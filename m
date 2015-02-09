@@ -1,41 +1,74 @@
-From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
-Date: Mon, 09 Feb 2015 12:00:27 +0100
-Subject: arm: kprobe compilation error
-In-Reply-To: <1423475079.2864.49.camel@linaro.org>
-References: <54D38982.6000100@elproma.com.pl>
- <1423475079.2864.49.camel@linaro.org>
-Message-ID: <54D8934B.6040709@elproma.com.pl>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 9 Feb 2015 12:14:34 +0100
+Subject: [PATCH 1/3] USB: gadget: at91_udc: add at91sam9n12 support
+In-Reply-To: <1423472572-19824-2-git-send-email-voice.shen@atmel.com>
+References: <1423472572-19824-1-git-send-email-voice.shen@atmel.com>
+ <1423472572-19824-2-git-send-email-voice.shen@atmel.com>
+Message-ID: <20150209111434.GN3715@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Bo,
 
-W dniu 2015-02-09 o 10:44, Jon Medhurst (Tixy) pisze:
-> Hi Janusz
->
-> On Thu, 2015-02-05 at 16:17 +0100, Janusz U?ycki wrote:
->> I got the compilation error on next-20150204:
->>
-> [...]
->> In file included from arch/arm/probes/kprobes/core.c:37:
->> arch/arm/probes/kprobes/core.h:43: error: '[*]' not allowed in other
->> than a declaration
-> [...]
->> gcc version 4.2.4
-> Thanks for reporting this, is it OK if I add to a patch to fix this a
-> line saying "Reported-by: Janusz U?ycki <j.uzycki@elproma.com.pl>"?
+On 09/02/2015 at 17:02:50 +0800, Bo Shen wrote :
+> Add at91sam9n12 SoC support.
+> 
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> ---
+> 
+>  drivers/usb/gadget/udc/at91_udc.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
+> index c862656..f4c785f 100644
+> --- a/drivers/usb/gadget/udc/at91_udc.c
+> +++ b/drivers/usb/gadget/udc/at91_udc.c
+> @@ -931,7 +931,8 @@ static void pullup(struct at91_udc *udc, int is_on)
+>  		at91_udp_write(udc, AT91_UDP_TXVC, 0);
+>  		if (cpu_is_at91rm9200())
+>  			gpio_set_value(udc->board.pullup_pin, active);
+> -		else if (cpu_is_at91sam9260() || cpu_is_at91sam9263() || cpu_is_at91sam9g20()) {
+> +		else if (cpu_is_at91sam9260() || cpu_is_at91sam9263() ||
+> +			 cpu_is_at91sam9g20() || cpu_is_at91sam9n12()) {
 
-sure
+cpu_is_at91xx have been removed from the kernel, using the correct
+compatible should be enough, see
+http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/drivers/usb/gadget/udc/at91_udc.c?id=f0bceab4e3b528e799aba8fda8d2936fcfd41f1f
 
->
-> Whilst the extra '*' looks like an obvious typo, it's interesting that
-> your error message implies that it's allowed in some situations and that
-> the version of GCC that I use (4.9.1) doesn't complain about it.
-> If it's valid C, I've no idea what that syntax that might represent.
->
-I've not find such extension in C11 but likely gcc's team knows the answer.
-It also compiles using gcc 4.8.3. However I thing more people use older 
-compilers
-for different platforms.
 
-best regards
-Janusz
+>  			u32	txvc = at91_udp_read(udc, AT91_UDP_TXVC);
+>  
+>  			txvc |= AT91_UDP_TXVC_PUON;
+> @@ -949,7 +950,8 @@ static void pullup(struct at91_udc *udc, int is_on)
+>  		at91_udp_write(udc, AT91_UDP_TXVC, AT91_UDP_TXVC_TXVDIS);
+>  		if (cpu_is_at91rm9200())
+>  			gpio_set_value(udc->board.pullup_pin, !active);
+> -		else if (cpu_is_at91sam9260() || cpu_is_at91sam9263() || cpu_is_at91sam9g20()) {
+> +		else if (cpu_is_at91sam9260() || cpu_is_at91sam9263() ||
+> +			 cpu_is_at91sam9g20() || cpu_is_at91sam9n12()) {
+>  			u32	txvc = at91_udp_read(udc, AT91_UDP_TXVC);
+>  
+>  			txvc &= ~AT91_UDP_TXVC_PUON;
+> @@ -1758,7 +1760,8 @@ static int at91udc_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	/* newer chips have more FIFO memory than rm9200 */
+> -	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20()) {
+> +	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20() ||
+> +	    cpu_is_at91sam9n12()) {
+>  		udc->ep[0].maxpacket = 64;
+>  		udc->ep[3].maxpacket = 64;
+>  		udc->ep[4].maxpacket = 512;
+> -- 
+> 2.3.0.rc0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
