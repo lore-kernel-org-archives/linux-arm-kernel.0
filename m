@@ -1,102 +1,277 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 9 Feb 2015 16:00:17 +0800
+From: peda@axentia.se (Peter Rosin)
+Date: Mon, 9 Feb 2015 08:09:36 +0000
 Subject: [PATCH v2] ASoC: atmel_ssc_dai: Allow more rates
-In-Reply-To: <eefc0f3159f649459f1798c2b0f0f955@EMAIL.axentia.se>
+In-Reply-To: <54D824F8.9030804@atmel.com>
 References: <1423050745-6372-1-git-send-email-peda@lysator.liu.se>
- <20150206230951.GL31311@finisterre.sirena.org.uk>
- <9f35349d2e6d47ae977e3e119c5175c6@EMAIL.axentia.se>
- <54D8243C.6090902@atmel.com>
- <eefc0f3159f649459f1798c2b0f0f955@EMAIL.axentia.se>
-Message-ID: <54D86911.2040302@atmel.com>
+ <54D824F8.9030804@atmel.com>
+Message-ID: <896ef5e9484a494e9e50cbed38919c5f@EMAIL.axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Bo Shen wrote:
+> Hi Peter,
 
-On 02/09/2015 03:35 PM, Peter Rosin wrote:
-> Bo Shen wrote:
->> Hi Peter,
->
-> Hi!
->
->> On 02/07/2015 06:51 PM, Peter Rosin wrote:
->>> Mark Brown wrote:
->>>> On Wed, Feb 04, 2015 at 12:52:25PM +0100, Peter Rosin wrote:
->>>>
->>>>> One thing remains a bit unclear, and that is the 500ppm deduction.
->>>>> Is that really warranted? The number was just pulled out of my hat...
->>>>
->>>> I don't really get what this is supposed to be protecting against.
->>>>
->>>>> +	case SND_SOC_DAIFMT_CBM_CFS:
->>>>> +	case SND_SOC_DAIFMT_CBM_CFM:
->>>>> +		t.min = 8000;
->>>>> +		t.max = ssc_p->mck_rate / mck_div / frame_size;
->>>>> +		/* Take away 500ppm, just to be on the safe side. */
->>>>> +		t.max -= t.max / 2000;
->>>>> +		t.openmin = t.openmax = 0;
->>>>> +		t.integer = 0;
->>>>> +		ret = snd_interval_refine(i, &t);
->>>>
->>>> As I understand it this is a straight divider rather than something
->>>> that's doing dithering or anything else more fancy.  Given that it
->>>> seems as well just to trust the clock rate we've got - we don't do
->>>> any error tracking with the clock API (perhaps we should) and for
->>>> many applications some degree of divergence from the nominal rate is
->>>> not
->>>> *too* bad for audio systems (for application specific values of "some"
->>>> and "too" of course).  If it is just dividers I'm not sure the
->>>> situation is really improved materially by knocking off the top frequency.
->>>>
->>>> If we are doing something more fancy than divididing my analysis is
->>>> off base of course.
->>>
->>> I'm thinking that the SSC samples the selected BCK pin using the
->>> (possibly
->>> divided) peripheral clock. Getting too near the theoretical rate limit
->>> would be bad, if these two independent clocks drift the wrong way. At
->>> least that is my take on it, but I don't know the internal workings of the SSC, so...
->>>
->>> I was hoping that someone from Atmel could chime in? Maybe I'm totally
->>
->> Sorry for late response.
->
-> No problem!
->
->>> off base, and the SSC is doing this completely differently?
->>
->> What you mean here? I am not sure I fully understand.
->
-> The SSC spec list a maximum rate (which varies with the direction
-> of various signals, ignoring that for the sake of this explanation). Lets
-> assume that this maximum rate is 11MHz, derived from the peripheral
-> clock which might be 66MHz. If you then try to input an 11MHz signal
-> derived from some unrelated xtal you might think it should work. My
-> theory was that the rate limit would be broken if the peripheral clock
-> wasn't really 66MHz, but instead a few ppm lower than nominal, and
-> the unrelated xtal was a few ppm higher than nominal.
->
-> If this matters or not depends on how the SSC is implemented.
+Hi!
 
-This is to let the user to know the clock limitation, am I right?
+> On 02/04/2015 07:52 PM, Peter Rosin wrote:
+> > From: Peter Rosin <peda@axentia.se>
+> >
+> > When the SSC acts as BCK master, use a ratnum rule to limit the rate
+> > instead of only doing the standard rates. When the SSC acts as BCK
+> > slave, allow any BCK frequency up to within 500ppm of the SSC master
+> > clock, possibly divided by 2, 3 or 6.
+> >
+> > Put a cap at 384kHz. Who's /ever/ going to need more than that?
+> >
+> > The divider of 2, 3 or 6 is selected based on the Serial Clock Ratio
+> > Considerations section from the SSC documentation:
+> >
+> >      The Transmitter and the Receiver can be programmed to operate
+> >      with the clock signals provided on either the TK or RK pins.
+> >      This allows the SSC to support many slave-mode data transfers.
+> >      In this case, the maximum clock speed allowed on the RK pin is:
+> >      - Peripheral clock divided by 2 if Receiver Frame Synchro is input
+> >      - Peripheral clock divided by 3 if Receiver Frame Synchro is output
+> >      In addition, the maximum clock speed allowed on the TK pin is:
+> >      - Peripheral clock divided by 6 if Transmit Frame Synchro is input
+> >      - Peripheral clock divided by 2 if Transmit Frame Synchro is
+> > output
+> >
+> > Signed-off-by: Peter Rosin <peda@axentia.se>
+> > ---
+> >   sound/soc/atmel/atmel_ssc_dai.c |  113
+> +++++++++++++++++++++++++++++++++++++--
+> >   sound/soc/atmel/atmel_ssc_dai.h |    1 +
+> >   2 files changed, 110 insertions(+), 4 deletions(-)
+> >
+> > Changes since v1:
+> >
+> > - I have checked all Atmel datasheets I could get my hands on (and
+> >    that seemed relevant), and in every instance where they have
+> >    described the SSC, the description have the exact rate limitations
+> >    on the RK and TK pin that I have implemented here.
+> >
+> > - Improved the comments.
+> >
+> > - Rebased on top of the latest patches from Bo Chen.
+> >
+> > One thing remains a bit unclear, and that is the 500ppm deduction. Is
+> > that really warranted? The number was just pulled out of my hat...
+> >
+> > Cheers,
+> > Peter
+> >
+> > diff --git a/sound/soc/atmel/atmel_ssc_dai.c
+> > b/sound/soc/atmel/atmel_ssc_dai.c index 379ac2a6ab16..767f65bab25d
+> > 100644
+> > --- a/sound/soc/atmel/atmel_ssc_dai.c
+> > +++ b/sound/soc/atmel/atmel_ssc_dai.c
+> > @@ -187,6 +187,96 @@ static irqreturn_t atmel_ssc_interrupt(int irq, void *dev_id)
+> >   	return IRQ_HANDLED;
+> >   }
+> >
+> > +/*
+> > + * When the bit clock is input, limit the maximum rate according to
+> > +the
+> > + * Serial Clock Ratio Considerations section from the SSC documentation:
+> > + *
+> > + *   The Transmitter and the Receiver can be programmed to operate
+> > + *   with the clock signals provided on either the TK or RK pins.
+> > + *   This allows the SSC to support many slave-mode data transfers.
+> > + *   In this case, the maximum clock speed allowed on the RK pin is:
+> > + *   - Peripheral clock divided by 2 if Receiver Frame Synchro is input
+> > + *   - Peripheral clock divided by 3 if Receiver Frame Synchro is output
+> > + *   In addition, the maximum clock speed allowed on the TK pin is:
+> > + *   - Peripheral clock divided by 6 if Transmit Frame Synchro is input
+> > + *   - Peripheral clock divided by 2 if Transmit Frame Synchro is output
+> > + *
+> > + * When the bit clock is output, limit the rate according to the
+> > + * SSC divider restrictions.
+> > + */
+> > +static int atmel_ssc_hw_rule_rate(struct snd_pcm_hw_params *params,
+> > +				  struct snd_pcm_hw_rule *rule)
+> > +{
+> > +	struct atmel_ssc_info *ssc_p = rule->private;
+> > +	struct ssc_device *ssc = ssc_p->ssc;
+> > +	struct snd_interval *i = hw_param_interval(params, rule->var);
+> > +	struct snd_interval t;
+> > +	struct snd_ratnum r = {
+> > +		.den_min = 1,
+> > +		.den_max = 4095,
+> > +		.den_step = 1,
+> > +	};
+> > +	unsigned int num = 0, den = 0;
+> > +	int frame_size;
+> > +	int mck_div = 2;
+> > +	int ret;
+> > +
+> > +	frame_size = snd_soc_params_to_frame_size(params);
+> > +	if (frame_size < 0)
+> > +		return frame_size;
+> > +
+> > +	switch (ssc_p->daifmt & SND_SOC_DAIFMT_MASTER_MASK) {
+> > +	case SND_SOC_DAIFMT_CBM_CFS:
+> > +		if ((ssc_p->dir_mask & SSC_DIR_MASK_CAPTURE)
+> > +		    && ssc->clk_from_rk_pin)
+> > +			/* Receiver Frame Synchro (i.e. capture)
+> > +			 * is output (format is _CFS) and the RK pin
+> > +			 * is used for input (format is _CBM_).
+> > +			 */
+> > +			mck_div = 3;
+> > +		break;
+> > +
+> > +	case SND_SOC_DAIFMT_CBM_CFM:
+> > +		if ((ssc_p->dir_mask & SSC_DIR_MASK_PLAYBACK)
+> > +		    && !ssc->clk_from_rk_pin)
+> > +			/* Transmit Frame Synchro (i.e. playback)
+> > +			 * is input (format is _CFM) and the TK pin
+> > +			 * is used for input (format _CBM_ but not
+> > +			 * using the RK pin).
+> > +			 */
+> > +			mck_div = 6;
+> > +		break;
+> > +	}
+> > +
+> > +	switch (ssc_p->daifmt & SND_SOC_DAIFMT_MASTER_MASK) {
+> > +	case SND_SOC_DAIFMT_CBS_CFS:
+> > +		r.num = ssc_p->mck_rate / mck_div / frame_size;
+> > +
+> > +		ret = snd_interval_ratnum(i, 1, &r, &num, &den);
+> > +		if (ret >= 0 && den && rule->var == SNDRV_PCM_HW_PARAM_RATE) {
+> > +			params->rate_num = num;
+> > +			params->rate_den = den;
+> > +		}
+> > +		break;
+> > +
+> > +	case SND_SOC_DAIFMT_CBM_CFS:
+> > +	case SND_SOC_DAIFMT_CBM_CFM:
+> > +		t.min = 8000;
+> > +		t.max = ssc_p->mck_rate / mck_div / frame_size;
+> > +		/* Take away 500ppm, just to be on the safe side. */
+> > +		t.max -= t.max / 2000;
+> > +		t.openmin = t.openmax = 0;
+> > +		t.integer = 0;
+> > +		ret = snd_interval_refine(i, &t);
+> > +		break;
+> > +
+> > +	default:
+> > +		ret = -EINVAL;
+> > +		break;
+> > +	}
+> > +
+> > +	return ret;
+> > +}
+> >
+> >   /*-------------------------------------------------------------------------*\
+> >    * DAI functions
+> > @@ -200,6 +290,7 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
+> >   	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
+> >   	struct atmel_pcm_dma_params *dma_params;
+> >   	int dir, dir_mask;
+> > +	int ret;
+> >
+> >   	pr_debug("atmel_ssc_startup: SSC_SR=0x%u\n",
+> >   		ssc_readl(ssc_p->ssc->regs, SR));
+> > @@ -207,6 +298,7 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
+> >   	/* Enable PMC peripheral clock for this SSC */
+> >   	pr_debug("atmel_ssc_dai: Starting clock\n");
+> >   	clk_enable(ssc_p->ssc->clk);
+> > +	ssc_p->mck_rate = clk_get_rate(ssc_p->ssc->clk) * 2;
+> 
+> Why the mck_rate is calculated in this form?
 
-And at the same time deal with the un-precise clock which come to SSC? 
-If this case, I think we should trust the clock come to SSC.
+What did you have in mind? Add another clock to the ssc node in the
+device tree?
 
-> There might be other reasons for not caring all that much about
-> this fringe case, and just trust the nominal rates and limits.
->
->>> In our application, we're not near the limit. Therefore, it really
->>> doesn't matter much to us.
->>>
->>> Should I resend w/o the 500ppm deduction?
->>>
->>> Cheers,
->>> Peter
->>>
->>
->> Best Regards,
->> Bo Shen
+IIUC, the device tree (at least normally) has the ssc clk as the peripheral
+clock divided by 2, but the ssc specifies (when capturing in the CBM/CFS
+case) the rate limit as the peripheral clock divided by 3 (i.e. ssc clk / 1.5).
+Since the SSC spec expresses the rate limit in terms of the peripheral
+clock, this was what I came up with. I didn't want to require dt changes...
 
-Best Regards,
-Bo Shen
+> >   	/* Reset the SSC to keep it at a clean status */
+> >   	ssc_writel(ssc_p->ssc->regs, CR, SSC_BIT(CR_SWRST)); @@ -219,6
+> > +311,17 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
+> >   		dir_mask = SSC_DIR_MASK_CAPTURE;
+> >   	}
+> >
+> > +	ret = snd_pcm_hw_rule_add(substream->runtime, 0,
+> > +				  SNDRV_PCM_HW_PARAM_RATE,
+> > +				  atmel_ssc_hw_rule_rate,
+> > +				  ssc_p,
+> > +				  SNDRV_PCM_HW_PARAM_FRAME_BITS,
+> > +				  SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+> > +	if (ret < 0) {
+> > +		dev_err(dai->dev, "Failed to specify rate rule: %d\n", ret);
+> > +		return ret;
+> > +	}
+> > +
+> >   	dma_params = &ssc_dma_params[dai->id][dir];
+> >   	dma_params->ssc = ssc_p->ssc;
+> >   	dma_params->substream = substream;
+> > @@ -783,8 +886,6 @@ static int atmel_ssc_resume(struct snd_soc_dai *cpu_dai)
+> >   #  define atmel_ssc_resume	NULL
+> >   #endif /* CONFIG_PM */
+> >
+> > -#define ATMEL_SSC_RATES (SNDRV_PCM_RATE_8000_96000)
+> > -
+> >   #define ATMEL_SSC_FORMATS (SNDRV_PCM_FMTBIT_S8     | SNDRV_PCM_FMTBIT_S16_LE |\
+> >   			  SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S32_LE)
+> >
+> > @@ -804,12 +905,16 @@ static struct snd_soc_dai_driver atmel_ssc_dai = {
+> >   		.playback = {
+> >   			.channels_min = 1,
+> >   			.channels_max = 2,
+> > -			.rates = ATMEL_SSC_RATES,
+> > +			.rates = SNDRV_PCM_RATE_CONTINUOUS,
+> > +			.rate_min = 8000,
+> > +			.rate_max = 384000,
+> 
+> Why this need to be changed? Do you mean in your application, the rates will
+> exceed 96000?
+
+Yes, we have designed for 250kHz and this works just fine. Why limit
+to 96kHz?
+
+Our application isn't audio, we're generating an FM subcarrier (DARC)
+and need to output signals up to about 100kHz, give or take a few kHz
+depending on how pedantic you are. Basically, we need a sampling rate
+above 208kHz or so (DACs will normally not be usable all the way up to
+the Nyquist frequency), or things are simply not usable for us.
+
+> >   			.formats = ATMEL_SSC_FORMATS,},
+> >   		.capture = {
+> >   			.channels_min = 1,
+> >   			.channels_max = 2,
+> > -			.rates = ATMEL_SSC_RATES,
+> > +			.rates = SNDRV_PCM_RATE_CONTINUOUS,
+> > +			.rate_min = 8000,
+> > +			.rate_max = 384000,
+> 
+> Ditto.
+
+We are not capturing in our application, I changed this for symmetry.
+
+Best regards,
+Peter
+
+> >   			.formats = ATMEL_SSC_FORMATS,},
+> >   		.ops = &atmel_ssc_dai_ops,
+> >   };
+> > diff --git a/sound/soc/atmel/atmel_ssc_dai.h
+> > b/sound/soc/atmel/atmel_ssc_dai.h index b1f08d511495..80b153857a88
+> > 100644
+> > --- a/sound/soc/atmel/atmel_ssc_dai.h
+> > +++ b/sound/soc/atmel/atmel_ssc_dai.h
+> > @@ -115,6 +115,7 @@ struct atmel_ssc_info {
+> >   	unsigned short rcmr_period;
+> >   	struct atmel_pcm_dma_params *dma_params[2];
+> >   	struct atmel_ssc_state ssc_state;
+> > +	unsigned long mck_rate;
+> >   };
+> >
+> >   int atmel_ssc_set_audio(int ssc_id);
+> >
+> 
+> Best Regards,
+> Bo Shen
