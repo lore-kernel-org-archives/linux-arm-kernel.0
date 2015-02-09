@@ -1,114 +1,96 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Mon, 9 Feb 2015 08:17:27 +0000
-Subject: [PATCH v2] ASoC: atmel_ssc_dai: Allow more rates
-In-Reply-To: <54D86911.2040302@atmel.com>
-References: <1423050745-6372-1-git-send-email-peda@lysator.liu.se>
- <20150206230951.GL31311@finisterre.sirena.org.uk>
- <9f35349d2e6d47ae977e3e119c5175c6@EMAIL.axentia.se>
- <54D8243C.6090902@atmel.com>
- <eefc0f3159f649459f1798c2b0f0f955@EMAIL.axentia.se>
- <54D86911.2040302@atmel.com>
-Message-ID: <66d42d03e3fd43f79c782d91b3f9ee4e@EMAIL.axentia.se>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Mon, 9 Feb 2015 16:18:10 +0800
+Subject: [RFC] change non-atomic bitops method
+In-Reply-To: <20150203025925.d1c95fb8.akpm@linux-foundation.org>
+References: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
+ <20150202152909.13bfd11f192fb0268b2ab4bf@linux-foundation.org>
+ <20150203011730.GA15653@node.dhcp.inet.fi>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0B@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0C@CNBJMBX05.corpusers.net>
+ <20150202223851.f30768d0.akpm@linux-foundation.org>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0D@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0E@CNBJMBX05.corpusers.net>
+ <20150203025925.d1c95fb8.akpm@linux-foundation.org>
+Message-ID: <35FD53F367049845BC99AC72306C23D1044A02027E12@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bo Shen wrote:
-> Hi Peter,
+> -----Original Message-----
+> From: Andrew Morton [mailto:akpm at linux-foundation.org]
+> Sent: Tuesday, February 03, 2015 6:59 PM
+> To: Wang, Yalin
+> Cc: 'Kirill A. Shutemov'; 'arnd at arndb.de'; 'linux-arch at vger.kernel.org';
+> 'linux-kernel at vger.kernel.org'; 'linux at arm.linux.org.uk'; 'linux-arm-
+> kernel at lists.infradead.org'
+> Subject: Re: [RFC] change non-atomic bitops method
 > 
-> On 02/09/2015 03:35 PM, Peter Rosin wrote:
-> > Bo Shen wrote:
-> >> Hi Peter,
-> >
-> > Hi!
-> >
-> >> On 02/07/2015 06:51 PM, Peter Rosin wrote:
-> >>> Mark Brown wrote:
-> >>>> On Wed, Feb 04, 2015 at 12:52:25PM +0100, Peter Rosin wrote:
-> >>>>
-> >>>>> One thing remains a bit unclear, and that is the 500ppm deduction.
-> >>>>> Is that really warranted? The number was just pulled out of my hat...
-> >>>>
-> >>>> I don't really get what this is supposed to be protecting against.
-> >>>>
-> >>>>> +	case SND_SOC_DAIFMT_CBM_CFS:
-> >>>>> +	case SND_SOC_DAIFMT_CBM_CFM:
-> >>>>> +		t.min = 8000;
-> >>>>> +		t.max = ssc_p->mck_rate / mck_div / frame_size;
-> >>>>> +		/* Take away 500ppm, just to be on the safe side. */
-> >>>>> +		t.max -= t.max / 2000;
-> >>>>> +		t.openmin = t.openmax = 0;
-> >>>>> +		t.integer = 0;
-> >>>>> +		ret = snd_interval_refine(i, &t);
-> >>>>
-> >>>> As I understand it this is a straight divider rather than something
-> >>>> that's doing dithering or anything else more fancy.  Given that it
-> >>>> seems as well just to trust the clock rate we've got - we don't do
-> >>>> any error tracking with the clock API (perhaps we should) and for
-> >>>> many applications some degree of divergence from the nominal rate
-> >>>> is not
-> >>>> *too* bad for audio systems (for application specific values of "some"
-> >>>> and "too" of course).  If it is just dividers I'm not sure the
-> >>>> situation is really improved materially by knocking off the top frequency.
-> >>>>
-> >>>> If we are doing something more fancy than divididing my analysis is
-> >>>> off base of course.
-> >>>
-> >>> I'm thinking that the SSC samples the selected BCK pin using the
-> >>> (possibly
-> >>> divided) peripheral clock. Getting too near the theoretical rate
-> >>> limit would be bad, if these two independent clocks drift the wrong
-> >>> way. At least that is my take on it, but I don't know the internal workings of the SSC, so...
-> >>>
-> >>> I was hoping that someone from Atmel could chime in? Maybe I'm
-> >>> totally
-> >>
-> >> Sorry for late response.
-> >
-> > No problem!
-> >
-> >>> off base, and the SSC is doing this completely differently?
-> >>
-> >> What you mean here? I am not sure I fully understand.
-> >
-> > The SSC spec list a maximum rate (which varies with the direction of
-> > various signals, ignoring that for the sake of this explanation). Lets
-> > assume that this maximum rate is 11MHz, derived from the peripheral
-> > clock which might be 66MHz. If you then try to input an 11MHz signal
-> > derived from some unrelated xtal you might think it should work. My
-> > theory was that the rate limit would be broken if the peripheral clock
-> > wasn't really 66MHz, but instead a few ppm lower than nominal, and the
-> > unrelated xtal was a few ppm higher than nominal.
-> >
-> > If this matters or not depends on how the SSC is implemented.
+> On Tue, 3 Feb 2015 16:42:14 +0800 "Wang, Yalin" <Yalin.Wang@sonymobile.com>
+> wrote:
 > 
-> This is to let the user to know the clock limitation, am I right?
-
-Yes, sort of, to prevent the user from even attempting to go too
-near the nominal limit.
-
-> And at the same time deal with the un-precise clock which come to SSC?
-> If this case, I think we should trust the clock come to SSC.
-
-Ok, I'll just kill the 500ppm thing for the next round. I'll wait a bit
-for the discussion in the other branch to fade out though. :-)
-
-Cheers,
-Peter
-
-> > There might be other reasons for not caring all that much about this
-> > fringe case, and just trust the nominal rates and limits.
-> >
-> >>> In our application, we're not near the limit. Therefore, it really
-> >>> doesn't matter much to us.
-> >>>
-> >>> Should I resend w/o the 500ppm deduction?
-> >>>
-> >>> Cheers,
-> >>> Peter
-> >>>
-> >>
-> >> Best Regards,
-> >> Bo Shen
+> > I make a change in kernel to test hit/miss ratio:
 > 
-> Best Regards,
-> Bo Shen
+> Neat, thanks.
+> 
+> >
+> > ...
+> >
+> > After use the phone some time:
+> > root at D5303:/ # cat /proc/meminfo
+> > VmallocUsed:       10348 kB
+> > VmallocChunk:      75632 kB
+> > __set_bit_miss_count:10002 __set_bit_success_count:1096661
+> > __clear_bit_miss_count:359484 __clear_bit_success_count:3674617
+> > __test_and_set_bit_miss_count:7 __test_and_set_bit_success_count:221
+> > __test_and_clear_bit_miss_count:924611
+> __test_and_clear_bit_success_count:193
+> >
+> > __test_and_clear_bit_miss_count has a very high miss rate.
+> > In fact, I think set/clear/test_and_set(clear)_bit atomic version can
+> also
+> > Be investigated to see its miss ratio,
+> > I have not tested the atomic version,
+> > Because it reside in different architectures.
+> 
+> Hopefully misses in test_and_X_bit are not a problem.  The CPU
+> implementation would be pretty stupid to go and dirty the cacheline
+> when it knows it didn't change anything.  But maybe I'm wrong about
+> that.
+> 
+> That we're running clear_bit against a cleared bit 10% of the time is a
+> bit alarming.  I wonder where that's coming from.
+> 
+> The enormous miss count in test_and_clear_bit() might indicate an
+> inefficiency somewhere.
+I te-test the patch on 3.10 kernel.
+The result like this:
+
+VmallocChunk:   251498164 kB
+__set_bit_miss_count:11730 __set_bit_success_count:1036316
+__clear_bit_miss_count:209640 __clear_bit_success_count:4806556
+__test_and_set_bit_miss_count:0 __test_and_set_bit_success_count:121
+__test_and_clear_bit_miss_count:0 __test_and_clear_bit_success_count:445
+
+__clear_bit miss rate is a little high,
+I check the log, and most miss coming from this code:
+
+<6>[  442.701798] [<ffffffc00021d084>] warn_slowpath_fmt+0x4c/0x58
+<6>[  442.701805] [<ffffffc0002461a8>] __clear_bit+0x98/0xa4
+<6>[  442.701813] [<ffffffc0003126ac>] __alloc_fd+0xc8/0x124
+<6>[  442.701821] [<ffffffc000312768>] get_unused_fd_flags+0x28/0x34
+<6>[  442.701828] [<ffffffc0002f9370>] do_sys_open+0x10c/0x1c0
+<6>[  442.701835] [<ffffffc0002f9458>] SyS_openat+0xc/0x18
+In __clear_close_on_exec(fd, fdt);
+
+
+
+<6>[  442.695354] [<ffffffc00021d084>] warn_slowpath_fmt+0x4c/0x58
+<6>[  442.695359] [<ffffffc0002461a8>] __clear_bit+0x98/0xa4
+<6>[  442.695367] [<ffffffc000312340>] dup_fd+0x1d4/0x280
+<6>[  442.695375] [<ffffffc00021b07c>] copy_process.part.56+0x42c/0xe38
+<6>[  442.695382] [<ffffffc00021bb9c>] do_fork+0xe0/0x360
+<6>[  442.695389] [<ffffffc00021beb4>] SyS_clone+0x10/0x1c
+In __clear_open_fd(open_files - i, new_fdt);
+
+Do we need test_bit() before clear_bit()at these 2 place?
+
+Thanks
