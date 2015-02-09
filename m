@@ -1,63 +1,117 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 9 Feb 2015 08:24:29 -0800
-Subject: [PATCH] ARM: shmobile: r8a73a4: Move pfc node to work around
- probe ordering bug
-In-Reply-To: <1423254173-31852-1-git-send-email-geert+renesas@glider.be>
-References: <1423254173-31852-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150209162428.GG25235@atomide.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Mon, 9 Feb 2015 10:43:39 -0600
+Subject: [BUG] ARM: socfpga: L2 cache init
+In-Reply-To: <20150209155314.GA7994@pengutronix.de>
+References: <20150206103946.GM15692@pengutronix.de>
+ <20150206110557.GY8656@n2100.arm.linux.org.uk>
+ <20150209155314.GA7994@pengutronix.de>
+Message-ID: <54D8E3BB.3060505@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Geert Uytterhoeven <geert+renesas@glider.be> [150206 12:26]:
-> Currently the pin function controller (which is also a GPIO controller)
-> is instantiated before the interrupt controllers due to the order in the
-> DTS. At that time, the irq domains for the interrupt controllers
-> referenced by its interrupts-extended property cannot be found yet:
-> 
->     irq: no irq domain found for /interrupt-controller at e61c0000 !
-> 
-> Nevertheless, the core OF probing code ignores this failure, besides a
-> debug message that's not normally printed:
-> 
->     not all legacy IRQ resources mapped for pfc
-> 
-> and continues initialization of the device. Then, the sh-pfc driver
-> cannot find any IRQ resources, and thinks no interrupts are available,
-> causing gpio-keys to fail later:
-> 
->     gpio-keys keyboard: Unable to claim irq 0; error -22
->     gpio-keys: probe of keyboard failed with error -22
-> 
-> Move the pin function controller node after the interrupt controller
-> nodes it references to work around the bug in the core OF probing code.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> Notes:
->   - It seems several people tried to solve this in the core OF probing
->     code before, but the final solution never went in?
->   - This can be reproduced on other SoCs (e.g. sh73a0 and r8a7740) by
->     moving their pfc nodes before their interrupt controller nodes.
->   - This patch is against my working tree, so it doesn't apply to
->     Simon's repository, but you get the idea....
+Hi Steffen,
 
-No issues with the patch, but here are few comments on the core
-reasons (without looking at the code in this case) that might help
-fix similar issues.
+On 02/09/2015 09:53 AM, Steffen Trumtrar wrote:
+> Hi!
+> 
+> On Fri, Feb 06, 2015 at 11:05:57AM +0000, Russell King - ARM Linux wrote:
+>> On Fri, Feb 06, 2015 at 11:39:46AM +0100, Steffen Trumtrar wrote:
+>>> I have run into a bug on the Socfpga platform. My boards sometimes fail
+>>> to boot when I have the commit
+>>>
+>>> 	commit 8b5c18f05621394eb108d3fbc9bf98b05e8162db
+>>> 	Author: Russell King <rmk+kernel@arm.linux.org.uk>
+>>> 	Date:   Mon Apr 28 15:55:59 2014 +0100
+>>>
+>>> 	ARM: l2c: socfpga: convert to generic l2c OF initialisation
+>>>
+>>> 	Remove the explicit call to l2x0_of_init(), converting to the generic
+>>> 	infrastructure instead.
+>>>
+>>> 	Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>>>
+>>
+>> That should only result in the L2 cache being turned on earlier (before
+>> the secondary CPUs come up.)  I wonder if there's a bug in the secondary
+>> CPU code which is being tickled by it.
+>>
+>> What we need is some information on the failure - and as you've noticed,
+>> the failure occurs before the console is initialised.  There's two
+>> solutions to that:
+>>
+>> 1. Enable early printk support (and hope that works)
+> 
+> Thanks. I actually got it working. Seems I had forgotten something in the
+> config. So, the bootlog now prints
+> 
+> Uncompressing Linux... done, booting the kernel.
+> [    0.000000] Booting Linux on physical CPU 0x0
+> [    0.000000] Initializing cgroup subsys cpuset
+> [    0.000000] Linux version 3.19.0-rc7-test-00001-g7c10eb5fb252 (str at dude) (gcc version 4.9.2 (OSELAS.Toolchain-2014.12.0) ) #163 SMP PREEMPT Mon Feb 9 16:35:27 CET 2015
+> [    0.000000] CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c5387d
+> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+> [    0.000000] Machine model: Terasic SoCkit
+> [    0.000000] bootconsole [earlycon0] enabled
+> [    0.000000] Memory policy: Data cache writealloc
+> [    0.000000] BUG: mapping for 0xfffec000 at 0xfffec000 out of vmalloc space
+> Early printk initialized
+> [    0.000000] PERCPU: Embedded 10 pages/cpu @bf7d4000 s11456 r8192 d21312 u40960
+> [    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 260096
+> [    0.000000] Kernel command line: console=ttyS0,115200 earlyprintk  ip=dhcp root=/dev/nfs nfsroot=/home/str/nfsroot/sockit,v3,tcp
+> [    0.000000] PID hash table entries: 4096 (order: 2, 16384 bytes)
+> [    0.000000] Dentry cache hash table entries: 131072 (order: 7, 524288 bytes)
+> [    0.000000] Inode-cache hash table entries: 65536 (order: 6, 262144 bytes)
+> [    0.000000] Memory: 1032636K/1048576K available (4716K kernel code, 222K rwdata, 1412K rodata, 276K init, 127K bss, 15940K reserved, 0K cma-reserved)
+> [    0.000000] Virtual kernel memory layout:
+> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+> [    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+> [    0.000000]     vmalloc : 0xc0800000 - 0xff000000   (1000 MB)
+> [    0.000000]     lowmem  : 0x80000000 - 0xc0000000   (1024 MB)
+> [    0.000000]     modules : 0x7f000000 - 0x80000000   (  16 MB)
+> [    0.000000]       .text : 0x80008000 - 0x806044d8   (6130 kB)
+> [    0.000000]       .init : 0x80605000 - 0x8064a000   ( 276 kB)
+> [    0.000000]       .data : 0x8064a000 - 0x80681a14   ( 223 kB)
+> [    0.000000]        .bss : 0x80681a14 - 0x806a161c   ( 128 kB)
+> [    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=2, Nodes=1
+> [    0.000000] Preemptible hierarchical RCU implementation.
+> [    0.000000] NR_IRQS:16 nr_irqs:16 16
+> [    0.000000] L2C-310 enabling early BRESP for Cortex-A9
+> [    0.000000] L2C-310 full line of zeros enabled for Cortex-A9
+> [    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
+> [    0.000000] L2C-310 cache controller enabled, 8 ways, 512 kB
+> [    0.000000] L2C-310: CACHE_ID 0x410030c9, AUX_CTRL 0x46060001
+> [    0.000013] sched_clock: 32 bits at 100MHz, resolution 10ns, wraps every 42949672950ns
+> [    0.008119] Console: colour dummy device 80x30
+> [    0.012670] Calibrating delay loop... 1594.16 BogoMIPS (lpj=7970816)
+> [    0.052740] pid_max: default: 32768 minimum: 301
+> [    0.057509] Mount-cache hash table entries: 2048 (order: 1, 8192 bytes)
+> [    0.064195] Mountpoint-cache hash table entries: 2048 (order: 1, 8192 bytes)
+> [    0.071877] CPU: Testing write buffer coherency: ok
+> [    0.077012] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+> [    0.082841] Setting up static identity map for 0x47cc10 - 0x47cc68
+> [    1.139876] CPU1: failed to come online
+> [    1.143808] Brought up 1 CPUs
+> [    1.146851] SMP: Total of 1 processors activated (1594.16 BogoMIPS).
+> 
+> 
+> It looks like there actually is something wrong with the SMP setup.
+> The SoC is a Cortex-A9 dual core and normally both CPUs are started.
+> Maybe it has something to do with
+> 
+> 	BUG: mapping for 0xfffec000 at 0xfffec000 out of vmalloc space
+> 
+> 0xfffec000 is the SCU base address.
+> 
 
-In all the cases I've seen these errors are caused by non-standard
-custom initcall levels for drivers like i2c bus. The real solution
-is to initialize drivers later with standard module_init, and stop
-the race to the bottom with custom initcall levels.
+This printout has been there for quite a while. The fix should be to
+remove the static define SOCFPGA_SCU_VIRT_BASE. I have a patch for this
+queue up but haven't had a chance to send it yet.
 
-If there is legacy board specific platofrm init code that needs
-i2c gpios early, that code can probably be moved to initialize
-later on.
+I was able to recreate this error(only 1 CPU coming online), when I
+build for socfpga_defconfig. But I cannot seem to recreate it if I build
+for multi_v7_defconfig, both CPUs come up just fine.
 
-Also, there should not be any need for custom driver initcall
-levels from Linux generic framework point of view as for example
-irqchip implementing drivers work just fine as a loadable module.
+Would it be possible for you to run your test with multi_v7_defconfig?
 
-Regards,
-
-Tony
+Thanks,
+Dinh
