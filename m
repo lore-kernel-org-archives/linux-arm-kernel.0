@@ -1,36 +1,79 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 9 Feb 2015 11:58:57 +0100
-Subject: [PATCH] exynos: pmu: use PS_HOLD based poweroff for all supported
- SoCs
-In-Reply-To: <CAJKOXPeeUjcwO6qBdHA8DJaviPxRwjAsSe7ciyGDFOUoNhZvcQ@mail.gmail.com>
-References: <1423466741-11421-1-git-send-email-m.szyprowski@samsung.com>
- <CAJKOXPeeUjcwO6qBdHA8DJaviPxRwjAsSe7ciyGDFOUoNhZvcQ@mail.gmail.com>
-Message-ID: <CAJKOXPe4=DHsV3_axDUhpimRaqSHA3=HLiSJ1K3DYZoGRRiTTg@mail.gmail.com>
+From: amit.daniel@samsung.com (Amit Daniel Kachhap)
+Date: Mon, 09 Feb 2015 16:32:05 +0530
+Subject: [PATCH RFC v4 2/3] PM / Domains: Save restore slave pm runtime devices
+In-Reply-To: <1423479726-23140-1-git-send-email-amit.daniel@samsung.com>
+References: <1423479726-23140-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <1423479726-23140-3-git-send-email-amit.daniel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-02-09 10:06 GMT+01:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> 2015-02-09 8:25 GMT+01:00 Marek Szyprowski <m.szyprowski@samsung.com>:
->> PS_HOLD based power off procedure is common for all Exynos SoCs, so use
->> it for every Exynos SoC.
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>  arch/arm/mach-exynos/pmu.c | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> I tried this on Trats2 board (Exynos 4412) and message "Power down
-> failed, please power off system manually." appears. Is it expected? Or
-> am I missing some patches (I applied this on top of next-20150129)?
+Based on the runtime request of the active device, the callbacks of
+the passive pm runtime devices will be invoked.
 
-It was my fault (I left attached JIG cable which prevents power off).
-Now it works fine.
+Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+---
+ drivers/base/power/domain.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-Tested on Trats2 (Exynos4412):
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Patch also looks good, so:
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index c5280f2..160e74a 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -49,6 +49,7 @@
+ 
+ static LIST_HEAD(gpd_list);
+ static DEFINE_MUTEX(gpd_list_lock);
++static void __pm_genpd_restore_devices(struct generic_pm_domain *genpd);
+ 
+ static struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name)
+ {
+@@ -176,6 +177,8 @@ static int genpd_power_on(struct generic_pm_domain *genpd)
+ 	pr_warn("%s: Power-%s latency exceeded, new value %lld ns\n",
+ 		genpd->name, "on", elapsed_ns);
+ 
++	__pm_genpd_restore_devices(genpd);
++
+ 	return ret;
+ }
+ 
+@@ -397,6 +400,9 @@ static int __pm_genpd_save_device(struct pm_domain_data *pdd,
+ 	struct device *dev = pdd->dev;
+ 	int ret = 0;
+ 
++	if (dev->power.slave == true)
++		gpd_data->need_restore = 0;
++
+ 	if (gpd_data->need_restore > 0)
+ 		return 0;
+ 
+@@ -453,6 +459,28 @@ static void __pm_genpd_restore_device(struct pm_domain_data *pdd,
+ }
+ 
+ /**
++ * __pm_genpd_restore_devices- Restore the pre-suspend state of all device
++ *				according to the restore flag.
++ * @genpd: PM domain the device belongs to.
++ */
++static void __pm_genpd_restore_devices(struct generic_pm_domain *genpd)
++{
++	struct pm_domain_data *pdd;
++	struct generic_pm_domain_data *gpd_data;
++	struct device *dev;
++
++	/* Force restore the devices according to the restore flag */
++	list_for_each_entry(pdd, &genpd->dev_list, list_node) {
++		dev = pdd->dev;
++		gpd_data = to_gpd_data(pdd);
++		if (dev->power.slave == true) {
++			gpd_data->need_restore = 1;
++			__pm_genpd_restore_device(pdd, genpd);
++		}
++	}
++}
++
++/**
+  * genpd_abort_poweroff - Check if a PM domain power off should be aborted.
+  * @genpd: PM domain to check.
+  *
+-- 
+2.2.0
