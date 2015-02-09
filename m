@@ -1,86 +1,67 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon,  9 Feb 2015 18:23:20 +0800
-Subject: [PATCH] ARM: sunxi: Have ARCH_SUNXI select RESET_CONTROLLER for clock
- driver usage
-Message-ID: <1423477400-30520-1-git-send-email-wens@csie.org>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 9 Feb 2015 18:23:29 +0800
+Subject: [PATCH 3/3] ARM: at91: dt: at91sam9n12ek: enable udp
+In-Reply-To: <20150209100404.GA17242@gradator.net>
+References: <1423472572-19824-1-git-send-email-voice.shen@atmel.com>
+ <1423472572-19824-4-git-send-email-voice.shen@atmel.com>
+ <20150209100404.GA17242@gradator.net>
+Message-ID: <54D88AA1.3020402@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the sunxi usb clocks all contain a reset controller, it is not
-possible to build the sunxi clock driver without RESET_CONTROLLER
-enabled. Doing so results in an undefined symbol error:
+Hi Sylvain,
 
-    drivers/built-in.o: In function `sunxi_gates_clk_setup':
-    linux/drivers/clk/sunxi/clk-sunxi.c:1071: undefined reference to
-	`reset_controller_register'
+On 02/09/2015 06:04 PM, Sylvain Rochet wrote:
+> Hello Bo,
+>
+> On Mon, Feb 09, 2015 at 05:02:52PM +0800, Bo Shen wrote:
+>> Enable usb device port on at91sam9n12ek board.
+>>
+>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>> ---
+>>
+>>   arch/arm/boot/dts/at91sam9n12ek.dts | 5 +++++
+>>   1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
+>> index 13bb24e..3e572e5 100644
+>> --- a/arch/arm/boot/dts/at91sam9n12ek.dts
+>> +++ b/arch/arm/boot/dts/at91sam9n12ek.dts
+>> @@ -120,6 +120,11 @@
+>>   				};
+>>   			};
+>>
+>> +			usb1: gadget at f803c000 {
+>> +				atmel,vbus-gpio = <&pioB 16 GPIO_ACTIVE_HIGH>;
+>> +				status = "okay";
+>> +			};
+>> +
+>
+> There is an external resistor divider on PB16, acting like a pull-down
+> (R22+R23). PB16 reset state is input, pull-up, schmitt trigger, you need
+> to disable the pull-up in pinctrl this way:
+>
+> usb1: gadget at f803c000 {
+> 	pinctrl-names = "default";
+> 	pinctrl-0 = <&pinctrl_board_usb1>;
+> 	?
+> }
+>
+> pinctrl ? {
+> 	usb1 {
+> 		pinctrl_board_usb1: usb1-board {
+> 			atmel,pins = <AT91_PIOB 16 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;    /* PB16, no pull up and deglitch */
+> 		};
+> 	};
+> };
 
-This is possible if building a minimal kernel without PHY_SUN4I_USB.
+Thanks.
 
-The dependency issue is made visible at compile time instead of
-link time by the new A80 mmc clocks, which also use a reset control
-itself.
+I will add it in next version.
 
-This patch makes ARCH_SUNXI select ARCH_HAS_RESET_CONTROLLER and
-RESET_CONTROLLER.
+>
+> Sylvain
+>
 
-Reported-by: Lourens Rozema <ik@lourensrozema.nl>
-Fixes: 559482d1f950 ARM: sunxi: Split the various SoCs support in Kconfig
-Cc: <stable@vger.kernel.org> # 3.16+
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
-
-Since we don't have Kconfig symbols for the clock driver, I figured
-this should work. Hope we can get it into one of the rc-s before 3.20
-is released.
-
----
- arch/arm/mach-sunxi/Kconfig | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-index a77604fbaf25..81502b90dd91 100644
---- a/arch/arm/mach-sunxi/Kconfig
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -1,10 +1,12 @@
- menuconfig ARCH_SUNXI
- 	bool "Allwinner SoCs" if ARCH_MULTI_V7
- 	select ARCH_REQUIRE_GPIOLIB
-+	select ARCH_HAS_RESET_CONTROLLER
- 	select CLKSRC_MMIO
- 	select GENERIC_IRQ_CHIP
- 	select PINCTRL
- 	select SUN4I_TIMER
-+	select RESET_CONTROLLER
- 
- if ARCH_SUNXI
- 
-@@ -20,10 +22,8 @@ config MACH_SUN5I
- config MACH_SUN6I
- 	bool "Allwinner A31 (sun6i) SoCs support"
- 	default ARCH_SUNXI
--	select ARCH_HAS_RESET_CONTROLLER
- 	select ARM_GIC
- 	select MFD_SUN6I_PRCM
--	select RESET_CONTROLLER
- 	select SUN5I_HSTIMER
- 
- config MACH_SUN7I
-@@ -37,16 +37,12 @@ config MACH_SUN7I
- config MACH_SUN8I
- 	bool "Allwinner A23 (sun8i) SoCs support"
- 	default ARCH_SUNXI
--	select ARCH_HAS_RESET_CONTROLLER
- 	select ARM_GIC
- 	select MFD_SUN6I_PRCM
--	select RESET_CONTROLLER
- 
- config MACH_SUN9I
- 	bool "Allwinner (sun9i) SoCs support"
- 	default ARCH_SUNXI
--	select ARCH_HAS_RESET_CONTROLLER
- 	select ARM_GIC
--	select RESET_CONTROLLER
- 
- endif
--- 
-2.1.4
+Best Regards,
+Bo Shen
