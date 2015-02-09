@@ -1,55 +1,136 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon,  9 Feb 2015 11:48:36 +0530
-Subject: [PATCH] ARM64: gic: Do not allow bypass FIQ signals to reach to
- processor
-Message-ID: <b449dac39614ed462c9a479e9de0aa5300d2c7cf.1423462126.git.panand@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 9 Feb 2015 06:34:45 +0000
+Subject: [PATCH v8 15/21] ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and
+ register device's gsi
+In-Reply-To: <1422881149-8177-16-git-send-email-hanjun.guo@linaro.org>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-16-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150209063444.GJ13969@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some case few signals of an IP(like PMU Overflow in APM88xx0x) can be
-mapped to nLEGACYFIQ, ie nFIQ of CPU. Until ARM64 supports FIQ handling,
-we will get nice "Bad mode in FIQ handler detected"
+On Mon, Feb 02, 2015 at 12:45:43PM +0000, Hanjun Guo wrote:
+> Introduce ACPI_IRQ_MODEL_GIC which is needed for ARM64 as GIC is
+> used, and then register device's gsi with the core IRQ subsystem.
+> 
+> acpi_register_gsi() is similar to DT based irq_of_parse_and_map(),
+> since gsi is unique in the system, so use hwirq number directly
+> for the mapping.
+> 
+> We are going to implement stacked domains when GICv2m, GICv3, ITS
+> support are added.
+> 
+> CC: Marc Zyngier <marc.zyngier@arm.com>
+> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Tested-by: Yijing Wang <wangyijing@huawei.com>
+> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+> Tested-by: Jon Masters <jcm@redhat.com>
+> Tested-by: Timur Tabi <timur@codeaurora.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/kernel/acpi.c | 73 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/acpi/bus.c       |  3 ++
+>  include/linux/acpi.h     |  1 +
+>  3 files changed, 77 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index f80caef..f86a982 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -38,6 +38,12 @@ EXPORT_SYMBOL(acpi_pci_disabled);
+>  static int enabled_cpus;	/* Processors (GICC) with enabled flag in MADT */
+>  
+>  /*
+> + * Since we're on ARM, the default interrupt routing model
+> + * clearly has to be GIC.
+> + */
+> +enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
+> +
+> +/*
+>   * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>   * or early_memremap() should be called here to for ACPI table mapping.
+>   */
+> @@ -185,6 +191,73 @@ void __init acpi_init_cpus(void)
+>  	pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
+>  }
+>  
+> +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+> +{
+> +	*irq = irq_find_mapping(NULL, gsi);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+> +
+> +/*
+> + * success: return IRQ number (>0)
+> + * failure: return =< 0
+> + */
+> +int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
+> +{
+> +	unsigned int irq;
+> +	unsigned int irq_type;
+> +
+> +	/*
+> +	 * ACPI have no bindings to indicate SPI or PPI, so we
+> +	 * use different mappings from DT in ACPI.
+> +	 *
+> +	 * For FDT
+> +	 * PPI interrupt: in the range [0, 15];
+> +	 * SPI interrupt: in the range [0, 987];
+> +	 *
+> +	 * For ACPI, GSI should be unique so using
+> +	 * the hwirq directly for the mapping:
+> +	 * PPI interrupt: in the range [16, 31];
+> +	 * SPI interrupt: in the range [32, 1019];
+> +	 */
+> +
+> +	if (trigger == ACPI_EDGE_SENSITIVE &&
+> +				polarity == ACPI_ACTIVE_LOW)
+> +		irq_type = IRQ_TYPE_EDGE_FALLING;
+> +	else if (trigger == ACPI_EDGE_SENSITIVE &&
+> +				polarity == ACPI_ACTIVE_HIGH)
+> +		irq_type = IRQ_TYPE_EDGE_RISING;
+> +	else if (trigger == ACPI_LEVEL_SENSITIVE &&
+> +				polarity == ACPI_ACTIVE_LOW)
+> +		irq_type = IRQ_TYPE_LEVEL_LOW;
+> +	else if (trigger == ACPI_LEVEL_SENSITIVE &&
+> +				polarity == ACPI_ACTIVE_HIGH)
+> +		irq_type = IRQ_TYPE_LEVEL_HIGH;
+> +	else
+> +		irq_type = IRQ_TYPE_NONE;
+> +
+> +	/*
+> +	 * Since only one GIC is supported in ACPI 5.0, we can
+> +	 * create mapping refer to the default domain
+> +	 */
+> +	irq = irq_create_mapping(NULL, gsi);
+> +	if (!irq)
+> +		return irq;
+> +
+> +	/* Set irq type if specified and different than the current one */
+> +	if (irq_type != IRQ_TYPE_NONE &&
+> +		irq_type != irq_get_trigger_type(irq))
+> +		irq_set_irq_type(irq, irq_type);
+> +	return irq;
+> +}
+> +EXPORT_SYMBOL_GPL(acpi_register_gsi);
+> +
+> +void acpi_unregister_gsi(u32 gsi)
+> +{
+> +}
+> +EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
+> +
+>  static int __init acpi_parse_fadt(struct acpi_table_header *table)
+>  {
+>  	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
 
-Therefore force FIQBypDisGrp1 to '1', so that bypass FIQ signal is not
-signaled to the processor.
+Does this code *have* to sit under arch/arm64? I can't see anything
+architecture-specific about it and the bulk of the functions map directly
+onto irq domain callbacks. I know that the answer is probably "we can fix
+that in the future", but it doesn't seem like a huge amount of effort to
+get the right abstractions in place from the beginning so that we don't
+have to churn this stuff later on.
 
-Signed-off-by: Pratyush Anand <panand@redhat.com>
----
- drivers/irqchip/irq-gic.c       | 9 ++++++++-
- include/linux/irqchip/arm-gic.h | 1 +
- 2 files changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index d617ee5a3d8a..525dfc966e60 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -362,7 +362,14 @@ static void gic_cpu_if_up(void)
- 	*/
- 	bypass = readl(cpu_base + GIC_CPU_CTRL);
- 	bypass &= GICC_DIS_BYPASS_MASK;
--
-+#ifdef CONFIG_ARM64
-+	/* FIXME: when ARM64 starts supporting FIQ mode.
-+	 *
-+	 * Until ARM64 supports FIQ handling, force FIQBypDisGrp1 to
-+	 * '1', so that bypass FIQ signal is not signaled to the processor.
-+	 */
-+	bypass |= GICC_DIS_BYPASS_FIQ_TO_CPU;
-+#endif
- 	writel_relaxed(bypass | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
- }
- 
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 71d706d5f169..c9fdd1972625 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -25,6 +25,7 @@
- #define GICC_INT_PRI_THRESHOLD		0xf0
- #define GICC_IAR_INT_ID_MASK		0x3ff
- #define GICC_INT_SPURIOUS		1023
-+#define GICC_DIS_BYPASS_FIQ_TO_CPU	(1 << 5)
- #define GICC_DIS_BYPASS_MASK		0x1e0
- 
- #define GIC_DIST_CTRL			0x000
--- 
-2.1.0
+Will
