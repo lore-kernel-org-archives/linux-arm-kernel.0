@@ -1,41 +1,94 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon,  9 Feb 2015 11:47:12 +0100
-Subject: [PATCH v5]: clk: Add common clock support for Mediatek MT8135 and
- MT8173
-Message-ID: <1423478845-2835-1-git-send-email-s.hauer@pengutronix.de>
+Date: Mon,  9 Feb 2015 11:47:21 +0100
+Subject: [PATCH 09/13] ARM: dts: mediatek: Enable clock support for Mediatek
+ MT8135.
+In-Reply-To: <1423478845-2835-1-git-send-email-s.hauer@pengutronix.de>
+References: <1423478845-2835-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1423478845-2835-10-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset contains the initial common clock support for Mediatek SoCs.
-Mediatek SoC's clock architecture comprises of various PLLs, dividers, muxes and clock gates.
+From: James Liao <jamesjj.liao@mediatek.com>
 
-This patchset also contains a basic clock support for Mediatek MT8135 and MT8173.
+This patch adds MT8135 clock controllers into device tree.
 
-Also included is now my PMIC wrapper series as of v3. Since it now depends on
-the clock drivers I can no longer post it independenty.
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/boot/dts/mt8135.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-This driver is based on 3.19-rc1 + MT8135 and MT8173 basic support.
-
-Changes in v2:
-- Re-ordered patchset. Fold include/dt-bindings and DT document in 1st patch.
-
-Changes in v3:
-- Rebase to 3.19-rc1.
-- Refine code. Remove unneed functions, debug logs and comments, and fine tune error logs.
-
-Changes in v4:
-- Support MT8173 platform.
-- Re-ordered patchset. driver/clk/Makefile in 2nd patch.
-- Extract the common part definition(mtk_gate/mtk_pll/mtk_mux) from clk-mt8135.c/clk-mt8173.c to clk-mtk.c.
-- Refine code. Rmove unnessacary debug information and unsed defines, add prefix "mtk_" for static functions.
-- Remove flag CLK_IGNORE_UNUSED and set flag CLK_SET_RATE_PARENT on gate/mux/fixed-factor.
-- Use spin_lock_irqsave(&clk_ops_lock, flags) instead of mtk_clk_lock.
-- Example above include a node for the clock controller itself, followed by the i2c controller example above.
-
-Changes in v5:
-- Add reset controller support for pericfg/infracfg
-- Use regmap for the gates
-- remove now unnecessary spinlock for the gates
-- Add PMIC wrapper support as of v3
-
-Sascha
+diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
+index 7d56a98..7cb5e84 100644
+--- a/arch/arm/boot/dts/mt8135.dtsi
++++ b/arch/arm/boot/dts/mt8135.dtsi
+@@ -12,6 +12,7 @@
+  * GNU General Public License for more details.
+  */
+ 
++#include <dt-bindings/clock/mt8135-clk.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include "skeleton64.dtsi"
+@@ -86,6 +87,18 @@
+ 			clock-frequency = <32000>;
+ 			#clock-cells = <0>;
+ 		};
++
++		clk_null: clk_null {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++		};
++
++		clk26m: clk26m {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <26000000>;
++		};
+ 	};
+ 
+ 	soc {
+@@ -94,6 +107,26 @@
+ 		compatible = "simple-bus";
+ 		ranges;
+ 
++		topckgen: topckgen at 10000000 {
++			compatible = "mediatek,mt8135-topckgen";
++			reg = <0 0x10000000 0 0x1000>;
++			#clock-cells = <1>;
++		};
++
++		infracfg: infracfg at 10001000 {
++			#reset-cells = <1>;
++			#clock-cells = <1>;
++			compatible = "mediatek,mt8135-infracfg", "syscon";
++			reg = <0 0x10001000 0 0x1000>;
++		};
++
++		pericfg: pericfg at 10003000 {
++			#reset-cells = <1>;
++			#clock-cells = <1>;
++			compatible = "mediatek,mt8135-pericfg", "syscon";
++			reg = <0 0x10003000 0 0x1000>;
++		};
++
+ 		timer: timer at 10008000 {
+ 			compatible = "mediatek,mt8135-timer",
+ 					"mediatek,mt6577-timer";
+@@ -103,6 +136,12 @@
+ 			clock-names = "system-clk", "rtc-clk";
+ 		};
+ 
++		apmixedsys: apmixedsys at 10209000 {
++			compatible = "mediatek,mt8135-apmixedsys";
++			reg = <0 0x10209000 0 0x1000>;
++			#clock-cells = <1>;
++		};
++
+ 		gic: interrupt-controller at 10211000 {
+ 			compatible = "arm,cortex-a15-gic";
+ 			interrupt-controller;
+-- 
+2.1.4
