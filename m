@@ -1,143 +1,64 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon, 9 Feb 2015 22:30:17 +0100
-Subject: [BUG] ARM: socfpga: L2 cache init
-In-Reply-To: <20150209185820.GB7994@pengutronix.de>
-References: <20150206103946.GM15692@pengutronix.de>
- <20150206110557.GY8656@n2100.arm.linux.org.uk>
- <20150209155314.GA7994@pengutronix.de>
- <54D8E3BB.3060505@opensource.altera.com>
- <20150209185820.GB7994@pengutronix.de>
-Message-ID: <20150209213017.GC7994@pengutronix.de>
+From: linux@rasmusvillemoes.dk (Rasmus Villemoes)
+Date: Mon, 09 Feb 2015 22:42:18 +0100
+Subject: [RFC] change non-atomic bitops method
+In-Reply-To: <35FD53F367049845BC99AC72306C23D1044A02027E12@CNBJMBX05.corpusers.net>
+ (Yalin Wang's message of "Mon, 9 Feb 2015 16:18:10 +0800")
+References: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
+ <20150202152909.13bfd11f192fb0268b2ab4bf@linux-foundation.org>
+ <20150203011730.GA15653@node.dhcp.inet.fi>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0B@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0C@CNBJMBX05.corpusers.net>
+ <20150202223851.f30768d0.akpm@linux-foundation.org>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0D@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0E@CNBJMBX05.corpusers.net>
+ <20150203025925.d1c95fb8.akpm@linux-foundation.org>
+ <35FD53F367049845BC99AC72306C23D1044A02027E12@CNBJMBX05.corpusers.net>
+Message-ID: <87386evk1x.fsf@rasmusvillemoes.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 09, 2015 at 07:58:20PM +0100, Steffen Trumtrar wrote:
-> Hi Dinh!
-> 
-> On Mon, Feb 09, 2015 at 10:43:39AM -0600, Dinh Nguyen wrote:
-> > Hi Steffen,
-> > 
-> > On 02/09/2015 09:53 AM, Steffen Trumtrar wrote:
-> > > Hi!
-> > > 
-> > > On Fri, Feb 06, 2015 at 11:05:57AM +0000, Russell King - ARM Linux wrote:
-> > >> On Fri, Feb 06, 2015 at 11:39:46AM +0100, Steffen Trumtrar wrote:
-> > >>> I have run into a bug on the Socfpga platform. My boards sometimes fail
-> > >>> to boot when I have the commit
-> > >>>
-> > >>> 	commit 8b5c18f05621394eb108d3fbc9bf98b05e8162db
-> > >>> 	Author: Russell King <rmk+kernel@arm.linux.org.uk>
-> > >>> 	Date:   Mon Apr 28 15:55:59 2014 +0100
-> > >>>
-> > >>> 	ARM: l2c: socfpga: convert to generic l2c OF initialisation
-> > >>>
-> > >>> 	Remove the explicit call to l2x0_of_init(), converting to the generic
-> > >>> 	infrastructure instead.
-> > >>>
-> > >>> 	Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > >>>
-> > >>
-> > >> That should only result in the L2 cache being turned on earlier (before
-> > >> the secondary CPUs come up.)  I wonder if there's a bug in the secondary
-> > >> CPU code which is being tickled by it.
-> > >>
-> > >> What we need is some information on the failure - and as you've noticed,
-> > >> the failure occurs before the console is initialised.  There's two
-> > >> solutions to that:
-> > >>
-> > >> 1. Enable early printk support (and hope that works)
-> > > 
-> > > Thanks. I actually got it working. Seems I had forgotten something in the
-> > > config. So, the bootlog now prints
-> > > 
-> > > Uncompressing Linux... done, booting the kernel.
-> > > [    0.000000] Booting Linux on physical CPU 0x0
-> > > [    0.000000] Initializing cgroup subsys cpuset
-> > > [    0.000000] Linux version 3.19.0-rc7-test-00001-g7c10eb5fb252 (str at dude) (gcc version 4.9.2 (OSELAS.Toolchain-2014.12.0) ) #163 SMP PREEMPT Mon Feb 9 16:35:27 CET 2015
-> > > [    0.000000] CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c5387d
-> > > [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-> > > [    0.000000] Machine model: Terasic SoCkit
-> > > [    0.000000] bootconsole [earlycon0] enabled
-> > > [    0.000000] Memory policy: Data cache writealloc
-> > > [    0.000000] BUG: mapping for 0xfffec000 at 0xfffec000 out of vmalloc space
-> > > Early printk initialized
-> > > [    0.000000] PERCPU: Embedded 10 pages/cpu @bf7d4000 s11456 r8192 d21312 u40960
-> > > [    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 260096
-> > > [    0.000000] Kernel command line: console=ttyS0,115200 earlyprintk  ip=dhcp root=/dev/nfs nfsroot=/home/str/nfsroot/sockit,v3,tcp
-> > > [    0.000000] PID hash table entries: 4096 (order: 2, 16384 bytes)
-> > > [    0.000000] Dentry cache hash table entries: 131072 (order: 7, 524288 bytes)
-> > > [    0.000000] Inode-cache hash table entries: 65536 (order: 6, 262144 bytes)
-> > > [    0.000000] Memory: 1032636K/1048576K available (4716K kernel code, 222K rwdata, 1412K rodata, 276K init, 127K bss, 15940K reserved, 0K cma-reserved)
-> > > [    0.000000] Virtual kernel memory layout:
-> > > [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-> > > [    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
-> > > [    0.000000]     vmalloc : 0xc0800000 - 0xff000000   (1000 MB)
-> > > [    0.000000]     lowmem  : 0x80000000 - 0xc0000000   (1024 MB)
-> > > [    0.000000]     modules : 0x7f000000 - 0x80000000   (  16 MB)
-> > > [    0.000000]       .text : 0x80008000 - 0x806044d8   (6130 kB)
-> > > [    0.000000]       .init : 0x80605000 - 0x8064a000   ( 276 kB)
-> > > [    0.000000]       .data : 0x8064a000 - 0x80681a14   ( 223 kB)
-> > > [    0.000000]        .bss : 0x80681a14 - 0x806a161c   ( 128 kB)
-> > > [    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=2, Nodes=1
-> > > [    0.000000] Preemptible hierarchical RCU implementation.
-> > > [    0.000000] NR_IRQS:16 nr_irqs:16 16
-> > > [    0.000000] L2C-310 enabling early BRESP for Cortex-A9
-> > > [    0.000000] L2C-310 full line of zeros enabled for Cortex-A9
-> > > [    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
-> > > [    0.000000] L2C-310 cache controller enabled, 8 ways, 512 kB
-> > > [    0.000000] L2C-310: CACHE_ID 0x410030c9, AUX_CTRL 0x46060001
-> > > [    0.000013] sched_clock: 32 bits at 100MHz, resolution 10ns, wraps every 42949672950ns
-> > > [    0.008119] Console: colour dummy device 80x30
-> > > [    0.012670] Calibrating delay loop... 1594.16 BogoMIPS (lpj=7970816)
-> > > [    0.052740] pid_max: default: 32768 minimum: 301
-> > > [    0.057509] Mount-cache hash table entries: 2048 (order: 1, 8192 bytes)
-> > > [    0.064195] Mountpoint-cache hash table entries: 2048 (order: 1, 8192 bytes)
-> > > [    0.071877] CPU: Testing write buffer coherency: ok
-> > > [    0.077012] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-> > > [    0.082841] Setting up static identity map for 0x47cc10 - 0x47cc68
-> > > [    1.139876] CPU1: failed to come online
-> > > [    1.143808] Brought up 1 CPUs
-> > > [    1.146851] SMP: Total of 1 processors activated (1594.16 BogoMIPS).
-> > > 
-> > > 
-> > > It looks like there actually is something wrong with the SMP setup.
-> > > The SoC is a Cortex-A9 dual core and normally both CPUs are started.
-> > > Maybe it has something to do with
-> > > 
-> > > 	BUG: mapping for 0xfffec000 at 0xfffec000 out of vmalloc space
-> > > 
-> > > 0xfffec000 is the SCU base address.
-> > > 
-> > 
-> > This printout has been there for quite a while. The fix should be to
-> > remove the static define SOCFPGA_SCU_VIRT_BASE. I have a patch for this
-> > queue up but haven't had a chance to send it yet.
-> >
-> 
-> Cool.
-> 
-> > I was able to recreate this error(only 1 CPU coming online), when I
-> > build for socfpga_defconfig. But I cannot seem to recreate it if I build
-> > for multi_v7_defconfig, both CPUs come up just fine.
-> > 
-> 
-> Interessting.
-> 
-> > Would it be possible for you to run your test with multi_v7_defconfig?
-> 
-> No problem. Will do and get back with the result.
-> 
+On Mon, Feb 09 2015, "Wang, Yalin" <Yalin.Wang@sonymobile.com> wrote:
 
-Doesn't seem to make such a big difference for me. It still sometimes
-doesn't boot. (I can't give any statistics, because ktest.pl is sadly
-not very reliable in finding all successful/failed boots and I'm to
-lazy to count)
+> I te-test the patch on 3.10 kernel.
+> The result like this:
+>
+> VmallocChunk:   251498164 kB
+> __set_bit_miss_count:11730 __set_bit_success_count:1036316
+> __clear_bit_miss_count:209640 __clear_bit_success_count:4806556
+> __test_and_set_bit_miss_count:0 __test_and_set_bit_success_count:121
+> __test_and_clear_bit_miss_count:0 __test_and_clear_bit_success_count:445
+>
+> __clear_bit miss rate is a little high,
+> I check the log, and most miss coming from this code:
+>
+> <6>[  442.701798] [<ffffffc00021d084>] warn_slowpath_fmt+0x4c/0x58
+> <6>[  442.701805] [<ffffffc0002461a8>] __clear_bit+0x98/0xa4
+> <6>[  442.701813] [<ffffffc0003126ac>] __alloc_fd+0xc8/0x124
+> <6>[  442.701821] [<ffffffc000312768>] get_unused_fd_flags+0x28/0x34
+> <6>[  442.701828] [<ffffffc0002f9370>] do_sys_open+0x10c/0x1c0
+> <6>[  442.701835] [<ffffffc0002f9458>] SyS_openat+0xc/0x18
+> In __clear_close_on_exec(fd, fdt);
+>
+>
+>
+> <6>[  442.695354] [<ffffffc00021d084>] warn_slowpath_fmt+0x4c/0x58
+> <6>[  442.695359] [<ffffffc0002461a8>] __clear_bit+0x98/0xa4
+> <6>[  442.695367] [<ffffffc000312340>] dup_fd+0x1d4/0x280
+> <6>[  442.695375] [<ffffffc00021b07c>] copy_process.part.56+0x42c/0xe38
+> <6>[  442.695382] [<ffffffc00021bb9c>] do_fork+0xe0/0x360
+> <6>[  442.695389] [<ffffffc00021beb4>] SyS_clone+0x10/0x1c
+> In __clear_open_fd(open_files - i, new_fdt);
+>
+> Do we need test_bit() before clear_bit()at these 2 place?
+>
 
-Regards,
-Steffen
+In the second case, new_fdt->open_fds has just been filled by a
+memcpy, and no-one can possibly have written to that cache line in the
+meantime. 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+In the first case, testing is also likely wasteful if fdt->max_fds is
+less than half the number of bits in a cacheline (fdt->close_on_exec and
+fdt->open_fds are always contiguous, and the latter is unconditionally
+written to).
+
+Rasmus
