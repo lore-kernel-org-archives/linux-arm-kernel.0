@@ -1,96 +1,101 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Mon, 9 Feb 2015 16:18:10 +0800
-Subject: [RFC] change non-atomic bitops method
-In-Reply-To: <20150203025925.d1c95fb8.akpm@linux-foundation.org>
-References: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
- <20150202152909.13bfd11f192fb0268b2ab4bf@linux-foundation.org>
- <20150203011730.GA15653@node.dhcp.inet.fi>
- <35FD53F367049845BC99AC72306C23D1044A02027E0B@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1044A02027E0C@CNBJMBX05.corpusers.net>
- <20150202223851.f30768d0.akpm@linux-foundation.org>
- <35FD53F367049845BC99AC72306C23D1044A02027E0D@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1044A02027E0E@CNBJMBX05.corpusers.net>
- <20150203025925.d1c95fb8.akpm@linux-foundation.org>
-Message-ID: <35FD53F367049845BC99AC72306C23D1044A02027E12@CNBJMBX05.corpusers.net>
+From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
+Date: Mon, 9 Feb 2015 10:22:06 +0200
+Subject: Overlapping regions in DT
+In-Reply-To: <488798996.225141.1423365437092.JavaMail.open-xchange@oxbaltgw06.schlund.de>
+References: <488798996.225141.1423365437092.JavaMail.open-xchange@oxbaltgw06.schlund.de>
+Message-ID: <CABM=7kkcbj1Yxot=FEB3Z0OtWbJ=oDue76uSnAmZndhG=eJp=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Andrew Morton [mailto:akpm at linux-foundation.org]
-> Sent: Tuesday, February 03, 2015 6:59 PM
-> To: Wang, Yalin
-> Cc: 'Kirill A. Shutemov'; 'arnd at arndb.de'; 'linux-arch at vger.kernel.org';
-> 'linux-kernel at vger.kernel.org'; 'linux at arm.linux.org.uk'; 'linux-arm-
-> kernel at lists.infradead.org'
-> Subject: Re: [RFC] change non-atomic bitops method
-> 
-> On Tue, 3 Feb 2015 16:42:14 +0800 "Wang, Yalin" <Yalin.Wang@sonymobile.com>
-> wrote:
-> 
-> > I make a change in kernel to test hit/miss ratio:
-> 
-> Neat, thanks.
-> 
-> >
-> > ...
-> >
-> > After use the phone some time:
-> > root at D5303:/ # cat /proc/meminfo
-> > VmallocUsed:       10348 kB
-> > VmallocChunk:      75632 kB
-> > __set_bit_miss_count:10002 __set_bit_success_count:1096661
-> > __clear_bit_miss_count:359484 __clear_bit_success_count:3674617
-> > __test_and_set_bit_miss_count:7 __test_and_set_bit_success_count:221
-> > __test_and_clear_bit_miss_count:924611
-> __test_and_clear_bit_success_count:193
-> >
-> > __test_and_clear_bit_miss_count has a very high miss rate.
-> > In fact, I think set/clear/test_and_set(clear)_bit atomic version can
-> also
-> > Be investigated to see its miss ratio,
-> > I have not tested the atomic version,
-> > Because it reside in different architectures.
-> 
-> Hopefully misses in test_and_X_bit are not a problem.  The CPU
-> implementation would be pretty stupid to go and dirty the cacheline
-> when it knows it didn't change anything.  But maybe I'm wrong about
-> that.
-> 
-> That we're running clear_bit against a cleared bit 10% of the time is a
-> bit alarming.  I wonder where that's coming from.
-> 
-> The enormous miss count in test_and_clear_bit() might indicate an
-> inefficiency somewhere.
-I te-test the patch on 3.10 kernel.
-The result like this:
+syscon regmap is one possible way to access a register file from two
+different drivers without mapping it twice. But in that case you loose
+the name-per-register in devicetree. The devtree maps the general
+regfile, and the drivers know the offsets by themselves.
+Have a look here:
+Have a look: http://thread.gmane.org/gmane.linux.kernel/1352299
 
-VmallocChunk:   251498164 kB
-__set_bit_miss_count:11730 __set_bit_success_count:1036316
-__clear_bit_miss_count:209640 __clear_bit_success_count:4806556
-__test_and_set_bit_miss_count:0 __test_and_set_bit_success_count:121
-__test_and_clear_bit_miss_count:0 __test_and_clear_bit_success_count:445
-
-__clear_bit miss rate is a little high,
-I check the log, and most miss coming from this code:
-
-<6>[  442.701798] [<ffffffc00021d084>] warn_slowpath_fmt+0x4c/0x58
-<6>[  442.701805] [<ffffffc0002461a8>] __clear_bit+0x98/0xa4
-<6>[  442.701813] [<ffffffc0003126ac>] __alloc_fd+0xc8/0x124
-<6>[  442.701821] [<ffffffc000312768>] get_unused_fd_flags+0x28/0x34
-<6>[  442.701828] [<ffffffc0002f9370>] do_sys_open+0x10c/0x1c0
-<6>[  442.701835] [<ffffffc0002f9458>] SyS_openat+0xc/0x18
-In __clear_close_on_exec(fd, fdt);
-
-
-
-<6>[  442.695354] [<ffffffc00021d084>] warn_slowpath_fmt+0x4c/0x58
-<6>[  442.695359] [<ffffffc0002461a8>] __clear_bit+0x98/0xa4
-<6>[  442.695367] [<ffffffc000312340>] dup_fd+0x1d4/0x280
-<6>[  442.695375] [<ffffffc00021b07c>] copy_process.part.56+0x42c/0xe38
-<6>[  442.695382] [<ffffffc00021bb9c>] do_fork+0xe0/0x360
-<6>[  442.695389] [<ffffffc00021beb4>] SyS_clone+0x10/0x1c
-In __clear_open_fd(open_files - i, new_fdt);
-
-Do we need test_bit() before clear_bit()at these 2 place?
-
-Thanks
+On 8 February 2015 at 05:17, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> Hi,
+>
+> currently i work on two DT capable drivers for a ARM9 processor. The former
+> driver mxs_power.c should trigger the population of the underlying power
+> management functions and the ladder take care of the on-chip regulators. In the
+> future more drivers
+> should be added as child nodes of the power driver.
+>
+> My problem is that some of the processor registers are not separated per
+> function. So
+> the drivers need access (mostly read) on the same registers.
+>
+> Here are my questions:
+>
+> How should define i the register space in the device?
+> Define the regions in the parent node and use offsets in the childs?
+> Which functions are recommend for such access?
+>
+> I want to make use of of_platform_populate / of_platform_depopulate.
+> Is there anything i should take care of?
+>
+> The relevant parts of the devicetree is at the end of the mail.
+>
+> Best regards
+> Stefan
+>
+>        power: power at 80044000 {
+>                 compatible = "fsl,imx28-power"; /* handled by mxs_power.c */
+>                 #address-cells = <1>;
+>                 #size-cells = <1>;
+>                 reg = <0x80044000 0x2000>;
+>                 interrupts = <6>;
+>                 ranges;
+>
+>                 reg_vddd: regulator at 80044040 {
+>                         reg = <0x80044040 0x10>,
+>                               <0x80044010 0x10>,
+>                               <0x800440c0 0x10>;
+>                         reg-names = "base-address",
+>                                     "v5ctrl-address",
+>                                     "status-address";
+>                         compatible = "fsl,imx28-vddd"; /* handled by
+> mxs-regulator.c */
+>                         regulator-name = "vddd";
+>                         regulator-min-microvolt = <1350000>;
+>                         regulator-max-microvolt = <1550000>;
+>                         vddd-supply = <&reg_vdda>;
+>                 };
+>
+>                 reg_vdda: regulator at 80044050 {
+>                         reg = <0x80044050 0x10>,
+>                               <0x80044010 0x10>,
+>                               <0x800440c0 0x10>;
+>                         reg-names = "base-address",
+>                                     "v5ctrl-address",
+>                                     "status-address";
+>                         compatible = "fsl,imx28-vdda"; /* handled by
+> mxs-regulator.c */
+>                         regulator-name = "vdda";
+>                         regulator-min-microvolt = <1725000>;
+>                         regulator-max-microvolt = <1950000>;
+>                         vdda-supply = <&reg_vddio>;
+>                 };
+>
+>                 reg_vddio: regulator at 80044060 {
+>                         reg = <0x80044060 0x10>,
+>                               <0x80044010 0x10>,
+>                               <0x800440c0 0x10>;
+>                         reg-names = "base-address",
+>                                     "v5ctrl-address",
+>                                     "status-address";
+>                         compatible = "fsl,imx28-vddio"; /* handled by
+> mxs-regulator.c */
+>                         regulator-name = "vddio";
+>                         regulator-min-microvolt = <3000000>;
+>                         regulator-max-microvolt = <3575000>;
+>                         regulator-microvolt-offset = <80000>;
+>                 };
+>         };
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
