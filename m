@@ -1,61 +1,61 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Mon, 09 Feb 2015 18:34:51 -0500
-Subject: [PATCH 03/16] tty: serial: 8250_core: read only RX if there is
- something in the FIFO
-In-Reply-To: <54D8B772.1010405@freebox.fr>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <1410377411-26656-4-git-send-email-bigeasy@linutronix.de>
- <54D8B772.1010405@freebox.fr>
-Message-ID: <54D9441B.7070403@hurleysoftware.com>
+From: mpeg.blue@free.fr (Mason)
+Date: Mon, 09 Feb 2015 15:50:12 -0800
+Subject: Delays, clocks, timers, hrtimers, etc
+In-Reply-To: <54D93FFA.3090506@codeaurora.org>
+References: <54C8E125.3070905@free.fr>
+ <e028a4eb604a491f4438557f4a1373ef@agner.ch> <54D52F84.9050600@free.fr>
+ <266c7b1ff2d1a8ba0ae4866f4fb4eca5@agner.ch> <54D576B1.4000001@free.fr>
+ <54D903F6.3050608@codeaurora.org> <54D93556.9050008@free.fr>
+ <54D93FFA.3090506@codeaurora.org>
+Message-ID: <54D947B4.4080401@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Stephen Boyd wrote:
 
-Thanks for the report.
+> Mason wrote:
+>
+>> My platform provides a 32-bit counter, ticking at a constant 27 MHz.
+>> Reading this counter has a latency of roughly 70 ns (it has to go
+>> over the system memory bus). I think this is good enough for both
+>> the clock source and sched_clock, is it not?
+>>
+>> So the plan would be:
+>> - clocksource and sched_clock : 27 MHz, 32-bit counter, platform
+>> - clockevents : TWD, standard
+>
+> Yep, that sounds like a good plan. If your platform has the ARM global
+> timer (drivers/clocksource/arm_global_timer.c) then you don't need
+> anything besides that timer because it provides both the clocksource,
+> sched_clock, and clockevents. Sounds like you don't have that timer
 
-On 02/09/2015 08:34 AM, Nicolas Schichan wrote:
-> On 09/10/2014 09:29 PM, Sebastian Andrzej Siewior wrote:
->> The serial8250_do_startup() function unconditionally clears the
->> interrupts and for that it reads from the RX-FIFO without checking if
->> there is a byte in the FIFO or not. This works fine on OMAP4+ HW like
->> AM335x or DRA7.
->> OMAP3630 ES1.1 (which means probably all OMAP3 and earlier) does not like
->> this:
-> 
-> Hello,
-> 
-> Sorry to wake up an old thread, but I'm affraid that this patch causes
-> problems on Marvell 88f6282 (Kirkwood).
-> 
-> When a caracter is received on the UART while the kernel is printing
-> the boot messages, as soon as the kernel configures the UART for
-> receiving (after root filesystem mount), it gets stuck printing the
-> following message repeatedly:
-> 
-> serial8250: too much work for irq29
-> 
-> Once stuck, the reception of another character allows the boot process
-> to finish.
-> 
-> From what I can gather, when we hit that, the UART_IIR_NO_INT is 0 (so the
-> interrupt is raised), but the UART_LSR_DR bit is 0 as well so the UART_RX
-> register is never read to clear the interrupt.
+I'm using Cortex A9, so I do have the global timer (AFAIU).
 
-The "too much work" message means serial8250_handle_irq() is returning 0,
-ie., not handled. Which in turn means IIR indicates no interrupt is pending
-(UART_IIR_NO_INT == 1).
+However, I don't think I can safely use it as a clock source because
+I'm also using cpufreq, and I don't think the arm_global_timer driver
+handles CPU frequency updates, while the TWD driver does (?)
 
-Can you log the register values for LSR and IIR at both patch locations
-in serial8250_do_startup()?
+/*
+  * Updates clockevent frequency when the cpu frequency changes.
+  * Called on the cpu that is changing frequency with interrupts disabled.
+  */
 
-(I can get you a debug patch, if necessary. Let me know)
+"The Interrupt Controller, global timer, private timers, and watchdogs
+are clocked with PERIPHCLK." And PERIPHCLK is tied to CLK, which is
+modified by cpufreq. I didn't see any code in the arm_global_timer
+driver to deal with with that.
 
-Regards,
-Peter Hurley
+Did I overlook something fundamental?
 
-> We are using the second UART multiplexed on mpps 15 and 16.
-> 
-> Reverting this particular patch fixes the issue.
-> 
-> We are seing the problem on a 3.18 kernel.
+> though, so you have to write a driver for your custom platform timer and
+> at least hook up clocksource and sched_clock to it. If you have
+> interrupts with your platform timer you can skip out on TWD and also
+> register a clockevent in your platform timer driver.
+
+Registering a clock source or a sched_clock seems straight-forward.
+All I need to provide is a function to read the platform counter.
+
+However, why would I skip out on TWD?
+(I'm trying to minimize code needed for the port.)
+
+Regards.
