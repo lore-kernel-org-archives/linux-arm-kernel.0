@@ -1,119 +1,161 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 09 Feb 2015 16:04:53 +0900
-Subject: [PATCH] mmc: dw_mmc: fix bug that cause 'Timeout sending command'
-In-Reply-To: <54D85A2F.1090301@rock-chips.com>
-References: <1423134801-23219-1-git-send-email-addy.ke@rock-chips.com>
- <CAPDyKFpxYcRu1s8jwtoV5SVCANwX90yEYxED+w45eVuwZJUGEQ@mail.gmail.com>
- <54D85A2F.1090301@rock-chips.com>
-Message-ID: <54D85C15.8010007@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 9 Feb 2015 07:07:54 +0000
+Subject: [PATCH v8 15/21] ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and
+ register device's gsi
+In-Reply-To: <54D8596B.1070102@linaro.org>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-16-git-send-email-hanjun.guo@linaro.org>
+ <20150209063444.GJ13969@arm.com> <54D8596B.1070102@linaro.org>
+Message-ID: <20150209070754.GL13969@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2015 03:56 PM, Addy wrote:
+On Mon, Feb 09, 2015 at 06:53:31AM +0000, Hanjun Guo wrote:
+> On 2015?02?09? 14:34, Will Deacon wrote:
+> > On Mon, Feb 02, 2015 at 12:45:43PM +0000, Hanjun Guo wrote:
+> >> Introduce ACPI_IRQ_MODEL_GIC which is needed for ARM64 as GIC is
+> >> used, and then register device's gsi with the core IRQ subsystem.
+> >>
+> >> acpi_register_gsi() is similar to DT based irq_of_parse_and_map(),
+> >> since gsi is unique in the system, so use hwirq number directly
+> >> for the mapping.
+> >>
+> >> We are going to implement stacked domains when GICv2m, GICv3, ITS
+> >> support are added.
+> >>
+> >> CC: Marc Zyngier <marc.zyngier@arm.com>
+> >> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> >> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> >> Tested-by: Yijing Wang <wangyijing@huawei.com>
+> >> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+> >> Tested-by: Jon Masters <jcm@redhat.com>
+> >> Tested-by: Timur Tabi <timur@codeaurora.org>
+> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >> ---
+> >>   arch/arm64/kernel/acpi.c | 73 ++++++++++++++++++++++++++++++++++++++++++++++++
+> >>   drivers/acpi/bus.c       |  3 ++
+> >>   include/linux/acpi.h     |  1 +
+> >>   3 files changed, 77 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> >> index f80caef..f86a982 100644
+> >> --- a/arch/arm64/kernel/acpi.c
+> >> +++ b/arch/arm64/kernel/acpi.c
+> >> @@ -38,6 +38,12 @@ EXPORT_SYMBOL(acpi_pci_disabled);
+> >>   static int enabled_cpus;	/* Processors (GICC) with enabled flag in MADT */
+> >>
+> >>   /*
+> >> + * Since we're on ARM, the default interrupt routing model
+> >> + * clearly has to be GIC.
+> >> + */
+> >> +enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
+> >> +
+> >> +/*
+> >>    * __acpi_map_table() will be called before page_init(), so early_ioremap()
+> >>    * or early_memremap() should be called here to for ACPI table mapping.
+> >>    */
+> >> @@ -185,6 +191,73 @@ void __init acpi_init_cpus(void)
+> >>   	pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
+> >>   }
+> >>
+> >> +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+> >> +{
+> >> +	*irq = irq_find_mapping(NULL, gsi);
+> >> +
+> >> +	return 0;
+> >> +}
+> >> +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+> >> +
+> >> +/*
+> >> + * success: return IRQ number (>0)
+> >> + * failure: return =< 0
+> >> + */
+> >> +int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
+> >> +{
+> >> +	unsigned int irq;
+> >> +	unsigned int irq_type;
+> >> +
+> >> +	/*
+> >> +	 * ACPI have no bindings to indicate SPI or PPI, so we
+> >> +	 * use different mappings from DT in ACPI.
+> >> +	 *
+> >> +	 * For FDT
+> >> +	 * PPI interrupt: in the range [0, 15];
+> >> +	 * SPI interrupt: in the range [0, 987];
+> >> +	 *
+> >> +	 * For ACPI, GSI should be unique so using
+> >> +	 * the hwirq directly for the mapping:
+> >> +	 * PPI interrupt: in the range [16, 31];
+> >> +	 * SPI interrupt: in the range [32, 1019];
+> >> +	 */
+> >> +
+> >> +	if (trigger == ACPI_EDGE_SENSITIVE &&
+> >> +				polarity == ACPI_ACTIVE_LOW)
+> >> +		irq_type = IRQ_TYPE_EDGE_FALLING;
+> >> +	else if (trigger == ACPI_EDGE_SENSITIVE &&
+> >> +				polarity == ACPI_ACTIVE_HIGH)
+> >> +		irq_type = IRQ_TYPE_EDGE_RISING;
+> >> +	else if (trigger == ACPI_LEVEL_SENSITIVE &&
+> >> +				polarity == ACPI_ACTIVE_LOW)
+> >> +		irq_type = IRQ_TYPE_LEVEL_LOW;
+> >> +	else if (trigger == ACPI_LEVEL_SENSITIVE &&
+> >> +				polarity == ACPI_ACTIVE_HIGH)
+> >> +		irq_type = IRQ_TYPE_LEVEL_HIGH;
+> >> +	else
+> >> +		irq_type = IRQ_TYPE_NONE;
+> >> +
+> >> +	/*
+> >> +	 * Since only one GIC is supported in ACPI 5.0, we can
+> >> +	 * create mapping refer to the default domain
+> >> +	 */
+> >> +	irq = irq_create_mapping(NULL, gsi);
+> >> +	if (!irq)
+> >> +		return irq;
+> >> +
+> >> +	/* Set irq type if specified and different than the current one */
+> >> +	if (irq_type != IRQ_TYPE_NONE &&
+> >> +		irq_type != irq_get_trigger_type(irq))
+> >> +		irq_set_irq_type(irq, irq_type);
+> >> +	return irq;
+> >> +}
+> >> +EXPORT_SYMBOL_GPL(acpi_register_gsi);
+> >> +
+> >> +void acpi_unregister_gsi(u32 gsi)
+> >> +{
+> >> +}
+> >> +EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
+> >> +
+> >>   static int __init acpi_parse_fadt(struct acpi_table_header *table)
+> >>   {
+> >>   	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+> >
+> > Does this code *have* to sit under arch/arm64? I can't see anything
+> > architecture-specific about it and the bulk of the functions map directly
+> > onto irq domain callbacks. I know that the answer is probably "we can fix
+> > that in the future", but it doesn't seem like a huge amount of effort to
+> > get the right abstractions in place from the beginning so that we don't
+> > have to churn this stuff later on.
 > 
+> Do you mean move acpi_register_gsi()/acpi_unregister_gsi() to irqdomain
+> related file?
 > 
-> On 2015.02.09 12:51, Ulf Hansson wrote:
->> On 5 February 2015 at 12:13, Addy Ke <addy.ke@rock-chips.com> wrote:
->>> Because of some uncertain factors, such as worse card or worse hardware,
->>> DAT[3:0](the data lines) may be pulled down by card, and mmc controller
->>> will be in busy state. This should not happend when mmc controller
->>> send command to update card clocks. If this happends, mci_send_cmd will
->>> be failed and we will get 'Timeout sending command', and then system will
->>> be blocked. To avoid this, we need reset mmc controller.
+> Since x86 and IA64 have their arch specific acpi_register_gsi()
+> /acpi_unregister_gsi(), we will got compile errors on x86 and IA64
+> platforms.
 
-I know that it needs to check whether card is busy or not, before clock-off.
-This patch seems to related with it. right?
+Right, but nobody builds a single kernel image supporting x86 and arm, so
+this doesn't sound impossible to fix.
 
-Best Regards,
-Jaehoon Chung
+The code here basically consists of:
 
->>>
->>> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
->>
->> Hi Addy,
->>
->> Should I consider $subject patch as a better option to the one below?
-> No:
-> This patch fix the bug, which can be found by script:
->     cd /sys/bus/platform/drivers/dwmmc_rockchip
->     for i in $(seq 1 10000); do
->       echo "========================" $i
->       echo ff0c0000.dwmmc > unbind
->       sleep .5
->       echo ff0c0000.dwmmc > bind
->       sleep 2
->     done
-> 
->> [PATCH] mmc: dw_mmc: rockchip: Add DW_MCI_QUIRK_RETRY_DELAY
-> This patch is for tuning issue: we should delay until card go to idle state, when the previous command return error.
->> https://lkml.org/lkml/2015/1/13/562
->>
->> Kind regards
->> Uffe
->>
->>
->>> ---
->>>   drivers/mmc/host/dw_mmc.c | 23 +++++++++++++++++++++++
->>>   1 file changed, 23 insertions(+)
->>>
->>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->>> index 4d2e3c2..b1d6dfb 100644
->>> --- a/drivers/mmc/host/dw_mmc.c
->>> +++ b/drivers/mmc/host/dw_mmc.c
->>> @@ -100,6 +100,7 @@ struct idmac_desc {
->>>   };
->>>   #endif /* CONFIG_MMC_DW_IDMAC */
->>>
->>> +static int dw_mci_card_busy(struct mmc_host *mmc);
->>>   static bool dw_mci_reset(struct dw_mci *host);
->>>   static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
->>>
->>> @@ -888,6 +889,26 @@ static void mci_send_cmd(struct dw_mci_slot *slot, u32 cmd, u32 arg)
->>>                  cmd, arg, cmd_status);
->>>   }
->>>
->>> +static void dw_mci_wait_busy(struct dw_mci_slot *slot)
->>> +{
->>> +       struct dw_mci *host = slot->host;
->>> +       unsigned long timeout = jiffies + msecs_to_jiffies(500);
->>> +
->>> +       while (time_before(jiffies, timeout)) {
->>> +               if (!dw_mci_card_busy(slot->mmc))
->>> +                       return;
->>> +       }
->>> +       dev_err(host->dev, "Data busy (status %#x)\n",
->>> +               mci_readl(slot->host, STATUS));
->>> +
->>> +       /*
->>> +        * Data busy, this should not happend when mmc controller send command
->>> +        * to update card clocks in non-volt-switch state. If it happends, we
->>> +        * should reset controller to avoid getting "Timeout sending command".
->>> +        */
->>> +       dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS);
->>> +}
->>> +
->>>   static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
->>>   {
->>>          struct dw_mci *host = slot->host;
->>> @@ -899,6 +920,8 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
->>>          /* We must continue to set bit 28 in CMD until the change is complete */
->>>          if (host->state == STATE_WAITING_CMD11_DONE)
->>>                  sdmmc_cmd_bits |= SDMMC_CMD_VOLT_SWITCH;
->>> +       else
->>> +               dw_mci_wait_busy(slot);
->>>
->>>          if (!clock) {
->>>                  mci_writel(host, CLKENA, 0);
->>> -- 
->>> 1.8.3.2
->>>
->>>
->>> -- 
->>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->>
-> 
-> 
-> 
+  - Definition of acpi_irq_model. That can stay here for now.
+  - Empty stub for acpi_unregister_gsi -- should be in core code
+  - acpi_gsi_to_irq -- maps directly to irq_find_mapping, core code.
+  - Code to translate an ACPI interrupt type to a Linux IRQ subsystem type
+  - Instantiaton of an irq mapping
+
+None of that has anything to do with the arm64 architecture. If we have to
+make some small changes to core code to accommodate a non-x86 architecture,
+then I think we should at least consider that first.
+
+Will
