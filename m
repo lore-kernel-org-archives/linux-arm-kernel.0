@@ -1,82 +1,104 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Mon, 9 Feb 2015 23:22:30 +0800
-Subject: [PATCH 2/2] PCI: Do not call pci_enable_resource when specifying
- PCI_PROBE_ONLY
-In-Reply-To: <1423495350-12295-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1423495350-12295-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1423495350-12295-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 9 Feb 2015 16:47:56 +0100
+Subject: [PATCH v4 0/5] ARM: at91: fix irq_pm_install_action WARNING
+In-Reply-To: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150209164756.0a4ed146@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using PCI_PROBE_ONLY, Linux does not assign resource to PCI devices.
-This causes error when calling the pci_enable_resources function, and not
-allowing driver to set the PCI_COMMAND_IO and PCI_COMMAND_MEMORY flag in
-the config space of endpoint device since it checks if the resource parent
-is set.
+Hi Thomas,
 
-This patch adds the check in driver/pci/pci.c to avoid redundant
-arch-specific code. For example, it was in arch/arm/kernel/bios32.c and
-also needed in the arch/arm64/kernel/pci.c.
+Any chance this could go in the next kernel release ?
+More and more people are complaining about this backtrace :-/.
 
-This should not affect other architecture since most of them either
-override the weak version of pcibios_enable_device()
-or does not set PCI_PROBE_ONLY.
+Regards,
 
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+Boris
 
----
-NOTE:
-Alpha seems to be the only arch that dooes not define pcibios_enable_device()
-and also set PCI_PROBE_ONLY flag. I am not sure if this would cause any issues.
-I might need help testing on Alpha.
+On Thu, 29 Jan 2015 11:33:35 +0100
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> Commit cab303be91dc47942bc25de33dc1140123540800 [1] introduced a WARN_ON
+> test which triggers a WARNING backtrace on at91 platforms.
+> While this WARN_ON is absolutely necessary to warn users that they should
+> not mix request with and without IRQF_NO_SUSPEND flags on shared IRQs,
+> there is no easy way to solve this issue on at91 platforms.
+> 
+> The main reason is that the init timer is often using a shared irq line
+> and thus request this irq with IRQF_NO_SUSPEND flag set, while other
+> peripherals request the same irq line without this flag.
+> 
+> As suggested by Thomas, the first 3 patches of this series add a dumb
+> demultiplexer irqchip implementation.
+> This demuxer registers to a source interrupt and then forwards all received
+> interrupts to its children (it they are enabled).
+> 
+> The last two patches rework at91 DTs and config to make use of this dumb
+> demuxer implementation.
+> 
+> Rob, I know you were not in favor of exposing this in the DT but we really
+> need to quickly a solution: more and more people complain about this warning.
+> If you see a better way to handle this case please share it.
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> Changes since v3:
+>  - replace dumb by virt
+> 
+> Changes since v2:
+>  - removed unneeded dumb demux flags passed to irq_alloc_dumb_demux_chip
+>  - set nested lockdep class for all requested irqs
+>  - add some explanation to the DT binding doc
+>  - change the compatible string to clearly show that this chip is purely
+>    virtual
+>  - added dumb demuxer to all at91 impacted SoCs
+> 
+> Changes since v1:
+>  - went for an dumb irq demuxer approach instead of trying to fix the
+>    current shared irq code
+> 
+> Boris Brezillon (5):
+>   genirq: Authorize chained handlers to remain disabled when initialized
+>   irqchip: add virtual demultiplexer implementation
+>   irqchip: Add DT binding doc for the virtual irq demuxer chip
+>   ARM: at91/dt: select VIRT_IRQ_DEMUX for all at91 SoCs
+>   ARM: at91/dt: define a virtual irq demultiplexer chip connected on
+>     irq1
+> 
+>  .../bindings/interrupt-controller/dumb-demux.txt   |  41 ++++++
+>  arch/arm/boot/dts/at91rm9200.dtsi                  |  20 ++-
+>  arch/arm/boot/dts/at91sam9260.dtsi                 |  26 +++-
+>  arch/arm/boot/dts/at91sam9261.dtsi                 |  26 +++-
+>  arch/arm/boot/dts/at91sam9263.dtsi                 |  29 ++++-
+>  arch/arm/boot/dts/at91sam9g45.dtsi                 |  29 ++++-
+>  arch/arm/boot/dts/at91sam9n12.dtsi                 |  25 +++-
+>  arch/arm/boot/dts/at91sam9rl.dtsi                  |  29 ++++-
+>  arch/arm/boot/dts/at91sam9x5.dtsi                  |  26 +++-
+>  arch/arm/mach-at91/Kconfig                         |   2 +
+>  drivers/irqchip/Kconfig                            |   4 +
+>  drivers/irqchip/Makefile                           |   1 +
+>  drivers/irqchip/irq-virt-demux.c                   |  72 +++++++++++
+>  include/linux/irq.h                                |  64 +++++++++-
+>  include/linux/irqdomain.h                          |   1 +
+>  kernel/irq/Kconfig                                 |   5 +
+>  kernel/irq/Makefile                                |   1 +
+>  kernel/irq/chip.c                                  |  53 +++++++-
+>  kernel/irq/handle.c                                |  31 ++++-
+>  kernel/irq/internals.h                             |   3 +
+>  kernel/irq/irqdomain.c                             |   2 +-
+>  kernel/irq/msi.c                                   |   3 +-
+>  kernel/irq/virt-demux-chip.c                       | 140 +++++++++++++++++++++
+>  23 files changed, 580 insertions(+), 53 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+>  create mode 100644 drivers/irqchip/irq-virt-demux.c
+>  create mode 100644 kernel/irq/virt-demux-chip.c
+> 
 
- arch/arm/kernel/bios32.c | 12 ------------
- drivers/pci/pci.c        |  3 +++
- 2 files changed, 3 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index a4effd6..091f508 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -607,18 +607,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 	return start;
- }
- 
--/**
-- * pcibios_enable_device - Enable I/O and memory.
-- * @dev: PCI device to be enabled
-- */
--int pcibios_enable_device(struct pci_dev *dev, int mask)
--{
--	if (pci_has_flag(PCI_PROBE_ONLY))
--		return 0;
--
--	return pci_enable_resources(dev, mask);
--}
--
- int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
- 			enum pci_mmap_state mmap_state, int write_combine)
- {
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index e9d4fd8..1748f95 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -1187,6 +1187,9 @@ EXPORT_SYMBOL_GPL(pci_load_and_free_saved_state);
- 
- int __weak pcibios_enable_device(struct pci_dev *dev, int bars)
- {
-+	if (pci_has_flag(PCI_PROBE_ONLY))
-+		return 0;
-+
- 	return pci_enable_resources(dev, bars);
- }
- 
+
 -- 
-2.1.0
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
