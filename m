@@ -1,87 +1,61 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 9 Feb 2015 11:27:39 +0000
-Subject: [PATCH] of: calculate masks of the device based on dma-range size
-In-Reply-To: <1423253720-2785-1-git-send-email-m-karicheri2@ti.com>
-References: <1423253720-2785-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20150209112739.GC16587@e104818-lin.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 9 Feb 2015 12:44:03 +0100
+Subject: [PATCH 09/13] ARM: dts: mediatek: Enable clock support for
+ Mediatek MT8135.
+In-Reply-To: <20150209112721.GG8656@n2100.arm.linux.org.uk>
+References: <1423478845-2835-1-git-send-email-s.hauer@pengutronix.de>
+ <1423478845-2835-10-git-send-email-s.hauer@pengutronix.de>
+ <20150209105134.GF8656@n2100.arm.linux.org.uk>
+ <20150209112500.GU12209@pengutronix.de>
+ <20150209112721.GG8656@n2100.arm.linux.org.uk>
+Message-ID: <20150209114403.GV12209@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 06, 2015 at 03:15:20PM -0500, Murali Karicheri wrote:
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 314c8a9..44209fa 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -83,17 +83,18 @@ int of_device_add(struct platform_device *ofdev)
->   */
->  void of_dma_configure(struct device *dev, struct device_node *np)
->  {
-> -	u64 dma_addr, paddr, size;
-> +	u64 dma_addr = 0, paddr, size;
->  	int ret;
->  	bool coherent;
-> -	unsigned long offset;
-> +	unsigned long offset = 0;
->  	struct iommu_ops *iommu;
->  
->  	/*
->  	 * Set default dma-mask to 32 bit. Drivers are expected to setup
->  	 * the correct supported dma_mask.
->  	 */
-> -	dev->coherent_dma_mask = DMA_BIT_MASK(32);
-> +	if (!dev->coherent_dma_mask)
-> +		dev->coherent_dma_mask = DMA_BIT_MASK(32);
->  
->  	/*
->  	 * Set it to coherent_dma_mask by default if the architecture
-> @@ -102,11 +103,14 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->  	if (!dev->dma_mask)
->  		dev->dma_mask = &dev->coherent_dma_mask;
->  
-> +	/*
-> +	 * Set default size to cover the 32-bit. Drivers are expected to setup
-> +	 * the correct size and dma_mask.
-> +	 */
+On Mon, Feb 09, 2015 at 11:27:21AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Feb 09, 2015 at 12:25:00PM +0100, Sascha Hauer wrote:
+> > On Mon, Feb 09, 2015 at 10:51:34AM +0000, Russell King - ARM Linux wrote:
+> > > On Mon, Feb 09, 2015 at 11:47:21AM +0100, Sascha Hauer wrote:
+> > > > From: James Liao <jamesjj.liao@mediatek.com>
+> > > > 
+> > > > This patch adds MT8135 clock controllers into device tree.
+> > > > @@ -86,6 +87,18 @@
+> > > >  			clock-frequency = <32000>;
+> > > >  			#clock-cells = <0>;
+> > > >  		};
+> > > > +
+> > > > +		clk_null: clk_null {
+> > > > +			compatible = "fixed-clock";
+> > > > +			#clock-cells = <0>;
+> > > > +			clock-frequency = <0>;
+> > > > +		};
+> > > > +
+> > > > +		clk26m: clk26m {
+> > > > +			compatible = "fixed-clock";
+> > > > +			#clock-cells = <0>;
+> > > > +			clock-frequency = <26000000>;
+> > > > +		};
+> > > 
+> > > Is this supposed to be here?
+> > 
+> > The clock support needs at least the clk26m clk. Do you think it should
+> > be in another patch or not present at all?
+> 
+> I didn't see anything which referenced either clk_null or clk26m in this
+> patch.  My main concern was that clk_null, but my concern grew when I
+> found that clk26m wasn't referenced either.
+> 
+> If the MT8135 needs it, shouldn't something in its description reference
+> this clock?
 
-Nitpick: drivers don't set up the size, just the mask. We read the size
-from DT.
+It's used in the code. The mt8135 clk code directly uses the names of
+these three clocks as parent_names.
 
-> +	size = 1ULL << 32;
-> +
->  	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
-> -	if (ret < 0) {
-> -		dma_addr = offset = 0;
-> -		size = dev->coherent_dma_mask + 1;
+Sascha
 
-Do you assume that, on error, of_dma_get_range() does not touch any of
-the dma_addr/paddr/size? It looks safer to me to leave it as the
-original.
-
-> -	} else {
-> +	if (!ret) {
->  		offset = PFN_DOWN(paddr - dma_addr);
->  
->  		/*
-> @@ -128,6 +132,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->  
->  	dev->dma_pfn_offset = offset;
->  
-> +	/*
-> +	 * Limit coherent and dma mask based on size and default mask
-> +	 * set by the driver.
-> +	 */
-> +	dev->coherent_dma_mask = min(dev->coherent_dma_mask,
-> +				     DMA_BIT_MASK(ilog2(dma_addr + size)));
-
-Do we need to cover the case where size is incorrectly set to 0 in the
-DT? At least some warning and leaving the mask unchanged.
-
-> +	*dev->dma_mask = min((*dev->dma_mask),
-> +			     DMA_BIT_MASK(ilog2(dma_addr + size)));
-> +
->  	coherent = of_dma_is_coherent(np);
->  	dev_dbg(dev, "device is%sdma coherent\n",
->  		coherent ? " " : " not ");
 
 -- 
-Catalin
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
