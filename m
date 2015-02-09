@@ -1,115 +1,65 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 9 Feb 2015 12:26:32 -0500
-Subject: [PATCH v6 0/7] PCI: get DMA configuration from parent device
-In-Reply-To: <54D84456.8050509@amd.com>
-References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
- <54D84456.8050509@amd.com>
-Message-ID: <54D8EDC8.2060908@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Feb 2015 09:31:11 -0800
+Subject: [PATCH 0/2] ARM: omap2+: omap_hwmod: Fix false lockdep warning
+In-Reply-To: <alpine.DEB.2.02.1502091557450.3767@utopia.booyaka.com>
+References: <1423226916-18804-1-git-send-email-peter.ujfalusi@ti.com>
+ <20150206141346.GP21418@twins.programming.kicks-ass.net>
+ <54D4E64C.7060208@ti.com>
+ <20150206183205.GS21418@twins.programming.kicks-ass.net>
+ <54D5154F.8080208@ti.com> <54D86F74.7070703@ti.com>
+ <alpine.DEB.2.02.1502091557450.3767@utopia.booyaka.com>
+Message-ID: <20150209173110.GI25235@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2015 12:23 AM, Suravee Suthikulpanit wrote:
-> Sorry for delay response. I have also tested this on AMD Seattle 
-> platform w/ PCI Generic Host Controller, and I can see that the PCI 
-> endpoint devices are getting proper dma_map_ops as set in the host 
-> bridge.
->
-> <Tested-by>: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Suravee,
+* Paul Walmsley <paul@pwsan.com> [150209 08:04]:
+> On Mon, 9 Feb 2015, Peter Ujfalusi wrote:
+> 
+> > On 02/06/2015 09:26 PM, Peter Ujfalusi wrote:
+> > >> Yeah, I've never really bothered with data too much, its a debug
+> > >> feature. So lock_class_key is 8 bytes, and strictly speaking you could
+> > >> union them over other fields, all we really need is unique addresses, we
+> > >> don't actually use the storage.
+> > > 
+> > > True. our omap2plus defconfig does not have LOCKDEP enabled so it should not
+> > > add anything to the data when running default kernel.
+> > > I'll test the lockdep_set_class() method you suggested on Monday (not
+> > > tomorrow), but still as first thing.
+> > > If it is working as expected I'll send a patch with you as author.
+> > 
+> > With omap2plus_defconfig my build produces (vmlinux size):
+> > Base: 				99905522
+> > with my series:			99908385 (base + 2863)
+> > with Peter Zijlstra's patch:	99910625 (base + 5103)
+> > 
+> > The reason for this is that we will only have
+> > struct lock_class_key { };
+> > in case of !CONFIG_LOCKDEP. On ARM however CONFIG_LOCKDEP is enabled by
+> > default, while the CONFIG_DEBUG_LOCKDEP is disabled.
+> > 
+> > So it does add more data to our default omap2plus config.
+> > 
+> > Tony: do you have preference on the way we fix this issue?
+> > 
+> > As I recall there is a plan to remove the hwmod static database and move it or
+> > generate it from DT? Not sure when and how this will be done, but will it
+> > affect the lockdep_set_class() way?
+> 
+> Well I guess we could see what Tony says, but you do realize that the 
+> difference in sizes that you posted above is about .003% of the total 
+> binary size, right?  
+> 
+> If there's one thing we can say about the last few years of ARM kernel 
+> development, it's that those kind of size increases are utterly dwarfed by 
+> other changes in the kernel.  So I'd say, post a patch based on PeterZ's 
+> fix and be done with it...
 
-Thanks for testing this patch.
+Well the thing to consider here is what Peter U is saying about
+having struct omap_hwmod allocated based on the data from .dts
+files. If the fix makes the dynamic allocation harder to do later on,
+we should probably avoid it. If it's relatively easy to do later on,
+then I don't have a problem with it.
 
-Murali
->
-> Thanks,
-> Suravee
->
-> On 02/06/2015 05:52 AM, Murali Karicheri wrote:
->> This patch add an important capability to PCI driver on Keystone. I 
->> hope to
->> have this merged to the upstream branch so that it is available for 
->> v3.20.
->> Also would like thank everyone for the contribution.
->>
->> PCI devices on Keystone doesn't have correct dma_pfn_offset set. This 
->> patch
->> add capability to set the dma configuration such as dma-mask, 
->> dma_pfn_offset,
->> and dma ops etc using the information from DT. The prior RFCs and 
->> discussions
->> are available at [1] and [2] below.
->>
->> [2] : 
->> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg790244.html
->> [1] : http://www.gossamer-threads.com/lists/linux/kernel/2024591
->>
->> Change history:
->>     v6 - Rebased to v3.19-v7
->>        - Addressed some minor comments about node name and DT size 
->> validation.
->>        - Pulled out 8/8 of v5 and plan to send a patch for enhancing
->>          of_dma_configure() to use size to calculate dma mask.
->>        - Added Acks from reviewers.
->>     v5 - moved the dma_mask update in device from ARM specific API to
->>          of_dma_configure to allow this across other architecture as 
->> well
->>        - improved sanity check for DT dma-range size in 
->> of_dma_configure()
->>        - moved API to get parent bridge device to PCI (host-bridge.c)
->>     v4 - moved size adjustments in of_iommu_configure() to a separate 
->> patch
->>        - consistent node name comment from Rob
->>        - patch 6 added for dma_mask adjustment and iommu mapping size
->>          limiting.
->>     v3 - addressed comments to re-use of_dma_configure() for PCI
->>        - To help re-use, change of_iommu_configure() function argument
->>         - Move of_dma_configure to of/device.c
->>         - Limit the of_iommu_configure to non pci devices
->>     v2 - update size to coherent_dma_mask + 1 if dma-range info is 
->> missing
->>        - also check the np for null.
->>     v1 - updates based on the comments against initial RFC.
->>        - Added a helper function to get the OF node of the parent
->>        - Added an API in of_pci.c to update DMA configuration of the pci
->>          device.
->>
->> Cc: Joerg Roedel <joro@8bytes.org>
->> Cc: Grant Likely <grant.likely@linaro.org>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Bjorn Helgaas <bhelgaas@google.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>
->> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
->> Acked-by: Murali Karicheri <m-karicheri2@ti.com>
->>
->> Murali Karicheri (7):
->>    of: iommu: add ptr to OF node arg to of_iommu_configure()
->>    of: move of_dma_configure() to device.c to help re-use
->>    of: fix size when dma-range is not used
->>    PCI: add helper functions pci_get[put]_host_bridge_device()
->>    of/pci: add of_pci_dma_configure() update dma configuration
->>    PCI: update dma configuration from DT
->>    arm: dma-mapping: limit iommu mapping size
->>
->>   arch/arm/mm/dma-mapping.c |    7 +++++
->>   drivers/iommu/of_iommu.c  |   10 ++++--
->>   drivers/of/device.c       |   74 
->> +++++++++++++++++++++++++++++++++++++++++++++
->>   drivers/of/of_pci.c       |   19 ++++++++++++
->>   drivers/of/platform.c     |   58 ++---------------------------------
->>   drivers/pci/host-bridge.c |   14 +++++++++
->>   drivers/pci/probe.c       |    2 ++
->>   include/linux/of_device.h |    2 ++
->>   include/linux/of_iommu.h  |    6 ++--
->>   include/linux/of_pci.h    |    5 +++
->>   include/linux/pci.h       |    3 ++
->>   11 files changed, 140 insertions(+), 60 deletions(-)
->>
+Regards,
 
-
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+Tony
