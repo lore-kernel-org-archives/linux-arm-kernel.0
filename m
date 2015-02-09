@@ -1,39 +1,37 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 9 Feb 2015 20:02:21 +0100 (CET)
-Subject: [PATCH v3 04/20] power_supply: sysfs: Use power_supply_*() API
- for accessing function attrs
-In-Reply-To: <1422629278-12202-5-git-send-email-k.kozlowski@samsung.com>
-References: <1422629278-12202-1-git-send-email-k.kozlowski@samsung.com>
- <1422629278-12202-5-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <70066540.345820.1423508541546.JavaMail.open-xchange@oxbaltgw00.schlund.de>
+From: joshc@ni.com (Josh Cartwright)
+Date: Mon, 9 Feb 2015 13:18:59 -0600
+Subject: [PATCH] clocksource: mark sched_clock_read functions notrace
+In-Reply-To: <20150206213103.GB15156@nathan3500-linux-VM>
+References: <1422643216-26673-1-git-send-email-nathan.sullivan@ni.com>
+ <20150203201326.GH11832@jcartwri.amer.corp.natinst.com>
+ <20150206213103.GB15156@nathan3500-linux-VM>
+Message-ID: <20150209191859.GC8466@jcartwri.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Fri, Feb 06, 2015 at 03:31:03PM -0600, Nathan Sullivan wrote:
+> On Tue, Feb 03, 2015 at 02:13:26PM -0600, Josh Cartwright wrote:
+> > > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> > > index 095c177..df5af55 100644
+> > > --- a/drivers/clocksource/arm_arch_timer.c
+> > > +++ b/drivers/clocksource/arm_arch_timer.c
+> > > @@ -405,7 +405,7 @@ u32 arch_timer_get_rate(void)
+> > >  	return arch_timer_rate;
+> > >  }
+> > >  
+> > > -static u64 arch_counter_get_cntvct_mem(void)
+> > > +static u64 notrace arch_counter_get_cntvct_mem(void)
+> > 
+> > Assuming you're trying to mark all sched_clock() implementations
+> > notrace, then you missed a few: arch_counter_get_cntvct and
+> > arch_counter_get_cntpct.
+> > 
+> >   Josh
+> 
+> Hmm, those are inlined.  Should I still mark them notrace?
 
-> Krzysztof Kozlowski <k.kozlowski@samsung.com> hat am 30. Januar 2015 um 15:47
-> geschrieben:
->
->
-> Replace direct calls to power supply function attributes with wrappers.
-> Wrappers provide safe access in case of unregistering the power
-> supply (e.g. by removing the driver). Replace:
-> - get_property -> power_supply_get_property
-> - set_property -> power_supply_set_property
-> - property_is_writeable -> power_supply_property_is_writeable
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Acked-by: Jonghwa Lee <jonghwa3.lee@samusng.com>
+There's necessarily an out-of-line version of these functions generated,
+as arch_timer_read_counter has to point at something, so yes, I'd say
+so.
 
-just a nit. It looks like a typo in the mail address which is also in patch 5 -
-10.
-
-I applied patch 1 - 14 to my repo with a upcoming power driver (mxs_power) and
-didn't see any problems with your patches.
-
-Stefan
-
-> Acked-by: Pavel Machek <pavel@ucw.cz>
-> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Reviewed-by: Sebastian Reichel <sre@kernel.org>
-> ---
+  Josh
