@@ -1,95 +1,97 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 9 Feb 2015 09:52:48 +0000
-Subject: [PATCH v8 14/21] ACPI / processor: Make it possible to get CPU
- hardware ID via GICC
-In-Reply-To: <20150209065512.GK13969@arm.com>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-15-git-send-email-hanjun.guo@linaro.org>
- <20150209065512.GK13969@arm.com>
-Message-ID: <20150209095248.GB16587@e104818-lin.cambridge.arm.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Mon, 09 Feb 2015 19:01:04 +0900
+Subject: [PATCH v2 1/2] mmc: dw_mmc: fix bug that cause 'Timeout sending
+ command'
+In-Reply-To: <1423466726-20833-2-git-send-email-addy.ke@rock-chips.com>
+References: <1423134801-23219-1-git-send-email-addy.ke@rock-chips.com>
+ <1423466726-20833-1-git-send-email-addy.ke@rock-chips.com>
+ <1423466726-20833-2-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <54D88560.4050808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 09, 2015 at 06:55:12AM +0000, Will Deacon wrote:
-> On Mon, Feb 02, 2015 at 12:45:42PM +0000, Hanjun Guo wrote:
-> > Introduce a new function map_gicc_mpidr() to allow MPIDRs to be obtained
-> > from the GICC Structure introduced by ACPI 5.1.
-> > 
-> > MPIDR is the CPU hardware ID as local APIC ID on x86 platform, so we use
-> > MPIDR not the GIC CPU interface ID to identify CPUs.
-> > 
-> > Further steps would typedef a phys_id_t for in arch code(with
-> > appropriate size and a corresponding invalid value, say ~0) and use that
-> > instead of an int in drivers/acpi/processor_core.c to store phys_id, then
-> > no need for mpidr packing.
-> > 
-> > CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-> > CC: Catalin Marinas <catalin.marinas@arm.com>
-> > CC: Will Deacon <will.deacon@arm.com>
-> > Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> > Tested-by: Yijing Wang <wangyijing@huawei.com>
-> > Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-> > Tested-by: Jon Masters <jcm@redhat.com>
-> > Tested-by: Timur Tabi <timur@codeaurora.org>
-> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > ---
-> >  arch/arm64/include/asm/acpi.h | 30 ++++++++++++++++++++++++++++++
-> >  drivers/acpi/processor_core.c | 37 +++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 67 insertions(+)
-> > 
-> > diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> > index 8984aa5..7e825b9 100644
-> > --- a/arch/arm64/include/asm/acpi.h
-> > +++ b/arch/arm64/include/asm/acpi.h
-> > @@ -12,6 +12,8 @@
-> >  #ifndef _ASM_ACPI_H
-> >  #define _ASM_ACPI_H
-> >  
-> > +#include <asm/smp_plat.h>
-> > +
-> >  /* Basic configuration for ACPI */
-> >  #ifdef	CONFIG_ACPI
-> >  #define acpi_strict 1	/* No out-of-spec workarounds on ARM64 */
-> > @@ -45,6 +47,34 @@ static inline void enable_acpi(void)
-> >  	acpi_noirq = 0;
-> >  }
-> >  
-> > +/* MPIDR value provided in GICC structure is 64 bits, but the
-> > + * existing phys_id (CPU hardware ID) using in acpi processor
-> > + * driver is 32-bit, to conform to the same datatype we need
-> > + * to repack the GICC structure MPIDR.
-> > + *
-> > + * bits other than following 32 bits are defined as 0, so it
-> > + * will be no information lost after repacked.
-> > + *
-> > + * Bits [0:7] Aff0;
-> > + * Bits [8:15] Aff1;
-> > + * Bits [16:23] Aff2;
-> > + * Bits [32:39] Aff3;
-> > + */
-> > +static inline u32 pack_mpidr(u64 mpidr)
-> > +{
-> > +	return (u32) ((mpidr & 0xff00000000) >> 8) | mpidr;
-> > +}
+Hi, Addy.
+
+On 02/09/2015 04:25 PM, Addy Ke wrote:
+> Because of some uncertain factors, such as worse card or worse hardware,
+> DAT[3:0](the data lines) may be pulled down by card, and mmc controller
+> will be in busy state. This should not happend when mmc controller
+> send command to update card clocks. If this happends, mci_send_cmd will
+> be failed and we will get 'Timeout sending command', and then system will
+> be blocked. To avoid this, we need reset mmc controller.
 > 
-> I'm a bit puzzled by this packing:
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+>  drivers/mmc/host/dw_mmc.c | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
 > 
->   - Bit 31 of the MPIDR is RES1. Do we need to mask it out first?
->   - How does this work for uniprocessor systems where bit 30 is set?
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 4d2e3c2..b0b57e3 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -100,6 +100,7 @@ struct idmac_desc {
+>  };
+>  #endif /* CONFIG_MMC_DW_IDMAC */
+>  
+> +static int dw_mci_card_busy(struct mmc_host *mmc);
+>  static bool dw_mci_reset(struct dw_mci *host);
+>  static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
+>  
+> @@ -888,6 +889,31 @@ static void mci_send_cmd(struct dw_mci_slot *slot, u32 cmd, u32 arg)
+>  		cmd, arg, cmd_status);
+>  }
+>  
+> +static void dw_mci_wait_busy(struct dw_mci_slot *slot)
+> +{
+> +	struct dw_mci *host = slot->host;
+> +	unsigned long timeout = jiffies + msecs_to_jiffies(500);
+> +
+> +	do {
+> +		if (!dw_mci_card_busy(slot->mmc))
+> +			return;
+> +		cpu_relax();
+> +	} while (time_before(jiffies, timeout));
+> +
+> +	dev_err(host->dev, "Data busy (status %#x)\n",
+> +		mci_readl(slot->host, STATUS));
+> +
+> +	/*
+> +	 * Data busy, this should not happend when mmc controller send command
+> +	 * to update card clocks in non-volt-switch state. If it happends, we
+> +	 * should reset controller to avoid getting "Timeout sending command".
+> +	 */
+> +	dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS);
 
-I asked about this on a previous version of the patches but the comment
-was only clarified in the map_gicc_mpidr() function (which duplicates
-the packing here). This is not the real MPIDR but the one passed from
-ACPI tables, so bits 24-31 are 0.
+If reset is failed, then dw_mci_ctrl_reset should return "false".
 
->   - Similarly for mythical multi-threaded implementations with bit 24 set.
+	ret = dw_mci_ctrl_reset();
 
-Anyway, as I posted here:
+	WARN_ON(!ret || dw_mci_card_busy(slot->mmc));
 
-http://article.gmane.org/gmane.linux.acpi.devel/73422
+Is it right?
 
-I think this function should go. I don't see the point of MPIDR packing
-just because we can't use a proper 64-bit type here.
+In my experiment, if reset is failed or card is busy, eMMC can't work anymore..right?
+I think this patch is reasonable to prevent blocking issue.
 
--- 
-Catalin
+Best Regards,
+Jaehoon Chung
+
+
+> +
+> +	/* Fail to reset controller or still data busy, WARN_ON! */
+> +	WARN_ON(dw_mci_card_busy(slot->mmc));
+> +}
+> +
+>  static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
+>  {
+>  	struct dw_mci *host = slot->host;
+> @@ -899,6 +925,8 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
+>  	/* We must continue to set bit 28 in CMD until the change is complete */
+>  	if (host->state == STATE_WAITING_CMD11_DONE)
+>  		sdmmc_cmd_bits |= SDMMC_CMD_VOLT_SWITCH;
+> +	else
+> +		dw_mci_wait_busy(slot);
+>  
+>  	if (!clock) {
+>  		mci_writel(host, CLKENA, 0);
+> 
