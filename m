@@ -1,16 +1,26 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Mon, 9 Feb 2015 23:22:29 +0800
-Subject: [PATCH 1/2] pci: generic: Use the pci_scan_root_bus instead of
- pci_common_init_dev
+Date: Mon, 9 Feb 2015 23:22:30 +0800
+Subject: [PATCH 2/2] PCI: Do not call pci_enable_resource when specifying
+ PCI_PROBE_ONLY
 In-Reply-To: <1423495350-12295-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1423495350-12295-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1423495350-12295-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1423495350-12295-3-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replacing pci_common_init_dev with pci_scan_root_bus, and remove reference
-to struct pci_sys_data and pci_hw, which is specific to ARM32. This allows
-the PCI host generic driver to also usable in ARM64 architecture.
+When using PCI_PROBE_ONLY, Linux does not assign resource to PCI devices.
+This causes error when calling the pci_enable_resources function, and not
+allowing driver to set the PCI_COMMAND_IO and PCI_COMMAND_MEMORY flag in
+the config space of endpoint device since it checks if the resource parent
+is set.
+
+This patch adds the check in driver/pci/pci.c to avoid redundant
+arch-specific code. For example, it was in arch/arm/kernel/bios32.c and
+also needed in the arch/arm64/kernel/pci.c.
+
+This should not affect other architecture since most of them either
+override the weak version of pcibios_enable_device()
+or does not set PCI_PROBE_ONLY.
 
 Cc: Bjorn Helgaas <bhelgaas@google.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
@@ -22,107 +32,50 @@ Cc: Liviu Dudau <Liviu.Dudau@arm.com>
 Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
 ---
- drivers/pci/host/Kconfig            |  2 +-
- drivers/pci/host/pci-host-generic.c | 33 ++++++++++-----------------------
- 2 files changed, 11 insertions(+), 24 deletions(-)
+NOTE:
+Alpha seems to be the only arch that dooes not define pcibios_enable_device()
+and also set PCI_PROBE_ONLY flag. I am not sure if this would cause any issues.
+I might need help testing on Alpha.
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index c4b6568..739bab0 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -53,7 +53,7 @@ config PCI_RCAR_GEN2_PCIE
- 
- config PCI_HOST_GENERIC
- 	bool "Generic PCI host controller"
--	depends on ARM && OF
-+	depends on (ARM||ARM64) && OF
- 	help
- 	  Say Y here if you want to support a simple generic PCI host
- 	  controller, such as the one emulated by kvmtool.
-diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-index 6eb1aa7..93f64e4 100644
---- a/drivers/pci/host/pci-host-generic.c
-+++ b/drivers/pci/host/pci-host-generic.c
-@@ -48,8 +48,7 @@ static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
- 					     unsigned int devfn,
- 					     int where)
- {
--	struct pci_sys_data *sys = bus->sysdata;
--	struct gen_pci *pci = sys->private_data;
-+	struct gen_pci *pci = bus->sysdata;
- 	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
- 
- 	return pci->cfg.win[idx] + ((devfn << 8) | where);
-@@ -64,8 +63,7 @@ static void __iomem *gen_pci_map_cfg_bus_ecam(struct pci_bus *bus,
- 					      unsigned int devfn,
- 					      int where)
- {
--	struct pci_sys_data *sys = bus->sysdata;
--	struct gen_pci *pci = sys->private_data;
-+	struct gen_pci *pci = bus->sysdata;
- 	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
- 
- 	return pci->cfg.win[idx] + ((devfn << 12) | where);
-@@ -80,8 +78,7 @@ static int gen_pci_config_read(struct pci_bus *bus, unsigned int devfn,
- 				int where, int size, u32 *val)
- {
- 	void __iomem *addr;
--	struct pci_sys_data *sys = bus->sysdata;
--	struct gen_pci *pci = sys->private_data;
-+	struct gen_pci *pci = bus->sysdata;
- 
- 	addr = pci->cfg.ops->map_bus(bus, devfn, where);
- 
-@@ -103,8 +100,7 @@ static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
- 				 int where, int size, u32 val)
- {
- 	void __iomem *addr;
--	struct pci_sys_data *sys = bus->sysdata;
--	struct gen_pci *pci = sys->private_data;
-+	struct gen_pci *pci = bus->sysdata;
- 
- 	addr = pci->cfg.ops->map_bus(bus, devfn, where);
- 
-@@ -244,13 +240,6 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
- 	return 0;
+ arch/arm/kernel/bios32.c | 12 ------------
+ drivers/pci/pci.c        |  3 +++
+ 2 files changed, 3 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index a4effd6..091f508 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -607,18 +607,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 	return start;
  }
  
--static int gen_pci_setup(int nr, struct pci_sys_data *sys)
+-/**
+- * pcibios_enable_device - Enable I/O and memory.
+- * @dev: PCI device to be enabled
+- */
+-int pcibios_enable_device(struct pci_dev *dev, int mask)
 -{
--	struct gen_pci *pci = sys->private_data;
--	list_splice_init(&pci->resources, &sys->resources);
--	return 1;
+-	if (pci_has_flag(PCI_PROBE_ONLY))
+-		return 0;
+-
+-	return pci_enable_resources(dev, mask);
 -}
 -
- static int gen_pci_probe(struct platform_device *pdev)
+ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+ 			enum pci_mmap_state mmap_state, int write_combine)
  {
- 	int err;
-@@ -260,13 +249,6 @@ static int gen_pci_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct device_node *np = dev->of_node;
- 	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
--	struct hw_pci hw = {
--		.nr_controllers	= 1,
--		.private_data	= (void **)&pci,
--		.setup		= gen_pci_setup,
--		.map_irq	= of_irq_parse_and_map_pci,
--		.ops		= &gen_pci_ops,
--	};
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index e9d4fd8..1748f95 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -1187,6 +1187,9 @@ EXPORT_SYMBOL_GPL(pci_load_and_free_saved_state);
  
- 	if (!pci)
- 		return -ENOMEM;
-@@ -303,7 +285,12 @@ static int gen_pci_probe(struct platform_device *pdev)
- 		return err;
- 	}
- 
--	pci_common_init_dev(dev, &hw);
-+	if (!pci_scan_root_bus(&pdev->dev, pci->cfg.bus_range->start,
-+			       &gen_pci_ops, pci, &pci->resources)) {
-+		dev_err(&pdev->dev, "failed to enable PCIe ports\n");
-+		return -ENODEV;
-+	}
+ int __weak pcibios_enable_device(struct pci_dev *dev, int bars)
+ {
++	if (pci_has_flag(PCI_PROBE_ONLY))
++		return 0;
 +
- 	return 0;
+ 	return pci_enable_resources(dev, bars);
  }
  
 -- 
