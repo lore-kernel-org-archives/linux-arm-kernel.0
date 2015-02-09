@@ -1,117 +1,79 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Mon, 9 Feb 2015 10:43:39 -0600
-Subject: [BUG] ARM: socfpga: L2 cache init
-In-Reply-To: <20150209155314.GA7994@pengutronix.de>
-References: <20150206103946.GM15692@pengutronix.de>
- <20150206110557.GY8656@n2100.arm.linux.org.uk>
- <20150209155314.GA7994@pengutronix.de>
-Message-ID: <54D8E3BB.3060505@opensource.altera.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 9 Feb 2015 16:50:41 +0000
+Subject: ask for help about swiotlb buffer is full
+In-Reply-To: <54D57017.6050704@huawei.com>
+References: <54CB5820.9020102@huawei.com> <54CB5AA4.7050705@huawei.com>
+ <20150130115915.GB27542@e104818-lin.cambridge.arm.com>
+ <54CC5346.5070402@huawei.com>
+ <20150202182435.GH22661@e104818-lin.cambridge.arm.com>
+ <54D209FD.40100@huawei.com>
+ <20150204133205.GC26006@e104818-lin.cambridge.arm.com>
+ <54D23123.3040208@huawei.com>
+ <20150205181934.GE21970@e104818-lin.cambridge.arm.com>
+ <54D57017.6050704@huawei.com>
+Message-ID: <20150209165041.GA11542@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steffen,
+On Sat, Feb 07, 2015 at 01:53:27AM +0000, Kefeng Wang wrote:
+> On 2015-02-06 2:19, Catalin Marinas wrote:
+> > On Wed, Feb 04, 2015 at 02:48:03PM +0000, Ding Tianhong wrote:
+> >> On 2015/2/4 21:32, Catalin Marinas wrote:
+> >>> On Wed, Feb 04, 2015 at 12:01:01PM +0000, Kefeng Wang wrote:
+> >>>> On 2015-02-03 2:24, Catalin Marinas wrote:
+> >>>>> On Sat, Jan 31, 2015 at 04:00:06AM +0000, Kefeng Wang wrote:
+> >>>>>> 4kb page,  use Make ARCH=arm64 defconfig in v3.19 to generate config.
+> >>>>>>
+> >>>>>> [    0.678293] software IO TLB [mem 0x7e800000-0x7ec00000] (4MB) mapped at [ffffffc07e800000-ffffffc07ebfffff]
+> >>>>>> [    0.686991] DMA: preallocated 256 KiB pool for atomic allocations
+> >>>>>
+> >>>>> Was the swiotlb buffer size the same in the 3.16 kernel? The only thing
+> >>>>> I recall adding was the atomic pool allocations but these are only for
+> >>>>> non-coherent DMA ops and only for dma_alloc/free. I assume, in the case
+> >>>>> of SATA, the failure is on the dma_map_sg() path.
+> >>>>
+> >>>> Swiotlb buffer size is both 4M in v3.16 and v3.19-rc4, and the failure is
+> >>>> on the dma_map_sg() -> swiotlb_map_sg_attrs.
+> >>>>
+> >>>>> Maybe with a 3.19 kernel you get more than 4MB swiotlb buffers used at a
+> >>>>> time with your tests; can you try increasing this via a kernel command
+> >>>>> like to, let's say, 8MB? If I got my calculations correctly (an IO TLB
+> >>>>> slab is 1 << 11):
+> >>>>>
+> >>>>> 	swiotlb=4096
+> >>>>>
+> >>>>> If it still runs out with bigger buffers, we may need to look into
+> >>>>> potential leaks.
+> >>>>
+> >>>> The buddy allocator can only support 4M contiguous physical memory, so it's
+> >>>> useless to increase swiotlb buffer.
+> >>>
+> >>> You could hack arch/arm64/Kconfig to set a higher
+> >>> CONFIG_FORCE_MAX_ZONEORDER as a test. Depending on the test result, we
+> >>> can look for an alternative solution.
+> >>
+> >> I have try this before and could fix the problem, but I think it is
+> >> not a perfect solution,.
+> > 
+> > So it's not some bug leaking memory but a genuine need for bigger
+> > swiotlb buffer. Ideally your hardware should have an iommu as bouncing
+> > is not cheap.
+> > 
+> > Most architectures using swiotlb seem to use the default size of 64MB
+> > (with the risk of wasting too much memory on smaller systems). That's
+> > what we had on arm64 before commit 3690951fc6d42f3a (arm64: Use swiotlb
+> > late initialisation) but the problem was that the generic swiotlb_init()
+> > function didn't bother with which zone it allocated memory from and it
+> > wasn't always suitable for 32-bit DMA.
+> 
+> Thanks for you help, I have tested this patch, and sata could work fine again.
 
-On 02/09/2015 09:53 AM, Steffen Trumtrar wrote:
-> Hi!
-> 
-> On Fri, Feb 06, 2015 at 11:05:57AM +0000, Russell King - ARM Linux wrote:
->> On Fri, Feb 06, 2015 at 11:39:46AM +0100, Steffen Trumtrar wrote:
->>> I have run into a bug on the Socfpga platform. My boards sometimes fail
->>> to boot when I have the commit
->>>
->>> 	commit 8b5c18f05621394eb108d3fbc9bf98b05e8162db
->>> 	Author: Russell King <rmk+kernel@arm.linux.org.uk>
->>> 	Date:   Mon Apr 28 15:55:59 2014 +0100
->>>
->>> 	ARM: l2c: socfpga: convert to generic l2c OF initialisation
->>>
->>> 	Remove the explicit call to l2x0_of_init(), converting to the generic
->>> 	infrastructure instead.
->>>
->>> 	Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->>>
->>
->> That should only result in the L2 cache being turned on earlier (before
->> the secondary CPUs come up.)  I wonder if there's a bug in the secondary
->> CPU code which is being tickled by it.
->>
->> What we need is some information on the failure - and as you've noticed,
->> the failure occurs before the console is initialised.  There's two
->> solutions to that:
->>
->> 1. Enable early printk support (and hope that works)
-> 
-> Thanks. I actually got it working. Seems I had forgotten something in the
-> config. So, the bootlog now prints
-> 
-> Uncompressing Linux... done, booting the kernel.
-> [    0.000000] Booting Linux on physical CPU 0x0
-> [    0.000000] Initializing cgroup subsys cpuset
-> [    0.000000] Linux version 3.19.0-rc7-test-00001-g7c10eb5fb252 (str at dude) (gcc version 4.9.2 (OSELAS.Toolchain-2014.12.0) ) #163 SMP PREEMPT Mon Feb 9 16:35:27 CET 2015
-> [    0.000000] CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c5387d
-> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-> [    0.000000] Machine model: Terasic SoCkit
-> [    0.000000] bootconsole [earlycon0] enabled
-> [    0.000000] Memory policy: Data cache writealloc
-> [    0.000000] BUG: mapping for 0xfffec000 at 0xfffec000 out of vmalloc space
-> Early printk initialized
-> [    0.000000] PERCPU: Embedded 10 pages/cpu @bf7d4000 s11456 r8192 d21312 u40960
-> [    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 260096
-> [    0.000000] Kernel command line: console=ttyS0,115200 earlyprintk  ip=dhcp root=/dev/nfs nfsroot=/home/str/nfsroot/sockit,v3,tcp
-> [    0.000000] PID hash table entries: 4096 (order: 2, 16384 bytes)
-> [    0.000000] Dentry cache hash table entries: 131072 (order: 7, 524288 bytes)
-> [    0.000000] Inode-cache hash table entries: 65536 (order: 6, 262144 bytes)
-> [    0.000000] Memory: 1032636K/1048576K available (4716K kernel code, 222K rwdata, 1412K rodata, 276K init, 127K bss, 15940K reserved, 0K cma-reserved)
-> [    0.000000] Virtual kernel memory layout:
-> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-> [    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
-> [    0.000000]     vmalloc : 0xc0800000 - 0xff000000   (1000 MB)
-> [    0.000000]     lowmem  : 0x80000000 - 0xc0000000   (1024 MB)
-> [    0.000000]     modules : 0x7f000000 - 0x80000000   (  16 MB)
-> [    0.000000]       .text : 0x80008000 - 0x806044d8   (6130 kB)
-> [    0.000000]       .init : 0x80605000 - 0x8064a000   ( 276 kB)
-> [    0.000000]       .data : 0x8064a000 - 0x80681a14   ( 223 kB)
-> [    0.000000]        .bss : 0x80681a14 - 0x806a161c   ( 128 kB)
-> [    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=2, Nodes=1
-> [    0.000000] Preemptible hierarchical RCU implementation.
-> [    0.000000] NR_IRQS:16 nr_irqs:16 16
-> [    0.000000] L2C-310 enabling early BRESP for Cortex-A9
-> [    0.000000] L2C-310 full line of zeros enabled for Cortex-A9
-> [    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
-> [    0.000000] L2C-310 cache controller enabled, 8 ways, 512 kB
-> [    0.000000] L2C-310: CACHE_ID 0x410030c9, AUX_CTRL 0x46060001
-> [    0.000013] sched_clock: 32 bits at 100MHz, resolution 10ns, wraps every 42949672950ns
-> [    0.008119] Console: colour dummy device 80x30
-> [    0.012670] Calibrating delay loop... 1594.16 BogoMIPS (lpj=7970816)
-> [    0.052740] pid_max: default: 32768 minimum: 301
-> [    0.057509] Mount-cache hash table entries: 2048 (order: 1, 8192 bytes)
-> [    0.064195] Mountpoint-cache hash table entries: 2048 (order: 1, 8192 bytes)
-> [    0.071877] CPU: Testing write buffer coherency: ok
-> [    0.077012] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-> [    0.082841] Setting up static identity map for 0x47cc10 - 0x47cc68
-> [    1.139876] CPU1: failed to come online
-> [    1.143808] Brought up 1 CPUs
-> [    1.146851] SMP: Total of 1 processors activated (1594.16 BogoMIPS).
-> 
-> 
-> It looks like there actually is something wrong with the SMP setup.
-> The SoC is a Cortex-A9 dual core and normally both CPUs are started.
-> Maybe it has something to do with
-> 
-> 	BUG: mapping for 0xfffec000 at 0xfffec000 out of vmalloc space
-> 
-> 0xfffec000 is the SCU base address.
-> 
+I take this as a tested-by.
 
-This printout has been there for quite a while. The fix should be to
-remove the static define SOCFPGA_SCU_VIRT_BASE. I have a patch for this
-queue up but haven't had a chance to send it yet.
+> Will you merger this patch?
 
-I was able to recreate this error(only 1 CPU coming online), when I
-build for socfpga_defconfig. But I cannot seem to recreate it if I build
-for multi_v7_defconfig, both CPUs come up just fine.
+Yes, after I do a bit more testing, but it will probably be merged in
+3.20.
 
-Would it be possible for you to run your test with multi_v7_defconfig?
-
-Thanks,
-Dinh
+-- 
+Catalin
