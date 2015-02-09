@@ -1,108 +1,77 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Mon, 9 Feb 2015 14:08:41 -0800
-Subject: [PATCH 2/9] regulator: core: Introduce set_optimum_mode op
-In-Reply-To: <20150130122714.GA26617@finisterre.sirena.org.uk>
-References: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1422413199-17273-3-git-send-email-bjorn.andersson@sonymobile.com>
- <20150128195204.GN21293@sirena.org.uk>
- <20150130000741.GP11960@sonymobile.com>
- <20150130122714.GA26617@finisterre.sirena.org.uk>
-Message-ID: <CAJAp7OjEKHut7jamChycfj_DHX7OaTm3kuKMWaY=hj4UZfyhaA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Feb 2015 14:16:35 -0800
+Subject: [PATCH 0/2] ARM: omap2+: omap_hwmod: Fix false lockdep warning
+In-Reply-To: <alpine.DEB.2.02.1502091835380.3767@utopia.booyaka.com>
+References: <1423226916-18804-1-git-send-email-peter.ujfalusi@ti.com>
+ <20150206141346.GP21418@twins.programming.kicks-ass.net>
+ <54D4E64C.7060208@ti.com>
+ <20150206183205.GS21418@twins.programming.kicks-ass.net>
+ <54D5154F.8080208@ti.com> <54D86F74.7070703@ti.com>
+ <alpine.DEB.2.02.1502091557450.3767@utopia.booyaka.com>
+ <20150209173110.GI25235@atomide.com>
+ <alpine.DEB.2.02.1502091835380.3767@utopia.booyaka.com>
+Message-ID: <20150209221634.GD2531@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 30, 2015 at 4:27 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, Jan 29, 2015 at 04:07:42PM -0800, Bjorn Andersson wrote:
->> On Wed 28 Jan 11:52 PST 2015, Mark Brown wrote:
->
->> > This is basically fine but can you please rename this to be something
->> > that more directly reflects the fact that we're just informing the
->> > driver about the operating parameters - there are other things a driver
->> > could usefully do with this, for example set current limits so that if
->> > something starts to consume excessive current the device will flag this
->> > as an error.
->
->> The purpose of the series was to be able to implement patch 9, which
->> will utilize the load_uA to set the "mode" of the Qualcomm regulators.
->
->> So I would like it to be a "setter of current consumption".
->
->> I'm not sure what to name the function to have it cover these additional
->> cases.
->
-> notify_load() or something?  That's what it's doing, what the driver
-> does with it is a separate thing.
->
+* Paul Walmsley <paul@pwsan.com> [150209 10:59]:
+> On Mon, 9 Feb 2015, Tony Lindgren wrote:
+> 
+> > * Paul Walmsley <paul@pwsan.com> [150209 08:04]:
+> > > On Mon, 9 Feb 2015, Peter Ujfalusi wrote:
+> > > 
+> > > > On 02/06/2015 09:26 PM, Peter Ujfalusi wrote:
+> > > > >> Yeah, I've never really bothered with data too much, its a debug
+> > > > >> feature. So lock_class_key is 8 bytes, and strictly speaking you could
+> > > > >> union them over other fields, all we really need is unique addresses, we
+> > > > >> don't actually use the storage.
+> > > > > 
+> > > > > True. our omap2plus defconfig does not have LOCKDEP enabled so it should not
+> > > > > add anything to the data when running default kernel.
+> > > > > I'll test the lockdep_set_class() method you suggested on Monday (not
+> > > > > tomorrow), but still as first thing.
+> > > > > If it is working as expected I'll send a patch with you as author.
+> > > > 
+> > > > With omap2plus_defconfig my build produces (vmlinux size):
+> > > > Base: 				99905522
+> > > > with my series:			99908385 (base + 2863)
+> > > > with Peter Zijlstra's patch:	99910625 (base + 5103)
+> > > > 
+> > > > The reason for this is that we will only have
+> > > > struct lock_class_key { };
+> > > > in case of !CONFIG_LOCKDEP. On ARM however CONFIG_LOCKDEP is enabled by
+> > > > default, while the CONFIG_DEBUG_LOCKDEP is disabled.
+> > > > 
+> > > > So it does add more data to our default omap2plus config.
+> > > > 
+> > > > Tony: do you have preference on the way we fix this issue?
+> > > > 
+> > > > As I recall there is a plan to remove the hwmod static database and move it or
+> > > > generate it from DT? Not sure when and how this will be done, but will it
+> > > > affect the lockdep_set_class() way?
+> > > 
+> > > Well I guess we could see what Tony says, but you do realize that the 
+> > > difference in sizes that you posted above is about .003% of the total 
+> > > binary size, right?  
+> > > 
+> > > If there's one thing we can say about the last few years of ARM kernel 
+> > > development, it's that those kind of size increases are utterly dwarfed by 
+> > > other changes in the kernel.  So I'd say, post a patch based on PeterZ's 
+> > > fix and be done with it...
+> > 
+> > Well the thing to consider here is what Peter U is saying about
+> > having struct omap_hwmod allocated based on the data from .dts
+> > files. If the fix makes the dynamic allocation harder to do later on,
+> > we should probably avoid it. If it's relatively easy to do later on,
+> > then I don't have a problem with it.
+> 
+> The future destination for that code that makes the most sense to me is 
+> for it to become integrated with the OMAP Sonics & Arteris bus drivers and 
+> DT data.  So I wouldn't worry too much about it; I don't think the 
+> lockdep fix will affect that at all.
 
-I changed it to set_load() in my tree, maybe "notify" is better as
-it's more of a hint to the driver.
-
-You said something when we talked that I interpreted to
-regulator_set_optimum_mode() is not a good name for the consumer API;
-was that a correct interpretation or was your comment limited to the
-driver facing API?
-
-Should we go ahead and rename it to regulator_notify_load()
-(regulator_set_load() perhaps?) before we get more consumers as well?
-(would be a separate patch set)
-
->> > It'd also be better to split the voltage specs out into a separate
->> > function, especially for the output voltage where obviously we have a
->> > separate range based interface for setting that.
->
->> The current implementors of get_optimum_mode all ignore the voltages, so
->> we could effectively simplify the interface to:
->
->>  get_optimum_mode(rdev, load);
->
->> Question is if there are any implementations where we don't know the
->> output voltage in the regulator driver (as locking prevents us from
->> using the standard interface of querying this). Input voltage is just a
->> query away.
->
-> We can always fix the locking to let people query the voltage if they
-> need to.
->
-
-Sounds good, drms_uA_update() becomes quite minimal with that.
-
-But if we're only considering load in drms_uA_update() does it make
-sense to check this against the valid ranges of min_uA, max_uA and
-hence instead of checking REGULATOR_CHANGE_DRMS just check for
-REGULATOR_CHANGE_CURRENT?
-We have reduced the interface to not necessarily be dynamic _mode_ setting.
-
-This would allow us to use existing properties in DT and
-of_get_regulation_constraints() would provide us those limits and flag
-that this code path is valid.
-
->> Having drms_uA_update() request an appropriate mode for the given load
->> and then calling set_mode directly (the current implementation) gives us
->> a single point of entry to the regulator drivers related to setting
->> modes (regulator_set_mode and drms_uA_update calls set_mode). But seen
->> from a consumer there's no consistency; the last call to
->> regulator_set_mode() and regulator_set_optimum_mode() will win.
->
-> That's fine, consumers shouldn't be using both simultaneously anyway.
-> If a consumer is actually setting modes actively at runtime by name it
-> needs to be fairly closely tied to a specific system and regulator so
-> it's not clear if there's much use case anyway.
->
-
-Indeed, as there's no MAX() or similar of the modes requested that
-seems to be a sure way to get into problems otherwise.
-
->> I think this covers your concern about patch 3-7 as well, please let me
->> know what you think.
->
-> Possibly.
-
-Well, my question is still there:
-
-Unless we replace the get_optimum_mode()/set_mode() pair with
-notify_load() the driver API logic will become confusing; so for the
-regulators that to day implement that combo I think we need patch 3-7
-as well.
+OK up to you guys then.
 
 Regards,
-Bjorn
+
+Tony
