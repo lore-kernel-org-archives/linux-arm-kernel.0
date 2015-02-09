@@ -1,86 +1,53 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 9 Feb 2015 22:50:56 +0800
-Subject: [PATCH] pinctrl: at91: move lock/unlock_as_irq calls into
- request/release resources methods
-In-Reply-To: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <BC36A77B-9986-495E-8F86-C80E9D0F0C63@jcrosoft.com>
+From: hofrat@osadl.org (Nicholas Mc Guire)
+Date: Mon,  9 Feb 2015 10:03:52 -0500
+Subject: [PATCH v2] i2c: cadence: fixup of wait_for_completion_timeout return
+ handling
+Message-ID: <1423494232-24747-1-git-send-email-hofrat@osadl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+return type of wait_for_completion_timeout is unsigned long not int. The
+return variable is renamed to reflect its use and the type adjusted to
+unsigned long.
 
-> On Feb 9, 2015, at 2:23 AM, Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> 
-> The gpiochip_lock_as_irq call can fail and return an error, while the
-> irq_startup is not expected to fail (returns an unsigned int which is not
-> checked by irq core code).
-> 
-> irq_request/release_resources functions have been created to address this
-> problem.
-> 
-> Move gpiochip_lock/unlock_as_irq calls into
-> irq_request/release_resources functions to prevent using a gpio as an irq
-> if the gpiochip_lock_as_irq call failed.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ?
+Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+---
 
-I?m travelling will take a look end of the week
+v2: int ret is an idiom not only a declaration - thus rather than just
+    changing the type, rename the variable, as suggested by Wolfram Sang 
+    <wsa@the-dreams.de>. 
 
-Best Regards,
-J.
-> drivers/pinctrl/pinctrl-at91.c | 17 +++++++----------
-> 1 file changed, 7 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index f4cd0b9..a481406 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -1477,28 +1477,25 @@ static void gpio_irq_ack(struct irq_data *d)
-> 	/* the interrupt is already cleared before by reading ISR */
-> }
-> 
-> -static unsigned int gpio_irq_startup(struct irq_data *d)
-> +static int gpio_irq_request_res(struct irq_data *d)
-> {
-> 	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
-> 	unsigned	pin = d->hwirq;
-> 	int ret;
-> 
-> 	ret = gpiochip_lock_as_irq(&at91_gpio->chip, pin);
-> -	if (ret) {
-> +	if (ret)
-> 		dev_err(at91_gpio->chip.dev, "unable to lock pind %lu IRQ\n",
-> 			d->hwirq);
-> -		return ret;
-> -	}
-> -	gpio_irq_unmask(d);
-> -	return 0;
-> +
-> +	return ret;
-> }
-> 
-> -static void gpio_irq_shutdown(struct irq_data *d)
-> +static void gpio_irq_release_res(struct irq_data *d)
-> {
-> 	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
-> 	unsigned	pin = d->hwirq;
-> 
-> -	gpio_irq_mask(d);
-> 	gpiochip_unlock_as_irq(&at91_gpio->chip, pin);
-> }
-> 
-> @@ -1577,8 +1574,8 @@ void at91_pinctrl_gpio_resume(void)
-> static struct irq_chip gpio_irqchip = {
-> 	.name		= "GPIO",
-> 	.irq_ack	= gpio_irq_ack,
-> -	.irq_startup	= gpio_irq_startup,
-> -	.irq_shutdown	= gpio_irq_shutdown,
-> +	.irq_request_resources = gpio_irq_request_res,
-> +	.irq_release_resources = gpio_irq_release_res,
-> 	.irq_disable	= gpio_irq_mask,
-> 	.irq_mask	= gpio_irq_mask,
-> 	.irq_unmask	= gpio_irq_unmask,
-> -- 
-> 1.9.1
-> 
+Patch was only compile tested with multi_v7_defconfig
+(implies CONFIG_I2C_CADENCE=y)
+
+Patch is against 3.19.0-rc7 (localversion-next is -next-20150209)
+
+ drivers/i2c/busses/i2c-cadence.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+index 7d7a14c..8f92732f 100644
+--- a/drivers/i2c/busses/i2c-cadence.c
++++ b/drivers/i2c/busses/i2c-cadence.c
+@@ -475,7 +475,7 @@ static void cdns_i2c_master_reset(struct i2c_adapter *adap)
+ static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
+ 		struct i2c_adapter *adap)
+ {
+-	int ret;
++	unsigned long timeout;
+ 	u32 reg;
+ 
+ 	id->p_msg = msg;
+@@ -501,8 +501,8 @@ static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
+ 		cdns_i2c_msend(id);
+ 
+ 	/* Wait for the signal of completion */
+-	ret = wait_for_completion_timeout(&id->xfer_done, adap->timeout);
+-	if (!ret) {
++	timeout = wait_for_completion_timeout(&id->xfer_done, adap->timeout);
++	if (!timeout) {
+ 		cdns_i2c_master_reset(adap);
+ 		dev_err(id->adap.dev.parent,
+ 				"timeout waiting on completion\n");
+-- 
+1.7.10.4
