@@ -1,71 +1,80 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Mon,  9 Feb 2015 21:12:23 +0800
-Subject: [PATCH 2/2] ARM: rockchip: disable watchdog during suspend
-In-Reply-To: <1423487543-10593-1-git-send-email-zyw@rock-chips.com>
-References: <1423487543-10593-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1423487543-10593-2-git-send-email-zyw@rock-chips.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 09 Feb 2015 14:17:17 +0100
+Subject: [PATCH] ARM: dts: exynos5420: Add maudio power domain
+In-Reply-To: <54D8AEE5.1090308@collabora.co.uk>
+References: <1423485695-22568-1-git-send-email-k.kozlowski@samsung.com>
+ <54D8AEE5.1090308@collabora.co.uk>
+Message-ID: <1423487837.23462.2.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The watchdog clock should be disable in dw_wdt_suspend, but we set a
-dummy clock to watchdog for rk3288. So the watchdog will continue to
-work during suspend. And we switch the system clock to 32khz from 24Mhz,
-during suspend, so the watchdog timer over count will increase to
-755 times, about 12.5 hours, the original value is 60 seconds. So
-watchdog will reset the system over a night,  but voltage are all
-incorrect, then it hang on reset.
+On pon, 2015-02-09 at 13:58 +0100, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
+> 
+> On 02/09/2015 01:41 PM, Krzysztof Kozlowski wrote:
+> > Add maudio power domain to Exynos 5420 DTSI file so its state could be
+> > tracked. This actually won't power down this domain because the pl330
+> > dmaengine driver (for adma channel) uses IRQ safe runtime PM. Thus the
+> > patch should not introduce any functional change except of visibility of
+> > this domain to the system.
+> > 
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> 
+> Your patch looks good to me, I just have two small comments below. With
+> those changes, feel free to add:
+> 
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Signed-off-by: Daniel Kurtz <djkurtz@google.com>
+Thanks!
 
----
+> 
+> >  arch/arm/boot/dts/exynos5420.dtsi | 7 +++++++
+> >  1 file changed, 7 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+> > index 6d38f8bfd0e6..2e99a39f7250 100644
+> > --- a/arch/arm/boot/dts/exynos5420.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> > @@ -270,6 +270,11 @@
+> >  		reg = <0x10044120 0x20>;
+> >  	};
+> >  
+> > +	mau_pd: power-domain at 100440E0 {
+> > +		compatible = "samsung,exynos4210-pd";
+> > +		reg = <0x100440E0 0x20>;
+> 
+> You also need to add #power-domain-cells = <0> here since "power-domain-cells"
+> is a required property now that the Exynos PD code has been converted to use
+> the generic power domains lookup.
 
- arch/arm/mach-rockchip/pm.c | 11 ++++++++---
- arch/arm/mach-rockchip/pm.h |  2 ++
- 2 files changed, 10 insertions(+), 3 deletions(-)
+Okay
 
-diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
-index a3ab397..b07d886 100644
---- a/arch/arm/mach-rockchip/pm.c
-+++ b/arch/arm/mach-rockchip/pm.c
-@@ -75,9 +75,13 @@ static void rk3288_slp_mode_set(int level)
- 	regmap_read(pmu_regmap, RK3288_PMU_PWRMODE_CON,
- 		    &rk3288_pmu_pwr_mode_con);
- 
--	/* set bit 8 so that system will resume to FAST_BOOT_ADDR */
-+	/*
-+	 * SGRF_FAST_BOOT_EN - system to boot from FAST_BOOT_ADDR
-+	 * PCLK_WDT_GATE - disable WDT during suspend.
-+	 */
- 	regmap_write(sgrf_regmap, RK3288_SGRF_SOC_CON0,
--		     SGRF_FAST_BOOT_EN | SGRF_FAST_BOOT_EN_WRITE);
-+		     SGRF_PCLK_WDT_GATE | SGRF_FAST_BOOT_EN
-+		     | SGRF_PCLK_WDT_GATE_WRITE | SGRF_FAST_BOOT_EN_WRITE);
- 
- 	/* booting address of resuming system is from this register value */
- 	regmap_write(sgrf_regmap, RK3288_SGRF_FAST_BOOT_ADDR,
-@@ -122,7 +126,8 @@ static void rk3288_slp_mode_set_resume(void)
- 		     rk3288_pmu_pwr_mode_con);
- 
- 	regmap_write(sgrf_regmap, RK3288_SGRF_SOC_CON0,
--		     rk3288_sgrf_soc_con0 | SGRF_FAST_BOOT_EN_WRITE);
-+		     rk3288_sgrf_soc_con0 | SGRF_PCLK_WDT_GATE_WRITE
-+		     | SGRF_FAST_BOOT_EN_WRITE);
- }
- 
- static int rockchip_lpmode_enter(unsigned long arg)
-diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
-index 96beaa0..d463978 100644
---- a/arch/arm/mach-rockchip/pm.h
-+++ b/arch/arm/mach-rockchip/pm.h
-@@ -44,6 +44,8 @@ void __init rockchip_suspend_init(void);
- 
- #define RK3288_SGRF_SOC_CON0		(0x0000)
- #define RK3288_SGRF_FAST_BOOT_ADDR	(0x0120)
-+#define SGRF_PCLK_WDT_GATE		BIT(6)
-+#define SGRF_PCLK_WDT_GATE_WRITE	BIT(22)
- #define SGRF_FAST_BOOT_EN		BIT(8)
- #define SGRF_FAST_BOOT_EN_WRITE		BIT(24)
- 
--- 
-1.9.1
+> 
+> > +	};
+> > +
+> >  	pinctrl_0: pinctrl at 13400000 {
+> >  		compatible = "samsung,exynos5420-pinctrl";
+> >  		reg = <0x13400000 0x1000>;
+> > @@ -328,6 +333,7 @@
+> >  			#dma-cells = <1>;
+> >  			#dma-channels = <6>;
+> >  			#dma-requests = <16>;
+> > +			samsung,power-domain = <&mau_pd>;
+> 
+> Same here. Even though "samsung,power-domain" is kept as backward compatible,
+> "power-domains" should be used instead. In fact Marek sent a patch [0] to get
+> rid of all the current "samsung,power-domain" properties so it would be good
+> if you can base on top of that one.
+
+Right, I rebased this on mid-January next which did not include Marek's
+work yet.
+
+Best regards,
+Krzysztof
+
+> 
+> Best regards,
+> Javier
+> 
+> [0]: http://www.spinics.net/lists/linux-samsung-soc/msg40584.html
