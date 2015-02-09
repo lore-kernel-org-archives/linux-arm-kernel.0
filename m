@@ -1,79 +1,85 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 9 Feb 2015 16:50:41 +0000
-Subject: ask for help about swiotlb buffer is full
-In-Reply-To: <54D57017.6050704@huawei.com>
-References: <54CB5820.9020102@huawei.com> <54CB5AA4.7050705@huawei.com>
- <20150130115915.GB27542@e104818-lin.cambridge.arm.com>
- <54CC5346.5070402@huawei.com>
- <20150202182435.GH22661@e104818-lin.cambridge.arm.com>
- <54D209FD.40100@huawei.com>
- <20150204133205.GC26006@e104818-lin.cambridge.arm.com>
- <54D23123.3040208@huawei.com>
- <20150205181934.GE21970@e104818-lin.cambridge.arm.com>
- <54D57017.6050704@huawei.com>
-Message-ID: <20150209165041.GA11542@e104818-lin.cambridge.arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 9 Feb 2015 18:14:24 +0100
+Subject: [PATCH] ARM: shmobile: r8a73a4: Move pfc node to work around
+ probe ordering bug
+In-Reply-To: <20150209162428.GG25235@atomide.com>
+References: <1423254173-31852-1-git-send-email-geert+renesas@glider.be>
+ <20150209162428.GG25235@atomide.com>
+Message-ID: <CAMuHMdXsbmcgRacg9CT9N7+KjOrog2F8mmGfORu31P3xyoVviA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 07, 2015 at 01:53:27AM +0000, Kefeng Wang wrote:
-> On 2015-02-06 2:19, Catalin Marinas wrote:
-> > On Wed, Feb 04, 2015 at 02:48:03PM +0000, Ding Tianhong wrote:
-> >> On 2015/2/4 21:32, Catalin Marinas wrote:
-> >>> On Wed, Feb 04, 2015 at 12:01:01PM +0000, Kefeng Wang wrote:
-> >>>> On 2015-02-03 2:24, Catalin Marinas wrote:
-> >>>>> On Sat, Jan 31, 2015 at 04:00:06AM +0000, Kefeng Wang wrote:
-> >>>>>> 4kb page,  use Make ARCH=arm64 defconfig in v3.19 to generate config.
-> >>>>>>
-> >>>>>> [    0.678293] software IO TLB [mem 0x7e800000-0x7ec00000] (4MB) mapped at [ffffffc07e800000-ffffffc07ebfffff]
-> >>>>>> [    0.686991] DMA: preallocated 256 KiB pool for atomic allocations
-> >>>>>
-> >>>>> Was the swiotlb buffer size the same in the 3.16 kernel? The only thing
-> >>>>> I recall adding was the atomic pool allocations but these are only for
-> >>>>> non-coherent DMA ops and only for dma_alloc/free. I assume, in the case
-> >>>>> of SATA, the failure is on the dma_map_sg() path.
-> >>>>
-> >>>> Swiotlb buffer size is both 4M in v3.16 and v3.19-rc4, and the failure is
-> >>>> on the dma_map_sg() -> swiotlb_map_sg_attrs.
-> >>>>
-> >>>>> Maybe with a 3.19 kernel you get more than 4MB swiotlb buffers used at a
-> >>>>> time with your tests; can you try increasing this via a kernel command
-> >>>>> like to, let's say, 8MB? If I got my calculations correctly (an IO TLB
-> >>>>> slab is 1 << 11):
-> >>>>>
-> >>>>> 	swiotlb=4096
-> >>>>>
-> >>>>> If it still runs out with bigger buffers, we may need to look into
-> >>>>> potential leaks.
-> >>>>
-> >>>> The buddy allocator can only support 4M contiguous physical memory, so it's
-> >>>> useless to increase swiotlb buffer.
-> >>>
-> >>> You could hack arch/arm64/Kconfig to set a higher
-> >>> CONFIG_FORCE_MAX_ZONEORDER as a test. Depending on the test result, we
-> >>> can look for an alternative solution.
-> >>
-> >> I have try this before and could fix the problem, but I think it is
-> >> not a perfect solution,.
-> > 
-> > So it's not some bug leaking memory but a genuine need for bigger
-> > swiotlb buffer. Ideally your hardware should have an iommu as bouncing
-> > is not cheap.
-> > 
-> > Most architectures using swiotlb seem to use the default size of 64MB
-> > (with the risk of wasting too much memory on smaller systems). That's
-> > what we had on arm64 before commit 3690951fc6d42f3a (arm64: Use swiotlb
-> > late initialisation) but the problem was that the generic swiotlb_init()
-> > function didn't bother with which zone it allocated memory from and it
-> > wasn't always suitable for 32-bit DMA.
-> 
-> Thanks for you help, I have tested this patch, and sata could work fine again.
+Hi Tony,
 
-I take this as a tested-by.
+On Mon, Feb 9, 2015 at 5:24 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Geert Uytterhoeven <geert+renesas@glider.be> [150206 12:26]:
+>> Currently the pin function controller (which is also a GPIO controller)
+>> is instantiated before the interrupt controllers due to the order in the
+>> DTS. At that time, the irq domains for the interrupt controllers
+>> referenced by its interrupts-extended property cannot be found yet:
+>>
+>>     irq: no irq domain found for /interrupt-controller at e61c0000 !
+>>
+>> Nevertheless, the core OF probing code ignores this failure, besides a
+>> debug message that's not normally printed:
+>>
+>>     not all legacy IRQ resources mapped for pfc
+>>
+>> and continues initialization of the device. Then, the sh-pfc driver
+>> cannot find any IRQ resources, and thinks no interrupts are available,
+>> causing gpio-keys to fail later:
+>>
+>>     gpio-keys keyboard: Unable to claim irq 0; error -22
+>>     gpio-keys: probe of keyboard failed with error -22
+>>
+>> Move the pin function controller node after the interrupt controller
+>> nodes it references to work around the bug in the core OF probing code.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>> Notes:
+>>   - It seems several people tried to solve this in the core OF probing
+>>     code before, but the final solution never went in?
+>>   - This can be reproduced on other SoCs (e.g. sh73a0 and r8a7740) by
+>>     moving their pfc nodes before their interrupt controller nodes.
+>>   - This patch is against my working tree, so it doesn't apply to
+>>     Simon's repository, but you get the idea....
+>
+> No issues with the patch, but here are few comments on the core
+> reasons (without looking at the code in this case) that might help
+> fix similar issues.
+>
+> In all the cases I've seen these errors are caused by non-standard
+> custom initcall levels for drivers like i2c bus. The real solution
+> is to initialize drivers later with standard module_init, and stop
+> the race to the bottom with custom initcall levels.
+>
+> If there is legacy board specific platofrm init code that needs
+> i2c gpios early, that code can probably be moved to initialize
+> later on.
 
-> Will you merger this patch?
+In this case no i2c is involved. The drivers for both pinctrl
+(renesas,pfc-r8a73a4) and irqchip (renesas,irqc) are registered
+at the same level:
+  - postcore_initcall(sh_pfc_init);
+  - postcore_initcall(irqc_init);
+Hence the system uses the "natural" order from within the DTS,
+and decided to instantiate the pfc before the irqchip.
 
-Yes, after I do a bit more testing, but it will probably be merged in
-3.20.
+> Also, there should not be any need for custom driver initcall
+> levels from Linux generic framework point of view as for example
+> irqchip implementing drivers work just fine as a loadable module.
 
--- 
-Catalin
+As long as no other device that's instantiated earlier references that
+irqchip?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
