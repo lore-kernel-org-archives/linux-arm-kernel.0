@@ -1,35 +1,61 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Mon, 09 Feb 2015 15:27:39 -0800
-Subject: Delays, clocks, timers, hrtimers, etc
-In-Reply-To: <20150203120925.GM8656@n2100.arm.linux.org.uk>
-References: <54C8E125.3070905@free.fr>
- <20150203120925.GM8656@n2100.arm.linux.org.uk>
-Message-ID: <54D9426B.9030802@free.fr>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Mon, 09 Feb 2015 18:34:51 -0500
+Subject: [PATCH 03/16] tty: serial: 8250_core: read only RX if there is
+ something in the FIFO
+In-Reply-To: <54D8B772.1010405@freebox.fr>
+References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
+ <1410377411-26656-4-git-send-email-bigeasy@linutronix.de>
+ <54D8B772.1010405@freebox.fr>
+Message-ID: <54D9441B.7070403@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+Hi Nicolas,
 
-> Mason wrote:
->  
->> Q1. the {n,u,m}delay function family
->>
->> [...]
->
-> Timers are preferred because of the problems with the software delay loop.
+Thanks for the report.
 
-Can you confirm that if one intends to use timer-based delays, one must
-call register_current_timer_delay at init?
+On 02/09/2015 08:34 AM, Nicolas Schichan wrote:
+> On 09/10/2014 09:29 PM, Sebastian Andrzej Siewior wrote:
+>> The serial8250_do_startup() function unconditionally clears the
+>> interrupts and for that it reads from the RX-FIFO without checking if
+>> there is a byte in the FIFO or not. This works fine on OMAP4+ HW like
+>> AM335x or DRA7.
+>> OMAP3630 ES1.1 (which means probably all OMAP3 and earlier) does not like
+>> this:
+> 
+> Hello,
+> 
+> Sorry to wake up an old thread, but I'm affraid that this patch causes
+> problems on Marvell 88f6282 (Kirkwood).
+> 
+> When a caracter is received on the UART while the kernel is printing
+> the boot messages, as soon as the kernel configures the UART for
+> receiving (after root filesystem mount), it gets stuck printing the
+> following message repeatedly:
+> 
+> serial8250: too much work for irq29
+> 
+> Once stuck, the reception of another character allows the boot process
+> to finish.
+> 
+> From what I can gather, when we hit that, the UART_IIR_NO_INT is 0 (so the
+> interrupt is raised), but the UART_LSR_DR bit is 0 as well so the UART_RX
+> register is never read to clear the interrupt.
 
-There aren't many callers of register_current_timer_delay.
+The "too much work" message means serial8250_handle_irq() is returning 0,
+ie., not handled. Which in turn means IIR indicates no interrupt is pending
+(UART_IIR_NO_INT == 1).
 
-   arch/arm/kernel/arch_timer.c:   register_current_timer_delay(&arch_delay_timer);
-   arch/arm/mach-u300/timer.c:     register_current_timer_delay(&u300_delay_timer);
-   drivers/clocksource/nomadik-mtu.c:      register_current_timer_delay(&mtu_delay_timer);
+Can you log the register values for LSR and IIR at both patch locations
+in serial8250_do_startup()?
 
-Does that mean that every other platform is using software delay-loops
-instead of timer-based delay-loops?
+(I can get you a debug patch, if necessary. Let me know)
 
-(AFAIU, architected / generic timers are new-ish in Cortex A7 and A15.)
+Regards,
+Peter Hurley
 
-Regards.
+> We are using the second UART multiplexed on mpps 15 and 16.
+> 
+> Reverting this particular patch fixes the issue.
+> 
+> We are seing the problem on a 3.18 kernel.
