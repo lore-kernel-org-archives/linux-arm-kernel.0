@@ -1,74 +1,81 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 9 Feb 2015 12:14:34 +0100
-Subject: [PATCH 1/3] USB: gadget: at91_udc: add at91sam9n12 support
-In-Reply-To: <1423472572-19824-2-git-send-email-voice.shen@atmel.com>
-References: <1423472572-19824-1-git-send-email-voice.shen@atmel.com>
- <1423472572-19824-2-git-send-email-voice.shen@atmel.com>
-Message-ID: <20150209111434.GN3715@piout.net>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Mon,  9 Feb 2015 20:19:21 +0900
+Subject: [PATCH] CHROMIUM: iommu: rockchip: Make sure that page table state is
+ coherent
+Message-ID: <1423480761-33453-1-git-send-email-tfiga@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bo,
+Even though the code uses the dt_lock spin lock to serialize mapping
+operation from different threads, it does not protect from IOMMU
+accesses that might be already taking place and thus altering state
+of the IOTLB. This means that current mapping code which first zaps
+the page table and only then updates it with new mapping which is
+prone to mentioned race.
 
-On 09/02/2015 at 17:02:50 +0800, Bo Shen wrote :
-> Add at91sam9n12 SoC support.
-> 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> ---
-> 
->  drivers/usb/gadget/udc/at91_udc.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
-> index c862656..f4c785f 100644
-> --- a/drivers/usb/gadget/udc/at91_udc.c
-> +++ b/drivers/usb/gadget/udc/at91_udc.c
-> @@ -931,7 +931,8 @@ static void pullup(struct at91_udc *udc, int is_on)
->  		at91_udp_write(udc, AT91_UDP_TXVC, 0);
->  		if (cpu_is_at91rm9200())
->  			gpio_set_value(udc->board.pullup_pin, active);
-> -		else if (cpu_is_at91sam9260() || cpu_is_at91sam9263() || cpu_is_at91sam9g20()) {
-> +		else if (cpu_is_at91sam9260() || cpu_is_at91sam9263() ||
-> +			 cpu_is_at91sam9g20() || cpu_is_at91sam9n12()) {
+In addition, current code assumes that mappings are always > 4 MiB
+(which translates to 1024 PTEs) and so they would always occupy
+entire page tables. This is not true for mappings created by V4L2
+Videobuf2 DMA contig allocator.
 
-cpu_is_at91xx have been removed from the kernel, using the correct
-compatible should be enough, see
-http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/drivers/usb/gadget/udc/at91_udc.c?id=f0bceab4e3b528e799aba8fda8d2936fcfd41f1f
+This patch changes the mapping code to always zap the page table
+after it is updated, which avoids the aforementioned race and also
+zap the last page of the mapping to make sure that stale data is
+not cached from an already existing mapping.
 
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+---
+ drivers/iommu/rockchip-iommu.c | 23 +++++++++++++++++------
+ 1 file changed, 17 insertions(+), 6 deletions(-)
 
->  			u32	txvc = at91_udp_read(udc, AT91_UDP_TXVC);
->  
->  			txvc |= AT91_UDP_TXVC_PUON;
-> @@ -949,7 +950,8 @@ static void pullup(struct at91_udc *udc, int is_on)
->  		at91_udp_write(udc, AT91_UDP_TXVC, AT91_UDP_TXVC_TXVDIS);
->  		if (cpu_is_at91rm9200())
->  			gpio_set_value(udc->board.pullup_pin, !active);
-> -		else if (cpu_is_at91sam9260() || cpu_is_at91sam9263() || cpu_is_at91sam9g20()) {
-> +		else if (cpu_is_at91sam9260() || cpu_is_at91sam9263() ||
-> +			 cpu_is_at91sam9g20() || cpu_is_at91sam9n12()) {
->  			u32	txvc = at91_udp_read(udc, AT91_UDP_TXVC);
->  
->  			txvc &= ~AT91_UDP_TXVC_PUON;
-> @@ -1758,7 +1760,8 @@ static int at91udc_probe(struct platform_device *pdev)
->  	}
->  
->  	/* newer chips have more FIFO memory than rm9200 */
-> -	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20()) {
-> +	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20() ||
-> +	    cpu_is_at91sam9n12()) {
->  		udc->ep[0].maxpacket = 64;
->  		udc->ep[3].maxpacket = 64;
->  		udc->ep[4].maxpacket = 512;
-> -- 
-> 2.3.0.rc0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index 6a8b1ec..b06fe76 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -544,6 +544,15 @@ static void rk_iommu_zap_iova(struct rk_iommu_domain *rk_domain,
+ 	spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
+ }
+ 
++static void rk_iommu_zap_iova_first_last(struct rk_iommu_domain *rk_domain,
++					 dma_addr_t iova, size_t size)
++{
++	rk_iommu_zap_iova(rk_domain, iova, SPAGE_SIZE);
++	if (size > SPAGE_SIZE)
++		rk_iommu_zap_iova(rk_domain, iova + size - SPAGE_SIZE,
++					SPAGE_SIZE);
++}
++
+ static u32 *rk_dte_get_page_table(struct rk_iommu_domain *rk_domain,
+ 				  dma_addr_t iova)
+ {
+@@ -568,12 +577,6 @@ static u32 *rk_dte_get_page_table(struct rk_iommu_domain *rk_domain,
+ 	rk_table_flush(page_table, NUM_PT_ENTRIES);
+ 	rk_table_flush(dte_addr, 1);
+ 
+-	/*
+-	 * Zap the first iova of newly allocated page table so iommu evicts
+-	 * old cached value of new dte from the iotlb.
+-	 */
+-	rk_iommu_zap_iova(rk_domain, iova, SPAGE_SIZE);
+-
+ done:
+ 	pt_phys = rk_dte_pt_address(dte);
+ 	return (u32 *)phys_to_virt(pt_phys);
+@@ -623,6 +626,14 @@ static int rk_iommu_map_iova(struct rk_iommu_domain *rk_domain, u32 *pte_addr,
+ 
+ 	rk_table_flush(pte_addr, pte_count);
+ 
++	/*
++	 * Zap the first and last iova to evict from iotlb any previously
++	 * mapped cachelines holding stale values for its dte and pte.
++	 * We only zap the first and last iova, since only they could have
++	 * dte or pte shared with an existing mapping.
++	 */
++	rk_iommu_zap_iova_first_last(rk_domain, iova, size);
++
+ 	return 0;
+ unwind:
+ 	/* Unmap the range of iovas that we just mapped */
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.2.0.rc0.207.ga3a616c
