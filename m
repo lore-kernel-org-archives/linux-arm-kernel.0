@@ -1,71 +1,60 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Mon, 9 Feb 2015 19:26:06 +0100
-Subject: [PATCH v2] drm: atmel-hlcdc: Atomic mode-setting conversion
-In-Reply-To: <1423236143-6494-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1423236143-6494-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150209182606.GA11712@gradator.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Feb 2015 10:29:19 -0800
+Subject: [PATCH] ARM: shmobile: r8a73a4: Move pfc node to work around
+ probe ordering bug
+In-Reply-To: <CAMuHMdXsbmcgRacg9CT9N7+KjOrog2F8mmGfORu31P3xyoVviA@mail.gmail.com>
+References: <1423254173-31852-1-git-send-email-geert+renesas@glider.be>
+ <20150209162428.GG25235@atomide.com>
+ <CAMuHMdXsbmcgRacg9CT9N7+KjOrog2F8mmGfORu31P3xyoVviA@mail.gmail.com>
+Message-ID: <20150209182918.GA2531@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Boris,
-
-On Fri, Feb 06, 2015 at 04:22:23PM +0100, Boris Brezillon wrote:
-> Convert the HLCDC driver to atomic mode-setting.
+* Geert Uytterhoeven <geert@linux-m68k.org> [150209 09:17]:
+> On Mon, Feb 9, 2015 at 5:24 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Geert Uytterhoeven <geert+renesas@glider.be> [150206 12:26]:
+> >> Notes:
+> >>   - It seems several people tried to solve this in the core OF probing
+> >>     code before, but the final solution never went in?
+> >>   - This can be reproduced on other SoCs (e.g. sh73a0 and r8a7740) by
+> >>     moving their pfc nodes before their interrupt controller nodes.
+> >>   - This patch is against my working tree, so it doesn't apply to
+> >>     Simon's repository, but you get the idea....
+> >
+> > No issues with the patch, but here are few comments on the core
+> > reasons (without looking at the code in this case) that might help
+> > fix similar issues.
+> >
+> > In all the cases I've seen these errors are caused by non-standard
+> > custom initcall levels for drivers like i2c bus. The real solution
+> > is to initialize drivers later with standard module_init, and stop
+> > the race to the bottom with custom initcall levels.
+> >
+> > If there is legacy board specific platofrm init code that needs
+> > i2c gpios early, that code can probably be moved to initialize
+> > later on.
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
+> In this case no i2c is involved. The drivers for both pinctrl
+> (renesas,pfc-r8a73a4) and irqchip (renesas,irqc) are registered
+> at the same level:
+>   - postcore_initcall(sh_pfc_init);
+>   - postcore_initcall(irqc_init);
+> Hence the system uses the "natural" order from within the DTS,
+> and decided to instantiate the pfc before the irqchip.
 
-I am getting the following trace with this patch applied, which seems 
-pretty straightforward to fix.
+OK
+ 
+> > Also, there should not be any need for custom driver initcall
+> > levels from Linux generic framework point of view as for example
+> > irqchip implementing drivers work just fine as a loadable module.
+> 
+> As long as no other device that's instantiated earlier references that
+> irqchip?
 
-Apart from that, it works perfectly, you can add my:
+Right :) And deferred probe won't still remove the warning in
+that case. From what I remember, that's a valid warning from irq
+framework point of view.
 
-Tested-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+Regards,
 
-
-
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 9 at drivers/clk/clk.c:992 clk_disable+0x28/0x34()
-Modules linked in:
-CPU: 0 PID: 9 Comm: kworker/0:1 Not tainted 3.19.0-rc7-next-20150204+ #90
-Hardware name: Atmel SAMA5 (Device Tree)
-Workqueue: events output_poll_execute
-[<c0013284>] (unwind_backtrace) from [<c0010f90>] (show_stack+0x10/0x14)
-[<c0010f90>] (show_stack) from [<c001b0fc>] (warn_slowpath_common+0x84/0xb0)
-[<c001b0fc>] (warn_slowpath_common) from [<c001b1c4>] (warn_slowpath_null+0x1c/0x24)
-[<c001b1c4>] (warn_slowpath_null) from [<c0355418>] (clk_disable+0x28/0x34)
-[<c0355418>] (clk_disable) from [<c024b1c0>] (atmel_hlcdc_crtc_disable+0xe8/0x114)
-[<c024b1c0>] (atmel_hlcdc_crtc_disable) from [<c02209dc>] (__drm_helper_disable_unused_functions+0xa4/0xd8)
-[<c02209dc>] (__drm_helper_disable_unused_functions) from [<c0220a24>] (drm_helper_disable_unused_functions+0x14/0x20)
-[<c0220a24>] (drm_helper_disable_unused_functions) from [<c022d078>] (drm_fbdev_cma_init+0x78/0xfc)
-[<c022d078>] (drm_fbdev_cma_init) from [<c024b7a8>] (atmel_hlcdc_fb_output_poll_changed+0x30/0x40)
-[<c024b7a8>] (atmel_hlcdc_fb_output_poll_changed) from [<c0222800>] (output_poll_execute+0x148/0x188)
-[<c0222800>] (output_poll_execute) from [<c002bf94>] (process_one_work+0xfc/0x310)
-[<c002bf94>] (process_one_work) from [<c002caec>] (worker_thread+0x60/0x478)
-[<c002caec>] (worker_thread) from [<c00305b4>] (kthread+0xd4/0xec)
-[<c00305b4>] (kthread) from [<c000e4a0>] (ret_from_fork+0x14/0x34)
----[ end trace 9500ebf8d7076b60 ]---
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 9 at drivers/clk/clk.c:898 clk_unprepare+0x24/0x2c()
-Modules linked in:
-CPU: 0 PID: 9 Comm: kworker/0:1 Tainted: G        W      3.19.0-rc7-next-20150204+ #90
-Hardware name: Atmel SAMA5 (Device Tree)
-Workqueue: events output_poll_execute
-[<c0013284>] (unwind_backtrace) from [<c0010f90>] (show_stack+0x10/0x14)
-[<c0010f90>] (show_stack) from [<c001b0fc>] (warn_slowpath_common+0x84/0xb0)
-[<c001b0fc>] (warn_slowpath_common) from [<c001b1c4>] (warn_slowpath_null+0x1c/0x24)
-[<c001b1c4>] (warn_slowpath_null) from [<c03553e8>] (clk_unprepare+0x24/0x2c)
-[<c03553e8>] (clk_unprepare) from [<c024b1c8>] (atmel_hlcdc_crtc_disable+0xf0/0x114)
-[<c024b1c8>] (atmel_hlcdc_crtc_disable) from [<c02209dc>] (__drm_helper_disable_unused_functions+0xa4/0xd8)
-[<c02209dc>] (__drm_helper_disable_unused_functions) from [<c0220a24>] (drm_helper_disable_unused_functions+0x14/0x20)
-[<c0220a24>] (drm_helper_disable_unused_functions) from [<c022d078>] (drm_fbdev_cma_init+0x78/0xfc)
-[<c022d078>] (drm_fbdev_cma_init) from [<c024b7a8>] (atmel_hlcdc_fb_output_poll_changed+0x30/0x40)
-[<c024b7a8>] (atmel_hlcdc_fb_output_poll_changed) from [<c0222800>] (output_poll_execute+0x148/0x188)
-[<c0222800>] (output_poll_execute) from [<c002bf94>] (process_one_work+0xfc/0x310)
-[<c002bf94>] (process_one_work) from [<c002caec>] (worker_thread+0x60/0x478)
-[<c002caec>] (worker_thread) from [<c00305b4>] (kthread+0xd4/0xec)
-[<c00305b4>] (kthread) from [<c000e4a0>] (ret_from_fork+0x14/0x34)
----[ end trace 9500ebf8d7076b61 ]--- 
-
-
-Sylvain
+Tony
