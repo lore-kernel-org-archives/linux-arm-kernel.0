@@ -1,31 +1,96 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 09 Feb 2015 17:44:39 +0800
-Subject: arm: kprobe compilation error
-In-Reply-To: <54D38982.6000100@elproma.com.pl>
-References: <54D38982.6000100@elproma.com.pl>
-Message-ID: <1423475079.2864.49.camel@linaro.org>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 9 Feb 2015 17:49:04 +0800
+Subject: [PATCH v2] ARM: at91: dts: sama5d4: add dts for sama5d4 xplained
+ board
+In-Reply-To: <20150209102435.56f39b81@bbrezillon>
+References: <1423473423-17798-1-git-send-email-josh.wu@atmel.com>
+ <20150209102435.56f39b81@bbrezillon>
+Message-ID: <54D88290.6030501@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Janusz
+Hi, Boris
 
-On Thu, 2015-02-05 at 16:17 +0100, Janusz U?ycki wrote:
-> I got the compilation error on next-20150204:
-> 
-[...]
-> In file included from arch/arm/probes/kprobes/core.c:37:
-> arch/arm/probes/kprobes/core.h:43: error: '[*]' not allowed in other 
-> than a declaration
-[...]
-> gcc version 4.2.4
+On 2/9/2015 5:24 PM, Boris Brezillon wrote:
+> Hi Josh,
+>
+> On Mon, 9 Feb 2015 17:17:03 +0800
+> Josh Wu <josh.wu@atmel.com> wrote:
+>
+>> Add at91 sama5d4 xplained board support.
+>>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>>
+>> Changes in v2:
+>> - to be sorted by memory address, put the adc dt node after usart4.
+>>
+>>   arch/arm/boot/dts/Makefile                  |   1 +
+>>   arch/arm/boot/dts/at91-sama5d4_xplained.dts | 232 ++++++++++++++++++++++++++++
+>>   2 files changed, 233 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/at91-sama5d4_xplained.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 91bd5bd..bbfbad6 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -49,6 +49,7 @@ dtb-$(CONFIG_ARCH_AT91)	+= sama5d34ek.dtb
+>>   dtb-$(CONFIG_ARCH_AT91)	+= sama5d35ek.dtb
+>>   dtb-$(CONFIG_ARCH_AT91)	+= sama5d36ek.dtb
+>>   # sama5d4
+>> +dtb-$(CONFIG_ARCH_AT91)	+= at91-sama5d4_xplained.dtb
+>>   dtb-$(CONFIG_ARCH_AT91)	+= at91-sama5d4ek.dtb
+>>   
+>>   dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
+>> diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
+>> new file mode 100644
+>> index 0000000..a04c3c8
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
+>> @@ -0,0 +1,232 @@
+>> +/*
+>> + * at91-sama5d4_xplained.dts - Device Tree file for SAMA5D4 Xplained board
+>> + *
+>> + *  Copyright (C) 2015 Atmel,
+>> + *                2015 Josh Wu <josh.wu@atmel.com>
+>> + *
+> [...]
+>
+>> +	ahb {
+>> +		apb {
+>> +			spi0: spi at f8010000 {
+>> +				cs-gpios = <&pioC 3 0>, <0>, <0>, <0>;
+>> +				status = "okay";
+>> +				m25p80 at 0 {
+>> +					compatible = "atmel,at25df321a";
+>> +					spi-max-frequency = <50000000>;
+>> +					reg = <0>;
+>> +				};
+>> +			};
+>> +
+>> +			macb0: ethernet at f8020000 {
+>> +				phy-mode = "rmii";
+>> +				status = "okay";
+> Could you define the PHY device attached to this ethernet MAC IP ?
+>
+>
+>                                  ethernet-phy at 1 {
+>                                          reg = <0x1>;
+>                                          /*
+> 					 * interrupt-parent = <&pioB>;
+> 					 * interrupts = <25
+> 					 *	   IRQ_TYPE_EDGE_FALLING>;
+> 					 */
+> 					/* ... */
+> 				};
+Ok, I will add this in next version. Thanks.
 
-Thanks for reporting this, is it OK if I add to a patch to fix this a
-line saying "Reported-by: Janusz U?ycki <j.uzycki@elproma.com.pl>"?
+Best Regards,
+Josh Wu
 
-Whilst the extra '*' looks like an obvious typo, it's interesting that
-your error message implies that it's allowed in some situations and that
-the version of GCC that I use (4.9.1) doesn't complain about it.
-If it's valid C, I've no idea what that syntax that might represent.
-
--- 
-Tixy 
+>
+>
+> Best Regards,
+>
+> Boris
+>
