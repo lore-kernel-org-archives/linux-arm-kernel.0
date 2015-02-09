@@ -1,294 +1,71 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 9 Feb 2015 19:10:39 +0100
-Subject: [PATCH v2] ARM: at91: dts: sama5d4: add dts for sama5d4 xplained
- board
-In-Reply-To: <1423473423-17798-1-git-send-email-josh.wu@atmel.com>
-References: <1423473423-17798-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <20150209181039.GQ3715@piout.net>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Mon, 9 Feb 2015 19:26:06 +0100
+Subject: [PATCH v2] drm: atmel-hlcdc: Atomic mode-setting conversion
+In-Reply-To: <1423236143-6494-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1423236143-6494-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150209182606.GA11712@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+Hello Boris,
 
-On 09/02/2015 at 17:17:03 +0800, Josh Wu wrote :
-> Add at91 sama5d4 xplained board support.
+On Fri, Feb 06, 2015 at 04:22:23PM +0100, Boris Brezillon wrote:
+> Convert the HLCDC driver to atomic mode-setting.
 > 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > ---
-> 
-> Changes in v2:
-> - to be sorted by memory address, put the adc dt node after usart4.
-> 
->  arch/arm/boot/dts/Makefile                  |   1 +
->  arch/arm/boot/dts/at91-sama5d4_xplained.dts | 232 ++++++++++++++++++++++++++++
->  2 files changed, 233 insertions(+)
->  create mode 100644 arch/arm/boot/dts/at91-sama5d4_xplained.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 91bd5bd..bbfbad6 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -49,6 +49,7 @@ dtb-$(CONFIG_ARCH_AT91)	+= sama5d34ek.dtb
->  dtb-$(CONFIG_ARCH_AT91)	+= sama5d35ek.dtb
->  dtb-$(CONFIG_ARCH_AT91)	+= sama5d36ek.dtb
->  # sama5d4
-> +dtb-$(CONFIG_ARCH_AT91)	+= at91-sama5d4_xplained.dtb
 
-That is changed in v3.20, have a look at:
-http://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/tree/arch/arm/boot/dts/Makefile?h=for-next
+I am getting the following trace with this patch applied, which seems 
+pretty straightforward to fix.
+
+Apart from that, it works perfectly, you can add my:
+
+Tested-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
 
 
->  dtb-$(CONFIG_ARCH_AT91)	+= at91-sama5d4ek.dtb
->  
->  dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
-> diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-> new file mode 100644
-> index 0000000..a04c3c8
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-> @@ -0,0 +1,232 @@
-> +/*
-> + * at91-sama5d4_xplained.dts - Device Tree file for SAMA5D4 Xplained board
-> + *
-> + *  Copyright (C) 2015 Atmel,
-> + *                2015 Josh Wu <josh.wu@atmel.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +/dts-v1/;
-> +#include "sama5d4.dtsi"
-> +
-> +/ {
-> +	model = "Atmel SAMA5D4 Xplained";
-> +	compatible = "atmel,sama5d4-xplained", "atmel,sama5d4", "atmel,sama5";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200 ignore_loglevel earlyprintk";
-> +	};
-> +
-> +	memory {
-> +		reg = <0x20000000 0x20000000>;
-> +	};
-> +
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		main_clock: clock at 0 {
-> +			compatible = "atmel,osc", "fixed-clock";
-> +			clock-frequency = <12000000>;
-> +		};
-> +
-> +		slow_xtal {
-> +			clock-frequency = <32768>;
-> +		};
-> +
-> +		main_xtal {
-> +			clock-frequency = <12000000>;
-> +		};
-> +	};
-> +
-> +	ahb {
-> +		apb {
-> +			spi0: spi at f8010000 {
-> +				cs-gpios = <&pioC 3 0>, <0>, <0>, <0>;
-> +				status = "okay";
-> +				m25p80 at 0 {
-> +					compatible = "atmel,at25df321a";
-> +					spi-max-frequency = <50000000>;
-> +					reg = <0>;
-> +				};
-> +			};
-> +
-> +			macb0: ethernet at f8020000 {
-> +				phy-mode = "rmii";
-> +				status = "okay";
-> +			};
-> +
-> +			mmc1: mmc at fc000000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_mmc1_clk_cmd_dat0 &pinctrl_mmc1_dat1_3 &pinctrl_mmc1_cd>;
-> +				status = "okay";
-> +				slot at 0 {
-> +					reg = <0>;
-> +					bus-width = <4>;
-> +					cd-gpios = <&pioE 3 0>;
-> +				};
-> +			};
-> +
-> +			usart3: serial at fc00c000 {
-> +				status = "okay";
-> +			};
-> +
-> +			usart4: serial at fc010000 {
-> +				status = "okay";
-> +			};
-> +
-> +			adc0: adc at fc034000 {
-> +				atmel,adc-vref = <3300>;
-> +				status = "okay";
-> +			};
-> +
-> +			watchdog at fc068640 {
-> +				status = "okay";
-> +			};
-> +
-> +			pinctrl at fc06a000 {
-> +				board {
-> +					pinctrl_mmc1_cd: mmc1_cd {
-> +						atmel,pins =
-> +							<AT91_PIOE 3 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
-> +					};
-> +					pinctrl_usba_vbus: usba_vbus {
-> +						atmel,pins =
-> +							<AT91_PIOE 31 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;
-> +					};
-> +					pinctrl_key_gpio: key_gpio_0 {
-> +						atmel,pins =
-> +							<AT91_PIOE 8 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>; /* PE13 gpio */
-> +					};
-> +				};
-> +			};
-> +		};
-> +
-> +		usb0: gadget at 00400000 {
-> +			atmel,vbus-gpio = <&pioE 31 GPIO_ACTIVE_HIGH>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_usba_vbus>;
-> +			status = "okay";
-> +		};
-> +
-> +		usb1: ohci at 00500000 {
-> +			num-ports = <3>;
-> +			atmel,vbus-gpio = <0
-> +					   &pioE 11 GPIO_ACTIVE_HIGH
-> +					   &pioE 14 GPIO_ACTIVE_HIGH
-> +					  >;
-> +			status = "okay";
-> +		};
-> +
-> +		usb2: ehci at 00600000 {
-> +			status = "okay";
-> +		};
-> +
-> +		nand0: nand at 80000000 {
-> +			nand-bus-width = <8>;
-> +			nand-ecc-mode = "hw";
-> +			nand-on-flash-bbt;
-> +			atmel,has-pmecc;
-> +			status = "okay";
-> +
-> +			at91bootstrap at 0 {
-> +				label = "at91bootstrap";
-> +				reg = <0x0 0x40000>;
-> +			};
-> +
-> +			bootloader at 40000 {
-> +				label = "bootloader";
-> +				reg = <0x40000 0x80000>;
-> +			};
-> +
-> +			bootloaderenv at c0000 {
-> +				label = "bootloader env";
-> +				reg = <0xc0000 0xc0000>;
-> +			};
-> +
-> +			dtb at 180000 {
-> +				label = "device tree";
-> +				reg = <0x180000 0x80000>;
-> +			};
-> +
-> +			kernel at 200000 {
-> +				label = "kernel";
-> +				reg = <0x200000 0x600000>;
-> +			};
-> +
-> +			rootfs at 800000 {
-> +				label = "rootfs";
-> +				reg = <0x800000 0x0f800000>;
-> +			};
-> +		};
-> +	};
-> +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_key_gpio>;
-> +
-> +		pb_user1 {
-> +			label = "pb_user1";
-> +			gpios = <&pioE 8 GPIO_ACTIVE_HIGH>;
-> +			linux,code = <0x100>;
-> +			gpio-key,wakeup;
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		status = "okay";
-> +
-> +		d8 {
-> +			label = "d8";
-> +			gpios = <&pioE 15 GPIO_ACTIVE_LOW>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +
-> +		d10 {
-> +			label = "d10";
-> +			gpios = <&pioD 30 GPIO_ACTIVE_HIGH>;
-> +		};
-> +	};
-> +};
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 9 at drivers/clk/clk.c:992 clk_disable+0x28/0x34()
+Modules linked in:
+CPU: 0 PID: 9 Comm: kworker/0:1 Not tainted 3.19.0-rc7-next-20150204+ #90
+Hardware name: Atmel SAMA5 (Device Tree)
+Workqueue: events output_poll_execute
+[<c0013284>] (unwind_backtrace) from [<c0010f90>] (show_stack+0x10/0x14)
+[<c0010f90>] (show_stack) from [<c001b0fc>] (warn_slowpath_common+0x84/0xb0)
+[<c001b0fc>] (warn_slowpath_common) from [<c001b1c4>] (warn_slowpath_null+0x1c/0x24)
+[<c001b1c4>] (warn_slowpath_null) from [<c0355418>] (clk_disable+0x28/0x34)
+[<c0355418>] (clk_disable) from [<c024b1c0>] (atmel_hlcdc_crtc_disable+0xe8/0x114)
+[<c024b1c0>] (atmel_hlcdc_crtc_disable) from [<c02209dc>] (__drm_helper_disable_unused_functions+0xa4/0xd8)
+[<c02209dc>] (__drm_helper_disable_unused_functions) from [<c0220a24>] (drm_helper_disable_unused_functions+0x14/0x20)
+[<c0220a24>] (drm_helper_disable_unused_functions) from [<c022d078>] (drm_fbdev_cma_init+0x78/0xfc)
+[<c022d078>] (drm_fbdev_cma_init) from [<c024b7a8>] (atmel_hlcdc_fb_output_poll_changed+0x30/0x40)
+[<c024b7a8>] (atmel_hlcdc_fb_output_poll_changed) from [<c0222800>] (output_poll_execute+0x148/0x188)
+[<c0222800>] (output_poll_execute) from [<c002bf94>] (process_one_work+0xfc/0x310)
+[<c002bf94>] (process_one_work) from [<c002caec>] (worker_thread+0x60/0x478)
+[<c002caec>] (worker_thread) from [<c00305b4>] (kthread+0xd4/0xec)
+[<c00305b4>] (kthread) from [<c000e4a0>] (ret_from_fork+0x14/0x34)
+---[ end trace 9500ebf8d7076b60 ]---
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 9 at drivers/clk/clk.c:898 clk_unprepare+0x24/0x2c()
+Modules linked in:
+CPU: 0 PID: 9 Comm: kworker/0:1 Tainted: G        W      3.19.0-rc7-next-20150204+ #90
+Hardware name: Atmel SAMA5 (Device Tree)
+Workqueue: events output_poll_execute
+[<c0013284>] (unwind_backtrace) from [<c0010f90>] (show_stack+0x10/0x14)
+[<c0010f90>] (show_stack) from [<c001b0fc>] (warn_slowpath_common+0x84/0xb0)
+[<c001b0fc>] (warn_slowpath_common) from [<c001b1c4>] (warn_slowpath_null+0x1c/0x24)
+[<c001b1c4>] (warn_slowpath_null) from [<c03553e8>] (clk_unprepare+0x24/0x2c)
+[<c03553e8>] (clk_unprepare) from [<c024b1c8>] (atmel_hlcdc_crtc_disable+0xf0/0x114)
+[<c024b1c8>] (atmel_hlcdc_crtc_disable) from [<c02209dc>] (__drm_helper_disable_unused_functions+0xa4/0xd8)
+[<c02209dc>] (__drm_helper_disable_unused_functions) from [<c0220a24>] (drm_helper_disable_unused_functions+0x14/0x20)
+[<c0220a24>] (drm_helper_disable_unused_functions) from [<c022d078>] (drm_fbdev_cma_init+0x78/0xfc)
+[<c022d078>] (drm_fbdev_cma_init) from [<c024b7a8>] (atmel_hlcdc_fb_output_poll_changed+0x30/0x40)
+[<c024b7a8>] (atmel_hlcdc_fb_output_poll_changed) from [<c0222800>] (output_poll_execute+0x148/0x188)
+[<c0222800>] (output_poll_execute) from [<c002bf94>] (process_one_work+0xfc/0x310)
+[<c002bf94>] (process_one_work) from [<c002caec>] (worker_thread+0x60/0x478)
+[<c002caec>] (worker_thread) from [<c00305b4>] (kthread+0xd4/0xec)
+[<c00305b4>] (kthread) from [<c000e4a0>] (ret_from_fork+0x14/0x34)
+---[ end trace 9500ebf8d7076b61 ]--- 
+
+
+Sylvain
