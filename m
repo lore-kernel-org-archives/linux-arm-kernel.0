@@ -1,97 +1,29 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 09 Feb 2015 19:01:04 +0900
-Subject: [PATCH v2 1/2] mmc: dw_mmc: fix bug that cause 'Timeout sending
- command'
-In-Reply-To: <1423466726-20833-2-git-send-email-addy.ke@rock-chips.com>
-References: <1423134801-23219-1-git-send-email-addy.ke@rock-chips.com>
- <1423466726-20833-1-git-send-email-addy.ke@rock-chips.com>
- <1423466726-20833-2-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <54D88560.4050808@samsung.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 9 Feb 2015 11:03:33 +0100
+Subject: [PATCH v8 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
+In-Reply-To: <54D7A694.4000903@broadcom.com>
+References: <rjui@broadcom.com>
+ <1423272507-18459-1-git-send-email-rjui@broadcom.com>
+ <1423272507-18459-3-git-send-email-rjui@broadcom.com>
+ <20150207175039.GB6263@katana> <54D6EF3D.4030302@broadcom.com>
+ <20150208110325.GA2750@katana> <54D7A694.4000903@broadcom.com>
+Message-ID: <20150209100332.GA1002@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Addy.
 
-On 02/09/2015 04:25 PM, Addy Ke wrote:
-> Because of some uncertain factors, such as worse card or worse hardware,
-> DAT[3:0](the data lines) may be pulled down by card, and mmc controller
-> will be in busy state. This should not happend when mmc controller
-> send command to update card clocks. If this happends, mci_send_cmd will
-> be failed and we will get 'Timeout sending command', and then system will
-> be blocked. To avoid this, we need reset mmc controller.
-> 
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
-> ---
->  drivers/mmc/host/dw_mmc.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 4d2e3c2..b0b57e3 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -100,6 +100,7 @@ struct idmac_desc {
->  };
->  #endif /* CONFIG_MMC_DW_IDMAC */
->  
-> +static int dw_mci_card_busy(struct mmc_host *mmc);
->  static bool dw_mci_reset(struct dw_mci *host);
->  static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
->  
-> @@ -888,6 +889,31 @@ static void mci_send_cmd(struct dw_mci_slot *slot, u32 cmd, u32 arg)
->  		cmd, arg, cmd_status);
->  }
->  
-> +static void dw_mci_wait_busy(struct dw_mci_slot *slot)
-> +{
-> +	struct dw_mci *host = slot->host;
-> +	unsigned long timeout = jiffies + msecs_to_jiffies(500);
-> +
-> +	do {
-> +		if (!dw_mci_card_busy(slot->mmc))
-> +			return;
-> +		cpu_relax();
-> +	} while (time_before(jiffies, timeout));
-> +
-> +	dev_err(host->dev, "Data busy (status %#x)\n",
-> +		mci_readl(slot->host, STATUS));
-> +
-> +	/*
-> +	 * Data busy, this should not happend when mmc controller send command
-> +	 * to update card clocks in non-volt-switch state. If it happends, we
-> +	 * should reset controller to avoid getting "Timeout sending command".
-> +	 */
-> +	dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS);
+> Okay. Let me check with our ASIC engineer to see if there's a way to get
+> the driver extended to support the case when data size is larger than
+> the FIFO size. From my understanding based on the data sheet I have, I
+> don't think that can be done with this controller. But if the ASIC
+> engineers tells me the opposite, I'll add it as a separate patch later.
 
-If reset is failed, then dw_mci_ctrl_reset should return "false".
+Perfect, thanks!
 
-	ret = dw_mci_ctrl_reset();
-
-	WARN_ON(!ret || dw_mci_card_busy(slot->mmc));
-
-Is it right?
-
-In my experiment, if reset is failed or card is busy, eMMC can't work anymore..right?
-I think this patch is reasonable to prevent blocking issue.
-
-Best Regards,
-Jaehoon Chung
-
-
-> +
-> +	/* Fail to reset controller or still data busy, WARN_ON! */
-> +	WARN_ON(dw_mci_card_busy(slot->mmc));
-> +}
-> +
->  static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
->  {
->  	struct dw_mci *host = slot->host;
-> @@ -899,6 +925,8 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
->  	/* We must continue to set bit 28 in CMD until the change is complete */
->  	if (host->state == STATE_WAITING_CMD11_DONE)
->  		sdmmc_cmd_bits |= SDMMC_CMD_VOLT_SWITCH;
-> +	else
-> +		dw_mci_wait_busy(slot);
->  
->  	if (!clock) {
->  		mci_writel(host, CLKENA, 0);
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150209/b20c9302/attachment.sig>
