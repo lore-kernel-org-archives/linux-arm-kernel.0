@@ -1,65 +1,76 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 9 Feb 2015 10:06:33 +0100
-Subject: [PATCH] exynos: pmu: use PS_HOLD based poweroff for all supported
- SoCs
-In-Reply-To: <1423466741-11421-1-git-send-email-m.szyprowski@samsung.com>
-References: <1423466741-11421-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAJKOXPeeUjcwO6qBdHA8DJaviPxRwjAsSe7ciyGDFOUoNhZvcQ@mail.gmail.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Mon, 9 Feb 2015 09:07:19 +0000
+Subject: [PATCH v2] ASoC: atmel_ssc_dai: Allow more rates
+In-Reply-To: <54D871E7.40902@atmel.com>
+References: <1423050745-6372-1-git-send-email-peda@lysator.liu.se>
+ <54D824F8.9030804@atmel.com>
+ <896ef5e9484a494e9e50cbed38919c5f@EMAIL.axentia.se>
+ <54D871E7.40902@atmel.com>
+Message-ID: <5c8e49d8b0b3491b856eae50f4594f4f@EMAIL.axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-02-09 8:25 GMT+01:00 Marek Szyprowski <m.szyprowski@samsung.com>:
-> PS_HOLD based power off procedure is common for all Exynos SoCs, so use
-> it for every Exynos SoC.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  arch/arm/mach-exynos/pmu.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+Bo Shen wrote:
+> Hi Peter,
+> 
+> On 02/09/2015 04:09 PM, Peter Rosin wrote:
+> 
+> [Snip]
+> 
+> >>>
+> >>>    /*-------------------------------------------------------------------------*\
+> >>>     * DAI functions
+> >>> @@ -200,6 +290,7 @@ static int atmel_ssc_startup(struct
+> snd_pcm_substream *substream,
+> >>>    	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
+> >>>    	struct atmel_pcm_dma_params *dma_params;
+> >>>    	int dir, dir_mask;
+> >>> +	int ret;
+> >>>
+> >>>    	pr_debug("atmel_ssc_startup: SSC_SR=0x%u\n",
+> >>>    		ssc_readl(ssc_p->ssc->regs, SR)); @@ -207,6 +298,7 @@
+> static
+> >>> int atmel_ssc_startup(struct snd_pcm_substream *substream,
+> >>>    	/* Enable PMC peripheral clock for this SSC */
+> >>>    	pr_debug("atmel_ssc_dai: Starting clock\n");
+> >>>    	clk_enable(ssc_p->ssc->clk);
+> >>> +	ssc_p->mck_rate = clk_get_rate(ssc_p->ssc->clk) * 2;
+> >>
+> >> Why the mck_rate is calculated in this form?
+> >
+> > What did you have in mind? Add another clock to the ssc node in the
+> > device tree?
+> >
+> > IIUC, the device tree (at least normally) has the ssc clk as the
+> > peripheral clock divided by 2, but the ssc specifies (when capturing
+> > in the CBM/CFS
+> > case) the rate limit as the peripheral clock divided by 3 (i.e. ssc clk / 1.5).
+> > Since the SSC spec expresses the rate limit in terms of the peripheral
+> > clock, this was what I came up with. I didn't want to require dt changes...
+> 
+> You make a misunderstand for the mck for ssc peripheral. The mck here is
+> not the system mck, it only related with the ssc, it is the PMC output.
+> For example, in device tree, the ssc clock divided by 2, then the pmc output
+> for ssc is "system mck / 2", so the ssc mck is "system mck / 2".
+> If divided by 4, then the ssc mck is "system / 4"
 
-I tried this on Trats2 board (Exynos 4412) and message "Power down
-failed, please power off system manually." appears. Is it expected? Or
-am I missing some patches (I applied this on top of next-20150129)?
+I think the reason for my misunderstanding might be that in the
+3.10-at91 tree, the ssc clk is twice the rate compared to what it is
+in the 3.18-at91 tree. This made me assume that the ssc clk had
+been changed to mean the rate after the fixed divider by two that
+is activated as soon as the ssc clock divider (given by SSC_CMR) is
+activated, and that it was a simple matter of multiplying by two to
+get to the MCK rate. I further assumed that "Master Clock" in the
+"Serial Clock Ratio Considerations" section was this MCK. Maybe
+the mistake was to involve the peripheral clock at all?
 
-Best regards,
-Krzysztof
+Ok, so I may have misunderstood, but in that case what does that
+mean in terms of finding the "Master Clock" rate that is mentioned
+in the "Serial Clock Ratio Considerations" section? Is it perhaps the
+rate of the parent clock of the given ssc clk? Or, given the above
+explanation, is it correct to simply multiply by two as I have done?
 
->
-> diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-> index c15761ca2f18..e812c1c85624 100644
-> --- a/arch/arm/mach-exynos/pmu.c
-> +++ b/arch/arm/mach-exynos/pmu.c
-> @@ -681,7 +681,7 @@ static unsigned int const exynos5420_list_disable_pmu_reg[] = {
->         EXYNOS5420_CMU_RESET_FSYS_SYS_PWR_REG,
->  };
->
-> -static void exynos5_power_off(void)
-> +static void exynos_power_off(void)
->  {
->         unsigned int tmp;
->
-> @@ -872,8 +872,6 @@ static void exynos5420_pmu_init(void)
->                         EXYNOS5420_ARM_INTR_SPREAD_USE_STANDBYWFI);
->
->         pmu_raw_writel(0x1, EXYNOS5420_UP_SCHEDULER);
-> -
-> -       pm_power_off = exynos5_power_off;
->         pr_info("EXYNOS5420 PMU initialized\n");
->  }
->
-> @@ -984,6 +982,8 @@ static int exynos_pmu_probe(struct platform_device *pdev)
->         if (ret)
->                 dev_warn(dev, "can't register restart handler err=%d\n", ret);
->
-> +       pm_power_off = exynos_power_off;
-> +
->         dev_dbg(dev, "Exynos PMU Driver probe done\n");
->         return 0;
->  }
-> --
-> 1.9.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+[snip]
+
+Cheers,
+Peter
