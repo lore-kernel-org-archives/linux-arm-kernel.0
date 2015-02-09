@@ -1,49 +1,64 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Mon, 09 Feb 2015 14:34:42 +0100
-Subject: [PATCH 03/16] tty: serial: 8250_core: read only RX if there is
- something in the FIFO
-In-Reply-To: <1410377411-26656-4-git-send-email-bigeasy@linutronix.de>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <1410377411-26656-4-git-send-email-bigeasy@linutronix.de>
-Message-ID: <54D8B772.1010405@freebox.fr>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 09 Feb 2015 14:35:14 +0100
+Subject: [PATCH 01/13] clk: dts: mediatek: add Mediatek MT8135 clock
+ bindings
+In-Reply-To: <1423478845-2835-2-git-send-email-s.hauer@pengutronix.de>
+References: <1423478845-2835-1-git-send-email-s.hauer@pengutronix.de>
+ <1423478845-2835-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1423488914.3716.9.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2014 09:29 PM, Sebastian Andrzej Siewior wrote:
-> The serial8250_do_startup() function unconditionally clears the
-> interrupts and for that it reads from the RX-FIFO without checking if
-> there is a byte in the FIFO or not. This works fine on OMAP4+ HW like
-> AM335x or DRA7.
-> OMAP3630 ES1.1 (which means probably all OMAP3 and earlier) does not like
-> this:
+Am Montag, den 09.02.2015, 11:47 +0100 schrieb Sascha Hauer:
+> From: James Liao <jamesjj.liao@mediatek.com>
+> 
+> Document the device-tree binding of Mediatek MT8135 SoC, including
+> TOPCKGEN, PLLs, INFRA and PERI clock controller.
+> 
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  .../bindings/clock/mediatek,mt8135-clock.txt       |  44 +++++
+>  include/dt-bindings/clock/mt8135-clk.h             | 190 +++++++++++++++++++++
+>  2 files changed, 234 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/mediatek,mt8135-clock.txt
+>  create mode 100644 include/dt-bindings/clock/mt8135-clk.h
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/mediatek,mt8135-clock.txt b/Documentation/devicetree/bindings/clock/mediatek,mt8135-clock.txt
+> new file mode 100644
+> index 0000000..1e3566f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/mediatek,mt8135-clock.txt
+> @@ -0,0 +1,44 @@
+> +Mediatek MT8135 Clock Controller
+> +
+> +This binding uses the common clock binding:
+> +Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +The Mediatek MT8135 clock controller generates and supplies clock to various
+> +controllers within Mediatek MT8135 SoC.
+> +
+> +Required Properties:
+> +
+> +- compatible: should be one of following:
+> +	- "mediatek,mt8135-topckgen" : for topckgen clock controller of MT8135.
+> +	- "mediatek,mt8135-apmixedsys" : for apmixed_sys (PLLs) of MT8135.
+> +	- "mediatek,mt8135-infracfg" : for infra_sys clock controller of MT8135.
+> +	- "mediatek,mt8135-pericfg" : for peri_sys clock controller of MT8135.
+> +
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +
+> +- #clock-cells: should be 1.
 
-Hello,
+After patch 3 ("clk: mediatek: Add reset controller support"), there's
+another required property:
 
-Sorry to wake up an old thread, but I'm affraid that this patch causes
-problems on Marvell 88f6282 (Kirkwood).
+- #reset-cells: should be 1.
 
-When a caracter is received on the UART while the kernel is printing
-the boot messages, as soon as the kernel configures the UART for
-receiving (after root filesystem mount), it gets stuck printing the
-following message repeatedly:
+Patch 9 ("ARM: dts: mediatek: Enable clock support for Mediatek
+MT8135.") already correctly includes these in the dtsi.
 
-serial8250: too much work for irq29
-
-Once stuck, the reception of another character allows the boot process
-to finish.
-
->From what I can gather, when we hit that, the UART_IIR_NO_INT is 0 (so the
-interrupt is raised), but the UART_LSR_DR bit is 0 as well so the UART_RX
-register is never read to clear the interrupt.
-
-We are using the second UART multiplexed on mpps 15 and 16.
-
-Reverting this particular patch fixes the issue.
-
-We are seing the problem on a 3.18 kernel.
-
-Regards,
-
--- 
-Nicolas Schichan
-Freebox SAS
+regards
+Philipp
