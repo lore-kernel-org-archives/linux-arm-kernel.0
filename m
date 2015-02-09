@@ -1,57 +1,57 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 9 Feb 2015 17:16:12 +0100
-Subject: [PATCH] crypto: atmel: remove bogus select
-In-Reply-To: <2762861.1qAcXXChEF@wuerfel>
-References: <1780191.gdgDmCPaN0@wuerfel>
- <20150129073328.GC1097@odux.rfo.atmel.com>
- <2762861.1qAcXXChEF@wuerfel>
-Message-ID: <20150209161612.GC1962@odux.rfo.atmel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 9 Feb 2015 17:20:19 +0100
+Subject: [PATCH 03/30] ARM: sun5i: a10s: Move to the common sun5i DTSI
+In-Reply-To: <CAGb2v66dwFr2KkGhbc3hmitXAyAmD2dbDCGvXgye3wJCMiE45w@mail.gmail.com>
+References: <1422798614-3581-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1422798614-3581-4-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v66dwFr2KkGhbc3hmitXAyAmD2dbDCGvXgye3wJCMiE45w@mail.gmail.com>
+Message-ID: <20150209162019.GZ2079@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 11:24:32PM +0100, Arnd Bergmann wrote:
-> On Thursday 29 January 2015 08:33:28 Ludovic Desroches wrote:
-> > On Wed, Jan 28, 2015 at 09:09:16PM +0100, Arnd Bergmann wrote:
-> > > The Atmel at91 crypto driver unconditionally selects AT_HDMAC,
-> > > which results in a Kconfig warning if that driver is not enabled:
-> > > 
-> > > warning: (CRYPTO_DEV_ATMEL_AES) selects AT_HDMAC which has unmet direct dependencies (DMADEVICES && ARCH_AT91)
-> > > 
-> > > The crypty driver itself does not actually have a dependency
-> > > on a particular dma engine, other than this being the one that
-> > > is used in at91.
-> > > 
-> > > Removing the 'select' gets rid of the warning, with no apparent
-> > > downsides.
-> > 
-> > This driver doesn't work without DMA. I think it is the reason why the
-> > select AT_HDMAC was used.
-> > 
+On Mon, Feb 02, 2015 at 11:25:45PM +0100, Chen-Yu Tsai wrote:
+> Hi,
 > 
-> I understand the intention, but this what was written in Kconfig is
-> not the correct way to express it.
+> On Sun, Feb 1, 2015 at 2:49 PM, Maxime Ripard
+> > diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+> > index 09a7df5107ee..e42cbb03620f 100644
+> > --- a/arch/arm/boot/dts/sun5i.dtsi
+> > +++ b/arch/arm/boot/dts/sun5i.dtsi
+> > @@ -349,6 +349,21 @@
+> >                         status = "disabled";
+> >                 };
+> >
+> > +               mmc1: mmc at 01c10000 {
+> > +                       compatible = "allwinner,sun5i-a13-mmc";
+> > +                       reg = <0x01c10000 0x1000>;
+> > +                       clocks = <&ahb_gates 9>,
+> > +                                <&mmc1_clk 0>,
+> > +                                <&mmc1_clk 1>,
+> > +                                <&mmc1_clk 2>;
+> > +                       clock-names = "ahb",
+> > +                                     "mmc",
+> > +                                     "output",
+> > +                                     "sample";
+> > +                       interrupts = <33>;
+> > +                       status = "disabled";
+> > +               };
+> > +
 > 
+> If it's common hardware then put this and the pinmux in
+> sun5i.dtsi in the first patch?
 
-Sure.
+You're right. I'll change that.
 
-> A lot of drivers require DMA_ENGINE support, but the linux/dmaengine.h
-> header file provides static inline helpers to make sure that things
-> still compile if that is disabled, and in the example I mentioned
-> above, it does build, but clearly cannot work as the real dmaengine
-> interfaces are not provided by the kernel.
-> 
-> What we could do to express the runtime dependency correctly is to add
-> 
-> 	depends on (ARCH_AT91 && AT_HDMAC) || COMPILE_TEST
-> 
+Thanks!
 
-I am fine with it, only have to add AT_XDMAC or to introduce something
-like HAVE_AT91_DMA.
-
-> which would let the driver only be enabled in cases that have a
-> reasonable chance of working, but still allow it to be built
-> everywhere else.
-> 
-> 	Arnd
-
-Ludovic
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150209/226886ec/attachment-0001.sig>
