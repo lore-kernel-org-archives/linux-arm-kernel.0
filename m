@@ -1,13 +1,13 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon,  9 Feb 2015 16:34:05 +0800
-Subject: [PATCH 3.14 13/20] arm64: Fix up /proc/cpuinfo
-In-Reply-To: <20150209083042.033412726@linuxfoundation.org>
-References: <20150209083042.033412726@linuxfoundation.org>
-Message-ID: <20150209083042.937818171@linuxfoundation.org>
+Date: Mon,  9 Feb 2015 16:34:12 +0800
+Subject: [PATCH 3.18 29/39] arm64: Fix up /proc/cpuinfo
+In-Reply-To: <20150209083328.753647350@linuxfoundation.org>
+References: <20150209083328.753647350@linuxfoundation.org>
+Message-ID: <20150209083330.163609674@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.14-stable review patch.  If anyone has any objections, please let me know.
+3.18-stable review patch.  If anyone has any objections, please let me know.
 
 ------------------
 
@@ -91,33 +91,20 @@ Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
- arch/arm64/include/asm/cputype.h |    2 
- arch/arm64/kernel/setup.c        |   99 ++++++++++++++++++++++++++++-----------
- arch/arm64/kernel/smp.c          |    5 +
- 3 files changed, 80 insertions(+), 26 deletions(-)
+ arch/arm64/kernel/setup.c |   94 ++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 71 insertions(+), 23 deletions(-)
 
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -77,6 +77,8 @@ static inline u32 __attribute_const__ re
- 	return read_cpuid(CTR_EL0);
- }
- 
-+void cpuinfo_store_cpu(void);
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif
 --- a/arch/arm64/kernel/setup.c
 +++ b/arch/arm64/kernel/setup.c
-@@ -41,6 +41,7 @@
- #include <linux/memblock.h>
+@@ -43,6 +43,7 @@
  #include <linux/of_fdt.h>
  #include <linux/of_platform.h>
+ #include <linux/efi.h>
 +#include <linux/personality.h>
  
- #include <asm/cputype.h>
- #include <asm/elf.h>
-@@ -73,7 +74,6 @@ unsigned int compat_elf_hwcap __read_mos
+ #include <asm/fixmap.h>
+ #include <asm/cpu.h>
+@@ -79,7 +80,6 @@ unsigned int compat_elf_hwcap2 __read_mo
  #endif
  
  static const char *cpu_name;
@@ -125,36 +112,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  phys_addr_t __fdt_pointer __initdata;
  
  /*
-@@ -193,6 +193,19 @@ static void __init smp_build_mpidr_hash(
- }
- #endif
- 
-+struct cpuinfo_arm64 {
-+	struct cpu	cpu;
-+	u32		reg_midr;
-+};
-+
-+static DEFINE_PER_CPU(struct cpuinfo_arm64, cpu_data);
-+
-+void cpuinfo_store_cpu(void)
-+{
-+	struct cpuinfo_arm64 *info = this_cpu_ptr(&cpu_data);
-+	info->reg_midr = read_cpuid_id();
-+}
-+
- static void __init setup_processor(void)
- {
- 	struct cpu_info *cpu_info;
-@@ -213,6 +226,8 @@ static void __init setup_processor(void)
- 	sprintf(init_utsname()->machine, ELF_PLATFORM);
- 	elf_hwcap = 0;
- 
-+	cpuinfo_store_cpu();
-+
- 	/*
- 	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
- 	 * The blocks we test below represent incremental functionality
-@@ -257,8 +272,6 @@ static void __init setup_machine_fdt(phy
+@@ -311,8 +311,6 @@ static void __init setup_machine_fdt(phy
  		while (true)
  			cpu_relax();
  	}
@@ -163,23 +121,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  }
  
  /*
-@@ -363,14 +376,12 @@ static int __init arm64_device_init(void
- }
- arch_initcall(arm64_device_init);
- 
--static DEFINE_PER_CPU(struct cpu, cpu_data);
--
- static int __init topology_init(void)
- {
- 	int i;
- 
- 	for_each_possible_cpu(i) {
--		struct cpu *cpu = &per_cpu(cpu_data, i);
-+		struct cpu *cpu = &per_cpu(cpu_data.cpu, i);
- 		cpu->hotpluggable = 1;
- 		register_cpu(cpu, i);
- 	}
-@@ -391,14 +402,41 @@ static const char *hwcap_str[] = {
+@@ -449,14 +447,50 @@ static const char *hwcap_str[] = {
  	NULL
  };
  
@@ -208,6 +150,15 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 +	"lpae",
 +	"evtstrm"
 +};
++
++static const char *compat_hwcap2_str[] = {
++	"aes",
++	"pmull",
++	"sha1",
++	"sha2",
++	"crc32",
++	NULL
++};
 +#endif /* CONFIG_COMPAT */
 +
  static int c_show(struct seq_file *m, void *v)
@@ -225,7 +176,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  		/*
  		 * glibc reads /proc/cpuinfo to determine the number of
  		 * online processors, looking for lines beginning with
-@@ -407,24 +445,33 @@ static int c_show(struct seq_file *m, vo
+@@ -465,24 +499,38 @@ static int c_show(struct seq_file *m, vo
  #ifdef CONFIG_SMP
  		seq_printf(m, "processor\t: %d\n", i);
  #endif
@@ -257,6 +208,10 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 +			for (j = 0; compat_hwcap_str[j]; j++)
 +				if (compat_elf_hwcap & (1 << j))
 +					seq_printf(m, " %s", compat_hwcap_str[j]);
++
++			for (j = 0; compat_hwcap2_str[j]; j++)
++				if (compat_elf_hwcap2 & (1 << j))
++					seq_printf(m, " %s", compat_hwcap2_str[j]);
 +#endif /* CONFIG_COMPAT */
 +		} else {
 +			for (j = 0; hwcap_str[j]; j++)
@@ -266,26 +221,13 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 +		seq_puts(m, "\n");
  
 -	seq_printf(m, "Hardware\t: %s\n", machine_name);
-+		seq_printf(m, "CPU implementer\t: 0x%02x\n", (midr >> 24));
++		seq_printf(m, "CPU implementer\t: 0x%02x\n",
++			   MIDR_IMPLEMENTOR(midr));
 +		seq_printf(m, "CPU architecture: 8\n");
-+		seq_printf(m, "CPU variant\t: 0x%x\n", ((midr >> 20) & 0xf));
-+		seq_printf(m, "CPU part\t: 0x%03x\n", ((midr >> 4) & 0xfff));
-+		seq_printf(m, "CPU revision\t: %d\n\n", (midr & 0xf));
++		seq_printf(m, "CPU variant\t: 0x%x\n", MIDR_VARIANT(midr));
++		seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
++		seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
 +	}
  
  	return 0;
  }
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -148,6 +148,11 @@ asmlinkage void secondary_start_kernel(v
- 		cpu_ops[cpu]->cpu_postboot();
- 
- 	/*
-+	 * Log the CPU info before it is marked online and might get read.
-+	 */
-+	cpuinfo_store_cpu();
-+
-+	/*
- 	 * Enable GIC and timers.
- 	 */
- 	notify_cpu_starting(cpu);
