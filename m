@@ -1,137 +1,47 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon,  9 Feb 2015 11:47:20 +0100
-Subject: [PATCH 08/13] soc: mediatek: Add PMIC wrapper for MT8135 and MT6397
- SoC
+Date: Mon,  9 Feb 2015 11:47:16 +0100
+Subject: [PATCH 04/13] clk: mediatek: Add basic clocks for Mediatek MT8135.
 In-Reply-To: <1423478845-2835-1-git-send-email-s.hauer@pengutronix.de>
 References: <1423478845-2835-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1423478845-2835-9-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1423478845-2835-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Flora Fu <flora.fu@mediatek.com>
+From: James Liao <jamesjj.liao@mediatek.com>
 
-This adds support for the PMIC wrapper found on MediaTek MT8135 and
-MT8173 SoCs.
+This patch adds basic clocks for MT8135, including TOPCKGEN, PLLs,
+INFRA and PERI clocks.
 
-On MediaTek MT8135, MT8173 and other SoCs the PMIC is connected via
-SPI. The SPI master interface is not directly visible to the CPU, but
-only through the PMIC wrapper inside the SoC. The communication between
-the SoC and the PMIC can optionally be encrypted. Also a non standard
-Dual IO SPI mode can be used to increase speed. The MT8135 also supports
-a special feature named "IP Pairing". With IP Pairing the pins of some
-SoC internal peripherals can be on the PMIC. The signals of these pins
-are routed over the SPI bus using the pwrap bridge. Because of these
-optional non SPI conform features the PMIC driver is not implemented as
-a SPI bus master driver.
-
-Signed-off-by: Flora Fu, MediaTek
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- .../devicetree/bindings/soc/mediatek/pwrap.txt     |   56 ++
- drivers/soc/mediatek/Kconfig                       |   11 +
- drivers/soc/mediatek/Makefile                      |    1 +
- drivers/soc/mediatek/mtk-pmic-wrap.c               | 1027 ++++++++++++++++++++
- 4 files changed, 1095 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
- create mode 100644 drivers/soc/mediatek/Kconfig
- create mode 100644 drivers/soc/mediatek/Makefile
- create mode 100644 drivers/soc/mediatek/mtk-pmic-wrap.c
+ drivers/clk/mediatek/Makefile         |   1 +
+ drivers/clk/mediatek/clk-mt8135-pll.c | 860 +++++++++++++++++++++++++++++++++
+ drivers/clk/mediatek/clk-mt8135-pll.h |  28 ++
+ drivers/clk/mediatek/clk-mt8135.c     | 873 ++++++++++++++++++++++++++++++++++
+ 4 files changed, 1762 insertions(+)
+ create mode 100644 drivers/clk/mediatek/clk-mt8135-pll.c
+ create mode 100644 drivers/clk/mediatek/clk-mt8135-pll.h
+ create mode 100644 drivers/clk/mediatek/clk-mt8135.c
 
-diff --git a/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt b/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
+diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
+index 0b6f1c3..afb52e5 100644
+--- a/drivers/clk/mediatek/Makefile
++++ b/drivers/clk/mediatek/Makefile
+@@ -1,2 +1,3 @@
+ obj-y += clk-mtk.o clk-pll.o clk-gate.o
+ obj-$(CONFIG_RESET_CONTROLLER) += reset.o
++obj-y += clk-mt8135.o clk-mt8135-pll.o
+diff --git a/drivers/clk/mediatek/clk-mt8135-pll.c b/drivers/clk/mediatek/clk-mt8135-pll.c
 new file mode 100644
-index 0000000..66cc528
+index 0000000..81f5a00
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
-@@ -0,0 +1,56 @@
-+MediaTek PMIC Wrapper Driver
-+
-+This document describes the binding for the MediaTek PMIC wrapper.
-+
-+On MediaTek MT8135, MT8173 and other SoCs the PMIC is connected via
-+SPI. The SPI master interface is not directly visible to the CPU, but
-+only through the PMIC wrapper inside the SoC. The communication between
-+the SoC and the PMIC can optionally be encrypted. Also a non standard
-+Dual IO SPI mode can be used to increase speed.
-+
-+IP Pairing
-+
-+on MT8135 the pins of some SoC internal peripherals can be on the PMIC.
-+The signals of these pins are routed over the SPI bus using the pwrap
-+bridge. In the binding description below the properties needed for bridging
-+are marked with "IP Pairing". These are optional on SoCs which do not support
-+IP Pairing
-+
-+Required properties in pwrap device node.
-+- compatible: "mediatek,mt8135-pwrap" or "mediatek,mt8173-pwrap"
-+- interrupts: IRQ for pwrap in SOC
-+- reg-names: Must include the following entries:
-+  "pwrap": Main registers base
-+  "pwrap-bridge": bridge base (IP Pairing)
-+- reg: Must contain an entry for each entry in reg-names.
-+- reset-names: Must include the following entries:
-+  "pwrap"
-+  "pwrap-bridge" (IP Pairing)
-+- resets: Must contain an entry for each entry in reset-names.
-+- clock-names: Must include the following entries:
-+  "spi": SPI bus clock
-+  "wrap": Main module clock
-+- clocks: Must contain an entry for each entry in clock-names.
-+
-+Optional properities:
-+- pmic: Mediatek PMIC MFD is the child device of pwrap
-+  See the following for child node definitions:
-+  Documentation/devicetree/bindings/mfd/mt6397.txt
-+
-+Example:
-+	pwrap: pwrap at 1000f000 {
-+		compatible = "mediatek,mt8135-pwrap";
-+		reg = <0 0x1000f000 0 0x1000>,
-+			<0 0x11017000 0 0x1000>;
-+		reg-names = "pwrap", "pwrap-bridge";
-+		interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>;
-+		resets = <&infracfg MT8135_INFRA_PMIC_WRAP_RST>,
-+				<&pericfg MT8135_PERI_PWRAP_BRIDGE_SW_RST>;
-+		reset-names = "pwrap", "pwrap-bridge";
-+		clocks = <&clk26m>, <&clk26m>;
-+		clock-names = "spi", "wrap";
-+
-+		pmic {
-+			compatible = "mediatek,mt6397";
-+		};
-+	};
-diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-new file mode 100644
-index 0000000..b91665a
---- /dev/null
-+++ b/drivers/soc/mediatek/Kconfig
-@@ -0,0 +1,11 @@
-+#
-+# MediaTek SoC drivers
-+#
-+config MTK_PMIC_WRAP
-+	tristate "MediaTek PMIC Wrapper Support"
-+	depends on ARCH_MEDIATEK
-+	select REGMAP
-+	help
-+	  Say yes here to add support for MediaTek PMIC Wrapper found
-+	  on the MT8135 and MT8173 SoCs. The PMIC wrapper is a proprietary
-+	  hardware to connect the PMIC.
-diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
-new file mode 100644
-index 0000000..ecaf4de
---- /dev/null
-+++ b/drivers/soc/mediatek/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_MTK_PMIC_WRAP) += mtk-pmic-wrap.o
-diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-new file mode 100644
-index 0000000..bd1f881
---- /dev/null
-+++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -0,0 +1,1027 @@
++++ b/drivers/clk/mediatek/clk-mt8135-pll.c
+@@ -0,0 +1,860 @@
 +/*
 + * Copyright (c) 2014 MediaTek Inc.
-+ * Author: Flora Fu, MediaTek
++ * Author: James Liao <jamesjj.liao@mediatek.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -142,1019 +52,1765 @@ index 0000000..bd1f881
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
 + */
-+#define DEBUG
-+#include <linux/clk.h>
-+#include <linux/interrupt.h>
++
 +#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/reset.h>
++#include <linux/slab.h>
++#include <linux/delay.h>
++#include <linux/clkdev.h>
 +
-+#define PWRAP_MT8135_BRIDGE_IORD_ARB_EN		0x4
-+#define PWRAP_MT8135_BRIDGE_WACS3_EN		0x10
-+#define PWRAP_MT8135_BRIDGE_INIT_DONE3		0x14
-+#define PWRAP_MT8135_BRIDGE_WACS4_EN		0x24
-+#define PWRAP_MT8135_BRIDGE_INIT_DONE4		0x28
-+#define PWRAP_MT8135_BRIDGE_INT_EN		0x38
-+#define PWRAP_MT8135_BRIDGE_TIMER_EN		0x48
-+#define PWRAP_MT8135_BRIDGE_WDT_UNIT		0x50
-+#define PWRAP_MT8135_BRIDGE_WDT_SRC_EN		0x54
++#include "clk-mtk.h"
++#include "clk-pll.h"
++#include "clk-mt8135-pll.h"
 +
-+/* macro for wrapper status */
-+#define PWRAP_GET_WACS_RDATA(x)		(((x) >> 0) & 0x0000ffff)
-+#define PWRAP_GET_WACS_FSM(x)		(((x) >> 16) & 0x00000007)
-+#define PWRAP_GET_WACS_REQ(x)		(((x) >> 19) & 0x00000001)
-+#define PWRAP_STATE_SYNC_IDLE0		(1 << 20)
-+#define PWRAP_STATE_INIT_DONE0		(1 << 21)
++#define PLL_BASE_EN	BIT(0)
++#define PLL_PWR_ON	BIT(0)
++#define PLL_ISO_EN	BIT(1)
++#define PLL_PCW_CHG	BIT(31)
++#define RST_BAR_MASK	BIT(27)
++#define AUDPLL_TUNER_EN	BIT(31)
 +
-+/* macro for WACS FSM */
-+#define PWRAP_WACS_FSM_IDLE		0x00
-+#define PWRAP_WACS_FSM_REQ		0x02
-+#define PWRAP_WACS_FSM_WFDLE		0x04
-+#define PWRAP_WACS_FSM_WFVLDCLR		0x06
-+#define PWRAP_WACS_INIT_DONE		0x01
-+#define PWRAP_WACS_WACS_SYNC_IDLE	0x01
-+#define PWRAP_WACS_SYNC_BUSY		0x00
++#define PLL_PREDIV_H		5
++#define PLL_PREDIV_L		4
++#define PLL_PREDIV_MASK		GENMASK(PLL_PREDIV_H, PLL_PREDIV_L)
++#define PLL_VCODIV_L		19
++#define PLL_VCODIV_MASK		BIT(19)
 +
-+/* macro for device wrapper default value */
-+#define PWRAP_DEW_READ_TEST_VAL		0x5aa5
-+#define PWRAP_DEW_WRITE_TEST_VAL	0xa55a
++static const u32 pll_vcodivsel_map[2] = { 1, 2 };
++static const u32 pll_prediv_map[4] = { 1, 2, 4, 4 };
++static const u32 pll_posdiv_map[8] = { 1, 2, 4, 8, 16, 16, 16, 16 };
++static const u32 pll_fbksel_map[4] = { 1, 2, 4, 4 };
 +
-+/* macro for manual command */
-+#define PWRAP_MAN_CMD_SPI_WRITE		(1 << 13)
-+#define PWRAP_MAN_CMD_OP_CSH		(0x0 << 8)
-+#define PWRAP_MAN_CMD_OP_CSL		(0x1 << 8)
-+#define PWRAP_MAN_CMD_OP_CK		(0x2 << 8)
-+#define PWRAP_MAN_CMD_OP_OUTS		(0x8 << 8)
-+#define PWRAP_MAN_CMD_OP_OUTD		(0x9 << 8)
-+#define PWRAP_MAN_CMD_OP_OUTQ		(0xa << 8)
-+
-+/* macro for slave device wrapper registers */
-+#define PWRAP_DEW_BASE			0xbc00
-+#define PWRAP_DEW_EVENT_OUT_EN		(PWRAP_DEW_BASE + 0x0)
-+#define PWRAP_DEW_DIO_EN		(PWRAP_DEW_BASE + 0x2)
-+#define PWRAP_DEW_EVENT_SRC_EN		(PWRAP_DEW_BASE + 0x4)
-+#define PWRAP_DEW_EVENT_SRC		(PWRAP_DEW_BASE + 0x6)
-+#define PWRAP_DEW_EVENT_FLAG		(PWRAP_DEW_BASE + 0x8)
-+#define PWRAP_DEW_READ_TEST		(PWRAP_DEW_BASE + 0xa)
-+#define PWRAP_DEW_WRITE_TEST		(PWRAP_DEW_BASE + 0xc)
-+#define PWRAP_DEW_CRC_EN		(PWRAP_DEW_BASE + 0xe)
-+#define PWRAP_DEW_CRC_VAL		(PWRAP_DEW_BASE + 0x10)
-+#define PWRAP_DEW_MON_GRP_SEL		(PWRAP_DEW_BASE + 0x12)
-+#define PWRAP_DEW_MON_FLAG_SEL		(PWRAP_DEW_BASE + 0x14)
-+#define PWRAP_DEW_EVENT_TEST		(PWRAP_DEW_BASE + 0x16)
-+#define PWRAP_DEW_CIPHER_KEY_SEL	(PWRAP_DEW_BASE + 0x18)
-+#define PWRAP_DEW_CIPHER_IV_SEL		(PWRAP_DEW_BASE + 0x1a)
-+#define PWRAP_DEW_CIPHER_LOAD		(PWRAP_DEW_BASE + 0x1c)
-+#define PWRAP_DEW_CIPHER_START		(PWRAP_DEW_BASE + 0x1e)
-+#define PWRAP_DEW_CIPHER_RDY		(PWRAP_DEW_BASE + 0x20)
-+#define PWRAP_DEW_CIPHER_MODE		(PWRAP_DEW_BASE + 0x22)
-+#define PWRAP_DEW_CIPHER_SWRST		(PWRAP_DEW_BASE + 0x24)
-+#define PWRAP_MT8173_DEW_CIPHER_IV0	(PWRAP_DEW_BASE + 0x26)
-+#define PWRAP_MT8173_DEW_CIPHER_IV1	(PWRAP_DEW_BASE + 0x28)
-+#define PWRAP_MT8173_DEW_CIPHER_IV2	(PWRAP_DEW_BASE + 0x2a)
-+#define PWRAP_MT8173_DEW_CIPHER_IV3	(PWRAP_DEW_BASE + 0x2c)
-+#define PWRAP_MT8173_DEW_CIPHER_IV4	(PWRAP_DEW_BASE + 0x2e)
-+#define PWRAP_MT8173_DEW_CIPHER_IV5	(PWRAP_DEW_BASE + 0x30)
-+
-+/*
-+ * FIXME: These shouldn't be here. These registers are on the PMIC,
-+ *        so they should be touched in the PMIC driver, not the driver
-+ *        granting access to it.
-+ */
-+#define MT6397_WRP_CKPDN		0x011a
-+#define MT6397_WRP_RST_CON		0x0120
-+#define MT6397_TOP_CKCON2		0x012a
-+#define MT6397_TOP_CKCON3		0x01d4
-+
-+enum pwrap_regs {
-+	PWRAP_MUX_SEL,
-+	PWRAP_WRAP_EN,
-+	PWRAP_DIO_EN,
-+	PWRAP_SIDLY,
-+	PWRAP_CSHEXT_WRITE,
-+	PWRAP_CSHEXT_READ,
-+	PWRAP_CSLEXT_START,
-+	PWRAP_CSLEXT_END,
-+	PWRAP_STAUPD_PRD,
-+	PWRAP_STAUPD_GRPEN,
-+	PWRAP_STAUPD_MAN_TRIG,
-+	PWRAP_STAUPD_STA,
-+	PWRAP_WRAP_STA,
-+	PWRAP_HARB_INIT,
-+	PWRAP_HARB_HPRIO,
-+	PWRAP_HIPRIO_ARB_EN,
-+	PWRAP_HARB_STA0,
-+	PWRAP_HARB_STA1,
-+	PWRAP_MAN_EN,
-+	PWRAP_MAN_CMD,
-+	PWRAP_MAN_RDATA,
-+	PWRAP_MAN_VLDCLR,
-+	PWRAP_WACS0_EN,
-+	PWRAP_INIT_DONE0,
-+	PWRAP_WACS0_CMD,
-+	PWRAP_WACS0_RDATA,
-+	PWRAP_WACS0_VLDCLR,
-+	PWRAP_WACS1_EN,
-+	PWRAP_INIT_DONE1,
-+	PWRAP_WACS1_CMD,
-+	PWRAP_WACS1_RDATA,
-+	PWRAP_WACS1_VLDCLR,
-+	PWRAP_WACS2_EN,
-+	PWRAP_INIT_DONE2,
-+	PWRAP_WACS2_CMD,
-+	PWRAP_WACS2_RDATA,
-+	PWRAP_WACS2_VLDCLR,
-+	PWRAP_INT_EN,
-+	PWRAP_INT_FLG_RAW,
-+	PWRAP_INT_FLG,
-+	PWRAP_INT_CLR,
-+	PWRAP_SIG_ADR,
-+	PWRAP_SIG_MODE,
-+	PWRAP_SIG_VALUE,
-+	PWRAP_SIG_ERRVAL,
-+	PWRAP_CRC_EN,
-+	PWRAP_TIMER_EN,
-+	PWRAP_TIMER_STA,
-+	PWRAP_WDT_UNIT,
-+	PWRAP_WDT_SRC_EN,
-+	PWRAP_WDT_FLG,
-+	PWRAP_DEBUG_INT_SEL,
-+	PWRAP_CIPHER_KEY_SEL,
-+	PWRAP_CIPHER_IV_SEL,
-+	PWRAP_CIPHER_RDY,
-+	PWRAP_CIPHER_MODE,
-+	PWRAP_CIPHER_SWRST,
-+	PWRAP_DCM_EN,
-+	PWRAP_DCM_DBC_PRD,
-+
-+	/* MT8135 only regs */
-+	PWRAP_CSHEXT,
-+	PWRAP_EVENT_IN_EN,
-+	PWRAP_EVENT_DST_EN,
-+	PWRAP_RRARB_INIT,
-+	PWRAP_RRARB_EN,
-+	PWRAP_RRARB_STA0,
-+	PWRAP_RRARB_STA1,
-+	PWRAP_EVENT_STA,
-+	PWRAP_EVENT_STACLR,
-+	PWRAP_CIPHER_LOAD,
-+	PWRAP_CIPHER_START,
-+
-+	/* MT8173 only regs */
-+	PWRAP_RDDMY,
-+	PWRAP_SI_CK_CON,
-+	PWRAP_DVFS_ADR0,
-+	PWRAP_DVFS_WDATA0,
-+	PWRAP_DVFS_ADR1,
-+	PWRAP_DVFS_WDATA1,
-+	PWRAP_DVFS_ADR2,
-+	PWRAP_DVFS_WDATA2,
-+	PWRAP_DVFS_ADR3,
-+	PWRAP_DVFS_WDATA3,
-+	PWRAP_DVFS_ADR4,
-+	PWRAP_DVFS_WDATA4,
-+	PWRAP_DVFS_ADR5,
-+	PWRAP_DVFS_WDATA5,
-+	PWRAP_DVFS_ADR6,
-+	PWRAP_DVFS_WDATA6,
-+	PWRAP_DVFS_ADR7,
-+	PWRAP_DVFS_WDATA7,
-+	PWRAP_SPMINF_STA,
-+	PWRAP_CIPHER_EN,
-+};
-+
-+static int mt8173_regs[] = {
-+	[PWRAP_MUX_SEL] =		0x0,
-+	[PWRAP_WRAP_EN] =		0x4,
-+	[PWRAP_DIO_EN] =		0x8,
-+	[PWRAP_SIDLY] =			0xc,
-+	[PWRAP_RDDMY] =			0x10,
-+	[PWRAP_SI_CK_CON] =		0x14,
-+	[PWRAP_CSHEXT_WRITE] =		0x18,
-+	[PWRAP_CSHEXT_READ] =		0x1c,
-+	[PWRAP_CSLEXT_START] =		0x20,
-+	[PWRAP_CSLEXT_END] =		0x24,
-+	[PWRAP_STAUPD_PRD] =		0x28,
-+	[PWRAP_STAUPD_GRPEN] =		0x2c,
-+	[PWRAP_STAUPD_MAN_TRIG] =	0x40,
-+	[PWRAP_STAUPD_STA] =		0x44,
-+	[PWRAP_WRAP_STA] =		0x48,
-+	[PWRAP_HARB_INIT] =		0x4c,
-+	[PWRAP_HARB_HPRIO] =		0x50,
-+	[PWRAP_HIPRIO_ARB_EN] =		0x54,
-+	[PWRAP_HARB_STA0] =		0x58,
-+	[PWRAP_HARB_STA1] =		0x5c,
-+	[PWRAP_MAN_EN] =		0x60,
-+	[PWRAP_MAN_CMD] =		0x64,
-+	[PWRAP_MAN_RDATA] =		0x68,
-+	[PWRAP_MAN_VLDCLR] =		0x6c,
-+	[PWRAP_WACS0_EN] =		0x70,
-+	[PWRAP_INIT_DONE0] =		0x74,
-+	[PWRAP_WACS0_CMD] =		0x78,
-+	[PWRAP_WACS0_RDATA] =		0x7c,
-+	[PWRAP_WACS0_VLDCLR] =		0x80,
-+	[PWRAP_WACS1_EN] =		0x84,
-+	[PWRAP_INIT_DONE1] =		0x88,
-+	[PWRAP_WACS1_CMD] =		0x8c,
-+	[PWRAP_WACS1_RDATA] =		0x90,
-+	[PWRAP_WACS1_VLDCLR] =		0x94,
-+	[PWRAP_WACS2_EN] =		0x98,
-+	[PWRAP_INIT_DONE2] =		0x9c,
-+	[PWRAP_WACS2_CMD] =		0xa0,
-+	[PWRAP_WACS2_RDATA] =		0xa4,
-+	[PWRAP_WACS2_VLDCLR] =		0xa8,
-+	[PWRAP_INT_EN] =		0xac,
-+	[PWRAP_INT_FLG_RAW] =		0xb0,
-+	[PWRAP_INT_FLG] =		0xb4,
-+	[PWRAP_INT_CLR] =		0xb8,
-+	[PWRAP_SIG_ADR] =		0xbc,
-+	[PWRAP_SIG_MODE] =		0xc0,
-+	[PWRAP_SIG_VALUE] =		0xc4,
-+	[PWRAP_SIG_ERRVAL] =		0xc8,
-+	[PWRAP_CRC_EN] =		0xcc,
-+	[PWRAP_TIMER_EN] =		0xd0,
-+	[PWRAP_TIMER_STA] =		0xd4,
-+	[PWRAP_WDT_UNIT] =		0xd8,
-+	[PWRAP_WDT_SRC_EN] =		0xdc,
-+	[PWRAP_WDT_FLG] =		0xe0,
-+	[PWRAP_DEBUG_INT_SEL] =		0xe4,
-+	[PWRAP_DVFS_ADR0] =		0xe8,
-+	[PWRAP_DVFS_WDATA0] =		0xec,
-+	[PWRAP_DVFS_ADR1] =		0xf0,
-+	[PWRAP_DVFS_WDATA1] =		0xf4,
-+	[PWRAP_DVFS_ADR2] =		0xf8,
-+	[PWRAP_DVFS_WDATA2] =		0xfc,
-+	[PWRAP_DVFS_ADR3] =		0x100,
-+	[PWRAP_DVFS_WDATA3] =		0x104,
-+	[PWRAP_DVFS_ADR4] =		0x108,
-+	[PWRAP_DVFS_WDATA4] =		0x10c,
-+	[PWRAP_DVFS_ADR5] =		0x110,
-+	[PWRAP_DVFS_WDATA5] =		0x114,
-+	[PWRAP_DVFS_ADR6] =		0x118,
-+	[PWRAP_DVFS_WDATA6] =		0x11c,
-+	[PWRAP_DVFS_ADR7] =		0x120,
-+	[PWRAP_DVFS_WDATA7] =		0x124,
-+	[PWRAP_SPMINF_STA] =		0x128,
-+	[PWRAP_CIPHER_KEY_SEL] =	0x12c,
-+	[PWRAP_CIPHER_IV_SEL] =		0x130,
-+	[PWRAP_CIPHER_EN] =		0x134,
-+	[PWRAP_CIPHER_RDY] =		0x138,
-+	[PWRAP_CIPHER_MODE] =		0x13c,
-+	[PWRAP_CIPHER_SWRST] =		0x140,
-+	[PWRAP_DCM_EN] =		0x144,
-+	[PWRAP_DCM_DBC_PRD] =		0x148,
-+};
-+
-+static int mt8135_regs[] = {
-+	[PWRAP_MUX_SEL] =		0x0,
-+	[PWRAP_WRAP_EN] =		0x4,
-+	[PWRAP_DIO_EN] =		0x8,
-+	[PWRAP_SIDLY] =			0xc,
-+	[PWRAP_CSHEXT] =		0x10,
-+	[PWRAP_CSHEXT_WRITE] =		0x14,
-+	[PWRAP_CSHEXT_READ] =		0x18,
-+	[PWRAP_CSLEXT_START] =		0x1c,
-+	[PWRAP_CSLEXT_END] =		0x20,
-+	[PWRAP_STAUPD_PRD] =		0x24,
-+	[PWRAP_STAUPD_GRPEN] =		0x28,
-+	[PWRAP_STAUPD_MAN_TRIG] =	0x2c,
-+	[PWRAP_STAUPD_STA] =		0x30,
-+	[PWRAP_EVENT_IN_EN] =		0x34,
-+	[PWRAP_EVENT_DST_EN] =		0x38,
-+	[PWRAP_WRAP_STA] =		0x3c,
-+	[PWRAP_RRARB_INIT] =		0x40,
-+	[PWRAP_RRARB_EN] =		0x44,
-+	[PWRAP_RRARB_STA0] =		0x48,
-+	[PWRAP_RRARB_STA1] =		0x4c,
-+	[PWRAP_HARB_INIT] =		0x50,
-+	[PWRAP_HARB_HPRIO] =		0x54,
-+	[PWRAP_HIPRIO_ARB_EN] =		0x58,
-+	[PWRAP_HARB_STA0] =		0x5c,
-+	[PWRAP_HARB_STA1] =		0x60,
-+	[PWRAP_MAN_EN] =		0x64,
-+	[PWRAP_MAN_CMD] =		0x68,
-+	[PWRAP_MAN_RDATA] =		0x6c,
-+	[PWRAP_MAN_VLDCLR] =		0x70,
-+	[PWRAP_WACS0_EN] =		0x74,
-+	[PWRAP_INIT_DONE0] =		0x78,
-+	[PWRAP_WACS0_CMD] =		0x7c,
-+	[PWRAP_WACS0_RDATA] =		0x80,
-+	[PWRAP_WACS0_VLDCLR] =		0x84,
-+	[PWRAP_WACS1_EN] =		0x88,
-+	[PWRAP_INIT_DONE1] =		0x8c,
-+	[PWRAP_WACS1_CMD] =		0x90,
-+	[PWRAP_WACS1_RDATA] =		0x94,
-+	[PWRAP_WACS1_VLDCLR] =		0x98,
-+	[PWRAP_WACS2_EN] =		0x9c,
-+	[PWRAP_INIT_DONE2] =		0xa0,
-+	[PWRAP_WACS2_CMD] =		0xa4,
-+	[PWRAP_WACS2_RDATA] =		0xa8,
-+	[PWRAP_WACS2_VLDCLR] =		0xac,
-+	[PWRAP_INT_EN] =		0xb0,
-+	[PWRAP_INT_FLG_RAW] =		0xb4,
-+	[PWRAP_INT_FLG] =		0xb8,
-+	[PWRAP_INT_CLR] =		0xbc,
-+	[PWRAP_SIG_ADR] =		0xc0,
-+	[PWRAP_SIG_MODE] =		0xc4,
-+	[PWRAP_SIG_VALUE] =		0xc8,
-+	[PWRAP_SIG_ERRVAL] =		0xcc,
-+	[PWRAP_CRC_EN] =		0xd0,
-+	[PWRAP_EVENT_STA] =		0xd4,
-+	[PWRAP_EVENT_STACLR] =		0xd8,
-+	[PWRAP_TIMER_EN] =		0xdc,
-+	[PWRAP_TIMER_STA] =		0xe0,
-+	[PWRAP_WDT_UNIT] =		0xe4,
-+	[PWRAP_WDT_SRC_EN] =		0xe8,
-+	[PWRAP_WDT_FLG] =		0xec,
-+	[PWRAP_DEBUG_INT_SEL] =		0xf0,
-+	[PWRAP_CIPHER_KEY_SEL] =	0x134,
-+	[PWRAP_CIPHER_IV_SEL] =		0x138,
-+	[PWRAP_CIPHER_LOAD] =		0x13c,
-+	[PWRAP_CIPHER_START] =		0x140,
-+	[PWRAP_CIPHER_RDY] =		0x144,
-+	[PWRAP_CIPHER_MODE] =		0x148,
-+	[PWRAP_CIPHER_SWRST] =		0x14c,
-+	[PWRAP_DCM_EN] =		0x15c,
-+	[PWRAP_DCM_DBC_PRD] =		0x160,
-+};
-+
-+enum pwrap_type {
-+	PWRAP_MT8135,
-+	PWRAP_MT8173,
-+};
-+
-+struct pmic_wrapper_type {
-+	int *regs;
-+	enum pwrap_type type;
-+	u32 arb_en_all;
-+};
-+
-+static struct pmic_wrapper_type pwrap_mt8135 = {
-+	.regs = mt8135_regs,
-+	.type = PWRAP_MT8135,
-+	.arb_en_all = 0x1ff,
-+};
-+
-+static struct pmic_wrapper_type pwrap_mt8173 = {
-+	.regs = mt8173_regs,
-+	.type = PWRAP_MT8173,
-+	.arb_en_all = 0x3f,
-+};
-+
-+struct pmic_wrapper {
-+	struct device *dev;
-+	void __iomem *base;
-+	struct regmap *regmap;
-+	int *regs;
-+	enum pwrap_type type;
-+	u32 arb_en_all;
-+	struct clk *clk_spi;
-+	struct clk *clk_wrap;
-+	struct reset_control *rstc;
-+
-+	struct reset_control *rstc_bridge;
-+	void __iomem *bridge_base;
-+};
-+
-+static inline int pwrap_is_mt8135(struct pmic_wrapper *wrp)
++static u32 mtk_calc_pll_vco_freq(
++		u32 fin,
++		u32 pcw,
++		u32 vcodivsel,
++		u32 prediv,
++		u32 pcwfbits)
 +{
-+	return wrp->type == PWRAP_MT8135;
++	/* vco = (fin * pcw * vcodivsel / prediv) >> pcwfbits; */
++	u64 vco = fin;
++	u8 c = 0;
++
++	vco = vco * pcw * vcodivsel;
++	do_div(vco, prediv);
++
++	if (vco & GENMASK(pcwfbits - 1, 0))
++		c = 1;
++
++	vco >>= pcwfbits;
++
++	if (c)
++		++vco;
++
++	return (u32)vco;
 +}
 +
-+static inline int pwrap_is_mt8173(struct pmic_wrapper *wrp)
++static u32 mtk_freq_limit(u32 freq)
 +{
-+	return wrp->type == PWRAP_MT8173;
++	static const u32 freq_max = 2000 * 1000 * 1000;		/* 2000 MHz */
++	static const u32 freq_min = 1000 * 1000 * 1000 / 16;	/* 62.5 MHz */
++
++	if (freq <= freq_min)
++		freq = freq_min + 16;
++	else if (freq > freq_max)
++		freq = freq_max;
++
++	return freq;
 +}
 +
-+static u32 pwrap_readl(struct pmic_wrapper *wrp, enum pwrap_regs reg)
++static int mtk_calc_pll_freq_cfg(
++		u32 *pcw,
++		u32 *postdiv_idx,
++		u32 freq,
++		u32 fin,
++		int pcwfbits)
 +{
-+	return readl(wrp->base + wrp->regs[reg]);
-+}
++	static const u64 freq_max = 2000 * 1000 * 1000;	/* 2000 MHz */
++	static const u64 freq_min = 1000 * 1000 * 1000;	/* 1000 MHz */
++	static const u64 postdiv[] = { 1, 2, 4, 8, 16 };
++	u64 n_info;
++	u32 idx;
 +
-+static void pwrap_writel(struct pmic_wrapper *wrp, u32 val, enum pwrap_regs reg)
-+{
-+	writel(val, wrp->base + wrp->regs[reg]);
-+}
++	/* search suitable postdiv */
++	for (idx = 0;
++		idx < ARRAY_SIZE(postdiv) && postdiv[idx] * freq <= freq_min;
++		idx++)
++		;
 +
-+static bool pwrap_is_fsm_idle(struct pmic_wrapper *wrp)
-+{
-+	u32 val = pwrap_readl(wrp, PWRAP_WACS2_RDATA);
++	if (idx >= ARRAY_SIZE(postdiv))
++		return -EINVAL;	/* freq is out of range (too low) */
++	else if (postdiv[idx] * freq > freq_max)
++		return -EINVAL;	/* freq is out of range (too high) */
 +
-+	return PWRAP_GET_WACS_FSM(val) == PWRAP_WACS_FSM_IDLE;
-+}
++	/* n_info = freq * postdiv / 26MHz * 2^pcwfbits */
++	n_info = (postdiv[idx] * freq) << pcwfbits;
++	do_div(n_info, fin);
 +
-+static bool pwrap_is_fsm_vldclr(struct pmic_wrapper *wrp)
-+{
-+	u32 val = pwrap_readl(wrp, PWRAP_WACS2_RDATA);
-+
-+	return PWRAP_GET_WACS_FSM(val) == PWRAP_WACS_FSM_WFVLDCLR;
-+}
-+
-+static bool pwrap_is_sync_idle(struct pmic_wrapper *wrp)
-+{
-+	return pwrap_readl(wrp, PWRAP_WACS2_RDATA) & PWRAP_STATE_SYNC_IDLE0;
-+}
-+
-+static bool pwrap_is_fsm_idle_and_sync_idle(struct pmic_wrapper *wrp)
-+{
-+	u32 val = pwrap_readl(wrp, PWRAP_WACS2_RDATA);
-+
-+	return (PWRAP_GET_WACS_FSM(val) == PWRAP_WACS_FSM_IDLE) &&
-+		(val & PWRAP_STATE_SYNC_IDLE0);
-+}
-+
-+static int pwrap_wait_for_state(struct pmic_wrapper *wrp,
-+		bool (*fp)(struct pmic_wrapper *))
-+{
-+	unsigned long timeout;
-+
-+	timeout = jiffies + usecs_to_jiffies(255);
-+
-+	do {
-+		if (time_after(jiffies, timeout))
-+			return fp(wrp) ? 0 : -ETIMEDOUT;
-+		if (fp(wrp))
-+			return 0;
-+	} while (1);
-+}
-+
-+static int pwrap_write(struct pmic_wrapper *wrp, u32 adr, u32 wdata)
-+{
-+	int ret;
-+	u32 val;
-+
-+	val = pwrap_readl(wrp, PWRAP_WACS2_RDATA);
-+	if (PWRAP_GET_WACS_FSM(val) == PWRAP_WACS_FSM_WFVLDCLR)
-+		pwrap_writel(wrp, 1, PWRAP_WACS2_VLDCLR);
-+
-+	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
-+	if (ret)
-+		return ret;
-+
-+	pwrap_writel(wrp, (1 << 31) | ((adr >> 1) << 16) | wdata,
-+			PWRAP_WACS2_CMD);
++	*postdiv_idx = idx;
++	*pcw = (u32)n_info;
 +
 +	return 0;
 +}
 +
-+static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
++static int mtk_clk_pll_is_enabled(struct clk_hw *hw)
 +{
-+	int ret;
-+	u32 val;
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
 +
-+	val = pwrap_readl(wrp, PWRAP_WACS2_RDATA);
-+	if (PWRAP_GET_WACS_FSM(val) == PWRAP_WACS_FSM_WFVLDCLR)
-+		pwrap_writel(wrp, 1, PWRAP_WACS2_VLDCLR);
-+
-+	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
-+	if (ret)
-+		return ret;
-+
-+	pwrap_writel(wrp, (adr >> 1) << 16, PWRAP_WACS2_CMD);
-+
-+	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_vldclr);
-+	if (ret)
-+		return ret;
-+
-+	*rdata = PWRAP_GET_WACS_RDATA(pwrap_readl(wrp, PWRAP_WACS2_RDATA));
-+
-+	return 0;
++	return (readl_relaxed(pll->base_addr) & PLL_BASE_EN) != 0;
 +}
 +
-+static int pwrap_regmap_read(void *context, u32 adr, u32 *rdata)
++static int mtk_clk_pll_prepare(struct clk_hw *hw)
 +{
-+	return pwrap_read(context, adr, rdata);
-+}
++	unsigned long flags = 0;
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	u32 r;
 +
-+static int pwrap_regmap_write(void *context, u32 adr, u32 wdata)
-+{
-+	return pwrap_write(context, adr, wdata);
-+}
++	spin_lock_irqsave(pll->lock, flags);
 +
-+static int pwrap_reset_spislave(struct pmic_wrapper *wrp)
-+{
-+	int ret, i;
++	r = readl_relaxed(pll->pwr_addr) | PLL_PWR_ON;
++	writel_relaxed(r, pll->pwr_addr);
++	wmb();	/* sync write before delay */
++	udelay(1);
 +
-+	pwrap_writel(wrp, 0, PWRAP_HIPRIO_ARB_EN);
-+	pwrap_writel(wrp, 0, PWRAP_WRAP_EN);
-+	pwrap_writel(wrp, 1, PWRAP_MUX_SEL);
-+	pwrap_writel(wrp, 1, PWRAP_MAN_EN);
-+	pwrap_writel(wrp, 0, PWRAP_DIO_EN);
++	r = readl_relaxed(pll->pwr_addr) & ~PLL_ISO_EN;
++	writel_relaxed(r, pll->pwr_addr);
++	wmb();	/* sync write before delay */
++	udelay(1);
 +
-+	pwrap_writel(wrp, PWRAP_MAN_CMD_SPI_WRITE | PWRAP_MAN_CMD_OP_CSL,
-+			PWRAP_MAN_CMD);
-+	pwrap_writel(wrp, PWRAP_MAN_CMD_SPI_WRITE | PWRAP_MAN_CMD_OP_OUTS,
-+			PWRAP_MAN_CMD);
-+	pwrap_writel(wrp, PWRAP_MAN_CMD_SPI_WRITE | PWRAP_MAN_CMD_OP_CSH,
-+			PWRAP_MAN_CMD);
++	r = readl_relaxed(pll->base_addr) | pll->en_mask;
++	writel_relaxed(r, pll->base_addr);
++	wmb();	/* sync write before delay */
++	udelay(20);
 +
-+	for (i = 0; i < 4; i++)
-+		pwrap_writel(wrp, PWRAP_MAN_CMD_SPI_WRITE | PWRAP_MAN_CMD_OP_OUTS,
-+				PWRAP_MAN_CMD);
-+
-+	ret = pwrap_wait_for_state(wrp, pwrap_is_sync_idle);
-+	if (ret) {
-+		dev_err(wrp->dev, "%s fail, ret=%d\n", __func__, ret);
-+		return ret;
++	if (pll->flags & HAVE_RST_BAR) {
++		r = readl_relaxed(pll->base_addr) | RST_BAR_MASK;
++		writel_relaxed(r, pll->base_addr);
 +	}
 +
-+	pwrap_writel(wrp, 0, PWRAP_MAN_EN);
-+	pwrap_writel(wrp, 0, PWRAP_MUX_SEL);
++	spin_unlock_irqrestore(pll->lock, flags);
 +
 +	return 0;
 +}
 +
++static void mtk_clk_pll_unprepare(struct clk_hw *hw)
++{
++	unsigned long flags = 0;
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	u32 r;
++
++	if (pll->flags & PLL_AO)
++		return;
++
++	spin_lock_irqsave(pll->lock, flags);
++
++	if (pll->flags & HAVE_RST_BAR) {
++		r = readl_relaxed(pll->base_addr) & ~RST_BAR_MASK;
++		writel_relaxed(r, pll->base_addr);
++	}
++
++	r = readl_relaxed(pll->base_addr) & ~PLL_BASE_EN;
++	writel_relaxed(r, pll->base_addr);
++
++	r = readl_relaxed(pll->pwr_addr) | PLL_ISO_EN;
++	writel_relaxed(r, pll->pwr_addr);
++
++	r = readl_relaxed(pll->pwr_addr) & ~PLL_PWR_ON;
++	writel_relaxed(r, pll->pwr_addr);
++
++	spin_unlock_irqrestore(pll->lock, flags);
++}
++
++static long mtk_clk_pll_round_rate(
++		struct clk_hw *hw,
++		unsigned long rate,
++		unsigned long *prate)
++{
++	u32 pcwfbits = 14;
++	u32 pcw = 0;
++	u32 postdiv = 0;
++	u32 r;
++
++	*prate = *prate ? *prate : 26000000;
++	rate = mtk_freq_limit(rate);
++	mtk_calc_pll_freq_cfg(&pcw, &postdiv, rate, *prate, pcwfbits);
++
++	r = mtk_calc_pll_vco_freq(*prate, pcw, 1, 1, pcwfbits);
++	r = (r + pll_posdiv_map[postdiv] - 1) / pll_posdiv_map[postdiv];
++
++	return r;
++}
++
++#define SDM_PLL_POSTDIV_H	8
++#define SDM_PLL_POSTDIV_L	6
++#define SDM_PLL_POSTDIV_MASK	GENMASK(SDM_PLL_POSTDIV_H, SDM_PLL_POSTDIV_L)
++#define SDM_PLL_PCW_H		20
++#define SDM_PLL_PCW_L		0
++#define SDM_PLL_PCW_MASK	GENMASK(SDM_PLL_PCW_H, SDM_PLL_PCW_L)
++
++static unsigned long mtk_clk_pll_recalc_rate(
++		struct clk_hw *hw,
++		unsigned long parent_rate)
++{
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++
++	u32 con0 = readl_relaxed(pll->base_addr);
++	u32 con1 = readl_relaxed(pll->base_addr + 4);
++
++	u32 vcodivsel = (con0 & PLL_VCODIV_MASK) >> PLL_VCODIV_L;
++	u32 prediv = (con0 & PLL_PREDIV_MASK) >> PLL_PREDIV_L;
++	u32 posdiv = (con0 & SDM_PLL_POSTDIV_MASK) >> SDM_PLL_POSTDIV_L;
++	u32 pcw = (con1 & SDM_PLL_PCW_MASK) >> SDM_PLL_PCW_L;
++	u32 pcwfbits = 14;
++
++	u32 vco_freq;
++	unsigned long r;
++
++	parent_rate = parent_rate ? parent_rate : 26000000;
++	vcodivsel = pll_vcodivsel_map[vcodivsel];
++	prediv = pll_prediv_map[prediv];
++
++	vco_freq = mtk_calc_pll_vco_freq(
++			parent_rate, pcw, vcodivsel, prediv, pcwfbits);
++	r = (vco_freq + pll_posdiv_map[posdiv] - 1) / pll_posdiv_map[posdiv];
++
++	return r;
++}
++
++static void mtk_clk_pll_set_rate_regs(
++		struct clk_hw *hw,
++		u32 pcw,
++		u32 postdiv_idx)
++{
++	unsigned long flags = 0;
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	void __iomem *con0_addr = pll->base_addr;
++	void __iomem *con1_addr = pll->base_addr + 4;
++	u32 con0;
++	u32 con1;
++	u32 pll_en;
++
++	spin_lock_irqsave(pll->lock, flags);
++
++	con0 = readl_relaxed(con0_addr);
++	con1 = readl_relaxed(con1_addr);
++
++	pll_en = con0 & PLL_BASE_EN;
++
++	/* set postdiv */
++	con0 &= ~SDM_PLL_POSTDIV_MASK;
++	con0 |= postdiv_idx << SDM_PLL_POSTDIV_L;
++	writel_relaxed(con0, con0_addr);
++
++	/* set pcw */
++	con1 &= ~SDM_PLL_PCW_MASK;
++	con1 |= pcw << SDM_PLL_PCW_L;
++
++	if (pll_en)
++		con1 |= PLL_PCW_CHG;
++
++	writel_relaxed(con1, con1_addr);
++
++	if (pll_en) {
++		wmb();	/* sync write before delay */
++		udelay(20);
++	}
++
++	spin_unlock_irqrestore(pll->lock, flags);
++}
++
++static int mtk_clk_pll_set_rate(
++		struct clk_hw *hw,
++		unsigned long rate,
++		unsigned long parent_rate)
++{
++	u32 pcwfbits = 14;
++	u32 pcw = 0;
++	u32 postdiv_idx = 0;
++	int r;
++
++	parent_rate = parent_rate ? parent_rate : 26000000;
++	r = mtk_calc_pll_freq_cfg(&pcw, &postdiv_idx, rate,
++			parent_rate, pcwfbits);
++
++	if (r == 0)
++		mtk_clk_pll_set_rate_regs(hw, pcw, postdiv_idx);
++
++	return r;
++}
++
++const struct clk_ops mt8135_pll_ops = {
++	.is_enabled	= mtk_clk_pll_is_enabled,
++	.prepare	= mtk_clk_pll_prepare,
++	.unprepare	= mtk_clk_pll_unprepare,
++	.recalc_rate	= mtk_clk_pll_recalc_rate,
++	.round_rate	= mtk_clk_pll_round_rate,
++	.set_rate	= mtk_clk_pll_set_rate,
++};
++
++#define ARM_PLL_POSTDIV_H	26
++#define ARM_PLL_POSTDIV_L	24
++#define ARM_PLL_POSTDIV_MASK	GENMASK(ARM_PLL_POSTDIV_H, ARM_PLL_POSTDIV_L)
++#define ARM_PLL_PCW_H		20
++#define ARM_PLL_PCW_L		0
++#define ARM_PLL_PCW_MASK	GENMASK(ARM_PLL_PCW_H, ARM_PLL_PCW_L)
++
++static unsigned long mtk_clk_arm_pll_recalc_rate(
++		struct clk_hw *hw,
++		unsigned long parent_rate)
++{
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++
++	u32 con0 = readl_relaxed(pll->base_addr);
++	u32 con1 = readl_relaxed(pll->base_addr + 4);
++
++	u32 vcodivsel = (con0 & PLL_VCODIV_MASK) >> PLL_VCODIV_L;
++	u32 prediv = (con0 & PLL_PREDIV_MASK) >> PLL_PREDIV_L;
++	u32 posdiv = (con1 & ARM_PLL_POSTDIV_MASK) >> ARM_PLL_POSTDIV_L;
++	u32 pcw = (con1 & ARM_PLL_PCW_MASK) >> ARM_PLL_PCW_L;
++	u32 pcwfbits = 14;
++
++	u32 vco_freq;
++	unsigned long r;
++
++	parent_rate = parent_rate ? parent_rate : 26000000;
++	vcodivsel = pll_vcodivsel_map[vcodivsel];
++	prediv = pll_prediv_map[prediv];
++
++	vco_freq = mtk_calc_pll_vco_freq(
++			parent_rate, pcw, vcodivsel, prediv, pcwfbits);
++	r = (vco_freq + pll_posdiv_map[posdiv] - 1) / pll_posdiv_map[posdiv];
++
++	return r;
++}
++
++static void mtk_clk_arm_pll_set_rate_regs(
++		struct clk_hw *hw,
++		u32 pcw,
++		u32 postdiv_idx)
++
++{
++	unsigned long flags = 0;
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	void __iomem *con0_addr = pll->base_addr;
++	void __iomem *con1_addr = pll->base_addr + 4;
++	u32 con0;
++	u32 con1;
++	u32 pll_en;
++
++	spin_lock_irqsave(pll->lock, flags);
++
++	con0 = readl_relaxed(con0_addr);
++	con1 = readl_relaxed(con1_addr);
++
++	pll_en = con0 & PLL_BASE_EN;
++
++	/* postdiv */
++	con1 &= ~ARM_PLL_POSTDIV_MASK;
++	con1 |= postdiv_idx << ARM_PLL_POSTDIV_L;
++
++	/* pcw */
++	con1 &= ~ARM_PLL_PCW_MASK;
++	con1 |= pcw << ARM_PLL_PCW_L;
++
++	if (pll_en)
++		con1 |= PLL_PCW_CHG;
++
++	writel_relaxed(con1, con1_addr);
++
++	if (pll_en) {
++		wmb();	/* sync write before delay */
++		udelay(20);
++	}
++
++	spin_unlock_irqrestore(pll->lock, flags);
++}
++
++static int mtk_clk_arm_pll_set_rate(
++		struct clk_hw *hw,
++		unsigned long rate,
++		unsigned long parent_rate)
++{
++	u32 pcwfbits = 14;
++	u32 pcw = 0;
++	u32 postdiv_idx = 0;
++	int r;
++
++	parent_rate = parent_rate ? parent_rate : 26000000;
++	r = mtk_calc_pll_freq_cfg(&pcw, &postdiv_idx, rate,
++			parent_rate, pcwfbits);
++
++	if (r == 0)
++		mtk_clk_arm_pll_set_rate_regs(hw, pcw, postdiv_idx);
++
++	return r;
++}
++
++const struct clk_ops mt8135_arm_pll_ops = {
++	.is_enabled	= mtk_clk_pll_is_enabled,
++	.prepare	= mtk_clk_pll_prepare,
++	.unprepare	= mtk_clk_pll_unprepare,
++	.recalc_rate	= mtk_clk_arm_pll_recalc_rate,
++	.round_rate	= mtk_clk_pll_round_rate,
++	.set_rate	= mtk_clk_arm_pll_set_rate,
++};
++
++static int mtk_clk_lc_pll_prepare(struct clk_hw *hw)
++{
++	unsigned long flags = 0;
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	u32 r;
++
++	spin_lock_irqsave(pll->lock, flags);
++
++	r = readl_relaxed(pll->base_addr) | pll->en_mask;
++	writel_relaxed(r, pll->base_addr);
++	wmb();	/* sync write before delay */
++	udelay(20);
++
++	if (pll->flags & HAVE_RST_BAR) {
++		r = readl_relaxed(pll->base_addr) | RST_BAR_MASK;
++		writel_relaxed(r, pll->base_addr);
++	}
++
++	spin_unlock_irqrestore(pll->lock, flags);
++
++	return 0;
++}
++
++static void mtk_clk_lc_pll_unprepare(struct clk_hw *hw)
++{
++	unsigned long flags = 0;
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	u32 r;
++
++	if (pll->flags & PLL_AO)
++		return;
++
++	spin_lock_irqsave(pll->lock, flags);
++
++	if (pll->flags & HAVE_RST_BAR) {
++		r = readl_relaxed(pll->base_addr) & ~RST_BAR_MASK;
++		writel_relaxed(r, pll->base_addr);
++	}
++
++	r = readl_relaxed(pll->base_addr) & ~PLL_BASE_EN;
++	writel_relaxed(r, pll->base_addr);
++
++	spin_unlock_irqrestore(pll->lock, flags);
++}
++
++#define LC_PLL_FBKSEL_H		21
++#define LC_PLL_FBKSEL_L		20
++#define LC_PLL_FBKSEL_MASK	GENMASK(LC_PLL_FBKSEL_H, LC_PLL_FBKSEL_L)
++#define LC_PLL_POSTDIV_H	8
++#define LC_PLL_POSTDIV_L	6
++#define LC_PLL_POSTDIV_MASK	GENMASK(LC_PLL_POSTDIV_H, LC_PLL_POSTDIV_L)
++#define LC_PLL_FBKDIV_H		15
++#define LC_PLL_FBKDIV_L		9
++#define LC_PLL_FBKDIV_MASK	GENMASK(LC_PLL_FBKDIV_H, LC_PLL_FBKDIV_L)
++
++static unsigned long mtk_clk_lc_pll_recalc_rate(
++		struct clk_hw *hw,
++		unsigned long parent_rate)
++{
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++
++	u32 con0 = readl_relaxed(pll->base_addr);
++
++	u32 fbksel = (con0 & LC_PLL_FBKSEL_MASK) >> LC_PLL_FBKSEL_L;
++	u32 vcodivsel = (con0 & PLL_VCODIV_MASK) >> PLL_VCODIV_L;
++	u32 fbkdiv = (con0 & LC_PLL_FBKDIV_MASK) >> LC_PLL_FBKDIV_L;
++	u32 prediv = (con0 & PLL_PREDIV_MASK) >> PLL_PREDIV_L;
++	u32 posdiv = (con0 & LC_PLL_POSTDIV_MASK) >> LC_PLL_POSTDIV_L;
++
++	u32 vco_freq;
++	unsigned long r;
++
++	parent_rate = parent_rate ? parent_rate : 26000000;
++	vcodivsel = pll_vcodivsel_map[vcodivsel];
++	fbksel = pll_fbksel_map[fbksel];
++	prediv = pll_prediv_map[prediv];
++
++	vco_freq = parent_rate * fbkdiv * fbksel * vcodivsel / prediv;
++	r = (vco_freq + pll_posdiv_map[posdiv] - 1) / pll_posdiv_map[posdiv];
++
++	return r;
++}
++
++static void mtk_clk_lc_pll_set_rate_regs(
++		struct clk_hw *hw,
++		u32 pcw,
++		u32 postdiv_idx)
++{
++	unsigned long flags = 0;
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	void __iomem *con0_addr = pll->base_addr;
++	u32 con0;
++	u32 pll_en;
++
++	spin_lock_irqsave(pll->lock, flags);
++
++	con0 = readl_relaxed(con0_addr);
++
++	pll_en = con0 & PLL_BASE_EN;
++
++	/* postdiv */
++	con0 &= ~LC_PLL_POSTDIV_MASK;
++	con0 |= postdiv_idx << LC_PLL_POSTDIV_L;
++
++	/* fkbdiv */
++	con0 &= ~LC_PLL_FBKDIV_MASK;
++	con0 |= pcw << LC_PLL_FBKDIV_L;
++
++	writel_relaxed(con0, con0_addr);
++
++	if (pll_en) {
++		wmb();	/* sync write before delay */
++		udelay(20);
++	}
++
++	spin_unlock_irqrestore(pll->lock, flags);
++}
++
++static long mtk_clk_lc_pll_round_rate(
++		struct clk_hw *hw,
++		unsigned long rate,
++		unsigned long *prate)
++{
++	u32 pcwfbits = 0;
++	u32 pcw = 0;
++	u32 postdiv = 0;
++	u32 r;
++
++	*prate = *prate ? *prate : 26000000;
++	rate = mtk_freq_limit(rate);
++	mtk_calc_pll_freq_cfg(&pcw, &postdiv, rate, *prate, pcwfbits);
++
++	r = mtk_calc_pll_vco_freq(*prate, pcw, 1, 1, pcwfbits);
++	r = (r + pll_posdiv_map[postdiv] - 1) / pll_posdiv_map[postdiv];
++
++	return r;
++}
++
++static int mtk_clk_lc_pll_set_rate(
++		struct clk_hw *hw,
++		unsigned long rate,
++		unsigned long parent_rate)
++{
++	u32 pcwfbits = 0;
++	u32 pcw = 0;
++	u32 postdiv_idx = 0;
++	int r;
++
++	parent_rate = parent_rate ? parent_rate : 26000000;
++	r = mtk_calc_pll_freq_cfg(&pcw, &postdiv_idx, rate,
++			parent_rate, pcwfbits);
++
++	if (r == 0)
++		mtk_clk_lc_pll_set_rate_regs(hw, pcw, postdiv_idx);
++
++	return r;
++}
++
++const struct clk_ops mt8135_lc_pll_ops = {
++	.is_enabled	= mtk_clk_pll_is_enabled,
++	.prepare	= mtk_clk_lc_pll_prepare,
++	.unprepare	= mtk_clk_lc_pll_unprepare,
++	.recalc_rate	= mtk_clk_lc_pll_recalc_rate,
++	.round_rate	= mtk_clk_lc_pll_round_rate,
++	.set_rate	= mtk_clk_lc_pll_set_rate,
++};
++
++static int mtk_clk_aud_pll_prepare(struct clk_hw *hw)
++{
++	unsigned long flags = 0;
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	void __iomem *con0_addr = pll->base_addr;
++	void __iomem *con4_addr = pll->base_addr + 16;
++	u32 r;
++
++	spin_lock_irqsave(pll->lock, flags);
++
++	r = readl_relaxed(pll->pwr_addr) | PLL_PWR_ON;
++	writel_relaxed(r, pll->pwr_addr);
++	wmb();	/* sync write before delay */
++	udelay(1);
++
++	r = readl_relaxed(pll->pwr_addr) & ~PLL_ISO_EN;
++	writel_relaxed(r, pll->pwr_addr);
++	wmb();	/* sync write before delay */
++	udelay(1);
++
++	r = readl_relaxed(con0_addr) | pll->en_mask;
++	writel_relaxed(r, con0_addr);
++
++	r = readl_relaxed(con4_addr) | AUDPLL_TUNER_EN;
++	writel_relaxed(r, con4_addr);
++	wmb();	/* sync write before delay */
++	udelay(20);
++
++	if (pll->flags & HAVE_RST_BAR) {
++		r = readl_relaxed(con0_addr) | RST_BAR_MASK;
++		writel_relaxed(r, con0_addr);
++	}
++
++	spin_unlock_irqrestore(pll->lock, flags);
++
++	return 0;
++}
++
++static void mtk_clk_aud_pll_unprepare(struct clk_hw *hw)
++{
++	unsigned long flags = 0;
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	void __iomem *con0_addr = pll->base_addr;
++	void __iomem *con4_addr = pll->base_addr + 16;
++	u32 r;
++
++	if (pll->flags & PLL_AO)
++		return;
++
++	spin_lock_irqsave(pll->lock, flags);
++
++	if (pll->flags & HAVE_RST_BAR) {
++		r = readl_relaxed(con0_addr) & ~RST_BAR_MASK;
++		writel_relaxed(r, con0_addr);
++	}
++
++	r = readl_relaxed(con4_addr) & ~AUDPLL_TUNER_EN;
++	writel_relaxed(r, con4_addr);
++
++	r = readl_relaxed(con0_addr) & ~PLL_BASE_EN;
++	writel_relaxed(r, con0_addr);
++
++	r = readl_relaxed(pll->pwr_addr) | PLL_ISO_EN;
++	writel_relaxed(r, pll->pwr_addr);
++
++	r = readl_relaxed(pll->pwr_addr) & ~PLL_PWR_ON;
++	writel_relaxed(r, pll->pwr_addr);
++
++	spin_unlock_irqrestore(pll->lock, flags);
++}
++
++#define AUD_PLL_POSTDIV_H	8
++#define AUD_PLL_POSTDIV_L	6
++#define AUD_PLL_POSTDIV_MASK	GENMASK(AUD_PLL_POSTDIV_H, AUD_PLL_POSTDIV_L)
++#define AUD_PLL_PCW_H		30
++#define AUD_PLL_PCW_L		0
++#define AUD_PLL_PCW_MASK	GENMASK(AUD_PLL_PCW_H, AUD_PLL_PCW_L)
++
++static unsigned long mtk_clk_aud_pll_recalc_rate(
++		struct clk_hw *hw,
++		unsigned long parent_rate)
++{
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++
++	u32 con0 = readl_relaxed(pll->base_addr);
++	u32 con1 = readl_relaxed(pll->base_addr + 4);
++
++	u32 vcodivsel = (con0 & PLL_VCODIV_MASK) >> PLL_VCODIV_L;
++	u32 prediv = (con0 & PLL_PREDIV_MASK) >> PLL_PREDIV_L;
++	u32 posdiv = (con0 & AUD_PLL_POSTDIV_MASK) >> AUD_PLL_POSTDIV_L;
++	u32 pcw = (con1 & AUD_PLL_PCW_MASK) >> AUD_PLL_PCW_L;
++	u32 pcwfbits = 24;
++
++	u32 vco_freq;
++	unsigned long r;
++
++	parent_rate = parent_rate ? parent_rate : 26000000;
++	vcodivsel = pll_vcodivsel_map[vcodivsel];
++	prediv = pll_prediv_map[prediv];
++
++	vco_freq = mtk_calc_pll_vco_freq(
++			parent_rate, pcw, vcodivsel, prediv, pcwfbits);
++	r = (vco_freq + pll_posdiv_map[posdiv] - 1) / pll_posdiv_map[posdiv];
++
++	return r;
++}
++
++static void mtk_clk_aud_pll_set_rate_regs(
++		struct clk_hw *hw,
++		u32 pcw,
++		u32 postdiv_idx)
++{
++	unsigned long flags = 0;
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	void __iomem *con0_addr = pll->base_addr;
++	void __iomem *con1_addr = pll->base_addr + 4;
++	void __iomem *con4_addr = pll->base_addr + 16;
++	u32 con0;
++	u32 con1;
++	u32 pll_en;
++
++	spin_lock_irqsave(pll->lock, flags);
++
++	con0 = readl_relaxed(con0_addr);
++	con1 = readl_relaxed(con1_addr);
++
++	pll_en = con0 & PLL_BASE_EN;
++
++	/* set postdiv */
++	con0 &= ~AUD_PLL_POSTDIV_MASK;
++	con0 |= postdiv_idx << AUD_PLL_POSTDIV_L;
++	writel_relaxed(con0, con0_addr);
++
++	/* set pcw */
++	con1 &= ~AUD_PLL_PCW_MASK;
++	con1 |= pcw << AUD_PLL_PCW_L;
++
++	if (pll_en)
++		con1 |= PLL_PCW_CHG;
++
++	writel_relaxed(con1, con1_addr);
++	writel_relaxed(con1 + 1, con4_addr);
++	/* AUDPLL_CON4[30:0] (AUDPLL_TUNER_N_INFO) = (pcw + 1) */
++
++	if (pll_en) {
++		wmb();	/* sync write before delay */
++		udelay(20);
++	}
++
++	spin_unlock_irqrestore(pll->lock, flags);
++}
++
++static long mtk_clk_aud_pll_round_rate(
++		struct clk_hw *hw,
++		unsigned long rate,
++		unsigned long *prate)
++{
++	u32 pcwfbits = 24;
++	u32 pcw = 0;
++	u32 postdiv = 0;
++	u32 r;
++
++	*prate = *prate ? *prate : 26000000;
++	rate = mtk_freq_limit(rate);
++	mtk_calc_pll_freq_cfg(&pcw, &postdiv, rate, *prate, pcwfbits);
++
++	r = mtk_calc_pll_vco_freq(*prate, pcw, 1, 1, pcwfbits);
++	r = (r + pll_posdiv_map[postdiv] - 1) / pll_posdiv_map[postdiv];
++
++	return r;
++}
++
++static int mtk_clk_aud_pll_set_rate(
++		struct clk_hw *hw,
++		unsigned long rate,
++		unsigned long parent_rate)
++{
++	u32 pcwfbits = 24;
++	u32 pcw = 0;
++	u32 postdiv_idx = 0;
++	int r;
++
++	parent_rate = parent_rate ? parent_rate : 26000000;
++	r = mtk_calc_pll_freq_cfg(&pcw, &postdiv_idx, rate,
++			parent_rate, pcwfbits);
++
++	if (r == 0)
++		mtk_clk_aud_pll_set_rate_regs(hw, pcw, postdiv_idx);
++
++	return r;
++}
++
++const struct clk_ops mt8135_aud_pll_ops = {
++	.is_enabled	= mtk_clk_pll_is_enabled,
++	.prepare	= mtk_clk_aud_pll_prepare,
++	.unprepare	= mtk_clk_aud_pll_unprepare,
++	.recalc_rate	= mtk_clk_aud_pll_recalc_rate,
++	.round_rate	= mtk_clk_aud_pll_round_rate,
++	.set_rate	= mtk_clk_aud_pll_set_rate,
++};
++
++#define TVD_PLL_POSTDIV_H	8
++#define TVD_PLL_POSTDIV_L	6
++#define TVD_PLL_POSTDIV_MASK	GENMASK(TVD_PLL_POSTDIV_H, TVD_PLL_POSTDIV_L)
++#define TVD_PLL_PCW_H		30
++#define TVD_PLL_PCW_L		0
++#define TVD_PLL_PCW_MASK	GENMASK(TVD_PLL_PCW_H, TVD_PLL_PCW_L)
++
++static void mtk_clk_tvd_pll_set_rate_regs(
++		struct clk_hw *hw,
++		u32 pcw,
++		u32 postdiv_idx)
++{
++	unsigned long flags = 0;
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	void __iomem *con0_addr = pll->base_addr;
++	void __iomem *con1_addr = pll->base_addr + 4;
++	u32 con0;
++	u32 con1;
++	u32 pll_en;
++
++	spin_lock_irqsave(pll->lock, flags);
++
++	con0 = readl_relaxed(con0_addr);
++	con1 = readl_relaxed(con1_addr);
++
++	pll_en = con0 & PLL_BASE_EN;
++
++	/* set postdiv */
++	con0 &= ~TVD_PLL_POSTDIV_MASK;
++	con0 |= postdiv_idx << TVD_PLL_POSTDIV_L;
++	writel_relaxed(con0, con0_addr);
++
++	/* set pcw */
++	con1 &= ~TVD_PLL_PCW_MASK;
++	con1 |= pcw << TVD_PLL_PCW_L;
++
++	if (pll_en)
++		con1 |= PLL_PCW_CHG;
++
++	writel_relaxed(con1, con1_addr);
++
++	if (pll_en) {
++		wmb();	/* sync write before delay */
++		udelay(20);
++	}
++
++	spin_unlock_irqrestore(pll->lock, flags);
++}
++
++static int mtk_clk_tvd_pll_set_rate(
++		struct clk_hw *hw,
++		unsigned long rate,
++		unsigned long parent_rate)
++{
++	u32 pcwfbits = 24;
++	u32 pcw = 0;
++	u32 postdiv_idx = 0;
++	int r;
++
++	parent_rate = parent_rate ? parent_rate : 26000000;
++	r = mtk_calc_pll_freq_cfg(&pcw, &postdiv_idx, rate,
++			parent_rate, pcwfbits);
++
++	if (r == 0)
++		mtk_clk_tvd_pll_set_rate_regs(hw, pcw, postdiv_idx);
++
++	return r;
++}
++
++const struct clk_ops mt8135_tvd_pll_ops = {
++	.is_enabled	= mtk_clk_pll_is_enabled,
++	.prepare	= mtk_clk_pll_prepare,
++	.unprepare	= mtk_clk_pll_unprepare,
++	.recalc_rate	= mtk_clk_aud_pll_recalc_rate,
++	.round_rate	= mtk_clk_aud_pll_round_rate,
++	.set_rate	= mtk_clk_tvd_pll_set_rate,
++};
+diff --git a/drivers/clk/mediatek/clk-mt8135-pll.h b/drivers/clk/mediatek/clk-mt8135-pll.h
+new file mode 100644
+index 0000000..dba18e08
+--- /dev/null
++++ b/drivers/clk/mediatek/clk-mt8135-pll.h
+@@ -0,0 +1,28 @@
 +/*
-+ * pwrap_init_sidly - configure serial input delay
++ * Copyright (c) 2014 MediaTek Inc.
++ * Author: James Liao <jamesjj.liao@mediatek.com>
 + *
-+ * This configures the serial input delay. We can configure 0, 2, 4 or 6ns
-+ * delay. Do a read test with all possible values and chose the best delay.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
-+static int pwrap_init_sidly(struct pmic_wrapper *wrp)
-+{
-+	u32 rdata;
-+	u32 i;
-+	u32 pass = 0;
-+	signed char dly[16] = {
-+		-1, 0, 1, 0, 2, -1, 1, 1, 3, -1, -1, -1, 3, -1, 2, 1
-+	};
 +
-+	for (i = 0; i < 4; i++) {
-+		pwrap_writel(wrp, i, PWRAP_SIDLY);
-+		pwrap_read(wrp, PWRAP_DEW_READ_TEST, &rdata);
-+		printk("%s: 0x%04x\n", __func__, rdata);
-+		if (rdata == PWRAP_DEW_READ_TEST_VAL) {
-+			dev_dbg(wrp->dev, "[Read Test] pass, SIDLY=%x\n", i);
-+			pass |= 1 << i;
-+		}
-+	}
++#ifndef __DRV_CLK_MT8135_PLL_H
++#define __DRV_CLK_MT8135_PLL_H
 +
-+	if (dly[pass] < 0) {
-+		dev_err(wrp->dev, "sidly pass range 0x%x not continuous\n",
-+				pass);
-+		return -EIO;
-+	}
++/*
++ * This is a private header file. DO NOT include it except clk-*.c.
++ */
 +
-+	pwrap_writel(wrp, dly[pass], PWRAP_SIDLY);
++extern const struct clk_ops mt8135_pll_ops;
++extern const struct clk_ops mt8135_arm_pll_ops;
++extern const struct clk_ops mt8135_lc_pll_ops;
++extern const struct clk_ops mt8135_aud_pll_ops;
++extern const struct clk_ops mt8135_tvd_pll_ops;
 +
-+	return 0;
-+}
++#endif /* __DRV_CLK_MT8135_PLL_H */
+diff --git a/drivers/clk/mediatek/clk-mt8135.c b/drivers/clk/mediatek/clk-mt8135.c
+new file mode 100644
+index 0000000..93e5f02
+--- /dev/null
++++ b/drivers/clk/mediatek/clk-mt8135.c
+@@ -0,0 +1,873 @@
++/*
++ * Copyright (c) 2014 MediaTek Inc.
++ * Author: James Liao <jamesjj.liao@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+static int pwrap_init_reg_clock(struct pmic_wrapper *wrp)
-+{
-+	u32 wdata;
-+	u32 rdata;
-+	unsigned long rate_spi;
-+	int ck_mhz;
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <linux/mfd/syscon.h>
 +
-+	rate_spi = clk_get_rate(wrp->clk_spi);
++#include "clk-mtk.h"
++#include "clk-pll.h"
++#include "clk-gate.h"
++#include "clk-mt8135-pll.h"
 +
-+	if (rate_spi > 26000000)
-+		ck_mhz = 26;
-+	else if (rate_spi > 18)
-+		ck_mhz = 18;
-+	else
-+		ck_mhz = 0;
++#include <dt-bindings/clock/mt8135-clk.h>
 +
-+	pwrap_read(wrp, MT6397_TOP_CKCON2, &rdata);
-+	wdata = rdata & ~(0x3 << 10);
++/* ROOT */
++#define clk_null		"clk_null"
++#define clk26m			"clk26m"
++#define rtc32k			"rtc32k"
 +
-+	if (ck_mhz == 18)
-+		wdata |= 0x1 << 10;
++#define dsi0_lntc_dsiclk	"dsi0_lntc_dsi"
++#define hdmitx_clkdig_cts	"hdmitx_dig_cts"
++#define clkph_mck		"clkph_mck"
++#define cpum_tck_in		"cpum_tck_in"
 +
-+	if (pwrap_write(wrp, MT6397_TOP_CKCON2, wdata))  {
-+		dev_err(wrp->dev, "Enable PMIC TOP_CKCON2 fail\n");
-+		return -EFAULT;
-+	}
++/* PLL */
++#define armpll1			"armpll1"
++#define armpll2			"armpll2"
++#define mainpll			"mainpll"
++#define univpll			"univpll"
++#define mmpll			"mmpll"
++#define msdcpll			"msdcpll"
++#define tvdpll			"tvdpll"
++#define lvdspll			"lvdspll"
++#define audpll			"audpll"
++#define vdecpll			"vdecpll"
 +
-+	switch (ck_mhz) {
-+	case 18:
-+		if (pwrap_is_mt8135(wrp))
-+			pwrap_writel(wrp, 0xc, PWRAP_CSHEXT);
-+		pwrap_writel(wrp, 0x4, PWRAP_CSHEXT_WRITE);
-+		pwrap_writel(wrp, 0xc, PWRAP_CSHEXT_READ);
-+		pwrap_writel(wrp, 0x0, PWRAP_CSLEXT_START);
-+		pwrap_writel(wrp, 0x0, PWRAP_CSLEXT_END);
-+		break;
-+	case 26:
-+		if (pwrap_is_mt8135(wrp))
-+			pwrap_writel(wrp, 0x4, PWRAP_CSHEXT);
-+		pwrap_writel(wrp, 0x0, PWRAP_CSHEXT_WRITE);
-+		pwrap_writel(wrp, 0x4, PWRAP_CSHEXT_READ);
-+		pwrap_writel(wrp, 0x0, PWRAP_CSLEXT_START);
-+		pwrap_writel(wrp, 0x0, PWRAP_CSLEXT_END);
-+		break;
-+	case 0:
-+		if (pwrap_is_mt8135(wrp))
-+			pwrap_writel(wrp, 0xf, PWRAP_CSHEXT);
-+		pwrap_writel(wrp, 0xf, PWRAP_CSHEXT_WRITE);
-+		pwrap_writel(wrp, 0xf, PWRAP_CSHEXT_READ);
-+		pwrap_writel(wrp, 0xf, PWRAP_CSLEXT_START);
-+		pwrap_writel(wrp, 0xf, PWRAP_CSLEXT_END);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
++#define mainpll_806m		"mainpll_806m"
++#define mainpll_537p3m		"mainpll_537p3m"
++#define mainpll_322p4m		"mainpll_322p4m"
++#define mainpll_230p3m		"mainpll_230p3m"
 +
-+	/* Enable PMIC side reg clock */
-+	if (pwrap_write(wrp, MT6397_WRP_CKPDN, 0) ||
-+			pwrap_write(wrp, MT6397_WRP_RST_CON, 0)) {
-+		dev_err(wrp->dev, "Enable PMIC fail\n");
-+		return -EFAULT;
-+	}
++#define univpll_624m		"univpll_624m"
++#define univpll_416m		"univpll_416m"
++#define univpll_249p6m		"univpll_249p6m"
++#define univpll_178p3m		"univpll_178p3m"
++#define univpll_48m		"univpll_48m"
 +
-+	return 0;
-+}
++/* DIV */
++#define mmpll_d2		"mmpll_d2"
++#define mmpll_d3		"mmpll_d3"
++#define mmpll_d5		"mmpll_d5"
++#define mmpll_d7		"mmpll_d7"
++#define mmpll_d4		"mmpll_d4"
++#define mmpll_d6		"mmpll_d6"
 +
-+static bool pwrap_is_cipher_ready(struct pmic_wrapper *wrp)
-+{
-+	return pwrap_readl(wrp, PWRAP_CIPHER_RDY) & 1;
-+}
++#define syspll_d2		"syspll_d2"
++#define syspll_d4		"syspll_d4"
++#define syspll_d6		"syspll_d6"
++#define syspll_d8		"syspll_d8"
++#define syspll_d10		"syspll_d10"
++#define syspll_d12		"syspll_d12"
++#define syspll_d16		"syspll_d16"
++#define syspll_d24		"syspll_d24"
++#define syspll_d3		"syspll_d3"
++#define syspll_d2p5		"syspll_d2p5"
++#define syspll_d5		"syspll_d5"
++#define syspll_d3p5		"syspll_d3p5"
 +
-+static bool pwrap_is_pmic_cipher_ready(struct pmic_wrapper *wrp)
-+{
-+	u32 rdata;
-+	int ret;
++#define univpll1_d2		"univpll1_d2"
++#define univpll1_d4		"univpll1_d4"
++#define univpll1_d6		"univpll1_d6"
++#define univpll1_d8		"univpll1_d8"
++#define univpll1_d10		"univpll1_d10"
 +
-+	ret = pwrap_read(wrp, PWRAP_DEW_CIPHER_RDY, &rdata);
-+	if (ret)
-+		return 0;
++#define univpll2_d2		"univpll2_d2"
++#define univpll2_d4		"univpll2_d4"
++#define univpll2_d6		"univpll2_d6"
++#define univpll2_d8		"univpll2_d8"
 +
-+	return rdata == 1;
-+}
++#define univpll_d3		"univpll_d3"
++#define univpll_d5		"univpll_d5"
++#define univpll_d7		"univpll_d7"
++#define univpll_d10		"univpll_d10"
++#define univpll_d26		"univpll_d26"
 +
-+static int pwrap_init_cipher(struct pmic_wrapper *wrp)
-+{
-+	int ret;
-+	u32 rdata;
++#define apll_ck			"apll"
++#define apll_d4			"apll_d4"
++#define apll_d8			"apll_d8"
++#define apll_d16		"apll_d16"
++#define apll_d24		"apll_d24"
 +
-+	pwrap_writel(wrp, 0x1, PWRAP_CIPHER_SWRST);
-+	pwrap_writel(wrp, 0x0, PWRAP_CIPHER_SWRST);
-+	pwrap_writel(wrp, 0x1, PWRAP_CIPHER_KEY_SEL);
-+	pwrap_writel(wrp, 0x2, PWRAP_CIPHER_IV_SEL);
++#define lvdspll_d2		"lvdspll_d2"
++#define lvdspll_d4		"lvdspll_d4"
++#define lvdspll_d8		"lvdspll_d8"
 +
-+	if (pwrap_is_mt8135(wrp)) {
-+		pwrap_writel(wrp, 1, PWRAP_CIPHER_LOAD);
-+		pwrap_writel(wrp, 1, PWRAP_CIPHER_START);
-+	} else {
-+		pwrap_writel(wrp, 1, PWRAP_CIPHER_EN);
-+	}
++#define lvdstx_clkdig_cts	"lvdstx_dig_cts"
++#define vpll_dpix_ck		"vpll_dpix_ck"
++#define tvhdmi_h_ck		"tvhdmi_h_ck"
++#define hdmitx_clkdig_d2	"hdmitx_dig_d2"
++#define hdmitx_clkdig_d3	"hdmitx_dig_d3"
++#define tvhdmi_d2		"tvhdmi_d2"
++#define tvhdmi_d4		"tvhdmi_d4"
++#define mempll_mck_d4		"mempll_mck_d4"
 +
-+	/* Config cipher mode @PMIC */
-+	pwrap_write(wrp, PWRAP_DEW_CIPHER_SWRST, 0x1);
-+	pwrap_write(wrp, PWRAP_DEW_CIPHER_SWRST, 0x0);
-+	pwrap_write(wrp, PWRAP_DEW_CIPHER_KEY_SEL, 0x1);
-+	pwrap_write(wrp, PWRAP_DEW_CIPHER_IV_SEL, 0x2);
-+	pwrap_write(wrp, PWRAP_DEW_CIPHER_LOAD, 0x1);
-+	pwrap_write(wrp, PWRAP_DEW_CIPHER_START, 0x1);
++/* TOP */
++#define axi_sel			"axi_sel"
++#define smi_sel			"smi_sel"
++#define mfg_sel			"mfg_sel"
++#define irda_sel		"irda_sel"
++#define cam_sel			"cam_sel"
++#define aud_intbus_sel		"aud_intbus_sel"
++#define jpg_sel			"jpg_sel"
++#define disp_sel		"disp_sel"
++#define msdc30_1_sel		"msdc30_1_sel"
++#define msdc30_2_sel		"msdc30_2_sel"
++#define msdc30_3_sel		"msdc30_3_sel"
++#define msdc30_4_sel		"msdc30_4_sel"
++#define usb20_sel		"usb20_sel"
++#define venc_sel		"venc_sel"
++#define spi_sel			"spi_sel"
++#define uart_sel		"uart_sel"
++#define mem_sel			"mem_sel"
++#define camtg_sel		"camtg_sel"
++#define audio_sel		"audio_sel"
++#define fix_sel			"fix_sel"
++#define vdec_sel		"vdec_sel"
++#define ddrphycfg_sel		"ddrphycfg_sel"
++#define dpilvds_sel		"dpilvds_sel"
++#define pmicspi_sel		"pmicspi_sel"
++#define msdc30_0_sel		"msdc30_0_sel"
++#define smi_mfg_as_sel		"smi_mfg_as_sel"
++#define gcpu_sel		"gcpu_sel"
++#define dpi1_sel		"dpi1_sel"
++#define cci_sel			"cci_sel"
++#define apll_sel		"apll_sel"
++#define hdmipll_sel		"hdmipll_sel"
 +
-+	/* wait for cipher data ready at AP */
-+	ret = pwrap_wait_for_state(wrp, pwrap_is_cipher_ready);
-+	if (ret) {
-+		dev_err(wrp->dev, "cipher data ready at AP fail, ret=%d\n", ret);
-+		return ret;
-+	}
++/* PERI0 */
++#define i2c5_ck			"i2c5_ck"
++#define i2c4_ck			"i2c4_ck"
++#define i2c3_ck			"i2c3_ck"
++#define i2c2_ck			"i2c2_ck"
++#define i2c1_ck			"i2c1_ck"
++#define i2c0_ck			"i2c0_ck"
++#define uart3_ck		"uart3_ck"
++#define uart2_ck		"uart2_ck"
++#define uart1_ck		"uart1_ck"
++#define uart0_ck		"uart0_ck"
++#define irda_ck			"irda_ck"
++#define nli_ck			"nli_ck"
++#define md_hif_ck		"md_hif_ck"
++#define ap_hif_ck		"ap_hif_ck"
++#define msdc30_3_ck		"msdc30_3_ck"
++#define msdc30_2_ck		"msdc30_2_ck"
++#define msdc30_1_ck		"msdc30_1_ck"
++#define msdc20_2_ck		"msdc20_2_ck"
++#define msdc20_1_ck		"msdc20_1_ck"
++#define ap_dma_ck		"ap_dma_ck"
++#define usb1_ck			"usb1_ck"
++#define usb0_ck			"usb0_ck"
++#define pwm_ck			"pwm_ck"
++#define pwm7_ck			"pwm7_ck"
++#define pwm6_ck			"pwm6_ck"
++#define pwm5_ck			"pwm5_ck"
++#define pwm4_ck			"pwm4_ck"
++#define pwm3_ck			"pwm3_ck"
++#define pwm2_ck			"pwm2_ck"
++#define pwm1_ck			"pwm1_ck"
++#define therm_ck		"therm_ck"
++#define nfi_ck			"nfi_ck"
 +
-+	/* wait for cipher data ready at PMIC */
-+	ret = pwrap_wait_for_state(wrp, pwrap_is_pmic_cipher_ready);
-+	if (ret) {
-+		dev_err(wrp->dev, "timeout waiting for cipher data ready at PMIC\n");
-+		return ret;
-+	}
++/* PERI1 */
++#define usbslv_ck		"usbslv_ck"
++#define usb1_mcu_ck		"usb1_mcu_ck"
++#define usb0_mcu_ck		"usb0_mcu_ck"
++#define gcpu_ck			"gcpu_ck"
++#define fhctl_ck		"fhctl_ck"
++#define spi1_ck			"spi1_ck"
++#define auxadc_ck		"auxadc_ck"
++#define peri_pwrap_ck		"peri_pwrap_ck"
++#define i2c6_ck			"i2c6_ck"
 +
-+	/* wait for cipher mode idle */
-+	pwrap_write(wrp, PWRAP_DEW_CIPHER_MODE, 0x1);
-+	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle_and_sync_idle);
-+	if (ret) {
-+		dev_err(wrp->dev, "cipher mode idle fail, ret=%d\n", ret);
-+		return ret;
-+	}
++/* INFRA */
++#define pmic_wrap_ck		"pmic_wrap_ck"
++#define pmicspi_ck		"pmicspi_ck"
++#define ccif1_ap_ctrl		"ccif1_ap_ctrl"
++#define ccif0_ap_ctrl		"ccif0_ap_ctrl"
++#define kp_ck			"kp_ck"
++#define cpum_ck			"cpum_ck"
++#define m4u_ck			"m4u_ck"
++#define mfgaxi_ck		"mfgaxi_ck"
++#define devapc_ck		"devapc_ck"
++#define audio_ck		"audio_ck"
++#define mfg_bus_ck		"mfg_bus_ck"
++#define smi_ck			"smi_ck"
++#define dbgclk_ck		"dbgclk_ck"
 +
-+	pwrap_writel(wrp, 1, PWRAP_CIPHER_MODE);
++static DEFINE_SPINLOCK(lock);
 +
-+	/* Write Test */
-+	if (pwrap_write(wrp, PWRAP_DEW_WRITE_TEST, PWRAP_DEW_WRITE_TEST_VAL) ||
-+	    pwrap_read(wrp, PWRAP_DEW_WRITE_TEST, &rdata) ||
-+			(rdata != PWRAP_DEW_WRITE_TEST_VAL)) {
-+		dev_err(wrp->dev, "rdata=0x%04X\n", rdata);
-+		return -EFAULT;
-+	}
-+
-+	return 0;
-+}
-+
-+static int pwrap_init(struct pmic_wrapper *wrp)
-+{
-+	int ret;
-+	u32 rdata;
-+
-+	reset_control_reset(wrp->rstc);
-+	if (wrp->rstc_bridge)
-+		reset_control_reset(wrp->rstc_bridge);
-+
-+	if (pwrap_is_mt8173(wrp)) {
-+		/* Enable DCM */
-+		pwrap_writel(wrp, 3, PWRAP_DCM_EN);
-+		pwrap_writel(wrp, 0, PWRAP_DCM_DBC_PRD);
-+	}
-+
-+	/* Reset SPI slave */
-+	ret = pwrap_reset_spislave(wrp);
-+	if (ret)
-+		return ret;
-+
-+	pwrap_writel(wrp, 1, PWRAP_WRAP_EN);
-+
-+	pwrap_writel(wrp, wrp->arb_en_all, PWRAP_HIPRIO_ARB_EN);
-+
-+	pwrap_writel(wrp, 1, PWRAP_WACS2_EN);
-+
-+	ret = pwrap_init_reg_clock(wrp);
-+	if (ret)
-+		return ret;
-+
-+	/* Setup serial input delay */
-+	ret = pwrap_init_sidly(wrp);
-+	if (ret)
-+		return ret;
-+
-+	if (pwrap_is_mt8173(wrp)) {
-+		/*
-+		 * Enable PMIC
-+		 * (May not be necessary, depending on S/W partition)
-+		 * set dewrap clock bit and clear dewrap reset bit
-+		 */
-+		if (pwrap_write(wrp, MT6397_WRP_CKPDN, 0) ||
-+			pwrap_write(wrp, MT6397_WRP_RST_CON, 0)) {
-+			dev_err(wrp->dev, "Enable PMIC fail\n");
-+			return -EFAULT;
-+		}
-+	}
-+
-+	/* Enable dual IO mode */
-+	pwrap_write(wrp, PWRAP_DEW_DIO_EN, 1);
-+
-+	/* Check IDLE & INIT_DONE in advance */
-+	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle_and_sync_idle);
-+	if (ret) {
-+		dev_err(wrp->dev, "%s fail, ret=%d\n", __func__, ret);
-+		return ret;
-+	}
-+
-+	pwrap_writel(wrp, 1, PWRAP_DIO_EN);
-+
-+	/* Read Test */
-+	pwrap_read(wrp, PWRAP_DEW_READ_TEST, &rdata);
-+	if (rdata != PWRAP_DEW_READ_TEST_VAL) {
-+		dev_err(wrp->dev, "Read test failed after switch to DIO mode: 0x%04x != 0x%04x\n",
-+				PWRAP_DEW_READ_TEST_VAL, rdata);
-+		return -EFAULT;
-+	}
-+
-+	/* Enable encryption */
-+	ret = pwrap_init_cipher(wrp);
-+	if (ret)
-+		return ret;
-+
-+	/* Signature checking - using CRC */
-+	if (pwrap_write(wrp, PWRAP_DEW_CRC_EN, 0x1))
-+		return -EFAULT;
-+
-+	pwrap_writel(wrp, 0x1, PWRAP_CRC_EN);
-+	pwrap_writel(wrp, 0x0, PWRAP_SIG_MODE);
-+	pwrap_writel(wrp, PWRAP_DEW_CRC_VAL, PWRAP_SIG_ADR);
-+	pwrap_writel(wrp, wrp->arb_en_all, PWRAP_HIPRIO_ARB_EN);
-+
-+	if (pwrap_is_mt8135(wrp))
-+		pwrap_writel(wrp, 0x7, PWRAP_RRARB_EN);
-+
-+	pwrap_writel(wrp, 0x1, PWRAP_WACS0_EN);
-+	pwrap_writel(wrp, 0x1, PWRAP_WACS1_EN);
-+	pwrap_writel(wrp, 0x1, PWRAP_WACS2_EN);
-+	pwrap_writel(wrp, 0x5, PWRAP_STAUPD_PRD);
-+	pwrap_writel(wrp, 0xff, PWRAP_STAUPD_GRPEN);
-+	pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
-+	pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
-+	pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
-+	pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
-+
-+	/* switch event pin from usbdl mode to normal mode @ MT6397 */
-+	if (pwrap_read(wrp, MT6397_TOP_CKCON3, &rdata) ||
-+			pwrap_write(wrp, MT6397_TOP_CKCON3, (rdata & 0x0007))) {
-+		dev_err(wrp->dev, "switch event pin fail\n");
-+		return -EFAULT;
-+	}
-+
-+	if (pwrap_is_mt8135(wrp)) {
-+		/* enable pwrap events and pwrap bridge in AP side */
-+		pwrap_writel(wrp, 0x1, PWRAP_EVENT_IN_EN);
-+		pwrap_writel(wrp, 0xffff, PWRAP_EVENT_DST_EN);
-+		writel(0x7f, wrp->bridge_base + PWRAP_MT8135_BRIDGE_IORD_ARB_EN);
-+		writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WACS3_EN);
-+		writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WACS4_EN);
-+		writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WDT_UNIT);
-+		writel(0xffff, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WDT_SRC_EN);
-+		writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_TIMER_EN);
-+		writel(0x7ff, wrp->bridge_base + PWRAP_MT8135_BRIDGE_INT_EN);
-+
-+		/* enable PMIC event out and sources */
-+		if (pwrap_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
-+				pwrap_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
-+			dev_err(wrp->dev, "enable dewrap fail\n");
-+			return -EFAULT;
-+		}
-+	} else {
-+		/* PMIC_DEWRAP enables */
-+		if (pwrap_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
-+				pwrap_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
-+			dev_err(wrp->dev, "enable dewrap fail\n");
-+			return -EFAULT;
-+		}
-+	}
-+
-+	/* Setup the init done registers */
-+	pwrap_writel(wrp, 1, PWRAP_INIT_DONE2);
-+	pwrap_writel(wrp, 1, PWRAP_INIT_DONE0);
-+	pwrap_writel(wrp, 1, PWRAP_INIT_DONE1);
-+
-+	if (pwrap_is_mt8135(wrp)) {
-+		writel(1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_INIT_DONE3);
-+		writel(1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_INIT_DONE4);
-+	}
-+
-+	return 0;
-+}
-+
-+static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
-+{
-+	u32 rdata;
-+	struct pmic_wrapper *wrp = dev_id;
-+
-+	rdata = pwrap_readl(wrp, PWRAP_INT_FLG);
-+
-+	dev_err(wrp->dev, "unexpected interrupt int=0x%x\n", rdata);
-+
-+	pwrap_writel(wrp, 0xffffffff, PWRAP_INT_CLR);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static const struct regmap_config pwrap_regmap_config = {
-+	.reg_bits = 16,
-+	.val_bits = 16,
-+	.reg_stride = 2,
-+	.reg_read = pwrap_regmap_read,
-+	.reg_write = pwrap_regmap_write,
-+	.max_register = 0xffff,
++static struct mtk_fixed_factor root_clk_alias[] __initdata = {
++	FACTOR(TOP_DSI0_LNTC_DSICLK, dsi0_lntc_dsiclk, clk_null, 1, 1),
++	FACTOR(TOP_HDMITX_CLKDIG_CTS, hdmitx_clkdig_cts, clk_null, 1, 1),
++	FACTOR(TOP_CLKPH_MCK, clkph_mck, clk_null, 1, 1),
++	FACTOR(TOP_CPUM_TCK_IN, cpum_tck_in, clk_null, 1, 1),
 +};
 +
-+static struct of_device_id of_pwrap_match_tbl[] = {
-+	{
-+		.compatible = "mediatek,mt8135-pwrap",
-+		.data = &pwrap_mt8135,
-+	}, {
-+		.compatible = "mediatek,mt8173-pwrap",
-+		.data = &pwrap_mt8173,
-+	}, {
-+		/* sentinel */
-+	}
++static struct mtk_fixed_factor top_divs[] __initdata = {
++	FACTOR(TOP_MAINPLL_806M, mainpll_806m, mainpll, 1, 2),
++	FACTOR(TOP_MAINPLL_537P3M, mainpll_537p3m, mainpll, 1, 3),
++	FACTOR(TOP_MAINPLL_322P4M, mainpll_322p4m, mainpll, 1, 5),
++	FACTOR(TOP_MAINPLL_230P3M, mainpll_230p3m, mainpll, 1, 7),
++
++	FACTOR(TOP_UNIVPLL_624M, univpll_624m, univpll, 1, 2),
++	FACTOR(TOP_UNIVPLL_416M, univpll_416m, univpll, 1, 3),
++	FACTOR(TOP_UNIVPLL_249P6M, univpll_249p6m, univpll, 1, 5),
++	FACTOR(TOP_UNIVPLL_178P3M, univpll_178p3m, univpll, 1, 7),
++	FACTOR(TOP_UNIVPLL_48M, univpll_48m, univpll, 1, 26),
++
++	FACTOR(TOP_MMPLL_D2, mmpll_d2, mmpll, 1, 2),
++	FACTOR(TOP_MMPLL_D3, mmpll_d3, mmpll, 1, 3),
++	FACTOR(TOP_MMPLL_D5, mmpll_d5, mmpll, 1, 5),
++	FACTOR(TOP_MMPLL_D7, mmpll_d7, mmpll, 1, 7),
++	FACTOR(TOP_MMPLL_D4, mmpll_d4, mmpll_d2, 1, 2),
++	FACTOR(TOP_MMPLL_D6, mmpll_d6, mmpll_d3, 1, 2),
++
++	FACTOR(TOP_SYSPLL_D2, syspll_d2, mainpll_806m, 1, 1),
++	FACTOR(TOP_SYSPLL_D4, syspll_d4, mainpll_806m, 1, 2),
++	FACTOR(TOP_SYSPLL_D6, syspll_d6, mainpll_806m, 1, 3),
++	FACTOR(TOP_SYSPLL_D8, syspll_d8, mainpll_806m, 1, 4),
++	FACTOR(TOP_SYSPLL_D10, syspll_d10, mainpll_806m, 1, 5),
++	FACTOR(TOP_SYSPLL_D12, syspll_d12, mainpll_806m, 1, 6),
++	FACTOR(TOP_SYSPLL_D16, syspll_d16, mainpll_806m, 1, 8),
++	FACTOR(TOP_SYSPLL_D24, syspll_d24, mainpll_806m, 1, 12),
++
++	FACTOR(TOP_SYSPLL_D3, syspll_d3, mainpll_537p3m, 1, 1),
++
++	FACTOR(TOP_SYSPLL_D2P5, syspll_d2p5, mainpll_322p4m, 2, 1),
++	FACTOR(TOP_SYSPLL_D5, syspll_d5, mainpll_322p4m, 1, 1),
++
++	FACTOR(TOP_SYSPLL_D3P5, syspll_d3p5, mainpll_230p3m, 2, 1),
++
++	FACTOR(TOP_UNIVPLL1_D2, univpll1_d2, univpll_624m, 1, 2),
++	FACTOR(TOP_UNIVPLL1_D4, univpll1_d4, univpll_624m, 1, 4),
++	FACTOR(TOP_UNIVPLL1_D6, univpll1_d6, univpll_624m, 1, 6),
++	FACTOR(TOP_UNIVPLL1_D8, univpll1_d8, univpll_624m, 1, 8),
++	FACTOR(TOP_UNIVPLL1_D10, univpll1_d10, univpll_624m, 1, 10),
++
++	FACTOR(TOP_UNIVPLL2_D2, univpll2_d2, univpll_416m, 1, 2),
++	FACTOR(TOP_UNIVPLL2_D4, univpll2_d4, univpll_416m, 1, 4),
++	FACTOR(TOP_UNIVPLL2_D6, univpll2_d6, univpll_416m, 1, 6),
++	FACTOR(TOP_UNIVPLL2_D8, univpll2_d8, univpll_416m, 1, 8),
++
++	FACTOR(TOP_UNIVPLL_D3, univpll_d3, univpll_416m, 1, 1),
++	FACTOR(TOP_UNIVPLL_D5, univpll_d5, univpll_249p6m, 1, 1),
++	FACTOR(TOP_UNIVPLL_D7, univpll_d7, univpll_178p3m, 1, 1),
++	FACTOR(TOP_UNIVPLL_D10, univpll_d10, univpll_249p6m, 1, 5),
++	FACTOR(TOP_UNIVPLL_D26, univpll_d26, univpll_48m, 1, 1),
++
++	FACTOR(TOP_APLL_CK, apll_ck, audpll, 1, 1),
++	FACTOR(TOP_APLL_D4, apll_d4, audpll, 1, 4),
++	FACTOR(TOP_APLL_D8, apll_d8, audpll, 1, 8),
++	FACTOR(TOP_APLL_D16, apll_d16, audpll, 1, 16),
++	FACTOR(TOP_APLL_D24, apll_d24, audpll, 1, 24),
++
++	FACTOR(TOP_LVDSPLL_D2, lvdspll_d2, lvdspll, 1, 2),
++	FACTOR(TOP_LVDSPLL_D4, lvdspll_d4, lvdspll, 1, 4),
++	FACTOR(TOP_LVDSPLL_D8, lvdspll_d8, lvdspll, 1, 8),
++
++	FACTOR(TOP_LVDSTX_CLKDIG_CT, lvdstx_clkdig_cts, lvdspll, 1, 1),
++	FACTOR(TOP_VPLL_DPIX_CK, vpll_dpix_ck, lvdspll, 1, 1),
++
++	FACTOR(TOP_TVHDMI_H_CK, tvhdmi_h_ck, tvdpll, 1, 1),
++
++	FACTOR(TOP_HDMITX_CLKDIG_D2, hdmitx_clkdig_d2, hdmitx_clkdig_cts, 1, 2),
++	FACTOR(TOP_HDMITX_CLKDIG_D3, hdmitx_clkdig_d3, hdmitx_clkdig_cts, 1, 3),
++
++	FACTOR(TOP_TVHDMI_D2, tvhdmi_d2, tvhdmi_h_ck, 1, 2),
++	FACTOR(TOP_TVHDMI_D4, tvhdmi_d4, tvhdmi_h_ck, 1, 4),
++
++	FACTOR(TOP_MEMPLL_MCK_D4, mempll_mck_d4, clkph_mck, 1, 4),
 +};
-+MODULE_DEVICE_TABLE(of, of_pwrap_match_tbl);
 +
-+static int pwrap_probe(struct platform_device *pdev)
++static const char *axi_parents[] __initconst = {
++		clk26m,
++		syspll_d3,
++		syspll_d4,
++		syspll_d6,
++		univpll_d5,
++		univpll2_d2,
++		syspll_d3p5};
++
++static const char *smi_parents[] __initconst = {
++		clk26m,
++		clkph_mck,
++		syspll_d2p5,
++		syspll_d3,
++		syspll_d8,
++		univpll_d5,
++		univpll1_d2,
++		univpll1_d6,
++		mmpll_d3,
++		mmpll_d4,
++		mmpll_d5,
++		mmpll_d6,
++		mmpll_d7,
++		vdecpll,
++		lvdspll};
++
++static const char *mfg_parents[] __initconst = {
++		clk26m,
++		univpll1_d4,
++		syspll_d2,
++		syspll_d2p5,
++		syspll_d3,
++		univpll_d5,
++		univpll1_d2,
++		mmpll_d2,
++		mmpll_d3,
++		mmpll_d4,
++		mmpll_d5,
++		mmpll_d6,
++		mmpll_d7};
++
++static const char *irda_parents[] __initconst = {
++		clk26m,
++		univpll2_d8,
++		univpll1_d6};
++
++static const char *cam_parents[] __initconst = {
++		clk26m,
++		syspll_d3,
++		syspll_d3p5,
++		syspll_d4,
++		univpll_d5,
++		univpll2_d2,
++		univpll_d7,
++		univpll1_d4};
++
++static const char *aud_intbus_parents[] __initconst = {
++		clk26m,
++		syspll_d6,
++		univpll_d10};
++
++static const char *jpg_parents[] __initconst = {
++		clk26m,
++		syspll_d5,
++		syspll_d4,
++		syspll_d3,
++		univpll_d7,
++		univpll2_d2,
++		univpll_d5};
++
++static const char *disp_parents[] __initconst = {
++		clk26m,
++		syspll_d3p5,
++		syspll_d3,
++		univpll2_d2,
++		univpll_d5,
++		univpll1_d2,
++		lvdspll,
++		vdecpll};
++
++static const char *msdc30_parents[] __initconst = {
++		clk26m,
++		syspll_d6,
++		syspll_d5,
++		univpll1_d4,
++		univpll2_d4,
++		msdcpll};
++
++static const char *usb20_parents[] __initconst = {
++		clk26m,
++		univpll2_d6,
++		univpll1_d10};
++
++static const char *venc_parents[] __initconst = {
++		clk26m,
++		syspll_d3,
++		syspll_d8,
++		univpll_d5,
++		univpll1_d6,
++		mmpll_d4,
++		mmpll_d5,
++		mmpll_d6};
++
++static const char *spi_parents[] __initconst = {
++		clk26m,
++		syspll_d6,
++		syspll_d8,
++		syspll_d10,
++		univpll1_d6,
++		univpll1_d8};
++
++static const char *uart_parents[] __initconst = {
++		clk26m,
++		univpll2_d8};
++
++static const char *mem_parents[] __initconst = {
++		clk26m,
++		clkph_mck};
++
++static const char *camtg_parents[] __initconst = {
++		clk26m,
++		univpll_d26,
++		univpll1_d6,
++		syspll_d16,
++		syspll_d8};
++
++static const char *audio_parents[] __initconst = {
++		clk26m,
++		syspll_d24};
++
++static const char *fix_parents[] __initconst = {
++		rtc32k,
++		clk26m,
++		univpll_d5,
++		univpll_d7,
++		univpll1_d2,
++		univpll1_d4,
++		univpll1_d6,
++		univpll1_d8};
++
++static const char *vdec_parents[] __initconst = {
++		clk26m,
++		vdecpll,
++		clkph_mck,
++		syspll_d2p5,
++		syspll_d3,
++		syspll_d3p5,
++		syspll_d4,
++		syspll_d5,
++		syspll_d6,
++		syspll_d8,
++		univpll1_d2,
++		univpll2_d2,
++		univpll_d7,
++		univpll_d10,
++		univpll2_d4,
++		lvdspll};
++
++static const char *ddrphycfg_parents[] __initconst = {
++		clk26m,
++		axi_sel,
++		syspll_d12};
++
++static const char *dpilvds_parents[] __initconst = {
++		clk26m,
++		lvdspll,
++		lvdspll_d2,
++		lvdspll_d4,
++		lvdspll_d8};
++
++static const char *pmicspi_parents[] __initconst = {
++		clk26m,
++		univpll2_d6,
++		syspll_d8,
++		syspll_d10,
++		univpll1_d10,
++		mempll_mck_d4,
++		univpll_d26,
++		syspll_d24};
++
++static const char *smi_mfg_as_parents[] __initconst = {
++		clk26m,
++		smi_sel,
++		mfg_sel,
++		mem_sel};
++
++static const char *gcpu_parents[] __initconst = {
++		clk26m,
++		syspll_d4,
++		univpll_d7,
++		syspll_d5,
++		syspll_d6};
++
++static const char *dpi1_parents[] __initconst = {
++		clk26m,
++		tvhdmi_h_ck,
++		tvhdmi_d2,
++		tvhdmi_d4};
++
++static const char *cci_parents[] __initconst = {
++		clk26m,
++		mainpll_537p3m,
++		univpll_d3,
++		syspll_d2p5,
++		syspll_d3,
++		syspll_d5};
++
++static const char *apll_parents[] __initconst = {
++		clk26m,
++		apll_ck,
++		apll_d4,
++		apll_d8,
++		apll_d16,
++		apll_d24};
++
++static const char *hdmipll_parents[] __initconst = {
++		clk26m,
++		hdmitx_clkdig_cts,
++		hdmitx_clkdig_d2,
++		hdmitx_clkdig_d3};
++
++static struct mtk_mux top_muxes[] __initdata = {
++	/* CLK_CFG_0 */
++	MUX(TOP_AXI_SEL, axi_sel, axi_parents,
++		0x0140, 0, 3, INVALID_MUX_GATE_BIT),
++	MUX(TOP_SMI_SEL, smi_sel, smi_parents, 0x0140, 8, 4, 15),
++	MUX(TOP_MFG_SEL, mfg_sel, mfg_parents, 0x0140, 16, 4, 23),
++	MUX(TOP_IRDA_SEL, irda_sel, irda_parents, 0x0140, 24, 2, 31),
++	/* CLK_CFG_1 */
++	MUX(TOP_CAM_SEL, cam_sel, cam_parents, 0x0144, 0, 3, 7),
++	MUX(TOP_AUD_INTBUS_SEL, aud_intbus_sel, aud_intbus_parents,
++		0x0144, 8, 2, 15),
++	MUX(TOP_JPG_SEL, jpg_sel, jpg_parents, 0x0144, 16, 3, 23),
++	MUX(TOP_DISP_SEL, disp_sel, disp_parents, 0x0144, 24, 3, 31),
++	/* CLK_CFG_2 */
++	MUX(TOP_MSDC30_1_SEL, msdc30_1_sel, msdc30_parents, 0x0148, 0, 3, 7),
++	MUX(TOP_MSDC30_2_SEL, msdc30_2_sel, msdc30_parents, 0x0148, 8, 3, 15),
++	MUX(TOP_MSDC30_3_SEL, msdc30_3_sel, msdc30_parents, 0x0148, 16, 3, 23),
++	MUX(TOP_MSDC30_4_SEL, msdc30_4_sel, msdc30_parents, 0x0148, 24, 3, 31),
++	/* CLK_CFG_3 */
++	MUX(TOP_USB20_SEL, usb20_sel, usb20_parents, 0x014c, 0, 2, 7),
++	/* CLK_CFG_4 */
++	MUX(TOP_VENC_SEL, venc_sel, venc_parents, 0x0150, 8, 3, 15),
++	MUX(TOP_SPI_SEL, spi_sel, spi_parents, 0x0150, 16, 3, 23),
++	MUX(TOP_UART_SEL, uart_sel, uart_parents, 0x0150, 24, 2, 31),
++	/* CLK_CFG_6 */
++	MUX(TOP_MEM_SEL, mem_sel, mem_parents, 0x0158, 0, 2, 7),
++	MUX(TOP_CAMTG_SEL, camtg_sel, camtg_parents, 0x0158, 8, 3, 15),
++	MUX(TOP_AUDIO_SEL, audio_sel, audio_parents, 0x0158, 24, 2, 31),
++	/* CLK_CFG_7 */
++	MUX(TOP_FIX_SEL, fix_sel, fix_parents, 0x015c, 0, 3, 7),
++	MUX(TOP_VDEC_SEL, vdec_sel, vdec_parents, 0x015c, 8, 4, 15),
++	MUX(TOP_DDRPHYCFG_SEL, ddrphycfg_sel, ddrphycfg_parents,
++		0x015c, 16, 2, 23),
++	MUX(TOP_DPILVDS_SEL, dpilvds_sel, dpilvds_parents, 0x015c, 24, 3, 31),
++	/* CLK_CFG_8 */
++	MUX(TOP_PMICSPI_SEL, pmicspi_sel, pmicspi_parents, 0x0164, 0, 3, 7),
++	MUX(TOP_MSDC30_0_SEL, msdc30_0_sel, msdc30_parents, 0x0164, 8, 3, 15),
++	MUX(TOP_SMI_MFG_AS_SEL, smi_mfg_as_sel, smi_mfg_as_parents,
++		0x0164, 16, 2, 23),
++	MUX(TOP_GCPU_SEL, gcpu_sel, gcpu_parents, 0x0164, 24, 3, 31),
++	/* CLK_CFG_9 */
++	MUX(TOP_DPI1_SEL, dpi1_sel, dpi1_parents, 0x0168, 0, 2, 7),
++	MUX(TOP_CCI_SEL, cci_sel, cci_parents, 0x0168, 8, 3, 15),
++	MUX(TOP_APLL_SEL, apll_sel, apll_parents, 0x0168, 16, 3, 23),
++	MUX(TOP_HDMIPLL_SEL, hdmipll_sel, hdmipll_parents, 0x0168, 24, 2, 31),
++};
++
++static void __init mtk_init_clk_topckgen(void __iomem *top_base,
++		struct clk_onecell_data *clk_data)
 +{
-+	int ret, irq;
-+	struct pmic_wrapper *wrp;
-+	struct device_node *np = pdev->dev.of_node;
-+	const struct of_device_id *of_id =
-+		of_match_device(of_pwrap_match_tbl, &pdev->dev);
-+	const struct pmic_wrapper_type *type;
-+	struct resource *res;
++	int i;
++	struct clk *clk;
 +
-+	wrp = devm_kzalloc(&pdev->dev, sizeof(*wrp), GFP_KERNEL);
-+	if (!wrp)
-+		return -ENOMEM;
++	for (i = 0; i < ARRAY_SIZE(top_muxes); i++) {
++		struct mtk_mux *mux = &top_muxes[i];
 +
-+	platform_set_drvdata(pdev, wrp);
++		clk = mtk_clk_register_mux(mux->name,
++			mux->parent_names, mux->num_parents,
++			top_base + mux->reg, mux->shift, mux->width,
++			mux->gate, &lock);
 +
-+	type = of_id->data;
-+	wrp->regs = type->regs;
-+	wrp->type = type->type;
-+	wrp->arb_en_all = type->arb_en_all;
-+	wrp->dev = &pdev->dev;
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pwrap");
-+	wrp->base = devm_ioremap_resource(wrp->dev, res);
-+	if (IS_ERR(wrp->base))
-+		return PTR_ERR(wrp->base);
-+
-+	wrp->rstc = devm_reset_control_get(wrp->dev, "pwrap");
-+	if (IS_ERR(wrp->rstc)) {
-+		ret = PTR_ERR(wrp->rstc);
-+		dev_dbg(wrp->dev, "cannot get pwrap reset: %d\n", ret);
-+		return ret;
-+	}
-+
-+	if (pwrap_is_mt8135(wrp)) {
-+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+				"pwrap-bridge");
-+		wrp->bridge_base = devm_ioremap_resource(wrp->dev, res);
-+		if (IS_ERR(wrp->bridge_base))
-+			return PTR_ERR(wrp->bridge_base);
-+
-+		wrp->rstc_bridge = devm_reset_control_get(wrp->dev, "pwrap-bridge");
-+		if (IS_ERR(wrp->rstc_bridge)) {
-+			ret = PTR_ERR(wrp->rstc_bridge);
-+			dev_dbg(wrp->dev, "cannot get pwrap-bridge reset: %d\n", ret);
-+			return ret;
++		if (IS_ERR(clk)) {
++			pr_err("Failed to register clk %s: %ld\n",
++					mux->name, PTR_ERR(clk));
++			continue;
 +		}
++
++		if (clk_data)
++			clk_data->clks[mux->id] = clk;
 +	}
-+
-+	wrp->clk_spi = devm_clk_get(wrp->dev, "spi");
-+	if (IS_ERR(wrp->clk_spi)) {
-+		dev_dbg(wrp->dev, "failed to get clock: %ld\n", PTR_ERR(wrp->clk_spi));
-+		return PTR_ERR(wrp->clk_spi);
-+	}
-+
-+	wrp->clk_wrap = devm_clk_get(wrp->dev, "wrap");
-+	if (IS_ERR(wrp->clk_wrap)) {
-+		dev_dbg(wrp->dev, "failed to get clock: %ld\n", PTR_ERR(wrp->clk_wrap));
-+		return PTR_ERR(wrp->clk_wrap);
-+	}
-+
-+	ret = clk_prepare_enable(wrp->clk_spi);
-+	if (ret)
-+		return ret;
-+
-+	ret = clk_prepare_enable(wrp->clk_wrap);
-+	if (ret)
-+		goto err_out1;
-+
-+	/* Enable internal dynamic clock */
-+	pwrap_writel(wrp, 1, PWRAP_DCM_EN);
-+	pwrap_writel(wrp, 0, PWRAP_DCM_DBC_PRD);
-+
-+	/*
-+	 * The PMIC could already be initialized by the bootloader.
-+	 * Skip initialization here in this case.
-+	 */
-+	if (!pwrap_readl(wrp, PWRAP_INIT_DONE2)) {
-+		ret = pwrap_init(wrp);
-+		if (ret) {
-+			dev_dbg(wrp->dev, "init failed with %d\n", ret);
-+			goto err_out2;
-+		}
-+	}
-+
-+	if (!(pwrap_readl(wrp, PWRAP_WACS2_RDATA) & PWRAP_STATE_INIT_DONE0)) {
-+		dev_dbg(wrp->dev, "initialization isn't finished\n");
-+		return -ENODEV;
-+	}
-+
-+	irq = platform_get_irq(pdev, 0);
-+	ret = devm_request_irq(wrp->dev, irq, pwrap_interrupt, IRQF_TRIGGER_HIGH,
-+			"mt-pmic-pwrap", wrp);
-+	if (ret)
-+		goto err_out2;
-+
-+	wrp->regmap = devm_regmap_init(wrp->dev, NULL, wrp, &pwrap_regmap_config);
-+	if (IS_ERR(wrp->regmap))
-+		return PTR_ERR(wrp->regmap);
-+
-+	ret = of_platform_populate(np, NULL, NULL, wrp->dev);
-+	if (ret) {
-+		dev_dbg(wrp->dev, "failed to create child devices at %s\n",
-+				np->full_name);
-+		goto err_out2;
-+	}
-+
-+	return 0;
-+
-+err_out2:
-+	clk_disable_unprepare(wrp->clk_wrap);
-+err_out1:
-+	clk_disable_unprepare(wrp->clk_spi);
-+
-+	return ret;
 +}
 +
-+static struct platform_driver pwrap_drv = {
-+	.driver = {
-+		.name = "mt-pmic-pwrap",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(of_pwrap_match_tbl),
-+	},
-+	.probe = pwrap_probe,
++static struct mtk_pll plls[] __initdata = {
++	PLL(APMIXED_ARMPLL1, armpll1, clk26m, 0x0200, 0x0218,
++		0x80000001, HAVE_PLL_HP, &mt8135_arm_pll_ops),
++	PLL(APMIXED_ARMPLL2, armpll2, clk26m, 0x02cc, 0x02e4,
++		0x80000001, HAVE_PLL_HP, &mt8135_arm_pll_ops),
++	PLL(APMIXED_MAINPLL, mainpll, clk26m, 0x021c, 0x0234,
++		0xf0000001, HAVE_PLL_HP | HAVE_RST_BAR | PLL_AO,
++		&mt8135_pll_ops),
++	PLL(APMIXED_UNIVPLL, univpll, clk26m, 0x0238, 0x0250,
++		0xf3000001, HAVE_RST_BAR | HAVE_FIX_FRQ | PLL_AO,
++		&mt8135_lc_pll_ops),
++	PLL(APMIXED_MMPLL, mmpll, clk26m, 0x0254, 0x026c,
++		0xf0000001, HAVE_PLL_HP | HAVE_RST_BAR, &mt8135_pll_ops),
++	PLL(APMIXED_MSDCPLL, msdcpll, clk26m, 0x0278, 0x0290,
++		0x80000001, HAVE_PLL_HP, &mt8135_pll_ops),
++	PLL(APMIXED_TVDPLL, tvdpll, clk26m, 0x0294, 0x02ac,
++		0x80000001, HAVE_PLL_HP, &mt8135_tvd_pll_ops),
++	PLL(APMIXED_LVDSPLL, lvdspll, clk26m, 0x02b0, 0x02c8,
++		0x80000001, HAVE_PLL_HP, &mt8135_pll_ops),
++	PLL(APMIXED_AUDPLL, audpll, clk26m, 0x02e8, 0x0300,
++		0x80000001, 0, &mt8135_aud_pll_ops),
++	PLL(APMIXED_VDECPLL, vdecpll, clk26m, 0x0304, 0x031c,
++		0x80000001, HAVE_PLL_HP, &mt8135_pll_ops),
 +};
 +
-+module_platform_driver(pwrap_drv);
++static void __init mtk_init_clk_apmixedsys(void __iomem *apmixed_base,
++		struct clk_onecell_data *clk_data)
++{
++	int i;
++	struct clk *clk;
 +
-+MODULE_AUTHOR("Flora Fu, MediaTek");
-+MODULE_DESCRIPTION("MediaTek MT8135 PMIC Wrapper Driver");
-+MODULE_LICENSE("GPL");
++	for (i = 0; i < ARRAY_SIZE(plls); i++) {
++		struct mtk_pll *pll = &plls[i];
++
++		clk = mtk_clk_register_pll(pll->name, pll->parent_name,
++				apmixed_base + pll->reg,
++				apmixed_base + pll->pwr_reg,
++				pll->en_mask, pll->flags, pll->ops, &lock);
++
++		if (IS_ERR(clk)) {
++			pr_err("Failed to register clk %s: %ld\n",
++					pll->name, PTR_ERR(clk));
++			continue;
++		}
++
++		if (clk_data)
++			clk_data->clks[pll->id] = clk;
++	}
++}
++
++static struct mtk_gate_regs infra_cg_regs = {
++	.set_ofs = 0x0040,
++	.clr_ofs = 0x0044,
++	.sta_ofs = 0x0048,
++};
++
++static struct mtk_gate infra_clks[] __initdata = {
++	GATE(INFRA_PMIC_WRAP_CK, pmic_wrap_ck, axi_sel, infra_cg_regs,
++		23, &mtk_clk_gate_ops_setclr),
++	GATE(INFRA_PMICSPI_CK, pmicspi_ck, pmicspi_sel, infra_cg_regs,
++		22, &mtk_clk_gate_ops_setclr),
++	GATE(INFRA_CCIF1_AP_CTRL, ccif1_ap_ctrl, axi_sel, infra_cg_regs,
++		21, &mtk_clk_gate_ops_setclr),
++	GATE(INFRA_CCIF0_AP_CTRL, ccif0_ap_ctrl, axi_sel, infra_cg_regs,
++		20, &mtk_clk_gate_ops_setclr),
++	GATE(INFRA_KP_CK, kp_ck, axi_sel, infra_cg_regs,
++		16, &mtk_clk_gate_ops_setclr),
++	GATE(INFRA_CPUM_CK, cpum_ck, cpum_tck_in, infra_cg_regs,
++		15, &mtk_clk_gate_ops_setclr),
++	GATE(INFRA_M4U_CK, m4u_ck, mem_sel, infra_cg_regs,
++		8, &mtk_clk_gate_ops_setclr),
++	GATE(INFRA_MFGAXI_CK, mfgaxi_ck, axi_sel, infra_cg_regs,
++		7, &mtk_clk_gate_ops_setclr),
++	GATE(INFRA_DEVAPC_CK, devapc_ck, axi_sel, infra_cg_regs,
++		6, &mtk_clk_gate_ops_setclr_inv),
++	GATE(INFRA_AUDIO_CK, audio_ck, aud_intbus_sel, infra_cg_regs,
++		5, &mtk_clk_gate_ops_setclr),
++	GATE(INFRA_MFG_BUS_CK, mfg_bus_ck, axi_sel, infra_cg_regs,
++		2, &mtk_clk_gate_ops_setclr),
++	GATE(INFRA_SMI_CK, smi_ck, smi_sel, infra_cg_regs,
++		1, &mtk_clk_gate_ops_setclr),
++	GATE(INFRA_DBGCLK_CK, dbgclk_ck, axi_sel, infra_cg_regs,
++		0, &mtk_clk_gate_ops_setclr),
++};
++
++static struct mtk_gate_regs peri0_cg_regs = {
++	.set_ofs = 0x0008,
++	.clr_ofs = 0x0010,
++	.sta_ofs = 0x0018,
++};
++
++static struct mtk_gate_regs peri1_cg_regs = {
++	.set_ofs = 0x000c,
++	.clr_ofs = 0x0014,
++	.sta_ofs = 0x001c,
++};
++
++static struct mtk_gate peri_clks[] __initdata = {
++	/* PERI0 */
++	GATE(PERI_I2C5_CK, i2c5_ck, axi_sel, peri0_cg_regs,
++		31, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_I2C4_CK, i2c4_ck, axi_sel, peri0_cg_regs,
++		30, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_I2C3_CK, i2c3_ck, axi_sel, peri0_cg_regs,
++		29, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_I2C2_CK, i2c2_ck, axi_sel, peri0_cg_regs,
++		28, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_I2C1_CK, i2c1_ck, axi_sel, peri0_cg_regs,
++		27, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_I2C0_CK, i2c0_ck, axi_sel, peri0_cg_regs,
++		26, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_UART3_CK, uart3_ck, axi_sel, peri0_cg_regs,
++		25, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_UART2_CK, uart2_ck, axi_sel, peri0_cg_regs,
++		24, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_UART1_CK, uart1_ck, axi_sel, peri0_cg_regs,
++		23, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_UART0_CK, uart0_ck, axi_sel, peri0_cg_regs,
++		22, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_IRDA_CK, irda_ck, irda_sel, peri0_cg_regs,
++		21, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_NLI_CK, nli_ck, axi_sel, peri0_cg_regs,
++		20, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_MD_HIF_CK, md_hif_ck, axi_sel, peri0_cg_regs,
++		19, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_AP_HIF_CK, ap_hif_ck, axi_sel, peri0_cg_regs,
++		18, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_MSDC30_3_CK, msdc30_3_ck, msdc30_4_sel, peri0_cg_regs,
++		17, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_MSDC30_2_CK, msdc30_2_ck, msdc30_3_sel, peri0_cg_regs,
++		16, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_MSDC30_1_CK, msdc30_1_ck, msdc30_2_sel, peri0_cg_regs,
++		15, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_MSDC20_2_CK, msdc20_2_ck, msdc30_1_sel, peri0_cg_regs,
++		14, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_MSDC20_1_CK, msdc20_1_ck, msdc30_0_sel, peri0_cg_regs,
++		13, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_AP_DMA_CK, ap_dma_ck, axi_sel, peri0_cg_regs,
++		12, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_USB1_CK, usb1_ck, usb20_sel, peri0_cg_regs,
++		11, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_USB0_CK, usb0_ck, usb20_sel, peri0_cg_regs,
++		10, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_PWM_CK, pwm_ck, axi_sel, peri0_cg_regs,
++		9, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_PWM7_CK, pwm7_ck, axi_sel, peri0_cg_regs,
++		8, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_PWM6_CK, pwm6_ck, axi_sel, peri0_cg_regs,
++		7, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_PWM5_CK, pwm5_ck, axi_sel, peri0_cg_regs,
++		6, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_PWM4_CK, pwm4_ck, axi_sel, peri0_cg_regs,
++		5, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_PWM3_CK, pwm3_ck, axi_sel, peri0_cg_regs,
++		4, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_PWM2_CK, pwm2_ck, axi_sel, peri0_cg_regs,
++		3, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_PWM1_CK, pwm1_ck, axi_sel, peri0_cg_regs,
++		2, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_THERM_CK, therm_ck, axi_sel, peri0_cg_regs,
++		1, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_NFI_CK, nfi_ck, axi_sel, peri0_cg_regs,
++		0, &mtk_clk_gate_ops_setclr),
++	/* PERI1 */
++	GATE(PERI_USBSLV_CK, usbslv_ck, axi_sel, peri1_cg_regs,
++		8, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_USB1_MCU_CK, usb1_mcu_ck, axi_sel, peri1_cg_regs,
++		7, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_USB0_MCU_CK, usb0_mcu_ck, axi_sel, peri1_cg_regs,
++		6, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_GCPU_CK, gcpu_ck, gcpu_sel, peri1_cg_regs,
++		5, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_FHCTL_CK, fhctl_ck, clk26m, peri1_cg_regs,
++		4, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_SPI1_CK, spi1_ck, spi_sel, peri1_cg_regs,
++		3, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_AUXADC_CK, auxadc_ck, clk26m, peri1_cg_regs,
++		2, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_PERI_PWRAP_CK, peri_pwrap_ck, axi_sel, peri1_cg_regs,
++		1, &mtk_clk_gate_ops_setclr),
++	GATE(PERI_I2C6_CK, i2c6_ck, axi_sel, peri1_cg_regs,
++		0, &mtk_clk_gate_ops_setclr),
++};
++
++static void __init mtk_topckgen_init(struct device_node *node)
++{
++	struct clk_onecell_data *clk_data;
++	void __iomem *base;
++	int r;
++
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s(): ioremap failed\n", __func__);
++		return;
++	}
++
++	clk_data = mtk_alloc_clk_data(TOP_NR_CLK);
++
++	mtk_init_factors(root_clk_alias, ARRAY_SIZE(root_clk_alias), clk_data);
++	mtk_init_factors(top_divs, ARRAY_SIZE(top_divs), clk_data);
++	mtk_init_clk_topckgen(base, clk_data);
++
++	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
++	if (r)
++		pr_err("%s(): could not register clock provider: %d\n",
++			__func__, r);
++}
++CLK_OF_DECLARE(mtk_topckgen, "mediatek,mt8135-topckgen", mtk_topckgen_init);
++
++static void __init mtk_apmixedsys_init(struct device_node *node)
++{
++	struct clk_onecell_data *clk_data;
++	void __iomem *base;
++	int r;
++
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s(): ioremap failed\n", __func__);
++		return;
++	}
++
++	clk_data = mtk_alloc_clk_data(APMIXED_NR_CLK);
++
++	mtk_init_clk_apmixedsys(base, clk_data);
++
++	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
++	if (r)
++		pr_err("%s(): could not register clock provider: %d\n",
++			__func__, r);
++}
++CLK_OF_DECLARE(mtk_apmixedsys, "mediatek,mt8135-apmixedsys",
++		mtk_apmixedsys_init);
++
++static void __init mtk_infrasys_init(struct device_node *node)
++{
++	struct clk_onecell_data *clk_data;
++	struct regmap *regmap;
++	int r;
++
++	regmap = syscon_node_to_regmap(node);
++	if (IS_ERR(regmap)) {
++		pr_err("Cannot find regmap for %s: %ld\n", node->full_name,
++				PTR_ERR(regmap));
++		return;
++	}
++
++	clk_data = mtk_alloc_clk_data(INFRA_NR_CLK);
++
++	mtk_init_clk_gates(regmap, infra_clks, ARRAY_SIZE(infra_clks),
++						clk_data);
++
++	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
++	if (r)
++		pr_err("%s(): could not register clock provider: %d\n",
++			__func__, r);
++
++	mtk_register_reset_controller(node, 2, 0x30);
++}
++CLK_OF_DECLARE(mtk_infrasys, "mediatek,mt8135-infracfg", mtk_infrasys_init);
++
++static void __init mtk_pericfg_init(struct device_node *node)
++{
++	struct clk_onecell_data *clk_data;
++	struct regmap *regmap;
++	int r;
++
++	regmap = syscon_node_to_regmap(node);
++	if (IS_ERR(regmap)) {
++		pr_err("Cannot find regmap for %s: %ld\n", node->full_name,
++				PTR_ERR(regmap));
++		return;
++	}
++
++	clk_data = mtk_alloc_clk_data(PERI_NR_CLK);
++
++	mtk_init_clk_gates(regmap, peri_clks, ARRAY_SIZE(peri_clks),
++						clk_data);
++
++	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
++	if (r)
++		pr_err("%s(): could not register clock provider: %d\n",
++			__func__, r);
++
++	mtk_register_reset_controller(node, 2, 0);
++}
++CLK_OF_DECLARE(mtk_pericfg, "mediatek,mt8135-pericfg", mtk_pericfg_init);
 -- 
 2.1.4
