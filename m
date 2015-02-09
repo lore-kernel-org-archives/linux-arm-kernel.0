@@ -1,19 +1,49 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 09 Feb 2015 14:03:37 +0100
-Subject: ARM: CACHE_PL310
-Message-ID: <1423487017.2246.118.camel@x220>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Mon,  9 Feb 2015 21:12:22 +0800
+Subject: [PATCH 1/2] ARM: rockchip: decrease the wait time for resume
+Message-ID: <1423487543-10593-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Your commit 20e783e39e55 ("ARM: 8296/1: cache-l2x0: clean up aurora
-cache handling") is included in today's linux-next (ie, next-20150209).
-I noticed because a script I use to check linux-next spotted a problem
-with it.
+The delay time for wait the 24MHz OSC stabilization is 750ms, and the
+delay time for wait the external PMU stabilization is 750ms too, let's
+decrease them to 30ms.
 
-That commit removed the only user of the Kconfig symbol CACHE_PL310.
-Setting CACHE_PL310 is now pointless in linux-next. Is the trivial patch
-to remove its Kconfig entry (and one select of this symbol in
-arch/arm/mach-at91/Kconfig) queued somewhere?
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+---
 
+ arch/arm/mach-rockchip/pm.c | 3 +++
+ arch/arm/mach-rockchip/pm.h | 4 ++++
+ 2 files changed, 7 insertions(+)
 
-Paul Bolle
+diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
+index 50cb781..a3ab397 100644
+--- a/arch/arm/mach-rockchip/pm.c
++++ b/arch/arm/mach-rockchip/pm.c
+@@ -209,6 +209,9 @@ static int rk3288_suspend_init(struct device_node *np)
+ 	memcpy(rk3288_bootram_base, rockchip_slp_cpu_resume,
+ 	       rk3288_bootram_sz);
+ 
++	regmap_write(pmu_regmap, RK3288_PMU_OSC_CNT, OSC_STABL_CNT_THRESH);
++	regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, PMU_STABL_CNT_THRESH);
++
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
+index 7d752ff..96beaa0 100644
+--- a/arch/arm/mach-rockchip/pm.h
++++ b/arch/arm/mach-rockchip/pm.h
+@@ -57,6 +57,10 @@ void __init rockchip_suspend_init(void);
+ /* PMU_WAKEUP_CFG1 bits */
+ #define PMU_ARMINT_WAKEUP_EN		BIT(0)
+ 
++/* wait 30ms for OSC stable and 30ms for pmic stable */
++#define OSC_STABL_CNT_THRESH	(32 * 30)
++#define PMU_STABL_CNT_THRESH	(32 * 30)
++
+ enum rk3288_pwr_mode_con {
+ 	PMU_PWR_MODE_EN = 0,
+ 	PMU_CLK_CORE_SRC_GATE_EN,
+-- 
+1.9.1
