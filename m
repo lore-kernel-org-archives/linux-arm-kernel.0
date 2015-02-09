@@ -1,32 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 9 Feb 2015 14:07:04 +0800
-Subject: [PATCH 0/4] ASoC: samsung: clean up references to outdated
- Kconfig symbols
-In-Reply-To: <1423298284.2246.5.camel@x220>
-References: <1421664067.9655.51.camel@x220>
- <20150206235044.GO31311@finisterre.sirena.org.uk>
- <1423298284.2246.5.camel@x220>
-Message-ID: <20150209060704.GB19229@finisterre.sirena.org.uk>
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon,  9 Feb 2015 11:48:36 +0530
+Subject: [PATCH] ARM64: gic: Do not allow bypass FIQ signals to reach to
+ processor
+Message-ID: <b449dac39614ed462c9a479e9de0aa5300d2c7cf.1423462126.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 07, 2015 at 09:38:04AM +0100, Paul Bolle wrote:
+In some case few signals of an IP(like PMU Overflow in APM88xx0x) can be
+mapped to nLEGACYFIQ, ie nFIQ of CPU. Until ARM64 supports FIQ handling,
+we will get nice "Bad mode in FIQ handler detected"
 
-> Patches 2/4, 3/4, and 4/4 didn't apply. Locally I carry them in a tree
-> that constantly rebases on top of linux-next. So locally I carry these
-> patches on top of next-20150204.
+Therefore force FIQBypDisGrp1 to '1', so that bypass FIQ signal is not
+signaled to the processor.
 
-What's posted doesn't apply against -next.
+Signed-off-by: Pratyush Anand <panand@redhat.com>
+---
+ drivers/irqchip/irq-gic.c       | 9 ++++++++-
+ include/linux/irqchip/arm-gic.h | 1 +
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-> What tree would you like me to rebase this onto?
-
-As ever submit against the tree listed in MAINTAINERS
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-next
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150209/0232ca68/attachment.sig>
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index d617ee5a3d8a..525dfc966e60 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -362,7 +362,14 @@ static void gic_cpu_if_up(void)
+ 	*/
+ 	bypass = readl(cpu_base + GIC_CPU_CTRL);
+ 	bypass &= GICC_DIS_BYPASS_MASK;
+-
++#ifdef CONFIG_ARM64
++	/* FIXME: when ARM64 starts supporting FIQ mode.
++	 *
++	 * Until ARM64 supports FIQ handling, force FIQBypDisGrp1 to
++	 * '1', so that bypass FIQ signal is not signaled to the processor.
++	 */
++	bypass |= GICC_DIS_BYPASS_FIQ_TO_CPU;
++#endif
+ 	writel_relaxed(bypass | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
+ }
+ 
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 71d706d5f169..c9fdd1972625 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -25,6 +25,7 @@
+ #define GICC_INT_PRI_THRESHOLD		0xf0
+ #define GICC_IAR_INT_ID_MASK		0x3ff
+ #define GICC_INT_SPURIOUS		1023
++#define GICC_DIS_BYPASS_FIQ_TO_CPU	(1 << 5)
+ #define GICC_DIS_BYPASS_MASK		0x1e0
+ 
+ #define GIC_DIST_CTRL			0x000
+-- 
+2.1.0
