@@ -1,129 +1,25 @@
-From: addy.ke@rock-chips.com (addy ke)
-Date: Mon, 09 Feb 2015 17:17:52 +0800
-Subject: [PATCH] mmc: dw_mmc: fix bug that cause 'Timeout sending command'
-In-Reply-To: <54D85C15.8010007@samsung.com>
-References: <1423134801-23219-1-git-send-email-addy.ke@rock-chips.com>
- <CAPDyKFpxYcRu1s8jwtoV5SVCANwX90yEYxED+w45eVuwZJUGEQ@mail.gmail.com>
- <54D85A2F.1090301@rock-chips.com> <54D85C15.8010007@samsung.com>
-Message-ID: <54D87B40.4000000@rock-chips.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 9 Feb 2015 10:23:32 +0100
+Subject: [PATCH 0/2] ARM: omap2+: omap_hwmod: Fix false lockdep warning
+In-Reply-To: <54D86F74.7070703@ti.com>
+References: <1423226916-18804-1-git-send-email-peter.ujfalusi@ti.com>
+ <20150206141346.GP21418@twins.programming.kicks-ass.net>
+ <54D4E64C.7060208@ti.com>
+ <20150206183205.GS21418@twins.programming.kicks-ass.net>
+ <54D5154F.8080208@ti.com> <54D86F74.7070703@ti.com>
+Message-ID: <20150209092332.GO5029@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Feb 09, 2015 at 10:27:32AM +0200, Peter Ujfalusi wrote:
+> As I recall there is a plan to remove the hwmod static database and move it or
+> generate it from DT? Not sure when and how this will be done, but will it
+> affect the lockdep_set_class() way?
 
+Yes, struct lock_class_key wants to be in static storage.
 
-On 2015/2/9 15:04, Jaehoon Chung wrote:
-> On 02/09/2015 03:56 PM, Addy wrote:
->>
->>
->> On 2015.02.09 12:51, Ulf Hansson wrote:
->>> On 5 February 2015 at 12:13, Addy Ke <addy.ke@rock-chips.com> wrote:
->>>> Because of some uncertain factors, such as worse card or worse hardware,
->>>> DAT[3:0](the data lines) may be pulled down by card, and mmc controller
->>>> will be in busy state. This should not happend when mmc controller
->>>> send command to update card clocks. If this happends, mci_send_cmd will
->>>> be failed and we will get 'Timeout sending command', and then system will
->>>> be blocked. To avoid this, we need reset mmc controller.
-> 
-> I know that it needs to check whether card is busy or not, before clock-off.
-> This patch seems to related with it. right?
+So you could still allocate a few of those statically and then use them
+where appropriate, but it'd going to be more work.
 
-Yes, it is.
-
-> 
-> Best Regards,
-> Jaehoon Chung
-> 
->>>>
->>>> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
->>>
->>> Hi Addy,
->>>
->>> Should I consider $subject patch as a better option to the one below?
->> No:
->> This patch fix the bug, which can be found by script:
->>     cd /sys/bus/platform/drivers/dwmmc_rockchip
->>     for i in $(seq 1 10000); do
->>       echo "========================" $i
->>       echo ff0c0000.dwmmc > unbind
->>       sleep .5
->>       echo ff0c0000.dwmmc > bind
->>       sleep 2
->>     done
->>
->>> [PATCH] mmc: dw_mmc: rockchip: Add DW_MCI_QUIRK_RETRY_DELAY
->> This patch is for tuning issue: we should delay until card go to idle state, when the previous command return error.
->>> https://lkml.org/lkml/2015/1/13/562
->>>
->>> Kind regards
->>> Uffe
->>>
->>>
->>>> ---
->>>>   drivers/mmc/host/dw_mmc.c | 23 +++++++++++++++++++++++
->>>>   1 file changed, 23 insertions(+)
->>>>
->>>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->>>> index 4d2e3c2..b1d6dfb 100644
->>>> --- a/drivers/mmc/host/dw_mmc.c
->>>> +++ b/drivers/mmc/host/dw_mmc.c
->>>> @@ -100,6 +100,7 @@ struct idmac_desc {
->>>>   };
->>>>   #endif /* CONFIG_MMC_DW_IDMAC */
->>>>
->>>> +static int dw_mci_card_busy(struct mmc_host *mmc);
->>>>   static bool dw_mci_reset(struct dw_mci *host);
->>>>   static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
->>>>
->>>> @@ -888,6 +889,26 @@ static void mci_send_cmd(struct dw_mci_slot *slot, u32 cmd, u32 arg)
->>>>                  cmd, arg, cmd_status);
->>>>   }
->>>>
->>>> +static void dw_mci_wait_busy(struct dw_mci_slot *slot)
->>>> +{
->>>> +       struct dw_mci *host = slot->host;
->>>> +       unsigned long timeout = jiffies + msecs_to_jiffies(500);
->>>> +
->>>> +       while (time_before(jiffies, timeout)) {
->>>> +               if (!dw_mci_card_busy(slot->mmc))
->>>> +                       return;
->>>> +       }
->>>> +       dev_err(host->dev, "Data busy (status %#x)\n",
->>>> +               mci_readl(slot->host, STATUS));
->>>> +
->>>> +       /*
->>>> +        * Data busy, this should not happend when mmc controller send command
->>>> +        * to update card clocks in non-volt-switch state. If it happends, we
->>>> +        * should reset controller to avoid getting "Timeout sending command".
->>>> +        */
->>>> +       dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS);
->>>> +}
->>>> +
->>>>   static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
->>>>   {
->>>>          struct dw_mci *host = slot->host;
->>>> @@ -899,6 +920,8 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
->>>>          /* We must continue to set bit 28 in CMD until the change is complete */
->>>>          if (host->state == STATE_WAITING_CMD11_DONE)
->>>>                  sdmmc_cmd_bits |= SDMMC_CMD_VOLT_SWITCH;
->>>> +       else
->>>> +               dw_mci_wait_busy(slot);
->>>>
->>>>          if (!clock) {
->>>>                  mci_writel(host, CLKENA, 0);
->>>> -- 
->>>> 1.8.3.2
->>>>
->>>>
->>>> -- 
->>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->>>> the body of a message to majordomo at vger.kernel.org
->>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>
->>>
->>
->>
->>
-> 
-> 
-> 
-> 
+The advantage of having the 1:1 relation is that any parent hierarchy
+works naturally.
