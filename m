@@ -1,49 +1,71 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Mon,  9 Feb 2015 21:12:22 +0800
-Subject: [PATCH 1/2] ARM: rockchip: decrease the wait time for resume
-Message-ID: <1423487543-10593-1-git-send-email-zyw@rock-chips.com>
+Date: Mon,  9 Feb 2015 21:12:23 +0800
+Subject: [PATCH 2/2] ARM: rockchip: disable watchdog during suspend
+In-Reply-To: <1423487543-10593-1-git-send-email-zyw@rock-chips.com>
+References: <1423487543-10593-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <1423487543-10593-2-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The delay time for wait the 24MHz OSC stabilization is 750ms, and the
-delay time for wait the external PMU stabilization is 750ms too, let's
-decrease them to 30ms.
+The watchdog clock should be disable in dw_wdt_suspend, but we set a
+dummy clock to watchdog for rk3288. So the watchdog will continue to
+work during suspend. And we switch the system clock to 32khz from 24Mhz,
+during suspend, so the watchdog timer over count will increase to
+755 times, about 12.5 hours, the original value is 60 seconds. So
+watchdog will reset the system over a night,  but voltage are all
+incorrect, then it hang on reset.
 
 Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Signed-off-by: Daniel Kurtz <djkurtz@google.com>
+
 ---
 
- arch/arm/mach-rockchip/pm.c | 3 +++
- arch/arm/mach-rockchip/pm.h | 4 ++++
- 2 files changed, 7 insertions(+)
+ arch/arm/mach-rockchip/pm.c | 11 ++++++++---
+ arch/arm/mach-rockchip/pm.h |  2 ++
+ 2 files changed, 10 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
-index 50cb781..a3ab397 100644
+index a3ab397..b07d886 100644
 --- a/arch/arm/mach-rockchip/pm.c
 +++ b/arch/arm/mach-rockchip/pm.c
-@@ -209,6 +209,9 @@ static int rk3288_suspend_init(struct device_node *np)
- 	memcpy(rk3288_bootram_base, rockchip_slp_cpu_resume,
- 	       rk3288_bootram_sz);
+@@ -75,9 +75,13 @@ static void rk3288_slp_mode_set(int level)
+ 	regmap_read(pmu_regmap, RK3288_PMU_PWRMODE_CON,
+ 		    &rk3288_pmu_pwr_mode_con);
  
-+	regmap_write(pmu_regmap, RK3288_PMU_OSC_CNT, OSC_STABL_CNT_THRESH);
-+	regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, PMU_STABL_CNT_THRESH);
-+
- 	return 0;
+-	/* set bit 8 so that system will resume to FAST_BOOT_ADDR */
++	/*
++	 * SGRF_FAST_BOOT_EN - system to boot from FAST_BOOT_ADDR
++	 * PCLK_WDT_GATE - disable WDT during suspend.
++	 */
+ 	regmap_write(sgrf_regmap, RK3288_SGRF_SOC_CON0,
+-		     SGRF_FAST_BOOT_EN | SGRF_FAST_BOOT_EN_WRITE);
++		     SGRF_PCLK_WDT_GATE | SGRF_FAST_BOOT_EN
++		     | SGRF_PCLK_WDT_GATE_WRITE | SGRF_FAST_BOOT_EN_WRITE);
+ 
+ 	/* booting address of resuming system is from this register value */
+ 	regmap_write(sgrf_regmap, RK3288_SGRF_FAST_BOOT_ADDR,
+@@ -122,7 +126,8 @@ static void rk3288_slp_mode_set_resume(void)
+ 		     rk3288_pmu_pwr_mode_con);
+ 
+ 	regmap_write(sgrf_regmap, RK3288_SGRF_SOC_CON0,
+-		     rk3288_sgrf_soc_con0 | SGRF_FAST_BOOT_EN_WRITE);
++		     rk3288_sgrf_soc_con0 | SGRF_PCLK_WDT_GATE_WRITE
++		     | SGRF_FAST_BOOT_EN_WRITE);
  }
  
+ static int rockchip_lpmode_enter(unsigned long arg)
 diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
-index 7d752ff..96beaa0 100644
+index 96beaa0..d463978 100644
 --- a/arch/arm/mach-rockchip/pm.h
 +++ b/arch/arm/mach-rockchip/pm.h
-@@ -57,6 +57,10 @@ void __init rockchip_suspend_init(void);
- /* PMU_WAKEUP_CFG1 bits */
- #define PMU_ARMINT_WAKEUP_EN		BIT(0)
+@@ -44,6 +44,8 @@ void __init rockchip_suspend_init(void);
  
-+/* wait 30ms for OSC stable and 30ms for pmic stable */
-+#define OSC_STABL_CNT_THRESH	(32 * 30)
-+#define PMU_STABL_CNT_THRESH	(32 * 30)
-+
- enum rk3288_pwr_mode_con {
- 	PMU_PWR_MODE_EN = 0,
- 	PMU_CLK_CORE_SRC_GATE_EN,
+ #define RK3288_SGRF_SOC_CON0		(0x0000)
+ #define RK3288_SGRF_FAST_BOOT_ADDR	(0x0120)
++#define SGRF_PCLK_WDT_GATE		BIT(6)
++#define SGRF_PCLK_WDT_GATE_WRITE	BIT(22)
+ #define SGRF_FAST_BOOT_EN		BIT(8)
+ #define SGRF_FAST_BOOT_EN_WRITE		BIT(24)
+ 
 -- 
 1.9.1
