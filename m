@@ -1,104 +1,88 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 9 Feb 2015 16:47:56 +0100
-Subject: [PATCH v4 0/5] ARM: at91: fix irq_pm_install_action WARNING
-In-Reply-To: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150209164756.0a4ed146@bbrezillon>
+From: freddy77@gmail.com (Frediano Ziglio)
+Date: Mon, 9 Feb 2015 15:51:48 +0000
+Subject: Kexec and KVM not working gracefully together
+In-Reply-To: <1423454089.4605.1.camel@infradead.org>
+References: <CAHt6W4cuRi3bfj5mryFouhOLGAAWuNXKVvz4K-rAjQnwiegL-Q@mail.gmail.com>
+ <54C7ADF0.8090102@arm.com> <54D30AE0.5050101@linaro.org>
+ <20150205094317.43f8554a@arm.com> <54D34592.9010903@linaro.org>
+ <CAHt6W4dS-fv0U+=ch1-=X36EpyE5FA89aY8LVqbFP0+R3GvLqw@mail.gmail.com>
+ <54D37108.9020103@arm.com>
+ <CAHt6W4cckuuK+=1ZHNUEEW5BuiyiGNc2CeuP9O7MaC0WpScZoA@mail.gmail.com>
+ <CAHt6W4eQ3iC+sqWAn5LkkfC-XBgGWR0i6TXjWvzEsUqFh75fwQ@mail.gmail.com>
+ <54D43F52.7030606@linaro.org>
+ <CAHt6W4eQ1q+JxmB2o4MigDF+Li98iYhBfg2KXTTq3wGcNSCKMw@mail.gmail.com>
+ <54D49DD5.3010202@linaro.org>
+ <CAHt6W4f-maGM75toP1TJV8wCZpZC3+ER9KqAnASJPhK8f_+aqg@mail.gmail.com>
+ <1423454089.4605.1.camel@infradead.org>
+Message-ID: <CAHt6W4dWqQhEN5xPSJ5zMbiftO2GCfwfbF=qTksxFMh_RE-Q4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+2015-02-09 3:54 GMT+00:00 Geoff Levand <geoff@infradead.org>:
+> Hi Frediano,
+>
+> On Fri, 2015-02-06 at 12:14 +0000, Frediano Ziglio wrote:
+>> 2015-02-06 10:56 GMT+00:00 AKASHI Takahiro <takahiro.akashi@linaro.org>:
+>> >> Frediano Ziglio wrote:
+>> >> The kernel code is supposed (at least in ARMv7) to run in SVC mode,
+>> >> not on HYP mode. One reason is that code that change SCTLR executed at
+>> >> HYP instead of SVC would not change current mode system control
+>> >> register. The function does not revert to HYP for this reason.
+>> >
+>> > I need understand what you mentioned here, but for arm64, Geoff's kexec lets
+>> > the boot cpu in hyp mode at soft_restart().
+>>
+>> Where's Geoff code? Note however that is not maintainable in this way
+>> as people have to consider that future code could execute in either
+>> HYP or SVC mode. Did you test that all code called from soft_restart
+>> could do it?
+>
+> Basically, when a CPU is reset it needs to be put into the exception
+> level it had when it first entered the kernel.
+>
+> I have my arm64 kernel patches here:
+>
+>   https://git.kernel.org/cgit/linux/kernel/git/geoff/linux-kexec.git
+>
+> The patches related to CPU reset are:
+>
+>   arm64: Convert hcalls to use ISS field
+>   arm64: Add new hcall HVC_CALL_FUNC
+>   arm64: Add EL2 switch to soft_restart
+>
+> -Geoff
+>
+>
 
-Any chance this could go in the next kernel release ?
-More and more people are complaining about this backtrace :-/.
+Thank you! This helps a lot.
 
-Regards,
+There are some differences in our patches:
+- your patches works only with kvm disabled (from
+https://git.kernel.org/cgit/linux/kernel/git/geoff/linux-kexec.git/commit/?id=cdd634d6018d00cefc595f02c4341d3f7c1f0c47
+you avoid EL2 switch if KVM is enabled);
+- you started using immediate from ERS
+(https://git.kernel.org/cgit/linux/kernel/git/geoff/linux-kexec.git/commit/?id=637faeaf6301208315c62be7a13713d50aa3a294).
+I proposed (without knowing your patches) a similar solution.
+Personally I think that function pointers can be removed and you could
+use some indexing. The function you can call are very limited and
+using indexes would be possibly in all vectors cases (stub,
+initialization, kvm);
+- you changed cpu_reset to accept an additional parameter and check if
+calling the EL2 switch code while I added a kvm_cpu_reset which does
+the switch or call the old cpu_reset. Well... here I think it's just a
+question of style. I like both. In arm32 there is no cpu_soft_restart
+so our code looks quite different;
+- missing the kvm part you don't take into consideration flushing the
+cache from EL2 mode. My tests confirm that not flushing cache cause
+memory corruptions. My solution is to have an HYP call that turn off
+caching and then one that jump to physical code after switching off
+mmu. Perhaps a bit convoluted but works.
 
-Boris
+For paranoia check for functions (HVC_CALL_HYP,
+https://git.kernel.org/cgit/linux/kernel/git/geoff/linux-kexec.git/commit/?id=a0a397cf6736b1ccfed7c8e9735a64dac1fb6304)
+should be the first as in the fast path is the most likely.
 
-On Thu, 29 Jan 2015 11:33:35 +0100
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> Commit cab303be91dc47942bc25de33dc1140123540800 [1] introduced a WARN_ON
-> test which triggers a WARNING backtrace on at91 platforms.
-> While this WARN_ON is absolutely necessary to warn users that they should
-> not mix request with and without IRQF_NO_SUSPEND flags on shared IRQs,
-> there is no easy way to solve this issue on at91 platforms.
-> 
-> The main reason is that the init timer is often using a shared irq line
-> and thus request this irq with IRQF_NO_SUSPEND flag set, while other
-> peripherals request the same irq line without this flag.
-> 
-> As suggested by Thomas, the first 3 patches of this series add a dumb
-> demultiplexer irqchip implementation.
-> This demuxer registers to a source interrupt and then forwards all received
-> interrupts to its children (it they are enabled).
-> 
-> The last two patches rework at91 DTs and config to make use of this dumb
-> demuxer implementation.
-> 
-> Rob, I know you were not in favor of exposing this in the DT but we really
-> need to quickly a solution: more and more people complain about this warning.
-> If you see a better way to handle this case please share it.
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> Changes since v3:
->  - replace dumb by virt
-> 
-> Changes since v2:
->  - removed unneeded dumb demux flags passed to irq_alloc_dumb_demux_chip
->  - set nested lockdep class for all requested irqs
->  - add some explanation to the DT binding doc
->  - change the compatible string to clearly show that this chip is purely
->    virtual
->  - added dumb demuxer to all at91 impacted SoCs
-> 
-> Changes since v1:
->  - went for an dumb irq demuxer approach instead of trying to fix the
->    current shared irq code
-> 
-> Boris Brezillon (5):
->   genirq: Authorize chained handlers to remain disabled when initialized
->   irqchip: add virtual demultiplexer implementation
->   irqchip: Add DT binding doc for the virtual irq demuxer chip
->   ARM: at91/dt: select VIRT_IRQ_DEMUX for all at91 SoCs
->   ARM: at91/dt: define a virtual irq demultiplexer chip connected on
->     irq1
-> 
->  .../bindings/interrupt-controller/dumb-demux.txt   |  41 ++++++
->  arch/arm/boot/dts/at91rm9200.dtsi                  |  20 ++-
->  arch/arm/boot/dts/at91sam9260.dtsi                 |  26 +++-
->  arch/arm/boot/dts/at91sam9261.dtsi                 |  26 +++-
->  arch/arm/boot/dts/at91sam9263.dtsi                 |  29 ++++-
->  arch/arm/boot/dts/at91sam9g45.dtsi                 |  29 ++++-
->  arch/arm/boot/dts/at91sam9n12.dtsi                 |  25 +++-
->  arch/arm/boot/dts/at91sam9rl.dtsi                  |  29 ++++-
->  arch/arm/boot/dts/at91sam9x5.dtsi                  |  26 +++-
->  arch/arm/mach-at91/Kconfig                         |   2 +
->  drivers/irqchip/Kconfig                            |   4 +
->  drivers/irqchip/Makefile                           |   1 +
->  drivers/irqchip/irq-virt-demux.c                   |  72 +++++++++++
->  include/linux/irq.h                                |  64 +++++++++-
->  include/linux/irqdomain.h                          |   1 +
->  kernel/irq/Kconfig                                 |   5 +
->  kernel/irq/Makefile                                |   1 +
->  kernel/irq/chip.c                                  |  53 +++++++-
->  kernel/irq/handle.c                                |  31 ++++-
->  kernel/irq/internals.h                             |   3 +
->  kernel/irq/irqdomain.c                             |   2 +-
->  kernel/irq/msi.c                                   |   3 +-
->  kernel/irq/virt-demux-chip.c                       | 140 +++++++++++++++++++++
->  23 files changed, 580 insertions(+), 53 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
->  create mode 100644 drivers/irqchip/irq-virt-demux.c
->  create mode 100644 kernel/irq/virt-demux-chip.c
-> 
+I think HVC_CALL_FUNC can be misleading. At the end it will call a
+function from EL2 but also with cache and MMU disabled.
 
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Frediano
