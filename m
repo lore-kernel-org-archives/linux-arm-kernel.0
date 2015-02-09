@@ -1,57 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 9 Feb 2015 09:22:50 +0100
-Subject: [PATCH v2 1/3] usb: XHCI: platform: Move the Marvell quirks
- after the enabling the clocks
-In-Reply-To: <20150204130418.GB5659@kroah.com>
-References: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
- <1421672474-2945-2-git-send-email-maxime.ripard@free-electrons.com>
- <20150204093522.GB5492@lukather> <20150204130418.GB5659@kroah.com>
-Message-ID: <20150209082250.GW2079@lukather>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 9 Feb 2015 10:27:32 +0200
+Subject: [PATCH 0/2] ARM: omap2+: omap_hwmod: Fix false lockdep warning
+In-Reply-To: <54D5154F.8080208@ti.com>
+References: <1423226916-18804-1-git-send-email-peter.ujfalusi@ti.com>
+ <20150206141346.GP21418@twins.programming.kicks-ass.net>
+ <54D4E64C.7060208@ti.com>
+ <20150206183205.GS21418@twins.programming.kicks-ass.net>
+ <54D5154F.8080208@ti.com>
+Message-ID: <54D86F74.7070703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 04, 2015 at 05:04:18AM -0800, Greg Kroah-Hartman wrote:
-> On Wed, Feb 04, 2015 at 10:35:22AM +0100, Maxime Ripard wrote:
-> > Hi Mathias, Greg,
-> > 
-> > On Mon, Jan 19, 2015 at 02:01:12PM +0100, Maxime Ripard wrote:
-> > > The commit 973747928514 ("usb: host: xhci-plat: add support for the Armada
-> > > 375/38x XHCI controllers") extended the xhci-plat driver to support the Armada
-> > > 375/38x SoCs, mostly by adding a quirk configuring the MBUS window.
-> > > 
-> > > However, that quirk was run before the clock the controllers needs has been
-> > > enabled. This usually worked because the clock was first enabled by the
-> > > bootloader, and left as such until the driver is probe, where it tries to
-> > > access the MBUS configuration registers before enabling the clock.
-> > > 
-> > > Things get messy when EPROBE_DEFER is involved during the probe, since as part
-> > > of its error path, the driver will rightfully disable the clock. When the
-> > > driver will be reprobed, it will retry to access the MBUS registers, but this
-> > > time with the clock disabled, which hangs forever.
-> > > 
-> > > Fix this by running the quirks after the clock has been enabled by the driver.
-> > > 
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > Cc: <stable@vger.kernel.org> # v3.16+
-> > 
-> > Any chance for this to go in 3.19?
+On 02/06/2015 09:26 PM, Peter Ujfalusi wrote:
+>> Yeah, I've never really bothered with data too much, its a debug
+>> feature. So lock_class_key is 8 bytes, and strictly speaking you could
+>> union them over other fields, all we really need is unique addresses, we
+>> don't actually use the storage.
 > 
-> For 3.19?  It's too late, I'm not sending anything else to Linus as 3.19
-> will be out in a few days.
+> True. our omap2plus defconfig does not have LOCKDEP enabled so it should not
+> add anything to the data when running default kernel.
+> I'll test the lockdep_set_class() method you suggested on Monday (not
+> tomorrow), but still as first thing.
+> If it is working as expected I'll send a patch with you as author.
 
-Ok. I'll resend it when 3.20-rc1 is out then.
+With omap2plus_defconfig my build produces (vmlinux size):
+Base: 				99905522
+with my series:			99908385 (base + 2863)
+with Peter Zijlstra's patch:	99910625 (base + 5103)
 
-Thanks!
-Maxime
+The reason for this is that we will only have
+struct lock_class_key { };
+in case of !CONFIG_LOCKDEP. On ARM however CONFIG_LOCKDEP is enabled by
+default, while the CONFIG_DEBUG_LOCKDEP is disabled.
+
+So it does add more data to our default omap2plus config.
+
+Tony: do you have preference on the way we fix this issue?
+
+As I recall there is a plan to remove the hwmod static database and move it or
+generate it from DT? Not sure when and how this will be done, but will it
+affect the lockdep_set_class() way?
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150209/73f78b6d/attachment.sig>
+P?ter
