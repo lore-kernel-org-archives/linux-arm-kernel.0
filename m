@@ -1,233 +1,144 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon,  9 Feb 2015 16:34:12 +0800
-Subject: [PATCH 3.18 29/39] arm64: Fix up /proc/cpuinfo
-In-Reply-To: <20150209083328.753647350@linuxfoundation.org>
-References: <20150209083328.753647350@linuxfoundation.org>
-Message-ID: <20150209083330.163609674@linuxfoundation.org>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 9 Feb 2015 16:37:59 +0800
+Subject: [PATCH v2] ASoC: atmel_ssc_dai: Allow more rates
+In-Reply-To: <896ef5e9484a494e9e50cbed38919c5f@EMAIL.axentia.se>
+References: <1423050745-6372-1-git-send-email-peda@lysator.liu.se>
+ <54D824F8.9030804@atmel.com>
+ <896ef5e9484a494e9e50cbed38919c5f@EMAIL.axentia.se>
+Message-ID: <54D871E7.40902@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.18-stable review patch.  If anyone has any objections, please let me know.
+Hi Peter,
 
-------------------
+On 02/09/2015 04:09 PM, Peter Rosin wrote:
 
-From: Mark Rutland <mark.rutland@arm.com>
+[Snip]
 
-commit 44b82b7700d05a52cd983799d3ecde1a976b3bed upstream.
+>>>
+>>>    /*-------------------------------------------------------------------------*\
+>>>     * DAI functions
+>>> @@ -200,6 +290,7 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
+>>>    	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
+>>>    	struct atmel_pcm_dma_params *dma_params;
+>>>    	int dir, dir_mask;
+>>> +	int ret;
+>>>
+>>>    	pr_debug("atmel_ssc_startup: SSC_SR=0x%u\n",
+>>>    		ssc_readl(ssc_p->ssc->regs, SR));
+>>> @@ -207,6 +298,7 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
+>>>    	/* Enable PMC peripheral clock for this SSC */
+>>>    	pr_debug("atmel_ssc_dai: Starting clock\n");
+>>>    	clk_enable(ssc_p->ssc->clk);
+>>> +	ssc_p->mck_rate = clk_get_rate(ssc_p->ssc->clk) * 2;
+>>
+>> Why the mck_rate is calculated in this form?
+>
+> What did you have in mind? Add another clock to the ssc node in the
+> device tree?
+>
+> IIUC, the device tree (at least normally) has the ssc clk as the peripheral
+> clock divided by 2, but the ssc specifies (when capturing in the CBM/CFS
+> case) the rate limit as the peripheral clock divided by 3 (i.e. ssc clk / 1.5).
+> Since the SSC spec expresses the rate limit in terms of the peripheral
+> clock, this was what I came up with. I didn't want to require dt changes...
 
-Commit d7a49086f263164a (arm64: cpuinfo: print info for all CPUs)
-attempted to clean up /proc/cpuinfo, but due to concerns regarding
-further changes was reverted in commit 5e39977edf6500fd (Revert "arm64:
-cpuinfo: print info for all CPUs").
+You make a misunderstand for the mck for ssc peripheral. The mck here is 
+not the system mck, it only related with the ssc, it is the PMC output. 
+For example, in device tree, the ssc clock divided by 2, then the pmc 
+output for ssc is "system mck / 2", so the ssc mck is "system mck / 2". 
+If divided by 4, then the ssc mck is "system / 4"
 
-There are two major issues with the arm64 /proc/cpuinfo format
-currently:
+>>>    	/* Reset the SSC to keep it at a clean status */
+>>>    	ssc_writel(ssc_p->ssc->regs, CR, SSC_BIT(CR_SWRST)); @@ -219,6
+>>> +311,17 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
+>>>    		dir_mask = SSC_DIR_MASK_CAPTURE;
+>>>    	}
+>>>
+>>> +	ret = snd_pcm_hw_rule_add(substream->runtime, 0,
+>>> +				  SNDRV_PCM_HW_PARAM_RATE,
+>>> +				  atmel_ssc_hw_rule_rate,
+>>> +				  ssc_p,
+>>> +				  SNDRV_PCM_HW_PARAM_FRAME_BITS,
+>>> +				  SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+>>> +	if (ret < 0) {
+>>> +		dev_err(dai->dev, "Failed to specify rate rule: %d\n", ret);
+>>> +		return ret;
+>>> +	}
+>>> +
+>>>    	dma_params = &ssc_dma_params[dai->id][dir];
+>>>    	dma_params->ssc = ssc_p->ssc;
+>>>    	dma_params->substream = substream;
+>>> @@ -783,8 +886,6 @@ static int atmel_ssc_resume(struct snd_soc_dai *cpu_dai)
+>>>    #  define atmel_ssc_resume	NULL
+>>>    #endif /* CONFIG_PM */
+>>>
+>>> -#define ATMEL_SSC_RATES (SNDRV_PCM_RATE_8000_96000)
+>>> -
+>>>    #define ATMEL_SSC_FORMATS (SNDRV_PCM_FMTBIT_S8     | SNDRV_PCM_FMTBIT_S16_LE |\
+>>>    			  SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S32_LE)
+>>>
+>>> @@ -804,12 +905,16 @@ static struct snd_soc_dai_driver atmel_ssc_dai = {
+>>>    		.playback = {
+>>>    			.channels_min = 1,
+>>>    			.channels_max = 2,
+>>> -			.rates = ATMEL_SSC_RATES,
+>>> +			.rates = SNDRV_PCM_RATE_CONTINUOUS,
+>>> +			.rate_min = 8000,
+>>> +			.rate_max = 384000,
+>>
+>> Why this need to be changed? Do you mean in your application, the rates will
+>> exceed 96000?
+>
+> Yes, we have designed for 250kHz and this works just fine. Why limit
+> to 96kHz?
+>
+> Our application isn't audio, we're generating an FM subcarrier (DARC)
+> and need to output signals up to about 100kHz, give or take a few kHz
+> depending on how pedantic you are. Basically, we need a sampling rate
+> above 208kHz or so (DACs will normally not be usable all the way up to
+> the Nyquist frequency), or things are simply not usable for us.
 
-* The "Features" line describes (only) the 64-bit hwcaps, which is
-  problematic for some 32-bit applications which attempt to parse it. As
-  the same names are used for analogous ISA features (e.g. aes) despite
-  these generally being architecturally unrelated, it is not possible to
-  simply append the 64-bit and 32-bit hwcaps in a manner that might not
-  be misleading to some applications.
+For me, I should consider this is an another application for SSC, but 
+not audio, however similar to audio. And as you specified, it is tested 
+OK. So, no objection here, then.
 
-  Various potential solutions have appeared in vendor kernels. Typically
-  the format of the Features line varies depending on whether the task
-  is 32-bit.
+>>>    			.formats = ATMEL_SSC_FORMATS,},
+>>>    		.capture = {
+>>>    			.channels_min = 1,
+>>>    			.channels_max = 2,
+>>> -			.rates = ATMEL_SSC_RATES,
+>>> +			.rates = SNDRV_PCM_RATE_CONTINUOUS,
+>>> +			.rate_min = 8000,
+>>> +			.rate_max = 384000,
+>>
+>> Ditto.
+>
+> We are not capturing in our application, I changed this for symmetry.
+>
+> Best regards,
+> Peter
+>
+>>>    			.formats = ATMEL_SSC_FORMATS,},
+>>>    		.ops = &atmel_ssc_dai_ops,
+>>>    };
+>>> diff --git a/sound/soc/atmel/atmel_ssc_dai.h
+>>> b/sound/soc/atmel/atmel_ssc_dai.h index b1f08d511495..80b153857a88
+>>> 100644
+>>> --- a/sound/soc/atmel/atmel_ssc_dai.h
+>>> +++ b/sound/soc/atmel/atmel_ssc_dai.h
+>>> @@ -115,6 +115,7 @@ struct atmel_ssc_info {
+>>>    	unsigned short rcmr_period;
+>>>    	struct atmel_pcm_dma_params *dma_params[2];
+>>>    	struct atmel_ssc_state ssc_state;
+>>> +	unsigned long mck_rate;
+>>>    };
+>>>
+>>>    int atmel_ssc_set_audio(int ssc_id);
+>>>
+>>
+>> Best Regards,
+>> Bo Shen
 
-* Information is only printed regarding a single CPU. This does not
-  match the ARM format, and does not provide sufficient information in
-  big.LITTLE systems where CPUs are heterogeneous. The CPU information
-  printed is queried from the current CPU's registers, which is racy
-  w.r.t. cross-cpu migration.
-
-This patch attempts to solve these issues. The following changes are
-made:
-
-* When a task with a LINUX32 personality attempts to read /proc/cpuinfo,
-  the "Features" line contains the decoded 32-bit hwcaps, as with the
-  arm port. Otherwise, the decoded 64-bit hwcaps are shown. This aligns
-  with the behaviour of COMPAT_UTS_MACHINE and COMPAT_ELF_PLATFORM. In
-  the absense of compat support, the Features line is empty.
-
-  The set of hwcaps injected into a task's auxval are unaffected.
-
-* Properties are printed per-cpu, as with the ARM port. The per-cpu
-  information is queried from pre-recorded cpu information (as used by
-  the sanity checks).
-
-* As with the previous attempt at fixing up /proc/cpuinfo, the hardware
-  field is removed. The only users so far are 32-bit applications tied
-  to particular boards, so no portable applications should be affected,
-  and this should prevent future tying to particular boards.
-
-The following differences remain:
-
-* No model_name is printed, as this cannot be queried from the hardware
-  and cannot be provided in a stable fashion. Use of the CPU
-  {implementor,variant,part,revision} fields is sufficient to identify a
-  CPU and is portable across arm and arm64.
-
-* The following system-wide properties are not provided, as they are not
-  possible to provide generally. Programs relying on these are already
-  tied to particular (32-bit only) boards:
-  - Hardware
-  - Revision
-  - Serial
-
-No software has yet been identified for which these remaining
-differences are problematic.
-
-Cc: Greg Hackmann <ghackmann@google.com>
-Cc: Ian Campbell <ijc@hellion.org.uk>
-Cc: Serban Constantinescu <serban.constantinescu@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: cross-distro at lists.linaro.org
-Cc: linux-api at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- arch/arm64/kernel/setup.c |   94 ++++++++++++++++++++++++++++++++++------------
- 1 file changed, 71 insertions(+), 23 deletions(-)
-
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -43,6 +43,7 @@
- #include <linux/of_fdt.h>
- #include <linux/of_platform.h>
- #include <linux/efi.h>
-+#include <linux/personality.h>
- 
- #include <asm/fixmap.h>
- #include <asm/cpu.h>
-@@ -79,7 +80,6 @@ unsigned int compat_elf_hwcap2 __read_mo
- #endif
- 
- static const char *cpu_name;
--static const char *machine_name;
- phys_addr_t __fdt_pointer __initdata;
- 
- /*
-@@ -311,8 +311,6 @@ static void __init setup_machine_fdt(phy
- 		while (true)
- 			cpu_relax();
- 	}
--
--	machine_name = of_flat_dt_get_machine_name();
- }
- 
- /*
-@@ -449,14 +447,50 @@ static const char *hwcap_str[] = {
- 	NULL
- };
- 
-+#ifdef CONFIG_COMPAT
-+static const char *compat_hwcap_str[] = {
-+	"swp",
-+	"half",
-+	"thumb",
-+	"26bit",
-+	"fastmult",
-+	"fpa",
-+	"vfp",
-+	"edsp",
-+	"java",
-+	"iwmmxt",
-+	"crunch",
-+	"thumbee",
-+	"neon",
-+	"vfpv3",
-+	"vfpv3d16",
-+	"tls",
-+	"vfpv4",
-+	"idiva",
-+	"idivt",
-+	"vfpd32",
-+	"lpae",
-+	"evtstrm"
-+};
-+
-+static const char *compat_hwcap2_str[] = {
-+	"aes",
-+	"pmull",
-+	"sha1",
-+	"sha2",
-+	"crc32",
-+	NULL
-+};
-+#endif /* CONFIG_COMPAT */
-+
- static int c_show(struct seq_file *m, void *v)
- {
--	int i;
--
--	seq_printf(m, "Processor\t: %s rev %d (%s)\n",
--		   cpu_name, read_cpuid_id() & 15, ELF_PLATFORM);
-+	int i, j;
- 
- 	for_each_online_cpu(i) {
-+		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
-+		u32 midr = cpuinfo->reg_midr;
-+
- 		/*
- 		 * glibc reads /proc/cpuinfo to determine the number of
- 		 * online processors, looking for lines beginning with
-@@ -465,24 +499,38 @@ static int c_show(struct seq_file *m, vo
- #ifdef CONFIG_SMP
- 		seq_printf(m, "processor\t: %d\n", i);
- #endif
--	}
--
--	/* dump out the processor features */
--	seq_puts(m, "Features\t: ");
--
--	for (i = 0; hwcap_str[i]; i++)
--		if (elf_hwcap & (1 << i))
--			seq_printf(m, "%s ", hwcap_str[i]);
--
--	seq_printf(m, "\nCPU implementer\t: 0x%02x\n", read_cpuid_id() >> 24);
--	seq_printf(m, "CPU architecture: AArch64\n");
--	seq_printf(m, "CPU variant\t: 0x%x\n", (read_cpuid_id() >> 20) & 15);
--	seq_printf(m, "CPU part\t: 0x%03x\n", (read_cpuid_id() >> 4) & 0xfff);
--	seq_printf(m, "CPU revision\t: %d\n", read_cpuid_id() & 15);
- 
--	seq_puts(m, "\n");
-+		/*
-+		 * Dump out the common processor features in a single line.
-+		 * Userspace should read the hwcaps with getauxval(AT_HWCAP)
-+		 * rather than attempting to parse this, but there's a body of
-+		 * software which does already (at least for 32-bit).
-+		 */
-+		seq_puts(m, "Features\t:");
-+		if (personality(current->personality) == PER_LINUX32) {
-+#ifdef CONFIG_COMPAT
-+			for (j = 0; compat_hwcap_str[j]; j++)
-+				if (compat_elf_hwcap & (1 << j))
-+					seq_printf(m, " %s", compat_hwcap_str[j]);
-+
-+			for (j = 0; compat_hwcap2_str[j]; j++)
-+				if (compat_elf_hwcap2 & (1 << j))
-+					seq_printf(m, " %s", compat_hwcap2_str[j]);
-+#endif /* CONFIG_COMPAT */
-+		} else {
-+			for (j = 0; hwcap_str[j]; j++)
-+				if (elf_hwcap & (1 << j))
-+					seq_printf(m, " %s", hwcap_str[j]);
-+		}
-+		seq_puts(m, "\n");
- 
--	seq_printf(m, "Hardware\t: %s\n", machine_name);
-+		seq_printf(m, "CPU implementer\t: 0x%02x\n",
-+			   MIDR_IMPLEMENTOR(midr));
-+		seq_printf(m, "CPU architecture: 8\n");
-+		seq_printf(m, "CPU variant\t: 0x%x\n", MIDR_VARIANT(midr));
-+		seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
-+		seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
-+	}
- 
- 	return 0;
- }
+Best Regards,
+Bo Shen
