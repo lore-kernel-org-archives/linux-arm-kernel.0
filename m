@@ -1,132 +1,55 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 10 Feb 2015 15:05:57 +0100
-Subject: [PATCH 1/2] drm: atmel-hlcdc: Add PM suspend/resume support
-In-Reply-To: <1423575646-3273-2-git-send-email-sylvain.rochet@finsecur.com>
-References: <1423575646-3273-1-git-send-email-sylvain.rochet@finsecur.com>
- <1423575646-3273-2-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <20150210150557.235fa139@bbrezillon>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 10 Feb 2015 15:08:42 +0100
+Subject: [PATCH 1/1] ARM: dts: Use more descriptive names for Exynos5420
+ PDs
+In-Reply-To: <1423574072.6241.8.camel@AMDC1943>
+References: <1423244258-24314-1-git-send-email-javier.martinez@collabora.co.uk>
+ <54D51170.10903@cogentembedded.com> <54D52905.6040100@collabora.co.uk>
+ <CAJKOXPepTJYYs6gR6NLQzsJndeRLgF+KHRpH9qt9noUgRBs2Dw@mail.gmail.com>
+ <54D9F1A4.1000908@cogentembedded.com> <1423570670.6241.2.camel@AMDC1943>
+ <54D9F7B1.3030106@cogentembedded.com> <1423571438.6241.4.camel@AMDC1943>
+ <54D9FD94.9000102@collabora.co.uk> <54DA0107.2020909@samsung.com>
+ <1423574072.6241.8.camel@AMDC1943>
+Message-ID: <54DA10EA.4010701@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylvain,
-
-On Tue, 10 Feb 2015 14:40:45 +0100
-Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
-
-> On suspend: switch off CRTC if not already suspended with runtime PM
+On 10/02/15 14:14, Krzysztof Kozlowski wrote:
+> On wto, 2015-02-10 at 14:00 +0100, Sylwester Nawrocki wrote:
+>> > On 10/02/15 13:46, Javier Martinez Canillas wrote:
+>>>>>> > >>>> This debugfs code iterates over list of generic_pm_domains (gpd_list). I
+>>>>>>>>> > >>>> >> > cannot find function for translating from genpd to its platform device
+>>>>>>>>> > >>>> >> > so only genpd->name can be printed.
+>>>>>>> > >>> >> 
+>>>>>>> > >>> >>     Then why power domains aren't just named with the platform device names?
+>>>>> > >> > 
+>>>>> > >> > Right, the mach-exynos/pm_domains.c set the name equal to OF node name.
+>>>>> > >> > I'll send a patch extending the name.
+>>>>> > >> >
+>>> > > IIRC the OF core uses the device node unit address and node name to create
+>>> > > the platform device names so you will have something like 10044000.power-domain.
+>>> > > 
+>>> > > Same if using the node full_name since it will /power-domain at 10044000. In both
+>>> > > cases the DTS should have to be checked to know which power domain really is
+>>> > > unless someone knows by heart the power domains addresses.
+> For the kernel developer that would be descriptive enough to find the
+> real domain but... as you said each time one would have to grep through
+> manual or DTS which is slower. However for end-user that still won't be
+> descriptive enough.
 > 
-> On resume: switch on CRTC if we were not already suspended from runtime
-> PM while suspending.
-> 
-> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-> ---
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 60 ++++++++++++++++++++++++++++
->  1 file changed, 60 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> index 22c3cca..4c89bd2 100644
-> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> @@ -427,6 +427,36 @@ static void atmel_hlcdc_dc_lastclose(struct drm_device *dev)
->  	drm_fbdev_cma_restore_mode(dc->fbdev);
->  }
->  
-> +static int atmel_hlcdc_dc_suspend(struct drm_device *dev, pm_message_t state)
-> +{
-> +	struct drm_crtc *crtc;
-> +
-> +	drm_modeset_lock_all(dev);
-> +
-> +	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
-> +		struct drm_crtc_helper_funcs *crtc_funcs = crtc->helper_private;
-> +		(*crtc_funcs->disable)(crtc);
+>>> > > 
+>>> > > But if using generic names for the power domains as suggested by ePAPR is so
+>>> > > important then we should change all the other Exynos DTS files which don't do.
+>> > 
+>> > Perhaps we could assign OF aliases to the power domain device nodes in DT
+>> > and then in the power domains driver map those aliases to more descriptive
+>> > names when creating the power domains?
+>
+> That would required additional alias in DT but it could be the most
+> descriptive for a user.
 
-Please replace that line by:
-
-		crtc_funcs->disable(crtc);
-		
-
-> +	}
-> +
-> +	drm_modeset_unlock_all(dev);
-> +	return 0;
-> +}
-> +
-> +static int atmel_hlcdc_dc_resume(struct drm_device *dev)
-> +{
-> +	struct drm_crtc *crtc;
-> +
-> +	drm_modeset_lock_all(dev);
-> +
-> +	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
-> +		struct drm_crtc_helper_funcs *crtc_funcs = crtc->helper_private;
-> +		(*crtc_funcs->enable)(crtc);
-
-Ditto:
-		crtc_funcs->enable(crtc);
-
-> +	}
-> +
-> +	drm_modeset_unlock_all(dev);
-> +	return 0;
-> +}
-> +
->  static int atmel_hlcdc_dc_irq_postinstall(struct drm_device *dev)
->  {
->  	struct atmel_hlcdc_dc *dc = dev->dev_private;
-> @@ -488,6 +518,8 @@ static struct drm_driver atmel_hlcdc_dc_driver = {
->  	.driver_features = DRIVER_HAVE_IRQ | DRIVER_GEM | DRIVER_MODESET,
->  	.preclose = atmel_hlcdc_dc_preclose,
->  	.lastclose = atmel_hlcdc_dc_lastclose,
-> +	.suspend = atmel_hlcdc_dc_suspend,
-> +	.resume = atmel_hlcdc_dc_resume,
->  	.irq_handler = atmel_hlcdc_dc_irq_handler,
->  	.irq_preinstall = atmel_hlcdc_dc_irq_uninstall,
->  	.irq_postinstall = atmel_hlcdc_dc_irq_postinstall,
-> @@ -559,6 +591,33 @@ static int atmel_hlcdc_dc_drm_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM
-> +static int atmel_hlcdc_dc_drm_suspend(struct device *dev)
-> +{
-> +	struct drm_device *drm_dev = dev_get_drvdata(dev);
-> +	pm_message_t message;
-> +
-> +	if (pm_runtime_suspended(dev) || !drm_dev)
-> +		return 0;
-> +
-> +	message.event = PM_EVENT_SUSPEND;
-> +	return atmel_hlcdc_dc_suspend(drm_dev, message);
-> +}
-> +
-> +static int atmel_hlcdc_dc_drm_resume(struct device *dev)
-> +{
-> +	struct drm_device *drm_dev = dev_get_drvdata(dev);
-> +
-> +	if (pm_runtime_suspended(dev) || !drm_dev)
-> +		return 0;
-> +
-> +	return atmel_hlcdc_dc_resume(drm_dev);
-> +}
-> +#endif
-> +
-> +static SIMPLE_DEV_PM_OPS(atmel_hlcdc_dc_drm_pm_ops,
-> +		atmel_hlcdc_dc_drm_suspend, atmel_hlcdc_dc_drm_resume);
-> +
-
-Do we really need to register both SIMPLE_DEV_PM_OPS and drm_driver
-suspend/resume functions.
-I thought the suspend/resume callbacks were called by DRM core code
-as part of the PM class specific operations.
-However, exynos driver seems to do the same, so this might well be
-required.
-
-Best Regards,
-
-Boris
+Yes, we could fall back to of_node->full_name if alias is not present in DT.
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards,
+Sylwester
