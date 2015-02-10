@@ -1,25 +1,49 @@
 From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Tue, 10 Feb 2015 14:40:44 +0100
-Subject: [PATCH 0/2] drm: atmel-hlcdc: PM support
-Message-ID: <1423575646-3273-1-git-send-email-sylvain.rochet@finsecur.com>
+Date: Tue, 10 Feb 2015 14:40:46 +0100
+Subject: [PATCH 2/2] drm: atmel-hlcdc: Add pinctrl PM select sleep,
+ default state in CRTC suspend/resume
+In-Reply-To: <1423575646-3273-1-git-send-email-sylvain.rochet@finsecur.com>
+References: <1423575646-3273-1-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <1423575646-3273-3-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series depends on Boris' "[PATCH v2] drm: atmel-hlcdc: Atomic 
-mode-setting conversion"
-  <1423236143-6494-1-git-send-email-boris.brezillon@free-electrons.com>
-plus a few fixes which are going to be in v3 of Boris' patch.
+Some LCD panels have back-powering issue when un-powered, allows users
+to use an alternate pinctrl "sleep" in order to clamp outputs to a
+wanted state at suspend.
 
-This series adds basic PM support for Atmel HLCDC.
+Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Sylvain Rochet (2):
-  drm: atmel-hlcdc: Add PM suspend/resume support
-  drm: atmel-hlcdc: Add pinctrl PM select sleep,default state in CRTC
-    suspend/resume
-
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c |  3 ++
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c   | 60 ++++++++++++++++++++++++++
- 2 files changed, 63 insertions(+)
-
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+index 79c9a19..decd9ea 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+@@ -21,6 +21,7 @@
+ #include <linux/clk.h>
+ #include <linux/pm.h>
+ #include <linux/pm_runtime.h>
++#include <linux/pinctrl/consumer.h>
+ 
+ #include <drm/drm_crtc.h>
+ #include <drm/drm_crtc_helper.h>
+@@ -156,6 +157,7 @@ static void atmel_hlcdc_crtc_disable(struct drm_crtc *c)
+ 		cpu_relax();
+ 
+ 	clk_disable_unprepare(crtc->dc->hlcdc->sys_clk);
++	pinctrl_pm_select_sleep_state(dev->dev);
+ 
+ 	pm_runtime_allow(dev->dev);
+ 
+@@ -178,6 +180,7 @@ static void atmel_hlcdc_crtc_enable(struct drm_crtc *c)
+ 
+ 	pm_runtime_forbid(dev->dev);
+ 
++	pinctrl_pm_select_default_state(dev->dev);
+ 	clk_prepare_enable(crtc->dc->hlcdc->sys_clk);
+ 
+ 	regmap_write(regmap, ATMEL_HLCDC_EN, ATMEL_HLCDC_PIXEL_CLK);
 -- 
 2.1.4
