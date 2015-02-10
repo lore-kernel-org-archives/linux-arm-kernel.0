@@ -1,30 +1,39 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 10 Feb 2015 11:09:19 -0200
-Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
- registers
-In-Reply-To: <54DA020C.6030703@i2se.com>
-References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
- <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
- <54DA020C.6030703@i2se.com>
-Message-ID: <CAOMZO5DGCP1p1vetwWHpSbe2qywA8DhWRRq22egMDFSw11uq4w@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 10 Feb 2015 14:12:00 +0100
+Subject: [PATCH] ARM: EXYNOS: Use platform device name as power domain name
+In-Reply-To: <1423573035-21960-1-git-send-email-k.kozlowski@samsung.com>
+References: <1423573035-21960-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <54DA03A0.9040305@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Hello 
 
-On Tue, Feb 10, 2015 at 11:05 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+Krzysztof,
 
-> sorry no. But i will try to get a mx28evk to reproduce the problem and
+On 02/10/2015 01:57 PM, Krzysztof Kozlowski wrote:
+> The power domain nodes in DTS may be very generic (e.g. "power-domain"
+> for Exynos 5420) making it very hard to debug:
+> 
+> $ cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+>     domain                      status         slaves
+> power-domain                    on
+> 
+> Use platform device name instead so the names will be a little more user
+> friendly:
+>     domain                      status         slaves
+> 100440e0.power-domain           on
+> 
 
-Just a comment: mx28evk comes without SPI NOR flash from the factory.
-I have populated one in my mx28evk (slot U49).
+I would had preferred to have even more info like 100440e0.mau-power-domain.
+Maybe using the OF aliases approach that Sylwester suggested? But in any case
+that could be complementary to your patch.
 
-> narrow down which part of the patch causes this problem.
->
-> Did you see any problem with the clock control register settings?
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Suggested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Suggested-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-I haven't inspected the clock control registers yet.
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-Regards,
-
-Fabio Estevam
+Best regards,
+Javier
