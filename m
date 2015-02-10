@@ -1,110 +1,45 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 9 Feb 2015 19:05:03 -0800
-Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
-In-Reply-To: <54D96783.9050600@codeaurora.org>
-References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
- <20150205105035.GL8656@n2100.arm.linux.org.uk>
- <20150205142918.GA10634@linux.vnet.ibm.com>
- <20150205161100.GQ8656@n2100.arm.linux.org.uk>
- <54D95DB8.9010308@codeaurora.org>
- <20150210013723.GL4166@linux.vnet.ibm.com>
- <54D96783.9050600@codeaurora.org>
-Message-ID: <20150210030503.GN4166@linux.vnet.ibm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 10 Feb 2015 12:09:05 +0900
+Subject: [PATCH] ARM: exynos: Fix wrong hwirq of RTC interrupt for Exynos3250
+ SoC
+Message-ID: <1423537745-11994-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 09, 2015 at 06:05:55PM -0800, Stephen Boyd wrote:
-> On 02/09/15 17:37, Paul E. McKenney wrote:
-> > On Mon, Feb 09, 2015 at 05:24:08PM -0800, Stephen Boyd wrote:
-> >> On 02/05/15 08:11, Russell King - ARM Linux wrote:
-> >>> On Thu, Feb 05, 2015 at 06:29:18AM -0800, Paul E. McKenney wrote:
-> >>>> Works for me, assuming no hidden uses of RCU in the IPI code.  ;-)
-> >>> Sigh... I kind'a new it wouldn't be this simple.  The gic code which
-> >>> actually raises the IPI takes a raw spinlock, so it's not going to be
-> >>> this simple - there's a small theoretical window where we have taken
-> >>> this lock, written the register to send the IPI, and then dropped the
-> >>> lock - the update to the lock to release it could get lost if the
-> >>> CPU power is quickly cut at that point.
-> >> Hm.. at first glance it would seem like a similar problem exists with
-> >> the completion variable. But it seems that we rely on the call to
-> >> complete() fom the dying CPU to synchronize with wait_for_completion()
-> >> on the killing CPU via the completion's wait.lock.
-> >>
-> >> void complete(struct completion *x)
-> >> {
-> >>         unsigned long flags;
-> >>
-> >>         spin_lock_irqsave(&x->wait.lock, flags);
-> >>         x->done++;
-> >>         __wake_up_locked(&x->wait, TASK_NORMAL, 1);
-> >>         spin_unlock_irqrestore(&x->wait.lock, flags);
-> >> }
-> >>
-> >> and
-> >>
-> >> static inline long __sched
-> >> do_wait_for_common(struct completion *x,
-> >>                   long (*action)(long), long timeout, int state)
-> >>                         ...
-> >> 			spin_unlock_irq(&x->wait.lock);
-> >> 			timeout = action(timeout);
-> >> 			spin_lock_irq(&x->wait.lock);
-> >>
-> >>
-> >> so the power can't really be cut until the killing CPU sees the lock
-> >> released either explicitly via the second cache flush in cpu_die() or
-> >> implicitly via hardware. Maybe we can do the same thing here by using a
-> >> spinlock for synchronization between the IPI handler and the dying CPU?
-> >> So lock/unlock around the IPI sending from the dying CPU and then do a
-> >> lock/unlock on the killing CPU before continuing.
-> >>
-> >> It would be nice if we didn't have to do anything at all though so
-> >> perhaps we can make it a nop on configs where there isn't a big little
-> >> switcher. Yeah it's some ugly coupling between these two pieces of code,
-> >> but I'm not sure how we can do better.
-> > The default ugly-but-known-to-work approach is to set a variable in
-> > the dying CPU that the surviving CPU periodically polls.  If all else
-> > fails and all that.
-> 
-> So it isn't the ugliest. Good.
+This patch fixes wrong hwirq of RTC irq for Exynos3250 SoC. When entering
+suspend state, 'enable_irq_wake fail' happen because of the mismatch of RTC hwirq.
 
-Woo-hoo!!!  Something to aspire to!  ;-)
+	[  429.200937] Freezing user space processes ... (elapsed 0.002 seconds) done.
+	[  429.203383] Freezing remaining freezable tasks ... (elapsed 0.000 seconds) done.
+	[  429.209914] Suspending console(s) (use no_console_suspend to debug)
+	[  429.370685] wake enabled for irq 65
+	[  429.370837] wake enabled for irq 64
+	[  429.370868] wake enabled for irq 79
+	[snip]
+	[  429.372120] s3c-rtc 10070000.rtc: enable_irq_wake failed
 
-> >>> Also, we _do_ need the second cache flush in place to ensure that the
-> >>> unlock is seen to other CPUs.
-> >>>
-> >>> We could work around that by taking and releasing the lock in the IPI
-> >>> processing function... but this is starting to look less attractive
-> >>> as the lock is private to irq-gic.c.
-> >> With Daniel Thompson's NMI fiq patches at least the lock would almost
-> >> always be gone, except for the bL switcher users. Another solution might
-> >> be to put a hotplug lock around the bL switcher code and then skip
-> >> taking the lock in gic_raise_softirq() if the IPI is our special hotplug
-> >> one. Conditional locking is pretty ugly though, so perhaps this isn't
-> >> such a great idea.
-> > Which hotplug lock are you suggesting?  We cannot use sleeplocks, because
-> > releasing them can go through the scheduler, which is not legal at this
-> > point.
-> >
-> 
-> I'm not suggesting we take any hotplug locks here in the cpu_die() path.
-> I'm thinking we make the bL switcher code hold a hotplug lock or at
-> least prevent hotplug from happening while it's moving IPIs from the
-> outgoing CPU to the incoming CPU (see code in
-> arch/arm/common/bL_switcher.c). Actually, I seem to recall that hotplug
-> can't happen if preemption/irqs are disabled, so maybe nothing needs to
-> change there and we can just assume that if we're sending the hotplug
-> IPI we don't need to worry about taking the spinlock in
-> gic_raise_softirq()? We still have conditional locking so it's still
-> fragile.
+Fixes: a4f582f5c5fe3 (ARM: EXYNOS: Add exynos3250 suspend-to-ram support)
+Cc: Kukjin Kim <kgene@kernel.org>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/suspend.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-More precisely, if you are running on a given CPU with preemption disabled
-(and disabling irqs disables preemption), then that CPU cannot go offline.
-On the other hand, some other CPU may have already been partway offline,
-and if it is far enough along in that process, it might well go the rest
-of the way offline during the time your CPU is running with preemption
-disabled.
-
-Does that help?
-
-							Thanx, Paul
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index d6feef3..2b8bd67 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -92,8 +92,8 @@ static unsigned int exynos_pmu_spare3;
+ static u32 exynos_irqwake_intmask = 0xffffffff;
+ 
+ static const struct exynos_wkup_irq exynos3250_wkup_irq[] = {
+-	{ 73, BIT(1) }, /* RTC alarm */
+-	{ 74, BIT(2) }, /* RTC tick */
++	{ 105, BIT(1) }, /* RTC alarm */
++	{ 106, BIT(2) }, /* RTC tick */
+ 	{ /* sentinel */ },
+ };
+ 
+-- 
+1.8.5.5
