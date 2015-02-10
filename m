@@ -1,73 +1,25 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Tue, 10 Feb 2015 15:50:24 +0800
-Subject: [PATCH v3 2/5] Documentation: dt-bindings: add dt binding info for
- hi6220
-In-Reply-To: <1423554627-694-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1423554627-694-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1423554627-694-3-git-send-email-zhangfei.gao@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 10 Feb 2015 15:12:51 +0800
+Subject: [PATCH v3] ASoC: atmel_ssc_dai: Allow more rates
+In-Reply-To: <1423494505-3368-1-git-send-email-peda@lysator.liu.se>
+References: <1423494505-3368-1-git-send-email-peda@lysator.liu.se>
+Message-ID: <20150210071251.GJ2593@finisterre.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- .../devicetree/bindings/usb/hi6220-usb.txt         | 49 ++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/hi6220-usb.txt
+On Mon, Feb 09, 2015 at 04:08:25PM +0100, Peter Rosin wrote:
+> From: Peter Rosin <peda@axentia.se>
+> 
+> When the SSC acts as BCK master, use a ratnum rule to limit
+> the rate instead of only doing the standard rates. When the SSC
+> acts as BCK slave, allow any BCK frequency up to the SSC master
+> clock, divided by either of 2, 3 or 6.
 
-diff --git a/Documentation/devicetree/bindings/usb/hi6220-usb.txt b/Documentation/devicetree/bindings/usb/hi6220-usb.txt
-new file mode 100644
-index 0000000..b8278de
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/hi6220-usb.txt
-@@ -0,0 +1,49 @@
-+Hisilicon hi6220 SoC USB controller
-+-----------------------------
-+
-+usb controller is inherited from dwc2, refer dwc2.txt
-+-----
-+
-+Required properties:
-+- compatible: "hisilicon,hi6220-usb"
-+Refer to dwc2.txt for dwc2 usb properties
-+
-+
-+PHY:
-+-----
-+
-+Required properties:
-+- compatible: "hisilicon,hi6220-usb-phy"
-+- vcc-supply: phandle to the regulator that provides power to the PHY.
-+- clocks: phandle and clock specifier of the PHY clock.
-+- hisilicon,peripheral-syscon: phandle of syscon used to control peripheral.
-+- hisilicon,gpio-vbus: gpio of detecting vbus.
-+- hisilicon,gpio-id: gpio of detecting id.
-+
-+Example:
-+
-+	peripheral_ctrl: syscon at f7030000 {
-+	        compatible = "syscon";
-+	        reg = <0x0 0xf7030000 0x0 0x1000>;
-+	};
-+
-+	usb2_phy: usbphy {
-+		compatible = "hisilicon,hi6220-usb-phy";
-+		vcc-supply = <&fixed_5v_hub>;
-+		hisilicon,gpio-vbus = <&gpio2 6 0>;
-+		hisilicon,gpio-id = <&gpio2 5 0>;
-+		hisilicon,peripheral-syscon = <&peripheral_ctrl>;
-+		clocks = <&clock_sys HI6220_USBOTG_HCLK>;
-+	};
-+
-+	usb: usb at f72c0000 {
-+		compatible = "hisilicon,hi6220-usb";
-+		reg = <0x0 0xf72c0000 0x0 0x40000>;
-+		phys = <&usb2_phy>;
-+		dr_mode = "otg";
-+		g-use-dma;
-+		g-rx-fifo-size = <512>;
-+		g-np-tx-fifo-size = <128>;
-+		g-tx-fifo-size = <128>;
-+		interrupts = <0 77 0x4>;
-+	};
--- 
-1.9.1
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150210/9f182c48/attachment.sig>
