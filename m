@@ -1,115 +1,121 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 10 Feb 2015 15:27:18 +0000
-Subject: [PATCH 3/3] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
-In-Reply-To: <CAAS=xmgvQLSOXGHmDhFKKV+UGLGeZXf2dpOYWzALYTRsYp9D7g@mail.gmail.com>
-References: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
- <1423128277-10297-4-git-send-email-bintian.wang@huawei.com>
- <20150205193017.GF20735@leverpostej>
- <CAAS=xmgsuY=c8-n_pDiZjLe2u+SPX7msRje7h0sNkRtT3HLfQA@mail.gmail.com>
- <20150206104420.GB9921@leverpostej>
- <CAAS=xmhcfeQjfyizJa38k+08pbY5WFOZH0a1wEx+gwqgVe0MXw@mail.gmail.com>
- <20150210133734.GC9432@leverpostej>
- <CAAS=xmgvQLSOXGHmDhFKKV+UGLGeZXf2dpOYWzALYTRsYp9D7g@mail.gmail.com>
-Message-ID: <20150210152718.GE9432@leverpostej>
+From: joshua.clayton@uniwest.com (Joshua Clayton)
+Date: Tue, 10 Feb 2015 07:31:55 -0800
+Subject: [PATCH 3/3] ARM: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <54D9EA6D.1020202@de.bosch.com>
+References: <1420559265-7333-1-git-send-email-p.zabel@pengutronix.de>
+ <1420559265-7333-3-git-send-email-p.zabel@pengutronix.de>
+ <54D9EA6D.1020202@de.bosch.com>
+Message-ID: <3108879.HFkjbTrYyl@jclayton-pc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> >> > Are we certain of the split between components the PSCI implementation
-> >> >> > must touch and those the kernel must touch?
-> >> >> >
-> >> >> >> Also add dts file to support HiKey development board which
-> >> >> >> based on Hi6220 SoC and document the devicetree bindings.
-> >> >> >>
-> >> >> >> These dts files will be changed later and more nodes will be
-> >> >> >> added to describe other devices.
-> >> >> >
-> >> >> > How is this going to be changed other than the addition of nodes?
-> >> >> >
-> >> >> > Will this DTB continue to work in future? Or do you intend to make
-> >> >> > changes that will break support?
-> >> >> My original idea is: use spin-table for SMP now, when firmware is OK to
-> >> >> support PSCI, we submit another patch to replace the spin-table with PSCI.
-> >> >
-> >> > For any users who have not updated their FW, this will break booting.
-> >> >
-> >> > This is why I suggest having hte bootloader/FW fill this in as it should
-> >> > know what enable-method the FW supports.
-> >> >
-> >> >> If DTB should continue to work in the future, we really need to remove
-> >> >> the spin-table
-> >> >> from current dts file, how about just enable one core now?
-> >> >>
-> >> >> Which one do you favor or any other suggestion?
-> >> >
-> >> > If spin-table is just for testing while you await PSCI, drop spin-table
-> >> > from the dts for now.
-> >> So, just booting one core may be the right choice now, right?
-> >
-> > Without an enable-method for secondary CPUs, that will be all that's
-> > possible. If your FW/bootlaoder injects the appropriate enable-method,
-> > then you could gain spin-table based SMP bringup while awaiting PSCI,
-> > without there being a DTB compatibility issue.
-> For DTB compatibility issue, how about just describe one core in dts
-> file? when PSCI
-> is OK, we can add the CPU topology to the dts file again.
+On Tuesday, February 10, 2015 12:24:29 PM Dirk Behme wrote:
+> On 06.01.2015 16:47, Philipp Zabel wrote:
+> > From: Fabio Estevam <fabio.estevam@freescale.com>
+> > 
+> > Due to incorrect placement of the clock gate cell in the ldb_di[x]_clk
+> > tree, the glitchy parent mux of ldb_di[x]_clk can cause a glitch to enter
+> > the ldb_di_ipu_div divider. If the divider gets locked up, no
+> > ldb_di[x]_clk is generated, and the LVDS display will hang when the
+> > ipu_di_clk is sourced from ldb_di_clk.
+> > 
+> > To fix the problem, both the new and current parent of the ldb_di_clk
+> > should be disabled before the switch. This patch ensures that correct
+> > steps are followed when ldb_di_clk parent is switched in the beginning of
+> > boot. The glitchy muxes are then registered as read-only. The clock
+> > parent can be selected using the assigned-clocks and
+> > assigned-clock-parents properties of the ccm> 
+> > device tree node:
+> > 	&clks {
+> > 	
+> > 		assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
+> > 		
+> > 				  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
+> > 		
+> > 		assigned-clock-parents = <&clks IMX6QDL_CLK_MMDC_CH1_AXI>,
+> > 		
+> > 					 <&clks IMX6QDL_CLK_PLL5_VIDEO_DIV>;
+> > 	
+> > 	};
+> > 
+> > Signed-off-by: Ranjani Vaidyanathan <Ranjani.Vaidyanathan@freescale.com>
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > ---
+> > 
+> >   arch/arm/mach-imx/clk-imx6q.c | 201
+> >   ++++++++++++++++++++++++++++++++++++++++++ 1 file changed, 201
+> >   insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> > index 2e379fb..77aa7b17 100644
+> > --- a/arch/arm/mach-imx/clk-imx6q.c
+> > +++ b/arch/arm/mach-imx/clk-imx6q.c
+> 
+> ...
+> 
+> > +	/*
+> > +	 * The LDB_DI0/1_SEL muxes are registered read-only due to a hardware
+> > +	 * bug. Set the muxes to the requested values before registering the
+> > +	 * ldb_di_sel clocks.
+> > +	 */
+> > +	if ((imx_get_soc_revision() != IMX_CHIP_REVISION_1_0) ||
+> > +	    cpu_is_imx6dl())
+> > +		init_ldb_clks(np, base);
+> 
+> I've a hopefully simple understanding question regarding this if():
+> 
+> What does happen (or: has to be done) in the (non-existing) else case of
+> this if() statement?
+> 
+> E.g. how to configure the clocks for the imx_get_soc_revision() ==
+> IMX_CHIP_REVISION_1_0 case?
+> 
+> For the if() case, we can configure the clocks via the assigned-clocks
+> and assigned-clock-parents as described in the commit message. But how
+> to configure the clocks/muxes in the else case? To my understanding,
+> with the patch 2/3 [1] the clocks/muxes are configured to read only.
+> 
+> Sorry if I missed anything ;)
+> 
+> Many thanks,
+> 
+> Dirk
+> 
+> [1]
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313619.ht
+> ml
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I have at least one imx6q SoM with IMX_CHIP_REVISION_1_0, and can confirm
+that with the current mainline kernel, it gets no lvds video,
+or rather very little.
+I see penguins, and then it goes black.
 
-Given that we won't boot secondary CPUs without an enable-method, we
-could leave them in, but in a currently-unusable state. That would allow
-a bootloader to patch in the relevant properties to boot them.
+with the 3.0.35 vendor kernel it was working.
+My only clue so far has been that there are a couple of clocks and
+regulators that come up different on the newer chip.
 
-If you add the nodes later with PSCI properties, users with existing
-firmware will expect their board to boot. So I'd recommendd that the
-bootloader patches that in, or that the firmware is ready prior to this
-being merged. I suspect that the former is more likely to be possible.
+vddarm and vddpu are 1100 mV on 1.0, 1150 mV on 1.5
 
-> > [...]
-> >
-> >> >> >> +             pm_ctrl: pm_ctrl {
-> >> >> >> +                     compatible = "hisilicon,pmctrl", "syscon";
-> >> >> >> +                     #address-cells = <1>;
-> >> >> >> +                     #size-cells = <1>;
-> >> >> >> +                     reg = <0x0 0xf7032000 0x0 0x1000>;
-> >> >> >> +                     ranges = <0 0x0 0xf7032000 0x1000>;
-> >> >> >> +
-> >> >> >> +                     clock_power: clock3 at 0 {
-> >> >> >> +                             compatible = "hisilicon,hi6220-clock-power";
-> >> >> >> +                             reg = <0 0x1000>;
-> >> >> >> +                             #clock-cells = <1>;
-> >> >> >> +                     };
-> >> >> >> +             };
-> >> >> >
-> >> >> > I really doesn't see the point in having a sub-device that covers the
-> >> >> > entirely of the register space of the containing node, and that being
-> >> >> > the case I am extremely concerned that the containers are marked as
-> >> >> > syscon compatible.
-> >> >> The SoC clocks are designed and placed under different system controllers,
-> >> >> so I define corresponding nodes under different controllers for clock operation.
-> >> >
-> >> > What I'm concerned wit hhere is that the pm_ctrl node and the clock3 at 0
-> >> > sub-node have the _exact_ same register space.
-> >> >
-> >> > Given this should mean that the clock3 at 0 node owns that register space,
-> >> > having the container node export this as syscon does not make sense. And
-> >> > the split between pm_ctrl and clock3@) doesn't seem to make sense given
-> >> > they cover the same space.
-> >> I understand your worry and will find the max offset of those clocks
-> >> under this controller.
-> >>
-> >> >
-> >> > As I asked before, why is pm_ctrl marked as a syscon, and what's the
-> >> > point of the separate sub-node?
-> >> There is no big difference between pm_ctrl and other controller,  they
-> >> are all designed as
-> >> the base address to control some functions of other modules (certainly
-> >> include some clock gates).
-> >
-> > Are they just different instances of the same IP block, or are there
-> > fundamental differences between them?
-> You can understand it as a different instance of the same IP block,
-> there is no fundamental
-> differences between them.
+and there is a message that looks like so on 1.0 chip:
+Switching to timer-based delay loop, resolution 15ns
+and like so on 1.5 (aka 1.3d):
+Switching to timer-based delay loop, resolution 333ns
 
-Ok. If that's the case each should have the same compatible string.
+Hope that helps.
 
-Thanks,
-Mark.
+
+-- 
+Joshua Clayton
+Software Engineer
+UniWest
+122 S. 4th Avenue
+Pasco, WA 99301
+Ph: (509) 544-0720
+Fx: (509) 544-0868 
