@@ -1,109 +1,50 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 10 Feb 2015 13:49:32 -0800
-Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
-In-Reply-To: <20150210211525.GO8656@n2100.arm.linux.org.uk>
-References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
- <20150205105035.GL8656@n2100.arm.linux.org.uk>
- <20150205142918.GA10634@linux.vnet.ibm.com>
- <20150205161100.GQ8656@n2100.arm.linux.org.uk>
- <54D95DB8.9010308@codeaurora.org> <20150210151416.GD9432@leverpostej>
- <54DA6E92.3090109@codeaurora.org> <54DA725E.6080305@codeaurora.org>
- <20150210211525.GO8656@n2100.arm.linux.org.uk>
-Message-ID: <54DA7CEC.7020606@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 10 Feb 2015 19:54:52 -0200
+Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
+ registers
+In-Reply-To: <462270270.419156.1423603473431.JavaMail.open-xchange@oxbaltgw02.schlund.de>
+References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
+ <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
+ <54DA020C.6030703@i2se.com>
+ <CAOMZO5DGCP1p1vetwWHpSbe2qywA8DhWRRq22egMDFSw11uq4w@mail.gmail.com>
+ <54DA0DE7.5050708@i2se.com>
+ <CAOMZO5AtFOThRjcAgMVbrbkcrJbehouSxoH03VUGJrRdWXnS_Q@mail.gmail.com>
+ <462270270.419156.1423603473431.JavaMail.open-xchange@oxbaltgw02.schlund.de>
+Message-ID: <CAOMZO5CYHKCUXyCGzuRaYt_o=ucSmZBwsc8mF84HqaA-+QX15g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/15 13:15, Russell King - ARM Linux wrote:
-> On Tue, Feb 10, 2015 at 01:04:30PM -0800, Stephen Boyd wrote:
->> From: Stephen Boyd <sboyd@codeaurora.org>
->> Subject: [PATCH] ARM: smp: Only expose /sys/.../cpuX/online if hotpluggable
->>
->> Writes to /sys/.../cpuX/online fail if we determine the platform
->> doesn't support hotplug for that CPU. Let's figure this out
->> befoer we make the sysfs nodes so that the online file doesn't
->> even exist if it's not possible to hotplug the CPU.
->>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
->>  arch/arm/include/asm/smp.h |  6 ++++++
->>  arch/arm/kernel/setup.c    |  2 +-
->>  arch/arm/kernel/smp.c      | 11 ++++-------
->>  3 files changed, 11 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
->> index 18f5a554134f..9f82430efd59 100644
->> --- a/arch/arm/include/asm/smp.h
->> +++ b/arch/arm/include/asm/smp.h
->> @@ -123,4 +123,10 @@ struct of_cpu_method {
->>   */
->>  extern void smp_set_ops(struct smp_operations *);
->>  
->> +#ifdef CONFIG_HOTPLUG_CPU
->> +extern int platform_can_hotplug_cpu(unsigned int cpu);
->> +#else
->> +static inline int platform_can_hotplug_cpu(unsigned int cpu) { return 0; }
-> Please split this across four lines like a normal function.
+Hi Stefan,
+
+On Tue, Feb 10, 2015 at 7:24 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+
+> thanks this is very helpful. I built the linux-next for my Duckbill and add the
+> SSP2 section from imx28-evk.dts into imx28-duckbill.dts.
 >
+> Without my patch i get the following for HW_CLKCTRL_FRAC0:
+>
+> ./memwatch -a 0x800401B0
+>
+> 0x800401b0: 0x5e5b5513
+>
+> With my patch i get:
+>
+> ./memwatch -a 0x800401B0
+>
+> 0x800401b0: 0x5e1b5513
+>
+> So it looks like a problem in my patch.
 
-Ok.
+Yes, let's try to get the same value HW_CLKCTRL_FRAC0.
 
->> +#endif
->> +
->>  #endif /* ifndef __ASM_ARM_SMP_H */
->> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->> index 715ae19bc7c8..c61c09defc78 100644
->> --- a/arch/arm/kernel/setup.c
->> +++ b/arch/arm/kernel/setup.c
->> @@ -974,7 +974,7 @@ static int __init topology_init(void)
->>  
->>  	for_each_possible_cpu(cpu) {
->>  		struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, cpu);
->> -		cpuinfo->cpu.hotpluggable = 1;
->> +		cpuinfo->cpu.hotpluggable = platform_can_hotplug_cpu(cpu);
->>  		register_cpu(&cpuinfo->cpu, cpu);
->>  	}
->>  
->> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
->> index fe0386c751b2..4d213b24db60 100644
->> --- a/arch/arm/kernel/smp.c
->> +++ b/arch/arm/kernel/smp.c
->> @@ -174,18 +174,19 @@ static int platform_cpu_kill(unsigned int cpu)
->>  	return 1;
->>  }
->>  
->> -static int platform_cpu_disable(unsigned int cpu)
->> +int platform_can_hotplug_cpu(unsigned int cpu)
->>  {
->>  	if (smp_ops.cpu_disable)
->> -		return smp_ops.cpu_disable(cpu);
->> +		return smp_ops.cpu_disable(cpu) ? 0 : 1;
->>  
->>  	/*
->>  	 * By default, allow disabling all CPUs except the first one,
->>  	 * since this is special on a lot of platforms, e.g. because
->>  	 * of clock tick interrupts.
->>  	 */
->> -	return cpu == 0 ? -EPERM : 0;
->> +	return cpu == 0 ? 0 : 1;
->>  }
->> +
->>  /*
->>   * __cpu_disable runs on the processor to be shutdown.
->>   */
->> @@ -194,10 +195,6 @@ int __cpu_disable(void)
->>  	unsigned int cpu = smp_processor_id();
->>  	int ret;
->>  
->> -	ret = platform_cpu_disable(cpu);
->> -	if (ret)
->> -		return ret;
->> -
-> I would much rather prefer smp_ops.cpu_disable() to be renamed in this
-> case - name it smp_ops.cpu_can_disable() so that it's clear that it's
-> no longer part of the __cpu_disable() path.
+> I orded such a flash chip, but it will take some time until i can use it with my
+> hardware.
 
-Sure. That also makes the  ? 0 : 1 thing go away.
+Thanks for doing this.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Maybe if you find out a way to fix the calculation of
+HW_CLKCTRL_FRAC0, then I can test it on my board.
+
+Regards,
+
+Fabio Estevam
