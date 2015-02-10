@@ -1,42 +1,64 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 10 Feb 2015 14:00:55 +0100
-Subject: [PATCH 1/1] ARM: dts: Use more descriptive names for Exynos5420
- PDs
-In-Reply-To: <54D9FD94.9000102@collabora.co.uk>
-References: <1423244258-24314-1-git-send-email-javier.martinez@collabora.co.uk>
- <54D51170.10903@cogentembedded.com> <54D52905.6040100@collabora.co.uk>
- <CAJKOXPepTJYYs6gR6NLQzsJndeRLgF+KHRpH9qt9noUgRBs2Dw@mail.gmail.com>
- <54D9F1A4.1000908@cogentembedded.com> <1423570670.6241.2.camel@AMDC1943>
- <54D9F7B1.3030106@cogentembedded.com> <1423571438.6241.4.camel@AMDC1943>
- <54D9FD94.9000102@collabora.co.uk>
-Message-ID: <54DA0107.2020909@samsung.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 10 Feb 2015 14:05:16 +0100
+Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
+ registers
+In-Reply-To: <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
+References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
+ <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
+Message-ID: <54DA020C.6030703@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/15 13:46, Javier Martinez Canillas wrote:
->>>> This debugfs code iterates over list of generic_pm_domains (gpd_list). I
->>>> >> > cannot find function for translating from genpd to its platform device
->>>> >> > so only genpd->name can be printed.
->>> >> 
->>> >>     Then why power domains aren't just named with the platform device names?
->> > 
->> > Right, the mach-exynos/pm_domains.c set the name equal to OF node name.
->> > I'll send a patch extending the name.
->> >
-> IIRC the OF core uses the device node unit address and node name to create
-> the platform device names so you will have something like 10044000.power-domain.
-> 
-> Same if using the node full_name since it will /power-domain at 10044000. In both
-> cases the DTS should have to be checked to know which power domain really is
-> unless someone knows by heart the power domains addresses.
-> 
-> But if using generic names for the power domains as suggested by ePAPR is so
-> important then we should change all the other Exynos DTS files which don't do.
+Hi Fabio,
 
-Perhaps we could assign OF aliases to the power domain device nodes in DT
-and then in the power domains driver map those aliases to more descriptive
-names when creating the power domains?
+Am 10.02.2015 um 13:52 schrieb Fabio Estevam:
+> Hi Stefan,
+>
+> On Fri, Jan 30, 2015 at 5:20 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>> According to i.MX23 and i.MX28 reference manual [1],[2] the fractional
+>> clock control register is 32-bit wide, but is separated in 4 parts.
+>> So write instructions must not apply to more than 1 part at once.
+>>
+>> The clk init for the i.MX28 violates this restriction and all the other
+>> accesses on that register suggest that there isn't such a restriction.
+>>
+>> This patch restricts the access to this register to byte instructions and
+>> extends the comment in the init functions.
+>>
+>> Btw the imx23 init now uses a R-M-W sequence just like imx28 init
+>> to avoid any clock glitches.
+>>
+>> The changes has been tested with a i.MX23 and a i.MX28 board.
+>>
+>> [1] - http://cache.freescale.com/files/dsp/doc/ref_manual/IMX23RM.pdf
+>> [2] - http://cache.freescale.com/files/dsp/doc/ref_manual/MCIMX28RM.pdf
+>>
+>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+>> Reviewed-by: Marek Vasut <marex@denx.de>
+>> ---
+>>
+>> Changes in V2:
+>> - use relaxed access operations in clk-ref
+> With this patch applied mx28evk cannot probe SPI NOR flash:
+>
+> m25p80 spi1.0: unrecognized JEDEC id bytes: bf, 24, 40
+>
+> Reverting it from linux-next, then the SPI NOR probe correctly.
+>
+> m25p80 spi1.0: sst25vf016b (2048 Kbytes)
+>
+> Any ideas?
 
---
-Regards,
-Sylwester
+sorry no. But i will try to get a mx28evk to reproduce the problem and
+narrow down which part of the patch causes this problem.
+
+Did you see any problem with the clock control register settings?
+
+Stefan
+
+>
+> Thanks for the suggestion, Marek!
+>
+> Regards,
+>
+> Fabio Estevam
