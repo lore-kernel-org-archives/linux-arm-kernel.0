@@ -1,41 +1,50 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 10 Feb 2015 19:59:40 +0900
-Subject: [patch] PM / devfreq: event: testing the wrong variable
-In-Reply-To: <20150210103547.GA18481@mwanda>
-References: <20150210103547.GA18481@mwanda>
-Message-ID: <54D9E49C.80105@samsung.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 10 Feb 2015 12:10:58 +0100
+Subject: [PATCH v12 0/6] cpufreq: use generic cpufreq drivers for exynos
+ platforms
+In-Reply-To: <CAMAWPa9fUJVjJ8V+93AkHy9DtEmUUnGs4MJDGcsoMdWwGmg5qg@mail.gmail.com>
+References: <1416576682-5255-1-git-send-email-thomas.ab@samsung.com>
+ <CAMAWPa9fUJVjJ8V+93AkHy9DtEmUUnGs4MJDGcsoMdWwGmg5qg@mail.gmail.com>
+Message-ID: <CAJKOXPfyPH7tyce6YB=q4krSP078aJVAmqObg89qCnLrL_Nbhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2015 07:35 PM, Dan Carpenter wrote:
-> There is a typo here so we test "edev" but we intended to test
-> "edev[i]".
-> 
-> Fixes: f262f28c1470 ('PM / devfreq: event: Add devfreq_event class')
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-> 
-> diff --git a/drivers/devfreq/event/exynos-ppmu.c b/drivers/devfreq/event/exynos-ppmu.c
-> index 135be0a..ad83473 100644
-> --- a/drivers/devfreq/event/exynos-ppmu.c
-> +++ b/drivers/devfreq/event/exynos-ppmu.c
-> @@ -327,8 +327,8 @@ static int exynos_ppmu_probe(struct platform_device *pdev)
->  
->  	for (i = 0; i < info->num_events; i++) {
->  		edev[i] = devm_devfreq_event_add_edev(&pdev->dev, &desc[i]);
-> -		if (IS_ERR(edev)) {
-> -			ret = PTR_ERR(edev);
-> +		if (IS_ERR(edev[i])) {
-> +			ret = PTR_ERR(edev[i]);
->  			dev_err(&pdev->dev,
->  				"failed to add devfreq-event device\n");
->  			goto err;
-> 
+2015-01-08 22:17 GMT+01:00 Kevin Hilman <khilman@kernel.org>:
+> On Fri, Nov 21, 2014 at 5:31 AM, Thomas Abraham <thomas.ab@samsung.com> wrote:
+>> Changes since v11:
+>> - Rebased on top of git://linuxtv.org/snawrocki/samsung.git for-v3.19-exynos-clk
+>>
+>> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
+>> drivers and enables the use of cpufreq-dt driver for these platforms. This
+>> series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
+>> driver.
+>>
+>> This series is based on the following branch.
+>> git://linuxtv.org/snawrocki/samsung.git for-v3.19-exynos-clk
+>>
+>> This series depends on the following patch which can be picked from
+>> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git samsung/dt
+>> e540920cf21c (ARM: dts: add CPU nodes for Exynos4 SoCs).
+>>
+>> This patch series has been tested on Exynos4210/5250/5420 based boards.
+>> Tomasz Figa had plans to take this in the Samsung clock tree for v3.19
+>> (http://www.spinics.net/lists/linux-samsung-soc/msg37933.html).
+>> Sylwester, could you consider to merge this in your tree?
+>
+> CPUfreq for exynos is still not upstream.  What's the status of this
+> series?  It's been ver a month since there's been any activity here
+> (or any responses to the issues I reported.)
+>
+> On a related note, this series only does frequency scaling. Is there
+> any work going on to also enable voltage scaling for the CPU rails as
+> well?
 
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+Hi Thomas,
 
-But,
-This patch has not yet merged to linux.git (http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git).
-After releasing Linux 3.20-rc1, this patch will be handled.
+Do you plan to continue with this work? It would be very helpful.
 
-Thanks,
-Chanwoo Choi
+I also wonder if Exynos 4412 could be re-added (without the boost if
+these bindings are not ready)?
+
+Best regards,
+Krzysztof
