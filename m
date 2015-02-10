@@ -1,57 +1,41 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 10 Feb 2015 15:58:39 +0200
-Subject: [PATCH 3/7] ARM: davinci: devices-da8xx: Clean up and correct the
- McASP device creation
-In-Reply-To: <1423576723-24375-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1423576723-24375-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1423576723-24375-4-git-send-email-peter.ujfalusi@ti.com>
+Date: Tue, 10 Feb 2015 15:58:36 +0200
+Subject: [PATCH 0/7] ARM: davinci: McASP related cleanups and fixes
+Message-ID: <1423576723-24375-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both DA830 and DA850 has McASP0 module, so do not restrict the use of
-McASP0 for da850 only.
+Hi,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Clean up series of McASP device creation for da8xx and dm646x DMSoCs.
+
+Patch5 (dm646x: Clean up the McASP DMA resources) depends on a patch queed for
+3.20 via ASoC:
+http://mailman.alsa-project.org/pipermail/alsa-devel/2015-February/087321.html
+
+There is another daVinci related fix going via ASoC for da830, which have shared
+irq line for all it's McASP ip:
+http://mailman.alsa-project.org/pipermail/alsa-devel/2015-February/087322.html
+
+Regards,
+Peter
 ---
- arch/arm/mach-davinci/devices-da8xx.c | 25 ++++++++++++++++++-------
- 1 file changed, 18 insertions(+), 7 deletions(-)
+Peter Ujfalusi (7):
+  ARM: davinci: devices-da8xx: Add resource name for the McASP DMA
+    request
+  ARM: davinci: devices-da8xx: Add interrupt resource to McASP structs
+  ARM: davinci: devices-da8xx: Clean up and correct the McASP device
+    creation
+  ARM: davinci: devices-da8xx: Add support for McASP2 on da830
+  ARM: davinci: dm646x: Clean up the McASP DMA resources
+  ARM: davinci: irqs: Correct McASP1 TX interrupt definition for DM646x
+  ARM: davinci: dm646x: Add interrupt resource for McASPs
 
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index e15e046c5438..fdc3219ba684 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -526,14 +526,25 @@ static struct platform_device da850_mcasp_device = {
- 
- void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata)
- {
--	/* DA830/OMAP-L137 has 3 instances of McASP */
--	if (cpu_is_davinci_da830() && id == 1) {
--		da830_mcasp1_device.dev.platform_data = pdata;
--		platform_device_register(&da830_mcasp1_device);
--	} else if (cpu_is_davinci_da850()) {
--		da850_mcasp_device.dev.platform_data = pdata;
--		platform_device_register(&da850_mcasp_device);
-+	struct platform_device *pdev;
-+
-+	switch (id) {
-+	case 0:
-+		/* Valid for DA830/OMAP-L137 or DA850/OMAP-L138 */
-+		pdev = &da850_mcasp_device;
-+		break;
-+	case 1:
-+		/* Valid for DA830/OMAP-L137 only */
-+		if (!cpu_is_davinci_da830())
-+			return;
-+		pdev = &da830_mcasp1_device;
-+		break;
-+	default:
-+		return;
- 	}
-+
-+	pdev->dev.platform_data = pdata;
-+	platform_device_register(pdev);
- }
- 
- static struct resource da8xx_pruss_resources[] = {
+ arch/arm/mach-davinci/asp.h               |  7 +++
+ arch/arm/mach-davinci/devices-da8xx.c     | 80 ++++++++++++++++++++++++++++---
+ arch/arm/mach-davinci/dm646x.c            | 23 ++++++---
+ arch/arm/mach-davinci/include/mach/irqs.h |  2 +-
+ 4 files changed, 98 insertions(+), 14 deletions(-)
+
 -- 
 2.3.0
