@@ -1,46 +1,50 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 10 Feb 2015 14:05:01 -0800
-Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
-In-Reply-To: <54DA7CEC.7020606@codeaurora.org>
-References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
- <20150205105035.GL8656@n2100.arm.linux.org.uk>
- <20150205142918.GA10634@linux.vnet.ibm.com>
- <20150205161100.GQ8656@n2100.arm.linux.org.uk>
- <54D95DB8.9010308@codeaurora.org> <20150210151416.GD9432@leverpostej>
- <54DA6E92.3090109@codeaurora.org> <54DA725E.6080305@codeaurora.org>
- <20150210211525.GO8656@n2100.arm.linux.org.uk>
- <54DA7CEC.7020606@codeaurora.org>
-Message-ID: <54DA808D.5070300@codeaurora.org>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 10 Feb 2015 23:07:51 +0100
+Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
+ registers
+In-Reply-To: <CAOMZO5CYHKCUXyCGzuRaYt_o=ucSmZBwsc8mF84HqaA-+QX15g@mail.gmail.com>
+References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
+ <462270270.419156.1423603473431.JavaMail.open-xchange@oxbaltgw02.schlund.de>
+ <CAOMZO5CYHKCUXyCGzuRaYt_o=ucSmZBwsc8mF84HqaA-+QX15g@mail.gmail.com>
+Message-ID: <201502102307.51740.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/15 13:49, Stephen Boyd wrote:
->>> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
->>> index fe0386c751b2..4d213b24db60 100644
->>> --- a/arch/arm/kernel/smp.c
->>> +++ b/arch/arm/kernel/smp.c
->>> @@ -174,18 +174,19 @@ static int platform_cpu_kill(unsigned int cpu)
->>>  	return 1;
->>>  }
->>>  
->>> -static int platform_cpu_disable(unsigned int cpu)
->>> +int platform_can_hotplug_cpu(unsigned int cpu)
->>>  {
->>>  	if (smp_ops.cpu_disable)
->>> -		return smp_ops.cpu_disable(cpu);
->>> +		return smp_ops.cpu_disable(cpu) ? 0 : 1;
->>>  
+On Tuesday, February 10, 2015 at 10:54:52 PM, Fabio Estevam wrote:
+> Hi Stefan,
+> 
+> On Tue, Feb 10, 2015 at 7:24 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> > thanks this is very helpful. I built the linux-next for my Duckbill and
+> > add the SSP2 section from imx28-evk.dts into imx28-duckbill.dts.
+> > 
+> > Without my patch i get the following for HW_CLKCTRL_FRAC0:
+> > 
+> > ./memwatch -a 0x800401B0
+> > 
+> > 0x800401b0: 0x5e5b5513
+> > 
+> > With my patch i get:
+> > 
+> > ./memwatch -a 0x800401B0
+> > 
+> > 0x800401b0: 0x5e1b5513
+> > 
+> > So it looks like a problem in my patch.
+> 
+> Yes, let's try to get the same value HW_CLKCTRL_FRAC0.
+> 
+> > I orded such a flash chip, but it will take some time until i can use it
+> > with my hardware.
+> 
+> Thanks for doing this.
+> 
+> Maybe if you find out a way to fix the calculation of
+> HW_CLKCTRL_FRAC0, then I can test it on my board.
 
-BTW, we also need this
+Hi,
 
-        /* cpu_die must be specified to support hotplug */
-        if (!smp_ops.cpu_die)
-                return 0;
+the difference is this 0x40 bit, right ? That's _STABLE bit, so it means
+the clock are not stable, right ? Why would that happen in the first place?
 
-otherwise it seems that we can have a situation where cpu_die() does
-nothing besides unexpectedly jump to secondary_start_kernel() before
-generic cpu hotplug facilities expect it to.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Best regards,
+Marek Vasut
