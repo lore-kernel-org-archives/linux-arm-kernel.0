@@ -1,60 +1,124 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 10 Feb 2015 22:24:33 +0100 (CET)
-Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
- registers
-In-Reply-To: <CAOMZO5AtFOThRjcAgMVbrbkcrJbehouSxoH03VUGJrRdWXnS_Q@mail.gmail.com>
-References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
- <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
- <54DA020C.6030703@i2se.com>
- <CAOMZO5DGCP1p1vetwWHpSbe2qywA8DhWRRq22egMDFSw11uq4w@mail.gmail.com>
- <54DA0DE7.5050708@i2se.com>
- <CAOMZO5AtFOThRjcAgMVbrbkcrJbehouSxoH03VUGJrRdWXnS_Q@mail.gmail.com>
-Message-ID: <462270270.419156.1423603473431.JavaMail.open-xchange@oxbaltgw02.schlund.de>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 10 Feb 2015 13:47:37 -0800
+Subject: [PATCH v8 2/4] pinctrl: cygnus: add gpio/pinconf driver
+In-Reply-To: <20150209191951.GA15709@dtor-ws>
+References: <rjui@broadcom.com>
+ <1423070463-24483-1-git-send-email-rjui@broadcom.com>
+ <1423070463-24483-3-git-send-email-rjui@broadcom.com>
+ <20150209191951.GA15709@dtor-ws>
+Message-ID: <54DA7C79.2010606@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
 
-> Fabio Estevam <festevam@gmail.com> hat am 10. Februar 2015 um 16:06
-> geschrieben:
->
->
-> Hi Stefan,
->
-> On Tue, Feb 10, 2015 at 11:55 AM, Stefan Wahren <stefan.wahren@i2se.com>
-> wrote:
->
-> > Could you apply only the clk-imx28.c part of my patch and see what happens?
->
-> If I apply only the clk-imx28.c part of your patch I can successfully
-> probe the SPI NOR.
 
-thanks this is very helpful. I built the linux-next for my Duckbill and add the
-SSP2 section from imx28-evk.dts into imx28-duckbill.dts.
+On 2/9/2015 11:20 AM, Dmitry Torokhov wrote:
+> Hi Ray,
+> 
+> On Wed, Feb 04, 2015 at 09:21:01AM -0800, Ray Jui wrote:
+>> +static int cygnus_gpio_pinmux_add_range(struct cygnus_gpio *chip)
+>> +{
+>> +	struct device_node *node = chip->dev->of_node;
+>> +	struct device_node *pinmux_node;
+>> +	struct platform_device *pinmux_pdev;
+>> +	struct gpio_chip *gc = &chip->gc;
+>> +	int i, ret;
+>> +
+>> +	/* parse DT to find the phandle to the pinmux controller */
+>> +	pinmux_node = of_parse_phandle(node, "pinmux", 0);
+>> +	if (!pinmux_node)
+>> +		return -ENODEV;
+>> +
+>> +	pinmux_pdev = of_find_device_by_node(pinmux_node);
+>> +	if (!pinmux_pdev) {
+>> +		dev_err(chip->dev, "failed to get pinmux device\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	/* now need to create the mapping between local GPIO and PINMUX pins */
+>> +	for (i = 0; i < ARRAY_SIZE(cygnus_gpio_pintable); i++) {
+>> +		ret = gpiochip_add_pin_range(gc, dev_name(&pinmux_pdev->dev),
+>> +					     cygnus_gpio_pintable[i].offset,
+>> +					     cygnus_gpio_pintable[i].pin_base,
+>> +					     cygnus_gpio_pintable[i].num_pins);
+>> +		if (ret) {
+>> +			dev_err(chip->dev, "unable to add GPIO pin range\n");
+>> +			goto err_put_device;
+>> +		}
+>> +	}
+>> +
+>> +	chip->pinmux_is_supported = true;
+>> +
+>> +	/* no need for pinmux_pdev device reference anymore */
+>> +	put_device(&pinmux_pdev->dev);
+> 
+> Sorry I did not notice it before, but of_parse_phandle() takes reference
+> to the returned device node, so you need to "put" it here and in error
+> path as well. Actually you can do:
+> 
+> 	int ret = 0;
+> 
+> 	pinmux_node = of_parse_phandle(node, "pinmux", 0);
+> 	if (!pinmux_node)
+> 		return -ENODEV;
+> 
+> 	pinmux_pdev = of_find_device_by_node(pinmux_node);
+> 	/* We do not longer need pinmux node */
+> 	of_node_put(pinmux_node);
+> 
+> 	if (!pinmux_dev)
+> 		....
+> 
+> 	for (..) {
+> 		...
+> 		if (ret) {
+> 			dev_err(...);
+> 			break;
+> 		}
+> 	}
+> 
+> 	chip->pinmux_is_supported = (ret == 0);
+> 	put_device(..);
+> 	return ret;
+> }
+> 
+> This way you free resources in the same path.
+> 
 
-Without my patch i get the following for HW_CLKCTRL_FRAC0:
+Thanks. I'll make the change.
 
-./memwatch -a 0x800401B0
+> ...
+> 
+>> +
+>> +static struct platform_driver cygnus_gpio_driver = {
+>> +	.driver = {
+>> +		.name = "cygnus-gpio",
+>> +		.of_match_table = cygnus_gpio_of_match,
+>> +		.suppress_bind_attrs = true,
+>> +	},
+>> +	.probe = cygnus_gpio_probe,
+>> +};
+>> +
+>> +static int __init cygnus_gpio_init(void)
+>> +{
+>> +	return platform_driver_probe(&cygnus_gpio_driver, cygnus_gpio_probe);
+> 
+> When I asked you to add ".suppress_bind_attrs = true" I missed the fact
+> that you were using platform_driver_probe() which already does this
+> internally. However platform_driver_probe() can't handle deferred
+> probing, which may or may not be OK. Is there a chance that any of the
+> resources needed by the driver return -EPROBE_DEFER? If not then it is
+> safe to continue using platform_driver_probe() and you can drop
+> suppress_bind_attrs assignment, otherwise it may be better to switch to
+> platform_driver_register().
+> 
+> Thanks.
+> 
 
-0x800401b0: 0x5e5b5513
+No I do not expect any resource that this driver depends on to return
+-EPROBE_DEFER. The IOMUX driver that this driver depends on should be
+initialized before this driver.
 
-With my patch i get:
+I'll drop .suppress_bind_attrs then. Thanks.
 
-./memwatch -a 0x800401B0
-
-0x800401b0: 0x5e1b5513
-
-So it looks like a problem in my patch.
-
-I orded such a flash chip, but it will take some time until i can use it with my
-hardware.
-
-Stefan
-
->
-> Thanks
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Ray
