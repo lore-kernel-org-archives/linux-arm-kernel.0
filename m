@@ -1,36 +1,69 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Feb 2015 15:20:39 +0800
-Subject: Recommendations for a new MFD device driver?
-In-Reply-To: <20150206101006.GK12209@pengutronix.de>
-References: <20150206101006.GK12209@pengutronix.de>
-Message-ID: <20150210072039.GC8020@x1>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Tue, 10 Feb 2015 07:26:40 +0000
+Subject: [PATCH] xen/arm: allow console=hvc0 to be omitted for guests
+In-Reply-To: <alpine.DEB.2.02.1502100648050.29696@kaball.uk.xensource.com>
+References: <1422626319-30752-1-git-send-email-ard.biesheuvel@linaro.org>
+ <alpine.DEB.2.02.1502100648050.29696@kaball.uk.xensource.com>
+Message-ID: <1423553200.5851.15.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 06 Feb 2015, Sascha Hauer wrote:
-
-> Hi All,
+On Tue, 2015-02-10 at 07:00 +0000, Stefano Stabellini wrote:
+> On Fri, 30 Jan 2015, Ard Biesheuvel wrote:
+> > This patch registers hvc0 as the preferred console if no console
+> > has been specified explicitly on the kernel command line.
+> > 
+> > The purpose is to allow platform agnostic kernels and boot images
+> > (such as distro installers) to boot in a Xen/ARM domU without the
+> > need to modify the command line by hand.
+> > 
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > ---
+> > 
+> > This applies on top of the patch Julien is cooking up to move the
+> > call to xen_guest_init() to an earlier boot stage. This needs to
+> > be at least before the call to console_init() in start_kernel()
+> > for this patch to do anything meaningful.
 > 
-> We are adding support for a new pretty typical MFD device, the MediaTek
-> MT6397. Initial patches are already posted. It's a PMIC which among other
-> things has regulators and a RTC. The same RTC is reused on another PMIC,
-> but with another register offset and another interrupt.
+> This patch looks good but there isn't much point in queuing this up
+> without the prerequisite.
 > 
-> Now the question is where shall we put the register/irq resource
-> information?
+> Julien, what patch exactly is that? What is the status of it?
 > 
-> 1) Put it into the RTC device driver.
-> 2) Put it into the .resource field of struct mfd_cell
-> 3) Put it into the device tree using standard reg, interrupt properties and
->    a) Let the RTC driver interpret these
->    b) Let the MFD driver create resources in the .resource field of struct
->       mfd_cell
->    c) Let the MFD core create the resources
+> 
+> >  arch/arm/xen/enlighten.c | 4 ++++
+> >  1 file changed, 4 insertions(+)
+> > 
+> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > index c7ca936ebd99..61382cafa877 100644
+> > --- a/arch/arm/xen/enlighten.c
+> > +++ b/arch/arm/xen/enlighten.c
+> > @@ -24,6 +24,7 @@
+> >  #include <linux/cpuidle.h>
+> >  #include <linux/cpufreq.h>
+> >  #include <linux/cpu.h>
+> > +#include <linux/console.h>
+> >  
+> >  #include <linux/mm.h>
+> >  
+> > @@ -322,6 +323,9 @@ static int __init xen_guest_init(void)
+> >  
+> >  	register_cpu_notifier(&xen_cpu_notifier);
+> >  
+> > +	if (!console_set_on_cmdline)
+> > +		add_preferred_console("hvc", 0, NULL);
 
-I have no problem with 2, if that's the route you'd like to take.
+FWIW on x86 this doesn't depend on console_set_on_cmdline, does it need
+to here?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+On x86 it does depend on !xen_initial_domain. I suppose on the principal
+that a VT is normally available there. I suppose that doesn't apply to
+ARM so much, although it could.
+
+> > +
+> >  	return 0;
+> >  }
+> >  early_initcall(xen_guest_init);
+> > -- 
+> > 1.8.3.2
+> > 
