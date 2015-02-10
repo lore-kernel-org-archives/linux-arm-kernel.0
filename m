@@ -1,64 +1,40 @@
 From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Tue, 10 Feb 2015 15:50:25 +0800
-Subject: [PATCH v3 3/5] usb: dwc2: platform: add hi6220 support
+Date: Tue, 10 Feb 2015 15:50:26 +0800
+Subject: [PATCH v3 4/5] usb: phy: load usb phy earlier
 In-Reply-To: <1423554627-694-1-git-send-email-zhangfei.gao@linaro.org>
 References: <1423554627-694-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1423554627-694-4-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <1423554627-694-5-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- drivers/usb/dwc2/platform.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+Since phy is definitely used in usb controller, load the phy
+earlier to make boot time shorter.
 
-diff --git a/drivers/usb/dwc2/platform.c b/drivers/usb/dwc2/platform.c
-index ae095f0..f7c67db 100644
---- a/drivers/usb/dwc2/platform.c
-+++ b/drivers/usb/dwc2/platform.c
-@@ -50,6 +50,35 @@
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+Acked-by: Peter Chen <peter.chen@freescale.com>
+---
+ drivers/usb/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/usb/Makefile b/drivers/usb/Makefile
+index 2f1e2aa..d8926c6 100644
+--- a/drivers/usb/Makefile
++++ b/drivers/usb/Makefile
+@@ -5,6 +5,7 @@
+ # Object files in subdirectories
  
- static const char dwc2_driver_name[] = "dwc2";
+ obj-$(CONFIG_USB)		+= core/
++obj-$(CONFIG_USB_SUPPORT)	+= phy/
  
-+static const struct dwc2_core_params params_hi6220 = {
-+	.otg_cap			= 2,	/* No HNP/SRP capable */
-+	.otg_ver			= 0,	/* 1.3 */
-+	.dma_enable			= 1,
-+	.dma_desc_enable		= 0,
-+	.speed				= 0,	/* High Speed */
-+	.enable_dynamic_fifo		= 1,
-+	.en_multiple_tx_fifo		= 1,
-+	.host_rx_fifo_size		= 512,
-+	.host_nperio_tx_fifo_size	= 512,
-+	.host_perio_tx_fifo_size	= 512,
-+	.max_transfer_size		= 65535,
-+	.max_packet_count		= 511,
-+	.host_channels			= 16,
-+	.phy_type			= 1,	/* UTMI */
-+	.phy_utmi_width			= 8,
-+	.phy_ulpi_ddr			= 0,	/* Single */
-+	.phy_ulpi_ext_vbus		= 0,
-+	.i2c_enable			= 0,
-+	.ulpi_fs_ls			= 0,
-+	.host_support_fs_ls_low_power	= 0,
-+	.host_ls_low_power_phy_clk	= 0,	/* 48 MHz */
-+	.ts_dline			= 0,
-+	.reload_ctl			= 0,
-+	.ahbcfg				= GAHBCFG_HBSTLEN_INCR16 <<
-+					  GAHBCFG_HBSTLEN_SHIFT,
-+	.uframe_sched			= 0,
-+};
-+
- static const struct dwc2_core_params params_bcm2835 = {
- 	.otg_cap			= 0,	/* HNP/SRP capable */
- 	.otg_ver			= 0,	/* 1.3 */
-@@ -129,6 +158,7 @@ static int dwc2_driver_remove(struct platform_device *dev)
+ obj-$(CONFIG_USB_DWC3)		+= dwc3/
+ obj-$(CONFIG_USB_DWC2)		+= dwc2/
+@@ -48,7 +49,6 @@ obj-$(CONFIG_USB_MICROTEK)	+= image/
+ obj-$(CONFIG_USB_SERIAL)	+= serial/
  
- static const struct of_device_id dwc2_of_match_table[] = {
- 	{ .compatible = "brcm,bcm2835-usb", .data = &params_bcm2835 },
-+	{ .compatible = "hisilicon,hi6220-usb", .data = &params_hi6220 },
- 	{ .compatible = "rockchip,rk3066-usb", .data = &params_rk3066 },
- 	{ .compatible = "snps,dwc2", .data = NULL },
- 	{ .compatible = "samsung,s3c6400-hsotg", .data = NULL},
+ obj-$(CONFIG_USB)		+= misc/
+-obj-$(CONFIG_USB_SUPPORT)	+= phy/
+ obj-$(CONFIG_EARLY_PRINTK_DBGP)	+= early/
+ 
+ obj-$(CONFIG_USB_ATM)		+= atm/
 -- 
 1.9.1
