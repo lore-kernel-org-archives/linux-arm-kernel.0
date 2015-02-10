@@ -1,78 +1,76 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 09 Feb 2015 17:24:08 -0800
-Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
-In-Reply-To: <20150205161100.GQ8656@n2100.arm.linux.org.uk>
-References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
- <20150205105035.GL8656@n2100.arm.linux.org.uk>
- <20150205142918.GA10634@linux.vnet.ibm.com>
- <20150205161100.GQ8656@n2100.arm.linux.org.uk>
-Message-ID: <54D95DB8.9010308@codeaurora.org>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Tue, 10 Feb 2015 09:25:38 +0800
+Subject: [PATCH 1/3] USB: gadget: at91_udc: add at91sam9n12 support
+In-Reply-To: <20150209111434.GN3715@piout.net>
+References: <1423472572-19824-1-git-send-email-voice.shen@atmel.com>
+ <1423472572-19824-2-git-send-email-voice.shen@atmel.com>
+ <20150209111434.GN3715@piout.net>
+Message-ID: <54D95E12.50308@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/15 08:11, Russell King - ARM Linux wrote:
-> On Thu, Feb 05, 2015 at 06:29:18AM -0800, Paul E. McKenney wrote:
->> Works for me, assuming no hidden uses of RCU in the IPI code.  ;-)
-> Sigh... I kind'a new it wouldn't be this simple.  The gic code which
-> actually raises the IPI takes a raw spinlock, so it's not going to be
-> this simple - there's a small theoretical window where we have taken
-> this lock, written the register to send the IPI, and then dropped the
-> lock - the update to the lock to release it could get lost if the
-> CPU power is quickly cut at that point.
+Hi Alexandre,
 
-Hm.. at first glance it would seem like a similar problem exists with
-the completion variable. But it seems that we rely on the call to
-complete() fom the dying CPU to synchronize with wait_for_completion()
-on the killing CPU via the completion's wait.lock.
+On 02/09/2015 07:14 PM, Alexandre Belloni wrote:
+> Hi Bo,
+>
+> On 09/02/2015 at 17:02:50 +0800, Bo Shen wrote :
+>> Add at91sam9n12 SoC support.
+>>
+>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>> ---
+>>
+>>   drivers/usb/gadget/udc/at91_udc.c | 9 ++++++---
+>>   1 file changed, 6 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
+>> index c862656..f4c785f 100644
+>> --- a/drivers/usb/gadget/udc/at91_udc.c
+>> +++ b/drivers/usb/gadget/udc/at91_udc.c
+>> @@ -931,7 +931,8 @@ static void pullup(struct at91_udc *udc, int is_on)
+>>   		at91_udp_write(udc, AT91_UDP_TXVC, 0);
+>>   		if (cpu_is_at91rm9200())
+>>   			gpio_set_value(udc->board.pullup_pin, active);
+>> -		else if (cpu_is_at91sam9260() || cpu_is_at91sam9263() || cpu_is_at91sam9g20()) {
+>> +		else if (cpu_is_at91sam9260() || cpu_is_at91sam9263() ||
+>> +			 cpu_is_at91sam9g20() || cpu_is_at91sam9n12()) {
+>
+> cpu_is_at91xx have been removed from the kernel, using the correct
+> compatible should be enough, see
+> http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/drivers/usb/gadget/udc/at91_udc.c?id=f0bceab4e3b528e799aba8fda8d2936fcfd41f1f
 
-void complete(struct completion *x)
-{
-        unsigned long flags;
+Thanks for you information. Missing this patch, check the next-20150209, 
+it is here. I will base on next-20150209, so this patch no need anymore, 
+only need to change the dts(i) file now.
 
-        spin_lock_irqsave(&x->wait.lock, flags);
-        x->done++;
-        __wake_up_locked(&x->wait, TASK_NORMAL, 1);
-        spin_unlock_irqrestore(&x->wait.lock, flags);
-}
-
-and
-
-static inline long __sched
-do_wait_for_common(struct completion *x,
-                  long (*action)(long), long timeout, int state)
-                        ...
-			spin_unlock_irq(&x->wait.lock);
-			timeout = action(timeout);
-			spin_lock_irq(&x->wait.lock);
-
-
-so the power can't really be cut until the killing CPU sees the lock
-released either explicitly via the second cache flush in cpu_die() or
-implicitly via hardware. Maybe we can do the same thing here by using a
-spinlock for synchronization between the IPI handler and the dying CPU?
-So lock/unlock around the IPI sending from the dying CPU and then do a
-lock/unlock on the killing CPU before continuing.
-
-It would be nice if we didn't have to do anything at all though so
-perhaps we can make it a nop on configs where there isn't a big little
-switcher. Yeah it's some ugly coupling between these two pieces of code,
-but I'm not sure how we can do better.
+Thanks again.
 
 >
-> Also, we _do_ need the second cache flush in place to ensure that the
-> unlock is seen to other CPUs.
->
-> We could work around that by taking and releasing the lock in the IPI
-> processing function... but this is starting to look less attractive
-> as the lock is private to irq-gic.c.
+>>   			u32	txvc = at91_udp_read(udc, AT91_UDP_TXVC);
+>>
+>>   			txvc |= AT91_UDP_TXVC_PUON;
+>> @@ -949,7 +950,8 @@ static void pullup(struct at91_udc *udc, int is_on)
+>>   		at91_udp_write(udc, AT91_UDP_TXVC, AT91_UDP_TXVC_TXVDIS);
+>>   		if (cpu_is_at91rm9200())
+>>   			gpio_set_value(udc->board.pullup_pin, !active);
+>> -		else if (cpu_is_at91sam9260() || cpu_is_at91sam9263() || cpu_is_at91sam9g20()) {
+>> +		else if (cpu_is_at91sam9260() || cpu_is_at91sam9263() ||
+>> +			 cpu_is_at91sam9g20() || cpu_is_at91sam9n12()) {
+>>   			u32	txvc = at91_udp_read(udc, AT91_UDP_TXVC);
+>>
+>>   			txvc &= ~AT91_UDP_TXVC_PUON;
+>> @@ -1758,7 +1760,8 @@ static int at91udc_probe(struct platform_device *pdev)
+>>   	}
+>>
+>>   	/* newer chips have more FIFO memory than rm9200 */
+>> -	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20()) {
+>> +	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20() ||
+>> +	    cpu_is_at91sam9n12()) {
+>>   		udc->ep[0].maxpacket = 64;
+>>   		udc->ep[3].maxpacket = 64;
+>>   		udc->ep[4].maxpacket = 512;
+>> --
+>> 2.3.0.rc0
 
-With Daniel Thompson's NMI fiq patches at least the lock would almost
-always be gone, except for the bL switcher users. Another solution might
-be to put a hotplug lock around the bL switcher code and then skip
-taking the lock in gic_raise_softirq() if the IPI is our special hotplug
-one. Conditional locking is pretty ugly though, so perhaps this isn't
-such a great idea.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Best Regards,
+Bo Shen
