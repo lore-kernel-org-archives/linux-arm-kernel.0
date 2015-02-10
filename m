@@ -1,38 +1,53 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 10 Feb 2015 14:55:51 +0100
-Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
- registers
-In-Reply-To: <CAOMZO5DGCP1p1vetwWHpSbe2qywA8DhWRRq22egMDFSw11uq4w@mail.gmail.com>
-References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>	<CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>	<54DA020C.6030703@i2se.com>
- <CAOMZO5DGCP1p1vetwWHpSbe2qywA8DhWRRq22egMDFSw11uq4w@mail.gmail.com>
-Message-ID: <54DA0DE7.5050708@i2se.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 10 Feb 2015 15:58:37 +0200
+Subject: [PATCH 1/7] ARM: davinci: devices-da8xx: Add resource name for the
+ McASP DMA request
+In-Reply-To: <1423576723-24375-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1423576723-24375-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1423576723-24375-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Add "tx" or "rx" as resource name for the DMA resources.
 
-Am 10.02.2015 um 14:09 schrieb Fabio Estevam:
-> Hi Stefan,
->
-> On Tue, Feb 10, 2015 at 11:05 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
->
->> sorry no. But i will try to get a mx28evk to reproduce the problem and
-> Just a comment: mx28evk comes without SPI NOR flash from the factory.
-> I have populated one in my mx28evk (slot U49).
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/mach-davinci/devices-da8xx.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-i tought it would be easy because of this nice flash socket, but it's
-for NAND :-(
-
-Could you apply only the clk-imx28.c part of my patch and see what happens?
-
-Stefan
-
->
->> narrow down which part of the patch causes this problem.
->>
->> Did you see any problem with the clock control register settings?
-> I haven't inspected the clock control registers yet.
->
-> Regards,
->
-> Fabio Estevam
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index b85b781b05fd..f35174317770 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -463,12 +463,14 @@ static struct resource da830_mcasp1_resources[] = {
+ 	},
+ 	/* TX event */
+ 	{
++		.name	= "tx",
+ 		.start	= DAVINCI_DA830_DMA_MCASP1_AXEVT,
+ 		.end	= DAVINCI_DA830_DMA_MCASP1_AXEVT,
+ 		.flags	= IORESOURCE_DMA,
+ 	},
+ 	/* RX event */
+ 	{
++		.name	= "rx",
+ 		.start	= DAVINCI_DA830_DMA_MCASP1_AREVT,
+ 		.end	= DAVINCI_DA830_DMA_MCASP1_AREVT,
+ 		.flags	= IORESOURCE_DMA,
+@@ -491,12 +493,14 @@ static struct resource da850_mcasp_resources[] = {
+ 	},
+ 	/* TX event */
+ 	{
++		.name	= "tx",
+ 		.start	= DAVINCI_DA8XX_DMA_MCASP0_AXEVT,
+ 		.end	= DAVINCI_DA8XX_DMA_MCASP0_AXEVT,
+ 		.flags	= IORESOURCE_DMA,
+ 	},
+ 	/* RX event */
+ 	{
++		.name	= "rx",
+ 		.start	= DAVINCI_DA8XX_DMA_MCASP0_AREVT,
+ 		.end	= DAVINCI_DA8XX_DMA_MCASP0_AREVT,
+ 		.flags	= IORESOURCE_DMA,
+-- 
+2.3.0
