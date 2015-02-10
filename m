@@ -1,48 +1,36 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 10 Feb 2015 14:16:24 -0800
-Subject: [PATCH v9 4/4] ARM: dts: cygnus: enable GPIO based hook detection
-In-Reply-To: <1423606584-21795-1-git-send-email-rjui@broadcom.com>
-References: <1423606584-21795-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1423606584-21795-5-git-send-email-rjui@broadcom.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 10 Feb 2015 23:21:55 +0100
+Subject: [PATCH] CHROMIUM: iommu: rockchip: Make sure that page table
+ state is coherent
+In-Reply-To: <1423480761-33453-1-git-send-email-tfiga@chromium.org>
+References: <1423480761-33453-1-git-send-email-tfiga@chromium.org>
+Message-ID: <1697393.usElVkPJfb@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables GPIO based phone hook detection for Broadcom BCM911360
-phone factor board (bcm911360_entphn)
+Am Montag, 9. Februar 2015, 20:19:21 schrieb Tomasz Figa:
+> Even though the code uses the dt_lock spin lock to serialize mapping
+> operation from different threads, it does not protect from IOMMU
+> accesses that might be already taking place and thus altering state
+> of the IOTLB. This means that current mapping code which first zaps
+> the page table and only then updates it with new mapping which is
+> prone to mentioned race.
+> 
+> In addition, current code assumes that mappings are always > 4 MiB
+> (which translates to 1024 PTEs) and so they would always occupy
+> entire page tables. This is not true for mappings created by V4L2
+> Videobuf2 DMA contig allocator.
+> 
+> This patch changes the mapping code to always zap the page table
+> after it is updated, which avoids the aforementioned race and also
+> zap the last page of the mapping to make sure that stale data is
+> not cached from an already existing mapping.
+> 
+> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
----
- arch/arm/boot/dts/bcm911360_entphn.dts |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+I don't know enough about iommu-magic yet to review this properly, but on my 
+rk3288-firefly the whole display pipeline stays in working condition, down to 
+x11 and es2gears, so
 
-diff --git a/arch/arm/boot/dts/bcm911360_entphn.dts b/arch/arm/boot/dts/bcm911360_entphn.dts
-index d2ee952..7db4843 100644
---- a/arch/arm/boot/dts/bcm911360_entphn.dts
-+++ b/arch/arm/boot/dts/bcm911360_entphn.dts
-@@ -33,6 +33,7 @@
- /dts-v1/;
- 
- #include "bcm-cygnus.dtsi"
-+#include "dt-bindings/input/input.h"
- 
- / {
- 	model = "Cygnus Enterprise Phone (BCM911360_ENTPHN)";
-@@ -50,4 +51,16 @@
- 	uart3: serial at 18023000 {
- 		status = "okay";
- 	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		hook {
-+			label = "HOOK";
-+			linux,code = <KEY_O>;
-+			gpios = <&gpio_asiu 48 0>;
-+		};
-+	};
- };
--- 
-1.7.9.5
+Tested-by: Heiko Stuebner <heiko@sntech.de>
