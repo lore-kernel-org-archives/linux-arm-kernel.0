@@ -1,59 +1,125 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 10 Feb 2015 07:00:01 +0000
-Subject: [PATCH] xen/arm: allow console=hvc0 to be omitted for guests
-In-Reply-To: <1422626319-30752-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1422626319-30752-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <alpine.DEB.2.02.1502100648050.29696@kaball.uk.xensource.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Tue, 10 Feb 2015 15:05:18 +0800
+Subject: [RFC] change non-atomic bitops method
+In-Reply-To: <20150209123402.1759cb791113cc64483579c5@linux-foundation.org>
+References: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
+ <20150202152909.13bfd11f192fb0268b2ab4bf@linux-foundation.org>
+ <20150203011730.GA15653@node.dhcp.inet.fi>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0B@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0C@CNBJMBX05.corpusers.net>
+ <20150202223851.f30768d0.akpm@linux-foundation.org>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0D@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0E@CNBJMBX05.corpusers.net>
+ <20150203025925.d1c95fb8.akpm@linux-foundation.org>
+ <35FD53F367049845BC99AC72306C23D1044A02027E12@CNBJMBX05.corpusers.net>
+ <20150209123402.1759cb791113cc64483579c5@linux-foundation.org>
+Message-ID: <35FD53F367049845BC99AC72306C23D1044A02027E17@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Jan 2015, Ard Biesheuvel wrote:
-> This patch registers hvc0 as the preferred console if no console
-> has been specified explicitly on the kernel command line.
+> -----Original Message-----
+> From: Andrew Morton [mailto:akpm at linux-foundation.org]
+> Sent: Tuesday, February 10, 2015 4:34 AM
+> To: Wang, Yalin
+> Cc: 'Kirill A. Shutemov'; 'arnd at arndb.de'; 'linux-arch at vger.kernel.org';
+> 'linux-kernel at vger.kernel.org'; 'linux at arm.linux.org.uk'; 'linux-arm-
+> kernel at lists.infradead.org'
+> Subject: Re: [RFC] change non-atomic bitops method
 > 
-> The purpose is to allow platform agnostic kernels and boot images
-> (such as distro installers) to boot in a Xen/ARM domU without the
-> need to modify the command line by hand.
+> On Mon, 9 Feb 2015 16:18:10 +0800 "Wang, Yalin" <Yalin.Wang@sonymobile.com>
+> wrote:
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
+> > > That we're running clear_bit against a cleared bit 10% of the time is a
+> > > bit alarming.  I wonder where that's coming from.
+> > >
+> > > The enormous miss count in test_and_clear_bit() might indicate an
+> > > inefficiency somewhere.
+> > I te-test the patch on 3.10 kernel.
+> > The result like this:
+> >
+> > VmallocChunk:   251498164 kB
+> > __set_bit_miss_count:11730 __set_bit_success_count:1036316
+> > __clear_bit_miss_count:209640 __clear_bit_success_count:4806556
+> > __test_and_set_bit_miss_count:0 __test_and_set_bit_success_count:121
+> > __test_and_clear_bit_miss_count:0 __test_and_clear_bit_success_count:445
+> >
+> > __clear_bit miss rate is a little high,
+> > I check the log, and most miss coming from this code:
+> >
+> > <6>[  442.701798] [<ffffffc00021d084>] warn_slowpath_fmt+0x4c/0x58
+> > <6>[  442.701805] [<ffffffc0002461a8>] __clear_bit+0x98/0xa4
+> > <6>[  442.701813] [<ffffffc0003126ac>] __alloc_fd+0xc8/0x124
+> > <6>[  442.701821] [<ffffffc000312768>] get_unused_fd_flags+0x28/0x34
+> > <6>[  442.701828] [<ffffffc0002f9370>] do_sys_open+0x10c/0x1c0
+> > <6>[  442.701835] [<ffffffc0002f9458>] SyS_openat+0xc/0x18
+> > In __clear_close_on_exec(fd, fdt);
+> >
+> >
+> >
+> > <6>[  442.695354] [<ffffffc00021d084>] warn_slowpath_fmt+0x4c/0x58
+> > <6>[  442.695359] [<ffffffc0002461a8>] __clear_bit+0x98/0xa4
+> > <6>[  442.695367] [<ffffffc000312340>] dup_fd+0x1d4/0x280
+> > <6>[  442.695375] [<ffffffc00021b07c>] copy_process.part.56+0x42c/0xe38
+> > <6>[  442.695382] [<ffffffc00021bb9c>] do_fork+0xe0/0x360
+> > <6>[  442.695389] [<ffffffc00021beb4>] SyS_clone+0x10/0x1c
+> > In __clear_open_fd(open_files - i, new_fdt);
+> >
+> > Do we need test_bit() before clear_bit()at these 2 place?
 > 
-> This applies on top of the patch Julien is cooking up to move the
-> call to xen_guest_init() to an earlier boot stage. This needs to
-> be at least before the call to console_init() in start_kernel()
-> for this patch to do anything meaningful.
-
-This patch looks good but there isn't much point in queuing this up
-without the prerequisite.
-
-Julien, what patch exactly is that? What is the status of it?
-
-
->  arch/arm/xen/enlighten.c | 4 ++++
->  1 file changed, 4 insertions(+)
+> I don't know.  I was happily typing in this:
 > 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index c7ca936ebd99..61382cafa877 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -24,6 +24,7 @@
->  #include <linux/cpuidle.h>
->  #include <linux/cpufreq.h>
->  #include <linux/cpu.h>
-> +#include <linux/console.h>
->  
->  #include <linux/mm.h>
->  
-> @@ -322,6 +323,9 @@ static int __init xen_guest_init(void)
->  
->  	register_cpu_notifier(&xen_cpu_notifier);
->  
-> +	if (!console_set_on_cmdline)
-> +		add_preferred_console("hvc", 0, NULL);
+> diff -puN include/linux/bitops.h~a include/linux/bitops.h
+> --- a/include/linux/bitops.h~a
+> +++ a/include/linux/bitops.h
+> @@ -226,5 +226,37 @@ extern unsigned long find_last_bit(const
+>  				   unsigned long size);
+>  #endif
+> 
+> +/**
+> + * __set_clear_bit - non-atomically set a bit if it is presently clear
+> + * @nr: The bit number
+> + * @addr: The base address of the operation
+> + *
+> + * __set_clear_bit() and similar functions avoid unnecessarily dirtying a
+> + * cacheline when the operation will have no effect.
+> + */
+> +static inline void __set_clear_bit(unsigned nr, volatile unsigned long
+> *addr)
+> +{
+> +	if (!test_bit(nr, addr))
+> +		__set_bit(nr, addr);
+> +}
 > +
->  	return 0;
->  }
->  early_initcall(xen_guest_init);
-> -- 
-> 1.8.3.2
+> +static inline void __clear_set_bit(unsigned nr, volatile unsigned long
+> *addr)
+> +{
+> +	if (test_bit(nr, addr))
+> +		__clear_bit(nr, addr);
+> +}
+> +
+> +static inline void set_clear_bit(unsigned nr, volatile unsigned long
+> *addr)
+> +{
+> +	if (!test_bit(nr, addr))
+> +		set_bit(nr, addr);
+> +}
+> +
+> +static inline void clear_set_bit(unsigned nr, volatile unsigned long
+> *addr)
+> +{
+> +	if (test_bit(nr, addr))
+> +		clear_bit(nr, addr);
+> +}
+> +
+>  #endif /* __KERNEL__ */
+>  #endif
 > 
+> (maybe __set_bit_if_clear would be a better name)
+> 
+> But I don't know if it will do anything useful.  The CPU *should* be
+> able to avoid dirtying the cacheline on its own: it has all the info it
+> needs to know that no writeback will be needed.  But I don't know which
+> (if any) CPUs perform this optimisation.
+I will send a new patch for your review .
+
+Thanks
