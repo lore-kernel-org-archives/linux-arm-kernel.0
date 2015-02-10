@@ -1,90 +1,24 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 10 Feb 2015 17:31:36 +0800
-Subject: [PATCH v5 4/4] media: ov2640: dt: add the device tree binding document
-In-Reply-To: <1423560696-12304-1-git-send-email-josh.wu@atmel.com>
-References: <1423560696-12304-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1423560696-12304-5-git-send-email-josh.wu@atmel.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 10 Feb 2015 10:32:17 +0100
+Subject: [PATCH 03/16] tty: serial: 8250_core: read only RX if there is
+ something in the FIFO
+In-Reply-To: <54D9441B.7070403@hurleysoftware.com>
+References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
+ <1410377411-26656-4-git-send-email-bigeasy@linutronix.de>
+ <54D8B772.1010405@freebox.fr> <54D9441B.7070403@hurleysoftware.com>
+Message-ID: <54D9D021.6000409@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the document for ov2640 dt.
+On 02/10/2015 12:34 AM, Peter Hurley wrote:
+> The "too much work" message means serial8250_handle_irq() is returning 0,
+> ie., not handled. Which in turn means IIR indicates no interrupt is pending
+> (UART_IIR_NO_INT == 1).
 
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
+The OMAP UART for instance have two possible TX-IRQ handling. The
+default is to fire the interrupt once there is room for at least one
+byte in the FIFO. I set the OMAP_UART_SCR_TX_EMPTY bit to get the same
+behavior as the 8250 driver expects (interrupt while the FIFO is empty).
+Without this bit set I've seen the message from time to time.
 
-Changes in v5: None
-Changes in v4:
-- remove aggsigned-clocks as it's general.
-- refine the explation.
-
-Changes in v3:
-- fix incorrect description.
-- Add assigned-clocks & assigned-clock-rates.
-- resetb pin should be ACTIVE_LOW.
-
-Changes in v2:
-- change the compatible string to be consistent with verdor file.
-- change the clock and pins' name.
-- add missed pinctrl in example.
-
- .../devicetree/bindings/media/i2c/ov2640.txt       | 46 ++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
-
-diff --git a/Documentation/devicetree/bindings/media/i2c/ov2640.txt b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
-new file mode 100644
-index 0000000..c429b5b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
-@@ -0,0 +1,46 @@
-+* Omnivision OV2640 CMOS sensor
-+
-+The Omnivision OV2640 sensor support multiple resolutions output, such as
-+CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
-+output format.
-+
-+Required Properties:
-+- compatible: should be "ovti,ov2640"
-+- clocks: reference to the xvclk input clock.
-+- clock-names: should be "xvclk".
-+
-+Optional Properties:
-+- resetb-gpios: reference to the GPIO connected to the resetb pin, if any.
-+- pwdn-gpios: reference to the GPIO connected to the pwdn pin, if any.
-+
-+The device node must contain one 'port' child node for its digital output
-+video port, in accordance with the video interface bindings defined in
-+Documentation/devicetree/bindings/media/video-interfaces.txt.
-+
-+Example:
-+
-+	i2c1: i2c at f0018000 {
-+		ov2640: camera at 0x30 {
-+			compatible = "ovti,ov2640";
-+			reg = <0x30>;
-+
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_pck1 &pinctrl_ov2640_pwdn &pinctrl_ov2640_resetb>;
-+
-+			resetb-gpios = <&pioE 24 GPIO_ACTIVE_LOW>;
-+			pwdn-gpios = <&pioE 29 GPIO_ACTIVE_HIGH>;
-+
-+			clocks = <&pck1>;
-+			clock-names = "xvclk";
-+
-+			assigned-clocks = <&pck1>;
-+			assigned-clock-rates = <25000000>;
-+
-+			port {
-+				ov2640_0: endpoint {
-+					remote-endpoint = <&isi_0>;
-+					bus-width = <8>;
-+				};
-+			};
-+		};
-+	};
--- 
-1.9.1
+Sebastian
