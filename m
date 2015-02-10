@@ -1,54 +1,58 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 10 Feb 2015 11:00:53 +0100
-Subject: [PATCH] ARM: mm: Remove Kconfig symbol CACHE_PL310
-Message-ID: <1423562453.5346.18.camel@x220>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 10 Feb 2015 12:10:44 +0200
+Subject: [PATCH v3 2/2] remoteproc: add support to handle internal memories
+In-Reply-To: <1420838519-15669-3-git-send-email-s-anna@ti.com>
+References: <1420838519-15669-1-git-send-email-s-anna@ti.com>
+ <1420838519-15669-3-git-send-email-s-anna@ti.com>
+Message-ID: <CAK=WgbaFoUpV315Tg1q=PGc-FkCvKBz2BmO8Fkj_FHa5UuWviw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 20e783e39e55 ("ARM: 8296/1: cache-l2x0: clean up aurora cache
-handling") removed the only user of the Kconfig symbol CACHE_PL310.
-Setting CACHE_PL310 is now pointless. Remove its Kconfig entry, and one
-select of this symbol.
+Hi Suman,
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Please note that the commit hash is valid for next-20150209. So if the
-tree that this commit is coming from will be rebased, or similar, it
-shouldn't be used.
+On Fri, Jan 9, 2015 at 11:21 PM, Suman Anna <s-anna@ti.com> wrote:
+> A remote processor may need to load certain firmware sections into
+> internal memories (eg: RAM at L1 or L2 levels) for performance or
+> other reasons. Introduce a new resource type (RSC_INTMEM) and add
+> an associated handler function to handle such memories. The handler
+> creates a kernel mapping for the resource's 'pa' (physical address).
+...
+> + * rproc_handle_intmem() - handle internal memory resource entry
+> + * @rproc: rproc handle
+> + * @rsc: the intmem resource entry
+> + * @offset: offset of the resource data in resource table
+> + * @avail: size of available data (for image validation)
+> + *
+> + * This function will handle firmware requests for mapping a memory region
+> + * internal to a remote processor into kernel. It neither allocates any
+> + * physical pages, nor performs any iommu mapping, as this resource entry
+> + * is primarily used for representing physical internal memories. If the
+> + * internal memory region can only be accessed through an iommu, please
+> + * use a devmem resource entry.
+> + *
+> + * These resource entries should be grouped near the carveout entries in
+> + * the firmware's resource table, as other firmware entries might request
+> + * placing other data objects inside these memory regions (e.g. data/code
+> + * segments, trace resource entries, ...).
+> + */
+> +static int rproc_handle_intmem(struct rproc *rproc, struct fw_rsc_intmem *rsc,
+> +                              int offset, int avail)
+> +{
+...
+> +       va = (__force void *)ioremap_nocache(rsc->pa, rsc->len);
 
- arch/arm/mach-at91/Kconfig | 1 -
- arch/arm/mm/Kconfig        | 7 -------
- 2 files changed, 8 deletions(-)
+Back in the days when we developed remoteproc there was a tremendous
+effort to move away from ioremap when not strictly needed.
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index c6740e359a44..c74a44324e5b 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -64,7 +64,6 @@ config SOC_SAMA5D4
- 	select SOC_SAMA5
- 	select CLKSRC_MMIO
- 	select CACHE_L2X0
--	select CACHE_PL310
- 	select HAVE_FB_ATMEL
- 	select HAVE_AT91_UTMI
- 	select HAVE_AT91_SMD
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index c43c71455566..9b4f29e595a4 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -892,13 +892,6 @@ config CACHE_L2X0
- 
- if CACHE_L2X0
- 
--config CACHE_PL310
--	bool
--	default y if CPU_V7 && !(CPU_V6 || CPU_V6K)
--	help
--	  This option enables optimisations for the PL310 cache
--	  controller.
--
- config PL310_ERRATA_588369
- 	bool "PL310 errata: Clean & Invalidate maintenance operations do not invalidate clean lines"
- 	help
--- 
-1.9.3
+I'd be happy if someone intimate with the related hardware could ack
+that in this specific case ioremap is indeed needed. No need to review
+the entire patch, or anything remoteproc, just make sure that
+generally ioremap is how we want to access this internal memory.
+
+Tony or Kevin any chance you could take a look and ack?
+
+If ioremap is indeed the way to go, I'd also expect that we wouldn't
+have to use __force here, but that's probably a minor patch cleanup.
+
+Thanks,
+Ohad.
