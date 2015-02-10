@@ -1,24 +1,93 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 10 Feb 2015 10:32:17 +0100
-Subject: [PATCH 03/16] tty: serial: 8250_core: read only RX if there is
- something in the FIFO
-In-Reply-To: <54D9441B.7070403@hurleysoftware.com>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <1410377411-26656-4-git-send-email-bigeasy@linutronix.de>
- <54D8B772.1010405@freebox.fr> <54D9441B.7070403@hurleysoftware.com>
-Message-ID: <54D9D021.6000409@linutronix.de>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 10 Feb 2015 17:31:34 +0800
+Subject: [PATCH v5 2/4] media: ov2640: add async probe function
+In-Reply-To: <1423560696-12304-1-git-send-email-josh.wu@atmel.com>
+References: <1423560696-12304-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1423560696-12304-3-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2015 12:34 AM, Peter Hurley wrote:
-> The "too much work" message means serial8250_handle_irq() is returning 0,
-> ie., not handled. Which in turn means IIR indicates no interrupt is pending
-> (UART_IIR_NO_INT == 1).
+In async probe, there is a case that ov2640 is probed before the
+host device which provided 'mclk'.
+To support this async probe, we will get 'mclk' at first in the probe(),
+if failed it will return -EPROBE_DEFER. That will let ov2640 wait for
+the host device probed.
 
-The OMAP UART for instance have two possible TX-IRQ handling. The
-default is to fire the interrupt once there is room for at least one
-byte in the FIFO. I set the OMAP_UART_SCR_TX_EMPTY bit to get the same
-behavior as the 8250 driver expects (interrupt while the FIFO is empty).
-Without this bit set I've seen the message from time to time.
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
 
-Sebastian
+Changes in v5:
+- don't change the ov2640_s_power() code.
+- will get 'mclk' at the beginning of ov2640_probe().
+
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
+
+ drivers/media/i2c/soc_camera/ov2640.c | 29 +++++++++++++++++++----------
+ 1 file changed, 19 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/media/i2c/soc_camera/ov2640.c b/drivers/media/i2c/soc_camera/ov2640.c
+index 1fdce2f..057dd49 100644
+--- a/drivers/media/i2c/soc_camera/ov2640.c
++++ b/drivers/media/i2c/soc_camera/ov2640.c
+@@ -1068,6 +1068,10 @@ static int ov2640_probe(struct i2c_client *client,
+ 		return -ENOMEM;
+ 	}
+ 
++	priv->clk = v4l2_clk_get(&client->dev, "mclk");
++	if (IS_ERR(priv->clk))
++		return -EPROBE_DEFER;
++
+ 	v4l2_i2c_subdev_init(&priv->subdev, client, &ov2640_subdev_ops);
+ 	v4l2_ctrl_handler_init(&priv->hdl, 2);
+ 	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
+@@ -1075,24 +1079,28 @@ static int ov2640_probe(struct i2c_client *client,
+ 	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
+ 			V4L2_CID_HFLIP, 0, 1, 1, 0);
+ 	priv->subdev.ctrl_handler = &priv->hdl;
+-	if (priv->hdl.error)
+-		return priv->hdl.error;
+-
+-	priv->clk = v4l2_clk_get(&client->dev, "mclk");
+-	if (IS_ERR(priv->clk)) {
+-		ret = PTR_ERR(priv->clk);
+-		goto eclkget;
++	if (priv->hdl.error) {
++		ret = priv->hdl.error;
++		goto err_clk;
+ 	}
+ 
+ 	ret = ov2640_video_probe(client);
+ 	if (ret) {
+-		v4l2_clk_put(priv->clk);
+-eclkget:
+-		v4l2_ctrl_handler_free(&priv->hdl);
++		goto err_videoprobe;
+ 	} else {
+ 		dev_info(&adapter->dev, "OV2640 Probed\n");
+ 	}
+ 
++	ret = v4l2_async_register_subdev(&priv->subdev);
++	if (ret < 0)
++		goto err_videoprobe;
++
++	return 0;
++
++err_videoprobe:
++	v4l2_ctrl_handler_free(&priv->hdl);
++err_clk:
++	v4l2_clk_put(priv->clk);
+ 	return ret;
+ }
+ 
+@@ -1100,6 +1108,7 @@ static int ov2640_remove(struct i2c_client *client)
+ {
+ 	struct ov2640_priv       *priv = to_ov2640(client);
+ 
++	v4l2_async_unregister_subdev(&priv->subdev);
+ 	v4l2_clk_put(priv->clk);
+ 	v4l2_device_unregister_subdev(&priv->subdev);
+ 	v4l2_ctrl_handler_free(&priv->hdl);
+-- 
+1.9.1
