@@ -1,82 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Feb 2015 15:46:34 +0800
-Subject: [PATCH v4 02/10] mtd: st_spi_fsm: Fetch boot device locations
- from DT match tables
-In-Reply-To: <20150206042744.GK18140@ld-irv-0074>
-References: <1421853868-8262-1-git-send-email-lee.jones@linaro.org>
- <1421853868-8262-3-git-send-email-lee.jones@linaro.org>
- <20150206042744.GK18140@ld-irv-0074>
-Message-ID: <20150210074634.GD8020@x1>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Tue, 10 Feb 2015 15:50:22 +0800
+Subject: [PATCH v3 0/5] add usb support for hi6220
+Message-ID: <1423554627-694-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 05 Feb 2015, Brian Norris wrote:
+v3:
+fix typo and add -EPROBE_DEFER of regulator, pointed by Peter
 
-> On Wed, Jan 21, 2015 at 03:24:20PM +0000, Lee Jones wrote:
-> > To trim down on the amount of properties used by this driver and to conform
-> > to the newly agreed method of acquiring syscfg registers/offsets, we now
-> > obtain this information using match tables.
-> 
-> Where did this agreement happen? Are you only referring to the previous
-> patch?
+v2:
+address comments from Sergei and Peter
+add hi6220_phy_setup(false) code
 
-I think your interpretation of the above text and my intentions are
-not the same.  I have no idea why there is a different configuration
-depending on if we booted from SPI NOR or not and hence can not answer
-your query below.  The description above is pertaining to the
-different/new way in which we obtain and request syscfg registers.
+v1:
+hi6220 usb controller is inherited from dwc2
+add phy accordingly
+support otg gadget/host
 
-In previous incarnations of this patchset, we were defining new vendor
-specific properties in order to request and register and the mask:
 
-  st,boot-device-reg = <0x958>;
-  st,boot-device-spi = <0x1a>;
+Zhangfei Gao (5):
+  Documentation: dt-bindings: add dt binding info for hi6220 dwc2
+  Documentation: dt-bindings: add dt binding info for hi6220
+  usb: dwc2: platform: add hi6220 support
+  usb: phy: load usb phy earlier
+  usb: phy: add phy-hi6220-usb
 
-... this is not optimal, as DT properties should only be created if
-there are no other way to obtain platform specific information.  As
-there are few supported platforms and this configuration does not
-change through variants, we are now supplying it via static tables,
-which can be obtained easily using the DT match framework.
-
-> I think I asked this previously, and I didn't get an answer.
-
-Not sure if you did or not to be honest.
-
-> Also, I realized that all this boot device / syscfg gymnastics is just
-> for one simple fact; your driver is trying to hide the fact that your
-> system can't reliably handle 4-byte addressing for the boot device. Even
-> if you try your best at toggling 4-byte addressing before/after each
-> read/write/erase, you still are vulnerable to power cuts during the
-> operation. This is a bad design, and we have consistently agreed that we
-> aren't going to work around that in Linux.
-> 
-> Better solutions: hook up a reset line to your flash; improve your boot
-> ROM / bootloader to handle 4-byte addressing for large flash.
-
-You have reached the boundaries of my knowledge on this.  Perhaps
-Angus (BCC'ed) would be kind enough to assist.
-
-> What's the possibility of dropping all this 4-byte address toggling
-> shenanigans? This will be a blocker to merging with spi-nor.c.
-> 
-> > In the process we are deprecating the old generic compatible string and
-> > providing 3 shiny new ones for each of the support platforms.  The
-> > deprecated compatible string will be removed in due course.
-> 
-> Aren't you already removing the compatible string? (You changed this in
-> the latest revision.)
-
-You're right.  I need to remove this line from the commit log.
-
-> > Cc: devicetree at vger.kernel.org
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> [snip]
-> 
-> Brian
+ Documentation/devicetree/bindings/usb/dwc2.txt     |   1 +
+ .../devicetree/bindings/usb/hi6220-usb.txt         |  49 ++++
+ drivers/usb/Makefile                               |   2 +-
+ drivers/usb/dwc2/platform.c                        |  30 ++
+ drivers/usb/phy/Kconfig                            |   9 +
+ drivers/usb/phy/Makefile                           |   1 +
+ drivers/usb/phy/phy-hi6220-usb.c                   | 308 +++++++++++++++++++++
+ 7 files changed, 399 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/hi6220-usb.txt
+ create mode 100644 drivers/usb/phy/phy-hi6220-usb.c
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
