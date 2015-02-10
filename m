@@ -1,38 +1,62 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Tue, 10 Feb 2015 15:43:51 +0100
-Subject: [PATCH 1/2] drm: atmel-hlcdc: Add PM suspend/resume support
-In-Reply-To: <20150210150557.235fa139@bbrezillon>
-References: <1423575646-3273-1-git-send-email-sylvain.rochet@finsecur.com>
- <1423575646-3273-2-git-send-email-sylvain.rochet@finsecur.com>
- <20150210150557.235fa139@bbrezillon>
-Message-ID: <20150210144351.GA14171@gradator.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 10 Feb 2015 08:48:07 -0600
+Subject: [resend PATCH v3 4/4] usb: phy: add phy-hi6220-usb
+In-Reply-To: <1423559404-13058-5-git-send-email-zhangfei.gao@linaro.org>
+References: <1423559404-13058-1-git-send-email-zhangfei.gao@linaro.org>
+ <1423559404-13058-5-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20150210144807.GC16711@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Boris,
-
-On Tue, Feb 10, 2015 at 03:05:57PM +0100, Boris Brezillon wrote:
-> On Tue, 10 Feb 2015 14:40:45 +0100
-> Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
-> > +
-> > +static SIMPLE_DEV_PM_OPS(atmel_hlcdc_dc_drm_pm_ops,
-> > +		atmel_hlcdc_dc_drm_suspend, atmel_hlcdc_dc_drm_resume);
-> > +
+On Tue, Feb 10, 2015 at 05:10:04PM +0800, Zhangfei Gao wrote:
+> Add usb phy controller for hi6220 platform
 > 
-> Do we really need to register both SIMPLE_DEV_PM_OPS and drm_driver
-> suspend/resume functions.
-> I thought the suspend/resume callbacks were called by DRM core code
-> as part of the PM class specific operations.
-> However, exynos driver seems to do the same, so this might well be
-> required.
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> ---
+>  drivers/usb/phy/Kconfig          |   9 ++
+>  drivers/usb/phy/Makefile         |   1 +
+>  drivers/usb/phy/phy-hi6220-usb.c | 306 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 316 insertions(+)
+>  create mode 100644 drivers/usb/phy/phy-hi6220-usb.c
+> 
+> diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
+> index c6d0c8e..405a3d0 100644
+> --- a/drivers/usb/phy/Kconfig
+> +++ b/drivers/usb/phy/Kconfig
+> @@ -173,6 +173,15 @@ config USB_MXS_PHY
+>  
+>  	  MXS Phy is used by some of the i.MX SoCs, for example imx23/28/6x.
+>  
+> +config USB_HI6220_PHY
+> +	tristate "hi6220 USB PHY support"
+> +	select USB_PHY
+> +	select MFD_SYSCON
+> +	help
+> +	  Enable this to support the HISILICON HI6220 USB PHY.
+> +
+> +	  To compile this driver as a module, choose M here.
+> +
+>  config USB_RCAR_PHY
+>  	tristate "Renesas R-Car USB PHY support"
+>  	depends on USB || USB_GADGET
+> diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
+> index 75f2bba..00172d3 100644
+> --- a/drivers/usb/phy/Makefile
+> +++ b/drivers/usb/phy/Makefile
+> @@ -18,6 +18,7 @@ obj-$(CONFIG_SAMSUNG_USBPHY)		+= phy-samsung-usb.o
+>  obj-$(CONFIG_TWL6030_USB)		+= phy-twl6030-usb.o
+>  obj-$(CONFIG_USB_EHCI_TEGRA)		+= phy-tegra-usb.o
+>  obj-$(CONFIG_USB_GPIO_VBUS)		+= phy-gpio-vbus-usb.o
+> +obj-$(CONFIG_USB_HI6220_PHY)		+= phy-hi6220-usb.o
 
-Looks like we need, if I comment out SIMPLE_DEV_PM_OPS ops registration 
-we don't suspend or resume anymore. I guess drm_driver suspend/resume 
-functions are only used for PM runtime support, which we don't support 
-yet, at least we added the basic requirements to add PM runtime support 
-at some point in the future.
+new drivers only on drivers/phy/, sorry.
 
-Anyway, even without PM runtime support we need to suspend and resume 
-this device, other DRM drivers do this as well.
-
-Sylvain
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150210/f92cd345/attachment.sig>
