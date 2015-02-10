@@ -1,121 +1,54 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 10 Feb 2015 12:27:18 +0000
-Subject: [PATCH] compat: Fix endian issue in union sigval
-In-Reply-To: <1423563011-12377-1-git-send-email-bamvor.zhangjian@huawei.com>
-References: <1423563011-12377-1-git-send-email-bamvor.zhangjian@huawei.com>
-Message-ID: <20150210122718.GC32052@e104818-lin.cambridge.arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 10 Feb 2015 13:30:38 +0100
+Subject: [PATCH 1/1] ARM: dts: Use more descriptive names for Exynos5420
+ PDs
+In-Reply-To: <54D9F7B1.3030106@cogentembedded.com>
+References: <1423244258-24314-1-git-send-email-javier.martinez@collabora.co.uk>
+ <54D51170.10903@cogentembedded.com> <54D52905.6040100@collabora.co.uk>
+ <CAJKOXPepTJYYs6gR6NLQzsJndeRLgF+KHRpH9qt9noUgRBs2Dw@mail.gmail.com>
+ <54D9F1A4.1000908@cogentembedded.com> <1423570670.6241.2.camel@AMDC1943>
+ <54D9F7B1.3030106@cogentembedded.com>
+Message-ID: <1423571438.6241.4.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cc'ing linux-arch as well.
-
-On Tue, Feb 10, 2015 at 10:10:11AM +0000, Zhang Jian(Bamvor) wrote:
-> In 64bit architecture, sigval_int is the high 32bit of sigval_ptr in
-> big endian kernel compare with low 32bit of sigval_ptr in little
-> endian kernel. reference:
+On wto, 2015-02-10 at 15:21 +0300, Sergei Shtylyov wrote:
+> On 2/10/2015 3:17 PM, Krzysztof Kozlowski wrote:
 > 
->     typedef union sigval {
->         int sival_int;
->         void *sival_ptr;
->     } sigval_t;
+> >>> Additionally (on Arndale Octa):
 > 
-> During compat_mq_notify or compat_timer_create, kernel get sigval
-> from user space by reading sigval.sival_int. This is correct in 32 bit
-> kernel and in 64bit little endian kernel. And It is wrong in 64bit big
-> endian kernel:
-> It get the high 32bit of sigval_ptr and put it to low 32bit of
-> sigval_ptr. And the high 32bit sigval_ptr in empty in arm 32bit user
-> space struct. So, kernel lost the value of sigval_ptr.
+> >>> $ cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+> >>>       domain                      status         slaves
+> >>>              /device                                      runtime status
+> >>> ----------------------------------------------------------------------
+> >>> power-domain                    on
+> >>>       /devices/platform/amba/3880000.adma                 suspended
+> >>> power-domain                    off
+> >>> power-domain                    off
+> >>> power-domain                    off
+> >>> power-domain                    off
+> >>> power-domain                    off
 > 
-> The following patch get the sigval_ptr in stead of sigval_int in order
-> to avoid endian issue.
-> Test pass in arm64 big endian and little endian kernel.
+> >>> This really is not helpful. From the power domain debugfs code it is
+> >>> complicated to extract of_node of power domain.
 > 
-> Signed-off-by: Zhang Jian(Bamvor) <bamvor.zhangjian@huawei.com>
-> ---
->  ipc/compat_mq.c | 7 ++-----
->  kernel/compat.c | 6 ++----
->  2 files changed, 4 insertions(+), 9 deletions(-)
+> >>      You shouldn't need it.
 > 
-> diff --git a/ipc/compat_mq.c b/ipc/compat_mq.c
-> index ef6f91c..2e07343 100644
-> --- a/ipc/compat_mq.c
-> +++ b/ipc/compat_mq.c
-> @@ -99,11 +99,8 @@ COMPAT_SYSCALL_DEFINE2(mq_notify, mqd_t, mqdes,
->  	if (u_notification) {
->  		struct sigevent n;
->  		p = compat_alloc_user_space(sizeof(*p));
-> -		if (get_compat_sigevent(&n, u_notification))
-> -			return -EFAULT;
-> -		if (n.sigev_notify == SIGEV_THREAD)
-> -			n.sigev_value.sival_ptr = compat_ptr(n.sigev_value.sival_int);
-> -		if (copy_to_user(p, &n, sizeof(*p)))
-> +		if (get_compat_sigevent(&n, u_notification) ||
-> +		    copy_to_user(p, &n, sizeof(*p)))
->  			return -EFAULT;
+> >>> It is easier to print
+> >>> the name of power domain. But wait... all names are the same! :) So
+> >>> why do we have the name in the first place?
+> 
+> >>      I'm not sure why the full platform device names aren't printed -- they
+> >> should all be different.
+> 
+> > This debugfs code iterates over list of generic_pm_domains (gpd_list). I
+> > cannot find function for translating from genpd to its platform device
+> > so only genpd->name can be printed.
+> 
+>     Then why power domains aren't just named with the platform device names?
 
-The kernel doesn't need to interpret the sival_ptr value, it's something
-to be passed to the notifier function as an argument. For the user's
-convenience, it is a union of an int and ptr. So I think the original
-SIGEV_THREAD check and compat_ptr() conversion here is wrong, it
-shouldn't exist at all (it doesn't exist in compat_sys_timer_create
-either). This hunk looks fine to me.
+Right, the mach-exynos/pm_domains.c set the name equal to OF node name.
+I'll send a patch extending the name.
 
->  	}
->  	return sys_mq_notify(mqdes, p);
-> diff --git a/kernel/compat.c b/kernel/compat.c
-> index ebb3c36..13a0e5d 100644
-> --- a/kernel/compat.c
-> +++ b/kernel/compat.c
-> @@ -871,16 +871,14 @@ COMPAT_SYSCALL_DEFINE4(clock_nanosleep, clockid_t, which_clock, int, flags,
->   * We currently only need the following fields from the sigevent
->   * structure: sigev_value, sigev_signo, sig_notify and (sometimes
->   * sigev_notify_thread_id).  The others are handled in user mode.
-> - * We also assume that copying sigev_value.sival_int is sufficient
-> - * to keep all the bits of sigev_value.sival_ptr intact.
->   */
->  int get_compat_sigevent(struct sigevent *event,
->  		const struct compat_sigevent __user *u_event)
->  {
->  	memset(event, 0, sizeof(*event));
->  	return (!access_ok(VERIFY_READ, u_event, sizeof(*u_event)) ||
-> -		__get_user(event->sigev_value.sival_int,
-> -			&u_event->sigev_value.sival_int) ||
-> +		__get_user(*(long long*)event->sigev_value.sival_ptr,
-> +			&u_event->sigev_value.sival_ptr) ||
-
-I don't think this is correct because some (most) architectures use
-sival_int here when copying to user and for a big endian compat they
-would get 0 for sival_int (mips, powerpc).
-
-I think the correct fix is in the arm64 code:
-
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index e299de396e9b..32601939a3c8 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -154,8 +154,7 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
- 	case __SI_TIMER:
- 		 err |= __put_user(from->si_tid, &to->si_tid);
- 		 err |= __put_user(from->si_overrun, &to->si_overrun);
--		 err |= __put_user((compat_uptr_t)(unsigned long)from->si_ptr,
--				   &to->si_ptr);
-+		 err |= __put_user(from->si_int, &to->si_int);
- 		break;
- 	case __SI_POLL:
- 		err |= __put_user(from->si_band, &to->si_band);
-@@ -184,7 +183,7 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
- 	case __SI_MESGQ: /* But this is */
- 		err |= __put_user(from->si_pid, &to->si_pid);
- 		err |= __put_user(from->si_uid, &to->si_uid);
--		err |= __put_user((compat_uptr_t)(unsigned long)from->si_ptr, &to->si_ptr);
-+		err |= __put_user(from->si_int, &to->si_int);
- 		break;
- 	case __SI_SYS:
- 		err |= __put_user((compat_uptr_t)(unsigned long)
-
-But we need to check other architectures that are capable of big endian
-and have a compat layer.
-
--- 
-Catalin
+Best regards,
+Krzysztof
