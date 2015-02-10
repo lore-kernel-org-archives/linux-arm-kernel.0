@@ -1,62 +1,89 @@
-From: dalias@libc.org (Rich Felker)
-Date: Tue, 10 Feb 2015 13:13:02 -0500
-Subject: [PATCHv3 00/24] ILP32 support in ARM64
-In-Reply-To: <20141002155217.GH32147@e104818-lin.cambridge.arm.com>
-Message-ID: <20150210181302.GA23886@brightrain.aerifal.cx>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 10 Feb 2015 10:33:59 -0800
+Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
+In-Reply-To: <20150210154157.GL8656@n2100.arm.linux.org.uk>
+References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
+ <20150205105035.GL8656@n2100.arm.linux.org.uk>
+ <20150205142918.GA10634@linux.vnet.ibm.com>
+ <20150205161100.GQ8656@n2100.arm.linux.org.uk>
+ <54D95DB8.9010308@codeaurora.org>
+ <20150210154157.GL8656@n2100.arm.linux.org.uk>
+Message-ID: <54DA4F17.2040705@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2 Oct 2014 at 16:52:18 +0100, Catalin Marinas wrote:
-> On Wed, Sep 03, 2014 at 10:18:54PM +0100, Andrew Pinski wrote:
-> > New version with all of the requested changes.  Updated to the
-> > latest sources.
-> > 
-> > Notable changes from the previous versions:
-> > VDSO code has been factored out to be easier to understand and
-> > easier to maintain.
-> > Move the config option to the last thing that gets added.
-> > Added some extra COMPAT_* macros for core dumping for easier usage.
-> 
-> Apart from a few comments I've made, I would also like to see non-empty
-> commit logs and long line wrapping (both in commit logs and
-> Documentation/). Otherwise, the patches look fine.
-> 
-> So what are the next steps? Are the glibc folk ok with the ILP32 Linux
-> ABI? On the kernel side, what I would like to see:
+On 02/10/15 07:41, Russell King - ARM Linux wrote:
+> On Mon, Feb 09, 2015 at 05:24:08PM -0800, Stephen Boyd wrote:
+>
+>
+>> Maybe we can do the same thing here by using a
+>> spinlock for synchronization between the IPI handler and the dying CPU?
+>> So lock/unlock around the IPI sending from the dying CPU and then do a
+>> lock/unlock on the killing CPU before continuing.
+> It would be nice, but it means exporting irq_controller_lock from irq_gic.c.
+> It's doable, but it's really not nice - it creates a layering issue, buy
+> making arch/arm/kernel/smp.c depend on symbols exported from
+> drivers/irqchip/irq-gic.c.
 
-I don't know if this has been discussed on libc-alpha yet or not, but
-I think we need to open a discussion of how it relates to open glibc
-bug #16437, which presently applies only to x32 (ILP32 ABI on x86_64):
+I wasn't talking about the irq_controller_lock. I was saying we should
+add another spinlock for synchronization purposes in arm/kernel/smp.c
 
-https://sourceware.org/bugzilla/show_bug.cgi?id=16437
+---8<----
 
-While most of the other type changes proposed (I'm looking at
-https://lkml.org/lkml/2014/9/3/719) are permissible and simply
-ugly/undesirable, defining struct timespec with tv_nsec having any
-type other than long conflicts with the requirements of C11 and POSIX,
-and WG14 is unlikely to be interested in changing the C language
-because the Linux kernel has the wrong type in timespec.
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 02c5da16c7ed..fe0386c751b2 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -225,6 +225,7 @@ int __cpu_disable(void)
+ }
+ 
+ static DECLARE_COMPLETION(cpu_died);
++static DEFINE_RAW_SPINLOCK(stop_lock);
+ 
+ /*
+  * called on the thread which is asking for a CPU to be shutdown -
+@@ -232,10 +233,13 @@ static DECLARE_COMPLETION(cpu_died);
+  */
+ void __cpu_die(unsigned int cpu)
+ {
++	unsigned long flags;
+ 	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
+ 		pr_err("CPU%u: cpu didn't die\n", cpu);
+ 		return;
+ 	}
++	raw_spin_lock_irqsave(&stop_lock, flags);
++	raw_spin_unlock_irqrestore(&stop_lock, flags);
+ 	pr_notice("CPU%u: shutdown\n", cpu);
+ 
+ 	/*
+@@ -280,7 +284,17 @@ void __ref cpu_die(void)
+ 	 * has been sent, power and/or clocks can be removed at any point
+ 	 * from this CPU and its cache by platform_cpu_kill().
+ 	 */
++	raw_spin_lock(&stop_lock);
+ 	__smp_cross_call(cpumask_of(cpumask_any(cpu_online_mask)), IPI_CPU_DEAD);
++	raw_spin_unlock(&stop_lock);
++
++	/*
++	 * Ensure that the cache lines associated with the stop_lock are
++	 * written out.  This covers the case where _this_ CPU is doing the
++	 * powering down, to ensure that the lock is visible to the
++	 * CPU waiting for this one.
++	 */
++	flush_cache_louis();
+ 
+ 	/*
+ 	 * The actual CPU shutdown procedure is@least platform (if not
+@@ -517,8 +531,6 @@ void tick_broadcast(const struct cpumask *mask)
+ }
+ #endif
+ 
+-static DEFINE_RAW_SPINLOCK(stop_lock);
+-
+ /*
+  * ipi_cpu_stop - handle IPI from smp_send_stop()
+  */
 
-Note that on aarch64 ILP32, the consequences of not fixing this right
-away will be much worse than on x32, since aarch64 (at least as I
-understand it) supports big endian where it's not just a matter of
-sign-extending the value from userspace and ignoring the padding, but
-rather changing the offset of the tv_nsec member.
-
-Working around the discrepencies in userspace IS possible, but ugly.
-We do it in musl libc for x32 right now -- see:
-
-http://git.musl-libc.org/cgit/musl/tree/arch/x32/syscall_arch.h?id=v1.1.6
-http://git.musl-libc.org/cgit/musl/tree/arch/x32/src/syscall_cp_fixup.c?id=v1.1.6
-
-I imagine the workarounds in glibc might need to be considerably more
-widespread and uglier.
-
-Whatever happens on the kernel side, this needs to be coordinated with
-userspace (glibc, etc.) properly so that the type error (glibc bug
-16437) is not propagated into a new target that we actually want
-people to use. I'd really like it if other undesirable type changes
-could be cleaned up too, but perhaps that's too much to ask from the
-kernel side.
-
-Rich
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
