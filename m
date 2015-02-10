@@ -1,50 +1,45 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 10 Feb 2015 23:07:51 +0100
-Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
- registers
-In-Reply-To: <CAOMZO5CYHKCUXyCGzuRaYt_o=ucSmZBwsc8mF84HqaA-+QX15g@mail.gmail.com>
-References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
- <462270270.419156.1423603473431.JavaMail.open-xchange@oxbaltgw02.schlund.de>
- <CAOMZO5CYHKCUXyCGzuRaYt_o=ucSmZBwsc8mF84HqaA-+QX15g@mail.gmail.com>
-Message-ID: <201502102307.51740.marex@denx.de>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 10 Feb 2015 14:11:05 -0800
+Subject: [PATCHv6 2/2] INPUT: Introduce generic trigger/LED pairs to
+ input LEDs
+In-Reply-To: <20150123122814.GB18514@type.bordeaux.inria.fr>
+References: <20150123122814.GB18514@type.bordeaux.inria.fr>
+Message-ID: <20150210221105.GC26472@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, February 10, 2015 at 10:54:52 PM, Fabio Estevam wrote:
-> Hi Stefan,
-> 
-> On Tue, Feb 10, 2015 at 7:24 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> > thanks this is very helpful. I built the linux-next for my Duckbill and
-> > add the SSP2 section from imx28-evk.dts into imx28-duckbill.dts.
-> > 
-> > Without my patch i get the following for HW_CLKCTRL_FRAC0:
-> > 
-> > ./memwatch -a 0x800401B0
-> > 
-> > 0x800401b0: 0x5e5b5513
-> > 
-> > With my patch i get:
-> > 
-> > ./memwatch -a 0x800401B0
-> > 
-> > 0x800401b0: 0x5e1b5513
-> > 
-> > So it looks like a problem in my patch.
-> 
-> Yes, let's try to get the same value HW_CLKCTRL_FRAC0.
-> 
-> > I orded such a flash chip, but it will take some time until i can use it
-> > with my hardware.
-> 
-> Thanks for doing this.
-> 
-> Maybe if you find out a way to fix the calculation of
-> HW_CLKCTRL_FRAC0, then I can test it on my board.
+Hi Samuel,
 
-Hi,
+On Fri, Jan 23, 2015 at 01:28:14PM +0100, Samuel Thibault wrote:
+> This permits to reassign input LEDs to something else than keyboard "leds"
+> state, by adding a trigger and a led for each input leds, the former being
+> triggered by EV_LED events, and the latter being by default triggered by the
+> former. The user can then make the LED use another trigger, including other LED
+> triggers of the same keyboard.
+> 
+> The hardware LEDs are now not actioned from the EV_LED event any more, but from
+> the per-device LED layer.
+> 
+> [ebroder at mokafive.com: Rebased to 3.2-rc1 or so, cleaned up some includes, and fixed some constants]
+> [akpm at linux-foundation.org: remove unneeded `extern', fix comment layout]
+> Signed-off-by: Samuel Thibault <samuel.thibault@ens-lyon.org>
+> Signed-off-by: Evan Broder <evan@ebroder.net>
+> Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
+> Signed-off-by: John Crispin <blogic@openwrt.org>
+> Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+> ---
+> Changed in this version:
+> - use drvdata instead of platform_data
+> - dropped CONFIG_INPUT_LEDS option
+> - compacted leds and triggers array allocation
+> - handle registration failure
 
-the difference is this 0x40 bit, right ? That's _STABLE bit, so it means
-the clock are not stable, right ? Why would that happen in the first place?
+This did not make the first batch, but I will try to get it into the
+2nd.
 
-Best regards,
-Marek Vasut
+Pavel, have you tried this version?
+
+Thanks!
+ 
+-- 
+Dmitry
