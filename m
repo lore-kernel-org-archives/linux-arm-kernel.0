@@ -1,129 +1,254 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 10 Feb 2015 12:48:18 -0800
-Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
-In-Reply-To: <20150210151416.GD9432@leverpostej>
-References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
- <20150205105035.GL8656@n2100.arm.linux.org.uk>
- <20150205142918.GA10634@linux.vnet.ibm.com>
- <20150205161100.GQ8656@n2100.arm.linux.org.uk>
- <54D95DB8.9010308@codeaurora.org> <20150210151416.GD9432@leverpostej>
-Message-ID: <54DA6E92.3090109@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 10 Feb 2015 20:48:36 +0000
+Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
+ demuxer chip
+In-Reply-To: <20150210165201.634bc04b@bbrezillon>
+References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1422527620-8308-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20150210153628.GF9432@leverpostej>
+ <20150210165201.634bc04b@bbrezillon>
+Message-ID: <20150210204835.GL9432@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/15 07:14, Mark Rutland wrote:
-> On Tue, Feb 10, 2015 at 01:24:08AM +0000, Stephen Boyd wrote:
->> On 02/05/15 08:11, Russell King - ARM Linux wrote:
->>> On Thu, Feb 05, 2015 at 06:29:18AM -0800, Paul E. McKenney wrote:
->>>> Works for me, assuming no hidden uses of RCU in the IPI code.  ;-)
->>> Sigh... I kind'a new it wouldn't be this simple.  The gic code which
->>> actually raises the IPI takes a raw spinlock, so it's not going to be
->>> this simple - there's a small theoretical window where we have taken
->>> this lock, written the register to send the IPI, and then dropped the
->>> lock - the update to the lock to release it could get lost if the
->>> CPU power is quickly cut at that point.
->> Hm.. at first glance it would seem like a similar problem exists with
->> the completion variable. But it seems that we rely on the call to
->> complete() fom the dying CPU to synchronize with wait_for_completion()
->> on the killing CPU via the completion's wait.lock.
->>
->> void complete(struct completion *x)
->> {
->>         unsigned long flags;
->>
->>         spin_lock_irqsave(&x->wait.lock, flags);
->>         x->done++;
->>         __wake_up_locked(&x->wait, TASK_NORMAL, 1);
->>         spin_unlock_irqrestore(&x->wait.lock, flags);
->> }
->>
->> and
->>
->> static inline long __sched
->> do_wait_for_common(struct completion *x,
->>                   long (*action)(long), long timeout, int state)
->>                         ...
->> 			spin_unlock_irq(&x->wait.lock);
->> 			timeout = action(timeout);
->> 			spin_lock_irq(&x->wait.lock);
->>
->>
->> so the power can't really be cut until the killing CPU sees the lock
->> released either explicitly via the second cache flush in cpu_die() or
->> implicitly via hardware.
-> That sounds about right, though surely cache flush is irrelevant w.r.t.
-> publishing of the unlock? The dsb(ishst) in the unlock path will ensure
-> that the write is visibile prior to the second flush_cache_louis().
+On Tue, Feb 10, 2015 at 03:52:01PM +0000, Boris Brezillon wrote:
+> Hi Mark,
+> 
+> On Tue, 10 Feb 2015 15:36:28 +0000
+> Mark Rutland <mark.rutland@arm.com> wrote:
+> 
+> > Hi Boris,
+> > 
+> > On Thu, Jan 29, 2015 at 10:33:38AM +0000, Boris Brezillon wrote:
+> > > Add documentation for the virtual irq demuxer.
+> > > 
+> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > ---
+> > >  .../bindings/interrupt-controller/dumb-demux.txt   | 41 ++++++++++++++++++++++
+> > >  1 file changed, 41 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+> > > new file mode 100644
+> > > index 0000000..b9a7830
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+> > > @@ -0,0 +1,41 @@
+> > > +* Virtual Interrupt Demultiplexer
+> > > +
+> > > +This virtual demultiplexer simply forward all incoming interrupts to its
+> > > +enabled/unmasked children.
+> > > +It is only intended to be used by hardware that do not provide a proper way
+> > > +to demultiplex a source interrupt, and thus have to wake all their children
+> > > +up so that they can possibly handle the interrupt (if needed).
+> > > +This can be seen as an alternative to shared interrupts when at least one
+> > > +of the interrupt children is a timer (and require the irq to stay enabled
+> > > +on suspend) while others are not. This will prevent calling irq handlers of
+> > > +non timer devices while they are suspended.
+> > 
+> > This sounds like a DT-workaround for a Linux implementation problem, and
+> > I don't think this the right way to solve your problem.
+> 
+> I understand your concern, but why are you answering while I asked for
+> DT maintainers reviews for several days (if not several weeks).
+> 
+> > 
+> > Why does this have to be in DT at all? Why can we not fix the core to
+> > handle these details?
+> 
+> We already discussed that with Rob and Thomas, and hiding such a
+> demuxer chip is not an easy task.
+> I'm open to any suggestion to do that, though I'd like you (I mean DT
+> guys) to provide a working implementation (or at least a viable concept)
+> that would silently demultiplex an irq.
+> 
+> > 
+> > I am very much not keen on this binding.
+> 
+> Yes, but do you have anything else to propose.
+> We're experiencing this warning for 2 releases now, and this is time to
+> find a solution (even if it's not a perfect one).
 
-Ah right. I was incorrectly thinking that the CPU had already disabled
-coherency at this point.
+Thoughts on the patch below?
 
->
-> That said, we _do_ need to flush the cache prior to the CPU being
-> killed, or we can lose any (shared) dirty cache lines the CPU owns. In
-> the presence of dirty cacheline migration we need to be sure the CPU to
-> be killed doesn't acquire any lines prior to being killed (i.e. its
-> caches need to be off and flushed). Given that I don't think it's
-> feasible to perform an IPI.
+Rather than handling this at the desc level it adds an extra flag to the
+irqaction which can be set/unset during suspend for those irqs we don't
+want to handle. That way we don't need to tell the core about the
+mismatch explicitly in DT (or ACPI/board files/whatever).
 
-The IPI/completion sounds nice because it allows the killing CPU to
-schedule and do other work until the dying CPU notifies that it's almost
-dead.
+If we can request/free interrupts during suspend then there's some logic
+missing, but it shows the basic idea.
 
->
-> I think we need to move the synchronisation down into the
-> cpu_ops::{cpu_die,cpu_kill} implementations, so that we can have the
-> dying CPU signal readiness after it has disabled and flushed its caches.
->
-> If the CPU can kill itself and we can query the state of the CPU, then
-> the dying CPU needs to do nothing, and cpu_kill can just poll until it
-> is dead. If the CPU needs to be killed from another CPU, it can update a
-> (cacheline-padded) percpu variable that cpu_kill can poll (cleaning
-> before each read).
+I didn't have a system to hand with shared mismatched IRQF_NO_SUSPEND
+interrupts, so I had to fake that up in code for testing.
 
-How about a hybrid approach where we send the IPI from generic cpu_die()
-and then do the cacheline-padded bit poll + invalidate and bit set? That
-way we get the benefit of not doing that poll until we really need to
-and if we need to do it at all.
+Thanks,
+Mark.
 
-cpu_kill | cpu_die | IPI | bit poll 
----------+---------+-----+----------
-    Y    |    Y    |  Y  |   N
-    N    |    Y    |  Y  |   Y
-    Y    |    N    |  ?  |   ?    <-- Is this a valid configuration?
-    N    |    N    |  N  |   N    <-- Hotplug should be disabled
+---->8----
+>From f390ccbb31f06efee49b4469943c8d85d963bfb5 Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Tue, 10 Feb 2015 20:14:33 +0000
+Subject: [PATCH] genirq: allow mixed IRQF_NO_SUSPEND requests
 
+In some cases a physical IRQ line may be shared between devices from
+which we expect interrupts during suspend (e.g. timers) and those we do
+not (e.g. anything we cut the power to). Where a driver did not request
+the interrupt with IRQF_NO_SUSPEND, it's unlikely that it can handle
+being called during suspend, and it may bring down the system.
 
-If the hardware doesn't have a synchronization method in row 1 we can
-expose the bit polling functionality to the ops so that they can set and
-poll the bit. It looks like rockchip would need this because we just
-pull the power in cpu_kill without any synchronization. Unfortunately
-this is starting to sound like a fairly large patch to backport.
+This patch adds logic to automatically mark the irqactions for these
+potentially unsafe handlers as disabled during suspend, leaving actions
+with IRQF_NO_SUSPEND enabled. If an interrupt is raised on a shared line
+during suspend, only the handlers requested with IRQF_NO_SUSPEND will be
+called. The handlers requested without IRQF_NO_SUSPEND will be skipped
+as if they had immediately returned IRQF_NONE.
 
-Aside: For that last row we really should be setting cpu->hotpluggable
-in struct cpu based on what cpu_ops::cpu_disable returns (from what I
-can tell we use that op to indicate if a CPU can be hotplugged).
+Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+---
+ include/linux/interrupt.h |  4 ++++
+ kernel/irq/handle.c       | 13 +++++++++++-
+ kernel/irq/pm.c           | 50 +++++++++++++++++++++++++++++++++++++++++++----
+ 3 files changed, 62 insertions(+), 5 deletions(-)
 
-Double Aside: It seems that exynos has a bug with coherency.
-exynos_cpu_die() calls v7_exit_coherency_flush() and then calls
-exynos_cpu_power_down() which may call of_machine_is_compatible() and
-that function will grab and release a kref which uses ldrex/strex for
-atomics after we've disabled coherency in v7_exit_coherency_flush().
-
->> Maybe we can do the same thing here by using a
->> spinlock for synchronization between the IPI handler and the dying CPU?
->> So lock/unlock around the IPI sending from the dying CPU and then do a
->> lock/unlock on the killing CPU before continuing.
->>
->> It would be nice if we didn't have to do anything at all though so
->> perhaps we can make it a nop on configs where there isn't a big little
->> switcher. Yeah it's some ugly coupling between these two pieces of code,
->> but I'm not sure how we can do better.
-> I'm missing something here. What does the switcher have to do with this?
-
-The switcher is the reason we have a spinlock in gic_raise_softirq().
-That's the problem that Russell was mentioning.
-
+diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+index d9b05b5..49dcb35 100644
+--- a/include/linux/interrupt.h
++++ b/include/linux/interrupt.h
+@@ -57,6 +57,9 @@
+  * IRQF_NO_THREAD - Interrupt cannot be threaded
+  * IRQF_EARLY_RESUME - Resume IRQ early during syscore instead of at device
+  *                resume time.
++ * IRQF_NO_ACTION - This irqaction should not be triggered.
++ *                  Used during suspend for !IRQF_NO_SUSPEND irqactions which
++ *                  share lines with IRQF_NO_SUSPEND irqactions.
+  */
+ #define IRQF_DISABLED		0x00000020
+ #define IRQF_SHARED		0x00000080
+@@ -70,6 +73,7 @@
+ #define IRQF_FORCE_RESUME	0x00008000
+ #define IRQF_NO_THREAD		0x00010000
+ #define IRQF_EARLY_RESUME	0x00020000
++#define IRQF_NO_ACTION		0x00040000
+ 
+ #define IRQF_TIMER		(__IRQF_TIMER | IRQF_NO_SUSPEND | IRQF_NO_THREAD)
+ 
+diff --git a/kernel/irq/handle.c b/kernel/irq/handle.c
+index 6354802..44c8662 100644
+--- a/kernel/irq/handle.c
++++ b/kernel/irq/handle.c
+@@ -130,6 +130,17 @@ void __irq_wake_thread(struct irq_desc *desc, struct irqaction *action)
+ 	wake_up_process(action->thread);
+ }
+ 
++static irqreturn_t __handle_irq_event_percpu(unsigned int irq, struct irqaction *action)
++{
++	/*
++	 * During suspend we must not call potentially unsafe irq handlers.
++	 * See suspend_suspendable_actions.
++	 */
++	if (unlikely(action->flags & IRQF_NO_ACTION))
++		return IRQ_NONE;
++	return action->handler(irq, action->dev_id);
++}
++
+ irqreturn_t
+ handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
+ {
+@@ -140,7 +151,7 @@ handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
+ 		irqreturn_t res;
+ 
+ 		trace_irq_handler_entry(irq, action);
+-		res = action->handler(irq, action->dev_id);
++		res = __handle_irq_event_percpu(irq, action);
+ 		trace_irq_handler_exit(irq, action, res);
+ 
+ 		if (WARN_ONCE(!irqs_disabled(),"irq %u handler %pF enabled interrupts\n",
+diff --git a/kernel/irq/pm.c b/kernel/irq/pm.c
+index 3ca5325..9d8a71f 100644
+--- a/kernel/irq/pm.c
++++ b/kernel/irq/pm.c
+@@ -43,9 +43,6 @@ void irq_pm_install_action(struct irq_desc *desc, struct irqaction *action)
+ 
+ 	if (action->flags & IRQF_NO_SUSPEND)
+ 		desc->no_suspend_depth++;
+-
+-	WARN_ON_ONCE(desc->no_suspend_depth &&
+-		     desc->no_suspend_depth != desc->nr_actions);
+ }
+ 
+ /*
+@@ -63,11 +60,54 @@ void irq_pm_remove_action(struct irq_desc *desc, struct irqaction *action)
+ 		desc->no_suspend_depth--;
+ }
+ 
++/*
++ * Physical IRQ lines may be shared between devices which may be expected to
++ * raise interrupts during suspend (e.g. timers) and those which may not (e.g.
++ * anything we cut the power to). If an action was requested without
++ * IRQF_NO_SUSPEND, then the handler probably can't handle being called during
++ * suspend, and may bring the system down.
++ *
++ * When going down for suspend, mark those potentially unsafe actions so they
++ * won't be called by handle_irq_event_percpu, as if we'd actually disabled the
++ * irq.
++ */
++static void suspend_suspendable_actions(struct irq_desc *desc)
++{
++	struct irqaction *action;
++
++	if (desc->nr_actions == desc->no_suspend_depth)
++		return;
++
++	for (action = desc->action; action; action = action->next)
++		if (!(action->flags & IRQF_NO_SUSPEND))
++			action->flags |= IRQF_NO_ACTION;
++}
++
++/*
++ * Reenable irqactions which were disabled during suspend. This undoes
++ * suspend_suspendable_actions.
++ */
++static void resume_suspendable_actions(struct irq_desc *desc)
++{
++	struct irqaction *action;
++
++	if (desc->nr_actions == desc->no_suspend_depth)
++		return;
++
++	for (action = desc->action; action; action = action->next)
++		action->flags &= ~IRQF_NO_ACTION;
++}
++
+ static bool suspend_device_irq(struct irq_desc *desc, int irq)
+ {
+-	if (!desc->action || desc->no_suspend_depth)
++	if (!desc->action)
+ 		return false;
+ 
++	if (desc->no_suspend_depth) {
++		suspend_suspendable_actions(desc);
++		return false;
++	}
++
+ 	if (irqd_is_wakeup_set(&desc->irq_data)) {
+ 		irqd_set(&desc->irq_data, IRQD_WAKEUP_ARMED);
+ 		/*
+@@ -135,6 +175,8 @@ static void resume_irq(struct irq_desc *desc, int irq)
+ 	if (desc->istate & IRQS_SUSPENDED)
+ 		goto resume;
+ 
++	resume_suspendable_actions(desc);
++
+ 	/* Force resume the interrupt? */
+ 	if (!desc->force_resume_depth)
+ 		return;
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
