@@ -1,77 +1,82 @@
-From: bamvor.zhangjian@huawei.com (Zhang Jian(Bamvor))
-Date: Tue, 10 Feb 2015 18:10:11 +0800
-Subject: [PATCH] compat: Fix endian issue in union sigval
-Message-ID: <1423563011-12377-1-git-send-email-bamvor.zhangjian@huawei.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 10 Feb 2015 02:17:32 -0800
+Subject: [GIT PULL] ARM: BCM5301X: DT changes for v3.20
+In-Reply-To: <54D99A62.6010508@gmail.com>
+References: <54BED7D7.80207@hauke-m.de> <20150123220111.GE20896@quad.lixom.net>
+ <54C48BA1.9080902@openwrt.org> <54D99A62.6010508@gmail.com>
+Message-ID: <CAOesGMjd3LLoRjFEii9Y1mpjmxqQX03F4P-CHugwK8XN3LqoQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In 64bit architecture, sigval_int is the high 32bit of sigval_ptr in
-big endian kernel compare with low 32bit of sigval_ptr in little
-endian kernel. reference:
+On Mon, Feb 9, 2015 at 9:42 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> Le 24/01/2015 22:22, Florian Fainelli a ?crit :
+>>
+>>
+>> Le 23/01/2015 14:01, Olof Johansson a ?crit :
+>>> On Tue, Jan 20, 2015 at 11:33:59PM +0100, Hauke Mehrtens wrote:
+>>>> Hi Olof, Hi Arnd,
+>>>>
+>>>> This is a pull request with some dt updates for BCM5301X for 3.20.
+>>>>
+>>>> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+>>>>
+>>>>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>   https://github.com/hauke/linux.git tags/bcm5301x-dt-2015-01-20
+>>>>
+>>>> for you to fetch changes up to 5b1864b899d2b591402704dd0f6528c8661f1817:
+>>>>
+>>>>   ARM: BCM5301X: Add DT for Buffalo WZR-900DHP (2015-01-20 23:23:25 +0100)
+>>>
+>>> Hi Hauke,
+>>>
+>>> I've merged this into next/dt now, comments below.
+>>>
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> bcm5301x-dt-2015-01-20: ARM: BCM5301X: dts updates for 3.20
+>>>>
+>>>> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+>>>
+>>> No signed-off-by needed in the tag -- the fact that you have signed it is
+>>> enough. We do ask for a few words about what's in the branch though more than
+>>> "dts updates". Something to think about going forward.
+>>>
+>>> Also:
+>>>
+>>> We had asked that broadcom platforms go in together through Florian from
+>>> here on out, so we don't have to deal with merge requests from each and
+>>> every one of you since there are several subplatforms. Would that be ok
+>>> with you?
+>>
+>> Humm, I had asked you and Arnd a couple times if you would actually
+>> agree in us (bcm5301x, cygnus, brcmstb and others) doing separate pull
+>> requests, the rationale being that:
+>>
+>> - the previous mach-bcm maintainers had been holding some of our
+>> development because of their lack of responsiveness, so we did not want
+>> to end-up creating the same (potential) situation here with centralized
+>> pull requests
+>>
+>> - there is little to no code sharing happening within mach-bcm, so you
+>> would typically only have to merge the Makefile and Kconfig portions
+>>
+>> That said, I still have no problems sending grouped pull requests if you
+>> prefer this model (that is sending all broadcom related pull requests
+>> through one maintainer).
+>
+> I will get all the Broadcom changes routed through a single pull request
+> model, let me know if you want that to change in the future.
 
-    typedef union sigval {
-        int sival_int;
-        void *sival_ptr;
-    } sigval_t;
+Sorry, forgot to reply earlier.
 
-During compat_mq_notify or compat_timer_create, kernel get sigval
-from user space by reading sigval.sival_int. This is correct in 32 bit
-kernel and in 64bit little endian kernel. And It is wrong in 64bit big
-endian kernel:
-It get the high 32bit of sigval_ptr and put it to low 32bit of
-sigval_ptr. And the high 32bit sigval_ptr in empty in arm 32bit user
-space struct. So, kernel lost the value of sigval_ptr.
+I think that would be preferred by us, yes.
 
-The following patch get the sigval_ptr in stead of sigval_int in order
-to avoid endian issue.
-Test pass in arm64 big endian and little endian kernel.
+Even though there's little code sharing, there's still the need to
+train new maintainers on what we prefer and not, which we'd then push
+one level further in the maintainer graph for better scaling. :)
 
-Signed-off-by: Zhang Jian(Bamvor) <bamvor.zhangjian@huawei.com>
----
- ipc/compat_mq.c | 7 ++-----
- kernel/compat.c | 6 ++----
- 2 files changed, 4 insertions(+), 9 deletions(-)
 
-diff --git a/ipc/compat_mq.c b/ipc/compat_mq.c
-index ef6f91c..2e07343 100644
---- a/ipc/compat_mq.c
-+++ b/ipc/compat_mq.c
-@@ -99,11 +99,8 @@ COMPAT_SYSCALL_DEFINE2(mq_notify, mqd_t, mqdes,
- 	if (u_notification) {
- 		struct sigevent n;
- 		p = compat_alloc_user_space(sizeof(*p));
--		if (get_compat_sigevent(&n, u_notification))
--			return -EFAULT;
--		if (n.sigev_notify == SIGEV_THREAD)
--			n.sigev_value.sival_ptr = compat_ptr(n.sigev_value.sival_int);
--		if (copy_to_user(p, &n, sizeof(*p)))
-+		if (get_compat_sigevent(&n, u_notification) ||
-+		    copy_to_user(p, &n, sizeof(*p)))
- 			return -EFAULT;
- 	}
- 	return sys_mq_notify(mqdes, p);
-diff --git a/kernel/compat.c b/kernel/compat.c
-index ebb3c36..13a0e5d 100644
---- a/kernel/compat.c
-+++ b/kernel/compat.c
-@@ -871,16 +871,14 @@ COMPAT_SYSCALL_DEFINE4(clock_nanosleep, clockid_t, which_clock, int, flags,
-  * We currently only need the following fields from the sigevent
-  * structure: sigev_value, sigev_signo, sig_notify and (sometimes
-  * sigev_notify_thread_id).  The others are handled in user mode.
-- * We also assume that copying sigev_value.sival_int is sufficient
-- * to keep all the bits of sigev_value.sival_ptr intact.
-  */
- int get_compat_sigevent(struct sigevent *event,
- 		const struct compat_sigevent __user *u_event)
- {
- 	memset(event, 0, sizeof(*event));
- 	return (!access_ok(VERIFY_READ, u_event, sizeof(*u_event)) ||
--		__get_user(event->sigev_value.sival_int,
--			&u_event->sigev_value.sival_int) ||
-+		__get_user(*(long long*)event->sigev_value.sival_ptr,
-+			&u_event->sigev_value.sival_ptr) ||
- 		__get_user(event->sigev_signo, &u_event->sigev_signo) ||
- 		__get_user(event->sigev_notify, &u_event->sigev_notify) ||
- 		__get_user(event->sigev_notify_thread_id,
--- 
-1.8.4.5
+-Olof
