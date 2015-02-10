@@ -1,72 +1,94 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 10 Feb 2015 20:53:44 +0200
-Subject: [PATCH] ARM: shmobile: r8a73a4: Move pfc node to work around
- probe ordering bug
-In-Reply-To: <CAMuHMdUmftjWD=hZVYVOGJWBc6tb1h=ZnMv61_nCROkOC=e_iw@mail.gmail.com>
-References: <1423254173-31852-1-git-send-email-geert+renesas@glider.be>
- <20150209182918.GA2531@atomide.com>
- <CAMuHMdUmftjWD=hZVYVOGJWBc6tb1h=ZnMv61_nCROkOC=e_iw@mail.gmail.com>
-Message-ID: <3282348.ooqjOMyZ9x@avalon>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue, 10 Feb 2015 19:59:57 +0100
+Subject: [PATCH 3/6] mtd: mxc-nand: Do the word to byte mangling in the
+ read_byte callback
+In-Reply-To: <1423594800-24214-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1423594800-24214-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1423594800-24214-4-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+When the hardware operates in 16 bit mode it always reads 16 bits even
+for operations that only have the lower 8 bits defined. So the upper
+bits must be discarded. Do this in the read_byte callback instead of
+when reading the NAND id to support reading byte wise more than 5 bytes
+and at other occations (like reading the ONFI parameter page).
 
-On Tuesday 10 February 2015 11:19:39 Geert Uytterhoeven wrote:
-> On Mon, Feb 9, 2015 at 7:29 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Geert Uytterhoeven <geert@linux-m68k.org> [150209 09:17]:
-> >> On Mon, Feb 9, 2015 at 5:24 PM, Tony Lindgren <tony@atomide.com> wrote:
-> >>> * Geert Uytterhoeven <geert+renesas@glider.be> [150206 12:26]:
-> >>>> Notes:
-> >>>>   - It seems several people tried to solve this in the core OF probing
-> >>>>     code before, but the final solution never went in?
-> >>>>   
-> >>>>   - This can be reproduced on other SoCs (e.g. sh73a0 and r8a7740) by
-> >>>>     moving their pfc nodes before their interrupt controller nodes.
-> >>>>   
-> >>>>   - This patch is against my working tree, so it doesn't apply to
-> >>>>     Simon's repository, but you get the idea....
-> >>> 
-> >>> No issues with the patch, but here are few comments on the core
-> >>> reasons (without looking at the code in this case) that might help
-> >>> fix similar issues.
-> >>> 
-> >>> In all the cases I've seen these errors are caused by non-standard
-> >>> custom initcall levels for drivers like i2c bus. The real solution
-> >>> is to initialize drivers later with standard module_init, and stop
-> >>> the race to the bottom with custom initcall levels.
-> >>> 
-> >>> If there is legacy board specific platofrm init code that needs
-> >>> i2c gpios early, that code can probably be moved to initialize
-> >>> later on.
-> >> 
-> >> In this case no i2c is involved. The drivers for both pinctrl
-> >> (renesas,pfc-r8a73a4) and irqchip (renesas,irqc) are registered
-> >> 
-> >> at the same level:
-> >>   - postcore_initcall(sh_pfc_init);
-> >>   - postcore_initcall(irqc_init);
-> >> 
-> >> Hence the system uses the "natural" order from within the DTS,
-> >> and decided to instantiate the pfc before the irqchip.
-> > 
-> > OK
-> 
-> I tried converting the renesas,irqc driver to IRQCHIP_DECLARE().
-> This solves the probe ordering problem, but it no longer allows the use of
-> a platform device.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ drivers/mtd/nand/mxc_nand.c | 34 ++++++++++------------------------
+ 1 file changed, 10 insertions(+), 24 deletions(-)
 
-One (quite hackish) possible way around this is to register the platform 
-driver (using a static variable to ensure the driver isn't registered multiple 
-times) in the IRQCHIP_DECLARE'd init function, and then call 
-of_platform_device_create() to create the platform device. This should get the 
-device probed immediately.
-
-> As I was already adding clock and runtime PM support
-> (which use platform devices), IRQCHIP_DECLARE doesn't look like the
-> right road to follow...
-
+diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+index d9637ae34719..aa98a0dddcfb 100644
+--- a/drivers/mtd/nand/mxc_nand.c
++++ b/drivers/mtd/nand/mxc_nand.c
+@@ -552,30 +552,17 @@ static void send_page_v1(struct mtd_info *mtd, unsigned int ops)
+ 
+ static void send_read_id_v3(struct mxc_nand_host *host)
+ {
+-	struct nand_chip *this = &host->nand;
+-
+ 	/* Read ID into main buffer */
+ 	writel(NFC_ID, NFC_V3_LAUNCH);
+ 
+ 	wait_op_done(host, true);
+ 
+ 	memcpy32_fromio(host->data_buf, host->main_area0, 16);
+-
+-	if (this->options & NAND_BUSWIDTH_16) {
+-		/* compress the ID info */
+-		host->data_buf[1] = host->data_buf[2];
+-		host->data_buf[2] = host->data_buf[4];
+-		host->data_buf[3] = host->data_buf[6];
+-		host->data_buf[4] = host->data_buf[8];
+-		host->data_buf[5] = host->data_buf[10];
+-	}
+ }
+ 
+ /* Request the NANDFC to perform a read of the NAND device ID. */
+ static void send_read_id_v1_v2(struct mxc_nand_host *host)
+ {
+-	struct nand_chip *this = &host->nand;
+-
+ 	/* NANDFC buffer 0 is used for device ID output */
+ 	writew(host->active_cs << 4, NFC_V1_V2_BUF_ADDR);
+ 
+@@ -585,15 +572,6 @@ static void send_read_id_v1_v2(struct mxc_nand_host *host)
+ 	wait_op_done(host, true);
+ 
+ 	memcpy32_fromio(host->data_buf, host->main_area0, 16);
+-
+-	if (this->options & NAND_BUSWIDTH_16) {
+-		/* compress the ID info */
+-		host->data_buf[1] = host->data_buf[2];
+-		host->data_buf[2] = host->data_buf[4];
+-		host->data_buf[3] = host->data_buf[6];
+-		host->data_buf[4] = host->data_buf[8];
+-		host->data_buf[5] = host->data_buf[10];
+-	}
+ }
+ 
+ static uint16_t get_dev_status_v3(struct mxc_nand_host *host)
+@@ -719,9 +697,17 @@ static u_char mxc_nand_read_byte(struct mtd_info *mtd)
+ 	if (host->status_request)
+ 		return host->devtype_data->get_dev_status(host) & 0xFF;
+ 
+-	ret = *(uint8_t *)(host->data_buf + host->buf_start);
+-	host->buf_start++;
++	if (nand_chip->options & NAND_BUSWIDTH_16) {
++		/* only take the lower byte of each word */
++		ret = *(uint16_t *)(host->data_buf + host->buf_start);
++
++		host->buf_start += 2;
++	} else {
++		ret = *(uint8_t *)(host->data_buf + host->buf_start);
++		host->buf_start++;
++	}
+ 
++	pr_debug("%s: ret=0x%hhx (start=%u)\n", __func__, ret, host->buf_start);
+ 	return ret;
+ }
+ 
 -- 
-Regards,
-
-Laurent Pinchart
+2.1.4
