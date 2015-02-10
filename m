@@ -1,72 +1,194 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 09 Feb 2015 21:42:58 -0800
-Subject: [GIT PULL] ARM: BCM5301X: DT changes for v3.20
-In-Reply-To: <54C48BA1.9080902@openwrt.org>
-References: <54BED7D7.80207@hauke-m.de>
- <20150123220111.GE20896@quad.lixom.net> <54C48BA1.9080902@openwrt.org>
-Message-ID: <54D99A62.6010508@gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 10 Feb 2015 14:14:43 +0800
+Subject: [PATCH 1/3] mtd: atmel_nand: move the hsmc_clk from nfc node to nand
+ node
+Message-ID: <1423548885-27589-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 24/01/2015 22:22, Florian Fainelli a ?crit :
-> 
-> 
-> Le 23/01/2015 14:01, Olof Johansson a ?crit :
->> On Tue, Jan 20, 2015 at 11:33:59PM +0100, Hauke Mehrtens wrote:
->>> Hi Olof, Hi Arnd,
->>>
->>> This is a pull request with some dt updates for BCM5301X for 3.20.
->>>
->>> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
->>>
->>>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
->>>
->>> are available in the git repository at:
->>>
->>>   https://github.com/hauke/linux.git tags/bcm5301x-dt-2015-01-20
->>>
->>> for you to fetch changes up to 5b1864b899d2b591402704dd0f6528c8661f1817:
->>>
->>>   ARM: BCM5301X: Add DT for Buffalo WZR-900DHP (2015-01-20 23:23:25 +0100)
->>
->> Hi Hauke,
->>
->> I've merged this into next/dt now, comments below.
->>
->>>
->>> ----------------------------------------------------------------
->>> bcm5301x-dt-2015-01-20: ARM: BCM5301X: dts updates for 3.20
->>>
->>> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
->>
->> No signed-off-by needed in the tag -- the fact that you have signed it is
->> enough. We do ask for a few words about what's in the branch though more than
->> "dts updates". Something to think about going forward.
->>
->> Also:
->>
->> We had asked that broadcom platforms go in together through Florian from
->> here on out, so we don't have to deal with merge requests from each and
->> every one of you since there are several subplatforms. Would that be ok
->> with you?
-> 
-> Humm, I had asked you and Arnd a couple times if you would actually
-> agree in us (bcm5301x, cygnus, brcmstb and others) doing separate pull
-> requests, the rationale being that:
-> 
-> - the previous mach-bcm maintainers had been holding some of our
-> development because of their lack of responsiveness, so we did not want
-> to end-up creating the same (potential) situation here with centralized
-> pull requests
-> 
-> - there is little to no code sharing happening within mach-bcm, so you
-> would typically only have to merge the Makefile and Kconfig portions
-> 
-> That said, I still have no problems sending grouped pull requests if you
-> prefer this model (that is sending all broadcom related pull requests
-> through one maintainer).
+Also add a new sama5d3_nand compatiable string for sama5d3 nand.
 
-I will get all the Broadcom changes routed through a single pull request
-model, let me know if you want that to change in the future.
---
-Florian
+For sama5d3, sama5d4 chip, the pmecc became part of HSMC, they need the
+HSMC clock enabled to work.
+The NFC is a sub feature for current nand driver, it can be disabled.
+But if HSMC clock is controlled by NFC, so disable NFC will also disable
+the HSMC clock. then, it will make the PMECC fail to work.
+
+So the solution is move the HSMC clock out of NFC to nand node. When
+nand driver probed, it will check whether the chip has HSMC, if yes then
+it will require a HSMC clock.
+
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+
+ .../devicetree/bindings/mtd/atmel-nand.txt         |  4 +-
+ drivers/mtd/nand/atmel_nand.c                      | 49 ++++++++++++----------
+ 2 files changed, 28 insertions(+), 25 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+index 7d4c8eb..955a793 100644
+--- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+@@ -12,6 +12,7 @@ Required properties:
+ - atmel,nand-cmd-offset : offset for the command latch.
+ - #address-cells, #size-cells : Must be present if the device has sub-nodes
+   representing partitions.
++- clocks: phandle to the peripheral clock
+ 
+ - gpios : specifies the gpio pins to control the NAND device. detect is an
+   optional gpio and may be set to 0 if not present.
+@@ -38,7 +39,6 @@ Optional properties:
+     - reg : should specify the address and size used for NFC command registers,
+             NFC registers and NFC Sram. NFC Sram address and size can be absent
+             if don't want to use it.
+-    - clocks: phandle to the peripheral clock
+   - Optional properties:
+     - atmel,write-by-sram: boolean to enable NFC write by sram.
+ 
+@@ -95,13 +95,13 @@ nand0: nand at 40000000 {
+ 	compatible = "atmel,at91rm9200-nand";
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
++	clocks = <&hsmc_clk>
+ 	ranges;
+         ...
+         nfc at 70000000 {
+ 		compatible = "atmel,sama5d3-nfc";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-		clocks = <&hsmc_clk>
+ 		reg = <
+ 			0x70000000 0x10000000	/* NFC Command Registers */
+ 			0xffffc000 0x00000070	/* NFC HSMC regs */
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 336cc2d..9de9952 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -65,6 +65,7 @@ module_param(on_flash_bbt, int, 0);
+ 
+ struct atmel_nand_caps {
+ 	bool pmecc_correct_erase_page;
++	bool has_hsmc_clk;
+ };
+ 
+ /* oob layout for large page size
+@@ -101,8 +102,6 @@ struct atmel_nfc {
+ 	bool			use_nfc_sram;
+ 	bool			write_by_sram;
+ 
+-	struct clk		*clk;
+-
+ 	bool			is_initialized;
+ 	struct completion	comp_ready;
+ 	struct completion	comp_cmd_done;
+@@ -127,6 +126,7 @@ struct atmel_nand_host {
+ 	struct dma_chan		*dma_chan;
+ 
+ 	struct atmel_nfc	*nfc;
++	struct clk		*clk;
+ 
+ 	struct atmel_nand_caps	*caps;
+ 	bool			has_pmecc;
+@@ -2131,6 +2131,19 @@ static int atmel_nand_probe(struct platform_device *pdev)
+ 	nand_chip->IO_ADDR_R = host->io_base;
+ 	nand_chip->IO_ADDR_W = host->io_base;
+ 
++	if (host->caps->has_hsmc_clk) {
++		host->clk = devm_clk_get(&pdev->dev, NULL);
++		if (IS_ERR(host->clk)) {
++			dev_err(&pdev->dev, "HSMC clock is missing, update your Device Tree");
++			res = PTR_ERR(host->clk);
++			goto err_nand_ioremap;
++		}
++
++		res = clk_prepare_enable(host->clk);
++		if (res)
++			goto err_nand_ioremap;
++	}
++
+ 	if (nand_nfc.is_initialized) {
+ 		/* NFC driver is probed and initialized */
+ 		host->nfc = &nand_nfc;
+@@ -2296,6 +2309,9 @@ static int atmel_nand_remove(struct platform_device *pdev)
+ 	if (host->dma_chan)
+ 		dma_release_channel(host->dma_chan);
+ 
++	if (!IS_ERR(host->clk))
++		clk_disable_unprepare(host->clk);
++
+ 	platform_driver_unregister(&atmel_nand_nfc_driver);
+ 
+ 	return 0;
+@@ -2303,14 +2319,22 @@ static int atmel_nand_remove(struct platform_device *pdev)
+ 
+ static struct atmel_nand_caps at91rm9200_caps = {
+ 	.pmecc_correct_erase_page = false,
++	.has_hsmc_clk = false,
++};
++
++static struct atmel_nand_caps sama5d3_caps = {
++	.pmecc_correct_erase_page = false,
++	.has_hsmc_clk = true,
+ };
+ 
+ static struct atmel_nand_caps sama5d4_caps = {
+ 	.pmecc_correct_erase_page = true,
++	.has_hsmc_clk = true,
+ };
+ 
+ static const struct of_device_id atmel_nand_dt_ids[] = {
+ 	{ .compatible = "atmel,at91rm9200-nand", .data = &at91rm9200_caps },
++	{ .compatible = "atmel,sama5d3-nand", .data = &sama5d3_caps },
+ 	{ .compatible = "atmel,sama5d4-nand", .data = &sama5d4_caps },
+ 	{ /* sentinel */ }
+ };
+@@ -2321,7 +2345,6 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+ {
+ 	struct atmel_nfc *nfc = &nand_nfc;
+ 	struct resource *nfc_cmd_regs, *nfc_hsmc_regs, *nfc_sram;
+-	int ret;
+ 
+ 	nfc_cmd_regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	nfc->base_cmd_regs = devm_ioremap_resource(&pdev->dev, nfc_cmd_regs);
+@@ -2354,31 +2377,12 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+ 	nfc_writel(nfc->hsmc_regs, IDR, 0xffffffff);
+ 	nfc_readl(nfc->hsmc_regs, SR);	/* clear the NFC_SR */
+ 
+-	nfc->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (!IS_ERR(nfc->clk)) {
+-		ret = clk_prepare_enable(nfc->clk);
+-		if (ret)
+-			return ret;
+-	} else {
+-		dev_warn(&pdev->dev, "NFC clock missing, update your Device Tree");
+-	}
+-
+ 	nfc->is_initialized = true;
+ 	dev_info(&pdev->dev, "NFC is probed.\n");
+ 
+ 	return 0;
+ }
+ 
+-static int atmel_nand_nfc_remove(struct platform_device *pdev)
+-{
+-	struct atmel_nfc *nfc = &nand_nfc;
+-
+-	if (!IS_ERR(nfc->clk))
+-		clk_disable_unprepare(nfc->clk);
+-
+-	return 0;
+-}
+-
+ static const struct of_device_id atmel_nand_nfc_match[] = {
+ 	{ .compatible = "atmel,sama5d3-nfc" },
+ 	{ /* sentinel */ }
+@@ -2391,7 +2395,6 @@ static struct platform_driver atmel_nand_nfc_driver = {
+ 		.of_match_table = of_match_ptr(atmel_nand_nfc_match),
+ 	},
+ 	.probe = atmel_nand_nfc_probe,
+-	.remove = atmel_nand_nfc_remove,
+ };
+ 
+ static struct platform_driver atmel_nand_driver = {
+-- 
+1.9.1
