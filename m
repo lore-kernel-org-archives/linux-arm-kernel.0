@@ -1,124 +1,109 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 10 Feb 2015 13:47:37 -0800
-Subject: [PATCH v8 2/4] pinctrl: cygnus: add gpio/pinconf driver
-In-Reply-To: <20150209191951.GA15709@dtor-ws>
-References: <rjui@broadcom.com>
- <1423070463-24483-1-git-send-email-rjui@broadcom.com>
- <1423070463-24483-3-git-send-email-rjui@broadcom.com>
- <20150209191951.GA15709@dtor-ws>
-Message-ID: <54DA7C79.2010606@broadcom.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 10 Feb 2015 13:49:32 -0800
+Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
+In-Reply-To: <20150210211525.GO8656@n2100.arm.linux.org.uk>
+References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
+ <20150205105035.GL8656@n2100.arm.linux.org.uk>
+ <20150205142918.GA10634@linux.vnet.ibm.com>
+ <20150205161100.GQ8656@n2100.arm.linux.org.uk>
+ <54D95DB8.9010308@codeaurora.org> <20150210151416.GD9432@leverpostej>
+ <54DA6E92.3090109@codeaurora.org> <54DA725E.6080305@codeaurora.org>
+ <20150210211525.GO8656@n2100.arm.linux.org.uk>
+Message-ID: <54DA7CEC.7020606@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 02/10/15 13:15, Russell King - ARM Linux wrote:
+> On Tue, Feb 10, 2015 at 01:04:30PM -0800, Stephen Boyd wrote:
+>> From: Stephen Boyd <sboyd@codeaurora.org>
+>> Subject: [PATCH] ARM: smp: Only expose /sys/.../cpuX/online if hotpluggable
+>>
+>> Writes to /sys/.../cpuX/online fail if we determine the platform
+>> doesn't support hotplug for that CPU. Let's figure this out
+>> befoer we make the sysfs nodes so that the online file doesn't
+>> even exist if it's not possible to hotplug the CPU.
+>>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>>  arch/arm/include/asm/smp.h |  6 ++++++
+>>  arch/arm/kernel/setup.c    |  2 +-
+>>  arch/arm/kernel/smp.c      | 11 ++++-------
+>>  3 files changed, 11 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+>> index 18f5a554134f..9f82430efd59 100644
+>> --- a/arch/arm/include/asm/smp.h
+>> +++ b/arch/arm/include/asm/smp.h
+>> @@ -123,4 +123,10 @@ struct of_cpu_method {
+>>   */
+>>  extern void smp_set_ops(struct smp_operations *);
+>>  
+>> +#ifdef CONFIG_HOTPLUG_CPU
+>> +extern int platform_can_hotplug_cpu(unsigned int cpu);
+>> +#else
+>> +static inline int platform_can_hotplug_cpu(unsigned int cpu) { return 0; }
+> Please split this across four lines like a normal function.
+>
 
+Ok.
 
-On 2/9/2015 11:20 AM, Dmitry Torokhov wrote:
-> Hi Ray,
-> 
-> On Wed, Feb 04, 2015 at 09:21:01AM -0800, Ray Jui wrote:
->> +static int cygnus_gpio_pinmux_add_range(struct cygnus_gpio *chip)
->> +{
->> +	struct device_node *node = chip->dev->of_node;
->> +	struct device_node *pinmux_node;
->> +	struct platform_device *pinmux_pdev;
->> +	struct gpio_chip *gc = &chip->gc;
->> +	int i, ret;
+>> +#endif
 >> +
->> +	/* parse DT to find the phandle to the pinmux controller */
->> +	pinmux_node = of_parse_phandle(node, "pinmux", 0);
->> +	if (!pinmux_node)
->> +		return -ENODEV;
+>>  #endif /* ifndef __ASM_ARM_SMP_H */
+>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>> index 715ae19bc7c8..c61c09defc78 100644
+>> --- a/arch/arm/kernel/setup.c
+>> +++ b/arch/arm/kernel/setup.c
+>> @@ -974,7 +974,7 @@ static int __init topology_init(void)
+>>  
+>>  	for_each_possible_cpu(cpu) {
+>>  		struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, cpu);
+>> -		cpuinfo->cpu.hotpluggable = 1;
+>> +		cpuinfo->cpu.hotpluggable = platform_can_hotplug_cpu(cpu);
+>>  		register_cpu(&cpuinfo->cpu, cpu);
+>>  	}
+>>  
+>> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+>> index fe0386c751b2..4d213b24db60 100644
+>> --- a/arch/arm/kernel/smp.c
+>> +++ b/arch/arm/kernel/smp.c
+>> @@ -174,18 +174,19 @@ static int platform_cpu_kill(unsigned int cpu)
+>>  	return 1;
+>>  }
+>>  
+>> -static int platform_cpu_disable(unsigned int cpu)
+>> +int platform_can_hotplug_cpu(unsigned int cpu)
+>>  {
+>>  	if (smp_ops.cpu_disable)
+>> -		return smp_ops.cpu_disable(cpu);
+>> +		return smp_ops.cpu_disable(cpu) ? 0 : 1;
+>>  
+>>  	/*
+>>  	 * By default, allow disabling all CPUs except the first one,
+>>  	 * since this is special on a lot of platforms, e.g. because
+>>  	 * of clock tick interrupts.
+>>  	 */
+>> -	return cpu == 0 ? -EPERM : 0;
+>> +	return cpu == 0 ? 0 : 1;
+>>  }
 >> +
->> +	pinmux_pdev = of_find_device_by_node(pinmux_node);
->> +	if (!pinmux_pdev) {
->> +		dev_err(chip->dev, "failed to get pinmux device\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	/* now need to create the mapping between local GPIO and PINMUX pins */
->> +	for (i = 0; i < ARRAY_SIZE(cygnus_gpio_pintable); i++) {
->> +		ret = gpiochip_add_pin_range(gc, dev_name(&pinmux_pdev->dev),
->> +					     cygnus_gpio_pintable[i].offset,
->> +					     cygnus_gpio_pintable[i].pin_base,
->> +					     cygnus_gpio_pintable[i].num_pins);
->> +		if (ret) {
->> +			dev_err(chip->dev, "unable to add GPIO pin range\n");
->> +			goto err_put_device;
->> +		}
->> +	}
->> +
->> +	chip->pinmux_is_supported = true;
->> +
->> +	/* no need for pinmux_pdev device reference anymore */
->> +	put_device(&pinmux_pdev->dev);
-> 
-> Sorry I did not notice it before, but of_parse_phandle() takes reference
-> to the returned device node, so you need to "put" it here and in error
-> path as well. Actually you can do:
-> 
-> 	int ret = 0;
-> 
-> 	pinmux_node = of_parse_phandle(node, "pinmux", 0);
-> 	if (!pinmux_node)
-> 		return -ENODEV;
-> 
-> 	pinmux_pdev = of_find_device_by_node(pinmux_node);
-> 	/* We do not longer need pinmux node */
-> 	of_node_put(pinmux_node);
-> 
-> 	if (!pinmux_dev)
-> 		....
-> 
-> 	for (..) {
-> 		...
-> 		if (ret) {
-> 			dev_err(...);
-> 			break;
-> 		}
-> 	}
-> 
-> 	chip->pinmux_is_supported = (ret == 0);
-> 	put_device(..);
-> 	return ret;
-> }
-> 
-> This way you free resources in the same path.
-> 
+>>  /*
+>>   * __cpu_disable runs on the processor to be shutdown.
+>>   */
+>> @@ -194,10 +195,6 @@ int __cpu_disable(void)
+>>  	unsigned int cpu = smp_processor_id();
+>>  	int ret;
+>>  
+>> -	ret = platform_cpu_disable(cpu);
+>> -	if (ret)
+>> -		return ret;
+>> -
+> I would much rather prefer smp_ops.cpu_disable() to be renamed in this
+> case - name it smp_ops.cpu_can_disable() so that it's clear that it's
+> no longer part of the __cpu_disable() path.
 
-Thanks. I'll make the change.
+Sure. That also makes the  ? 0 : 1 thing go away.
 
-> ...
-> 
->> +
->> +static struct platform_driver cygnus_gpio_driver = {
->> +	.driver = {
->> +		.name = "cygnus-gpio",
->> +		.of_match_table = cygnus_gpio_of_match,
->> +		.suppress_bind_attrs = true,
->> +	},
->> +	.probe = cygnus_gpio_probe,
->> +};
->> +
->> +static int __init cygnus_gpio_init(void)
->> +{
->> +	return platform_driver_probe(&cygnus_gpio_driver, cygnus_gpio_probe);
-> 
-> When I asked you to add ".suppress_bind_attrs = true" I missed the fact
-> that you were using platform_driver_probe() which already does this
-> internally. However platform_driver_probe() can't handle deferred
-> probing, which may or may not be OK. Is there a chance that any of the
-> resources needed by the driver return -EPROBE_DEFER? If not then it is
-> safe to continue using platform_driver_probe() and you can drop
-> suppress_bind_attrs assignment, otherwise it may be better to switch to
-> platform_driver_register().
-> 
-> Thanks.
-> 
-
-No I do not expect any resource that this driver depends on to return
--EPROBE_DEFER. The IOMUX driver that this driver depends on should be
-initialized before this driver.
-
-I'll drop .suppress_bind_attrs then. Thanks.
-
-Ray
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
