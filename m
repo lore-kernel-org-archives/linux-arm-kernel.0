@@ -1,105 +1,115 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Tue, 10 Feb 2015 20:52:47 +0530
-Subject: [PATCH v2 1/2] mmc: dw_mmc: fix bug that cause 'Timeout sending
- command'
-In-Reply-To: <1423466726-20833-2-git-send-email-addy.ke@rock-chips.com>
-References: <1423134801-23219-1-git-send-email-addy.ke@rock-chips.com>
- <1423466726-20833-1-git-send-email-addy.ke@rock-chips.com>
- <1423466726-20833-2-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <CAGOxZ51wgw9iXF3xX39vnB0M5ZPb+zHWoCtTvvKdyo9bSOCVgw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 10 Feb 2015 15:27:18 +0000
+Subject: [PATCH 3/3] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+In-Reply-To: <CAAS=xmgvQLSOXGHmDhFKKV+UGLGeZXf2dpOYWzALYTRsYp9D7g@mail.gmail.com>
+References: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
+ <1423128277-10297-4-git-send-email-bintian.wang@huawei.com>
+ <20150205193017.GF20735@leverpostej>
+ <CAAS=xmgsuY=c8-n_pDiZjLe2u+SPX7msRje7h0sNkRtT3HLfQA@mail.gmail.com>
+ <20150206104420.GB9921@leverpostej>
+ <CAAS=xmhcfeQjfyizJa38k+08pbY5WFOZH0a1wEx+gwqgVe0MXw@mail.gmail.com>
+ <20150210133734.GC9432@leverpostej>
+ <CAAS=xmgvQLSOXGHmDhFKKV+UGLGeZXf2dpOYWzALYTRsYp9D7g@mail.gmail.com>
+Message-ID: <20150210152718.GE9432@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Addy,
+> >> >> > Are we certain of the split between components the PSCI implementation
+> >> >> > must touch and those the kernel must touch?
+> >> >> >
+> >> >> >> Also add dts file to support HiKey development board which
+> >> >> >> based on Hi6220 SoC and document the devicetree bindings.
+> >> >> >>
+> >> >> >> These dts files will be changed later and more nodes will be
+> >> >> >> added to describe other devices.
+> >> >> >
+> >> >> > How is this going to be changed other than the addition of nodes?
+> >> >> >
+> >> >> > Will this DTB continue to work in future? Or do you intend to make
+> >> >> > changes that will break support?
+> >> >> My original idea is: use spin-table for SMP now, when firmware is OK to
+> >> >> support PSCI, we submit another patch to replace the spin-table with PSCI.
+> >> >
+> >> > For any users who have not updated their FW, this will break booting.
+> >> >
+> >> > This is why I suggest having hte bootloader/FW fill this in as it should
+> >> > know what enable-method the FW supports.
+> >> >
+> >> >> If DTB should continue to work in the future, we really need to remove
+> >> >> the spin-table
+> >> >> from current dts file, how about just enable one core now?
+> >> >>
+> >> >> Which one do you favor or any other suggestion?
+> >> >
+> >> > If spin-table is just for testing while you await PSCI, drop spin-table
+> >> > from the dts for now.
+> >> So, just booting one core may be the right choice now, right?
+> >
+> > Without an enable-method for secondary CPUs, that will be all that's
+> > possible. If your FW/bootlaoder injects the appropriate enable-method,
+> > then you could gain spin-table based SMP bringup while awaiting PSCI,
+> > without there being a DTB compatibility issue.
+> For DTB compatibility issue, how about just describe one core in dts
+> file? when PSCI
+> is OK, we can add the CPU topology to the dts file again.
 
-On Mon, Feb 9, 2015 at 12:55 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
-> Because of some uncertain factors, such as worse card or worse hardware,
-> DAT[3:0](the data lines) may be pulled down by card, and mmc controller
-> will be in busy state. This should not happend when mmc controller
-> send command to update card clocks. If this happends, mci_send_cmd will
-> be failed and we will get 'Timeout sending command', and then system will
-> be blocked. To avoid this, we need reset mmc controller.
->
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
-> ---
->  drivers/mmc/host/dw_mmc.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 4d2e3c2..b0b57e3 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -100,6 +100,7 @@ struct idmac_desc {
->  };
->  #endif /* CONFIG_MMC_DW_IDMAC */
->
-> +static int dw_mci_card_busy(struct mmc_host *mmc);
->  static bool dw_mci_reset(struct dw_mci *host);
->  static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
->
-> @@ -888,6 +889,31 @@ static void mci_send_cmd(struct dw_mci_slot *slot, u32 cmd, u32 arg)
->                 cmd, arg, cmd_status);
->  }
->
-> +static void dw_mci_wait_busy(struct dw_mci_slot *slot)
-> +{
-> +       struct dw_mci *host = slot->host;
-> +       unsigned long timeout = jiffies + msecs_to_jiffies(500);
-> +
-Why 500 msec?
+Given that we won't boot secondary CPUs without an enable-method, we
+could leave them in, but in a currently-unusable state. That would allow
+a bootloader to patch in the relevant properties to boot them.
 
-> +       do {
-> +               if (!dw_mci_card_busy(slot->mmc))
-> +                       return;
-> +               cpu_relax();
-> +       } while (time_before(jiffies, timeout));
-> +
-> +       dev_err(host->dev, "Data busy (status %#x)\n",
-> +               mci_readl(slot->host, STATUS));
-> +
-> +       /*
-> +        * Data busy, this should not happend when mmc controller send command
-> +        * to update card clocks in non-volt-switch state. If it happends, we
-> +        * should reset controller to avoid getting "Timeout sending command".
-> +        */
-> +       dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS);
-> +
-Why you need to reset all blocks? may be CTRL_RESET is good enough here.
+If you add the nodes later with PSCI properties, users with existing
+firmware will expect their board to boot. So I'd recommendd that the
+bootloader patches that in, or that the firmware is ready prior to this
+being merged. I suspect that the former is more likely to be possible.
 
-> +       /* Fail to reset controller or still data busy, WARN_ON! */
-> +       WARN_ON(dw_mci_card_busy(slot->mmc));
-> +}
-> +
->  static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
->  {
->         struct dw_mci *host = slot->host;
-> @@ -899,6 +925,8 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
->         /* We must continue to set bit 28 in CMD until the change is complete */
->         if (host->state == STATE_WAITING_CMD11_DONE)
->                 sdmmc_cmd_bits |= SDMMC_CMD_VOLT_SWITCH;
-> +       else
-> +               dw_mci_wait_busy(slot);
->
-hmm...I would suggest you to call dw_mci_wait_busy() from inside
-mci_send_cmd(), seems like dw_mmc hangs while sending update clock cmd
-in multiple cases.see [1]
+> > [...]
+> >
+> >> >> >> +             pm_ctrl: pm_ctrl {
+> >> >> >> +                     compatible = "hisilicon,pmctrl", "syscon";
+> >> >> >> +                     #address-cells = <1>;
+> >> >> >> +                     #size-cells = <1>;
+> >> >> >> +                     reg = <0x0 0xf7032000 0x0 0x1000>;
+> >> >> >> +                     ranges = <0 0x0 0xf7032000 0x1000>;
+> >> >> >> +
+> >> >> >> +                     clock_power: clock3 at 0 {
+> >> >> >> +                             compatible = "hisilicon,hi6220-clock-power";
+> >> >> >> +                             reg = <0 0x1000>;
+> >> >> >> +                             #clock-cells = <1>;
+> >> >> >> +                     };
+> >> >> >> +             };
+> >> >> >
+> >> >> > I really doesn't see the point in having a sub-device that covers the
+> >> >> > entirely of the register space of the containing node, and that being
+> >> >> > the case I am extremely concerned that the containers are marked as
+> >> >> > syscon compatible.
+> >> >> The SoC clocks are designed and placed under different system controllers,
+> >> >> so I define corresponding nodes under different controllers for clock operation.
+> >> >
+> >> > What I'm concerned wit hhere is that the pm_ctrl node and the clock3 at 0
+> >> > sub-node have the _exact_ same register space.
+> >> >
+> >> > Given this should mean that the clock3 at 0 node owns that register space,
+> >> > having the container node export this as syscon does not make sense. And
+> >> > the split between pm_ctrl and clock3@) doesn't seem to make sense given
+> >> > they cover the same space.
+> >> I understand your worry and will find the max offset of those clocks
+> >> under this controller.
+> >>
+> >> >
+> >> > As I asked before, why is pm_ctrl marked as a syscon, and what's the
+> >> > point of the separate sub-node?
+> >> There is no big difference between pm_ctrl and other controller,  they
+> >> are all designed as
+> >> the base address to control some functions of other modules (certainly
+> >> include some clock gates).
+> >
+> > Are they just different instances of the same IP block, or are there
+> > fundamental differences between them?
+> You can understand it as a different instance of the same IP block,
+> there is no fundamental
+> differences between them.
 
-[1]: http://permalink.gmane.org/gmane.linux.kernel.mmc/31140
+Ok. If that's the case each should have the same compatible string.
 
->         if (!clock) {
->                 mci_writel(host, CLKENA, 0);
-> --
-> 1.8.3.2
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
--- 
-Regards,
-Alim
+Thanks,
+Mark.
