@@ -1,121 +1,63 @@
-From: joshua.clayton@uniwest.com (Joshua Clayton)
-Date: Tue, 10 Feb 2015 07:31:55 -0800
-Subject: [PATCH 3/3] ARM: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <54D9EA6D.1020202@de.bosch.com>
-References: <1420559265-7333-1-git-send-email-p.zabel@pengutronix.de>
- <1420559265-7333-3-git-send-email-p.zabel@pengutronix.de>
- <54D9EA6D.1020202@de.bosch.com>
-Message-ID: <3108879.HFkjbTrYyl@jclayton-pc>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 10 Feb 2015 15:36:28 +0000
+Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
+ demuxer chip
+In-Reply-To: <1422527620-8308-4-git-send-email-boris.brezillon@free-electrons.com>
+References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1422527620-8308-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150210153628.GF9432@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, February 10, 2015 12:24:29 PM Dirk Behme wrote:
-> On 06.01.2015 16:47, Philipp Zabel wrote:
-> > From: Fabio Estevam <fabio.estevam@freescale.com>
-> > 
-> > Due to incorrect placement of the clock gate cell in the ldb_di[x]_clk
-> > tree, the glitchy parent mux of ldb_di[x]_clk can cause a glitch to enter
-> > the ldb_di_ipu_div divider. If the divider gets locked up, no
-> > ldb_di[x]_clk is generated, and the LVDS display will hang when the
-> > ipu_di_clk is sourced from ldb_di_clk.
-> > 
-> > To fix the problem, both the new and current parent of the ldb_di_clk
-> > should be disabled before the switch. This patch ensures that correct
-> > steps are followed when ldb_di_clk parent is switched in the beginning of
-> > boot. The glitchy muxes are then registered as read-only. The clock
-> > parent can be selected using the assigned-clocks and
-> > assigned-clock-parents properties of the ccm> 
-> > device tree node:
-> > 	&clks {
-> > 	
-> > 		assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
-> > 		
-> > 				  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
-> > 		
-> > 		assigned-clock-parents = <&clks IMX6QDL_CLK_MMDC_CH1_AXI>,
-> > 		
-> > 					 <&clks IMX6QDL_CLK_PLL5_VIDEO_DIV>;
-> > 	
-> > 	};
-> > 
-> > Signed-off-by: Ranjani Vaidyanathan <Ranjani.Vaidyanathan@freescale.com>
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > ---
-> > 
-> >   arch/arm/mach-imx/clk-imx6q.c | 201
-> >   ++++++++++++++++++++++++++++++++++++++++++ 1 file changed, 201
-> >   insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> > index 2e379fb..77aa7b17 100644
-> > --- a/arch/arm/mach-imx/clk-imx6q.c
-> > +++ b/arch/arm/mach-imx/clk-imx6q.c
-> 
-> ...
-> 
-> > +	/*
-> > +	 * The LDB_DI0/1_SEL muxes are registered read-only due to a hardware
-> > +	 * bug. Set the muxes to the requested values before registering the
-> > +	 * ldb_di_sel clocks.
-> > +	 */
-> > +	if ((imx_get_soc_revision() != IMX_CHIP_REVISION_1_0) ||
-> > +	    cpu_is_imx6dl())
-> > +		init_ldb_clks(np, base);
-> 
-> I've a hopefully simple understanding question regarding this if():
-> 
-> What does happen (or: has to be done) in the (non-existing) else case of
-> this if() statement?
-> 
-> E.g. how to configure the clocks for the imx_get_soc_revision() ==
-> IMX_CHIP_REVISION_1_0 case?
-> 
-> For the if() case, we can configure the clocks via the assigned-clocks
-> and assigned-clock-parents as described in the commit message. But how
-> to configure the clocks/muxes in the else case? To my understanding,
-> with the patch 2/3 [1] the clocks/muxes are configured to read only.
-> 
-> Sorry if I missed anything ;)
-> 
-> Many thanks,
-> 
-> Dirk
-> 
-> [1]
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313619.ht
-> ml
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-I have at least one imx6q SoM with IMX_CHIP_REVISION_1_0, and can confirm
-that with the current mainline kernel, it gets no lvds video,
-or rather very little.
-I see penguins, and then it goes black.
+Hi Boris,
 
-with the 3.0.35 vendor kernel it was working.
-My only clue so far has been that there are a couple of clocks and
-regulators that come up different on the newer chip.
+On Thu, Jan 29, 2015 at 10:33:38AM +0000, Boris Brezillon wrote:
+> Add documentation for the virtual irq demuxer.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  .../bindings/interrupt-controller/dumb-demux.txt   | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+> new file mode 100644
+> index 0000000..b9a7830
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+> @@ -0,0 +1,41 @@
+> +* Virtual Interrupt Demultiplexer
+> +
+> +This virtual demultiplexer simply forward all incoming interrupts to its
+> +enabled/unmasked children.
+> +It is only intended to be used by hardware that do not provide a proper way
+> +to demultiplex a source interrupt, and thus have to wake all their children
+> +up so that they can possibly handle the interrupt (if needed).
+> +This can be seen as an alternative to shared interrupts when at least one
+> +of the interrupt children is a timer (and require the irq to stay enabled
+> +on suspend) while others are not. This will prevent calling irq handlers of
+> +non timer devices while they are suspended.
 
-vddarm and vddpu are 1100 mV on 1.0, 1150 mV on 1.5
+This sounds like a DT-workaround for a Linux implementation problem, and
+I don't think this the right way to solve your problem.
 
-and there is a message that looks like so on 1.0 chip:
-Switching to timer-based delay loop, resolution 15ns
-and like so on 1.5 (aka 1.3d):
-Switching to timer-based delay loop, resolution 333ns
+Why does this have to be in DT at all? Why can we not fix the core to
+handle these details?
 
-Hope that helps.
+I am very much not keen on this binding.
 
+> +
+> +Required properties:
+> +- compatible: Should be "virtual,irq-demux".
+> +- interrupt-controller: Identifies the node as an interrupt controller.
+> +- interrupts-extended or interrupt-parent and interrupts: Reference the source
+> +  interrupt connected to this dumb demuxer.
+> +- #interrupt-cells: The number of cells to define the interrupts (should be 1).
+> +  The only cell is the IRQ number.
+> +- irqs: u32 bitfield specifying the interrupts provided by the demuxer.
 
--- 
-Joshua Clayton
-Software Engineer
-UniWest
-122 S. 4th Avenue
-Pasco, WA 99301
-Ph: (509) 544-0720
-Fx: (509) 544-0868 
+Arbitrary limitation?
+
+Thanks,
+Mark.
