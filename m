@@ -1,39 +1,51 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 10 Feb 2015 14:12:00 +0100
-Subject: [PATCH] ARM: EXYNOS: Use platform device name as power domain name
-In-Reply-To: <1423573035-21960-1-git-send-email-k.kozlowski@samsung.com>
-References: <1423573035-21960-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <54DA03A0.9040305@collabora.co.uk>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 10 Feb 2015 14:14:32 +0100
+Subject: [PATCH 1/1] ARM: dts: Use more descriptive names for Exynos5420
+ PDs
+In-Reply-To: <54DA0107.2020909@samsung.com>
+References: <1423244258-24314-1-git-send-email-javier.martinez@collabora.co.uk>
+ <54D51170.10903@cogentembedded.com> <54D52905.6040100@collabora.co.uk>
+ <CAJKOXPepTJYYs6gR6NLQzsJndeRLgF+KHRpH9qt9noUgRBs2Dw@mail.gmail.com>
+ <54D9F1A4.1000908@cogentembedded.com> <1423570670.6241.2.camel@AMDC1943>
+ <54D9F7B1.3030106@cogentembedded.com> <1423571438.6241.4.camel@AMDC1943>
+ <54D9FD94.9000102@collabora.co.uk> <54DA0107.2020909@samsung.com>
+Message-ID: <1423574072.6241.8.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello 
+On wto, 2015-02-10 at 14:00 +0100, Sylwester Nawrocki wrote:
+> On 10/02/15 13:46, Javier Martinez Canillas wrote:
+> >>>> This debugfs code iterates over list of generic_pm_domains (gpd_list). I
+> >>>> >> > cannot find function for translating from genpd to its platform device
+> >>>> >> > so only genpd->name can be printed.
+> >>> >> 
+> >>> >>     Then why power domains aren't just named with the platform device names?
+> >> > 
+> >> > Right, the mach-exynos/pm_domains.c set the name equal to OF node name.
+> >> > I'll send a patch extending the name.
+> >> >
+> > IIRC the OF core uses the device node unit address and node name to create
+> > the platform device names so you will have something like 10044000.power-domain.
+> > 
+> > Same if using the node full_name since it will /power-domain at 10044000. In both
+> > cases the DTS should have to be checked to know which power domain really is
+> > unless someone knows by heart the power domains addresses.
 
-Krzysztof,
+For the kernel developer that would be descriptive enough to find the
+real domain but... as you said each time one would have to grep through
+manual or DTS which is slower. However for end-user that still won't be
+descriptive enough.
 
-On 02/10/2015 01:57 PM, Krzysztof Kozlowski wrote:
-> The power domain nodes in DTS may be very generic (e.g. "power-domain"
-> for Exynos 5420) making it very hard to debug:
+> > 
+> > But if using generic names for the power domains as suggested by ePAPR is so
+> > important then we should change all the other Exynos DTS files which don't do.
 > 
-> $ cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
->     domain                      status         slaves
-> power-domain                    on
-> 
-> Use platform device name instead so the names will be a little more user
-> friendly:
->     domain                      status         slaves
-> 100440e0.power-domain           on
-> 
+> Perhaps we could assign OF aliases to the power domain device nodes in DT
+> and then in the power domains driver map those aliases to more descriptive
+> names when creating the power domains?
 
-I would had preferred to have even more info like 100440e0.mau-power-domain.
-Maybe using the OF aliases approach that Sylwester suggested? But in any case
-that could be complementary to your patch.
-
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Suggested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Suggested-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+That would required additional alias in DT but it could be the most
+descriptive for a user.
 
 Best regards,
-Javier
+Krzysztof
