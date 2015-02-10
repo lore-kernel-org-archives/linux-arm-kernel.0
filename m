@@ -1,47 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Feb 2015 11:32:30 +0000
-Subject: [PATCH] ARM: print cma-reserved pages from show_mem
-In-Reply-To: <CADtm3G7CUYUUbmTrWiudQ5j-wX9hu86Ox8TkB+FnXwEvjb=xeg@mail.gmail.com>
-References: <1423092164-9145-1-git-send-email-gregory.0xf0@gmail.com>
- <54D40DAF.4080609@codeaurora.org>
- <CADtm3G7ROX4CrxSKRvTKcjqCiX=uJQZ=Q5izH8pS61z4jfumLg@mail.gmail.com>
- <54D534FB.1090101@codeaurora.org>
- <CADtm3G7CUYUUbmTrWiudQ5j-wX9hu86Ox8TkB+FnXwEvjb=xeg@mail.gmail.com>
-Message-ID: <20150210113230.GJ8656@n2100.arm.linux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 10 Feb 2015 14:37:01 +0300
+Subject: [resend PATCH v3 2/4] Documentation: dt-bindings: add dt binding
+ info for hi6220
+In-Reply-To: <1423559404-13058-3-git-send-email-zhangfei.gao@linaro.org>
+References: <1423559404-13058-1-git-send-email-zhangfei.gao@linaro.org>
+ <1423559404-13058-3-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <54D9ED5D.2000001@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 09, 2015 at 11:55:54AM -0800, Gregory Fong wrote:
-> On Fri, Feb 6, 2015 at 1:41 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> > So it looks like the lib/show_mem.c does something different
-> > #ifdef CONFIG_CMA
-> >         printk("%lu pages reserved\n", (reserved - totalcma_pages));
-> >         printk("%lu pages cma reserved\n", totalcma_pages);
-> > #else
-> >         printk("%lu pages reserved\n", reserved);
-> > #endif
-> >
-> >
-> > No need to change the name, instead I'd say fix up arm to match what
-> > the generic showmem is doing.
-> 
-> The trouble is that lib/show_mem.c and ARM's show_mem use the
-> 'reserved' variable to hold different info, which was not a problem I
-> was aiming to tackle here, and am not sure I understand what's going
-> on well enough to do so.  But let's give it a shot:
-> 
-> In lib/show_mem.c, reserved is calculated by iterating over all online
-> nodes, then increasing reserved by (zone->present_pages -
-> zone->managed_pages).  This count includes CMA pages and so when
-> reserved pages is printed it should be 'reserved' - totalcma_pages, as
-> it currently is.
+Hello.
 
-So, some digging is needed into why the generic version is different.
-You have to remember that many of the algorithms for this kind of thing
-were based on the x86 implementation, so differences like this are
-probably down to ARM being annoyingly overlooked or ignored when generic
-changes happen.
+On 2/10/2015 12:10 PM, Zhangfei Gao wrote:
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> ---
+>   .../devicetree/bindings/usb/hi6220-usb.txt         | 49 ++++++++++++++++++++++
+>   1 file changed, 49 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/usb/hi6220-usb.txt
+
+> diff --git a/Documentation/devicetree/bindings/usb/hi6220-usb.txt b/Documentation/devicetree/bindings/usb/hi6220-usb.txt
+> new file mode 100644
+> index 0000000..b8278de
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/hi6220-usb.txt
+> @@ -0,0 +1,49 @@
+> +Hisilicon hi6220 SoC USB controller
+> +-----------------------------
+[...]
+> +PHY:
+> +-----
+> +
+> +Required properties:
+> +- compatible: "hisilicon,hi6220-usb-phy"
+> +- vcc-supply: phandle to the regulator that provides power to the PHY.
+> +- clocks: phandle and clock specifier of the PHY clock.
+> +- hisilicon,peripheral-syscon: phandle of syscon used to control peripheral.
+> +- hisilicon,gpio-vbus: gpio of detecting vbus.
+> +- hisilicon,gpio-id: gpio of detecting id.
+
+    Actually, GPIO bindings say that GPIO properties should be named 
+"[<name>-]gpios".
+
+> +
+> +Example:
+> +
+> +	peripheral_ctrl: syscon at f7030000 {
+> +	        compatible = "syscon";
+> +	        reg = <0x0 0xf7030000 0x0 0x1000>;
+> +	};
+> +
+> +	usb2_phy: usbphy {
+
+    Please name it "usb-phy" as it better resembles "ethernet-phy" 
+standardized by ePAPR.
+
+[...]
+
+WBR, Sergei
