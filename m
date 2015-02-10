@@ -1,50 +1,77 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 10 Feb 2015 12:10:58 +0100
-Subject: [PATCH v12 0/6] cpufreq: use generic cpufreq drivers for exynos
- platforms
-In-Reply-To: <CAMAWPa9fUJVjJ8V+93AkHy9DtEmUUnGs4MJDGcsoMdWwGmg5qg@mail.gmail.com>
-References: <1416576682-5255-1-git-send-email-thomas.ab@samsung.com>
- <CAMAWPa9fUJVjJ8V+93AkHy9DtEmUUnGs4MJDGcsoMdWwGmg5qg@mail.gmail.com>
-Message-ID: <CAJKOXPfyPH7tyce6YB=q4krSP078aJVAmqObg89qCnLrL_Nbhg@mail.gmail.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Tue, 10 Feb 2015 12:24:29 +0100
+Subject: [PATCH 3/3] ARM: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <1420559265-7333-3-git-send-email-p.zabel@pengutronix.de>
+References: <1420559265-7333-1-git-send-email-p.zabel@pengutronix.de>
+ <1420559265-7333-3-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <54D9EA6D.1020202@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-08 22:17 GMT+01:00 Kevin Hilman <khilman@kernel.org>:
-> On Fri, Nov 21, 2014 at 5:31 AM, Thomas Abraham <thomas.ab@samsung.com> wrote:
->> Changes since v11:
->> - Rebased on top of git://linuxtv.org/snawrocki/samsung.git for-v3.19-exynos-clk
->>
->> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
->> drivers and enables the use of cpufreq-dt driver for these platforms. This
->> series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
->> driver.
->>
->> This series is based on the following branch.
->> git://linuxtv.org/snawrocki/samsung.git for-v3.19-exynos-clk
->>
->> This series depends on the following patch which can be picked from
->> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git samsung/dt
->> e540920cf21c (ARM: dts: add CPU nodes for Exynos4 SoCs).
->>
->> This patch series has been tested on Exynos4210/5250/5420 based boards.
->> Tomasz Figa had plans to take this in the Samsung clock tree for v3.19
->> (http://www.spinics.net/lists/linux-samsung-soc/msg37933.html).
->> Sylwester, could you consider to merge this in your tree?
+On 06.01.2015 16:47, Philipp Zabel wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 >
-> CPUfreq for exynos is still not upstream.  What's the status of this
-> series?  It's been ver a month since there's been any activity here
-> (or any responses to the issues I reported.)
+> Due to incorrect placement of the clock gate cell in the ldb_di[x]_clk tree,
+> the glitchy parent mux of ldb_di[x]_clk can cause a glitch to enter the
+> ldb_di_ipu_div divider. If the divider gets locked up, no ldb_di[x]_clk is
+> generated, and the LVDS display will hang when the ipu_di_clk is sourced from
+> ldb_di_clk.
 >
-> On a related note, this series only does frequency scaling. Is there
-> any work going on to also enable voltage scaling for the CPU rails as
-> well?
+> To fix the problem, both the new and current parent of the ldb_di_clk should
+> be disabled before the switch. This patch ensures that correct steps are
+> followed when ldb_di_clk parent is switched in the beginning of boot. The
+> glitchy muxes are then registered as read-only. The clock parent can be selected
+> using the assigned-clocks and assigned-clock-parents properties of the ccm
+> device tree node:
+>
+> 	&clks {
+> 		assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
+> 				  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
+> 		assigned-clock-parents = <&clks IMX6QDL_CLK_MMDC_CH1_AXI>,
+> 					 <&clks IMX6QDL_CLK_PLL5_VIDEO_DIV>;
+> 	};
+>
+> Signed-off-by: Ranjani Vaidyanathan <Ranjani.Vaidyanathan@freescale.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>   arch/arm/mach-imx/clk-imx6q.c | 201 ++++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 201 insertions(+)
+>
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index 2e379fb..77aa7b17 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+...
+> +	/*
+> +	 * The LDB_DI0/1_SEL muxes are registered read-only due to a hardware
+> +	 * bug. Set the muxes to the requested values before registering the
+> +	 * ldb_di_sel clocks.
+> +	 */
+> +	if ((imx_get_soc_revision() != IMX_CHIP_REVISION_1_0) ||
+> +	    cpu_is_imx6dl())
+> +		init_ldb_clks(np, base);
 
-Hi Thomas,
 
-Do you plan to continue with this work? It would be very helpful.
+I've a hopefully simple understanding question regarding this if():
 
-I also wonder if Exynos 4412 could be re-added (without the boost if
-these bindings are not ready)?
+What does happen (or: has to be done) in the (non-existing) else case of 
+this if() statement?
 
-Best regards,
-Krzysztof
+E.g. how to configure the clocks for the imx_get_soc_revision() == 
+IMX_CHIP_REVISION_1_0 case?
+
+For the if() case, we can configure the clocks via the assigned-clocks 
+and assigned-clock-parents as described in the commit message. But how 
+to configure the clocks/muxes in the else case? To my understanding, 
+with the patch 2/3 [1] the clocks/muxes are configured to read only.
+
+Sorry if I missed anything ;)
+
+Many thanks,
+
+Dirk
+
+[1] 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313619.html
