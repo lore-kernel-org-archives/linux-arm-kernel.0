@@ -1,62 +1,90 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 10 Feb 2015 17:31:33 +0800
-Subject: [PATCH v5 1/4] media: soc-camera: use icd->control instead of
- icd->pdev for reset()
+Date: Tue, 10 Feb 2015 17:31:36 +0800
+Subject: [PATCH v5 4/4] media: ov2640: dt: add the device tree binding document
 In-Reply-To: <1423560696-12304-1-git-send-email-josh.wu@atmel.com>
 References: <1423560696-12304-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1423560696-12304-2-git-send-email-josh.wu@atmel.com>
+Message-ID: <1423560696-12304-5-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-icd->control is the sub device dev, i.e. i2c device.
-icd->pdev is the soc camera device's device.
+Add the document for ov2640 dt.
 
-To be consitent with power() function, we will call reset() with
-icd->control as well.
-
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
 
 Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+Changes in v4:
+- remove aggsigned-clocks as it's general.
+- refine the explation.
 
- drivers/media/platform/soc_camera/soc_camera.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+Changes in v3:
+- fix incorrect description.
+- Add assigned-clocks & assigned-clock-rates.
+- resetb pin should be ACTIVE_LOW.
 
-diff --git a/drivers/media/platform/soc_camera/soc_camera.c b/drivers/media/platform/soc_camera/soc_camera.c
-index f4be2a1..7e6b914 100644
---- a/drivers/media/platform/soc_camera/soc_camera.c
-+++ b/drivers/media/platform/soc_camera/soc_camera.c
-@@ -688,7 +688,8 @@ static int soc_camera_open(struct file *file)
- 
- 		/* The camera could have been already on, try to reset */
- 		if (sdesc->subdev_desc.reset)
--			sdesc->subdev_desc.reset(icd->pdev);
-+			if (icd->control)
-+				sdesc->subdev_desc.reset(icd->control);
- 
- 		ret = soc_camera_add_device(icd);
- 		if (ret < 0) {
-@@ -1175,7 +1176,8 @@ static void scan_add_host(struct soc_camera_host *ici)
- 
- 			/* The camera could have been already on, try to reset */
- 			if (ssdd->reset)
--				ssdd->reset(icd->pdev);
-+				if (icd->control)
-+					ssdd->reset(icd->control);
- 
- 			icd->parent = ici->v4l2_dev.dev;
- 
-@@ -1461,7 +1463,7 @@ static int soc_camera_async_bound(struct v4l2_async_notifier *notifier,
- 				memcpy(&sdesc->subdev_desc, ssdd,
- 				       sizeof(sdesc->subdev_desc));
- 				if (ssdd->reset)
--					ssdd->reset(icd->pdev);
-+					ssdd->reset(&client->dev);
- 			}
- 
- 			icd->control = &client->dev;
+Changes in v2:
+- change the compatible string to be consistent with verdor file.
+- change the clock and pins' name.
+- add missed pinctrl in example.
+
+ .../devicetree/bindings/media/i2c/ov2640.txt       | 46 ++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
+
+diff --git a/Documentation/devicetree/bindings/media/i2c/ov2640.txt b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
+new file mode 100644
+index 0000000..c429b5b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
+@@ -0,0 +1,46 @@
++* Omnivision OV2640 CMOS sensor
++
++The Omnivision OV2640 sensor support multiple resolutions output, such as
++CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
++output format.
++
++Required Properties:
++- compatible: should be "ovti,ov2640"
++- clocks: reference to the xvclk input clock.
++- clock-names: should be "xvclk".
++
++Optional Properties:
++- resetb-gpios: reference to the GPIO connected to the resetb pin, if any.
++- pwdn-gpios: reference to the GPIO connected to the pwdn pin, if any.
++
++The device node must contain one 'port' child node for its digital output
++video port, in accordance with the video interface bindings defined in
++Documentation/devicetree/bindings/media/video-interfaces.txt.
++
++Example:
++
++	i2c1: i2c at f0018000 {
++		ov2640: camera at 0x30 {
++			compatible = "ovti,ov2640";
++			reg = <0x30>;
++
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_pck1 &pinctrl_ov2640_pwdn &pinctrl_ov2640_resetb>;
++
++			resetb-gpios = <&pioE 24 GPIO_ACTIVE_LOW>;
++			pwdn-gpios = <&pioE 29 GPIO_ACTIVE_HIGH>;
++
++			clocks = <&pck1>;
++			clock-names = "xvclk";
++
++			assigned-clocks = <&pck1>;
++			assigned-clock-rates = <25000000>;
++
++			port {
++				ov2640_0: endpoint {
++					remote-endpoint = <&isi_0>;
++					bus-width = <8>;
++				};
++			};
++		};
++	};
 -- 
 1.9.1
