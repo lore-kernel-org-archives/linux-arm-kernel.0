@@ -1,53 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 10 Feb 2015 10:52:52 -0200
-Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
- registers
-In-Reply-To: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
-References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 10 Feb 2015 13:57:15 +0100
+Subject: [PATCH] ARM: EXYNOS: Use platform device name as power domain name
+Message-ID: <1423573035-21960-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+The power domain nodes in DTS may be very generic (e.g. "power-domain"
+for Exynos 5420) making it very hard to debug:
 
-On Fri, Jan 30, 2015 at 5:20 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> According to i.MX23 and i.MX28 reference manual [1],[2] the fractional
-> clock control register is 32-bit wide, but is separated in 4 parts.
-> So write instructions must not apply to more than 1 part at once.
->
-> The clk init for the i.MX28 violates this restriction and all the other
-> accesses on that register suggest that there isn't such a restriction.
->
-> This patch restricts the access to this register to byte instructions and
-> extends the comment in the init functions.
->
-> Btw the imx23 init now uses a R-M-W sequence just like imx28 init
-> to avoid any clock glitches.
->
-> The changes has been tested with a i.MX23 and a i.MX28 board.
->
-> [1] - http://cache.freescale.com/files/dsp/doc/ref_manual/IMX23RM.pdf
-> [2] - http://cache.freescale.com/files/dsp/doc/ref_manual/MCIMX28RM.pdf
->
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> Reviewed-by: Marek Vasut <marex@denx.de>
-> ---
->
-> Changes in V2:
-> - use relaxed access operations in clk-ref
+$ cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+    domain                      status         slaves
+power-domain                    on
 
-With this patch applied mx28evk cannot probe SPI NOR flash:
+Use platform device name instead so the names will be a little more user
+friendly:
+    domain                      status         slaves
+100440e0.power-domain           on
 
-m25p80 spi1.0: unrecognized JEDEC id bytes: bf, 24, 40
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Suggested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Suggested-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+---
+ arch/arm/mach-exynos/pm_domains.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Reverting it from linux-next, then the SPI NOR probe correctly.
-
-m25p80 spi1.0: sst25vf016b (2048 Kbytes)
-
-Any ideas?
-
-Thanks for the suggestion, Marek!
-
-Regards,
-
-Fabio Estevam
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index 20f267121b3e..37642ea97d23 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -125,7 +125,7 @@ static __init int exynos4_pm_init_power_domain(void)
+ 			return -ENOMEM;
+ 		}
+ 
+-		pd->pd.name = kstrdup(np->name, GFP_KERNEL);
++		pd->pd.name = kstrdup(dev_name(dev), GFP_KERNEL);
+ 		pd->name = pd->pd.name;
+ 		pd->base = of_iomap(np, 0);
+ 		pd->pd.power_off = exynos_pd_power_off;
+-- 
+1.9.1
