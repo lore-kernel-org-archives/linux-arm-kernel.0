@@ -1,60 +1,68 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 10 Feb 2015 14:37:01 +0300
-Subject: [resend PATCH v3 2/4] Documentation: dt-bindings: add dt binding
- info for hi6220
-In-Reply-To: <1423559404-13058-3-git-send-email-zhangfei.gao@linaro.org>
-References: <1423559404-13058-1-git-send-email-zhangfei.gao@linaro.org>
- <1423559404-13058-3-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <54D9ED5D.2000001@cogentembedded.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 10 Feb 2015 12:46:06 +0100
+Subject: [PATCH 1/1] ARM: dts: Use more descriptive names for Exynos5420
+ PDs
+In-Reply-To: <54D52905.6040100@collabora.co.uk>
+References: <1423244258-24314-1-git-send-email-javier.martinez@collabora.co.uk>
+ <54D51170.10903@cogentembedded.com>
+ <54D52905.6040100@collabora.co.uk>
+Message-ID: <CAJKOXPepTJYYs6gR6NLQzsJndeRLgF+KHRpH9qt9noUgRBs2Dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+2015-02-06 21:50 GMT+01:00 Javier Martinez Canillas
+<javier.martinez@collabora.co.uk>:
+> Hello Sergei,
+>
+> Thanks a lot for your feedback.
+>
+> On 02/06/2015 08:09 PM, Sergei Shtylyov wrote:
+>> Hello.
+>>
+>> On 02/06/2015 08:37 PM, Javier Martinez Canillas wrote:
+>>
+>>> All the device nodes for the Exynos5420 power-domains have a quite
+>>> generic "power-domain" name.
+>>
+>>     And this is in conformance to the ePAPR standard.
+>>
+>
+> True, I forgot that the ePAPR recommends that the node names should be
+> somewhat generic but OTOH this is the only Exynos DTSI file that follows
+> the standard for the power domain device nodes. All other Exynos DTSI
+> use a prefix to differentiate between each power domain.
+>
+>>> So in case of an error, the Exynos PD
+>>> driver shows the following (not very useful) message:
+>>
+>>> "Power domain power-domain disable failed"
+>>
+>>     Why not fix the message instead to use the full device name?
+>>
+>
+> Well, the full node name is also not very useful IMHO since you have
+> to check the DTSI or SoC manual to map the device node unit-address to
+> the corresponding power domain.
+>
+> I used $subject when debugging an HDMI issue and instead of dropping
+> it, I just posted it in case someone considered useful. I don't really
+> mind if the patch is nacked / not picked.
 
-On 2/10/2015 12:10 PM, Zhangfei Gao wrote:
+Additionally (on Arndale Octa):
 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> ---
->   .../devicetree/bindings/usb/hi6220-usb.txt         | 49 ++++++++++++++++++++++
->   1 file changed, 49 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/usb/hi6220-usb.txt
+$ cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+    domain                      status         slaves
+           /device                                      runtime status
+----------------------------------------------------------------------
+power-domain                    on
+    /devices/platform/amba/3880000.adma                 suspended
+power-domain                    off
+power-domain                    off
+power-domain                    off
+power-domain                    off
+power-domain                    off
 
-> diff --git a/Documentation/devicetree/bindings/usb/hi6220-usb.txt b/Documentation/devicetree/bindings/usb/hi6220-usb.txt
-> new file mode 100644
-> index 0000000..b8278de
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/hi6220-usb.txt
-> @@ -0,0 +1,49 @@
-> +Hisilicon hi6220 SoC USB controller
-> +-----------------------------
-[...]
-> +PHY:
-> +-----
-> +
-> +Required properties:
-> +- compatible: "hisilicon,hi6220-usb-phy"
-> +- vcc-supply: phandle to the regulator that provides power to the PHY.
-> +- clocks: phandle and clock specifier of the PHY clock.
-> +- hisilicon,peripheral-syscon: phandle of syscon used to control peripheral.
-> +- hisilicon,gpio-vbus: gpio of detecting vbus.
-> +- hisilicon,gpio-id: gpio of detecting id.
-
-    Actually, GPIO bindings say that GPIO properties should be named 
-"[<name>-]gpios".
-
-> +
-> +Example:
-> +
-> +	peripheral_ctrl: syscon at f7030000 {
-> +	        compatible = "syscon";
-> +	        reg = <0x0 0xf7030000 0x0 0x1000>;
-> +	};
-> +
-> +	usb2_phy: usbphy {
-
-    Please name it "usb-phy" as it better resembles "ethernet-phy" 
-standardized by ePAPR.
-
-[...]
-
-WBR, Sergei
+This really is not helpful. From the power domain debugfs code it is
+complicated to extract of_node of power domain. It is easier to print
+the name of power domain. But wait... all names are the same! :) So
+why do we have the name in the first place?
