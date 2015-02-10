@@ -1,107 +1,97 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 10 Feb 2015 15:14:16 +0000
-Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
-In-Reply-To: <54D95DB8.9010308@codeaurora.org>
-References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
- <20150205105035.GL8656@n2100.arm.linux.org.uk>
- <20150205142918.GA10634@linux.vnet.ibm.com>
- <20150205161100.GQ8656@n2100.arm.linux.org.uk>
- <54D95DB8.9010308@codeaurora.org>
-Message-ID: <20150210151416.GD9432@leverpostej>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 10 Feb 2015 16:20:17 +0100
+Subject: [PATCH v4 2/5] irqchip: add virtual demultiplexer implementation
+In-Reply-To: <20150210150013.GD7119@twins.programming.kicks-ass.net>
+References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1422527620-8308-3-git-send-email-boris.brezillon@free-electrons.com>
+ <20150210150013.GD7119@twins.programming.kicks-ass.net>
+Message-ID: <20150210162017.0882cb77@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 10, 2015 at 01:24:08AM +0000, Stephen Boyd wrote:
-> On 02/05/15 08:11, Russell King - ARM Linux wrote:
-> > On Thu, Feb 05, 2015 at 06:29:18AM -0800, Paul E. McKenney wrote:
-> >> Works for me, assuming no hidden uses of RCU in the IPI code.  ;-)
-> > Sigh... I kind'a new it wouldn't be this simple.  The gic code which
-> > actually raises the IPI takes a raw spinlock, so it's not going to be
-> > this simple - there's a small theoretical window where we have taken
-> > this lock, written the register to send the IPI, and then dropped the
-> > lock - the update to the lock to release it could get lost if the
-> > CPU power is quickly cut at that point.
-> 
-> Hm.. at first glance it would seem like a similar problem exists with
-> the completion variable. But it seems that we rely on the call to
-> complete() fom the dying CPU to synchronize with wait_for_completion()
-> on the killing CPU via the completion's wait.lock.
-> 
-> void complete(struct completion *x)
-> {
->         unsigned long flags;
-> 
->         spin_lock_irqsave(&x->wait.lock, flags);
->         x->done++;
->         __wake_up_locked(&x->wait, TASK_NORMAL, 1);
->         spin_unlock_irqrestore(&x->wait.lock, flags);
-> }
-> 
-> and
-> 
-> static inline long __sched
-> do_wait_for_common(struct completion *x,
->                   long (*action)(long), long timeout, int state)
->                         ...
-> 			spin_unlock_irq(&x->wait.lock);
-> 			timeout = action(timeout);
-> 			spin_lock_irq(&x->wait.lock);
-> 
-> 
-> so the power can't really be cut until the killing CPU sees the lock
-> released either explicitly via the second cache flush in cpu_die() or
-> implicitly via hardware.
+Hello Peter,
 
-That sounds about right, though surely cache flush is irrelevant w.r.t.
-publishing of the unlock? The dsb(ishst) in the unlock path will ensure
-that the write is visibile prior to the second flush_cache_louis().
+On Tue, 10 Feb 2015 16:00:13 +0100
+Peter Zijlstra <peterz@infradead.org> wrote:
 
-That said, we _do_ need to flush the cache prior to the CPU being
-killed, or we can lose any (shared) dirty cache lines the CPU owns. In
-the presence of dirty cacheline migration we need to be sure the CPU to
-be killed doesn't acquire any lines prior to being killed (i.e. its
-caches need to be off and flushed). Given that I don't think it's
-feasible to perform an IPI.
-
-I think we need to move the synchronisation down into the
-cpu_ops::{cpu_die,cpu_kill} implementations, so that we can have the
-dying CPU signal readiness after it has disabled and flushed its caches.
-
-If the CPU can kill itself and we can query the state of the CPU, then
-the dying CPU needs to do nothing, and cpu_kill can just poll until it
-is dead. If the CPU needs to be killed from another CPU, it can update a
-(cacheline-padded) percpu variable that cpu_kill can poll (cleaning
-before each read).
-
-> Maybe we can do the same thing here by using a
-> spinlock for synchronization between the IPI handler and the dying CPU?
-> So lock/unlock around the IPI sending from the dying CPU and then do a
-> lock/unlock on the killing CPU before continuing.
+> On Thu, Jan 29, 2015 at 11:33:37AM +0100, Boris Brezillon wrote:
+> > +#ifdef CONFIG_VIRT_IRQ_DEMUX_CHIP
+> > +/**
+> > + * struct irq_chip_virt_demux - Dumb demultiplexer irq chip data structure
 > 
-> It would be nice if we didn't have to do anything at all though so
-> perhaps we can make it a nop on configs where there isn't a big little
-> switcher. Yeah it's some ugly coupling between these two pieces of code,
-> but I'm not sure how we can do better.
-
-I'm missing something here. What does the switcher have to do with this?
-
-> > Also, we _do_ need the second cache flush in place to ensure that the
-> > unlock is seen to other CPUs.
-> >
-> > We could work around that by taking and releasing the lock in the IPI
-> > processing function... but this is starting to look less attractive
-> > as the lock is private to irq-gic.c.
+> s/Dumb/Virtual/ ?
 > 
-> With Daniel Thompson's NMI fiq patches at least the lock would almost
-> always be gone, except for the bL switcher users. Another solution might
-> be to put a hotplug lock around the bL switcher code and then skip
-> taking the lock in gic_raise_softirq() if the IPI is our special hotplug
-> one. Conditional locking is pretty ugly though, so perhaps this isn't
-> such a great idea.
+> > + * @domain:		irq domain pointer
+> > + * @available:		Bitfield of valid irqs
+> > + * @unmasked:		Bitfield containing irqs status
+> > + * @flags:		irq_virt_demux_flags flags
+> > + * @src_irq:		irq feeding the virt demux chip
+> > + *
+> > + * Note, that irq_chip_generic can have multiple irq_chip_type
+> > + * implementations which can be associated to a particular irq line of
+> > + * an irq_chip_generic instance. That allows to share and protect
+> > + * state in an irq_chip_generic instance when we need to implement
+> > + * different flow mechanisms (level/edge) for it.
+> 
+> This seems like a copy/paste from struct irq_chip_generic; it seems not
+> relevant, seeing how irq_chip_virt_demux does not even have an
+> irq_chip_type pointer list.
+> 
+> Also, with a demuxer like this, we're bound to whatever flow type its
+> host is, no?
 
-There are also SMP platforms without a GIC (e.g. hip04) that would need
-similar modifications to their interrupt controller drivers, which is
-going to be painful.
+Absolutely, I'll fix the comment by removing those lines.
 
-Thanks,
-Mark.
+> 
+> > +# Dumb interrupt demuxer chip implementation
+> 
+> s/Dumb/Virtual/ ?
+
+Yep, I'll fix that one too.
+
+> 
+> > +#ifdef CONFIG_VIRT_IRQ_DEMUX_CHIP
+> > +/**
+> > + *	handle_virt_demux_irq - Dumb demuxer irq handle function.
+> 
+> idem
+> 
+> > + *	@irq:	the interrupt number
+> > + *	@desc:	the interrupt description structure for this irq
+> > + *
+> > + *	Dumb demux interrupts are sent from a demultiplexing interrupt handler
+> 
+> idem
+> 
+> > + *	which is not able to decide which child interrupt handler should be
+> > + *	called.
+> > + *
+> > + *	Note: The caller is expected to handle the ack, clear, mask and
+> > + *	unmask issues if necessary.
+> > + */
+> 
+> If we're calling multiple handlers, how can they all do this and not
+> collide?
+
+It's the same problem as you noted above: a copy/paste that should have
+been reworded.
+I'll remove those lines too.
+
+> 
+> Over all it looks good -- in as far as my (admittedly stale IRQ
+> braincells) go.
+> 
+> I'll go queue up these bits, if you could send me a delta patch
+> addressing these 'minor' comment issues?
+
+Thanks, I'll send you a patch addressing your comments (it would be
+great if you could squash it with this patch).
+
+Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
