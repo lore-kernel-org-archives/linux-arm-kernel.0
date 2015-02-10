@@ -1,70 +1,68 @@
-From: der.herr@hofr.at (Nicholas Mc Guire)
-Date: Tue, 10 Feb 2015 15:55:26 +0100
-Subject: [PATCH v2] i2c: cadence: fixup of wait_for_completion_timeout
- return handling
-In-Reply-To: <54DA12F4.3080203@cogentembedded.com>
-References: <1423494232-24747-1-git-send-email-hofrat@osadl.org>
- <54DA12F4.3080203@cogentembedded.com>
-Message-ID: <20150210145526.GA30328@opentech.at>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 10 Feb 2015 16:00:13 +0100
+Subject: [PATCH v4 2/5] irqchip: add virtual demultiplexer implementation
+In-Reply-To: <1422527620-8308-3-git-send-email-boris.brezillon@free-electrons.com>
+References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1422527620-8308-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150210150013.GD7119@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Feb 2015, Sergei Shtylyov wrote:
+On Thu, Jan 29, 2015 at 11:33:37AM +0100, Boris Brezillon wrote:
+> +#ifdef CONFIG_VIRT_IRQ_DEMUX_CHIP
+> +/**
+> + * struct irq_chip_virt_demux - Dumb demultiplexer irq chip data structure
 
-> Hello.
->
-> On 2/9/2015 6:03 PM, Nicholas Mc Guire wrote:
->
->> return type of wait_for_completion_timeout is unsigned long not int. The
->> return variable is renamed to reflect its use and the type adjusted to
->> unsigned long.
->
->> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
->> ---
->
->> v2: int ret is an idiom not only a declaration - thus rather than just
->>      changing the type, rename the variable, as suggested by Wolfram Sang
->>      <wsa@the-dreams.de>.
->
->> Patch was only compile tested with multi_v7_defconfig
->> (implies CONFIG_I2C_CADENCE=y)
->
->> Patch is against 3.19.0-rc7 (localversion-next is -next-20150209)
->
->>   drivers/i2c/busses/i2c-cadence.c |    6 +++---
->>   1 file changed, 3 insertions(+), 3 deletions(-)
->
->> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
->> index 7d7a14c..8f92732f 100644
->> --- a/drivers/i2c/busses/i2c-cadence.c
->> +++ b/drivers/i2c/busses/i2c-cadence.c
->> @@ -475,7 +475,7 @@ static void cdns_i2c_master_reset(struct i2c_adapter *adap)
->>   static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
->>   		struct i2c_adapter *adap)
->>   {
->> -	int ret;
->> +	unsigned long timeout;
->>   	u32 reg;
->>
->>   	id->p_msg = msg;
->> @@ -501,8 +501,8 @@ static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
->>   		cdns_i2c_msend(id);
->>
->>   	/* Wait for the signal of completion */
->> -	ret = wait_for_completion_timeout(&id->xfer_done, adap->timeout);
->> -	if (!ret) {
->> +	timeout = wait_for_completion_timeout(&id->xfer_done, adap->timeout);
->> +	if (!timeout) {
->
->    Which means that timeout *did* expire, contrary to what one may think. 
-> I don't think this is a good name for the variable, I'd suggest something 
-> like 'time_left' instead...
->
+s/Dumb/Virtual/ ?
 
-thanks for that review - yes it (time_left == 0) would clearly read as
-timeout.
+> + * @domain:		irq domain pointer
+> + * @available:		Bitfield of valid irqs
+> + * @unmasked:		Bitfield containing irqs status
+> + * @flags:		irq_virt_demux_flags flags
+> + * @src_irq:		irq feeding the virt demux chip
+> + *
+> + * Note, that irq_chip_generic can have multiple irq_chip_type
+> + * implementations which can be associated to a particular irq line of
+> + * an irq_chip_generic instance. That allows to share and protect
+> + * state in an irq_chip_generic instance when we need to implement
+> + * different flow mechanisms (level/edge) for it.
 
-Will fix that up and repost.
+This seems like a copy/paste from struct irq_chip_generic; it seems not
+relevant, seeing how irq_chip_virt_demux does not even have an
+irq_chip_type pointer list.
 
-thx!
-hofrat
+Also, with a demuxer like this, we're bound to whatever flow type its
+host is, no?
+
+> +# Dumb interrupt demuxer chip implementation
+
+s/Dumb/Virtual/ ?
+
+> +#ifdef CONFIG_VIRT_IRQ_DEMUX_CHIP
+> +/**
+> + *	handle_virt_demux_irq - Dumb demuxer irq handle function.
+
+idem
+
+> + *	@irq:	the interrupt number
+> + *	@desc:	the interrupt description structure for this irq
+> + *
+> + *	Dumb demux interrupts are sent from a demultiplexing interrupt handler
+
+idem
+
+> + *	which is not able to decide which child interrupt handler should be
+> + *	called.
+> + *
+> + *	Note: The caller is expected to handle the ack, clear, mask and
+> + *	unmask issues if necessary.
+> + */
+
+If we're calling multiple handlers, how can they all do this and not
+collide?
+
+Over all it looks good -- in as far as my (admittedly stale IRQ
+braincells) go.
+
+I'll go queue up these bits, if you could send me a delta patch
+addressing these 'minor' comment issues?
