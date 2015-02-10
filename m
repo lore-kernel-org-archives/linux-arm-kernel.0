@@ -1,94 +1,46 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 10 Feb 2015 19:59:57 +0100
-Subject: [PATCH 3/6] mtd: mxc-nand: Do the word to byte mangling in the
- read_byte callback
-In-Reply-To: <1423594800-24214-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1423594800-24214-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1423594800-24214-4-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Tue, 10 Feb 2015 19:59:54 +0100
+Subject: [PATCH 0/6] mtd: teach mxc-nand about ONFI probing
+Message-ID: <1423594800-24214-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the hardware operates in 16 bit mode it always reads 16 bits even
-for operations that only have the lower 8 bits defined. So the upper
-bits must be discarded. Do this in the read_byte callback instead of
-when reading the NAND id to support reading byte wise more than 5 bytes
-and at other occations (like reading the ONFI parameter page).
+Hello,
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/mtd/nand/mxc_nand.c | 34 ++++++++++------------------------
- 1 file changed, 10 insertions(+), 24 deletions(-)
+this series implements support for ONFI probing in mxc-nand.
+Before a PARAM command was just ignored and the following read_bytes
+read whatever then happened to be available from the controller's RAM.
+But actually this wasn't that bad because the driver already failed to
+read the ONFI marker at offset 32 in response to the READID command and
+so the PARAM command wasn't issued at all :-)
 
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index d9637ae34719..aa98a0dddcfb 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -552,30 +552,17 @@ static void send_page_v1(struct mtd_info *mtd, unsigned int ops)
- 
- static void send_read_id_v3(struct mxc_nand_host *host)
- {
--	struct nand_chip *this = &host->nand;
--
- 	/* Read ID into main buffer */
- 	writel(NFC_ID, NFC_V3_LAUNCH);
- 
- 	wait_op_done(host, true);
- 
- 	memcpy32_fromio(host->data_buf, host->main_area0, 16);
--
--	if (this->options & NAND_BUSWIDTH_16) {
--		/* compress the ID info */
--		host->data_buf[1] = host->data_buf[2];
--		host->data_buf[2] = host->data_buf[4];
--		host->data_buf[3] = host->data_buf[6];
--		host->data_buf[4] = host->data_buf[8];
--		host->data_buf[5] = host->data_buf[10];
--	}
- }
- 
- /* Request the NANDFC to perform a read of the NAND device ID. */
- static void send_read_id_v1_v2(struct mxc_nand_host *host)
- {
--	struct nand_chip *this = &host->nand;
--
- 	/* NANDFC buffer 0 is used for device ID output */
- 	writew(host->active_cs << 4, NFC_V1_V2_BUF_ADDR);
- 
-@@ -585,15 +572,6 @@ static void send_read_id_v1_v2(struct mxc_nand_host *host)
- 	wait_op_done(host, true);
- 
- 	memcpy32_fromio(host->data_buf, host->main_area0, 16);
--
--	if (this->options & NAND_BUSWIDTH_16) {
--		/* compress the ID info */
--		host->data_buf[1] = host->data_buf[2];
--		host->data_buf[2] = host->data_buf[4];
--		host->data_buf[3] = host->data_buf[6];
--		host->data_buf[4] = host->data_buf[8];
--		host->data_buf[5] = host->data_buf[10];
--	}
- }
- 
- static uint16_t get_dev_status_v3(struct mxc_nand_host *host)
-@@ -719,9 +697,17 @@ static u_char mxc_nand_read_byte(struct mtd_info *mtd)
- 	if (host->status_request)
- 		return host->devtype_data->get_dev_status(host) & 0xFF;
- 
--	ret = *(uint8_t *)(host->data_buf + host->buf_start);
--	host->buf_start++;
-+	if (nand_chip->options & NAND_BUSWIDTH_16) {
-+		/* only take the lower byte of each word */
-+		ret = *(uint16_t *)(host->data_buf + host->buf_start);
-+
-+		host->buf_start += 2;
-+	} else {
-+		ret = *(uint8_t *)(host->data_buf + host->buf_start);
-+		host->buf_start++;
-+	}
- 
-+	pr_debug("%s: ret=0x%hhx (start=%u)\n", __func__, ret, host->buf_start);
- 	return ret;
- }
- 
+Patch 1 is a robustness fix. Patch 2 is necessary to not make the
+controller stuck when the READPAGE command is issued before the flash
+chip is identified. Patch 3 is needed to be able to read more than 6
+bytes in the read_byte callback. Finally patch 4 fixes the driver to
+allow reading out the READID ONFI marker and patch 5 implements support
+for the PARAM command.
+
+Patch 6 implements a WARN that triggers when the core requests an
+unknown command from the driver. In the case of missing PARAM support it
+wouldn't have triggered because READID at offset 0x20 failed, too, but
+it might be worthwhile anyhow; I'm not sure though, so I marked it RFC.
+Not sure the set of commands will grow in the near future ...
+
+Best regards
+Uwe
+
+Uwe Kleine-K?nig (6):
+  mtd: mxc-nand: Add a timeout when waiting for interrupt
+  mtd: mxc-nand: Only enable hardware checksumming for fully detected
+    flashes
+  mtd: mxc-nand: Do the word to byte mangling in the read_byte callback
+  mtd: mxc-nand: Allow to use column addresses different from 0
+  mtd: mxc-nand: Implement support for PARAM command
+  [RFC] mtd: mxc-nand: Warn on unimplemented commands
+
+ drivers/mtd/nand/mxc_nand.c | 146 ++++++++++++++++++++++++++++----------------
+ 1 file changed, 93 insertions(+), 53 deletions(-)
+
 -- 
 2.1.4
