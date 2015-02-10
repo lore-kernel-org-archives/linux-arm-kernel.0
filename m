@@ -1,80 +1,59 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 10 Feb 2015 11:05:42 +0530
-Subject: [PATCH 2/2] ARM: dts: am43xx-clocks: Fix ehrpwm tbclk data on am43xx
-In-Reply-To: <1423546542-29664-1-git-send-email-vigneshr@ti.com>
-References: <1423546542-29664-1-git-send-email-vigneshr@ti.com>
-Message-ID: <1423546542-29664-3-git-send-email-vigneshr@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 10 Feb 2015 07:00:01 +0000
+Subject: [PATCH] xen/arm: allow console=hvc0 to be omitted for guests
+In-Reply-To: <1422626319-30752-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1422626319-30752-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <alpine.DEB.2.02.1502100648050.29696@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ehrpwm tbclk is wrongly modelled as deriving from dpll_per_m2_ck.
-The TRM says tbclk is derived from SYSCLKOUT. SYSCLKOUT nothing but the
-functional clock of pwmss (l4ls_gclk).
-Fix this by changing source of ehrpwmx_tbclk to l4ls_gclk.
+On Fri, 30 Jan 2015, Ard Biesheuvel wrote:
+> This patch registers hvc0 as the preferred console if no console
+> has been specified explicitly on the kernel command line.
+> 
+> The purpose is to allow platform agnostic kernels and boot images
+> (such as distro installers) to boot in a Xen/ARM domU without the
+> need to modify the command line by hand.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> 
+> This applies on top of the patch Julien is cooking up to move the
+> call to xen_guest_init() to an earlier boot stage. This needs to
+> be at least before the call to console_init() in start_kernel()
+> for this patch to do anything meaningful.
 
-Fixes: 4da1c67719f61 ("add tbclk data for ehrpwm")
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- arch/arm/boot/dts/am43xx-clocks.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+This patch looks good but there isn't much point in queuing this up
+without the prerequisite.
 
-diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
-index c7dc9dab93a4..cfb49686ab6a 100644
---- a/arch/arm/boot/dts/am43xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
-@@ -107,7 +107,7 @@
- 	ehrpwm0_tbclk: ehrpwm0_tbclk {
- 		#clock-cells = <0>;
- 		compatible = "ti,gate-clock";
--		clocks = <&dpll_per_m2_ck>;
-+		clocks = <&l4ls_gclk>;
- 		ti,bit-shift = <0>;
- 		reg = <0x0664>;
- 	};
-@@ -115,7 +115,7 @@
- 	ehrpwm1_tbclk: ehrpwm1_tbclk {
- 		#clock-cells = <0>;
- 		compatible = "ti,gate-clock";
--		clocks = <&dpll_per_m2_ck>;
-+		clocks = <&l4ls_gclk>;
- 		ti,bit-shift = <1>;
- 		reg = <0x0664>;
- 	};
-@@ -123,7 +123,7 @@
- 	ehrpwm2_tbclk: ehrpwm2_tbclk {
- 		#clock-cells = <0>;
- 		compatible = "ti,gate-clock";
--		clocks = <&dpll_per_m2_ck>;
-+		clocks = <&l4ls_gclk>;
- 		ti,bit-shift = <2>;
- 		reg = <0x0664>;
- 	};
-@@ -131,7 +131,7 @@
- 	ehrpwm3_tbclk: ehrpwm3_tbclk {
- 		#clock-cells = <0>;
- 		compatible = "ti,gate-clock";
--		clocks = <&dpll_per_m2_ck>;
-+		clocks = <&l4ls_gclk>;
- 		ti,bit-shift = <4>;
- 		reg = <0x0664>;
- 	};
-@@ -139,7 +139,7 @@
- 	ehrpwm4_tbclk: ehrpwm4_tbclk {
- 		#clock-cells = <0>;
- 		compatible = "ti,gate-clock";
--		clocks = <&dpll_per_m2_ck>;
-+		clocks = <&l4ls_gclk>;
- 		ti,bit-shift = <5>;
- 		reg = <0x0664>;
- 	};
-@@ -147,7 +147,7 @@
- 	ehrpwm5_tbclk: ehrpwm5_tbclk {
- 		#clock-cells = <0>;
- 		compatible = "ti,gate-clock";
--		clocks = <&dpll_per_m2_ck>;
-+		clocks = <&l4ls_gclk>;
- 		ti,bit-shift = <6>;
- 		reg = <0x0664>;
- 	};
--- 
-1.9.1
+Julien, what patch exactly is that? What is the status of it?
+
+
+>  arch/arm/xen/enlighten.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index c7ca936ebd99..61382cafa877 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/cpuidle.h>
+>  #include <linux/cpufreq.h>
+>  #include <linux/cpu.h>
+> +#include <linux/console.h>
+>  
+>  #include <linux/mm.h>
+>  
+> @@ -322,6 +323,9 @@ static int __init xen_guest_init(void)
+>  
+>  	register_cpu_notifier(&xen_cpu_notifier);
+>  
+> +	if (!console_set_on_cmdline)
+> +		add_preferred_console("hvc", 0, NULL);
+> +
+>  	return 0;
+>  }
+>  early_initcall(xen_guest_init);
+> -- 
+> 1.8.3.2
+> 
