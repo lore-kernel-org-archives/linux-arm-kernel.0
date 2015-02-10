@@ -1,33 +1,132 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 10 Feb 2015 15:58:42 +0200
-Subject: [PATCH 6/7] ARM: davinci: irqs: Correct McASP1 TX interrupt
- definition for DM646x
-In-Reply-To: <1423576723-24375-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1423576723-24375-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1423576723-24375-7-git-send-email-peter.ujfalusi@ti.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 10 Feb 2015 15:05:57 +0100
+Subject: [PATCH 1/2] drm: atmel-hlcdc: Add PM suspend/resume support
+In-Reply-To: <1423575646-3273-2-git-send-email-sylvain.rochet@finsecur.com>
+References: <1423575646-3273-1-git-send-email-sylvain.rochet@finsecur.com>
+ <1423575646-3273-2-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <20150210150557.235fa139@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-McASP1 TX interrupt is 30, not 32 on DM646x DMSoC
+Hi Sylvain,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/mach-davinci/include/mach/irqs.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Tue, 10 Feb 2015 14:40:45 +0100
+Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
 
-diff --git a/arch/arm/mach-davinci/include/mach/irqs.h b/arch/arm/mach-davinci/include/mach/irqs.h
-index 354af71798dc..edb2ca62321a 100644
---- a/arch/arm/mach-davinci/include/mach/irqs.h
-+++ b/arch/arm/mach-davinci/include/mach/irqs.h
-@@ -129,8 +129,8 @@
- #define IRQ_DM646X_EMACMISCINT  27
- #define IRQ_DM646X_MCASP0TXINT  28
- #define IRQ_DM646X_MCASP0RXINT  29
-+#define IRQ_DM646X_MCASP1TXINT  30
- #define IRQ_DM646X_RESERVED_3   31
--#define IRQ_DM646X_MCASP1TXINT  32
- #define IRQ_DM646X_VLQINT       38
- #define IRQ_DM646X_UARTINT2     42
- #define IRQ_DM646X_SPINT0       43
+> On suspend: switch off CRTC if not already suspended with runtime PM
+> 
+> On resume: switch on CRTC if we were not already suspended from runtime
+> PM while suspending.
+> 
+> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+> ---
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 60 ++++++++++++++++++++++++++++
+>  1 file changed, 60 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> index 22c3cca..4c89bd2 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> @@ -427,6 +427,36 @@ static void atmel_hlcdc_dc_lastclose(struct drm_device *dev)
+>  	drm_fbdev_cma_restore_mode(dc->fbdev);
+>  }
+>  
+> +static int atmel_hlcdc_dc_suspend(struct drm_device *dev, pm_message_t state)
+> +{
+> +	struct drm_crtc *crtc;
+> +
+> +	drm_modeset_lock_all(dev);
+> +
+> +	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+> +		struct drm_crtc_helper_funcs *crtc_funcs = crtc->helper_private;
+> +		(*crtc_funcs->disable)(crtc);
+
+Please replace that line by:
+
+		crtc_funcs->disable(crtc);
+		
+
+> +	}
+> +
+> +	drm_modeset_unlock_all(dev);
+> +	return 0;
+> +}
+> +
+> +static int atmel_hlcdc_dc_resume(struct drm_device *dev)
+> +{
+> +	struct drm_crtc *crtc;
+> +
+> +	drm_modeset_lock_all(dev);
+> +
+> +	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+> +		struct drm_crtc_helper_funcs *crtc_funcs = crtc->helper_private;
+> +		(*crtc_funcs->enable)(crtc);
+
+Ditto:
+		crtc_funcs->enable(crtc);
+
+> +	}
+> +
+> +	drm_modeset_unlock_all(dev);
+> +	return 0;
+> +}
+> +
+>  static int atmel_hlcdc_dc_irq_postinstall(struct drm_device *dev)
+>  {
+>  	struct atmel_hlcdc_dc *dc = dev->dev_private;
+> @@ -488,6 +518,8 @@ static struct drm_driver atmel_hlcdc_dc_driver = {
+>  	.driver_features = DRIVER_HAVE_IRQ | DRIVER_GEM | DRIVER_MODESET,
+>  	.preclose = atmel_hlcdc_dc_preclose,
+>  	.lastclose = atmel_hlcdc_dc_lastclose,
+> +	.suspend = atmel_hlcdc_dc_suspend,
+> +	.resume = atmel_hlcdc_dc_resume,
+>  	.irq_handler = atmel_hlcdc_dc_irq_handler,
+>  	.irq_preinstall = atmel_hlcdc_dc_irq_uninstall,
+>  	.irq_postinstall = atmel_hlcdc_dc_irq_postinstall,
+> @@ -559,6 +591,33 @@ static int atmel_hlcdc_dc_drm_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_PM
+> +static int atmel_hlcdc_dc_drm_suspend(struct device *dev)
+> +{
+> +	struct drm_device *drm_dev = dev_get_drvdata(dev);
+> +	pm_message_t message;
+> +
+> +	if (pm_runtime_suspended(dev) || !drm_dev)
+> +		return 0;
+> +
+> +	message.event = PM_EVENT_SUSPEND;
+> +	return atmel_hlcdc_dc_suspend(drm_dev, message);
+> +}
+> +
+> +static int atmel_hlcdc_dc_drm_resume(struct device *dev)
+> +{
+> +	struct drm_device *drm_dev = dev_get_drvdata(dev);
+> +
+> +	if (pm_runtime_suspended(dev) || !drm_dev)
+> +		return 0;
+> +
+> +	return atmel_hlcdc_dc_resume(drm_dev);
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(atmel_hlcdc_dc_drm_pm_ops,
+> +		atmel_hlcdc_dc_drm_suspend, atmel_hlcdc_dc_drm_resume);
+> +
+
+Do we really need to register both SIMPLE_DEV_PM_OPS and drm_driver
+suspend/resume functions.
+I thought the suspend/resume callbacks were called by DRM core code
+as part of the PM class specific operations.
+However, exynos driver seems to do the same, so this might well be
+required.
+
+Best Regards,
+
+Boris
+
 -- 
-2.3.0
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
