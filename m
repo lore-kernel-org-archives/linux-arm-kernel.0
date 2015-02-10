@@ -1,80 +1,89 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 10 Feb 2015 19:59:56 +0100
-Subject: [PATCH 2/6] mtd: mxc-nand: Only enable hardware checksumming for
- fully detected flashes
+Date: Tue, 10 Feb 2015 19:59:55 +0100
+Subject: [PATCH 1/6] mtd: mxc-nand: Add a timeout when waiting for interrupt
 In-Reply-To: <1423594800-24214-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1423594800-24214-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1423594800-24214-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1423594800-24214-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At least on i.MX25 (i.e. NFCv2) preset_v2 is called with mtd->writesize
-== 0 that is before the connect flash chip is detected. It then
-configures for 8 bit ECC mode which needs 26 bytes of OOB per 512 bytes
-main section. For flashes with a smaller OOB area issuing a read page
-command makes the controller stuck with this config.
-
-Note that this currently doesn't hurt because the first read page
-command is issued only after detection is complete and preset is called
-once more.
+While extending the mxc-nand driver it happend to me a few times that
+the device was stuck and this made the machine hang during boot. So
+implement a timeout and print a stack trace the first time this happens
+to make it debuggable. The return type of the waiting function is also
+changed to int to be able to handle the timeout in the caller.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/mtd/nand/mxc_nand.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ drivers/mtd/nand/mxc_nand.c | 47 ++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 36 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 27ba07c07966..d9637ae34719 100644
+index a8f550fec35e..27ba07c07966 100644
 --- a/drivers/mtd/nand/mxc_nand.c
 +++ b/drivers/mtd/nand/mxc_nand.c
-@@ -928,7 +928,7 @@ static void preset_v1(struct mtd_info *mtd)
- 	struct mxc_nand_host *host = nand_chip->priv;
- 	uint16_t config1 = 0;
- 
--	if (nand_chip->ecc.mode == NAND_ECC_HW)
-+	if (nand_chip->ecc.mode == NAND_ECC_HW && mtd->writesize)
- 		config1 |= NFC_V1_V2_CONFIG1_ECC_EN;
- 
- 	if (!host->devtype_data->irqpending_quirk)
-@@ -956,9 +956,6 @@ static void preset_v2(struct mtd_info *mtd)
- 	struct mxc_nand_host *host = nand_chip->priv;
- 	uint16_t config1 = 0;
- 
--	if (nand_chip->ecc.mode == NAND_ECC_HW)
--		config1 |= NFC_V1_V2_CONFIG1_ECC_EN;
--
- 	config1 |= NFC_V2_CONFIG1_FP_INT;
- 
- 	if (!host->devtype_data->irqpending_quirk)
-@@ -967,6 +964,9 @@ static void preset_v2(struct mtd_info *mtd)
- 	if (mtd->writesize) {
- 		uint16_t pages_per_block = mtd->erasesize / mtd->writesize;
- 
-+		if (nand_chip->ecc.mode == NAND_ECC_HW)
-+			config1 |= NFC_V1_V2_CONFIG1_ECC_EN;
+@@ -386,26 +386,51 @@ static irqreturn_t mxc_nfc_irq(int irq, void *dev_id)
+ /* This function polls the NANDFC to wait for the basic operation to
+  * complete by checking the INT bit of config2 register.
+  */
+-static void wait_op_done(struct mxc_nand_host *host, int useirq)
++static int wait_op_done(struct mxc_nand_host *host, int useirq)
+ {
+-	int max_retries = 8000;
++	int ret = 0;
 +
- 		host->eccsize = get_eccsize(mtd);
- 		if (host->eccsize == 4)
- 			config1 |= NFC_V2_CONFIG1_ECC_MODE_4;
-@@ -1024,9 +1024,6 @@ static void preset_v3(struct mtd_info *mtd)
- 		NFC_V3_CONFIG2_INT_MSK |
- 		NFC_V3_CONFIG2_NUM_ADDR_PHASE0;
++	/*
++	 * If operation is already complete, don't bother to setup an irq or a
++	 * loop.
++	 */
++	if (host->devtype_data->check_int(host))
++		return 0;
  
--	if (chip->ecc.mode == NAND_ECC_HW)
--		config2 |= NFC_V3_CONFIG2_ECC_EN;
--
- 	addr_phases = fls(chip->pagemask) >> 3;
+ 	if (useirq) {
+-		if (!host->devtype_data->check_int(host)) {
+-			reinit_completion(&host->op_completion);
+-			irq_control(host, 1);
+-			wait_for_completion(&host->op_completion);
++		unsigned long timeout;
++
++		reinit_completion(&host->op_completion);
++
++		irq_control(host, 1);
++
++		timeout = wait_for_completion_timeout(&host->op_completion, HZ);
++		if (!timeout && !host->devtype_data->check_int(host)) {
++			dev_dbg(host->dev, "timeout waiting for irq\n");
++			ret = -ETIMEDOUT;
+ 		}
+ 	} else {
+-		while (max_retries-- > 0) {
+-			if (host->devtype_data->check_int(host))
+-				break;
++		int max_retries = 8000;
++		int done;
  
- 	if (mtd->writesize == 2048) {
-@@ -1041,6 +1038,9 @@ static void preset_v3(struct mtd_info *mtd)
++		do {
+ 			udelay(1);
++
++			done = host->devtype_data->check_int(host);
++			if (done)
++				break;
++
++		} while (--max_retries);
++
++		if (!done) {
++			dev_dbg(host->dev, "timeout polling for completion\n");
++			ret = -ETIMEDOUT;
+ 		}
+-		if (max_retries < 0)
+-			pr_debug("%s: INT not set\n", __func__);
  	}
- 
- 	if (mtd->writesize) {
-+		if (chip->ecc.mode == NAND_ECC_HW)
-+			config2 |= NFC_V3_CONFIG2_ECC_EN;
 +
- 		config2 |= NFC_V3_CONFIG2_PPB(
- 				ffs(mtd->erasesize / mtd->writesize) - 6,
- 				host->devtype_data->ppb_shift);
++	WARN_ONCE(ret < 0, "timeout! useirq=%d\n", useirq);
++
++	return ret;
+ }
+ 
+ static void send_cmd_v3(struct mxc_nand_host *host, uint16_t cmd, int useirq)
 -- 
 2.1.4
