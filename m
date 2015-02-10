@@ -1,29 +1,64 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue, 10 Feb 2015 22:16:31 +0800
-Subject: [RFC PATCH 0/3] 
-Message-ID: <1423577791-19238-1-git-send-email-ykk@rock-chips.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 10 Feb 2015 17:17:24 +0300
+Subject: [PATCH v2] i2c: cadence: fixup of wait_for_completion_timeout
+ return handling
+In-Reply-To: <1423494232-24747-1-git-send-email-hofrat@osadl.org>
+References: <1423494232-24747-1-git-send-email-hofrat@osadl.org>
+Message-ID: <54DA12F4.3080203@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RK3288 hdmi eye-diagram test would fail when pixel clock is 148.5MHz,
-and single-ended test would failed when display mode is 74.25MHz.
-- Fix some code style, leave space for next patches.
-- For hdmi eye-diagram test, we turn on the Transmitter Trailer-B and
-  improve slopeboost to 25%-30% decrease.
-- For hdmi single-ended test, we set CKLVL & TXLVL to 17 when pixel
-  clock is 74.25MHz, keep CKLVL & TXLVL to 13 when pixel clock is 148.5MHz.
+Hello.
 
+On 2/9/2015 6:03 PM, Nicholas Mc Guire wrote:
 
-Yakir Yang (3):
-  drm: bridge/dw_hdmi: fixed codec style
-  drm: bridge/dw_hdmi_rockchip: improve hdmi eye-diagram test
-  drm: bridge/dw_hdmi: improve hdmi single-end test
+> return type of wait_for_completion_timeout is unsigned long not int. The
+> return variable is renamed to reflect its use and the type adjusted to
+> unsigned long.
 
- drivers/gpu/drm/bridge/dw_hdmi.c            |   20 ++++++++++----------
- drivers/gpu/drm/imx/dw_hdmi-imx.c           |   12 ++++++------
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c |   14 +++++++-------
- include/drm/bridge/dw_hdmi.h                |    5 +++--
- 4 files changed, 26 insertions(+), 25 deletions(-)
+> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+> ---
 
--- 
-1.7.9.5
+> v2: int ret is an idiom not only a declaration - thus rather than just
+>      changing the type, rename the variable, as suggested by Wolfram Sang
+>      <wsa@the-dreams.de>.
+
+> Patch was only compile tested with multi_v7_defconfig
+> (implies CONFIG_I2C_CADENCE=y)
+
+> Patch is against 3.19.0-rc7 (localversion-next is -next-20150209)
+
+>   drivers/i2c/busses/i2c-cadence.c |    6 +++---
+>   1 file changed, 3 insertions(+), 3 deletions(-)
+
+> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+> index 7d7a14c..8f92732f 100644
+> --- a/drivers/i2c/busses/i2c-cadence.c
+> +++ b/drivers/i2c/busses/i2c-cadence.c
+> @@ -475,7 +475,7 @@ static void cdns_i2c_master_reset(struct i2c_adapter *adap)
+>   static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
+>   		struct i2c_adapter *adap)
+>   {
+> -	int ret;
+> +	unsigned long timeout;
+>   	u32 reg;
+>
+>   	id->p_msg = msg;
+> @@ -501,8 +501,8 @@ static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
+>   		cdns_i2c_msend(id);
+>
+>   	/* Wait for the signal of completion */
+> -	ret = wait_for_completion_timeout(&id->xfer_done, adap->timeout);
+> -	if (!ret) {
+> +	timeout = wait_for_completion_timeout(&id->xfer_done, adap->timeout);
+> +	if (!timeout) {
+
+    Which means that timeout *did* expire, contrary to what one may think. I 
+don't think this is a good name for the variable, I'd suggest something like 
+'time_left' instead...
+
+>   		cdns_i2c_master_reset(adap);
+>   		dev_err(id->adap.dev.parent,
+>   				"timeout waiting on completion\n");
+
+WBR, Sergei
