@@ -1,34 +1,25 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 10 Feb 2015 14:14:45 +0800
-Subject: [PATCH 3/3] ARM: at91: sama5d3/dts: add sama5d3 compatiable string
- for nand
-In-Reply-To: <1423548885-27589-1-git-send-email-josh.wu@atmel.com>
-References: <1423548885-27589-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1423548885-27589-3-git-send-email-josh.wu@atmel.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 10 Feb 2015 11:05:40 +0530
+Subject: [PATCH 0/2] fix ehrpwm tbclk data on am33xx and am43xx
+Message-ID: <1423546542-29664-1-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we introduce a new "atmel,sama5d3-nand" compatible string for
-sama5d3, Apply it for sama5d3 chip.
+In am33xx and am43xx, ehrpwm tbclk is derived from functional clock of
+PWMSS. The schematics and TRMs show that there is only one input clock to
+the PWMSS. But currently, tbclk is wrongly shown to be deriving from
+dpll_per_m2_ck instead of functional clock l4ls_gclk in the DT.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
+Fixing ehrpwm tbclk data to reflect the right clk source.
+Tested on beaglebone and am437x-gp-evm.
 
- arch/arm/boot/dts/sama5d3.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Vignesh R (2):
+  ARM: dts: am33xx-clocks: Fix ehrpwm tbclk data on am33xx
+  ARM: dts: am43xx-clocks: Fix ehrpwm tbclk data on am43xx
 
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index c0c3597..7b6c36f 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -1398,7 +1398,7 @@
- 		};
- 
- 		nand0: nand at 60000000 {
--			compatible = "atmel,at91rm9200-nand";
-+			compatible = "atmel,sama5d3-nand", "atmel,at91rm9200-nand";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
+ arch/arm/boot/dts/am33xx-clocks.dtsi |  6 +++---
+ arch/arm/boot/dts/am43xx-clocks.dtsi | 12 ++++++------
+ 2 files changed, 9 insertions(+), 9 deletions(-)
+
 -- 
 1.9.1
