@@ -1,80 +1,53 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 10 Feb 2015 13:46:12 +0100
-Subject: [PATCH 1/1] ARM: dts: Use more descriptive names for Exynos5420
- PDs
-In-Reply-To: <1423571438.6241.4.camel@AMDC1943>
-References: <1423244258-24314-1-git-send-email-javier.martinez@collabora.co.uk>
- <54D51170.10903@cogentembedded.com> <54D52905.6040100@collabora.co.uk>
- <CAJKOXPepTJYYs6gR6NLQzsJndeRLgF+KHRpH9qt9noUgRBs2Dw@mail.gmail.com>
- <54D9F1A4.1000908@cogentembedded.com> <1423570670.6241.2.camel@AMDC1943>
- <54D9F7B1.3030106@cogentembedded.com> <1423571438.6241.4.camel@AMDC1943>
-Message-ID: <54D9FD94.9000102@collabora.co.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 10 Feb 2015 10:52:52 -0200
+Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
+ registers
+In-Reply-To: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
+References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Stefan,
 
-On 02/10/2015 01:30 PM, Krzysztof Kozlowski wrote:
-> On wto, 2015-02-10 at 15:21 +0300, Sergei Shtylyov wrote:
->> On 2/10/2015 3:17 PM, Krzysztof Kozlowski wrote:
->> 
->> >>> Additionally (on Arndale Octa):
->> 
->> >>> $ cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
->> >>>       domain                      status         slaves
->> >>>              /device                                      runtime status
->> >>> ----------------------------------------------------------------------
->> >>> power-domain                    on
->> >>>       /devices/platform/amba/3880000.adma                 suspended
->> >>> power-domain                    off
->> >>> power-domain                    off
->> >>> power-domain                    off
->> >>> power-domain                    off
->> >>> power-domain                    off
->> 
->> >>> This really is not helpful. From the power domain debugfs code it is
->> >>> complicated to extract of_node of power domain.
->>
-
-Not very useful indeed.
- 
->> >>      You shouldn't need it.
->> 
->> >>> It is easier to print
->> >>> the name of power domain. But wait... all names are the same! :) So
->> >>> why do we have the name in the first place?
->> 
->> >>      I'm not sure why the full platform device names aren't printed -- they
->> >> should all be different.
->> 
-
-Yes, but like I said in a previous email the fact that are different doesn't
-necessarily mean that they will be helpful for debugging purposes.
-
->> > This debugfs code iterates over list of generic_pm_domains (gpd_list). I
->> > cannot find function for translating from genpd to its platform device
->> > so only genpd->name can be printed.
->> 
->>     Then why power domains aren't just named with the platform device names?
-> 
-> Right, the mach-exynos/pm_domains.c set the name equal to OF node name.
-> I'll send a patch extending the name.
+On Fri, Jan 30, 2015 at 5:20 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> According to i.MX23 and i.MX28 reference manual [1],[2] the fractional
+> clock control register is 32-bit wide, but is separated in 4 parts.
+> So write instructions must not apply to more than 1 part at once.
 >
+> The clk init for the i.MX28 violates this restriction and all the other
+> accesses on that register suggest that there isn't such a restriction.
+>
+> This patch restricts the access to this register to byte instructions and
+> extends the comment in the init functions.
+>
+> Btw the imx23 init now uses a R-M-W sequence just like imx28 init
+> to avoid any clock glitches.
+>
+> The changes has been tested with a i.MX23 and a i.MX28 board.
+>
+> [1] - http://cache.freescale.com/files/dsp/doc/ref_manual/IMX23RM.pdf
+> [2] - http://cache.freescale.com/files/dsp/doc/ref_manual/MCIMX28RM.pdf
+>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Reviewed-by: Marek Vasut <marex@denx.de>
+> ---
+>
+> Changes in V2:
+> - use relaxed access operations in clk-ref
 
-IIRC the OF core uses the device node unit address and node name to create
-the platform device names so you will have something like 10044000.power-domain.
+With this patch applied mx28evk cannot probe SPI NOR flash:
 
-Same if using the node full_name since it will /power-domain at 10044000. In both
-cases the DTS should have to be checked to know which power domain really is
-unless someone knows by heart the power domains addresses.
+m25p80 spi1.0: unrecognized JEDEC id bytes: bf, 24, 40
 
-But if using generic names for the power domains as suggested by ePAPR is so
-important then we should change all the other Exynos DTS files which don't do.
- 
-> Best regards,
-> Krzysztof
-> 
-> 
+Reverting it from linux-next, then the SPI NOR probe correctly.
 
-Best regards,
-Javier
+m25p80 spi1.0: sst25vf016b (2048 Kbytes)
+
+Any ideas?
+
+Thanks for the suggestion, Marek!
+
+Regards,
+
+Fabio Estevam
