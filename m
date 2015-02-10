@@ -1,350 +1,129 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Tue, 10 Feb 2015 21:32:55 +0100
-Subject: [PATCH RFC] ARM: BCM5301X: Implement SMP support
-Message-ID: <1423600375-18665-1-git-send-email-zajec5@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 10 Feb 2015 12:48:18 -0800
+Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
+In-Reply-To: <20150210151416.GD9432@leverpostej>
+References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
+ <20150205105035.GL8656@n2100.arm.linux.org.uk>
+ <20150205142918.GA10634@linux.vnet.ibm.com>
+ <20150205161100.GQ8656@n2100.arm.linux.org.uk>
+ <54D95DB8.9010308@codeaurora.org> <20150210151416.GD9432@leverpostej>
+Message-ID: <54DA6E92.3090109@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
----
- arch/arm/boot/dts/bcm4708.dtsi       |   1 +
- arch/arm/mach-bcm/Makefile           |   3 +
- arch/arm/mach-bcm/bcm5301x_headsmp.S | 108 ++++++++++++++++++++
- arch/arm/mach-bcm/bcm5301x_smp.c     | 185 +++++++++++++++++++++++++++++++++++
- 4 files changed, 297 insertions(+)
- create mode 100644 arch/arm/mach-bcm/bcm5301x_headsmp.S
- create mode 100644 arch/arm/mach-bcm/bcm5301x_smp.c
+On 02/10/15 07:14, Mark Rutland wrote:
+> On Tue, Feb 10, 2015 at 01:24:08AM +0000, Stephen Boyd wrote:
+>> On 02/05/15 08:11, Russell King - ARM Linux wrote:
+>>> On Thu, Feb 05, 2015 at 06:29:18AM -0800, Paul E. McKenney wrote:
+>>>> Works for me, assuming no hidden uses of RCU in the IPI code.  ;-)
+>>> Sigh... I kind'a new it wouldn't be this simple.  The gic code which
+>>> actually raises the IPI takes a raw spinlock, so it's not going to be
+>>> this simple - there's a small theoretical window where we have taken
+>>> this lock, written the register to send the IPI, and then dropped the
+>>> lock - the update to the lock to release it could get lost if the
+>>> CPU power is quickly cut at that point.
+>> Hm.. at first glance it would seem like a similar problem exists with
+>> the completion variable. But it seems that we rely on the call to
+>> complete() fom the dying CPU to synchronize with wait_for_completion()
+>> on the killing CPU via the completion's wait.lock.
+>>
+>> void complete(struct completion *x)
+>> {
+>>         unsigned long flags;
+>>
+>>         spin_lock_irqsave(&x->wait.lock, flags);
+>>         x->done++;
+>>         __wake_up_locked(&x->wait, TASK_NORMAL, 1);
+>>         spin_unlock_irqrestore(&x->wait.lock, flags);
+>> }
+>>
+>> and
+>>
+>> static inline long __sched
+>> do_wait_for_common(struct completion *x,
+>>                   long (*action)(long), long timeout, int state)
+>>                         ...
+>> 			spin_unlock_irq(&x->wait.lock);
+>> 			timeout = action(timeout);
+>> 			spin_lock_irq(&x->wait.lock);
+>>
+>>
+>> so the power can't really be cut until the killing CPU sees the lock
+>> released either explicitly via the second cache flush in cpu_die() or
+>> implicitly via hardware.
+> That sounds about right, though surely cache flush is irrelevant w.r.t.
+> publishing of the unlock? The dsb(ishst) in the unlock path will ensure
+> that the write is visibile prior to the second flush_cache_louis().
 
-diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
-index 31141e8..ed4ddba 100644
---- a/arch/arm/boot/dts/bcm4708.dtsi
-+++ b/arch/arm/boot/dts/bcm4708.dtsi
-@@ -15,6 +15,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "brcm,bcm4708-smp";
- 
- 		cpu at 0 {
- 			device_type = "cpu";
-diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-index 4c38674..ca12727 100644
---- a/arch/arm/mach-bcm/Makefile
-+++ b/arch/arm/mach-bcm/Makefile
-@@ -36,6 +36,9 @@ obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
- 
- # BCM5301X
- obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
-+ifeq ($(CONFIG_SMP),y)
-+obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm5301x_smp.o bcm5301x_headsmp.o
-+endif
- 
- # BCM63XXx
- obj-$(CONFIG_ARCH_BCM_63XX)	:= bcm63xx.o
-diff --git a/arch/arm/mach-bcm/bcm5301x_headsmp.S b/arch/arm/mach-bcm/bcm5301x_headsmp.S
-new file mode 100644
-index 0000000..e8df65f
---- /dev/null
-+++ b/arch/arm/mach-bcm/bcm5301x_headsmp.S
-@@ -0,0 +1,108 @@
-+/*
-+ * Broadcom BCM470X / BCM5301X ARM platform code.
-+ *
-+ * Copyright 2003 - 2008 Broadcom Corporation
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
-+
-+#include <asm/memory.h>
-+
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+
-+#define __virt_to_phys(x)	((x) - PAGE_OFFSET)
-+
-+/*
-+ * v7_l1_cache_invalidate
-+ *
-+ * Invalidate contents of L1 cache without flushing its contents
-+ * into outer cache and memory. This is needed when the contents
-+ * of the cache are unpredictable after power-up.
-+ *
-+ * corrupts r0-r6
-+ */
-+ENTRY(v7_l1_cache_invalidate)
-+	mov	r0, #0
-+	mcr	p15, 2, r0, c0, c0, 0	@ set cache level to 1
-+	mrc	p15, 1, r0, c0, c0, 0	@ read CLIDR
-+
-+	ldr	r1, =0x7fff
-+	and	r2, r1, r0, lsr #13	@ get max # of index size
-+
-+	ldr	r1, =0x3ff
-+	and	r3, r1, r0, lsr #3	@ NumWays - 1
-+	add	r2, r2, #1		@ NumSets
-+
-+	and	r0, r0, #0x7
-+	add	r0, r0, #4		@ SetShift
-+
-+	clz	r1, r3			@ WayShift
-+	add	r4, r3, #1		@ NumWays
-+1:	sub	r2, r2, #1		@ NumSets--
-+	mov	r3, r4			@ Temp = NumWays
-+2:	subs	r3, r3, #1		@ Temp--
-+	mov	r5, r3, lsl r1
-+	mov	r6, r2, lsl r0
-+	orr	r5, r5, r6		@ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
-+	mcr	p15, 0, r5, c7, c6, 2	@ Invalidate line
-+	bgt	2b
-+	cmp	r2, #0
-+	bgt	1b
-+	dsb
-+	mov	r0,#0
-+	mcr	p15,0,r0,c7,c5,0	/* Invalidate icache */
-+	isb
-+	mov	pc, lr
-+ENDPROC(v7_l1_cache_invalidate)
-+
-+/*
-+ * Platform specific entry point for secondary CPUs.  This
-+ * provides a "holding pen" into which all secondary cores are held
-+ * until we're ready for them to initialise.
-+ */
-+	__CPUINIT
-+ENTRY(bcm5301x_secondary_startup)
-+	/*
-+	 * Get hardware CPU id of ours
-+	 */
-+	mrc	p15, 0, r0, c0, c0, 5
-+	and	r0, r0, #15
-+	/*
-+	 * Wait on <pen_release> variable by physical address
-+	 * to contain our hardware CPU id
-+	 */
-+#ifdef CONFIG_SPARSEMEM
-+	ldr	r2, =(PAGE_OFFSET+SZ_128M)
-+	ldr	r1, =pen_release
-+	cmp	r1, r2
-+	bge	1f
-+	ldr	r2, =PAGE_OFFSET
-+	sub	r6, r1, r2
-+	b	2f
-+1:
-+	sub	r1, r1, r2
-+	ldr	r2, =PHYS_OFFSET2
-+	add	r6, r1, r2
-+2:
-+#else
-+	ldr	r6, =__virt_to_phys(pen_release)
-+#endif
-+pen:	ldr	r7, [r6]
-+	cmp	r7, r0
-+	bne	pen
-+	nop
-+	/*
-+	 * In case L1 cache has unpredictable contents at power-up
-+	 * clean its contents without flushing.
-+	 */
-+	bl	v7_l1_cache_invalidate
-+	nop
-+	/*
-+	 * we've been released from the holding pen: secondary_stack
-+	 * should now contain the SVC stack for this core
-+	 */
-+	b	secondary_startup
-+
-+ENDPROC(bcm5301x_secondary_startup)
-+	.ltorg
-diff --git a/arch/arm/mach-bcm/bcm5301x_smp.c b/arch/arm/mach-bcm/bcm5301x_smp.c
-new file mode 100644
-index 0000000..1a173ec
---- /dev/null
-+++ b/arch/arm/mach-bcm/bcm5301x_smp.c
-@@ -0,0 +1,185 @@
-+/*
-+ * Broadcom BCM470X / BCM5301X ARM platform code.
-+ *
-+ * Copyright (C) 2002 ARM Ltd.
-+ * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
-+
-+#include <asm/cacheflush.h>
-+#include <asm/delay.h>
-+#include <asm/smp_scu.h>
-+
-+#include <linux/clockchips.h>
-+
-+/*
-+ * There is a 1KB LUT located at 0xFFFF0400-0xFFFFFFFF, and its first entry
-+ * is where the secondary entry point needs to be written
-+*/
-+#define SOC_ROM_BASE_PA		0xffff0000
-+#define SOC_ROM_LUT_OFF		0x400
-+
-+/* ENTRY in bcm5301x_headsmp.S */
-+extern void bcm5301x_secondary_startup(void);
-+
-+static DEFINE_SPINLOCK(boot_lock);
-+
-+static void __cpuinit write_pen_release(int val)
-+{
-+	pen_release = val;
-+	/* Make sure this store is visible to other CPUs */
-+	smp_wmb();
-+	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
-+	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
-+}
-+
-+static void __init bcm5301x_smp_secondary_set_entry(void (*entry_point)(void))
-+{
-+	void __iomem *rombase = NULL;
-+	phys_addr_t lut_pa;
-+	u32 offset, mask;
-+	u32 val;
-+
-+	mask = (1UL << PAGE_SHIFT) - 1;
-+
-+	lut_pa = SOC_ROM_BASE_PA & ~mask;
-+	offset = SOC_ROM_BASE_PA &  mask;
-+	offset += SOC_ROM_LUT_OFF;
-+
-+	rombase = ioremap(lut_pa, PAGE_SIZE);
-+	if (!rombase)
-+		return;
-+	val = virt_to_phys(entry_point);
-+
-+	writel(val, rombase + offset);
-+
-+	smp_wmb();	/* probably not needed - io regs are not cached */
-+	dsb_sev();	/* Exit WFI */
-+	mb();
-+
-+	iounmap(rombase);
-+}
-+
-+static void __init bcm5301x_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	void __iomem *scu_base;
-+	unsigned int ncores;
-+
-+	if (!scu_a9_has_base()) {
-+		pr_warn("Unknown SCU base\n");
-+		return;
-+	}
-+
-+	scu_base = ioremap((phys_addr_t)scu_a9_get_base(), SZ_256);
-+	if (!scu_base) {
-+		pr_err("Failed to remap SCU\n");
-+		return;
-+	}
-+
-+	ncores = scu_get_core_count(scu_base);
-+	if (max_cpus > ncores) {
-+		unsigned int i;
-+
-+		pr_warn("Possible CPU mask exceeds available cores, reducing to %u\n",
-+			ncores);
-+		for (i = ncores - 1; i < max_cpus; i++)
-+			set_cpu_present(i, false);
-+		max_cpus = ncores;
-+	}
-+
-+	if (max_cpus > 1) {
-+		/* nobody is to be released from the pen yet */
-+		pen_release = -1;
-+
-+		/* Initialise the SCU */
-+		scu_enable(scu_base);
-+
-+		/* Let CPUs know where to start */
-+		bcm5301x_smp_secondary_set_entry(bcm5301x_secondary_startup);
-+	}
-+
-+	iounmap(scu_base);
-+}
-+
-+static void __cpuinit bcm5301x_smp_secondary_init(unsigned int cpu)
-+{
-+	trace_hardirqs_off();
-+
-+	/*
-+	 * let the primary processor know we're out of the
-+	 * pen, then head off into the C entry point
-+	 */
-+	write_pen_release(-1);
-+
-+	/*
-+	 * Synchronise with the boot thread.
-+	 */
-+	spin_lock(&boot_lock);
-+	spin_unlock(&boot_lock);
-+}
-+
-+static int __cpuinit bcm5301x_smp_boot_secondary(unsigned int cpu,
-+						 struct task_struct *idle)
-+{
-+	unsigned long timeout;
-+
-+	/*
-+	 * set synchronisation state between this boot processor
-+	 * and the secondary one
-+	 */
-+	spin_lock(&boot_lock);
-+
-+	/*
-+	 * The secondary processor is waiting to be released from
-+	 * the holding pen - release it, then wait for it to flag
-+	 * that it has been released by resetting pen_release.
-+	 *
-+	 * Note that "pen_release" is the hardware CPU ID, whereas
-+	 * "cpu" is Linux's internal ID.
-+	 */
-+	write_pen_release(cpu);
-+
-+	dsb_sev();
-+
-+	/*
-+	 * Timeout set on purpose in jiffies so that on slow processors
-+	 * that must also have low HZ it will wait longer.
-+	 */
-+	timeout = jiffies + (HZ * 10);
-+
-+	udelay(100);
-+
-+	/*
-+	 * If the secondary CPU was waiting on WFE, it should
-+	 * be already watching <pen_release>, or it could be
-+	 * waiting in WFI, send it an IPI to be sure it wakes.
-+	 */
-+	if (pen_release != -1)
-+		tick_broadcast(cpumask_of(cpu));
-+
-+	while (time_before(jiffies, timeout)) {
-+		smp_rmb();
-+		if (pen_release == -1)
-+			break;
-+
-+		udelay(10);
-+	}
-+
-+	/*
-+	 * now the secondary core is starting up let it run its
-+	 * calibrations, then wait for it to finish
-+	 */
-+	spin_unlock(&boot_lock);
-+
-+	return pen_release != -1 ? -ENOSYS : 0;
-+}
-+
-+static struct smp_operations bcm5301x_smp_ops __initdata = {
-+	.smp_prepare_cpus	= bcm5301x_smp_prepare_cpus,
-+	.smp_secondary_init	= bcm5301x_smp_secondary_init,
-+	.smp_boot_secondary	= bcm5301x_smp_boot_secondary,
-+};
-+
-+CPU_METHOD_OF_DECLARE(bcm5301x_smp, "brcm,bcm4708-smp",
-+		      &bcm5301x_smp_ops);
+Ah right. I was incorrectly thinking that the CPU had already disabled
+coherency at this point.
+
+>
+> That said, we _do_ need to flush the cache prior to the CPU being
+> killed, or we can lose any (shared) dirty cache lines the CPU owns. In
+> the presence of dirty cacheline migration we need to be sure the CPU to
+> be killed doesn't acquire any lines prior to being killed (i.e. its
+> caches need to be off and flushed). Given that I don't think it's
+> feasible to perform an IPI.
+
+The IPI/completion sounds nice because it allows the killing CPU to
+schedule and do other work until the dying CPU notifies that it's almost
+dead.
+
+>
+> I think we need to move the synchronisation down into the
+> cpu_ops::{cpu_die,cpu_kill} implementations, so that we can have the
+> dying CPU signal readiness after it has disabled and flushed its caches.
+>
+> If the CPU can kill itself and we can query the state of the CPU, then
+> the dying CPU needs to do nothing, and cpu_kill can just poll until it
+> is dead. If the CPU needs to be killed from another CPU, it can update a
+> (cacheline-padded) percpu variable that cpu_kill can poll (cleaning
+> before each read).
+
+How about a hybrid approach where we send the IPI from generic cpu_die()
+and then do the cacheline-padded bit poll + invalidate and bit set? That
+way we get the benefit of not doing that poll until we really need to
+and if we need to do it at all.
+
+cpu_kill | cpu_die | IPI | bit poll 
+---------+---------+-----+----------
+    Y    |    Y    |  Y  |   N
+    N    |    Y    |  Y  |   Y
+    Y    |    N    |  ?  |   ?    <-- Is this a valid configuration?
+    N    |    N    |  N  |   N    <-- Hotplug should be disabled
+
+
+If the hardware doesn't have a synchronization method in row 1 we can
+expose the bit polling functionality to the ops so that they can set and
+poll the bit. It looks like rockchip would need this because we just
+pull the power in cpu_kill without any synchronization. Unfortunately
+this is starting to sound like a fairly large patch to backport.
+
+Aside: For that last row we really should be setting cpu->hotpluggable
+in struct cpu based on what cpu_ops::cpu_disable returns (from what I
+can tell we use that op to indicate if a CPU can be hotplugged).
+
+Double Aside: It seems that exynos has a bug with coherency.
+exynos_cpu_die() calls v7_exit_coherency_flush() and then calls
+exynos_cpu_power_down() which may call of_machine_is_compatible() and
+that function will grab and release a kref which uses ldrex/strex for
+atomics after we've disabled coherency in v7_exit_coherency_flush().
+
+>> Maybe we can do the same thing here by using a
+>> spinlock for synchronization between the IPI handler and the dying CPU?
+>> So lock/unlock around the IPI sending from the dying CPU and then do a
+>> lock/unlock on the killing CPU before continuing.
+>>
+>> It would be nice if we didn't have to do anything at all though so
+>> perhaps we can make it a nop on configs where there isn't a big little
+>> switcher. Yeah it's some ugly coupling between these two pieces of code,
+>> but I'm not sure how we can do better.
+> I'm missing something here. What does the switcher have to do with this?
+
+The switcher is the reason we have a spinlock in gic_raise_softirq().
+That's the problem that Russell was mentioning.
+
 -- 
-1.8.4.5
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
