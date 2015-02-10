@@ -1,214 +1,91 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 10 Feb 2015 15:40:22 +0000
-Subject: [RFC PATCH v2 2/3] arm64: add IOMMU dma_ops
-In-Reply-To: <20150209060224.GG13969@arm.com>
-References: <cover.1423226542.git.robin.murphy@arm.com>
- <058e038009ac708a40197c80e07410914c2a162e.1423226542.git.robin.murphy@arm.com>
- <20150209060224.GG13969@arm.com>
-Message-ID: <54DA2666.9030003@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Feb 2015 15:41:57 +0000
+Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
+In-Reply-To: <54D95DB8.9010308@codeaurora.org>
+References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
+ <20150205105035.GL8656@n2100.arm.linux.org.uk>
+ <20150205142918.GA10634@linux.vnet.ibm.com>
+ <20150205161100.GQ8656@n2100.arm.linux.org.uk>
+ <54D95DB8.9010308@codeaurora.org>
+Message-ID: <20150210154157.GL8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/15 06:02, Will Deacon wrote:
-> On Fri, Feb 06, 2015 at 02:55:14PM +0000, Robin Murphy wrote:
->> Taking some inspiration from the arch/arm code, implement the
->> arch-specific side of the DMA mapping ops using the new IOMMU-DMA layer.
->
-> Is anybody looking at porting arch/arm/ over to this?
+On Mon, Feb 09, 2015 at 05:24:08PM -0800, Stephen Boyd wrote:
+> On 02/05/15 08:11, Russell King - ARM Linux wrote:
+> > On Thu, Feb 05, 2015 at 06:29:18AM -0800, Paul E. McKenney wrote:
+> >> Works for me, assuming no hidden uses of RCU in the IPI code.  ;-)
+> > Sigh... I kind'a new it wouldn't be this simple.  The gic code which
+> > actually raises the IPI takes a raw spinlock, so it's not going to be
+> > this simple - there's a small theoretical window where we have taken
+> > this lock, written the register to send the IPI, and then dropped the
+> > lock - the update to the lock to release it could get lost if the
+> > CPU power is quickly cut at that point.
+> 
+> Hm.. at first glance it would seem like a similar problem exists with
+> the completion variable. But it seems that we rely on the call to
+> complete() fom the dying CPU to synchronize with wait_for_completion()
+> on the killing CPU via the completion's wait.lock.
+> 
+> void complete(struct completion *x)
+> {
+>         unsigned long flags;
+> 
+>         spin_lock_irqsave(&x->wait.lock, flags);
+>         x->done++;
+>         __wake_up_locked(&x->wait, TASK_NORMAL, 1);
+>         spin_unlock_irqrestore(&x->wait.lock, flags);
+> }
+> 
+> and
+> 
+> static inline long __sched
+> do_wait_for_common(struct completion *x,
+>                   long (*action)(long), long timeout, int state)
+>                         ...
+> 			spin_unlock_irq(&x->wait.lock);
+> 			timeout = action(timeout);
+> 			spin_lock_irq(&x->wait.lock);
+> 
+> 
+> so the power can't really be cut until the killing CPU sees the lock
+> released either explicitly via the second cache flush in cpu_die() or
+> implicitly via hardware.
 
-If not, future me from once-there-are-no-more-major-changes-to-patch-1 
-will be.
+Correct - so the caller of wait_for_completion_timeout() needs to
+re-acquire the cache line after the complete() in order to return
+successfully - which means that the spin_unlock_irqrestore() on the
+dying CPU _must_ have become visible to other observers for the
+requesting CPU to proceed.
 
->
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>   arch/arm64/include/asm/device.h      |   3 +
->>   arch/arm64/include/asm/dma-mapping.h |  17 ++
->>   arch/arm64/mm/dma-mapping.c          | 320 +++++++++++++++++++++++++++++++++++
->>   3 files changed, 340 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
->> index 243ef25..510cee1 100644
->> --- a/arch/arm64/include/asm/device.h
->> +++ b/arch/arm64/include/asm/device.h
->> @@ -20,6 +20,9 @@ struct dev_archdata {
->>   	struct dma_map_ops *dma_ops;
->>   #ifdef CONFIG_IOMMU_API
->>   	void *iommu;			/* private IOMMU data */
->> +#ifdef CONFIG_IOMMU_DMA
->> +	struct iommu_dma_domain *dma_domain;
->> +#endif
->>   #endif
->>   	bool dma_coherent;
->>   };
->> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
->> index 6932bb5..c1b271f 100644
->> --- a/arch/arm64/include/asm/dma-mapping.h
->> +++ b/arch/arm64/include/asm/dma-mapping.h
->> @@ -62,13 +62,30 @@ static inline bool is_device_dma_coherent(struct device *dev)
->>
->>   #include <asm-generic/dma-mapping-common.h>
->>
->> +#ifdef CONFIG_IOMMU_DMA
->> +static inline struct iommu_dma_domain *get_dma_domain(struct device *dev)
->> +{
->> +	return dev->archdata.dma_domain;
->> +}
->
-> You use this function in patch 1, so you probably need to reorder the series
-> slightly.
+> Maybe we can do the same thing here by using a
+> spinlock for synchronization between the IPI handler and the dying CPU?
+> So lock/unlock around the IPI sending from the dying CPU and then do a
+> lock/unlock on the killing CPU before continuing.
 
-Good point. I need to introduce the dummy stubs unconditionally first, 
-then configure them out here.
+It would be nice, but it means exporting irq_controller_lock from irq_gic.c.
+It's doable, but it's really not nice - it creates a layering issue, buy
+making arch/arm/kernel/smp.c depend on symbols exported from
+drivers/irqchip/irq-gic.c.
 
->> +static inline void set_dma_domain(struct device *dev,
->> +				  struct iommu_dma_domain *dma_domain)
->> +{
->> +	dev->archdata.dma_domain = dma_domain;
->> +}
->> +#endif
->> +
->>   static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
->>   {
->> +	if (WARN_ON(dev && get_dma_domain(dev)))
->> +		return DMA_ERROR_CODE;
->>   	return (dma_addr_t)paddr;
->>   }
->>
->>   static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
->>   {
->> +	if (WARN_ON(dev && get_dma_domain(dev)))
->> +		return 0;
->>   	return (phys_addr_t)dev_addr;
->>   }
->>
->> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->> index 0a24b9b..28e771c 100644
->> --- a/arch/arm64/mm/dma-mapping.c
->> +++ b/arch/arm64/mm/dma-mapping.c
->> @@ -23,6 +23,7 @@
->>   #include <linux/genalloc.h>
->>   #include <linux/dma-mapping.h>
->>   #include <linux/dma-contiguous.h>
->> +#include <linux/dma-iommu.h>
->>   #include <linux/vmalloc.h>
->>   #include <linux/swiotlb.h>
->>
->> @@ -426,6 +427,7 @@ static int __init arm64_dma_init(void)
->>
->>   	ret |= swiotlb_late_init();
->>   	ret |= atomic_pool_init();
->> +	ret |= iommu_dma_init();
->>
->>   	return ret;
->>   }
->> @@ -439,3 +441,321 @@ static int __init dma_debug_do_init(void)
->>   	return 0;
->>   }
->>   fs_initcall(dma_debug_do_init);
->> +
->> +
->> +#ifdef CONFIG_IOMMU_DMA
->> +
->> +static struct page **__atomic_get_pages(void *addr)
->> +{
->> +	struct page *page;
->> +	phys_addr_t phys;
->> +
->> +	phys = gen_pool_virt_to_phys(atomic_pool, (unsigned long)addr);
->> +	page = phys_to_page(phys);
->> +
->> +	return (struct page **)page;
->> +}
->> +
->> +static struct page **__iommu_get_pages(void *cpu_addr, struct dma_attrs *attrs)
->> +{
->> +	struct vm_struct *area;
->> +
->> +	if (__in_atomic_pool(cpu_addr, PAGE_SIZE))
->> +		return __atomic_get_pages(cpu_addr);
->> +
->> +	area = find_vm_area(cpu_addr);
->> +	if (!area)
->> +		return NULL;
->> +
->> +	return area->pages;
->> +}
->> +
->> +static void *__iommu_alloc_atomic(struct device *dev, size_t size,
->> +				  dma_addr_t *handle, bool coherent)
->> +{
->> +	struct page *page;
->> +	void *addr;
->> +
->> +	addr = __alloc_from_pool(size, &page);
->> +	if (!addr)
->> +		return NULL;
->> +
->> +	*handle = iommu_dma_create_iova_mapping(dev, &page, size, coherent);
->> +	if (*handle == DMA_ERROR_CODE) {
->> +		__free_from_pool(addr, size);
->> +		return NULL;
->> +	}
->> +	return addr;
->> +}
->> +
->> +static void __iommu_free_atomic(struct device *dev, void *cpu_addr,
->> +				dma_addr_t handle, size_t size)
->> +{
->> +	iommu_dma_release_iova_mapping(dev, handle, size);
->> +	__free_from_pool(cpu_addr, size);
->> +}
->
-> Up until this point, I don't get why things need to be arch-specific. Surely
-> we should only care about cache and MMU management in the arch code?
+> > Also, we _do_ need the second cache flush in place to ensure that the
+> > unlock is seen to other CPUs.
+> >
+> > We could work around that by taking and releasing the lock in the IPI
+> > processing function... but this is starting to look less attractive
+> > as the lock is private to irq-gic.c.
+> 
+> With Daniel Thompson's NMI fiq patches at least the lock would almost
+> always be gone, except for the bL switcher users. Another solution might
+> be to put a hotplug lock around the bL switcher code and then skip
+> taking the lock in gic_raise_softirq() if the IPI is our special hotplug
+> one. Conditional locking is pretty ugly though, so perhaps this isn't
+> such a great idea.
 
-I agree, but the atomic pool implementation being private got in the 
-way. However, the idea of replacing the _get_pages() stuff with 
-scatterlists makes me think I can clean this up too.
+I haven't even thought about the implications of that yet. :)  We need to
+fix the already existing in-kernel code before we consider not-yet-merged
+code.
 
->> +static void __dma_clear_buffer(struct page *page, size_t size)
->> +{
->> +	void *ptr = page_address(page);
->> +
->> +	memset(ptr, 0, size);
->> +	__dma_flush_range(ptr, ptr + size);
->> +}
->> +
->> +static void *__iommu_alloc_attrs(struct device *dev, size_t size,
->> +				 dma_addr_t *handle, gfp_t gfp,
->> +				 struct dma_attrs *attrs)
->> +{
->> +	bool coherent = is_device_dma_coherent(dev);
->> +	pgprot_t prot = coherent ? __pgprot(PROT_NORMAL) :
->> +				   __pgprot(PROT_NORMAL_NC);
->> +	struct page **pages;
->> +	void *addr = NULL;
->> +
->> +	*handle = DMA_ERROR_CODE;
->> +	size = PAGE_ALIGN(size);
->> +
->> +	if (!(gfp & __GFP_WAIT))
->> +		return __iommu_alloc_atomic(dev, size, handle, coherent);
->> +	/*
->> +	 * FIXME: This isn't even true any more!
->> +	 *
->> +	 * Following is a work-around (a.k.a. hack) to prevent pages
->> +	 * with __GFP_COMP being passed to split_page() which cannot
->> +	 * handle them.  The real problem is that this flag probably
->> +	 * should be 0 on ARM as it is not supported on this
->> +	 * platform; see CONFIG_HUGETLBFS.
->> +	 */
->> +	gfp &= ~(__GFP_COMP);
->
-> We should fix this... is it not just a case of calling split_huge_page
-> for compond pages?
-
-I've been reading up on the matter and so far I'd concur, but I'm 
-starting to wonder if we really need to do half of this at all. AFAICT 
-the only real reason for splitting pages is so the mmap() implementation 
-can use vm_insert_page() - if that was changed to use remap_pfn_range() 
-instead would the need go away entirely? (SWIOTLB doesn't seem to worry 
-about any of this stuff)
-
-Robin.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
