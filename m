@@ -1,86 +1,56 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 10 Feb 2015 17:20:05 +0100
-Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
- demuxer chip
-In-Reply-To: <20150210161600.GH9432@leverpostej>
-References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
- <1422527620-8308-4-git-send-email-boris.brezillon@free-electrons.com>
- <20150210153628.GF9432@leverpostej>
- <20150210165201.634bc04b@bbrezillon>
- <20150210161600.GH9432@leverpostej>
-Message-ID: <20150210172005.4263c3a4@bbrezillon>
+From: hofrat@osadl.org (Nicholas Mc Guire)
+Date: Tue, 10 Feb 2015 11:55:10 -0500
+Subject: [PATCH v3] i2c: cadence: fixup wait_for_completion_timeout return
+ handling
+Message-ID: <1423587310-18103-1-git-send-email-hofrat@osadl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Feb 2015 16:16:00 +0000
-Mark Rutland <mark.rutland@arm.com> wrote:
+return type of wait_for_completion_timeout is unsigned long not int. The
+return variable is renamed to make the timeout condition clearly readable
+and the type adjusted to unsigned long.
 
-> On Tue, Feb 10, 2015 at 03:52:01PM +0000, Boris Brezillon wrote:
-> > Hi Mark,
-> > 
-> > On Tue, 10 Feb 2015 15:36:28 +0000
-> > Mark Rutland <mark.rutland@arm.com> wrote:
-> > 
-> > > Hi Boris,
-> > > 
-> > > On Thu, Jan 29, 2015 at 10:33:38AM +0000, Boris Brezillon wrote:
-> > > > Add documentation for the virtual irq demuxer.
-> > > > 
-> > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > > ---
-> > > >  .../bindings/interrupt-controller/dumb-demux.txt   | 41 ++++++++++++++++++++++
-> > > >  1 file changed, 41 insertions(+)
-> > > >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
-> > > > new file mode 100644
-> > > > index 0000000..b9a7830
-> > > > --- /dev/null
-> > > > +++ b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
-> > > > @@ -0,0 +1,41 @@
-> > > > +* Virtual Interrupt Demultiplexer
-> > > > +
-> > > > +This virtual demultiplexer simply forward all incoming interrupts to its
-> > > > +enabled/unmasked children.
-> > > > +It is only intended to be used by hardware that do not provide a proper way
-> > > > +to demultiplex a source interrupt, and thus have to wake all their children
-> > > > +up so that they can possibly handle the interrupt (if needed).
-> > > > +This can be seen as an alternative to shared interrupts when at least one
-> > > > +of the interrupt children is a timer (and require the irq to stay enabled
-> > > > +on suspend) while others are not. This will prevent calling irq handlers of
-> > > > +non timer devices while they are suspended.
-> > > 
-> > > This sounds like a DT-workaround for a Linux implementation problem, and
-> > > I don't think this the right way to solve your problem.
-> > 
-> > I understand your concern, but why are you answering while I asked for
-> > DT maintainers reviews for several days (if not several weeks).
-> 
-> I am sorry that I did not spot those, and I am very sorry that this
-> means I am only now able to air my concerns.
-> 
-> > > Why does this have to be in DT at all? Why can we not fix the core to
-> > > handle these details?
-> > 
-> > We already discussed that with Rob and Thomas, and hiding such a
-> > demuxer chip is not an easy task.
-> > I'm open to any suggestion to do that, though I'd like you (I mean DT
-> > guys) to provide a working implementation (or at least a viable concept)
-> > that would silently demultiplex an irq.
-> 
-> Is it truly necessary to drop a emux in the middle?
-> 
-> As far as I can see, all that we're attempting to do here is hide the
-> IRQF_NO_SUSPEND mismatch from the core IRQ code, though I've only just
-> started digging and haven't yet figured out where/why the core code
-> cares. Any hints?
+Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+---
 
-You should have a look at this thread [1] ;-)
+v3: rename the variable to time_left as suggested by Sergei Shtylyov 
+    <sergei.shtylyov@cogentembedded.com> so that the timeout condition is
+    clearly readable.
+v2: int ret is an idiom not only a declaration - thus rather than just
+    changing the type, rename the variable, as suggested by Wolfram Sang
+    <wsa@the-dreams.de>.
 
-[1]https://lkml.org/lkml/2014/12/15/552
+Patch was only compile tested with multi_v7_defconfig
+(implies CONFIG_I2C_CADENCE=y)
 
+Patch is against 3.19.0 (localversion-next is -next-20150210)
+
+ drivers/i2c/busses/i2c-cadence.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+index 7d7a14c..2ee78e0 100644
+--- a/drivers/i2c/busses/i2c-cadence.c
++++ b/drivers/i2c/busses/i2c-cadence.c
+@@ -475,7 +475,7 @@ static void cdns_i2c_master_reset(struct i2c_adapter *adap)
+ static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
+ 		struct i2c_adapter *adap)
+ {
+-	int ret;
++	unsigned long time_left;
+ 	u32 reg;
+ 
+ 	id->p_msg = msg;
+@@ -501,8 +501,8 @@ static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
+ 		cdns_i2c_msend(id);
+ 
+ 	/* Wait for the signal of completion */
+-	ret = wait_for_completion_timeout(&id->xfer_done, adap->timeout);
+-	if (!ret) {
++	time_left = wait_for_completion_timeout(&id->xfer_done, adap->timeout);
++	if (time_left == 0) {
+ 		cdns_i2c_master_reset(adap);
+ 		dev_err(id->adap.dev.parent,
+ 				"timeout waiting on completion\n");
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.7.10.4
