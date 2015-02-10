@@ -1,61 +1,85 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Mon, 09 Feb 2015 15:50:12 -0800
-Subject: Delays, clocks, timers, hrtimers, etc
-In-Reply-To: <54D93FFA.3090506@codeaurora.org>
-References: <54C8E125.3070905@free.fr>
- <e028a4eb604a491f4438557f4a1373ef@agner.ch> <54D52F84.9050600@free.fr>
- <266c7b1ff2d1a8ba0ae4866f4fb4eca5@agner.ch> <54D576B1.4000001@free.fr>
- <54D903F6.3050608@codeaurora.org> <54D93556.9050008@free.fr>
- <54D93FFA.3090506@codeaurora.org>
-Message-ID: <54D947B4.4080401@free.fr>
+From: cbz@baozis.org (Chen Baozi)
+Date: Tue, 10 Feb 2015 08:02:58 +0800
+Subject: [PATCH 3/3] stmmac: Add AXI burst length support to platform
+ device.
+In-Reply-To: <20150209120443.GF4250@leverpostej>
+References: <1423285636-8623-1-git-send-email-cbz@baozis.org>
+ <1423285636-8623-4-git-send-email-cbz@baozis.org>
+ <20150209120443.GF4250@leverpostej>
+Message-ID: <20150210000258.GD7920@cbz-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd wrote:
+On Mon, Feb 09, 2015 at 12:04:43PM +0000, Mark Rutland wrote:
+> On Sat, Feb 07, 2015 at 05:07:16AM +0000, Chen Baozi wrote:
+> > The AXI Bus Mode Register controls the AXI master behavior. It is mainly
+> > used to control the burst splitting and the number of outstanding requests.
+> > This register is present and valid only in GMAC-AXI configuration. The old
+> > driver only supports this feature on PCI devices. This patch adds an
+> > 'snps,apl' properties in DT to enable it on platform devices.
+> > 
+> > Signed-off-by: Chen Baozi <chenbaozi@kylinos.com.cn>
+> > ---
+> >  Documentation/devicetree/bindings/net/stmmac.txt      | 1 +
+> >  drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c | 1 +
+> >  2 files changed, 2 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/stmmac.txt b/Documentation/devicetree/bindings/net/stmmac.txt
+> > index c41afd9..8f3c834 100644
+> > --- a/Documentation/devicetree/bindings/net/stmmac.txt
+> > +++ b/Documentation/devicetree/bindings/net/stmmac.txt
+> > @@ -43,6 +43,7 @@ Optional properties:
+> >    available this clock is used for programming the Timestamp Addend Register.
+> >    If not passed then the system clock will be used and this is fine on some
+> >    platforms.
+> > +- snps,abl: AXI Burst Length
+> 
+> This is not a good name (though I see it follows "snps,pbl", which is
+> also not a good name)...
 
-> Mason wrote:
->
->> My platform provides a 32-bit counter, ticking at a constant 27 MHz.
->> Reading this counter has a latency of roughly 70 ns (it has to go
->> over the system memory bus). I think this is good enough for both
->> the clock source and sched_clock, is it not?
->>
->> So the plan would be:
->> - clocksource and sched_clock : 27 MHz, 32-bit counter, platform
->> - clockevents : TWD, standard
->
-> Yep, that sounds like a good plan. If your platform has the ARM global
-> timer (drivers/clocksource/arm_global_timer.c) then you don't need
-> anything besides that timer because it provides both the clocksource,
-> sched_clock, and clockevents. Sounds like you don't have that timer
+Any idea for a better name?
 
-I'm using Cortex A9, so I do have the global timer (AFAIU).
+> 
+> Why does this need to be in the DT? Is this required for correctness? Or
+> performance?
 
-However, I don't think I can safely use it as a clock source because
-I'm also using cpufreq, and I don't think the arm_global_timer driver
-handles CPU frequency updates, while the TWD driver does (?)
+This is required for correctness. Otherwise, the driver would write
+'0' to the register by default, which makes the driver not work.
 
-/*
-  * Updates clockevent frequency when the cpu frequency changes.
-  * Called on the cpu that is changing frequency with interrupts disabled.
-  */
+Cheers,
 
-"The Interrupt Controller, global timer, private timers, and watchdogs
-are clocked with PERIPHCLK." And PERIPHCLK is tied to CLK, which is
-modified by cpufreq. I didn't see any code in the arm_global_timer
-driver to deal with with that.
+Baozi.
 
-Did I overlook something fundamental?
-
-> though, so you have to write a driver for your custom platform timer and
-> at least hook up clocksource and sched_clock to it. If you have
-> interrupts with your platform timer you can skip out on TWD and also
-> register a clockevent in your platform timer driver.
-
-Registering a clock source or a sched_clock seems straight-forward.
-All I need to provide is a function to read the platform counter.
-
-However, why would I skip out on TWD?
-(I'm trying to minimize code needed for the port.)
-
-Regards.
+> 
+> Thanks,
+> Mark.
+> 
+> >  
+> >  Examples:
+> >  
+> > diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+> > index 3039de2..abbc897 100644
+> > --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+> > +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+> > @@ -230,6 +230,7 @@ static int stmmac_probe_config_dt(struct platform_device *pdev,
+> >  			return -ENOMEM;
+> >  		plat->dma_cfg = dma_cfg;
+> >  		of_property_read_u32(np, "snps,pbl", &dma_cfg->pbl);
+> > +		of_property_read_u32(np, "snps,abl", &dma_cfg->burst_len);
+> >  		dma_cfg->fixed_burst =
+> >  			of_property_read_bool(np, "snps,fixed-burst");
+> >  		dma_cfg->mixed_burst =
+> > -- 
+> > 2.1.4
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
