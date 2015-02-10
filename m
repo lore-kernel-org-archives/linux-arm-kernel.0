@@ -1,58 +1,77 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 10 Feb 2015 12:10:44 +0200
-Subject: [PATCH v3 2/2] remoteproc: add support to handle internal memories
-In-Reply-To: <1420838519-15669-3-git-send-email-s-anna@ti.com>
-References: <1420838519-15669-1-git-send-email-s-anna@ti.com>
- <1420838519-15669-3-git-send-email-s-anna@ti.com>
-Message-ID: <CAK=WgbaFoUpV315Tg1q=PGc-FkCvKBz2BmO8Fkj_FHa5UuWviw@mail.gmail.com>
+From: bamvor.zhangjian@huawei.com (Zhang Jian(Bamvor))
+Date: Tue, 10 Feb 2015 18:10:11 +0800
+Subject: [PATCH] compat: Fix endian issue in union sigval
+Message-ID: <1423563011-12377-1-git-send-email-bamvor.zhangjian@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+In 64bit architecture, sigval_int is the high 32bit of sigval_ptr in
+big endian kernel compare with low 32bit of sigval_ptr in little
+endian kernel. reference:
 
-On Fri, Jan 9, 2015 at 11:21 PM, Suman Anna <s-anna@ti.com> wrote:
-> A remote processor may need to load certain firmware sections into
-> internal memories (eg: RAM at L1 or L2 levels) for performance or
-> other reasons. Introduce a new resource type (RSC_INTMEM) and add
-> an associated handler function to handle such memories. The handler
-> creates a kernel mapping for the resource's 'pa' (physical address).
-...
-> + * rproc_handle_intmem() - handle internal memory resource entry
-> + * @rproc: rproc handle
-> + * @rsc: the intmem resource entry
-> + * @offset: offset of the resource data in resource table
-> + * @avail: size of available data (for image validation)
-> + *
-> + * This function will handle firmware requests for mapping a memory region
-> + * internal to a remote processor into kernel. It neither allocates any
-> + * physical pages, nor performs any iommu mapping, as this resource entry
-> + * is primarily used for representing physical internal memories. If the
-> + * internal memory region can only be accessed through an iommu, please
-> + * use a devmem resource entry.
-> + *
-> + * These resource entries should be grouped near the carveout entries in
-> + * the firmware's resource table, as other firmware entries might request
-> + * placing other data objects inside these memory regions (e.g. data/code
-> + * segments, trace resource entries, ...).
-> + */
-> +static int rproc_handle_intmem(struct rproc *rproc, struct fw_rsc_intmem *rsc,
-> +                              int offset, int avail)
-> +{
-...
-> +       va = (__force void *)ioremap_nocache(rsc->pa, rsc->len);
+    typedef union sigval {
+        int sival_int;
+        void *sival_ptr;
+    } sigval_t;
 
-Back in the days when we developed remoteproc there was a tremendous
-effort to move away from ioremap when not strictly needed.
+During compat_mq_notify or compat_timer_create, kernel get sigval
+from user space by reading sigval.sival_int. This is correct in 32 bit
+kernel and in 64bit little endian kernel. And It is wrong in 64bit big
+endian kernel:
+It get the high 32bit of sigval_ptr and put it to low 32bit of
+sigval_ptr. And the high 32bit sigval_ptr in empty in arm 32bit user
+space struct. So, kernel lost the value of sigval_ptr.
 
-I'd be happy if someone intimate with the related hardware could ack
-that in this specific case ioremap is indeed needed. No need to review
-the entire patch, or anything remoteproc, just make sure that
-generally ioremap is how we want to access this internal memory.
+The following patch get the sigval_ptr in stead of sigval_int in order
+to avoid endian issue.
+Test pass in arm64 big endian and little endian kernel.
 
-Tony or Kevin any chance you could take a look and ack?
+Signed-off-by: Zhang Jian(Bamvor) <bamvor.zhangjian@huawei.com>
+---
+ ipc/compat_mq.c | 7 ++-----
+ kernel/compat.c | 6 ++----
+ 2 files changed, 4 insertions(+), 9 deletions(-)
 
-If ioremap is indeed the way to go, I'd also expect that we wouldn't
-have to use __force here, but that's probably a minor patch cleanup.
-
-Thanks,
-Ohad.
+diff --git a/ipc/compat_mq.c b/ipc/compat_mq.c
+index ef6f91c..2e07343 100644
+--- a/ipc/compat_mq.c
++++ b/ipc/compat_mq.c
+@@ -99,11 +99,8 @@ COMPAT_SYSCALL_DEFINE2(mq_notify, mqd_t, mqdes,
+ 	if (u_notification) {
+ 		struct sigevent n;
+ 		p = compat_alloc_user_space(sizeof(*p));
+-		if (get_compat_sigevent(&n, u_notification))
+-			return -EFAULT;
+-		if (n.sigev_notify == SIGEV_THREAD)
+-			n.sigev_value.sival_ptr = compat_ptr(n.sigev_value.sival_int);
+-		if (copy_to_user(p, &n, sizeof(*p)))
++		if (get_compat_sigevent(&n, u_notification) ||
++		    copy_to_user(p, &n, sizeof(*p)))
+ 			return -EFAULT;
+ 	}
+ 	return sys_mq_notify(mqdes, p);
+diff --git a/kernel/compat.c b/kernel/compat.c
+index ebb3c36..13a0e5d 100644
+--- a/kernel/compat.c
++++ b/kernel/compat.c
+@@ -871,16 +871,14 @@ COMPAT_SYSCALL_DEFINE4(clock_nanosleep, clockid_t, which_clock, int, flags,
+  * We currently only need the following fields from the sigevent
+  * structure: sigev_value, sigev_signo, sig_notify and (sometimes
+  * sigev_notify_thread_id).  The others are handled in user mode.
+- * We also assume that copying sigev_value.sival_int is sufficient
+- * to keep all the bits of sigev_value.sival_ptr intact.
+  */
+ int get_compat_sigevent(struct sigevent *event,
+ 		const struct compat_sigevent __user *u_event)
+ {
+ 	memset(event, 0, sizeof(*event));
+ 	return (!access_ok(VERIFY_READ, u_event, sizeof(*u_event)) ||
+-		__get_user(event->sigev_value.sival_int,
+-			&u_event->sigev_value.sival_int) ||
++		__get_user(*(long long*)event->sigev_value.sival_ptr,
++			&u_event->sigev_value.sival_ptr) ||
+ 		__get_user(event->sigev_signo, &u_event->sigev_signo) ||
+ 		__get_user(event->sigev_notify, &u_event->sigev_notify) ||
+ 		__get_user(event->sigev_notify_thread_id,
+-- 
+1.8.4.5
