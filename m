@@ -1,53 +1,47 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Tue, 10 Feb 2015 16:13:17 +0800
-Subject: [PATCH] ARM: kprobes: Fix compilation error caused by superfluous
- '*'
-In-Reply-To: <1423553267.2647.7.camel@linaro.org>
-References: <1423553267.2647.7.camel@linaro.org>
-Message-ID: <54D9BD9D.2030503@huawei.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 10 Feb 2015 16:17:03 +0800
+Subject: [PATCH v5 3/5] ARM: mediatek: Add Pinctrl/GPIO driver for mt8135.
+In-Reply-To: <1421818097-9281-4-git-send-email-hongzhou.yang@mediatek.com>
+References: <1421818097-9281-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1421818097-9281-4-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <CACRpkdasVPUtn=-DhJ4OUXGZh36sLKwLhvm-nD-mkZjP7gQXww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/2/10 15:27, Jon Medhurst (Tixy) wrote:
-> There is a superfluous '*' in the definition of kprobe_decode_insn_t
-> which on older versions of GCC (4.2.4) causes the compilation error:
-> 
-> In file included from arch/arm/probes/kprobes/core.c:37:
-> arch/arm/probes/kprobes/core.h:43: error: '[*]' not allowed in other than a declaration
-> 
-> Fix this by removing the unneeded character.
-> 
+On Wed, Jan 21, 2015 at 1:28 PM, Hongzhou Yang
+<hongzhou.yang@mediatek.com> wrote:
 
-Hi Tixy,
+> From: Hongzhou Yang <hongzhou.yang@mediatek.com>
+>
+> The mediatek SoCs have GPIO controller that handle both the muxing and GPIOs.
+>
+> The GPIO controller have pinmux, pull enable, pull select, direction and output high/low control.
+>
+> This driver include common driver and mt8135 part.
+> The common driver include the pinctrl driver and GPIO driver.
+> The mt8135 part contain its special device data.
+>
+> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
 
-I checked C spec when writing this code and found [*] should be a standard way to
-represent array of unspecified number elements. But I forgot there are old gccs
-which don't support it.
+I have merged this patch for v3.21, except:
 
-Thank you for your fix!
+>  arch/arm/mach-mediatek/Kconfig                |    1 +
+(...)
+ --- a/arch/arm/mach-mediatek/Kconfig
+> +++ b/arch/arm/mach-mediatek/Kconfig
+> @@ -1,6 +1,7 @@
+>  menuconfig ARCH_MEDIATEK
+>         bool "Mediatek MT65xx & MT81xx SoC" if ARCH_MULTI_V7
+>         select ARM_GIC
+> +       select PINCTRL
+>         select MTK_TIMER
+>         help
+>           Support for Mediatek MT65xx & MT81xx SoCs
 
-> Reported-by: Janusz U?ycki <j.uzycki@elproma.com.pl>
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> ---
-> 
-> Russell, I also applied this to my branch that you pulled which
-> introduced the bug...
-> git://git.linaro.org/people/tixy/kernel.git kprobes
-> 
->  arch/arm/probes/kprobes/core.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/probes/kprobes/core.h b/arch/arm/probes/kprobes/core.h
-> index b3036c5..ec5d1f2 100644
-> --- a/arch/arm/probes/kprobes/core.h
-> +++ b/arch/arm/probes/kprobes/core.h
-> @@ -40,7 +40,7 @@ typedef enum probes_insn (kprobe_decode_insn_t)(probes_opcode_t,
->  						struct arch_probes_insn *,
->  						bool,
->  						const union decode_action *,
-> -						const struct decode_checker *[*]);
-> +						const struct decode_checker *[]);
->  
->  #ifdef CONFIG_THUMB2_KERNEL
->  
-> 
+This, which should come in through the ARM SoC tree. It's not
+dependent on this series anyway.
+
+This will appear after the merge window as we start the v3.21 cycle.
+
+Yours,
+Linus Walleij
