@@ -1,68 +1,24 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 10 Feb 2015 16:00:13 +0100
-Subject: [PATCH v4 2/5] irqchip: add virtual demultiplexer implementation
-In-Reply-To: <1422527620-8308-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
- <1422527620-8308-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150210150013.GD7119@twins.programming.kicks-ass.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 10 Feb 2015 13:06:18 -0200
+Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
+ registers
+In-Reply-To: <54DA0DE7.5050708@i2se.com>
+References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
+ <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
+ <54DA020C.6030703@i2se.com>
+ <CAOMZO5DGCP1p1vetwWHpSbe2qywA8DhWRRq22egMDFSw11uq4w@mail.gmail.com>
+ <54DA0DE7.5050708@i2se.com>
+Message-ID: <CAOMZO5AtFOThRjcAgMVbrbkcrJbehouSxoH03VUGJrRdWXnS_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 11:33:37AM +0100, Boris Brezillon wrote:
-> +#ifdef CONFIG_VIRT_IRQ_DEMUX_CHIP
-> +/**
-> + * struct irq_chip_virt_demux - Dumb demultiplexer irq chip data structure
+Hi Stefan,
 
-s/Dumb/Virtual/ ?
+On Tue, Feb 10, 2015 at 11:55 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
 
-> + * @domain:		irq domain pointer
-> + * @available:		Bitfield of valid irqs
-> + * @unmasked:		Bitfield containing irqs status
-> + * @flags:		irq_virt_demux_flags flags
-> + * @src_irq:		irq feeding the virt demux chip
-> + *
-> + * Note, that irq_chip_generic can have multiple irq_chip_type
-> + * implementations which can be associated to a particular irq line of
-> + * an irq_chip_generic instance. That allows to share and protect
-> + * state in an irq_chip_generic instance when we need to implement
-> + * different flow mechanisms (level/edge) for it.
+> Could you apply only the clk-imx28.c part of my patch and see what happens?
 
-This seems like a copy/paste from struct irq_chip_generic; it seems not
-relevant, seeing how irq_chip_virt_demux does not even have an
-irq_chip_type pointer list.
+If I apply only the clk-imx28.c part of your patch I can successfully
+probe the SPI NOR.
 
-Also, with a demuxer like this, we're bound to whatever flow type its
-host is, no?
-
-> +# Dumb interrupt demuxer chip implementation
-
-s/Dumb/Virtual/ ?
-
-> +#ifdef CONFIG_VIRT_IRQ_DEMUX_CHIP
-> +/**
-> + *	handle_virt_demux_irq - Dumb demuxer irq handle function.
-
-idem
-
-> + *	@irq:	the interrupt number
-> + *	@desc:	the interrupt description structure for this irq
-> + *
-> + *	Dumb demux interrupts are sent from a demultiplexing interrupt handler
-
-idem
-
-> + *	which is not able to decide which child interrupt handler should be
-> + *	called.
-> + *
-> + *	Note: The caller is expected to handle the ack, clear, mask and
-> + *	unmask issues if necessary.
-> + */
-
-If we're calling multiple handlers, how can they all do this and not
-collide?
-
-Over all it looks good -- in as far as my (admittedly stale IRQ
-braincells) go.
-
-I'll go queue up these bits, if you could send me a delta patch
-addressing these 'minor' comment issues?
+Thanks
