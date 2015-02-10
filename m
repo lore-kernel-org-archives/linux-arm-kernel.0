@@ -1,476 +1,107 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 10 Feb 2015 15:11:46 +0000
-Subject: [RFC PATCH v2 1/3] iommu: implement common IOMMU ops for DMA
- mapping
-In-Reply-To: <20150209040539.GE13969@arm.com>
-References: <cover.1423226542.git.robin.murphy@arm.com>
- <da0e905ae94f2fca241a47b2a20e078255e45a81.1423226542.git.robin.murphy@arm.com>
- <20150209040539.GE13969@arm.com>
-Message-ID: <54DA1FB2.5000507@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 10 Feb 2015 15:14:16 +0000
+Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
+In-Reply-To: <54D95DB8.9010308@codeaurora.org>
+References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
+ <20150205105035.GL8656@n2100.arm.linux.org.uk>
+ <20150205142918.GA10634@linux.vnet.ibm.com>
+ <20150205161100.GQ8656@n2100.arm.linux.org.uk>
+ <54D95DB8.9010308@codeaurora.org>
+Message-ID: <20150210151416.GD9432@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Tue, Feb 10, 2015 at 01:24:08AM +0000, Stephen Boyd wrote:
+> On 02/05/15 08:11, Russell King - ARM Linux wrote:
+> > On Thu, Feb 05, 2015 at 06:29:18AM -0800, Paul E. McKenney wrote:
+> >> Works for me, assuming no hidden uses of RCU in the IPI code.  ;-)
+> > Sigh... I kind'a new it wouldn't be this simple.  The gic code which
+> > actually raises the IPI takes a raw spinlock, so it's not going to be
+> > this simple - there's a small theoretical window where we have taken
+> > this lock, written the register to send the IPI, and then dropped the
+> > lock - the update to the lock to release it could get lost if the
+> > CPU power is quickly cut at that point.
+> 
+> Hm.. at first glance it would seem like a similar problem exists with
+> the completion variable. But it seems that we rely on the call to
+> complete() fom the dying CPU to synchronize with wait_for_completion()
+> on the killing CPU via the completion's wait.lock.
+> 
+> void complete(struct completion *x)
+> {
+>         unsigned long flags;
+> 
+>         spin_lock_irqsave(&x->wait.lock, flags);
+>         x->done++;
+>         __wake_up_locked(&x->wait, TASK_NORMAL, 1);
+>         spin_unlock_irqrestore(&x->wait.lock, flags);
+> }
+> 
+> and
+> 
+> static inline long __sched
+> do_wait_for_common(struct completion *x,
+>                   long (*action)(long), long timeout, int state)
+>                         ...
+> 			spin_unlock_irq(&x->wait.lock);
+> 			timeout = action(timeout);
+> 			spin_lock_irq(&x->wait.lock);
+> 
+> 
+> so the power can't really be cut until the killing CPU sees the lock
+> released either explicitly via the second cache flush in cpu_die() or
+> implicitly via hardware.
 
-Thanks for the comments,
+That sounds about right, though surely cache flush is irrelevant w.r.t.
+publishing of the unlock? The dsb(ishst) in the unlock path will ensure
+that the write is visibile prior to the second flush_cache_louis().
 
-On 09/02/15 04:05, Will Deacon wrote:
-> Hi Robin,
->
-> On Fri, Feb 06, 2015 at 02:55:13PM +0000, Robin Murphy wrote:
->> Taking inspiration from the existing arch/arm code, break out some
->> generic functions to interface the DMA-API to the IOMMU-API. This will
->> do the bulk of the heavy lifting for IOMMU-backed dma-mapping.
->>
->> Whilst this RFC series is aimed at enabling arm64, once any remaining
->> obvious issues in the common code are addressed we can complete the
->> refactoring by porting arch/arm over for a merge-worthy series.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>   drivers/iommu/Kconfig     |   7 +
->>   drivers/iommu/Makefile    |   1 +
->>   drivers/iommu/dma-iommu.c | 552 ++++++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/dma-iommu.h |  94 ++++++++
->>   4 files changed, 654 insertions(+)
->>   create mode 100644 drivers/iommu/dma-iommu.c
->>   create mode 100644 include/linux/dma-iommu.h
->>
->> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
->> index a839ca9..19027bb 100644
->> --- a/drivers/iommu/Kconfig
->> +++ b/drivers/iommu/Kconfig
->> @@ -20,6 +20,13 @@ config OF_IOMMU
->>          def_bool y
->>          depends on OF && IOMMU_API
->>
->> +# IOMMU-agnostic DMA-mapping layer
->> +config IOMMU_DMA
->> +       def_bool n
->
-> This can just be `bool' (n is the default).
->
+That said, we _do_ need to flush the cache prior to the CPU being
+killed, or we can lose any (shared) dirty cache lines the CPU owns. In
+the presence of dirty cacheline migration we need to be sure the CPU to
+be killed doesn't acquire any lines prior to being killed (i.e. its
+caches need to be off and flushed). Given that I don't think it's
+feasible to perform an IPI.
 
-Good to know, fixed.
+I think we need to move the synchronisation down into the
+cpu_ops::{cpu_die,cpu_kill} implementations, so that we can have the
+dying CPU signal readiness after it has disabled and flushed its caches.
 
->> +       depends on NEED_SG_DMA_LENGTH
->> +       select IOMMU_API
->> +       select IOMMU_IOVA
->> +
->>   config FSL_PAMU
->>          bool "Freescale IOMMU support"
->>          depends on PPC_E500MC
->> diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
->> index 0b1b94e..37bfc4e 100644
->> --- a/drivers/iommu/Makefile
->> +++ b/drivers/iommu/Makefile
->> @@ -1,6 +1,7 @@
->>   obj-$(CONFIG_IOMMU_API) += iommu.o
->>   obj-$(CONFIG_IOMMU_API) += iommu-traces.o
->>   obj-$(CONFIG_IOMMU_API) += iommu-sysfs.o
->> +obj-$(CONFIG_IOMMU_DMA) += dma-iommu.o
->>   obj-$(CONFIG_IOMMU_IOVA) += iova.o
->>   obj-$(CONFIG_OF_IOMMU) += of_iommu.o
->>   obj-$(CONFIG_MSM_IOMMU) += msm_iommu.o msm_iommu_dev.o
->> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
->> new file mode 100644
->> index 0000000..b97cc0b9
->> --- /dev/null
->> +++ b/drivers/iommu/dma-iommu.c
->> @@ -0,0 +1,552 @@
->> +/*
->> + * A fairly generic DMA-API to IOMMU-API glue layer.
->> + *
->> + * Copyright (C) 2014 ARM Ltd.
->> + *
->> + * based in part on arch/arm/mm/dma-mapping.c:
->> + * Copyright (C) 2000-2004 Russell King
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#define pr_fmt(fmt)    "%s: " fmt, __func__
->> +
->> +#include <linux/dma-contiguous.h>
->> +#include <linux/dma-iommu.h>
->> +#include <linux/iova.h>
->> +
->> +int iommu_dma_init(void)
->> +{
->> +       return iommu_iova_cache_init();
->> +}
->> +
->> +struct iommu_dma_domain {
->> +       struct iommu_domain *domain;
->> +       struct iova_domain *iovad;
->> +       struct kref kref;
->> +};
->> +
->> +static inline dma_addr_t dev_dma_addr(struct device *dev, dma_addr_t addr)
->> +{
->> +       BUG_ON(addr < dev->dma_pfn_offset);
->
-> Shouldn't we convert the pfn_offset to an address before this check?
->
+If the CPU can kill itself and we can query the state of the CPU, then
+the dying CPU needs to do nothing, and cpu_kill can just poll until it
+is dead. If the CPU needs to be killed from another CPU, it can update a
+(cacheline-padded) percpu variable that cpu_kill can poll (cleaning
+before each read).
 
-Oops, yes indeed we should...
+> Maybe we can do the same thing here by using a
+> spinlock for synchronization between the IPI handler and the dying CPU?
+> So lock/unlock around the IPI sending from the dying CPU and then do a
+> lock/unlock on the killing CPU before continuing.
+> 
+> It would be nice if we didn't have to do anything at all though so
+> perhaps we can make it a nop on configs where there isn't a big little
+> switcher. Yeah it's some ugly coupling between these two pieces of code,
+> but I'm not sure how we can do better.
 
->> +       return addr - ((dma_addr_t)dev->dma_pfn_offset << PAGE_SHIFT);
->> +}
->> +
->> +static int __dma_direction_to_prot(enum dma_data_direction dir, bool coherent)
->> +{
->> +       int prot = coherent ? IOMMU_CACHE : 0;
->> +
->> +       switch (dir) {
->> +       case DMA_BIDIRECTIONAL:
->> +               return prot | IOMMU_READ | IOMMU_WRITE;
->> +       case DMA_TO_DEVICE:
->> +               return prot | IOMMU_READ;
->> +       case DMA_FROM_DEVICE:
->> +               return prot | IOMMU_WRITE;
->> +       default:
->> +               return 0;
->> +       }
->> +}
->
-> We could actually stick this into a header file as a generic helper.
-> arch/arm/ already uses its own flavour, for example.
+I'm missing something here. What does the switcher have to do with this?
 
-Well, it's already been said that the arch/arm implementation should go 
-away as part of merging this ;) Having had a good look around there 
-don't appear to be any other potential users to share it with.
+> > Also, we _do_ need the second cache flush in place to ensure that the
+> > unlock is seen to other CPUs.
+> >
+> > We could work around that by taking and releasing the lock in the IPI
+> > processing function... but this is starting to look less attractive
+> > as the lock is private to irq-gic.c.
+> 
+> With Daniel Thompson's NMI fiq patches at least the lock would almost
+> always be gone, except for the bL switcher users. Another solution might
+> be to put a hotplug lock around the bL switcher code and then skip
+> taking the lock in gic_raise_softirq() if the IPI is our special hotplug
+> one. Conditional locking is pretty ugly though, so perhaps this isn't
+> such a great idea.
 
->> +static struct iova *__alloc_iova(struct device *dev, size_t size, bool coherent)
->> +{
->> +       struct iommu_dma_domain *dom = get_dma_domain(dev);
->> +       struct iova_domain *iovad = dom->iovad;
->> +       unsigned long shift = iova_shift(iovad);
->> +       unsigned long length = iova_align(iovad, size) >> shift;
->> +       unsigned long limit_pfn = iovad->dma_32bit_pfn;
->> +       u64 dma_limit = coherent ? dev->coherent_dma_mask : *dev->dma_mask;
->
-> Should we use dma_get_mask in the non-coherent case in case the mask pointer
-> is NULL?
+There are also SMP platforms without a GIC (e.g. hip04) that would need
+similar modifications to their interrupt controller drivers, which is
+going to be painful.
 
-Good point, fixed.
-
->> +       limit_pfn = min(limit_pfn, (unsigned long)(dma_limit >> shift));
->
-> min_t avoids the explicit cast.
-
-Agreed, it does look a little nicer that way (although this is more of a 
-nasty workaround for the mask not reflecting dma-ranges limits - 
-hopefully that'll get sorted soon[1] so this can go back to just using 
-the mask)
-
-[1]:http://www.spinics.net/lists/arm-kernel/msg397604.html
-
->
->> +       /* Alignment should probably come from a domain/device attribute... */
->> +       return alloc_iova(iovad, length, limit_pfn, false);
->> +}
->> +
->> +/*
->> + * Create a mapping in device IO address space for specified pages
->> + */
->> +dma_addr_t iommu_dma_create_iova_mapping(struct device *dev,
->> +               struct page **pages, size_t size, bool coherent)
->> +{
->> +       struct iommu_dma_domain *dom = get_dma_domain(dev);
->> +       struct iova_domain *iovad = dom->iovad;
->> +       struct iommu_domain *domain = dom->domain;
->> +       struct iova *iova;
->> +       unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
->
-> Why not just make the size parameter npages instead?
->
->> +       dma_addr_t addr_lo, addr_hi;
->> +       int i, prot = __dma_direction_to_prot(DMA_BIDIRECTIONAL, coherent);
->> +
->> +       iova = __alloc_iova(dev, size, coherent);
->> +       if (!iova)
->> +               return DMA_ERROR_CODE;
->> +
->> +       addr_hi = addr_lo = iova_dma_addr(iovad, iova);
->> +       for (i = 0; i < count; ) {
->> +               unsigned int next_pfn = page_to_pfn(pages[i]) + 1;
->> +               phys_addr_t phys = page_to_phys(pages[i]);
->> +               unsigned int len, j;
->> +
->> +               for (j = i+1; j < count; j++, next_pfn++)
->> +                       if (page_to_pfn(pages[j]) != next_pfn)
->> +                               break;
->> +
->> +               len = (j - i) << PAGE_SHIFT;
->> +               if (iommu_map(domain, addr_hi, phys, len, prot))
->> +                       goto fail;
->> +               addr_hi += len;
->> +               i = j;
->> +       }
->
-> This loop is pretty miserable to read. Could we pass this off to ->map_sg
-> and avoid the need to check that the pfns are contiguous?
-
-All part of the copy-paste magic ;) Y'know, other than the bit of extra 
-work to set up the sg_table (and the possible hard size limit to that on 
-some architectures), using scatterlists as the general primitive makes a 
-lot of sense. With a full iommu_dma_alloc_attrs() implementation using 
-sg_alloc_table_from_pages(), this function can end up mostly going away, 
-and we get benefits...
-
->
->> +       return dev_dma_addr(dev, addr_lo);
->> +fail:
->> +       iommu_unmap(domain, addr_lo, addr_hi - addr_lo);
->> +       __free_iova(iovad, iova);
->> +       return DMA_ERROR_CODE;
->> +}
->> +
->> +int iommu_dma_release_iova_mapping(struct device *dev, dma_addr_t iova,
->> +               size_t size)
->> +{
->> +       struct iommu_dma_domain *dom = get_dma_domain(dev);
->> +       struct iova_domain *iovad = dom->iovad;
->> +       size_t offset = iova_offset(iovad, iova);
->> +       size_t len = iova_align(iovad, size + offset);
->> +
->> +       iommu_unmap(dom->domain, iova - offset, len);
->> +       free_iova(iovad, iova_pfn(iovad, iova));
->> +       return 0;
->> +}
->> +
->> +struct page **iommu_dma_alloc_buffer(struct device *dev, size_t size,
->> +               gfp_t gfp, struct dma_attrs *attrs,
->> +               void (clear_buffer)(struct page *page, size_t size))
->> +{
->> +       struct page **pages;
->> +       int count = size >> PAGE_SHIFT;
->> +       int array_size = count * sizeof(struct page *);
->> +       int i = 0;
->> +
->> +       if (array_size <= PAGE_SIZE)
->> +               pages = kzalloc(array_size, GFP_KERNEL);
->> +       else
->> +               pages = vzalloc(array_size);
->> +       if (!pages)
->> +               return NULL;
->> +
->> +       if (dma_get_attr(DMA_ATTR_FORCE_CONTIGUOUS, attrs)) {
->> +               unsigned long order = get_order(size);
->> +               struct page *page;
->> +
->> +               page = dma_alloc_from_contiguous(dev, count, order);
->> +               if (!page)
->> +                       goto error;
->> +
->> +               if (clear_buffer)
->> +                       clear_buffer(page, size);
->
-> For cache-coherent systems, this is just a memset so perhaps we could
-> default to that if no function pointer is passed? It would also be cool
-> to do the highmem vs lowmem stuff in core code, but that's more fiddly
-> than it looks and probably not worth the hassle.
-
-...like being able to use sg_miter_* to magically memset everything here 
-and have the architecture provide just the cache flush callback (if it 
-wants to). I'll definitely investigate this as it might help solve some 
-other issues too.
-
->> +struct iommu_dma_domain *iommu_dma_create_domain(const struct iommu_ops *ops,
->> +               dma_addr_t base, size_t size)
->> +{
->> +       struct iommu_dma_domain *dom;
->> +       struct iommu_domain *domain;
->> +       struct iova_domain *iovad;
->> +       struct iommu_domain_geometry *dg;
->> +       unsigned long order, base_pfn, end_pfn;
->> +
->> +       pr_debug("base=%pad\tsize=0x%zx\n", &base, size);
->
-> We can lose the debug prints for upstream.
->
->> +       dom = kzalloc(sizeof(*dom), GFP_KERNEL);
->> +       if (!dom)
->> +               return NULL;
->> +
->> +       /*
->> +        * HACK: We'd like to ask the relevant IOMMU in ops for a suitable
->> +        * domain, but until that happens, bypass the bus nonsense and create
->> +        * one directly for this specific device/IOMMU combination...
->> +        */
->> +       domain = kzalloc(sizeof(*domain), GFP_KERNEL);
->> +
->> +       if (!domain)
->> +               goto out_free_dma_domain;
->> +       domain->ops = ops;
->> +
->> +       if (ops->domain_init(domain))
->> +               goto out_free_iommu_domain;
->> +       /*
->> +        * ...and do the bare minimum to sanity-check that the domain allows
->> +        * at least some access to the device...
->> +        */
->> +       dg = &domain->geometry;
->> +       if (!(base <= dg->aperture_end && base + size > dg->aperture_start)) {
->> +               pr_warn("DMA range outside IOMMU capability; is DT correct?\n");
->
-> We probably shouldn't print things about DT in core (non-OF) code.
-
-True. I'll change it for now, although I hope the default domain stuff 
-will make most of this entirely redundant soon.
-
->> +               goto out_free_iommu_domain;
->> +       }
->> +       /* ...then finally give it a kicking to make sure it fits */
->> +       dg->aperture_start = max(base, dg->aperture_start);
->> +       dg->aperture_end = min(base + size - 1, dg->aperture_end);
->> +       /*
->> +        * Note that this almost certainly breaks the case where multiple
->> +        * devices with different DMA capabilities need to share a domain,
->> +        * but we don't have the necessary information to handle that here
->> +        * anyway - "proper" group and domain allocation needs to involve
->> +        * the IOMMU driver and a complete view of the bus.
->> +        */
->> +
->> +       iovad = kzalloc(sizeof(*iovad), GFP_KERNEL);
->> +       if (!iovad)
->> +               goto out_free_iommu_domain;
->> +
->> +       /* Use the smallest supported page size for IOVA granularity */
->> +       order = __ffs(ops->pgsize_bitmap);
->> +       base_pfn = max(dg->aperture_start >> order, (dma_addr_t)1);
->> +       end_pfn = dg->aperture_end >> order;
->> +       init_iova_domain(iovad, 1UL << order, base_pfn, end_pfn);
->> +
->> +       dom->domain = domain;
->> +       dom->iovad = iovad;
->> +       kref_init(&dom->kref);
->> +       pr_debug("domain %p created\n", dom);
->> +       return dom;
->> +
->> +out_free_iommu_domain:
->> +       kfree(domain);
->> +out_free_dma_domain:
->> +       kfree(dom);
->> +       return NULL;
->> +}
->> +
->> +static void iommu_dma_free_domain(struct kref *kref)
->> +{
->> +       struct iommu_dma_domain *dom;
->> +
->> +       dom = container_of(kref, struct iommu_dma_domain, kref);
->> +       put_iova_domain(dom->iovad);
->> +       iommu_domain_free(dom->domain);
->> +       kfree(dom);
->> +       pr_debug("domain %p freed\n", dom);
->> +}
->> +
->> +void iommu_dma_release_domain(struct iommu_dma_domain *dom)
->> +{
->> +       kref_put(&dom->kref, iommu_dma_free_domain);
->> +}
->> +
->> +struct iommu_domain *iommu_dma_raw_domain(struct iommu_dma_domain *dom)
->> +{
->> +       return dom ? dom->domain : NULL;
->> +}
->> +
->> +int iommu_dma_attach_device(struct device *dev, struct iommu_dma_domain *dom)
->> +{
->> +       int ret;
->> +
->> +       kref_get(&dom->kref);
->> +       ret = iommu_attach_device(dom->domain, dev);
->> +       if (ret)
->> +               iommu_dma_release_domain(dom);
->
-> Shouldn't this be the responsibility of the caller?
-
-It's the responsibility of the caller to release its reference by making 
-a matching detach call on a successfully attached device. The original 
-code only *takes* the reference on success - I just shuffled things 
-around to avoid the race with someone else detaching the last device and 
-taking down the domain before this iommu_attach_device() returns.
-
->> +       else
->> +               set_dma_domain(dev, dom);
->> +       pr_debug("%s%s attached to domain %p\n", dev_name(dev),
->> +                       ret?" *not*":"", dom);
->> +       return ret;
->> +}
->> +
->> +void iommu_dma_detach_device(struct device *dev)
->> +{
->> +       struct iommu_dma_domain *dom = get_dma_domain(dev);
->> +
->> +       if (!dom) {
->> +               dev_warn(dev, "Not attached\n");
->> +               return;
->> +       }
->> +       set_dma_domain(dev, NULL);
->> +       iommu_detach_device(dom->domain, dev);
->
-> I think this means that we should be checking for NULL DMA domains in all of
-> the IOVA calls, or can we assume our callers behave themselves?
-
-This check is a hangover from the original code, which similarly never 
-checks the validity of archdata.mapping elsewhere. I'm inclined to 
-simply remove it and let broken callers blow up violently in 
-iommu_detach_device() because I really can't think of a justifiable 
-reason to let them off with a warning. IMO this is intended more for 
-arch code than for any old driver to use willy-nilly, so they really 
-should be getting it right.
-
->
->> +       iommu_dma_release_domain(dom);
->> +       pr_debug("%s detached from domain %p\n", dev_name(dev), dom);
->> +}
->> +
->> +int iommu_dma_supported(struct device *dev, u64 mask)
->> +{
->> +       /*
->> +        * This looks awful, but really it's reasonable to assume that if an
->> +        * IOMMU can't address everything that the CPU can, it probably isn't
->> +        * generic enough to be using this implementation in the first place.
->> +        */
->> +       return 1;
->
-> Hmm, perhaps, but I don't think it's *completely* unrealistic to have an
-> IOMMU with more limited physical addressing caps than the CPU. Maybe we
-> could have an IOMMU callback for querying the addressing capabilities?
->
-> It shouldn't block this series, I'm just interested in your thoughts on
-> solving this in the future.
-
-I see potentially two places the relevant data could already exist:
-
-* the DMA mask of the IOMMU device itself - accessible, but possibly not 
-reliable if the IOMMU driver doesn't bother to set it correctly (e.g. 
-ours). Also, really this should only represent the IOMMU's own DMA (i.e. 
-PTW interface) capability which, sanity notwithstanding, could 
-conceivably differ from that of the master interface.
-
-* the output address size of the io_pgtable_config - not widely used 
-yet, and not really something to be poking around in outside of the 
-IOMMU driver itself.
-
-Given that it's a fixed property of the hardware it seems like something 
-we could reasonably express with e.g. a mask in iommu_ops, but strictly 
-we'd still need to go digging around for the IOMMU device's 
-dma_pfn_offset as well in case it's behind some wacky interconnect. 
-Unless of course the PTW and master interfaces are hooked up to 
-*different* wacky interconnects, in which case, urgh...
-
-Robin.
+Thanks,
+Mark.
