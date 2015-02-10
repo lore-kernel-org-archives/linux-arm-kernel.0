@@ -1,41 +1,66 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 10 Feb 2015 15:27:47 +0800
-Subject: [PATCH] ARM: kprobes: Fix compilation error caused by superfluous '*'
-Message-ID: <1423553267.2647.7.camel@linaro.org>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 10 Feb 2015 09:29:13 +0200
+Subject: [RFC] MMC: CMD52 During Data Transfer support
+In-Reply-To: <CAGsJ_4xeWOXtav4HhpB_4XhkXHqS4+V81tSw4LGT3Yvtq79qxQ@mail.gmail.com>
+References: <CAGsJ_4xeWOXtav4HhpB_4XhkXHqS4+V81tSw4LGT3Yvtq79qxQ@mail.gmail.com>
+Message-ID: <54D9B349.3080905@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a superfluous '*' in the definition of kprobe_decode_insn_t
-which on older versions of GCC (4.2.4) causes the compilation error:
+On 09/02/15 05:14, Barry Song wrote:
+> hi Chris, Ulf,
+> According to https://www.sdcard.org/downloads/pls/simplified_specs/archive/partE1_200.pdf
+> (section CMD52 During Data Transfer ),
+> A card may accept CMD52 during data transfer if it supports Direct
+> Commands (see SDC, Table 6-3). For both SD and SPI modes, if an error
+> occurs during data transfer the SDIO card shall accept CMD52 to allow
+> I/O abort and reset regardless of this bit value of the value of SDC.
+> 
+> But drivers/mmc/host/sdhci.c doesn't support this mode if i didn't
+> miss something:-) we need it now to improve he throughput of a high
+> speed Software Digital Radio SDIO card. so we'd like to add support
+> for it.
+> 
+> a simple idea is
+> 
+> 1. we need to drop this WARN_ON:
+> 
+> 1343 static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
+> 1344 {
+> 1345         struct sdhci_host *host;
+> 1346         int present;
+> 1347         unsigned long flags;
+> 1348         u32 tuning_opcode;
+> 1349
+> 1350         host = mmc_priv(mmc);
+> 1351
+> 1352         sdhci_runtime_pm_get(host);
+> 1353
+> 1354         present = mmc_gpio_get_cd(host->mmc);
+> 1355
+> 1356         spin_lock_irqsave(&host->lock, flags);
+> 1357
+> 1358         WARN_ON(host->mrq != NULL);
+> 
+> 2. we need to permit a new command to execute even when host->mrq is
+> not NULL and a CMD53 is ongoing.
+> this means we might add a new cmd52 request field in host struct to
+> buffer CMD52 request. and after the cmd52 finishes, we still need the
+> capability to wake up the blocking thread.
+> 
+> I'd like to know your suggestions on this feature.
 
-In file included from arch/arm/probes/kprobes/core.c:37:
-arch/arm/probes/kprobes/core.h:43: error: '[*]' not allowed in other than a declaration
+Can you explain more about how CMD52 will be used with CMD53? Will you have
+separate threads processing CMD52 and CMD53? If you did, how would you stop
+the CMD53 thread from starting another CMD53 while a CMD52 is in progress?
 
-Fix this by removing the unneeded character.
+Also you mention you might need to buffer the CMD52. Under what circumstances?
 
-Reported-by: Janusz U?ycki <j.uzycki@elproma.com.pl>
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
----
+Will the CMD53 request need to use the cmd line for other commands like the
+STOP command?
 
-Russell, I also applied this to my branch that you pulled which
-introduced the bug...
-git://git.linaro.org/people/tixy/kernel.git kprobes
+Also what is the benefit of using CMD52 during CMD53? Is it really worth
+doing? Could it be done another way?
 
- arch/arm/probes/kprobes/core.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/probes/kprobes/core.h b/arch/arm/probes/kprobes/core.h
-index b3036c5..ec5d1f2 100644
---- a/arch/arm/probes/kprobes/core.h
-+++ b/arch/arm/probes/kprobes/core.h
-@@ -40,7 +40,7 @@ typedef enum probes_insn (kprobe_decode_insn_t)(probes_opcode_t,
- 						struct arch_probes_insn *,
- 						bool,
- 						const union decode_action *,
--						const struct decode_checker *[*]);
-+						const struct decode_checker *[]);
- 
- #ifdef CONFIG_THUMB2_KERNEL
- 
--- 
-2.1.4
+Finally, there are other drivers, are you looking only at SDHCI? What about
+the others?
