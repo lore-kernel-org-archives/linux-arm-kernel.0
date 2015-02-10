@@ -1,63 +1,49 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 10 Feb 2015 15:58:41 +0200
-Subject: [PATCH 5/7] ARM: davinci: dm646x: Clean up the McASP DMA resources
+Date: Tue, 10 Feb 2015 15:58:43 +0200
+Subject: [PATCH 7/7] ARM: davinci: dm646x: Add interrupt resource for McASPs
 In-Reply-To: <1423576723-24375-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1423576723-24375-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1423576723-24375-6-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1423576723-24375-8-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add names to the DMA resources and remove the RX DMA dummy part for McASP1.
+The interrupt can be used for error recovery.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-davinci/dm646x.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+ arch/arm/mach-davinci/dm646x.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
 diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index 6c3bbea7d77d..d2a2619aee81 100644
+index d2a2619aee81..c86e0d503b68 100644
 --- a/arch/arm/mach-davinci/dm646x.c
 +++ b/arch/arm/mach-davinci/dm646x.c
-@@ -610,19 +610,21 @@ static struct resource dm646x_mcasp0_resources[] = {
- 		.end 	= DAVINCI_DM646X_MCASP0_REG_BASE + (SZ_1K << 1) - 1,
- 		.flags 	= IORESOURCE_MEM,
- 	},
--	/* first TX, then RX */
- 	{
-+		.name	= "tx",
- 		.start	= DAVINCI_DM646X_DMA_MCASP0_AXEVT0,
- 		.end	= DAVINCI_DM646X_DMA_MCASP0_AXEVT0,
- 		.flags	= IORESOURCE_DMA,
- 	},
- 	{
-+		.name	= "rx",
- 		.start	= DAVINCI_DM646X_DMA_MCASP0_AREVT0,
+@@ -622,6 +622,16 @@ static struct resource dm646x_mcasp0_resources[] = {
  		.end	= DAVINCI_DM646X_DMA_MCASP0_AREVT0,
  		.flags	= IORESOURCE_DMA,
  	},
++	{
++		.name	= "tx",
++		.start	= IRQ_DM646X_MCASP0TXINT,
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.name	= "rx",
++		.start	= IRQ_DM646X_MCASP0RXINT,
++		.flags	= IORESOURCE_IRQ,
++	},
  };
  
-+/* DIT mode only, rx is not supported */
- static struct resource dm646x_mcasp1_resources[] = {
- 	{
- 		.name	= "mpu",
-@@ -630,18 +632,12 @@ static struct resource dm646x_mcasp1_resources[] = {
- 		.end	= DAVINCI_DM646X_MCASP1_REG_BASE + (SZ_1K << 1) - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
--	/* DIT mode, only TX event */
- 	{
-+		.name	= "tx",
- 		.start	= DAVINCI_DM646X_DMA_MCASP1_AXEVT1,
+ /* DIT mode only, rx is not supported */
+@@ -638,6 +648,11 @@ static struct resource dm646x_mcasp1_resources[] = {
  		.end	= DAVINCI_DM646X_DMA_MCASP1_AXEVT1,
  		.flags	= IORESOURCE_DMA,
  	},
--	/* DIT mode, dummy entry */
--	{
--		.start	= -1,
--		.end	= -1,
--		.flags	= IORESOURCE_DMA,
--	},
++	{
++		.name	= "tx",
++		.start	= IRQ_DM646X_MCASP1TXINT,
++		.flags	= IORESOURCE_IRQ,
++	},
  };
  
  static struct platform_device dm646x_mcasp0_device = {
