@@ -1,39 +1,36 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Tue, 10 Feb 2015 15:17:00 +0800
-Subject: [PATCH 0/3] Add initial DT support for Qualcomm SPMI PMIC devices
-In-Reply-To: <CAJAp7OjL6+QLs45LM8pEsZ4tHQ2jgM9z2tg8pb6A=xAxBO7pGA@mail.gmail.com>
-References: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
- <CAJAp7OjL6+QLs45LM8pEsZ4tHQ2jgM9z2tg8pb6A=xAxBO7pGA@mail.gmail.com>
-Message-ID: <1423552620.9293.5.camel@mm-sol.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 10 Feb 2015 15:20:39 +0800
+Subject: Recommendations for a new MFD device driver?
+In-Reply-To: <20150206101006.GK12209@pengutronix.de>
+References: <20150206101006.GK12209@pengutronix.de>
+Message-ID: <20150210072039.GC8020@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 06 Feb 2015, Sascha Hauer wrote:
 
-On Tue, 2015-02-03 at 12:38 -0800, Bjorn Andersson wrote:
-> On Tue, Feb 3, 2015 at 4:17 AM, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
-> > Following set of patches add initial DT support for PMIC devices
-> > found on recent Quqalcomm chipsets. Details for SPMI bus and PMIC arbiter
-> > could be found here [1].
-> > 
-> > Regards,
-> > Ivan
-> > 
-> > [1] http://lwn.net/Articles/564637/
-> > 
-> > Ivan T. Ivanov (3):
-> >   ARM: dts: qcom: Add SPMI PMIC Arbiter nodes for APQ8084 and MSM8974
-> >   ARM: dts: qcom: Add 8x74 chipset SPMI PMIC's nodes
-> >   ARM: dts: qcom: Add APQ8084 chipset SPMI PMIC's nodes
-> > 
+> Hi All,
 > 
-> Looks good.
+> We are adding support for a new pretty typical MFD device, the MediaTek
+> MT6397. Initial patches are already posted. It's a PMIC which among other
+> things has regulators and a RTC. The same RTC is reused on another PMIC,
+> but with another register offset and another interrupt.
 > 
-> Reviewed-by: Bjorn Andersson andersson at sonymobile.com>
+> Now the question is where shall we put the register/irq resource
+> information?
 > 
+> 1) Put it into the RTC device driver.
+> 2) Put it into the .resource field of struct mfd_cell
+> 3) Put it into the device tree using standard reg, interrupt properties and
+>    a) Let the RTC driver interpret these
+>    b) Let the MFD driver create resources in the .resource field of struct
+>       mfd_cell
+>    c) Let the MFD core create the resources
 
-Thank you.
+I have no problem with 2, if that's the route you'd like to take.
 
-Any other comments? Kumar?
-
-Regards,
-Ivan
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
