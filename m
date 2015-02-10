@@ -1,48 +1,105 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Tue, 10 Feb 2015 23:20:23 +0800
-Subject: [PATCH v3 4/5] usb: phy: load usb phy earlier
-In-Reply-To: <20150210144925.GD16711@saruman.tx.rr.com>
-References: <20150210070424.GC32709@shlinux2>
- <20150210144925.GD16711@saruman.tx.rr.com>
-Message-ID: <54DA21B7.6090306@linaro.org>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Tue, 10 Feb 2015 20:52:47 +0530
+Subject: [PATCH v2 1/2] mmc: dw_mmc: fix bug that cause 'Timeout sending
+ command'
+In-Reply-To: <1423466726-20833-2-git-send-email-addy.ke@rock-chips.com>
+References: <1423134801-23219-1-git-send-email-addy.ke@rock-chips.com>
+ <1423466726-20833-1-git-send-email-addy.ke@rock-chips.com>
+ <1423466726-20833-2-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <CAGOxZ51wgw9iXF3xX39vnB0M5ZPb+zHWoCtTvvKdyo9bSOCVgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Addy,
 
-
-On 02/10/2015 10:49 PM, Felipe Balbi wrote:
-> On Tue, Feb 10, 2015 at 03:04:28PM +0800, Peter Chen wrote:
->> This patch does not belong to phy, so, doesn't need to
->> add phy in subject, meanwhile, please add GregKH as TO list,
->> he is the right one to queue this patch.
->>
->> Reply-To:
->> In-Reply-To: <1423554627-694-5-git-send-email-zhangfei.gao@linaro.org>
->>
->> On Tue, Feb 10, 2015 at 03:50:26PM +0800, Zhangfei Gao wrote:
->>> Since phy is definitely used in usb controller, load the phy
->>> earlier to make boot time shorter.
->>>
->>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->>> Acked-by: Peter Chen <peter.chen@freescale.com>
+On Mon, Feb 9, 2015 at 12:55 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
+> Because of some uncertain factors, such as worse card or worse hardware,
+> DAT[3:0](the data lines) may be pulled down by card, and mmc controller
+> will be in busy state. This should not happend when mmc controller
+> send command to update card clocks. If this happends, mci_send_cmd will
+> be failed and we will get 'Timeout sending command', and then system will
+> be blocked. To avoid this, we need reset mmc controller.
 >
-> NAK, make sure there are no such dependencies with your controller
-> driver. They should know how to defer probing if their resources aren't
-> available yet.
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+>  drivers/mmc/host/dw_mmc.c | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 4d2e3c2..b0b57e3 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -100,6 +100,7 @@ struct idmac_desc {
+>  };
+>  #endif /* CONFIG_MMC_DW_IDMAC */
+>
+> +static int dw_mci_card_busy(struct mmc_host *mmc);
+>  static bool dw_mci_reset(struct dw_mci *host);
+>  static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
+>
+> @@ -888,6 +889,31 @@ static void mci_send_cmd(struct dw_mci_slot *slot, u32 cmd, u32 arg)
+>                 cmd, arg, cmd_status);
+>  }
+>
+> +static void dw_mci_wait_busy(struct dw_mci_slot *slot)
+> +{
+> +       struct dw_mci *host = slot->host;
+> +       unsigned long timeout = jiffies + msecs_to_jiffies(500);
+> +
+Why 500 msec?
 
-Sorry for the confusion,
-There is no dependencies at all, just for optimization.
-Peter already told me this patch should not be put here, causing confusion.
-And I resend in another thread.
+> +       do {
+> +               if (!dw_mci_card_busy(slot->mmc))
+> +                       return;
+> +               cpu_relax();
+> +       } while (time_before(jiffies, timeout));
+> +
+> +       dev_err(host->dev, "Data busy (status %#x)\n",
+> +               mci_readl(slot->host, STATUS));
+> +
+> +       /*
+> +        * Data busy, this should not happend when mmc controller send command
+> +        * to update card clocks in non-volt-switch state. If it happends, we
+> +        * should reset controller to avoid getting "Timeout sending command".
+> +        */
+> +       dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS);
+> +
+Why you need to reset all blocks? may be CTRL_RESET is good enough here.
 
-The controller is dwc2, which use defer probe. And dwc2 controller defer 
-probe every time even the phy driver in the same folder.
-Since we know the calling sequence, we can simply change the sequence to 
-load the phy earlier.
+> +       /* Fail to reset controller or still data busy, WARN_ON! */
+> +       WARN_ON(dw_mci_card_busy(slot->mmc));
+> +}
+> +
+>  static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
+>  {
+>         struct dw_mci *host = slot->host;
+> @@ -899,6 +925,8 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
+>         /* We must continue to set bit 28 in CMD until the change is complete */
+>         if (host->state == STATE_WAITING_CMD11_DONE)
+>                 sdmmc_cmd_bits |= SDMMC_CMD_VOLT_SWITCH;
+> +       else
+> +               dw_mci_wait_busy(slot);
+>
+hmm...I would suggest you to call dw_mci_wait_busy() from inside
+mci_send_cmd(), seems like dw_mmc hangs while sending update clock cmd
+in multiple cases.see [1]
+
+[1]: http://permalink.gmane.org/gmane.linux.kernel.mmc/31140
+
+>         if (!clock) {
+>                 mci_writel(host, CLKENA, 0);
+> --
+> 1.8.3.2
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 
-However, as you said the new driver will be put in drivers/phy, there 
-should be no such issue in the future.
-It is OK not using this patch.
 
-Thanks
+-- 
+Regards,
+Alim
