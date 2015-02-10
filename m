@@ -1,55 +1,61 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 10 Feb 2015 15:08:42 +0100
-Subject: [PATCH 1/1] ARM: dts: Use more descriptive names for Exynos5420
- PDs
-In-Reply-To: <1423574072.6241.8.camel@AMDC1943>
-References: <1423244258-24314-1-git-send-email-javier.martinez@collabora.co.uk>
- <54D51170.10903@cogentembedded.com> <54D52905.6040100@collabora.co.uk>
- <CAJKOXPepTJYYs6gR6NLQzsJndeRLgF+KHRpH9qt9noUgRBs2Dw@mail.gmail.com>
- <54D9F1A4.1000908@cogentembedded.com> <1423570670.6241.2.camel@AMDC1943>
- <54D9F7B1.3030106@cogentembedded.com> <1423571438.6241.4.camel@AMDC1943>
- <54D9FD94.9000102@collabora.co.uk> <54DA0107.2020909@samsung.com>
- <1423574072.6241.8.camel@AMDC1943>
-Message-ID: <54DA10EA.4010701@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 10 Feb 2015 15:11:25 +0100
+Subject: [PATCH 2/2] drm: atmel-hlcdc: Add pinctrl PM select
+ sleep,default state in CRTC suspend/resume
+In-Reply-To: <1423575646-3273-3-git-send-email-sylvain.rochet@finsecur.com>
+References: <1423575646-3273-1-git-send-email-sylvain.rochet@finsecur.com>
+ <1423575646-3273-3-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <20150210151125.65336f20@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/15 14:14, Krzysztof Kozlowski wrote:
-> On wto, 2015-02-10 at 14:00 +0100, Sylwester Nawrocki wrote:
->> > On 10/02/15 13:46, Javier Martinez Canillas wrote:
->>>>>> > >>>> This debugfs code iterates over list of generic_pm_domains (gpd_list). I
->>>>>>>>> > >>>> >> > cannot find function for translating from genpd to its platform device
->>>>>>>>> > >>>> >> > so only genpd->name can be printed.
->>>>>>> > >>> >> 
->>>>>>> > >>> >>     Then why power domains aren't just named with the platform device names?
->>>>> > >> > 
->>>>> > >> > Right, the mach-exynos/pm_domains.c set the name equal to OF node name.
->>>>> > >> > I'll send a patch extending the name.
->>>>> > >> >
->>> > > IIRC the OF core uses the device node unit address and node name to create
->>> > > the platform device names so you will have something like 10044000.power-domain.
->>> > > 
->>> > > Same if using the node full_name since it will /power-domain at 10044000. In both
->>> > > cases the DTS should have to be checked to know which power domain really is
->>> > > unless someone knows by heart the power domains addresses.
-> For the kernel developer that would be descriptive enough to find the
-> real domain but... as you said each time one would have to grep through
-> manual or DTS which is slower. However for end-user that still won't be
-> descriptive enough.
-> 
->>> > > 
->>> > > But if using generic names for the power domains as suggested by ePAPR is so
->>> > > important then we should change all the other Exynos DTS files which don't do.
->> > 
->> > Perhaps we could assign OF aliases to the power domain device nodes in DT
->> > and then in the power domains driver map those aliases to more descriptive
->> > names when creating the power domains?
->
-> That would required additional alias in DT but it could be the most
-> descriptive for a user.
+On Tue, 10 Feb 2015 14:40:46 +0100
+Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
 
-Yes, we could fall back to of_node->full_name if alias is not present in DT.
+> Some LCD panels have back-powering issue when un-powered, allows users
+> to use an alternate pinctrl "sleep" in order to clamp outputs to a
+> wanted state at suspend.
+> 
+> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+> ---
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> index 79c9a19..decd9ea 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/pm.h>
+>  #include <linux/pm_runtime.h>
+> +#include <linux/pinctrl/consumer.h>
+>  
+>  #include <drm/drm_crtc.h>
+>  #include <drm/drm_crtc_helper.h>
+> @@ -156,6 +157,7 @@ static void atmel_hlcdc_crtc_disable(struct drm_crtc *c)
+>  		cpu_relax();
+>  
+>  	clk_disable_unprepare(crtc->dc->hlcdc->sys_clk);
+> +	pinctrl_pm_select_sleep_state(dev->dev);
+>  
+>  	pm_runtime_allow(dev->dev);
+>  
+> @@ -178,6 +180,7 @@ static void atmel_hlcdc_crtc_enable(struct drm_crtc *c)
+>  
+>  	pm_runtime_forbid(dev->dev);
+>  
+> +	pinctrl_pm_select_default_state(dev->dev);
+>  	clk_prepare_enable(crtc->dc->hlcdc->sys_clk);
+>  
+>  	regmap_write(regmap, ATMEL_HLCDC_EN, ATMEL_HLCDC_PIXEL_CLK);
+
+
 
 -- 
-Regards,
-Sylwester
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
