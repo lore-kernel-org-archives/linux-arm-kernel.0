@@ -1,26 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 Feb 2015 16:13:22 +0800
-Subject: [PATCH v5 5/5] ARM: dts: mt8135: Add pinctrl/GPIO/EINT node for
- mt8135.
-In-Reply-To: <1421818097-9281-6-git-send-email-hongzhou.yang@mediatek.com>
-References: <1421818097-9281-1-git-send-email-hongzhou.yang@mediatek.com>
- <1421818097-9281-6-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <CACRpkdYqYg1p+FHq2e-1iQA8hQfbnLBde2_0XkD9=s=Zpv5UJA@mail.gmail.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Tue, 10 Feb 2015 16:13:17 +0800
+Subject: [PATCH] ARM: kprobes: Fix compilation error caused by superfluous
+ '*'
+In-Reply-To: <1423553267.2647.7.camel@linaro.org>
+References: <1423553267.2647.7.camel@linaro.org>
+Message-ID: <54D9BD9D.2030503@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 1:28 PM, Hongzhou Yang
-<hongzhou.yang@mediatek.com> wrote:
+On 2015/2/10 15:27, Jon Medhurst (Tixy) wrote:
+> There is a superfluous '*' in the definition of kprobe_decode_insn_t
+> which on older versions of GCC (4.2.4) causes the compilation error:
+> 
+> In file included from arch/arm/probes/kprobes/core.c:37:
+> arch/arm/probes/kprobes/core.h:43: error: '[*]' not allowed in other than a declaration
+> 
+> Fix this by removing the unneeded character.
+> 
 
-> From: Hongzhou Yang <hongzhou.yang@mediatek.com>
->
-> Add pinctrl,GPIO and EINT node to mt8135.dtsi.
->
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+Hi Tixy,
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I checked C spec when writing this code and found [*] should be a standard way to
+represent array of unspecified number elements. But I forgot there are old gccs
+which don't support it.
 
-The pinctrl driver portions are merged to the pin control tree.
+Thank you for your fix!
 
-Yours,
-Linus Walleij
+> Reported-by: Janusz U?ycki <j.uzycki@elproma.com.pl>
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> ---
+> 
+> Russell, I also applied this to my branch that you pulled which
+> introduced the bug...
+> git://git.linaro.org/people/tixy/kernel.git kprobes
+> 
+>  arch/arm/probes/kprobes/core.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/probes/kprobes/core.h b/arch/arm/probes/kprobes/core.h
+> index b3036c5..ec5d1f2 100644
+> --- a/arch/arm/probes/kprobes/core.h
+> +++ b/arch/arm/probes/kprobes/core.h
+> @@ -40,7 +40,7 @@ typedef enum probes_insn (kprobe_decode_insn_t)(probes_opcode_t,
+>  						struct arch_probes_insn *,
+>  						bool,
+>  						const union decode_action *,
+> -						const struct decode_checker *[*]);
+> +						const struct decode_checker *[]);
+>  
+>  #ifdef CONFIG_THUMB2_KERNEL
+>  
+> 
