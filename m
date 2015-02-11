@@ -1,31 +1,48 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 11 Feb 2015 11:10:31 +0200
-Subject: [resend PATCH v3 4/4] usb: phy: add phy-hi6220-usb
-In-Reply-To: <BN3PR0301MB0849FB28B1DAF7BEB5F3BE7881250@BN3PR0301MB0849.namprd03.prod.outlook.com>
-References: <1423559404-13058-1-git-send-email-zhangfei.gao@linaro.org>
- <1423559404-13058-5-git-send-email-zhangfei.gao@linaro.org>
- <20150210144807.GC16711@saruman.tx.rr.com>
- <BN3PR0301MB0849FB28B1DAF7BEB5F3BE7881250@BN3PR0301MB0849.namprd03.prod.outlook.com>
-Message-ID: <20150211091031.GR16955@sapphire.tkos.co.il>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 11 Feb 2015 10:11:59 +0100
+Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
+ demuxer chip
+In-Reply-To: <20150210204835.GL9432@leverpostej>
+References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1422527620-8308-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20150210153628.GF9432@leverpostej>
+ <20150210165201.634bc04b@bbrezillon>
+ <20150210204835.GL9432@leverpostej>
+Message-ID: <20150211091159.GE7119@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter, Felipe,
-
-> > new drivers only on drivers/phy/, sorry.
+On Tue, Feb 10, 2015 at 08:48:36PM +0000, Mark Rutland wrote:
+> From f390ccbb31f06efee49b4469943c8d85d963bfb5 Mon Sep 17 00:00:00 2001
+> From: Mark Rutland <mark.rutland@arm.com>
+> Date: Tue, 10 Feb 2015 20:14:33 +0000
+> Subject: [PATCH] genirq: allow mixed IRQF_NO_SUSPEND requests
 > 
-> This driver has many USB dependencies, like otg, gadget. I don't know it
-> can use generic phy currently.
+> In some cases a physical IRQ line may be shared between devices from
+> which we expect interrupts during suspend (e.g. timers) and those we do
+> not (e.g. anything we cut the power to). Where a driver did not request
+> the interrupt with IRQF_NO_SUSPEND, it's unlikely that it can handle
+> being called during suspend, and it may bring down the system.
+> 
+> This patch adds logic to automatically mark the irqactions for these
+> potentially unsafe handlers as disabled during suspend, leaving actions
+> with IRQF_NO_SUSPEND enabled. If an interrupt is raised on a shared line
+> during suspend, only the handlers requested with IRQF_NO_SUSPEND will be
+> called. The handlers requested without IRQF_NO_SUSPEND will be skipped
+> as if they had immediately returned IRQF_NONE.
+> 
+> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 
-I would like to remind you the thread at 
-http://thread.gmane.org/gmane.linux.kernel/1858137. I have a USB PHY driver 
-here that depends on notify_connect/notify_disconnect, which are not currently 
-provided by the generic phy infrastructure (drivers/phy/). What would be 
-acceptable solution for this case?
+Aw gawd.. not that again.
 
-baruch
+So Rafael and tglx went over this a few months ago I think:
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+  lkml.kernel.org/r/26580319.OZP7jvJnA9 at vostro.rjw.lan
+
+is the last series I could find. Maybe Rafael can summarize?
