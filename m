@@ -1,81 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 11 Feb 2015 00:38:32 +0000 (UTC)
-Subject: [PATCH 1/4] arm: omap: hwmod: 43xx: add DebugSS hwmod data
-In-Reply-To: <20150210235629.GA4785@saruman.tx.rr.com>
-References: <1422054704-14915-2-git-send-email-balbi@ti.com>
- <alpine.DEB.2.02.1501260142590.5450@utopia.booyaka.com>
- <20150126165640.GA10679@saruman.tx.rr.com>
- <20150126194933.GG6660@saruman.tx.rr.com>
- <20150127160143.GH14623@saruman.tx.rr.com>
- <alpine.DEB.2.02.1501271652340.7149@utopia.booyaka.com>
- <20150127171532.GC14878@saruman.tx.rr.com>
- <20150127171843.GD14878@saruman.tx.rr.com>
- <alpine.DEB.2.02.1501271751020.4845@utopia.booyaka.com>
- <alpine.DEB.2.02.1502102311570.3767@utopia.booyaka.com>
- <20150210235629.GA4785@saruman.tx.rr.com>
-Message-ID: <alpine.DEB.2.02.1502110037440.3767@utopia.booyaka.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 10 Feb 2015 17:05:22 -0800
+Subject: [PATCH 0/2] Scorpion PMU support
+Message-ID: <1423616724-20849-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Feb 2015, Felipe Balbi wrote:
+These patches add support for the Scorpion PMU found on devices
+such as msm8660, qsd8x50, etc. The first patch is some groundwork
+to make functions more "generic". Even then we end up copying quite
+a bit of code from the Krait part into the Scorpion part with only
+subtle tweaks because two things happen:
 
-> On Tue, Feb 10, 2015 at 11:12:40PM +0000, Paul Walmsley wrote:
-> > > > > > > > > hm... modulemode SWCTRL causes wait_target_ready to fail. Any hints ?
-> > > > > > > > 
-> > > > > > > > gets stuck in transition state. PRCM_CM_WKUP_DBGSS_CLKCTRL is always
-> > > > > > > > read as 0x 12510f00 which would translate into:
-> > > > > > > > 
-> > > > > > > > - module disabled
-> > > > > > > > - all opt clocks are on
-> > > > > > > > - module is transitioning
-> > > > > > > > - module in standby
-> > > > > > > > - clkA as TPIU and STM trace clock
-> > > > > > > > - all dividers set to 2
-> > > > > > > 
-> > > > > > > just fyi, checking with HW folks, this might be a new bug, unless
-> > > > > > > debugss needs something special.
-> > > > > > 
-> > > > > > If that happens on DEBUGSS disable, it's probably the same issue as on 
-> > > > > > AM33xx:
-> > > > > > 
-> > > > > > http://www.spinics.net/lists/arm-kernel/msg320801.html
-> > > > > > http://www.spinics.net/lists/arm-kernel/msg321930.html
-> > > > > > http://www.spinics.net/lists/arm-kernel/msg329151.html
-> > > > > > 
-> > > > > > Does adding HWMOD_INIT_NO_IDLE fix the issue you're seeing?
-> > > > > 
-> > > > > I'll try it out in a bit...
-> > > > 
-> > > > nope, same thing.
-> > > > 
-> > > > [   27.633235] omap_hwmod: debugss: _wait_target_disable failed
-> > > 
-> > > OK, looking at the code, this makes sense.  So here's what I'd suggest 
-> > > asking the hardware team: is the right approach to:
-> > > 
-> > > 1. keep the DEBUGSS CLKCTRL MODULEMODE bitfield at 0x2 all the time, even 
-> > > when it's not in use or when entering chip low-power states, or
-> > > 
-> > > 2. program the DEBUGSS CLKCTRL MODULEMODE bitfield to 0x0 when the DEBUGSS 
-> > > is not in use or when entering chip low-power states, but ignore the 
-> > > DEBUGSS CLKCTRL IDLEST register 
-> > > 
-> > > We'll need a new hwmod flag either way; the question is whether it should 
-> > > be something like HWMOD_CANNOT_DISABLE (case 1), or 
-> > > HWMOD_DISABLE_IGNORE_IDLEST (case 2).
-> > 
-> > Just checking on this.  Heard anything from the hardware team?  If not I'd 
-> > say the HWMOD_CANNOT_DISABLE approach is probably the right one for now...
-> 
-> nothing from HW team yet. Last I heard is that they can reproduce the
-> issue, and are now digging through documentation (and maybe RTL, but I'm
-> speculating) to see if that should be supported or not.
-> 
-> From my point of view, however, the thing idles, it just doesn't report
-> it.
+ 1. We gain another "region" register, i.e. L2LPM
+ 2. The way to access the region registers are with different cp15 instructions
 
-Ok sounds like the thing to do is to wait until you hear back from them, 
-if they are still looking at it.
+I'm not sure how to make this better, suggestions are welcome.
 
+Stephen Boyd (2):
+  ARM: perf: Preparatory work for Scorpion PMU support
+  ARM: perf: Add support for Scorpion PMUs
 
-- Paul
+ Documentation/devicetree/bindings/arm/pmu.txt |   2 +
+ arch/arm/kernel/perf_event_cpu.c              |   2 +
+ arch/arm/kernel/perf_event_v7.c               | 482 +++++++++++++++++++++++---
+ 3 files changed, 445 insertions(+), 41 deletions(-)
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
