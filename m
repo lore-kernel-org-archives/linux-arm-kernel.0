@@ -1,10 +1,10 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 11 Feb 2015 17:15:31 +0100
-Subject: [PATCH 10/11] ARM: berlin: rework chip and system controller nodes
- for BG2CD
+Date: Wed, 11 Feb 2015 17:15:32 +0100
+Subject: [PATCH 11/11] ARM: berlin: rework chip and system controller nodes
+ for BG2Q
 In-Reply-To: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1423671332-24580-11-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1423671332-24580-12-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,77 +17,121 @@ Rework the device tree to take this changes into account.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2cd.dtsi | 32 ++++++++++++++++++++++----------
- 1 file changed, 22 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/berlin2q.dtsi | 70 ++++++++++++++++++++++++-----------------
+ 1 file changed, 41 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index 230df3b1770e..314cde70a3ba 100644
---- a/arch/arm/boot/dts/berlin2cd.dtsi
-+++ b/arch/arm/boot/dts/berlin2cd.dtsi
-@@ -79,7 +79,7 @@
- 			compatible = "marvell,berlin2cd-usb-phy";
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index e2f61f27944e..bd86d4121ec8 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -119,7 +119,7 @@
+ 			compatible = "marvell,berlin2-usb-phy";
+ 			reg = <0xa2f400 0x128>;
+ 			#phy-cells = <0>;
+-			resets = <&chip 0x104 14>;
++			resets = <&chip_rst 0x104 14>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -137,7 +137,7 @@
+ 			compatible = "marvell,berlin2-usb-phy";
  			reg = <0xb74000 0x128>;
  			#phy-cells = <0>;
--			resets = <&chip 0x178 23>;
-+			resets = <&chip_rst 0x178 23>;
+-			resets = <&chip 0x104 12>;
++			resets = <&chip_rst 0x104 12>;
  			status = "disabled";
  		};
  
-@@ -87,7 +87,7 @@
- 			compatible = "marvell,berlin2cd-usb-phy";
- 			reg = <0xb78000 0x128>;
- 			#phy-cells = <0>;
--			resets = <&chip 0x178 24>;
-+			resets = <&chip_rst 0x178 24>;
- 			status = "disabled";
- 		};
- 
-@@ -289,17 +289,25 @@
+@@ -351,22 +351,30 @@
  			};
  		};
  
 -		chip: chip-control at ea0000 {
--			compatible = "marvell,berlin2cd-chip-ctrl";
+-			compatible = "marvell,berlin2q-chip-ctrl";
 -			#clock-cells = <1>;
 -			#reset-cells = <2>;
 +		chip: chip-controller at ea0000 {
-+			compatible = "marvell,berlin2cd-chip-ctrl", "syscon";
- 			reg = <0xea0000 0x400>;
++			compatible = "marvell,berlin2q-chip-ctrl", "syscon";
+ 			reg = <0xea0000 0x400>, <0xdd0170 0x10>;
 +			#clock-cells = <1>;
  			clocks = <&refclk>;
  			clock-names = "refclk";
  
--			uart0_pmux: uart0-pmux {
+-			twsi0_pmux: twsi0-pmux {
 -				groups = "G6";
--				function = "uart0";
+-				function = "twsi0";
 +			soc_pinctrl: pin-controller {
-+				compatible = "marvell,berlin2cd-soc-pinctrl";
++				compatible = "marvell,berlin2q-soc-pinctrl";
 +
-+				uart0_pmux: uart0-pmux {
++				twsi0_pmux: twsi0-pmux {
 +					groups = "G6";
-+					function = "uart0";
++					function = "twsi0";
 +				};
-+			};
 +
++				twsi1_pmux: twsi1-pmux {
++					groups = "G7";
++					function = "twsi1";
++				};
+ 			};
+ 
+-			twsi1_pmux: twsi1-pmux {
+-				groups = "G7";
+-				function = "twsi1";
 +			chip_rst: reset {
 +				compatible = "marvell,berlin2-reset";
 +				#reset-cells = <2>;
  			};
  		};
  
-@@ -384,8 +392,12 @@
+@@ -517,28 +525,32 @@
+ 				};
  			};
  
- 			sysctrl: system-controller at d000 {
--				compatible = "marvell,berlin2cd-system-ctrl";
-+				compatible = "marvell,berlin2cd-system-ctrl", "syscon";
+-			sysctrl: pin-controller at d000 {
+-				compatible = "marvell,berlin2q-system-ctrl";
++			sysctrl: system-controller at d000 {
++				compatible = "marvell,berlin2q-system-ctrl", "syscon";
  				reg = <0xd000 0x100>;
-+
+ 
+-				uart0_pmux: uart0-pmux {
+-					groups = "GSM12";
+-					function = "uart0";
+-				};
 +				sys_pinctrl: pin-controller {
-+					compatible = "marvell,berlin2cd-system-pinctrl";
-+				};
++					compatible = "marvell,berlin2q-system-pinctrl";
+ 
+-				uart1_pmux: uart1-pmux {
+-					groups = "GSM14";
+-					function = "uart1";
+-				};
++					uart0_pmux: uart0-pmux {
++						groups = "GSM12";
++						function = "uart0";
++					};
+ 
+-				twsi2_pmux: twsi2-pmux {
+-					groups = "GSM13";
+-					function = "twsi2";
+-				};
++					uart1_pmux: uart1-pmux {
++						groups = "GSM14";
++						function = "uart1";
++					};
++
++					twsi2_pmux: twsi2-pmux {
++						groups = "GSM13";
++						function = "twsi2";
++					};
+ 
+-				twsi3_pmux: twsi3-pmux {
+-					groups = "GSM14";
+-					function = "twsi3";
++					twsi3_pmux: twsi3-pmux {
++						groups = "GSM14";
++						function = "twsi3";
++					};
+ 				};
  			};
  
- 			sic: interrupt-controller at e000 {
 -- 
 2.3.0
