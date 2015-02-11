@@ -1,57 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 11 Feb 2015 12:40:27 +0000
-Subject: [PATCH 2/2] ARM: dts: zynq: Add linux, stdout-path and stdout-path
-In-Reply-To: <ea777ffbffea442e3bc69fe11183811772a5716e.1423657710.git.michal.simek@xilinx.com>
-References: <0a0e0579fb6e2794d2c0c6fb9186c5b43618f448.1423657710.git.michal.simek@xilinx.com>
- <ea777ffbffea442e3bc69fe11183811772a5716e.1423657710.git.michal.simek@xilinx.com>
-Message-ID: <20150211124027.GH9154@leverpostej>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 11 Feb 2015 13:56:46 +0100
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher
+ constraints with dma-parms
+In-Reply-To: <CAF6AEGscETLVnhg7zTFHQbj2KmX150VPaVHsqjvyJnVfHnHkOQ@mail.gmail.com>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+ <54DB12B5.4080000@samsung.com>
+ <20150211111258.GP8656@n2100.arm.linux.org.uk>
+ <CAF6AEGscETLVnhg7zTFHQbj2KmX150VPaVHsqjvyJnVfHnHkOQ@mail.gmail.com>
+Message-ID: <20150211125646.GR24485@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 11, 2015 at 12:29:02PM +0000, Michal Simek wrote:
-> parallella - Use reference instead of hardcoded path
->              (linux,stdout-path)
+On Wed, Feb 11, 2015 at 06:23:52AM -0500, Rob Clark wrote:
+> On Wed, Feb 11, 2015 at 6:12 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > As I've already pointed out, there's a major problem if you have already
+> > had a less restrictive attachment which has an active mapping, and a new
+> > more restrictive attachment comes along later.
+> >
+> > It seems from Rob's descriptions that we also need another flag in the
+> > importer to indicate whether it wants to have a valid struct page in the
+> > scatter list, or whether it (correctly) uses the DMA accessors on the
+> > scatter list - so that exporters can reject importers which are buggy.
 > 
-> stdout-path is used by bootloader to identify console.
-> 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
-> 
-> U-Boot driver model requires stdout-path.
-> ---
->  arch/arm/boot/dts/zynq-parallella.dts | 3 ++-
->  arch/arm/boot/dts/zynq-zc702.dts      | 2 ++
->  arch/arm/boot/dts/zynq-zc706.dts      | 2 ++
->  arch/arm/boot/dts/zynq-zed.dts        | 2 ++
->  arch/arm/boot/dts/zynq-zybo.dts       | 2 ++
->  5 files changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
-> index 6a5f51daa708..45228a427006 100644
-> --- a/arch/arm/boot/dts/zynq-parallella.dts
-> +++ b/arch/arm/boot/dts/zynq-parallella.dts
-> @@ -35,7 +35,8 @@
->  
->  	chosen {
->  		bootargs = "console=ttyPS0,115200 earlyprintk root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait";
-> -		linux,stdout-path = "/amba/serial at e0001000";
-> +		linux,stdout-path = &uart1;
-> +		stdout-path = &uart1;
+> to be completely generic, we would really need a way that the device
+> could take over only just the last iommu (in case there were multiple
+> levels of address translation)..
 
-Given that you added aliases in the last patch, you can use that to
-refer to the serial:
-
-	stdout-path - "serial0:115200n8";
-
-With or without the alias you can encode the UART configuration here
-too:
-
-	stdout-path = "/amba/serial at e0001000:115200n8"
-
-Which makes the expected configuration explicit without relying on the
-Linux-specific bootargs.
-
-Is there any reason to keep linux,stdout-path?
-
-Thanks,
-Mark.
+I still hold that if the dma api steals the iommu your gpu needs for
+context switching then that's a bug in the platform setup code. dma api
+really doesn't have any concept of switchable hw contexts. So trying to
+work around this brokeness by mandating it as a valid dma-buf use-case is
+totally backwards.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
