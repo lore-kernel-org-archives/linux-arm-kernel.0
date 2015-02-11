@@ -1,8 +1,8 @@
 From: tyler.baker@linaro.org (Tyler Baker)
-Date: Tue, 10 Feb 2015 19:51:36 -0800
+Date: Tue, 10 Feb 2015 19:52:26 -0800
 Subject: [PATCH 0/2] ARM: multi_v7_defconfig,
  sunxi_defconfig: increase maximum number of CPUs  
-Message-ID: <1423626698-1230-1-git-send-email-tyler.baker@linaro.org>
+Message-ID: <1423626748-1277-1-git-send-email-tyler.baker@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
