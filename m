@@ -1,100 +1,76 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 12 Feb 2015 01:27:06 +0300
-Subject: [PATCH v2] ARM: shmobile: silk: initial device tree
-In-Reply-To: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
-References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
-Message-ID: <2981242.5l1vvMcV1t@wasted.cogentembedded.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 11 Feb 2015 16:28:51 -0600
+Subject: [PATCH v3 2/2] remoteproc: add support to handle internal memories
+In-Reply-To: <20150211205757.GI2531@atomide.com>
+References: <1420838519-15669-1-git-send-email-s-anna@ti.com>
+ <1420838519-15669-3-git-send-email-s-anna@ti.com>
+ <CAK=WgbaFoUpV315Tg1q=PGc-FkCvKBz2BmO8Fkj_FHa5UuWviw@mail.gmail.com>
+ <20150211205757.GI2531@atomide.com>
+Message-ID: <54DBD7A3.9020604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the initial device tree for the R8A7794 SoC based SILK low cost board.
-SCIF2 serial port support is included, so that the serial console can work.
+On 02/11/2015 02:57 PM, Tony Lindgren wrote:
+> * Ohad Ben-Cohen <ohad@wizery.com> [150210 02:14]:
+>> Hi Suman,
+>>
+>> On Fri, Jan 9, 2015 at 11:21 PM, Suman Anna <s-anna@ti.com> wrote:
+>>> A remote processor may need to load certain firmware sections into
+>>> internal memories (eg: RAM at L1 or L2 levels) for performance or
+>>> other reasons. Introduce a new resource type (RSC_INTMEM) and add
+>>> an associated handler function to handle such memories. The handler
+>>> creates a kernel mapping for the resource's 'pa' (physical address).
+>> ...
+>>> + * rproc_handle_intmem() - handle internal memory resource entry
+>>> + * @rproc: rproc handle
+>>> + * @rsc: the intmem resource entry
+>>> + * @offset: offset of the resource data in resource table
+>>> + * @avail: size of available data (for image validation)
+>>> + *
+>>> + * This function will handle firmware requests for mapping a memory region
+>>> + * internal to a remote processor into kernel. It neither allocates any
+>>> + * physical pages, nor performs any iommu mapping, as this resource entry
+>>> + * is primarily used for representing physical internal memories. If the
+>>> + * internal memory region can only be accessed through an iommu, please
+>>> + * use a devmem resource entry.
+>>> + *
+>>> + * These resource entries should be grouped near the carveout entries in
+>>> + * the firmware's resource table, as other firmware entries might request
+>>> + * placing other data objects inside these memory regions (e.g. data/code
+>>> + * segments, trace resource entries, ...).
+>>> + */
+>>> +static int rproc_handle_intmem(struct rproc *rproc, struct fw_rsc_intmem *rsc,
+>>> +                              int offset, int avail)
+>>> +{
+>> ...
+>>> +       va = (__force void *)ioremap_nocache(rsc->pa, rsc->len);
+>>
+>> Back in the days when we developed remoteproc there was a tremendous
+>> effort to move away from ioremap when not strictly needed.
+> 
+> The use of ioremap in general is just fine for drivers as long
+> as they access a dedicated area to the specific device. Accessing
+> random registers and memory in the SoC is what I'm worried about.
+>  
+>> I'd be happy if someone intimate with the related hardware could ack
+>> that in this specific case ioremap is indeed needed. No need to review
+>> the entire patch, or anything remoteproc, just make sure that
+>> generally ioremap is how we want to access this internal memory.
+>>
+>> Tony or Kevin any chance you could take a look and ack?
+>>
+>> If ioremap is indeed the way to go, I'd also expect that we wouldn't
+>> have to use __force here, but that's probably a minor patch cleanup.
+> 
+> Hmm sounds like this memory should be dedicated to the accelerator?
+> 
+> In that case it should use memblock to reserve that area early so
+> the kernel won't be accessing it at all.
 
-Based on the original patch by Vladimir Barinov
-<vladimir.barinov@cogentembedded.com>.
+The usage here is not really on regular memory, but on internal device
+memory (eg: L2RAM within DSP which is accessible by MPU through L3 bus).
+For the regular shared memory for vrings and vring buffers, the
+remoteproc core does rely on CMA pools.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
-This patch is against the 'renesas-devel-20150211-v3.19' tag of Simon Horman's
-'renesas.git' repo.  It requires just posted R8A7794 PFC DT  patch in order to
-compile, and R8A7794 PFC driver patch in order for the pins  to be configured.
-
-Changes in version 2:
-- removed "console=" parameter from the kernel command line;
-- added PFC node with SCIF2 pins subnode and referred it from the SCIF2 node;
-- rebased the patch
-- mentioned the origin of patch in the changelog.
-
- arch/arm/boot/dts/Makefile         |    1 
- arch/arm/boot/dts/r8a7794-silk.dts |   51 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 52 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/Makefile
-===================================================================
---- renesas.orig/arch/arm/boot/dts/Makefile
-+++ renesas/arch/arm/boot/dts/Makefile
-@@ -421,6 +421,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += eme
- 	r8a7791-henninger.dtb \
- 	r8a7791-koelsch.dtb \
- 	r8a7794-alt.dtb \
-+	r8a7794-silk.dtb \
- 	sh73a0-kzm9g.dtb
- dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
- 	socfpga_arria10_socdk.dtb \
-Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
-===================================================================
---- /dev/null
-+++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -0,0 +1,51 @@
-+/*
-+ * Device Tree Source for the SILK board
-+ *
-+ * Copyright (C) 2014 Renesas Electronics Corporation
-+ * Copyright (C) 2014-2015 Renesas Solutions Corp.
-+ * Copyright (C) 2014-2015 Cogent Embedded, Inc.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "r8a7794.dtsi"
-+
-+/ {
-+	model = "SILK";
-+	compatible = "renesas,silk", "renesas,r8a7794";
-+
-+	aliases {
-+		serial0 = &scif2;
-+	};
-+
-+	chosen {
-+		bootargs = "ignore_loglevel";
-+		stdout-path = &scif2;
-+	};
-+
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0 0x40000000 0 0x40000000>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <20000000>;
-+};
-+
-+&pfc {
-+	scif2_pins: serial2 {
-+		renesas,groups = "scif2_data";
-+		renesas,function = "scif2";
-+	};
-+};
-+
-+&scif2 {
-+	pinctrl-0 = <&scif2_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
+regards
+Suman
