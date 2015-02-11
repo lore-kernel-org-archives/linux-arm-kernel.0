@@ -1,67 +1,56 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 11 Feb 2015 10:24:03 -0800
-Subject: [PATCH] Input: sun4i-ts: add thermal driver dependency
-In-Reply-To: <20150129185151.GA33547@dtor-ws>
-References: <2265502.1m7jYBaqyh@wuerfel> <54C9E63A.6020806@redhat.com>
- <20150129185151.GA33547@dtor-ws>
-Message-ID: <20150211182403.GE29440@dtor-ws>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 11 Feb 2015 10:27:17 -0800
+Subject: [PATCH 2/2] ARM: perf: Add support for Scorpion PMUs
+In-Reply-To: <CAJ5Y-eZsCbeZMwgPrNOg9Qdt8XqAoJBVNbiNMC7c3PQTOrUJ+g@mail.gmail.com>
+References: <1423616724-20849-1-git-send-email-sboyd@codeaurora.org>
+ <1423616724-20849-3-git-send-email-sboyd@codeaurora.org>
+ <CAJ5Y-eZsCbeZMwgPrNOg9Qdt8XqAoJBVNbiNMC7c3PQTOrUJ+g@mail.gmail.com>
+Message-ID: <20150211182717.GA11190@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 10:51:51AM -0800, Dmitry Torokhov wrote:
-> On Thu, Jan 29, 2015 at 08:50:18AM +0100, Hans de Goede wrote:
-> > Hi,
-> > 
-> > On 28-01-15 16:17, Arnd Bergmann wrote:
-> > >The sun4i-ts driver has had a dependency on the thermal code
-> > >since it was first merged,
-> > 
-> > The "since it was first merged bit" is not true, this is caused
-> > by recent changes by ChenYu.
-> > 
-> > Other then that no objections from me against the proposed fix.
-> > 
-> > Regards,
-> > 
-> > Hans
-> > 
-> > 
-> >  but this is not currently enforced
-> > >in Kconfig, so in some randconfig builds we get
-> > >
-> > >drivers/built-in.o: In function `sun4i_ts_remove':
-> > >:(.text+0x2376f4): undefined reference to `thermal_zone_of_sensor_unregister'
-> > >drivers/built-in.o: In function `sun4i_ts_probe':
-> > >:(.text+0x237a94): undefined reference to `thermal_zone_of_sensor_register'
-> > >:(.text+0x237c00): undefined reference to `thermal_zone_of_sensor_unregister'
-> > >
-> > >We need the dependency on THERMAL in order to ensure that this
-> > >driver becomes a loadable module if the thermal support itself
-> > >is modular, while the dependency on THERMAL_OF is a runtime dependency
-> > >and the driver will still build but not work if it is missing.
-> > >
-> > >Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > >Fixes: 6decea7c5438e2 ("Input: add driver for Allwinner sunxi SoC's rtp controller")
-> > >
-> > >diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-> > >index 58917525126e..e2447f0063b7 100644
-> > >--- a/drivers/input/touchscreen/Kconfig
-> > >+++ b/drivers/input/touchscreen/Kconfig
-> > >@@ -943,6 +943,8 @@ config TOUCHSCREEN_SUN4I
-> > >  	tristate "Allwinner sun4i resistive touchscreen controller support"
-> > >  	depends on ARCH_SUNXI || COMPILE_TEST
-> > >  	depends on HWMON
-> > >+	depends on THERMAL
-> > >+	depends on THERMAL_OF || COMPILE_TEST
+On 02/10, Ashwin Chaugule wrote:
+> Hi Stephen,
 > 
-> THERMAL_OF does have proper stubs and I do not see why we need to force
-> having TERMAL even if we don't do compile test. Should the dependency be:
+> On 10 February 2015 at 20:05, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > Scorpion supports a set of local performance monitor event
+> > selection registers (LPM) sitting behind a cp15 based interface
+> > that extend the architected PMU events to include Scorpion CPU
+> > and Venum VFP specific events. To use these events the user is
+> > expected to program the lpm register with the event code shifted
+> > into the group they care about and then point the PMNx event at
+> > that region+group combo by writing a LPMn_GROUPx event. Add
+> > support for this hardware.
+> >
+> > Note: the raw event number is a pure software construct that
+> > allows us to map the multi-dimensional number space of regions,
+> > groups, and event codes into a flat event number space suitable
+> > for use by the perf framework.
+> >
+> > This is based on code originally written by Ashwin Chaugule and
+> > Neil Leeder [1] massed to become similar to the Krait PMU support
+> > code.
 > 
-> 	depends on !THERMAL_OF || TERMAL
+> Thanks for taking this up!
+> Overall this series looks good to me, but from what I faintly
+> recollect, doesn't this (and the Krait pmu code) get affected by
+> powercollapse issues anymore?
+> e.g.
+> https://www.codeaurora.org/cgit/quic/la/kernel/msm/commit/arch/arm/kernel/perf_event_msm.c?h=msm-3.4&id=b5ca687960f0fea2f4735e83ca5c9543474c19de
+> 
 
-*ping*
+Right now there isn't any power collapse support in mainline so
+there's no immediate problem. Once we add power collapse support
+(i.e. cpuidle) to the Scorpion and Krait platforms we'll need to
+do something in the perf event code to properly maintain the
+counts across idle. I imagine it would be done by registering for
+cpu_pm notifications and then doing the save/restore on
+CPU_PM_ENTER and CPU_PM_EXIT. At least, that's what you started
+doing in this patch[1]. And then it seems the patch you mention
+came after that and actually did the save/restore of the counts.
 
-Thanks.
+[1] https://www.codeaurora.org/cgit/quic/la/kernel/msm/commit/?h=msm-3.4&id=464983a7e991a484cac0bc0885cee4fee318d659
 
 -- 
-Dmitry
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
