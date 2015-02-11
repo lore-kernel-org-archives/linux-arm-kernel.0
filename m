@@ -1,217 +1,80 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Wed, 11 Feb 2015 08:06:55 +0000
-Subject: [PATCH 1/2] dmaengine: fsl-edma: add dma memcpy support
-In-Reply-To: <63612a565e0cbf4081b0b8efa0bc3c46@agner.ch>
-References: <1419928907-18053-1-git-send-email-jingchang.lu@freescale.com>
- <1419928907-18053-2-git-send-email-jingchang.lu@freescale.com>
- <63612a565e0cbf4081b0b8efa0bc3c46@agner.ch>
-Message-ID: <DM2PR03MB349BBD3ECA4BEC0773C50C983250@DM2PR03MB349.namprd03.prod.outlook.com>
+From: rsahu@apm.com (Rameshwar Sahu)
+Date: Wed, 11 Feb 2015 13:38:07 +0530
+Subject: [PATCH v5 1/3] dmaengine: Add support for APM X-Gene SoC DMA
+ engine driver
+In-Reply-To: <20150205201118.GB16547@intel.com>
+References: <1422968107-23125-1-git-send-email-rsahu@apm.com>
+ <1422968107-23125-2-git-send-email-rsahu@apm.com>
+ <20150205015031.GK4489@intel.com>
+ <CAFd313yBS3KOdtKbnaeTKehmC_f5ZaB-nx299QoLeMm279=Jsg@mail.gmail.com>
+ <20150205201118.GB16547@intel.com>
+Message-ID: <CAFd313xiXQXaYoTNdGnVqnAisYoFDneQ0VwW64v7unFpKU5P_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Hi Vinod,
 
-Thanks for your test.
 
-Yes, it's not a huge number.
+On Fri, Feb 6, 2015 at 1:41 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Thu, Feb 05, 2015 at 05:29:06PM +0530, Rameshwar Sahu wrote:
+>> Hi Vinod,
+>>
+>> Thanks for reviewing this patch.
+>>
+>> Please see inline......
+> Please STOP top posting
+>
+>> >
+>> >> +}
+>> >> +
+>> >> +static void xgene_dma_issue_pending(struct dma_chan *channel)
+>> >> +{
+>> >> +     /* Nothing to do */
+>> >> +}
+>> > What do you mean by nothing to do here
+>> > See Documentation/dmaengine/client.txt Section 4 & 5
+>> This docs is only applicable on slave DMA operations, we don't support
+>> slave DMA, it's only master.
+>> Our hw engine is designed in the way that there is no scope of
+>> flushing pending transaction explicitly by sw.
+>> We have circular ring descriptor dedicated to engine. In submit
+>> callback  we are queuing descriptor and informing to engine, so after
+>> this it's internal to hw to execute descriptor one by one.
+> But the API expectations on this are _same_
+>
+> No the API expects you to maintain a SW queue, then push to your ring buffer
+> when you get issue_pending. Issue pending is the start of data transfer, you
+> client will expect accordingly.
 
-The number is always very small especially when the "test_buf_size" is small.
+Okay, I will maintain a sw queue, and will push sw descriptor to hw in
+this callback.
+>
+>> >> +     /* Run until we are out of length */
+>> >> +     do {
+>> >> +             /* Create the largest transaction possible */
+>> >> +             copy = min_t(size_t, len, DMA_MAX_64BDSC_BYTE_CNT);
+>> >> +
+>> >> +             /* Prepare DMA descriptor */
+>> >> +             xgene_dma_prep_cpy_desc(chan, slot, dst, src, copy);
+>> >> +
+>> > This is wrong. The descriptor is supposed to be already prepared and now it
+>> > has to be submitted to queue
+>>
+>> Due to the race in tx_submit call from the client, need to serialize
+>> the submission of H/W DMA descriptors.
+>>  So we are making  shadow copy in prepare DMA  routine and  preparing
+>> actual descriptor during tx_submit call.
+> Thats an abuse of API and I dont see a reason why this race should happen in
+> the first place.
+>
+> So you get a prep call, you prepare a desc in SW. Then submit pushes it to a
+> queue. Finally in issue pending you push them to HW. Simple..?
 
-For dmatest tool, the measure transmission time is far greater than the actual transmission time.
-So the number is small. In fact, the DMA with memory copy mode is very fast.
-
-Best Regards,
-Yuan Yao
-
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
-> On Behalf Of Stefan Agner
-> Sent: Friday, January 30, 2015 8:39 PM
-> To: Lu Jingchang-B35083
-> Cc: vinod.koul at intel.com; dmaengine at vger.kernel.org;
-> dan.j.williams at intel.com; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/2] dmaengine: fsl-edma: add dma memcpy support
-> 
-> On 2014-12-30 09:41, Jingchang Lu wrote:
-> > This adds the memory copy capability support, the memcpy functionality
-> > needs to configure the DMAMUX of the channel with the always on slave
-> > id.
-> 
-> Hi Jingchang,
-> 
-> I run some tests on v3.19-rc6 with this patches applied on Vybrid SoC
-> VF500 and VF610.
-> 
-> On VF500 clocked at 400MHz I get this numbers:
-> # insmod dmatest.ko max_channels=1 iterations=100 run=1 [  616.809594]
-> dmatest: Started 1 threads using dma0chan0 [  617.293498] dmatest:
-> dma0chan0-copy0: summary 100 tests, 0 failures
-> 209 iops 1613 KB/s (0)
-> 
-> In contrast, on a VF610 clocked at 500MHz I get this:
-> # insmod dmatest.ko max_channels=1 iterations=100 run=1 [  154.203290]
-> dmatest: Started 1 threads using dma0chan4 [  154.614225] dmatest:
-> dma0chan4-copy0: summary 100 tests, 0 failures
-> 246 iops 2002 KB/s (0)
-> 
-> Not that huge numbers, but I guess this is what the hardware can deliver... Did
-> you run some performance tests?
-> 
-> But generally, looks good.
-> 
-> Tested-by: Stefan Agner <stefan@agner.ch>
-> 
-> >
-> > Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-> > ---
-> >  drivers/dma/fsl-edma.c | 63
-> > ++++++++++++++++++++++++++++++++++++++++++++++++--
-> >  1 file changed, 61 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c index
-> > 09e2842..e0bd517 100644
-> > --- a/drivers/dma/fsl-edma.c
-> > +++ b/drivers/dma/fsl-edma.c
-> > @@ -110,6 +110,8 @@
-> >  #define EDMAMUX_CHCFG_ENBL		0x80
-> >  #define EDMAMUX_CHCFG_SOURCE(n)		((n) & 0x3F)
-> >
-> > +#define SLAVE_ID_ALWAYSON	63 /* the always on slave id */
-> > +
-> >  #define DMAMUX_NR	2
-> >
-> >  #define FSL_EDMA_BUSWIDTHS	BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-> \
-> > @@ -147,6 +149,7 @@ struct fsl_edma_slave_config {  struct
-> > fsl_edma_chan {
-> >  	struct virt_dma_chan		vchan;
-> >  	enum dma_status			status;
-> > +	u32				slave_id;
-> >  	struct fsl_edma_engine		*edma;
-> >  	struct fsl_edma_desc		*edesc;
-> >  	struct fsl_edma_slave_config	fsc;
-> > @@ -637,6 +640,45 @@ static struct dma_async_tx_descriptor
-> > *fsl_edma_prep_slave_sg(
-> >  	return vchan_tx_prep(&fsl_chan->vchan, &fsl_desc->vdesc, flags);  }
-> >
-> > +static struct dma_async_tx_descriptor * fsl_edma_prep_memcpy(struct
-> > +dma_chan *chan, dma_addr_t dst,
-> > +			dma_addr_t src, size_t len, unsigned long tx_flags) {
-> > +	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
-> > +	struct fsl_edma_desc *fsl_desc;
-> > +	u16 soff, doff, attr;
-> > +
-> > +	/*
-> > +	 * use 4-bytes data transfer size if all is 4-bytes aligned,
-> > +	 * else 2-bytes data transfer size of all is 2-bytes aligned,
-> > +	 * otherwise 1-byte tranfer size.
-> > +	 */
-> > +	if (src & 0x1 || dst & 0x1 || len & 0x1) {
-> > +		attr = EDMA_TCD_ATTR_SSIZE_8BIT |
-> EDMA_TCD_ATTR_DSIZE_8BIT;
-> > +		soff = 0x1;
-> > +		doff = 0x1;
-> > +	} else if (src & 0x2 || dst & 0x2 || len & 0x2) {
-> > +		attr = EDMA_TCD_ATTR_SSIZE_16BIT |
-> EDMA_TCD_ATTR_DSIZE_16BIT;
-> > +		soff = 0x2;
-> > +		doff = 0x2;
-> > +	} else {
-> > +		attr = EDMA_TCD_ATTR_SSIZE_32BIT |
-> EDMA_TCD_ATTR_DSIZE_32BIT;
-> > +		soff = 0x4;
-> > +		doff = 0x4;
-> > +	}
-> > +
-> > +	fsl_desc = fsl_edma_alloc_desc(fsl_chan, 1);
-> > +	if (!fsl_desc)
-> > +		return NULL;
-> > +	fsl_desc->iscyclic = false;
-> > +
-> > +	fsl_edma_fill_tcd(fsl_desc->tcd[0].vtcd, src, dst, attr, soff, len,
-> > +			  0, 1, 1, doff, 0, true, true, false);
-> > +
-> > +	return vchan_tx_prep(&fsl_chan->vchan, &fsl_desc->vdesc, tx_flags);
-> > +
-> > +}
-> > +
-> >  static void fsl_edma_xfer_desc(struct fsl_edma_chan *fsl_chan)  {
-> >  	struct virt_dma_desc *vdesc;
-> > @@ -735,6 +777,7 @@ static struct dma_chan *fsl_edma_xlate(struct
-> > of_phandle_args *dma_spec,  {
-> >  	struct fsl_edma_engine *fsl_edma = ofdma->of_dma_data;
-> >  	struct dma_chan *chan, *_chan;
-> > +	struct fsl_edma_chan *fsl_chan;
-> >  	unsigned long chans_per_mux = fsl_edma->n_chans / DMAMUX_NR;
-> >
-> >  	if (dma_spec->args_count != 2)
-> > @@ -748,8 +791,10 @@ static struct dma_chan *fsl_edma_xlate(struct
-> > of_phandle_args *dma_spec,
-> >  			chan = dma_get_slave_channel(chan);
-> >  			if (chan) {
-> >  				chan->device->privatecnt++;
-> > -				fsl_edma_chan_mux(to_fsl_edma_chan(chan),
-> > -					dma_spec->args[1], true);
-> > +				fsl_chan = to_fsl_edma_chan(chan);
-> > +				fsl_chan->slave_id = dma_spec->args[1];
-> > +				fsl_edma_chan_mux(fsl_chan, fsl_chan-
-> >slave_id,
-> > +						  true);
-> >  				mutex_unlock(&fsl_edma->fsl_edma_mutex);
-> >  				return chan;
-> >  			}
-> > @@ -763,6 +808,17 @@ static int fsl_edma_alloc_chan_resources(struct
-> > dma_chan *chan)
-> >  {
-> >  	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
-> >
-> > +	/*
-> > +	 * If the slave id of the channel DMAMUX is not set yet,
-> > +	 * this could happy when the channel is requested by the
-> > +	 * dma_request_channel() for memory copy purpose instead
-> > +	 * of by dts binding, then configure the DMAMUX with the
-> > +	 * always on slave id.
-> > +	 */
-> > +	if (fsl_chan->slave_id == 0) {
-> > +		fsl_chan->slave_id = SLAVE_ID_ALWAYSON;
-> > +		fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id, true);
-> > +	}
-> >  	fsl_chan->tcd_pool = dma_pool_create("tcd_pool", chan->device-
-> >dev,
-> >  				sizeof(struct fsl_edma_hw_tcd),
-> >  				32, 0);
-> > @@ -778,6 +834,7 @@ static void fsl_edma_free_chan_resources(struct
-> > dma_chan *chan)
-> >  	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-> >  	fsl_edma_disable_request(fsl_chan);
-> >  	fsl_edma_chan_mux(fsl_chan, 0, false);
-> > +	fsl_chan->slave_id = 0;
-> >  	fsl_chan->edesc = NULL;
-> >  	vchan_get_all_descriptors(&fsl_chan->vchan, &head);
-> >  	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags); @@ -903,6
-> > +960,7 @@ static int fsl_edma_probe(struct platform_device *pdev)
-> >  	dma_cap_set(DMA_PRIVATE, fsl_edma->dma_dev.cap_mask);
-> >  	dma_cap_set(DMA_SLAVE, fsl_edma->dma_dev.cap_mask);
-> >  	dma_cap_set(DMA_CYCLIC, fsl_edma->dma_dev.cap_mask);
-> > +	dma_cap_set(DMA_MEMCPY, fsl_edma->dma_dev.cap_mask);
-> >
-> >  	fsl_edma->dma_dev.dev = &pdev->dev;
-> >  	fsl_edma->dma_dev.device_alloc_chan_resources
-> > @@ -912,6 +970,7 @@ static int fsl_edma_probe(struct platform_device
-> *pdev)
-> >  	fsl_edma->dma_dev.device_tx_status = fsl_edma_tx_status;
-> >  	fsl_edma->dma_dev.device_prep_slave_sg =
-> fsl_edma_prep_slave_sg;
-> >  	fsl_edma->dma_dev.device_prep_dma_cyclic =
-> fsl_edma_prep_dma_cyclic;
-> > +	fsl_edma->dma_dev.device_prep_dma_memcpy =
-> fsl_edma_prep_memcpy;
-> >  	fsl_edma->dma_dev.device_config = fsl_edma_slave_config;
-> >  	fsl_edma->dma_dev.device_pause = fsl_edma_pause;
-> >  	fsl_edma->dma_dev.device_resume = fsl_edma_resume;
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I agree, I will do it and post another version soon.
+>
+> --
+> ~Vinod
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
