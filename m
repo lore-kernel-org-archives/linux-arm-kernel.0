@@ -1,966 +1,227 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 11 Feb 2015 00:03:39 -0600
-Subject: [Patch v3 2/2] dmaengine: Add ADM driver
-In-Reply-To: <1423634619-614-1-git-send-email-agross@codeaurora.org>
-References: <1423634619-614-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1423634619-614-3-git-send-email-agross@codeaurora.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 11 Feb 2015 06:33:13 +0000
+Subject: [PATCH v8 08/21] dt / chosen: Add linux,uefi-stub-generated-dtb
+ property
+In-Reply-To: <CAKv+Gu-fnpxr-3T9RPuf4de2DGVE6xkDEcfFyzYp5KJCJH_fzw@mail.gmail.com>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-9-git-send-email-hanjun.guo@linaro.org>
+ <20150202134033.GR4278@bivouac.eciton.net>
+ <20150202135051.GA3825@xora-haswell.xora.org.uk>
+ <20150202163253.GG21175@leverpostej>
+ <CAGCh1+nL7YMXYp42ekWAqmw_m5cy=s_7NszLDAXj=bUr2aZVig@mail.gmail.com>
+ <54D5884A.6050009@linaro.org>
+ <CAKv+Gu-oDRjYPC3SxSDVZ7rV7eG9DCct=kNS0xBVd28YoV5fSg@mail.gmail.com>
+ <20150209114624.GD4250@leverpostej>
+ <CAKv+Gu-fnpxr-3T9RPuf4de2DGVE6xkDEcfFyzYp5KJCJH_fzw@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1502110607250.29696@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the DMA engine driver for the QCOM Application Data Mover (ADM) DMA
-controller found in the MSM8x60 and IPQ/APQ8064 platforms.
+On Wed, 11 Feb 2015, Ard Biesheuvel wrote:
+> On 9 February 2015 at 19:46, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Sat, Feb 07, 2015 at 05:03:44AM +0000, Ard Biesheuvel wrote:
+> >> On 7 February 2015 at 03:36, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> >> > On 2015?02?06? 18:34, G Gregory wrote:
+> >> > [...]
+> >> >
+> >> >>>>>>
+> >> >>>>>> --------------------------------------------------------------------------------
+> >> >>>>>>   linux,uefi-stub-kern-ver  | string | Copy of linux_banner from
+> >> >>>>>> build.
+> >> >>>>>>
+> >> >>>>>> --------------------------------------------------------------------------------
+> >> >>>>>> +linux,uefi-stub-generated-dtb  | bool | Indication for no DTB
+> >> >>>>>> provided by
+> >> >>>>>> +                        |      | firmware.
+> >> >>>>>>
+> >> >>>>>> +--------------------------------------------------------------------------------
+> >> >>>>>
+> >> >>>>>
+> >> >>>>> Apologies for the late bikeshedding, but the discussion on this topic
+> >> >>>>> previsously was lively enough that I thought I'd let it die down a bit
+> >> >>>>> before seeing if I had anything to add.
+> >> >>>>>
+> >> >>>>> That, and I just realised something:
+> >> >>>>> One alternative to this added DT entry is that we could treat the
+> >> >>>>> absence of a registered UEFI configuration table as the indication
+> >> >>>>> that no HW description was provided from firmware, since the stub does
+> >> >>>>> not call InstallConfigurationTable() on the DT it generates. This does
+> >> >>>>> move the ability to detect to after efi_init(), but this should be
+> >> >>>>> fine for ACPI-purposes.
+> >> >>>>>
+> >> >>>> That would not work as expected in the kexec/Xen use case though as they
+> >> >>>> may genuinely boot with DT from an ACPI host without UEFI.
+> >> >>>
+> >> >>>
+> >> >>> I'm a little concerned by this case. How do we intend to pass stuff from
+> >> >>> Xen to the kernel in this case? When we initially discussed the stub
+> >> >>> prior to merging, we weren't quite sure if ACPI without UEFI was
+> >> >>> entirely safe.
+> >> >>>
+> >> >>> The linux,uefi-stub-kern-ver property was originally intended as a
+> >> >>> sanity-check feature to ensure nothing (including Xen) masqueraded as
+> >> >>> the stub, but for some reason the actual sanity check was never
+> >> >>> implemented.
+> >> >>>
+> >> >>>>> If that is deemed undesirable, I would still prefer Catalin's
+> >> >>>>> suggested name ("linux,bare-dtb"), which describes the state rather
+> >> >>>>> than the route we took to get there.
+> >> >>>>>
+> >> >>>> I agree.
+> >> >>>
+> >> >>>
+> >> >>> I guess this would be ok, though it would be nice to know which agent
+> >> >>> generated the DTB.
+> >> >>>
+> >> >>
+> >> >> The most obvious scheme then is
+> >> >>
+> >> >> linux,bare-dtb = "uefi-stub";
+> >> >>
+> >> >> otherwise we generate a new binding for every component in the boot path.
+> >> >
+> >> >
+> >> > Leif, Mark, any comments on this?
+> >> >
+> >>
+> >> As far as I remember, we did not finalize the decision to go with a
+> >> stub generated property instead of some other means to infer that the
+> >> device tree is not suitable for booting and ACPI should be preferred.
+> >>
+> >> We will be discussing the 'stub<->kernel interface as a boot protocol'
+> >> topic this week at Connect, so let's discuss it in that context before
+> >> signing off on patches like these.
+> >
+> > As some of us (at least myself) aren't at connect, it would be nice if
+> > those discussions could be at least mirrored on the mailing list. I have
+> > some concerns regarding how this is going to work long-term, and I'd
+> > like to make sure we don't get stuck with something that limits what we
+> > can do long-term.
+> >
+> > Is there a session set aside for this, or is this a hallway track topic?
+> >
+> 
+> Hello all,
+> 
+> (added team-Xen to cc)
+> 
+> We had our meeting yesterday: allow me to summarize what we discussed,
+> and we can proceed with the discussion on-list if desired.
+> 
+> Present:
+> Grant Likely
+> Al Stone
+> Hanjun Guo
+> Leif Lindholm
+> Roy Franz
+> Ard Biesheuvel
+> 
+> Topic #1: booting the arm64 kernel with ACPI but no UEFI
+> 
+> We have identified Xen as the only use case: there is a need to boot
+> dom0 using the host's ACPI tables but without allowing the dom0 kernel
+> to interface directly with the UEFI firmware. There may be other valid
+> use cases, though, so this use case should be addressed generically
+> regardless.
+> 
+> First, it was proposed to allow the ACPI root pointer to be added to a
+> /chosen node property, and the kernel would use this property instead
+> of going through the UEFI tables.
+> However, there is a similar case that could be made for SMBIOS: unlike
+> x86, where there is a 'legacy' method to locate either table by
+> scanning some special physical memory regions, the respective
+> specifications only provide a single method to perform table
+> discovery, which is through UEFI. This means that passing the ACPI
+> root pointer to the kernel using a property in the /chosen node
+> doesn't scale well, as we would need to do the same for SMBIOS at
+> least, and potentially other tables in the future.
 
-The ADM supports both memory to memory transactions and memory
-to/from peripheral device transactions.  The controller also provides flow
-control capabilities for transactions to/from peripheral devices.
+TBH there are no other tables and even if there were, this method would
+still scale linearly with the number of tables, that is not bad in my
+view.
 
-The initial release of this driver supports slave transfers to/from peripherals
-and also incorporates CRCI (client rate control interface) flow control.
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- drivers/dma/Kconfig    |   10 +
- drivers/dma/Makefile   |    1 +
- drivers/dma/qcom_adm.c |  902 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 913 insertions(+)
- create mode 100644 drivers/dma/qcom_adm.c
+> There are two other concerns related to passing the ACPI root pointer directly:
+> - the actual discovery occurs in core code, and we are reluctant to
+> change it to accommodate arm64 specific behavior
+> - it would create separate paths through the early boot code which
+> complicates testing and validation
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index f2b2c4e..69bc15e 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -464,4 +464,14 @@ config QCOM_BAM_DMA
- 	  Enable support for the QCOM BAM DMA controller.  This controller
- 	  provides DMA capabilities for a variety of on-chip devices.
+OK
+
+
+> So instead, we think it is reasonable to mandate a minimal subset of
+> the UEFI environment to be present, either natively or emulated/mocked
+> up by Xen, kexec etc.
+
+No emulation please :-)
+
+
+> - an EFI system table (and a /chosen/linux,uefi-system-table that
+> points to it) containing at least
+>   * a fully populated header with version >= 2.0 and correct CRC
+>   * populated fw_vendor string
+>   * configuration table pointer and count, pointing to the ACPI and
+> SMBIOS configuration tables with their respective GUIDs
+>   * NULL runtime services function table pointer
+> 
+> - an EFI format memory map (and the /chosen/linux,uefi-mmap-*
+> properties that go with it) covering all of system RAM, with ACPI and
+> SMBIOS reserved regions marked as appropriate
+
+Runtime services actually are going to be available via hypercalls, see
+drivers/xen/efi.c, but Boot Services are not going to be.
+
+Given that Dom0 is not booted via EFI but as zImage, how are we going to
+pass the two EFI table pointers to Linux? Via Device Tree? It doesn't
+look like a great improvement to me.
+
+Generating those two EFI tables shouldn't be a problem though.
+
+
+> As this basically promotes the stub<->kernel interface to an external
+> ABI, the current documentation about the /chosen node properties
+> should also be promoted to a proper binding, with the above mandated
+> minimal subset added as well.
+> 
+> There are some minimal changes required to the current kernel code to
+> adhere to the above: primarlly to deal with a NULL runtime services
+> pointer, which is arguably an improvement anyway.
+
+This is not needed, if not for the first generation of patches
+
+
+> Topic #2: how to identify an 'empty' DTB
+> 
+> The proposed policy regarding whether DT or ACPI should be preferred
+> if both methods are available hinges on being able to identify a DTB
+> as containing a platform description or not. One suggested way of
+> doing this is to make the stub add a /chosen node property that
+> indicates that it didn't receive a DTB from the firmware, nor loaded
+> one from the file system, but created an empty one from scratch.
+> 
+> Considering the previous topic, i.e., the promotion of the
+> stub<->kernel interface to external ABI, we should not be frivolous
+> about adding new properties, and adding a 'stub-generated-dtb'
+> property should be avoided if there is a better way to deal with this.
+> Also, e.g., when booting via GRUB, it may in fact be GRUB and not the
+> stub that creates the DTB (when booting with an initrd, for instance)
+> so GRUB would have to be modified as well. (If not, simply adding a
+> initrd= property to the command line would result in the kernel
+> preferring DT over ACPI all of a sudden, which surely, we all agree is
+> undesirable behavior)
+> 
+> So instead, we propose to use a heuristic to decide whether a DTB
+> should be considered empty or not:
+> If /chosen is the only level 1 node in the tree, the DTB is empty,
+> otherwise it is not.
+> 
+> This can be trivially implemented into the existing EFI early FDT
+> discovery code, and does not require any other changes to the stub or
+> GRUB.
+> 
+> Please, could those affected by this comment whether this is feasible
+> or not? Other comments/remarks also highly appreciated, of course,
  
-+config QCOM_ADM
-+	tristate "Qualcomm ADM support"
-+	depends on ARCH_QCOM || (COMPILE_TEST && OF && ARM)
-+	select DMA_ENGINE
-+	select DMA_VIRTUAL_CHANNELS
-+	---help---
-+	  Enable support for the Qualcomm ADM DMA controller.  This controller
-+	  provides DMA capabilities for both general purpose and on-chip
-+	  peripheral devices.
-+
- endif
-diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
-index 2022b54..3b7ead6 100644
---- a/drivers/dma/Makefile
-+++ b/drivers/dma/Makefile
-@@ -50,3 +50,4 @@ obj-y += xilinx/
- obj-$(CONFIG_INTEL_MIC_X100_DMA) += mic_x100_dma.o
- obj-$(CONFIG_NBPFAXI_DMA) += nbpfaxi.o
- obj-$(CONFIG_DMA_SUN6I) += sun6i-dma.o
-+obj-$(CONFIG_QCOM_ADM) += qcom_adm.o
-diff --git a/drivers/dma/qcom_adm.c b/drivers/dma/qcom_adm.c
-new file mode 100644
-index 0000000..7381c38
---- /dev/null
-+++ b/drivers/dma/qcom_adm.c
-@@ -0,0 +1,902 @@
-+/*
-+ * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/io.h>
-+#include <linux/init.h>
-+#include <linux/slab.h>
-+#include <linux/module.h>
-+#include <linux/interrupt.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/scatterlist.h>
-+#include <linux/device.h>
-+#include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_dma.h>
-+#include <linux/reset.h>
-+#include <linux/clk.h>
-+#include <linux/dmaengine.h>
-+
-+#include "dmaengine.h"
-+#include "virt-dma.h"
-+
-+/* ADM registers - calculated from channel number and security domain */
-+#define HI_CH_CMD_PTR(chan, ee)		(4*chan + 0x20800*ee)
-+#define HI_CH_RSLT(chan, ee)		(0x40 + 4*chan + 0x20800*ee)
-+#define HI_CH_FLUSH_STATE0(chan, ee)	(0x80 + 4*chan + 0x20800*ee)
-+#define HI_CH_FLUSH_STATE1(chan, ee)	(0xc0 + 4*chan + 0x20800*ee)
-+#define HI_CH_FLUSH_STATE2(chan, ee)	(0x100 + 4*chan + 0x20800*ee)
-+#define HI_CH_FLUSH_STATE3(chan, ee)	(0x140 + 4*chan + 0x20800*ee)
-+#define HI_CH_FLUSH_STATE4(chan, ee)	(0x180 + 4*chan + 0x20800*ee)
-+#define HI_CH_FLUSH_STATE5(chan, ee)	(0x1c0 + 4*chan + 0x20800*ee)
-+#define HI_CH_STATUS_SD(chan, ee)	(0x200 + 4*chan + 0x20800*ee)
-+#define HI_CH_CONF(chan)		(0x240 + 4*chan)
-+#define HI_CH_RSLT_CONF(chan, ee)	(0x300 + 4*chan + 0x20800*ee)
-+#define HI_SEC_DOMAIN_IRQ_STATUS(ee)	(0x380 + 0x20800*ee)
-+#define HI_CI_CONF(ci)			(0x390 + 4*ci)
-+#define HI_CRCI_CONF0			0x3d0
-+#define HI_CRCI_CONF1			0x3d4
-+#define HI_GP_CTL			0x3d8
-+#define HI_CRCI_CTL(crci, ee)		(0x400 + 0x4*crci + 0x20800*ee)
-+
-+/* channel status */
-+#define CH_STATUS_VALID	BIT(1)
-+
-+/* channel result */
-+#define CH_RSLT_VALID	BIT(31)
-+#define CH_RSLT_ERR	BIT(3)
-+#define CH_RSLT_FLUSH	BIT(2)
-+#define CH_RSLT_TPD	BIT(1)
-+
-+/* channel conf */
-+#define CH_CONF_MPU_DISABLE	BIT(11)
-+#define CH_CONF_PERM_MPU_CONF	BIT(9)
-+#define CH_CONF_FLUSH_RSLT_EN	BIT(8)
-+#define CH_CONF_FORCE_RSLT_EN	BIT(7)
-+#define CH_CONF_IRQ_EN		BIT(6)
-+
-+/* channel result conf */
-+#define CH_RSLT_CONF_FLUSH_EN	BIT(1)
-+#define CH_RSLT_CONF_IRQ_EN	BIT(0)
-+
-+/* CRCI CTL */
-+#define CRCI_CTL_MUX_SEL	BIT(18)
-+#define CRCI_CTL_RST		BIT(17)
-+
-+/* CI configuration */
-+#define CI_RANGE_END(x)		(x << 24)
-+#define CI_RANGE_START(x)	(x << 16)
-+#define CI_BURST_4_WORDS	0x4
-+#define CI_BURST_8_WORDS	0x8
-+
-+/* GP CTL */
-+#define GP_CTL_LP_EN		BIT(12)
-+#define GP_CTL_LP_CNT(x)	(x << 8)
-+
-+/* Command pointer list entry */
-+#define CPLE_LP			BIT(31)
-+#define CPLE_CMD_PTR_LIST	BIT(29)
-+
-+/* Command list entry */
-+#define CMD_LC			BIT(31)
-+#define CMD_DST_CRCI(n)		(((n) & 0xf) << 7)
-+#define CMD_SRC_CRCI(n)		(((n) & 0xf) << 3)
-+
-+#define CMD_TYPE_SINGLE		0x0
-+#define CMD_TYPE_BOX		0x3
-+
-+#define ADM_DESC_ALIGN	8
-+#define ADM_MAX_XFER	(SZ_64K-1)
-+#define ADM_MAX_ROWS	(SZ_64K-1)
-+#define ADM_MAX_CHANNELS	16
-+
-+struct adm_desc_hw_box {
-+	u32 cmd;
-+	u32 src_addr;
-+	u32 dst_addr;
-+	u32 row_len;
-+	u32 num_rows;
-+	u32 row_offset;
-+};
-+
-+struct adm_desc_hw_single {
-+	u32 cmd;
-+	u32 src_addr;
-+	u32 dst_addr;
-+	u32 len;
-+};
-+
-+struct adm_async_desc {
-+	struct virt_dma_desc vd;
-+	struct adm_device *adev;
-+
-+	size_t length;
-+	enum dma_transfer_direction dir;
-+	dma_addr_t dma_addr;
-+	size_t dma_len;
-+
-+	void *cpl;
-+	dma_addr_t cp_addr;
-+	u32 crci;
-+	u32 mux;
-+	u32 blk_size;
-+};
-+
-+struct adm_chan {
-+	struct virt_dma_chan vc;
-+	struct adm_device *adev;
-+
-+	/* parsed from DT */
-+	u32 id;			/* channel id */
-+
-+	struct adm_async_desc *curr_txd;
-+	struct dma_slave_config slave;
-+	struct list_head node;
-+
-+	int error;
-+	int initialized;
-+};
-+
-+static inline struct adm_chan *to_adm_chan(struct dma_chan *common)
-+{
-+	return container_of(common, struct adm_chan, vc.chan);
-+}
-+
-+struct adm_device {
-+	void __iomem *regs;
-+	struct device *dev;
-+	struct dma_device common;
-+	struct device_dma_parameters dma_parms;
-+	struct adm_chan *channels;
-+
-+	u32 ee;
-+
-+	struct clk *core_clk;
-+	struct clk *iface_clk;
-+
-+	struct reset_control *clk_reset;
-+	struct reset_control *c0_reset;
-+	struct reset_control *c1_reset;
-+	struct reset_control *c2_reset;
-+	int irq;
-+};
-+
-+/**
-+ * adm_alloc_chan - Allocates channel resources for DMA channel
-+ *
-+ * This function is effectively a stub, as we don't need to setup any resources
-+ */
-+static int adm_alloc_chan(struct dma_chan *chan)
-+{
-+	return 0;
-+}
-+
-+/**
-+ * adm_free_chan - Frees dma resources associated with the specific channel
-+ *
-+ * Free all allocated descriptors associated with this channel
-+ *
-+ */
-+static void adm_free_chan(struct dma_chan *chan)
-+{
-+	/* free all queued descriptors */
-+	vchan_free_chan_resources(to_virt_chan(chan));
-+}
-+
-+/**
-+ * adm_get_blksize - Get block size from burst value
-+ *
-+ */
-+static int adm_get_blksize(unsigned int burst)
-+{
-+	int ret;
-+
-+	switch (burst) {
-+	case 16:
-+		ret = 0;
-+		break;
-+	case 32:
-+		ret = 1;
-+		break;
-+	case 64:
-+		ret = 2;
-+		break;
-+	case 128:
-+		ret = 3;
-+		break;
-+	case 192:
-+		ret = 4;
-+		break;
-+	case 256:
-+		ret = 5;
-+		break;
-+	default:
-+		ret = -EINVAL;
-+		break;
-+	}
-+
-+	return ret;
-+}
-+
-+/**
-+ * adm_prep_slave_sg - Prep slave sg transaction
-+ *
-+ * @chan: dma channel
-+ * @sgl: scatter gather list
-+ * @sg_len: length of sg
-+ * @direction: DMA transfer direction
-+ * @flags: DMA flags
-+ * @context: transfer context (unused)
-+ */
-+static struct dma_async_tx_descriptor *adm_prep_slave_sg(struct dma_chan *chan,
-+	struct scatterlist *sgl, unsigned int sg_len,
-+	enum dma_transfer_direction direction, unsigned long flags,
-+	void *context)
-+{
-+	struct adm_chan *achan = to_adm_chan(chan);
-+	struct adm_device *adev = achan->adev;
-+	struct adm_async_desc *async_desc;
-+	struct scatterlist *sg;
-+	u32 i;
-+	u32 single_count = 0, box_count = 0, desc_offset = 0, crci = 0;
-+	struct adm_desc_hw_box *box_desc;
-+	struct adm_desc_hw_single *single_desc;
-+	void *desc;
-+	u32 *cple, *last_cmd;
-+	u32 burst;
-+	int blk_size = 0;
-+
-+
-+	if (!is_slave_direction(direction)) {
-+		dev_err(adev->dev, "invalid dma direction\n");
-+		return NULL;
-+	}
-+
-+	/*
-+	 * get burst value from slave configuration
-+	 * If zero, default to maximum burst size
-+	 * If larger than the max transfer size, set to ADM_MAX_XFER
-+	 */
-+	burst = (direction == DMA_MEM_TO_DEV) ?
-+		achan->slave.dst_maxburst :
-+		achan->slave.src_maxburst;
-+
-+	if (!burst || burst > ADM_MAX_XFER)
-+		burst = ADM_MAX_XFER;
-+
-+	/* if using flow control, validate burst and crci values */
-+	if (achan->slave.device_fc) {
-+
-+		blk_size = adm_get_blksize(burst);
-+		if (blk_size < 0) {
-+			dev_err(adev->dev, "invalid burst value w/ crci: %d\n",
-+				burst);
-+			return ERR_PTR(-EINVAL);
-+		}
-+
-+		crci = achan->slave.slave_id & 0xf;
-+		if (!crci || achan->slave.slave_id > 0x1f) {
-+			dev_err(adev->dev, "invalid crci value\n");
-+			return ERR_PTR(-EINVAL);
-+		}
-+	}
-+
-+	/* iterate through sgs and compute allocation size of structures */
-+	for_each_sg(sgl, sg, sg_len, i)
-+		if (sg_dma_len(sg) % burst)
-+			single_count += DIV_ROUND_UP(sg_dma_len(sg), burst);
-+		else
-+			box_count += DIV_ROUND_UP(sg_dma_len(sg) / burst,
-+							ADM_MAX_ROWS);
-+
-+	async_desc = kzalloc(sizeof(*async_desc), GFP_NOWAIT);
-+	if (!async_desc)
-+		return ERR_PTR(-ENOMEM);
-+
-+	if (crci)
-+		async_desc->mux = achan->slave.slave_id >> 4 ?
-+					CRCI_CTL_MUX_SEL : 0;
-+	async_desc->crci = crci;
-+	async_desc->blk_size = blk_size;
-+	async_desc->dma_len = single_count * sizeof(*single_desc) +
-+				box_count * sizeof(*box_desc) + sizeof(*cple) +
-+				2*ADM_DESC_ALIGN;
-+
-+	async_desc->cpl = dma_alloc_writecombine(adev->dev, async_desc->dma_len,
-+				&async_desc->dma_addr, GFP_NOWAIT);
-+
-+	if (!async_desc->cpl) {
-+		kfree(async_desc);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	async_desc->adev = adev;
-+
-+	/* both command list entry and descriptors must be 8 byte aligned */
-+	cple = PTR_ALIGN(async_desc->cpl, ADM_DESC_ALIGN);
-+	desc = PTR_ALIGN(cple + 1, ADM_DESC_ALIGN);
-+	last_cmd = desc;
-+
-+	/* init cmd list */
-+	*cple = CPLE_LP;
-+	*cple |= (desc - async_desc->cpl + async_desc->dma_addr) >> 3;
-+
-+	for_each_sg(sgl, sg, sg_len, i) {
-+		unsigned int xfer_len, row_len, rows;
-+		unsigned int remainder = sg_dma_len(sg);
-+		unsigned int offset = 0;
-+
-+		do {
-+			/* use single if length is not multiple of burst */
-+			if (remainder % burst) {
-+				single_desc = desc + desc_offset;
-+				last_cmd = &single_desc->cmd;
-+				single_desc->cmd = CMD_TYPE_SINGLE;
-+				xfer_len = (remainder > ADM_MAX_XFER) ?
-+					ADM_MAX_XFER : remainder;
-+				if (direction == DMA_DEV_TO_MEM) {
-+					single_desc->dst_addr =
-+						sg_dma_address(sg) + offset;
-+					single_desc->src_addr =
-+						achan->slave.src_addr;
-+					single_desc->len = xfer_len;
-+					single_desc->cmd |= CMD_SRC_CRCI(crci);
-+				} else {
-+					single_desc->src_addr =
-+						sg_dma_address(sg) + offset;
-+					single_desc->dst_addr =
-+						achan->slave.dst_addr;
-+					single_desc->len = xfer_len;
-+					single_desc->cmd |= CMD_DST_CRCI(crci);
-+				}
-+
-+				remainder -= xfer_len;
-+				async_desc->length += xfer_len;
-+				offset += xfer_len;
-+				desc_offset += sizeof(*single_desc);
-+			} else {
-+				box_desc = desc + desc_offset;
-+				last_cmd = &box_desc->cmd;
-+				box_desc->cmd = CMD_TYPE_BOX;
-+				box_desc->row_offset = 0;
-+
-+				if (direction == DMA_DEV_TO_MEM) {
-+					box_desc->dst_addr =
-+						sg_dma_address(sg) + offset;
-+					box_desc->src_addr =
-+						achan->slave.src_addr;
-+					box_desc->cmd |= CMD_SRC_CRCI(crci);
-+					box_desc->row_offset = burst;
-+
-+				} else {
-+					box_desc->src_addr =
-+						sg_dma_address(sg) + offset;
-+					box_desc->dst_addr =
-+						achan->slave.dst_addr;
-+					box_desc->cmd |= CMD_DST_CRCI(crci);
-+					box_desc->row_offset = burst << 16;
-+				}
-+
-+				desc_offset += sizeof(*box_desc);
-+				rows = remainder / burst;
-+				rows = min_t(u32, rows, ADM_MAX_ROWS);
-+				row_len = burst;
-+				box_desc->num_rows = rows << 16 | rows;
-+				box_desc->row_len = row_len << 16 | row_len;
-+
-+				remainder -= row_len * rows;
-+				async_desc->length += row_len * rows;
-+				offset += row_len * rows;
-+			}
-+		} while (remainder > 0);
-+	}
-+
-+	/* set last command flag */
-+	*last_cmd |= CMD_LC;
-+
-+	return vchan_tx_prep(&achan->vc, &async_desc->vd, flags);
-+}
-+
-+/**
-+ * adm_terminate_all - terminate all transactions on a channel
-+ * @achan: adm dma channel
-+ *
-+ * Dequeues and frees all transactions, aborts current transaction
-+ * No callbacks are done
-+ *
-+ */
-+static void adm_terminate_all(struct adm_chan *achan)
-+{
-+	struct adm_device *adev = achan->adev;
-+	unsigned long flags;
-+	LIST_HEAD(head);
-+
-+	/* send flush command to terminate current transaction */
-+	writel_relaxed(0x0,
-+		adev->regs + HI_CH_FLUSH_STATE0(achan->id, adev->ee));
-+
-+	spin_lock_irqsave(&achan->vc.lock, flags);
-+	vchan_get_all_descriptors(&achan->vc, &head);
-+	spin_unlock_irqrestore(&achan->vc.lock, flags);
-+
-+	vchan_dma_desc_free_list(&achan->vc, &head);
-+}
-+
-+/**
-+ * adm_control - DMA device control
-+ * @chan: dma channel
-+ * @cmd: control cmd
-+ * @arg: cmd argument
-+ *
-+ * Perform DMA control command
-+ *
-+ */
-+static int adm_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-+	unsigned long arg)
-+{
-+	struct adm_chan *achan = to_adm_chan(chan);
-+	unsigned long flag;
-+	int ret = 0;
-+
-+	switch (cmd) {
-+	case DMA_SLAVE_CONFIG:
-+		spin_lock_irqsave(&achan->vc.lock, flag);
-+		memcpy(&achan->slave, (void *)arg,
-+			sizeof(struct dma_slave_config));
-+		spin_unlock_irqrestore(&achan->vc.lock, flag);
-+		break;
-+
-+	case DMA_TERMINATE_ALL:
-+		adm_terminate_all(achan);
-+		break;
-+
-+	default:
-+		ret = -ENXIO;
-+		break;
-+	};
-+
-+	return ret;
-+}
-+
-+/**
-+ * adm_start_dma - start next transaction
-+ * @achan - ADM dma channel
-+ */
-+static void adm_start_dma(struct adm_chan *achan)
-+{
-+	struct virt_dma_desc *vd = vchan_next_desc(&achan->vc);
-+	struct adm_device *adev = achan->adev;
-+	struct adm_async_desc *async_desc;
-+
-+	lockdep_assert_held(&achan->vc.lock);
-+
-+	if (!vd)
-+		return;
-+
-+	list_del(&vd->node);
-+
-+	/* write next command list out to the CMD FIFO */
-+	async_desc = container_of(vd, struct adm_async_desc, vd);
-+	achan->curr_txd = async_desc;
-+
-+	/* reset channel error */
-+	achan->error = 0;
-+
-+	if (!achan->initialized) {
-+		/* enable interrupts */
-+		writel(CH_CONF_IRQ_EN | CH_CONF_FLUSH_RSLT_EN |
-+			CH_CONF_FORCE_RSLT_EN | CH_CONF_PERM_MPU_CONF |
-+			CH_CONF_MPU_DISABLE,
-+			adev->regs + HI_CH_CONF(achan->id));
-+
-+		writel(CH_RSLT_CONF_IRQ_EN | CH_RSLT_CONF_FLUSH_EN,
-+			adev->regs + HI_CH_RSLT_CONF(achan->id, adev->ee));
-+
-+		achan->initialized = 1;
-+	}
-+
-+	/* set the crci block size if this transaction requires CRCI */
-+	if (async_desc->crci) {
-+		writel(async_desc->mux | async_desc->blk_size,
-+			adev->regs + HI_CRCI_CTL(async_desc->crci, adev->ee));
-+	}
-+
-+	/* make sure IRQ enable doesn't get reordered */
-+	wmb();
-+
-+	/* write next command list out to the CMD FIFO */
-+	writel(ALIGN(async_desc->dma_addr, ADM_DESC_ALIGN) >> 3,
-+		adev->regs + HI_CH_CMD_PTR(achan->id, adev->ee));
-+}
-+
-+/**
-+ * adm_dma_irq - irq handler for ADM controller
-+ * @irq: IRQ of interrupt
-+ * @data: callback data
-+ *
-+ * IRQ handler for the bam controller
-+ */
-+static irqreturn_t adm_dma_irq(int irq, void *data)
-+{
-+	struct adm_device *adev = data;
-+	u32 srcs, i;
-+	struct adm_async_desc *async_desc;
-+	unsigned long flags;
-+
-+	srcs = readl_relaxed(adev->regs +
-+			HI_SEC_DOMAIN_IRQ_STATUS(adev->ee));
-+
-+	for (i = 0; i < ADM_MAX_CHANNELS; i++) {
-+		struct adm_chan *achan = &adev->channels[i];
-+		u32 status, result;
-+
-+		if (srcs & BIT(i)) {
-+			status = readl_relaxed(adev->regs +
-+				HI_CH_STATUS_SD(i, adev->ee));
-+
-+			/* if no result present, skip */
-+			if (!(status & CH_STATUS_VALID))
-+				continue;
-+
-+			result = readl_relaxed(adev->regs +
-+				HI_CH_RSLT(i, adev->ee));
-+
-+			/* no valid results, skip */
-+			if (!(result & CH_RSLT_VALID))
-+				continue;
-+
-+			/* flag error if transaction was flushed or failed */
-+			if (result & (CH_RSLT_ERR | CH_RSLT_FLUSH))
-+				achan->error = 1;
-+
-+			spin_lock_irqsave(&achan->vc.lock, flags);
-+			async_desc = achan->curr_txd;
-+
-+			achan->curr_txd = NULL;
-+
-+			if (async_desc) {
-+				vchan_cookie_complete(&async_desc->vd);
-+
-+				/* kick off next DMA */
-+				adm_start_dma(achan);
-+			}
-+
-+			spin_unlock_irqrestore(&achan->vc.lock, flags);
-+		}
-+	}
-+
-+	return IRQ_HANDLED;
-+}
-+
-+/**
-+ * adm_tx_status - returns status of transaction
-+ * @chan: dma channel
-+ * @cookie: transaction cookie
-+ * @txstate: DMA transaction state
-+ *
-+ * Return status of dma transaction
-+ */
-+static enum dma_status adm_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
-+	struct dma_tx_state *txstate)
-+{
-+	struct adm_chan *achan = to_adm_chan(chan);
-+	struct virt_dma_desc *vd;
-+	enum dma_status ret;
-+	unsigned long flags;
-+	size_t residue = 0;
-+
-+	ret = dma_cookie_status(chan, cookie, txstate);
-+	if (ret == DMA_COMPLETE || !txstate)
-+		return ret;
-+
-+	spin_lock_irqsave(&achan->vc.lock, flags);
-+
-+	vd = vchan_find_desc(&achan->vc, cookie);
-+	if (vd)
-+		residue = container_of(vd, struct adm_async_desc, vd)->length;
-+
-+	spin_unlock_irqrestore(&achan->vc.lock, flags);
-+
-+	/*
-+	 * residue is either the full length if it is in the issued list, or 0
-+	 * if it is in progress.  We have no reliable way of determining
-+	 * anything inbetween
-+	*/
-+	dma_set_residue(txstate, residue);
-+
-+	if (achan->error)
-+		return DMA_ERROR;
-+
-+	return ret;
-+}
-+
-+static struct dma_chan *adm_dma_xlate(struct of_phandle_args *dma_spec,
-+	struct of_dma *of)
-+{
-+	struct adm_device *adev = container_of(of->of_dma_data,
-+			struct adm_device, common);
-+	struct dma_chan *chan;
-+	unsigned int request;
-+
-+	if (dma_spec->args_count != 1) {
-+		dev_err(adev->dev, "incorrect number of dma arguments\n");
-+		return NULL;
-+	}
-+
-+	request = dma_spec->args[0];
-+	if (request >= ADM_MAX_CHANNELS)
-+		return NULL;
-+
-+	chan = dma_get_slave_channel(&(adev->channels[request].vc.chan));
-+
-+	if (!chan)
-+		return NULL;
-+
-+	return chan;
-+}
-+
-+/**
-+ * adm_issue_pending - starts pending transactions
-+ * @chan: dma channel
-+ *
-+ * Issues all pending transactions and starts DMA
-+ */
-+static void adm_issue_pending(struct dma_chan *chan)
-+{
-+	struct adm_chan *achan = to_adm_chan(chan);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&achan->vc.lock, flags);
-+
-+	if (vchan_issue_pending(&achan->vc) && !achan->curr_txd)
-+		adm_start_dma(achan);
-+	spin_unlock_irqrestore(&achan->vc.lock, flags);
-+}
-+
-+/**
-+ * adm_dma_free_desc - free descriptor memory
-+ * @vd: virtual descriptor
-+ *
-+ */
-+static void adm_dma_free_desc(struct virt_dma_desc *vd)
-+{
-+	struct adm_async_desc *async_desc = container_of(vd,
-+			struct adm_async_desc, vd);
-+
-+	dma_free_writecombine(async_desc->adev->dev, async_desc->dma_len,
-+		async_desc->cpl, async_desc->dma_addr);
-+	kfree(async_desc);
-+}
-+
-+static void adm_channel_init(struct adm_device *adev, struct adm_chan *achan,
-+	u32 index)
-+{
-+	achan->id = index;
-+	achan->adev = adev;
-+
-+	vchan_init(&achan->vc, &adev->common);
-+	achan->vc.desc_free = adm_dma_free_desc;
-+}
-+
-+static int adm_dma_probe(struct platform_device *pdev)
-+{
-+	struct adm_device *adev;
-+	struct resource *iores;
-+	int ret;
-+	u32 i;
-+
-+	adev = devm_kzalloc(&pdev->dev, sizeof(*adev), GFP_KERNEL);
-+	if (!adev)
-+		return -ENOMEM;
-+
-+	adev->dev = &pdev->dev;
-+
-+	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	adev->regs = devm_ioremap_resource(&pdev->dev, iores);
-+	if (IS_ERR(adev->regs))
-+		return PTR_ERR(adev->regs);
-+
-+	adev->irq = platform_get_irq(pdev, 0);
-+	if (adev->irq < 0)
-+		return adev->irq;
-+
-+	ret = of_property_read_u32(pdev->dev.of_node, "qcom,ee", &adev->ee);
-+	if (ret) {
-+		dev_err(adev->dev, "Execution environment unspecified\n");
-+		return ret;
-+	}
-+
-+	adev->core_clk = devm_clk_get(adev->dev, "core");
-+	if (IS_ERR(adev->core_clk))
-+		return PTR_ERR(adev->core_clk);
-+
-+	ret = clk_prepare_enable(adev->core_clk);
-+	if (ret) {
-+		dev_err(adev->dev, "failed to prepare/enable core clock\n");
-+		return ret;
-+	}
-+
-+	adev->iface_clk = devm_clk_get(adev->dev, "iface");
-+	if (IS_ERR(adev->iface_clk)) {
-+		ret = PTR_ERR(adev->iface_clk);
-+		goto err_disable_core_clk;
-+	}
-+
-+	ret = clk_prepare_enable(adev->iface_clk);
-+	if (ret) {
-+		dev_err(adev->dev, "failed to prepare/enable iface clock\n");
-+		goto err_disable_core_clk;
-+	}
-+
-+	adev->clk_reset = devm_reset_control_get(&pdev->dev, "clk");
-+	if (IS_ERR(adev->clk_reset)) {
-+		dev_err(adev->dev, "failed to get ADM0 reset\n");
-+		ret = PTR_ERR(adev->clk_reset);
-+		goto err_disable_clks;
-+	}
-+
-+	adev->c0_reset = devm_reset_control_get(&pdev->dev, "c0");
-+	if (IS_ERR(adev->c0_reset)) {
-+		dev_err(adev->dev, "failed to get ADM0 C0 reset\n");
-+		ret = PTR_ERR(adev->c0_reset);
-+		goto err_disable_clks;
-+	}
-+
-+	adev->c1_reset = devm_reset_control_get(&pdev->dev, "c1");
-+	if (IS_ERR(adev->c1_reset)) {
-+		dev_err(adev->dev, "failed to get ADM0 C1 reset\n");
-+		ret = PTR_ERR(adev->c1_reset);
-+		goto err_disable_clks;
-+	}
-+
-+	adev->c2_reset = devm_reset_control_get(&pdev->dev, "c2");
-+	if (IS_ERR(adev->c2_reset)) {
-+		dev_err(adev->dev, "failed to get ADM0 C2 reset\n");
-+		ret = PTR_ERR(adev->c2_reset);
-+		goto err_disable_clks;
-+	}
-+
-+	reset_control_assert(adev->clk_reset);
-+	reset_control_assert(adev->c0_reset);
-+	reset_control_assert(adev->c1_reset);
-+	reset_control_assert(adev->c2_reset);
-+
-+	reset_control_deassert(adev->clk_reset);
-+	reset_control_deassert(adev->c0_reset);
-+	reset_control_deassert(adev->c1_reset);
-+	reset_control_deassert(adev->c2_reset);
-+
-+	adev->channels = devm_kcalloc(adev->dev, ADM_MAX_CHANNELS,
-+				sizeof(*adev->channels), GFP_KERNEL);
-+
-+	if (!adev->channels) {
-+		ret = -ENOMEM;
-+		goto err_disable_clks;
-+	}
-+
-+	/* allocate and initialize channels */
-+	INIT_LIST_HEAD(&adev->common.channels);
-+
-+	for (i = 0; i < ADM_MAX_CHANNELS; i++)
-+		adm_channel_init(adev, &adev->channels[i], i);
-+
-+	/* reset CRCIs */
-+	for (i = 0; i < 16; i++)
-+		writel(CRCI_CTL_RST, adev->regs + HI_CRCI_CTL(i, adev->ee));
-+
-+	/* configure client interfaces */
-+	writel(CI_RANGE_START(0x40) | CI_RANGE_END(0xb0) | CI_BURST_8_WORDS,
-+		adev->regs + HI_CI_CONF(0));
-+	writel(CI_RANGE_START(0x2a) | CI_RANGE_END(0x2c) | CI_BURST_8_WORDS,
-+		adev->regs + HI_CI_CONF(1));
-+	writel(CI_RANGE_START(0x12) | CI_RANGE_END(0x28) | CI_BURST_8_WORDS,
-+		adev->regs + HI_CI_CONF(2));
-+	writel(GP_CTL_LP_EN | GP_CTL_LP_CNT(0xf), adev->regs + HI_GP_CTL);
-+
-+	ret = devm_request_irq(adev->dev, adev->irq, adm_dma_irq,
-+			0, "adm_dma", adev);
-+	if (ret)
-+		goto err_disable_clks;
-+
-+	platform_set_drvdata(pdev, adev);
-+
-+	adev->common.dev = adev->dev;
-+	adev->common.dev->dma_parms = &adev->dma_parms;
-+
-+	/* set capabilities */
-+	dma_cap_zero(adev->common.cap_mask);
-+	dma_cap_set(DMA_SLAVE, adev->common.cap_mask);
-+	dma_cap_set(DMA_PRIVATE, adev->common.cap_mask);
-+
-+	/* initialize dmaengine apis */
-+	adev->common.device_alloc_chan_resources = adm_alloc_chan;
-+	adev->common.device_free_chan_resources = adm_free_chan;
-+	adev->common.device_prep_slave_sg = adm_prep_slave_sg;
-+	adev->common.device_control = adm_control;
-+	adev->common.device_issue_pending = adm_issue_pending;
-+	adev->common.device_tx_status = adm_tx_status;
-+
-+	ret = dma_async_device_register(&adev->common);
-+	if (ret) {
-+		dev_err(adev->dev, "failed to register dma async device\n");
-+		goto err_disable_clks;
-+	}
-+
-+	ret = of_dma_controller_register(pdev->dev.of_node, adm_dma_xlate,
-+					&adev->common);
-+	if (ret)
-+		goto err_unregister_dma;
-+
-+	return 0;
-+
-+err_unregister_dma:
-+	dma_async_device_unregister(&adev->common);
-+err_disable_clks:
-+	clk_disable_unprepare(adev->iface_clk);
-+err_disable_core_clk:
-+	clk_disable_unprepare(adev->core_clk);
-+
-+	return ret;
-+}
-+
-+static int adm_dma_remove(struct platform_device *pdev)
-+{
-+	struct adm_device *adev = platform_get_drvdata(pdev);
-+	struct adm_chan *achan;
-+	u32 i;
-+
-+	of_dma_controller_free(pdev->dev.of_node);
-+	dma_async_device_unregister(&adev->common);
-+
-+	devm_free_irq(adev->dev, adev->irq, adev);
-+
-+	for (i = 0; i < ADM_MAX_CHANNELS; i++) {
-+		achan = &adev->channels[i];
-+		writel(CH_CONF_FLUSH_RSLT_EN,
-+			adev->regs + HI_CH_CONF(achan->id));
-+		writel(CH_RSLT_CONF_FLUSH_EN,
-+			adev->regs + HI_CH_RSLT_CONF(achan->id, adev->ee));
-+
-+		adm_terminate_all(&adev->channels[i]);
-+	}
-+
-+	clk_disable_unprepare(adev->core_clk);
-+	clk_disable_unprepare(adev->iface_clk);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id adm_of_match[] = {
-+	{ .compatible = "qcom,adm", },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, adm_of_match);
-+
-+static struct platform_driver adm_dma_driver = {
-+	.probe = adm_dma_probe,
-+	.remove = adm_dma_remove,
-+	.driver = {
-+		.name = "adm-dma-engine",
-+		.owner = THIS_MODULE,
-+		.of_match_table = adm_of_match,
-+	},
-+};
-+
-+module_platform_driver(adm_dma_driver);
-+
-+MODULE_AUTHOR("Andy Gross <agross@codeaurora.org>");
-+MODULE_DESCRIPTION("QCOM ADM DMA engine driver");
-+MODULE_LICENSE("GPL v2");
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Wouldn't it make sense to use the same interface between Xen and Dom0
+and between stub and kernel?
