@@ -1,75 +1,138 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 11 Feb 2015 12:57:58 -0800
-Subject: [PATCH v3 2/2] remoteproc: add support to handle internal memories
-In-Reply-To: <CAK=WgbaFoUpV315Tg1q=PGc-FkCvKBz2BmO8Fkj_FHa5UuWviw@mail.gmail.com>
-References: <1420838519-15669-1-git-send-email-s-anna@ti.com>
- <1420838519-15669-3-git-send-email-s-anna@ti.com>
- <CAK=WgbaFoUpV315Tg1q=PGc-FkCvKBz2BmO8Fkj_FHa5UuWviw@mail.gmail.com>
-Message-ID: <20150211205757.GI2531@atomide.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Wed, 11 Feb 2015 18:08:54 -0300
+Subject: [GIT PULL 00/21] perf/core improvements and fixes
+Message-ID: <1423688955-8094-1-git-send-email-acme@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ohad Ben-Cohen <ohad@wizery.com> [150210 02:14]:
-> Hi Suman,
-> 
-> On Fri, Jan 9, 2015 at 11:21 PM, Suman Anna <s-anna@ti.com> wrote:
-> > A remote processor may need to load certain firmware sections into
-> > internal memories (eg: RAM at L1 or L2 levels) for performance or
-> > other reasons. Introduce a new resource type (RSC_INTMEM) and add
-> > an associated handler function to handle such memories. The handler
-> > creates a kernel mapping for the resource's 'pa' (physical address).
-> ...
-> > + * rproc_handle_intmem() - handle internal memory resource entry
-> > + * @rproc: rproc handle
-> > + * @rsc: the intmem resource entry
-> > + * @offset: offset of the resource data in resource table
-> > + * @avail: size of available data (for image validation)
-> > + *
-> > + * This function will handle firmware requests for mapping a memory region
-> > + * internal to a remote processor into kernel. It neither allocates any
-> > + * physical pages, nor performs any iommu mapping, as this resource entry
-> > + * is primarily used for representing physical internal memories. If the
-> > + * internal memory region can only be accessed through an iommu, please
-> > + * use a devmem resource entry.
-> > + *
-> > + * These resource entries should be grouped near the carveout entries in
-> > + * the firmware's resource table, as other firmware entries might request
-> > + * placing other data objects inside these memory regions (e.g. data/code
-> > + * segments, trace resource entries, ...).
-> > + */
-> > +static int rproc_handle_intmem(struct rproc *rproc, struct fw_rsc_intmem *rsc,
-> > +                              int offset, int avail)
-> > +{
-> ...
-> > +       va = (__force void *)ioremap_nocache(rsc->pa, rsc->len);
-> 
-> Back in the days when we developed remoteproc there was a tremendous
-> effort to move away from ioremap when not strictly needed.
+Hi Ingo,
 
-The use of ioremap in general is just fine for drivers as long
-as they access a dedicated area to the specific device. Accessing
-random registers and memory in the SoC is what I'm worried about.
- 
-> I'd be happy if someone intimate with the related hardware could ack
-> that in this specific case ioremap is indeed needed. No need to review
-> the entire patch, or anything remoteproc, just make sure that
-> generally ioremap is how we want to access this internal memory.
-> 
-> Tony or Kevin any chance you could take a look and ack?
-> 
-> If ioremap is indeed the way to go, I'd also expect that we wouldn't
-> have to use __force here, but that's probably a minor patch cleanup.
+	Please consider pulling,
 
-Hmm sounds like this memory should be dedicated to the accelerator?
+- Arnaldo
 
-In that case it should use memblock to reserve that area early so
-the kernel won't be accessing it at all.
+The following changes since commit 2fde4f94e0a9531251e706fa57131b51b0df042e:
 
-If it needs to be shared between the kernel and the accelerator,
-then is the remoteproc or mailbox somehow needs to coordinating the
-shared access to this memory.. I think those cases should be handled
-separately and not with a single interface.
+  perf: Decouple unthrottling and rotating (2015-02-04 08:07:16 +0100)
 
-Regards,
+are available in the git repository at:
 
-Tony
+  git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-core-for-mingo
+
+for you to fetch changes up to 39f5704399042fff5f0d5f6af32bbbc3e787a897:
+
+  perf tools: Define _GNU_SOURCE on pthread_attr_setaffinity_np feature check (2015-02-11 17:38:55 -0300)
+
+----------------------------------------------------------------
+perf/core improvement and fixes:
+
+User visible:
+
+- No need to explicitely enable evsels for workload started from perf, let it
+  be enabled via perf_event_attr.enable_on_exec, removing some events that take
+  place in the 'perf trace' before a workload is really started by it.
+  (Arnaldo Carvalho de Melo)
+
+- Fix to handle optimized not-inlined functions in 'perf probe' (Masami Hiramatsu)
+
+- Update 'perf probe' man page (Masami Hiramatsu)
+
+Infrastructure:
+
+Arnaldo Carvalho de Melo (4):
+- Introduce {trace_seq_do,event_format_}_fprintf functions to allow
+  a default tracepoint field list printer to be used in tools that allows
+  redirecting output to a file. (Arnaldo Carvalho de Melo)
+
+- The man page for pthread_attr_set_affinity_np states that _GNU_SOURCE
+  must be defined before pthread.h, do it to fix the build in some
+  systems (Josh Boyer)
+
+- Cleanups in 'perf buildid-cache' (Masami Hiramatsu)
+
+- Fix dso cache test case (Namhyung Kim)
+
+- Do Not rely on dso__data_read_offset() to open DSO (Namhyung Kim)
+
+- Make perf aware of tracefs (Steven Rostedt).
+
+- Fix build by defining STT_GNU_IFUNC for glibc 2.9 and older (Vinson Lee)
+
+- AArch64 symbol resolution fixes (Victor Kamensky)
+
+Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+
+----------------------------------------------------------------
+Arnaldo Carvalho de Melo (4):
+      tools lib traceevent: Introduce trace_seq_do_fprintf function
+      perf tools: Introduce event_format__fprintf method
+      perf trace: No need to enable evsels for workload started from perf
+      perf evlist: Fix typo in comment
+
+Josh Boyer (1):
+      perf tools: Define _GNU_SOURCE on pthread_attr_setaffinity_np feature check
+
+Masami Hiramatsu (4):
+      perf probe: Fix to handle optimized not-inlined functions
+      perf probe: Update man page
+      perf buildid-cache: Remove unneeded debugdir parameters
+      perf buildid-cache: Consolidate .build-id cache path generators
+
+Namhyung Kim (3):
+      perf test: Fix dso cache testcase
+      perf tests: Do not rely on dso__data_read_offset() to open dso
+      perf tools: Fix a dso open fail message
+
+Steven Rostedt (Red Hat) (6):
+      perf tools: Do not check debugfs MAGIC for tracing files
+      tools lib fs: Add helper to find mounted file systems
+      tools lib api fs: Add tracefs mount helper functions
+      tools lib api debugfs: Add DEBUGFS_DEFAULT_PATH macro
+      tools lib api fs: Add {tracefs,debugfs}_configured() functions
+      perf tools: Make perf aware of tracefs
+
+Victor Kamensky (2):
+      perf symbols: Ignore mapping symbols on aarch64
+      perf symbols: debuglink should take symfs option into account
+
+Vinson Lee (1):
+      perf symbols: Define STT_GNU_IFUNC for glibc 2.9 and older.
+
+ tools/lib/api/Makefile                    |  4 ++
+ tools/lib/api/fs/debugfs.c                | 69 +++++++---------------
+ tools/lib/api/fs/debugfs.h                | 13 +----
+ tools/lib/api/fs/findfs.c                 | 63 ++++++++++++++++++++
+ tools/lib/api/fs/findfs.h                 | 23 ++++++++
+ tools/lib/api/fs/tracefs.c                | 78 +++++++++++++++++++++++++
+ tools/lib/api/fs/tracefs.h                | 21 +++++++
+ tools/lib/traceevent/event-parse.h        |  2 +
+ tools/lib/traceevent/trace-seq.c          | 13 +++--
+ tools/perf/Documentation/perf-probe.txt   | 16 +++++-
+ tools/perf/builtin-buildid-cache.c        | 37 ++++++------
+ tools/perf/builtin-trace.c                |  4 +-
+ tools/perf/config/feature-checks/Makefile |  2 +-
+ tools/perf/tests/dso-data.c               | 22 ++++---
+ tools/perf/tests/open-syscall-all-cpus.c  |  7 ++-
+ tools/perf/tests/open-syscall.c           |  7 ++-
+ tools/perf/tests/parse-events.c           | 13 ++++-
+ tools/perf/util/build-id.c                | 96 +++++++++++++++++++------------
+ tools/perf/util/build-id.h                |  4 +-
+ tools/perf/util/cache.h                   |  1 +
+ tools/perf/util/dso.c                     |  8 +--
+ tools/perf/util/dwarf-aux.c               | 15 +++++
+ tools/perf/util/dwarf-aux.h               |  3 +
+ tools/perf/util/evlist.c                  |  3 +-
+ tools/perf/util/parse-events.c            | 19 ------
+ tools/perf/util/parse-events.h            |  2 +-
+ tools/perf/util/probe-event.c             | 24 +++++---
+ tools/perf/util/probe-finder.c            | 12 ++--
+ tools/perf/util/symbol-elf.c              | 11 ++--
+ tools/perf/util/trace-event-parse.c       | 12 +++-
+ tools/perf/util/trace-event.h             |  3 +
+ tools/perf/util/util.c                    | 60 +++++++++++++++----
+ tools/perf/util/util.h                    |  1 +
+ 33 files changed, 468 insertions(+), 200 deletions(-)
+ create mode 100644 tools/lib/api/fs/findfs.c
+ create mode 100644 tools/lib/api/fs/findfs.h
+ create mode 100644 tools/lib/api/fs/tracefs.c
+ create mode 100644 tools/lib/api/fs/tracefs.h
