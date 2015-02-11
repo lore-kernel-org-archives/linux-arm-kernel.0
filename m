@@ -1,86 +1,72 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Wed, 11 Feb 2015 13:58:45 -0800
-Subject: Delays, clocks, timers, hrtimers, etc
-In-Reply-To: <20150211184515.GB11190@codeaurora.org>
-References: <54C8E125.3070905@free.fr>
- <e028a4eb604a491f4438557f4a1373ef@agner.ch> <54D52F84.9050600@free.fr>
- <266c7b1ff2d1a8ba0ae4866f4fb4eca5@agner.ch> <54D576B1.4000001@free.fr>
- <54D903F6.3050608@codeaurora.org> <54D93556.9050008@free.fr>
- <54D93FFA.3090506@codeaurora.org> <54D947B4.4080401@free.fr>
- <54DB94B0.8020000@free.fr> <20150211184515.GB11190@codeaurora.org>
-Message-ID: <54DBD095.3040800@free.fr>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 11 Feb 2015 14:06:17 -0800
+Subject: [PATCH] arm/mm: fix compiler warning in pmdp_invalidate() (in
+ -next)
+In-Reply-To: <20150130164015.GQ26493@n2100.arm.linux.org.uk>
+References: <20150130100620.GL2395@suse.de>
+ <1422635852-21569-1-git-send-email-andre.przywara@arm.com>
+ <20150130164015.GQ26493@n2100.arm.linux.org.uk>
+Message-ID: <20150211140617.9f00465d147fe0db10777dfb@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd wrote:
+On Fri, 30 Jan 2015 16:40:15 +0000 Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-> Mason wrote:
->
->> Also, you wrote "I don't see any problem with the TWD dropping the
->> dependency on SMP." Would something as simple as this be acceptable?
->> (Most probably NOT; there are a lot of smp* occurrences in smp_twd.c
->> even the file name.) What is the rationale for the dependency?
->>
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index a34698d..47b02c8 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -1565,7 +1565,6 @@ config HAVE_ARM_ARCH_TIMER
->>   config HAVE_ARM_TWD
->>          bool
->> -       depends on SMP
->>          select CLKSRC_OF if OF
->>          help
->>            This options enables support for the ARM timer and watchdog unit
->>
->
-> Hmm it looks like we would also need to add this to the patch. It
-> looks like a holdover from when the local timer APIs were around.
-> Back then twd_local_timer_common_register() would fail if
-> is_smp() was false or setup_max_cpus was 0. Now it will just
-> register a clockevent that may or may not be used depending on
-> what other clockevents are in the system and the ratings of those
-> other clockevents.
->
-> ----8<----
-> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> index 172c6a05d27f..e8f6d241881f 100644
-> --- a/arch/arm/kernel/smp_twd.c
-> +++ b/arch/arm/kernel/smp_twd.c
-> @@ -23,7 +23,6 @@
->   #include <linux/of_irq.h>
->   #include <linux/of_address.h>
->
-> -#include <asm/smp_plat.h>
->   #include <asm/smp_twd.h>
->
->   /* set up by the platform code */
-> @@ -388,9 +387,6 @@ static void __init twd_local_timer_of_register(struct device_node *np)
->   {
->   	int err;
->
-> -	if (!is_smp() || !setup_max_cpus)
-> -		return;
-> -
->   	twd_ppi = irq_of_parse_and_map(np, 0);
->   	if (!twd_ppi) {
->   		err = -EINVAL;
+> On Fri, Jan 30, 2015 at 04:37:32PM +0000, Andre Przywara wrote:
+> > Commit ff61d185f4e7 ("mm: convert p[te|md]_mknonnuma and remaining
+> > page table manipulations") removed a check in
+> > mm/pgtable-generic.c:pmdp_invalidate(), which leaves the
+> > pmd_mknotpresent macro the only user of the entry variable.
+> > For ARM/LPAE we use a constant 0 without referencing the argument to
+> > mark this condition, so the entry variable is no longer used here:
+> > 
+> > mm/pgtable-generic.c: In function 'pmdp_invalidate':
+> > mm/pgtable-generic.c:195:8: warning: unused variable 'entry' [-Wunused-variable]
+> >   pmd_t entry = *pmdp;
+> >         ^
+> > 
+> > Replace the ARM macro implementation with a static inline function to
+> > get rid of this warning.
+> >  
+> > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> > ---
+> > Hi Andrew,
+> > 
+> > Mel mentioned that I should send that simple fix below to you to
+> > merge it with his original mmotm patch:
+> > mm-convert-p_mknonnuma-and-remaining-page-table-manipulations.patch
+> > The commit message above contains the mmotm-reference to this patch,
+> > which will break when it hits mainline.
+> > 
+> > Can you consider this? Given that's only a warning fix I am also
+> > happy with resending it after -rc1, if you reckon that this arch/arm
+> > change should not go via mmotm.
+> 
+> This isn't correct though.
+> 
+> >  /* represent a notpresent pmd by zero, this is used by pmdp_invalidate */
+> > -#define pmd_mknotpresent(pmd)	(__pmd(0))
+> > +static inline pmd_t pmd_mknotpresent(pmd_t pmd)
+> > +{
+> > +	return 0;
+> > +}
+> 
+> typedef struct { pmdval_t pmd; } pmd_t;
+> 
+> typedef u32 pmdval_t;
+> 
+> "0" is not compatible with pmd_t when STRICT_MM_TYPECHECKS is enabled.
 
-Looking at the difference between OF and !OF registration functions
-in smp_twd.c
+This?
 
-!OF
-   if (twd_base || twd_evt) return -EBUSY;
-   assign twd_ppi and twd_base
-   twd_local_timer_common_register(NULL)
-
-OF
-   if (!is_smp() || !setup_max_cpus) return; // TO BE DELETED
-   assign twd_ppi and twd_base
-   twd_local_timer_common_register(np)
-
-I suppose OF guarantees that the init code is called only once?
-(Hence the !OF guard code would be unnecessary.)
-
-Regards.
+--- a/arch/arm/include/asm/pgtable-3level.h~mm-convert-p_mknonnuma-and-remaining-page-table-manipulations-fix-fix
++++ a/arch/arm/include/asm/pgtable-3level.h
+@@ -259,7 +259,7 @@ PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
+ /* represent a notpresent pmd by zero, this is used by pmdp_invalidate */
+ static inline pmd_t pmd_mknotpresent(pmd_t pmd)
+ {
+-	return 0;
++	return __pmd(0);
+ }
+ 
+ static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
