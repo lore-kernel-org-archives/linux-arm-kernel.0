@@ -1,72 +1,39 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 11 Feb 2015 14:06:17 -0800
-Subject: [PATCH] arm/mm: fix compiler warning in pmdp_invalidate() (in
- -next)
-In-Reply-To: <20150130164015.GQ26493@n2100.arm.linux.org.uk>
-References: <20150130100620.GL2395@suse.de>
- <1422635852-21569-1-git-send-email-andre.przywara@arm.com>
- <20150130164015.GQ26493@n2100.arm.linux.org.uk>
-Message-ID: <20150211140617.9f00465d147fe0db10777dfb@linux-foundation.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 12 Feb 2015 01:06:49 +0300
+Subject: [PATCH] ARM: shmobile: r8a7794: add PFC DT support
+In-Reply-To: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+Message-ID: <5570320.hDPc0mxmnU@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Jan 2015 16:40:15 +0000 Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Define the generic R8A7794 part of the PFC device node.
 
-> On Fri, Jan 30, 2015 at 04:37:32PM +0000, Andre Przywara wrote:
-> > Commit ff61d185f4e7 ("mm: convert p[te|md]_mknonnuma and remaining
-> > page table manipulations") removed a check in
-> > mm/pgtable-generic.c:pmdp_invalidate(), which leaves the
-> > pmd_mknotpresent macro the only user of the entry variable.
-> > For ARM/LPAE we use a constant 0 without referencing the argument to
-> > mark this condition, so the entry variable is no longer used here:
-> > 
-> > mm/pgtable-generic.c: In function 'pmdp_invalidate':
-> > mm/pgtable-generic.c:195:8: warning: unused variable 'entry' [-Wunused-variable]
-> >   pmd_t entry = *pmdp;
-> >         ^
-> > 
-> > Replace the ARM macro implementation with a static inline function to
-> > get rid of this warning.
-> >  
-> > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> > ---
-> > Hi Andrew,
-> > 
-> > Mel mentioned that I should send that simple fix below to you to
-> > merge it with his original mmotm patch:
-> > mm-convert-p_mknonnuma-and-remaining-page-table-manipulations.patch
-> > The commit message above contains the mmotm-reference to this patch,
-> > which will break when it hits mainline.
-> > 
-> > Can you consider this? Given that's only a warning fix I am also
-> > happy with resending it after -rc1, if you reckon that this arch/arm
-> > change should not go via mmotm.
-> 
-> This isn't correct though.
-> 
-> >  /* represent a notpresent pmd by zero, this is used by pmdp_invalidate */
-> > -#define pmd_mknotpresent(pmd)	(__pmd(0))
-> > +static inline pmd_t pmd_mknotpresent(pmd_t pmd)
-> > +{
-> > +	return 0;
-> > +}
-> 
-> typedef struct { pmdval_t pmd; } pmd_t;
-> 
-> typedef u32 pmdval_t;
-> 
-> "0" is not compatible with pmd_t when STRICT_MM_TYPECHECKS is enabled.
+Based on original patch by Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>.
 
-This?
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
---- a/arch/arm/include/asm/pgtable-3level.h~mm-convert-p_mknonnuma-and-remaining-page-table-manipulations-fix-fix
-+++ a/arch/arm/include/asm/pgtable-3level.h
-@@ -259,7 +259,7 @@ PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
- /* represent a notpresent pmd by zero, this is used by pmdp_invalidate */
- static inline pmd_t pmd_mknotpresent(pmd_t pmd)
- {
--	return 0;
-+	return __pmd(0);
- }
+---
+This patch is against 'renesas-devel-20150211-v3.19' tag of Simon Horman's
+'renesas.git' repo. It needs the R8A7794 PFC driver patch in order to work.
+
+ arch/arm/boot/dts/r8a7794.dtsi |    6 ++++++
+ 1 file changed, 6 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
++++ renesas/arch/arm/boot/dts/r8a7794.dtsi
+@@ -107,6 +107,12 @@
+ 			     <0 17 IRQ_TYPE_LEVEL_HIGH>;
+ 	};
  
- static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
++	pfc: pin-controller at e6060000 {
++		compatible = "renesas,pfc-r8a7794";
++		reg = <0 0xe6060000 0 0x11c>;
++		#gpio-range-cells = <3>;
++	};
++
+ 	dmac0: dma-controller at e6700000 {
+ 		compatible = "renesas,rcar-dmac";
+ 		reg = <0 0xe6700000 0 0x20000>;
