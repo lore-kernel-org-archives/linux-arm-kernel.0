@@ -1,41 +1,99 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 11 Feb 2015 09:20:54 +0100
-Subject: [RFC v2 1/4] chip.c: complete the forwarded IRQ in case the handler
- is not reached
+Date: Wed, 11 Feb 2015 09:20:55 +0100
+Subject: [RFC v2 2/4] KVM: arm: vgic: fix state machine for forwarded IRQ
 In-Reply-To: <1423642857-24240-1-git-send-email-eric.auger@linaro.org>
 References: <1423642857-24240-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1423642857-24240-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <1423642857-24240-3-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With current handle_fasteoi_irq implementation, in case irqd_irq_disabled
-is true (disable_irq was called) or !irq_may_run, the IRQ is not completed.
-Only the running priority is dropped. IN those cases, the IRQ will
-never be forwarded and hence will never be deactivated by anyone else.
+Fix multiple injection of level sensitive forwarded IRQs.
+With current code, the second injection fails since the state bitmaps
+are not reset (process_maintenance is not called anymore).
+
+New implementation follows those principles:
+- A forwarded IRQ only can be sampled when it is pending
+- when queueing the IRQ (programming the LR), the pending state is removed
+  as for edge sensitive IRQs
+- an injection of a forwarded IRQ is considered always valid since
+  coming from the HW and level always is 1.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
----
- kernel/irq/chip.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-index 2f9571b..f12cce6 100644
---- a/kernel/irq/chip.c
-+++ b/kernel/irq/chip.c
-@@ -561,8 +561,12 @@ handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
- 	raw_spin_unlock(&desc->lock);
- 	return;
- out:
--	if (!(chip->flags & IRQCHIP_EOI_IF_HANDLED))
--		eoi_irq(desc, chip);
-+	if (!(chip->flags & IRQCHIP_EOI_IF_HANDLED)) {
-+		if (chip->irq_priority_drop)
-+			chip->irq_priority_drop(&desc->irq_data);
-+		if (chip->irq_eoi)
-+			chip->irq_eoi(&desc->irq_data);
-+	}
- 	raw_spin_unlock(&desc->lock);
+---
+
+v1 -> v2:
+- integration in new vgic_can_sample_irq
+- remove the pending state when programming the LR
+---
+ virt/kvm/arm/vgic.c | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index cd00cf2..433ecba 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -361,7 +361,10 @@ static void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq)
+ 
+ static bool vgic_can_sample_irq(struct kvm_vcpu *vcpu, int irq)
+ {
+-	return vgic_irq_is_edge(vcpu, irq) || !vgic_irq_is_queued(vcpu, irq);
++	bool is_forwarded =  (vgic_get_phys_irq(vcpu, irq) >= 0);
++
++	return vgic_irq_is_edge(vcpu, irq) || !vgic_irq_is_queued(vcpu, irq) ||
++		(is_forwarded && vgic_dist_irq_is_pending(vcpu, irq));
  }
- EXPORT_SYMBOL_GPL(handle_fasteoi_irq);
+ 
+ static u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
+@@ -1296,6 +1299,7 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	struct vgic_lr vlr;
+ 	int lr;
++	bool is_forwarded =  (vgic_get_phys_irq(vcpu, irq) >= 0);
+ 
+ 	/* Sanitize the input... */
+ 	BUG_ON(sgi_source_id & ~7);
+@@ -1331,7 +1335,7 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
+ 	vlr.irq = irq;
+ 	vlr.source = sgi_source_id;
+ 	vlr.state = LR_STATE_PENDING;
+-	if (!vgic_irq_is_edge(vcpu, irq))
++	if (!vgic_irq_is_edge(vcpu, irq) && !is_forwarded)
+ 		vlr.state |= LR_EOI_INT;
+ 
+ 	vgic_set_lr(vcpu, lr, vlr);
+@@ -1372,11 +1376,12 @@ static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
+ 
+ static bool vgic_queue_hwirq(struct kvm_vcpu *vcpu, int irq)
+ {
++	bool is_forwarded = (vgic_get_phys_irq(vcpu, irq) >= 0);
+ 	if (!vgic_can_sample_irq(vcpu, irq))
+ 		return true; /* level interrupt, already queued */
+ 
+ 	if (vgic_queue_irq(vcpu, 0, irq)) {
+-		if (vgic_irq_is_edge(vcpu, irq)) {
++		if (vgic_irq_is_edge(vcpu, irq) || is_forwarded) {
+ 			vgic_dist_irq_clear_pending(vcpu, irq);
+ 			vgic_cpu_irq_clear(vcpu, irq);
+ 		} else {
+@@ -1626,14 +1631,17 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+ 	int edge_triggered, level_triggered;
+ 	int enabled;
+ 	bool ret = true;
++	bool is_forwarded;
+ 
+ 	spin_lock(&dist->lock);
+ 
+ 	vcpu = kvm_get_vcpu(kvm, cpuid);
++	is_forwarded = (vgic_get_phys_irq(vcpu, irq_num) >= 0);
++
+ 	edge_triggered = vgic_irq_is_edge(vcpu, irq_num);
+ 	level_triggered = !edge_triggered;
+ 
+-	if (!vgic_validate_injection(vcpu, irq_num, level)) {
++	if (!vgic_validate_injection(vcpu, irq_num, level) && !is_forwarded) {
+ 		ret = false;
+ 		goto out;
+ 	}
 -- 
 1.9.1
