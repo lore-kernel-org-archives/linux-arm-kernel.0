@@ -1,9 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Feb 2015 10:01:18 +0100
-Subject: [PATCH v2 19/30] ARM: sun6i: m9: Convert to DT label based syntax
+Date: Wed, 11 Feb 2015 10:01:15 +0100
+Subject: [PATCH v2 16/30] ARM: sun5i: a13: olinuxino: Convert to DT label
+ based syntax
 In-Reply-To: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1423645289-1074-20-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1423645289-1074-17-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,157 +14,250 @@ when overriding DTSI nodes, convert the board to this syntax
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun6i-a31-m9.dts | 148 ++++++++++++++++++-------------------
- 1 file changed, 73 insertions(+), 75 deletions(-)
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts | 236 +++++++++++++++---------------
+ 1 file changed, 117 insertions(+), 119 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-m9.dts b/arch/arm/boot/dts/sun6i-a31-m9.dts
-index 139a21e6b695..5cbbbd696b00 100644
---- a/arch/arm/boot/dts/sun6i-a31-m9.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-m9.dts
-@@ -60,93 +60,91 @@
- 		bootargs = "earlyprintk console=ttyS0,115200";
+diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+index 6b24876ed462..d09c57b4905b 100644
+--- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
++++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+@@ -63,141 +63,139 @@
+ 		serial0 = &uart1;
  	};
  
 -	soc at 01c00000 {
 -		mmc0: mmc at 01c0f000 {
 -			pinctrl-names = "default";
--			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_m9>;
+-			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_olinuxino>;
 -			vmmc-supply = <&reg_vcc3v3>;
 -			bus-width = <4>;
--			cd-gpios = <&pio 7 22 GPIO_ACTIVE_HIGH>; /* PH22 */
+-			cd-gpios = <&pio 6 0 GPIO_ACTIVE_HIGH>; /* PG0 */
 -			cd-inverted;
 -			status = "okay";
 -		};
 +	leds {
 +		compatible = "gpio-leds";
 +		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_m9>;
++		pinctrl-0 = <&led_pins_olinuxino>;
  
--		usbphy: phy at 01c19400 {
+-		usbphy: phy at 01c13400 {
 -			usb1_vbus-supply = <&reg_usb1_vbus>;
 -			status = "okay";
-+		blue {
-+			label = "m9:blue:usr";
-+			gpios = <&pio 7 13 GPIO_ACTIVE_HIGH>;
++		power {
++			gpios = <&pio 6 9 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
  		};
 +	};
 +};
  
--		ehci0: usb at 01c1a000 {
+-		ehci0: usb at 01c14000 {
 -			status = "okay";
 -		};
 +&ehci0 {
 +	status = "okay";
 +};
  
--		ehci1: usb at 01c1b000 {
+-		ohci0: usb at 01c14400 {
 -			status = "okay";
 -		};
-+&ehci1 {
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
 +	status = "okay";
-+};
  
--		pio: pinctrl at 01c20800 {
--			led_pins_m9: led_pins at 0 {
--				allwinner,pins = "PH13";
--				allwinner,function = "gpio_out";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--			};
--
--			mmc0_cd_pin_m9: mmc0_cd_pin at 0 {
--				allwinner,pins = "PH22";
+-		pinctrl at 01c20800 {
+-			mmc0_cd_pin_olinuxino: mmc0_cd_pin at 0 {
+-				allwinner,pins = "PG0";
 -				allwinner,function = "gpio_in";
 -				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 -				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
 -			};
 -
--			usb1_vbus_pin_m9: usb1_vbus_pin at 0 {
--				allwinner,pins = "PC27";
+-			led_pins_olinuxino: led_pins at 0 {
+-				allwinner,pins = "PG9";
+-				allwinner,function = "gpio_out";
+-				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
+-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-			};
+-
+-			usb1_vbus_pin_olinuxino: usb1_vbus_pin at 0 {
+-				allwinner,pins = "PG11";
 -				allwinner,function = "gpio_out";
 -				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 -				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 -			};
 -		};
-+&gmac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_pins_mii_a>;
-+	phy = <&phy1>;
-+	phy-mode = "mii";
-+	status = "okay";
++	axp209: pmic at 34 {
++		compatible = "x-powers,axp209";
++		reg = <0x34>;
++		interrupts = <0>;
  
--		uart0: serial at 01c28000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&uart0_pins_a>;
+-		lradc: lradc at 01c22800 {
+-			vref-supply = <&reg_vcc3v0>;
 -			status = "okay";
+-
+-			button at 191 {
+-				label = "Volume Up";
+-				linux,code = <KEY_VOLUMEUP>;
+-				channel = <0>;
+-				voltage = <191274>;
+-			};
+-
+-			button at 392 {
+-				label = "Volume Down";
+-				linux,code = <KEY_VOLUMEDOWN>;
+-				channel = <0>;
+-				voltage = <392644>;
+-			};
+-
+-			button at 601 {
+-				label = "Menu";
+-				linux,code = <KEY_MENU>;
+-				channel = <0>;
+-				voltage = <601151>;
+-			};
+-
+-			button at 795 {
+-				label = "Enter";
+-				linux,code = <KEY_ENTER>;
+-				channel = <0>;
+-				voltage = <795090>;
+-			};
+-
+-			button at 987 {
+-				label = "Home";
+-				linux,code = <KEY_HOMEPAGE>;
+-				channel = <0>;
+-				voltage = <987387>;
+-			};
 -		};
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
++		interrupt-controller;
++		#interrupt-cells = <1>;
 +	};
 +};
  
--		gmac: ethernet at 01c30000 {
+-		uart1: serial at 01c28400 {
 -			pinctrl-names = "default";
--			pinctrl-0 = <&gmac_pins_mii_a>;
--			phy = <&phy1>;
--			phy-mode = "mii";
+-			pinctrl-0 = <&uart1_pins_b>;
 -			status = "okay";
-+&ir {
+-		};
++&i2c1 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&ir_pins_a>;
++	pinctrl-0 = <&i2c1_pins_a>;
 +	status = "okay";
 +};
  
--			phy1: ethernet-phy at 1 {
--				reg = <1>;
+-		i2c0: i2c at 01c2ac00 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c0_pins_a>;
+-			status = "okay";
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins_a>;
++	status = "okay";
++};
+ 
+-			axp209: pmic at 34 {
+-				compatible = "x-powers,axp209";
+-				reg = <0x34>;
+-				interrupts = <0>;
++&lradc {
++	vref-supply = <&reg_vcc3v0>;
++	status = "okay";
+ 
+-				interrupt-controller;
+-				#interrupt-cells = <1>;
 -			};
 -		};
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_m9>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 22 GPIO_ACTIVE_HIGH>; /* PH22 */
-+	cd-inverted;
-+	status = "okay";
-+};
++	button at 191 {
++		label = "Volume Up";
++		linux,code = <KEY_VOLUMEUP>;
++		channel = <0>;
++		voltage = <191274>;
++	};
  
--		ir at 01f02000 {
+-		i2c1: i2c at 01c2b000 {
 -			pinctrl-names = "default";
--			pinctrl-0 = <&ir_pins_a>;
+-			pinctrl-0 = <&i2c1_pins_a>;
 -			status = "okay";
 -		};
-+&pio {
-+	led_pins_m9: led_pins at 0 {
-+		allwinner,pins = "PH13";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	button at 392 {
++		label = "Volume Down";
++		linux,code = <KEY_VOLUMEDOWN>;
++		channel = <0>;
++		voltage = <392644>;
++	};
+ 
+-		i2c2: i2c at 01c2b400 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c2_pins_a>;
+-			status = "okay";
+-		};
++	button at 601 {
++		label = "Menu";
++		linux,code = <KEY_MENU>;
++		channel = <0>;
++		voltage = <601151>;
  	};
  
 -	leds {
 -		compatible = "gpio-leds";
 -		pinctrl-names = "default";
--		pinctrl-0 = <&led_pins_m9>;
--
--		blue {
--			label = "m9:blue:usr";
--			gpios = <&pio 7 13 GPIO_ACTIVE_HIGH>;
+-		pinctrl-0 = <&led_pins_olinuxino>;
++	button at 795 {
++		label = "Enter";
++		linux,code = <KEY_ENTER>;
++		channel = <0>;
++		voltage = <795090>;
++	};
+ 
+-		power {
+-			gpios = <&pio 6 9 GPIO_ACTIVE_HIGH>;
+-			default-state = "on";
 -		};
-+	mmc0_cd_pin_m9: mmc0_cd_pin at 0 {
-+		allwinner,pins = "PH22";
++	button at 987 {
++		label = "Home";
++		linux,code = <KEY_HOMEPAGE>;
++		channel = <0>;
++		voltage = <987387>;
++	};
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_olinuxino>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 6 0 GPIO_ACTIVE_HIGH>; /* PG0 */
++	cd-inverted;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&pio {
++	mmc0_cd_pin_olinuxino: mmc0_cd_pin at 0 {
++		allwinner,pins = "PG0";
 +		allwinner,function = "gpio_in";
 +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++
++	led_pins_olinuxino: led_pins at 0 {
++		allwinner,pins = "PG9";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
  	};
  
 -	reg_usb1_vbus: usb1-vbus {
--		pinctrl-names = "default";
--		pinctrl-0 = <&usb1_vbus_pin_m9>;
--		gpio = <&pio 2 27 GPIO_ACTIVE_HIGH>;
+-		pinctrl-0 = <&usb1_vbus_pin_olinuxino>;
+-		gpio = <&pio 6 11 GPIO_ACTIVE_HIGH>;
 -		status = "okay";
-+	usb1_vbus_pin_m9: usb1_vbus_pin at 0 {
-+		allwinner,pins = "PC27";
++	usb1_vbus_pin_olinuxino: usb1_vbus_pin at 0 {
++		allwinner,pins = "PG11";
 +		allwinner,function = "gpio_out";
 +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
@@ -171,15 +265,14 @@ index 139a21e6b695..5cbbbd696b00 100644
  };
 +
 +&reg_usb1_vbus {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb1_vbus_pin_m9>;
-+	gpio = <&pio 2 27 GPIO_ACTIVE_HIGH>;
++	pinctrl-0 = <&usb1_vbus_pin_olinuxino>;
++	gpio = <&pio 6 11 GPIO_ACTIVE_HIGH>;
 +	status = "okay";
 +};
 +
-+&uart0 {
++&uart1 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
++	pinctrl-0 = <&uart1_pins_b>;
 +	status = "okay";
 +};
 +
