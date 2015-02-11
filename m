@@ -1,56 +1,125 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 11 Feb 2015 09:32:12 +0100
-Subject: [RFC v4 02/13] VFIO: platform: test forwarded state when selecting
- IRQ handler
+Date: Wed, 11 Feb 2015 09:32:14 +0100
+Subject: [RFC v4 04/13] KVM: kvm-vfio: User API for IRQ forwarding
 In-Reply-To: <1423643543-24409-1-git-send-email-eric.auger@linaro.org>
 References: <1423643543-24409-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1423643543-24409-3-git-send-email-eric.auger@linaro.org>
+Message-ID: <1423643543-24409-5-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case the IRQ is forwarded, the VFIO platform IRQ handler does not
-need to disable the IRQ anymore.
-
-When setting the IRQ handler we now also test the forwarded state. In
-case the IRQ is forwarded we select the vfio_irq_handler.
+This patch adds and documents a new KVM_DEV_VFIO_DEVICE group
+and 2 device attributes: KVM_DEV_VFIO_DEVICE_FORWARD_IRQ,
+KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ. The purpose is to be able
+to set a VFIO device IRQ as forwarded or not forwarded.
+the command takes as argument a handle to a new struct named
+kvm_vfio_dev_irq.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
 
 v3 -> v4:
-- change title
+- rename kvm_arch_forwarded_irq into kvm_vfio_dev_irq
+- some rewording in commit message
+- document forwarding restrictions and remove unforwarding ones
 
 v2 -> v3:
-- forwarded state was tested in the handler. Now the forwarded state
-  is tested before setting the handler. This definitively limits
-  the dynamics of forwarded state changes but I don't think there is
-  a use case where we need to be able to change the state at any time.
+- rework vfio kvm device documentation
+- reword commit message and title
+- add subindex in kvm_arch_forwarded_irq to be closer to VFIO API
+- forwarding state can only be changed with VFIO IRQ signaling is off
 
-Conflicts:
-	drivers/vfio/platform/vfio_platform_irq.c
+v1 -> v2:
+- struct kvm_arch_forwarded_irq moved from arch/arm/include/uapi/asm/kvm.h
+  to include/uapi/linux/kvm.h
+  also irq_index renamed into index and guest_irq renamed into gsi
+- ASSIGN/DEASSIGN renamed into FORWARD/UNFORWARD
 ---
- drivers/vfio/platform/vfio_platform_irq.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ Documentation/virtual/kvm/devices/vfio.txt | 34 ++++++++++++++++++++++++------
+ include/uapi/linux/kvm.h                   | 12 +++++++++++
+ 2 files changed, 40 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
-index 88bba57..132bb3f 100644
---- a/drivers/vfio/platform/vfio_platform_irq.c
-+++ b/drivers/vfio/platform/vfio_platform_irq.c
-@@ -229,8 +229,13 @@ static int vfio_platform_set_irq_trigger(struct vfio_platform_device *vdev,
- {
- 	struct vfio_platform_irq *irq = &vdev->irqs[index];
- 	irq_handler_t handler;
-+	struct irq_data *d;
-+	bool is_forwarded;
+diff --git a/Documentation/virtual/kvm/devices/vfio.txt b/Documentation/virtual/kvm/devices/vfio.txt
+index ef51740..6186e6d 100644
+--- a/Documentation/virtual/kvm/devices/vfio.txt
++++ b/Documentation/virtual/kvm/devices/vfio.txt
+@@ -4,15 +4,20 @@ VFIO virtual device
+ Device types supported:
+   KVM_DEV_TYPE_VFIO
  
--	if (vdev->irqs[index].flags & VFIO_IRQ_INFO_AUTOMASKED)
-+	d = irq_get_irq_data(irq->hwirq);
-+	is_forwarded = irqd_irq_forwarded(d);
+-Only one VFIO instance may be created per VM.  The created device
+-tracks VFIO groups in use by the VM and features of those groups
+-important to the correctness and acceleration of the VM.  As groups
+-are enabled and disabled for use by the VM, KVM should be updated
+-about their presence.  When registered with KVM, a reference to the
+-VFIO-group is held by KVM.
++Only one VFIO instance may be created per VM.
 +
-+	if (vdev->irqs[index].flags & VFIO_IRQ_INFO_AUTOMASKED && !is_forwarded)
- 		handler = vfio_automasked_irq_handler;
- 	else
- 		handler = vfio_irq_handler;
++The created device tracks VFIO groups in use by the VM and features
++of those groups important to the correctness and acceleration of
++the VM.  As groups are enabled and disabled for use by the VM, KVM
++should be updated about their presence.  When registered with KVM,
++a reference to the VFIO-group is held by KVM.
++
++The device also enables to control some IRQ settings of VFIO devices:
++forwarding/posting.
+ 
+ Groups:
+   KVM_DEV_VFIO_GROUP
++  KVM_DEV_VFIO_DEVICE
+ 
+ KVM_DEV_VFIO_GROUP attributes:
+   KVM_DEV_VFIO_GROUP_ADD: Add a VFIO group to VFIO-KVM device tracking
+@@ -20,3 +25,20 @@ KVM_DEV_VFIO_GROUP attributes:
+ 
+ For each, kvm_device_attr.addr points to an int32_t file descriptor
+ for the VFIO group.
++
++KVM_DEV_VFIO_DEVICE attributes:
++  KVM_DEV_VFIO_DEVICE_FORWARD_IRQ: set a VFIO device IRQ as forwarded
++  KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ: set a VFIO device IRQ as not forwarded
++
++For each, kvm_device_attr.addr points to a kvm_vfio_dev_irq struct.
++
++When forwarded, a physical IRQ is completed by the guest and not by the
++host. This requires HW support in the interrupt controller.
++
++Forwarding can only be set when the corresponding VFIO IRQ is not masked
++(would it be through VFIO_DEVICE_SET_IRQS command or as a consequence of this
++IRQ being currently handled) or active at interrupt controller level.
++In such a situation, -EAGAIN is returned. It is advised to to set the
++forwarding before the VFIO signaling is set up, this avoids trial and errors.
++
++Unforwarding can happen at any time.
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index a37fd12..d1a6496 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -938,6 +938,9 @@ struct kvm_device_attr {
+ #define  KVM_DEV_VFIO_GROUP			1
+ #define   KVM_DEV_VFIO_GROUP_ADD			1
+ #define   KVM_DEV_VFIO_GROUP_DEL			2
++#define  KVM_DEV_VFIO_DEVICE			2
++#define   KVM_DEV_VFIO_DEVICE_FORWARD_IRQ			1
++#define   KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ			2
+ 
+ enum kvm_device_type {
+ 	KVM_DEV_TYPE_FSL_MPIC_20	= 1,
+@@ -955,6 +958,15 @@ enum kvm_device_type {
+ 	KVM_DEV_TYPE_MAX,
+ };
+ 
++struct kvm_vfio_dev_irq {
++	__u32	argsz;		/* structure length */
++	__u32	fd;		/* file descriptor of the VFIO device */
++	__u32	index;		/* VFIO device IRQ index */
++	__u32	start;		/* start of subindex range */
++	__u32	count;		/* size of subindex range */
++	__u32	gsi[];		/* gsi, ie. virtual IRQ number */
++};
++
+ /*
+  * ioctls for VM fds
+  */
 -- 
 1.9.1
