@@ -1,171 +1,141 @@
-From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Tue, 10 Feb 2015 21:31:24 -0700
-Subject: [PATCH v3 1/2] coresight: Adding coresight support for arm64
- architecture
-Message-ID: <1423629085-1044-1-git-send-email-mathieu.poirier@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 11 Feb 2015 05:34:40 +0100
+Subject: [PATCH V4 4/4] mmc: pwrseq_simple: Add support for a reset GPIO
+ pin
+In-Reply-To: <CAAVeFuJjU-fsknYdMZ1c+aOEmc2rFy=z35S584DfHBLvUm=OAQ@mail.gmail.com>
+References: <1421658784-11980-1-git-send-email-ulf.hansson@linaro.org>
+ <1421658784-11980-5-git-send-email-ulf.hansson@linaro.org>
+ <CAAVeFuJjU-fsknYdMZ1c+aOEmc2rFy=z35S584DfHBLvUm=OAQ@mail.gmail.com>
+Message-ID: <CAPDyKFonXw2NDbEw9CoRj7Sncgm_FUki+cc7j3q=xVZRrJHBkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
+On 10 February 2015 at 10:12, Alexandre Courbot <gnurou@gmail.com> wrote:
+> On Mon, Jan 19, 2015 at 6:13 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> The need for reset GPIOs has several times been pointed out from
+>> erlier posted patchsets. Especially some WLAN chips which are
+>> attached to an SDIO interface may use a GPIO reset.
+>>
+>> The reset GPIO is asserted at initialization and prior we start the
+>> power up procedure. The GPIO will be de-asserted right after the power
+>> has been provided to the card, from the ->post_power_on() callback.
+>>
+>> Note, the reset GPIO is optional. Thus we don't return an error even if
+>> we can't find a GPIO for the consumer.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>
+> Excellent, with this I can probe the wifi chip on NVIDIA SHIELD which
+> requires a GPIO to be high for reset to be de-asserted.
+>
+> The series:
+>
+> Tested-by: Alexandre Courbot <acourbot@nvidia.com>
 
-Most CoreSight blocks are 64-bit ready.  As such move configuration
-entries from "arch/arm/Kconfig.config" to the driver's subdirectory
-and source the newly created Kconfig from architecture specific
-Kconfig.debug files.
+Thanks for testing! Unfortunate, I can't add you tag since this
+patchset is already in the PR for 3.20.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
-Change for v3:
-  - Separating Kconfig work from compilation warnings fixes.
----
- arch/arm/Kconfig.debug    | 55 +-----------------------------------------
- arch/arm64/Kconfig.debug  |  2 ++
- drivers/coresight/Kconfig | 61 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 64 insertions(+), 54 deletions(-)
- create mode 100644 drivers/coresight/Kconfig
+>
+>> ---
+>>
+>> Changes in v4:
+>>         - Fixed call to kfree().
+>>
+>> ---
+>>  drivers/mmc/core/pwrseq_simple.c | 38 ++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 38 insertions(+)
+>>
+>> diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
+>> index 61c991e..0958c69 100644
+>> --- a/drivers/mmc/core/pwrseq_simple.c
+>> +++ b/drivers/mmc/core/pwrseq_simple.c
+>> @@ -11,6 +11,7 @@
+>>  #include <linux/slab.h>
+>>  #include <linux/device.h>
+>>  #include <linux/err.h>
+>> +#include <linux/gpio/consumer.h>
+>>
+>>  #include <linux/mmc/host.h>
+>>
+>> @@ -18,31 +19,68 @@
+>>
+>>  struct mmc_pwrseq_simple {
+>>         struct mmc_pwrseq pwrseq;
+>> +       struct gpio_desc *reset_gpio;
+>>  };
+>>
+>> +static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
+>> +{
+>> +       struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
+>> +                                       struct mmc_pwrseq_simple, pwrseq);
+>> +
+>> +       if (!IS_ERR(pwrseq->reset_gpio))
+>> +               gpiod_set_value_cansleep(pwrseq->reset_gpio, 1);
+>> +}
+>> +
+>> +static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
+>> +{
+>> +       struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
+>> +                                       struct mmc_pwrseq_simple, pwrseq);
+>> +
+>> +       if (!IS_ERR(pwrseq->reset_gpio))
+>> +               gpiod_set_value_cansleep(pwrseq->reset_gpio, 0);
+>> +}
+>> +
+>>  static void mmc_pwrseq_simple_free(struct mmc_host *host)
+>>  {
+>>         struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
+>>                                         struct mmc_pwrseq_simple, pwrseq);
+>>
+>> +       if (!IS_ERR(pwrseq->reset_gpio))
+>> +               gpiod_put(pwrseq->reset_gpio);
+>> +
+>>         kfree(pwrseq);
+>>         host->pwrseq = NULL;
+>>  }
+>>
+>>  static struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
+>> +       .pre_power_on = mmc_pwrseq_simple_pre_power_on,
+>> +       .post_power_on = mmc_pwrseq_simple_post_power_on,
+>> +       .power_off = mmc_pwrseq_simple_pre_power_on,
+>>         .free = mmc_pwrseq_simple_free,
+>>  };
+>>
+>>  int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
+>>  {
+>>         struct mmc_pwrseq_simple *pwrseq;
+>> +       int ret = 0;
+>>
+>>         pwrseq = kzalloc(sizeof(struct mmc_pwrseq_simple), GFP_KERNEL);
+>>         if (!pwrseq)
+>>                 return -ENOMEM;
+>>
+>> +       pwrseq->reset_gpio = gpiod_get_index(dev, "reset", 0, GPIOD_OUT_HIGH);
+>
+> gpiod_get() will translate to exactly the same, with less characters.
+>
+> Actually I see that the version in -next has support for multiple
+> GPIOs. You will probably want to look at Rojhalat's latest work on
+> GPIO arrays:
+>
+> http://permalink.gmane.org/gmane.linux.kernel.gpio/6126
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 5ddd4906f7a7..4fdbb0c012e6 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1478,59 +1478,6 @@ config DEBUG_SET_MODULE_RONX
- 	  against certain classes of kernel exploits.
- 	  If in doubt, say "N".
- 
--menuconfig CORESIGHT
--	bool "CoreSight Tracing Support"
--	select ARM_AMBA
--	help
--	  This framework provides a kernel interface for the CoreSight debug
--	  and trace drivers to register themselves with. It's intended to build
--	  a topological view of the CoreSight components based on a DT
--	  specification and configure the right serie of components when a
--	  trace source gets enabled.
--
--if CORESIGHT
--config CORESIGHT_LINKS_AND_SINKS
--	bool "CoreSight Link and Sink drivers"
--	help
--	  This enables support for CoreSight link and sink drivers that are
--	  responsible for transporting and collecting the trace data
--	  respectively.  Link and sinks are dynamically aggregated with a trace
--	  entity at run time to form a complete trace path.
--
--config CORESIGHT_LINK_AND_SINK_TMC
--	bool "Coresight generic TMC driver"
--	depends on CORESIGHT_LINKS_AND_SINKS
--	help
--	  This enables support for the Trace Memory Controller driver.  Depending
--	  on its configuration the device can act as a link (embedded trace router
--	  - ETR) or sink (embedded trace FIFO).  The driver complies with the
--	  generic implementation of the component without special enhancement or
--	  added features.
--
--config CORESIGHT_SINK_TPIU
--	bool "Coresight generic TPIU driver"
--	depends on CORESIGHT_LINKS_AND_SINKS
--	help
--	  This enables support for the Trace Port Interface Unit driver, responsible
--	  for bridging the gap between the on-chip coresight components and a trace
--	  port collection engine, typically connected to an external host for use
--	  case capturing more traces than the on-board coresight memory can handle.
--
--config CORESIGHT_SINK_ETBV10
--	bool "Coresight ETBv1.0 driver"
--	depends on CORESIGHT_LINKS_AND_SINKS
--	help
--	  This enables support for the Embedded Trace Buffer version 1.0 driver
--	  that complies with the generic implementation of the component without
--	  special enhancement or added features.
-+source "drivers/coresight/Kconfig"
- 
--config CORESIGHT_SOURCE_ETM3X
--	bool "CoreSight Embedded Trace Macrocell 3.x driver"
--	select CORESIGHT_LINKS_AND_SINKS
--	help
--	  This driver provides support for processor ETM3.x and PTM1.x modules,
--	  which allows tracing the instructions that a processor is executing
--	  This is primarily useful for instruction level tracing.  Depending
--	  the ETM version data tracing may also be available.
--endif
- endmenu
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index 5fdd6dce8061..650e46056c55 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -66,4 +66,6 @@ config DEBUG_SET_MODULE_RONX
-           against certain classes of kernel exploits.
-           If in doubt, say "N".
- 
-+source "drivers/coresight/Kconfig"
-+
- endmenu
-diff --git a/drivers/coresight/Kconfig b/drivers/coresight/Kconfig
-new file mode 100644
-index 000000000000..fc1f1ae7a49d
---- /dev/null
-+++ b/drivers/coresight/Kconfig
-@@ -0,0 +1,61 @@
-+#
-+# Coresight configuration
-+#
-+menuconfig CORESIGHT
-+	bool "CoreSight Tracing Support"
-+	select ARM_AMBA
-+	help
-+	  This framework provides a kernel interface for the CoreSight debug
-+	  and trace drivers to register themselves with. It's intended to build
-+	  a topological view of the CoreSight components based on a DT
-+	  specification and configure the right serie of components when a
-+	  trace source gets enabled.
-+
-+if CORESIGHT
-+config CORESIGHT_LINKS_AND_SINKS
-+	bool "CoreSight Link and Sink drivers"
-+	help
-+	  This enables support for CoreSight link and sink drivers that are
-+	  responsible for transporting and collecting the trace data
-+	  respectively.  Link and sinks are dynamically aggregated with a trace
-+	  entity at run time to form a complete trace path.
-+
-+config CORESIGHT_LINK_AND_SINK_TMC
-+	bool "Coresight generic TMC driver"
-+	depends on CORESIGHT_LINKS_AND_SINKS
-+	help
-+	  This enables support for the Trace Memory Controller driver.
-+	  Depending on its configuration the device can act as a link (embedded
-+	  trace router - ETR) or sink (embedded trace FIFO).  The driver
-+	  complies with the generic implementation of the component without
-+	  special enhancement or added features.
-+
-+config CORESIGHT_SINK_TPIU
-+	bool "Coresight generic TPIU driver"
-+	depends on CORESIGHT_LINKS_AND_SINKS
-+	help
-+	  This enables support for the Trace Port Interface Unit driver,
-+	  responsible for bridging the gap between the on-chip coresight
-+	  components and a trace for bridging the gap between the on-chip
-+	  coresight components and a trace port collection engine, typically
-+	  connected to an external host for use case capturing more traces than
-+	  the on-board coresight memory can handle.
-+
-+config CORESIGHT_SINK_ETBV10
-+	bool "Coresight ETBv1.0 driver"
-+	depends on CORESIGHT_LINKS_AND_SINKS
-+	help
-+	  This enables support for the Embedded Trace Buffer version 1.0 driver
-+	  that complies with the generic implementation of the component without
-+	  special enhancement or added features.
-+
-+config CORESIGHT_SOURCE_ETM3X
-+	bool "CoreSight Embedded Trace Macrocell 3.x driver"
-+	depends on !ARM64
-+	select CORESIGHT_LINKS_AND_SINKS
-+	help
-+	  This driver provides support for processor ETM3.x and PTM1.x modules,
-+	  which allows tracing the instructions that a processor is executing
-+	  This is primarily useful for instruction level tracing.  Depending
-+	  the ETM version data tracing may also be available.
-+endif
--- 
-1.9.1
+Cool!
+
+>
+> This code would be a great candidate to use this GPIO array API, but
+> since it is not in -next yet (should happen soon though) you might
+> want to consider doing it later.
+>
+> Btw, I wasted a considerable amount of time on one of the defunct
+> previous attempts at power sequences, so I'm interested in reviewing
+> future versions of this patchset if you don't mind adding me to the CC
+> list. :)
+
+:-)
+
+I will keep you posted for future updates. Feel free to post patches
+improving the mmc-pwrseq code yourself, I will happily review them.
+
+Kind regards
+Uffe
