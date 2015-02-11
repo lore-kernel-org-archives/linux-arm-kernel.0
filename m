@@ -1,84 +1,97 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 11 Feb 2015 09:32:11 +0100
-Subject: [RFC v4 01/13] KVM: arm/arm64: Enable the KVM-VFIO device
+Date: Wed, 11 Feb 2015 09:32:13 +0100
+Subject: [RFC v4 03/13] VFIO: platform: single handler using function pointer
 In-Reply-To: <1423643543-24409-1-git-send-email-eric.auger@linaro.org>
 References: <1423643543-24409-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1423643543-24409-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <1423643543-24409-4-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kim Phillips <kim.phillips@linaro.org>
+A single handler now is registered whatever the use case: automasked
+or not. A function pointer is set according to the wished behavior
+and the handler calls this function.
 
-The KVM-VFIO device is used by the QEMU VFIO device. It is used to
-record the list of in-use VFIO groups so that KVM can manipulate
-them. With this series, it will also be used to record the forwarded
-IRQs.
+The irq lock is taken/released in the root handler. eventfd_signal can
+be called in regions not allowed to sleep.
 
-Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
 
-v4 -> v5:
-- reword the commit message to explain both usages of the KVM-VFIO
-  device in QEMU
-- squash both arm and arm64 enables
+v4: creation
 ---
- arch/arm/kvm/Kconfig    | 1 +
- arch/arm/kvm/Makefile   | 2 +-
- arch/arm64/kvm/Kconfig  | 1 +
- arch/arm64/kvm/Makefile | 2 +-
- 4 files changed, 4 insertions(+), 2 deletions(-)
+ drivers/vfio/platform/vfio_platform_irq.c     | 21 +++++++++++++++------
+ drivers/vfio/platform/vfio_platform_private.h |  1 +
+ 2 files changed, 16 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 7db7df4..0ddb745 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -25,6 +25,7 @@ config KVM
- 	select KVM_ARM_HOST
- 	select SRCU
- 	depends on ARM_VIRT_EXT && ARM_LPAE
-+	select KVM_VFIO
- 	select HAVE_KVM_EVENTFD
- 	---help---
- 	  Support hosting virtualized guest machines. You will also
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index 859db09..ea1fa76 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
- AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
+diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
+index 132bb3f..8eb65c1 100644
+--- a/drivers/vfio/platform/vfio_platform_irq.c
++++ b/drivers/vfio/platform/vfio_platform_irq.c
+@@ -147,11 +147,8 @@ static int vfio_platform_set_irq_unmask(struct vfio_platform_device *vdev,
+ static irqreturn_t vfio_automasked_irq_handler(int irq, void *dev_id)
+ {
+ 	struct vfio_platform_irq *irq_ctx = dev_id;
+-	unsigned long flags;
+ 	int ret = IRQ_NONE;
  
- KVM := ../../../virt/kvm
--kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
-+kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
+-	spin_lock_irqsave(&irq_ctx->lock, flags);
+-
+ 	if (!irq_ctx->masked) {
+ 		ret = IRQ_HANDLED;
  
- obj-y += kvm-arm.o init.o interrupts.o
- obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index 0965056..b73fba8 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -27,6 +27,7 @@ config KVM
- 	select KVM_ARM_VGIC
- 	select KVM_ARM_TIMER
- 	select SRCU
-+	select KVM_VFIO
- 	select HAVE_KVM_EVENTFD
- 	---help---
- 	  Support hosting virtualized guest machines.
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 2e6b827..81ed091 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -11,7 +11,7 @@ ARM=../../../arch/arm/kvm
+@@ -160,8 +157,6 @@ static irqreturn_t vfio_automasked_irq_handler(int irq, void *dev_id)
+ 		irq_ctx->masked = true;
+ 	}
  
- obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
+-	spin_unlock_irqrestore(&irq_ctx->lock, flags);
+-
+ 	if (ret == IRQ_HANDLED)
+ 		eventfd_signal(irq_ctx->trigger, 1);
  
--kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
+@@ -177,6 +172,19 @@ static irqreturn_t vfio_irq_handler(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
  
++static irqreturn_t vfio_handler(int irq, void *dev_id)
++{
++	struct vfio_platform_irq *irq_ctx = dev_id;
++	unsigned long flags;
++	irqreturn_t ret;
++
++	spin_lock_irqsave(&irq_ctx->lock, flags);
++	ret = irq_ctx->handler(irq, dev_id);
++	spin_unlock_irqrestore(&irq_ctx->lock, flags);
++
++	return ret;
++}
++
+ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+ 			    int fd, irq_handler_t handler)
+ {
+@@ -206,9 +214,10 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+ 	}
+ 
+ 	irq->trigger = trigger;
++	irq->handler = handler;
+ 
+ 	irq_set_status_flags(irq->hwirq, IRQ_NOAUTOEN);
+-	ret = request_irq(irq->hwirq, handler, 0, irq->name, irq);
++	ret = request_irq(irq->hwirq, vfio_handler, 0, irq->name, irq);
+ 	if (ret) {
+ 		kfree(irq->name);
+ 		eventfd_ctx_put(trigger);
+diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+index 5d31e04..eb91deb 100644
+--- a/drivers/vfio/platform/vfio_platform_private.h
++++ b/drivers/vfio/platform/vfio_platform_private.h
+@@ -37,6 +37,7 @@ struct vfio_platform_irq {
+ 	spinlock_t		lock;
+ 	struct virqfd		*unmask;
+ 	struct virqfd		*mask;
++	irqreturn_t (*handler)(int irq, void *dev_id);
+ };
+ 
+ struct vfio_platform_region {
 -- 
 1.9.1
