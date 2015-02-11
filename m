@@ -1,114 +1,152 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 11 Feb 2015 16:51:36 +0100
-Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
- demuxer chip
-In-Reply-To: <20150211151237.GN9154@leverpostej>
-References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
- <2437801.56xPyk3atd@vostro.rjw.lan> <20150211151237.GN9154@leverpostej>
-Message-ID: <1487331.cgC9j5u0aF@vostro.rjw.lan>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 11 Feb 2015 15:40:54 +0000
+Subject: [PATCH] compat: Fix endian issue in union sigval
+In-Reply-To: <54DB3B60.4050100@huawei.com>
+References: <1423563011-12377-1-git-send-email-bamvor.zhangjian@huawei.com>
+ <20150210122718.GC32052@e104818-lin.cambridge.arm.com>
+ <54DB3B60.4050100@huawei.com>
+Message-ID: <20150211154054.GD9058@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 11, 2015 03:12:38 PM Mark Rutland wrote:
-> On Wed, Feb 11, 2015 at 03:17:20PM +0000, Rafael J. Wysocki wrote:
-> > On Wednesday, February 11, 2015 02:43:45 PM Mark Rutland wrote:
-> > > [...]
-> > > 
-> > > > > > > > +static irqreturn_t __handle_irq_event_percpu(unsigned int irq, struct irqaction *action)
-> > > > > > > > +{
-> > > > > > > > +	/*
-> > > > > > > > +	 * During suspend we must not call potentially unsafe irq handlers.
-> > > > > > > > +	 * See suspend_suspendable_actions.
-> > > > > > > > +	 */
-> > > > > > > > +	if (unlikely(action->flags & IRQF_NO_ACTION))
-> > > > > > > > +		return IRQ_NONE;
-> > > > > > > 
-> > > > > > > Thomas was trying to avoid any new conditional code in the interrupt
-> > > > > > > handling path, that's why I added a suspended_action list in my
-> > > > > > > proposal.
-> > > > > > > Even if your 'unlikely' statement make things better I'm pretty sure it
-> > > > > > > adds some latency.
-> > > > > > 
-> > > > > > I can see that we don't want to add more code here to keep things
-> > > > > > clean/pure, but I find it hard to believe that a single bit test and
-> > > > > > branch (for data that should be hot in the cache) are going to add
-> > > > > > measurable latency to a path that does pointer chasing to get to the
-> > > > > > irqaction in the first place. I could be wrong though, and I'm happy to
-> > > > > > benchmark.
-> > > > > 
-> > > > > Again, I don't have enough experience to say this is (or isn't)
-> > > > > impacting irq handling latency, I'm just reporting what Thomas told me.
-> > > > > 
-> > > > > > 
-> > > > > > It would be possible to go for your list shuffling approach here while
-> > > > > > still keeping the flag internal and all the logic hidden away in
-> > > > > > kernel/irq/pm.c. I wasn't sure how actions could be manipulated during
-> > > > > > suspend, which made me wary of moving them to a separate list.
-> > > > > 
-> > > > > Moving them to a temporary list on suspend and restoring them on
-> > > > > resume should not be a problem.
-> > > > > The only drawback I see is that actions might be reordered after the
-> > > > > first resume (anyway, relying on shared irq action order is dangerous
-> > > > > IMHO).
-> > > > 
-> > > > We considered doing that too and saw some drawbacks (in addition to the
-> > > > reordering of actions you've mentioned).  It added just too much complexity
-> > > > to the IRQ suspend-resume code.
-> > > > 
-> > > > I, personally, would be fine with adding an IRQ flag to silence the
-> > > > warning mentioned by Alexandre.  Something like IRQD_TIMER_SHARED that would
-> > > > be set automatically if someone requested IRQF_TIMER | IRQF_SHARED.
-> > > > 
-> > > > Thoughts?
-> > > 
-> > > Even if the timer driver does that, we still require the other handlers
-> > > sharing the line to do the right thing across suspend, no? So either
-> > > their actions need to be masked at suspend time, or the handlers need to
-> > > detect when they're called during suspend and return early.
+On Wed, Feb 11, 2015 at 07:22:08PM +0800, Bamvor Jian Zhang wrote:
+> On 2015/2/10 20:27, Catalin Marinas wrote:
+> > On Tue, Feb 10, 2015 at 10:10:11AM +0000, Zhang Jian(Bamvor) wrote:
+> >> In 64bit architecture, sigval_int is the high 32bit of sigval_ptr in
+> >> big endian kernel compare with low 32bit of sigval_ptr in little
+> >> endian kernel. reference:
+> >>
+> >>     typedef union sigval {
+> >>         int sival_int;
+> >>         void *sival_ptr;
+> >>     } sigval_t;
+> >>
+> >> During compat_mq_notify or compat_timer_create, kernel get sigval
+> >> from user space by reading sigval.sival_int. This is correct in 32 bit
+> >> kernel and in 64bit little endian kernel. And It is wrong in 64bit big
+> >> endian kernel:
+> >> It get the high 32bit of sigval_ptr and put it to low 32bit of
+> >> sigval_ptr. And the high 32bit sigval_ptr in empty in arm 32bit user
+> >> space struct. So, kernel lost the value of sigval_ptr.
+> >>
+> >> The following patch get the sigval_ptr in stead of sigval_int in order
+> >> to avoid endian issue.
+> >> Test pass in arm64 big endian and little endian kernel.
+> >>
+> >> Signed-off-by: Zhang Jian(Bamvor) <bamvor.zhangjian@huawei.com>
+> >> ---
+> >>  ipc/compat_mq.c | 7 ++-----
+> >>  kernel/compat.c | 6 ++----
+> >>  2 files changed, 4 insertions(+), 9 deletions(-)
+> >>
+> >> diff --git a/ipc/compat_mq.c b/ipc/compat_mq.c
+> >> index ef6f91c..2e07343 100644
+> >> --- a/ipc/compat_mq.c
+> >> +++ b/ipc/compat_mq.c
+> >> @@ -99,11 +99,8 @@ COMPAT_SYSCALL_DEFINE2(mq_notify, mqd_t, mqdes,
+> >>  	if (u_notification) {
+> >>  		struct sigevent n;
+> >>  		p = compat_alloc_user_space(sizeof(*p));
+> >> -		if (get_compat_sigevent(&n, u_notification))
+> >> -			return -EFAULT;
+> >> -		if (n.sigev_notify == SIGEV_THREAD)
+> >> -			n.sigev_value.sival_ptr = compat_ptr(n.sigev_value.sival_int);
+> >> -		if (copy_to_user(p, &n, sizeof(*p)))
+> >> +		if (get_compat_sigevent(&n, u_notification) ||
+> >> +		    copy_to_user(p, &n, sizeof(*p)))
+> >>  			return -EFAULT;
 > > 
-> > Well, the issue at hand is about things that share an IRQ with a timer AFAICS.
-> > 
-> > That is odd enough already and I'd say everyone in that situation needs to
-> > be prepared to take the pain (including having to check if the device is not
-> > suspended in their interrupt handlers).
-> 
-> IMO if the line is shared it would be ideal for the core to mask the
-> action (as that's essentially the behaviour when the line isn't shared
-> with an IRQF_NO_SUSPEND action), but that's not esseential if a flag is
-> OK for now.
-> 
-> > And quite frankly they need to do that already, because we've never suspended
-> > timer IRQs.
-> 
-> This is a very good point.
-> 
-> > > So for the flag at request time approach to work, all the drivers using
-> > > the interrupt would have to flag they're safe in that context.
-> > 
-> > Something like IRQF_"I can share the line with a timer" I guess?  That wouldn't
-> > hurt and can be checked at request time even.
-> 
-> I guess that would have to imply IRQF_SHARED, so we'd have something
-> like:
-> 
-> IRQF_SHARED_SUSPEND_OK - This handler is safe to call spuriously during
-> 			 suspend in the case the line is shared. The
-> 			 handler will not access unavailable hardware
-> 			 or kernel infrastructure during this period.
-> 
-> #define __IRQF_SUSPEND_SPURIOUS		0x00040000
-> #define	IRQF_SHARED_SUSPEND_OK		(IRQF_SHARED | __IRQF_SUSPEND_SPURIOUS)
+> > The kernel doesn't need to interpret the sival_ptr value, it's something
+> > to be passed to the notifier function as an argument.
 
-What about
+Actually I was wrong here. The kernel _does_ interpret the sival_ptr to
+read a cookie in sys_mq_notify() for PF_NETLINK sockets. So this code is
+correct.
 
-#define __IRQF_TIMER_SIBLING_OK	0x00040000
-#define	IRQF_SHARED_TIMER_OK	(IRQF_SHARED | __IRQF_TIMER_SIBLING_OK)
+> >>  	}
+> >>  	return sys_mq_notify(mqdes, p);
+> >> diff --git a/kernel/compat.c b/kernel/compat.c
+> >> index ebb3c36..13a0e5d 100644
+> >> --- a/kernel/compat.c
+> >> +++ b/kernel/compat.c
+> >> @@ -871,16 +871,14 @@ COMPAT_SYSCALL_DEFINE4(clock_nanosleep, clockid_t, which_clock, int, flags,
+> >>   * We currently only need the following fields from the sigevent
+> >>   * structure: sigev_value, sigev_signo, sig_notify and (sometimes
+> >>   * sigev_notify_thread_id).  The others are handled in user mode.
+> >> - * We also assume that copying sigev_value.sival_int is sufficient
+> >> - * to keep all the bits of sigev_value.sival_ptr intact.
+> >>   */
+> >>  int get_compat_sigevent(struct sigevent *event,
+> >>  		const struct compat_sigevent __user *u_event)
+> >>  {
+> >>  	memset(event, 0, sizeof(*event));
+> >>  	return (!access_ok(VERIFY_READ, u_event, sizeof(*u_event)) ||
+> >> -		__get_user(event->sigev_value.sival_int,
+> >> -			&u_event->sigev_value.sival_int) ||
+> >> +		__get_user(*(long long*)event->sigev_value.sival_ptr,
+> 
+> should be:
+> 		__get_user(event->sigev_value.sival_ptr,
+> 
+> > > +         &u_event->sigev_value.sival_ptr) ||
+> >
+> > I don't think this is correct because some (most) architectures use
+> > sival_int here when copying to user and for a big endian compat they
+> > would get 0 for sival_int (mips, powerpc).
+> 
+> Sorry, I am lost here. As we mentioned above, sival_ptr and sival_int
+> is union, so, copy sival_ptr should include sival_int.
 
-The "suspend" part is kind of a distraction to me here, because that really
-only is about sharing an IRQ with a timer and the "your interrupt handler
-may be called when the device is suspended" part is just a consequence of that.
+The user access size in your patch is the size of sival_ptr which is
+32-bit for compat, same as sival_int; so far, so good. However, when you
+store it to the native sival_ptr, you perform a conversion to long long
+(shouldn't it be unsigned long long, or just unsigned long?).
 
-So IMO it's better to have "TIMER" in the names to avoid encouraging people to
-abuse this for other purposes not related to timers.
+The native sigval_t is also a union but on 64-bit big endian, the
+sival_int overlaps with the most significant 32-bit of the sival_ptr.
+So reading sival_int would always be 0. When the compat siginfo is
+copied to user, arm64 reads the native sival_ptr (si_ptr) and converts
+it to the compat one, getting the correct 32-bit value. However, other
+architectures access sival_int (si_int) instead which breaks with your
+get_compat_sigevent() changes.
 
-Rafael
+> > I think the correct fix is in the arm64 code:
+> 
+> The following code could fix my issue.
+
+Without any parts of your patch?
+
+I think that's correct fix since in the SIGEV_THREAD mq_notify case, we
+would not deliver a signal as notification, so the sival_int value is
+irrelevant (it would be 0 for big-endian compat tasks because of the
+sigval_t union on 64-bit).
+
+Your patch would work as well but you have to change all the other
+architectures to use si_ptr when copying to a compat siginfo.
+
+> > diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+> > index e299de396e9b..32601939a3c8 100644
+> > --- a/arch/arm64/kernel/signal32.c
+> > +++ b/arch/arm64/kernel/signal32.c
+> > @@ -154,8 +154,7 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
+> >  	case __SI_TIMER:
+> >  		 err |= __put_user(from->si_tid, &to->si_tid);
+> >  		 err |= __put_user(from->si_overrun, &to->si_overrun);
+> > -		 err |= __put_user((compat_uptr_t)(unsigned long)from->si_ptr,
+> > -				   &to->si_ptr);
+> > +		 err |= __put_user(from->si_int, &to->si_int);
+> >  		break;
+> >  	case __SI_POLL:
+> >  		err |= __put_user(from->si_band, &to->si_band);
+> > @@ -184,7 +183,7 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
+> >  	case __SI_MESGQ: /* But this is */
+> >  		err |= __put_user(from->si_pid, &to->si_pid);
+> >  		err |= __put_user(from->si_uid, &to->si_uid);
+> > -		err |= __put_user((compat_uptr_t)(unsigned long)from->si_ptr, &to->si_ptr);
+> > +		err |= __put_user(from->si_int, &to->si_int);
+> >  		break;
+> >  	case __SI_SYS:
+> >  		err |= __put_user((compat_uptr_t)(unsigned long)
+
+-- 
+Catalin
