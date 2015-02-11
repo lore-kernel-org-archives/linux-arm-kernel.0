@@ -1,71 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 11 Feb 2015 18:47:54 +0000
-Subject: [PATCH v1] of: calculate masks of the device based on dma-range
- size
-In-Reply-To: <1423677215-28968-1-git-send-email-m-karicheri2@ti.com>
-References: <1423677215-28968-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20150211184754.GH9058@e104818-lin.cambridge.arm.com>
+From: dalias@libc.org (Rich Felker)
+Date: Wed, 11 Feb 2015 14:02:52 -0500
+Subject: [PATCHv3 00/24] ILP32 support in ARM64
+In-Reply-To: <CAMe9rOqX-VpjZ+E-JCusk+e4Kpw1V1tsFq1Kjtai5DR9saKLaA@mail.gmail.com>
+References: <20141002155217.GH32147@e104818-lin.cambridge.arm.com>
+ <20150210181302.GA23886@brightrain.aerifal.cx>
+ <CAMe9rOqX-VpjZ+E-JCusk+e4Kpw1V1tsFq1Kjtai5DR9saKLaA@mail.gmail.com>
+Message-ID: <20150211190252.GB23507@brightrain.aerifal.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 11, 2015 at 12:53:35PM -0500, Murali Karicheri wrote:
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 314c8a9..167ad2d 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -90,10 +90,11 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->  	struct iommu_ops *iommu;
->  
->  	/*
-> -	 * Set default dma-mask to 32 bit. Drivers are expected to setup
-> -	 * the correct supported dma_mask.
-> +	 * Set default coherent_dma_mask to 32 bit. Drivers are expected to
-> +	 * setup the correct supported mask.
->  	 */
-> -	dev->coherent_dma_mask = DMA_BIT_MASK(32);
-> +	if (!dev->coherent_dma_mask)
-> +		dev->coherent_dma_mask = DMA_BIT_MASK(32);
->  
->  	/*
->  	 * Set it to coherent_dma_mask by default if the architecture
-> @@ -102,6 +103,11 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->  	if (!dev->dma_mask)
->  		dev->dma_mask = &dev->coherent_dma_mask;
->  
-> +	/*
-> +	 * Use default size to cover 32 bit. Drivers need to set this in DT
-> +	 * to override the same.
-> +	 */
-> +	size = 1ULL << 32;
+On Wed, Feb 11, 2015 at 10:33:32AM -0800, H.J. Lu wrote:
+> On Tue, Feb 10, 2015 at 10:13 AM, Rich Felker <dalias@libc.org> wrote:
+> > On Thu, 2 Oct 2014 at 16:52:18 +0100, Catalin Marinas wrote:
+> >> On Wed, Sep 03, 2014 at 10:18:54PM +0100, Andrew Pinski wrote:
+> >> > New version with all of the requested changes.  Updated to the
+> >> > latest sources.
+> >> >
+> >> > Notable changes from the previous versions:
+> >> > VDSO code has been factored out to be easier to understand and
+> >> > easier to maintain.
+> >> > Move the config option to the last thing that gets added.
+> >> > Added some extra COMPAT_* macros for core dumping for easier usage.
+> >>
+> >> Apart from a few comments I've made, I would also like to see non-empty
+> >> commit logs and long line wrapping (both in commit logs and
+> >> Documentation/). Otherwise, the patches look fine.
+> >>
+> >> So what are the next steps? Are the glibc folk ok with the ILP32 Linux
+> >> ABI? On the kernel side, what I would like to see:
+> >
+> > I don't know if this has been discussed on libc-alpha yet or not, but
+> > I think we need to open a discussion of how it relates to open glibc
+> > bug #16437, which presently applies only to x32 (ILP32 ABI on x86_64):
+> >
+> > https://sourceware.org/bugzilla/show_bug.cgi?id=16437
+> 
+> Please leave x32 out of this discussion.  I have resolved this bug
+> as WONTFIX.
 
-I'm not sure this is needed since on error path the original code would
-set the size to coherent_dma_mask.
+>From the glibc side, I thought things went by a consensus process
+these days, not the old WONTFIX regime of he who shall not be named.
+If this is not fixed for x32, then x32 cannot provide a conforming C
+environment and thus it's rather a toy target. But I think we should
+discuss this on libc-alpha. In the mean time please leave it REOPENED.
 
->  	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
->  	if (ret < 0) {
->  		dma_addr = offset = 0;
-
-Here we already have (not seen in the context):
-
-		size = dev->coherent_dma_mask + 1;
-
-> @@ -128,6 +134,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->  
->  	dev->dma_pfn_offset = offset;
->  
-> +	/*
-> +	 * Limit coherent and dma mask based on size and default mask
-> +	 * set by the driver.
-> +	 */
-> +	dev->coherent_dma_mask = min(dev->coherent_dma_mask,
-> +				     DMA_BIT_MASK(ilog2(dma_addr + size)));
-> +	*dev->dma_mask = min((*dev->dma_mask),
-> +			     DMA_BIT_MASK(ilog2(dma_addr + size)));
-> +
->  	coherent = of_dma_is_coherent(np);
->  	dev_dbg(dev, "device is%sdma coherent\n",
->  		coherent ? " " : " not ");
-
-Otherwise it looks fine to me.
-
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Rich
