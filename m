@@ -1,87 +1,53 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Wed, 11 Feb 2015 00:42:56 -0800
-Subject: [PATCH v5 3/5] ARM: mediatek: Add Pinctrl/GPIO driver for mt8135.
-In-Reply-To: <CACRpkdasVPUtn=-DhJ4OUXGZh36sLKwLhvm-nD-mkZjP7gQXww@mail.gmail.com>
-References: <1421818097-9281-1-git-send-email-hongzhou.yang@mediatek.com>
- <1421818097-9281-4-git-send-email-hongzhou.yang@mediatek.com>
- <CACRpkdasVPUtn=-DhJ4OUXGZh36sLKwLhvm-nD-mkZjP7gQXww@mail.gmail.com>
-Message-ID: <1423644176.1967.12.camel@mussux00.eus.mediatek.inc>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 11 Feb 2015 09:42:56 +0100
+Subject: [PATCH 6/6] [RFC] mtd: mxc-nand: Warn on unimplemented commands
+In-Reply-To: <1423594800-24214-7-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1423594800-24214-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1423594800-24214-7-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20150211094256.2ef2805b@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-02-10 at 16:17 +0800, Linus Walleij wrote:
-> On Wed, Jan 21, 2015 at 1:28 PM, Hongzhou Yang
-> <hongzhou.yang@mediatek.com> wrote:
+Hi,
+
+Uwe Kleine-K?nig wrote:
+> The PARAM command was long unimplemented and it probably wasn't
+> noticed because chip probing using only the few bytes returned by the
+> READID command are good enough in most cases to determine the chip in
+> use.
 > 
-> > From: Hongzhou Yang <hongzhou.yang@mediatek.com>
-> >
-> > The mediatek SoCs have GPIO controller that handle both the muxing and GPIOs.
-> >
-> > The GPIO controller have pinmux, pull enable, pull select, direction and output high/low control.
-> >
-> > This driver include common driver and mt8135 part.
-> > The common driver include the pinctrl driver and GPIO driver.
-> > The mt8135 part contain its special device data.
-> >
-> > Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> Still to notice such a shortcoming earlier in the future would be nice
+> in case it's something more vital.
 > 
-> I have merged this patch for v3.21, except:
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  drivers/mtd/nand/mxc_nand.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> >  arch/arm/mach-mediatek/Kconfig                |    1 +
-> (...)
->  --- a/arch/arm/mach-mediatek/Kconfig
-> > +++ b/arch/arm/mach-mediatek/Kconfig
-> > @@ -1,6 +1,7 @@
-> >  menuconfig ARCH_MEDIATEK
-> >         bool "Mediatek MT65xx & MT81xx SoC" if ARCH_MULTI_V7
-> >         select ARM_GIC
-> > +       select PINCTRL
-> >         select MTK_TIMER
-> >         help
-> >           Support for Mediatek MT65xx & MT81xx SoCs
-> 
-> This, which should come in through the ARM SoC tree. It's not
-> dependent on this series anyway.
-> 
-> This will appear after the merge window as we start the v3.21 cycle.
-> 
-> Yours,
-> Linus Walleij
+> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> index 0083b4ee4f33..372e0e38f59b 100644
+> --- a/drivers/mtd/nand/mxc_nand.c
+> +++ b/drivers/mtd/nand/mxc_nand.c
+> @@ -1160,6 +1160,10 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
+>  		memcpy32_fromio(host->data_buf, host->main_area0, 512);
+>  		host->buf_start = 0;
+>  		break;
+> +	default:
+> +		WARN_ONCE(1, "Unimplemented command (cmd=%u)\n",
+> +			  command);
+> +		break;
+>  	}
+useless break;
 
-Hi Linus,
 
-Due to pinconf relate API changed at kernel-3.20, a build error
-happened.
-Do I need to send patch v6?
-Thanks.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-index 721f429..83f474b
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-@@ -391,7 +391,7 @@ static int mtk_pctrl_dt_subnode_to_map(struct
-pinctrl_dev *pctldev,
-                return -EINVAL;
-        }
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
--       err = pinconf_generic_parse_dt_config(node, &configs,
-&num_configs);
-+       err = pinconf_generic_parse_dt_config(node, pctldev, &configs,
-&num_configs);
-        if (num_configs)
-                has_config = 1;
-
-@@ -716,7 +716,7 @@ int mtk_pctrl_init(struct platform_device *pdev,
-
-        prop = of_find_property(np, "pins-are-numbered", NULL);
-        if (!prop) {
--               dev_err(&pdev->dev, "only support pins-are-numbered
-format\n", ret);
-+               dev_err(&pdev->dev, "only support pins-are-numbered
-format\n");
-                return -EINVAL;
-        }
-
-Yours,
-Hongzhou
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
