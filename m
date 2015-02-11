@@ -1,83 +1,98 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 11 Feb 2015 17:38:23 +0100
-Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
- demuxer chip
-In-Reply-To: <20150211163231.GR9154@leverpostej>
-References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
- <2437801.56xPyk3atd@vostro.rjw.lan>
- <20150211151237.GN9154@leverpostej>
- <1487331.cgC9j5u0aF@vostro.rjw.lan>
- <20150211155720.GQ9154@leverpostej>
- <20150211171515.55d5066f@bbrezillon>
- <20150211163231.GR9154@leverpostej>
-Message-ID: <20150211173823.30c42c6a@bbrezillon>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 11 Feb 2015 11:54:56 -0500
+Subject: [PATCH v6 0/7] PCI: get DMA configuration from parent device
+In-Reply-To: <54D509C9.9010204@ti.com>
+References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
+ <20150206151542.GD23190@e104818-lin.cambridge.arm.com>
+ <54D4DD95.7000303@ti.com>
+ <CAErSpo6GOXHeKKfU8s5jCS3+Mui=HupZd=jpkLEyWAE94Ory5w@mail.gmail.com>
+ <54D509C9.9010204@ti.com>
+Message-ID: <54DB8960.9010707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Feb 2015 16:32:31 +0000
-Mark Rutland <mark.rutland@arm.com> wrote:
+On 02/06/2015 01:36 PM, Murali Karicheri wrote:
+> On 02/06/2015 12:53 PM, Bjorn Helgaas wrote:
+>> On Fri, Feb 6, 2015 at 9:28 AM, Murali Karicheri<m-karicheri2@ti.com>
+>> wrote:
+>>> On 02/06/2015 10:15 AM, Catalin Marinas wrote:
+>>>>
+>>>> On Thu, Feb 05, 2015 at 09:52:52PM +0000, Murali Karicheri wrote:
+>>>>>
+>>>>> This patch add an important capability to PCI driver on Keystone. I
+>>>>> hope
+>>>>> to
+>>>>> have this merged to the upstream branch so that it is available for
+>>>>> v3.20.
+>>>>
+>>>> It's very late for 3.20 and the code hasn't been in linux-next at all
+>>>> (but it's not me who's merging this code), unless you can squeeze it in
+>>>> as a bug-fix.
+>>>
+>>> This is in fact a bug fix as PCI on Keystone is broken without this.
+>>
+>> Oh, sorry, I didn't realize that this was so urgent. I guess I read
+>> "this adds an important capability" in the cover letter and concluded
+>> that it was new functionality.
+> Bjorn,
+>
+> Thanks for responding.
+>
+> Let me give you some context on this without which my explanation won't
+> be complete. For using PCI driver on Keystone, I had submitted patches
+> related to machine and DTS to the arm mailing list to enable the driver
+> on Keystone. Subsequenty one of the patch from my series was Nack-ed and
+> I was asked to implememented in a different way and started this series.
+> You can refer to the discussion of this at
+>
+> http://www.gossamer-threads.com/lists/linux/kernel/2024591
+>
+> The PCI driver enablement on Keystone is still a working in progress and
+> I am trying to get it fully functional on the upstream. Another missing
+> piece is the SerDes phy driver patch. We have started working on the
+> other part (SerDes phy driver) already as the initial one was not
+> accepted. So it is fine if we are too late for the v3.20 merge window to
+> merge this series and this can be applied to the next branch for v3.21.
+>
+>>
+>> Anyway, if it's broken, presumably PCI on Keystone *did* work at one
+>> point. Can you identify the commit that broke it and requires these
+>> fixes, so we can figure out how far the fixes need to be backported?
+>>
+>
+> I am trying to get this driver enabled on Keystone by adding the missing
+> pieces as described above. So I guess we don't have to back port
+> anything here.
+>
+>> If I merge it, I would like to get into my for-linus branch and get a
+>> little time in -next before asking Linus to pull it. The merge window
+>> is a little wrinkle there -- I don't like to add new things to the mix
+>> during the window. But if it's an important fix we can still get it
+>> in before the final v3.20.
+>
+> Please apply this to next branch for v3.21. It currently apply cleanly
+> to v3.19-rc7. If you want me rebase to another branch, let me know I can
+> apply and send you an updated patch.
+>
+Bjorn, Arnd,
 
-> On Wed, Feb 11, 2015 at 04:15:15PM +0000, Boris Brezillon wrote:
-> > On Wed, 11 Feb 2015 15:57:20 +0000
-> > Mark Rutland <mark.rutland@arm.com> wrote:
-> > 
-> > > [...]
-> > > 
-> > > > > > > So for the flag at request time approach to work, all the drivers using
-> > > > > > > the interrupt would have to flag they're safe in that context.
-> > > > > > 
-> > > > > > Something like IRQF_"I can share the line with a timer" I guess?  That wouldn't
-> > > > > > hurt and can be checked at request time even.
-> > > > > 
-> > > > > I guess that would have to imply IRQF_SHARED, so we'd have something
-> > > > > like:
-> > > > > 
-> > > > > IRQF_SHARED_SUSPEND_OK - This handler is safe to call spuriously during
-> > > > > 			 suspend in the case the line is shared. The
-> > > > > 			 handler will not access unavailable hardware
-> > > > > 			 or kernel infrastructure during this period.
-> > > > > 
-> > > > > #define __IRQF_SUSPEND_SPURIOUS		0x00040000
-> > > > > #define	IRQF_SHARED_SUSPEND_OK		(IRQF_SHARED | __IRQF_SUSPEND_SPURIOUS)
-> > > > 
-> > > > What about
-> > > > 
-> > > > #define __IRQF_TIMER_SIBLING_OK	0x00040000
-> > > > #define	IRQF_SHARED_TIMER_OK	(IRQF_SHARED | __IRQF_TIMER_SIBLING_OK)
-> > > > 
-> > > > The "suspend" part is kind of a distraction to me here, because that really
-> > > > only is about sharing an IRQ with a timer and the "your interrupt handler
-> > > > may be called when the device is suspended" part is just a consequence of that.
-> > > 
-> > > My rationale was that you didn't really care who else was using the IRQ
-> > > (e.g. the timer); you're just stating that you can survive being called
-> > > during suspend (which is what the driver may need to check for in the
-> > > handler if the device happens to be powered down or whatever).
-> > > 
-> > > So I guess I see it the other way around. This is essentially claiming
-> > > we can handle sharing with IRQF_NO_SUSPEND rather than IRQF_TIMER.
-> > > 
-> > > > So IMO it's better to have "TIMER" in the names to avoid encouraging people to
-> > > > abuse this for other purposes not related to timers.
-> > > 
-> > > In the end a name is a name, and if you think IRQF_SHARED_TIMER_OK is
-> > > better I shan't complain.
-> > > 
-> > > The fundamental issue I'm concerned with is addressed by this approach.
-> > 
-> > Okay then, is anyone taking care of submitting such a patch (Mark ?) ?
-> 
-> I'll have the core patch shortly.
-> 
-> I'll need to ask for your help tagging the relevant drivers and testing.
+I am assuming, Bjorn is going to merge this to his next branch for 
+v3.21. If not, it might have to be merged through the arm soc? There are 
+a couple of Tested-by and Acked-by received after v7. Do you want me to 
+post v8 with these updated in the patches?
 
-For the list of impacted drivers, you can have a look at this series [1]
-(patches 2 to 5), and I'll take care of the testing part once every one
-has agreed on the solution ;-).
+Murali
 
-[1]https://lkml.org/lkml/2014/12/15/552
+> Thanks
+>
+> Murali
+>
+>>
+>> Bjorn
+>
+>
+
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Murali Karicheri
+Linux Kernel, Texas Instruments
