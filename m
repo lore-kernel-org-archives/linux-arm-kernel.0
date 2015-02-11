@@ -1,84 +1,66 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 11 Feb 2015 22:09:32 +0800
-Subject: [PATCH RFC v8 11/21] Documentation: dt-bindings: Add bindings
- for Synopsys DW MIPI DSI DRM bridge driver
-In-Reply-To: <1423659648.4680.18.camel@pengutronix.de>
-References: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
- <1420014219-915-12-git-send-email-Ying.Liu@freescale.com>
- <1423131004.3207.27.camel@pengutronix.de> <20150206081318.GA15088@victor>
- <20150211072128.GA13301@victor> <1423659648.4680.18.camel@pengutronix.de>
-Message-ID: <20150211140931.GA6666@victor>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 11 Feb 2015 15:31:18 +0100
+Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
+ demuxer chip
+In-Reply-To: <20150211111516.GB9154@leverpostej>
+References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150211091159.GE7119@twins.programming.kicks-ass.net>
+ <20150211111516.GB9154@leverpostej>
+Message-ID: <32372622.IiYZ15O7e1@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
-
-On Wed, Feb 11, 2015 at 02:00:48PM +0100, Philipp Zabel wrote:
-> Hi Liu,
-> 
-> Am Mittwoch, den 11.02.2015, 15:21 +0800 schrieb Liu Ying:
-> [...]
-> > Our internal MIPI DSI SoC owner gave me some feedbacks on the clock sources.
-> > According to him, the Synopsys DesignWare MIPI DSI host controller needs four
-> > clock sources from an application platform - pclk, refclk, cfg_clk and dpipclk.
-> > These clocks are mentioned in the "DesignWare Cores MIPI DSI Host Controller
-> > Databook, 1.01a1.30a.pdf" documentation.
+On Wednesday, February 11, 2015 11:15:17 AM Mark Rutland wrote:
+> On Wed, Feb 11, 2015 at 09:11:59AM +0000, Peter Zijlstra wrote:
+> > On Tue, Feb 10, 2015 at 08:48:36PM +0000, Mark Rutland wrote:
+> > > From f390ccbb31f06efee49b4469943c8d85d963bfb5 Mon Sep 17 00:00:00 2001
+> > > From: Mark Rutland <mark.rutland@arm.com>
+> > > Date: Tue, 10 Feb 2015 20:14:33 +0000
+> > > Subject: [PATCH] genirq: allow mixed IRQF_NO_SUSPEND requests
+> > > 
+> > > In some cases a physical IRQ line may be shared between devices from
+> > > which we expect interrupts during suspend (e.g. timers) and those we do
+> > > not (e.g. anything we cut the power to). Where a driver did not request
+> > > the interrupt with IRQF_NO_SUSPEND, it's unlikely that it can handle
+> > > being called during suspend, and it may bring down the system.
+> > > 
+> > > This patch adds logic to automatically mark the irqactions for these
+> > > potentially unsafe handlers as disabled during suspend, leaving actions
+> > > with IRQF_NO_SUSPEND enabled. If an interrupt is raised on a shared line
+> > > during suspend, only the handlers requested with IRQF_NO_SUSPEND will be
+> > > called. The handlers requested without IRQF_NO_SUSPEND will be skipped
+> > > as if they had immediately returned IRQF_NONE.
+> > > 
+> > > Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > Cc: Jason Cooper <jason@lakedaemon.net>
+> > > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > Cc: Peter Zijlstra <peterz@infradead.org>
+> > > Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> > > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 > > 
-> > Quote some words from the documentation:
-> > pclk    - APB clock signal.
-> > refclk  - D-PHY reference clock used for Master-side serial clock generation in
-> >           clock multiplying unit(PLL).
-> > cfg_clk - D-PHY Configuration clock used for the initialization of the PHY. It
-> >           is also used for exiting ULPS state.
-> > dpipclk - Input Pixel clock signal.
+> > Aw gawd.. not that again.
+> 
+> I agree this isn't pretty, but at least it doesn't require the HW
+> description to know about Linux internals, and it can work for !DT
+> systems.
+> 
+> I'm really not happy with placing Linux implementation details into
+> DTBs.
+> 
+> > So Rafael and tglx went over this a few months ago I think:
 > > 
-> > The below table reflects how does i.MX6Q/DL provide the pclk, refclk and cfg_clk
-> > for the DesignWare MIPI DSI host controller, according to the SoC owner.
-> >  ----------------------------------------------------------------------------
-> > | Synopsys      |                     i.MX6Q/DL MIPI DSI                     |
-> > | DesignWare    |------------------------------------------------------------|
-> > | documentation |    clock   |     clock root     |       CCM_CCGR bits      |
-> > |---------------|------------|--------------------|--------------------------|
-> > |     pclk      |   ips_clk  |    ipg_clk_root    | mipi_core_cfg_clk_enable |
-> > |---------------|------------|--------------------|--------------------------|
-> > |    refclk     | pll_refclk | video_27m_clk_root | mipi_core_cfg_clk_enable |
-> > |---------------|------------|--------------------|--------------------------|
-> > |    cfg_clk    |   cfg_clk  | video_27m_clk_root | mipi_core_cfg_clk_enable |
-> >  ----------------------------------------------------------------------------
+> >   lkml.kernel.org/r/26580319.OZP7jvJnA9 at vostro.rjw.lan
 > > 
-> > I think we should add a new clock "IMX6QDL_CLK_MIPI_IPG" as a shared clock gate
-> > clock.
+> > is the last series I could find. Maybe Rafael can summarize?
 > 
-> That would be necessary if the pclk clock rate mattered or would be set
-> anywhere.
-
-I don't think the pclk clock rate matters a lot.  It should be sufficient
-for the driver only to enable/disable the pclk for registers access, just
-like the way the pwm-imx driver uses the ipg clock.
-
+> I can't get at any commentary from that link, unfortunately.
 > 
-> > And, the clock-names property should exactly contain "pclk", "refclk"
-> > and "cfg_clk", right?
-> 
-> My personal preference would be to drop the superfluous "clk" prefix if
-> the resulting clock name is still clearly relatable to the official
-> name. Existing clock naming for the pclk is a bit mixed -
-> The "snps,dw-apb-timer" binding uses "pclk", which seems to be quite
-> common in other places, too. The "snps,dw-apb-uart" bindings use
-> "apb_pclk". "snps,dw-hdmi-tx" uses "iahb" and "isfr" without the clk
-> suffix.
-> How about "pclk", "ref" and "cfg"?
+> Rafael?
 
-Looks good and clear enough.  I'd like to use them.  Thanks.
+Well, the commentary is not there, because both I and Thomas implicitly agreed
+on one thing: We cannot add any suspend-related checks to the interrupt handling
+hot path, because that will affect everyone including people who don't use
+suspend at all and who *really* care about interrupt handling performance.
 
-BTW, regarding the compatible string topic, shall I keep my implementation
-unchanged and don't append the additional "snps,dw-mipi-dsi" as I shared
-my concerns about it before?
-
-Regards,
-Liu Ying
-
-> 
-> regards
-> Philipp
-> 
+Rafael
