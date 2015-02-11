@@ -1,43 +1,56 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 11 Feb 2015 05:28:42 +0100
-Subject: [PATCH V4 3/4] mmc: pwrseq: Initial support for the simple MMC
- power sequence provider
-In-Reply-To: <CAAVeFu+ubZZGQd=zPPYm--PVCO9q-A3503Y5g50+sU4ztxU+iA@mail.gmail.com>
-References: <1421658784-11980-1-git-send-email-ulf.hansson@linaro.org>
- <1421658784-11980-4-git-send-email-ulf.hansson@linaro.org>
- <CAAVeFu+ubZZGQd=zPPYm--PVCO9q-A3503Y5g50+sU4ztxU+iA@mail.gmail.com>
-Message-ID: <CAPDyKFrdpknrMa62Vz4dfKaFMTdF-uXaAz3pkw_3qwNvHy49SQ@mail.gmail.com>
+From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
+Date: Tue, 10 Feb 2015 21:31:25 -0700
+Subject: [PATCH v3 2/2] coresight: fixing compilation warnings picked up by
+ 64bit compiler
+In-Reply-To: <1423629085-1044-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1423629085-1044-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1423629085-1044-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
->> +int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
->> +{
->> +       struct mmc_pwrseq_simple *pwrseq;
->> +
->> +       pwrseq = kzalloc(sizeof(struct mmc_pwrseq_simple), GFP_KERNEL);
->> +       if (!pwrseq)
->> +               return -ENOMEM;
->> +
->> +       pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
->> +       host->pwrseq = &pwrseq->pwrseq;
->
-> How about making this function return a struct mmc_pwrseq * so this
-> last line can be moved to mmc_pwrseq_alloc() instead of requiring all
-> power sequences to do it?
->
-> The same applies to
->
->     host->pwrseq = NULL;
->
-> in mmc_pwrseq_simple_free(), which could be done in mmc_pwrseq_free() it seems.
+Compiling coresight drivers with a 64-bit compiler highlights a couple
+of formatting issues, which are fixed by this patch.
 
-Thanks for reviewing!
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+Changes for v3:
+  - Splitting Kconfig work from compilation warnings fixes.
+---
+ drivers/coresight/coresight-etb10.c | 4 ++--
+ drivers/coresight/coresight-tmc.c   | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-I like you suggestion, though $subject patch is already part of the PR for 3.20.
-
-Feel free to send a patch, I would happily apply it.
-
-Kind regards
-Uffe
+diff --git a/drivers/coresight/coresight-etb10.c b/drivers/coresight/coresight-etb10.c
+index c9acd406f0d0..40049869aecd 100644
+--- a/drivers/coresight/coresight-etb10.c
++++ b/drivers/coresight/coresight-etb10.c
+@@ -313,8 +313,8 @@ static ssize_t etb_read(struct file *file, char __user *data,
+ 
+ 	*ppos += len;
+ 
+-	dev_dbg(drvdata->dev, "%s: %d bytes copied, %d bytes left\n",
+-		__func__, len, (int) (depth * 4 - *ppos));
++	dev_dbg(drvdata->dev, "%s: %zu bytes copied, %d bytes left\n",
++		__func__, len, (int)(depth * 4 - *ppos));
+ 	return len;
+ }
+ 
+diff --git a/drivers/coresight/coresight-tmc.c b/drivers/coresight/coresight-tmc.c
+index 3ff232f9ddf7..030e097c4fb2 100644
+--- a/drivers/coresight/coresight-tmc.c
++++ b/drivers/coresight/coresight-tmc.c
+@@ -533,8 +533,8 @@ static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
+ 
+ 	*ppos += len;
+ 
+-	dev_dbg(drvdata->dev, "%s: %d bytes copied, %d bytes left\n",
+-		__func__, len, (int) (drvdata->size - *ppos));
++	dev_dbg(drvdata->dev, "%s: %zu bytes copied, %d bytes left\n",
++		__func__, len, (int)(drvdata->size - *ppos));
+ 	return len;
+ }
+ 
+-- 
+1.9.1
