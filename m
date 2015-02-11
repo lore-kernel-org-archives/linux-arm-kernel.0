@@ -1,73 +1,84 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 11 Feb 2015 13:48:55 +0000
-Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
- demuxer chip
-In-Reply-To: <20150211133859.GC3971@piout.net>
-References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
- <1422527620-8308-4-git-send-email-boris.brezillon@free-electrons.com>
- <20150210153628.GF9432@leverpostej>
- <20150210165201.634bc04b@bbrezillon>
- <20150210204835.GL9432@leverpostej>
- <20150211095339.0a2e4e7b@bbrezillon>
- <20150211111106.GA9154@leverpostej>
- <20150211132437.0753a7da@bbrezillon>
- <20150211123656.GG9154@leverpostej>
- <20150211133859.GC3971@piout.net>
-Message-ID: <20150211134855.GJ9154@leverpostej>
+From: Ying.Liu@freescale.com (Liu Ying)
+Date: Wed, 11 Feb 2015 22:09:32 +0800
+Subject: [PATCH RFC v8 11/21] Documentation: dt-bindings: Add bindings
+ for Synopsys DW MIPI DSI DRM bridge driver
+In-Reply-To: <1423659648.4680.18.camel@pengutronix.de>
+References: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
+ <1420014219-915-12-git-send-email-Ying.Liu@freescale.com>
+ <1423131004.3207.27.camel@pengutronix.de> <20150206081318.GA15088@victor>
+ <20150211072128.GA13301@victor> <1423659648.4680.18.camel@pengutronix.de>
+Message-ID: <20150211140931.GA6666@victor>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 11, 2015 at 01:38:59PM +0000, Alexandre Belloni wrote:
-> On 11/02/2015 at 12:36:56 +0000, Mark Rutland wrote :
-> > > Actually, that was one of the requirements expressed by Thomas (Thomas,
-> > > correct me if I'm wrong).
-> > > The point was to force shared irq users to explicitly specify that they
-> > > are mixing !IRQF_NO_SUSPEND and IRQF_NO_SUSPEND because they have no
-> > > other choice.
-> > > 
-> > > With your patch, there's no way to inform users that they are
-> > > erroneously setting the IRQF_NO_SUSPEND flag on one of their shared
-> > > interrupt.
-> > 
-> > Sure, but even with the demux that's still the case (because it pretends
-> > that this mismatch is a HW property rather than a property of the set of
-> > drivers sharing the interrupt).
-> > 
-> > Whether there's a demux node in the DTB is entirely separate from
-> > whether the drivers can actually handle the situation.
-> > 
-> > So if we need a warning in the presence of mismatch and action masking,
-> > we need the exact same warning with the demux.
-> > 
+Hi Philipp,
+
+On Wed, Feb 11, 2015 at 02:00:48PM +0100, Philipp Zabel wrote:
+> Hi Liu,
 > 
-> Actually, we only care about removing the warning. It is effectively the
-> HW that forces us to do so. So we would be completely happy with a new
-> flag to silence the warning as we know what we are doing (I think that
-> has already been suggested).
-
-Sure.
-
-Given that the warning is there to tell you that the _drivers_ aren't
-using the interrupt in a consistent manner, I don't see how introducing
-a new fake device in the DT solves that. It simply masks some irqactions
-at a different level of the SW stack from my patch, completely
-independently of the drivers.
-
-So whether or not the warning is necessary is orthogonal to whether or
-not this patch is reasonable. If it's not necessary, neither patch needs
-it. If it is necessary, it's also necessary for the demux.
-
-> > The presence of a demux implies the DTB author believes they have solved
-> > the problem with the demux, not necessarily that they have considered
-> > the situation and updated drivers appropriately. Relying on the demux to
-> > imply that everything is fine only gives us the illusion that everything
-> > is fine.
+> Am Mittwoch, den 11.02.2015, 15:21 +0800 schrieb Liu Ying:
+> [...]
+> > Our internal MIPI DSI SoC owner gave me some feedbacks on the clock sources.
+> > According to him, the Synopsys DesignWare MIPI DSI host controller needs four
+> > clock sources from an application platform - pclk, refclk, cfg_clk and dpipclk.
+> > These clocks are mentioned in the "DesignWare Cores MIPI DSI Host Controller
+> > Databook, 1.01a1.30a.pdf" documentation.
 > > 
+> > Quote some words from the documentation:
+> > pclk    - APB clock signal.
+> > refclk  - D-PHY reference clock used for Master-side serial clock generation in
+> >           clock multiplying unit(PLL).
+> > cfg_clk - D-PHY Configuration clock used for the initialization of the PHY. It
+> >           is also used for exiting ULPS state.
+> > dpipclk - Input Pixel clock signal.
+> > 
+> > The below table reflects how does i.MX6Q/DL provide the pclk, refclk and cfg_clk
+> > for the DesignWare MIPI DSI host controller, according to the SoC owner.
+> >  ----------------------------------------------------------------------------
+> > | Synopsys      |                     i.MX6Q/DL MIPI DSI                     |
+> > | DesignWare    |------------------------------------------------------------|
+> > | documentation |    clock   |     clock root     |       CCM_CCGR bits      |
+> > |---------------|------------|--------------------|--------------------------|
+> > |     pclk      |   ips_clk  |    ipg_clk_root    | mipi_core_cfg_clk_enable |
+> > |---------------|------------|--------------------|--------------------------|
+> > |    refclk     | pll_refclk | video_27m_clk_root | mipi_core_cfg_clk_enable |
+> > |---------------|------------|--------------------|--------------------------|
+> > |    cfg_clk    |   cfg_clk  | video_27m_clk_root | mipi_core_cfg_clk_enable |
+> >  ----------------------------------------------------------------------------
+> > 
+> > I think we should add a new clock "IMX6QDL_CLK_MIPI_IPG" as a shared clock gate
+> > clock.
 > 
-> Whatever the solution, it could be used as a workaround the warning as
-> this is exactly what we need for our platform.
+> That would be necessary if the pclk clock rate mattered or would be set
+> anywhere.
 
-Let's hope we can get this patch into shape quickly then :)
+I don't think the pclk clock rate matters a lot.  It should be sufficient
+for the driver only to enable/disable the pclk for registers access, just
+like the way the pwm-imx driver uses the ipg clock.
 
-Thanks,
-Mark.
+> 
+> > And, the clock-names property should exactly contain "pclk", "refclk"
+> > and "cfg_clk", right?
+> 
+> My personal preference would be to drop the superfluous "clk" prefix if
+> the resulting clock name is still clearly relatable to the official
+> name. Existing clock naming for the pclk is a bit mixed -
+> The "snps,dw-apb-timer" binding uses "pclk", which seems to be quite
+> common in other places, too. The "snps,dw-apb-uart" bindings use
+> "apb_pclk". "snps,dw-hdmi-tx" uses "iahb" and "isfr" without the clk
+> suffix.
+> How about "pclk", "ref" and "cfg"?
+
+Looks good and clear enough.  I'd like to use them.  Thanks.
+
+BTW, regarding the compatible string topic, shall I keep my implementation
+unchanged and don't append the additional "snps,dw-mipi-dsi" as I shared
+my concerns about it before?
+
+Regards,
+Liu Ying
+
+> 
+> regards
+> Philipp
+> 
