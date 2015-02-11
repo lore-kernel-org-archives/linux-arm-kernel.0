@@ -1,52 +1,60 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Wed, 11 Feb 2015 08:30:52 -0500
-Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
- with dma-parms
-In-Reply-To: <20150211125646.GR24485@phenom.ffwll.local>
-References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
- <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
- <54DB12B5.4080000@samsung.com>
- <20150211111258.GP8656@n2100.arm.linux.org.uk>
- <CAF6AEGscETLVnhg7zTFHQbj2KmX150VPaVHsqjvyJnVfHnHkOQ@mail.gmail.com>
- <20150211125646.GR24485@phenom.ffwll.local>
-Message-ID: <CAF6AEGuzex2Y7+=hP73Sp9CtOnn1t0veHRdzJrs3w8p6b8_rEg@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 11 Feb 2015 14:38:59 +0100
+Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
+ demuxer chip
+In-Reply-To: <20150211123656.GG9154@leverpostej>
+References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1422527620-8308-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20150210153628.GF9432@leverpostej>
+ <20150210165201.634bc04b@bbrezillon>
+ <20150210204835.GL9432@leverpostej>
+ <20150211095339.0a2e4e7b@bbrezillon>
+ <20150211111106.GA9154@leverpostej>
+ <20150211132437.0753a7da@bbrezillon>
+ <20150211123656.GG9154@leverpostej>
+Message-ID: <20150211133859.GC3971@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 11, 2015 at 7:56 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
-> On Wed, Feb 11, 2015 at 06:23:52AM -0500, Rob Clark wrote:
->> On Wed, Feb 11, 2015 at 6:12 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > As I've already pointed out, there's a major problem if you have already
->> > had a less restrictive attachment which has an active mapping, and a new
->> > more restrictive attachment comes along later.
->> >
->> > It seems from Rob's descriptions that we also need another flag in the
->> > importer to indicate whether it wants to have a valid struct page in the
->> > scatter list, or whether it (correctly) uses the DMA accessors on the
->> > scatter list - so that exporters can reject importers which are buggy.
->>
->> to be completely generic, we would really need a way that the device
->> could take over only just the last iommu (in case there were multiple
->> levels of address translation)..
->
-> I still hold that if the dma api steals the iommu your gpu needs for
-> context switching then that's a bug in the platform setup code. dma api
-> really doesn't have any concept of switchable hw contexts. So trying to
-> work around this brokeness by mandating it as a valid dma-buf use-case is
-> totally backwards.
+On 11/02/2015 at 12:36:56 +0000, Mark Rutland wrote :
+> > Actually, that was one of the requirements expressed by Thomas (Thomas,
+> > correct me if I'm wrong).
+> > The point was to force shared irq users to explicitly specify that they
+> > are mixing !IRQF_NO_SUSPEND and IRQF_NO_SUSPEND because they have no
+> > other choice.
+> > 
+> > With your patch, there's no way to inform users that they are
+> > erroneously setting the IRQF_NO_SUSPEND flag on one of their shared
+> > interrupt.
+> 
+> Sure, but even with the demux that's still the case (because it pretends
+> that this mismatch is a HW property rather than a property of the set of
+> drivers sharing the interrupt).
+> 
+> Whether there's a demux node in the DTB is entirely separate from
+> whether the drivers can actually handle the situation.
+> 
+> So if we need a warning in the presence of mismatch and action masking,
+> we need the exact same warning with the demux.
+> 
 
-sure, my only point is that if I'm the odd man out, I can live with a
-hack (ie. requiring drm/msm to be aware enough of the platform to know
-if there is >1 level of address translation and frob'ing my 'struct
-device' accordingly)... no point in a generic solution for one user.
-I like to be practical.
+Actually, we only care about removing the warning. It is effectively the
+HW that forces us to do so. So we would be completely happy with a new
+flag to silence the warning as we know what we are doing (I think that
+has already been suggested).
 
-BR,
--R
+> The presence of a demux implies the DTB author believes they have solved
+> the problem with the demux, not necessarily that they have considered
+> the situation and updated drivers appropriately. Relying on the demux to
+> imply that everything is fine only gives us the illusion that everything
+> is fine.
+> 
 
-> -Daniel
-> --
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> +41 (0) 79 365 57 48 - http://blog.ffwll.ch
+Whatever the solution, it could be used as a workaround the warning as
+this is exactly what we need for our platform.
+
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
