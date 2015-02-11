@@ -1,10 +1,9 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Feb 2015 10:01:19 +0100
-Subject: [PATCH v2 20/30] ARM: sun7i: bananapi: Convert to DT label based
- syntax
+Date: Wed, 11 Feb 2015 10:01:18 +0100
+Subject: [PATCH v2 19/30] ARM: sun6i: m9: Convert to DT label based syntax
 In-Reply-To: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1423645289-1074-21-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1423645289-1074-20-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,131 +13,83 @@ when overriding DTSI nodes, convert the board to this syntax
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun7i-a20-bananapi.dts | 262 +++++++++++++++----------------
- 1 file changed, 130 insertions(+), 132 deletions(-)
+ arch/arm/boot/dts/sun6i-a31-m9.dts | 148 ++++++++++++++++++-------------------
+ 1 file changed, 73 insertions(+), 75 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-index 5dd139e7792e..6d1faf069e7e 100644
---- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-@@ -65,160 +65,158 @@
- 		serial2 = &uart7;
+diff --git a/arch/arm/boot/dts/sun6i-a31-m9.dts b/arch/arm/boot/dts/sun6i-a31-m9.dts
+index 139a21e6b695..5cbbbd696b00 100644
+--- a/arch/arm/boot/dts/sun6i-a31-m9.dts
++++ b/arch/arm/boot/dts/sun6i-a31-m9.dts
+@@ -60,93 +60,91 @@
+ 		bootargs = "earlyprintk console=ttyS0,115200";
  	};
  
 -	soc at 01c00000 {
--		spi0: spi at 01c05000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&spi0_pins_a>;
--			status = "okay";
--		};
--
 -		mmc0: mmc at 01c0f000 {
 -			pinctrl-names = "default";
--			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bananapi>;
+-			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_m9>;
 -			vmmc-supply = <&reg_vcc3v3>;
 -			bus-width = <4>;
--			cd-gpios = <&pio 7 10 GPIO_ACTIVE_HIGH>; /* PH10 */
+-			cd-gpios = <&pio 7 22 GPIO_ACTIVE_HIGH>; /* PH22 */
 -			cd-inverted;
 -			status = "okay";
 -		};
 +	leds {
 +		compatible = "gpio-leds";
 +		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_bananapi>;
++		pinctrl-0 = <&led_pins_m9>;
  
--		usbphy: phy at 01c13400 {
+-		usbphy: phy at 01c19400 {
 -			usb1_vbus-supply = <&reg_usb1_vbus>;
--			usb2_vbus-supply = <&reg_usb2_vbus>;
 -			status = "okay";
-+		green {
-+			label = "bananapi:green:usr";
-+			gpios = <&pio 7 24 GPIO_ACTIVE_HIGH>;
++		blue {
++			label = "m9:blue:usr";
++			gpios = <&pio 7 13 GPIO_ACTIVE_HIGH>;
  		};
 +	};
- 
--		ehci0: usb at 01c14000 {
--			status = "okay";
--		};
-+	reg_gmac_3v3: gmac-3v3 {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gmac_power_pin_bananapi>;
-+		regulator-name = "gmac-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		enable-active-high;
-+		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>;
-+	};
 +};
  
--		ohci0: usb at 01c14400 {
--			status = "okay";
--		};
-+&ahci {
-+	status = "okay";
-+};
- 
--		ahci: sata at 01c18000 {
+-		ehci0: usb at 01c1a000 {
 -			status = "okay";
 -		};
 +&ehci0 {
 +	status = "okay";
 +};
  
--		ehci1: usb at 01c1c000 {
+-		ehci1: usb at 01c1b000 {
 -			status = "okay";
 -		};
 +&ehci1 {
 +	status = "okay";
 +};
  
--		ohci1: usb at 01c1c400 {
--			status = "okay";
--		};
-+&gmac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_pins_rgmii_a>;
-+	phy = <&phy1>;
-+	phy-mode = "rgmii";
-+	phy-supply = <&reg_gmac_3v3>;
-+	status = "okay";
- 
--		pinctrl at 01c20800 {
--			mmc0_cd_pin_bananapi: mmc0_cd_pin at 0 {
--				allwinner,pins = "PH10";
+-		pio: pinctrl at 01c20800 {
+-			led_pins_m9: led_pins at 0 {
+-				allwinner,pins = "PH13";
+-				allwinner,function = "gpio_out";
+-				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-			};
+-
+-			mmc0_cd_pin_m9: mmc0_cd_pin at 0 {
+-				allwinner,pins = "PH22";
 -				allwinner,function = "gpio_in";
 -				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 -				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
 -			};
 -
--			gmac_power_pin_bananapi: gmac_power_pin at 0 {
--				allwinner,pins = "PH23";
--				allwinner,function = "gpio_out";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--			};
--
--			led_pins_bananapi: led_pins at 0 {
--				allwinner,pins = "PH24";
+-			usb1_vbus_pin_m9: usb1_vbus_pin at 0 {
+-				allwinner,pins = "PC27";
 -				allwinner,function = "gpio_out";
 -				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 -				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 -			};
 -		};
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
- 
--		ir0: ir at 01c21800 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&ir0_pins_a>;
--			status = "okay";
--		};
-+&i2c0 {
++&gmac {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
++	pinctrl-0 = <&gmac_pins_mii_a>;
++	phy = <&phy1>;
++	phy-mode = "mii";
 +	status = "okay";
  
 -		uart0: serial at 01c28000 {
@@ -146,146 +97,83 @@ index 5dd139e7792e..6d1faf069e7e 100644
 -			pinctrl-0 = <&uart0_pins_a>;
 -			status = "okay";
 -		};
-+	axp209: pmic at 34 {
-+		compatible = "x-powers,axp209";
-+		reg = <0x34>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
- 
--		uart3: serial at 01c28c00 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&uart3_pins_b>;
--			status = "okay";
--		};
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
 +	};
 +};
  
--		uart7: serial at 01c29c00 {
+-		gmac: ethernet at 01c30000 {
 -			pinctrl-names = "default";
--			pinctrl-0 = <&uart7_pins_a>;
--			status = "okay";
--		};
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+};
- 
--		i2c0: i2c at 01c2ac00 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&i2c0_pins_a>;
--			status = "okay";
-+&ir0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir0_pins_a>;
-+	status = "okay";
-+};
- 
--			axp209: pmic at 34 {
--				compatible = "x-powers,axp209";
--				reg = <0x34>;
--				interrupt-parent = <&nmi_intc>;
--				interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bananapi>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 10 GPIO_ACTIVE_HIGH>; /* PH10 */
-+	cd-inverted;
-+	status = "okay";
-+};
- 
--				interrupt-controller;
--				#interrupt-cells = <1>;
--			};
--		};
-+&ohci0 {
-+	status = "okay";
-+};
- 
--		i2c2: i2c at 01c2b400 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&i2c2_pins_a>;
--			status = "okay";
--		};
-+&ohci1 {
-+	status = "okay";
-+};
- 
--		gmac: ethernet at 01c50000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&gmac_pins_rgmii_a>;
+-			pinctrl-0 = <&gmac_pins_mii_a>;
 -			phy = <&phy1>;
--			phy-mode = "rgmii";
--			phy-supply = <&reg_gmac_3v3>;
+-			phy-mode = "mii";
 -			status = "okay";
--
++&ir {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ir_pins_a>;
++	status = "okay";
++};
+ 
 -			phy1: ethernet-phy at 1 {
 -				reg = <1>;
 -			};
 -		};
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_m9>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 22 GPIO_ACTIVE_HIGH>; /* PH22 */
++	cd-inverted;
++	status = "okay";
++};
+ 
+-		ir at 01f02000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&ir_pins_a>;
+-			status = "okay";
+-		};
 +&pio {
-+	mmc0_cd_pin_bananapi: mmc0_cd_pin at 0 {
-+		allwinner,pins = "PH10";
-+		allwinner,function = "gpio_in";
++	led_pins_m9: led_pins at 0 {
++		allwinner,pins = "PH13";
++		allwinner,function = "gpio_out";
 +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
  	};
  
 -	leds {
 -		compatible = "gpio-leds";
 -		pinctrl-names = "default";
--		pinctrl-0 = <&led_pins_bananapi>;
+-		pinctrl-0 = <&led_pins_m9>;
 -
--		green {
--			label = "bananapi:green:usr";
--			gpios = <&pio 7 24 GPIO_ACTIVE_HIGH>;
+-		blue {
+-			label = "m9:blue:usr";
+-			gpios = <&pio 7 13 GPIO_ACTIVE_HIGH>;
 -		};
-+	gmac_power_pin_bananapi: gmac_power_pin at 0 {
-+		allwinner,pins = "PH23";
-+		allwinner,function = "gpio_out";
++	mmc0_cd_pin_m9: mmc0_cd_pin at 0 {
++		allwinner,pins = "PH22";
++		allwinner,function = "gpio_in";
 +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
  	};
  
 -	reg_usb1_vbus: usb1-vbus {
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&usb1_vbus_pin_m9>;
+-		gpio = <&pio 2 27 GPIO_ACTIVE_HIGH>;
 -		status = "okay";
-+	led_pins_bananapi: led_pins at 0 {
-+		allwinner,pins = "PH24";
++	usb1_vbus_pin_m9: usb1_vbus_pin at 0 {
++		allwinner,pins = "PC27";
 +		allwinner,function = "gpio_out";
 +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
  	};
-+};
- 
--	reg_usb2_vbus: usb2-vbus {
--		status = "okay";
--	};
-+&reg_usb1_vbus {
-+	status = "okay";
-+};
- 
--	reg_gmac_3v3: gmac-3v3 {
--		compatible = "regulator-fixed";
--		pinctrl-names = "default";
--		pinctrl-0 = <&gmac_power_pin_bananapi>;
--		regulator-name = "gmac-3v3";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--		startup-delay-us = <100000>;
--		enable-active-high;
--		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>;
--	};
-+&reg_usb2_vbus {
-+	status = "okay";
-+};
+ };
 +
-+&spi0 {
++&reg_usb1_vbus {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins_a>;
++	pinctrl-0 = <&usb1_vbus_pin_m9>;
++	gpio = <&pio 2 27 GPIO_ACTIVE_HIGH>;
 +	status = "okay";
 +};
 +
@@ -295,22 +183,9 @@ index 5dd139e7792e..6d1faf069e7e 100644
 +	status = "okay";
 +};
 +
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins_b>;
-+	status = "okay";
-+};
-+
-+&uart7 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart7_pins_a>;
-+	status = "okay";
-+};
-+
 +&usbphy {
 +	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
 +	status = "okay";
- };
++};
 -- 
 2.3.0
