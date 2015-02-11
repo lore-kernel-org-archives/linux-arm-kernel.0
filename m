@@ -1,162 +1,79 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 11 Feb 2015 17:15:25 +0100
-Subject: [PATCH 04/11] reset: berlin: convert to a platform driver
+Date: Wed, 11 Feb 2015 17:15:28 +0100
+Subject: [PATCH 07/11] pinctrl: berlin: use proper compatibles
 In-Reply-To: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1423671332-24580-5-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1423671332-24580-8-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Berlin reset controller was introduced without being a platform
-driver because of a needed DT rework: the node describing the reset
-controller also describes the pinctrl and clk controllers...
-
-The DT issue being solved thanks to the addition of the Berlin
-controller mfd driver, it is now possible to convert the Berlin reset
-driver to a plaftorm driver.
+The Berlin pin-controller driver was sharing the chip and system
+controller nodes with the clock and the reset drivers. They all shared
+the same compatible. With the introduction of the Marvell Berlin MFD
+controller, the Berlin pin-controller driver has now its own node.
+Update its compatibles to not share anymore the ones of the chip and
+system controllers.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/reset/reset-berlin.c | 69 +++++++++++++++++---------------------------
- 1 file changed, 26 insertions(+), 43 deletions(-)
+ drivers/pinctrl/berlin/berlin-bg2.c   | 4 ++--
+ drivers/pinctrl/berlin/berlin-bg2cd.c | 4 ++--
+ drivers/pinctrl/berlin/berlin-bg2q.c  | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/reset/reset-berlin.c b/drivers/reset/reset-berlin.c
-index f8b48a13cf0b..fd44f872a212 100644
---- a/drivers/reset/reset-berlin.c
-+++ b/drivers/reset/reset-berlin.c
-@@ -12,10 +12,12 @@
- #include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/module.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/platform_device.h>
- #include <linux/reset-controller.h>
-+#include <linux/regmap.h>
- #include <linux/slab.h>
- #include <linux/types.h>
+diff --git a/drivers/pinctrl/berlin/berlin-bg2.c b/drivers/pinctrl/berlin/berlin-bg2.c
+index 368ec0b9b8ba..3769eaedf519 100644
+--- a/drivers/pinctrl/berlin/berlin-bg2.c
++++ b/drivers/pinctrl/berlin/berlin-bg2.c
+@@ -218,11 +218,11 @@ static const struct berlin_pinctrl_desc berlin2_sysmgr_pinctrl_data = {
  
-@@ -25,8 +27,7 @@
- 	container_of((p), struct berlin_reset_priv, rcdev)
+ static const struct of_device_id berlin2_pinctrl_match[] = {
+ 	{
+-		.compatible = "marvell,berlin2-chip-ctrl",
++		.compatible = "marvell,berlin2-soc-pinctrl",
+ 		.data = &berlin2_soc_pinctrl_data
+ 	},
+ 	{
+-		.compatible = "marvell,berlin2-system-ctrl",
++		.compatible = "marvell,berlin2-system-pinctrl",
+ 		.data = &berlin2_sysmgr_pinctrl_data
+ 	},
+ 	{}
+diff --git a/drivers/pinctrl/berlin/berlin-bg2cd.c b/drivers/pinctrl/berlin/berlin-bg2cd.c
+index 6b9cae029ef7..9e11f191d643 100644
+--- a/drivers/pinctrl/berlin/berlin-bg2cd.c
++++ b/drivers/pinctrl/berlin/berlin-bg2cd.c
+@@ -161,11 +161,11 @@ static const struct berlin_pinctrl_desc berlin2cd_sysmgr_pinctrl_data = {
  
- struct berlin_reset_priv {
--	void __iomem			*base;
--	unsigned int			size;
-+	struct regmap			*regmap;
- 	struct reset_controller_dev	rcdev;
- };
+ static const struct of_device_id berlin2cd_pinctrl_match[] = {
+ 	{
+-		.compatible = "marvell,berlin2cd-chip-ctrl",
++		.compatible = "marvell,berlin2cd-soc-pinctrl",
+ 		.data = &berlin2cd_soc_pinctrl_data
+ 	},
+ 	{
+-		.compatible = "marvell,berlin2cd-system-ctrl",
++		.compatible = "marvell,berlin2cd-system-pinctrl",
+ 		.data = &berlin2cd_sysmgr_pinctrl_data
+ 	},
+ 	{}
+diff --git a/drivers/pinctrl/berlin/berlin-bg2q.c b/drivers/pinctrl/berlin/berlin-bg2q.c
+index 11aa10cc0e3e..ba7a8a8ad010 100644
+--- a/drivers/pinctrl/berlin/berlin-bg2q.c
++++ b/drivers/pinctrl/berlin/berlin-bg2q.c
+@@ -380,11 +380,11 @@ static const struct berlin_pinctrl_desc berlin2q_sysmgr_pinctrl_data = {
  
-@@ -37,7 +38,7 @@ static int berlin_reset_reset(struct reset_controller_dev *rcdev,
- 	int offset = id >> 8;
- 	int mask = BIT(id & 0x1f);
- 
--	writel(mask, priv->base + offset);
-+	regmap_write(priv->regmap, offset, mask);
- 
- 	/* let the reset be effective */
- 	udelay(10);
-@@ -52,7 +53,6 @@ static struct reset_control_ops berlin_reset_ops = {
- static int berlin_reset_xlate(struct reset_controller_dev *rcdev,
- 			      const struct of_phandle_args *reset_spec)
- {
--	struct berlin_reset_priv *priv = to_berlin_reset_priv(rcdev);
- 	unsigned offset, bit;
- 
- 	if (WARN_ON(reset_spec->args_count != rcdev->of_reset_n_cells))
-@@ -61,71 +61,54 @@ static int berlin_reset_xlate(struct reset_controller_dev *rcdev,
- 	offset = reset_spec->args[0];
- 	bit = reset_spec->args[1];
- 
--	if (offset >= priv->size)
--		return -EINVAL;
--
- 	if (bit >= BERLIN_MAX_RESETS)
- 		return -EINVAL;
- 
- 	return (offset << 8) | bit;
- }
- 
--static int __berlin_reset_init(struct device_node *np)
-+static int berlin2_reset_probe(struct platform_device *pdev)
- {
-+	struct device_node *parent_np = of_get_parent(pdev->dev.of_node);
- 	struct berlin_reset_priv *priv;
--	struct resource res;
--	resource_size_t size;
--	int ret;
- 
--	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
- 	if (!priv)
- 		return -ENOMEM;
- 
--	ret = of_address_to_resource(np, 0, &res);
--	if (ret)
--		goto err;
--
--	size = resource_size(&res);
--	priv->base = ioremap(res.start, size);
--	if (!priv->base) {
--		ret = -ENOMEM;
--		goto err;
--	}
--	priv->size = size;
-+	priv->regmap = syscon_node_to_regmap(parent_np);
-+	of_node_put(parent_np);
-+	if (IS_ERR(priv->regmap))
-+		return PTR_ERR(priv->regmap);
- 
- 	priv->rcdev.owner = THIS_MODULE;
- 	priv->rcdev.ops = &berlin_reset_ops;
--	priv->rcdev.of_node = np;
-+	priv->rcdev.of_node = pdev->dev.of_node;
- 	priv->rcdev.of_reset_n_cells = 2;
- 	priv->rcdev.of_xlate = berlin_reset_xlate;
- 
- 	reset_controller_register(&priv->rcdev);
- 
- 	return 0;
--
--err:
--	kfree(priv);
--	return ret;
- }
- 
- static const struct of_device_id berlin_reset_of_match[] __initconst = {
--	{ .compatible = "marvell,berlin2-chip-ctrl" },
--	{ .compatible = "marvell,berlin2cd-chip-ctrl" },
--	{ .compatible = "marvell,berlin2q-chip-ctrl" },
-+	{ .compatible = "marvell,berlin2-reset" },
- 	{ },
- };
-+MODULE_DEVICE_TABLE(of, berlin_reset_of_match);
- 
--static int __init berlin_reset_init(void)
--{
--	struct device_node *np;
--	int ret;
-+static struct platform_driver berlin_reset_driver = {
-+	.probe	= berlin2_reset_probe,
-+	.driver	= {
-+		.name = "berlin2-reset",
-+		.of_match_table = berlin_reset_of_match,
-+	},
- 
--	for_each_matching_node(np, berlin_reset_of_match) {
--		ret = __berlin_reset_init(np);
--		if (ret)
--			return ret;
--	}
-+};
-+module_platform_driver(berlin_reset_driver);
- 
--	return 0;
--}
--arch_initcall(berlin_reset_init);
-+MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
-+MODULE_AUTHOR("Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>");
-+MODULE_DESCRIPTION("Marvell Berlin reset driver");
-+MODULE_LICENSE("GPL");
+ static const struct of_device_id berlin2q_pinctrl_match[] = {
+ 	{
+-		.compatible = "marvell,berlin2q-chip-ctrl",
++		.compatible = "marvell,berlin2q-soc-pinctrl",
+ 		.data = &berlin2q_soc_pinctrl_data,
+ 	},
+ 	{
+-		.compatible = "marvell,berlin2q-system-ctrl",
++		.compatible = "marvell,berlin2q-system-pinctrl",
+ 		.data = &berlin2q_sysmgr_pinctrl_data,
+ 	},
+ 	{}
 -- 
 2.3.0
