@@ -1,41 +1,109 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 11 Feb 2015 12:26:12 -0800
-Subject: [PATCH] ARM: OMAP1: PM: fix some build warnings on 1510-only
- Kconfigs
-In-Reply-To: <54DB93DA.8050308@gmail.com>
-References: <alpine.DEB.2.02.1502070020530.3767@utopia.booyaka.com>
- <54D9CFBC.3070405@nvidia.com> <54D9E42C.7010105@gmail.com>
- <alpine.DEB.2.02.1502110218090.3767@utopia.booyaka.com>
- <54DB93DA.8050308@gmail.com>
-Message-ID: <20150211202611.GF2531@atomide.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 11 Feb 2015 21:31:17 +0100 (CET)
+Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
+ registers
+In-Reply-To: <CAOMZO5B4mxP6RBkbsbj=wC6bZJgtreoo5S_NhYuki6kW=Y=QFw@mail.gmail.com>
+References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
+ <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
+ <54DA020C.6030703@i2se.com>
+ <CAOMZO5DGCP1p1vetwWHpSbe2qywA8DhWRRq22egMDFSw11uq4w@mail.gmail.com>
+ <54DA0DE7.5050708@i2se.com>
+ <CAOMZO5AtFOThRjcAgMVbrbkcrJbehouSxoH03VUGJrRdWXnS_Q@mail.gmail.com>
+ <462270270.419156.1423603473431.JavaMail.open-xchange@oxbaltgw02.schlund.de>
+ <CAOMZO5B4mxP6RBkbsbj=wC6bZJgtreoo5S_NhYuki6kW=Y=QFw@mail.gmail.com>
+Message-ID: <1705379122.406018.1423686677196.JavaMail.open-xchange@oxbaltgw01.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jgchunter@gmail.com> [150211 09:43]:
-> 
-> Thinking about this some more, I don't understand the dependency on the
-> DM_TIMER here. For an omap1 device, regardless of whether the DM_TIMERs
-> are enable or not, the device should be able to enter low power if the
-> 32K is enabled. Hence, shouldn't this have been !(CONFIG_OMAP_32K_TIMER)
-> above?
+Hi Fabio,
 
-Sounds about right, there are separate timers on omap1 and additional
-gp timers. There's no 32KiHz timer on 1510 variants, including
-720 and 730.
- 
-> Furthermore, you will get the above warning on a omap16xx only build if
-> you disable DM_TIMERs and keep MPU_TIMER enabled, which should be a
-> valid thing to do.
-> 
-> Tony, I see you added the DM_TIMER dependency in commit
-> be26a008414414c69a4ae9fe9877401c3ba62c5a. I understand your motivation,
-> but why not just use !(CONFIG_OMAP_32K_TIMER) here? Bit 9 of the idlect1
-> is only for the TIMCK clock that is used for the MPU timers and not the
-> DM_TIMERs.
+> Fabio Estevam <festevam@gmail.com> hat am 11. Februar 2015 um 17:58
+> geschrieben:
+>
+>
+> Hi Stefan,
+>
+> On Tue, Feb 10, 2015 at 7:24 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> > Hi Fabio,
+> >
+> >> Fabio Estevam <festevam@gmail.com> hat am 10. Februar 2015 um 16:06
+> >> geschrieben:
+> >>
+> >>
+> >> Hi Stefan,
+> >>
+> >> On Tue, Feb 10, 2015 at 11:55 AM, Stefan Wahren <stefan.wahren@i2se.com>
+> >> wrote:
+> >>
+> >> > Could you apply only the clk-imx28.c part of my patch and see what
+> >> > happens?
+> >>
+> >> If I apply only the clk-imx28.c part of your patch I can successfully
+> >> probe the SPI NOR.
+> >
+> > thanks this is very helpful. I built the linux-next for my Duckbill and add
+> > the
+> > SSP2 section from imx28-evk.dts into imx28-duckbill.dts.
+> >
+> > Without my patch i get the following for HW_CLKCTRL_FRAC0:
+> >
+> > ./memwatch -a 0x800401B0
+> >
+> > 0x800401b0: 0x5e5b5513
+> >
+> > With my patch i get:
+> >
+> > ./memwatch -a 0x800401B0
+> >
+> > 0x800401b0: 0x5e1b5513
+>
+> I always get 0x5e5b5513 with or without your patch.
 
-Hmm yes looks like you're right. That check be done based on
-!CONFIG_OMAP_32K_TIMER like you're saying.
+very strange. Do you have any idea why IO1_STABLE is permanent low?
 
-Regards,
+Here are the register dumps as requested by Mike.
 
-Tony
+Without this patch after boot
+
+0x80040000: 0x00060000
+0x80040010: 0x800004b1
+0x80040050: 0x00011001
+0x80040080: 0x64000001
+0x80040090: 0x00000001
+0x800400a0: 0x80000001
+0x800400b0: 0x00000002
+0x800400c0: 0xa0000001
+0x800401b0: 0x5e5b5513
+0x800401c0: 0x00929292
+0x800401d0: 0x00004104
+
+With this patch after boot
+
+0x80040000: 0x00060000
+0x80040010: 0x800004b1
+0x80040050: 0x00011001
+0x80040080: 0x64000001
+0x80040090: 0x00000001
+0x800400a0: 0x80000001
+0x800400b0: 0x00000002
+0x800400c0: 0xa0000001
+0x800401b0: 0x5e1b5513
+0x800401c0: 0x00929292
+0x800401d0: 0x00004104
+
+So only IO1_STABLE (0x800401b0) is different.
+
+If i restore clk_ref_set_rate() from clk-ref.c after the complete patch is
+applied, the issue with the IO1_STABLE bit disappears.
+
+Can you confirm the behavior according to your flash issue?
+
+I think it would be the best to revert my patch. Sorry for the trouble.
+
+Stefan
+
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
