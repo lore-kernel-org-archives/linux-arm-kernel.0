@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Feb 2015 10:01:13 +0100
-Subject: [PATCH v2 14/30] ARM: sun5i: a13: hsg h702: Convert to DT label based
- syntax
+Date: Wed, 11 Feb 2015 10:01:12 +0100
+Subject: [PATCH v2 13/30] ARM: sun5i: a10s: r7 tv dongle: Convert to DT label
+ based syntax
 In-Reply-To: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1423645289-1074-15-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1423645289-1074-14-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,40 +14,39 @@ when overriding DTSI nodes, convert the board to this syntax
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i-a13-hsg-h702.dts | 136 +++++++++++++++----------------
- 1 file changed, 67 insertions(+), 69 deletions(-)
+ arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts | 132 +++++++++++++-------------
+ 1 file changed, 65 insertions(+), 67 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-index 03aa04555630..b59255a445bc 100644
---- a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-@@ -59,82 +59,69 @@
- 	aliases {
- 		serial0 = &uart1;
- 	};
-+};
-+
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
+diff --git a/arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts b/arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts
+index 7deddfc9df8b..d42ce170e640 100644
+--- a/arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts
++++ b/arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts
+@@ -56,69 +56,6 @@
+ 	model = "R7 A10s hdmi tv-stick";
+ 	compatible = "allwinner,r7-tv-dongle", "allwinner,sun5i-a10s";
  
 -	soc at 01c00000 {
 -		mmc0: mmc at 01c0f000 {
 -			pinctrl-names = "default";
--			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_h702>;
+-			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_r7>;
 -			vmmc-supply = <&reg_vcc3v3>;
 -			bus-width = <4>;
--			cd-gpios = <&pio 6 0 GPIO_ACTIVE_HIGH>; /* PG0 */
+-			cd-gpios = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
 -			cd-inverted;
 -			status = "okay";
 -		};
 -
+-		mmc1: mmc at 01c10000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&mmc1_pins_a>;
+-			vmmc-supply = <&reg_vcc3v3>;
+-			bus-width = <4>;
+-			non-removable;
+-			status = "okay";
+-		};
+-
 -		usbphy: phy at 01c13400 {
--			usb1_vbus-supply = <&reg_ldo3>;
+-			usb1_vbus-supply = <&reg_usb1_vbus>;
 -			status = "okay";
 -		};
 -
@@ -60,85 +59,64 @@ index 03aa04555630..b59255a445bc 100644
 -		};
 -
 -		pinctrl at 01c20800 {
--			mmc0_cd_pin_h702: mmc0_cd_pin at 0 {
--				allwinner,pins = "PG0";
+-			mmc0_cd_pin_r7: mmc0_cd_pin at 0 {
+-				allwinner,pins = "PG1";
 -				allwinner,function = "gpio_in";
 -				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 -				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
 -			};
--		};
 -
--		uart1: serial at 01c28400 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&uart1_pins_b>;
--			status = "okay";
--		};
+-			led_pins_r7: led_pins at 0 {
+-				allwinner,pins = "PB2";
+-				allwinner,function = "gpio_out";
+-				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
+-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-			};
 -
--		i2c0: i2c at 01c2ac00 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&i2c0_pins_a>;
--			status = "okay";
--
--			axp209: pmic at 34 {
--				reg = <0x34>;
--				interrupts = <0>;
+-			usb1_vbus_pin_r7: usb1_vbus_pin at 0 {
+-				allwinner,pins = "PG13";
+-				allwinner,function = "gpio_out";
+-				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 -			};
 -		};
 -
--		i2c1: i2c at 01c2b000 {
+-		uart0: serial at 01c28000 {
 -			pinctrl-names = "default";
--			pinctrl-0 = <&i2c1_pins_a>;
--			status = "okay";
--
--			pcf8563: rtc at 51 {
--				compatible = "nxp,pcf8563";
--				reg = <0x51>;
--			};
--		};
--
--		i2c2: i2c at 01c2b400 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&i2c2_pins_a>;
+-			pinctrl-0 = <&uart0_pins_a>;
 -			status = "okay";
 -		};
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		reg = <0x34>;
-+		interrupts = <0>;
+-	};
+-
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		pinctrl-names = "default";
+@@ -130,10 +67,71 @@
+ 			default-state = "on";
+ 		};
  	};
- };
- 
--#include "axp209.dtsi"
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
- 
--&cpu0 {
--	cpu-supply = <&reg_dcdc2>;
-+	pcf8563: rtc at 51 {
-+		compatible = "nxp,pcf8563";
-+		reg = <0x51>;
-+	};
 +};
 +
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
++&ehci0 {
 +	status = "okay";
- };
- 
++};
++
 +&mmc0 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_h702>;
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_r7>;
 +	vmmc-supply = <&reg_vcc3v3>;
 +	bus-width = <4>;
-+	cd-gpios = <&pio 6 0 GPIO_ACTIVE_HIGH>; /* PG0 */
++	cd-gpios = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
 +	cd-inverted;
++	status = "okay";
++};
++
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	non-removable;
 +	status = "okay";
 +};
 +
@@ -147,32 +125,46 @@ index 03aa04555630..b59255a445bc 100644
 +};
 +
 +&pio {
-+	mmc0_cd_pin_h702: mmc0_cd_pin at 0 {
-+		allwinner,pins = "PG0";
++	mmc0_cd_pin_r7: mmc0_cd_pin at 0 {
++		allwinner,pins = "PG1";
 +		allwinner,function = "gpio_in";
 +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
 +	};
-+};
 +
-+#include "axp209.dtsi"
-+
- &reg_dcdc2 {
- 	regulator-always-on;
- 	regulator-min-microvolt = <1000000>;
-@@ -165,3 +152,14 @@
- 	regulator-max-microvolt = <3300000>;
- 	regulator-name = "vcc-wifi";
++	led_pins_r7: led_pins at 0 {
++		allwinner,pins = "PB2";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
+ 
+-	reg_usb1_vbus: usb1-vbus {
+-		pinctrl-0 = <&usb1_vbus_pin_r7>;
+-		gpio = <&pio 6 13 GPIO_ACTIVE_HIGH>;
+-		status = "okay";
++	usb1_vbus_pin_r7: usb1_vbus_pin at 0 {
++		allwinner,pins = "PG13";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
  };
 +
-+&uart1 {
++&reg_usb1_vbus {
++	pinctrl-0 = <&usb1_vbus_pin_r7>;
++	gpio = <&pio 6 13 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
++
++&uart0 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins_b>;
++	pinctrl-0 = <&uart0_pins_a>;
 +	status = "okay";
 +};
 +
 +&usbphy {
-+	usb1_vbus-supply = <&reg_ldo3>;
++	usb1_vbus-supply = <&reg_usb1_vbus>;
 +	status = "okay";
 +};
 -- 
