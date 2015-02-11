@@ -1,161 +1,84 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 11 Feb 2015 09:32:10 +0100
-Subject: [RFC v4 00/13] KVM-VFIO IRQ forward control
-Message-ID: <1423643543-24409-1-git-send-email-eric.auger@linaro.org>
+Date: Wed, 11 Feb 2015 09:32:11 +0100
+Subject: [RFC v4 01/13] KVM: arm/arm64: Enable the KVM-VFIO device
+In-Reply-To: <1423643543-24409-1-git-send-email-eric.auger@linaro.org>
+References: <1423643543-24409-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1423643543-24409-2-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series proposes an integration of "ARM: Forwarding physical
-interrupts to a guest VM" (http://lwn.net/Articles/603514/) in
-KVM.
+From: Kim Phillips <kim.phillips@linaro.org>
 
-It enables to set/unset forwarding for a VFIO platform device IRQ.
+The KVM-VFIO device is used by the QEMU VFIO device. It is used to
+record the list of in-use VFIO groups so that KVM can manipulate
+them. With this series, it will also be used to record the forwarded
+IRQs.
 
-A forwarded IRQ is deactivated by the guest and not by the host.
-When the guest deactivates the associated virtual IRQ, the interrupt
-controller automatically completes the physical IRQ. Obviously
-this requires some HW support in the interrupt controller. This is
-the case for ARM GIC.
-
-The direct benefit is that, for a level sensitive IRQ, a VM exit
-can be avoided on forwarded IRQ completion.
-
-When the IRQ is forwarded, the VFIO platform driver does not need to
-mask the physical IRQ anymore before signaling the eventfd. Indeed
-genirq lowers the running priority, enabling other physical IRQ to hit
-except that one.
-
-Besides, the injection still is based on irqfd triggering. The only
-impact on irqfd process is resamplefd is not called anymore on
-virtual IRQ completion since deactivation is not trapped by KVM.
-
-The current integration is based on an extension of the KVM-VFIO
-device, previously used by KVM to interact with VFIO groups. The
-patch series now enables KVM to directly interact with a VFIO
-platform device. The VFIO external API was extended for that purpose.
-
-The IRQ forward programming is architecture specific (virtual interrupt
-controller programming basically). However the whole infrastructure is
-kept generic.
-
-from a user point of view, the functionality is provided through a
-new KVM-VFIO group named KVM_DEV_VFIO_DEVICE and 2 associated
-attributes:
-- KVM_DEV_VFIO_DEVICE_FORWARD_IRQ,
-- KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ.
-
-The capability can be checked with KVM_HAS_DEVICE_ATTR.
-
-Forwarding must be activated when the VFIO IRQ is not active at
-physical level or being under injection into the guest (VFIO masked)
-Forwarding can be unset at any time.
+Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
 
-This patch series has the following dependencies:
-- "ARM: Forwarding physical interrupts to a guest VM"
-  (http://lwn.net/Articles/603514/)
-- [PATCH v13 00/18] VFIO support for platform devices, VOSYS
-  (http://www.spinics.net/lists/kvm-arm/msg13414.html)
-- [PATCH v3 0/6] vfio: type1: support for ARM SMMUS with VFIO_IOMMU_TYPE1,
-  VOSYS (http://www.spinics.net/lists/kvm-arm/msg11738.html)
-- [RFC v2] chip/vgic adaptations for forwarded irq
+v4 -> v5:
+- reword the commit message to explain both usages of the KVM-VFIO
+  device in QEMU
+- squash both arm and arm64 enables
+---
+ arch/arm/kvm/Kconfig    | 1 +
+ arch/arm/kvm/Makefile   | 2 +-
+ arch/arm64/kvm/Kconfig  | 1 +
+ arch/arm64/kvm/Makefile | 2 +-
+ 4 files changed, 4 insertions(+), 2 deletions(-)
 
-Integrated pieces can be found at
-ssh://git.linaro.org/people/eric.auger/linux.git
-on branch irqfd_integ_v9
-
-This was tested on Calxeda Midway, assigning the xgmac main IRQ.
-Unforward was tested doing periodic forward/unforward with random offsets,
-while using netcat traffic to make sure unforward often occurs while the
-IRQ is in progress.
-
-v3 -> v4:
-- revert as RFC again due to lots of changes, extra complexity induced
-  by new set/unset_forward implementation, and dependencies on RFC patches
-- kvm_vfio_dev_irq struct is used at user level to pass the parameters
-  to KVM-VFIO KVM_DEV_VFIO_DEVICE/KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ. Shared
-  with Intel posted IRQs.
-- unforward now can happen any time with no constraint and cannot fail
-- new VFIO platform external functions introduced:
-  vfio_externl_set_automasked, vfio_external_mask, vfio_external_is_active,
-- introduce a modality to force guest to exit & prevent it from being
-  re-entered and rename older ARM pause modality into power-off
-  (related to PSCI power-off start)
-- kvm_vfio_arm.c no more exists. architecture specific code is moved into
-  arm/gic.c. This code is not that much VFIO dependent anymore. Although
-  some references still exit in comments.
-- 2 separate architecture specific functions for set and unset (only one
-  has a return value).
-
-v2 -> v3:
-- kvm_fwd_irq_action enum replaced by a bool (KVM_VFIO_IRQ_CLEANUP does not
-  exist anymore)
-- a new struct local to vfio.c was introduced to wrap kvm_fw_irq and make it
-  linkable: kvm_vfio_fwd_irq_node
-- kvm_fwd_irq now is self-contained (includes struct vfio_device *)
-- a single list of kvm_vfio_fwd_irq_irq_node is used instead of having
-  a list of devices and a list of forward irq per device. Having 2 lists
-  brought extra complexity.
-- the VFIO device ref counter is incremented each time a new IRQ is forwarded.
-  It is not attempted anymore to hold a single reference whatever the number
-  of forwarded IRQs.
-- subindex added on top of index to be closer to VFIO API
-- platform device check moved in the arm specific implementation
-- enable the KVM-VFIO device for arm64
-- forwarded state change only can happen while the VFIO IRQ handler is not
-  set; in other words, when the VFIO IRQ signaling is not set.
-
-v1 -> v2:
-- forward control is moved from architecture specific file into generic
-  vfio.c module.
-  only kvm_arch_set_fwd_state remains architecture specific
-- integrate Kim's patch which enables KVM-VFIO for ARM
-- fix vgic state bypass in vgic_queue_hwirq
-- struct kvm_arch_forwarded_irq moved from arch/arm/include/uapi/asm/kvm.h
-  to include/uapi/linux/kvm.h
-  also irq_index renamed into index and guest_irq renamed into gsi
-- ASSIGN/DEASSIGN renamed into FORWARD/UNFORWARD
-- vfio_external_get_base_device renamed into vfio_external_base_device
-- vfio_external_get_type removed
-- kvm_vfio_external_get_base_device renamed into kvm_vfio_external_base_device
-- __KVM_HAVE_ARCH_KVM_VFIO renamed into __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
-
-Eric Auger (12):
-  VFIO: platform: test forwarded state when selecting IRQ handler
-  VFIO: platform: single handler using function pointer
-  KVM: kvm-vfio: User API for IRQ forwarding
-  VFIO: external user API for interaction with vfio devices
-  VFIO: platform: add vfio_external_{mask|is_active|set_automasked}
-  KVM: kvm-vfio: wrappers to VFIO external API device helpers
-  KVM: kvm-vfio: wrappers for
-    vfio_external_{mask|is_active|set_automasked}
-  KVM: arm: rename pause into power_off
-  kvm: introduce kvm_arch_halt_guest and kvm_arch_resume_guest
-  kvm: arm: implement kvm_arch_halt_guest and kvm_arch_resume_guest
-  KVM: kvm-vfio: generic forwarding control
-  KVM: arm: vgic: forwarding control
-
-Kim Phillips (1):
-  KVM: arm/arm64: Enable the KVM-VFIO device
-
- Documentation/virtual/kvm/devices/vfio.txt    |  34 +-
- arch/arm/include/asm/kvm_host.h               |   7 +-
- arch/arm/kvm/Kconfig                          |   1 +
- arch/arm/kvm/Makefile                         |   2 +-
- arch/arm/kvm/arm.c                            |  38 ++-
- arch/arm/kvm/psci.c                           |  10 +-
- arch/arm64/kvm/Kconfig                        |   1 +
- arch/arm64/kvm/Makefile                       |   2 +-
- drivers/vfio/platform/vfio_platform_irq.c     |  71 ++++-
- drivers/vfio/platform/vfio_platform_private.h |   1 +
- drivers/vfio/vfio.c                           |  24 ++
- include/linux/kvm_host.h                      |  59 ++++
- include/linux/vfio.h                          |  15 +
- include/uapi/linux/kvm.h                      |  12 +
- virt/kvm/arm/vgic.c                           | 190 ++++++++++++
- virt/kvm/vfio.c                               | 429 +++++++++++++++++++++++++-
- 16 files changed, 866 insertions(+), 30 deletions(-)
-
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index 7db7df4..0ddb745 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -25,6 +25,7 @@ config KVM
+ 	select KVM_ARM_HOST
+ 	select SRCU
+ 	depends on ARM_VIRT_EXT && ARM_LPAE
++	select KVM_VFIO
+ 	select HAVE_KVM_EVENTFD
+ 	---help---
+ 	  Support hosting virtualized guest machines. You will also
+diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+index 859db09..ea1fa76 100644
+--- a/arch/arm/kvm/Makefile
++++ b/arch/arm/kvm/Makefile
+@@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
+ AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
+ 
+ KVM := ../../../virt/kvm
+-kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
++kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
+ 
+ obj-y += kvm-arm.o init.o interrupts.o
+ obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index 0965056..b73fba8 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -27,6 +27,7 @@ config KVM
+ 	select KVM_ARM_VGIC
+ 	select KVM_ARM_TIMER
+ 	select SRCU
++	select KVM_VFIO
+ 	select HAVE_KVM_EVENTFD
+ 	---help---
+ 	  Support hosting virtualized guest machines.
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index 2e6b827..81ed091 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -11,7 +11,7 @@ ARM=../../../arch/arm/kvm
+ 
+ obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
+ 
+-kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
+ 
 -- 
 1.9.1
