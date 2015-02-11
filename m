@@ -1,146 +1,86 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Feb 2015 10:01:07 +0100
-Subject: [PATCH v2 08/30] ARM: sun4i: inet97fv2: Convert to DT label based
- syntax
-In-Reply-To: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1423645289-1074-9-git-send-email-maxime.ripard@free-electrons.com>
+Date: Wed, 11 Feb 2015 10:00:59 +0100
+Subject: [PATCH v2 00/30] ARM: dt: sunxi: DT cleanups
+Message-ID: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to lessen the amount of duplication of the DT tree, ease the
-new and follow the trend that prefers to use label based references
-when overriding DTSI nodes, convert the board to this syntax
+Hi,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun4i-a10-inet97fv2.dts | 104 ++++++++++++++----------------
- 1 file changed, 49 insertions(+), 55 deletions(-)
+This set does a set of cleanups that were either long awaited (sun5i
+DTSI merge) or have been asked recently (conversion to label based
+syntax for DTS).
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-index 482914333bba..ab3bbc13db1c 100644
---- a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-@@ -56,71 +56,65 @@
- / {
- 	model = "INet-97F Rev 02";
- 	compatible = "primux,inet97fv2", "allwinner,sun4i-a10";
-+};
- 
--	aliases {
--		serial0 = &uart0;
--	};
--
--	soc at 01c00000 {
--		mmc0: mmc at 01c0f000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
--			vmmc-supply = <&reg_vcc3v3>;
--			bus-width = <4>;
--			cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
--			cd-inverted;
--			status = "okay";
--		};
-+&ehci0 {
-+	status = "okay";
-+};
- 
--		uart0: serial at 01c28000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&uart0_pins_a>;
--			status = "okay";
--		};
-+&ehci1 {
-+	status = "okay";
-+};
- 
--		usbphy: phy at 01c13400 {
--			usb1_vbus-supply = <&reg_usb1_vbus>;
--			usb2_vbus-supply = <&reg_usb2_vbus>;
--			status = "okay";
--		};
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
- 
--		ehci0: usb at 01c14000 {
--			status = "okay";
--		};
-+	axp209: pmic at 34 {
-+		compatible = "x-powers,axp209";
-+		reg = <0x34>;
-+		interrupts = <0>;
- 
--		ohci0: usb at 01c14400 {
--			status = "okay";
--		};
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+	};
-+};
- 
--		ehci1: usb at 01c1c000 {
--			status = "okay";
--		};
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
-+	cd-inverted;
-+	status = "okay";
-+};
- 
--		ohci1: usb at 01c1c400 {
--			status = "okay";
--		};
-+&ohci0 {
-+	status = "okay";
-+};
- 
--		i2c0: i2c at 01c2ac00 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&i2c0_pins_a>;
--			status = "okay";
-+&ohci1 {
-+	status = "okay";
-+};
- 
--			axp209: pmic at 34 {
--				compatible = "x-powers,axp209";
--				reg = <0x34>;
--				interrupts = <0>;
-+&reg_usb1_vbus {
-+	status = "okay";
-+};
- 
--				interrupt-controller;
--				#interrupt-cells = <1>;
--			};
--		};
--	};
-+&reg_usb2_vbus {
-+	status = "okay";
-+};
- 
--	reg_usb1_vbus: usb1-vbus {
--		status = "okay";
--	};
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
- 
--	reg_usb2_vbus: usb2-vbus {
--		status = "okay";
--	};
-+&usbphy {
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
- };
+Maxime
+
+Changes from v1:
+  - Moved MMC1 node addition from the A10s convertion patch to the
+    first one
+
+Maxime Ripard (30):
+  ARM: sun5i: Add a DTSI common to A10s and A13
+  ARM: sun5i: a13: Move to the common sun5i DTSI
+  ARM: sun5i: a10s: Move to the common sun5i DTSI
+  ARM: sun4i: a1000: Convert to DT label based syntax
+  ARM: sun4i: ba10 tvbox: Convert to DT label based syntax
+  ARM: sun4i: cubieboard: Convert to DT label based syntax
+  ARM: sun4i: hackberry: Convert to DT label based syntax
+  ARM: sun4i: inet97fv2: Convert to DT label based syntax
+  ARM: sun4i: mini xplus: Convert to DT label based syntax
+  ARM: sun4i: olinuxino lime: Convert to DT label based syntax
+  ARM: sun4i: pcduino: Convert to DT label based syntax
+  ARM: sun5i: a10s: olinuxino micro: Convert to DT label based syntax
+  ARM: sun5i: a10s: r7 tv dongle: Convert to DT label based syntax
+  ARM: sun5i: a13: hsg h702: Convert to DT label based syntax
+  ARM: sun5i: a13: olinuxino micro: Convert to DT label based syntax
+  ARM: sun5i: a13: olinuxino: Convert to DT label based syntax
+  ARM: sun6i: app4 evb1: Convert to DT label based syntax
+  ARM: sun6i: colombus: Convert to DT label based syntax
+  ARM: sun6i: m9: Convert to DT label based syntax
+  ARM: sun7i: bananapi: Convert to DT label based syntax
+  ARM: sun7i: cubieboard2: Convert to DT label based syntax
+  ARM: sun7i: cubietruck: Convert to DT label based syntax
+  ARM: sun7i: hummingbird: Convert to DT label based syntax
+  ARM: sun7i: i12 tvbox: Convert to DT label based syntax
+  ARM: sun7i: m3: Convert to DT label based syntax
+  ARM: sun7i: olinuxino lime: Convert to DT label based syntax
+  ARM: sun7i: olinuxino lime2: Convert to DT label based syntax
+  ARM: sun7i: olinuxino micro: Convert to DT label based syntax
+  ARM: sun7i: pcduino3: Convert to DT label based syntax
+  ARM: sun8i: ippo q8h v5: Convert to DT label based syntax
+
+ arch/arm/boot/dts/sun4i-a10-a1000.dts            | 200 ++++----
+ arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts       | 168 ++++---
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts       | 214 +++++----
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts        | 187 ++++----
+ arch/arm/boot/dts/sun4i-a10-inet97fv2.dts        | 104 ++--
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts       | 140 +++---
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts   | 188 ++++----
+ arch/arm/boot/dts/sun4i-a10-pcduino.dts          | 177 ++++---
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 315 ++++++------
+ arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts    | 132 +++--
+ arch/arm/boot/dts/sun5i-a10s.dtsi                | 582 ++---------------------
+ arch/arm/boot/dts/sun5i-a13-hsg-h702.dts         | 136 +++---
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts  | 148 +++---
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts        | 236 +++++----
+ arch/arm/boot/dts/sun5i-a13.dtsi                 | 554 ++-------------------
+ arch/arm/boot/dts/sun5i.dtsi                     | 560 ++++++++++++++++++++++
+ arch/arm/boot/dts/sun6i-a31-app4-evb1.dts        |  52 +-
+ arch/arm/boot/dts/sun6i-a31-colombus.dts         | 120 +++--
+ arch/arm/boot/dts/sun6i-a31-m9.dts               | 148 +++---
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts         | 262 +++++-----
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts      | 198 ++++----
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts       | 316 ++++++------
+ arch/arm/boot/dts/sun7i-a20-hummingbird.dts      | 384 ++++++++-------
+ arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts        | 252 +++++-----
+ arch/arm/boot/dts/sun7i-a20-m3.dts               | 178 ++++---
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts   | 186 ++++----
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts  | 288 ++++++-----
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts  | 364 +++++++-------
+ arch/arm/boot/dts/sun7i-a20-pcduino3.dts         | 210 ++++----
+ arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts      | 110 +++--
+ 30 files changed, 3316 insertions(+), 3793 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun5i.dtsi
+
 -- 
 2.3.0
