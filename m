@@ -1,212 +1,51 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 11 Feb 2015 13:24:37 +0100
-Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
- demuxer chip
-In-Reply-To: <20150211111106.GA9154@leverpostej>
-References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
- <1422527620-8308-4-git-send-email-boris.brezillon@free-electrons.com>
- <20150210153628.GF9432@leverpostej>
- <20150210165201.634bc04b@bbrezillon>
- <20150210204835.GL9432@leverpostej>
- <20150211095339.0a2e4e7b@bbrezillon>
- <20150211111106.GA9154@leverpostej>
-Message-ID: <20150211132437.0753a7da@bbrezillon>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 11 Feb 2015 13:29:01 +0100
+Subject: [PATCH 1/2] ARM: dts: zynq: Add missing alias node for zybo and
+ parallella
+Message-ID: <0a0e0579fb6e2794d2c0c6fb9186c5b43618f448.1423657710.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Add missing alias node.
 
-On Wed, 11 Feb 2015 11:11:06 +0000
-Mark Rutland <mark.rutland@arm.com> wrote:
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-> On Wed, Feb 11, 2015 at 08:53:39AM +0000, Boris Brezillon wrote:
-> > Hi Mark,
-> > 
-> > On Tue, 10 Feb 2015 20:48:36 +0000
-> > Mark Rutland <mark.rutland@arm.com> wrote:
-> > 
-> > > On Tue, Feb 10, 2015 at 03:52:01PM +0000, Boris Brezillon wrote:
-> > > > Hi Mark,
-> > > > 
-> > > > On Tue, 10 Feb 2015 15:36:28 +0000
-> > > > Mark Rutland <mark.rutland@arm.com> wrote:
-> > > > 
-> > > > > Hi Boris,
-> > > > > 
-> > > > > On Thu, Jan 29, 2015 at 10:33:38AM +0000, Boris Brezillon wrote:
-> > > > > > Add documentation for the virtual irq demuxer.
-> > > > > > 
-> > > > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > > > > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > > > > ---
-> > > > > >  .../bindings/interrupt-controller/dumb-demux.txt   | 41 ++++++++++++++++++++++
-> > > > > >  1 file changed, 41 insertions(+)
-> > > > > >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
-> > > > > > 
-> > > > > > diff --git a/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
-> > > > > > new file mode 100644
-> > > > > > index 0000000..b9a7830
-> > > > > > --- /dev/null
-> > > > > > +++ b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
-> > > > > > @@ -0,0 +1,41 @@
-> > > > > > +* Virtual Interrupt Demultiplexer
-> > > > > > +
-> > > > > > +This virtual demultiplexer simply forward all incoming interrupts to its
-> > > > > > +enabled/unmasked children.
-> > > > > > +It is only intended to be used by hardware that do not provide a proper way
-> > > > > > +to demultiplex a source interrupt, and thus have to wake all their children
-> > > > > > +up so that they can possibly handle the interrupt (if needed).
-> > > > > > +This can be seen as an alternative to shared interrupts when at least one
-> > > > > > +of the interrupt children is a timer (and require the irq to stay enabled
-> > > > > > +on suspend) while others are not. This will prevent calling irq handlers of
-> > > > > > +non timer devices while they are suspended.
-> > > > > 
-> > > > > This sounds like a DT-workaround for a Linux implementation problem, and
-> > > > > I don't think this the right way to solve your problem.
-> > > > 
-> > > > I understand your concern, but why are you answering while I asked for
-> > > > DT maintainers reviews for several days (if not several weeks).
-> > > > 
-> > > > > 
-> > > > > Why does this have to be in DT at all? Why can we not fix the core to
-> > > > > handle these details?
-> > > > 
-> > > > We already discussed that with Rob and Thomas, and hiding such a
-> > > > demuxer chip is not an easy task.
-> > > > I'm open to any suggestion to do that, though I'd like you (I mean DT
-> > > > guys) to provide a working implementation (or at least a viable concept)
-> > > > that would silently demultiplex an irq.
-> > > > 
-> > > > > 
-> > > > > I am very much not keen on this binding.
-> > > > 
-> > > > Yes, but do you have anything else to propose.
-> > > > We're experiencing this warning for 2 releases now, and this is time to
-> > > > find a solution (even if it's not a perfect one).
-> > > 
-> > > Thoughts on the patch below?
-> > 
-> > That's pretty much what I proposed in my first attempt to solve this
-> > problem [1] (except for a few things commented below).
-> > Anyway, Thomas suggested to go for the "dumb/virt irq demultiplexer"
-> > approach instead.
-> 
-> There is one fundamental difference in that this patch does not require
-> drivers to be updated (the new flag is only used internally). Which
-> avoids having to patch every single driver that could possibly be used
-> in combination with one wanting interrupts during suspend.
+ arch/arm/boot/dts/zynq-parallella.dts | 5 +++++
+ arch/arm/boot/dts/zynq-zybo.dts       | 5 +++++
+ 2 files changed, 10 insertions(+)
 
-Actually, that was one of the requirements expressed by Thomas (Thomas,
-correct me if I'm wrong).
-The point was to force shared irq users to explicitly specify that they
-are mixing !IRQF_NO_SUSPEND and IRQF_NO_SUSPEND because they have no
-other choice.
-
-With your patch, there's no way to inform users that they are
-erroneously setting the IRQF_NO_SUSPEND flag on one of their shared
-interrupt.
-
-> 
-> Any used which did not explicitly request with IRQF_NO_SUSPEND will not
-> receive interrupts during suspend.
-> 
-> [...]
-> 
-> > > +static irqreturn_t __handle_irq_event_percpu(unsigned int irq, struct irqaction *action)
-> > > +{
-> > > +	/*
-> > > +	 * During suspend we must not call potentially unsafe irq handlers.
-> > > +	 * See suspend_suspendable_actions.
-> > > +	 */
-> > > +	if (unlikely(action->flags & IRQF_NO_ACTION))
-> > > +		return IRQ_NONE;
-> > 
-> > Thomas was trying to avoid any new conditional code in the interrupt
-> > handling path, that's why I added a suspended_action list in my
-> > proposal.
-> > Even if your 'unlikely' statement make things better I'm pretty sure it
-> > adds some latency.
-> 
-> I can see that we don't want to add more code here to keep things
-> clean/pure, but I find it hard to believe that a single bit test and
-> branch (for data that should be hot in the cache) are going to add
-> measurable latency to a path that does pointer chasing to get to the
-> irqaction in the first place. I could be wrong though, and I'm happy to
-> benchmark.
-
-Again, I don't have enough experience to say this is (or isn't)
-impacting irq handling latency, I'm just reporting what Thomas told me.
-
-> 
-> It would be possible to go for your list shuffling approach here while
-> still keeping the flag internal and all the logic hidden away in
-> kernel/irq/pm.c. I wasn't sure how actions could be manipulated during
-> suspend, which made me wary of moving them to a separate list.
-
-Moving them to a temporary list on suspend and restoring them on
-resume should not be a problem.
-The only drawback I see is that actions might be reordered after the
-first resume (anyway, relying on shared irq action order is dangerous
-IMHO).
-
-> 
-> > > +	return action->handler(irq, action->dev_id);
-> > > +}
-> > > +
-> > >  irqreturn_t
-> > >  handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
-> > >  {
-> > > @@ -140,7 +151,7 @@ handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
-> > >  		irqreturn_t res;
-> > >  
-> > >  		trace_irq_handler_entry(irq, action);
-> > > -		res = action->handler(irq, action->dev_id);
-> > > +		res = __handle_irq_event_percpu(irq, action);
-> > >  		trace_irq_handler_exit(irq, action, res);
-> > >  
-> > >  		if (WARN_ONCE(!irqs_disabled(),"irq %u handler %pF enabled interrupts\n",
-> > > diff --git a/kernel/irq/pm.c b/kernel/irq/pm.c
-> > > index 3ca5325..9d8a71f 100644
-> > > --- a/kernel/irq/pm.c
-> > > +++ b/kernel/irq/pm.c
-> > > @@ -43,9 +43,6 @@ void irq_pm_install_action(struct irq_desc *desc, struct irqaction *action)
-> > >  
-> > >  	if (action->flags & IRQF_NO_SUSPEND)
-> > >  		desc->no_suspend_depth++;
-> > > -
-> > > -	WARN_ON_ONCE(desc->no_suspend_depth &&
-> > > -		     desc->no_suspend_depth != desc->nr_actions);
-> > 
-> > Hm, actually this WARN_ON was here to detect offending drivers
-> > (those mixing handler with and without IRQF_NO_SUSPEND on a shared irq).
-> > IMO, removing it is not such a good idea.
-> 
-> I'm not sure I follow. This patch remove the reason we care, no?
-
-Yep, but as explained above, the whole point of this warning is to make
-people think twice before passing IRQF_NO_SUSPEND when registering a
-shared irq, if you silently handle this case, then nobody can notice
-they might be doing something wrong.
-
-> 
-> When going for suspend the patch uses the mismatch to detect whether it
-> needs to mask out any actions for the desc.
-> 
-> If unexpected interrupts can be generated from devices we're masking the
-> actions for things could go wrong, but that's also the case with the
-> demux. So if we need the warning here we should also have one in the
-> demux to that effect...
-
-Except they are explicitly defining a virtual irq demuxer.
-This should imply taking the appropriate action to prevent any
-interrupt coming from the devices when entering suspend, but maybe
-that's not clear enough in the virtual demux description.
-
-Regards,
-
-Boris
-
+diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
+index ab1dc0a56cdd..6a5f51daa708 100644
+--- a/arch/arm/boot/dts/zynq-parallella.dts
++++ b/arch/arm/boot/dts/zynq-parallella.dts
+@@ -23,6 +23,11 @@
+ 	model = "Adapteva Parallella Board";
+ 	compatible = "adapteva,parallella", "xlnx,zynq-7000";
+ 
++	aliases {
++		ethernet0 = &gem0;
++		serial0 = &uart1;
++	};
++
+ 	memory {
+ 		device_type = "memory";
+ 		reg = <0x0 0x40000000>;
+diff --git a/arch/arm/boot/dts/zynq-zybo.dts b/arch/arm/boot/dts/zynq-zybo.dts
+index a9a12ce5023b..935a561f6aa6 100644
+--- a/arch/arm/boot/dts/zynq-zybo.dts
++++ b/arch/arm/boot/dts/zynq-zybo.dts
+@@ -18,6 +18,11 @@
+ 	model = "Zynq ZYBO Development Board";
+ 	compatible = "digilent,zynq-zybo", "xlnx,zynq-7000";
+ 
++	aliases {
++		ethernet0 = &gem0;
++		serial0 = &uart1;
++	};
++
+ 	memory {
+ 		device_type = "memory";
+ 		reg = <0x0 0x20000000>;
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.8.2.3
