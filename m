@@ -1,52 +1,64 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Tue, 10 Feb 2015 19:52:28 -0800
-Subject: [PATCH 2/2] ARM: sunxi_defconfig: increase the number of maximum
- number of CPUs to 8
-In-Reply-To: <1423626748-1277-1-git-send-email-tyler.baker@linaro.org>
-References: <1423626748-1277-1-git-send-email-tyler.baker@linaro.org>
-Message-ID: <1423626748-1277-3-git-send-email-tyler.baker@linaro.org>
+From: psawargaonkar@apm.com (Pranavkumar Sawargaonkar)
+Date: Wed, 11 Feb 2015 09:39:28 +0530
+Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
+In-Reply-To: <54C75B4B.6050709@redhat.com>
+References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
+ <54C75B4B.6050709@redhat.com>
+Message-ID: <CANFfpkTvKkLZFrOO+wXeWO8CKQ6EM9uH86H2AeqjqCF_4i+WVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The a80 optimus has 8 CPUs. I propose we increase the maximum number of CPUs to 8 to avoid the following warning identified during automated boot testing [1].
+Hi,
 
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 0 at ../arch/arm/kernel/devtree.c:144 arm_dt_init_cpu_maps+0x110/0x1e0()
-DT /cpu 5 nodes greater than max cores 4, capping them
-CPU: 0 PID: 0 Comm: swapper Not tainted 3.19.0-00528-gbdccc4edeb03 #1
-Hardware name: Allwinner sun9i Family
-[] (unwind_backtrace) from [] (show_stack+0x10/0x14)
-[] (show_stack) from [] (dump_stack+0x74/0x90)
-[] (dump_stack) from [] (warn_slowpath_common+0x70/0xac)
-[] (warn_slowpath_common) from [] (warn_slowpath_fmt+0x30/0x40)
-[] (warn_slowpath_fmt) from [] (arm_dt_init_cpu_maps+0x110/0x1e0)
-[] (arm_dt_init_cpu_maps) from [] (setup_arch+0x634/0x8d4)
-[] (setup_arch) from [] (start_kernel+0x88/0x3ac)
-[] (start_kernel) from [<20008074>] (0x20008074)
----[ end trace cb88537fdc8fa200 ]---
+On Tue, Jan 27, 2015 at 3:02 PM, Jon Masters <jcm@redhat.com> wrote:
+> On 01/27/2015 02:03 AM, Pranavkumar Sawargaonkar wrote:
+>> In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
+>> in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
+>> size due to size alignment checking in vgic driver for VCPU Control and
+>> VCPU register.
+>>
+>> This patch corrects the sizes to be inline with the hardware spec.
+>>
+>> CC: linux-arm-kernel at lists.infradead.org
+>> CC: kvmarm at lists.cs.columbia.edu
+>> CC: arnd at arndb.de
+>> CC: marc.zyngier at arm.com
+>> CC: christoffer.dall at linaro.org
+>> CC: jcm at redhat.com
+>> Signed-off-by: Pranavkumar Sawargaonkar <psawargaonkar@apm.com>
+>> Signed-off-by: Tushar Jagad <tjagad@apm.com>
+>> Signed-off-by: Feng Kan <fkan@apm.com>
+>> ---
+>>  arch/arm64/boot/dts/apm/apm-storm.dtsi |    8 ++++----
+>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> index f1ad9c2..65f0e6d 100644
+>> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> @@ -81,10 +81,10 @@
+>>               compatible = "arm,cortex-a15-gic";
+>>               #interrupt-cells = <3>;
+>>               interrupt-controller;
+>> -             reg = <0x0 0x78010000 0x0 0x1000>,      /* GIC Dist */
+>> -                   <0x0 0x78020000 0x0 0x1000>,      /* GIC CPU */
+>> -                   <0x0 0x78040000 0x0 0x2000>,      /* GIC VCPU Control */
+>> -                   <0x0 0x78060000 0x0 0x2000>;      /* GIC VCPU */
+>> +             reg = <0x0 0x78010000 0x0 0x10000>,     /* GIC Dist */
+>> +                   <0x0 0x78020000 0x0 0x20000>,     /* GIC CPU */
+>> +                   <0x0 0x78040000 0x0 0x10000>,     /* GIC VCPU Control */
+>> +                   <0x0 0x78060000 0x0 0x20000>;     /* GIC VCPU */
+>>               interrupts = <1 9 0xf04>;       /* GIC Maintenence IRQ */
+>>       };
 
-[1] http://storage.kernelci.org/mainline/v3.19-528-gbdccc4edeb03/arm-sunxi_defconfig/lab-tbaker/boot-sun9i-a80-optimus.html
+Any comments on this patch ?
 
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Kevin Hilman <khilman@kernel.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
----
- arch/arm/configs/sunxi_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+>
+> Thanks. I confirm that we have tested this.
+>
+> Jon.
+>
+>
 
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index 38840a8..8f6a570 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -4,6 +4,7 @@ CONFIG_BLK_DEV_INITRD=y
- CONFIG_PERF_EVENTS=y
- CONFIG_ARCH_SUNXI=y
- CONFIG_SMP=y
-+CONFIG_NR_CPUS=8
- CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
- CONFIG_HIGHPTE=y
--- 
-2.1.4
+Thanks,
+Pranav
