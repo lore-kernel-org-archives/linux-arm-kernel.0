@@ -1,114 +1,97 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 11 Feb 2015 11:58:52 -0500
-Subject: [PATCH v6 0/7] PCI: get DMA configuration from parent device
-In-Reply-To: <54DB8960.9010707@ti.com>
-References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
- <20150206151542.GD23190@e104818-lin.cambridge.arm.com>
- <54D4DD95.7000303@ti.com>
- <CAErSpo6GOXHeKKfU8s5jCS3+Mui=HupZd=jpkLEyWAE94Ory5w@mail.gmail.com>
- <54D509C9.9010204@ti.com> <54DB8960.9010707@ti.com>
-Message-ID: <54DB8A4C.9050002@ti.com>
+Date: Wed, 11 Feb 2015 12:13:09 -0500
+Subject: [PATCH] of: calculate masks of the device based on dma-range size
+In-Reply-To: <20150209112739.GC16587@e104818-lin.cambridge.arm.com>
+References: <1423253720-2785-1-git-send-email-m-karicheri2@ti.com>
+ <20150209112739.GC16587@e104818-lin.cambridge.arm.com>
+Message-ID: <54DB8DA5.7000204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2015 11:54 AM, Murali Karicheri wrote:
-> On 02/06/2015 01:36 PM, Murali Karicheri wrote:
->> On 02/06/2015 12:53 PM, Bjorn Helgaas wrote:
->>> On Fri, Feb 6, 2015 at 9:28 AM, Murali Karicheri<m-karicheri2@ti.com>
->>> wrote:
->>>> On 02/06/2015 10:15 AM, Catalin Marinas wrote:
->>>>>
->>>>> On Thu, Feb 05, 2015 at 09:52:52PM +0000, Murali Karicheri wrote:
->>>>>>
->>>>>> This patch add an important capability to PCI driver on Keystone. I
->>>>>> hope
->>>>>> to
->>>>>> have this merged to the upstream branch so that it is available for
->>>>>> v3.20.
->>>>>
->>>>> It's very late for 3.20 and the code hasn't been in linux-next at all
->>>>> (but it's not me who's merging this code), unless you can squeeze
->>>>> it in
->>>>> as a bug-fix.
->>>>
->>>> This is in fact a bug fix as PCI on Keystone is broken without this.
->>>
->>> Oh, sorry, I didn't realize that this was so urgent. I guess I read
->>> "this adds an important capability" in the cover letter and concluded
->>> that it was new functionality.
->> Bjorn,
+On 02/09/2015 06:27 AM, Catalin Marinas wrote:
+> On Fri, Feb 06, 2015 at 03:15:20PM -0500, Murali Karicheri wrote:
+>> diff --git a/drivers/of/device.c b/drivers/of/device.c
+>> index 314c8a9..44209fa 100644
+>> --- a/drivers/of/device.c
+>> +++ b/drivers/of/device.c
+>> @@ -83,17 +83,18 @@ int of_device_add(struct platform_device *ofdev)
+>>    */
+>>   void of_dma_configure(struct device *dev, struct device_node *np)
+>>   {
+>> -	u64 dma_addr, paddr, size;
+>> +	u64 dma_addr = 0, paddr, size;
+>>   	int ret;
+>>   	bool coherent;
+>> -	unsigned long offset;
+>> +	unsigned long offset = 0;
+>>   	struct iommu_ops *iommu;
 >>
->> Thanks for responding.
+>>   	/*
+>>   	 * Set default dma-mask to 32 bit. Drivers are expected to setup
+>>   	 * the correct supported dma_mask.
+>>   	 */
+>> -	dev->coherent_dma_mask = DMA_BIT_MASK(32);
+>> +	if (!dev->coherent_dma_mask)
+>> +		dev->coherent_dma_mask = DMA_BIT_MASK(32);
 >>
->> Let me give you some context on this without which my explanation won't
->> be complete. For using PCI driver on Keystone, I had submitted patches
->> related to machine and DTS to the arm mailing list to enable the driver
->> on Keystone. Subsequenty one of the patch from my series was Nack-ed and
->> I was asked to implememented in a different way and started this series.
->> You can refer to the discussion of this at
+>>   	/*
+>>   	 * Set it to coherent_dma_mask by default if the architecture
+>> @@ -102,11 +103,14 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>>   	if (!dev->dma_mask)
+>>   		dev->dma_mask =&dev->coherent_dma_mask;
 >>
->> http://www.gossamer-threads.com/lists/linux/kernel/2024591
->>
->> The PCI driver enablement on Keystone is still a working in progress and
->> I am trying to get it fully functional on the upstream. Another missing
->> piece is the SerDes phy driver patch. We have started working on the
->> other part (SerDes phy driver) already as the initial one was not
->> accepted. So it is fine if we are too late for the v3.20 merge window to
->> merge this series and this can be applied to the next branch for v3.21.
->>
->>>
->>> Anyway, if it's broken, presumably PCI on Keystone *did* work at one
->>> point. Can you identify the commit that broke it and requires these
->>> fixes, so we can figure out how far the fixes need to be backported?
->>>
->>
->> I am trying to get this driver enabled on Keystone by adding the missing
->> pieces as described above. So I guess we don't have to back port
->> anything here.
->>
->>> If I merge it, I would like to get into my for-linus branch and get a
->>> little time in -next before asking Linus to pull it. The merge window
->>> is a little wrinkle there -- I don't like to add new things to the mix
->>> during the window. But if it's an important fix we can still get it
->>> in before the final v3.20.
->>
->> Please apply this to next branch for v3.21. It currently apply cleanly
->> to v3.19-rc7. If you want me rebase to another branch, let me know I can
->> apply and send you an updated patch.
->>
-> Bjorn, Arnd,
+>> +	/*
+>> +	 * Set default size to cover the 32-bit. Drivers are expected to setup
+>> +	 * the correct size and dma_mask.
+>> +	 */
 >
-> I am assuming, Bjorn is going to merge this to his next branch for
-> v3.21. If not, it might have to be merged through the arm soc? There are
-> a couple of Tested-by and Acked-by received after v7. Do you want me to
-> post v8 with these updated in the patches?
-FYI.
+> Nitpick: drivers don't set up the size, just the mask. We read the size
+> from DT.
 
-These are the updates.
-Series was
-
-1) Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-    (on AMD Seattle platform w/ PCI Generic Host controller)
-2) Acked-by: Will Deacon <will.deacon@arm.com>
-3) Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-
-If you want to send a updated series with these, please let me know.
-
-Thanks and regards,
-
-Murali
+Not sure how this came, I will update this.
 >
-> Murali
+>> +	size = 1ULL<<  32;
+>> +
+>>   	ret = of_dma_get_range(np,&dma_addr,&paddr,&size);
+>> -	if (ret<  0) {
+>> -		dma_addr = offset = 0;
+>> -		size = dev->coherent_dma_mask + 1;
 >
->> Thanks
->>
->> Murali
->>
->>>
->>> Bjorn
->>
->>
+> Do you assume that, on error, of_dma_get_range() does not touch any of
+> the dma_addr/paddr/size? It looks safer to me to leave it as the
+> original.
+I think dma_addr and paddr is both modified on error. So this change 
+can't be done. I will revert the logic back to original.
 >
+>> -	} else {
+>> +	if (!ret) {
+>>   		offset = PFN_DOWN(paddr - dma_addr);
+>>
+>>   		/*
+>> @@ -128,6 +132,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>>
+>>   	dev->dma_pfn_offset = offset;
+>>
+>> +	/*
+>> +	 * Limit coherent and dma mask based on size and default mask
+>> +	 * set by the driver.
+>> +	 */
+>> +	dev->coherent_dma_mask = min(dev->coherent_dma_mask,
+>> +				     DMA_BIT_MASK(ilog2(dma_addr + size)));
+>
+> Do we need to cover the case where size is incorrectly set to 0 in the
+> DT? At least some warning and leaving the mask unchanged.
+
+The previous series already warn and return if the size is incorrect 
+(Patch v6 3/7) and leave the dma mask unchanged. So we don't have to do 
+anything in this patch. I will fix the above and re-send.
+>
+>> +	*dev->dma_mask = min((*dev->dma_mask),
+>> +			     DMA_BIT_MASK(ilog2(dma_addr + size)));
+>> +
+>>   	coherent = of_dma_is_coherent(np);
+>>   	dev_dbg(dev, "device is%sdma coherent\n",
+>>   		coherent ? " " : " not ");
 >
 
 
