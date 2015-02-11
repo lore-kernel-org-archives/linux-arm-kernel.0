@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Feb 2015 10:01:16 +0100
-Subject: [PATCH v2 17/30] ARM: sun6i: app4 evb1: Convert to DT label based
+Date: Wed, 11 Feb 2015 10:01:17 +0100
+Subject: [PATCH v2 18/30] ARM: sun6i: colombus: Convert to DT label based
  syntax
 In-Reply-To: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1423645289-1074-18-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1423645289-1074-19-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,57 +14,130 @@ when overriding DTSI nodes, convert the board to this syntax
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun6i-a31-app4-evb1.dts | 52 +++++++++++++++----------------
- 1 file changed, 25 insertions(+), 27 deletions(-)
+ arch/arm/boot/dts/sun6i-a31-colombus.dts | 120 +++++++++++++++----------------
+ 1 file changed, 59 insertions(+), 61 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-index be9f5ee6b59e..98a74da02fd7 100644
---- a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-@@ -61,36 +61,34 @@
+diff --git a/arch/arm/boot/dts/sun6i-a31-colombus.dts b/arch/arm/boot/dts/sun6i-a31-colombus.dts
+index 84630e56acd7..d6e925c381a3 100644
+--- a/arch/arm/boot/dts/sun6i-a31-colombus.dts
++++ b/arch/arm/boot/dts/sun6i-a31-colombus.dts
+@@ -61,76 +61,74 @@
  	chosen {
  		bootargs = "earlyprintk console=ttyS0,115200";
  	};
 +};
  
 -	soc at 01c00000 {
+-		mmc0: mmc at 01c0f000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_colombus>;
+-			vmmc-supply = <&reg_vcc3v0>;
+-			bus-width = <4>;
+-			cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
+-			cd-inverted;
+-			status = "okay";
+-		};
++&ehci1 {
++	status = "okay";
++};
+ 
+-		usbphy: phy at 01c19400 {
+-			usb2_vbus-supply = <&reg_usb2_vbus>;
+-			status = "okay";
+-		};
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "fail";
++};
+ 
+-		ehci1: usb at 01c1b000 {
+-			status = "okay";
+-		};
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
++};
+ 
 -		pio: pinctrl at 01c20800 {
--			usb1_vbus_pin_a: usb1_vbus_pin at 0 {
--				allwinner,pins = "PH27";
+-			mmc0_pins_a: mmc0 at 0 {
+-				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+-			};
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins_a>;
++	status = "okay";
++};
+ 
+-			mmc0_cd_pin_colombus: mmc0_cd_pin at 0 {
+-				allwinner,pins = "PA8";
+-				allwinner,function = "gpio_in";
+-				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+-			};
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_colombus>;
++	vmmc-supply = <&reg_vcc3v0>;
++	bus-width = <4>;
++	cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
++	cd-inverted;
++	status = "okay";
++};
+ 
+-			usb2_vbus_pin_colombus: usb2_vbus_pin at 0 {
+-				allwinner,pins = "PH24";
 -				allwinner,function = "gpio_out";
 -				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 -				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 -			};
 -		};
-+&ehci0 {
-+	status = "okay";
++&mmc0_pins_a {
++	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
 +};
  
--		usbphy: phy at 01c19400 {
--			usb1_vbus-supply = <&reg_usb1_vbus>;
+-		uart0: serial at 01c28000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&uart0_pins_a>;
 -			status = "okay";
 -		};
 +&pio {
-+	usb1_vbus_pin_a: usb1_vbus_pin at 0 {
-+		allwinner,pins = "PH27";
++	mmc0_cd_pin_colombus: mmc0_cd_pin at 0 {
++		allwinner,pins = "PA8";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
+ 
+-		i2c0: i2c at 01c2ac00 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c0_pins_a>;
+-			status = "fail";
+-		};
++	usb2_vbus_pin_colombus: usb2_vbus_pin at 0 {
++		allwinner,pins = "PH24";
 +		allwinner,function = "gpio_out";
 +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 +	};
 +};
  
--		ehci0: usb at 01c1a000 {
+-		i2c1: i2c at 01c2b000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c1_pins_a>;
 -			status = "okay";
 -		};
-+&reg_usb1_vbus {
-+	pinctrl-0 = <&usb1_vbus_pin_a>;
-+	gpio = <&pio 7 27 GPIO_ACTIVE_HIGH>;
++&reg_usb2_vbus {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb2_vbus_pin_colombus>;
++	gpio = <&pio 7 24 GPIO_ACTIVE_HIGH>;
 +	status = "okay";
 +};
  
--		uart0: serial at 01c28000 {
+-		i2c2: i2c at 01c2b400 {
 -			pinctrl-names = "default";
--			pinctrl-0 = <&uart0_pins_a>;
+-			pinctrl-0 = <&i2c2_pins_a>;
 -			status = "okay";
 -		};
 -	};
@@ -74,13 +147,14 @@ index be9f5ee6b59e..98a74da02fd7 100644
 +	status = "okay";
 +};
  
--	reg_usb1_vbus: usb1-vbus {
--		pinctrl-0 = <&usb1_vbus_pin_a>;
--		gpio = <&pio 7 27 GPIO_ACTIVE_HIGH>;
+-	reg_usb2_vbus: usb2-vbus {
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&usb2_vbus_pin_colombus>;
+-		gpio = <&pio 7 24 GPIO_ACTIVE_HIGH>;
 -		status = "okay";
 -	};
 +&usbphy {
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
 +	status = "okay";
  };
 -- 
