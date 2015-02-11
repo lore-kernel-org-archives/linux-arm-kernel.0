@@ -1,102 +1,123 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 11 Feb 2015 09:32:18 +0100
-Subject: [RFC v4 08/13] KVM: kvm-vfio: wrappers for
- vfio_external_{mask|is_active|set_automasked}
+Date: Wed, 11 Feb 2015 09:32:19 +0100
+Subject: [RFC v4 09/13] KVM: arm: rename pause into power_off
 In-Reply-To: <1423643543-24409-1-git-send-email-eric.auger@linaro.org>
 References: <1423643543-24409-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1423643543-24409-9-git-send-email-eric.auger@linaro.org>
+Message-ID: <1423643543-24409-10-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Those 3 new wrapper functions call the respective VFIO external
-functions.
+The kvm_vcpu_arch pause field is renamed into power_off to prepare
+for the introduction of a new pause field.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
-
 ---
+ arch/arm/include/asm/kvm_host.h |  4 ++--
+ arch/arm/kvm/arm.c              | 10 +++++-----
+ arch/arm/kvm/psci.c             | 10 +++++-----
+ 3 files changed, 12 insertions(+), 12 deletions(-)
 
-v4: creation
----
- include/linux/vfio.h |  8 +++-----
- virt/kvm/vfio.c      | 44 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 47 insertions(+), 5 deletions(-)
-
-diff --git a/include/linux/vfio.h b/include/linux/vfio.h
-index e04ca93..565f5f7 100644
---- a/include/linux/vfio.h
-+++ b/include/linux/vfio.h
-@@ -106,14 +106,12 @@ extern struct device *vfio_external_base_device(struct vfio_device *vdev);
- struct vfio_platform_device;
- extern void vfio_external_mask(struct vfio_platform_device *vdev, int index);
- /*
-- * returns whether the VFIO IRQ is active:
-- * true if not yet deactivated at interrupt controller level or if
-- * automasked (level sensitive IRQ). Unfortunately there is no way to
-- * discriminate between handler auto-masking and user-space masking
-+ * returns whether the VFIO IRQ is active at interrupt controller level
-+ * or VFIO-masked. Note that if the use-space masked the IRQ index it
-+ * cannot be discriminated from automasked handler situation.
-  */
- extern bool vfio_external_is_active(struct vfio_platform_device *vdev,
- 				    int index);
--
- extern void vfio_external_set_automasked(struct vfio_platform_device *vdev,
- 					 int index, bool automasked);
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 9cbcc53..87f0921 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -128,8 +128,8 @@ struct kvm_vcpu_arch {
+ 	 * here.
+ 	 */
  
-diff --git a/virt/kvm/vfio.c b/virt/kvm/vfio.c
-index 80a45e4..c995e51 100644
---- a/virt/kvm/vfio.c
-+++ b/virt/kvm/vfio.c
-@@ -134,6 +134,50 @@ static void kvm_vfio_put_vfio_device(struct vfio_device *vdev)
- 	kvm_vfio_device_put_external_user(vdev);
+-	/* Don't run the guest on this vcpu */
+-	bool pause;
++	/* vcpu power-off state*/
++	bool power_off;
+ 
+ 	/* IO related fields */
+ 	struct kvm_decode mmio_decode;
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 61586a3..6f63ab7 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -459,7 +459,7 @@ static void vcpu_pause(struct kvm_vcpu *vcpu)
+ {
+ 	wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
+ 
+-	wait_event_interruptible(*wq, !vcpu->arch.pause);
++	wait_event_interruptible(*wq, !vcpu->arch.power_off);
  }
  
-+bool kvm_vfio_external_is_active(struct vfio_platform_device *vpdev,
-+				 int index)
-+{
-+	bool (*fn)(struct vfio_platform_device *, int index);
-+	bool active;
-+
-+	fn = symbol_get(vfio_external_is_active);
-+	if (!fn)
-+		return -1;
-+
-+	active = fn(vpdev, index);
-+
-+	symbol_put(vfio_external_is_active);
-+	return active;
-+}
-+
-+void kvm_vfio_external_mask(struct vfio_platform_device *vpdev,
-+			    int index)
-+{
-+	void (*fn)(struct vfio_platform_device *, int index);
-+
-+	fn = symbol_get(vfio_external_mask);
-+	if (!fn)
-+		return;
-+
-+	fn(vpdev, index);
-+
-+	symbol_put(vfio_external_mask);
-+}
-+
-+void kvm_vfio_external_set_automasked(struct vfio_platform_device *vpdev,
-+				      int index, bool automasked)
-+{
-+	void (*fn)(struct vfio_platform_device *, int index, bool automasked);
-+
-+	fn = symbol_get(vfio_external_set_automasked);
-+	if (!fn)
-+		return;
-+
-+	fn(vpdev, index, automasked);
-+
-+	symbol_put(vfio_external_set_automasked);
-+}
-+
- static bool kvm_vfio_group_is_coherent(struct vfio_group *vfio_group)
+ static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
+@@ -509,7 +509,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ 		update_vttbr(vcpu->kvm);
+ 
+-		if (vcpu->arch.pause)
++		if (vcpu->arch.power_off)
+ 			vcpu_pause(vcpu);
+ 
+ 		kvm_vgic_flush_hwstate(vcpu);
+@@ -731,12 +731,12 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
+ 	vcpu_reset_hcr(vcpu);
+ 
+ 	/*
+-	 * Handle the "start in power-off" case by marking the VCPU as paused.
++	 * Handle the "start in power-off" case.
+ 	 */
+ 	if (test_bit(KVM_ARM_VCPU_POWER_OFF, vcpu->arch.features))
+-		vcpu->arch.pause = true;
++		vcpu->arch.power_off = true;
+ 	else
+-		vcpu->arch.pause = false;
++		vcpu->arch.power_off = false;
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+index 58cb324..ec0bd13 100644
+--- a/arch/arm/kvm/psci.c
++++ b/arch/arm/kvm/psci.c
+@@ -60,7 +60,7 @@ static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
+ 
+ static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
  {
- 	long (*fn)(struct vfio_group *, unsigned long);
+-	vcpu->arch.pause = true;
++	vcpu->arch.power_off = true;
+ }
+ 
+ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+@@ -92,7 +92,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ 	 */
+ 	if (!vcpu)
+ 		return PSCI_RET_INVALID_PARAMS;
+-	if (!vcpu->arch.pause) {
++	if (!vcpu->arch.power_off) {
+ 		if (kvm_psci_version(source_vcpu) != KVM_ARM_PSCI_0_1)
+ 			return PSCI_RET_ALREADY_ON;
+ 		else
+@@ -120,7 +120,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ 	 * the general puspose registers are undefined upon CPU_ON.
+ 	 */
+ 	*vcpu_reg(vcpu, 0) = context_id;
+-	vcpu->arch.pause = false;
++	vcpu->arch.power_off = false;
+ 	smp_mb();		/* Make sure the above is visible */
+ 
+ 	wq = kvm_arch_vcpu_wq(vcpu);
+@@ -157,7 +157,7 @@ static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
+ 	kvm_for_each_vcpu(i, tmp, kvm) {
+ 		mpidr = kvm_vcpu_get_mpidr(tmp);
+ 		if (((mpidr & target_affinity_mask) == target_affinity) &&
+-		    !tmp->arch.pause) {
++		    !tmp->arch.power_off) {
+ 			return PSCI_0_2_AFFINITY_LEVEL_ON;
+ 		}
+ 	}
+@@ -180,7 +180,7 @@ static void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
+ 	 * re-initialized.
+ 	 */
+ 	kvm_for_each_vcpu(i, tmp, vcpu->kvm) {
+-		tmp->arch.pause = true;
++		tmp->arch.power_off = true;
+ 		kvm_vcpu_kick(tmp);
+ 	}
+ 
 -- 
 1.9.1
