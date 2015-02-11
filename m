@@ -1,53 +1,221 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 11 Feb 2015 09:42:56 +0100
-Subject: [PATCH 6/6] [RFC] mtd: mxc-nand: Warn on unimplemented commands
-In-Reply-To: <1423594800-24214-7-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1423594800-24214-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1423594800-24214-7-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20150211094256.2ef2805b@ipc1.ka-ro>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 11 Feb 2015 09:53:39 +0100
+Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
+ demuxer chip
+In-Reply-To: <20150210204835.GL9432@leverpostej>
+References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1422527620-8308-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20150210153628.GF9432@leverpostej>
+ <20150210165201.634bc04b@bbrezillon>
+ <20150210204835.GL9432@leverpostej>
+Message-ID: <20150211095339.0a2e4e7b@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Mark,
 
-Uwe Kleine-K?nig wrote:
-> The PARAM command was long unimplemented and it probably wasn't
-> noticed because chip probing using only the few bytes returned by the
-> READID command are good enough in most cases to determine the chip in
-> use.
+On Tue, 10 Feb 2015 20:48:36 +0000
+Mark Rutland <mark.rutland@arm.com> wrote:
+
+> On Tue, Feb 10, 2015 at 03:52:01PM +0000, Boris Brezillon wrote:
+> > Hi Mark,
+> > 
+> > On Tue, 10 Feb 2015 15:36:28 +0000
+> > Mark Rutland <mark.rutland@arm.com> wrote:
+> > 
+> > > Hi Boris,
+> > > 
+> > > On Thu, Jan 29, 2015 at 10:33:38AM +0000, Boris Brezillon wrote:
+> > > > Add documentation for the virtual irq demuxer.
+> > > > 
+> > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > > ---
+> > > >  .../bindings/interrupt-controller/dumb-demux.txt   | 41 ++++++++++++++++++++++
+> > > >  1 file changed, 41 insertions(+)
+> > > >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+> > > > 
+> > > > diff --git a/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+> > > > new file mode 100644
+> > > > index 0000000..b9a7830
+> > > > --- /dev/null
+> > > > +++ b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+> > > > @@ -0,0 +1,41 @@
+> > > > +* Virtual Interrupt Demultiplexer
+> > > > +
+> > > > +This virtual demultiplexer simply forward all incoming interrupts to its
+> > > > +enabled/unmasked children.
+> > > > +It is only intended to be used by hardware that do not provide a proper way
+> > > > +to demultiplex a source interrupt, and thus have to wake all their children
+> > > > +up so that they can possibly handle the interrupt (if needed).
+> > > > +This can be seen as an alternative to shared interrupts when at least one
+> > > > +of the interrupt children is a timer (and require the irq to stay enabled
+> > > > +on suspend) while others are not. This will prevent calling irq handlers of
+> > > > +non timer devices while they are suspended.
+> > > 
+> > > This sounds like a DT-workaround for a Linux implementation problem, and
+> > > I don't think this the right way to solve your problem.
+> > 
+> > I understand your concern, but why are you answering while I asked for
+> > DT maintainers reviews for several days (if not several weeks).
+> > 
+> > > 
+> > > Why does this have to be in DT at all? Why can we not fix the core to
+> > > handle these details?
+> > 
+> > We already discussed that with Rob and Thomas, and hiding such a
+> > demuxer chip is not an easy task.
+> > I'm open to any suggestion to do that, though I'd like you (I mean DT
+> > guys) to provide a working implementation (or at least a viable concept)
+> > that would silently demultiplex an irq.
+> > 
+> > > 
+> > > I am very much not keen on this binding.
+> > 
+> > Yes, but do you have anything else to propose.
+> > We're experiencing this warning for 2 releases now, and this is time to
+> > find a solution (even if it's not a perfect one).
 > 
-> Still to notice such a shortcoming earlier in the future would be nice
-> in case it's something more vital.
+> Thoughts on the patch below?
+
+That's pretty much what I proposed in my first attempt to solve this
+problem [1] (except for a few things commented below).
+Anyway, Thomas suggested to go for the "dumb/virt irq demultiplexer"
+approach instead.
+
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Rather than handling this at the desc level it adds an extra flag to the
+> irqaction which can be set/unset during suspend for those irqs we don't
+> want to handle. That way we don't need to tell the core about the
+> mismatch explicitly in DT (or ACPI/board files/whatever).
+> 
+> If we can request/free interrupts during suspend then there's some logic
+> missing, but it shows the basic idea.
+> 
+> I didn't have a system to hand with shared mismatched IRQF_NO_SUSPEND
+> interrupts, so I had to fake that up in code for testing.
+> 
+> Thanks,
+> Mark.
+> 
+> ---->8----
+> From f390ccbb31f06efee49b4469943c8d85d963bfb5 Mon Sep 17 00:00:00 2001
+> From: Mark Rutland <mark.rutland@arm.com>
+> Date: Tue, 10 Feb 2015 20:14:33 +0000
+> Subject: [PATCH] genirq: allow mixed IRQF_NO_SUSPEND requests
+> 
+> In some cases a physical IRQ line may be shared between devices from
+> which we expect interrupts during suspend (e.g. timers) and those we do
+> not (e.g. anything we cut the power to). Where a driver did not request
+> the interrupt with IRQF_NO_SUSPEND, it's unlikely that it can handle
+> being called during suspend, and it may bring down the system.
+> 
+> This patch adds logic to automatically mark the irqactions for these
+> potentially unsafe handlers as disabled during suspend, leaving actions
+> with IRQF_NO_SUSPEND enabled. If an interrupt is raised on a shared line
+> during suspend, only the handlers requested with IRQF_NO_SUSPEND will be
+> called. The handlers requested without IRQF_NO_SUSPEND will be skipped
+> as if they had immediately returned IRQF_NONE.
+> 
+> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 > ---
->  drivers/mtd/nand/mxc_nand.c | 4 ++++
->  1 file changed, 4 insertions(+)
+>  include/linux/interrupt.h |  4 ++++
+>  kernel/irq/handle.c       | 13 +++++++++++-
+>  kernel/irq/pm.c           | 50 +++++++++++++++++++++++++++++++++++++++++++----
+>  3 files changed, 62 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-> index 0083b4ee4f33..372e0e38f59b 100644
-> --- a/drivers/mtd/nand/mxc_nand.c
-> +++ b/drivers/mtd/nand/mxc_nand.c
-> @@ -1160,6 +1160,10 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
->  		memcpy32_fromio(host->data_buf, host->main_area0, 512);
->  		host->buf_start = 0;
->  		break;
-> +	default:
-> +		WARN_ONCE(1, "Unimplemented command (cmd=%u)\n",
-> +			  command);
-> +		break;
->  	}
-useless break;
+> diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+> index d9b05b5..49dcb35 100644
+> --- a/include/linux/interrupt.h
+> +++ b/include/linux/interrupt.h
+> @@ -57,6 +57,9 @@
+>   * IRQF_NO_THREAD - Interrupt cannot be threaded
+>   * IRQF_EARLY_RESUME - Resume IRQ early during syscore instead of at device
+>   *                resume time.
+> + * IRQF_NO_ACTION - This irqaction should not be triggered.
+> + *                  Used during suspend for !IRQF_NO_SUSPEND irqactions which
+> + *                  share lines with IRQF_NO_SUSPEND irqactions.
+>   */
+>  #define IRQF_DISABLED		0x00000020
+>  #define IRQF_SHARED		0x00000080
+> @@ -70,6 +73,7 @@
+>  #define IRQF_FORCE_RESUME	0x00008000
+>  #define IRQF_NO_THREAD		0x00010000
+>  #define IRQF_EARLY_RESUME	0x00020000
+> +#define IRQF_NO_ACTION		0x00040000
+>  
+>  #define IRQF_TIMER		(__IRQF_TIMER | IRQF_NO_SUSPEND | IRQF_NO_THREAD)
+>  
+> diff --git a/kernel/irq/handle.c b/kernel/irq/handle.c
+> index 6354802..44c8662 100644
+> --- a/kernel/irq/handle.c
+> +++ b/kernel/irq/handle.c
+> @@ -130,6 +130,17 @@ void __irq_wake_thread(struct irq_desc *desc, struct irqaction *action)
+>  	wake_up_process(action->thread);
+>  }
+>  
+> +static irqreturn_t __handle_irq_event_percpu(unsigned int irq, struct irqaction *action)
+> +{
+> +	/*
+> +	 * During suspend we must not call potentially unsafe irq handlers.
+> +	 * See suspend_suspendable_actions.
+> +	 */
+> +	if (unlikely(action->flags & IRQF_NO_ACTION))
+> +		return IRQ_NONE;
+
+Thomas was trying to avoid any new conditional code in the interrupt
+handling path, that's why I added a suspended_action list in my
+proposal.
+Even if your 'unlikely' statement make things better I'm pretty sure it
+adds some latency.
 
 
-Lothar Wa?mann
+> +	return action->handler(irq, action->dev_id);
+> +}
+> +
+>  irqreturn_t
+>  handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
+>  {
+> @@ -140,7 +151,7 @@ handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
+>  		irqreturn_t res;
+>  
+>  		trace_irq_handler_entry(irq, action);
+> -		res = action->handler(irq, action->dev_id);
+> +		res = __handle_irq_event_percpu(irq, action);
+>  		trace_irq_handler_exit(irq, action, res);
+>  
+>  		if (WARN_ONCE(!irqs_disabled(),"irq %u handler %pF enabled interrupts\n",
+> diff --git a/kernel/irq/pm.c b/kernel/irq/pm.c
+> index 3ca5325..9d8a71f 100644
+> --- a/kernel/irq/pm.c
+> +++ b/kernel/irq/pm.c
+> @@ -43,9 +43,6 @@ void irq_pm_install_action(struct irq_desc *desc, struct irqaction *action)
+>  
+>  	if (action->flags & IRQF_NO_SUSPEND)
+>  		desc->no_suspend_depth++;
+> -
+> -	WARN_ON_ONCE(desc->no_suspend_depth &&
+> -		     desc->no_suspend_depth != desc->nr_actions);
+
+Hm, actually this WARN_ON was here to detect offending drivers
+(those mixing handler with and without IRQF_NO_SUSPEND on a shared irq).
+IMO, removing it is not such a good idea.
+
+Best Regards,
+
+Boris
+
+
+[1]https://lkml.org/lkml/2014/12/15/551
+
+
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
