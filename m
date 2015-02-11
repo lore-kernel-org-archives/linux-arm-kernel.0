@@ -1,81 +1,50 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 11 Feb 2015 12:53:35 -0500
-Subject: [PATCH v1] of: calculate masks of the device based on dma-range size
-Message-ID: <1423677215-28968-1-git-send-email-m-karicheri2@ti.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 11 Feb 2015 19:11:42 +0100
+Subject: [PATCHv6 2/2] INPUT: Introduce generic trigger/LED pairs to
+ input LEDs
+In-Reply-To: <20150210221105.GC26472@dtor-ws>
+References: <20150123122814.GB18514@type.bordeaux.inria.fr>
+ <20150210221105.GC26472@dtor-ws>
+Message-ID: <20150211181142.GA29636@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch update of_dma_configure() API to calculate the
-masks (dma_mask and coherent_dma_mask) based on the dma-range
-values set in DT for the device. Also limit the mask to lower
-of the default mask and mask calculated.
+On Tue 2015-02-10 14:11:05, Dmitry Torokhov wrote:
+> Hi Samuel,
+> 
+> On Fri, Jan 23, 2015 at 01:28:14PM +0100, Samuel Thibault wrote:
+> > This permits to reassign input LEDs to something else than keyboard "leds"
+> > state, by adding a trigger and a led for each input leds, the former being
+> > triggered by EV_LED events, and the latter being by default triggered by the
+> > former. The user can then make the LED use another trigger, including other LED
+> > triggers of the same keyboard.
+> > 
+> > The hardware LEDs are now not actioned from the EV_LED event any more, but from
+> > the per-device LED layer.
+> > 
+> > [ebroder at mokafive.com: Rebased to 3.2-rc1 or so, cleaned up some includes, and fixed some constants]
+> > [akpm at linux-foundation.org: remove unneeded `extern', fix comment layout]
+> > Signed-off-by: Samuel Thibault <samuel.thibault@ens-lyon.org>
+> > Signed-off-by: Evan Broder <evan@ebroder.net>
+> > Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
+> > Signed-off-by: John Crispin <blogic@openwrt.org>
+> > Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+> > ---
+> > Changed in this version:
+> > - use drvdata instead of platform_data
+> > - dropped CONFIG_INPUT_LEDS option
+> > - compacted leds and triggers array allocation
+> > - handle registration failure
+> 
+> This did not make the first batch, but I will try to get it into the
+> 2nd.
+> 
+> Pavel, have you tried this version?
 
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+Not really, busy with other stuff, sorry. I promise to test -next once
+it hits it :-).
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- - apply on top of the series "[PATCH v6 0/7] PCI: get DMA configuration
-   from parent device" at www.spinics.net/lists/linux-pci/msg38699.html
-
- v1 - updated based on comments. Reverted to original
-      code for of_dma_get_range() within the of_dma_configure()
-
- drivers/of/device.c |   21 ++++++++++++++++++---
- 1 file changed, 18 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 314c8a9..167ad2d 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -90,10 +90,11 @@ void of_dma_configure(struct device *dev, struct device_node *np)
- 	struct iommu_ops *iommu;
- 
- 	/*
--	 * Set default dma-mask to 32 bit. Drivers are expected to setup
--	 * the correct supported dma_mask.
-+	 * Set default coherent_dma_mask to 32 bit. Drivers are expected to
-+	 * setup the correct supported mask.
- 	 */
--	dev->coherent_dma_mask = DMA_BIT_MASK(32);
-+	if (!dev->coherent_dma_mask)
-+		dev->coherent_dma_mask = DMA_BIT_MASK(32);
- 
- 	/*
- 	 * Set it to coherent_dma_mask by default if the architecture
-@@ -102,6 +103,11 @@ void of_dma_configure(struct device *dev, struct device_node *np)
- 	if (!dev->dma_mask)
- 		dev->dma_mask = &dev->coherent_dma_mask;
- 
-+	/*
-+	 * Use default size to cover 32 bit. Drivers need to set this in DT
-+	 * to override the same.
-+	 */
-+	size = 1ULL << 32;
- 	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
- 	if (ret < 0) {
- 		dma_addr = offset = 0;
-@@ -128,6 +134,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
- 
- 	dev->dma_pfn_offset = offset;
- 
-+	/*
-+	 * Limit coherent and dma mask based on size and default mask
-+	 * set by the driver.
-+	 */
-+	dev->coherent_dma_mask = min(dev->coherent_dma_mask,
-+				     DMA_BIT_MASK(ilog2(dma_addr + size)));
-+	*dev->dma_mask = min((*dev->dma_mask),
-+			     DMA_BIT_MASK(ilog2(dma_addr + size)));
-+
- 	coherent = of_dma_is_coherent(np);
- 	dev_dbg(dev, "device is%sdma coherent\n",
- 		coherent ? " " : " not ");
+									Pavel
 -- 
-1.7.9.5
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
