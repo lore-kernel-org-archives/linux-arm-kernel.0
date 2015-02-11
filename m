@@ -1,28 +1,117 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 11 Feb 2015 16:23:01 +0100
-Subject: [PATCH RFC v8 11/21] Documentation: dt-bindings: Add bindings
- for Synopsys DW MIPI DSI DRM bridge driver
-In-Reply-To: <20150211140931.GA6666@victor>
-References: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
- <1420014219-915-12-git-send-email-Ying.Liu@freescale.com>
- <1423131004.3207.27.camel@pengutronix.de> <20150206081318.GA15088@victor>
- <20150211072128.GA13301@victor> <1423659648.4680.18.camel@pengutronix.de>
- <20150211140931.GA6666@victor>
-Message-ID: <1423668181.4680.24.camel@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 11 Feb 2015 15:23:59 +0000
+Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
+ demuxer chip
+In-Reply-To: <2875371.t6c6mhUP9i@vostro.rjw.lan>
+References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
+ <2437801.56xPyk3atd@vostro.rjw.lan>
+ <20150211160317.6d6c64e5@bbrezillon>
+ <2875371.t6c6mhUP9i@vostro.rjw.lan>
+Message-ID: <20150211152359.GO9154@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 11.02.2015, 22:09 +0800 schrieb Liu Ying:
-> BTW, regarding the compatible string topic, shall I keep my implementation
-> unchanged and don't append the additional "snps,dw-mipi-dsi" as I shared
-> my concerns about it before?
+On Wed, Feb 11, 2015 at 03:39:48PM +0000, Rafael J. Wysocki wrote:
+> On Wednesday, February 11, 2015 04:03:17 PM Boris Brezillon wrote:
+> > On Wed, 11 Feb 2015 16:17:20 +0100
+> > "Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
+> > 
+> > > On Wednesday, February 11, 2015 02:43:45 PM Mark Rutland wrote:
+> > > > [...]
+> > > > 
+> > > > > > > > > +static irqreturn_t __handle_irq_event_percpu(unsigned int irq, struct irqaction *action)
+> > > > > > > > > +{
+> > > > > > > > > +	/*
+> > > > > > > > > +	 * During suspend we must not call potentially unsafe irq handlers.
+> > > > > > > > > +	 * See suspend_suspendable_actions.
+> > > > > > > > > +	 */
+> > > > > > > > > +	if (unlikely(action->flags & IRQF_NO_ACTION))
+> > > > > > > > > +		return IRQ_NONE;
+> > > > > > > > 
+> > > > > > > > Thomas was trying to avoid any new conditional code in the interrupt
+> > > > > > > > handling path, that's why I added a suspended_action list in my
+> > > > > > > > proposal.
+> > > > > > > > Even if your 'unlikely' statement make things better I'm pretty sure it
+> > > > > > > > adds some latency.
+> > > > > > > 
+> > > > > > > I can see that we don't want to add more code here to keep things
+> > > > > > > clean/pure, but I find it hard to believe that a single bit test and
+> > > > > > > branch (for data that should be hot in the cache) are going to add
+> > > > > > > measurable latency to a path that does pointer chasing to get to the
+> > > > > > > irqaction in the first place. I could be wrong though, and I'm happy to
+> > > > > > > benchmark.
+> > > > > > 
+> > > > > > Again, I don't have enough experience to say this is (or isn't)
+> > > > > > impacting irq handling latency, I'm just reporting what Thomas told me.
+> > > > > > 
+> > > > > > > 
+> > > > > > > It would be possible to go for your list shuffling approach here while
+> > > > > > > still keeping the flag internal and all the logic hidden away in
+> > > > > > > kernel/irq/pm.c. I wasn't sure how actions could be manipulated during
+> > > > > > > suspend, which made me wary of moving them to a separate list.
+> > > > > > 
+> > > > > > Moving them to a temporary list on suspend and restoring them on
+> > > > > > resume should not be a problem.
+> > > > > > The only drawback I see is that actions might be reordered after the
+> > > > > > first resume (anyway, relying on shared irq action order is dangerous
+> > > > > > IMHO).
+> > > > > 
+> > > > > We considered doing that too and saw some drawbacks (in addition to the
+> > > > > reordering of actions you've mentioned).  It added just too much complexity
+> > > > > to the IRQ suspend-resume code.
+> > > > > 
+> > > > > I, personally, would be fine with adding an IRQ flag to silence the
+> > > > > warning mentioned by Alexandre.  Something like IRQD_TIMER_SHARED that would
+> > > > > be set automatically if someone requested IRQF_TIMER | IRQF_SHARED.
+> > > > > 
+> > > > > Thoughts?
+> > > > 
+> > > > Even if the timer driver does that, we still require the other handlers
+> > > > sharing the line to do the right thing across suspend, no? So either
+> > > > their actions need to be masked at suspend time, or the handlers need to
+> > > > detect when they're called during suspend and return early.
+> > > 
+> > > Well, the issue at hand is about things that share an IRQ with a timer AFAICS.
+> > > 
+> > > That is odd enough already and I'd say everyone in that situation needs to
+> > > be prepared to take the pain (including having to check if the device is not
+> > > suspended in their interrupt handlers).
+> > > 
+> > > And quite frankly they need to do that already, because we've never suspended
+> > > timer IRQs.
+> > > 
+> > > > So for the flag at request time approach to work, all the drivers using
+> > > > the interrupt would have to flag they're safe in that context.
+> > > 
+> > > Something like IRQF_"I can share the line with a timer" I guess?  That wouldn't
+> > > hurt and can be checked at request time even.
+> > > 
+> > > > I'm not averse to having that (only a few drivers shuold be affected and
+> > > > we can sanity check them now).
+> > > 
+> > > Right.
+> > 
+> > Okay, if everyone agrees on this solution, then I'm fine with that too
+> > (even if I'm a bit disappointed to have spent so much time on this
+> > problem to eventually end-up with a simple IRQF_SHARED_TIMER flag :-().
+> 
+> IRQD_SHARED_TIMER (that needs to be an IRQ flag, not an irqaction one).
 
-Leave the implementation unchanged. Still, I'd like to see
-"snps,dw-mipi-dsi" appended to the mipi_dsi compatible property in
-Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
-and in arch/arm/boot/dts/imx6qdl.dtsi. After all, Freescale's i.MX6
-specific implementation is register compatible to Synopsys' design,
-isn't it?
+Surely for the drivers to be able to announce that they can handle
+suspend safely this has to be an irqaction flag?
 
-regards
-Philipp
+For IRQD_SHARED_TIMER to work the irqchip would need to set this, and it
+doesn't know anything about the drivers (or potentially what any of the
+interrupts are if the block is reused).
+
+> And spending time on things that never go in happens a lot in the core
+> development.  I've sent several versions of the wakeup interrupts handling
+> rework and then Thomas wrote the final one himself. :-)
+> 
+> The goal is to find a way that will address everyone's needs and that's
+> not always starightforward.
+
+Indeed!
+
+Thanks,
+Mark.
