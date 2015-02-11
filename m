@@ -1,42 +1,64 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 11 Feb 2015 03:25:51 +0300
-Subject: [PATCH] ARM: sa1100: add dummy clk_set_rate implementation
-Message-ID: <1423614351-29741-1-git-send-email-dbaryshkov@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 11 Feb 2015 09:28:05 +0900
+Subject: [PATCH v2 1/3] ARM: shmobile: armadillo800eva: Properly specify
+ HDMI audio link format
+In-Reply-To: <87d25wg804.wl%kuninori.morimoto.gx@renesas.com>
+References: <1421847492-8857-1-git-send-email-lars@metafoo.de>
+ <87d25wg804.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20150211002802.GC7826@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dummy clk_set_rate implementation that returns -EINVAL if the rate
-passed is not equal to the rate of the clock. This for example fixes the
-following build issue:
+On Fri, Jan 30, 2015 at 05:18:56AM +0000, Kuninori Morimoto wrote:
+> 
+> Hi Lars, Simon
+> 
+> > The DAI link format should be specified for the whole link rather than just
+> > one component on the link. So move the format specification for the HDMI
+> > audio link from the CPU component to the link itself.
+> > 
+> > Since the sh-mobile-hdmi DAI driver doesn't implement the set_fmt() callback
+> > in this case there is no functional difference between only specifying the
+> > the format for the CPU side or for the whole link, but the later it will
+> > allow us to remove support for just specifying the format for one component.
+> > 
+> > Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+> > ---
+> 
+> I tested these 3 patches on armadillo800eva
+> 
+> 	[PATCH v2 1/3] ARM: shmobile: armadillo800eva: Properly specify HDMI audio link format
+> 	[PATCH v2 2/3] ASoC: sh: fsi: Fix clock inversion
+> 	[PATCH v2 3/3] ASoC: simple-card: Remove support for setting differing DAI formats
+> 
+> Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> 
+> 2/3 patch changed behavior for clock inversion on FSI driver.
+> FSI + wm8978 on armadillo800eva worked without any issues,
+> but, I don't know how much effect it has for other board.
+> We used this inversion flags on each board for historical reasons (copy-paste),
+> but, almost all these were not needed (except some picky board) on FSI.
+> Maybe Lars's 2/3 patch is correct, but, it is difficult to check/confirm for all boards.
+> And unfortunately, Renesas don't use FSI anymore.
+> So, I think keeping current FSI driver as-is is more safety for old boards.
+> armadillo800eva works well with below patch (as 2/3 patch)
 
-ERROR: "clk_set_rate" [drivers/usb/phy/phy-generic.ko] undefined!
-scripts/Makefile.modpost:90: recipe for target '__modpost' failed
 
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/mach-sa1100/clock.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Thanks, I am inclined to agree that it is best to leave things unchanged.
 
-diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
-index 03c75a8..7f9544d 100644
---- a/arch/arm/mach-sa1100/clock.c
-+++ b/arch/arm/mach-sa1100/clock.c
-@@ -104,6 +104,15 @@ unsigned long clk_get_rate(struct clk *clk)
- }
- EXPORT_SYMBOL(clk_get_rate);
- 
-+int clk_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	if (rate != clk_get_rate(clk))
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(clk_set_rate);
-+
- const struct clkops clk_gpio27_ops = {
- 	.enable		= clk_gpio27_enable,
- 	.disable	= clk_gpio27_disable,
--- 
-2.1.4
+> 
+> --------------
+> diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+> index 75de26c..36aaeb1 100644
+> --- a/arch/arm/mach-shmobile/board-armadillo800eva.c
+> +++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+> @@ -1015,7 +1015,6 @@ static struct asoc_simple_card_info fsi_wm8978_info = {
+>         .platform       = "sh_fsi2",
+>         .daifmt         = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM,
+>         .cpu_dai = {
+> -               .fmt    = SND_SOC_DAIFMT_IB_NF,
+>                 .name   = "fsia-dai",
+>         },
+>         .codec_dai = {
+> --------------
+> 
