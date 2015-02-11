@@ -1,68 +1,41 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 11 Feb 2015 16:16:30 +0800
-Subject: [PATCH 7/7] cpufreq-dt: Use DT to set policy->cpus/related_cpus
-In-Reply-To: <cover.1423642246.git.viresh.kumar@linaro.org>
-References: <cover.1423642246.git.viresh.kumar@linaro.org>
-Message-ID: <7f6fcfa7cbbcc48148487330011b05005c002ab5.1423642246.git.viresh.kumar@linaro.org>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 11 Feb 2015 09:20:54 +0100
+Subject: [RFC v2 1/4] chip.c: complete the forwarded IRQ in case the handler
+ is not reached
+In-Reply-To: <1423642857-24240-1-git-send-email-eric.auger@linaro.org>
+References: <1423642857-24240-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1423642857-24240-2-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This updates cpufreq-dt driver to read clock sharing information from new OPP
-bindings. And then initialize OPPs for CPUs with help of new bindings.
+With current handle_fasteoi_irq implementation, in case irqd_irq_disabled
+is true (disable_irq was called) or !irq_may_run, the IRQ is not completed.
+Only the running priority is dropped. IN those cases, the IRQ will
+never be forwarded and hence will never be deactivated by anyone else.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
 ---
- drivers/cpufreq/cpufreq-dt.c | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
+ kernel/irq/chip.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
-index bab67db54b7e..6f307897e17a 100644
---- a/drivers/cpufreq/cpufreq-dt.c
-+++ b/drivers/cpufreq/cpufreq-dt.c
-@@ -208,8 +208,14 @@ static int cpufreq_init(struct cpufreq_policy *policy)
- 		goto out_put_reg_clk;
- 	}
- 
-+	pd = cpufreq_get_driver_data();
-+	if (!pd || !pd->independent_clocks) {
-+		if (of_get_cpus_sharing_opps(cpu_dev, policy->cpus))
-+			cpumask_setall(policy->cpus);
+diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+index 2f9571b..f12cce6 100644
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -561,8 +561,12 @@ handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
+ 	raw_spin_unlock(&desc->lock);
+ 	return;
+ out:
+-	if (!(chip->flags & IRQCHIP_EOI_IF_HANDLED))
+-		eoi_irq(desc, chip);
++	if (!(chip->flags & IRQCHIP_EOI_IF_HANDLED)) {
++		if (chip->irq_priority_drop)
++			chip->irq_priority_drop(&desc->irq_data);
++		if (chip->irq_eoi)
++			chip->irq_eoi(&desc->irq_data);
 +	}
-+
- 	/* OPPs might be populated at runtime, don't check for error here */
--	of_init_opp_table(cpu_dev);
-+	of_cpumask_init_opp_table(policy->cpus);
- 
- 	/*
- 	 * But we need OPP table to function so if it is not there let's
-@@ -293,10 +299,6 @@ static int cpufreq_init(struct cpufreq_policy *policy)
- 
- 	policy->cpuinfo.transition_latency = transition_latency;
- 
--	pd = cpufreq_get_driver_data();
--	if (!pd || !pd->independent_clocks)
--		cpumask_setall(policy->cpus);
--
- 	of_node_put(np);
- 
- 	return 0;
-@@ -306,7 +308,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
- out_free_priv:
- 	kfree(priv);
- out_free_opp:
--	of_free_opp_table(cpu_dev);
-+	of_cpumask_free_opp_table(policy->cpus);
- 	of_node_put(np);
- out_put_reg_clk:
- 	clk_put(cpu_clk);
-@@ -322,7 +324,7 @@ static int cpufreq_exit(struct cpufreq_policy *policy)
- 
- 	cpufreq_cooling_unregister(priv->cdev);
- 	dev_pm_opp_free_cpufreq_table(priv->cpu_dev, &policy->freq_table);
--	of_free_opp_table(priv->cpu_dev);
-+	of_cpumask_free_opp_table(policy->related_cpus);
- 	clk_put(policy->clk);
- 	if (!IS_ERR(priv->cpu_reg))
- 		regulator_put(priv->cpu_reg);
+ 	raw_spin_unlock(&desc->lock);
+ }
+ EXPORT_SYMBOL_GPL(handle_fasteoi_irq);
 -- 
-2.3.0.rc0.44.ga94655d
+1.9.1
