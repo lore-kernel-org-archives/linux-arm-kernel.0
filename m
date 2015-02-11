@@ -1,86 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Feb 2015 10:00:59 +0100
-Subject: [PATCH v2 00/30] ARM: dt: sunxi: DT cleanups
-Message-ID: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Wed, 11 Feb 2015 18:01:41 +0900
+Subject: [PATCH RESEND] ARM: DMA: Fix kzalloc flags in __iommu_alloc_buffer()
+Message-ID: <1423645301-709-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+There doesn't seem to be any valid reason to allocate the pages array
+with the same flags as the buffer itself. Doing so can eventually lead
+to the following safeguard in mm/slab.c to be hit:
 
-This set does a set of cleanups that were either long awaited (sun5i
-DTSI merge) or have been asked recently (conversion to label based
-syntax for DTS).
+BUG_ON(flags & GFP_SLAB_BUG_MASK);
 
-Maxime
+This happens when buffers are allocated with __GFP_DMA32 or
+__GFP_HIGHMEM.
 
-Changes from v1:
-  - Moved MMC1 node addition from the A10s convertion patch to the
-    first one
+Fix this by allocating the pages array with GFP_KERNEL to follow what is
+done elsewhere in this file. Using GFP_KERNEL in __iommu_alloc_buffer()
+is safe because atomic allocations are handled by __iommu_alloc_atomic().
 
-Maxime Ripard (30):
-  ARM: sun5i: Add a DTSI common to A10s and A13
-  ARM: sun5i: a13: Move to the common sun5i DTSI
-  ARM: sun5i: a10s: Move to the common sun5i DTSI
-  ARM: sun4i: a1000: Convert to DT label based syntax
-  ARM: sun4i: ba10 tvbox: Convert to DT label based syntax
-  ARM: sun4i: cubieboard: Convert to DT label based syntax
-  ARM: sun4i: hackberry: Convert to DT label based syntax
-  ARM: sun4i: inet97fv2: Convert to DT label based syntax
-  ARM: sun4i: mini xplus: Convert to DT label based syntax
-  ARM: sun4i: olinuxino lime: Convert to DT label based syntax
-  ARM: sun4i: pcduino: Convert to DT label based syntax
-  ARM: sun5i: a10s: olinuxino micro: Convert to DT label based syntax
-  ARM: sun5i: a10s: r7 tv dongle: Convert to DT label based syntax
-  ARM: sun5i: a13: hsg h702: Convert to DT label based syntax
-  ARM: sun5i: a13: olinuxino micro: Convert to DT label based syntax
-  ARM: sun5i: a13: olinuxino: Convert to DT label based syntax
-  ARM: sun6i: app4 evb1: Convert to DT label based syntax
-  ARM: sun6i: colombus: Convert to DT label based syntax
-  ARM: sun6i: m9: Convert to DT label based syntax
-  ARM: sun7i: bananapi: Convert to DT label based syntax
-  ARM: sun7i: cubieboard2: Convert to DT label based syntax
-  ARM: sun7i: cubietruck: Convert to DT label based syntax
-  ARM: sun7i: hummingbird: Convert to DT label based syntax
-  ARM: sun7i: i12 tvbox: Convert to DT label based syntax
-  ARM: sun7i: m3: Convert to DT label based syntax
-  ARM: sun7i: olinuxino lime: Convert to DT label based syntax
-  ARM: sun7i: olinuxino lime2: Convert to DT label based syntax
-  ARM: sun7i: olinuxino micro: Convert to DT label based syntax
-  ARM: sun7i: pcduino3: Convert to DT label based syntax
-  ARM: sun8i: ippo q8h v5: Convert to DT label based syntax
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/mm/dma-mapping.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/boot/dts/sun4i-a10-a1000.dts            | 200 ++++----
- arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts       | 168 ++++---
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts       | 214 +++++----
- arch/arm/boot/dts/sun4i-a10-hackberry.dts        | 187 ++++----
- arch/arm/boot/dts/sun4i-a10-inet97fv2.dts        | 104 ++--
- arch/arm/boot/dts/sun4i-a10-mini-xplus.dts       | 140 +++---
- arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts   | 188 ++++----
- arch/arm/boot/dts/sun4i-a10-pcduino.dts          | 177 ++++---
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 315 ++++++------
- arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts    | 132 +++--
- arch/arm/boot/dts/sun5i-a10s.dtsi                | 582 ++---------------------
- arch/arm/boot/dts/sun5i-a13-hsg-h702.dts         | 136 +++---
- arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts  | 148 +++---
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts        | 236 +++++----
- arch/arm/boot/dts/sun5i-a13.dtsi                 | 554 ++-------------------
- arch/arm/boot/dts/sun5i.dtsi                     | 560 ++++++++++++++++++++++
- arch/arm/boot/dts/sun6i-a31-app4-evb1.dts        |  52 +-
- arch/arm/boot/dts/sun6i-a31-colombus.dts         | 120 +++--
- arch/arm/boot/dts/sun6i-a31-m9.dts               | 148 +++---
- arch/arm/boot/dts/sun7i-a20-bananapi.dts         | 262 +++++-----
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts      | 198 ++++----
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts       | 316 ++++++------
- arch/arm/boot/dts/sun7i-a20-hummingbird.dts      | 384 ++++++++-------
- arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts        | 252 +++++-----
- arch/arm/boot/dts/sun7i-a20-m3.dts               | 178 ++++---
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts   | 186 ++++----
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts  | 288 ++++++-----
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts  | 364 +++++++-------
- arch/arm/boot/dts/sun7i-a20-pcduino3.dts         | 210 ++++----
- arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts      | 110 +++--
- 30 files changed, 3316 insertions(+), 3793 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun5i.dtsi
-
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 903dba0..170a116 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1106,7 +1106,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+ 	int i = 0;
+ 
+ 	if (array_size <= PAGE_SIZE)
+-		pages = kzalloc(array_size, gfp);
++		pages = kzalloc(array_size, GFP_KERNEL);
+ 	else
+ 		pages = vzalloc(array_size);
+ 	if (!pages)
 -- 
 2.3.0
