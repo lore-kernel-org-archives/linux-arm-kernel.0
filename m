@@ -1,88 +1,156 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Wed, 11 Feb 2015 06:23:52 -0500
-Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
- with dma-parms
-In-Reply-To: <20150211111258.GP8656@n2100.arm.linux.org.uk>
-References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
- <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
- <54DB12B5.4080000@samsung.com>
- <20150211111258.GP8656@n2100.arm.linux.org.uk>
-Message-ID: <CAF6AEGscETLVnhg7zTFHQbj2KmX150VPaVHsqjvyJnVfHnHkOQ@mail.gmail.com>
+From: bamvor.zhangjian@huawei.com (Bamvor Jian Zhang)
+Date: Wed, 11 Feb 2015 19:22:08 +0800
+Subject: [PATCH] compat: Fix endian issue in union sigval
+In-Reply-To: <20150210122718.GC32052@e104818-lin.cambridge.arm.com>
+References: <1423563011-12377-1-git-send-email-bamvor.zhangjian@huawei.com>
+ <20150210122718.GC32052@e104818-lin.cambridge.arm.com>
+Message-ID: <54DB3B60.4050100@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 11, 2015 at 6:12 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Feb 11, 2015 at 09:28:37AM +0100, Marek Szyprowski wrote:
->> Hello,
+On 2015/2/10 20:27, Catalin Marinas wrote:
+> cc'ing linux-arch as well.
+> 
+> On Tue, Feb 10, 2015 at 10:10:11AM +0000, Zhang Jian(Bamvor) wrote:
+>> In 64bit architecture, sigval_int is the high 32bit of sigval_ptr in
+>> big endian kernel compare with low 32bit of sigval_ptr in little
+>> endian kernel. reference:
 >>
->> On 2015-01-27 09:25, Sumit Semwal wrote:
->> >Add some helpers to share the constraints of devices while attaching
->> >to the dmabuf buffer.
->> >
->> >At each attach, the constraints are calculated based on the following:
->> >- max_segment_size, max_segment_count, segment_boundary_mask from
->> >    device_dma_parameters.
->> >
->> >In case the attaching device's constraints don't match up, attach() fails.
->> >
->> >At detach, the constraints are recalculated based on the remaining
->> >attached devices.
->> >
->> >Two helpers are added:
->> >- dma_buf_get_constraints - which gives the current constraints as calculated
->> >       during each attach on the buffer till the time,
->> >- dma_buf_recalc_constraints - which recalculates the constraints for all
->> >       currently attached devices for the 'paranoid' ones amongst us.
->> >
->> >The idea of this patch is largely taken from Rob Clark's RFC at
->> >https://lkml.org/lkml/2012/7/19/285, and the comments received on it.
->> >
->> >Cc: Rob Clark <robdclark@gmail.com>
->> >Signed-off-by: Sumit Semwal <sumit.semwal@linaro.org>
+>>     typedef union sigval {
+>>         int sival_int;
+>>         void *sival_ptr;
+>>     } sigval_t;
 >>
->> The code looks okay, although it will probably will work well only with
->> typical cases like 'contiguous memory needed' or 'no constraints at all'
->> (iommu).
+>> During compat_mq_notify or compat_timer_create, kernel get sigval
+>> from user space by reading sigval.sival_int. This is correct in 32 bit
+>> kernel and in 64bit little endian kernel. And It is wrong in 64bit big
+>> endian kernel:
+>> It get the high 32bit of sigval_ptr and put it to low 32bit of
+>> sigval_ptr. And the high 32bit sigval_ptr in empty in arm 32bit user
+>> space struct. So, kernel lost the value of sigval_ptr.
+>>
+>> The following patch get the sigval_ptr in stead of sigval_int in order
+>> to avoid endian issue.
+>> Test pass in arm64 big endian and little endian kernel.
+>>
+>> Signed-off-by: Zhang Jian(Bamvor) <bamvor.zhangjian@huawei.com>
+>> ---
+>>  ipc/compat_mq.c | 7 ++-----
+>>  kernel/compat.c | 6 ++----
+>>  2 files changed, 4 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/ipc/compat_mq.c b/ipc/compat_mq.c
+>> index ef6f91c..2e07343 100644
+>> --- a/ipc/compat_mq.c
+>> +++ b/ipc/compat_mq.c
+>> @@ -99,11 +99,8 @@ COMPAT_SYSCALL_DEFINE2(mq_notify, mqd_t, mqdes,
+>>  	if (u_notification) {
+>>  		struct sigevent n;
+>>  		p = compat_alloc_user_space(sizeof(*p));
+>> -		if (get_compat_sigevent(&n, u_notification))
+>> -			return -EFAULT;
+>> -		if (n.sigev_notify == SIGEV_THREAD)
+>> -			n.sigev_value.sival_ptr = compat_ptr(n.sigev_value.sival_int);
+>> -		if (copy_to_user(p, &n, sizeof(*p)))
+>> +		if (get_compat_sigevent(&n, u_notification) ||
+>> +		    copy_to_user(p, &n, sizeof(*p)))
+>>  			return -EFAULT;
+> 
+> The kernel doesn't need to interpret the sival_ptr value, it's something
+> to be passed to the notifier function as an argument.
+Yeah, this is the reason why I try to fix sival_ptr through
+get_compat_sigevent before sys_mq_notify. After this compat wrapper,
+sys_mq_notify will put the sival_ptr to nc buffer(file ipc/mqueue.c line 1221
+to line 1226):
+    if (copy_from_user(nc->data,
+                    notification.sigev_value.sival_ptr,
+                    NOTIFY_COOKIE_LEN)) {
+            ret = -EFAULT;
+            goto out;
+    }
+    /* TODO: add a header? */
+    skb_put(nc, NOTIFY_COOKIE_LEN);
+    /* and attach it to the socket */
+
+The original changes is introduced by Alexander Viro
+<viro@parcelfarce.linux.theplanet.co.uk> more than ten years ago[1]:
+
+author   Alexander Viro <viro@parcelfarce.linux.theplanet.co.uk> 2004-07-13 04:02:57 (GMT)
+committer   Linus Torvalds <torvalds@ppc970.osdl.org>   2004-07-13 04:02:57 (GMT)
+commit  95b5842264ac470a1a3a59d2741bb18adb140c8b (patch)
+tree    5167f68fae8f3bbc9b3a2d7617d1500356837c16 /ipc/compat_mq.c
+parent  de54add33621c5b4a1be895c82b7af96fb4dd447 (diff)
+[PATCH] sparse: ipc compat annotations and cleanups
+    ipc compat code switched to compat_alloc_user_space() and annotated.
+
+> For the user's
+> convenience, it is a union of an int and ptr. So I think the original
+> SIGEV_THREAD check and compat_ptr() conversion here is wrong, it
+> shouldn't exist at all (it doesn't exist in compat_sys_timer_create
+> either). This hunk looks fine to me.
+> 
+>>  	}
+>>  	return sys_mq_notify(mqdes, p);
+>> diff --git a/kernel/compat.c b/kernel/compat.c
+>> index ebb3c36..13a0e5d 100644
+>> --- a/kernel/compat.c
+>> +++ b/kernel/compat.c
+>> @@ -871,16 +871,14 @@ COMPAT_SYSCALL_DEFINE4(clock_nanosleep, clockid_t, which_clock, int, flags,
+>>   * We currently only need the following fields from the sigevent
+>>   * structure: sigev_value, sigev_signo, sig_notify and (sometimes
+>>   * sigev_notify_thread_id).  The others are handled in user mode.
+>> - * We also assume that copying sigev_value.sival_int is sufficient
+>> - * to keep all the bits of sigev_value.sival_ptr intact.
+>>   */
+>>  int get_compat_sigevent(struct sigevent *event,
+>>  		const struct compat_sigevent __user *u_event)
+>>  {
+>>  	memset(event, 0, sizeof(*event));
+>>  	return (!access_ok(VERIFY_READ, u_event, sizeof(*u_event)) ||
+>> -		__get_user(event->sigev_value.sival_int,
+>> -			&u_event->sigev_value.sival_int) ||
+>> +		__get_user(*(long long*)event->sigev_value.sival_ptr,
+should be:
+		__get_user(event->sigev_value.sival_ptr,
+> > +         &u_event->sigev_value.sival_ptr) ||
 >
-> Which is a damn good reason to NAK it - by that admission, it's a half-baked
-> idea.
+> I don't think this is correct because some (most) architectures use
+> sival_int here when copying to user and for a big endian compat they
+> would get 0 for sival_int (mips, powerpc).
+Sorry, I am lost here. As we mentioned above, sival_ptr and sival_int
+is union, so, copy sival_ptr should include sival_int.
 >
-> If all we want to know is whether the importer can accept only contiguous
-> memory or not, make a flag to do that, and allow the exporter to test this
-> flag.  Don't over-engineer this to make it _seem_ like it can do something
-> that it actually totally fails with.
+> I think the correct fix is in the arm64 code:
+The following code could fix my issue.
 
-jfyi, I agree with that.. I think the flag is probably the right
-approach to start with.  At the end of the day it *is* still just an
-in-kernel API (and not something that ends up as userspace ABI) so
-when we come up with the use case to make it more generic we can.  Vs.
-making it look like something more generic when it isn't really yet.
+regards
 
-> As I've already pointed out, there's a major problem if you have already
-> had a less restrictive attachment which has an active mapping, and a new
-> more restrictive attachment comes along later.
->
-> It seems from Rob's descriptions that we also need another flag in the
-> importer to indicate whether it wants to have a valid struct page in the
-> scatter list, or whether it (correctly) uses the DMA accessors on the
-> scatter list - so that exporters can reject importers which are buggy.
+bamvor
 
-to be completely generic, we would really need a way that the device
-could take over only just the last iommu (in case there were multiple
-levels of address translation)..
-
-I'm not completely sure, but I *think* the other arm gpu's have their
-own internal mmu for doing context switching, etc, so if there is an
-additional iommu in front of them they may actually still want to use
-the normal dma api's.  Someone please contradict me if I am wrong.  If
-this ends up being an issue only for msm, then I'm completely ok with
-the easier option of a less generic solution..
-
-BR,
--R
-
->
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+> diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+> index e299de396e9b..32601939a3c8 100644
+> --- a/arch/arm64/kernel/signal32.c
+> +++ b/arch/arm64/kernel/signal32.c
+> @@ -154,8 +154,7 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
+>  	case __SI_TIMER:
+>  		 err |= __put_user(from->si_tid, &to->si_tid);
+>  		 err |= __put_user(from->si_overrun, &to->si_overrun);
+> -		 err |= __put_user((compat_uptr_t)(unsigned long)from->si_ptr,
+> -				   &to->si_ptr);
+> +		 err |= __put_user(from->si_int, &to->si_int);
+>  		break;
+>  	case __SI_POLL:
+>  		err |= __put_user(from->si_band, &to->si_band);
+> @@ -184,7 +183,7 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
+>  	case __SI_MESGQ: /* But this is */
+>  		err |= __put_user(from->si_pid, &to->si_pid);
+>  		err |= __put_user(from->si_uid, &to->si_uid);
+> -		err |= __put_user((compat_uptr_t)(unsigned long)from->si_ptr, &to->si_ptr);
+> +		err |= __put_user(from->si_int, &to->si_int);
+>  		break;
+>  	case __SI_SYS:
+>  		err |= __put_user((compat_uptr_t)(unsigned long)
+> 
+> But we need to check other architectures that are capable of big endian
+> and have a compat layer.
+> 
