@@ -1,84 +1,98 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 11 Feb 2015 17:28:03 +0100
-Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
- demuxer chip
-In-Reply-To: <2067295.NbJCftPPli@vostro.rjw.lan>
-References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150211155720.GQ9154@leverpostej>
- <20150211171515.55d5066f@bbrezillon>
- <2067295.NbJCftPPli@vostro.rjw.lan>
-Message-ID: <20150211172803.287bbae9@bbrezillon>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 11 Feb 2015 17:31:19 +0100
+Subject: [PATCH 5/9] mtd: pxa3xx_nand: add support for the Marvell Berlin
+ nand controller
+In-Reply-To: <20150209005503.3fad39c7@bbrezillon>
+References: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1422367816-4257-6-git-send-email-antoine.tenart@free-electrons.com>
+ <20150209005503.3fad39c7@bbrezillon>
+Message-ID: <20150211163119.GG11169@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Feb 2015 17:42:22 +0100
-"Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
+Boris,
 
-> On Wednesday, February 11, 2015 05:15:15 PM Boris Brezillon wrote:
-> > On Wed, 11 Feb 2015 15:57:20 +0000
-> > Mark Rutland <mark.rutland@arm.com> wrote:
-> > 
-> > > [...]
-> > > 
-> > > > > > > So for the flag at request time approach to work, all the drivers using
-> > > > > > > the interrupt would have to flag they're safe in that context.
-> > > > > > 
-> > > > > > Something like IRQF_"I can share the line with a timer" I guess?  That wouldn't
-> > > > > > hurt and can be checked at request time even.
-> > > > > 
-> > > > > I guess that would have to imply IRQF_SHARED, so we'd have something
-> > > > > like:
-> > > > > 
-> > > > > IRQF_SHARED_SUSPEND_OK - This handler is safe to call spuriously during
-> > > > > 			 suspend in the case the line is shared. The
-> > > > > 			 handler will not access unavailable hardware
-> > > > > 			 or kernel infrastructure during this period.
-> > > > > 
-> > > > > #define __IRQF_SUSPEND_SPURIOUS		0x00040000
-> > > > > #define	IRQF_SHARED_SUSPEND_OK		(IRQF_SHARED | __IRQF_SUSPEND_SPURIOUS)
-> > > > 
-> > > > What about
-> > > > 
-> > > > #define __IRQF_TIMER_SIBLING_OK	0x00040000
-> > > > #define	IRQF_SHARED_TIMER_OK	(IRQF_SHARED | __IRQF_TIMER_SIBLING_OK)
-> > > > 
-> > > > The "suspend" part is kind of a distraction to me here, because that really
-> > > > only is about sharing an IRQ with a timer and the "your interrupt handler
-> > > > may be called when the device is suspended" part is just a consequence of that.
-> > > 
-> > > My rationale was that you didn't really care who else was using the IRQ
-> > > (e.g. the timer); you're just stating that you can survive being called
-> > > during suspend (which is what the driver may need to check for in the
-> > > handler if the device happens to be powered down or whatever).
-> > > 
-> > > So I guess I see it the other way around. This is essentially claiming
-> > > we can handle sharing with IRQF_NO_SUSPEND rather than IRQF_TIMER.
-> > > 
-> > > > So IMO it's better to have "TIMER" in the names to avoid encouraging people to
-> > > > abuse this for other purposes not related to timers.
-> > > 
-> > > In the end a name is a name, and if you think IRQF_SHARED_TIMER_OK is
-> > > better I shan't complain.
-> > > 
-> > > The fundamental issue I'm concerned with is addressed by this approach.
-> > 
-> > Okay then, is anyone taking care of submitting such a patch (Mark ?) ?
+On Mon, Feb 09, 2015 at 12:55:03AM +0100, Boris Brezillon wrote:
+> On Tue, 27 Jan 2015 15:10:12 +0100
+> Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 > 
-> Well, I guess I should take the responsibility for that. :-)
+> >  
+> > +		if (info->variant == PXA3XX_NAND_VARIANT_BERLIN2 &&
+> > +				info->ndcb0 & NDCB0_LEN_OVRD)
+> > +			nand_writel(info, NDCB0,
+> > +					info->chunk_size + info->oob_size);
+> > +
 > 
-> I'll try to cut one later today or tomorrow unless someone else beats me to that.
+> Why don't you reuse the following if statement (which is doing the
+> exact same thing, except for the size being stored in ndbc3 when
+> the command is created).
 
-I won't (I'm done with these irq stuff for now ;-)).
+I'll update to reuse this!
 
-Peter, if this patch is accepted, I guess you'll have to drop (or
-revert my patches).
+> Moreover, I'm pretty sure you don't want to add oob_size on the 2nd
+> chunk, but only on the last one.
+> Doing that will only work for 4K pages (2 * max_chunk_size), and you
+> add support for 8K pages NANDs in this patch.
 
-Thanks,
+Yep. As a matter of fact, oob_size was equl to 0 in this case because of
+some dirty hacks. I'll remove them and will send a v2 with a proper
+solution.
 
-Boris
+> >  
+> > +	if (info->variant == PXA3XX_NAND_VARIANT_BERLIN2)
+> > +		chip->cmdfunc = nand_cmdfunc_berlin;
+> 
+> Your cmdfunc looks like the nand_cmdfunc_extended one, and this one is
+> only used for NAND chips that have writesize > PAGE_CHUNK_SIZE.
+> 
+> Is your cmdfunc supporting accesses to NAND chips with smaller pages ?
+> If you're unsure, maybe you should add a check here, and refuse to
+> probe such NAND chips.
 
+I currently have no idea, so I'll add a check here.
+
+> >  
+> > -	num = ARRAY_SIZE(builtin_flash_types) + pdata->num_flash - 1;
+> > -	for (i = 0; i < num; i++) {
+> > -		if (i < pdata->num_flash)
+> > -			f = pdata->flash + i;
+> > -		else
+> > -			f = &builtin_flash_types[i - pdata->num_flash + 1];
+> > +	if (info->variant == PXA3XX_NAND_VARIANT_BERLIN2)
+> > +		flash_types = berlin_builtin_flash_types;
+> > +	else
+> > +		flash_types = builtin_flash_types;
+> >  
+> > -		/* find the chip in default list */
+> > +	for (i = 0; (f = &flash_types[i]); i++)
+> >  		if (f->chip_id == id)
+> >  			break;
+> > +
+> > +	if (f == NULL) {
+> > +		for (i = 0; i < pdata->num_flash; i++) {
+> > +			f = pdata->flash + i;
+> > +			if (f->chip_id == id)
+> > +				break;
+> > +		}
+> >  	}
+> 
+> You're changing the matching order here, the initial order was:
+> 
+> 1/ pdata definition
+> 2/ builtin types
+> 
+> and you're now doing:
+> 
+> 1/ builtin types
+> 2/ pdata definition
+
+Oops...
+
+Thanks for the review!
+
+Antoine
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
