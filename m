@@ -1,89 +1,81 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Wed, 11 Feb 2015 09:43:12 -0800
-Subject: Delays, clocks, timers, hrtimers, etc
-In-Reply-To: <54D947B4.4080401@free.fr>
-References: <54C8E125.3070905@free.fr>
- <e028a4eb604a491f4438557f4a1373ef@agner.ch> <54D52F84.9050600@free.fr>
- <266c7b1ff2d1a8ba0ae4866f4fb4eca5@agner.ch> <54D576B1.4000001@free.fr>
- <54D903F6.3050608@codeaurora.org> <54D93556.9050008@free.fr>
- <54D93FFA.3090506@codeaurora.org> <54D947B4.4080401@free.fr>
-Message-ID: <54DB94B0.8020000@free.fr>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 11 Feb 2015 12:53:35 -0500
+Subject: [PATCH v1] of: calculate masks of the device based on dma-range size
+Message-ID: <1423677215-28968-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason wrote:
+This patch update of_dma_configure() API to calculate the
+masks (dma_mask and coherent_dma_mask) based on the dma-range
+values set in DT for the device. Also limit the mask to lower
+of the default mask and mask calculated.
 
-> Stephen Boyd wrote:
->
->> Mason wrote:
->>
->>> My platform provides a 32-bit counter, ticking at a constant 27 MHz.
->>> Reading this counter has a latency of roughly 70 ns (it has to go
->>> over the system memory bus). I think this is good enough for both
->>> the clock source and sched_clock, is it not?
->>>
->>> So the plan would be:
->>> - clocksource and sched_clock : 27 MHz, 32-bit counter, platform
->>> - clockevents : TWD, standard
->>
->> Yep, that sounds like a good plan. If your platform has the ARM global
->> timer (drivers/clocksource/arm_global_timer.c) then you don't need
->> anything besides that timer because it provides both the clocksource,
->> sched_clock, and clockevents. Sounds like you don't have that timer
->
-> I'm using Cortex A9, so I do have the global timer (AFAIU).
->
-> However, I don't think I can safely use it as a clock source because
-> I'm also using cpufreq, and I don't think the arm_global_timer driver
-> handles CPU frequency updates, while the TWD driver does (?)
->
-> /*
->   * Updates clockevent frequency when the cpu frequency changes.
->   * Called on the cpu that is changing frequency with interrupts disabled.
->   */
->
-> "The Interrupt Controller, global timer, private timers, and watchdogs
-> are clocked with PERIPHCLK." And PERIPHCLK is tied to CLK, which is
-> modified by cpufreq. I didn't see any code in the arm_global_timer
-> driver to deal with with that.
->
-> Did I overlook something fundamental?
->
->> though, so you have to write a driver for your custom platform timer and
->> at least hook up clocksource and sched_clock to it. If you have
->> interrupts with your platform timer you can skip out on TWD and also
->> register a clockevent in your platform timer driver.
->
-> Registering a clock source or a sched_clock seems straight-forward.
-> All I need to provide is a function to read the platform counter.
->
-> However, why would I skip out on TWD?
-> (I'm trying to minimize code needed for the port.)
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-Please forgive me for piling on extra questions:
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ - apply on top of the series "[PATCH v6 0/7] PCI: get DMA configuration
+   from parent device" at www.spinics.net/lists/linux-pci/msg38699.html
 
-Cortex A9 provides the global timer, and the local timers/watchdog,
-both of which can be used for clockevents, AFAICT. Are there other
-choices available, or are these the only (standard) options?
+ v1 - updated based on comments. Reverted to original
+      code for of_dma_get_range() within the of_dma_configure()
 
-Also, you wrote "I don't see any problem with the TWD dropping the
-dependency on SMP." Would something as simple as this be acceptable?
-(Most probably NOT; there are a lot of smp* occurrences in smp_twd.c
-even the file name.) What is the rationale for the dependency?
+ drivers/of/device.c |   21 ++++++++++++++++++---
+ 1 file changed, 18 insertions(+), 3 deletions(-)
 
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a34698d..47b02c8 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1565,7 +1565,6 @@ config HAVE_ARM_ARCH_TIMER
-  
-  config HAVE_ARM_TWD
-         bool
--       depends on SMP
-         select CLKSRC_OF if OF
-         help
-           This options enables support for the ARM timer and watchdog unit
-
-
-Regards.
+diff --git a/drivers/of/device.c b/drivers/of/device.c
+index 314c8a9..167ad2d 100644
+--- a/drivers/of/device.c
++++ b/drivers/of/device.c
+@@ -90,10 +90,11 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+ 	struct iommu_ops *iommu;
+ 
+ 	/*
+-	 * Set default dma-mask to 32 bit. Drivers are expected to setup
+-	 * the correct supported dma_mask.
++	 * Set default coherent_dma_mask to 32 bit. Drivers are expected to
++	 * setup the correct supported mask.
+ 	 */
+-	dev->coherent_dma_mask = DMA_BIT_MASK(32);
++	if (!dev->coherent_dma_mask)
++		dev->coherent_dma_mask = DMA_BIT_MASK(32);
+ 
+ 	/*
+ 	 * Set it to coherent_dma_mask by default if the architecture
+@@ -102,6 +103,11 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+ 	if (!dev->dma_mask)
+ 		dev->dma_mask = &dev->coherent_dma_mask;
+ 
++	/*
++	 * Use default size to cover 32 bit. Drivers need to set this in DT
++	 * to override the same.
++	 */
++	size = 1ULL << 32;
+ 	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+ 	if (ret < 0) {
+ 		dma_addr = offset = 0;
+@@ -128,6 +134,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+ 
+ 	dev->dma_pfn_offset = offset;
+ 
++	/*
++	 * Limit coherent and dma mask based on size and default mask
++	 * set by the driver.
++	 */
++	dev->coherent_dma_mask = min(dev->coherent_dma_mask,
++				     DMA_BIT_MASK(ilog2(dma_addr + size)));
++	*dev->dma_mask = min((*dev->dma_mask),
++			     DMA_BIT_MASK(ilog2(dma_addr + size)));
++
+ 	coherent = of_dma_is_coherent(np);
+ 	dev_dbg(dev, "device is%sdma coherent\n",
+ 		coherent ? " " : " not ");
+-- 
+1.7.9.5
