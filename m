@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Feb 2015 10:01:06 +0100
-Subject: [PATCH v2 07/30] ARM: sun4i: hackberry: Convert to DT label based
+Date: Wed, 11 Feb 2015 10:01:08 +0100
+Subject: [PATCH v2 09/30] ARM: sun4i: mini xplus: Convert to DT label based
  syntax
 In-Reply-To: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1423645289-1074-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1423645289-1074-10-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,34 +14,20 @@ when overriding DTSI nodes, convert the board to this syntax
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun4i-a10-hackberry.dts | 187 ++++++++++++++----------------
- 1 file changed, 85 insertions(+), 102 deletions(-)
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts | 140 ++++++++++++++---------------
+ 1 file changed, 68 insertions(+), 72 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-index d3f73ea25567..3cb067ed8715 100644
---- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-@@ -58,102 +58,6 @@
- 	model = "Miniand Hackberry";
- 	compatible = "miniand,hackberry", "allwinner,sun4i-a10";
+diff --git a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
+index eb5fd6904a69..dce9a341516b 100644
+--- a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
++++ b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
+@@ -57,80 +57,76 @@
+ / {
+ 	model = "PineRiver Mini X-Plus";
+ 	compatible = "pineriver,mini-xplus", "allwinner,sun4i-a10";
++};
  
 -	soc at 01c00000 {
--		emac: ethernet at 01c0b000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&emac_pins_a>;
--			phy = <&phy0>;
--			status = "okay";
--		};
--
--		mdio at 01c0b080 {
--			phy-supply = <&reg_emac_3v3>;
--			status = "okay";
--
--			phy0: ethernet-phy at 0 {
--				reg = <0>;
--			};
--		};
--
 -		mmc0: mmc at 01c0f000 {
 -			pinctrl-names = "default";
 -			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
@@ -74,22 +60,10 @@ index d3f73ea25567..3cb067ed8715 100644
 -			status = "okay";
 -		};
 -
--		pio: pinctrl at 01c20800 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&hackberry_hogs>;
--
--			hackberry_hogs: hogs at 0 {
--				allwinner,pins = "PH19";
--				allwinner,function = "gpio_out";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--			};
--
--			usb2_vbus_pin_hackberry: usb2_vbus_pin at 0 {
--					allwinner,pins = "PH12";
--					allwinner,function = "gpio_out";
--					allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--					allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-		pinctrl at 01c20800 {
+-			ir0_pins_a: ir0 at 0 {
+-				/* The ir receiver is not always populated */
+-				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
 -			};
 -		};
 -
@@ -120,30 +94,33 @@ index d3f73ea25567..3cb067ed8715 100644
 -			};
 -		};
 -	};
--
- 	reg_emac_3v3: emac-3v3 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "emac-3v3";
-@@ -162,14 +66,93 @@
- 		enable-active-high;
- 		gpio = <&pio 7 19 GPIO_ACTIVE_HIGH>;
- 	};
-+};
-+
 +&ehci0 {
 +	status = "okay";
 +};
-+
+ 
+-	reg_usb1_vbus: usb1-vbus {
+-		status = "okay";
+-	};
 +&ehci1 {
 +	status = "okay";
 +};
 +
-+&emac {
++&i2c0 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_pins_a>;
-+	phy = <&phy0>;
++	pinctrl-0 = <&i2c0_pins_a>;
 +	status = "okay";
-+};
++
++	axp209: pmic at 34 {
++		compatible = "x-powers,axp209";
++		reg = <0x34>;
++		interrupts = <0>;
+ 
+-	reg_usb2_vbus: usb2-vbus {
+-		status = "okay";
++		interrupt-controller;
++		#interrupt-cells = <1>;
+ 	};
+ };
 +
 +&ir0 {
 +	pinctrl-names = "default";
@@ -151,17 +128,11 @@ index d3f73ea25567..3cb067ed8715 100644
 +	status = "okay";
 +};
 +
-+&mdio {
-+	phy-supply = <&reg_emac_3v3>;
-+	status = "okay";
-+
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
++&ir0_pins_a {
++	/* The ir receiver is not always populated */
++	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
 +};
- 
--	reg_usb1_vbus: usb1-vbus {
--		status = "okay";
++
 +&mmc0 {
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
@@ -180,48 +151,23 @@ index d3f73ea25567..3cb067ed8715 100644
 +	status = "okay";
 +};
 +
-+&pio {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hackberry_hogs>;
-+
-+	hackberry_hogs: hogs at 0 {
-+		allwinner,pins = "PH19";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
- 
--	reg_usb2_vbus: usb2-vbus {
--		pinctrl-0 = <&usb2_vbus_pin_hackberry>;
--		gpio = <&pio 7 12 GPIO_ACTIVE_HIGH>;
--		status = "okay";
-+	usb2_vbus_pin_hackberry: usb2_vbus_pin at 0 {
-+		allwinner,pins = "PH12";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
- };
-+
 +&reg_usb1_vbus {
 +	status = "okay";
 +};
 +
 +&reg_usb2_vbus {
-+	pinctrl-0 = <&usb2_vbus_pin_hackberry>;
-+	gpio = <&pio 7 12 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
 +	status = "okay";
 +};
 +
 +&uart0 {
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
 +	status = "okay";
 +};
 -- 
