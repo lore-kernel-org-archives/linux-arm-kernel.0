@@ -1,100 +1,100 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 11 Feb 2015 16:03:17 +0100
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 11 Feb 2015 15:03:38 +0000
 Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
  demuxer chip
-In-Reply-To: <2437801.56xPyk3atd@vostro.rjw.lan>
+In-Reply-To: <1448858.4nScWhYZcX@vostro.rjw.lan>
 References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
- <2982569.CIWvqghzfx@vostro.rjw.lan>
- <20150211144345.GL9154@leverpostej>
- <2437801.56xPyk3atd@vostro.rjw.lan>
-Message-ID: <20150211160317.6d6c64e5@bbrezillon>
+ <32372622.IiYZ15O7e1@vostro.rjw.lan>
+ <20150211141437.GK9154@leverpostej>
+ <1448858.4nScWhYZcX@vostro.rjw.lan>
+Message-ID: <20150211150338.GM9154@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Feb 2015 16:17:20 +0100
-"Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
-
-> On Wednesday, February 11, 2015 02:43:45 PM Mark Rutland wrote:
-> > [...]
-> > 
-> > > > > > > +static irqreturn_t __handle_irq_event_percpu(unsigned int irq, struct irqaction *action)
-> > > > > > > +{
-> > > > > > > +	/*
-> > > > > > > +	 * During suspend we must not call potentially unsafe irq handlers.
-> > > > > > > +	 * See suspend_suspendable_actions.
-> > > > > > > +	 */
-> > > > > > > +	if (unlikely(action->flags & IRQF_NO_ACTION))
-> > > > > > > +		return IRQ_NONE;
+On Wed, Feb 11, 2015 at 03:07:48PM +0000, Rafael J. Wysocki wrote:
+> On Wednesday, February 11, 2015 02:14:37 PM Mark Rutland wrote:
+> > On Wed, Feb 11, 2015 at 02:31:18PM +0000, Rafael J. Wysocki wrote:
+> > > On Wednesday, February 11, 2015 11:15:17 AM Mark Rutland wrote:
+> > > > On Wed, Feb 11, 2015 at 09:11:59AM +0000, Peter Zijlstra wrote:
+> > > > > On Tue, Feb 10, 2015 at 08:48:36PM +0000, Mark Rutland wrote:
+> > > > > > From f390ccbb31f06efee49b4469943c8d85d963bfb5 Mon Sep 17 00:00:00 2001
+> > > > > > From: Mark Rutland <mark.rutland@arm.com>
+> > > > > > Date: Tue, 10 Feb 2015 20:14:33 +0000
+> > > > > > Subject: [PATCH] genirq: allow mixed IRQF_NO_SUSPEND requests
 > > > > > > 
-> > > > > > Thomas was trying to avoid any new conditional code in the interrupt
-> > > > > > handling path, that's why I added a suspended_action list in my
-> > > > > > proposal.
-> > > > > > Even if your 'unlikely' statement make things better I'm pretty sure it
-> > > > > > adds some latency.
+> > > > > > In some cases a physical IRQ line may be shared between devices from
+> > > > > > which we expect interrupts during suspend (e.g. timers) and those we do
+> > > > > > not (e.g. anything we cut the power to). Where a driver did not request
+> > > > > > the interrupt with IRQF_NO_SUSPEND, it's unlikely that it can handle
+> > > > > > being called during suspend, and it may bring down the system.
+> > > > > > 
+> > > > > > This patch adds logic to automatically mark the irqactions for these
+> > > > > > potentially unsafe handlers as disabled during suspend, leaving actions
+> > > > > > with IRQF_NO_SUSPEND enabled. If an interrupt is raised on a shared line
+> > > > > > during suspend, only the handlers requested with IRQF_NO_SUSPEND will be
+> > > > > > called. The handlers requested without IRQF_NO_SUSPEND will be skipped
+> > > > > > as if they had immediately returned IRQF_NONE.
+> > > > > > 
+> > > > > > Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > > > Cc: Jason Cooper <jason@lakedaemon.net>
+> > > > > > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > > > > Cc: Peter Zijlstra <peterz@infradead.org>
+> > > > > > Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> > > > > > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > > > > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 > > > > > 
-> > > > > I can see that we don't want to add more code here to keep things
-> > > > > clean/pure, but I find it hard to believe that a single bit test and
-> > > > > branch (for data that should be hot in the cache) are going to add
-> > > > > measurable latency to a path that does pointer chasing to get to the
-> > > > > irqaction in the first place. I could be wrong though, and I'm happy to
-> > > > > benchmark.
+> > > > > Aw gawd.. not that again.
 > > > > 
-> > > > Again, I don't have enough experience to say this is (or isn't)
-> > > > impacting irq handling latency, I'm just reporting what Thomas told me.
+> > > > I agree this isn't pretty, but at least it doesn't require the HW
+> > > > description to know about Linux internals, and it can work for !DT
+> > > > systems.
 > > > > 
+> > > > I'm really not happy with placing Linux implementation details into
+> > > > DTBs.
+> > > > 
+> > > > > So Rafael and tglx went over this a few months ago I think:
 > > > > > 
-> > > > > It would be possible to go for your list shuffling approach here while
-> > > > > still keeping the flag internal and all the logic hidden away in
-> > > > > kernel/irq/pm.c. I wasn't sure how actions could be manipulated during
-> > > > > suspend, which made me wary of moving them to a separate list.
+> > > > >   lkml.kernel.org/r/26580319.OZP7jvJnA9 at vostro.rjw.lan
+> > > > > 
+> > > > > is the last series I could find. Maybe Rafael can summarize?
 > > > > 
-> > > > Moving them to a temporary list on suspend and restoring them on
-> > > > resume should not be a problem.
-> > > > The only drawback I see is that actions might be reordered after the
-> > > > first resume (anyway, relying on shared irq action order is dangerous
-> > > > IMHO).
+> > > > I can't get at any commentary from that link, unfortunately.
+> > > > 
+> > > > Rafael?
 > > > 
-> > > We considered doing that too and saw some drawbacks (in addition to the
-> > > reordering of actions you've mentioned).  It added just too much complexity
-> > > to the IRQ suspend-resume code.
-> > > 
-> > > I, personally, would be fine with adding an IRQ flag to silence the
-> > > warning mentioned by Alexandre.  Something like IRQD_TIMER_SHARED that would
-> > > be set automatically if someone requested IRQF_TIMER | IRQF_SHARED.
-> > > 
-> > > Thoughts?
+> > > Well, the commentary is not there, because both I and Thomas implicitly agreed
+> > > on one thing: We cannot add any suspend-related checks to the interrupt handling
+> > > hot path, because that will affect everyone including people who don't use
+> > > suspend at all and who *really* care about interrupt handling performance.
 > > 
-> > Even if the timer driver does that, we still require the other handlers
-> > sharing the line to do the right thing across suspend, no? So either
-> > their actions need to be masked at suspend time, or the handlers need to
-> > detect when they're called during suspend and return early.
+> > That's fair enough, and I'm happy to avoid that by other means.
+> > 
+> > My fundamental objection(s) to the current approach is that we create a
+> > binding for a non-existent device that people will abuse without
+> > considering the consequences. All we will end up with is more DTBs
+> > containing the mux regardless of wether the drivers (or hardware) are
+> > actually safe with a shared line.
 > 
-> Well, the issue at hand is about things that share an IRQ with a timer AFAICS.
+> That is a valid concern in my view.
 > 
-> That is odd enough already and I'd say everyone in that situation needs to
-> be prepared to take the pain (including having to check if the device is not
-> suspended in their interrupt handlers).
+> > So with the changes moves out of the hot-path (e.g. with shuffling
+> > to/from a suspended_actions list in the pm code), is there some issue
+> > that I have not considered?
 > 
-> And quite frankly they need to do that already, because we've never suspended
-> timer IRQs.
-> 
-> > So for the flag at request time approach to work, all the drivers using
-> > the interrupt would have to flag they're safe in that context.
-> 
-> Something like IRQF_"I can share the line with a timer" I guess?  That wouldn't
-> hurt and can be checked at request time even.
-> 
-> > I'm not averse to having that (only a few drivers shuold be affected and
-> > we can sanity check them now).
-> 
-> Right.
+> When we were reworking the handling of wakeup interrupts during the 3.18
+> cycle, one of my proposals was to move the "suspended" irqactions to an
+> "inactive" list during suspend_device_irqs() and back during
+> resume_device_irqs(), but Thomas didn't like that approach.  His main
+> argument was that it made the code in question overly complex which
+> was fair enough to me.
 
-Okay, if everyone agrees on this solution, then I'm fine with that too
-(even if I'm a bit disappointed to have spent so much time on this
-problem to eventually end-up with a simple IRQF_SHARED_TIMER flag :-().
+I've just looked into that, and have a trivial implementation that's
+contained within kernel/irq/pm.c, but it assumes that during suspend
+nothing needs to modify actions.
 
+> What about adding a new flag like I said?
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+That works for me. I'll respond in the other mail.
+
+Thanks,
+Mark.
