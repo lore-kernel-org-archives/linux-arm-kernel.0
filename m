@@ -1,37 +1,60 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 11 Feb 2015 19:10:21 -0200
-Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
- registers
-In-Reply-To: <1705379122.406018.1423686677196.JavaMail.open-xchange@oxbaltgw01.schlund.de>
-References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
- <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
- <54DA020C.6030703@i2se.com>
- <CAOMZO5DGCP1p1vetwWHpSbe2qywA8DhWRRq22egMDFSw11uq4w@mail.gmail.com>
- <54DA0DE7.5050708@i2se.com>
- <CAOMZO5AtFOThRjcAgMVbrbkcrJbehouSxoH03VUGJrRdWXnS_Q@mail.gmail.com>
- <462270270.419156.1423603473431.JavaMail.open-xchange@oxbaltgw02.schlund.de>
- <CAOMZO5B4mxP6RBkbsbj=wC6bZJgtreoo5S_NhYuki6kW=Y=QFw@mail.gmail.com>
- <1705379122.406018.1423686677196.JavaMail.open-xchange@oxbaltgw01.schlund.de>
-Message-ID: <CAOMZO5ChJiHiUBhrRf_qqi7gTLvPp08fsfRBK+GVzvrqimKinw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 11 Feb 2015 13:14:55 -0800
+Subject: [PATCH] ARM: OMAP1: PM: fix some build warnings on 1510-only
+ Kconfigs
+In-Reply-To: <alpine.DEB.2.02.1502112056200.3767@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1502070020530.3767@utopia.booyaka.com>
+ <54D9CFBC.3070405@nvidia.com> <54D9E42C.7010105@gmail.com>
+ <alpine.DEB.2.02.1502110218090.3767@utopia.booyaka.com>
+ <20150211203757.GH2531@atomide.com>
+ <alpine.DEB.2.02.1502112056200.3767@utopia.booyaka.com>
+Message-ID: <20150211211454.GJ2531@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 11, 2015 at 6:31 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+* Paul Walmsley <paul@pwsan.com> [150211 13:03]:
+> On Wed, 11 Feb 2015, Tony Lindgren wrote:
+> 
+> > * Paul Walmsley <paul@pwsan.com> [150210 18:28]:
+> > > On Tue, 10 Feb 2015, Jon Hunter wrote:
+> > > > On 07/02/2015 00:23, Paul Walmsley wrote:
+> > > 
+> > > > Unfortunately, there is not a single TRM for the omap5910 but individual 
+> > > > documents for each chapter in the original TRM. Check out the "OMAP5910 
+> > > > Dual-Core Processor Timer Reference Guide" and possibly the "OMAP5910 
+> > > > Dual-Core Processor Clock Generation and System Reset Management 
+> > > > Reference Guide"
+> > > > 
+> > > > The omap15xx/5910 did have a 32k timer but as you can see it appears it
+> > > > was never supported by the kernel for this device (not sure why). I do
+> > > > recall that there is some errata regarding the 32k timer, if you look at
+> > > > the omap5910 errata document and search for 32k you should find it.
+> > > 
+> > > OK thanks for the context.  I probably am not going to investigate adding 
+> > > support for this timer on OMAP1510/5910 - am primarily trying to avoid 
+> > > causing a regression on the existing platforms.
+> > 
+> > At least I've never seen the 32KiHz timer registers in any 15xx
+> > documentation. Jon are you sure you're not mixing up 5910 (15xx)
+> > and 5912 (16xx)?
+> 
+> It's documented in the OMAP5910 Timer Reference Guide (SPRU682A) Section 3 
+> "32-kHz Timer", at the link Jon mentioned.  Have not checked the errata 
+> that Jon mentioned though.
 
->> I always get 0x5e5b5513 with or without your patch.
->
-> very strange. Do you have any idea why IO1_STABLE is permanent low?
+Interesting. Looks like it's the same as on 16xx at 0xfffb9000.
+AFAIK that never worked on 15xx. Or maybe the issue was that 15xx
+is missing the constantly running 32KiHz counter making the timer
+unusable from PM point of view as the clockevent alone is not enough.
 
-On my case it is always 1.
+> Regarding the patch: I'd suggest keeping the compilation warning fixes 
+> (which was the original purpose of the patch) from anything that changes 
+> the logic too much.   That way if there's an error in the patch that 
+> changes the logic and it needs to be reverted, it won't also revert the 
+> warning fixes.
 
-> Can you confirm the behavior according to your flash issue?
+Makes sense to me.
 
-In my tests IO1_STABLE stays the same.
+Regards,
 
-> I think it would be the best to revert my patch. Sorry for the trouble.
-
-To be on the safe side, I agree.
-
-Could you please send a revert patch?
-
-Thanks
+Tony
