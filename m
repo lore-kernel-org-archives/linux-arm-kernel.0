@@ -1,133 +1,51 @@
-From: dalias@libc.org (Rich Felker)
-Date: Wed, 11 Feb 2015 16:37:58 -0500
-Subject: [musl] Re: [PATCHv3 00/24] ILP32 support in ARM64
-In-Reply-To: <1383502854.512344.1423688575473.JavaMail.open-xchange@oxbaltgw09.schlund.de>
+From: joseph@codesourcery.com (Joseph Myers)
+Date: Wed, 11 Feb 2015 21:41:27 +0000
+Subject: [PATCHv3 00/24] ILP32 support in ARM64
+In-Reply-To: <20150211190252.GB23507@brightrain.aerifal.cx>
 References: <20141002155217.GH32147@e104818-lin.cambridge.arm.com>
  <20150210181302.GA23886@brightrain.aerifal.cx>
- <20150211173919.GF9058@e104818-lin.cambridge.arm.com>
- <20150211190537.GK32724@port70.net>
- <359577916.509062.1423684206521.JavaMail.open-xchange@oxbaltgw09.schlund.de>
- <20150211201251.GK23507@brightrain.aerifal.cx>
- <1383502854.512344.1423688575473.JavaMail.open-xchange@oxbaltgw09.schlund.de>
-Message-ID: <20150211213758.GN23507@brightrain.aerifal.cx>
+ <CAMe9rOqX-VpjZ+E-JCusk+e4Kpw1V1tsFq1Kjtai5DR9saKLaA@mail.gmail.com>
+ <20150211190252.GB23507@brightrain.aerifal.cx>
+Message-ID: <alpine.DEB.2.10.1502112125560.19244@digraph.polyomino.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 11, 2015 at 10:02:55PM +0100, arnd at arndb.de wrote:
-> Rich Felker <dalias@libc.org> hat am 11. Februar 2015 um 21:12 geschrieben:
-> > On Wed, Feb 11, 2015 at 08:50:06PM +0100, arnd at arndb.de wrote:
-> > > > > At least for AArch64 ILP32 we are still free to change the user/kernel
-> > > > > ABI, so we could add wrappers for the affected syscalls to fix this up.
-> > > > yes, afaik on x32 the 64bit kernel expects 64bit layout,
-> > > > arm64 can fix this
-> > >
-> > > We have to fix it on all 32-bit architectures when we move to 64-bit time_t.
-> > >
-> > > I think ideally you'd want a user space definition like
-> > >
-> > > typedef long long time_t;
-> > > struct timespec {
-> > > time_t tv_sec;
-> > > long long tv_nsec;
-> > > };
-> > >
-> > > which is the only way to avoid passing uninitialized tv_nsec into the kernel
-> > > from arbitrary user space doing ioctl. This is of course against POSIX and
-> > > C99. Changing POSIX to allow it is probably easier than the C standard,
-> > > but we have a couple of years before we need to make this the default.
-> >
-> > I don't see why you want it to be long long. There is no harm in
-> > passing uninitialized padding to the kernel; the kernel just needs to
-> > do the right thing and ignore it (or avoid reading it to begin with).
->  
-> This would however mean having three different implementations
-> in the kernel rather than just two: Every driver that can pass a timespec
-> with this model needs to handle the native 64-bit case (64/64), the legacy
-> 32-bit case (32/32) and the y2038-safe case (64/32). Most code can
-> already handle the first two, and none today handles the third. If you
-> want to make the handling explicitly incompatible with native 64-bit
-> mode, you get a lot of untested code in obscure places that are never
-> tested properly, while using the normal behavior in the kernel at least
-> gives us the same bugs that we already have on native 64-bit systems.
+On Wed, 11 Feb 2015, Rich Felker wrote:
 
-Would it really be that hard to do:
-
-	if (ILP32_on_64_process) tv_nsec = (int)tv_nsec;
-
-or similar? That's all that's needed.
-
-> In some cases, there may also be a measurable performance penalty
-> in interpreting a user space data structure manually over copying
-> it (including the timespec values) in one chunk.
-
-I don't think the above would be measurable.
-
-> An alternative would be to change the native 64-bit case to ignore the upper
-> half of tv_nsec and always just copy the low bits. This should work
-> fine almost all of the time, but I fear that there might be corner cases
-> where existing 64-bit user space depends on passing large or negative
-> tv_nsec values into the kernel.
-
-Most functions using caller-provided timespecs are required to
-diagnose invalid forms with EINVAL when tv_nsec>=1000000000 or <0, so
-if the kernel examines only the low 32 bits on ABIs where long is
-64-bit, userspace would need to be responsible for doing this
-checking.
-
-> > The other direction, passing uninitialized data from the kernel to
-> > userspace, would be dangerous. But it doesn't happen as long as the
-> > userspace padding is positioned (in an endian-dependent manner) where
-> > the high bits of the kernel type would lie. It could happen if you
-> > used a separate conversion wrapper that ony wrote 32 bits, but if you
-> > wanted to take that approach you'd just need the wrapper to also write
-> > the padding field manually.
->  
-> Going from kernel to user space should not be an issue as long as we
-> always just write two 64-bit words, and this will zero-fill the upper half.
-
-Agreed.
-
-> > > In the kernel headers, the current plan is to provide interfaces taking
-> > > structures
-> > >
-> > > typedef long long __kernel_time64_t;
-> > > struct __kernel_timespec64_t {
-> > > __kernel_time64_t tv_sec;
-> > > long long tv_nsec;
-> > > };
-> > >
-> > > at least for ioctls, to avoid the ambiguity with libc headers specifying
-> > > something else.
-> >
-> > This seems hideous from an application standpoint. Application
-> > programmers don't want to know, and shouldn't need to know, these
-> > silly implementation details that make no sense except as historical
-> > baggage. They should just be able to use "struct timespec" everywhere
-> > and have it work.
+> > > https://sourceware.org/bugzilla/show_bug.cgi?id=16437
+> > 
+> > Please leave x32 out of this discussion.  I have resolved this bug
+> > as WONTFIX.
 > 
-> The kernel does not even know how timespec is defined by libc, and we have
-> to at least be able to handle the common cases of timespec being 32/32
-> and 64/64 (or 64/32 plus explicit padding). For system calls, we can rely
-> on libc calling the syscalls that match the definition (or convert the
-> structure as necessary), while for ioctl the command number is chosen
-> by the application and has to match the structure definition provided in
-> the same header.
+> From the glibc side, I thought things went by a consensus process
+> these days, not the old WONTFIX regime of he who shall not be named.
+> If this is not fixed for x32, then x32 cannot provide a conforming C
+> environment and thus it's rather a toy target. But I think we should
+> discuss this on libc-alpha. In the mean time please leave it REOPENED.
 
-Generally I would think the kernel knows the model the process is
-using, but if not, all you need is separate ioctl numbers for
-userspace to use depending on which definition it's using.
+Indeed.  x86 is handled primarily by community review, and even when we 
+have maintainers for architectures or other subsystems, being maintainer 
+serves as a shortcut to presume consensus in the absence of controversy 
+(in the expectation that the community won't object), not to override 
+community discussion if something is more controversial.  I've reopened 
+the bug.
 
-> In a lot of cases, the ioctl command number is defined (correctly) using the
-> _IOR/_IOW macros that take the size of the structure into account, but then
-> you also have cases where you get indirect pointers and the size of data
-> structure
-> passed by the ioctl command is independent of the size of timespec or time_t.
->  
-> This is not just limited to time_t, we have a lot of data types for which we
-> define
-> __kernel_*_t types for this purpose, to deal with ioctls that need a specific
-> layout independent of what libc uses.
+I believe I made clear in the discussion of 64-bit time interfaces for 
+32-bit systems that the x32 ABI mistake was not one to be repeated - that 
+since there is obviously no need for nanoseconds values that cannot fit in 
+32 bits, nanoseconds (and microseconds) values should remain as long in 
+accordance with POSIX.  It's absolutely fine for the userspace structures 
+to have an explicit __glibc_reserved padding field in an endian-dependent 
+place to keep the low part of the nanoseconds value in the same place as 
+it would be for a 64-bit type, but if the kernel doesn't ignore that 
+padding for the 64-bit time interfaces then all places that pass these 
+structures from glibc to the kernel need to copy them and zero the padding 
+in the copy.
 
-That doesn't make it any less of a mess. :(
+Whether the high 32 bits can be treated as padding for interfaces where 
+long is 64-bit depends on whether the interfaces in question are required 
+to return an error such as EINVAL for out-of-range nanoseconds values.
 
-Rich
+-- 
+Joseph S. Myers
+joseph at codesourcery.com
