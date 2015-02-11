@@ -1,80 +1,38 @@
-From: rsahu@apm.com (Rameshwar Sahu)
-Date: Wed, 11 Feb 2015 13:38:07 +0530
-Subject: [PATCH v5 1/3] dmaengine: Add support for APM X-Gene SoC DMA
- engine driver
-In-Reply-To: <20150205201118.GB16547@intel.com>
-References: <1422968107-23125-1-git-send-email-rsahu@apm.com>
- <1422968107-23125-2-git-send-email-rsahu@apm.com>
- <20150205015031.GK4489@intel.com>
- <CAFd313yBS3KOdtKbnaeTKehmC_f5ZaB-nx299QoLeMm279=Jsg@mail.gmail.com>
- <20150205201118.GB16547@intel.com>
-Message-ID: <CAFd313xiXQXaYoTNdGnVqnAisYoFDneQ0VwW64v7unFpKU5P_A@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 11 Feb 2015 16:16:23 +0800
+Subject: [PATCH 0/7] OPP: Introduce OPP bindings V2 and supporting code
+Message-ID: <cover.1423642246.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Now that I have received an verbal Ack from Rob Herring (in a personal
+conversation) about the bindings, I am showing how the code looks like with
+these new bindings.
 
+Some part is still now done:
+- Interface for adding new detailed OPPs from platform code instead of DT
+- Providing cpufreq helpers for the next OPPs
+- Providing regulator helpers for the target/min/max ranges
 
-On Fri, Feb 6, 2015 at 1:41 AM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Thu, Feb 05, 2015 at 05:29:06PM +0530, Rameshwar Sahu wrote:
->> Hi Vinod,
->>
->> Thanks for reviewing this patch.
->>
->> Please see inline......
-> Please STOP top posting
->
->> >
->> >> +}
->> >> +
->> >> +static void xgene_dma_issue_pending(struct dma_chan *channel)
->> >> +{
->> >> +     /* Nothing to do */
->> >> +}
->> > What do you mean by nothing to do here
->> > See Documentation/dmaengine/client.txt Section 4 & 5
->> This docs is only applicable on slave DMA operations, we don't support
->> slave DMA, it's only master.
->> Our hw engine is designed in the way that there is no scope of
->> flushing pending transaction explicitly by sw.
->> We have circular ring descriptor dedicated to engine. In submit
->> callback  we are queuing descriptor and informing to engine, so after
->> this it's internal to hw to execute descriptor one by one.
-> But the API expectations on this are _same_
->
-> No the API expects you to maintain a SW queue, then push to your ring buffer
-> when you get issue_pending. Issue pending is the start of data transfer, you
-> client will expect accordingly.
+Please provide feedback on how this looks like..
 
-Okay, I will maintain a sw queue, and will push sw descriptor to hw in
-this callback.
->
->> >> +     /* Run until we are out of length */
->> >> +     do {
->> >> +             /* Create the largest transaction possible */
->> >> +             copy = min_t(size_t, len, DMA_MAX_64BDSC_BYTE_CNT);
->> >> +
->> >> +             /* Prepare DMA descriptor */
->> >> +             xgene_dma_prep_cpy_desc(chan, slot, dst, src, copy);
->> >> +
->> > This is wrong. The descriptor is supposed to be already prepared and now it
->> > has to be submitted to queue
->>
->> Due to the race in tx_submit call from the client, need to serialize
->> the submission of H/W DMA descriptors.
->>  So we are making  shadow copy in prepare DMA  routine and  preparing
->> actual descriptor during tx_submit call.
-> Thats an abuse of API and I dont see a reason why this race should happen in
-> the first place.
->
-> So you get a prep call, you prepare a desc in SW. Then submit pushes it to a
-> queue. Finally in issue pending you push them to HW. Simple..?
+--
+viresh
 
-I agree, I will do it and post another version soon.
->
-> --
-> ~Vinod
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Viresh Kumar (7):
+  OPP: Redefine bindings to overcome shortcomings
+  opp: Relocate few routines
+  OPP: Break _opp_add_dynamic() into smaller functions
+  opp: Parse new (v2) bindings
+  opp: convert device_opp->dev to a list of devices
+  opp: Add helpers for initializing CPU opps
+  cpufreq-dt: Use DT to set policy->cpus/related_cpus
+
+ Documentation/devicetree/bindings/power/opp.txt |  407 ++++++++-
+ drivers/base/power/opp.c                        | 1041 +++++++++++++++++------
+ drivers/cpufreq/cpufreq-dt.c                    |   16 +-
+ include/linux/pm_opp.h                          |   23 +
+ 4 files changed, 1232 insertions(+), 255 deletions(-)
+
+-- 
+2.3.0.rc0.44.ga94655d
