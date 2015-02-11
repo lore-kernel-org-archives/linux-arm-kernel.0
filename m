@@ -1,33 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 11 Feb 2015 13:28:27 +0800
-Subject: [systemd-devel] Making udev emit a signal when it is done
- loading modules
-In-Reply-To: <20150128013852.GA8177@gardel-login>
-References: <54BA20D0.7060402@redhat.com> <20150117160319.GO18247@in.waw.pl>
- <20150128013852.GA8177@gardel-login>
-Message-ID: <20150211052827.GP2593@finisterre.sirena.org.uk>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 11 Feb 2015 00:03:37 -0600
+Subject: [Patch v3 0/2] Add Qualcomm ADM dmaengine driver
+Message-ID: <1423634619-614-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 02:38:52AM +0100, Lennart Poettering wrote:
+This patch set introduces the dmaengine driver for the Qualcomm Application
+Data Mover (ADM) DMA controller present on MSM8x60, APQ8064, and IPQ8064
+devices.
 
-> To clarify this: if people do this, then this pulls in
-> systemd-udev-settle.service, which slows down boot. Every service that
-> does that is hence a majour source of slowness. 
+The initial version of this driver will only support slave DMA operations
+between system memory and peripherals.  Flow control via the CRCI (client rate
+control interface) is supported and can be configured via device tree
+configuration.  Flow control usage is required for some peripheral devices.
 
-> It's a hack to use this, not a solution. 
+Changes from v2:
+  - Removed extraneous achan variable from xlate function
+  - Reworked crci check in slave_sg function
+  - Added mux field to async_desc structure.
+  - Reworked dma start function to use crci and mux values directly from
+    structure.
+  - Added disable of clocks in probe error paths.
+  - Changed to use #define for fixed number of channels.
 
-Well, yes.  There aren't really any good solutions with our event driven
-model - we never "finish" booting, we just get to a point where nothing
-has been happening for a while.  I have been thinking that we need to
-just admit that properly and do something timer based - have a timer
-that gets reset every time we instantiate something, then do all our
-"end of boot" actions when nothing happened for a while.  It's not
-elegant but I don't think elegant is a realistic goal here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150211/e5b16174/attachment-0001.sig>
+Changes since v1:
+  - Fixed various review comments
+  - Fixed some descriptor programming issues.
+  - Added single descriptors to support sub burst length transactions.
+    Selection of single or box descriptors depends on the sg length and burst
+    size.
+  - Removed use of crci in the dmas property.  CRCI is now designated via the
+    slave_config structure and will be stored in slave_id.
+
+Andy Gross (2):
+  dt/bindings: qcom_adm: Fix channel specifiers
+  dmaengine: Add ADM driver
+
+ Documentation/devicetree/bindings/dma/qcom_adm.txt |   16 +-
+ drivers/dma/Kconfig                                |   10 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/qcom_adm.c                             |  902 ++++++++++++++++++++
+ 4 files changed, 919 insertions(+), 10 deletions(-)
+ create mode 100644 drivers/dma/qcom_adm.c
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
