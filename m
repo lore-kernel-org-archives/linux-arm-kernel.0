@@ -1,54 +1,30 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 12 Feb 2015 01:33:39 +0300
-Subject: -n900 (not mainline): fix compilation with 3.20-rc0
-In-Reply-To: <20150211222342.GE11313@amd>
-References: <20150211222342.GE11313@amd>
-Message-ID: <54DBD8C3.4090904@cogentembedded.com>
+From: vbridger@opensource.altera.com (Vince Bridgers)
+Date: Wed, 11 Feb 2015 12:34:25 -0600
+Subject: [PATCH] arm: socfpga: Correct SCU virtual mapping in socfpga
+Message-ID: <1423679665-19545-1-git-send-email-vbridger@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Correct SCU virtual mapping that was causing this BUG message:
 
-On 02/12/2015 01:23 AM, Pavel Machek wrote:
+"BUG: mapping for 0xfffec000 at 0xfffec000 out of vmalloc space"
 
-    This looked like a patch in its final form, so I decided to comment on it...
+Signed-off-by: Vince Bridgers <vbridger@opensource.altera.com>
+---
+ arch/arm/mach-socfpga/core.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> commit 02aa41563bd0f14268d2142ab69694880d3425a1
-> Author: Pavel <pavel@ucw.cz>
-> Date:   Wed Feb 11 23:22:51 2015 +0100
-
-    No need for this header.
-
->      Fix compilation of wl1251 specific parts with 3.20-rc0.
-
->      Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
-    Please don't indent the change log.
-
-> diff --git a/drivers/net/wireless/ti/wl1251/netlink.c b/drivers/net/wireless/ti/wl1251/netlink.c
-> index e5f5a45..90a5486 100644
-> --- a/drivers/net/wireless/ti/wl1251/netlink.c
-> +++ b/drivers/net/wireless/ti/wl1251/netlink.c
-[...]
-> @@ -406,14 +398,10 @@ static int wl1251_nl_phy_reg_read(struct sk_buff *skb, struct genl_info *info)
->   	if (nla_put_u32(msg, WL1251_NL_ATTR_REG_VAL, *reg_value))
->   		goto nla_put_failure;
->
-> -	ret = genlmsg_end(msg, hdr);
-> -	if (ret < 0) {
-> -		wl1251_error("%s() failed", __func__);
-> -		goto nla_put_failure;
-> -	}
-> +	genlmsg_end(msg, hdr);
->
->   	kfree(reg_value);
-> -
-> +	
-
-    Remove this stray tab please.
-
->   	return genlmsg_reply(msg, info);
->
->   nla_put_failure:
-
-WBR, Sergei
+diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
+index 483cb46..a0f3b1c 100644
+--- a/arch/arm/mach-socfpga/core.h
++++ b/arch/arm/mach-socfpga/core.h
+@@ -45,6 +45,6 @@ extern char secondary_trampoline, secondary_trampoline_end;
+ 
+ extern unsigned long socfpga_cpu1start_addr;
+ 
+-#define SOCFPGA_SCU_VIRT_BASE   0xfffec000
++#define SOCFPGA_SCU_VIRT_BASE   0xfee00000
+ 
+ #endif
+-- 
+1.9.1
