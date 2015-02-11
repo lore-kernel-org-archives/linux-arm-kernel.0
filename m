@@ -1,141 +1,48 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 11 Feb 2015 05:34:40 +0100
-Subject: [PATCH V4 4/4] mmc: pwrseq_simple: Add support for a reset GPIO
- pin
-In-Reply-To: <CAAVeFuJjU-fsknYdMZ1c+aOEmc2rFy=z35S584DfHBLvUm=OAQ@mail.gmail.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Wed, 11 Feb 2015 13:34:26 +0900
+Subject: [PATCH V4 3/4] mmc: pwrseq: Initial support for the simple MMC
+ power sequence provider
+In-Reply-To: <CAPDyKFrdpknrMa62Vz4dfKaFMTdF-uXaAz3pkw_3qwNvHy49SQ@mail.gmail.com>
 References: <1421658784-11980-1-git-send-email-ulf.hansson@linaro.org>
- <1421658784-11980-5-git-send-email-ulf.hansson@linaro.org>
- <CAAVeFuJjU-fsknYdMZ1c+aOEmc2rFy=z35S584DfHBLvUm=OAQ@mail.gmail.com>
-Message-ID: <CAPDyKFonXw2NDbEw9CoRj7Sncgm_FUki+cc7j3q=xVZRrJHBkg@mail.gmail.com>
+ <1421658784-11980-4-git-send-email-ulf.hansson@linaro.org>
+ <CAAVeFu+ubZZGQd=zPPYm--PVCO9q-A3503Y5g50+sU4ztxU+iA@mail.gmail.com>
+ <CAPDyKFrdpknrMa62Vz4dfKaFMTdF-uXaAz3pkw_3qwNvHy49SQ@mail.gmail.com>
+Message-ID: <CAAVeFuLQkNz6x21w8xCM==nwyt0QbYL_uPC9+TdRCj2w+FVu1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 February 2015 at 10:12, Alexandre Courbot <gnurou@gmail.com> wrote:
-> On Mon, Jan 19, 2015 at 6:13 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> The need for reset GPIOs has several times been pointed out from
->> erlier posted patchsets. Especially some WLAN chips which are
->> attached to an SDIO interface may use a GPIO reset.
->>
->> The reset GPIO is asserted at initialization and prior we start the
->> power up procedure. The GPIO will be de-asserted right after the power
->> has been provided to the card, from the ->post_power_on() callback.
->>
->> Note, the reset GPIO is optional. Thus we don't return an error even if
->> we can't find a GPIO for the consumer.
->>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+On Wed, Feb 11, 2015 at 1:28 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> [...]
 >
-> Excellent, with this I can probe the wifi chip on NVIDIA SHIELD which
-> requires a GPIO to be high for reset to be de-asserted.
+>>> +int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
+>>> +{
+>>> +       struct mmc_pwrseq_simple *pwrseq;
+>>> +
+>>> +       pwrseq = kzalloc(sizeof(struct mmc_pwrseq_simple), GFP_KERNEL);
+>>> +       if (!pwrseq)
+>>> +               return -ENOMEM;
+>>> +
+>>> +       pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
+>>> +       host->pwrseq = &pwrseq->pwrseq;
+>>
+>> How about making this function return a struct mmc_pwrseq * so this
+>> last line can be moved to mmc_pwrseq_alloc() instead of requiring all
+>> power sequences to do it?
+>>
+>> The same applies to
+>>
+>>     host->pwrseq = NULL;
+>>
+>> in mmc_pwrseq_simple_free(), which could be done in mmc_pwrseq_free() it seems.
 >
-> The series:
+> Thanks for reviewing!
 >
-> Tested-by: Alexandre Courbot <acourbot@nvidia.com>
+> I like you suggestion, though $subject patch is already part of the PR for 3.20.
+>
+> Feel free to send a patch, I would happily apply it.
 
-Thanks for testing! Unfortunate, I can't add you tag since this
-patchset is already in the PR for 3.20.
+Damn, why am I always so late to review patches...
 
->
->> ---
->>
->> Changes in v4:
->>         - Fixed call to kfree().
->>
->> ---
->>  drivers/mmc/core/pwrseq_simple.c | 38 ++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 38 insertions(+)
->>
->> diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
->> index 61c991e..0958c69 100644
->> --- a/drivers/mmc/core/pwrseq_simple.c
->> +++ b/drivers/mmc/core/pwrseq_simple.c
->> @@ -11,6 +11,7 @@
->>  #include <linux/slab.h>
->>  #include <linux/device.h>
->>  #include <linux/err.h>
->> +#include <linux/gpio/consumer.h>
->>
->>  #include <linux/mmc/host.h>
->>
->> @@ -18,31 +19,68 @@
->>
->>  struct mmc_pwrseq_simple {
->>         struct mmc_pwrseq pwrseq;
->> +       struct gpio_desc *reset_gpio;
->>  };
->>
->> +static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
->> +{
->> +       struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
->> +                                       struct mmc_pwrseq_simple, pwrseq);
->> +
->> +       if (!IS_ERR(pwrseq->reset_gpio))
->> +               gpiod_set_value_cansleep(pwrseq->reset_gpio, 1);
->> +}
->> +
->> +static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
->> +{
->> +       struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
->> +                                       struct mmc_pwrseq_simple, pwrseq);
->> +
->> +       if (!IS_ERR(pwrseq->reset_gpio))
->> +               gpiod_set_value_cansleep(pwrseq->reset_gpio, 0);
->> +}
->> +
->>  static void mmc_pwrseq_simple_free(struct mmc_host *host)
->>  {
->>         struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
->>                                         struct mmc_pwrseq_simple, pwrseq);
->>
->> +       if (!IS_ERR(pwrseq->reset_gpio))
->> +               gpiod_put(pwrseq->reset_gpio);
->> +
->>         kfree(pwrseq);
->>         host->pwrseq = NULL;
->>  }
->>
->>  static struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
->> +       .pre_power_on = mmc_pwrseq_simple_pre_power_on,
->> +       .post_power_on = mmc_pwrseq_simple_post_power_on,
->> +       .power_off = mmc_pwrseq_simple_pre_power_on,
->>         .free = mmc_pwrseq_simple_free,
->>  };
->>
->>  int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
->>  {
->>         struct mmc_pwrseq_simple *pwrseq;
->> +       int ret = 0;
->>
->>         pwrseq = kzalloc(sizeof(struct mmc_pwrseq_simple), GFP_KERNEL);
->>         if (!pwrseq)
->>                 return -ENOMEM;
->>
->> +       pwrseq->reset_gpio = gpiod_get_index(dev, "reset", 0, GPIOD_OUT_HIGH);
->
-> gpiod_get() will translate to exactly the same, with less characters.
->
-> Actually I see that the version in -next has support for multiple
-> GPIOs. You will probably want to look at Rojhalat's latest work on
-> GPIO arrays:
->
-> http://permalink.gmane.org/gmane.linux.kernel.gpio/6126
+I will send a fixup patch - better to have this done early.
 
-Cool!
-
->
-> This code would be a great candidate to use this GPIO array API, but
-> since it is not in -next yet (should happen soon though) you might
-> want to consider doing it later.
->
-> Btw, I wasted a considerable amount of time on one of the defunct
-> previous attempts at power sequences, so I'm interested in reviewing
-> future versions of this patchset if you don't mind adding me to the CC
-> list. :)
-
-:-)
-
-I will keep you posted for future updates. Feel free to post patches
-improving the mmc-pwrseq code yourself, I will happily review them.
-
-Kind regards
-Uffe
+Thanks!
