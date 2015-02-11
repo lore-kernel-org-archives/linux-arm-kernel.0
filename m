@@ -1,73 +1,217 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 11 Feb 2015 08:29:36 +0100
-Subject: [PATCH v2] ARM: dts: exynos5420: Add maudio power domain
-In-Reply-To: <1423490243-7675-1-git-send-email-k.kozlowski@samsung.com>
-References: <1423490243-7675-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1423639776.19979.2.camel@AMDC1943>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Wed, 11 Feb 2015 08:06:55 +0000
+Subject: [PATCH 1/2] dmaengine: fsl-edma: add dma memcpy support
+In-Reply-To: <63612a565e0cbf4081b0b8efa0bc3c46@agner.ch>
+References: <1419928907-18053-1-git-send-email-jingchang.lu@freescale.com>
+ <1419928907-18053-2-git-send-email-jingchang.lu@freescale.com>
+ <63612a565e0cbf4081b0b8efa0bc3c46@agner.ch>
+Message-ID: <DM2PR03MB349BBD3ECA4BEC0773C50C983250@DM2PR03MB349.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pon, 2015-02-09 at 14:57 +0100, Krzysztof Kozlowski wrote:
-> Add maudio power domain to Exynos 5420 DTSI file so its state could be
-> tracked. This actually won't power down this domain because the pl330
-> dmaengine driver (for adma channel) uses IRQ safe runtime PM. Thus the
-> patch should not introduce any functional change except of visibility of
-> this domain to the system.
+Hi Stefan,
 
-I was wrong. There is a functional change during suspend.
+Thanks for your test.
 
-The mau domain is powered off after suspending adma device (pl330 dma).
-However later clk-exynos-audss receives syscore suspend notification and
-tries to save mau clock registers. This results in imprecise abort
-because mau power domain is turned off.
+Yes, it's not a huge number.
 
-I think it is better to drop my patch.
+The number is always very small especially when the "test_buf_size" is small.
 
-Krzysztof
+For dmatest tool, the measure transmission time is far greater than the actual transmission time.
+So the number is small. In fact, the DMA with memory copy mode is very fast.
 
+Best Regards,
+Yuan Yao
+
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
+> On Behalf Of Stefan Agner
+> Sent: Friday, January 30, 2015 8:39 PM
+> To: Lu Jingchang-B35083
+> Cc: vinod.koul at intel.com; dmaengine at vger.kernel.org;
+> dan.j.williams at intel.com; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/2] dmaengine: fsl-edma: add dma memcpy support
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> On 2014-12-30 09:41, Jingchang Lu wrote:
+> > This adds the memory copy capability support, the memcpy functionality
+> > needs to configure the DMAMUX of the channel with the always on slave
+> > id.
 > 
-> ---
+> Hi Jingchang,
 > 
-> Changes sinve v1:
-> 1. Use generic power domain bindings (suggested by Javier).
-> 2. Add Javier's reviewed-by.
-> ---
->  arch/arm/boot/dts/exynos5420.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> I run some tests on v3.19-rc6 with this patches applied on Vybrid SoC
+> VF500 and VF610.
 > 
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-> index 9dc2e9773b30..28c4a2f4b991 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -288,6 +288,12 @@
->  			      "pclk1", "clk1", "pclk2", "clk2";
->  	};
->  
-> +	mau_pd: power-domain at 100440E0 {
-> +		compatible = "samsung,exynos4210-pd";
-> +		reg = <0x100440E0 0x20>;
-> +		#power-domain-cells = <0>;
-> +	};
-> +
->  	pinctrl_0: pinctrl at 13400000 {
->  		compatible = "samsung,exynos5420-pinctrl";
->  		reg = <0x13400000 0x1000>;
-> @@ -346,6 +352,7 @@
->  			#dma-cells = <1>;
->  			#dma-channels = <6>;
->  			#dma-requests = <16>;
-> +			power-domains = <&mau_pd>;
->  		};
->  
->  		pdma0: pdma at 121A0000 {
-> @@ -415,6 +422,7 @@
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&i2s0_bus>;
->  		status = "disabled";
-> +		power-domains = <&mau_pd>;
->  	};
->  
->  	i2s1: i2s at 12D60000 {
+> On VF500 clocked at 400MHz I get this numbers:
+> # insmod dmatest.ko max_channels=1 iterations=100 run=1 [  616.809594]
+> dmatest: Started 1 threads using dma0chan0 [  617.293498] dmatest:
+> dma0chan0-copy0: summary 100 tests, 0 failures
+> 209 iops 1613 KB/s (0)
+> 
+> In contrast, on a VF610 clocked at 500MHz I get this:
+> # insmod dmatest.ko max_channels=1 iterations=100 run=1 [  154.203290]
+> dmatest: Started 1 threads using dma0chan4 [  154.614225] dmatest:
+> dma0chan4-copy0: summary 100 tests, 0 failures
+> 246 iops 2002 KB/s (0)
+> 
+> Not that huge numbers, but I guess this is what the hardware can deliver... Did
+> you run some performance tests?
+> 
+> But generally, looks good.
+> 
+> Tested-by: Stefan Agner <stefan@agner.ch>
+> 
+> >
+> > Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+> > ---
+> >  drivers/dma/fsl-edma.c | 63
+> > ++++++++++++++++++++++++++++++++++++++++++++++++--
+> >  1 file changed, 61 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c index
+> > 09e2842..e0bd517 100644
+> > --- a/drivers/dma/fsl-edma.c
+> > +++ b/drivers/dma/fsl-edma.c
+> > @@ -110,6 +110,8 @@
+> >  #define EDMAMUX_CHCFG_ENBL		0x80
+> >  #define EDMAMUX_CHCFG_SOURCE(n)		((n) & 0x3F)
+> >
+> > +#define SLAVE_ID_ALWAYSON	63 /* the always on slave id */
+> > +
+> >  #define DMAMUX_NR	2
+> >
+> >  #define FSL_EDMA_BUSWIDTHS	BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
+> \
+> > @@ -147,6 +149,7 @@ struct fsl_edma_slave_config {  struct
+> > fsl_edma_chan {
+> >  	struct virt_dma_chan		vchan;
+> >  	enum dma_status			status;
+> > +	u32				slave_id;
+> >  	struct fsl_edma_engine		*edma;
+> >  	struct fsl_edma_desc		*edesc;
+> >  	struct fsl_edma_slave_config	fsc;
+> > @@ -637,6 +640,45 @@ static struct dma_async_tx_descriptor
+> > *fsl_edma_prep_slave_sg(
+> >  	return vchan_tx_prep(&fsl_chan->vchan, &fsl_desc->vdesc, flags);  }
+> >
+> > +static struct dma_async_tx_descriptor * fsl_edma_prep_memcpy(struct
+> > +dma_chan *chan, dma_addr_t dst,
+> > +			dma_addr_t src, size_t len, unsigned long tx_flags) {
+> > +	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
+> > +	struct fsl_edma_desc *fsl_desc;
+> > +	u16 soff, doff, attr;
+> > +
+> > +	/*
+> > +	 * use 4-bytes data transfer size if all is 4-bytes aligned,
+> > +	 * else 2-bytes data transfer size of all is 2-bytes aligned,
+> > +	 * otherwise 1-byte tranfer size.
+> > +	 */
+> > +	if (src & 0x1 || dst & 0x1 || len & 0x1) {
+> > +		attr = EDMA_TCD_ATTR_SSIZE_8BIT |
+> EDMA_TCD_ATTR_DSIZE_8BIT;
+> > +		soff = 0x1;
+> > +		doff = 0x1;
+> > +	} else if (src & 0x2 || dst & 0x2 || len & 0x2) {
+> > +		attr = EDMA_TCD_ATTR_SSIZE_16BIT |
+> EDMA_TCD_ATTR_DSIZE_16BIT;
+> > +		soff = 0x2;
+> > +		doff = 0x2;
+> > +	} else {
+> > +		attr = EDMA_TCD_ATTR_SSIZE_32BIT |
+> EDMA_TCD_ATTR_DSIZE_32BIT;
+> > +		soff = 0x4;
+> > +		doff = 0x4;
+> > +	}
+> > +
+> > +	fsl_desc = fsl_edma_alloc_desc(fsl_chan, 1);
+> > +	if (!fsl_desc)
+> > +		return NULL;
+> > +	fsl_desc->iscyclic = false;
+> > +
+> > +	fsl_edma_fill_tcd(fsl_desc->tcd[0].vtcd, src, dst, attr, soff, len,
+> > +			  0, 1, 1, doff, 0, true, true, false);
+> > +
+> > +	return vchan_tx_prep(&fsl_chan->vchan, &fsl_desc->vdesc, tx_flags);
+> > +
+> > +}
+> > +
+> >  static void fsl_edma_xfer_desc(struct fsl_edma_chan *fsl_chan)  {
+> >  	struct virt_dma_desc *vdesc;
+> > @@ -735,6 +777,7 @@ static struct dma_chan *fsl_edma_xlate(struct
+> > of_phandle_args *dma_spec,  {
+> >  	struct fsl_edma_engine *fsl_edma = ofdma->of_dma_data;
+> >  	struct dma_chan *chan, *_chan;
+> > +	struct fsl_edma_chan *fsl_chan;
+> >  	unsigned long chans_per_mux = fsl_edma->n_chans / DMAMUX_NR;
+> >
+> >  	if (dma_spec->args_count != 2)
+> > @@ -748,8 +791,10 @@ static struct dma_chan *fsl_edma_xlate(struct
+> > of_phandle_args *dma_spec,
+> >  			chan = dma_get_slave_channel(chan);
+> >  			if (chan) {
+> >  				chan->device->privatecnt++;
+> > -				fsl_edma_chan_mux(to_fsl_edma_chan(chan),
+> > -					dma_spec->args[1], true);
+> > +				fsl_chan = to_fsl_edma_chan(chan);
+> > +				fsl_chan->slave_id = dma_spec->args[1];
+> > +				fsl_edma_chan_mux(fsl_chan, fsl_chan-
+> >slave_id,
+> > +						  true);
+> >  				mutex_unlock(&fsl_edma->fsl_edma_mutex);
+> >  				return chan;
+> >  			}
+> > @@ -763,6 +808,17 @@ static int fsl_edma_alloc_chan_resources(struct
+> > dma_chan *chan)
+> >  {
+> >  	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
+> >
+> > +	/*
+> > +	 * If the slave id of the channel DMAMUX is not set yet,
+> > +	 * this could happy when the channel is requested by the
+> > +	 * dma_request_channel() for memory copy purpose instead
+> > +	 * of by dts binding, then configure the DMAMUX with the
+> > +	 * always on slave id.
+> > +	 */
+> > +	if (fsl_chan->slave_id == 0) {
+> > +		fsl_chan->slave_id = SLAVE_ID_ALWAYSON;
+> > +		fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id, true);
+> > +	}
+> >  	fsl_chan->tcd_pool = dma_pool_create("tcd_pool", chan->device-
+> >dev,
+> >  				sizeof(struct fsl_edma_hw_tcd),
+> >  				32, 0);
+> > @@ -778,6 +834,7 @@ static void fsl_edma_free_chan_resources(struct
+> > dma_chan *chan)
+> >  	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
+> >  	fsl_edma_disable_request(fsl_chan);
+> >  	fsl_edma_chan_mux(fsl_chan, 0, false);
+> > +	fsl_chan->slave_id = 0;
+> >  	fsl_chan->edesc = NULL;
+> >  	vchan_get_all_descriptors(&fsl_chan->vchan, &head);
+> >  	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags); @@ -903,6
+> > +960,7 @@ static int fsl_edma_probe(struct platform_device *pdev)
+> >  	dma_cap_set(DMA_PRIVATE, fsl_edma->dma_dev.cap_mask);
+> >  	dma_cap_set(DMA_SLAVE, fsl_edma->dma_dev.cap_mask);
+> >  	dma_cap_set(DMA_CYCLIC, fsl_edma->dma_dev.cap_mask);
+> > +	dma_cap_set(DMA_MEMCPY, fsl_edma->dma_dev.cap_mask);
+> >
+> >  	fsl_edma->dma_dev.dev = &pdev->dev;
+> >  	fsl_edma->dma_dev.device_alloc_chan_resources
+> > @@ -912,6 +970,7 @@ static int fsl_edma_probe(struct platform_device
+> *pdev)
+> >  	fsl_edma->dma_dev.device_tx_status = fsl_edma_tx_status;
+> >  	fsl_edma->dma_dev.device_prep_slave_sg =
+> fsl_edma_prep_slave_sg;
+> >  	fsl_edma->dma_dev.device_prep_dma_cyclic =
+> fsl_edma_prep_dma_cyclic;
+> > +	fsl_edma->dma_dev.device_prep_dma_memcpy =
+> fsl_edma_prep_memcpy;
+> >  	fsl_edma->dma_dev.device_config = fsl_edma_slave_config;
+> >  	fsl_edma->dma_dev.device_pause = fsl_edma_pause;
+> >  	fsl_edma->dma_dev.device_resume = fsl_edma_resume;
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
