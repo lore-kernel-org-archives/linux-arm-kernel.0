@@ -1,72 +1,40 @@
-From: dalias@libc.org (Rich Felker)
-Date: Wed, 11 Feb 2015 15:12:51 -0500
-Subject: [musl] Re: [PATCHv3 00/24] ILP32 support in ARM64
-In-Reply-To: <359577916.509062.1423684206521.JavaMail.open-xchange@oxbaltgw09.schlund.de>
-References: <20141002155217.GH32147@e104818-lin.cambridge.arm.com>
- <20150210181302.GA23886@brightrain.aerifal.cx>
- <20150211173919.GF9058@e104818-lin.cambridge.arm.com>
- <20150211190537.GK32724@port70.net>
- <359577916.509062.1423684206521.JavaMail.open-xchange@oxbaltgw09.schlund.de>
-Message-ID: <20150211201251.GK23507@brightrain.aerifal.cx>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Wed, 11 Feb 2015 12:15:56 -0800
+Subject: [PATCHv3 00/24] ILP32 support in ARM64
+In-Reply-To: <CAMe9rOrVGFcQN3J1-pkXWd9j4MaQv2QxPrA5cTtLPBPaQ2-zfw@mail.gmail.com>
+References: <20141002155217.GH32147@e104818-lin.cambridge.arm.com>	<20150210181302.GA23886@brightrain.aerifal.cx>	<CAMe9rOqX-VpjZ+E-JCusk+e4Kpw1V1tsFq1Kjtai5DR9saKLaA@mail.gmail.com>	<20150211190252.GB23507@brightrain.aerifal.cx>	<CAMe9rOoME1fct=Dk1YFeoJbayvhdsaCUBZCY2YD6jK58J7=MkA@mail.gmail.com>	<20150211192558.GE23507@brightrain.aerifal.cx>	<CAMe9rOpr6j1siK5gJ_HPLTOfjG_sLOL48TFzaLx+shCS9O8ahA@mail.gmail.com>	<20150211194741.GI23507@brightrain.aerifal.cx>
+ <CAMe9rOrVGFcQN3J1-pkXWd9j4MaQv2QxPrA5cTtLPBPaQ2-zfw@mail.gmail.com>
+Message-ID: <54DBB87C.5060901@amacapital.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 11, 2015 at 08:50:06PM +0100, arnd at arndb.de wrote:
-> > > At least for AArch64 ILP32 we are still free to change the user/kernel
-> > > ABI, so we could add wrappers for the affected syscalls to fix this up.
-> > >
-> >
-> > yes, afaik on x32 the 64bit kernel expects 64bit layout,
-> > arm64 can fix this
->  
-> We have to fix it on all 32-bit architectures when we move to 64-bit time_t.
->  
-> I think ideally you'd want a user space definition like
-> 
-> typedef long long time_t;
-> struct timespec {
->       time_t tv_sec;
->       long long tv_nsec;
-> };
-> 
-> which is the only way to avoid passing uninitialized tv_nsec into the kernel
-> from arbitrary user space doing ioctl. This is of course against POSIX and
-> C99. Changing POSIX to allow it is probably easier than the C standard,
-> but we have a couple of years before we need to make this the default.
+On 02/11/2015 11:57 AM, H.J. Lu wrote:
+>>>> trivially satisfied if you consider x32 and x86_64 separate
+>>>> compilation environments, but it's not related to the core issue: that
+>>>> the definition of timespec violates core (not obscure) requirements of
+>>>> both POSIX and C11. At the time you were probably unaware of the C11
+>>>> requirement. Note that it's a LOT harder to effect change in the C
+>>>> standard, so even if the Austin Group would be amenable to changing
+>>>> the requirement for timespec to allow something like nseconds_t,
+>>>> getting WG14 to make this change to work around a Linux/glibc mistake
+>>>> does not sound practical.
+>>>
+>>> That is very unfortunate.  I consider it is too late for x32 to change.
+>>
+>> Why? It's hardly an incompatible ABI change, as long as the
+>> kernel/libc fills the upper bits (for old programs that read them
+>> based on the old headers) when structs are read from the kernel to the
+>> application, and ignores the upper bits (potentially set or left
+>> uninitialized by the application) when strings are passed from
+>> userspace to the kernel. Newly built apps using the struct definition
+>> with 32-bit tv_nsec would need new libc to ensure that the high bits
+>> aren't interpreted, but this could be handled by symbol versioning.
+>>
+>
+> We have considered this option.  But since kernel wouldn't change
+> tv_nsec/tv_usec handling just for x32, it wasn't selected.
+>
 
-I don't see why you want it to be long long. There is no harm in
-passing uninitialized padding to the kernel; the kernel just needs to
-do the right thing and ignore it (or avoid reading it to begin with).
-Changing the C standard in an incompatible way that invalidates
-existing code is not preferable over fixing an implementation bug in
-one implementation. Even if C16 or so changed the requirement, people
-will still be looking to C11 (and even C99) for years or decades to
-come. Alignment of code to language standards moves slowly.
+Did anyone *ask* the kernel people (e.g. hpa)?
 
-The other direction, passing uninitialized data from the kernel to
-userspace, would be dangerous. But it doesn't happen as long as the
-userspace padding is positioned (in an endian-dependent manner) where
-the high bits of the kernel type would lie. It could happen if you
-used a separate conversion wrapper that ony wrote 32 bits, but if you
-wanted to take that approach you'd just need the wrapper to also write
-the padding field manually.
-
-> In the kernel headers, the current plan is to provide interfaces taking
-> structures 
->  
-> typedef long long __kernel_time64_t;
-> struct __kernel_timespec64_t {
->       __kernel_time64_t tv_sec;
->       long long tv_nsec;
-> };
->  
-> at least for ioctls, to avoid the ambiguity with libc headers specifying
-> something else.
-
-This seems hideous from an application standpoint. Application
-programmers don't want to know, and shouldn't need to know, these
-silly implementation details that make no sense except as historical
-baggage. They should just be able to use "struct timespec" everywhere
-and have it work.
-
-Rich
+--Andy
