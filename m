@@ -1,374 +1,191 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 11 Feb 2015 16:16:28 +0800
-Subject: [PATCH 5/7] opp: convert device_opp->dev to a list of devices
+Date: Wed, 11 Feb 2015 16:16:29 +0800
+Subject: [PATCH 6/7] opp: Add helpers for initializing CPU opps
 In-Reply-To: <cover.1423642246.git.viresh.kumar@linaro.org>
 References: <cover.1423642246.git.viresh.kumar@linaro.org>
-Message-ID: <ac7a6543beed80bfe4d8bbe3900fc17673168f18.1423642246.git.viresh.kumar@linaro.org>
+Message-ID: <6bd4f6207604d97c0fd46ee39b0d296d5208ac68.1423642246.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An opp can be shared by multiple devices, for example its very common for CPUs
-to share the OPPs, i.e. when they share clock lines.
-
-Until now, the OPPs are bound to a single device and there is no way to mark
-them shared.
-
-This patch adds support to manage a list of devices sharing OPPs. It also senses
-if the device (we are trying to initialize OPPs for) shares OPPs with an device
-added earlier and in that case we just update the list of devices managed by
-OPPs instead of initializing them again.
+This provides helpers to find which CPUs share OPPs and initialize OPPs for
+them.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/base/power/opp.c | 189 +++++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 157 insertions(+), 32 deletions(-)
+ drivers/base/power/opp.c | 113 +++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/pm_opp.h   |  17 +++++++
+ 2 files changed, 130 insertions(+)
 
 diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-index b7b9c33fbb65..24a014b7a68a 100644
+index 24a014b7a68a..751f56f323bf 100644
 --- a/drivers/base/power/opp.c
 +++ b/drivers/base/power/opp.c
-@@ -89,16 +89,33 @@ struct dev_pm_opp {
- };
- 
- /**
-+ * struct device_list_opp - devices managed by 'struct device_opp'
-+ * @node:	list node
-+ * @dev:	device to which the struct object belongs
-+ * @rcu_head:	RCU callback head used for deferred freeing
-+ *
-+ * This is an internal data structure maintaining the list of devices that are
-+ * managed by 'struct device_opp'.
-+ */
-+struct device_list_opp {
-+	struct list_head node;
-+	struct device *dev;
-+	struct rcu_head rcu_head;
-+};
-+
-+/**
-  * struct device_opp - Device opp structure
-  * @node:	list node - contains the devices with OPPs that
-  *		have been registered. Nodes once added are not modified in this
-  *		list.
-  *		RCU usage: nodes are not modified in the list of device_opp,
-  *		however addition is possible and is secured by dev_opp_list_lock
-- * @dev:	device pointer
-  * @srcu_head:	notifier head to notify the OPP availability changes.
-  * @rcu_head:	RCU callback head used for deferred freeing
-+ * @dev_list:	list of devices that share these OPPs
-  * @opp_list:	list of opps
-+ * @np:		struct device_node pointer for opp's DT node.
-+ * @shared_opp: OPP is shared between multiple devices.
-  *
-  * This is an internal data structure maintaining the link to opps attached to
-  * a device. This structure is not meant to be shared to users as it is
-@@ -111,10 +128,12 @@ struct dev_pm_opp {
- struct device_opp {
- 	struct list_head node;
- 
--	struct device *dev;
- 	struct srcu_notifier_head srcu_head;
- 	struct rcu_head rcu_head;
-+	struct list_head dev_list;
- 	struct list_head opp_list;
-+	struct device_node *np;
-+	bool shared_opp;
- };
- 
- /*
-@@ -134,6 +153,45 @@ do {									\
- 			   "dev_opp_list_lock protection");		\
- } while (0)
- 
-+static struct device_list_opp *_find_list_dev(struct device *dev,
-+					      struct device_opp *dev_opp)
-+{
-+	struct device_list_opp *list_dev;
-+
-+	list_for_each_entry(list_dev, &dev_opp->dev_list, node)
-+		if (list_dev->dev == dev)
-+			return list_dev;
-+
-+	return NULL;
-+}
-+
-+static int _list_dev_count(struct device_opp *dev_opp)
-+{
-+	struct device_list_opp *list_dev;
-+	int count = 0;
-+
-+	list_for_each_entry(list_dev, &dev_opp->dev_list, node)
-+		count++;
-+
-+	return count;
-+}
-+
-+static struct device_opp *_managed_opp(struct device_node *np)
-+{
-+	struct device_opp *dev_opp;
-+
-+	list_for_each_entry_rcu(dev_opp, &dev_opp_list, node)
-+		if (dev_opp->np == np) {
-+			/* Managed only if the OPPs are shared */
-+			if (dev_opp->shared_opp)
-+				return dev_opp;
-+			else
-+				return NULL;
-+		}
-+
-+	return NULL;
-+}
-+
- /**
-  * _find_device_opp() - find device_opp struct using device pointer
-  * @dev:	device pointer used to lookup device OPPs
-@@ -150,21 +208,18 @@ do {									\
+@@ -11,6 +11,7 @@
+  * published by the Free Software Foundation.
   */
- static struct device_opp *_find_device_opp(struct device *dev)
- {
--	struct device_opp *tmp_dev_opp, *dev_opp = ERR_PTR(-ENODEV);
-+	struct device_opp *dev_opp;
  
- 	if (unlikely(IS_ERR_OR_NULL(dev))) {
- 		pr_err("%s: Invalid parameters\n", __func__);
- 		return ERR_PTR(-EINVAL);
- 	}
- 
--	list_for_each_entry_rcu(tmp_dev_opp, &dev_opp_list, node) {
--		if (tmp_dev_opp->dev == dev) {
--			dev_opp = tmp_dev_opp;
--			break;
--		}
--	}
-+	list_for_each_entry_rcu(dev_opp, &dev_opp_list, node)
-+		if (_find_list_dev(dev, dev_opp))
-+			return dev_opp;
- 
--	return dev_opp;
-+	return ERR_PTR(-ENODEV);
++#include <linux/cpu.h>
+ #include <linux/kernel.h>
+ #include <linux/errno.h>
+ #include <linux/err.h>
+@@ -1321,6 +1322,44 @@ int of_init_opp_table(struct device *dev)
  }
+ EXPORT_SYMBOL_GPL(of_init_opp_table);
  
- /**
-@@ -425,6 +480,38 @@ struct dev_pm_opp *dev_pm_opp_find_freq_floor(struct device *dev,
- }
- EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_floor);
- 
-+static struct device_list_opp *_add_list_dev(struct device *dev,
-+					     struct device_opp *dev_opp)
++int of_cpumask_init_opp_table(cpumask_var_t cpumask)
 +{
-+	struct device_list_opp *list_dev;
++	struct device *cpu_dev;
++	int cpu, tcpu, ret = 0;
 +
-+	list_dev = kzalloc(sizeof(*list_dev), GFP_KERNEL);
-+	if (!list_dev)
-+		return NULL;
++	if (cpumask_empty(cpumask))
++		return -EINVAL;
 +
-+	/* Initialize list-dev */
-+	list_add_rcu(&list_dev->node, &dev_opp->dev_list);
-+	list_dev->dev = dev;
-+
-+	return list_dev;
-+}
-+
-+static void _kfree_list_dev_rcu(struct rcu_head *head)
-+{
-+	struct device_list_opp *list_dev;
-+
-+	list_dev = container_of(head, struct device_list_opp, rcu_head);
-+	kfree_rcu(list_dev, rcu_head);
-+}
-+
-+static void _remove_list_dev(struct device_list_opp *list_dev,
-+			     struct device_opp *dev_opp)
-+{
-+	list_del(&list_dev->node);
-+	call_srcu(&dev_opp->srcu_head.srcu, &list_dev->rcu_head,
-+		  _kfree_list_dev_rcu);
-+}
-+
- /**
-  * _kfree_opp_rcu() - Free OPP RCU handler
-  * @head:	RCU head
-@@ -478,6 +565,17 @@ static void _opp_remove(struct device_opp *dev_opp,
- 
- 	/* Free device if all OPPs are freed */
- 	if (list_empty(&dev_opp->opp_list)) {
-+		struct device_list_opp *list_dev;
-+
-+		list_dev = list_first_entry(&dev_opp->dev_list,
-+					    struct device_list_opp, node);
-+
-+		_remove_list_dev(list_dev, dev_opp);
-+
-+		/* dev_list must be empty now */
-+		WARN_ON(!list_empty(&dev_opp->dev_list));
-+
-+		/* Free dev-opp */
- 		list_del_rcu(&dev_opp->node);
- 		call_srcu(&dev_opp->srcu_head.srcu, &dev_opp->rcu_head,
- 			  _kfree_device_rcu);
-@@ -541,6 +639,7 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_remove);
- static struct device_opp *_add_device_opp(struct device *dev)
- {
- 	struct device_opp *dev_opp;
-+	struct device_list_opp *list_dev;
- 
- 	/*
- 	 * Allocate a new device OPP table. In the infrequent case where a new
-@@ -550,7 +649,13 @@ static struct device_opp *_add_device_opp(struct device *dev)
- 	if (!dev_opp)
- 		return NULL;
- 
--	dev_opp->dev = dev;
-+	INIT_LIST_HEAD(&dev_opp->dev_list);
-+	list_dev = _add_list_dev(dev, dev_opp);
-+	if (!list_dev) {
-+		kfree(dev_opp);
-+		return NULL;
-+	}
-+
- 	srcu_init_notifier_head(&dev_opp->srcu_head);
- 	INIT_LIST_HEAD(&dev_opp->opp_list);
- 
-@@ -584,7 +689,8 @@ static struct dev_pm_opp *_allocate_opp(struct device *dev,
- 	return opp;
- }
- 
--static int _opp_add(struct dev_pm_opp *new_opp, struct device_opp *dev_opp)
-+static int _opp_add(struct device *dev, struct dev_pm_opp *new_opp,
-+		    struct device_opp *dev_opp)
- {
- 	struct dev_pm_opp *opp = NULL;
- 	struct list_head *head = &dev_opp->opp_list;
-@@ -602,7 +708,7 @@ static int _opp_add(struct dev_pm_opp *new_opp, struct device_opp *dev_opp)
- 
- 	/* Duplicate OPPs ? */
- 	if (opp && new_opp->rate == opp->rate) {
--		dev_warn(dev_opp->dev,
-+		dev_warn(dev,
- 			 "%s: duplicate OPPs detected. Existing: freq: %lu, volt: %lu, enabled: %d. New: freq: %lu, volt: %lu, enabled: %d\n",
- 			 __func__, opp->rate, opp->u_volt, opp->available,
- 			 new_opp->rate, new_opp->u_volt, new_opp->available);
-@@ -665,7 +771,7 @@ static int _opp_add_dynamic(struct device *dev, unsigned long freq,
- 	new_opp->available = true;
- 	new_opp->dynamic = dynamic;
- 
--	ret = _opp_add(new_opp, dev_opp);
-+	ret = _opp_add(dev, new_opp, dev_opp);
- 	if (ret)
- 		goto free_opp;
- 
-@@ -789,7 +895,7 @@ static int _opp_add_dynamic_v2(struct device *dev, struct device_node *np,
- 		}
- 	}
- 
--	ret = _opp_add(new_opp, dev_opp);
-+	ret = _opp_add(dev, new_opp, dev_opp);
- 	if (ret)
- 		goto free_opp;
- 
-@@ -826,16 +932,11 @@ static struct dev_pm_opp *_get_opp_from_np(struct device_opp *dev_opp,
- 	return NULL;
- }
- 
--static void _opp_fill_opp_next(struct device *dev)
-+static void _opp_fill_opp_next(struct device_opp *dev_opp, struct device *dev)
- {
--	struct device_opp *dev_opp;
- 	struct dev_pm_opp *opp;
- 	int i;
- 
--	dev_opp = _find_device_opp(dev);
--	if (WARN_ON(!dev_opp))
--		return;
--
- 	list_for_each_entry_rcu(opp, &dev_opp->opp_list, node) {
- 		if (!opp->next)
- 			continue;
-@@ -1086,6 +1187,7 @@ static int _of_init_opp_table_v2(struct device *dev,
- 				 const struct property *prop)
- {
- 	struct device_node *opp_np, *np;
-+	struct device_opp *dev_opp;
- 	int ret = 0, count = 0;
- 
- 	/* Get opp node */
-@@ -1093,6 +1195,14 @@ static int _of_init_opp_table_v2(struct device *dev,
- 	if (IS_ERR(opp_np))
- 		return PTR_ERR(opp_np);
- 
-+	dev_opp = _managed_opp(opp_np);
-+	if (dev_opp) {
-+		/* OPPs are already managed */
-+		if (!_add_list_dev(dev, dev_opp))
-+			ret = -ENOMEM;
-+		goto put_opp_np;
-+	}
-+
- 	/* We have opp-list node now, iterate over it and add OPPs */
- 	for_each_available_child_of_node(opp_np, np) {
- 		count++;
-@@ -1109,10 +1219,19 @@ static int _of_init_opp_table_v2(struct device *dev,
- 	if (WARN_ON(!count))
- 		goto put_opp_np;
- 
--	if (ret)
-+	if (ret) {
- 		of_free_opp_table(dev);
--	else
--		_opp_fill_opp_next(dev);
-+	} else {
-+		/* Update np and shared_opp */
-+		dev_opp = _find_device_opp(dev);
-+		if (WARN_ON(!dev_opp))
-+			goto put_opp_np;
-+
-+		dev_opp->np = opp_np;
-+		if (of_get_property(opp_np, "shared-opp", NULL))
-+			dev_opp->shared_opp = true;
-+		_opp_fill_opp_next(dev_opp, dev);
-+	}
- 
- put_opp_np:
- 	of_node_put(opp_np);
-@@ -1219,6 +1338,9 @@ void of_free_opp_table(struct device *dev)
- 	struct device_opp *dev_opp;
- 	struct dev_pm_opp *opp, *tmp;
- 
-+	/* Hold our list modification lock here */
-+	mutex_lock(&dev_opp_list_lock);
-+
- 	/* Check for existing list for 'dev' */
- 	dev_opp = _find_device_opp(dev);
- 	if (IS_ERR(dev_opp)) {
-@@ -1228,18 +1350,21 @@ void of_free_opp_table(struct device *dev)
- 			     IS_ERR_OR_NULL(dev) ?
- 					"Invalid device" : dev_name(dev),
- 			     error);
--		return;
-+		goto unlock;
- 	}
- 
--	/* Hold our list modification lock here */
--	mutex_lock(&dev_opp_list_lock);
--
--	/* Free static OPPs */
--	list_for_each_entry_safe(opp, tmp, &dev_opp->opp_list, node) {
--		if (!opp->dynamic)
--			_opp_remove(dev_opp, opp, true);
-+	/* Find if dev_opp manages a single device */
-+	if (_list_dev_count(dev_opp) == 1) {
-+		/* Free static OPPs */
-+		list_for_each_entry_safe(opp, tmp, &dev_opp->opp_list, node) {
-+			if (!opp->dynamic)
-+				_opp_remove(dev_opp, opp, true);
++	for_each_cpu(cpu, cpumask) {
++		cpu_dev = get_cpu_device(cpu);
++		if (!cpu_dev) {
++			pr_err("%s: failed to get cpu%d device\n", __func__,
++			       cpu);
++			continue;
 +		}
-+	} else {
-+		_remove_list_dev(_find_list_dev(dev, dev_opp), dev_opp);
- 	}
- 
-+unlock:
++
++		ret = of_init_opp_table(cpu_dev);
++		if (ret) {
++			pr_err("%s: couldn't find opp table for cpu:%d, %d\n",
++			       __func__, cpu, ret);
++
++			/* Free all other OPPs */
++			for_each_cpu(tcpu, cpumask) {
++				if (cpu == tcpu)
++					break;
++
++				cpu_dev = get_cpu_device(tcpu);
++				if (cpu_dev)
++					of_free_opp_table(cpu_dev);
++			}
++			break;
++		}
++	}
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(of_cpumask_init_opp_table);
++
+ /**
+  * of_free_opp_table() - Free OPP table entries created from static DT entries
+  * @dev:	device pointer used to lookup device OPPs.
+@@ -1368,4 +1407,78 @@ void of_free_opp_table(struct device *dev)
  	mutex_unlock(&dev_opp_list_lock);
  }
  EXPORT_SYMBOL_GPL(of_free_opp_table);
++
++void of_cpumask_free_opp_table(cpumask_var_t cpumask)
++{
++	struct device *cpu_dev;
++	int cpu;
++
++	WARN_ON(cpumask_empty(cpumask));
++
++	for_each_cpu(cpu, cpumask) {
++		cpu_dev = get_cpu_device(cpu);
++		if (!cpu_dev) {
++			pr_err("%s: failed to get cpu%d device\n", __func__,
++			       cpu);
++			continue;
++		}
++
++		of_free_opp_table(cpu_dev);
++	}
++}
++EXPORT_SYMBOL_GPL(of_cpumask_free_opp_table);
++
++/* Works only for OPP v2 bindings */
++int of_get_cpus_sharing_opps(struct device *cpu_dev, cpumask_var_t cpumask)
++{
++	struct device_node *np, *tmp_np;
++	struct device *tcpu_dev;
++	int cpu, ret = 0;
++
++	cpumask_set_cpu(cpu_dev->id, cpumask);
++
++	/* Get OPP descriptor node */
++	np = of_get_opp_desc_node(cpu_dev);
++	if (IS_ERR(np)) {
++		dev_info(cpu_dev, "%s: Couldn't find opp node: %ld\n", __func__,
++			 PTR_ERR(np));
++		return -EINVAL;
++	}
++
++	/* OPPs are shared ? */
++	if (!of_get_property(np, "shared-opp", NULL))
++		goto put_cpu_node;
++
++	for_each_possible_cpu(cpu) {
++		if (cpu == cpu_dev->id)
++			continue;
++
++		tcpu_dev = get_cpu_device(cpu);
++		if (!tcpu_dev) {
++			pr_err("failed to get cpu%d device\n", cpu);
++			ret = -ENODEV;
++			goto put_cpu_node;
++		}
++
++		/* Get OPP descriptor node */
++		tmp_np = of_get_opp_desc_node(tcpu_dev);
++		if (IS_ERR(tmp_np)) {
++			dev_info(tcpu_dev, "%s: Couldn't find opp node: %ld\n",
++				 __func__, PTR_ERR(np));
++			ret = -EINVAL;
++			goto put_cpu_node;
++		}
++
++		/* CPUs are sharing opp node */
++		if (np == tmp_np)
++			cpumask_set_cpu(cpu, cpumask);
++
++		of_node_put(tmp_np);
++	}
++
++put_cpu_node:
++	of_node_put(np);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(of_get_cpus_sharing_opps);
+ #endif
+diff --git a/include/linux/pm_opp.h b/include/linux/pm_opp.h
+index 9949d07a93f9..41cbc7469b5a 100644
+--- a/include/linux/pm_opp.h
++++ b/include/linux/pm_opp.h
+@@ -115,6 +115,9 @@ static inline struct srcu_notifier_head *dev_pm_opp_get_notifier(
+ #if defined(CONFIG_PM_OPP) && defined(CONFIG_OF)
+ int of_init_opp_table(struct device *dev);
+ void of_free_opp_table(struct device *dev);
++int of_cpumask_init_opp_table(cpumask_var_t cpumask);
++void of_cpumask_free_opp_table(cpumask_var_t cpumask);
++int of_get_cpus_sharing_opps(struct device *cpu_dev, cpumask_var_t cpumask);
+ struct device_node *of_get_opp_desc_node(struct device *dev);
+ #else
+ static inline int of_init_opp_table(struct device *dev)
+@@ -126,6 +129,20 @@ static inline void of_free_opp_table(struct device *dev)
+ {
+ }
+ 
++static inline int of_cpumask_init_opp_table(cpumask_var_t cpumask)
++{
++	return -EINVAL;
++}
++
++static inline void of_cpumask_free_opp_table(cpumask_var_t cpumask)
++{
++}
++
++static inline int of_get_cpus_sharing_opps(struct device *cpu_dev, cpumask_var_t cpumask)
++{
++	return -EINVAL;
++}
++
+ static inline struct device_node *of_get_opp_desc_node(struct device *dev)
+ {
+ 	return ERR_PTR(-EINVAL);
 -- 
 2.3.0.rc0.44.ga94655d
