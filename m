@@ -1,98 +1,51 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 11 Feb 2015 11:54:56 -0500
-Subject: [PATCH v6 0/7] PCI: get DMA configuration from parent device
-In-Reply-To: <54D509C9.9010204@ti.com>
-References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
- <20150206151542.GD23190@e104818-lin.cambridge.arm.com>
- <54D4DD95.7000303@ti.com>
- <CAErSpo6GOXHeKKfU8s5jCS3+Mui=HupZd=jpkLEyWAE94Ory5w@mail.gmail.com>
- <54D509C9.9010204@ti.com>
-Message-ID: <54DB8960.9010707@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 11 Feb 2015 14:58:30 -0200
+Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
+ registers
+In-Reply-To: <462270270.419156.1423603473431.JavaMail.open-xchange@oxbaltgw02.schlund.de>
+References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
+ <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
+ <54DA020C.6030703@i2se.com>
+ <CAOMZO5DGCP1p1vetwWHpSbe2qywA8DhWRRq22egMDFSw11uq4w@mail.gmail.com>
+ <54DA0DE7.5050708@i2se.com>
+ <CAOMZO5AtFOThRjcAgMVbrbkcrJbehouSxoH03VUGJrRdWXnS_Q@mail.gmail.com>
+ <462270270.419156.1423603473431.JavaMail.open-xchange@oxbaltgw02.schlund.de>
+Message-ID: <CAOMZO5B4mxP6RBkbsbj=wC6bZJgtreoo5S_NhYuki6kW=Y=QFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2015 01:36 PM, Murali Karicheri wrote:
-> On 02/06/2015 12:53 PM, Bjorn Helgaas wrote:
->> On Fri, Feb 6, 2015 at 9:28 AM, Murali Karicheri<m-karicheri2@ti.com>
+Hi Stefan,
+
+On Tue, Feb 10, 2015 at 7:24 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> Hi Fabio,
+>
+>> Fabio Estevam <festevam@gmail.com> hat am 10. Februar 2015 um 16:06
+>> geschrieben:
+>>
+>>
+>> Hi Stefan,
+>>
+>> On Tue, Feb 10, 2015 at 11:55 AM, Stefan Wahren <stefan.wahren@i2se.com>
 >> wrote:
->>> On 02/06/2015 10:15 AM, Catalin Marinas wrote:
->>>>
->>>> On Thu, Feb 05, 2015 at 09:52:52PM +0000, Murali Karicheri wrote:
->>>>>
->>>>> This patch add an important capability to PCI driver on Keystone. I
->>>>> hope
->>>>> to
->>>>> have this merged to the upstream branch so that it is available for
->>>>> v3.20.
->>>>
->>>> It's very late for 3.20 and the code hasn't been in linux-next at all
->>>> (but it's not me who's merging this code), unless you can squeeze it in
->>>> as a bug-fix.
->>>
->>> This is in fact a bug fix as PCI on Keystone is broken without this.
 >>
->> Oh, sorry, I didn't realize that this was so urgent. I guess I read
->> "this adds an important capability" in the cover letter and concluded
->> that it was new functionality.
-> Bjorn,
->
-> Thanks for responding.
->
-> Let me give you some context on this without which my explanation won't
-> be complete. For using PCI driver on Keystone, I had submitted patches
-> related to machine and DTS to the arm mailing list to enable the driver
-> on Keystone. Subsequenty one of the patch from my series was Nack-ed and
-> I was asked to implememented in a different way and started this series.
-> You can refer to the discussion of this at
->
-> http://www.gossamer-threads.com/lists/linux/kernel/2024591
->
-> The PCI driver enablement on Keystone is still a working in progress and
-> I am trying to get it fully functional on the upstream. Another missing
-> piece is the SerDes phy driver patch. We have started working on the
-> other part (SerDes phy driver) already as the initial one was not
-> accepted. So it is fine if we are too late for the v3.20 merge window to
-> merge this series and this can be applied to the next branch for v3.21.
->
+>> > Could you apply only the clk-imx28.c part of my patch and see what happens?
 >>
->> Anyway, if it's broken, presumably PCI on Keystone *did* work at one
->> point. Can you identify the commit that broke it and requires these
->> fixes, so we can figure out how far the fixes need to be backported?
->>
+>> If I apply only the clk-imx28.c part of your patch I can successfully
+>> probe the SPI NOR.
 >
-> I am trying to get this driver enabled on Keystone by adding the missing
-> pieces as described above. So I guess we don't have to back port
-> anything here.
+> thanks this is very helpful. I built the linux-next for my Duckbill and add the
+> SSP2 section from imx28-evk.dts into imx28-duckbill.dts.
 >
->> If I merge it, I would like to get into my for-linus branch and get a
->> little time in -next before asking Linus to pull it. The merge window
->> is a little wrinkle there -- I don't like to add new things to the mix
->> during the window. But if it's an important fix we can still get it
->> in before the final v3.20.
+> Without my patch i get the following for HW_CLKCTRL_FRAC0:
 >
-> Please apply this to next branch for v3.21. It currently apply cleanly
-> to v3.19-rc7. If you want me rebase to another branch, let me know I can
-> apply and send you an updated patch.
+> ./memwatch -a 0x800401B0
 >
-Bjorn, Arnd,
+> 0x800401b0: 0x5e5b5513
+>
+> With my patch i get:
+>
+> ./memwatch -a 0x800401B0
+>
+> 0x800401b0: 0x5e1b5513
 
-I am assuming, Bjorn is going to merge this to his next branch for 
-v3.21. If not, it might have to be merged through the arm soc? There are 
-a couple of Tested-by and Acked-by received after v7. Do you want me to 
-post v8 with these updated in the patches?
-
-Murali
-
-> Thanks
->
-> Murali
->
->>
->> Bjorn
->
->
-
-
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+I always get 0x5e5b5513 with or without your patch.
