@@ -1,74 +1,128 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 11 Feb 2015 10:45:15 -0800
-Subject: Delays, clocks, timers, hrtimers, etc
-In-Reply-To: <54DB94B0.8020000@free.fr>
-References: <54C8E125.3070905@free.fr>
- <e028a4eb604a491f4438557f4a1373ef@agner.ch>
- <54D52F84.9050600@free.fr>
- <266c7b1ff2d1a8ba0ae4866f4fb4eca5@agner.ch>
- <54D576B1.4000001@free.fr> <54D903F6.3050608@codeaurora.org>
- <54D93556.9050008@free.fr> <54D93FFA.3090506@codeaurora.org>
- <54D947B4.4080401@free.fr> <54DB94B0.8020000@free.fr>
-Message-ID: <20150211184515.GB11190@codeaurora.org>
+From: jonathar@broadcom.com (Jonathan Richardson)
+Date: Wed, 11 Feb 2015 10:45:34 -0800
+Subject: [PATCH v2 1/2] Input: touchscreen-iproc: Add Broadcom iProc
+ touchscreen driver
+In-Reply-To: <54B81A4A.9020905@broadcom.com>
+References: <jonathar@broadcom.com>
+ <1419027470-7969-1-git-send-email-jonathar@broadcom.com>
+ <1419027470-7969-2-git-send-email-jonathar@broadcom.com>
+ <20150115010256.GC9134@dtor-ws> <54B753C7.6000006@broadcom.com>
+ <20150115060713.GA2694@dtor-ws> <54B81A4A.9020905@broadcom.com>
+Message-ID: <54DBA34E.8090400@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11, Mason wrote:
-> Mason wrote:
-> 
-> 
-> Also, you wrote "I don't see any problem with the TWD dropping the
-> dependency on SMP." Would something as simple as this be acceptable?
-> (Most probably NOT; there are a lot of smp* occurrences in smp_twd.c
-> even the file name.) What is the rationale for the dependency?
-> 
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a34698d..47b02c8 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1565,7 +1565,6 @@ config HAVE_ARM_ARCH_TIMER
->  config HAVE_ARM_TWD
->         bool
-> -       depends on SMP
->         select CLKSRC_OF if OF
->         help
->           This options enables support for the ARM timer and watchdog unit
-> 
+Pinging maintainers... Am I ok to go ahead with the current rotation
+implementation? I haven't heard anything further. Any feedback on naming
+conventions from DT people?
 
-Hmm it looks like we would also need to add this to the patch. It
-looks like a holdover from when the local timer APIs were around.
-Back then twd_local_timer_common_register() would fail if
-is_smp() was false or setup_max_cpus was 0. Now it will just
-register a clockevent that may or may not be used depending on
-what other clockevents are in the system and the ratings of those
-other clockevents.
+Thanks!
 
-----8<----
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 172c6a05d27f..e8f6d241881f 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -23,7 +23,6 @@
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
- 
--#include <asm/smp_plat.h>
- #include <asm/smp_twd.h>
- 
- /* set up by the platform code */
-@@ -388,9 +387,6 @@ static void __init twd_local_timer_of_register(struct device_node *np)
- {
- 	int err;
- 
--	if (!is_smp() || !setup_max_cpus)
--		return;
--
- 	twd_ppi = irq_of_parse_and_map(np, 0);
- 	if (!twd_ppi) {
- 		err = -EINVAL;
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+On 15-01-15 11:51 AM, Jonathan Richardson wrote:
+> Hi Dmitry,
+> 
+> On 15-01-14 10:07 PM, Dmitry Torokhov wrote:
+>> On Wed, Jan 14, 2015 at 09:44:39PM -0800, Scott Branden wrote:
+>>> On 15-01-14 05:02 PM, Dmitry Torokhov wrote:
+>>>> Hi Jonathan,
+>>>>
+>>>> On Fri, Dec 19, 2014 at 02:17:49PM -0800, Jonathan Richardson wrote:
+>>>>> +	if (of_property_read_u32(np, "scanning_period", &val) >= 0) {
+>>>>> +		if (val < 1 || val > 256) {
+>>>>> +			dev_err(dev, "scanning_period must be [1-256]\n");
+>>>>> +			return -EINVAL;
+>>>>> +		}
+>>>>> +		priv->cfg_params.scanning_period = val;
+>>>>> +	}
+>>>>> +
+>>>>> +	if (of_property_read_u32(np, "debounce_timeout", &val) >= 0) {
+>>>>> +		if (val < 0 || val > 255) {
+>>>>> +			dev_err(dev, "debounce_timeout must be [0-255]\n");
+>>>>> +			return -EINVAL;
+>>>>> +		}
+>>>>> +		priv->cfg_params.debounce_timeout = val;
+>>>>> +	}
+>>>>> +
+>>>>> +	if (of_property_read_u32(np, "settling_timeout", &val) >= 0) {
+>>>>> +		if (val < 0 || val > 11) {
+>>>>> +			dev_err(dev, "settling_timeout must be [0-11]\n");
+>>>>> +			return -EINVAL;
+>>>>> +		}
+>>>>> +		priv->cfg_params.settling_timeout = val;
+>>>>> +	}
+>>>>> +
+>>>>> +	if (of_property_read_u32(np, "touch_timeout", &val) >= 0) {
+>>>>> +		if (val < 0 || val > 255) {
+>>>>> +			dev_err(dev, "touch_timeout must be [0-255]\n");
+>>>>> +			return -EINVAL;
+>>>>> +		}
+>>>>> +		priv->cfg_params.touch_timeout = val;
+>>>>> +	}
+>>>>> +
+>>>>> +	if (of_property_read_u32(np, "average_data", &val) >= 0) {
+>>>>> +		if (val < 0 || val > 8) {
+>>>>> +			dev_err(dev, "average_data must be [0-8]\n");
+>>>>> +			return -EINVAL;
+>>>>> +		}
+>>>>> +		priv->cfg_params.average_data = val;
+>>>>> +	}
+>>>>> +
+>>>>> +	if (of_property_read_u32(np, "fifo_threshold", &val) >= 0) {
+>>>>> +		if (val < 0 || val > 31) {
+>>>>> +			dev_err(dev, "fifo_threshold must be [0-31]\n");
+>>>>> +			return -EINVAL;
+>>>>> +		}
+>>>>> +		priv->cfg_params.fifo_threshold = val;
+>>>>> +	}
+>>>>
+>>>> I think these are dveice specific and thus should have "brcm," prefix.
+>>> I'm confused as to why we need the brcm prefix?  Other device tree
+>>> bindings we have for other drivers do not need such prefix.
+>>
+>> Properties that are not standard on the system (reg, interrupts,
+>> clkocks, etc) or subsystem level customarily carry the vendor prefix so
+>> that they do not clash with newly added global or subsystem properties.
+>>
+>>>  Is this
+>>> convention documented somewhere?
+>>
+>> Not sure. I glanced through Documentation/devicetree and do not see it
+>> spelled out. Device tree overlords, what say you?
+> 
+> Let me know. I haven't seen this before either. I will change the
+> entries to use dashes though instead of underscores but will wait until
+> these other issues are decided on before sending out another patch.
+> 
+>>
+>>>>
+>>>>> +
+>>>>> +	priv->ts_rotation = TS_ROTATION_0;
+>>>>> +	if (of_property_read_u32(np, "ts-rotation", &val) >= 0) {
+>>>>> +		priv->ts_rotation = val;
+>>>>> +		dev_dbg(dev, "ts rotation [%d] degrees\n",
+>>>>> +			90 * priv->ts_rotation);
+>>>>> +	}
+>>>>
+>>>> This I am not quite sure about - if we want rotation or swap+invert. You
+>>>> are CCed on another email (tsc2007) that talks about need of generic
+>>>> touchscreen transforms in input core/of bindings.
+>>> Does such generic binding exist today?  If not, I would like to go
+>>> with this implementation and update to the new binding if/when it
+>>> exists?
+>>
+>> Not yet but there several people interested. I think we have enough time
+>> till 3.20 to hash it out properly.
+> 
+> I think the rotation is simpler personally. Everyone would understand
+> rotation refers to how it's oriented but I'm not sure everyone would
+> immediately know how it is wired. Let me know what is decided and I'll
+> make any changes required.
+> 
+> Thanks,
+> Jon
+> 
+> 
+>>
+>> Thanks.
+>>
+> 
