@@ -1,90 +1,170 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 11 Feb 2015 16:07:48 +0100
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 11 Feb 2015 15:45:30 +0100
 Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
  demuxer chip
-In-Reply-To: <20150211141437.GK9154@leverpostej>
+In-Reply-To: <2982569.CIWvqghzfx@vostro.rjw.lan>
 References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
- <32372622.IiYZ15O7e1@vostro.rjw.lan> <20150211141437.GK9154@leverpostej>
-Message-ID: <1448858.4nScWhYZcX@vostro.rjw.lan>
+ <20150211111106.GA9154@leverpostej>
+ <20150211132437.0753a7da@bbrezillon>
+ <2982569.CIWvqghzfx@vostro.rjw.lan>
+Message-ID: <20150211154530.24abb00e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 11, 2015 02:14:37 PM Mark Rutland wrote:
-> On Wed, Feb 11, 2015 at 02:31:18PM +0000, Rafael J. Wysocki wrote:
-> > On Wednesday, February 11, 2015 11:15:17 AM Mark Rutland wrote:
-> > > On Wed, Feb 11, 2015 at 09:11:59AM +0000, Peter Zijlstra wrote:
-> > > > On Tue, Feb 10, 2015 at 08:48:36PM +0000, Mark Rutland wrote:
-> > > > > From f390ccbb31f06efee49b4469943c8d85d963bfb5 Mon Sep 17 00:00:00 2001
-> > > > > From: Mark Rutland <mark.rutland@arm.com>
-> > > > > Date: Tue, 10 Feb 2015 20:14:33 +0000
-> > > > > Subject: [PATCH] genirq: allow mixed IRQF_NO_SUSPEND requests
-> > > > > 
-> > > > > In some cases a physical IRQ line may be shared between devices from
-> > > > > which we expect interrupts during suspend (e.g. timers) and those we do
-> > > > > not (e.g. anything we cut the power to). Where a driver did not request
-> > > > > the interrupt with IRQF_NO_SUSPEND, it's unlikely that it can handle
-> > > > > being called during suspend, and it may bring down the system.
-> > > > > 
-> > > > > This patch adds logic to automatically mark the irqactions for these
-> > > > > potentially unsafe handlers as disabled during suspend, leaving actions
-> > > > > with IRQF_NO_SUSPEND enabled. If an interrupt is raised on a shared line
-> > > > > during suspend, only the handlers requested with IRQF_NO_SUSPEND will be
-> > > > > called. The handlers requested without IRQF_NO_SUSPEND will be skipped
-> > > > > as if they had immediately returned IRQF_NONE.
-> > > > > 
-> > > > > Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > > > Cc: Jason Cooper <jason@lakedaemon.net>
-> > > > > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > > > Cc: Peter Zijlstra <peterz@infradead.org>
-> > > > > Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> > > > > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > > > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > > 
-> > > > Aw gawd.. not that again.
-> > > 
-> > > I agree this isn't pretty, but at least it doesn't require the HW
-> > > description to know about Linux internals, and it can work for !DT
-> > > systems.
-> > > 
-> > > I'm really not happy with placing Linux implementation details into
-> > > DTBs.
-> > > 
-> > > > So Rafael and tglx went over this a few months ago I think:
-> > > > 
-> > > >   lkml.kernel.org/r/26580319.OZP7jvJnA9 at vostro.rjw.lan
-> > > > 
-> > > > is the last series I could find. Maybe Rafael can summarize?
-> > > 
-> > > I can't get at any commentary from that link, unfortunately.
-> > > 
-> > > Rafael?
+On Wed, 11 Feb 2015 15:55:47 +0100
+"Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
+
+> On Wednesday, February 11, 2015 01:24:37 PM Boris Brezillon wrote:
+> > Hi Mark,
 > > 
-> > Well, the commentary is not there, because both I and Thomas implicitly agreed
-> > on one thing: We cannot add any suspend-related checks to the interrupt handling
-> > hot path, because that will affect everyone including people who don't use
-> > suspend at all and who *really* care about interrupt handling performance.
+> > On Wed, 11 Feb 2015 11:11:06 +0000
+> > Mark Rutland <mark.rutland@arm.com> wrote:
+> > 
+> > > On Wed, Feb 11, 2015 at 08:53:39AM +0000, Boris Brezillon wrote:
+> > > > Hi Mark,
+> > > > 
+> > > > On Tue, 10 Feb 2015 20:48:36 +0000
+> > > > Mark Rutland <mark.rutland@arm.com> wrote:
+> > > > 
+> > > > > On Tue, Feb 10, 2015 at 03:52:01PM +0000, Boris Brezillon wrote:
+> > > > > > Hi Mark,
+> > > > > > 
+> > > > > > On Tue, 10 Feb 2015 15:36:28 +0000
+> > > > > > Mark Rutland <mark.rutland@arm.com> wrote:
+> > > > > > 
+> > > > > > > Hi Boris,
+> > > > > > > 
+> > > > > > > On Thu, Jan 29, 2015 at 10:33:38AM +0000, Boris Brezillon wrote:
+> > > > > > > > Add documentation for the virtual irq demuxer.
+> > > > > > > > 
+> > > > > > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > > > > > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > > > > > > ---
+> > > > > > > >  .../bindings/interrupt-controller/dumb-demux.txt   | 41 ++++++++++++++++++++++
+> > > > > > > >  1 file changed, 41 insertions(+)
+> > > > > > > >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+> > > > > > > > 
+> > > > > > > > diff --git a/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+> > > > > > > > new file mode 100644
+> > > > > > > > index 0000000..b9a7830
+> > > > > > > > --- /dev/null
+> > > > > > > > +++ b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+> > > > > > > > @@ -0,0 +1,41 @@
+> > > > > > > > +* Virtual Interrupt Demultiplexer
+> > > > > > > > +
+> > > > > > > > +This virtual demultiplexer simply forward all incoming interrupts to its
+> > > > > > > > +enabled/unmasked children.
+> > > > > > > > +It is only intended to be used by hardware that do not provide a proper way
+> > > > > > > > +to demultiplex a source interrupt, and thus have to wake all their children
+> > > > > > > > +up so that they can possibly handle the interrupt (if needed).
+> > > > > > > > +This can be seen as an alternative to shared interrupts when at least one
+> > > > > > > > +of the interrupt children is a timer (and require the irq to stay enabled
+> > > > > > > > +on suspend) while others are not. This will prevent calling irq handlers of
+> > > > > > > > +non timer devices while they are suspended.
+> > > > > > > 
+> > > > > > > This sounds like a DT-workaround for a Linux implementation problem, and
+> > > > > > > I don't think this the right way to solve your problem.
+> > > > > > 
+> > > > > > I understand your concern, but why are you answering while I asked for
+> > > > > > DT maintainers reviews for several days (if not several weeks).
+> > > > > > 
+> > > > > > > 
+> > > > > > > Why does this have to be in DT at all? Why can we not fix the core to
+> > > > > > > handle these details?
+> > > > > > 
+> > > > > > We already discussed that with Rob and Thomas, and hiding such a
+> > > > > > demuxer chip is not an easy task.
+> > > > > > I'm open to any suggestion to do that, though I'd like you (I mean DT
+> > > > > > guys) to provide a working implementation (or at least a viable concept)
+> > > > > > that would silently demultiplex an irq.
+> > > > > > 
+> > > > > > > 
+> > > > > > > I am very much not keen on this binding.
+> > > > > > 
+> > > > > > Yes, but do you have anything else to propose.
+> > > > > > We're experiencing this warning for 2 releases now, and this is time to
+> > > > > > find a solution (even if it's not a perfect one).
+> > > > > 
+> > > > > Thoughts on the patch below?
+> > > > 
+> > > > That's pretty much what I proposed in my first attempt to solve this
+> > > > problem [1] (except for a few things commented below).
+> > > > Anyway, Thomas suggested to go for the "dumb/virt irq demultiplexer"
+> > > > approach instead.
+> > > 
+> > > There is one fundamental difference in that this patch does not require
+> > > drivers to be updated (the new flag is only used internally). Which
+> > > avoids having to patch every single driver that could possibly be used
+> > > in combination with one wanting interrupts during suspend.
+> > 
+> > Actually, that was one of the requirements expressed by Thomas (Thomas,
+> > correct me if I'm wrong).
+> > The point was to force shared irq users to explicitly specify that they
+> > are mixing !IRQF_NO_SUSPEND and IRQF_NO_SUSPEND because they have no
+> > other choice.
+> > 
+> > With your patch, there's no way to inform users that they are
+> > erroneously setting the IRQF_NO_SUSPEND flag on one of their shared
+> > interrupt.
+> > 
+> > > 
+> > > Any used which did not explicitly request with IRQF_NO_SUSPEND will not
+> > > receive interrupts during suspend.
+> > > 
+> > > [...]
+> > > 
+> > > > > +static irqreturn_t __handle_irq_event_percpu(unsigned int irq, struct irqaction *action)
+> > > > > +{
+> > > > > +	/*
+> > > > > +	 * During suspend we must not call potentially unsafe irq handlers.
+> > > > > +	 * See suspend_suspendable_actions.
+> > > > > +	 */
+> > > > > +	if (unlikely(action->flags & IRQF_NO_ACTION))
+> > > > > +		return IRQ_NONE;
+> > > > 
+> > > > Thomas was trying to avoid any new conditional code in the interrupt
+> > > > handling path, that's why I added a suspended_action list in my
+> > > > proposal.
+> > > > Even if your 'unlikely' statement make things better I'm pretty sure it
+> > > > adds some latency.
+> > > 
+> > > I can see that we don't want to add more code here to keep things
+> > > clean/pure, but I find it hard to believe that a single bit test and
+> > > branch (for data that should be hot in the cache) are going to add
+> > > measurable latency to a path that does pointer chasing to get to the
+> > > irqaction in the first place. I could be wrong though, and I'm happy to
+> > > benchmark.
+> > 
+> > Again, I don't have enough experience to say this is (or isn't)
+> > impacting irq handling latency, I'm just reporting what Thomas told me.
+> > 
+> > > 
+> > > It would be possible to go for your list shuffling approach here while
+> > > still keeping the flag internal and all the logic hidden away in
+> > > kernel/irq/pm.c. I wasn't sure how actions could be manipulated during
+> > > suspend, which made me wary of moving them to a separate list.
+> > 
+> > Moving them to a temporary list on suspend and restoring them on
+> > resume should not be a problem.
+> > The only drawback I see is that actions might be reordered after the
+> > first resume (anyway, relying on shared irq action order is dangerous
+> > IMHO).
 > 
-> That's fair enough, and I'm happy to avoid that by other means.
+> We considered doing that too and saw some drawbacks (in addition to the
+> reordering of actions you've mentioned).  It added just too much complexity
+> to the IRQ suspend-resume code.
 > 
-> My fundamental objection(s) to the current approach is that we create a
-> binding for a non-existent device that people will abuse without
-> considering the consequences. All we will end up with is more DTBs
-> containing the mux regardless of wether the drivers (or hardware) are
-> actually safe with a shared line.
+> I, personally, would be fine with adding an IRQ flag to silence the
+> warning mentioned by Alexandre.  Something like IRQD_TIMER_SHARED that would
+> be set automatically if someone requested IRQF_TIMER | IRQF_SHARED.
 
-That is a valid concern in my view.
+Yep, but that won't prevent irq handler from being called (even when
+they are suspended), and IIRC, that was one of Thomas' concerns.
+This shouldn't be a problem for the at91 platform though (actually, this
+is the current behavior).
 
-> So with the changes moves out of the hot-path (e.g. with shuffling
-> to/from a suspended_actions list in the pm code), is there some issue
-> that I have not considered?
 
-When we were reworking the handling of wakeup interrupts during the 3.18
-cycle, one of my proposals was to move the "suspended" irqactions to an
-"inactive" list during suspend_device_irqs() and back during
-resume_device_irqs(), but Thomas didn't like that approach.  His main
-argument was that it made the code in question overly complex which
-was fair enough to me.
-
-What about adding a new flag like I said?
-
-Rafael
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
