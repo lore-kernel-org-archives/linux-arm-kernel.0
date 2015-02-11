@@ -1,137 +1,66 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 11 Feb 2015 17:15:32 +0100
-Subject: [PATCH 11/11] ARM: berlin: rework chip and system controller nodes
- for BG2Q
-In-Reply-To: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1423671332-24580-12-git-send-email-antoine.tenart@free-electrons.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 11 Feb 2015 17:42:22 +0100
+Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
+ demuxer chip
+In-Reply-To: <20150211171515.55d5066f@bbrezillon>
+References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150211155720.GQ9154@leverpostej> <20150211171515.55d5066f@bbrezillon>
+Message-ID: <2067295.NbJCftPPli@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chip and system controller nodes are now handled by the Berlin
-controller mfd driver. Its sub-devices are then registered by the mfd
-driver and let the drivers be probed properly, using their own
-sub-nodes.
+On Wednesday, February 11, 2015 05:15:15 PM Boris Brezillon wrote:
+> On Wed, 11 Feb 2015 15:57:20 +0000
+> Mark Rutland <mark.rutland@arm.com> wrote:
+> 
+> > [...]
+> > 
+> > > > > > So for the flag at request time approach to work, all the drivers using
+> > > > > > the interrupt would have to flag they're safe in that context.
+> > > > > 
+> > > > > Something like IRQF_"I can share the line with a timer" I guess?  That wouldn't
+> > > > > hurt and can be checked at request time even.
+> > > > 
+> > > > I guess that would have to imply IRQF_SHARED, so we'd have something
+> > > > like:
+> > > > 
+> > > > IRQF_SHARED_SUSPEND_OK - This handler is safe to call spuriously during
+> > > > 			 suspend in the case the line is shared. The
+> > > > 			 handler will not access unavailable hardware
+> > > > 			 or kernel infrastructure during this period.
+> > > > 
+> > > > #define __IRQF_SUSPEND_SPURIOUS		0x00040000
+> > > > #define	IRQF_SHARED_SUSPEND_OK		(IRQF_SHARED | __IRQF_SUSPEND_SPURIOUS)
+> > > 
+> > > What about
+> > > 
+> > > #define __IRQF_TIMER_SIBLING_OK	0x00040000
+> > > #define	IRQF_SHARED_TIMER_OK	(IRQF_SHARED | __IRQF_TIMER_SIBLING_OK)
+> > > 
+> > > The "suspend" part is kind of a distraction to me here, because that really
+> > > only is about sharing an IRQ with a timer and the "your interrupt handler
+> > > may be called when the device is suspended" part is just a consequence of that.
+> > 
+> > My rationale was that you didn't really care who else was using the IRQ
+> > (e.g. the timer); you're just stating that you can survive being called
+> > during suspend (which is what the driver may need to check for in the
+> > handler if the device happens to be powered down or whatever).
+> > 
+> > So I guess I see it the other way around. This is essentially claiming
+> > we can handle sharing with IRQF_NO_SUSPEND rather than IRQF_TIMER.
+> > 
+> > > So IMO it's better to have "TIMER" in the names to avoid encouraging people to
+> > > abuse this for other purposes not related to timers.
+> > 
+> > In the end a name is a name, and if you think IRQF_SHARED_TIMER_OK is
+> > better I shan't complain.
+> > 
+> > The fundamental issue I'm concerned with is addressed by this approach.
+> 
+> Okay then, is anyone taking care of submitting such a patch (Mark ?) ?
 
-Rework the device tree to take this changes into account.
+Well, I guess I should take the responsibility for that. :-)
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2q.dtsi | 70 ++++++++++++++++++++++++-----------------
- 1 file changed, 41 insertions(+), 29 deletions(-)
+I'll try to cut one later today or tomorrow unless someone else beats me to that.
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index e2f61f27944e..bd86d4121ec8 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -119,7 +119,7 @@
- 			compatible = "marvell,berlin2-usb-phy";
- 			reg = <0xa2f400 0x128>;
- 			#phy-cells = <0>;
--			resets = <&chip 0x104 14>;
-+			resets = <&chip_rst 0x104 14>;
- 			status = "disabled";
- 		};
- 
-@@ -137,7 +137,7 @@
- 			compatible = "marvell,berlin2-usb-phy";
- 			reg = <0xb74000 0x128>;
- 			#phy-cells = <0>;
--			resets = <&chip 0x104 12>;
-+			resets = <&chip_rst 0x104 12>;
- 			status = "disabled";
- 		};
- 
-@@ -351,22 +351,30 @@
- 			};
- 		};
- 
--		chip: chip-control at ea0000 {
--			compatible = "marvell,berlin2q-chip-ctrl";
--			#clock-cells = <1>;
--			#reset-cells = <2>;
-+		chip: chip-controller at ea0000 {
-+			compatible = "marvell,berlin2q-chip-ctrl", "syscon";
- 			reg = <0xea0000 0x400>, <0xdd0170 0x10>;
-+			#clock-cells = <1>;
- 			clocks = <&refclk>;
- 			clock-names = "refclk";
- 
--			twsi0_pmux: twsi0-pmux {
--				groups = "G6";
--				function = "twsi0";
-+			soc_pinctrl: pin-controller {
-+				compatible = "marvell,berlin2q-soc-pinctrl";
-+
-+				twsi0_pmux: twsi0-pmux {
-+					groups = "G6";
-+					function = "twsi0";
-+				};
-+
-+				twsi1_pmux: twsi1-pmux {
-+					groups = "G7";
-+					function = "twsi1";
-+				};
- 			};
- 
--			twsi1_pmux: twsi1-pmux {
--				groups = "G7";
--				function = "twsi1";
-+			chip_rst: reset {
-+				compatible = "marvell,berlin2-reset";
-+				#reset-cells = <2>;
- 			};
- 		};
- 
-@@ -517,28 +525,32 @@
- 				};
- 			};
- 
--			sysctrl: pin-controller at d000 {
--				compatible = "marvell,berlin2q-system-ctrl";
-+			sysctrl: system-controller at d000 {
-+				compatible = "marvell,berlin2q-system-ctrl", "syscon";
- 				reg = <0xd000 0x100>;
- 
--				uart0_pmux: uart0-pmux {
--					groups = "GSM12";
--					function = "uart0";
--				};
-+				sys_pinctrl: pin-controller {
-+					compatible = "marvell,berlin2q-system-pinctrl";
- 
--				uart1_pmux: uart1-pmux {
--					groups = "GSM14";
--					function = "uart1";
--				};
-+					uart0_pmux: uart0-pmux {
-+						groups = "GSM12";
-+						function = "uart0";
-+					};
- 
--				twsi2_pmux: twsi2-pmux {
--					groups = "GSM13";
--					function = "twsi2";
--				};
-+					uart1_pmux: uart1-pmux {
-+						groups = "GSM14";
-+						function = "uart1";
-+					};
-+
-+					twsi2_pmux: twsi2-pmux {
-+						groups = "GSM13";
-+						function = "twsi2";
-+					};
- 
--				twsi3_pmux: twsi3-pmux {
--					groups = "GSM14";
--					function = "twsi3";
-+					twsi3_pmux: twsi3-pmux {
-+						groups = "GSM14";
-+						function = "twsi3";
-+					};
- 				};
- 			};
- 
--- 
-2.3.0
+Rafael
