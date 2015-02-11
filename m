@@ -1,44 +1,31 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Wed, 11 Feb 2015 18:01:41 +0900
-Subject: [PATCH RESEND] ARM: DMA: Fix kzalloc flags in __iommu_alloc_buffer()
-Message-ID: <1423645301-709-1-git-send-email-acourbot@nvidia.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 11 Feb 2015 11:10:31 +0200
+Subject: [resend PATCH v3 4/4] usb: phy: add phy-hi6220-usb
+In-Reply-To: <BN3PR0301MB0849FB28B1DAF7BEB5F3BE7881250@BN3PR0301MB0849.namprd03.prod.outlook.com>
+References: <1423559404-13058-1-git-send-email-zhangfei.gao@linaro.org>
+ <1423559404-13058-5-git-send-email-zhangfei.gao@linaro.org>
+ <20150210144807.GC16711@saruman.tx.rr.com>
+ <BN3PR0301MB0849FB28B1DAF7BEB5F3BE7881250@BN3PR0301MB0849.namprd03.prod.outlook.com>
+Message-ID: <20150211091031.GR16955@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There doesn't seem to be any valid reason to allocate the pages array
-with the same flags as the buffer itself. Doing so can eventually lead
-to the following safeguard in mm/slab.c to be hit:
+Hi Peter, Felipe,
 
-BUG_ON(flags & GFP_SLAB_BUG_MASK);
+> > new drivers only on drivers/phy/, sorry.
+> 
+> This driver has many USB dependencies, like otg, gadget. I don't know it
+> can use generic phy currently.
 
-This happens when buffers are allocated with __GFP_DMA32 or
-__GFP_HIGHMEM.
+I would like to remind you the thread at 
+http://thread.gmane.org/gmane.linux.kernel/1858137. I have a USB PHY driver 
+here that depends on notify_connect/notify_disconnect, which are not currently 
+provided by the generic phy infrastructure (drivers/phy/). What would be 
+acceptable solution for this case?
 
-Fix this by allocating the pages array with GFP_KERNEL to follow what is
-done elsewhere in this file. Using GFP_KERNEL in __iommu_alloc_buffer()
-is safe because atomic allocations are handled by __iommu_alloc_atomic().
+baruch
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/mm/dma-mapping.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 903dba0..170a116 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1106,7 +1106,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
- 	int i = 0;
- 
- 	if (array_size <= PAGE_SIZE)
--		pages = kzalloc(array_size, gfp);
-+		pages = kzalloc(array_size, GFP_KERNEL);
- 	else
- 		pages = vzalloc(array_size);
- 	if (!pages)
 -- 
-2.3.0
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
