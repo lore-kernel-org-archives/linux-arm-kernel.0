@@ -1,109 +1,120 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 11 Feb 2015 21:31:17 +0100 (CET)
-Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
- registers
-In-Reply-To: <CAOMZO5B4mxP6RBkbsbj=wC6bZJgtreoo5S_NhYuki6kW=Y=QFw@mail.gmail.com>
-References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
- <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
- <54DA020C.6030703@i2se.com>
- <CAOMZO5DGCP1p1vetwWHpSbe2qywA8DhWRRq22egMDFSw11uq4w@mail.gmail.com>
- <54DA0DE7.5050708@i2se.com>
- <CAOMZO5AtFOThRjcAgMVbrbkcrJbehouSxoH03VUGJrRdWXnS_Q@mail.gmail.com>
- <462270270.419156.1423603473431.JavaMail.open-xchange@oxbaltgw02.schlund.de>
- <CAOMZO5B4mxP6RBkbsbj=wC6bZJgtreoo5S_NhYuki6kW=Y=QFw@mail.gmail.com>
-Message-ID: <1705379122.406018.1423686677196.JavaMail.open-xchange@oxbaltgw01.schlund.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 11 Feb 2015 14:40:33 -0600
+Subject: runtime check for omap-aes bus access permission (was: Re:
+ 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
+In-Reply-To: <201502112128.44852@pali>
+References: <20131206213613.GA19648@earth.universe> <201502111339.54480@pali>
+ <CAALWOA_ngoSKjB=ZQ264Va37bBK7v41Ei45SyoYLiMdanTKnxQ@mail.gmail.com>
+ <201502112128.44852@pali>
+Message-ID: <CAGo_u6oZxi7O6re30L2-wVyxTeahhyMb4qVcrE3tSCV9sBvrnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-> Fabio Estevam <festevam@gmail.com> hat am 11. Februar 2015 um 17:58
-> geschrieben:
+On Wed, Feb 11, 2015 at 2:28 PM, Pali Roh?r <pali.rohar@gmail.com> wrote:
+> On Wednesday 11 February 2015 16:22:51 Matthijs van Duin wrote:
+>> On 11 February 2015 at 13:39, Pali Roh?r <pali.rohar@gmail.com>
+> wrote:
+>> >> Anyhow, since checking the firewalls/APs to see if you have
+>> >> permission will probably only get you yet another fault if
+>> >> things are walled off, the robust way of dealing with this
+>> >> sort of situation is by probing the device with a read
+>> >> while trapping bus faults. This also handles modules that
+>> >> are unreachable for other reasons, e.g. being disabled by
+>> >> eFuse.
+>> >
+>> > It is possible to patch kernel code to mask or ignore that
+>> > fault? Can you help me with something like that?
+>>
+>> As I mentioned, I'm still learning my way around the kernel,
+>> so I don't feel very comfortable suggesting a concrete patch
+>> just yet. I've been browsing arch/arm/mm/ however and my
+>> impression is that all that would be required is editing
+>> fault.c by making a copy of do_bad but containing
+>>     return user_mode(regs) || !fixup_exception(regs);
+>> and hook it onto the appropriate fault codes.  However, this
+>> really needs the opinion of someone more familiar with this
+>> code.
+>>
+>> I do have an observation to make on the issue of fault
+>> decoding: the list in fsr-2level.c may be "standard ARMv3 and
+>> ARMv4 aborts" but they are quite wrong for ARMv7 which has:
+>>
+>> [ 0] -
+>> [ 1] alignment fault
+>> [ 2] debug event
+>> [ 3] section access flag fault
+>> [ 4] instruction cache maintainance fault (reported via data
+>> abort) [ 5] section translation fault
+>> [ 6] page access flag fault
+>> [ 7] page translation fault
+>> [ 8] bus error on access
+>> [ 9] section domain fault
+>> [10] -
+>> [11] page domain fault
+>> [12] bus error on section table walk
+>> [13] section permission fault
+>> [14] bus error on page table walk
+>> [15] page permission fault
+>> [16] (TLB conflict abort)
+>> [17] -
+>> [18] -
+>> [19] -
+>> [20] (lockdown abort)
+>> [21] -
+>> [22] async bus error (reported via data abort)
+>> [23] -
+>> [24] async parity/ECC error (reported via data abort)
+>> [25] parity/ECC error on access
+>> [26] (coprocessor abort)
+>> [27] -
+>> [28] parity/ECC error on section table walk
+>> [29] -
+>> [30] parity/ECC error on page table walk
+>> [31] -
+>>
+>> Some entries are patched up near the bottom of fault.c but
+>> many bogus messages remain, for example the "on linefetch" vs
+>> "on non-linefetch" is misleading since no such thing can be
+>> inferred from the fault status on v7.  Also, the i-cache
+>> maintenance fault handling looks wrong to me: it should fetch
+>> the actual fault status from IFSR (even though the address
+>> still comes from DFSR) and dispatch based on that.
+>>
+>> Async external aborts (async bus error and async parity/ECC
+>> error) give you basically no info. DFAR will contain garbage
+>> hence displaying it will confuse rather than enlighten, a
+>> traceback is pointless since the instruction that caused the
+>> access is long retired, likewise user_mode() doesn't matter
+>> since a transition to kernel space may have happened after
+>> the access that cause the abort. Basically they should be
+>> treated more as an IRQ than as a fault (note they can also be
+>> masked just like irqs). In case of a bus error, it may be
+>> appropriate to just warn about it, or perhaps send a signal
+>> to the current process, although in the latter case it should
+>> have some means to distinguish it from a synchronous bus
+>> error.
+>>
+>> At least on the cortex-a8, a parity/ECC error (whether async
+>> or not) is to be regarded as absolutely fatal.  Quoth the
+>> TRM: "No recovery is possible. The abort handler must disable
+>> the caches, communicate the fail directly with the external
+>> system, request a reboot."
+>>
+>> Bit 10 no longer indicates an asynchronous (let alone
+>> imprecise) fault.  Apart from the debug events and async
+>> aborts (and possibly some implementation-defined aborts), all
+>> aborts listed are synchronous, and DFAR/IFAR is valid.
+>> There's no technical obstruction to make these trappable via
+>> the kernel exception handling mechanism. (Though at least in
+>> case of parity/ECC errors one shouldn't.)
 >
->
-> Hi Stefan,
->
-> On Tue, Feb 10, 2015 at 7:24 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> > Hi Fabio,
-> >
-> >> Fabio Estevam <festevam@gmail.com> hat am 10. Februar 2015 um 16:06
-> >> geschrieben:
-> >>
-> >>
-> >> Hi Stefan,
-> >>
-> >> On Tue, Feb 10, 2015 at 11:55 AM, Stefan Wahren <stefan.wahren@i2se.com>
-> >> wrote:
-> >>
-> >> > Could you apply only the clk-imx28.c part of my patch and see what
-> >> > happens?
-> >>
-> >> If I apply only the clk-imx28.c part of your patch I can successfully
-> >> probe the SPI NOR.
-> >
-> > thanks this is very helpful. I built the linux-next for my Duckbill and add
-> > the
-> > SSP2 section from imx28-evk.dts into imx28-duckbill.dts.
-> >
-> > Without my patch i get the following for HW_CLKCTRL_FRAC0:
-> >
-> > ./memwatch -a 0x800401B0
-> >
-> > 0x800401b0: 0x5e5b5513
-> >
-> > With my patch i get:
-> >
-> > ./memwatch -a 0x800401B0
-> >
-> > 0x800401b0: 0x5e1b5513
->
-> I always get 0x5e5b5513 with or without your patch.
+> Tony, Nishanth, or somebody else... can you help with memory
+> management? Or do you know some expert for arch/arm/mm/ code?
 
-very strange. Do you have any idea why IO1_STABLE is permanent low?
+Folks in linux-arm-kernel are probably the right people, I suppose.
+Looping them in.
 
-Here are the register dumps as requested by Mike.
-
-Without this patch after boot
-
-0x80040000: 0x00060000
-0x80040010: 0x800004b1
-0x80040050: 0x00011001
-0x80040080: 0x64000001
-0x80040090: 0x00000001
-0x800400a0: 0x80000001
-0x800400b0: 0x00000002
-0x800400c0: 0xa0000001
-0x800401b0: 0x5e5b5513
-0x800401c0: 0x00929292
-0x800401d0: 0x00004104
-
-With this patch after boot
-
-0x80040000: 0x00060000
-0x80040010: 0x800004b1
-0x80040050: 0x00011001
-0x80040080: 0x64000001
-0x80040090: 0x00000001
-0x800400a0: 0x80000001
-0x800400b0: 0x00000002
-0x800400c0: 0xa0000001
-0x800401b0: 0x5e1b5513
-0x800401c0: 0x00929292
-0x800401d0: 0x00004104
-
-So only IO1_STABLE (0x800401b0) is different.
-
-If i restore clk_ref_set_rate() from clk-ref.c after the complete patch is
-applied, the issue with the IO1_STABLE bit disappears.
-
-Can you confirm the behavior according to your flash issue?
-
-I think it would be the best to revert my patch. Sorry for the trouble.
-
-Stefan
-
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+---
+Regards,
+Nishanth Menon
