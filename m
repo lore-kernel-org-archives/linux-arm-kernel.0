@@ -1,102 +1,179 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 11 Feb 2015 07:07:45 +0000
-Subject: [PATCH v8 08/21] dt / chosen: Add linux,uefi-stub-generated-dtb
- property
-In-Reply-To: <CAKv+Gu_uXs7tto3JdEOoEfqFpjUKdwFo4dSN3X3399uc+sJKrQ@mail.gmail.com>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-9-git-send-email-hanjun.guo@linaro.org>
- <20150202134033.GR4278@bivouac.eciton.net>
- <20150202135051.GA3825@xora-haswell.xora.org.uk>
- <20150202163253.GG21175@leverpostej>
- <CAGCh1+nL7YMXYp42ekWAqmw_m5cy=s_7NszLDAXj=bUr2aZVig@mail.gmail.com>
- <54D5884A.6050009@linaro.org>
- <CAKv+Gu-oDRjYPC3SxSDVZ7rV7eG9DCct=kNS0xBVd28YoV5fSg@mail.gmail.com>
- <20150209114624.GD4250@leverpostej>
- <CAKv+Gu-fnpxr-3T9RPuf4de2DGVE6xkDEcfFyzYp5KJCJH_fzw@mail.gmail.com>
- <alpine.DEB.2.02.1502110607250.29696@kaball.uk.xensource.com>
- <CAKv+Gu_uXs7tto3JdEOoEfqFpjUKdwFo4dSN3X3399uc+sJKrQ@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1502110704420.29696@kaball.uk.xensource.com>
+From: Ying.Liu@freescale.com (Liu Ying)
+Date: Wed, 11 Feb 2015 15:21:46 +0800
+Subject: [PATCH RFC v8 11/21] Documentation: dt-bindings: Add bindings
+ for Synopsys DW MIPI DSI DRM bridge driver
+In-Reply-To: <20150206081318.GA15088@victor>
+References: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
+ <1420014219-915-12-git-send-email-Ying.Liu@freescale.com>
+ <1423131004.3207.27.camel@pengutronix.de> <20150206081318.GA15088@victor>
+Message-ID: <20150211072128.GA13301@victor>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Feb 2015, Ard Biesheuvel wrote:
-> > Given that Dom0 is not booted via EFI but as zImage, how are we going to
-> > pass the two EFI table pointers to Linux? Via Device Tree? It doesn't
-> > look like a great improvement to me.
-> >
-> 
-> The EFI system table and memory map pointers shall be passed to the
-> kernel in the exact same way as the stub does: via the /chosen node.
-> This is currently documented in Documentation/arm/uefi.txt but it
-> should be promoted to a proper binding.
+Hi Philipp,
 
-Ah, right.
+On Fri, Feb 06, 2015 at 04:13:20PM +0800, Liu Ying wrote:
+> On Thu, Feb 05, 2015 at 11:10:04AM +0100, Philipp Zabel wrote:
+> > Am Mittwoch, den 31.12.2014, 16:23 +0800 schrieb Liu Ying:
+> > > This patch adds device tree bindings for Synopsys DesignWare MIPI DSI
+> > > host controller DRM bridge driver.
+> > > 
+> > > Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+> > > ---
+> > > v7->v8:
+> > >  * None.
+> > > 
+> > > v6->v7:
+> > >  * None.
+> > > 
+> > > v5->v6:
+> > >  * Add the #address-cells and #size-cells properties in the example 'ports'
+> > >    node.
+> > >  * Remove the useless input-port properties from the example port at 0 and port at 1
+> > >    nodes.
+> > > 
+> > > v4->v5:
+> > >  * None.
+> > > 
+> > > v3->v4:
+> > >  * Newly introduced in v4.  This is separated from the relevant driver patch
+> > >    in v3 to address Stefan Wahren's comment.
+> > > 
+> > >  .../devicetree/bindings/drm/bridge/dw_mipi_dsi.txt | 73 ++++++++++++++++++++++
+> > >  1 file changed, 73 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt b/Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
+> > > new file mode 100644
+> > > index 0000000..f88a8d6
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
+> > > @@ -0,0 +1,73 @@
+> > > +Device-Tree bindings for Synopsys DesignWare MIPI DSI host controller
+> > > +
+> > > +The controller is a digital core that implements all protocol functions
+> > > +defined in the MIPI DSI specification, providing an interface between
+> > > +the system and the MIPI DPHY, and allowing communication with a MIPI DSI
+> > > +compliant display.
+> > > +
+> > > +Required properties:
+> > > + - #address-cells: Should be <1>.
+> > > + - #size-cells: Should be <0>.
+> > > + - compatible: The compatible string should be "fsl,imx6q-mipi-dsi" for
+> > > +   i.MX6q/sdl SoCs.  For other SoCs, please refer to their specific
+> > > +   device tree binding documentations.
+> > 
+> > I think the compatible property should additionally contain
+> > "snps,dw-mipi-dsi". Also I think other SoCs using the same IP core
+> > should eventually list their compatibles here, but that's for later.
+> > 
+> > How about:
+> > + - compatible: The compatible string contain "fsl,imx6q-mipi-dsi" for
+> > +   i.MX6q/sdl SoCs.  For other SoCs, please refer to their specific
+> > +   device tree binding documentations. A common compatible string
+> > +   "snps,dw-mipi-dsi" should be appended for all SoCs.
+> 
+> I'm not sure if "snps,dw-mipi-dsi" should be appended.
+> 
+> Is it a compatible string that SoC specific drivers should actually use to
+> bind a device?
+> 
+> As Andy mentioned in [1], DW MIPI DSI embedded in RK618 is configured via I2C
+> bus, while i.MX6Q/DL is configured via ARM bus...
+> 
+> Another concern is that if users only specify "snps,dw-mipi-dsi" in their
+> device tree sources and use a kernel which supports multiple platforms,
+> say ARM multi v7 platforms, could several enabled SoC specific drivers be
+> probed for a single DW MIPI DSI device?
+> 
+> [1] http://lists.freedesktop.org/archives/dri-devel/2014-December/074344.html
+> 
+> > 
+> > > + - reg: Represent the physical address range of the controller.
+> > > + - interrupts: Represent the controller's interrupt to the CPU(s).
+> > > + - clocks, clock-names: Phandles to the controller pll reference and
+> > > +   core configuration clocks, as described in [1].
+> > 
+> > From the MIPI CSI-2 datasheets it looks like the D-PHY has a refclk and
+> > a cfg_clk input. So I suspect from the name of the "core_cfg" clock,
+> > that it actually represents two clock inputs, the "cfg_clk" wired to the
+> > D-PHY and a core clock wired to the MIPI DSI host controller. I am not
+> > sure if there are designs that control those clocks separately, but I
+> > think it'd be safer to split this into two clocks in the device tree.
+> 
 
+Our internal MIPI DSI SoC owner gave me some feedbacks on the clock sources.
+According to him, the Synopsys DesignWare MIPI DSI host controller needs four
+clock sources from an application platform - pclk, refclk, cfg_clk and dpipclk.
+These clocks are mentioned in the "DesignWare Cores MIPI DSI Host Controller
+Databook, 1.01a1.30a.pdf" documentation.
 
-> > Generating those two EFI tables shouldn't be a problem though.
-> >
-> >
-> 
-> Good.
-> 
-> >> As this basically promotes the stub<->kernel interface to an external
-> >> ABI, the current documentation about the /chosen node properties
-> >> should also be promoted to a proper binding, with the above mandated
-> >> minimal subset added as well.
-> >>
-> >> There are some minimal changes required to the current kernel code to
-> >> adhere to the above: primarlly to deal with a NULL runtime services
-> >> pointer, which is arguably an improvement anyway.
-> >
-> > This is not needed, if not for the first generation of patches
-> >
-> >
-> 
-> It is needed: the UEFI code needs to understand that the runtime
-> pointer in the EFI system table may be NULL, in which case no virtual
-> remapping or installation of the runtime services should take place.
-> Whether Xen ends up installing its own runtime services is a separate
-> matter.
-> 
-> >> Topic #2: how to identify an 'empty' DTB
-> >>
-> >> The proposed policy regarding whether DT or ACPI should be preferred
-> >> if both methods are available hinges on being able to identify a DTB
-> >> as containing a platform description or not. One suggested way of
-> >> doing this is to make the stub add a /chosen node property that
-> >> indicates that it didn't receive a DTB from the firmware, nor loaded
-> >> one from the file system, but created an empty one from scratch.
-> >>
-> >> Considering the previous topic, i.e., the promotion of the
-> >> stub<->kernel interface to external ABI, we should not be frivolous
-> >> about adding new properties, and adding a 'stub-generated-dtb'
-> >> property should be avoided if there is a better way to deal with this.
-> >> Also, e.g., when booting via GRUB, it may in fact be GRUB and not the
-> >> stub that creates the DTB (when booting with an initrd, for instance)
-> >> so GRUB would have to be modified as well. (If not, simply adding a
-> >> initrd= property to the command line would result in the kernel
-> >> preferring DT over ACPI all of a sudden, which surely, we all agree is
-> >> undesirable behavior)
-> >>
-> >> So instead, we propose to use a heuristic to decide whether a DTB
-> >> should be considered empty or not:
-> >> If /chosen is the only level 1 node in the tree, the DTB is empty,
-> >> otherwise it is not.
-> >>
-> >> This can be trivially implemented into the existing EFI early FDT
-> >> discovery code, and does not require any other changes to the stub or
-> >> GRUB.
-> >>
-> >> Please, could those affected by this comment whether this is feasible
-> >> or not? Other comments/remarks also highly appreciated, of course,
-> >
-> > Wouldn't it make sense to use the same interface between Xen and Dom0
-> > and between stub and kernel?
-> 
-> That is exactly the point: the stub communicates the EFI entry points
-> (system table and memmap) via the device tree. If you are not booting
-> via UEFI, there is no way you can execute the stub, so Xen needs to
-> add those properties to the /chosen node directly, and make them point
-> to data that the UEFI layer can understand.
+Quote some words from the documentation:
+pclk    - APB clock signal.
+refclk  - D-PHY reference clock used for Master-side serial clock generation in
+          clock multiplying unit(PLL).
+cfg_clk - D-PHY Configuration clock used for the initialization of the PHY. It
+          is also used for exiting ULPS state.
+dpipclk - Input Pixel clock signal.
 
-OK, it looks like the right way of doing it to me.
+The below table reflects how does i.MX6Q/DL provide the pclk, refclk and cfg_clk
+for the DesignWare MIPI DSI host controller, according to the SoC owner.
+ ----------------------------------------------------------------------------
+| Synopsys      |                     i.MX6Q/DL MIPI DSI                     |
+| DesignWare    |------------------------------------------------------------|
+| documentation |    clock   |     clock root     |       CCM_CCGR bits      |
+|---------------|------------|--------------------|--------------------------|
+|     pclk      |   ips_clk  |    ipg_clk_root    | mipi_core_cfg_clk_enable |
+|---------------|------------|--------------------|--------------------------|
+|    refclk     | pll_refclk | video_27m_clk_root | mipi_core_cfg_clk_enable |
+|---------------|------------|--------------------|--------------------------|
+|    cfg_clk    |   cfg_clk  | video_27m_clk_root | mipi_core_cfg_clk_enable |
+ ----------------------------------------------------------------------------
+
+I think we should add a new clock "IMX6QDL_CLK_MIPI_IPG" as a shared clock gate
+clock.  And, the clock-names property should exactly contain "pclk", "refclk"
+and "cfg_clk", right?
+
+Let me know your thoughts.  Thanks.
+
+> What MIPI CSI-2 datasheets do you refer to?
+> I don't find the refclk and cfg_clk in the MIPI CSI chapter of the i.MX6DQ
+> Reference Manual v2[2].
+> 
+> I think we need to know the design philosophy of DW MIPI DSI clock sources
+> to settle down the documentation here.  I've asked our internal MIPI DSI
+> SoC owner for ideas.  But, someone from Synopsys might be the right
+> person, perhaps.
+> 
+> [2] http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf?fasp=1&WT_TYPE=Reference%20Manuals&WT_VENDOR=FREESCALE&WT_FILE_FORMAT=pdf&WT_ASSET=Documentation&fileExt=.pdf
+> 
+> > 
+> > Also I am not sure which input to the MIPI DSI host controller the core
+> > clock represents. The i.MX6DQ Reference Manual v2 calls the remaining
+> > clock inputs gated by mipi_core_cfg_clk_enable "ac_clk_125m" and
+> > "ips_clk" (I think the latter is the ABP clock driving the register
+> > bank, just called "pclk" in the MIPI CSI-2 documentation).
+
+Yes, the "ips_clk" clock is the "pclk" clock.  The "ac_clk_125m" clock is
+designed for test and should not be used by software development, according to
+the SoC owner.
+
+Regards,
+Liu Ying
+
+> 
+> The same MIPI CSI-2 documentation you mentioned above?
+> 
+> I'm also puzzled about the clocks.
+> 
+> Regards,
+> Liu Ying
+> 
+> > 
+> > regards
+> > Philipp
+> > 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
