@@ -1,285 +1,161 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 11 Feb 2015 09:28:37 +0100
-Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
- with dma-parms
-In-Reply-To: <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
-References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
- <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
-Message-ID: <54DB12B5.4080000@samsung.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 11 Feb 2015 09:32:10 +0100
+Subject: [RFC v4 00/13] KVM-VFIO IRQ forward control
+Message-ID: <1423643543-24409-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This series proposes an integration of "ARM: Forwarding physical
+interrupts to a guest VM" (http://lwn.net/Articles/603514/) in
+KVM.
 
-On 2015-01-27 09:25, Sumit Semwal wrote:
-> Add some helpers to share the constraints of devices while attaching
-> to the dmabuf buffer.
->
-> At each attach, the constraints are calculated based on the following:
-> - max_segment_size, max_segment_count, segment_boundary_mask from
->     device_dma_parameters.
->
-> In case the attaching device's constraints don't match up, attach() fails.
->
-> At detach, the constraints are recalculated based on the remaining
-> attached devices.
->
-> Two helpers are added:
-> - dma_buf_get_constraints - which gives the current constraints as calculated
->        during each attach on the buffer till the time,
-> - dma_buf_recalc_constraints - which recalculates the constraints for all
->        currently attached devices for the 'paranoid' ones amongst us.
->
-> The idea of this patch is largely taken from Rob Clark's RFC at
-> https://lkml.org/lkml/2012/7/19/285, and the comments received on it.
->
-> Cc: Rob Clark <robdclark@gmail.com>
-> Signed-off-by: Sumit Semwal <sumit.semwal@linaro.org>
+It enables to set/unset forwarding for a VFIO platform device IRQ.
 
-The code looks okay, although it will probably will work well only with 
-typical
-cases like 'contiguous memory needed' or 'no constraints at all' (iommu).
+A forwarded IRQ is deactivated by the guest and not by the host.
+When the guest deactivates the associated virtual IRQ, the interrupt
+controller automatically completes the physical IRQ. Obviously
+this requires some HW support in the interrupt controller. This is
+the case for ARM GIC.
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+The direct benefit is that, for a level sensitive IRQ, a VM exit
+can be avoided on forwarded IRQ completion.
 
-> ---
-> v3:
-> - Thanks to Russell's comment, remove dma_mask and coherent_dma_mask from
->    constraints' calculation; has a nice side effect of letting us use
->    device_dma_parameters directly to list constraints.
-> - update the debugfs output to show constraint info as well.
->    
-> v2: split constraints-sharing and allocation helpers
->
->   drivers/dma-buf/dma-buf.c | 126 +++++++++++++++++++++++++++++++++++++++++++++-
->   include/linux/dma-buf.h   |   7 +++
->   2 files changed, 132 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/dma-buf/dma-buf.c b/drivers/dma-buf/dma-buf.c
-> index 5be225c2ba98..f363f1440803 100644
-> --- a/drivers/dma-buf/dma-buf.c
-> +++ b/drivers/dma-buf/dma-buf.c
-> @@ -264,6 +264,66 @@ static inline int is_dma_buf_file(struct file *file)
->   	return file->f_op == &dma_buf_fops;
->   }
->   
-> +static inline void init_constraints(struct device_dma_parameters *cons)
-> +{
-> +	cons->max_segment_count = (unsigned int)-1;
-> +	cons->max_segment_size = (unsigned int)-1;
-> +	cons->segment_boundary_mask = (unsigned long)-1;
-> +}
-> +
-> +/*
-> + * calc_constraints - calculates if the new attaching device's constraints
-> + * match, with the constraints of already attached devices; if yes, returns
-> + * the constraints; else return ERR_PTR(-EINVAL)
-> + */
-> +static int calc_constraints(struct device *dev,
-> +			    struct device_dma_parameters *calc_cons)
-> +{
-> +	struct device_dma_parameters cons = *calc_cons;
-> +
-> +	cons.max_segment_count = min(cons.max_segment_count,
-> +					dma_get_max_seg_count(dev));
-> +	cons.max_segment_size = min(cons.max_segment_size,
-> +					dma_get_max_seg_size(dev));
-> +	cons.segment_boundary_mask &= dma_get_seg_boundary(dev);
-> +
-> +	if (!cons.max_segment_count ||
-> +	    !cons.max_segment_size ||
-> +	    !cons.segment_boundary_mask) {
-> +		pr_err("Dev: %s's constraints don't match\n", dev_name(dev));
-> +		return -EINVAL;
-> +	}
-> +
-> +	*calc_cons = cons;
-> +
-> +	return 0;
-> +}
-> +
-> +/*
-> + * recalc_constraints - recalculates constraints for all attached devices;
-> + *  useful for detach() recalculation, and for dma_buf_recalc_constraints()
-> + *  helper.
-> + *  Returns recalculated constraints in recalc_cons, or error in the unlikely
-> + *  case when constraints of attached devices might have changed.
-> + */
-> +static int recalc_constraints(struct dma_buf *dmabuf,
-> +			      struct device_dma_parameters *recalc_cons)
-> +{
-> +	struct device_dma_parameters calc_cons;
-> +	struct dma_buf_attachment *attach;
-> +	int ret = 0;
-> +
-> +	init_constraints(&calc_cons);
-> +
-> +	list_for_each_entry(attach, &dmabuf->attachments, node) {
-> +		ret = calc_constraints(attach->dev, &calc_cons);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +	*recalc_cons = calc_cons;
-> +	return 0;
-> +}
-> +
->   /**
->    * dma_buf_export_named - Creates a new dma_buf, and associates an anon file
->    * with this buffer, so it can be exported.
-> @@ -313,6 +373,9 @@ struct dma_buf *dma_buf_export_named(void *priv, const struct dma_buf_ops *ops,
->   	dmabuf->ops = ops;
->   	dmabuf->size = size;
->   	dmabuf->exp_name = exp_name;
-> +
-> +	init_constraints(&dmabuf->constraints);
-> +
->   	init_waitqueue_head(&dmabuf->poll);
->   	dmabuf->cb_excl.poll = dmabuf->cb_shared.poll = &dmabuf->poll;
->   	dmabuf->cb_excl.active = dmabuf->cb_shared.active = 0;
-> @@ -422,7 +485,7 @@ struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
->   					  struct device *dev)
->   {
->   	struct dma_buf_attachment *attach;
-> -	int ret;
-> +	int ret = 0;
->   
->   	if (WARN_ON(!dmabuf || !dev))
->   		return ERR_PTR(-EINVAL);
-> @@ -436,6 +499,9 @@ struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
->   
->   	mutex_lock(&dmabuf->lock);
->   
-> +	if (calc_constraints(dev, &dmabuf->constraints))
-> +		goto err_constraints;
-> +
->   	if (dmabuf->ops->attach) {
->   		ret = dmabuf->ops->attach(dmabuf, dev, attach);
->   		if (ret)
-> @@ -448,6 +514,7 @@ struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
->   
->   err_attach:
->   	kfree(attach);
-> +err_constraints:
->   	mutex_unlock(&dmabuf->lock);
->   	return ERR_PTR(ret);
->   }
-> @@ -470,6 +537,8 @@ void dma_buf_detach(struct dma_buf *dmabuf, struct dma_buf_attachment *attach)
->   	if (dmabuf->ops->detach)
->   		dmabuf->ops->detach(dmabuf, attach);
->   
-> +	recalc_constraints(dmabuf, &dmabuf->constraints);
-> +
->   	mutex_unlock(&dmabuf->lock);
->   	kfree(attach);
->   }
-> @@ -770,6 +839,56 @@ void dma_buf_vunmap(struct dma_buf *dmabuf, void *vaddr)
->   }
->   EXPORT_SYMBOL_GPL(dma_buf_vunmap);
->   
-> +/**
-> + * dma_buf_get_constraints - get the *current* constraints of the dmabuf,
-> + *  as calculated during each attach(); returns error on invalid inputs
-> + *
-> + * @dmabuf:		[in]	buffer to get constraints of
-> + * @constraints:	[out]	current constraints are returned in this
-> + */
-> +int dma_buf_get_constraints(struct dma_buf *dmabuf,
-> +			    struct device_dma_parameters *constraints)
-> +{
-> +	if (WARN_ON(!dmabuf || !constraints))
-> +		return -EINVAL;
-> +
-> +	mutex_lock(&dmabuf->lock);
-> +	*constraints = dmabuf->constraints;
-> +	mutex_unlock(&dmabuf->lock);
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(dma_buf_get_constraints);
-> +
-> +/**
-> + * dma_buf_recalc_constraints - *recalculate* the constraints for the buffer
-> + *  afresh, from the list of currently attached devices; this could be useful
-> + *  cross-check the current constraints, for exporters that might want to be
-> + *  'paranoid' about the device constraints.
-> + *
-> + *  returns error on invalid inputs
-> + *
-> + * @dmabuf:		[in]	buffer to get constraints of
-> + * @constraints:	[out]	recalculated constraints are returned in this
-> + */
-> +int dma_buf_recalc_constraints(struct dma_buf *dmabuf,
-> +			    struct device_dma_parameters *constraints)
-> +{
-> +	struct device_dma_parameters calc_cons;
-> +	int ret = 0;
-> +
-> +	if (WARN_ON(!dmabuf || !constraints))
-> +		return -EINVAL;
-> +
-> +	mutex_lock(&dmabuf->lock);
-> +	ret = recalc_constraints(dmabuf, &calc_cons);
-> +	if (!ret)
-> +		*constraints = calc_cons;
-> +
-> +	mutex_unlock(&dmabuf->lock);
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(dma_buf_recalc_constraints);
-> +
->   #ifdef CONFIG_DEBUG_FS
->   static int dma_buf_describe(struct seq_file *s)
->   {
-> @@ -801,6 +920,11 @@ static int dma_buf_describe(struct seq_file *s)
->   				buf_obj->file->f_flags, buf_obj->file->f_mode,
->   				file_count(buf_obj->file),
->   				buf_obj->exp_name);
-> +		seq_printf(s, "\tConstraints: Seg Count: %08u, Seg Size: %08u",
-> +				buf_obj->constraints.max_segment_count,
-> +				buf_obj->constraints.max_segment_size);
-> +		seq_printf(s, " seg boundary mask: %08lx\n",
-> +				buf_obj->constraints.segment_boundary_mask);
->   
->   		seq_puts(s, "\tAttached Devices:\n");
->   		attach_count = 0;
-> diff --git a/include/linux/dma-buf.h b/include/linux/dma-buf.h
-> index 694e1fe1c4b4..489ad9b2e5ae 100644
-> --- a/include/linux/dma-buf.h
-> +++ b/include/linux/dma-buf.h
-> @@ -34,6 +34,7 @@
->   #include <linux/wait.h>
->   
->   struct device;
-> +struct device_dma_parameters;
->   struct dma_buf;
->   struct dma_buf_attachment;
->   
-> @@ -116,6 +117,7 @@ struct dma_buf_ops {
->    * @ops: dma_buf_ops associated with this buffer object.
->    * @exp_name: name of the exporter; useful for debugging.
->    * @list_node: node for dma_buf accounting and debugging.
-> + * @constraints: calculated constraints of attached devices.
->    * @priv: exporter specific private data for this buffer object.
->    * @resv: reservation object linked to this dma-buf
->    */
-> @@ -130,6 +132,7 @@ struct dma_buf {
->   	void *vmap_ptr;
->   	const char *exp_name;
->   	struct list_head list_node;
-> +	struct device_dma_parameters constraints;
->   	void *priv;
->   	struct reservation_object *resv;
->   
-> @@ -211,4 +214,8 @@ void *dma_buf_vmap(struct dma_buf *);
->   void dma_buf_vunmap(struct dma_buf *, void *vaddr);
->   int dma_buf_debugfs_create_file(const char *name,
->   				int (*write)(struct seq_file *));
-> +
-> +int dma_buf_get_constraints(struct dma_buf *, struct device_dma_parameters *);
-> +int dma_buf_recalc_constraints(struct dma_buf *,
-> +					struct device_dma_parameters *);
->   #endif /* __DMA_BUF_H__ */
+When the IRQ is forwarded, the VFIO platform driver does not need to
+mask the physical IRQ anymore before signaling the eventfd. Indeed
+genirq lowers the running priority, enabling other physical IRQ to hit
+except that one.
 
-Best regards
+Besides, the injection still is based on irqfd triggering. The only
+impact on irqfd process is resamplefd is not called anymore on
+virtual IRQ completion since deactivation is not trapped by KVM.
+
+The current integration is based on an extension of the KVM-VFIO
+device, previously used by KVM to interact with VFIO groups. The
+patch series now enables KVM to directly interact with a VFIO
+platform device. The VFIO external API was extended for that purpose.
+
+The IRQ forward programming is architecture specific (virtual interrupt
+controller programming basically). However the whole infrastructure is
+kept generic.
+
+from a user point of view, the functionality is provided through a
+new KVM-VFIO group named KVM_DEV_VFIO_DEVICE and 2 associated
+attributes:
+- KVM_DEV_VFIO_DEVICE_FORWARD_IRQ,
+- KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ.
+
+The capability can be checked with KVM_HAS_DEVICE_ATTR.
+
+Forwarding must be activated when the VFIO IRQ is not active at
+physical level or being under injection into the guest (VFIO masked)
+Forwarding can be unset at any time.
+
+---
+
+This patch series has the following dependencies:
+- "ARM: Forwarding physical interrupts to a guest VM"
+  (http://lwn.net/Articles/603514/)
+- [PATCH v13 00/18] VFIO support for platform devices, VOSYS
+  (http://www.spinics.net/lists/kvm-arm/msg13414.html)
+- [PATCH v3 0/6] vfio: type1: support for ARM SMMUS with VFIO_IOMMU_TYPE1,
+  VOSYS (http://www.spinics.net/lists/kvm-arm/msg11738.html)
+- [RFC v2] chip/vgic adaptations for forwarded irq
+
+Integrated pieces can be found at
+ssh://git.linaro.org/people/eric.auger/linux.git
+on branch irqfd_integ_v9
+
+This was tested on Calxeda Midway, assigning the xgmac main IRQ.
+Unforward was tested doing periodic forward/unforward with random offsets,
+while using netcat traffic to make sure unforward often occurs while the
+IRQ is in progress.
+
+v3 -> v4:
+- revert as RFC again due to lots of changes, extra complexity induced
+  by new set/unset_forward implementation, and dependencies on RFC patches
+- kvm_vfio_dev_irq struct is used at user level to pass the parameters
+  to KVM-VFIO KVM_DEV_VFIO_DEVICE/KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ. Shared
+  with Intel posted IRQs.
+- unforward now can happen any time with no constraint and cannot fail
+- new VFIO platform external functions introduced:
+  vfio_externl_set_automasked, vfio_external_mask, vfio_external_is_active,
+- introduce a modality to force guest to exit & prevent it from being
+  re-entered and rename older ARM pause modality into power-off
+  (related to PSCI power-off start)
+- kvm_vfio_arm.c no more exists. architecture specific code is moved into
+  arm/gic.c. This code is not that much VFIO dependent anymore. Although
+  some references still exit in comments.
+- 2 separate architecture specific functions for set and unset (only one
+  has a return value).
+
+v2 -> v3:
+- kvm_fwd_irq_action enum replaced by a bool (KVM_VFIO_IRQ_CLEANUP does not
+  exist anymore)
+- a new struct local to vfio.c was introduced to wrap kvm_fw_irq and make it
+  linkable: kvm_vfio_fwd_irq_node
+- kvm_fwd_irq now is self-contained (includes struct vfio_device *)
+- a single list of kvm_vfio_fwd_irq_irq_node is used instead of having
+  a list of devices and a list of forward irq per device. Having 2 lists
+  brought extra complexity.
+- the VFIO device ref counter is incremented each time a new IRQ is forwarded.
+  It is not attempted anymore to hold a single reference whatever the number
+  of forwarded IRQs.
+- subindex added on top of index to be closer to VFIO API
+- platform device check moved in the arm specific implementation
+- enable the KVM-VFIO device for arm64
+- forwarded state change only can happen while the VFIO IRQ handler is not
+  set; in other words, when the VFIO IRQ signaling is not set.
+
+v1 -> v2:
+- forward control is moved from architecture specific file into generic
+  vfio.c module.
+  only kvm_arch_set_fwd_state remains architecture specific
+- integrate Kim's patch which enables KVM-VFIO for ARM
+- fix vgic state bypass in vgic_queue_hwirq
+- struct kvm_arch_forwarded_irq moved from arch/arm/include/uapi/asm/kvm.h
+  to include/uapi/linux/kvm.h
+  also irq_index renamed into index and guest_irq renamed into gsi
+- ASSIGN/DEASSIGN renamed into FORWARD/UNFORWARD
+- vfio_external_get_base_device renamed into vfio_external_base_device
+- vfio_external_get_type removed
+- kvm_vfio_external_get_base_device renamed into kvm_vfio_external_base_device
+- __KVM_HAVE_ARCH_KVM_VFIO renamed into __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
+
+Eric Auger (12):
+  VFIO: platform: test forwarded state when selecting IRQ handler
+  VFIO: platform: single handler using function pointer
+  KVM: kvm-vfio: User API for IRQ forwarding
+  VFIO: external user API for interaction with vfio devices
+  VFIO: platform: add vfio_external_{mask|is_active|set_automasked}
+  KVM: kvm-vfio: wrappers to VFIO external API device helpers
+  KVM: kvm-vfio: wrappers for
+    vfio_external_{mask|is_active|set_automasked}
+  KVM: arm: rename pause into power_off
+  kvm: introduce kvm_arch_halt_guest and kvm_arch_resume_guest
+  kvm: arm: implement kvm_arch_halt_guest and kvm_arch_resume_guest
+  KVM: kvm-vfio: generic forwarding control
+  KVM: arm: vgic: forwarding control
+
+Kim Phillips (1):
+  KVM: arm/arm64: Enable the KVM-VFIO device
+
+ Documentation/virtual/kvm/devices/vfio.txt    |  34 +-
+ arch/arm/include/asm/kvm_host.h               |   7 +-
+ arch/arm/kvm/Kconfig                          |   1 +
+ arch/arm/kvm/Makefile                         |   2 +-
+ arch/arm/kvm/arm.c                            |  38 ++-
+ arch/arm/kvm/psci.c                           |  10 +-
+ arch/arm64/kvm/Kconfig                        |   1 +
+ arch/arm64/kvm/Makefile                       |   2 +-
+ drivers/vfio/platform/vfio_platform_irq.c     |  71 ++++-
+ drivers/vfio/platform/vfio_platform_private.h |   1 +
+ drivers/vfio/vfio.c                           |  24 ++
+ include/linux/kvm_host.h                      |  59 ++++
+ include/linux/vfio.h                          |  15 +
+ include/uapi/linux/kvm.h                      |  12 +
+ virt/kvm/arm/vgic.c                           | 190 ++++++++++++
+ virt/kvm/vfio.c                               | 429 +++++++++++++++++++++++++-
+ 16 files changed, 866 insertions(+), 30 deletions(-)
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+1.9.1
