@@ -1,64 +1,43 @@
-From: psawargaonkar@apm.com (Pranavkumar Sawargaonkar)
-Date: Wed, 11 Feb 2015 09:39:28 +0530
-Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
-In-Reply-To: <54C75B4B.6050709@redhat.com>
-References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
- <54C75B4B.6050709@redhat.com>
-Message-ID: <CANFfpkTvKkLZFrOO+wXeWO8CKQ6EM9uH86H2AeqjqCF_4i+WVg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 11 Feb 2015 05:28:42 +0100
+Subject: [PATCH V4 3/4] mmc: pwrseq: Initial support for the simple MMC
+ power sequence provider
+In-Reply-To: <CAAVeFu+ubZZGQd=zPPYm--PVCO9q-A3503Y5g50+sU4ztxU+iA@mail.gmail.com>
+References: <1421658784-11980-1-git-send-email-ulf.hansson@linaro.org>
+ <1421658784-11980-4-git-send-email-ulf.hansson@linaro.org>
+ <CAAVeFu+ubZZGQd=zPPYm--PVCO9q-A3503Y5g50+sU4ztxU+iA@mail.gmail.com>
+Message-ID: <CAPDyKFrdpknrMa62Vz4dfKaFMTdF-uXaAz3pkw_3qwNvHy49SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+[...]
 
-On Tue, Jan 27, 2015 at 3:02 PM, Jon Masters <jcm@redhat.com> wrote:
-> On 01/27/2015 02:03 AM, Pranavkumar Sawargaonkar wrote:
->> In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
->> in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
->> size due to size alignment checking in vgic driver for VCPU Control and
->> VCPU register.
->>
->> This patch corrects the sizes to be inline with the hardware spec.
->>
->> CC: linux-arm-kernel at lists.infradead.org
->> CC: kvmarm at lists.cs.columbia.edu
->> CC: arnd at arndb.de
->> CC: marc.zyngier at arm.com
->> CC: christoffer.dall at linaro.org
->> CC: jcm at redhat.com
->> Signed-off-by: Pranavkumar Sawargaonkar <psawargaonkar@apm.com>
->> Signed-off-by: Tushar Jagad <tjagad@apm.com>
->> Signed-off-by: Feng Kan <fkan@apm.com>
->> ---
->>  arch/arm64/boot/dts/apm/apm-storm.dtsi |    8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
->> index f1ad9c2..65f0e6d 100644
->> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
->> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
->> @@ -81,10 +81,10 @@
->>               compatible = "arm,cortex-a15-gic";
->>               #interrupt-cells = <3>;
->>               interrupt-controller;
->> -             reg = <0x0 0x78010000 0x0 0x1000>,      /* GIC Dist */
->> -                   <0x0 0x78020000 0x0 0x1000>,      /* GIC CPU */
->> -                   <0x0 0x78040000 0x0 0x2000>,      /* GIC VCPU Control */
->> -                   <0x0 0x78060000 0x0 0x2000>;      /* GIC VCPU */
->> +             reg = <0x0 0x78010000 0x0 0x10000>,     /* GIC Dist */
->> +                   <0x0 0x78020000 0x0 0x20000>,     /* GIC CPU */
->> +                   <0x0 0x78040000 0x0 0x10000>,     /* GIC VCPU Control */
->> +                   <0x0 0x78060000 0x0 0x20000>;     /* GIC VCPU */
->>               interrupts = <1 9 0xf04>;       /* GIC Maintenence IRQ */
->>       };
+>> +int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
+>> +{
+>> +       struct mmc_pwrseq_simple *pwrseq;
+>> +
+>> +       pwrseq = kzalloc(sizeof(struct mmc_pwrseq_simple), GFP_KERNEL);
+>> +       if (!pwrseq)
+>> +               return -ENOMEM;
+>> +
+>> +       pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
+>> +       host->pwrseq = &pwrseq->pwrseq;
+>
+> How about making this function return a struct mmc_pwrseq * so this
+> last line can be moved to mmc_pwrseq_alloc() instead of requiring all
+> power sequences to do it?
+>
+> The same applies to
+>
+>     host->pwrseq = NULL;
+>
+> in mmc_pwrseq_simple_free(), which could be done in mmc_pwrseq_free() it seems.
 
-Any comments on this patch ?
+Thanks for reviewing!
 
->
-> Thanks. I confirm that we have tested this.
->
-> Jon.
->
->
+I like you suggestion, though $subject patch is already part of the PR for 3.20.
 
-Thanks,
-Pranav
+Feel free to send a patch, I would happily apply it.
+
+Kind regards
+Uffe
