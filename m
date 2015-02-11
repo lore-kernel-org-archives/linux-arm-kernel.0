@@ -1,64 +1,81 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 11 Feb 2015 09:28:05 +0900
-Subject: [PATCH v2 1/3] ARM: shmobile: armadillo800eva: Properly specify
- HDMI audio link format
-In-Reply-To: <87d25wg804.wl%kuninori.morimoto.gx@renesas.com>
-References: <1421847492-8857-1-git-send-email-lars@metafoo.de>
- <87d25wg804.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20150211002802.GC7826@verge.net.au>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 11 Feb 2015 00:38:32 +0000 (UTC)
+Subject: [PATCH 1/4] arm: omap: hwmod: 43xx: add DebugSS hwmod data
+In-Reply-To: <20150210235629.GA4785@saruman.tx.rr.com>
+References: <1422054704-14915-2-git-send-email-balbi@ti.com>
+ <alpine.DEB.2.02.1501260142590.5450@utopia.booyaka.com>
+ <20150126165640.GA10679@saruman.tx.rr.com>
+ <20150126194933.GG6660@saruman.tx.rr.com>
+ <20150127160143.GH14623@saruman.tx.rr.com>
+ <alpine.DEB.2.02.1501271652340.7149@utopia.booyaka.com>
+ <20150127171532.GC14878@saruman.tx.rr.com>
+ <20150127171843.GD14878@saruman.tx.rr.com>
+ <alpine.DEB.2.02.1501271751020.4845@utopia.booyaka.com>
+ <alpine.DEB.2.02.1502102311570.3767@utopia.booyaka.com>
+ <20150210235629.GA4785@saruman.tx.rr.com>
+Message-ID: <alpine.DEB.2.02.1502110037440.3767@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 30, 2015 at 05:18:56AM +0000, Kuninori Morimoto wrote:
-> 
-> Hi Lars, Simon
-> 
-> > The DAI link format should be specified for the whole link rather than just
-> > one component on the link. So move the format specification for the HDMI
-> > audio link from the CPU component to the link itself.
+On Tue, 10 Feb 2015, Felipe Balbi wrote:
+
+> On Tue, Feb 10, 2015 at 11:12:40PM +0000, Paul Walmsley wrote:
+> > > > > > > > > hm... modulemode SWCTRL causes wait_target_ready to fail. Any hints ?
+> > > > > > > > 
+> > > > > > > > gets stuck in transition state. PRCM_CM_WKUP_DBGSS_CLKCTRL is always
+> > > > > > > > read as 0x 12510f00 which would translate into:
+> > > > > > > > 
+> > > > > > > > - module disabled
+> > > > > > > > - all opt clocks are on
+> > > > > > > > - module is transitioning
+> > > > > > > > - module in standby
+> > > > > > > > - clkA as TPIU and STM trace clock
+> > > > > > > > - all dividers set to 2
+> > > > > > > 
+> > > > > > > just fyi, checking with HW folks, this might be a new bug, unless
+> > > > > > > debugss needs something special.
+> > > > > > 
+> > > > > > If that happens on DEBUGSS disable, it's probably the same issue as on 
+> > > > > > AM33xx:
+> > > > > > 
+> > > > > > http://www.spinics.net/lists/arm-kernel/msg320801.html
+> > > > > > http://www.spinics.net/lists/arm-kernel/msg321930.html
+> > > > > > http://www.spinics.net/lists/arm-kernel/msg329151.html
+> > > > > > 
+> > > > > > Does adding HWMOD_INIT_NO_IDLE fix the issue you're seeing?
+> > > > > 
+> > > > > I'll try it out in a bit...
+> > > > 
+> > > > nope, same thing.
+> > > > 
+> > > > [   27.633235] omap_hwmod: debugss: _wait_target_disable failed
+> > > 
+> > > OK, looking at the code, this makes sense.  So here's what I'd suggest 
+> > > asking the hardware team: is the right approach to:
+> > > 
+> > > 1. keep the DEBUGSS CLKCTRL MODULEMODE bitfield at 0x2 all the time, even 
+> > > when it's not in use or when entering chip low-power states, or
+> > > 
+> > > 2. program the DEBUGSS CLKCTRL MODULEMODE bitfield to 0x0 when the DEBUGSS 
+> > > is not in use or when entering chip low-power states, but ignore the 
+> > > DEBUGSS CLKCTRL IDLEST register 
+> > > 
+> > > We'll need a new hwmod flag either way; the question is whether it should 
+> > > be something like HWMOD_CANNOT_DISABLE (case 1), or 
+> > > HWMOD_DISABLE_IGNORE_IDLEST (case 2).
 > > 
-> > Since the sh-mobile-hdmi DAI driver doesn't implement the set_fmt() callback
-> > in this case there is no functional difference between only specifying the
-> > the format for the CPU side or for the whole link, but the later it will
-> > allow us to remove support for just specifying the format for one component.
-> > 
-> > Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
-> > ---
+> > Just checking on this.  Heard anything from the hardware team?  If not I'd 
+> > say the HWMOD_CANNOT_DISABLE approach is probably the right one for now...
 > 
-> I tested these 3 patches on armadillo800eva
+> nothing from HW team yet. Last I heard is that they can reproduce the
+> issue, and are now digging through documentation (and maybe RTL, but I'm
+> speculating) to see if that should be supported or not.
 > 
-> 	[PATCH v2 1/3] ARM: shmobile: armadillo800eva: Properly specify HDMI audio link format
-> 	[PATCH v2 2/3] ASoC: sh: fsi: Fix clock inversion
-> 	[PATCH v2 3/3] ASoC: simple-card: Remove support for setting differing DAI formats
-> 
-> Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> 
-> 2/3 patch changed behavior for clock inversion on FSI driver.
-> FSI + wm8978 on armadillo800eva worked without any issues,
-> but, I don't know how much effect it has for other board.
-> We used this inversion flags on each board for historical reasons (copy-paste),
-> but, almost all these were not needed (except some picky board) on FSI.
-> Maybe Lars's 2/3 patch is correct, but, it is difficult to check/confirm for all boards.
-> And unfortunately, Renesas don't use FSI anymore.
-> So, I think keeping current FSI driver as-is is more safety for old boards.
-> armadillo800eva works well with below patch (as 2/3 patch)
+> From my point of view, however, the thing idles, it just doesn't report
+> it.
+
+Ok sounds like the thing to do is to wait until you hear back from them, 
+if they are still looking at it.
 
 
-Thanks, I am inclined to agree that it is best to leave things unchanged.
-
-> 
-> --------------
-> diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> index 75de26c..36aaeb1 100644
-> --- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-> +++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> @@ -1015,7 +1015,6 @@ static struct asoc_simple_card_info fsi_wm8978_info = {
->         .platform       = "sh_fsi2",
->         .daifmt         = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM,
->         .cpu_dai = {
-> -               .fmt    = SND_SOC_DAIFMT_IB_NF,
->                 .name   = "fsia-dai",
->         },
->         .codec_dai = {
-> --------------
-> 
+- Paul
