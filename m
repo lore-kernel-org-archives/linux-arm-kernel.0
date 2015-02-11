@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Feb 2015 10:01:28 +0100
-Subject: [PATCH v2 29/30] ARM: sun7i: pcduino3: Convert to DT label based
+Date: Wed, 11 Feb 2015 10:01:05 +0100
+Subject: [PATCH v2 06/30] ARM: sun4i: cubieboard: Convert to DT label based
  syntax
 In-Reply-To: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1423645289-1074-30-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1423645289-1074-7-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,18 +14,33 @@ when overriding DTSI nodes, convert the board to this syntax
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun7i-a20-pcduino3.dts | 210 +++++++++++++++----------------
- 1 file changed, 104 insertions(+), 106 deletions(-)
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 214 ++++++++++++++---------------
+ 1 file changed, 106 insertions(+), 108 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-pcduino3.dts b/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
-index 0a2c2aeb4687..09ec96b2b7d7 100644
---- a/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
-@@ -59,105 +59,6 @@
- 	model = "LinkSprite pcDuino3";
- 	compatible = "linksprite,pcduino3", "allwinner,sun7i-a20";
+diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+index 4260c2b47607..07c2f64b14ee 100644
+--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+@@ -57,104 +57,6 @@
+ 	model = "Cubietech Cubieboard";
+ 	compatible = "cubietech,a10-cubieboard", "allwinner,sun4i-a10";
  
 -	soc at 01c00000 {
+-		emac: ethernet at 01c0b000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&emac_pins_a>;
+-			phy = <&phy1>;
+-			status = "okay";
+-		};
+-
+-		mdio at 01c0b080 {
+-			status = "okay";
+-
+-			phy1: ethernet-phy at 1 {
+-				reg = <1>;
+-			};
+-		};
+-
 -		mmc0: mmc at 01c0f000 {
 -			pinctrl-names = "default";
 -			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
@@ -64,21 +79,10 @@ index 0a2c2aeb4687..09ec96b2b7d7 100644
 -		};
 -
 -		pinctrl at 01c20800 {
--			ahci_pwr_pin_a: ahci_pwr_pin at 0 {
--				allwinner,pins = "PH2";
--			};
--
--			led_pins_pcduino3: led_pins at 0 {
--				allwinner,pins = "PH15", "PH16";
+-			led_pins_cubieboard: led_pins at 0 {
+-				allwinner,pins = "PH20", "PH21";
 -				allwinner,function = "gpio_out";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--			};
--
--			key_pins_pcduino3: key_pins at 0 {
--				allwinner,pins = "PH17", "PH18", "PH19";
--				allwinner,function = "gpio_in";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
 -				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 -			};
 -		};
@@ -101,45 +105,43 @@ index 0a2c2aeb4687..09ec96b2b7d7 100644
 -			status = "okay";
 -
 -			axp209: pmic at 34 {
--				compatible = "x-powers,axp209";
 -				reg = <0x34>;
--				interrupt-parent = <&nmi_intc>;
--				interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
--
--				interrupt-controller;
--				#interrupt-cells = <1>;
+-				interrupts = <0>;
 -			};
 -		};
 -
--		gmac: ethernet at 01c50000 {
+-		i2c1: i2c at 01c2b000 {
 -			pinctrl-names = "default";
--			pinctrl-0 = <&gmac_pins_mii_a>;
--			phy = <&phy1>;
--			phy-mode = "mii";
+-			pinctrl-0 = <&i2c1_pins_a>;
 -			status = "okay";
+-		};
 -
--			phy1: ethernet-phy at 1 {
--				reg = <1>;
--			};
+-		spi0: spi at 01c05000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&spi0_pins_a>;
+-			status = "okay";
 -		};
 -	};
 -
  	leds {
  		compatible = "gpio-leds";
  		pinctrl-names = "default";
-@@ -196,17 +97,114 @@
- 			gpios = <&pio 7 19 GPIO_ACTIVE_LOW>;
+@@ -171,26 +73,96 @@
+ 			linux,default-trigger = "heartbeat";
  		};
  	};
 +};
-+
+ 
+-	reg_ahci_5v: ahci-5v {
+-		status = "okay";
+-	};
 +&ahci {
 +	target-supply = <&reg_ahci_5v>;
 +	status = "okay";
 +};
 +
-+&ahci_pwr_pin_a {
-+	allwinner,pins = "PH2";
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
 +};
 +
 +&ehci0 {
@@ -150,34 +152,32 @@ index 0a2c2aeb4687..09ec96b2b7d7 100644
 +	status = "okay";
 +};
 +
-+&gmac {
++&emac {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_pins_mii_a>;
++	pinctrl-0 = <&emac_pins_a>;
 +	phy = <&phy1>;
-+	phy-mode = "mii";
 +	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
 +};
-+
+ 
+-	reg_usb1_vbus: usb1-vbus {
+-		status = "okay";
 +&i2c0 {
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&i2c0_pins_a>;
 +	status = "okay";
 +
 +	axp209: pmic at 34 {
-+		compatible = "x-powers,axp209";
 +		reg = <0x34>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
- 
--	reg_usb1_vbus: usb1-vbus {
--		status = "okay";
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
++		interrupts = <0>;
  	};
++};
+ 
+-	reg_usb2_vbus: usb2-vbus {
+-		status = "okay";
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
 +};
 +
 +&ir0 {
@@ -185,9 +185,16 @@ index 0a2c2aeb4687..09ec96b2b7d7 100644
 +	pinctrl-0 = <&ir0_pins_a>;
 +	status = "okay";
 +};
++
++&mdio {
++	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
+ 	};
+ };
  
--	reg_usb2_vbus: usb2-vbus {
--		status = "okay";
+-#include "axp209.dtsi"
 +&mmc0 {
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
@@ -197,44 +204,51 @@ index 0a2c2aeb4687..09ec96b2b7d7 100644
 +	cd-inverted;
 +	status = "okay";
 +};
-+
+ 
+-&cpu0 {
+-	cpu-supply = <&reg_dcdc2>;
 +&ohci0 {
 +	status = "okay";
-+};
-+
+ };
+ 
 +&ohci1 {
 +	status = "okay";
 +};
 +
 +&pio {
-+	led_pins_pcduino3: led_pins at 0 {
-+		allwinner,pins = "PH15", "PH16";
++	led_pins_cubieboard: led_pins at 0 {
++		allwinner,pins = "PH20", "PH21";
 +		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
 +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
- 
--	reg_ahci_5v: ahci-5v {
--		gpio = <&pio 7 2 GPIO_ACTIVE_HIGH>;
--		status = "okay";
-+	key_pins_pcduino3: key_pins at 0 {
-+		allwinner,pins = "PH17", "PH18", "PH19";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
- };
++	};
++};
 +
 +&reg_ahci_5v {
-+	gpio = <&pio 7 2 GPIO_ACTIVE_HIGH>;
 +	status = "okay";
 +};
++
++#include "axp209.dtsi"
++
+ &reg_dcdc2 {
+ 	regulator-always-on;
+ 	regulator-min-microvolt = <1000000>;
+@@ -215,3 +187,29 @@
+ 	regulator-max-microvolt = <3000000>;
+ 	regulator-name = "avcc";
+ };
 +
 +&reg_usb1_vbus {
 +	status = "okay";
 +};
 +
 +&reg_usb2_vbus {
++	status = "okay";
++};
++
++&spi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_pins_a>;
 +	status = "okay";
 +};
 +
