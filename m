@@ -1,74 +1,42 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Feb 2015 10:01:01 +0100
-Subject: [PATCH v2 02/30] ARM: sun5i: a13: Move to the common sun5i DTSI
+Date: Wed, 11 Feb 2015 10:01:02 +0100
+Subject: [PATCH v2 03/30] ARM: sun5i: a10s: Move to the common sun5i DTSI
 In-Reply-To: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1423645289-1074-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1423645289-1074-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1423645289-1074-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a common DTSI for the sun5i family, move the A13 to use it.
+Now that we have a common DTSI for the sun5i family, move the A10s to use it.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i-a13.dtsi | 554 +++------------------------------------
- arch/arm/boot/dts/sun5i.dtsi     |  28 ++
- 2 files changed, 66 insertions(+), 516 deletions(-)
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 582 ++++----------------------------------
+ 1 file changed, 48 insertions(+), 534 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 5b2fa59fad38..5d9ce84486bb 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -49,10 +49,10 @@
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index 3733fc1ed4c7..ef516db5852d 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -49,6 +49,8 @@
  
  #include "skeleton.dtsi"
  
--#include <dt-bindings/thermal/thermal.h>
 +#include "sun5i.dtsi"
- 
--#include <dt-bindings/dma/sun4i-a10.h>
++
+ #include <dt-bindings/dma/sun4i-a10.h>
  #include <dt-bindings/pinctrl/sun4i-a10.h>
-+#include <dt-bindings/thermal/thermal.h>
  
- / {
- 	interrupt-parent = <&intc>;
-@@ -71,32 +71,6 @@
+@@ -81,113 +83,7 @@
  		};
  	};
  
 -	cpus {
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		cpu0: cpu at 0 {
--			device_type = "cpu";
+-		cpu at 0 {
 -			compatible = "arm,cortex-a8";
--			reg = <0x0>;
--			clocks = <&cpu>;
--			clock-latency = <244144>; /* 8 32k periods */
--			operating-points = <
--				/* kHz    uV */
--				1104000	1500000
--				1008000 1400000
--				912000  1350000
--				864000  1300000
--				624000  1200000
--				576000  1200000
--				432000  1200000
--				>;
--			#cooling-cells = <2>;
--			cooling-min-level = <0>;
--			cooling-max-level = <6>;
 -		};
 -	};
 -
- 	thermal-zones {
- 		cpu_thermal {
- 			/* milliseconds */
-@@ -129,107 +103,7 @@
- 		};
- 	};
- 
 -	memory {
 -		reg = <0x40000000 0x20000000>;
 -	};
@@ -172,9 +140,9 @@ index 5b2fa59fad38..5d9ce84486bb 100644
 -
  		ahb_gates: clk at 01c20060 {
  			#clock-cells = <1>;
- 			compatible = "allwinner,sun5i-a13-ahb-gates-clk";
-@@ -243,14 +117,6 @@
- 				"ahb_de_fe", "ahb_iep", "ahb_mali400";
+ 			compatible = "allwinner,sun5i-a10s-ahb-gates-clk";
+@@ -202,14 +98,6 @@
+ 				"ahb_de_be", "ahb_de_fe", "ahb_iep", "ahb_mali400";
  		};
  
 -		apb0: apb0 at 01c20054 {
@@ -187,9 +155,9 @@ index 5b2fa59fad38..5d9ce84486bb 100644
 -
  		apb0_gates: clk at 01c20068 {
  			#clock-cells = <1>;
- 			compatible = "allwinner,sun5i-a13-apb0-gates-clk";
-@@ -259,14 +125,6 @@
- 			clock-output-names = "apb0_codec", "apb0_pio", "apb0_ir";
+ 			compatible = "allwinner,sun5i-a10s-apb0-gates-clk";
+@@ -219,14 +107,6 @@
+ 				"apb0_ir", "apb0_keypad";
  		};
  
 -		apb1: clk at 01c20058 {
@@ -202,10 +170,10 @@ index 5b2fa59fad38..5d9ce84486bb 100644
 -
  		apb1_gates: clk at 01c2006c {
  			#clock-cells = <1>;
- 			compatible = "allwinner,sun5i-a13-apb1-gates-clk";
-@@ -275,384 +133,48 @@
- 			clock-output-names = "apb1_i2c0", "apb1_i2c1",
- 				"apb1_i2c2", "apb1_uart1", "apb1_uart3";
+ 			compatible = "allwinner,sun5i-a10s-apb1-gates-clk";
+@@ -236,161 +116,9 @@
+ 				"apb1_i2c2", "apb1_uart0", "apb1_uart1",
+ 				"apb1_uart2", "apb1_uart3";
  		};
 -
 -		nand_clk: clk at 01c20080 {
@@ -319,9 +287,8 @@ index 5b2fa59fad38..5d9ce84486bb 100644
 -			clock-output-names = "mbus";
 -		};
  	};
-+};
  
--	soc at 01c00000 {
+ 	soc at 01c00000 {
 -		compatible = "simple-bus";
 -		#address-cells = <1>;
 -		#size-cells = <1>;
@@ -363,6 +330,13 @@ index 5b2fa59fad38..5d9ce84486bb 100644
 -			#size-cells = <0>;
 -		};
 -
+ 		emac: ethernet at 01c0b000 {
+ 			compatible = "allwinner,sun4i-a10-emac";
+ 			reg = <0x01c0b000 0x1000>;
+@@ -407,214 +135,6 @@
+ 			#size-cells = <0>;
+ 		};
+ 
 -		mmc0: mmc at 01c0f000 {
 -			compatible = "allwinner,sun5i-a13-mmc";
 -			reg = <0x01c0f000 0x1000>;
@@ -375,6 +349,21 @@ index 5b2fa59fad38..5d9ce84486bb 100644
 -				      "output",
 -				      "sample";
 -			interrupts = <32>;
+-			status = "disabled";
+-		};
+-
+-		mmc1: mmc at 01c10000 {
+-			compatible = "allwinner,sun5i-a13-mmc";
+-			reg = <0x01c10000 0x1000>;
+-			clocks = <&ahb_gates 9>,
+-				 <&mmc1_clk 0>,
+-				 <&mmc1_clk 1>,
+-				 <&mmc1_clk 2>;
+-			clock-names = "ahb",
+-				      "mmc",
+-				      "output",
+-				      "sample";
+-			interrupts = <33>;
 -			status = "disabled";
 -		};
 -
@@ -406,7 +395,7 @@ index 5b2fa59fad38..5d9ce84486bb 100644
 -		};
 -
 -		ehci0: usb at 01c14000 {
--			compatible = "allwinner,sun5i-a13-ehci", "generic-ehci";
+-			compatible = "allwinner,sun5i-a10s-ehci", "generic-ehci";
 -			reg = <0x01c14000 0x100>;
 -			interrupts = <39>;
 -			clocks = <&ahb_gates 1>;
@@ -416,7 +405,7 @@ index 5b2fa59fad38..5d9ce84486bb 100644
 -		};
 -
 -		ohci0: usb at 01c14400 {
--			compatible = "allwinner,sun5i-a13-ohci", "generic-ohci";
+-			compatible = "allwinner,sun5i-a10s-ohci", "generic-ohci";
 -			reg = <0x01c14400 0x100>;
 -			interrupts = <40>;
 -			clocks = <&usb_clk 6>, <&ahb_gates 2>;
@@ -447,7 +436,7 @@ index 5b2fa59fad38..5d9ce84486bb 100644
 -		};
 -
 -		pio: pinctrl at 01c20800 {
--			compatible = "allwinner,sun5i-a13-pinctrl";
+-			compatible = "allwinner,sun5i-a10s-pinctrl";
 -			reg = <0x01c20800 0x400>;
 -			interrupts = <28>;
 -			clocks = <&apb0_gates 5>;
@@ -457,16 +446,34 @@ index 5b2fa59fad38..5d9ce84486bb 100644
 -			#size-cells = <0>;
 -			#gpio-cells = <3>;
 -
--			uart1_pins_a: uart1 at 0 {
--				allwinner,pins = "PE10", "PE11";
--				allwinner,function = "uart1";
+-			uart0_pins_a: uart0 at 0 {
+-				allwinner,pins = "PB19", "PB20";
+-				allwinner,function = "uart0";
 -				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 -				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 -			};
 -
--			uart1_pins_b: uart1 at 1 {
--				allwinner,pins = "PG3", "PG4";
--				allwinner,function = "uart1";
+-			uart2_pins_a: uart2 at 0 {
+-				allwinner,pins = "PC18", "PC19";
+-				allwinner,function = "uart2";
+-				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-			};
+-
+-			uart3_pins_a: uart3 at 0 {
+-				allwinner,pins = "PG9", "PG10";
+-				allwinner,function = "uart3";
+-				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-			};
+-
+-			emac_pins_a: emac0 at 0 {
+-				allwinner,pins = "PA0", "PA1", "PA2",
+-						"PA3", "PA4", "PA5", "PA6",
+-						"PA7", "PA8", "PA9", "PA10",
+-						"PA11", "PA12", "PA13", "PA14",
+-						"PA15", "PA16";
+-				allwinner,function = "emac";
 -				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 -				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 -			};
@@ -495,6 +502,13 @@ index 5b2fa59fad38..5d9ce84486bb 100644
 -			mmc0_pins_a: mmc0 at 0 {
 -				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
 -				allwinner,function = "mmc0";
+-				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
+-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-			};
+-
+-			mmc1_pins_a: mmc1 at 0 {
+-				allwinner,pins = "PG3","PG4","PG5","PG6","PG7","PG8";
+-				allwinner,function = "mmc1";
 -				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
 -				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 -			};
@@ -531,6 +545,13 @@ index 5b2fa59fad38..5d9ce84486bb 100644
 -			#thermal-sensor-cells = <0>;
 -		};
 -
+ 		uart0: serial at 01c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
+@@ -625,16 +145,6 @@
+ 			status = "disabled";
+ 		};
+ 
 -		uart1: serial at 01c28400 {
 -			compatible = "snps,dw-apb-uart";
 -			reg = <0x01c28400 0x400>;
@@ -540,21 +561,15 @@ index 5b2fa59fad38..5d9ce84486bb 100644
 -			clocks = <&apb1_gates 17>;
 -			status = "disabled";
 -		};
-+&cpu0 {
-+	clock-latency = <244144>; /* 8 32k periods */
-+	operating-points = <
-+		/* kHz    uV */
-+		1104000	1500000
-+		1008000 1400000
-+		912000  1350000
-+		864000  1300000
-+		624000  1200000
-+		576000  1200000
-+		432000  1200000
-+		>;
-+	#cooling-cells = <2>;
-+	cooling-min-level = <0>;
-+	cooling-max-level = <6>;
+-
+ 		uart2: serial at 01c28800 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28800 0x400>;
+@@ -644,52 +154,56 @@
+ 			clocks = <&apb1_gates 18>;
+ 			status = "disabled";
+ 		};
++	};
 +};
  
 -		uart3: serial at 01c28c00 {
@@ -567,46 +582,46 @@ index 5b2fa59fad38..5d9ce84486bb 100644
 -			status = "disabled";
 -		};
 +&ehci0 {
-+	compatible = "allwinner,sun5i-a13-ehci", "generic-ehci";
++	compatible = "allwinner,sun5i-a10s-ehci", "generic-ehci";
 +};
  
 -		i2c0: i2c at 01c2ac00 {
--			compatible = "allwinner,sun5i-a13-i2c", "allwinner,sun4i-a10-i2c";
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			compatible = "allwinner,sun5i-a10s-i2c", "allwinner,sun4i-a10-i2c";
 -			reg = <0x01c2ac00 0x400>;
 -			interrupts = <7>;
 -			clocks = <&apb1_gates 0>;
 -			status = "disabled";
--			#address-cells = <1>;
--			#size-cells = <0>;
 -		};
 +&ohci0 {
-+	compatible = "allwinner,sun5i-a13-ohci", "generic-ohci";
++	compatible = "allwinner,sun5i-a10s-ohci", "generic-ohci";
 +};
  
 -		i2c1: i2c at 01c2b000 {
--			compatible = "allwinner,sun5i-a13-i2c", "allwinner,sun4i-a10-i2c";
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			compatible = "allwinner,sun5i-a10s-i2c", "allwinner,sun4i-a10-i2c";
 -			reg = <0x01c2b000 0x400>;
 -			interrupts = <8>;
 -			clocks = <&apb1_gates 1>;
 -			status = "disabled";
--			#address-cells = <1>;
--			#size-cells = <0>;
 -		};
 +&pio {
-+	compatible = "allwinner,sun5i-a13-pinctrl";
++	compatible = "allwinner,sun5i-a10s-pinctrl";
  
 -		i2c2: i2c at 01c2b400 {
--			compatible = "allwinner,sun5i-a13-i2c", "allwinner,sun4i-a10-i2c";
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			compatible = "allwinner,sun5i-a10s-i2c", "allwinner,sun4i-a10-i2c";
 -			reg = <0x01c2b400 0x400>;
 -			interrupts = <9>;
 -			clocks = <&apb1_gates 2>;
 -			status = "disabled";
--			#address-cells = <1>;
--			#size-cells = <0>;
 -		};
-+	uart1_pins_a: uart1 at 0 {
-+		allwinner,pins = "PE10", "PE11";
-+		allwinner,function = "uart1";
++	uart0_pins_a: uart0 at 0 {
++		allwinner,pins = "PB19", "PB20";
++		allwinner,function = "uart0";
 +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 +	};
@@ -617,51 +632,37 @@ index 5b2fa59fad38..5d9ce84486bb 100644
 -			interrupts = <82>, <83>;
 -			clocks = <&ahb_gates 28>;
 -		};
-+	uart1_pins_b: uart1 at 1 {
-+		allwinner,pins = "PG3", "PG4";
-+		allwinner,function = "uart1";
++	uart2_pins_a: uart2 at 0 {
++		allwinner,pins = "PC18", "PC19";
++		allwinner,function = "uart2";
 +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	uart3_pins_a: uart3 at 0 {
++		allwinner,pins = "PG9", "PG10";
++		allwinner,function = "uart3";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	emac_pins_a: emac0 at 0 {
++		allwinner,pins = "PA0", "PA1", "PA2",
++				"PA3", "PA4", "PA5", "PA6",
++				"PA7", "PA8", "PA9", "PA10",
++				"PA11", "PA12", "PA13", "PA14",
++				"PA15", "PA16";
++		allwinner,function = "emac";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	mmc1_pins_a: mmc1 at 0 {
++		allwinner,pins = "PG3","PG4","PG5","PG6","PG7","PG8";
++		allwinner,function = "mmc1";
++		allwinner,drive = <SUN4I_PINCTRL_30_MA>;
 +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
  	};
  };
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index 24c29c27fc6d..e42cbb03620f 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -439,6 +439,34 @@
- 			#interrupt-cells = <2>;
- 			#size-cells = <0>;
- 			#gpio-cells = <3>;
-+
-+			i2c0_pins_a: i2c0 at 0 {
-+				allwinner,pins = "PB0", "PB1";
-+				allwinner,function = "i2c0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			i2c1_pins_a: i2c1 at 0 {
-+				allwinner,pins = "PB15", "PB16";
-+				allwinner,function = "i2c1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			i2c2_pins_a: i2c2 at 0 {
-+				allwinner,pins = "PB17", "PB18";
-+				allwinner,function = "i2c2";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			mmc0_pins_a: mmc0 at 0 {
-+				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
-+				allwinner,function = "mmc0";
-+				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
- 		};
- 
- 		timer at 01c20c00 {
 -- 
 2.3.0
