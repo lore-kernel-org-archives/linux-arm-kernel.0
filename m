@@ -1,79 +1,134 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 11 Feb 2015 17:15:28 +0100
-Subject: [PATCH 07/11] pinctrl: berlin: use proper compatibles
+Date: Wed, 11 Feb 2015 17:15:29 +0100
+Subject: [PATCH 08/11] Documentation: bindings: move the Berlin pinctrl
+ documentation
 In-Reply-To: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1423671332-24580-8-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1423671332-24580-9-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Berlin pin-controller driver was sharing the chip and system
-controller nodes with the clock and the reset drivers. They all shared
-the same compatible. With the introduction of the Marvell Berlin MFD
-controller, the Berlin pin-controller driver has now its own node.
-Update its compatibles to not share anymore the ones of the chip and
-system controllers.
+The Berlin pinctrl documentation was part of the Marvell Berlin SoC
+documentation because the Berlin pinctrl configuration was inside the
+chip and the system controllers. With the recent rework of the chip and
+system controller handling (now an MFD driver registers all sub-devices
+of the two soc and system controller nodes and each device has its own
+sub-node), the documentation of the Berlin pinctrl driver can be moved
+to the generic pinctrl documentation directory.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/pinctrl/berlin/berlin-bg2.c   | 4 ++--
- drivers/pinctrl/berlin/berlin-bg2cd.c | 4 ++--
- drivers/pinctrl/berlin/berlin-bg2q.c  | 4 ++--
- 3 files changed, 6 insertions(+), 6 deletions(-)
+ .../devicetree/bindings/arm/marvell,berlin.txt     | 37 -------------------
+ .../devicetree/bindings/pinctrl/berlin,pinctrl.txt | 43 ++++++++++++++++++++++
+ 2 files changed, 43 insertions(+), 37 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
 
-diff --git a/drivers/pinctrl/berlin/berlin-bg2.c b/drivers/pinctrl/berlin/berlin-bg2.c
-index 368ec0b9b8ba..3769eaedf519 100644
---- a/drivers/pinctrl/berlin/berlin-bg2.c
-+++ b/drivers/pinctrl/berlin/berlin-bg2.c
-@@ -218,11 +218,11 @@ static const struct berlin_pinctrl_desc berlin2_sysmgr_pinctrl_data = {
+diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+index 6413ce1fa485..080953daf9f5 100644
+--- a/Documentation/devicetree/bindings/arm/marvell,berlin.txt
++++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+@@ -60,23 +60,6 @@ Clocks provided by core clocks shall be referenced by a clock specifier
+ indexing one of the provided clocks. Refer to dt-bindings/clock/berlin<soc>.h
+ for the corresponding index mapping.
  
- static const struct of_device_id berlin2_pinctrl_match[] = {
- 	{
--		.compatible = "marvell,berlin2-chip-ctrl",
-+		.compatible = "marvell,berlin2-soc-pinctrl",
- 		.data = &berlin2_soc_pinctrl_data
- 	},
- 	{
--		.compatible = "marvell,berlin2-system-ctrl",
-+		.compatible = "marvell,berlin2-system-pinctrl",
- 		.data = &berlin2_sysmgr_pinctrl_data
- 	},
- 	{}
-diff --git a/drivers/pinctrl/berlin/berlin-bg2cd.c b/drivers/pinctrl/berlin/berlin-bg2cd.c
-index 6b9cae029ef7..9e11f191d643 100644
---- a/drivers/pinctrl/berlin/berlin-bg2cd.c
-+++ b/drivers/pinctrl/berlin/berlin-bg2cd.c
-@@ -161,11 +161,11 @@ static const struct berlin_pinctrl_desc berlin2cd_sysmgr_pinctrl_data = {
+-* Pin controller binding
+-
+-Pin control registers are part of both register sets, chip control and system
+-control. The pins controlled are organized in groups, so no actual pin
+-information is needed.
+-
+-A pin-controller node should contain subnodes representing the pin group
+-configurations, one per function. Each subnode has the group name and the muxing
+-function used.
+-
+-Be aware the Marvell Berlin datasheets use the keyword 'mode' for what is called
+-a 'function' in the pin-controller subsystem.
+-
+-Required subnode-properties:
+-- groups: a list of strings describing the group names.
+-- function: a string describing the function used to mux the groups.
+-
+ Example:
  
- static const struct of_device_id berlin2cd_pinctrl_match[] = {
- 	{
--		.compatible = "marvell,berlin2cd-chip-ctrl",
-+		.compatible = "marvell,berlin2cd-soc-pinctrl",
- 		.data = &berlin2cd_soc_pinctrl_data
- 	},
- 	{
--		.compatible = "marvell,berlin2cd-system-ctrl",
-+		.compatible = "marvell,berlin2cd-system-pinctrl",
- 		.data = &berlin2cd_sysmgr_pinctrl_data
- 	},
- 	{}
-diff --git a/drivers/pinctrl/berlin/berlin-bg2q.c b/drivers/pinctrl/berlin/berlin-bg2q.c
-index 11aa10cc0e3e..ba7a8a8ad010 100644
---- a/drivers/pinctrl/berlin/berlin-bg2q.c
-+++ b/drivers/pinctrl/berlin/berlin-bg2q.c
-@@ -380,11 +380,11 @@ static const struct berlin_pinctrl_desc berlin2q_sysmgr_pinctrl_data = {
+ chip: chip-control at ea0000 {
+@@ -85,29 +68,9 @@ chip: chip-control at ea0000 {
+ 	reg = <0xea0000 0x400>;
+ 	clocks = <&refclk>, <&externaldev 0>;
+ 	clock-names = "refclk", "video_ext0";
+-
+-	spi1_pmux: spi1-pmux {
+-		groups = "G0";
+-		function = "spi1";
+-	};
+ };
  
- static const struct of_device_id berlin2q_pinctrl_match[] = {
- 	{
--		.compatible = "marvell,berlin2q-chip-ctrl",
-+		.compatible = "marvell,berlin2q-soc-pinctrl",
- 		.data = &berlin2q_soc_pinctrl_data,
- 	},
- 	{
--		.compatible = "marvell,berlin2q-system-ctrl",
-+		.compatible = "marvell,berlin2q-system-pinctrl",
- 		.data = &berlin2q_sysmgr_pinctrl_data,
- 	},
- 	{}
+ sysctrl: system-controller at d000 {
+ 	compatible = "marvell,berlin2-system-ctrl";
+ 	reg = <0xd000 0x100>;
+-
+-	uart0_pmux: uart0-pmux {
+-		groups = "GSM4";
+-		function = "uart0";
+-	};
+-
+-	uart1_pmux: uart1-pmux {
+-		groups = "GSM5";
+-		function = "uart1";
+-	};
+-
+-	uart2_pmux: uart2-pmux {
+-		groups = "GSM3";
+-		function = "uart2";
+-	};
+ };
+diff --git a/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
+new file mode 100644
+index 000000000000..a8bb5e26019c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
+@@ -0,0 +1,43 @@
++* Pin-controller driver for the Marvell Berlin SoCs
++
++Pin control registers are part of both chip controller and system
++controller register sets. Pin controller nodes should be a sub-node of
++either the chip controller or system controller node. The pins
++controlled are organized in groups, so no actual pin information is
++needed.
++
++A pin-controller node should contain subnodes representing the pin group
++configurations, one per function. Each subnode has the group name and
++the muxing function used.
++
++Be aware the Marvell Berlin datasheets use the keyword 'mode' for what
++is called a 'function' in the pin-controller subsystem.
++
++Required properties:
++- compatible: should be one of:
++	"marvell,berlin2-soc-pinctrl",
++	"marvell,berlin2-system-pinctrl",
++	"marvell,berlin2cd-soc-pinctrl",
++	"marvell,berlin2cd-system-pinctrl",
++	"marvell,berlin2q-soc-pinctrl",
++	"marvell,berlin2q-system-pinctrl"
++
++Required subnode-properties:
++- groups: a list of strings describing the group names.
++- function: a string describing the function used to mux the groups.
++
++Example:
++
++sys_pinctrl: pin-controller {
++	compatible = "marvell,berlin2q-system-pinctrl";
++
++	uart0_pmux: uart0-pmux {
++		groups = "GSM12";
++		function = "uart0";
++	};
++};
++
++&uart0 {
++	pinctrl-0 = <&uart0_pmux>;
++	pinctrl-names = "default";
++};
 -- 
 2.3.0
