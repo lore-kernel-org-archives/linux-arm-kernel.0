@@ -1,48 +1,24 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Wed, 11 Feb 2015 13:34:26 +0900
-Subject: [PATCH V4 3/4] mmc: pwrseq: Initial support for the simple MMC
- power sequence provider
-In-Reply-To: <CAPDyKFrdpknrMa62Vz4dfKaFMTdF-uXaAz3pkw_3qwNvHy49SQ@mail.gmail.com>
-References: <1421658784-11980-1-git-send-email-ulf.hansson@linaro.org>
- <1421658784-11980-4-git-send-email-ulf.hansson@linaro.org>
- <CAAVeFu+ubZZGQd=zPPYm--PVCO9q-A3503Y5g50+sU4ztxU+iA@mail.gmail.com>
- <CAPDyKFrdpknrMa62Vz4dfKaFMTdF-uXaAz3pkw_3qwNvHy49SQ@mail.gmail.com>
-Message-ID: <CAAVeFuLQkNz6x21w8xCM==nwyt0QbYL_uPC9+TdRCj2w+FVu1A@mail.gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 10 Feb 2015 23:20:02 -0600
+Subject: [Patch v2 1/2] dmaengine: Add ADM driver
+In-Reply-To: <54CB6F67.9080600@smartplayin.com>
+References: <1420687572-7116-1-git-send-email-agross@codeaurora.org>
+ <1420687572-7116-2-git-send-email-agross@codeaurora.org>
+ <54CB6F67.9080600@smartplayin.com>
+Message-ID: <20150211052002.GA24943@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 11, 2015 at 1:28 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> [...]
->
->>> +int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
->>> +{
->>> +       struct mmc_pwrseq_simple *pwrseq;
->>> +
->>> +       pwrseq = kzalloc(sizeof(struct mmc_pwrseq_simple), GFP_KERNEL);
->>> +       if (!pwrseq)
->>> +               return -ENOMEM;
->>> +
->>> +       pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
->>> +       host->pwrseq = &pwrseq->pwrseq;
->>
->> How about making this function return a struct mmc_pwrseq * so this
->> last line can be moved to mmc_pwrseq_alloc() instead of requiring all
->> power sequences to do it?
->>
->> The same applies to
->>
->>     host->pwrseq = NULL;
->>
->> in mmc_pwrseq_simple_free(), which could be done in mmc_pwrseq_free() it seems.
->
-> Thanks for reviewing!
->
-> I like you suggestion, though $subject patch is already part of the PR for 3.20.
->
-> Feel free to send a patch, I would happily apply it.
+On Fri, Jan 30, 2015 at 05:17:51PM +0530, Pramod Gurav wrote:
+> > +
+> > +	achan = to_adm_chan(chan);
+> Could not understand the use of achan here. unused code?
 
-Damn, why am I always so late to review patches...
+yeah its unnecessary now.  will remove.  Thanks!
+> 
+> > +
 
-I will send a fixup patch - better to have this done early.
-
-Thanks!
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
