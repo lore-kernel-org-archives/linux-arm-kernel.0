@@ -1,51 +1,86 @@
-From: joseph@codesourcery.com (Joseph Myers)
-Date: Wed, 11 Feb 2015 21:41:27 +0000
-Subject: [PATCHv3 00/24] ILP32 support in ARM64
-In-Reply-To: <20150211190252.GB23507@brightrain.aerifal.cx>
-References: <20141002155217.GH32147@e104818-lin.cambridge.arm.com>
- <20150210181302.GA23886@brightrain.aerifal.cx>
- <CAMe9rOqX-VpjZ+E-JCusk+e4Kpw1V1tsFq1Kjtai5DR9saKLaA@mail.gmail.com>
- <20150211190252.GB23507@brightrain.aerifal.cx>
-Message-ID: <alpine.DEB.2.10.1502112125560.19244@digraph.polyomino.org.uk>
+From: mpeg.blue@free.fr (Mason)
+Date: Wed, 11 Feb 2015 13:58:45 -0800
+Subject: Delays, clocks, timers, hrtimers, etc
+In-Reply-To: <20150211184515.GB11190@codeaurora.org>
+References: <54C8E125.3070905@free.fr>
+ <e028a4eb604a491f4438557f4a1373ef@agner.ch> <54D52F84.9050600@free.fr>
+ <266c7b1ff2d1a8ba0ae4866f4fb4eca5@agner.ch> <54D576B1.4000001@free.fr>
+ <54D903F6.3050608@codeaurora.org> <54D93556.9050008@free.fr>
+ <54D93FFA.3090506@codeaurora.org> <54D947B4.4080401@free.fr>
+ <54DB94B0.8020000@free.fr> <20150211184515.GB11190@codeaurora.org>
+Message-ID: <54DBD095.3040800@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Feb 2015, Rich Felker wrote:
+Stephen Boyd wrote:
 
-> > > https://sourceware.org/bugzilla/show_bug.cgi?id=16437
-> > 
-> > Please leave x32 out of this discussion.  I have resolved this bug
-> > as WONTFIX.
-> 
-> From the glibc side, I thought things went by a consensus process
-> these days, not the old WONTFIX regime of he who shall not be named.
-> If this is not fixed for x32, then x32 cannot provide a conforming C
-> environment and thus it's rather a toy target. But I think we should
-> discuss this on libc-alpha. In the mean time please leave it REOPENED.
+> Mason wrote:
+>
+>> Also, you wrote "I don't see any problem with the TWD dropping the
+>> dependency on SMP." Would something as simple as this be acceptable?
+>> (Most probably NOT; there are a lot of smp* occurrences in smp_twd.c
+>> even the file name.) What is the rationale for the dependency?
+>>
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index a34698d..47b02c8 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -1565,7 +1565,6 @@ config HAVE_ARM_ARCH_TIMER
+>>   config HAVE_ARM_TWD
+>>          bool
+>> -       depends on SMP
+>>          select CLKSRC_OF if OF
+>>          help
+>>            This options enables support for the ARM timer and watchdog unit
+>>
+>
+> Hmm it looks like we would also need to add this to the patch. It
+> looks like a holdover from when the local timer APIs were around.
+> Back then twd_local_timer_common_register() would fail if
+> is_smp() was false or setup_max_cpus was 0. Now it will just
+> register a clockevent that may or may not be used depending on
+> what other clockevents are in the system and the ratings of those
+> other clockevents.
+>
+> ----8<----
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index 172c6a05d27f..e8f6d241881f 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -23,7 +23,6 @@
+>   #include <linux/of_irq.h>
+>   #include <linux/of_address.h>
+>
+> -#include <asm/smp_plat.h>
+>   #include <asm/smp_twd.h>
+>
+>   /* set up by the platform code */
+> @@ -388,9 +387,6 @@ static void __init twd_local_timer_of_register(struct device_node *np)
+>   {
+>   	int err;
+>
+> -	if (!is_smp() || !setup_max_cpus)
+> -		return;
+> -
+>   	twd_ppi = irq_of_parse_and_map(np, 0);
+>   	if (!twd_ppi) {
+>   		err = -EINVAL;
 
-Indeed.  x86 is handled primarily by community review, and even when we 
-have maintainers for architectures or other subsystems, being maintainer 
-serves as a shortcut to presume consensus in the absence of controversy 
-(in the expectation that the community won't object), not to override 
-community discussion if something is more controversial.  I've reopened 
-the bug.
+Looking at the difference between OF and !OF registration functions
+in smp_twd.c
 
-I believe I made clear in the discussion of 64-bit time interfaces for 
-32-bit systems that the x32 ABI mistake was not one to be repeated - that 
-since there is obviously no need for nanoseconds values that cannot fit in 
-32 bits, nanoseconds (and microseconds) values should remain as long in 
-accordance with POSIX.  It's absolutely fine for the userspace structures 
-to have an explicit __glibc_reserved padding field in an endian-dependent 
-place to keep the low part of the nanoseconds value in the same place as 
-it would be for a 64-bit type, but if the kernel doesn't ignore that 
-padding for the 64-bit time interfaces then all places that pass these 
-structures from glibc to the kernel need to copy them and zero the padding 
-in the copy.
+!OF
+   if (twd_base || twd_evt) return -EBUSY;
+   assign twd_ppi and twd_base
+   twd_local_timer_common_register(NULL)
 
-Whether the high 32 bits can be treated as padding for interfaces where 
-long is 64-bit depends on whether the interfaces in question are required 
-to return an error such as EINVAL for out-of-range nanoseconds values.
+OF
+   if (!is_smp() || !setup_max_cpus) return; // TO BE DELETED
+   assign twd_ppi and twd_base
+   twd_local_timer_common_register(np)
 
--- 
-Joseph S. Myers
-joseph at codesourcery.com
+I suppose OF guarantees that the init code is called only once?
+(Hence the !OF guard code would be unnecessary.)
+
+Regards.
