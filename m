@@ -1,53 +1,121 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Thu, 12 Feb 2015 14:01:30 +0800
-Subject: [PATCH RFC v9 07/20] ARM: imx6q: clk: Add support for mipi_ipg clock
- as a shared clock gate
+Date: Thu, 12 Feb 2015 14:01:31 +0800
+Subject: [PATCH RFC v9 08/20] ARM: dts: imx6qdl: Move existing MIPI DSI ports
+ into a new 'ports' node
 In-Reply-To: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
 References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1423720903-24806-8-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1423720903-24806-9-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CG8 field of the CCM CCGR3 register is the 'mipi_core_cfg' gate clock,
-according to the i.MX6q/sdl reference manuals.  This clock is actually the
-gate for several clocks, including the ipg clock's output.  The MIPI DSI host
-controller embedded in the i.MX6q/sdl SoCs takes the ipg clock as the pclk -
-the APB clock signal .  In order to gate/ungate the ipg clock, this patch adds
-a new shared clock gate named as "mipi_ipg".
+The MIPI DSI node contains some ports which represent possible DRM CRTCs
+it can connect with.  Each port has a 'reg' property embedded.  This
+property will be wrongly interpretted by the MIPI DSI bus driver, because
+the driver will take each subnode which contains a 'reg' property as a
+DSI peripheral device.  This patch moves the existing MIPI DSI ports into
+a new 'ports' node so that the MIPI DSI bus driver may distinguish its
+DSI peripheral device(s) from the existing ports.
 
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
 v8->v9:
- * Newly introduced in v9.
+ * Rebase onto the imx-drm/next branch of Philipp Zabel's open git repository.
 
- arch/arm/mach-imx/clk-imx6q.c             | 1 +
- include/dt-bindings/clock/imx6qdl-clock.h | 3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+v7->v8:
+ * None.
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index cbdbe2a..909828d 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -419,6 +419,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_IPU2_DI1]     = imx_clk_gate2("ipu2_di1",      "ipu2_di1_sel",      base + 0x74, 10);
- 	clk[IMX6QDL_CLK_HSI_TX]       = imx_clk_gate2_shared("hsi_tx", "hsi_tx_podf",       base + 0x74, 16, &share_count_mipi_core_cfg);
- 	clk[IMX6QDL_CLK_MIPI_CORE_CFG] = imx_clk_gate2_shared("mipi_core_cfg", "video_27m", base + 0x74, 16, &share_count_mipi_core_cfg);
-+	clk[IMX6QDL_CLK_MIPI_IPG]     = imx_clk_gate2_shared("mipi_ipg", "ipg",             base + 0x74, 16, &share_count_mipi_core_cfg);
- 	if (cpu_is_imx6dl())
- 		/*
- 		 * The multiplexer and divider of the imx6q clock gpu2d get
-diff --git a/include/dt-bindings/clock/imx6qdl-clock.h b/include/dt-bindings/clock/imx6qdl-clock.h
-index dbc828c..8780868 100644
---- a/include/dt-bindings/clock/imx6qdl-clock.h
-+++ b/include/dt-bindings/clock/imx6qdl-clock.h
-@@ -250,6 +250,7 @@
- #define IMX6QDL_CLK_GPT_3M			237
- #define IMX6QDL_CLK_VIDEO_27M			238
- #define IMX6QDL_CLK_MIPI_CORE_CFG		239
--#define IMX6QDL_CLK_END				240
-+#define IMX6QDL_CLK_MIPI_IPG			240
-+#define IMX6QDL_CLK_END				241
+v5->v6:
+ * None.
+
+v4->v5:
+ * None.
+
+v3->v4:
+ * None.
+
+v2->v3:
+ * Add Philipp's Ack.
+
+v1->v2:
+ * Newly added, as suggested by Thierry Reding.
+
+ arch/arm/boot/dts/imx6q.dtsi   | 20 +++++++++++---------
+ arch/arm/boot/dts/imx6qdl.dtsi | 23 ++++++++++++++---------
+ 2 files changed, 25 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 85f72e6..e152e6e 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -292,19 +292,21 @@
+ };
  
- #endif /* __DT_BINDINGS_CLOCK_IMX6QDL_H */
+ &mipi_dsi {
+-	port at 2 {
+-		reg = <2>;
++	ports {
++		port at 2 {
++			reg = <2>;
+ 
+-		mipi_mux_2: endpoint {
+-			remote-endpoint = <&ipu2_di0_mipi>;
++			mipi_mux_2: endpoint {
++				remote-endpoint = <&ipu2_di0_mipi>;
++			};
+ 		};
+-	};
+ 
+-	port at 3 {
+-		reg = <3>;
++		port at 3 {
++			reg = <3>;
+ 
+-		mipi_mux_3: endpoint {
+-			remote-endpoint = <&ipu2_di1_mipi>;
++			mipi_mux_3: endpoint {
++				remote-endpoint = <&ipu2_di1_mipi>;
++			};
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 2109d07..55aced8 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1023,19 +1023,24 @@
+ 				reg = <0x021e0000 0x4000>;
+ 				status = "disabled";
+ 
+-				port at 0 {
+-					reg = <0>;
++				ports {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					port at 0 {
++						reg = <0>;
+ 
+-					mipi_mux_0: endpoint {
+-						remote-endpoint = <&ipu1_di0_mipi>;
++						mipi_mux_0: endpoint {
++							remote-endpoint = <&ipu1_di0_mipi>;
++						};
+ 					};
+-				};
+ 
+-				port at 1 {
+-					reg = <1>;
++					port at 1 {
++						reg = <1>;
+ 
+-					mipi_mux_1: endpoint {
+-						remote-endpoint = <&ipu1_di1_mipi>;
++						mipi_mux_1: endpoint {
++							remote-endpoint = <&ipu1_di1_mipi>;
++						};
+ 					};
+ 				};
+ 			};
 -- 
 2.1.0
