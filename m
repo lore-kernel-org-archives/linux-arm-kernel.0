@@ -1,24 +1,56 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 12 Feb 2015 16:06:08 +0100
-Subject: 3.20-rc0: very poor performance when running festival
-Message-ID: <20150212150608.GA14349@amd>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 12 Feb 2015 15:07:10 +0000
+Subject: [PATCH v2] ARM: dts: zynq: Add OCM node
+In-Reply-To: <5c1602f83c594a72aac78c245f1830fa@BL2FFO11FD052.protection.gbl>
+References: <6df19b400e314ef8228be475bb8ba83765683016.1423737765.git.michal.simek@xilinx.com>
+ <20150212105443.GB1522@leverpostej>
+ <c64e7b4bf78649049cea3dceecea453c@BN1AFFO11FD014.protection.gbl>
+ <5c1602f83c594a72aac78c245f1830fa@BL2FFO11FD052.protection.gbl>
+Message-ID: <20150212150709.GG1522@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Thu, Feb 12, 2015 at 02:58:36PM +0000, S?ren Brinkmann wrote:
+> On Thu, 2015-02-12 at 12:01PM +0100, Michal Simek wrote:
+> > On 02/12/2015 11:54 AM, Mark Rutland wrote:
+> > > On Thu, Feb 12, 2015 at 10:42:47AM +0000, Michal Simek wrote:
+> > >> Add OCM node for all zynq boards. OCM location
+> > >> can changed but for all current boards this
+> > >> is the location where OCM is.`
+> > >>
+> > >> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> > >> ---
+> > >>
+> > >> Changes in v2:
+> > >> - Move node to board file suggested by Mark
+> > >>
+> > >> This patch is done based on discussion here.
+> > >> https://lkml.org/lkml/2014/12/1/396
+> > >>
+> > >> Mark: I expect you won't like amba bus reference or
+> > >> am I wrong?
+> > > 
+> > > I'm fine with dropping things onto a bus in this way. If we're happy to
+> > > do it for other nodes I don't see why busses should be special.
+> > 
+> > Wonderful. I will give people some time to comment this style.
+> 
+> Given that the location is discoverable, wouldn't it make sense to let
+> 'reg' point to the ctrl/cfg registers in the SLCR and let the driver
+> handle the whereabouts of the OCM location? (but I guess this is going
+> in circles now, such a proposal was on the table at some point, IIRC).
+> But I'd prefer:
+> 	memory-controller at 0xfffc0000 { /* the address here would of course not match all configurations */
 
-I'm using
+I'd really prefer that we keep the unit-address and reg consistent.
 
-echo 'Come shall then well bload? Then well bload shell when blaight!' | bash -c 'time festival --tts'
+Given that the address may change on a per-board basis, it simply has to
+live in the board file.
 
-to test audio, and I noticed that in 3.20-rc0, it takes about 3x longer
-than it should, on Nokia N900. Normally on 3.19, it takes 12 seconds,
-but it takes 30 on 3.20.
+However, given that all boards are currently the same it could be
+dropped in the SoC file for now, with a comment saying it should be
+factored out to boards when the first board with a different address
+comes along.
 
-Any ideas?
-
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Thanks,
+Mark.
