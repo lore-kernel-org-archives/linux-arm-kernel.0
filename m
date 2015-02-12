@@ -1,63 +1,40 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Thu, 12 Feb 2015 20:19:51 +0800
-Subject: [RFC PATCH v2 08/26] ftrace: enable other subsystems make ftrace nop
- before ftrace_init()
+Date: Thu, 12 Feb 2015 20:20:00 +0800
+Subject: [RFC PATCH v2 10/26] ftrace: x86: try to fix ftrace when
+ ftrace_replace_code.
 In-Reply-To: <1423743476-11927-1-git-send-email-wangnan0@huawei.com>
 References: <1423743476-11927-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1423743591-12353-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1423743600-12439-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
 ---
- include/linux/ftrace.h |  5 +++++
- kernel/trace/ftrace.c  | 15 +++++++++++++++
- 2 files changed, 20 insertions(+)
+ arch/x86/kernel/ftrace.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
-index 8db315a..d37ccd8a 100644
---- a/include/linux/ftrace.h
-+++ b/include/linux/ftrace.h
-@@ -702,9 +702,14 @@ static inline void __ftrace_enabled_restore(int enabled)
- #ifdef CONFIG_FTRACE_MCOUNT_RECORD
- extern void ftrace_init(void);
- extern void ftrace_init_early(void);
-+extern int ftrace_process_loc_early(unsigned long ip);
- #else
- static inline void ftrace_init(void) { }
- static inline void ftrace_init_early(void) { }
-+static inline int ftrace_process_loc_early(unsigned long __unused)
-+{
-+	return 0;
-+}
- #endif
+diff --git a/arch/x86/kernel/ftrace.c b/arch/x86/kernel/ftrace.c
+index 7bdba65..c869138 100644
+--- a/arch/x86/kernel/ftrace.c
++++ b/arch/x86/kernel/ftrace.c
+@@ -553,8 +553,16 @@ void ftrace_replace_code(int enable)
+ 		rec = ftrace_rec_iter_record(iter);
  
- /*
-diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
-index 79b3e88..150762a 100644
---- a/kernel/trace/ftrace.c
-+++ b/kernel/trace/ftrace.c
-@@ -5028,6 +5028,21 @@ void __init ftrace_init_early(void)
- 	ftrace_sort_mcount_area();
- }
+ 		ret = add_breakpoints(rec, enable);
+-		if (ret)
+-			goto remove_breakpoints;
++		if (ret) {
++			/*
++			 * Don't trigger ftrace_bug here. Let it done by
++			 * remove_breakpoints procedure.
++			 */
++			ret = __ftrace_tryfix_bug(ret, enable, rec,
++					add_breakpoints(rec, enable), false);
++			if (ret)
++				goto remove_breakpoints;
++		}
+ 		count++;
+ 	}
  
-+int __init ftrace_process_loc_early(unsigned long addr)
-+{
-+	unsigned long ip = ftrace_location(addr);
-+	struct dyn_ftrace fake_rec;
-+	int ret;
-+
-+	if (ip != addr)
-+		return -EINVAL;
-+
-+	memset(&fake_rec, '\0', sizeof(fake_rec));
-+	fake_rec.ip = ip;
-+	ret = ftrace_make_nop(NULL, &fake_rec, MCOUNT_ADDR);
-+	return ret;
-+}
-+
- /* Do nothing if arch does not support this */
- void __weak arch_ftrace_update_trampoline(struct ftrace_ops *ops)
- {
 -- 
 1.8.4
