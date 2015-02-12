@@ -1,67 +1,124 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 12 Feb 2015 15:53:26 +0100
-Subject: [PATCH v2 00/10] ARM: berlin: add nand support
-Message-ID: <1423752816-26219-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Thu, 12 Feb 2015 15:53:28 +0100
+Subject: [PATCH v2 02/10] mtd: pxa3xx_nand: add a non mandatory ECC clock
+In-Reply-To: <1423752816-26219-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1423752816-26219-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1423752816-26219-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Some controllers (as the coming Berlin nand controller) need to enable
+an ECC clock. Add support for this clock in the pxa3xx nand driver, and
+leave it as non mandatory.
 
-This series introduces the support for the Marvell Berlin nand
-controller. It is based on top of v3.19 and was tested on the
-Marvell Berlin BG2Q DMP board.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ drivers/mtd/nand/pxa3xx_nand.c | 32 +++++++++++++++++++++++---------
+ 1 file changed, 23 insertions(+), 9 deletions(-)
 
-The support is added into the existing pxa3xx nand controller. Some
-additions were done in order to get this controller working:
-- Support for a non mandatory ECC clock has been added.
-- The Berlin nand controller needs to poll the status register.
-- Sequences of commands are quite different in order to perform write
-  operation.
-
-Changes were done in order to avoid impacting other controllers using
-this driver, but I'd like people actually using the pxa3xx nand driver
-to test theses patches to ensure no harm was done. A specific Berlin
-nand cmd function has been added to deal with most of the Berlin
-specific code.
-
-Because of a bug in the Berlin clock driver, this series requires the
-fix provided by Jisheng Zhang, which is already in v3.19-rc6
-(b71e8ecd57c8aae5b1815782c47b74ffe3efc09a).
-
-Thanks!
-
-Antoine
-
-Changes since v1:
-        - Added a fallback to NULL when looking for the 'nfc' clock
-	- Added the clocks in the bindings documentation
-        - Reworked the DT
-        - Removed non needed RNDOUT command
-        - Used the standard RESET command
-        - Fixed the flash type matching order
-        - Remove all non tested flash types (only one left)
-        - Added a check to explicitly not support nand chips with small pages
-        - Remove useless checks for clocks in the probing function
-        - Various clean up
-
-Antoine Tenart (10):
-  mtd: pxa3xx_nand: initialiaze pxa3xx_flash_ids to 0
-  mtd: pxa3xx_nand: add a non mandatory ECC clock
-  Documentation: bindings: document the clocks for pxa3xx-nand
-  mtd: pxa3xx_nand: set NDCR_PG_PER_BLK if page per block is 128
-  mtd: pxa3xx_nand: add a default chunk size
-  mtd: pxa3xx_nand: add support for the Marvell Berlin nand controller
-  Documentation: bindings: add the Berlin nand controller compatible
-  mtd: nand: let Marvell Berlin SoCs select the pxa3xx driver
-  ARM: berlin: add BG2Q node for the nand
-  ARM: berlin: enable flash on the BG2Q DMP
-
- .../devicetree/bindings/mtd/pxa3xx-nand.txt        |   5 +
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |  25 ++
- arch/arm/boot/dts/berlin2q.dtsi                    |  13 +
- drivers/mtd/nand/Kconfig                           |   2 +-
- drivers/mtd/nand/pxa3xx_nand.c                     | 268 ++++++++++++++++++---
- 5 files changed, 276 insertions(+), 37 deletions(-)
-
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index d00ac392d1c4..55fce9527c2e 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -180,7 +180,7 @@ struct pxa3xx_nand_info {
+ 	struct nand_hw_control	controller;
+ 	struct platform_device	 *pdev;
+ 
+-	struct clk		*clk;
++	struct clk		*clk, *ecc_clk;
+ 	void __iomem		*mmio_base;
+ 	unsigned long		mmio_phys;
+ 	struct completion	cmd_complete, dev_ready;
+@@ -1608,15 +1608,26 @@ static int alloc_nand_resource(struct platform_device *pdev)
+ 
+ 	spin_lock_init(&chip->controller->lock);
+ 	init_waitqueue_head(&chip->controller->wq);
+-	info->clk = devm_clk_get(&pdev->dev, NULL);
++	info->clk = devm_clk_get(&pdev->dev, "nfc");
+ 	if (IS_ERR(info->clk)) {
+-		dev_err(&pdev->dev, "failed to get nand clock\n");
+-		return PTR_ERR(info->clk);
++		info->clk = devm_clk_get(&pdev->dev, NULL);
++
++		if (IS_ERR(info->clk)) {
++			dev_err(&pdev->dev, "failed to get nand clock\n");
++			return PTR_ERR(info->clk);
++		}
+ 	}
+ 	ret = clk_prepare_enable(info->clk);
+ 	if (ret < 0)
+ 		return ret;
+ 
++	info->ecc_clk = devm_clk_get(&pdev->dev, "ecc");
++	if (!IS_ERR(info->ecc_clk)) {
++		ret = clk_prepare_enable(info->ecc_clk);
++		if (ret < 0)
++			goto fail_disable_clk;
++	}
++
+ 	if (use_dma) {
+ 		/*
+ 		 * This is a dirty hack to make this driver work from
+@@ -1633,7 +1644,7 @@ static int alloc_nand_resource(struct platform_device *pdev)
+ 				dev_err(&pdev->dev,
+ 					"no resource defined for data DMA\n");
+ 				ret = -ENXIO;
+-				goto fail_disable_clk;
++				goto fail_disable_ecc_clk;
+ 			}
+ 			info->drcmr_dat = r->start;
+ 
+@@ -1642,7 +1653,7 @@ static int alloc_nand_resource(struct platform_device *pdev)
+ 				dev_err(&pdev->dev,
+ 					"no resource defined for cmd DMA\n");
+ 				ret = -ENXIO;
+-				goto fail_disable_clk;
++				goto fail_disable_ecc_clk;
+ 			}
+ 			info->drcmr_cmd = r->start;
+ 		}
+@@ -1652,14 +1663,14 @@ static int alloc_nand_resource(struct platform_device *pdev)
+ 	if (irq < 0) {
+ 		dev_err(&pdev->dev, "no IRQ resource defined\n");
+ 		ret = -ENXIO;
+-		goto fail_disable_clk;
++		goto fail_disable_ecc_clk;
+ 	}
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	info->mmio_base = devm_ioremap_resource(&pdev->dev, r);
+ 	if (IS_ERR(info->mmio_base)) {
+ 		ret = PTR_ERR(info->mmio_base);
+-		goto fail_disable_clk;
++		goto fail_disable_ecc_clk;
+ 	}
+ 	info->mmio_phys = r->start;
+ 
+@@ -1668,7 +1679,7 @@ static int alloc_nand_resource(struct platform_device *pdev)
+ 	info->data_buff = kmalloc(info->buf_size, GFP_KERNEL);
+ 	if (info->data_buff == NULL) {
+ 		ret = -ENOMEM;
+-		goto fail_disable_clk;
++		goto fail_disable_ecc_clk;
+ 	}
+ 
+ 	/* initialize all interrupts to be disabled */
+@@ -1687,6 +1698,8 @@ static int alloc_nand_resource(struct platform_device *pdev)
+ fail_free_buf:
+ 	free_irq(irq, info);
+ 	kfree(info->data_buff);
++fail_disable_ecc_clk:
++	clk_disable_unprepare(info->ecc_clk);
+ fail_disable_clk:
+ 	clk_disable_unprepare(info->clk);
+ 	return ret;
+@@ -1709,6 +1722,7 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
+ 	pxa3xx_nand_free_buff(info);
+ 
+ 	clk_disable_unprepare(info->clk);
++	clk_disable_unprepare(info->ecc_clk);
+ 
+ 	for (cs = 0; cs < pdata->num_cs; cs++)
+ 		nand_release(info->host[cs]->mtd);
 -- 
 2.3.0
