@@ -1,69 +1,62 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 12 Feb 2015 23:31:02 +0800
-Subject: [PATCH] efi: get_memory_map: add sufficient slack for memory
- descriptors
-In-Reply-To: <20150212151607.GH1522@leverpostej>
-References: <1423718659-795-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150212102226.GB1245@leverpostej>
- <CAKv+Gu88vzPpXoSEs1ZSQbO7wsqh7NRSZc=iSpC9D6vzus7f8g@mail.gmail.com>
- <20150212144727.GD4665@codeblueprint.co.uk>
- <CAKv+Gu-NAKASZc4phj5x83mB8Ak4Gy2zYq-a0CDADEOTBD4pXA@mail.gmail.com>
- <20150212151607.GH1522@leverpostej>
-Message-ID: <CAKv+Gu_Z0Upoy0J-hxf0i7Oen00tb-TENJ9CszdEtTHsb5pGSg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 12 Feb 2015 16:33:19 +0100
+Subject: [PATCH] dmaengine: at_xdmac: fix for chan conf simplification
+In-Reply-To: <1423755030-14257-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1423755030-14257-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <54DCC7BF.6010001@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 February 2015 at 23:16, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Feb 12, 2015 at 02:56:51PM +0000, Ard Biesheuvel wrote:
->> On 12 February 2015 at 22:47, Matt Fleming <matt@codeblueprint.co.uk> wrote:
->> > On Thu, 12 Feb, at 06:39:46PM, Ard Biesheuvel wrote:
->> >>
->> >> I don't see how doing a single allocation could result in a single
->> >> free region to be split into more than 1 occupied region + 2 free
->> >> regions.
->> >> So no, I don't think it is ...
->> >
->> > I don't think that's a guarantee we can make, nor is it something we
->> > should rely upon.
->> >
->> > Please explain the user-visible failure that this patch fixes. Does your
->> > machine refuse to boot?
->>
->> I am running UEFI under QEMU and Xen primarily at the moment, and
->> experimenting with various build options in Tianocore, One of the
->> options is preallocating and freeing blocks of various memory types,
->> in a way that should result in the final number of distinct regions to
->> be much lower. It could result however in a free memory region to be
->> carved up in three instead of two, and that is a failure I have seen
->> occur.
->
-> The simple answer is that the machine will fail to boot, beause the
-> efi_get_memory_map helper will give up after one go, and propagate the
-> error. The arm-stub will give up when the error is encountered.
->
+Le 12/02/2015 16:30, Ludovic Desroches a ?crit :
+> When simplificating the channel configuration, the cyclic case has been
+> forgotten. It leads to use bad configuration causing many bugs.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Indeed.
+Oh, yes indeed, pretty important:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
->> > Why is the 'goto again' loop insufficient in
->> > handling this scenario?
->> >
->>
->> Yes, that should solve it as well, so if you prefer I reinstate that,
->> I can respin the patch. There is a theoretical possibility that it
->> would take more than just one more iteration, but that is highly
->> unlikely and it should still always complete.
->
-> Please reinstate the loop. It will make this far less fragile.
->
+Bye,
 
-Actually, looking again at the original patch, it appears that my
-analysis was incorrect regarding the possibility that the loop would
-never terminate. The only thing that could happen if desc_size >
-sizeof(efi_memory_desc_t) is that you need two iterations instead of
-one to get a pool allocation that is of sufficient size.
-So perhaps it is better to just revert the patch.
+> ---
+>  drivers/dma/at_xdmac.c | 7 +++----
+>  1 file changed, 3 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+> index 710546d..895b8bd 100644
+> --- a/drivers/dma/at_xdmac.c
+> +++ b/drivers/dma/at_xdmac.c
+> @@ -664,7 +664,6 @@ at_xdmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
+>  	struct at_xdmac_desc	*first = NULL, *prev = NULL;
+>  	unsigned int		periods = buf_len / period_len;
+>  	int			i;
+> -	u32			cfg;
+>  
+>  	dev_dbg(chan2dev(chan), "%s: buf_addr=%pad, buf_len=%zd, period_len=%zd, dir=%s, flags=0x%lx\n",
+>  		__func__, &buf_addr, buf_len, period_len,
+> @@ -700,17 +699,17 @@ at_xdmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
+>  		if (direction == DMA_DEV_TO_MEM) {
+>  			desc->lld.mbr_sa = atchan->per_src_addr;
+>  			desc->lld.mbr_da = buf_addr + i * period_len;
+> -			cfg = atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG];
+> +			desc->lld.mbr_cfg = atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG];
+>  		} else {
+>  			desc->lld.mbr_sa = buf_addr + i * period_len;
+>  			desc->lld.mbr_da = atchan->per_dst_addr;
+> -			cfg = atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG];
+> +			desc->lld.mbr_cfg = atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG];
+>  		}
+>  		desc->lld.mbr_ubc = AT_XDMAC_MBR_UBC_NDV1
+>  			| AT_XDMAC_MBR_UBC_NDEN
+>  			| AT_XDMAC_MBR_UBC_NSEN
+>  			| AT_XDMAC_MBR_UBC_NDE
+> -			| period_len >> at_xdmac_get_dwidth(cfg);
+> +			| period_len >> at_xdmac_get_dwidth(desc->lld.mbr_cfg);
+>  
+>  		dev_dbg(chan2dev(chan),
+>  			 "%s: lld: mbr_sa=%pad, mbr_da=%pad, mbr_ubc=0x%08x\n",
+> 
 
-My apologies for the hassle.
 
 -- 
-Ard.
+Nicolas Ferre
