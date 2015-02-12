@@ -1,31 +1,71 @@
-From: marek@goldelico.com (Marek Belisko)
-Date: Thu, 12 Feb 2015 14:03:46 +0100
-Subject: [PATCH 4/4] ARM: dts: omap3-pandora: include in dts Makefile
-In-Reply-To: <1423746226-700-1-git-send-email-marek@goldelico.com>
-References: <1423746226-700-1-git-send-email-marek@goldelico.com>
-Message-ID: <1423746226-700-5-git-send-email-marek@goldelico.com>
+From: ola@adapteva.com (Ola Jeppsson)
+Date: Thu, 12 Feb 2015 14:12:19 +0100
+Subject: [PATCH 4/5] ARM: dts: zynq: Split off Parallella Microserver
+ device tree
+In-Reply-To: <1423702513-4032-5-git-send-email-afaerber@suse.de>
+References: <1423702513-4032-1-git-send-email-afaerber@suse.de>
+ <1423702513-4032-5-git-send-email-afaerber@suse.de>
+Message-ID: <54DCA6B3.1090903@adapteva.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "H. Nikolaus Schaller" <hns@goldelico.com>
+On 2015-02-12 01:55, Andreas F?rber wrote:
+> The Microserver edition has neither HDMI nor USB.
+>
+> Cc: Ola Jeppsson <ola@adapteva.com>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>   arch/arm/boot/dts/Makefile                        |  1 +
+>   arch/arm/boot/dts/zynq-parallella-microserver.dts | 19 +++++++++++++++++++
+>   2 files changed, 20 insertions(+)
+>   create mode 100644 arch/arm/boot/dts/zynq-parallella-microserver.dts
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index a1c776b8dcec..42c75eeba584 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -606,6 +606,7 @@ dtb-$(CONFIG_ARCH_VT8500) += \
+>   	wm8850-w70v2.dtb
+>   dtb-$(CONFIG_ARCH_ZYNQ) += \
+>   	zynq-parallella.dtb \
+> +	zynq-parallella-microserver.dtb \
+>   	zynq-zc702.dtb \
+>   	zynq-zc706.dtb \
+>   	zynq-zed.dtb \
+> diff --git a/arch/arm/boot/dts/zynq-parallella-microserver.dts b/arch/arm/boot/dts/zynq-parallella-microserver.dts
+> new file mode 100644
+> index 000000000000..1f3bd2d27a93
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/zynq-parallella-microserver.dts
+> @@ -0,0 +1,19 @@
+> +/*
+> + * Copyright (c) 2014 SUSE LINUX Products GmbH
+> + * Copyright (c) 2015 SUSE Linux GmbH
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +/dts-v1/;
+> +#include "zynq-parallella1.dtsi"
+> +
+> +/ {
+> +	model = "Adapteva Parallella Microserver Board";
+> +};
+To me it would make more sense to use the model number in the file name.
+I.e., p1600 instead of microserver.
 
-Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
----
- arch/arm/boot/dts/Makefile | 2 ++
- 1 file changed, 2 insertions(+)
+http://www.digikey.com/product-search/en?v=1554&FV=fff40028%2Cfff8014d
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 91bd5bd..69f3106 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -343,6 +343,8 @@ dtb-$(CONFIG_ARCH_OMAP3) += am3517-craneboard.dtb \
- 	omap3-overo-storm-tobi.dtb \
- 	omap3-overo-summit.dtb \
- 	omap3-overo-tobi.dtb \
-+	omap3-pandora-600mhz.dtb \
-+	omap3-pandora-1ghz.dtb \
- 	omap3-sbc-t3517.dtb \
- 	omap3-sbc-t3530.dtb \
- 	omap3-sbc-t3730.dtb \
+
+// Ola
+
 -- 
-1.9.1
+Phone: +46.733208642
+Skype: olajep
+Email: ola at adapteva.com
