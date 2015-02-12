@@ -1,26 +1,28 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Thu, 12 Feb 2015 16:35:14 +0200
-Subject: [PATCH 0/4] add openpandora device support
-In-Reply-To: <1423746226-700-1-git-send-email-marek@goldelico.com>
-References: <1423746226-700-1-git-send-email-marek@goldelico.com>
-Message-ID: <CANOLnOPZ5j-r9APq6WrW65iOyNQPT4M_uRgN+xp9Mrp4zgVn7w@mail.gmail.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Thu, 12 Feb 2015 14:47:27 +0000
+Subject: [PATCH] efi: get_memory_map: add sufficient slack for memory
+ descriptors
+In-Reply-To: <CAKv+Gu88vzPpXoSEs1ZSQbO7wsqh7NRSZc=iSpC9D6vzus7f8g@mail.gmail.com>
+References: <1423718659-795-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150212102226.GB1245@leverpostej>
+ <CAKv+Gu88vzPpXoSEs1ZSQbO7wsqh7NRSZc=iSpC9D6vzus7f8g@mail.gmail.com>
+Message-ID: <20150212144727.GD4665@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 12, 2015 at 3:03 PM, Marek Belisko <marek@goldelico.com> wrote:
-> This series of patches adds initial device tree support for the
-> OpenPandora. The most important parts are working (display, keyboard,
-> touch, charging, fuel gauge, musb port, sd/mmc ports, leds, buttons).
-> Not yet supported are: usb host port, nubs, wifi, bluetooth, audio.
->
-> First patch add common dtsi file which is then used in 600mhz and 1ghz
-> variants of openpandora which support is added in patches 2 and 3.
+On Thu, 12 Feb, at 06:39:46PM, Ard Biesheuvel wrote:
+> 
+> I don't see how doing a single allocation could result in a single
+> free region to be split into more than 1 occupied region + 2 free
+> regions.
+> So no, I don't think it is ...
 
-Nice, thanks for those patches.
-There is also a OMAP3530 variant with 256MB of RAM (otherwise
-identical to 512MB OMAP3530) that the legacy board file supports, over
-1000 such units were made. Could we also have support for that? I
-guess that will make 4 pandora related .dts files...
+I don't think that's a guarantee we can make, nor is it something we
+should rely upon.
 
+Please explain the user-visible failure that this patch fixes. Does your
+machine refuse to boot? Why is the 'goto again' loop insufficient in
+handling this scenario?
 
-Gra?vydas
+-- 
+Matt Fleming, Intel Open Source Technology Center
