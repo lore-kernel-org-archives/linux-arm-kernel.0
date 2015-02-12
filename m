@@ -1,58 +1,42 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Thu, 12 Feb 2015 20:19:17 +0800
-Subject: [RFC PATCH v2 02/26] kprobes: makes kprobes/enabled works correctly
- for optimized kprobes.
+Date: Thu, 12 Feb 2015 20:19:26 +0800
+Subject: [RFC PATCH v2 03/26] kprobes: x86: mark 2 bytes NOP as boostable.
 In-Reply-To: <1423743476-11927-1-git-send-email-wangnan0@huawei.com>
 References: <1423743476-11927-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1423743557-12090-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1423743566-12137-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-debugfs/kprobes/enabled doesn't work correctly on optimized kprobes.
-Masami Hiramatsu has a test report on x86_64 platform:
+Currently, x86 kprobes is unable to boost 2 bytes nop like:
 
-https://lkml.org/lkml/2015/1/19/274
+nopl 0x0(%rax,%rax,1)
 
-This patch forces it to unoptimize kprobe if kprobes_all_disarmed
-is set. It also checks the flag in unregistering path for skipping
-unneeded disarming process when kprobes globally disarmed.
+which is 0x0f 0x1f 0x44 0x00 0x00.
+
+Such nops have exactly 5 bytes which is able to hold a relative jmp
+instruction. Boosting them should be obviously safe.
+
+This patch enable boosting such nops by simply updating
+twobyte_is_boostable[] array.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
-Signed-off-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-Cc: Ingo Molnar <mingo@kernel.org>
-Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
 ---
- kernel/kprobes.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ arch/x86/kernel/kprobes/core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/kernel/kprobes.c b/kernel/kprobes.c
-index c397900..c90e417 100644
---- a/kernel/kprobes.c
-+++ b/kernel/kprobes.c
-@@ -869,7 +869,8 @@ static void __disarm_kprobe(struct kprobe *p, bool reopt)
- {
- 	struct kprobe *_p;
- 
--	unoptimize_kprobe(p, false);	/* Try to unoptimize */
-+	/* Try to unoptimize */
-+	unoptimize_kprobe(p, kprobes_all_disarmed);
- 
- 	if (!kprobe_queued(p)) {
- 		arch_disarm_kprobe(p);
-@@ -1571,7 +1572,13 @@ static struct kprobe *__disable_kprobe(struct kprobe *p)
- 
- 		/* Try to disarm and disable this/parent probe */
- 		if (p == orig_p || aggr_kprobe_disabled(orig_p)) {
--			disarm_kprobe(orig_p, true);
-+			/*
-+			 * If kprobes_all_disarmed is set, orig_p
-+			 * should have already been disarmed, so
-+			 * skip unneed disarming process.
-+			 */
-+			if (!kprobes_all_disarmed)
-+				disarm_kprobe(orig_p, true);
- 			orig_p->flags |= KPROBE_FLAG_DISABLED;
- 		}
- 	}
+diff --git a/arch/x86/kernel/kprobes/core.c b/arch/x86/kernel/kprobes/core.c
+index 98f654d..6a1146e 100644
+--- a/arch/x86/kernel/kprobes/core.c
++++ b/arch/x86/kernel/kprobes/core.c
+@@ -84,7 +84,7 @@ static volatile u32 twobyte_is_boostable[256 / 32] = {
+ 	/*      0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f          */
+ 	/*      ----------------------------------------------          */
+ 	W(0x00, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0) | /* 00 */
+-	W(0x10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) , /* 10 */
++	W(0x10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1) , /* 10 */
+ 	W(0x20, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) | /* 20 */
+ 	W(0x30, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) , /* 30 */
+ 	W(0x40, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1) | /* 40 */
 -- 
 1.8.4
