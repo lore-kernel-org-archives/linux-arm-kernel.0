@@ -1,59 +1,66 @@
-From: gang.chen@sunrus.com.cn (Chen Gang S)
-Date: Fri, 13 Feb 2015 05:56:59 +0800
-Subject: [PATCH] rc: st_rc: Use CONFIG_PM_SLEEP instead of CONFIG_PM for
- st_rc_suspend() and st_rc_resume()
-In-Reply-To: <54CF2D36.5060002@st.com>
-References: <54CE3B47.6050909@sunrus.com.cn> <54CF2D36.5060002@st.com>
-Message-ID: <54DD21AB.8070700@sunrus.com.cn>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 12 Feb 2015 13:57:09 -0800
+Subject: [PATCH 03/11] ARM: BCM: put back ARCH_MULTI_V7 dependency for
+ mobile
+In-Reply-To: <1423770163-583064-4-git-send-email-arnd@arndb.de>
+References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
+ <1423770163-583064-4-git-send-email-arnd@arndb.de>
+Message-ID: <CAGVrzcbmshyZooXTvy1Tono8wjPR=DizNSSA2i8oN6_GRSDP5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maintainers:
+2015-02-12 11:42 GMT-08:00 Arnd Bergmann <arnd@arndb.de>:
+> A recent cleanup rearranged the Kconfig file for mach-bcm and
+> accidentally dropped the dependency on ARCH_MULTI_V7, which
+> makes it possible to now build the two mobile SoC platforms
+> on an ARMv6-only kernel, resulting in a log of Kconfig
+> warnings like
+>
+> warning: ARCH_BCM_MOBILE selects ARM_ERRATA_775420 which has unmet direct dependencies (CPU_V7)
+>
+> and which of course cannot work on any machine.
+>
+> This puts back the dependencies as before.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 64e74aa788f99 ("ARM: mach-bcm: ARCH_BCM_MOBILE: remove one level of menu from Kconfig")
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Christian Daudt <bcm@fixthebug.org>
+> Cc: Scott Branden <sbranden@broadcom.com>
 
-Please help to process this patch, when you have time.
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Thanks.
-
-On 2/2/15 15:54, Patrice Chotard wrote:
-> Hi Chen
-> 
-> On 02/01/2015 03:42 PM, Chen Gang S wrote:
->> st_rc_suspend() and st_rc_resume() depend on CONFIG_PM_SLEEP finally, so
->> they need CONFIG_PM_SLEEP instead of CONFIG_PM, or they will cause build
->> warning (with allmodconfig under xtensa):
->>
->>      CC [M]  drivers/media/pci/smipcie/smipcie.o
->>    drivers/media/rc/st_rc.c:338:12: warning: 'st_rc_suspend' defined but not used [-Wunused-function]
->>     static int st_rc_suspend(struct device *dev)
->>                ^
->>    drivers/media/rc/st_rc.c:359:12: warning: 'st_rc_resume' defined but not used [-Wunused-function]
->>     static int st_rc_resume(struct device *dev)
->>                ^
->>
->> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
->> ---
->>   drivers/media/rc/st_rc.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/media/rc/st_rc.c b/drivers/media/rc/st_rc.c
->> index 0e758ae..fbfe958 100644
->> --- a/drivers/media/rc/st_rc.c
->> +++ b/drivers/media/rc/st_rc.c
->> @@ -334,7 +334,7 @@ err:
->>       return ret;
->>   }
->>   -#ifdef CONFIG_PM
->> +#ifdef CONFIG_PM_SLEEP
->>   static int st_rc_suspend(struct device *dev)
->>   {
->>       struct st_rc_device *rc_dev = dev_get_drvdata(dev);
-> 
-> Acked-by: Patrice Chotard <patrice.chotard@st.com>
-> 
+> ---
+>  arch/arm/mach-bcm/Kconfig | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index aaeec78c3ec4..8b11f44bb36e 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -68,7 +68,7 @@ config ARCH_BCM_MOBILE
+>           This enables support for systems based on Broadcom mobile SoCs.
+>
+>  config ARCH_BCM_281XX
+> -       bool "Broadcom BCM281XX SoC family"
+> +       bool "Broadcom BCM281XX SoC family" if ARCH_MULTI_V7
+>         select ARCH_BCM_MOBILE
+>         select HAVE_SMP
+>         help
+> @@ -77,7 +77,7 @@ config ARCH_BCM_281XX
+>           variants.
+>
+>  config ARCH_BCM_21664
+> -       bool "Broadcom BCM21664 SoC family"
+> +       bool "Broadcom BCM21664 SoC family" if ARCH_MULTI_V7
+>         select ARCH_BCM_MOBILE
+>         select HAVE_SMP
+>         help
+> --
+> 2.1.0.rc2
+>
 
 
-Thanks.
+
 -- 
-Chen Gang
-
-Open, share, and attitude like air, water, and life which God blessed
+Florian
