@@ -1,71 +1,139 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Thu, 12 Feb 2015 03:58:08 +0100
-Subject: [PATCH RFC 0/5] ARM: dts: zynq: pinctrl, LED, USB for Parallella
-In-Reply-To: <6aaaf1a93107489da80368cf01e3bcff@BN1BFFO11FD006.protection.gbl>
-References: <1423702513-4032-1-git-send-email-afaerber@suse.de>
- <6aaaf1a93107489da80368cf01e3bcff@BN1BFFO11FD006.protection.gbl>
-Message-ID: <54DC16C0.3060303@suse.de>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Thu, 12 Feb 2015 10:55:16 +0800
+Subject: [PATCH 1/2] pm: at91: add the PM initialization for the sama5d3 and
+ sama5d4
+In-Reply-To: <1423709668-8539-1-git-send-email-wenyou.yang@atmel.com>
+References: <1423709668-8539-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1423709716-8576-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi S?ren,
+To get the mpddrc peripheral id from the PM initialization,
+which will be used to disable mpddrc'c clock during suspending.
 
-Am 12.02.2015 um 02:19 schrieb S?ren Brinkmann:
-> I'm just thinking out loud here. I think it's reasonable to have a dts
-> for each platform/board. On dtsi files the opinions seem to diverge,
-> but as long as it isn't a completely confusing include scheme,
-> I'm always for minimizing duplication.
-> But what I'm not convinced of is, additional dts files for different
-> bitstreams. The amount of variation you can achieve by programming
-> different bitstreams is virtually unlimited. Having a dts file for all
-> of that upstream doesn't seem that reasonable to me.
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
+ arch/arm/mach-at91/generic.h              |    4 ++++
+ arch/arm/mach-at91/include/mach/sama5d3.h |    1 +
+ arch/arm/mach-at91/include/mach/sama5d4.h |    5 +++++
+ arch/arm/mach-at91/pm.c                   |   21 +++++++++++++++++++++
+ arch/arm/mach-at91/sama5.c                |   10 ++++++++--
+ 5 files changed, 39 insertions(+), 2 deletions(-)
 
-Hm, for your Xilinx boards or for the Zed board I would agree. However,
-Adapteva specifically offers two alternative bitstreams per board:
-https://github.com/parallella/parallella-hw/tree/master/fpga/bitstreams
-ftp://ftp.parallella.org/boot/linux/
-
-Don't you think it's reasonable to support those official two, while
-letting people who tinker with bitstreams themselves worry about their
-own device trees?
-
-Personally I use the HDMI bitstream (despite the ADI AXI HDMI driver
-still missing, i.e. headless), so I don't insist on having headless DTs.
-
->From a distro perspective we'd put just one bitstream (HDMI probably) in
-a JeOS image and would set it up to use the matching device tree. On the
-other hand, if we were providing both bitstreams and had both dtbs
-packaged, then switching would be two file copies or a boot.scr update.
-So far the FAT boot partition has kept me from preparing such an image,
-don't know how far other distros are here.
-
-I'll leave it to Ola and Andreas O. to comment on how widely the
-headless bitstream is used. But as a reminder, it was you S?ren who
-discouraged me from adding VDMA etc. to the device tree in case the
-bitstream doesn't provide it:
-https://patchwork.kernel.org/patch/4620231/
-Therefore I've prepared said headless vs. HDMI DT split. ;)
-
-> So, I'd say it needs parallella-{userver, e16, e64} (conceptually, the
-> names I don't care). I think it should be possible for all of those to
-> inherit from zynq-7000.dtsi or is there a reason to have a parallella
-> dtsi?
-
-It would be possible, but it would result in duplication. For the Exynos
-Chromebooks we decided that there were not enough common bits, so we
-inlined an existing .dtsi and I've been using manual diff -u for
-checking which bits people forgot to sync (and I do have a local patch
-fixing some things that went out of sync that I need to submit...).
-
-In this case it seems the "same" board with some components left out. We
-could duplicate the PHYs for instance (which are physically absent for
-the Microserver IIUC), but I'd rather not duplicate all those gory
-pinctrl settings.
-
-Cheers,
-Andreas
-
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index a6e726a..fa70811 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -34,11 +34,15 @@ extern void __init at91rm9200_pm_init(void);
+ extern void __init at91sam9260_pm_init(void);
+ extern void __init at91sam9g45_pm_init(void);
+ extern void __init at91sam9x5_pm_init(void);
++extern void __init sam5d3_pm_init(void);
++extern void __init sam5d4_pm_init(void);
+ #else
+ void __init at91rm9200_pm_init(void) { }
+ void __init at91sam9260_pm_init(void) { }
+ void __init at91sam9g45_pm_init(void) { }
+ void __init at91sam9x5_pm_init(void) { }
++void __init sam5d3_pm_init(void) {}
++void __init sam5d4_pm_init(void) {}
+ #endif
+ 
+ #endif /* _AT91_GENERIC_H */
+diff --git a/arch/arm/mach-at91/include/mach/sama5d3.h b/arch/arm/mach-at91/include/mach/sama5d3.h
+index 25613d8..5a383d8 100644
+--- a/arch/arm/mach-at91/include/mach/sama5d3.h
++++ b/arch/arm/mach-at91/include/mach/sama5d3.h
+@@ -63,6 +63,7 @@
+ #define SAMA5D3_ID_TDES		44	/* Triple Data Encryption Standard */
+ #define SAMA5D3_ID_TRNG		45	/* True Random Generator Number */
+ #define SAMA5D3_ID_IRQ0		47	/* Advanced Interrupt Controller (IRQ0) */
++#define SAMA5D3_ID_MPDDRC	49	/* MPDDR controller */
+ 
+ /*
+  * User Peripheral physical base addresses.
+diff --git a/arch/arm/mach-at91/include/mach/sama5d4.h b/arch/arm/mach-at91/include/mach/sama5d4.h
+index f256a45..e45f1b8 100644
+--- a/arch/arm/mach-at91/include/mach/sama5d4.h
++++ b/arch/arm/mach-at91/include/mach/sama5d4.h
+@@ -14,6 +14,11 @@
+ #define SAMA5D4_H
+ 
+ /*
++ * Peripheral identifiers/interrupts.
++ */
++#define SAMA5D4_ID_MPDDRC	16	/* MPDDR controller */
++
++/*
+  * User Peripheral physical base addresses.
+  */
+ #define SAMA5D4_BASE_USART3	0xfc00c000 /* (USART3 non-secure) Base Address */
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 2574bad..7acb40e 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -41,6 +41,8 @@
+ static struct {
+ 	unsigned long uhp_udp_mask;
+ 	int memctrl;
++	unsigned int ddrc_pid;
++	bool is_sama5d4;
+ } at91_pm_data;
+ 
+ void __iomem *at91_ramc_base[2];
+@@ -360,3 +362,22 @@ void __init at91sam9x5_pm_init(void)
+ 	at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
+ 	return at91_pm_init();
+ }
++
++void __init sam5d3_pm_init(void)
++{
++	at91_dt_ramc();
++	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
++	at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
++	at91_pm_data.ddrc_pid = SAMA5D3_ID_MPDDRC;
++	return at91_pm_init();
++}
++
++void __init sam5d4_pm_init(void)
++{
++	at91_dt_ramc();
++	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
++	at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
++	at91_pm_data.ddrc_pid = SAMA5D4_ID_MPDDRC;
++	at91_pm_data.is_sama5d4 = true;
++	return at91_pm_init();
++}
+diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
+index 228814a..4338d43 100644
+--- a/arch/arm/mach-at91/sama5.c
++++ b/arch/arm/mach-at91/sama5.c
+@@ -31,7 +31,7 @@
+ static void __init sama5_dt_device_init(void)
+ {
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-	at91sam9x5_pm_init();
++	sam5d3_pm_init();
+ }
+ 
+ static const char *sama5_dt_board_compat[] __initconst = {
+@@ -84,10 +84,16 @@ static const char *sama5_alt_dt_board_compat[] __initconst = {
+ 	NULL
+ };
+ 
++static void __init sama5d4_dt_device_init(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	sam5d4_pm_init();
++}
++
+ DT_MACHINE_START(sama5_alt_dt, "Atmel SAMA5")
+ 	/* Maintainer: Atmel */
+ 	.map_io		= sama5_alt_map_io,
+-	.init_machine	= sama5_dt_device_init,
++	.init_machine	= sama5d4_dt_device_init,
+ 	.dt_compat	= sama5_alt_dt_board_compat,
+ 	.l2c_aux_mask	= ~0UL,
+ MACHINE_END
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
-Graham Norton; HRB 21284 (AG N?rnberg)
+1.7.9.5
