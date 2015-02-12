@@ -1,28 +1,33 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Thu, 12 Feb 2015 14:47:27 +0000
-Subject: [PATCH] efi: get_memory_map: add sufficient slack for memory
- descriptors
-In-Reply-To: <CAKv+Gu88vzPpXoSEs1ZSQbO7wsqh7NRSZc=iSpC9D6vzus7f8g@mail.gmail.com>
-References: <1423718659-795-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150212102226.GB1245@leverpostej>
- <CAKv+Gu88vzPpXoSEs1ZSQbO7wsqh7NRSZc=iSpC9D6vzus7f8g@mail.gmail.com>
-Message-ID: <20150212144727.GD4665@codeblueprint.co.uk>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 12 Feb 2015 15:53:27 +0100
+Subject: [PATCH v2 01/10] mtd: pxa3xx_nand: initialiaze pxa3xx_flash_ids to 0
+In-Reply-To: <1423752816-26219-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1423752816-26219-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1423752816-26219-2-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Feb, at 06:39:46PM, Ard Biesheuvel wrote:
-> 
-> I don't see how doing a single allocation could result in a single
-> free region to be split into more than 1 occupied region + 2 free
-> regions.
-> So no, I don't think it is ...
+pxa3xx_flash_ids wasn't initialized to 0, which in certain cases could
+end up containing corrupted values in its members. Fix this to avoid
+possible issues.
 
-I don't think that's a guarantee we can make, nor is it something we
-should rely upon.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ drivers/mtd/nand/pxa3xx_nand.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Please explain the user-visible failure that this patch fixes. Does your
-machine refuse to boot? Why is the 'goto again' loop insufficient in
-handling this scenario?
-
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index 96b0b1d27df1..d00ac392d1c4 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -1472,6 +1472,8 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+ 		return ret;
+ 	}
+ 
++	memset(pxa3xx_flash_ids, 0, sizeof(pxa3xx_flash_ids));
++
+ 	pxa3xx_flash_ids[0].name = f->name;
+ 	pxa3xx_flash_ids[0].dev_id = (f->chip_id >> 8) & 0xffff;
+ 	pxa3xx_flash_ids[0].pagesize = f->page_size;
 -- 
-Matt Fleming, Intel Open Source Technology Center
+2.3.0
