@@ -1,64 +1,111 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 12 Feb 2015 17:08:34 -0200
-Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
- registers
-In-Reply-To: <1378197784.470306.1423767540298.JavaMail.open-xchange@oxbaltgw01.schlund.de>
-References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
- <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
- <54DA020C.6030703@i2se.com>
- <CAOMZO5DGCP1p1vetwWHpSbe2qywA8DhWRRq22egMDFSw11uq4w@mail.gmail.com>
- <54DA0DE7.5050708@i2se.com>
- <CAOMZO5AtFOThRjcAgMVbrbkcrJbehouSxoH03VUGJrRdWXnS_Q@mail.gmail.com>
- <462270270.419156.1423603473431.JavaMail.open-xchange@oxbaltgw02.schlund.de>
- <CAOMZO5B4mxP6RBkbsbj=wC6bZJgtreoo5S_NhYuki6kW=Y=QFw@mail.gmail.com>
- <1705379122.406018.1423686677196.JavaMail.open-xchange@oxbaltgw01.schlund.de>
- <CAOMZO5ChJiHiUBhrRf_qqi7gTLvPp08fsfRBK+GVzvrqimKinw@mail.gmail.com>
- <1378197784.470306.1423767540298.JavaMail.open-xchange@oxbaltgw01.schlund.de>
-Message-ID: <CAOMZO5DJ82Yyq4Ch_kKR01-yYhjn53As7ZBt91Dd5sna9Z+wXg@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 12 Feb 2015 20:23:33 +0100
+Subject: [PATCH 03/16] tty: serial: 8250_core: read only RX if there is
+ something in the FIFO
+In-Reply-To: <54DCD584.3010500@hurleysoftware.com>
+References: <1410377411-26656-4-git-send-email-bigeasy@linutronix.de>
+ <54D8B772.1010405@freebox.fr> <54D9441B.7070403@hurleysoftware.com>
+ <54D9F3C7.5000809@freebox.fr> <54DA43F8.9090904@hurleysoftware.com>
+ <54DBB531.2030504@hurleysoftware.com>
+ <20150211200313.GE2531@atomide.com>
+ <54DBBE9E.90104@hurleysoftware.com>
+ <54DC6832.3070507@linutronix.de>
+ <54DCD584.3010500@hurleysoftware.com>
+Message-ID: <20150212192333.GA18882@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+* Peter Hurley | 2015-02-12 11:32:04 [-0500]:
 
-On Thu, Feb 12, 2015 at 4:59 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> Hi Fabio,
->
->> Fabio Estevam <festevam@gmail.com> hat am 11. Februar 2015 um 22:10
->> geschrieben:
->>
->>
->> On Wed, Feb 11, 2015 at 6:31 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
->>
->> >> I always get 0x5e5b5513 with or without your patch.
->> >
->> > very strange. Do you have any idea why IO1_STABLE is permanent low?
->>
->> On my case it is always 1.
->
-> i expected the same behavior on my hardware.
->
-> Do you use u-boot as bootloader?
+>That said, I don't think serial8250_do_startup() is really doing that much
+>for OMAP h/w startup; open-coding what omap_8250 really needs is probably
+>< 10 loc.
 
-Yes, I do.
+10 loc? I have a few more. serial8250_clear_fifos(),
+serial_link_irq_chain() aren't exported. serial8250_set_mctrl() can
+maybe accessed via uart_ops->set_mctrl(). Maybe I'm not removing the
+obvious not required code but here it looks better to just a BUG flag for
+the Omap.
 
->>
->> > Can you confirm the behavior according to your flash issue?
->>
->> In my tests IO1_STABLE stays the same.
->
-> This wasn't the intension of my second question. I wanted to know about the
-> state of the SPI NOR flash detection process.
->
-> Does it sucessed if you apply the patch, but revert the changes in
-> clk_ref_set_rate() from clk-ref.c?
+--- a/drivers/tty/serial/8250/8250_omap.c
++++ b/drivers/tty/serial/8250/8250_omap.c
+@@ -557,9 +557,74 @@ static int omap_8250_startup(struct uart_port *port)
+ 
+ 	pm_runtime_get_sync(port->dev);
+ 
+-	ret = serial8250_do_startup(port);
+-	if (ret)
+-		goto err;
++	up->mcr = 0;
++
++	/*
++	 * Clear the FIFO buffers and disable them.
++	 * (they will be reenabled in set_termios())
++	 */
++	serial8250_clear_fifos(up);
++
++	/*
++	 * Clear the interrupt registers.
++	 */
++	if (serial_port_in(port, UART_LSR) & UART_LSR_DR)
++		serial_port_in(port, UART_RX);
++	serial_port_in(port, UART_IIR);
++	serial_port_in(port, UART_MSR);
++
++	retval = serial_link_irq_chain(up);
++	if (retval)
++		goto out;
++
++	/*
++	 * Now, initialize the UART
++	 */
++	serial_port_out(port, UART_LCR, UART_LCR_WLEN8);
++
++	spin_lock_irqsave(&port->lock, flags);
++	/*
++	 * Most PC uarts need OUT2 raised to enable interrupts.
++	 */
++	if (port->irq)
++		up->port.mctrl |= TIOCM_OUT2;
++
++	serial8250_set_mctrl(port, port->mctrl);
++
++	spin_unlock_irqrestore(&port->lock, flags);
++
++	/*
++	 * Clear the interrupt registers again for luck, and clear the
++	 * saved flags to avoid getting false values from polling
++	 * routines or the previous session.
++	 */
++	if (serial_port_in(port, UART_LSR) & UART_LSR_DR)
++		serial_port_in(port, UART_RX);
++	serial_port_in(port, UART_IIR);
++	serial_port_in(port, UART_MSR);
++	up->lsr_saved_flags = 0;
++	up->msr_saved_flags = 0;
++
++	/*
++	 * Request DMA channels for both RX and TX.
++	 */
++	if (up->dma) {
++		retval = serial8250_request_dma(up);
++		if (retval) {
++			pr_warn_ratelimited("ttyS%d - failed to request DMA\n",
++					    serial_index(port));
++			up->dma = NULL;
++		}
++	}
++
++	/*
++	 * Finally, enable interrupts.  Note: Modem status interrupts
++	 * are set via set_termios(), which will be occurring imminently
++	 * anyway, so we don't enable them here.
++	 */
++	up->ier = UART_IER_RLSI | UART_IER_RDI;
++	serial_port_out(port, UART_IER, up->ier);
++
+ 
+ #ifdef CONFIG_PM
+ 	up->capabilities |= UART_CAP_RPM;
 
-I don't have my mx28evk setup available at the moment, but when I
-applied your patch and reverted all the changes in clk-ref.c, then the
-SPI flash detection works.
-
-I haven't tested to only reverting the changes inside
-clk_ref_set_rate(), but I can do it tomorrow.
-
-Regards,
-
-Fabio Estevam
+Sebastian
