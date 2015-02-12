@@ -1,61 +1,76 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 12 Feb 2015 06:12:22 +0000
-Subject: [PATCH] xen/arm: allow console=hvc0 to be omitted for guests
-In-Reply-To: <54DC3813.2020908@linaro.org>
-References: <1422626319-30752-1-git-send-email-ard.biesheuvel@linaro.org>
- <alpine.DEB.2.02.1502100648050.29696@kaball.uk.xensource.com>
- <1423553200.5851.15.camel@citrix.com>
- <CAKv+Gu8kQ5e9dKTp9+e_11pnvskOPjin7ODpxXTj+HmTj+fPag@mail.gmail.com>
- <1423558788.5851.17.camel@citrix.com>
- <alpine.DEB.2.02.1502120433040.29696@kaball.uk.xensource.com>
- <1423716873.27551.30.camel@citrix.com> <54DC3813.2020908@linaro.org>
-Message-ID: <alpine.DEB.2.02.1502120610590.29696@kaball.uk.xensource.com>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Thu, 12 Feb 2015 11:46:20 +0530
+Subject: [PATCH RESEND] dmaengine: qcom_bam_dma: Fix error path in probe
+ function
+Message-ID: <1423721780-16385-1-git-send-email-pramod.gurav@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Feb 2015, Julien Grall wrote:
-> On 12/02/2015 12:54, Ian Campbell wrote:
-> > On Thu, 2015-02-12 at 04:35 +0000, Stefano Stabellini wrote:
-> > > On Tue, 10 Feb 2015, Ian Campbell wrote:
-> > > > On Tue, 2015-02-10 at 15:51 +0800, Ard Biesheuvel wrote:
-> > > > > > FWIW on x86 this doesn't depend on console_set_on_cmdline, does it
-> > > > > > need
-> > > > > > to here?
-> > > > > > 
-> > > > > 
-> > > > > I didn't check the code, but it seems inappropriate to add a preferred
-> > > > > console implicitly if the user has set 'console=' on the command line.
-> > > > 
-> > > > I had been thinking that add_preferred_console would DTRT, but it seems
-> > > > not. Seems strange that most calls to it do not check if the console is
-> > > > already set, but it does seem like the right thing in this case.
-> > > > 
-> > > > > > On x86 it does depend on !xen_initial_domain. I suppose on the
-> > > > > > principal
-> > > > > > that a VT is normally available there. I suppose that doesn't apply
-> > > > > > to
-> > > > > > ARM so much, although it could.
-> > > > > > 
-> > > > > 
-> > > > > OK, I got confused by the xen_guest_init(). So do you mean if if
-> > > > > (!xen_initial_domain) should be added?
-> > > > 
-> > > > (dom0 is "Just A Guest" too ;-))
-> > > > 
-> > > > Adding it would be consistent with x86, I'm not precisely sure if that
-> > > > is important or desirable in this case. I'd be inclined to start with
-> > > > the if there.
-> > > 
-> > > The reasoning is that dom0 command line arguments come from its old
-> > > native grub stanza, therefore the console parameter is incorrect, right?
-> > > As opposed to regular domUs, that being freshly installed, are supposed
-> > > to have the correct console parameter?
-> > 
-> > Other way around I think, dom0 has the correct stuff from grub.cfg
-> > whereas the guest may not.
-> 
-> Yes, currently for ARM guest you have to add 'extra="console=hvc0"' in the
-> configuration file.
+Calls tasklet_kill() in error path of the probe function were missing.
+Add the same in error path.
 
-I see. If this is the concern that we are trying to address, then yes,
-doing the same that we are already doing on x86 might be best.
+Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+---
+
+Resending it with linux-arm-msm in cc.
+
+ drivers/dma/qcom_bam_dma.c |   14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom_bam_dma.c
+index 3122a99..a1ff4a6 100644
+--- a/drivers/dma/qcom_bam_dma.c
++++ b/drivers/dma/qcom_bam_dma.c
+@@ -1115,7 +1115,7 @@ static int bam_dma_probe(struct platform_device *pdev)
+ 
+ 	if (!bdev->channels) {
+ 		ret = -ENOMEM;
+-		goto err_disable_clk;
++		goto err_tasklet_kill;
+ 	}
+ 
+ 	/* allocate and initialize channels */
+@@ -1127,7 +1127,7 @@ static int bam_dma_probe(struct platform_device *pdev)
+ 	ret = devm_request_irq(bdev->dev, bdev->irq, bam_dma_irq,
+ 			IRQF_TRIGGER_HIGH, "bam_dma", bdev);
+ 	if (ret)
+-		goto err_disable_clk;
++		goto err_bam_channel_exit;
+ 
+ 	/* set max dma segment size */
+ 	bdev->common.dev = bdev->dev;
+@@ -1135,7 +1135,7 @@ static int bam_dma_probe(struct platform_device *pdev)
+ 	ret = dma_set_max_seg_size(bdev->common.dev, BAM_MAX_DATA_SIZE);
+ 	if (ret) {
+ 		dev_err(bdev->dev, "cannot set maximum segment size\n");
+-		goto err_disable_clk;
++		goto err_bam_channel_exit;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, bdev);
+@@ -1156,7 +1156,7 @@ static int bam_dma_probe(struct platform_device *pdev)
+ 	ret = dma_async_device_register(&bdev->common);
+ 	if (ret) {
+ 		dev_err(bdev->dev, "failed to register dma async device\n");
+-		goto err_disable_clk;
++		goto err_bam_channel_exit;
+ 	}
+ 
+ 	ret = of_dma_controller_register(pdev->dev.of_node, bam_dma_xlate,
+@@ -1168,8 +1168,14 @@ static int bam_dma_probe(struct platform_device *pdev)
+ 
+ err_unregister_dma:
+ 	dma_async_device_unregister(&bdev->common);
++err_bam_channel_exit:
++	for (i = 0; i < bdev->num_channels; i++)
++		tasklet_kill(&bdev->channels[i].vc.task);
++err_tasklet_kill:
++	tasklet_kill(&bdev->task);
+ err_disable_clk:
+ 	clk_disable_unprepare(bdev->bamclk);
++
+ 	return ret;
+ }
+ 
+-- 
+1.7.9.5
