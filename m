@@ -1,67 +1,34 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 12 Feb 2015 12:02:28 -0800
+From: arnd@arndb.de (arnd at arndb.de)
+Date: Thu, 12 Feb 2015 21:08:10 +0100 (CET)
 Subject: [PATCH 03/11] ARM: BCM: put back ARCH_MULTI_V7 dependency for
  mobile
-In-Reply-To: <1423770163-583064-4-git-send-email-arnd@arndb.de>
+In-Reply-To: <CAGVrzcZREV5O1ui3KjwdZVBtBaAByUz7GpstMeAARXs0XCra6w@mail.gmail.com>
 References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
  <1423770163-583064-4-git-send-email-arnd@arndb.de>
-Message-ID: <CAGVrzcZREV5O1ui3KjwdZVBtBaAByUz7GpstMeAARXs0XCra6w@mail.gmail.com>
+ <CAGVrzcZREV5O1ui3KjwdZVBtBaAByUz7GpstMeAARXs0XCra6w@mail.gmail.com>
+Message-ID: <925335687.498462.1423771690391.JavaMail.open-xchange@oxbaltgw04.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-02-12 11:42 GMT-08:00 Arnd Bergmann <arnd@arndb.de>:
-> A recent cleanup rearranged the Kconfig file for mach-bcm and
-> accidentally dropped the dependency on ARCH_MULTI_V7, which
-> makes it possible to now build the two mobile SoC platforms
-> on an ARMv6-only kernel, resulting in a log of Kconfig
-> warnings like
+> Florian Fainelli <f.fainelli@gmail.com> hat am 12. Februar 2015 um 21:02
+> geschrieben:
+> 2015-02-12 11:42 GMT-08:00 Arnd Bergmann <arnd@arndb.de>:
+> > A recent cleanup rearranged the Kconfig file for mach-bcm and
+> > accidentally dropped the dependency on ARCH_MULTI_V7, which
+> > makes it possible to now build the two mobile SoC platforms
+> > on an ARMv6-only kernel, resulting in a log of Kconfig
+> > warnings like
+> >
+> > warning: ARCH_BCM_MOBILE selects ARM_ERRATA_775420 which has unmet direct
+> > dependencies (CPU_V7)
+> >
+> > and which of course cannot work on any machine.
+> >
+> > This puts back the dependencies as before.
 >
-> warning: ARCH_BCM_MOBILE selects ARM_ERRATA_775420 which has unmet direct dependencies (CPU_V7)
->
-> and which of course cannot work on any machine.
->
-> This puts back the dependencies as before.
+> Since both of these Kconfig options also select ARCH_BCM_MOBILE, you
+> could put the select there instead?
 
-Since both of these Kconfig options also select ARCH_BCM_MOBILE, you
-could put the select there instead?
+No, that would only work with 'select', but we need 'depends on' here.
 
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 64e74aa788f99 ("ARM: mach-bcm: ARCH_BCM_MOBILE: remove one level of menu from Kconfig")
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Christian Daudt <bcm@fixthebug.org>
-> Cc: Scott Branden <sbranden@broadcom.com>
-> ---
->  arch/arm/mach-bcm/Kconfig | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> index aaeec78c3ec4..8b11f44bb36e 100644
-> --- a/arch/arm/mach-bcm/Kconfig
-> +++ b/arch/arm/mach-bcm/Kconfig
-> @@ -68,7 +68,7 @@ config ARCH_BCM_MOBILE
->           This enables support for systems based on Broadcom mobile SoCs.
->
->  config ARCH_BCM_281XX
-> -       bool "Broadcom BCM281XX SoC family"
-> +       bool "Broadcom BCM281XX SoC family" if ARCH_MULTI_V7
->         select ARCH_BCM_MOBILE
->         select HAVE_SMP
->         help
-> @@ -77,7 +77,7 @@ config ARCH_BCM_281XX
->           variants.
->
->  config ARCH_BCM_21664
-> -       bool "Broadcom BCM21664 SoC family"
-> +       bool "Broadcom BCM21664 SoC family" if ARCH_MULTI_V7
->         select ARCH_BCM_MOBILE
->         select HAVE_SMP
->         help
-> --
-> 2.1.0.rc2
->
-
-
-
--- 
-Florian
+    Arnd
