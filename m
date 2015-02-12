@@ -1,53 +1,45 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 12 Feb 2015 15:53:36 +0100
-Subject: [PATCH v2 10/10] ARM: berlin: enable flash on the BG2Q DMP
+Date: Thu, 12 Feb 2015 15:53:35 +0100
+Subject: [PATCH v2 09/10] ARM: berlin: add BG2Q node for the nand
 In-Reply-To: <1423752816-26219-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1423752816-26219-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1423752816-26219-11-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1423752816-26219-10-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BG2Q DMP has a nand controller. Add the corresponding node, but do
-not enable it by default because the nand is only available on some BG2Q
-DMP.
+Add a node describing the nand controller of the Marvell Berlin BG2Q
+SoC. It uses the pxa3xx nand driver, with a dedicated compatible.
+
+Also add the corresponding pinmuxing configuration.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/berlin2q.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-index a98ac1bd8f65..4157258a6fb0 100644
---- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-+++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-@@ -112,3 +112,28 @@
- &sata_phy {
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index e2f61f27944e..9f5d48b68e16 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -429,6 +429,19 @@
+ 			status = "disabled";
+ 		};
+ 
++		nand0: nand at f00000 {
++			compatible = "marvell,berlin2-nand";
++			reg = <0xf00000 0x10000>;
++			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&chip CLKID_NFC>,
++				 <&chip CLKID_NFC_ECC>;
++			clock-names = "nfc", "ecc";
 +
-+&chip {
-+	nand_pmux: nand-pmux {
-+		groups = "G0", "G1";
-+		function = "nand";
-+	};
-+};
++			#address-cells = <1>;
 +
-+&nand0 {
-+	pinctrl-0 = <&nand_pmux>;
-+	pinctrl-names = "default";
++			status = "disabled";
++		};
 +
-+	marvell,nand-enable-arbiter;
-+	nand-ecc-strength = <48>;
-+	nand-ecc-step-size = <1024>;
-+
-+	num-cs = <1>;
-+
-+	/*
-+	 * Two kinds of BG2Q DMP are available: one with emmc and
-+	 * one with a nand. The latter is not widespread. Because
-+	 * of this, disable the nand by default.
-+	 */
-+	status = "disabled";
-+};
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
 -- 
 2.3.0
