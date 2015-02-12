@@ -1,35 +1,30 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 12 Feb 2015 12:01:10 +0100
-Subject: [PATCH v2] ARM: dts: zynq: Add OCM node
-In-Reply-To: <20150212105443.GB1522@leverpostej>
-References: <6df19b400e314ef8228be475bb8ba83765683016.1423737765.git.michal.simek@xilinx.com>
- <20150212105443.GB1522@leverpostej>
-Message-ID: <c64e7b4bf78649049cea3dceecea453c@BN1AFFO11FD014.protection.gbl>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 12 Feb 2015 11:02:08 +0000
+Subject: [PATCH v3 1/8] arm64: exynos5433: Enable ARMv8 based Exynos5433
+ (SoC) support
+In-Reply-To: <1423724158-23632-2-git-send-email-cw00.choi@samsung.com>
+References: <1423724158-23632-1-git-send-email-cw00.choi@samsung.com>
+ <1423724158-23632-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <20150212110208.GB1028@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2015 11:54 AM, Mark Rutland wrote:
-> On Thu, Feb 12, 2015 at 10:42:47AM +0000, Michal Simek wrote:
->> Add OCM node for all zynq boards. OCM location
->> can changed but for all current boards this
->> is the location where OCM is.`
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->>
->> Changes in v2:
->> - Move node to board file suggested by Mark
->>
->> This patch is done based on discussion here.
->> https://lkml.org/lkml/2014/12/1/396
->>
->> Mark: I expect you won't like amba bus reference or
->> am I wrong?
-> 
-> I'm fine with dropping things onto a bus in this way. If we're happy to
-> do it for other nodes I don't see why busses should be special.
+On Thu, Feb 12, 2015 at 03:55:51PM +0900, Chanwoo Choi wrote:
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 15e8e74..4fc08d1 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -153,6 +153,19 @@ config ARCH_EXYNOS
+>  	help
+>  	  This enables support for Samsung Exynos SoC family
+>  
+> +config ARCH_EXYNOS5433
+> +	bool "ARMv8 based Samsung Exynos5433"
+> +	select ARCH_EXYNOS
+> +	select ARM_AMBA
+> +	select ARM_GIC
 
-Wonderful. I will give people some time to comment this style.
+ARM_GIC and ARM_AMBA are already selected by the top ARM64 config.
 
-Thanks for your comments,
-Michal
+-- 
+Catalin
