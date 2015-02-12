@@ -1,59 +1,140 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Thu, 12 Feb 2015 01:55:12 +0100
-Subject: [PATCH 4/5] ARM: dts: zynq: Split off Parallella Microserver device
- tree
+Date: Thu, 12 Feb 2015 01:55:13 +0100
+Subject: [PATCH 5/5] ARM: dts: zynq: Add USB for Parallella
 In-Reply-To: <1423702513-4032-1-git-send-email-afaerber@suse.de>
 References: <1423702513-4032-1-git-send-email-afaerber@suse.de>
-Message-ID: <1423702513-4032-5-git-send-email-afaerber@suse.de>
+Message-ID: <1423702513-4032-6-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Microserver edition has neither HDMI nor USB.
+The Microserver edition does not feature USB - only the Kickstarter,
+pre-order, Desktop and Embedded editions.
 
-Cc: Ola Jeppsson <ola@adapteva.com>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- arch/arm/boot/dts/Makefile                        |  1 +
- arch/arm/boot/dts/zynq-parallella-microserver.dts | 19 +++++++++++++++++++
- 2 files changed, 20 insertions(+)
- create mode 100644 arch/arm/boot/dts/zynq-parallella-microserver.dts
+ arch/arm/boot/dts/zynq-parallella.dts   | 16 +++++++
+ arch/arm/boot/dts/zynq-parallella1.dtsi | 74 +++++++++++++++++++++++++++++++++
+ 2 files changed, 90 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a1c776b8dcec..42c75eeba584 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -606,6 +606,7 @@ dtb-$(CONFIG_ARCH_VT8500) += \
- 	wm8850-w70v2.dtb
- dtb-$(CONFIG_ARCH_ZYNQ) += \
- 	zynq-parallella.dtb \
-+	zynq-parallella-microserver.dtb \
- 	zynq-zc702.dtb \
- 	zynq-zc706.dtb \
- 	zynq-zed.dtb \
-diff --git a/arch/arm/boot/dts/zynq-parallella-microserver.dts b/arch/arm/boot/dts/zynq-parallella-microserver.dts
-new file mode 100644
-index 000000000000..1f3bd2d27a93
---- /dev/null
-+++ b/arch/arm/boot/dts/zynq-parallella-microserver.dts
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright (c) 2014 SUSE LINUX Products GmbH
-+ * Copyright (c) 2015 SUSE Linux GmbH
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+/dts-v1/;
-+#include "zynq-parallella1.dtsi"
+diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
+index 99ee6551ae8d..b2eede1c708f 100644
+--- a/arch/arm/boot/dts/zynq-parallella.dts
++++ b/arch/arm/boot/dts/zynq-parallella.dts
+@@ -17,3 +17,19 @@
+ / {
+ 	model = "Adapteva Parallella Board";
+ };
 +
-+/ {
-+	model = "Adapteva Parallella Microserver Board";
++&usb_phy0 {
++	status = "okay";
++};
++
++&usb_phy1 {
++	status = "okay";
++};
++
++&usb0 {
++	status = "okay";
++};
++
++&usb1 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/zynq-parallella1.dtsi b/arch/arm/boot/dts/zynq-parallella1.dtsi
+index 8b2895c06c8e..1395aaadf3be 100644
+--- a/arch/arm/boot/dts/zynq-parallella1.dtsi
++++ b/arch/arm/boot/dts/zynq-parallella1.dtsi
+@@ -47,6 +47,18 @@
+ 			default-state = "on";
+ 		};
+ 	};
++
++	usb_phy0: phy0 {
++		compatible = "usb-nop-xceiv";
++		#phy-cells = <0>;
++		status = "disabled";
++	};
++
++	usb_phy1: phy1 {
++		compatible = "usb-nop-xceiv";
++		#phy-cells = <0>;
++		status = "disabled";
++	};
+ };
+ 
+ &clkc {
+@@ -208,6 +220,54 @@
+ 			bias-disable = <0>;
+ 		};
+ 	};
++
++	pinctrl_usb0_default: usb0-default {
++		mux {
++			function = "usb0";
++			groups = "usb0_0_grp";
++		};
++
++		conf {
++			groups = "usb0_0_grp";
++			slew-rate = <0>;
++			io-standard = <1>;
++		};
++
++		conf-rx {
++			pins = "MIO29", "MIO31", "MIO36";
++			bias-high-impedance;
++		};
++
++		conf-tx {
++			pins = "MIO28", "MIO30", "MIO32", "MIO33", "MIO34",
++			       "MIO35", "MIO37", "MIO38", "MIO39";
++			bias-disable;
++		};
++	};
++
++	pinctrl_usb1_default: usb1-default {
++		mux {
++			function = "usb1";
++			groups = "usb1_0_grp";
++		};
++
++		conf {
++			groups = "usb1_0_grp";
++			slew-rate = <0>;
++			io-standard = <1>;
++		};
++
++		conf-rx {
++			pins = "MIO41", "MIO43", "MIO48";
++			bias-high-impedance;
++		};
++
++		conf-tx {
++			pins = "MIO40", "MIO42", "MIO44", "MIO45", "MIO46",
++			       "MIO47", "MIO49", "MIO50", "MIO51";
++			bias-disable;
++		};
++	};
+ };
+ 
+ &sdhci1 {
+@@ -221,3 +281,17 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1_default>;
+ };
++
++&usb0 {
++	dr_mode = "host";
++	usb-phy = <&usb_phy0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usb0_default>;
++};
++
++&usb1 {
++	dr_mode = "peripheral";
++	usb-phy = <&usb_phy1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usb1_default>;
 +};
 -- 
 2.2.2
