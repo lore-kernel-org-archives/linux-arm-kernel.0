@@ -1,64 +1,107 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Thu, 12 Feb 2015 03:21:32 -0500
-Subject: [PATCH] efi: get_memory_map: add sufficient slack for memory
- descriptors
-In-Reply-To: <1423718659-795-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1423718659-795-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAFECyb_e9HgsdDDD9bLhurDbi3qWOckEcWqQSsRLk6nDTCzLJg@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Thu, 12 Feb 2015 16:23:06 +0800
+Subject: [PATCH] ASoC: wm8731: let codec to manage clock by itself
+In-Reply-To: <1423121713-19434-1-git-send-email-voice.shen@atmel.com>
+References: <1423121713-19434-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <54DC62EA.5030503@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 12, 2015 at 12:24 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> As it turns out, when allocating room for the UEFI memory map using
-> UEFI's AllocatePool (), it may result in two new memory map entries
-> being created, for instance, when using Tianocore's preallocated region
-> feature. For example, the following region
+Hi All,
+
+On 02/05/2015 03:35 PM, Bo Shen wrote:
+> Let the wm8731 codec to manage clock by itself.
 >
-> 0x00005ead5000-0x00005ebfffff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
->
-> may be split like this
->
-> 0x00005ead5000-0x00005eae2fff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
-> 0x00005eae3000-0x00005eae4fff [Loader Data        |   |  |  |  |   |WB|WT|WC|UC]
-> 0x00005eae5000-0x00005ebfffff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
->
-> if the preallocated Loader Data region was chosen to be right in the
-> middle of the original free space.
->
-> After patch d1a8d66b9177 ("efi/libstub: Call get_memory_map() to
-> obtain map and desc sizes"), this is not being dealt with correctly
-> anymore, as the existing logic to allocate room for a single additional
-> entry has become insufficient.
->
-> So instead, add room for two additional entries instead.
->
-> Fixes: d1a8d66b9177 ("efi/libstub: Call get_memory_map() to obtain map and desc sizes")
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
 > ---
->  drivers/firmware/efi/libstub/efi-stub-helper.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
 >
-> diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
-> index af5d63c7cc53..ca0b07ed3b14 100644
-> --- a/drivers/firmware/efi/libstub/efi-stub-helper.c
-> +++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
-> @@ -84,10 +84,10 @@ efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
->                 return EFI_LOAD_ERROR;
+>   sound/soc/codecs/wm8731.c | 28 ++++++++++++++++++++++++++++
+>   1 file changed, 28 insertions(+)
+
+Any comments for this patch (aka ping?)
+
+> diff --git a/sound/soc/codecs/wm8731.c b/sound/soc/codecs/wm8731.c
+> index b115ed8..ecd8424 100644
+> --- a/sound/soc/codecs/wm8731.c
+> +++ b/sound/soc/codecs/wm8731.c
+> @@ -13,6 +13,7 @@
+>    * published by the Free Software Foundation.
+>    */
 >
->         /*
-> -        * Add an additional efi_memory_desc_t because we're doing an
-> -        * allocation which may be in a new descriptor region.
-> +        * Add room for two additional efi_memory_desc_t entries because we're
-> +        * doing an allocation which may be in a new descriptor region.
->          */
-> -       *map_size += *desc_size;
-> +       *map_size += *desc_size * 2;
->         status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
->                                 *map_size, (void **)&m);
->         if (status != EFI_SUCCESS)
-> --
-> 1.8.3.2
+> +#include <linux/clk.h>
+>   #include <linux/module.h>
+>   #include <linux/moduleparam.h>
+>   #include <linux/init.h>
+> @@ -45,6 +46,7 @@ static const char *wm8731_supply_names[WM8731_NUM_SUPPLIES] = {
+>   /* codec private data */
+>   struct wm8731_priv {
+>   	struct regmap *regmap;
+> +	struct clk *mclk;
+>   	struct regulator_bulk_data supplies[WM8731_NUM_SUPPLIES];
+>   	const struct snd_pcm_hw_constraint_list *constraints;
+>   	unsigned int sysclk;
+> @@ -389,6 +391,9 @@ static int wm8731_set_dai_sysclk(struct snd_soc_dai *codec_dai,
+>   	switch (clk_id) {
+>   	case WM8731_SYSCLK_XTAL:
+>   	case WM8731_SYSCLK_MCLK:
+> +		if (IS_ENABLED(CONFIG_COMMON_CLK))
+> +			if (clk_set_rate(wm8731->mclk, freq))
+> +				return -EINVAL;
+>   		wm8731->sysclk_type = clk_id;
+>   		break;
+>   	default:
+> @@ -490,6 +495,9 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
+>
+>   	switch (level) {
+>   	case SND_SOC_BIAS_ON:
+> +		if (IS_ENABLED(CONFIG_COMMON_CLK))
+> +			if (clk_prepare_enable(wm8731->mclk))
+> +				return -EINVAL;
+>   		break;
+>   	case SND_SOC_BIAS_PREPARE:
+>   		break;
+> @@ -508,6 +516,8 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
+>   		snd_soc_write(codec, WM8731_PWR, reg | 0x0040);
+>   		break;
+>   	case SND_SOC_BIAS_OFF:
+> +		if (IS_ENABLED(CONFIG_COMMON_CLK))
+> +			clk_disable_unprepare(wm8731->mclk);
+>   		snd_soc_write(codec, WM8731_PWR, 0xffff);
+>   		regulator_bulk_disable(ARRAY_SIZE(wm8731->supplies),
+>   				       wm8731->supplies);
+> @@ -666,6 +676,15 @@ static int wm8731_spi_probe(struct spi_device *spi)
+>   	if (wm8731 == NULL)
+>   		return -ENOMEM;
+>
+> +	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+> +		wm8731->mclk = devm_clk_get(&spi->dev, "mclk");
+> +		if (IS_ERR(wm8731->mclk)) {
+> +			ret = PTR_ERR(wm8731->mclk);
+> +			dev_err(&spi->dev, "Failed to get MCLK\n");
+> +			return ret;
+> +		}
+> +	}
+> +
+>   	mutex_init(&wm8731->lock);
+>
+>   	wm8731->regmap = devm_regmap_init_spi(spi, &wm8731_regmap);
+> @@ -717,6 +736,15 @@ static int wm8731_i2c_probe(struct i2c_client *i2c,
+>   	if (wm8731 == NULL)
+>   		return -ENOMEM;
+>
+> +	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+> +		wm8731->mclk = devm_clk_get(&i2c->dev, "mclk");
+> +		if (IS_ERR(wm8731->mclk)) {
+> +			ret = PTR_ERR(wm8731->mclk);
+> +			dev_err(&i2c->dev, "Failed to get MCLK\n");
+> +			return ret;
+> +		}
+> +	}
+> +
+>   	mutex_init(&wm8731->lock);
+>
+>   	wm8731->regmap = devm_regmap_init_i2c(i2c, &wm8731_regmap);
 >
 
-Reviewed-by: Roy Franz <roy.franz@linaro.org>
+Best Regards,
+Bo Shen
