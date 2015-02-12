@@ -1,34 +1,76 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 12 Feb 2015 07:18:47 +0100
-Subject: [PATCH v4 02/11] ARM: tegra: Move out nyan-generic parts out
- from the nyan-big DT
-In-Reply-To: <CAL1qeaHeB6vikVWquGM7psdKPKc0FVqj5-xuc3PXbJhok1vGoA@mail.gmail.com>
-References: <1423667220-1062-1-git-send-email-tomeu.vizoso@collabora.com>	<1423667220-1062-3-git-send-email-tomeu.vizoso@collabora.com>
- <CAL1qeaHeB6vikVWquGM7psdKPKc0FVqj5-xuc3PXbJhok1vGoA@mail.gmail.com>
-Message-ID: <54DC45C7.8020907@collabora.com>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Thu, 12 Feb 2015 11:51:41 +0530
+Subject: [PATCH RESEND] dmaengine: qcom_bam_dma: Fix error path in probe
+ function
+Message-ID: <1423722101-16424-1-git-send-email-pramod.gurav@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2015 06:26 PM, Andrew Bresticker wrote:
-> Hi Tomeu,
-> 
-> On Wed, Feb 11, 2015 at 7:06 AM, Tomeu Vizoso
-> <tomeu.vizoso@collabora.com> wrote:
->> In preparation for adding the DT for the nyan-blaze board.
->>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> 
-> Maybe it's worth pulling the common pinmux bits into nyan.dtsi as well?
+Calls tasklet_kill() in error path of the probe function were missing.
+Add the same in error path.
 
-I decided to have them in the leaf DTSs so the whole output from
-tegra-pinmux-scripts can be stuck in there without any extra processing.
+Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+---
 
-I think this way we can be more certain that the pinmux in the kernel
-isn't diverging from what it should be.
+Resending it with linux-arm-msm in cc.
 
-> Otherwise,
-> Acked-by: Andrew Bresticker <abrestic@chromium.org>
+ drivers/dma/qcom_bam_dma.c |   14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
-Thanks,
-
-Tomeu
+diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom_bam_dma.c
+index 3122a99..a1ff4a6 100644
+--- a/drivers/dma/qcom_bam_dma.c
++++ b/drivers/dma/qcom_bam_dma.c
+@@ -1115,7 +1115,7 @@ static int bam_dma_probe(struct platform_device *pdev)
+ 
+ 	if (!bdev->channels) {
+ 		ret = -ENOMEM;
+-		goto err_disable_clk;
++		goto err_tasklet_kill;
+ 	}
+ 
+ 	/* allocate and initialize channels */
+@@ -1127,7 +1127,7 @@ static int bam_dma_probe(struct platform_device *pdev)
+ 	ret = devm_request_irq(bdev->dev, bdev->irq, bam_dma_irq,
+ 			IRQF_TRIGGER_HIGH, "bam_dma", bdev);
+ 	if (ret)
+-		goto err_disable_clk;
++		goto err_bam_channel_exit;
+ 
+ 	/* set max dma segment size */
+ 	bdev->common.dev = bdev->dev;
+@@ -1135,7 +1135,7 @@ static int bam_dma_probe(struct platform_device *pdev)
+ 	ret = dma_set_max_seg_size(bdev->common.dev, BAM_MAX_DATA_SIZE);
+ 	if (ret) {
+ 		dev_err(bdev->dev, "cannot set maximum segment size\n");
+-		goto err_disable_clk;
++		goto err_bam_channel_exit;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, bdev);
+@@ -1156,7 +1156,7 @@ static int bam_dma_probe(struct platform_device *pdev)
+ 	ret = dma_async_device_register(&bdev->common);
+ 	if (ret) {
+ 		dev_err(bdev->dev, "failed to register dma async device\n");
+-		goto err_disable_clk;
++		goto err_bam_channel_exit;
+ 	}
+ 
+ 	ret = of_dma_controller_register(pdev->dev.of_node, bam_dma_xlate,
+@@ -1168,8 +1168,14 @@ static int bam_dma_probe(struct platform_device *pdev)
+ 
+ err_unregister_dma:
+ 	dma_async_device_unregister(&bdev->common);
++err_bam_channel_exit:
++	for (i = 0; i < bdev->num_channels; i++)
++		tasklet_kill(&bdev->channels[i].vc.task);
++err_tasklet_kill:
++	tasklet_kill(&bdev->task);
+ err_disable_clk:
+ 	clk_disable_unprepare(bdev->bamclk);
++
+ 	return ret;
+ }
+ 
+-- 
+1.7.9.5
