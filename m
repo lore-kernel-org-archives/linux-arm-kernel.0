@@ -1,62 +1,118 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 12 Feb 2015 15:50:24 +0000
-Subject: [PATCHv3 00/24] ILP32 support in ARM64
-In-Reply-To: <54DBB87C.5060901@amacapital.net>
-References: <20141002155217.GH32147@e104818-lin.cambridge.arm.com>
- <20150210181302.GA23886@brightrain.aerifal.cx>
- <CAMe9rOqX-VpjZ+E-JCusk+e4Kpw1V1tsFq1Kjtai5DR9saKLaA@mail.gmail.com>
- <20150211190252.GB23507@brightrain.aerifal.cx>
- <CAMe9rOoME1fct=Dk1YFeoJbayvhdsaCUBZCY2YD6jK58J7=MkA@mail.gmail.com>
- <20150211192558.GE23507@brightrain.aerifal.cx>
- <CAMe9rOpr6j1siK5gJ_HPLTOfjG_sLOL48TFzaLx+shCS9O8ahA@mail.gmail.com>
- <20150211194741.GI23507@brightrain.aerifal.cx>
- <CAMe9rOrVGFcQN3J1-pkXWd9j4MaQv2QxPrA5cTtLPBPaQ2-zfw@mail.gmail.com>
- <54DBB87C.5060901@amacapital.net>
-Message-ID: <20150212155023.GA25491@e104818-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 12 Feb 2015 08:03:16 -0800
+Subject: [PATCH 1/4] ARM: dts: omap3-pandora: add common device tree
+In-Reply-To: <1423746226-700-2-git-send-email-marek@goldelico.com>
+References: <1423746226-700-1-git-send-email-marek@goldelico.com>
+ <1423746226-700-2-git-send-email-marek@goldelico.com>
+Message-ID: <20150212160316.GL2531@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 11, 2015 at 12:15:56PM -0800, Andy Lutomirski wrote:
-> On 02/11/2015 11:57 AM, H.J. Lu wrote:
-> >>>>trivially satisfied if you consider x32 and x86_64 separate
-> >>>>compilation environments, but it's not related to the core issue: that
-> >>>>the definition of timespec violates core (not obscure) requirements of
-> >>>>both POSIX and C11. At the time you were probably unaware of the C11
-> >>>>requirement. Note that it's a LOT harder to effect change in the C
-> >>>>standard, so even if the Austin Group would be amenable to changing
-> >>>>the requirement for timespec to allow something like nseconds_t,
-> >>>>getting WG14 to make this change to work around a Linux/glibc mistake
-> >>>>does not sound practical.
-> >>>
-> >>>That is very unfortunate.  I consider it is too late for x32 to change.
-> >>
-> >>Why? It's hardly an incompatible ABI change, as long as the
-> >>kernel/libc fills the upper bits (for old programs that read them
-> >>based on the old headers) when structs are read from the kernel to the
-> >>application, and ignores the upper bits (potentially set or left
-> >>uninitialized by the application) when strings are passed from
-> >>userspace to the kernel. Newly built apps using the struct definition
-> >>with 32-bit tv_nsec would need new libc to ensure that the high bits
-> >>aren't interpreted, but this could be handled by symbol versioning.
-> >>
-> >
-> >We have considered this option.  But since kernel wouldn't change
-> >tv_nsec/tv_usec handling just for x32, it wasn't selected.
-> 
-> Did anyone *ask* the kernel people (e.g. hpa)?
+Hi,
 
-It seems so:
+Few comments below.
 
-https://lkml.org/lkml/2011/8/31/244
+* Marek Belisko <marek@goldelico.com> [150212 05:07]:
+> +
+> +&omap3_pmx_core {
+> +
+> +	mmc1_pins: pinmux_mmc1_pins {
+> +		pinctrl-single,pins = <
+> +			OMAP3_CORE1_IOPAD(0x2144, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_clk.sdmmc1_clk */
+> +			OMAP3_CORE1_IOPAD(0x2146, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_cmd.sdmmc1_cmd */
+> +			OMAP3_CORE1_IOPAD(0x2148, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_dat0.sdmmc1_dat0 */
+> +			OMAP3_CORE1_IOPAD(0x214a, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_dat1.sdmmc1_dat1 */
+> +			OMAP3_CORE1_IOPAD(0x214c, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_dat2.sdmmc1_dat2 */
+> +			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_dat3.sdmmc1_dat3 */
+> +		>;
+...
 
-Couple of more replies from hpa:
+> +&omap3_pmx_core2 {
+> +	/* define in CPU specific file that includes this one
+> +	 * use either OMAP3430_CORE2_IOPAD() or OMAP3630_CORE2_IOPAD()
+> +	 */
+> +};
 
-https://lkml.org/lkml/2011/8/31/261
-https://lkml.org/lkml/2012/2/8/408
+OK looks like you have some SoC specific pins too.. I assume you
+guys have checked that all the pins defined in this file are at
+the same offset between 34xx and 36xx variants?
 
-It looks like hpa was going to talk the POSIX committee but I don't know
-what the conclusion was and didn't follow the thread (at the time I
-wasn't interested in ARM ILP32).
+> +&i2c1 {
+> +	clock-frequency = <2600000>;
+> +
+> +	twl: twl at 48 {
+> +		reg = <0x48>;
+> +		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+> +		interrupt-parent = <&intc>;
+> +
+> +		twl_power: power {
+> +			compatible = "ti,twl4030-power-reset";
+> +			ti,use_poweroff;
+> +		};
+> +
+> +		twl_audio: audio {
+> +			compatible = "ti,twl4030-audio";
+> +
+> +			codec {
+> +				ti,ramp_delay_value = <3>;
+> +			};
+> +		};
+> +	};
+> +};
 
--- 
-Catalin
+Can be done later naturally, but ere you probably want
+ti,twl4030-power-idle or ti,twl4030-power-idle-osc-off
+if the osicllator can be shut down during off-idle.
+
+> +&gpmc {
+> +	ranges = <0 0 0x30000000 0x04>; /* CS0: NAND */
+
+The ranges here allocate the GPMC partition, so it needs to be
+a minimum of 16MB:
+
+	ranges = <0 0 0x30000000 0x1000000>,	/* CS0: 16MB for NAND */
+
+> +	nand at 0,0 {
+> +		reg = <0 0 0>; /* CS0, offset 0 */
+
+The reg is for the device driver to ioremap it's registers,
+for NAND it's just 4:
+
+		reg = <0 0 4>;	/* CS0, offset 0, IO size 4 */
+
+> +		filesystem at 680000 {
+> +			label = "rootfs";
+> +			reg = <0xc80000 0>;	/* 0 = MTDPART_SIZ_FULL */
+> +		};
+> +	};
+> +};
+
+Is the NAND the same size on all of them? I don't think dts
+has a binding for MTDPART_SIZ_FULL type thing..
+
+> +	lcd: lcd at 1 {
+> +		reg = <1>;	/* CS1 */
+> +		compatible =	"omapdss,tpo,td043mtea1";
+> +		spi-max-frequency = <100000>;
+> +		spi-cpol;
+> +		spi-cpha;
+> +
+> +		label = "lcd";
+> +		reset-gpios = <&gpio5 29 GPIO_ACTIVE_LOW>;	/* GPIO_157 */
+> +		vcc-supply = <&vaux1>;
+> +
+> +		port {
+> +			lcd_in: endpoint {
+> +				remote-endpoint = <&dpi_out>;
+> +			};
+> +		};
+> +	};
+
+Oh there's already a binding for the LCD too? That's great :)
+
+Nine job, good to see this happening!
+
+Regards,
+
+
+Tony
