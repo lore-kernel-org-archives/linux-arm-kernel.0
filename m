@@ -1,44 +1,87 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 12 Feb 2015 10:33:56 +0100
-Subject: [PATCH RFC v9 01/20] clk: divider: Correct parent clk round rate
- if no bestdiv is normally found
-In-Reply-To: <1423720903-24806-2-git-send-email-Ying.Liu@freescale.com>
-References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
- <1423720903-24806-2-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <20150212093356.GR12209@pengutronix.de>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 12 Feb 2015 10:36:29 +0100
+Subject: [PATCH 2/2] ARM: dts: zynq: Add linux, stdout-path and stdout-path
+In-Reply-To: <54DB9CEA.1060701@suse.de>
+References: <0a0e0579fb6e2794d2c0c6fb9186c5b43618f448.1423657710.git.michal.simek@xilinx.com>
+ <ea777ffbffea442e3bc69fe11183811772a5716e.1423657710.git.michal.simek@xilinx.com>
+ <20150211124027.GH9154@leverpostej>
+ <74a9cc5d88d64421a4f1ebdacee93d7d@BL2FFO11FD041.protection.gbl>
+ <54DB9CEA.1060701@suse.de>
+Message-ID: <0c4b1ee445924842ab035a291c3b6417@BN1BFFO11FD004.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 12, 2015 at 02:01:24PM +0800, Liu Ying wrote:
-> If no best divider is normally found, we will try to use the maximum divider.
-> We should not set the parent clock rate to be 1Hz by force for being rounded.
-> Instead, we should take the maximum divider as a base and calculate a correct
-> parent clock rate for being rounded.
+On 02/11/2015 07:18 PM, Andreas F?rber wrote:
+> Am 11.02.2015 um 15:25 schrieb Michal Simek:
+>> On 02/11/2015 01:40 PM, Mark Rutland wrote:
+>>> On Wed, Feb 11, 2015 at 12:29:02PM +0000, Michal Simek wrote:
+>>>> parallella - Use reference instead of hardcoded path
+>>>>              (linux,stdout-path)
+>>>>
+>>>> stdout-path is used by bootloader to identify console.
+>>>>
+>>>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>>>> ---
+>>>>
+>>>> U-Boot driver model requires stdout-path.
+>>>> ---
+>>>>  arch/arm/boot/dts/zynq-parallella.dts | 3 ++-
+>>>>  arch/arm/boot/dts/zynq-zc702.dts      | 2 ++
+>>>>  arch/arm/boot/dts/zynq-zc706.dts      | 2 ++
+>>>>  arch/arm/boot/dts/zynq-zed.dts        | 2 ++
+>>>>  arch/arm/boot/dts/zynq-zybo.dts       | 2 ++
+>>>>  5 files changed, 10 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
+>>>> index 6a5f51daa708..45228a427006 100644
+>>>> --- a/arch/arm/boot/dts/zynq-parallella.dts
+>>>> +++ b/arch/arm/boot/dts/zynq-parallella.dts
+>>>> @@ -35,7 +35,8 @@
+>>>>  
+>>>>  	chosen {
+>>>>  		bootargs = "console=ttyPS0,115200 earlyprintk root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait";
+>>>> -		linux,stdout-path = "/amba/serial at e0001000";
+>>>> +		linux,stdout-path = &uart1;
+>>>> +		stdout-path = &uart1;
+>>>
+>>> Given that you added aliases in the last patch, you can use that to
+>>> refer to the serial:
+>>>
+>>> 	stdout-path - "serial0:115200n8";
+>>>
+>>> With or without the alias you can encode the UART configuration here
+>>> too:
+>>>
+>>> 	stdout-path = "/amba/serial at e0001000:115200n8"
+>>
+>> let me check this configuration if it is supported by u-boot.
+> 
+> I would be surprised if either is supported - my Parallella ships:
+> U-Boot 2012.10-00003-g792c31c (Jan 03 2014 - 12:24:08)
+> and upstream U-Boot still doesn't have support for the Parallella.
 
-Please add an explanation why you think the current code is wrong and
-what this actually fixes, maybe an example?
+Ancient u-boot versions are not using this features. Zynq hasn't been
+switched to DM anyway.
 
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index c0a842b..f641d4b 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -311,7 +311,8 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
->  
->  	if (!bestdiv) {
->  		bestdiv = _get_maxdiv(divider);
-> -		*best_parent_rate = __clk_round_rate(__clk_get_parent(hw->clk), 1);
-> +		*best_parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
-> +						MULT_ROUND_UP(rate, bestdiv));
+>>> Which makes the expected configuration explicit without relying on the
+>>> Linux-specific bootargs.
+>>>
+>>> Is there any reason to keep linux,stdout-path?
+>>
+>> Agree when stdout-patch is defined there is no reason to use linux,stdout-patch.
+> 
+> It's not used, it was added on reviewers' request at the time. Feel free
+> to drop. But again, we are bound for patch conflict here.
 
-When getting into the if(!bestdiv) it means that the lowest possible
-rate we can archieve is still higher than the target rate, so setting
-the parent rate as low as possible seems sane to me. Why do you think
-this is wrong? In which case this even makes a difference?
+I will solved that conflicts - it is easy one.
 
-Sascha
+Thanks,
+Michal
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150212/a2453890/attachment.sig>
