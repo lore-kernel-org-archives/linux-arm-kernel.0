@@ -1,15 +1,14 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Thu, 12 Feb 2015 14:01:25 +0800
-Subject: [PATCH RFC v9 02/20] ARM: imx6q: Add GPR3 MIPI muxing control
- register field shift bits definition
+Date: Thu, 12 Feb 2015 14:01:26 +0800
+Subject: [PATCH RFC v9 03/20] ARM: imx6q: clk: Add the video_27m clock
 In-Reply-To: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
 References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1423720903-24806-3-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1423720903-24806-4-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a macro to define the GPR3 MIPI muxing control register field
-shift bits.
+This patch supports the video_27m clock which is a fixed factor
+clock of the pll3_pfd1_540m clock.
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
@@ -37,20 +36,34 @@ v2->v3:
 v1->v2:
  * None.
 
- include/linux/mfd/syscon/imx6q-iomuxc-gpr.h | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-imx/clk-imx6q.c             | 1 +
+ include/dt-bindings/clock/imx6qdl-clock.h | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-index c877cad..d16f4c8 100644
---- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-+++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-@@ -207,6 +207,7 @@
- #define IMX6Q_GPR3_LVDS0_MUX_CTL_IPU1_DI1	(0x1 << 6)
- #define IMX6Q_GPR3_LVDS0_MUX_CTL_IPU2_DI0	(0x2 << 6)
- #define IMX6Q_GPR3_LVDS0_MUX_CTL_IPU2_DI1	(0x3 << 6)
-+#define IMX6Q_GPR3_MIPI_MUX_CTL_SHIFT		4
- #define IMX6Q_GPR3_MIPI_MUX_CTL_MASK		(0x3 << 4)
- #define IMX6Q_GPR3_MIPI_MUX_CTL_IPU1_DI0	(0x0 << 4)
- #define IMX6Q_GPR3_MIPI_MUX_CTL_IPU1_DI1	(0x1 << 4)
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 2daef61..2b7beb8 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -246,6 +246,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[IMX6QDL_CLK_PLL3_60M]  = imx_clk_fixed_factor("pll3_60m",  "pll3_usb_otg",   1, 8);
+ 	clk[IMX6QDL_CLK_TWD]       = imx_clk_fixed_factor("twd",       "arm",            1, 2);
+ 	clk[IMX6QDL_CLK_GPT_3M]    = imx_clk_fixed_factor("gpt_3m",    "osc",            1, 8);
++	clk[IMX6QDL_CLK_VIDEO_27M] = imx_clk_fixed_factor("video_27m", "pll3_pfd1_540m", 1, 20);
+ 	if (cpu_is_imx6dl()) {
+ 		clk[IMX6QDL_CLK_GPU2D_AXI] = imx_clk_fixed_factor("gpu2d_axi", "mmdc_ch0_axi_podf", 1, 1);
+ 		clk[IMX6QDL_CLK_GPU3D_AXI] = imx_clk_fixed_factor("gpu3d_axi", "mmdc_ch0_axi_podf", 1, 1);
+diff --git a/include/dt-bindings/clock/imx6qdl-clock.h b/include/dt-bindings/clock/imx6qdl-clock.h
+index b690cdb..25625bf 100644
+--- a/include/dt-bindings/clock/imx6qdl-clock.h
++++ b/include/dt-bindings/clock/imx6qdl-clock.h
+@@ -248,6 +248,7 @@
+ #define IMX6QDL_PLL6_BYPASS			235
+ #define IMX6QDL_PLL7_BYPASS			236
+ #define IMX6QDL_CLK_GPT_3M			237
+-#define IMX6QDL_CLK_END				238
++#define IMX6QDL_CLK_VIDEO_27M			238
++#define IMX6QDL_CLK_END				239
+ 
+ #endif /* __DT_BINDINGS_CLOCK_IMX6QDL_H */
 -- 
 2.1.0
