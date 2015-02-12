@@ -1,43 +1,30 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 12 Feb 2015 19:29:03 +0800
-Subject: [PATCH v2] xen/arm: allow console=hvc0 to be omitted for guests
-Message-ID: <1423740543-6168-1-git-send-email-ard.biesheuvel@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 12 Feb 2015 13:20:07 +0100
+Subject: [PATCH] ARM: shmobile: r8a7794: add PFC DT support
+In-Reply-To: <5570320.hDPc0mxmnU@wasted.cogentembedded.com>
+References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+ <5570320.hDPc0mxmnU@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdWvoFxjc586Xpmva678ZA85FEXbWbREYK6RmGTsC+5RZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch registers hvc0 as the preferred console if no console
-has been specified explicitly on the kernel command line.
+On Wed, Feb 11, 2015 at 11:06 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Define the generic R8A7794 part of the PFC device node.
+>
+> Based on original patch by Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-The purpose is to allow platform agnostic kernels and boot images
-(such as distro installers) to boot in a Xen/ARM domU without the
-need to modify the command line by hand.
+Acked-by: by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/xen/enlighten.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Gr{oetje,eeting}s,
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 0abeefa7dbf8..927be1d1bad7 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -24,6 +24,7 @@
- #include <linux/cpuidle.h>
- #include <linux/cpufreq.h>
- #include <linux/cpu.h>
-+#include <linux/console.h>
- 
- #include <linux/mm.h>
- 
-@@ -255,6 +256,9 @@ void __init xen_early_init(void)
- 		xen_start_info->flags |= SIF_INITDOMAIN|SIF_PRIVILEGED;
- 	else
- 		xen_start_info->flags &= ~(SIF_INITDOMAIN|SIF_PRIVILEGED);
-+
-+	if (!console_set_on_cmdline && !xen_initial_domain())
-+		add_preferred_console("hvc", 0, NULL);
- }
- 
- static int __init xen_guest_init(void)
--- 
-1.8.3.2
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
