@@ -1,42 +1,54 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 12 Feb 2015 16:16:16 +0100
-Subject: [PATCH v2 04/10] mtd: pxa3xx_nand: set NDCR_PG_PER_BLK if page
- per block is 128
-In-Reply-To: <1423752816-26219-5-git-send-email-antoine.tenart@free-electrons.com>
-References: <1423752816-26219-1-git-send-email-antoine.tenart@free-electrons.com>
- <1423752816-26219-5-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20150212161616.184481ea@bbrezillon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 12 Feb 2015 15:16:07 +0000
+Subject: [PATCH] efi: get_memory_map: add sufficient slack for memory
+ descriptors
+In-Reply-To: <CAKv+Gu-NAKASZc4phj5x83mB8Ak4Gy2zYq-a0CDADEOTBD4pXA@mail.gmail.com>
+References: <1423718659-795-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150212102226.GB1245@leverpostej>
+ <CAKv+Gu88vzPpXoSEs1ZSQbO7wsqh7NRSZc=iSpC9D6vzus7f8g@mail.gmail.com>
+ <20150212144727.GD4665@codeblueprint.co.uk>
+ <CAKv+Gu-NAKASZc4phj5x83mB8Ak4Gy2zYq-a0CDADEOTBD4pXA@mail.gmail.com>
+Message-ID: <20150212151607.GH1522@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Feb 2015 15:53:30 +0100
-Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
-
-Hm, still no commit message here ;-)
-
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->  drivers/mtd/nand/pxa3xx_nand.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+On Thu, Feb 12, 2015 at 02:56:51PM +0000, Ard Biesheuvel wrote:
+> On 12 February 2015 at 22:47, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> > On Thu, 12 Feb, at 06:39:46PM, Ard Biesheuvel wrote:
+> >>
+> >> I don't see how doing a single allocation could result in a single
+> >> free region to be split into more than 1 occupied region + 2 free
+> >> regions.
+> >> So no, I don't think it is ...
+> >
+> > I don't think that's a guarantee we can make, nor is it something we
+> > should rely upon.
+> >
+> > Please explain the user-visible failure that this patch fixes. Does your
+> > machine refuse to boot?
 > 
-> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index 55fce9527c2e..64628bff3fa5 100644
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -1216,7 +1216,8 @@ static int pxa3xx_nand_config_flash(struct pxa3xx_nand_info *info,
->  
->  	ndcr |= (pdata->enable_arbiter) ? NDCR_ND_ARB_EN : 0;
->  	ndcr |= (host->col_addr_cycles == 2) ? NDCR_RA_START : 0;
-> -	ndcr |= (f->page_per_block == 64) ? NDCR_PG_PER_BLK : 0;
-> +	ndcr |= (f->page_per_block == 64 || f->page_per_block == 128) ?
-> +		NDCR_PG_PER_BLK : 0;
->  	ndcr |= (f->page_size == 2048) ? NDCR_PAGE_SZ : 0;
->  	ndcr |= (f->flash_width == 16) ? NDCR_DWIDTH_M : 0;
->  	ndcr |= (f->dfc_width == 16) ? NDCR_DWIDTH_C : 0;
+> I am running UEFI under QEMU and Xen primarily at the moment, and
+> experimenting with various build options in Tianocore, One of the
+> options is preallocating and freeing blocks of various memory types,
+> in a way that should result in the final number of distinct regions to
+> be much lower. It could result however in a free memory region to be
+> carved up in three instead of two, and that is a failure I have seen
+> occur.
 
+The simple answer is that the machine will fail to boot, beause the
+efi_get_memory_map helper will give up after one go, and propagate the
+error. The arm-stub will give up when the error is encountered.
 
+> > Why is the 'goto again' loop insufficient in
+> > handling this scenario?
+> >
+> 
+> Yes, that should solve it as well, so if you prefer I reinstate that,
+> I can respin the patch. There is a theoretical possibility that it
+> would take more than just one more iteration, but that is highly
+> unlikely and it should still always complete.
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Please reinstate the loop. It will make this far less fragile.
+
+Thanks,
+Mark.
