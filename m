@@ -1,67 +1,48 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 12 Feb 2015 10:45:02 +0100
-Subject: [PATCH] spi: xilinx: Use standard num-cs binding
-In-Reply-To: <67f3c196833c427a489ca2c530d08987a6b5ee2a.1421412912.git.michal.simek@xilinx.com>
-References: <67f3c196833c427a489ca2c530d08987a6b5ee2a.1421412912.git.michal.simek@xilinx.com>
-Message-ID: <54DC761E.9040701@monstr.eu>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 12 Feb 2015 10:44:49 +0100
+Subject: [PATCH 1/2] pwm/doc: Clearify that the pin state after pwm_disable is
+ undefined
+In-Reply-To: <1423734290-19750-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1423734290-19750-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1423734290-19750-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+This makes assumptions on the behaviour of the pwm API explicit.
 
-On 01/16/2015 01:55 PM, Michal Simek wrote:
-> Use standard num-cs binding property and setup
-> "xlnx,num-ss-bits" as deprecated.
-> 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
-> 
->  drivers/spi/spi-xilinx.c | 11 +++++++++--
->  1 file changed, 9 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-> index 79bd84f43430..30e5180195bb 100644
-> --- a/drivers/spi/spi-xilinx.c
-> +++ b/drivers/spi/spi-xilinx.c
-> @@ -338,8 +338,15 @@ static int xilinx_spi_probe(struct platform_device *pdev)
->  		num_cs = pdata->num_chipselect;
->  		bits_per_word = pdata->bits_per_word;
->  	} else {
-> -		of_property_read_u32(pdev->dev.of_node, "xlnx,num-ss-bits",
-> -					  &num_cs);
-> +		if (of_property_read_u32(pdev->dev.of_node, "num-cs",
-> +					 &num_cs)) {
-> +			if (!of_property_read_u32(pdev->dev.of_node,
-> +						  "xlnx,num-ss-bits",
-> +						  &num_cs)) {
-> +				dev_err(&pdev->dev,
-> +					"property name 'xlnx,num-ss-bits' is deprecated.\n");
-> +			}
-> +		}
->  	}
-> 
->  	if (!num_cs) {
-> --
-> 1.8.2.3
-> 
+Note that there are drivers that assume that pwm_disable does result in
+a stable output matching the last pwm_config; leds-pwm is an example
+that is fixed in a followup patch.
 
-Any update on this one?
+On arm/i.MX28 it can really happen that after
 
-Thanks,
-Michal
+	pwm_config(led_dat->pwm, 0, 100);
+	pwm_disable(led_dat->pwm);
 
+the output is stuck at 1. That's because the pwm only works with the
+newly configured config when a period is over for the previously
+configured setting to prevent spikes.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ Documentation/pwm.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/Documentation/pwm.txt b/Documentation/pwm.txt
+index ca895fd211e4..abdd21d047ca 100644
+--- a/Documentation/pwm.txt
++++ b/Documentation/pwm.txt
+@@ -46,6 +46,11 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns);
+ 
+ To start/stop toggling the PWM output use pwm_enable()/pwm_disable().
+ 
++Note that after calling pwm_disable() it's undefined if the output stops in a
++high or low state, even if the duty cycle is set to 0% or 100%. So don't call
++pwm_disable() if there is a need for a specific level. The same applies when
++pwm_enable() was called, but pwm_config() was not.
++
+ Using PWMs with the sysfs interface
+ -----------------------------------
+ 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150212/cb78f389/attachment.sig>
+2.1.4
