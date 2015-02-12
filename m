@@ -1,48 +1,118 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 12 Feb 2015 19:52:08 +0100
-Subject: imx_v6_v7_defconfig needs lzop
-In-Reply-To: <20150212175836.52351ae2@canb.auug.org.au>
-References: <CAMuHMdVjqp52BQqH32Ut7kxDYzmyY4+JEVuhXgTqU8V24kQyZA@mail.gmail.com>
- <CAOMZO5Dh0Wv61Y0J_Ue1G=Y8vc23yM2Fxq6CqhpmNBHa-2Lkvg@mail.gmail.com>
- <CAMuHMdXJCh32e-+7rqNzCdbYX4AH3qfBQ3uZ_t9kC_8+1P1jJQ@mail.gmail.com>
- <20150205105951.GU10842@pengutronix.de>
- <CAMuHMdU_gBiqVouvHaVh+kC=BcdXw5waE6A4phn_MrjkLTu7Ow@mail.gmail.com>
- <20150212175836.52351ae2@canb.auug.org.au>
-Message-ID: <CAMuHMdVxiYJc8_9X+KJLdhvu+-vZSC5ZOt43MVxaBibX97y4gA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 12 Feb 2015 10:53:17 -0800
+Subject: [PATCH 2/2] ARM: perf: Add support for Scorpion PMUs
+In-Reply-To: <20150212124949.GE1522@leverpostej>
+References: <1423616724-20849-1-git-send-email-sboyd@codeaurora.org>
+ <1423616724-20849-3-git-send-email-sboyd@codeaurora.org>
+ <20150212124949.GE1522@leverpostej>
+Message-ID: <54DCF69D.5090707@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Thu, Feb 12, 2015 at 7:58 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->> >> >> /bin/sh: 1: lzop: not found
->> >> >> cat: write error: Broken pipe
->> >> >> make[3]: *** [arch/arm/boot/compressed/piggy.lzo] Error 1
->> >> >
->> >> > Isn't this error happening due to the lack of 'lzop' package installed
->> >> > on the host machine?
->> >>
->> >> Indeed.
->> > I guess you don't want to ask for help or report a build breakage, but
->> > question if it's sensible to let a defconfig depend on a host tool that
->> > isn't commonly installed, right?
->>
->> Right.
->>
->> The maintainers of the host machines were in the To-header, in the hope they
->> would install the missing tool.
+On 02/12/15 04:49, Mark Rutland wrote:
+> Hi,
 >
-> We have now done that.
+> I haven't given this a thorough review, but I spotted a couple of items
+> below.
+>
+> On Wed, Feb 11, 2015 at 01:05:24AM +0000, Stephen Boyd wrote:
+>> Scorpion supports a set of local performance monitor event
+>> selection registers (LPM) sitting behind a cp15 based interface
+>> that extend the architected PMU events to include Scorpion CPU
+>> and Venum VFP specific events. To use these events the user is
+>> expected to program the lpm register with the event code shifted
+>> into the group they care about and then point the PMNx event at
+>> that region+group combo by writing a LPMn_GROUPx event. Add
+>> support for this hardware.
+>>
+>> Note: the raw event number is a pure software construct that
+>> allows us to map the multi-dimensional number space of regions,
+>> groups, and event codes into a flat event number space suitable
+>> for use by the perf framework.
+>>
+>> This is based on code originally written by Ashwin Chaugule and
+>> Neil Leeder [1] massed to become similar to the Krait PMU support
+>> code.
+>>
+>> [1] https://www.codeaurora.org/cgit/quic/la/kernel/msm/tree/arch/arm/kernel/perf_event_msm.c?h=msm-3.4
+>>
+>> Cc: Neil Leeder <nleeder@codeaurora.org>
+>> Cc: Ashwin Chaugule <ashwinc@codeaurora.org>
+>> Cc: <devicetree@vger.kernel.org>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>>  Documentation/devicetree/bindings/arm/pmu.txt |   2 +
+>>  arch/arm/kernel/perf_event_cpu.c              |   2 +
+>>  arch/arm/kernel/perf_event_v7.c               | 395 ++++++++++++++++++++++++++
+>>  3 files changed, 399 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+>> index 75ef91d08f3b..6e54a9d88b7a 100644
+>> --- a/Documentation/devicetree/bindings/arm/pmu.txt
+>> +++ b/Documentation/devicetree/bindings/arm/pmu.txt
+>> @@ -18,6 +18,8 @@ Required properties:
+>>         "arm,arm11mpcore-pmu"
+>>         "arm,arm1176-pmu"
+>>         "arm,arm1136-pmu"
+>> +       "qcom,scorpion-pmu"
+>> +       "qcom,scorpion-mp-pmu"
+> Is the PMU any different in the MP and !MP variants? The code doesn't
+> seem to handle the two any differently and will pass either to userspace
+> as "armv7_scorpion".
+>
+> If there is some difference that we don't handle right now, that's fine,
+> it just looks a little odd.
 
-Thanks, the imx_v6_v7_defconfig build succeeds now.
+It seems that on MP there are two event encodings on MP that aren't
+there on !MP and vice versa[1]. So I made two compatibles to reflect
+that. I'll make two names that go to userspace to clarify this.
 
-Gr{oetje,eeting}s,
+>> +static const unsigned scorpion_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+>> +                                           [PERF_COUNT_HW_CACHE_OP_MAX]
+>> +                                           [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
+>> +       PERF_CACHE_MAP_ALL_UNSUPPORTED,
+>> +       /*
+>> +        * The performance counters don't differentiate between read and write
+>> +        * accesses/misses so this isn't strictly correct, but it's the best we
+>> +        * can do. Writes and reads get combined.
+>> +        */
+>> +       [C(L1D)][C(OP_READ)][C(RESULT_ACCESS)] = ARMV7_PERFCTR_L1_DCACHE_ACCESS,
+>> +       [C(L1D)][C(OP_READ)][C(RESULT_MISS)] = ARMV7_PERFCTR_L1_DCACHE_REFILL,
+>> +       [C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)] = ARMV7_PERFCTR_L1_DCACHE_ACCESS,
+>> +       [C(L1D)][C(OP_WRITE)][C(RESULT_MISS)] = ARMV7_PERFCTR_L1_DCACHE_REFILL,
+>> +       [C(L1I)][C(OP_READ)][C(RESULT_ACCESS)] = SCORPION_ICACHE_ACCESS,
+>> +       [C(L1I)][C(OP_READ)][C(RESULT_MISS)] = SCORPION_ICACHE_MISS,
+>> +       [C(L1I)][C(OP_WRITE)][C(RESULT_ACCESS)] = SCORPION_ICACHE_ACCESS,
+>> +       [C(L1I)][C(OP_WRITE)][C(RESULT_MISS)] = SCORPION_ICACHE_MISS,
+> These last two entries go against the policy we set in commit
+> 40c390c768f89849: "ARM: perf: don't pretend to support counting of L1I
+> writes", so I think they should be dropped.
 
-                        Geert
+Fair enough. Thanks for the pointer.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+>> +       /*
+>> +        * Only ITLB misses and DTLB refills are supported.  If users want the
+>> +        * DTLB refills misses a raw counter must be used.
+>> +        */
+>> +       [C(DTLB)][C(OP_READ)][C(RESULT_ACCESS)] = SCORPION_DTLB_ACCESS,
+>> +       [C(DTLB)][C(OP_READ)][C(RESULT_MISS)] = SCORPION_DTLB_MISS,
+>> +       [C(DTLB)][C(OP_WRITE)][C(RESULT_ACCESS)] = SCORPION_DTLB_ACCESS,
+>> +       [C(DTLB)][C(OP_WRITE)][C(RESULT_MISS)] = SCORPION_DTLB_MISS,
+>> +       [C(ITLB)][C(OP_READ)][C(RESULT_MISS)] = SCORPION_ITLB_MISS,
+>> +       [C(ITLB)][C(OP_WRITE)][C(RESULT_MISS)] = SCORPION_ITLB_MISS,
+>> +       [C(BPU)][C(OP_READ)][C(RESULT_ACCESS)] = ARMV7_PERFCTR_PC_BRANCH_PRED,
+>> +       [C(BPU)][C(OP_READ)][C(RESULT_MISS)] = ARMV7_PERFCTR_PC_BRANCH_PRED,
+>> +       [C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)] = ARMV7_PERFCTR_PC_BRANCH_PRED,
+>> +       [C(BPU)][C(OP_WRITE)][C(RESULT_MISS)] = ARMV7_PERFCTR_PC_BRANCH_PRED,
+>> +};
+> Not ARMV7_PERFCTR_PC_BRANCH_MIS_PRED for the RESULT_MISS cases as with
+> all other ARMv7 instances (Krait included)?
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+I was just copying the stuff from downstream. I think it's a bug that
+nobody noticed because the same problem was there on Krait and I fixed
+it before sending upstream. Thanks for catching it.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
