@@ -1,46 +1,64 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Feb 2015 20:42:39 +0100
-Subject: [PATCH 07/11] ARM: prima2: do not select SMP_ON_UP
-In-Reply-To: <1423770163-583064-1-git-send-email-arnd@arndb.de>
-References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
-Message-ID: <1423770163-583064-8-git-send-email-arnd@arndb.de>
+Date: Thu, 12 Feb 2015 20:42:32 +0100
+Subject: [PATCH 00/11] ARM: random randconfig fixes, soc specific
+Message-ID: <1423770163-583064-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new Atlas7 platform implicitly selects 'CONFIG_SMP_ON_UP',
-which leads to problems if we enable building the platform without
-MMU, as that combination is not allowed and causes a link error:
+Hello maintainers,
 
-arch/arm/kernel/built-in.o: In function `c_show':
-:(.text+0x1872): undefined reference to `smp_on_up'
-:(.text+0x1876): undefined reference to `smp_on_up'
-arch/arm/kernel/built-in.o: In function `arch_irq_work_raise':
-:(.text+0x3d48): undefined reference to `smp_on_up'
-:(.text+0x3d4c): undefined reference to `smp_on_up'
-arch/arm/kernel/built-in.o: In function `smp_setup_processor_id':
-:(.init.text+0x180): undefined reference to `smp_on_up'
+I've kept these to myself for too long, and would like to get them into
+v3.20. I hope all of these are noncontroversial, but please have
+a look and provide an Ack/Nak where appropriate so we can stick
+them into the first fixes pull request after the initial merge
+for -rc1.
 
-This removes the 'select' statement.
+     Arnd
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 4cba058526a7 ("ARM: sirf: add Atlas7 machine support")
-Cc: Zhiwu Song <Zhiwu.Song@csr.com>
-Cc: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/mach-prima2/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+Arnd Bergmann (11):
+  ARM: vexpress: use ARM_CPU_SUSPEND if needed
+  ARM: sunxi: always select RESET_CONTROLLER
+  ARM: BCM: put back ARCH_MULTI_V7 dependency for mobile
+  ARM: davinci: davinci_cfg_reg cannot be init
+  ARM: davinci: multi-soc kernels require AUTO_ZRELADDR
+  ARM: at91: fix pm declarations
+  ARM: prima2: do not select SMP_ON_UP
+  ARM: ixp4xx: fix {in,out}s{bwl} data types
+  ARM: rockchip: make rockchip_suspend_init conditional
+  ARM: sti: always enable RESET_CONTROLLER
+  ARM: mvebu: build armada375-smp code conditionally
 
-diff --git a/arch/arm/mach-prima2/Kconfig b/arch/arm/mach-prima2/Kconfig
-index a219dc310d5d..e03d8b5c9ad0 100644
---- a/arch/arm/mach-prima2/Kconfig
-+++ b/arch/arm/mach-prima2/Kconfig
-@@ -27,7 +27,6 @@ config ARCH_ATLAS7
- 	select CPU_V7
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_SMP
--	select SMP_ON_UP if SMP
- 	help
-           Support for CSR SiRFSoC ARM Cortex A7 Platform
- 
+ arch/arm/mach-at91/generic.h            |  8 ++++----
+ arch/arm/mach-bcm/Kconfig               |  4 ++--
+ arch/arm/mach-davinci/Kconfig           |  2 ++
+ arch/arm/mach-davinci/mux.c             |  4 ++--
+ arch/arm/mach-ixp4xx/include/mach/io.h  | 19 +++++++++++++------
+ arch/arm/mach-mvebu/system-controller.c |  2 +-
+ arch/arm/mach-prima2/Kconfig            |  1 -
+ arch/arm/mach-rockchip/pm.h             |  6 ++++++
+ arch/arm/mach-sti/Kconfig               |  1 +
+ arch/arm/mach-sunxi/Kconfig             |  8 ++------
+ arch/arm/mach-vexpress/Kconfig          |  1 +
+ 11 files changed, 34 insertions(+), 22 deletions(-)
+
 -- 
 2.1.0.rc2
+
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Barry Song <Baohua.Song@csr.com>
+Cc: Christian Daudt <bcm@fixthebug.org>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Imre Kaloz <kaloz@openwrt.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Krzysztof Halasa <khalasa@piap.pl>
+Cc: Liviu Dudau <liviu.dudau@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Maxime Coquelin <maxime.coquelin@st.com>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
