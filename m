@@ -1,58 +1,33 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 12 Feb 2015 10:51:26 +0800
-Subject: [PATCH 1/3] pm: at91: pm_suspend: add the WFI instruction support for
- ARMv7
-In-Reply-To: <1423709441-8342-1-git-send-email-wenyou.yang@atmel.com>
-References: <1423709441-8342-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1423709486-8382-1-git-send-email-wenyou.yang@atmel.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 11 Feb 2015 19:54:04 -0700
+Subject: [PATCH v3 1/2] coresight: Adding coresight support for arm64
+ architecture
+In-Reply-To: <20150211113651.GC9058@e104818-lin.cambridge.arm.com>
+References: <1423629085-1044-1-git-send-email-mathieu.poirier@linaro.org>
+ <20150211113651.GC9058@e104818-lin.cambridge.arm.com>
+Message-ID: <CANLsYky9sGK=vpEM5kMD8HZJ_a+hyU58sV=u=KHe9+oKGhGCqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the WFI instruction to make the cpu to the idle state.
-In the meanwhile, disable the processor's clock.
+On 11 February 2015 at 04:36, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Feb 10, 2015 at 09:31:24PM -0700, mathieu.poirier at linaro.org wrote:
+>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>
+>> Most CoreSight blocks are 64-bit ready.  As such move configuration
+>> entries from "arch/arm/Kconfig.config" to the driver's subdirectory
+>> and source the newly created Kconfig from architecture specific
+>> Kconfig.debug files.
+>>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> ---
+>> Change for v3:
+>>   - Separating Kconfig work from compilation warnings fixes.
+>
+> Nitpick: merge the compilation warnings fix first so that we don't get
+> them once the Kconfig patch is merged for arm64.
+>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- arch/arm/mach-at91/pm_suspend.S |   20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
-index bebe3de..1c7256a 100644
---- a/arch/arm/mach-at91/pm_suspend.S
-+++ b/arch/arm/mach-at91/pm_suspend.S
-@@ -51,6 +51,24 @@ tmp2	.req	r5
- 	beq	1b
- 	.endm
- 
-+/*
-+ * Put the processor to enter the idle state
-+ */
-+	.macro at91_cpu_idle
-+
-+#if defined(CONFIG_CPU_V7)
-+	mov	tmp1, #AT91_PMC_PCK
-+	str	tmp1, [pmc, #AT91_PMC_SCDR]
-+
-+	dsb
-+
-+	wfi		@ Wait For Interrupt
-+#else
-+	mcr	p15, 0, tmp1, c7, c0, 4
-+#endif
-+
-+	.endm
-+
- 	.text
- 
- /*
-@@ -120,7 +138,7 @@ skip_disable_main_clock:
- 	ldr	pmc, .pmc_base
- 
- 	/* Wait for interrupt */
--	mcr	p15, 0, tmp1, c7, c0, 4
-+	at91_cpu_idle
- 
- 	ldr	r0, .pm_mode
- 	tst	r0, #AT91_PM_SLOW_CLOCK
--- 
-1.7.9.5
+I intended to merge both patches via my tree and as such ensuring the
+Kconfig changes and compilation warnings fix go in at the same time.
+Is this fine with you?
