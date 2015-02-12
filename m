@@ -1,54 +1,46 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 12 Feb 2015 15:55:56 +0900
-Subject: [PATCH v3 6/8] arm64: dts: exynos: Add RTC and ADC dt node for
- Exynos5433 SoC
+Date: Thu, 12 Feb 2015 15:55:57 +0900
+Subject: [PATCH v3 7/8] arm64: dts: exynos: Add ADMA dt node for Exynos5433 SoC
 In-Reply-To: <1423724158-23632-1-git-send-email-cw00.choi@samsung.com>
 References: <1423724158-23632-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1423724158-23632-7-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1423724158-23632-8-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds RTC (Real Time Clock) dt node for Exynos5433 SoC and adds
-ADC dt node for Exynos5433 SoC. The c1b501564c98a94b4(iio: adc: exynos_adc:
-Add support for exynos7) commit supports the ADC for Exynos7. Exynos5433's ADC
-IP is the same with Exynos7's ADC IP. Exynos5433 has a little different from
-ADCv2 on ADC_CON2 register. Exynos5433 don't contain OSEL/ESEL /HIGHF of ADC_CON2.
+From: Inha Song <ideal.song@samsung.com>
+
+This patch adds ADMA (Advanced DMA) device tree node for Exynos5433 SoC.
+In Exynos5433 SoC, ADMA is used for I2S audio interface.
 
 Cc: Kukjin Kim <kgene@kernel.org>
+Signed-off-by: Inha Song <ideal.song@samsung.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Acked-by: Inki Dae <inki.dae@samsung.com>
 ---
- arch/arm64/boot/dts/exynos/exynos5433.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index 0168786..8e9ca8d 100644
+index 8e9ca8d..7bf4dcf 100644
 --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
 +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -852,6 +852,24 @@
- 			clocks = <&xxti>;
+@@ -462,6 +462,17 @@
+ 				#dma-channels = <8>;
+ 				#dma-requests = <32>;
+ 			};
++
++			adma: adma at 11420000 {
++				compatible = "arm,pl330", "arm,primecell";
++				reg = <0x11420000 0x1000>;
++				interrupts = <0 73 0>;
++				clocks = <&cmu_aud CLK_ACLK_DMAC>;
++				clock-names = "apb_pclk";
++				#dma-cells = <1>;
++				#dma-channels = <8>;
++				#dma-requests = <32>;
++			};
  		};
  
-+		rtc: rtc at 10590000 {
-+			compatible = "samsung,exynos3250-rtc";
-+			reg = <0x10590000 0x100>;
-+			interrupts = <0 385 0>, <0 386 0>;
-+			status = "disabled";
-+		};
-+
-+		adc: adc at 14d10000 {
-+			compatible = "samsung,exynos7-adc";
-+			reg = <0x14d10000 0x100>;
-+			interrupts = <0 438 0>;
-+			clock-names = "adc";
-+			clocks = <&cmu_peric CLK_PCLK_ADCIF>;
-+			#io-channel-cells = <1>;
-+			io-channel-ranges;
-+			status = "disabled";
-+		};
-+
- 		timer {
- 			compatible = "arm,armv8-timer";
- 			interrupts = <1 13 0xff04>,
+ 		serial_0: serial at 14c10000 {
 -- 
 1.8.5.5
