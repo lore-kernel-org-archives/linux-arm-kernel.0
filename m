@@ -1,72 +1,117 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 12 Feb 2015 08:01:40 +0100
-Subject: [PATCH] Input: sun4i-ts: add thermal driver dependency
-In-Reply-To: <20150211182403.GE29440@dtor-ws>
-References: <2265502.1m7jYBaqyh@wuerfel> <54C9E63A.6020806@redhat.com>
- <20150129185151.GA33547@dtor-ws> <20150211182403.GE29440@dtor-ws>
-Message-ID: <54DC4FD4.4060503@redhat.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 12 Feb 2015 15:22:07 +0800
+Subject: [PATCH 0/7] OPP: Introduce OPP bindings V2 and supporting code
+In-Reply-To: <20150212005220.GG11190@codeaurora.org>
+References: <cover.1423642246.git.viresh.kumar@linaro.org>
+ <20150212005220.GG11190@codeaurora.org>
+Message-ID: <CAKohponaLt51hiHd=uTocK_fPPwRDgkse5wc_PGG5tFQNnvfAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 11-02-15 19:24, Dmitry Torokhov wrote:
-> On Thu, Jan 29, 2015 at 10:51:51AM -0800, Dmitry Torokhov wrote:
->> On Thu, Jan 29, 2015 at 08:50:18AM +0100, Hans de Goede wrote:
->>> Hi,
->>>
->>> On 28-01-15 16:17, Arnd Bergmann wrote:
->>>> The sun4i-ts driver has had a dependency on the thermal code
->>>> since it was first merged,
->>>
->>> The "since it was first merged bit" is not true, this is caused
->>> by recent changes by ChenYu.
->>>
->>> Other then that no objections from me against the proposed fix.
->>>
->>> Regards,
->>>
->>> Hans
->>>
->>>
->>>   but this is not currently enforced
->>>> in Kconfig, so in some randconfig builds we get
->>>>
->>>> drivers/built-in.o: In function `sun4i_ts_remove':
->>>> :(.text+0x2376f4): undefined reference to `thermal_zone_of_sensor_unregister'
->>>> drivers/built-in.o: In function `sun4i_ts_probe':
->>>> :(.text+0x237a94): undefined reference to `thermal_zone_of_sensor_register'
->>>> :(.text+0x237c00): undefined reference to `thermal_zone_of_sensor_unregister'
->>>>
->>>> We need the dependency on THERMAL in order to ensure that this
->>>> driver becomes a loadable module if the thermal support itself
->>>> is modular, while the dependency on THERMAL_OF is a runtime dependency
->>>> and the driver will still build but not work if it is missing.
->>>>
->>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>>> Fixes: 6decea7c5438e2 ("Input: add driver for Allwinner sunxi SoC's rtp controller")
->>>>
->>>> diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
->>>> index 58917525126e..e2447f0063b7 100644
->>>> --- a/drivers/input/touchscreen/Kconfig
->>>> +++ b/drivers/input/touchscreen/Kconfig
->>>> @@ -943,6 +943,8 @@ config TOUCHSCREEN_SUN4I
->>>>   	tristate "Allwinner sun4i resistive touchscreen controller support"
->>>>   	depends on ARCH_SUNXI || COMPILE_TEST
->>>>   	depends on HWMON
->>>> +	depends on THERMAL
->>>> +	depends on THERMAL_OF || COMPILE_TEST
->>
->> THERMAL_OF does have proper stubs and I do not see why we need to force
->> having TERMAL even if we don't do compile test. Should the dependency be:
->>
->> 	depends on !THERMAL_OF || TERMAL
+On 12 February 2015 at 08:52, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> Here's some feedback on how we can't use OPPs (and OPPs in DT) on
+> qcom platforms.
 >
-> *ping*
+> On these platforms the OPPs are not always frequency voltage
+> pairs. Sometimes they're a frequency voltage voltage triplet, or
 
-ChenYu, since your patch causes this problem I'm assuming that you will come
-up with a fix, is that correct ?
+So, making opp-microvolt an array of <target/min/max>, values should fix this?
+Do we also need a opp-microvolt-names array as well? or can we reused
+similar ones from the CPU node where regulator are defined.
 
-Regards,
+> frequency voltage current triplet. I know that the OPP framework
 
-Hans
+so we do need opp-milliamp here..
+
+> in the kernel doesn't support more than frequency voltage pairs,
+> but that doesn't mean it can't in the future, and if it needs to
+> do so the DT bindings shouldn't need a v3 revision.
+
+Sure.
+
+> Furthermore, we have a large number of OPP sets that apply to
+> different speed bins and silicon characteristics of the SoC. In
+> our systems we read some efuses (an eeprom of sorts) that tell us
+> to use a certain set of OPPs because the silicon is so fast or
+> has these certain characteristics. The bootloader is *not*
+> reading these fuses and populating OPPs in DT. So right now we
+> just put all these custom OPPish tables in DT and then pick the
+> right one based on a node name match constructed from the bits we
+> read in the efuses. How can we express this in DT with these
+> bindings?
+
+What about keeping things as is in DT and disabling the OPPs which
+you don't support at boot? And only keep enabled the set of OPPs
+that you want to use based on these efuses ?
+
+> For example, on msm8974 we have a frequency voltage current
+> triplet and there are 18 different sets of these triplets, each
+> with 23 triplets per set. We could encode all of these tables as
+> a bunch of nodes with compatible = "operating-points-v2" but how
+> do we pick the right one to assign and populate for the CPU
+> devices? Do we need some sort of opp-fuse-map table that encodes
+> the information we want somewhere?
+
+Probably add all these groups in a single OPP descriptor and
+enable/disable them at runtime..
+
+>  qcom,opp-fuse-map = <speedX binY versionZ &oppN>,
+>                      ...
+>
+> but where do we put it? In the cpus node? Or maybe we can keep
+> doing the node name matching? That would required dropping the
+> oppN convention.
+
+Probably this might not be required then ?
+
+> Or take msm8916 as another example. On this device the voltage
+> for a few frequencies comes from the efuses and then we
+> interpolate the rest of the frequency voltage pairs. The speed
+> bins are picked from another set of efuses so we can do the
+> interpolation. Unfortunately we don't encode the frequency in the
+> fuses, so we rely on a handful of tables being defined somewhere
+> so that we know speed bin 0 means this set of frequencies and
+> speed bin 1 means this set of frequencies. How do we encode this
+> in DT?  Should we have the frequencies as OPPs and leave the
+> voltage part out, filling it in at runtime based on what we read
+
+Maybe yes.
+
+> out of the efuses? I assume it's desirable to have the frequency
+> tables in DT but we could also have them in the driver and if we
+> did that there wouldn't be any shared-opp property to set and
+> have the cpufreq-dt driver use to figure out clock sharing.
+
+Probably better keep them in DT. But for platforms with dynamic OPPs
+only, we will surely provide some API to make OPPs shared at runtime
+too..
+
+> Also sometimes we need to correlate OPPs between each other. For
+> example on msm8960/apq8064 if the CPU is running at a frequency
+> and voltage, the L2 needs to be running at another frequency,
+> voltage, and voltage (triplet). The L2 is in two power domains
+> but it only has one clock. Can/should this be expressed in DT? It
+
+Not sure.
+
+> certainly seems that it's at least easier to add it on as a
+> feature because OPPs are nodes instead of an array. But we need
+
+It wouldn't be a great idea to make these nodes too large just to support
+some corner cases, and we better try to find the best way out. But if
+we need it this way, we need it this way :)
+
+> to make sure we can support multiple regulators somehow, either
+> through correlated OPPs and multiple OPPs for a single device or
+> by being able to say opp-0-microvolt, opp-1-microvolt. I would
+
+an array would be better.
+
+> guess something similar could happen if there were two clocks and
+> one regulator although I've never seen such a scenario in
+> practice.
+
+Isn't this common? A single regulator voltage supporting multiple clock
+rates? Or did I misunderstood it :)
+
+We can have separate OPP nodes in this case.
