@@ -1,74 +1,74 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 12 Feb 2015 15:24:41 +0100
-Subject: [PATCH 4/5] serial: mctrl-gpio: don't check for struct mctrl_gpios *
- to be invalid
-In-Reply-To: <1423751082-15888-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1423751082-15888-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1423751082-15888-4-git-send-email-u.kleine-koenig@pengutronix.de>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 12 Feb 2015 16:24:40 +0200
+Subject: [PATCH v7 07/16] clk: tegra: Save/restore CCLKG_BURST_POLICY on
+ suspend
+In-Reply-To: <1420723339-30735-8-git-send-email-mikko.perttunen@kapsi.fi>
+References: <1420723339-30735-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <1420723339-30735-8-git-send-email-mikko.perttunen@kapsi.fi>
+Message-ID: <20150212142440.GL20811@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers using mctrl-gpio must not pass invalid values for struct
-mctrl_gpios *. All drivers were fixed in this regard and so some checks
-can go away or be simplified.
+On Thu, Jan 08, 2015 at 03:22:10PM +0200, Mikko Perttunen wrote:
+> From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+> 
+> Save and restore this register since the LP1 restore assembly routines
+> fiddle with it. Otherwise the CPU would keep running on PLLX after
+> resume from suspend even when DFLL was the original clocksource.
+> 
+> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+> Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
+Acked-By: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/tty/serial/serial_mctrl_gpio.c | 20 ++------------------
- 1 file changed, 2 insertions(+), 18 deletions(-)
-
-diff --git a/drivers/tty/serial/serial_mctrl_gpio.c b/drivers/tty/serial/serial_mctrl_gpio.c
-index a38596c5194e..c0381a09f12d 100644
---- a/drivers/tty/serial/serial_mctrl_gpio.c
-+++ b/drivers/tty/serial/serial_mctrl_gpio.c
-@@ -48,9 +48,6 @@ void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl)
- 	int value_array[UART_GPIO_MAX];
- 	unsigned int count = 0;
- 
--	if (IS_ERR_OR_NULL(gpios))
--		return;
--
- 	for (i = 0; i < UART_GPIO_MAX; i++)
- 		if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
- 		    mctrl_gpios_desc[i].dir_out) {
-@@ -65,10 +62,7 @@ EXPORT_SYMBOL_GPL(mctrl_gpio_set);
- struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
- 				      enum mctrl_gpio_idx gidx)
- {
--	if (!IS_ERR_OR_NULL(gpios) && !IS_ERR_OR_NULL(gpios->gpio[gidx]))
--		return gpios->gpio[gidx];
--	else
--		return NULL;
-+	return gpios->gpio[gidx];
- }
- EXPORT_SYMBOL_GPL(mctrl_gpio_to_gpiod);
- 
-@@ -76,15 +70,8 @@ unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
- {
- 	enum mctrl_gpio_idx i;
- 
--	/*
--	 * return it unchanged if the structure is not allocated
--	 */
--	if (IS_ERR_OR_NULL(gpios))
--		return *mctrl;
--
- 	for (i = 0; i < UART_GPIO_MAX; i++) {
--		if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
--		    !mctrl_gpios_desc[i].dir_out) {
-+		if (gpios->gpio[i] && !mctrl_gpios_desc[i].dir_out) {
- 			if (gpiod_get_value(gpios->gpio[i]))
- 				*mctrl |= mctrl_gpios_desc[i].mctrl;
- 			else
-@@ -138,9 +125,6 @@ void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
- {
- 	enum mctrl_gpio_idx i;
- 
--	if (IS_ERR_OR_NULL(gpios))
--		return;
--
- 	for (i = 0; i < UART_GPIO_MAX; i++)
- 		if (!IS_ERR_OR_NULL(gpios->gpio[i]))
- 			devm_gpiod_put(dev, gpios->gpio[i]);
--- 
-2.1.4
+> ---
+>  drivers/clk/tegra/clk-tegra124.c | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
+> index 623b77f..9354c42 100644
+> --- a/drivers/clk/tegra/clk-tegra124.c
+> +++ b/drivers/clk/tegra/clk-tegra124.c
+> @@ -89,6 +89,8 @@
+>  #define PMC_PLLM_WB0_OVERRIDE 0x1dc
+>  #define PMC_PLLM_WB0_OVERRIDE_2 0x2b0
+>  
+> +#define CCLKG_BURST_POLICY 0x368
+> +
+>  #define UTMIP_PLL_CFG2 0x488
+>  #define UTMIP_PLL_CFG2_STABLE_COUNT(x) (((x) & 0xffff) << 6)
+>  #define UTMIP_PLL_CFG2_ACTIVE_DLY_COUNT(x) (((x) & 0x3f) << 18)
+> @@ -121,6 +123,8 @@
+>  #ifdef CONFIG_PM_SLEEP
+>  static struct cpu_clk_suspend_context {
+>  	u32 clk_csite_src;
+> +	u32 cclkg_burst;
+> +	u32 cclkg_divider;
+>  } tegra124_cpu_clk_sctx;
+>  #endif
+>  
+> @@ -1331,12 +1335,22 @@ static void tegra124_cpu_clock_suspend(void)
+>  	tegra124_cpu_clk_sctx.clk_csite_src =
+>  				readl(clk_base + CLK_SOURCE_CSITE);
+>  	writel(3 << 30, clk_base + CLK_SOURCE_CSITE);
+> +
+> +	tegra124_cpu_clk_sctx.cclkg_burst =
+> +				readl(clk_base + CCLKG_BURST_POLICY);
+> +	tegra124_cpu_clk_sctx.cclkg_divider =
+> +				readl(clk_base + CCLKG_BURST_POLICY + 4);
+>  }
+>  
+>  static void tegra124_cpu_clock_resume(void)
+>  {
+>  	writel(tegra124_cpu_clk_sctx.clk_csite_src,
+>  				clk_base + CLK_SOURCE_CSITE);
+> +
+> +	writel(tegra124_cpu_clk_sctx.cclkg_burst,
+> +					clk_base + CCLKG_BURST_POLICY);
+> +	writel(tegra124_cpu_clk_sctx.cclkg_divider,
+> +					clk_base + CCLKG_BURST_POLICY + 4);
+>  }
+>  #endif
+>  
+> -- 
+> 2.2.1
+> 
