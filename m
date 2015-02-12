@@ -1,76 +1,57 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 12 Feb 2015 10:22:27 +0000
-Subject: [PATCH] efi: get_memory_map: add sufficient slack for memory
- descriptors
-In-Reply-To: <1423718659-795-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1423718659-795-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150212102226.GB1245@leverpostej>
+Date: Thu, 12 Feb 2015 10:26:16 +0000
+Subject: [PATCH] ARM: dts: zynq: Add OCM node
+In-Reply-To: <135fba212abd740584a2547903cc8d175417344c.1423736523.git.michal.simek@xilinx.com>
+References: <135fba212abd740584a2547903cc8d175417344c.1423736523.git.michal.simek@xilinx.com>
+Message-ID: <20150212102615.GC1245@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 12, 2015 at 05:24:19AM +0000, Ard Biesheuvel wrote:
-> As it turns out, when allocating room for the UEFI memory map using
-> UEFI's AllocatePool (), it may result in two new memory map entries
-> being created, for instance, when using Tianocore's preallocated region
-> feature. For example, the following region
+On Thu, Feb 12, 2015 at 10:22:07AM +0000, Michal Simek wrote:
+> Add OCM node for all zynq boards. OCM location
+> can changed but for all current boards this
+> is the location where OCM is.`
 > 
-> 0x00005ead5000-0x00005ebfffff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
-> 
-> may be split like this
-> 
-> 0x00005ead5000-0x00005eae2fff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
-> 0x00005eae3000-0x00005eae4fff [Loader Data        |   |  |  |  |   |WB|WT|WC|UC]
-> 0x00005eae5000-0x00005ebfffff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
-> 
-> if the preallocated Loader Data region was chosen to be right in the
-> middle of the original free space.
-> 
-> After patch d1a8d66b9177 ("efi/libstub: Call get_memory_map() to
-> obtain map and desc sizes"), this is not being dealt with correctly
-> anymore, as the existing logic to allocate room for a single additional
-> entry has become insufficient.
-> 
-> So instead, add room for two additional entries instead.
-> 
-> Fixes: d1a8d66b9177 ("efi/libstub: Call get_memory_map() to obtain map and desc sizes")
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 > ---
->  drivers/firmware/efi/libstub/efi-stub-helper.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
-> index af5d63c7cc53..ca0b07ed3b14 100644
-> --- a/drivers/firmware/efi/libstub/efi-stub-helper.c
-> +++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
-> @@ -84,10 +84,10 @@ efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
->  		return EFI_LOAD_ERROR;
->  
->  	/*
-> -	 * Add an additional efi_memory_desc_t because we're doing an
-> -	 * allocation which may be in a new descriptor region.
-> +	 * Add room for two additional efi_memory_desc_t entries because we're
-> +	 * doing an allocation which may be in a new descriptor region.
+> This patch is done based on discussion here.
+> https://lkml.org/lkml/2014/12/1/396
+> 
+> There are some ways how to do it.
+> OCM location can be changed but board DTS files
+> can easily rewrite it.
+> The problem which there is that node has address
+> in it but maybe someone can suggest better solution.
 
-It might be worth noting that a existing regions can be
-split/reorganised here, otherwise it's a little difficult to deduce from
-the comment why to regions are needed.
-
->  	 */
-> -	*map_size += *desc_size;
-> +	*map_size += *desc_size * 2;
-
-Can we forsee any cases where we might need more than two additional
-descs? Is it perhaps adding a little more slack now?
-
-Otherwise this looks fine to me.
+Given that the node is so simple, can't this be pushed down into the
+board files? So long as the label is consistent anything else that's
+referring to it should still work.
 
 Thanks,
 Mark.
 
->  	status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
->  				*map_size, (void **)&m);
->  	if (status != EFI_SUCCESS)
+> ---
+>  arch/arm/boot/dts/zynq-7000.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index a5cd2eda3edf..d55a8b365a6c 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -150,6 +150,11 @@
+>  			reg = <0xf8006000 0x1000>;
+>  		};
+>  
+> +		ocm: sram at fffc0000 {
+> +			compatible = "mmio-sram";
+> +			reg = <0xfffc0000 0x10000>;
+> +		};
+> +
+>  		uart0: serial at e0000000 {
+>  			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
+>  			status = "disabled";
 > -- 
-> 1.8.3.2
+> 1.8.2.3
 > 
 > 
