@@ -1,61 +1,67 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 12 Feb 2015 10:44:50 +0100
-Subject: [PATCH 2/2] leds/pwm: Don't disable pwm when setting brightness to 0
-In-Reply-To: <1423734290-19750-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1423734290-19750-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1423734290-19750-3-git-send-email-u.kleine-koenig@pengutronix.de>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 12 Feb 2015 10:45:02 +0100
+Subject: [PATCH] spi: xilinx: Use standard num-cs binding
+In-Reply-To: <67f3c196833c427a489ca2c530d08987a6b5ee2a.1421412912.git.michal.simek@xilinx.com>
+References: <67f3c196833c427a489ca2c530d08987a6b5ee2a.1421412912.git.michal.simek@xilinx.com>
+Message-ID: <54DC761E.9040701@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes disabling the LED on i.MX28. The PWM hardware delays using
-the newly set pwm-config until the beginning of a new period. It's very
-likely that pwm_disable is called before the current period ends. In
-case the LED was on brightness=max before the LED stays on because in
-the disabled PWM block the period never ends.
+Hi Mark,
 
-Also only call pwm_enable only once in the probe call back and the
-matching pwm_disable in .remove(). Moreover the pwm is explicitly
-initialized to off.
+On 01/16/2015 01:55 PM, Michal Simek wrote:
+> Use standard num-cs binding property and setup
+> "xlnx,num-ss-bits" as deprecated.
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+>  drivers/spi/spi-xilinx.c | 11 +++++++++--
+>  1 file changed, 9 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
+> index 79bd84f43430..30e5180195bb 100644
+> --- a/drivers/spi/spi-xilinx.c
+> +++ b/drivers/spi/spi-xilinx.c
+> @@ -338,8 +338,15 @@ static int xilinx_spi_probe(struct platform_device *pdev)
+>  		num_cs = pdata->num_chipselect;
+>  		bits_per_word = pdata->bits_per_word;
+>  	} else {
+> -		of_property_read_u32(pdev->dev.of_node, "xlnx,num-ss-bits",
+> -					  &num_cs);
+> +		if (of_property_read_u32(pdev->dev.of_node, "num-cs",
+> +					 &num_cs)) {
+> +			if (!of_property_read_u32(pdev->dev.of_node,
+> +						  "xlnx,num-ss-bits",
+> +						  &num_cs)) {
+> +				dev_err(&pdev->dev,
+> +					"property name 'xlnx,num-ss-bits' is deprecated.\n");
+> +			}
+> +		}
+>  	}
+> 
+>  	if (!num_cs) {
+> --
+> 1.8.2.3
+> 
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/leds/leds-pwm.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Any update on this one?
 
-diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
-index f668500a2157..5dae0d2dc3dc 100644
---- a/drivers/leds/leds-pwm.c
-+++ b/drivers/leds/leds-pwm.c
-@@ -44,11 +44,6 @@ static void __led_pwm_set(struct led_pwm_data *led_dat)
- 	int new_duty = led_dat->duty;
- 
- 	pwm_config(led_dat->pwm, new_duty, led_dat->period);
--
--	if (new_duty == 0)
--		pwm_disable(led_dat->pwm);
--	else
--		pwm_enable(led_dat->pwm);
- }
- 
- static void led_pwm_work(struct work_struct *work)
-@@ -93,6 +88,7 @@ static void led_pwm_cleanup(struct led_pwm_priv *priv)
- 		led_classdev_unregister(&priv->leds[priv->num_leds].cdev);
- 		if (priv->leds[priv->num_leds].can_sleep)
- 			cancel_work_sync(&priv->leds[priv->num_leds].work);
-+		pwm_disable(priv->leds[i].pwm);
- 	}
- }
- 
-@@ -132,6 +128,10 @@ static int led_pwm_add(struct device *dev, struct led_pwm_priv *priv,
- 	if (!led_data->period && (led->pwm_period_ns > 0))
- 		led_data->period = led->pwm_period_ns;
- 
-+	pwm_config(led_data->pwm, led_data->active_low ? led_data->period: 0,
-+		   led_data->period);
-+	pwm_enable(led_data->pwm);
-+
- 	ret = led_classdev_register(dev, &led_data->cdev);
- 	if (ret == 0) {
- 		priv->num_leds++;
+Thanks,
+Michal
+
 -- 
-2.1.4
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150212/cb78f389/attachment.sig>
