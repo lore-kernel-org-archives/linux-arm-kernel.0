@@ -1,17 +1,15 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Thu, 12 Feb 2015 14:01:24 +0800
-Subject: [PATCH RFC v9 01/20] clk: divider: Correct parent clk round rate if
- no bestdiv is normally found
+Date: Thu, 12 Feb 2015 14:01:25 +0800
+Subject: [PATCH RFC v9 02/20] ARM: imx6q: Add GPR3 MIPI muxing control
+ register field shift bits definition
 In-Reply-To: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
 References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1423720903-24806-2-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1423720903-24806-3-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If no best divider is normally found, we will try to use the maximum divider.
-We should not set the parent clock rate to be 1Hz by force for being rounded.
-Instead, we should take the maximum divider as a base and calculate a correct
-parent clock rate for being rounded.
+This patch adds a macro to define the GPR3 MIPI muxing control register field
+shift bits.
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
@@ -39,22 +37,20 @@ v2->v3:
 v1->v2:
  * None.
 
- drivers/clk/clk-divider.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index c0a842b..f641d4b 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -311,7 +311,8 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
- 
- 	if (!bestdiv) {
- 		bestdiv = _get_maxdiv(divider);
--		*best_parent_rate = __clk_round_rate(__clk_get_parent(hw->clk), 1);
-+		*best_parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
-+						MULT_ROUND_UP(rate, bestdiv));
- 	}
- 
- 	return bestdiv;
+diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+index c877cad..d16f4c8 100644
+--- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
++++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+@@ -207,6 +207,7 @@
+ #define IMX6Q_GPR3_LVDS0_MUX_CTL_IPU1_DI1	(0x1 << 6)
+ #define IMX6Q_GPR3_LVDS0_MUX_CTL_IPU2_DI0	(0x2 << 6)
+ #define IMX6Q_GPR3_LVDS0_MUX_CTL_IPU2_DI1	(0x3 << 6)
++#define IMX6Q_GPR3_MIPI_MUX_CTL_SHIFT		4
+ #define IMX6Q_GPR3_MIPI_MUX_CTL_MASK		(0x3 << 4)
+ #define IMX6Q_GPR3_MIPI_MUX_CTL_IPU1_DI0	(0x0 << 4)
+ #define IMX6Q_GPR3_MIPI_MUX_CTL_IPU1_DI1	(0x1 << 4)
 -- 
 2.1.0
