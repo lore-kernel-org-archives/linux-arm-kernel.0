@@ -1,42 +1,34 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 12 Feb 2015 15:18:00 +0900
-Subject: [PATCH v3] pinctrl: exynos: Add support for Exynos5433
-In-Reply-To: <CA+Ln22E1xpdj+LZAR6uf7sCEBR_TEN=CaTVznsKM490a8AzGww@mail.gmail.com>
-References: <1421822591-10536-1-git-send-email-cw00.choi@samsung.com>
- <CACRpkdYq-1ztF5baHjB9aBUNspD5vRXrpnEd1zdWsADmwrhuWw@mail.gmail.com>
- <CA+Ln22E1xpdj+LZAR6uf7sCEBR_TEN=CaTVznsKM490a8AzGww@mail.gmail.com>
-Message-ID: <54DC4598.4010603@samsung.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 12 Feb 2015 07:18:47 +0100
+Subject: [PATCH v4 02/11] ARM: tegra: Move out nyan-generic parts out
+ from the nyan-big DT
+In-Reply-To: <CAL1qeaHeB6vikVWquGM7psdKPKc0FVqj5-xuc3PXbJhok1vGoA@mail.gmail.com>
+References: <1423667220-1062-1-git-send-email-tomeu.vizoso@collabora.com>	<1423667220-1062-3-git-send-email-tomeu.vizoso@collabora.com>
+ <CAL1qeaHeB6vikVWquGM7psdKPKc0FVqj5-xuc3PXbJhok1vGoA@mail.gmail.com>
+Message-ID: <54DC45C7.8020907@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On 02/08/2015 11:59 PM, Tomasz Figa wrote:
-> Hi,
+On 02/11/2015 06:26 PM, Andrew Bresticker wrote:
+> Hi Tomeu,
 > 
-> 2015-01-29 18:48 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
->> On Wed, Jan 21, 2015 at 7:43 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> On Wed, Feb 11, 2015 at 7:06 AM, Tomeu Vizoso
+> <tomeu.vizoso@collabora.com> wrote:
+>> In preparation for adding the DT for the nyan-blaze board.
 >>
->>> This patch adds driver data for Exynos5433 SoC. Exynos5433 includes 228 multi-
->>> functional input/output port pins and 135 memory port pins. There are 41 general
->>> port groups and 2 memory port groups.
->>>
->>> Cc: Tomasz Figa <tomasz.figa@gmail.com>
->>> Cc: Thomas Abraham <thomas.abraham@linaro.org>
->>> Cc: Linus Walleij <linus.walleij@linaro.org>
->>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>> Acked-by: Inki Dae <inki.dae@samsung.com>
->>> ---
->>> Changes from v2:
->>> - Rebase it on v3.19-rc5
->>
->> Waiting for Tomasz to review this.
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 > 
-> Thanks Linus. Looks good to me.
-> 
-> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+> Maybe it's worth pulling the common pinmux bits into nyan.dtsi as well?
 
-Could you please pick this patch?
+I decided to have them in the leaf DTSs so the whole output from
+tegra-pinmux-scripts can be stuck in there without any extra processing.
 
-Best Regards,
-Chanwoo Choi
+I think this way we can be more certain that the pinmux in the kernel
+isn't diverging from what it should be.
+
+> Otherwise,
+> Acked-by: Andrew Bresticker <abrestic@chromium.org>
+
+Thanks,
+
+Tomeu
