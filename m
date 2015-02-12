@@ -1,57 +1,52 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 12 Feb 2015 13:24:19 +0800
-Subject: [PATCH] efi: get_memory_map: add sufficient slack for memory
- descriptors
-Message-ID: <1423718659-795-1-git-send-email-ard.biesheuvel@linaro.org>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 11 Feb 2015 23:46:03 -0600
+Subject: [Patch v4 0/2] Add Qualcomm ADM dmaengine driver
+Message-ID: <1423719965-8156-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As it turns out, when allocating room for the UEFI memory map using
-UEFI's AllocatePool (), it may result in two new memory map entries
-being created, for instance, when using Tianocore's preallocated region
-feature. For example, the following region
+This patch set introduces the dmaengine driver for the Qualcomm Application
+Data Mover (ADM) DMA controller present on MSM8x60, APQ8064, and IPQ8064
+devices.
 
-0x00005ead5000-0x00005ebfffff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
+The initial version of this driver will only support slave DMA operations
+between system memory and peripherals.  Flow control via the CRCI (client rate
+control interface) is supported and can be configured via device tree
+configuration.  Flow control usage is required for some peripheral devices.
 
-may be split like this
+Changes from v3:
+  - Remove .owner field
 
-0x00005ead5000-0x00005eae2fff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
-0x00005eae3000-0x00005eae4fff [Loader Data        |   |  |  |  |   |WB|WT|WC|UC]
-0x00005eae5000-0x00005ebfffff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
+Changes from v2:
+  - Removed extraneous achan variable from xlate function
+  - Reworked crci check in slave_sg function
+  - Added mux field to async_desc structure.
+  - Reworked dma start function to use crci and mux values directly from
+    structure.
+  - Added disable of clocks in probe error paths.
+  - Changed to use #define for fixed number of channels.
 
-if the preallocated Loader Data region was chosen to be right in the
-middle of the original free space.
+Changes since v1:
+  - Fixed various review comments
+  - Fixed some descriptor programming issues.
+  - Added single descriptors to support sub burst length transactions.
+    Selection of single or box descriptors depends on the sg length and burst
+    size.
+  - Removed use of crci in the dmas property.  CRCI is now designated via the
+    slave_config structure and will be stored in slave_id.
 
-After patch d1a8d66b9177 ("efi/libstub: Call get_memory_map() to
-obtain map and desc sizes"), this is not being dealt with correctly
-anymore, as the existing logic to allocate room for a single additional
-entry has become insufficient.
 
-So instead, add room for two additional entries instead.
+Andy Gross (2):
+  dt/bindings: qcom_adm: Fix channel specifiers
+  dmaengine: Add ADM driver
 
-Fixes: d1a8d66b9177 ("efi/libstub: Call get_memory_map() to obtain map and desc sizes")
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/firmware/efi/libstub/efi-stub-helper.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/dma/qcom_adm.txt |   16 +-
+ drivers/dma/Kconfig                                |   10 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/qcom_adm.c                             |  901 ++++++++++++++++++++
+ 4 files changed, 918 insertions(+), 10 deletions(-)
+ create mode 100644 drivers/dma/qcom_adm.c
 
-diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
-index af5d63c7cc53..ca0b07ed3b14 100644
---- a/drivers/firmware/efi/libstub/efi-stub-helper.c
-+++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
-@@ -84,10 +84,10 @@ efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
- 		return EFI_LOAD_ERROR;
- 
- 	/*
--	 * Add an additional efi_memory_desc_t because we're doing an
--	 * allocation which may be in a new descriptor region.
-+	 * Add room for two additional efi_memory_desc_t entries because we're
-+	 * doing an allocation which may be in a new descriptor region.
- 	 */
--	*map_size += *desc_size;
-+	*map_size += *desc_size * 2;
- 	status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
- 				*map_size, (void **)&m);
- 	if (status != EFI_SUCCESS)
 -- 
-1.8.3.2
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
