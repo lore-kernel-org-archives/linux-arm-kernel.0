@@ -1,48 +1,68 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 12 Feb 2015 10:13:36 -0500 (EST)
-Subject: [PATCH RFC v4 1/3] PM / Runtime: Add an API pm_runtime_set_slave
-In-Reply-To: <CADGdYn6OwXgsGFspQva-q5WV5b_WB=G2PxZyhcETTgt8zY96ZQ@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1502121010070.1209-100000@iolanthe.rowland.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 12 Feb 2015 16:15:43 +0100
+Subject: [PATCH v2] ARM: dts: zynq: Add OCM node
+In-Reply-To: <20150212150709.GG1522@leverpostej>
+References: <6df19b400e314ef8228be475bb8ba83765683016.1423737765.git.michal.simek@xilinx.com>
+ <20150212105443.GB1522@leverpostej>
+ <c64e7b4bf78649049cea3dceecea453c@BN1AFFO11FD014.protection.gbl>
+ <5c1602f83c594a72aac78c245f1830fa@BL2FFO11FD052.protection.gbl>
+ <20150212150709.GG1522@leverpostej>
+Message-ID: <6cd07a2ca61d4083b1a3d370efcc19bc@BN1BFFO11FD016.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Feb 2015, amit daniel kachhap wrote:
-
-> Hi Alan,
+On 02/12/2015 04:07 PM, Mark Rutland wrote:
+> On Thu, Feb 12, 2015 at 02:58:36PM +0000, S?ren Brinkmann wrote:
+>> On Thu, 2015-02-12 at 12:01PM +0100, Michal Simek wrote:
+>>> On 02/12/2015 11:54 AM, Mark Rutland wrote:
+>>>> On Thu, Feb 12, 2015 at 10:42:47AM +0000, Michal Simek wrote:
+>>>>> Add OCM node for all zynq boards. OCM location
+>>>>> can changed but for all current boards this
+>>>>> is the location where OCM is.`
+>>>>>
+>>>>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>>>>> ---
+>>>>>
+>>>>> Changes in v2:
+>>>>> - Move node to board file suggested by Mark
+>>>>>
+>>>>> This patch is done based on discussion here.
+>>>>> https://lkml.org/lkml/2014/12/1/396
+>>>>>
+>>>>> Mark: I expect you won't like amba bus reference or
+>>>>> am I wrong?
+>>>>
+>>>> I'm fine with dropping things onto a bus in this way. If we're happy to
+>>>> do it for other nodes I don't see why busses should be special.
+>>>
+>>> Wonderful. I will give people some time to comment this style.
+>>
+>> Given that the location is discoverable, wouldn't it make sense to let
+>> 'reg' point to the ctrl/cfg registers in the SLCR and let the driver
+>> handle the whereabouts of the OCM location? (but I guess this is going
+>> in circles now, such a proposal was on the table at some point, IIRC).
+>> But I'd prefer:
+>> 	memory-controller at 0xfffc0000 { /* the address here would of course not match all configurations */
 > 
-> On Mon, Feb 9, 2015 at 9:28 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> > On Mon, 9 Feb 2015, Amit Daniel Kachhap wrote:
-> >
-> >> This API creates a pm runtime slave type device which does not itself
-> >> participates in pm runtime but depends on the master devices to power
-> >> manage them.
-> >
-> > This makes no sense.  How can a master device manage a slave device?
-> > Devices are managed by drivers, not by other devices.
-> May be my commit is not explaining the requirements completely and the
-> API name may not reflect the relevance. But If you see the 3rd patch
-> it has one clock use-case where this new feature is used and the
-> current pm runtime feature is not sufficient enough to handle it. I
-> have one more IOMMU use case also which is not part of this patch
-> series.
+> I'd really prefer that we keep the unit-address and reg consistent.
+> 
+> Given that the address may change on a per-board basis, it simply has to
+> live in the board file.
+> 
+> However, given that all boards are currently the same it could be
+> dropped in the SoC file for now, with a comment saying it should be
+> factored out to boards when the first board with a different address
+> comes along.
 
-Regardless, your description should say what is really happening.  The
-master device doesn't power-manage the clock; some driver power-manages
-it.
+Soren is talking about different solution which I have tried to push to mainline
+in that thread above. OCM configuration is discoverable through system controller
+to find out which configuration is used.
 
-> I am not sure if this approach is final but I looked at runtime.c file
-> and it has couple of API's like pm_runtime_forbid/allow which
-> blocks/unblocks the runtime callbacks according to driver requirement.
-> In the similar line I added this new API.
+>From this simple sram block it looks like that it is 64k of memory but
+it is just one block which can live in low or high address (at 0x0 or 0xfffc0000)
+based on controller configuration.
 
-forbid/allow blocks/unblocks runtime PM according to the user's 
-requirements, not the driver's requirements.
+In total there are 4 blocks with low and high locations.
 
-> > Besides, doesn't the no_callbacks flag already do more or less what you
-> > want?
-> yes to some extent. But I thought its purpose is different so I added 1 more.
-
-The purpose doesn't matter.  If no_callbacks does what you want then 
-you should use it instead of adding another API.
-
-Alan Stern
+Thanks,
+Michal
