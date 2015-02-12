@@ -1,5 +1,5 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 12 Feb 2015 04:52:03 +0000
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Thu, 12 Feb 2015 04:54:33 +0000
 Subject: [PATCH] xen/arm: allow console=hvc0 to be omitted for guests
 In-Reply-To: <alpine.DEB.2.02.1502120433040.29696@kaball.uk.xensource.com>
 References: <1422626319-30752-1-git-send-email-ard.biesheuvel@linaro.org>
@@ -8,11 +8,11 @@ References: <1422626319-30752-1-git-send-email-ard.biesheuvel@linaro.org>
  <CAKv+Gu8kQ5e9dKTp9+e_11pnvskOPjin7ODpxXTj+HmTj+fPag@mail.gmail.com>
  <1423558788.5851.17.camel@citrix.com>
  <alpine.DEB.2.02.1502120433040.29696@kaball.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1502120438510.29696@kaball.uk.xensource.com>
+Message-ID: <1423716873.27551.30.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Feb 2015, Stefano Stabellini wrote:
+On Thu, 2015-02-12 at 04:35 +0000, Stefano Stabellini wrote:
 > On Tue, 10 Feb 2015, Ian Campbell wrote:
 > > On Tue, 2015-02-10 at 15:51 +0800, Ard Biesheuvel wrote:
 > > > > FWIW on x86 this doesn't depend on console_set_on_cmdline, does it need
@@ -45,16 +45,5 @@ On Thu, 12 Feb 2015, Stefano Stabellini wrote:
 > As opposed to regular domUs, that being freshly installed, are supposed
 > to have the correct console parameter?
 
-I got it the other way around, but the question remains: why the
-difference between dom0 and domUs? I guess that on x86 might make sense
-because dom0 has access to vga there.
-
-It is also interesting to note that the actual code is:
-
-if (!xen_initial_domain()) {
-		add_preferred_console("xenboot", 0, NULL);
-		add_preferred_console("tty", 0, NULL);
-		add_preferred_console("hvc", 0, NULL);
-
-that I am guessing it would prioritize a possible graphical console if
-present, like fbcon on pvfb.
+Other way around I think, dom0 has the correct stuff from grub.cfg
+whereas the guest may not.
