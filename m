@@ -1,54 +1,50 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 12 Feb 2015 16:22:47 +0100
-Subject: [PATCH v2 05/10] mtd: pxa3xx_nand: add a default chunk size
-In-Reply-To: <20150212161732.7542331b@bbrezillon>
-References: <1423752816-26219-1-git-send-email-antoine.tenart@free-electrons.com>
- <1423752816-26219-6-git-send-email-antoine.tenart@free-electrons.com>
- <20150212161732.7542331b@bbrezillon>
-Message-ID: <20150212152247.GJ11169@kwain>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 12 Feb 2015 16:30:30 +0100
+Subject: [PATCH] dmaengine: at_xdmac: fix for chan conf simplification
+Message-ID: <1423755030-14257-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 12, 2015 at 04:17:32PM +0100, Boris Brezillon wrote:
-> On Thu, 12 Feb 2015 15:53:31 +0100
-> Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
-> 
-> > Add a default chunk size of 512 in the pxa3xx nand driver.
-> > 
-> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> > ---
-> >  drivers/mtd/nand/pxa3xx_nand.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> > index 64628bff3fa5..8ed045195d31 100644
-> > --- a/drivers/mtd/nand/pxa3xx_nand.c
-> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> > @@ -1430,6 +1430,9 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
-> >  	if (pdata->keep_config && !pxa3xx_nand_detect_config(info))
-> >  		goto KEEP_CONFIG;
-> >  
-> > +	/* Set a default chunk size */
-> 
-> Ditto => no explanation about why you do that.
+When simplificating the channel configuration, the cyclic case has been
+forgotten. It leads to use bad configuration causing many bugs.
 
-Will do.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/dma/at_xdmac.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-> 
-> > +	info->chunk_size = 512;
-> > +
-> >  	ret = pxa3xx_nand_sensing(info);
-> >  	if (ret) {
-> >  		dev_info(&info->pdev->dev, "There is no chip on cs %d!\n",
-> 
-> 
-> 
-> -- 
-> Boris Brezillon, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index 710546d..895b8bd 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -664,7 +664,6 @@ at_xdmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
+ 	struct at_xdmac_desc	*first = NULL, *prev = NULL;
+ 	unsigned int		periods = buf_len / period_len;
+ 	int			i;
+-	u32			cfg;
+ 
+ 	dev_dbg(chan2dev(chan), "%s: buf_addr=%pad, buf_len=%zd, period_len=%zd, dir=%s, flags=0x%lx\n",
+ 		__func__, &buf_addr, buf_len, period_len,
+@@ -700,17 +699,17 @@ at_xdmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
+ 		if (direction == DMA_DEV_TO_MEM) {
+ 			desc->lld.mbr_sa = atchan->per_src_addr;
+ 			desc->lld.mbr_da = buf_addr + i * period_len;
+-			cfg = atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG];
++			desc->lld.mbr_cfg = atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG];
+ 		} else {
+ 			desc->lld.mbr_sa = buf_addr + i * period_len;
+ 			desc->lld.mbr_da = atchan->per_dst_addr;
+-			cfg = atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG];
++			desc->lld.mbr_cfg = atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG];
+ 		}
+ 		desc->lld.mbr_ubc = AT_XDMAC_MBR_UBC_NDV1
+ 			| AT_XDMAC_MBR_UBC_NDEN
+ 			| AT_XDMAC_MBR_UBC_NSEN
+ 			| AT_XDMAC_MBR_UBC_NDE
+-			| period_len >> at_xdmac_get_dwidth(cfg);
++			| period_len >> at_xdmac_get_dwidth(desc->lld.mbr_cfg);
+ 
+ 		dev_dbg(chan2dev(chan),
+ 			 "%s: lld: mbr_sa=%pad, mbr_da=%pad, mbr_ubc=0x%08x\n",
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.2.0
