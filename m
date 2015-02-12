@@ -1,47 +1,46 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Thu, 12 Feb 2015 18:45:52 +0100
-Subject: [PATCH 02/14] ARM: ARMv7M: Enlarge vector table to 256 entries
+Date: Thu, 12 Feb 2015 18:45:55 +0100
+Subject: [PATCH 05/14] ARM: call reset_controller_of_init from default
+ time_init handler
 In-Reply-To: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
 References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1423763164-5606-3-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1423763164-5606-6-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From Cortex-M4 and M7 reference manuals, the nvic supports up to 240
-interrupts. So the number of entries in vectors table is 256.
+Some DT ARM platforms need the reset controllers to be initialized before
+the timers.
+This is the case of the stm32 and sunxi platforms.
 
-This patch adds the missing entries, and change the alignement, so that
-vector_table remains naturally aligned.
+This patch adds a call to reset_controller_of_init() to the default
+.init_time callback when RESET_CONTROLLER is used by the platform.
 
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 ---
- arch/arm/kernel/entry-v7m.S | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/kernel/time.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
-index 8944f49..29a461b 100644
---- a/arch/arm/kernel/entry-v7m.S
-+++ b/arch/arm/kernel/entry-v7m.S
-@@ -117,9 +117,9 @@ ENTRY(__switch_to)
- ENDPROC(__switch_to)
- 
- 	.data
--	.align	8
-+	.align	10
- /*
-- * Vector table (64 words => 256 bytes natural alignment)
-+ * Vector table (256 words => 1024 bytes alignment)
-  */
- ENTRY(vector_table)
- 	.long	0			@ 0 - Reset stack pointer
-@@ -138,6 +138,6 @@ ENTRY(vector_table)
- 	.long	__invalid_entry		@ 13 - Reserved
- 	.long	__pendsv_entry		@ 14 - PendSV
- 	.long	__invalid_entry		@ 15 - SysTick
--	.rept	64 - 16
--	.long	__irq_entry		@ 16..64 - External Interrupts
-+	.rept	256 - 16
-+	.long	__irq_entry		@ 16..256 - External Interrupts
- 	.endr
+diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+index 0cc7e58..4601b1e 100644
+--- a/arch/arm/kernel/time.c
++++ b/arch/arm/kernel/time.c
+@@ -20,6 +20,7 @@
+ #include <linux/irq.h>
+ #include <linux/kernel.h>
+ #include <linux/profile.h>
++#include <linux/reset-controller.h>
+ #include <linux/sched.h>
+ #include <linux/sched_clock.h>
+ #include <linux/smp.h>
+@@ -117,6 +118,9 @@ void __init time_init(void)
+ 	if (machine_desc->init_time) {
+ 		machine_desc->init_time();
+ 	} else {
++#ifdef CONFIG_RESET_CONTROLLER
++		reset_controller_of_init();
++#endif
+ #ifdef CONFIG_COMMON_CLK
+ 		of_clk_init(NULL);
+ #endif
 -- 
 1.9.1
