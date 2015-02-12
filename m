@@ -1,47 +1,54 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 12 Feb 2015 15:55:51 +0900
-Subject: [PATCH v3 1/8] arm64: exynos5433: Enable ARMv8 based Exynos5433 (SoC)
- support
+Date: Thu, 12 Feb 2015 15:55:56 +0900
+Subject: [PATCH v3 6/8] arm64: dts: exynos: Add RTC and ADC dt node for
+ Exynos5433 SoC
 In-Reply-To: <1423724158-23632-1-git-send-email-cw00.choi@samsung.com>
 References: <1423724158-23632-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1423724158-23632-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1423724158-23632-7-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the necessary Kconfig entries to enable
-support for the ARMv8 based Exynos5433 SoC.
+This patch adds RTC (Real Time Clock) dt node for Exynos5433 SoC and adds
+ADC dt node for Exynos5433 SoC. The c1b501564c98a94b4(iio: adc: exynos_adc:
+Add support for exynos7) commit supports the ADC for Exynos7. Exynos5433's ADC
+IP is the same with Exynos7's ADC IP. Exynos5433 has a little different from
+ADCv2 on ADC_CON2 register. Exynos5433 don't contain OSEL/ESEL /HIGHF of ADC_CON2.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Kukjin Kim <kgene@kernel.org>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Acked-by: Inki Dae <inki.dae@samsung.com>
 ---
- arch/arm64/Kconfig | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 15e8e74..4fc08d1 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -153,6 +153,19 @@ config ARCH_EXYNOS
- 	help
- 	  This enables support for Samsung Exynos SoC family
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+index 0168786..8e9ca8d 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+@@ -852,6 +852,24 @@
+ 			clocks = <&xxti>;
+ 		};
  
-+config ARCH_EXYNOS5433
-+	bool "ARMv8 based Samsung Exynos5433"
-+	select ARCH_EXYNOS
-+	select ARM_AMBA
-+	select ARM_GIC
-+	select COMMON_CLK_SAMSUNG
-+	select HAVE_S3C_RTC if RTC_CLASS
-+	select PINCTRL
-+	select PINCTRL_EXYNOS
++		rtc: rtc at 10590000 {
++			compatible = "samsung,exynos3250-rtc";
++			reg = <0x10590000 0x100>;
++			interrupts = <0 385 0>, <0 386 0>;
++			status = "disabled";
++		};
 +
-+	help
-+	  This enables support for Samsung Exynos5433 SoC family
++		adc: adc at 14d10000 {
++			compatible = "samsung,exynos7-adc";
++			reg = <0x14d10000 0x100>;
++			interrupts = <0 438 0>;
++			clock-names = "adc";
++			clocks = <&cmu_peric CLK_PCLK_ADCIF>;
++			#io-channel-cells = <1>;
++			io-channel-ranges;
++			status = "disabled";
++		};
 +
- config ARCH_EXYNOS7
- 	bool "ARMv8 based Samsung Exynos7"
- 	select ARCH_EXYNOS
+ 		timer {
+ 			compatible = "arm,armv8-timer";
+ 			interrupts = <1 13 0xff04>,
 -- 
 1.8.5.5
