@@ -1,39 +1,57 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Feb 2015 20:35:41 +0100
-Subject: [PATCH 4/9] ARM: s3c24xx: use SAMSUNG_WAKEMASK for s3c2416
+Date: Thu, 12 Feb 2015 20:35:38 +0100
+Subject: [PATCH 1/9] ARM: s3c64xx: add I2C dependencies where needed
 In-Reply-To: <1423769746-582629-1-git-send-email-arnd@arndb.de>
 References: <1423769746-582629-1-git-send-email-arnd@arndb.de>
-Message-ID: <1423769746-582629-5-git-send-email-arnd@arndb.de>
+Message-ID: <1423769746-582629-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both s3c2412 and s3c2416 use the s3c2412_pm_prepare code, which
-depends on the common wakemask code, but only s3c2412 currently
-selects the code, leading to a build error for an s3c2416-only
-kernel.
+The SMDK6410_WM1190_EV1 and SMDK6410_WM1192_EV1 add-on
+cards select MFD_WM*_I2C, but they ignore the fact that I2C
+may be compiled as a loadable module.
 
-arch/arm/mach-s3c24xx/built-in.o: In function `s3c2412_pm_prepare':
-:(.text+0x240): undefined reference to `samsung_sync_wakemask'
-arch/arm/mach-s3c24xx/built-in.o:(.data+0xeb0): undefined reference to `s3c2412_subsys'
-
-This adds the missing select.
+This patch adds a dependency on I2C, which means we avoid
+the build errors, but can end up in a case where the options
+are hidden from the user when I2C is turned off.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-s3c24xx/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-s3c64xx/Kconfig | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index 79c49ff77f6e..389173690716 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -362,6 +362,7 @@ if CPU_S3C2416
- config S3C2416_PM
- 	bool
- 	select S3C2412_PM_SLEEP
-+	select SAMSUNG_WAKEMASK
- 	help
- 	  Internal config node to apply S3C2416 power management
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index 26ca2427e53d..eff95e950d81 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -189,6 +189,7 @@ endchoice
+ config SMDK6410_WM1190_EV1
+ 	bool "Support Wolfson Microelectronics 1190-EV1 PMIC card"
+ 	depends on MACH_SMDK6410
++	depends on I2C=y
+ 	select MFD_WM8350_I2C
+ 	select REGULATOR
+ 	select REGULATOR_WM8350
+@@ -203,6 +204,7 @@ config SMDK6410_WM1190_EV1
+ config SMDK6410_WM1192_EV1
+ 	bool "Support Wolfson Microelectronics 1192-EV1 PMIC card"
+ 	depends on MACH_SMDK6410
++	depends on I2C=y
+ 	select MFD_WM831X
+ 	select MFD_WM831X_I2C
+ 	select REGULATOR
+@@ -269,8 +271,8 @@ config MACH_SMARTQ7
  
+ config MACH_WLF_CRAGG_6410
+ 	bool "Wolfson Cragganmore 6410"
++	depends on I2C=y
+ 	select CPU_S3C6410
+-	select I2C
+ 	select LEDS_GPIO_REGISTER
+ 	select S3C64XX_DEV_SPI0
+ 	select S3C64XX_SETUP_FB_24BPP
 -- 
 2.1.0.rc2
