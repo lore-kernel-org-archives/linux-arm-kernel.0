@@ -1,36 +1,54 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Feb 2015 20:42:42 +0100
-Subject: [PATCH 10/11] ARM: sti: always enable RESET_CONTROLLER
+Date: Thu, 12 Feb 2015 20:42:35 +0100
+Subject: [PATCH 03/11] ARM: BCM: put back ARCH_MULTI_V7 dependency for mobile
 In-Reply-To: <1423770163-583064-1-git-send-email-arnd@arndb.de>
 References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
-Message-ID: <1423770163-583064-11-git-send-email-arnd@arndb.de>
+Message-ID: <1423770163-583064-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A lot of the sti device drivers require reset controller support,
-but do not all have individual 'depends on RESET_CONTROLLER'
-statements. Using 'select' here once avoids a lot of build errors
-resulting from this.
+A recent cleanup rearranged the Kconfig file for mach-bcm and
+accidentally dropped the dependency on ARCH_MULTI_V7, which
+makes it possible to now build the two mobile SoC platforms
+on an ARMv6-only kernel, resulting in a log of Kconfig
+warnings like
+
+warning: ARCH_BCM_MOBILE selects ARM_ERRATA_775420 which has unmet direct dependencies (CPU_V7)
+
+and which of course cannot work on any machine.
+
+This puts back the dependencies as before.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Maxime Coquelin <maxime.coquelin@st.com>
-Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
-Cc: Patrice Chotard <patrice.chotard@st.com>
+Fixes: 64e74aa788f99 ("ARM: mach-bcm: ARCH_BCM_MOBILE: remove one level of menu from Kconfig")
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Christian Daudt <bcm@fixthebug.org>
+Cc: Scott Branden <sbranden@broadcom.com>
 ---
- arch/arm/mach-sti/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-bcm/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
-index 8825bc9e2553..3b1ac463a494 100644
---- a/arch/arm/mach-sti/Kconfig
-+++ b/arch/arm/mach-sti/Kconfig
-@@ -13,6 +13,7 @@ menuconfig ARCH_STI
- 	select ARM_ERRATA_775420
- 	select PL310_ERRATA_753970 if CACHE_L2X0
- 	select PL310_ERRATA_769419 if CACHE_L2X0
-+	select RESET_CONTROLLER
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index aaeec78c3ec4..8b11f44bb36e 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -68,7 +68,7 @@ config ARCH_BCM_MOBILE
+ 	  This enables support for systems based on Broadcom mobile SoCs.
+ 
+ config ARCH_BCM_281XX
+-	bool "Broadcom BCM281XX SoC family"
++	bool "Broadcom BCM281XX SoC family" if ARCH_MULTI_V7
+ 	select ARCH_BCM_MOBILE
+ 	select HAVE_SMP
  	help
- 	  Include support for STiH41x SOCs like STiH415/416 using the device tree
- 	  for discovery
+@@ -77,7 +77,7 @@ config ARCH_BCM_281XX
+ 	  variants.
+ 
+ config ARCH_BCM_21664
+-	bool "Broadcom BCM21664 SoC family"
++	bool "Broadcom BCM21664 SoC family" if ARCH_MULTI_V7
+ 	select ARCH_BCM_MOBILE
+ 	select HAVE_SMP
+ 	help
 -- 
 2.1.0.rc2
