@@ -1,43 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Feb 2015 20:42:41 +0100
-Subject: [PATCH 09/11] ARM: rockchip: make rockchip_suspend_init conditional
-In-Reply-To: <1423770163-583064-1-git-send-email-arnd@arndb.de>
-References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
-Message-ID: <1423770163-583064-10-git-send-email-arnd@arndb.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 12 Feb 2015 22:51:25 +0300
+Subject: [PATCH] ARM64:ftrace: fix ftrace_modify_graph_caller for branch
+ replace
+In-Reply-To: <b86ab19fb587cc7acc94a9b990afe0c33a073170.1423755113.git.panand@redhat.com>
+References: <b86ab19fb587cc7acc94a9b990afe0c33a073170.1423755113.git.panand@redhat.com>
+Message-ID: <54DD043D.8000801@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_PM_SLEEP is disabled, we get a build error for rockchips:
+Hello.
 
-arch/arm/mach-rockchip/built-in.o: In function `rockchip_dt_init':
-:(.init.text+0x1c): undefined reference to `rockchip_suspend_init'
+On 02/12/2015 06:33 PM, Pratyush Anand wrote:
 
-This adds an inline alternative for that case.
+> ftrace_enable_ftrace_graph_caller and ftrace_disable_ftrace_graph_caller
+> should replace B(jmp) instruction and not BL(call) instruction.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: linux-rockchip at lists.infradead.org
----
- arch/arm/mach-rockchip/pm.h | 6 ++++++
- 1 file changed, 6 insertions(+)
+> patch 9f1ae7596aad71d18c3e88a3927f3f76b037b8fe did a typo and used
 
-diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
-index 7d752ff39f91..7c889c04604b 100644
---- a/arch/arm/mach-rockchip/pm.h
-+++ b/arch/arm/mach-rockchip/pm.h
-@@ -24,7 +24,13 @@ extern unsigned long rkpm_bootdata_ddr_data;
- extern unsigned long rk3288_bootram_sz;
- 
- void rockchip_slp_cpu_resume(void);
-+#ifdef CONFIG_PM_SLEEP
- void __init rockchip_suspend_init(void);
-+#else
-+static inline void rockchip_suspend_init(void)
-+{
-+}
-+#endif
- 
- /****** following is rk3288 defined **********/
- #define RK3288_PMU_WAKEUP_CFG0		0x00
--- 
-2.1.0.rc2
+    s/patch/commit/. And please specify that commit's summary line in parens.
+
+> AARCH64_INSN_BRANCH_LINK instead of AARCH64_INSN_BRANCH_NOLINK.
+
+> Signed-off-by: Pratyush Anand <panand@redhat.com>
+
+[...]
+
+WBR, Sergei
