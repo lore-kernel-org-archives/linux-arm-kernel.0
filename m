@@ -1,67 +1,56 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 12 Feb 2015 15:42:12 +0800
-Subject: [PATCH] Input: sun4i-ts: add thermal driver dependency
-In-Reply-To: <20150129185151.GA33547@dtor-ws>
-References: <2265502.1m7jYBaqyh@wuerfel> <54C9E63A.6020806@redhat.com>
- <20150129185151.GA33547@dtor-ws>
-Message-ID: <CAGb2v67V-fBKYyoQAf2+LLzOsKbLRGAiRtcQh+bVwHpL7hydtw@mail.gmail.com>
+Date: Thu, 12 Feb 2015 16:00:11 +0800
+Subject: [PATCH v2] Input: sun4i-ts: add thermal driver dependency
+Message-ID: <1423728011-30272-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 30, 2015 at 2:51 AM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> On Thu, Jan 29, 2015 at 08:50:18AM +0100, Hans de Goede wrote:
->> Hi,
->>
->> On 28-01-15 16:17, Arnd Bergmann wrote:
->> >The sun4i-ts driver has had a dependency on the thermal code
->> >since it was first merged,
->>
->> The "since it was first merged bit" is not true, this is caused
->> by recent changes by ChenYu.
->>
->> Other then that no objections from me against the proposed fix.
->>
->> Regards,
->>
->> Hans
->>
->>
->>  but this is not currently enforced
->> >in Kconfig, so in some randconfig builds we get
->> >
->> >drivers/built-in.o: In function `sun4i_ts_remove':
->> >:(.text+0x2376f4): undefined reference to `thermal_zone_of_sensor_unregister'
->> >drivers/built-in.o: In function `sun4i_ts_probe':
->> >:(.text+0x237a94): undefined reference to `thermal_zone_of_sensor_register'
->> >:(.text+0x237c00): undefined reference to `thermal_zone_of_sensor_unregister'
->> >
->> >We need the dependency on THERMAL in order to ensure that this
->> >driver becomes a loadable module if the thermal support itself
->> >is modular, while the dependency on THERMAL_OF is a runtime dependency
->> >and the driver will still build but not work if it is missing.
->> >
->> >Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> >Fixes: 6decea7c5438e2 ("Input: add driver for Allwinner sunxi SoC's rtp controller")
->> >
->> >diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
->> >index 58917525126e..e2447f0063b7 100644
->> >--- a/drivers/input/touchscreen/Kconfig
->> >+++ b/drivers/input/touchscreen/Kconfig
->> >@@ -943,6 +943,8 @@ config TOUCHSCREEN_SUN4I
->> >     tristate "Allwinner sun4i resistive touchscreen controller support"
->> >     depends on ARCH_SUNXI || COMPILE_TEST
->> >     depends on HWMON
->> >+    depends on THERMAL
->> >+    depends on THERMAL_OF || COMPILE_TEST
->
-> THERMAL_OF does have proper stubs and I do not see why we need to force
-> having TERMAL even if we don't do compile test. Should the dependency be:
->
->         depends on !THERMAL_OF || TERMAL
-                                    ^^^ typo
+From: Arnd Bergmann <arnd@arndb.de>
 
-Yes this solves the problem.
+The sun4i-ts driver has had a dependency on the thermal code
+with the addition of the thermal zone sensor support, but this
+is not currently enforced in Kconfig, so with TOUCHSCREEN_SUN4I=y,
+THERMAL=m and THERMAL_OF=y we get
 
+drivers/built-in.o: In function `sun4i_ts_remove':
+:(.text+0x2376f4): undefined reference to `thermal_zone_of_sensor_unregister'
+drivers/built-in.o: In function `sun4i_ts_probe':
+:(.text+0x237a94): undefined reference to `thermal_zone_of_sensor_register'
+:(.text+0x237c00): undefined reference to `thermal_zone_of_sensor_unregister'
 
-ChenYu
+We need the dependency on THERMAL in order to ensure that this
+driver becomes a loadable module if the thermal support itself
+is modular, while the dependency on THERMAL_OF is a runtime
+dependency and the driver will still build if it is missing.
+It is entirely possible to build sun4i-ts without THERMAL_OF
+just to use the hwmon sensors and/or touchscreen.
+
+Fixes: 223697107949 ("Input: sun4i-ts - add thermal zone sensor support")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+[wens at csie.org: Fix description and Kconfig dependencies]
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+
+v2 updates the Kconfig dependencies as Dmitry pointed out, and makes
+the description be more specific on the failing config and why a
+dependency on THERMAL_OF is not required. The failing commit hash
+is also updated.
+
+---
+ drivers/input/touchscreen/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+index 58917525126e..6261fd6d7c3c 100644
+--- a/drivers/input/touchscreen/Kconfig
++++ b/drivers/input/touchscreen/Kconfig
+@@ -943,6 +943,7 @@ config TOUCHSCREEN_SUN4I
+ 	tristate "Allwinner sun4i resistive touchscreen controller support"
+ 	depends on ARCH_SUNXI || COMPILE_TEST
+ 	depends on HWMON
++	depends on THERMAL || !THERMAL_OF
+ 	help
+ 	  This selects support for the resistive touchscreen controller
+ 	  found on Allwinner sunxi SoCs.
+-- 
+2.1.4
