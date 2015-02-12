@@ -1,53 +1,67 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Thu, 12 Feb 2015 20:19:36 +0800
-Subject: [RFC PATCH v2 05/26] ftrace/x86: Ensure rec->flags no change when
- failure occures.
+Date: Thu, 12 Feb 2015 20:19:31 +0800
+Subject: [RFC PATCH v2 04/26] ftrace: don't update record flags if code
+ modification fail.
 In-Reply-To: <1423743476-11927-1-git-send-email-wangnan0@huawei.com>
 References: <1423743476-11927-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1423743576-12224-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1423743571-12180-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't change rec->flags if code modification fails.
+X86 and common ftrace_replace_code() behave differently.
+
+In x86, rec->flags get updated only when (almost) all works are done. In
+common code, rec->flags is updated before code modification, and never
+get restored when code modification fails.
+
+This patch ensures rec->flags kept its original value if
+ftrace_replace_code() fail. A later patch will correct that function
+for x86.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
 ---
- arch/x86/kernel/ftrace.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ kernel/trace/ftrace.c | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
 
-diff --git a/arch/x86/kernel/ftrace.c b/arch/x86/kernel/ftrace.c
-index 8b7b0a5..7bdba65 100644
---- a/arch/x86/kernel/ftrace.c
-+++ b/arch/x86/kernel/ftrace.c
-@@ -497,6 +497,7 @@ static int finish_update(struct dyn_ftrace *rec, int enable)
- {
- 	unsigned long ftrace_addr;
- 	int ret;
-+	unsigned long old_flags = rec->flags;
+diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
+index 45e5cb1..6c6cbb1 100644
+--- a/kernel/trace/ftrace.c
++++ b/kernel/trace/ftrace.c
+@@ -2254,23 +2254,30 @@ __ftrace_replace_code(struct dyn_ftrace *rec, int enable)
+ 	/* This needs to be done before we call ftrace_update_record */
+ 	ftrace_old_addr = ftrace_get_addr_curr(rec);
  
- 	ret = ftrace_update_record(rec, enable);
+-	ret = ftrace_update_record(rec, enable);
++	ret = ftrace_test_record(rec, enable);
  
-@@ -509,14 +510,18 @@ static int finish_update(struct dyn_ftrace *rec, int enable)
- 	case FTRACE_UPDATE_MODIFY_CALL:
+ 	switch (ret) {
+ 	case FTRACE_UPDATE_IGNORE:
+ 		return 0;
+ 
  	case FTRACE_UPDATE_MAKE_CALL:
- 		/* converting nop to call */
--		return finish_update_call(rec, ftrace_addr);
-+		ret = finish_update_call(rec, ftrace_addr);
+-		return ftrace_make_call(rec, ftrace_addr);
++		ret = ftrace_make_call(rec, ftrace_addr);
 +		break;
  
  	case FTRACE_UPDATE_MAKE_NOP:
- 		/* converting a call to a nop */
--		return finish_update_nop(rec);
-+		ret = finish_update_nop(rec);
+-		return ftrace_make_nop(NULL, rec, ftrace_old_addr);
++		ret = ftrace_make_nop(NULL, rec, ftrace_old_addr);
++		break;
+ 
+ 	case FTRACE_UPDATE_MODIFY_CALL:
+-		return ftrace_modify_call(rec, ftrace_old_addr, ftrace_addr);
++		ret = ftrace_modify_call(rec, ftrace_old_addr, ftrace_addr);
 +		break;
  	}
  
--	return 0;
+-	return -1; /* unknow ftrace bug */
 +	if (ret)
-+		rec->flags = old_flags;
-+	return ret;
++		return -1; /* unknow ftrace bug */
++
++	ftrace_update_record(rec, enable);
++	return 0;
  }
  
- static void do_sync_core(void *data)
+ void __weak ftrace_replace_code(int enable)
 -- 
 1.8.4
