@@ -1,50 +1,20 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 12 Feb 2015 14:54:55 -0600
-Subject: [PATCH v3 2/2] remoteproc: add support to handle internal memories
-In-Reply-To: <CAK=WgbbFxNfn5tUeJn-8NehFXAD+=7UW-WtBf3ZFm1xyomFAfA@mail.gmail.com>
-References: <1420838519-15669-1-git-send-email-s-anna@ti.com>
- <1420838519-15669-3-git-send-email-s-anna@ti.com>
- <CAK=WgbaFoUpV315Tg1q=PGc-FkCvKBz2BmO8Fkj_FHa5UuWviw@mail.gmail.com>
- <20150211205757.GI2531@atomide.com>
- <CAK=WgbbFxNfn5tUeJn-8NehFXAD+=7UW-WtBf3ZFm1xyomFAfA@mail.gmail.com>
-Message-ID: <54DD131F.8040704@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 12 Feb 2015 19:12:37 -0200
+Subject: [PATCH] Revert "clk: mxs: Fix invalid 32-bit access to frac
+ registers"
+In-Reply-To: <1423773007-10752-1-git-send-email-stefan.wahren@i2se.com>
+References: <1423773007-10752-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <CAOMZO5Akvc3-h_=wj5P2aM__w8dX4kdLCuELwg9T0t=S5--zrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+On Thu, Feb 12, 2015 at 6:30 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> Revert commit 039e59707507 (clk: mxs: Fix invalid 32-bit access to frac
+> registers), because it leads to a faulty spi communication on mx28evk.
+>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-On 02/12/2015 03:09 AM, Ohad Ben-Cohen wrote:
-> On Wed, Feb 11, 2015 at 10:57 PM, Tony Lindgren <tony@atomide.com> wrote:
->>>> +static int rproc_handle_intmem(struct rproc *rproc, struct fw_rsc_intmem *rsc,
->>>> +                              int offset, int avail)
->>>> +{
->>> ...
->>>> +       va = (__force void *)ioremap_nocache(rsc->pa, rsc->len);
->>>
->>> Back in the days when we developed remoteproc there was a tremendous
->>> effort to move away from ioremap when not strictly needed.
->>
->> The use of ioremap in general is just fine for drivers as long
->> as they access a dedicated area to the specific device. Accessing
->> random registers and memory in the SoC is what I'm worried about.
-> 
-> Yes, the proposed interface essentially allows exactly this random
-> access, since the parameters to ioremap would be provided from the
-> user space (specifically from the resource table contained within the
-> firmware of the remote processor).
+Thanks, Stefan
 
-My original motivation was that it would only need to be added on
-firmwares requiring support for loading into internal memories,
-otherwise, these are something left to be managed by the software
-running on the remote processor completely, and MPU will not even touch
-them.
-
-So, let me know if this is a NAK. If so, we have two options - one to go
-the sram node model where each of them have to be defined separately,
-and have a specific property in the rproc nodes to be able to get the
-gen_pool handles. The other one is simply to define these as <reg> and
-use devm_ioremap_resource() (so use DT for defining the regions instead
-of a resource table entry).
-
-regards
-Suman
+Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
