@@ -1,264 +1,104 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 12 Feb 2015 14:40:02 +0100
-Subject: [PATCH v3 2/4] serial: mxs-auart: Use helpers for gpio irqs
-In-Reply-To: <1423241735-30387-2-git-send-email-j.uzycki@elproma.com.pl>
-References: <1423241735-30387-1-git-send-email-j.uzycki@elproma.com.pl>
- <1423241735-30387-2-git-send-email-j.uzycki@elproma.com.pl>
-Message-ID: <20150212134002.GF10842@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 12 Feb 2015 14:41:31 +0100
+Subject: [PATCH RFC v9 01/20] clk: divider: Correct parent clk round rate
+ if no bestdiv is normally found
+In-Reply-To: <20150212125646.GT8656@n2100.arm.linux.org.uk>
+References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
+ <1423720903-24806-2-git-send-email-Ying.Liu@freescale.com>
+ <20150212093356.GR12209@pengutronix.de>
+ <20150212103944.GA1290@victor>
+ <20150212122405.GW12209@pengutronix.de>
+ <20150212125646.GT8656@n2100.arm.linux.org.uk>
+Message-ID: <20150212134131.GX12209@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 06, 2015 at 05:55:33PM +0100, Janusz Uzycki wrote:
-> The patch updates mxs-auart driver to use new mctrl_gpio helpers for
-> gpio irqs. The code is much simpler now.
+On Thu, Feb 12, 2015 at 12:56:46PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Feb 12, 2015 at 01:24:05PM +0100, Sascha Hauer wrote:
+> > On Thu, Feb 12, 2015 at 06:39:45PM +0800, Liu Ying wrote:
+> > > On Thu, Feb 12, 2015 at 10:33:56AM +0100, Sascha Hauer wrote:
+> > > > On Thu, Feb 12, 2015 at 02:01:24PM +0800, Liu Ying wrote:
+> > > > > If no best divider is normally found, we will try to use the maximum divider.
+> > > > > We should not set the parent clock rate to be 1Hz by force for being rounded.
+> > > > > Instead, we should take the maximum divider as a base and calculate a correct
+> > > > > parent clock rate for being rounded.
+> > > > 
+> > > > Please add an explanation why you think the current code is wrong and
+> > > > what this actually fixes, maybe an example?
+> > > 
+> > > The MIPI DSI panel's pixel clock rate is 26.4MHz and it's derived from PLL5 on
+> > > the MX6DL SabreSD board.
+> > > 
+> > > These are the clock tree summaries with or without the patch applied:
+> > > 1) With the patch applied:
+> > > pll5_bypass_src                       1            1    24000000          0 0
+> > >    pll5                               1            1   844800048          0 0
+> > >       pll5_bypass                     1            1   844800048          0 0
+> > >          pll5_video                   1            1   844800048          0 0
+> > >             pll5_post_div             1            1   211200012          0 0
+> > >                pll5_video_div           1            1   211200012        0 0
+> > >                   ipu1_di0_pre_sel           1            1   211200012   0 0
+> > >                      ipu1_di0_pre           1            1    26400002    0 0
+> > >                         ipu1_di0_sel           1            1    26400002 0 0
+> > >                            ipu1_di0           1            1    26400002  0 0
+> > > 
+> > > 2) Without the patch applied:
+> > > pll5_bypass_src                       1            1    24000000          0 0
+> > >    pll5                               1            1   648000000          0 0
+> > >       pll5_bypass                     1            1   648000000          0 0
+> > >          pll5_video                   1            1   648000000          0 0
+> > >             pll5_post_div             1            1   162000000          0 0
+> > >                pll5_video_div           1            1    40500000        0 0
+> > >                   ipu1_di0_pre_sel           1            1    40500000   0 0
+> > >                      ipu1_di0_pre           1            1    20250000    0 0
+> > >                         ipu1_di0_sel           1            1    20250000 0 0
+> > >                            ipu1_di0           1            1    20250000  0 0
+> > 
+> > This seems to be broken since:
+> > 
+> > | commit b11d282dbea27db1788893115dfca8a7856bf205
+> > | Author: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > | Date:   Thu Feb 13 12:03:59 2014 +0200
+> > | 
+> > |     clk: divider: fix rate calculation for fractional rates
+> > 
+> > This patch fixed a case when clk_set_rate(clk_round_rate(rate)) resulted
+> > in a lower frequency than clk_round_rate(rate) returned.
+> > 
+> > Since then the MULT_ROUND_UP in clk_divider_bestdiv() is inconsistent to
+> > the rest of the divider. Maybe this should be a simple rate * i now, but
+> > I'm unsure what side effects this has.
+> > 
+> > I think your patch only fixes the behaviour in your case by accident,
+> > it's not a correct fix for this issue.
 > 
-> Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
-> ---
+> Well, it's defined that:
 > 
-> Changes since RFC v2:
->  - fixed comments in *_ms functions to match the coding style
->    (credits to Uwe Kleine-K?nig)
->  - rebased to next-20150204
+> 	new_rate = clk_round_rate(clk, rate);
 > 
-> ---
->  drivers/tty/serial/mxs-auart.c | 137 +++++------------------------------------
->  1 file changed, 17 insertions(+), 120 deletions(-)
+> returns the rate which you would get if you did:
 > 
-> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-> index d1298b6..5a8cf2c 100644
-> --- a/drivers/tty/serial/mxs-auart.c
-> +++ b/drivers/tty/serial/mxs-auart.c
-> @@ -149,7 +149,6 @@ struct mxs_auart_port {
->  #define MXS_AUART_DMA_RX_READY	3  /* bit 3 */
->  #define MXS_AUART_RTSCTS	4  /* bit 4 */
->  	unsigned long flags;
-> -	unsigned int mctrl_prev;
->  	enum mxs_auart_type devtype;
->  
->  	struct clk *clk;
-> @@ -165,7 +164,6 @@ struct mxs_auart_port {
->  	void *rx_dma_buf;
->  
->  	struct mctrl_gpios	*gpios;
-> -	int			gpio_irq[UART_GPIO_MAX];
->  	bool			ms_irq_enabled;
->  };
->  
-> @@ -431,29 +429,6 @@ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
->  	mctrl_gpio_set(s->gpios, mctrl);
->  }
->  
-> -#define MCTRL_ANY_DELTA        (TIOCM_RI | TIOCM_DSR | TIOCM_CD | TIOCM_CTS)
-> -static u32 mxs_auart_modem_status(struct mxs_auart_port *s, u32 mctrl)
-> -{
-> -	u32 mctrl_diff;
-> -
-> -	mctrl_diff = mctrl ^ s->mctrl_prev;
-> -	s->mctrl_prev = mctrl;
-> -	if (mctrl_diff & MCTRL_ANY_DELTA && s->ms_irq_enabled &&
-> -						s->port.state != NULL) {
-> -		if (mctrl_diff & TIOCM_RI)
-> -			s->port.icount.rng++;
-> -		if (mctrl_diff & TIOCM_DSR)
-> -			s->port.icount.dsr++;
-> -		if (mctrl_diff & TIOCM_CD)
-> -			uart_handle_dcd_change(&s->port, mctrl & TIOCM_CD);
-> -		if (mctrl_diff & TIOCM_CTS)
-> -			uart_handle_cts_change(&s->port, mctrl & TIOCM_CTS);
-> -
-> -		wake_up_interruptible(&s->port.state->port.delta_msr_wait);
-> -	}
-> -	return mctrl;
-> -}
-> -
->  static u32 mxs_auart_get_mctrl(struct uart_port *u)
->  {
->  	struct mxs_auart_port *s = to_auart_port(u);
-> @@ -481,18 +456,11 @@ static void mxs_auart_enable_ms(struct uart_port *port)
->  
->  	s->ms_irq_enabled = true;
->  
-> -	if (s->gpio_irq[UART_GPIO_CTS] >= 0)
-> -		enable_irq(s->gpio_irq[UART_GPIO_CTS]);
-> -	/* TODO: enable AUART_INTR_CTSMIEN otherwise */
-> -
-> -	if (s->gpio_irq[UART_GPIO_DSR] >= 0)
-> -		enable_irq(s->gpio_irq[UART_GPIO_DSR]);
-> -
-> -	if (s->gpio_irq[UART_GPIO_RI] >= 0)
-> -		enable_irq(s->gpio_irq[UART_GPIO_RI]);
-> -
-> -	if (s->gpio_irq[UART_GPIO_DCD] >= 0)
-> -		enable_irq(s->gpio_irq[UART_GPIO_DCD]);
-> +	mctrl_gpio_enable_ms(s->gpios);
-> +	/*
-> +	 * TODO: enable AUART_INTR_CTSMIEN if CTS isn't handled by
-> +	 * mctrl_gpio.
-> +	 */
->  }
->  
->  /*
-> @@ -510,18 +478,11 @@ static void mxs_auart_disable_ms(struct uart_port *port)
->  
->  	s->ms_irq_enabled = false;
->  
-> -	if (s->gpio_irq[UART_GPIO_CTS] >= 0)
-> -		disable_irq(s->gpio_irq[UART_GPIO_CTS]);
-> -	/* TODO: disable AUART_INTR_CTSMIEN otherwise */
-> -
-> -	if (s->gpio_irq[UART_GPIO_DSR] >= 0)
-> -		disable_irq(s->gpio_irq[UART_GPIO_DSR]);
-> -
-> -	if (s->gpio_irq[UART_GPIO_RI] >= 0)
-> -		disable_irq(s->gpio_irq[UART_GPIO_RI]);
-> -
-> -	if (s->gpio_irq[UART_GPIO_DCD] >= 0)
-> -		disable_irq(s->gpio_irq[UART_GPIO_DCD]);
-> +	mctrl_gpio_disable_ms(s->gpios);
-> +	/*
-> +	 * TODO: disable AUART_INTR_CTSMIEN if CTS isn't handled by
-> +	 * mctrl_gpio.
-> +	 */
->  }
->  
->  static int mxs_auart_dma_prep_rx(struct mxs_auart_port *s);
-> @@ -797,7 +758,6 @@ static irqreturn_t mxs_auart_irq_handle(int irq, void *context)
->  {
->  	u32 istat;
->  	struct mxs_auart_port *s = context;
-> -	u32 mctrl_temp = s->mctrl_prev;
->  	u32 stat = readl(s->port.membase + AUART_STAT);
->  
->  	istat = readl(s->port.membase + AUART_INTR);
-> @@ -809,16 +769,6 @@ static irqreturn_t mxs_auart_irq_handle(int irq, void *context)
->  		| AUART_INTR_CTSMIS),
->  			s->port.membase + AUART_INTR_CLR);
->  
-> -	/*
-> -	 * Dealing with GPIO interrupt
-> -	 */
-> -	if (irq == s->gpio_irq[UART_GPIO_CTS] ||
-> -	    irq == s->gpio_irq[UART_GPIO_DCD] ||
-> -	    irq == s->gpio_irq[UART_GPIO_DSR] ||
-> -	    irq == s->gpio_irq[UART_GPIO_RI])
-> -		mxs_auart_modem_status(s,
-> -				mctrl_gpio_get(s->gpios, &mctrl_temp));
-> -
->  	if (istat & AUART_INTR_CTSMIS) {
->  		if (CTS_AT_AUART() && s->ms_irq_enabled)
->  			uart_handle_cts_change(&s->port,
-> @@ -883,9 +833,6 @@ static int mxs_auart_startup(struct uart_port *u)
->  	 */
->  	writel(AUART_LINECTRL_FEN, u->membase + AUART_LINECTRL_SET);
->  
-> -	/* get initial status of modem lines */
-> -	mctrl_gpio_get(s->gpios, &s->mctrl_prev);
-> -
->  	s->ms_irq_enabled = false;
->  	return 0;
->  }
-> @@ -1155,71 +1102,23 @@ static int serial_mxs_probe_dt(struct mxs_auart_port *s,
->  	return 0;
->  }
->  
-> -static bool mxs_auart_init_gpios(struct mxs_auart_port *s, struct device *dev)
-> +static bool mxs_auart_init_gpios(struct mxs_auart_port *s)
->  {
-> -	enum mctrl_gpio_idx i;
-> -	struct gpio_desc *gpiod;
-> -
-> -	s->gpios = mctrl_gpio_init(dev, 0);
-> +	s->gpios = mctrl_gpio_init_dt(&s->port, 0);
->  	if (IS_ERR_OR_NULL(s->gpios))
-mctrl_gpio_init_dt never returns NULL.
+> 	clk_set_rate(clk, rate);
+> 	new_rate = clk_get_rate(clk);
+> 
+> The reasoning here is that clk_round_rate() gives you a way to query what
+> rate you would get if you were to ask for the rate to be set, without
+> effecting a change in the hardware.
+> 
+> The idea that you should call clk_round_rate() first before clk_set_rate()
+> and pass the returned rounded rate into clk_set_rate() is really idiotic
+> given that.  Please don't do it, and please remove code which does it, and
+> in review comment on it.  Thanks.
 
-IMHO mxs_auart_init_gpios should return PTR_ERR(s->gpios) in this case.
-(So the return type has to change.)
+Tomis patch is based on the assumption that clk_set_rate(clk_round_rate(rate))
+is equal to clk_round_rate(rate). So when this assumption is wrong then
+it should simply be reverted.
+So Liu, could you test if reverting Tomis patch fixes your problem?
 
->  		return false;
->  
->  	/* Block (enabled before) DMA option if RTS or CTS is GPIO line */
->  	if (!RTS_AT_AUART() || !CTS_AT_AUART()) {
->  		if (test_bit(MXS_AUART_RTSCTS, &s->flags))
-> -			dev_warn(dev,
-> +			dev_warn(s->dev,
->  				 "DMA and flow control via gpio may cause some problems. DMA disabled!\n");
->  		clear_bit(MXS_AUART_RTSCTS, &s->flags);
->  	}
->  
-> -	for (i = 0; i < UART_GPIO_MAX; i++) {
-> -		gpiod = mctrl_gpio_to_gpiod(s->gpios, i);
-> -		if (gpiod && (gpiod_get_direction(gpiod) == GPIOF_DIR_IN))
-> -			s->gpio_irq[i] = gpiod_to_irq(gpiod);
-> -		else
-> -			s->gpio_irq[i] = -EINVAL;
-> -	}
-> -
->  	return true;
->  }
->  
-> -static void mxs_auart_free_gpio_irq(struct mxs_auart_port *s)
-> -{
-> -	enum mctrl_gpio_idx i;
-> -
-> -	for (i = 0; i < UART_GPIO_MAX; i++)
-> -		if (s->gpio_irq[i] >= 0)
-> -			free_irq(s->gpio_irq[i], s);
-> -}
-> -
-> -static int mxs_auart_request_gpio_irq(struct mxs_auart_port *s)
-> -{
-> -	int *irq = s->gpio_irq;
-> -	enum mctrl_gpio_idx i;
-> -	int err = 0;
-> -
-> -	for (i = 0; (i < UART_GPIO_MAX) && !err; i++) {
-> -		if (irq[i] < 0)
-> -			continue;
-> -
-> -		irq_set_status_flags(irq[i], IRQ_NOAUTOEN);
-> -		err = request_irq(irq[i], mxs_auart_irq_handle,
-> -				IRQ_TYPE_EDGE_BOTH, dev_name(s->dev), s);
-> -		if (err)
-> -			dev_err(s->dev, "%s - Can't get %d irq\n",
-> -				__func__, irq[i]);
-> -	}
-> -
-> -	/*
-> -	 * If something went wrong, rollback.
-> -	 */
-> -	while (err && (--i >= 0))
-> -		if (irq[i] >= 0)
-> -			free_irq(irq[i], s);
-> -
-> -	return err;
-> -}
-> -
->  static int mxs_auart_probe(struct platform_device *pdev)
->  {
->  	const struct of_device_id *of_id =
-> @@ -1262,8 +1161,6 @@ static int mxs_auart_probe(struct platform_device *pdev)
->  	s->port.type = PORT_IMX;
->  	s->port.dev = s->dev = &pdev->dev;
->  
-> -	s->mctrl_prev = 0;
-> -
->  	irq = platform_get_irq(pdev, 0);
->  	if (irq < 0)
->  		return irq;
-> @@ -1276,14 +1173,14 @@ static int mxs_auart_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, s);
->  
-> -	if (!mxs_auart_init_gpios(s, &pdev->dev))
-> +	if (!mxs_auart_init_gpios(s))
->  		dev_err(&pdev->dev,
->  			"Failed to initialize GPIOs. The serial port may not work as expected\n");
-Better return failure in this case.
-
-Best regards
-Uwe
+Sascha
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
