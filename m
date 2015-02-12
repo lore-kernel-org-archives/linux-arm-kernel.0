@@ -1,116 +1,52 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Feb 2015 20:35:43 +0100
-Subject: [PATCH 6/9] ARM: s3c24xx: fix header file inclusions
+Date: Thu, 12 Feb 2015 20:35:44 +0100
+Subject: [PATCH 7/9] ARM: s3c24xx: avoid a Kconfig warning
 In-Reply-To: <1423769746-582629-1-git-send-email-arnd@arndb.de>
 References: <1423769746-582629-1-git-send-email-arnd@arndb.de>
-Message-ID: <1423769746-582629-7-git-send-email-arnd@arndb.de>
+Message-ID: <1423769746-582629-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pm-core.h file does not include all the necessary headers,
-and has a static declaration for a function that is not
-defined in the same file, causing SAMSUNG_PM_DEBUG to
-break on s3c24xx:
+The PM_H1940 symbol is used by two platforms: RX3715 and RX1950. However,
+it is hidden inside of the the CPU_S3C2410 conditional, which is only
+set by one of them, so we get a lot of randconfig warnings like
 
-arch/arm/mach-s3c24xx/include/mach/pm-core.h:50:91: warning: 's3c_pm_show_resume_irqs' used but never defined
-arch/arm/mach-s3c24xx/include/mach/pm-core.h: In function 's3c_pm_debug_init_uart':
-arch/arm/mach-s3c24xx/include/mach/pm-core.h:16:34: error: 'S3C2410_CLKCON' undeclared (first use in this function)
-  unsigned long tmp = __raw_readl(S3C2410_CLKCON);
-                                  ^
+warning: (MACH_RX3715 && MACH_RX1950) selects PM_H1940 which has unmet direct dependencies (ARCH_S3C24XX && CPU_S3C2410)
 
-This moves the code around slightly to avoid the errors.
+This moves it outside of the conditional to remove the warnings.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-s3c24xx/include/mach/pm-core.h | 24 ++++++++++++++++++++++--
- arch/arm/plat-samsung/pm-debug.c             |  1 +
- arch/arm/plat-samsung/pm.c                   | 20 --------------------
- 3 files changed, 23 insertions(+), 22 deletions(-)
+ arch/arm/mach-s3c24xx/Kconfig | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-s3c24xx/include/mach/pm-core.h b/arch/arm/mach-s3c24xx/include/mach/pm-core.h
-index 2eef7e6f7675..69459dbbdcad 100644
---- a/arch/arm/mach-s3c24xx/include/mach/pm-core.h
-+++ b/arch/arm/mach-s3c24xx/include/mach/pm-core.h
-@@ -10,6 +10,11 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/delay.h>
-+#include <linux/io.h>
+diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+index a6d3b5bcc4c2..23bec3a85b22 100644
+--- a/arch/arm/mach-s3c24xx/Kconfig
++++ b/arch/arm/mach-s3c24xx/Kconfig
+@@ -228,11 +228,6 @@ config H1940BT
+ 	  This is a simple driver that is able to control
+ 	  the state of built in bluetooth chip on h1940.
+ 
+-config PM_H1940
+-	bool
+-	help
+-	  Internal node for H1940 and related PM
+-
+ config MACH_N30
+ 	bool "Acer N30 family"
+ 	select S3C_DEV_NAND
+@@ -585,6 +580,11 @@ config MACH_SMDK2443
+ 
+ endif	# CPU_S3C2443
+ 
++config PM_H1940
++	bool
++	help
++	  Internal node for H1940 and related PM
 +
-+#include "regs-clock.h"
-+#include "regs-irq.h"
+ endmenu	# SAMSUNG S3C24XX SoCs Support
  
- static inline void s3c_pm_debug_init_uart(void)
- {
-@@ -42,8 +47,23 @@ static inline void s3c_pm_arch_stop_clocks(void)
- 	__raw_writel(0x00, S3C2410_CLKCON);  /* turn off clocks over sleep */
- }
- 
--static void s3c_pm_show_resume_irqs(int start, unsigned long which,
--				    unsigned long mask);
-+/* s3c2410_pm_show_resume_irqs
-+ *
-+ * print any IRQs asserted at resume time (ie, we woke from)
-+*/
-+static inline void s3c_pm_show_resume_irqs(int start, unsigned long which,
-+					   unsigned long mask)
-+{
-+	int i;
-+
-+	which &= ~mask;
-+
-+	for (i = 0; i <= 31; i++) {
-+		if (which & (1L<<i)) {
-+			S3C_PMDBG("IRQ %d asserted@resume\n", start+i);
-+		}
-+	}
-+}
- 
- static inline void s3c_pm_arch_show_resume_irqs(void)
- {
-diff --git a/arch/arm/plat-samsung/pm-debug.c b/arch/arm/plat-samsung/pm-debug.c
-index 39609601f407..64e15da33b42 100644
---- a/arch/arm/plat-samsung/pm-debug.c
-+++ b/arch/arm/plat-samsung/pm-debug.c
-@@ -23,6 +23,7 @@
- #include <plat/pm-common.h>
- 
- #ifdef CONFIG_SAMSUNG_ATAGS
-+#include <plat/pm.h>
- #include <mach/pm-core.h>
- #else
- static inline void s3c_pm_debug_init_uart(void) {}
-diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
-index f8c0f9797dcf..82777c649774 100644
---- a/arch/arm/plat-samsung/pm.c
-+++ b/arch/arm/plat-samsung/pm.c
-@@ -65,26 +65,6 @@ int s3c_irqext_wake(struct irq_data *data, unsigned int state)
- 	return 0;
- }
- 
--/* s3c2410_pm_show_resume_irqs
-- *
-- * print any IRQs asserted at resume time (ie, we woke from)
--*/
--static void __maybe_unused s3c_pm_show_resume_irqs(int start,
--						   unsigned long which,
--						   unsigned long mask)
--{
--	int i;
--
--	which &= ~mask;
--
--	for (i = 0; i <= 31; i++) {
--		if (which & (1L<<i)) {
--			S3C_PMDBG("IRQ %d asserted@resume\n", start+i);
--		}
--	}
--}
--
--
- void (*pm_cpu_prep)(void);
- int (*pm_cpu_sleep)(unsigned long);
- 
+ endif	# ARCH_S3C24XX
 -- 
 2.1.0.rc2
