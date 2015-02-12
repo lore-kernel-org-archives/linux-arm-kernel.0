@@ -1,85 +1,44 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 12 Feb 2015 10:26:42 +0100
-Subject: [PATCH RFC v9 09/20] drm/dsi: Add a helper to get bits per pixel
- of MIPI DSI pixel format
-In-Reply-To: <1423720903-24806-10-git-send-email-Ying.Liu@freescale.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 12 Feb 2015 10:33:56 +0100
+Subject: [PATCH RFC v9 01/20] clk: divider: Correct parent clk round rate
+ if no bestdiv is normally found
+In-Reply-To: <1423720903-24806-2-git-send-email-Ying.Liu@freescale.com>
 References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
- <1423720903-24806-10-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <20150212092642.GY24485@phenom.ffwll.local>
+ <1423720903-24806-2-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <20150212093356.GR12209@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 12, 2015 at 02:01:32PM +0800, Liu Ying wrote:
-> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
-> ---
-> v8->v9:
->  * Rebase onto the imx-drm/next branch of Philipp Zabel's open git repository.
-> 
-> v7->v8:
->  * None.
-> 
-> v6->v7:
->  * None.
-> 
-> v5->v6:
->  * Address the over 80 characters in one line warning reported by the
->    checkpatch.pl script.
-> 
-> v4->v5:
->  * None.
-> 
-> v3->v4:
->  * None.
-> 
-> v2->v3:
->  * None.
-> 
-> v1->v2:
->  * Thierry Reding suggested that the mipi_dsi_pixel_format_to_bpp() function
->    could be placed at the common DRM MIPI DSI driver.
->    This patch is newly added.
-> 
->  include/drm/drm_mipi_dsi.h | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/include/drm/drm_mipi_dsi.h b/include/drm/drm_mipi_dsi.h
-> index f1d8d0d..3662021 100644
-> --- a/include/drm/drm_mipi_dsi.h
-> +++ b/include/drm/drm_mipi_dsi.h
-> @@ -163,6 +163,20 @@ static inline struct mipi_dsi_device *to_mipi_dsi_device(struct device *dev)
->  	return container_of(dev, struct mipi_dsi_device, dev);
->  }
+On Thu, Feb 12, 2015 at 02:01:24PM +0800, Liu Ying wrote:
+> If no best divider is normally found, we will try to use the maximum divider.
+> We should not set the parent clock rate to be 1Hz by force for being rounded.
+> Instead, we should take the maximum divider as a base and calculate a correct
+> parent clock rate for being rounded.
+
+Please add an explanation why you think the current code is wrong and
+what this actually fixes, maybe an example?
+
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index c0a842b..f641d4b 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -311,7 +311,8 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
 >  
-> +static inline int mipi_dsi_pixel_format_to_bpp(enum mipi_dsi_pixel_format fmt)
+>  	if (!bestdiv) {
+>  		bestdiv = _get_maxdiv(divider);
+> -		*best_parent_rate = __clk_round_rate(__clk_get_parent(hw->clk), 1);
+> +		*best_parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
+> +						MULT_ROUND_UP(rate, bestdiv));
 
-Kerneldoc seems to be missing for this one.
--Daniel
+When getting into the if(!bestdiv) it means that the lowest possible
+rate we can archieve is still higher than the target rate, so setting
+the parent rate as low as possible seems sane to me. Why do you think
+this is wrong? In which case this even makes a difference?
 
-> +{
-> +	switch (fmt) {
-> +	case MIPI_DSI_FMT_RGB888:
-> +	case MIPI_DSI_FMT_RGB666:
-> +		return 24;
-> +	case MIPI_DSI_FMT_RGB666_PACKED:
-> +		return 18;
-> +	case MIPI_DSI_FMT_RGB565:
-> +		return 16;
-> +	}
-> +	return -EINVAL;
-> +}
-> +
->  struct mipi_dsi_device *of_find_mipi_dsi_device_by_node(struct device_node *np);
->  int mipi_dsi_attach(struct mipi_dsi_device *dsi);
->  int mipi_dsi_detach(struct mipi_dsi_device *dsi);
-> -- 
-> 2.1.0
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+Sascha
 
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
