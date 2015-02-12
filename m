@@ -1,67 +1,109 @@
-From: jgchunter@gmail.com (Jon Hunter)
-Date: Thu, 12 Feb 2015 12:34:03 +0000
-Subject: [PATCH] ARM: OMAP1: PM: fix some build warnings on 1510-only
- Kconfigs
-In-Reply-To: <54DC8DF7.1070302@gmail.com>
-References: <alpine.DEB.2.02.1502070020530.3767@utopia.booyaka.com>
- <54D9CFBC.3070405@nvidia.com> <54D9E42C.7010105@gmail.com>
- <alpine.DEB.2.02.1502110218090.3767@utopia.booyaka.com>
- <20150211203757.GH2531@atomide.com>
- <alpine.DEB.2.02.1502112056200.3767@utopia.booyaka.com>
- <20150211211454.GJ2531@atomide.com> <54DC8DF7.1070302@gmail.com>
-Message-ID: <54DC9DBB.4000601@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 12 Feb 2015 12:49:49 +0000
+Subject: [PATCH 2/2] ARM: perf: Add support for Scorpion PMUs
+In-Reply-To: <1423616724-20849-3-git-send-email-sboyd@codeaurora.org>
+References: <1423616724-20849-1-git-send-email-sboyd@codeaurora.org>
+ <1423616724-20849-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150212124949.GE1522@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On 02/12/2015 11:26 AM, Jon Hunter wrote:
-> 
-> On 02/11/2015 09:14 PM, Tony Lindgren wrote:
->> * Paul Walmsley <paul@pwsan.com> [150211 13:03]:
->>> On Wed, 11 Feb 2015, Tony Lindgren wrote:
->>>
->>>> * Paul Walmsley <paul@pwsan.com> [150210 18:28]:
->>>>> On Tue, 10 Feb 2015, Jon Hunter wrote:
->>>>>> On 07/02/2015 00:23, Paul Walmsley wrote:
->>>>>
->>>>>> Unfortunately, there is not a single TRM for the omap5910 but individual 
->>>>>> documents for each chapter in the original TRM. Check out the "OMAP5910 
->>>>>> Dual-Core Processor Timer Reference Guide" and possibly the "OMAP5910 
->>>>>> Dual-Core Processor Clock Generation and System Reset Management 
->>>>>> Reference Guide"
->>>>>>
->>>>>> The omap15xx/5910 did have a 32k timer but as you can see it appears it
->>>>>> was never supported by the kernel for this device (not sure why). I do
->>>>>> recall that there is some errata regarding the 32k timer, if you look at
->>>>>> the omap5910 errata document and search for 32k you should find it.
->>>>>
->>>>> OK thanks for the context.  I probably am not going to investigate adding 
->>>>> support for this timer on OMAP1510/5910 - am primarily trying to avoid 
->>>>> causing a regression on the existing platforms.
->>>>
->>>> At least I've never seen the 32KiHz timer registers in any 15xx
->>>> documentation. Jon are you sure you're not mixing up 5910 (15xx)
->>>> and 5912 (16xx)?
->>>
->>> It's documented in the OMAP5910 Timer Reference Guide (SPRU682A) Section 3 
->>> "32-kHz Timer", at the link Jon mentioned.  Have not checked the errata 
->>> that Jon mentioned though.
->>
->> Interesting. Looks like it's the same as on 16xx at 0xfffb9000.
->> AFAIK that never worked on 15xx. Or maybe the issue was that 15xx
->> is missing the constantly running 32KiHz counter making the timer
->> unusable from PM point of view as the clockevent alone is not enough.
->>
->>> Regarding the patch: I'd suggest keeping the compilation warning fixes 
->>> (which was the original purpose of the patch) from anything that changes 
->>> the logic too much.   That way if there's an error in the patch that 
->>> changes the logic and it needs to be reverted, it won't also revert the 
->>> warning fixes.
->>
->> Makes sense to me.
-> 
-> Yes that's fine with me as well, I don't wish to over complicate
-> matters. I have a couple minor comments though and will respond to the
-> latest patch rev.
+I haven't given this a thorough review, but I spotted a couple of items
+below.
 
-Actually, nevermind the latest version is fine with me. Jon
+On Wed, Feb 11, 2015 at 01:05:24AM +0000, Stephen Boyd wrote:
+> Scorpion supports a set of local performance monitor event
+> selection registers (LPM) sitting behind a cp15 based interface
+> that extend the architected PMU events to include Scorpion CPU
+> and Venum VFP specific events. To use these events the user is
+> expected to program the lpm register with the event code shifted
+> into the group they care about and then point the PMNx event at
+> that region+group combo by writing a LPMn_GROUPx event. Add
+> support for this hardware.
+> 
+> Note: the raw event number is a pure software construct that
+> allows us to map the multi-dimensional number space of regions,
+> groups, and event codes into a flat event number space suitable
+> for use by the perf framework.
+> 
+> This is based on code originally written by Ashwin Chaugule and
+> Neil Leeder [1] massed to become similar to the Krait PMU support
+> code.
+> 
+> [1] https://www.codeaurora.org/cgit/quic/la/kernel/msm/tree/arch/arm/kernel/perf_event_msm.c?h=msm-3.4
+> 
+> Cc: Neil Leeder <nleeder@codeaurora.org>
+> Cc: Ashwin Chaugule <ashwinc@codeaurora.org>
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  Documentation/devicetree/bindings/arm/pmu.txt |   2 +
+>  arch/arm/kernel/perf_event_cpu.c              |   2 +
+>  arch/arm/kernel/perf_event_v7.c               | 395 ++++++++++++++++++++++++++
+>  3 files changed, 399 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+> index 75ef91d08f3b..6e54a9d88b7a 100644
+> --- a/Documentation/devicetree/bindings/arm/pmu.txt
+> +++ b/Documentation/devicetree/bindings/arm/pmu.txt
+> @@ -18,6 +18,8 @@ Required properties:
+>         "arm,arm11mpcore-pmu"
+>         "arm,arm1176-pmu"
+>         "arm,arm1136-pmu"
+> +       "qcom,scorpion-pmu"
+> +       "qcom,scorpion-mp-pmu"
+
+Is the PMU any different in the MP and !MP variants? The code doesn't
+seem to handle the two any differently and will pass either to userspace
+as "armv7_scorpion".
+
+If there is some difference that we don't handle right now, that's fine,
+it just looks a little odd.
+
+[...]
+
+> +static const unsigned scorpion_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+> +                                           [PERF_COUNT_HW_CACHE_OP_MAX]
+> +                                           [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
+> +       PERF_CACHE_MAP_ALL_UNSUPPORTED,
+> +       /*
+> +        * The performance counters don't differentiate between read and write
+> +        * accesses/misses so this isn't strictly correct, but it's the best we
+> +        * can do. Writes and reads get combined.
+> +        */
+> +       [C(L1D)][C(OP_READ)][C(RESULT_ACCESS)] = ARMV7_PERFCTR_L1_DCACHE_ACCESS,
+> +       [C(L1D)][C(OP_READ)][C(RESULT_MISS)] = ARMV7_PERFCTR_L1_DCACHE_REFILL,
+> +       [C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)] = ARMV7_PERFCTR_L1_DCACHE_ACCESS,
+> +       [C(L1D)][C(OP_WRITE)][C(RESULT_MISS)] = ARMV7_PERFCTR_L1_DCACHE_REFILL,
+> +       [C(L1I)][C(OP_READ)][C(RESULT_ACCESS)] = SCORPION_ICACHE_ACCESS,
+> +       [C(L1I)][C(OP_READ)][C(RESULT_MISS)] = SCORPION_ICACHE_MISS,
+> +       [C(L1I)][C(OP_WRITE)][C(RESULT_ACCESS)] = SCORPION_ICACHE_ACCESS,
+> +       [C(L1I)][C(OP_WRITE)][C(RESULT_MISS)] = SCORPION_ICACHE_MISS,
+
+These last two entries go against the policy we set in commit
+40c390c768f89849: "ARM: perf: don't pretend to support counting of L1I
+writes", so I think they should be dropped.
+
+> +       /*
+> +        * Only ITLB misses and DTLB refills are supported.  If users want the
+> +        * DTLB refills misses a raw counter must be used.
+> +        */
+> +       [C(DTLB)][C(OP_READ)][C(RESULT_ACCESS)] = SCORPION_DTLB_ACCESS,
+> +       [C(DTLB)][C(OP_READ)][C(RESULT_MISS)] = SCORPION_DTLB_MISS,
+> +       [C(DTLB)][C(OP_WRITE)][C(RESULT_ACCESS)] = SCORPION_DTLB_ACCESS,
+> +       [C(DTLB)][C(OP_WRITE)][C(RESULT_MISS)] = SCORPION_DTLB_MISS,
+> +       [C(ITLB)][C(OP_READ)][C(RESULT_MISS)] = SCORPION_ITLB_MISS,
+> +       [C(ITLB)][C(OP_WRITE)][C(RESULT_MISS)] = SCORPION_ITLB_MISS,
+> +       [C(BPU)][C(OP_READ)][C(RESULT_ACCESS)] = ARMV7_PERFCTR_PC_BRANCH_PRED,
+> +       [C(BPU)][C(OP_READ)][C(RESULT_MISS)] = ARMV7_PERFCTR_PC_BRANCH_PRED,
+> +       [C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)] = ARMV7_PERFCTR_PC_BRANCH_PRED,
+> +       [C(BPU)][C(OP_WRITE)][C(RESULT_MISS)] = ARMV7_PERFCTR_PC_BRANCH_PRED,
+> +};
+
+Not ARMV7_PERFCTR_PC_BRANCH_MIS_PRED for the RESULT_MISS cases as with
+all other ARMv7 instances (Krait included)?
+
+Thanks,
+Mark.
