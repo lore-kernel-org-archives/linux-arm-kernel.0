@@ -1,117 +1,48 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 12 Feb 2015 16:19:44 +0200
-Subject: [PATCH v7 05/16] clk: tegra: Add DFLL DVCO reset control for
- Tegra124
-In-Reply-To: <1420723339-30735-6-git-send-email-mikko.perttunen@kapsi.fi>
-References: <1420723339-30735-1-git-send-email-mikko.perttunen@kapsi.fi>
- <1420723339-30735-6-git-send-email-mikko.perttunen@kapsi.fi>
-Message-ID: <20150212141944.GK20811@tbergstrom-lnx.Nvidia.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 12 Feb 2015 15:24:38 +0100
+Subject: [PATCH 1/5] serial: atmel: fix error handling when mctrl_gpio_init
+ fails
+Message-ID: <1423751082-15888-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 03:22:08PM +0200, Mikko Perttunen wrote:
-> From: Paul Walmsley <pwalmsley@nvidia.com>
-> 
-> The DVCO present in the DFLL IP block has a separate reset line,
-> exposed via the CAR IP block.  This reset line is asserted upon SoC
-> reset.  Unless something (such as the DFLL driver) deasserts this
-> line, the DVCO will not oscillate, although reads and writes to the
-> DFLL IP block will complete.
-> 
-> Thanks to Aleksandr Frid <afrid@nvidia.com> for identifying this and
-> saving hours of debugging time.
-> 
+mctrl_gpio_init at present doesn't return NULL. (It might be used in the
+future when no gpios are to be used indicating success.) Properly pass
+error returned and also make driver probing fail on error.
 
-Should this be done as a reset driver?
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ drivers/tty/serial/atmel_serial.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-> Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
-> [ttynkkynen: ported to tegra124 from tegra114]
-> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
-> Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
-> ---
->  drivers/clk/tegra/clk-tegra124.c | 47 ++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/tegra/clk.h          |  3 +++
->  2 files changed, 50 insertions(+)
-> 
-> diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
-> index f5f9bac..623b77f 100644
-> --- a/drivers/clk/tegra/clk-tegra124.c
-> +++ b/drivers/clk/tegra/clk-tegra124.c
-> @@ -31,6 +31,9 @@
->  #define CLK_SOURCE_CSITE 0x1d4
->  #define CLK_SOURCE_EMC 0x19c
->  
-> +#define RST_DFLL_DVCO			0x2f4
-> +#define DVFS_DFLL_RESET_SHIFT		0
-> +
->  #define PLLC_BASE 0x80
->  #define PLLC_OUT 0x84
->  #define PLLC_MISC2 0x88
-> @@ -1399,6 +1402,50 @@ static void __init tegra124_clock_apply_init_table(void)
->  	tegra_init_from_table(init_table, clks, TEGRA124_CLK_CLK_MAX);
->  }
->  
-> +/**
-> + * tegra124_car_barrier - wait for pending writes to the CAR to complete
-> + *
-> + * Wait for any outstanding writes to the CAR MMIO space from this CPU
-> + * to complete before continuing execution.  No return value.
-> + */
-> +static void tegra124_car_barrier(void)
-> +{
-> +	readl_relaxed(clk_base + RST_DFLL_DVCO);
-> +}
-> +
-> +/**
-> + * tegra124_clock_assert_dfll_dvco_reset - assert the DFLL's DVCO reset
-> + *
-> + * Assert the reset line of the DFLL's DVCO.  No return value.
-> + */
-> +void tegra124_clock_assert_dfll_dvco_reset(void)
-> +{
-> +	u32 v;
-> +
-> +	v = readl_relaxed(clk_base + RST_DFLL_DVCO);
-> +	v |= (1 << DVFS_DFLL_RESET_SHIFT);
-> +	writel_relaxed(v, clk_base + RST_DFLL_DVCO);
-> +	tegra124_car_barrier();
-> +}
-> +EXPORT_SYMBOL(tegra124_clock_assert_dfll_dvco_reset);
-> +
-> +/**
-> + * tegra124_clock_deassert_dfll_dvco_reset - deassert the DFLL's DVCO reset
-> + *
-> + * Deassert the reset line of the DFLL's DVCO, allowing the DVCO to
-> + * operate.  No return value.
-> + */
-> +void tegra124_clock_deassert_dfll_dvco_reset(void)
-> +{
-> +	u32 v;
-> +
-> +	v = readl_relaxed(clk_base + RST_DFLL_DVCO);
-> +	v &= ~(1 << DVFS_DFLL_RESET_SHIFT);
-> +	writel_relaxed(v, clk_base + RST_DFLL_DVCO);
-> +	tegra124_car_barrier();
-> +}
-> +EXPORT_SYMBOL(tegra124_clock_deassert_dfll_dvco_reset);
-> +
->  static void __init tegra124_clock_init(struct device_node *np)
->  {
->  	struct device_node *node;
-> diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
-> index 4e458aa..def0ea4 100644
-> --- a/drivers/clk/tegra/clk.h
-> +++ b/drivers/clk/tegra/clk.h
-> @@ -629,6 +629,9 @@ void tegra114_clock_tune_cpu_trimmers_init(void);
->  void tegra114_clock_assert_dfll_dvco_reset(void);
->  void tegra114_clock_deassert_dfll_dvco_reset(void);
->  
-> +void tegra124_clock_assert_dfll_dvco_reset(void);
-> +void tegra124_clock_deassert_dfll_dvco_reset(void);
-> +
->  typedef void (*tegra_clk_apply_init_table_func)(void);
->  extern tegra_clk_apply_init_table_func tegra_clk_apply_init_table;
->  
-> -- 
-> 2.2.1
-> 
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 4d848a29e223..8a30342dfa7c 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -2507,8 +2507,8 @@ static int atmel_init_gpios(struct atmel_uart_port *p, struct device *dev)
+ 	struct gpio_desc *gpiod;
+ 
+ 	p->gpios = mctrl_gpio_init(dev, 0);
+-	if (IS_ERR_OR_NULL(p->gpios))
+-		return -1;
++	if (IS_ERR(p->gpios))
++		return PTR_ERR(p->gpios);
+ 
+ 	for (i = 0; i < UART_GPIO_MAX; i++) {
+ 		gpiod = mctrl_gpio_to_gpiod(p->gpios, i);
+@@ -2559,9 +2559,10 @@ static int atmel_serial_probe(struct platform_device *pdev)
+ 	port->uart.line = ret;
+ 
+ 	ret = atmel_init_gpios(port, &pdev->dev);
+-	if (ret < 0)
+-		dev_err(&pdev->dev, "%s",
+-			"Failed to initialize GPIOs. The serial port may not work as expected");
++	if (ret < 0) {
++		dev_err(&pdev->dev, "Failed to initialize GPIOs.");
++		goto err;
++	}
+ 
+ 	ret = atmel_init_port(port, pdev);
+ 	if (ret)
+-- 
+2.1.4
