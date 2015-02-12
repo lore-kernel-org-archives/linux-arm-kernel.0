@@ -1,54 +1,70 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 12 Feb 2015 17:58:36 +1100
-Subject: imx_v6_v7_defconfig needs lzop
-In-Reply-To: <CAMuHMdU_gBiqVouvHaVh+kC=BcdXw5waE6A4phn_MrjkLTu7Ow@mail.gmail.com>
-References: <CAMuHMdVjqp52BQqH32Ut7kxDYzmyY4+JEVuhXgTqU8V24kQyZA@mail.gmail.com>
- <CAOMZO5Dh0Wv61Y0J_Ue1G=Y8vc23yM2Fxq6CqhpmNBHa-2Lkvg@mail.gmail.com>
- <CAMuHMdXJCh32e-+7rqNzCdbYX4AH3qfBQ3uZ_t9kC_8+1P1jJQ@mail.gmail.com>
- <20150205105951.GU10842@pengutronix.de>
- <CAMuHMdU_gBiqVouvHaVh+kC=BcdXw5waE6A4phn_MrjkLTu7Ow@mail.gmail.com>
-Message-ID: <20150212175836.52351ae2@canb.auug.org.au>
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Thu, 12 Feb 2015 16:00:20 +0900
+Subject: [PATCH v3] pinctrl: exynos: Add support for Exynos5433
+In-Reply-To: <54DC4598.4010603@samsung.com>
+References: <1421822591-10536-1-git-send-email-cw00.choi@samsung.com>
+ <CACRpkdYq-1ztF5baHjB9aBUNspD5vRXrpnEd1zdWsADmwrhuWw@mail.gmail.com>
+ <CA+Ln22E1xpdj+LZAR6uf7sCEBR_TEN=CaTVznsKM490a8AzGww@mail.gmail.com>
+ <54DC4598.4010603@samsung.com>
+Message-ID: <009301d04691$90e47d40$b2ad77c0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi Linus,
 
-On Thu, 5 Feb 2015 12:12:17 +0100 Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->
-> On Thu, Feb 5, 2015 at 11:59 AM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > On Wed, Feb 04, 2015 at 03:41:45PM +0100, Geert Uytterhoeven wrote:
-> >> On Wed, Feb 4, 2015 at 3:32 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> >> > On Wed, Feb 4, 2015 at 12:21 PM, Geert Uytterhoeven
-> >> > <geert@linux-m68k.org> wrote:
-> >> >> http://kisskb.ellerman.id.au/kisskb/buildresult/12358024/
-> >> >>
-> >> >> /bin/sh: 1: lzop: not found
-> >> >> cat: write error: Broken pipe
-> >> >> make[3]: *** [arch/arm/boot/compressed/piggy.lzo] Error 1
-> >> >
-> >> > Isn't this error happening due to the lack of 'lzop' package installed
-> >> > on the host machine?
+We're looking forward to merging it on the v3.20.
+Could you pick this patch up before merge-window is closed?
+
+Best Regards,
+Chanho Park
+
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Chanwoo Choi
+> Sent: Thursday, February 12, 2015 3:18 PM
+> To: Linus Walleij
+> Cc: linux-samsung-soc; Tomasz Figa; linux-kernel at vger.kernel.org; Inki
+> Dae; Kukjin Kim; Thomas Abraham; Chanho Park; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v3] pinctrl: exynos: Add support for Exynos5433
+> 
+> Hi Linus,
+> 
+> On 02/08/2015 11:59 PM, Tomasz Figa wrote:
+> > Hi,
+> >
+> > 2015-01-29 18:48 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+> >> On Wed, Jan 21, 2015 at 7:43 AM, Chanwoo Choi <cw00.choi@samsung.com>
+> wrote:
 > >>
-> >> Indeed.
-> > I guess you don't want to ask for help or report a build breakage, but
-> > question if it's sensible to let a defconfig depend on a host tool that
-> > isn't commonly installed, right?
+> >>> This patch adds driver data for Exynos5433 SoC. Exynos5433 includes
+> 228 multi-
+> >>> functional input/output port pins and 135 memory port pins. There
+> are 41 general
+> >>> port groups and 2 memory port groups.
+> >>>
+> >>> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> >>> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+> >>> Cc: Linus Walleij <linus.walleij@linaro.org>
+> >>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> >>> Acked-by: Inki Dae <inki.dae@samsung.com>
+> >>> ---
+> >>> Changes from v2:
+> >>> - Rebase it on v3.19-rc5
+> >>
+> >> Waiting for Tomasz to review this.
+> >
+> > Thanks Linus. Looks good to me.
+> >
+> > Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
 > 
-> Right.
+> Could you please pick this patch?
 > 
-> The maintainers of the host machines were in the To-header, in the hope they
-> would install the missing tool.
-
-We have now done that.
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150212/692487c5/attachment.sig>
+> Best Regards,
+> Chanwoo Choi
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
