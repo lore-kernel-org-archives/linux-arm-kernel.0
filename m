@@ -1,52 +1,112 @@
-From: rric@kernel.org (Robert Richter)
-Date: Thu, 12 Feb 2015 11:02:35 +0100
-Subject: [PATCH v8 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150212100235.GA30412@rric.localhost>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 12 Feb 2015 10:17:07 +0000
+Subject: [PATCH v2] ARM: dts: zynq: Fix stdout-path and bootargs
+In-Reply-To: <a9a55b576d88ef1f2ab6a1d1f6707d56104db32b.1423734193.git.michal.simek@xilinx.com>
+References: <a9a55b576d88ef1f2ab6a1d1f6707d56104db32b.1423734193.git.michal.simek@xilinx.com>
+Message-ID: <20150212101707.GA1245@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.02.15 20:45:28, Hanjun Guo wrote:
-> This is the v8 of ACPI core patches for ARM64 based on ACPI 5.1, there are
-> some updates since v7:
+On Thu, Feb 12, 2015 at 09:43:16AM +0000, Michal Simek wrote:
+> parallella - Remove linux,stdout-path.
+> Use stdout-path to identify kernel console
 > 
->  - Add two more documantation to explain why we need ACPI in ARM64 servers
->    by Grant, and recommendations and prohibitions on the use of the numerous
->    ACPI tables and objects by Al Stone.
-> 
->  - Add two patches which is need to map acpi tables after acpi_gbl_permanent_mmap
->    is set
-> 
->  - Add another patch "dt / chosen: Add linux,uefi-stub-generated-dtb property"
->    to address that if firmware providing no dtb, we can try ACPI configuration data
->    even if no "acpi=force" is passed in early parameters. (I think ACPI for XEN and
->    kexec need consider sperately as disscussed, correct me if I'm wrong).
-> 
->  - Add CC in the patch to the subsystem maintainers and modify the subject
->    of the patch to explicitly show the subsystem touched by this patch set,
->    please help us to review and ack them if they make sense, thanks.
-> 
->  - Add Tested-by from Qualcomm and Redhat;
-> 
->  - Make ACPI depends on PCI suggested by Catalin;
-> 
->  - Clean up SMP init function as Lorenzo suggested, remove physical
->    CPU hot-plug code in the patch;
-> 
->  - Address some comments from Marc and explicitly state that will
->    implment statcked irqdomain and GIC init framework when GICv3 and
->    ITS, GICv2m are implemented;
-> 
->  - Rebased on top of 3.19-rc7.
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-Patches tested on Cavium ThunderX. For the whole series:
+It's nice to see this in use!
 
- Tested-by: Robert Richter <rrichter@cavium.com>
- Acked-by: Robert Richter <rrichter@cavium.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Please apply.
+Mark.
 
-Thanks,
-
--Robert
+> ---
+> 
+> Changes in v2:
+> - Remove linux,stdout-path reported by Mark Rutland
+> - Use stdout-path new console description with setting
+> - Change patch subject from "ARM: dts: zynq: Add linux,stdout-path and
+>   stdout-path"
+> - Do not add 1/2 patch which added aliases node to zybo and parallella
+> 
+>  arch/arm/boot/dts/zynq-parallella.dts | 4 ++--
+>  arch/arm/boot/dts/zynq-zc702.dts      | 3 ++-
+>  arch/arm/boot/dts/zynq-zc706.dts      | 3 ++-
+>  arch/arm/boot/dts/zynq-zed.dts        | 3 ++-
+>  arch/arm/boot/dts/zynq-zybo.dts       | 3 ++-
+>  5 files changed, 10 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
+> index 6a5f51daa708..e1e5b2423d26 100644
+> --- a/arch/arm/boot/dts/zynq-parallella.dts
+> +++ b/arch/arm/boot/dts/zynq-parallella.dts
+> @@ -34,8 +34,8 @@
+>  	};
+>  
+>  	chosen {
+> -		bootargs = "console=ttyPS0,115200 earlyprintk root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait";
+> -		linux,stdout-path = "/amba/serial at e0001000";
+> +		bootargs = "earlyprintk root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait";
+> +		stdout-path = "serial0:115200n8";
+>  	};
+>  };
+>  
+> diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+> index 1fc1d3911e9b..fb59d34e8ee6 100644
+> --- a/arch/arm/boot/dts/zynq-zc702.dts
+> +++ b/arch/arm/boot/dts/zynq-zc702.dts
+> @@ -30,7 +30,8 @@
+>  	};
+>  
+>  	chosen {
+> -		bootargs = "console=ttyPS0,115200 earlyprintk";
+> +		bootargs = "earlyprintk";
+> +		stdout-path = "serial0:115200n8";
+>  	};
+>  
+>  	leds {
+> diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+> index 850518d9b8ac..abf5d238ae04 100644
+> --- a/arch/arm/boot/dts/zynq-zc706.dts
+> +++ b/arch/arm/boot/dts/zynq-zc706.dts
+> @@ -30,7 +30,8 @@
+>  	};
+>  
+>  	chosen {
+> -		bootargs = "console=ttyPS0,115200 earlyprintk";
+> +		bootargs = "earlyprintk";
+> +		stdout-path = "serial0:115200n8";
+>  	};
+>  
+>  	usb_phy0: phy0 {
+> diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
+> index 5658bc8434de..b9f2522012e8 100644
+> --- a/arch/arm/boot/dts/zynq-zed.dts
+> +++ b/arch/arm/boot/dts/zynq-zed.dts
+> @@ -29,7 +29,8 @@
+>  	};
+>  
+>  	chosen {
+> -		bootargs = "console=ttyPS0,115200 earlyprintk";
+> +		bootargs = "earlyprintk";
+> +		stdout-path = "serial0:115200n8";
+>  	};
+>  
+>  	usb_phy0: phy0 {
+> diff --git a/arch/arm/boot/dts/zynq-zybo.dts b/arch/arm/boot/dts/zynq-zybo.dts
+> index 935a561f6aa6..16c9cacd668d 100644
+> --- a/arch/arm/boot/dts/zynq-zybo.dts
+> +++ b/arch/arm/boot/dts/zynq-zybo.dts
+> @@ -29,7 +29,8 @@
+>  	};
+>  
+>  	chosen {
+> -		bootargs = "console=ttyPS0,115200 earlyprintk";
+> +		bootargs = "earlyprintk";
+> +		stdout-path = "serial0:115200n8";
+>  	};
+>  
+>  };
+> -- 
+> 1.8.2.3
+> 
+> 
