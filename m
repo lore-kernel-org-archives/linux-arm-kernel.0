@@ -1,61 +1,57 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Thu, 12 Feb 2015 13:20:19 +0800
-Subject: [PATCH] xen/arm: allow console=hvc0 to be omitted for guests
-In-Reply-To: <1423716873.27551.30.camel@citrix.com>
-References: <1422626319-30752-1-git-send-email-ard.biesheuvel@linaro.org>	
- <alpine.DEB.2.02.1502100648050.29696@kaball.uk.xensource.com>	
- <1423553200.5851.15.camel@citrix.com>	
- <CAKv+Gu8kQ5e9dKTp9+e_11pnvskOPjin7ODpxXTj+HmTj+fPag@mail.gmail.com>	
- <1423558788.5851.17.camel@citrix.com>	
- <alpine.DEB.2.02.1502120433040.29696@kaball.uk.xensource.com>
- <1423716873.27551.30.camel@citrix.com>
-Message-ID: <54DC3813.2020908@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 12 Feb 2015 13:24:19 +0800
+Subject: [PATCH] efi: get_memory_map: add sufficient slack for memory
+ descriptors
+Message-ID: <1423718659-795-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+As it turns out, when allocating room for the UEFI memory map using
+UEFI's AllocatePool (), it may result in two new memory map entries
+being created, for instance, when using Tianocore's preallocated region
+feature. For example, the following region
 
+0x00005ead5000-0x00005ebfffff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
 
-On 12/02/2015 12:54, Ian Campbell wrote:
-> On Thu, 2015-02-12 at 04:35 +0000, Stefano Stabellini wrote:
->> On Tue, 10 Feb 2015, Ian Campbell wrote:
->>> On Tue, 2015-02-10 at 15:51 +0800, Ard Biesheuvel wrote:
->>>>> FWIW on x86 this doesn't depend on console_set_on_cmdline, does it need
->>>>> to here?
->>>>>
->>>>
->>>> I didn't check the code, but it seems inappropriate to add a preferred
->>>> console implicitly if the user has set 'console=' on the command line.
->>>
->>> I had been thinking that add_preferred_console would DTRT, but it seems
->>> not. Seems strange that most calls to it do not check if the console is
->>> already set, but it does seem like the right thing in this case.
->>>
->>>>> On x86 it does depend on !xen_initial_domain. I suppose on the principal
->>>>> that a VT is normally available there. I suppose that doesn't apply to
->>>>> ARM so much, although it could.
->>>>>
->>>>
->>>> OK, I got confused by the xen_guest_init(). So do you mean if if
->>>> (!xen_initial_domain) should be added?
->>>
->>> (dom0 is "Just A Guest" too ;-))
->>>
->>> Adding it would be consistent with x86, I'm not precisely sure if that
->>> is important or desirable in this case. I'd be inclined to start with
->>> the if there.
->>
->> The reasoning is that dom0 command line arguments come from its old
->> native grub stanza, therefore the console parameter is incorrect, right?
->> As opposed to regular domUs, that being freshly installed, are supposed
->> to have the correct console parameter?
->
-> Other way around I think, dom0 has the correct stuff from grub.cfg
-> whereas the guest may not.
+may be split like this
 
-Yes, currently for ARM guest you have to add 'extra="console=hvc0"' in 
-the configuration file.
+0x00005ead5000-0x00005eae2fff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
+0x00005eae3000-0x00005eae4fff [Loader Data        |   |  |  |  |   |WB|WT|WC|UC]
+0x00005eae5000-0x00005ebfffff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
 
-Regards,
+if the preallocated Loader Data region was chosen to be right in the
+middle of the original free space.
 
+After patch d1a8d66b9177 ("efi/libstub: Call get_memory_map() to
+obtain map and desc sizes"), this is not being dealt with correctly
+anymore, as the existing logic to allocate room for a single additional
+entry has become insufficient.
+
+So instead, add room for two additional entries instead.
+
+Fixes: d1a8d66b9177 ("efi/libstub: Call get_memory_map() to obtain map and desc sizes")
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/firmware/efi/libstub/efi-stub-helper.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
+index af5d63c7cc53..ca0b07ed3b14 100644
+--- a/drivers/firmware/efi/libstub/efi-stub-helper.c
++++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
+@@ -84,10 +84,10 @@ efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
+ 		return EFI_LOAD_ERROR;
+ 
+ 	/*
+-	 * Add an additional efi_memory_desc_t because we're doing an
+-	 * allocation which may be in a new descriptor region.
++	 * Add room for two additional efi_memory_desc_t entries because we're
++	 * doing an allocation which may be in a new descriptor region.
+ 	 */
+-	*map_size += *desc_size;
++	*map_size += *desc_size * 2;
+ 	status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
+ 				*map_size, (void **)&m);
+ 	if (status != EFI_SUCCESS)
 -- 
-Julien Grall
+1.8.3.2
