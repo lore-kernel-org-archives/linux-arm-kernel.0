@@ -1,32 +1,53 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 12 Feb 2015 15:53:31 +0100
-Subject: [PATCH v2 05/10] mtd: pxa3xx_nand: add a default chunk size
+Date: Thu, 12 Feb 2015 15:53:36 +0100
+Subject: [PATCH v2 10/10] ARM: berlin: enable flash on the BG2Q DMP
 In-Reply-To: <1423752816-26219-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1423752816-26219-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1423752816-26219-6-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1423752816-26219-11-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a default chunk size of 512 in the pxa3xx nand driver.
+The BG2Q DMP has a nand controller. Add the corresponding node, but do
+not enable it by default because the nand is only available on some BG2Q
+DMP.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 64628bff3fa5..8ed045195d31 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -1430,6 +1430,9 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
- 	if (pdata->keep_config && !pxa3xx_nand_detect_config(info))
- 		goto KEEP_CONFIG;
- 
-+	/* Set a default chunk size */
-+	info->chunk_size = 512;
+diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+index a98ac1bd8f65..4157258a6fb0 100644
+--- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
++++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+@@ -112,3 +112,28 @@
+ &sata_phy {
+ 	status = "okay";
+ };
 +
- 	ret = pxa3xx_nand_sensing(info);
- 	if (ret) {
- 		dev_info(&info->pdev->dev, "There is no chip on cs %d!\n",
++&chip {
++	nand_pmux: nand-pmux {
++		groups = "G0", "G1";
++		function = "nand";
++	};
++};
++
++&nand0 {
++	pinctrl-0 = <&nand_pmux>;
++	pinctrl-names = "default";
++
++	marvell,nand-enable-arbiter;
++	nand-ecc-strength = <48>;
++	nand-ecc-step-size = <1024>;
++
++	num-cs = <1>;
++
++	/*
++	 * Two kinds of BG2Q DMP are available: one with emmc and
++	 * one with a nand. The latter is not widespread. Because
++	 * of this, disable the nand by default.
++	 */
++	status = "disabled";
++};
 -- 
 2.3.0
