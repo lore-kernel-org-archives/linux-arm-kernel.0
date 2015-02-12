@@ -1,14 +1,16 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Thu, 12 Feb 2015 14:01:37 +0800
-Subject: [PATCH RFC v9 14/20] Documentation: dt-bindings: Add bindings for
- Himax HX8369A DRM panel driver
+Date: Thu, 12 Feb 2015 14:01:40 +0800
+Subject: [PATCH RFC v9 17/20] ARM: dts: imx6qdl-sabresd: Add support for TRULY
+ TFT480800-16-E MIPI DSI panel
 In-Reply-To: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
 References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1423720903-24806-15-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1423720903-24806-18-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree bindings for Himax HX8369A DRM panel driver.
+The TRULY TFT480800-16-E panel is driven by the Himax HX8369A driver IC.
+The driver IC supports several display/control interface modes, including
+the MIPI DSI video mode and command mode.
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
@@ -25,54 +27,51 @@ v5->v6:
  * None.
 
 v4->v5:
- * Merge the bs[3:0]-gpios properties into one property - bs-gpios.
+ * Replace the bs[3:0]-gpios properties with the bs-gpios property.
    This addresses Andrzej Hajda's comment.
 
 v3->v4:
- * Newly introduced in v4.  This is separated from the relevant driver patch
-   in v3 to address Stefan Wahren's comment.
+ * None.
 
- .../devicetree/bindings/panel/himax,hx8369a.txt    | 39 ++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/panel/himax,hx8369a.txt
+v2->v3:
+ * None.
 
-diff --git a/Documentation/devicetree/bindings/panel/himax,hx8369a.txt b/Documentation/devicetree/bindings/panel/himax,hx8369a.txt
-new file mode 100644
-index 0000000..3a44b70
---- /dev/null
-+++ b/Documentation/devicetree/bindings/panel/himax,hx8369a.txt
-@@ -0,0 +1,39 @@
-+Himax HX8369A WVGA 16.7M color TFT single chip driver with internal GRAM
+v1->v2:
+ * To address Thierry Reding's comments, remove several unnecessary
+   properties as they can be implied by the compatible string.
+ * Fix the compatible string.
+ * Remove the display-timings node from the panel node as it can be
+   implied by the compatible string as well.
+ * Remove the status property as it is unneeded.
+
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index f1cd214..9ff4ba5 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -480,6 +480,13 @@
+ 				MX6QDL_PAD_SD4_DAT7__SD4_DATA7		0x17059
+ 			>;
+ 		};
 +
-+Himax HX8369A is a WVGA resolution driving controller.
-+It is designed to provide a single chip solution that combines a source
-+driver and power supply circuits to drive a TFT dot matrix LCD with
-+480RGBx864 dots at the maximum.
++		pinctrl_mipi_panel: mipipanelgrp {
++			fsl,pins = <
++				MX6QDL_PAD_NANDF_CS0__GPIO6_IO11 0x1b0b0
++				MX6QDL_PAD_NANDF_CS1__GPIO6_IO14 0x1b0b0
++			>;
++		};
+ 	};
+ 
+ 	gpio_leds {
+@@ -516,6 +523,19 @@
+ 	};
+ };
+ 
++&mipi_dsi {
++	status = "okay";
 +
-+The HX8369A supports several interface modes, including MPU MIPI DBI Type
-+A/B mode, MIPI DPI/DBI Type C mode, MIPI DSI video mode, MIPI DSI command
-+mode and MDDI mode. The interface mode is selected by the external hardware
-+pins BS[3:0].
-+
-+Currently, only the MIPI DSI video mode is supported.
-+
-+Required properties:
-+  - compatible: should be a panel's compatible string
-+  - reg: the virtual channel number of a DSI peripheral, as described in [1]
-+  - reset-gpios: a GPIO spec for the reset pin, as described in [2]
-+
-+Optional properties:
-+  - vdd1-supply: I/O and interface power supply
-+  - vdd2-supply: analog power supply
-+  - vdd3-supply: logic power supply
-+  - dsi-vcc-supply: DSI and MDDI power supply
-+  - vpp-supply: OTP programming voltage
-+  - bs-gpios: a GPIO spec for the pins BS[3:0], as described in [2]
-+
-+[1] Documentation/devicetree/bindings/mipi/dsi/mipi-dsi-bus.txt
-+[2] Documentation/devicetree/bindings/gpio/gpio.txt
-+
-+Example:
 +	panel {
 +		compatible = "truly,tft480800-16-e-dsi";
 +		reg = <0>;
@@ -81,5 +80,10 @@ index 0000000..3a44b70
 +		reset-gpios = <&gpio6 11 GPIO_ACTIVE_LOW>;
 +		bs-gpios = <0>, <0>, <&gpio6 14 GPIO_ACTIVE_HIGH>, <0>;
 +	};
++};
++
+ &pcie {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pcie>;
 -- 
 2.1.0
