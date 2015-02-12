@@ -1,41 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Feb 2015 09:40:20 +0000
-Subject: [PATCH 03/16] tty: serial: 8250_core: read only RX if there is
- something in the FIFO
-In-Reply-To: <54DC6832.3070507@linutronix.de>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <1410377411-26656-4-git-send-email-bigeasy@linutronix.de>
- <54D8B772.1010405@freebox.fr> <54D9441B.7070403@hurleysoftware.com>
- <54D9F3C7.5000809@freebox.fr> <54DA43F8.9090904@hurleysoftware.com>
- <54DBB531.2030504@hurleysoftware.com>
- <20150211200313.GE2531@atomide.com>
- <54DBBE9E.90104@hurleysoftware.com>
- <54DC6832.3070507@linutronix.de>
-Message-ID: <20150212094020.GE8670@n2100.arm.linux.org.uk>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Thu, 12 Feb 2015 15:12:52 +0530
+Subject: [PATCH RFC v4 1/3] PM / Runtime: Add an API pm_runtime_set_slave
+In-Reply-To: <Pine.LNX.4.44L0.1502091055460.20425-100000@netrider.rowland.org>
+References: <1423479726-23140-2-git-send-email-amit.daniel@samsung.com>
+ <Pine.LNX.4.44L0.1502091055460.20425-100000@netrider.rowland.org>
+Message-ID: <CADGdYn6OwXgsGFspQva-q5WV5b_WB=G2PxZyhcETTgt8zY96ZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 12, 2015 at 09:45:38AM +0100, Sebastian Andrzej Siewior wrote:
-> On 02/11/2015 09:42 PM, Peter Hurley wrote:
-> 
-> >> Reverting makes sense to me if it has caused a regression. Maybe Sebastian
-> >> can update his patch to do this based on some quirk flag instead?
-> > 
-> > That's fine with me. There's a 'bugs' field in struct 8250_uart_port and
-> > UART_BUG_* defines in 8250/8250.h for that purpose.
-> 
-> Makes sense. Reading an empty FIFO does not look right. Maybe we should
-> do the bug flag the other way around? But I can do what I am told to so
-> if there is more fallout than just this Marvell UART I could come
-> around with a patch to the bug field for the older OMAP.
+Hi Alan,
 
-Reading the RX FIFO is something that goes back a long time in the 8250
-driver, to the time when Ted Ts'o wrote the driver.
+On Mon, Feb 9, 2015 at 9:28 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Mon, 9 Feb 2015, Amit Daniel Kachhap wrote:
+>
+>> This API creates a pm runtime slave type device which does not itself
+>> participates in pm runtime but depends on the master devices to power
+>> manage them.
+>
+> This makes no sense.  How can a master device manage a slave device?
+> Devices are managed by drivers, not by other devices.
+May be my commit is not explaining the requirements completely and the
+API name may not reflect the relevance. But If you see the 3rd patch
+it has one clock use-case where this new feature is used and the
+current pm runtime feature is not sufficient enough to handle it. I
+have one more IOMMU use case also which is not part of this patch
+series.
+I am not sure if this approach is final but I looked at runtime.c file
+and it has couple of API's like pm_runtime_forbid/allow which
+blocks/unblocks the runtime callbacks according to driver requirement.
+In the similar line I added this new API.
+>
+>>  These devices should have pm runtime callbacks.
+>>
+>> These devices (like clock) may not implement complete pm_runtime calls
+>> such as pm_runtime_get/pm_runtime_put due to subsystems interaction
+>> behaviour or any other reason.
+>>
+>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> ---
+>>  drivers/base/power/runtime.c | 18 ++++++++++++++++++
+>>  include/linux/pm.h           |  1 +
+>>  include/linux/pm_runtime.h   |  2 ++
+>>  3 files changed, 21 insertions(+)
+>
+> This patch is unacceptable because it does not update the runtime PM
+> documentation file.
+my fault. Will update in next version.
+>
+> Besides, doesn't the no_callbacks flag already do more or less what you
+> want?
+yes to some extent. But I thought its purpose is different so I added 1 more.
 
-I would suggest that it remains there as the default (it was obviously
-found to be necessary for x86 all those years ago when Linux was in
-its infancy) and has survived for getting on 20 years without issue.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Amit D
+>
+> Alan Stern
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
