@@ -1,76 +1,42 @@
-From: pramod.gurav@smartplayin.com (Pramod Gurav)
-Date: Thu, 12 Feb 2015 11:46:20 +0530
-Subject: [PATCH RESEND] dmaengine: qcom_bam_dma: Fix error path in probe
- function
-Message-ID: <1423721780-16385-1-git-send-email-pramod.gurav@smartplayin.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 12 Feb 2015 15:18:00 +0900
+Subject: [PATCH v3] pinctrl: exynos: Add support for Exynos5433
+In-Reply-To: <CA+Ln22E1xpdj+LZAR6uf7sCEBR_TEN=CaTVznsKM490a8AzGww@mail.gmail.com>
+References: <1421822591-10536-1-git-send-email-cw00.choi@samsung.com>
+ <CACRpkdYq-1ztF5baHjB9aBUNspD5vRXrpnEd1zdWsADmwrhuWw@mail.gmail.com>
+ <CA+Ln22E1xpdj+LZAR6uf7sCEBR_TEN=CaTVznsKM490a8AzGww@mail.gmail.com>
+Message-ID: <54DC4598.4010603@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Calls tasklet_kill() in error path of the probe function were missing.
-Add the same in error path.
+Hi Linus,
 
-Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
----
+On 02/08/2015 11:59 PM, Tomasz Figa wrote:
+> Hi,
+> 
+> 2015-01-29 18:48 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+>> On Wed, Jan 21, 2015 at 7:43 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>>
+>>> This patch adds driver data for Exynos5433 SoC. Exynos5433 includes 228 multi-
+>>> functional input/output port pins and 135 memory port pins. There are 41 general
+>>> port groups and 2 memory port groups.
+>>>
+>>> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+>>> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+>>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>> Acked-by: Inki Dae <inki.dae@samsung.com>
+>>> ---
+>>> Changes from v2:
+>>> - Rebase it on v3.19-rc5
+>>
+>> Waiting for Tomasz to review this.
+> 
+> Thanks Linus. Looks good to me.
+> 
+> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-Resending it with linux-arm-msm in cc.
+Could you please pick this patch?
 
- drivers/dma/qcom_bam_dma.c |   14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom_bam_dma.c
-index 3122a99..a1ff4a6 100644
---- a/drivers/dma/qcom_bam_dma.c
-+++ b/drivers/dma/qcom_bam_dma.c
-@@ -1115,7 +1115,7 @@ static int bam_dma_probe(struct platform_device *pdev)
- 
- 	if (!bdev->channels) {
- 		ret = -ENOMEM;
--		goto err_disable_clk;
-+		goto err_tasklet_kill;
- 	}
- 
- 	/* allocate and initialize channels */
-@@ -1127,7 +1127,7 @@ static int bam_dma_probe(struct platform_device *pdev)
- 	ret = devm_request_irq(bdev->dev, bdev->irq, bam_dma_irq,
- 			IRQF_TRIGGER_HIGH, "bam_dma", bdev);
- 	if (ret)
--		goto err_disable_clk;
-+		goto err_bam_channel_exit;
- 
- 	/* set max dma segment size */
- 	bdev->common.dev = bdev->dev;
-@@ -1135,7 +1135,7 @@ static int bam_dma_probe(struct platform_device *pdev)
- 	ret = dma_set_max_seg_size(bdev->common.dev, BAM_MAX_DATA_SIZE);
- 	if (ret) {
- 		dev_err(bdev->dev, "cannot set maximum segment size\n");
--		goto err_disable_clk;
-+		goto err_bam_channel_exit;
- 	}
- 
- 	platform_set_drvdata(pdev, bdev);
-@@ -1156,7 +1156,7 @@ static int bam_dma_probe(struct platform_device *pdev)
- 	ret = dma_async_device_register(&bdev->common);
- 	if (ret) {
- 		dev_err(bdev->dev, "failed to register dma async device\n");
--		goto err_disable_clk;
-+		goto err_bam_channel_exit;
- 	}
- 
- 	ret = of_dma_controller_register(pdev->dev.of_node, bam_dma_xlate,
-@@ -1168,8 +1168,14 @@ static int bam_dma_probe(struct platform_device *pdev)
- 
- err_unregister_dma:
- 	dma_async_device_unregister(&bdev->common);
-+err_bam_channel_exit:
-+	for (i = 0; i < bdev->num_channels; i++)
-+		tasklet_kill(&bdev->channels[i].vc.task);
-+err_tasklet_kill:
-+	tasklet_kill(&bdev->task);
- err_disable_clk:
- 	clk_disable_unprepare(bdev->bamclk);
-+
- 	return ret;
- }
- 
--- 
-1.7.9.5
+Best Regards,
+Chanwoo Choi
