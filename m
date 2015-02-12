@@ -1,54 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Feb 2015 20:42:35 +0100
-Subject: [PATCH 03/11] ARM: BCM: put back ARCH_MULTI_V7 dependency for mobile
+Date: Thu, 12 Feb 2015 20:42:39 +0100
+Subject: [PATCH 07/11] ARM: prima2: do not select SMP_ON_UP
 In-Reply-To: <1423770163-583064-1-git-send-email-arnd@arndb.de>
 References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
-Message-ID: <1423770163-583064-4-git-send-email-arnd@arndb.de>
+Message-ID: <1423770163-583064-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent cleanup rearranged the Kconfig file for mach-bcm and
-accidentally dropped the dependency on ARCH_MULTI_V7, which
-makes it possible to now build the two mobile SoC platforms
-on an ARMv6-only kernel, resulting in a log of Kconfig
-warnings like
+The new Atlas7 platform implicitly selects 'CONFIG_SMP_ON_UP',
+which leads to problems if we enable building the platform without
+MMU, as that combination is not allowed and causes a link error:
 
-warning: ARCH_BCM_MOBILE selects ARM_ERRATA_775420 which has unmet direct dependencies (CPU_V7)
+arch/arm/kernel/built-in.o: In function `c_show':
+:(.text+0x1872): undefined reference to `smp_on_up'
+:(.text+0x1876): undefined reference to `smp_on_up'
+arch/arm/kernel/built-in.o: In function `arch_irq_work_raise':
+:(.text+0x3d48): undefined reference to `smp_on_up'
+:(.text+0x3d4c): undefined reference to `smp_on_up'
+arch/arm/kernel/built-in.o: In function `smp_setup_processor_id':
+:(.init.text+0x180): undefined reference to `smp_on_up'
 
-and which of course cannot work on any machine.
-
-This puts back the dependencies as before.
+This removes the 'select' statement.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 64e74aa788f99 ("ARM: mach-bcm: ARCH_BCM_MOBILE: remove one level of menu from Kconfig")
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Cc: Christian Daudt <bcm@fixthebug.org>
-Cc: Scott Branden <sbranden@broadcom.com>
+Fixes: 4cba058526a7 ("ARM: sirf: add Atlas7 machine support")
+Cc: Zhiwu Song <Zhiwu.Song@csr.com>
+Cc: Barry Song <Baohua.Song@csr.com>
 ---
- arch/arm/mach-bcm/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-prima2/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index aaeec78c3ec4..8b11f44bb36e 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -68,7 +68,7 @@ config ARCH_BCM_MOBILE
- 	  This enables support for systems based on Broadcom mobile SoCs.
- 
- config ARCH_BCM_281XX
--	bool "Broadcom BCM281XX SoC family"
-+	bool "Broadcom BCM281XX SoC family" if ARCH_MULTI_V7
- 	select ARCH_BCM_MOBILE
+diff --git a/arch/arm/mach-prima2/Kconfig b/arch/arm/mach-prima2/Kconfig
+index a219dc310d5d..e03d8b5c9ad0 100644
+--- a/arch/arm/mach-prima2/Kconfig
++++ b/arch/arm/mach-prima2/Kconfig
+@@ -27,7 +27,6 @@ config ARCH_ATLAS7
+ 	select CPU_V7
+ 	select HAVE_ARM_SCU if SMP
  	select HAVE_SMP
+-	select SMP_ON_UP if SMP
  	help
-@@ -77,7 +77,7 @@ config ARCH_BCM_281XX
- 	  variants.
+           Support for CSR SiRFSoC ARM Cortex A7 Platform
  
- config ARCH_BCM_21664
--	bool "Broadcom BCM21664 SoC family"
-+	bool "Broadcom BCM21664 SoC family" if ARCH_MULTI_V7
- 	select ARCH_BCM_MOBILE
- 	select HAVE_SMP
- 	help
 -- 
 2.1.0.rc2
