@@ -1,28 +1,50 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Thu, 12 Feb 2015 21:49:21 +0100
-Subject: [PATCHv2 0/2] drm: atmel-hlcdc: PM support
-Message-ID: <1423774163-4752-1-git-send-email-sylvain.rochet@finsecur.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 12 Feb 2015 14:54:55 -0600
+Subject: [PATCH v3 2/2] remoteproc: add support to handle internal memories
+In-Reply-To: <CAK=WgbbFxNfn5tUeJn-8NehFXAD+=7UW-WtBf3ZFm1xyomFAfA@mail.gmail.com>
+References: <1420838519-15669-1-git-send-email-s-anna@ti.com>
+ <1420838519-15669-3-git-send-email-s-anna@ti.com>
+ <CAK=WgbaFoUpV315Tg1q=PGc-FkCvKBz2BmO8Fkj_FHa5UuWviw@mail.gmail.com>
+ <20150211205757.GI2531@atomide.com>
+ <CAK=WgbbFxNfn5tUeJn-8NehFXAD+=7UW-WtBf3ZFm1xyomFAfA@mail.gmail.com>
+Message-ID: <54DD131F.8040704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series depends on Boris' "[PATCH v2] drm: atmel-hlcdc: Atomic
-mode-setting conversion"
-  <1423236143-6494-1-git-send-email-boris.brezillon@free-electrons.com>
-plus a few fixes which are going to be in v3 of Boris' patch.
+Hi Ohad,
 
-This series adds basic PM support for Atmel HLCDC.
+On 02/12/2015 03:09 AM, Ohad Ben-Cohen wrote:
+> On Wed, Feb 11, 2015 at 10:57 PM, Tony Lindgren <tony@atomide.com> wrote:
+>>>> +static int rproc_handle_intmem(struct rproc *rproc, struct fw_rsc_intmem *rsc,
+>>>> +                              int offset, int avail)
+>>>> +{
+>>> ...
+>>>> +       va = (__force void *)ioremap_nocache(rsc->pa, rsc->len);
+>>>
+>>> Back in the days when we developed remoteproc there was a tremendous
+>>> effort to move away from ioremap when not strictly needed.
+>>
+>> The use of ioremap in general is just fine for drivers as long
+>> as they access a dedicated area to the specific device. Accessing
+>> random registers and memory in the SoC is what I'm worried about.
+> 
+> Yes, the proposed interface essentially allows exactly this random
+> access, since the parameters to ioremap would be provided from the
+> user space (specifically from the resource table contained within the
+> firmware of the remote processor).
 
-Changes since v1:
-  * (*crtc_funcs->disable)(crtc) replaced to crtc_funcs->disable(crtc)
+My original motivation was that it would only need to be added on
+firmwares requiring support for loading into internal memories,
+otherwise, these are something left to be managed by the software
+running on the remote processor completely, and MPU will not even touch
+them.
 
-Sylvain Rochet (2):
-  drm: atmel-hlcdc: Add PM suspend/resume support
-  drm: atmel-hlcdc: Add pinctrl PM select sleep,default state in CRTC
-    suspend/resume
+So, let me know if this is a NAK. If so, we have two options - one to go
+the sram node model where each of them have to be defined separately,
+and have a specific property in the rproc nodes to be able to get the
+gen_pool handles. The other one is simply to define these as <reg> and
+use devm_ioremap_resource() (so use DT for defining the regions instead
+of a resource table entry).
 
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c |  3 ++
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c   | 60 ++++++++++++++++++++++++++
- 2 files changed, 63 insertions(+)
-
--- 
-2.1.4
+regards
+Suman
