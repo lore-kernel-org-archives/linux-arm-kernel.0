@@ -1,108 +1,90 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 11 Feb 2015 16:18:58 -0800
-Subject: [PATCH v3 2/2] remoteproc: add support to handle internal memories
-In-Reply-To: <54DBED69.6070206@ti.com>
-References: <1420838519-15669-1-git-send-email-s-anna@ti.com>
- <1420838519-15669-3-git-send-email-s-anna@ti.com>
- <CAK=WgbaFoUpV315Tg1q=PGc-FkCvKBz2BmO8Fkj_FHa5UuWviw@mail.gmail.com>
- <20150211205757.GI2531@atomide.com> <54DBD7A3.9020604@ti.com>
- <20150211224841.GK2531@atomide.com> <54DBED69.6070206@ti.com>
-Message-ID: <20150212001857.GC25954@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 11 Feb 2015 16:52:20 -0800
+Subject: [PATCH 0/7] OPP: Introduce OPP bindings V2 and supporting code
+In-Reply-To: <cover.1423642246.git.viresh.kumar@linaro.org>
+References: <cover.1423642246.git.viresh.kumar@linaro.org>
+Message-ID: <20150212005220.GG11190@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [150211 16:05]:
-> On 02/11/2015 04:48 PM, Tony Lindgren wrote:
-> > * Suman Anna <s-anna@ti.com> [150211 14:32]:
-> >> On 02/11/2015 02:57 PM, Tony Lindgren wrote:
-> >>> * Ohad Ben-Cohen <ohad@wizery.com> [150210 02:14]:
-> >>>> Hi Suman,
-> >>>>
-> >>>> On Fri, Jan 9, 2015 at 11:21 PM, Suman Anna <s-anna@ti.com> wrote:
-> >>>>> A remote processor may need to load certain firmware sections into
-> >>>>> internal memories (eg: RAM at L1 or L2 levels) for performance or
-> >>>>> other reasons. Introduce a new resource type (RSC_INTMEM) and add
-> >>>>> an associated handler function to handle such memories. The handler
-> >>>>> creates a kernel mapping for the resource's 'pa' (physical address).
-> >>>> ...
-> >>>>> + * rproc_handle_intmem() - handle internal memory resource entry
-> >>>>> + * @rproc: rproc handle
-> >>>>> + * @rsc: the intmem resource entry
-> >>>>> + * @offset: offset of the resource data in resource table
-> >>>>> + * @avail: size of available data (for image validation)
-> >>>>> + *
-> >>>>> + * This function will handle firmware requests for mapping a memory region
-> >>>>> + * internal to a remote processor into kernel. It neither allocates any
-> >>>>> + * physical pages, nor performs any iommu mapping, as this resource entry
-> >>>>> + * is primarily used for representing physical internal memories. If the
-> >>>>> + * internal memory region can only be accessed through an iommu, please
-> >>>>> + * use a devmem resource entry.
-> >>>>> + *
-> >>>>> + * These resource entries should be grouped near the carveout entries in
-> >>>>> + * the firmware's resource table, as other firmware entries might request
-> >>>>> + * placing other data objects inside these memory regions (e.g. data/code
-> >>>>> + * segments, trace resource entries, ...).
-> >>>>> + */
-> >>>>> +static int rproc_handle_intmem(struct rproc *rproc, struct fw_rsc_intmem *rsc,
-> >>>>> +                              int offset, int avail)
-> >>>>> +{
-> >>>> ...
-> >>>>> +       va = (__force void *)ioremap_nocache(rsc->pa, rsc->len);
-> >>>>
-> >>>> Back in the days when we developed remoteproc there was a tremendous
-> >>>> effort to move away from ioremap when not strictly needed.
-> >>>
-> >>> The use of ioremap in general is just fine for drivers as long
-> >>> as they access a dedicated area to the specific device. Accessing
-> >>> random registers and memory in the SoC is what I'm worried about.
-> >>>  
-> >>>> I'd be happy if someone intimate with the related hardware could ack
-> >>>> that in this specific case ioremap is indeed needed. No need to review
-> >>>> the entire patch, or anything remoteproc, just make sure that
-> >>>> generally ioremap is how we want to access this internal memory.
-> >>>>
-> >>>> Tony or Kevin any chance you could take a look and ack?
-> >>>>
-> >>>> If ioremap is indeed the way to go, I'd also expect that we wouldn't
-> >>>> have to use __force here, but that's probably a minor patch cleanup.
-> >>>
-> >>> Hmm sounds like this memory should be dedicated to the accelerator?
-> >>>
-> >>> In that case it should use memblock to reserve that area early so
-> >>> the kernel won't be accessing it at all.
-> >>
-> >> The usage here is not really on regular memory, but on internal device
-> >> memory (eg: L2RAM within DSP which is accessible by MPU through L3 bus).
-> >> For the regular shared memory for vrings and vring buffers, the
-> >> remoteproc core does rely on CMA pools.
-> > 
-> > OK sounds like Linux needs to access it initially to load the DSP boot
-> > code to L2RAM to get the DSP booted.
-> > 
-> > Maybe it can be done with the API provided by drivers/misc/sram.c?
-> > 
-> > You could set up the L2RAM as compatible = "mmio-sram" and then
-> > parse the optional phandle for that in the remoteproc code, then
-> > allocate some memory from it to load the DSP boot code and free
-> > it.
+On 02/11, Viresh Kumar wrote:
+> Now that I have received an verbal Ack from Rob Herring (in a personal
+> conversation) about the bindings, I am showing how the code looks like with
+> these new bindings.
 > 
-> Not quite the same usage, there are no implicit assumptions on managing
-> this memory. Isn't the SRAM driver better suited for allocating memory
-> using the gen_pool API. It is just regular code that is being placed
-> into RAM, and the linker file on the remoteproc side dictates which
-> portion we are using. So, the section can be anywhere based on the ELF
-> parsing. Further, the same RAM space can be partitioned into Cache
-> and/or RAM, which is usually controlled from internal processor
-> subsystem register programming.
+> Some part is still now done:
+> - Interface for adding new detailed OPPs from platform code instead of DT
+> - Providing cpufreq helpers for the next OPPs
+> - Providing regulator helpers for the target/min/max ranges
+> 
+> Please provide feedback on how this looks like..
+> 
 
-It still sounds like you need an API like gen_pool to allocate and
-load the DSP code though? So from that point of view it's best to
-use some Linux generic API.
+Here's some feedback on how we can't use OPPs (and OPPs in DT) on
+qcom platforms.
 
-Just guessing, but the process here is probably something like
-request_firmware, configure hardware, allocate memory area,
-copy firmware to memory, unallocate memory, boot m3 :)
+On these platforms the OPPs are not always frequency voltage
+pairs. Sometimes they're a frequency voltage voltage triplet, or
+frequency voltage current triplet. I know that the OPP framework
+in the kernel doesn't support more than frequency voltage pairs,
+but that doesn't mean it can't in the future, and if it needs to
+do so the DT bindings shouldn't need a v3 revision.
 
-Regards,
+Furthermore, we have a large number of OPP sets that apply to
+different speed bins and silicon characteristics of the SoC. In
+our systems we read some efuses (an eeprom of sorts) that tell us
+to use a certain set of OPPs because the silicon is so fast or
+has these certain characteristics. The bootloader is *not*
+reading these fuses and populating OPPs in DT. So right now we
+just put all these custom OPPish tables in DT and then pick the
+right one based on a node name match constructed from the bits we
+read in the efuses. How can we express this in DT with these
+bindings?
 
-Tony
+For example, on msm8974 we have a frequency voltage current
+triplet and there are 18 different sets of these triplets, each
+with 23 triplets per set. We could encode all of these tables as
+a bunch of nodes with compatible = "operating-points-v2" but how
+do we pick the right one to assign and populate for the CPU
+devices? Do we need some sort of opp-fuse-map table that encodes
+the information we want somewhere?
+
+ qcom,opp-fuse-map = <speedX binY versionZ &oppN>,
+                     ...
+
+but where do we put it? In the cpus node? Or maybe we can keep
+doing the node name matching? That would required dropping the
+oppN convention.
+
+Or take msm8916 as another example. On this device the voltage
+for a few frequencies comes from the efuses and then we
+interpolate the rest of the frequency voltage pairs. The speed
+bins are picked from another set of efuses so we can do the
+interpolation. Unfortunately we don't encode the frequency in the
+fuses, so we rely on a handful of tables being defined somewhere
+so that we know speed bin 0 means this set of frequencies and
+speed bin 1 means this set of frequencies. How do we encode this
+in DT?  Should we have the frequencies as OPPs and leave the
+voltage part out, filling it in at runtime based on what we read
+out of the efuses? I assume it's desirable to have the frequency
+tables in DT but we could also have them in the driver and if we
+did that there wouldn't be any shared-opp property to set and
+have the cpufreq-dt driver use to figure out clock sharing.
+
+Also sometimes we need to correlate OPPs between each other. For
+example on msm8960/apq8064 if the CPU is running at a frequency
+and voltage, the L2 needs to be running at another frequency,
+voltage, and voltage (triplet). The L2 is in two power domains
+but it only has one clock. Can/should this be expressed in DT? It
+certainly seems that it's at least easier to add it on as a
+feature because OPPs are nodes instead of an array. But we need
+to make sure we can support multiple regulators somehow, either
+through correlated OPPs and multiple OPPs for a single device or
+by being able to say opp-0-microvolt, opp-1-microvolt. I would
+guess something similar could happen if there were two clocks and
+one regulator although I've never seen such a scenario in
+practice.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
