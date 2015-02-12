@@ -1,42 +1,33 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 12 Feb 2015 10:08:37 +0100
-Subject: [PATCH 0/4] ARM: at91: at91sam9x5: enable ISI and ov2640 support
-In-Reply-To: <1423728386-24544-1-git-send-email-josh.wu@atmel.com>
-References: <1423728386-24544-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <20150212100837.2ab78742@bbrezillon>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 12 Feb 2015 11:09:50 +0200
+Subject: [PATCH v3 2/2] remoteproc: add support to handle internal memories
+In-Reply-To: <20150211205757.GI2531@atomide.com>
+References: <1420838519-15669-1-git-send-email-s-anna@ti.com>
+ <1420838519-15669-3-git-send-email-s-anna@ti.com>
+ <CAK=WgbaFoUpV315Tg1q=PGc-FkCvKBz2BmO8Fkj_FHa5UuWviw@mail.gmail.com>
+ <20150211205757.GI2531@atomide.com>
+Message-ID: <CAK=WgbbFxNfn5tUeJn-8NehFXAD+=7UW-WtBf3ZFm1xyomFAfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Feb 2015 16:06:22 +0800
-Josh Wu <josh.wu@atmel.com> wrote:
+On Wed, Feb 11, 2015 at 10:57 PM, Tony Lindgren <tony@atomide.com> wrote:
+>> > +static int rproc_handle_intmem(struct rproc *rproc, struct fw_rsc_intmem *rsc,
+>> > +                              int offset, int avail)
+>> > +{
+>> ...
+>> > +       va = (__force void *)ioremap_nocache(rsc->pa, rsc->len);
+>>
+>> Back in the days when we developed remoteproc there was a tremendous
+>> effort to move away from ioremap when not strictly needed.
+>
+> The use of ioremap in general is just fine for drivers as long
+> as they access a dedicated area to the specific device. Accessing
+> random registers and memory in the SoC is what I'm worried about.
 
-> This patch series will enable ISI and ov2640 sensor support for
-> at91sam9g25ek board.
+Yes, the proposed interface essentially allows exactly this random
+access, since the parameters to ioremap would be provided from the
+user space (specifically from the resource table contained within the
+firmware of the remote processor).
 
-This series looks good to me.
-
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-> 
-> 
-> Josh Wu (4):
->   ARM: at91: at91sam9x5/dts: add ISI dt support, include isi node,
->     pinctrls
->   ARM: at91: at91sam9x5ek/dts: add ov2640 support
->   ARM: at91: at91sam9g25ek/dts: enable ISI and ov2640
->   ARM: at91: at91_dt_defconfig: enable ISI and ov2640 support
-> 
->  arch/arm/boot/dts/at91sam9g25.dtsi    |  1 +
->  arch/arm/boot/dts/at91sam9g25ek.dts   | 18 +++++++++++++
->  arch/arm/boot/dts/at91sam9x5_isi.dtsi | 46 +++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/at91sam9x5ek.dtsi   | 48 +++++++++++++++++++++++++++++++++++
->  arch/arm/configs/at91_dt_defconfig    |  6 +++++
->  5 files changed, 119 insertions(+)
-> 
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks,
+Ohad.
