@@ -1,45 +1,35 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 12 Feb 2015 17:26:20 +0100
-Subject: [PATCH 5/9] mtd: pxa3xx_nand: add support for the Marvell Berlin
- nand controller
-In-Reply-To: <20150211163343.GH11169@kwain> (Antoine Tenart's message of "Wed,
- 11 Feb 2015 17:33:43 +0100")
-References: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
- <1422367816-4257-6-git-send-email-antoine.tenart@free-electrons.com>
- <20150209005503.3fad39c7@bbrezillon> <871tlx7dgu.fsf@free.fr>
- <20150211163343.GH11169@kwain>
-Message-ID: <87k2zn5c5v.fsf@free.fr>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 12 Feb 2015 16:27:39 +0000 (UTC)
+Subject: [PATCH] ARM: dra7xx: hwmod: drop .modulemode from pcie1/2 hwmods
+In-Reply-To: <54DCD3C3.3010008@linaro.org>
+References: <1422978684-4826-1-git-send-email-grygorii.strashko@linaro.org>
+ <54D874E9.1040302@ti.com> <54D88BB3.4060104@linaro.org> <54D8B515.201@ti.com>
+ <54D8C9C3.5090500@linaro.org> <54DC4B99.8070009@ti.com>
+ <54DC65E0.7090206@linaro.org>
+ <alpine.DEB.2.02.1502121507480.3767@utopia.booyaka.com>
+ <54DCD3C3.3010008@linaro.org>
+Message-ID: <alpine.DEB.2.02.1502121627210.3767@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Antoine Tenart <antoine.tenart@free-electrons.com> writes:
+On Fri, 13 Feb 2015, Grygorii.Strashko at linaro.org wrote:
 
->> All these ifs per variant will add complexity to the current driver, won't they
->> ?
->
-> Given the current state of this driver I believe this would be a better
-> idea to first rework it to use the nand framework properly. Then it will
-> be possible to have a look on what we have, to decide whether or not a
-> mrvl-nand-lib is needed.
+> On 02/12/2015 11:08 PM, Paul Walmsley wrote:
+> > Thanks guys.
+> > 
+> > On Thu, 12 Feb 2015, Grygorii.Strashko at linaro.org wrote:
+> > 
+> > > Looks good for me and seems working.
+> > 
+> > Grygorii, can I add your Acked-by?
+> > 
+> > 
+> > - Paul
+> > 
+> 
+> There is my "Signed-off-by" :)
 
-I don't fully agree to delay.
-You're taking code, making sometimes copy-paste, for the berlin specific
-functions, and I think you're taking the bugs as well, which duplicates the fix
-effort.
+OK thanks, queued for v3.20-rc.
 
-For example, in nand_cmdfunc_berlin():
-+	if (info->reg_ndcr & NDCR_DWIDTH_M)
-+		column /= 2;
 
-This is I think a copy-paste from its twin nand_cmdfunc(). Now consider what
-happens if the command is _not_ a read command, but an ONFI READID command
-(ONFI being specified by column=0x20 if memory serves me well).
-
-This is the reason I don't really like this patch. And this is also the reason
-why I believe you're in a perfect timing to improve things, by grouping the
-common function, and keeping the bugs in only one place, not many.
-
-Cheers.
-
--- 
-Robert
+- Paul
