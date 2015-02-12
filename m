@@ -1,65 +1,74 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 12 Feb 2015 15:24:40 +0100
-Subject: [PATCH 3/5] serial: mxs-auart: properly handle mctrl_gpio failing
+Date: Thu, 12 Feb 2015 15:24:41 +0100
+Subject: [PATCH 4/5] serial: mctrl-gpio: don't check for struct mctrl_gpios *
+ to be invalid
 In-Reply-To: <1423751082-15888-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1423751082-15888-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1423751082-15888-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1423751082-15888-4-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If mctrl_gpio_init returns an error code this value should be forwarded and
-the driver must not simply ignore this failure.
+Drivers using mctrl-gpio must not pass invalid values for struct
+mctrl_gpios *. All drivers were fixed in this regard and so some checks
+can go away or be simplified.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/tty/serial/mxs-auart.c | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
+ drivers/tty/serial/serial_mctrl_gpio.c | 20 ++------------------
+ 1 file changed, 2 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index ec553f8eb218..14430394985d 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -1157,14 +1157,14 @@ static int serial_mxs_probe_dt(struct mxs_auart_port *s,
- 	return 0;
- }
+diff --git a/drivers/tty/serial/serial_mctrl_gpio.c b/drivers/tty/serial/serial_mctrl_gpio.c
+index a38596c5194e..c0381a09f12d 100644
+--- a/drivers/tty/serial/serial_mctrl_gpio.c
++++ b/drivers/tty/serial/serial_mctrl_gpio.c
+@@ -48,9 +48,6 @@ void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl)
+ 	int value_array[UART_GPIO_MAX];
+ 	unsigned int count = 0;
  
--static bool mxs_auart_init_gpios(struct mxs_auart_port *s, struct device *dev)
-+static int mxs_auart_init_gpios(struct mxs_auart_port *s, struct device *dev)
+-	if (IS_ERR_OR_NULL(gpios))
+-		return;
+-
+ 	for (i = 0; i < UART_GPIO_MAX; i++)
+ 		if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
+ 		    mctrl_gpios_desc[i].dir_out) {
+@@ -65,10 +62,7 @@ EXPORT_SYMBOL_GPL(mctrl_gpio_set);
+ struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
+ 				      enum mctrl_gpio_idx gidx)
+ {
+-	if (!IS_ERR_OR_NULL(gpios) && !IS_ERR_OR_NULL(gpios->gpio[gidx]))
+-		return gpios->gpio[gidx];
+-	else
+-		return NULL;
++	return gpios->gpio[gidx];
+ }
+ EXPORT_SYMBOL_GPL(mctrl_gpio_to_gpiod);
+ 
+@@ -76,15 +70,8 @@ unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
  {
  	enum mctrl_gpio_idx i;
- 	struct gpio_desc *gpiod;
  
- 	s->gpios = mctrl_gpio_init(dev, 0);
--	if (IS_ERR_OR_NULL(s->gpios))
--		return false;
-+	if (IS_ERR(s->gpios))
-+		return PTR_ERR(s->gpios);
+-	/*
+-	 * return it unchanged if the structure is not allocated
+-	 */
+-	if (IS_ERR_OR_NULL(gpios))
+-		return *mctrl;
+-
+ 	for (i = 0; i < UART_GPIO_MAX; i++) {
+-		if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
+-		    !mctrl_gpios_desc[i].dir_out) {
++		if (gpios->gpio[i] && !mctrl_gpios_desc[i].dir_out) {
+ 			if (gpiod_get_value(gpios->gpio[i]))
+ 				*mctrl |= mctrl_gpios_desc[i].mctrl;
+ 			else
+@@ -138,9 +125,6 @@ void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
+ {
+ 	enum mctrl_gpio_idx i;
  
- 	/* Block (enabled before) DMA option if RTS or CTS is GPIO line */
- 	if (!RTS_AT_AUART() || !CTS_AT_AUART()) {
-@@ -1182,7 +1182,7 @@ static bool mxs_auart_init_gpios(struct mxs_auart_port *s, struct device *dev)
- 			s->gpio_irq[i] = -EINVAL;
- 	}
- 
--	return true;
-+	return 0;
- }
- 
- static void mxs_auart_free_gpio_irq(struct mxs_auart_port *s)
-@@ -1279,9 +1279,11 @@ static int mxs_auart_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, s);
- 
--	if (!mxs_auart_init_gpios(s, &pdev->dev))
--		dev_err(&pdev->dev,
--			"Failed to initialize GPIOs. The serial port may not work as expected\n");
-+	ret = mxs_auart_init_gpios(s, &pdev->dev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to initialize GPIOs.\n");
-+		got out_free_irq;
-+	}
- 
- 	/*
- 	 * Get the GPIO lines IRQ
+-	if (IS_ERR_OR_NULL(gpios))
+-		return;
+-
+ 	for (i = 0; i < UART_GPIO_MAX; i++)
+ 		if (!IS_ERR_OR_NULL(gpios->gpio[i]))
+ 			devm_gpiod_put(dev, gpios->gpio[i]);
 -- 
 2.1.4
