@@ -1,24 +1,31 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 12 Feb 2015 10:15:41 -0600
-Subject: [PATCH RESEND] dmaengine: qcom_bam_dma: Fix error path in probe
- function
-In-Reply-To: <1423722101-16424-1-git-send-email-pramod.gurav@smartplayin.com>
-References: <1423722101-16424-1-git-send-email-pramod.gurav@smartplayin.com>
-Message-ID: <20150212161541.GA25578@qualcomm.com>
+From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
+Date: Fri, 13 Feb 2015 00:24:35 +0800
+Subject: [PATCH] ARM: dra7xx: hwmod: drop .modulemode from pcie1/2 hwmods
+In-Reply-To: <alpine.DEB.2.02.1502121507480.3767@utopia.booyaka.com>
+References: <1422978684-4826-1-git-send-email-grygorii.strashko@linaro.org>
+ <54D874E9.1040302@ti.com> <54D88BB3.4060104@linaro.org> <54D8B515.201@ti.com>
+ <54D8C9C3.5090500@linaro.org> <54DC4B99.8070009@ti.com>
+ <54DC65E0.7090206@linaro.org>
+ <alpine.DEB.2.02.1502121507480.3767@utopia.booyaka.com>
+Message-ID: <54DCD3C3.3010008@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 12, 2015 at 11:51:41AM +0530, Pramod Gurav wrote:
-> Calls tasklet_kill() in error path of the probe function were missing.
-> Add the same in error path.
-> 
-> Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+On 02/12/2015 11:08 PM, Paul Walmsley wrote:
+> Thanks guys.
+>
+> On Thu, 12 Feb 2015, Grygorii.Strashko at linaro.org wrote:
+>
+>> Looks good for me and seems working.
+>
+> Grygorii, can I add your Acked-by?
+>
+>
+> - Paul
+>
 
-Looks ok.
-
-Reviewed-by: Andy Gross <agross@codeaurora.org>
+There is my "Signed-off-by" :)
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+regards,
+-grygorii
