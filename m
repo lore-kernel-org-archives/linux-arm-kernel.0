@@ -1,72 +1,85 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 12 Feb 2015 10:54:44 +0000
-Subject: [PATCH v2] ARM: dts: zynq: Add OCM node
-In-Reply-To: <6df19b400e314ef8228be475bb8ba83765683016.1423737765.git.michal.simek@xilinx.com>
-References: <6df19b400e314ef8228be475bb8ba83765683016.1423737765.git.michal.simek@xilinx.com>
-Message-ID: <20150212105443.GB1522@leverpostej>
+Date: Thu, 12 Feb 2015 10:56:23 +0000
+Subject: [PATCH] efi: get_memory_map: add sufficient slack for memory
+ descriptors
+In-Reply-To: <CAKv+Gu88vzPpXoSEs1ZSQbO7wsqh7NRSZc=iSpC9D6vzus7f8g@mail.gmail.com>
+References: <1423718659-795-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150212102226.GB1245@leverpostej>
+ <CAKv+Gu88vzPpXoSEs1ZSQbO7wsqh7NRSZc=iSpC9D6vzus7f8g@mail.gmail.com>
+Message-ID: <20150212105623.GC1522@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 12, 2015 at 10:42:47AM +0000, Michal Simek wrote:
-> Add OCM node for all zynq boards. OCM location
-> can changed but for all current boards this
-> is the location where OCM is.`
+On Thu, Feb 12, 2015 at 10:39:46AM +0000, Ard Biesheuvel wrote:
+> On 12 February 2015 at 18:22, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Thu, Feb 12, 2015 at 05:24:19AM +0000, Ard Biesheuvel wrote:
+> >> As it turns out, when allocating room for the UEFI memory map using
+> >> UEFI's AllocatePool (), it may result in two new memory map entries
+> >> being created, for instance, when using Tianocore's preallocated region
+> >> feature. For example, the following region
+> >>
+> >> 0x00005ead5000-0x00005ebfffff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
+> >>
+> >> may be split like this
+> >>
+> >> 0x00005ead5000-0x00005eae2fff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
+> >> 0x00005eae3000-0x00005eae4fff [Loader Data        |   |  |  |  |   |WB|WT|WC|UC]
+> >> 0x00005eae5000-0x00005ebfffff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
+> >>
+> >> if the preallocated Loader Data region was chosen to be right in the
+> >> middle of the original free space.
+> >>
+> >> After patch d1a8d66b9177 ("efi/libstub: Call get_memory_map() to
+> >> obtain map and desc sizes"), this is not being dealt with correctly
+> >> anymore, as the existing logic to allocate room for a single additional
+> >> entry has become insufficient.
+> >>
+> >> So instead, add room for two additional entries instead.
+> >>
+> >> Fixes: d1a8d66b9177 ("efi/libstub: Call get_memory_map() to obtain map and desc sizes")
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  drivers/firmware/efi/libstub/efi-stub-helper.c | 6 +++---
+> >>  1 file changed, 3 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
+> >> index af5d63c7cc53..ca0b07ed3b14 100644
+> >> --- a/drivers/firmware/efi/libstub/efi-stub-helper.c
+> >> +++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
+> >> @@ -84,10 +84,10 @@ efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
+> >>               return EFI_LOAD_ERROR;
+> >>
+> >>       /*
+> >> -      * Add an additional efi_memory_desc_t because we're doing an
+> >> -      * allocation which may be in a new descriptor region.
+> >> +      * Add room for two additional efi_memory_desc_t entries because we're
+> >> +      * doing an allocation which may be in a new descriptor region.
+> >
+> > It might be worth noting that a existing regions can be
+> > split/reorganised here, otherwise it's a little difficult to deduce from
+> > the comment why to regions are needed.
+> >
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
+> OK
 > 
-> Changes in v2:
-> - Move node to board file suggested by Mark
+> >>        */
+> >> -     *map_size += *desc_size;
+> >> +     *map_size += *desc_size * 2;
+> >
+> > Can we forsee any cases where we might need more than two additional
+> > descs? Is it perhaps adding a little more slack now?
+> >
 > 
-> This patch is done based on discussion here.
-> https://lkml.org/lkml/2014/12/1/396
-> 
-> Mark: I expect you won't like amba bus reference or
-> am I wrong?
+> I don't see how doing a single allocation could result in a single
+> free region to be split into more than 1 occupied region + 2 free
+> regions.
+> So no, I don't think it is ...
 
-I'm fine with dropping things onto a bus in this way. If we're happy to
-do it for other nodes I don't see why busses should be special.
+Fair enough. If we're surprised later we can always fix things up.
 
+With the comment fix up:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
 Mark.
-
-> 
-> ---
->  arch/arm/boot/dts/zynq-7000.dtsi | 2 +-
->  arch/arm/boot/dts/zynq-zc702.dts | 7 +++++++
->  2 files changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> index a5cd2eda3edf..acca3c180324 100644
-> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> @@ -57,7 +57,7 @@
->  		regulator-always-on;
->  	};
->  
-> -	amba {
-> +	amba: amba {
->  		compatible = "simple-bus";
->  		#address-cells = <1>;
->  		#size-cells = <1>;
-> diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-> index fb59d34e8ee6..79077c5ac60e 100644
-> --- a/arch/arm/boot/dts/zynq-zc702.dts
-> +++ b/arch/arm/boot/dts/zynq-zc702.dts
-> @@ -50,6 +50,13 @@
->  	};
->  };
->  
-> +&amba {
-> +	ocm: sram at fffc0000 {
-> +		compatible = "mmio-sram";
-> +		reg = <0xfffc0000 0x10000>;
-> +	};
-> +};
-> +
->  &can0 {
->  	status = "okay";
->  	pinctrl-names = "default";
-> -- 
-> 1.8.2.3
-> 
-> 
