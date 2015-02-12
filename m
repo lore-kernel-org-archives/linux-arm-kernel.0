@@ -1,70 +1,44 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 11 Feb 2015 21:51:50 -0600
-Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if UP
- system
-In-Reply-To: <20150131070939.GA4068@saruman.tx.rr.com>
-References: <1422665010-5854-1-git-send-email-sboyd@codeaurora.org>
- <20150131070939.GA4068@saruman.tx.rr.com>
-Message-ID: <20150212035150.GB29500@kahuna>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 12 Feb 2015 04:35:16 +0000
+Subject: [PATCH] xen/arm: allow console=hvc0 to be omitted for guests
+In-Reply-To: <1423558788.5851.17.camel@citrix.com>
+References: <1422626319-30752-1-git-send-email-ard.biesheuvel@linaro.org>
+ <alpine.DEB.2.02.1502100648050.29696@kaball.uk.xensource.com>
+ <1423553200.5851.15.camel@citrix.com>
+ <CAKv+Gu8kQ5e9dKTp9+e_11pnvskOPjin7ODpxXTj+HmTj+fPag@mail.gmail.com>
+ <1423558788.5851.17.camel@citrix.com>
+Message-ID: <alpine.DEB.2.02.1502120433040.29696@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01:09-20150131, Felipe Balbi wrote:
-> +linux-omap
-> 
-> On Fri, Jan 30, 2015 at 04:43:30PM -0800, Stephen Boyd wrote:
-> > In a uniprocessor implementation the interrupt processor targets
-> > registers are read-as-zero/write-ignored (RAZ/WI). Unfortunately
-> > gic_get_cpumask() will print a critical message saying
+On Tue, 10 Feb 2015, Ian Campbell wrote:
+> On Tue, 2015-02-10 at 15:51 +0800, Ard Biesheuvel wrote:
+> > > FWIW on x86 this doesn't depend on console_set_on_cmdline, does it need
+> > > to here?
+> > >
 > > 
-> >  GIC CPU mask not found - kernel will fail to boot.
+> > I didn't check the code, but it seems inappropriate to add a preferred
+> > console implicitly if the user has set 'console=' on the command line.
+> 
+> I had been thinking that add_preferred_console would DTRT, but it seems
+> not. Seems strange that most calls to it do not check if the console is
+> already set, but it does seem like the right thing in this case.
+> 
+> > > On x86 it does depend on !xen_initial_domain. I suppose on the principal
+> > > that a VT is normally available there. I suppose that doesn't apply to
+> > > ARM so much, although it could.
+> > >
 > > 
-> > if these registers all read as zero, but there won't actually be
-> > a problem on uniprocessor systems and the kernel will boot just
-> > fine. Skip this check if we're running a UP kernel or if we
-> > detect that the hardware only supports a single processor.
-> > 
+> > OK, I got confused by the xen_guest_init(). So do you mean if if
+> > (!xen_initial_domain) should be added?
 > 
-> Nice, I'll test this on AM437x on Monday but certainly looks promising:
+> (dom0 is "Just A Guest" too ;-))
 > 
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> 
-> 
-> > Acked-by: Nicolas Pitre <nico@linaro.org>
-> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Cc: Stefan Agner <stefan@agner.ch>
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > ---
-> >  drivers/irqchip/irq-gic.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> > index d617ee5a3d8a..1b70e0de0f6e 100644
-> > --- a/drivers/irqchip/irq-gic.c
-> > +++ b/drivers/irqchip/irq-gic.c
-> > @@ -346,7 +346,7 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
-> >  			break;
-> >  	}
-> >  
-> > -	if (!mask)
-> > +	if (!mask && num_possible_cpus() > 1)
-> >  		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
-> >  
-> >  	return mask;
-> > -- 
-> > The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> > a Linux Foundation Collaborative Project
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
-> 
-> -- 
-> balbi
+> Adding it would be consistent with x86, I'm not precisely sure if that
+> is important or desirable in this case. I'd be inclined to start with
+> the if there.
 
-Acked-by: Nishanth Menon <nm@ti.com>
--- 
-Regards,
-Nishanth Menon
+The reasoning is that dom0 command line arguments come from its old
+native grub stanza, therefore the console parameter is incorrect, right?
+As opposed to regular domUs, that being freshly installed, are supposed
+to have the correct console parameter?
