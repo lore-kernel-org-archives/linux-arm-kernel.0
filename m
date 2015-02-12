@@ -1,46 +1,91 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Thu, 12 Feb 2015 18:45:55 +0100
-Subject: [PATCH 05/14] ARM: call reset_controller_of_init from default
- time_init handler
+Date: Thu, 12 Feb 2015 18:45:54 +0100
+Subject: [PATCH 04/14] reset: Add reset_controller_of_init() function
 In-Reply-To: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
 References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1423763164-5606-6-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1423763164-5606-5-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some DT ARM platforms need the reset controllers to be initialized before
-the timers.
-This is the case of the stm32 and sunxi platforms.
+Some platforms need to initialize the reset controller before the timers.
 
-This patch adds a call to reset_controller_of_init() to the default
-.init_time callback when RESET_CONTROLLER is used by the platform.
+This patch introduces a reset_controller_of_init() function that can be
+called before the timers intialization.
 
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 ---
- arch/arm/kernel/time.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/reset/core.c              | 20 ++++++++++++++++++++
+ include/asm-generic/vmlinux.lds.h |  4 +++-
+ include/linux/reset-controller.h  |  6 ++++++
+ 3 files changed, 29 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-index 0cc7e58..4601b1e 100644
---- a/arch/arm/kernel/time.c
-+++ b/arch/arm/kernel/time.c
-@@ -20,6 +20,7 @@
- #include <linux/irq.h>
- #include <linux/kernel.h>
- #include <linux/profile.h>
-+#include <linux/reset-controller.h>
- #include <linux/sched.h>
- #include <linux/sched_clock.h>
- #include <linux/smp.h>
-@@ -117,6 +118,9 @@ void __init time_init(void)
- 	if (machine_desc->init_time) {
- 		machine_desc->init_time();
- 	} else {
-+#ifdef CONFIG_RESET_CONTROLLER
-+		reset_controller_of_init();
-+#endif
- #ifdef CONFIG_COMMON_CLK
- 		of_clk_init(NULL);
+diff --git a/drivers/reset/core.c b/drivers/reset/core.c
+index 7955e00..18ee579 100644
+--- a/drivers/reset/core.c
++++ b/drivers/reset/core.c
+@@ -86,6 +86,26 @@ void reset_controller_unregister(struct reset_controller_dev *rcdev)
+ }
+ EXPORT_SYMBOL_GPL(reset_controller_unregister);
+ 
++extern struct of_device_id __reset_ctrl_of_table[];
++
++static const struct of_device_id __reset_ctrl_of_table_sentinel
++	__used __section(__reset_ctrl_of_table_end);
++
++void __init reset_controller_of_init(void)
++{
++	struct device_node *np;
++	const struct of_device_id *match;
++	of_init_fn_1 init_func;
++
++	for_each_matching_node_and_match(np, __reset_ctrl_of_table, &match) {
++		if (!of_device_is_available(np))
++			continue;
++
++		init_func = match->data;
++		init_func(np);
++	}
++}
++
+ /**
+  * reset_control_reset - reset the controlled device
+  * @rstc: reset controller
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index bee5d68..1f96365 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -168,6 +168,7 @@
+ #define RESERVEDMEM_OF_TABLES()	OF_TABLE(CONFIG_OF_RESERVED_MEM, reservedmem)
+ #define CPU_METHOD_OF_TABLES()	OF_TABLE(CONFIG_SMP, cpu_method)
+ #define EARLYCON_OF_TABLES()	OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
++#define RESET_CTRL_OF_TABLES()	OF_TABLE(CONFIG_RESET_CONTROLLER, reset_ctrl)
+ 
+ #define KERNEL_DTB()							\
+ 	STRUCT_ALIGN();							\
+@@ -502,7 +503,8 @@
+ 	CPU_METHOD_OF_TABLES()						\
+ 	KERNEL_DTB()							\
+ 	IRQCHIP_OF_MATCH_TABLE()					\
+-	EARLYCON_OF_TABLES()
++	EARLYCON_OF_TABLES()						\
++	RESET_CTRL_OF_TABLES()
+ 
+ #define INIT_TEXT							\
+ 	*(.init.text)							\
+diff --git a/include/linux/reset-controller.h b/include/linux/reset-controller.h
+index ce6b962..f8a030a 100644
+--- a/include/linux/reset-controller.h
++++ b/include/linux/reset-controller.h
+@@ -51,4 +51,10 @@ struct reset_controller_dev {
+ int reset_controller_register(struct reset_controller_dev *rcdev);
+ void reset_controller_unregister(struct reset_controller_dev *rcdev);
+ 
++
++#define RESET_CONTROLLER_OF_DECLARE(name, compat, fn) \
++	OF_DECLARE_1(reset_ctrl, name, compat, fn)
++
++void reset_controller_of_init(void);
++
  #endif
 -- 
 1.9.1
