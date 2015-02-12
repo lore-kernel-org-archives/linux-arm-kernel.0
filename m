@@ -1,33 +1,28 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Thu, 12 Feb 2015 08:54:18 -0800
-Subject: [PATCH v4 02/11] ARM: tegra: Move out nyan-generic parts out from
- the nyan-big DT
-In-Reply-To: <54DC45C7.8020907@collabora.com>
-References: <1423667220-1062-1-git-send-email-tomeu.vizoso@collabora.com>
- <1423667220-1062-3-git-send-email-tomeu.vizoso@collabora.com>
- <CAL1qeaHeB6vikVWquGM7psdKPKc0FVqj5-xuc3PXbJhok1vGoA@mail.gmail.com>
- <54DC45C7.8020907@collabora.com>
-Message-ID: <CAL1qeaFaH4pBqOR_TKdsRLJG-_40k9X1+PFuSCd+3Tph4gQE2Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 12 Feb 2015 08:52:39 -0800
+Subject: [PATCH 1/4] ARM: dts: omap3-pandora: add common device tree
+In-Reply-To: <572DFAE0-6B61-47B2-90FF-DF8A827DE735@goldelico.com>
+References: <1423746226-700-1-git-send-email-marek@goldelico.com>
+ <1423746226-700-2-git-send-email-marek@goldelico.com>
+ <20150212160316.GL2531@atomide.com>
+ <572DFAE0-6B61-47B2-90FF-DF8A827DE735@goldelico.com>
+Message-ID: <20150212165238.GN2531@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 11, 2015 at 10:18 PM, Tomeu Vizoso
-<tomeu.vizoso@collabora.com> wrote:
-> On 02/11/2015 06:26 PM, Andrew Bresticker wrote:
->> Hi Tomeu,
->>
->> On Wed, Feb 11, 2015 at 7:06 AM, Tomeu Vizoso
->> <tomeu.vizoso@collabora.com> wrote:
->>> In preparation for adding the DT for the nyan-blaze board.
->>>
->>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->>
->> Maybe it's worth pulling the common pinmux bits into nyan.dtsi as well?
->
-> I decided to have them in the leaf DTSs so the whole output from
-> tegra-pinmux-scripts can be stuck in there without any extra processing.
->
-> I think this way we can be more certain that the pinmux in the kernel
-> isn't diverging from what it should be.
+* Dr. H. Nikolaus Schaller <hns@goldelico.com> [150212 08:34]:
+> Am 12.02.2015 um 17:03 schrieb Tony Lindgren <tony@atomide.com>:
+> 
+> > I don't think dts
+> > has a binding for MTDPART_SIZ_FULL type thing..
+> 
+> It does not need a special binding, we just set the size to 0. This
+> is interpreted as MTDPART_SIZ_FULL later on. For board files,
+> there is just a #define in include/linux/mtd/partitions.h and it appears
+> to work.
 
-Ok, that makes sense to me.  Thanks.
+Oh OK good to know.
+
+Regards,
+
+Tony
