@@ -1,63 +1,41 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 12 Feb 2015 10:38:21 +0100
-Subject: [PATCH 2/2] ARM: dts: zynq: Add linux, stdout-path and stdout-path
-In-Reply-To: <54DB663E.4060605@xilinx.com>
-References: <0a0e0579fb6e2794d2c0c6fb9186c5b43618f448.1423657710.git.michal.simek@xilinx.com>
- <ea777ffbffea442e3bc69fe11183811772a5716e.1423657710.git.michal.simek@xilinx.com>
- <20150211124027.GH9154@leverpostej> <54DB663E.4060605@xilinx.com>
-Message-ID: <b19bf0fdc82b47cc88187edecd23f5b6@BL2FFO11OLC004.protection.gbl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Feb 2015 09:40:20 +0000
+Subject: [PATCH 03/16] tty: serial: 8250_core: read only RX if there is
+ something in the FIFO
+In-Reply-To: <54DC6832.3070507@linutronix.de>
+References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
+ <1410377411-26656-4-git-send-email-bigeasy@linutronix.de>
+ <54D8B772.1010405@freebox.fr> <54D9441B.7070403@hurleysoftware.com>
+ <54D9F3C7.5000809@freebox.fr> <54DA43F8.9090904@hurleysoftware.com>
+ <54DBB531.2030504@hurleysoftware.com>
+ <20150211200313.GE2531@atomide.com>
+ <54DBBE9E.90104@hurleysoftware.com>
+ <54DC6832.3070507@linutronix.de>
+Message-ID: <20150212094020.GE8670@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark and Simon,
-
-On 02/11/2015 03:25 PM, Michal Simek wrote:
-> On 02/11/2015 01:40 PM, Mark Rutland wrote:
->> On Wed, Feb 11, 2015 at 12:29:02PM +0000, Michal Simek wrote:
->>> parallella - Use reference instead of hardcoded path
->>>              (linux,stdout-path)
->>>
->>> stdout-path is used by bootloader to identify console.
->>>
->>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->>> ---
->>>
->>> U-Boot driver model requires stdout-path.
->>> ---
->>>  arch/arm/boot/dts/zynq-parallella.dts | 3 ++-
->>>  arch/arm/boot/dts/zynq-zc702.dts      | 2 ++
->>>  arch/arm/boot/dts/zynq-zc706.dts      | 2 ++
->>>  arch/arm/boot/dts/zynq-zed.dts        | 2 ++
->>>  arch/arm/boot/dts/zynq-zybo.dts       | 2 ++
->>>  5 files changed, 10 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
->>> index 6a5f51daa708..45228a427006 100644
->>> --- a/arch/arm/boot/dts/zynq-parallella.dts
->>> +++ b/arch/arm/boot/dts/zynq-parallella.dts
->>> @@ -35,7 +35,8 @@
->>>  
->>>  	chosen {
->>>  		bootargs = "console=ttyPS0,115200 earlyprintk root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait";
->>> -		linux,stdout-path = "/amba/serial at e0001000";
->>> +		linux,stdout-path = &uart1;
->>> +		stdout-path = &uart1;
->>
->> Given that you added aliases in the last patch, you can use that to
->> refer to the serial:
->>
->> 	stdout-path - "serial0:115200n8";
->>
->> With or without the alias you can encode the UART configuration here
->> too:
->>
->> 	stdout-path = "/amba/serial at e0001000:115200n8"
+On Thu, Feb 12, 2015 at 09:45:38AM +0100, Sebastian Andrzej Siewior wrote:
+> On 02/11/2015 09:42 PM, Peter Hurley wrote:
 > 
-> let me check this configuration if it is supported by u-boot.
+> >> Reverting makes sense to me if it has caused a regression. Maybe Sebastian
+> >> can update his patch to do this based on some quirk flag instead?
+> > 
+> > That's fine with me. There's a 'bugs' field in struct 8250_uart_port and
+> > UART_BUG_* defines in 8250/8250.h for that purpose.
+> 
+> Makes sense. Reading an empty FIFO does not look right. Maybe we should
+> do the bug flag the other way around? But I can do what I am told to so
+> if there is more fallout than just this Marvell UART I could come
+> around with a patch to the bug field for the older OMAP.
 
-I have converted Linux DTSes to this style and it is working fine.
-For U-Boot DM this description is not supported.
-Simon: Do you have any plan to support this new description?
+Reading the RX FIFO is something that goes back a long time in the 8250
+driver, to the time when Ted Ts'o wrote the driver.
 
-Thanks,
-Michal
+I would suggest that it remains there as the default (it was obviously
+found to be necessary for x86 all those years ago when Linux was in
+its infancy) and has survived for getting on 20 years without issue.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
