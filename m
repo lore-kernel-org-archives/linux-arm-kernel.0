@@ -1,77 +1,64 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Fri, 13 Feb 2015 13:41:13 +0800
-Subject: [RFC PATCH v3 23/26] early kprobes: x86:
- arch_restore_optimized_kprobe().
-In-Reply-To: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
-References: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1423806073-62441-1-git-send-email-wangnan0@huawei.com>
+Date: Fri, 13 Feb 2015 13:39:01 +0800
+Subject: [RFC PATCH v3 00/26] Early kprobe: enable kprobes at very early
+ booting stage.
+Message-ID: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch_restore_optimized_kprobe() can be used to temporarily restore
-probed instruction. It will actually disable optimized kprobe, but keep
-the relatived data structure. It uses stop_machine() to enforce
-atimicity.
+I fell very sorry for people who reviewed my v2 patch series yesterday
+at https://lkml.org/lkml/2015/2/12/234 because I didn't provide enough
+information in commit log. This v3 patch series add those missing
+commit messages. There are also 2 small fix based on v2:
 
-Signed-off-by: Wang Nan <wangnan0@huawei.com>
----
- arch/x86/kernel/kprobes/opt.c | 26 ++++++++++++++++++++++++++
- include/linux/kprobes.h       |  1 +
- 2 files changed, 27 insertions(+)
+ 1. Fixes ftrace_sort_mcount_area. Original patch doesn't work for module.
+ 2. Wraps setting of kprobes_initialized in stop_machine() context. 
 
-diff --git a/arch/x86/kernel/kprobes/opt.c b/arch/x86/kernel/kprobes/opt.c
-index f3ea954..12332c2 100644
---- a/arch/x86/kernel/kprobes/opt.c
-+++ b/arch/x86/kernel/kprobes/opt.c
-@@ -28,6 +28,7 @@
- #include <linux/kdebug.h>
- #include <linux/kallsyms.h>
- #include <linux/ftrace.h>
-+#include <linux/stop_machine.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/desc.h>
-@@ -486,4 +487,29 @@ void arch_fix_ftrace_early_kprobe(struct optimized_kprobe *op)
- 		memcpy(&list_p->opcode, correct_nop5, sizeof(kprobe_opcode_t));
- 
- }
-+
-+static int do_restore_kprobe(void *p)
-+{
-+	struct optimized_kprobe *op = p;
-+	u8 insn_buf[RELATIVEJUMP_SIZE];
-+
-+	memcpy(insn_buf, &op->kp.opcode, sizeof(kprobe_opcode_t));
-+	memcpy(insn_buf + INT3_SIZE,
-+			op->optinsn.copied_insn,
-+			RELATIVE_ADDR_SIZE);
-+	text_poke(op->kp.addr, insn_buf, RELATIVEJUMP_SIZE);
-+	return 0;
-+}
-+
-+void arch_restore_optimized_kprobe(struct optimized_kprobe *op)
-+{
-+	u32 mask = KPROBE_FLAG_EARLY |
-+		KPROBE_FLAG_OPTIMIZED |
-+		KPROBE_FLAG_FTRACE;
-+
-+	if ((op->kp.flags & mask) != mask)
-+		return;
-+
-+	stop_machine(do_restore_kprobe, op, NULL);
-+}
- #endif
-diff --git a/include/linux/kprobes.h b/include/linux/kprobes.h
-index e483f1b..e615402 100644
---- a/include/linux/kprobes.h
-+++ b/include/linux/kprobes.h
-@@ -462,6 +462,7 @@ extern int arch_prepare_kprobe_ftrace(struct kprobe *p);
- 
- #ifdef CONFIG_EARLY_KPROBES
- extern void arch_fix_ftrace_early_kprobe(struct optimized_kprobe *p);
-+extern void arch_restore_optimized_kprobe(struct optimized_kprobe *p);
- #endif
- 
- #endif
+Wang Nan (26):
+  kprobes: set kprobes_all_disarmed earlier to enable re-optimization.
+  kprobes: makes kprobes/enabled works correctly for optimized kprobes.
+  kprobes: x86: mark 2 bytes NOP as boostable.
+  ftrace: don't update record flags if code modification fail.
+  ftrace/x86: Ensure rec->flags no change when failure occures.
+  ftrace: sort ftrace entries earlier.
+  ftrace: allow search ftrace addr before ftrace fully inited.
+  ftrace: enable make ftrace nop before ftrace_init().
+  ftrace: allow fixing code update failure by notifier chain.
+  ftrace: x86: try to fix ftrace when ftrace_replace_code.
+  early kprobes: introduce kprobe_is_early for futher early kprobe use.
+  early kprobes: Add an KPROBE_FLAG_EARLY for early kprobe.
+  early kprobes: ARM: directly modify code.
+  early kprobes: ARM: introduce early kprobes related code area.
+  early kprobes: x86: directly modify code.
+  early kprobes: x86: introduce early kprobes related code area.
+  early kprobes: introduces macros for allocing early kprobe resources.
+  early kprobes: allows __alloc_insn_slot() from early kprobes slots.
+  early kprobes: perhibit probing at early kprobe reserved area.
+  early kprobes: core logic of eraly kprobes.
+  early kprobes: add CONFIG_EARLY_KPROBES option.
+  early kprobes: introduce arch_fix_ftrace_early_kprobe().
+  early kprobes: x86: arch_restore_optimized_kprobe().
+  early kprobes: core logic to support early kprobe on ftrace.
+  early kprobes: introduce kconfig option to support early kprobe on
+    ftrace.
+  kprobes: enable 'ekprobe=' cmdline option for early kprobes.
+
+ arch/Kconfig                      |  15 ++
+ arch/arm/include/asm/kprobes.h    |  31 ++-
+ arch/arm/kernel/vmlinux.lds.S     |   2 +
+ arch/arm/probes/kprobes/opt-arm.c |  12 +-
+ arch/x86/include/asm/insn.h       |   7 +-
+ arch/x86/include/asm/kprobes.h    |  47 +++-
+ arch/x86/kernel/ftrace.c          |  23 +-
+ arch/x86/kernel/kprobes/core.c    |   2 +-
+ arch/x86/kernel/kprobes/opt.c     |  69 +++++-
+ arch/x86/kernel/vmlinux.lds.S     |   2 +
+ include/linux/ftrace.h            |  37 +++
+ include/linux/kprobes.h           | 132 +++++++++++
+ init/main.c                       |   1 +
+ kernel/kprobes.c                  | 479 +++++++++++++++++++++++++++++++++++++-
+ kernel/trace/ftrace.c             | 157 +++++++++++--
+ 15 files changed, 969 insertions(+), 47 deletions(-)
+
 -- 
 1.8.4
