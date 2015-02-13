@@ -1,225 +1,205 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 13 Feb 2015 17:42:55 +0100
-Subject: [PATCH 1/7] clk: convert clock mux to accept regmap
+Date: Fri, 13 Feb 2015 17:42:56 +0100
+Subject: [PATCH 2/7] clk: convert clock gate to accept regmap
 In-Reply-To: <1423845781-7480-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1423845781-7480-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1423845781-7480-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1423845781-7480-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rework the clk_mux helpers to either use an iomem base address or a
+Rework the clk_gate helpers to either use an iomem base address or a
 regmap.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/clk/clk-mux.c        | 72 +++++++++++++++++++++++++++++++++++++-------
- include/linux/clk-provider.h | 39 +++++++++++++++++++-----
- 2 files changed, 93 insertions(+), 18 deletions(-)
+ drivers/clk/clk-gate.c       | 94 +++++++++++++++++++++++++++++++++-----------
+ include/linux/clk-provider.h | 12 ++++--
+ 2 files changed, 80 insertions(+), 26 deletions(-)
 
-diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index 6e1ecf94bf58..1cd0ecd35ce3 100644
---- a/drivers/clk/clk-mux.c
-+++ b/drivers/clk/clk-mux.c
-@@ -42,7 +42,11 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
- 	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
- 	 * val = 0x4 really means "bit 2, index starts at bit 0"
- 	 */
--	val = clk_readl(mux->reg) >> mux->shift;
-+	if (mux->reg_type == CLK_REG_TYPE_IOMEM)
-+		val = clk_readl(mux->reg.iomem) >> mux->shift;
-+	else
-+		regmap_read(mux->reg.regmap, mux->reg.offset, &val);
-+
- 	val &= mux->mask;
+diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+index 51fd87fb7ba6..6cc27ebf6573 100644
+--- a/drivers/clk/clk-gate.c
++++ b/drivers/clk/clk-gate.c
+@@ -11,6 +11,7 @@
  
- 	if (mux->table) {
-@@ -83,20 +87,24 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
- 			index++;
- 	}
+ #include <linux/clk-provider.h>
+ #include <linux/module.h>
++#include <linux/regmap.h>
+ #include <linux/slab.h>
+ #include <linux/io.h>
+ #include <linux/err.h>
+@@ -50,15 +51,18 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
  
--	if (mux->lock)
--		spin_lock_irqsave(mux->lock, flags);
-+	if (mux->reg_type == CLK_REG_TYPE_IOMEM && mux->reg.lock)
-+		spin_lock_irqsave(mux->reg.lock, flags);
+ 	set ^= enable;
  
- 	if (mux->flags & CLK_MUX_HIWORD_MASK) {
- 		val = mux->mask << (mux->shift + 16);
+-	if (gate->lock)
+-		spin_lock_irqsave(gate->lock, flags);
++	if (gate->reg_type == CLK_REG_TYPE_IOMEM && gate->reg.lock)
++		spin_lock_irqsave(gate->reg.lock, flags);
+ 
+ 	if (gate->flags & CLK_GATE_HIWORD_MASK) {
+ 		reg = BIT(gate->bit_idx + 16);
+ 		if (set)
+ 			reg |= BIT(gate->bit_idx);
  	} else {
--		val = clk_readl(mux->reg);
-+		val = clk_readl(mux->reg.iomem);
- 		val &= ~(mux->mask << mux->shift);
+-		reg = clk_readl(gate->reg);
++		if (gate->reg_type == CLK_REG_TYPE_IOMEM)
++			reg = clk_readl(gate->reg.iomem);
++		else
++			regmap_read(gate->reg.regmap, gate->reg.offset, &reg);
+ 
+ 		if (set)
+ 			reg |= BIT(gate->bit_idx);
+@@ -66,10 +70,13 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
+ 			reg &= ~BIT(gate->bit_idx);
  	}
- 	val |= index << mux->shift;
--	clk_writel(val, mux->reg);
  
--	if (mux->lock)
--		spin_unlock_irqrestore(mux->lock, flags);
-+	if (mux->reg_type == CLK_REG_TYPE_IOMEM)
-+		clk_writel(val, mux->reg.iomem);
+-	clk_writel(reg, gate->reg);
++	if (gate->reg_type == CLK_REG_TYPE_IOMEM)
++		clk_writel(reg, gate->reg.iomem);
 +	else
-+		regmap_write(mux->reg.regmap, mux->reg.offset, val);
-+
-+	if (mux->reg_type == CLK_REG_TYPE_IOMEM && mux->reg.lock)
-+		spin_unlock_irqrestore(mux->reg.lock, flags);
++		regmap_write(gate->reg.regmap, gate->reg.offset, reg);
  
- 	return 0;
+-	if (gate->lock)
+-		spin_unlock_irqrestore(gate->lock, flags);
++	if (gate->reg_type == CLK_REG_TYPE_IOMEM && gate->reg.lock)
++		spin_unlock_irqrestore(gate->reg.lock, flags);
  }
-@@ -113,10 +121,10 @@ const struct clk_ops clk_mux_ro_ops = {
+ 
+ static int clk_gate_enable(struct clk_hw *hw)
+@@ -89,7 +96,10 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
+ 	u32 reg;
+ 	struct clk_gate *gate = to_clk_gate(hw);
+ 
+-	reg = clk_readl(gate->reg);
++	if (gate->reg_type == CLK_REG_TYPE_IOMEM)
++		reg = clk_readl(gate->reg.iomem);
++	else
++		regmap_read(gate->reg.regmap, gate->reg.offset, &reg);
+ 
+ 	/* if a set bit disables this clk, flip it before masking */
+ 	if (gate->flags & CLK_GATE_SET_TO_DISABLE)
+@@ -107,21 +117,10 @@ const struct clk_ops clk_gate_ops = {
  };
- EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
+ EXPORT_SYMBOL_GPL(clk_gate_ops);
  
--struct clk *clk_register_mux_table(struct device *dev, const char *name,
-+struct clk *__clk_register_mux_table(struct device *dev, const char *name,
- 		const char **parent_names, u8 num_parents, unsigned long flags,
--		void __iomem *reg, u8 shift, u32 mask,
--		u8 clk_mux_flags, u32 *table, spinlock_t *lock)
-+		union clk_reg reg, enum clk_reg_type reg_type, u8 shift,
-+		u32 mask, u8 clk_mux_flags, u32 *table)
+-/**
+- * clk_register_gate - register a gate clock with the clock framework
+- * @dev: device that is registering this clock
+- * @name: name of this clock
+- * @parent_name: name of this clock's parent
+- * @flags: framework-specific flags for this clock
+- * @reg: register address to control gating of this clock
+- * @bit_idx: which bit in the register controls gating of this clock
+- * @clk_gate_flags: gate-specific flags for this clock
+- * @lock: shared register lock for this clock
+- */
+-struct clk *clk_register_gate(struct device *dev, const char *name,
++struct clk *__clk_register_gate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+-		void __iomem *reg, u8 bit_idx,
+-		u8 clk_gate_flags, spinlock_t *lock)
++		union clk_reg reg, enum clk_reg_type type, u8 bit_idx,
++		u8 clk_gate_flags)
  {
- 	struct clk_mux *mux;
+ 	struct clk_gate *gate;
  	struct clk *clk;
-@@ -149,10 +157,10 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
+@@ -149,9 +148,9 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
  
- 	/* struct clk_mux assignments */
- 	mux->reg = reg;
-+	mux->reg_type = reg_type;
- 	mux->shift = shift;
- 	mux->mask = mask;
- 	mux->flags = clk_mux_flags;
--	mux->lock = lock;
- 	mux->table = table;
- 	mux->hw.init = &init;
+ 	/* struct clk_gate assignments */
+ 	gate->reg = reg;
++	gate->reg_type = type;
+ 	gate->bit_idx = bit_idx;
+ 	gate->flags = clk_gate_flags;
+-	gate->lock = lock;
+ 	gate->hw.init = &init;
  
-@@ -163,8 +171,37 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
+ 	clk = clk_register(dev, &gate->hw);
+@@ -161,4 +160,55 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
  
  	return clk;
  }
 +
-+struct clk *clk_register_mux_table(struct device *dev, const char *name,
-+		const char **parent_names, u8 num_parents, unsigned long flags,
-+		void __iomem *reg, u8 shift, u32 mask,
-+		u8 clk_mux_flags, u32 *table, spinlock_t *lock)
++/**
++ * clk_register_gate - register a gate clock with the clock framework
++ * @dev: device that is registering this clock
++ * @name: name of this clock
++ * @parent_name: name of this clock's parent
++ * @flags: framework-specific flags for this clock
++ * @reg: register address to control gating of this clock
++ * @bit_idx: which bit in the register controls gating of this clock
++ * @clk_gate_flags: gate-specific flags for this clock
++ * @lock: shared register lock for this clock
++ */
++struct clk *clk_register_gate(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		void __iomem *reg, u8 bit_idx,
++		u8 clk_gate_flags, spinlock_t *lock)
 +{
 +	union clk_reg clk_reg;
 +
 +	clk_reg.iomem = reg;
 +	clk_reg.lock = lock;
-+	return __clk_register_mux_table(dev, name, parent_names, num_parents,
-+					flags, clk_reg, CLK_REG_TYPE_IOMEM,
-+					shift, mask, clk_mux_flags, table);
++
++	return __clk_register_gate(dev, name, parent_name, flags, clk_reg,
++				   CLK_REG_TYPE_IOMEM, bit_idx, clk_gate_flags);
 +}
- EXPORT_SYMBOL_GPL(clk_register_mux_table);
- 
-+struct clk *clk_register_mux_table_regmap(struct device *dev, const char *name,
-+		const char **parent_names, u8 num_parents, unsigned long flags,
-+		struct regmap *regmap, unsigned int offset, u8 shift, u32 mask,
-+		u8 clk_mux_flags, u32 *table)
+ EXPORT_SYMBOL_GPL(clk_register_gate);
++
++/**
++ * clk_register_gate_regmap - register a gate clock with the clock framework
++ * @dev: device that is registering this clock
++ * @name: name of this clock
++ * @parent_name: name of this clock's parent
++ * @flags: framework-specific flags for this clock
++ * @reg: regmap to control the gating of this clock
++ * @bit_idx: which bit in the register controls gating of this clock
++ * @clk_gate_flags: gate-specific flags for this clock
++ * @lock: shared register lock for this clock
++ */
++struct clk *clk_register_gate_regmap(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		struct regmap *reg, unsigned int offset, u8 bit_idx,
++		u8 clk_gate_flags)
 +{
 +	union clk_reg clk_reg;
 +
-+	clk_reg.regmap = regmap;
++	clk_reg.regmap = reg;
 +	clk_reg.offset = offset;
-+	return __clk_register_mux_table(dev, name, parent_names, num_parents,
-+					flags, clk_reg, CLK_REG_TYPE_REGMAP,
-+					shift, mask, clk_mux_flags, table);
++	return __clk_register_gate(dev, name, parent_name, flags, clk_reg,
++				   CLK_REG_TYPE_REGMAP, bit_idx,
++				   clk_gate_flags);
 +}
-+EXPORT_SYMBOL_GPL(clk_register_mux_table_regmap);
-+
- struct clk *clk_register_mux(struct device *dev, const char *name,
- 		const char **parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u8 width,
-@@ -177,3 +214,16 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
- 				      NULL, lock);
- }
- EXPORT_SYMBOL_GPL(clk_register_mux);
-+
-+struct clk *clk_register_mux_regmap(struct device *dev, const char *name,
-+		const char **parent_names, u8 num_parents, unsigned long flags,
-+		struct regmap *regmap, unsigned int offset, u8 shift, u8 width,
-+		u8 clk_mux_flags)
-+{
-+	u32 mask = BIT(width) - 1;
-+
-+	return clk_register_mux_table_regmap(dev, name, parent_names,
-+				      num_parents, flags, regmap, offset, shift,
-+				      mask, clk_mux_flags, NULL);
-+}
-+EXPORT_SYMBOL_GPL(clk_register_mux_regmap);
++EXPORT_SYMBOL_GPL(clk_register_gate_regmap);
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index d936409520f8..3d2b9ab2130d 100644
+index 3d2b9ab2130d..b3f7018960fb 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -14,6 +14,7 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/of.h>
-+#include <linux/regmap.h>
- 
- #ifdef CONFIG_COMMON_CLK
- 
-@@ -258,6 +259,22 @@ struct clk *clk_register_fixed_rate_with_accuracy(struct device *dev,
- 
- void of_fixed_clk_setup(struct device_node *np);
- 
-+union clk_reg {
-+	struct {
-+		void __iomem	*iomem;
-+		spinlock_t	*lock;
-+	};
-+	struct {
-+		struct regmap	*regmap;
-+		unsigned int	offset;
-+	};
-+};
-+
-+enum clk_reg_type {
-+	CLK_REG_TYPE_IOMEM,
-+	CLK_REG_TYPE_REGMAP,
-+};
-+
- /**
-  * struct clk_gate - gating clock
-  *
-@@ -384,13 +401,13 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
-  *	indicate changing mux bits.
+@@ -297,10 +297,10 @@ enum clk_reg_type {
   */
- struct clk_mux {
--	struct clk_hw	hw;
+ struct clk_gate {
+ 	struct clk_hw hw;
 -	void __iomem	*reg;
--	u32		*table;
--	u32		mask;
--	u8		shift;
+-	u8		bit_idx;
 -	u8		flags;
 -	spinlock_t	*lock;
-+	struct clk_hw		hw;
 +	union clk_reg		reg;
 +	enum clk_reg_type	reg_type;
-+	u32			*table;
-+	u32			mask;
-+	u8			shift;
++	u8			bit_idx;
 +	u8			flags;
  };
  
- #define CLK_MUX_INDEX_ONE		BIT(0)
-@@ -405,11 +422,19 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
- 		const char **parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u8 width,
- 		u8 clk_mux_flags, spinlock_t *lock);
-+struct clk *clk_register_mux_regmap(struct device *dev, const char *name,
-+		const char **parent_names, u8 num_parents, unsigned long flags,
-+		struct regmap *regmap, unsigned int offset, u8 shift, u8 width,
-+		u8 clk_mux_flags);
+ #define CLK_GATE_SET_TO_DISABLE		BIT(0)
+@@ -311,6 +311,10 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 bit_idx,
+ 		u8 clk_gate_flags, spinlock_t *lock);
++struct clk *clk_register_gate_regmap(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		struct regmap *reg, unsigned int offset, u8 bit_idx,
++		u8 clk_gate_flags);
  
- struct clk *clk_register_mux_table(struct device *dev, const char *name,
- 		const char **parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u32 mask,
- 		u8 clk_mux_flags, u32 *table, spinlock_t *lock);
-+struct clk *clk_register_mux_table_regmap(struct device *dev, const char *name,
-+		const char **parent_names, u8 num_parents, unsigned long flags,
-+		struct regmap *regmap, unsigned int offset, u8 shift, u32 mask,
-+		u8 clk_mux_flags, u32 *table);
- 
- void of_fixed_factor_clk_setup(struct device_node *node);
- 
+ struct clk_div_table {
+ 	unsigned int	val;
 -- 
 2.3.0
