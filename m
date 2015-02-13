@@ -1,170 +1,75 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 13 Feb 2015 18:12:52 +0200
-Subject: [PATCHv2 33/33] ARM: OMAP4+: control: add support for initializing
- control module via DT
+Date: Fri, 13 Feb 2015 18:12:50 +0200
+Subject: [PATCHv2 31/33] ARM: dts: omap5: add nodes for control module core
+ instances
 In-Reply-To: <1423843973-6050-1-git-send-email-t-kristo@ti.com>
 References: <1423843973-6050-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1423843973-6050-31-git-send-email-t-kristo@ti.com>
+Message-ID: <1423843973-6050-29-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP4, OMAP5 and DRA7 now parse DT entries for control module address spaces,
-and set up syscon mappings appropriately. Low level IO init is updated to
-remove the legacy control module mappings for these devices also.
+Add support for control module core generic and padconf memory spaces.
+These nodes add syscon support for shared access, and the duplicate
+omap5_padconf_global node is removed with the same patch. Kernel support
+for the new compatible strings is going to be added in a separate patch.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/control.c |   44 +++++++++++++++++++++++++++++++++++------
- arch/arm/mach-omap2/io.c      |    9 +++------
- 2 files changed, 41 insertions(+), 12 deletions(-)
+ .../devicetree/bindings/arm/omap/ctrl.txt          |    2 ++
+ arch/arm/boot/dts/omap5.dtsi                       |   19 ++++++++++++-------
+ 2 files changed, 14 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index a6d987b..d223aa45 100644
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -35,8 +35,8 @@
- #define PADCONF_SAVE_DONE		0x1
+diff --git a/Documentation/devicetree/bindings/arm/omap/ctrl.txt b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
+index 02fb500..99f81ea 100644
+--- a/Documentation/devicetree/bindings/arm/omap/ctrl.txt
++++ b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
+@@ -17,6 +17,8 @@ Required properties:
+ 		"ti,omap3-scrm"
+ 		"ti,omap4-ctrl-gen-core"
+ 		"ti,omap4-ctrl-pad-core"
++		"ti,omap5-ctrl-gen-core"
++		"ti,omap5-ctrl-pad-core"
+ - reg:		Contains Control Module register address range
+ 		(base address and length)
  
- static void __iomem *omap2_ctrl_base;
--static void __iomem *omap4_ctrl_pad_base;
- static struct regmap *omap2_ctrl_syscon;
-+static struct regmap *omap4_ctrl_pad_syscon;
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index b321fdf..8d49116 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -182,6 +182,16 @@
+ 			};
+ 		};
  
- #if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
- struct omap3_scratchpad {
-@@ -138,13 +138,10 @@ struct omap3_control_regs {
- static struct omap3_control_regs control_context;
- #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
++		ctrl_gen_core: ctrl_gen_core at 4a002000 {
++			compatible = "ti,omap5-ctrl-gen-core", "syscon";
++			reg = <0x4a002000 0x800>;
++		};
++
++		ctrl_pad_core: ctrl_pad_core at 4a002800 {
++			compatible = "ti,omap5-ctrl-pad-core", "syscon";
++			reg = <0x4a002800 0x800>;
++		};
++
+ 		counter32k: counter at 4ae04000 {
+ 			compatible = "ti,omap-counter32k";
+ 			reg = <0x4ae04000 0x40>;
+@@ -209,15 +219,10 @@
+ 			pinctrl-single,function-mask = <0x7fff>;
+ 		};
  
--#define OMAP4_CTRL_PAD_REGADDR(reg)	(omap4_ctrl_pad_base + (reg))
+-		omap5_padconf_global: tisyscon at 4a002da0 {
+-			compatible = "syscon";
+-			reg = <0x4A002da0 0xec>;
+-		};
 -
- void __init omap2_set_globals_control(void __iomem *ctrl,
- 				      void __iomem *ctrl_pad)
- {
- 	omap2_ctrl_base = ctrl;
--	omap4_ctrl_pad_base = ctrl_pad;
- }
- 
- u8 omap_ctrl_readb(u16 offset)
-@@ -225,12 +222,15 @@ void omap_ctrl_writel(u32 val, u16 offset)
- 
- u32 omap4_ctrl_pad_readl(u16 offset)
- {
--	return readl_relaxed(OMAP4_CTRL_PAD_REGADDR(offset));
-+	u32 val;
-+
-+	regmap_read(omap4_ctrl_pad_syscon, offset, &val);
-+	return val;
- }
- 
- void omap4_ctrl_pad_writel(u32 val, u16 offset)
- {
--	writel_relaxed(val, OMAP4_CTRL_PAD_REGADDR(offset));
-+	regmap_write(omap4_ctrl_pad_syscon, offset, val);
- }
- 
- #ifdef CONFIG_ARCH_OMAP3
-@@ -658,11 +658,30 @@ static const struct control_init_data ctrl_data = {
- 	.index = CLK_MEMMAP_INDEX_CTRL,
- };
- 
-+static const struct control_init_data omap4_ctrl_gen_core_data = {
-+	.index = CLK_MEMMAP_INDEX_CTRL,
-+};
-+
-+static const struct control_init_data omap4_ctrl_pad_core_data = {
-+};
-+
- static struct of_device_id omap_scrm_dt_match_table[] = {
- 	{ .compatible = "ti,am3-scrm", .data = &ctrl_data },
- 	{ .compatible = "ti,am4-scrm", .data = &ctrl_data },
- 	{ .compatible = "ti,omap2-scrm", .data = &ctrl_data },
- 	{ .compatible = "ti,omap3-scrm", .data = &ctrl_data },
-+	{ .compatible = "ti,omap4-ctrl-gen-core",
-+	  .data = &omap4_ctrl_gen_core_data },
-+	{ .compatible = "ti,omap4-ctrl-pad-core",
-+	  .data = &omap4_ctrl_pad_core_data },
-+	{ .compatible = "ti,omap5-ctrl-gen-core",
-+	  .data = &omap4_ctrl_gen_core_data },
-+	{ .compatible = "ti,omap5-ctrl-pad-core",
-+	  .data = &omap4_ctrl_pad_core_data },
-+	{ .compatible = "ti,dra7-ctrl-gen-core",
-+	  .data = &omap4_ctrl_gen_core_data },
-+	{ .compatible = "ti,dra7-ctrl-pad-core",
-+	  .data = &omap4_ctrl_pad_core_data },
- 	{ }
- };
- 
-@@ -682,6 +701,13 @@ int __init omap2_control_base_init(void)
- 	for_each_matching_node_and_match(np, omap_scrm_dt_match_table, &match) {
- 		data = match->data;
- 
-+		/*
-+		 * Only setup omap2_ctrl_base for base index, omap4+ has
-+		 * padconf mapping also
-+		 */
-+		if (data->index != CLK_MEMMAP_INDEX_CTRL)
-+			continue;
-+
- 		omap2_ctrl_base = of_iomap(np, 0);
- 		if (!omap2_ctrl_base)
- 			return -ENOMEM;
-@@ -711,6 +737,10 @@ int __init omap_control_init(void)
- 		if (IS_ERR(syscon))
- 			return PTR_ERR(syscon);
- 
-+		/*
-+		 * Setup appropriate syscon mapping; omap4+ is currently
-+		 * using two of these, separate ones for generic + padconf
-+		 */
- 		if (data->index == CLK_MEMMAP_INDEX_CTRL) {
- 			omap2_ctrl_syscon = syscon;
- 
-@@ -721,6 +751,8 @@ int __init omap_control_init(void)
- 
- 			iounmap(omap2_ctrl_base);
- 			omap2_ctrl_base = NULL;
-+		} else {
-+			omap4_ctrl_pad_syscon = syscon;
- 		}
- 	}
- 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 5e100ed..0b6b20c 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -611,9 +611,8 @@ void __init omap4430_init_early(void)
- {
- 	omap2_set_globals_tap(OMAP443X_CLASS,
- 			      OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE));
--	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
--				  OMAP2_L4_IO_ADDRESS(OMAP443X_CTRL_BASE));
- 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP4430_PRCM_MPU_BASE));
-+	omap2_control_base_init();
- 	omap4xxx_check_revision();
- 	omap4xxx_check_features();
- 	omap2_prcm_base_init();
-@@ -640,9 +639,8 @@ void __init omap5_init_early(void)
- {
- 	omap2_set_globals_tap(OMAP54XX_CLASS,
- 			      OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
--	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
--				  OMAP2_L4_IO_ADDRESS(OMAP54XX_CTRL_BASE));
- 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
-+	omap2_control_base_init();
- 	omap4_pm_init_early();
- 	omap2_prcm_base_init();
- 	omap5xxx_check_revision();
-@@ -666,9 +664,8 @@ void __init omap5_init_late(void)
- void __init dra7xx_init_early(void)
- {
- 	omap2_set_globals_tap(-1, OMAP2_L4_IO_ADDRESS(DRA7XX_TAP_BASE));
--	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
--				  OMAP2_L4_IO_ADDRESS(DRA7XX_CTRL_BASE));
- 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
-+	omap2_control_base_init();
- 	omap4_pm_init_early();
- 	omap2_prcm_base_init();
- 	dra7xxx_check_revision();
+ 		pbias_regulator: pbias_regulator {
+ 			compatible = "ti,pbias-omap";
+-			reg = <0x60 0x4>;
+-			syscon = <&omap5_padconf_global>;
++			reg = <0x600 0x4>;
++			syscon = <&ctrl_pad_core>;
+ 			pbias_mmc_reg: pbias_mmc_omap5 {
+ 				regulator-name = "pbias_mmc_omap5";
+ 				regulator-min-microvolt = <1800000>;
 -- 
 1.7.9.5
