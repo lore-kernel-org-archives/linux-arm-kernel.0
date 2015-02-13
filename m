@@ -1,102 +1,123 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Fri, 13 Feb 2015 13:40:34 +0800
-Subject: [RFC PATCH v3 07/26] ftrace: allow search ftrace addr before ftrace
- fully inited.
+Date: Fri, 13 Feb 2015 13:40:31 +0800
+Subject: [RFC PATCH v3 06/26] ftrace: sort ftrace entries earlier.
 In-Reply-To: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
 References: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1423806034-61781-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1423806031-61742-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables ftrace_location() to be used before ftrace_init().
-The first user should be early kprobes, which can insert kprobes to
-kernel code even before setup_arch() finishes. This patch gives it a
-chance to determine whether it is probing ftrace entries and allows it
-do some special treatment.
+By extracting mcount sorting code and sort them earliler, futher patches
+will be able to determine whether an address is on an ftrace entry or
+not using bsearch().
 
-ftrace_cmp_ips_insn() is introduced to make early ftrace_location()
-behavior consistent with normal ftrace_location(). With existing
-ftrace_cmp_ips(), searching an address in middle of an instruction will
-fail, which is inconsistent with ftrace_cmp_recs() used by normal
-ftrace_location().
-
-With this and previous patch ftrace_location() now is able to be called
-in and after setup_arch().
+ftrace_sort_mcount_area() will be called before, during and after
+ftrace_init (when module insertion). Ensure it sort kernel mcount table
+only once.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
 ---
- kernel/trace/ftrace.c | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ include/linux/ftrace.h |  2 ++
+ init/main.c            |  1 +
+ kernel/trace/ftrace.c  | 38 ++++++++++++++++++++++++++++++++++++--
+ 3 files changed, 39 insertions(+), 2 deletions(-)
 
+diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
+index 1da6029..8db315a 100644
+--- a/include/linux/ftrace.h
++++ b/include/linux/ftrace.h
+@@ -701,8 +701,10 @@ static inline void __ftrace_enabled_restore(int enabled)
+ 
+ #ifdef CONFIG_FTRACE_MCOUNT_RECORD
+ extern void ftrace_init(void);
++extern void ftrace_init_early(void);
+ #else
+ static inline void ftrace_init(void) { }
++static inline void ftrace_init_early(void) { }
+ #endif
+ 
+ /*
+diff --git a/init/main.c b/init/main.c
+index 6f0f1c5f..eaafc3e 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -517,6 +517,7 @@ asmlinkage __visible void __init start_kernel(void)
+ 	boot_cpu_init();
+ 	page_address_init();
+ 	pr_notice("%s", linux_banner);
++	ftrace_init_early();
+ 	setup_arch(&command_line);
+ 	mm_init_cpumask(&init_mm);
+ 	setup_command_line(command_line);
 diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
-index a75cfbe..fc0c1aa 100644
+index 6c6cbb1..a75cfbe 100644
 --- a/kernel/trace/ftrace.c
 +++ b/kernel/trace/ftrace.c
-@@ -1539,6 +1539,8 @@ static unsigned long ftrace_location_range(unsigned long start, unsigned long en
- 	return 0;
- }
+@@ -1169,6 +1169,7 @@ struct ftrace_page {
  
-+static unsigned long ftrace_search_mcount_ip(unsigned long ip);
-+
- /**
-  * ftrace_location - return true if the ip giving is a traced location
-  * @ip: the instruction pointer to check
-@@ -1550,6 +1552,9 @@ static unsigned long ftrace_location_range(unsigned long start, unsigned long en
-  */
- unsigned long ftrace_location(unsigned long ip)
+ static struct ftrace_page	*ftrace_pages_start;
+ static struct ftrace_page	*ftrace_pages;
++static bool kernel_mcount_sorted = false;
+ 
+ static bool __always_inline ftrace_hash_empty(struct ftrace_hash *hash)
  {
-+	if (unlikely(!ftrace_pages_start))
-+		return ftrace_search_mcount_ip(ip);
-+
- 	return ftrace_location_range(ip, ip);
+@@ -4743,6 +4744,32 @@ static void ftrace_swap_ips(void *a, void *b, int size)
+ 	*ipb = t;
  }
  
-@@ -4733,6 +4738,18 @@ static int ftrace_cmp_ips(const void *a, const void *b)
- 	return 0;
- }
- 
-+static int ftrace_cmp_ips_insn(const void *a, const void *b)
-+{
-+	const unsigned long *ipa = a;
-+	const unsigned long *ipb = b;
-+
-+	if (*ipa >= *ipb + MCOUNT_INSN_SIZE)
-+		return 1;
-+	if (*ipa < *ipb)
-+		return -1;
-+	return 0;
-+}
-+
- static void ftrace_swap_ips(void *a, void *b, int size)
- {
- 	unsigned long *ipa = a;
-@@ -4770,6 +4787,27 @@ static void ftrace_sort_mcount_area(unsigned long *start, unsigned long *end)
- 		kernel_mcount_sorted = true;
- }
- 
-+static unsigned long ftrace_search_mcount_ip(unsigned long ip)
++static void ftrace_sort_mcount_area(unsigned long *start, unsigned long *end)
 +{
 +	extern unsigned long __start_mcount_loc[];
 +	extern unsigned long __stop_mcount_loc[];
 +
-+	unsigned long *mcount_start = __start_mcount_loc;
-+	unsigned long *mcount_end = __stop_mcount_loc;
-+	unsigned long count = mcount_end - mcount_start;
-+	unsigned long *retval;
++	unsigned long count;
++	bool is_kernel_mcount;
 +
-+	if (!kernel_mcount_sorted)
-+		return 0;
++	count = end - start;
++	if (!count)
++		return;
 +
-+	retval = bsearch(&ip, mcount_start, count,
-+			sizeof(unsigned long), ftrace_cmp_ips_insn);
-+	if (!retval)
-+		return 0;
++	is_kernel_mcount =
++		(start == __start_mcount_loc) &&
++		(end == __stop_mcount_loc);
 +
-+	return ftrace_call_adjust(ip);
++	if (is_kernel_mcount && kernel_mcount_sorted)
++		return;
++
++	sort(start, count, sizeof(*start),
++		ftrace_cmp_ips, ftrace_swap_ips);
++
++	if (is_kernel_mcount)
++		kernel_mcount_sorted = true;
 +}
 +
  static int ftrace_process_locs(struct module *mod,
  			       unsigned long *start,
  			       unsigned long *end)
+@@ -4761,8 +4788,7 @@ static int ftrace_process_locs(struct module *mod,
+ 	if (!count)
+ 		return 0;
+ 
+-	sort(start, count, sizeof(*start),
+-	     ftrace_cmp_ips, ftrace_swap_ips);
++	ftrace_sort_mcount_area(start, end);
+ 
+ 	start_pg = ftrace_allocate_pages(count);
+ 	if (!start_pg)
+@@ -4965,6 +4991,14 @@ void __init ftrace_init(void)
+ 	ftrace_disabled = 1;
+ }
+ 
++void __init ftrace_init_early(void)
++{
++	extern unsigned long __start_mcount_loc[];
++	extern unsigned long __stop_mcount_loc[];
++
++	ftrace_sort_mcount_area(__start_mcount_loc, __stop_mcount_loc);
++}
++
+ /* Do nothing if arch does not support this */
+ void __weak arch_ftrace_update_trampoline(struct ftrace_ops *ops)
+ {
 -- 
 1.8.4
