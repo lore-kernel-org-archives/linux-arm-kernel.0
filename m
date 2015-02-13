@@ -1,69 +1,57 @@
-From: mxs@sbrk.org (s. rannou)
-Date: Fri, 13 Feb 2015 15:55:03 +0100 (CET)
-Subject: [PATCH] cpuidle: mvebu: update cpuidle thresholds for Armada XP SOCs
-Message-ID: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 13 Feb 2015 17:06:52 +0200
+Subject: [PATCH 01/23] ARM: OMAP2+: clock: move clock provider
+ infrastructure to clock driver
+In-Reply-To: <20150127165016.GJ28663@atomide.com>
+References: <1417103514-17027-1-git-send-email-t-kristo@ti.com>
+ <1417103514-17027-2-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.02.1501242142181.5450@utopia.booyaka.com>
+ <54C61938.8000303@ti.com> <20150126154936.GC28663@atomide.com>
+ <54C777CE.1070900@ti.com> <20150127165016.GJ28663@atomide.com>
+Message-ID: <54DE130C.2080808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Originally, the thresholds used in the cpuidle driver for Armada SOCs
-were temporarily chosen, leaving room for improvements.
+On 01/27/2015 06:50 PM, Tony Lindgren wrote:
+> * Tomi Valkeinen <tomi.valkeinen@ti.com> [150127 03:37]:
+>> On 26/01/15 17:49, Tony Lindgren wrote:
+>>
+>>>> I'm not sure if I miss something, but regmap_write does not protect from
+>>>> problems if there are multiple users for the same registers. You need to
+>>>> use regmap_update_bits() to get a protected read/write sequence, in
+>>>> which you can change only the bits that you want to change.
+>>>
+>>> To me it seems that issue can be fixed by making all the code use regmap.
+>>> AFAIK that should work for the legacy code too.
+>>
+>> Even if everybody uses regmap, doing
+>>
+>> v = regmap_read()
+>> modify v
+>> regmap_write(v)
+>>
+>> is racy. regmap_update_bits() has to be used to protect the read/write
+>> sequence. Which may be somewhat challenging at times with some strange
+>> registers, the like Roger Q encountered recently related to CAN.
+>
+> Yeah that's a good point.
+>
+> Regards,
+>
+> Tony
+>
 
-This commit updates the thresholds for the Armada XP SOCs with values
-that positively impact performances:
+I have a v2 of this series ready now, which also moves control module 
+completely to use syscon for register accesses. The move to regmap is 
+done at later point though, not in this patch as Paul proposed, as the 
+changes to the rest of the series were not posted.
 
-                                without patch  with patch   vendor kernel
- - iperf localhost (gbit/sec)   ~3.7           ~6.4         ~5.4
- - ioping tmpfs (iops)          ~163k          ~206k        ~179k
- - ioping tmpfs (mib/s)         ~636           ~805         ~699
+The race handling needs to be done on driver level to use 
+regmap_update_bits, my take on this is that we can post separate patches 
+against the individual drivers, once the regmap/syscon conversion has 
+been done. Mostly, the drivers do not touch same register anyway, so 
+getting any conflicts should be pretty rare. Moreover, this set does not 
+do anything for this anyway, if there are currently races with some 
+users of control module, these will be there still.
 
-The idle power consumption is negatively impacted (proportionally less
-than the performance gain), and we are still performing better than
-the vendor kernel here:
-
-                                without patch   with patch  vendor kernel
- - power consumption idle (W)   ~2.4            ~3.2        ~4.4
- - power consumption busy (W)   ~8.6            ~8.3        ~8.6
-
-There is still room for improvement regarding the value of these
-thresholds, they were chosen to mimic the vendor kernel.
-
-This patch only impacts Armada XP SOCs and was tested on Online Labs
-C1 boards. A similar approach can be taken to improve the performances
-of the Armada 370 and Armada 38x SOCs.
-
-Thanks a lot to Thomas Petazzoni, Gregory Clement and Willy Tarreau
-for the discussions and tips around this topic.
-
-Signed-off-by: Sebastien Rannou <mxs@sbrk.org>
----
- drivers/cpuidle/cpuidle-mvebu-v7.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
-index 38e6861..3716a1f 100644
---- a/drivers/cpuidle/cpuidle-mvebu-v7.c
-+++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
-@@ -50,17 +50,17 @@ static struct cpuidle_driver armadaxp_idle_driver = {
- 	.states[0]		= ARM_CPUIDLE_WFI_STATE,
- 	.states[1]		= {
- 		.enter			= mvebu_v7_enter_idle,
--		.exit_latency		= 10,
-+		.exit_latency		= 100,
- 		.power_usage		= 50,
--		.target_residency	= 100,
-+		.target_residency	= 1000,
- 		.name			= "MV CPU IDLE",
- 		.desc			= "CPU power down",
- 	},
- 	.states[2]		= {
- 		.enter			= mvebu_v7_enter_idle,
--		.exit_latency		= 100,
-+		.exit_latency		= 1000,
- 		.power_usage		= 5,
--		.target_residency	= 1000,
-+		.target_residency	= 10000,
- 		.flags			= MVEBU_V7_FLAG_DEEP_IDLE,
- 		.name			= "MV CPU DEEP IDLE",
- 		.desc			= "CPU and L2 Fabric power down",
--- 
-2.1.4
+-Tero
