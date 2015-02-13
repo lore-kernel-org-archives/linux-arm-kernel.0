@@ -1,75 +1,128 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 13 Feb 2015 18:12:50 +0200
-Subject: [PATCHv2 31/33] ARM: dts: omap5: add nodes for control module core
- instances
-In-Reply-To: <1423843973-6050-1-git-send-email-t-kristo@ti.com>
-References: <1423843973-6050-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1423843973-6050-29-git-send-email-t-kristo@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 14 Feb 2015 00:23:52 +0800
+Subject: [PATCH] efi: get_memory_map: add sufficient slack for memory
+ descriptors
+In-Reply-To: <20150213160448.GA30567@codeblueprint.co.uk>
+References: <1423718659-795-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150212102226.GB1245@leverpostej>
+ <CAKv+Gu88vzPpXoSEs1ZSQbO7wsqh7NRSZc=iSpC9D6vzus7f8g@mail.gmail.com>
+ <20150212144727.GD4665@codeblueprint.co.uk>
+ <CAKv+Gu-NAKASZc4phj5x83mB8Ak4Gy2zYq-a0CDADEOTBD4pXA@mail.gmail.com>
+ <20150212151607.GH1522@leverpostej>
+ <CAKv+Gu_Z0Upoy0J-hxf0i7Oen00tb-TENJ9CszdEtTHsb5pGSg@mail.gmail.com>
+ <20150213160448.GA30567@codeblueprint.co.uk>
+Message-ID: <4582A14D-E69B-459E-BC9E-F642B098D061@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for control module core generic and padconf memory spaces.
-These nodes add syscon support for shared access, and the duplicate
-omap5_padconf_global node is removed with the same patch. Kernel support
-for the new compatible strings is going to be added in a separate patch.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- .../devicetree/bindings/arm/omap/ctrl.txt          |    2 ++
- arch/arm/boot/dts/omap5.dtsi                       |   19 ++++++++++++-------
- 2 files changed, 14 insertions(+), 7 deletions(-)
+> On 14 Feb 2015, at 00:04, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> 
+>> On Thu, 12 Feb, at 11:31:02PM, Ard Biesheuvel wrote:
+>> 
+>> Actually, looking again at the original patch, it appears that my
+>> analysis was incorrect regarding the possibility that the loop would
+>> never terminate. The only thing that could happen if desc_size >
+>> sizeof(efi_memory_desc_t) is that you need two iterations instead of
+>> one to get a pool allocation that is of sufficient size.
+>> So perhaps it is better to just revert the patch.
+>> 
+>> My apologies for the hassle.
+> 
+> This is what I've got queued up,
+> 
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/ctrl.txt b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
-index 02fb500..99f81ea 100644
---- a/Documentation/devicetree/bindings/arm/omap/ctrl.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
-@@ -17,6 +17,8 @@ Required properties:
- 		"ti,omap3-scrm"
- 		"ti,omap4-ctrl-gen-core"
- 		"ti,omap4-ctrl-pad-core"
-+		"ti,omap5-ctrl-gen-core"
-+		"ti,omap5-ctrl-pad-core"
- - reg:		Contains Control Module register address range
- 		(base address and length)
- 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index b321fdf..8d49116 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -182,6 +182,16 @@
- 			};
- 		};
- 
-+		ctrl_gen_core: ctrl_gen_core at 4a002000 {
-+			compatible = "ti,omap5-ctrl-gen-core", "syscon";
-+			reg = <0x4a002000 0x800>;
-+		};
-+
-+		ctrl_pad_core: ctrl_pad_core at 4a002800 {
-+			compatible = "ti,omap5-ctrl-pad-core", "syscon";
-+			reg = <0x4a002800 0x800>;
-+		};
-+
- 		counter32k: counter at 4ae04000 {
- 			compatible = "ti,omap-counter32k";
- 			reg = <0x4ae04000 0x40>;
-@@ -209,15 +219,10 @@
- 			pinctrl-single,function-mask = <0x7fff>;
- 		};
- 
--		omap5_padconf_global: tisyscon at 4a002da0 {
--			compatible = "syscon";
--			reg = <0x4A002da0 0xec>;
--		};
--
- 		pbias_regulator: pbias_regulator {
- 			compatible = "ti,pbias-omap";
--			reg = <0x60 0x4>;
--			syscon = <&omap5_padconf_global>;
-+			reg = <0x600 0x4>;
-+			syscon = <&ctrl_pad_core>;
- 			pbias_mmc_reg: pbias_mmc_omap5 {
- 				regulator-name = "pbias_mmc_omap5";
- 				regulator-min-microvolt = <1800000>;
--- 
-1.7.9.5
+Acked-by: Ard Biesheuvel <ard@linaro.org>
+
+Thanks Matt
+
+> ---
+> 
+> From 3f281b98ffc99e604a3988aa93304a3a591eeeb5 Mon Sep 17 00:00:00 2001
+> From: Matt Fleming <matt.fleming@intel.com>
+> Date: Fri, 13 Feb 2015 15:46:56 +0000
+> Subject: [PATCH] Revert "efi/libstub: Call get_memory_map() to obtain map and
+> desc sizes"
+> 
+> This reverts commit d1a8d66b9177105e898e73716f97eb61842c457a.
+> 
+> Ard reported a boot failure when running UEFI under Qemu and Xen and
+> experimenting with various Tianocore build options,
+> 
+> "As it turns out, when allocating room for the UEFI memory map using
+>  UEFI's AllocatePool (), it may result in two new memory map entries
+>  being created, for instance, when using Tianocore's preallocated region
+>  feature. For example, the following region
+> 
+>  0x00005ead5000-0x00005ebfffff [Conventional Memory|   |  |  |  |  |WB|WT|WC|UC]
+> 
+>  may be split like this
+> 
+>  0x00005ead5000-0x00005eae2fff [Conventional Memory|   |  |  |  |  |WB|WT|WC|UC]
+>  0x00005eae3000-0x00005eae4fff [Loader Data        |   |  |  |  |  |WB|WT|WC|UC]
+>  0x00005eae5000-0x00005ebfffff [Conventional Memory|   |  |  |  |  |WB|WT|WC|UC]
+> 
+>  if the preallocated Loader Data region was chosen to be right in the
+>  middle of the original free space.
+> 
+>  After patch d1a8d66b9177 ("efi/libstub: Call get_memory_map() to
+>  obtain map and desc sizes"), this is not being dealt with correctly
+>  anymore, as the existing logic to allocate room for a single additional
+>  entry has become insufficient."
+> 
+> Mark requested to reinstate the old loop we had before commit
+> d1a8d66b9177, which grows the memory map buffer until it's big enough to
+> hold the EFI memory map.
+> 
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Matt Fleming <matt.fleming@intel.com>
+> ---
+> drivers/firmware/efi/libstub/efi-stub-helper.c | 16 ++++++----------
+> 1 file changed, 6 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
+> index d073e3946383..9bd9fbb5bea8 100644
+> --- a/drivers/firmware/efi/libstub/efi-stub-helper.c
+> +++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
+> @@ -66,29 +66,25 @@ efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
+>    unsigned long key;
+>    u32 desc_version;
+> 
+> -    *map_size = 0;
+> -    *desc_size = 0;
+> -    key = 0;
+> -    status = efi_call_early(get_memory_map, map_size, NULL,
+> -                &key, desc_size, &desc_version);
+> -    if (status != EFI_BUFFER_TOO_SMALL)
+> -        return EFI_LOAD_ERROR;
+> -
+> +    *map_size = sizeof(*m) * 32;
+> +again:
+>    /*
+>     * Add an additional efi_memory_desc_t because we're doing an
+>     * allocation which may be in a new descriptor region.
+>     */
+> -    *map_size += *desc_size;
+> +    *map_size += sizeof(*m);
+>    status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
+>                *map_size, (void **)&m);
+>    if (status != EFI_SUCCESS)
+>        goto fail;
+> 
+> +    *desc_size = 0;
+> +    key = 0;
+>    status = efi_call_early(get_memory_map, map_size, m,
+>                &key, desc_size, &desc_version);
+>    if (status == EFI_BUFFER_TOO_SMALL) {
+>        efi_call_early(free_pool, m);
+> -        return EFI_LOAD_ERROR;
+> +        goto again;
+>    }
+> 
+>    if (status != EFI_SUCCESS)
+> -- 
+> 1.9.3
+> 
+> -- 
+> Matt Fleming, Intel Open Source Technology Center
