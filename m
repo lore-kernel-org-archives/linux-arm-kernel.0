@@ -1,49 +1,105 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 13 Feb 2015 19:57:13 +0100
-Subject: [PATCH RFC v9 01/20] clk: divider: Correct parent clk round rate
- if no bestdiv is normally found
-In-Reply-To: <54DE0BB8.7070004@ti.com>
-References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
- <1423720903-24806-2-git-send-email-Ying.Liu@freescale.com>
- <20150212093356.GR12209@pengutronix.de>
- <20150212103944.GA1290@victor>
- <20150212122405.GW12209@pengutronix.de>
- <20150212125646.GT8656@n2100.arm.linux.org.uk>
- <20150212134131.GX12209@pengutronix.de> <54DE0BB8.7070004@ti.com>
-Message-ID: <20150213185713.GA12209@pengutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 13 Feb 2015 20:18:22 +0100
+Subject: [PATCH 12/14] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <CALszF6Ad93BgT4UsJudVKpfhhL2dbtKTTRno1XqQ5=eANkwXzA@mail.gmail.com>
+References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1423763164-5606-13-git-send-email-mcoquelin.stm32@gmail.com>
+ <1423828078.4182.17.camel@pengutronix.de>
+ <CALszF6D+5mXajUWarwq8M4yL_Nc+x1Bmu4D7_HxDRy2kGRXNVQ@mail.gmail.com>
+ <1423844735.4182.52.camel@pengutronix.de>
+ <CALszF6Ad93BgT4UsJudVKpfhhL2dbtKTTRno1XqQ5=eANkwXzA@mail.gmail.com>
+Message-ID: <1423855102.4182.63.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 13, 2015 at 04:35:36PM +0200, Tomi Valkeinen wrote:
-> On 12/02/15 15:41, Sascha Hauer wrote:
+Am Freitag, den 13.02.2015, 17:41 +0100 schrieb Maxime Coquelin:
+> 2015-02-13 17:25 GMT+01:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> > Hi Maxime,
+> >
+> > Am Freitag, den 13.02.2015, 16:59 +0100 schrieb Maxime Coquelin:
+> >> Hi Philipp,
+> >>
+> >> 2015-02-13 12:47 GMT+01:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> >> > Hi Maxime,
+> >> >
+> >> > Am Donnerstag, den 12.02.2015, 18:46 +0100 schrieb Maxime Coquelin:
+> >> > [...]
+> >> >> +     soc {
+> >> >> +             reset_ahb1: reset at 40023810 {
+> >> >> +                     #reset-cells = <1>;
+> >> >> +                     compatible = "st,stm32-reset";
+> >> >> +                     reg = <0x40023810 0x4>;
+> >> >> +             };
+> >> >> +
+> >> >> +             reset_ahb2: reset at 40023814 {
+> >> >> +                     #reset-cells = <1>;
+> >> >> +                     compatible = "st,stm32-reset";
+> >> >> +                     reg = <0x40023814 0x4>;
+> >> >> +             };
+> >> >> +
+> >> >> +             reset_ahb3: reset at 40023818 {
+> >> >> +                     #reset-cells = <1>;
+> >> >> +                     compatible = "st,stm32-reset";
+> >> >> +                     reg = <0x40023818 0x4>;
+> >> >> +             };
+> >> >> +
+> >> >> +             reset_apb1: reset at 40023820 {
+> >> >> +                     #reset-cells = <1>;
+> >> >> +                     compatible = "st,stm32-reset";
+> >> >> +                     reg = <0x40023820 0x4>;
+> >> >> +             };
+> >> >> +
+> >> >> +             reset_apb2: reset at 40023824 {
+> >> >> +                     #reset-cells = <1>;
+> >> >> +                     compatible = "st,stm32-reset";
+> >> >> +                     reg = <0x40023824 0x4>;
+> >> >> +             };
+> >> >
+> >> > These are mostly consecutive, single registers. I wonder if these are
+> >> > part of the same IP block and thus should be grouped together into the
+> >> > same reset controller node?
+> >>
+> >> What I could to is to have two instances. One for AHB and one for APB domain.
+> >> Doing this, I will have one instance per domain, and only consecutive registers.
+> >> Is it fine for you?
+> >
+> > Looking at
+> > http://www.st.com/web/en/resource/technical/document/reference_manual/DM00031020.pdf
+> > Table 34 (RCC register map and reset values), I'd say there is a single
+> > "Reset and Clock Control" device at 0x40023800 - 0x40023884:
+> >
+> >         soc {
+> >                 rcc: rcc at 40023800 {
+> >                         #clock-cells = <1>;
+> >                         #reset-cells = <1>;
+> >                         compatible = "st,stm32-rcc";
+> >                         reg = <0x40023800 0x84>;
+> >                 };
+> >
+> >                 ...
+> >
+> > If you really want to describe the reset controller parts (offsets +0x10
+> > to +0x24) in a separate node, I won't argue against it too long,
+> > although this is a somewhat arbitrary decision.
+> >
+> > In any case, the whole register at offset +0x1c is reserved, so there is
+> > no reason to split the reset controller. It is ok to have unused ranges
+> > as is already the case with reserved bits inside the used registers.
 > 
-> > Tomis patch is based on the assumption that clk_set_rate(clk_round_rate(rate))
-> > is equal to clk_round_rate(rate). So when this assumption is wrong then
-> > it should simply be reverted.
-> 
-> When is it not equal?
-> 
-> I agree that doing clk_set_rate(clk, clk_round_rate(clk, rate)) is
-> pointless, but shouldn't it still work?
-> 
-> And we can forget about clk_round_rate. Without my patch, this would
-> behave oddly also:
-> 
-> rate = clk_get_rate(clk);
-> clk_set_rate(clk, rate);
-> 
-> The end result could be something else than 'rate'.
+> Ok. I understand your point.
+> But it will be more difficult at usage, because the node referencing
+> the fourth reset bit of apb2 register will have to pass 164 as
+> parameter.
+> It is error prone IMHO.
+>
+> Other solution would be to add some defines for each reset line in the
+> DT-Bindings, as we do today for STi platform.
+> But it is giving an unneeded constraint between DT and reset trees.
 
-I agree that it's a bit odd, but I think it has to be like this.
-Consider that you request a rate of 100Hz, but the clock can only
-produce 99.5Hz, so due to rounding clk_round_rate() returns 99Hz.
-Now when you request 99Hz from clk_set_rate() the 99.5Hz value
-can't be used because it's too high.
+That is a bit unfortunate, but providing the named constants in
+include/dt-bindings/reset/ makes for a much better readable device tree,
+so I'd prefer that solution, even if it means having to coordinate pull
+requests.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+regards
+Philipp
