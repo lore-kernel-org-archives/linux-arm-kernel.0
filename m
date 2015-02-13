@@ -1,118 +1,47 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 13 Feb 2015 17:11:23 +0200
-Subject: [PATCH 6/9] arm/dts: dra7.dtsi: add DSS support
+Date: Fri, 13 Feb 2015 17:11:26 +0200
+Subject: [PATCH 9/9] RFC: ARM: DRA7: enable DSS_DESHDCP_CLKEN
 In-Reply-To: <1423840286-18377-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1423840286-18377-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1423840286-18377-7-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1423840286-18377-10-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DRA7xxx contains a very similar DSS to OMAP5. The main differences are:
+DRA7xx's CTRL_CORE_CONTROL_IO_2 register contains bits for various
+subsystems, including PCIe, DCAN, QSPI and DSS. At the moment only DCAN
+bits are used by the SW via syscon.
 
-* no DSI or RFBI support.
-* 1 or 2 dedicated video PLLs.
-* need to do additional configuration to the DRA7 CONTROL module.
-
-DRA72xx has only one video PLL, and DRA74xx has two.
+For DSS there is DSS_DESHDCP_CLKEN bit. This (presumably) enables a
+clock related to DSS's HDCP. If that clock is off, DSS module does not
+start at all, causing OCP errors. This means that the HWMOD code is not
+able to reset and initialize DSS.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: devicetree at vger.kernel.org
 ---
- arch/arm/boot/dts/dra7.dtsi   | 38 ++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/dra72x.dtsi | 11 +++++++++++
- arch/arm/boot/dts/dra74x.dtsi | 15 +++++++++++++++
- 3 files changed, 64 insertions(+)
+ arch/arm/mach-omap2/io.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 22771bc1643a..fc35a8a06d95 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1421,6 +1421,44 @@
- 			clocks = <&sys_clkin1>;
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index a1bd6affb508..2206fb13f195 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -700,6 +700,17 @@ void __init dra7xx_init_early(void)
+ 	dra7xx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+ 	omap_clk_soc_init = dra7xx_dt_clk_init;
 +
-+		dss: dss at 58000000 {
-+			compatible = "ti,dra7-dss";
-+			/* 'reg' defined in dra72x.dtsi and dra74x.dtsi */
-+			/* 'clocks' defined in dra72x.dtsi and dra74x.dtsi */
-+			status = "disabled";
-+			ti,hwmods = "dss_core";
-+			/* CTRL_CORE_DSS_PLL_CONTROL */
-+			syscon-pll-ctrl = <&dra7_ctrl_core 0x538>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
++	if (soc_is_dra7xx()) {
++		u32 v;
++		const u16 ctrl_core_control_io_2 = 0x558;
 +
-+			dispc at 58001000 {
-+				compatible = "ti,dra7-dispc";
-+				reg = <0x58001000 0x1000>;
-+				interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+				ti,hwmods = "dss_dispc";
-+				clocks = <&dss_dss_clk>;
-+				clock-names = "fck";
-+				/* CTRL_CORE_SMA_SW_1 */
-+				syscon-pol = <&dra7_ctrl_core 0x534>;
-+			};
++		/* set CTRL_CORE_CONTROL_IO_2:DSS_DESHDCP_CLKEN */
 +
-+			hdmi: encoder at 58060000 {
-+				compatible = "ti,dra7-hdmi";
-+				reg = <0x58040000 0x200>,
-+				      <0x58040200 0x80>,
-+				      <0x58040300 0x80>,
-+				      <0x58060000 0x19000>;
-+				reg-names = "wp", "pll", "phy", "core";
-+				interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
-+				status = "disabled";
-+				ti,hwmods = "dss_hdmi";
-+				clocks = <&dss_48mhz_clk>, <&dss_hdmi_clk>;
-+				clock-names = "fck", "sys_clk";
-+			};
-+		};
- 	};
- };
++		v = omap_ctrl_readl(ctrl_core_control_io_2);
++		v |= 1;
++		omap_ctrl_writel(v, ctrl_core_control_io_2);
++	}
+ }
  
-diff --git a/arch/arm/boot/dts/dra72x.dtsi b/arch/arm/boot/dts/dra72x.dtsi
-index e5a3d23a3df1..0866866c8e94 100644
---- a/arch/arm/boot/dts/dra72x.dtsi
-+++ b/arch/arm/boot/dts/dra72x.dtsi
-@@ -28,3 +28,14 @@
- 		interrupts = <GIC_SPI DIRECT_IRQ(131) IRQ_TYPE_LEVEL_HIGH>;
- 	};
- };
-+
-+&dss {
-+	reg = <0x58000000 0x80>,
-+	      <0x58004054 0x4>,
-+	      <0x58004300 0x20>;
-+	reg-names = "dss", "pll1_clkctrl", "pll1";
-+
-+	clocks = <&dss_dss_clk>,
-+		 <&dss_video1_clk>;
-+	clock-names = "fck", "video1_clk";
-+};
-diff --git a/arch/arm/boot/dts/dra74x.dtsi b/arch/arm/boot/dts/dra74x.dtsi
-index 10173fab1a15..1a4f4970aaad 100644
---- a/arch/arm/boot/dts/dra74x.dtsi
-+++ b/arch/arm/boot/dts/dra74x.dtsi
-@@ -67,3 +67,18 @@
- 		};
- 	};
- };
-+
-+&dss {
-+	reg = <0x58000000 0x80>,
-+	      <0x58004054 0x4>,
-+	      <0x58004300 0x20>,
-+	      <0x58005054 0x4>,
-+	      <0x58005300 0x20>;
-+	reg-names = "dss", "pll1_clkctrl", "pll1",
-+		    "pll2_clkctrl", "pll2";
-+
-+	clocks = <&dss_dss_clk>,
-+		 <&dss_video1_clk>,
-+		 <&dss_video2_clk>;
-+	clock-names = "fck", "video1_clk", "video2_clk";
-+};
+ void __init dra7xx_init_late(void)
 -- 
 2.3.0
