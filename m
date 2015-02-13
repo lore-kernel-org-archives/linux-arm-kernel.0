@@ -1,40 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 13 Feb 2015 10:54:47 +0000
-Subject: [PATCH v10 4/6] ARM: add vdso user-space code
-In-Reply-To: <loom.20150213T053547-381@post.gmane.org>
-References: <1411413485-7675-1-git-send-email-nathan_lynch@mentor.com>
- <1411413485-7675-5-git-send-email-nathan_lynch@mentor.com>
- <loom.20150213T053547-381@post.gmane.org>
-Message-ID: <20150213105447.GB3508@e104818-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Feb 2015 10:57:53 +0000
+Subject: [PATCH 01/11] ARM: vexpress: use ARM_CPU_SUSPEND if needed
+In-Reply-To: <20150213103716.GQ14954@e106497-lin.cambridge.arm.com>
+References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
+ <1423770163-583064-2-git-send-email-arnd@arndb.de>
+ <20150213103716.GQ14954@e106497-lin.cambridge.arm.com>
+Message-ID: <20150213105752.GU8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 13, 2015 at 04:36:25AM +0000, Venkappa Mala wrote:
-> Nathan Lynch <nathan_lynch <at> mentor.com> writes:
+On Fri, Feb 13, 2015 at 10:37:16AM +0000, Liviu Dudau wrote:
+> On Thu, Feb 12, 2015 at 07:42:33PM +0000, Arnd Bergmann wrote:
+> > The vexpress tc2 power management code calls mcpm_loopback, which
+> > is only available if ARM_CPU_SUSPEND is enabled, otherwise we
+> > get a link error:
+> > 
+> > arch/arm/mach-vexpress/built-in.o: In function `tc2_pm_init':
+> > arch/arm/mach-vexpress/tc2_pm.c:389: undefined reference to `mcpm_loopback'
 > 
-> > +#ifdef CONFIG_ARM_ARCH_TIMER
-> > +
-> > +static notrace u64 get_ns(struct vdso_data *vdata)
-> > +{
-> > +	u64 cycle_delta;
-> > +	u64 cycle_now;
-> > +	u64 nsec;
-> > +
-> > +	cycle_now = arch_counter_get_cntvct();
+> Arnd,
 > 
-> Regarding ARM:vDSO, I have enabled your patch set on Cortex-A7/ARMv7, 
-> the vDSO is up and running using generic arch timer using physical 
-> counter but not with VCT.
-> I anticipate, the issue could be due to VCT cycles.
-[...]
-> Perhaps, either we need to revise the vDSO frame work to choose VCT or 
-> PCT dynamically Otherwise CNTVOFF reset to be zero but CNTVOFF could not 
-> be accessed in SVC mode (PL1).
+> We are having reports of TC2 not booting with MCPM enabled. Lorenzo
+> was investigating this but then headed for Linaro Connect this week,
+> so we don't have yet a resolution. Can this patch be postponed for
+> a later -rc?
 
-I assume on your platform, the DT also contains
-"arm,cpu-registers-not-fw-configured". In such case, the VDSO
-optimisation for gettimeofday should just be disabled (as it would be if
-the generic timers are not present). Really, just fix the firmware.
+Why?
+
+This patch isn't forcing MCPM to be enabled for Versatile Express.
+
+* In order to build tc2_pm.c, MCPM must already be enabled (the
+  feature depends on MCPM in the Kconfig already)
+* When this feature is enabled, the above link error occurs if
+  ARM_CPU_SUSPEND is not also enabled.
+
+So, it is merely fixing the requirement that tc2_pm.c needs the CPU
+suspend infrastructure, which in turn has no effect on whether MCPM
+is enabled or not.
 
 -- 
-Catalin
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
