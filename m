@@ -1,64 +1,68 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 13 Feb 2015 13:43:42 +0530
-Subject: [PATCH] ARM64: gic: Do not allow bypass FIQ signals to reach
- to processor
-In-Reply-To: <b449dac39614ed462c9a479e9de0aa5300d2c7cf.1423462126.git.panand@redhat.com>
-References: <b449dac39614ed462c9a479e9de0aa5300d2c7cf.1423462126.git.panand@redhat.com>
-Message-ID: <54DDB236.4040503@redhat.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 13 Feb 2015 09:37:05 +0100
+Subject: [PATCH 06/11] ARM: at91: fix pm declarations
+In-Reply-To: <1423770163-583064-7-git-send-email-arnd@arndb.de>
+References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
+ <1423770163-583064-7-git-send-email-arnd@arndb.de>
+Message-ID: <54DDB7B1.2020800@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Le 12/02/2015 20:42, Arnd Bergmann a ?crit :
+> In a recent rearrangement of the at91 pm initialization code, a broken
+> set of declarations was added for the !CONFIG_PM-case, leading to
+> this link error:
+> 
+> arch/arm/mach-at91/board-dt-sama5.o: In function `at91_rm9200_pm_init':
+> arch/arm/mach-at91/generic.h:40: multiple definition of `at91_rm9200_pm_init'
+> arch/arm/mach-at91/setup.o:arch/arm/mach-at91/generic.h:40: first defined here
+> arch/arm/mach-at91/board-dt-sama5.o: In function `at91_sam9260_pm_init':
+> arch/arm/mach-at91/generic.h:41: multiple definition of `at91_sam9260_pm_init'
+> arch/arm/mach-at91/setup.o:arch/arm/mach-at91/generic.h:41: first defined here
+> arch/arm/mach-at91/board-dt-sama5.o: In function `at91_sam9g45_pm_init':
+> arch/arm/mach-at91/generic.h:42: multiple definition of `at91_sam9g45_pm_init'
+> arch/arm/mach-at91/setup.o:arch/arm/mach-at91/generic.h:42: first defined here
+> 
+> This adds the missing 'static inline' to the declarations to avoid
+> creating a copy of the functions in each file that includes the
+> header.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 4db0ba22da9 ("ARM: at91: pm: prepare for multiplatform")
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-On Monday 09 February 2015 11:48 AM, Pratyush Anand wrote:
-> In some case few signals of an IP(like PMU Overflow in APM88xx0x) can be
-> mapped to nLEGACYFIQ, ie nFIQ of CPU. Until ARM64 supports FIQ handling,
-> we will get nice "Bad mode in FIQ handler detected"
->
-> Therefore force FIQBypDisGrp1 to '1', so that bypass FIQ signal is not
-> signaled to the processor.
->
+Yes:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Please review this patch.
+Thanks Arnd. Bye,
 
-~Pratyush
-
-> Signed-off-by: Pratyush Anand <panand@redhat.com>
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
->   drivers/irqchip/irq-gic.c       | 9 ++++++++-
->   include/linux/irqchip/arm-gic.h | 1 +
->   2 files changed, 9 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index d617ee5a3d8a..525dfc966e60 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -362,7 +362,14 @@ static void gic_cpu_if_up(void)
->   	*/
->   	bypass = readl(cpu_base + GIC_CPU_CTRL);
->   	bypass &= GICC_DIS_BYPASS_MASK;
-> -
-> +#ifdef CONFIG_ARM64
-> +	/* FIXME: when ARM64 starts supporting FIQ mode.
-> +	 *
-> +	 * Until ARM64 supports FIQ handling, force FIQBypDisGrp1 to
-> +	 * '1', so that bypass FIQ signal is not signaled to the processor.
-> +	 */
-> +	bypass |= GICC_DIS_BYPASS_FIQ_TO_CPU;
-> +#endif
->   	writel_relaxed(bypass | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
->   }
->
-> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-> index 71d706d5f169..c9fdd1972625 100644
-> --- a/include/linux/irqchip/arm-gic.h
-> +++ b/include/linux/irqchip/arm-gic.h
-> @@ -25,6 +25,7 @@
->   #define GICC_INT_PRI_THRESHOLD		0xf0
->   #define GICC_IAR_INT_ID_MASK		0x3ff
->   #define GICC_INT_SPURIOUS		1023
-> +#define GICC_DIS_BYPASS_FIQ_TO_CPU	(1 << 5)
->   #define GICC_DIS_BYPASS_MASK		0x1e0
->
->   #define GIC_DIST_CTRL			0x000
->
+>  arch/arm/mach-at91/generic.h | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+> index a6e726a6e0b5..583369ffc284 100644
+> --- a/arch/arm/mach-at91/generic.h
+> +++ b/arch/arm/mach-at91/generic.h
+> @@ -35,10 +35,10 @@ extern void __init at91sam9260_pm_init(void);
+>  extern void __init at91sam9g45_pm_init(void);
+>  extern void __init at91sam9x5_pm_init(void);
+>  #else
+> -void __init at91rm9200_pm_init(void) { }
+> -void __init at91sam9260_pm_init(void) { }
+> -void __init at91sam9g45_pm_init(void) { }
+> -void __init at91sam9x5_pm_init(void) { }
+> +static inline void __init at91rm9200_pm_init(void) { }
+> +static inline void __init at91sam9260_pm_init(void) { }
+> +static inline void __init at91sam9g45_pm_init(void) { }
+> +static inline void __init at91sam9x5_pm_init(void) { }
+>  #endif
+>  
+>  #endif /* _AT91_GENERIC_H */
+> 
+
+
+-- 
+Nicolas Ferre
