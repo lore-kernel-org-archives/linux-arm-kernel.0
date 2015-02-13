@@ -1,73 +1,276 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 13 Feb 2015 14:14:26 +0000
-Subject: [PATCH v10 4/6] ARM: add vdso user-space code
-In-Reply-To: <loom.20150213T124417-857@post.gmane.org>
-References: <1411413485-7675-1-git-send-email-nathan_lynch@mentor.com>
- <1411413485-7675-5-git-send-email-nathan_lynch@mentor.com>
- <loom.20150213T053547-381@post.gmane.org>
- <20150213105447.GB3508@e104818-lin.cambridge.arm.com>
- <loom.20150213T124417-857@post.gmane.org>
-Message-ID: <20150213141425.GA4713@localhost>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 13 Feb 2015 19:45:37 +0530
+Subject: [PATCH] ARM: dra7xx: hwmod: drop .modulemode from pcie1/2 hwmods
+In-Reply-To: <alpine.DEB.2.02.1502121644570.3767@utopia.booyaka.com>
+References: <1422978684-4826-1-git-send-email-grygorii.strashko@linaro.org>
+ <54D874E9.1040302@ti.com> <54D88BB3.4060104@linaro.org> <54D8B515.201@ti.com>
+ <54D8C9C3.5090500@linaro.org> <54DC4B99.8070009@ti.com>
+ <54DC65E0.7090206@linaro.org>
+ <alpine.DEB.2.02.1502121507480.3767@utopia.booyaka.com>
+ <54DCD3C3.3010008@linaro.org>
+ <alpine.DEB.2.02.1502121627210.3767@utopia.booyaka.com>
+ <alpine.DEB.2.02.1502121644570.3767@utopia.booyaka.com>
+Message-ID: <54DE0709.7080208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 13, 2015 at 12:01:40PM +0000, Venkappa Mala wrote:
-> Catalin Marinas <catalin.marinas <at> arm.com> writes:
-> > On Fri, Feb 13, 2015 at 04:36:25AM +0000, Venkappa Mala wrote:
-> > > Nathan Lynch <nathan_lynch <at> mentor.com> writes:
-> > > > +#ifdef CONFIG_ARM_ARCH_TIMER
-> > > > +
-> > > > +static notrace u64 get_ns(struct vdso_data *vdata)
-> > > > +{
-> > > > +	u64 cycle_delta;
-> > > > +	u64 cycle_now;
-> > > > +	u64 nsec;
-> > > > +
-> > > > +	cycle_now = arch_counter_get_cntvct();
-> > > 
-> > > Regarding ARM:vDSO, I have enabled your patch set on Cortex-A7/ARMv7, 
-> > > the vDSO is up and running using generic arch timer using physical 
-> > > counter but not with VCT.
-> > > I anticipate, the issue could be due to VCT cycles.
-> > [...]
-> > > Perhaps, either we need to revise the vDSO frame work to choose VCT or 
-> > > PCT dynamically Otherwise CNTVOFF reset to be zero but CNTVOFF could not 
-> > > be accessed in SVC mode (PL1).
-> > 
-> > I assume on your platform, the DT also contains
-> > "arm,cpu-registers-not-fw-configured". In such case, the VDSO
-> > optimisation for gettimeofday should just be disabled (as it would be if
-> > the generic timers are not present). Really, just fix the firmware.
-> 
-> Thanks Catalin for your promote reply. Yes, DTS contained
-> arm,cpu-registers-not-fw-configured so that it uses generic physical
-> timer instead of virtual timer. Now, the vDSO gettimeofday
-> optimization is also possible since the generic timer is presented and
-> enabled. However, vDSO gettimeofday implementation has been using
-> virtual timer (VCT  user access) but the current implementation will
-> not be sufficient to handle when the firmware is not taken care about
-> reset CNTVOFF to zero. Let?s assume,neither firmware taken care nor
-> booted with HYP mode, then Can we use physical timer (PCT user access
-> needs to be enabled) for vDSO in the safe manner?
+Hi Paul,
 
-The short answer: no.
+On Thursday 12 February 2015 10:15 PM, Paul Walmsley wrote:
+> On Thu, 12 Feb 2015, Paul Walmsley wrote:
+>
+>> On Fri, 13 Feb 2015, Grygorii.Strashko at linaro.org wrote:
+>>
+>>> On 02/12/2015 11:08 PM, Paul Walmsley wrote:
+>>>> Thanks guys.
+>>>>
+>>>> On Thu, 12 Feb 2015, Grygorii.Strashko at linaro.org wrote:
+>>>>
+>>>>> Looks good for me and seems working.
+>>>>
+>>>> Grygorii, can I add your Acked-by?
+>>>>
+>>>>
+>>>> - Paul
+>>>>
+>>>
+>>> There is my "Signed-off-by" :)
+>>
+>> OK thanks, queued for v3.20-rc.
+>
+> Actually, could you guys test the updated patch?  It had to be changed to
+> apply on mainline and I don't have a DRA7xx board to test.
 
-The problem is that user space is very "innovative" in making use of
-features in a different way than what the kernel people intended and
-it will be claimed "user ABI" afterwards. Take this glibc revert for
-example, luckily we noticed it early:
+We don't use resets used here in mainline. I'll send an updated patch for mainline.
 
-https://sourceware.org/git/?p=glibc.git;a=commitdiff;h=33ef2f0c763b51e1df7896d7d39d585824558c75
+Thanks
+Kishon
 
-CNTVCT is not intended to be used outside of the VDSO but, apparently,
-the VDSO->kernel interface is seen as user ABI by some.
-
-CNTPCT cannot always be used in user space (VDSO and not even the
-kernel), especially when the kernel boots at EL1. Choosing CNTPCT vs
-CNTVCT in VDSO dynamically (or at boot time) is technically doable but
-there is a high risk that user space ends up using them directly when it
-detects a gettimeofday VDSO and such code will break when CNTPCT is no
-longer accessible.
-
--- 
-Catalin
+>
+>
+> - Paul
+>
+>  From 0f9a1ee083a7adbb2c867d5c8d25d7e5fcb38b07 Mon Sep 17 00:00:00 2001
+> From: Kishon Vijay Abraham I <kishon@ti.com>
+> Date: Thu, 12 Feb 2015 09:29:31 -0700
+> Subject: [PATCH] ARM: DRA7: hwmod_data: Fix hwmod data for pcie
+>
+> Fixed hwmod data for pcie by having the correct module mode offset.
+> Previously this module mode offset was part of pcie PHY which was wrong.
+> Now this module mode offset was moved to pcie hwmod and removed the
+> hwmod data
+> for pcie phy. While at that renamed pcie_hwmod to pciess_hwmod in order
+> to match with the name given in TRM.
+>
+> This helps to get rid of the following warning
+> "omap_hwmod: pcie1: _wait_target_disable failed"
+>
+> [Grygorii.Strashko at linaro.org: Found the issue that actually caused
+>    "omap_hwmod: pcie1: _wait_target_disable failed"]
+> Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> [paul at pwsan.com: updated to apply on mainline]
+> ---
+>   arch/arm/boot/dts/dra7.dtsi               |   2 -
+>   arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 111 ++++++++++--------------------
+>   2 files changed, 35 insertions(+), 78 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 5827fedafd43..18a904db32bb 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -1111,7 +1111,6 @@
+>   					      "wkupclk", "refclk",
+>   					      "div-clk", "phy-div";
+>   				#phy-cells = <0>;
+> -				ti,hwmods = "pcie1-phy";
+>   			};
+>
+>   			pcie2_phy: pciephy at 4a095000 {
+> @@ -1130,7 +1129,6 @@
+>   					      "wkupclk", "refclk",
+>   					      "div-clk", "phy-div";
+>   				#phy-cells = <0>;
+> -				ti,hwmods = "pcie2-phy";
+>   				status = "disabled";
+>   			};
+>   		};
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> index e8692e7675b8..6a74a7ea8c95 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> @@ -1466,29 +1466,43 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
+>    *
+>    */
+>
+> -static struct omap_hwmod_class dra7xx_pcie_hwmod_class = {
+> +static struct omap_hwmod_class dra7xx_pciess_hwmod_class = {
+>   	.name	= "pcie",
+>   };
+>
+>   /* pcie1 */
+> -static struct omap_hwmod dra7xx_pcie1_hwmod = {
+> +static struct omap_hwmod_rst_info dra7xx_pciess1_resets[] = {
+> +	{ .name = "pcie", .rst_shift = 0 },
+> +};
+> +
+> +static struct omap_hwmod dra7xx_pciess1_hwmod = {
+>   	.name		= "pcie1",
+> -	.class		= &dra7xx_pcie_hwmod_class,
+> +	.class		= &dra7xx_pciess_hwmod_class,
+>   	.clkdm_name	= "pcie_clkdm",
+>   	.main_clk	= "l4_root_clk_div",
+> +	.rst_lines	= dra7xx_pciess1_resets,
+> +	.rst_lines_cnt	= ARRAY_SIZE(dra7xx_pciess1_resets),
+>   	.prcm = {
+>   		.omap4 = {
+> -			.clkctrl_offs	= DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
+> +			.clkctrl_offs	= DRA7XX_CM_L3INIT_PCIESS1_CLKCTRL_OFFSET,
+> +			.context_offs	= DRA7XX_RM_L3INIT_PCIESS1_CONTEXT_OFFSET,
+>   			.modulemode	= MODULEMODE_SWCTRL,
+>   		},
+>   	},
+>   };
+>
+>   /* pcie2 */
+> -static struct omap_hwmod dra7xx_pcie2_hwmod = {
+> +
+> +static struct omap_hwmod_rst_info dra7xx_pciess2_resets[] = {
+> +	{ .name = "pcie", .rst_shift = 1 },
+> +};
+> +
+> +static struct omap_hwmod dra7xx_pciess2_hwmod = {
+>   	.name		= "pcie2",
+> -	.class		= &dra7xx_pcie_hwmod_class,
+> +	.class		= &dra7xx_pciess_hwmod_class,
+>   	.clkdm_name	= "pcie_clkdm",
+> +	.rst_lines	= dra7xx_pciess2_resets,
+> +	.rst_lines_cnt	= ARRAY_SIZE(dra7xx_pciess2_resets),
+>   	.main_clk	= "l4_root_clk_div",
+>   	.prcm = {
+>   		.omap4 = {
+> @@ -1498,44 +1512,7 @@ static struct omap_hwmod dra7xx_pcie2_hwmod = {
+>   	},
+>   };
+>
+> -/*
+> - * 'PCIE PHY' class
+> - *
+> - */
+>
+> -static struct omap_hwmod_class dra7xx_pcie_phy_hwmod_class = {
+> -	.name	= "pcie-phy",
+> -};
+> -
+> -/* pcie1 phy */
+> -static struct omap_hwmod dra7xx_pcie1_phy_hwmod = {
+> -	.name		= "pcie1-phy",
+> -	.class		= &dra7xx_pcie_phy_hwmod_class,
+> -	.clkdm_name	= "l3init_clkdm",
+> -	.main_clk	= "l4_root_clk_div",
+> -	.prcm = {
+> -		.omap4 = {
+> -			.clkctrl_offs = DRA7XX_CM_L3INIT_PCIESS1_CLKCTRL_OFFSET,
+> -			.context_offs = DRA7XX_RM_L3INIT_PCIESS1_CONTEXT_OFFSET,
+> -			.modulemode   = MODULEMODE_SWCTRL,
+> -		},
+> -	},
+> -};
+> -
+> -/* pcie2 phy */
+> -static struct omap_hwmod dra7xx_pcie2_phy_hwmod = {
+> -	.name		= "pcie2-phy",
+> -	.class		= &dra7xx_pcie_phy_hwmod_class,
+> -	.clkdm_name	= "l3init_clkdm",
+> -	.main_clk	= "l4_root_clk_div",
+> -	.prcm = {
+> -		.omap4 = {
+> -			.clkctrl_offs = DRA7XX_CM_L3INIT_PCIESS2_CLKCTRL_OFFSET,
+> -			.context_offs = DRA7XX_RM_L3INIT_PCIESS2_CONTEXT_OFFSET,
+> -			.modulemode   = MODULEMODE_SWCTRL,
+> -		},
+> -	},
+> -};
+>
+>   /*
+>    * 'qspi' class
+> @@ -2877,50 +2854,34 @@ static struct omap_hwmod_ocp_if dra7xx_l4_cfg__ocp2scp3 = {
+>   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>   };
+>
+> -/* l3_main_1 -> pcie1 */
+> -static struct omap_hwmod_ocp_if dra7xx_l3_main_1__pcie1 = {
+> +/* l3_main_1 -> pciess1 */
+> +static struct omap_hwmod_ocp_if dra7xx_l3_main_1__pciess1 = {
+>   	.master		= &dra7xx_l3_main_1_hwmod,
+> -	.slave		= &dra7xx_pcie1_hwmod,
+> +	.slave		= &dra7xx_pciess1_hwmod,
+>   	.clk		= "l3_iclk_div",
+>   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>   };
+>
+> -/* l4_cfg -> pcie1 */
+> -static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1 = {
+> +/* l4_cfg -> pciess1 */
+> +static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pciess1 = {
+>   	.master		= &dra7xx_l4_cfg_hwmod,
+> -	.slave		= &dra7xx_pcie1_hwmod,
+> +	.slave		= &dra7xx_pciess1_hwmod,
+>   	.clk		= "l4_root_clk_div",
+>   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>   };
+>
+> -/* l3_main_1 -> pcie2 */
+> -static struct omap_hwmod_ocp_if dra7xx_l3_main_1__pcie2 = {
+> +/* l3_main_1 -> pciess2 */
+> +static struct omap_hwmod_ocp_if dra7xx_l3_main_1__pciess2 = {
+>   	.master		= &dra7xx_l3_main_1_hwmod,
+> -	.slave		= &dra7xx_pcie2_hwmod,
+> +	.slave		= &dra7xx_pciess2_hwmod,
+>   	.clk		= "l3_iclk_div",
+>   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>   };
+>
+>   /* l4_cfg -> pcie2 */
+> -static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie2 = {
+> -	.master		= &dra7xx_l4_cfg_hwmod,
+> -	.slave		= &dra7xx_pcie2_hwmod,
+> -	.clk		= "l4_root_clk_div",
+> -	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> -};
+> -
+> -/* l4_cfg -> pcie1 phy */
+> -static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1_phy = {
+> -	.master		= &dra7xx_l4_cfg_hwmod,
+> -	.slave		= &dra7xx_pcie1_phy_hwmod,
+> -	.clk		= "l4_root_clk_div",
+> -	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> -};
+> -
+> -/* l4_cfg -> pcie2 phy */
+> -static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie2_phy = {
+> +static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pciess2 = {
+>   	.master		= &dra7xx_l4_cfg_hwmod,
+> -	.slave		= &dra7xx_pcie2_phy_hwmod,
+> +	.slave		= &dra7xx_pciess2_hwmod,
+>   	.clk		= "l4_root_clk_div",
+>   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>   };
+> @@ -3327,12 +3288,10 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+>   	&dra7xx_l4_cfg__mpu,
+>   	&dra7xx_l4_cfg__ocp2scp1,
+>   	&dra7xx_l4_cfg__ocp2scp3,
+> -	&dra7xx_l3_main_1__pcie1,
+> -	&dra7xx_l4_cfg__pcie1,
+> -	&dra7xx_l3_main_1__pcie2,
+> -	&dra7xx_l4_cfg__pcie2,
+> -	&dra7xx_l4_cfg__pcie1_phy,
+> -	&dra7xx_l4_cfg__pcie2_phy,
+> +	&dra7xx_l3_main_1__pciess1,
+> +	&dra7xx_l4_cfg__pciess1,
+> +	&dra7xx_l3_main_1__pciess2,
+> +	&dra7xx_l4_cfg__pciess2,
+>   	&dra7xx_l3_main_1__qspi,
+>   	&dra7xx_l4_per3__rtcss,
+>   	&dra7xx_l4_cfg__sata,
+>
