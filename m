@@ -1,130 +1,86 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 13 Feb 2015 16:34:46 +0000
-Subject: [PATCH] efi: get_memory_map: add sufficient slack for memory
- descriptors
-In-Reply-To: <20150213160448.GA30567@codeblueprint.co.uk>
-References: <1423718659-795-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150212102226.GB1245@leverpostej>
- <CAKv+Gu88vzPpXoSEs1ZSQbO7wsqh7NRSZc=iSpC9D6vzus7f8g@mail.gmail.com>
- <20150212144727.GD4665@codeblueprint.co.uk>
- <CAKv+Gu-NAKASZc4phj5x83mB8Ak4Gy2zYq-a0CDADEOTBD4pXA@mail.gmail.com>
- <20150212151607.GH1522@leverpostej>
- <CAKv+Gu_Z0Upoy0J-hxf0i7Oen00tb-TENJ9CszdEtTHsb5pGSg@mail.gmail.com>
- <20150213160448.GA30567@codeblueprint.co.uk>
-Message-ID: <20150213163446.GD2529@leverpostej>
+From: claudio.fontana@huawei.com (Claudio Fontana)
+Date: Fri, 13 Feb 2015 17:36:10 +0100
+Subject: stand-alone kvmtool
+In-Reply-To: <54DE0CDD.70308@arm.com>
+References: <54DDD465.3050300@arm.com> <54DE0A9C.7080505@huawei.com>
+ <54DE0CDD.70308@arm.com>
+Message-ID: <54DE27FA.6070507@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 13, 2015 at 04:04:48PM +0000, Matt Fleming wrote:
-> On Thu, 12 Feb, at 11:31:02PM, Ard Biesheuvel wrote:
-> > 
-> > Actually, looking again at the original patch, it appears that my
-> > analysis was incorrect regarding the possibility that the loop would
-> > never terminate. The only thing that could happen if desc_size >
-> > sizeof(efi_memory_desc_t) is that you need two iterations instead of
-> > one to get a pool allocation that is of sufficient size.
-> > So perhaps it is better to just revert the patch.
-> > 
-> > My apologies for the hassle.
+On 13.02.2015 15:40, Andre Przywara wrote:
+> Ciao Claudio,
 > 
-> This is what I've got queued up,
+> On 13/02/15 14:30, Claudio Fontana wrote:
+>> Hello Andre,
+>>
+>> On 13.02.2015 11:39, Andre Przywara wrote:
+>>> Hi,
+>>>
+>>> as I found it increasingly inconvenient to use kvmtool[1] as part of a
+>>> Linux repository, I decided to give it a go and make it a stand-alone
+>>> project. So I filtered all the respective commits, adjusted the paths in
+>>> there (while keeping authorship and commit date, of course) and then
+>>> added the missing bits to let it compile without a kernel tree nearby.
+>>> The result is now available on:
+>>>
+>>> git://linux-arm.org/kvmtool.git
+>>> http://linux-arm.org/kvmtool.git
+>>
+>> It builds fine on x86_64, but when I tried to crosscompile from x86_64 to AArch64,
+>> I get in trouble because of libfdt: I have the aarch64 libs (static and shared), but how do I instruct the build system to get it from the right place?
+> 
+> You have to install them into your cross-compiler's SYSROOT.
+> Get the location of that by executing
+> $ ${CROSS_COMPILE}gcc -print-sysroot.
+> If it's just for libfdt, it's probably the easiest to copy them
+> manually, the header files into $SYSROOT/usr/include, the libraries into
+> $SYSROOT/usr/lib/aarch64-linux-gnu
+> That fixed it for me ;-)
 
-Looks sane to me:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
+Thanks!
 
 > 
-> ---
+> For a more robust approach you would use your distribution's packaging
+> system to install the aarch64 package into $SYSROOT.
 > 
-> From 3f281b98ffc99e604a3988aa93304a3a591eeeb5 Mon Sep 17 00:00:00 2001
-> From: Matt Fleming <matt.fleming@intel.com>
-> Date: Fri, 13 Feb 2015 15:46:56 +0000
-> Subject: [PATCH] Revert "efi/libstub: Call get_memory_map() to obtain map and
->  desc sizes"
-> 
-> This reverts commit d1a8d66b9177105e898e73716f97eb61842c457a.
-> 
-> Ard reported a boot failure when running UEFI under Qemu and Xen and
-> experimenting with various Tianocore build options,
-> 
->  "As it turns out, when allocating room for the UEFI memory map using
->   UEFI's AllocatePool (), it may result in two new memory map entries
->   being created, for instance, when using Tianocore's preallocated region
->   feature. For example, the following region
-> 
->   0x00005ead5000-0x00005ebfffff [Conventional Memory|   |  |  |  |  |WB|WT|WC|UC]
-> 
->   may be split like this
-> 
->   0x00005ead5000-0x00005eae2fff [Conventional Memory|   |  |  |  |  |WB|WT|WC|UC]
->   0x00005eae3000-0x00005eae4fff [Loader Data        |   |  |  |  |  |WB|WT|WC|UC]
->   0x00005eae5000-0x00005ebfffff [Conventional Memory|   |  |  |  |  |WB|WT|WC|UC]
-> 
->   if the preallocated Loader Data region was chosen to be right in the
->   middle of the original free space.
-> 
->   After patch d1a8d66b9177 ("efi/libstub: Call get_memory_map() to
->   obtain map and desc sizes"), this is not being dealt with correctly
->   anymore, as the existing logic to allocate room for a single additional
->   entry has become insufficient."
-> 
-> Mark requested to reinstate the old loop we had before commit
-> d1a8d66b9177, which grows the memory map buffer until it's big enough to
-> hold the EFI memory map.
-> 
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Matt Fleming <matt.fleming@intel.com>
-> ---
->  drivers/firmware/efi/libstub/efi-stub-helper.c | 16 ++++++----------
->  1 file changed, 6 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
-> index d073e3946383..9bd9fbb5bea8 100644
-> --- a/drivers/firmware/efi/libstub/efi-stub-helper.c
-> +++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
-> @@ -66,29 +66,25 @@ efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
->  	unsigned long key;
->  	u32 desc_version;
->  
-> -	*map_size = 0;
-> -	*desc_size = 0;
-> -	key = 0;
-> -	status = efi_call_early(get_memory_map, map_size, NULL,
-> -				&key, desc_size, &desc_version);
-> -	if (status != EFI_BUFFER_TOO_SMALL)
-> -		return EFI_LOAD_ERROR;
-> -
-> +	*map_size = sizeof(*m) * 32;
-> +again:
->  	/*
->  	 * Add an additional efi_memory_desc_t because we're doing an
->  	 * allocation which may be in a new descriptor region.
->  	 */
-> -	*map_size += *desc_size;
-> +	*map_size += sizeof(*m);
->  	status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
->  				*map_size, (void **)&m);
->  	if (status != EFI_SUCCESS)
->  		goto fail;
->  
-> +	*desc_size = 0;
-> +	key = 0;
->  	status = efi_call_early(get_memory_map, map_size, m,
->  				&key, desc_size, &desc_version);
->  	if (status == EFI_BUFFER_TOO_SMALL) {
->  		efi_call_early(free_pool, m);
-> -		return EFI_LOAD_ERROR;
-> +		goto again;
->  	}
->  
->  	if (status != EFI_SUCCESS)
-> -- 
-> 1.9.3
-> 
-> -- 
-> Matt Fleming, Intel Open Source Technology Center
-> 
+> Cheers,
+> Andre.
+
+I still prefer to be forced to understand things so I actually prefer the manual route.
+
+Ciao,
+
+Claudio
+
+>>
+>>>
+>>> You can simply check it out, type make and use "./lkvm run" for a quick
+>>> test. So far I briefly tested x86-64, arm and arm64, the later two were
+>>> also cross-compiled. For sure there are rough edges in there (for
+>>> instance copying a few non-uapi header files into), but I deem it worthy
+>>> enough to get some public comments.
+>>> For me that also fixed some nasty warnings about libfdt, which now are
+>>> gone due it using your system library version of it.
+>>> I also managed to get rid of the libc-i386-dev dependency when compiling
+>>> for x86-64, but that still needs to be cleaned up and thus is not in the
+>>> current HEAD.
+>>> I haven't got around to compile-test the other supported architectures,
+>>> but supporting them should be as easy as copying over the uapi kvm.h
+>>> header file (see the respective ARM commit). Contributions (and tests!)
+>>> are welcome.
+>>>
+>>> Please give it a go and tell me what you think. I don't want to fork the
+>>> project, so I am happy if someone "official" picks it up.
+>>>
+>>> Cheers,
+>>> Andre.
+>>>
+>>> [1] https://github.com/penberg/linux-kvm/tree/master/tools/kvm
+>>> _______________________________________________
+>>> kvmarm mailing list
+>>> kvmarm at lists.cs.columbia.edu
+>>> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+>>>
+>>
+>>
