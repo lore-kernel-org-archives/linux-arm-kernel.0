@@ -1,103 +1,37 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Fri, 13 Feb 2015 17:41:43 +0100
-Subject: [PATCH 12/14] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <1423844735.4182.52.camel@pengutronix.de>
-References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1423763164-5606-13-git-send-email-mcoquelin.stm32@gmail.com>
- <1423828078.4182.17.camel@pengutronix.de>
- <CALszF6D+5mXajUWarwq8M4yL_Nc+x1Bmu4D7_HxDRy2kGRXNVQ@mail.gmail.com>
- <1423844735.4182.52.camel@pengutronix.de>
-Message-ID: <CALszF6Ad93BgT4UsJudVKpfhhL2dbtKTTRno1XqQ5=eANkwXzA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 13 Feb 2015 10:24:07 -0800
+Subject: [PATCH v2 0/2] Scorpion PMU support
+Message-ID: <1423851849-6069-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-02-13 17:25 GMT+01:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> Hi Maxime,
->
-> Am Freitag, den 13.02.2015, 16:59 +0100 schrieb Maxime Coquelin:
->> Hi Philipp,
->>
->> 2015-02-13 12:47 GMT+01:00 Philipp Zabel <p.zabel@pengutronix.de>:
->> > Hi Maxime,
->> >
->> > Am Donnerstag, den 12.02.2015, 18:46 +0100 schrieb Maxime Coquelin:
->> > [...]
->> >> +     soc {
->> >> +             reset_ahb1: reset at 40023810 {
->> >> +                     #reset-cells = <1>;
->> >> +                     compatible = "st,stm32-reset";
->> >> +                     reg = <0x40023810 0x4>;
->> >> +             };
->> >> +
->> >> +             reset_ahb2: reset at 40023814 {
->> >> +                     #reset-cells = <1>;
->> >> +                     compatible = "st,stm32-reset";
->> >> +                     reg = <0x40023814 0x4>;
->> >> +             };
->> >> +
->> >> +             reset_ahb3: reset at 40023818 {
->> >> +                     #reset-cells = <1>;
->> >> +                     compatible = "st,stm32-reset";
->> >> +                     reg = <0x40023818 0x4>;
->> >> +             };
->> >> +
->> >> +             reset_apb1: reset at 40023820 {
->> >> +                     #reset-cells = <1>;
->> >> +                     compatible = "st,stm32-reset";
->> >> +                     reg = <0x40023820 0x4>;
->> >> +             };
->> >> +
->> >> +             reset_apb2: reset at 40023824 {
->> >> +                     #reset-cells = <1>;
->> >> +                     compatible = "st,stm32-reset";
->> >> +                     reg = <0x40023824 0x4>;
->> >> +             };
->> >
->> > These are mostly consecutive, single registers. I wonder if these are
->> > part of the same IP block and thus should be grouped together into the
->> > same reset controller node?
->>
->> What I could to is to have two instances. One for AHB and one for APB domain.
->> Doing this, I will have one instance per domain, and only consecutive registers.
->> Is it fine for you?
->
-> Looking at
-> http://www.st.com/web/en/resource/technical/document/reference_manual/DM00031020.pdf
-> Table 34 (RCC register map and reset values), I'd say there is a single
-> "Reset and Clock Control" device at 0x40023800 - 0x40023884:
->
->         soc {
->                 rcc: rcc at 40023800 {
->                         #clock-cells = <1>;
->                         #reset-cells = <1>;
->                         compatible = "st,stm32-rcc";
->                         reg = <0x40023800 0x84>;
->                 };
->
->                 ...
->
-> If you really want to describe the reset controller parts (offsets +0x10
-> to +0x24) in a separate node, I won't argue against it too long,
-> although this is a somewhat arbitrary decision.
->
-> In any case, the whole register at offset +0x1c is reserved, so there is
-> no reason to split the reset controller. It is ok to have unused ranges
-> as is already the case with reserved bits inside the used registers.
+These patches add support for the Scorpion PMU found on devices
+such as msm8660, qsd8x50, etc. The first patch is some groundwork
+to make functions more "generic". Even then we end up copying quite
+a bit of code from the Krait part into the Scorpion part with only
+subtle tweaks because two things happen:
 
-Ok. I understand your point.
-But it will be more difficult at usage, because the node referencing
-the fourth reset bit of apb2 register will have to pass 164 as
-parameter.
-It is error prone IMHO.
+ 1. We gain another "region" register, L2LPM
+ 2. The way to access the region registers are with different cp15 instructions
 
-Other solution would be to add some defines for each reset line in the
-DT-Bindings, as we do today for STi platform.
-But it is giving an unneeded constraint between DT and reset trees.
+I'm not sure how to make this better, suggestions are welcome.
 
-Br,
-Maxime
+Changes from v1:
+ * Added stub functions for CONFIG_CPU_V7=n
+ * Fixed L2LPM register accessors
+ * Exposed mp and !mp versions of PMU to userspace differently (mrutland)
+ * Dropped I-cache events that shouldn't be there (mrutland)
+ * Fixed branch misprediction event (mrutland)
 
->
-> regards
-> Philipp
->
+Stephen Boyd (2):
+  ARM: perf: Preparatory work for Scorpion PMU support
+  ARM: perf: Add support for Scorpion PMUs
+
+ Documentation/devicetree/bindings/arm/pmu.txt |   2 +
+ arch/arm/kernel/perf_event_cpu.c              |   2 +
+ arch/arm/kernel/perf_event_v7.c               | 504 +++++++++++++++++++++++---
+ 3 files changed, 467 insertions(+), 41 deletions(-)
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
