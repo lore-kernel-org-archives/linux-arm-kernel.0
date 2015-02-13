@@ -1,128 +1,86 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 14 Feb 2015 00:23:52 +0800
-Subject: [PATCH] efi: get_memory_map: add sufficient slack for memory
- descriptors
-In-Reply-To: <20150213160448.GA30567@codeblueprint.co.uk>
-References: <1423718659-795-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150212102226.GB1245@leverpostej>
- <CAKv+Gu88vzPpXoSEs1ZSQbO7wsqh7NRSZc=iSpC9D6vzus7f8g@mail.gmail.com>
- <20150212144727.GD4665@codeblueprint.co.uk>
- <CAKv+Gu-NAKASZc4phj5x83mB8Ak4Gy2zYq-a0CDADEOTBD4pXA@mail.gmail.com>
- <20150212151607.GH1522@leverpostej>
- <CAKv+Gu_Z0Upoy0J-hxf0i7Oen00tb-TENJ9CszdEtTHsb5pGSg@mail.gmail.com>
- <20150213160448.GA30567@codeblueprint.co.uk>
-Message-ID: <4582A14D-E69B-459E-BC9E-F642B098D061@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 13 Feb 2015 17:25:35 +0100
+Subject: [PATCH 12/14] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <CALszF6D+5mXajUWarwq8M4yL_Nc+x1Bmu4D7_HxDRy2kGRXNVQ@mail.gmail.com>
+References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1423763164-5606-13-git-send-email-mcoquelin.stm32@gmail.com>
+ <1423828078.4182.17.camel@pengutronix.de>
+ <CALszF6D+5mXajUWarwq8M4yL_Nc+x1Bmu4D7_HxDRy2kGRXNVQ@mail.gmail.com>
+Message-ID: <1423844735.4182.52.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Maxime,
 
-> On 14 Feb 2015, at 00:04, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+Am Freitag, den 13.02.2015, 16:59 +0100 schrieb Maxime Coquelin:
+> Hi Philipp,
 > 
->> On Thu, 12 Feb, at 11:31:02PM, Ard Biesheuvel wrote:
->> 
->> Actually, looking again at the original patch, it appears that my
->> analysis was incorrect regarding the possibility that the loop would
->> never terminate. The only thing that could happen if desc_size >
->> sizeof(efi_memory_desc_t) is that you need two iterations instead of
->> one to get a pool allocation that is of sufficient size.
->> So perhaps it is better to just revert the patch.
->> 
->> My apologies for the hassle.
+> 2015-02-13 12:47 GMT+01:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> > Hi Maxime,
+> >
+> > Am Donnerstag, den 12.02.2015, 18:46 +0100 schrieb Maxime Coquelin:
+> > [...]
+> >> +     soc {
+> >> +             reset_ahb1: reset at 40023810 {
+> >> +                     #reset-cells = <1>;
+> >> +                     compatible = "st,stm32-reset";
+> >> +                     reg = <0x40023810 0x4>;
+> >> +             };
+> >> +
+> >> +             reset_ahb2: reset at 40023814 {
+> >> +                     #reset-cells = <1>;
+> >> +                     compatible = "st,stm32-reset";
+> >> +                     reg = <0x40023814 0x4>;
+> >> +             };
+> >> +
+> >> +             reset_ahb3: reset at 40023818 {
+> >> +                     #reset-cells = <1>;
+> >> +                     compatible = "st,stm32-reset";
+> >> +                     reg = <0x40023818 0x4>;
+> >> +             };
+> >> +
+> >> +             reset_apb1: reset at 40023820 {
+> >> +                     #reset-cells = <1>;
+> >> +                     compatible = "st,stm32-reset";
+> >> +                     reg = <0x40023820 0x4>;
+> >> +             };
+> >> +
+> >> +             reset_apb2: reset at 40023824 {
+> >> +                     #reset-cells = <1>;
+> >> +                     compatible = "st,stm32-reset";
+> >> +                     reg = <0x40023824 0x4>;
+> >> +             };
+> >
+> > These are mostly consecutive, single registers. I wonder if these are
+> > part of the same IP block and thus should be grouped together into the
+> > same reset controller node?
 > 
-> This is what I've got queued up,
-> 
+> What I could to is to have two instances. One for AHB and one for APB domain.
+> Doing this, I will have one instance per domain, and only consecutive registers.
+> Is it fine for you?
 
-Acked-by: Ard Biesheuvel <ard@linaro.org>
+Looking at
+http://www.st.com/web/en/resource/technical/document/reference_manual/DM00031020.pdf
+Table 34 (RCC register map and reset values), I'd say there is a single
+"Reset and Clock Control" device at 0x40023800 - 0x40023884:
 
-Thanks Matt
+	soc {
+		rcc: rcc at 40023800 {
+			#clock-cells = <1>;
+			#reset-cells = <1>;
+			compatible = "st,stm32-rcc";
+			reg = <0x40023800 0x84>;
+		};
 
-> ---
-> 
-> From 3f281b98ffc99e604a3988aa93304a3a591eeeb5 Mon Sep 17 00:00:00 2001
-> From: Matt Fleming <matt.fleming@intel.com>
-> Date: Fri, 13 Feb 2015 15:46:56 +0000
-> Subject: [PATCH] Revert "efi/libstub: Call get_memory_map() to obtain map and
-> desc sizes"
-> 
-> This reverts commit d1a8d66b9177105e898e73716f97eb61842c457a.
-> 
-> Ard reported a boot failure when running UEFI under Qemu and Xen and
-> experimenting with various Tianocore build options,
-> 
-> "As it turns out, when allocating room for the UEFI memory map using
->  UEFI's AllocatePool (), it may result in two new memory map entries
->  being created, for instance, when using Tianocore's preallocated region
->  feature. For example, the following region
-> 
->  0x00005ead5000-0x00005ebfffff [Conventional Memory|   |  |  |  |  |WB|WT|WC|UC]
-> 
->  may be split like this
-> 
->  0x00005ead5000-0x00005eae2fff [Conventional Memory|   |  |  |  |  |WB|WT|WC|UC]
->  0x00005eae3000-0x00005eae4fff [Loader Data        |   |  |  |  |  |WB|WT|WC|UC]
->  0x00005eae5000-0x00005ebfffff [Conventional Memory|   |  |  |  |  |WB|WT|WC|UC]
-> 
->  if the preallocated Loader Data region was chosen to be right in the
->  middle of the original free space.
-> 
->  After patch d1a8d66b9177 ("efi/libstub: Call get_memory_map() to
->  obtain map and desc sizes"), this is not being dealt with correctly
->  anymore, as the existing logic to allocate room for a single additional
->  entry has become insufficient."
-> 
-> Mark requested to reinstate the old loop we had before commit
-> d1a8d66b9177, which grows the memory map buffer until it's big enough to
-> hold the EFI memory map.
-> 
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Matt Fleming <matt.fleming@intel.com>
-> ---
-> drivers/firmware/efi/libstub/efi-stub-helper.c | 16 ++++++----------
-> 1 file changed, 6 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
-> index d073e3946383..9bd9fbb5bea8 100644
-> --- a/drivers/firmware/efi/libstub/efi-stub-helper.c
-> +++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
-> @@ -66,29 +66,25 @@ efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
->    unsigned long key;
->    u32 desc_version;
-> 
-> -    *map_size = 0;
-> -    *desc_size = 0;
-> -    key = 0;
-> -    status = efi_call_early(get_memory_map, map_size, NULL,
-> -                &key, desc_size, &desc_version);
-> -    if (status != EFI_BUFFER_TOO_SMALL)
-> -        return EFI_LOAD_ERROR;
-> -
-> +    *map_size = sizeof(*m) * 32;
-> +again:
->    /*
->     * Add an additional efi_memory_desc_t because we're doing an
->     * allocation which may be in a new descriptor region.
->     */
-> -    *map_size += *desc_size;
-> +    *map_size += sizeof(*m);
->    status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
->                *map_size, (void **)&m);
->    if (status != EFI_SUCCESS)
->        goto fail;
-> 
-> +    *desc_size = 0;
-> +    key = 0;
->    status = efi_call_early(get_memory_map, map_size, m,
->                &key, desc_size, &desc_version);
->    if (status == EFI_BUFFER_TOO_SMALL) {
->        efi_call_early(free_pool, m);
-> -        return EFI_LOAD_ERROR;
-> +        goto again;
->    }
-> 
->    if (status != EFI_SUCCESS)
-> -- 
-> 1.9.3
-> 
-> -- 
-> Matt Fleming, Intel Open Source Technology Center
+		...
+
+If you really want to describe the reset controller parts (offsets +0x10
+to +0x24) in a separate node, I won't argue against it too long,
+although this is a somewhat arbitrary decision.
+
+In any case, the whole register at offset +0x1c is reserved, so there is
+no reason to split the reset controller. It is ok to have unused ranges
+as is already the case with reserved bits inside the used registers.
+
+regards
+Philipp
