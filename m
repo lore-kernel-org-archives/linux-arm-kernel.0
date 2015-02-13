@@ -1,52 +1,50 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 13 Feb 2015 09:31:30 +0800 (HKT)
-Subject: [PATCH 01/11] ARM: vexpress: use ARM_CPU_SUSPEND if needed
-In-Reply-To: <1423770163-583064-2-git-send-email-arnd@arndb.de>
-References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
- <1423770163-583064-2-git-send-email-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.11.1502130930030.25300@knanqh.ubzr>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 12 Feb 2015 18:46:33 -0700
+Subject: [PATCH v3 1/2] coresight: Adding coresight support for arm64
+ architecture
+In-Reply-To: <20150212094911.GA1028@e104818-lin.cambridge.arm.com>
+References: <1423629085-1044-1-git-send-email-mathieu.poirier@linaro.org>
+ <20150211113651.GC9058@e104818-lin.cambridge.arm.com>
+ <CANLsYky9sGK=vpEM5kMD8HZJ_a+hyU58sV=u=KHe9+oKGhGCqA@mail.gmail.com>
+ <20150212094911.GA1028@e104818-lin.cambridge.arm.com>
+Message-ID: <CANLsYkzSQX3V7GD6wbmA+jFXBk8YSB465E0XbpFaUYYbbbAbnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Feb 2015, Arnd Bergmann wrote:
+On 12 February 2015 at 02:49, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Wed, Feb 11, 2015 at 07:54:04PM -0700, Mathieu Poirier wrote:
+>> On 11 February 2015 at 04:36, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > On Tue, Feb 10, 2015 at 09:31:24PM -0700, mathieu.poirier at linaro.org wrote:
+>> >> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> >>
+>> >> Most CoreSight blocks are 64-bit ready.  As such move configuration
+>> >> entries from "arch/arm/Kconfig.config" to the driver's subdirectory
+>> >> and source the newly created Kconfig from architecture specific
+>> >> Kconfig.debug files.
+>> >>
+>> >> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> >> ---
+>> >> Change for v3:
+>> >>   - Separating Kconfig work from compilation warnings fixes.
+>> >
+>> > Nitpick: merge the compilation warnings fix first so that we don't get
+>> > them once the Kconfig patch is merged for arm64.
+>> >
+>> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>>
+>> I intended to merge both patches via my tree and as such ensuring the
+>> Kconfig changes and compilation warnings fix go in at the same time.
+>> Is this fine with you?
+>
+> It was more about bisectability. If reordering is problematic (already
+> published branch etc.), leave them as they are.
 
-> The vexpress tc2 power management code calls mcpm_loopback, which
-> is only available if ARM_CPU_SUSPEND is enabled, otherwise we
-> get a link error:
-> 
-> arch/arm/mach-vexpress/built-in.o: In function `tc2_pm_init':
-> arch/arm/mach-vexpress/tc2_pm.c:389: undefined reference to `mcpm_loopback'
-> 
-> This explicitly selects ARM_CPU_SUSPEND like other platforms that
-> need it.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 3592d7e002438 ("ARM: 8082/1: TC2: test the MCPM loopback during boot")
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Other than on this mailing list the code hasn't been published.  I
+will re-order the patches.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Thanks for the reviews,
+Mathieu
 
-> ---
->  arch/arm/mach-vexpress/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-> index d6b16d9a7838..3c2509b4b694 100644
-> --- a/arch/arm/mach-vexpress/Kconfig
-> +++ b/arch/arm/mach-vexpress/Kconfig
-> @@ -73,6 +73,7 @@ config ARCH_VEXPRESS_TC2_PM
->  	depends on MCPM
->  	select ARM_CCI
->  	select ARCH_VEXPRESS_SPC
-> +	select ARM_CPU_SUSPEND
->  	help
->  	  Support for CPU and cluster power management on Versatile Express
->  	  with a TC2 (A15x2 A7x3) big.LITTLE core tile.
-> -- 
-> 2.1.0.rc2
-> 
-> 
+>
+> --
+> Catalin
