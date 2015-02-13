@@ -1,122 +1,97 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 13 Feb 2015 11:38:27 +0200
-Subject: [PATCH v7 01/16] clk: tegra: Add binding for the Tegra124 DFLL
- clocksource
-In-Reply-To: <20150212224242.GA23500@mithrandir>
-References: <1420723339-30735-1-git-send-email-mikko.perttunen@kapsi.fi>
- <1420723339-30735-2-git-send-email-mikko.perttunen@kapsi.fi>
- <20150212224242.GA23500@mithrandir>
-Message-ID: <20150213093827.GM20811@tbergstrom-lnx.Nvidia.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri, 13 Feb 2015 19:51:16 +0100
+Subject: [PATCH 03/16] tty: serial: 8250_core: read only RX if there is
+ something in the FIFO
+In-Reply-To: <54DD053A.8060905@hurleysoftware.com>
+References: <54D9441B.7070403@hurleysoftware.com> <54D9F3C7.5000809@freebox.fr>
+ <54DA43F8.9090904@hurleysoftware.com>
+ <54DBB531.2030504@hurleysoftware.com>
+ <20150211200313.GE2531@atomide.com>
+ <54DBBE9E.90104@hurleysoftware.com>
+ <54DC6832.3070507@linutronix.de>
+ <54DCD584.3010500@hurleysoftware.com>
+ <20150212192333.GA18882@linutronix.de>
+ <54DD053A.8060905@hurleysoftware.com>
+Message-ID: <20150213185115.GF5482@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 12, 2015 at 11:42:44PM +0100, Thierry Reding wrote:
-> * PGP Signed by an unknown key
-> 
-> On Thu, Jan 08, 2015 at 03:22:04PM +0200, Mikko Perttunen wrote:
-> > From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
-> > 
-> > The DFLL is the main clocksource for the fast CPU cluster on Tegra124
-> > and also provides automatic CPU rail voltage scaling as well. The DFLL
-> > is a separate IP block from the usual Tegra124 clock-and-reset
-> > controller, so it gets its own node in the device tree.
-> > 
-> > Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
-> > Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
-> > ---
-> >  .../bindings/clock/nvidia,tegra124-dfll.txt        | 69 ++++++++++++++++++++++
-> >  1 file changed, 69 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
-> > new file mode 100644
-> > index 0000000..54c62ac
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
-> > @@ -0,0 +1,69 @@
-> > +NVIDIA Tegra124 DFLL FCPU clocksource
-> > +
-> > +This binding uses the common clock binding:
-> > +Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > +
-> > +The DFLL IP block on Tegra is a root clocksource designed for clocking
-> > +the fast CPU cluster. It consists of a free-running voltage controlled
-> > +oscillator connected to the CPU voltage rail (VDD_CPU), and a closed loop
-> > +control module that will automatically adjust the VDD_CPU voltage by
-> > +communicating with an off-chip PMIC either via an I2C bus or via PWM signals.
-> 
-> How would PWM communication work? The documentation below doesn't
-> describe it, so perhaps either leave that part out until the binding is
-> updated to support it, or maybe make an explicit note that this mode of
-> operation isn't supported yet?
-> 
-> > +Required properties:
-> > +- compatible : should be "nvidia,tegra124-dfll-fcpu"
-> > +- reg : Defines the following set of registers, in the order listed:
-> > +        - registers for the DFLL control logic.
-> > +        - registers for the I2C output logic.
-> > +        - registers for the integrated I2C master controller.
-> > +        - look-up table RAM for voltage register values.
-> 
-> Why do these all need to be separate sets? According to the TRM this is
-> a single IP block with a single register region, why the need to split
-> them apart?
-> 
-> > +- interrupts: Should contain the DFLL block interrupt.
-> > +- clocks: Must contain an entry for each entry in clock-names.
-> > +  See ../clocks/clock-bindings.txt for details.
-> > +- clock-names: Must include the following entries:
-> > +  - soc: Clock source for the DFLL control logic.
-> > +  - ref: The closed loop reference clock
-> > +  - i2c: Clock source for the integrated I2C master.
-> > +- #clock-cells: Must be 0.
-> > +- clock-output-names: Name of the clock output.
-> > +- vdd-cpu-supply: Regulator for the CPU voltage rail that the DFLL
-> > +  hardware will start controlling.
-> 
-> How does the hardware control it? How do we go from regulator phandle to
-> something that the hardware will know how to access?
-> 
-> > +Required properties for the control loop parameters:
-> > +- nvidia,sample-rate: Sample rate of the DFLL control loop.
-> > +- nvidia,droop-ctrl: See the register CL_DVFS_DROOP_CTRL in the TRM.
-> > +- nvidia,force-mode: See the field DFLL_PARAMS_FORCE_MODE in the TRM.
-> > +- nvidia,cf: Numeric value, see the field DFLL_PARAMS_CF_PARAM in the TRM.
-> > +- nvidia,ci: Numeric value, see the field DFLL_PARAMS_CI_PARAM in the TRM.
-> > +- nvidia,cg: Numeric value, see the field DFLL_PARAMS_CG_PARAM in the TRM.
-> > +- nvidia,cg-scale: Boolean value, see the field DFLL_PARAMS_CG_SCALE in the TRM.
-> > +
-> > +Required properties for I2C mode:
-> > +- nvidia,i2c-fs-rate: I2C transfer rate, if using FS mode.
-> 
-> What's FS mode?
-> 
-> > +
-> > +Example:
-> > +
-> > +dfll at 0,70110000 {
-> 
-> Perhaps this should be "clock at 0,70110000"?
-> 
-> > +        compatible = "nvidia,tegra124-dfll";
-> > +        reg = <0 0x70110000 0 0x100>, /* DFLL control */
-> > +              <0 0x70110000 0 0x100>, /* I2C output control */
-> > +              <0 0x70110100 0 0x100>, /* Integrated I2C controller */
-> > +              <0 0x70110200 0 0x100>; /* Look-up table RAM */
-> > +        interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-> > +        clocks = <&tegra_car TEGRA124_CLK_DFLL_SOC>,
-> > +                 <&tegra_car TEGRA124_CLK_DFLL_REF>,
-> > +                 <&tegra_car TEGRA124_CLK_I2C5>;
-> 
-> If this controls I2C5 now, should it be documented that we can't use
-> this controller in software while it is in use by DFLL?
+Something like this maybe?
 
-It doesn't control I2C5. However, I2C5 and the dfll I2C controller control
-the same pins. There is some arbitration logic which prevents both controllers
-driving the pins at the same time. This logic does not have a sw interface.
-However, this logic doesn't work if I2C5 is not clocked. So once the dfll
-is enabled, I2C5 must always be clocked.
+Subject: [PATCH] serial: 8250: skip empty RX-read only on OMAP
 
-Cheers,
+The conditional RX-FIFO read seems to cause spurious interrupts and we
+see just:
+|serial8250: too much work for irq29
 
-Peter.
+The previous behaviour was "default" for decades and Marvell's 88f6282 SoC
+might not be the only that relies on it. Therefore this patch moves this
+special OMAP3630 behaviour befind a BUG field.
+
+Fixes: 0aa525d11859 ("tty: serial: 8250_core: read only RX if there is
+       something in the FIFO")
+
+Reported-By: Nicolas Schichan <nschichan@freebox.fr>
+Debuged-By: Peter Hurley <peter@hurleysoftware.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ drivers/tty/serial/8250/8250.h      |  1 +
+ drivers/tty/serial/8250/8250_core.c | 10 ++++++++--
+ drivers/tty/serial/8250/8250_omap.c |  1 +
+ 3 files changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/tty/serial/8250/8250.h b/drivers/tty/serial/8250/8250.h
+index b00836851061..b6899fd69c7e 100644
+--- a/drivers/tty/serial/8250/8250.h
++++ b/drivers/tty/serial/8250/8250.h
+@@ -84,6 +84,7 @@ struct serial8250_config {
+ #define UART_BUG_NOMSR	(1 << 2)	/* UART has buggy MSR status bits (Au1x00) */
+ #define UART_BUG_THRE	(1 << 3)	/* UART has buggy THRE reassertion */
+ #define UART_BUG_PARITY	(1 << 4)	/* UART mishandles parity if FIFO enabled */
++#define UART_BUG_RXEMPT	(1 << 5)	/* UART can not read empty FIFO */
+ 
+ #define PROBE_RSA	(1 << 0)
+ #define PROBE_ANY	(~0)
+diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+index e3b9570a1eff..185386178023 100644
+--- a/drivers/tty/serial/8250/8250_core.c
++++ b/drivers/tty/serial/8250/8250_core.c
+@@ -2137,8 +2137,13 @@ int serial8250_do_startup(struct uart_port *port)
+ 
+ 	/*
+ 	 * Clear the interrupt registers.
++	 *
++	 * This (and later) unsolicied read of the RX FIFO seems to clear the
++	 * RX timeout condition which otherwise generates spurious interrupt.
++	 * This behaviour has been observed on Marvell's 88f6282 SoC.
+ 	 */
+-	if (serial_port_in(port, UART_LSR) & UART_LSR_DR)
++	if (!(up->bugs & UART_BUG_RXEMPT) ||
++	    (serial_port_in(port, UART_LSR) & UART_LSR_DR))
+ 		serial_port_in(port, UART_RX);
+ 	serial_port_in(port, UART_IIR);
+ 	serial_port_in(port, UART_MSR);
+@@ -2300,7 +2305,8 @@ int serial8250_do_startup(struct uart_port *port)
+ 	 * saved flags to avoid getting false values from polling
+ 	 * routines or the previous session.
+ 	 */
+-	if (serial_port_in(port, UART_LSR) & UART_LSR_DR)
++	if (!(up->bugs & UART_BUG_RXEMPT) ||
++	    (serial_port_in(port, UART_LSR) & UART_LSR_DR))
+ 		serial_port_in(port, UART_RX);
+ 	serial_port_in(port, UART_IIR);
+ 	serial_port_in(port, UART_MSR);
+diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
+index fe6d2e51da09..a7ead2fa6a32 100644
+--- a/drivers/tty/serial/8250/8250_omap.c
++++ b/drivers/tty/serial/8250/8250_omap.c
+@@ -1021,6 +1021,7 @@ static int omap8250_probe(struct platform_device *pdev)
+ 	up.port.fifosize = 64;
+ 	up.tx_loadsz = 64;
+ 	up.capabilities = UART_CAP_FIFO;
++	up.bugs = UART_BUG_RXEMPT;
+ #ifdef CONFIG_PM
+ 	/*
+ 	 * Runtime PM is mostly transparent. However to do it right we need to a
+-- 
+2.1.4
