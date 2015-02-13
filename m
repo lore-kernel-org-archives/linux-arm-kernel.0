@@ -1,116 +1,44 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Fri, 13 Feb 2015 13:40:58 +0800
-Subject: [RFC PATCH v3 17/26] early kprobes: introduces macros for allocing
- early kprobe resources.
+Date: Fri, 13 Feb 2015 13:41:08 +0800
+Subject: [RFC PATCH v3 21/26] early kprobes: add CONFIG_EARLY_KPROBES option.
 In-Reply-To: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
 References: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1423806058-62193-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1423806068-62359-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduces macros to genearte common early kprobe related resource
-allocator.
-
-All early kprobe related resources are statically allocated during
-linking for each early kprobe slot. For each type of resource, a bitmap
-is used to track allocation. __DEFINE_EKPROBE_ALLOC_OPS defines alloc
-and free handler for them. The range of the resource and the bitmap
-should be provided for allocaing and freeing. DEFINE_EKPROBE_ALLOC_OPS
-defines bitmap and the array used by it.
+Enable early kprobes in Kconfig.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
 ---
- include/linux/kprobes.h | 78 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 78 insertions(+)
+ arch/Kconfig | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/include/linux/kprobes.h b/include/linux/kprobes.h
-index 8d2e754..cd7a2a5 100644
---- a/include/linux/kprobes.h
-+++ b/include/linux/kprobes.h
-@@ -270,6 +270,84 @@ extern void show_registers(struct pt_regs *regs);
- extern void kprobes_inc_nmissed_count(struct kprobe *p);
- extern bool arch_within_kprobe_blacklist(unsigned long addr);
+diff --git a/arch/Kconfig b/arch/Kconfig
+index 05d7a8a..32e9f4a 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -46,6 +46,21 @@ config KPROBES
+ 	  for kernel debugging, non-intrusive instrumentation and testing.
+ 	  If in doubt, say "N".
  
-+#ifdef CONFIG_EARLY_KPROBES
++config EARLY_KPROBES
++	bool "Enable kprobes at very early booting stage"
++	depends on KPROBES && OPTPROBES
++	def_bool y
++	help
++	  Enable kprobe at very early booting stage.
 +
-+#define NR_EARLY_KPROBES_SLOTS	CONFIG_NR_EARLY_KPROBES_SLOTS
-+#define ALIGN_UP(v, a)	(((v) + ((a) - 1)) & ~((a) - 1))
-+#define EARLY_KPROBES_BITMAP_SZ	ALIGN_UP(NR_EARLY_KPROBES_SLOTS, BITS_PER_LONG)
++config NR_EARLY_KPROBES_SLOTS
++	int "Number of possible early kprobes"
++	range 1 64
++	default 16
++	depends on EARLY_KPROBES
++	help
++	  Number of early kprobes slots.
 +
-+#define __ek_in_range(v, s, e)	(((v) >= (s)) && ((v) < (e)))
-+#define __ek_buf_sz(s, e)	((void *)(e) - (void *)(s))
-+#define __ek_elem_sz_b(s, e)	(__ek_buf_sz(s, e) / NR_EARLY_KPROBES_SLOTS)
-+#define __ek_elem_sz(s, e)	(__ek_elem_sz_b(s, e) / sizeof(s[0]))
-+#define __ek_elem_idx(v, s, e)	(__ek_buf_sz(s, v) / __ek_elem_sz_b(s, e))
-+#define __ek_get_elem(i, s, e)	(&((s)[__ek_elem_sz(s, e) * (i)]))
-+#define __DEFINE_EKPROBE_ALLOC_OPS(__t, __name)				\
-+static inline __t *__ek_alloc_##__name(__t *__s, __t *__e, unsigned long *__b)\
-+{									\
-+	int __i = find_next_zero_bit(__b, NR_EARLY_KPROBES_SLOTS, 0);	\
-+	if (__i >= NR_EARLY_KPROBES_SLOTS)				\
-+		return NULL;						\
-+	set_bit(__i, __b);						\
-+	return __ek_get_elem(__i, __s, __e);				\
-+}									\
-+static inline int __ek_free_##__name(__t *__v, __t *__s, __t *__e, unsigned long *__b)	\
-+{									\
-+	if (!__ek_in_range(__v, __s, __e))				\
-+		return 0;						\
-+	clear_bit(__ek_elem_idx(__v, __s, __e), __b);			\
-+	return 1;							\
-+}
-+
-+#define __DEFINE_EKPROBE_AREA(__t, __name, __static)			\
-+__static __t __ek_##__name##_slots[NR_EARLY_KPROBES_SLOTS];		\
-+__static unsigned long __ek_##__name##_bitmap[EARLY_KPROBES_BITMAP_SZ];
-+
-+#define DEFINE_EKPROBE_ALLOC_OPS(__t, __name, __static)			\
-+__DEFINE_EKPROBE_AREA(__t, __name, __static)				\
-+__DEFINE_EKPROBE_ALLOC_OPS(__t, __name)					\
-+static inline __t *ek_alloc_##__name(void)				\
-+{									\
-+	return __ek_alloc_##__name(&((__ek_##__name##_slots)[0]),	\
-+			&((__ek_##__name##_slots)[NR_EARLY_KPROBES_SLOTS]),\
-+			(__ek_##__name##_bitmap));			\
-+}									\
-+static inline int ek_free_##__name(__t *__s)				\
-+{									\
-+	return __ek_free_##__name(__s, &((__ek_##__name##_slots)[0]),	\
-+			&((__ek_##__name##_slots)[NR_EARLY_KPROBES_SLOTS]),\
-+			(__ek_##__name##_bitmap));			\
-+}
-+
-+
-+#else
-+#define __DEFINE_EKPROBE_ALLOC_OPS(__t, __name)				\
-+static inline __t *__ek_alloc_##__name(__t *__s, __t *__e, unsigned long *__b)\
-+{									\
-+	return NULL;							\
-+}									\
-+static inline int __ek_free_##__name(__t *__v, __t *__s, __t *__e, unsigned long *__b)\
-+{									\
-+	return 0;							\
-+}
-+
-+#define __DEFINE_EKPROBE_AREA(__t, __name, __static)			\
-+__static __t __ek_##__name##_slots[0];					\
-+__static unsigned long __ek_##__name##_bitmap[0];
-+
-+#define DEFINE_EKPROBE_ALLOC_OPS(__t, __name, __static)			\
-+__DEFINE_EKPROBE_ALLOC_OPS(__t, __name)					\
-+static inline __t *ek_alloc_##__name(void)				\
-+{									\
-+	return NULL;							\
-+}									\
-+static inline int ek_free_##__name(__t *__s)				\
-+{									\
-+	return 0;							\
-+}
-+
-+#endif
-+
- struct kprobe_insn_cache {
- 	struct mutex mutex;
- 	void *(*alloc)(void);	/* allocate insn page */
+ config JUMP_LABEL
+        bool "Optimize very unlikely/likely branches"
+        depends on HAVE_ARCH_JUMP_LABEL
 -- 
 1.8.4
