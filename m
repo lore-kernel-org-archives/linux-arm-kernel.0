@@ -1,43 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Feb 2015 10:57:53 +0000
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 13 Feb 2015 11:01:52 +0000
 Subject: [PATCH 01/11] ARM: vexpress: use ARM_CPU_SUSPEND if needed
-In-Reply-To: <20150213103716.GQ14954@e106497-lin.cambridge.arm.com>
+In-Reply-To: <20150213105752.GU8656@n2100.arm.linux.org.uk>
 References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
  <1423770163-583064-2-git-send-email-arnd@arndb.de>
  <20150213103716.GQ14954@e106497-lin.cambridge.arm.com>
-Message-ID: <20150213105752.GU8656@n2100.arm.linux.org.uk>
+ <20150213105752.GU8656@n2100.arm.linux.org.uk>
+Message-ID: <20150213110152.GR14954@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 13, 2015 at 10:37:16AM +0000, Liviu Dudau wrote:
-> On Thu, Feb 12, 2015 at 07:42:33PM +0000, Arnd Bergmann wrote:
-> > The vexpress tc2 power management code calls mcpm_loopback, which
-> > is only available if ARM_CPU_SUSPEND is enabled, otherwise we
-> > get a link error:
+On Fri, Feb 13, 2015 at 10:57:53AM +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 13, 2015 at 10:37:16AM +0000, Liviu Dudau wrote:
+> > On Thu, Feb 12, 2015 at 07:42:33PM +0000, Arnd Bergmann wrote:
+> > > The vexpress tc2 power management code calls mcpm_loopback, which
+> > > is only available if ARM_CPU_SUSPEND is enabled, otherwise we
+> > > get a link error:
+> > > 
+> > > arch/arm/mach-vexpress/built-in.o: In function `tc2_pm_init':
+> > > arch/arm/mach-vexpress/tc2_pm.c:389: undefined reference to `mcpm_loopback'
 > > 
-> > arch/arm/mach-vexpress/built-in.o: In function `tc2_pm_init':
-> > arch/arm/mach-vexpress/tc2_pm.c:389: undefined reference to `mcpm_loopback'
+> > Arnd,
+> > 
+> > We are having reports of TC2 not booting with MCPM enabled. Lorenzo
+> > was investigating this but then headed for Linaro Connect this week,
+> > so we don't have yet a resolution. Can this patch be postponed for
+> > a later -rc?
 > 
-> Arnd,
+> Why?
 > 
-> We are having reports of TC2 not booting with MCPM enabled. Lorenzo
-> was investigating this but then headed for Linaro Connect this week,
-> so we don't have yet a resolution. Can this patch be postponed for
-> a later -rc?
+> This patch isn't forcing MCPM to be enabled for Versatile Express.
+> 
+> * In order to build tc2_pm.c, MCPM must already be enabled (the
+>   feature depends on MCPM in the Kconfig already)
+> * When this feature is enabled, the above link error occurs if
+>   ARM_CPU_SUSPEND is not also enabled.
+> 
+> So, it is merely fixing the requirement that tc2_pm.c needs the CPU
+> suspend infrastructure, which in turn has no effect on whether MCPM
+> is enabled or not.
 
-Why?
+Because I think Lorenzo's plan was to disable MCPM for TC2. Which would
+make this patch moot.
 
-This patch isn't forcing MCPM to be enabled for Versatile Express.
+Best regards,
+Liviu
 
-* In order to build tc2_pm.c, MCPM must already be enabled (the
-  feature depends on MCPM in the Kconfig already)
-* When this feature is enabled, the above link error occurs if
-  ARM_CPU_SUSPEND is not also enabled.
-
-So, it is merely fixing the requirement that tc2_pm.c needs the CPU
-suspend infrastructure, which in turn has no effect on whether MCPM
-is enabled or not.
+> 
+> -- 
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
+> 
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
