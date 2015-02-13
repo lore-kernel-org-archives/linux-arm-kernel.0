@@ -1,9 +1,9 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 13 Feb 2015 17:43:00 +0100
-Subject: [PATCH 6/7] ARM: berlin: rework the clock node for BG2CD
+Date: Fri, 13 Feb 2015 17:43:01 +0100
+Subject: [PATCH 7/7] ARM: berlin: rework the clock node for BG2Q
 In-Reply-To: <1423845781-7480-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1423845781-7480-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1423845781-7480-7-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1423845781-7480-8-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,131 +13,174 @@ own sub-node.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2cd.dtsi | 39 ++++++++++++++++++++++-----------------
- 1 file changed, 22 insertions(+), 17 deletions(-)
+ arch/arm/boot/dts/berlin2q.dtsi | 53 ++++++++++++++++++++++-------------------
+ 1 file changed, 29 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index 314cde70a3ba..34d3ec957243 100644
---- a/arch/arm/boot/dts/berlin2cd.dtsi
-+++ b/arch/arm/boot/dts/berlin2cd.dtsi
-@@ -48,7 +48,7 @@
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index bd86d4121ec8..ca69dc26782f 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -66,7 +66,7 @@
  		sdhci0: sdhci at ab0000 {
  			compatible = "mrvl,pxav3-mmc";
  			reg = <0xab0000 0x200>;
--			clocks = <&chip CLKID_SDIO0XIN>, <&chip CLKID_SDIO0>;
-+			clocks = <&chip_clk CLKID_SDIO0XIN>, <&chip_clk CLKID_SDIO0>;
- 			clock-names = "io", "core";
+-			clocks = <&chip CLKID_SDIO1XIN>;
++			clocks = <&chip_clk CLKID_SDIO1XIN>;
  			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
  			status = "disabled";
-@@ -72,7 +72,7 @@
+ 		};
+@@ -74,7 +74,7 @@
+ 		sdhci1: sdhci at ab0800 {
+ 			compatible = "mrvl,pxav3-mmc";
+ 			reg = <0xab0800 0x200>;
+-			clocks = <&chip CLKID_SDIO1XIN>;
++			clocks = <&chip_clk CLKID_SDIO1XIN>;
+ 			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
+ 		};
+@@ -83,7 +83,7 @@
+ 			compatible = "mrvl,pxav3-mmc";
+ 			reg = <0xab1000 0x200>;
+ 			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&chip CLKID_NFC_ECC>, <&chip CLKID_NFC>;
++			clocks = <&chip_clk CLKID_NFC_ECC>, <&chip_clk CLKID_NFC>;
+ 			clock-names = "io", "core";
+ 			status = "disabled";
+ 		};
+@@ -104,7 +104,7 @@
+ 		local-timer at ad0600 {
  			compatible = "arm,cortex-a9-twd-timer";
  			reg = <0xad0600 0x20>;
- 			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
 -			clocks = <&chip CLKID_TWD>;
 +			clocks = <&chip_clk CLKID_TWD>;
+ 			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
  		};
  
- 		usb_phy0: usb-phy at b74000 {
-@@ -94,7 +94,7 @@
- 		eth1: ethernet at b90000 {
+@@ -127,7 +127,7 @@
+ 			compatible = "chipidea,usb2";
+ 			reg = <0xa30000 0x10000>;
+ 			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&chip CLKID_USB2>;
++			clocks = <&chip_clk CLKID_USB2>;
+ 			phys = <&usb_phy2>;
+ 			phy-names = "usb-phy";
+ 			status = "disabled";
+@@ -145,14 +145,14 @@
+ 			compatible = "marvell,berlin2-usb-phy";
+ 			reg = <0xb78000 0x128>;
+ 			#phy-cells = <0>;
+-			resets = <&chip 0x104 13>;
++			resets = <&chip_rst 0x104 13>;
+ 			status = "disabled";
+ 		};
+ 
+ 		eth0: ethernet at b90000 {
  			compatible = "marvell,pxa168-eth";
  			reg = <0xb90000 0x10000>;
--			clocks = <&chip CLKID_GETH1>;
-+			clocks = <&chip_clk CLKID_GETH1>;
+-			clocks = <&chip CLKID_GETH0>;
++			clocks = <&chip_clk CLKID_GETH0>;
  			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
  			/* set by bootloader */
  			local-mac-address = [00 00 00 00 00 00];
-@@ -112,7 +112,7 @@
- 		eth0: ethernet at e50000 {
- 			compatible = "marvell,pxa168-eth";
- 			reg = <0xe50000 0x10000>;
--			clocks = <&chip CLKID_GETH0>;
-+			clocks = <&chip_clk CLKID_GETH0>;
- 			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
- 			/* set by bootloader */
- 			local-mac-address = [00 00 00 00 00 00];
-@@ -211,7 +211,7 @@
+@@ -259,7 +259,7 @@
+ 				reg = <0x1400 0x100>;
+ 				interrupt-parent = <&aic>;
+ 				interrupts = <4>;
+-				clocks = <&chip CLKID_CFG>;
++				clocks = <&chip_clk CLKID_CFG>;
+ 				pinctrl-0 = <&twsi0_pmux>;
+ 				pinctrl-names = "default";
+ 				status = "disabled";
+@@ -272,7 +272,7 @@
+ 				reg = <0x1800 0x100>;
+ 				interrupt-parent = <&aic>;
+ 				interrupts = <5>;
+-				clocks = <&chip CLKID_CFG>;
++				clocks = <&chip_clk CLKID_CFG>;
+ 				pinctrl-0 = <&twsi1_pmux>;
+ 				pinctrl-names = "default";
+ 				status = "disabled";
+@@ -281,7 +281,7 @@
+ 			timer0: timer at 2c00 {
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c00 0x14>;
- 				interrupts = <8>;
 -				clocks = <&chip CLKID_CFG>;
 +				clocks = <&chip_clk CLKID_CFG>;
  				clock-names = "timer";
- 				status = "okay";
+ 				interrupts = <8>;
  			};
-@@ -220,7 +220,7 @@
+@@ -289,14 +289,14 @@
+ 			timer1: timer at 2c14 {
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c14 0x14>;
- 				interrupts = <9>;
 -				clocks = <&chip CLKID_CFG>;
 +				clocks = <&chip_clk CLKID_CFG>;
  				clock-names = "timer";
- 				status = "okay";
  			};
-@@ -229,7 +229,7 @@
+ 
+ 			timer2: timer at 2c28 {
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c28 0x14>;
- 				interrupts = <10>;
 -				clocks = <&chip CLKID_CFG>;
 +				clocks = <&chip_clk CLKID_CFG>;
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -238,7 +238,7 @@
+@@ -304,7 +304,7 @@
+ 			timer3: timer at 2c3c {
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c3c 0x14>;
- 				interrupts = <11>;
 -				clocks = <&chip CLKID_CFG>;
 +				clocks = <&chip_clk CLKID_CFG>;
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -247,7 +247,7 @@
+@@ -312,7 +312,7 @@
+ 			timer4: timer at 2c50 {
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c50 0x14>;
- 				interrupts = <12>;
 -				clocks = <&chip CLKID_CFG>;
 +				clocks = <&chip_clk CLKID_CFG>;
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -256,7 +256,7 @@
+@@ -320,7 +320,7 @@
+ 			timer5: timer at 2c64 {
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c64 0x14>;
- 				interrupts = <13>;
 -				clocks = <&chip CLKID_CFG>;
 +				clocks = <&chip_clk CLKID_CFG>;
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -265,7 +265,7 @@
+@@ -328,7 +328,7 @@
+ 			timer6: timer at 2c78 {
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c78 0x14>;
- 				interrupts = <14>;
 -				clocks = <&chip CLKID_CFG>;
 +				clocks = <&chip_clk CLKID_CFG>;
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -274,7 +274,7 @@
+@@ -336,7 +336,7 @@
+ 			timer7: timer at 2c8c {
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c8c 0x14>;
- 				interrupts = <15>;
 -				clocks = <&chip CLKID_CFG>;
 +				clocks = <&chip_clk CLKID_CFG>;
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -292,9 +292,14 @@
+@@ -354,9 +354,14 @@
  		chip: chip-controller at ea0000 {
- 			compatible = "marvell,berlin2cd-chip-ctrl", "syscon";
- 			reg = <0xea0000 0x400>;
+ 			compatible = "marvell,berlin2q-chip-ctrl", "syscon";
+ 			reg = <0xea0000 0x400>, <0xdd0170 0x10>;
 -			#clock-cells = <1>;
 -			clocks = <&refclk>;
 -			clock-names = "refclk";
 +
 +			chip_clk: clock {
-+				compatible = "marvell,berlin2-clk";
++				compatible = "marvell,berlin2q-clk";
 +
 +				#clock-cells = <1>;
 +				clocks = <&refclk>;
@@ -145,19 +188,37 @@ index 314cde70a3ba..34d3ec957243 100644
 +			};
  
  			soc_pinctrl: pin-controller {
- 				compatible = "marvell,berlin2cd-soc-pinctrl";
-@@ -315,7 +320,7 @@
+ 				compatible = "marvell,berlin2q-soc-pinctrl";
+@@ -382,7 +387,7 @@
+ 			compatible = "marvell,berlin2q-ahci", "generic-ahci";
+ 			reg = <0xe90000 0x1000>;
+ 			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&chip CLKID_SATA>;
++			clocks = <&chip_clk CLKID_SATA>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
+@@ -402,7 +407,7 @@
+ 		sata_phy: phy at e900a0 {
+ 			compatible = "marvell,berlin2q-sata-phy";
+ 			reg = <0xe900a0 0x200>;
+-			clocks = <&chip CLKID_SATA>;
++			clocks = <&chip_clk CLKID_SATA>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			#phy-cells = <1>;
+@@ -421,7 +426,7 @@
  			compatible = "chipidea,usb2";
- 			reg = <0xed0000 0x200>;
+ 			reg = <0xed0000 0x10000>;
  			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
 -			clocks = <&chip CLKID_USB0>;
 +			clocks = <&chip_clk CLKID_USB0>;
  			phys = <&usb_phy0>;
  			phy-names = "usb-phy";
  			status = "disabled";
-@@ -325,7 +330,7 @@
+@@ -431,7 +436,7 @@
  			compatible = "chipidea,usb2";
- 			reg = <0xee0000 0x200>;
+ 			reg = <0xee0000 0x10000>;
  			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
 -			clocks = <&chip CLKID_USB1>;
 +			clocks = <&chip_clk CLKID_USB1>;
