@@ -1,58 +1,46 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Fri, 13 Feb 2015 13:40:22 +0800
-Subject: [RFC PATCH v3 02/26] kprobes: makes kprobes/enabled works correctly
- for optimized kprobes.
+Date: Fri, 13 Feb 2015 13:40:41 +0800
+Subject: [RFC PATCH v3 10/26] ftrace: x86: try to fix ftrace when
+ ftrace_replace_code.
 In-Reply-To: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
 References: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1423806022-61575-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1423806041-61907-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-debugfs/kprobes/enabled doesn't work correctly on optimized kprobes.
-Masami Hiramatsu has a test report on x86_64 platform:
+For ftrace x86, when ftrace_replace_code(), if it failed to add
+breakpoint, trigger a bugfix trying instead of ftrace_bug().
 
-https://lkml.org/lkml/2015/1/19/274
-
-This patch forces it to unoptimize kprobe if kprobes_all_disarmed
-is set. It also checks the flag in unregistering path for skipping
-unneeded disarming process when kprobes globally disarmed.
+Only give one chance for fixing at add_breakpoints(). If it fails at
+other stage, bug directly.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
-Signed-off-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-Cc: Ingo Molnar <mingo@kernel.org>
-Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
 ---
- kernel/kprobes.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ arch/x86/kernel/ftrace.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/kernel/kprobes.c b/kernel/kprobes.c
-index c397900..c90e417 100644
---- a/kernel/kprobes.c
-+++ b/kernel/kprobes.c
-@@ -869,7 +869,8 @@ static void __disarm_kprobe(struct kprobe *p, bool reopt)
- {
- 	struct kprobe *_p;
+diff --git a/arch/x86/kernel/ftrace.c b/arch/x86/kernel/ftrace.c
+index 7bdba65..c869138 100644
+--- a/arch/x86/kernel/ftrace.c
++++ b/arch/x86/kernel/ftrace.c
+@@ -553,8 +553,16 @@ void ftrace_replace_code(int enable)
+ 		rec = ftrace_rec_iter_record(iter);
  
--	unoptimize_kprobe(p, false);	/* Try to unoptimize */
-+	/* Try to unoptimize */
-+	unoptimize_kprobe(p, kprobes_all_disarmed);
- 
- 	if (!kprobe_queued(p)) {
- 		arch_disarm_kprobe(p);
-@@ -1571,7 +1572,13 @@ static struct kprobe *__disable_kprobe(struct kprobe *p)
- 
- 		/* Try to disarm and disable this/parent probe */
- 		if (p == orig_p || aggr_kprobe_disabled(orig_p)) {
--			disarm_kprobe(orig_p, true);
+ 		ret = add_breakpoints(rec, enable);
+-		if (ret)
+-			goto remove_breakpoints;
++		if (ret) {
 +			/*
-+			 * If kprobes_all_disarmed is set, orig_p
-+			 * should have already been disarmed, so
-+			 * skip unneed disarming process.
++			 * Don't trigger ftrace_bug here. Let it done by
++			 * remove_breakpoints procedure.
 +			 */
-+			if (!kprobes_all_disarmed)
-+				disarm_kprobe(orig_p, true);
- 			orig_p->flags |= KPROBE_FLAG_DISABLED;
- 		}
++			ret = __ftrace_tryfix_bug(ret, enable, rec,
++					add_breakpoints(rec, enable), false);
++			if (ret)
++				goto remove_breakpoints;
++		}
+ 		count++;
  	}
+ 
 -- 
 1.8.4
