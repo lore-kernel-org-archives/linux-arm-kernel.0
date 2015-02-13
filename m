@@ -1,85 +1,99 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Fri, 13 Feb 2015 22:22:02 +0900
-Subject: [PATCH 02/13] clk: mediatek: Add initial common clock support for
- Mediatek SoCs.
-In-Reply-To: <20150213120613.GZ12209@pengutronix.de>
-References: <1423478845-2835-1-git-send-email-s.hauer@pengutronix.de>
- <1423478845-2835-3-git-send-email-s.hauer@pengutronix.de>
- <CAAFQd5APGYRSQzriBBB=-vDyMhQZe7k9zDPgxLwzcV2C6f9DJQ@mail.gmail.com>
- <20150213120613.GZ12209@pengutronix.de>
-Message-ID: <CAAFQd5BxYNjsVpJnS+t=kZdXSdBTpgJii=T_qadRmMEzrR=dng@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Feb 2015 13:29:25 +0000
+Subject: [PATCH 3/5] ARM: dove: create a proper PMU driver for power
+ domains, PMU IRQs and resets
+In-Reply-To: <CAPDyKFoboE4iKyom86+EwHHTQAGpgKxGq969yrjQVpqizk-SLA@mail.gmail.com>
+References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
+ <E1WeP8f-0000Uo-1q@rmk-PC.arm.linux.org.uk>
+ <CAPDyKFoboE4iKyom86+EwHHTQAGpgKxGq969yrjQVpqizk-SLA@mail.gmail.com>
+Message-ID: <20150213132924.GA27774@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Mon, Apr 28, 2014 at 01:55:40PM +0200, Ulf Hansson wrote:
+> On 27 April 2014 15:29, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+> > The PMU device contains an interrupt controller, power control and
+> > resets.  The interrupt controller is a little sub-standard in that
+> > there is no race free way to clear down pending interrupts, so we try
+> > to avoid problems by reducing the window as much as possible, and
+> > clearing as infrequently as possible.
+> >
+> > The interrupt support is implemented using an IRQ domain, and the
+> > parent interrupt referenced in the standard DT way.
+> >
+> > The power domains and reset support is closely related - there is a
+> > defined sequence for powering down a domain which is tightly coupled
+> > with asserting the reset.  Hence, it makes sense to group these two
+> > together.
+> >
+> > This patch adds the core PMU driver: power domains must be defined in
+> > the DT file in order to make use of them.  The reset controller can
+> > be referenced in the standard way for reset controllers.
+> 
+> Hi Russell,
+> 
+> This patch would be simplified if this was based upon the not yet
+> merged patchset from Tomasz Figa, "[PATCH v3 0/3] Generic Device Tree
+> based power domain look-up".
+> 
+> For example you would likely not need to add some of the marvel
+> specific DT bindings, and you wouldn?t need the bus_notifiers to add
+> devices to the power domain. I guess I just though it could be useful
+> input to consider while going forward, unless you already knew.
 
-On Fri, Feb 13, 2015 at 9:06 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->
-> Hi Tomasz,
->
->> > +static void mtk_cg_disable(struct clk_hw *hw)
->> > +{
->> > +       mtk_cg_set_bit(hw);
->> > +}
->> > +
->> > +static int mtk_cg_enable_inv(struct clk_hw *hw)
->> > +{
->> > +       mtk_cg_set_bit(hw);
->> > +
->> > +       return 0;
->> > +}
->> > +
->> > +static void mtk_cg_disable_inv(struct clk_hw *hw)
->> > +{
->> > +       mtk_cg_clr_bit(hw);
->> > +}
->>
->> Instead of duplicating the ops, couldn't you add a flag or something
->> to mtk_clk_gate struct and then act appropriately in the ops? Also,
->> see below.
->
-> I prefer duplicating the ops. It makes the functions simpler without
-> ifs.
+In 3.19, I notice something of an odd behaviour.
 
-I meant something else. Compared to ifs I'd prefer duplicated ops too.
+My vMeta driver has runtime PM support enabled.  When I explicitly register
+the PM domain in the pmu driver via a bus notifier, I see:
 
-is_enabled()
-{
-    status = regmap_read() ^ (inverted << shift);
-    return status & BIT(shift);
-}
+root at cubox:~# cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+    domain                      status         slaves
+           /device                                      runtime status
+----------------------------------------------------------------------
+gpu-domain                      on
+    /devices/platform/vivante/etnaviv-gpu,2d            active
+vpu-domain                      off
+    /devices/platform/mbus/mbus:internal-regs/f1c00000.video-decoder  suspended
 
-However I missed the fact that writing uses set and clear registers,
-which effectively means that this approach can't really be used for
-writing, so I'm okay with keeping this as is.
+But when I disable that, and let the generic code do the registration,
+I instead get:
 
->
->> > diff --git a/drivers/clk/mediatek/clk-gate.h b/drivers/clk/mediatek/clk-gate.h
->> > new file mode 100644
->> > index 0000000..a44dcbf
->> > --- /dev/null
->> > +++ b/drivers/clk/mediatek/clk-gate.h
->> > @@ -0,0 +1,49 @@
->> > +/*
->> > + * Copyright (c) 2014 MediaTek Inc.
->> > + * Author: James Liao <jamesjj.liao@mediatek.com>
->>
->> Might not be necessary, but maybe the other people (all or some of
->> them) from signed-off-by should be added to this and other copyright
->> statements?
->
-> I rather do not want to update these copyrights frequently. Otherwise we
-> would see a lot of patches with an extra hunk changing the copyrights.
-> I'm glad we left that behind and look at the git history instead.
-> The above is the original author. I don't want to remove him, but I also
-> do not want to add every other person who touched that file.
+root at cubox:~# cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+    domain                      status         slaves
+           /device                                      runtime status
+----------------------------------------------------------------------
+gpu-domain                      on
+    /devices/platform/vivante/etnaviv-gpu,2d            active
+vpu-domain                      on
+    /devices/platform/mbus/mbus:internal-regs/f1c00000.video-decoder  suspended
 
-Alright. I just wanted to make sure that this is desired state.
+The difference being that the vpu domain remains powered.
 
->
-> The other stuff will be fixed in the next round. Thanks for reviewing.
+The only difference code-wise seems to be when genpd_dev_pm_attach() is
+called.  In the working case, it's before the device is considered for
+probing.  In the non-working case, it's just before the device is probed.
 
-You're welcome. Looking forward for next revision.
+With debugging enabled in the PM domain code, with the former case I get:
 
-Best regards,
-Tomasz
+Added domain provider from /mbus/internal-regs/power-management at d0000/vpu-domain
+platform f1c00000.video-decoder: adding to PM domain vpu-domain
+platform f1c00000.video-decoder: __pm_genpd_add_device()
+
+With the latter non-working case:
+
+Added domain provider from /mbus/internal-regs/power-management at d0000/vpu-domain
+...
+ap510-vmeta f1c00000.video-decoder: adding to PM domain vpu-domain
+ap510-vmeta f1c00000.video-decoder: __pm_genpd_add_device()
+vpu-domain: Power-on latency exceeded, new value 1578 ns
+
+Neither of these debug messages provide much hint as to what the
+difference is, or the cause of the PM domain code being de-sync'd
+with its devices.
+
+Maybe the PM code needs more debugging in it, and maybe the debugfs
+file should always be present if debugfs support is enabled?
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
