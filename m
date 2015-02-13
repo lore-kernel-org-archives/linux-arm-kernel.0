@@ -1,124 +1,41 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Fri, 13 Feb 2015 12:39:03 +0200
-Subject: [PATCH v7 05/16] clk: tegra: Add DFLL DVCO reset control for
- Tegra124
-In-Reply-To: <20150212141944.GK20811@tbergstrom-lnx.Nvidia.com>
-References: <1420723339-30735-1-git-send-email-mikko.perttunen@kapsi.fi>
- <1420723339-30735-6-git-send-email-mikko.perttunen@kapsi.fi>
- <20150212141944.GK20811@tbergstrom-lnx.Nvidia.com>
-Message-ID: <54DDD447.8000404@kapsi.fi>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 13 Feb 2015 10:39:33 +0000
+Subject: stand-alone kvmtool
+Message-ID: <54DDD465.3050300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2015 04:19 PM, Peter De Schrijver wrote:
-> On Thu, Jan 08, 2015 at 03:22:08PM +0200, Mikko Perttunen wrote:
->> From: Paul Walmsley <pwalmsley@nvidia.com>
->>
->> The DVCO present in the DFLL IP block has a separate reset line,
->> exposed via the CAR IP block.  This reset line is asserted upon SoC
->> reset.  Unless something (such as the DFLL driver) deasserts this
->> line, the DVCO will not oscillate, although reads and writes to the
->> DFLL IP block will complete.
->>
->> Thanks to Aleksandr Frid <afrid@nvidia.com> for identifying this and
->> saving hours of debugging time.
->>
->
-> Should this be done as a reset driver?
+Hi,
 
-Probably through the already existing CAR reset driver. This reset 
-doesn't fit well with the existing numbering scheme there, though. 
-Perhaps a magic high-valued constant that represents it.
+as I found it increasingly inconvenient to use kvmtool[1] as part of a
+Linux repository, I decided to give it a go and make it a stand-alone
+project. So I filtered all the respective commits, adjusted the paths in
+there (while keeping authorship and commit date, of course) and then
+added the missing bits to let it compile without a kernel tree nearby.
+The result is now available on:
 
->
->> Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
->> [ttynkkynen: ported to tegra124 from tegra114]
->> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
->> Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
->> ---
->>   drivers/clk/tegra/clk-tegra124.c | 47 ++++++++++++++++++++++++++++++++++++++++
->>   drivers/clk/tegra/clk.h          |  3 +++
->>   2 files changed, 50 insertions(+)
->>
->> diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
->> index f5f9bac..623b77f 100644
->> --- a/drivers/clk/tegra/clk-tegra124.c
->> +++ b/drivers/clk/tegra/clk-tegra124.c
->> @@ -31,6 +31,9 @@
->>   #define CLK_SOURCE_CSITE 0x1d4
->>   #define CLK_SOURCE_EMC 0x19c
->>
->> +#define RST_DFLL_DVCO			0x2f4
->> +#define DVFS_DFLL_RESET_SHIFT		0
->> +
->>   #define PLLC_BASE 0x80
->>   #define PLLC_OUT 0x84
->>   #define PLLC_MISC2 0x88
->> @@ -1399,6 +1402,50 @@ static void __init tegra124_clock_apply_init_table(void)
->>   	tegra_init_from_table(init_table, clks, TEGRA124_CLK_CLK_MAX);
->>   }
->>
->> +/**
->> + * tegra124_car_barrier - wait for pending writes to the CAR to complete
->> + *
->> + * Wait for any outstanding writes to the CAR MMIO space from this CPU
->> + * to complete before continuing execution.  No return value.
->> + */
->> +static void tegra124_car_barrier(void)
->> +{
->> +	readl_relaxed(clk_base + RST_DFLL_DVCO);
->> +}
->> +
->> +/**
->> + * tegra124_clock_assert_dfll_dvco_reset - assert the DFLL's DVCO reset
->> + *
->> + * Assert the reset line of the DFLL's DVCO.  No return value.
->> + */
->> +void tegra124_clock_assert_dfll_dvco_reset(void)
->> +{
->> +	u32 v;
->> +
->> +	v = readl_relaxed(clk_base + RST_DFLL_DVCO);
->> +	v |= (1 << DVFS_DFLL_RESET_SHIFT);
->> +	writel_relaxed(v, clk_base + RST_DFLL_DVCO);
->> +	tegra124_car_barrier();
->> +}
->> +EXPORT_SYMBOL(tegra124_clock_assert_dfll_dvco_reset);
->> +
->> +/**
->> + * tegra124_clock_deassert_dfll_dvco_reset - deassert the DFLL's DVCO reset
->> + *
->> + * Deassert the reset line of the DFLL's DVCO, allowing the DVCO to
->> + * operate.  No return value.
->> + */
->> +void tegra124_clock_deassert_dfll_dvco_reset(void)
->> +{
->> +	u32 v;
->> +
->> +	v = readl_relaxed(clk_base + RST_DFLL_DVCO);
->> +	v &= ~(1 << DVFS_DFLL_RESET_SHIFT);
->> +	writel_relaxed(v, clk_base + RST_DFLL_DVCO);
->> +	tegra124_car_barrier();
->> +}
->> +EXPORT_SYMBOL(tegra124_clock_deassert_dfll_dvco_reset);
->> +
->>   static void __init tegra124_clock_init(struct device_node *np)
->>   {
->>   	struct device_node *node;
->> diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
->> index 4e458aa..def0ea4 100644
->> --- a/drivers/clk/tegra/clk.h
->> +++ b/drivers/clk/tegra/clk.h
->> @@ -629,6 +629,9 @@ void tegra114_clock_tune_cpu_trimmers_init(void);
->>   void tegra114_clock_assert_dfll_dvco_reset(void);
->>   void tegra114_clock_deassert_dfll_dvco_reset(void);
->>
->> +void tegra124_clock_assert_dfll_dvco_reset(void);
->> +void tegra124_clock_deassert_dfll_dvco_reset(void);
->> +
->>   typedef void (*tegra_clk_apply_init_table_func)(void);
->>   extern tegra_clk_apply_init_table_func tegra_clk_apply_init_table;
->>
->> --
->> 2.2.1
->>
+git://linux-arm.org/kvmtool.git
+http://linux-arm.org/kvmtool.git
+
+You can simply check it out, type make and use "./lkvm run" for a quick
+test. So far I briefly tested x86-64, arm and arm64, the later two were
+also cross-compiled. For sure there are rough edges in there (for
+instance copying a few non-uapi header files into), but I deem it worthy
+enough to get some public comments.
+For me that also fixed some nasty warnings about libfdt, which now are
+gone due it using your system library version of it.
+I also managed to get rid of the libc-i386-dev dependency when compiling
+for x86-64, but that still needs to be cleaned up and thus is not in the
+current HEAD.
+I haven't got around to compile-test the other supported architectures,
+but supporting them should be as easy as copying over the uapi kvm.h
+header file (see the respective ARM commit). Contributions (and tests!)
+are welcome.
+
+Please give it a go and tell me what you think. I don't want to fork the
+project, so I am happy if someone "official" picks it up.
+
+Cheers,
+Andre.
+
+[1] https://github.com/penberg/linux-kvm/tree/master/tools/kvm
