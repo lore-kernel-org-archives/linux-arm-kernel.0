@@ -1,98 +1,19 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Feb 2015 13:29:25 +0000
-Subject: [PATCH 3/5] ARM: dove: create a proper PMU driver for power
- domains, PMU IRQs and resets
-In-Reply-To: <CAPDyKFoboE4iKyom86+EwHHTQAGpgKxGq969yrjQVpqizk-SLA@mail.gmail.com>
-References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
- <E1WeP8f-0000Uo-1q@rmk-PC.arm.linux.org.uk>
- <CAPDyKFoboE4iKyom86+EwHHTQAGpgKxGq969yrjQVpqizk-SLA@mail.gmail.com>
-Message-ID: <20150213132924.GA27774@n2100.arm.linux.org.uk>
+Date: Fri, 13 Feb 2015 13:31:42 +0000
+Subject: [RFC PATCH] ARM: LL_DEBUG: Fix hang on i.MX53 when wrong port
+ selected.
+In-Reply-To: <20150213124849.22919.14204.stgit@localhost>
+References: <20150213124849.22919.14204.stgit@localhost>
+Message-ID: <20150213133142.GY8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 01:55:40PM +0200, Ulf Hansson wrote:
-> On 27 April 2014 15:29, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> > The PMU device contains an interrupt controller, power control and
-> > resets.  The interrupt controller is a little sub-standard in that
-> > there is no race free way to clear down pending interrupts, so we try
-> > to avoid problems by reducing the window as much as possible, and
-> > clearing as infrequently as possible.
-> >
-> > The interrupt support is implemented using an IRQ domain, and the
-> > parent interrupt referenced in the standard DT way.
-> >
-> > The power domains and reset support is closely related - there is a
-> > defined sequence for powering down a domain which is tightly coupled
-> > with asserting the reset.  Hence, it makes sense to group these two
-> > together.
-> >
-> > This patch adds the core PMU driver: power domains must be defined in
-> > the DT file in order to make use of them.  The reset controller can
-> > be referenced in the standard way for reset controllers.
-> 
-> Hi Russell,
-> 
-> This patch would be simplified if this was based upon the not yet
-> merged patchset from Tomasz Figa, "[PATCH v3 0/3] Generic Device Tree
-> based power domain look-up".
-> 
-> For example you would likely not need to add some of the marvel
-> specific DT bindings, and you wouldn?t need the bus_notifiers to add
-> devices to the power domain. I guess I just though it could be useful
-> input to consider while going forward, unless you already knew.
+On Fri, Feb 13, 2015 at 01:48:49PM +0100, Martin Fuzzey wrote:
+> Hence RFC status for the moment to see if there are any better ideas.
 
-In 3.19, I notice something of an odd behaviour.
-
-My vMeta driver has runtime PM support enabled.  When I explicitly register
-the PM domain in the pmu driver via a bus notifier, I see:
-
-root at cubox:~# cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
-    domain                      status         slaves
-           /device                                      runtime status
-----------------------------------------------------------------------
-gpu-domain                      on
-    /devices/platform/vivante/etnaviv-gpu,2d            active
-vpu-domain                      off
-    /devices/platform/mbus/mbus:internal-regs/f1c00000.video-decoder  suspended
-
-But when I disable that, and let the generic code do the registration,
-I instead get:
-
-root at cubox:~# cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
-    domain                      status         slaves
-           /device                                      runtime status
-----------------------------------------------------------------------
-gpu-domain                      on
-    /devices/platform/vivante/etnaviv-gpu,2d            active
-vpu-domain                      on
-    /devices/platform/mbus/mbus:internal-regs/f1c00000.video-decoder  suspended
-
-The difference being that the vpu domain remains powered.
-
-The only difference code-wise seems to be when genpd_dev_pm_attach() is
-called.  In the working case, it's before the device is considered for
-probing.  In the non-working case, it's just before the device is probed.
-
-With debugging enabled in the PM domain code, with the former case I get:
-
-Added domain provider from /mbus/internal-regs/power-management at d0000/vpu-domain
-platform f1c00000.video-decoder: adding to PM domain vpu-domain
-platform f1c00000.video-decoder: __pm_genpd_add_device()
-
-With the latter non-working case:
-
-Added domain provider from /mbus/internal-regs/power-management at d0000/vpu-domain
-...
-ap510-vmeta f1c00000.video-decoder: adding to PM domain vpu-domain
-ap510-vmeta f1c00000.video-decoder: __pm_genpd_add_device()
-vpu-domain: Power-on latency exceeded, new value 1578 ns
-
-Neither of these debug messages provide much hint as to what the
-difference is, or the cause of the PM domain code being de-sync'd
-with its devices.
-
-Maybe the PM code needs more debugging in it, and maybe the debugfs
-file should always be present if debugfs support is enabled?
+How about detecting the condition in the addruart macro - if the UART
+is not enabled, we can clear r1 - and detect that in the various users
+and just bail out.  We wouldn't need to test on every character then.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
