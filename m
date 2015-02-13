@@ -1,56 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Feb 2015 03:32:43 +0000
-Subject: [PATCH RESEND] ARM: DMA: Fix kzalloc flags in
- __iommu_alloc_buffer()
-In-Reply-To: <1423645301-709-1-git-send-email-acourbot@nvidia.com>
-References: <1423645301-709-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <20150213033243.GC961@arm.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Fri, 13 Feb 2015 09:36:21 +0530
+Subject: [PATCH Resend] ARM64:ftrace: fix ftrace_modify_graph_caller for
+ branch replace
+Message-ID: <ce66ac4d80d4b200a9dad610d46533bb24934352.1423800192.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 11, 2015 at 09:01:41AM +0000, Alexandre Courbot wrote:
-> There doesn't seem to be any valid reason to allocate the pages array
-> with the same flags as the buffer itself. Doing so can eventually lead
-> to the following safeguard in mm/slab.c to be hit:
-> 
-> BUG_ON(flags & GFP_SLAB_BUG_MASK);
+ftrace_enable_ftrace_graph_caller and ftrace_disable_ftrace_graph_caller
+should replace B(jmp) instruction and not BL(call) instruction.
 
-nit: I can't actually spot this BUG_ON in the kernel.
+commit 9f1ae7596aad("arm64: Correct ftrace calls to
+aarch64_insn_gen_branch_imm()") did a typo and used
+AARCH64_INSN_BRANCH_LINK instead of AARCH64_INSN_BRANCH_NOLINK.
 
-> This happens when buffers are allocated with __GFP_DMA32 or
-> __GFP_HIGHMEM.
-> 
-> Fix this by allocating the pages array with GFP_KERNEL to follow what is
-> done elsewhere in this file. Using GFP_KERNEL in __iommu_alloc_buffer()
-> is safe because atomic allocations are handled by __iommu_alloc_atomic().
-> 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  arch/arm/mm/dma-mapping.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 903dba0..170a116 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1106,7 +1106,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
->  	int i = 0;
->  
->  	if (array_size <= PAGE_SIZE)
-> -		pages = kzalloc(array_size, gfp);
-> +		pages = kzalloc(array_size, GFP_KERNEL);
->  	else
->  		pages = vzalloc(array_size);
->  	if (!pages)
-> -- 
-> 2.3.0
+Signed-off-by: Pratyush Anand <panand@redhat.com>
+---
+ arch/arm64/kernel/ftrace.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Looks sensible to me:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+index cf8556ae09d0..c851be795080 100644
+--- a/arch/arm64/kernel/ftrace.c
++++ b/arch/arm64/kernel/ftrace.c
+@@ -156,7 +156,7 @@ static int ftrace_modify_graph_caller(bool enable)
+ 
+ 	branch = aarch64_insn_gen_branch_imm(pc,
+ 					     (unsigned long)ftrace_graph_caller,
+-					     AARCH64_INSN_BRANCH_LINK);
++					     AARCH64_INSN_BRANCH_NOLINK);
+ 	nop = aarch64_insn_gen_nop();
+ 
+ 	if (enable)
+-- 
+2.1.0
