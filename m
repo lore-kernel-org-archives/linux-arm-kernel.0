@@ -1,42 +1,67 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Fri, 13 Feb 2015 13:40:24 +0800
-Subject: [RFC PATCH v3 03/26] kprobes: x86: mark 2 bytes NOP as boostable.
+Date: Fri, 13 Feb 2015 13:40:26 +0800
+Subject: [RFC PATCH v3 04/26] ftrace: don't update record flags if code
+ modification fail.
 In-Reply-To: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
 References: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1423806024-61617-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1423806026-61660-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, x86 kprobes is unable to boost 2 bytes nop like:
+X86 and common ftrace_replace_code() behave differently.
 
-nopl 0x0(%rax,%rax,1)
+In x86, rec->flags get updated only when (almost) all works are done. In
+common code, rec->flags is updated before code modification, and never
+get restored when code modification fails.
 
-which is 0x0f 0x1f 0x44 0x00 0x00.
-
-Such nops have exactly 5 bytes which is able to hold a relative jmp
-instruction. Boosting them should be obviously safe.
-
-This patch enable boosting such nops by simply updating
-twobyte_is_boostable[] array.
+This patch ensures rec->flags kept its original value if
+ftrace_replace_code() fail. A later patch will correct that function
+for x86.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
-Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
 ---
- arch/x86/kernel/kprobes/core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ kernel/trace/ftrace.c | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
 
-diff --git a/arch/x86/kernel/kprobes/core.c b/arch/x86/kernel/kprobes/core.c
-index 98f654d..6a1146e 100644
---- a/arch/x86/kernel/kprobes/core.c
-+++ b/arch/x86/kernel/kprobes/core.c
-@@ -84,7 +84,7 @@ static volatile u32 twobyte_is_boostable[256 / 32] = {
- 	/*      0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f          */
- 	/*      ----------------------------------------------          */
- 	W(0x00, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0) | /* 00 */
--	W(0x10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) , /* 10 */
-+	W(0x10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1) , /* 10 */
- 	W(0x20, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) | /* 20 */
- 	W(0x30, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) , /* 30 */
- 	W(0x40, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1) | /* 40 */
+diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
+index 45e5cb1..6c6cbb1 100644
+--- a/kernel/trace/ftrace.c
++++ b/kernel/trace/ftrace.c
+@@ -2254,23 +2254,30 @@ __ftrace_replace_code(struct dyn_ftrace *rec, int enable)
+ 	/* This needs to be done before we call ftrace_update_record */
+ 	ftrace_old_addr = ftrace_get_addr_curr(rec);
+ 
+-	ret = ftrace_update_record(rec, enable);
++	ret = ftrace_test_record(rec, enable);
+ 
+ 	switch (ret) {
+ 	case FTRACE_UPDATE_IGNORE:
+ 		return 0;
+ 
+ 	case FTRACE_UPDATE_MAKE_CALL:
+-		return ftrace_make_call(rec, ftrace_addr);
++		ret = ftrace_make_call(rec, ftrace_addr);
++		break;
+ 
+ 	case FTRACE_UPDATE_MAKE_NOP:
+-		return ftrace_make_nop(NULL, rec, ftrace_old_addr);
++		ret = ftrace_make_nop(NULL, rec, ftrace_old_addr);
++		break;
+ 
+ 	case FTRACE_UPDATE_MODIFY_CALL:
+-		return ftrace_modify_call(rec, ftrace_old_addr, ftrace_addr);
++		ret = ftrace_modify_call(rec, ftrace_old_addr, ftrace_addr);
++		break;
+ 	}
+ 
+-	return -1; /* unknow ftrace bug */
++	if (ret)
++		return -1; /* unknow ftrace bug */
++
++	ftrace_update_record(rec, enable);
++	return 0;
+ }
+ 
+ void __weak ftrace_replace_code(int enable)
 -- 
 1.8.4
