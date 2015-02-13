@@ -1,39 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Feb 2015 17:30:00 +0000
-Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
-In-Reply-To: <20150213172141.GF2529@leverpostej>
-References: <20150205105035.GL8656@n2100.arm.linux.org.uk>
- <20150205142918.GA10634@linux.vnet.ibm.com>
- <20150205161100.GQ8656@n2100.arm.linux.org.uk>
- <54D95DB8.9010308@codeaurora.org>
- <20150210151416.GD9432@leverpostej>
- <54DA6E92.3090109@codeaurora.org> <54DA725E.6080305@codeaurora.org>
- <20150213155208.GG10496@leverpostej>
- <20150213162725.GC8656@n2100.arm.linux.org.uk>
- <20150213172141.GF2529@leverpostej>
-Message-ID: <20150213173000.GD8656@n2100.arm.linux.org.uk>
+From: alison@she-devel.com (alison at she-devel.com)
+Date: Fri, 13 Feb 2015 09:33:04 -0800
+Subject: [PATCH] i.MX6: WEIM: put node reference on early loop exit
+Message-ID: <1423848784-6988-1-git-send-email-alison_chaiken@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 13, 2015 at 05:21:41PM +0000, Mark Rutland wrote:
-> On Fri, Feb 13, 2015 at 04:27:25PM +0000, Russell King - ARM Linux wrote:
-> > If it happens after __cpu_disable(), then that's a problem: the system
-> > will have gone through all the expensive preparation by that time to
-> > shut the CPU down, and it will expect the CPU to go offline.  The only
-> > way it can come back at that point is by going through a CPU plug-in
-> > cycle... which means going back through secondary_start_kernel.
-> 
-> This would happen within __cpu_disable, as the current
-> platform_cpu_disable() call does, before it's too late to abort the
-> hotplug.
+From: Alison Chaiken <alison_chaiken@mentor.com>
 
-Okay, in which case it all sounds fine, but what it does mean is that
-we can't merge Stephen's patch since we have no real idea which cores
-can be hotplugged.
+Signed-off-by: Alison Chaiken <alison_chaiken@mentor.com>
+---
+ drivers/bus/imx-weim.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-I'd rather not add additional complexity when we know that it's not
-going to work very well...
-
+diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
+index 0958b69..11f2c8b 100644
+--- a/drivers/bus/imx-weim.c
++++ b/drivers/bus/imx-weim.c
+@@ -158,7 +158,7 @@ static int __init weim_parse_dt(struct platform_device *pdev,
+ 		if (ret) {
+ 			dev_err(&pdev->dev, "%s set timing failed.\n",
+ 				child->full_name);
+-			return ret;
++			goto put_node;
+ 		}
+ 	}
+ 
+@@ -166,7 +166,14 @@ static int __init weim_parse_dt(struct platform_device *pdev,
+ 				   of_default_bus_match_table,
+ 				   NULL, &pdev->dev);
+ 	if (ret)
+-		dev_err(&pdev->dev, "%s fail to create devices.\n",
++		goto out;
++
++	return 0;
++
++put_node:
++	of_node_put(child);
++out:
++	dev_err(&pdev->dev, "%s fail to create devices.\n",
+ 			pdev->dev.of_node->full_name);
+ 	return ret;
+ }
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
