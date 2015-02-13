@@ -1,74 +1,79 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 13 Feb 2015 12:15:31 -0500
-Subject: [RFC PATCH v3 00/26] Early kprobe: enable kprobes at very early
- booting stage.
-In-Reply-To: <1423805907-61335-1-git-send-email-wangnan0@huawei.com>
-References: <1423743476-11927-1-git-send-email-wangnan0@huawei.com>
- <1423805907-61335-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <20150213121531.6f2aa5cb@gandalf.local.home>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 13 Feb 2015 17:21:41 +0000
+Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
+In-Reply-To: <20150213162725.GC8656@n2100.arm.linux.org.uk>
+References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
+ <20150205105035.GL8656@n2100.arm.linux.org.uk>
+ <20150205142918.GA10634@linux.vnet.ibm.com>
+ <20150205161100.GQ8656@n2100.arm.linux.org.uk>
+ <54D95DB8.9010308@codeaurora.org>
+ <20150210151416.GD9432@leverpostej>
+ <54DA6E92.3090109@codeaurora.org> <54DA725E.6080305@codeaurora.org>
+ <20150213155208.GG10496@leverpostej>
+ <20150213162725.GC8656@n2100.arm.linux.org.uk>
+Message-ID: <20150213172141.GF2529@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Feb 2015 13:38:27 +0800
-Wang Nan <wangnan0@huawei.com> wrote:
-
-> I fell very sorry for people who reviewed my v2 patch series yesterday
-> at https://lkml.org/lkml/2015/2/12/234 because I didn't provide enough
-> information in commit log. This v3 patch series add those missing
-> commit messages. There are also 2 small fix based on v2:
-
-Note the 0/26 patch should contain the summary of what the entire
-series is trying to accomplish, and how it is trying to accomplish it.
-
+On Fri, Feb 13, 2015 at 04:27:25PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 13, 2015 at 03:52:08PM +0000, Mark Rutland wrote:
+> > > @@ -194,10 +195,6 @@ int __cpu_disable(void)
+> > >  	unsigned int cpu = smp_processor_id();
+> > >  	int ret;
+> > >  
+> > > -	ret = platform_cpu_disable(cpu);
+> > > -	if (ret)
+> > > -		return ret;
+> > 
+> > For PSCI 0.2+ I was hoping to hook the MIGRATE logic in here. The secure
+> > side may reject hotplugging of a CPU, but it's a dynamic property of the
+> > system and so can't be probed once at boot time.
 > 
->  1. Fixes ftrace_sort_mcount_area. Original patch doesn't work for module.
->  2. Wraps setting of kprobes_initialized in stop_machine() context. 
+> You may have to think about how to deal with the static nature of the
+> sysfs CPU hotplug properties then - or, you may wish to have the existing
+> behaviour where we expose the sysfs hotplug properties on all CPUs and
+> rely on returning -EPERM.
 > 
+> One question does come up - if it's a dynamic property of the system,
+> what ensures that it can't change between the point when we test it
+> (in __cpu_disable()) and when we actually come to take the CPU offline?
 
-I'll be attending Linux Collaboration Summit next week and there's a
-lot of things I need to finish before I leave, and I wont be able to
-look at these while at the conference. Which means I can not take a in
-depth look at the patches until I get back, and even then I'll be
-catching up on other things. Feel free to ping me about this after
-Feb 23rd.
+By relying on hotplug operations being serialised and the secure OS not
+moving arbitrarily (as required by the PSCI spec).
 
->From what I can gather from skimming the patches, you attend to have a
-way to pass kprobes via the kernel command line or some other way that
-kprobes are pre allocated (called before memory management), and if
-they happen to be at an ftrace location, you have hooks to have ftrace
-notify kprobes to fix it up.
+This matters in the case of a UP, migrateable secure OS (AKA TOS). It
+lives on a core, but we can ask it (via the PSCI implementation) to
+move. It will only move in response to MIGRATE calls, and at boot time
+we would query which CPU it's on (which should in practice be CPU0
+except in rare cases like a crash kernel).
 
-Honestly, I hate the notifiers. Get rid of them. kprobes and ftrace are
-coupled, as kprobes must know about ftrace, and ftrace knows about
-kprobes. This is a very specific case. Notifiers represent a "general"
-use case, and I don't want something else hooking into these notifiers.
-This should be hard coded, and fixed up at ftrace_init(), where after
-ftrace_init() everything acts as it does today.
+At __cpu_disable time (where the current platform_cpu_disable callback
+is), if the core being disabled has the TOS resident it would call
+MIGRATE, passsing the physical ID of another CPU to migrate to. If this
+fails, then the TOS didn't move and we can't hotplug. If it succeeds,
+then we know it has moved to the other CPU.
 
-That is, the early kprobes add hooks to the ftrace nop locations. When
-ftrace tries to convert them to nops it will notice that they do not
-match the call to mcount. In this case, ftrace should call a kprobes
-function asking if this is a call to kprobe, and if so, it will convert
-this location into a normal call to the ftrace trampoline that calls
-the early kprobe function. This will only be done during ftrace_init()
-when it tries to convert the calls to mcount or __fentry__ (not
-ftrace_caller) to nops. It will then convert it to ftrace_caller, if
-need be, or whatever.
+The disabled CPU then goes through the rest of the teardown, eventually
+calling PSCI_OFF to actually be shut down. 
 
-Perhaps that would be easier. Before doing the modifications, it could
-do a special register of ftrace to have the ftrace_regs_caller point to
-the early kprobe function and when its doing the modifications, it will
-be aware that there might be some locations that call the early kprobe
-function.
+We can then wait for the dying CPU to have been killed with
+AFFINITY_INFO (as with the current psci_cpu_kill implementation). As we
+can't initiate antoehr hotplug before this we can't race and migrate the
+TOS back to the original CPU.
 
-Basically what I'm saying is that this is a very special case. Don't
-try to over engineer this into something that can be expanded by other
-use cases. I rather not make this easy for other use cases to connect
-to the ftrace locations at early boot up. That's just opening a can of
-worms that are spoiled, and taste like bad sushi from a restaurant with
-lots of neon lights.
+> How does the secure side signal its rejection of hotunplugging of a CPU?
 
-I'm not against the idea of having early kprobes, but I'm not thrilled
-with the current implementation.
+It returns an error code in response to the PSCI MIGRATE call.
 
--- Steve
+> If it happens after __cpu_disable(), then that's a problem: the system
+> will have gone through all the expensive preparation by that time to
+> shut the CPU down, and it will expect the CPU to go offline.  The only
+> way it can come back at that point is by going through a CPU plug-in
+> cycle... which means going back through secondary_start_kernel.
+
+This would happen within __cpu_disable, as the current
+platform_cpu_disable() call does, before it's too late to abort the
+hotplug.
+
+Thanks,
+Mark.
