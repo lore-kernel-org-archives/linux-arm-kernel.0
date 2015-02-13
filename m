@@ -1,79 +1,34 @@
-From: bamvor.zhangjian@huawei.com (Bamvor Jian Zhang)
-Date: Fri, 13 Feb 2015 16:00:43 +0800
-Subject: [PATCH] compat: Fix endian issue in union sigval
-In-Reply-To: <20150211154054.GD9058@e104818-lin.cambridge.arm.com>
-References: <1423563011-12377-1-git-send-email-bamvor.zhangjian@huawei.com>
- <20150210122718.GC32052@e104818-lin.cambridge.arm.com>
- <54DB3B60.4050100@huawei.com>
- <20150211154054.GD9058@e104818-lin.cambridge.arm.com>
-Message-ID: <54DDAF2B.2070707@huawei.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Fri, 13 Feb 2015 09:09:20 +0100
+Subject: [PATCH 10/11] ARM: sti: always enable RESET_CONTROLLER
+In-Reply-To: <1423770163-583064-11-git-send-email-arnd@arndb.de>
+References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
+ <1423770163-583064-11-git-send-email-arnd@arndb.de>
+Message-ID: <54DDB130.9020600@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/2/11 23:40, Catalin Marinas wrote:
-> On Wed, Feb 11, 2015 at 07:22:08PM +0800, Bamvor Jian Zhang wrote:
->> On 2015/2/10 20:27, Catalin Marinas wrote:
->>> On Tue, Feb 10, 2015 at 10:10:11AM +0000, Zhang Jian(Bamvor) wrote:
-...
-> The native sigval_t is also a union but on 64-bit big endian, the
-> sival_int overlaps with the most significant 32-bit of the sival_ptr.
-> So reading sival_int would always be 0. When the compat siginfo is
-> copied to user, arm64 reads the native sival_ptr (si_ptr) and converts
-> it to the compat one, getting the correct 32-bit value. However, other
-> architectures access sival_int (si_int) instead which breaks with your
-> get_compat_sigevent() changes.
-> 
->>> I think the correct fix is in the arm64 code:
->>
->> The following code could fix my issue.
-> 
-> Without any parts of your patch?
-Yes. As you mentioned above, sival_int overlaps the most significant 32bit
-of the sival_ptr, it seems that your patch is right if sival_ptr is less than
-32bit.
+Hi Arnd,
+On 02/12/2015 08:42 PM, Arnd Bergmann wrote:
+> A lot of the sti device drivers require reset controller support,
+> but do not all have individual 'depends on RESET_CONTROLLER'
+> statements. Using 'select' here once avoids a lot of build errors
+> resulting from this.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Maxime Coquelin <maxime.coquelin@st.com>
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+> Cc: Patrice Chotard <patrice.chotard@st.com>
+> ---
+>   arch/arm/mach-sti/Kconfig | 1 +
+>   1 file changed, 1 insertion(+)
+>
 
-> I think that's correct fix since in the SIGEV_THREAD mq_notify case, we
-> would not deliver a signal as notification, so the sival_int value is
-> irrelevant (it would be 0 for big-endian compat tasks because of the
-> sigval_t union on 64-bit).
-> 
-> Your patch would work as well but you have to change all the other
-> architectures to use si_ptr when copying to a compat siginfo.
-Yeah, it seems that my patch is useful only if the sival_ptr is bigger
-than 32bit. It need the similar changes with following catalin's patch
-in the following 64bit architecture:
-x86:                 arch/x86/ia32/ia32_signal.c
-tile, s390:          arch/xxx/kernel/compat_signal.c
-parisc, sparc, mips: arch/xxx/kernel/signal32.c
-powerpc:             arch/xxx/kernel/signal_32.c
+I agree with you, the board is useless without all the drivers depending 
+on the resets.
 
-cc these maintainers for input.
+You can add my:
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-regards
-
-bamvor
-
->>> diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
->>> index e299de396e9b..32601939a3c8 100644
->>> --- a/arch/arm64/kernel/signal32.c
->>> +++ b/arch/arm64/kernel/signal32.c
->>> @@ -154,8 +154,7 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
->>>  	case __SI_TIMER:
->>>  		 err |= __put_user(from->si_tid, &to->si_tid);
->>>  		 err |= __put_user(from->si_overrun, &to->si_overrun);
->>> -		 err |= __put_user((compat_uptr_t)(unsigned long)from->si_ptr,
->>> -				   &to->si_ptr);
->>> +		 err |= __put_user(from->si_int, &to->si_int);
->>>  		break;
->>>  	case __SI_POLL:
->>>  		err |= __put_user(from->si_band, &to->si_band);
->>> @@ -184,7 +183,7 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
->>>  	case __SI_MESGQ: /* But this is */
->>>  		err |= __put_user(from->si_pid, &to->si_pid);
->>>  		err |= __put_user(from->si_uid, &to->si_uid);
->>> -		err |= __put_user((compat_uptr_t)(unsigned long)from->si_ptr, &to->si_ptr);
->>> +		err |= __put_user(from->si_int, &to->si_int);
->>>  		break;
->>>  	case __SI_SYS:
->>>  		err |= __put_user((compat_uptr_t)(unsigned long)
-> 
+Br,
+Maxime
