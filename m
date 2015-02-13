@@ -1,145 +1,85 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Fri, 13 Feb 2015 13:48:49 +0100
-Subject: [RFC PATCH] ARM: LL_DEBUG: Fix hang on i.MX53 when wrong port
- selected.
-Message-ID: <20150213124849.22919.14204.stgit@localhost>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Fri, 13 Feb 2015 22:22:02 +0900
+Subject: [PATCH 02/13] clk: mediatek: Add initial common clock support for
+ Mediatek SoCs.
+In-Reply-To: <20150213120613.GZ12209@pengutronix.de>
+References: <1423478845-2835-1-git-send-email-s.hauer@pengutronix.de>
+ <1423478845-2835-3-git-send-email-s.hauer@pengutronix.de>
+ <CAAFQd5APGYRSQzriBBB=-vDyMhQZe7k9zDPgxLwzcV2C6f9DJQ@mail.gmail.com>
+ <20150213120613.GZ12209@pengutronix.de>
+Message-ID: <CAAFQd5BxYNjsVpJnS+t=kZdXSdBTpgJii=T_qadRmMEzrR=dng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Attempts to access the i.MX53 UART data registers while the UART
-is not enabled cause the processor to hang.
+Hi Sascha,
 
-This can occur when CONFIG_LL_DEBUG is selected but
-CONFIG_DEBUG_IMX_UART_PORT does not correspond to the
-port enabled by the bootloader.
+On Fri, Feb 13, 2015 at 9:06 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>
+> Hi Tomasz,
+>
+>> > +static void mtk_cg_disable(struct clk_hw *hw)
+>> > +{
+>> > +       mtk_cg_set_bit(hw);
+>> > +}
+>> > +
+>> > +static int mtk_cg_enable_inv(struct clk_hw *hw)
+>> > +{
+>> > +       mtk_cg_set_bit(hw);
+>> > +
+>> > +       return 0;
+>> > +}
+>> > +
+>> > +static void mtk_cg_disable_inv(struct clk_hw *hw)
+>> > +{
+>> > +       mtk_cg_clr_bit(hw);
+>> > +}
+>>
+>> Instead of duplicating the ops, couldn't you add a flag or something
+>> to mtk_clk_gate struct and then act appropriately in the ops? Also,
+>> see below.
+>
+> I prefer duplicating the ops. It makes the functions simpler without
+> ifs.
 
-So, do not attempt to send any data if the port is not enabled.
+I meant something else. Compared to ifs I'd prefer duplicated ops too.
 
-Checking the enabled bit requires an extra scratch register.
-For the moment I have only added this to the imx version.
-Obviously, if this solution is acceptable, the register would have to be
-added to all the other implementations too in order to avoid breaking
-the build.
+is_enabled()
+{
+    status = regmap_read() ^ (inverted << shift);
+    return status & BIT(shift);
+}
 
-Hence RFC status for the moment to see if there are any better ideas.
+However I missed the fact that writing uses set and clear registers,
+which effectively means that this approach can't really be used for
+writing, so I'm okay with keeping this as is.
 
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
----
- arch/arm/boot/compressed/debug.S |    2 +-
- arch/arm/boot/compressed/head.S  |   16 ++++++++--------
- arch/arm/include/debug/imx.S     |   10 ++++++++--
- arch/arm/kernel/debug.S          |    2 +-
- 4 files changed, 18 insertions(+), 12 deletions(-)
+>
+>> > diff --git a/drivers/clk/mediatek/clk-gate.h b/drivers/clk/mediatek/clk-gate.h
+>> > new file mode 100644
+>> > index 0000000..a44dcbf
+>> > --- /dev/null
+>> > +++ b/drivers/clk/mediatek/clk-gate.h
+>> > @@ -0,0 +1,49 @@
+>> > +/*
+>> > + * Copyright (c) 2014 MediaTek Inc.
+>> > + * Author: James Liao <jamesjj.liao@mediatek.com>
+>>
+>> Might not be necessary, but maybe the other people (all or some of
+>> them) from signed-off-by should be added to this and other copyright
+>> statements?
+>
+> I rather do not want to update these copyrights frequently. Otherwise we
+> would see a lot of patches with an extra hunk changing the copyrights.
+> I'm glad we left that behind and look at the git history instead.
+> The above is the original author. I don't want to remove him, but I also
+> do not want to add every other person who touched that file.
 
-diff --git a/arch/arm/boot/compressed/debug.S b/arch/arm/boot/compressed/debug.S
-index 5392ee6..1f83297 100644
---- a/arch/arm/boot/compressed/debug.S
-+++ b/arch/arm/boot/compressed/debug.S
-@@ -8,7 +8,7 @@
- ENTRY(putc)
- 	addruart r1, r2, r3
- 	waituart r3, r1
--	senduart r0, r1
-+	senduart r0, r1, r3
- 	busyuart r3, r1
- 	mov	 pc, lr
- ENDPROC(putc)
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 132c70e..0a02301 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -26,19 +26,19 @@
- #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
- 		.macro	loadsp, rb, tmp
- 		.endm
--		.macro	writeb, ch, rb
-+		.macro	writeb, ch, rb, tmp
- 		mcr	p14, 0, \ch, c0, c5, 0
- 		.endm
- #elif defined(CONFIG_CPU_XSCALE)
- 		.macro	loadsp, rb, tmp
- 		.endm
--		.macro	writeb, ch, rb
-+		.macro	writeb, ch, rb, tmp
- 		mcr	p14, 0, \ch, c8, c0, 0
- 		.endm
- #else
- 		.macro	loadsp, rb, tmp
- 		.endm
--		.macro	writeb, ch, rb
-+		.macro	writeb, ch, rb, tmp
- 		mcr	p14, 0, \ch, c1, c0, 0
- 		.endm
- #endif
-@@ -47,8 +47,8 @@
- 
- #include CONFIG_DEBUG_LL_INCLUDE
- 
--		.macro	writeb,	ch, rb
--		senduart \ch, \rb
-+		.macro	writeb,	ch, rb, tmp
-+		senduart \ch, \rb, \tmp
- 		.endm
- 
- #if defined(CONFIG_ARCH_SA1100)
-@@ -870,7 +870,7 @@ proc_types:
- 		W(b)	__armv3_mpu_cache_on
- 		W(b)	__armv3_mpu_cache_off
- 		W(b)	__armv3_mpu_cache_flush
--		
-+
- 		.word	0x41009400		@ ARM94x
- 		.word	0xff00ff00
- 		W(b)	__armv4_mpu_cache_on
-@@ -1084,7 +1084,7 @@ __armv4_mpu_cache_flush:
- 		mcrne	p15, 0, ip, c7, c5, 0	@ invalidate I cache
- 		mcr	p15, 0, ip, c7, c10, 4	@ drain WB
- 		mov	pc, lr
--		
-+
- __fa526_cache_flush:
- 		tst	r4, #1
- 		movne	pc, lr
-@@ -1246,7 +1246,7 @@ puts:		loadsp	r3, r1
- 1:		ldrb	r2, [r0], #1
- 		teq	r2, #0
- 		moveq	pc, lr
--2:		writeb	r2, r3
-+2:		writeb	r2, r3, r1
- 		mov	r1, #0x00020000
- 3:		subs	r1, r1, #1
- 		bne	3b
-diff --git a/arch/arm/include/debug/imx.S b/arch/arm/include/debug/imx.S
-index 619d8cc..a04821c 100644
---- a/arch/arm/include/debug/imx.S
-+++ b/arch/arm/include/debug/imx.S
-@@ -33,8 +33,14 @@
- 		ldr	\rv, =UART_VADDR	@ virtual
- 		.endm
- 
--		.macro	senduart,rd,rx
--		str	\rd, [\rx, #0x40]	@ TXDATA
-+		.macro	senduart,rd,rx, tmp
-+/*
-+ * Data registers only accessible if uart enabled.
-+ * Check to prevent hangs if bootloader config does not match
-+ */
-+		ldr	\tmp, [\rx, #0x80]	@ CR1
-+		tst	\tmp, #1
-+		strne	\rd, [\rx, #0x40]	@ TXDATA
- 		.endm
- 
- 		.macro	waituart,rd,rx
-diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-index 78c91b5..5a360ab 100644
---- a/arch/arm/kernel/debug.S
-+++ b/arch/arm/kernel/debug.S
-@@ -81,7 +81,7 @@ ENTRY(printascii)
- 		addruart_current r3, r1, r2
- 		b	2f
- 1:		waituart r2, r3
--		senduart r1, r3
-+		senduart r1, r3, r2
- 		busyuart r2, r3
- 		teq	r1, #'\n'
- 		moveq	r1, #'\r'
+Alright. I just wanted to make sure that this is desired state.
+
+>
+> The other stuff will be fixed in the next round. Thanks for reviewing.
+
+You're welcome. Looking forward for next revision.
+
+Best regards,
+Tomasz
