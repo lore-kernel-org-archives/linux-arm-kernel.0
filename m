@@ -1,27 +1,52 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Fri, 13 Feb 2015 09:29:10 +0800
-Subject: [RFC PATCH v2 08/26] ftrace: enable other subsystems make ftrace
- nop before ftrace_init()
-In-Reply-To: <20150212123930.74d582d1@gandalf.local.home>
-References: <1423743476-11927-1-git-send-email-wangnan0@huawei.com>	<1423743591-12353-1-git-send-email-wangnan0@huawei.com>
- <20150212123930.74d582d1@gandalf.local.home>
-Message-ID: <54DD5366.1040805@huawei.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 13 Feb 2015 09:31:30 +0800 (HKT)
+Subject: [PATCH 01/11] ARM: vexpress: use ARM_CPU_SUSPEND if needed
+In-Reply-To: <1423770163-583064-2-git-send-email-arnd@arndb.de>
+References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
+ <1423770163-583064-2-git-send-email-arnd@arndb.de>
+Message-ID: <alpine.LFD.2.11.1502130930030.25300@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/2/13 1:39, Steven Rostedt wrote:
-> On Thu, 12 Feb 2015 20:19:51 +0800
-> Wang Nan <wangnan0@huawei.com> wrote:
-> 
-> The rest of the ftrace patches have no change logs, so I stopped my
-> review here.
-> 
-> -- Steve
-> 
+On Thu, 12 Feb 2015, Arnd Bergmann wrote:
 
-I'm very sorry for the mistake. I must in a very bad state when sending
-these patches.
+> The vexpress tc2 power management code calls mcpm_loopback, which
+> is only available if ARM_CPU_SUSPEND is enabled, otherwise we
+> get a link error:
+> 
+> arch/arm/mach-vexpress/built-in.o: In function `tc2_pm_init':
+> arch/arm/mach-vexpress/tc2_pm.c:389: undefined reference to `mcpm_loopback'
+> 
+> This explicitly selects ARM_CPU_SUSPEND like other platforms that
+> need it.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 3592d7e002438 ("ARM: 8082/1: TC2: test the MCPM loopback during boot")
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-I'll fix commit log immediately.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
->> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+> ---
+>  arch/arm/mach-vexpress/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+> index d6b16d9a7838..3c2509b4b694 100644
+> --- a/arch/arm/mach-vexpress/Kconfig
+> +++ b/arch/arm/mach-vexpress/Kconfig
+> @@ -73,6 +73,7 @@ config ARCH_VEXPRESS_TC2_PM
+>  	depends on MCPM
+>  	select ARM_CCI
+>  	select ARCH_VEXPRESS_SPC
+> +	select ARM_CPU_SUSPEND
+>  	help
+>  	  Support for CPU and cluster power management on Versatile Express
+>  	  with a TC2 (A15x2 A7x3) big.LITTLE core tile.
+> -- 
+> 2.1.0.rc2
+> 
+> 
