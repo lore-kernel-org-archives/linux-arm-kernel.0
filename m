@@ -1,72 +1,107 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 13 Feb 2015 17:42:54 +0100
-Subject: [PATCH 0/7] ARM: berlin: refactor the clock
-Message-ID: <1423845781-7480-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Fri, 13 Feb 2015 17:42:58 +0100
+Subject: [PATCH 4/7] Documentation: bindings: move the Berlin clock
+ documentation
+In-Reply-To: <1423845781-7480-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1423845781-7480-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1423845781-7480-5-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The Berlin clock documentation was part of the Marvell Berlin SoC
+documentation because the Berlin clock configuration was inside the
+chip controller. With the recent rework of the chip and system
+controller handling (now an MFD driver registers all sub-devices of the
+two soc and system controller nodes and each device has its own
+sub-node), the documentation of the Berlin clock driver can be moved to
+the generic clock documentation directory.
 
-Marvell Berlin SoCs have a chip control register set providing several
-individual registers dealing with various controllers (pinctrl, reset,
-clk). This chip controller is described by a single DT node since the
-individual registers are spread among the chip control register bank.
-
-Marvell Berlin also have a system control register set providing several
-individual registers for pinctrl or adc.
-
-A series was sent[1] to correctly handle these two nodes, by introducing
-a Berlin mfd controller driver. The series converted the existing
-pin-controller and reset drivers to take the changes into account.
-
-Because the Berlin clock driver was still working with the above
-modification, Berlin clock reworks were not included into the previous
-series. Also the clock reworks change some of the clock framework
-functions, so having a dedicated series helps.
-
-This series aims to convert the Berlin clock driver to use the proper
-way of dealing with the chip and system controller on Berlin SoCs. To do
-this changes were done in the clk-mux and clk-gate helpers so they can
-handle regmaps alongside iomem addresses.
-
-This series has been tested on the Marvell Berlin BG2Q DMP.
-
-This series is based on v3.19 and [1].
-
-Thanks!
-
-Antoine
-
-[1] https://lkml.org/lkml/2015/2/11/367
-
-
-Antoine Tenart (7):
-  clk: convert clock mux to accept regmap
-  clk: convert clock gate to accept regmap
-  clk: berlin: use regmap
-  Documentation: bindings: move the Berlin clock documentation
-  ARM: berlin: rework the clock node for BG2
-  ARM: berlin: rework the clock node for BG2CD
-  ARM: berlin: rework the clock node for BG2Q
-
- .../devicetree/bindings/arm/marvell,berlin.txt     |  35 -------
- .../devicetree/bindings/clock/marvell,berlin.txt   |  31 ++++++
- arch/arm/boot/dts/berlin2.dtsi                     |  43 ++++----
- arch/arm/boot/dts/berlin2cd.dtsi                   |  39 +++----
- arch/arm/boot/dts/berlin2q.dtsi                    |  53 +++++-----
- drivers/clk/berlin/berlin2-avpll.c                 |  72 +++++++------
- drivers/clk/berlin/berlin2-avpll.h                 |  13 ++-
- drivers/clk/berlin/berlin2-div.c                   |  82 +++++----------
- drivers/clk/berlin/berlin2-div.h                   |   4 +-
- drivers/clk/berlin/berlin2-pll.c                   |  16 +--
- drivers/clk/berlin/berlin2-pll.h                   |   7 +-
- drivers/clk/berlin/bg2.c                           | 112 +++++++++++----------
- drivers/clk/berlin/bg2q.c                          |  64 +++++++-----
- drivers/clk/clk-gate.c                             |  94 +++++++++++++----
- drivers/clk/clk-mux.c                              |  72 +++++++++++--
- include/linux/clk-provider.h                       |  51 ++++++++--
- 16 files changed, 467 insertions(+), 321 deletions(-)
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ .../devicetree/bindings/arm/marvell,berlin.txt     | 35 ----------------------
+ .../devicetree/bindings/clock/marvell,berlin.txt   | 31 +++++++++++++++++++
+ 2 files changed, 31 insertions(+), 35 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/clock/marvell,berlin.txt
 
+diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+index 080953daf9f5..7f9b3ccdf25b 100644
+--- a/Documentation/devicetree/bindings/arm/marvell,berlin.txt
++++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+@@ -39,38 +39,3 @@ cpu-ctrl at f7dd0000 {
+ 	compatible = "marvell,berlin-cpu-ctrl";
+ 	reg = <0xf7dd0000 0x10000>;
+ };
+-
+-* Clock provider binding
+-
+-As clock related registers are spread among the chip control registers, the
+-chip control node also provides the clocks. Marvell Berlin2 (BG2, BG2CD, BG2Q)
+-SoCs share the same IP for PLLs and clocks, with some minor differences in
+-features and register layout.
+-
+-Required properties:
+-- #clock-cells: shall be set to 1
+-- clocks: clock specifiers referencing the core clock input clocks
+-- clock-names: array of strings describing the input clock specifiers above.
+-    Allowed clock-names for the reference clocks are
+-      "refclk" for the SoCs osciallator input on all SoCs,
+-    and SoC-specific input clocks for
+-      BG2/BG2CD: "video_ext0" for the external video clock input
+-
+-Clocks provided by core clocks shall be referenced by a clock specifier
+-indexing one of the provided clocks. Refer to dt-bindings/clock/berlin<soc>.h
+-for the corresponding index mapping.
+-
+-Example:
+-
+-chip: chip-control at ea0000 {
+-	compatible = "marvell,berlin2-chip-ctrl";
+-	#clock-cells = <1>;
+-	reg = <0xea0000 0x400>;
+-	clocks = <&refclk>, <&externaldev 0>;
+-	clock-names = "refclk", "video_ext0";
+-};
+-
+-sysctrl: system-controller at d000 {
+-	compatible = "marvell,berlin2-system-ctrl";
+-	reg = <0xd000 0x100>;
+-};
+diff --git a/Documentation/devicetree/bindings/clock/marvell,berlin.txt b/Documentation/devicetree/bindings/clock/marvell,berlin.txt
+new file mode 100644
+index 000000000000..c611c495f3ff
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/marvell,berlin.txt
+@@ -0,0 +1,31 @@
++Device Tree Clock bindings for Marvell Berlin
++
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Clock related registers are spread among the chip control registers. Berlin
++clock node should be a sub-node of the chip controller node. Marvell Berlin2
++(BG2, BG2CD, BG2Q) SoCs share the same IP for PLLs and clocks, with some
++minor differences in features and register layout.
++
++Required properties:
++- compatible: must be "marvell,berlin2-clk" or "marvell,berlin2q-clk"
++- #clock-cells: must be 1
++- clocks: must be the input parent clock phandle
++- clock-names: name of the input parent clock
++	Allowed clock-names for the reference clocks are
++	"refclk" for the SoCs oscillator input on all SoCs,
++	and SoC-specific input clocks for
++	BG2/BG2CD: "video_ext0" for the external video clock input
++
++
++Example:
++
++chip_clk: clock {
++	compatible = "marvell,berlin2q-clk";
++
++	#clock-cells = <1>;
++	clocks = <&refclk>;
++	clock-names = "refclk";
++};
 -- 
 2.3.0
