@@ -1,97 +1,49 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 13 Feb 2015 19:51:16 +0100
-Subject: [PATCH 03/16] tty: serial: 8250_core: read only RX if there is
- something in the FIFO
-In-Reply-To: <54DD053A.8060905@hurleysoftware.com>
-References: <54D9441B.7070403@hurleysoftware.com> <54D9F3C7.5000809@freebox.fr>
- <54DA43F8.9090904@hurleysoftware.com>
- <54DBB531.2030504@hurleysoftware.com>
- <20150211200313.GE2531@atomide.com>
- <54DBBE9E.90104@hurleysoftware.com>
- <54DC6832.3070507@linutronix.de>
- <54DCD584.3010500@hurleysoftware.com>
- <20150212192333.GA18882@linutronix.de>
- <54DD053A.8060905@hurleysoftware.com>
-Message-ID: <20150213185115.GF5482@linutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 13 Feb 2015 19:57:13 +0100
+Subject: [PATCH RFC v9 01/20] clk: divider: Correct parent clk round rate
+ if no bestdiv is normally found
+In-Reply-To: <54DE0BB8.7070004@ti.com>
+References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
+ <1423720903-24806-2-git-send-email-Ying.Liu@freescale.com>
+ <20150212093356.GR12209@pengutronix.de>
+ <20150212103944.GA1290@victor>
+ <20150212122405.GW12209@pengutronix.de>
+ <20150212125646.GT8656@n2100.arm.linux.org.uk>
+ <20150212134131.GX12209@pengutronix.de> <54DE0BB8.7070004@ti.com>
+Message-ID: <20150213185713.GA12209@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Something like this maybe?
+On Fri, Feb 13, 2015 at 04:35:36PM +0200, Tomi Valkeinen wrote:
+> On 12/02/15 15:41, Sascha Hauer wrote:
+> 
+> > Tomis patch is based on the assumption that clk_set_rate(clk_round_rate(rate))
+> > is equal to clk_round_rate(rate). So when this assumption is wrong then
+> > it should simply be reverted.
+> 
+> When is it not equal?
+> 
+> I agree that doing clk_set_rate(clk, clk_round_rate(clk, rate)) is
+> pointless, but shouldn't it still work?
+> 
+> And we can forget about clk_round_rate. Without my patch, this would
+> behave oddly also:
+> 
+> rate = clk_get_rate(clk);
+> clk_set_rate(clk, rate);
+> 
+> The end result could be something else than 'rate'.
 
-Subject: [PATCH] serial: 8250: skip empty RX-read only on OMAP
+I agree that it's a bit odd, but I think it has to be like this.
+Consider that you request a rate of 100Hz, but the clock can only
+produce 99.5Hz, so due to rounding clk_round_rate() returns 99Hz.
+Now when you request 99Hz from clk_set_rate() the 99.5Hz value
+can't be used because it's too high.
 
-The conditional RX-FIFO read seems to cause spurious interrupts and we
-see just:
-|serial8250: too much work for irq29
+Sascha
 
-The previous behaviour was "default" for decades and Marvell's 88f6282 SoC
-might not be the only that relies on it. Therefore this patch moves this
-special OMAP3630 behaviour befind a BUG field.
-
-Fixes: 0aa525d11859 ("tty: serial: 8250_core: read only RX if there is
-       something in the FIFO")
-
-Reported-By: Nicolas Schichan <nschichan@freebox.fr>
-Debuged-By: Peter Hurley <peter@hurleysoftware.com>
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
- drivers/tty/serial/8250/8250.h      |  1 +
- drivers/tty/serial/8250/8250_core.c | 10 ++++++++--
- drivers/tty/serial/8250/8250_omap.c |  1 +
- 3 files changed, 10 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/tty/serial/8250/8250.h b/drivers/tty/serial/8250/8250.h
-index b00836851061..b6899fd69c7e 100644
---- a/drivers/tty/serial/8250/8250.h
-+++ b/drivers/tty/serial/8250/8250.h
-@@ -84,6 +84,7 @@ struct serial8250_config {
- #define UART_BUG_NOMSR	(1 << 2)	/* UART has buggy MSR status bits (Au1x00) */
- #define UART_BUG_THRE	(1 << 3)	/* UART has buggy THRE reassertion */
- #define UART_BUG_PARITY	(1 << 4)	/* UART mishandles parity if FIFO enabled */
-+#define UART_BUG_RXEMPT	(1 << 5)	/* UART can not read empty FIFO */
- 
- #define PROBE_RSA	(1 << 0)
- #define PROBE_ANY	(~0)
-diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-index e3b9570a1eff..185386178023 100644
---- a/drivers/tty/serial/8250/8250_core.c
-+++ b/drivers/tty/serial/8250/8250_core.c
-@@ -2137,8 +2137,13 @@ int serial8250_do_startup(struct uart_port *port)
- 
- 	/*
- 	 * Clear the interrupt registers.
-+	 *
-+	 * This (and later) unsolicied read of the RX FIFO seems to clear the
-+	 * RX timeout condition which otherwise generates spurious interrupt.
-+	 * This behaviour has been observed on Marvell's 88f6282 SoC.
- 	 */
--	if (serial_port_in(port, UART_LSR) & UART_LSR_DR)
-+	if (!(up->bugs & UART_BUG_RXEMPT) ||
-+	    (serial_port_in(port, UART_LSR) & UART_LSR_DR))
- 		serial_port_in(port, UART_RX);
- 	serial_port_in(port, UART_IIR);
- 	serial_port_in(port, UART_MSR);
-@@ -2300,7 +2305,8 @@ int serial8250_do_startup(struct uart_port *port)
- 	 * saved flags to avoid getting false values from polling
- 	 * routines or the previous session.
- 	 */
--	if (serial_port_in(port, UART_LSR) & UART_LSR_DR)
-+	if (!(up->bugs & UART_BUG_RXEMPT) ||
-+	    (serial_port_in(port, UART_LSR) & UART_LSR_DR))
- 		serial_port_in(port, UART_RX);
- 	serial_port_in(port, UART_IIR);
- 	serial_port_in(port, UART_MSR);
-diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
-index fe6d2e51da09..a7ead2fa6a32 100644
---- a/drivers/tty/serial/8250/8250_omap.c
-+++ b/drivers/tty/serial/8250/8250_omap.c
-@@ -1021,6 +1021,7 @@ static int omap8250_probe(struct platform_device *pdev)
- 	up.port.fifosize = 64;
- 	up.tx_loadsz = 64;
- 	up.capabilities = UART_CAP_FIFO;
-+	up.bugs = UART_BUG_RXEMPT;
- #ifdef CONFIG_PM
- 	/*
- 	 * Runtime PM is mostly transparent. However to do it right we need to a
 -- 
-2.1.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
