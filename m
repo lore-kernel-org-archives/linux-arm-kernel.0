@@ -1,35 +1,65 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 13 Feb 2015 18:12:43 +0200
-Subject: [PATCHv2 24/33] ARM: OMAP2+: id: cache omap_type value
+Date: Fri, 13 Feb 2015 18:12:45 +0200
+Subject: [PATCHv2 26/33] ARM: dts: am4372: add syscon support to control
+ module node
 In-Reply-To: <1423843973-6050-1-git-send-email-t-kristo@ti.com>
 References: <1423843973-6050-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1423843973-6050-22-git-send-email-t-kristo@ti.com>
+Message-ID: <1423843973-6050-24-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to read the register with every invocation of the function,
-as the value is constant. Thus, cache the value in a static variable.
+Control module will be converted to use syscon, thus add compatible
+string for this. Also, remove the existing duplicate syscon entries
+at the same time, and change the users of these to use the real
+control module syscon.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/id.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/am4372.dtsi |   11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index c25feba..3ce76a7 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -52,7 +52,10 @@ EXPORT_SYMBOL(omap_rev);
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index b62a1cd..4bf029e 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -57,11 +57,6 @@
+ 		cache-level = <2>;
+ 	};
  
- int omap_type(void)
- {
--	u32 val = 0;
-+	static u32 val = OMAP2_DEVICETYPE_MASK + 1;
-+
-+	if (val < OMAP2_DEVICETYPE_MASK)
-+		return val;
+-	am43xx_control_module: control_module at 4a002000 {
+-		compatible = "syscon";
+-		reg = <0x44e10000 0x7f4>;
+-	};
+-
+ 	am43xx_pinmux: pinmux at 44e10800 {
+ 		compatible = "ti,am437-padconf", "pinctrl-single";
+ 		reg = <0x44e10800 0x31c>;
+@@ -98,7 +93,7 @@
+ 		};
  
- 	if (cpu_is_omap24xx()) {
- 		val = omap_ctrl_readl(OMAP24XX_CONTROL_STATUS);
+ 		scrm: scrm at 44e10000 {
+-			compatible = "ti,am4-scrm";
++			compatible = "ti,am4-scrm", "syscon";
+ 			reg = <0x44e10000 0x2000>;
+ 
+ 			scrm_clocks: clocks {
+@@ -933,7 +928,7 @@
+ 			clocks = <&dcan0_fck>;
+ 			clock-names = "fck";
+ 			reg = <0x481cc000 0x2000>;
+-			syscon-raminit = <&am43xx_control_module 0x644 0>;
++			syscon-raminit = <&scrm 0x644 0>;
+ 			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
+ 		};
+@@ -944,7 +939,7 @@
+ 			clocks = <&dcan1_fck>;
+ 			clock-names = "fck";
+ 			reg = <0x481d0000 0x2000>;
+-			syscon-raminit = <&am43xx_control_module 0x644 1>;
++			syscon-raminit = <&scrm 0x644 1>;
+ 			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
+ 		};
 -- 
 1.7.9.5
