@@ -1,81 +1,55 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Fri, 13 Feb 2015 15:17:16 +0800
-Subject: [PATCH v2] xen/arm: allow console=hvc0 to be omitted for guests
-In-Reply-To: <CAKv+Gu-KErA+NxX2ctZmrjKYTLYLbGvGiqbEXkowvNbCGF65Bw@mail.gmail.com>
-References: <1423740543-6168-1-git-send-email-ard.biesheuvel@linaro.org>	<54DDA1D2.5010001@linaro.org>
- <CAKv+Gu-KErA+NxX2ctZmrjKYTLYLbGvGiqbEXkowvNbCGF65Bw@mail.gmail.com>
-Message-ID: <54DDA4FC.6050307@linaro.org>
+From: addy.ke@rock-chips.com (Addy Ke)
+Date: Fri, 13 Feb 2015 15:22:20 +0800
+Subject: [PATCH] mmc: dw_mmc: rockchip: add support MMC_CAP_RUNTIME_RESUME
+ capability
+Message-ID: <1423812140-24196-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+To support HS200 and UHS mode, mmc core will call init_card() to
+execute tuning:
+- sdio: init_card can be executed at runtime resume.
+- sd and mmc: init_card can be executed at resume or runtime resume,
+  which depends on MMC_CAP_RUNTIME_RESUME capability.
 
+On rk3288 SoC, host will get DRTO interrupt when host send command
+to read tuning data. This will spend more than 111ms:
+drto_ms = drto_clks * 1000 / bus_hz = 111ms.
 
-On 13/02/2015 15:12, Ard Biesheuvel wrote:
-> On 13 February 2015 at 15:03, Julien Grall <julien.grall@linaro.org> wrote:
->> Hi Ard,
->>
->>
->> On 12/02/2015 19:29, Ard Biesheuvel wrote:
->>>
->>> This patch registers hvc0 as the preferred console if no console
->>> has been specified explicitly on the kernel command line.
->>>
->>> The purpose is to allow platform agnostic kernels and boot images
->>> (such as distro installers) to boot in a Xen/ARM domU without the
->>> need to modify the command line by hand.
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>>    arch/arm/xen/enlighten.c | 4 ++++
->>>    1 file changed, 4 insertions(+)
->>>
->>> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
->>> index 0abeefa7dbf8..927be1d1bad7 100644
->>> --- a/arch/arm/xen/enlighten.c
->>> +++ b/arch/arm/xen/enlighten.c
->>> @@ -24,6 +24,7 @@
->>>    #include <linux/cpuidle.h>
->>>    #include <linux/cpufreq.h>
->>>    #include <linux/cpu.h>
->>> +#include <linux/console.h>
->>>
->>>    #include <linux/mm.h>
->>>
->>> @@ -255,6 +256,9 @@ void __init xen_early_init(void)
->>>                  xen_start_info->flags |= SIF_INITDOMAIN|SIF_PRIVILEGED;
->>>          else
->>>                  xen_start_info->flags &= ~(SIF_INITDOMAIN|SIF_PRIVILEGED);
->>> +
->>> +       if (!console_set_on_cmdline && !xen_initial_domain())
->>> +               add_preferred_console("hvc", 0, NULL);
->>
->>
->> Unfortunately, this won't work as expected.
->>
->
-> Did you try it?
+And the total tuning time will be more than 400ms.
 
-No just looked at the code.
+So we should add MMC_CAP_RUNTIME_RESUME capability to execute tuning
+at runtime resume. Only if we do so, can we pass resume test.
 
->> console_set_on_cmdline is set when Linux parses the early params. The
->> parsing is done after setup_arch (the function which call xen_early_init).
->>
->> So we will end up to add the HVC console even if a console has been passed
->> on the command line.
->>
->
-> parse_early_param() is also called by setup_arch(), before xen_early_init()
->
-> The call to parse_early_param() in generic code is only there for
-> architectures that don't call it in their setup_arch()
+Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+---
+ drivers/mmc/host/dw_mmc-rockchip.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Oh, right. Sorry for the noise.
-
-So:
-
-Reviewed-by: Julien Grall <julien.grall@linaro.org>
-
-Regards,
-
+diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
+index e2a726a..e5f57b5 100644
+--- a/drivers/mmc/host/dw_mmc-rockchip.c
++++ b/drivers/mmc/host/dw_mmc-rockchip.c
+@@ -76,12 +76,20 @@ static int dw_mci_rockchip_init(struct dw_mci *host)
+ 	return 0;
+ }
+ 
++/* Common capabilities of RK3288 SoC */
++static unsigned long dw_mci_rk3288_dwmmc_caps[4] = {
++	MMC_CAP_RUNTIME_RESUME, /* emmc */
++	MMC_CAP_RUNTIME_RESUME, /* sdmmc */
++	0, /* sdio0 */
++	0, /* sdio1 */
++};
+ static const struct dw_mci_drv_data rk2928_drv_data = {
+ 	.prepare_command        = dw_mci_rockchip_prepare_command,
+ 	.init			= dw_mci_rockchip_init,
+ };
+ 
+ static const struct dw_mci_drv_data rk3288_drv_data = {
++	.caps			= dw_mci_rk3288_dwmmc_caps,
+ 	.prepare_command        = dw_mci_rockchip_prepare_command,
+ 	.set_ios		= dw_mci_rk3288_set_ios,
+ 	.setup_clock    = dw_mci_rk3288_setup_clock,
 -- 
-Julien Grall
+1.8.3.2
