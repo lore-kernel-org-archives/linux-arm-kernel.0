@@ -1,68 +1,48 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 13 Feb 2015 09:37:05 +0100
-Subject: [PATCH 06/11] ARM: at91: fix pm declarations
-In-Reply-To: <1423770163-583064-7-git-send-email-arnd@arndb.de>
-References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
- <1423770163-583064-7-git-send-email-arnd@arndb.de>
-Message-ID: <54DDB7B1.2020800@atmel.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Fri, 13 Feb 2015 09:42:46 +0100
+Subject: [PATCH 02/14] ARM: ARMv7M: Enlarge vector table to 256 entries
+In-Reply-To: <CAMuHMdWESyPktOSBfVoZCb35stUbhNpbbpzSW4JfORdObgg5jw@mail.gmail.com>
+References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1423763164-5606-3-git-send-email-mcoquelin.stm32@gmail.com>
+ <CAMuHMdWESyPktOSBfVoZCb35stUbhNpbbpzSW4JfORdObgg5jw@mail.gmail.com>
+Message-ID: <CALszF6BDa9pUb534YN2z9DbYA+hPCnG8XYy5YbjJwSiseKz4xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/02/2015 20:42, Arnd Bergmann a ?crit :
-> In a recent rearrangement of the at91 pm initialization code, a broken
-> set of declarations was added for the !CONFIG_PM-case, leading to
-> this link error:
-> 
-> arch/arm/mach-at91/board-dt-sama5.o: In function `at91_rm9200_pm_init':
-> arch/arm/mach-at91/generic.h:40: multiple definition of `at91_rm9200_pm_init'
-> arch/arm/mach-at91/setup.o:arch/arm/mach-at91/generic.h:40: first defined here
-> arch/arm/mach-at91/board-dt-sama5.o: In function `at91_sam9260_pm_init':
-> arch/arm/mach-at91/generic.h:41: multiple definition of `at91_sam9260_pm_init'
-> arch/arm/mach-at91/setup.o:arch/arm/mach-at91/generic.h:41: first defined here
-> arch/arm/mach-at91/board-dt-sama5.o: In function `at91_sam9g45_pm_init':
-> arch/arm/mach-at91/generic.h:42: multiple definition of `at91_sam9g45_pm_init'
-> arch/arm/mach-at91/setup.o:arch/arm/mach-at91/generic.h:42: first defined here
-> 
-> This adds the missing 'static inline' to the declarations to avoid
-> creating a copy of the functions in each file that includes the
-> header.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 4db0ba22da9 ("ARM: at91: pm: prepare for multiplatform")
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Hi Geert,
 
-Yes:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+2015-02-12 21:34 GMT+01:00 Geert Uytterhoeven <geert@linux-m68k.org>:
+> On Thu, Feb 12, 2015 at 6:45 PM, Maxime Coquelin
+> <mcoquelin.stm32@gmail.com> wrote:
+>> From Cortex-M4 and M7 reference manuals, the nvic supports up to 240
+>> interrupts. So the number of entries in vectors table is 256.
+>>
+>> This patch adds the missing entries, and change the alignement, so that
+>> vector_table remains naturally aligned.
+>
+> Shouldn't this depend on ARCH_STM32, or some other M4 or M7 specific
+> Kconfig option, to avoid wasting the space on other CPUs?
 
-Thanks Arnd. Bye,
+Actually, the STM32F429 has 90 interrupts, so it would need 106
+entries in the vector table.
+The maximum of supported interrupts is not only for Cortex-M4 and M7,
+this is also true for Cortex-M3.
 
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  arch/arm/mach-at91/generic.h | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-> index a6e726a6e0b5..583369ffc284 100644
-> --- a/arch/arm/mach-at91/generic.h
-> +++ b/arch/arm/mach-at91/generic.h
-> @@ -35,10 +35,10 @@ extern void __init at91sam9260_pm_init(void);
->  extern void __init at91sam9g45_pm_init(void);
->  extern void __init at91sam9x5_pm_init(void);
->  #else
-> -void __init at91rm9200_pm_init(void) { }
-> -void __init at91sam9260_pm_init(void) { }
-> -void __init at91sam9g45_pm_init(void) { }
-> -void __init at91sam9x5_pm_init(void) { }
-> +static inline void __init at91rm9200_pm_init(void) { }
-> +static inline void __init at91sam9260_pm_init(void) { }
-> +static inline void __init at91sam9g45_pm_init(void) { }
-> +static inline void __init at91sam9x5_pm_init(void) { }
->  #endif
->  
->  #endif /* _AT91_GENERIC_H */
-> 
+I see two possibilities:
+ 1 - We declare the vector table for the maximum supported number of
+IRQs, as this patch does.
+        - Pro: it will be functionnal with all Cortex-M MCUs
+        - Con: Waste of less than 1KB for memory
+ 2 - We introduce a config flag that provides the number of interrupts
+        - Pro: No more memory waste
+        - Con: Need to declare a per MCU model config flag.
 
+Then, regarding the natural alignment, is there a way to ensure it
+depending on the value of a config flag?
+Or we should keep it at the maximum value possible?
 
--- 
-Nicolas Ferre
+Any feedback will be appreciated, especially from Uwe who maintains
+the efm32 machine.
+
+Kind regards,
+Maxime
