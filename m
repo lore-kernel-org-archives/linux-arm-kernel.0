@@ -1,51 +1,82 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Fri, 13 Feb 2015 17:00:24 +0100
-Subject: [PATCH 04/14] reset: Add reset_controller_of_init() function
-In-Reply-To: <1423828144.4182.18.camel@pengutronix.de>
-References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1423763164-5606-5-git-send-email-mcoquelin.stm32@gmail.com>
- <1423828144.4182.18.camel@pengutronix.de>
-Message-ID: <CALszF6BVOv40fBTMU8tsnrFXuFPMFHpToZb7O8mRXQQpmsW4eg@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 13 Feb 2015 10:01:29 -0600
+Subject: [PATCH 0/9] ARM: DRA7: add display support
+In-Reply-To: <1423840286-18377-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1423840286-18377-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <54DE1FD9.6030801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On 02/13/2015 09:11 AM, Tomi Valkeinen wrote:
+> Hi,
+> 
+> This series adds the arch/arm/ side of the display support for DRA7 (DRA72x,
+> DRA74x, AM54xx) SoCs. Also support for HDMI output on x15 and DRA72 EVM boards
+> is added.
+> 
+> The series is based on OMAPDSS driver patches in fbdev changes for 3.20, which
+> have been merged to Linus' tree.
+> 
+> The changes are very similar to OMAP5 DSS. All the other patches look fine to
+> me except the "RFC: ARM: DRA7: enable DSS_DESHDCP_CLKEN". That's been discussed
+> earlier with Paul and Tero, but I don't think we have any good solution for it
+> yet.
 
-2015-02-13 12:49 GMT+01:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> Hi Maxime,
->
-> Am Donnerstag, den 12.02.2015, 18:45 +0100 schrieb Maxime Coquelin:
->> Some platforms need to initialize the reset controller before the timers.
->>
->> This patch introduces a reset_controller_of_init() function that can be
->> called before the timers intialization.
->>
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> ---
->>  drivers/reset/core.c              | 20 ++++++++++++++++++++
->>  include/asm-generic/vmlinux.lds.h |  4 +++-
->>  include/linux/reset-controller.h  |  6 ++++++
->>  3 files changed, 29 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/reset/core.c b/drivers/reset/core.c
->> index 7955e00..18ee579 100644
->> --- a/drivers/reset/core.c
->> +++ b/drivers/reset/core.c
->> @@ -86,6 +86,26 @@ void reset_controller_unregister(struct reset_controller_dev *rcdev)
->>  }
->>  EXPORT_SYMBOL_GPL(reset_controller_unregister);
->>
->> +extern struct of_device_id __reset_ctrl_of_table[];
->> +
->> +static const struct of_device_id __reset_ctrl_of_table_sentinel
->> +     __used __section(__reset_ctrl_of_table_end);
->> +
->> +void __init reset_controller_of_init(void)
->
-> The patch looks fine to me, but this function is missing a kerneldoc
-> comment.
+Is there some specific tag I can test this on (some next perhaps?), I
+get the following error:
+build fail, Error:
+arch/arm/mach-omap2/display.c: In function ?omap_display_get_version?:
+arch/arm/mach-omap2/display.c:285:10: error: ?OMAPDSS_VER_DRA7xx?
+undeclared (first use in this function)
+arch/arm/mach-omap2/display.c:285:10: note: each undeclared identifier
+is reported only once for each function it appears in
+arch/arm/mach-omap2/display.c:288:1: warning: control reaches end of
+non-void function [-Wreturn-type]
+make[1]: *** [arch/arm/mach-omap2/display.o] Error 1
+make: *** [arch/arm/mach-omap2] Error 2
+make: *** Waiting for unfinished jobs....
 
-Right! It will be fixed in the v2.
 
-Thanks,
-Maxime
+Further are you proposing this for 3.20 or 3.21 window? 3.20, we seem
+to have already missed.
+
+
+> 
+>  Tomi
+> 
+> Tomi Valkeinen (9):
+>   arm/dts: dra7xx: add 'ti,set-rate-parent' for dss_dss_clk
+^^
+>   ARM: DRA7: hwmod: add DMM hwmod description
+>   ARM: DRA7: hwmod: set DSS submodule parent hwmods
+>   ARM: OMAP: display: change compat names to array
+>   ARM: OMAP2+: display: detect DRA7 DSS
+>   arm/dts: dra7.dtsi: add DSS support
+^^
+>   arm/dts: dra72-evm.dts: add HDMI
+^^
+>   arm/dts: am57xx-beagle-x15.dts: add HDMI
+
+ARM: dts: am57xx-beagle-x15: Add HDMI
+
+Would be good to follow above convention for all dts patches $subject.
+
+
+>   RFC: ARM: DRA7: enable DSS_DESHDCP_CLKEN
+> 
+>  arch/arm/boot/dts/am57xx-beagle-x15.dts   |  80 +++++++++++++++++++++
+>  arch/arm/boot/dts/dra7.dtsi               |  38 ++++++++++
+>  arch/arm/boot/dts/dra72-evm.dts           | 111 ++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/dra72x.dtsi             |  11 +++
+>  arch/arm/boot/dts/dra74x.dtsi             |  15 ++++
+>  arch/arm/boot/dts/dra7xx-clocks.dtsi      |   1 +
+>  arch/arm/mach-omap2/display.c             |  32 +++++----
+>  arch/arm/mach-omap2/io.c                  |  11 +++
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  32 +++++++++
+>  9 files changed, 316 insertions(+), 15 deletions(-)
+> 
+
+
+-- 
+Regards,
+Nishanth Menon
