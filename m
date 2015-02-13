@@ -1,50 +1,152 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Fri, 13 Feb 2015 13:40:53 +0800
-Subject: [RFC PATCH v3 15/26] early kprobes: x86: directly modify code.
+Date: Fri, 13 Feb 2015 13:40:56 +0800
+Subject: [RFC PATCH v3 16/26] early kprobes: x86: introduce early kprobes
+ related code area.
 In-Reply-To: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
 References: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1423806053-62111-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1423806056-62154-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When registering early kprobes, SMP should has not been enabled, so
-doesn't require synchronization in text_poke_bp(). Simply memcpy is
-enough.
+This patch introduces EARLY_KPROBES_CODES_AREA into x86 vmlinux for
+early kprobes.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
 ---
- arch/x86/kernel/kprobes/opt.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ arch/x86/include/asm/insn.h    |  7 ++++---
+ arch/x86/include/asm/kprobes.h | 47 +++++++++++++++++++++++++++++++++++-------
+ arch/x86/kernel/vmlinux.lds.S  |  2 ++
+ 3 files changed, 45 insertions(+), 11 deletions(-)
 
-diff --git a/arch/x86/kernel/kprobes/opt.c b/arch/x86/kernel/kprobes/opt.c
-index 0dd8d08..21847ab 100644
---- a/arch/x86/kernel/kprobes/opt.c
-+++ b/arch/x86/kernel/kprobes/opt.c
-@@ -36,6 +36,7 @@
- #include <asm/alternative.h>
- #include <asm/insn.h>
- #include <asm/debugreg.h>
-+#include <asm/tlbflush.h>
+diff --git a/arch/x86/include/asm/insn.h b/arch/x86/include/asm/insn.h
+index 47f29b1..ea6f318 100644
+--- a/arch/x86/include/asm/insn.h
++++ b/arch/x86/include/asm/insn.h
+@@ -20,6 +20,9 @@
+  * Copyright (C) IBM Corporation, 2009
+  */
  
- #include "common.h"
++#define MAX_INSN_SIZE	16
++
++#ifndef __ASSEMBLY__
+ /* insn_attr_t is defined in inat.h */
+ #include <asm/inat.h>
  
-@@ -397,8 +398,15 @@ void arch_optimize_kprobes(struct list_head *oplist)
- 		insn_buf[0] = RELATIVEJUMP_OPCODE;
- 		*(s32 *)(&insn_buf[1]) = rel;
+@@ -69,8 +72,6 @@ struct insn {
+ 	const insn_byte_t *next_byte;
+ };
  
--		text_poke_bp(op->kp.addr, insn_buf, RELATIVEJUMP_SIZE,
--			     op->optinsn.insn);
-+		if (unlikely(kprobes_is_early())) {
-+			BUG_ON(!(op->kp.flags & KPROBE_FLAG_EARLY));
-+			memcpy(op->kp.addr, insn_buf, RELATIVEJUMP_SIZE);
-+			local_flush_tlb();
-+			sync_core();
-+		} else {
-+			text_poke_bp(op->kp.addr, insn_buf, RELATIVEJUMP_SIZE,
-+				     op->optinsn.insn);
-+		}
+-#define MAX_INSN_SIZE	16
+-
+ #define X86_MODRM_MOD(modrm) (((modrm) & 0xc0) >> 6)
+ #define X86_MODRM_REG(modrm) (((modrm) & 0x38) >> 3)
+ #define X86_MODRM_RM(modrm) ((modrm) & 0x07)
+@@ -197,5 +198,5 @@ static inline int insn_offset_immediate(struct insn *insn)
+ {
+ 	return insn_offset_displacement(insn) + insn->displacement.nbytes;
+ }
+-
++#endif /* __ASSEMBLY__ */
+ #endif /* _ASM_X86_INSN_H */
+diff --git a/arch/x86/include/asm/kprobes.h b/arch/x86/include/asm/kprobes.h
+index 4421b5d..6a6066a 100644
+--- a/arch/x86/include/asm/kprobes.h
++++ b/arch/x86/include/asm/kprobes.h
+@@ -21,23 +21,54 @@
+  *
+  * See arch/x86/kernel/kprobes.c for x86 kprobes history.
+  */
+-#include <linux/types.h>
+-#include <linux/ptrace.h>
+-#include <linux/percpu.h>
+-#include <asm/insn.h>
  
- 		list_del_init(&op->list);
- 	}
+ #define  __ARCH_WANT_KPROBES_INSN_SLOT
+ 
+-struct pt_regs;
+-struct kprobe;
++#include <linux/types.h>
++#include <asm/insn.h>
+ 
+-typedef u8 kprobe_opcode_t;
+ #define BREAKPOINT_INSTRUCTION	0xcc
+ #define RELATIVEJUMP_OPCODE 0xe9
+ #define RELATIVEJUMP_SIZE 5
+ #define RELATIVECALL_OPCODE 0xe8
+ #define RELATIVE_ADDR_SIZE 4
+ #define MAX_STACK_SIZE 64
++#define MAX_OPTIMIZED_LENGTH (MAX_INSN_SIZE + RELATIVE_ADDR_SIZE)
++
++#ifdef __ASSEMBLY__
++
++#define KPROBE_OPCODE_SIZE     1
++#define MAX_OPTINSN_SIZE ((optprobe_template_end - optprobe_template_entry) + \
++	MAX_OPTIMIZED_LENGTH + RELATIVEJUMP_SIZE)
++
++#ifdef CONFIG_EARLY_KPROBES
++# define EARLY_KPROBES_CODES_AREA					\
++	. = ALIGN(8);							\
++	VMLINUX_SYMBOL(__early_kprobes_start) = .;			\
++	VMLINUX_SYMBOL(__early_kprobes_code_area_start) = .;		\
++	. = . + MAX_OPTINSN_SIZE * CONFIG_NR_EARLY_KPROBES_SLOTS;	\
++	VMLINUX_SYMBOL(__early_kprobes_code_area_end) = .;		\
++	. = ALIGN(8);							\
++	VMLINUX_SYMBOL(__early_kprobes_insn_slot_start) = .;		\
++	. = . + MAX_INSN_SIZE * KPROBE_OPCODE_SIZE *			\
++		CONFIG_NR_EARLY_KPROBES_SLOTS;				\
++	VMLINUX_SYMBOL(__early_kprobes_insn_slot_end) = .;		\
++	VMLINUX_SYMBOL(__early_kprobes_end) = .;
++#else
++# define EARLY_KPROBES_CODES_AREA
++#endif
++
++#else
++
++#include <linux/ptrace.h>
++#include <linux/percpu.h>
++
++
++struct pt_regs;
++struct kprobe;
++
++typedef u8 kprobe_opcode_t;
++#define KPROBE_OPCODE_SIZE     sizeof(kprobe_opcode_t)
+ #define MIN_STACK_SIZE(ADDR)					       \
+ 	(((MAX_STACK_SIZE) < (((unsigned long)current_thread_info()) + \
+ 			      THREAD_SIZE - (unsigned long)(ADDR)))    \
+@@ -52,7 +83,6 @@ extern __visible kprobe_opcode_t optprobe_template_entry;
+ extern __visible kprobe_opcode_t optprobe_template_val;
+ extern __visible kprobe_opcode_t optprobe_template_call;
+ extern __visible kprobe_opcode_t optprobe_template_end;
+-#define MAX_OPTIMIZED_LENGTH (MAX_INSN_SIZE + RELATIVE_ADDR_SIZE)
+ #define MAX_OPTINSN_SIZE 				\
+ 	(((unsigned long)&optprobe_template_end -	\
+ 	  (unsigned long)&optprobe_template_entry) +	\
+@@ -117,4 +147,5 @@ extern int kprobe_exceptions_notify(struct notifier_block *self,
+ 				    unsigned long val, void *data);
+ extern int kprobe_int3_handler(struct pt_regs *regs);
+ extern int kprobe_debug_handler(struct pt_regs *regs);
++#endif /* __ASSEMBLY__ */
+ #endif /* _ASM_X86_KPROBES_H */
+diff --git a/arch/x86/kernel/vmlinux.lds.S b/arch/x86/kernel/vmlinux.lds.S
+index 00bf300..69f3f0e 100644
+--- a/arch/x86/kernel/vmlinux.lds.S
++++ b/arch/x86/kernel/vmlinux.lds.S
+@@ -26,6 +26,7 @@
+ #include <asm/page_types.h>
+ #include <asm/cache.h>
+ #include <asm/boot.h>
++#include <asm/kprobes.h>
+ 
+ #undef i386     /* in case the preprocessor is a 32bit one */
+ 
+@@ -100,6 +101,7 @@ SECTIONS
+ 		SCHED_TEXT
+ 		LOCK_TEXT
+ 		KPROBES_TEXT
++		EARLY_KPROBES_CODES_AREA
+ 		ENTRY_TEXT
+ 		IRQENTRY_TEXT
+ 		*(.fixup)
 -- 
 1.8.4
