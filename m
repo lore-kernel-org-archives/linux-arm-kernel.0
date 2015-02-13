@@ -1,90 +1,27 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 14 Feb 2015 06:55:05 +0800 (HKT)
-Subject: [PATCH 01/11] ARM: vexpress: use ARM_CPU_SUSPEND if needed
-In-Reply-To: <20150213103716.GQ14954@e106497-lin.cambridge.arm.com>
-References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
- <1423770163-583064-2-git-send-email-arnd@arndb.de>
- <20150213103716.GQ14954@e106497-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.11.1502140649560.25300@knanqh.ubzr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Feb 2015 22:57:04 +0000
+Subject: [PATCH v2] ARM: smp: Only expose /sys/.../cpuX/online if
+ hotpluggable
+In-Reply-To: <20150213202002.GB29727@verge.net.au>
+References: <1423850799-4028-1-git-send-email-sboyd@codeaurora.org>
+ <20150213202002.GB29727@verge.net.au>
+Message-ID: <20150213225704.GF8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Feb 2015, Liviu Dudau wrote:
+On Fri, Feb 13, 2015 at 03:20:04PM -0500, Simon Horman wrote:
+> > -static int r8a7779_cpu_disable(unsigned int cpu)
+> > -{
+> > -	/* only CPU1->3 have power domains, do not allow hotplug of CPU0 */
+> > -	return cpu == 0 ? -EPERM : 0;
+> > -}
+...
+> Its not clear to me why r8a7779_cpu_disable() has been
+> removed rather than replaced by r8a7779_cpu_can_disable()
 
-> On Thu, Feb 12, 2015 at 07:42:33PM +0000, Arnd Bergmann wrote:
-> > The vexpress tc2 power management code calls mcpm_loopback, which
-> > is only available if ARM_CPU_SUSPEND is enabled, otherwise we
-> > get a link error:
-> > 
-> > arch/arm/mach-vexpress/built-in.o: In function `tc2_pm_init':
-> > arch/arm/mach-vexpress/tc2_pm.c:389: undefined reference to `mcpm_loopback'
-> 
-> Arnd,
-> 
-> We are having reports of TC2 not booting with MCPM enabled. Lorenzo
-> was investigating this but then headed for Linaro Connect this week,
-> so we don't have yet a resolution. Can this patch be postponed for
-> a later -rc?
+This is the default if you don't provide a cpu_disable function, so it
+should be removed irrespective of this patch.
 
-Can you share those reports?  I did boot my TC2 with v3.19-rc7 before 
-leaving for Linaro Connect and it just worked.
-
-Regardless, this patch is about a build fix and doesn't change any 
-functionality, so I wouldn't postpone it.
-
-
-
-> 
-> Best regards,
-> Liviu
-> 
-> 
-> > 
-> > This explicitly selects ARM_CPU_SUSPEND like other platforms that
-> > need it.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: 3592d7e002438 ("ARM: 8082/1: TC2: test the MCPM loopback during boot")
-> > Cc: Nicolas Pitre <nico@linaro.org>
-> > Cc: Kevin Hilman <khilman@linaro.org>
-> > Cc: Liviu Dudau <liviu.dudau@arm.com>
-> > Cc: Sudeep Holla <sudeep.holla@arm.com>
-> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> >  arch/arm/mach-vexpress/Kconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-> > index d6b16d9a7838..3c2509b4b694 100644
-> > --- a/arch/arm/mach-vexpress/Kconfig
-> > +++ b/arch/arm/mach-vexpress/Kconfig
-> > @@ -73,6 +73,7 @@ config ARCH_VEXPRESS_TC2_PM
-> >  	depends on MCPM
-> >  	select ARM_CCI
-> >  	select ARCH_VEXPRESS_SPC
-> > +	select ARM_CPU_SUSPEND
-> >  	help
-> >  	  Support for CPU and cluster power management on Versatile Express
-> >  	  with a TC2 (A15x2 A7x3) big.LITTLE core tile.
-> > -- 
-> > 2.1.0.rc2
-> > 
-> > 
-> 
-> -- 
-> ====================
-> | I would like to |
-> | fix the world,  |
-> | but they're not |
-> | giving me the   |
->  \ source code!  /
->   ---------------
->     ?\_(?)_/?
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
-> 
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
