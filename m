@@ -1,55 +1,122 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Fri, 13 Feb 2015 15:35:55 +0900
-Subject: [PATCH RESEND v2] ARM: DMA: Fix kzalloc flags in
- __iommu_alloc_buffer()
-Message-ID: <1423809355-9429-1-git-send-email-acourbot@nvidia.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 13 Feb 2015 11:38:27 +0200
+Subject: [PATCH v7 01/16] clk: tegra: Add binding for the Tegra124 DFLL
+ clocksource
+In-Reply-To: <20150212224242.GA23500@mithrandir>
+References: <1420723339-30735-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <1420723339-30735-2-git-send-email-mikko.perttunen@kapsi.fi>
+ <20150212224242.GA23500@mithrandir>
+Message-ID: <20150213093827.GM20811@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Courbot <gnurou@gmail.com>
+On Thu, Feb 12, 2015 at 11:42:44PM +0100, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+> 
+> On Thu, Jan 08, 2015 at 03:22:04PM +0200, Mikko Perttunen wrote:
+> > From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+> > 
+> > The DFLL is the main clocksource for the fast CPU cluster on Tegra124
+> > and also provides automatic CPU rail voltage scaling as well. The DFLL
+> > is a separate IP block from the usual Tegra124 clock-and-reset
+> > controller, so it gets its own node in the device tree.
+> > 
+> > Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+> > Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
+> > ---
+> >  .../bindings/clock/nvidia,tegra124-dfll.txt        | 69 ++++++++++++++++++++++
+> >  1 file changed, 69 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+> > new file mode 100644
+> > index 0000000..54c62ac
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+> > @@ -0,0 +1,69 @@
+> > +NVIDIA Tegra124 DFLL FCPU clocksource
+> > +
+> > +This binding uses the common clock binding:
+> > +Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > +
+> > +The DFLL IP block on Tegra is a root clocksource designed for clocking
+> > +the fast CPU cluster. It consists of a free-running voltage controlled
+> > +oscillator connected to the CPU voltage rail (VDD_CPU), and a closed loop
+> > +control module that will automatically adjust the VDD_CPU voltage by
+> > +communicating with an off-chip PMIC either via an I2C bus or via PWM signals.
+> 
+> How would PWM communication work? The documentation below doesn't
+> describe it, so perhaps either leave that part out until the binding is
+> updated to support it, or maybe make an explicit note that this mode of
+> operation isn't supported yet?
+> 
+> > +Required properties:
+> > +- compatible : should be "nvidia,tegra124-dfll-fcpu"
+> > +- reg : Defines the following set of registers, in the order listed:
+> > +        - registers for the DFLL control logic.
+> > +        - registers for the I2C output logic.
+> > +        - registers for the integrated I2C master controller.
+> > +        - look-up table RAM for voltage register values.
+> 
+> Why do these all need to be separate sets? According to the TRM this is
+> a single IP block with a single register region, why the need to split
+> them apart?
+> 
+> > +- interrupts: Should contain the DFLL block interrupt.
+> > +- clocks: Must contain an entry for each entry in clock-names.
+> > +  See ../clocks/clock-bindings.txt for details.
+> > +- clock-names: Must include the following entries:
+> > +  - soc: Clock source for the DFLL control logic.
+> > +  - ref: The closed loop reference clock
+> > +  - i2c: Clock source for the integrated I2C master.
+> > +- #clock-cells: Must be 0.
+> > +- clock-output-names: Name of the clock output.
+> > +- vdd-cpu-supply: Regulator for the CPU voltage rail that the DFLL
+> > +  hardware will start controlling.
+> 
+> How does the hardware control it? How do we go from regulator phandle to
+> something that the hardware will know how to access?
+> 
+> > +Required properties for the control loop parameters:
+> > +- nvidia,sample-rate: Sample rate of the DFLL control loop.
+> > +- nvidia,droop-ctrl: See the register CL_DVFS_DROOP_CTRL in the TRM.
+> > +- nvidia,force-mode: See the field DFLL_PARAMS_FORCE_MODE in the TRM.
+> > +- nvidia,cf: Numeric value, see the field DFLL_PARAMS_CF_PARAM in the TRM.
+> > +- nvidia,ci: Numeric value, see the field DFLL_PARAMS_CI_PARAM in the TRM.
+> > +- nvidia,cg: Numeric value, see the field DFLL_PARAMS_CG_PARAM in the TRM.
+> > +- nvidia,cg-scale: Boolean value, see the field DFLL_PARAMS_CG_SCALE in the TRM.
+> > +
+> > +Required properties for I2C mode:
+> > +- nvidia,i2c-fs-rate: I2C transfer rate, if using FS mode.
+> 
+> What's FS mode?
+> 
+> > +
+> > +Example:
+> > +
+> > +dfll at 0,70110000 {
+> 
+> Perhaps this should be "clock at 0,70110000"?
+> 
+> > +        compatible = "nvidia,tegra124-dfll";
+> > +        reg = <0 0x70110000 0 0x100>, /* DFLL control */
+> > +              <0 0x70110000 0 0x100>, /* I2C output control */
+> > +              <0 0x70110100 0 0x100>, /* Integrated I2C controller */
+> > +              <0 0x70110200 0 0x100>; /* Look-up table RAM */
+> > +        interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+> > +        clocks = <&tegra_car TEGRA124_CLK_DFLL_SOC>,
+> > +                 <&tegra_car TEGRA124_CLK_DFLL_REF>,
+> > +                 <&tegra_car TEGRA124_CLK_I2C5>;
+> 
+> If this controls I2C5 now, should it be documented that we can't use
+> this controller in software while it is in use by DFLL?
 
-There doesn't seem to be any valid reason to allocate the pages array
-with the same flags as the buffer itself. Doing so can eventually lead
-to the following safeguard in mm/slab.c's cache_grow() to be hit:
+It doesn't control I2C5. However, I2C5 and the dfll I2C controller control
+the same pins. There is some arbitration logic which prevents both controllers
+driving the pins at the same time. This logic does not have a sw interface.
+However, this logic doesn't work if I2C5 is not clocked. So once the dfll
+is enabled, I2C5 must always be clocked.
 
-        if (unlikely(flags & GFP_SLAB_BUG_MASK)) {
-		pr_emerg("gfp: %u\n", flags & GFP_SLAB_BUG_MASK);
-		BUG();
-	}
+Cheers,
 
-This happens when buffers are allocated with __GFP_DMA32 or
-__GFP_HIGHMEM.
-
-Fix this by allocating the pages array with GFP_KERNEL to follow what is
-done elsewhere in this file. Using GFP_KERNEL in __iommu_alloc_buffer()
-is safe because atomic allocations are handled by __iommu_alloc_atomic().
-
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
-Changes since v1:
-- Updated commit message to better point the assert that fails
-- Added Will's ack
-
- arch/arm/mm/dma-mapping.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 903dba064a03..170a116d1b29 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1106,7 +1106,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
- 	int i = 0;
- 
- 	if (array_size <= PAGE_SIZE)
--		pages = kzalloc(array_size, gfp);
-+		pages = kzalloc(array_size, GFP_KERNEL);
- 	else
- 		pages = vzalloc(array_size);
- 	if (!pages)
--- 
-2.3.0
+Peter.
