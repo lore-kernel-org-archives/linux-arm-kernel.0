@@ -1,107 +1,225 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 13 Feb 2015 17:42:58 +0100
-Subject: [PATCH 4/7] Documentation: bindings: move the Berlin clock
- documentation
+Date: Fri, 13 Feb 2015 17:42:55 +0100
+Subject: [PATCH 1/7] clk: convert clock mux to accept regmap
 In-Reply-To: <1423845781-7480-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1423845781-7480-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1423845781-7480-5-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1423845781-7480-2-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Berlin clock documentation was part of the Marvell Berlin SoC
-documentation because the Berlin clock configuration was inside the
-chip controller. With the recent rework of the chip and system
-controller handling (now an MFD driver registers all sub-devices of the
-two soc and system controller nodes and each device has its own
-sub-node), the documentation of the Berlin clock driver can be moved to
-the generic clock documentation directory.
+Rework the clk_mux helpers to either use an iomem base address or a
+regmap.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- .../devicetree/bindings/arm/marvell,berlin.txt     | 35 ----------------------
- .../devicetree/bindings/clock/marvell,berlin.txt   | 31 +++++++++++++++++++
- 2 files changed, 31 insertions(+), 35 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/marvell,berlin.txt
+ drivers/clk/clk-mux.c        | 72 +++++++++++++++++++++++++++++++++++++-------
+ include/linux/clk-provider.h | 39 +++++++++++++++++++-----
+ 2 files changed, 93 insertions(+), 18 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
-index 080953daf9f5..7f9b3ccdf25b 100644
---- a/Documentation/devicetree/bindings/arm/marvell,berlin.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
-@@ -39,38 +39,3 @@ cpu-ctrl at f7dd0000 {
- 	compatible = "marvell,berlin-cpu-ctrl";
- 	reg = <0xf7dd0000 0x10000>;
+diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+index 6e1ecf94bf58..1cd0ecd35ce3 100644
+--- a/drivers/clk/clk-mux.c
++++ b/drivers/clk/clk-mux.c
+@@ -42,7 +42,11 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
+ 	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
+ 	 * val = 0x4 really means "bit 2, index starts at bit 0"
+ 	 */
+-	val = clk_readl(mux->reg) >> mux->shift;
++	if (mux->reg_type == CLK_REG_TYPE_IOMEM)
++		val = clk_readl(mux->reg.iomem) >> mux->shift;
++	else
++		regmap_read(mux->reg.regmap, mux->reg.offset, &val);
++
+ 	val &= mux->mask;
+ 
+ 	if (mux->table) {
+@@ -83,20 +87,24 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
+ 			index++;
+ 	}
+ 
+-	if (mux->lock)
+-		spin_lock_irqsave(mux->lock, flags);
++	if (mux->reg_type == CLK_REG_TYPE_IOMEM && mux->reg.lock)
++		spin_lock_irqsave(mux->reg.lock, flags);
+ 
+ 	if (mux->flags & CLK_MUX_HIWORD_MASK) {
+ 		val = mux->mask << (mux->shift + 16);
+ 	} else {
+-		val = clk_readl(mux->reg);
++		val = clk_readl(mux->reg.iomem);
+ 		val &= ~(mux->mask << mux->shift);
+ 	}
+ 	val |= index << mux->shift;
+-	clk_writel(val, mux->reg);
+ 
+-	if (mux->lock)
+-		spin_unlock_irqrestore(mux->lock, flags);
++	if (mux->reg_type == CLK_REG_TYPE_IOMEM)
++		clk_writel(val, mux->reg.iomem);
++	else
++		regmap_write(mux->reg.regmap, mux->reg.offset, val);
++
++	if (mux->reg_type == CLK_REG_TYPE_IOMEM && mux->reg.lock)
++		spin_unlock_irqrestore(mux->reg.lock, flags);
+ 
+ 	return 0;
+ }
+@@ -113,10 +121,10 @@ const struct clk_ops clk_mux_ro_ops = {
  };
--
--* Clock provider binding
--
--As clock related registers are spread among the chip control registers, the
--chip control node also provides the clocks. Marvell Berlin2 (BG2, BG2CD, BG2Q)
--SoCs share the same IP for PLLs and clocks, with some minor differences in
--features and register layout.
--
--Required properties:
--- #clock-cells: shall be set to 1
--- clocks: clock specifiers referencing the core clock input clocks
--- clock-names: array of strings describing the input clock specifiers above.
--    Allowed clock-names for the reference clocks are
--      "refclk" for the SoCs osciallator input on all SoCs,
--    and SoC-specific input clocks for
--      BG2/BG2CD: "video_ext0" for the external video clock input
--
--Clocks provided by core clocks shall be referenced by a clock specifier
--indexing one of the provided clocks. Refer to dt-bindings/clock/berlin<soc>.h
--for the corresponding index mapping.
--
--Example:
--
--chip: chip-control at ea0000 {
--	compatible = "marvell,berlin2-chip-ctrl";
--	#clock-cells = <1>;
--	reg = <0xea0000 0x400>;
--	clocks = <&refclk>, <&externaldev 0>;
--	clock-names = "refclk", "video_ext0";
--};
--
--sysctrl: system-controller at d000 {
--	compatible = "marvell,berlin2-system-ctrl";
--	reg = <0xd000 0x100>;
--};
-diff --git a/Documentation/devicetree/bindings/clock/marvell,berlin.txt b/Documentation/devicetree/bindings/clock/marvell,berlin.txt
-new file mode 100644
-index 000000000000..c611c495f3ff
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/marvell,berlin.txt
-@@ -0,0 +1,31 @@
-+Device Tree Clock bindings for Marvell Berlin
+ EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
+ 
+-struct clk *clk_register_mux_table(struct device *dev, const char *name,
++struct clk *__clk_register_mux_table(struct device *dev, const char *name,
+ 		const char **parent_names, u8 num_parents, unsigned long flags,
+-		void __iomem *reg, u8 shift, u32 mask,
+-		u8 clk_mux_flags, u32 *table, spinlock_t *lock)
++		union clk_reg reg, enum clk_reg_type reg_type, u8 shift,
++		u32 mask, u8 clk_mux_flags, u32 *table)
+ {
+ 	struct clk_mux *mux;
+ 	struct clk *clk;
+@@ -149,10 +157,10 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
+ 
+ 	/* struct clk_mux assignments */
+ 	mux->reg = reg;
++	mux->reg_type = reg_type;
+ 	mux->shift = shift;
+ 	mux->mask = mask;
+ 	mux->flags = clk_mux_flags;
+-	mux->lock = lock;
+ 	mux->table = table;
+ 	mux->hw.init = &init;
+ 
+@@ -163,8 +171,37 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
+ 
+ 	return clk;
+ }
 +
-+This binding uses the common clock binding[1].
++struct clk *clk_register_mux_table(struct device *dev, const char *name,
++		const char **parent_names, u8 num_parents, unsigned long flags,
++		void __iomem *reg, u8 shift, u32 mask,
++		u8 clk_mux_flags, u32 *table, spinlock_t *lock)
++{
++	union clk_reg clk_reg;
 +
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++	clk_reg.iomem = reg;
++	clk_reg.lock = lock;
++	return __clk_register_mux_table(dev, name, parent_names, num_parents,
++					flags, clk_reg, CLK_REG_TYPE_IOMEM,
++					shift, mask, clk_mux_flags, table);
++}
+ EXPORT_SYMBOL_GPL(clk_register_mux_table);
+ 
++struct clk *clk_register_mux_table_regmap(struct device *dev, const char *name,
++		const char **parent_names, u8 num_parents, unsigned long flags,
++		struct regmap *regmap, unsigned int offset, u8 shift, u32 mask,
++		u8 clk_mux_flags, u32 *table)
++{
++	union clk_reg clk_reg;
 +
-+Clock related registers are spread among the chip control registers. Berlin
-+clock node should be a sub-node of the chip controller node. Marvell Berlin2
-+(BG2, BG2CD, BG2Q) SoCs share the same IP for PLLs and clocks, with some
-+minor differences in features and register layout.
++	clk_reg.regmap = regmap;
++	clk_reg.offset = offset;
++	return __clk_register_mux_table(dev, name, parent_names, num_parents,
++					flags, clk_reg, CLK_REG_TYPE_REGMAP,
++					shift, mask, clk_mux_flags, table);
++}
++EXPORT_SYMBOL_GPL(clk_register_mux_table_regmap);
 +
-+Required properties:
-+- compatible: must be "marvell,berlin2-clk" or "marvell,berlin2q-clk"
-+- #clock-cells: must be 1
-+- clocks: must be the input parent clock phandle
-+- clock-names: name of the input parent clock
-+	Allowed clock-names for the reference clocks are
-+	"refclk" for the SoCs oscillator input on all SoCs,
-+	and SoC-specific input clocks for
-+	BG2/BG2CD: "video_ext0" for the external video clock input
+ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 		const char **parent_names, u8 num_parents, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
+@@ -177,3 +214,16 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 				      NULL, lock);
+ }
+ EXPORT_SYMBOL_GPL(clk_register_mux);
 +
++struct clk *clk_register_mux_regmap(struct device *dev, const char *name,
++		const char **parent_names, u8 num_parents, unsigned long flags,
++		struct regmap *regmap, unsigned int offset, u8 shift, u8 width,
++		u8 clk_mux_flags)
++{
++	u32 mask = BIT(width) - 1;
 +
-+Example:
-+
-+chip_clk: clock {
-+	compatible = "marvell,berlin2q-clk";
-+
-+	#clock-cells = <1>;
-+	clocks = <&refclk>;
-+	clock-names = "refclk";
++	return clk_register_mux_table_regmap(dev, name, parent_names,
++				      num_parents, flags, regmap, offset, shift,
++				      mask, clk_mux_flags, NULL);
++}
++EXPORT_SYMBOL_GPL(clk_register_mux_regmap);
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index d936409520f8..3d2b9ab2130d 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -14,6 +14,7 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
++#include <linux/regmap.h>
+ 
+ #ifdef CONFIG_COMMON_CLK
+ 
+@@ -258,6 +259,22 @@ struct clk *clk_register_fixed_rate_with_accuracy(struct device *dev,
+ 
+ void of_fixed_clk_setup(struct device_node *np);
+ 
++union clk_reg {
++	struct {
++		void __iomem	*iomem;
++		spinlock_t	*lock;
++	};
++	struct {
++		struct regmap	*regmap;
++		unsigned int	offset;
++	};
 +};
++
++enum clk_reg_type {
++	CLK_REG_TYPE_IOMEM,
++	CLK_REG_TYPE_REGMAP,
++};
++
+ /**
+  * struct clk_gate - gating clock
+  *
+@@ -384,13 +401,13 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
+  *	indicate changing mux bits.
+  */
+ struct clk_mux {
+-	struct clk_hw	hw;
+-	void __iomem	*reg;
+-	u32		*table;
+-	u32		mask;
+-	u8		shift;
+-	u8		flags;
+-	spinlock_t	*lock;
++	struct clk_hw		hw;
++	union clk_reg		reg;
++	enum clk_reg_type	reg_type;
++	u32			*table;
++	u32			mask;
++	u8			shift;
++	u8			flags;
+ };
+ 
+ #define CLK_MUX_INDEX_ONE		BIT(0)
+@@ -405,11 +422,19 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 		const char **parent_names, u8 num_parents, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
+ 		u8 clk_mux_flags, spinlock_t *lock);
++struct clk *clk_register_mux_regmap(struct device *dev, const char *name,
++		const char **parent_names, u8 num_parents, unsigned long flags,
++		struct regmap *regmap, unsigned int offset, u8 shift, u8 width,
++		u8 clk_mux_flags);
+ 
+ struct clk *clk_register_mux_table(struct device *dev, const char *name,
+ 		const char **parent_names, u8 num_parents, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u32 mask,
+ 		u8 clk_mux_flags, u32 *table, spinlock_t *lock);
++struct clk *clk_register_mux_table_regmap(struct device *dev, const char *name,
++		const char **parent_names, u8 num_parents, unsigned long flags,
++		struct regmap *regmap, unsigned int offset, u8 shift, u32 mask,
++		u8 clk_mux_flags, u32 *table);
+ 
+ void of_fixed_factor_clk_setup(struct device_node *node);
+ 
 -- 
 2.3.0
