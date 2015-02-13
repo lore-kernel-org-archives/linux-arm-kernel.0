@@ -1,124 +1,102 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 13 Feb 2015 11:07:16 +0530
-Subject: [RFC PATCH] ARM: DRA: hwmod: RTC: Add reset function for RTC
-In-Reply-To: <alpine.DEB.2.02.1502121641320.3767@utopia.booyaka.com>
-References: <1416199402-3865-1-git-send-email-lokeshvutla@ti.com>
- <546DB513.6000104@ti.com>
- <alpine.DEB.2.02.1411201644470.9204@utopia.booyaka.com>
- <5473FF68.3070805@ti.com>
- <alpine.DEB.2.02.1411260649330.16047@utopia.booyaka.com>
- <alpine.DEB.2.02.1501022252580.27058@utopia.booyaka.com>
- <alpine.DEB.2.02.1502121641320.3767@utopia.booyaka.com>
-Message-ID: <54DD8D8C.60203@ti.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Fri, 13 Feb 2015 13:40:34 +0800
+Subject: [RFC PATCH v3 07/26] ftrace: allow search ftrace addr before ftrace
+ fully inited.
+In-Reply-To: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
+References: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1423806034-61781-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-On Thursday 12 February 2015 10:11 PM, Paul Walmsley wrote:
-> + Felipe, Nishanth
-> 
-> Hi Lokesh,
-> 
-> what's the status here?
-Sorry for the delayed response.
-I am currently on a high priority issue. Once I am done with it Ill address your
-comments and repost the patch.
+This patch enables ftrace_location() to be used before ftrace_init().
+The first user should be early kprobes, which can insert kprobes to
+kernel code even before setup_arch() finishes. This patch gives it a
+chance to determine whether it is probing ftrace entries and allows it
+do some special treatment.
 
-Thanks and regards,
-Lokesh
-> 
-> - Paul
-> 
-> 
-> On Fri, 2 Jan 2015, Paul Walmsley wrote:
-> 
->> Ping.  Are you going to redo this one?
->>
->> - Paul
->>
->> On Wed, 26 Nov 2014, Paul Walmsley wrote:
->>
->>> Hi Lokesh 
->>>
->>> On Tue, 25 Nov 2014, Lokesh Vutla wrote:
->>>
->>>> Hi Paul,
->>>> On Thursday 20 November 2014 10:26 PM, Paul Walmsley wrote:
->>>>> On Thu, 20 Nov 2014, Lokesh Vutla wrote:
->>>>>
->>>>>> On Monday 17 November 2014 10:13 AM, Lokesh Vutla wrote:
->>>>>>> RTC IP have kicker feature which prevents spurious writes to its registers.
->>>>>>> In order to write into any of the RTC registers, KICK values has te be
->>>>>>> written to KICK registers. Currently hwmod is updating the IDLEMODE in rtc
->>>>>>> sysconfig register without writing into any kick register which is a noop.
->>>>>>> When autoidle is allowed for rtc, interruts are not received until IDLEMODE
->>>>>>> is set to SIDLE_SMART_WKUP.
->>>>>>> Adding a reset function to unlock RTC registers so that IDLEMODE is
->>>>>>> updated.
->>>>>> Ping..!!
->>>>>> Is this patch acceptable?
->>>>>
->>>>> Lokesh
->>>>>
->>>>> 1. This looks like a fix.  Is this intended to go in as a v3.18-rc patch, 
->>>>> or against v3.19?  If so it would be very helpful for the maintainers if 
->>>>> you were to state that somewhere.
->>>> Yes. This is a fix, intended to go in 3.18-rc. Sorry should have
->>>> mentioned it.
->>>
->>> A few questions.  Do you know when this problem started (in terms of 
->>> kernel versions)?
->>>
->>> Also: the patch description states that this is only a problem when 
->>> autoidle is allowed for RTC.  What enables autoidle for RTC - the RTCSS 
->>> driver?  Or does hwmod wind up doing this after the RTCSS driver unlocks 
->>> it?
->>>
->>>>> 2. Your patch unlocks the RTC registers, but never relocks it.  This seems 
->>>>> to defeat the point of the spurious write protection.  Shouldn't your 
->>>>> patch only unlock the RTC immediately before the hwmod code touches the 
->>>>> RTC registers, and then relock it immediately afterwards, per SPRUHZ6 
->>>>> section 23.4.3.3?  If so then the .reset function pointer is the wrong 
->>>>> place for this; I would suggest adding some .lock and .unlock function 
->>>>> pointers that are to be called before and after any register write to the 
->>>>> IP block.
->>>> Yeah I agree with you.
->>>> Currently rtc driver unlocks these kick registers in probe and leaves it unlocks for
->>>> further use.
->>>> But if hwmod does unlock and lock for every sysconfig write driver should also
->>>> implement unlock and lock for every rtc register write, which adds an extra overhead.
->>>> I am not sure if some one writes into rtc registers other than hwmod and driver.
->>>> IMO we can leave it unlocked as the driver does.
->>>
->>> I would think that the best approach would be to set up .lock and .unlock 
->>> function pointers, then add a temporary hwmod flag that, if set, would 
->>> prevent the .lock function from ever being called.  Then once the driver 
->>> is fixed, that flag can be dropped.
->>>
->>>>> 3. Your macros don't mention DRA7xx specifically.  Does this sequence 
->>>>> apply to some other TI chips, or just DRA7xx?  Please document this in a 
->>>>> comment above the macros, and possibly change the name of the macros to 
->>>>> refer to DRA7XX.
->>>> This sequence applies to AM43xx and AM33xx also. So made it generic.
->>>> Ill document it.
->>>
->>> OK but it would need more than just documentation, right?  Wouldn't the 
->>> hwmod data also need to be modified for AM33xx/AM43xx to add the .reset 
->>> function pointer?  Any reason why folks wouldn't have seen this problem on 
->>> AM33xx/AM43xx?
->>>
->>>
->>> - Paul
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>
->>
->>
->> - Paul
->>
-> 
-> 
-> - Paul
-> 
+ftrace_cmp_ips_insn() is introduced to make early ftrace_location()
+behavior consistent with normal ftrace_location(). With existing
+ftrace_cmp_ips(), searching an address in middle of an instruction will
+fail, which is inconsistent with ftrace_cmp_recs() used by normal
+ftrace_location().
+
+With this and previous patch ftrace_location() now is able to be called
+in and after setup_arch().
+
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+---
+ kernel/trace/ftrace.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
+
+diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
+index a75cfbe..fc0c1aa 100644
+--- a/kernel/trace/ftrace.c
++++ b/kernel/trace/ftrace.c
+@@ -1539,6 +1539,8 @@ static unsigned long ftrace_location_range(unsigned long start, unsigned long en
+ 	return 0;
+ }
+ 
++static unsigned long ftrace_search_mcount_ip(unsigned long ip);
++
+ /**
+  * ftrace_location - return true if the ip giving is a traced location
+  * @ip: the instruction pointer to check
+@@ -1550,6 +1552,9 @@ static unsigned long ftrace_location_range(unsigned long start, unsigned long en
+  */
+ unsigned long ftrace_location(unsigned long ip)
+ {
++	if (unlikely(!ftrace_pages_start))
++		return ftrace_search_mcount_ip(ip);
++
+ 	return ftrace_location_range(ip, ip);
+ }
+ 
+@@ -4733,6 +4738,18 @@ static int ftrace_cmp_ips(const void *a, const void *b)
+ 	return 0;
+ }
+ 
++static int ftrace_cmp_ips_insn(const void *a, const void *b)
++{
++	const unsigned long *ipa = a;
++	const unsigned long *ipb = b;
++
++	if (*ipa >= *ipb + MCOUNT_INSN_SIZE)
++		return 1;
++	if (*ipa < *ipb)
++		return -1;
++	return 0;
++}
++
+ static void ftrace_swap_ips(void *a, void *b, int size)
+ {
+ 	unsigned long *ipa = a;
+@@ -4770,6 +4787,27 @@ static void ftrace_sort_mcount_area(unsigned long *start, unsigned long *end)
+ 		kernel_mcount_sorted = true;
+ }
+ 
++static unsigned long ftrace_search_mcount_ip(unsigned long ip)
++{
++	extern unsigned long __start_mcount_loc[];
++	extern unsigned long __stop_mcount_loc[];
++
++	unsigned long *mcount_start = __start_mcount_loc;
++	unsigned long *mcount_end = __stop_mcount_loc;
++	unsigned long count = mcount_end - mcount_start;
++	unsigned long *retval;
++
++	if (!kernel_mcount_sorted)
++		return 0;
++
++	retval = bsearch(&ip, mcount_start, count,
++			sizeof(unsigned long), ftrace_cmp_ips_insn);
++	if (!retval)
++		return 0;
++
++	return ftrace_call_adjust(ip);
++}
++
+ static int ftrace_process_locs(struct module *mod,
+ 			       unsigned long *start,
+ 			       unsigned long *end)
+-- 
+1.8.4
