@@ -1,86 +1,72 @@
-From: claudio.fontana@huawei.com (Claudio Fontana)
-Date: Fri, 13 Feb 2015 17:36:10 +0100
-Subject: stand-alone kvmtool
-In-Reply-To: <54DE0CDD.70308@arm.com>
-References: <54DDD465.3050300@arm.com> <54DE0A9C.7080505@huawei.com>
- <54DE0CDD.70308@arm.com>
-Message-ID: <54DE27FA.6070507@huawei.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Fri, 13 Feb 2015 17:42:54 +0100
+Subject: [PATCH 0/7] ARM: berlin: refactor the clock
+Message-ID: <1423845781-7480-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.02.2015 15:40, Andre Przywara wrote:
-> Ciao Claudio,
-> 
-> On 13/02/15 14:30, Claudio Fontana wrote:
->> Hello Andre,
->>
->> On 13.02.2015 11:39, Andre Przywara wrote:
->>> Hi,
->>>
->>> as I found it increasingly inconvenient to use kvmtool[1] as part of a
->>> Linux repository, I decided to give it a go and make it a stand-alone
->>> project. So I filtered all the respective commits, adjusted the paths in
->>> there (while keeping authorship and commit date, of course) and then
->>> added the missing bits to let it compile without a kernel tree nearby.
->>> The result is now available on:
->>>
->>> git://linux-arm.org/kvmtool.git
->>> http://linux-arm.org/kvmtool.git
->>
->> It builds fine on x86_64, but when I tried to crosscompile from x86_64 to AArch64,
->> I get in trouble because of libfdt: I have the aarch64 libs (static and shared), but how do I instruct the build system to get it from the right place?
-> 
-> You have to install them into your cross-compiler's SYSROOT.
-> Get the location of that by executing
-> $ ${CROSS_COMPILE}gcc -print-sysroot.
-> If it's just for libfdt, it's probably the easiest to copy them
-> manually, the header files into $SYSROOT/usr/include, the libraries into
-> $SYSROOT/usr/lib/aarch64-linux-gnu
-> That fixed it for me ;-)
+Hi,
+
+Marvell Berlin SoCs have a chip control register set providing several
+individual registers dealing with various controllers (pinctrl, reset,
+clk). This chip controller is described by a single DT node since the
+individual registers are spread among the chip control register bank.
+
+Marvell Berlin also have a system control register set providing several
+individual registers for pinctrl or adc.
+
+A series was sent[1] to correctly handle these two nodes, by introducing
+a Berlin mfd controller driver. The series converted the existing
+pin-controller and reset drivers to take the changes into account.
+
+Because the Berlin clock driver was still working with the above
+modification, Berlin clock reworks were not included into the previous
+series. Also the clock reworks change some of the clock framework
+functions, so having a dedicated series helps.
+
+This series aims to convert the Berlin clock driver to use the proper
+way of dealing with the chip and system controller on Berlin SoCs. To do
+this changes were done in the clk-mux and clk-gate helpers so they can
+handle regmaps alongside iomem addresses.
+
+This series has been tested on the Marvell Berlin BG2Q DMP.
+
+This series is based on v3.19 and [1].
 
 Thanks!
 
-> 
-> For a more robust approach you would use your distribution's packaging
-> system to install the aarch64 package into $SYSROOT.
-> 
-> Cheers,
-> Andre.
+Antoine
 
-I still prefer to be forced to understand things so I actually prefer the manual route.
+[1] https://lkml.org/lkml/2015/2/11/367
 
-Ciao,
 
-Claudio
+Antoine Tenart (7):
+  clk: convert clock mux to accept regmap
+  clk: convert clock gate to accept regmap
+  clk: berlin: use regmap
+  Documentation: bindings: move the Berlin clock documentation
+  ARM: berlin: rework the clock node for BG2
+  ARM: berlin: rework the clock node for BG2CD
+  ARM: berlin: rework the clock node for BG2Q
 
->>
->>>
->>> You can simply check it out, type make and use "./lkvm run" for a quick
->>> test. So far I briefly tested x86-64, arm and arm64, the later two were
->>> also cross-compiled. For sure there are rough edges in there (for
->>> instance copying a few non-uapi header files into), but I deem it worthy
->>> enough to get some public comments.
->>> For me that also fixed some nasty warnings about libfdt, which now are
->>> gone due it using your system library version of it.
->>> I also managed to get rid of the libc-i386-dev dependency when compiling
->>> for x86-64, but that still needs to be cleaned up and thus is not in the
->>> current HEAD.
->>> I haven't got around to compile-test the other supported architectures,
->>> but supporting them should be as easy as copying over the uapi kvm.h
->>> header file (see the respective ARM commit). Contributions (and tests!)
->>> are welcome.
->>>
->>> Please give it a go and tell me what you think. I don't want to fork the
->>> project, so I am happy if someone "official" picks it up.
->>>
->>> Cheers,
->>> Andre.
->>>
->>> [1] https://github.com/penberg/linux-kvm/tree/master/tools/kvm
->>> _______________________________________________
->>> kvmarm mailing list
->>> kvmarm at lists.cs.columbia.edu
->>> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
->>>
->>
->>
+ .../devicetree/bindings/arm/marvell,berlin.txt     |  35 -------
+ .../devicetree/bindings/clock/marvell,berlin.txt   |  31 ++++++
+ arch/arm/boot/dts/berlin2.dtsi                     |  43 ++++----
+ arch/arm/boot/dts/berlin2cd.dtsi                   |  39 +++----
+ arch/arm/boot/dts/berlin2q.dtsi                    |  53 +++++-----
+ drivers/clk/berlin/berlin2-avpll.c                 |  72 +++++++------
+ drivers/clk/berlin/berlin2-avpll.h                 |  13 ++-
+ drivers/clk/berlin/berlin2-div.c                   |  82 +++++----------
+ drivers/clk/berlin/berlin2-div.h                   |   4 +-
+ drivers/clk/berlin/berlin2-pll.c                   |  16 +--
+ drivers/clk/berlin/berlin2-pll.h                   |   7 +-
+ drivers/clk/berlin/bg2.c                           | 112 +++++++++++----------
+ drivers/clk/berlin/bg2q.c                          |  64 +++++++-----
+ drivers/clk/clk-gate.c                             |  94 +++++++++++++----
+ drivers/clk/clk-mux.c                              |  72 +++++++++++--
+ include/linux/clk-provider.h                       |  51 ++++++++--
+ 16 files changed, 467 insertions(+), 321 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/marvell,berlin.txt
+
+-- 
+2.3.0
