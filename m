@@ -1,34 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Feb 2015 23:15:19 +0000
-Subject: [PATCH 03/16] tty: serial: 8250_core: read only RX if there is
- something in the FIFO
-In-Reply-To: <20150213185115.GF5482@linutronix.de>
-References: <54D9F3C7.5000809@freebox.fr> <54DA43F8.9090904@hurleysoftware.com>
- <54DBB531.2030504@hurleysoftware.com>
- <20150211200313.GE2531@atomide.com>
- <54DBBE9E.90104@hurleysoftware.com>
- <54DC6832.3070507@linutronix.de>
- <54DCD584.3010500@hurleysoftware.com>
- <20150212192333.GA18882@linutronix.de>
- <54DD053A.8060905@hurleysoftware.com>
- <20150213185115.GF5482@linutronix.de>
-Message-ID: <20150213231519.GF8670@n2100.arm.linux.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 13 Feb 2015 18:24:37 -0500
+Subject: [PATCH v2] ARM: smp: Only expose /sys/.../cpuX/online if
+ hotpluggable
+In-Reply-To: <20150213225704.GF8656@n2100.arm.linux.org.uk>
+References: <1423850799-4028-1-git-send-email-sboyd@codeaurora.org>
+ <20150213202002.GB29727@verge.net.au>
+ <20150213225704.GF8656@n2100.arm.linux.org.uk>
+Message-ID: <20150213232435.GA21924@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 13, 2015 at 07:51:16PM +0100, Sebastian Andrzej Siewior wrote:
-> Something like this maybe?
+On Fri, Feb 13, 2015 at 10:57:04PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 13, 2015 at 03:20:04PM -0500, Simon Horman wrote:
+> > > -static int r8a7779_cpu_disable(unsigned int cpu)
+> > > -{
+> > > -	/* only CPU1->3 have power domains, do not allow hotplug of CPU0 */
+> > > -	return cpu == 0 ? -EPERM : 0;
+> > > -}
+> ...
+> > Its not clear to me why r8a7779_cpu_disable() has been
+> > removed rather than replaced by r8a7779_cpu_can_disable()
+> 
+> This is the default if you don't provide a cpu_disable function, so it
+> should be removed irrespective of this patch.
 
-My personal feeling is that as 0aa525d11859 was wrong, it should be
-reverted and this should be another attempt to fix the problem.  In
-other words, there should be two patches, one a revert of the previously
-known bad commit and this one having another go at it.
+Thanks and agreed.
 
-I feel that would be a better approach, since then we don't end up
-with this change building on a previously know buggy change.  It
-would also make the changes to this solution from the previous,
-known-to-work-for-decades code more obvious.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+I'd be quite happy to take such a patch through my tree.
