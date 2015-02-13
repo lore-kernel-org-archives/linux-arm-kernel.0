@@ -1,94 +1,60 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 13 Feb 2015 17:59:36 +0100
-Subject: [PATCH 4/5] ARM: dts: imx28-apf28dev: add support for can0
-In-Reply-To: <20150213163131.23cbffb5@x230.trabucayre.com>
-References: <1423836725-86061-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <1423836725-86061-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <1423836725-86061-3-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <1423836725-86061-4-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <20150213155358.12678942@ipc1.ka-ro>
- <20150213163131.23cbffb5@x230.trabucayre.com>
-Message-ID: <20150213175936.7dcecb8b@ipc1.ka-ro>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Fri, 13 Feb 2015 19:04:46 +0100
+Subject: [PATCH 0/7] ARM: berlin: refactor the clock
+In-Reply-To: <20150213173121.GG26475@lunn.ch>
+References: <1423845781-7480-1-git-send-email-antoine.tenart@free-electrons.com>
+ <20150213173121.GG26475@lunn.ch>
+Message-ID: <20150213180446.GA4930@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Andrew,
 
-gwenhael.goavec wrote:
-> Hi,
-> 
-> On Fri, 13 Feb 2015 15:53:58 +0100
-> Lothar Wa?mann <LW@KARO-electronics.de> wrote:
-> 
-> > Hi,
+On Fri, Feb 13, 2015 at 06:31:21PM +0100, Andrew Lunn wrote:
+> On Fri, Feb 13, 2015 at 05:42:54PM +0100, Antoine Tenart wrote:
 > > 
-> > Gwenhael Goavec-Merou wrote:
-> > > Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> > > Signed-off-by: Sebastien Szymanski <sebastien.szymanski@armadeus.com>
-> > > ---
-> > >  arch/arm/boot/dts/imx28-apf28dev.dts | 15 +++++++++++++++
-> > >  1 file changed, 15 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
-> > > index 68405c3..a052d3e 100644
-> > > --- a/arch/arm/boot/dts/imx28-apf28dev.dts
-> > > +++ b/arch/arm/boot/dts/imx28-apf28dev.dts
-> > > @@ -110,6 +110,13 @@
-> > >  					};
-> > >  				};
-> > >  			};
-> > > +
-> > > +			can0: can at 80032000 {
-> > >
-> > Did you compile-test this? It should produce a build error, since
-> > the label can0 already exists in imx28.dtsi.
-> Compile fine and without error. It's the same thing for all labels in 
-> this dts file.
-> > You should use:
-> > |&can0 {
-> > |				pinctrl-names = "default";
-> > |				pinctrl-0 = <&can0_pins_a>;
-> > |				xceiver-supply = <&reg_can0_vcc>;
-> > |				status = "okay";
-> > |};
->
-I also noticed now, that defining a label for the same node twice is OK
-with the dtc-compiler.
-But you could simplify your dts files and make them more readable by
-referencing the existing labels (like all the other platforms do)
-rather than reproducing the whole tree structrure in your files.
+> > Marvell Berlin SoCs have a chip control register set providing several
+> > individual registers dealing with various controllers (pinctrl, reset,
+> > clk). This chip controller is described by a single DT node since the
+> > individual registers are spread among the chip control register bank.
+> > 
+> > Marvell Berlin also have a system control register set providing several
+> > individual registers for pinctrl or adc.
+> > 
+> > A series was sent[1] to correctly handle these two nodes, by introducing
+> > a Berlin mfd controller driver. The series converted the existing
+> > pin-controller and reset drivers to take the changes into account.
+> 
+> Something which needs to be discussed for both this patchset and the
+> previous one, is backwards compatibility of the device tree.
+> 
+> As far as i can see, these changes are not backwards compatible.
+> Somebody trying to boot a new kernel with a old DT blob is going to
+> have trouble.
 
-Thus instead of:
-|	apb at 80000000 {
-|		apbh at 80000000 {
-|			gpmi-nand at 8000c000 {
-[...]
-|		};
-|
-|		apbx at 80040000 {
-|			duart: serial at 80074000 {
-[...]
+Big trouble :)
 
-you would only have:
-|&duart {
-	[...]
-|};
-|
-|&gpmi {
-|	[...]
-|};
-in your dts files.
-Sorting the labels alphabetically additionally helps readability.
+> 
+> How do we want to handle this?
 
+Keeping a backward compatibility here would make Berlin drivers hard to
+maintain, with lots of quirks. This rework is needed because since we
+started to push things on Berlin we discovered how the chip and the
+system controller are organized and working. It would have been
+difficult to guess the perfect device tree organization at first, but
+the current way we handle it is not acceptable on the long term.
 
-Lothar Wa?mann
+The support is quite new and can be considered as in development and not
+stable yet as far as I'm concerned. We just begin to have enough
+functionalities supported. In this case backward compatibility would be
+the same as having dead code in Berlin drivers.
+
+IMHO, we do not want to handle this. But I'll let others, and Sebastian,
+answer and I'm open to the discussion if needed.
+
+Antoine
+
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
