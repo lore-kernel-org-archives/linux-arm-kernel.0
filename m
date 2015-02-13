@@ -1,57 +1,58 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 13 Feb 2015 17:06:52 +0200
-Subject: [PATCH 01/23] ARM: OMAP2+: clock: move clock provider
- infrastructure to clock driver
-In-Reply-To: <20150127165016.GJ28663@atomide.com>
+Date: Fri, 13 Feb 2015 17:07:34 +0200
+Subject: [PATCH 13/23] ARM: OMAP2+: CM: determine CM base address from
+ device tree
+In-Reply-To: <alpine.DEB.2.02.1501241937570.5450@utopia.booyaka.com>
 References: <1417103514-17027-1-git-send-email-t-kristo@ti.com>
- <1417103514-17027-2-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.02.1501242142181.5450@utopia.booyaka.com>
- <54C61938.8000303@ti.com> <20150126154936.GC28663@atomide.com>
- <54C777CE.1070900@ti.com> <20150127165016.GJ28663@atomide.com>
-Message-ID: <54DE130C.2080808@ti.com>
+ <1417103514-17027-14-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.02.1501241937570.5450@utopia.booyaka.com>
+Message-ID: <54DE1336.1060407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2015 06:50 PM, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [150127 03:37]:
->> On 26/01/15 17:49, Tony Lindgren wrote:
->>
->>>> I'm not sure if I miss something, but regmap_write does not protect from
->>>> problems if there are multiple users for the same registers. You need to
->>>> use regmap_update_bits() to get a protected read/write sequence, in
->>>> which you can change only the bits that you want to change.
->>>
->>> To me it seems that issue can be fixed by making all the code use regmap.
->>> AFAIK that should work for the legacy code too.
->>
->> Even if everybody uses regmap, doing
->>
->> v = regmap_read()
->> modify v
->> regmap_write(v)
->>
->> is racy. regmap_update_bits() has to be used to protect the read/write
->> sequence. Which may be somewhat challenging at times with some strange
->> registers, the like Roger Q encountered recently related to CAN.
+On 01/24/2015 09:39 PM, Paul Walmsley wrote:
+> Hi Tero
 >
-> Yeah that's a good point.
+> On Thu, 27 Nov 2014, Tero Kristo wrote:
 >
-> Regards,
+>> There is no need to provide the CM base address through a low-level API
+>> from the low-level IO init, as this information is available through DT.
+>> Re-routed the parsing function to be called from the CM drivers also to
+>> simplify the implementation under io.c.
+>>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 >
-> Tony
->
+> This one breaks boot on OMAP2430 (and presumably all other OMAP2xxx).
+> Adding something like this seems to get it working.
 
-I have a v2 of this series ready now, which also moves control module 
-completely to use syscon for register accesses. The move to regmap is 
-done at later point though, not in this patch as Paul proposed, as the 
-changes to the rest of the series were not posted.
-
-The race handling needs to be done on driver level to use 
-regmap_update_bits, my take on this is that we can post separate patches 
-against the individual drivers, once the regmap/syscon conversion has 
-been done. Mostly, the drivers do not touch same register anyway, so 
-getting any conflicts should be pretty rare. Moreover, this set does not 
-do anything for this anyway, if there are currently races with some 
-users of control module, these will be there still.
+Yeah, you are right. This patch also broke am33xx boot, I will fix this 
+in v2.
 
 -Tero
+
+>
+>
+> - Paul
+>
+> ---
+>   arch/arm/mach-omap2/cm_common.c | 5 +++++
+>   1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
+> index c2d7c7b3002c..1770364f0499 100644
+> --- a/arch/arm/mach-omap2/cm_common.c
+> +++ b/arch/arm/mach-omap2/cm_common.c
+> @@ -234,7 +234,12 @@ static struct omap_prcm_init_data omap3_cm_data = {
+>   	.offset = -OMAP3430_IVA2_MOD,
+>   };
+>
+> +static struct omap_prcm_init_data omap2_prcm_data = {
+> +	.index = CLK_MEMMAP_INDEX_CM1,
+> +};
+> +
+>   static struct of_device_id omap_cm_dt_match_table[] = {
+> +	{ .compatible = "ti,omap2-prcm", .data = &omap2_prcm_data },
+>   	{ .compatible = "ti,omap3-cm", .data = &omap3_cm_data },
+>   	{ .compatible = "ti,omap4-cm1", .data = &cm_data },
+>   	{ .compatible = "ti,omap4-cm2", .data = &cm2_data },
+>
