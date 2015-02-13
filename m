@@ -1,82 +1,119 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 13 Feb 2015 10:01:29 -0600
-Subject: [PATCH 0/9] ARM: DRA7: add display support
-In-Reply-To: <1423840286-18377-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1423840286-18377-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <54DE1FD9.6030801@ti.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Fri, 13 Feb 2015 16:04:48 +0000
+Subject: [PATCH] efi: get_memory_map: add sufficient slack for memory
+ descriptors
+In-Reply-To: <CAKv+Gu_Z0Upoy0J-hxf0i7Oen00tb-TENJ9CszdEtTHsb5pGSg@mail.gmail.com>
+References: <1423718659-795-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150212102226.GB1245@leverpostej>
+ <CAKv+Gu88vzPpXoSEs1ZSQbO7wsqh7NRSZc=iSpC9D6vzus7f8g@mail.gmail.com>
+ <20150212144727.GD4665@codeblueprint.co.uk>
+ <CAKv+Gu-NAKASZc4phj5x83mB8Ak4Gy2zYq-a0CDADEOTBD4pXA@mail.gmail.com>
+ <20150212151607.GH1522@leverpostej>
+ <CAKv+Gu_Z0Upoy0J-hxf0i7Oen00tb-TENJ9CszdEtTHsb5pGSg@mail.gmail.com>
+Message-ID: <20150213160448.GA30567@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2015 09:11 AM, Tomi Valkeinen wrote:
-> Hi,
+On Thu, 12 Feb, at 11:31:02PM, Ard Biesheuvel wrote:
 > 
-> This series adds the arch/arm/ side of the display support for DRA7 (DRA72x,
-> DRA74x, AM54xx) SoCs. Also support for HDMI output on x15 and DRA72 EVM boards
-> is added.
+> Actually, looking again at the original patch, it appears that my
+> analysis was incorrect regarding the possibility that the loop would
+> never terminate. The only thing that could happen if desc_size >
+> sizeof(efi_memory_desc_t) is that you need two iterations instead of
+> one to get a pool allocation that is of sufficient size.
+> So perhaps it is better to just revert the patch.
 > 
-> The series is based on OMAPDSS driver patches in fbdev changes for 3.20, which
-> have been merged to Linus' tree.
-> 
-> The changes are very similar to OMAP5 DSS. All the other patches look fine to
-> me except the "RFC: ARM: DRA7: enable DSS_DESHDCP_CLKEN". That's been discussed
-> earlier with Paul and Tero, but I don't think we have any good solution for it
-> yet.
+> My apologies for the hassle.
 
-Is there some specific tag I can test this on (some next perhaps?), I
-get the following error:
-build fail, Error:
-arch/arm/mach-omap2/display.c: In function ?omap_display_get_version?:
-arch/arm/mach-omap2/display.c:285:10: error: ?OMAPDSS_VER_DRA7xx?
-undeclared (first use in this function)
-arch/arm/mach-omap2/display.c:285:10: note: each undeclared identifier
-is reported only once for each function it appears in
-arch/arm/mach-omap2/display.c:288:1: warning: control reaches end of
-non-void function [-Wreturn-type]
-make[1]: *** [arch/arm/mach-omap2/display.o] Error 1
-make: *** [arch/arm/mach-omap2] Error 2
-make: *** Waiting for unfinished jobs....
+This is what I've got queued up,
 
+---
 
-Further are you proposing this for 3.20 or 3.21 window? 3.20, we seem
-to have already missed.
+>From 3f281b98ffc99e604a3988aa93304a3a591eeeb5 Mon Sep 17 00:00:00 2001
+From: Matt Fleming <matt.fleming@intel.com>
+Date: Fri, 13 Feb 2015 15:46:56 +0000
+Subject: [PATCH] Revert "efi/libstub: Call get_memory_map() to obtain map and
+ desc sizes"
 
+This reverts commit d1a8d66b9177105e898e73716f97eb61842c457a.
 
-> 
->  Tomi
-> 
-> Tomi Valkeinen (9):
->   arm/dts: dra7xx: add 'ti,set-rate-parent' for dss_dss_clk
-^^
->   ARM: DRA7: hwmod: add DMM hwmod description
->   ARM: DRA7: hwmod: set DSS submodule parent hwmods
->   ARM: OMAP: display: change compat names to array
->   ARM: OMAP2+: display: detect DRA7 DSS
->   arm/dts: dra7.dtsi: add DSS support
-^^
->   arm/dts: dra72-evm.dts: add HDMI
-^^
->   arm/dts: am57xx-beagle-x15.dts: add HDMI
+Ard reported a boot failure when running UEFI under Qemu and Xen and
+experimenting with various Tianocore build options,
 
-ARM: dts: am57xx-beagle-x15: Add HDMI
+ "As it turns out, when allocating room for the UEFI memory map using
+  UEFI's AllocatePool (), it may result in two new memory map entries
+  being created, for instance, when using Tianocore's preallocated region
+  feature. For example, the following region
 
-Would be good to follow above convention for all dts patches $subject.
+  0x00005ead5000-0x00005ebfffff [Conventional Memory|   |  |  |  |  |WB|WT|WC|UC]
 
+  may be split like this
 
->   RFC: ARM: DRA7: enable DSS_DESHDCP_CLKEN
-> 
->  arch/arm/boot/dts/am57xx-beagle-x15.dts   |  80 +++++++++++++++++++++
->  arch/arm/boot/dts/dra7.dtsi               |  38 ++++++++++
->  arch/arm/boot/dts/dra72-evm.dts           | 111 ++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/dra72x.dtsi             |  11 +++
->  arch/arm/boot/dts/dra74x.dtsi             |  15 ++++
->  arch/arm/boot/dts/dra7xx-clocks.dtsi      |   1 +
->  arch/arm/mach-omap2/display.c             |  32 +++++----
->  arch/arm/mach-omap2/io.c                  |  11 +++
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  32 +++++++++
->  9 files changed, 316 insertions(+), 15 deletions(-)
-> 
+  0x00005ead5000-0x00005eae2fff [Conventional Memory|   |  |  |  |  |WB|WT|WC|UC]
+  0x00005eae3000-0x00005eae4fff [Loader Data        |   |  |  |  |  |WB|WT|WC|UC]
+  0x00005eae5000-0x00005ebfffff [Conventional Memory|   |  |  |  |  |WB|WT|WC|UC]
 
+  if the preallocated Loader Data region was chosen to be right in the
+  middle of the original free space.
+
+  After patch d1a8d66b9177 ("efi/libstub: Call get_memory_map() to
+  obtain map and desc sizes"), this is not being dealt with correctly
+  anymore, as the existing logic to allocate room for a single additional
+  entry has become insufficient."
+
+Mark requested to reinstate the old loop we had before commit
+d1a8d66b9177, which grows the memory map buffer until it's big enough to
+hold the EFI memory map.
+
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Matt Fleming <matt.fleming@intel.com>
+---
+ drivers/firmware/efi/libstub/efi-stub-helper.c | 16 ++++++----------
+ 1 file changed, 6 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
+index d073e3946383..9bd9fbb5bea8 100644
+--- a/drivers/firmware/efi/libstub/efi-stub-helper.c
++++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
+@@ -66,29 +66,25 @@ efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
+ 	unsigned long key;
+ 	u32 desc_version;
+ 
+-	*map_size = 0;
+-	*desc_size = 0;
+-	key = 0;
+-	status = efi_call_early(get_memory_map, map_size, NULL,
+-				&key, desc_size, &desc_version);
+-	if (status != EFI_BUFFER_TOO_SMALL)
+-		return EFI_LOAD_ERROR;
+-
++	*map_size = sizeof(*m) * 32;
++again:
+ 	/*
+ 	 * Add an additional efi_memory_desc_t because we're doing an
+ 	 * allocation which may be in a new descriptor region.
+ 	 */
+-	*map_size += *desc_size;
++	*map_size += sizeof(*m);
+ 	status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
+ 				*map_size, (void **)&m);
+ 	if (status != EFI_SUCCESS)
+ 		goto fail;
+ 
++	*desc_size = 0;
++	key = 0;
+ 	status = efi_call_early(get_memory_map, map_size, m,
+ 				&key, desc_size, &desc_version);
+ 	if (status == EFI_BUFFER_TOO_SMALL) {
+ 		efi_call_early(free_pool, m);
+-		return EFI_LOAD_ERROR;
++		goto again;
+ 	}
+ 
+ 	if (status != EFI_SUCCESS)
+-- 
+1.9.3
 
 -- 
-Regards,
-Nishanth Menon
+Matt Fleming, Intel Open Source Technology Center
