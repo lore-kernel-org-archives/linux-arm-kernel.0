@@ -1,94 +1,136 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 13 Feb 2015 11:00:50 +0100
-Subject: [PATCH 02/14] ARM: ARMv7M: Enlarge vector table to 256 entries
-In-Reply-To: <CALszF6BDa9pUb534YN2z9DbYA+hPCnG8XYy5YbjJwSiseKz4xg@mail.gmail.com>
-References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1423763164-5606-3-git-send-email-mcoquelin.stm32@gmail.com>
- <CAMuHMdWESyPktOSBfVoZCb35stUbhNpbbpzSW4JfORdObgg5jw@mail.gmail.com>
- <CALszF6BDa9pUb534YN2z9DbYA+hPCnG8XYy5YbjJwSiseKz4xg@mail.gmail.com>
-Message-ID: <20150213100050.GM10842@pengutronix.de>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Fri, 13 Feb 2015 12:18:51 +0200
+Subject: [PATCH v7 01/16] clk: tegra: Add binding for the Tegra124 DFLL
+ clocksource
+In-Reply-To: <20150212224242.GA23500@mithrandir>
+References: <1420723339-30735-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <1420723339-30735-2-git-send-email-mikko.perttunen@kapsi.fi>
+ <20150212224242.GA23500@mithrandir>
+Message-ID: <54DDCF8B.1050903@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 13, 2015 at 09:42:46AM +0100, Maxime Coquelin wrote:
-> Hi Geert,
-> 
-> 2015-02-12 21:34 GMT+01:00 Geert Uytterhoeven <geert@linux-m68k.org>:
-> > On Thu, Feb 12, 2015 at 6:45 PM, Maxime Coquelin
-> > <mcoquelin.stm32@gmail.com> wrote:
-> >> From Cortex-M4 and M7 reference manuals, the nvic supports up to 240
-> >> interrupts. So the number of entries in vectors table is 256.
-> >>
-> >> This patch adds the missing entries, and change the alignement, so that
-> >> vector_table remains naturally aligned.
-> >
-> > Shouldn't this depend on ARCH_STM32, or some other M4 or M7 specific
-> > Kconfig option, to avoid wasting the space on other CPUs?
-> 
-> Actually, the STM32F429 has 90 interrupts, so it would need 106
-> entries in the vector table.
-> The maximum of supported interrupts is not only for Cortex-M4 and M7,
-> this is also true for Cortex-M3.
-> 
-> I see two possibilities:
->  1 - We declare the vector table for the maximum supported number of
-> IRQs, as this patch does.
->         - Pro: it will be functionnal with all Cortex-M MCUs
->         - Con: Waste of less than 1KB for memory
->  2 - We introduce a config flag that provides the number of interrupts
->         - Pro: No more memory waste
->         - Con: Need to declare a per MCU model config flag.
-I'd vote for 2, something like:
+On 02/13/2015 12:42 AM, Thierry Reding wrote:
+> On Thu, Jan 08, 2015 at 03:22:04PM +0200, Mikko Perttunen wrote:
+>> From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+>>
+>> The DFLL is the main clocksource for the fast CPU cluster on Tegra124
+>> and also provides automatic CPU rail voltage scaling as well. The DFLL
+>> is a separate IP block from the usual Tegra124 clock-and-reset
+>> controller, so it gets its own node in the device tree.
+>>
+>> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+>> Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
+>> ---
+>>   .../bindings/clock/nvidia,tegra124-dfll.txt        | 69 ++++++++++++++++++++++
+>>   1 file changed, 69 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+>> new file mode 100644
+>> index 0000000..54c62ac
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+>> @@ -0,0 +1,69 @@
+>> +NVIDIA Tegra124 DFLL FCPU clocksource
+>> +
+>> +This binding uses the common clock binding:
+>> +Documentation/devicetree/bindings/clock/clock-bindings.txt
+>> +
+>> +The DFLL IP block on Tegra is a root clocksource designed for clocking
+>> +the fast CPU cluster. It consists of a free-running voltage controlled
+>> +oscillator connected to the CPU voltage rail (VDD_CPU), and a closed loop
+>> +control module that will automatically adjust the VDD_CPU voltage by
+>> +communicating with an off-chip PMIC either via an I2C bus or via PWM signals.
+>
+> How would PWM communication work? The documentation below doesn't
+> describe it, so perhaps either leave that part out until the binding is
+> updated to support it, or maybe make an explicit note that this mode of
+> operation isn't supported yet?
 
-	config CPUV7M_NUM_IRQ
-		int
-		default 90 if STM32F429
-		default 38 if EFM32GG
-		default 240
+Yes, I'll edit this part.
 
-then there is a working default and platforms being short on memory can
-configure as appropriate. (The only down side is that if we create
-multi-platfrom images at some time in the future either all or none of
-the supported platforms must provide a value here.)
- 
-> Then, regarding the natural alignment, is there a way to ensure it
-> depending on the value of a config flag?
-The exact wording in ARMARMv7-M is:
+>
+>> +Required properties:
+>> +- compatible : should be "nvidia,tegra124-dfll-fcpu"
+>> +- reg : Defines the following set of registers, in the order listed:
+>> +        - registers for the DFLL control logic.
+>> +        - registers for the I2C output logic.
+>> +        - registers for the integrated I2C master controller.
+>> +        - look-up table RAM for voltage register values.
+>
+> Why do these all need to be separate sets? According to the TRM this is
+> a single IP block with a single register region, why the need to split
+> them apart?
 
-	The Vector table must be naturally aligned to a power of two
-	whose alignment value is greater than or equal
-	to (Number of Exceptions supported x 4), with a minimum
-	alignment of 128 bytes.
+I will have to check with Tuomas if he had a reason to do it this way.
 
-> Or we should keep it at the maximum value possible?
-So we need:
+>
+>> +- interrupts: Should contain the DFLL block interrupt.
+>> +- clocks: Must contain an entry for each entry in clock-names.
+>> +  See ../clocks/clock-bindings.txt for details.
+>> +- clock-names: Must include the following entries:
+>> +  - soc: Clock source for the DFLL control logic.
+>> +  - ref: The closed loop reference clock
+>> +  - i2c: Clock source for the integrated I2C master.
+>> +- #clock-cells: Must be 0.
+>> +- clock-output-names: Name of the clock output.
+>> +- vdd-cpu-supply: Regulator for the CPU voltage rail that the DFLL
+>> +  hardware will start controlling.
+>
+> How does the hardware control it? How do we go from regulator phandle to
+> something that the hardware will know how to access?
 
-	.align x
+Looks like this property doesn't exist in the current device tree, along
+with some other properties. The compatible-string noted above is wrong 
+too. I'll fix these for the next version.
 
-with x being max(7, ceil(log((CPUV7M_NUM_IRQ + 16) * 4, 2))). So the
-alignment needed is between 7 and 10.
+>
+>> +Required properties for the control loop parameters:
+>> +- nvidia,sample-rate: Sample rate of the DFLL control loop.
+>> +- nvidia,droop-ctrl: See the register CL_DVFS_DROOP_CTRL in the TRM.
+>> +- nvidia,force-mode: See the field DFLL_PARAMS_FORCE_MODE in the TRM.
+>> +- nvidia,cf: Numeric value, see the field DFLL_PARAMS_CF_PARAM in the TRM.
+>> +- nvidia,ci: Numeric value, see the field DFLL_PARAMS_CI_PARAM in the TRM.
+>> +- nvidia,cg: Numeric value, see the field DFLL_PARAMS_CG_PARAM in the TRM.
+>> +- nvidia,cg-scale: Boolean value, see the field DFLL_PARAMS_CG_SCALE in the TRM.
+>> +
+>> +Required properties for I2C mode:
+>> +- nvidia,i2c-fs-rate: I2C transfer rate, if using FS mode.
+>
+> What's FS mode?
 
-If the assembler supports an expression here I'd use that. But before
-adding strange hacks to generate the right value there better go for a
-static value like:
+I would imagine it stands for full speed. I'll expand the abbreviation.
 
-	/* The vector table must be naturally aligned */
-	#if CONFIG_CPUV7M_NUM_IRQ <= 112
-	.align 9 /* log2((112 + 16) * 4) */
-	#else
-	.align 10
-	#endif
+>
+>> +
+>> +Example:
+>> +
+>> +dfll at 0,70110000 {
+>
+> Perhaps this should be "clock at 0,70110000"?
 
-Further steps would be:
+Probably.
 
-	CONFIG_CPUV7M_NUM_IRQ <= 48 -> .align 8
-	CONFIG_CPUV7M_NUM_IRQ <= 16 -> .align 7
+>
+>> +        compatible = "nvidia,tegra124-dfll";
+>> +        reg = <0 0x70110000 0 0x100>, /* DFLL control */
+>> +              <0 0x70110000 0 0x100>, /* I2C output control */
+>> +              <0 0x70110100 0 0x100>, /* Integrated I2C controller */
+>> +              <0 0x70110200 0 0x100>; /* Look-up table RAM */
+>> +        interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+>> +        clocks = <&tegra_car TEGRA124_CLK_DFLL_SOC>,
+>> +                 <&tegra_car TEGRA124_CLK_DFLL_REF>,
+>> +                 <&tegra_car TEGRA124_CLK_I2C5>;
+>
+> If this controls I2C5 now, should it be documented that we can't use
+> this controller in software while it is in use by DFLL?
 
-Probably it's not worth to add the respective #ifdefs here.
+I'll add a note about this.
 
-Best regards
-Uwe
+>
+> Thierry
+>
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Cheers,
+Mikko.
