@@ -1,53 +1,58 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Fri, 13 Feb 2015 13:40:29 +0800
-Subject: [RFC PATCH v3 05/26] ftrace/x86: Ensure rec->flags no change when
- failure occures.
+Date: Fri, 13 Feb 2015 13:40:22 +0800
+Subject: [RFC PATCH v3 02/26] kprobes: makes kprobes/enabled works correctly
+ for optimized kprobes.
 In-Reply-To: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
 References: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1423806029-61699-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1423806022-61575-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't change rec->flags if code modification fails.
+debugfs/kprobes/enabled doesn't work correctly on optimized kprobes.
+Masami Hiramatsu has a test report on x86_64 platform:
+
+https://lkml.org/lkml/2015/1/19/274
+
+This patch forces it to unoptimize kprobe if kprobes_all_disarmed
+is set. It also checks the flag in unregistering path for skipping
+unneeded disarming process when kprobes globally disarmed.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
+Signed-off-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+Cc: Ingo Molnar <mingo@kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
 ---
- arch/x86/kernel/ftrace.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ kernel/kprobes.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/x86/kernel/ftrace.c b/arch/x86/kernel/ftrace.c
-index 8b7b0a5..7bdba65 100644
---- a/arch/x86/kernel/ftrace.c
-+++ b/arch/x86/kernel/ftrace.c
-@@ -497,6 +497,7 @@ static int finish_update(struct dyn_ftrace *rec, int enable)
+diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+index c397900..c90e417 100644
+--- a/kernel/kprobes.c
++++ b/kernel/kprobes.c
+@@ -869,7 +869,8 @@ static void __disarm_kprobe(struct kprobe *p, bool reopt)
  {
- 	unsigned long ftrace_addr;
- 	int ret;
-+	unsigned long old_flags = rec->flags;
+ 	struct kprobe *_p;
  
- 	ret = ftrace_update_record(rec, enable);
+-	unoptimize_kprobe(p, false);	/* Try to unoptimize */
++	/* Try to unoptimize */
++	unoptimize_kprobe(p, kprobes_all_disarmed);
  
-@@ -509,14 +510,18 @@ static int finish_update(struct dyn_ftrace *rec, int enable)
- 	case FTRACE_UPDATE_MODIFY_CALL:
- 	case FTRACE_UPDATE_MAKE_CALL:
- 		/* converting nop to call */
--		return finish_update_call(rec, ftrace_addr);
-+		ret = finish_update_call(rec, ftrace_addr);
-+		break;
+ 	if (!kprobe_queued(p)) {
+ 		arch_disarm_kprobe(p);
+@@ -1571,7 +1572,13 @@ static struct kprobe *__disable_kprobe(struct kprobe *p)
  
- 	case FTRACE_UPDATE_MAKE_NOP:
- 		/* converting a call to a nop */
--		return finish_update_nop(rec);
-+		ret = finish_update_nop(rec);
-+		break;
+ 		/* Try to disarm and disable this/parent probe */
+ 		if (p == orig_p || aggr_kprobe_disabled(orig_p)) {
+-			disarm_kprobe(orig_p, true);
++			/*
++			 * If kprobes_all_disarmed is set, orig_p
++			 * should have already been disarmed, so
++			 * skip unneed disarming process.
++			 */
++			if (!kprobes_all_disarmed)
++				disarm_kprobe(orig_p, true);
+ 			orig_p->flags |= KPROBE_FLAG_DISABLED;
+ 		}
  	}
- 
--	return 0;
-+	if (ret)
-+		rec->flags = old_flags;
-+	return ret;
- }
- 
- static void do_sync_core(void *data)
 -- 
 1.8.4
