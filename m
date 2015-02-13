@@ -1,56 +1,103 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 13 Feb 2015 19:19:28 +0100
-Subject: [PATCH 0/7] ARM: berlin: refactor the clock
-In-Reply-To: <20150213173121.GG26475@lunn.ch>
-References: <1423845781-7480-1-git-send-email-antoine.tenart@free-electrons.com>
- <20150213173121.GG26475@lunn.ch>
-Message-ID: <20150213191928.20f79ebf@free-electrons.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Fri, 13 Feb 2015 17:41:43 +0100
+Subject: [PATCH 12/14] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <1423844735.4182.52.camel@pengutronix.de>
+References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1423763164-5606-13-git-send-email-mcoquelin.stm32@gmail.com>
+ <1423828078.4182.17.camel@pengutronix.de>
+ <CALszF6D+5mXajUWarwq8M4yL_Nc+x1Bmu4D7_HxDRy2kGRXNVQ@mail.gmail.com>
+ <1423844735.4182.52.camel@pengutronix.de>
+Message-ID: <CALszF6Ad93BgT4UsJudVKpfhhL2dbtKTTRno1XqQ5=eANkwXzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+2015-02-13 17:25 GMT+01:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> Hi Maxime,
+>
+> Am Freitag, den 13.02.2015, 16:59 +0100 schrieb Maxime Coquelin:
+>> Hi Philipp,
+>>
+>> 2015-02-13 12:47 GMT+01:00 Philipp Zabel <p.zabel@pengutronix.de>:
+>> > Hi Maxime,
+>> >
+>> > Am Donnerstag, den 12.02.2015, 18:46 +0100 schrieb Maxime Coquelin:
+>> > [...]
+>> >> +     soc {
+>> >> +             reset_ahb1: reset at 40023810 {
+>> >> +                     #reset-cells = <1>;
+>> >> +                     compatible = "st,stm32-reset";
+>> >> +                     reg = <0x40023810 0x4>;
+>> >> +             };
+>> >> +
+>> >> +             reset_ahb2: reset at 40023814 {
+>> >> +                     #reset-cells = <1>;
+>> >> +                     compatible = "st,stm32-reset";
+>> >> +                     reg = <0x40023814 0x4>;
+>> >> +             };
+>> >> +
+>> >> +             reset_ahb3: reset at 40023818 {
+>> >> +                     #reset-cells = <1>;
+>> >> +                     compatible = "st,stm32-reset";
+>> >> +                     reg = <0x40023818 0x4>;
+>> >> +             };
+>> >> +
+>> >> +             reset_apb1: reset at 40023820 {
+>> >> +                     #reset-cells = <1>;
+>> >> +                     compatible = "st,stm32-reset";
+>> >> +                     reg = <0x40023820 0x4>;
+>> >> +             };
+>> >> +
+>> >> +             reset_apb2: reset at 40023824 {
+>> >> +                     #reset-cells = <1>;
+>> >> +                     compatible = "st,stm32-reset";
+>> >> +                     reg = <0x40023824 0x4>;
+>> >> +             };
+>> >
+>> > These are mostly consecutive, single registers. I wonder if these are
+>> > part of the same IP block and thus should be grouped together into the
+>> > same reset controller node?
+>>
+>> What I could to is to have two instances. One for AHB and one for APB domain.
+>> Doing this, I will have one instance per domain, and only consecutive registers.
+>> Is it fine for you?
+>
+> Looking at
+> http://www.st.com/web/en/resource/technical/document/reference_manual/DM00031020.pdf
+> Table 34 (RCC register map and reset values), I'd say there is a single
+> "Reset and Clock Control" device at 0x40023800 - 0x40023884:
+>
+>         soc {
+>                 rcc: rcc at 40023800 {
+>                         #clock-cells = <1>;
+>                         #reset-cells = <1>;
+>                         compatible = "st,stm32-rcc";
+>                         reg = <0x40023800 0x84>;
+>                 };
+>
+>                 ...
+>
+> If you really want to describe the reset controller parts (offsets +0x10
+> to +0x24) in a separate node, I won't argue against it too long,
+> although this is a somewhat arbitrary decision.
+>
+> In any case, the whole register at offset +0x1c is reserved, so there is
+> no reason to split the reset controller. It is ok to have unused ranges
+> as is already the case with reserved bits inside the used registers.
 
-On Fri, 13 Feb 2015 18:31:21 +0100, Andrew Lunn wrote:
+Ok. I understand your point.
+But it will be more difficult at usage, because the node referencing
+the fourth reset bit of apb2 register will have to pass 164 as
+parameter.
+It is error prone IMHO.
 
-> Something which needs to be discussed for both this patchset and the
-> previous one, is backwards compatibility of the device tree.
-> 
-> As far as i can see, these changes are not backwards compatible.
-> Somebody trying to boot a new kernel with a old DT blob is going to
-> have trouble.
-> 
-> How do we want to handle this?
+Other solution would be to add some defines for each reset line in the
+DT-Bindings, as we do today for STi platform.
+But it is giving an unneeded constraint between DT and reset trees.
 
-I think one thing that should really be taken into account here is that
-we have basically no usable datasheet for those SoCs. We only have very
-partial datasheets, and only fairly a vendor kernel tree. This makes it
-nearly impossible to have from the start up a clear picture of the
-hardware layout and how it should be represented in the DT. Antoine,
-and I guess Sebastian as well, are discovering progressively the layout
-of the registers, their functionality, depending on the features that
-are enabled.
+Br,
+Maxime
 
-The DT backward compatibility requirement essentially requires either:
-
- * A very clear picture of the hardware from the beginning, so that we
-   can be pretty sure when designing the first DT binding, that it is
-   going to be alright. This is clearly not something we have for the
-   Marvell Berlin platforms.
-
- * Keep vast amount of legacy code to support old DTs, which nobody is
-   every going to test, which means that such code is guaranteed to
-   bitrot within 2 or 3 kernel releases, if not earlier.
-
-Instead, since I believe at this point Marvell doesn't care about DT
-backward compatibility for its platforms, could we instead declare the
-DT bindings of this platform as "unstable", just like the AT91 guys did
-for their DT bindings
-(http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/Documentation/arm/Atmel/README#n100) ?
-
-Best regards,
-
-Thomas Petazzoni
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>
+> regards
+> Philipp
+>
