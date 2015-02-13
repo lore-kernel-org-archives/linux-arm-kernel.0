@@ -1,58 +1,73 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 13 Feb 2015 17:07:34 +0200
-Subject: [PATCH 13/23] ARM: OMAP2+: CM: determine CM base address from
- device tree
-In-Reply-To: <alpine.DEB.2.02.1501241937570.5450@utopia.booyaka.com>
-References: <1417103514-17027-1-git-send-email-t-kristo@ti.com>
- <1417103514-17027-14-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.02.1501241937570.5450@utopia.booyaka.com>
-Message-ID: <54DE1336.1060407@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 13 Feb 2015 17:11:19 +0200
+Subject: [PATCH 2/9] ARM: DRA7: hwmod: add DMM hwmod description
+In-Reply-To: <1423840286-18377-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1423840286-18377-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1423840286-18377-3-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2015 09:39 PM, Paul Walmsley wrote:
-> Hi Tero
->
-> On Thu, 27 Nov 2014, Tero Kristo wrote:
->
->> There is no need to provide the CM base address through a low-level API
->> from the low-level IO init, as this information is available through DT.
->> Re-routed the parsing function to be called from the CM drivers also to
->> simplify the implementation under io.c.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->
-> This one breaks boot on OMAP2430 (and presumably all other OMAP2xxx).
-> Adding something like this seems to get it working.
+Add DMM hwmod entries for DRA7. This is identical to DMM on OMAP5.
 
-Yeah, you are right. This patch also broke am33xx boot, I will fix this 
-in v2.
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
--Tero
-
->
->
-> - Paul
->
-> ---
->   arch/arm/mach-omap2/cm_common.c | 5 +++++
->   1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
-> index c2d7c7b3002c..1770364f0499 100644
-> --- a/arch/arm/mach-omap2/cm_common.c
-> +++ b/arch/arm/mach-omap2/cm_common.c
-> @@ -234,7 +234,12 @@ static struct omap_prcm_init_data omap3_cm_data = {
->   	.offset = -OMAP3430_IVA2_MOD,
->   };
->
-> +static struct omap_prcm_init_data omap2_prcm_data = {
-> +	.index = CLK_MEMMAP_INDEX_CM1,
-> +};
-> +
->   static struct of_device_id omap_cm_dt_match_table[] = {
-> +	{ .compatible = "ti,omap2-prcm", .data = &omap2_prcm_data },
->   	{ .compatible = "ti,omap3-cm", .data = &omap3_cm_data },
->   	{ .compatible = "ti,omap4-cm1", .data = &cm_data },
->   	{ .compatible = "ti,omap4-cm2", .data = &cm2_data },
->
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index ffd6604cd546..47664bab5b57 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -49,6 +49,27 @@
+  */
+ 
+ /*
++ * 'dmm' class
++ * instance(s): dmm
++ */
++static struct omap_hwmod_class dra7xx_dmm_hwmod_class = {
++	.name	= "dmm",
++};
++
++/* dmm */
++static struct omap_hwmod dra7xx_dmm_hwmod = {
++	.name		= "dmm",
++	.class		= &dra7xx_dmm_hwmod_class,
++	.clkdm_name	= "emif_clkdm",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = DRA7XX_CM_EMIF_DMM_CLKCTRL_OFFSET,
++			.context_offs = DRA7XX_RM_EMIF_DMM_CONTEXT_OFFSET,
++		},
++	},
++};
++
++/*
+  * 'l3' class
+  * instance(s): l3_instr, l3_main_1, l3_main_2
+  */
+@@ -2312,6 +2333,14 @@ static struct omap_hwmod dra7xx_wd_timer2_hwmod = {
+  * Interfaces
+  */
+ 
++/* l3_main_1 -> dmm */
++static struct omap_hwmod_ocp_if dra7xx_l3_main_1__dmm = {
++	.master		= &dra7xx_l3_main_1_hwmod,
++	.slave		= &dra7xx_dmm_hwmod,
++	.clk		= "l3_iclk_div",
++	.user		= OCP_USER_SDMA,
++};
++
+ /* l3_main_2 -> l3_instr */
+ static struct omap_hwmod_ocp_if dra7xx_l3_main_2__l3_instr = {
+ 	.master		= &dra7xx_l3_main_2_hwmod,
+@@ -3264,6 +3293,7 @@ static struct omap_hwmod_ocp_if dra7xx_l4_wkup__wd_timer2 = {
+ };
+ 
+ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
++	&dra7xx_l3_main_1__dmm,
+ 	&dra7xx_l3_main_2__l3_instr,
+ 	&dra7xx_l4_cfg__l3_main_1,
+ 	&dra7xx_mpu__l3_main_1,
+-- 
+2.3.0
