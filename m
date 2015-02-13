@@ -1,55 +1,42 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Fri, 13 Feb 2015 15:22:20 +0800
-Subject: [PATCH] mmc: dw_mmc: rockchip: add support MMC_CAP_RUNTIME_RESUME
- capability
-Message-ID: <1423812140-24196-1-git-send-email-addy.ke@rock-chips.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Fri, 13 Feb 2015 08:28:37 +0100
+Subject: [PATCH 10/11] ARM: sti: always enable RESET_CONTROLLER
+In-Reply-To: <1423770163-583064-11-git-send-email-arnd@arndb.de>
+References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
+ <1423770163-583064-11-git-send-email-arnd@arndb.de>
+Message-ID: <54DDA7A5.7070307@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support HS200 and UHS mode, mmc core will call init_card() to
-execute tuning:
-- sdio: init_card can be executed at runtime resume.
-- sd and mmc: init_card can be executed at resume or runtime resume,
-  which depends on MMC_CAP_RUNTIME_RESUME capability.
+Hi Arnd
 
-On rk3288 SoC, host will get DRTO interrupt when host send command
-to read tuning data. This will spend more than 111ms:
-drto_ms = drto_clks * 1000 / bus_hz = 111ms.
+On 02/12/2015 08:42 PM, Arnd Bergmann wrote:
+> A lot of the sti device drivers require reset controller support,
+> but do not all have individual 'depends on RESET_CONTROLLER'
+> statements. Using 'select' here once avoids a lot of build errors
+> resulting from this.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Maxime Coquelin <maxime.coquelin@st.com>
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+> Cc: Patrice Chotard <patrice.chotard@st.com>
+> ---
+>   arch/arm/mach-sti/Kconfig | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
+> index 8825bc9e2553..3b1ac463a494 100644
+> --- a/arch/arm/mach-sti/Kconfig
+> +++ b/arch/arm/mach-sti/Kconfig
+> @@ -13,6 +13,7 @@ menuconfig ARCH_STI
+>   	select ARM_ERRATA_775420
+>   	select PL310_ERRATA_753970 if CACHE_L2X0
+>   	select PL310_ERRATA_769419 if CACHE_L2X0
+> +	select RESET_CONTROLLER
+>   	help
+>   	  Include support for STiH41x SOCs like STiH415/416 using the device tree
+>   	  for discovery
 
-And the total tuning time will be more than 400ms.
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
 
-So we should add MMC_CAP_RUNTIME_RESUME capability to execute tuning
-at runtime resume. Only if we do so, can we pass resume test.
-
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
----
- drivers/mmc/host/dw_mmc-rockchip.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
-index e2a726a..e5f57b5 100644
---- a/drivers/mmc/host/dw_mmc-rockchip.c
-+++ b/drivers/mmc/host/dw_mmc-rockchip.c
-@@ -76,12 +76,20 @@ static int dw_mci_rockchip_init(struct dw_mci *host)
- 	return 0;
- }
- 
-+/* Common capabilities of RK3288 SoC */
-+static unsigned long dw_mci_rk3288_dwmmc_caps[4] = {
-+	MMC_CAP_RUNTIME_RESUME, /* emmc */
-+	MMC_CAP_RUNTIME_RESUME, /* sdmmc */
-+	0, /* sdio0 */
-+	0, /* sdio1 */
-+};
- static const struct dw_mci_drv_data rk2928_drv_data = {
- 	.prepare_command        = dw_mci_rockchip_prepare_command,
- 	.init			= dw_mci_rockchip_init,
- };
- 
- static const struct dw_mci_drv_data rk3288_drv_data = {
-+	.caps			= dw_mci_rk3288_dwmmc_caps,
- 	.prepare_command        = dw_mci_rockchip_prepare_command,
- 	.set_ios		= dw_mci_rk3288_set_ios,
- 	.setup_clock    = dw_mci_rk3288_setup_clock,
--- 
-1.8.3.2
+Thanks
