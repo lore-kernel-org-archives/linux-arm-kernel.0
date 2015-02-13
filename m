@@ -1,70 +1,124 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 13 Feb 2015 10:37:16 +0000
-Subject: [PATCH 01/11] ARM: vexpress: use ARM_CPU_SUSPEND if needed
-In-Reply-To: <1423770163-583064-2-git-send-email-arnd@arndb.de>
-References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
- <1423770163-583064-2-git-send-email-arnd@arndb.de>
-Message-ID: <20150213103716.GQ14954@e106497-lin.cambridge.arm.com>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Fri, 13 Feb 2015 12:39:03 +0200
+Subject: [PATCH v7 05/16] clk: tegra: Add DFLL DVCO reset control for
+ Tegra124
+In-Reply-To: <20150212141944.GK20811@tbergstrom-lnx.Nvidia.com>
+References: <1420723339-30735-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <1420723339-30735-6-git-send-email-mikko.perttunen@kapsi.fi>
+ <20150212141944.GK20811@tbergstrom-lnx.Nvidia.com>
+Message-ID: <54DDD447.8000404@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 12, 2015 at 07:42:33PM +0000, Arnd Bergmann wrote:
-> The vexpress tc2 power management code calls mcpm_loopback, which
-> is only available if ARM_CPU_SUSPEND is enabled, otherwise we
-> get a link error:
-> 
-> arch/arm/mach-vexpress/built-in.o: In function `tc2_pm_init':
-> arch/arm/mach-vexpress/tc2_pm.c:389: undefined reference to `mcpm_loopback'
+On 02/12/2015 04:19 PM, Peter De Schrijver wrote:
+> On Thu, Jan 08, 2015 at 03:22:08PM +0200, Mikko Perttunen wrote:
+>> From: Paul Walmsley <pwalmsley@nvidia.com>
+>>
+>> The DVCO present in the DFLL IP block has a separate reset line,
+>> exposed via the CAR IP block.  This reset line is asserted upon SoC
+>> reset.  Unless something (such as the DFLL driver) deasserts this
+>> line, the DVCO will not oscillate, although reads and writes to the
+>> DFLL IP block will complete.
+>>
+>> Thanks to Aleksandr Frid <afrid@nvidia.com> for identifying this and
+>> saving hours of debugging time.
+>>
+>
+> Should this be done as a reset driver?
 
-Arnd,
+Probably through the already existing CAR reset driver. This reset 
+doesn't fit well with the existing numbering scheme there, though. 
+Perhaps a magic high-valued constant that represents it.
 
-We are having reports of TC2 not booting with MCPM enabled. Lorenzo
-was investigating this but then headed for Linaro Connect this week,
-so we don't have yet a resolution. Can this patch be postponed for
-a later -rc?
-
-Best regards,
-Liviu
-
-
-> 
-> This explicitly selects ARM_CPU_SUSPEND like other platforms that
-> need it.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 3592d7e002438 ("ARM: 8082/1: TC2: test the MCPM loopback during boot")
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  arch/arm/mach-vexpress/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-> index d6b16d9a7838..3c2509b4b694 100644
-> --- a/arch/arm/mach-vexpress/Kconfig
-> +++ b/arch/arm/mach-vexpress/Kconfig
-> @@ -73,6 +73,7 @@ config ARCH_VEXPRESS_TC2_PM
->  	depends on MCPM
->  	select ARM_CCI
->  	select ARCH_VEXPRESS_SPC
-> +	select ARM_CPU_SUSPEND
->  	help
->  	  Support for CPU and cluster power management on Versatile Express
->  	  with a TC2 (A15x2 A7x3) big.LITTLE core tile.
-> -- 
-> 2.1.0.rc2
-> 
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+>
+>> Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
+>> [ttynkkynen: ported to tegra124 from tegra114]
+>> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+>> Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
+>> ---
+>>   drivers/clk/tegra/clk-tegra124.c | 47 ++++++++++++++++++++++++++++++++++++++++
+>>   drivers/clk/tegra/clk.h          |  3 +++
+>>   2 files changed, 50 insertions(+)
+>>
+>> diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
+>> index f5f9bac..623b77f 100644
+>> --- a/drivers/clk/tegra/clk-tegra124.c
+>> +++ b/drivers/clk/tegra/clk-tegra124.c
+>> @@ -31,6 +31,9 @@
+>>   #define CLK_SOURCE_CSITE 0x1d4
+>>   #define CLK_SOURCE_EMC 0x19c
+>>
+>> +#define RST_DFLL_DVCO			0x2f4
+>> +#define DVFS_DFLL_RESET_SHIFT		0
+>> +
+>>   #define PLLC_BASE 0x80
+>>   #define PLLC_OUT 0x84
+>>   #define PLLC_MISC2 0x88
+>> @@ -1399,6 +1402,50 @@ static void __init tegra124_clock_apply_init_table(void)
+>>   	tegra_init_from_table(init_table, clks, TEGRA124_CLK_CLK_MAX);
+>>   }
+>>
+>> +/**
+>> + * tegra124_car_barrier - wait for pending writes to the CAR to complete
+>> + *
+>> + * Wait for any outstanding writes to the CAR MMIO space from this CPU
+>> + * to complete before continuing execution.  No return value.
+>> + */
+>> +static void tegra124_car_barrier(void)
+>> +{
+>> +	readl_relaxed(clk_base + RST_DFLL_DVCO);
+>> +}
+>> +
+>> +/**
+>> + * tegra124_clock_assert_dfll_dvco_reset - assert the DFLL's DVCO reset
+>> + *
+>> + * Assert the reset line of the DFLL's DVCO.  No return value.
+>> + */
+>> +void tegra124_clock_assert_dfll_dvco_reset(void)
+>> +{
+>> +	u32 v;
+>> +
+>> +	v = readl_relaxed(clk_base + RST_DFLL_DVCO);
+>> +	v |= (1 << DVFS_DFLL_RESET_SHIFT);
+>> +	writel_relaxed(v, clk_base + RST_DFLL_DVCO);
+>> +	tegra124_car_barrier();
+>> +}
+>> +EXPORT_SYMBOL(tegra124_clock_assert_dfll_dvco_reset);
+>> +
+>> +/**
+>> + * tegra124_clock_deassert_dfll_dvco_reset - deassert the DFLL's DVCO reset
+>> + *
+>> + * Deassert the reset line of the DFLL's DVCO, allowing the DVCO to
+>> + * operate.  No return value.
+>> + */
+>> +void tegra124_clock_deassert_dfll_dvco_reset(void)
+>> +{
+>> +	u32 v;
+>> +
+>> +	v = readl_relaxed(clk_base + RST_DFLL_DVCO);
+>> +	v &= ~(1 << DVFS_DFLL_RESET_SHIFT);
+>> +	writel_relaxed(v, clk_base + RST_DFLL_DVCO);
+>> +	tegra124_car_barrier();
+>> +}
+>> +EXPORT_SYMBOL(tegra124_clock_deassert_dfll_dvco_reset);
+>> +
+>>   static void __init tegra124_clock_init(struct device_node *np)
+>>   {
+>>   	struct device_node *node;
+>> diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+>> index 4e458aa..def0ea4 100644
+>> --- a/drivers/clk/tegra/clk.h
+>> +++ b/drivers/clk/tegra/clk.h
+>> @@ -629,6 +629,9 @@ void tegra114_clock_tune_cpu_trimmers_init(void);
+>>   void tegra114_clock_assert_dfll_dvco_reset(void);
+>>   void tegra114_clock_deassert_dfll_dvco_reset(void);
+>>
+>> +void tegra124_clock_assert_dfll_dvco_reset(void);
+>> +void tegra124_clock_deassert_dfll_dvco_reset(void);
+>> +
+>>   typedef void (*tegra_clk_apply_init_table_func)(void);
+>>   extern tegra_clk_apply_init_table_func tegra_clk_apply_init_table;
+>>
+>> --
+>> 2.2.1
+>>
