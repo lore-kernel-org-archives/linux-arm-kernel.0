@@ -1,59 +1,60 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 13 Feb 2015 09:25:18 -0600
-Subject: [PATCH 9/9] RFC: ARM: DRA7: enable DSS_DESHDCP_CLKEN
-In-Reply-To: <1423840286-18377-10-git-send-email-tomi.valkeinen@ti.com>
-References: <1423840286-18377-1-git-send-email-tomi.valkeinen@ti.com>
- <1423840286-18377-10-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <CAGo_u6p89ot-eNwK65otoYsLM6NXeh929=SBG6uKAsX8Tnd_RQ@mail.gmail.com>
+From: gwenhael.goavec-merou@armadeus.com (gwenhael.goavec)
+Date: Fri, 13 Feb 2015 16:31:31 +0100
+Subject: [PATCH 4/5] ARM: dts: imx28-apf28dev: add support for can0
+In-Reply-To: <20150213155358.12678942@ipc1.ka-ro>
+References: <1423836725-86061-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+ <1423836725-86061-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
+ <1423836725-86061-3-git-send-email-gwenhael.goavec-merou@armadeus.com>
+ <1423836725-86061-4-git-send-email-gwenhael.goavec-merou@armadeus.com>
+ <20150213155358.12678942@ipc1.ka-ro>
+Message-ID: <20150213163131.23cbffb5@x230.trabucayre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 13, 2015 at 9:11 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> DRA7xx's CTRL_CORE_CONTROL_IO_2 register contains bits for various
-> subsystems, including PCIe, DCAN, QSPI and DSS. At the moment only DCAN
-> bits are used by the SW via syscon.
->
-> For DSS there is DSS_DESHDCP_CLKEN bit. This (presumably) enables a
-> clock related to DSS's HDCP. If that clock is off, DSS module does not
-> start at all, causing OCP errors. This means that the HWMOD code is not
-> able to reset and initialize DSS.
->
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> ---
->  arch/arm/mach-omap2/io.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
->
-> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-> index a1bd6affb508..2206fb13f195 100644
-> --- a/arch/arm/mach-omap2/io.c
-> +++ b/arch/arm/mach-omap2/io.c
-> @@ -700,6 +700,17 @@ void __init dra7xx_init_early(void)
->         dra7xx_hwmod_init();
->         omap_hwmod_init_postsetup();
->         omap_clk_soc_init = dra7xx_dt_clk_init;
-> +
-> +       if (soc_is_dra7xx()) {
+Hi,
 
-Umm.. this code will only be executed for dra7xx :)
+On Fri, 13 Feb 2015 15:53:58 +0100
+Lothar Wa?mann <LW@KARO-electronics.de> wrote:
 
-> +               u32 v;
-> +               const u16 ctrl_core_control_io_2 = 0x558;
-> +
-> +               /* set CTRL_CORE_CONTROL_IO_2:DSS_DESHDCP_CLKEN */
-> +
-> +               v = omap_ctrl_readl(ctrl_core_control_io_2);
-> +               v |= 1;
-> +               omap_ctrl_writel(v, ctrl_core_control_io_2);
-> +       }
->  }
->
->  void __init dra7xx_init_late(void)
-just my 2 cents.
-I would probably wait for control module to become syscon and probably
-model this as syscon clk - I thin we should be seeing a series
-sometime soon.
-
--- 
----
-Regards,
-Nishanth Menon
+> Hi,
+> 
+> Gwenhael Goavec-Merou wrote:
+> > Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+> > Signed-off-by: Sebastien Szymanski <sebastien.szymanski@armadeus.com>
+> > ---
+> >  arch/arm/boot/dts/imx28-apf28dev.dts | 15 +++++++++++++++
+> >  1 file changed, 15 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
+> > index 68405c3..a052d3e 100644
+> > --- a/arch/arm/boot/dts/imx28-apf28dev.dts
+> > +++ b/arch/arm/boot/dts/imx28-apf28dev.dts
+> > @@ -110,6 +110,13 @@
+> >  					};
+> >  				};
+> >  			};
+> > +
+> > +			can0: can at 80032000 {
+> >
+> Did you compile-test this? It should produce a build error, since
+> the label can0 already exists in imx28.dtsi.
+Compile fine and without error. It's the same thing for all labels in 
+this dts file.
+> You should use:
+> |&can0 {
+> |				pinctrl-names = "default";
+> |				pinctrl-0 = <&can0_pins_a>;
+> |				xceiver-supply = <&reg_can0_vcc>;
+> |				status = "okay";
+> |};
+> 
+> > @@ -176,6 +183,14 @@
+> >  			gpio = <&gpio1 23 1>;
+> s/ 1/ GPIO_ACTIVE_LOW/ ?
+> 
+This change is out of the context to this patch. This change will be done in
+other patch.
+> 
+> Lothar Wa?mann
+> -- 
+Gwenhael Goavec-Merou
