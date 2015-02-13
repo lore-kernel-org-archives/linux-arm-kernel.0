@@ -1,93 +1,69 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Fri, 13 Feb 2015 13:01:14 +0800
-Subject: [PATCH RFC v9 09/20] drm/dsi: Add a helper to get bits per pixel
- of MIPI DSI pixel format
-In-Reply-To: <20150212092642.GY24485@phenom.ffwll.local>
-References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
- <1423720903-24806-10-git-send-email-Ying.Liu@freescale.com>
- <20150212092642.GY24485@phenom.ffwll.local>
-Message-ID: <20150213050112.GA18793@victor>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Fri, 13 Feb 2015 14:13:31 +0900
+Subject: [PATCH RESEND] ARM: DMA: Fix kzalloc flags in
+ __iommu_alloc_buffer()
+In-Reply-To: <20150213033243.GC961@arm.com>
+References: <1423645301-709-1-git-send-email-acourbot@nvidia.com>
+ <20150213033243.GC961@arm.com>
+Message-ID: <54DD87FB.6070802@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 12, 2015 at 10:26:42AM +0100, Daniel Vetter wrote:
-> On Thu, Feb 12, 2015 at 02:01:32PM +0800, Liu Ying wrote:
-> > Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
-> > ---
-> > v8->v9:
-> >  * Rebase onto the imx-drm/next branch of Philipp Zabel's open git repository.
-> > 
-> > v7->v8:
-> >  * None.
-> > 
-> > v6->v7:
-> >  * None.
-> > 
-> > v5->v6:
-> >  * Address the over 80 characters in one line warning reported by the
-> >    checkpatch.pl script.
-> > 
-> > v4->v5:
-> >  * None.
-> > 
-> > v3->v4:
-> >  * None.
-> > 
-> > v2->v3:
-> >  * None.
-> > 
-> > v1->v2:
-> >  * Thierry Reding suggested that the mipi_dsi_pixel_format_to_bpp() function
-> >    could be placed at the common DRM MIPI DSI driver.
-> >    This patch is newly added.
-> > 
-> >  include/drm/drm_mipi_dsi.h | 14 ++++++++++++++
-> >  1 file changed, 14 insertions(+)
-> > 
-> > diff --git a/include/drm/drm_mipi_dsi.h b/include/drm/drm_mipi_dsi.h
-> > index f1d8d0d..3662021 100644
-> > --- a/include/drm/drm_mipi_dsi.h
-> > +++ b/include/drm/drm_mipi_dsi.h
-> > @@ -163,6 +163,20 @@ static inline struct mipi_dsi_device *to_mipi_dsi_device(struct device *dev)
-> >  	return container_of(dev, struct mipi_dsi_device, dev);
-> >  }
-> >  
-> > +static inline int mipi_dsi_pixel_format_to_bpp(enum mipi_dsi_pixel_format fmt)
-> 
-> Kerneldoc seems to be missing for this one.
+On 02/13/2015 12:32 PM, Will Deacon wrote:
+> On Wed, Feb 11, 2015 at 09:01:41AM +0000, Alexandre Courbot wrote:
+>> There doesn't seem to be any valid reason to allocate the pages array
+>> with the same flags as the buffer itself. Doing so can eventually lead
+>> to the following safeguard in mm/slab.c to be hit:
+>>
+>> BUG_ON(flags & GFP_SLAB_BUG_MASK);
+>
+> nit: I can't actually spot this BUG_ON in the kernel.
 
-I'll add it.  Thanks for pointing out this.
+I have been trying to push this patch for so long that the line in 
+question changed in the meantime. :) It is now
 
-Regards,
-Liu Ying
+         if (unlikely(flags & GFP_SLAB_BUG_MASK)) {
+                 pr_emerg("gfp: %u\n", flags & GFP_SLAB_BUG_MASK);
+                 BUG();
+         }
 
-> -Daniel
-> 
-> > +{
-> > +	switch (fmt) {
-> > +	case MIPI_DSI_FMT_RGB888:
-> > +	case MIPI_DSI_FMT_RGB666:
-> > +		return 24;
-> > +	case MIPI_DSI_FMT_RGB666_PACKED:
-> > +		return 18;
-> > +	case MIPI_DSI_FMT_RGB565:
-> > +		return 16;
-> > +	}
-> > +	return -EINVAL;
-> > +}
-> > +
-> >  struct mipi_dsi_device *of_find_mipi_dsi_device_by_node(struct device_node *np);
-> >  int mipi_dsi_attach(struct mipi_dsi_device *dsi);
-> >  int mipi_dsi_detach(struct mipi_dsi_device *dsi);
-> > -- 
-> > 2.1.0
-> > 
-> > _______________________________________________
-> > dri-devel mailing list
-> > dri-devel at lists.freedesktop.org
-> > http://lists.freedesktop.org/mailman/listinfo/dri-devel
-> 
-> -- 
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> +41 (0) 79 365 57 48 - http://blog.ffwll.ch
+in cache_grow, line 2593 of mm/slab.c.
+
+>
+>> This happens when buffers are allocated with __GFP_DMA32 or
+>> __GFP_HIGHMEM.
+>>
+>> Fix this by allocating the pages array with GFP_KERNEL to follow what is
+>> done elsewhere in this file. Using GFP_KERNEL in __iommu_alloc_buffer()
+>> is safe because atomic allocations are handled by __iommu_alloc_atomic().
+>>
+>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>   arch/arm/mm/dma-mapping.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index 903dba0..170a116 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -1106,7 +1106,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+>>   	int i = 0;
+>>
+>>   	if (array_size <= PAGE_SIZE)
+>> -		pages = kzalloc(array_size, gfp);
+>> +		pages = kzalloc(array_size, GFP_KERNEL);
+>>   	else
+>>   		pages = vzalloc(array_size);
+>>   	if (!pages)
+>> --
+>> 2.3.0
+>
+> Looks sensible to me:
+>
+>    Acked-by: Will Deacon <will.deacon@arm.com>
+
+Thanks! I will amend the commit message and resend.
