@@ -1,112 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 13 Feb 2015 15:52:08 +0000
-Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
-In-Reply-To: <54DA725E.6080305@codeaurora.org>
-References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
- <20150205105035.GL8656@n2100.arm.linux.org.uk>
- <20150205142918.GA10634@linux.vnet.ibm.com>
- <20150205161100.GQ8656@n2100.arm.linux.org.uk>
- <54D95DB8.9010308@codeaurora.org>
- <20150210151416.GD9432@leverpostej>
- <54DA6E92.3090109@codeaurora.org> <54DA725E.6080305@codeaurora.org>
-Message-ID: <20150213155208.GG10496@leverpostej>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Fri, 13 Feb 2015 16:59:01 +0100
+Subject: [PATCH 12/14] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <1423828078.4182.17.camel@pengutronix.de>
+References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1423763164-5606-13-git-send-email-mcoquelin.stm32@gmail.com>
+ <1423828078.4182.17.camel@pengutronix.de>
+Message-ID: <CALszF6D+5mXajUWarwq8M4yL_Nc+x1Bmu4D7_HxDRy2kGRXNVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Hi Philipp,
 
-> > Aside: For that last row we really should be setting cpu->hotpluggable
-> > in struct cpu based on what cpu_ops::cpu_disable returns (from what I
-> > can tell we use that op to indicate if a CPU can be hotplugged).
-> >
-> 
-> There's a patch for that (tm).
-> 
-> ----8<----
-> 
-> From: Stephen Boyd <sboyd@codeaurora.org>
-> Subject: [PATCH] ARM: smp: Only expose /sys/.../cpuX/online if hotpluggable
-> 
-> Writes to /sys/.../cpuX/online fail if we determine the platform
-> doesn't support hotplug for that CPU. Let's figure this out
-> befoer we make the sysfs nodes so that the online file doesn't
-> even exist if it's not possible to hotplug the CPU.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/include/asm/smp.h |  6 ++++++
->  arch/arm/kernel/setup.c    |  2 +-
->  arch/arm/kernel/smp.c      | 11 ++++-------
->  3 files changed, 11 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-> index 18f5a554134f..9f82430efd59 100644
-> --- a/arch/arm/include/asm/smp.h
-> +++ b/arch/arm/include/asm/smp.h
-> @@ -123,4 +123,10 @@ struct of_cpu_method {
->   */
->  extern void smp_set_ops(struct smp_operations *);
->  
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +extern int platform_can_hotplug_cpu(unsigned int cpu);
-> +#else
-> +static inline int platform_can_hotplug_cpu(unsigned int cpu) { return 0; }
-> +#endif
-> +
->  #endif /* ifndef __ASM_ARM_SMP_H */
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 715ae19bc7c8..c61c09defc78 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -974,7 +974,7 @@ static int __init topology_init(void)
->  
->  	for_each_possible_cpu(cpu) {
->  		struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, cpu);
-> -		cpuinfo->cpu.hotpluggable = 1;
-> +		cpuinfo->cpu.hotpluggable = platform_can_hotplug_cpu(cpu);
->  		register_cpu(&cpuinfo->cpu, cpu);
->  	}
->  
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index fe0386c751b2..4d213b24db60 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -174,18 +174,19 @@ static int platform_cpu_kill(unsigned int cpu)
->  	return 1;
->  }
->  
-> -static int platform_cpu_disable(unsigned int cpu)
-> +int platform_can_hotplug_cpu(unsigned int cpu)
->  {
->  	if (smp_ops.cpu_disable)
-> -		return smp_ops.cpu_disable(cpu);
-> +		return smp_ops.cpu_disable(cpu) ? 0 : 1;
->  
->  	/*
->  	 * By default, allow disabling all CPUs except the first one,
->  	 * since this is special on a lot of platforms, e.g. because
->  	 * of clock tick interrupts.
->  	 */
-> -	return cpu == 0 ? -EPERM : 0;
-> +	return cpu == 0 ? 0 : 1;
->  }
-> +
->  /*
->   * __cpu_disable runs on the processor to be shutdown.
->   */
-> @@ -194,10 +195,6 @@ int __cpu_disable(void)
->  	unsigned int cpu = smp_processor_id();
->  	int ret;
->  
-> -	ret = platform_cpu_disable(cpu);
-> -	if (ret)
-> -		return ret;
+2015-02-13 12:47 GMT+01:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> Hi Maxime,
+>
+> Am Donnerstag, den 12.02.2015, 18:46 +0100 schrieb Maxime Coquelin:
+> [...]
+>> +     soc {
+>> +             reset_ahb1: reset at 40023810 {
+>> +                     #reset-cells = <1>;
+>> +                     compatible = "st,stm32-reset";
+>> +                     reg = <0x40023810 0x4>;
+>> +             };
+>> +
+>> +             reset_ahb2: reset at 40023814 {
+>> +                     #reset-cells = <1>;
+>> +                     compatible = "st,stm32-reset";
+>> +                     reg = <0x40023814 0x4>;
+>> +             };
+>> +
+>> +             reset_ahb3: reset at 40023818 {
+>> +                     #reset-cells = <1>;
+>> +                     compatible = "st,stm32-reset";
+>> +                     reg = <0x40023818 0x4>;
+>> +             };
+>> +
+>> +             reset_apb1: reset at 40023820 {
+>> +                     #reset-cells = <1>;
+>> +                     compatible = "st,stm32-reset";
+>> +                     reg = <0x40023820 0x4>;
+>> +             };
+>> +
+>> +             reset_apb2: reset at 40023824 {
+>> +                     #reset-cells = <1>;
+>> +                     compatible = "st,stm32-reset";
+>> +                     reg = <0x40023824 0x4>;
+>> +             };
+>
+> These are mostly consecutive, single registers. I wonder if these are
+> part of the same IP block and thus should be grouped together into the
+> same reset controller node?
 
-For PSCI 0.2+ I was hoping to hook the MIGRATE logic in here. The secure
-side may reject hotplugging of a CPU, but it's a dynamic property of the
-system and so can't be probed once at boot time.
-
-I guess when I manage to get around to that I can restore a hook here.
+What I could to is to have two instances. One for AHB and one for APB domain.
+Doing this, I will have one instance per domain, and only consecutive registers.
+Is it fine for you?
 
 Thanks,
-Mark.
+Maxime
+
+>
+> regards
+> Philipp
+>
