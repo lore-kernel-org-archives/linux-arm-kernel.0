@@ -1,43 +1,58 @@
 From: b52261@freescale.com (Jianwei Wang)
-Date: Fri, 13 Feb 2015 19:03:55 +0800
-Subject: [PATCH 2/3] arm/dts/ls1021a: Add DCU dts node
+Date: Fri, 13 Feb 2015 19:03:56 +0800
+Subject: [PATCH 3/3] arm/dts/ls1021a: Add a TFT LCD panel dts node for DCU
 In-Reply-To: <1423825436-47780-1-git-send-email-b52261@freescale.com>
 References: <1423825436-47780-1-git-send-email-b52261@freescale.com>
-Message-ID: <1423825436-47780-2-git-send-email-b52261@freescale.com>
+Message-ID: <1423825436-47780-3-git-send-email-b52261@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DCU node, DCU is a display controller of Freescale
-named 2D-ACE.
+Add a required display-timings node for the TFT LCD panel.
+the TFT LCD panel is WQVGA "480x272", and the bpp is 24.
 
 Signed-off-by: Alison Wang <b18965@freescale.com>
 Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
 Signed-off-by: Jianwei Wang <b52261@freescale.com>
 ---
- arch/arm/boot/dts/ls1021a.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/ls1021a-twr.dts | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index c70bb27..28c37f1 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -383,6 +383,17 @@
- 				 <&platform_clk 1>;
- 		};
+diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
+index a2c591e..3602286 100644
+--- a/arch/arm/boot/dts/ls1021a-twr.dts
++++ b/arch/arm/boot/dts/ls1021a-twr.dts
+@@ -58,6 +58,32 @@
+ 	};
+ };
  
-+		dcfb: dcfb at 2ce0000 {
-+			compatible = "fsl,ls1021a-dcfb";
-+			reg = <0x0 0x2ce0000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&platform_clk 0>;
-+			clock-names = "dcfb";
-+			scfg-controller = <&scfg>;
-+			big-endian;
-+			status = "disabled";
-+		};
++&dcfb {
++	display = <&display>;
++	status = "okay";
 +
- 		mdio0: mdio at 2d24000 {
- 			compatible = "gianfar";
- 			device_type = "mdio";
++	display: display at 0 {
++		bits-per-pixel = <24>;
++
++		display-timings {
++			native-mode = <&timing0>;
++			timing0: nl4827hc19 {
++				clock-frequency = <10870000>;
++				hactive = <480>;
++				vactive = <272>;
++				hback-porch = <2>;
++				hfront-porch = <2>;
++				vback-porch = <2>;
++				vfront-porch = <2>;
++				hsync-len = <41>;
++				vsync-len = <4>;
++				hsync-active = <1>;
++				vsync-active = <1>;
++			};
++		};
++	};
++};
++
+ &dspi1 {
+ 	bus-num = <0>;
+ 	status = "okay";
 -- 
 2.1.0.27.g96db324
