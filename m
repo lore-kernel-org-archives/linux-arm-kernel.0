@@ -1,44 +1,75 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 13 Feb 2015 16:35:36 +0200
-Subject: [PATCH RFC v9 01/20] clk: divider: Correct parent clk round rate
- if no bestdiv is normally found
-In-Reply-To: <20150212134131.GX12209@pengutronix.de>
-References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
- <1423720903-24806-2-git-send-email-Ying.Liu@freescale.com>
- <20150212093356.GR12209@pengutronix.de> <20150212103944.GA1290@victor>
- <20150212122405.GW12209@pengutronix.de>
- <20150212125646.GT8656@n2100.arm.linux.org.uk>
- <20150212134131.GX12209@pengutronix.de>
-Message-ID: <54DE0BB8.7070004@ti.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 13 Feb 2015 14:40:29 +0000
+Subject: stand-alone kvmtool
+In-Reply-To: <54DE0A9C.7080505@huawei.com>
+References: <54DDD465.3050300@arm.com> <54DE0A9C.7080505@huawei.com>
+Message-ID: <54DE0CDD.70308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/15 15:41, Sascha Hauer wrote:
+Ciao Claudio,
 
-> Tomis patch is based on the assumption that clk_set_rate(clk_round_rate(rate))
-> is equal to clk_round_rate(rate). So when this assumption is wrong then
-> it should simply be reverted.
+On 13/02/15 14:30, Claudio Fontana wrote:
+> Hello Andre,
+> 
+> On 13.02.2015 11:39, Andre Przywara wrote:
+>> Hi,
+>>
+>> as I found it increasingly inconvenient to use kvmtool[1] as part of a
+>> Linux repository, I decided to give it a go and make it a stand-alone
+>> project. So I filtered all the respective commits, adjusted the paths in
+>> there (while keeping authorship and commit date, of course) and then
+>> added the missing bits to let it compile without a kernel tree nearby.
+>> The result is now available on:
+>>
+>> git://linux-arm.org/kvmtool.git
+>> http://linux-arm.org/kvmtool.git
+> 
+> It builds fine on x86_64, but when I tried to crosscompile from x86_64 to AArch64,
+> I get in trouble because of libfdt: I have the aarch64 libs (static and shared), but how do I instruct the build system to get it from the right place?
 
-When is it not equal?
+You have to install them into your cross-compiler's SYSROOT.
+Get the location of that by executing
+$ ${CROSS_COMPILE}gcc -print-sysroot.
+If it's just for libfdt, it's probably the easiest to copy them
+manually, the header files into $SYSROOT/usr/include, the libraries into
+$SYSROOT/usr/lib/aarch64-linux-gnu
+That fixed it for me ;-)
 
-I agree that doing clk_set_rate(clk, clk_round_rate(clk, rate)) is
-pointless, but shouldn't it still work?
+For a more robust approach you would use your distribution's packaging
+system to install the aarch64 package into $SYSROOT.
 
-And we can forget about clk_round_rate. Without my patch, this would
-behave oddly also:
+Cheers,
+Andre.
 
-rate = clk_get_rate(clk);
-clk_set_rate(clk, rate);
-
-The end result could be something else than 'rate'.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150213/50a7ea41/attachment.sig>
+> 
+>>
+>> You can simply check it out, type make and use "./lkvm run" for a quick
+>> test. So far I briefly tested x86-64, arm and arm64, the later two were
+>> also cross-compiled. For sure there are rough edges in there (for
+>> instance copying a few non-uapi header files into), but I deem it worthy
+>> enough to get some public comments.
+>> For me that also fixed some nasty warnings about libfdt, which now are
+>> gone due it using your system library version of it.
+>> I also managed to get rid of the libc-i386-dev dependency when compiling
+>> for x86-64, but that still needs to be cleaned up and thus is not in the
+>> current HEAD.
+>> I haven't got around to compile-test the other supported architectures,
+>> but supporting them should be as easy as copying over the uapi kvm.h
+>> header file (see the respective ARM commit). Contributions (and tests!)
+>> are welcome.
+>>
+>> Please give it a go and tell me what you think. I don't want to fork the
+>> project, so I am happy if someone "official" picks it up.
+>>
+>> Cheers,
+>> Andre.
+>>
+>> [1] https://github.com/penberg/linux-kvm/tree/master/tools/kvm
+>> _______________________________________________
+>> kvmarm mailing list
+>> kvmarm at lists.cs.columbia.edu
+>> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+>>
+> 
+> 
