@@ -1,229 +1,74 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 13 Feb 2015 17:43:01 +0100
-Subject: [PATCH 7/7] ARM: berlin: rework the clock node for BG2Q
-In-Reply-To: <1423845781-7480-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1423845781-7480-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1423845781-7480-8-git-send-email-antoine.tenart@free-electrons.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 13 Feb 2015 12:15:31 -0500
+Subject: [RFC PATCH v3 00/26] Early kprobe: enable kprobes at very early
+ booting stage.
+In-Reply-To: <1423805907-61335-1-git-send-email-wangnan0@huawei.com>
+References: <1423743476-11927-1-git-send-email-wangnan0@huawei.com>
+ <1423805907-61335-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <20150213121531.6f2aa5cb@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the introduction of the Berlin mfd controller driver, all drivers
-previously sharing the chip and system controller nodes now have their
-own sub-node.
+On Fri, 13 Feb 2015 13:38:27 +0800
+Wang Nan <wangnan0@huawei.com> wrote:
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2q.dtsi | 53 ++++++++++++++++++++++-------------------
- 1 file changed, 29 insertions(+), 24 deletions(-)
+> I fell very sorry for people who reviewed my v2 patch series yesterday
+> at https://lkml.org/lkml/2015/2/12/234 because I didn't provide enough
+> information in commit log. This v3 patch series add those missing
+> commit messages. There are also 2 small fix based on v2:
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index bd86d4121ec8..ca69dc26782f 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -66,7 +66,7 @@
- 		sdhci0: sdhci at ab0000 {
- 			compatible = "mrvl,pxav3-mmc";
- 			reg = <0xab0000 0x200>;
--			clocks = <&chip CLKID_SDIO1XIN>;
-+			clocks = <&chip_clk CLKID_SDIO1XIN>;
- 			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
- 			status = "disabled";
- 		};
-@@ -74,7 +74,7 @@
- 		sdhci1: sdhci at ab0800 {
- 			compatible = "mrvl,pxav3-mmc";
- 			reg = <0xab0800 0x200>;
--			clocks = <&chip CLKID_SDIO1XIN>;
-+			clocks = <&chip_clk CLKID_SDIO1XIN>;
- 			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
- 			status = "disabled";
- 		};
-@@ -83,7 +83,7 @@
- 			compatible = "mrvl,pxav3-mmc";
- 			reg = <0xab1000 0x200>;
- 			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&chip CLKID_NFC_ECC>, <&chip CLKID_NFC>;
-+			clocks = <&chip_clk CLKID_NFC_ECC>, <&chip_clk CLKID_NFC>;
- 			clock-names = "io", "core";
- 			status = "disabled";
- 		};
-@@ -104,7 +104,7 @@
- 		local-timer at ad0600 {
- 			compatible = "arm,cortex-a9-twd-timer";
- 			reg = <0xad0600 0x20>;
--			clocks = <&chip CLKID_TWD>;
-+			clocks = <&chip_clk CLKID_TWD>;
- 			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 
-@@ -127,7 +127,7 @@
- 			compatible = "chipidea,usb2";
- 			reg = <0xa30000 0x10000>;
- 			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&chip CLKID_USB2>;
-+			clocks = <&chip_clk CLKID_USB2>;
- 			phys = <&usb_phy2>;
- 			phy-names = "usb-phy";
- 			status = "disabled";
-@@ -145,14 +145,14 @@
- 			compatible = "marvell,berlin2-usb-phy";
- 			reg = <0xb78000 0x128>;
- 			#phy-cells = <0>;
--			resets = <&chip 0x104 13>;
-+			resets = <&chip_rst 0x104 13>;
- 			status = "disabled";
- 		};
- 
- 		eth0: ethernet at b90000 {
- 			compatible = "marvell,pxa168-eth";
- 			reg = <0xb90000 0x10000>;
--			clocks = <&chip CLKID_GETH0>;
-+			clocks = <&chip_clk CLKID_GETH0>;
- 			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
- 			/* set by bootloader */
- 			local-mac-address = [00 00 00 00 00 00];
-@@ -259,7 +259,7 @@
- 				reg = <0x1400 0x100>;
- 				interrupt-parent = <&aic>;
- 				interrupts = <4>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				pinctrl-0 = <&twsi0_pmux>;
- 				pinctrl-names = "default";
- 				status = "disabled";
-@@ -272,7 +272,7 @@
- 				reg = <0x1800 0x100>;
- 				interrupt-parent = <&aic>;
- 				interrupts = <5>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				pinctrl-0 = <&twsi1_pmux>;
- 				pinctrl-names = "default";
- 				status = "disabled";
-@@ -281,7 +281,7 @@
- 			timer0: timer at 2c00 {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c00 0x14>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				clock-names = "timer";
- 				interrupts = <8>;
- 			};
-@@ -289,14 +289,14 @@
- 			timer1: timer at 2c14 {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c14 0x14>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				clock-names = "timer";
- 			};
- 
- 			timer2: timer at 2c28 {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c28 0x14>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -304,7 +304,7 @@
- 			timer3: timer at 2c3c {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c3c 0x14>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -312,7 +312,7 @@
- 			timer4: timer at 2c50 {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c50 0x14>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -320,7 +320,7 @@
- 			timer5: timer at 2c64 {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c64 0x14>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -328,7 +328,7 @@
- 			timer6: timer at 2c78 {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c78 0x14>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -336,7 +336,7 @@
- 			timer7: timer at 2c8c {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c8c 0x14>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -354,9 +354,14 @@
- 		chip: chip-controller at ea0000 {
- 			compatible = "marvell,berlin2q-chip-ctrl", "syscon";
- 			reg = <0xea0000 0x400>, <0xdd0170 0x10>;
--			#clock-cells = <1>;
--			clocks = <&refclk>;
--			clock-names = "refclk";
-+
-+			chip_clk: clock {
-+				compatible = "marvell,berlin2q-clk";
-+
-+				#clock-cells = <1>;
-+				clocks = <&refclk>;
-+				clock-names = "refclk";
-+			};
- 
- 			soc_pinctrl: pin-controller {
- 				compatible = "marvell,berlin2q-soc-pinctrl";
-@@ -382,7 +387,7 @@
- 			compatible = "marvell,berlin2q-ahci", "generic-ahci";
- 			reg = <0xe90000 0x1000>;
- 			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&chip CLKID_SATA>;
-+			clocks = <&chip_clk CLKID_SATA>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 
-@@ -402,7 +407,7 @@
- 		sata_phy: phy at e900a0 {
- 			compatible = "marvell,berlin2q-sata-phy";
- 			reg = <0xe900a0 0x200>;
--			clocks = <&chip CLKID_SATA>;
-+			clocks = <&chip_clk CLKID_SATA>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			#phy-cells = <1>;
-@@ -421,7 +426,7 @@
- 			compatible = "chipidea,usb2";
- 			reg = <0xed0000 0x10000>;
- 			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&chip CLKID_USB0>;
-+			clocks = <&chip_clk CLKID_USB0>;
- 			phys = <&usb_phy0>;
- 			phy-names = "usb-phy";
- 			status = "disabled";
-@@ -431,7 +436,7 @@
- 			compatible = "chipidea,usb2";
- 			reg = <0xee0000 0x10000>;
- 			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&chip CLKID_USB1>;
-+			clocks = <&chip_clk CLKID_USB1>;
- 			phys = <&usb_phy1>;
- 			phy-names = "usb-phy";
- 			status = "disabled";
--- 
-2.3.0
+Note the 0/26 patch should contain the summary of what the entire
+series is trying to accomplish, and how it is trying to accomplish it.
+
+> 
+>  1. Fixes ftrace_sort_mcount_area. Original patch doesn't work for module.
+>  2. Wraps setting of kprobes_initialized in stop_machine() context. 
+> 
+
+I'll be attending Linux Collaboration Summit next week and there's a
+lot of things I need to finish before I leave, and I wont be able to
+look at these while at the conference. Which means I can not take a in
+depth look at the patches until I get back, and even then I'll be
+catching up on other things. Feel free to ping me about this after
+Feb 23rd.
+
+>From what I can gather from skimming the patches, you attend to have a
+way to pass kprobes via the kernel command line or some other way that
+kprobes are pre allocated (called before memory management), and if
+they happen to be at an ftrace location, you have hooks to have ftrace
+notify kprobes to fix it up.
+
+Honestly, I hate the notifiers. Get rid of them. kprobes and ftrace are
+coupled, as kprobes must know about ftrace, and ftrace knows about
+kprobes. This is a very specific case. Notifiers represent a "general"
+use case, and I don't want something else hooking into these notifiers.
+This should be hard coded, and fixed up at ftrace_init(), where after
+ftrace_init() everything acts as it does today.
+
+That is, the early kprobes add hooks to the ftrace nop locations. When
+ftrace tries to convert them to nops it will notice that they do not
+match the call to mcount. In this case, ftrace should call a kprobes
+function asking if this is a call to kprobe, and if so, it will convert
+this location into a normal call to the ftrace trampoline that calls
+the early kprobe function. This will only be done during ftrace_init()
+when it tries to convert the calls to mcount or __fentry__ (not
+ftrace_caller) to nops. It will then convert it to ftrace_caller, if
+need be, or whatever.
+
+Perhaps that would be easier. Before doing the modifications, it could
+do a special register of ftrace to have the ftrace_regs_caller point to
+the early kprobe function and when its doing the modifications, it will
+be aware that there might be some locations that call the early kprobe
+function.
+
+Basically what I'm saying is that this is a very special case. Don't
+try to over engineer this into something that can be expanded by other
+use cases. I rather not make this easy for other use cases to connect
+to the ftrace locations at early boot up. That's just opening a can of
+worms that are spoiled, and taste like bad sushi from a restaurant with
+lots of neon lights.
+
+I'm not against the idea of having early kprobes, but I'm not thrilled
+with the current implementation.
+
+-- Steve
