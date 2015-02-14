@@ -1,29 +1,39 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Sat, 14 Feb 2015 09:58:42 +0000
-Subject: [PATCH] ARM: shmobile: Remove redundant cpu_disable implementation
-In-Reply-To: <1423874461-2405-1-git-send-email-sboyd@codeaurora.org>
-References: <1423874461-2405-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CANqRtoRBpf6gmqUb1avYFWV0sJ5Oo_ZcymRZoDKtm7sgS-zBhA@mail.gmail.com>
+Date: Sat, 14 Feb 2015 10:01:22 +0000
+Subject: [PATCH v2] ARM: smp: Only expose /sys/.../cpuX/online if
+ hotpluggable
+In-Reply-To: <20150213230137.GH8656@n2100.arm.linux.org.uk>
+References: <1423850799-4028-1-git-send-email-sboyd@codeaurora.org>
+ <20150213202002.GB29727@verge.net.au>
+ <54DE5D3A.5070104@codeaurora.org>
+ <CANqRtoSOBf3ZCKdKYta-P2q==ZMHk=VZgfEztPJ+uaKQtkBWjg@mail.gmail.com>
+ <54DE65C6.8000304@codeaurora.org>
+ <CANqRtoQsKVNMWrj1LZdinHs_iZmsCwWxtqmMWv7SENS3-QXk1A@mail.gmail.com>
+ <20150213230137.GH8656@n2100.arm.linux.org.uk>
+Message-ID: <CANqRtoTkLLGOOmsTghnXTQYsGne_30iFVBWgUCeDwW1n3goysA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Russell,
 
-On Sat, Feb 14, 2015 at 12:41 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> By default only the non-boot CPUs can be hotplugged if the
-> smp_operations structure doesn't have the cpu_disable function
-> pointer set. r8a7779_cpu_disable() implements the same logic,
-> only non-boot CPUs can be hotplugged, so it's redundant to
-> override the default behavior.
+On Fri, Feb 13, 2015 at 11:01 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Feb 13, 2015 at 09:44:50PM +0000, Magnus Damm wrote:
+>> Also, based on the comment in mcpm_cpu_can_disable() it looks like the
+>> PSCI hook may be executed once only with your change in place?
+>> Hopefully PSCI is OK not being invoked for every CPU shutdown.
 >
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/mach-shmobile/smp-r8a7779.c | 7 -------
->  1 file changed, 7 deletions(-)
+> This is why I've said (in the parent thread) that I'm not happy to
+> apply this patch.  Mark Rutland has indicated that he has MCPM cases
+> where the CPUs which can be disabled changes dynamically according
+> to the secure firmware requirements, and ripping out todays
+> infrastructure in light of that, only to have to add it back again
+> later makes no sense.
+>
+> However, cleaning things up by removing unnecessary cpu_disable
+> methods is a good thing to do irrespective of that.
 
-Thanks for breaking out this change. It looks good to me!
-
-Acked-by: Magnus Damm <damm+renesas@opensource.se>
+I completely agree!
 
 Cheers,
 
