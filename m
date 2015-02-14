@@ -1,54 +1,26 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Sat, 14 Feb 2015 09:02:25 -0800
-Subject: [PATCH 1/2] hwrng: iproc-rng200 - Add Broadcom IPROC RNG driver
-In-Reply-To: <54DF797B.40407@broadcom.com>
-References: <Scott Branden <sbranden@broadcom.com>	
- <1423526830-29516-1-git-send-email-sbranden@broadcom.com>	
- <1423526830-29516-2-git-send-email-sbranden@broadcom.com>
- <1423528033.2933.29.camel@perches.com> <54DF797B.40407@broadcom.com>
-Message-ID: <54DF7FA1.1090906@broadcom.com>
+From: ali.soleimani.dehdivan@gmail.com (ali soleimanidehdivan)
+Date: Sat, 14 Feb 2015 12:10:30 -0500
+Subject: mmap cached memory mapped io in user space
+Message-ID: <CAGnjDtwRFoYtk_Jxy66nQRz7dYA550Rx5BgzPtPMJhD_EZeQkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I didn't read this properly.  Will add \n in the dev_err messages.
+i need to cache data for sending to memory mapped io device because
+device is using axi full protocol. i write data to cache and then
+flush it so data is written using burst mode
 
-Thanks,
-  Scott
+i did some research and finnally i add this lines
 
-On 15-02-14 08:36 AM, Scott Branden wrote:
-> Hi Joe,
->
-> I really don't see the missing terminating newlines in the patch or
-> source code.  The lines look the same as every other line???
->
-> Regards,
->   Scott
->
-> On 15-02-09 04:27 PM, Joe Perches wrote:
->> On Mon, 2015-02-09 at 16:07 -0800, Scott Branden wrote:
->>> This adds a driver for random number generator present on Broadcom
->>> IPROC devices.
->>
->> trivia:
->>
->>> diff --git a/drivers/char/hw_random/iproc-rng200.c
->>> b/drivers/char/hw_random/iproc-rng200.c
->> []
->>> +static int iproc_rng200_probe(struct platform_device *pdev)
->>> +{
->> []
->>> +    if (!res) {
->>> +        dev_err(dev, "failed to get rng resources");
->>
->> Missing terminating newline:
->>
->>         dev_err(dev, "failed to get rng resources\n");
->>
->>> +    rng_base = devm_ioremap_resource(dev, res);
->>> +    if (!rng_base) {
->>> +        dev_err(dev, "failed to remap rng regs");
->>
->> here too.
->>
->>
->
+#define pgprot_devcached(prot) \
+    __pgprot_modify(prot, L_PTE_MT_MASK, L_PTE_MT_DEV_CACHED)
+
+to arch/arm/include/asm/pgtable.h.
+
+but this doesn't work good actually it works for just first burst. if
+your data is bigger than a burst it doesn't work and just send first
+burst. how can i use cache for data bigger than a burst. i done it in
+standalone os from xilinx but i stuck on it in linux. my platform is
+zynq.
+
+p.s: i know i can use ioremap_cache but i want to full buffer from
+user space and performance is critical in this situation.
