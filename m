@@ -1,111 +1,65 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Sat, 14 Feb 2015 01:34:34 +0000
-Subject: [PATCH 01/11] ARM: vexpress: use ARM_CPU_SUSPEND if needed
-In-Reply-To: <alpine.LFD.2.11.1502140649560.25300@knanqh.ubzr>
-References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
- <1423770163-583064-2-git-send-email-arnd@arndb.de>
- <20150213103716.GQ14954@e106497-lin.cambridge.arm.com>
- <alpine.LFD.2.11.1502140649560.25300@knanqh.ubzr>
-Message-ID: <20150214013433.GA4194@bart.dudau.co.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 14 Feb 2015 12:22:55 +0800
+Subject: [PATCH 0/4] ASoC: samsung: clean up references to outdated
+ Kconfig symbols
+In-Reply-To: <1423646498.21685.35.camel@x220>
+References: <1421664067.9655.51.camel@x220>
+ <20150206235044.GO31311@finisterre.sirena.org.uk>
+ <1423298284.2246.5.camel@x220>
+ <20150209060704.GB19229@finisterre.sirena.org.uk>
+ <1423646498.21685.35.camel@x220>
+Message-ID: <20150214042255.GA9110@finisterre.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 14, 2015 at 06:55:05AM +0800, Nicolas Pitre wrote:
-> On Fri, 13 Feb 2015, Liviu Dudau wrote:
-> 
-> > On Thu, Feb 12, 2015 at 07:42:33PM +0000, Arnd Bergmann wrote:
-> > > The vexpress tc2 power management code calls mcpm_loopback, which
-> > > is only available if ARM_CPU_SUSPEND is enabled, otherwise we
-> > > get a link error:
-> > > 
-> > > arch/arm/mach-vexpress/built-in.o: In function `tc2_pm_init':
-> > > arch/arm/mach-vexpress/tc2_pm.c:389: undefined reference to `mcpm_loopback'
-> > 
-> > Arnd,
-> > 
-> > We are having reports of TC2 not booting with MCPM enabled. Lorenzo
-> > was investigating this but then headed for Linaro Connect this week,
-> > so we don't have yet a resolution. Can this patch be postponed for
-> > a later -rc?
-> 
-> Can you share those reports?  I did boot my TC2 with v3.19-rc7 before 
-> leaving for Linaro Connect and it just worked.
-> 
-> Regardless, this patch is about a build fix and doesn't change any 
-> functionality, so I wouldn't postpone it.
-> 
+On Wed, Feb 11, 2015 at 10:21:38AM +0100, Paul Bolle wrote:
 
-OK. Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> TL;DR: what exactly should I resend and when?
 
-Best regards,
-Liviu
+This is disappointing; you're someone who's been contributing for quite
+some time now, I'd really expect you to be faimilar with the process of
+submitting patches and able to identify answers to your questions.
 
-> 
-> 
-> > 
-> > Best regards,
-> > Liviu
-> > 
-> > 
-> > > 
-> > > This explicitly selects ARM_CPU_SUSPEND like other platforms that
-> > > need it.
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > Fixes: 3592d7e002438 ("ARM: 8082/1: TC2: test the MCPM loopback during boot")
-> > > Cc: Nicolas Pitre <nico@linaro.org>
-> > > Cc: Kevin Hilman <khilman@linaro.org>
-> > > Cc: Liviu Dudau <liviu.dudau@arm.com>
-> > > Cc: Sudeep Holla <sudeep.holla@arm.com>
-> > > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > ---
-> > >  arch/arm/mach-vexpress/Kconfig | 1 +
-> > >  1 file changed, 1 insertion(+)
-> > > 
-> > > diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-> > > index d6b16d9a7838..3c2509b4b694 100644
-> > > --- a/arch/arm/mach-vexpress/Kconfig
-> > > +++ b/arch/arm/mach-vexpress/Kconfig
-> > > @@ -73,6 +73,7 @@ config ARCH_VEXPRESS_TC2_PM
-> > >  	depends on MCPM
-> > >  	select ARM_CCI
-> > >  	select ARCH_VEXPRESS_SPC
-> > > +	select ARM_CPU_SUSPEND
-> > >  	help
-> > >  	  Support for CPU and cluster power management on Versatile Express
-> > >  	  with a TC2 (A15x2 A7x3) big.LITTLE core tile.
-> > > -- 
-> > > 2.1.0.rc2
-> > > 
-> > > 
-> > 
-> > -- 
-> > ====================
-> > | I would like to |
-> > | fix the world,  |
-> > | but they're not |
-> > | giving me the   |
-> >  \ source code!  /
-> >   ---------------
-> >     ?\_(?)_/?
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
-> > 
-> > 
+> > What's posted doesn't apply against -next.
 
+> That's because of trivial conflicts with commit a59aa180ea56 ("ASoC:
+> samsung: Replace depends on REGMAP_I2C with depends on I2C"). That
+> commit landed in next-20150127 (ie, eight days after I sent this short
+> series). I guess I resolved these conflicts in the local version of
+> these patches and promptly forgot about them, as they were so trivial.
 
--- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
+For something like this I'm just not even going to look at what's
+required to fix up by hand, sorry.
 
- One small step
-   for me ...
+> > As ever submit against the tree listed in MAINTAINERS
+
+> >    git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-next
+
+> Which is not entirely obvious, since this series only touches files
+> below sound/soc/samsung/. That directory is mentioned in MAINTAINERS
+> under "ARM/SAMSUNG EXYNOS ARM ARCHITECTURES" and under "SAMSUNG AUDIO
+> (ASoC) DRIVERS". (Why does that directory need two entries?) Neither
+> entry mention a repository.
+
+Of course neither of those entries list me either yet you managed to
+figure out that you should send the patch to me.  The same process that
+helps you identify that things should be submitted to the subsystem
+maintainers should allow you to identify where they're likely to try to
+apply changes.  Or simply looking at how other similar patches get
+merged.
+
+> And now I wonder what I should resend: the three patches 2/4, 3/4, and
+> 4/4 with the trivial conflicts resolved or the entire series? And when
+> do you prefer I resend?
+
+Again this is something I'd really expect you to be familiar with.  As
+ever if there are changes you would like to see integrated into the
+kernel then please submit them using the normal patch submission
+process.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150214/7d208b49/attachment-0001.sig>
