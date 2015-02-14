@@ -1,68 +1,595 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 14 Feb 2015 18:09:39 +0100
-Subject: [PATCH 4/8] ARM: dove: create a proper PMU driver for power
- domains, PMU IRQs and resets
-In-Reply-To: <E1YMedG-00054d-0d@rmk-PC.arm.linux.org.uk>
-References: <20150214152659.GI8656@n2100.arm.linux.org.uk>
- <E1YMedG-00054d-0d@rmk-PC.arm.linux.org.uk>
-Message-ID: <20150214170939.GG3213@lunn.ch>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Sat, 14 Feb 2015 09:12:19 -0800
+Subject: [PATCH 2/2] Input: bcm-keypad: Add Broadcom keypad controller
+In-Reply-To: <20150210010225.GB13695@dtor-ws>
+References: <sbranden@broadcom.com>
+ <1423526861-29579-1-git-send-email-sbranden@broadcom.com>
+ <1423526861-29579-3-git-send-email-sbranden@broadcom.com>
+ <20150210010225.GB13695@dtor-ws>
+Message-ID: <54DF81F3.8050903@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell
+Hi Dmitry,
 
-> +static struct reset_control_ops pmu_reset_ops = {
-> +	.reset = pmu_reset_reset,
-> +	.assert = pmu_reset_assert,
-> +	.deassert = pmu_reset_deassert,
-> +};
-> +
-> +static struct reset_controller_dev pmu_reset __initdata = {
-> +	.ops = &pmu_reset_ops,
-> +	.owner = THIS_MODULE,
+Good review.  Thanks.  Commented inline.
 
-Dumb question: Is this still needed? There have been a lot of patches
-from Wolfram Sang removing similar THIS_MODULE statements.
+On 15-02-09 05:02 PM, Dmitry Torokhov wrote:
+> Hi Scott,
+>
+> On Mon, Feb 09, 2015 at 04:07:41PM -0800, Scott Branden wrote:
+>> Add driver for Broadcom's keypad controller.
+>>
+>> Broadcom Keypad controller is used to interface a SoC with a matrix-type
+>> keypad device. The keypad controller supports multiple row and column lines.
+>> A key can be placed at each intersection of a unique row and a unique column.
+>> The keypad controller can sense a key-press and key-release and report the
+>> event using a interrupt to the cpu.
+>>
+>> Reviewed-by: Ray Jui <rjui@broadcom.com>
+>> Signed-off-by: Scott Branden <sbranden@broadcom.com>
+>> ---
+>>   drivers/input/keyboard/Kconfig      |  10 +
+>>   drivers/input/keyboard/Makefile     |   1 +
+>>   drivers/input/keyboard/bcm-keypad.c | 489 ++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 500 insertions(+)
+>>   create mode 100644 drivers/input/keyboard/bcm-keypad.c
+>>
+>> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+>> index a5d9b3f..3a0c0f2 100644
+>> --- a/drivers/input/keyboard/Kconfig
+>> +++ b/drivers/input/keyboard/Kconfig
+>> @@ -676,4 +676,14 @@ config KEYBOARD_CAP11XX
+>>   	  To compile this driver as a module, choose M here: the
+>>   	  module will be called cap11xx.
+>>
+>> +config KEYBOARD_BCM
+>> +	tristate "Broadcom keypad driver"
+>> +	select INPUT_MATRIXKMAP
+>> +	default ARCH_BCM_CYGNUS
+>> +	help
+>> +	  Say Y here if you want to use Broadcom keypad.
+>> +
+>> +	  To compile this driver as a module, choose M here: the
+>> +	  module will be called bcm-keypad.
+>> +
+>>   endif
+>> diff --git a/drivers/input/keyboard/Makefile b/drivers/input/keyboard/Makefile
+>> index febafa5..3cff8f6 100644
+>> --- a/drivers/input/keyboard/Makefile
+>> +++ b/drivers/input/keyboard/Makefile
+>> @@ -10,6 +10,7 @@ obj-$(CONFIG_KEYBOARD_ADP5589)		+= adp5589-keys.o
+>>   obj-$(CONFIG_KEYBOARD_AMIGA)		+= amikbd.o
+>>   obj-$(CONFIG_KEYBOARD_ATARI)		+= atakbd.o
+>>   obj-$(CONFIG_KEYBOARD_ATKBD)		+= atkbd.o
+>> +obj-$(CONFIG_KEYBOARD_BCM)		+= bcm-keypad.o
+>>   obj-$(CONFIG_KEYBOARD_BFIN)		+= bf54x-keys.o
+>>   obj-$(CONFIG_KEYBOARD_CAP11XX)		+= cap11xx.o
+>>   obj-$(CONFIG_KEYBOARD_CLPS711X)		+= clps711x-keypad.o
+>> diff --git a/drivers/input/keyboard/bcm-keypad.c b/drivers/input/keyboard/bcm-keypad.c
+>> new file mode 100644
+>> index 0000000..b2c4bb7
+>> --- /dev/null
+>> +++ b/drivers/input/keyboard/bcm-keypad.c
+>> @@ -0,0 +1,489 @@
+>> +/*
+>> + * Copyright (C) 2014 Broadcom Corporation
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation version 2.
+>> + *
+>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+>> + * kind, whether express or implied; without even the implied warranty
+>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/mm.h>
+>> +#include <linux/module.h>
+>> +#include <linux/input.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/bitops.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/sizes.h>
+>> +#include <linux/stddef.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/types.h>
+>> +#include <linux/string.h>
+>> +#include <asm/memory.h>
+>> +#include <linux/io.h>
+>> +#include <linux/input/matrix_keypad.h>
+>> +
+>> +#define DEFAULT_CLK_HZ                  31250
+>> +/* Repeat period (ms) */
+>> +#define KEY_REPEAT_PERIOD               100
+>> +/* First time press dly (ms) */
+>> +#define KEY_REPEAT_DELAY                400
+>> +#define MAX_ROWS                        8
+>> +#define MAX_COLS                        8
+>> +
+>> +/* Register/field definitions */
+>> +#define KPCR_OFFSET                          0x00000080
+>> +#define KPCR_MODE                       0x00000002
+>> +#define KPCR_MODE_SHIFT                 1
+>> +#define KPCR_MODE_MASK                  1
+>> +#define KPCR_ENABLE                     0x00000001
+>> +#define KPCR_STATUSFILTERENABLE         0x00008000
+>> +#define KPCR_STATUSFILTERTYPE_SHIFT          12
+>> +#define KPCR_COLFILTERENABLE            0x00000800
+>> +#define KPCR_COLFILTERTYPE_SHIFT             8
+>> +#define KPCR_ROWWIDTH_SHIFT                  20
+>> +#define KPCR_COLUMNWIDTH_SHIFT               16
+>> +
+>> +#define KPIOR_OFFSET                         0x00000084
+>> +#define KPIOR_ROWOCONTRL_SHIFT               24
+>> +#define KPIOR_ROWOCONTRL_MASK                0xFF000000
+>> +#define KPIOR_COLUMNOCONTRL_SHIFT            16
+>> +#define KPIOR_COLUMNOCONTRL_MASK             0x00FF0000
+>> +#define KPIOR_COLUMN_IO_DATA_SHIFT           0
+>> +
+>> +#define KPEMR0_OFFSET                        0x00000090
+>> +#define KPEMR1_OFFSET                        0x00000094
+>> +#define KPEMR2_OFFSET                        0x00000098
+>> +#define KPEMR3_OFFSET                        0x0000009C
+>> +#define KPEMR_EDGETYPE_MAX 3
+>> +
+>> +#define KPSSR0_OFFSET                        0x000000A0
+>> +#define KPSSR1_OFFSET                        0x000000A4
+>> +#define KPIMR0_OFFSET                        0x000000B0
+>> +#define KPIMR1_OFFSET                        0x000000B4
+>> +#define KPICR0_OFFSET                        0x000000B8
+>> +#define KPICR1_OFFSET                        0x000000BC
+>> +#define KPISR0_OFFSET                        0x000000C0
+>> +#define KPISR1_OFFSET                        0x000000C4
+>> +
+>> +#define KPCR_STATUSFILTERTYPE_MAX 7
+>> +#define KPCR_COLFILTERTYPE_MAX 7
+>> +
+>> +/* Macros to determine the row/column from a bit that is set in SSR0/1. */
+>> +#define BIT_TO_ROW_SSR0(bit_nr)  (bit_nr >> 3)
+>> +#define BIT_TO_ROW_SSR1(bit_nr)  ((bit_nr >> 3) + 4)
+>> +#define BIT_TO_COL(bit_nr)       (bit_nr % 8)
+>> +
+>> +/* Structure representing various run-time entities */
+>> +struct bcm_kp {
+>> +	void __iomem *base;
+>> +	int irq;
+>> +	struct clk *clk;
+>> +	struct input_dev *input_dev;
+>> +	unsigned long last_state[2];
+>> +	unsigned int n_rows;
+>> +	unsigned int n_cols;
+>> +	u32 kpcr;
+>> +	u32 kpior;
+>> +	u32 kpemr;
+>> +	u32 imr0_val;
+>> +	u32 imr1_val;
+>> +};
+>> +
+>> +/*
+>> + * Returns the keycode from the input device keymap given the row and
+>> + * column.
+>> + */
+>> +static inline int bcm_kp_get_keycode(struct bcm_kp *kp, int row, int col)
+>> +{
+>> +	unsigned int row_shift = get_count_order(kp->n_cols);
+>> +	unsigned short *keymap = kp->input_dev->keycode;
+>> +
+>> +	return keymap[MATRIX_SCAN_CODE(row, col, row_shift)];
+>> +}
+>> +
+>> +static irqreturn_t bcm_kp_isr_thread(int irq, void *dev_id)
+>> +{
+>> +	struct bcm_kp *kp = dev_id;
+>> +	unsigned long state, change;
+>> +	int bit_nr;
+>> +	int pull_mode = (kp->kpcr >> KPCR_MODE_SHIFT) & KPCR_MODE_MASK;
+>> +	int key_press;
+>> +	int row, col;
+>> +	unsigned int keycode;
+>> +
+>> +	/* Clear interrupts */
+>> +	writel(0xFFFFFFFF, kp->base + KPICR0_OFFSET);
+>> +	writel(0xFFFFFFFF, kp->base + KPICR1_OFFSET);
+>> +
+>> +	state = readl(kp->base + KPSSR0_OFFSET);
+>> +	change = kp->last_state[0] ^ state;
+>> +	kp->last_state[0] = state;
+>> +
+>> +	for_each_set_bit(bit_nr, &change, BITS_PER_LONG) {
+>> +		key_press = state & BIT(bit_nr);
+>> +		/* The meaning of SSR register depends on pull mode. */
+>> +		key_press = pull_mode ? !key_press : key_press;
+>> +		row = BIT_TO_ROW_SSR0(bit_nr);
+>> +		col = BIT_TO_COL(bit_nr);
+>> +		keycode = bcm_kp_get_keycode(kp, row, col);
+>> +		input_report_key(kp->input_dev, keycode, key_press);
+>> +	}
+>> +
+>> +	state = readl(kp->base + KPSSR1_OFFSET);
+>> +	change = kp->last_state[1] ^ state;
+>> +	kp->last_state[1] = state;
+>> +
+>> +	for_each_set_bit(bit_nr, &change, BITS_PER_LONG) {
+>> +		key_press = state & BIT(bit_nr);
+>> +		/* The meaning of SSR register depends on pull mode. */
+>> +		key_press = pull_mode ? !key_press : key_press;
+>> +		row = BIT_TO_ROW_SSR1(bit_nr);
+>> +		col = BIT_TO_COL(bit_nr);
+>> +		keycode = bcm_kp_get_keycode(kp, row, col);
+>> +		input_report_key(kp->input_dev, keycode, key_press);
+>> +	}
+>
+> Please split it into a separate function that processes one bank and
+> call it twice instead of doing cut-and-paste of almost the same code. Or
+> even better combine it all into one block (i.e have changes[2], use
+> bitmap_xor to figure difference, etc...).
+>
+OK.  It was a few lines of code called twice but I'll change it.
 
-> + * pmu {
-> + *	compatible = "marvell,pmu";
+>> +
+>> +	input_sync(kp->input_dev);
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+>> +
+>> +static int bcm_kp_start(struct bcm_kp *kp)
+>> +{
+>> +	int error;
+>> +
+>> +	error = clk_prepare_enable(kp->clk);
+>> +	if (error)
+>> +		return error;
+>> +
+>> +	writel(kp->kpior, kp->base + KPIOR_OFFSET);
+>> +
+>> +	writel(kp->imr0_val, kp->base + KPIMR0_OFFSET);
+>> +	writel(kp->imr1_val, kp->base + KPIMR1_OFFSET);
+>> +
+>> +	writel(kp->kpemr, kp->base + KPEMR0_OFFSET);
+>> +	writel(kp->kpemr, kp->base + KPEMR1_OFFSET);
+>> +	writel(kp->kpemr, kp->base + KPEMR2_OFFSET);
+>> +	writel(kp->kpemr, kp->base + KPEMR3_OFFSET);
+>> +
+>> +	writel(0xFFFFFFFF, kp->base + KPICR0_OFFSET);
+>> +	writel(0xFFFFFFFF, kp->base + KPICR1_OFFSET);
+>> +
+>> +	kp->last_state[0] = readl(kp->base + KPSSR0_OFFSET);
+>> +	kp->last_state[0] = readl(kp->base + KPSSR1_OFFSET);
+>> +
+>> +	writel(kp->kpcr | KPCR_ENABLE, kp->base + KPCR_OFFSET);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static void bcm_kp_stop(const struct bcm_kp *kp)
+>> +{
+>> +	u32 val;
+>> +
+>> +	val = readl(kp->base + KPCR_OFFSET);
+>> +	val &= ~KPCR_ENABLE;
+>> +	writel(0, kp->base + KPCR_OFFSET);
+>> +	writel(0, kp->base + KPIMR0_OFFSET);
+>> +	writel(0, kp->base + KPIMR1_OFFSET);
+>> +	writel(0xFFFFFFFF, kp->base + KPICR0_OFFSET);
+>> +	writel(0xFFFFFFFF, kp->base + KPICR1_OFFSET);
+>> +
+>> +	clk_disable_unprepare(kp->clk);
+>> +}
+>> +
+>> +static int bcm_kp_open(struct input_dev *dev)
+>> +{
+>> +	struct bcm_kp *kp = input_get_drvdata(dev);
+>> +
+>> +	return bcm_kp_start(kp);
+>> +}
+>> +
+>> +static void bcm_kp_close(struct input_dev *dev)
+>> +{
+>> +	struct bcm_kp *kp = input_get_drvdata(dev);
+>> +
+>> +	bcm_kp_stop(kp);
+>> +}
+>> +
+>> +static int bcm_kp_matrix_key_parse_dt(struct bcm_kp *kp)
+>> +{
+>> +	struct device *dev = kp->input_dev->dev.parent;
+>> +	struct device_node *np = dev->of_node;
+>> +	int error;
+>> +	unsigned int dt_val;
+>> +	unsigned int i;
+>> +
+>> +	/* Initialize the KPCR Keypad Configuration Register */
+>> +	kp->kpcr = KPCR_STATUSFILTERENABLE | KPCR_COLFILTERENABLE;
+>> +
+>> +	error = matrix_keypad_parse_of_params(dev, &kp->n_rows, &kp->n_cols);
+>> +	if (error) {
+>> +		dev_err(dev, "failed to parse kp params\n");
+>> +		return error;
+>> +	}
+>> +	/* Set row width for the ASIC block. */
+>> +	kp->kpcr |= (kp->n_rows - 1) << KPCR_ROWWIDTH_SHIFT;
+>> +
+>> +	/* Set column width for the ASIC block. */
+>> +	kp->kpcr |= (kp->n_cols - 1) << KPCR_COLUMNWIDTH_SHIFT;
+>> +
+>> +	/* Configure the IMR registers */
+>> +	{
+>> +		unsigned int num_rows, col_mask, rows_set;
+>> +
+>> +		/* IMR registers contain interrupt enable bits for 8x8 matrix
+>> +		 * IMR0 register format: <row3> <row2> <row1> <row0>
+>> +		 * IMR1 register format: <row7> <row6> <row5> <row4>
+>> +		 */
+>> +
+>> +		col_mask = (1 << (kp->n_cols)) - 1;
+>> +		num_rows = kp->n_rows;
+>> +
+>> +		/* Set column bits in rows 0 to 3 in IMR0 */
+>> +		kp->imr0_val = col_mask;
+>> +
+>> +		rows_set = 1;
+>> +		while ((--num_rows) && (rows_set++ < 4))
+>> +			kp->imr0_val |= (kp->imr0_val << MAX_COLS);
+>> +
+>> +		/* Set column bits in rows 4 to 7 in IMR1 */
+>> +		kp->imr1_val = 0;
+>> +		if (num_rows) {
+>> +			kp->imr1_val = col_mask;
+>> +			while (--num_rows)
+>> +				kp->imr1_val |= (kp->imr1_val << MAX_COLS);
+>> +		}
+>> +	}
+>> +
+>> +	/*
+>> +	 * Obtain the interrupt trigger type specified and verify against the
+>> +	 * possible values specified in the DT binding.
+>> +	 */
+>> +	of_property_read_u32(np, "key-interrupt-trigger-type",
+>> +		&dt_val);
+>> +	if ((dt_val == 0) || (dt_val > KPEMR_EDGETYPE_MAX)) {
+>> +		dev_err(dev, "Invalid interrupt trigger type %d\n", dt_val);
+>> +		return -EINVAL;
+>> +	}
+>> +	/* Initialize the KPEMR Keypress Edge Mode Registers */
+>> +	kp->kpemr = 0;
+>> +	for (i = 0; i <= 30; i = i + 2)
+>> +		kp->kpemr |= (dt_val << i);
+>> +
+>> +	/*
+>> +	 * Obtain the Status filter debounce value and verify against the
+>> +	 * possible values specified in the DT binding.
+>> +	 */
+>> +	of_property_read_u32(np, "status-debounce-filter-period",
+>> +		&dt_val);
+>> +	if (dt_val > KPCR_STATUSFILTERTYPE_MAX) {
+>> +		dev_err(dev, "Invalid Status filter debounce value %d\n",
+>> +			dt_val);
+>> +		return -EINVAL;
+>> +	}
+>> +	kp->kpcr |= dt_val << KPCR_STATUSFILTERTYPE_SHIFT;
+>> +
+>> +
+>> +	/*
+>> +	 * Obtain the Column filter debounce value and verify against the
+>> +	 * possible values specified in the DT binding.
+>> +	 */
+>> +	of_property_read_u32(np, "col-debounce-filter-period",
+>> +		&dt_val);
+>> +
+>> +	if (dt_val > KPCR_COLFILTERTYPE_MAX) {
+>> +		dev_err(dev, "Invalid Column filter debounce value %d\n",
+>> +			dt_val);
+>> +		return -EINVAL;
+>> +	}
+>> +	kp->kpcr |= dt_val << KPCR_COLFILTERTYPE_SHIFT;
+>> +
+>> +	/*
+>> +	 * Determine between the row and column,
+>> +	 * which should be configured as output.
+>> +	 */
+>> +	if (of_property_read_bool(np, "row-output-enabled")) {
+>> +		/*
+>> +		* Set RowOContrl or ColumnOContrl in KPIOR
+>> +		* to the number of pins to drive as outputs
+>> +		*/
+>> +		kp->kpior = (((1 << kp->n_rows) - 1) <<
+>> +				KPIOR_ROWOCONTRL_SHIFT);
+>> +	} else {
+>> +		kp->kpior = (((1 << kp->n_cols) - 1) <<
+>> +				KPIOR_COLUMNOCONTRL_SHIFT);
+>> +	}
+>> +
+>> +	/*
+>> +	 * Determine if the scan pull up needs to be enabled
+>> +	 */
+>> +	if (of_property_read_bool(np, "pull-up-enabled"))
+>> +		kp->kpcr |= KPCR_MODE;
+>> +
+>> +	dev_dbg(dev, "n_rows=%d n_col=%d kpcr=%x kpior=%x kpemr=%x\n",
+>> +		kp->n_rows, kp->n_cols,
+>> +		kp->kpcr, kp->kpior, kp->kpemr);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +
+>> +static int bcm_kp_probe(struct platform_device *pdev)
+>> +{
+>> +	struct bcm_kp *kp;
+>> +	struct input_dev *input_dev;
+>> +	struct resource *res;
+>> +	int error;
+>> +
+>> +	kp = devm_kzalloc(&pdev->dev, sizeof(*kp),
+>> +				   GFP_KERNEL);
+>> +	if (!kp)
+>> +		return -ENOMEM;
+>> +
+>> +	input_dev = devm_input_allocate_device(&pdev->dev);
+>> +	if (!input_dev) {
+>> +		dev_err(&pdev->dev, "failed to allocate the input device\n");
+>> +		return -ENOMEM;
+>> +	}
+>> +	__set_bit(EV_KEY, input_dev->evbit);
+>> +	__set_bit(EV_REP, input_dev->evbit);
+>> +	input_dev->rep[REP_PERIOD] = KEY_REPEAT_PERIOD;
+>> +	input_dev->rep[REP_DELAY] = KEY_REPEAT_DELAY;
+>
+> That does not do what you think: if you set up custom delay and period
+> you are supposed to supply your own timer as well. Either adjust values
+> after registering input device, or leave defaults.
+>
+> Also it might be a good idea to have "linux,autorepeat" DT property to
+> control it.
+>
+I'll look into this in more detail to understand.
 
-Is this maybe too generic? I'm sure Marvell has more than one pmu.
-Maybe "marvell,dove-pmu"
+>> +	input_dev->name = pdev->name;
+>> +	input_dev->phys = "keypad/input0";
+>> +	input_dev->dev.parent = &pdev->dev;
+>> +	input_dev->open = bcm_kp_open;
+>> +	input_dev->close = bcm_kp_close;
+>> +
+>> +	input_dev->id.bustype = BUS_HOST;
+>> +	input_dev->id.vendor = 0x0001;
+>> +	input_dev->id.product = 0x0001;
+>> +	input_dev->id.version = 0x0100;
+>> +
+>> +	input_set_drvdata(input_dev, kp);
+>> +
+>> +	kp->input_dev = input_dev;
+>> +
+>> +	platform_set_drvdata(pdev, kp);
+>> +
+>> +	error = bcm_kp_matrix_key_parse_dt(kp);
+>> +	if (error)
+>> +		return error;
+>> +
+>> +	error = matrix_keypad_build_keymap(NULL, NULL,
+>> +					   kp->n_rows,
+>> +					   kp->n_cols,
+>> +					   NULL, input_dev);
+>> +	if (error) {
+>> +		dev_err(&pdev->dev, "failed to build keymap\n");
+>> +		return error;
+>> +	}
+>> +
+>> +	/* Get the KEYPAD base address */
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	if (!res) {
+>> +		dev_err(&pdev->dev, "Missing keypad base address resource\n");
+>> +		return -ENODEV;
+>> +	}
+>> +
+>> +	kp->base = devm_ioremap_resource(&pdev->dev, res);
+>> +	if (IS_ERR(kp->base))
+>> +		return PTR_ERR(kp->base);
+>> +
+>> +	/* Enable clock */
+>> +
+>> +	kp->clk = devm_clk_get(&pdev->dev, "peri_clk");
+>> +	if (IS_ERR(kp->clk))
+>> +		dev_info(&pdev->dev,
+>> +			"No clock specified. Assuming it's enabled\n");
+>> +	else {
+>> +		unsigned int desired_rate;
+>> +		long actual_rate;
+>> +
+>> +		error = of_property_read_u32(pdev->dev.of_node,
+>> +				"clock-frequency", &desired_rate);
+>> +		if (error < 0)
+>> +			desired_rate = DEFAULT_CLK_HZ;
+>> +
+>> +		actual_rate = clk_round_rate(kp->clk, desired_rate);
+>> +		if (actual_rate <= 0)
+>> +			return -EINVAL;
+>> +
+>> +		error = clk_set_rate(kp->clk, actual_rate);
+>> +		if (error)
+>> +			return -EINVAL;
+>> +
+>> +		error = clk_prepare_enable(kp->clk);
+>> +		if (error)
+>> +			return -EINVAL;
+>> +	}
+>> +
+>> +	/* Put the kp into a known sane state */
+>> +	bcm_kp_stop(kp);
+>> +
+>> +	kp->irq = platform_get_irq(pdev, 0);
+>> +	if (kp->irq < 0) {
+>> +		dev_err(&pdev->dev, "no IRQ specified\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	error = devm_request_threaded_irq(&pdev->dev, kp->irq, NULL,
+>> +		bcm_kp_isr_thread,
+>> +		IRQF_ONESHOT, pdev->name, kp);
+>> +	if (error) {
+>> +		dev_err(&pdev->dev, "failed to request IRQ\n");
+>> +		return error;
+>> +	}
+>> +
+>> +	error = input_register_device(input_dev);
+>> +	if (error) {
+>> +		dev_err(&pdev->dev, "failed to register input device\n");
+>> +		return error;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +/* Called to perform module cleanup when the module is unloaded. */
+>> +static int bcm_kp_remove(struct platform_device *pdev)
+>> +{
+>> +	struct bcm_kp *kp = platform_get_drvdata(pdev);
+>> +
+>> +	pr_info("bcm_kp_remove\n");
+>> +
+>> +	/* Unregister everything */
+>> +	input_unregister_device(kp->input_dev);
+>> +	clk_disable_unprepare(kp->clk);
+>
+> You already calling clk_disable_unprepare() as part of bcm_kp_close()
+> (in stop()), so you do not need it here. input_unregister_device() will
+> also be called automatically since you are using managed input device,
+> so please remove bcm_kp_remove altogether.
+>
+OK, will remove.  That's an easy thing to do.
 
-> +int __init dove_init_pmu(void)
-> +{
-> +	struct device_node *np_pmu, *np;
-> +	struct pmu_data *pmu;
-> +	int ret, parent_irq;
-> +
-> +	/* Lookup the PMU node */
-> +	np_pmu = of_find_compatible_node(NULL, NULL, "marvell,pmu");
-> +	if (!np_pmu)
-> +		return 0;
-> +
-> +	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
-> +	if (!pmu)
-> +		return -ENOMEM;
-> +
-> +	spin_lock_init(&pmu->lock);
-> +	pmu->of_node = np_pmu;
-> +	pmu->pmc_base = of_iomap(pmu->of_node, 0);
-> +	pmu->pmu_base = of_iomap(pmu->of_node, 1);
-> +	if (!pmu->pmc_base || !pmu->pmu_base) {
-> +		pr_err("%s: failed to map PMU\n", np_pmu->name);
-> +		iounmap(pmu->pmu_base);
-> +		iounmap(pmu->pmc_base);
-> +		kfree(pmu);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	parent_irq = irq_of_parse_and_map(pmu->of_node, 0);
-> +	if (!parent_irq)
-> +		pr_err("%s: no interrupt specified\n", np_pmu->name);
-> +
-
-Is it not fatal to be missing the interrupt? Seems like return -EINVAL
-would be a good idea?
-
-      Andrew
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct of_device_id bcm_kp_of_match[] = {
+>> +	{ .compatible = "brcm,bcm-keypad" },
+>> +	{ },
+>> +};
+>> +MODULE_DEVICE_TABLE(of, bcm_kp_of_match);
+>> +
+>> +static struct platform_driver bcm_kp_device_driver = {
+>> +	.probe		= bcm_kp_probe,
+>> +	.remove = bcm_kp_remove,
+>> +	.driver		= {
+>> +		.name	= "bcm-keypad",
+>> +		.of_match_table = of_match_ptr(bcm_kp_of_match),
+>> +	}
+>> +};
+>> +
+>> +module_platform_driver(bcm_kp_device_driver);
+>> +
+>> +MODULE_AUTHOR("Broadcom Corporation");
+>> +MODULE_DESCRIPTION("BCM Keypad Driver");
+>> +MODULE_LICENSE("GPL");
+>> --
+>> 2.2.2
+>>
+>
+> Thanks.
+>
