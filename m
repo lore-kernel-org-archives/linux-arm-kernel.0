@@ -1,87 +1,39 @@
 From: addy.ke@rock-chips.com (Addy Ke)
-Date: Sat, 14 Feb 2015 14:17:47 +0800
-Subject: [PATCH v4 2/3] mmc: dw_mmc: fix bug that cause 'Timeout sending
- command'
+Date: Sat, 14 Feb 2015 14:17:48 +0800
+Subject: [PATCH v4 3/3] mmc: dw_mmc: Don't start command while data busy
 In-Reply-To: <1423894668-8886-1-git-send-email-addy.ke@rock-chips.com>
 References: <1423828368-18456-1-git-send-email-addy.ke@rock-chips.com>
  <1423894668-8886-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <1423894668-8886-3-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <1423894668-8886-4-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because of some uncertain factors, such as worse card or worse hardware,
-DAT[3:0](the data lines) may be pulled down by card, and mmc controller
-will be in busy state. This should not happend when mmc controller
-send command to update card clocks. If this happends, mci_send_cmd will
-be failed and we will get 'Timeout sending command', and then system will
-be blocked. To avoid this, we need reset mmc controller.
+We should wait until unbusy before the next request.
+But this does't need if the command is CMD13, which can access
+SD Status register regardless of data busy.
 
 Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
-Changes in v4:
-- Retry to wait and reset all blocks until data unbusy.
-  I have a sd card, which need retry 2 times to change to unbusy state.
-
 ---
- drivers/mmc/host/dw_mmc.c | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+Changes in v4:
+- CMD13 doesn't need wait until unbusy.
+
+ drivers/mmc/host/dw_mmc.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 3472f9b..ac21863 100644
+index ac21863..692d97a 100644
 --- a/drivers/mmc/host/dw_mmc.c
 +++ b/drivers/mmc/host/dw_mmc.c
-@@ -100,6 +100,7 @@ struct idmac_desc {
- };
- #endif /* CONFIG_MMC_DW_IDMAC */
+@@ -1076,6 +1076,10 @@ static void dw_mci_request(struct mmc_host *mmc, struct mmc_request *mrq)
  
-+static int dw_mci_card_busy(struct mmc_host *mmc);
- static bool dw_mci_reset(struct dw_mci *host);
- static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
+ 	WARN_ON(slot->mrq);
  
-@@ -888,6 +889,36 @@ static void mci_send_cmd(struct dw_mci_slot *slot, u32 cmd, u32 arg)
- 		cmd, arg, cmd_status);
- }
- 
-+static void dw_mci_wait_busy(struct dw_mci_slot *slot)
-+{
-+	bool ret = true;
-+	struct dw_mci *host = slot->host;
-+	unsigned long timeout = jiffies + msecs_to_jiffies(500);
++	/* Wait until unbusy if the command isn't CMD13 */
++	if (mrq->cmd->opcode != MMC_SEND_STATUS)
++		dw_mci_wait_busy(slot);
 +
-+	if (host->state == STATE_WAITING_CMD11_DONE)
-+		return;
-+
-+	do {
-+		do {
-+			if (!dw_mci_card_busy(slot->mmc))
-+				return;
-+			usleep_range(50, 100);
-+		} while (time_before(jiffies, timeout));
-+
-+		dev_err(host->dev, "Data busy (status %#x)\n",
-+			mci_readl(slot->host, STATUS));
-+
-+		/*
-+		 * Data busy, this should not happend when mmc controller
-+		 * send command to update card clocks in non-volt-switch state.
-+		 * If it happends, we should reset controller to avoid getting
-+		 * "Timeout sending command".
-+		 */
-+		ret = dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS);
-+
-+	} while (!ret || dw_mci_card_busy(slot->mmc));
-+}
-+
- static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
- {
- 	struct dw_mci *host = slot->host;
-@@ -896,6 +927,8 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
- 	u32 clk_en_a;
- 	u32 sdmmc_cmd_bits = SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT;
- 
-+	dw_mci_wait_busy(slot);
-+
- 	/* We must continue to set bit 28 in CMD until the change is complete */
- 	if (host->state == STATE_WAITING_CMD11_DONE)
- 		sdmmc_cmd_bits |= SDMMC_CMD_VOLT_SWITCH;
+ 	/*
+ 	 * The check for card presence and queueing of the request must be
+ 	 * atomic, otherwise the card could be removed in between and the
 -- 
 1.8.3.2
