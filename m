@@ -1,33 +1,42 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sun, 15 Feb 2015 10:28:52 +0100
-Subject: [PATCH] ARM: exynos_defconfig: Enable Marvell WiFi-Ex support
-Message-ID: <1423992532-29228-1-git-send-email-javier.martinez@collabora.co.uk>
+From: wuyun.wu@huawei.com (Yun Wu)
+Date: Sun, 15 Feb 2015 17:31:57 +0800
+Subject: [PATCH v2 0/6] enhance configuring an ITS
+Message-ID: <1423992723-5028-1-git-send-email-wuyun.wu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos5420 Peach Pit and Exynos5800 Peach Pi boards have a MMC/SDIO
-Marvell WiFi-Ex chip. This patch enables wireless support and the
-mwifiex driver.
+This patch series makes some enhancement to ITS configuration in the
+following aspects:
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- arch/arm/configs/exynos_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+o allocation of the ITS tables
+o replacing magic numbers with sensible macros
+o guarantees a safe quiescent status before initializing an ITS
+o judging enabling status of LPI feature
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 70e5d0bdb4e4..dcef516bcd0d 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -34,6 +34,10 @@ CONFIG_PACKET=y
- CONFIG_UNIX=y
- CONFIG_NET_KEY=y
- CONFIG_INET=y
-+CONFIG_WIRELESS=y
-+CONFIG_CFG80211=y
-+CONFIG_MWIFIEX=y
-+CONFIG_MWIFIEX_SDIO=y
- CONFIG_RFKILL_REGULATOR=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
--- 
-2.1.3
+This patch series is based on Marc's branch[1], and tested on Hisilion
+ARM64 board with GICv3 ITS hardware.
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gic-fixes
+
+v1 -> v2:
+o rebase to Marc's GIC fix branch
+o drop DT size calculation part since Marc had already posted one
+o guarantees a safe quiescent status before initializing an ITS as
+  Marc suggested, rather than register a reboot notifier
+o fix an issue about the enabling status of LPI feature
+
+Yun Wu (6):
+  irqchip: gicv3-its: zero itt before handling to hardware
+  irqchip: gicv3-its: use 64KB page as default granule
+  irqchip: gicv3-its: limit order of DT size to MAX_ORDER
+  irqchip: gicv3-its: define macros for GITS_CTLR fields
+  irqchip: gicv3-its: add support for power down
+  irqchip: gicv3: skip ITS init when no ITS available
+
+ drivers/irqchip/irq-gic-v3-its.c   | 44 +++++++++++++++++++++++++++++++++++---
+ drivers/irqchip/irq-gic-v3.c       | 18 ++++++++--------
+ include/linux/irqchip/arm-gic-v3.h |  3 +++
+ 3 files changed, 53 insertions(+), 12 deletions(-)
+
+--
+1.8.0
