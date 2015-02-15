@@ -1,48 +1,50 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Sun, 15 Feb 2015 17:27:03 +0100
-Subject: n900 audio: any ideas how to get headset speaker to work?
-In-Reply-To: <20150215162028.GA6857@amd>
-References: <20150215102152.GA23736@amd> <201502151208.03126@pali>
- <20150215162028.GA6857@amd>
-Message-ID: <201502151727.03129@pali>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 15 Feb 2015 16:36:47 +0000
+Subject: [PATCH 4/8] ARM: dove: create a proper PMU driver for power
+ domains, PMU IRQs and resets
+In-Reply-To: <54DF7F93.3040009@gmail.com>
+References: <20150214152659.GI8656@n2100.arm.linux.org.uk>
+ <E1YMedG-00054d-0d@rmk-PC.arm.linux.org.uk>
+ <54DF7F93.3040009@gmail.com>
+Message-ID: <20150215163647.GK8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 15 February 2015 17:20:29 Pavel Machek wrote:
-> On Sun 2015-02-15 12:08:02, Pali Roh?r wrote:
-> > On Sunday 15 February 2015 11:21:52 Pavel Machek wrote:
-> > > Hi!
-> > > 
-> > > By default, output goes to loudspeaker (top right relative
-> > > to keyboard). Any ideas how to switch it to the speaker
-> > > on the left or wired headset? Because I suspect that echo
-> > > cancelation is not going to be simple...
-> > > 
-> > > 									Pavel
-> > 
-> > I do not know but maybe this file could help:
-> > 
-> > https://gitorious.org/community-ssu/policy-settings-rx51/sou
-> > rce/dcb6429c12006dc9850cc942b7143358fe3fd330:rx51/etc/alsape
-> > d.conf
-> > 
-> > There are definitions of alsa channels and settings for
-> > different profiles.
+On Sat, Feb 14, 2015 at 06:02:11PM +0100, Sebastian Hesselbarth wrote:
+> Should we be more precise and call it "marvell,dove-pmu" ?
+
+Andrew made the same comment, consider it done.
+
+> Also, can we have an additional "syscon" compatible for that node?
+
+I'll look into it, thanks.
+
+> How about we copy the clk subsystem way of installing early probed
+> pm for DT here?
 > 
-> Thanks... it seems to be what I needed. More code to write...
-> 									Pavel
+> For example:
+> 
+> #define PM_OF_DECLARE(name, compat, fn) OF_DECLARE_1(clk, name, compat, fn)
+> 
+> and
+> 
+> static int __init dove_pmu_init(struct device_node *np) { ... }
+> PM_OF_DECLARE(dove_pmu, "marvell,dove-pmu", dove_init_pmu);
 
-Will you create asoundrc file with both speakers for n900?
+Not sure it's worth the overhead.  Firstly, sticking the PMU into the
+clock OF tables doesn't seem like the right thing to do.  Secondly,
+it means modifying the asm-generic vmlinux.lds.S, adding another
+config symbol for PMUs to enable that table, adding a sentinel entry,
+and finally adding some code somewhere to scan this new table which
+right now is only going to have at most one entry.
 
-I would like to see n900 sound setup without pulseaudio...
+That seems like an awful lot of overhead.
+
+It would have been easier if there was a generic mechanism, like the
+initcall mechanism, where it's possible to add these kinds of
+compatible matches automatically without having to mess around with
+so many different files.
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150215/da5d411f/attachment.sig>
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
