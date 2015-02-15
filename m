@@ -1,58 +1,84 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 15 Feb 2015 23:43:51 +0800
-Subject: [PATCH] mmc: sirf: update sdhci_sirf_execute_tuning procedure
-Message-ID: <1424015031-24676-1-git-send-email-21cnbao@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Sun, 15 Feb 2015 10:45:57 -0500
+Subject: [PATCH v5 0/5] drivers: bus: Add Simple Power-Managed Bus
+In-Reply-To: <20150211001835.GB7826@verge.net.au>
+References: <1423131088-7835-1-git-send-email-geert+renesas@glider.be>
+ <20150211001835.GB7826@verge.net.au>
+Message-ID: <20150215154556.GD25065@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: weijun yang <york.yang@csr.com>
+On Wed, Feb 11, 2015 at 09:18:35AM +0900, Simon Horman wrote:
+> Hi Geert,
+> 
+> On Thu, Feb 05, 2015 at 11:11:23AM +0100, Geert Uytterhoeven wrote:
+> >         Hi all,
+> > 
+> > The Renesas Bus State Controller (BSC) provides an external bus for
+> > connecting multiple external devices to an SoC, driving several chip
+> > select lines, for e.g. NOR FLASH, Ethernet and USB.
+> > On the kzm9g and ape6evm development boards, an smsc9220 Ethernet
+> > controller is connnected to the BSC of an SH-Mobile AG5 (sh73a0) resp.
+> > R-Mobile APE6 (r8a73a4) SoC.
+> > 
+> > The BSC is a fairly simple memory-mapped bus, hence a "simple-bus"
+> > compatibility seems suitable.  However, the BSC is special in two
+> > ways:
+> >   1. It is part of a PM domain (A4S on sh73a0),
+> >   2. It has a gateable functional clock (ZB).
+> > Before a device connected to the BSC can be accessed, the PM domain
+> > containing the BSC must be powered on, and the functional clock
+> > driving the BSC must be enabled.
+> > 
+> > Both special properties can be described in DT in a standardized way
+> > ("power-domains = <&pd_a4s>" and "clocks = <&zb_clk>", cfr. the
+> > example in the DT binding documentation).  Externally connected
+> > devices are described as children of the BSC node.
+> > 
+> > Unfortunately this doesn't mean everything will work out-of-the-box.
+> > There are two problems:
+> >   1. Without a device driver bound to the bus device, this device is
+> >      not attached to the PM domain. And although a child device is
+> >      present and active, the PM domain may be powered down, as it's
+> >      considered unused by the PM domain core.
+> >   2. Without a device driver calling pm_runtime_enable(), its
+> >      functional clock is not enabled. Once runtime PM is enabled, the
+> >      R-Mobile PM domain platform driver manages the functional clock
+> >      using runtime PM.
+> > 
+> > As none of the above is really bus hardware-specific (PM domains and
+> > functional clocks in clock domains are handled from genpd and platform
+> > code), this series adds a Simple Power-Managed Bus driver for
+> > transparent busses, which matches against "simple-pm-bus", enables
+> > runtime PM for the bus device, and calls of_platform_populate() to
+> > probe for child devices.
+> > Due to the child-parent relationship of devices connected to the bus,
+> > as long as the device drivers for the child devices are runtime PM
+> > enabled, the bus's PM domain will be powered, and the bus's clock will
+> > be enabled automatically when needed, for both runtime PM and s2ram.
+> > 
+> > This was tested on sh73a0/kzm9g-multiplatform (by me), and (v3) on
+> > r8a73a4/ape6evm-multiplatform (by Ulrich Hecht). Without this,
+> > Ethernet doesn't work, as the ZB clock is disabled by
+> > clk_disable_unused().
+> > 
+> > Felipe: It looks like drivers/usb/musb/musb_am335x.c can be removed, if
+> > "ti,am33xx-usb" claims compatibility with "simple-pm-bus"?
+> > 
+> > As drivers/bus doesn't have a maintainer, and this driver is needed to
+> > move two shmobile platforms away from legacy to multiplatform, I think
+> > this can go in through Simon's shmobile tree.
+> 
+> thanks for persisting with this. From my point of view it appears
+> to be reviewed and ready.
+> 
+> Does anyone object to me queueing this up for v3.21 in the renesas tree?
+> 
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
-For the original tuning code, delay value is set to SD Bus Clock Delay
-Register (SD_CLK_DELAY_SETTING) as (val | (Val << 7) | (val << 16)),
-which means CLK_DELAY_IN1, CLK_DELAY_IN2 and CLK_DELAY_OUT are the
-same and with 128 steps. This is doubtful. In CSR design specification
-documents CS-304575-DR-3H, this issue is clarified, the delay[13:0] in
-SD_CLK_DELAY_SETTING is simplied to the concatenation of {CLK_DELAY_IN2,
-CLK_DELAY_IN1}.
-Besides, for CMD19 tuning, no need to set CLK_DELAY_OUT([22,16]
-of SD_CLK_DELAY_SETTING).
+As no one has objected and it seems has been thoroughly reviewed
+I have queued this up in the renesas tree.
 
-Signed-off-by: weijun yang <york.yang@csr.com>
-Signed-off-by: Barry Song <baohua.song@csr.com>
----
- drivers/mmc/host/sdhci-sirf.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+It is part of the renesas-devel-20150215-v3.19 tag.
 
-diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
-index f6f82ec..4331409 100644
---- a/drivers/mmc/host/sdhci-sirf.c
-+++ b/drivers/mmc/host/sdhci-sirf.c
-@@ -56,7 +56,7 @@ static int sdhci_sirf_execute_tuning(struct sdhci_host *host, u32 opcode)
- 	int tuning_seq_cnt = 3;
- 	u8 phase, tuned_phases[SIRF_TUNING_COUNT];
- 	u8 tuned_phase_cnt = 0;
--	int rc, longest_range = 0;
-+	int rc = 0, longest_range = 0;
- 	int start = -1, end = 0, tuning_value = -1, range = 0;
- 	u16 clock_setting;
- 	struct mmc_host *mmc = host->mmc;
-@@ -68,7 +68,7 @@ retry:
- 	phase = 0;
- 	do {
- 		sdhci_writel(host,
--			clock_setting | phase | (phase << 7) | (phase << 16),
-+			clock_setting | phase,
- 			SDHCI_CLK_DELAY_SETTING);
- 
- 		if (!mmc_send_tuning(mmc)) {
-@@ -102,7 +102,7 @@ retry:
- 		 */
- 		phase = tuning_value;
- 		sdhci_writel(host,
--			clock_setting | phase | (phase << 7) | (phase << 16),
-+			clock_setting | phase,
- 			SDHCI_CLK_DELAY_SETTING);
- 
- 		dev_dbg(mmc_dev(mmc), "%s: Setting the tuning phase to %d\n",
--- 
-1.9.1
+[snip]
