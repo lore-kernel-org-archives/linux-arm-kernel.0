@@ -1,61 +1,58 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sun, 15 Feb 2015 10:36:50 -0500
-Subject: [PATCH/RFC] ARM: shmobile: r8a7791: Fix HSUSB clock to hp_clk
- from mp_clk
-In-Reply-To: <1424011746-3787-3-git-send-email-ykaneko0929@gmail.com>
-References: <1424011746-3787-3-git-send-email-ykaneko0929@gmail.com>
-Message-ID: <20150215153649.GC25065@verge.net.au>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun, 15 Feb 2015 23:43:51 +0800
+Subject: [PATCH] mmc: sirf: update sdhci_sirf_execute_tuning procedure
+Message-ID: <1424015031-24676-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 15, 2015 at 11:49:06PM +0900, Yoshihiro Kaneko wrote:
-> From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-> 
-> HSUSB uses hp_clk for H/W register access.
-> HSUSB uses mp_clk for USB-DMAC access.
-> The clock is defined for H/W register access.
-> 
-> Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> ---
-> 
-> This patch is based on devel branch of Simon Horman's renesas tree.
+From: weijun yang <york.yang@csr.com>
 
-I plan to take this through the renesas tree unless someone objects.
-In the mean time, for reference:
+For the original tuning code, delay value is set to SD Bus Clock Delay
+Register (SD_CLK_DELAY_SETTING) as (val | (Val << 7) | (val << 16)),
+which means CLK_DELAY_IN1, CLK_DELAY_IN2 and CLK_DELAY_OUT are the
+same and with 128 steps. This is doubtful. In CSR design specification
+documents CS-304575-DR-3H, this issue is clarified, the delay[13:0] in
+SD_CLK_DELAY_SETTING is simplied to the concatenation of {CLK_DELAY_IN2,
+CLK_DELAY_IN1}.
+Besides, for CMD19 tuning, no need to set CLK_DELAY_OUT([22,16]
+of SD_CLK_DELAY_SETTING).
 
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: weijun yang <york.yang@csr.com>
+Signed-off-by: Barry Song <baohua.song@csr.com>
+---
+ drivers/mmc/host/sdhci-sirf.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
->  arch/arm/boot/dts/r8a7791.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-> index afba8af..cb9a9e7 100644
-> --- a/arch/arm/boot/dts/r8a7791.dtsi
-> +++ b/arch/arm/boot/dts/r8a7791.dtsi
-> @@ -1,7 +1,7 @@
->  /*
->   * Device Tree Source for the r8a7791 SoC
->   *
-> - * Copyright (C) 2013-2014 Renesas Electronics Corporation
-> + * Copyright (C) 2013-2015 Renesas Electronics Corporation
->   * Copyright (C) 2013-2014 Renesas Solutions Corp.
->   * Copyright (C) 2014 Cogent Embedded Inc.
->   *
-> @@ -1136,7 +1136,7 @@
->  		mstp7_clks: mstp7_clks at e615014c {
->  			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
->  			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
-> -			clocks = <&mp_clk>,  <&mp_clk>, <&zs_clk>, <&p_clk>, <&p_clk>, <&zs_clk>,
-> +			clocks = <&mp_clk>,  <&hp_clk>, <&zs_clk>, <&p_clk>, <&p_clk>, <&zs_clk>,
->  				 <&zs_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
->  				 <&zx_clk>, <&zx_clk>, <&zx_clk>;
->  			#clock-cells = <1>;
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
+index f6f82ec..4331409 100644
+--- a/drivers/mmc/host/sdhci-sirf.c
++++ b/drivers/mmc/host/sdhci-sirf.c
+@@ -56,7 +56,7 @@ static int sdhci_sirf_execute_tuning(struct sdhci_host *host, u32 opcode)
+ 	int tuning_seq_cnt = 3;
+ 	u8 phase, tuned_phases[SIRF_TUNING_COUNT];
+ 	u8 tuned_phase_cnt = 0;
+-	int rc, longest_range = 0;
++	int rc = 0, longest_range = 0;
+ 	int start = -1, end = 0, tuning_value = -1, range = 0;
+ 	u16 clock_setting;
+ 	struct mmc_host *mmc = host->mmc;
+@@ -68,7 +68,7 @@ retry:
+ 	phase = 0;
+ 	do {
+ 		sdhci_writel(host,
+-			clock_setting | phase | (phase << 7) | (phase << 16),
++			clock_setting | phase,
+ 			SDHCI_CLK_DELAY_SETTING);
+ 
+ 		if (!mmc_send_tuning(mmc)) {
+@@ -102,7 +102,7 @@ retry:
+ 		 */
+ 		phase = tuning_value;
+ 		sdhci_writel(host,
+-			clock_setting | phase | (phase << 7) | (phase << 16),
++			clock_setting | phase,
+ 			SDHCI_CLK_DELAY_SETTING);
+ 
+ 		dev_dbg(mmc_dev(mmc), "%s: Setting the tuning phase to %d\n",
+-- 
+1.9.1
