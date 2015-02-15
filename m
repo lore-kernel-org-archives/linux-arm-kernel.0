@@ -1,46 +1,59 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 15 Feb 2015 23:34:41 +0100
-Subject: n900 audio: any ideas how to get headset speaker to work?
-In-Reply-To: <201502151727.03129@pali>
-References: <20150215102152.GA23736@amd> <201502151208.03126@pali>
- <20150215162028.GA6857@amd> <201502151727.03129@pali>
-Message-ID: <20150215223441.GA5475@amd>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 15 Feb 2015 16:42:59 -0600
+Subject: [PATCH 02/14] ARM: ARMv7M: Enlarge vector table to 256 entries
+In-Reply-To: <CALszF6BDa9pUb534YN2z9DbYA+hPCnG8XYy5YbjJwSiseKz4xg@mail.gmail.com>
+References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1423763164-5606-3-git-send-email-mcoquelin.stm32@gmail.com>
+ <CAMuHMdWESyPktOSBfVoZCb35stUbhNpbbpzSW4JfORdObgg5jw@mail.gmail.com>
+ <CALszF6BDa9pUb534YN2z9DbYA+hPCnG8XYy5YbjJwSiseKz4xg@mail.gmail.com>
+Message-ID: <CAL_Jsq+rHFPXmWqByvdG435tpbO_+ODByiMcdxboULYpUfDUmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun 2015-02-15 17:27:03, Pali Roh?r wrote:
-> On Sunday 15 February 2015 17:20:29 Pavel Machek wrote:
-> > On Sun 2015-02-15 12:08:02, Pali Roh?r wrote:
-> > > On Sunday 15 February 2015 11:21:52 Pavel Machek wrote:
-> > > > Hi!
-> > > > 
-> > > > By default, output goes to loudspeaker (top right relative
-> > > > to keyboard). Any ideas how to switch it to the speaker
-> > > > on the left or wired headset? Because I suspect that echo
-> > > > cancelation is not going to be simple...
-> > > 
-> > > I do not know but maybe this file could help:
-> > > 
-> > > https://gitorious.org/community-ssu/policy-settings-rx51/sou
-> > > rce/dcb6429c12006dc9850cc942b7143358fe3fd330:rx51/etc/alsape
-> > > d.conf
-> > > 
-> > > There are definitions of alsa channels and settings for
-> > > different profiles.
-> > 
-> > Thanks... it seems to be what I needed. More code to write...
-> 
-> Will you create asoundrc file with both speakers for n900?
-> 
-> I would like to see n900 sound setup without pulseaudio...
+On Fri, Feb 13, 2015 at 2:42 AM, Maxime Coquelin
+<mcoquelin.stm32@gmail.com> wrote:
+> Hi Geert,
+>
+> 2015-02-12 21:34 GMT+01:00 Geert Uytterhoeven <geert@linux-m68k.org>:
+>> On Thu, Feb 12, 2015 at 6:45 PM, Maxime Coquelin
+>> <mcoquelin.stm32@gmail.com> wrote:
+>>> From Cortex-M4 and M7 reference manuals, the nvic supports up to 240
+>>> interrupts. So the number of entries in vectors table is 256.
+>>>
+>>> This patch adds the missing entries, and change the alignement, so that
+>>> vector_table remains naturally aligned.
+>>
+>> Shouldn't this depend on ARCH_STM32, or some other M4 or M7 specific
+>> Kconfig option, to avoid wasting the space on other CPUs?
+>
+> Actually, the STM32F429 has 90 interrupts, so it would need 106
+> entries in the vector table.
+> The maximum of supported interrupts is not only for Cortex-M4 and M7,
+> this is also true for Cortex-M3.
+>
+> I see two possibilities:
+>  1 - We declare the vector table for the maximum supported number of
+> IRQs, as this patch does.
+>         - Pro: it will be functionnal with all Cortex-M MCUs
+>         - Con: Waste of less than 1KB for memory
 
-I actually have pulseaudio running (and plan to keep it since Debian
-has it by default).
+The waste depends on the alignment size as well and could be up to
+almost 2KB worst case. It varies depending on the padding. We should
+try to place it so it always aligned and the wasted space is
+minimized.
 
-It seems mixer names changed a lot between Maemo kernel and 3.19. I have
-parser for alsaped.conf, but was not able to identify matching mixers.
+Rob
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+>  2 - We introduce a config flag that provides the number of interrupts
+>         - Pro: No more memory waste
+>         - Con: Need to declare a per MCU model config flag.
+>
+> Then, regarding the natural alignment, is there a way to ensure it
+> depending on the value of a config flag?
+> Or we should keep it at the maximum value possible?
+>
+> Any feedback will be appreciated, especially from Uwe who maintains
+> the efm32 machine.
+>
+> Kind regards,
+> Maxime
