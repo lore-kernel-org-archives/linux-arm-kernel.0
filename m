@@ -1,19 +1,36 @@
-From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
-Date: Sun, 15 Feb 2015 01:25:59 +0100
-Subject: [PATCHv3 0/8] devfreq: Add generic exynos memory-bus
- frequency driver
-In-Reply-To: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
-References: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <54DFE797.1020008@math.uni-bielefeld.de>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Sun, 15 Feb 2015 09:11:14 +0800
+Subject: [PATCH v2 00/30] Refine PCI scan interfaces and make generic
+ pci host bridge
+In-Reply-To: <20150214194552.GA3932@e102568-lin.cambridge.arm.com>
+References: <1421800225-26230-1-git-send-email-wangyijing@huawei.com>
+ <20150214194552.GA3932@e102568-lin.cambridge.arm.com>
+Message-ID: <54DFF232.3090001@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+>> Also we could eliminate all arch specific pci_domain_nr() after applied this series.
+>>
+>> I tested this series on x86 (with or without ACPI).
+>> Comments and tests are warmly welcome!
+> 
+> Can you push a public branch out rebased against mainline for us to pull
+> and test please ?
 
-I've tested the series on my Odroid-X2 (by adapting the TRATS2 changes),
-and so far I haven't seen any issues. With the system being idle one can
-see that the 'simple_ondemand' devfreq governor clocks down both memory
-busses to the lowest state.
+OK, I will rebase it and push it to my github repo today, and send out the git URL, thanks!
 
-With best wishes,
-Tobias
+Thanks!
+Yijing.
+
+> 
+> Thanks !
+> Lorenzo
+> 
+> 
+> .
+> 
+
+
+-- 
+Thanks!
+Yijing
