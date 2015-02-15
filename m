@@ -1,31 +1,86 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 15 Feb 2015 17:20:29 +0100
-Subject: n900 audio: any ideas how to get headset speaker to work?
-In-Reply-To: <201502151208.03126@pali>
-References: <20150215102152.GA23736@amd>
- <201502151208.03126@pali>
-Message-ID: <20150215162028.GA6857@amd>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 15 Feb 2015 16:26:26 +0000
+Subject: [PATCH 4/8] ARM: dove: create a proper PMU driver for power
+ domains, PMU IRQs and resets
+In-Reply-To: <20150214170939.GG3213@lunn.ch>
+References: <20150214152659.GI8656@n2100.arm.linux.org.uk>
+ <E1YMedG-00054d-0d@rmk-PC.arm.linux.org.uk>
+ <20150214170939.GG3213@lunn.ch>
+Message-ID: <20150215162626.GJ8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun 2015-02-15 12:08:02, Pali Roh?r wrote:
-> On Sunday 15 February 2015 11:21:52 Pavel Machek wrote:
-> > Hi!
-> > 
-> > By default, output goes to loudspeaker (top right relative to
-> > keyboard). Any ideas how to switch it to the speaker on the
-> > left or wired headset? Because I suspect that echo
-> > cancelation is not going to be simple...
-> > 									Pavel
+On Sat, Feb 14, 2015 at 06:09:39PM +0100, Andrew Lunn wrote:
+> Hi Russell
 > 
-> I do not know but maybe this file could help:
+> > +static struct reset_control_ops pmu_reset_ops = {
+> > +	.reset = pmu_reset_reset,
+> > +	.assert = pmu_reset_assert,
+> > +	.deassert = pmu_reset_deassert,
+> > +};
+> > +
+> > +static struct reset_controller_dev pmu_reset __initdata = {
+> > +	.ops = &pmu_reset_ops,
+> > +	.owner = THIS_MODULE,
 > 
-> https://gitorious.org/community-ssu/policy-settings-rx51/source/dcb6429c12006dc9850cc942b7143358fe3fd330:rx51/etc/alsaped.conf
-> 
-> There are definitions of alsa channels and settings for different profiles.
+> Dumb question: Is this still needed? There have been a lot of patches
+> from Wolfram Sang removing similar THIS_MODULE statements.
 
-Thanks... it seems to be what I needed. More code to write...
-									Pavel
+If this is not set, then .owner remains NULL; reset_controller_register()
+is not wrapped to hide the initialisation of this member.  (IMHO, that's
+exactly why hiding it is bad - it has created inconsistencies because
+some APIs need an explicit initialisation, others don't.)
+
+> > + * pmu {
+> > + *	compatible = "marvell,pmu";
+> 
+> Is this maybe too generic? I'm sure Marvell has more than one pmu.
+> Maybe "marvell,dove-pmu"
+
+Changed.
+
+> > +int __init dove_init_pmu(void)
+> > +{
+> > +	struct device_node *np_pmu, *np;
+> > +	struct pmu_data *pmu;
+> > +	int ret, parent_irq;
+> > +
+> > +	/* Lookup the PMU node */
+> > +	np_pmu = of_find_compatible_node(NULL, NULL, "marvell,pmu");
+> > +	if (!np_pmu)
+> > +		return 0;
+> > +
+> > +	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
+> > +	if (!pmu)
+> > +		return -ENOMEM;
+> > +
+> > +	spin_lock_init(&pmu->lock);
+> > +	pmu->of_node = np_pmu;
+> > +	pmu->pmc_base = of_iomap(pmu->of_node, 0);
+> > +	pmu->pmu_base = of_iomap(pmu->of_node, 1);
+> > +	if (!pmu->pmc_base || !pmu->pmu_base) {
+> > +		pr_err("%s: failed to map PMU\n", np_pmu->name);
+> > +		iounmap(pmu->pmu_base);
+> > +		iounmap(pmu->pmc_base);
+> > +		kfree(pmu);
+> > +		return -ENOMEM;
+> > +	}
+> > +
+> > +	parent_irq = irq_of_parse_and_map(pmu->of_node, 0);
+> > +	if (!parent_irq)
+> > +		pr_err("%s: no interrupt specified\n", np_pmu->name);
+> > +
+> 
+> Is it not fatal to be missing the interrupt? Seems like return -EINVAL
+> would be a good idea?
+
+I don't think so.  The lack of parent interrupt shouldn't stop the
+rest of the PMU code initialising - least of all only because the
+only user of this right now is the RTC.
+
+It may make sense to avoid initialising the PMU's IRQ support in
+that case though.
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
