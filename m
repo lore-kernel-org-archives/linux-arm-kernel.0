@@ -1,55 +1,32 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Sun, 15 Feb 2015 16:27:13 +0800
-Subject: [RFC PATCH 3/3] early kprobes: introduce early kprobes related code
- area.
-In-Reply-To: <1423988798-7104-1-git-send-email-wangnan0@huawei.com>
-References: <1423988798-7104-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1423988833-7301-1-git-send-email-wangnan0@huawei.com>
+Date: Sun, 15 Feb 2015 16:26:38 +0800
+Subject: [RFC PATCH 0/3] early kprobes: rearrange vmlinux.lds related code.
+In-Reply-To: <20150213173244.GE8656@n2100.arm.linux.org.uk>
+References: <20150213173244.GE8656@n2100.arm.linux.org.uk>
+Message-ID: <1423988798-7104-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Append early kprobe related slots to KPROBES_TEXT. This is arch
-independent part. Arch code should define MAX_OPTINSN_SIZE,
-KPROBE_OPCODE_SIZE and MAX_INSN_SIZE for it.
+This is part of early kprobes patch series update. Full series can be
+found from [1].
 
-Signed-off-by: Wang Nan <wangnan0@huawei.com>
----
+Early kprobes need some statically allocated slots, which is determined
+during linking by vmlinux.lds.S. Russell King suggests me not to spread
+vmlinux stuff around the kernel include files. This series tries to
+extract common code to include/asm-generic/vmlinux.lds.h and let arch
+dependent code define macros common code requires.
+
+[1]: https://lkml.org/lkml/2015/2/13/24
+
+Wang Nan (3):
+  early kprobes: ARM: add definition for vmlinux.lds use.
+  early kprobes: x86: add definition for vmlinux.lds use.
+  early kprobes: introduce early kprobes related code area.
+
+ arch/arm/kernel/vmlinux.lds.S     | 10 ++++++++++
+ arch/x86/kernel/vmlinux.lds.S     | 10 ++++++++++
  include/asm-generic/vmlinux.lds.h | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+ 3 files changed, 38 insertions(+), 1 deletion(-)
 
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index ac78910..7cd1d21 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -424,11 +424,28 @@
- 		*(.spinlock.text)					\
- 		VMLINUX_SYMBOL(__lock_text_end) = .;
- 
-+#ifndef CONFIG_EARLY_KPROBES
-+# define EARLY_KPROBES_TEXT
-+#else
-+# define EARLY_KPROBES_TEXT						\
-+	. = ALIGN(8);							\
-+	VMLINUX_SYMBOL(__early_kprobes_start) = .;			\
-+	VMLINUX_SYMBOL(__early_kprobes_code_area_start) = .;		\
-+	. = . + MAX_OPTINSN_SIZE * CONFIG_NR_EARLY_KPROBES_SLOTS;	\
-+	VMLINUX_SYMBOL(__early_kprobes_code_area_end) = .;		\
-+	. = ALIGN(8);							\
-+	VMLINUX_SYMBOL(__early_kprobes_insn_slot_start) = .;		\
-+	. = . + MAX_INSN_SIZE * KPROBE_OPCODE_SIZE * CONFIG_NR_EARLY_KPROBES_SLOTS;\
-+	VMLINUX_SYMBOL(__early_kprobes_insn_slot_end) = .;		\
-+	VMLINUX_SYMBOL(__early_kprobes_end) = .;
-+#endif
-+
- #define KPROBES_TEXT							\
- 		ALIGN_FUNCTION();					\
- 		VMLINUX_SYMBOL(__kprobes_text_start) = .;		\
- 		*(.kprobes.text)					\
--		VMLINUX_SYMBOL(__kprobes_text_end) = .;
-+		VMLINUX_SYMBOL(__kprobes_text_end) = .;			\
-+		EARLY_KPROBES_TEXT
- 
- #define ENTRY_TEXT							\
- 		ALIGN_FUNCTION();					\
 -- 
 1.8.4
