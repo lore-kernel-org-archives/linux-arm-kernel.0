@@ -1,93 +1,40 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Sun, 15 Feb 2015 18:32:16 +0100
-Subject: [PATCH] serial: 8250: Revert "tty: serial: 8250_core: read only RX
- if there is something in the FIFO"
-In-Reply-To: <20150213231519.GF8670@n2100.arm.linux.org.uk>
-References: <54DA43F8.9090904@hurleysoftware.com>
- <54DBB531.2030504@hurleysoftware.com>
- <20150211200313.GE2531@atomide.com>
- <54DBBE9E.90104@hurleysoftware.com>
- <54DC6832.3070507@linutronix.de>
- <54DCD584.3010500@hurleysoftware.com>
- <20150212192333.GA18882@linutronix.de>
- <54DD053A.8060905@hurleysoftware.com>
- <20150213185115.GF5482@linutronix.de>
- <20150213231519.GF8670@n2100.arm.linux.org.uk>
-Message-ID: <20150215173216.GA8660@linutronix.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 15 Feb 2015 21:22:41 +0100
+Subject: [GIT PULL 0/2] KVM/ARM Fixes for 3.20
+Message-ID: <1424031763-9534-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 0aa525d11859c1a4d5b78fdc704148e2ae03ae13.
+Hi Paolo,
 
-The conditional RX-FIFO read seems to cause spurious interrupts and we
-see just:
-|serial8250: too much work for irq29
+The following changes since commit bfa76d49576599a4b9f9b7a71f23d73d6dcff735:
 
-The previous behaviour was "default" for decades and Marvell's 88f6282 SoC
-might not be the only that relies on it. Therefore the Omap fix is
-reverted for now.
+  Linux 3.19 (2015-02-08 18:54:22 -0800)
 
-Fixes: 0aa525d11859 ("tty: serial: 8250_core: read only RX if there is
-something in the FIFO")
-Reported-By: Nicolas Schichan <nschichan@freebox.fr>
-Debuged-By: Peter Hurley <peter@hurleysoftware.com>
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
-* Russell King - ARM Linux | 2015-02-13 23:15:19 [+0000]:
+are available in the git repository at:
 
->On Fri, Feb 13, 2015 at 07:51:16PM +0100, Sebastian Andrzej Siewior wrote:
->> Something like this maybe?
->
->My personal feeling is that as 0aa525d11859 was wrong, it should be
->reverted and this should be another attempt to fix the problem.  In
->other words, there should be two patches, one a revert of the previously
->known bad commit and this one having another go at it.
->
->I feel that would be a better approach, since then we don't end up
->with this change building on a previously know buggy change.  It
->would also make the changes to this solution from the previous,
->known-to-work-for-decades code more obvious.
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-3.20
 
-Okay. So here is the revert.
+for you to fetch changes up to 42e387ed20c012e37e60535bdbe809e65ce1559b:
 
- drivers/tty/serial/8250/8250_core.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+  arm/arm64: KVM: Add exit reaons to kvm_exit event tracing (2015-02-15 17:12:27 +0100)
 
-diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-index e3b9570a1eff..deae122c9c4b 100644
---- a/drivers/tty/serial/8250/8250_core.c
-+++ b/drivers/tty/serial/8250/8250_core.c
-@@ -2138,8 +2138,8 @@ int serial8250_do_startup(struct uart_port *port)
- 	/*
- 	 * Clear the interrupt registers.
- 	 */
--	if (serial_port_in(port, UART_LSR) & UART_LSR_DR)
--		serial_port_in(port, UART_RX);
-+	serial_port_in(port, UART_LSR);
-+	serial_port_in(port, UART_RX);
- 	serial_port_in(port, UART_IIR);
- 	serial_port_in(port, UART_MSR);
- 
-@@ -2300,8 +2300,8 @@ int serial8250_do_startup(struct uart_port *port)
- 	 * saved flags to avoid getting false values from polling
- 	 * routines or the previous session.
- 	 */
--	if (serial_port_in(port, UART_LSR) & UART_LSR_DR)
--		serial_port_in(port, UART_RX);
-+	serial_port_in(port, UART_LSR);
-+	serial_port_in(port, UART_RX);
- 	serial_port_in(port, UART_IIR);
- 	serial_port_in(port, UART_MSR);
- 	up->lsr_saved_flags = 0;
-@@ -2394,8 +2394,7 @@ void serial8250_do_shutdown(struct uart_port *port)
- 	 * Read data port to reset things, and then unlink from
- 	 * the IRQ chain.
- 	 */
--	if (serial_port_in(port, UART_LSR) & UART_LSR_DR)
--		serial_port_in(port, UART_RX);
-+	serial_port_in(port, UART_RX);
- 	serial8250_rpm_put(up);
- 
- 	del_timer_sync(&up->timer);
--- 
-2.1.4
+Thanks,
+-Christoffer
+
+----------------------------------------------------------------
+First round of KVM/ARM fixes for 3.20 (or what it will be called).
+
+Fixes a VM_BUG_ON error check and adds exit reasons to tracing.
+
+----------------------------------------------------------------
+Jan Kiszka (1):
+      ARM: KVM: Fix size check in __coherent_cache_guest_page
+
+Wei Huang (1):
+      arm/arm64: KVM: Add exit reaons to kvm_exit event tracing
+
+ arch/arm/include/asm/kvm_mmu.h |  2 +-
+ arch/arm/kvm/arm.c             |  2 +-
+ arch/arm/kvm/trace.h           | 10 +++++++---
+ 3 files changed, 9 insertions(+), 5 deletions(-)
