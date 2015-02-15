@@ -1,43 +1,55 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Sun, 15 Feb 2015 16:27:05 +0800
-Subject: [RFC PATCH 1/3] early kprobes: ARM: add definition for vmlinux.lds
- use.
+Date: Sun, 15 Feb 2015 16:27:13 +0800
+Subject: [RFC PATCH 3/3] early kprobes: introduce early kprobes related code
+ area.
 In-Reply-To: <1423988798-7104-1-git-send-email-wangnan0@huawei.com>
 References: <1423988798-7104-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1423988825-7211-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1423988833-7301-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch defines MAX_OPTINSN_SIZE, MAX_INSN_SIZE and
-KPROBE_OPCODE_SIZE for ARM for vmlinux.lds.S use. These macros are
-originally defined in kprobes.h, which are unable to be used in
-vmlinux.lds.
+Append early kprobe related slots to KPROBES_TEXT. This is arch
+independent part. Arch code should define MAX_OPTINSN_SIZE,
+KPROBE_OPCODE_SIZE and MAX_INSN_SIZE for it.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
 ---
- arch/arm/kernel/vmlinux.lds.S | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ include/asm-generic/vmlinux.lds.h | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index b31aa73..38ba4fd 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -45,6 +45,16 @@
- #define ARM_EXIT_DISCARD(x)	x
- #endif
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index ac78910..7cd1d21 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -424,11 +424,28 @@
+ 		*(.spinlock.text)					\
+ 		VMLINUX_SYMBOL(__lock_text_end) = .;
  
-+#ifdef CONFIG_EARLY_KPROBES
-+# ifdef CONFIG_THUMB2_KERNEL
-+#  error "Thumb2 kernel does not support early kprobes now"
-+# else
-+#  define MAX_OPTINSN_SIZE (optprobe_template_end - optprobe_template_entry)
-+#  define MAX_INSN_SIZE 2
-+#  define KPROBE_OPCODE_SIZE 4
-+# endif
++#ifndef CONFIG_EARLY_KPROBES
++# define EARLY_KPROBES_TEXT
++#else
++# define EARLY_KPROBES_TEXT						\
++	. = ALIGN(8);							\
++	VMLINUX_SYMBOL(__early_kprobes_start) = .;			\
++	VMLINUX_SYMBOL(__early_kprobes_code_area_start) = .;		\
++	. = . + MAX_OPTINSN_SIZE * CONFIG_NR_EARLY_KPROBES_SLOTS;	\
++	VMLINUX_SYMBOL(__early_kprobes_code_area_end) = .;		\
++	. = ALIGN(8);							\
++	VMLINUX_SYMBOL(__early_kprobes_insn_slot_start) = .;		\
++	. = . + MAX_INSN_SIZE * KPROBE_OPCODE_SIZE * CONFIG_NR_EARLY_KPROBES_SLOTS;\
++	VMLINUX_SYMBOL(__early_kprobes_insn_slot_end) = .;		\
++	VMLINUX_SYMBOL(__early_kprobes_end) = .;
 +#endif
 +
- OUTPUT_ARCH(arm)
- ENTRY(stext)
+ #define KPROBES_TEXT							\
+ 		ALIGN_FUNCTION();					\
+ 		VMLINUX_SYMBOL(__kprobes_text_start) = .;		\
+ 		*(.kprobes.text)					\
+-		VMLINUX_SYMBOL(__kprobes_text_end) = .;
++		VMLINUX_SYMBOL(__kprobes_text_end) = .;			\
++		EARLY_KPROBES_TEXT
  
+ #define ENTRY_TEXT							\
+ 		ALIGN_FUNCTION();					\
 -- 
 1.8.4
