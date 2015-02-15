@@ -1,34 +1,93 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Sun, 15 Feb 2015 12:08:02 +0100
-Subject: n900 audio: any ideas how to get headset speaker to work?
-In-Reply-To: <20150215102152.GA23736@amd>
-References: <20150215102152.GA23736@amd>
-Message-ID: <201502151208.03126@pali>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Sun, 15 Feb 2015 12:41:57 +0100
+Subject: [PATCH v4 0/3] about data busy
+In-Reply-To: <1423894668-8886-1-git-send-email-addy.ke@rock-chips.com>
+References: <1423828368-18456-1-git-send-email-addy.ke@rock-chips.com>
+ <1423894668-8886-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <CABxcv==G_sKsvWHX6rJP7EUv8jE=01k-JeGGXgiwiCN53pxdmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 15 February 2015 11:21:52 Pavel Machek wrote:
-> Hi!
-> 
-> By default, output goes to loudspeaker (top right relative to
-> keyboard). Any ideas how to switch it to the speaker on the
-> left or wired headset? Because I suspect that echo
-> cancelation is not going to be simple...
-> 									Pavel
+Hello Addy,
 
-I do not know but maybe this file could help:
+On Sat, Feb 14, 2015 at 7:17 AM, Addy Ke <addy.ke@rock-chips.com> wrote:
+> patch 1: This patch can fix bug that controller is still data busy after
+>          reset all blocks. After this patch, I still get data busy in
+>          set_ios().
+>
+> patch 2: This patch fix bug 'Timeout sending command'. After patch1 and
+>          patch2, there is no mmc errors after:
+>          cd /sys/bus/platform/drivers/dwmmc_rockchip
+>          for i in $(seq 1 10000); do
+>                 echo "========================" $i
+>                 echo ff0c0000.dwmmc > unbind
+>                 sleep .5
+>                 echo ff0c0000.dwmmc > bind
+>                 sleep 2
+>         done
+>
+> patch3: This patch fix bug that there is data busy before sdio send CMD53.
+>         But This patch is necessary for sd and mmc too.
+>
 
-https://gitorious.org/community-ssu/policy-settings-rx51/source/dcb6429c12006dc9850cc942b7143358fe3fd330:rx51/etc/alsaped.conf
+I faced the same 'Timeout sending command' error when trying to enable
+support for the SDIO wifi chip attached to mmc at 12210000 (mmc1) on an
+Exynos5420 Peach Pit Chromebook. On booting the kernel log shows:
 
-There are definitions of alsa channels and settings for different profiles.
+mmc_host mmc1: Timeout sending command (cmd 0x202000 arg 0x0 status 0x80202000)
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150215/ee897062/attachment.sig>
+0x202000 == SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT so your patch
+#2 dw_mci_setup_bus() avoids the mmc comand to time out. However, it
+has a side effect since with your series the uSD that in mmc at 12220000
+(mmc2) fails to be detected and the kernel log shows:
+
+[    5.466432] Waiting for root device /dev/mmcblk1p4...
+[  240.169436] INFO: task kworker/u16:1:50 blocked for more than 120 seconds.
+[  240.174844]       Not tainted
+3.19.0-next-20150211-00006-g045d4aba96ce-dirty #476
+[  240.182302] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs"
+disables this message.
+[  240.190109] kworker/u16:1   D c04c2710     0    50      2 0x00000000
+[  240.196446] Workqueue: kmmcd mmc_rescan
+[  240.200249] [<c04c2710>] (__schedule) from [<c04c2ac0>] (schedule+0x34/0x98)
+[  240.207290] [<c04c2ac0>] (schedule) from [<c04c6568>]
+(schedule_timeout+0x120/0x16c)
+[  240.215009] [<c04c6568>] (schedule_timeout) from [<c04c3584>]
+(wait_for_common+0xb0/0x154)
+[  240.223251] [<c04c3584>] (wait_for_common) from [<c038a5ac>]
+(mmc_wait_for_req+0xa0/0x140)
+[  240.231492] [<c038a5ac>] (mmc_wait_for_req) from [<c038a6d4>]
+(mmc_wait_for_cmd+0x88/0xa8)
+[  240.239735] [<c038a6d4>] (mmc_wait_for_cmd) from [<c03905b0>]
+(mmc_go_idle+0x78/0xf8)
+[  240.247540] [<c03905b0>] (mmc_go_idle) from [<c038c578>]
+(mmc_rescan+0x254/0x300)
+[  240.255003] [<c038c578>] (mmc_rescan) from [<c00346e8>]
+(process_one_work+0x120/0x324)
+[  240.262897] [<c00346e8>] (process_one_work) from [<c0034a58>]
+(worker_thread+0x138/0x464)
+[  240.271048] [<c0034a58>] (worker_thread) from [<c0039070>]
+(kthread+0xd8/0xf4)
+[  240.278254] [<c0039070>] (kthread) from [<c000e680>]
+(ret_from_fork+0x14/0x34)
+
+
+By enabling debug I see that the card is detected in dw_mci_get_cd() though.
+
+Alim suggested [0] that dw_mci_wait_busy() should be called in
+mci_send_cmd() instead dw_mci_setup_bus() because the controller hangs
+when when sending update clock cmd in different cases.
+
+I modified [1] your patch #2 to do what Alim suggested and only with
+that patch on top of linux-next I have neither the the "Timeout
+sending command" error nor the uSD not getting detected errors. Linux
+mounts the rootfs from the uSD and the wifi SDIO device is enumerated
+and listed in /sys/bus/sdio/devices/
+
+Does that also solve your issue?
+
+Best regards,
+Javier
+
+[0]: https://lkml.org/lkml/2015/2/10/353
+[1]: http://paste.debian.net/plain/148794
