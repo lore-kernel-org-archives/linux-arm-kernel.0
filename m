@@ -1,36 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 15 Feb 2015 23:12:51 +0000
-Subject: [PATCH 05/14] ARM: call reset_controller_of_init from default
- time_init handler
-In-Reply-To: <CAL_Jsq+Sk0C-1UHCKE18fEVwBbV=quV9mrJSKTO_UPXWcaYfCw@mail.gmail.com>
-References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1423763164-5606-6-git-send-email-mcoquelin.stm32@gmail.com>
- <CAL_Jsq+Sk0C-1UHCKE18fEVwBbV=quV9mrJSKTO_UPXWcaYfCw@mail.gmail.com>
-Message-ID: <20150215231251.GL8656@n2100.arm.linux.org.uk>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Mon, 16 Feb 2015 04:58:47 +0530
+Subject: [PATCH v4 1/3] mmc: dw_mmc: update clock after host reach a
+ stable voltage
+In-Reply-To: <1423894668-8886-2-git-send-email-addy.ke@rock-chips.com>
+References: <1423828368-18456-1-git-send-email-addy.ke@rock-chips.com>
+ <1423894668-8886-1-git-send-email-addy.ke@rock-chips.com>
+ <1423894668-8886-2-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <CAGOxZ53ndi_hYDGBGhY-7q8aOrFid1=D=_5KEbUvzTsnybJQ3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 15, 2015 at 04:17:31PM -0600, Rob Herring wrote:
-> On Thu, Feb 12, 2015 at 11:45 AM, Maxime Coquelin
-> <mcoquelin.stm32@gmail.com> wrote:
-> > Some DT ARM platforms need the reset controllers to be initialized before
-> > the timers.
-> > This is the case of the stm32 and sunxi platforms.
-> 
-> I would say this is the exception, not the rule and therefore should
-> be handled in a machine desc function. Or it could be part of your
-> timer setup. Or is the bootloader's problem (like arch timer setup).
-> 
-> We just want to limit how much this mechanism gets used.
+Hi Addy,
 
-Can you clarify please - what is "this mechanism"?  Placing explicit
-calls at this location, or the whole OF_DECLARE_* stuff?
+On Sat, Feb 14, 2015 at 11:47 AM, Addy Ke <addy.ke@rock-chips.com> wrote:
+> As show in mmc_power_up(), in MMC_POWER_UP state, the voltage isn't
+> stable and we may get 'data busy' which can't be cleaned by resetting
+> all blocks. So we should not send command to update clock in this state.
+>
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+>  drivers/mmc/host/dw_mmc.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 4d2e3c2..3472f9b 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -1102,7 +1102,8 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>                 drv_data->set_ios(slot->host, ios);
+>
+>         /* Slot specific timing and width adjustment */
+> -       dw_mci_setup_bus(slot, false);
+> +       if (ios->power_mode != MMC_POWER_UP)
+> +               dw_mci_setup_bus(slot, false);
+>
+This looks a HACK to me.
+If stabilizing host voltage regulator is the problem, can you try out
+below patch, and see if this resolve your issue?
 
-Sebastian suggested using the OF_DECLARE_* stuff for the Dove PMU -
-so maybe you have a comment on that too?
+===========
+[PATCH] mmc: dw_mmc: Wait for host voltage regulator to be stable
 
-Thanks.
+Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+---
+ drivers/mmc/host/dw_mmc.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 4d2e3c2..dc10fbb 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -1202,6 +1202,9 @@ static int dw_mci_switch_voltage(struct mmc_host
+*mmc, struct mmc_ios *ios)
+  }
+  mci_writel(host, UHS_REG, uhs);
+
++ /* wait for 5ms so that host voltage regulator is stable */
++ usleep_range(5000, 5500);
++
+  return 0;
+ }
+
+===============
+
+>         if (slot->host->state == STATE_WAITING_CMD11_DONE && ios->clock != 0)
+>                 slot->host->state = STATE_IDLE;
+> --
+> 1.8.3.2
+>
+>
+
+
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Alim
