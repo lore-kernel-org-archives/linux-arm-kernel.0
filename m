@@ -1,36 +1,43 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Sun, 15 Feb 2015 09:11:14 +0800
-Subject: [PATCH v2 00/30] Refine PCI scan interfaces and make generic
- pci host bridge
-In-Reply-To: <20150214194552.GA3932@e102568-lin.cambridge.arm.com>
-References: <1421800225-26230-1-git-send-email-wangyijing@huawei.com>
- <20150214194552.GA3932@e102568-lin.cambridge.arm.com>
-Message-ID: <54DFF232.3090001@huawei.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Sun, 15 Feb 2015 16:27:05 +0800
+Subject: [RFC PATCH 1/3] early kprobes: ARM: add definition for vmlinux.lds
+ use.
+In-Reply-To: <1423988798-7104-1-git-send-email-wangnan0@huawei.com>
+References: <1423988798-7104-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1423988825-7211-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Also we could eliminate all arch specific pci_domain_nr() after applied this series.
->>
->> I tested this series on x86 (with or without ACPI).
->> Comments and tests are warmly welcome!
-> 
-> Can you push a public branch out rebased against mainline for us to pull
-> and test please ?
+This patch defines MAX_OPTINSN_SIZE, MAX_INSN_SIZE and
+KPROBE_OPCODE_SIZE for ARM for vmlinux.lds.S use. These macros are
+originally defined in kprobes.h, which are unable to be used in
+vmlinux.lds.
 
-OK, I will rebase it and push it to my github repo today, and send out the git URL, thanks!
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+---
+ arch/arm/kernel/vmlinux.lds.S | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Thanks!
-Yijing.
-
-> 
-> Thanks !
-> Lorenzo
-> 
-> 
-> .
-> 
-
-
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index b31aa73..38ba4fd 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -45,6 +45,16 @@
+ #define ARM_EXIT_DISCARD(x)	x
+ #endif
+ 
++#ifdef CONFIG_EARLY_KPROBES
++# ifdef CONFIG_THUMB2_KERNEL
++#  error "Thumb2 kernel does not support early kprobes now"
++# else
++#  define MAX_OPTINSN_SIZE (optprobe_template_end - optprobe_template_entry)
++#  define MAX_INSN_SIZE 2
++#  define KPROBE_OPCODE_SIZE 4
++# endif
++#endif
++
+ OUTPUT_ARCH(arm)
+ ENTRY(stext)
+ 
 -- 
-Thanks!
-Yijing
+1.8.4
