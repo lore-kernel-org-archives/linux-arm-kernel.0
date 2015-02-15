@@ -1,59 +1,36 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 15 Feb 2015 16:42:59 -0600
-Subject: [PATCH 02/14] ARM: ARMv7M: Enlarge vector table to 256 entries
-In-Reply-To: <CALszF6BDa9pUb534YN2z9DbYA+hPCnG8XYy5YbjJwSiseKz4xg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 15 Feb 2015 23:12:51 +0000
+Subject: [PATCH 05/14] ARM: call reset_controller_of_init from default
+ time_init handler
+In-Reply-To: <CAL_Jsq+Sk0C-1UHCKE18fEVwBbV=quV9mrJSKTO_UPXWcaYfCw@mail.gmail.com>
 References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1423763164-5606-3-git-send-email-mcoquelin.stm32@gmail.com>
- <CAMuHMdWESyPktOSBfVoZCb35stUbhNpbbpzSW4JfORdObgg5jw@mail.gmail.com>
- <CALszF6BDa9pUb534YN2z9DbYA+hPCnG8XYy5YbjJwSiseKz4xg@mail.gmail.com>
-Message-ID: <CAL_Jsq+rHFPXmWqByvdG435tpbO_+ODByiMcdxboULYpUfDUmg@mail.gmail.com>
+ <1423763164-5606-6-git-send-email-mcoquelin.stm32@gmail.com>
+ <CAL_Jsq+Sk0C-1UHCKE18fEVwBbV=quV9mrJSKTO_UPXWcaYfCw@mail.gmail.com>
+Message-ID: <20150215231251.GL8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 13, 2015 at 2:42 AM, Maxime Coquelin
-<mcoquelin.stm32@gmail.com> wrote:
-> Hi Geert,
->
-> 2015-02-12 21:34 GMT+01:00 Geert Uytterhoeven <geert@linux-m68k.org>:
->> On Thu, Feb 12, 2015 at 6:45 PM, Maxime Coquelin
->> <mcoquelin.stm32@gmail.com> wrote:
->>> From Cortex-M4 and M7 reference manuals, the nvic supports up to 240
->>> interrupts. So the number of entries in vectors table is 256.
->>>
->>> This patch adds the missing entries, and change the alignement, so that
->>> vector_table remains naturally aligned.
->>
->> Shouldn't this depend on ARCH_STM32, or some other M4 or M7 specific
->> Kconfig option, to avoid wasting the space on other CPUs?
->
-> Actually, the STM32F429 has 90 interrupts, so it would need 106
-> entries in the vector table.
-> The maximum of supported interrupts is not only for Cortex-M4 and M7,
-> this is also true for Cortex-M3.
->
-> I see two possibilities:
->  1 - We declare the vector table for the maximum supported number of
-> IRQs, as this patch does.
->         - Pro: it will be functionnal with all Cortex-M MCUs
->         - Con: Waste of less than 1KB for memory
+On Sun, Feb 15, 2015 at 04:17:31PM -0600, Rob Herring wrote:
+> On Thu, Feb 12, 2015 at 11:45 AM, Maxime Coquelin
+> <mcoquelin.stm32@gmail.com> wrote:
+> > Some DT ARM platforms need the reset controllers to be initialized before
+> > the timers.
+> > This is the case of the stm32 and sunxi platforms.
+> 
+> I would say this is the exception, not the rule and therefore should
+> be handled in a machine desc function. Or it could be part of your
+> timer setup. Or is the bootloader's problem (like arch timer setup).
+> 
+> We just want to limit how much this mechanism gets used.
 
-The waste depends on the alignment size as well and could be up to
-almost 2KB worst case. It varies depending on the padding. We should
-try to place it so it always aligned and the wasted space is
-minimized.
+Can you clarify please - what is "this mechanism"?  Placing explicit
+calls at this location, or the whole OF_DECLARE_* stuff?
 
-Rob
+Sebastian suggested using the OF_DECLARE_* stuff for the Dove PMU -
+so maybe you have a comment on that too?
 
->  2 - We introduce a config flag that provides the number of interrupts
->         - Pro: No more memory waste
->         - Con: Need to declare a per MCU model config flag.
->
-> Then, regarding the natural alignment, is there a way to ensure it
-> depending on the value of a config flag?
-> Or we should keep it at the maximum value possible?
->
-> Any feedback will be appreciated, especially from Uwe who maintains
-> the efm32 machine.
->
-> Kind regards,
-> Maxime
+Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
