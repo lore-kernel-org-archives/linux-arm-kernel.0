@@ -1,84 +1,31 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sun, 15 Feb 2015 10:45:57 -0500
-Subject: [PATCH v5 0/5] drivers: bus: Add Simple Power-Managed Bus
-In-Reply-To: <20150211001835.GB7826@verge.net.au>
-References: <1423131088-7835-1-git-send-email-geert+renesas@glider.be>
- <20150211001835.GB7826@verge.net.au>
-Message-ID: <20150215154556.GD25065@verge.net.au>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 15 Feb 2015 17:20:29 +0100
+Subject: n900 audio: any ideas how to get headset speaker to work?
+In-Reply-To: <201502151208.03126@pali>
+References: <20150215102152.GA23736@amd>
+ <201502151208.03126@pali>
+Message-ID: <20150215162028.GA6857@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 11, 2015 at 09:18:35AM +0900, Simon Horman wrote:
-> Hi Geert,
+On Sun 2015-02-15 12:08:02, Pali Roh?r wrote:
+> On Sunday 15 February 2015 11:21:52 Pavel Machek wrote:
+> > Hi!
+> > 
+> > By default, output goes to loudspeaker (top right relative to
+> > keyboard). Any ideas how to switch it to the speaker on the
+> > left or wired headset? Because I suspect that echo
+> > cancelation is not going to be simple...
+> > 									Pavel
 > 
-> On Thu, Feb 05, 2015 at 11:11:23AM +0100, Geert Uytterhoeven wrote:
-> >         Hi all,
-> > 
-> > The Renesas Bus State Controller (BSC) provides an external bus for
-> > connecting multiple external devices to an SoC, driving several chip
-> > select lines, for e.g. NOR FLASH, Ethernet and USB.
-> > On the kzm9g and ape6evm development boards, an smsc9220 Ethernet
-> > controller is connnected to the BSC of an SH-Mobile AG5 (sh73a0) resp.
-> > R-Mobile APE6 (r8a73a4) SoC.
-> > 
-> > The BSC is a fairly simple memory-mapped bus, hence a "simple-bus"
-> > compatibility seems suitable.  However, the BSC is special in two
-> > ways:
-> >   1. It is part of a PM domain (A4S on sh73a0),
-> >   2. It has a gateable functional clock (ZB).
-> > Before a device connected to the BSC can be accessed, the PM domain
-> > containing the BSC must be powered on, and the functional clock
-> > driving the BSC must be enabled.
-> > 
-> > Both special properties can be described in DT in a standardized way
-> > ("power-domains = <&pd_a4s>" and "clocks = <&zb_clk>", cfr. the
-> > example in the DT binding documentation).  Externally connected
-> > devices are described as children of the BSC node.
-> > 
-> > Unfortunately this doesn't mean everything will work out-of-the-box.
-> > There are two problems:
-> >   1. Without a device driver bound to the bus device, this device is
-> >      not attached to the PM domain. And although a child device is
-> >      present and active, the PM domain may be powered down, as it's
-> >      considered unused by the PM domain core.
-> >   2. Without a device driver calling pm_runtime_enable(), its
-> >      functional clock is not enabled. Once runtime PM is enabled, the
-> >      R-Mobile PM domain platform driver manages the functional clock
-> >      using runtime PM.
-> > 
-> > As none of the above is really bus hardware-specific (PM domains and
-> > functional clocks in clock domains are handled from genpd and platform
-> > code), this series adds a Simple Power-Managed Bus driver for
-> > transparent busses, which matches against "simple-pm-bus", enables
-> > runtime PM for the bus device, and calls of_platform_populate() to
-> > probe for child devices.
-> > Due to the child-parent relationship of devices connected to the bus,
-> > as long as the device drivers for the child devices are runtime PM
-> > enabled, the bus's PM domain will be powered, and the bus's clock will
-> > be enabled automatically when needed, for both runtime PM and s2ram.
-> > 
-> > This was tested on sh73a0/kzm9g-multiplatform (by me), and (v3) on
-> > r8a73a4/ape6evm-multiplatform (by Ulrich Hecht). Without this,
-> > Ethernet doesn't work, as the ZB clock is disabled by
-> > clk_disable_unused().
-> > 
-> > Felipe: It looks like drivers/usb/musb/musb_am335x.c can be removed, if
-> > "ti,am33xx-usb" claims compatibility with "simple-pm-bus"?
-> > 
-> > As drivers/bus doesn't have a maintainer, and this driver is needed to
-> > move two shmobile platforms away from legacy to multiplatform, I think
-> > this can go in through Simon's shmobile tree.
+> I do not know but maybe this file could help:
 > 
-> thanks for persisting with this. From my point of view it appears
-> to be reviewed and ready.
+> https://gitorious.org/community-ssu/policy-settings-rx51/source/dcb6429c12006dc9850cc942b7143358fe3fd330:rx51/etc/alsaped.conf
 > 
-> Does anyone object to me queueing this up for v3.21 in the renesas tree?
-> 
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> There are definitions of alsa channels and settings for different profiles.
 
-As no one has objected and it seems has been thoroughly reviewed
-I have queued this up in the renesas tree.
-
-It is part of the renesas-devel-20150215-v3.19 tag.
-
-[snip]
+Thanks... it seems to be what I needed. More code to write...
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
