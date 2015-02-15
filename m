@@ -1,71 +1,59 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 15 Feb 2015 21:22:43 +0100
-Subject: [GIT PULL 2/2] arm/arm64: KVM: Add exit reaons to kvm_exit event
- tracing
-In-Reply-To: <1424031763-9534-1-git-send-email-christoffer.dall@linaro.org>
-References: <1424031763-9534-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1424031763-9534-3-git-send-email-christoffer.dall@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 15 Feb 2015 16:17:31 -0600
+Subject: [PATCH 05/14] ARM: call reset_controller_of_init from default
+ time_init handler
+In-Reply-To: <1423763164-5606-6-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1423763164-5606-6-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <CAL_Jsq+Sk0C-1UHCKE18fEVwBbV=quV9mrJSKTO_UPXWcaYfCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Huang <wei@redhat.com>
+On Thu, Feb 12, 2015 at 11:45 AM, Maxime Coquelin
+<mcoquelin.stm32@gmail.com> wrote:
+> Some DT ARM platforms need the reset controllers to be initialized before
+> the timers.
+> This is the case of the stm32 and sunxi platforms.
 
-This patch extends trace_kvm_exit() to include KVM exit reasons
-(i.e. EC of HSR). The tracing function then dumps both exit reason
-and PC of vCPU, shown as the following. Tracing tools can use this
-new exit_reason field to better understand the behavior of guest VMs.
+I would say this is the exception, not the rule and therefore should
+be handled in a machine desc function. Or it could be part of your
+timer setup. Or is the bootloader's problem (like arch timer setup).
 
-886.301252: kvm_exit:             HSR_EC: 0x0024, PC: 0xfffffe0000506b28
+We just want to limit how much this mechanism gets used.
 
-Signed-off-by: Wei Huang <wei@redhat.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/kvm/arm.c   |  2 +-
- arch/arm/kvm/trace.h | 10 +++++++---
- 2 files changed, 8 insertions(+), 4 deletions(-)
+Rob
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 0b0d58a..4a00131 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -533,7 +533,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- 		vcpu->mode = OUTSIDE_GUEST_MODE;
- 		kvm_guest_exit();
--		trace_kvm_exit(*vcpu_pc(vcpu));
-+		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
- 		/*
- 		 * We may have taken a host interrupt in HYP mode (ie
- 		 * while executing the guest). This interrupt is still
-diff --git a/arch/arm/kvm/trace.h b/arch/arm/kvm/trace.h
-index b6a6e71..89fd80a6 100644
---- a/arch/arm/kvm/trace.h
-+++ b/arch/arm/kvm/trace.h
-@@ -25,18 +25,22 @@ TRACE_EVENT(kvm_entry,
- );
- 
- TRACE_EVENT(kvm_exit,
--	TP_PROTO(unsigned long vcpu_pc),
--	TP_ARGS(vcpu_pc),
-+	TP_PROTO(unsigned int exit_reason, unsigned long vcpu_pc),
-+	TP_ARGS(exit_reason, vcpu_pc),
- 
- 	TP_STRUCT__entry(
-+		__field(	unsigned int,	exit_reason	)
- 		__field(	unsigned long,	vcpu_pc		)
- 	),
- 
- 	TP_fast_assign(
-+		__entry->exit_reason		= exit_reason;
- 		__entry->vcpu_pc		= vcpu_pc;
- 	),
- 
--	TP_printk("PC: 0x%08lx", __entry->vcpu_pc)
-+	TP_printk("HSR_EC: 0x%04x, PC: 0x%08lx",
-+		  __entry->exit_reason,
-+		  __entry->vcpu_pc)
- );
- 
- TRACE_EVENT(kvm_guest_fault,
--- 
-2.1.2.330.g565301e.dirty
+>
+> This patch adds a call to reset_controller_of_init() to the default
+> .init_time callback when RESET_CONTROLLER is used by the platform.
+>
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> ---
+>  arch/arm/kernel/time.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+> index 0cc7e58..4601b1e 100644
+> --- a/arch/arm/kernel/time.c
+> +++ b/arch/arm/kernel/time.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/irq.h>
+>  #include <linux/kernel.h>
+>  #include <linux/profile.h>
+> +#include <linux/reset-controller.h>
+>  #include <linux/sched.h>
+>  #include <linux/sched_clock.h>
+>  #include <linux/smp.h>
+> @@ -117,6 +118,9 @@ void __init time_init(void)
+>         if (machine_desc->init_time) {
+>                 machine_desc->init_time();
+>         } else {
+> +#ifdef CONFIG_RESET_CONTROLLER
+> +               reset_controller_of_init();
+> +#endif
+>  #ifdef CONFIG_COMMON_CLK
+>                 of_clk_init(NULL);
+>  #endif
+> --
+> 1.9.1
+>
