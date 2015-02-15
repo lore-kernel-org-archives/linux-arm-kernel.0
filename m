@@ -1,116 +1,63 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Sun, 15 Feb 2015 15:36:29 +0100
-Subject: [PATCH 12/14] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <1423855102.4182.63.camel@pengutronix.de>
-References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1423763164-5606-13-git-send-email-mcoquelin.stm32@gmail.com>
- <1423828078.4182.17.camel@pengutronix.de>
- <CALszF6D+5mXajUWarwq8M4yL_Nc+x1Bmu4D7_HxDRy2kGRXNVQ@mail.gmail.com>
- <1423844735.4182.52.camel@pengutronix.de>
- <CALszF6Ad93BgT4UsJudVKpfhhL2dbtKTTRno1XqQ5=eANkwXzA@mail.gmail.com>
- <1423855102.4182.63.camel@pengutronix.de>
-Message-ID: <CALszF6CxQcJ6NDy_4P-PDPf1=+zQ_QcUBB9qYn=n02XFKNG2Rw@mail.gmail.com>
+From: patrikbachan@gmail.com (Patrik Bachan aka DiGGiT)
+Date: Sun, 15 Feb 2015 15:45:27 +0100
+Subject: n900 audio: any ideas how to get headset speaker to work?
+In-Reply-To: <20150215102152.GA23736@amd>
+References: <20150215102152.GA23736@amd>
+Message-ID: <CAK7bGn+NH9BOB25+dhNZXFxY_fD8TeoWvuSpTD-4cg-zU5dOmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
-
-2015-02-13 20:18 GMT+01:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> Am Freitag, den 13.02.2015, 17:41 +0100 schrieb Maxime Coquelin:
->> 2015-02-13 17:25 GMT+01:00 Philipp Zabel <p.zabel@pengutronix.de>:
->> > Hi Maxime,
->> >
->> > Am Freitag, den 13.02.2015, 16:59 +0100 schrieb Maxime Coquelin:
->> >> Hi Philipp,
->> >>
->> >> 2015-02-13 12:47 GMT+01:00 Philipp Zabel <p.zabel@pengutronix.de>:
->> >> > Hi Maxime,
->> >> >
->> >> > Am Donnerstag, den 12.02.2015, 18:46 +0100 schrieb Maxime Coquelin:
->> >> > [...]
->> >> >> +     soc {
->> >> >> +             reset_ahb1: reset at 40023810 {
->> >> >> +                     #reset-cells = <1>;
->> >> >> +                     compatible = "st,stm32-reset";
->> >> >> +                     reg = <0x40023810 0x4>;
->> >> >> +             };
->> >> >> +
->> >> >> +             reset_ahb2: reset at 40023814 {
->> >> >> +                     #reset-cells = <1>;
->> >> >> +                     compatible = "st,stm32-reset";
->> >> >> +                     reg = <0x40023814 0x4>;
->> >> >> +             };
->> >> >> +
->> >> >> +             reset_ahb3: reset at 40023818 {
->> >> >> +                     #reset-cells = <1>;
->> >> >> +                     compatible = "st,stm32-reset";
->> >> >> +                     reg = <0x40023818 0x4>;
->> >> >> +             };
->> >> >> +
->> >> >> +             reset_apb1: reset at 40023820 {
->> >> >> +                     #reset-cells = <1>;
->> >> >> +                     compatible = "st,stm32-reset";
->> >> >> +                     reg = <0x40023820 0x4>;
->> >> >> +             };
->> >> >> +
->> >> >> +             reset_apb2: reset at 40023824 {
->> >> >> +                     #reset-cells = <1>;
->> >> >> +                     compatible = "st,stm32-reset";
->> >> >> +                     reg = <0x40023824 0x4>;
->> >> >> +             };
->> >> >
->> >> > These are mostly consecutive, single registers. I wonder if these are
->> >> > part of the same IP block and thus should be grouped together into the
->> >> > same reset controller node?
->> >>
->> >> What I could to is to have two instances. One for AHB and one for APB domain.
->> >> Doing this, I will have one instance per domain, and only consecutive registers.
->> >> Is it fine for you?
->> >
->> > Looking at
->> > http://www.st.com/web/en/resource/technical/document/reference_manual/DM00031020.pdf
->> > Table 34 (RCC register map and reset values), I'd say there is a single
->> > "Reset and Clock Control" device at 0x40023800 - 0x40023884:
->> >
->> >         soc {
->> >                 rcc: rcc at 40023800 {
->> >                         #clock-cells = <1>;
->> >                         #reset-cells = <1>;
->> >                         compatible = "st,stm32-rcc";
->> >                         reg = <0x40023800 0x84>;
->> >                 };
->> >
->> >                 ...
->> >
->> > If you really want to describe the reset controller parts (offsets +0x10
->> > to +0x24) in a separate node, I won't argue against it too long,
->> > although this is a somewhat arbitrary decision.
->> >
->> > In any case, the whole register at offset +0x1c is reserved, so there is
->> > no reason to split the reset controller. It is ok to have unused ranges
->> > as is already the case with reserved bits inside the used registers.
->>
->> Ok. I understand your point.
->> But it will be more difficult at usage, because the node referencing
->> the fourth reset bit of apb2 register will have to pass 164 as
->> parameter.
->> It is error prone IMHO.
->>
->> Other solution would be to add some defines for each reset line in the
->> DT-Bindings, as we do today for STi platform.
->> But it is giving an unneeded constraint between DT and reset trees.
+2015-02-15 11:21 GMT+01:00 Pavel Machek <pavel@ucw.cz>:
+> Hi!
 >
-> That is a bit unfortunate, but providing the named constants in
-> include/dt-bindings/reset/ makes for a much better readable device tree,
-> so I'd prefer that solution, even if it means having to coordinate pull
-> requests.
+> By default, output goes to loudspeaker (top right relative to
+> keyboard). Any ideas how to switch it to the speaker on the left or
+> wired headset? Because I suspect that echo cancelation is not going to
+> be simple...
+>                                                                         Pavel
+> --
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 
-Ok, I will add constants in include/dt-bindings/reset/
+Hi,
+in case of direct alsa output (not PA), setup is pretty complex.
+Headphones referenced as line. All audio outputs are differential.
+Here are controls that affects volumes...
 
-Thanks,
-Maxime
+global:
+ PCM (volume)
+ left/right DAC mux (below)
+      -- DAC_L1/R1 passes sound to loudspeakers, line, (maybe others)
+      -- DAC_L2/R2 passes sound to loudspeakers, NOT line, (maybe others)
+      -- DAC_L3/R3 passes sound to NOT loudspeakers, line, (maybe others)
+      if DAC_L1/R1 is chosen, you can hear lower volume on both
+outputs in compare to dedicated outputs (DAC_L2/R2, DAC_L3/R3),
+probabbly due to higher load of ADC
 
->
-> regards
-> Philipp
->
+
+loudspeakers:
+ Speaker function (on)
+ HP (unmute)
+ HP DAC (volume)
+ left HP Mixer DACL1 (below)
+ right HP Mixer DACR1 (below)
+   --unmute theese two,  this will pass left channel sound to left
+channel output and vice versa
+ left HP Mixer DACR1 (below)
+ right HP Mixer DACL1 (below)
+  --mute these two, this controls channel crosstalk ( amount of left
+channel sound going to right channel output and vice versa)
+
+line:
+ line (unmute)
+ line DAC (volume)
+ jack function (headphone)
+ TPA6130A2 Headphone (volume)
+ left Line Mixer DACL1 (below)
+ right Line Mixer DACR1 (below)
+   --unmute theese two,  this will pass left channel sound to left
+channel output and vice versa
+ left Line Mixer DACR1 (below)
+ right Line Mixer DACL1 (below)
+  --mute these two, this controls channel crosstalk ( amount of left
+channel sound going to right channel output and vice versa)
