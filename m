@@ -1,118 +1,42 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 16 Feb 2015 21:24:51 +0100 (CET)
-Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
- registers
-In-Reply-To: <CAOMZO5DJ82Yyq4Ch_kKR01-yYhjn53As7ZBt91Dd5sna9Z+wXg@mail.gmail.com>
-References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
- <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
- <54DA020C.6030703@i2se.com>
- <CAOMZO5DGCP1p1vetwWHpSbe2qywA8DhWRRq22egMDFSw11uq4w@mail.gmail.com>
- <54DA0DE7.5050708@i2se.com>
- <CAOMZO5AtFOThRjcAgMVbrbkcrJbehouSxoH03VUGJrRdWXnS_Q@mail.gmail.com>
- <462270270.419156.1423603473431.JavaMail.open-xchange@oxbaltgw02.schlund.de>
- <CAOMZO5B4mxP6RBkbsbj=wC6bZJgtreoo5S_NhYuki6kW=Y=QFw@mail.gmail.com>
- <1705379122.406018.1423686677196.JavaMail.open-xchange@oxbaltgw01.schlund.de>
- <CAOMZO5ChJiHiUBhrRf_qqi7gTLvPp08fsfRBK+GVzvrqimKinw@mail.gmail.com>
- <1378197784.470306.1423767540298.JavaMail.open-xchange@oxbaltgw01.schlund.de>
- <CAOMZO5DJ82Yyq4Ch_kKR01-yYhjn53As7ZBt91Dd5sna9Z+wXg@mail.gmail.com>
-Message-ID: <235965536.675649.1424118291283.JavaMail.open-xchange@oxbaltgw06.schlund.de>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Mon, 16 Feb 2015 12:30:37 -0800
+Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
+ hwspinlock
+In-Reply-To: <CAK=WgbZ2986xxuAFvMSoyQLaPAxdUpZ8e5g-mSjyETfvd4KKHw@mail.gmail.com>
+References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
+ <1421269101-51105-2-git-send-email-s-anna@ti.com>
+ <20150115135201.GG16217@leverpostej>
+ <20150115135556.GH16217@leverpostej>
+ <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
+ <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
+ <20150116101746.GA21809@leverpostej>
+ <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
+ <CAJAp7Og+-KQd7bygWQjTS72Kye3fkp3s3ry+2bw7Gcv7aPF5AQ@mail.gmail.com>
+ <CAK=WgbZ2986xxuAFvMSoyQLaPAxdUpZ8e5g-mSjyETfvd4KKHw@mail.gmail.com>
+Message-ID: <CAJAp7OjvFj6RL=Z=SQ6XYzo4qd-Bhe3SYV9-JAGS5SzjJ6R5xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-> Fabio Estevam <festevam@gmail.com> hat am 12. Februar 2015 um 20:08
-> geschrieben:
+On Fri, Jan 30, 2015 at 9:41 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+[..]
+> Since the existence of several hwblocks is still fictional (Bjorn,
+> please confirm too?), we may prefer to introduce changes to support it
+> only when it shows up; it all depends on the amount of changes needed.
+> Suman, care to take a look please?
 >
->
-> Hi Stefan,
->
-> On Thu, Feb 12, 2015 at 4:59 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> > Hi Fabio,
-> >
-> >> Fabio Estevam <festevam@gmail.com> hat am 11. Februar 2015 um 22:10
-> >> geschrieben:
-> >>
-> >>
-> >> On Wed, Feb 11, 2015 at 6:31 PM, Stefan Wahren <stefan.wahren@i2se.com>
-> >> wrote:
-> >>
-> >> >> I always get 0x5e5b5513 with or without your patch.
-> >> >
-> >> > very strange. Do you have any idea why IO1_STABLE is permanent low?
-> >>
-> >> On my case it is always 1.
-> >
-> > i expected the same behavior on my hardware.
-> >
-> > Do you use u-boot as bootloader?
->
-> Yes, I do.
 
-i will try to test it with u-boot.
+It turns out that the Qualcomm platforms have two additional "remote
+spinlock" mechanisms - both using shared memory.
 
->
-> >>
-> >> > Can you confirm the behavior according to your flash issue?
-> >>
-> >> In my tests IO1_STABLE stays the same.
-> >
-> > This wasn't the intension of my second question. I wanted to know about the
-> > state of the SPI NOR flash detection process.
-> >
-> > Does it sucessed if you apply the patch, but revert the changes in
-> > clk_ref_set_rate() from clk-ref.c?
->
-> I don't have my mx28evk setup available at the moment, but when I
-> applied your patch and reverted all the changes in clk-ref.c, then the
-> SPI flash detection works.
->
-> I haven't tested to only reverting the changes inside
-> clk_ref_set_rate(), but I can do it tomorrow.
+On most platforms only 1 (out of these 3) is actually consumed, but
+e.g. the older msm7x30 uses 2 of them (SMEM and DAL). Due to its age I
+don't think it's on anyones todo list to actually support this
+platform as of today; but it's out there.
 
-I think the reason for the problem in the flash detection is caused by the
-misaligned access on the frac register.
 
-Maybe you want to try the following after the second patch is reverted.
+None of these hwlocks are allocated dynamically, so if needed a
+dynamic base_id (-1 like other frameworks) would be a acceptable
+solution - and can easily be implemented when we need it.
 
-Stefan
-
------------->8----------------------------------------------------------
-diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
-index 9fc9359..87969e3 100644
---- a/drivers/clk/mxs/clk-imx23.c
-+++ b/drivers/clk/mxs/clk-imx23.c
-@@ -73,8 +73,10 @@ static void __init clk_misc_init(void)
- 	 * 480 MHz seems too high to be ssp clock source directly,
- 	 * so set frac to get a 288 MHz ref_io.
- 	 */
--	writel_relaxed(0x3f << BP_FRAC_IOFRAC, FRAC + CLR);
--	writel_relaxed(30 << BP_FRAC_IOFRAC, FRAC + SET);
-+	val = readl_relaxed(FRAC);
-+	val &= ~(0x3f << BP_FRAC_IOFRAC);
-+	val |= 30 << BP_FRAC_IOFRAC;
-+	writel_relaxed(val, FRAC);
- }
- 
- static const char *sel_pll[]  __initconst = { "pll", "ref_xtal", };
-diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
-index a6c3501..e47ad69 100644
---- a/drivers/clk/mxs/clk-imx28.c
-+++ b/drivers/clk/mxs/clk-imx28.c
-@@ -118,10 +118,15 @@ static void __init clk_misc_init(void)
- 	/*
- 	 * 480 MHz seems too high to be ssp clock source directly,
- 	 * so set frac0 to get a 288 MHz ref_io0 and ref_io1.
-+	 * According to reference manual we must modify frac bytewise.
- 	 */
- 	val = readl_relaxed(FRAC0);
--	val &= ~((0x3f << BP_FRAC0_IO0FRAC) | (0x3f << BP_FRAC0_IO1FRAC));
--	val |= (30 << BP_FRAC0_IO0FRAC) | (30 << BP_FRAC0_IO1FRAC);
-+	val &= ~(0x3f << BP_FRAC0_IO0FRAC);
-+	val |= 30 << BP_FRAC0_IO0FRAC;
-+	writel_relaxed(val, FRAC0);
-+	val = readl_relaxed(FRAC0);
-+	val &= ~(0x3f << BP_FRAC0_IO1FRAC);
-+	val |= 30 << BP_FRAC0_IO1FRAC;
- 	writel_relaxed(val, FRAC0);
- }
+Regards,
+Bjorn
