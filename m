@@ -1,56 +1,99 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Tue, 17 Feb 2015 01:15:20 +0900
-Subject: [PATCH 1/3] thermal: exynos: Fix NULL pointer exception during
- kernel booting
-In-Reply-To: <20150216160633.29eac148@amdc2363>
-References: <1424096414-4327-1-git-send-email-cw00.choi@samsung.com>
- <1424096414-4327-2-git-send-email-cw00.choi@samsung.com>
- <20150216160633.29eac148@amdc2363>
-Message-ID: <CAGTfZH3tESLb3V7PNpiy-nwi+cCVq6DHxkU6+gJU-MZhNqDBzg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 16 Feb 2015 16:27:12 +0000
+Subject: [PATCH v4 2/4] mfd: lubbock_cplds: add lubbock IO board
+In-Reply-To: <1170550770.470129293.1424093248596.JavaMail.root@zimbra1-e1.priv.proxad.net>
+References: <20150216130549.GF14545@x1>
+ <1170550770.470129293.1424093248596.JavaMail.root@zimbra1-e1.priv.proxad.net>
+Message-ID: <20150216162712.GR14545@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lukasz,
+On Mon, 16 Feb 2015, robert.jarzmik at free.fr wrote:
 
-On Tue, Feb 17, 2015 at 12:06 AM, Lukasz Majewski
-<l.majewski@samsung.com> wrote:
-> Hi Chanwoo,
->
->> This patch fixes the NULL pointer exception during kernel booting.
->> The thermal_zone _of_sensor_register() registers a sensor to DT
->> thermal zone and then read the current temperature by '.get_temp'
->> callback. The callback function of exynos thermal driver is
->> exynos_get_temp() which must need the 'pdata' instance of exynos_tmu
->> _platform_data structure.
->> - exynos_get_temp() -> code_to_temp() -> Must need the 'pdata'
->> instance
->>
->> But, exynos thermal driver is executed before getting the 'pdata'
->> instance. To avoid the kernel panic, have to get the platform data by
->> executing the exynos_map_dt_data() before calling
->> thermal_zone_of_sensor_register() .
->
-> I've already prepared patch for this (unfortunately it isn't yet
-> applied to mainline):
->
-> "[PATCH] thermal: exynos: fix: Check if data->tmu_read callback is
-> present before read"
->
-> http://www.spinics.net/lists/linux-samsung-soc/msg42245.html
+> ----- Mail original -----
+> De: "Lee Jones" <lee.jones@linaro.org>
+> ?: "Robert Jarzmik" <robert.jarzmik@free.fr>
+> Cc: "Rob Herring" <robh+dt@kernel.org>, "Pawel Moll" <pawel.moll@arm.com>, "Mark Rutland" <mark.rutland@arm.com>, "Ian Campbell" <ijc+devicetree@hellion.org.uk>, "Kumar Gala" <galak@codeaurora.org>, "Daniel Mack" <daniel@zonque.org>, "Haojian Zhuang" <haojian.zhuang@gmail.com>, "Samuel Ortiz" <sameo@linux.intel.com>, "Grant Likely" <grant.likely@linaro.org>, devicetree at vger.kernel.org, linux-kernel at vger.kernel.org, linux-arm-kernel at lists.infradead.org, "Arnd Bergmann" <arnd@arndb.de>, "Russell King - ARM Linux" <linux@arm.linux.org.uk>, "Dmitry Eremin-Solenikov" <dbaryshkov@gmail.com>
+> Envoy?: Lundi 16 F?vrier 2015 14:05:49
+> Objet: Re: [PATCH v4 2/4] mfd: lubbock_cplds: add lubbock IO board
 
-There is different issue between you patch and this patch.
-Your patch check the whether data->tmu_read is NULL or not.
-But, my patch check the pdata is NULL or not.
+What's all this?  Please configure your mail client correctly.
 
->
-> Does applying this patch help?
->
-> BTW: How can I reproduce this error? Could you point me the SHA1 and
-> repository?
+For advice, see:
 
-I used your patch-set of linux-soc-thermal.git (branch: next). So I
-applied you patchiest on Linux 3.19 for test.
-- https://git.kernel.org/cgit/linux/kernel/git/evalenti/linux-soc-thermal.git/log/?h=next
+  Documentation/email-clients.txt
 
-Best Regards,
-Chanwoo Choi
+> On Sat, 24 Jan 2015, Robert Jarzmik wrote:
+> 
+> > ---
+> > Since v1: change the name from cottula to lubbock_io
+> >             Dmitry pointed out the Cottula was the pxa25x family name,
+> > 	    lubbock was the pxa25x development board name. Therefore the
+> > 	    name was changed to lubbock_io (lubbock IO board)
+> 
+> > Are you sure this is what you want to do?  We don't usually support
+> > 'boards' per say.  Instead we support 'devices', then pull each of
+> > those devices together using some h/w description mechanism.
+> 
+> Do you know that :
+>  1) anything under "---" in a commit message is thrown away
+
+Yes.  But I don't remember reading this passage before.  Just becuase
+this is no longer v2, it doesn't void any comments regarding v1
+changelogs.
+
+>  2) after v2, we _both_ agreed that the accurate name is "cplds"
+>     which exactly what is in this patch
+>     (see device registering with lubbock_cplds).
+
+There is no mention of this decision in the changelogs.  If it's not
+in the change logs, it didn't happen. ;)
+
+I'm still concerned with the fact that the driver file is named using
+and is populated by lots of instances of a "board" name.  I'm sure you
+would share my thoughts is someone submitted a driver called
+beaglebone.c or raspberrypi.c to MFD.
+
+>  3) there is no more mention of "board" anywhere in the patch core
+
+No, just the name of one.
+
+> > Besides, this is MFD, where we support single pieces of silicon which
+> > happen to support multiple devices.  I definitely don't want to support
+> > boards here.
+> > You might want to re-think the naming and your (sales) pitch.
+> I might need help. As for the (sales), no comment.
+
+By pitch, I mean to convince me that this belongs in MFD.
+
+> >> +#include <linux/mfd/core.h>
+> > Why have you included this?  I don't see the use of the MFD framework
+> > anywhere.  So what makes this an MFD?
+> I thought cplds were to be handled by an MFD driver.
+
+Not to my knowledge, although we do appear to have one.  That doesn't
+necessarily mean that it's the right place for it though.  I'm not
+entirely sure how CPLDs even work on a functional level.
+
+> > I'm going to stop here, as I think I need more of an explanation so
+> > what you're trying to achieve with this driver.
+> Why ? I think things were clear that this driver handles the CPLDs on
+> lubbock board, namely u46 and u52. I don't understand what is wrong
+> with this patch so that you don't want to go forward.
+
+Understanding was lost when I learned that the whole file was centred
+around the premise of board support.  I understand now that this is a
+driver for a CPLD, which I'm not sure is even MFD.  Also, if it is
+really a CPLD driver, shouldn't be named after the manufacturer/model
+number of the chip, rather than the PCB which it's connected to?
+
+I'm also concerned that this driver has no functional CPLD code
+contained.  All you're doing is defining an IRQ domain.  Why then
+isn't this really an drivers/irqchip (Suggested-by: Josh Cartwright)
+driver?
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
