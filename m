@@ -1,63 +1,39 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 16 Feb 2015 10:28:36 +0200
-Subject: [PATCH 9/9] RFC: ARM: DRA7: enable DSS_DESHDCP_CLKEN
-In-Reply-To: <CAGo_u6p89ot-eNwK65otoYsLM6NXeh929=SBG6uKAsX8Tnd_RQ@mail.gmail.com>
-References: <1423840286-18377-1-git-send-email-tomi.valkeinen@ti.com>	<1423840286-18377-10-git-send-email-tomi.valkeinen@ti.com>
- <CAGo_u6p89ot-eNwK65otoYsLM6NXeh929=SBG6uKAsX8Tnd_RQ@mail.gmail.com>
-Message-ID: <54E1AA34.8090205@ti.com>
+Date: Mon, 16 Feb 2015 10:30:52 +0200
+Subject: [PATCH 0/9] ARM: DRA7: add display support
+In-Reply-To: <54DE1FD9.6030801@ti.com>
+References: <1423840286-18377-1-git-send-email-tomi.valkeinen@ti.com>
+ <54DE1FD9.6030801@ti.com>
+Message-ID: <54E1AABC.5010907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/02/15 17:25, Nishanth Menon wrote:
-> On Fri, Feb 13, 2015 at 9:11 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
->> DRA7xx's CTRL_CORE_CONTROL_IO_2 register contains bits for various
->> subsystems, including PCIe, DCAN, QSPI and DSS. At the moment only DCAN
->> bits are used by the SW via syscon.
+On 13/02/15 18:01, Nishanth Menon wrote:
+> On 02/13/2015 09:11 AM, Tomi Valkeinen wrote:
+>> Hi,
 >>
->> For DSS there is DSS_DESHDCP_CLKEN bit. This (presumably) enables a
->> clock related to DSS's HDCP. If that clock is off, DSS module does not
->> start at all, causing OCP errors. This means that the HWMOD code is not
->> able to reset and initialize DSS.
+>> This series adds the arch/arm/ side of the display support for DRA7 (DRA72x,
+>> DRA74x, AM54xx) SoCs. Also support for HDMI output on x15 and DRA72 EVM boards
+>> is added.
 >>
->> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
->> ---
->>  arch/arm/mach-omap2/io.c | 11 +++++++++++
->>  1 file changed, 11 insertions(+)
+>> The series is based on OMAPDSS driver patches in fbdev changes for 3.20, which
+>> have been merged to Linus' tree.
 >>
->> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
->> index a1bd6affb508..2206fb13f195 100644
->> --- a/arch/arm/mach-omap2/io.c
->> +++ b/arch/arm/mach-omap2/io.c
->> @@ -700,6 +700,17 @@ void __init dra7xx_init_early(void)
->>         dra7xx_hwmod_init();
->>         omap_hwmod_init_postsetup();
->>         omap_clk_soc_init = dra7xx_dt_clk_init;
->> +
->> +       if (soc_is_dra7xx()) {
+>> The changes are very similar to OMAP5 DSS. All the other patches look fine to
+>> me except the "RFC: ARM: DRA7: enable DSS_DESHDCP_CLKEN". That's been discussed
+>> earlier with Paul and Tero, but I don't think we have any good solution for it
+>> yet.
 > 
-> Umm.. this code will only be executed for dra7xx :)
+> Is there some specific tag I can test this on (some next perhaps?), I
 
-Better safe than sorry! But you're right, I'll remove the if =).
+Linus's master or linux-next should work. This series is based on the
+fbdev changes for 3.20. So if Linus' master or linux-next doesn't work,
+v3.19 + fbdev-3.20 + this series should work.
 
->> +               u32 v;
->> +               const u16 ctrl_core_control_io_2 = 0x558;
->> +
->> +               /* set CTRL_CORE_CONTROL_IO_2:DSS_DESHDCP_CLKEN */
->> +
->> +               v = omap_ctrl_readl(ctrl_core_control_io_2);
->> +               v |= 1;
->> +               omap_ctrl_writel(v, ctrl_core_control_io_2);
->> +       }
->>  }
->>
->>  void __init dra7xx_init_late(void)
-> just my 2 cents.
-> I would probably wait for control module to become syscon and probably
-> model this as syscon clk - I thin we should be seeing a series
-> sometime soon.
+> Further are you proposing this for 3.20 or 3.21 window? 3.20, we seem
+> to have already missed.
 
-Yep, I hope Tero's work will make this patch not needed. I wanted to
-include something in this series that makes the DSS usable.
+3.21.
 
  Tomi
 
@@ -68,4 +44,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150216/c7d589fb/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150216/ac3e3b68/attachment.sig>
