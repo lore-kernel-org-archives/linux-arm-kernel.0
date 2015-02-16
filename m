@@ -1,93 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 16 Feb 2015 17:37:09 +0800
-Subject: [PATCH v2] xen/arm: allow console=hvc0 to be omitted for guests
-In-Reply-To: <54DDA4FC.6050307@linaro.org>
-References: <1423740543-6168-1-git-send-email-ard.biesheuvel@linaro.org>
- <54DDA1D2.5010001@linaro.org>
- <CAKv+Gu-KErA+NxX2ctZmrjKYTLYLbGvGiqbEXkowvNbCGF65Bw@mail.gmail.com>
- <54DDA4FC.6050307@linaro.org>
-Message-ID: <CAKv+Gu8nQ12SKipQC7EuzFwge6NMF3zyAdYJmRUjNWfBoux9Jw@mail.gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 16 Feb 2015 11:40:01 +0200
+Subject: [PATCH v7 05/16] clk: tegra: Add DFLL DVCO reset control for
+ Tegra124
+In-Reply-To: <54DDD447.8000404@kapsi.fi>
+References: <1420723339-30735-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <1420723339-30735-6-git-send-email-mikko.perttunen@kapsi.fi>
+ <20150212141944.GK20811@tbergstrom-lnx.Nvidia.com>
+ <54DDD447.8000404@kapsi.fi>
+Message-ID: <20150216094000.GD19839@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 February 2015 at 15:17, Julien Grall <julien.grall@linaro.org> wrote:
->
->
-> On 13/02/2015 15:12, Ard Biesheuvel wrote:
->>
->> On 13 February 2015 at 15:03, Julien Grall <julien.grall@linaro.org>
->> wrote:
->>>
->>> Hi Ard,
->>>
->>>
->>> On 12/02/2015 19:29, Ard Biesheuvel wrote:
->>>>
->>>>
->>>> This patch registers hvc0 as the preferred console if no console
->>>> has been specified explicitly on the kernel command line.
->>>>
->>>> The purpose is to allow platform agnostic kernels and boot images
->>>> (such as distro installers) to boot in a Xen/ARM domU without the
->>>> need to modify the command line by hand.
->>>>
->>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>> ---
->>>>    arch/arm/xen/enlighten.c | 4 ++++
->>>>    1 file changed, 4 insertions(+)
->>>>
->>>> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
->>>> index 0abeefa7dbf8..927be1d1bad7 100644
->>>> --- a/arch/arm/xen/enlighten.c
->>>> +++ b/arch/arm/xen/enlighten.c
->>>> @@ -24,6 +24,7 @@
->>>>    #include <linux/cpuidle.h>
->>>>    #include <linux/cpufreq.h>
->>>>    #include <linux/cpu.h>
->>>> +#include <linux/console.h>
->>>>
->>>>    #include <linux/mm.h>
->>>>
->>>> @@ -255,6 +256,9 @@ void __init xen_early_init(void)
->>>>                  xen_start_info->flags |= SIF_INITDOMAIN|SIF_PRIVILEGED;
->>>>          else
->>>>                  xen_start_info->flags &=
->>>> ~(SIF_INITDOMAIN|SIF_PRIVILEGED);
->>>> +
->>>> +       if (!console_set_on_cmdline && !xen_initial_domain())
->>>> +               add_preferred_console("hvc", 0, NULL);
->>>
->>>
->>>
->>> Unfortunately, this won't work as expected.
->>>
->>
->> Did you try it?
->
->
-> No just looked at the code.
->
->>> console_set_on_cmdline is set when Linux parses the early params. The
->>> parsing is done after setup_arch (the function which call
->>> xen_early_init).
->>>
->>> So we will end up to add the HVC console even if a console has been
->>> passed
->>> on the command line.
->>>
->>
->> parse_early_param() is also called by setup_arch(), before
->> xen_early_init()
->>
->> The call to parse_early_param() in generic code is only there for
->> architectures that don't call it in their setup_arch()
->
->
-> Oh, right. Sorry for the noise.
->
-> So:
->
-> Reviewed-by: Julien Grall <julien.grall@linaro.org>
->
+On Fri, Feb 13, 2015 at 12:39:03PM +0200, Mikko Perttunen wrote:
+> On 02/12/2015 04:19 PM, Peter De Schrijver wrote:
+> >On Thu, Jan 08, 2015 at 03:22:08PM +0200, Mikko Perttunen wrote:
+> >>From: Paul Walmsley <pwalmsley@nvidia.com>
+> >>
+> >>The DVCO present in the DFLL IP block has a separate reset line,
+> >>exposed via the CAR IP block.  This reset line is asserted upon SoC
+> >>reset.  Unless something (such as the DFLL driver) deasserts this
+> >>line, the DVCO will not oscillate, although reads and writes to the
+> >>DFLL IP block will complete.
+> >>
+> >>Thanks to Aleksandr Frid <afrid@nvidia.com> for identifying this and
+> >>saving hours of debugging time.
+> >>
+> >
+> >Should this be done as a reset driver?
+> 
+> Probably through the already existing CAR reset driver. This reset
+> doesn't fit well with the existing numbering scheme there, though.
+> Perhaps a magic high-valued constant that represents it.
+> 
 
-Would it make sense to roll this into your xen_early_init() series as #3?
+Indeed. Just like only the lower part of the clock IDs map have a realtion
+with the hardware registers. The rest is just arbitrary numbers.
+
+Cheers,
+
+Peter.
