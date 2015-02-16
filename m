@@ -1,170 +1,76 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 16 Feb 2015 13:23:09 +0100
-Subject: [RFC PATCH 0/6] ARM64: KVM: PMU infrastructure support
-In-Reply-To: <CAAhSdy1Nj1THsdF6UeM--ihmk8mnDR38Bi9v_ri3Y-MRKD34zg@mail.gmail.com>
-References: <20141125134239.GI31297@cbox>
- <CAAhSdy32G+-BVQk-=dWjfM1S-cytGavp4qq942m=3y7HUudguw@mail.gmail.com>
- <5476FFAF.2010601@arm.com>
- <CAAhSdy3US4H9DZLDmwawR6D22GUpQ8H5NqrZ8XvYJjhsnPzzRQ@mail.gmail.com>
- <547705BF.5040609@arm.com>
- <CAAhSdy32-MsRORQ9j3YfH4Fn7xCEEFV5O7D43sYbXZCsF4VgaQ@mail.gmail.com>
- <20150111191131.GC3868@cbox>
- <CAAhSdy0FjX0TfkzThkmCz0k=mbnhJiE7tHU=jYUTFpxgDZZXeQ@mail.gmail.com>
- <20150215153337.GB8034@cbox>
- <CAAhSdy1Nj1THsdF6UeM--ihmk8mnDR38Bi9v_ri3Y-MRKD34zg@mail.gmail.com>
-Message-ID: <20150216122309.GA23821@cbox>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Feb 2015 12:23:43 +0000
+Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
+ demuxer chip
+In-Reply-To: <20150216092814.GF7119@twins.programming.kicks-ass.net>
+References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
+ <2437801.56xPyk3atd@vostro.rjw.lan>
+ <20150211151237.GN9154@leverpostej>
+ <1487331.cgC9j5u0aF@vostro.rjw.lan>
+ <20150216092814.GF7119@twins.programming.kicks-ass.net>
+Message-ID: <20150216122343.GA8994@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 16, 2015 at 05:46:54PM +0530, Anup Patel wrote:
-> Hi Christoffer,
-> 
-> On Sun, Feb 15, 2015 at 9:03 PM, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> > Hi Anup,
-> >
-> > On Mon, Jan 12, 2015 at 09:49:13AM +0530, Anup Patel wrote:
-> >> On Mon, Jan 12, 2015 at 12:41 AM, Christoffer Dall
-> >> <christoffer.dall@linaro.org> wrote:
-> >> > On Tue, Dec 30, 2014 at 11:19:13AM +0530, Anup Patel wrote:
-> >> >> (dropping previous conversation for easy reading)
-> >> >>
-> >> >> Hi Marc/Christoffer,
-> >> >>
-> >> >> I tried implementing PMU context-switch via C code
-> >> >> in EL1 mode and in atomic context with irqs disabled.
-> >> >> The context switch itself works perfectly fine but
-> >> >> irq forwarding is not clean for PMU irq.
-> >> >>
-> >> >> I found another issue that is GIC only samples irq
-> >> >> lines if they are enabled. This means for using
-> >> >> irq forwarding we will need to ensure that host PMU
-> >> >> irq is enabled.  The arch_timer code does this by
-> >> >> doing request_irq() for host virtual timer interrupt.
-> >> >> For PMU, we can either enable/disable host PMU
-> >> >> irq in context switch or we need to do have shared
-> >> >> irq handler between kvm pmu and host kernel pmu.
-> >> >
-> >> > could we simply require the host PMU driver to request the IRQ and have
-> >> > the driver inject the corresponding IRQ to the VM via a mechanism
-> >> > similar to VFIO using an eventfd and irqfds etc.?
-> >>
-> >> Currently, the host PMU driver does request_irq() only when
-> >> there is some event to be monitored. This means host will do
-> >> request_irq() only when we run perf application on host
-> >> user space.
-> >>
-> >> Initially, I though that we could simply pass IRQF_SHARED
-> >> for request_irq() in host PMU driver and do the same for
-> >> reqest_irq() in KVM PMU code but the PMU irq can be
-> >> SPI or PPI. If the PMU irq is SPI then IRQF_SHARED
-> >> flag would fine but if its PPI then we have no way to
-> >> set IRQF_SHARED flag because request_percpu_irq()
-> >> does not have irq flags parameter.
-> >>
-> >> >
-> >> > (I haven't quite thought through if there's a way for the host PMU
-> >> > driver to distinguish between an IRQ for itself and one for the guest,
-> >> > though).
-> >> >
-> >> > It does feel like we will need some sort of communication/coordination
-> >> > between the host PMU driver and KVM...
-> >> >
-> >> >>
-> >> >> I have rethinked about our discussion so far. I
-> >> >> understand that we need KVM PMU virtualization
-> >> >> to meet following criteria:
-> >> >> 1. No modification in host PMU driver
-> >> >
-> >> > is this really a strict requirement?  one of the advantages of KVM
-> >> > should be that the rest of the kernel should be supportive of KVM.
-> >>
-> >> I guess so because host PMU driver should not do things
-> >> differently for host and guest. I think this the reason why
-> >> we discarded the mask/unmask PMU irq approach which
-> >> I had implemented in RFC v1.
-> >>
-> >> >
-> >> >> 2. No modification in guest PMU driver
-> >> >> 3. No mask/unmask dance for sharing host PMU irq
-> >> >> 4. Clean way to avoid infinite VM exits due to
-> >> >> PMU interrupt
-> >> >>
-> >> >> I have discovered new approach which is as follows:
-> >> >> 1. Context switch PMU in atomic context (i.e. local_irq_disable())
-> >> >> 2. Ensure that host PMU irq is disabled when entering guest
-> >> >> mode and re-enable host PMU irq when exiting guest mode if
-> >> >> it was enabled previously.
-> >> >
-> >> > How does this look like software-engineering wise?  Would you be looking
-> >> > up the IRQ number from the DT in the KVM code again?  How does KVM then
-> >> > synchronize with the host PMU driver so they're not both requesting the
-> >> > same IRQ at the same time?
-> >>
-> >> We only lookup host PMU irq numbers from DT at HYP init time.
-> >>
-> >> During context switch we know the host PMU irq number for
-> >> current host CPU so we can get state of host PMU irq in
-> >> context switch code.
-> >>
-> >> If we go by the shard irq handler approach then both KVM
-> >> and host PMU driver will do request_irq() on same host
-> >> PMU irq. In other words, there is no virtual PMU irq provided
-> >> by HW for guest.
-> >>
-> >
-> > Sorry for the *really* long delay in this response.
-> >
-> > We had a chat about this subject with Will Deacon and Marc Zyngier
-> > during connect, and basically we came to think of a number of problems
-> > with the current approach:
-> >
-> > 1. As you pointed out, there is a need for a shared IRQ handler, and
-> >    there is no immediately nice way to implement this without a more
-> >    sophisticated perf/kvm interface, probably comprising eventfds or
-> >    something similar.
-> >
-> > 2. Hijacking the counters for the VM without perf knowing about it
-> >    basically makes it impossible to do system-wide event counting, an
-> >    important use case for a virtualization host.
-> >
-> > So the approach we will be taking now would be to:
-> >
-> > First, implement a strictly trap-and-emulate in software approach.  This
-> > would allow any software relying on access to performance counters to
-> > work, although potentially with slightly unprecise values.  This is the
-> > approach taken by x86 and would be significantly simpler to support on
-> > systems like big.LITTLE as well.
-> 
-> Actually, trap-and-emulate would also help avoid additions to the
-> KVM world switch.
-> 
-> >
-> > Second, if there are values obtained from within the guest that are so
-> > skewed by the trap-and-emulate approach that we need to give the guest
-> > access to counters, we should try to share the hardware by partitioning
-> > the physical counters, but again, we need to coordinate with the host
-> > perf system for this.  We would only be pursuing this approach if
-> > absolutely necessary.
-> 
-> Yes, with trap-and-emulate we cannot accurately emulate all types
-> of hw counters (particularly cache misses and similar events).
-> 
-> >
-> > Apologies for the change in direction on this.
-> >
-> > What are your thoughts?  Do you still have time/interest to work
-> > on any of this?
-> 
-> Its a drastic change in direction.
-> 
-> Currently, I have taken up some different work (not related to KVM)
-> so for next few months I wont be able spend time on this.
-> 
-> Its better if Linaro takes this work to avoid any further delays.
-> 
-ok, will do, thanks for being responsive and putting in the efforts so
-far!
+[...]
 
-Best,
--Christoffer
+> > The "suspend" part is kind of a distraction to me here, because that really
+> > only is about sharing an IRQ with a timer and the "your interrupt handler
+> > may be called when the device is suspended" part is just a consequence of that.
+> > 
+> > So IMO it's better to have "TIMER" in the names to avoid encouraging people to
+> > abuse this for other purposes not related to timers.
+> 
+> Sorry to be late to the bike-shed party, but what about:
+
+[...]
+
+> arch/arm/mach-omap2/mux.c:		omap_hwmod_mux_handle_irq, IRQF_SHARED | IRQF_NO_SUSPEND,
+> arch/arm/mach-omap2/pm34xx.c:		_prcm_int_handle_io, IRQF_SHARED | IRQF_NO_SUSPEND, "pm_io",
+> drivers/pinctrl/pinctrl-single.c:				  IRQF_SHARED | IRQF_NO_SUSPEND,
+
+These are chained IRQ handlers. If any of these have a chained timer irq
+then the IRQF_NO_SUSPEND may be legitimate. I can't imagine why these
+would be shared, however.
+
+It also looks like these abuse IRQF_NO_SUSPEND for wakeup interrupts.
+
+> drivers/rtc/rtc-pl031.c:	.irqflags = IRQF_SHARED | IRQF_NO_SUSPEND,
+
+This looks to be an abuse and should use {enable,disable}_irq_wake.
+
+However, we'd then need to handle mismatch with wakeup interrupts (which
+is effectively the same problem as sharing with a timer).
+
+> drivers/mfd/ab8500-debugfs.c:				   IRQF_SHARED | IRQF_NO_SUSPEND,
+> drivers/mfd/ab8500-gpadc.c:			IRQF_NO_SUSPEND | IRQF_SHARED, "ab8500-gpadc-sw",
+> drivers/mfd/ab8500-gpadc.c:			IRQF_NO_SUSPEND | IRQF_SHARED, "ab8500-gpadc-hw",
+> drivers/power/ab8500_btemp.c:			IRQF_SHARED | IRQF_NO_SUSPEND,
+> drivers/power/ab8500_charger.c:			IRQF_SHARED | IRQF_NO_SUSPEND,
+> drivers/power/ab8500_fg.c:			IRQF_SHARED | IRQF_NO_SUSPEND,
+> drivers/usb/phy/phy-ab8500-usb.c:				IRQF_NO_SUSPEND | IRQF_SHARED,
+> drivers/usb/phy/phy-ab8500-usb.c:				IRQF_NO_SUSPEND | IRQF_SHARED,
+> drivers/usb/phy/phy-ab8500-usb.c:				IRQF_NO_SUSPEND | IRQF_SHARED,
+
+All the *ab8500* look cargo-culted. There's other nonsense in these
+(e.g. mutex_lock in irq handlers...). I suspect these are not
+legitimate.
+
+> drivers/watchdog/intel-mid_wdt.c:			       IRQF_SHARED | IRQF_NO_SUSPEND, "watchdog",
+
+Watchdogs could be a legitimate case, but this driver relies on another
+timer and the timeout irq handler simply calls panic(), which seems a
+little extreme.
+
+> Is there a single legitimate user in that list? If so, the TIMER name
+> might be misleading.
+
+The watchdog case could be legitimate, and with drivers corrected to use
+{enable,disable}_irq_wake we'll need to handle mismatch for wakeup
+interrupts too.
+
+Having separate flags for sharing with timers and sharing with wakeup
+sources seems redundant, and IRQF_SHARED_TIMER_OK would be misleading.
+
+Thanks,
+Mark.
