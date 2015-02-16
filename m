@@ -1,46 +1,80 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 16 Feb 2015 08:51:47 -0500
-Subject: [PATCH/RFC] ARM: shmobile: lager: Fix audio clk master to SSI
- and change audio data interface format type
-In-Reply-To: <87fva6n2pb.wl%kuninori.morimoto.gx@renesas.com>
-References: <1424011746-3787-1-git-send-email-ykaneko0929@gmail.com>
- <20150215152957.GA25065@verge.net.au>
- <87fva6n2pb.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20150216135141.GA3622@verge.net.au>
+Date: Mon, 16 Feb 2015 08:57:54 -0500
+Subject: [PATCH/RFC] ARM: shmobile: r8a7790: Fix HSUSB clock to hp_clk
+ from mp_clk
+In-Reply-To: <CAMuHMdX=cdHaiHCnYsJvZFc2RNv=Pk8cLXuvkezg4Ht4U4mXsg@mail.gmail.com>
+References: <1424011746-3787-2-git-send-email-ykaneko0929@gmail.com>
+ <CAMuHMdX=cdHaiHCnYsJvZFc2RNv=Pk8cLXuvkezg4Ht4U4mXsg@mail.gmail.com>
+Message-ID: <20150216135754.GA5479@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Morimoto-san,
+On Mon, Feb 16, 2015 at 10:20:10AM +0100, Geert Uytterhoeven wrote:
+> Hi Kaneko-san, Mizuguchi-san,
+> 
+> On Sun, Feb 15, 2015 at 3:49 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+> > From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+> >
+> > HSUSB uses hp_clk for H/W register access.
+> 
+> That indeed seems to be true, and that's what this patch is changing.
+> 
+> > HSUSB uses mp_clk for USB-DMAC access.
+> 
+> However, page 64-2 doesn't mention the MP clock for USB-DMAC:
+>    "AXI bus clock (ZS?: 260 MHz), HPB bus clock (HP?: 130 MHz).
+>     USB local bus clock (48 MHz)"
+> So your statement doesn't seem to be true?
 
-On Mon, Feb 16, 2015 at 12:01:15AM +0000, Kuninori Morimoto wrote:
-> 
-> Hi Kaneko-san, Simon
-> 
-> > >  arch/arm/boot/dts/r8a7790-lager.dts | 4 +---
-> > >  1 file changed, 1 insertion(+), 3 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-> > > index 0c3b678..e7dda8a 100644
-> > > --- a/arch/arm/boot/dts/r8a7790-lager.dts
-> > > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-> > > @@ -177,9 +177,7 @@
-> > >  	sound {
-> > >  		compatible = "simple-audio-card";
-> > >  
-> > > -		simple-audio-card,format = "left_j";
-> > > -		simple-audio-card,bitclock-master = <&sndcodec>;
-> > > -		simple-audio-card,frame-master = <&sndcodec>;
-> > > +		simple-audio-card,format = "i2s";
-> > >  
-> > >  		sndcpu: simple-audio-card,cpu {
-> > >  			sound-dai = <&rcar_sound>;
-> 
-> Unfortunately, I can't accept this patch.
-> It will be strange sound if you change clk master to SSI (*1).
-> Additionally, it needs audio_clk settings for SSI master,
-> but, it needs special limitation (*1).
-> (*1 HW connection reason)
-> And format change left_j -> i2s is no meaning on Lager board case
+Thanks, I see that too.
 
-Thanks for your analysis.
-I am marking this patch as "rejected".
+> Note that mstp3_clks in dtsi has hp_clk as the parent for both usbdmac0 and
+> usbdmac1, so if your statement would be true, that has to changed, too?
+> 
+> The same is true for other members of the R-Car Gen2 family, e.g. your patch
+> for r8a7791.
+
+It seems to me that we could:
+
+1. Apply this patch with the changelog updated and;
+2. Follow up on the DMAC clocks
+
+Does that sound reasonable to you?
+
+> > The clock is defined for H/W register access.
+> >
+> > Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> > ---
+> >
+> > This patch is based on devel branch of Simon Horman's renesas tree.
+> >
+> >  arch/arm/boot/dts/r8a7790.dtsi | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+> > index 24de994..113edf2 100644
+> > --- a/arch/arm/boot/dts/r8a7790.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> 
+> > @@ -1132,7 +1133,7 @@
+> >                 mstp7_clks: mstp7_clks at e615014c {
+> >                         compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
+> >                         reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
+> > -                       clocks = <&mp_clk>, <&mp_clk>, <&zs_clk>, <&zs_clk>, <&p_clk>,
+> > +                       clocks = <&mp_clk>, <&hp_clk>, <&zs_clk>, <&zs_clk>, <&p_clk>,
+> >                                  <&p_clk>, <&zx_clk>, <&zx_clk>, <&zx_clk>, <&zx_clk>,
+> >                                  <&zx_clk>;
+> >                         #clock-cells = <1>;
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
