@@ -1,70 +1,51 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 16 Feb 2015 10:52:17 +0100
-Subject: [PATCH v12 0/6] cpufreq: use generic cpufreq drivers for exynos
- platforms
-In-Reply-To: <CAJKOXPfyPH7tyce6YB=q4krSP078aJVAmqObg89qCnLrL_Nbhg@mail.gmail.com>
-References: <1416576682-5255-1-git-send-email-thomas.ab@samsung.com>
- <CAMAWPa9fUJVjJ8V+93AkHy9DtEmUUnGs4MJDGcsoMdWwGmg5qg@mail.gmail.com>
- <CAJKOXPfyPH7tyce6YB=q4krSP078aJVAmqObg89qCnLrL_Nbhg@mail.gmail.com>
-Message-ID: <20150216105217.79315ffd@amdc2363>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 16 Feb 2015 09:56:21 +0000
+Subject: [PATCH] arm64: Add L2 cache topology to ARM Ltd boards/models
+In-Reply-To: <20150212140702.GF1522@leverpostej>
+References: <1421841750-26722-1-git-send-email-sudeep.holla@arm.com>
+ <20150121164632.GK5044@leverpostej> <20150212140702.GF1522@leverpostej>
+Message-ID: <54E1BEC5.5070009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof, Thomas,
+Hi Mark,
 
-> 2015-01-08 22:17 GMT+01:00 Kevin Hilman <khilman@kernel.org>:
-> > On Fri, Nov 21, 2014 at 5:31 AM, Thomas Abraham
-> > <thomas.ab@samsung.com> wrote:
-> >> Changes since v11:
-> >> - Rebased on top of git://linuxtv.org/snawrocki/samsung.git
-> >> for-v3.19-exynos-clk
-> >>
-> >> This patch series removes the use of Exynos4210 and Exynos5250
-> >> specific cpufreq drivers and enables the use of cpufreq-dt driver
-> >> for these platforms. This series also enables cpufreq support for
-> >> Exynos5420 using arm_big_little cpufreq driver.
-> >>
-> >> This series is based on the following branch.
-> >> git://linuxtv.org/snawrocki/samsung.git for-v3.19-exynos-clk
-> >>
-> >> This series depends on the following patch which can be picked from
-> >> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-> >> samsung/dt e540920cf21c (ARM: dts: add CPU nodes for Exynos4 SoCs).
-> >>
-> >> This patch series has been tested on Exynos4210/5250/5420 based
-> >> boards. Tomasz Figa had plans to take this in the Samsung clock
-> >> tree for v3.19
-> >> (http://www.spinics.net/lists/linux-samsung-soc/msg37933.html).
-> >> Sylwester, could you consider to merge this in your tree?
-> >
-> > CPUfreq for exynos is still not upstream.  What's the status of this
-> > series?  It's been ver a month since there's been any activity here
-> > (or any responses to the issues I reported.)
-> >
-> > On a related note, this series only does frequency scaling. Is there
-> > any work going on to also enable voltage scaling for the CPU rails
-> > as well?
-> 
-> Hi Thomas,
-> 
-> Do you plan to continue with this work? It would be very helpful.
+On 12/02/15 14:07, Mark Rutland wrote:
+> Hi,
+>
+> On Wed, Jan 21, 2015 at 04:46:32PM +0000, Mark Rutland wrote:
+>> On Wed, Jan 21, 2015 at 12:02:30PM +0000, Sudeep Holla wrote:
+>>> Commit 5d425c18653731af6 ("arm64: kernel: add support for cpu
+>>> cache information") adds cacheinfo support for ARM64. Since
+>>> there's no architectural way of detecting the cpus that share
+>>> particular cache, device tree can be used and the core cacheinfo
+>>> already supports the same.
+>>
+>> This still leaves the possibility that misleading information is
+>> exposed for systems from other vendors. I've made a quick attempt
+>> to Cc the authors of other arm64 dts here.
+>>
+>> Given that in the absence of these nodes we can't derive a complete
+>> view of the cache hierarchy, shouldn't we only expose the cacheinfo
+>> when we have these nodes and can therefore produce correct values?
+>
+> I'm still rather concerned about exposing misleading cache info in
+> this manner. Is there no way we can limit the exposure of this
+> information to those cases where we actually have the information?
+>
 
-+1 from me.
+Yes I have a patch to check all the device nodes in the cache hierarchy
+before initializing the sysfs. So cacheinfo won't be setup if all the
+device nodes aren't found(at-least on architecture like ARM/ARM64 which
+depends on DT). I will post it soon, was waiting for a week so that it's
+not lost during merge window.
 
-> 
-> I also wonder if Exynos 4412 could be re-added (without the boost if
-> these bindings are not ready)?
+> Do we know if/how this will work for ACPI systems?
+>
 
-I would prefer to have all platforms converted at once, since it might
-happen that some parts of the work would get lost.
+It should be similar to DT i.e. the hierarchy must be completely
+detected through ACPI tables/methods, but I have not thought of
+implementation specifics yet.
 
-> 
-> Best regards,
-> Krzysztof
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Regards,
+Sudeep
