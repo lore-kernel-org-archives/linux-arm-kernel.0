@@ -1,57 +1,29 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Feb 2015 10:19:35 +0000
-Subject: [PATCH] arm64: Add L2 cache topology to ARM Ltd boards/models
-In-Reply-To: <54E1BEC5.5070009@arm.com>
-References: <1421841750-26722-1-git-send-email-sudeep.holla@arm.com>
- <20150121164632.GK5044@leverpostej>
- <20150212140702.GF1522@leverpostej> <54E1BEC5.5070009@arm.com>
-Message-ID: <20150216101935.GA8676@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Feb 2015 11:28:57 +0100
+Subject: [PATCH RFC 2/2] ARM: pxa: transition to dmaengine phase 1
+In-Reply-To: <1423954053-21760-3-git-send-email-robert.jarzmik@free.fr>
+References: <1423954053-21760-1-git-send-email-robert.jarzmik@free.fr>
+ <1423954053-21760-3-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <2708248.TZ13zqn6jW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 16, 2015 at 09:56:21AM +0000, Sudeep Holla wrote:
-> Hi Mark,
+On Saturday 14 February 2015 23:47:33 Robert Jarzmik wrote:
+> @@ -294,7 +294,8 @@ int pxa_request_dma (char *name, pxa_dma_prio prio,
+>                 /* try grabbing a DMA channel with the requested priority */
+>                 for (i = 0; i < num_dma_channels; i++) {
+>                         if ((dma_channels[i].prio == prio) &&
+> -                           !dma_channels[i].name) {
+> +                           !dma_channels[i].name &&
+> +                           !mmp_pdma_toggle_reserved_channel(i)) {
+>                                 found = 1;
+>                                 break;
+>                         }
 > 
-> On 12/02/15 14:07, Mark Rutland wrote:
-> > Hi,
-> >
-> > On Wed, Jan 21, 2015 at 04:46:32PM +0000, Mark Rutland wrote:
-> >> On Wed, Jan 21, 2015 at 12:02:30PM +0000, Sudeep Holla wrote:
-> >>> Commit 5d425c18653731af6 ("arm64: kernel: add support for cpu
-> >>> cache information") adds cacheinfo support for ARM64. Since
-> >>> there's no architectural way of detecting the cpus that share
-> >>> particular cache, device tree can be used and the core cacheinfo
-> >>> already supports the same.
-> >>
-> >> This still leaves the possibility that misleading information is
-> >> exposed for systems from other vendors. I've made a quick attempt
-> >> to Cc the authors of other arm64 dts here.
-> >>
-> >> Given that in the absence of these nodes we can't derive a complete
-> >> view of the cache hierarchy, shouldn't we only expose the cacheinfo
-> >> when we have these nodes and can therefore produce correct values?
-> >
-> > I'm still rather concerned about exposing misleading cache info in
-> > this manner. Is there no way we can limit the exposure of this
-> > information to those cases where we actually have the information?
-> >
-> 
-> Yes I have a patch to check all the device nodes in the cache hierarchy
-> before initializing the sysfs. So cacheinfo won't be setup if all the
-> device nodes aren't found(at-least on architecture like ARM/ARM64 which
-> depends on DT). I will post it soon, was waiting for a week so that it's
-> not lost during merge window.
 
-Great, that's exactly what I was hoping for!
+How is the order between the two enforced? I.e. can it be that the dmaengine
+driver uses the same channel for a different slave before we get here?
 
-> > Do we know if/how this will work for ACPI systems?
-> >
-> 
-> It should be similar to DT i.e. the hierarchy must be completely
-> detected through ACPI tables/methods, but I have not thought of
-> implementation specifics yet.
+If this is ensured to work, I'm fine with your approach.
 
-Ok.
-
-Thanks,
-Mark
+	Arnd
