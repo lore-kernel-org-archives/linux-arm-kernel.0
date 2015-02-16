@@ -1,67 +1,42 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 16 Feb 2015 12:05:47 +0100
-Subject: [PATCH 0/7] ARM: berlin: refactor the clock
-In-Reply-To: <20150216113738.281f226a@xhacker>
-References: <1423845781-7480-1-git-send-email-antoine.tenart@free-electrons.com>
- <20150216113738.281f226a@xhacker>
-Message-ID: <54E1CF0B.1030901@gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 16 Feb 2015 12:09:43 +0100
+Subject: [PATCH v4 0/3] about data busy
+In-Reply-To: <54E184B6.90808@samsung.com>
+References: <1423828368-18456-1-git-send-email-addy.ke@rock-chips.com>
+ <1423894668-8886-1-git-send-email-addy.ke@rock-chips.com>
+ <CABxcv==G_sKsvWHX6rJP7EUv8jE=01k-JeGGXgiwiCN53pxdmQ@mail.gmail.com>
+ <54E184B6.90808@samsung.com>
+Message-ID: <CABxcv=mHAJLviM1ACJKW3cH2JgtuCVp6-54bORaWY=dw4hP-oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.02.2015 04:37, Jisheng Zhang wrote:
-> On Fri, 13 Feb 2015 08:42:54 -0800
-> Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
->> Marvell Berlin SoCs have a chip control register set providing several
->> individual registers dealing with various controllers (pinctrl, reset,
->> clk). This chip controller is described by a single DT node since the
->> individual registers are spread among the chip control register bank.
->>
->> Marvell Berlin also have a system control register set providing several
->> individual registers for pinctrl or adc.
+Hello Jaehoon,
+
+On Mon, Feb 16, 2015 at 6:48 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> On 02/15/2015 08:41 PM, Javier Martinez Canillas wrote:
+>> I modified [1] your patch #2 to do what Alim suggested and only with
+>> that patch on top of linux-next I have neither the the "Timeout
+>> sending command" error nor the uSD not getting detected errors. Linux
+>> mounts the rootfs from the uSD and the wifi SDIO device is enumerated
+>> and listed in /sys/bus/sdio/devices/
 >
-> There's no chip control IP. The HW just put some HW registers into the so
-> called "chip control" address space, the registers in this space are mostly used for
-> "control" purpose, but some are not. Take the clk as an example, some clocks'
-> registers are put into the system control register space, some clocks' are
-> not.
-
-Jisheng,
-
-you are right, there is no specific IP for those registers. But as we
-don't want these registers to be spread among our SoC nodes, we chose
-to sum them all up into a single node.
-
-Back when the clk driver was proposed, Mike requested to not expose
-each of the clocks in DT - so we joined them basically into a single
-node and let the driver do the rest.
-
-Now, this patch set goes a little bit further and simply joins all of
-the chip ctrl registers into a single node and just adds sub-nodes where
-we need them (e.g. pinctrl).
-
-[...]
-> In newer chips, there are no group clocks any more. So the driver code can be more
-> simpler and clean.
+> it needs to check when clock value only update.
+> As Javier and Alim are mentioned, if check whether card is busy or not in setup_bus(),
+> should be processed unnecessary checking.
+> (According to TRM, before disabling clock, check whether card is busy or not.)
+> if my thinking is right, chekcing is located more exactly before mci_writel(host, CLKENA, 0).
 >
-> So I think we'd better to implement drivers without the "chip control" concept in
-> mind. The previous clock patches reflect what the HW really does.
+> And i recommend if CLK_GATE is enabled, clkgate_delay sets to the bigger value than 3.
+> I'm not sure Javier's issue is same thing..I will check more this.
+>
 
-I see no problem in what future SoCs do with register layout. It seems
-that it will be fundamentally different anyway, so we might consider to
-have a completely new driver for any SoC past BG2Q.
+Thanks for checking, do you have access to a Peach Pit or Pi
+Chromebook to reproduce the issue I reported? Please let me know if
+you need any help from me.
 
-> The above is just my humble opinions and the current berlin clk driver is different
-> with the previous one I dunno how can we handle this situation now. I really need
-> help!
+> Best Regards,
+> Jaehoon Chung
+>
 
-We appreciate you share your opinion!
-
-How does having a single node  (and basically a single reg property
-shared by regmap) block you from implementing support for your new SoC?
-
-Also, you don't need to follow the chip-ctrl node concept for the new
-SoC if it is too different. It is just that we kind of give up to chop
-this register set into functional pieces in DT and think it will be
-better dealt with in each of the drivers.
-
-Sebastian
+Best regards,
+Javier
