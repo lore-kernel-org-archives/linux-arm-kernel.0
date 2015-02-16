@@ -1,67 +1,38 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 16 Feb 2015 14:10:16 +0000
-Subject: [PATCH] drivers/base: cacheinfo: validate device node for all the
- caches
-Message-ID: <1424095816-4414-1-git-send-email-sudeep.holla@arm.com>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Mon, 16 Feb 2015 15:11:57 +0100
+Subject: [PATCHv6 2/2] leds: tlc591xx: Driver for the TI 8/16 Channel i2c
+ LED driver
+In-Reply-To: <1422367161-16487-3-git-send-email-andrew@lunn.ch>
+References: <1422367161-16487-1-git-send-email-andrew@lunn.ch>
+ <1422367161-16487-3-git-send-email-andrew@lunn.ch>
+Message-ID: <op.xt5lp7ix2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On architectures that depend on DT for obtaining cache hierarcy, we need
-to validate the device node for all the cache indices, failing to do so
-might result in wrong information being exposed to the userspace.
+Hi Andrew,
 
-This is quite possible on initial/incomplete versions of the device
-trees. In such cases, it's better to bail out if all the required device
-nodes are not present.
+On Tue, 27 Jan 2015 14:59:21 +0100, Andrew Lunn <andrew@lunn.ch> wrote:
 
-This patch adds checks for the validation of device node for all the
-caches and doesn't initialise the cacheinfo if there's any error.
+> The TLC59116 is an I2C bus controlled 16-channel LED driver.  The
+> TLC59108 is an I2C bus controlled 8-channel LED driver, which is very
+> similar to the TLC59116. Each LED output has its own 8-bit
+> fixed-frequency PWM controller to control the brightness of the LED.
+> The LEDs can also be fixed off and on, making them suitable for use as
+> GPOs.
+>
+> This is based on a driver from Belkin, but has been extensively
+> rewritten and extended to support both 08 and 16 versions.
+>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Cc: Matthew.Fatheree at belkin.com
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Reported-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/base/cacheinfo.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+I've tested the driver on the Mamba (WRT1900AC) and it has been integrated  
+to OpenWrt trunk for a while now, and no issues has been reported by the  
+community either.
 
-diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
-index 6e64563361f0..7015bf05c828 100644
---- a/drivers/base/cacheinfo.c
-+++ b/drivers/base/cacheinfo.c
-@@ -62,15 +62,21 @@ static int cache_setup_of_node(unsigned int cpu)
- 		return -ENOENT;
- 	}
- 
--	while (np && index < cache_leaves(cpu)) {
-+	while (index < cache_leaves(cpu)) {
- 		this_leaf = this_cpu_ci->info_list + index;
- 		if (this_leaf->level != 1)
- 			np = of_find_next_cache_node(np);
- 		else
- 			np = of_node_get(np);/* cpu node itself */
-+		if (!np)
-+			break;
- 		this_leaf->of_node = np;
- 		index++;
- 	}
-+
-+	if (index != cache_leaves(cpu)) /* not all OF nodes populated */
-+		return -ENOENT;
-+
- 	return 0;
- }
- 
-@@ -189,8 +195,10 @@ static int detect_cache_attributes(unsigned int cpu)
- 	 * will be set up here only if they are not populated already
- 	 */
- 	ret = cache_shared_cpu_map_setup(cpu);
--	if (ret)
-+	if (ret) {
-+		pr_err("failed to setup cache hierarcy from DT\n");
- 		goto free_ci;
-+	}
- 	return 0;
- 
- free_ci:
--- 
-1.9.1
+Please feel free to add Tested-by: Imre Kaloz <kaloz@openwrt.org>.
+
+
+Thanks,
+
+Imre
