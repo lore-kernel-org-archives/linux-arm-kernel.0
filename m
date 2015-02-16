@@ -1,88 +1,90 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 16 Feb 2015 23:14:13 +0100
-Subject: [PATCH v4 2/4] mfd: lubbock_cplds: add lubbock IO board
-In-Reply-To: <20150216162712.GR14545@x1> (Lee Jones's message of "Mon, 16 Feb
- 2015 16:27:12 +0000")
-References: <20150216130549.GF14545@x1>
- <1170550770.470129293.1424093248596.JavaMail.root@zimbra1-e1.priv.proxad.net>
- <20150216162712.GR14545@x1>
-Message-ID: <87fva5a4i2.fsf@free.fr>
+From: patrikbachan@gmail.com (Patrik Bachan aka DiGGiT)
+Date: Mon, 16 Feb 2015 23:38:49 +0100
+Subject: n900 audio: any ideas how to get headset speaker to work?
+In-Reply-To: <20150216095748.GA25918@amd>
+References: <20150215102152.GA23736@amd>
+ <CAK7bGn+NH9BOB25+dhNZXFxY_fD8TeoWvuSpTD-4cg-zU5dOmA@mail.gmail.com>
+ <20150216095748.GA25918@amd>
+Message-ID: <CAK7bGn+SUXCk+ydMmCPeP18dMdwj85zeHte2zdGdNLGX-YBRdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lee Jones <lee.jones@linaro.org> writes:
-
-> What's all this?  Please configure your mail client correctly.
+2015-02-16 10:57 GMT+01:00 Pavel Machek <pavel@ucw.cz>:
+> Ahoj!
 >
-> For advice, see:
+>> > By default, output goes to loudspeaker (top right relative to
+>> > keyboard). Any ideas how to switch it to the speaker on the left or
+>> > wired headset? Because I suspect that echo cancelation is not going to
+>> > be simple...
+>> >                                                                         Pavel
+>> > --
+>> > (english) http://www.livejournal.com/~pavelmachek
+>> > (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+>>
+>> Hi,
+>> in case of direct alsa output (not PA), setup is pretty complex.
+>> Headphones referenced as line. All audio outputs are differential.
+>> Here are controls that affects volumes...
 >
->   Documentation/email-clients.txt
-While at day work, I have only access to web mail ...
-
->>  2) after v2, we _both_ agreed that the accurate name is "cplds"
->>     which exactly what is in this patch
->>     (see device registering with lubbock_cplds).
+> Aha, thanks for nice explanation. Now it starts to make sense... I got
+> headset connected to 3.5" jack to work.
 >
-> There is no mention of this decision in the changelogs.  If it's not
-> in the change logs, it didn't happen. ;)
-Ah right.
-
-> I'm still concerned with the fact that the driver file is named using
-> and is populated by lots of instances of a "board" name.  I'm sure you
-> would share my thoughts is someone submitted a driver called
-> beaglebone.c or raspberrypi.c to MFD.
-I understand your concern. Arnd, a thought about it ? The only viable
-alternative would be to move it to arch/arm/plat-pxa AFAIS.
-
->> > Besides, this is MFD, where we support single pieces of silicon which
->> > happen to support multiple devices.  I definitely don't want to support
->> > boards here.
->> > You might want to re-think the naming and your (sales) pitch.
->> I might need help. As for the (sales), no comment.
+> Now, I guess I'd like the internal speaker on the left to work,
+> too... Aha, so n900 has two stereo "loud" speakers on the keyboard
+> part, plus extra speaker on the left display part for communication?
 >
-> By pitch, I mean to convince me that this belongs in MFD.
-I've been trying.
 
->> I thought cplds were to be handled by an MFD driver.
+Yes, exactly.
+
+> I got the two stereo ones to work now.
 >
-> Not to my knowledge, although we do appear to have one.  That doesn't
-> necessarily mean that it's the right place for it though.  I'm not
-> entirely sure how CPLDs even work on a functional level.
-As I said, I understand your concern.
+> Any idea what is the last speaker on display is called? HPCOM? Mono?
 
->> > I'm going to stop here, as I think I need more of an explanation so
->> > what you're trying to achieve with this driver.
->> Why ? I think things were clear that this driver handles the CPLDs on
->> lubbock board, namely u46 and u52. I don't understand what is wrong
->> with this patch so that you don't want to go forward.
+In schematics, earphone is connected to Left HP, channel B
+(loudspeakers are channel A). But even after enabling all its
+controls, earphone stays muted. My N900 may have broken flex causing
+my touchscreen problems too. Better try it yourself.
+
+>> global:
+>>  PCM (volume)
+>>  left/right DAC mux (below)
+>>       -- DAC_L1/R1 passes sound to loudspeakers, line, (maybe others)
+>>       -- DAC_L2/R2 passes sound to loudspeakers, NOT line, (maybe others)
+>>       -- DAC_L3/R3 passes sound to NOT loudspeakers, line, (maybe others)
+>>       if DAC_L1/R1 is chosen, you can hear lower volume on both
+>> outputs in compare to dedicated outputs (DAC_L2/R2, DAC_L3/R3),
+>> probabbly due to higher load of ADC
+>>
+>>
+>> loudspeakers:
+>>  Speaker function (on)
+>>  HP (unmute)
+>>  HP DAC (volume)
+>>  left HP Mixer DACL1 (below)
+>>  right HP Mixer DACR1 (below)
+>>    --unmute theese two,  this will pass left channel sound to left
+>> channel output and vice versa
+>>  left HP Mixer DACR1 (below)
+>>  right HP Mixer DACL1 (below)
+>>   --mute these two, this controls channel crosstalk ( amount of left
+>> channel sound going to right channel output and vice versa)
+>>
+>> line:
+>>  line (unmute)
+>>  line DAC (volume)
+>>  jack function (headphone)
+>>  TPA6130A2 Headphone (volume)
+>>  left Line Mixer DACL1 (below)
+>>  right Line Mixer DACR1 (below)
+>>    --unmute theese two,  this will pass left channel sound to left
+>> channel output and vice versa
+>>  left Line Mixer DACR1 (below)
+>>  right Line Mixer DACL1 (below)
+>>   --mute these two, this controls channel crosstalk ( amount of left
+>> channel sound going to right channel output and vice versa)
 >
-> Understanding was lost when I learned that the whole file was centred
-> around the premise of board support.  I understand now that this is a
-> driver for a CPLD, which I'm not sure is even MFD.  Also, if it is
-> really a CPLD driver, shouldn't be named after the manufacturer/model
-> number of the chip, rather than the PCB which it's connected to?
->
-> I'm also concerned that this driver has no functional CPLD code
-> contained.  All you're doing is defining an IRQ domain.  Why then
-> isn't this really an drivers/irqchip (Suggested-by: Josh Cartwright)
-> driver?
-Is not only a irqchip because, as explained at the bottom of the commit message,
-quoting myself :
-  This patch moves all that handling to a mfd driver. It's only purpose
-  for the time being is the interrupt handling, but in the future it
-  should encompass all the motherboard CPLDs handling :
-   - leds
-   - switches
-   - hexleds
-
-When these parts will be added, and they'll have to be handled by this driver
-because of iospace sharing, and same IP (cplds) providing the hardware support,
-the irqchip way will be just impossible to follow.
-
-As I said above, I understand your concern. If we all reach a concensus this
-should be moved to the pxa tree, so be it. But I'd like other opinion here.
-
-Cheers.
-
--- 
-Robert
+> Thanks a lot!
+>                                                                         Pavel
+> --
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
