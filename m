@@ -1,46 +1,71 @@
-From: tuomas.tynkkynen@iki.fi (Tuomas Tynkkynen)
-Date: Mon, 16 Feb 2015 09:11:00 +0200
-Subject: [PATCH v7 01/16] clk: tegra: Add binding for the Tegra124 DFLL
- clocksource
-In-Reply-To: <20150212224242.GA23500@mithrandir>
-References: <1420723339-30735-1-git-send-email-mikko.perttunen@kapsi.fi>
- <1420723339-30735-2-git-send-email-mikko.perttunen@kapsi.fi>
- <20150212224242.GA23500@mithrandir>
-Message-ID: <54E19804.9080003@iki.fi>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 16 Feb 2015 10:28:36 +0200
+Subject: [PATCH 9/9] RFC: ARM: DRA7: enable DSS_DESHDCP_CLKEN
+In-Reply-To: <CAGo_u6p89ot-eNwK65otoYsLM6NXeh929=SBG6uKAsX8Tnd_RQ@mail.gmail.com>
+References: <1423840286-18377-1-git-send-email-tomi.valkeinen@ti.com>	<1423840286-18377-10-git-send-email-tomi.valkeinen@ti.com>
+ <CAGo_u6p89ot-eNwK65otoYsLM6NXeh929=SBG6uKAsX8Tnd_RQ@mail.gmail.com>
+Message-ID: <54E1AA34.8090205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2015 12:42 AM, Thierry Reding wrote:
-> On Thu, Jan 08, 2015 at 03:22:04PM +0200, Mikko Perttunen wrote:
->> From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+On 13/02/15 17:25, Nishanth Menon wrote:
+> On Fri, Feb 13, 2015 at 9:11 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+>> DRA7xx's CTRL_CORE_CONTROL_IO_2 register contains bits for various
+>> subsystems, including PCIe, DCAN, QSPI and DSS. At the moment only DCAN
+>> bits are used by the SW via syscon.
 >>
->> The DFLL is the main clocksource for the fast CPU cluster on Tegra124
->> and also provides automatic CPU rail voltage scaling as well. The DFLL
->> is a separate IP block from the usual Tegra124 clock-and-reset
->> controller, so it gets its own node in the device tree.
+>> For DSS there is DSS_DESHDCP_CLKEN bit. This (presumably) enables a
+>> clock related to DSS's HDCP. If that clock is off, DSS module does not
+>> start at all, causing OCP errors. This means that the HWMOD code is not
+>> able to reset and initialize DSS.
 >>
->> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
->> Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
+>> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 >> ---
->>   .../bindings/clock/nvidia,tegra124-dfll.txt        | 69 ++++++++++++++++++++++
->>   1 file changed, 69 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+>>  arch/arm/mach-omap2/io.c | 11 +++++++++++
+>>  1 file changed, 11 insertions(+)
 >>
-...
->> +Required properties:
->> +- compatible : should be "nvidia,tegra124-dfll-fcpu"
->> +- reg : Defines the following set of registers, in the order listed:
->> +        - registers for the DFLL control logic.
->> +        - registers for the I2C output logic.
->> +        - registers for the integrated I2C master controller.
->> +        - look-up table RAM for voltage register values.
->
-> Why do these all need to be separate sets? According to the TRM this is
-> a single IP block with a single register region, why the need to split
-> them apart?
+>> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+>> index a1bd6affb508..2206fb13f195 100644
+>> --- a/arch/arm/mach-omap2/io.c
+>> +++ b/arch/arm/mach-omap2/io.c
+>> @@ -700,6 +700,17 @@ void __init dra7xx_init_early(void)
+>>         dra7xx_hwmod_init();
+>>         omap_hwmod_init_postsetup();
+>>         omap_clk_soc_init = dra7xx_dt_clk_init;
+>> +
+>> +       if (soc_is_dra7xx()) {
+> 
+> Umm.. this code will only be executed for dra7xx :)
 
-On Tegra132, some of those register blocks (IIRC the first one) has 
-moved to a different place (somewhere in the CAR register area). The TRM 
-description indeed gives a single list of registers for the Tegra124 
-implementation of the DFLL. The split into 4 blocks was to make the 
-binding more future-proof and to be closer to the real hardware design.
+Better safe than sorry! But you're right, I'll remove the if =).
+
+>> +               u32 v;
+>> +               const u16 ctrl_core_control_io_2 = 0x558;
+>> +
+>> +               /* set CTRL_CORE_CONTROL_IO_2:DSS_DESHDCP_CLKEN */
+>> +
+>> +               v = omap_ctrl_readl(ctrl_core_control_io_2);
+>> +               v |= 1;
+>> +               omap_ctrl_writel(v, ctrl_core_control_io_2);
+>> +       }
+>>  }
+>>
+>>  void __init dra7xx_init_late(void)
+> just my 2 cents.
+> I would probably wait for control module to become syscon and probably
+> model this as syscon clk - I thin we should be seeing a series
+> sometime soon.
+
+Yep, I hope Tero's work will make this patch not needed. I wanted to
+include something in this series that makes the DSS usable.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150216/c7d589fb/attachment-0001.sig>
