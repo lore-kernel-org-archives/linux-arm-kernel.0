@@ -1,72 +1,79 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Mon, 16 Feb 2015 10:06:26 -0800
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <20150211112907.GD9154@leverpostej>
-References: <20150115135556.GH16217@leverpostej>
- <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
- <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
- <20150116101746.GA21809@leverpostej>
- <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
- <20150120180548.GK7718@atomide.com>
- <CAK=WgbZGGtwmQwzWumjpYOsYHTt8vPQpTraABwJBsv5VXOmJ_Q@mail.gmail.com>
- <54BFE855.3090200@ti.com> <20150122185622.GE12911@leverpostej>
- <54C9AFF2.6000108@ti.com> <20150211112907.GD9154@leverpostej>
-Message-ID: <CAJAp7OgCs2kyF+ZdSzbf02qNHDdd_g=Nyf54akiAjAd1uK6cEA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Feb 2015 20:38:39 +0100
+Subject: [musl] Re: [PATCHv3 00/24] ILP32 support in ARM64
+In-Reply-To: <20150216175135.GB23507@brightrain.aerifal.cx>
+References: <20141002155217.GH32147@e104818-lin.cambridge.arm.com>
+ <95765022.dfzNYZrNVS@wuerfel> <20150216175135.GB23507@brightrain.aerifal.cx>
+Message-ID: <4247895.OCsFybr21D@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 11, 2015 at 3:29 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Jan 29, 2015 at 03:58:42AM +0000, Suman Anna wrote:
->> On 01/22/2015 12:56 PM, Mark Rutland wrote:
-[..]
->> > That's the only way I would expect this to possibly remain a stable
->> > over time, and it's the entire reason for #hwlock-cells, no?
->> >
->> > How do you expect the other components sharing the hwspinlocks to be
->> > described?
->>
->> Yes indeed, this is what any of the clients will use on Linux. But
->> this is not necessarily the semantics for exchanging hwlocks with the
->> other processor(s) which is where the global id space comes into
->> picture.
->
-> I did try to consider that above. Rather than thinking about the
-> numbering as "global", think of it as unique within the a given pool
-> shared between processors. That's what the "poolN" names are about
-> above.
->
-> That way you can dynamically allocate within the pool and know that
-> Linux and the SW on the other processors will use the same ID. You can
-> have pools that span multiple hwlock hardware blocks, and you can have
-> multiple separate pools in operation at once.
->
-> Surely that covers the cases you care about?
->
-> If using names is clunky, we could instead have a pool-hwlocks property
-> for that purpose.
->
+On Monday 16 February 2015 12:51:35 Rich Felker wrote:
+> On Mon, Feb 16, 2015 at 06:20:18PM +0100, Arnd Bergmann wrote:
+> > > Would it really be that hard to do:
+> > > 
+> > > 	if (ILP32_on_64_process) tv_nsec = (int)tv_nsec;
+> > > 
+> > > or similar? That's all that's needed.
+> > > 
+> > > > In some cases, there may also be a measurable performance penalty
+> > > > in interpreting a user space data structure manually over copying
+> > > > it (including the timespec values) in one chunk.
+> > > 
+> > > I don't think the above would be measurable.
+> > 
+> > It depends: Copying the structure first and then doing the conversion
+> > in kernel space on the specific members as you do in the example
+> > should indeed have a trivial performance impact. However, it is also
+> > the hardest for driver writers to get right, and it's better not to
+> > trust them with corner cases like this.
+> > 
+> > To make it more readable, we would probably introduce a helper function
+> > that copies the timespec from user space memory to kernel space and
+> > then does all the checks and conversions as required. However, doing
+> > separate copies can (depending on the architecture) have a noticeable
+> > impact. An example for this would be architectures that require setting
+> > up a page table entry for the user space page in order to access the
+> > data and then destroy it again afterwards, with the correct TLB flushes.
+> > 
+> > We can do something like this for the old-style compat handlers that
+> > use 32-bit time_t, but I'd prefer not to have it in the fast path for
+> > the native 64-bit time_t on 64-bit architectures.
+> 
+> I know this isn't the place to discuss large architectural kernel
+> changes, but it would be really nice if the kernel had proper abstract
+> knowledge, at syscall entry time, what regions of memory from
+> userspace the syscall is going to need and a way of marshalling them
+> all together as prep for enterring the code that implements the
+> syscalls, and if conversion between different ABIs could take place
+> mostly automatically at this layer. Perhaps this kind of thing is an
+> idea that could be kept open for the future. I suspect the
+> combinatorics of different legacy interfaces are going to continue
+> getting worse, and it would be much nicer to have the support factored
+> out of the actual syscall implementations.
 
-Just to make I understand your suggestion.
+Some subsystems (e.g. v4l) do this in their ioctls, and it sounds
+like a nice idea, but as I count 17457 instances of copy_{to,from}_user
+or {get,put}_user in the kernel, I believe we are basically stuck
+with the current way.
 
-We would have the communication entity list all the potential hwlocks
-(and gpios etc) that it can share and the key to be communicated would
-then basically be the index in that list?
+> > > Generally I would think the kernel knows the model the process is
+> > > using, but if not, all you need is separate ioctl numbers for
+> > > userspace to use depending on which definition it's using.
+> > 
+> > I've checked now, and indeed the kernel knows for ilp32 x86 and arm, since
+> > it uses a different ELF interpreter. I thought it might be running the
+> > ilp32 binaries as ELF64, but it does not.
+> 
+> This would result in lots of problems like argv[], auxv[], envp[],
+> etc. being in the wrong format.
 
-Like:
-awesome-hub {
-    pool-hwlocks = <&a 1>, <&a 3>, <&b 5>;
-};
+Right. It depends a bit on the scope though: My impression is that
+a lot of people who ask for ilp32 mode on arm64 are just interested
+in getting to work one or two applications. If that was the only
+goal, they could work around the problem (mostly) in user space, but
+as it turns out, the kernel patch is doing the entire job of
+implementing the new ABI at syscall level to the point where you
+can (mostly) just recompile all of user space.
 
-And a communicated "lock 2" would mean lock 3 from block a?
-
-
-This would make it possible to describe what locks are available in
-this "allocation pool" and would keep such allocation logic out from
-the hwlock core - as the awesome-hub driver could simply trial and
-error (with some logic) through the list.
-
-Is this understanding correct?
-
-Regards,
-Bjorn
+	Arnd
