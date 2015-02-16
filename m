@@ -1,105 +1,102 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 16 Feb 2015 10:05:11 +0000
-Subject: [PATCH v2 6/6] irqchip: gicv3: skip ITS init when no ITS available
-In-Reply-To: <1423992723-5028-7-git-send-email-wuyun.wu@huawei.com>
-References: <1423992723-5028-1-git-send-email-wuyun.wu@huawei.com>
- <1423992723-5028-7-git-send-email-wuyun.wu@huawei.com>
-Message-ID: <54E1C0D7.7000708@arm.com>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Mon, 16 Feb 2015 10:09:54 +0000
+Subject: [PATCH v2] xen/arm: allow console=hvc0 to be omitted for guests
+In-Reply-To: <CAKv+Gu8nQ12SKipQC7EuzFwge6NMF3zyAdYJmRUjNWfBoux9Jw@mail.gmail.com>
+References: <1423740543-6168-1-git-send-email-ard.biesheuvel@linaro.org>	<54DDA1D2.5010001@linaro.org>	<CAKv+Gu-KErA+NxX2ctZmrjKYTLYLbGvGiqbEXkowvNbCGF65Bw@mail.gmail.com>	<54DDA4FC.6050307@linaro.org>
+ <CAKv+Gu8nQ12SKipQC7EuzFwge6NMF3zyAdYJmRUjNWfBoux9Jw@mail.gmail.com>
+Message-ID: <54E1C1F2.9030305@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yun,
+Hi Ard,
 
-On 15/02/15 09:32, Yun Wu wrote:
-> There is one more condition that needs to be considered when judging
-> whether LPI feature is enabled or not, which is whether there is any
-> ITS available and correctly enabled.
+On 16/02/15 09:37, Ard Biesheuvel wrote:
+> On 13 February 2015 at 15:17, Julien Grall <julien.grall@linaro.org> wrote:
+>>
+>>
+>> On 13/02/2015 15:12, Ard Biesheuvel wrote:
+>>>
+>>> On 13 February 2015 at 15:03, Julien Grall <julien.grall@linaro.org>
+>>> wrote:
+>>>>
+>>>> Hi Ard,
+>>>>
+>>>>
+>>>> On 12/02/2015 19:29, Ard Biesheuvel wrote:
+>>>>>
+>>>>>
+>>>>> This patch registers hvc0 as the preferred console if no console
+>>>>> has been specified explicitly on the kernel command line.
+>>>>>
+>>>>> The purpose is to allow platform agnostic kernels and boot images
+>>>>> (such as distro installers) to boot in a Xen/ARM domU without the
+>>>>> need to modify the command line by hand.
+>>>>>
+>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>>> ---
+>>>>>    arch/arm/xen/enlighten.c | 4 ++++
+>>>>>    1 file changed, 4 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+>>>>> index 0abeefa7dbf8..927be1d1bad7 100644
+>>>>> --- a/arch/arm/xen/enlighten.c
+>>>>> +++ b/arch/arm/xen/enlighten.c
+>>>>> @@ -24,6 +24,7 @@
+>>>>>    #include <linux/cpuidle.h>
+>>>>>    #include <linux/cpufreq.h>
+>>>>>    #include <linux/cpu.h>
+>>>>> +#include <linux/console.h>
+>>>>>
+>>>>>    #include <linux/mm.h>
+>>>>>
+>>>>> @@ -255,6 +256,9 @@ void __init xen_early_init(void)
+>>>>>                  xen_start_info->flags |= SIF_INITDOMAIN|SIF_PRIVILEGED;
+>>>>>          else
+>>>>>                  xen_start_info->flags &=
+>>>>> ~(SIF_INITDOMAIN|SIF_PRIVILEGED);
+>>>>> +
+>>>>> +       if (!console_set_on_cmdline && !xen_initial_domain())
+>>>>> +               add_preferred_console("hvc", 0, NULL);
+>>>>
+>>>>
+>>>>
+>>>> Unfortunately, this won't work as expected.
+>>>>
+>>>
+>>> Did you try it?
+>>
+>>
+>> No just looked at the code.
+>>
+>>>> console_set_on_cmdline is set when Linux parses the early params. The
+>>>> parsing is done after setup_arch (the function which call
+>>>> xen_early_init).
+>>>>
+>>>> So we will end up to add the HVC console even if a console has been
+>>>> passed
+>>>> on the command line.
+>>>>
+>>>
+>>> parse_early_param() is also called by setup_arch(), before
+>>> xen_early_init()
+>>>
+>>> The call to parse_early_param() in generic code is only there for
+>>> architectures that don't call it in their setup_arch()
+>>
+>>
+>> Oh, right. Sorry for the noise.
+>>
+>> So:
+>>
+>> Reviewed-by: Julien Grall <julien.grall@linaro.org>
+>>
 > 
-> This patch will fix this by caching ITS enabling status in the GIC
-> chip data structure.
+> Would it make sense to roll this into your xen_early_init() series as #3?
 
-I posted patch for that before [1] and it landed in Marc's tree
-(irq/gic-fixes). It is not clear from the commit message what the "one
-more condition" is, but I guess it is the same dts stuff. Do you see
-issue without your patch applied?
+The xen_early_init has been created in order to support preferred
+console. I don't mind to carry this patch in the next version.
 
-[1]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314752.html
+Regards,
 
-Thanks
-Vladimir
-
-> 
-> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
-> ---
->  drivers/irqchip/irq-gic-v3.c | 18 +++++++++---------
->  1 file changed, 9 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index 1a146cc..e17faca 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -47,6 +47,7 @@ struct gic_chip_data {
->  	u64			redist_stride;
->  	u32			nr_redist_regions;
->  	unsigned int		irq_nr;
-> +	int			lpi_enabled;
->  };
-> 
->  static struct gic_chip_data gic_data __read_mostly;
-> @@ -390,11 +391,6 @@ static void gic_cpu_sys_reg_init(void)
->  	gic_write_grpen1(1);
->  }
-> 
-> -static int gic_dist_supports_lpis(void)
-> -{
-> -	return !!(readl_relaxed(gic_data.dist_base + GICD_TYPER) & GICD_TYPER_LPIS);
-> -}
-> -
->  static void gic_cpu_init(void)
->  {
->  	void __iomem *rbase;
-> @@ -410,7 +406,7 @@ static void gic_cpu_init(void)
->  	gic_cpu_config(rbase, gic_redist_wait_for_rwp);
-> 
->  	/* Give LPIs a spin */
-> -	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
-> +	if (gic_data.lpi_enabled)
->  		its_cpu_init();
-> 
->  	/* initialise system registers */
-> @@ -629,7 +625,7 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
->  	}
->  	/* LPIs */
->  	if (hw >= 8192 && hw < GIC_ID_NR) {
-> -		if (!gic_dist_supports_lpis())
-> +		if (!gic_data.lpi_enabled)
->  			return -EPERM;
->  		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
->  				    handle_fasteoi_irq, NULL, NULL);
-> @@ -785,8 +781,12 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
-> 
->  	set_handle_irq(gic_handle_irq);
-> 
-> -	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
-> -		its_init(node, &gic_data.rdists, gic_data.domain);
-> +	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) &&
-> +	    !!(readl_relaxed(dist_base + GICD_TYPER) & GICD_TYPER_LPIS) &&
-> +	    !its_init(node, &gic_data.rdists, gic_data.domain))
-> +		gic_data.lpi_enabled = 1;
-> +	else
-> +		gic_data.lpi_enabled = 0;
-> 
->  	gic_smp_init();
->  	gic_dist_init();
-> --
-> 1.8.0
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+-- 
+Julien Grall
