@@ -1,39 +1,25 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 16 Feb 2015 14:36:42 +0100
-Subject: [PATCH] ARM: EXYNOS: Don't use LDREX and STREX after disabling cache
- coherency
-Message-ID: <1424093802-5488-1-git-send-email-k.kozlowski@samsung.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 16 Feb 2015 10:35:50 -0300
+Subject: [PATCH v3 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
+In-Reply-To: <1424091072-7738-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1424091072-7738-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1424091072-7738-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54E1F236.4090706@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During CPU shutdown the exynos_cpu_power_down() is called after
-disabling cache coherency and it uses LDREX and STREX instructions (by
-calling of_machine_is_compatible() -> kobject_get() -> kref_get()).
+On 02/16/2015 09:51 AM, Maxime Ripard wrote:
+> The NDDB register holds the data that are needed by the read and write
+> commands.
+> 
+> However, during a read PIO access, the datasheet specifies that after each 32
+> bits read in that register, when BCH is enabled, we have to make sure that the
+> RDDREQ bit is set in the NDSR register.
+> 
 
-The LDREX and STREX should not be used after disabling the cache
-coherency so just use soc_is_exynos().
+Typo s/32 bits/32 bytes
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Fixes: adc548d77c22 ("ARM: EXYNOS: Use MCPM call-backs to support S2R on exynos5420")
-Cc: <stable@vger.kernel.org>
-Reported-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/mach-exynos/platsmp.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 7a1ebfeeeeb8..0abb7dff73ab 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -126,8 +126,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
-  */
- void exynos_cpu_power_down(int cpu)
- {
--	if (cpu == 0 && (of_machine_is_compatible("samsung,exynos5420") ||
--		of_machine_is_compatible("samsung,exynos5800"))) {
-+	if (cpu == 0 && (soc_is_exynos5420() || soc_is_exynos5800())) {
- 		/*
- 		 * Bypass power down for CPU0 during suspend. Check for
- 		 * the SYS_PWR_REG value to decide if we are suspending
 -- 
-1.9.1
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
