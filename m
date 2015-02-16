@@ -1,62 +1,93 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 16 Feb 2015 10:28:14 +0100
-Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
- demuxer chip
-In-Reply-To: <1487331.cgC9j5u0aF@vostro.rjw.lan>
-References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
- <2437801.56xPyk3atd@vostro.rjw.lan>
- <20150211151237.GN9154@leverpostej>
- <1487331.cgC9j5u0aF@vostro.rjw.lan>
-Message-ID: <20150216092814.GF7119@twins.programming.kicks-ass.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 16 Feb 2015 17:37:09 +0800
+Subject: [PATCH v2] xen/arm: allow console=hvc0 to be omitted for guests
+In-Reply-To: <54DDA4FC.6050307@linaro.org>
+References: <1423740543-6168-1-git-send-email-ard.biesheuvel@linaro.org>
+ <54DDA1D2.5010001@linaro.org>
+ <CAKv+Gu-KErA+NxX2ctZmrjKYTLYLbGvGiqbEXkowvNbCGF65Bw@mail.gmail.com>
+ <54DDA4FC.6050307@linaro.org>
+Message-ID: <CAKv+Gu8nQ12SKipQC7EuzFwge6NMF3zyAdYJmRUjNWfBoux9Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 13 February 2015 at 15:17, Julien Grall <julien.grall@linaro.org> wrote:
+>
+>
+> On 13/02/2015 15:12, Ard Biesheuvel wrote:
+>>
+>> On 13 February 2015 at 15:03, Julien Grall <julien.grall@linaro.org>
+>> wrote:
+>>>
+>>> Hi Ard,
+>>>
+>>>
+>>> On 12/02/2015 19:29, Ard Biesheuvel wrote:
+>>>>
+>>>>
+>>>> This patch registers hvc0 as the preferred console if no console
+>>>> has been specified explicitly on the kernel command line.
+>>>>
+>>>> The purpose is to allow platform agnostic kernels and boot images
+>>>> (such as distro installers) to boot in a Xen/ARM domU without the
+>>>> need to modify the command line by hand.
+>>>>
+>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>> ---
+>>>>    arch/arm/xen/enlighten.c | 4 ++++
+>>>>    1 file changed, 4 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+>>>> index 0abeefa7dbf8..927be1d1bad7 100644
+>>>> --- a/arch/arm/xen/enlighten.c
+>>>> +++ b/arch/arm/xen/enlighten.c
+>>>> @@ -24,6 +24,7 @@
+>>>>    #include <linux/cpuidle.h>
+>>>>    #include <linux/cpufreq.h>
+>>>>    #include <linux/cpu.h>
+>>>> +#include <linux/console.h>
+>>>>
+>>>>    #include <linux/mm.h>
+>>>>
+>>>> @@ -255,6 +256,9 @@ void __init xen_early_init(void)
+>>>>                  xen_start_info->flags |= SIF_INITDOMAIN|SIF_PRIVILEGED;
+>>>>          else
+>>>>                  xen_start_info->flags &=
+>>>> ~(SIF_INITDOMAIN|SIF_PRIVILEGED);
+>>>> +
+>>>> +       if (!console_set_on_cmdline && !xen_initial_domain())
+>>>> +               add_preferred_console("hvc", 0, NULL);
+>>>
+>>>
+>>>
+>>> Unfortunately, this won't work as expected.
+>>>
+>>
+>> Did you try it?
+>
+>
+> No just looked at the code.
+>
+>>> console_set_on_cmdline is set when Linux parses the early params. The
+>>> parsing is done after setup_arch (the function which call
+>>> xen_early_init).
+>>>
+>>> So we will end up to add the HVC console even if a console has been
+>>> passed
+>>> on the command line.
+>>>
+>>
+>> parse_early_param() is also called by setup_arch(), before
+>> xen_early_init()
+>>
+>> The call to parse_early_param() in generic code is only there for
+>> architectures that don't call it in their setup_arch()
+>
+>
+> Oh, right. Sorry for the noise.
+>
+> So:
+>
+> Reviewed-by: Julien Grall <julien.grall@linaro.org>
+>
 
-Guys, trim your emails, please!
-
-On Wed, Feb 11, 2015 at 04:51:36PM +0100, Rafael J. Wysocki wrote:
-> On Wednesday, February 11, 2015 03:12:38 PM Mark Rutland wrote:
-> > I guess that would have to imply IRQF_SHARED, so we'd have something
-> > like:
-> > 
-> > IRQF_SHARED_SUSPEND_OK - This handler is safe to call spuriously during
-> > 			 suspend in the case the line is shared. The
-> > 			 handler will not access unavailable hardware
-> > 			 or kernel infrastructure during this period.
-> > 
-> > #define __IRQF_SUSPEND_SPURIOUS		0x00040000
-> > #define	IRQF_SHARED_SUSPEND_OK		(IRQF_SHARED | __IRQF_SUSPEND_SPURIOUS)
-> 
-> What about
-> 
-> #define __IRQF_TIMER_SIBLING_OK	0x00040000
-> #define	IRQF_SHARED_TIMER_OK	(IRQF_SHARED | __IRQF_TIMER_SIBLING_OK)
-> 
-> The "suspend" part is kind of a distraction to me here, because that really
-> only is about sharing an IRQ with a timer and the "your interrupt handler
-> may be called when the device is suspended" part is just a consequence of that.
-> 
-> So IMO it's better to have "TIMER" in the names to avoid encouraging people to
-> abuse this for other purposes not related to timers.
-
-Sorry to be late to the bike-shed party, but what about:
-
-Documentation/power/suspend-and-interrupts.txt:the IRQ's users.  For this reason, using IRQF_NO_SUSPEND and IRQF_SHARED at the
-
-arch/arm/mach-omap2/mux.c:		omap_hwmod_mux_handle_irq, IRQF_SHARED | IRQF_NO_SUSPEND,
-arch/arm/mach-omap2/pm34xx.c:		_prcm_int_handle_io, IRQF_SHARED | IRQF_NO_SUSPEND, "pm_io",
-drivers/mfd/ab8500-debugfs.c:				   IRQF_SHARED | IRQF_NO_SUSPEND,
-drivers/mfd/ab8500-gpadc.c:			IRQF_NO_SUSPEND | IRQF_SHARED, "ab8500-gpadc-sw",
-drivers/mfd/ab8500-gpadc.c:			IRQF_NO_SUSPEND | IRQF_SHARED, "ab8500-gpadc-hw",
-drivers/pinctrl/pinctrl-single.c:				  IRQF_SHARED | IRQF_NO_SUSPEND,
-drivers/power/ab8500_btemp.c:			IRQF_SHARED | IRQF_NO_SUSPEND,
-drivers/power/ab8500_charger.c:			IRQF_SHARED | IRQF_NO_SUSPEND,
-drivers/power/ab8500_fg.c:			IRQF_SHARED | IRQF_NO_SUSPEND,
-drivers/rtc/rtc-pl031.c:	.irqflags = IRQF_SHARED | IRQF_NO_SUSPEND,
-drivers/usb/phy/phy-ab8500-usb.c:				IRQF_NO_SUSPEND | IRQF_SHARED,
-drivers/usb/phy/phy-ab8500-usb.c:				IRQF_NO_SUSPEND | IRQF_SHARED,
-drivers/usb/phy/phy-ab8500-usb.c:				IRQF_NO_SUSPEND | IRQF_SHARED,
-drivers/watchdog/intel-mid_wdt.c:			       IRQF_SHARED | IRQF_NO_SUSPEND, "watchdog",
-
-Is there a single legitimate user in that list? If so, the TIMER name
-might be misleading.
+Would it make sense to roll this into your xen_early_init() series as #3?
