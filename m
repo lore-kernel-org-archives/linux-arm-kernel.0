@@ -1,68 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 16 Feb 2015 10:20:10 +0100
-Subject: [PATCH/RFC] ARM: shmobile: r8a7790: Fix HSUSB clock to hp_clk
- from mp_clk
-In-Reply-To: <1424011746-3787-2-git-send-email-ykaneko0929@gmail.com>
-References: <1424011746-3787-2-git-send-email-ykaneko0929@gmail.com>
-Message-ID: <CAMuHMdX=cdHaiHCnYsJvZFc2RNv=Pk8cLXuvkezg4Ht4U4mXsg@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 16 Feb 2015 10:28:14 +0100
+Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
+ demuxer chip
+In-Reply-To: <1487331.cgC9j5u0aF@vostro.rjw.lan>
+References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
+ <2437801.56xPyk3atd@vostro.rjw.lan>
+ <20150211151237.GN9154@leverpostej>
+ <1487331.cgC9j5u0aF@vostro.rjw.lan>
+Message-ID: <20150216092814.GF7119@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kaneko-san, Mizuguchi-san,
 
-On Sun, Feb 15, 2015 at 3:49 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
->
-> HSUSB uses hp_clk for H/W register access.
+Guys, trim your emails, please!
 
-That indeed seems to be true, and that's what this patch is changing.
+On Wed, Feb 11, 2015 at 04:51:36PM +0100, Rafael J. Wysocki wrote:
+> On Wednesday, February 11, 2015 03:12:38 PM Mark Rutland wrote:
+> > I guess that would have to imply IRQF_SHARED, so we'd have something
+> > like:
+> > 
+> > IRQF_SHARED_SUSPEND_OK - This handler is safe to call spuriously during
+> > 			 suspend in the case the line is shared. The
+> > 			 handler will not access unavailable hardware
+> > 			 or kernel infrastructure during this period.
+> > 
+> > #define __IRQF_SUSPEND_SPURIOUS		0x00040000
+> > #define	IRQF_SHARED_SUSPEND_OK		(IRQF_SHARED | __IRQF_SUSPEND_SPURIOUS)
+> 
+> What about
+> 
+> #define __IRQF_TIMER_SIBLING_OK	0x00040000
+> #define	IRQF_SHARED_TIMER_OK	(IRQF_SHARED | __IRQF_TIMER_SIBLING_OK)
+> 
+> The "suspend" part is kind of a distraction to me here, because that really
+> only is about sharing an IRQ with a timer and the "your interrupt handler
+> may be called when the device is suspended" part is just a consequence of that.
+> 
+> So IMO it's better to have "TIMER" in the names to avoid encouraging people to
+> abuse this for other purposes not related to timers.
 
-> HSUSB uses mp_clk for USB-DMAC access.
+Sorry to be late to the bike-shed party, but what about:
 
-However, page 64-2 doesn't mention the MP clock for USB-DMAC:
-   "AXI bus clock (ZS?: 260 MHz), HPB bus clock (HP?: 130 MHz).
-    USB local bus clock (48 MHz)"
-So your statement doesn't seem to be true?
+Documentation/power/suspend-and-interrupts.txt:the IRQ's users.  For this reason, using IRQF_NO_SUSPEND and IRQF_SHARED at the
 
-Note that mstp3_clks in dtsi has hp_clk as the parent for both usbdmac0 and
-usbdmac1, so if your statement would be true, that has to changed, too?
+arch/arm/mach-omap2/mux.c:		omap_hwmod_mux_handle_irq, IRQF_SHARED | IRQF_NO_SUSPEND,
+arch/arm/mach-omap2/pm34xx.c:		_prcm_int_handle_io, IRQF_SHARED | IRQF_NO_SUSPEND, "pm_io",
+drivers/mfd/ab8500-debugfs.c:				   IRQF_SHARED | IRQF_NO_SUSPEND,
+drivers/mfd/ab8500-gpadc.c:			IRQF_NO_SUSPEND | IRQF_SHARED, "ab8500-gpadc-sw",
+drivers/mfd/ab8500-gpadc.c:			IRQF_NO_SUSPEND | IRQF_SHARED, "ab8500-gpadc-hw",
+drivers/pinctrl/pinctrl-single.c:				  IRQF_SHARED | IRQF_NO_SUSPEND,
+drivers/power/ab8500_btemp.c:			IRQF_SHARED | IRQF_NO_SUSPEND,
+drivers/power/ab8500_charger.c:			IRQF_SHARED | IRQF_NO_SUSPEND,
+drivers/power/ab8500_fg.c:			IRQF_SHARED | IRQF_NO_SUSPEND,
+drivers/rtc/rtc-pl031.c:	.irqflags = IRQF_SHARED | IRQF_NO_SUSPEND,
+drivers/usb/phy/phy-ab8500-usb.c:				IRQF_NO_SUSPEND | IRQF_SHARED,
+drivers/usb/phy/phy-ab8500-usb.c:				IRQF_NO_SUSPEND | IRQF_SHARED,
+drivers/usb/phy/phy-ab8500-usb.c:				IRQF_NO_SUSPEND | IRQF_SHARED,
+drivers/watchdog/intel-mid_wdt.c:			       IRQF_SHARED | IRQF_NO_SUSPEND, "watchdog",
 
-The same is true for other members of the R-Car Gen2 family, e.g. your patch
-for r8a7791.
-
-> The clock is defined for H/W register access.
->
-> Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> ---
->
-> This patch is based on devel branch of Simon Horman's renesas tree.
->
->  arch/arm/boot/dts/r8a7790.dtsi | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-> index 24de994..113edf2 100644
-> --- a/arch/arm/boot/dts/r8a7790.dtsi
-> +++ b/arch/arm/boot/dts/r8a7790.dtsi
-
-> @@ -1132,7 +1133,7 @@
->                 mstp7_clks: mstp7_clks at e615014c {
->                         compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
->                         reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
-> -                       clocks = <&mp_clk>, <&mp_clk>, <&zs_clk>, <&zs_clk>, <&p_clk>,
-> +                       clocks = <&mp_clk>, <&hp_clk>, <&zs_clk>, <&zs_clk>, <&p_clk>,
->                                  <&p_clk>, <&zx_clk>, <&zx_clk>, <&zx_clk>, <&zx_clk>,
->                                  <&zx_clk>;
->                         #clock-cells = <1>;
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Is there a single legitimate user in that list? If so, the TIMER name
+might be misleading.
