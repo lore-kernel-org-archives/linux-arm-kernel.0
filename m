@@ -1,37 +1,72 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 16 Feb 2015 19:03:36 +0100
-Subject: [PATCH RFC 2/2] ARM: pxa: transition to dmaengine phase 1
-In-Reply-To: <CA+E=qVcEfGaA=V2+cFWfEbOxxBxewfaOarw2_hGfM_4x+7M-jQ@mail.gmail.com>
- (Vasily Khoruzhick's message of "Mon, 16 Feb 2015 20:00:44 +0300")
-References: <1423954053-21760-1-git-send-email-robert.jarzmik@free.fr>
- <1423954053-21760-3-git-send-email-robert.jarzmik@free.fr>
- <CA+E=qVfP=JY5ccUyCat5Thtk6waVng-PsnL7Y4c7_Hj+s8==nw@mail.gmail.com>
- <87wq3hajbc.fsf@free.fr>
- <CA+E=qVcEfGaA=V2+cFWfEbOxxBxewfaOarw2_hGfM_4x+7M-jQ@mail.gmail.com>
-Message-ID: <87sie5ag3r.fsf@free.fr>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Mon, 16 Feb 2015 10:06:26 -0800
+Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
+ hwspinlock
+In-Reply-To: <20150211112907.GD9154@leverpostej>
+References: <20150115135556.GH16217@leverpostej>
+ <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
+ <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
+ <20150116101746.GA21809@leverpostej>
+ <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
+ <20150120180548.GK7718@atomide.com>
+ <CAK=WgbZGGtwmQwzWumjpYOsYHTt8vPQpTraABwJBsv5VXOmJ_Q@mail.gmail.com>
+ <54BFE855.3090200@ti.com> <20150122185622.GE12911@leverpostej>
+ <54C9AFF2.6000108@ti.com> <20150211112907.GD9154@leverpostej>
+Message-ID: <CAJAp7OgCs2kyF+ZdSzbf02qNHDdd_g=Nyf54akiAjAd1uK6cEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vasily Khoruzhick <anarsoul@gmail.com> writes:
-
-> On Mon, Feb 16, 2015 at 7:54 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+On Wed, Feb 11, 2015 at 3:29 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Jan 29, 2015 at 03:58:42AM +0000, Suman Anna wrote:
+>> On 01/22/2015 12:56 PM, Mark Rutland wrote:
+[..]
+>> > That's the only way I would expect this to possibly remain a stable
+>> > over time, and it's the entire reason for #hwlock-cells, no?
+>> >
+>> > How do you expect the other components sharing the hwspinlocks to be
+>> > described?
+>>
+>> Yes indeed, this is what any of the clients will use on Linux. But
+>> this is not necessarily the semantics for exchanging hwlocks with the
+>> other processor(s) which is where the global id space comes into
+>> picture.
 >
->> Oh, do you volunteer ? That would indeed ease up my burden. I only rebased
->> pxa3xx_nand, so any help to submit and push is welcome. At least I can commit to
->> review, and I would concentrate on pxa_camera.c in the meantime.
+> I did try to consider that above. Rather than thinking about the
+> numbering as "global", think of it as unique within the a given pool
+> shared between processors. That's what the "poolN" names are about
+> above.
 >
-> I can rebase those patches on-top of Linus' tree and make sure they
-> work on my machine.
-> I can test pxamci, pxa2xx-spi and pxa2xx-pcm drivers. But I don't
-> think that I have enough time now to submit it and
-> go through review process.
-Do your best, I'll take over when you'll meet your load limit.
+> That way you can dynamically allocate within the pool and know that
+> Linux and the SW on the other processors will use the same ID. You can
+> have pools that span multiple hwlock hardware blocks, and you can have
+> multiple separate pools in operation at once.
+>
+> Surely that covers the cases you care about?
+>
+> If using names is clunky, we could instead have a pool-hwlocks property
+> for that purpose.
+>
 
-> Btw, where I can find your git tree?
-Here :
-git fetch https://github.com/rjarzmik/linux.git work/clocks-pxa
+Just to make I understand your suggestion.
 
-Cheers.
+We would have the communication entity list all the potential hwlocks
+(and gpios etc) that it can share and the key to be communicated would
+then basically be the index in that list?
 
--- 
-Robert
+Like:
+awesome-hub {
+    pool-hwlocks = <&a 1>, <&a 3>, <&b 5>;
+};
+
+And a communicated "lock 2" would mean lock 3 from block a?
+
+
+This would make it possible to describe what locks are available in
+this "allocation pool" and would keep such allocation logic out from
+the hwlock core - as the awesome-hub driver could simply trial and
+error (with some logic) through the list.
+
+Is this understanding correct?
+
+Regards,
+Bjorn
