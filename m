@@ -1,52 +1,46 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Mon, 16 Feb 2015 15:43:38 +0200
-Subject: [PATCH v2 1/3] usb: XHCI: platform: Move the Marvell quirks after
- the enabling the clocks
-In-Reply-To: <20150209083144.GA29855@kroah.com>
-References: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
- <1421672474-2945-2-git-send-email-maxime.ripard@free-electrons.com>
- <20150204093522.GB5492@lukather> <20150204130418.GB5659@kroah.com>
- <20150209082250.GW2079@lukather> <20150209083144.GA29855@kroah.com>
-Message-ID: <54E1F40A.3020507@linux.intel.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 16 Feb 2015 08:51:47 -0500
+Subject: [PATCH/RFC] ARM: shmobile: lager: Fix audio clk master to SSI
+ and change audio data interface format type
+In-Reply-To: <87fva6n2pb.wl%kuninori.morimoto.gx@renesas.com>
+References: <1424011746-3787-1-git-send-email-ykaneko0929@gmail.com>
+ <20150215152957.GA25065@verge.net.au>
+ <87fva6n2pb.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20150216135141.GA3622@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.02.2015 10:31, Greg Kroah-Hartman wrote:
-> On Mon, Feb 09, 2015 at 09:22:50AM +0100, Maxime Ripard wrote:
->> On Wed, Feb 04, 2015 at 05:04:18AM -0800, Greg Kroah-Hartman wrote:
->>> On Wed, Feb 04, 2015 at 10:35:22AM +0100, Maxime Ripard wrote:
->>>> Hi Mathias, Greg,
->>>>
->>>> On Mon, Jan 19, 2015 at 02:01:12PM +0100, Maxime Ripard wrote:
->>>>> The commit 973747928514 ("usb: host: xhci-plat: add support for the Armada
->>>>> 375/38x XHCI controllers") extended the xhci-plat driver to support the Armada
->>>>> 375/38x SoCs, mostly by adding a quirk configuring the MBUS window.
->>>>>
->>>>> However, that quirk was run before the clock the controllers needs has been
->>>>> enabled. This usually worked because the clock was first enabled by the
->>>>> bootloader, and left as such until the driver is probe, where it tries to
->>>>> access the MBUS configuration registers before enabling the clock.
->>>>>
->>>>> Things get messy when EPROBE_DEFER is involved during the probe, since as part
->>>>> of its error path, the driver will rightfully disable the clock. When the
->>>>> driver will be reprobed, it will retry to access the MBUS registers, but this
->>>>> time with the clock disabled, which hangs forever.
->>>>>
->>>>> Fix this by running the quirks after the clock has been enabled by the driver.
->>>>>
->>>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>>>> Cc: <stable@vger.kernel.org> # v3.16+
->>>>
->>>> Any chance for this to go in 3.19?
->>>
->>> For 3.19?  It's too late, I'm not sending anything else to Linus as 3.19
->>> will be out in a few days.
->>
->> Ok. I'll resend it when 3.20-rc1 is out then.
-> 
-> Why resend?  Mathias should be queueing this up properly.  Mathias?
-> 
+Hi Morimoto-san,
 
-Yep, I'll send it forward to Greg once 3.20-rc1 is tagged
+On Mon, Feb 16, 2015 at 12:01:15AM +0000, Kuninori Morimoto wrote:
+> 
+> Hi Kaneko-san, Simon
+> 
+> > >  arch/arm/boot/dts/r8a7790-lager.dts | 4 +---
+> > >  1 file changed, 1 insertion(+), 3 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+> > > index 0c3b678..e7dda8a 100644
+> > > --- a/arch/arm/boot/dts/r8a7790-lager.dts
+> > > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
+> > > @@ -177,9 +177,7 @@
+> > >  	sound {
+> > >  		compatible = "simple-audio-card";
+> > >  
+> > > -		simple-audio-card,format = "left_j";
+> > > -		simple-audio-card,bitclock-master = <&sndcodec>;
+> > > -		simple-audio-card,frame-master = <&sndcodec>;
+> > > +		simple-audio-card,format = "i2s";
+> > >  
+> > >  		sndcpu: simple-audio-card,cpu {
+> > >  			sound-dai = <&rcar_sound>;
+> 
+> Unfortunately, I can't accept this patch.
+> It will be strange sound if you change clk master to SSI (*1).
+> Additionally, it needs audio_clk settings for SSI master,
+> but, it needs special limitation (*1).
+> (*1 HW connection reason)
+> And format change left_j -> i2s is no meaning on Lager board case
 
--Mathias
+Thanks for your analysis.
+I am marking this patch as "rejected".
