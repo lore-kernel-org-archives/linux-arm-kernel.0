@@ -1,84 +1,42 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 16 Feb 2015 16:07:54 +0100
-Subject: [PATCH 3/3] thermal: exynos: Clean-up code to use oneline entry
- for exynos compatible table
-In-Reply-To: <1424096414-4327-4-git-send-email-cw00.choi@samsung.com>
-References: <1424096414-4327-1-git-send-email-cw00.choi@samsung.com>
- <1424096414-4327-4-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20150216160754.18ee3ebb@amdc2363>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Feb 2015 15:29:48 +0000
+Subject: [PATCH v2] ARM: smp: Only expose /sys/.../cpuX/online if
+ hotpluggable
+In-Reply-To: <20150213230137.GH8656@n2100.arm.linux.org.uk>
+References: <1423850799-4028-1-git-send-email-sboyd@codeaurora.org>
+ <20150213202002.GB29727@verge.net.au>
+ <54DE5D3A.5070104@codeaurora.org>
+ <CANqRtoSOBf3ZCKdKYta-P2q==ZMHk=VZgfEztPJ+uaKQtkBWjg@mail.gmail.com>
+ <54DE65C6.8000304@codeaurora.org>
+ <CANqRtoQsKVNMWrj1LZdinHs_iZmsCwWxtqmMWv7SENS3-QXk1A@mail.gmail.com>
+ <20150213230137.GH8656@n2100.arm.linux.org.uk>
+Message-ID: <20150216152948.GH8994@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
-
-> This patch cleanup the code to use oneline for entry of exynos
-> compatible table.
+On Fri, Feb 13, 2015 at 11:01:37PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 13, 2015 at 09:44:50PM +0000, Magnus Damm wrote:
+> > Also, based on the comment in mcpm_cpu_can_disable() it looks like the
+> > PSCI hook may be executed once only with your change in place?
+> > Hopefully PSCI is OK not being invoked for every CPU shutdown.
 > 
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: Eduardo Valentin <edubezval@gmail.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
->  drivers/thermal/samsung/exynos_tmu.c | 38
-> ++++++++++-------------------------- 1 file changed, 10
-> insertions(+), 28 deletions(-)
-> 
-> diff --git a/drivers/thermal/samsung/exynos_tmu.c
-> b/drivers/thermal/samsung/exynos_tmu.c index b199fff..7e6baf5 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.c
-> +++ b/drivers/thermal/samsung/exynos_tmu.c
-> @@ -919,34 +919,16 @@ static irqreturn_t exynos_tmu_irq(int irq, void
-> *id) }
->  
->  static const struct of_device_id exynos_tmu_match[] = {
-> -	{
-> -		.compatible = "samsung,exynos3250-tmu",
-> -	},
-> -	{
-> -		.compatible = "samsung,exynos4210-tmu",
-> -	},
-> -	{
-> -		.compatible = "samsung,exynos4412-tmu",
-> -	},
-> -	{
-> -		.compatible = "samsung,exynos5250-tmu",
-> -	},
-> -	{
-> -		.compatible = "samsung,exynos5260-tmu",
-> -	},
-> -	{
-> -		.compatible = "samsung,exynos5420-tmu",
-> -	},
-> -	{
-> -		.compatible = "samsung,exynos5420-tmu-ext-triminfo",
-> -	},
-> -	{
-> -		.compatible = "samsung,exynos5440-tmu",
-> -	},
-> -	{
-> -		.compatible = "samsung,exynos7-tmu",
-> -	},
-> -	{},
-> +	{ .compatible = "samsung,exynos3250-tmu", },
-> +	{ .compatible = "samsung,exynos4210-tmu", },
-> +	{ .compatible = "samsung,exynos4412-tmu", },
-> +	{ .compatible = "samsung,exynos5250-tmu", },
-> +	{ .compatible = "samsung,exynos5260-tmu", },
-> +	{ .compatible = "samsung,exynos5420-tmu", },
-> +	{ .compatible = "samsung,exynos5420-tmu-ext-triminfo", },
-> +	{ .compatible = "samsung,exynos5440-tmu", },
-> +	{ .compatible = "samsung,exynos7-tmu", },
-> +	{ /* sentinel */ },
->  };
->  MODULE_DEVICE_TABLE(of, exynos_tmu_match);
->  
+> This is why I've said (in the parent thread) that I'm not happy to
+> apply this patch.  Mark Rutland has indicated that he has MCPM cases
+> where the CPUs which can be disabled changes dynamically according
+> to the secure firmware requirements, and ripping out todays
+> infrastructure in light of that, only to have to add it back again
+> later makes no sense.
 
-Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+To clarify, PSCI and MCPM are unrelated. It was originally conceived
+that MCPM would use PSCI as a backend, but it turns out that they're
+effectively mutually exclusive, and are handled separately. I still want
+to add support for MIGRATE in the PSCI client code, but this is
+independent of MCPM.
 
-Thanks for clean up!
+In some cases it's possible to determine at boot time that a CPU cannot
+be hotplugged (e.g. in PSCI if the TOS is non-migrateable), so having
+separate hooks for determining that static and dynamic ability to
+hotplug a CPU sounds reasonable to me.
 
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Thanks,
+Mark.
