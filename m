@@ -1,108 +1,111 @@
-From: wuyun.wu@huawei.com (Yun Wu (Abel))
-Date: Mon, 16 Feb 2015 22:57:39 +0800
-Subject: [PATCH v2 6/6] irqchip: gicv3: skip ITS init when no ITS available
-In-Reply-To: <54E1C0D7.7000708@arm.com>
-References: <1423992723-5028-1-git-send-email-wuyun.wu@huawei.com>
- <1423992723-5028-7-git-send-email-wuyun.wu@huawei.com>
- <54E1C0D7.7000708@arm.com>
-Message-ID: <54E20563.2040104@huawei.com>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Mon, 16 Feb 2015 16:06:33 +0100
+Subject: [PATCH 1/3] thermal: exynos: Fix NULL pointer exception during
+ kernel booting
+In-Reply-To: <1424096414-4327-2-git-send-email-cw00.choi@samsung.com>
+References: <1424096414-4327-1-git-send-email-cw00.choi@samsung.com>
+ <1424096414-4327-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <20150216160633.29eac148@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Murzin,
-On 2015/2/16 18:05, Vladimir Murzin wrote:
+Hi Chanwoo,
 
-> Hi Yun,
+> This patch fixes the NULL pointer exception during kernel booting.
+> The thermal_zone _of_sensor_register() registers a sensor to DT
+> thermal zone and then read the current temperature by '.get_temp'
+> callback. The callback function of exynos thermal driver is
+> exynos_get_temp() which must need the 'pdata' instance of exynos_tmu
+> _platform_data structure.
+> - exynos_get_temp() -> code_to_temp() -> Must need the 'pdata'
+> instance
 > 
-> On 15/02/15 09:32, Yun Wu wrote:
->> There is one more condition that needs to be considered when judging
->> whether LPI feature is enabled or not, which is whether there is any
->> ITS available and correctly enabled.
->>
->> This patch will fix this by caching ITS enabling status in the GIC
->> chip data structure.
-> 
-> I posted patch for that before [1] and it landed in Marc's tree
-> (irq/gic-fixes). It is not clear from the commit message what the "one
-> more condition" is, but I guess it is the same dts stuff. Do you see
-> issue without your patch applied?
+> But, exynos thermal driver is executed before getting the 'pdata'
+> instance. To avoid the kernel panic, have to get the platform data by
+> executing the exynos_map_dt_data() before calling
+> thermal_zone_of_sensor_register() .
 
-Oh yes, your patch perfectly solved this problem, so this one is no longer
-needed. And sorry for not noticing your patch. :)
+I've already prepared patch for this (unfortunately it isn't yet
+applied to mainline):
 
-Thanks,
-	Abel
+"[PATCH] thermal: exynos: fix: Check if data->tmu_read callback is
+present before read"
+
+http://www.spinics.net/lists/linux-samsung-soc/msg42245.html
+
+Does applying this patch help?
+
+BTW: How can I reproduce this error? Could you point me the SHA1 and
+repository?
 
 > 
-> [1]
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314752.html
+> - kernel panic log
+> [ 4211.324346] PC is at 0x0
+> [ 4211.326867] LR is at exynos_get_temp+0x3c/0xe4
+> [ 4211.331289] pc : [<0000000000000000>] lr : [<ffffffc0004df460>]
+> [snip]
+> [ 4211.940625] [<          (null)>]           (null)
+> [ 4211.945315] [<ffffffc0004de6d8>] of_thermal_get_temp+0x1c/0x30
+> [ 4211.951132] [<ffffffc0004db86c>] thermal_zone_get_temp+0x48/0x7c
+> [ 4211.957118] [<ffffffc0004dd278>]
+> thermal_zone_device_update+0x20/0x110 [ 4211.963627]
+> [<ffffffc0004de9c8>] of_thermal_set_mode+0x44/0x68 [ 4211.969443]
+> [<ffffffc0004decb8>] thermal_zone_of_sensor_register+0x15c/0x1d8
+> [ 4211.976475] [<ffffffc0004dfbe4>] exynos_tmu_probe+0x6c/0x814
+> [ 4211.982120] [<ffffffc0003ef808>] platform_drv_probe+0x48/0xb8
+> [ 4211.987846] [<ffffffc0003edb28>] driver_probe_device+0x8c/0x244
+> [ 4211.993747] [<ffffffc0003eddcc>] __driver_attach+0x98/0xa0
+> [ 4211.999216] [<ffffffc0003ebea0>] bus_for_each_dev+0x54/0x98
+> [ 4212.004771] [<ffffffc0003ed66c>] driver_attach+0x1c/0x28
+> [ 4212.010066] [<ffffffc0003ed2e8>] bus_add_driver+0x150/0x208
+> [ 4212.015622] [<ffffffc0003ee6a4>] driver_register+0x5c/0x11c
+> [ 4212.021178] [<ffffffc0003ef73c>]
+> __platform_driver_register+0x5c/0x68 [ 4212.027600]
+> [<ffffffc000b64eb8>] exynos_tmu_driver_init+0x14/0x20 [ 4212.033678]
+> [<ffffffc0000828d4>] do_one_initcall+0x88/0x1a0 [ 4212.039235]
+> [<ffffffc000b34b34>] kernel_init_freeable+0x1bc/0x260 [ 4212.045311]
+> [<ffffffc0007e9fd4>] kernel_init+0xc/0xd8
 > 
-> Thanks
-> Vladimir
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Eduardo Valentin <edubezval@gmail.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  drivers/thermal/samsung/exynos_tmu.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
 > 
->>
->> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
->> ---
->>  drivers/irqchip/irq-gic-v3.c | 18 +++++++++---------
->>  1 file changed, 9 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->> index 1a146cc..e17faca 100644
->> --- a/drivers/irqchip/irq-gic-v3.c
->> +++ b/drivers/irqchip/irq-gic-v3.c
->> @@ -47,6 +47,7 @@ struct gic_chip_data {
->>  	u64			redist_stride;
->>  	u32			nr_redist_regions;
->>  	unsigned int		irq_nr;
->> +	int			lpi_enabled;
->>  };
->>
->>  static struct gic_chip_data gic_data __read_mostly;
->> @@ -390,11 +391,6 @@ static void gic_cpu_sys_reg_init(void)
->>  	gic_write_grpen1(1);
->>  }
->>
->> -static int gic_dist_supports_lpis(void)
->> -{
->> -	return !!(readl_relaxed(gic_data.dist_base + GICD_TYPER) & GICD_TYPER_LPIS);
->> -}
->> -
->>  static void gic_cpu_init(void)
->>  {
->>  	void __iomem *rbase;
->> @@ -410,7 +406,7 @@ static void gic_cpu_init(void)
->>  	gic_cpu_config(rbase, gic_redist_wait_for_rwp);
->>
->>  	/* Give LPIs a spin */
->> -	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
->> +	if (gic_data.lpi_enabled)
->>  		its_cpu_init();
->>
->>  	/* initialise system registers */
->> @@ -629,7 +625,7 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
->>  	}
->>  	/* LPIs */
->>  	if (hw >= 8192 && hw < GIC_ID_NR) {
->> -		if (!gic_dist_supports_lpis())
->> +		if (!gic_data.lpi_enabled)
->>  			return -EPERM;
->>  		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
->>  				    handle_fasteoi_irq, NULL, NULL);
->> @@ -785,8 +781,12 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
->>
->>  	set_handle_irq(gic_handle_irq);
->>
->> -	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
->> -		its_init(node, &gic_data.rdists, gic_data.domain);
->> +	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) &&
->> +	    !!(readl_relaxed(dist_base + GICD_TYPER) & GICD_TYPER_LPIS) &&
->> +	    !its_init(node, &gic_data.rdists, gic_data.domain))
->> +		gic_data.lpi_enabled = 1;
->> +	else
->> +		gic_data.lpi_enabled = 0;
->>
->>  	gic_smp_init();
->>  	gic_dist_init();
->> --
->> 1.8.0
->>
+> diff --git a/drivers/thermal/samsung/exynos_tmu.c
+> b/drivers/thermal/samsung/exynos_tmu.c index fbeedc0..b8846f1 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.c
+> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> @@ -1147,17 +1147,17 @@ static int exynos_tmu_probe(struct
+> platform_device *pdev) platform_set_drvdata(pdev, data);
+>  	mutex_init(&data->lock);
+>  
+> +	ret = exynos_map_dt_data(pdev);
+> +	if (ret)
+> +		return ret;
+> +	pdata = data->pdata;
+> +
+>  	data->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0,
+> data, &exynos_sensor_ops);
+>  	if (IS_ERR(data->tzd)) {
+>  		pr_err("thermal: tz: %p ERROR\n", data->tzd);
+>  		return PTR_ERR(data->tzd);
+>  	}
+> -	ret = exynos_map_dt_data(pdev);
+> -	if (ret)
+> -		goto err_sensor;
+> -
+> -	pdata = data->pdata;
+>  
+>  	INIT_WORK(&data->irq_work, exynos_tmu_work);
+>  
+
+
+
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
