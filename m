@@ -1,51 +1,17 @@
-From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Tue, 17 Feb 2015 05:37:54 +0800
-Subject: [PATCH 1/1] ARM: coresignth: fix system halt when etm enable and add
- nosmp to command line
-Message-ID: <1424122674-21361-1-git-send-email-Frank.Li@freescale.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 17 Feb 2015 01:53:57 +0300
+Subject: [PATCH 0/2] Add R8A7794/SILK board eMMC DT support
+Message-ID: <2215524.TTIERu0tyd@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
+Hello.
 
-when nosmp set, only 1 core enabled. try to access disable core will halt.
-dts need added arm,primecell-periphid =  <id> for none-boot core
-otherwise amba_device_add will halt when read peripheral id.
+   Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-20150215-v3.19' tag. Here we add the eMMC device tree support
+for the R8A7794-based SILK board. It depends on the  order to work.
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
----
- drivers/coresight/coresight-etm3x.c | 4 ++++
- drivers/coresight/of_coresight.c    | 3 +--
- 2 files changed, 5 insertions(+), 2 deletions(-)
+[1/2] ARM: shmobile: r8a7794: add MMCIF DT support
+[2/2] ARM: shmobile: silk: add eMMC DT support
 
-diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/coresight/coresight-etm3x.c
-index 73c3669..d312952 100644
---- a/drivers/coresight/coresight-etm3x.c
-+++ b/drivers/coresight/coresight-etm3x.c
-@@ -1829,6 +1829,10 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
- 		return ret;
- 
- 	drvdata->cpu = pdata ? pdata->cpu : 0;
-+	if (drvdata->cpu < 0) {
-+		ret = -EINVAL;
-+		goto err_arch_supported;
-+	}
- 
- 	get_online_cpus();
- 	etmdrvdata[drvdata->cpu] = drvdata;
-diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
-index c3efa41..6804bbd 100644
---- a/drivers/coresight/of_coresight.c
-+++ b/drivers/coresight/of_coresight.c
-@@ -196,8 +196,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
- 		if (cell) {
- 			hwid = of_read_number(cell, of_n_addr_cells(dn));
- 			index = get_logical_index(hwid);
--			if (index != -EINVAL)
--				pdata->cpu = index;
-+			pdata->cpu = index;
- 		}
- 	}
- 
--- 
-1.9.1
+WBR, Sergei
