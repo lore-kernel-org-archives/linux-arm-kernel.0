@@ -1,71 +1,29 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 16 Feb 2015 23:20:14 +0900
-Subject: [PATCH 3/3] thermal: exynos: Clean-up code to use oneline entry for
- exynos compatible table
-In-Reply-To: <1424096414-4327-1-git-send-email-cw00.choi@samsung.com>
-References: <1424096414-4327-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1424096414-4327-4-git-send-email-cw00.choi@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 16 Feb 2015 14:38:17 +0000
+Subject: [PATCH 2/3] ARM: sunxi: Add register bit definitions for SRAM
+ mapping syscon
+In-Reply-To: <1422200959-1717-3-git-send-email-jenskuske@gmail.com>
+References: <1422200959-1717-1-git-send-email-jenskuske@gmail.com>
+ <1422200959-1717-3-git-send-email-jenskuske@gmail.com>
+Message-ID: <20150216143817.GO14545@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch cleanup the code to use oneline for entry of exynos compatible
-table.
+On Sun, 25 Jan 2015, Jens Kuske wrote:
 
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Eduardo Valentin <edubezval@gmail.com>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
----
- drivers/thermal/samsung/exynos_tmu.c | 38 ++++++++++--------------------------
- 1 file changed, 10 insertions(+), 28 deletions(-)
+> From: Chen-Yu Tsai <wens@csie.org>
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+> ---
+>  include/linux/mfd/syscon/sun4i-sc.h | 42 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+>  create mode 100644 include/linux/mfd/syscon/sun4i-sc.h
 
-diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index b199fff..7e6baf5 100644
---- a/drivers/thermal/samsung/exynos_tmu.c
-+++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -919,34 +919,16 @@ static irqreturn_t exynos_tmu_irq(int irq, void *id)
- }
- 
- static const struct of_device_id exynos_tmu_match[] = {
--	{
--		.compatible = "samsung,exynos3250-tmu",
--	},
--	{
--		.compatible = "samsung,exynos4210-tmu",
--	},
--	{
--		.compatible = "samsung,exynos4412-tmu",
--	},
--	{
--		.compatible = "samsung,exynos5250-tmu",
--	},
--	{
--		.compatible = "samsung,exynos5260-tmu",
--	},
--	{
--		.compatible = "samsung,exynos5420-tmu",
--	},
--	{
--		.compatible = "samsung,exynos5420-tmu-ext-triminfo",
--	},
--	{
--		.compatible = "samsung,exynos5440-tmu",
--	},
--	{
--		.compatible = "samsung,exynos7-tmu",
--	},
--	{},
-+	{ .compatible = "samsung,exynos3250-tmu", },
-+	{ .compatible = "samsung,exynos4210-tmu", },
-+	{ .compatible = "samsung,exynos4412-tmu", },
-+	{ .compatible = "samsung,exynos5250-tmu", },
-+	{ .compatible = "samsung,exynos5260-tmu", },
-+	{ .compatible = "samsung,exynos5420-tmu", },
-+	{ .compatible = "samsung,exynos5420-tmu-ext-triminfo", },
-+	{ .compatible = "samsung,exynos5440-tmu", },
-+	{ .compatible = "samsung,exynos7-tmu", },
-+	{ /* sentinel */ },
- };
- MODULE_DEVICE_TABLE(of, exynos_tmu_match);
- 
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
 -- 
-1.8.5.5
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
