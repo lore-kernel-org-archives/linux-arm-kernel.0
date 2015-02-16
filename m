@@ -1,93 +1,105 @@
-From: gwenhael.goavec-merou@armadeus.com (gwenhael.goavec)
-Date: Mon, 16 Feb 2015 10:59:59 +0100
-Subject: [PATCH 4/5] ARM: dts: imx28-apf28dev: add support for can0
-In-Reply-To: <20150213175936.7dcecb8b@ipc1.ka-ro>
-References: <1423836725-86061-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <1423836725-86061-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <1423836725-86061-3-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <1423836725-86061-4-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <20150213155358.12678942@ipc1.ka-ro>
- <20150213163131.23cbffb5@x230.trabucayre.com>
- <20150213175936.7dcecb8b@ipc1.ka-ro>
-Message-ID: <20150216105959.305aadd0@x230.trabucayre.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 16 Feb 2015 10:05:11 +0000
+Subject: [PATCH v2 6/6] irqchip: gicv3: skip ITS init when no ITS available
+In-Reply-To: <1423992723-5028-7-git-send-email-wuyun.wu@huawei.com>
+References: <1423992723-5028-1-git-send-email-wuyun.wu@huawei.com>
+ <1423992723-5028-7-git-send-email-wuyun.wu@huawei.com>
+Message-ID: <54E1C0D7.7000708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Yun,
 
-On Fri, 13 Feb 2015 17:59:36 +0100
-Lothar Wa?mann <LW@KARO-electronics.de> wrote:
+On 15/02/15 09:32, Yun Wu wrote:
+> There is one more condition that needs to be considered when judging
+> whether LPI feature is enabled or not, which is whether there is any
+> ITS available and correctly enabled.
+> 
+> This patch will fix this by caching ITS enabling status in the GIC
+> chip data structure.
 
-> Hi,
-> 
-> gwenhael.goavec wrote:
-> > Hi,
-> > 
-> > On Fri, 13 Feb 2015 15:53:58 +0100
-> > Lothar Wa?mann <LW@KARO-electronics.de> wrote:
-> > 
-> > > Hi,
-> > > 
-> > > Gwenhael Goavec-Merou wrote:
-> > > > Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> > > > Signed-off-by: Sebastien Szymanski <sebastien.szymanski@armadeus.com>
-> > > > ---
-> > > >  arch/arm/boot/dts/imx28-apf28dev.dts | 15 +++++++++++++++
-> > > >  1 file changed, 15 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
-> > > > index 68405c3..a052d3e 100644
-> > > > --- a/arch/arm/boot/dts/imx28-apf28dev.dts
-> > > > +++ b/arch/arm/boot/dts/imx28-apf28dev.dts
-> > > > @@ -110,6 +110,13 @@
-> > > >  					};
-> > > >  				};
-> > > >  			};
-> > > > +
-> > > > +			can0: can at 80032000 {
-> > > >
-> > > Did you compile-test this? It should produce a build error, since
-> > > the label can0 already exists in imx28.dtsi.
-> > Compile fine and without error. It's the same thing for all labels in 
-> > this dts file.
-> > > You should use:
-> > > |&can0 {
-> > > |				pinctrl-names = "default";
-> > > |				pinctrl-0 = <&can0_pins_a>;
-> > > |				xceiver-supply = <&reg_can0_vcc>;
-> > > |				status = "okay";
-> > > |};
-> >
-> I also noticed now, that defining a label for the same node twice is OK
-> with the dtc-compiler.
-> But you could simplify your dts files and make them more readable by
-> referencing the existing labels (like all the other platforms do)
-> rather than reproducing the whole tree structrure in your files.
-> 
-> Thus instead of:
-> |	apb at 80000000 {
-> |		apbh at 80000000 {
-> |			gpmi-nand at 8000c000 {
-> [...]
-> |		};
-> |
-> |		apbx at 80040000 {
-> |			duart: serial at 80074000 {
-> [...]
-> 
-> you would only have:
-> |&duart {
-> 	[...]
-> |};
-> |
-> |&gpmi {
-> |	[...]
-> |};
-> in your dts files.
-> Sorting the labels alphabetically additionally helps readability.
-> 
-Yes it's possible but, according to [1], this change does not seem desirable.
+I posted patch for that before [1] and it landed in Marc's tree
+(irq/gic-fixes). It is not clear from the commit message what the "one
+more condition" is, but I guess it is the same dts stuff. Do you see
+issue without your patch applied?
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/255375.html
+[1]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314752.html
 
-Gwenhael Goavec-Merou
+Thanks
+Vladimir
+
+> 
+> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
+> ---
+>  drivers/irqchip/irq-gic-v3.c | 18 +++++++++---------
+>  1 file changed, 9 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index 1a146cc..e17faca 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -47,6 +47,7 @@ struct gic_chip_data {
+>  	u64			redist_stride;
+>  	u32			nr_redist_regions;
+>  	unsigned int		irq_nr;
+> +	int			lpi_enabled;
+>  };
+> 
+>  static struct gic_chip_data gic_data __read_mostly;
+> @@ -390,11 +391,6 @@ static void gic_cpu_sys_reg_init(void)
+>  	gic_write_grpen1(1);
+>  }
+> 
+> -static int gic_dist_supports_lpis(void)
+> -{
+> -	return !!(readl_relaxed(gic_data.dist_base + GICD_TYPER) & GICD_TYPER_LPIS);
+> -}
+> -
+>  static void gic_cpu_init(void)
+>  {
+>  	void __iomem *rbase;
+> @@ -410,7 +406,7 @@ static void gic_cpu_init(void)
+>  	gic_cpu_config(rbase, gic_redist_wait_for_rwp);
+> 
+>  	/* Give LPIs a spin */
+> -	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
+> +	if (gic_data.lpi_enabled)
+>  		its_cpu_init();
+> 
+>  	/* initialise system registers */
+> @@ -629,7 +625,7 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>  	}
+>  	/* LPIs */
+>  	if (hw >= 8192 && hw < GIC_ID_NR) {
+> -		if (!gic_dist_supports_lpis())
+> +		if (!gic_data.lpi_enabled)
+>  			return -EPERM;
+>  		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
+>  				    handle_fasteoi_irq, NULL, NULL);
+> @@ -785,8 +781,12 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+> 
+>  	set_handle_irq(gic_handle_irq);
+> 
+> -	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
+> -		its_init(node, &gic_data.rdists, gic_data.domain);
+> +	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) &&
+> +	    !!(readl_relaxed(dist_base + GICD_TYPER) & GICD_TYPER_LPIS) &&
+> +	    !its_init(node, &gic_data.rdists, gic_data.domain))
+> +		gic_data.lpi_enabled = 1;
+> +	else
+> +		gic_data.lpi_enabled = 0;
+> 
+>  	gic_smp_init();
+>  	gic_dist_init();
+> --
+> 1.8.0
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
