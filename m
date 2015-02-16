@@ -1,80 +1,93 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 16 Feb 2015 10:57:48 +0100
-Subject: n900 audio: any ideas how to get headset speaker to work?
-In-Reply-To: <CAK7bGn+NH9BOB25+dhNZXFxY_fD8TeoWvuSpTD-4cg-zU5dOmA@mail.gmail.com>
-References: <20150215102152.GA23736@amd>
- <CAK7bGn+NH9BOB25+dhNZXFxY_fD8TeoWvuSpTD-4cg-zU5dOmA@mail.gmail.com>
-Message-ID: <20150216095748.GA25918@amd>
+From: gwenhael.goavec-merou@armadeus.com (gwenhael.goavec)
+Date: Mon, 16 Feb 2015 10:59:59 +0100
+Subject: [PATCH 4/5] ARM: dts: imx28-apf28dev: add support for can0
+In-Reply-To: <20150213175936.7dcecb8b@ipc1.ka-ro>
+References: <1423836725-86061-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+ <1423836725-86061-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
+ <1423836725-86061-3-git-send-email-gwenhael.goavec-merou@armadeus.com>
+ <1423836725-86061-4-git-send-email-gwenhael.goavec-merou@armadeus.com>
+ <20150213155358.12678942@ipc1.ka-ro>
+ <20150213163131.23cbffb5@x230.trabucayre.com>
+ <20150213175936.7dcecb8b@ipc1.ka-ro>
+Message-ID: <20150216105959.305aadd0@x230.trabucayre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ahoj!
+Hi,
 
-> > By default, output goes to loudspeaker (top right relative to
-> > keyboard). Any ideas how to switch it to the speaker on the left or
-> > wired headset? Because I suspect that echo cancelation is not going to
-> > be simple...
-> >                                                                         Pavel
-> > --
-> > (english) http://www.livejournal.com/~pavelmachek
-> > (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
-> 
+On Fri, 13 Feb 2015 17:59:36 +0100
+Lothar Wa?mann <LW@KARO-electronics.de> wrote:
+
 > Hi,
-> in case of direct alsa output (not PA), setup is pretty complex.
-> Headphones referenced as line. All audio outputs are differential.
-> Here are controls that affects volumes...
-
-Aha, thanks for nice explanation. Now it starts to make sense... I got
-headset connected to 3.5" jack to work.
-
-Now, I guess I'd like the internal speaker on the left to work,
-too... Aha, so n900 has two stereo "loud" speakers on the keyboard
-part, plus extra speaker on the left display part for communication?
-
-I got the two stereo ones to work now.
-
-Any idea what is the last speaker on display is called? HPCOM? Mono?
-
-> global:
->  PCM (volume)
->  left/right DAC mux (below)
->       -- DAC_L1/R1 passes sound to loudspeakers, line, (maybe others)
->       -- DAC_L2/R2 passes sound to loudspeakers, NOT line, (maybe others)
->       -- DAC_L3/R3 passes sound to NOT loudspeakers, line, (maybe others)
->       if DAC_L1/R1 is chosen, you can hear lower volume on both
-> outputs in compare to dedicated outputs (DAC_L2/R2, DAC_L3/R3),
-> probabbly due to higher load of ADC
 > 
+> gwenhael.goavec wrote:
+> > Hi,
+> > 
+> > On Fri, 13 Feb 2015 15:53:58 +0100
+> > Lothar Wa?mann <LW@KARO-electronics.de> wrote:
+> > 
+> > > Hi,
+> > > 
+> > > Gwenhael Goavec-Merou wrote:
+> > > > Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+> > > > Signed-off-by: Sebastien Szymanski <sebastien.szymanski@armadeus.com>
+> > > > ---
+> > > >  arch/arm/boot/dts/imx28-apf28dev.dts | 15 +++++++++++++++
+> > > >  1 file changed, 15 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
+> > > > index 68405c3..a052d3e 100644
+> > > > --- a/arch/arm/boot/dts/imx28-apf28dev.dts
+> > > > +++ b/arch/arm/boot/dts/imx28-apf28dev.dts
+> > > > @@ -110,6 +110,13 @@
+> > > >  					};
+> > > >  				};
+> > > >  			};
+> > > > +
+> > > > +			can0: can at 80032000 {
+> > > >
+> > > Did you compile-test this? It should produce a build error, since
+> > > the label can0 already exists in imx28.dtsi.
+> > Compile fine and without error. It's the same thing for all labels in 
+> > this dts file.
+> > > You should use:
+> > > |&can0 {
+> > > |				pinctrl-names = "default";
+> > > |				pinctrl-0 = <&can0_pins_a>;
+> > > |				xceiver-supply = <&reg_can0_vcc>;
+> > > |				status = "okay";
+> > > |};
+> >
+> I also noticed now, that defining a label for the same node twice is OK
+> with the dtc-compiler.
+> But you could simplify your dts files and make them more readable by
+> referencing the existing labels (like all the other platforms do)
+> rather than reproducing the whole tree structrure in your files.
 > 
-> loudspeakers:
->  Speaker function (on)
->  HP (unmute)
->  HP DAC (volume)
->  left HP Mixer DACL1 (below)
->  right HP Mixer DACR1 (below)
->    --unmute theese two,  this will pass left channel sound to left
-> channel output and vice versa
->  left HP Mixer DACR1 (below)
->  right HP Mixer DACL1 (below)
->   --mute these two, this controls channel crosstalk ( amount of left
-> channel sound going to right channel output and vice versa)
+> Thus instead of:
+> |	apb at 80000000 {
+> |		apbh at 80000000 {
+> |			gpmi-nand at 8000c000 {
+> [...]
+> |		};
+> |
+> |		apbx at 80040000 {
+> |			duart: serial at 80074000 {
+> [...]
 > 
-> line:
->  line (unmute)
->  line DAC (volume)
->  jack function (headphone)
->  TPA6130A2 Headphone (volume)
->  left Line Mixer DACL1 (below)
->  right Line Mixer DACR1 (below)
->    --unmute theese two,  this will pass left channel sound to left
-> channel output and vice versa
->  left Line Mixer DACR1 (below)
->  right Line Mixer DACL1 (below)
->   --mute these two, this controls channel crosstalk ( amount of left
-> channel sound going to right channel output and vice versa)
+> you would only have:
+> |&duart {
+> 	[...]
+> |};
+> |
+> |&gpmi {
+> |	[...]
+> |};
+> in your dts files.
+> Sorting the labels alphabetically additionally helps readability.
+> 
+Yes it's possible but, according to [1], this change does not seem desirable.
 
-Thanks a lot!
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/255375.html
+
+Gwenhael Goavec-Merou
