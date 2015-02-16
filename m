@@ -1,89 +1,35 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 16 Feb 2015 17:28:02 +0100
-Subject: [PATCH 1/3] thermal: exynos: Fix NULL pointer exception during
- kernel booting
-In-Reply-To: <CAGTfZH3tESLb3V7PNpiy-nwi+cCVq6DHxkU6+gJU-MZhNqDBzg@mail.gmail.com>
-References: <1424096414-4327-1-git-send-email-cw00.choi@samsung.com>
- <1424096414-4327-2-git-send-email-cw00.choi@samsung.com>
- <20150216160633.29eac148@amdc2363>
- <CAGTfZH3tESLb3V7PNpiy-nwi+cCVq6DHxkU6+gJU-MZhNqDBzg@mail.gmail.com>
-Message-ID: <20150216172802.414525a9@amdc2363>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 16 Feb 2015 17:30:24 +0100
+Subject: [PATCH 4/8] ARM: dove: create a proper PMU driver for power
+ domains, PMU IRQs and resets
+In-Reply-To: <20150216155823.GO8656@n2100.arm.linux.org.uk>
+References: <20150214152659.GI8656@n2100.arm.linux.org.uk>
+ <E1YMedG-00054d-0d@rmk-PC.arm.linux.org.uk> <54DF7F93.3040009@gmail.com>
+ <20150216155823.GO8656@n2100.arm.linux.org.uk>
+Message-ID: <54E21B20.10700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+On 16.02.2015 16:58, Russell King - ARM Linux wrote:
+> On Sat, Feb 14, 2015 at 06:02:11PM +0100, Sebastian Hesselbarth wrote:
+>> How about we copy the clk subsystem way of installing early probed
+>> pm for DT here?
+>>
+>> For example:
+>>
+>> #define PM_OF_DECLARE(name, compat, fn) OF_DECLARE_1(clk, name, compat, fn)
+>>
+>> and
+>>
+>> static int __init dove_pmu_init(struct device_node *np) { ... }
+>> PM_OF_DECLARE(dove_pmu, "marvell,dove-pmu", dove_init_pmu);
+>
+> Well, Rob's response was basically "use the machine descriptor" so I
+> guess it needs to be explicitly called from
+> arch/arm/mach-mvebu/dove.c:dove_init().
 
-> Hi Lukasz,
-> 
-> On Tue, Feb 17, 2015 at 12:06 AM, Lukasz Majewski
-> <l.majewski@samsung.com> wrote:
-> > Hi Chanwoo,
-> >
-> >> This patch fixes the NULL pointer exception during kernel booting.
-> >> The thermal_zone _of_sensor_register() registers a sensor to DT
-> >> thermal zone and then read the current temperature by '.get_temp'
-> >> callback. The callback function of exynos thermal driver is
-> >> exynos_get_temp() which must need the 'pdata' instance of
-> >> exynos_tmu _platform_data structure.
-> >> - exynos_get_temp() -> code_to_temp() -> Must need the 'pdata'
-> >> instance
-> >>
-> >> But, exynos thermal driver is executed before getting the 'pdata'
-> >> instance. To avoid the kernel panic, have to get the platform data
-> >> by executing the exynos_map_dt_data() before calling
-> >> thermal_zone_of_sensor_register() .
-> >
-> > I've already prepared patch for this (unfortunately it isn't yet
-> > applied to mainline):
-> >
-> > "[PATCH] thermal: exynos: fix: Check if data->tmu_read callback is
-> > present before read"
-> >
-> > http://www.spinics.net/lists/linux-samsung-soc/msg42245.html
-> 
-> There is different issue between you patch and this patch.
-> Your patch check the whether data->tmu_read is NULL or not.
-> But, my patch check the pdata is NULL or not.
+Ok, I am very fine with that, too.
 
-I've tried to do the same previously. Please compare with:
-[PATCH 1/2] thermal: exynos: Reorder exynos_map_dt_data() function
+Still, we'd have to find a proper place for the driver, don't we?
 
-http://www.spinics.net/lists/linux-samsung-soc/msg41308.html
-
-Unfortunately, Abhilash found some issues with this code, so I've
-looked into different solution.
-
-
-However, I didn't need to move pdata = data->pdata; Hence, I wonder why
-it need to be reordered. Are you using Exynos3250 based device?
-
-
-> 
-> >
-> > Does applying this patch help?
-> >
-> > BTW: How can I reproduce this error? Could you point me the SHA1 and
-> > repository?
-> 
-> I used your patch-set of linux-soc-thermal.git (branch: next). So I
-> applied you patchiest on Linux 3.19 for test.
-> -
-> https://git.kernel.org/cgit/linux/kernel/git/evalenti/linux-soc-thermal.git/log/?h=next
-
-Is there any special .config?
-
-May I ask about the target platform?
-I will look closely on this problem tomorrow.
-
-> 
-> Best Regards,
-> Chanwoo Choi
-
-
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Sebastian
