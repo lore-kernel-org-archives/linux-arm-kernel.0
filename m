@@ -1,38 +1,36 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Mon, 16 Feb 2015 15:11:57 +0100
-Subject: [PATCHv6 2/2] leds: tlc591xx: Driver for the TI 8/16 Channel i2c
- LED driver
-In-Reply-To: <1422367161-16487-3-git-send-email-andrew@lunn.ch>
-References: <1422367161-16487-1-git-send-email-andrew@lunn.ch>
- <1422367161-16487-3-git-send-email-andrew@lunn.ch>
-Message-ID: <op.xt5lp7ix2s3iss@ecaz>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Mon, 16 Feb 2015 15:16:46 +0100
+Subject: [PATCH 08/11] ARM: ixp4xx: fix {in,out}s{bwl} data types
+In-Reply-To: <1423770163-583064-9-git-send-email-arnd@arndb.de> (Arnd
+ Bergmann's message of "Thu, 12 Feb 2015 20:42:40 +0100")
+References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
+ <1423770163-583064-9-git-send-email-arnd@arndb.de>
+Message-ID: <m3fva6vt4h.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Arnd Bergmann <arnd@arndb.de> writes:
 
-On Tue, 27 Jan 2015 14:59:21 +0100, Andrew Lunn <andrew@lunn.ch> wrote:
-
-> The TLC59116 is an I2C bus controlled 16-channel LED driver.  The
-> TLC59108 is an I2C bus controlled 8-channel LED driver, which is very
-> similar to the TLC59116. Each LED output has its own 8-bit
-> fixed-frequency PWM controller to control the brightness of the LED.
-> The LEDs can also be fixed off and on, making them suitable for use as
-> GPOs.
+> Most platforms use void pointer arguments in these functions, but
+> ixp4xx does not, which triggers lots of warnings in device drivers like:
 >
-> This is based on a driver from Belkin, but has been extensively
-> rewritten and extended to support both 08 and 16 versions.
+> net/ethernet/8390/ne2k-pci.c: In function 'ne2k_pci_get_8390_hdr':
+> net/ethernet/8390/ne2k-pci.c:503:3: warning: passing argument 2 of 'insw' from incompatible pointer type
+>    insw(NE_BASE + NE_DATAPORT, hdr, sizeof(struct e8390_pkt_hdr)>>1);
+>    ^
+> In file included from include/asm/io.h:214:0,
+>                  from /git/arm-soc/include/linux/io.h:22,
+>                  from /git/arm-soc/include/linux/pci.h:31,
+>                  from net/ethernet/8390/ne2k-pci.c:48:
+> mach-ixp4xx/include/mach/io.h:316:91: note: expected 'u16 *' but argument is of type 'struct e8390_pkt_hdr *'
+>  static inline void insw(u32 io_addr, u16 *vaddr, u32 count)
 >
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Cc: Matthew.Fatheree at belkin.com
+> Fixing the drivers seems hopeless, so this changes the ixp4xx code
+> to do the same as the others to avoid the warnings.
 
-I've tested the driver on the Mamba (WRT1900AC) and it has been integrated  
-to OpenWrt trunk for a while now, and no issues has been reported by the  
-community either.
+Acked-by: Krzysztof Halasa <khalasa@piap.pl>
+-- 
+Krzysztof Halasa
 
-Please feel free to add Tested-by: Imre Kaloz <kaloz@openwrt.org>.
-
-
-Thanks,
-
-Imre
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
