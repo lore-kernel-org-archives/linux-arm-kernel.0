@@ -1,68 +1,43 @@
-From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
-Date: Mon, 16 Feb 2015 00:59:18 +0100
-Subject: [PATCH 06/14] drivers: reset: Add STM32 reset driver
-In-Reply-To: <1423763164-5606-7-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1423763164-5606-7-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <54E132D6.6010608@suse.de>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Mon, 16 Feb 2015 00:01:15 +0000
+Subject: [PATCH/RFC] ARM: shmobile: lager: Fix audio clk master to SSI and
+ change audio data interface format type
+In-Reply-To: <20150215152957.GA25065@verge.net.au>
+References: <1424011746-3787-1-git-send-email-ykaneko0929@gmail.com>
+ <20150215152957.GA25065@verge.net.au>
+Message-ID: <87fva6n2pb.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 12.02.2015 um 18:45 schrieb Maxime Coquelin:
-> The STM32 MCUs family IP can be reset by accessing some shared registers.
-> 
-> The specificity is that some reset lines are used by the timers.
-> At timer initialization time, the timer has to be reset, that's why
-> we cannot use a regular driver.
-> 
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> ---
->  .../devicetree/bindings/reset/st,stm32-reset.txt   |  19 ++++
->  drivers/reset/Makefile                             |   1 +
->  drivers/reset/reset-stm32.c                        | 124 +++++++++++++++++++++
->  3 files changed, 144 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-reset.txt
->  create mode 100644 drivers/reset/reset-stm32.c
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/st,stm32-reset.txt b/Documentation/devicetree/bindings/reset/st,stm32-reset.txt
-> new file mode 100644
-> index 0000000..add1298
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reset/st,stm32-reset.txt
-> @@ -0,0 +1,19 @@
-> +STMicroelectronics STM32 Peripheral Reset Controller
-> +====================================================
-> +
-> +Please also refer to reset.txt in this directory for common reset
-> +controller binding usage.
-> +
-> +Required properties:
-> +- compatible: Should be "st,stm32-reset"
-> +- reg: should be register base and length as documented in the
-> +  datasheet
-> +- #reset-cells: 1, see below
-> +
-> +example:
-> +
-> +reset_ahb1: reset at 40023810 {
-> +	#reset-cells = <1>;
-> +	compatible = "st,stm32-reset";
-> +	reg = <0x40023810 0x4>;
-> +};
-[snip]
 
-RM0090 has two different chapters on the RCC IP:
-* Reset and clock control for STM32F42xxx and STM32F43xxx (RCC)
-* Reset and clock control for STM32F405xx/07xx and STM32F415xx/17xx(RCC)
+Hi Kaneko-san, Simon
 
-I therefore feel it is wrong to use "stm32-" here; instead I used
-"st,stm32f429-rcc" (also relates to 12/14 discussion). This may apply to
-other identifiers, too.
+> >  arch/arm/boot/dts/r8a7790-lager.dts | 4 +---
+> >  1 file changed, 1 insertion(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+> > index 0c3b678..e7dda8a 100644
+> > --- a/arch/arm/boot/dts/r8a7790-lager.dts
+> > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
+> > @@ -177,9 +177,7 @@
+> >  	sound {
+> >  		compatible = "simple-audio-card";
+> >  
+> > -		simple-audio-card,format = "left_j";
+> > -		simple-audio-card,bitclock-master = <&sndcodec>;
+> > -		simple-audio-card,frame-master = <&sndcodec>;
+> > +		simple-audio-card,format = "i2s";
+> >  
+> >  		sndcpu: simple-audio-card,cpu {
+> >  			sound-dai = <&rcar_sound>;
 
-Regards,
-Andreas
+Unfortunately, I can't accept this patch.
+It will be strange sound if you change clk master to SSI (*1).
+Additionally, it needs audio_clk settings for SSI master,
+but, it needs special limitation (*1).
+(*1 HW connection reason)
+And format change left_j -> i2s is no meaning on Lager board case
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
-Graham Norton; HRB 21284 (AG N?rnberg)
+Best regards
+---
+Kuninori Morimoto
