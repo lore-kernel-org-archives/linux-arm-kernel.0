@@ -1,64 +1,118 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 16 Feb 2015 21:11:24 +0100
-Subject: [PATCH v3 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
-In-Reply-To: <1424091072-7738-2-git-send-email-maxime.ripard@free-electrons.com>
- (Maxime Ripard's message of "Mon, 16 Feb 2015 13:51:11 +0100")
-References: <1424091072-7738-1-git-send-email-maxime.ripard@free-electrons.com>
- <1424091072-7738-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <87oaotaa6r.fsf@free.fr>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 16 Feb 2015 21:24:51 +0100 (CET)
+Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
+ registers
+In-Reply-To: <CAOMZO5DJ82Yyq4Ch_kKR01-yYhjn53As7ZBt91Dd5sna9Z+wXg@mail.gmail.com>
+References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
+ <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
+ <54DA020C.6030703@i2se.com>
+ <CAOMZO5DGCP1p1vetwWHpSbe2qywA8DhWRRq22egMDFSw11uq4w@mail.gmail.com>
+ <54DA0DE7.5050708@i2se.com>
+ <CAOMZO5AtFOThRjcAgMVbrbkcrJbehouSxoH03VUGJrRdWXnS_Q@mail.gmail.com>
+ <462270270.419156.1423603473431.JavaMail.open-xchange@oxbaltgw02.schlund.de>
+ <CAOMZO5B4mxP6RBkbsbj=wC6bZJgtreoo5S_NhYuki6kW=Y=QFw@mail.gmail.com>
+ <1705379122.406018.1423686677196.JavaMail.open-xchange@oxbaltgw01.schlund.de>
+ <CAOMZO5ChJiHiUBhrRf_qqi7gTLvPp08fsfRBK+GVzvrqimKinw@mail.gmail.com>
+ <1378197784.470306.1423767540298.JavaMail.open-xchange@oxbaltgw01.schlund.de>
+ <CAOMZO5DJ82Yyq4Ch_kKR01-yYhjn53As7ZBt91Dd5sna9Z+wXg@mail.gmail.com>
+Message-ID: <235965536.675649.1424118291283.JavaMail.open-xchange@oxbaltgw06.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+Hi Fabio,
 
->  drivers/mtd/nand/pxa3xx_nand.c | 47 ++++++++++++++++++++++++++++++++++++------
->  1 file changed, 41 insertions(+), 6 deletions(-)
+> Fabio Estevam <festevam@gmail.com> hat am 12. Februar 2015 um 20:08
+> geschrieben:
 >
-> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index 96b0b1d27df1..b2d8d6960765 100644
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -480,6 +480,41 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
->  	nand_writel(info, NDCR, ndcr | int_mask);
->  }
->  
-> +static void drain_fifo(struct pxa3xx_nand_info *info, void *data, int len)
-> +{
-> +	if (info->ecc_bch) {
-> +		int index = 0;
-> +
-> +		while (index < (len * 4)) {
-> +			u32 timeout;
-> +
-> +			__raw_readsl(info->mmio_base + NDDB, data + index, 8);
-> +
-> +			/*
-> +			 * According to the datasheet, when reading
-> +			 * from NDDB with BCH enabled, after each 32
-> +			 * bytes reads, we have to make sure that the
-> +			 * NDSR.RDDREQ bit is set
-> +			 */
-> +			for (timeout = 0;
-> +			     !(nand_readl(info, NDSR) & NDSR_RDDREQ);
-> +			     timeout++) {
-> +				if (timeout >= 5) {
-> +					dev_err(&info->pdev->dev,
-> +						"Timeout on RDDREQ while draining the FIFO\n");
-> +					return;
-> +				}
-> +
-> +				mdelay(1);
-So in worst case, we'll end up with 4 times mdelay(1) times len / 32.
-For a 2048 page, it is : 256ms where everything is stuck (mdelay and not
-msleep).
+>
+> Hi Stefan,
+>
+> On Thu, Feb 12, 2015 at 4:59 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> > Hi Fabio,
+> >
+> >> Fabio Estevam <festevam@gmail.com> hat am 11. Februar 2015 um 22:10
+> >> geschrieben:
+> >>
+> >>
+> >> On Wed, Feb 11, 2015 at 6:31 PM, Stefan Wahren <stefan.wahren@i2se.com>
+> >> wrote:
+> >>
+> >> >> I always get 0x5e5b5513 with or without your patch.
+> >> >
+> >> > very strange. Do you have any idea why IO1_STABLE is permanent low?
+> >>
+> >> On my case it is always 1.
+> >
+> > i expected the same behavior on my hardware.
+> >
+> > Do you use u-boot as bootloader?
+>
+> Yes, I do.
 
-I know you had no choice because this is called from interrupt handler (top
-half). But having a irq handler and a irq thread handler would solve that issue,
-and you'll end up with msleep(1) in this code.
+i will try to test it with u-boot.
 
-I don't think an mdelay(256) is acceptable.
+>
+> >>
+> >> > Can you confirm the behavior according to your flash issue?
+> >>
+> >> In my tests IO1_STABLE stays the same.
+> >
+> > This wasn't the intension of my second question. I wanted to know about the
+> > state of the SPI NOR flash detection process.
+> >
+> > Does it sucessed if you apply the patch, but revert the changes in
+> > clk_ref_set_rate() from clk-ref.c?
+>
+> I don't have my mx28evk setup available at the moment, but when I
+> applied your patch and reverted all the changes in clk-ref.c, then the
+> SPI flash detection works.
+>
+> I haven't tested to only reverting the changes inside
+> clk_ref_set_rate(), but I can do it tomorrow.
 
-Cheers.
+I think the reason for the problem in the flash detection is caused by the
+misaligned access on the frac register.
 
---
-Robert
+Maybe you want to try the following after the second patch is reverted.
+
+Stefan
+
+------------>8----------------------------------------------------------
+diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
+index 9fc9359..87969e3 100644
+--- a/drivers/clk/mxs/clk-imx23.c
++++ b/drivers/clk/mxs/clk-imx23.c
+@@ -73,8 +73,10 @@ static void __init clk_misc_init(void)
+ 	 * 480 MHz seems too high to be ssp clock source directly,
+ 	 * so set frac to get a 288 MHz ref_io.
+ 	 */
+-	writel_relaxed(0x3f << BP_FRAC_IOFRAC, FRAC + CLR);
+-	writel_relaxed(30 << BP_FRAC_IOFRAC, FRAC + SET);
++	val = readl_relaxed(FRAC);
++	val &= ~(0x3f << BP_FRAC_IOFRAC);
++	val |= 30 << BP_FRAC_IOFRAC;
++	writel_relaxed(val, FRAC);
+ }
+ 
+ static const char *sel_pll[]  __initconst = { "pll", "ref_xtal", };
+diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
+index a6c3501..e47ad69 100644
+--- a/drivers/clk/mxs/clk-imx28.c
++++ b/drivers/clk/mxs/clk-imx28.c
+@@ -118,10 +118,15 @@ static void __init clk_misc_init(void)
+ 	/*
+ 	 * 480 MHz seems too high to be ssp clock source directly,
+ 	 * so set frac0 to get a 288 MHz ref_io0 and ref_io1.
++	 * According to reference manual we must modify frac bytewise.
+ 	 */
+ 	val = readl_relaxed(FRAC0);
+-	val &= ~((0x3f << BP_FRAC0_IO0FRAC) | (0x3f << BP_FRAC0_IO1FRAC));
+-	val |= (30 << BP_FRAC0_IO0FRAC) | (30 << BP_FRAC0_IO1FRAC);
++	val &= ~(0x3f << BP_FRAC0_IO0FRAC);
++	val |= 30 << BP_FRAC0_IO0FRAC;
++	writel_relaxed(val, FRAC0);
++	val = readl_relaxed(FRAC0);
++	val &= ~(0x3f << BP_FRAC0_IO1FRAC);
++	val |= 30 << BP_FRAC0_IO1FRAC;
+ 	writel_relaxed(val, FRAC0);
+ }
