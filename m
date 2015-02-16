@@ -1,402 +1,265 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Mon, 16 Feb 2015 13:31:04 +0100
-Subject: [PATCHv3] mvebu: add Linksys WRT1900AC (Mamba) support
-Message-ID: <1424089864-15651-1-git-send-email-kaloz@openwrt.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 16 Feb 2015 12:48:08 +0000
+Subject: [PATCH 01/11] mfd: add the Berlin controller driver
+In-Reply-To: <1423671332-24580-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1423671332-24580-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20150216124808.GC14545@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Linksys WRT1900AC (Mamba) is a router that has
+On Wed, 11 Feb 2015, Antoine Tenart wrote:
 
-- 2 mini-PCIe slots with Marvell 88W8864 radios
-- 1 USB 3.0 port
-- 1 USB 2.0/eSATAp port
-- 2 Ethernet interfaces connected to a 88E6172 switch (1x WAN + 4x LAN)
-- 128MB NAND flash
-- 256MB RAM
+> Marvell Berlin SoC have two nodes providing multiple devices (clk,
+> pinctrl, reset). While until now these drivers were initialized using
+> initcalls, this wasn't a proper solution. This mfd driver will be
+> responsible of adding these devices, to be probed properly.
+> 
+> It currently registers the pin controllers and the reset drivers for
+> BG2, BG2CD and BG2Q in the soc and system controller nodes.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  drivers/mfd/Kconfig       |   5 ++
+>  drivers/mfd/Makefile      |   2 +
+>  drivers/mfd/berlin-ctrl.c | 180 ++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 187 insertions(+)
+>  create mode 100644 drivers/mfd/berlin-ctrl.c
+> 
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 2e6b7311fabc..eda6dbec02ff 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -840,6 +840,11 @@ config STMPE_SPI
+>  	  This is used to enable SPI interface of STMPE
+>  endmenu
+>  
+> +config MFD_BERLIN_CTRL
+> +	bool
 
-Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
----
-Changes since v2:
-  * added tlc59116 leds
-  * added an extra partition for the unused space
-  * added serial console pinout
-  * renamed the dts to armada-xp-linksys-mamba.dts
+Missing description.
 
-Changes since v1:
-  * add dual license
-  * lower SPI speed to meet the chip's maximum
-  * pinctrl cleanups based on Andrew Lunn's suggestions
----
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 348 ++++++++++++++++++++++++++
- 2 files changed, 349 insertions(+)
- create mode 100644 arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+Why can't this driver be built as a module?
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 91bd5bd..a84063f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -541,6 +541,7 @@ dtb-$(CONFIG_MACH_ARMADA_XP) += \
- 	armada-xp-db.dtb \
- 	armada-xp-gp.dtb \
- 	armada-xp-lenovo-ix4-300d.dtb \
-+	armada-xp-linksys-mamba.dtb \
- 	armada-xp-matrix.dtb \
- 	armada-xp-netgear-rn2120.dtb \
- 	armada-xp-openblocks-ax3-4.dtb \
-diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-new file mode 100644
-index 0000000..0a3d1d6
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-@@ -0,0 +1,348 @@
-+/*
-+ * Device Tree file for the Linksys WRT1900AC (Mamba).
-+ *
-+ * Note: this board is shipped with a new generation boot loader that
-+ * remaps internal registers at 0xf1000000. Therefore, if earlyprintk
-+ * is used, the CONFIG_DEBUG_MVEBU_UART_ALTERNATE option should be
-+ * used.
-+ *
-+ * Copyright (C) 2014 Imre Kaloz <kaloz@openwrt.org>
-+ *
-+ * Based on armada-xp-axpwifiap.dts:
-+ *
-+ *     Copyright (C) 2013 Marvell
-+ *
-+ *     Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is licensed under the terms of the GNU General Public
-+ *     License version 2.  This program is licensed "as is" without
-+ *     any warranty of any kind, whether express or implied.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include "armada-xp-mv78230.dtsi"
-+
-+/ {
-+	model = "Linksys WRT1900AC";
-+	compatible = "linksys,mamba", "marvell,armadaxp-mv78230",
-+		     "marvell,armadaxp", "marvell,armada-370-xp";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+		stdout-path = &uart0;
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x00000000 0x00000000 0x10000000>; /* 256MB */
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
-+
-+		pcie-controller {
-+			status = "okay";
-+
-+			/* Etron EJ168 USB 3.0 controller */
-+			pcie at 1,0 {
-+				/* Port 0, Lane 0 */
-+				status = "okay";
-+			};
-+
-+			/* First mini-PCIe port */
-+			pcie at 2,0 {
-+				/* Port 0, Lane 1 */
-+				status = "okay";
-+			};
-+
-+			/* Second mini-PCIe port */
-+			pcie at 3,0 {
-+				/* Port 0, Lane 3 */
-+				status = "okay";
-+			};
-+		};
-+
-+		internal-regs {
-+
-+			/* J10: VCC, NC, RX, NC, TX, GND  */
-+			serial at 12000 {
-+				status = "okay";
-+			};
-+
-+			sata at a0000 {
-+				nr-ports = <1>;
-+				status = "okay";
-+			};
-+
-+			ethernet at 70000 {
-+				pinctrl-0 = <&ge0_rgmii_pins>;
-+				pinctrl-names = "default";
-+				status = "okay";
-+				phy-mode = "rgmii-id";
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+
-+			ethernet at 74000 {
-+				pinctrl-0 = <&ge1_rgmii_pins>;
-+				pinctrl-names = "default";
-+				status = "okay";
-+				phy-mode = "rgmii-id";
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+
-+			/* USB part of the eSATA/USB 2.0 port */
-+			usb at 50000 {
-+				status = "okay";
-+			};
-+
-+			i2c at 11000 {
-+				status = "okay";
-+				clock-frequency = <100000>;
-+
-+				tmp421 at 4c {
-+					compatible = "ti,tmp421";
-+					reg = <0x4c>;
-+				};
-+
-+				tlc59116 at 68 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					#gpio-cells = <2>;
-+					compatible = "ti,tlc59116";
-+					reg = <0x68>;
-+
-+					wan_amber at 0 {
-+						label = "mamba:amber:wan";
-+						reg = <0x0>;
-+					};
-+
-+					wan_white at 1 {
-+						label = "mamba:white:wan";
-+						reg = <0x1>;
-+					};
-+
-+					wlan_2g at 2 {
-+						label = "mamba:white:wlan_2g";
-+						reg = <0x2>;
-+					};
-+
-+					wlan_5g at 3 {
-+						label = "mamba:white:wlan_5g";
-+						reg = <0x3>;
-+					};
-+
-+					esata at 4 {
-+						label = "mamba:white:esata";
-+						reg = <0x4>;
-+					};
-+
-+					usb2 at 5 {
-+						label = "mamba:white:usb2";
-+						reg = <0x5>;
-+					};
-+
-+					usb3_1 at 6 {
-+						label = "mamba:white:usb3_1";
-+						reg = <0x6>;
-+					};
-+
-+					usb3_2 at 7 {
-+						label = "mamba:white:usb3_2";
-+						reg = <0x7>;
-+					};
-+
-+					wps_white at 8 {
-+						label = "mamba:white:wps";
-+						reg = <0x8>;
-+					};
-+
-+					wps_amber at 9 {
-+						label = "mamba:amber:wps";
-+						reg = <0x9>;
-+					};
-+				};
-+			};
-+
-+			nand at d0000 {
-+				status = "okay";
-+				num-cs = <1>;
-+				marvell,nand-keep-config;
-+				marvell,nand-enable-arbiter;
-+				nand-on-flash-bbt;
-+				nand-ecc-strength = <4>;
-+				nand-ecc-step-size = <512>;
-+
-+				partition at 0 {
-+					label = "u-boot";
-+					reg = <0x0000000 0x100000>;  /* 1MB */
-+					read-only;
-+				};
-+
-+				partition at 100000 {
-+					label = "u_env";
-+					reg = <0x100000 0x40000>;    /* 256KB */
-+				};
-+
-+				partition at 140000 {
-+					label = "s_env";
-+					reg = <0x140000 0x40000>;    /* 256KB */
-+				};
-+
-+				partition at 900000 {
-+					label = "devinfo";
-+					reg = <0x900000 0x100000>;   /* 1MB */
-+					read-only;
-+				};
-+
-+				/* kernel1 overlaps with rootfs1 by design */
-+				partition at a00000 {
-+					label = "kernel1";
-+					reg = <0xa00000 0x2800000>;  /* 40MB */
-+				};
-+
-+				partition at d00000 {
-+					label = "rootfs1";
-+					reg = <0xd00000 0x2500000>;  /* 37MB */
-+				};
-+
-+				/* kernel2 overlaps with rootfs2 by design */
-+				partition at 3200000 {
-+					label = "kernel2";
-+					reg = <0x3200000 0x2800000>; /* 40MB */
-+				};
-+
-+				partition at 3500000 {
-+					label = "rootfs2";
-+					reg = <0x3500000 0x2500000>; /* 37MB */
-+				};
-+
-+				/*
-+				 * 38MB, last MB is for the BBT, not writable */
-+				 */
-+				partition at 5a00000 {
-+					label = "syscfg";
-+					reg = <0x5a00000 0x2600000>;
-+				};
-+
-+				/*
-+				 * Unused area between "s_env" and "devinfo".
-+				 * Moved here because otherwise the renumbered
-+				 * partitions would break the bootloader
-+				 * supplied bootargs
-+				 */
-+				partition at 180000 {
-+					label = "unused_area";
-+					reg = <0x180000 0x780000>;   /* 7.5MB */
-+				};
-+			};
-+
-+			spi0: spi at 10600 {
-+				status = "okay";
-+
-+				spi-flash at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-+					compatible = "everspin,mr25h256";
-+					reg = <0>; /* Chip select 0 */
-+					spi-max-frequency = <40000000>;
-+				};
-+			};
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&keys_pin>;
-+		pinctrl-names = "default";
-+
-+		button at 1 {
-+			label = "WPS";
-+			linux,code = <KEY_WPS_BUTTON>;
-+			gpios = <&gpio1 0 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		button at 2 {
-+			label = "Factory Reset Button";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&gpio1 1 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&power_led_pin>;
-+		pinctrl-names = "default";
-+
-+		power {
-+			label = "mamba:white:power";
-+			gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+	};
-+
-+	gpio_fan {
-+		/* SUNON HA4010V4-0000-C99 */
-+		compatible = "gpio-fan";
-+		gpios = <&gpio0 24 0>;
-+
-+		gpio-fan,speed-map = <0    0
-+				      4500 1>;
-+	};
-+};
-+
-+&pinctrl {
-+
-+	keys_pin: keys-pin {
-+		marvell,pins = "mpp32", "mpp33";
-+		marvell,function = "gpio";
-+	};
-+
-+	power_led_pin: power-led-pin {
-+		marvell,pins = "mpp40";
-+		marvell,function = "gpio";
-+	};
-+
-+	gpio_fan_pin: gpio-fan-pin {
-+		marvell,pins = "mpp24";
-+		marvell,function = "gpio";
-+	};
-+};
+> +	select MFD_CORE
+> +	select MFD_SYSCON
+
+Missing help.
+
+>  config MFD_STA2X11
+>  	bool "STMicroelectronics STA2X11"
+>  	depends on STA2X11
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index 53467e211381..adf60e85df20 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -179,3 +179,5 @@ obj-$(CONFIG_MFD_DLN2)		+= dln2.o
+>  
+>  intel-soc-pmic-objs		:= intel_soc_pmic_core.o intel_soc_pmic_crc.o
+>  obj-$(CONFIG_INTEL_SOC_PMIC)	+= intel-soc-pmic.o
+> +
+> +obj-$(CONFIG_MFD_BERLIN_CTRL)	+= berlin-ctrl.o
+> diff --git a/drivers/mfd/berlin-ctrl.c b/drivers/mfd/berlin-ctrl.c
+> new file mode 100644
+> index 000000000000..e3ce6f069f16
+> --- /dev/null
+> +++ b/drivers/mfd/berlin-ctrl.c
+> @@ -0,0 +1,180 @@
+> +/*
+> + * Copyright (C) 2015 Marvell Technology Group Ltd.
+> + *
+> + * Antoine Tenart <antoine.tenart@free-electrons.com>
+
+Author: Antoine Tenart <antoine.tenart@free-electrons.com>
+
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/mfd/core.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+
+kernel.h?
+
+> +struct berlin_ctrl_priv {
+> +	const struct mfd_cell	*devs;
+> +	unsigned		ndevs;
+> +};
+> +
+> +/*
+> + * BG2 devices
+> + */
+> +static const struct mfd_cell berlin2_ctrl_chip_ctrl_subdevs[] = {
+> +	{
+> +		.name		= "berlin2-soc-pinctrl",
+> +		.of_compatible	= "marvell,berlin2-soc-pinctrl",
+> +	},
+> +	{
+> +		.name		= "berlin2-reset",
+> +		.of_compatible	= "marvell,berlin2-reset",
+> +	},
+> +};
+> +
+> +static const struct mfd_cell berlin2_ctrl_system_ctrl_subdevs[] = {
+> +	{
+> +		.name		= "berlin2-system-pinctrl",
+> +		.of_compatible	= "marvell,berlin2-system-pinctrl",
+> +	},
+> +};
+> +
+> +static const struct berlin_ctrl_priv berlin2_ctrl_chip_ctrl_data = {
+> +	.devs	= berlin2_ctrl_chip_ctrl_subdevs,
+> +	.ndevs	= ARRAY_SIZE(berlin2_ctrl_chip_ctrl_subdevs),
+> +};
+> +
+> +static const struct berlin_ctrl_priv berlin2_ctrl_system_data = {
+> +	.devs	= berlin2_ctrl_system_ctrl_subdevs,
+> +	.ndevs	= ARRAY_SIZE(berlin2_ctrl_system_ctrl_subdevs),
+> +};
+> +
+> +
+
+Superfluous '\n'
+
+> +/*
+> + * BG2CD devices
+> + */
+> +static const struct mfd_cell berlin2cd_ctrl_chip_ctrl_subdevs[] = {
+> +	{
+> +		.name		= "berlin2cd-soc-pinctrl",
+> +		.of_compatible	= "marvell,berlin2cd-soc-pinctrl",
+> +	},
+> +	{
+> +		.name		= "berlin2-reset",
+> +		.of_compatible	= "marvell,berlin2-reset",
+> +	},
+> +};
+> +
+> +static const struct mfd_cell berlin2cd_ctrl_system_ctrl_subdevs[] = {
+> +	{
+> +		.name		= "berlin2cd-system-pinctrl",
+> +		.of_compatible	= "marvell,berlin2cd-system-pinctrl",
+> +	},
+> +};
+> +
+> +static const struct berlin_ctrl_priv berlin2cd_ctrl_chip_ctrl_data = {
+> +	.devs	= berlin2cd_ctrl_chip_ctrl_subdevs,
+> +	.ndevs	= ARRAY_SIZE(berlin2cd_ctrl_chip_ctrl_subdevs),
+> +};
+> +
+> +static const struct berlin_ctrl_priv berlin2cd_ctrl_system_data = {
+> +	.devs	= berlin2cd_ctrl_system_ctrl_subdevs,
+> +	.ndevs	= ARRAY_SIZE(berlin2cd_ctrl_system_ctrl_subdevs),
+> +};
+> +
+> +/*
+> + * BG2Q devices
+> + */
+> +static const struct mfd_cell berlin2q_ctrl_chip_ctrl_subdevs[] = {
+> +	{
+> +		.name		= "berlin2q-soc-pinctrl",
+> +		.of_compatible	= "marvell,berlin2q-soc-pinctrl",
+> +	},
+> +	{
+> +		.name		= "berlin2-reset",
+> +		.of_compatible	= "marvell,berlin2-reset",
+> +	},
+> +};
+> +
+> +static const struct mfd_cell berlin2q_ctrl_system_ctrl_subdevs[] = {
+> +	{
+> +		.name		= "berlin2q-system-pinctrl",
+> +		.of_compatible	= "marvell,berlin2q-system-pinctrl",
+> +	},
+> +};
+> +
+> +static const struct berlin_ctrl_priv berlin2q_ctrl_chip_ctrl_data = {
+> +	.devs	= berlin2q_ctrl_chip_ctrl_subdevs,
+> +	.ndevs	= ARRAY_SIZE(berlin2q_ctrl_chip_ctrl_subdevs),
+> +};
+> +
+> +static const struct berlin_ctrl_priv berlin2q_ctrl_system_data = {
+> +	.devs	= berlin2q_ctrl_system_ctrl_subdevs,
+> +	.ndevs	= ARRAY_SIZE(berlin2q_ctrl_system_ctrl_subdevs),
+> +};
+> +
+> +
+> +static const struct of_device_id berlin_ctrl_of_match[] = {
+> +	/* BG2 */
+> +	{
+> +		.compatible	= "marvell,berlin2-chip-ctrl",
+> +		.data		= &berlin2_ctrl_chip_ctrl_data,
+> +	},
+> +	{
+> +		.compatible	= "marvell,berlin2-system-ctrl",
+> +		.data		= &berlin2_ctrl_system_data,
+> +	},
+> +	/* BG2CD */
+> +	{
+> +		.compatible	= "marvell,berlin2cd-chip-ctrl",
+> +		.data		= &berlin2cd_ctrl_chip_ctrl_data,
+> +	},
+> +	{
+> +		.compatible	= "marvell,berlin2cd-system-ctrl",
+> +		.data		= &berlin2cd_ctrl_system_data,
+> +	},
+> +	/* BG2Q */
+> +	{
+> +		.compatible	= "marvell,berlin2q-chip-ctrl",
+> +		.data		= &berlin2q_ctrl_chip_ctrl_data,
+> +	},
+> +	{
+> +		.compatible	= "marvell,berlin2q-system-ctrl",
+> +		.data		= &berlin2q_ctrl_system_data,
+> +	},
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, berlin_ctrl_of_match);
+> +
+> +static int berlin_ctrl_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	const struct of_device_id *match;
+> +	const struct berlin_ctrl_priv *priv;
+> +	int ret;
+> +
+> +	match = of_match_node(berlin_ctrl_of_match, dev->of_node);
+> +	if (!match)
+> +		return -EINVAL;
+> +
+> +	priv = match->data;
+> +
+> +	ret = mfd_add_devices(dev, 0, priv->devs, priv->ndevs, NULL, -1, NULL);
+> +	if (ret) {
+> +		dev_err(dev, "Failed to add devices: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+
+I'm not sure I see the point in this driver.  Why can't you just
+register these devices directly from DT?
+
+> +static struct platform_driver berlin_ctrl_driver = {
+> +	.probe	= berlin_ctrl_probe,
+> +	.driver	= {
+> +		.name = "berlin-ctrl",
+> +		.of_match_table = berlin_ctrl_of_match,
+> +	},
+> +};
+> +module_platform_driver(berlin_ctrl_driver);
+> +
+> +MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
+> +MODULE_DESCRIPTION("Marvell Berlin controller driver (mfd)");
+> +MODULE_LICENSE("GPL");
+
+v2
+
 -- 
-2.1.0
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
