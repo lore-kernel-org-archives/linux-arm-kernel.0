@@ -1,148 +1,40 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 16 Feb 2015 16:43:20 +0000
-Subject: [PATCH 1/2] pci: generic: Use the pci_scan_root_bus instead of
- pci_common_init_dev
-In-Reply-To: <1423495350-12295-2-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1423495350-12295-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1423495350-12295-2-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <20150216164320.GB817@red-moon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 16 Feb 2015 17:41:34 +0100
+Subject: [PATCH v3 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
+In-Reply-To: <20150216172753.5e92739a@free-electrons.com>
+References: <1424091072-7738-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1424091072-7738-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20150216172753.5e92739a@free-electrons.com>
+Message-ID: <20150216164134.GE25269@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 09, 2015 at 03:22:29PM +0000, Suravee Suthikulpanit wrote:
-> Replacing pci_common_init_dev with pci_scan_root_bus, and remove reference
-> to struct pci_sys_data and pci_hw, which is specific to ARM32. This allows
-> the PCI host generic driver to also usable in ARM64 architecture.
+On Mon, Feb 16, 2015 at 05:27:53PM +0100, Thomas Petazzoni wrote:
+> Dear Maxime Ripard,
 > 
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> On Mon, 16 Feb 2015 13:51:11 +0100, Maxime Ripard wrote:
 > 
-> ---
->  drivers/pci/host/Kconfig            |  2 +-
->  drivers/pci/host/pci-host-generic.c | 33 ++++++++++-----------------------
->  2 files changed, 11 insertions(+), 24 deletions(-)
+> > +		while (index < (len * 4)) {
+> > +			u32 timeout;
+> > +
+> > +			__raw_readsl(info->mmio_base + NDDB, data + index, 8);
 > 
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> index c4b6568..739bab0 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -53,7 +53,7 @@ config PCI_RCAR_GEN2_PCIE
->  
->  config PCI_HOST_GENERIC
->  	bool "Generic PCI host controller"
-> -	depends on ARM && OF
-> +	depends on (ARM||ARM64) && OF
->  	help
->  	  Say Y here if you want to support a simple generic PCI host
->  	  controller, such as the one emulated by kvmtool.
-> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> index 6eb1aa7..93f64e4 100644
-> --- a/drivers/pci/host/pci-host-generic.c
-> +++ b/drivers/pci/host/pci-host-generic.c
-> @@ -48,8 +48,7 @@ static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
->  					     unsigned int devfn,
->  					     int where)
->  {
-> -	struct pci_sys_data *sys = bus->sysdata;
-> -	struct gen_pci *pci = sys->private_data;
-> +	struct gen_pci *pci = bus->sysdata;
->  	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
->  
->  	return pci->cfg.win[idx] + ((devfn << 8) | where);
-> @@ -64,8 +63,7 @@ static void __iomem *gen_pci_map_cfg_bus_ecam(struct pci_bus *bus,
->  					      unsigned int devfn,
->  					      int where)
->  {
-> -	struct pci_sys_data *sys = bus->sysdata;
-> -	struct gen_pci *pci = sys->private_data;
-> +	struct gen_pci *pci = bus->sysdata;
->  	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
->  
->  	return pci->cfg.win[idx] + ((devfn << 12) | where);
-> @@ -80,8 +78,7 @@ static int gen_pci_config_read(struct pci_bus *bus, unsigned int devfn,
->  				int where, int size, u32 *val)
->  {
->  	void __iomem *addr;
-> -	struct pci_sys_data *sys = bus->sysdata;
-> -	struct gen_pci *pci = sys->private_data;
-> +	struct gen_pci *pci = bus->sysdata;
->  
->  	addr = pci->cfg.ops->map_bus(bus, devfn, where);
->  
-> @@ -103,8 +100,7 @@ static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
->  				 int where, int size, u32 val)
->  {
->  	void __iomem *addr;
-> -	struct pci_sys_data *sys = bus->sysdata;
-> -	struct gen_pci *pci = sys->private_data;
-> +	struct gen_pci *pci = bus->sysdata;
->  
->  	addr = pci->cfg.ops->map_bus(bus, devfn, where);
->  
-> @@ -244,13 +240,6 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
->  	return 0;
->  }
->  
-> -static int gen_pci_setup(int nr, struct pci_sys_data *sys)
-> -{
-> -	struct gen_pci *pci = sys->private_data;
-> -	list_splice_init(&pci->resources, &sys->resources);
-> -	return 1;
-> -}
-> -
->  static int gen_pci_probe(struct platform_device *pdev)
->  {
->  	int err;
-> @@ -260,13 +249,6 @@ static int gen_pci_probe(struct platform_device *pdev)
->  	struct device *dev = &pdev->dev;
->  	struct device_node *np = dev->of_node;
->  	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-> -	struct hw_pci hw = {
-> -		.nr_controllers	= 1,
-> -		.private_data	= (void **)&pci,
-> -		.setup		= gen_pci_setup,
-> -		.map_irq	= of_irq_parse_and_map_pci,
-> -		.ops		= &gen_pci_ops,
-> -	};
->  
->  	if (!pci)
->  		return -ENOMEM;
-> @@ -303,7 +285,12 @@ static int gen_pci_probe(struct platform_device *pdev)
->  		return err;
->  	}
->  
-> -	pci_common_init_dev(dev, &hw);
-> +	if (!pci_scan_root_bus(&pdev->dev, pci->cfg.bus_range->start,
-> +			       &gen_pci_ops, pci, &pci->resources)) {
-> +		dev_err(&pdev->dev, "failed to enable PCIe ports\n");
-> +		return -ENODEV;
-> +	}
+> Are you guaranteed that 'len' is a multiple of 32 bytes?
 
-We need to assign resources if !PCI_PROBE_ONLY. And to do that we can't
-use pci_scan_root_bus() because it adds devices before resources can be
-assigned.
+I don't know if you're guaranteed of anything, but the controller
+supports only 512, 2k, 4k and 8k pages, which are all mutiples of 32
+bytes.
 
-Furthermore, the ARM32 pcibios_align_resource() implementation requires
-pci_sys_data, so we _still_ rely on pci_common_init_dev to create one
-for us.
+Maxime
 
-There are patches in flight to change this behaviour, so for this
-series to be applicable there is still some code to be merged first,
-we are getting there, bear with us.
-
-Lorenzo
-
-> +
->  	return 0;
->  }
->  
-> -- 
-> 2.1.0
-> 
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150216/0183dd62/attachment.sig>
