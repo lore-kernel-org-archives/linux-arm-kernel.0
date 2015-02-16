@@ -1,139 +1,108 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 16 Feb 2015 14:45:00 +0000
-Subject: [PATCH] mfd: vexpress: Remove non-DT code
-In-Reply-To: <1421774715-29926-1-git-send-email-pawel.moll@arm.com>
-References: <1421774715-29926-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20150216144500.GQ14545@x1>
+From: wuyun.wu@huawei.com (Yun Wu (Abel))
+Date: Mon, 16 Feb 2015 22:57:39 +0800
+Subject: [PATCH v2 6/6] irqchip: gicv3: skip ITS init when no ITS available
+In-Reply-To: <54E1C0D7.7000708@arm.com>
+References: <1423992723-5028-1-git-send-email-wuyun.wu@huawei.com>
+ <1423992723-5028-7-git-send-email-wuyun.wu@huawei.com>
+ <54E1C0D7.7000708@arm.com>
+Message-ID: <54E20563.2040104@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Jan 2015, Pawel Moll wrote:
+Hi Murzin,
+On 2015/2/16 18:05, Vladimir Murzin wrote:
 
-> Now, as all VE platforms have to be booted with DT,
-> the code handling non-DT case can be removed.
+> Hi Yun,
 > 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
->  drivers/mfd/vexpress-sysreg.c | 71 +++++++++----------------------------------
->  1 file changed, 15 insertions(+), 56 deletions(-)
+> On 15/02/15 09:32, Yun Wu wrote:
+>> There is one more condition that needs to be considered when judging
+>> whether LPI feature is enabled or not, which is whether there is any
+>> ITS available and correctly enabled.
+>>
+>> This patch will fix this by caching ITS enabling status in the GIC
+>> chip data structure.
+> 
+> I posted patch for that before [1] and it landed in Marc's tree
+> (irq/gic-fixes). It is not clear from the commit message what the "one
+> more condition" is, but I guess it is the same dts stuff. Do you see
+> issue without your patch applied?
 
-Code looks better and I'm sure you've tested it.
+Oh yes, your patch perfectly solved this problem, so this one is no longer
+needed. And sorry for not noticing your patch. :)
 
-Applied, thanks.
+Thanks,
+	Abel
 
-> diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
-> index 8f43ab8..3e628df 100644
-> --- a/drivers/mfd/vexpress-sysreg.c
-> +++ b/drivers/mfd/vexpress-sysreg.c
-> @@ -47,71 +47,26 @@
->  #define SYS_HBI_MASK		0xfff
->  #define SYS_PROCIDx_HBI_SHIFT	0
->  
-> -#define SYS_MCI_CARDIN		(1 << 0)
-> -#define SYS_MCI_WPROT		(1 << 1)
-> -
->  #define SYS_MISC_MASTERSITE	(1 << 14)
->  
-> -
-> -static void __iomem *__vexpress_sysreg_base;
-> -
-> -static void __iomem *vexpress_sysreg_base(void)
-> +void vexpress_flags_set(u32 data)
->  {
-> -	if (!__vexpress_sysreg_base) {
-> +	static void __iomem *base;
-> +
-> +	if (!base) {
->  		struct device_node *node = of_find_compatible_node(NULL, NULL,
->  				"arm,vexpress-sysreg");
->  
-> -		__vexpress_sysreg_base = of_iomap(node, 0);
-> +		base = of_iomap(node, 0);
->  	}
->  
-> -	WARN_ON(!__vexpress_sysreg_base);
-> -
-> -	return __vexpress_sysreg_base;
-> -}
-> -
-> -
-> -static int vexpress_sysreg_get_master(void)
-> -{
-> -	if (readl(vexpress_sysreg_base() + SYS_MISC) & SYS_MISC_MASTERSITE)
-> -		return VEXPRESS_SITE_DB2;
-> -
-> -	return VEXPRESS_SITE_DB1;
-> -}
-> -
-> -void vexpress_flags_set(u32 data)
-> -{
-> -	writel(~0, vexpress_sysreg_base() + SYS_FLAGSCLR);
-> -	writel(data, vexpress_sysreg_base() + SYS_FLAGSSET);
-> -}
-> -
-> -unsigned int vexpress_get_mci_cardin(struct device *dev)
-> -{
-> -	return readl(vexpress_sysreg_base() + SYS_MCI) & SYS_MCI_CARDIN;
-> -}
-> -
-> -u32 vexpress_get_procid(int site)
-> -{
-> -	if (site == VEXPRESS_SITE_MASTER)
-> -		site = vexpress_sysreg_get_master();
-> +	if (WARN_ON(!base))
-> +		return;
->  
-> -	return readl(vexpress_sysreg_base() + (site == VEXPRESS_SITE_DB1 ?
-> -			SYS_PROCID0 : SYS_PROCID1));
-> +	writel(~0, base + SYS_FLAGSCLR);
-> +	writel(data, base + SYS_FLAGSSET);
->  }
->  
-> -void __iomem *vexpress_get_24mhz_clock_base(void)
-> -{
-> -	return vexpress_sysreg_base() + SYS_24MHZ;
-> -}
-> -
-> -
-> -void __init vexpress_sysreg_early_init(void __iomem *base)
-> -{
-> -	__vexpress_sysreg_base = base;
-> -
-> -	vexpress_config_set_master(vexpress_sysreg_get_master());
-> -}
-> -
-> -
->  /* The sysreg block is just a random collection of various functions... */
->  
->  static struct syscon_platform_data vexpress_sysreg_sys_id_pdata = {
-> @@ -210,6 +165,7 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
->  	struct resource *mem;
->  	void __iomem *base;
->  	struct bgpio_chip *mmc_gpio_chip;
-> +	int master;
->  	u32 dt_hbi;
->  
->  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> @@ -220,11 +176,14 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
->  	if (!base)
->  		return -ENOMEM;
->  
-> -	vexpress_config_set_master(vexpress_sysreg_get_master());
-> +	master = readl(base + SYS_MISC) & SYS_MISC_MASTERSITE ?
-> +			VEXPRESS_SITE_DB2 : VEXPRESS_SITE_DB1;
-> +	vexpress_config_set_master(master);
->  
->  	/* Confirm board type against DT property, if available */
->  	if (of_property_read_u32(of_root, "arm,hbi", &dt_hbi) == 0) {
-> -		u32 id = vexpress_get_procid(VEXPRESS_SITE_MASTER);
-> +		u32 id = readl(base + (master == VEXPRESS_SITE_DB1 ?
-> +				 SYS_PROCID0 : SYS_PROCID1));
->  		u32 hbi = (id >> SYS_PROCIDx_HBI_SHIFT) & SYS_HBI_MASK;
->  
->  		if (WARN_ON(dt_hbi != hbi))
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> 
+> [1]
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314752.html
+> 
+> Thanks
+> Vladimir
+> 
+>>
+>> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
+>> ---
+>>  drivers/irqchip/irq-gic-v3.c | 18 +++++++++---------
+>>  1 file changed, 9 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>> index 1a146cc..e17faca 100644
+>> --- a/drivers/irqchip/irq-gic-v3.c
+>> +++ b/drivers/irqchip/irq-gic-v3.c
+>> @@ -47,6 +47,7 @@ struct gic_chip_data {
+>>  	u64			redist_stride;
+>>  	u32			nr_redist_regions;
+>>  	unsigned int		irq_nr;
+>> +	int			lpi_enabled;
+>>  };
+>>
+>>  static struct gic_chip_data gic_data __read_mostly;
+>> @@ -390,11 +391,6 @@ static void gic_cpu_sys_reg_init(void)
+>>  	gic_write_grpen1(1);
+>>  }
+>>
+>> -static int gic_dist_supports_lpis(void)
+>> -{
+>> -	return !!(readl_relaxed(gic_data.dist_base + GICD_TYPER) & GICD_TYPER_LPIS);
+>> -}
+>> -
+>>  static void gic_cpu_init(void)
+>>  {
+>>  	void __iomem *rbase;
+>> @@ -410,7 +406,7 @@ static void gic_cpu_init(void)
+>>  	gic_cpu_config(rbase, gic_redist_wait_for_rwp);
+>>
+>>  	/* Give LPIs a spin */
+>> -	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
+>> +	if (gic_data.lpi_enabled)
+>>  		its_cpu_init();
+>>
+>>  	/* initialise system registers */
+>> @@ -629,7 +625,7 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>>  	}
+>>  	/* LPIs */
+>>  	if (hw >= 8192 && hw < GIC_ID_NR) {
+>> -		if (!gic_dist_supports_lpis())
+>> +		if (!gic_data.lpi_enabled)
+>>  			return -EPERM;
+>>  		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
+>>  				    handle_fasteoi_irq, NULL, NULL);
+>> @@ -785,8 +781,12 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+>>
+>>  	set_handle_irq(gic_handle_irq);
+>>
+>> -	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
+>> -		its_init(node, &gic_data.rdists, gic_data.domain);
+>> +	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) &&
+>> +	    !!(readl_relaxed(dist_base + GICD_TYPER) & GICD_TYPER_LPIS) &&
+>> +	    !its_init(node, &gic_data.rdists, gic_data.domain))
+>> +		gic_data.lpi_enabled = 1;
+>> +	else
+>> +		gic_data.lpi_enabled = 0;
+>>
+>>  	gic_smp_init();
+>>  	gic_dist_init();
+>> --
+>> 1.8.0
+>>
