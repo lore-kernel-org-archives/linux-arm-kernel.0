@@ -1,79 +1,139 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Feb 2015 15:40:54 +0100
-Subject: [PATCHv3 00/24] ILP32 support in ARM64
-In-Reply-To: <20150213183706.GF23507@brightrain.aerifal.cx>
-References: <20141002155217.GH32147@e104818-lin.cambridge.arm.com>
- <20150213173345.GA26217@e104818-lin.cambridge.arm.com>
- <20150213183706.GF23507@brightrain.aerifal.cx>
-Message-ID: <2282163.7MvOQMXljz@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 16 Feb 2015 14:45:00 +0000
+Subject: [PATCH] mfd: vexpress: Remove non-DT code
+In-Reply-To: <1421774715-29926-1-git-send-email-pawel.moll@arm.com>
+References: <1421774715-29926-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <20150216144500.GQ14545@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 February 2015 13:37:07 Rich Felker wrote:
-> On Fri, Feb 13, 2015 at 05:33:46PM +0000, Catalin Marinas wrote:
-> > > > > The data structure definition is a little bit fragile, as it depends on
-> > > > > user space not using the __BIT_ENDIAN symbol in a conflicting way. So
-> > > > > far we have managed to keep that outside of general purpose headers, but
-> > > > > it should at least blow up in an obvious way if it does, rather than
-> > > > > breaking silently.
-> > > > > 
-> > > > > I still think it's more practical to keep the zeroing in user space though.
-> > > > > In that case, we keep defining __kernel_timespec64 with a 'typedef long
-> > > > > long __kernel_snseconds_t', and it's up to the libc to either use
-> > > > > __kernel_timespec64 as its timespec, or to define a C11-compliant
-> > > > > timespec itself and zero out the bits before passing the data to the kernel.
-> > > > 
-> > > > The problem with doing this in user space is syscall(2). If we don't
-> > > > allow it, then it's fine to do the padding in libc.
-> > > 
-> > > It's already the case that callers have to tiptoe around syscall(2)
-> > > usage on a per-arch basis for silly things like the convention for
-> > > passing 64-bit arguments on 32-bit archs, different arg orders to work
-> > > around 64-bit alignment and issues with too many args, and various
-> > > legacy issues.
+On Tue, 20 Jan 2015, Pawel Moll wrote:
 
-Right. If one wants to use syscall(), they have to know exactly what the
-kernel's calling conventions are, including knowing what the timespec
-definition looks like, which could have a different size and padding
-compared to the user space one.
+> Now, as all VE platforms have to be booted with DT,
+> the code handling non-DT case can be removed.
+> 
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+>  drivers/mfd/vexpress-sysreg.c | 71 +++++++++----------------------------------
+>  1 file changed, 15 insertions(+), 56 deletions(-)
 
-> > I think there is another problem with sign-extending tv_nsec in libc.
-> > The prototype for functions like clock_settime(2) take a const struct
-> > timespec *. There isn't anything to prevent such structure being in a
-> > read-only section, even though it is unlikely. So libc would have to
-> > duplicate the structure rather than just sign-extending tv_nsec in
-> > place.
+Code looks better and I'm sure you've tested it.
 
-Do we actually need sign-extend, or does zero-extend have the exact
-same effect? For all I can tell, all invalid nanoseconds values
-remain invalid, and the accepted values are unchanged regardless
-of which type extension gets used.
+Applied, thanks.
 
-> Yes, we already have to do this for x32 in musl. I'd rather not have
-> to do the same for aarch64-ILP32.
+> diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
+> index 8f43ab8..3e628df 100644
+> --- a/drivers/mfd/vexpress-sysreg.c
+> +++ b/drivers/mfd/vexpress-sysreg.c
+> @@ -47,71 +47,26 @@
+>  #define SYS_HBI_MASK		0xfff
+>  #define SYS_PROCIDx_HBI_SHIFT	0
+>  
+> -#define SYS_MCI_CARDIN		(1 << 0)
+> -#define SYS_MCI_WPROT		(1 << 1)
+> -
+>  #define SYS_MISC_MASTERSITE	(1 << 14)
+>  
+> -
+> -static void __iomem *__vexpress_sysreg_base;
+> -
+> -static void __iomem *vexpress_sysreg_base(void)
+> +void vexpress_flags_set(u32 data)
+>  {
+> -	if (!__vexpress_sysreg_base) {
+> +	static void __iomem *base;
+> +
+> +	if (!base) {
+>  		struct device_node *node = of_find_compatible_node(NULL, NULL,
+>  				"arm,vexpress-sysreg");
+>  
+> -		__vexpress_sysreg_base = of_iomap(node, 0);
+> +		base = of_iomap(node, 0);
+>  	}
+>  
+> -	WARN_ON(!__vexpress_sysreg_base);
+> -
+> -	return __vexpress_sysreg_base;
+> -}
+> -
+> -
+> -static int vexpress_sysreg_get_master(void)
+> -{
+> -	if (readl(vexpress_sysreg_base() + SYS_MISC) & SYS_MISC_MASTERSITE)
+> -		return VEXPRESS_SITE_DB2;
+> -
+> -	return VEXPRESS_SITE_DB1;
+> -}
+> -
+> -void vexpress_flags_set(u32 data)
+> -{
+> -	writel(~0, vexpress_sysreg_base() + SYS_FLAGSCLR);
+> -	writel(data, vexpress_sysreg_base() + SYS_FLAGSSET);
+> -}
+> -
+> -unsigned int vexpress_get_mci_cardin(struct device *dev)
+> -{
+> -	return readl(vexpress_sysreg_base() + SYS_MCI) & SYS_MCI_CARDIN;
+> -}
+> -
+> -u32 vexpress_get_procid(int site)
+> -{
+> -	if (site == VEXPRESS_SITE_MASTER)
+> -		site = vexpress_sysreg_get_master();
+> +	if (WARN_ON(!base))
+> +		return;
+>  
+> -	return readl(vexpress_sysreg_base() + (site == VEXPRESS_SITE_DB1 ?
+> -			SYS_PROCID0 : SYS_PROCID1));
+> +	writel(~0, base + SYS_FLAGSCLR);
+> +	writel(data, base + SYS_FLAGSSET);
+>  }
+>  
+> -void __iomem *vexpress_get_24mhz_clock_base(void)
+> -{
+> -	return vexpress_sysreg_base() + SYS_24MHZ;
+> -}
+> -
+> -
+> -void __init vexpress_sysreg_early_init(void __iomem *base)
+> -{
+> -	__vexpress_sysreg_base = base;
+> -
+> -	vexpress_config_set_master(vexpress_sysreg_get_master());
+> -}
+> -
+> -
+>  /* The sysreg block is just a random collection of various functions... */
+>  
+>  static struct syscon_platform_data vexpress_sysreg_sys_id_pdata = {
+> @@ -210,6 +165,7 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
+>  	struct resource *mem;
+>  	void __iomem *base;
+>  	struct bgpio_chip *mmc_gpio_chip;
+> +	int master;
+>  	u32 dt_hbi;
+>  
+>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> @@ -220,11 +176,14 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
+>  	if (!base)
+>  		return -ENOMEM;
+>  
+> -	vexpress_config_set_master(vexpress_sysreg_get_master());
+> +	master = readl(base + SYS_MISC) & SYS_MISC_MASTERSITE ?
+> +			VEXPRESS_SITE_DB2 : VEXPRESS_SITE_DB1;
+> +	vexpress_config_set_master(master);
+>  
+>  	/* Confirm board type against DT property, if available */
+>  	if (of_property_read_u32(of_root, "arm,hbi", &dt_hbi) == 0) {
+> -		u32 id = vexpress_get_procid(VEXPRESS_SITE_MASTER);
+> +		u32 id = readl(base + (master == VEXPRESS_SITE_DB1 ?
+> +				 SYS_PROCID0 : SYS_PROCID1));
+>  		u32 hbi = (id >> SYS_PROCIDx_HBI_SHIFT) & SYS_HBI_MASK;
+>  
+>  		if (WARN_ON(dt_hbi != hbi))
 
-This would of course be solved by using a 64-bit __kernel_snseconds_t
-or snseconds_t, and I suspect other libc implementations would just do
-that, when they are less strict about posix/c11 compliance compared
-to musl.
-
-If you don't mind the (slight) distraction, can you describe what your
-plans are for handling 64-bit time_t on the existing 32-bit ABIs?
-I'm involved in both the efforts to do that and the ilp32 code on
-ARM, so it would be good for me to understand your plans for musl to
-get the bigger picture. Specifically, which of these do you plan
-to support (if you know already):
-
-- using 64-bit time_t on future arm32/i386/... kernels
-- using 64-bit time_t on existing arm32/i386/... kernels with native
-  32-bit time_t
-- using 32-bit time_t on future architectures that only support 64-bit
-  time_t in the kernel
-- running existing binaries with 32-bit time_t on a library with 64-bit
-  time_t support, using symbol versioning
-- compiling new code with 32-bit time_t against a library that supports
-  both 32-bit and 64-bit time_t at runtime.
-- building a libc for existing architectures but without support for
-  running existing 32-bit time_t applications.
-
-	Arnd
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
