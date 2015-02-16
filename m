@@ -1,32 +1,37 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 16 Feb 2015 21:20:47 +0530
-Subject: [PATCH 05/11] ARM: davinci: multi-soc kernels require
- AUTO_ZRELADDR
-In-Reply-To: <1423770163-583064-6-git-send-email-arnd@arndb.de>
-References: <1423770163-583064-1-git-send-email-arnd@arndb.de>
- <1423770163-583064-6-git-send-email-arnd@arndb.de>
-Message-ID: <54E211D7.1040208@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Feb 2015 15:58:23 +0000
+Subject: [PATCH 4/8] ARM: dove: create a proper PMU driver for power
+ domains, PMU IRQs and resets
+In-Reply-To: <54DF7F93.3040009@gmail.com>
+References: <20150214152659.GI8656@n2100.arm.linux.org.uk>
+ <E1YMedG-00054d-0d@rmk-PC.arm.linux.org.uk>
+ <54DF7F93.3040009@gmail.com>
+Message-ID: <20150216155823.GO8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 February 2015 01:12 AM, Arnd Bergmann wrote:
-> The davinci DA8xx and DMx families have incompatible zreladdr
-> settings, and attempting to build a kernel with both enabled
-> results in an error unless AUTO_ZRELADDR is set:
+On Sat, Feb 14, 2015 at 06:02:11PM +0100, Sebastian Hesselbarth wrote:
+> How about we copy the clk subsystem way of installing early probed
+> pm for DT here?
 > 
-> multiple zreladdrs: 0xc0008000 0x80008000
-> This needs CONFIG_AUTO_ZRELADDR to be set
+> For example:
 > 
-> This patch changes Kconfig to make the two families mutually
-> exclusive when this is unset.
+> #define PM_OF_DECLARE(name, compat, fn) OF_DECLARE_1(clk, name, compat, fn)
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> and
+> 
+> static int __init dove_pmu_init(struct device_node *np) { ... }
+> PM_OF_DECLARE(dove_pmu, "marvell,dove-pmu", dove_init_pmu);
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+Well, Rob's response was basically "use the machine descriptor" so I
+guess it needs to be explicitly called from
+arch/arm/mach-mvebu/dove.c:dove_init().
 
-Thanks for the fixes, Arnd!
+If you disagree, please discuss with Rob (on To:) and try and find a
+way forward and let me know how to deal with this.
 
-Regards,
-Sekhar
+Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
