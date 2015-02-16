@@ -1,51 +1,51 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 16 Feb 2015 09:56:21 +0000
-Subject: [PATCH] arm64: Add L2 cache topology to ARM Ltd boards/models
-In-Reply-To: <20150212140702.GF1522@leverpostej>
-References: <1421841750-26722-1-git-send-email-sudeep.holla@arm.com>
- <20150121164632.GK5044@leverpostej> <20150212140702.GF1522@leverpostej>
-Message-ID: <54E1BEC5.5070009@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 16 Feb 2015 09:56:45 +0000
+Subject: [PATCH 13/13] mfd: Add support for the MediaTek MT6397 PMIC
+In-Reply-To: <1423478845-2835-14-git-send-email-s.hauer@pengutronix.de>
+References: <1423478845-2835-1-git-send-email-s.hauer@pengutronix.de>
+ <1423478845-2835-14-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20150216095645.GA2037@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+> From: Flora Fu <flora.fu@mediatek.com>
+> 
+> This adds support for the MediaTek MT6397 PMIC. This is a
+> multifunction device with the following sub modules:
+> 
+> - Regulator
+> - RTC
+> - Audio codec
+> - GPIO
+> - Clock
+> 
+> It is interfaced to the host controller using SPI interface by a proprietary
+> hardware called PMIC wrapper or pwrap. MT6397 MFD is a child device of the
+> pwrap.
+> 
+> Signed-off-by: Flora Fu, MediaTek
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mfd/Kconfig                  |  10 +
+>  drivers/mfd/Makefile                 |   1 +
+>  drivers/mfd/mt6397-core.c            | 223 +++++++++++++++++++++
+>  include/linux/mfd/mt6397/core.h      |  64 +++++++
+>  include/linux/mfd/mt6397/registers.h | 362 +++++++++++++++++++++++++++++++++++
+>  5 files changed, 660 insertions(+)
+>  create mode 100644 drivers/mfd/mt6397-core.c
+>  create mode 100644 include/linux/mfd/mt6397/core.h
+>  create mode 100644 include/linux/mfd/mt6397/registers.h
 
-On 12/02/15 14:07, Mark Rutland wrote:
-> Hi,
->
-> On Wed, Jan 21, 2015 at 04:46:32PM +0000, Mark Rutland wrote:
->> On Wed, Jan 21, 2015 at 12:02:30PM +0000, Sudeep Holla wrote:
->>> Commit 5d425c18653731af6 ("arm64: kernel: add support for cpu
->>> cache information") adds cacheinfo support for ARM64. Since
->>> there's no architectural way of detecting the cpus that share
->>> particular cache, device tree can be used and the core cacheinfo
->>> already supports the same.
->>
->> This still leaves the possibility that misleading information is
->> exposed for systems from other vendors. I've made a quick attempt
->> to Cc the authors of other arm64 dts here.
->>
->> Given that in the absence of these nodes we can't derive a complete
->> view of the cache hierarchy, shouldn't we only expose the cacheinfo
->> when we have these nodes and can therefore produce correct values?
->
-> I'm still rather concerned about exposing misleading cache info in
-> this manner. Is there no way we can limit the exposure of this
-> information to those cases where we actually have the information?
->
+Looks okay to me now.
 
-Yes I have a patch to check all the device nodes in the cache hierarchy
-before initializing the sysfs. So cacheinfo won't be setup if all the
-device nodes aren't found(at-least on architecture like ARM/ARM64 which
-depends on DT). I will post it soon, was waiting for a week so that it's
-not lost during merge window.
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-> Do we know if/how this will work for ACPI systems?
->
+What's the merge plan for this set?
 
-It should be similar to DT i.e. the hierarchy must be completely
-detected through ACPI tables/methods, but I have not thought of
-implementation specifics yet.
-
-Regards,
-Sudeep
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
