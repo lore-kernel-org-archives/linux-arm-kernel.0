@@ -1,102 +1,57 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Mon, 16 Feb 2015 10:09:54 +0000
-Subject: [PATCH v2] xen/arm: allow console=hvc0 to be omitted for guests
-In-Reply-To: <CAKv+Gu8nQ12SKipQC7EuzFwge6NMF3zyAdYJmRUjNWfBoux9Jw@mail.gmail.com>
-References: <1423740543-6168-1-git-send-email-ard.biesheuvel@linaro.org>	<54DDA1D2.5010001@linaro.org>	<CAKv+Gu-KErA+NxX2ctZmrjKYTLYLbGvGiqbEXkowvNbCGF65Bw@mail.gmail.com>	<54DDA4FC.6050307@linaro.org>
- <CAKv+Gu8nQ12SKipQC7EuzFwge6NMF3zyAdYJmRUjNWfBoux9Jw@mail.gmail.com>
-Message-ID: <54E1C1F2.9030305@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Feb 2015 10:19:35 +0000
+Subject: [PATCH] arm64: Add L2 cache topology to ARM Ltd boards/models
+In-Reply-To: <54E1BEC5.5070009@arm.com>
+References: <1421841750-26722-1-git-send-email-sudeep.holla@arm.com>
+ <20150121164632.GK5044@leverpostej>
+ <20150212140702.GF1522@leverpostej> <54E1BEC5.5070009@arm.com>
+Message-ID: <20150216101935.GA8676@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
-
-On 16/02/15 09:37, Ard Biesheuvel wrote:
-> On 13 February 2015 at 15:17, Julien Grall <julien.grall@linaro.org> wrote:
->>
->>
->> On 13/02/2015 15:12, Ard Biesheuvel wrote:
->>>
->>> On 13 February 2015 at 15:03, Julien Grall <julien.grall@linaro.org>
->>> wrote:
->>>>
->>>> Hi Ard,
->>>>
->>>>
->>>> On 12/02/2015 19:29, Ard Biesheuvel wrote:
->>>>>
->>>>>
->>>>> This patch registers hvc0 as the preferred console if no console
->>>>> has been specified explicitly on the kernel command line.
->>>>>
->>>>> The purpose is to allow platform agnostic kernels and boot images
->>>>> (such as distro installers) to boot in a Xen/ARM domU without the
->>>>> need to modify the command line by hand.
->>>>>
->>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>> ---
->>>>>    arch/arm/xen/enlighten.c | 4 ++++
->>>>>    1 file changed, 4 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
->>>>> index 0abeefa7dbf8..927be1d1bad7 100644
->>>>> --- a/arch/arm/xen/enlighten.c
->>>>> +++ b/arch/arm/xen/enlighten.c
->>>>> @@ -24,6 +24,7 @@
->>>>>    #include <linux/cpuidle.h>
->>>>>    #include <linux/cpufreq.h>
->>>>>    #include <linux/cpu.h>
->>>>> +#include <linux/console.h>
->>>>>
->>>>>    #include <linux/mm.h>
->>>>>
->>>>> @@ -255,6 +256,9 @@ void __init xen_early_init(void)
->>>>>                  xen_start_info->flags |= SIF_INITDOMAIN|SIF_PRIVILEGED;
->>>>>          else
->>>>>                  xen_start_info->flags &=
->>>>> ~(SIF_INITDOMAIN|SIF_PRIVILEGED);
->>>>> +
->>>>> +       if (!console_set_on_cmdline && !xen_initial_domain())
->>>>> +               add_preferred_console("hvc", 0, NULL);
->>>>
->>>>
->>>>
->>>> Unfortunately, this won't work as expected.
->>>>
->>>
->>> Did you try it?
->>
->>
->> No just looked at the code.
->>
->>>> console_set_on_cmdline is set when Linux parses the early params. The
->>>> parsing is done after setup_arch (the function which call
->>>> xen_early_init).
->>>>
->>>> So we will end up to add the HVC console even if a console has been
->>>> passed
->>>> on the command line.
->>>>
->>>
->>> parse_early_param() is also called by setup_arch(), before
->>> xen_early_init()
->>>
->>> The call to parse_early_param() in generic code is only there for
->>> architectures that don't call it in their setup_arch()
->>
->>
->> Oh, right. Sorry for the noise.
->>
->> So:
->>
->> Reviewed-by: Julien Grall <julien.grall@linaro.org>
->>
+On Mon, Feb 16, 2015 at 09:56:21AM +0000, Sudeep Holla wrote:
+> Hi Mark,
 > 
-> Would it make sense to roll this into your xen_early_init() series as #3?
+> On 12/02/15 14:07, Mark Rutland wrote:
+> > Hi,
+> >
+> > On Wed, Jan 21, 2015 at 04:46:32PM +0000, Mark Rutland wrote:
+> >> On Wed, Jan 21, 2015 at 12:02:30PM +0000, Sudeep Holla wrote:
+> >>> Commit 5d425c18653731af6 ("arm64: kernel: add support for cpu
+> >>> cache information") adds cacheinfo support for ARM64. Since
+> >>> there's no architectural way of detecting the cpus that share
+> >>> particular cache, device tree can be used and the core cacheinfo
+> >>> already supports the same.
+> >>
+> >> This still leaves the possibility that misleading information is
+> >> exposed for systems from other vendors. I've made a quick attempt
+> >> to Cc the authors of other arm64 dts here.
+> >>
+> >> Given that in the absence of these nodes we can't derive a complete
+> >> view of the cache hierarchy, shouldn't we only expose the cacheinfo
+> >> when we have these nodes and can therefore produce correct values?
+> >
+> > I'm still rather concerned about exposing misleading cache info in
+> > this manner. Is there no way we can limit the exposure of this
+> > information to those cases where we actually have the information?
+> >
+> 
+> Yes I have a patch to check all the device nodes in the cache hierarchy
+> before initializing the sysfs. So cacheinfo won't be setup if all the
+> device nodes aren't found(at-least on architecture like ARM/ARM64 which
+> depends on DT). I will post it soon, was waiting for a week so that it's
+> not lost during merge window.
 
-The xen_early_init has been created in order to support preferred
-console. I don't mind to carry this patch in the next version.
+Great, that's exactly what I was hoping for!
 
-Regards,
+> > Do we know if/how this will work for ACPI systems?
+> >
+> 
+> It should be similar to DT i.e. the hierarchy must be completely
+> detected through ACPI tables/methods, but I have not thought of
+> implementation specifics yet.
 
--- 
-Julien Grall
+Ok.
+
+Thanks,
+Mark
