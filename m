@@ -1,42 +1,129 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Mon, 16 Feb 2015 12:30:37 -0800
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <CAK=WgbZ2986xxuAFvMSoyQLaPAxdUpZ8e5g-mSjyETfvd4KKHw@mail.gmail.com>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
- <1421269101-51105-2-git-send-email-s-anna@ti.com>
- <20150115135201.GG16217@leverpostej>
- <20150115135556.GH16217@leverpostej>
- <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
- <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
- <20150116101746.GA21809@leverpostej>
- <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
- <CAJAp7Og+-KQd7bygWQjTS72Kye3fkp3s3ry+2bw7Gcv7aPF5AQ@mail.gmail.com>
- <CAK=WgbZ2986xxuAFvMSoyQLaPAxdUpZ8e5g-mSjyETfvd4KKHw@mail.gmail.com>
-Message-ID: <CAJAp7OjvFj6RL=Z=SQ6XYzo4qd-Bhe3SYV9-JAGS5SzjJ6R5xg@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 16 Feb 2015 21:40:39 +0100
+Subject: Extending the Marvell MBus DT binding to create remappable windows
+In-Reply-To: <2546568.bLP37K1160@wuerfel>
+References: <20150216182805.529a0071@free-electrons.com>
+ <2546568.bLP37K1160@wuerfel>
+Message-ID: <20150216214039.789560f7@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 30, 2015 at 9:41 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-[..]
-> Since the existence of several hwblocks is still fictional (Bjorn,
-> please confirm too?), we may prefer to introduce changes to support it
-> only when it shows up; it all depends on the amount of changes needed.
-> Suman, care to take a look please?
->
+Arnd,
 
-It turns out that the Qualcomm platforms have two additional "remote
-spinlock" mechanisms - both using shared memory.
+Thanks for your quick feedback!
 
-On most platforms only 1 (out of these 3) is actually consumed, but
-e.g. the older msm7x30 uses 2 of them (SMEM and DAL). Due to its age I
-don't think it's on anyones todo list to actually support this
-platform as of today; but it's out there.
+On Mon, 16 Feb 2015 21:05:52 +0100, Arnd Bergmann wrote:
 
+> Looking at for example arch/arm/boot/dts/armada-xp-netgear-rn2120.dts,
+> I find the following mbus ranges
+> 
+>             ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+>                       MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
+>                          ^                ^ ^     ^         ^
+>                          a                b c     c         d
+> 
+> and here the table should get set up from the fields like
+> 
+> a) mbus target (32 bit)
+> b) mbus-local address (32 bit)
+> c) cpu-physical address (64 bit)
+> d) window size
+> 
+> with the registers from the spec, this seems to map to
+> 
+> a) 0x00020000
+> b) 0x00020008
+> c) 0x00020004
+> d) 0x00020000
+> 
+> so you just need to put the remap-address into the second cell and ensure
+> that it is correctly evaluated by the driver.
+> 
+> Did you miss that part of the binding, or did I miss what you are
+> trying to say?
 
-None of these hwlocks are allocated dynamically, so if needed a
-dynamic base_id (-1 like other frameworks) would be a acceptable
-solution - and can easily be implemented when we need it.
+Well what you are saying here does not really match exactly what the
+binding document is saying. From
+http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/bus/mvebu-mbus.txt#L77:
 
-Regards,
-Bjorn
+ 77 ** MBus address decoding window specification
+ 78 
+ 79 The MBus children address space is comprised of two cells: the first one for
+ 80 the window ID and the second one for the offset within the window.
+ 81 In order to allow to describe valid and non-valid window entries, the
+ 82 following encoding is used:
+ 83 
+ 84   0xSIAA0000 0x00oooooo
+
+I am not sure what this "offset within the window" is supposed to mean.
+Ezequiel, any idea?
+
+In addition, the current implementation of the mvebu-mbus driver
+considers that all windows described in the DT ranges property are
+non-remappable windows:
+
+static int __init mbus_dt_setup(struct mvebu_mbus_state *mbus,
+                                struct device_node *np)
+{
+        int addr_cells, c_addr_cells, c_size_cells;
+        int i, ret, cell_count;
+        const __be32 *r, *ranges_start, *ranges_end;
+
+        ret = mbus_parse_ranges(np, &addr_cells, &c_addr_cells,
+                                &c_size_cells, &cell_count,
+                                &ranges_start, &ranges_end);
+        if (ret < 0)
+                return ret;
+
+        for (i = 0, r = ranges_start; r < ranges_end; r += cell_count, i++) {
+                u32 windowid, base, size;
+                u8 target, attr;
+
+                /*
+                 * An entry with a non-zero custom field do not
+                 * correspond to a static window, so skip it.
+                 */
+                windowid = of_read_number(r, 1);
+                if (CUSTOM(windowid))
+                        continue;
+
+                target = TARGET(windowid);
+                attr = ATTR(windowid);
+
+                base = of_read_number(r + c_addr_cells, addr_cells);
+                size = of_read_number(r + c_addr_cells + addr_cells,
+                                      c_size_cells);
+                ret = mbus_dt_setup_win(mbus, base, size, target, attr);
+                if (ret < 0)
+                        return ret;
+        }
+        return 0;
+}
+
+And finally, with a "0" value in 'b' as you suggest, you have no idea
+whether it means:
+
+ * That you want a remap address to be set to 0.
+
+ * Or that you don't want any remap address.
+
+This difference is quite important, because out of the 20 windows
+available, 9 of them are remappable windows, and 11 are not remappable.
+So you don't want to use windows that have the remap capability for no
+reason.
+
+Or, we should make b == c to indicate that the CPU side address and the
+MBus local address are the same, and in this case, it indicates that we
+don't want the remap capability to be enabled for this window. However,
+if b != c, then we need to enable the remapping capability.
+
+Notice also that the remap address can be a 64 bits address, even
+though I don't really understand in which scenarios this is used.
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
