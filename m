@@ -1,35 +1,86 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 16 Feb 2015 13:02:44 -0800
-Subject: [GIT PULL] Broadcom Device Tree changes for 3.20
-Message-ID: <1424120564-32721-1-git-send-email-f.fainelli@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 16 Feb 2015 22:36:02 +0100
+Subject: [PATCH v3 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
+In-Reply-To: <20150216205825.GG25269@lukather> (Maxime Ripard's message of
+ "Mon, 16 Feb 2015 21:58:25 +0100")
+References: <1424091072-7738-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1424091072-7738-2-git-send-email-maxime.ripard@free-electrons.com>
+ <87oaotaa6r.fsf@free.fr> <20150216205825.GG25269@lukather>
+Message-ID: <87k2zha69p.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+Maxime Ripard <maxime.ripard@free-electrons.com> writes:
 
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+>> I don't think an mdelay(256) is acceptable.
+>
+> That's very true that this driver would need some love, but
+> valentine's day was last week.
+That doesn't cope with the 256ms mdelay. And a potential big mdelay is not what
+I'd call a bug fix, see below.
 
-are available in the git repository at:
+> I'm sorry, but this is a patch targeted for stable. This is a pure
+> bugfix. I won't rewrite the whole driver solely to make the driver
+> better, especially since that would make such a patch (or more likely
+> a whole serie) unsuitable for stable.
 
-  http://github.com/broadcom/stblinux tags/arm-soc/for-3.20/dts
+This is the rewrite I was asking for (not tested), consider it against your
+"rewrite the whole driver" :
 
-for you to fetch changes up to b51c05a331ff46d2b29e4007df938ec2dbbadfde:
+	Modified   drivers/mtd/nand/pxa3xx_nand.c
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index e512902..6e569e9 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -576,11 +576,20 @@ static void start_data_dma(struct pxa3xx_nand_info *info)
+ {}
+ #endif
+ 
++static irqreturn_t pxa3xx_nand_irq_thread(int irq, void *data)
++{
++	struct pxa3xx_nand_info *info = data;
++
++	handle_data_pio(info);
++	return IRQ_HANDLED;
++}
++
+ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+ {
+ 	struct pxa3xx_nand_info *info = devid;
+ 	unsigned int status, is_completed = 0, is_ready = 0;
+ 	unsigned int ready, cmd_done;
++	irqreturn_t ret = IRQ_HANDLED;
+ 
+ 	if (info->cs == 0) {
+ 		ready           = NDSR_FLASH_RDY;
+@@ -622,7 +631,7 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+ 		} else {
+ 			info->state = (status & NDSR_RDDREQ) ?
+ 				      STATE_PIO_READING : STATE_PIO_WRITING;
+-			handle_data_pio(info);
++			ret = IRQ_WAKE_THREAD;
+ 		}
+ 	}
+ 	if (status & cmd_done) {
+@@ -663,7 +672,7 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+ 	if (is_ready)
+ 		complete(&info->dev_ready);
+ NORMAL_IRQ_EXIT:
+-	return IRQ_HANDLED;
++	return ret;
+ }
+ 
+ static inline int is_buf_blank(uint8_t *buf, size_t len)
+@@ -1688,7 +1697,8 @@ static int alloc_nand_resource(struct platform_device *pdev)
+ 	/* initialize all interrupts to be disabled */
+ 	disable_int(info, NDSR_MASK);
+ 
+-	ret = request_irq(irq, pxa3xx_nand_irq, 0, pdev->name, info);
++	ret = request_threaded_irq(irq, pxa3xx_nand_irq,
++				   pxa3xx_nand_irq_thread, 0, pdev->name, info);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "failed to request IRQ\n");
+ 		goto fail_free_buf;
 
-  ARM: dts: add I2C device nodes for Broadcom Cygnus (2015-02-16 12:50:39 -0800)
-
-----------------------------------------------------------------
-This pull request contains the following Broadcom SoCs Device Tree changes:
-
-- Ray adds support for the Cygnus i2c Device Tree controller on Cygnus SoCs
-- Fixes to the BCM63138 dtsi file for the L2 cache controller properties
-
-----------------------------------------------------------------
-Florian Fainelli (1):
-      ARM: dts: BCM63xx: fix L2 cache properties
-
-Ray Jui (1):
-      ARM: dts: add I2C device nodes for Broadcom Cygnus
-
- arch/arm/boot/dts/bcm-cygnus.dtsi | 20 ++++++++++++++++++++
- arch/arm/boot/dts/bcm63138.dtsi   |  5 +++--
- 2 files changed, 23 insertions(+), 2 deletions(-)
+--
+Robert
