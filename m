@@ -1,34 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Feb 2015 11:27:24 +0000
-Subject: [PATCH RFC v9 01/20] clk: divider: Correct parent clk round rate
- if no bestdiv is normally found
-In-Reply-To: <20150213185713.GA12209@pengutronix.de>
-References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
- <1423720903-24806-2-git-send-email-Ying.Liu@freescale.com>
- <20150212093356.GR12209@pengutronix.de>
- <20150212103944.GA1290@victor>
- <20150212122405.GW12209@pengutronix.de>
- <20150212125646.GT8656@n2100.arm.linux.org.uk>
- <20150212134131.GX12209@pengutronix.de> <54DE0BB8.7070004@ti.com>
- <20150213185713.GA12209@pengutronix.de>
-Message-ID: <20150216112724.GN8656@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Feb 2015 12:33:37 +0100
+Subject: [PATCH RFC 2/2] ARM: pxa: transition to dmaengine phase 1
+In-Reply-To: <1627069656.469844934.1424085134263.JavaMail.root@zimbra1-e1.priv.proxad.net>
+References: <1627069656.469844934.1424085134263.JavaMail.root@zimbra1-e1.priv.proxad.net>
+Message-ID: <13207901.k8BLLCXjzv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 13, 2015 at 07:57:13PM +0100, Sascha Hauer wrote:
-> I agree that it's a bit odd, but I think it has to be like this.
-> Consider that you request a rate of 100Hz, but the clock can only
-> produce 99.5Hz, so due to rounding clk_round_rate() returns 99Hz.
-> Now when you request 99Hz from clk_set_rate() the 99.5Hz value
-> can't be used because it's too high.
+On Monday 16 February 2015 12:12:14 robert.jarzmik at free.fr wrote:
+> ----- Mail original -----
+> De: "Arnd Bergmann" <arnd@arndb.de>
+> ?: linux-arm-kernel at lists.infradead.org
+> Cc: "Robert Jarzmik" <robert.jarzmik@free.fr>, "Vinod Koul" <vinod.koul@intel.com>, "Olof Johansson" <olof@lixom.net>, "Daniel Mack" <zonque@gmail.com>, "Haojian Zhuang" <haojian.zhuang@gmail.com>, dmaengine at vger.kernel.org, linux-kernel at vger.kernel.org
+> Envoy?: Lundi 16 F?vrier 2015 11:28:57
+> Objet: Re: [PATCH RFC 2/2] ARM: pxa: transition to dmaengine phase 1
+> 
+> On Saturday 14 February 2015 23:47:33 Robert Jarzmik wrote:
+> >> @@ -294,7 +294,8 @@ int pxa_request_dma (char *name, pxa_dma_prio prio,
+> >>                 /* try grabbing a DMA channel with the requested priority */
+> >>                 for (i = 0; i < num_dma_channels; i++) {
+> >>                         if ((dma_channels[i].prio == prio) &&
+> >> -                           !dma_channels[i].name) {
+> >> +                           !dma_channels[i].name &&
+> >> +                           !mmp_pdma_toggle_reserved_channel(i)) {
+> >>                                 found = 1;
+> >>                                 break;
+> >>                         }
+> >> 
+> 
+> > How is the order between the two enforced? I.e. can it be that the dmaengine
+> > driver uses the same channel for a different slave before we get here?
+> 
+> If a request is made for a "low prio channel", ie. channel 8, 9 or 10 if I remember
+> correctly :
+>  - suppose dmaengine has transactions underway, and channel 8 is busy
+>  - this loop, for i == 8 : mmp_pdma_toggle_reserved_channel(8) -> -EBUSY
+>  - loop continues, i == 9 : mmp_pdma_toggle_reserved_channel(8) -> 0
+>    => pxa_request_dma reserves channel 9
+> 
+> From now on, mmp_pdma will "skip" channel 9 from its candidates to serve requests.
 
-Math rounding rules normally state that anything of .5 and greater
-should be rounded up, not rounded down.  So, for 99.5Hz, you really
-ought to be returning 100Hz, not 99Hz.
+Ah, so the function asks for just one channel of the right priority,
+not a particular channel. I missed that detail.
 
-However, you do have a point for 99.4Hz, which would be returned as
-99Hz, and when set, it would result in something which isn't 99.4Hz.
+> > If this is ensured to work, I'm fine with your approach.
+> Actually it does. Not exactly this version, as the mmp_pdma interrupt was a bit
+> amended to "skip" also reserved channels and not steal events from legacy code,
+> but that will be for official submission.
+> 
+> It's also designed to be race free, relying on the fact that there is only one
+> CPU on pxa{2,3}xx SocS (irq_save covers). 
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Ok.
+
+> I'm testing it right now with 2 drivers :
+>  - pxa3xx_nand, which is converted to dmaengine
+>  - pxamci, which is not converted to dmaengine
+> In 3 variants :
+>  - zylonite pxa3xx board booted with device-tree
+>  - zylonite pxa3xx board booted in legacy
+>  - mioa701 board booted in device-tree
+> 
+> So far so good. If the mmp_pdma patch is accepted for the transition, it will
+> open up my path towards dmaengine conversion of all pxa drivers (mmc, nand,
+> pxa_camera and pxa2xx-pcm-lib). As Daniel has already done most of the work,
+> and because I have kept it for 2 years, that part will be less a burden than
+> it would seem ... 
+
+Ok, great!
+
+> only the camera will give me a small headache.
+
+Let's worry about that when all the other ones are done then ;-)
+
+	Arnd
