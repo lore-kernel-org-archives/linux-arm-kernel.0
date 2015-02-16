@@ -1,48 +1,37 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 16 Feb 2015 18:54:55 +0100
-Subject: [PATCH 4/8] ARM: dove: create a proper PMU driver for power
- domains, PMU IRQs and resets
-In-Reply-To: <20150216165254.GP8656@n2100.arm.linux.org.uk>
-References: <20150214152659.GI8656@n2100.arm.linux.org.uk>
- <E1YMedG-00054d-0d@rmk-PC.arm.linux.org.uk>
- <54DF7F93.3040009@gmail.com>
- <20150216155823.GO8656@n2100.arm.linux.org.uk>
- <54E21B20.10700@gmail.com>
- <20150216165254.GP8656@n2100.arm.linux.org.uk>
-Message-ID: <20150216175455.GD9247@lunn.ch>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 16 Feb 2015 19:03:36 +0100
+Subject: [PATCH RFC 2/2] ARM: pxa: transition to dmaengine phase 1
+In-Reply-To: <CA+E=qVcEfGaA=V2+cFWfEbOxxBxewfaOarw2_hGfM_4x+7M-jQ@mail.gmail.com>
+ (Vasily Khoruzhick's message of "Mon, 16 Feb 2015 20:00:44 +0300")
+References: <1423954053-21760-1-git-send-email-robert.jarzmik@free.fr>
+ <1423954053-21760-3-git-send-email-robert.jarzmik@free.fr>
+ <CA+E=qVfP=JY5ccUyCat5Thtk6waVng-PsnL7Y4c7_Hj+s8==nw@mail.gmail.com>
+ <87wq3hajbc.fsf@free.fr>
+ <CA+E=qVcEfGaA=V2+cFWfEbOxxBxewfaOarw2_hGfM_4x+7M-jQ@mail.gmail.com>
+Message-ID: <87sie5ag3r.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 16, 2015 at 04:52:54PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Feb 16, 2015 at 05:30:24PM +0100, Sebastian Hesselbarth wrote:
-> > On 16.02.2015 16:58, Russell King - ARM Linux wrote:
-> > >On Sat, Feb 14, 2015 at 06:02:11PM +0100, Sebastian Hesselbarth wrote:
-> > >>How about we copy the clk subsystem way of installing early probed
-> > >>pm for DT here?
-> > >>
-> > >>For example:
-> > >>
-> > >>#define PM_OF_DECLARE(name, compat, fn) OF_DECLARE_1(clk, name, compat, fn)
-> > >>
-> > >>and
-> > >>
-> > >>static int __init dove_pmu_init(struct device_node *np) { ... }
-> > >>PM_OF_DECLARE(dove_pmu, "marvell,dove-pmu", dove_init_pmu);
-> > >
-> > >Well, Rob's response was basically "use the machine descriptor" so I
-> > >guess it needs to be explicitly called from
-> > >arch/arm/mach-mvebu/dove.c:dove_init().
-> > 
-> > Ok, I am very fine with that, too.
-> > 
-> > Still, we'd have to find a proper place for the driver, don't we?
-> 
-> Yep - I'm not sure creating drivers/pmu for (at the moment) one driver
-> is a particularly good idea.  Maybe something in drivers/soc/ ?
+Vasily Khoruzhick <anarsoul@gmail.com> writes:
 
-If you did create drivers/pmu, you could move drives/soc/pmc.c into
-it.
+> On Mon, Feb 16, 2015 at 7:54 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>
+>> Oh, do you volunteer ? That would indeed ease up my burden. I only rebased
+>> pxa3xx_nand, so any help to submit and push is welcome. At least I can commit to
+>> review, and I would concentrate on pxa_camera.c in the meantime.
+>
+> I can rebase those patches on-top of Linus' tree and make sure they
+> work on my machine.
+> I can test pxamci, pxa2xx-spi and pxa2xx-pcm drivers. But I don't
+> think that I have enough time now to submit it and
+> go through review process.
+Do your best, I'll take over when you'll meet your load limit.
 
-But drivers/soc also seems like a good place for the dove PMU code.
+> Btw, where I can find your git tree?
+Here :
+git fetch https://github.com/rjarzmik/linux.git work/clocks-pxa
 
-    Andrew
+Cheers.
+
+-- 
+Robert
