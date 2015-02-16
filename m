@@ -1,54 +1,51 @@
-From: robert.jarzmik@free.fr (robert.jarzmik at free.fr)
-Date: Mon, 16 Feb 2015 14:27:28 +0100 (CET)
-Subject: [PATCH v4 2/4] mfd: lubbock_cplds: add lubbock IO board
-In-Reply-To: <20150216130549.GF14545@x1>
-Message-ID: <1170550770.470129293.1424093248596.JavaMail.root@zimbra1-e1.priv.proxad.net>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 16 Feb 2015 15:20:03 +0200
+Subject: [PATCH 1/2] i2c: dt binding documentation for the Digicolor I2C
+ controller
+Message-ID: <7da767503ac6085c10fbd1953ffd36621b8bf0c5.1424092804.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ Mail original -----
-De: "Lee Jones" <lee.jones@linaro.org>
-?: "Robert Jarzmik" <robert.jarzmik@free.fr>
-Cc: "Rob Herring" <robh+dt@kernel.org>, "Pawel Moll" <pawel.moll@arm.com>, "Mark Rutland" <mark.rutland@arm.com>, "Ian Campbell" <ijc+devicetree@hellion.org.uk>, "Kumar Gala" <galak@codeaurora.org>, "Daniel Mack" <daniel@zonque.org>, "Haojian Zhuang" <haojian.zhuang@gmail.com>, "Samuel Ortiz" <sameo@linux.intel.com>, "Grant Likely" <grant.likely@linaro.org>, devicetree at vger.kernel.org, linux-kernel at vger.kernel.org, linux-arm-kernel at lists.infradead.org, "Arnd Bergmann" <arnd@arndb.de>, "Russell King - ARM Linux" <linux@arm.linux.org.uk>, "Dmitry Eremin-Solenikov" <dbaryshkov@gmail.com>
-Envoy?: Lundi 16 F?vrier 2015 14:05:49
-Objet: Re: [PATCH v4 2/4] mfd: lubbock_cplds: add lubbock IO board
+The CX92755 is an SoC in the Conexant Digicolor series. This devicetree binding
+document describes the I2C controller on the CX92755 SoC, that is also shared
+by some other SoCs in the Digicolor series.
 
-On Sat, 24 Jan 2015, Robert Jarzmik wrote:
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ .../devicetree/bindings/i2c/i2c-digicolor.txt      | 25 ++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-digicolor.txt
 
-> ---
-> Since v1: change the name from cottula to lubbock_io
->             Dmitry pointed out the Cottula was the pxa25x family name,
-> 	    lubbock was the pxa25x development board name. Therefore the
-> 	    name was changed to lubbock_io (lubbock IO board)
-
-> Are you sure this is what you want to do?  We don't usually support
-> 'boards' per say.  Instead we support 'devices', then pull each of
-> those devices together using some h/w description mechanism.
-
-Do you know that :
- 1) anything under "---" in a commit message is thrown away
- 2) after v2, we _both_ agreed that the accurate name is "cplds"
-    which exactly what is in this patch
-    (see device registering with lubbock_cplds).
- 3) there is no more mention of "board" anywhere in the patch core
-
-> Besides, this is MFD, where we support single pieces of silicon which
-> happen to support multiple devices.  I definitely don't want to support
-> boards here.
-> You might want to re-think the naming and your (sales) pitch.
-I might need help. As for the (sales), no comment.
-
->> +#include <linux/mfd/core.h>
-> Why have you included this?  I don't see the use of the MFD framework
-> anywhere.  So what makes this an MFD?
-I thought cplds were to be handled by an MFD driver.
-
-> I'm going to stop here, as I think I need more of an explanation so
-> what you're trying to achieve with this driver.
-Why ? I think things were clear that this driver handles the CPLDs on
-lubbock board, namely u46 and u52. I don't understand what is wrong
-with this patch so that you don't want to go forward.
-
---
-
-Robert
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-digicolor.txt b/Documentation/devicetree/bindings/i2c/i2c-digicolor.txt
+new file mode 100644
+index 000000000000..457a098d4f7e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-digicolor.txt
+@@ -0,0 +1,25 @@
++Conexant Digicolor I2C controller
++
++Required properties:
++ - compatible: must be "cnxt,cx92755-i2c"
++ - reg: physical address and length of the device registers
++ - interrupts: a single interrupt specifier
++ - clocks: clock for the device
++ - #address-cells: should be <1>
++ - #size-cells: should be <0>
++
++Optional properties:
++- clock-frequency: the desired I2C bus clock frequency in Hz; in
++  absence of this property the default value is used (100 kHz).
++
++Example:
++
++	i2c: i2c at f0000120 {
++		compatible = "cnxt,cx92755-i2c";
++		reg = <0xf0000120 0x10>;
++		interrupts = <28>;
++		clocks = <&main_clk>;
++		clock-frequency = <100000>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
+-- 
+2.1.4
