@@ -1,63 +1,70 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 16 Feb 2015 10:49:46 +0100
-Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
- demuxer chip
-In-Reply-To: <20150211171313.GS9154@leverpostej>
-References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150211155720.GQ9154@leverpostej>
- <20150211171515.55d5066f@bbrezillon>
- <2067295.NbJCftPPli@vostro.rjw.lan>
- <20150211171313.GS9154@leverpostej>
-Message-ID: <20150216094946.GG7119@twins.programming.kicks-ass.net>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Mon, 16 Feb 2015 10:52:17 +0100
+Subject: [PATCH v12 0/6] cpufreq: use generic cpufreq drivers for exynos
+ platforms
+In-Reply-To: <CAJKOXPfyPH7tyce6YB=q4krSP078aJVAmqObg89qCnLrL_Nbhg@mail.gmail.com>
+References: <1416576682-5255-1-git-send-email-thomas.ab@samsung.com>
+ <CAMAWPa9fUJVjJ8V+93AkHy9DtEmUUnGs4MJDGcsoMdWwGmg5qg@mail.gmail.com>
+ <CAJKOXPfyPH7tyce6YB=q4krSP078aJVAmqObg89qCnLrL_Nbhg@mail.gmail.com>
+Message-ID: <20150216105217.79315ffd@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Krzysztof, Thomas,
 
-Please change the Subject to start with [PATCH] again when including
-patches, otherwise its too easy for them to get lost. Esp. with
-excessive quoting on top.
-
-I nearly missed the patch here, seeing nothing in the first page of
-text.
-
-On Wed, Feb 11, 2015 at 05:13:13PM +0000, Mark Rutland wrote:
-> ---
->  include/linux/interrupt.h |  5 +++++
->  kernel/irq/pm.c           | 44 ++++++++++++++++++++++++++++++++++++++++++--
->  2 files changed, 47 insertions(+), 2 deletions(-)
+> 2015-01-08 22:17 GMT+01:00 Kevin Hilman <khilman@kernel.org>:
+> > On Fri, Nov 21, 2014 at 5:31 AM, Thomas Abraham
+> > <thomas.ab@samsung.com> wrote:
+> >> Changes since v11:
+> >> - Rebased on top of git://linuxtv.org/snawrocki/samsung.git
+> >> for-v3.19-exynos-clk
+> >>
+> >> This patch series removes the use of Exynos4210 and Exynos5250
+> >> specific cpufreq drivers and enables the use of cpufreq-dt driver
+> >> for these platforms. This series also enables cpufreq support for
+> >> Exynos5420 using arm_big_little cpufreq driver.
+> >>
+> >> This series is based on the following branch.
+> >> git://linuxtv.org/snawrocki/samsung.git for-v3.19-exynos-clk
+> >>
+> >> This series depends on the following patch which can be picked from
+> >> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+> >> samsung/dt e540920cf21c (ARM: dts: add CPU nodes for Exynos4 SoCs).
+> >>
+> >> This patch series has been tested on Exynos4210/5250/5420 based
+> >> boards. Tomasz Figa had plans to take this in the Samsung clock
+> >> tree for v3.19
+> >> (http://www.spinics.net/lists/linux-samsung-soc/msg37933.html).
+> >> Sylwester, could you consider to merge this in your tree?
+> >
+> > CPUfreq for exynos is still not upstream.  What's the status of this
+> > series?  It's been ver a month since there's been any activity here
+> > (or any responses to the issues I reported.)
+> >
+> > On a related note, this series only does frequency scaling. Is there
+> > any work going on to also enable voltage scaling for the CPU rails
+> > as well?
 > 
-> diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-> index d9b05b5..2b8ff50 100644
-> --- a/include/linux/interrupt.h
-> +++ b/include/linux/interrupt.h
-> @@ -57,6 +57,9 @@
->   * IRQF_NO_THREAD - Interrupt cannot be threaded
->   * IRQF_EARLY_RESUME - Resume IRQ early during syscore instead of at device
->   *                resume time.
-> + * IRQF_SHARED_TIMER_OK - Interrupt is safe to be shared with a timer. The
-> + *                        handler may be called spuriously during suspend
-> + *                        without issue.
+> Hi Thomas,
+> 
+> Do you plan to continue with this work? It would be very helpful.
 
-I feel we should do better documenting this; at the very least refer to
-Documentation/power/suspend-and-interrupts.txt and ideally put a scary
-note in telling people that if they use this as a bandaid to make the
-warn go away, they will end up with a broken system.
++1 from me.
 
-Now ideally every driver that employs this should also have a comment
-next to it how it does indeed behave nicely, such that we can 'quickly'
-see people have indeed thought about things and not just slapped it on
-to make the WARN go away.
+> 
+> I also wonder if Exynos 4412 could be re-added (without the boost if
+> these bindings are not ready)?
 
-> diff --git a/kernel/irq/pm.c b/kernel/irq/pm.c
-> index 3ca5325..e4ec91a 100644
-> --- a/kernel/irq/pm.c
-> +++ b/kernel/irq/pm.c
-> @@ -28,6 +28,47 @@ bool irq_pm_check_wakeup(struct irq_desc *desc)
+I would prefer to have all platforms converted at once, since it might
+happen that some parts of the work would get lost.
 
-> +	for (action = desc->action; action; action = action->next)
-> +		if (!(action->flags & safe_flags))
-> +			return false;
+> 
+> Best regards,
+> Krzysztof
 
-In general I prefer braces around the for loop even though C does not
-strictly require it. Its just too easy to confuse multi-line statements
-with multiple statements. Extra braces comfort the brain in this case.
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
