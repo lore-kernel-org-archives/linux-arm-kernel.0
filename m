@@ -1,77 +1,62 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 16 Feb 2015 18:28:05 +0100
-Subject: Extending the Marvell MBus DT binding to create remappable windows
-Message-ID: <20150216182805.529a0071@free-electrons.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 16 Feb 2015 17:46:29 +0000
+Subject: [PATCH v2 23/30] PCI/mvebu: Use pci_common_init_dev() to
+ simplify code
+In-Reply-To: <20150122184000.63ba06bb@free-electrons.com>
+References: <1421800225-26230-1-git-send-email-wangyijing@huawei.com>
+ <1421800225-26230-24-git-send-email-wangyijing@huawei.com>
+ <20150122184000.63ba06bb@free-electrons.com>
+Message-ID: <20150216174628.GA13861@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Ezequiel,
+Hi Thomas,
 
-Both of you were heavily involved in the definition of the MBus Device
-Tree binding, and I'm now facing a new need, which maybe will require
-extending this Device Tree binding.
+On Thu, Jan 22, 2015 at 05:40:00PM +0000, Thomas Petazzoni wrote:
+> Dear Yijing Wang,
+> 
+> On Wed, 21 Jan 2015 08:30:18 +0800, Yijing Wang wrote:
+> > Mvebu_pcie_scan_bus() is not necessary, we could use
+> > pci_common_init_dev() instead of pci_common_init(),
+> > and pass the device pointer as the parent. Then
+> > pci_scan_root_bus() will be called to scan the pci busses.
+> > 
+> > Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> > CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > CC: Jason Cooper <jason@lakedaemon.net>
+> 
+> While I'm fine with the change to pci_common_init_dev(), I am not so
+> sure about the removal of mvebu_pcie_scan_bus(). I vaguely remember
+> that we intentionally did not use the default function for a specific
+> reason. Of course, this was a long time ago, and I don't remember the
+> reason. I would have to take a bit of time to 1/ review the archives of
+> the discussion surrounding the pcie-mvebu driver, and 2/ test your
+> patch to validate it works fine on HW.
 
-Let me summarize a few things:
+I guess the reason: by providing the scan pointer to pcibios through
+the hw_pci struct you were preventing calling pci_scan_root_bus() in
+bios32.c that in turn can add devices before the resources are assigned.
 
- - MBus windows are physical address windows that can be dynamically
-   created. They associate a range of physical addresses with a
-   certain device (a NOR flash, a PCIe memory or I/O area, etc.).
+Basically mvebu_pci_scan_bus() was doing what pci_scan_root_bus() does
+except for calling pci_bus_add_devices().
 
- - Some windows are statically described in the Device Tree: the ones
-   for a NOR flash, for the BootROM, etc. For these, the Device Tree
-   gives both the MBus target ID and attribute (which identify the
-   target device) and the physical address and size at which the MBus
-   window will be created. Such windows are created by the mvebu-mbus
-   driver during its initialization.
+Yijing patches remove pci_bus_add_devices() from pci_scan_root_bus() so
+his change should be fine and it actually improves the current behaviour
+which is quite hard to untangle, and not just on mvebu (I suspect
+drivers/pci/host/pcie-xilinx.c can suffer from the same problem).
 
- - Some windows however have to be dynamically created: the PCIe
-   memory and I/O windows. For these, the Device Tree only specifies
-   the MBus target ID and attribute for each PCIe interface, but the
-   windows are created by the pci-mvebu driver at runtime, using an
-   API provided by the mvebu-mbus driver.
+Lorenzo
 
-Windows, in addition to having a (target ID, target attribute)
-identifying the device plus a (physical address, size) describing
-where the window is mapped in the CPU physical address, can describe a
-"remap address". It's basically an additional register that exists for
-each configurable MBus window, which allows to say at what address the
-window is mapped "from the point of view of the device".
-
-For now, such remappable windows were only used for PCI I/O windows:
-even if an I/O window is visible at (say) 0xe8000000 in the CPU
-physical address space, we still need to make the PCIe device believe
-the PCIe I/O accesses are made from address (say) 0x10000. This is
-what the remappable register that exists for each window allows to do.
-
-For dynamically created windows, this works all fine: the mvebu-mbus
-driver provides an API to create windows while specifying a remappable
-address. So for the PCIe case, no problem.
-
-Now, on the newly released Armada 39x SoC, the networking complex
-requires some MBus windows, and one of them needs to be configured
-with a certain "remap" value. Those windows are not dynamic like the
-PCIe ones: they should be defined statically in the Device Tree, just
-like the MBus window for a NOR flash.
-
-Unfortunately, it seems we designed the Device Tree binding for MBus
-without this use case in mind: there is no way in the MBus DT binding
-to specify a "remap" address for a certain window.
-
-Do you have an idea on how we could extend the MBus Device Tree
-binding to encode this additional information?
-
-If you want to learn more about this remappable attribute, look at the
-public Armada XP datasheet
-(http://www.marvell.com/embedded-processors/armada-xp/assets/ARMADA-XP-Functional-SpecDatasheet.pdf),
-section 3.1.1 for example. This section is only about PCIe remapping,
-but the same happens for other devices. Also look at the description
-of register 0x20008 (table 182, page 631), it describes the remap
-register for window 0.
-
-Thanks for your input,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> 
+> Thanks!
+> 
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
