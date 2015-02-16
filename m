@@ -1,29 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Feb 2015 11:28:57 +0100
-Subject: [PATCH RFC 2/2] ARM: pxa: transition to dmaengine phase 1
-In-Reply-To: <1423954053-21760-3-git-send-email-robert.jarzmik@free.fr>
-References: <1423954053-21760-1-git-send-email-robert.jarzmik@free.fr>
- <1423954053-21760-3-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <2708248.TZ13zqn6jW@wuerfel>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Mon, 16 Feb 2015 10:31:22 +0000
+Subject: [alsa-devel] [PATCH] ASoC: wm8731: let codec to manage clock
+ by itself
+In-Reply-To: <54DC62EA.5030503@atmel.com>
+References: <1423121713-19434-1-git-send-email-voice.shen@atmel.com>
+ <54DC62EA.5030503@atmel.com>
+Message-ID: <20150216103122.GA1091@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 14 February 2015 23:47:33 Robert Jarzmik wrote:
-> @@ -294,7 +294,8 @@ int pxa_request_dma (char *name, pxa_dma_prio prio,
->                 /* try grabbing a DMA channel with the requested priority */
->                 for (i = 0; i < num_dma_channels; i++) {
->                         if ((dma_channels[i].prio == prio) &&
-> -                           !dma_channels[i].name) {
-> +                           !dma_channels[i].name &&
-> +                           !mmp_pdma_toggle_reserved_channel(i)) {
->                                 found = 1;
->                                 break;
->                         }
-> 
+On Thu, Feb 12, 2015 at 04:23:06PM +0800, Bo Shen wrote:
+> Hi All,
+>
+> On 02/05/2015 03:35 PM, Bo Shen wrote:
+>> Let the wm8731 codec to manage clock by itself.
+>>
+>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>> ---
+>>
+>>   sound/soc/codecs/wm8731.c | 28 ++++++++++++++++++++++++++++
+>>   1 file changed, 28 insertions(+)
+>
+> Any comments for this patch (aka ping?)
 
-How is the order between the two enforced? I.e. can it be that the dmaengine
-driver uses the same channel for a different slave before we get here?
+I preferred the idea of having the clock as optional and from the
+discussion on the last patch it didn't look too tricky to
+achieve. OTOH I think the Atmel system is the only one that uses
+both this CODEC and common clock so it doesn't look like this
+would cause any problems, but might be nice for this not to be
+one more thing for someone to fix up when moving a system to
+common clock.
 
-If this is ensured to work, I'm fine with your approach.
-
-	Arnd
+Thanks,
+Charles
