@@ -1,76 +1,83 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Feb 2015 12:23:43 +0000
-Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
- demuxer chip
-In-Reply-To: <20150216092814.GF7119@twins.programming.kicks-ass.net>
-References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
- <2437801.56xPyk3atd@vostro.rjw.lan>
- <20150211151237.GN9154@leverpostej>
- <1487331.cgC9j5u0aF@vostro.rjw.lan>
- <20150216092814.GF7119@twins.programming.kicks-ass.net>
-Message-ID: <20150216122343.GA8994@leverpostej>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Mon, 16 Feb 2015 13:25:24 +0100
+Subject: [PATCH 06/14] drivers: reset: Add STM32 reset driver
+In-Reply-To: <54E132D6.6010608@suse.de>
+References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1423763164-5606-7-git-send-email-mcoquelin.stm32@gmail.com>
+ <54E132D6.6010608@suse.de>
+Message-ID: <CALszF6Cc8CZk-tBQzB-YSsPNDhufoewBzEFz+uRHXqCsQG4BkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+2015-02-16 0:59 GMT+01:00 Andreas F?rber <afaerber@suse.de>:
+> Am 12.02.2015 um 18:45 schrieb Maxime Coquelin:
+>> The STM32 MCUs family IP can be reset by accessing some shared registers.
+>>
+>> The specificity is that some reset lines are used by the timers.
+>> At timer initialization time, the timer has to be reset, that's why
+>> we cannot use a regular driver.
+>>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> ---
+>>  .../devicetree/bindings/reset/st,stm32-reset.txt   |  19 ++++
+>>  drivers/reset/Makefile                             |   1 +
+>>  drivers/reset/reset-stm32.c                        | 124 +++++++++++++++++++++
+>>  3 files changed, 144 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-reset.txt
+>>  create mode 100644 drivers/reset/reset-stm32.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/reset/st,stm32-reset.txt b/Documentation/devicetree/bindings/reset/st,stm32-reset.txt
+>> new file mode 100644
+>> index 0000000..add1298
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/reset/st,stm32-reset.txt
+>> @@ -0,0 +1,19 @@
+>> +STMicroelectronics STM32 Peripheral Reset Controller
+>> +====================================================
+>> +
+>> +Please also refer to reset.txt in this directory for common reset
+>> +controller binding usage.
+>> +
+>> +Required properties:
+>> +- compatible: Should be "st,stm32-reset"
+>> +- reg: should be register base and length as documented in the
+>> +  datasheet
+>> +- #reset-cells: 1, see below
+>> +
+>> +example:
+>> +
+>> +reset_ahb1: reset at 40023810 {
+>> +     #reset-cells = <1>;
+>> +     compatible = "st,stm32-reset";
+>> +     reg = <0x40023810 0x4>;
+>> +};
+> [snip]
+>
+> RM0090 has two different chapters on the RCC IP:
+> * Reset and clock control for STM32F42xxx and STM32F43xxx (RCC)
+> * Reset and clock control for STM32F405xx/07xx and STM32F415xx/17xx(RCC)
+>
+> I therefore feel it is wrong to use "stm32-" here; instead I used
+> "st,stm32f429-rcc" (also relates to 12/14 discussion). This may apply to
+> other identifiers, too.
 
-> > The "suspend" part is kind of a distraction to me here, because that really
-> > only is about sharing an IRQ with a timer and the "your interrupt handler
-> > may be called when the device is suspended" part is just a consequence of that.
-> > 
-> > So IMO it's better to have "TIMER" in the names to avoid encouraging people to
-> > abuse this for other purposes not related to timers.
-> 
-> Sorry to be late to the bike-shed party, but what about:
+In this first version, the reset driver was really generic, and was
+compatible with the STM32 family.
+The only difference would have been in the device trees.
 
-[...]
-
-> arch/arm/mach-omap2/mux.c:		omap_hwmod_mux_handle_irq, IRQF_SHARED | IRQF_NO_SUSPEND,
-> arch/arm/mach-omap2/pm34xx.c:		_prcm_int_handle_io, IRQF_SHARED | IRQF_NO_SUSPEND, "pm_io",
-> drivers/pinctrl/pinctrl-single.c:				  IRQF_SHARED | IRQF_NO_SUSPEND,
-
-These are chained IRQ handlers. If any of these have a chained timer irq
-then the IRQF_NO_SUSPEND may be legitimate. I can't imagine why these
-would be shared, however.
-
-It also looks like these abuse IRQF_NO_SUSPEND for wakeup interrupts.
-
-> drivers/rtc/rtc-pl031.c:	.irqflags = IRQF_SHARED | IRQF_NO_SUSPEND,
-
-This looks to be an abuse and should use {enable,disable}_irq_wake.
-
-However, we'd then need to handle mismatch with wakeup interrupts (which
-is effectively the same problem as sharing with a timer).
-
-> drivers/mfd/ab8500-debugfs.c:				   IRQF_SHARED | IRQF_NO_SUSPEND,
-> drivers/mfd/ab8500-gpadc.c:			IRQF_NO_SUSPEND | IRQF_SHARED, "ab8500-gpadc-sw",
-> drivers/mfd/ab8500-gpadc.c:			IRQF_NO_SUSPEND | IRQF_SHARED, "ab8500-gpadc-hw",
-> drivers/power/ab8500_btemp.c:			IRQF_SHARED | IRQF_NO_SUSPEND,
-> drivers/power/ab8500_charger.c:			IRQF_SHARED | IRQF_NO_SUSPEND,
-> drivers/power/ab8500_fg.c:			IRQF_SHARED | IRQF_NO_SUSPEND,
-> drivers/usb/phy/phy-ab8500-usb.c:				IRQF_NO_SUSPEND | IRQF_SHARED,
-> drivers/usb/phy/phy-ab8500-usb.c:				IRQF_NO_SUSPEND | IRQF_SHARED,
-> drivers/usb/phy/phy-ab8500-usb.c:				IRQF_NO_SUSPEND | IRQF_SHARED,
-
-All the *ab8500* look cargo-culted. There's other nonsense in these
-(e.g. mutex_lock in irq handlers...). I suspect these are not
-legitimate.
-
-> drivers/watchdog/intel-mid_wdt.c:			       IRQF_SHARED | IRQF_NO_SUSPEND, "watchdog",
-
-Watchdogs could be a legitimate case, but this driver relies on another
-timer and the timeout irq handler simply calls panic(), which seems a
-little extreme.
-
-> Is there a single legitimate user in that list? If so, the TIMER name
-> might be misleading.
-
-The watchdog case could be legitimate, and with drivers corrected to use
-{enable,disable}_irq_wake we'll need to handle mismatch for wakeup
-interrupts too.
-
-Having separate flags for sharing with timers and sharing with wakeup
-sources seems redundant, and IRQF_SHARED_TIMER_OK would be misleading.
+Now, from the discussion with Philipp, I will reconsider the
+implementation to add some named constants,
+so maybe I will reconsider the compatible, it will depend on how I
+will implement it.
 
 Thanks,
-Mark.
+Maxime
+
+>
+> Regards,
+> Andreas
+>
+> --
+> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+> GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
+> Graham Norton; HRB 21284 (AG N?rnberg)
