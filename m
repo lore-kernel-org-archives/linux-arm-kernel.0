@@ -1,167 +1,35 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 17 Feb 2015 10:20:20 +0100
-Subject: [PATCH 01/11] mfd: add the Berlin controller driver
-In-Reply-To: <20150216124808.GC14545@x1>
-References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
- <1423671332-24580-2-git-send-email-antoine.tenart@free-electrons.com>
- <20150216124808.GC14545@x1>
-Message-ID: <20150217092020.GC4507@kwain>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 17 Feb 2015 18:25:22 +0900
+Subject: drm/exynos: DRM_EXYNOS7DECON?
+In-Reply-To: <1424163888.7082.16.camel@x220>
+References: <1424163888.7082.16.camel@x220>
+Message-ID: <54E30902.5070000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lee,
-
-On Mon, Feb 16, 2015 at 12:48:08PM +0000, Lee Jones wrote:
-> On Wed, 11 Feb 2015, Antoine Tenart wrote:
+On 2015? 02? 17? 18:04, Paul Bolle wrote:
+> Your commit 96976c3d9aff ("drm/exynos: Add DECON driver") is included in
+> today's linux-next (ie, next-20150217). I noticed because a script I use
+> to check linux-next spotted a problem with it.
 > 
-> > --- a/drivers/mfd/Kconfig
-> > +++ b/drivers/mfd/Kconfig
-> > @@ -840,6 +840,11 @@ config STMPE_SPI
-> >  	  This is used to enable SPI interface of STMPE
-> >  endmenu
-> >  
-> > +config MFD_BERLIN_CTRL
-> > +	bool
-> 
-> Missing description.
-> Why can't this driver be built as a module?
+> It added an (optional) dependency on DRM_EXYNOS7DECON instead of
+> DRM_EXYNOS7_DECON (see drivers/gpu/drm/exynos/Kconfig). Is the trivial
+> patch to correct this typo queued somewhere? (This assumes an optional
+> dependency on DRM_EXYNOS7_DECON is actually needed for DRM_EXYNOS_DP, of
+> course.)
 
-Well, this mfd driver registers various devices as the pinctrl and the
-reset driver. I think we want the pinctrl driver to always be
-registered.
+Ah, right. It's my mistake. That is just typo so it should be
+DRM_EXYNOS7_DECON instead of DRM_EXYNOS7DECON. It would be fixed at RC1.
 
-IMHO we want this driver to always be selected when using a Berlin SoC.
+Thanks for report,
+Inki Dae
 
 > 
-> > +	select MFD_CORE
-> > +	select MFD_SYSCON
 > 
-> Missing help.
+> Paul Bolle
 > 
-> >  config MFD_STA2X11
-> >  	bool "STMicroelectronics STA2X11"
-> >  	depends on STA2X11
-> > diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> > index 53467e211381..adf60e85df20 100644
-> > --- a/drivers/mfd/Makefile
-> > +++ b/drivers/mfd/Makefile
-> > @@ -179,3 +179,5 @@ obj-$(CONFIG_MFD_DLN2)		+= dln2.o
-> >  
-> >  intel-soc-pmic-objs		:= intel_soc_pmic_core.o intel_soc_pmic_crc.o
-> >  obj-$(CONFIG_INTEL_SOC_PMIC)	+= intel-soc-pmic.o
-> > +
-> > +obj-$(CONFIG_MFD_BERLIN_CTRL)	+= berlin-ctrl.o
-> > diff --git a/drivers/mfd/berlin-ctrl.c b/drivers/mfd/berlin-ctrl.c
-> > new file mode 100644
-> > index 000000000000..e3ce6f069f16
-> > --- /dev/null
-> > +++ b/drivers/mfd/berlin-ctrl.c
-> > @@ -0,0 +1,180 @@
-> > +/*
-> > + * Copyright (C) 2015 Marvell Technology Group Ltd.
-> > + *
-> > + * Antoine Tenart <antoine.tenart@free-electrons.com>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> Author: Antoine Tenart <antoine.tenart@free-electrons.com>
-
-Hmmm, okay.
-
-> 
-> > +
-> > +#include <linux/mfd/core.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of.h>
-> 
-> kernel.h?
-
-Is there a reason to add this header here?
-
-> > +/*
-> > + * BG2 devices
-> > + */
-> > +static const struct mfd_cell berlin2_ctrl_chip_ctrl_subdevs[] = {
-> > +	{
-> > +		.name		= "berlin2-soc-pinctrl",
-> > +		.of_compatible	= "marvell,berlin2-soc-pinctrl",
-> > +	},
-> > +	{
-> > +		.name		= "berlin2-reset",
-> > +		.of_compatible	= "marvell,berlin2-reset",
-> > +	},
-> > +};
-> > +
-> > +static const struct mfd_cell berlin2_ctrl_system_ctrl_subdevs[] = {
-> > +	{
-> > +		.name		= "berlin2-system-pinctrl",
-> > +		.of_compatible	= "marvell,berlin2-system-pinctrl",
-> > +	},
-> > +};
-> > +
-> > +static const struct berlin_ctrl_priv berlin2_ctrl_chip_ctrl_data = {
-> > +	.devs	= berlin2_ctrl_chip_ctrl_subdevs,
-> > +	.ndevs	= ARRAY_SIZE(berlin2_ctrl_chip_ctrl_subdevs),
-> > +};
-> > +
-> > +static const struct berlin_ctrl_priv berlin2_ctrl_system_data = {
-> > +	.devs	= berlin2_ctrl_system_ctrl_subdevs,
-> > +	.ndevs	= ARRAY_SIZE(berlin2_ctrl_system_ctrl_subdevs),
-> > +};
-> > +
-> > +
-> 
-> Superfluous '\n'
-
-Sure.
-
-> 
-> > +
-> > +static int berlin_ctrl_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	const struct of_device_id *match;
-> > +	const struct berlin_ctrl_priv *priv;
-> > +	int ret;
-> > +
-> > +	match = of_match_node(berlin_ctrl_of_match, dev->of_node);
-> > +	if (!match)
-> > +		return -EINVAL;
-> > +
-> > +	priv = match->data;
-> > +
-> > +	ret = mfd_add_devices(dev, 0, priv->devs, priv->ndevs, NULL, -1, NULL);
-> > +	if (ret) {
-> > +		dev_err(dev, "Failed to add devices: %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> 
-> I'm not sure I see the point in this driver.  Why can't you just
-> register these devices directly from DT?
-
-All these devices share the same bank of registers and we previously
-used a single node. But with many devices sharing a single node, this is
-problematic to register all the devices from DT. Using this MFD driver
-to do it is a proper solution in this case.
-
-To provide a regmap to the devices' drivers we also use syscon on the
-chip/system controller nodes.
-
-> > +MODULE_LICENSE("GPL");
-> 
-> v2
-
-"GPL" is a valid choice, quoting include/linux.module.h:
-
-	"GPL"              [GNU Public License v2 or later]
-	"GPL v2"           [GNU Public License v2]
-
-Is there a reason you explicitly want to use GPLv2, and only GPLv2?
-
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
