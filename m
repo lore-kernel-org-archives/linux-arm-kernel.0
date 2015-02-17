@@ -1,63 +1,52 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Feb 2015 09:29:35 +0000
-Subject: [PATCH v2 5/6] irqchip: gicv3-its: add support for power down
-In-Reply-To: <1423992723-5028-6-git-send-email-wuyun.wu@huawei.com>
+Date: Tue, 17 Feb 2015 09:46:39 +0000
+Subject: [PATCH v2 2/6] irqchip: gicv3-its: use 64KB page as default
+ granule
+In-Reply-To: <1423992723-5028-3-git-send-email-wuyun.wu@huawei.com>
 References: <1423992723-5028-1-git-send-email-wuyun.wu@huawei.com>
- <1423992723-5028-6-git-send-email-wuyun.wu@huawei.com>
-Message-ID: <20150217092935.1fefcb24@arm.com>
+ <1423992723-5028-3-git-send-email-wuyun.wu@huawei.com>
+Message-ID: <20150217094639.1114dad5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 15 Feb 2015 09:32:02 +0000
+On Sun, 15 Feb 2015 09:31:59 +0000
 Yun Wu <wuyun.wu@huawei.com> wrote:
 
-> It's unsafe to change the configurations of an activated ITS directly
-> since this will lead to unpredictable results. This patch guarantees
-> a safe quiescent status before initializing an ITS.
-
-Please change the title of this patch to reflect what it actually
-does. Nothing here is about powering down anything.
-
+> The field of page size in register GITS_BASERn might be read-only
+> if an implementation only supports a single, fixed page size. But
+> currently the ITS driver will throw out an error when PAGE_SIZE
+> is less than the minimum size supported by an ITS. So addressing
+> this problem by using 64KB pages as default granule for all the
+> ITS base tables.
+> 
 > Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
 > ---
->  drivers/irqchip/irq-gic-v3-its.c | 32
-> ++++++++++++++++++++++++++++++++ 1 file changed, 32 insertions(+)
+>  drivers/irqchip/irq-gic-v3-its.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
 > diff --git a/drivers/irqchip/irq-gic-v3-its.c
-> b/drivers/irqchip/irq-gic-v3-its.c index 42c03b2..29eb665 100644
+> b/drivers/irqchip/irq-gic-v3-its.c index 69eeea3..f5bfa42 100644
 > --- a/drivers/irqchip/irq-gic-v3-its.c
 > +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1321,6 +1321,31 @@ static const struct irq_domain_ops
-> its_domain_ops = { .deactivate		=
-> its_irq_domain_deactivate, };
+> @@ -800,7 +800,7 @@ static int its_alloc_tables(struct its_node *its)
+>  {
+>  	int err;
+>  	int i;
+> -	int psz = PAGE_SIZE;
+> +	int psz = SZ_64K;
+>  	u64 shr = GITS_BASER_InnerShareable;
 > 
-> +static int its_check_quiesced(void __iomem *base)
-> +{
-> +	u32 count = 1000000;	/* 1s */
-> +	u32 val;
-> +
-> +	val = readl_relaxed(base + GITS_CTLR);
-> +	if (val & GITS_CTLR_QUIESCENT)
-> +		return 0;
-> +
-> +	/* Disable the generation of all interrupts to this ITS */
-> +	val &= ~GITS_CTLR_ENABLE;
-> +	writel_relaxed(val, base + GITS_CTLR);
-> +
-> +	/* Poll GITS_CTLR and wait until ITS becomes quiescent */
-> +	while (count--) {
-> +		val = readl_relaxed(base + GITS_CTLR);
-> +		if (val & GITS_CTLR_QUIESCENT)
-> +			return 0;
-> +		cpu_relax();
-> +		udelay(1);
-> +	}
+>  	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+> --
+> 1.8.0
+> 
+> 
+> 
 
-You're now introducing a third variant of a 1s timeout loop. Notice a
-pattern?
 
-Thanks,
 
-	M.
 -- 
 Jazz is not dead. It just smells funny.
