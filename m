@@ -1,111 +1,209 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 17 Feb 2015 21:39:06 +0100
-Subject: [PATCH v2 1/2] dma: mmp_dma: add support for legacy transition
-In-Reply-To: <1423954053-21760-1-git-send-email-robert.jarzmik@free.fr>
+Date: Tue, 17 Feb 2015 21:39:07 +0100
+Subject: [PATCH v2 2/2] ARM: pxa: transition to dmaengine phase 1
+In-Reply-To: <1424205547-15429-1-git-send-email-robert.jarzmik@free.fr>
 References: <1423954053-21760-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1424205547-15429-1-git-send-email-robert.jarzmik@free.fr>
+ <1424205547-15429-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1424205547-15429-2-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to achieve smooth transition of pxa drivers from old legacy dma
-handling to new dmaengine, introduce a function to "hide" dma physical
-channels from dmaengine.
+In order to slowly transition pxa to dmaengine, the legacy code will now
+rely on dmaengine to request a channel.
 
-This is temporary situation where pxa dma will be handled in 2 places :
- - arch/arm/plat-pxa/dma.c
- - drivers/dma/mmp_pdma.c
-
-The resources, ie. dma channels, will be controlled by mmp_dma. The
-legacy code will request or release a channel with
-mmp_pdma_toggle_reserved_channel().
-
-This is not very pretty, but it ensures both legacy and dmaengine
-consumers can live in the same kernel until the conversion is done.
+This implies that PXA architecture selects DMADEVICES and MMP_PDMA,
+which is not pretty. Yet it enables PXA drivers to be ported one by one,
+with part of them using dmaengine, and the other part using the legacy
+code.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
-Since v1: fix irq handler to not touch legacy reserved dma interrupts
----
- drivers/dma/mmp_pdma.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
 
-diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-index 8926f27..1b82bd6 100644
---- a/drivers/dma/mmp_pdma.c
-+++ b/drivers/dma/mmp_pdma.c
-@@ -198,6 +198,15 @@ static int clear_chan_irq(struct mmp_pdma_phy *phy)
- 	return 0;
+---
+Since v1: removed Kconfig selects
+          added the mmp_pdma platform devices for legacy platforms
+	  fixed the legacy dma interrupt handler to cooperate with mmp_pdma
+---
+ arch/arm/mach-pxa/devices.c          | 37 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-pxa/pxa25x.c           |  1 +
+ arch/arm/mach-pxa/pxa27x.c           |  1 +
+ arch/arm/mach-pxa/pxa3xx.c           |  1 +
+ arch/arm/plat-pxa/dma.c              | 22 ++++++++++-----------
+ arch/arm/plat-pxa/include/plat/dma.h | 15 +++++++++++++++
+ 6 files changed, 66 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
+index 3543466..7b7161a 100644
+--- a/arch/arm/mach-pxa/devices.c
++++ b/arch/arm/mach-pxa/devices.c
+@@ -17,6 +17,7 @@
+ #include <linux/platform_data/camera-pxa.h>
+ #include <mach/audio.h>
+ #include <mach/hardware.h>
++#include <linux/platform_data/mmp_dma.h>
+ #include <linux/platform_data/mtd-nand-pxa3xx.h>
+ 
+ #include "devices.h"
+@@ -1193,3 +1194,39 @@ void __init pxa2xx_set_spi_info(unsigned id, struct pxa2xx_spi_master *info)
+ 	pd->dev.platform_data = info;
+ 	platform_device_add(pd);
  }
++
++static struct mmp_dma_platdata mmp_pdma_pdata = {
++	.dma_channels	= 0,
++};
++
++static struct resource mmp_pdma_resource[] = {
++	[0] = {
++		.start	= 0x40000000,
++		.end	= 0x4000ffff,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= IRQ_DMA,
++		.end	= IRQ_DMA,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static u64 pxadma_dmamask = 0xffffffffUL;
++
++static struct platform_device pxa2xx_mmp_dma = {
++	.name		= "mmp-pdma",
++	.id		= 0,
++	.dev		= {
++		.dma_mask = &pxadma_dmamask,
++		.coherent_dma_mask = 0xffffffff,
++	},
++	.num_resources	= ARRAY_SIZE(mmp_pdma_resource),
++	.resource	= mmp_pdma_resource,
++};
++
++void __init pxa2xx_set_dmac_info(int nb_channels)
++{
++	mmp_pdma_pdata.dma_channels = nb_channels;
++	return pxa_register_device(&pxa2xx_mmp_dma, &mmp_pdma_pdata);
++}
+diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+index 23a90c6..1dc85ff 100644
+--- a/arch/arm/mach-pxa/pxa25x.c
++++ b/arch/arm/mach-pxa/pxa25x.c
+@@ -206,6 +206,7 @@ static int __init pxa25x_init(void)
+ 		register_syscore_ops(&pxa_irq_syscore_ops);
+ 		register_syscore_ops(&pxa2xx_mfp_syscore_ops);
+ 
++		pxa2xx_set_dmac_info(16);
+ 		pxa_register_device(&pxa25x_device_gpio, &pxa25x_gpio_info);
+ 		ret = platform_add_devices(pxa25x_devices,
+ 					   ARRAY_SIZE(pxa25x_devices));
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index b5abdeb..e6aae9e 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -310,6 +310,7 @@ static int __init pxa27x_init(void)
+ 		if (!of_have_populated_dt()) {
+ 			pxa_register_device(&pxa27x_device_gpio,
+ 					    &pxa27x_gpio_info);
++			pxa2xx_set_dmac_info(32);
+ 			ret = platform_add_devices(devices,
+ 						   ARRAY_SIZE(devices));
+ 		}
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index bd4cbef..aa85ec1 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -431,6 +431,7 @@ static int __init pxa3xx_init(void)
+ 		if (of_have_populated_dt())
+ 			return 0;
+ 
++		pxa2xx_set_dmac_info(32);
+ 		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+ 		if (ret)
+ 			return ret;
+diff --git a/arch/arm/plat-pxa/dma.c b/arch/arm/plat-pxa/dma.c
+index 054fc5a..67a2b1f 100644
+--- a/arch/arm/plat-pxa/dma.c
++++ b/arch/arm/plat-pxa/dma.c
+@@ -294,7 +294,8 @@ int pxa_request_dma (char *name, pxa_dma_prio prio,
+ 		/* try grabbing a DMA channel with the requested priority */
+ 		for (i = 0; i < num_dma_channels; i++) {
+ 			if ((dma_channels[i].prio == prio) &&
+-			    !dma_channels[i].name) {
++			    !dma_channels[i].name &&
++			    !mmp_pdma_toggle_reserved_channel(i)) {
+ 				found = 1;
+ 				break;
+ 			}
+@@ -331,13 +332,14 @@ void pxa_free_dma (int dma_ch)
+ 	local_irq_save(flags);
+ 	DCSR(dma_ch) = DCSR_STARTINTR|DCSR_ENDINTR|DCSR_BUSERR;
+ 	dma_channels[dma_ch].name = NULL;
++	mmp_pdma_toggle_reserved_channel(dma_ch);
+ 	local_irq_restore(flags);
+ }
+ EXPORT_SYMBOL(pxa_free_dma);
+ 
+ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
+ {
+-	int i, dint = DINT;
++	int i, dint = DINT, done = 0;
+ 	struct dma_channel *channel;
+ 
+ 	while (dint) {
+@@ -346,16 +348,13 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
+ 		channel = &dma_channels[i];
+ 		if (channel->name && channel->irq_handler) {
+ 			channel->irq_handler(i, channel->data);
+-		} else {
+-			/*
+-			 * IRQ for an unregistered DMA channel:
+-			 * let's clear the interrupts and disable it.
+-			 */
+-			printk (KERN_WARNING "spurious IRQ for DMA channel %d\n", i);
+-			DCSR(i) = DCSR_STARTINTR|DCSR_ENDINTR|DCSR_BUSERR;
++			done++;
+ 		}
+ 	}
+-	return IRQ_HANDLED;
++	if (done)
++		return IRQ_HANDLED;
++	else
++		return IRQ_NONE;
+ }
+ 
+ int __init pxa_init_dma(int irq, int num_ch)
+@@ -377,7 +376,8 @@ int __init pxa_init_dma(int irq, int num_ch)
+ 		spin_lock_init(&dma_channels[i].lock);
+ 	}
+ 
+-	ret = request_irq(irq, dma_irq_handler, 0, "DMA", NULL);
++	ret = request_irq(irq, dma_irq_handler, IRQF_SHARED, "DMA",
++			  dma_channels);
+ 	if (ret) {
+ 		printk (KERN_CRIT "Wow!  Can't register IRQ for DMA\n");
+ 		kfree(dma_channels);
+diff --git a/arch/arm/plat-pxa/include/plat/dma.h b/arch/arm/plat-pxa/include/plat/dma.h
+index a7b91dc..f6f1acb 100644
+--- a/arch/arm/plat-pxa/include/plat/dma.h
++++ b/arch/arm/plat-pxa/include/plat/dma.h
+@@ -82,4 +82,19 @@ int pxa_request_dma (char *name,
+ 
+ void pxa_free_dma (int dma_ch);
  
 +/*
-+ * In the transition phase where legacy pxa handling is done at the same time as
-+ * mmp_dma, the DMA physical channel split between the 2 DMA providers is done
-+ * through legacy_reserved. Legacy code reserves DMA channels by settings
-+ * corresponding bits in legacy_reserved.
++ * Cooperation with mmp_pdma + dmaengine while there remains at least one pxa
++ * driver not converted to dmaengine.
 + */
-+static u32 legacy_reserved;
-+static u32 legacy_unavailable;
-+
- static irqreturn_t mmp_pdma_chan_handler(int irq, void *dev_id)
- {
- 	struct mmp_pdma_phy *phy = dev_id;
-@@ -221,6 +230,8 @@ static irqreturn_t mmp_pdma_int_handler(int irq, void *dev_id)
- 		i = __ffs(dint);
- 		dint &= (dint - 1);
- 		phy = &pdev->phy[i];
-+		if ((i < 32) && (legacy_reserved & (1 << i)))
-+			continue;
- 		ret = mmp_pdma_chan_handler(irq, phy);
- 		if (ret == IRQ_HANDLED)
- 			irq_num++;
-@@ -253,10 +264,14 @@ static struct mmp_pdma_phy *lookup_phy(struct mmp_pdma_chan *pchan)
- 		for (i = 0; i < pdev->dma_channels; i++) {
- 			if (prio != (i & 0xf) >> 2)
- 				continue;
-+			if ((i < 32) && (legacy_reserved & (1 << i)))
-+				continue;
- 			phy = &pdev->phy[i];
- 			if (!phy->vchan) {
- 				phy->vchan = pchan;
- 				found = phy;
-+				if (i < 32)
-+					legacy_unavailable |= (1 << i);
- 				goto out_unlock;
- 			}
- 		}
-@@ -272,6 +287,7 @@ static void mmp_pdma_free_phy(struct mmp_pdma_chan *pchan)
- 	struct mmp_pdma_device *pdev = to_mmp_pdma_dev(pchan->chan.device);
- 	unsigned long flags;
- 	u32 reg;
-+	int i;
- 
- 	if (!pchan->phy)
- 		return;
-@@ -281,6 +297,9 @@ static void mmp_pdma_free_phy(struct mmp_pdma_chan *pchan)
- 	writel(0, pchan->phy->base + reg);
- 
- 	spin_lock_irqsave(&pdev->phy_lock, flags);
-+	for (i = 0; i < 32; i++)
-+		if (pchan->phy == &pdev->phy[i])
-+			legacy_unavailable &= ~(1 << i);
- 	pchan->phy->vchan = NULL;
- 	pchan->phy = NULL;
- 	spin_unlock_irqrestore(&pdev->phy_lock, flags);
-@@ -1121,6 +1140,15 @@ bool mmp_pdma_filter_fn(struct dma_chan *chan, void *param)
- }
- EXPORT_SYMBOL_GPL(mmp_pdma_filter_fn);
- 
-+int mmp_pdma_toggle_reserved_channel(int legacy_channel)
++#if defined(CONFIG_MMP_PDMA)
++extern int mmp_pdma_toggle_reserved_channel(int legacy_channel);
++#else
++static inline mmp_pdma_toggle_reserved_channel(int legacy_channel)
 +{
-+	if (legacy_unavailable & (1 << legacy_channel))
-+		return -EBUSY;
-+	legacy_reserved ^= 1 << legacy_channel;
 +	return 0;
 +}
-+EXPORT_SYMBOL_GPL(mmp_pdma_toggle_reserved_channel);
++#endif
 +
- module_platform_driver(mmp_pdma_driver);
- 
- MODULE_DESCRIPTION("MARVELL MMP Peripheral DMA Driver");
++extern void __init pxa2xx_set_dmac_info(int nb_channels);
++
+ #endif /* __PLAT_DMA_H */
 -- 
 2.1.0
