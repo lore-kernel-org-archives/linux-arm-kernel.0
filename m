@@ -1,36 +1,43 @@
-From: mikko.rapeli@iki.fi (Mikko Rapeli)
-Date: Tue, 17 Feb 2015 00:05:10 +0100
-Subject: [PATCH 07/45] exynos_drm.h: include stdint.h in userspace
-In-Reply-To: <1424127948-22484-1-git-send-email-mikko.rapeli@iki.fi>
-References: <1424127948-22484-1-git-send-email-mikko.rapeli@iki.fi>
-Message-ID: <1424127948-22484-8-git-send-email-mikko.rapeli@iki.fi>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 17 Feb 2015 09:12:19 +0900
+Subject: [PATCH Resend] ARM64:ftrace: fix ftrace_modify_graph_caller for
+ branch replace
+In-Reply-To: <ce66ac4d80d4b200a9dad610d46533bb24934352.1423800192.git.panand@redhat.com>
+References: <ce66ac4d80d4b200a9dad610d46533bb24934352.1423800192.git.panand@redhat.com>
+Message-ID: <54E28763.5080708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes compilation errors like:
+On 02/13/2015 01:06 PM, Pratyush Anand wrote:
+> ftrace_enable_ftrace_graph_caller and ftrace_disable_ftrace_graph_caller
+> should replace B(jmp) instruction and not BL(call) instruction.
 
-drm/exynos_drm.h:30:2: error: unknown type name ?uint64_t?
+Thanks. I originally intended to use "b".
+("bl" may also work anyway 'cause link register will be saved/restored
+around ftrace_caller().)
 
-Signed-off-by: Mikko Rapeli <mikko.rapeli@iki.fi>
----
- include/uapi/drm/exynos_drm.h | 5 +++++
- 1 file changed, 5 insertions(+)
+-Takahiro AKASHI
 
-diff --git a/include/uapi/drm/exynos_drm.h b/include/uapi/drm/exynos_drm.h
-index 5575ed1..03d094d 100644
---- a/include/uapi/drm/exynos_drm.h
-+++ b/include/uapi/drm/exynos_drm.h
-@@ -15,6 +15,11 @@
- #ifndef _UAPI_EXYNOS_DRM_H_
- #define _UAPI_EXYNOS_DRM_H_
- 
-+#ifdef __KERNEL__
-+#include <linux/types.h>
-+#else
-+#include <stdint.h>
-+#endif
- #include <drm/drm.h>
- 
- /**
--- 
-2.1.4
+> commit 9f1ae7596aad("arm64: Correct ftrace calls to
+> aarch64_insn_gen_branch_imm()") did a typo and used
+> AARCH64_INSN_BRANCH_LINK instead of AARCH64_INSN_BRANCH_NOLINK.
+>
+> Signed-off-by: Pratyush Anand <panand@redhat.com>
+> ---
+>   arch/arm64/kernel/ftrace.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+> index cf8556ae09d0..c851be795080 100644
+> --- a/arch/arm64/kernel/ftrace.c
+> +++ b/arch/arm64/kernel/ftrace.c
+> @@ -156,7 +156,7 @@ static int ftrace_modify_graph_caller(bool enable)
+>
+>   	branch = aarch64_insn_gen_branch_imm(pc,
+>   					     (unsigned long)ftrace_graph_caller,
+> -					     AARCH64_INSN_BRANCH_LINK);
+> +					     AARCH64_INSN_BRANCH_NOLINK);
+>   	nop = aarch64_insn_gen_nop();
+>
+>   	if (enable)
+>
