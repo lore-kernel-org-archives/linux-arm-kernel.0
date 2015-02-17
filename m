@@ -1,36 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Feb 2015 20:41:41 +0100
-Subject: [PATCH 1/2] phy: usbphy: Add dt documentation for Broadcom Cygnus
- USB PHY driver
-In-Reply-To: <1424200821-16368-2-git-send-email-arun.ramamurthy@broadcom.com>
-References: <1424200821-16368-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1424200821-16368-2-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <8242260.cl4QTECoeX@wuerfel>
+From: marek@goldelico.com (Marek Belisko)
+Date: Tue, 17 Feb 2015 20:52:20 +0100
+Subject: [PATCH v2 0/3] ARM: dts: add openpandora device support
+Message-ID: <1424202743-26387-1-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 February 2015 11:20:20 Arun Ramamurthy wrote:
-> +       /* This nodes declares  port 0
-> +       and port 1 as host*/
-> +
-> +       ehci0: usb at 0x18048000 {
-> +               compatible = "generic-ehci";
-> +               reg = <0x18048000 0x100>;
-> +               interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
-> +               phys = <&usbphy0 0 1 &usbphy0 1>;
+changes from v1:
+- add new boards to makefile in patch 2,3 (don't add them
+in separate commit together), fix gpmc issues (reported by Tony Lindgren)
 
-The second reference in the example is missing the last cell,
-as you have #phy-cells = <2>.
+- fix various issues reported by Grazvydas Ignotas
+(drop internal pullups from pinmux as external are in place,
+fix gpio buttons active state ...)
 
-> +               phy-names = "usbp0","usbp1";
-> +               status = "okay";
-> +       };
+This series of patches adds initial device tree support for the
+OpenPandora. The most important parts are working (display, keyboard,
+touch, charging, fuel gauge, musb port, sd/mmc ports, leds, buttons).
+Not yet supported are: usb host port, nubs, wifi, bluetooth, audio.
 
-Further, the binding for "generic-ehci" requires the name to be "usb",
-not "usbp0". You should probably update that binding if you can have
-multiple references to mention that.
+First patch add common dtsi file which is then used in 600mhz and 1ghz
+variants of openpandora which support is added in patches 2 and 3.
 
-Can you make both names "usb"? If not, we should document a common
-naming scheme that the driver can use.
 
-	Arnd
+H. Nikolaus Schaller (3):
+  ARM: dts: omap3-pandora: add common device tree
+  ARM: dts: omap3-pandora: add OMAP3530 600 MHz version
+  ARM: dts: omap3-pandora: add DM3730 1 GHz version
+
+ arch/arm/boot/dts/Makefile                  |   2 +
+ arch/arm/boot/dts/omap3-pandora-1ghz.dts    |  70 +++
+ arch/arm/boot/dts/omap3-pandora-600mhz.dts  |  65 +++
+ arch/arm/boot/dts/omap3-pandora-common.dtsi | 640 ++++++++++++++++++++++++++++
+ 4 files changed, 777 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omap3-pandora-1ghz.dts
+ create mode 100644 arch/arm/boot/dts/omap3-pandora-600mhz.dts
+ create mode 100644 arch/arm/boot/dts/omap3-pandora-common.dtsi
+
+-- 
+1.9.1
