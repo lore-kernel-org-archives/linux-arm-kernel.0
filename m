@@ -1,85 +1,38 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 17 Feb 2015 16:04:42 +0100
-Subject: [PATCH v4 2/6] ARM: shmobile: ape6evm dts: Move Ethernet node to BSC
+Date: Tue, 17 Feb 2015 16:04:46 +0100
+Subject: [PATCH v4 6/6] ARM: shmobile: ape6evm dts: Drop console= bootargs
+ parameter
 In-Reply-To: <1424185486-3017-1-git-send-email-geert+renesas@glider.be>
 References: <1424185486-3017-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1424185486-3017-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1424185486-3017-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the Ethernet node from the ad-hoc lbsc node to the BSC node,
-as its connected to the Bus State Controller.  This allows the system to
-know the right position of the Ethernet node in the clock and PM domain
-hierarchy, and manage the clock and PM domain appropriately.
+Since ("ARM: shmobile: r8a73a4: ape6evm: Remove legacy platform"),
+ape6evm is restricted to booting from DT, so chosen/stdout-path is
+always used, and we can drop the "console=" parameter from
+chosen/bootargs.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Acked-by: Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
 v4:
-  - Add Acked-by,
-
-v3:
-  - Add Tested-by,
-
-v2:
   - New.
 ---
- arch/arm/boot/dts/r8a73a4-ape6evm.dts | 35 +++++++++++++++--------------------
- 1 file changed, 15 insertions(+), 20 deletions(-)
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-index 0d50bef0123449f5..44c4cac1820a4dfe 100644
+index 44c4cac1820a4dfe..f9e81512201a2ec4 100644
 --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
 +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-@@ -72,26 +72,6 @@
- 		regulator-always-on;
+@@ -22,7 +22,7 @@
  	};
  
--	lbsc {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges = <0 0 0 0x20000000>;
--
--		ethernet at 8000000 {
--			compatible = "smsc,lan9220", "smsc,lan9115";
--			reg = <0x08000000 0x1000>;
--			interrupt-parent = <&irqc1>;
--			interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
--			phy-mode = "mii";
--			reg-io-width = <4>;
--			smsc,irq-active-high;
--			smsc,irq-push-pull;
--			vdd33a-supply = <&ape6evm_fixed_3v3>;
--			vddvario-supply = <&ape6evm_fixed_1v8>;
--		};
--	};
--
- 	leds {
- 		compatible = "gpio-leds";
- 		led1 {
-@@ -184,6 +164,21 @@
- 	voltage-tolerance = <1>; /* 1% */
- };
+ 	chosen {
+-		bootargs = "console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp rw";
++		bootargs = "ignore_loglevel root=/dev/nfs ip=dhcp rw";
+ 		stdout-path = &scifa0;
+ 	};
  
-+&bsc {
-+	ethernet at 8000000 {
-+		compatible = "smsc,lan9220", "smsc,lan9115";
-+		reg = <0x08000000 0x1000>;
-+		interrupt-parent = <&irqc1>;
-+		interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
-+		phy-mode = "mii";
-+		reg-io-width = <4>;
-+		smsc,irq-active-high;
-+		smsc,irq-push-pull;
-+		vdd33a-supply = <&ape6evm_fixed_3v3>;
-+		vddvario-supply = <&ape6evm_fixed_1v8>;
-+	};
-+};
-+
- &cmt1 {
- 	status = "okay";
- };
 -- 
 1.9.1
