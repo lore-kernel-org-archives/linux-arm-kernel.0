@@ -1,66 +1,83 @@
 From: wuyun.wu@huawei.com (Yun Wu (Abel))
-Date: Tue, 17 Feb 2015 18:00:52 +0800
-Subject: [PATCH v2 3/6] irqchip: gicv3-its: limit order of DT size to
- MAX_ORDER
-In-Reply-To: <20150217091945.1c47e92f@arm.com>
+Date: Tue, 17 Feb 2015 18:15:15 +0800
+Subject: [PATCH v2 5/6] irqchip: gicv3-its: add support for power down
+In-Reply-To: <20150217092935.1fefcb24@arm.com>
 References: <1423992723-5028-1-git-send-email-wuyun.wu@huawei.com>
- <1423992723-5028-4-git-send-email-wuyun.wu@huawei.com>
- <20150217091945.1c47e92f@arm.com>
-Message-ID: <54E31154.3020308@huawei.com>
+ <1423992723-5028-6-git-send-email-wuyun.wu@huawei.com>
+ <20150217092935.1fefcb24@arm.com>
+Message-ID: <54E314B3.40803@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/2/17 17:19, Marc Zyngier wrote:
+On 2015/2/17 17:29, Marc Zyngier wrote:
 
-> On Sun, 15 Feb 2015 09:32:00 +0000
+> On Sun, 15 Feb 2015 09:32:02 +0000
 > Yun Wu <wuyun.wu@huawei.com> wrote:
 > 
->> When required DT size is out of the kmalloc()'s capability, the whole
+>> It's unsafe to change the configurations of an activated ITS directly
+>> since this will lead to unpredictable results. This patch guarantees
+>> a safe quiescent status before initializing an ITS.
 > 
-> Nit: Using the DT acronym is very confusing here, as it means "Device
-> Tree" to most people, including me. Please use "Device Table" instead.
-> 
-> Also, the reference to kmalloc is wrong, as we're really using the page
-> allocator.
+> Please change the title of this patch to reflect what it actually
+> does. Nothing here is about powering down anything.
 
-OK, I will get the description fixed in the next version.
+My miss, I will fix this in next version.
 
 > 
->> ITS will fail in probing. This actually is not the hardware's problem
->> and is mainly a limitation of the kernel memory allocator. This patch
->> will keep ITS going on to the next initializaion step with an explicit
->> warning.
->>
 >> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
 >> ---
->>  drivers/irqchip/irq-gic-v3-its.c | 6 ++++++
->>  1 file changed, 6 insertions(+)
+>>  drivers/irqchip/irq-gic-v3-its.c | 32
+>> ++++++++++++++++++++++++++++++++ 1 file changed, 32 insertions(+)
 >>
 >> diff --git a/drivers/irqchip/irq-gic-v3-its.c
->> b/drivers/irqchip/irq-gic-v3-its.c index f5bfa42..de36606 100644
+>> b/drivers/irqchip/irq-gic-v3-its.c index 42c03b2..29eb665 100644
 >> --- a/drivers/irqchip/irq-gic-v3-its.c
 >> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -828,6 +828,12 @@ static int its_alloc_tables(struct its_node *its)
->>  			u32 ids = GITS_TYPER_DEVBITS(typer);
+>> @@ -1321,6 +1321,31 @@ static const struct irq_domain_ops
+>> its_domain_ops = { .deactivate		=
+>> its_irq_domain_deactivate, };
 >>
->>  			order = get_order((1UL << ids) * entry_size);
->> +			if (order >= MAX_ORDER) {
->> +				pr_warn("%s: DT size too large,
->> reduce to %u pages\n",
+>> +static int its_check_quiesced(void __iomem *base)
+>> +{
+>> +	u32 count = 1000000;	/* 1s */
+>> +	u32 val;
 >> +
->> its->msi_chip.of_node->full_name,
->> +					1 << order);
->> +				order = MAX_ORDER;
->> +			}
->>  		}
+>> +	val = readl_relaxed(base + GITS_CTLR);
+>> +	if (val & GITS_CTLR_QUIESCENT)
+>> +		return 0;
+>> +
+>> +	/* Disable the generation of all interrupts to this ITS */
+>> +	val &= ~GITS_CTLR_ENABLE;
+>> +	writel_relaxed(val, base + GITS_CTLR);
+>> +
+>> +	/* Poll GITS_CTLR and wait until ITS becomes quiescent */
+>> +	while (count--) {
+>> +		val = readl_relaxed(base + GITS_CTLR);
+>> +		if (val & GITS_CTLR_QUIESCENT)
+>> +			return 0;
+>> +		cpu_relax();
+>> +		udelay(1);
+>> +	}
 > 
-> Something is wrong here. Either (order == MAX_ORDER) is acceptable, or
-> it is not. Also, your warning says that you're reducing the size to a
-> new value, but you're displaying the size you can't handle. That
-> message should be fixed.
+> You're now introducing a third variant of a 1s timeout loop. Notice a
+> pattern?
 > 
 
-Yes, my fault, I will fix them.
+I am not sure I know exactly what you suggest. Do you mean I should code
+like below to keep the coding style same as the other 2 loops?
+
+	while (1) {
+		val = readl_relaxed(base + GITS_CTLR);
+		if (val & GITS_CTLR_QUIESCENT)
+			return 0;
+
+		count--;
+		if (!count)
+			return -EBUSY;
+
+		cpu_relax();
+		udelay(1);
+	}
 
 Thanks,
 	Abel
