@@ -1,86 +1,110 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Feb 2015 11:37:40 +0100
-Subject: [PATCH v3 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
-In-Reply-To: <87k2zha69p.fsf@free.fr>
-References: <1424091072-7738-1-git-send-email-maxime.ripard@free-electrons.com>
- <1424091072-7738-2-git-send-email-maxime.ripard@free-electrons.com>
- <87oaotaa6r.fsf@free.fr> <20150216205825.GG25269@lukather>
- <87k2zha69p.fsf@free.fr>
-Message-ID: <20150217103740.GK25269@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 17 Feb 2015 11:11:04 +0000
+Subject: [PATCH v2 5/6] irqchip: gicv3-its: add support for power down
+In-Reply-To: <54E314B3.40803@huawei.com>
+References: <1423992723-5028-1-git-send-email-wuyun.wu@huawei.com>
+ <1423992723-5028-6-git-send-email-wuyun.wu@huawei.com>
+ <20150217092935.1fefcb24@arm.com> <54E314B3.40803@huawei.com>
+Message-ID: <20150217111104.5718d6f1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 16, 2015 at 10:36:02PM +0100, Robert Jarzmik wrote:
-> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index e512902..6e569e9 100644
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -576,11 +576,20 @@ static void start_data_dma(struct pxa3xx_nand_info *info)
->  {}
->  #endif
->  
-> +static irqreturn_t pxa3xx_nand_irq_thread(int irq, void *data)
-> +{
-> +	struct pxa3xx_nand_info *info = data;
-> +
-> +	handle_data_pio(info);
-> +	return IRQ_HANDLED;
-> +}
-> +
->  static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
->  {
->  	struct pxa3xx_nand_info *info = devid;
->  	unsigned int status, is_completed = 0, is_ready = 0;
->  	unsigned int ready, cmd_done;
-> +	irqreturn_t ret = IRQ_HANDLED;
->  
->  	if (info->cs == 0) {
->  		ready           = NDSR_FLASH_RDY;
-> @@ -622,7 +631,7 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
->  		} else {
->  			info->state = (status & NDSR_RDDREQ) ?
->  				      STATE_PIO_READING : STATE_PIO_WRITING;
-> -			handle_data_pio(info);
-> +			ret = IRQ_WAKE_THREAD;
->  		}
->  	}
->  	if (status & cmd_done) {
-> @@ -663,7 +672,7 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
->  	if (is_ready)
->  		complete(&info->dev_ready);
->  NORMAL_IRQ_EXIT:
-> -	return IRQ_HANDLED;
-> +	return ret;
->  }
->  
->  static inline int is_buf_blank(uint8_t *buf, size_t len)
-> @@ -1688,7 +1697,8 @@ static int alloc_nand_resource(struct platform_device *pdev)
->  	/* initialize all interrupts to be disabled */
->  	disable_int(info, NDSR_MASK);
->  
-> -	ret = request_irq(irq, pxa3xx_nand_irq, 0, pdev->name, info);
-> +	ret = request_threaded_irq(irq, pxa3xx_nand_irq,
-> +				   pxa3xx_nand_irq_thread, 0, pdev->name, info);
->  	if (ret < 0) {
->  		dev_err(&pdev->dev, "failed to request IRQ\n");
->  		goto fail_free_buf;
+On Tue, 17 Feb 2015 10:15:15 +0000
+"Yun Wu (Abel)" <wuyun.wu@huawei.com> wrote:
 
-I just gave this patch a try, and it blows up quite badly:
-http://code.bulix.org/p96krc-87889?raw
+> On 2015/2/17 17:29, Marc Zyngier wrote:
+> 
+> > On Sun, 15 Feb 2015 09:32:02 +0000
+> > Yun Wu <wuyun.wu@huawei.com> wrote:
+> > 
+> >> It's unsafe to change the configurations of an activated ITS
+> >> directly since this will lead to unpredictable results. This patch
+> >> guarantees a safe quiescent status before initializing an ITS.
+> > 
+> > Please change the title of this patch to reflect what it actually
+> > does. Nothing here is about powering down anything.
+> 
+> My miss, I will fix this in next version.
+> 
+> > 
+> >> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
+> >> ---
+> >>  drivers/irqchip/irq-gic-v3-its.c | 32
+> >> ++++++++++++++++++++++++++++++++ 1 file changed, 32 insertions(+)
+> >>
+> >> diff --git a/drivers/irqchip/irq-gic-v3-its.c
+> >> b/drivers/irqchip/irq-gic-v3-its.c index 42c03b2..29eb665 100644
+> >> --- a/drivers/irqchip/irq-gic-v3-its.c
+> >> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> >> @@ -1321,6 +1321,31 @@ static const struct irq_domain_ops
+> >> its_domain_ops = { .deactivate		=
+> >> its_irq_domain_deactivate, };
+> >>
+> >> +static int its_check_quiesced(void __iomem *base)
+> >> +{
+> >> +	u32 count = 1000000;	/* 1s */
+> >> +	u32 val;
+> >> +
+> >> +	val = readl_relaxed(base + GITS_CTLR);
+> >> +	if (val & GITS_CTLR_QUIESCENT)
+> >> +		return 0;
+> >> +
+> >> +	/* Disable the generation of all interrupts to this ITS */
+> >> +	val &= ~GITS_CTLR_ENABLE;
+> >> +	writel_relaxed(val, base + GITS_CTLR);
+> >> +
+> >> +	/* Poll GITS_CTLR and wait until ITS becomes quiescent */
+> >> +	while (count--) {
+> >> +		val = readl_relaxed(base + GITS_CTLR);
+> >> +		if (val & GITS_CTLR_QUIESCENT)
+> >> +			return 0;
+> >> +		cpu_relax();
+> >> +		udelay(1);
+> >> +	}
+> > 
+> > You're now introducing a third variant of a 1s timeout loop. Notice
+> > a pattern?
+> > 
+> 
+> I am not sure I know exactly what you suggest. Do you mean I should
+> code like below to keep the coding style same as the other 2 loops?
+> 
+> 	while (1) {
+> 		val = readl_relaxed(base + GITS_CTLR);
+> 		if (val & GITS_CTLR_QUIESCENT)
+> 			return 0;
+> 
+> 		count--;
+> 		if (!count)
+> 			return -EBUSY;
+> 
+> 		cpu_relax();
+> 		udelay(1);
+> 	}
 
-It looks like there's more work here, most likely in the waitqueues
-wake up.
+That'd be a good start. But given that this is starting to be a common
+construct, it could probably be rewritten as:
 
-Maxime
+static int its_poll_timeout(struct its_node *its, void *data,
+                            int (*fn)(struct its_node *its,
+                                      void *data))
+{
+	while (1) {
+		if (!fn(its, data))
+			return 0;
 
+		...
+	}
+}
+
+and have the call sites to provide the right utility function. We also
+have two similar timeout loops in the main GICv3 driver, so there
+should be room for improvement.
+
+Thoughts?
+
+Thanks,
+
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150217/ed94971d/attachment.sig>
+Jazz is not dead. It just smells funny.
