@@ -1,26 +1,76 @@
 From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Tue, 17 Feb 2015 11:20:19 -0800
-Subject: [PATCH 0/2] USB PHY driver for Broadcom's Cygnus chipset
-Message-ID: <1424200821-16368-1-git-send-email-arun.ramamurthy@broadcom.com>
+Date: Tue, 17 Feb 2015 11:20:20 -0800
+Subject: [PATCH 1/2] phy: usbphy: Add dt documentation for Broadcom Cygnus USB
+ PHY driver
+In-Reply-To: <1424200821-16368-1-git-send-email-arun.ramamurthy@broadcom.com>
+References: <1424200821-16368-1-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <1424200821-16368-2-git-send-email-arun.ramamurthy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds the USB phy driver and documentation 
-for Broadom's Cygnus chipset. The phy is configurable from device tree
-and is capable of both device and host functions. It also provides
-a clock and reset to the host controller
-
-Arun Ramamurthy (2):
-  phy: usbphy: Add dt documentation for Broadcom Cygnus USB PHY driver
-  phy: usbphy: Add Broadcom Cygnus USB PHY driver
-
- .../bindings/phy/brcm,cygnus-usb-phy.txt           |  50 +++
- drivers/phy/Kconfig                                |  12 +
- drivers/phy/Makefile                               |   2 +
- drivers/phy/phy-bcm-cygnus-usb.c                   | 491 +++++++++++++++++++++
- 4 files changed, 555 insertions(+)
+Reviewed-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
+Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+---
+ .../bindings/phy/brcm,cygnus-usb-phy.txt           | 50 ++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
- create mode 100644 drivers/phy/phy-bcm-cygnus-usb.c
 
+diff --git a/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt b/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+new file mode 100644
+index 0000000..f218fae
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+@@ -0,0 +1,50 @@
++BROADCOM CYGNUS USB PHY
++
++Required Properties:
++	- compatible:  brcm,cygnus-usb-phy
++	- reg : usbphy_regs - Base address of phy registers
++			usb2h_idm_regs - Base address of host idm registers
++			usb2d_idm_regs - Base address of device idm registers
++	 - num_phys : Number of phys available
++	 - #phy-cells must be 2
++The node that uses the phy must provide two integers, the first indicates the
++port and the second indicates whether its host or device. The second integer
++is 0 for device and 1 for host
++
++NOTE: port 0 and port 1 are host only and port 2 can be configured for host or device.
++
++Example of phy :
++	usbphy0: usbphy at 0x0301c000 {
++		#phy-cells = <2>;
++		num_phys = <3>;
++		compatible = "brcm,cygnus-usb-phy";
++		reg = <0x0301c000 0x2000>,
++		      <0x18115000 0x1000>,
++		      <0x18111000 0x1000>;
++		status = "okay";
++	};
++
++Example of node using the phy:
++
++	/* This nodes declares  port 0
++	and port 1 as host*/
++
++	ehci0: usb at 0x18048000 {
++		compatible = "generic-ehci";
++		reg = <0x18048000 0x100>;
++		interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
++		phys = <&usbphy0 0 1 &usbphy0 1>;
++		phy-names = "usbp0","usbp1";
++		status = "okay";
++	};
++
++	/* This node declares port 2 phy
++	and configures it for device */
++
++	usbd_udc_dwc1: usbd_udc_dwc at 0x1804c000 {
++		compatible = "iproc-udc";
++		reg = <0x1804c000 0x2000>;
++		interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
++		phys = <&usbphy0 2 0>;
++		phy-names = "usb";
++	};
 -- 
 2.3.0
