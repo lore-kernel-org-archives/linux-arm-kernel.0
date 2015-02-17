@@ -1,14 +1,26 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 17 Feb 2015 19:52:03 +0100
-Subject: [PATCH 2/8] devicetree: vendor-prefixes: Add CompuLab to known vendors
+Date: Tue, 17 Feb 2015 19:52:02 +0100
+Subject: [PATCH 1/8] i2c: mux-pinctrl: Rework to honor disabled child nodes
 In-Reply-To: <1424199129-22099-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1424199129-22099-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1424199129-22099-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1424199129-22099-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds "compulab" as a vendor-prefix for CompuLab (compulab.co.il),
-an Israeli company that builds ARM-based SoMs and CoMs.
+I2C mux pinctrl driver currently determines the number of sub-busses by
+counting available pinctrl-names. Unfortunately, this requires each
+incarnation of the devicetree node with different available sub-busses
+to be rewritten.
+
+This patch reworks i2c-mux-pinctrl driver to count the number of
+available sub-nodes instead. The rework should be compatible to the old
+way of probing for sub-busses and additionally allows to disable unused
+sub-busses with standard DT property status = "disabled".
+
+This also amends the corresponding devicetree binding documentation to
+reflect the new functionality to disable unused sub-nodes. While at it,
+also fix two references to binding documentation files that miss an "i2c-"
+prefix.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -16,29 +28,179 @@ Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Gregory Clement <gregory.clement@free-electrons.com>
 Cc: Gabriel Dobato <dobatog@gmail.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: linux-i2c at vger.kernel.org
 Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+ .../devicetree/bindings/i2c/i2c-mux-pinctrl.txt    | 28 ++++-----
+ drivers/i2c/muxes/i2c-mux-pinctrl.c                | 70 ++++++++++++++--------
+ 2 files changed, 59 insertions(+), 39 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index d443279c95dc..2de628532d4b 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -35,6 +35,7 @@ chrp	Common Hardware Reference Platform
- chunghwa	Chunghwa Picture Tubes Ltd.
- cirrus	Cirrus Logic, Inc.
- cnm	Chips&Media, Inc.
-+compulab	CompuLab
- cortina	Cortina Systems, Inc.
- crystalfontz	Crystalfontz America, Inc.
- dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-mux-pinctrl.txt b/Documentation/devicetree/bindings/i2c/i2c-mux-pinctrl.txt
+index ae8af1694e95..24b9fdef8850 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-mux-pinctrl.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-mux-pinctrl.txt
+@@ -28,27 +28,24 @@ Also required are:
+ * Standard pinctrl properties that specify the pin mux state for each child
+   bus. See ../pinctrl/pinctrl-bindings.txt.
+ 
+-* Standard I2C mux properties. See mux.txt in this directory.
++* Standard I2C mux properties. See i2c-mux.txt in this directory.
+ 
+-* I2C child bus nodes. See mux.txt in this directory.
++* I2C child bus nodes. See i2c-mux.txt in this directory.
+ 
+-For each named state defined in the pinctrl-names property, an I2C child bus
+-will be created. I2C child bus numbers are assigned based on the index into
+-the pinctrl-names property.
++For each child node that is not disabled by a status != "okay", an I2C
++child bus will be created. I2C child bus numbers are assigned based on the
++order of child nodes.
+ 
+-The only exception is that no bus will be created for a state named "idle". If
+-such a state is defined, it must be the last entry in pinctrl-names. For
+-example:
+-
+-	pinctrl-names = "ddc", "pta", "idle"  ->  ddc = bus 0, pta = bus 1
+-	pinctrl-names = "ddc", "idle", "pta"  ->  Invalid ("idle" not last)
+-	pinctrl-names = "idle", "ddc", "pta"  ->  Invalid ("idle" not last)
++There must be a corresponding pinctrl-names entry for each enabled child
++node at the position of the child node's "reg" property.
+ 
+ Whenever an access is made to a device on a child bus, the relevant pinctrl
+ state will be programmed into hardware.
+ 
+-If an idle state is defined, whenever an access is not being made to a device
+-on a child bus, the idle pinctrl state will be programmed into hardware.
++Also, there can be an idle pinctrl state defined at the end of possible
++pinctrl states. If an idle state is defined, whenever an access is not being
++made to a device on a child bus, the idle pinctrl state will be programmed
++into hardware.
+ 
+ If an idle state is not defined, the most recently used pinctrl state will be
+ left programmed into hardware whenever no access is being made of a device on
+@@ -68,6 +65,7 @@ Example:
+ 		pinctrl-1 = <&state_i2cmux_pta>;
+ 		pinctrl-2 = <&state_i2cmux_idle>;
+ 
++		/* Enabled child bus 0 */
+ 		i2c at 0 {
+ 			reg = <0>;
+ 			#address-cells = <1>;
+@@ -79,10 +77,12 @@ Example:
+ 			};
+ 		};
+ 
++		/* Disabled child bus 1 */
+ 		i2c at 1 {
+ 			reg = <1>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			status = "disabled";
+ 
+ 			eeprom {
+ 				compatible = "eeprom";
+diff --git a/drivers/i2c/muxes/i2c-mux-pinctrl.c b/drivers/i2c/muxes/i2c-mux-pinctrl.c
+index b48378c4b40d..033dacfabfdf 100644
+--- a/drivers/i2c/muxes/i2c-mux-pinctrl.c
++++ b/drivers/i2c/muxes/i2c-mux-pinctrl.c
+@@ -56,9 +56,12 @@ static int i2c_mux_pinctrl_parse_dt(struct i2c_mux_pinctrl *mux,
+ 				struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+-	int num_names, i, ret;
++	struct device_node *child;
++	struct property *prop;
++	int num_names, num_children, ret;
+ 	struct device_node *adapter_np;
+ 	struct i2c_adapter *adapter;
++	const char *state;
+ 
+ 	if (!np)
+ 		return 0;
+@@ -77,32 +80,16 @@ static int i2c_mux_pinctrl_parse_dt(struct i2c_mux_pinctrl *mux,
+ 		return num_names;
+ 	}
+ 
+-	mux->pdata->pinctrl_states = devm_kzalloc(&pdev->dev,
+-		sizeof(*mux->pdata->pinctrl_states) * num_names,
+-		GFP_KERNEL);
+-	if (!mux->pdata->pinctrl_states) {
+-		dev_err(mux->dev, "Cannot allocate pinctrl_states\n");
+-		return -ENOMEM;
++	num_children = of_get_available_child_count(np);
++	if (num_children < 0) {
++		dev_err(mux->dev, "Unable to count available children: %d\n",
++			num_children);
++		return num_children;
+ 	}
+ 
+-	for (i = 0; i < num_names; i++) {
+-		ret = of_property_read_string_index(np, "pinctrl-names", i,
+-			&mux->pdata->pinctrl_states[mux->pdata->bus_count]);
+-		if (ret < 0) {
+-			dev_err(mux->dev, "Cannot parse pinctrl-names: %d\n",
+-				ret);
+-			return ret;
+-		}
+-		if (!strcmp(mux->pdata->pinctrl_states[mux->pdata->bus_count],
+-			    "idle")) {
+-			if (i != num_names - 1) {
+-				dev_err(mux->dev, "idle state must be last\n");
+-				return -EINVAL;
+-			}
+-			mux->pdata->pinctrl_state_idle = "idle";
+-		} else {
+-			mux->pdata->bus_count++;
+-		}
++	if (num_names < num_children) {
++		dev_err(mux->dev, "Found less pinctrl states than children\n");
++		return -EINVAL;
+ 	}
+ 
+ 	adapter_np = of_parse_phandle(np, "i2c-parent", 0);
+@@ -118,6 +105,39 @@ static int i2c_mux_pinctrl_parse_dt(struct i2c_mux_pinctrl *mux,
+ 	mux->pdata->parent_bus_num = i2c_adapter_id(adapter);
+ 	put_device(&adapter->dev);
+ 
++	mux->pdata->pinctrl_states = devm_kzalloc(&pdev->dev,
++		sizeof(*mux->pdata->pinctrl_states) * num_children,
++		GFP_KERNEL);
++	if (!mux->pdata->pinctrl_states) {
++		dev_err(mux->dev, "Cannot allocate pinctrl_states\n");
++		return -ENOMEM;
++	}
++
++	of_property_for_each_string(np, "pinctrl-names", prop, state)
++		if (!strcmp(state, "idle"))
++			mux->pdata->pinctrl_state_idle = "idle";
++
++	for_each_available_child_of_node(np, child) {
++		u32 reg;
++
++		ret = of_property_read_u32(child, "reg", &reg);
++		if (ret < 0) {
++			dev_err(mux->dev, "Missing reg property for child node: %d\n",
++				ret);
++			return ret;
++		}
++
++		ret = of_property_read_string_index(np,
++				    "pinctrl-names", reg, &state);
++		if (ret < 0) {
++			dev_err(mux->dev, "Cannot parse pinctrl-names for mux %d: %d\n",
++				reg, ret);
++			return ret;
++		}
++
++		mux->pdata->pinctrl_states[mux->pdata->bus_count++] = state;
++	}
++
+ 	return 0;
+ }
+ #else
 -- 
 2.1.0
