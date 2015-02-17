@@ -1,71 +1,110 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 17 Feb 2015 16:04:40 +0100
-Subject: [PATCH v4 0/6] ARM: shmobile: r8a73a4/ape6evm: Complete multiplatform
- support
-Message-ID: <1424185486-3017-1-git-send-email-geert+renesas@glider.be>
+Date: Tue, 17 Feb 2015 16:04:43 +0100
+Subject: [PATCH v4 3/6] ARM: shmobile: r8a73a4: Move pfc node to work around
+ probe ordering bug
+In-Reply-To: <1424185486-3017-1-git-send-email-geert+renesas@glider.be>
+References: <1424185486-3017-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1424185486-3017-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
+Currently the pin function controller (which is also a GPIO controller)
+is instantiated before the interrupt controllers due to the order in the
+DTS. At that time, the irq domains for the interrupt controllers
+referenced by its interrupts-extended property cannot be found yet:
 
-This patch series completes the migration from aep6evm-legacy (legacy board
-code) and ape6evm-reference (legacy DT based) to ape6evm-multiplatform (ARM
-multiplatform DT based with common clock framework).
+    irq: no irq domain found for /interrupt-controller at e61c0000 !
 
-It depends on Simon's branch simple-pm-bus-for-v3.21.
+Nevertheless, the core OF probing code ignores this failure, besides a
+debug message that's not normally printed:
 
-  - The first two patches fix Ethernet on ape6evm, by adding a Bus State
-    Controller node, and moving the Ethernet node to it, and thus depends
-    on Simon's branch simple-pm-bus-for-v3.21,
-  - The third patch moves the pfc node after the irqc nodes, to work around
-    a bug in the core OF proving code,
-  - The fourth and fifth patch remove all ape6evm-legacy and
-    ape6evm-reference support, now the r8a73a4 generic multiplatform case
-    has the same feature set,
-  - The sixth patch is new, and removes the now superfluous console=
-    bootargs parameter.
+    not all legacy IRQ resources mapped for pfc
 
-Thanks for applying!
+and continues initialization of the device. Then, the sh-pfc driver
+cannot find any IRQ resources, and thinks no interrupts are available,
+causing gpio-keys to fail later:
 
-Geert Uytterhoeven (4):
-  ARM: shmobile: r8a73a4 dtsi: Add Bus State Controller node
-  ARM: shmobile: ape6evm dts: Move Ethernet node to BSC
-  ARM: shmobile: r8a73a4: Move pfc node to work around probe ordering
-    bug
-  ARM: shmobile: ape6evm dts: Drop console= bootargs parameter
+    gpio-keys keyboard: Unable to claim irq 0; error -22
+    gpio-keys: probe of keyboard failed with error -22
 
-Ulrich Hecht (2):
-  ARM: shmobile: ape6evm-reference: Remove board C code and DT file
-  ARM: shmobile: r8a73a4: ape6evm: Remove legacy platform
+Move the pin function controller node after the interrupt controller
+nodes it references to work around the bug in the core OF probing code.
 
- Documentation/devicetree/bindings/arm/shmobile.txt |   2 -
- MAINTAINERS                                        |   1 -
- arch/arm/boot/dts/Makefile                         |   2 -
- arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts    | 156 -----------
- arch/arm/boot/dts/r8a73a4-ape6evm.dts              |  37 ++-
- arch/arm/boot/dts/r8a73a4.dtsi                     |  56 ++--
- arch/arm/configs/ape6evm_defconfig                 | 109 --------
- arch/arm/mach-shmobile/Kconfig                     |  25 --
- arch/arm/mach-shmobile/Makefile                    |   2 -
- arch/arm/mach-shmobile/Makefile.boot               |   2 -
- arch/arm/mach-shmobile/board-ape6evm-reference.c   |  61 ----
- arch/arm/mach-shmobile/board-ape6evm.c             | 306 ---------------------
- 12 files changed, 49 insertions(+), 710 deletions(-)
- delete mode 100644 arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
- delete mode 100644 arch/arm/configs/ape6evm_defconfig
- delete mode 100644 arch/arm/mach-shmobile/board-ape6evm-reference.c
- delete mode 100644 arch/arm/mach-shmobile/board-ape6evm.c
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+This can be reproduced on other SoCs (e.g. sh73a0 and r8a7740) by moving
+their pfc nodes before their interrupt controller nodes.
 
+v4:
+  - New, but an RFC version of this patch has been sent before as a
+    separate patch.
+---
+ arch/arm/boot/dts/r8a73a4.dtsi | 46 +++++++++++++++++++++---------------------
+ 1 file changed, 23 insertions(+), 23 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 77bd35cd89113df7..d41201d258cacb1f 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -92,29 +92,6 @@
+ 		};
+ 	};
+ 
+-	pfc: pfc at e6050000 {
+-		compatible = "renesas,pfc-r8a73a4";
+-		reg = <0 0xe6050000 0 0x9000>;
+-		gpio-controller;
+-		#gpio-cells = <2>;
+-		interrupts-extended =
+-			<&irqc0  0 0>, <&irqc0  1 0>, <&irqc0  2 0>, <&irqc0  3 0>,
+-			<&irqc0  4 0>, <&irqc0  5 0>, <&irqc0  6 0>, <&irqc0  7 0>,
+-			<&irqc0  8 0>, <&irqc0  9 0>, <&irqc0 10 0>, <&irqc0 11 0>,
+-			<&irqc0 12 0>, <&irqc0 13 0>, <&irqc0 14 0>, <&irqc0 15 0>,
+-			<&irqc0 16 0>, <&irqc0 17 0>, <&irqc0 18 0>, <&irqc0 19 0>,
+-			<&irqc0 20 0>, <&irqc0 21 0>, <&irqc0 22 0>, <&irqc0 23 0>,
+-			<&irqc0 24 0>, <&irqc0 25 0>, <&irqc0 26 0>, <&irqc0 27 0>,
+-			<&irqc0 28 0>, <&irqc0 29 0>, <&irqc0 30 0>, <&irqc0 31 0>,
+-			<&irqc1  0 0>, <&irqc1  1 0>, <&irqc1  2 0>, <&irqc1  3 0>,
+-			<&irqc1  4 0>, <&irqc1  5 0>, <&irqc1  6 0>, <&irqc1  7 0>,
+-			<&irqc1  8 0>, <&irqc1  9 0>, <&irqc1 10 0>, <&irqc1 11 0>,
+-			<&irqc1 12 0>, <&irqc1 13 0>, <&irqc1 14 0>, <&irqc1 15 0>,
+-			<&irqc1 16 0>, <&irqc1 17 0>, <&irqc1 18 0>, <&irqc1 19 0>,
+-			<&irqc1 20 0>, <&irqc1 21 0>, <&irqc1 22 0>, <&irqc1 23 0>,
+-			<&irqc1 24 0>, <&irqc1 25 0>;
+-	};
+-
+ 	i2c5: i2c at e60b0000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -210,6 +187,29 @@
+ 			     <0 57 IRQ_TYPE_LEVEL_HIGH>;
+ 	};
+ 
++	pfc: pfc at e6050000 {
++		compatible = "renesas,pfc-r8a73a4";
++		reg = <0 0xe6050000 0 0x9000>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupts-extended =
++			<&irqc0  0 0>, <&irqc0  1 0>, <&irqc0  2 0>, <&irqc0  3 0>,
++			<&irqc0  4 0>, <&irqc0  5 0>, <&irqc0  6 0>, <&irqc0  7 0>,
++			<&irqc0  8 0>, <&irqc0  9 0>, <&irqc0 10 0>, <&irqc0 11 0>,
++			<&irqc0 12 0>, <&irqc0 13 0>, <&irqc0 14 0>, <&irqc0 15 0>,
++			<&irqc0 16 0>, <&irqc0 17 0>, <&irqc0 18 0>, <&irqc0 19 0>,
++			<&irqc0 20 0>, <&irqc0 21 0>, <&irqc0 22 0>, <&irqc0 23 0>,
++			<&irqc0 24 0>, <&irqc0 25 0>, <&irqc0 26 0>, <&irqc0 27 0>,
++			<&irqc0 28 0>, <&irqc0 29 0>, <&irqc0 30 0>, <&irqc0 31 0>,
++			<&irqc1  0 0>, <&irqc1  1 0>, <&irqc1  2 0>, <&irqc1  3 0>,
++			<&irqc1  4 0>, <&irqc1  5 0>, <&irqc1  6 0>, <&irqc1  7 0>,
++			<&irqc1  8 0>, <&irqc1  9 0>, <&irqc1 10 0>, <&irqc1 11 0>,
++			<&irqc1 12 0>, <&irqc1 13 0>, <&irqc1 14 0>, <&irqc1 15 0>,
++			<&irqc1 16 0>, <&irqc1 17 0>, <&irqc1 18 0>, <&irqc1 19 0>,
++			<&irqc1 20 0>, <&irqc1 21 0>, <&irqc1 22 0>, <&irqc1 23 0>,
++			<&irqc1 24 0>, <&irqc1 25 0>;
++	};
++
+ 	thermal at e61f0000 {
+ 		compatible = "renesas,thermal-r8a73a4", "renesas,rcar-thermal";
+ 		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>,
 -- 
 1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
