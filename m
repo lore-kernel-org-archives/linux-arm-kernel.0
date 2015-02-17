@@ -1,40 +1,60 @@
 From: fkan@apm.com (Feng Kan)
-Date: Tue, 17 Feb 2015 15:14:00 -0800
-Subject: [PATCH] pci: host: xgene: fix incorrectly returned address by map_bus
-Message-ID: <1424214840-26498-1-git-send-email-fkan@apm.com>
+Date: Tue, 17 Feb 2015 15:40:47 -0800
+Subject: [PATCH 2/3] Documentation: mailbox: Add APM X-Gene SLIMpro mailbox
+ dts documentation
+In-Reply-To: <1424216448-28665-1-git-send-email-fkan@apm.com>
+References: <1424216448-28665-1-git-send-email-fkan@apm.com>
+Message-ID: <1424216448-28665-2-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic accessor functions for pci-xgene uses map_bus
-call that returns the base address but did not add the additional
-offset.
+This adds the APM X-Gene SLIMpro mailbox device tree node documentation.
 
 Signed-off-by: Feng Kan <fkan@apm.com>
 ---
- drivers/pci/host/pci-xgene.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ .../bindings/mailbox/xgene-slimpro-mailbox.txt     | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
 
-diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-index aab5547..ee082c0 100644
---- a/drivers/pci/host/pci-xgene.c
-+++ b/drivers/pci/host/pci-xgene.c
-@@ -127,7 +127,7 @@ static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
- 	return false;
- }
- 
--static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
-+static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
- 			      int offset)
- {
- 	struct xgene_pcie_port *port = bus->sysdata;
-@@ -137,7 +137,7 @@ static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
- 		return NULL;
- 
- 	xgene_pcie_set_rtdid_reg(bus, devfn);
--	return xgene_pcie_get_cfg_base(bus);
-+	return xgene_pcie_get_cfg_base(bus) + offset;
- }
- 
- static struct pci_ops xgene_pcie_ops = {
+diff --git a/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
+new file mode 100644
+index 0000000..d02a3d8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
+@@ -0,0 +1,34 @@
++The APM X-Gene SLIMpro mailbox is used to communicate messages between
++the ARM64 processors and the Cortex M3 (dubbed SLIMpro). It uses a simple
++interrupt based door bell mechanism and can exchange simple messages using the
++internal registers.
++
++There are total of 7 interrupts in this mailbox. Each used for an individual
++door bell (or mailbox channel).
++
++Required properties:
++- compatible:	Should be as "apm, xgene-slimpro-mbox".
++
++- reg:		Contain the mailbox register address range.
++
++- interrupts:	7 interrupts must start from 0 to 6, interrupt 0 define the
++		the interrupt for mailbox channel 0 and interrupt 1 for
++		mailbox channel 1 and so likewise for the reminder.
++
++- #mbox-cells:	only one to specify the mailbox channel number.
++
++Example:
++
++Mailbox Node:
++		slimpro-mbox: slimpro-mbox at 10540000 {
++			compatible = "apm,xgene-slimpro-mbox";
++			reg = <0x0 0x10540000 0x0 0xa000>;
++			#mbox-cells = <1>;
++			interrupts =  	<0x0 0x0 0x4>,
++					<0x0 0x1 0x4>,
++					<0x0 0x2 0x4>,
++					<0x0 0x3 0x4>,
++					<0x0 0x4 0x4>,
++					<0x0 0x5 0x4>,
++					<0x0 0x6 0x4>,
++		};
 -- 
 1.9.1
