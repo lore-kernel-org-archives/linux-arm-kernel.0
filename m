@@ -1,80 +1,57 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 17 Feb 2015 15:52:37 +0100
-Subject: [PATCH v4 2/5] ARM: shmobile: kzm9g dts: Move Ethernet node to BSC
+Date: Tue, 17 Feb 2015 15:52:40 +0100
+Subject: [PATCH v4 5/5] ARM: shmobile: sh73a0: Remove unused
+ sh73a0_add_standard_devices_dt()
 In-Reply-To: <1424184760-1671-1-git-send-email-geert+renesas@glider.be>
 References: <1424184760-1671-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1424184760-1671-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1424184760-1671-6-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the Ethernet node from the root of the device tree to the BSC node,
-as it's connected to the Bus State Controller.  This allows the system
-to know the right position of the Ethernet node in the clock and PM
-domain hierarchy, and manage the clock and PM domain appropriately.
-
-Also rename the node's name from "lan9220" to "ethernet", to conform to
-ePAPR generic name recomendations.
+"ARM: shmobile: kzm9g-reference: Remove board C code and DT file"
+removed the last user of sh73a0_add_standard_devices_dt(). Hence remove
+this function.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 v4:
-  - No changes,
-
-v3:
-  - No changes,
-
-v2:
-  - s/confirm/conform/,
-  - Moved from kzm9g-reference to kzm9g.
+  - New.
 ---
- arch/arm/boot/dts/sh73a0-kzm9g.dts | 28 +++++++++++++++-------------
- 1 file changed, 15 insertions(+), 13 deletions(-)
+ arch/arm/mach-shmobile/setup-sh73a0.c | 9 ---------
+ arch/arm/mach-shmobile/sh73a0.h       | 1 -
+ 2 files changed, 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-index 6f00e6b680e8e0fa..022ba505f57339a9 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-@@ -84,19 +84,6 @@
- 		enable-active-high;
- 	};
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index 48f2447ab01f6e60..2f68459e78114323 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -783,15 +783,6 @@ void __init sh73a0_add_early_devices(void)
+ 	shmobile_setup_console();
+ }
  
--	lan9220 at 10000000 {
--		compatible = "smsc,lan9220", "smsc,lan9115";
--		reg = <0x10000000 0x100>;
--		phy-mode = "mii";
--		interrupt-parent = <&irqpin0>;
--		interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
--		reg-io-width = <4>;
--		smsc,irq-push-pull;
--		smsc,save-mac-address;
--		vddvario-supply = <&reg_1p8v>;
--		vdd33a-supply = <&reg_3p3v>;
--	};
+-void __init sh73a0_add_standard_devices_dt(void)
+-{
+-	/* clocks are setup late during boot in the case of DT */
+-#ifndef CONFIG_COMMON_CLK
+-	sh73a0_clock_init();
+-#endif
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-}
 -
- 	leds {
- 		compatible = "gpio-leds";
- 		led1 {
-@@ -178,6 +165,21 @@
- 	};
- };
- 
-+&bsc {
-+	ethernet at 10000000 {
-+		compatible = "smsc,lan9220", "smsc,lan9115";
-+		reg = <0x10000000 0x100>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&irqpin0>;
-+		interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
-+		reg-io-width = <4>;
-+		smsc,irq-push-pull;
-+		smsc,save-mac-address;
-+		vddvario-supply = <&reg_1p8v>;
-+		vdd33a-supply = <&reg_3p3v>;
-+	};
-+};
-+
- &cmt1 {
- 	status = "okay";
- };
+ #define RESCNT2 IOMEM(0xe6188020)
+ static void sh73a0_restart(enum reboot_mode mode, const char *cmd)
+ {
+diff --git a/arch/arm/mach-shmobile/sh73a0.h b/arch/arm/mach-shmobile/sh73a0.h
+index f037c64b14fc0767..5a80f18b4fa0665f 100644
+--- a/arch/arm/mach-shmobile/sh73a0.h
++++ b/arch/arm/mach-shmobile/sh73a0.h
+@@ -77,7 +77,6 @@ extern void sh73a0_map_io(void);
+ extern void sh73a0_earlytimer_init(void);
+ extern void sh73a0_add_early_devices(void);
+ extern void sh73a0_add_standard_devices(void);
+-extern void sh73a0_add_standard_devices_dt(void);
+ extern void sh73a0_clock_init(void);
+ extern void sh73a0_pinmux_init(void);
+ extern void sh73a0_pm_init(void);
 -- 
 1.9.1
