@@ -1,66 +1,80 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 17 Feb 2015 15:52:35 +0100
-Subject: [PATCH v4 0/5] ARM: shmobile: sh73a0/kzm9g: Complete multiplatform
- support
-Message-ID: <1424184760-1671-1-git-send-email-geert+renesas@glider.be>
+Date: Tue, 17 Feb 2015 15:52:37 +0100
+Subject: [PATCH v4 2/5] ARM: shmobile: kzm9g dts: Move Ethernet node to BSC
+In-Reply-To: <1424184760-1671-1-git-send-email-geert+renesas@glider.be>
+References: <1424184760-1671-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1424184760-1671-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
+Move the Ethernet node from the root of the device tree to the BSC node,
+as it's connected to the Bus State Controller.  This allows the system
+to know the right position of the Ethernet node in the clock and PM
+domain hierarchy, and manage the clock and PM domain appropriately.
 
-This patch series completes the migration from kzm9g-reference (legacy
-DT based) to kzm9g-multiplatform (ARM multiplatform DT based with
-common clock framework).
+Also rename the node's name from "lan9220" to "ethernet", to conform to
+ePAPR generic name recomendations.
 
-It depends on Simon's branch simple-pm-bus-for-v3.21.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v4:
+  - No changes,
 
-  - The first two patches fix Ethernet on kzm9g, by adding a Bus State
-    Controller node, and moving the Ethernet node to it, and thus depends
-    on Simon's branch simple-pm-bus-for-v3.21,
-  - The third patch removes all kzm9g-reference support, now the
-    sh73a0 generic multiplatform case has the same feature set
-    (better, it provides 16 MiB more RAM!),
-  - The fourth patch fixes CONFIG_CPU_IDLE=y by adding a node for the TWD,
-    which could not be done before, as the TWD driver doesn't support DT
-    without CCF,
-  - The fifth path is new, and removes the now unused function
-    sh73a0_add_standard_devices_dt().
+v3:
+  - No changes,
+
+v2:
+  - s/confirm/conform/,
+  - Moved from kzm9g-reference to kzm9g.
+---
+ arch/arm/boot/dts/sh73a0-kzm9g.dts | 28 +++++++++++++++-------------
+ 1 file changed, 15 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts b/arch/arm/boot/dts/sh73a0-kzm9g.dts
+index 6f00e6b680e8e0fa..022ba505f57339a9 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
+@@ -84,19 +84,6 @@
+ 		enable-active-high;
+ 	};
  
-Thanks for applying!
-
-Geert Uytterhoeven (5):
-  ARM: shmobile: sh73a0 dtsi: Add Bus State Controller node
-  ARM: shmobile: kzm9g dts: Move Ethernet node to BSC
-  ARM: shmobile: kzm9g-reference: Remove board C code and DT file
-  ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node
-  ARM: shmobile: sh73a0: Remove unused sh73a0_add_standard_devices_dt()
-
- Documentation/devicetree/bindings/arm/shmobile.txt |   2 -
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       | 398 ---------------------
- arch/arm/boot/dts/sh73a0-kzm9g.dts                 |  28 +-
- arch/arm/boot/dts/sh73a0.dtsi                      |  19 +
- arch/arm/mach-shmobile/Kconfig                     |  14 -
- arch/arm/mach-shmobile/Makefile                    |   1 -
- arch/arm/mach-shmobile/Makefile.boot               |   1 -
- arch/arm/mach-shmobile/board-kzm9g-reference.c     |  62 ----
- arch/arm/mach-shmobile/include/mach/zboot.h        |   2 +-
- arch/arm/mach-shmobile/setup-sh73a0.c              |   9 -
- arch/arm/mach-shmobile/sh73a0.h                    |   1 -
- 12 files changed, 36 insertions(+), 504 deletions(-)
- delete mode 100644 arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
- delete mode 100644 arch/arm/mach-shmobile/board-kzm9g-reference.c
-
+-	lan9220 at 10000000 {
+-		compatible = "smsc,lan9220", "smsc,lan9115";
+-		reg = <0x10000000 0x100>;
+-		phy-mode = "mii";
+-		interrupt-parent = <&irqpin0>;
+-		interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
+-		reg-io-width = <4>;
+-		smsc,irq-push-pull;
+-		smsc,save-mac-address;
+-		vddvario-supply = <&reg_1p8v>;
+-		vdd33a-supply = <&reg_3p3v>;
+-	};
+-
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		led1 {
+@@ -178,6 +165,21 @@
+ 	};
+ };
+ 
++&bsc {
++	ethernet at 10000000 {
++		compatible = "smsc,lan9220", "smsc,lan9115";
++		reg = <0x10000000 0x100>;
++		phy-mode = "mii";
++		interrupt-parent = <&irqpin0>;
++		interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
++		reg-io-width = <4>;
++		smsc,irq-push-pull;
++		smsc,save-mac-address;
++		vddvario-supply = <&reg_1p8v>;
++		vdd33a-supply = <&reg_3p3v>;
++	};
++};
++
+ &cmt1 {
+ 	status = "okay";
+ };
 -- 
 1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
