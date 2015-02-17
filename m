@@ -1,63 +1,46 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 17 Feb 2015 11:22:55 +0100
-Subject: [PATCH 1/3] pm: at91: pm_suspend: add the WFI instruction
- support for ARMv7
-In-Reply-To: <1423709486-8382-1-git-send-email-wenyou.yang@atmel.com>
+Date: Tue, 17 Feb 2015 11:24:11 +0100
+Subject: [PATCH 2/3] pm: at91: pm_suspend: MOR register KEY was missing
+In-Reply-To: <1423709533-8416-1-git-send-email-wenyou.yang@atmel.com>
 References: <1423709441-8342-1-git-send-email-wenyou.yang@atmel.com>
- <1423709486-8382-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20150217102255.GB11529@piout.net>
+ <1423709533-8416-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20150217102411.GC11529@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2015 at 10:51:26 +0800, Wenyou Yang wrote :
-> Add the WFI instruction to make the cpu to the idle state.
-> In the meanwhile, disable the processor's clock.
+On 12/02/2015 at 10:52:13 +0800, Wenyou Yang wrote :
+> From: Patrice Vilchez <patrice.vilchez@atmel.com>
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> Because writing the MOR register requires the PASSWD(0x37),
+> if missed, the write operation will be aborted.
+> 
+> Signed-off-by: Patrice Vilchez <patrice.vilchez@atmel.com>
 Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
 > ---
->  arch/arm/mach-at91/pm_suspend.S |   20 +++++++++++++++++++-
->  1 file changed, 19 insertions(+), 1 deletion(-)
+>  arch/arm/mach-at91/pm_suspend.S |    2 ++
+>  1 file changed, 2 insertions(+)
 > 
 > diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
-> index bebe3de..1c7256a 100644
+> index 1c7256a..5347ad4 100644
 > --- a/arch/arm/mach-at91/pm_suspend.S
 > +++ b/arch/arm/mach-at91/pm_suspend.S
-> @@ -51,6 +51,24 @@ tmp2	.req	r5
->  	beq	1b
->  	.endm
+> @@ -132,6 +132,7 @@ ENTRY(at91_pm_suspend_in_sram)
+>  	/* Turn off the main oscillator */
+>  	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+>  	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
+> +	orr	tmp1, tmp1, #AT91_PMC_KEY
+>  	str	tmp1, [pmc, #AT91_CKGR_MOR]
 >  
-> +/*
-> + * Put the processor to enter the idle state
-> + */
-> +	.macro at91_cpu_idle
-> +
-> +#if defined(CONFIG_CPU_V7)
-> +	mov	tmp1, #AT91_PMC_PCK
-> +	str	tmp1, [pmc, #AT91_PMC_SCDR]
-> +
-> +	dsb
-> +
-> +	wfi		@ Wait For Interrupt
-> +#else
-> +	mcr	p15, 0, tmp1, c7, c0, 4
-> +#endif
-> +
-> +	.endm
-> +
->  	.text
+>  skip_disable_main_clock:
+> @@ -149,6 +150,7 @@ skip_disable_main_clock:
+>  	/* Turn on the main oscillator */
+>  	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+>  	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
+> +	orr	tmp1, tmp1, #AT91_PMC_KEY
+>  	str	tmp1, [pmc, #AT91_CKGR_MOR]
 >  
->  /*
-> @@ -120,7 +138,7 @@ skip_disable_main_clock:
->  	ldr	pmc, .pmc_base
->  
->  	/* Wait for interrupt */
-> -	mcr	p15, 0, tmp1, c7, c0, 4
-> +	at91_cpu_idle
->  
->  	ldr	r0, .pm_mode
->  	tst	r0, #AT91_PM_SLOW_CLOCK
+>  	wait_moscrdy
 > -- 
 > 1.7.9.5
 > 
