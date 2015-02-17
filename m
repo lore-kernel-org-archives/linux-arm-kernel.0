@@ -1,164 +1,138 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Tue, 17 Feb 2015 16:00:47 -0600
-Subject: [BUG] ARM: socfpga: L2 cache init
-In-Reply-To: <20150213080106.GD7994@pengutronix.de>
-References: <20150206103946.GM15692@pengutronix.de>
- <20150206110557.GY8656@n2100.arm.linux.org.uk>
- <20150209155314.GA7994@pengutronix.de>
- <54D8E3BB.3060505@opensource.altera.com>
- <20150209185820.GB7994@pengutronix.de>
- <20150209213017.GC7994@pengutronix.de>
- <54DD2BB3.3090507@opensource.altera.com>
- <20150213080106.GD7994@pengutronix.de>
-Message-ID: <CADhT+wfbZb+u7a-aCi71rh9xFMuphOvqiyEgEYpmmTQtujLcVg@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 17 Feb 2015 14:01:04 -0800
+Subject: [Cocci] [PATCH v13 3/6] clk: Make clk API return per-user struct
+ clk instances
+In-Reply-To: <54D423C3.9030105@codeaurora.org>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
+ <20150201212432.22722.70917@quantum> <54CFE1FE.7040404@codeaurora.org>
+ <alpine.DEB.2.02.1502022230110.2045@localhost6.localdomain6>
+ <54CFFBCF.90706@codeaurora.org> <20150202225036.421.43421@quantum>
+ <54D0F179.1040906@gmail.com> <54D2AA9B.7010800@codeaurora.org>
+ <54D3900A.9060200@gmail.com> <54D423C3.9030105@codeaurora.org>
+Message-ID: <54E3BA20.3080205@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 13, 2015 at 2:01 AM, Steffen Trumtrar
-<s.trumtrar@pengutronix.de> wrote:
-> Hi Dinh,
->
-> On Thu, Feb 12, 2015 at 04:39:47PM -0600, Dinh Nguyen wrote:
->> Hi Steffen,
+On 02/05/15 18:15, Stephen Boyd wrote:
+> On 02/05/15 07:45, Quentin Lambert wrote:
+>> On 05/02/2015 00:26, Stephen Boyd wrote:
+>>>> If you want me to I can enlarge the search to other directories.
+>>> Yes please do. And if you could share the coccinelle patch that would be
+>>> great. Thanks.
+>>>
+>> structclk.cocci is the coccinelle patch
+>> structclk-arm.patch is the result I got when applying it to the
+>> arch/arm directory
 >>
->> On 02/09/2015 03:30 PM, Steffen Trumtrar wrote:
->> > On Mon, Feb 09, 2015 at 07:58:20PM +0100, Steffen Trumtrar wrote:
->> >> Hi Dinh!
->> >>
->> >> On Mon, Feb 09, 2015 at 10:43:39AM -0600, Dinh Nguyen wrote:
->> >>> Hi Steffen,
->> >>>
->> >>> On 02/09/2015 09:53 AM, Steffen Trumtrar wrote:
->> >>>> Hi!
->> >>>>
->> >>>> On Fri, Feb 06, 2015 at 11:05:57AM +0000, Russell King - ARM Linux wrote:
->> >>>>> On Fri, Feb 06, 2015 at 11:39:46AM +0100, Steffen Trumtrar wrote:
->> >>>>>> I have run into a bug on the Socfpga platform. My boards sometimes fail
->> >>>>>> to boot when I have the commit
->> >>>>>>
->> >>>>>>        commit 8b5c18f05621394eb108d3fbc9bf98b05e8162db
->> >>>>>>        Author: Russell King <rmk+kernel@arm.linux.org.uk>
->> >>>>>>        Date:   Mon Apr 28 15:55:59 2014 +0100
->> >>>>>>
->> >>>>>>        ARM: l2c: socfpga: convert to generic l2c OF initialisation
->> >>>>>>
->> >>>>>>        Remove the explicit call to l2x0_of_init(), converting to the generic
->> >>>>>>        infrastructure instead.
->> >>>>>>
->> >>>>>>        Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> >>>>>>
->> >>>>>
->> >>>>> That should only result in the L2 cache being turned on earlier (before
->> >>>>> the secondary CPUs come up.)  I wonder if there's a bug in the secondary
->> >>>>> CPU code which is being tickled by it.
->> >>>>>
->> >>>>> What we need is some information on the failure - and as you've noticed,
->> >>>>> the failure occurs before the console is initialised.  There's two
->> >>>>> solutions to that:
->> >>>>>
->> >>>>> 1. Enable early printk support (and hope that works)
->> >>>>
->> >>>> Thanks. I actually got it working. Seems I had forgotten something in the
->> >>>> config. So, the bootlog now prints
->> >>>>
->> >>>> Uncompressing Linux... done, booting the kernel.
->> >>>> [    0.000000] Booting Linux on physical CPU 0x0
->> >>>> [    0.000000] Initializing cgroup subsys cpuset
->> >>>> [    0.000000] Linux version 3.19.0-rc7-test-00001-g7c10eb5fb252 (str at dude) (gcc version 4.9.2 (OSELAS.Toolchain-2014.12.0) ) #163 SMP PREEMPT Mon Feb 9 16:35:27 CET 2015
->> >>>> [    0.000000] CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c5387d
->> >>>> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
->> >>>> [    0.000000] Machine model: Terasic SoCkit
->> >>>> [    0.000000] bootconsole [earlycon0] enabled
->> >>>> [    0.000000] Memory policy: Data cache writealloc
->> >>>> [    0.000000] BUG: mapping for 0xfffec000 at 0xfffec000 out of vmalloc space
->> >>>> Early printk initialized
->> >>>> [    0.000000] PERCPU: Embedded 10 pages/cpu @bf7d4000 s11456 r8192 d21312 u40960
->> >>>> [    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 260096
->> >>>> [    0.000000] Kernel command line: console=ttyS0,115200 earlyprintk  ip=dhcp root=/dev/nfs nfsroot=/home/str/nfsroot/sockit,v3,tcp
->> >>>> [    0.000000] PID hash table entries: 4096 (order: 2, 16384 bytes)
->> >>>> [    0.000000] Dentry cache hash table entries: 131072 (order: 7, 524288 bytes)
->> >>>> [    0.000000] Inode-cache hash table entries: 65536 (order: 6, 262144 bytes)
->> >>>> [    0.000000] Memory: 1032636K/1048576K available (4716K kernel code, 222K rwdata, 1412K rodata, 276K init, 127K bss, 15940K reserved, 0K cma-reserved)
->> >>>> [    0.000000] Virtual kernel memory layout:
->> >>>> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
->> >>>> [    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
->> >>>> [    0.000000]     vmalloc : 0xc0800000 - 0xff000000   (1000 MB)
->> >>>> [    0.000000]     lowmem  : 0x80000000 - 0xc0000000   (1024 MB)
->> >>>> [    0.000000]     modules : 0x7f000000 - 0x80000000   (  16 MB)
->> >>>> [    0.000000]       .text : 0x80008000 - 0x806044d8   (6130 kB)
->> >>>> [    0.000000]       .init : 0x80605000 - 0x8064a000   ( 276 kB)
->> >>>> [    0.000000]       .data : 0x8064a000 - 0x80681a14   ( 223 kB)
->> >>>> [    0.000000]        .bss : 0x80681a14 - 0x806a161c   ( 128 kB)
->> >>>> [    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=2, Nodes=1
->> >>>> [    0.000000] Preemptible hierarchical RCU implementation.
->> >>>> [    0.000000] NR_IRQS:16 nr_irqs:16 16
->> >>>> [    0.000000] L2C-310 enabling early BRESP for Cortex-A9
->> >>>> [    0.000000] L2C-310 full line of zeros enabled for Cortex-A9
->> >>>> [    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
->> >>>> [    0.000000] L2C-310 cache controller enabled, 8 ways, 512 kB
->> >>>> [    0.000000] L2C-310: CACHE_ID 0x410030c9, AUX_CTRL 0x46060001
->> >>>> [    0.000013] sched_clock: 32 bits at 100MHz, resolution 10ns, wraps every 42949672950ns
->> >>>> [    0.008119] Console: colour dummy device 80x30
->> >>>> [    0.012670] Calibrating delay loop... 1594.16 BogoMIPS (lpj=7970816)
->> >>>> [    0.052740] pid_max: default: 32768 minimum: 301
->> >>>> [    0.057509] Mount-cache hash table entries: 2048 (order: 1, 8192 bytes)
->> >>>> [    0.064195] Mountpoint-cache hash table entries: 2048 (order: 1, 8192 bytes)
->> >>>> [    0.071877] CPU: Testing write buffer coherency: ok
->> >>>> [    0.077012] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
->> >>>> [    0.082841] Setting up static identity map for 0x47cc10 - 0x47cc68
->> >>>> [    1.139876] CPU1: failed to come online
->> >>>> [    1.143808] Brought up 1 CPUs
->> >>>> [    1.146851] SMP: Total of 1 processors activated (1594.16 BogoMIPS).
->> >>>>
->> >>>>
->> >>>> It looks like there actually is something wrong with the SMP setup.
->> >>>> The SoC is a Cortex-A9 dual core and normally both CPUs are started.
->> >>>> Maybe it has something to do with
->> >>>>
->> >>>>  BUG: mapping for 0xfffec000 at 0xfffec000 out of vmalloc space
->> >>>>
->> >>>> 0xfffec000 is the SCU base address.
->> >>>>
->> >>>
->> >>> This printout has been there for quite a while. The fix should be to
->> >>> remove the static define SOCFPGA_SCU_VIRT_BASE. I have a patch for this
->> >>> queue up but haven't had a chance to send it yet.
->> >>>
->> >>
->> >> Cool.
->> >>
->> >>> I was able to recreate this error(only 1 CPU coming online), when I
->> >>> build for socfpga_defconfig. But I cannot seem to recreate it if I build
->> >>> for multi_v7_defconfig, both CPUs come up just fine.
->> >>>
->> >>
->> >> Interessting.
->> >>
->> >>> Would it be possible for you to run your test with multi_v7_defconfig?
->> >>
->> >> No problem. Will do and get back with the result.
->> >>
->> >
->> > Doesn't seem to make such a big difference for me. It still sometimes
->> > doesn't boot. (I can't give any statistics, because ktest.pl is sadly
->> > not very reliable in finding all successful/failed boots and I'm to
->> > lazy to count)
->> >
+>> Is there anything else I can do to help?
 >>
->> Yes, after a while I can reproduce it with both socfpga_defconfig and
->> multi_v7_defconfig. Just seems that the failure is easier to reproduce
->> with socfpga_defconfig.
 >>
+> Thanks for the coccinelle patch. Thinking more about it, I don't think
+> we care if the pointer is dereferenced because that would require a
+> definition of struct clk and that is most likely not the case outside of
+> the clock framework. Did you scan the entire kernel? I'm running it now
+> but it seems to be taking a while.
 >
-> That is "good". At least it shows, that there is a common bug for SoCFPGA
-> and not only in my setup.
->
->> Like Russell said, it seems that enabling the L2 before bringing up the
->> secondary CPU is triggering a bug somewhere.
->>
->
-> Yes, seems very likely that Russell is right.
 
-The bug doesn't happen if I disable the L2. Digging more...
+I ran the script on all files that include <linux/clk.h>. I've also
+trimmed out mips and unicore32 because they're not using the common
+clock framework.
 
-Dinh
+diff = 
+--- arch/arm/mach-imx/mach-imx6q.c
++++ /tmp/cocci-output-11792-b62223-mach-imx6q.c
+@@ -211,7 +211,6 @@ static void __init imx6q_1588_init(void)
+ 	 * set bit IOMUXC_GPR1[21].  Or the PTP clock must be from pad
+ 	 * (external OSC), and we need to clear the bit.
+ 	 */
+-	clksel = ptp_clk == enet_ref ? IMX6Q_GPR1_ENET_CLK_SEL_ANATOP :
+ 				       IMX6Q_GPR1_ENET_CLK_SEL_PAD;
+ 	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
+ 	if (!IS_ERR(gpr))
+diff = 
+--- drivers/gpu/drm/armada/armada_510.c
++++ /tmp/cocci-output-12321-a5f298-armada_510.c
+@@ -53,7 +53,6 @@ static int armada510_crtc_compute_clock(
+ 	if (IS_ERR(clk))
+ 		return PTR_ERR(clk);
+ 
+-	if (dcrtc->clk != clk) {
+ 		ret = clk_prepare_enable(clk);
+ 		if (ret)
+ 			return ret;
+drivers/gpu/drm/armada/armada_510.c:56:5-15: WARNING trying to compare or dereference struct clk pointers.
+diff = 
+--- drivers/pwm/pwm-atmel-hlcdc.c
++++ /tmp/cocci-output-12679-3c5195-pwm-atmel-hlcdc.c
+@@ -91,7 +91,6 @@ static int atmel_hlcdc_pwm_config(struct
+ 
+ 	pwmcfg = ATMEL_HLCDC_PWMPS(pres);
+ 
+-	if (new_clk != chip->cur_clk) {
+ 		u32 gencfg = 0;
+ 		int ret;
+ 
+drivers/pwm/pwm-atmel-hlcdc.c:94:5-12: WARNING trying to compare or dereference struct clk pointers.
+diff = 
+--- drivers/tty/serial/samsung.c
++++ /tmp/cocci-output-12827-715e72-samsung.c
+@@ -750,7 +750,6 @@ static void s3c24xx_serial_set_termios(s
+ 
+ 	/* check to see if we need  to change clock source */
+ 
+-	if (ourport->baudclk != clk) {
+ 		s3c24xx_serial_setsource(port, clk_sel);
+ 
+ 		if (!IS_ERR(ourport->baudclk)) {
+drivers/tty/serial/samsung.c:753:5-21: WARNING trying to compare or dereference struct clk pointers.
+diff = 
+--- sound/soc/fsl/fsl_esai.c
++++ /tmp/cocci-output-13020-d518c3-fsl_esai.c
+@@ -269,7 +269,6 @@ static int fsl_esai_set_dai_sysclk(struc
+ 	}
+ 
+ 	/* Only EXTAL source can be output directly without using PSR and PM */
+-	if (ratio == 1 && clksrc == esai_priv->extalclk) {
+ 		/* Bypass all the dividers if not being needed */
+ 		ecr |= tx ? ESAI_ECR_ETO : ESAI_ECR_ERO;
+ 		goto out;
+sound/soc/fsl/fsl_esai.c:272:19-25: WARNING trying to compare or dereference struct clk pointers.
+diff = 
+--- sound/soc/fsl/fsl_spdif.c
++++ /tmp/cocci-output-13024-7acb1d-fsl_spdif.c
+@@ -1054,7 +1054,6 @@ static u32 fsl_spdif_txclk_caldiv(struct
+ 				enum spdif_txrate index, bool round)
+ {
+ 	const u32 rate[] = { 32000, 44100, 48000, 96000, 192000 };
+-	bool is_sysclk = clk == spdif_priv->sysclk;
+ 	u64 rate_ideal, rate_actual, sub;
+ 	u32 sysclk_dfmin, sysclk_dfmax;
+ 	u32 txclk_df, sysclk_df, arate;
+@@ -1148,7 +1147,6 @@ static int fsl_spdif_probe_txclk(struct
+ 			spdif_priv->txclk_src[index], rate[index]);
+ 	dev_dbg(&pdev->dev, "use txclk df %d for %dHz sample rate\n",
+ 			spdif_priv->txclk_df[index], rate[index]);
+-	if (spdif_priv->txclk[index] == spdif_priv->sysclk)
+ 		dev_dbg(&pdev->dev, "use sysclk df %d for %dHz sample rate\n",
+ 				spdif_priv->sysclk_df[index], rate[index]);
+ 	dev_dbg(&pdev->dev, "the best rate for %dHz sample rate is %dHz\n",
+sound/soc/fsl/fsl_spdif.c:1151:5-29: WARNING trying to compare or dereference struct clk pointers.
+sound/soc/fsl/fsl_spdif.c:1057:18-21: WARNING trying to compare or dereference struct clk pointers.
+diff = 
+--- sound/soc/kirkwood/kirkwood-i2s.c
++++ /tmp/cocci-output-13041-3200a6-kirkwood-i2s.c
+@@ -579,7 +579,6 @@ static int kirkwood_i2s_dev_probe(struct
+ 		if (PTR_ERR(priv->extclk) == -EPROBE_DEFER)
+ 			return -EPROBE_DEFER;
+ 	} else {
+-		if (priv->extclk == priv->clk) {
+ 			devm_clk_put(&pdev->dev, priv->extclk);
+ 			priv->extclk = ERR_PTR(-EINVAL);
+ 		} else {
+sound/soc/kirkwood/kirkwood-i2s.c:582:6-18: WARNING trying to compare or dereference struct clk pointers.
+
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
