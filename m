@@ -1,31 +1,37 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 17 Feb 2015 14:24:51 -0800
-Subject: [PATCH] ARM: EXYNOS: Don't use LDREX and STREX after disabling
- cache coherency
-In-Reply-To: <1424093802-5488-1-git-send-email-k.kozlowski@samsung.com>
-References: <1424093802-5488-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <54E3BFB3.5030801@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 17 Feb 2015 22:28:17 +0000
+Subject: [BUG] ARM: socfpga: L2 cache init
+In-Reply-To: <CADhT+wfbZb+u7a-aCi71rh9xFMuphOvqiyEgEYpmmTQtujLcVg@mail.gmail.com>
+References: <20150206103946.GM15692@pengutronix.de>
+ <20150206110557.GY8656@n2100.arm.linux.org.uk>
+ <20150209155314.GA7994@pengutronix.de>
+ <54D8E3BB.3060505@opensource.altera.com>
+ <20150209185820.GB7994@pengutronix.de>
+ <20150209213017.GC7994@pengutronix.de>
+ <54DD2BB3.3090507@opensource.altera.com>
+ <20150213080106.GD7994@pengutronix.de>
+ <CADhT+wfbZb+u7a-aCi71rh9xFMuphOvqiyEgEYpmmTQtujLcVg@mail.gmail.com>
+Message-ID: <20150217222817.GS8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/16/15 05:36, Krzysztof Kozlowski wrote:
-> During CPU shutdown the exynos_cpu_power_down() is called after
-> disabling cache coherency and it uses LDREX and STREX instructions (by
-> calling of_machine_is_compatible() -> kobject_get() -> kref_get()).
->
-> The LDREX and STREX should not be used after disabling the cache
-> coherency so just use soc_is_exynos().
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Fixes: adc548d77c22 ("ARM: EXYNOS: Use MCPM call-backs to support S2R on exynos5420")
-> Cc: <stable@vger.kernel.org>
-> Reported-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+On Tue, Feb 17, 2015 at 04:00:47PM -0600, Dinh Nguyen wrote:
+> On Fri, Feb 13, 2015 at 2:01 AM, Steffen Trumtrar
+> <s.trumtrar@pengutronix.de> wrote:
+> > Yes, seems very likely that Russell is right.
+> 
+> The bug doesn't happen if I disable the L2. Digging more...
 
-Looks good to me.
+What ensures that the value written to socfpga_cpu1start_addr (by
+of_property_read_u32() in socfpga_sysmgr_init(), called at .init_irq
+time) is visible to the secondary CPU?
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+>From what I can see, the physical address written there is not
+guaranteed to be flushed from all levels of cache.
+
+The flush_cache_all() in socfpga_boot_secondary() won't do the job -
+that won't touch the L2C-310.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
