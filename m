@@ -1,209 +1,90 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 17 Feb 2015 21:39:07 +0100
-Subject: [PATCH v2 2/2] ARM: pxa: transition to dmaengine phase 1
-In-Reply-To: <1424205547-15429-1-git-send-email-robert.jarzmik@free.fr>
-References: <1423954053-21760-1-git-send-email-robert.jarzmik@free.fr>
- <1424205547-15429-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1424205547-15429-2-git-send-email-robert.jarzmik@free.fr>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 17 Feb 2015 13:46:31 -0700
+Subject: [PATCH 1/8] i2c: mux-pinctrl: Rework to honor disabled child nodes
+In-Reply-To: <1424199129-22099-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1424199129-22099-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1424199129-22099-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <54E3A8A7.8080703@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to slowly transition pxa to dmaengine, the legacy code will now
-rely on dmaengine to request a channel.
+On 02/17/2015 11:52 AM, Sebastian Hesselbarth wrote:
+> I2C mux pinctrl driver currently determines the number of sub-busses by
+> counting available pinctrl-names. Unfortunately, this requires each
+> incarnation of the devicetree node with different available sub-busses
+> to be rewritten.
 
-This implies that PXA architecture selects DMADEVICES and MMP_PDMA,
-which is not pretty. Yet it enables PXA drivers to be ported one by one,
-with part of them using dmaengine, and the other part using the legacy
-code.
+Can you be more explicit about the problem here? Why does anything need 
+to be re-written if a child node is disabled; presumably there's no need 
+for the child bus numbers to be contiguous. In other words, with the 
+example in the existing DT binding doc:
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+         i2cmux {
+                 compatible = "i2c-mux-pinctrl";
+...
+                 pinctrl-names = "ddc", "pta", "idle";
+                 pinctrl-0 = <&state_i2cmux_ddc>;
+                 pinctrl-1 = <&state_i2cmux_pta>;
+                 pinctrl-2 = <&state_i2cmux_idle>;
 
----
-Since v1: removed Kconfig selects
-          added the mmp_pdma platform devices for legacy platforms
-	  fixed the legacy dma interrupt handler to cooperate with mmp_pdma
----
- arch/arm/mach-pxa/devices.c          | 37 ++++++++++++++++++++++++++++++++++++
- arch/arm/mach-pxa/pxa25x.c           |  1 +
- arch/arm/mach-pxa/pxa27x.c           |  1 +
- arch/arm/mach-pxa/pxa3xx.c           |  1 +
- arch/arm/plat-pxa/dma.c              | 22 ++++++++++-----------
- arch/arm/plat-pxa/include/plat/dma.h | 15 +++++++++++++++
- 6 files changed, 66 insertions(+), 11 deletions(-)
+                 i2c at 0 {
+                         reg = <0>;
+...
+                 i2c at 1 {
+                         reg = <1>;
+...
 
-diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
-index 3543466..7b7161a 100644
---- a/arch/arm/mach-pxa/devices.c
-+++ b/arch/arm/mach-pxa/devices.c
-@@ -17,6 +17,7 @@
- #include <linux/platform_data/camera-pxa.h>
- #include <mach/audio.h>
- #include <mach/hardware.h>
-+#include <linux/platform_data/mmp_dma.h>
- #include <linux/platform_data/mtd-nand-pxa3xx.h>
- 
- #include "devices.h"
-@@ -1193,3 +1194,39 @@ void __init pxa2xx_set_spi_info(unsigned id, struct pxa2xx_spi_master *info)
- 	pd->dev.platform_data = info;
- 	platform_device_add(pd);
- }
-+
-+static struct mmp_dma_platdata mmp_pdma_pdata = {
-+	.dma_channels	= 0,
-+};
-+
-+static struct resource mmp_pdma_resource[] = {
-+	[0] = {
-+		.start	= 0x40000000,
-+		.end	= 0x4000ffff,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= IRQ_DMA,
-+		.end	= IRQ_DMA,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static u64 pxadma_dmamask = 0xffffffffUL;
-+
-+static struct platform_device pxa2xx_mmp_dma = {
-+	.name		= "mmp-pdma",
-+	.id		= 0,
-+	.dev		= {
-+		.dma_mask = &pxadma_dmamask,
-+		.coherent_dma_mask = 0xffffffff,
-+	},
-+	.num_resources	= ARRAY_SIZE(mmp_pdma_resource),
-+	.resource	= mmp_pdma_resource,
-+};
-+
-+void __init pxa2xx_set_dmac_info(int nb_channels)
-+{
-+	mmp_pdma_pdata.dma_channels = nb_channels;
-+	return pxa_register_device(&pxa2xx_mmp_dma, &mmp_pdma_pdata);
-+}
-diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
-index 23a90c6..1dc85ff 100644
---- a/arch/arm/mach-pxa/pxa25x.c
-+++ b/arch/arm/mach-pxa/pxa25x.c
-@@ -206,6 +206,7 @@ static int __init pxa25x_init(void)
- 		register_syscore_ops(&pxa_irq_syscore_ops);
- 		register_syscore_ops(&pxa2xx_mfp_syscore_ops);
- 
-+		pxa2xx_set_dmac_info(16);
- 		pxa_register_device(&pxa25x_device_gpio, &pxa25x_gpio_info);
- 		ret = platform_add_devices(pxa25x_devices,
- 					   ARRAY_SIZE(pxa25x_devices));
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index b5abdeb..e6aae9e 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -310,6 +310,7 @@ static int __init pxa27x_init(void)
- 		if (!of_have_populated_dt()) {
- 			pxa_register_device(&pxa27x_device_gpio,
- 					    &pxa27x_gpio_info);
-+			pxa2xx_set_dmac_info(32);
- 			ret = platform_add_devices(devices,
- 						   ARRAY_SIZE(devices));
- 		}
-diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-index bd4cbef..aa85ec1 100644
---- a/arch/arm/mach-pxa/pxa3xx.c
-+++ b/arch/arm/mach-pxa/pxa3xx.c
-@@ -431,6 +431,7 @@ static int __init pxa3xx_init(void)
- 		if (of_have_populated_dt())
- 			return 0;
- 
-+		pxa2xx_set_dmac_info(32);
- 		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
- 		if (ret)
- 			return ret;
-diff --git a/arch/arm/plat-pxa/dma.c b/arch/arm/plat-pxa/dma.c
-index 054fc5a..67a2b1f 100644
---- a/arch/arm/plat-pxa/dma.c
-+++ b/arch/arm/plat-pxa/dma.c
-@@ -294,7 +294,8 @@ int pxa_request_dma (char *name, pxa_dma_prio prio,
- 		/* try grabbing a DMA channel with the requested priority */
- 		for (i = 0; i < num_dma_channels; i++) {
- 			if ((dma_channels[i].prio == prio) &&
--			    !dma_channels[i].name) {
-+			    !dma_channels[i].name &&
-+			    !mmp_pdma_toggle_reserved_channel(i)) {
- 				found = 1;
- 				break;
- 			}
-@@ -331,13 +332,14 @@ void pxa_free_dma (int dma_ch)
- 	local_irq_save(flags);
- 	DCSR(dma_ch) = DCSR_STARTINTR|DCSR_ENDINTR|DCSR_BUSERR;
- 	dma_channels[dma_ch].name = NULL;
-+	mmp_pdma_toggle_reserved_channel(dma_ch);
- 	local_irq_restore(flags);
- }
- EXPORT_SYMBOL(pxa_free_dma);
- 
- static irqreturn_t dma_irq_handler(int irq, void *dev_id)
- {
--	int i, dint = DINT;
-+	int i, dint = DINT, done = 0;
- 	struct dma_channel *channel;
- 
- 	while (dint) {
-@@ -346,16 +348,13 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
- 		channel = &dma_channels[i];
- 		if (channel->name && channel->irq_handler) {
- 			channel->irq_handler(i, channel->data);
--		} else {
--			/*
--			 * IRQ for an unregistered DMA channel:
--			 * let's clear the interrupts and disable it.
--			 */
--			printk (KERN_WARNING "spurious IRQ for DMA channel %d\n", i);
--			DCSR(i) = DCSR_STARTINTR|DCSR_ENDINTR|DCSR_BUSERR;
-+			done++;
- 		}
- 	}
--	return IRQ_HANDLED;
-+	if (done)
-+		return IRQ_HANDLED;
-+	else
-+		return IRQ_NONE;
- }
- 
- int __init pxa_init_dma(int irq, int num_ch)
-@@ -377,7 +376,8 @@ int __init pxa_init_dma(int irq, int num_ch)
- 		spin_lock_init(&dma_channels[i].lock);
- 	}
- 
--	ret = request_irq(irq, dma_irq_handler, 0, "DMA", NULL);
-+	ret = request_irq(irq, dma_irq_handler, IRQF_SHARED, "DMA",
-+			  dma_channels);
- 	if (ret) {
- 		printk (KERN_CRIT "Wow!  Can't register IRQ for DMA\n");
- 		kfree(dma_channels);
-diff --git a/arch/arm/plat-pxa/include/plat/dma.h b/arch/arm/plat-pxa/include/plat/dma.h
-index a7b91dc..f6f1acb 100644
---- a/arch/arm/plat-pxa/include/plat/dma.h
-+++ b/arch/arm/plat-pxa/include/plat/dma.h
-@@ -82,4 +82,19 @@ int pxa_request_dma (char *name,
- 
- void pxa_free_dma (int dma_ch);
- 
-+/*
-+ * Cooperation with mmp_pdma + dmaengine while there remains at least one pxa
-+ * driver not converted to dmaengine.
-+ */
-+#if defined(CONFIG_MMP_PDMA)
-+extern int mmp_pdma_toggle_reserved_channel(int legacy_channel);
-+#else
-+static inline mmp_pdma_toggle_reserved_channel(int legacy_channel)
-+{
-+	return 0;
-+}
-+#endif
-+
-+extern void __init pxa2xx_set_dmac_info(int nb_channels);
-+
- #endif /* __PLAT_DMA_H */
--- 
-2.1.0
+That would generate child busses 0 and 1. If I was to disable the i2c at 0 
+node, then there would still be definitions for child busses 0 and 1 in 
+the DT, it's just that child bus 0 wouldn't actually exist at run-time. 
+I don't see what part of DT needs to be re-written to accomodate this?
+
+> This patch reworks i2c-mux-pinctrl driver to count the number of
+> available sub-nodes instead. The rework should be compatible to the old
+> way of probing for sub-busses and additionally allows to disable unused
+> sub-busses with standard DT property status = "disabled".
+>
+> This also amends the corresponding devicetree binding documentation to
+> reflect the new functionality to disable unused sub-nodes. While at it,
+> also fix two references to binding documentation files that miss an "i2c-"
+> prefix.
+
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mux-pinctrl.txt b/Documentation/devicetree/bindings/i2c/i2c-mux-pinctrl.txt
+
+> -For each named state defined in the pinctrl-names property, an I2C child bus
+> -will be created. I2C child bus numbers are assigned based on the index into
+> -the pinctrl-names property.
+> +For each child node that is not disabled by a status != "okay", an I2C
+> +child bus will be created. I2C child bus numbers are assigned based on the
+> +order of child nodes.
+
+I would have assumed that disabled sub-nodes was a global concept within 
+DT, and so wouldn't be mentioned in the binding. It would just be a bug 
+in the driver if it didn't ignore disabled sub-nodes.
+
+
+
+
+>
+> -The only exception is that no bus will be created for a state named "idle". If
+> -such a state is defined, it must be the last entry in pinctrl-names. For
+> -example:
+> -
+> -	pinctrl-names = "ddc", "pta", "idle"  ->  ddc = bus 0, pta = bus 1
+> -	pinctrl-names = "ddc", "idle", "pta"  ->  Invalid ("idle" not last)
+> -	pinctrl-names = "idle", "ddc", "pta"  ->  Invalid ("idle" not last)
+> +There must be a corresponding pinctrl-names entry for each enabled child
+> +node at the position of the child node's "reg" property.
+
+The addition there seems fine, but the existing text re: the idle state 
+seems clearer in the original text.
+>
+>   Whenever an access is made to a device on a child bus, the relevant pinctrl
+>   state will be programmed into hardware.
+>
+> -If an idle state is defined, whenever an access is not being made to a device
+> -on a child bus, the idle pinctrl state will be programmed into hardware.
+> +Also, there can be an idle pinctrl state defined at the end of possible
+> +pinctrl states. If an idle state is defined, whenever an access is not being
+> +made to a device on a child bus, the idle pinctrl state will be programmed
+> +into hardware.
