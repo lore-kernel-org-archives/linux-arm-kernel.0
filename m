@@ -1,45 +1,31 @@
-From: joshua.clayton@uniwest.com (Joshua Clayton)
-Date: Tue, 17 Feb 2015 09:51:05 -0800
-Subject: [PATCH] i.MX6: WEIM: put node reference on early loop exit
-In-Reply-To: <60BA5429A0E1584BA3633194F6F993B5576E8DB6@NA-MBX-03.mgc.mentorg.com>
-References: <1423848784-6988-1-git-send-email-alison_chaiken@mentor.com>
- <20150216054702.GF12209@pengutronix.de>
- <60BA5429A0E1584BA3633194F6F993B5576E8DB6@NA-MBX-03.mgc.mentorg.com>
-Message-ID: <21911320.10lVZQzK19@jclayton-pc>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 17 Feb 2015 09:57:13 -0800
+Subject: [GIT PULL 5/7] ARM: SoC driver updates
+In-Reply-To: <CA+55aFz1i4M4GYOpPp4UAQPGx7b0PTd9Uv0gctU6EMKe3kb4wA@mail.gmail.com>
+References: <1424162008-23768-1-git-send-email-olof@lixom.net>
+ <1424162008-23768-6-git-send-email-olof@lixom.net>
+ <CA+55aFz1i4M4GYOpPp4UAQPGx7b0PTd9Uv0gctU6EMKe3kb4wA@mail.gmail.com>
+Message-ID: <CAOesGMjnUAt5MuXqN19ggT2H8vMQKMvArGx_TgAto2prPNmiXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, February 17, 2015 04:28:28 PM Chaiken, Alison wrote:
-> Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> >Looking at the code I get the question why the current code bails out on
-> >error. Wouldn't it be better to just skip erroneous child devices and
-> >issue a warning?
-> 
-> The WEIM connects only one child at any given time.   Since it is a platform
-Not true. WEIM is designed to connect to up to 4 children each with its own 
-chipselect and io memory area.
+On Tue, Feb 17, 2015 at 9:41 AM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+> On Tue, Feb 17, 2015 at 12:33 AM, Olof Johansson <olof@lixom.net> wrote:
+>>
+>> Conflicts:
+>>
+>> arch/arm/boot/dts/rk3288.dtsi:  add/add: Keep both sides
+> ...
+>
+> You mixed up the aliases of this pull and the previous DT pull.
+>
+> Not a real problem, but while resolving the DT aliases (which you
+> claimed had "No conflicts") I was wondering just what you had been
+> doing..
 
-> device, any child is cold-plugged.   If the probe of the child that is
-> marked 'status = "okay"' in the device-tree fails, then the WEIM itself has
-> no function, which sounds more like an error than a warning state.
-Is it possible to set 'status = disabled' per child if the call to 
-weim_timing_setup() fails, or something like that, so that 
-of_platform_populate() will skip it? 
+Whoops, sorry for that. I took merge conflict notes in a separate
+window and copied and pasted, and did it into the wrong email.
 
-> 
-> -- Alison
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
--- 
-Joshua Clayton
-Software Engineer
-UniWest
-122 S. 4th Avenue
-Pasco, WA 99301
-Ph: (509) 544-0720
-Fx: (509) 544-0868 
+-Olof
