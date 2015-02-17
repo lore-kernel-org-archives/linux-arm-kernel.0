@@ -1,21 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 17 Feb 2015 00:33:27 -0800
-Subject: [GIT PULL 6/7] ARM: SoC defconfig changes
+Date: Tue, 17 Feb 2015 00:33:26 -0800
+Subject: [GIT PULL 5/7] ARM: SoC driver updates
 In-Reply-To: <1424162008-23768-1-git-send-email-olof@lixom.net>
 References: <1424162008-23768-1-git-send-email-olof@lixom.net>
-Message-ID: <1424162008-23768-7-git-send-email-olof@lixom.net>
+Message-ID: <1424162008-23768-6-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of these changes are to enable new drivers that have been merged, or
-various additions to make defconfigs more useful. There's also a set of patches
-trimming down omap2plus kernel size a bit since it is quite large.
+These are changes for drivers that are intimately tied to some SoC
+and for some reason could not get merged through the respective
+subsystem maintainer tree.
+
+This time around, much of this is for at91, with the bulk of it being syscon
+and udc drivers.
+
+Also, there's:
+- coupled cpuidle support for Samsung Exynos4210
+- Renesas 73A0 common-clk work
+- of/platform changes to tear down DMA mappings on device destruction
+- a few updates to the TI Keystone knav code
 
 
 Conflicts:
 
-arch/arm/configs/omap2plus_defconfig: change/change conflict, keep CPUFREQ_DT
-arch/arm/configs/shmobile_defconfig: change/change, keep SH73A0, remove LAGER
+arch/arm/boot/dts/rk3288.dtsi:  add/add: Keep both sides                
+arch/arm/boot/dts/stih407-family.dtsi: Duplicate patch causes context
+mismatch, keep branch contents
+arch/arm/boot/dts/stih410.dtsi: Duplicate patch causes context mismatch,
+keep branch contents
+arch/arm/boot/dts/sun5i-a13.dtsi: add/remove: Remove aliases, keep chosen
+arch/arm/boot/dts/sun8i-a23.dtsi: add/remove: Remove aliases, keep chosen
 
 ----------------------------------------------------------------
 
@@ -25,132 +39,96 @@ The following changes since commit eaa27f34e91a14cdceed26ed6c6793ec1d186115:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/defconfig-for-linus
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/drivers-for-linus
 
-for you to fetch changes up to 0f01f9588d7b2e5f90335e2bf74c1e8d10177b56:
+for you to fetch changes up to 6f4554bdff6870c9e0f0b152bbec71d7a0f366f1:
 
-  Merge tag 'samsung-defconfig' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into next/defconfig
+  Merge tag 'samsung-cpuidle' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into next/drivers
 
 ----------------------------------------------------------------
 
-Anand Moon (1):
-      ARM: exynos_defconfig: Enable CONFIG_LOCKUP_DETECTOR
+Alexandre Belloni (1):
+      pcmcia: at91_cf: depend on !ARCH_MULTIPLATFORM
 
-Andreas Faerber (1):
-      ARM: exynos_defconfig: Enable LM90 driver
+Bartlomiej Zolnierkiewicz (2):
+      ARM: EXYNOS: apply S5P_CENTRAL_SEQ_OPTION fix only when necessary
+      cpuidle: exynos: add coupled cpuidle support for exynos4210
 
-Carlo Caione (2):
-      ARM: sunxi: Add AXP20x support in defconfig
-      ARM: sunxi: Add AXP20x support multi_v7_defconfig
+Boris Brezillon (12):
+      mfd: syscon: Add atmel-matrix registers definition
+      mfd: syscon: Add Atmel Matrix bus DT binding documentation
+      mfd: syscon: Add atmel-smc registers definition
+      mfd: syscon: Add Atmel SMC binding doc
+      usb: gadget: at91_udc: Fix clock names
+      usb: gadget: at91_udc: Drop uclk clock
+      usb: gadget: at91_udc: Document DT clocks and clock-names property
+      usb: gadget: at91_udc: Remove non-DT handling code
+      usb: gadget: at91_udc: Simplify probe and remove functions
+      usb: gadget: at91_udc: Rework for multi-platform kernel support
+      usb: gadget: at91_udc: Update DT binding documentation
+      usb: gadget: at91_udc: Allocate udc instance
 
-Chen-Yu Tsai (2):
-      ARM: sunxi_defconfig: Enable TOUCHSCREEN_SUN4I, CPUFREQ_DT, CPU_THERMAL
-      ARM: multi_v7_defconfig: Enable TOUCHSCREEN_SUN4I, CPU_THERMAL
+Murali Karicheri (3):
+      soc: ti: knav_qmss_queue: export API calls for use by user driver
+      soc: ti: knav_qmss_queue: makefile tweak to build as dynamic module
+      soc: ti: knav_qmss_queue: change knav_range_setup_acc_irq to static
 
-Eddie Huang (1):
-      ARM: Add mediatek SoC UART support in defconfig
+Olof Johansson (5):
+      Merge tag 'renesas-sh73a0-ccf-for-v3.20' of git://git.kernel.org/.../horms/renesas into next/drivers
+      Merge tag 'at91-drivers' of git://git.kernel.org/.../nferre/linux-at91 into next/drivers
+      Merge tag 'renesas-sh73a0-ccf2-for-v3.20' of git://git.kernel.org/.../horms/renesas into next/drivers
+      Merge tag 'drivers-soc-ti' of git://git.kernel.org/.../ssantosh/linux-keystone into next/drivers
+      Merge tag 'samsung-cpuidle' of git://git.kernel.org/.../kgene/linux-samsung into next/drivers
 
-Fabio Estevam (2):
-      ARM: imx_v6_v7_defconfig: Select SPI_FSL_QUADSPI by default
-      ARM: imx_v6_v7_defconfig: Select CONFIG_FB_MXS
+Ulrich Hecht (6):
+      clk: shmobile: sh73a0 common clock framework implementation
+      ARM: shmobile: sh73a0: Add CPG register bits header
+      ARM: shmobile: sh73a0: Common clock framework DT description
+      ARM: shmobile: kzm9g-reference: Common clock framework DT description
+      ARM: shmobile: sh73a0: add MSTP clock assignments to DT
+      ARM: shmobile: sh73a0: disable legacy clock initialization
 
-Felipe Balbi (2):
-      ARM: omap2plus_defconfig: reduce zImage size on omap2plus_defconfig
-      ARM: omap2plus_defconfig: enable TPS65218 power button
+Wei Yongjun (1):
+      clk: shmobile: fix sparse NULL pointer warning
 
-Gabriel FERNANDEZ (1):
-      ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic (SATA, PCIe & USB3) PHY
-
-Geert Uytterhoeven (4):
-      ARM: shmobile: kzm9g_defconfig: Update AK8975 config option
-      ARM: shmobile: Enable MICREL_PHY in shmobile_defconfig
-      ARM: shmobile: Enable DA9063 watchdog in multiplatform defconfig
-      ARM: shmobile: Enable kzm9g board in multiplatform defconfig
-
-Grygorii Strashko (1):
-      ARM: config: multi_v7: Update it for Keystone defconfig
-
-Javier Martinez Canillas (1):
-      ARM: multi_v7_defconfig: Enable Exynos5420 Multi-Cluster PM support
-
-Josh Wu (1):
-      ARM: at91: sama5: enable atmel-isi and ov2640 in defconfig
-
-Krzysztof Kozlowski (1):
-      ARM: exynos_defconfig: Enable PMIC and MUIC drivers for Gears and Trats2
-
-Kuninori Morimoto (3):
-      ARM: shmobile: defconfig: cleanup by savedefconfig
-      ARM: shmobile: defconfig: add MTD_BLOCK
-      ARM: shmobile: Select CONFIG_REGULATOR in defconfig once again
-
-Maxime Ripard (1):
-      ARM: at91/config: sama5: Remove DEBUG_LL
-
-Murali Karicheri (1):
-      ARM: config: add DEVTMPFS option by default to keystone config
-
-Nishanth Menon (1):
-      ARM: omap2plus_defconfig: Enable misc options for BeagleBoard-X15 platform
-
-Olof Johansson (13):
-      Merge tag 'renesas-defconfig-for-v3.20' of git://git.kernel.org/.../horms/renesas into next/defconfig
-      Merge tag 'v3.20-next-defconfig' of https://github.com/mbgg/linux-mediatek into next/defconfig
-      Merge tag 'mvebu-defconfig-3.20' of git://git.infradead.org/linux-mvebu into next/defconfig
-      Merge tag 'at91-defconfig' of git://git.kernel.org/.../nferre/linux-at91 into next/defconfig
-      Merge tag 'renesas-defconfig2-for-v3.20' of git://git.kernel.org/.../horms/renesas into next/defconfig
-      Merge tag 'sti-defconfig-for-v3.20-1' of git://git.stlinux.com/devel/kernel/linux-sti into next/defconfig
-      Merge tag 'omap-for-v3.20/defconfig-modular' of git://git.kernel.org/.../tmlind/linux-omap into next/defconfig
-      Merge tag 'imx-defconfig-3.20' of git://git.kernel.org/.../shawnguo/linux into next/defconfig
-      Merge tag 'tegra-for-3.20-defconfig' of git://git.kernel.org/.../tegra/linux into next/defconfig
-      Merge tag 'sunxi-defconfig-for-3.20' of https://git.kernel.org/.../mripard/linux into next/defconfig
-      Merge tag 'renesas-defconfig-fixes-for-v3.20' of git://git.kernel.org/.../horms/renesas into next/defconfig
-      Merge tag 'keystone-soc' of git://git.kernel.org/.../ssantosh/linux-keystone into next/defconfig
-      Merge tag 'samsung-defconfig' of git://git.kernel.org/.../kgene/linux-samsung into next/defconfig
-
-Peter Chen (1):
-      ARM: imx_v6_v7_defconfig: enable more USB functions
-
-Peter Griffin (1):
-      ARM: multi_v7_defconfig: Enable stih407 usb picophy
-
-Sjoerd Simons (2):
-      ARM: omap2plus_defconfig: Enable OHCI & EHCI HCD support
-      ARM: exynos_defconfig: Enable CONFIG_FHANDLE
-
-Stefan Agner (1):
-      ARM: imx_v6_v7_defconfig: add POWER_RESET_SYSCON
-
-Thierry Reding (1):
-      ARM: tegra: Regenerate defconfig based on v3.19-rc1
-
-Thomas Petazzoni (1):
-      ARM: mvebu: enable CPUFREQ_DT in mvebu_v7_defconfig
-
-Tony Lindgren (3):
-      ARM: omap2plus_defconfig: Enable support for davinci_emac
-      ARM: omap2plus_defconfig: Add NOR flash support
-      ARM: omap2plus_defconfig: Enable pcf857x
-
-Uwe Kleine-K?nig (1):
-      ARM: efm32: update defconfig
-
-Wang Long (2):
-      ARM: multi_v7_defconfig: Enable Hip01 platform
-      ARM: config: enable ARCH_HIP01
+Will Deacon (1):
+      of/platform: teardown DMA mappings on device destruction
 
 
- arch/arm/configs/efm32_defconfig     |   5 +-
- arch/arm/configs/exynos_defconfig    |  11 +++
- arch/arm/configs/hisi_defconfig      |   1 +
- arch/arm/configs/imx_v6_v7_defconfig |  39 ++++++++-
- arch/arm/configs/keystone_defconfig  |   1 +
- arch/arm/configs/kzm9g_defconfig     |   2 +-
- arch/arm/configs/multi_v7_defconfig  |  21 +++++
- arch/arm/configs/mvebu_v7_defconfig  |   1 +
- arch/arm/configs/omap2plus_defconfig | 127 ++++++++++++++++++++----------
- arch/arm/configs/sama5_defconfig     |   8 +-
- arch/arm/configs/shmobile_defconfig  |  48 ++++++-----
- arch/arm/configs/sunxi_defconfig     |  10 ++-
- arch/arm/configs/tegra_defconfig     |   2 -
- 13 files changed, 203 insertions(+), 73 deletions(-)
+ .../clock/renesas,sh73a0-cpg-clocks.txt         |  35 ++
+ .../devicetree/bindings/mfd/atmel-matrix.txt    |  24 +
+ .../devicetree/bindings/mfd/atmel-smc.txt       |  19 +
+ .../devicetree/bindings/usb/atmel-usb.txt       |  10 +-
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts    |   4 +
+ arch/arm/boot/dts/sh73a0.dtsi                   | 358 +++++++++++++
+ arch/arm/mach-exynos/common.h                   |   4 +
+ arch/arm/mach-exynos/exynos.c                   |   4 +
+ arch/arm/mach-exynos/platsmp.c                  |   2 +-
+ arch/arm/mach-exynos/pm.c                       | 133 ++++-
+ arch/arm/mach-exynos/suspend.c                  |   4 +
+ arch/arm/mach-shmobile/setup-sh73a0.c           |   5 +-
+ drivers/clk/shmobile/Makefile                   |   1 +
+ drivers/clk/shmobile/clk-sh73a0.c               | 218 ++++++++
+ drivers/cpuidle/Kconfig.arm                     |   1 +
+ drivers/cpuidle/cpuidle-exynos.c                |  76 ++-
+ drivers/of/platform.c                           |   1 +
+ drivers/pcmcia/Kconfig                          |   1 +
+ drivers/soc/ti/Makefile                         |   3 +-
+ drivers/soc/ti/knav_qmss_acc.c                  |   2 +-
+ drivers/soc/ti/knav_qmss_queue.c                |   9 +
+ drivers/usb/gadget/udc/Kconfig                  |   1 +
+ drivers/usb/gadget/udc/at91_udc.c               | 525 ++++++++++---------
+ drivers/usb/gadget/udc/at91_udc.h               |   9 +-
+ include/dt-bindings/clock/sh73a0-clock.h        |  79 +++
+ include/linux/mfd/syscon/atmel-matrix.h         | 117 +++++
+ include/linux/mfd/syscon/atmel-smc.h            | 173 ++++++
+ include/linux/platform_data/cpuidle-exynos.h    |  20 +
+ 28 files changed, 1570 insertions(+), 268 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/renesas,sh73a0-cpg-clocks.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/atmel-matrix.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/atmel-smc.txt
+ create mode 100644 drivers/clk/shmobile/clk-sh73a0.c
+ create mode 100644 include/dt-bindings/clock/sh73a0-clock.h
+ create mode 100644 include/linux/mfd/syscon/atmel-matrix.h
+ create mode 100644 include/linux/mfd/syscon/atmel-smc.h
+ create mode 100644 include/linux/platform_data/cpuidle-exynos.h
