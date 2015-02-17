@@ -1,123 +1,72 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Feb 2015 10:47:44 +0100
-Subject: [PATCH v3 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
-In-Reply-To: <87k2zha69p.fsf@free.fr>
-References: <1424091072-7738-1-git-send-email-maxime.ripard@free-electrons.com>
- <1424091072-7738-2-git-send-email-maxime.ripard@free-electrons.com>
- <87oaotaa6r.fsf@free.fr> <20150216205825.GG25269@lukather>
- <87k2zha69p.fsf@free.fr>
-Message-ID: <20150217094744.GI25269@lukather>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue, 17 Feb 2015 10:52:39 +0100
+Subject: [PATCH 5/9] mtd: pxa3xx_nand: add support for the Marvell Berlin
+ nand controller
+In-Reply-To: <87k2zn5c5v.fsf@free.fr>
+References: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1422367816-4257-6-git-send-email-antoine.tenart@free-electrons.com>
+ <20150209005503.3fad39c7@bbrezillon> <871tlx7dgu.fsf@free.fr>
+ <20150211163343.GH11169@kwain> <87k2zn5c5v.fsf@free.fr>
+Message-ID: <20150217095239.GD4507@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 16, 2015 at 10:36:02PM +0100, Robert Jarzmik wrote:
-> Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+Robert,
+
+On Thu, Feb 12, 2015 at 05:26:20PM +0100, Robert Jarzmik wrote:
+> Antoine Tenart <antoine.tenart@free-electrons.com> writes:
 > 
-> >> I don't think an mdelay(256) is acceptable.
+> >> All these ifs per variant will add complexity to the current driver, won't they
+> >> ?
 > >
-> > That's very true that this driver would need some love, but
-> > valentine's day was last week.
->
-> That doesn't cope with the 256ms mdelay. And a potential big mdelay
-> is not what I'd call a bug fix, see below.
-
-I really don't care about the delay itself, really.
-
-Just splitting the readsl into several chunks seems to slow the FIFO
-draining enough so that we don't even need to poll the RDDREQ bit.
-
-I was asked (rightfully) for a timeout, and since there's no
-particular indication in the datasheet on this, I came up with a
-totally random and made-up number. If you want to suggest any other
-random number, I'd be happy to use it.
-
-Plus, saying that this is strictly equivalent to mdelay(256) is just
-bad faith. It is a (very very very unlikely) worst case scenario.
-During my tests, I've never experienced even a single delay being
-used, let alone every single reads needing to poll the bit for 5ms,
-always succeeding at the last attempt.
-
-If we really care about this, we might as well start caring about
-other theoretically possible situations, such as the NAND chip being
-ripped off the board by an asteroid.
-
-> > I'm sorry, but this is a patch targeted for stable. This is a pure
-> > bugfix. I won't rewrite the whole driver solely to make the driver
-> > better, especially since that would make such a patch (or more likely
-> > a whole serie) unsuitable for stable.
+> > Given the current state of this driver I believe this would be a better
+> > idea to first rework it to use the nand framework properly. Then it will
+> > be possible to have a look on what we have, to decide whether or not a
+> > mrvl-nand-lib is needed.
 > 
-> This is the rewrite I was asking for (not tested), consider it against your
-> "rewrite the whole driver" :
+> I don't fully agree to delay.
+
+And sorry, but I don't think reworking the pxa3xx driver this way is a
+good idea. As I was saying, I'd like to rework it and doing this would
+be useless once the rework is done.
+
+> You're taking code, making sometimes copy-paste, for the berlin specific
+> functions, and I think you're taking the bugs as well, which duplicates the fix
+> effort.
 > 
-> 	Modified   drivers/mtd/nand/pxa3xx_nand.c
-> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index e512902..6e569e9 100644
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -576,11 +576,20 @@ static void start_data_dma(struct pxa3xx_nand_info *info)
->  {}
->  #endif
->  
-> +static irqreturn_t pxa3xx_nand_irq_thread(int irq, void *data)
-> +{
-> +	struct pxa3xx_nand_info *info = data;
-> +
-> +	handle_data_pio(info);
-> +	return IRQ_HANDLED;
-> +}
-> +
->  static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
->  {
->  	struct pxa3xx_nand_info *info = devid;
->  	unsigned int status, is_completed = 0, is_ready = 0;
->  	unsigned int ready, cmd_done;
-> +	irqreturn_t ret = IRQ_HANDLED;
->  
->  	if (info->cs == 0) {
->  		ready           = NDSR_FLASH_RDY;
-> @@ -622,7 +631,7 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
->  		} else {
->  			info->state = (status & NDSR_RDDREQ) ?
->  				      STATE_PIO_READING : STATE_PIO_WRITING;
-> -			handle_data_pio(info);
-> +			ret = IRQ_WAKE_THREAD;
->  		}
->  	}
->  	if (status & cmd_done) {
-> @@ -663,7 +672,7 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
->  	if (is_ready)
->  		complete(&info->dev_ready);
->  NORMAL_IRQ_EXIT:
-> -	return IRQ_HANDLED;
-> +	return ret;
->  }
->  
->  static inline int is_buf_blank(uint8_t *buf, size_t len)
-> @@ -1688,7 +1697,8 @@ static int alloc_nand_resource(struct platform_device *pdev)
->  	/* initialize all interrupts to be disabled */
->  	disable_int(info, NDSR_MASK);
->  
-> -	ret = request_irq(irq, pxa3xx_nand_irq, 0, pdev->name, info);
-> +	ret = request_threaded_irq(irq, pxa3xx_nand_irq,
-> +				   pxa3xx_nand_irq_thread, 0, pdev->name, info);
->  	if (ret < 0) {
->  		dev_err(&pdev->dev, "failed to request IRQ\n");
->  		goto fail_free_buf;
+> For example, in nand_cmdfunc_berlin():
+> +	if (info->reg_ndcr & NDCR_DWIDTH_M)
+> +		column /= 2;
+> 
+> This is I think a copy-paste from its twin nand_cmdfunc(). Now consider what
+> happens if the command is _not_ a read command, but an ONFI READID command
+> (ONFI being specified by column=0x20 if memory serves me well).
 
-While I agree that this change would be needed, it is still not stable
-material, so both patches will have to go through separate ways (and
-one will live without the other).
+In the Berlin specific cmdfunc we have ~10 lines copied from the others
+cmd functions. That's not much. The pxa3xx driver is already factorized
+and not a lot of functions are SoC-specific, except the cmdfunc which is
+not that long. So you would want me to move all the driver to
+mrvl-nand-lib and have a berlin_nand.c file with less than 100 lines
+(i.e only its cmdfunc)? Thant would introduce small specific probing
+functions and driver definitions and increase the code size, wouldn't
+it?
 
-Maxime
+> This is the reason I don't really like this patch. And this is also the reason
+> why I believe you're in a perfect timing to improve things, by grouping the
+> common function, and keeping the bugs in only one place, not many.
+
+Well, I think that would not be the refactoring needed for this driver.
+
+I may have been missing something. If so, please explain me which
+code part is not factorized (except for the first 10 lines of the
+cmd functions, which I can factorize if you really want it) and how the
+driver would benefit from this?
+
+Thanks,
+
+Antoine
 
 -- 
-Maxime Ripard, Free Electrons
+Antoine T?nart, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150217/bf5623eb/attachment.sig>
