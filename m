@@ -1,60 +1,167 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Feb 2015 09:19:45 +0000
-Subject: [PATCH v2 3/6] irqchip: gicv3-its: limit order of DT size to
- MAX_ORDER
-In-Reply-To: <1423992723-5028-4-git-send-email-wuyun.wu@huawei.com>
-References: <1423992723-5028-1-git-send-email-wuyun.wu@huawei.com>
- <1423992723-5028-4-git-send-email-wuyun.wu@huawei.com>
-Message-ID: <20150217091945.1c47e92f@arm.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue, 17 Feb 2015 10:20:20 +0100
+Subject: [PATCH 01/11] mfd: add the Berlin controller driver
+In-Reply-To: <20150216124808.GC14545@x1>
+References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1423671332-24580-2-git-send-email-antoine.tenart@free-electrons.com>
+ <20150216124808.GC14545@x1>
+Message-ID: <20150217092020.GC4507@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 15 Feb 2015 09:32:00 +0000
-Yun Wu <wuyun.wu@huawei.com> wrote:
+Lee,
 
-> When required DT size is out of the kmalloc()'s capability, the whole
-
-Nit: Using the DT acronym is very confusing here, as it means "Device
-Tree" to most people, including me. Please use "Device Table" instead.
-
-Also, the reference to kmalloc is wrong, as we're really using the page
-allocator.
-
-> ITS will fail in probing. This actually is not the hardware's problem
-> and is mainly a limitation of the kernel memory allocator. This patch
-> will keep ITS going on to the next initializaion step with an explicit
-> warning.
+On Mon, Feb 16, 2015 at 12:48:08PM +0000, Lee Jones wrote:
+> On Wed, 11 Feb 2015, Antoine Tenart wrote:
 > 
-> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+> > --- a/drivers/mfd/Kconfig
+> > +++ b/drivers/mfd/Kconfig
+> > @@ -840,6 +840,11 @@ config STMPE_SPI
+> >  	  This is used to enable SPI interface of STMPE
+> >  endmenu
+> >  
+> > +config MFD_BERLIN_CTRL
+> > +	bool
 > 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c
-> b/drivers/irqchip/irq-gic-v3-its.c index f5bfa42..de36606 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -828,6 +828,12 @@ static int its_alloc_tables(struct its_node *its)
->  			u32 ids = GITS_TYPER_DEVBITS(typer);
+> Missing description.
+> Why can't this driver be built as a module?
+
+Well, this mfd driver registers various devices as the pinctrl and the
+reset driver. I think we want the pinctrl driver to always be
+registered.
+
+IMHO we want this driver to always be selected when using a Berlin SoC.
+
 > 
->  			order = get_order((1UL << ids) * entry_size);
-> +			if (order >= MAX_ORDER) {
-> +				pr_warn("%s: DT size too large,
-> reduce to %u pages\n",
-> +
-> its->msi_chip.of_node->full_name,
-> +					1 << order);
-> +				order = MAX_ORDER;
-> +			}
->  		}
+> > +	select MFD_CORE
+> > +	select MFD_SYSCON
+> 
+> Missing help.
+> 
+> >  config MFD_STA2X11
+> >  	bool "STMicroelectronics STA2X11"
+> >  	depends on STA2X11
+> > diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> > index 53467e211381..adf60e85df20 100644
+> > --- a/drivers/mfd/Makefile
+> > +++ b/drivers/mfd/Makefile
+> > @@ -179,3 +179,5 @@ obj-$(CONFIG_MFD_DLN2)		+= dln2.o
+> >  
+> >  intel-soc-pmic-objs		:= intel_soc_pmic_core.o intel_soc_pmic_crc.o
+> >  obj-$(CONFIG_INTEL_SOC_PMIC)	+= intel-soc-pmic.o
+> > +
+> > +obj-$(CONFIG_MFD_BERLIN_CTRL)	+= berlin-ctrl.o
+> > diff --git a/drivers/mfd/berlin-ctrl.c b/drivers/mfd/berlin-ctrl.c
+> > new file mode 100644
+> > index 000000000000..e3ce6f069f16
+> > --- /dev/null
+> > +++ b/drivers/mfd/berlin-ctrl.c
+> > @@ -0,0 +1,180 @@
+> > +/*
+> > + * Copyright (C) 2015 Marvell Technology Group Ltd.
+> > + *
+> > + * Antoine Tenart <antoine.tenart@free-electrons.com>
+> 
+> Author: Antoine Tenart <antoine.tenart@free-electrons.com>
 
-Something is wrong here. Either (order == MAX_ORDER) is acceptable, or
-it is not. Also, your warning says that you're reducing the size to a
-new value, but you're displaying the size you can't handle. That
-message should be fixed.
+Hmmm, okay.
 
-Thanks,
+> 
+> > +
+> > +#include <linux/mfd/core.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of.h>
+> 
+> kernel.h?
 
-	M.
+Is there a reason to add this header here?
+
+> > +/*
+> > + * BG2 devices
+> > + */
+> > +static const struct mfd_cell berlin2_ctrl_chip_ctrl_subdevs[] = {
+> > +	{
+> > +		.name		= "berlin2-soc-pinctrl",
+> > +		.of_compatible	= "marvell,berlin2-soc-pinctrl",
+> > +	},
+> > +	{
+> > +		.name		= "berlin2-reset",
+> > +		.of_compatible	= "marvell,berlin2-reset",
+> > +	},
+> > +};
+> > +
+> > +static const struct mfd_cell berlin2_ctrl_system_ctrl_subdevs[] = {
+> > +	{
+> > +		.name		= "berlin2-system-pinctrl",
+> > +		.of_compatible	= "marvell,berlin2-system-pinctrl",
+> > +	},
+> > +};
+> > +
+> > +static const struct berlin_ctrl_priv berlin2_ctrl_chip_ctrl_data = {
+> > +	.devs	= berlin2_ctrl_chip_ctrl_subdevs,
+> > +	.ndevs	= ARRAY_SIZE(berlin2_ctrl_chip_ctrl_subdevs),
+> > +};
+> > +
+> > +static const struct berlin_ctrl_priv berlin2_ctrl_system_data = {
+> > +	.devs	= berlin2_ctrl_system_ctrl_subdevs,
+> > +	.ndevs	= ARRAY_SIZE(berlin2_ctrl_system_ctrl_subdevs),
+> > +};
+> > +
+> > +
+> 
+> Superfluous '\n'
+
+Sure.
+
+> 
+> > +
+> > +static int berlin_ctrl_probe(struct platform_device *pdev)
+> > +{
+> > +	struct device *dev = &pdev->dev;
+> > +	const struct of_device_id *match;
+> > +	const struct berlin_ctrl_priv *priv;
+> > +	int ret;
+> > +
+> > +	match = of_match_node(berlin_ctrl_of_match, dev->of_node);
+> > +	if (!match)
+> > +		return -EINVAL;
+> > +
+> > +	priv = match->data;
+> > +
+> > +	ret = mfd_add_devices(dev, 0, priv->devs, priv->ndevs, NULL, -1, NULL);
+> > +	if (ret) {
+> > +		dev_err(dev, "Failed to add devices: %d\n", ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> 
+> I'm not sure I see the point in this driver.  Why can't you just
+> register these devices directly from DT?
+
+All these devices share the same bank of registers and we previously
+used a single node. But with many devices sharing a single node, this is
+problematic to register all the devices from DT. Using this MFD driver
+to do it is a proper solution in this case.
+
+To provide a regmap to the devices' drivers we also use syscon on the
+chip/system controller nodes.
+
+> > +MODULE_LICENSE("GPL");
+> 
+> v2
+
+"GPL" is a valid choice, quoting include/linux.module.h:
+
+	"GPL"              [GNU Public License v2 or later]
+	"GPL v2"           [GNU Public License v2]
+
+Is there a reason you explicitly want to use GPLv2, and only GPLv2?
+
+Antoine
+
 -- 
-Jazz is not dead. It just smells funny.
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
