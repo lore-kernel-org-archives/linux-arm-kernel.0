@@ -1,113 +1,112 @@
-From: bamvor.zhangjian@huawei.com (Bamvor Jian Zhang)
-Date: Tue, 17 Feb 2015 15:15:15 +0800
-Subject: [PATCH] compat: Fix endian issue in union sigval
-In-Reply-To: <20150213104455.GA3508@e104818-lin.cambridge.arm.com>
-References: <1423563011-12377-1-git-send-email-bamvor.zhangjian@huawei.com>
- <20150210122718.GC32052@e104818-lin.cambridge.arm.com>
- <54DB3B60.4050100@huawei.com>
- <20150211154054.GD9058@e104818-lin.cambridge.arm.com>
- <54DDAF2B.2070707@huawei.com>
- <20150213104455.GA3508@e104818-lin.cambridge.arm.com>
-Message-ID: <54E2EA83.8080800@huawei.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 17 Feb 2015 07:43:10 +0000
+Subject: [PATCH v4 2/4] mfd: lubbock_cplds: add lubbock IO board
+In-Reply-To: <87fva5a4i2.fsf@free.fr>
+References: <20150216130549.GF14545@x1>
+ <1170550770.470129293.1424093248596.JavaMail.root@zimbra1-e1.priv.proxad.net>
+ <20150216162712.GR14545@x1> <87fva5a4i2.fsf@free.fr>
+Message-ID: <20150217074310.GT14545@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/2/13 18:44, Catalin Marinas wrote:
-> On Fri, Feb 13, 2015 at 04:00:43PM +0800, Bamvor Jian Zhang wrote:
->> On 2015/2/11 23:40, Catalin Marinas wrote:
->>> On Wed, Feb 11, 2015 at 07:22:08PM +0800, Bamvor Jian Zhang wrote:
->>>> On 2015/2/10 20:27, Catalin Marinas wrote:
->>>>> On Tue, Feb 10, 2015 at 10:10:11AM +0000, Zhang Jian(Bamvor) wrote:
->> ...
->>> The native sigval_t is also a union but on 64-bit big endian, the
->>> sival_int overlaps with the most significant 32-bit of the sival_ptr.
->>> So reading sival_int would always be 0. When the compat siginfo is
->>> copied to user, arm64 reads the native sival_ptr (si_ptr) and converts
->>> it to the compat one, getting the correct 32-bit value. However, other
->>> architectures access sival_int (si_int) instead which breaks with your
->>> get_compat_sigevent() changes.
->>>
->>>>> I think the correct fix is in the arm64 code:
->>>>
->>>> The following code could fix my issue.
->>>
->>> Without any parts of your patch?
->>
->> Yes. As you mentioned above, sival_int overlaps the most significant 32bit
->> of the sival_ptr, it seems that your patch is right if sival_ptr is less than
->> 32bit.
-> 
-> I don't follow you here. sival_ptr is greater than 32-bit on a 64-bit
-> kernel.
-Sorry for confuse. I was considering if the pointer in sival_ptr is greater
-than 32bit in 64bit application. But it seems that it is not relative to my
-issue: We only talk about the 32bit application here.
->>> I think that's correct fix since in the SIGEV_THREAD mq_notify case, we
->>> would not deliver a signal as notification, so the sival_int value is
->>> irrelevant (it would be 0 for big-endian compat tasks because of the
->>> sigval_t union on 64-bit).
->>>
->>> Your patch would work as well but you have to change all the other
->>> architectures to use si_ptr when copying to a compat siginfo.
->>
->> Yeah, it seems that my patch is useful only if the sival_ptr is bigger
->> than 32bit. It need the similar changes with following catalin's patch
->> in the following 64bit architecture:
->>
->> x86:                 arch/x86/ia32/ia32_signal.c
-> 
-> That's a little endian architecture and the use of ptr_to_compat() looks
-> fine to me.
-> 
->> tile, s390:          arch/xxx/kernel/compat_signal.c
-> 
-> s390 uses si_int already, as in my proposed arm64 patch.
-> 
-> tile seems to be bi-endian, though I couldn't see a Kconfig option, nor
-> something defining __BIG_ENDIAN__ in headers or Makefile. I guess it's
-> coming from the compiler directly. Anyway, on big endian tile, I we have
-> the same issue as on big endian arm64.
-> 
->> parisc, sparc, mips: arch/xxx/kernel/signal32.c
-> 
-> paris, sparc and mips all use si_int instead of si_ptr, so that's fine.
-> 
->> powerpc:             arch/xxx/kernel/signal_32.c
-> 
-> Same for powerpc, it uses si_int instead of si_ptr.
-> 
->> cc these maintainers for input.
-> 
-> I think it's only tile that needs fixing for big endian, something like
-> the arm64 patch below:
-Agree. I was thinking if it is not very clear that app write to si_ptr in
-userspace while kernel only read/write si_int.
+Arnd, Greg,
 
-regards
+  Perhaps you have some ideas WRT programmables (PLDs/CPLDs/FPGAs)?
 
-bamvor
+On Mon, 16 Feb 2015, Robert Jarzmik wrote:
+> Lee Jones wrote:
+> > What's all this?  Please configure your mail client correctly.
+> >
+> > For advice, see:
+> >
+> >   Documentation/email-clients.txt
+> While at day work, I have only access to web mail ...
 
->>>>> diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
->>>>> index e299de396e9b..32601939a3c8 100644
->>>>> --- a/arch/arm64/kernel/signal32.c
->>>>> +++ b/arch/arm64/kernel/signal32.c
->>>>> @@ -154,8 +154,7 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
->>>>>  	case __SI_TIMER:
->>>>>  		 err |= __put_user(from->si_tid, &to->si_tid);
->>>>>  		 err |= __put_user(from->si_overrun, &to->si_overrun);
->>>>> -		 err |= __put_user((compat_uptr_t)(unsigned long)from->si_ptr,
->>>>> -				   &to->si_ptr);
->>>>> +		 err |= __put_user(from->si_int, &to->si_int);
->>>>>  		break;
->>>>>  	case __SI_POLL:
->>>>>  		err |= __put_user(from->si_band, &to->si_band);
->>>>> @@ -184,7 +183,7 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
->>>>>  	case __SI_MESGQ: /* But this is */
->>>>>  		err |= __put_user(from->si_pid, &to->si_pid);
->>>>>  		err |= __put_user(from->si_uid, &to->si_uid);
->>>>> -		err |= __put_user((compat_uptr_t)(unsigned long)from->si_ptr, &to->si_ptr);
->>>>> +		err |= __put_user(from->si_int, &to->si_int);
->>>>>  		break;
->>>>>  	case __SI_SYS:
->>>>>  		err |= __put_user((compat_uptr_t)(unsigned long)
+Probably best to hold off your reply until you get home then.  It's
+not just a formatting issue, you also exposed many raw email addresses
+to the internet, which are easily harvested up by web crawlers.
+
+See this:
+  https://lkml.org/lkml/2015/2/16/247
+
+> >>  2) after v2, we _both_ agreed that the accurate name is "cplds"
+> >>     which exactly what is in this patch
+> >>     (see device registering with lubbock_cplds).
+> >
+> > There is no mention of this decision in the changelogs.  If it's not
+> > in the change logs, it didn't happen. ;)
+> Ah right.
 > 
+> > I'm still concerned with the fact that the driver file is named using
+> > and is populated by lots of instances of a "board" name.  I'm sure you
+> > would share my thoughts is someone submitted a driver called
+> > beaglebone.c or raspberrypi.c to MFD.
+> I understand your concern. Arnd, a thought about it ? The only viable
+> alternative would be to move it to arch/arm/plat-pxa AFAIS.
+
+I don't think this is correct either.  CPLD handling would probably be
+slightly less out of place in drivers/misc, but perhaps a new
+subsystem for PLDs/CPLDs/FPGAs would be more appropriate
+drivers/programmables or similar maybe.
+
+> >> > Besides, this is MFD, where we support single pieces of silicon which
+> >> > happen to support multiple devices.  I definitely don't want to support
+> >> > boards here.
+> >> > You might want to re-think the naming and your (sales) pitch.
+> >> I might need help. As for the (sales), no comment.
+> >
+> > By pitch, I mean to convince me that this belongs in MFD.
+> I've been trying.
+
+I'm pretty convinced that it doesn't belong in MFD now, but it doesn't
+mean I'm going to leave you on the curb.  I'd like to help you get it
+into a better home.
+
+[...]
+
+> > Understanding was lost when I learned that the whole file was centred
+> > around the premise of board support.  I understand now that this is a
+> > driver for a CPLD, which I'm not sure is even MFD.  Also, if it is
+> > really a CPLD driver, shouldn't be named after the manufacturer/model
+> > number of the chip, rather than the PCB which it's connected to?
+> >
+> > I'm also concerned that this driver has no functional CPLD code
+> > contained.  All you're doing is defining an IRQ domain.  Why then
+> > isn't this really an drivers/irqchip (Suggested-by: Josh Cartwright)
+> > driver?
+> Is not only a irqchip because, as explained at the bottom of the commit message,
+> quoting myself :
+>   This patch moves all that handling to a mfd driver. It's only purpose
+>   for the time being is the interrupt handling, but in the future it
+>   should encompass all the motherboard CPLDs handling :
+>    - leds
+>    - switches
+>    - hexleds
+
+I had a conversation about this on IRC yesterday and some good
+points/questions were posed.  This is a difficult area, because you
+can program these things to do whatever you like.  Depending on the
+'intention' (and it is only an intention -- someone else can come
+along and reprogram these devices on a whim), the CPLD code could live
+anywhere.  If you wanted to put watchdog functionality in there, then
+there is an argument for it to live in drivers/watchdog, etc etc.  So
+just because the plan is to support a few (i.e. more than one) simple
+devices, it doesn't necessarily mean that the handling should be done
+in MFD.
+
+Yesterday I was asked "Are you wanting to restrict drivers in
+drivers/mfd to those that make use of MFD_CORE functionality?".  My
+answer to that was "No, however; I only want devices which
+_intrinsically_ operate in multiple subsystems", which these
+programmables no not do.
+
+FYI, you're not on your own here.  There is at least one of these
+devices in the kernel already and upon a short inspection there
+appears to be a number of Out-of-Tree (OoT) drivers out there which
+will require a home in Mainline sooner or later.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
