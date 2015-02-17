@@ -1,108 +1,114 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 17 Feb 2015 11:54:48 +0000
-Subject: [PATCH 01/11] mfd: add the Berlin controller driver
-In-Reply-To: <20150217092020.GC4507@kwain>
-References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
- <1423671332-24580-2-git-send-email-antoine.tenart@free-electrons.com>
- <20150216124808.GC14545@x1> <20150217092020.GC4507@kwain>
-Message-ID: <20150217115447.GA3989@x1>
+From: wuyun.wu@huawei.com (Yun Wu (Abel))
+Date: Tue, 17 Feb 2015 20:27:58 +0800
+Subject: [PATCH v2 5/6] irqchip: gicv3-its: add support for power down
+In-Reply-To: <20150217111104.5718d6f1@arm.com>
+References: <1423992723-5028-1-git-send-email-wuyun.wu@huawei.com>
+ <1423992723-5028-6-git-send-email-wuyun.wu@huawei.com>
+ <20150217092935.1fefcb24@arm.com> <54E314B3.40803@huawei.com>
+ <20150217111104.5718d6f1@arm.com>
+Message-ID: <54E333CE.5010800@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Feb 2015, Antoine Tenart wrote:
-> On Mon, Feb 16, 2015 at 12:48:08PM +0000, Lee Jones wrote:
-> > On Wed, 11 Feb 2015, Antoine Tenart wrote:
-> > 
-> > > --- a/drivers/mfd/Kconfig
-> > > +++ b/drivers/mfd/Kconfig
-> > > @@ -840,6 +840,11 @@ config STMPE_SPI
-> > >  	  This is used to enable SPI interface of STMPE
-> > >  endmenu
-> > >  
-> > > +config MFD_BERLIN_CTRL
-> > > +	bool
-> > 
-> > Missing description.
-> > Why can't this driver be built as a module?
+On 2015/2/17 19:11, Marc Zyngier wrote:
+
+> On Tue, 17 Feb 2015 10:15:15 +0000
+> "Yun Wu (Abel)" <wuyun.wu@huawei.com> wrote:
 > 
-> Well, this mfd driver registers various devices as the pinctrl and the
-> reset driver. I think we want the pinctrl driver to always be
-> registered.
+>> On 2015/2/17 17:29, Marc Zyngier wrote:
+>>
+>>> On Sun, 15 Feb 2015 09:32:02 +0000
+>>> Yun Wu <wuyun.wu@huawei.com> wrote:
+>>>
+>>>> It's unsafe to change the configurations of an activated ITS
+>>>> directly since this will lead to unpredictable results. This patch
+>>>> guarantees a safe quiescent status before initializing an ITS.
+>>>
+>>> Please change the title of this patch to reflect what it actually
+>>> does. Nothing here is about powering down anything.
+>>
+>> My miss, I will fix this in next version.
+>>
+>>>
+>>>> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
+>>>> ---
+>>>>  drivers/irqchip/irq-gic-v3-its.c | 32
+>>>> ++++++++++++++++++++++++++++++++ 1 file changed, 32 insertions(+)
+>>>>
+>>>> diff --git a/drivers/irqchip/irq-gic-v3-its.c
+>>>> b/drivers/irqchip/irq-gic-v3-its.c index 42c03b2..29eb665 100644
+>>>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>>>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>>>> @@ -1321,6 +1321,31 @@ static const struct irq_domain_ops
+>>>> its_domain_ops = { .deactivate		=
+>>>> its_irq_domain_deactivate, };
+>>>>
+>>>> +static int its_check_quiesced(void __iomem *base)
+>>>> +{
+>>>> +	u32 count = 1000000;	/* 1s */
+>>>> +	u32 val;
+>>>> +
+>>>> +	val = readl_relaxed(base + GITS_CTLR);
+>>>> +	if (val & GITS_CTLR_QUIESCENT)
+>>>> +		return 0;
+>>>> +
+>>>> +	/* Disable the generation of all interrupts to this ITS */
+>>>> +	val &= ~GITS_CTLR_ENABLE;
+>>>> +	writel_relaxed(val, base + GITS_CTLR);
+>>>> +
+>>>> +	/* Poll GITS_CTLR and wait until ITS becomes quiescent */
+>>>> +	while (count--) {
+>>>> +		val = readl_relaxed(base + GITS_CTLR);
+>>>> +		if (val & GITS_CTLR_QUIESCENT)
+>>>> +			return 0;
+>>>> +		cpu_relax();
+>>>> +		udelay(1);
+>>>> +	}
+>>>
+>>> You're now introducing a third variant of a 1s timeout loop. Notice
+>>> a pattern?
+>>>
+>>
+>> I am not sure I know exactly what you suggest. Do you mean I should
+>> code like below to keep the coding style same as the other 2 loops?
+>>
+>> 	while (1) {
+>> 		val = readl_relaxed(base + GITS_CTLR);
+>> 		if (val & GITS_CTLR_QUIESCENT)
+>> 			return 0;
+>>
+>> 		count--;
+>> 		if (!count)
+>> 			return -EBUSY;
+>>
+>> 		cpu_relax();
+>> 		udelay(1);
+>> 	}
 > 
-> IMHO we want this driver to always be selected when using a Berlin SoC.
-
-[...]
-
-> > > +#include <linux/mfd/core.h>
-> > > +#include <linux/module.h>
-> > > +#include <linux/of.h>
-> > 
-> > kernel.h?
+> That'd be a good start. But given that this is starting to be a common
+> construct, it could probably be rewritten as:
 > 
-> Is there a reason to add this header here?
-
-I guess not if you're not using any of its macros.  Although, I don't
-recall every seeing s driver without it.  I guess you learn something
-every day.
-
-[...]
-
-> > > +static int berlin_ctrl_probe(struct platform_device *pdev)
-> > > +{
-> > > +	struct device *dev = &pdev->dev;
-> > > +	const struct of_device_id *match;
-> > > +	const struct berlin_ctrl_priv *priv;
-> > > +	int ret;
-> > > +
-> > > +	match = of_match_node(berlin_ctrl_of_match, dev->of_node);
-> > > +	if (!match)
-> > > +		return -EINVAL;
-> > > +
-> > > +	priv = match->data;
-> > > +
-> > > +	ret = mfd_add_devices(dev, 0, priv->devs, priv->ndevs, NULL, -1, NULL);
-> > > +	if (ret) {
-> > > +		dev_err(dev, "Failed to add devices: %d\n", ret);
-> > > +		return ret;
-> > > +	}
-> > > +
-> > > +	return 0;
-> > > +}
-> > 
-> > I'm not sure I see the point in this driver.  Why can't you just
-> > register these devices directly from DT?
+> static int its_poll_timeout(struct its_node *its, void *data,
+>                             int (*fn)(struct its_node *its,
+>                                       void *data))
+> {
+> 	while (1) {
+> 		if (!fn(its, data))
+> 			return 0;
 > 
-> All these devices share the same bank of registers and we previously
-> used a single node. But with many devices sharing a single node, this is
-> problematic to register all the devices from DT. Using this MFD driver
-> to do it is a proper solution in this case.
-
-Tell me more.  What are the problems you encountered?
-
-> To provide a regmap to the devices' drivers we also use syscon on the
-> chip/system controller nodes.
+> 		...
+> 	}
+> }
 > 
-> > > +MODULE_LICENSE("GPL");
-
-I wonder if these are actually useful if you're always going to be
-built-in? 
-
-> > > +MODULE_LICENSE("GPL");
-> > 
-> > v2
+> and have the call sites to provide the right utility function. We also
+> have two similar timeout loops in the main GICv3 driver, so there
+> should be room for improvement.
 > 
-> "GPL" is a valid choice, quoting include/linux.module.h:
+> Thoughts?
 > 
-> 	"GPL"              [GNU Public License v2 or later]
-> 	"GPL v2"           [GNU Public License v2]
-> 
-> Is there a reason you explicitly want to use GPLv2, and only GPLv2?
 
-Yes, there is disparity between this and the comment in the file
-header.  I don't mind which one you amend, but a change is required.
+It looks fine to me. I will make some improvement in the next version after
+Chinese Spring Festival. :)
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+	Abel
