@@ -1,47 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Feb 2015 15:16:08 +0000
-Subject: [PATCH v4 6/6] ARM: shmobile: ape6evm dts: Drop console=
- bootargs parameter
-In-Reply-To: <1424185486-3017-7-git-send-email-geert+renesas@glider.be>
-References: <1424185486-3017-1-git-send-email-geert+renesas@glider.be>
- <1424185486-3017-7-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150217151608.GN8994@leverpostej>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 17 Feb 2015 16:31:39 +0100
+Subject: [PATCH v3 2/2] drivers: sh: Disable PM runtime for multi-platform
+ sh73a0 with genpd
+In-Reply-To: <1424187099-5628-1-git-send-email-geert+renesas@glider.be>
+References: <1424187099-5628-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1424187099-5628-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 17, 2015 at 03:04:46PM +0000, Geert Uytterhoeven wrote:
-> Since ("ARM: shmobile: r8a73a4: ape6evm: Remove legacy platform"),
-> ape6evm is restricted to booting from DT, so chosen/stdout-path is
-> always used, and we can drop the "console=" parameter from
-> chosen/bootargs.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v4:
->   - New.
-> ---
->  arch/arm/boot/dts/r8a73a4-ape6evm.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> index 44c4cac1820a4dfe..f9e81512201a2ec4 100644
-> --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> @@ -22,7 +22,7 @@
->  	};
->  
->  	chosen {
-> -		bootargs = "console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp rw";
-> +		bootargs = "ignore_loglevel root=/dev/nfs ip=dhcp rw";
->  		stdout-path = &scifa0;
+If the default PM domain using PM_CLK is used for PM runtime, the real PM
+domain(s) cannot be registered from DT later.
 
-I'd strongly recommend that you also pass the configuration explicitly
-here, so as to avoid nasty surprises. For that you can either use a path
-or an alias, depending on what the rest of your DT looks like:
+Hence do not enable it when running a multi-platform kernel with genpd
+support on an sh73a0. The R-Mobile PM domain driver will take care of
+PM runtime management of the module clocks.
 
-	stdout-path = "/path/to/scifa0:115200n8"
+The default PM domain is still needed for:
+  - platforms without genpd support,
+  - the legacy (non-DT) case, where genpd may take over later, except
+    for the C5 "always on" PM domain.
 
-	stdout-path = "serial0:115200n8"
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v3:
+  - No changes,
 
-Thanks,
-Mark.
+v2:
+  - No changes.
+---
+ drivers/sh/pm_runtime.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/sh/pm_runtime.c b/drivers/sh/pm_runtime.c
+index cd4c293f0dd0d375..6b16a67ba618b793 100644
+--- a/drivers/sh/pm_runtime.c
++++ b/drivers/sh/pm_runtime.c
+@@ -83,6 +83,7 @@ static int __init sh_pm_runtime_init(void)
+ 		    !of_machine_is_compatible("renesas,r8a73a4") &&
+ #ifndef CONFIG_PM_GENERIC_DOMAINS_OF
+ 		    !of_machine_is_compatible("renesas,r8a7740") &&
++		    !of_machine_is_compatible("renesas,sh73a0") &&
+ #endif
+ 		    !of_machine_is_compatible("renesas,r8a7778") &&
+ 		    !of_machine_is_compatible("renesas,r8a7779") &&
+@@ -91,8 +92,7 @@ static int __init sh_pm_runtime_init(void)
+ 		    !of_machine_is_compatible("renesas,r8a7792") &&
+ 		    !of_machine_is_compatible("renesas,r8a7793") &&
+ 		    !of_machine_is_compatible("renesas,r8a7794") &&
+-		    !of_machine_is_compatible("renesas,sh7372") &&
+-		    !of_machine_is_compatible("renesas,sh73a0"))
++		    !of_machine_is_compatible("renesas,sh7372"))
+ 			return 0;
+ 	}
+ 
+-- 
+1.9.1
