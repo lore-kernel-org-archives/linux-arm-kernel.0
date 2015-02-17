@@ -1,72 +1,66 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 17 Feb 2015 10:52:39 +0100
-Subject: [PATCH 5/9] mtd: pxa3xx_nand: add support for the Marvell Berlin
- nand controller
-In-Reply-To: <87k2zn5c5v.fsf@free.fr>
-References: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
- <1422367816-4257-6-git-send-email-antoine.tenart@free-electrons.com>
- <20150209005503.3fad39c7@bbrezillon> <871tlx7dgu.fsf@free.fr>
- <20150211163343.GH11169@kwain> <87k2zn5c5v.fsf@free.fr>
-Message-ID: <20150217095239.GD4507@kwain>
+From: wuyun.wu@huawei.com (Yun Wu (Abel))
+Date: Tue, 17 Feb 2015 18:00:52 +0800
+Subject: [PATCH v2 3/6] irqchip: gicv3-its: limit order of DT size to
+ MAX_ORDER
+In-Reply-To: <20150217091945.1c47e92f@arm.com>
+References: <1423992723-5028-1-git-send-email-wuyun.wu@huawei.com>
+ <1423992723-5028-4-git-send-email-wuyun.wu@huawei.com>
+ <20150217091945.1c47e92f@arm.com>
+Message-ID: <54E31154.3020308@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert,
+On 2015/2/17 17:19, Marc Zyngier wrote:
 
-On Thu, Feb 12, 2015 at 05:26:20PM +0100, Robert Jarzmik wrote:
-> Antoine Tenart <antoine.tenart@free-electrons.com> writes:
+> On Sun, 15 Feb 2015 09:32:00 +0000
+> Yun Wu <wuyun.wu@huawei.com> wrote:
 > 
-> >> All these ifs per variant will add complexity to the current driver, won't they
-> >> ?
-> >
-> > Given the current state of this driver I believe this would be a better
-> > idea to first rework it to use the nand framework properly. Then it will
-> > be possible to have a look on what we have, to decide whether or not a
-> > mrvl-nand-lib is needed.
+>> When required DT size is out of the kmalloc()'s capability, the whole
 > 
-> I don't fully agree to delay.
-
-And sorry, but I don't think reworking the pxa3xx driver this way is a
-good idea. As I was saying, I'd like to rework it and doing this would
-be useless once the rework is done.
-
-> You're taking code, making sometimes copy-paste, for the berlin specific
-> functions, and I think you're taking the bugs as well, which duplicates the fix
-> effort.
+> Nit: Using the DT acronym is very confusing here, as it means "Device
+> Tree" to most people, including me. Please use "Device Table" instead.
 > 
-> For example, in nand_cmdfunc_berlin():
-> +	if (info->reg_ndcr & NDCR_DWIDTH_M)
-> +		column /= 2;
+> Also, the reference to kmalloc is wrong, as we're really using the page
+> allocator.
+
+OK, I will get the description fixed in the next version.
+
 > 
-> This is I think a copy-paste from its twin nand_cmdfunc(). Now consider what
-> happens if the command is _not_ a read command, but an ONFI READID command
-> (ONFI being specified by column=0x20 if memory serves me well).
+>> ITS will fail in probing. This actually is not the hardware's problem
+>> and is mainly a limitation of the kernel memory allocator. This patch
+>> will keep ITS going on to the next initializaion step with an explicit
+>> warning.
+>>
+>> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
+>> ---
+>>  drivers/irqchip/irq-gic-v3-its.c | 6 ++++++
+>>  1 file changed, 6 insertions(+)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c
+>> b/drivers/irqchip/irq-gic-v3-its.c index f5bfa42..de36606 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -828,6 +828,12 @@ static int its_alloc_tables(struct its_node *its)
+>>  			u32 ids = GITS_TYPER_DEVBITS(typer);
+>>
+>>  			order = get_order((1UL << ids) * entry_size);
+>> +			if (order >= MAX_ORDER) {
+>> +				pr_warn("%s: DT size too large,
+>> reduce to %u pages\n",
+>> +
+>> its->msi_chip.of_node->full_name,
+>> +					1 << order);
+>> +				order = MAX_ORDER;
+>> +			}
+>>  		}
+> 
+> Something is wrong here. Either (order == MAX_ORDER) is acceptable, or
+> it is not. Also, your warning says that you're reducing the size to a
+> new value, but you're displaying the size you can't handle. That
+> message should be fixed.
+> 
 
-In the Berlin specific cmdfunc we have ~10 lines copied from the others
-cmd functions. That's not much. The pxa3xx driver is already factorized
-and not a lot of functions are SoC-specific, except the cmdfunc which is
-not that long. So you would want me to move all the driver to
-mrvl-nand-lib and have a berlin_nand.c file with less than 100 lines
-(i.e only its cmdfunc)? Thant would introduce small specific probing
-functions and driver definitions and increase the code size, wouldn't
-it?
-
-> This is the reason I don't really like this patch. And this is also the reason
-> why I believe you're in a perfect timing to improve things, by grouping the
-> common function, and keeping the bugs in only one place, not many.
-
-Well, I think that would not be the refactoring needed for this driver.
-
-I may have been missing something. If so, please explain me which
-code part is not factorized (except for the first 10 lines of the
-cmd functions, which I can factorize if you really want it) and how the
-driver would benefit from this?
+Yes, my fault, I will fix them.
 
 Thanks,
-
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Abel
