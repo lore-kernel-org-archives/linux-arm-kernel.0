@@ -1,52 +1,140 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Feb 2015 09:46:39 +0000
-Subject: [PATCH v2 2/6] irqchip: gicv3-its: use 64KB page as default
- granule
-In-Reply-To: <1423992723-5028-3-git-send-email-wuyun.wu@huawei.com>
-References: <1423992723-5028-1-git-send-email-wuyun.wu@huawei.com>
- <1423992723-5028-3-git-send-email-wuyun.wu@huawei.com>
-Message-ID: <20150217094639.1114dad5@arm.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 17 Feb 2015 10:47:23 +0100
+Subject: [PATCHv2 1/2] drm: atmel-hlcdc: Add PM suspend/resume support
+In-Reply-To: <1423774163-4752-2-git-send-email-sylvain.rochet@finsecur.com>
+References: <1423774163-4752-1-git-send-email-sylvain.rochet@finsecur.com>
+ <1423774163-4752-2-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <54E30E2B.5070407@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 15 Feb 2015 09:31:59 +0000
-Yun Wu <wuyun.wu@huawei.com> wrote:
+Hi Sylvain,
 
-> The field of page size in register GITS_BASERn might be read-only
-> if an implementation only supports a single, fixed page size. But
-> currently the ITS driver will throw out an error when PAGE_SIZE
-> is less than the minimum size supported by an ITS. So addressing
-> this problem by using 64KB pages as default granule for all the
-> ITS base tables.
+Few comments below.
+
+On 02/12/2015 09:49 PM, Sylvain Rochet wrote:
+> On suspend: switch off CRTC if not already suspended with runtime PM
 > 
-> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
-
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
+> On resume: switch on CRTC if we were not already suspended from runtime
+> PM while suspending.
+> 
+> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
 > ---
->  drivers/irqchip/irq-gic-v3-its.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 60 ++++++++++++++++++++++++++++
+>  1 file changed, 60 insertions(+)
 > 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c
-> b/drivers/irqchip/irq-gic-v3-its.c index 69eeea3..f5bfa42 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -800,7 +800,7 @@ static int its_alloc_tables(struct its_node *its)
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> index 22c3cca..e22883b 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> @@ -427,6 +427,36 @@ static void atmel_hlcdc_dc_lastclose(struct drm_device *dev)
+>  	drm_fbdev_cma_restore_mode(dc->fbdev);
+>  }
+>  
+> +static int atmel_hlcdc_dc_suspend(struct drm_device *dev, pm_message_t state)
+> +{
+> +	struct drm_crtc *crtc;
+> +
+> +	drm_modeset_lock_all(dev);
+> +
+> +	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+> +		struct drm_crtc_helper_funcs *crtc_funcs = crtc->helper_private;
+> +		crtc_funcs->disable(crtc);
+> +	}
+> +
+> +	drm_modeset_unlock_all(dev);
+> +	return 0;
+> +}
+> +
+> +static int atmel_hlcdc_dc_resume(struct drm_device *dev)
+> +{
+> +	struct drm_crtc *crtc;
+> +
+> +	drm_modeset_lock_all(dev);
+> +
+> +	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+> +		struct drm_crtc_helper_funcs *crtc_funcs = crtc->helper_private;
+> +		crtc_funcs->enable(crtc);
+
+What about crtc's which were disabled before suspend, they will be
+enabled here unconditionally.
+
+
+> +	}
+> +
+> +	drm_modeset_unlock_all(dev);
+> +	return 0;
+> +}
+> +
+>  static int atmel_hlcdc_dc_irq_postinstall(struct drm_device *dev)
 >  {
->  	int err;
->  	int i;
-> -	int psz = PAGE_SIZE;
-> +	int psz = SZ_64K;
->  	u64 shr = GITS_BASER_InnerShareable;
-> 
->  	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
-> --
-> 1.8.0
-> 
-> 
-> 
+>  	struct atmel_hlcdc_dc *dc = dev->dev_private;
+> @@ -488,6 +518,8 @@ static struct drm_driver atmel_hlcdc_dc_driver = {
+>  	.driver_features = DRIVER_HAVE_IRQ | DRIVER_GEM | DRIVER_MODESET,
+>  	.preclose = atmel_hlcdc_dc_preclose,
+>  	.lastclose = atmel_hlcdc_dc_lastclose,
+> +	.suspend = atmel_hlcdc_dc_suspend,
+> +	.resume = atmel_hlcdc_dc_resume,
 
+These callbacks are obsolete and should not be used, additionally core
+don't call them if drm_device have DRIVER_MODESET flag.
 
+>  	.irq_handler = atmel_hlcdc_dc_irq_handler,
+>  	.irq_preinstall = atmel_hlcdc_dc_irq_uninstall,
+>  	.irq_postinstall = atmel_hlcdc_dc_irq_postinstall,
+> @@ -559,6 +591,33 @@ static int atmel_hlcdc_dc_drm_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_PM
+> +static int atmel_hlcdc_dc_drm_suspend(struct device *dev)
+> +{
+> +	struct drm_device *drm_dev = dev_get_drvdata(dev);
+> +	pm_message_t message;
+> +
+> +	if (pm_runtime_suspended(dev) || !drm_dev)
 
--- 
-Jazz is not dead. It just smells funny.
+Nitpick, !drm_dev is always false, is not?
+
+> +		return 0;
+> +
+> +	message.event = PM_EVENT_SUSPEND;
+> +	return atmel_hlcdc_dc_suspend(drm_dev, message);
+
+If you remove obsolete callbacks you can move suspend code here,
+the same for resume.
+
+> +}
+> +
+> +static int atmel_hlcdc_dc_drm_resume(struct device *dev)
+> +{
+> +	struct drm_device *drm_dev = dev_get_drvdata(dev);
+> +
+> +	if (pm_runtime_suspended(dev) || !drm_dev)
+> +		return 0;
+> +
+> +	return atmel_hlcdc_dc_resume(drm_dev);
+
+Ditto x2
+
+Regards
+Andrzej
+
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(atmel_hlcdc_dc_drm_pm_ops,
+> +		atmel_hlcdc_dc_drm_suspend, atmel_hlcdc_dc_drm_resume);
+> +
+>  static const struct of_device_id atmel_hlcdc_dc_of_match[] = {
+>  	{ .compatible = "atmel,hlcdc-display-controller" },
+>  	{ },
+> @@ -569,6 +628,7 @@ static struct platform_driver atmel_hlcdc_dc_platform_driver = {
+>  	.remove	= atmel_hlcdc_dc_drm_remove,
+>  	.driver	= {
+>  		.name	= "atmel-hlcdc-display-controller",
+> +		.pm	= &atmel_hlcdc_dc_drm_pm_ops,
+>  		.of_match_table = atmel_hlcdc_dc_of_match,
+>  	},
+>  };
+> 
