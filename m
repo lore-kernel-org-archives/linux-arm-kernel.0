@@ -1,46 +1,51 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 17 Feb 2015 11:24:11 +0100
-Subject: [PATCH 2/3] pm: at91: pm_suspend: MOR register KEY was missing
-In-Reply-To: <1423709533-8416-1-git-send-email-wenyou.yang@atmel.com>
+Date: Tue, 17 Feb 2015 11:25:59 +0100
+Subject: [PATCH 3/3] pm: at91: flush data cache and clean, invalidate and
+ disable the L2 cache
+In-Reply-To: <1423709578-8475-1-git-send-email-wenyou.yang@atmel.com>
 References: <1423709441-8342-1-git-send-email-wenyou.yang@atmel.com>
- <1423709533-8416-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20150217102411.GC11529@piout.net>
+ <1423709578-8475-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20150217102559.GD11529@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2015 at 10:52:13 +0800, Wenyou Yang wrote :
-> From: Patrice Vilchez <patrice.vilchez@atmel.com>
+On 12/02/2015 at 10:52:58 +0800, Wenyou Yang wrote :
+> Flush data cache, and clean, invalidate and disable the L2 cache before going to suspend.
+> Restore the L2 cache configuration and re-enable the L2 cache after waking up.
 > 
-> Because writing the MOR register requires the PASSWD(0x37),
-> if missed, the write operation will be aborted.
-> 
-> Signed-off-by: Patrice Vilchez <patrice.vilchez@atmel.com>
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
 > ---
->  arch/arm/mach-at91/pm_suspend.S |    2 ++
->  1 file changed, 2 insertions(+)
+>  arch/arm/mach-at91/pm.c |    6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
-> index 1c7256a..5347ad4 100644
-> --- a/arch/arm/mach-at91/pm_suspend.S
-> +++ b/arch/arm/mach-at91/pm_suspend.S
-> @@ -132,6 +132,7 @@ ENTRY(at91_pm_suspend_in_sram)
->  	/* Turn off the main oscillator */
->  	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
->  	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
-> +	orr	tmp1, tmp1, #AT91_PMC_KEY
->  	str	tmp1, [pmc, #AT91_CKGR_MOR]
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index 9075b41..2574bad 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -30,6 +30,7 @@
+>  #include <asm/mach/time.h>
+>  #include <asm/mach/irq.h>
+>  #include <asm/fncpy.h>
+> +#include <asm/cacheflush.h>
 >  
->  skip_disable_main_clock:
-> @@ -149,6 +150,7 @@ skip_disable_main_clock:
->  	/* Turn on the main oscillator */
->  	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
->  	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
-> +	orr	tmp1, tmp1, #AT91_PMC_KEY
->  	str	tmp1, [pmc, #AT91_CKGR_MOR]
+>  #include <mach/cpu.h>
+>  #include <mach/hardware.h>
+> @@ -145,8 +146,13 @@ static void at91_pm_suspend(suspend_state_t state)
+>  	pm_data |= (state == PM_SUSPEND_MEM) ?
+>  				AT91_PM_MODE(AT91_PM_SLOW_CLOCK) : 0;
 >  
->  	wait_moscrdy
+> +	flush_cache_all();
+> +	outer_disable();
+> +
+>  	at91_suspend_sram_fn(at91_pmc_base, at91_ramc_base[0],
+>  				at91_ramc_base[1], pm_data);
+> +
+> +	outer_resume();
+>  }
+>  
+>  static int at91_pm_enter(suspend_state_t state)
 > -- 
 > 1.7.9.5
 > 
