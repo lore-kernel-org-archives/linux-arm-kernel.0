@@ -1,66 +1,81 @@
-From: alison@she-devel.com (alison at she-devel.com)
-Date: Wed, 18 Feb 2015 00:37:21 -0800
-Subject: [PATCH] i.MX6: WEIM: improve error handling upon child probe-failure
-In-Reply-To: <21911320.10lVZQzK19@jclayton-pc>
-References: <21911320.10lVZQzK19@jclayton-pc>
-Message-ID: <1424248641-30331-1-git-send-email-alison_chaiken@mentor.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 18 Feb 2015 09:40:04 +0100
+Subject: [PATCH 01/11] mfd: add the Berlin controller driver
+In-Reply-To: <20150217115447.GA3989@x1>
+References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1423671332-24580-2-git-send-email-antoine.tenart@free-electrons.com>
+ <20150216124808.GC14545@x1> <20150217092020.GC4507@kwain>
+ <20150217115447.GA3989@x1>
+Message-ID: <20150218084004.GD21937@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alison Chaiken <alison_chaiken@mentor.com>
+On Tue, Feb 17, 2015 at 11:54:48AM +0000, Lee Jones wrote:
+> On Tue, 17 Feb 2015, Antoine Tenart wrote:
+> > On Mon, Feb 16, 2015 at 12:48:08PM +0000, Lee Jones wrote:
+> > > On Wed, 11 Feb 2015, Antoine Tenart wrote:
+> 
+> > > > +static int berlin_ctrl_probe(struct platform_device *pdev)
+> > > > +{
+> > > > +	struct device *dev = &pdev->dev;
+> > > > +	const struct of_device_id *match;
+> > > > +	const struct berlin_ctrl_priv *priv;
+> > > > +	int ret;
+> > > > +
+> > > > +	match = of_match_node(berlin_ctrl_of_match, dev->of_node);
+> > > > +	if (!match)
+> > > > +		return -EINVAL;
+> > > > +
+> > > > +	priv = match->data;
+> > > > +
+> > > > +	ret = mfd_add_devices(dev, 0, priv->devs, priv->ndevs, NULL, -1, NULL);
+> > > > +	if (ret) {
+> > > > +		dev_err(dev, "Failed to add devices: %d\n", ret);
+> > > > +		return ret;
+> > > > +	}
+> > > > +
+> > > > +	return 0;
+> > > > +}
+> > > 
+> > > I'm not sure I see the point in this driver.  Why can't you just
+> > > register these devices directly from DT?
+> > 
+> > All these devices share the same bank of registers and we previously
+> > used a single node. But with many devices sharing a single node, this is
+> > problematic to register all the devices from DT. Using this MFD driver
+> > to do it is a proper solution in this case.
+> 
+> Tell me more.  What are the problems you encountered?
 
-Probe all children of the WEIM node, reporting any failures.  Report
-failure from parsing of WEIM node itself if probes of all children fail.
+So we had a single node, chip-controller, accessed by multiple
+devices -and drivers-. We ended up with:
 
-Signed-off-by: Alison Chaiken <alison_chaiken@mentor.com>
----
- drivers/bus/imx-weim.c | 20 ++++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
+chip: chip-control at ea0000 {
+	compatible = "marvell,berlin2q-chip-ctrl";
+	reg = <0xea0000 0x400>, <0xdd0170 0x10>;
+	#clock-cells = <1>;
+	#reset-cells = <2>;
+	clocks = <&refclk>;
+	clock-names = "refclk";
 
-diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-index 0958b69..98e04bf 100644
---- a/drivers/bus/imx-weim.c
-+++ b/drivers/bus/imx-weim.c
-@@ -142,7 +142,7 @@ static int __init weim_parse_dt(struct platform_device *pdev,
- 							   &pdev->dev);
- 	const struct imx_weim_devtype *devtype = of_id->data;
- 	struct device_node *child;
--	int ret;
-+	int ret, have_child;
- 
- 	if (devtype == &imx50_weim_devtype) {
- 		ret = imx_weim_gpr_setup(pdev);
-@@ -155,20 +155,24 @@ static int __init weim_parse_dt(struct platform_device *pdev,
- 			continue;
- 
- 		ret = weim_timing_setup(child, base, devtype);
--		if (ret) {
--			dev_err(&pdev->dev, "%s set timing failed.\n",
-+		if (ret)
-+			dev_warn(&pdev->dev, "%s set timing failed.\n",
- 				child->full_name);
--			return ret;
--		}
-+		else
-+			have_child = 1;
- 	}
- 
--	ret = of_platform_populate(pdev->dev.of_node,
-+	if (have_child)
-+		ret = of_platform_populate(pdev->dev.of_node,
- 				   of_default_bus_match_table,
- 				   NULL, &pdev->dev);
--	if (ret)
-+	if (ret) {
- 		dev_err(&pdev->dev, "%s fail to create devices.\n",
- 			pdev->dev.of_node->full_name);
--	return ret;
-+		return ret;
-+	}
-+
-+	return 0;
- }
- 
- static int __init weim_probe(struct platform_device *pdev)
+	[pinmux nodes]
+};
+
+In addition to being a mess, how can you probe various drivers with this
+single node? We had to probe a clock driver in addition to the
+pin-controller and reset drivers. We ended up using arch_initcall() in
+the reset driver, which was *not* acceptable.
+
+These chip and system controllers are not an IP, but helps not spreading
+this bank of registers all over the DT.
+
+The solution to this problem is to introduce an mtd driver which
+registers all the sub-devices described by these chip and system
+controller nodes.
+
+Antoine
+
 -- 
-2.1.4
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
