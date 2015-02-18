@@ -1,112 +1,57 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 18 Feb 2015 12:50:39 -0600
-Subject: [PATCH v2 4/4] clk: dt: Introduce always-on clock domain
- documentation
-In-Reply-To: <20150218171230.GA30676@x1>
-References: <1424276101-30137-1-git-send-email-lee.jones@linaro.org>
- <1424276101-30137-5-git-send-email-lee.jones@linaro.org>
- <CAL_Jsq+r1BKt5B9FNPG+Y0Oi1-3RGNmRUDbpX_uDJwr45bxMXA@mail.gmail.com>
- <20150218171230.GA30676@x1>
-Message-ID: <CAL_JsqJ0sfQ-OQvYjL3X3ebH4p9HkN4iy35iT7i9S2d+yz9zYg@mail.gmail.com>
+Date: Wed, 18 Feb 2015 13:02:56 -0600
+Subject: [PATCH 3/6] x86, acpi, pci: Move PCI config space accessors.
+In-Reply-To: <20150218182739.GA17462@google.com>
+References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
+ <1416413091-13452-4-git-send-email-tomasz.nowicki@linaro.org>
+ <20141210231746.GF6692@google.com> <54E33C05.9010300@linaro.org>
+ <20150218182739.GA17462@google.com>
+Message-ID: <CAL_Jsq+vR2-YbfVqQ2hFCRLyWUZJW4_Ki+ZFRz1=JTeOiE07Lw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 18, 2015 at 11:12 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Wed, 18 Feb 2015, Rob Herring wrote:
->
->> On Wed, Feb 18, 2015 at 10:15 AM, Lee Jones <lee.jones@linaro.org> wrote:
->> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> > ---
->> >  .../devicetree/bindings/clock/clk-domain.txt       | 35 ++++++++++++++++++++++
->> >  1 file changed, 35 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/clock/clk-domain.txt
+On Wed, Feb 18, 2015 at 12:27 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Tue, Feb 17, 2015 at 02:03:01PM +0100, Tomasz Nowicki wrote:
+>> On 11.12.2014 00:17, Bjorn Helgaas wrote:
+>> >On Wed, Nov 19, 2014 at 05:04:48PM +0100, Tomasz Nowicki wrote:
+>> >>We are going to use mmio_config_{} name convention across all architectures.
 >> >
->> > diff --git a/Documentation/devicetree/bindings/clock/clk-domain.txt b/Documentation/devicetree/bindings/clock/clk-domain.txt
->> > new file mode 100644
->> > index 0000000..b86772f5
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/clock/clk-domain.txt
->> > @@ -0,0 +1,35 @@
->> > +Always-on Clock Domain
->> > +
->> > +Some hardware is contains bunches of clocks which must never be
->> > +turned off.  If drivers a) fail to obtain a reference to any of
->> > +these or b) give up a previously obtained reference during suspend,
->> > +the common clk framework will attempt to disable them and the
->> > +hardware can fail irrecoverably.  Usually, the only way to recover
->> > +from these failures is to restart.
+>> >mmio_config_*() are workarounds for an AMD Fam10h defect [1].  I would prefer
+>> >not to extend these names to other architectures, because they should be
+>> >able to use readb()/writeb()/etc. directly, as we did on x86 before
+>> >3320ad994afb ("x86: Work around mmio config space quirk on AMD Fam10h").
+>> >
+>> >In fact, it would be nice if we could use readb()/writeb()/etc. on x86, and
+>> >only use mmio_config_*() when we're on AMD Fam10h.  Maybe there could be a
+>> >"struct pci_raw_ops pci_mmcfg_amd_fam10h" that used mmio_config_*(), and we
+>> >could set raw_pci_ext_ops to those ops instead of the default ones when
+>> >we're on AMD Fam10h.  Then x86 should be able to use the generic
+>> >readb()-based ops on most platforms.
 >>
->> How is (b) not a bug?
+>> While I do agree we should use readb()/writeb()... methods, I am not
+>> sure there is a nice way to use mmio_config_*() exclusively for AMD
+>> Fam10h. For x86, right now, we have three PCI config accessors sets:
+>> mmconfig_32.c, mmconfig_64.c, numachip.c and each are different. So
+>> one pci_mmcfg_amd_fam10h pci_raw_ops is not enough. I am thinking of
+>> having additional structure (integrated with "struct
+>> pci_mmcfg_region") that keeps MMIO accessors where readb()/writeb()
+>> would be the default one. For AMD Fam10h case we could tweak it as
+>> necessary. What do you thing Bjorn?
 >
-> Clocks are normally disabled during suspend.  When clocks are disabled
-> they give up their reference.  If references reach 0, the clock is
-> gated.  If one of these clocks is gated, the system will never come
-> out of suspend.
+> It's OK if we use mmio_config_*() for all x86 (not just AMD Fam10h); that's
+> what we do today.  It'd be *nicer* if we could use the workaround only for
+> Fam10h, but if it complicates the code, don't bother.
 >
-> How is it a bug?
+> My main point is that I think your v1 posting requires every arch to
+> implement mmio_config_*(), and they will all be the same.  If an arch
+> doesn't require a workaround, it shouldn't have to supply anything and we
+> should default to readb/writeb/etc.
 
-It a clock needs to be enabled during suspend, then the driver using
-it should not disable it. Anyway, suspend is a bit orthogonal to this
-issue.
+Perhaps the abstraction needs to move up a level to pci_ops functions.
+Then x86 can use the generic ones I added and AMD can use custom ones.
 
->> While I think we need something here, I worry that this will be abused
->> to be a list of clocks you have not gotten around to managing. We
->
-> You can say that about any framework.  It's our responsibility to ask
-> the right questions and to disallow it from being abused.  The clocks
-> I use in the (real-world) example in this set are _really_ always-on.
-> If any of them are turned off the system will cease to perform in any
-> meaningful way.
-
-You cannot tell here up front whether clocks are really always-on. A
-reviewer is not going to know, and the submitter may not even have all
-the documentation and know the answer. Getting it wrong here means you
-have to change the dtb to fix it. Granted, it doesn't really break
-things in this case.
-
->> cannot be changing the DT every time the kernel starts managing a
->> clock. I think this should operate more as always on until claimed.
->
-> The point of this is that even when these clocks are claimed, there is
-> an issue that when unclaimed (i.e. during suspend) the clk framework
-> will attempt to gate them, and when they do *boom*.
->
->> But then you get into drivers having to be aware that the clock
->> started enabled.
->
-> This has nothing to do with the initial state of the clock.  It's
-> whether the clock is integral (i.e. is part of a vital interconnect)
-> that's important.  For instance, ST's bootloader turns on lots of
-> clocks which can be safely gated if unused.  The clocks we're
-> registering with this always-on framework cannot.
-
-It does because you have to assume either the initial state is wrong
-and you need to disable it, or that the initial state is correct and
-you need to leave the clock enabled.
-
-There are also other usecases such as simplefb where you want to leave
-clocks on until the real fb driver takes over. Consoles have a similar
-issue.
-
-Perhaps you need to model your buses more completely? Does
-simple-pm-bus help you?
-
->> Also, I feel like we are using DT to work around kernel policy (of
->> turning off clocks). If the policy was to leave on clocks, then we
->> would be trying to put a list of clocks to disable in DT.
->
-> I'm not sure I understand your point.  The current policy is correct
-> if it's power that you care about, which is invariably the point of
-> disabling clocks in the first place, right?  Also, this has nothing to
-> do with DT per say.  It's just another framework driver.
-
-It does have something to do with DT because you are designing a
-binding around what the kernel does. Should the kernel assume it can
-disable clocks safely? Another OS may do the opposite and assume it
-cannot turn-off unused clocks. Then you would have a list of clocks
-safe to disable in DT.
-
-This is also completely solvable within the framework driver by
-claiming those clocks in the clock controller driver.
+BTW, there are some cases on MIPS that need special accessors. It's
+mainly a function of whether the accessors need to do endian swapping
+or not.
 
 Rob
