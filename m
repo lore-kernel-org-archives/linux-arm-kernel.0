@@ -1,151 +1,89 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Feb 2015 10:40:23 +0000
-Subject: [PATCH 01/11] mfd: add the Berlin controller driver
-In-Reply-To: <20150218092225.GE21937@kwain>
-References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
- <1423671332-24580-2-git-send-email-antoine.tenart@free-electrons.com>
- <20150216124808.GC14545@x1> <20150217092020.GC4507@kwain>
- <20150217115447.GA3989@x1> <20150218084004.GD21937@kwain>
- <20150218090958.GA18042@x1> <20150218092225.GE21937@kwain>
-Message-ID: <20150218104023.GA22296@x1>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 18 Feb 2015 11:41:00 +0100
+Subject: [PATCH] pinctrl: at91: move lock/unlock_as_irq calls into
+ request/release resources methods
+In-Reply-To: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150218104100.GC32600@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Feb 2015, Antoine Tenart wrote:
+On Sun, Feb 08, 2015 at 07:23:42PM +0100, Boris Brezillon wrote:
+> The gpiochip_lock_as_irq call can fail and return an error, while the
+> irq_startup is not expected to fail (returns an unsigned int which is not
+> checked by irq core code).
+> 
+> irq_request/release_resources functions have been created to address this
+> problem.
+> 
+> Move gpiochip_lock/unlock_as_irq calls into
+> irq_request/release_resources functions to prevent using a gpio as an irq
+> if the gpiochip_lock_as_irq call failed.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-> On Wed, Feb 18, 2015 at 09:09:58AM +0000, Lee Jones wrote:
-> > On Wed, 18 Feb 2015, Antoine Tenart wrote:
-> > 
-> > > On Tue, Feb 17, 2015 at 11:54:48AM +0000, Lee Jones wrote:
-> > > > On Tue, 17 Feb 2015, Antoine Tenart wrote:
-> > > > > On Mon, Feb 16, 2015 at 12:48:08PM +0000, Lee Jones wrote:
-> > > > > > On Wed, 11 Feb 2015, Antoine Tenart wrote:
-> > > > 
-> > > > > > > +static int berlin_ctrl_probe(struct platform_device *pdev)
-> > > > > > > +{
-> > > > > > > +	struct device *dev = &pdev->dev;
-> > > > > > > +	const struct of_device_id *match;
-> > > > > > > +	const struct berlin_ctrl_priv *priv;
-> > > > > > > +	int ret;
-> > > > > > > +
-> > > > > > > +	match = of_match_node(berlin_ctrl_of_match, dev->of_node);
-> > > > > > > +	if (!match)
-> > > > > > > +		return -EINVAL;
-> > > > > > > +
-> > > > > > > +	priv = match->data;
-> > > > > > > +
-> > > > > > > +	ret = mfd_add_devices(dev, 0, priv->devs, priv->ndevs, NULL, -1, NULL);
-> > > > > > > +	if (ret) {
-> > > > > > > +		dev_err(dev, "Failed to add devices: %d\n", ret);
-> > > > > > > +		return ret;
-> > > > > > > +	}
-> > > > > > > +
-> > > > > > > +	return 0;
-> > > > > > > +}
-> > > > > > 
-> > > > > > I'm not sure I see the point in this driver.  Why can't you just
-> > > > > > register these devices directly from DT?
-> > > > > 
-> > > > > All these devices share the same bank of registers and we previously
-> > > > > used a single node. But with many devices sharing a single node, this is
-> > > > > problematic to register all the devices from DT. Using this MFD driver
-> > > > > to do it is a proper solution in this case.
-> > > > 
-> > > > Tell me more.  What are the problems you encountered?
-> > > 
-> > > So we had a single node, chip-controller, accessed by multiple
-> > > devices -and drivers-. We ended up with:
-> > > 
-> > > chip: chip-control at ea0000 {
-> > > 	compatible = "marvell,berlin2q-chip-ctrl";
-> > > 	reg = <0xea0000 0x400>, <0xdd0170 0x10>;
-> > > 	#clock-cells = <1>;
-> > > 	#reset-cells = <2>;
-> > > 	clocks = <&refclk>;
-> > > 	clock-names = "refclk";
-> > > 
-> > > 	[pinmux nodes]
-> > > };
-> > > 
-> > > In addition to being a mess, how can you probe various drivers with this
-> > > single node? We had to probe a clock driver in addition to the
-> > > pin-controller and reset drivers. We ended up using arch_initcall() in
-> > > the reset driver, which was *not* acceptable.
-> > > 
-> > > These chip and system controllers are not an IP, but helps not spreading
-> > > this bank of registers all over the DT.
-> > > 
-> > > The solution to this problem is to introduce an mtd driver which
-> > > registers all the sub-devices described by these chip and system
-> > > controller nodes.
-> > 
-> > I'm still not convinced that your problem can't be solved in DT, but
-> > creating a single psudo-hardware node is not correct either.  What
-> > does the h/w _really_ look like?  Is all of this stuff on a single
-> > chip? 
-> 
-> There is no specific IP for these registers, but we do not want them
-> spread all over the DT nodes so they're summed up into this chip node.
-> 
-> SO we have all those registers into a chip/system node and sub-nodes for
-> the devices using them.
-> 
-> > If so, I would expect to see something like:
-> > 
-> > control at ea0000 {
-> > 	compatible = "marvel,control";
-> > 
-> > 	pinctrl at xxxxx {
-> > 		compatible = "marvel,pinctrl";
-> > 	};
-> > 
-> > 	reset at xxxxx {
-> > 		compatible = "marvel,reset";
-> > 	};
-> > };
-> 
-> That's exactly the point of this series: having one sub-node per device.
-> 
-> With this series applied, we have (the clock being a sub-node of the
-> chip-controller node is part of another series following this one):
-> 
-> chip: chip-controller at ea0000 {
->         compatible = "marvell,berlin2q-chip-ctrl", "syscon";
->         reg = <0xea0000 0x400>, <0xdd0170 0x10>;
->         #clock-cells = <1>;
->         clocks = <&refclk>;
->         clock-names = "refclk";
-> 
->         soc_pinctrl: pin-controller {
->                 compatible = "marvell,berlin2q-soc-pinctrl";
-> 
->                 twsi0_pmux: twsi0-pmux {
->                         groups = "G6";
->                         function = "twsi0";
->                 };
-> 
->                 twsi1_pmux: twsi1-pmux {
->                         groups = "G7";
->                         function = "twsi1";
->                 };
->         };
-> 
->         chip_rst: reset {
->                 compatible = "marvell,berlin2-reset";
->                 #reset-cells = <2>;
->         };
-> };
+It sounds good for me, you can add my
 
-This is what I'd expect to see in DT, so we're heading in the right
-direction.  So make to my original question, what's the point of this
-MFD driver, and why don't you just let DT framework register these
-devices for you?
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-You issue a compatible string here, then duplicate it in the driver,
-why do you think this is necessary?
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> ---
+>  drivers/pinctrl/pinctrl-at91.c | 17 +++++++----------
+>  1 file changed, 7 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index f4cd0b9..a481406 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -1477,28 +1477,25 @@ static void gpio_irq_ack(struct irq_data *d)
+>  	/* the interrupt is already cleared before by reading ISR */
+>  }
+>  
+> -static unsigned int gpio_irq_startup(struct irq_data *d)
+> +static int gpio_irq_request_res(struct irq_data *d)
+>  {
+>  	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
+>  	unsigned	pin = d->hwirq;
+>  	int ret;
+>  
+>  	ret = gpiochip_lock_as_irq(&at91_gpio->chip, pin);
+> -	if (ret) {
+> +	if (ret)
+>  		dev_err(at91_gpio->chip.dev, "unable to lock pind %lu IRQ\n",
+>  			d->hwirq);
+> -		return ret;
+> -	}
+> -	gpio_irq_unmask(d);
+> -	return 0;
+> +
+> +	return ret;
+>  }
+>  
+> -static void gpio_irq_shutdown(struct irq_data *d)
+> +static void gpio_irq_release_res(struct irq_data *d)
+>  {
+>  	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
+>  	unsigned	pin = d->hwirq;
+>  
+> -	gpio_irq_mask(d);
+>  	gpiochip_unlock_as_irq(&at91_gpio->chip, pin);
+>  }
+>  
+> @@ -1577,8 +1574,8 @@ void at91_pinctrl_gpio_resume(void)
+>  static struct irq_chip gpio_irqchip = {
+>  	.name		= "GPIO",
+>  	.irq_ack	= gpio_irq_ack,
+> -	.irq_startup	= gpio_irq_startup,
+> -	.irq_shutdown	= gpio_irq_shutdown,
+> +	.irq_request_resources = gpio_irq_request_res,
+> +	.irq_release_resources = gpio_irq_release_res,
+>  	.irq_disable	= gpio_irq_mask,
+>  	.irq_mask	= gpio_irq_mask,
+>  	.irq_unmask	= gpio_irq_unmask,
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
