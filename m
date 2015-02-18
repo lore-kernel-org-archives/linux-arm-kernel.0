@@ -1,114 +1,20 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Wed, 18 Feb 2015 12:25:42 +0100
-Subject: [PATCH dt] ARM: BCM5301X: Add DT for Netgear R8000
-Message-ID: <1424258742-30191-1-git-send-email-zajec5@gmail.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Wed, 18 Feb 2015 11:27:46 +0000
+Subject: [PATCH 1/2] arm/xen: Correctly check if the event channel
+ interrupt is present
+In-Reply-To: <1423722898-16110-2-git-send-email-julien.grall@linaro.org>
+References: <1423722898-16110-1-git-send-email-julien.grall@linaro.org>
+ <1423722898-16110-2-git-send-email-julien.grall@linaro.org>
+Message-ID: <1424258866.27775.15.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-Reported-by: Ian Kent <raven@themaw.net>
----
- arch/arm/boot/dts/Makefile                  |  3 +-
- arch/arm/boot/dts/bcm4709-netgear-r8000.dts | 77 +++++++++++++++++++++++++++++
- 2 files changed, 79 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+On Thu, 2015-02-12 at 06:34 +0000, Julien Grall wrote:
+> The function irq_of_parse_and_map returns 0 when the IRQ is not found.
+> 
+> Furthermore xen_events_irq is only read when the CPU is bring up, so
+> it's not necessary to use the attribute __read_mostly.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a8873b8..f1cb752 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -59,7 +59,8 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm4708-netgear-r6300-v2.dtb \
- 	bcm47081-asus-rt-n18u.dtb \
- 	bcm47081-buffalo-wzr-600dhp2.dtb \
--	bcm47081-buffalo-wzr-900dhp.dtb
-+	bcm47081-buffalo-wzr-900dhp.dtb \
-+	bcm4709-netgear-r8000.dtb
- dtb-$(CONFIG_ARCH_BCM_63XX) += \
- 	bcm963138dvt.dtb
- dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
-diff --git a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-new file mode 100644
-index 0000000..ea26dd3
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-@@ -0,0 +1,77 @@
-+/*
-+ * Broadcom BCM470X / BCM5301X ARM platform code.
-+ * DTS for Netgear R8000
-+ *
-+ * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm4708.dtsi"
-+
-+/ {
-+	compatible = "netgear,r8000", "brcm,bcm4709", "brcm,bcm4708";
-+	model = "Netgear R8000 (BCM4709)";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
-+
-+	memory {
-+		reg = <0x00000000 0x08000000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		power0 {
-+			label = "bcm53xx:white:power";
-+			gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		power1 {
-+			label = "bcm53xx:amber:power";
-+			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		5ghz-1 {
-+			label = "bcm53xx:white:5ghz-1";
-+			gpios = <&chipcommon 12 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		2ghz {
-+			label = "bcm53xx:white:2ghz";
-+			gpios = <&chipcommon 13 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		rfkill {
-+			label = "WiFi";
-+			linux,code = <KEY_RFKILL>;
-+			gpios = <&chipcommon 4 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		wps {
-+			label = "WPS";
-+			linux,code = <KEY_WPS_BUTTON>;
-+			gpios = <&chipcommon 5 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		restart {
-+			label = "Reset";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&chipcommon 6 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
--- 
-1.8.4.5
+Part of the purpose of __read_mostly is to move such things out of
+sharing cachelines with other more hot read/write things, as much as it
+is to group all the "read only" things together.
