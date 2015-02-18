@@ -1,33 +1,99 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 18 Feb 2015 10:02:55 +0100
-Subject: [PATCH] ARM: remove empty preprocessor #else branch
-Message-ID: <1424250175-1674-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Feb 2015 09:09:58 +0000
+Subject: [PATCH 01/11] mfd: add the Berlin controller driver
+In-Reply-To: <20150218084004.GD21937@kwain>
+References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1423671332-24580-2-git-send-email-antoine.tenart@free-electrons.com>
+ <20150216124808.GC14545@x1> <20150217092020.GC4507@kwain>
+ <20150217115447.GA3989@x1> <20150218084004.GD21937@kwain>
+Message-ID: <20150218090958.GA18042@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the patch for e16343c47e42 (ARM: 8160/1: drop warning about
-return_address not using unwind tables) was created there was still more
-code in said branch. Probably this simplification was just missed during
-conflict resolution when the patch was applied.
+On Wed, 18 Feb 2015, Antoine Tenart wrote:
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/kernel/return_address.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+> On Tue, Feb 17, 2015 at 11:54:48AM +0000, Lee Jones wrote:
+> > On Tue, 17 Feb 2015, Antoine Tenart wrote:
+> > > On Mon, Feb 16, 2015 at 12:48:08PM +0000, Lee Jones wrote:
+> > > > On Wed, 11 Feb 2015, Antoine Tenart wrote:
+> > 
+> > > > > +static int berlin_ctrl_probe(struct platform_device *pdev)
+> > > > > +{
+> > > > > +	struct device *dev = &pdev->dev;
+> > > > > +	const struct of_device_id *match;
+> > > > > +	const struct berlin_ctrl_priv *priv;
+> > > > > +	int ret;
+> > > > > +
+> > > > > +	match = of_match_node(berlin_ctrl_of_match, dev->of_node);
+> > > > > +	if (!match)
+> > > > > +		return -EINVAL;
+> > > > > +
+> > > > > +	priv = match->data;
+> > > > > +
+> > > > > +	ret = mfd_add_devices(dev, 0, priv->devs, priv->ndevs, NULL, -1, NULL);
+> > > > > +	if (ret) {
+> > > > > +		dev_err(dev, "Failed to add devices: %d\n", ret);
+> > > > > +		return ret;
+> > > > > +	}
+> > > > > +
+> > > > > +	return 0;
+> > > > > +}
+> > > > 
+> > > > I'm not sure I see the point in this driver.  Why can't you just
+> > > > register these devices directly from DT?
+> > > 
+> > > All these devices share the same bank of registers and we previously
+> > > used a single node. But with many devices sharing a single node, this is
+> > > problematic to register all the devices from DT. Using this MFD driver
+> > > to do it is a proper solution in this case.
+> > 
+> > Tell me more.  What are the problems you encountered?
+> 
+> So we had a single node, chip-controller, accessed by multiple
+> devices -and drivers-. We ended up with:
+> 
+> chip: chip-control at ea0000 {
+> 	compatible = "marvell,berlin2q-chip-ctrl";
+> 	reg = <0xea0000 0x400>, <0xdd0170 0x10>;
+> 	#clock-cells = <1>;
+> 	#reset-cells = <2>;
+> 	clocks = <&refclk>;
+> 	clock-names = "refclk";
+> 
+> 	[pinmux nodes]
+> };
+> 
+> In addition to being a mess, how can you probe various drivers with this
+> single node? We had to probe a clock driver in addition to the
+> pin-controller and reset drivers. We ended up using arch_initcall() in
+> the reset driver, which was *not* acceptable.
+> 
+> These chip and system controllers are not an IP, but helps not spreading
+> this bank of registers all over the DT.
+> 
+> The solution to this problem is to introduce an mtd driver which
+> registers all the sub-devices described by these chip and system
+> controller nodes.
 
-diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
-index 24b4a04846eb..36ed35073289 100644
---- a/arch/arm/kernel/return_address.c
-+++ b/arch/arm/kernel/return_address.c
-@@ -56,8 +56,6 @@ void *return_address(unsigned int level)
- 		return NULL;
- }
- 
--#else /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) */
--
--#endif /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) / else */
-+#endif /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) */
- 
- EXPORT_SYMBOL_GPL(return_address);
+I'm still not convinced that your problem can't be solved in DT, but
+creating a single psudo-hardware node is not correct either.  What
+does the h/w _really_ look like?  Is all of this stuff on a single
+chip?  If so, I would expect to see something like:
+
+control at ea0000 {
+	compatible = "marvel,control";
+
+	pinctrl at xxxxx {
+		compatible = "marvel,pinctrl";
+	};
+
+	reset at xxxxx {
+		compatible = "marvel,reset";
+	};
+};
+
 -- 
-2.1.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
