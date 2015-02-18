@@ -1,65 +1,35 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 18 Feb 2015 17:00:33 +0100
-Subject: [PATCH 2/2] at91sam9_wdt: Allow watchdog to reset device at
- early boot
-In-Reply-To: <54E4A6C4.4070706@roeck-us.net>
-References: <54B53160.6060309@roeck-us.net>
- <cover.1424262664.git.timo.kokkonen@offcode.fi>
- <6c0a3a5bcd93d18437eeed04712b4aeff201a16f.1424262664.git.timo.kokkonen@offcode.fi>
- <54E49AA5.40008@roeck-us.net> <20150218151713.7a718311@bbrezillon>
- <54E4A6C4.4070706@roeck-us.net>
-Message-ID: <20150218160033.GK11529@piout.net>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Wed, 18 Feb 2015 16:03:00 +0000
+Subject: [PATCH v2 3/3] xen/arm: allow console=hvc0 to be omitted for
+ guests
+In-Reply-To: <CAL_Jsq+QniOFiVXEhuS+GEEnCkUpkrmtdE5E4ZytwTzoQSDpOg@mail.gmail.com>
+References: <1424267513-15836-1-git-send-email-julien.grall@linaro.org>
+ <1424267513-15836-4-git-send-email-julien.grall@linaro.org>
+ <CAL_Jsq+QniOFiVXEhuS+GEEnCkUpkrmtdE5E4ZytwTzoQSDpOg@mail.gmail.com>
+Message-ID: <1424275380.20761.31.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 18/02/2015 at 06:50:44 -0800, Guenter Roeck wrote :
-> >>>   Optional properties:
-> >>>   - timeout-sec: Contains the watchdog timeout in seconds.
-> >>>+- early-timeout-sec: If present, specifies a timeout value in seconds
-> >>>+  that the driver keeps on ticking the watchdog HW on behalf of user
-> >>>+  space. Once this timeout expires watchdog is left to expire in
-> >>>+  timeout-sec seconds. If this propery is set to zero, watchdog is
-> >>>+  started (or left running) so that a reset occurs in timeout-sec
-> >>>+  since the watchdog was started.
-> >>>
-> >>>   Example:
-> >>>
-> >>>   watchdog {
-> >>>   	 timeout-sec = <60>;
-> >>>+	 early-timeout-sec = <120>;
-> >>
-> >>That is not a generic property as you defined it; if so,
-> >>it would have to be implemented in the watchdog core code,
-> >>not in the at91 code. You'll have to document it in the bindings
-> >>description for at91sam9_wdt.
+On Wed, 2015-02-18 at 09:50 -0600, Rob Herring wrote:
+> On Wed, Feb 18, 2015 at 7:51 AM, Julien Grall <julien.grall@linaro.org> wrote:
+> > From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > >
-> >Then, if this is a controller specific property, it should be defined
-> >with the 'atmel,' prefix.
-> >We're kind of looping here: the initial discussion was "is there a need
-> >for this property to be a generic one ?", and now you're saying no,
-> >while you previously left the door opened.
+> > This patch registers hvc0 as the preferred console if no console
+> > has been specified explicitly on the kernel command line.
 > >
-> >Tomi is proposing a generic approach, as you asked him to. I agree that
-> >parsing the property in core code and making its value part of the
-> >generic watchdog struct makes sense (that's what I proposed to Tomi a
-> >few weeks ago).
-> >
-> Hmm ... the problem here is that the property description creates the
-> assumption or expectation that the property is used if defined,
-> which is not the case.
+> > The purpose is to allow platform agnostic kernels and boot images
+> > (such as distro installers) to boot in a Xen/ARM domU without the
+> > need to modify the command line by hand.
 > 
-> I am not sure how to best resolve this. Maybe a comment in the property
-> description stating that implementation of is device (driver) dependent ?
-> After all, that is true for the timeout-sec property as well.
-> 
+> How does this interact with DT chosen stdout-path?
 
-I would leave it in the generic file and state that it may not be
-implemented in the driver. That way, the property is documented for new
-driver writers.
+I think it shouldn't any more than the existing calls from e.g. the 8250
+driver to preferred_console do.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> Is there a node for hvc0?
+
+Not a direct one, it is inferred from the presence of the general Xen
+node. I did vaguely consider handling a stdout-path pointing to that --
+but it seemed a bit of an abuse.
+
+Ian.
