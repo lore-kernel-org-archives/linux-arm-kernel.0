@@ -1,47 +1,96 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 18 Feb 2015 11:32:06 +0100
-Subject: [PATCH v4 0/2] ARM: mvebu: a385-db-ap: Enable the NAND controller
-Message-ID: <1424255528-1717-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Wed, 18 Feb 2015 11:32:07 +0100
+Subject: [PATCH v4 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
+In-Reply-To: <1424255528-1717-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1424255528-1717-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1424255528-1717-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The NDDB register holds the data that are needed by the read and write
+commands.
 
-This patch serie enable the NAND support on the Armada 385 Access
-Point DB.
+However, during a read PIO access, the datasheet specifies that after each 32
+bytes read in that register, when BCH is enabled, we have to make sure that the
+RDDREQ bit is set in the NDSR register.
 
-In the process, some timeouts were found when we were accessing a
-freshly erased NAND page, which turned out to be an issue when
-draining the read FIFO where we were not following the datasheet.
+This fixes an issue that was seen on the Armada 385, and presumably other mvebu
+SoCs, when a read on a newly erased page would end up in the driver reporting a
+timeout from the NAND.
 
-This has been fixed with the first patch, with stable CC'd. The second
-patch just enables the NAND controller in the DT.
+Cc: <stable@vger.kernel.org> # v3.14
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/mtd/nand/pxa3xx_nand.c | 48 ++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 42 insertions(+), 6 deletions(-)
 
-Thanks,
-Maxime
-
-Changes from v3:
-  - Fixed a typo in the commit log
-  - Reworked the FIFO draining function to not poll the RDDREQ
-    register on the last 32 bytes chunk, and handle non 32 bytes
-    aligned reads
-
-Changes from v2:
-  - Read the status bits only every 32 bytes read, and not 32 bits
-    like was done before.
-  - Changed the timeout routine code not use the jiffies that won't
-    change in an interrupt context.
-
-Changes from v1:
-  - Added a timeout to the busy waiting loop for RDDREQ
-
-Maxime Ripard (2):
-  mtd: nand: pxa3xx: Fix PIO FIFO draining
-  ARM: mvebu: a385-db-ap: Enable the NAND
-
- arch/arm/boot/dts/armada-385-db-ap.dts | 13 +++++++++
- drivers/mtd/nand/pxa3xx_nand.c         | 48 +++++++++++++++++++++++++++++-----
- 2 files changed, 55 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index 96b0b1d27df1..bc677362bc73 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -480,6 +480,42 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
+ 	nand_writel(info, NDCR, ndcr | int_mask);
+ }
+ 
++static void drain_fifo(struct pxa3xx_nand_info *info, void *data, int len)
++{
++	if (info->ecc_bch) {
++		int timeout;
++
++		/*
++		 * According to the datasheet, when reading from NDDB
++		 * with BCH enabled, after each 32 bytes reads, we
++		 * have to make sure that the NDSR.RDDREQ bit is set.
++		 *
++		 * Drain the FIFO 8 32 bits reads at a time, and skip
++		 * the polling on the last read.
++		 */
++		while (len > 8) {
++			__raw_readsl(info->mmio_base + NDDB, data, 8);
++
++			for (timeout = 0;
++			     !(nand_readl(info, NDSR) & NDSR_RDDREQ);
++			     timeout++) {
++				if (timeout >= 5) {
++					dev_err(&info->pdev->dev,
++						"Timeout on RDDREQ while draining the FIFO\n");
++					return;
++				}
++
++				mdelay(1);
++			}
++
++			data += 32;
++			len -= 8;
++		}
++	}
++
++	__raw_readsl(info->mmio_base + NDDB, data, len);
++}
++
+ static void handle_data_pio(struct pxa3xx_nand_info *info)
+ {
+ 	unsigned int do_bytes = min(info->data_size, info->chunk_size);
+@@ -496,14 +532,14 @@ static void handle_data_pio(struct pxa3xx_nand_info *info)
+ 				      DIV_ROUND_UP(info->oob_size, 4));
+ 		break;
+ 	case STATE_PIO_READING:
+-		__raw_readsl(info->mmio_base + NDDB,
+-			     info->data_buff + info->data_buff_pos,
+-			     DIV_ROUND_UP(do_bytes, 4));
++		drain_fifo(info,
++			   info->data_buff + info->data_buff_pos,
++			   DIV_ROUND_UP(do_bytes, 4));
+ 
+ 		if (info->oob_size > 0)
+-			__raw_readsl(info->mmio_base + NDDB,
+-				     info->oob_buff + info->oob_buff_pos,
+-				     DIV_ROUND_UP(info->oob_size, 4));
++			drain_fifo(info,
++				   info->oob_buff + info->oob_buff_pos,
++				   DIV_ROUND_UP(info->oob_size, 4));
+ 		break;
+ 	default:
+ 		dev_err(&info->pdev->dev, "%s: invalid state %d\n", __func__,
 -- 
 2.3.0
