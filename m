@@ -1,75 +1,149 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 18 Feb 2015 15:11:43 -0600
-Subject: [PATCH 2/2] at91sam9_wdt: Allow watchdog to reset device at early
- boot
-In-Reply-To: <20150218160033.GK11529@piout.net>
-References: <54B53160.6060309@roeck-us.net>
- <cover.1424262664.git.timo.kokkonen@offcode.fi>
- <6c0a3a5bcd93d18437eeed04712b4aeff201a16f.1424262664.git.timo.kokkonen@offcode.fi>
- <54E49AA5.40008@roeck-us.net> <20150218151713.7a718311@bbrezillon>
- <54E4A6C4.4070706@roeck-us.net> <20150218160033.GK11529@piout.net>
-Message-ID: <CAL_JsqLj=bGTWr1aUMRNMjC+xmftMLjUHnGu5M337jNdDDOsZA@mail.gmail.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Wed, 18 Feb 2015 22:14:59 +0100
+Subject: runtime check for omap-aes bus access permission (was: Re:
+ 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
+In-Reply-To: <CAGo_u6oZxi7O6re30L2-wVyxTeahhyMb4qVcrE3tSCV9sBvrnw@mail.gmail.com>
+References: <20131206213613.GA19648@earth.universe> <201502112128.44852@pali>
+ <CAGo_u6oZxi7O6re30L2-wVyxTeahhyMb4qVcrE3tSCV9sBvrnw@mail.gmail.com>
+Message-ID: <201502182214.59888@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 18, 2015 at 10:00 AM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> Hi,
->
-> On 18/02/2015 at 06:50:44 -0800, Guenter Roeck wrote :
->> >>>   Optional properties:
->> >>>   - timeout-sec: Contains the watchdog timeout in seconds.
->> >>>+- early-timeout-sec: If present, specifies a timeout value in seconds
->> >>>+  that the driver keeps on ticking the watchdog HW on behalf of user
->> >>>+  space. Once this timeout expires watchdog is left to expire in
->> >>>+  timeout-sec seconds. If this propery is set to zero, watchdog is
->> >>>+  started (or left running) so that a reset occurs in timeout-sec
->> >>>+  since the watchdog was started.
->> >>>
->> >>>   Example:
->> >>>
->> >>>   watchdog {
->> >>>            timeout-sec = <60>;
->> >>>+   early-timeout-sec = <120>;
->> >>
->> >>That is not a generic property as you defined it; if so,
->> >>it would have to be implemented in the watchdog core code,
->> >>not in the at91 code. You'll have to document it in the bindings
->> >>description for at91sam9_wdt.
->> >
->> >Then, if this is a controller specific property, it should be defined
->> >with the 'atmel,' prefix.
->> >We're kind of looping here: the initial discussion was "is there a need
->> >for this property to be a generic one ?", and now you're saying no,
->> >while you previously left the door opened.
->> >
->> >Tomi is proposing a generic approach, as you asked him to. I agree that
->> >parsing the property in core code and making its value part of the
->> >generic watchdog struct makes sense (that's what I proposed to Tomi a
->> >few weeks ago).
->> >
->> Hmm ... the problem here is that the property description creates the
->> assumption or expectation that the property is used if defined,
->> which is not the case.
->>
->> I am not sure how to best resolve this. Maybe a comment in the property
->> description stating that implementation of is device (driver) dependent ?
->> After all, that is true for the timeout-sec property as well.
->>
->
-> I would leave it in the generic file and state that it may not be
-> implemented in the driver. That way, the property is documented for new
-> driver writers.
+On Wednesday 11 February 2015 21:40:33 Nishanth Menon wrote:
+> On Wed, Feb 11, 2015 at 2:28 PM, Pali Roh?r 
+<pali.rohar@gmail.com> wrote:
+> > On Wednesday 11 February 2015 16:22:51 Matthijs van Duin 
+wrote:
+> >> On 11 February 2015 at 13:39, Pali Roh?r
+> >> <pali.rohar@gmail.com>
+> > 
+> > wrote:
+> >> >> Anyhow, since checking the firewalls/APs to see if you
+> >> >> have permission will probably only get you yet another
+> >> >> fault if things are walled off, the robust way of
+> >> >> dealing with this sort of situation is by probing the
+> >> >> device with a read while trapping bus faults. This also
+> >> >> handles modules that are unreachable for other reasons,
+> >> >> e.g. being disabled by eFuse.
+> >> > 
+> >> > It is possible to patch kernel code to mask or ignore
+> >> > that fault? Can you help me with something like that?
+> >> 
+> >> As I mentioned, I'm still learning my way around the
+> >> kernel, so I don't feel very comfortable suggesting a
+> >> concrete patch just yet. I've been browsing arch/arm/mm/
+> >> however and my impression is that all that would be
+> >> required is editing fault.c by making a copy of do_bad but
+> >> containing
+> >> 
+> >>     return user_mode(regs) || !fixup_exception(regs);
+> >> 
+> >> and hook it onto the appropriate fault codes.  However,
+> >> this really needs the opinion of someone more familiar
+> >> with this code.
+> >> 
+> >> I do have an observation to make on the issue of fault
+> >> decoding: the list in fsr-2level.c may be "standard ARMv3
+> >> and ARMv4 aborts" but they are quite wrong for ARMv7 which
+> >> has:
+> >> 
+> >> [ 0] -
+> >> [ 1] alignment fault
+> >> [ 2] debug event
+> >> [ 3] section access flag fault
+> >> [ 4] instruction cache maintainance fault (reported via
+> >> data abort) [ 5] section translation fault
+> >> [ 6] page access flag fault
+> >> [ 7] page translation fault
+> >> [ 8] bus error on access
+> >> [ 9] section domain fault
+> >> [10] -
+> >> [11] page domain fault
+> >> [12] bus error on section table walk
+> >> [13] section permission fault
+> >> [14] bus error on page table walk
+> >> [15] page permission fault
+> >> [16] (TLB conflict abort)
+> >> [17] -
+> >> [18] -
+> >> [19] -
+> >> [20] (lockdown abort)
+> >> [21] -
+> >> [22] async bus error (reported via data abort)
+> >> [23] -
+> >> [24] async parity/ECC error (reported via data abort)
+> >> [25] parity/ECC error on access
+> >> [26] (coprocessor abort)
+> >> [27] -
+> >> [28] parity/ECC error on section table walk
+> >> [29] -
+> >> [30] parity/ECC error on page table walk
+> >> [31] -
+> >> 
+> >> Some entries are patched up near the bottom of fault.c but
+> >> many bogus messages remain, for example the "on linefetch"
+> >> vs "on non-linefetch" is misleading since no such thing
+> >> can be inferred from the fault status on v7.  Also, the
+> >> i-cache maintenance fault handling looks wrong to me: it
+> >> should fetch the actual fault status from IFSR (even
+> >> though the address still comes from DFSR) and dispatch
+> >> based on that.
+> >> 
+> >> Async external aborts (async bus error and async parity/ECC
+> >> error) give you basically no info. DFAR will contain
+> >> garbage hence displaying it will confuse rather than
+> >> enlighten, a traceback is pointless since the instruction
+> >> that caused the access is long retired, likewise
+> >> user_mode() doesn't matter since a transition to kernel
+> >> space may have happened after the access that cause the
+> >> abort. Basically they should be treated more as an IRQ
+> >> than as a fault (note they can also be masked just like
+> >> irqs). In case of a bus error, it may be appropriate to
+> >> just warn about it, or perhaps send a signal to the
+> >> current process, although in the latter case it should
+> >> have some means to distinguish it from a synchronous bus
+> >> error.
+> >> 
+> >> At least on the cortex-a8, a parity/ECC error (whether
+> >> async or not) is to be regarded as absolutely fatal. 
+> >> Quoth the TRM: "No recovery is possible. The abort handler
+> >> must disable the caches, communicate the fail directly
+> >> with the external system, request a reboot."
+> >> 
+> >> Bit 10 no longer indicates an asynchronous (let alone
+> >> imprecise) fault.  Apart from the debug events and async
+> >> aborts (and possibly some implementation-defined aborts),
+> >> all aborts listed are synchronous, and DFAR/IFAR is valid.
+> >> There's no technical obstruction to make these trappable
+> >> via the kernel exception handling mechanism. (Though at
+> >> least in case of parity/ECC errors one shouldn't.)
+> > 
+> > Tony, Nishanth, or somebody else... can you help with memory
+> > management? Or do you know some expert for arch/arm/mm/
+> > code?
+> 
+> Folks in linux-arm-kernel are probably the right people, I
+> suppose. Looping them in.
 
-That is pretty much true of any optional property. Whether implemented
-in the driver or core is an implementation detail that does not belong
-in the binding.
+Hi folks in linux-arm-kernel!
 
-I find this property pretty questionable. Certainly having the kernel
-service a watchdog either enabled at reset, in the bootloader, or by
-the kernel is a useful feature. A timeout for "how long userspace
-watchdog daemon takes to start" does not belong in DT. timeout-sec
-should be the default/initial timeout and long enough for userspace to
-start. Userspace can then change it to a more suitable value.
+Can you help us with above problem? How to catch external abort 
+on non-linefetch in kernel driver and prevent kernel panic?
 
-Rob
+Here is that kernel panic log: 
+http://thread.gmane.org/gmane.linux.ports.arm.omap/108397/
+
+We want to check for "Unhandled fault: external abort on non-
+linefetch" and if it happens disable some functionality in kernel 
+driver omap-aes.ko
+
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150218/c3e32be8/attachment-0001.sig>
