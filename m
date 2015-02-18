@@ -1,139 +1,203 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Thu, 19 Feb 2015 00:00:14 +0900
-Subject: [PATCH v5 2/6] arm64: Add more test functions to insn.c
-In-Reply-To: <1424214701-4899-3-git-send-email-dave.long@linaro.org>
-References: <1424214701-4899-1-git-send-email-dave.long@linaro.org>
- <1424214701-4899-3-git-send-email-dave.long@linaro.org>
-Message-ID: <54E4A8FE.8050801@hitachi.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 18 Feb 2015 16:02:16 +0100
+Subject: [PATCH 1/2] dma: at_hdmac: Fix calculation of the residual bytes
+In-Reply-To: <1423387744-2410-2-git-send-email-torfl6749@gmail.com>
+References: <1423387744-2410-1-git-send-email-torfl6749@gmail.com>
+ <1423387744-2410-2-git-send-email-torfl6749@gmail.com>
+Message-ID: <20150218150216.GE32600@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2015/02/18 8:11), David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
+Hello Torsten,
+
+On Sun, Feb 08, 2015 at 10:29:03AM +0100, Torsten Fleischer wrote:
+> From: Torsten Fleischer <torfl6749@gmail.com>
 > 
-> Certain instructions are hard to execute correctly out-of-line (as in
-> kprobes).  Test functions are added to insn.[hc] to identify these.  The
-> instructions include any that use PC-relative addressing, change the PC,
-> or change interrupt masking. For efficiency and simplicity test
-> functions are also added for small collections of related instructions.
+> This patch fixes the following issues regarding to the calculation of the
+> residue:
 > 
-> Signed-off-by: David A. Long <dave.long@linaro.org>
+> 1. The residue is always calculated for the current transfer even if the
+> cookie is associated to a pending transfer.
+> 
+> 2. For scatter/gather DMA the calculation of the residue for the current
+> transfer doesn't include the bytes of the child descriptors that are already
+> transferred.
+> It only calculates the difference between the transfer's total length minus
+> the number of bytes that are already transferred for the current child
+> descriptor.
+> For example: There is a scatter/gather DMA transfer with a total length of
+> 1 MByte. Getting the residue several times while the transfer is running shows
+> something like that:
+> 
+> 1: residue = 975584
+> 2: residue = 1002766
+> 3: residue = 992627
+> 4: residue = 983767
+> 5: residue = 985694
+> 6: residue = 1008094
+> 7: residue = 1009741
+> 8: residue = 1011195
+> 
+> 3. The driver stores the residue but never resets it when starting a new
+> transfer.
+> For example: If there are two subsequent DMA transfers. The first one with
+> a total length of 1 MByte and the second one with a total length of 1 kByte.
+> Getting the residue for both transfers shows something like that:
+> 
+> transfer 1: residue = 975584
+> transfer 2: residue = 1048380
+> 
 
-Reviewed-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+You're right about these points. Good job. I think it should be sent to
+stable if it can be applied properly.
 
-But I'd like to ask someone who precisely understand aarch64 ISA to Ack...
+For multilines comments, please follow the coding rule 
+/*
+ * my
+ * comments
+ */
 
-Thank you,
+> Signed-off-by: Torsten Fleischer <torfl6749@gmail.com>
+
+Another comments below. Otherwise
+
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
 > ---
->  arch/arm64/include/asm/insn.h | 24 ++++++++++++++++++++++--
->  arch/arm64/kernel/insn.c      | 28 ++++++++++++++++++++++++++++
->  2 files changed, 50 insertions(+), 2 deletions(-)
+>  drivers/dma/at_hdmac.c      | 151 ++++++++++++++++++++++----------------------
+>  drivers/dma/at_hdmac_regs.h |  11 ++--
+>  2 files changed, 79 insertions(+), 83 deletions(-)
 > 
-> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-> index e2ff32a..4a534ce 100644
-> --- a/arch/arm64/include/asm/insn.h
-> +++ b/arch/arm64/include/asm/insn.h
-> @@ -223,8 +223,13 @@ static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
->  static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
->  { return (val); }
->  
-> +__AARCH64_INSN_FUNCS(adr_adrp,	0x1F000000, 0x10000000)
-> +__AARCH64_INSN_FUNCS(prfm_lit,	0xFF000000, 0xD8000000)
->  __AARCH64_INSN_FUNCS(str_reg,	0x3FE0EC00, 0x38206800)
->  __AARCH64_INSN_FUNCS(ldr_reg,	0x3FE0EC00, 0x38606800)
-> +__AARCH64_INSN_FUNCS(ldr_lit,	0xBF000000, 0x18000000)
-> +__AARCH64_INSN_FUNCS(ldrsw_lit,	0xFF000000, 0x98000000)
-> +__AARCH64_INSN_FUNCS(exclusive,	0x3F000000, 0x08000000)
->  __AARCH64_INSN_FUNCS(stp_post,	0x7FC00000, 0x28800000)
->  __AARCH64_INSN_FUNCS(ldp_post,	0x7FC00000, 0x28C00000)
->  __AARCH64_INSN_FUNCS(stp_pre,	0x7FC00000, 0x29800000)
-> @@ -264,17 +269,29 @@ __AARCH64_INSN_FUNCS(ands,	0x7F200000, 0x6A000000)
->  __AARCH64_INSN_FUNCS(bics,	0x7F200000, 0x6A200000)
->  __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
->  __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
-> -__AARCH64_INSN_FUNCS(cbz,	0xFE000000, 0x34000000)
-> -__AARCH64_INSN_FUNCS(cbnz,	0xFE000000, 0x35000000)
-> +__AARCH64_INSN_FUNCS(b_bl,	0x7C000000, 0x14000000)
-> +__AARCH64_INSN_FUNCS(cb,	0x7E000000, 0x34000000)
-> +__AARCH64_INSN_FUNCS(cbz,	0x7F000000, 0x34000000)
-> +__AARCH64_INSN_FUNCS(cbnz,	0x7F000000, 0x35000000)
->  __AARCH64_INSN_FUNCS(bcond,	0xFF000010, 0x54000000)
-> +__AARCH64_INSN_FUNCS(tb,	0x7E000000, 0x36000000)
-> +__AARCH64_INSN_FUNCS(tbz,	0x7F000000, 0x36000000)
-> +__AARCH64_INSN_FUNCS(tbnz,	0x7F000000, 0x37000000)
-> +__AARCH64_INSN_FUNCS(b_bl_cb_tb, 0x5C000000, 0x14000000)
->  __AARCH64_INSN_FUNCS(svc,	0xFFE0001F, 0xD4000001)
->  __AARCH64_INSN_FUNCS(hvc,	0xFFE0001F, 0xD4000002)
->  __AARCH64_INSN_FUNCS(smc,	0xFFE0001F, 0xD4000003)
->  __AARCH64_INSN_FUNCS(brk,	0xFFE0001F, 0xD4200000)
-> +__AARCH64_INSN_FUNCS(exception,	0xFF000000, 0xD4000000)
->  __AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
->  __AARCH64_INSN_FUNCS(br,	0xFFFFFC1F, 0xD61F0000)
->  __AARCH64_INSN_FUNCS(blr,	0xFFFFFC1F, 0xD63F0000)
-> +__AARCH64_INSN_FUNCS(br_blr,	0xFFDFFC1F, 0xD61F0000)
->  __AARCH64_INSN_FUNCS(ret,	0xFFFFFC1F, 0xD65F0000)
-> +__AARCH64_INSN_FUNCS(msr_imm,	0xFFF8F000, 0xD5004000)
-> +__AARCH64_INSN_FUNCS(msr_reg,	0xFFF00000, 0xD5100000)
-> +__AARCH64_INSN_FUNCS(set_clr_daif, 0xFFFFF0DF, 0xD50340DF)
-> +__AARCH64_INSN_FUNCS(rd_wr_daif, 0xFFDFFFE0, 0xD51B4220)
->  
->  #undef	__AARCH64_INSN_FUNCS
->  
-> @@ -283,6 +300,9 @@ bool aarch64_insn_is_nop(u32 insn);
->  int aarch64_insn_read(void *addr, u32 *insnp);
->  int aarch64_insn_write(void *addr, u32 insn);
->  enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
-> +bool aarch64_insn_uses_literal(u32 insn);
-> +bool aarch64_insn_is_branch(u32 insn);
-> +bool aarch64_insn_is_daif_access(u32 insn);
->  u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
->  				  u32 insn, u64 imm);
->  u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 7e9327a..ec1c707 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -72,6 +72,34 @@ bool __kprobes aarch64_insn_is_nop(u32 insn)
->  	}
+> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+> index ca9dd26..0fb98a3 100644
+> --- a/drivers/dma/at_hdmac.c
+> +++ b/drivers/dma/at_hdmac.c
+> @@ -233,93 +233,92 @@ static void atc_dostart(struct at_dma_chan *atchan, struct at_desc *first)
 >  }
+
+[...]
+
+> -/*
+> - * atc_get_bytes_left -
+> - * Get the number of bytes residue in dma buffer,
+> - * @chan: the channel we want to start
+> +/**
+> + * atc_get_bytes_left - get the number of bytes residue for a cookie
+> + * @chan: DMA channel
+> + * @cookie: transaction identifier to check status of
+>   */
+> -static int atc_get_bytes_left(struct dma_chan *chan)
+> +static int atc_get_bytes_left(struct dma_chan *chan, dma_cookie_t cookie)
+>  {
+>  	struct at_dma_chan      *atchan = to_at_dma_chan(chan);
+> -	struct at_dma           *atdma = to_at_dma(chan->device);
+> -	int	chan_id = atchan->chan_common.chan_id;
+>  	struct at_desc *desc_first = atc_first_active(atchan);
+> -	struct at_desc *desc_cur;
+> +	struct at_desc *desc;
+>  	int ret = 0, count = 0;
+> +	u32 ctrla, dscr;
 >  
-> +bool __kprobes aarch64_insn_uses_literal(u32 insn)
-> +{
-> +	/* ldr/ldrsw (literal), prfm */
+> -	/*
+> -	 * Initialize necessary values in the first time.
+> -	 * remain_desc record remain desc length.
+> -	 */
+> -	if (atchan->remain_desc == 0)
+> -		/* First descriptor embedds the transaction length */
+> -		atchan->remain_desc = desc_first->len;
+> +	/* If the cookie doesn't match to the currently running transfer then
+> +	 * we can return the total length of the associated DMA transfer,
+> +	 * because it is still queued. */
+> +	desc = atc_get_desc_by_cookie(atchan, cookie);
+> +	if (desc == NULL)
+> +		return -EINVAL;
+> +	else if (desc != desc_first)
+> +		return desc->total_len;
+>  
+> -	/*
+> -	 * This happens when current descriptor transfer complete.
+> -	 * The residual buffer size should reduce current descriptor length.
+> -	 */
+> -	if (unlikely(test_bit(ATC_IS_BTC, &atchan->status))) {
+> -		clear_bit(ATC_IS_BTC, &atchan->status);
+> -		desc_cur = atc_get_current_descriptors(atchan,
+> -						channel_readl(atchan, DSCR));
+> -		if (!desc_cur) {
+> -			ret = -EINVAL;
+> -			goto out;
+> -		}
+> +	/* cookie matches to the currently running transfer */
+> +	ret = desc_first->total_len;
 > +
-> +	return aarch64_insn_is_ldr_lit(insn) ||
-> +		aarch64_insn_is_ldrsw_lit(insn) ||
-> +		aarch64_insn_is_adr_adrp(insn) ||
-> +		aarch64_insn_is_prfm_lit(insn);
-> +}
+> +	if (desc_first->lli.dscr) {
+> +		/* hardware linked list transfer */
 > +
-> +bool __kprobes aarch64_insn_is_branch(u32 insn)
-> +{
-> +	/* b, bl, cb*, tb*, b.cond, br, blr */
+> +		/* Calculate the residue by removing the length of the child
+> +		 * descriptors already transferred from the total length.
+> +		 * To get the current child descriptor we can use the value of
+> +		 * the channel's DSCR register and compare it against the value
+> +		 * of the hardware linked list structure of each child
+> +		 * descriptor. */
 > +
-> +	return aarch64_insn_is_b_bl_cb_tb(insn) ||
-> +		aarch64_insn_is_br_blr(insn) ||
-> +		aarch64_insn_is_ret(insn) ||
-> +		aarch64_insn_is_bcond(insn);
-> +}
+> +		dscr = channel_readl(atchan, DSCR);
 > +
-> +bool __kprobes aarch64_insn_is_daif_access(u32 insn)
-> +{
-> +	/* msr daif, mrs daif, msr daifset, msr daifclr */
+> +		/* the first descriptor is currently in work */
+> +		if (desc_first->lli.dscr == dscr)
+> +			return ret;
+>  
+
+Why returning total_len in this case? I think you can return a more accurate
+value as you do for the last descriptor.
+
+> -		count = (desc_cur->lli.ctrla & ATC_BTSIZE_MAX)
+> -			<< desc_first->tx_width;
+> -		if (atchan->remain_desc < count) {
+> -			ret = -EINVAL;
+> -			goto out;
+> +		list_for_each_entry(desc, &desc_first->tx_list, desc_node) {
+> +			if (desc->lli.dscr == dscr)
+> +				break;
 > +
-> +	return aarch64_insn_is_rd_wr_daif(insn) ||
-> +		aarch64_insn_is_set_clr_daif(insn);
-> +}
+> +			ret -= desc->len;
+>  		}
+>  
+> -		atchan->remain_desc -= count;
+> -		ret = atchan->remain_desc;
+> +		/* For the last descriptor in the chain we can calculate
+> +		 * the remaining bytes using the channel's register. */
+> +		if (!desc->lli.dscr) {
+> +			ctrla = channel_readl(atchan, CTRLA);
+> +			count = (desc->lli.ctrla & ATC_BTSIZE_MAX) -
+> +				(ctrla & ATC_BTSIZE_MAX);
 > +
->  /*
->   * In ARMv8-A, A64 instructions have a fixed length of 32 bits and are always
->   * little-endian.
-> 
+> +			ret = count << ATC_REG_TO_SRC_WIDTH(ctrla);
+> +		}
+>  	} else {
+> -		/*
+> -		 * Get residual bytes when current
+> -		 * descriptor transfer in progress.
+> -		 */
+> -		count = (channel_readl(atchan, CTRLA) & ATC_BTSIZE_MAX)
+> -				<< (desc_first->tx_width);
+> -		ret = atchan->remain_desc - count;
+> +		/* single transfer */
+> +		ctrla = channel_readl(atchan, CTRLA);
+> +		count = (ctrla & ATC_BTSIZE_MAX) << ATC_REG_TO_SRC_WIDTH(ctrla);
+> +		ret -= count;
+>  	}
+> -	/*
+> -	 * Check fifo empty.
+> -	 */
+> -	if (!(dma_readl(atdma, CHSR) & AT_DMA_EMPT(chan_id)))
+> -		atc_issue_pending(chan);
+>  
+> -out:
+>  	return ret;
+>  }
+
+[...]
 
 
--- 
-Masami HIRAMATSU
-Software Platform Research Dept. Linux Technology Research Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+Regards
+
+Ludovic
