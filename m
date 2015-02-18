@@ -1,65 +1,41 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Wed, 18 Feb 2015 15:51:07 +0200
-Subject: [PATCHv3 0/2] watchdog: Introduce "early-timeout-sec" property
-In-Reply-To: <20150218141655.0445958d@bbrezillon>
-References: <54B53160.6060309@roeck-us.net>	<cover.1424262664.git.timo.kokkonen@offcode.fi>
- <20150218141655.0445958d@bbrezillon>
-Message-ID: <54E498CB.8010100@offcode.fi>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Wed, 18 Feb 2015 13:51:50 +0000
+Subject: [PATCH v2 0/3] arm/arm64: Detect Xen support earlier
+Message-ID: <1424267513-15836-1-git-send-email-julien.grall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Hello,
 
-Thanks for your comments. I will resend tomorrow!
+This small patch series moves the detection of running on Xen earlier. This is
+required in order to support earlyprintk via Xen and selecting preferred console.
 
--Timo
+Actually, the last patch of this patch series adds HVC0 as preferred console
+when running on Xen. The patch [1] was previously separetly sent by Ard.
 
-On 18.02.2015 15:16, Boris Brezillon wrote:
-> Hi Timo,
->
-> Could you send new versions of this in their own thread (not in reply
-> to previous versions), and increment the version in patch 1 and 2 ?
->
-> Could you also summarize what has changed between each versions in this
-> cover letter ?
->
-> Best Regards,
->
-> Boris
->
-> On Wed, 18 Feb 2015 14:57:20 +0200
-> Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
->
->> Currently we have no means to adjust the watchdog behavior on early
->> start up before user space has opened the device. The generic behavior
->> among the watchdog drivers is to not start the watchdog at all (or
->> disable it, if possible, or in case at91sam9_wdt, start a kernel timer
->> that keeps on pinging the watchdog on behalf of user space until a
->> watchdog daemon opens it). This unfortunately opens a time window
->> between starting the driver and starting the user space watchdog
->> daemon where a crash of the kernel or user space might prevent the
->> watchdog from ever resetting the device at all. This is obviously bad
->> on production systems.
->>
->> Introduce a new device tree property that, when set, changes the
->> watchdog driver behavior in such way that there no longer is any
->> window where crash is not caught by the watchdog.
->>
->> This is the third version of this patch. Previous versions of the
->> patch were using an atmel specific property name. This patch uses a
->> generic name instead as the functionality itself has nothing atmel
->> related. I am also introducing watchdog.txt for describing the generic
->> watchdog device tree bindings as there was no such file before.
->>
->> Timo Kokkonen (2):
->>    devicetree: Document generic watchdog properties
->>    at91sam9_wdt: Allow watchdog to reset device at early boot
->>
->>   .../devicetree/bindings/watchdog/watchdog.txt         | 19 +++++++++++++++++++
->>   drivers/watchdog/at91sam9_wdt.c                       |  9 ++++++++-
->>   2 files changed, 27 insertions(+), 1 deletion(-)
->>   create mode 100644 Documentation/devicetree/bindings/watchdog/watchdog.txt
->>
->
->
->
+For the maintainers, does this patch series should go in upstream via the ARM
+tree or Xen tree?
+
+Regards,
+
+[1] https://patches.linaro.org/44633/ 
+
+Tested-by: Ard Biesheuvel <ard@linaro.org>
+
+Ard Biesheuvel (1):
+  xen/arm: allow console=hvc0 to be omitted for guests
+
+Julien Grall (1):
+  arm/xen: Correctly check if the event channel interrupt is present
+
+Stefano Stabellini (1):
+  arm,arm64/xen: move Xen initialization earlier
+
+ arch/arm/include/asm/xen/hypervisor.h |  8 +++++
+ arch/arm/kernel/setup.c               |  2 ++
+ arch/arm/xen/enlighten.c              | 62 ++++++++++++++++++++++-------------
+ arch/arm64/kernel/setup.c             |  2 ++
+ 4 files changed, 51 insertions(+), 23 deletions(-)
+
+-- 
+2.1.4
