@@ -1,75 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Feb 2015 11:58:53 +0000
-Subject: [PATCH 01/11] mfd: add the Berlin controller driver
-In-Reply-To: <54E4730D.1060507@gmail.com>
-References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
- <1423671332-24580-2-git-send-email-antoine.tenart@free-electrons.com>
- <20150216124808.GC14545@x1> <20150217092020.GC4507@kwain>
- <20150217115447.GA3989@x1> <20150218084004.GD21937@kwain>
- <20150218090958.GA18042@x1> <20150218092225.GE21937@kwain>
- <20150218104023.GA22296@x1> <54E4730D.1060507@gmail.com>
-Message-ID: <20150218115853.GB22296@x1>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Wed, 18 Feb 2015 12:03:08 +0000
+Subject: [PATCH 0/2] arm/arm64: Detect Xen support earlier
+In-Reply-To: <54E47CBD.7060002@linaro.org>
+References: <1423722898-16110-1-git-send-email-julien.grall@linaro.org>
+ <1424259059.27775.17.camel@citrix.com> <54E47CBD.7060002@linaro.org>
+Message-ID: <1424260988.27775.26.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Feb 2015, Sebastian Hesselbarth wrote:
-
-> On 18.02.2015 11:40, Lee Jones wrote:
-> >On Wed, 18 Feb 2015, Antoine Tenart wrote:
-> [...]
-> >>chip: chip-controller at ea0000 {
-> >>         compatible = "marvell,berlin2q-chip-ctrl", "syscon";
-> >>         reg = <0xea0000 0x400>, <0xdd0170 0x10>;
-> >>         #clock-cells = <1>;
-> >>         clocks = <&refclk>;
-> >>         clock-names = "refclk";
-> >>
-> >>         soc_pinctrl: pin-controller {
-> >>                 compatible = "marvell,berlin2q-soc-pinctrl";
-> >>
-> >>                 twsi0_pmux: twsi0-pmux {
-> >>                         groups = "G6";
-> >>                         function = "twsi0";
-> >>                 };
-> >>
-> >>                 twsi1_pmux: twsi1-pmux {
-> >>                         groups = "G7";
-> >>                         function = "twsi1";
-> >>                 };
-> >>         };
-> >>
-> >>         chip_rst: reset {
-> >>                 compatible = "marvell,berlin2-reset";
-> >>                 #reset-cells = <2>;
-> >>         };
-> >>};
-> >
-> >This is what I'd expect to see in DT, so we're heading in the right
-> >direction.  So make to my original question, what's the point of this
-> >MFD driver, and why don't you just let DT framework register these
-> >devices for you?
-> >
-> >You issue a compatible string here, then duplicate it in the driver,
-> >why do you think this is necessary?
+On Wed, 2015-02-18 at 11:51 +0000, Julien Grall wrote:
+> Hi Ian,
 > 
-> there is no DT framework that automatically probes for
-> compatible<->driver matches. You either make it "simple-bus" compatible
-> which will call of_foo_populate() or you have to register each of the
-> devices yourself. It clearly is not a bus, so if we use this as a
-> workaround, we'll get yelled at by others.
+> On 18/02/2015 11:30, Ian Campbell wrote:
+> > On Thu, 2015-02-12 at 06:34 +0000, Julien Grall wrote:
+> >> Hello,
+> >>
+> >> This small patch series move the detection of running on Xen earlier. This is
+> >> required in order to support earlyprintk via Xen and selecting the preferred
+> >> console.
+> >
+> > Thanks for doing this, having all of the init done in an initcall (even
+> > a relatively early one) has been a niggle I've wanted address for ages,
+> > for exactly earlyprintk and preferred console reasons.
+> >
+> > I had a very minor comment on #1 but nonetheless both patches:
+> > Acked-by: Ian Campbell <ian.campbell@citrix.com>
+> 
+> Can I keep you ack on the first one with the __read_mostly dropped?
 
-I do agree that using 'simple-bus' to describe only this IP would be
-an abuse.  However, my foundation thought/argument is unchanged.  This
-'driver' is a hack.  It has no functional use besides to work around a
-problem of semantics and as such has no place in MFD.
+Sure.
 
-Back onto the simple-bus theme, as this is a syscon device it is a bus
-of sorts.  Have you thought about making it a child of your its syscon
-node, then using simple-bus to get the OF framework to register the
-child devices?
+BTW, when reposting you might want to CC the arch/arm* maintainers on
+this intro mail as well as just the second patch.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Ian.
