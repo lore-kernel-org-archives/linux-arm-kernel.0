@@ -1,36 +1,50 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Wed, 18 Feb 2015 12:03:08 +0000
-Subject: [PATCH 0/2] arm/arm64: Detect Xen support earlier
-In-Reply-To: <54E47CBD.7060002@linaro.org>
-References: <1423722898-16110-1-git-send-email-julien.grall@linaro.org>
- <1424259059.27775.17.camel@citrix.com> <54E47CBD.7060002@linaro.org>
-Message-ID: <1424260988.27775.26.camel@citrix.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Feb 2015 12:08:44 +0000
+Subject: [PATCH v5 1/6] mfd: fsl imx25 Touchscreen ADC driver
+In-Reply-To: <CAOMZO5BjVrcb3t1=kQQYf=-PztzDpGk8S5ApsTThGekT1yTTnA@mail.gmail.com>
+References: <1422108103-15052-1-git-send-email-mpa@pengutronix.de>
+ <1422108103-15052-2-git-send-email-mpa@pengutronix.de>
+ <20150216133829.GG14545@x1>
+ <CAOMZO5AwbNeEhVgUuLUi-_QT0DesPBBCTvvebuA91y-P2_CNzg@mail.gmail.com>
+ <20150218080156.GA5781@x1>
+ <CAOMZO5BjVrcb3t1=kQQYf=-PztzDpGk8S5ApsTThGekT1yTTnA@mail.gmail.com>
+Message-ID: <20150218120844.GC22296@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-02-18 at 11:51 +0000, Julien Grall wrote:
-> Hi Ian,
-> 
-> On 18/02/2015 11:30, Ian Campbell wrote:
-> > On Thu, 2015-02-12 at 06:34 +0000, Julien Grall wrote:
-> >> Hello,
+On Wed, 18 Feb 2015, Fabio Estevam wrote:
+
+> On Wed, Feb 18, 2015 at 6:01 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Tue, 17 Feb 2015, Fabio Estevam wrote:
+> >
+> >> On Mon, Feb 16, 2015 at 11:38 AM, Lee Jones <lee.jones@linaro.org> wrote:
 > >>
-> >> This small patch series move the detection of running on Xen earlier. This is
-> >> required in order to support earlyprintk via Xen and selecting the preferred
-> >> console.
+> >> >> +static int mx25_tsadc_setup_irq(struct platform_device *pdev,
+> >> >> +                             struct mx25_tsadc *tsadc)
+> >> >> +{
+> >> >> +     struct device *dev = &pdev->dev;
+> >> >> +     struct device_node *np = dev->of_node;
+> >> >> +     int irq;
+> >> >> +
+> >> >> +     irq = platform_get_irq(pdev, 0);
+> >> >> +     if (irq < 0) {
+> >> >
+> >> > What if 0 is returned?
+> >>
+> >> Then  imx25.dtsi would be passing irq=0 for the ADC, which would be
+> >> totally wrong.
 > >
-> > Thanks for doing this, having all of the init done in an initcall (even
-> > a relatively early one) has been a niggle I've wanted address for ages,
-> > for exactly earlyprintk and preferred console reasons.
-> >
-> > I had a very minor comment on #1 but nonetheless both patches:
-> > Acked-by: Ian Campbell <ian.campbell@citrix.com>
+> > Exactly, so it should be <=.
 > 
-> Can I keep you ack on the first one with the __read_mostly dropped?
+> imx25.dtsi passes interrupts = <46>; for the touch screen controller,
+> so the irq number will never be zero.
 
-Sure.
+It doesn't matter what happens to be passed at the moment.  The
+correct thing to do is enforce correct/full error checking.  Yes <0 is
+an error, but so is =0, so encompass it in the checks.
 
-BTW, when reposting you might want to CC the arch/arm* maintainers on
-this intro mail as well as just the second patch.
-
-Ian.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
