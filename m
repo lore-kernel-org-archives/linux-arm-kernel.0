@@ -1,58 +1,52 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Feb 2015 16:15:01 +0000
-Subject: [PATCH v2 4/4] clk: dt: Introduce always-on clock domain documentation
-In-Reply-To: <1424276101-30137-1-git-send-email-lee.jones@linaro.org>
-References: <1424276101-30137-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1424276101-30137-5-git-send-email-lee.jones@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Feb 2015 17:15:23 +0100
+Subject: [PATCH 01/11] mfd: add the Berlin controller driver
+In-Reply-To: <54E4B6EE.9030304@gmail.com>
+References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
+ <5101633.XnBqLvsiGQ@wuerfel> <54E4B6EE.9030304@gmail.com>
+Message-ID: <8186955.8t2pyeaYSF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- .../devicetree/bindings/clock/clk-domain.txt       | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/clk-domain.txt
+On Wednesday 18 February 2015 16:59:42 Sebastian Hesselbarth wrote:
+> 
+> > The alternative is to come up with a way to probe all the child
+> > devices automatically, but then we should make that parent device
+> > have a generic driver that does not need to know about the children
+> > and that can work on any platform with similar requirements.
+> 
+> Ok, this is most likely the part that Lee doesn't like on the current
+> driver: a platform_device for registering platform_devices *only* and
+> only for Berlin.
+> 
+> So, out of the two options:
+> 
+> (a) Go for syscon_of_populate_devices() with a new compatible (I guess)
+>      and having sub-nodes for each Linux subsystem that we want to have
+>      a platform_device for. I fear that this will clash with early
+>      registration of clk and we still have to find a way, i.e. device
+>      naming policy, to match the drivers with their devices.
 
-diff --git a/Documentation/devicetree/bindings/clock/clk-domain.txt b/Documentation/devicetree/bindings/clock/clk-domain.txt
-new file mode 100644
-index 0000000..b86772f5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/clk-domain.txt
-@@ -0,0 +1,35 @@
-+Always-on Clock Domain
-+
-+Some hardware is contains bunches of clocks which must never be
-+turned off.  If drivers a) fail to obtain a reference to any of
-+these or b) give up a previously obtained reference during suspend,
-+the common clk framework will attempt to disable them and the
-+hardware can fail irrecoverably.  Usually, the only way to recover
-+from these failures is to restart.
-+
-+To avoid either of these two scenarios from catastrophically
-+disabling an otherwise perfectly healthy running system, we have
-+implemented a clock domain where clocks are consumed and references
-+are taken, thus preventing them from being shut down by the
-+framework.
-+
-+We use the generic clock bindings found in:
-+  Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Required properties:
-+- compatible : Must be "always-on-clk-domain"
-+
-+Example:
-+
-+clk-domain {
-+	compatible = "always-on-clk-domain";
-+	clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>,
-+		 <&clk_s_c0_flexgen CLK_COMPO_DVP>,
-+		 <&clk_s_c0_flexgen CLK_MMC_1>,
-+		 <&clk_s_c0_flexgen CLK_ICN_SBC>,
-+		 <&clk_s_c0_flexgen CLK_ICN_LMI>,
-+		 <&clk_s_c0_flexgen CLK_ICN_CPU>,
-+		 <&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
-+		 <&clk_s_a0_flexgen CLK_IC_LMI0>,
-+		 <&clk_m_a9>;
-+};
--- 
-1.9.1
+I don't see the problem with early clk registration, AFAICT it should
+just work as expected, you just end up with an extra platform_device
+for the clocks that does not get bound to a driver later because the
+device node is already in use by the clock driver.
+
+> (b) Join clk, pinctrl, reset into a single chip/soc-control node and
+>      rewrite the sub-drivers to not directly rely on DT compatible.
+>      With this, joining all sub-drivers into drivers/soc/berlin would
+>      be a sane approach, right? Also, I have the strong feeling, that
+>      we will encounter situations later that will require the clk driver
+>      to pull a reset before changing a specific clk rate, e.g. for GPU.
+
+If we do this, I think it should be a single driver as well, without
+subdrivers. We should probably just do this if there is a small number
+of subsystems to bind to, so the driver doesn't get out of hand.
+
+This driver could live in drivers/soc then. 
+
+If you want to have subdrivers after all, that would be a classic
+MFD and should live in drivers/mfd. The binding would be the same
+for both approaches.
+
+	Arnd
