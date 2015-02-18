@@ -1,89 +1,37 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 18 Feb 2015 11:41:00 +0100
-Subject: [PATCH] pinctrl: at91: move lock/unlock_as_irq calls into
- request/release resources methods
-In-Reply-To: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150218104100.GC32600@odux.rfo.atmel.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 18 Feb 2015 11:35:55 +0100
+Subject: [PATCH 09/11] ARM: berlin: rework chip and system controller
+ nodes for BG2
+In-Reply-To: <20150218103322.GA16432@kwain>
+References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1423671332-24580-10-git-send-email-antoine.tenart@free-electrons.com>
+ <54E4699E.4010909@gmail.com> <20150218103322.GA16432@kwain>
+Message-ID: <54E46B0B.4010703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 08, 2015 at 07:23:42PM +0100, Boris Brezillon wrote:
-> The gpiochip_lock_as_irq call can fail and return an error, while the
-> irq_startup is not expected to fail (returns an unsigned int which is not
-> checked by irq core code).
-> 
-> irq_request/release_resources functions have been created to address this
-> problem.
-> 
-> Move gpiochip_lock/unlock_as_irq calls into
-> irq_request/release_resources functions to prevent using a gpio as an irq
-> if the gpiochip_lock_as_irq call failed.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+On 18.02.2015 11:33, Antoine Tenart wrote:
+> On Wed, Feb 18, 2015 at 11:29:50AM +0100, Sebastian Hesselbarth wrote:
+>> On 11.02.2015 17:15, Antoine Tenart wrote:
+>> [...]
+>>> -		chip: chip-control at ea0000 {
+>>> -			compatible = "marvell,berlin2-chip-ctrl";
+>>> -			#clock-cells = <1>;
+>>> -			#reset-cells = <2>;
+>>> +		chip: chip-controller at ea0000 {
+>>> +			compatible = "marvell,berlin2-chip-ctrl", "syscon";
+>>>   			reg = <0xea0000 0x400>;
+>>> +			#clock-cells = <1>;
+>>
+>> I noticed just now, but we should either have all of clock, reset,
+>> pinctrl as sub-nodes or none. Currently, this has pinctrl and reset
+>> as sub-nodes but clock hooked up to chip-controller.
+>
+> Of course. The clock rework is part of the other series[1] which
+> modifies the clock driver to use regmap but also move the clock into
+> its own sub-node.
 
-It sounds good for me, you can add my
+Ah, ok. I misinterpreted the addition of #clock-cells above, but it
+gets removed and re-added again.
 
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-
-> ---
->  drivers/pinctrl/pinctrl-at91.c | 17 +++++++----------
->  1 file changed, 7 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index f4cd0b9..a481406 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -1477,28 +1477,25 @@ static void gpio_irq_ack(struct irq_data *d)
->  	/* the interrupt is already cleared before by reading ISR */
->  }
->  
-> -static unsigned int gpio_irq_startup(struct irq_data *d)
-> +static int gpio_irq_request_res(struct irq_data *d)
->  {
->  	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
->  	unsigned	pin = d->hwirq;
->  	int ret;
->  
->  	ret = gpiochip_lock_as_irq(&at91_gpio->chip, pin);
-> -	if (ret) {
-> +	if (ret)
->  		dev_err(at91_gpio->chip.dev, "unable to lock pind %lu IRQ\n",
->  			d->hwirq);
-> -		return ret;
-> -	}
-> -	gpio_irq_unmask(d);
-> -	return 0;
-> +
-> +	return ret;
->  }
->  
-> -static void gpio_irq_shutdown(struct irq_data *d)
-> +static void gpio_irq_release_res(struct irq_data *d)
->  {
->  	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
->  	unsigned	pin = d->hwirq;
->  
-> -	gpio_irq_mask(d);
->  	gpiochip_unlock_as_irq(&at91_gpio->chip, pin);
->  }
->  
-> @@ -1577,8 +1574,8 @@ void at91_pinctrl_gpio_resume(void)
->  static struct irq_chip gpio_irqchip = {
->  	.name		= "GPIO",
->  	.irq_ack	= gpio_irq_ack,
-> -	.irq_startup	= gpio_irq_startup,
-> -	.irq_shutdown	= gpio_irq_shutdown,
-> +	.irq_request_resources = gpio_irq_request_res,
-> +	.irq_release_resources = gpio_irq_release_res,
->  	.irq_disable	= gpio_irq_mask,
->  	.irq_mask	= gpio_irq_mask,
->  	.irq_unmask	= gpio_irq_unmask,
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Sebastian
