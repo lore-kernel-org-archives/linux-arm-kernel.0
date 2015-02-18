@@ -1,23 +1,40 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 18 Feb 2015 19:16:39 -0200
-Subject: [PATCH 4/7] serial: imx: drop support for IRDA
-In-Reply-To: <1424292068-28197-4-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1424292068-28197-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1424292068-28197-4-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CAOMZO5AfE_tikox7d49=9ZtSD8R0_mGuuOQWZEg+E3rTqL4LSA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 18 Feb 2015 15:17:31 -0600
+Subject: [PATCH 1/2] Documentation: bindings: add optional fifo size
+ property to AMBA UARTs
+In-Reply-To: <1424290069-8760-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
+References: <1424290069-8760-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <1424290069-8760-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
+Message-ID: <CAL_JsqKBxmEUCYz4Pw6wbBTvU8p7Fo5O05tLUi9SHoiAzdVRgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Wed, Feb 18, 2015 at 2:07 PM, Jorge Ramirez-Ortiz
+<jorge.ramirez-ortiz@linaro.org> wrote:
+> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
 
-On Wed, Feb 18, 2015 at 6:41 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Support for IRDA was added in 2009 in commit v2.6.31-rc1~399^2~2. There
-> are no in-tree users.
+Acked-by: Rob Herring <robh@kernel.org>
 
-'fsl,irda-mode' is still documented at
-Documentation/devicetree/bindings/serial/fsl-imx-uart.txt .
-
-Is the irda support broken?
-
-Maybe there are people using it in out-of-tree dts files?
+> ---
+>  Documentation/devicetree/bindings/serial/pl011.txt | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/Documentation/devicetree/bindings/serial/pl011.txt b/Documentation/devicetree/bindings/serial/pl011.txt
+> index 5d2e840..05d1adb 100644
+> --- a/Documentation/devicetree/bindings/serial/pl011.txt
+> +++ b/Documentation/devicetree/bindings/serial/pl011.txt
+> @@ -13,5 +13,6 @@ Optional properties:
+>  - dmas:           When present, may have one or two dma channels.
+>            The first one must be named "rx", the second one
+>            must be named "tx".
+> +- fifo-size:  When present, must have the fifo size.
+>
+>  See also bindings/arm/primecell.txt
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
