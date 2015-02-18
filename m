@@ -1,93 +1,90 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 18 Feb 2015 11:06:22 -0300
-Subject: [PATCH v4 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
-In-Reply-To: <20150218140143.GQ25269@lukather>
-References: <1424255528-1717-1-git-send-email-maxime.ripard@free-electrons.com>
- <1424255528-1717-2-git-send-email-maxime.ripard@free-electrons.com>
- <54E49632.1000001@free-electrons.com> <20150218140143.GQ25269@lukather>
-Message-ID: <54E49C5E.3090300@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 18 Feb 2015 15:17:13 +0100
+Subject: [PATCH 2/2] at91sam9_wdt: Allow watchdog to reset device at
+ early boot
+In-Reply-To: <54E49AA5.40008@roeck-us.net>
+References: <54B53160.6060309@roeck-us.net>
+ <cover.1424262664.git.timo.kokkonen@offcode.fi>
+ <6c0a3a5bcd93d18437eeed04712b4aeff201a16f.1424262664.git.timo.kokkonen@offcode.fi>
+ <54E49AA5.40008@roeck-us.net>
+Message-ID: <20150218151713.7a718311@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA256
+Hi Guenter,
 
-On 02/18/2015 11:01 AM, Maxime Ripard wrote:
-> On Wed, Feb 18, 2015 at 10:40:02AM -0300, Ezequiel Garcia wrote:
->> On 02/18/2015 07:32 AM, Maxime Ripard wrote:
->>> The NDDB register holds the data that are needed by the read
->>> and write commands.
->>> 
->>> However, during a read PIO access, the datasheet specifies that
->>> after each 32 bytes read in that register, when BCH is enabled,
->>> we have to make sure that the RDDREQ bit is set in the NDSR
->>> register.
->>> 
->>> This fixes an issue that was seen on the Armada 385, and
->>> presumably other mvebu SoCs, when a read on a newly erased page
->>> would end up in the driver reporting a timeout from the NAND.
->>> 
->>> Cc: <stable@vger.kernel.org> # v3.14 Signed-off-by: Maxime
->>> Ripard <maxime.ripard@free-electrons.com> --- 
->>> drivers/mtd/nand/pxa3xx_nand.c | 48
->>> ++++++++++++++++++++++++++++++++++++------ 1 file changed, 42
->>> insertions(+), 6 deletions(-)
->>> 
->>> diff --git a/drivers/mtd/nand/pxa3xx_nand.c
->>> b/drivers/mtd/nand/pxa3xx_nand.c index
->>> 96b0b1d27df1..bc677362bc73 100644 ---
->>> a/drivers/mtd/nand/pxa3xx_nand.c +++
->>> b/drivers/mtd/nand/pxa3xx_nand.c @@ -480,6 +480,42 @@ static
->>> void disable_int(struct pxa3xx_nand_info *info, uint32_t
->>> int_mask) nand_writel(info, NDCR, ndcr | int_mask); }
->>> 
->>> +static void drain_fifo(struct pxa3xx_nand_info *info, void
->>> *data, int len) +{ +	if (info->ecc_bch) { +		int timeout; + +
->>> /* +		 * According to the datasheet, when reading from NDDB +
->>> * with BCH enabled, after each 32 bytes reads, we +		 * have to
->>> make sure that the NDSR.RDDREQ bit is set. +		 * +		 * Drain
->>> the FIFO 8 32 bits reads at a time, and skip +		 * the polling
->>> on the last read. +		 */ +		while (len > 8) { +
->>> __raw_readsl(info->mmio_base + NDDB, data, 8); + +			for
->>> (timeout = 0; +			     !(nand_readl(info, NDSR) &
->>> NDSR_RDDREQ); +			     timeout++) { +				if (timeout >= 5) { +
->>> dev_err(&info->pdev->dev, +						"Timeout on RDDREQ while
->>> draining the FIFO\n"); +					return; +				} + +				mdelay(1);
->> 
->> This is probably a stupid nit.. but here it goes is it any 
->> difference if udelay is used here?
->> 
->> Does this makes anything better/worse?
-> 
-> It doesn't make any difference. On the board I've been using, we
-> never hit the delay.
-> 
-> So I really don't care about the number of retries and the sleep 
-> behind them. I made these numbers up, feel free to come up with
-> others if it makes you more comfortable, but could we settle this?
-> 
+On Wed, 18 Feb 2015 05:59:01 -0800
+Guenter Roeck <linux@roeck-us.net> wrote:
 
-OK, let's stop the bikeshedding. For both patches:
+> On 02/18/2015 04:57 AM, Timo Kokkonen wrote:
+> > By default the driver will start a kernel timer which keeps on kicking
+> > the watchdog HW until user space has opened the watchdog
+> > device. Usually this is desirable as the watchdog HW is running by
+> > default and the user space may not have any watchdog daemon running at
+> > all.
+> >
+> > However, on production systems it may be mandatory that also early
+> > crashes and lockups will lead to a watchdog reset, even if they happen
+> > before the user space has opened the watchdog device.
+> >
+> > To resolve the issue, add a new device tree property
+> > "early-timeout-sec" which will let the kernel timer to ping the
+> > watchdog HW only as long as the specified timeout permits. The default
+> > is still to use kernel timer, but more strict behavior can be enabled
+> > via the device tree property.
+> >
+> > Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+> > ---
+> >   Documentation/devicetree/bindings/watchdog/watchdog.txt | 7 +++++++
+> >   drivers/watchdog/at91sam9_wdt.c                         | 9 ++++++++-
+> >   2 files changed, 15 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/watchdog/watchdog.txt b/Documentation/devicetree/bindings/watchdog/watchdog.txt
+> > index 7e3686c..32647cf 100644
+> > --- a/Documentation/devicetree/bindings/watchdog/watchdog.txt
+> > +++ b/Documentation/devicetree/bindings/watchdog/watchdog.txt
+> > @@ -4,9 +4,16 @@ using these definitions.
+> >
+> >   Optional properties:
+> >   - timeout-sec: Contains the watchdog timeout in seconds.
+> > +- early-timeout-sec: If present, specifies a timeout value in seconds
+> > +  that the driver keeps on ticking the watchdog HW on behalf of user
+> > +  space. Once this timeout expires watchdog is left to expire in
+> > +  timeout-sec seconds. If this propery is set to zero, watchdog is
+> > +  started (or left running) so that a reset occurs in timeout-sec
+> > +  since the watchdog was started.
+> >
+> >   Example:
+> >
+> >   watchdog {
+> >   	 timeout-sec = <60>;
+> > +	 early-timeout-sec = <120>;
+> 
+> That is not a generic property as you defined it; if so,
+> it would have to be implemented in the watchdog core code,
+> not in the at91 code. You'll have to document it in the bindings
+> description for at91sam9_wdt.
 
-Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-- -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
+Then, if this is a controller specific property, it should be defined
+with the 'atmel,' prefix.
+We're kind of looping here: the initial discussion was "is there a need
+for this property to be a generic one ?", and now you're saying no,
+while you previously left the door opened.
+
+Tomi is proposing a generic approach, as you asked him to. I agree that
+parsing the property in core code and making its value part of the
+generic watchdog struct makes sense (that's what I proposed to Tomi a
+few weeks ago).
+
+Anyway, I'm fine with both approaches (generic and controller specific),
+so I'll let you decide in the end.
+
+Best Regards,
+
+Boris
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v2
-
-iQIcBAEBCAAGBQJU5JxaAAoJEIOKbhOEIHKi9HYP/jxU75zI6QjNk1yGL7Y3qwEy
-M2UYrepXTwgRVRxAIN3nhGqERuBVOJCIVKlb3CUSiq9auNAO8rsRs6JTAossV781
-LTUniAA0nIBFbTn/k2Wc6yGQizSy7iJRXu73MrLJrcSFO8JxFFqu04V1EYuZbh5s
-fuVpeLJEX8Gfy6gj85ybFs7+wkD/XnENKlnDzD6y/n4ewBC3yDPLNh436hZpEVDO
-ky8lYjGPHMQs0yEDcp1rfFejLAmxJ4SY6hVSKAxq3/Bn58S4y3Pgkm4cJtP8nHYe
-UN4q9UfOBIHWrQIVbBlViK//n3zyEtaPojDSKUiSvI2+Hmz9+eortlYEvpN1HCP3
-Xqy1gzFto9FpP4Wp3KpyF609JNVUeQxAsUQZMXM6yaH2oz35szZhBq2xlIpsyo3C
-BDbjaYKFk3hVg+jAE0iitZW8BiZS+WZ/pzX4A8rwQBSTMcbrLTuRV611R4E/nEBL
-sfCwDWc1gxDDiM8pMJBGC97gwtHEibJqxES9y+T3LrhxtqPl1kUczHFDPgd3uoVw
-fT71PsZBtGUeOu3ysymNPc+mF9b9G9KRHYhSiOjnEIle9yvXh6kaGWv93ZM3RCUG
-JASv01+gqb+Bz5ZU3MMU+xjHxeoWBq7KfSWcshEHpD8QCuiZzNZ3yt0dZaYXao+M
-YsLlm5s62fDVILb2Q3+d
-=MA8V
------END PGP SIGNATURE-----
