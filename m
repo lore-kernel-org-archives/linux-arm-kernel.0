@@ -1,42 +1,43 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 18 Feb 2015 11:33:22 +0100
-Subject: [PATCH 09/11] ARM: berlin: rework chip and system controller
- nodes for BG2
-In-Reply-To: <54E4699E.4010909@gmail.com>
-References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
- <1423671332-24580-10-git-send-email-antoine.tenart@free-electrons.com>
- <54E4699E.4010909@gmail.com>
-Message-ID: <20150218103322.GA16432@kwain>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 18 Feb 2015 11:32:08 +0100
+Subject: [PATCH v4 2/2] ARM: mvebu: a385-db-ap: Enable the NAND
+In-Reply-To: <1424255528-1717-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1424255528-1717-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1424255528-1717-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian!
+The Armada 385 Access Point Development Board has a 1GB NAND SLC chip from
+Micron as its main storage. Enable it.
 
-On Wed, Feb 18, 2015 at 11:29:50AM +0100, Sebastian Hesselbarth wrote:
-> On 11.02.2015 17:15, Antoine Tenart wrote:
-> [...]
-> >-		chip: chip-control at ea0000 {
-> >-			compatible = "marvell,berlin2-chip-ctrl";
-> >-			#clock-cells = <1>;
-> >-			#reset-cells = <2>;
-> >+		chip: chip-controller at ea0000 {
-> >+			compatible = "marvell,berlin2-chip-ctrl", "syscon";
-> >  			reg = <0xea0000 0x400>;
-> >+			#clock-cells = <1>;
-> 
-> I noticed just now, but we should either have all of clock, reset,
-> pinctrl as sub-nodes or none. Currently, this has pinctrl and reset
-> as sub-nodes but clock hooked up to chip-controller.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-385-db-ap.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-Of course. The clock rework is part of the other series[1] which
-modifies the clock driver to use regmap but also move the clock into
-its own sub-node.
-
-Antoine
-
-[1] https://lkml.org/lkml/2015/2/13/252
-
+diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
+index b891b4c897f5..ee648fb19075 100644
+--- a/arch/arm/boot/dts/armada-385-db-ap.dts
++++ b/arch/arm/boot/dts/armada-385-db-ap.dts
+@@ -130,6 +130,19 @@
+ 				phy-mode = "rgmii-id";
+ 			};
+ 
++			nfc: flash at d0000 {
++				status = "okay";
++				#address-cells = <1>;
++				#size-cells = <1>;
++
++				num-cs = <1>;
++				nand-ecc-strength = <4>;
++				nand-ecc-step-size = <512>;
++				marvell,nand-keep-config;
++				marvell,nand-enable-arbiter;
++				nand-on-flash-bbt;
++			};
++
+ 			usb3 at f0000 {
+ 				status = "okay";
+ 				usb-phy = <&usb3_phy>;
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.3.0
