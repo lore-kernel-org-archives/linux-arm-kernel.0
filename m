@@ -1,61 +1,38 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Wed, 18 Feb 2015 08:46:34 +0100
-Subject: [PATCH v3 0/6] Convert twl4030_madc_battery to IIO consumer and
- add DT aupport
-In-Reply-To: <1423088075-10025-1-git-send-email-marek@goldelico.com>
-References: <1423088075-10025-1-git-send-email-marek@goldelico.com>
-Message-ID: <CAAfyv36i0e4h7LTeuzxJFjFG9uXqUn+Gi2kmBtmHoo=f_Gj3Fg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Feb 2015 08:01:56 +0000
+Subject: [PATCH v5 1/6] mfd: fsl imx25 Touchscreen ADC driver
+In-Reply-To: <CAOMZO5AwbNeEhVgUuLUi-_QT0DesPBBCTvvebuA91y-P2_CNzg@mail.gmail.com>
+References: <1422108103-15052-1-git-send-email-mpa@pengutronix.de>
+ <1422108103-15052-2-git-send-email-mpa@pengutronix.de>
+ <20150216133829.GG14545@x1>
+ <CAOMZO5AwbNeEhVgUuLUi-_QT0DesPBBCTvvebuA91y-P2_CNzg@mail.gmail.com>
+Message-ID: <20150218080156.GA5781@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping.
+On Tue, 17 Feb 2015, Fabio Estevam wrote:
 
-On Wed, Feb 4, 2015 at 11:14 PM, Marek Belisko <marek@goldelico.com> wrote:
-> This patches adding support for twl4030_madc_battery to use twl4030_madc iio framework + DT support.
-> Patches was tested on gta04 board. twl4030_madc_battery driver is converted in
-> first patch to iio consumer and in next patches is added support for devicetree
-> + some small fixes for module autoloading.
->
-> Changes from V2:
-> - fix property names
-> - add MODULE_DEVICE_TABLE and MODULE_ALIAS
->
-> Changes from V1:
-> - use iio_read_channel_processed instead iio_read_channel_processed
-> - convert probe to use devm_ as part of adding error handling for iio
-> - free iio channels on error and on module removal
->
-> [1] - https://lkml.org/lkml/2014/2/26/482dd
->
-> Marek Belisko (6):
->   power: twl4030-madc-battery: Convert to iio consumer.
->   power: twl4030_madc_battery: Add device tree support
->   Documentation: DT: Document twl4030-madc-battery bindings
->   ARM: dts: omap3-gta04: Add battery support
->   power: twl4030_madc_battery: Add of_twl4030_madc_match to
->     MODULE_DEVICE_TABLE
->   power: twl4030_madc_battery: Add missing MODULE_ALIAS
->
->  .../bindings/power_supply/twl4030_madc_battery.txt |  43 +++++
->  arch/arm/boot/dts/omap3-gta04.dtsi                 |  30 ++++
->  drivers/power/twl4030_madc_battery.c               | 183 +++++++++++++++++----
->  3 files changed, 221 insertions(+), 35 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
->
-> --
-> 1.9.1
->
+> On Mon, Feb 16, 2015 at 11:38 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> >> +static int mx25_tsadc_setup_irq(struct platform_device *pdev,
+> >> +                             struct mx25_tsadc *tsadc)
+> >> +{
+> >> +     struct device *dev = &pdev->dev;
+> >> +     struct device_node *np = dev->of_node;
+> >> +     int irq;
+> >> +
+> >> +     irq = platform_get_irq(pdev, 0);
+> >> +     if (irq < 0) {
+> >
+> > What if 0 is returned?
+> 
+> Then  imx25.dtsi would be passing irq=0 for the ADC, which would be
+> totally wrong.
 
-
+Exactly, so it should be <=.
 
 -- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
-
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
