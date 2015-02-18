@@ -1,41 +1,59 @@
 From: julien.grall@linaro.org (Julien Grall)
-Date: Wed, 18 Feb 2015 13:51:50 +0000
-Subject: [PATCH v2 0/3] arm/arm64: Detect Xen support earlier
-Message-ID: <1424267513-15836-1-git-send-email-julien.grall@linaro.org>
+Date: Wed, 18 Feb 2015 13:51:51 +0000
+Subject: [PATCH v2 1/3] arm/xen: Correctly check if the event channel
+ interrupt is present
+In-Reply-To: <1424267513-15836-1-git-send-email-julien.grall@linaro.org>
+References: <1424267513-15836-1-git-send-email-julien.grall@linaro.org>
+Message-ID: <1424267513-15836-2-git-send-email-julien.grall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The function irq_of_parse_and_map returns 0 when the IRQ is not found.
 
-This small patch series moves the detection of running on Xen earlier. This is
-required in order to support earlyprintk via Xen and selecting preferred console.
+Futhermore, move the check before notifying the user that we are running on
+Xen.
 
-Actually, the last patch of this patch series adds HVC0 as preferred console
-when running on Xen. The patch [1] was previously separetly sent by Ard.
+Signed-off-by: Julien Grall <julien.grall@linaro.org>
+Acked-by: Ian Campbell <ian.campbell@citrix.com>
 
-For the maintainers, does this patch series should go in upstream via the ARM
-tree or Xen tree?
+---
+    Changes in v2:
+        - Add Ian's ack
+        - Re-add __read_mostly
+---
+ arch/arm/xen/enlighten.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-Regards,
-
-[1] https://patches.linaro.org/44633/ 
-
-Tested-by: Ard Biesheuvel <ard@linaro.org>
-
-Ard Biesheuvel (1):
-  xen/arm: allow console=hvc0 to be omitted for guests
-
-Julien Grall (1):
-  arm/xen: Correctly check if the event channel interrupt is present
-
-Stefano Stabellini (1):
-  arm,arm64/xen: move Xen initialization earlier
-
- arch/arm/include/asm/xen/hypervisor.h |  8 +++++
- arch/arm/kernel/setup.c               |  2 ++
- arch/arm/xen/enlighten.c              | 62 ++++++++++++++++++++++-------------
- arch/arm64/kernel/setup.c             |  2 ++
- 4 files changed, 51 insertions(+), 23 deletions(-)
-
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 263a204..c8d3a17 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -51,7 +51,7 @@ EXPORT_SYMBOL_GPL(xen_have_vector_callback);
+ int xen_platform_pci_unplug = XEN_UNPLUG_ALL;
+ EXPORT_SYMBOL_GPL(xen_platform_pci_unplug);
+ 
+-static __read_mostly int xen_events_irq = -1;
++static __read_mostly unsigned int xen_events_irq;
+ 
+ /* map fgmfn of domid to lpfn in the current domain */
+ static int map_foreign_page(unsigned long lpfn, unsigned long fgmfn,
+@@ -251,12 +251,14 @@ static int __init xen_guest_init(void)
+ 		return 0;
+ 	grant_frames = res.start;
+ 	xen_events_irq = irq_of_parse_and_map(node, 0);
++	if (!xen_events_irq) {
++		pr_debug("Xen event channel interrupt not found\n");
++		return -ENODEV;
++	}
++
+ 	pr_info("Xen %s support found, events_irq=%d gnttab_frame=%pa\n",
+ 			version, xen_events_irq, &grant_frames);
+ 
+-	if (xen_events_irq < 0)
+-		return -ENODEV;
+-
+ 	xen_domain_type = XEN_HVM_DOMAIN;
+ 
+ 	xen_setup_features();
 -- 
 2.1.4
