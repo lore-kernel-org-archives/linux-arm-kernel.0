@@ -1,100 +1,91 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 18 Feb 2015 05:59:01 -0800
-Subject: [PATCH 2/2] at91sam9_wdt: Allow watchdog to reset device at early
- boot
-In-Reply-To: <6c0a3a5bcd93d18437eeed04712b4aeff201a16f.1424262664.git.timo.kokkonen@offcode.fi>
-References: <54B53160.6060309@roeck-us.net>
- <cover.1424262664.git.timo.kokkonen@offcode.fi>
- <6c0a3a5bcd93d18437eeed04712b4aeff201a16f.1424262664.git.timo.kokkonen@offcode.fi>
-Message-ID: <54E49AA5.40008@roeck-us.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 18 Feb 2015 15:01:43 +0100
+Subject: [PATCH v4 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
+In-Reply-To: <54E49632.1000001@free-electrons.com>
+References: <1424255528-1717-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1424255528-1717-2-git-send-email-maxime.ripard@free-electrons.com>
+ <54E49632.1000001@free-electrons.com>
+Message-ID: <20150218140143.GQ25269@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2015 04:57 AM, Timo Kokkonen wrote:
-> By default the driver will start a kernel timer which keeps on kicking
-> the watchdog HW until user space has opened the watchdog
-> device. Usually this is desirable as the watchdog HW is running by
-> default and the user space may not have any watchdog daemon running at
-> all.
->
-> However, on production systems it may be mandatory that also early
-> crashes and lockups will lead to a watchdog reset, even if they happen
-> before the user space has opened the watchdog device.
->
-> To resolve the issue, add a new device tree property
-> "early-timeout-sec" which will let the kernel timer to ping the
-> watchdog HW only as long as the specified timeout permits. The default
-> is still to use kernel timer, but more strict behavior can be enabled
-> via the device tree property.
->
-> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
-> ---
->   Documentation/devicetree/bindings/watchdog/watchdog.txt | 7 +++++++
->   drivers/watchdog/at91sam9_wdt.c                         | 9 ++++++++-
->   2 files changed, 15 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/watchdog/watchdog.txt b/Documentation/devicetree/bindings/watchdog/watchdog.txt
-> index 7e3686c..32647cf 100644
-> --- a/Documentation/devicetree/bindings/watchdog/watchdog.txt
-> +++ b/Documentation/devicetree/bindings/watchdog/watchdog.txt
-> @@ -4,9 +4,16 @@ using these definitions.
->
->   Optional properties:
->   - timeout-sec: Contains the watchdog timeout in seconds.
-> +- early-timeout-sec: If present, specifies a timeout value in seconds
-> +  that the driver keeps on ticking the watchdog HW on behalf of user
-> +  space. Once this timeout expires watchdog is left to expire in
-> +  timeout-sec seconds. If this propery is set to zero, watchdog is
-> +  started (or left running) so that a reset occurs in timeout-sec
-> +  since the watchdog was started.
->
->   Example:
->
->   watchdog {
->   	 timeout-sec = <60>;
-> +	 early-timeout-sec = <120>;
+On Wed, Feb 18, 2015 at 10:40:02AM -0300, Ezequiel Garcia wrote:
+> On 02/18/2015 07:32 AM, Maxime Ripard wrote:
+> > The NDDB register holds the data that are needed by the read and write
+> > commands.
+> > 
+> > However, during a read PIO access, the datasheet specifies that after each 32
+> > bytes read in that register, when BCH is enabled, we have to make sure that the
+> > RDDREQ bit is set in the NDSR register.
+> > 
+> > This fixes an issue that was seen on the Armada 385, and presumably other mvebu
+> > SoCs, when a read on a newly erased page would end up in the driver reporting a
+> > timeout from the NAND.
+> > 
+> > Cc: <stable@vger.kernel.org> # v3.14
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/mtd/nand/pxa3xx_nand.c | 48 ++++++++++++++++++++++++++++++++++++------
+> >  1 file changed, 42 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> > index 96b0b1d27df1..bc677362bc73 100644
+> > --- a/drivers/mtd/nand/pxa3xx_nand.c
+> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> > @@ -480,6 +480,42 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
+> >  	nand_writel(info, NDCR, ndcr | int_mask);
+> >  }
+> >  
+> > +static void drain_fifo(struct pxa3xx_nand_info *info, void *data, int len)
+> > +{
+> > +	if (info->ecc_bch) {
+> > +		int timeout;
+> > +
+> > +		/*
+> > +		 * According to the datasheet, when reading from NDDB
+> > +		 * with BCH enabled, after each 32 bytes reads, we
+> > +		 * have to make sure that the NDSR.RDDREQ bit is set.
+> > +		 *
+> > +		 * Drain the FIFO 8 32 bits reads at a time, and skip
+> > +		 * the polling on the last read.
+> > +		 */
+> > +		while (len > 8) {
+> > +			__raw_readsl(info->mmio_base + NDDB, data, 8);
+> > +
+> > +			for (timeout = 0;
+> > +			     !(nand_readl(info, NDSR) & NDSR_RDDREQ);
+> > +			     timeout++) {
+> > +				if (timeout >= 5) {
+> > +					dev_err(&info->pdev->dev,
+> > +						"Timeout on RDDREQ while draining the FIFO\n");
+> > +					return;
+> > +				}
+> > +
+> > +				mdelay(1);
+> 
+> This is probably a stupid nit.. but here it goes is it any
+> difference if udelay is used here?
+> 
+> Does this makes anything better/worse?
 
-That is not a generic property as you defined it; if so,
-it would have to be implemented in the watchdog core code,
-not in the at91 code. You'll have to document it in the bindings
-description for at91sam9_wdt.
+It doesn't make any difference. On the board I've been using, we never
+hit the delay.
 
-Guenter
+So I really don't care about the number of retries and the sleep
+behind them. I made these numbers up, feel free to come up with others
+if it makes you more comfortable, but could we settle this?
 
+Thanks,
+Maxime
 
->   };
-> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-> index 6df9405..1b40bfa 100644
-> --- a/drivers/watchdog/at91sam9_wdt.c
-> +++ b/drivers/watchdog/at91sam9_wdt.c
-> @@ -89,6 +89,8 @@ struct at91wdt {
->   	u32 mr_mask;
->   	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
->   	bool nowayout;
-> +	/* Timeout in jiffies for stopping the early timer */
-> +	unsigned long early_timer;
->   	unsigned int irq;
->   };
->
-> @@ -122,7 +124,8 @@ static void at91_ping(unsigned long data)
->   {
->   	struct at91wdt *wdt = (struct at91wdt *)data;
->   	if (time_before(jiffies, wdt->next_heartbeat) ||
-> -	    !watchdog_active(&wdt->wdd)) {
-> +		(time_before(jiffies, wdt->early_timer) &&
-> +			!watchdog_active(&wdt->wdd))) {
->   		at91_wdt_reset(wdt);
->   		mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
->   	} else {
-> @@ -316,6 +319,10 @@ static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
->
->   	wdt->mr |= max | ((max - min) << 16);
->
-> +	if (!of_property_read_u32_index(np, "early-timeout-sec", 0,
-> +					(u32 *)&wdt->early_timer))
-> +		wdt->early_timer = wdt->early_timer * HZ + jiffies;
-> +
->   	return 0;
->   }
->   #else
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150218/b2ce9e4e/attachment.sig>
