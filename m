@@ -1,41 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Feb 2015 21:38:19 +0100
-Subject: [PATCH] ARM: make arrays containing machine compatible strings
- const
-In-Reply-To: <1424289705-11786-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1424289705-11786-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <5808332.37GVWYAetI@wuerfel>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 18 Feb 2015 21:41:04 +0100
+Subject: [PATCH 3/7] serial: imx: fix comment about which machines use the
+ i.MX21 type
+In-Reply-To: <1424292068-28197-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1424292068-28197-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1424292068-28197-3-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 February 2015 21:01:45 Uwe Kleine-K?nig wrote:
-> The definition
-> 
->         static const char *axxia_dt_match[] __initconst = {
->                 ...
-> 
-> defines a changable array of constant strings. That is you must not do:
-> 
->         *axxia_dt_match[0] = 'k';
-> 
-> but
-> 
->         axxia_dt_match[0] = "different string";
-> 
-> is fine. So the annotation __initconst is wrong and yields a compiler
-> error when other really const variables are added with __initconst.
-> 
-> As the struct machine_desc member dt_compat is declared as
-> 
->         const char *const *dt_compat;
-> 
-> making the arrays const is the better alternative over changing all
-> annotations to __initdata.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ drivers/tty/serial/imx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-Applied to fixes branch, thanks!
-
-	Arnd
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 8ab52ed15917..cf1a612435cc 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -181,7 +181,7 @@
+ 
+ #define UART_NR 8
+ 
+-/* i.mx21 type uart runs on all i.mx except i.mx1 */
++/* i.MX21 type uart runs on all i.mx except i.MX1 and i.MX6q */
+ enum imx_uart_type {
+ 	IMX1_UART,
+ 	IMX21_UART,
+-- 
+2.1.4
