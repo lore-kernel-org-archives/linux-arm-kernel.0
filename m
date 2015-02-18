@@ -1,77 +1,157 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 18 Feb 2015 16:21:11 -0500
-Subject: [PATCH v2 0/3] ARM: shmobile: r8a73a4: DT PM domain support
-In-Reply-To: <1424187783-6390-1-git-send-email-geert+renesas@glider.be>
-References: <1424187783-6390-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150218212110.GG12754@verge.net.au>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Feb 2015 21:54:35 +0000
+Subject: [PATCH v2 4/4] clk: dt: Introduce always-on clock domain
+ documentation
+In-Reply-To: <CAL_JsqJ0sfQ-OQvYjL3X3ebH4p9HkN4iy35iT7i9S2d+yz9zYg@mail.gmail.com>
+References: <1424276101-30137-1-git-send-email-lee.jones@linaro.org>
+ <1424276101-30137-5-git-send-email-lee.jones@linaro.org>
+ <CAL_Jsq+r1BKt5B9FNPG+Y0Oi1-3RGNmRUDbpX_uDJwr45bxMXA@mail.gmail.com>
+ <20150218171230.GA30676@x1>
+ <CAL_JsqJ0sfQ-OQvYjL3X3ebH4p9HkN4iy35iT7i9S2d+yz9zYg@mail.gmail.com>
+Message-ID: <20150218215435.GA32415@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 17, 2015 at 04:43:00PM +0100, Geert Uytterhoeven wrote:
-> 	Hi Simon, Magnus,
-> 
-> This patch series enables DT support for PM domains on the Renesas
-> R-Mobile APE6 (r8a73a4) SoC.  As a bonus, it also allows the use of the
-> R-Mobile Reset driver to restart the system.
-> 
-> This series builds further upon the DT PM Domain support for R-Mobile
-> A1 (r8a7740) and SH-Mobile AG5 (sh73a0).  Due to the similarity of the
-> SYSC System-Controller on the various SH-Mobile/R-Mobile SoCs, and the
-> abstraction of PM domains in DT, the same driver can handle r8a73a4,
-> without any additional modifications, and without changing the DT
-> bindings.
-> 
-> root at ape6evm:~# cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
->     domain                      status         slaves
->            /device                                      runtime status
-> ----------------------------------------------------------------------
-> a2is                            off
-> a2rv                            off
-> a3r                             off              a2rv, a2is
-> a4sf                            off
-> a3vc                            off
-> a3mp                            off
-> a4mp                            off              a3mp, a3vc
-> a4lc                            off
-> a4l                             off
-> a3bc                            on
-> a4bc                            on               a3bc
-> d4                              on
-> c4cl                            off
-> c4ma                            off
-> a2kl                            off
-> a3km                            off              a2kl
-> a2sl                            on
-> a3sm                            on               a2sl
-> a2us                            off
-> a3sp                            on               a2us
->     /devices/platform/e60b0000.i2c                      suspended
->     /devices/platform/dma-multiplexer/e6700020.dma-controller  suspended
->     /devices/platform/e6c40000.serial                   active
->     /devices/platform/ee100000.sd                       active
->     /devices/platform/ee120000.sd                       active
->     /devices/platform/ee200000.mmc                      active
-> a3ex                            off
-> a3sg                            off
-> c4                              on               a3sg, a3ex, a3sp, a3sm, a3km
->     /devices/platform/e61c0000.interrupt-controller     unsupported
->     /devices/platform/e61c0200.interrupt-controller     unsupported
->     /devices/platform/fec10000.bus                      active
-> c5                              on               c4, c4ma, c4cl, d4, a4bc, a4l, a4lc, a4mp, a4sf, a3r
->     /devices/platform/e6050000.pfc                      unsupported
->     /devices/platform/e6130000.timer                    suspended
->     /devices/platform/e61f0000.thermal                  active
-> root at ape6evm:~#
-> 
-> Dependencies:
->   - Patch 1 (DT binding doc) depends on Simon's tag renesas-dt2-for-v3.20,
->     which should be upstream tonight,
->   - Patch 2 (dtsi) depends on the series "[PATCH v4 0/6] ARM: shmobile:
->     r8a73a4/ape6evm: Complete multiplatform support",
->   - Patch 3 (drivers/sh) depends functionally on patch 2, and literally on
->     the series "[PATCH v3 0/2] ARM: shmobile: sh73a0: Enable DT PM domain
->     support".
-> 
-> Thanks for applying!
+On Wed, 18 Feb 2015, Rob Herring wrote:
 
-Thanks, done.
+> On Wed, Feb 18, 2015 at 11:12 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Wed, 18 Feb 2015, Rob Herring wrote:
+> >
+> >> On Wed, Feb 18, 2015 at 10:15 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> >> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >> > ---
+> >> >  .../devicetree/bindings/clock/clk-domain.txt       | 35 ++++++++++++++++++++++
+> >> >  1 file changed, 35 insertions(+)
+> >> >  create mode 100644 Documentation/devicetree/bindings/clock/clk-domain.txt
+> >> >
+> >> > diff --git a/Documentation/devicetree/bindings/clock/clk-domain.txt b/Documentation/devicetree/bindings/clock/clk-domain.txt
+> >> > new file mode 100644
+> >> > index 0000000..b86772f5
+> >> > --- /dev/null
+> >> > +++ b/Documentation/devicetree/bindings/clock/clk-domain.txt
+> >> > @@ -0,0 +1,35 @@
+> >> > +Always-on Clock Domain
+> >> > +
+> >> > +Some hardware is contains bunches of clocks which must never be
+> >> > +turned off.  If drivers a) fail to obtain a reference to any of
+> >> > +these or b) give up a previously obtained reference during suspend,
+> >> > +the common clk framework will attempt to disable them and the
+> >> > +hardware can fail irrecoverably.  Usually, the only way to recover
+> >> > +from these failures is to restart.
+> >>
+> >> How is (b) not a bug?
+> >
+> > Clocks are normally disabled during suspend.  When clocks are disabled
+> > they give up their reference.  If references reach 0, the clock is
+> > gated.  If one of these clocks is gated, the system will never come
+> > out of suspend.
+> >
+> > How is it a bug?
+> 
+> It a clock needs to be enabled during suspend, then the driver using
+> it should not disable it. Anyway, suspend is a bit orthogonal to this
+> issue.
+
+IMO, it's not the driver's responsibility to know which clock they are
+using and whether it's a critical clock or not.
+
+> >> While I think we need something here, I worry that this will be abused
+> >> to be a list of clocks you have not gotten around to managing. We
+> >
+> > You can say that about any framework.  It's our responsibility to ask
+> > the right questions and to disallow it from being abused.  The clocks
+> > I use in the (real-world) example in this set are _really_ always-on.
+> > If any of them are turned off the system will cease to perform in any
+> > meaningful way.
+> 
+> You cannot tell here up front whether clocks are really always-on. A
+> reviewer is not going to know, and the submitter may not even have all
+> the documentation and know the answer. Getting it wrong here means you
+> have to change the dtb to fix it. Granted, it doesn't really break
+> things in this case.
+
+We should make it clear in the documentation that this framework
+should only be used if the clock is a critical "if it's turned off it
+will cripple the system" one.
+
+> >> cannot be changing the DT every time the kernel starts managing a
+> >> clock. I think this should operate more as always on until claimed.
+> >
+> > The point of this is that even when these clocks are claimed, there is
+> > an issue that when unclaimed (i.e. during suspend) the clk framework
+> > will attempt to gate them, and when they do *boom*.
+> >
+> >> But then you get into drivers having to be aware that the clock
+> >> started enabled.
+> >
+> > This has nothing to do with the initial state of the clock.  It's
+> > whether the clock is integral (i.e. is part of a vital interconnect)
+> > that's important.  For instance, ST's bootloader turns on lots of
+> > clocks which can be safely gated if unused.  The clocks we're
+> > registering with this always-on framework cannot.
+> 
+> It does because you have to assume either the initial state is wrong
+> and you need to disable it, or that the initial state is correct and
+> you need to leave the clock enabled.
+
+I think the kernel's policy is a good one i.e. wait until all devices
+are probed and have had the opportunity to take the clocks they need,
+at which point we can usually safely gate the remainder.  These types
+of clocks are the exception however; hence the need for this driver.
+There are other vendors which have similar issues with their h/w.
+These are currently using bespoke versions of this implementation, but
+IMO a generic solution would be better.
+
+> There are also other usecases such as simplefb where you want to leave
+> clocks on until the real fb driver takes over. Consoles have a similar
+> issue.
+
+Why wouldn't these devices have taken references by the time
+clk_disable_unused() is called?
+
+> Perhaps you need to model your buses more completely?
+
+Would you mind explaining this a little more please?
+
+> Does simple-pm-bus help you?
+
+I have no idea what this is, and I'm struggling to grep for it too?
+
+> >> Also, I feel like we are using DT to work around kernel policy (of
+> >> turning off clocks). If the policy was to leave on clocks, then we
+> >> would be trying to put a list of clocks to disable in DT.
+> >
+> > I'm not sure I understand your point.  The current policy is correct
+> > if it's power that you care about, which is invariably the point of
+> > disabling clocks in the first place, right?  Also, this has nothing to
+> > do with DT per say.  It's just another framework driver.
+> 
+> It does have something to do with DT because you are designing a
+> binding around what the kernel does. Should the kernel assume it can
+> disable clocks safely?
+
+I guess it depends on what you're trying to achieve.  Personally I
+think the kernel's policy is a good one, especually with regards to
+power saving.  What are you suggesting?  A new policy?
+
+> Another OS may do the opposite and assume it
+> cannot turn-off unused clocks. Then you would have a list of clocks
+> safe to disable in DT.
+
+Sounds bananas.  What's good about that kind of policy?  It wouldn't
+matter anyway, both of these implementations can live harmoniously in
+the same tree.
+
+> This is also completely solvable within the framework driver by
+> claiming those clocks in the clock controller driver.
+
+This conversation has now gone full circle.  This was an earlier
+suggestion, but it was considered hacky, and I'm inclined to agree.
+An always-on power domain was deemed to be a much more elegant
+solution.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
