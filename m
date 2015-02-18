@@ -1,46 +1,76 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Wed, 18 Feb 2015 13:40:06 +0000
-Subject: [PATCH 0/2] arm/arm64: Detect Xen support earlier
-In-Reply-To: <54E481D6.2080908@linaro.org>
-References: <1423722898-16110-1-git-send-email-julien.grall@linaro.org>
- <1424259059.27775.17.camel@citrix.com> <54E47CBD.7060002@linaro.org>
- <1424260988.27775.26.camel@citrix.com> <54E481D6.2080908@linaro.org>
-Message-ID: <1424266806.27775.55.camel@citrix.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 18 Feb 2015 08:40:51 -0500
+Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
+In-Reply-To: <20141205110507.GB28339@e104818-lin.cambridge.arm.com>
+References: <1417707993-82290-1-git-send-email-agraf@suse.de>
+ <5480F12D.90007@suse.de>
+ <CAOesGMi-sVTxdo8f7vNnYMgd+meBF+Gsf3Pk5VbHEPxv5Q6iDA@mail.gmail.com>
+ <3551792.oHatG1W6W1@wuerfel>
+ <20141205110507.GB28339@e104818-lin.cambridge.arm.com>
+Message-ID: <54E49663.6040706@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-02-18 at 12:13 +0000, Julien Grall wrote:
+On 12/05/2014 06:05 AM, Catalin Marinas wrote:
+> On Fri, Dec 05, 2014 at 10:39:40AM +0000, Arnd Bergmann wrote:
+>> On Thursday 04 December 2014 15:48:50 Olof Johansson wrote:
+>>> On Thu, Dec 4, 2014 at 3:41 PM, Alexander Graf <agraf@suse.de> wrote:
+>>>> On 04.12.14 22:15, Olof Johansson wrote:
+>>>>> On Thu, Dec 4, 2014 at 7:46 AM, Alexander Graf <agraf@suse.de> wrote:
+>>>>>> With binutils 2.25 the default alignment for 32bit arm sections changed to
+>>>>>> have everything 64k aligned. Armv7 binaries built with this binutils version
+>>>>>> run successfully on an arm64 system.
+>>>>>>
+>>>>>> Since effectively there is now the chance to run armv7 code on arm64 even
+>>>>>> with 64k page size, it doesn't make sense to block people from enabling
+>>>>>> CONFIG_COMPAT on those configurations.
+>>>>>>
+>>>>>> Signed-off-by: Alexander Graf <agraf@suse.de>
+>>>>>> ---
+>>>>>>  arch/arm64/Kconfig | 1 -
+>>>>>>  1 file changed, 1 deletion(-)
+>>>>>>
+>>>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>>>>> index 9532f8d..3cf4f238 100644
+>>>>>> --- a/arch/arm64/Kconfig
+>>>>>> +++ b/arch/arm64/Kconfig
+>>>>>> @@ -409,7 +409,6 @@ source "fs/Kconfig.binfmt"
+>>>>>>
+>>>>>>  config COMPAT
+>>>>>>         bool "Kernel support for 32-bit EL0"
+>>>>>> -       depends on !ARM64_64K_PAGES
+>>>>>>         select COMPAT_BINFMT_ELF
+>>>>>>         select HAVE_UID16
+>>>>>>         select OLD_SIGSUSPEND3
+>>>>>
+>>>>> This is hardly "compat". Sure, it's great to have a new binutils that
+>>>>> has larger alignment, but practically not a single existing binary
+>>>>> will work today if someone tries to do this.
+>>>>
+>>>> Yes, but IMHO that's an implementation detail. The same applies for
+>>>> 32bit PPC binaries if you use 4k aligned segments. If your applications
+>>>> are not aligned for your page size, you can't run them. The only
+>>>> platform that managed nevertheless FWIW was IA64 ;).
+>>>
+>>> Yes, but there the binutils change happened early enough that by the
+>>> time the kernel change went in, all major distros had binaries that
+>>> were compatible.
+>>
+>> What is the exact symptom you see when running an unaligned user
+>> space binary on 64k-pages? Do we at least print a helpful error
+>> message somewhere or does it just crash?
 > 
-> On 18/02/2015 12:03, Ian Campbell wrote:
-> > On Wed, 2015-02-18 at 11:51 +0000, Julien Grall wrote:
-> >> Hi Ian,
-> >>
-> >> On 18/02/2015 11:30, Ian Campbell wrote:
-> >>> On Thu, 2015-02-12 at 06:34 +0000, Julien Grall wrote:
-> >>>> Hello,
-> >>>>
-> >>>> This small patch series move the detection of running on Xen earlier. This is
-> >>>> required in order to support earlyprintk via Xen and selecting the preferred
-> >>>> console.
-> >>>
-> >>> Thanks for doing this, having all of the init done in an initcall (even
-> >>> a relatively early one) has been a niggle I've wanted address for ages,
-> >>> for exactly earlyprintk and preferred console reasons.
-> >>>
-> >>> I had a very minor comment on #1 but nonetheless both patches:
-> >>> Acked-by: Ian Campbell <ian.campbell@citrix.com>
-> >>
-> >> Can I keep you ack on the first one with the __read_mostly dropped?
-> >
-> > Sure.
-> >
-> > BTW, when reposting you might want to CC the arch/arm* maintainers on
-> > this intro mail as well as just the second patch.
-> 
-> Ok. I wasn't sure if this patches should go via the Xen tree or ARM one.
+> The application doesn't even start because it cannot map page 0. It
+> looks like most 32-bit arm binaries are linked to be loaded at 32K. 
 
-That's a question for all relevant maintainers to discuss -- and replies
-to the 0/N mail is a good place to do that. I suggest you explicitly ask
-the question in the intro next time around.
+I looked at this briefly and the first problem I narrowed in on was underflow
+in the calculation of the off variable in elf_map().
 
-Ian.
+http://lxr.free-electrons.com/source/fs/binfmt_elf.c?v=3.18#L341
+
+Chris
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
