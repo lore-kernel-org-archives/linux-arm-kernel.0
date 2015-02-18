@@ -1,26 +1,108 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Feb 2015 13:16:45 +0100
-Subject: [PATCH] ARM: mm: Remove Kconfig symbol CACHE_PL310
-In-Reply-To: <1423562453.5346.18.camel@x220>
-References: <1423562453.5346.18.camel@x220>
-Message-ID: <4136777.yqkxmBgocn@wuerfel>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 18 Feb 2015 13:52:39 +0100
+Subject: [PATCH v4 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
+In-Reply-To: <1424255528-1717-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1424255528-1717-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1424255528-1717-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150218135239.080c49fc@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 February 2015 11:00:53 Paul Bolle wrote:
-> Commit 20e783e39e55 ("ARM: 8296/1: cache-l2x0: clean up aurora cache
-> handling") removed the only user of the Kconfig symbol CACHE_PL310.
-> Setting CACHE_PL310 is now pointless. Remove its Kconfig entry, and one
-> select of this symbol.
+On Wed, 18 Feb 2015 11:32:07 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+
+> The NDDB register holds the data that are needed by the read and write
+> commands.
 > 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> However, during a read PIO access, the datasheet specifies that after each 32
+> bytes read in that register, when BCH is enabled, we have to make sure that the
+> RDDREQ bit is set in the NDSR register.
+> 
+> This fixes an issue that was seen on the Armada 385, and presumably other mvebu
+> SoCs, when a read on a newly erased page would end up in the driver reporting a
+> timeout from the NAND.
+> 
+> Cc: <stable@vger.kernel.org> # v3.14
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
 > ---
-> Please note that the commit hash is valid for next-20150209. So if the
-> tree that this commit is coming from will be rebased, or similar, it
-> shouldn't be used.
+>  drivers/mtd/nand/pxa3xx_nand.c | 48 ++++++++++++++++++++++++++++++++++++------
+>  1 file changed, 42 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> index 96b0b1d27df1..bc677362bc73 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -480,6 +480,42 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
+>  	nand_writel(info, NDCR, ndcr | int_mask);
+>  }
+>  
+> +static void drain_fifo(struct pxa3xx_nand_info *info, void *data, int len)
+> +{
+> +	if (info->ecc_bch) {
+> +		int timeout;
+> +
+> +		/*
+> +		 * According to the datasheet, when reading from NDDB
+> +		 * with BCH enabled, after each 32 bytes reads, we
+> +		 * have to make sure that the NDSR.RDDREQ bit is set.
+> +		 *
+> +		 * Drain the FIFO 8 32 bits reads at a time, and skip
+> +		 * the polling on the last read.
+> +		 */
+> +		while (len > 8) {
+> +			__raw_readsl(info->mmio_base + NDDB, data, 8);
+> +
+> +			for (timeout = 0;
+> +			     !(nand_readl(info, NDSR) & NDSR_RDDREQ);
+> +			     timeout++) {
+> +				if (timeout >= 5) {
+> +					dev_err(&info->pdev->dev,
+> +						"Timeout on RDDREQ while draining the FIFO\n");
+> +					return;
+> +				}
+> +
+> +				mdelay(1);
+> +			}
+> +
+> +			data += 32;
+> +			len -= 8;
+> +		}
+> +	}
+> +
+> +	__raw_readsl(info->mmio_base + NDDB, data, len);
+> +}
+> +
+>  static void handle_data_pio(struct pxa3xx_nand_info *info)
+>  {
+>  	unsigned int do_bytes = min(info->data_size, info->chunk_size);
+> @@ -496,14 +532,14 @@ static void handle_data_pio(struct pxa3xx_nand_info *info)
+>  				      DIV_ROUND_UP(info->oob_size, 4));
+>  		break;
+>  	case STATE_PIO_READING:
+> -		__raw_readsl(info->mmio_base + NDDB,
+> -			     info->data_buff + info->data_buff_pos,
+> -			     DIV_ROUND_UP(do_bytes, 4));
+> +		drain_fifo(info,
+> +			   info->data_buff + info->data_buff_pos,
+> +			   DIV_ROUND_UP(do_bytes, 4));
+>  
+>  		if (info->oob_size > 0)
+> -			__raw_readsl(info->mmio_base + NDDB,
+> -				     info->oob_buff + info->oob_buff_pos,
+> -				     DIV_ROUND_UP(info->oob_size, 4));
+> +			drain_fifo(info,
+> +				   info->oob_buff + info->oob_buff_pos,
+> +				   DIV_ROUND_UP(info->oob_size, 4));
+>  		break;
+>  	default:
+>  		dev_err(&info->pdev->dev, "%s: invalid state %d\n", __func__,
 
-Applied to the arm-soc fixes branch, which is top of the merges
-that Linus has done and that includes my patch as it went in though
-Russell's tree.
 
-	Arnd
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
