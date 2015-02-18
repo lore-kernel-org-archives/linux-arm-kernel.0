@@ -1,43 +1,59 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed, 18 Feb 2015 19:25:58 +0100
-Subject: [PATCH 5/6] ASoC: samsung: Extend Snow driver to support max98089
+Date: Wed, 18 Feb 2015 19:25:59 +0100
+Subject: [PATCH 6/6] ARM: dts: Add sound support to exynos5250-spring
 In-Reply-To: <1424283959-16289-1-git-send-email-afaerber@suse.de>
 References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
-Message-ID: <1424283959-16289-6-git-send-email-afaerber@suse.de>
+Message-ID: <1424283959-16289-7-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is needed for Spring.
-
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- sound/soc/samsung/Kconfig | 1 +
- sound/soc/samsung/snow.c  | 1 +
- 2 files changed, 2 insertions(+)
+ arch/arm/boot/dts/exynos5250-spring.dts | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index 3cebf6ca03df..222181655e4f 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -214,6 +214,7 @@ config SND_SOC_LITTLEMILL
- config SND_SOC_SNOW
- 	tristate "Audio support for Google Snow boards"
- 	depends on SND_SOC_SAMSUNG && I2C
-+	select SND_SOC_MAX98088
- 	select SND_SOC_MAX98090
- 	select SND_SOC_MAX98095
- 	select SND_SAMSUNG_I2S
-diff --git a/sound/soc/samsung/snow.c b/sound/soc/samsung/snow.c
-index 7651dc924161..89d7e39b206e 100644
---- a/sound/soc/samsung/snow.c
-+++ b/sound/soc/samsung/snow.c
-@@ -105,6 +105,7 @@ static int snow_probe(struct platform_device *pdev)
- }
+diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
+index 866beb4e0597..142e0550e223 100644
+--- a/arch/arm/boot/dts/exynos5250-spring.dts
++++ b/arch/arm/boot/dts/exynos5250-spring.dts
+@@ -49,6 +49,17 @@
+ 		};
+ 	};
  
- static const struct of_device_id snow_of_match[] = {
-+	{ .compatible = "google,snow-audio-max98089", },
- 	{ .compatible = "google,snow-audio-max98090", },
- 	{ .compatible = "google,snow-audio-max98091", },
- 	{ .compatible = "google,snow-audio-max98095", },
++	sound {
++		compatible = "google,snow-audio-max98089";
++		samsung,model = "Spring-I2S-MAX98089";
++		samsung,i2s-controller = <&i2s0>;
++		samsung,audio-codec = <&max98089>;
++		clocks = <&pmu_system_controller 0>;
++		clock-names = "mclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&mic_det_gpio>, <&hp_det_gpio>;
++	};
++
+ 	usb-hub {
+ 		compatible = "smsc,usb3503a";
+ 		reset-gpios = <&gpe1 0 GPIO_ACTIVE_LOW>;
+@@ -499,6 +510,20 @@
+ 		samsung,pin-drv = <0>;
+ 	};
+ 
++	mic_det_gpio: mic-det-gpio {
++		samsung,pins = "gpx2-0";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
++	hp_det_gpio: hp-det-gpio {
++		samsung,pins = "gpx2-2";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
+ 	s5m8767_ds: s5m8767-ds {
+ 		samsung,pins = "gpx2-3", "gpx2-4", "gpx2-5";
+ 		samsung,pin-function = <0>;
 -- 
 2.1.4
