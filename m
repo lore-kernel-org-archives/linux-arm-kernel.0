@@ -1,40 +1,27 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 18 Feb 2015 15:17:31 -0600
-Subject: [PATCH 1/2] Documentation: bindings: add optional fifo size
- property to AMBA UARTs
-In-Reply-To: <1424290069-8760-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
-References: <1424290069-8760-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <1424290069-8760-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
-Message-ID: <CAL_JsqKBxmEUCYz4Pw6wbBTvU8p7Fo5O05tLUi9SHoiAzdVRgA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 18 Feb 2015 16:20:03 -0500
+Subject: [PATCH 0/2] ARM: shmobile: emev2 dts: Add pinmux support
+In-Reply-To: <1424179915-17417-1-git-send-email-geert+renesas@glider.be>
+References: <1424179915-17417-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20150218212002.GB12754@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 18, 2015 at 2:07 PM, Jorge Ramirez-Ortiz
-<jorge.ramirez-ortiz@linaro.org> wrote:
-> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+On Tue, Feb 17, 2015 at 02:31:53PM +0100, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
+> 
+> Here are the two remaining patches from Niklas S?derlund to add
+> pinmux support for EMMA Mobile EV2. The patches for the actual pinctrl
+> driver have already landed in Linus' tree.
+> 
+> Thanks for applying!
 
-Acked-by: Rob Herring <robh@kernel.org>
+Thanks, done.
 
-> ---
->  Documentation/devicetree/bindings/serial/pl011.txt | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/Documentation/devicetree/bindings/serial/pl011.txt b/Documentation/devicetree/bindings/serial/pl011.txt
-> index 5d2e840..05d1adb 100644
-> --- a/Documentation/devicetree/bindings/serial/pl011.txt
-> +++ b/Documentation/devicetree/bindings/serial/pl011.txt
-> @@ -13,5 +13,6 @@ Optional properties:
->  - dmas:           When present, may have one or two dma channels.
->            The first one must be named "rx", the second one
->            must be named "tx".
-> +- fifo-size:  When present, must have the fifo size.
->
->  See also bindings/arm/primecell.txt
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Niklas S?derlund (2):
+>   ARM: shmobile: emev2 dtsi: Add PFC information
+>   ARM: shmobile: emev2-kzm9d dts: Add PFC information for uart1
+> 
+>  arch/arm/boot/dts/emev2-kzm9d.dts | 13 +++++++++++++
+>  arch/arm/boot/dts/emev2.dtsi      | 10 ++++++++++
+>  2 files changed, 23 insertions(+)
