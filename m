@@ -1,35 +1,39 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Wed, 18 Feb 2015 16:03:00 +0000
-Subject: [PATCH v2 3/3] xen/arm: allow console=hvc0 to be omitted for
- guests
-In-Reply-To: <CAL_Jsq+QniOFiVXEhuS+GEEnCkUpkrmtdE5E4ZytwTzoQSDpOg@mail.gmail.com>
-References: <1424267513-15836-1-git-send-email-julien.grall@linaro.org>
- <1424267513-15836-4-git-send-email-julien.grall@linaro.org>
- <CAL_Jsq+QniOFiVXEhuS+GEEnCkUpkrmtdE5E4ZytwTzoQSDpOg@mail.gmail.com>
-Message-ID: <1424275380.20761.31.camel@citrix.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 18 Feb 2015 16:08:12 +0000
+Subject: [PATCH] arm64: insn: fix compare-and-branch encodings
+In-Reply-To: <369053df4298c754061e47068834bd9640b0841b.1424273599.git.robin.murphy@arm.com>
+References: <369053df4298c754061e47068834bd9640b0841b.1424273599.git.robin.murphy@arm.com>
+Message-ID: <54E4B8EC.7090709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-02-18 at 09:50 -0600, Rob Herring wrote:
-> On Wed, Feb 18, 2015 at 7:51 AM, Julien Grall <julien.grall@linaro.org> wrote:
-> > From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >
-> > This patch registers hvc0 as the preferred console if no console
-> > has been specified explicitly on the kernel command line.
-> >
-> > The purpose is to allow platform agnostic kernels and boot images
-> > (such as distro installers) to boot in a Xen/ARM domU without the
-> > need to modify the command line by hand.
-> 
-> How does this interact with DT chosen stdout-path?
+Oops, missed some CCs...
 
-I think it shouldn't any more than the existing calls from e.g. the 8250
-driver to preferred_console do.
-
-> Is there a node for hvc0?
-
-Not a direct one, it is inferred from the presence of the general Xen
-node. I did vaguely consider handling a stdout-path pointing to that --
-but it seemed a bit of an abuse.
-
-Ian.
+On 18/02/15 15:40, Robin Murphy wrote:
+> Fix cbz/cbnz having the mask offset by a bit, and add encodings for
+> tbz/tbnz so that all branch forms are represented.
+>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> ---
+>   arch/arm64/include/asm/insn.h | 6 ++++--
+>   1 file changed, 4 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+> index e2ff32a..d2f4942 100644
+> --- a/arch/arm64/include/asm/insn.h
+> +++ b/arch/arm64/include/asm/insn.h
+> @@ -264,8 +264,10 @@ __AARCH64_INSN_FUNCS(ands,	0x7F200000, 0x6A000000)
+>   __AARCH64_INSN_FUNCS(bics,	0x7F200000, 0x6A200000)
+>   __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
+>   __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
+> -__AARCH64_INSN_FUNCS(cbz,	0xFE000000, 0x34000000)
+> -__AARCH64_INSN_FUNCS(cbnz,	0xFE000000, 0x35000000)
+> +__AARCH64_INSN_FUNCS(cbz,	0x7F000000, 0x34000000)
+> +__AARCH64_INSN_FUNCS(cbnz,	0x7F000000, 0x35000000)
+> +__AARCH64_INSN_FUNCS(tbz,	0x7F000000, 0x36000000)
+> +__AARCH64_INSN_FUNCS(tbnz,	0x7F000000, 0x37000000)
+>   __AARCH64_INSN_FUNCS(bcond,	0xFF000010, 0x54000000)
+>   __AARCH64_INSN_FUNCS(svc,	0xFFE0001F, 0xD4000001)
+>   __AARCH64_INSN_FUNCS(hvc,	0xFFE0001F, 0xD4000002)
+>
