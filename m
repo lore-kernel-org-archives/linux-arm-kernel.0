@@ -1,36 +1,50 @@
-From: fkan@apm.com (Feng Kan)
-Date: Wed, 18 Feb 2015 11:34:03 -0800
-Subject: [PATCH V2 3/3] arm64: dts: add proxy I2C device driver on APM X-Gene
- platform
-In-Reply-To: <1424288043-2995-1-git-send-email-fkan@apm.com>
-References: <1424288043-2995-1-git-send-email-fkan@apm.com>
-Message-ID: <1424288043-2995-3-git-send-email-fkan@apm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Feb 2015 20:47:30 +0100
+Subject: [PATCH] net: smc91x: improve neponset hack
+Message-ID: <5763365.j5Nvv4LgM3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add proxy I2C device driver on APM X-Gene platform.
+The smc91x driver tries to support multiple platforms at compile
+time, but they are mutually exclusive at runtime, and not clearly
+defined.
 
-Signed-off-by: Feng Kan <fkan@apm.com>
-Signed-off-by: Hieu Le <hnle@apm.com>
----
- arch/arm64/boot/dts/apm/apm-storm.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+Trying to build for CONFIG_SA1100_ASSABET without CONFIG_ASSABET_NEPONSET
+results in this link error:
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index 27d6c3d..f19bb6b 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -483,6 +483,11 @@
- 					<0x0 0x7 0x4>;
- 		};
- 
-+		i2cslimpro {
-+			compatible = "apm,xgene-slimpro-i2c";
-+			mboxes = <&mailbox 0>;
-+		};
-+
- 		serial0: serial at 1c020000 {
- 			status = "disabled";
- 			device_type = "serial";
--- 
-1.9.1
+drivers/built-in.o: In function `smc_drv_probe':
+:(.text+0x33310c): undefined reference to `neponset_ncr_frob'
+
+since the neponset_ncr_set function is not defined otherwise.
+
+Similarly, building for both CONFIG_SA1100_ASSABET and CONFIG_SA1100_PLEB
+results in a different build error:
+
+smsc/smc91x.c: In function 'smc_drv_probe':
+smsc/smc91x.c:2299:2: error: implicit declaration of function 'neponset_ncr_set' [-Werror=implicit-function-declaration]
+  neponset_ncr_set(NCR_ENET_OSC_EN);
+  ^
+smsc/smc91x.c:2299:19: error: 'NCR_ENET_OSC_EN' undeclared (first use in this function)
+  neponset_ncr_set(NCR_ENET_OSC_EN);
+                   ^
+
+This is an attempt to fix the call site responsible for both
+errors, making sure we call the function exactly when the driver
+is actually trying to run on the assabet/neponset machine. With
+this patch, I no longer see randconfig build errors in this file.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/net/ethernet/smsc/smc91x.c b/drivers/net/ethernet/smsc/smc91x.c
+index 88a55f95fe09..fa3f193b5f4d 100644
+--- a/drivers/net/ethernet/smsc/smc91x.c
++++ b/drivers/net/ethernet/smsc/smc91x.c
+@@ -2355,7 +2355,7 @@ static int smc_drv_probe(struct platform_device *pdev)
+ 	ret = smc_request_attrib(pdev, ndev);
+ 	if (ret)
+ 		goto out_release_io;
+-#if defined(CONFIG_SA1100_ASSABET)
++#if defined(CONFIG_ASSABET_NEPONSET) && !defined(CONFIG_SA1100_PLEB)
+ 	neponset_ncr_set(NCR_ENET_OSC_EN);
+ #endif
+ 	platform_set_drvdata(pdev, ndev);
