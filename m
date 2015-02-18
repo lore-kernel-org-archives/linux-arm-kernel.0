@@ -1,64 +1,48 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 18 Feb 2015 09:50:12 -0600
-Subject: [PATCH v2 3/3] xen/arm: allow console=hvc0 to be omitted for
- guests
-In-Reply-To: <1424267513-15836-4-git-send-email-julien.grall@linaro.org>
-References: <1424267513-15836-1-git-send-email-julien.grall@linaro.org>
- <1424267513-15836-4-git-send-email-julien.grall@linaro.org>
-Message-ID: <CAL_Jsq+QniOFiVXEhuS+GEEnCkUpkrmtdE5E4ZytwTzoQSDpOg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 18 Feb 2015 15:50:42 +0000
+Subject: stand-alone kvmtool
+In-Reply-To: <54DDD465.3050300@arm.com>
+References: <54DDD465.3050300@arm.com>
+Message-ID: <20150218155042.GF22017@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 18, 2015 at 7:51 AM, Julien Grall <julien.grall@linaro.org> wrote:
-> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> This patch registers hvc0 as the preferred console if no console
-> has been specified explicitly on the kernel command line.
->
-> The purpose is to allow platform agnostic kernels and boot images
-> (such as distro installers) to boot in a Xen/ARM domU without the
-> need to modify the command line by hand.
+Hi Andre,
 
-How does this interact with DT chosen stdout-path?
+Thanks for doing this. Since it looks unlikely that kvmtool will ever be
+merged back into the kernel tree, it makes sense to cut the dependency
+in my opinion.
 
-Is there a node for hvc0?
+On Fri, Feb 13, 2015 at 10:39:33AM +0000, Andre Przywara wrote:
+> as I found it increasingly inconvenient to use kvmtool[1] as part of a
+> Linux repository, I decided to give it a go and make it a stand-alone
+> project. So I filtered all the respective commits, adjusted the paths in
+> there (while keeping authorship and commit date, of course) and then
+> added the missing bits to let it compile without a kernel tree nearby.
+> The result is now available on:
+> 
+> git://linux-arm.org/kvmtool.git
+> http://linux-arm.org/kvmtool.git
+> 
+> You can simply check it out, type make and use "./lkvm run" for a quick
+> test. So far I briefly tested x86-64, arm and arm64, the later two were
+> also cross-compiled. For sure there are rough edges in there (for
+> instance copying a few non-uapi header files into), but I deem it worthy
+> enough to get some public comments.
+> For me that also fixed some nasty warnings about libfdt, which now are
+> gone due it using your system library version of it.
+> I also managed to get rid of the libc-i386-dev dependency when compiling
+> for x86-64, but that still needs to be cleaned up and thus is not in the
+> current HEAD.
+> I haven't got around to compile-test the other supported architectures,
+> but supporting them should be as easy as copying over the uapi kvm.h
+> header file (see the respective ARM commit). Contributions (and tests!)
+> are welcome.
+> 
+> Please give it a go and tell me what you think. I don't want to fork the
+> project, so I am happy if someone "official" picks it up.
 
-Rob
+In which case, it's probably best to post the patches for review rather
+than just point me at your git repo!
 
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Reviewed-by: Julien Grall <julien.grall@linaro.org>
-> ---
->  arch/arm/xen/enlighten.c | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 1660432..904bd2d 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -24,6 +24,7 @@
->  #include <linux/cpuidle.h>
->  #include <linux/cpufreq.h>
->  #include <linux/cpu.h>
-> +#include <linux/console.h>
->
->  #include <linux/mm.h>
->
-> @@ -255,6 +256,9 @@ void __init xen_early_init(void)
->                 xen_start_info->flags |= SIF_INITDOMAIN|SIF_PRIVILEGED;
->         else
->                 xen_start_info->flags &= ~(SIF_INITDOMAIN|SIF_PRIVILEGED);
-> +
-> +       if (!console_set_on_cmdline && !xen_initial_domain())
-> +               add_preferred_console("hvc", 0, NULL);
->  }
->
->  static int __init xen_guest_init(void)
-> --
-> 2.1.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Will
