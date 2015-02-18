@@ -1,76 +1,72 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 18 Feb 2015 21:21:48 +0100
-Subject: [PATCH 2/2] at91sam9_wdt: Allow watchdog to reset device at
- early boot
-In-Reply-To: <20150218175002.GA28529@roeck-us.net>
-References: <54B53160.6060309@roeck-us.net>
- <cover.1424262664.git.timo.kokkonen@offcode.fi>
- <6c0a3a5bcd93d18437eeed04712b4aeff201a16f.1424262664.git.timo.kokkonen@offcode.fi>
- <54E49AA5.40008@roeck-us.net> <20150218151713.7a718311@bbrezillon>
- <54E4A6C4.4070706@roeck-us.net> <20150218160033.GK11529@piout.net>
- <20150218175002.GA28529@roeck-us.net>
-Message-ID: <20150218212148.6c2a780c@bbrezillon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Feb 2015 21:35:08 +0100
+Subject: [PATCH v2] ASoC: Samsung: add missing I2C/SPI dependencies
+Message-ID: <8075847.dUio9f5hRh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Feb 2015 09:50:02 -0800
-Guenter Roeck <linux@roeck-us.net> wrote:
+A few sound drivers for the samsung platforms are missing dependencies
+on I2C or SPI, which can lead to build errors like
 
-> On Wed, Feb 18, 2015 at 05:00:33PM +0100, Alexandre Belloni wrote:
-> > Hi,
-> > 
-> > On 18/02/2015 at 06:50:44 -0800, Guenter Roeck wrote :
-> > > >>>   Optional properties:
-> > > >>>   - timeout-sec: Contains the watchdog timeout in seconds.
-> > > >>>+- early-timeout-sec: If present, specifies a timeout value in seconds
-> > > >>>+  that the driver keeps on ticking the watchdog HW on behalf of user
-> > > >>>+  space. Once this timeout expires watchdog is left to expire in
-> > > >>>+  timeout-sec seconds. If this propery is set to zero, watchdog is
-> > > >>>+  started (or left running) so that a reset occurs in timeout-sec
-> > > >>>+  since the watchdog was started.
-> > > >>>
-> > > >>>   Example:
-> > > >>>
-> > > >>>   watchdog {
-> > > >>>   	 timeout-sec = <60>;
-> > > >>>+	 early-timeout-sec = <120>;
-> > > >>
-> > > >>That is not a generic property as you defined it; if so,
-> > > >>it would have to be implemented in the watchdog core code,
-> > > >>not in the at91 code. You'll have to document it in the bindings
-> > > >>description for at91sam9_wdt.
-> > > >
-> > > >Then, if this is a controller specific property, it should be defined
-> > > >with the 'atmel,' prefix.
-> > > >We're kind of looping here: the initial discussion was "is there a need
-> > > >for this property to be a generic one ?", and now you're saying no,
-> > > >while you previously left the door opened.
-> > > >
-> > > >Tomi is proposing a generic approach, as you asked him to. I agree that
-> > > >parsing the property in core code and making its value part of the
-> > > >generic watchdog struct makes sense (that's what I proposed to Tomi a
-> > > >few weeks ago).
-> > > >
-> > > Hmm ... the problem here is that the property description creates the
-> > > assumption or expectation that the property is used if defined,
-> > > which is not the case.
-> > > 
-> > > I am not sure how to best resolve this. Maybe a comment in the property
-> > > description stating that implementation of is device (driver) dependent ?
-> > > After all, that is true for the timeout-sec property as well.
-> > > 
-> > 
-> > I would leave it in the generic file and state that it may not be
-> > implemented in the driver. That way, the property is documented for new
-> > driver writers.
-> > 
-> Yes, that would be fine ok me.
+codecs/rt5631.c:1737:1: warning: data definition has no type or storage class
+31_i2c_driver);
 
-Great!
-Timo can you change the documentation accordingly ?
+codecs/rt5631.c:1737:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
+codecs/rt5631.c:1737:1: warning: parameter names (without types) in function declaration
+codecs/rt5631.c:1726:26: warning: 'rt5631_i2c_driver' defined but not used [-Wunused-variable]
 
+I have gone through all the ones that did not already have
+an I2C dependency and added the ones that I found missing,
+namely arndale, odroid-x2, littlemill, bells and speyside
+and this patch adds all the dependencies.
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+index 3cebf6ca03df..0632a36852c8 100644
+--- a/sound/soc/samsung/Kconfig
++++ b/sound/soc/samsung/Kconfig
+@@ -174,7 +174,7 @@ config SND_SOC_SMDK_WM8994_PCM
+ 
+ config SND_SOC_SPEYSIDE
+ 	tristate "Audio support for Wolfson Speyside"
+-	depends on SND_SOC_SAMSUNG && MACH_WLF_CRAGG_6410
++	depends on SND_SOC_SAMSUNG && MACH_WLF_CRAGG_6410 && I2C && SPI_MASTER
+ 	select SND_SAMSUNG_I2S
+ 	select SND_SOC_WM8996
+ 	select SND_SOC_WM9081
+@@ -189,7 +189,7 @@ config SND_SOC_TOBERMORY
+ 
+ config SND_SOC_BELLS
+ 	tristate "Audio support for Wolfson Bells"
+-	depends on SND_SOC_SAMSUNG && MACH_WLF_CRAGG_6410 && MFD_ARIZONA
++	depends on SND_SOC_SAMSUNG && MACH_WLF_CRAGG_6410 && MFD_ARIZONA && I2C && SPI_MASTER
+ 	select SND_SAMSUNG_I2S
+ 	select SND_SOC_WM5102
+ 	select SND_SOC_WM5110
+@@ -206,7 +206,7 @@ config SND_SOC_LOWLAND
+ 
+ config SND_SOC_LITTLEMILL
+ 	tristate "Audio support for Wolfson Littlemill"
+-	depends on SND_SOC_SAMSUNG && MACH_WLF_CRAGG_6410
++	depends on SND_SOC_SAMSUNG && MACH_WLF_CRAGG_6410 && I2C
+ 	select SND_SAMSUNG_I2S
+ 	select MFD_WM8994
+ 	select SND_SOC_WM8994
+@@ -223,7 +223,7 @@ config SND_SOC_SNOW
+ 
+ config SND_SOC_ODROIDX2
+ 	tristate "Audio support for Odroid-X2 and Odroid-U3"
+-	depends on SND_SOC_SAMSUNG
++	depends on SND_SOC_SAMSUNG && I2C
+ 	select SND_SOC_MAX98090
+ 	select SND_SAMSUNG_I2S
+ 	help
+@@ -231,6 +231,6 @@ config SND_SOC_ODROIDX2
+ 
+ config SND_SOC_ARNDALE_RT5631_ALC5631
+         tristate "Audio support for RT5631(ALC5631) on Arndale Board"
+-        depends on SND_SOC_SAMSUNG
++        depends on SND_SOC_SAMSUNG && I2C
+         select SND_SAMSUNG_I2S
+         select SND_SOC_RT5631
