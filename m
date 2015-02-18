@@ -1,71 +1,65 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 18 Feb 2015 10:40:02 -0300
-Subject: [PATCH v4 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
-In-Reply-To: <1424255528-1717-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1424255528-1717-1-git-send-email-maxime.ripard@free-electrons.com>
- <1424255528-1717-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <54E49632.1000001@free-electrons.com>
+From: timo.kokkonen@offcode.fi (Timo Kokkonen)
+Date: Wed, 18 Feb 2015 15:51:07 +0200
+Subject: [PATCHv3 0/2] watchdog: Introduce "early-timeout-sec" property
+In-Reply-To: <20150218141655.0445958d@bbrezillon>
+References: <54B53160.6060309@roeck-us.net>	<cover.1424262664.git.timo.kokkonen@offcode.fi>
+ <20150218141655.0445958d@bbrezillon>
+Message-ID: <54E498CB.8010100@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2015 07:32 AM, Maxime Ripard wrote:
-> The NDDB register holds the data that are needed by the read and write
-> commands.
-> 
-> However, during a read PIO access, the datasheet specifies that after each 32
-> bytes read in that register, when BCH is enabled, we have to make sure that the
-> RDDREQ bit is set in the NDSR register.
-> 
-> This fixes an issue that was seen on the Armada 385, and presumably other mvebu
-> SoCs, when a read on a newly erased page would end up in the driver reporting a
-> timeout from the NAND.
-> 
-> Cc: <stable@vger.kernel.org> # v3.14
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/mtd/nand/pxa3xx_nand.c | 48 ++++++++++++++++++++++++++++++++++++------
->  1 file changed, 42 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index 96b0b1d27df1..bc677362bc73 100644
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -480,6 +480,42 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
->  	nand_writel(info, NDCR, ndcr | int_mask);
->  }
->  
-> +static void drain_fifo(struct pxa3xx_nand_info *info, void *data, int len)
-> +{
-> +	if (info->ecc_bch) {
-> +		int timeout;
-> +
-> +		/*
-> +		 * According to the datasheet, when reading from NDDB
-> +		 * with BCH enabled, after each 32 bytes reads, we
-> +		 * have to make sure that the NDSR.RDDREQ bit is set.
-> +		 *
-> +		 * Drain the FIFO 8 32 bits reads at a time, and skip
-> +		 * the polling on the last read.
-> +		 */
-> +		while (len > 8) {
-> +			__raw_readsl(info->mmio_base + NDDB, data, 8);
-> +
-> +			for (timeout = 0;
-> +			     !(nand_readl(info, NDSR) & NDSR_RDDREQ);
-> +			     timeout++) {
-> +				if (timeout >= 5) {
-> +					dev_err(&info->pdev->dev,
-> +						"Timeout on RDDREQ while draining the FIFO\n");
-> +					return;
-> +				}
-> +
-> +				mdelay(1);
+Hi Boris,
 
-This is probably a stupid nit.. but here it goes is it any difference if
-udelay is used here?
+Thanks for your comments. I will resend tomorrow!
 
-Does this makes anything better/worse?
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+-Timo
+
+On 18.02.2015 15:16, Boris Brezillon wrote:
+> Hi Timo,
+>
+> Could you send new versions of this in their own thread (not in reply
+> to previous versions), and increment the version in patch 1 and 2 ?
+>
+> Could you also summarize what has changed between each versions in this
+> cover letter ?
+>
+> Best Regards,
+>
+> Boris
+>
+> On Wed, 18 Feb 2015 14:57:20 +0200
+> Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
+>
+>> Currently we have no means to adjust the watchdog behavior on early
+>> start up before user space has opened the device. The generic behavior
+>> among the watchdog drivers is to not start the watchdog at all (or
+>> disable it, if possible, or in case at91sam9_wdt, start a kernel timer
+>> that keeps on pinging the watchdog on behalf of user space until a
+>> watchdog daemon opens it). This unfortunately opens a time window
+>> between starting the driver and starting the user space watchdog
+>> daemon where a crash of the kernel or user space might prevent the
+>> watchdog from ever resetting the device at all. This is obviously bad
+>> on production systems.
+>>
+>> Introduce a new device tree property that, when set, changes the
+>> watchdog driver behavior in such way that there no longer is any
+>> window where crash is not caught by the watchdog.
+>>
+>> This is the third version of this patch. Previous versions of the
+>> patch were using an atmel specific property name. This patch uses a
+>> generic name instead as the functionality itself has nothing atmel
+>> related. I am also introducing watchdog.txt for describing the generic
+>> watchdog device tree bindings as there was no such file before.
+>>
+>> Timo Kokkonen (2):
+>>    devicetree: Document generic watchdog properties
+>>    at91sam9_wdt: Allow watchdog to reset device at early boot
+>>
+>>   .../devicetree/bindings/watchdog/watchdog.txt         | 19 +++++++++++++++++++
+>>   drivers/watchdog/at91sam9_wdt.c                       |  9 ++++++++-
+>>   2 files changed, 27 insertions(+), 1 deletion(-)
+>>   create mode 100644 Documentation/devicetree/bindings/watchdog/watchdog.txt
+>>
+>
+>
+>
