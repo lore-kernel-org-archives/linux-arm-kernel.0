@@ -1,36 +1,114 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Feb 2015 12:24:01 +0100
-Subject: [GIT PULL] Broadcom Device Tree changes for 3.20
-In-Reply-To: <1424120564-32721-1-git-send-email-f.fainelli@gmail.com>
-References: <1424120564-32721-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <3332038.FVyOu5oIIu@wuerfel>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Wed, 18 Feb 2015 12:25:42 +0100
+Subject: [PATCH dt] ARM: BCM5301X: Add DT for Netgear R8000
+Message-ID: <1424258742-30191-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 February 2015 13:02:44 Florian Fainelli wrote:
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> 
-> are available in the git repository at:
-> 
->   http://github.com/broadcom/stblinux tags/arm-soc/for-3.20/dts
-> 
-> for you to fetch changes up to b51c05a331ff46d2b29e4007df938ec2dbbadfde:
-> 
->   ARM: dts: add I2C device nodes for Broadcom Cygnus (2015-02-16 12:50:39 -0800)
-> 
-> ----------------------------------------------------------------
-> This pull request contains the following Broadcom SoCs Device Tree changes:
-> 
-> - Ray adds support for the Cygnus i2c Device Tree controller on Cygnus SoCs
-> - Fixes to the BCM63138 dtsi file for the L2 cache controller properties
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+Reported-by: Ian Kent <raven@themaw.net>
+---
+ arch/arm/boot/dts/Makefile                  |  3 +-
+ arch/arm/boot/dts/bcm4709-netgear-r8000.dts | 77 +++++++++++++++++++++++++++++
+ 2 files changed, 79 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/bcm4709-netgear-r8000.dts
 
-Pulled into fixes branch.
-
-The addition of the i2c node really looks like you could have known
-about this earlier. In cases like this, please try to include the
-nodes in the normal (pre-mergewindow) pull requests as soon as
-the binding has been accepted.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a8873b8..f1cb752 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -59,7 +59,8 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm4708-netgear-r6300-v2.dtb \
+ 	bcm47081-asus-rt-n18u.dtb \
+ 	bcm47081-buffalo-wzr-600dhp2.dtb \
+-	bcm47081-buffalo-wzr-900dhp.dtb
++	bcm47081-buffalo-wzr-900dhp.dtb \
++	bcm4709-netgear-r8000.dtb
+ dtb-$(CONFIG_ARCH_BCM_63XX) += \
+ 	bcm963138dvt.dtb
+ dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
+diff --git a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+new file mode 100644
+index 0000000..ea26dd3
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+@@ -0,0 +1,77 @@
++/*
++ * Broadcom BCM470X / BCM5301X ARM platform code.
++ * DTS for Netgear R8000
++ *
++ * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++/dts-v1/;
++
++#include "bcm4708.dtsi"
++
++/ {
++	compatible = "netgear,r8000", "brcm,bcm4709", "brcm,bcm4708";
++	model = "Netgear R8000 (BCM4709)";
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		power0 {
++			label = "bcm53xx:white:power";
++			gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-on";
++		};
++
++		power1 {
++			label = "bcm53xx:amber:power";
++			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++
++		5ghz-1 {
++			label = "bcm53xx:white:5ghz-1";
++			gpios = <&chipcommon 12 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++
++		2ghz {
++			label = "bcm53xx:white:2ghz";
++			gpios = <&chipcommon 13 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		rfkill {
++			label = "WiFi";
++			linux,code = <KEY_RFKILL>;
++			gpios = <&chipcommon 4 GPIO_ACTIVE_LOW>;
++		};
++
++		wps {
++			label = "WPS";
++			linux,code = <KEY_WPS_BUTTON>;
++			gpios = <&chipcommon 5 GPIO_ACTIVE_LOW>;
++		};
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 6 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
+-- 
+1.8.4.5
