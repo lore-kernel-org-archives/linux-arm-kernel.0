@@ -1,59 +1,48 @@
 From: julien.grall@linaro.org (Julien Grall)
-Date: Wed, 18 Feb 2015 13:51:51 +0000
-Subject: [PATCH v2 1/3] arm/xen: Correctly check if the event channel
- interrupt is present
+Date: Wed, 18 Feb 2015 13:51:53 +0000
+Subject: [PATCH v2 3/3] xen/arm: allow console=hvc0 to be omitted for guests
 In-Reply-To: <1424267513-15836-1-git-send-email-julien.grall@linaro.org>
 References: <1424267513-15836-1-git-send-email-julien.grall@linaro.org>
-Message-ID: <1424267513-15836-2-git-send-email-julien.grall@linaro.org>
+Message-ID: <1424267513-15836-4-git-send-email-julien.grall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function irq_of_parse_and_map returns 0 when the IRQ is not found.
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Futhermore, move the check before notifying the user that we are running on
-Xen.
+This patch registers hvc0 as the preferred console if no console
+has been specified explicitly on the kernel command line.
 
-Signed-off-by: Julien Grall <julien.grall@linaro.org>
-Acked-by: Ian Campbell <ian.campbell@citrix.com>
+The purpose is to allow platform agnostic kernels and boot images
+(such as distro installers) to boot in a Xen/ARM domU without the
+need to modify the command line by hand.
 
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Julien Grall <julien.grall@linaro.org>
 ---
-    Changes in v2:
-        - Add Ian's ack
-        - Re-add __read_mostly
----
- arch/arm/xen/enlighten.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/xen/enlighten.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 263a204..c8d3a17 100644
+index 1660432..904bd2d 100644
 --- a/arch/arm/xen/enlighten.c
 +++ b/arch/arm/xen/enlighten.c
-@@ -51,7 +51,7 @@ EXPORT_SYMBOL_GPL(xen_have_vector_callback);
- int xen_platform_pci_unplug = XEN_UNPLUG_ALL;
- EXPORT_SYMBOL_GPL(xen_platform_pci_unplug);
+@@ -24,6 +24,7 @@
+ #include <linux/cpuidle.h>
+ #include <linux/cpufreq.h>
+ #include <linux/cpu.h>
++#include <linux/console.h>
  
--static __read_mostly int xen_events_irq = -1;
-+static __read_mostly unsigned int xen_events_irq;
+ #include <linux/mm.h>
  
- /* map fgmfn of domid to lpfn in the current domain */
- static int map_foreign_page(unsigned long lpfn, unsigned long fgmfn,
-@@ -251,12 +251,14 @@ static int __init xen_guest_init(void)
- 		return 0;
- 	grant_frames = res.start;
- 	xen_events_irq = irq_of_parse_and_map(node, 0);
-+	if (!xen_events_irq) {
-+		pr_debug("Xen event channel interrupt not found\n");
-+		return -ENODEV;
-+	}
+@@ -255,6 +256,9 @@ void __init xen_early_init(void)
+ 		xen_start_info->flags |= SIF_INITDOMAIN|SIF_PRIVILEGED;
+ 	else
+ 		xen_start_info->flags &= ~(SIF_INITDOMAIN|SIF_PRIVILEGED);
 +
- 	pr_info("Xen %s support found, events_irq=%d gnttab_frame=%pa\n",
- 			version, xen_events_irq, &grant_frames);
++	if (!console_set_on_cmdline && !xen_initial_domain())
++		add_preferred_console("hvc", 0, NULL);
+ }
  
--	if (xen_events_irq < 0)
--		return -ENODEV;
--
- 	xen_domain_type = XEN_HVM_DOMAIN;
- 
- 	xen_setup_features();
+ static int __init xen_guest_init(void)
 -- 
 2.1.4
