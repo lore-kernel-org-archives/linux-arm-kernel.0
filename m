@@ -1,43 +1,26 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Wed, 18 Feb 2015 12:13:10 +0000
-Subject: [PATCH 0/2] arm/arm64: Detect Xen support earlier
-In-Reply-To: <1424260988.27775.26.camel@citrix.com>
-References: <1423722898-16110-1-git-send-email-julien.grall@linaro.org>	
- <1424259059.27775.17.camel@citrix.com> <54E47CBD.7060002@linaro.org>
- <1424260988.27775.26.camel@citrix.com>
-Message-ID: <54E481D6.2080908@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Feb 2015 13:16:45 +0100
+Subject: [PATCH] ARM: mm: Remove Kconfig symbol CACHE_PL310
+In-Reply-To: <1423562453.5346.18.camel@x220>
+References: <1423562453.5346.18.camel@x220>
+Message-ID: <4136777.yqkxmBgocn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday 10 February 2015 11:00:53 Paul Bolle wrote:
+> Commit 20e783e39e55 ("ARM: 8296/1: cache-l2x0: clean up aurora cache
+> handling") removed the only user of the Kconfig symbol CACHE_PL310.
+> Setting CACHE_PL310 is now pointless. Remove its Kconfig entry, and one
+> select of this symbol.
+> 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+> Please note that the commit hash is valid for next-20150209. So if the
+> tree that this commit is coming from will be rebased, or similar, it
+> shouldn't be used.
 
+Applied to the arm-soc fixes branch, which is top of the merges
+that Linus has done and that includes my patch as it went in though
+Russell's tree.
 
-On 18/02/2015 12:03, Ian Campbell wrote:
-> On Wed, 2015-02-18 at 11:51 +0000, Julien Grall wrote:
->> Hi Ian,
->>
->> On 18/02/2015 11:30, Ian Campbell wrote:
->>> On Thu, 2015-02-12 at 06:34 +0000, Julien Grall wrote:
->>>> Hello,
->>>>
->>>> This small patch series move the detection of running on Xen earlier. This is
->>>> required in order to support earlyprintk via Xen and selecting the preferred
->>>> console.
->>>
->>> Thanks for doing this, having all of the init done in an initcall (even
->>> a relatively early one) has been a niggle I've wanted address for ages,
->>> for exactly earlyprintk and preferred console reasons.
->>>
->>> I had a very minor comment on #1 but nonetheless both patches:
->>> Acked-by: Ian Campbell <ian.campbell@citrix.com>
->>
->> Can I keep you ack on the first one with the __read_mostly dropped?
->
-> Sure.
->
-> BTW, when reposting you might want to CC the arch/arm* maintainers on
-> this intro mail as well as just the second patch.
-
-Ok. I wasn't sure if this patches should go via the Xen tree or ARM one.
-
--- 
-Julien Grall
+	Arnd
