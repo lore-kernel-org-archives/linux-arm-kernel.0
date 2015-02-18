@@ -1,186 +1,157 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 18 Feb 2015 11:45:25 +0100
-Subject: [RESEND PATCH] ARM: EXYNOS: Fix failed second suspend on Exynos4
-Message-ID: <1424256325-16659-1-git-send-email-k.kozlowski@samsung.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 18 Feb 2015 11:51:09 +0100
+Subject: [PATCH 01/11] mfd: add the Berlin controller driver
+In-Reply-To: <20150218104023.GA22296@x1>
+References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1423671332-24580-2-git-send-email-antoine.tenart@free-electrons.com>
+ <20150216124808.GC14545@x1> <20150217092020.GC4507@kwain>
+ <20150217115447.GA3989@x1> <20150218084004.GD21937@kwain>
+ <20150218090958.GA18042@x1> <20150218092225.GE21937@kwain>
+ <20150218104023.GA22296@x1>
+Message-ID: <20150218105109.GB16432@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Exynos4412 boards (Trats2, Odroid U3) after enabling L2 cache in
-56b60b8bce4a ("ARM: 8265/1: dts: exynos4: Add nodes for L2 cache
-controller") the second suspend to RAM failed. First suspend worked fine
-but the next one hang just after powering down of secondary CPUs (system
-consumed energy as it would be running but was not responsive).
+On Wed, Feb 18, 2015 at 10:40:23AM +0000, Lee Jones wrote:
+> On Wed, 18 Feb 2015, Antoine Tenart wrote:
+> 
+> > On Wed, Feb 18, 2015 at 09:09:58AM +0000, Lee Jones wrote:
+> > > On Wed, 18 Feb 2015, Antoine Tenart wrote:
+> > > 
+> > > > On Tue, Feb 17, 2015 at 11:54:48AM +0000, Lee Jones wrote:
+> > > > > On Tue, 17 Feb 2015, Antoine Tenart wrote:
+> > > > > > On Mon, Feb 16, 2015 at 12:48:08PM +0000, Lee Jones wrote:
+> > > > > > > On Wed, 11 Feb 2015, Antoine Tenart wrote:
+> > > > > 
+> > > > > > > > +static int berlin_ctrl_probe(struct platform_device *pdev)
+> > > > > > > > +{
+> > > > > > > > +	struct device *dev = &pdev->dev;
+> > > > > > > > +	const struct of_device_id *match;
+> > > > > > > > +	const struct berlin_ctrl_priv *priv;
+> > > > > > > > +	int ret;
+> > > > > > > > +
+> > > > > > > > +	match = of_match_node(berlin_ctrl_of_match, dev->of_node);
+> > > > > > > > +	if (!match)
+> > > > > > > > +		return -EINVAL;
+> > > > > > > > +
+> > > > > > > > +	priv = match->data;
+> > > > > > > > +
+> > > > > > > > +	ret = mfd_add_devices(dev, 0, priv->devs, priv->ndevs, NULL, -1, NULL);
+> > > > > > > > +	if (ret) {
+> > > > > > > > +		dev_err(dev, "Failed to add devices: %d\n", ret);
+> > > > > > > > +		return ret;
+> > > > > > > > +	}
+> > > > > > > > +
+> > > > > > > > +	return 0;
+> > > > > > > > +}
+> > > > > > > 
+> > > > > > > I'm not sure I see the point in this driver.  Why can't you just
+> > > > > > > register these devices directly from DT?
+> > > > > > 
+> > > > > > All these devices share the same bank of registers and we previously
+> > > > > > used a single node. But with many devices sharing a single node, this is
+> > > > > > problematic to register all the devices from DT. Using this MFD driver
+> > > > > > to do it is a proper solution in this case.
+> > > > > 
+> > > > > Tell me more.  What are the problems you encountered?
+> > > > 
+> > > > So we had a single node, chip-controller, accessed by multiple
+> > > > devices -and drivers-. We ended up with:
+> > > > 
+> > > > chip: chip-control at ea0000 {
+> > > > 	compatible = "marvell,berlin2q-chip-ctrl";
+> > > > 	reg = <0xea0000 0x400>, <0xdd0170 0x10>;
+> > > > 	#clock-cells = <1>;
+> > > > 	#reset-cells = <2>;
+> > > > 	clocks = <&refclk>;
+> > > > 	clock-names = "refclk";
+> > > > 
+> > > > 	[pinmux nodes]
+> > > > };
+> > > > 
+> > > > In addition to being a mess, how can you probe various drivers with this
+> > > > single node? We had to probe a clock driver in addition to the
+> > > > pin-controller and reset drivers. We ended up using arch_initcall() in
+> > > > the reset driver, which was *not* acceptable.
+> > > > 
+> > > > These chip and system controllers are not an IP, but helps not spreading
+> > > > this bank of registers all over the DT.
+> > > > 
+> > > > The solution to this problem is to introduce an mtd driver which
+> > > > registers all the sub-devices described by these chip and system
+> > > > controller nodes.
+> > > 
+> > > I'm still not convinced that your problem can't be solved in DT, but
+> > > creating a single psudo-hardware node is not correct either.  What
+> > > does the h/w _really_ look like?  Is all of this stuff on a single
+> > > chip? 
+> > 
+> > There is no specific IP for these registers, but we do not want them
+> > spread all over the DT nodes so they're summed up into this chip node.
+> > 
+> > SO we have all those registers into a chip/system node and sub-nodes for
+> > the devices using them.
+> > 
+> > > If so, I would expect to see something like:
+> > > 
+> > > control at ea0000 {
+> > > 	compatible = "marvel,control";
+> > > 
+> > > 	pinctrl at xxxxx {
+> > > 		compatible = "marvel,pinctrl";
+> > > 	};
+> > > 
+> > > 	reset at xxxxx {
+> > > 		compatible = "marvel,reset";
+> > > 	};
+> > > };
+> > 
+> > That's exactly the point of this series: having one sub-node per device.
+> > 
+> > With this series applied, we have (the clock being a sub-node of the
+> > chip-controller node is part of another series following this one):
+> > 
+> > chip: chip-controller at ea0000 {
+> >         compatible = "marvell,berlin2q-chip-ctrl", "syscon";
+> >         reg = <0xea0000 0x400>, <0xdd0170 0x10>;
+> >         #clock-cells = <1>;
+> >         clocks = <&refclk>;
+> >         clock-names = "refclk";
+> > 
+> >         soc_pinctrl: pin-controller {
+> >                 compatible = "marvell,berlin2q-soc-pinctrl";
+> > 
+> >                 twsi0_pmux: twsi0-pmux {
+> >                         groups = "G6";
+> >                         function = "twsi0";
+> >                 };
+> > 
+> >                 twsi1_pmux: twsi1-pmux {
+> >                         groups = "G7";
+> >                         function = "twsi1";
+> >                 };
+> >         };
+> > 
+> >         chip_rst: reset {
+> >                 compatible = "marvell,berlin2-reset";
+> >                 #reset-cells = <2>;
+> >         };
+> > };
+> 
+> This is what I'd expect to see in DT, so we're heading in the right
+> direction.  So make to my original question, what's the point of this
+> MFD driver, and why don't you just let DT framework register these
+> devices for you?
+> 
+> You issue a compatible string here, then duplicate it in the driver,
+> why do you think this is necessary?
 
-The issue was caused by enabling delayed reset assertion for CPU0 just
-after issuing power down of cores. This was introduced for Exynos4 in
-13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off").
+The chip-controller node is *not* a bus. Please have a look on
+Sebastian's answer.
 
-The whole behavior is not well documented but after checking with vendor
-code this should be done like this (on Exynos4):
-1. Enable delayed reset assertion when system is running (for all CPUs).
-2. Disable delayed reset assertion before suspending the system.
-   This can be done after powering off secondary CPUs.
-3. Re-enable the delayed reset assertion when system is resumed.
+Antoine
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Fixes: 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off")
-Cc: <stable@vger.kernel.org>
----
- arch/arm/mach-exynos/common.h  |  2 ++
- arch/arm/mach-exynos/exynos.c  | 27 +++++++++++++++++++++++++++
- arch/arm/mach-exynos/platsmp.c | 39 ++-------------------------------------
- arch/arm/mach-exynos/suspend.c |  3 +++
- 4 files changed, 34 insertions(+), 37 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index f70eca7ee705..0ef8d4b47102 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -153,6 +153,8 @@ extern void exynos_enter_aftr(void);
- 
- extern struct cpuidle_exynos_data cpuidle_coupled_exynos_data;
- 
-+extern void exynos_set_delayed_reset_assertion(bool enable);
-+
- extern void s5p_init_cpu(void __iomem *cpuid_addr);
- extern unsigned int samsung_rev(void);
- extern void __iomem *cpu_boot_reg_base(void);
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 2013f73797ed..e2f46295eed7 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -166,6 +166,33 @@ static void __init exynos_init_io(void)
- 	exynos_map_io();
- }
- 
-+/*
-+ * Set or clear the USE_DELAYED_RESET_ASSERTION option. Used by smp code
-+ * and suspend.
-+ *
-+ * This is necessary only on Exynos4 SoCs. When system is running
-+ * USE_DELAYED_RESET_ASSERTION should be set so the ARM CLK clock down
-+ * feature could properly detect global idle state when secondary CPU is
-+ * powered down.
-+ *
-+ * However this should not be set when such system is going into suspend.
-+ */
-+void exynos_set_delayed_reset_assertion(bool enable)
-+{
-+	if (soc_is_exynos4()) {
-+		unsigned int tmp, core_id;
-+
-+		for (core_id = 0; core_id < num_possible_cpus(); core_id++) {
-+			tmp = pmu_raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
-+			if (enable)
-+				tmp |= S5P_USE_DELAYED_RESET_ASSERTION;
-+			else
-+				tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
-+			pmu_raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
-+		}
-+	}
-+}
-+
- static const struct of_device_id exynos_dt_pmu_match[] = {
- 	{ .compatible = "samsung,exynos3250-pmu" },
- 	{ .compatible = "samsung,exynos4210-pmu" },
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 3f32c47a6d74..19d5c87c842c 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -34,30 +34,6 @@
- 
- extern void exynos4_secondary_startup(void);
- 
--/*
-- * Set or clear the USE_DELAYED_RESET_ASSERTION option, set on Exynos4 SoCs
-- * during hot-(un)plugging CPUx.
-- *
-- * The feature can be cleared safely during first boot of secondary CPU.
-- *
-- * Exynos4 SoCs require setting USE_DELAYED_RESET_ASSERTION during powering
-- * down a CPU so the CPU idle clock down feature could properly detect global
-- * idle state when CPUx is off.
-- */
--static void exynos_set_delayed_reset_assertion(u32 core_id, bool enable)
--{
--	if (soc_is_exynos4()) {
--		unsigned int tmp;
--
--		tmp = pmu_raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
--		if (enable)
--			tmp |= S5P_USE_DELAYED_RESET_ASSERTION;
--		else
--			tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
--		pmu_raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
--	}
--}
--
- #ifdef CONFIG_HOTPLUG_CPU
- static inline void cpu_leave_lowpower(u32 core_id)
- {
-@@ -73,8 +49,6 @@ static inline void cpu_leave_lowpower(u32 core_id)
- 	  : "=&r" (v)
- 	  : "Ir" (CR_C), "Ir" (0x40)
- 	  : "cc");
--
--	 exynos_set_delayed_reset_assertion(core_id, false);
- }
- 
- static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
-@@ -87,14 +61,6 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
- 		/* Turn the CPU off on next WFI instruction. */
- 		exynos_cpu_power_down(core_id);
- 
--		/*
--		 * Exynos4 SoCs require setting
--		 * USE_DELAYED_RESET_ASSERTION so the CPU idle
--		 * clock down feature could properly detect
--		 * global idle state when CPUx is off.
--		 */
--		exynos_set_delayed_reset_assertion(core_id, true);
--
- 		wfi();
- 
- 		if (pen_release == core_id) {
-@@ -355,9 +321,6 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 		udelay(10);
- 	}
- 
--	/* No harm if this is called during first boot of secondary CPU */
--	exynos_set_delayed_reset_assertion(core_id, false);
--
- 	/*
- 	 * now the secondary core is starting up let it run its
- 	 * calibrations, then wait for it to finish
-@@ -404,6 +367,8 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
- 
- 	exynos_sysram_init();
- 
-+	exynos_set_delayed_reset_assertion(true);
-+
- 	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
- 		scu_enable(scu_base_addr());
- 
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index 666ec3e5b03f..d4da035cc88a 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -235,6 +235,8 @@ static void exynos_pm_enter_sleep_mode(void)
- 
- static void exynos_pm_prepare(void)
- {
-+	exynos_set_delayed_reset_assertion(false);
-+
- 	/* Set wake-up mask registers */
- 	exynos_pm_set_wakeup_mask();
- 
-@@ -383,6 +385,7 @@ early_wakeup:
- 
- 	/* Clear SLEEP mode set in INFORM1 */
- 	pmu_raw_writel(0x0, S5P_INFORM1);
-+	exynos_set_delayed_reset_assertion(true);
- }
- 
- static void exynos3250_pm_resume(void)
 -- 
-1.9.1
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
