@@ -1,57 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 18 Feb 2015 13:02:56 -0600
-Subject: [PATCH 3/6] x86, acpi, pci: Move PCI config space accessors.
-In-Reply-To: <20150218182739.GA17462@google.com>
-References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
- <1416413091-13452-4-git-send-email-tomasz.nowicki@linaro.org>
- <20141210231746.GF6692@google.com> <54E33C05.9010300@linaro.org>
- <20150218182739.GA17462@google.com>
-Message-ID: <CAL_Jsq+vR2-YbfVqQ2hFCRLyWUZJW4_Ki+ZFRz1=JTeOiE07Lw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 18 Feb 2015 19:06:02 +0000
+Subject: amba uarts - arm type uarts fifo size provided by device tree
+In-Reply-To: <1424285593-2886-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+References: <1424285593-2886-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+Message-ID: <20150218190601.GI29429@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 18, 2015 at 12:27 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> On Tue, Feb 17, 2015 at 02:03:01PM +0100, Tomasz Nowicki wrote:
->> On 11.12.2014 00:17, Bjorn Helgaas wrote:
->> >On Wed, Nov 19, 2014 at 05:04:48PM +0100, Tomasz Nowicki wrote:
->> >>We are going to use mmio_config_{} name convention across all architectures.
->> >
->> >mmio_config_*() are workarounds for an AMD Fam10h defect [1].  I would prefer
->> >not to extend these names to other architectures, because they should be
->> >able to use readb()/writeb()/etc. directly, as we did on x86 before
->> >3320ad994afb ("x86: Work around mmio config space quirk on AMD Fam10h").
->> >
->> >In fact, it would be nice if we could use readb()/writeb()/etc. on x86, and
->> >only use mmio_config_*() when we're on AMD Fam10h.  Maybe there could be a
->> >"struct pci_raw_ops pci_mmcfg_amd_fam10h" that used mmio_config_*(), and we
->> >could set raw_pci_ext_ops to those ops instead of the default ones when
->> >we're on AMD Fam10h.  Then x86 should be able to use the generic
->> >readb()-based ops on most platforms.
->>
->> While I do agree we should use readb()/writeb()... methods, I am not
->> sure there is a nice way to use mmio_config_*() exclusively for AMD
->> Fam10h. For x86, right now, we have three PCI config accessors sets:
->> mmconfig_32.c, mmconfig_64.c, numachip.c and each are different. So
->> one pci_mmcfg_amd_fam10h pci_raw_ops is not enough. I am thinking of
->> having additional structure (integrated with "struct
->> pci_mmcfg_region") that keeps MMIO accessors where readb()/writeb()
->> would be the default one. For AMD Fam10h case we could tweak it as
->> necessary. What do you thing Bjorn?
->
-> It's OK if we use mmio_config_*() for all x86 (not just AMD Fam10h); that's
-> what we do today.  It'd be *nicer* if we could use the workaround only for
-> Fam10h, but if it complicates the code, don't bother.
->
-> My main point is that I think your v1 posting requires every arch to
-> implement mmio_config_*(), and they will all be the same.  If an arch
-> doesn't require a workaround, it shouldn't have to supply anything and we
-> should default to readb/writeb/etc.
+Hi,
 
-Perhaps the abstraction needs to move up a level to pci_ops functions.
-Then x86 can use the generic ones I added and AMD can use custom ones.
+Please Cc lakml for patches in this area in future.
 
-BTW, there are some cases on MIPS that need special accessors. It's
-mainly a function of whether the accessors need to do endian swapping
-or not.
+On Wed, Feb 18, 2015 at 06:53:11PM +0000, Jorge Ramirez-Ortiz wrote:
+> [PATCH 1/2] Documentation: bindings: add optional fifo size property
+> [PATCH 2/2] drivers/tty: pl011: read fifo size from OF if present
+> 
+> 
+> These patches aim at resolving an issue present on some of the amba pl011
+> uarts.  
 
-Rob
+Which systems are affected? Neither of your two patches add the property
+to any dts file.
+
+> Some of these arm type uarts have their fifo sizes not defined in terms of the
+> amba_rev register. 
+
+What does said register actually contain?
+
+Is this a full PL011, or a cut-down SBSA UART?
+
+Mark.
+
+> Those uarts should be able to declare their fifo sizes using the optional
+> property "fifo-size" in the device tree. This device tree setting shall take
+> precedence over any other values. 
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
