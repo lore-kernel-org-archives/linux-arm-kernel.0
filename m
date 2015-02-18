@@ -1,114 +1,65 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 18 Feb 2015 16:59:42 +0100
-Subject: [PATCH 01/11] mfd: add the Berlin controller driver
-In-Reply-To: <5101633.XnBqLvsiGQ@wuerfel>
-References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
- <20150218115853.GB22296@x1> <54E48EF0.4050807@gmail.com>
- <5101633.XnBqLvsiGQ@wuerfel>
-Message-ID: <54E4B6EE.9030304@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 18 Feb 2015 17:00:33 +0100
+Subject: [PATCH 2/2] at91sam9_wdt: Allow watchdog to reset device at
+ early boot
+In-Reply-To: <54E4A6C4.4070706@roeck-us.net>
+References: <54B53160.6060309@roeck-us.net>
+ <cover.1424262664.git.timo.kokkonen@offcode.fi>
+ <6c0a3a5bcd93d18437eeed04712b4aeff201a16f.1424262664.git.timo.kokkonen@offcode.fi>
+ <54E49AA5.40008@roeck-us.net> <20150218151713.7a718311@bbrezillon>
+ <54E4A6C4.4070706@roeck-us.net>
+Message-ID: <20150218160033.GK11529@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2015 04:06 PM, Arnd Bergmann wrote:
-> On Wednesday 18 February 2015 14:09:04 Sebastian Hesselbarth wrote:
->> I fundamentally disagree that either this registers or syscon in general
->> should in any way be seen as a bus. The chip control registers is an
->> highly unsorted bunch of bits that we try to match with cleanly
->> separated subsystems. This makes it a resource but no bus of any sort.
->
-> It really depends on what you mean by 'bus'. It's certainly not a bus_type
-> in Linux, but if you have a node in DT with multiple children, we
-> sometimes think of that as a bus. I believe it makes sense to have
-> the child devices under the syscon node here, at least the ones that
-> have no other registers.
+Hi,
 
-Arnd, Lee,
+On 18/02/2015 at 06:50:44 -0800, Guenter Roeck wrote :
+> >>>   Optional properties:
+> >>>   - timeout-sec: Contains the watchdog timeout in seconds.
+> >>>+- early-timeout-sec: If present, specifies a timeout value in seconds
+> >>>+  that the driver keeps on ticking the watchdog HW on behalf of user
+> >>>+  space. Once this timeout expires watchdog is left to expire in
+> >>>+  timeout-sec seconds. If this propery is set to zero, watchdog is
+> >>>+  started (or left running) so that a reset occurs in timeout-sec
+> >>>+  since the watchdog was started.
+> >>>
+> >>>   Example:
+> >>>
+> >>>   watchdog {
+> >>>   	 timeout-sec = <60>;
+> >>>+	 early-timeout-sec = <120>;
+> >>
+> >>That is not a generic property as you defined it; if so,
+> >>it would have to be implemented in the watchdog core code,
+> >>not in the at91 code. You'll have to document it in the bindings
+> >>description for at91sam9_wdt.
+> >
+> >Then, if this is a controller specific property, it should be defined
+> >with the 'atmel,' prefix.
+> >We're kind of looping here: the initial discussion was "is there a need
+> >for this property to be a generic one ?", and now you're saying no,
+> >while you previously left the door opened.
+> >
+> >Tomi is proposing a generic approach, as you asked him to. I agree that
+> >parsing the property in core code and making its value part of the
+> >generic watchdog struct makes sense (that's what I proposed to Tomi a
+> >few weeks ago).
+> >
+> Hmm ... the problem here is that the property description creates the
+> assumption or expectation that the property is used if defined,
+> which is not the case.
+> 
+> I am not sure how to best resolve this. Maybe a comment in the property
+> description stating that implementation of is device (driver) dependent ?
+> After all, that is true for the timeout-sec property as well.
+> 
 
-First of all, I think I get the points of both of you.
+I would leave it in the generic file and state that it may not be
+implemented in the driver. That way, the property is documented for new
+driver writers.
 
-With 'bus' I was referring to anything that implies a fixed number to
-address any of the sub-units. As the register is more or less unsorted
-and unordered, I'd see it as a resource - but that isn't important
-really.
-
->> The problem that we try to solve here is not a DT problem but solely
->> driven by the fact that we need something to register platform_devices
->> for pinctrl and reset. The unit we describe in DT is a pinctrl-clock-
->> power-reset-unit - or short chip control.
->
-> There are two problems here that we need to look at separately,
-> even though there is some interaction:
->
-> * For the DT representation, we need to make it something that
-> corresponds to the hardware. We could either have a single device
-> node for the set of registers, or we could have one node for each
-> child. With syscon, we could also put the functional device nodes
-> somewhere else, which we have to do if any device uses multiple
-> syscon parents.
-
-Well, during the discussion, I think we can also get along with a
-single node for the whole chip-registers - even in DT. Clock and
-reset just require corresponding #foo-cells and pinctrl will have
-its pinmux sub-nodes right in that single node. If we have separate
-sub-nodes for each of the subsystems is mainly a matter of taste,
-right?
-
-> * For the driver code, we need a way to fit into the kernel model
-> while at the same time using the information that is in DT.
-> I agree with Lee that your current driver is not a good solution
-> here: you create a driver for the parent device that knows what
-> child devices there are, which is not a good abstraction. Instead
-> we should have a way for the child devices to get probed automatically,
-> just like we do for simple-bus, whether we use simple-bus or not.
-
-With no sub-nodes, we'd have to have a driver that knows the linux
-subsystem platform_devices. With sub-nodes, you are proposing a
-"syscon-bus"-like compatible hook to populate sub-devices. Ok, I
-get this.
-
->> If you argue that mfd is not the right place for this "driver" we'll
->> have to find a different place for it. I remember Mike has no problem
->> with extending early probed clock drivers to register additional
->> platform_devices - so I guess we end up putting it in there ignoring
->> mfd's ability to do it for us.
->
-> If you have a driver that is responsible for the entire register
-> area, I think it would be best to make that driver just register
-> to all the subsystems itself rather than creating child devices.
-
-Hmm. That would create a beast of a driver wouldn't it? We could
-get along with a library-like structure we each of foo-related
-code resides in drivers/foo but still we'd need some common include
-to reference to the sub-driver.
-
-> The alternative is to come up with a way to probe all the child
-> devices automatically, but then we should make that parent device
-> have a generic driver that does not need to know about the children
-> and that can work on any platform with similar requirements.
-
-Ok, this is most likely the part that Lee doesn't like on the current
-driver: a platform_device for registering platform_devices *only* and
-only for Berlin.
-
-So, out of the two options:
-
-(a) Go for syscon_of_populate_devices() with a new compatible (I guess)
-     and having sub-nodes for each Linux subsystem that we want to have
-     a platform_device for. I fear that this will clash with early
-     registration of clk and we still have to find a way, i.e. device
-     naming policy, to match the drivers with their devices.
-
-(b) Join clk, pinctrl, reset into a single chip/soc-control node and
-     rewrite the sub-drivers to not directly rely on DT compatible.
-     With this, joining all sub-drivers into drivers/soc/berlin would
-     be a sane approach, right? Also, I have the strong feeling, that
-     we will encounter situations later that will require the clk driver
-     to pull a reset before changing a specific clk rate, e.g. for GPU.
-
-Anyway, I appreciate your discussion but still I am a little lost
-between the two options. I thought that Antoine's mfd approach is
-good, but I understand your concerns.
-
-Any direction we should go for?
-
-Sebastian
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
