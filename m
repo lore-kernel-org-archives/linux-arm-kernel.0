@@ -1,43 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 18 Feb 2015 19:06:02 +0000
-Subject: amba uarts - arm type uarts fifo size provided by device tree
-In-Reply-To: <1424285593-2886-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
-References: <1424285593-2886-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
-Message-ID: <20150218190601.GI29429@leverpostej>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 18 Feb 2015 22:08:44 +0300
+Subject: [PATCH 2/6] ASoC: max98088: Add DT bindings
+In-Reply-To: <1424283959-16289-3-git-send-email-afaerber@suse.de>
+References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
+ <1424283959-16289-3-git-send-email-afaerber@suse.de>
+Message-ID: <54E4E33C.9040301@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-Please Cc lakml for patches in this area in future.
+On 02/18/2015 09:25 PM, Andreas F?rber wrote:
 
-On Wed, Feb 18, 2015 at 06:53:11PM +0000, Jorge Ramirez-Ortiz wrote:
-> [PATCH 1/2] Documentation: bindings: add optional fifo size property
-> [PATCH 2/2] drivers/tty: pl011: read fifo size from OF if present
-> 
-> 
-> These patches aim at resolving an issue present on some of the amba pl011
-> uarts.  
+> "maxim,max98089" will be used for the Spring Chromebook.
 
-Which systems are affected? Neither of your two patches add the property
-to any dts file.
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>   sound/soc/codecs/max98088.c | 8 ++++++++
+>   1 file changed, 8 insertions(+)
 
-> Some of these arm type uarts have their fifo sizes not defined in terms of the
-> amba_rev register. 
+> diff --git a/sound/soc/codecs/max98088.c b/sound/soc/codecs/max98088.c
+> index 805b3f8cd39d..69a21d1946e3 100644
+> --- a/sound/soc/codecs/max98088.c
+> +++ b/sound/soc/codecs/max98088.c
+> @@ -2009,10 +2009,18 @@ static const struct i2c_device_id max98088_i2c_id[] = {
+>   };
+>   MODULE_DEVICE_TABLE(i2c, max98088_i2c_id);
+>
+> +static const struct of_device_id max98088_of_match[] = {
 
-What does said register actually contain?
+    If I don't mistake, gcc will complain about this variable being unused if 
+CONFIG_OF=n.
 
-Is this a full PL011, or a cut-down SBSA UART?
+> +	{ .compatible = "maxim,max98088" },
+> +	{ .compatible = "maxim,max98089" },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, max98088_of_match);
+> +
+>   static struct i2c_driver max98088_i2c_driver = {
+>   	.driver = {
+>   		.name = "max98088",
+>   		.owner = THIS_MODULE,
+> +		.of_match_table = of_match_ptr(max98088_of_match),
 
-Mark.
+    You probably don;t need of_match_ptr(). Either that or do something with 
+the match table, like enclosing into #ifdef or annotating with '__maybe_unused'.
 
-> Those uarts should be able to declare their fifo sizes using the optional
-> property "fifo-size" in the device tree. This device tree setting shall take
-> precedence over any other values. 
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+[...]
+
+WBR, Sergei
