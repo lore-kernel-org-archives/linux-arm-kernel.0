@@ -1,31 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Feb 2015 22:07:07 +0100
-Subject: [PATCH v2] usb: renesas: fix extcon dependency
-Message-ID: <12432955.vUbSfWRFHl@wuerfel>
+Date: Wed, 18 Feb 2015 22:10:53 +0100
+Subject: [PATCH, RESEND] leds: ipaq needs LEDS_CLASS
+Message-ID: <6859961.SRiBVu7Ycu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The renesas usbhs driver calls extcon_get_edev_by_phandle(), which
-is defined in drivers/extcon/extcon-class.c, and that can be a
-loadable module. If the extcon-class support is disabled, usbhs
-will work correctly for all devices that do not need extcon.
+All other drivers have a dependency on this already, but this one
+does not, which can lead to a link error when LEDS_CLASS is not set.
 
-However, if extcon-class is a loadable module, and usbhs is
-built-in, the kernel fails to link. In order to solve that,
-we need a Kconfig dependency that allows extcon to be disabled
-but does not allow usbhs built-in if extcon is a module.
+drivers/built-in.o: In function `micro_leds_remove':
+:(.text+0x13d1bc): undefined reference to `led_classdev_unregister'
+drivers/built-in.o: In function `micro_leds_probe':
+:(.text+0x13d3d0): undefined reference to `led_classdev_register'
+
+This patch adds the missing dependency.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+----
+Originally sent on 2015-01-28, but has not appeared in linux-next
 
-diff --git a/drivers/usb/renesas_usbhs/Kconfig b/drivers/usb/renesas_usbhs/Kconfig
-index de83b9d0cd5c..ebc99ee076ce 100644
---- a/drivers/usb/renesas_usbhs/Kconfig
-+++ b/drivers/usb/renesas_usbhs/Kconfig
-@@ -6,6 +6,7 @@ config USB_RENESAS_USBHS
- 	tristate 'Renesas USBHS controller'
- 	depends on USB_GADGET
- 	depends on ARCH_SHMOBILE || SUPERH || COMPILE_TEST
-+	depends on EXTCON || !EXTCON # if EXTCON=m, USBHS cannot be built-in
- 	default n
+diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+index 95029dfd311a..927bb4491e1c 100644
+--- a/drivers/leds/Kconfig
++++ b/drivers/leds/Kconfig
+@@ -144,6 +144,7 @@ config LEDS_SUNFIRE
+ 
+ config LEDS_IPAQ_MICRO
+ 	tristate "LED Support for the Compaq iPAQ h3xxx"
++	depends on LEDS_CLASS
+ 	depends on MFD_IPAQ_MICRO
  	help
- 	  Renesas USBHS is a discrete USB host and peripheral controller chip
+ 	  Choose this option if you want to use the notification LED on
