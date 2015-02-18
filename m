@@ -1,48 +1,45 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 18 Feb 2015 12:23:40 -0500 (EST)
-Subject: [PATCH] ARM: bL_switcher: add GIC dependency
-In-Reply-To: <13974795.LDi5KKMcsa@wuerfel>
-References: <13974795.LDi5KKMcsa@wuerfel>
-Message-ID: <alpine.LFD.2.11.1502181222290.22104@knanqh.ubzr>
+From: kyle@redhat.com (Kyle McMartin)
+Date: Wed, 18 Feb 2015 12:26:38 -0500
+Subject: [PATCH] arm64: annotate psci invoke functions as notrace
+Message-ID: <20150218172638.GB1772@redacted.bos.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Feb 2015, Arnd Bergmann wrote:
+Using GCC 5 to build the kernel with ftrace enabled, we encounter the
+following error as a result of the mcount prologue changing the expected
+register use of the function parameters,
 
-> It is not possible to build the bL_switcher code if the GIC
-> driver is disabled, because it relies on calling into some
-> gic specific interfaces, and that would result in this build
-> error:
-> 
-> arch/arm/common/built-in.o: In function `bL_switch_to':
-> :(.text+0x1230): undefined reference to `gic_get_sgir_physaddr'
-> :(.text+0x1244): undefined reference to `gic_send_sgi'
-> :(.text+0x1268): undefined reference to `gic_migrate_target'
-> arch/arm/common/built-in.o: In function `bL_switcher_enable.part.4':
-> :(.text.unlikely+0x2f8): undefined reference to `gic_get_cpu_id'
-> 
-> This adds a Kconfig dependency to ensure we only build the big-little
-> switcher if the GIC driver is present as well.
-> 
-> Almost all ARMv7 platforms come with a GIC anyway, but it is possible
-> to build a kernel that disables all platforms.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+/tmp/cc8Kpn7A.s: Assembler messages:
+/tmp/cc8Kpn7A.s:41: Error: .err encountered
+/tmp/cc8Kpn7A.s:42: Error: .err encountered
+/tmp/cc8Kpn7A.s:43: Error: .err encountered
+/tmp/cc8Kpn7A.s:101: Error: .err encountered
+/tmp/cc8Kpn7A.s:102: Error: .err encountered
+/tmp/cc8Kpn7A.s:103: Error: .err encountered
+scripts/Makefile.build:257: recipe for target 'arch/arm64/kernel/psci.o' failed
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Fix this by annotating the function as notrace, to suppress the
+generation of profiling prologues and epilogues on the function.
 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 4b68867641f9..6aa2a766be66 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1420,7 +1420,7 @@ config BIG_LITTLE
->  
->  config BL_SWITCHER
->  	bool "big.LITTLE switcher support"
-> -	depends on BIG_LITTLE && MCPM && HOTPLUG_CPU
-> +	depends on BIG_LITTLE && MCPM && HOTPLUG_CPU && ARM_GIC
->  	select ARM_CPU_SUSPEND
->  	select CPU_PM
->  	help
-> 
-> 
+Signed-off-by: Kyle McMartin <kyle@redhat.com>
+
+--- a/arch/arm64/kernel/psci.c
++++ b/arch/arm64/kernel/psci.c
+@@ -113,7 +113,7 @@ static void psci_power_state_unpack(u32 power_state,
+  * The following two functions are invoked via the invoke_psci_fn pointer
+  * and will not be inlined, allowing us to piggyback on the AAPCS.
+  */
+-static noinline int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
++static noinline notrace int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
+ 					 u64 arg2)
+ {
+ 	asm volatile(
+@@ -128,7 +128,7 @@ static noinline int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
+ 	return function_id;
+ }
+ 
+-static noinline int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1,
++static noinline notrace int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1,
+ 					 u64 arg2)
+ {
+ 	asm volatile(
