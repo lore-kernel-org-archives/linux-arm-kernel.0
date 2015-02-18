@@ -1,52 +1,62 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 18 Feb 2015 14:09:04 +0100
-Subject: [PATCH 01/11] mfd: add the Berlin controller driver
-In-Reply-To: <20150218115853.GB22296@x1>
-References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
- <1423671332-24580-2-git-send-email-antoine.tenart@free-electrons.com>
- <20150216124808.GC14545@x1> <20150217092020.GC4507@kwain>
- <20150217115447.GA3989@x1> <20150218084004.GD21937@kwain>
- <20150218090958.GA18042@x1> <20150218092225.GE21937@kwain>
- <20150218104023.GA22296@x1> <54E4730D.1060507@gmail.com>
- <20150218115853.GB22296@x1>
-Message-ID: <54E48EF0.4050807@gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 18 Feb 2015 14:16:55 +0100
+Subject: [PATCHv3 0/2] watchdog: Introduce "early-timeout-sec" property
+In-Reply-To: <cover.1424262664.git.timo.kokkonen@offcode.fi>
+References: <54B53160.6060309@roeck-us.net>
+ <cover.1424262664.git.timo.kokkonen@offcode.fi>
+Message-ID: <20150218141655.0445958d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2015 12:58 PM, Lee Jones wrote:
-> I do agree that using 'simple-bus' to describe only this IP would be
-> an abuse.  However, my foundation thought/argument is unchanged.  This
-> 'driver' is a hack.  It has no functional use besides to work around a
-> problem of semantics and as such has no place in MFD.
+Hi Timo,
 
-Lee,
+Could you send new versions of this in their own thread (not in reply
+to previous versions), and increment the version in patch 1 and 2 ?
 
-sorry I don't get it. Here you say that using simple-bus is an abuse...
+Could you also summarize what has changed between each versions in this
+cover letter ?
 
-> Back onto the simple-bus theme, as this is a syscon device it is a bus
-> of sorts.  Have you thought about making it a child of your its syscon
-> node, then using simple-bus to get the OF framework to register the
-> child devices?
+Best Regards,
 
-... and here you suggest to use simple-bus to register the child
-devices?
+Boris
 
-I fundamentally disagree that either this registers or syscon in general
-should in any way be seen as a bus. The chip control registers is an
-highly unsorted bunch of bits that we try to match with cleanly
-separated subsystems. This makes it a resource but no bus of any sort.
+On Wed, 18 Feb 2015 14:57:20 +0200
+Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
 
-The problem that we try to solve here is not a DT problem but solely
-driven by the fact that we need something to register platform_devices
-for pinctrl and reset. The unit we describe in DT is a pinctrl-clock-
-power-reset-unit - or short chip control.
+> Currently we have no means to adjust the watchdog behavior on early
+> start up before user space has opened the device. The generic behavior
+> among the watchdog drivers is to not start the watchdog at all (or
+> disable it, if possible, or in case at91sam9_wdt, start a kernel timer
+> that keeps on pinging the watchdog on behalf of user space until a
+> watchdog daemon opens it). This unfortunately opens a time window
+> between starting the driver and starting the user space watchdog
+> daemon where a crash of the kernel or user space might prevent the
+> watchdog from ever resetting the device at all. This is obviously bad
+> on production systems.
+> 
+> Introduce a new device tree property that, when set, changes the
+> watchdog driver behavior in such way that there no longer is any
+> window where crash is not caught by the watchdog.
+> 
+> This is the third version of this patch. Previous versions of the
+> patch were using an atmel specific property name. This patch uses a
+> generic name instead as the functionality itself has nothing atmel
+> related. I am also introducing watchdog.txt for describing the generic
+> watchdog device tree bindings as there was no such file before.
+> 
+> Timo Kokkonen (2):
+>   devicetree: Document generic watchdog properties
+>   at91sam9_wdt: Allow watchdog to reset device at early boot
+> 
+>  .../devicetree/bindings/watchdog/watchdog.txt         | 19 +++++++++++++++++++
+>  drivers/watchdog/at91sam9_wdt.c                       |  9 ++++++++-
+>  2 files changed, 27 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/watchdog/watchdog.txt
+> 
 
-If you argue that mfd is not the right place for this "driver" we'll
-have to find a different place for it. I remember Mike has no problem
-with extending early probed clock drivers to register additional
-platform_devices - so I guess we end up putting it in there ignoring
-mfd's ability to do it for us.
 
-Do we agree on that?
 
-Sebastian
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
