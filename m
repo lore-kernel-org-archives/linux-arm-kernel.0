@@ -1,657 +1,689 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Wed, 18 Feb 2015 23:59:51 +0900
-Subject: [PATCH v5 3/6] arm64: Kprobes with single stepping support
-In-Reply-To: <1424214701-4899-4-git-send-email-dave.long@linaro.org>
-References: <1424214701-4899-1-git-send-email-dave.long@linaro.org>
- <1424214701-4899-4-git-send-email-dave.long@linaro.org>
-Message-ID: <54E4A8E7.2050708@hitachi.com>
+From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
+Date: Wed, 18 Feb 2015 16:59:35 +0200
+Subject: [PATCH 3/4] arm: am33xx: DT quirks for am33xx based beaglebone
+ variants
+In-Reply-To: <1424271576-1952-1-git-send-email-pantelis.antoniou@konsulko.com>
+References: <1424271576-1952-1-git-send-email-pantelis.antoniou@konsulko.com>
+Message-ID: <1424271576-1952-4-git-send-email-pantelis.antoniou@konsulko.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Implement DT quirks for the am33xx beaglebone boards.
 
-(2015/02/18 8:11), David Long wrote:
-> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-> 
-> Add support for basic kernel probes(kprobes) and jump probes
-> (jprobes) for ARM64.
-> 
-> Kprobes will utilize software breakpoint and single step debug
-> exceptions supported on ARM v8.
-> 
-> Software breakpoint is placed at the probe address to trap the
-> kernel execution into kprobe handler.
-> 
-> ARM v8 supports single stepping to be enabled while exception return
-> (ERET) with next PC in exception return address (ELR_EL1). The
-> kprobe handler prepares an executable memory slot for out-of-line
-> execution with a copy of the original instruction being probed, and
-> enables single stepping from the instruction slot. With this scheme,
-> the instruction is executed with the exact same register context
-> 'except PC' that points to instruction slot.
-> 
-> Debug mask(PSTATE.D) is enabled only when single stepping a recursive
+A single boot DTB supports both the beaglebone white and the beaglebone
+black, and on boot time the identifying EEPROM is read and the info
+is used to modify the live tree to match the board detected.
 
-Is that same as "debug flag" in the code commment?
+Refer to Documentation/devicetree/bindings/quirks/am33xx-bone-quirk.txt
+for detailed information.
 
-> kprobe, e.g.: during kprobes reenter so that probed instruction can be
-> single stepped within the kprobe handler -exception- context.
-> The recursion depth of kprobe is always 2, i.e. upon probe re-entry,
-> any further re-entry is prevented by not calling handlers and the case
-> counted as a missed kprobe).
+Signed-off-by: Pantelis Antoniou <pantelis.antoniou@konsulko.com>
+---
+ .../bindings/quirks/am33xx-bone-quirk.txt          |  82 ++++
+ arch/arm/mach-omap2/Makefile                       |   5 +
+ arch/arm/mach-omap2/am33xx-dt-quirks.c             | 498 +++++++++++++++++++++
+ arch/arm/mach-omap2/am33xx-dt-quirks.h             |  10 +
+ arch/arm/mach-omap2/board-generic.c                |   1 +
+ arch/arm/mach-omap2/common.h                       |   8 +
+ 6 files changed, 604 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/quirks/am33xx-bone-quirk.txt
+ create mode 100644 arch/arm/mach-omap2/am33xx-dt-quirks.c
+ create mode 100644 arch/arm/mach-omap2/am33xx-dt-quirks.h
 
-So, would this mean the debug mask is required for single-stepping
-in exception context by specification?
-
-> 
-> Single stepping from slot has a drawback on PC-relative accesses
-> like branching and symbolic literals access as offset from new PC
-> (slot address) may not be ensured to fit in immediate value of
-> opcode. Such instructions needs simulation, so reject
-> probing such instructions.
-
-BTW, since while the single stepping IRQs are disabled, does that
-also requires fixups for irq-mask loading instruction or something
-like that? (sorry, I'm not good at aarch64 ISA...)
-
-> Instructions generating exceptions or cpu mode change are rejected,
-> and not allowed to insert probe for these instructions.
-> 
-> Instructions using Exclusive Monitor are rejected too.
-> 
-> System instructions are mostly enabled for stepping, except MSR
-> immediate that updates "daif" flags in PSTATE, which are not safe
-> for probing.
-> 
-> Thanks to Steve Capper and Pratyush Anand for several suggested
-> Changes.
-
-Ok, I have some comments on the code.
-
-[...]
-> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
-> new file mode 100644
-> index 0000000..1ead41f
-> --- /dev/null
-> +++ b/arch/arm64/kernel/kprobes.c
-> @@ -0,0 +1,551 @@
-> +/*
-> + * arch/arm64/kernel/kprobes.c
-> + *
-> + * Kprobes support for ARM64
-> + *
-> + * Copyright (C) 2013 Linaro Limited.
-> + * Author: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License for more details.
-> + *
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/kprobes.h>
-> +#include <linux/module.h>
-> +#include <linux/slab.h>
-> +#include <linux/stop_machine.h>
-> +#include <linux/stringify.h>
-> +#include <asm/traps.h>
-> +#include <asm/ptrace.h>
-> +#include <asm/cacheflush.h>
-> +#include <asm/debug-monitors.h>
-> +#include <asm/system_misc.h>
-> +#include <asm/insn.h>
-> +
-> +#include "kprobes.h"
-> +#include "kprobes-arm64.h"
-> +
-> +#define MIN_STACK_SIZE(addr)	min((unsigned long)MAX_STACK_SIZE,	\
-> +	(unsigned long)current_thread_info() + THREAD_START_SP - (addr))
-> +
-> +DEFINE_PER_CPU(struct kprobe *, current_kprobe) = NULL;
-> +DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
-> +
-> +static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
-> +{
-> +	/* prepare insn slot */
-> +	p->ainsn.insn[0] = p->opcode;
-> +
-> +	flush_icache_range((uintptr_t) (p->ainsn.insn),
-> +			   (uintptr_t) (p->ainsn.insn) + MAX_INSN_SIZE);
-> +
-> +	/*
-> +	 * Needs restoring of return address after stepping xol.
-> +	 */
-> +	p->ainsn.restore.addr = (unsigned long) p->addr +
-> +	  sizeof(kprobe_opcode_t);
-> +	p->ainsn.restore.type = RESTORE_PC;
-> +}
-> +
-> +int __kprobes arch_prepare_kprobe(struct kprobe *p)
-> +{
-> +	kprobe_opcode_t insn;
-> +	unsigned long probe_addr = (unsigned long)p->addr;
-> +
-> +	/* copy instruction */
-> +	insn = *p->addr;
-> +	p->opcode = insn;
-> +
-> +	if (in_exception_text(probe_addr))
-> +		return -EINVAL;
-> +
-> +	/* decode instruction */
-> +	switch (arm_kprobe_decode_insn(insn, &p->ainsn)) {
-> +	case INSN_REJECTED:	/* insn not supported */
-> +		return -EINVAL;
-> +
-> +	case INSN_GOOD_NO_SLOT:	/* insn need simulation */
-> +		return -EINVAL;
-> +
-> +	case INSN_GOOD:	/* instruction uses slot */
-> +		p->ainsn.insn = get_insn_slot();
-> +		if (!p->ainsn.insn)
-> +			return -ENOMEM;
-> +		break;
-> +	};
-> +
-> +	/* prepare the instruction */
-> +	arch_prepare_ss_slot(p);
-> +
-> +	return 0;
-> +}
-> +
-> +static int __kprobes patch_text(kprobe_opcode_t *addr, u32 opcode)
-> +{
-> +	void *addrs[1];
-> +	u32 insns[1];
-> +
-> +	addrs[0] = (void *)addr;
-> +	insns[0] = (u32)opcode;
-> +
-> +	return aarch64_insn_patch_text_sync(addrs, insns, 1);
-> +}
-> +
-> +/* arm kprobe: install breakpoint in text */
-> +void __kprobes arch_arm_kprobe(struct kprobe *p)
-> +{
-> +	patch_text(p->addr, BRK64_OPCODE_KPROBES);
-> +}
-> +
-> +/* disarm kprobe: remove breakpoint from text */
-> +void __kprobes arch_disarm_kprobe(struct kprobe *p)
-> +{
-> +	patch_text(p->addr, p->opcode);
-> +}
-> +
-> +void __kprobes arch_remove_kprobe(struct kprobe *p)
-> +{
-> +	if (p->ainsn.insn) {
-> +		free_insn_slot(p->ainsn.insn, 0);
-> +		p->ainsn.insn = NULL;
-> +	}
-> +}
-> +
-> +static void __kprobes save_previous_kprobe(struct kprobe_ctlblk *kcb)
-> +{
-> +	kcb->prev_kprobe.kp = kprobe_running();
-> +	kcb->prev_kprobe.status = kcb->kprobe_status;
-> +}
-> +
-> +static void __kprobes restore_previous_kprobe(struct kprobe_ctlblk *kcb)
-> +{
-> +	__this_cpu_write(current_kprobe, kcb->prev_kprobe.kp);
-> +	kcb->kprobe_status = kcb->prev_kprobe.status;
-> +}
-> +
-> +static void __kprobes set_current_kprobe(struct kprobe *p)
-> +{
-> +	__this_cpu_write(current_kprobe, p);
-> +}
-> +
-> +/*
-> + * Debug flag (D-flag) is disabled upon exception entry.
-> + * Kprobes need to unmask D-flag -ONLY- in case of recursive
-> + * probe i.e. when probe hit from kprobe handler context upon
-> + * executing the pre/post handlers. In this case we return with
-> + * D-flag unmasked so that single-stepping can be carried-out.
-> + *
-> + * Keep D-flag masked in all other cases.
-
-Here, we'd better choose D-flag or Debug mask.
-
-> + */
-> +static void __kprobes
-> +spsr_set_debug_flag(struct pt_regs *regs, int mask)
-> +{
-> +	unsigned long spsr = regs->pstate;
-> +
-> +	if (mask)
-> +		spsr |= PSR_D_BIT;
-> +	else
-> +		spsr &= ~PSR_D_BIT;
-> +
-> +	regs->pstate = spsr;
-> +}
-> +
-> +/*
-> + * Interrupts need to be disabled before single-step mode is set, and not
-> + * reenabled until after single-step mode ends.
-> + * Without disabling interrupt on local CPU, there is a chance of
-> + * interrupt occurrence in the period of exception return and  start of
-> + * out-of-line single-step, that result in wrongly single stepping
-> + * the interrupt handler.
-> + */
-> +static void __kprobes kprobes_save_local_irqflag(struct pt_regs *regs)
-> +{
-> +	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> +
-> +	kcb->saved_irqflag = regs->pstate;
-> +	regs->pstate |= PSR_I_BIT;
-> +}
-> +
-> +static void __kprobes kprobes_restore_local_irqflag(struct pt_regs *regs)
-> +{
-> +	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> +
-> +	if (kcb->saved_irqflag & PSR_I_BIT)
-> +		regs->pstate |= PSR_I_BIT;
-> +	else
-> +		regs->pstate &= ~PSR_I_BIT;
-> +}
-> +
-> +static void __kprobes
-> +set_ss_context(struct kprobe_ctlblk *kcb, unsigned long addr)
-> +{
-> +	kcb->ss_ctx.ss_status = KPROBES_STEP_PENDING;
-> +	kcb->ss_ctx.match_addr = addr + sizeof(kprobe_opcode_t);
-> +}
-> +
-> +static void __kprobes clear_ss_context(struct kprobe_ctlblk *kcb)
-> +{
-> +	kcb->ss_ctx.ss_status = KPROBES_STEP_NONE;
-> +	kcb->ss_ctx.match_addr = 0;
-> +}
-> +
-> +static void __kprobes
-> +skip_singlestep_missed(struct kprobe_ctlblk *kcb, struct pt_regs *regs)
-> +{
-> +	/* set return addr to next pc to continue */
-> +	instruction_pointer(regs) += sizeof(kprobe_opcode_t);
-> +}
-> +
-> +static void __kprobes setup_singlestep(struct kprobe *p,
-> +				       struct pt_regs *regs,
-> +				       struct kprobe_ctlblk *kcb, int reenter)
-> +{
-> +	unsigned long slot;
-> +
-> +	if (reenter) {
-> +		save_previous_kprobe(kcb);
-> +		set_current_kprobe(p);
-> +		kcb->kprobe_status = KPROBE_REENTER;
-> +	} else {
-> +		kcb->kprobe_status = KPROBE_HIT_SS;
-> +	}
-> +
-> +	if (p->ainsn.insn) {
-> +		/* prepare for single stepping */
-> +		slot = (unsigned long)p->ainsn.insn;
-> +
-> +		set_ss_context(kcb, slot);	/* mark pending ss */
-> +
-> +		if (kcb->kprobe_status == KPROBE_REENTER)
-> +			spsr_set_debug_flag(regs, 0);
-> +
-> +		/* IRQs and single stepping do not mix well. */
-> +		kprobes_save_local_irqflag(regs);
-> +		kernel_enable_single_step(regs);
-> +		instruction_pointer(regs) = slot;
-> +	} else	{
-> +		BUG();
-> +	}
-> +}
-> +
-> +static int __kprobes reenter_kprobe(struct kprobe *p,
-> +				    struct pt_regs *regs,
-> +				    struct kprobe_ctlblk *kcb)
-> +{
-> +	switch (kcb->kprobe_status) {
-> +	case KPROBE_HIT_SSDONE:
-> +	case KPROBE_HIT_ACTIVE:
-> +		if (!p->ainsn.check_condn || p->ainsn.check_condn(p, regs)) {
-> +			kprobes_inc_nmissed_count(p);
-> +			setup_singlestep(p, regs, kcb, 1);
-> +		} else	{
-> +			/* condition check failed, skip stepping */
-> +			skip_singlestep_missed(kcb, regs);
-> +		}
-> +		break;
-> +	case KPROBE_HIT_SS:
-
-Here, KPROBE_REENTER should be needed.
-And also, do we really need to fail when KPROBE_HIT_SS case?
-On x86, I've fixed similar code, since kprobes can hit in single stepping
-if we put a handler in perf and it can be hit in NMI context, which
-happens on single-stepping...
-
-> +		pr_warn("Unrecoverable kprobe detected at %p.\n", p->addr);
-> +		dump_kprobe(p);
-> +		BUG();
-> +		break;
-> +	default:
-> +		WARN_ON(1);
-> +		return 0;
-> +	}
-> +
-> +	return 1;
-> +}
-> +
-> +static void __kprobes
-> +post_kprobe_handler(struct kprobe_ctlblk *kcb, struct pt_regs *regs)
-> +{
-> +	struct kprobe *cur = kprobe_running();
-> +
-> +	if (!cur)
-> +		return;
-> +
-> +	/* return addr restore if non-branching insn */
-> +	if (cur->ainsn.restore.type == RESTORE_PC) {
-> +		instruction_pointer(regs) = cur->ainsn.restore.addr;
-> +		if (!instruction_pointer(regs))
-> +			BUG();
-> +	}
-> +
-> +	/* restore back original saved kprobe variables and continue */
-> +	if (kcb->kprobe_status == KPROBE_REENTER) {
-> +		restore_previous_kprobe(kcb);
-> +		return;
-> +	}
-> +	/* call post handler */
-> +	kcb->kprobe_status = KPROBE_HIT_SSDONE;
-> +	if (cur->post_handler)	{
-> +		/* post_handler can hit breakpoint and single step
-> +		 * again, so we enable D-flag for recursive exception.
-> +		 */
-> +		cur->post_handler(cur, regs, 0);
-> +	}
-> +
-> +	reset_current_kprobe();
-> +}
-> +
-> +int __kprobes kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr)
-> +{
-> +	struct kprobe *cur = kprobe_running();
-> +	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> +
-> +	switch (kcb->kprobe_status) {
-> +	case KPROBE_HIT_SS:
-> +	case KPROBE_REENTER:
-> +		/*
-> +		 * We are here because the instruction being single
-> +		 * stepped caused a page fault. We reset the current
-> +		 * kprobe and the ip points back to the probe address
-> +		 * and allow the page fault handler to continue as a
-> +		 * normal page fault.
-> +		 */
-> +		instruction_pointer(regs) = (unsigned long)cur->addr;
-> +		if (!instruction_pointer(regs))
-> +			BUG();
-> +		if (kcb->kprobe_status == KPROBE_REENTER)
-> +			restore_previous_kprobe(kcb);
-> +		else
-> +			reset_current_kprobe();
-> +
-> +		break;
-> +	case KPROBE_HIT_ACTIVE:
-> +	case KPROBE_HIT_SSDONE:
-> +		/*
-> +		 * We increment the nmissed count for accounting,
-> +		 * we can also use npre/npostfault count for accounting
-> +		 * these specific fault cases.
-> +		 */
-> +		kprobes_inc_nmissed_count(cur);
-> +
-> +		/*
-> +		 * We come here because instructions in the pre/post
-> +		 * handler caused the page_fault, this could happen
-> +		 * if handler tries to access user space by
-> +		 * copy_from_user(), get_user() etc. Let the
-> +		 * user-specified handler try to fix it first.
-> +		 */
-> +		if (cur->fault_handler && cur->fault_handler(cur, regs, fsr))
-> +			return 1;
-> +
-> +		/*
-> +		 * In case the user-specified fault handler returned
-> +		 * zero, try to fix up.
-> +		 */
-> +		if (fixup_exception(regs))
-> +			return 1;
-> +
-> +		break;
-> +	}
-> +	return 0;
-> +}
-> +
-> +int __kprobes kprobe_exceptions_notify(struct notifier_block *self,
-> +				       unsigned long val, void *data)
-> +{
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +void __kprobes kprobe_handler(struct pt_regs *regs)
-> +{
-> +	struct kprobe *p, *cur;
-> +	struct kprobe_ctlblk *kcb;
-> +	unsigned long addr = instruction_pointer(regs);
-> +
-> +	kcb = get_kprobe_ctlblk();
-> +	cur = kprobe_running();
-> +
-> +	p = get_kprobe((kprobe_opcode_t *) addr);
-
-BTW, I'd like to ensure that this handler runs under normal irqs are disabled.
-Or, we need preempt_disable() here.
-# From the same reason, x86 implementation is a bit odd...
-
-> +
-> +	if (p) {
-> +		if (cur) {
-> +			if (reenter_kprobe(p, regs, kcb))
-> +				return;
-> +		} else if (!p->ainsn.check_condn ||
-> +			   p->ainsn.check_condn(p, regs)) {
-> +			/* Probe hit and conditional execution check ok. */
-> +			set_current_kprobe(p);
-> +			kcb->kprobe_status = KPROBE_HIT_ACTIVE;
-> +
-> +			/*
-> +			 * If we have no pre-handler or it returned 0, we
-> +			 * continue with normal processing.  If we have a
-> +			 * pre-handler and it returned non-zero, it prepped
-> +			 * for calling the break_handler below on re-entry,
-> +			 * so get out doing nothing more here.
-> +			 *
-> +			 * pre_handler can hit a breakpoint and can step thru
-> +			 * before return, keep PSTATE D-flag enabled until
-> +			 * pre_handler return back.
-> +			 */
-> +			if (!p->pre_handler || !p->pre_handler(p, regs)) {
-> +				kcb->kprobe_status = KPROBE_HIT_SS;
-> +				setup_singlestep(p, regs, kcb, 0);
-> +				return;
-> +			}
-> +		} else {
-> +			/*
-> +			 * Breakpoint hit but conditional check failed,
-> +			 * so just skip the instruction (NOP behaviour)
-> +			 */
-> +			skip_singlestep_missed(kcb, regs);
-> +			return;
-> +		}
-> +	} else if (*(kprobe_opcode_t *) addr != BRK64_OPCODE_KPROBES) {
-> +		/*
-> +		 * The breakpoint instruction was removed right
-> +		 * after we hit it.  Another cpu has removed
-> +		 * either a probepoint or a debugger breakpoint
-> +		 * at this address.  In either case, no further
-> +		 * handling of this interrupt is appropriate.
-> +		 * Return back to original instruction, and continue.
-> +		 */
-> +		return;
-> +	} else if (cur) {
-> +		/* We probably hit a jprobe.  Call its break handler. */
-> +		if (cur->break_handler && cur->break_handler(cur, regs)) {
-> +			kcb->kprobe_status = KPROBE_HIT_SS;
-> +			setup_singlestep(cur, regs, kcb, 0);
-> +			return;
-> +		}
-> +	} else {
-> +		/* breakpoint is removed, now in a race
-> +		 * Return back to original instruction & continue.
-> +		 */
-> +	}
-> +}
-> +
-> +static int __kprobes
-> +kprobe_ss_hit(struct kprobe_ctlblk *kcb, unsigned long addr)
-> +{
-> +	if ((kcb->ss_ctx.ss_status == KPROBES_STEP_PENDING)
-> +	    && (kcb->ss_ctx.match_addr == addr)) {
-> +		clear_ss_context(kcb);	/* clear pending ss */
-> +		return DBG_HOOK_HANDLED;
-> +	}
-> +	/* not ours, kprobes should ignore it */
-> +	return DBG_HOOK_ERROR;
-> +}
-> +
-> +static int __kprobes
-> +kprobe_single_step_handler(struct pt_regs *regs, unsigned int esr)
-> +{
-> +	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> +	int retval;
-> +
-> +	/* return error if this is not our step */
-> +	retval = kprobe_ss_hit(kcb, instruction_pointer(regs));
-> +
-> +	if (retval == DBG_HOOK_HANDLED) {
-> +		kprobes_restore_local_irqflag(regs);
-> +		kernel_disable_single_step();
-> +
-> +		if (kcb->kprobe_status == KPROBE_REENTER)
-> +			spsr_set_debug_flag(regs, 1);
-> +
-> +		post_kprobe_handler(kcb, regs);
-> +	}
-> +
-> +	return retval;
-> +}
-> +
-> +static int __kprobes
-> +kprobe_breakpoint_handler(struct pt_regs *regs, unsigned int esr)
-> +{
-> +	kprobe_handler(regs);
-> +	return DBG_HOOK_HANDLED;
-> +}
-> +
-> +int __kprobes setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
-> +{
-> +	struct jprobe *jp = container_of(p, struct jprobe, kp);
-> +	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> +	long stack_ptr = stack_pointer(regs);
-> +
-> +	kcb->jprobe_saved_regs = *regs;
-> +	memcpy(kcb->jprobes_stack, (void *)stack_ptr,
-> +	       MIN_STACK_SIZE(stack_ptr));
-> +
-> +	instruction_pointer(regs) = (long)jp->entry;
-> +	preempt_disable();
-> +	return 1;
-> +}
-> +
-> +void __kprobes jprobe_return(void)
-> +{
-> +	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> +
-> +	/*
-> +	 * Jprobe handler return by entering break exception,
-> +	 * encoded same as kprobe, but with following conditions
-> +	 * -a magic number in x0 to identify from rest of other kprobes.
-> +	 * -restore stack addr to original saved pt_regs
-> +	 */
-> +	asm volatile ("ldr x0, [%0]\n\t"
-> +		      "mov sp, x0\n\t"
-> +		      "ldr x0, =" __stringify(JPROBES_MAGIC_NUM) "\n\t"
-> +		      "BRK %1\n\t"
-> +		      "NOP\n\t"
-> +		      :
-> +		      : "r"(&kcb->jprobe_saved_regs.sp),
-> +		      "I"(BRK64_ESR_KPROBES)
-> +		      : "memory");
-> +}
-> +
-> +int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
-> +{
-> +	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> +	long stack_addr = kcb->jprobe_saved_regs.sp;
-> +	long orig_sp = stack_pointer(regs);
-> +	struct jprobe *jp = container_of(p, struct jprobe, kp);
-> +
-> +	if (regs->regs[0] == JPROBES_MAGIC_NUM) {
-> +		if (orig_sp != stack_addr) {
-> +			struct pt_regs *saved_regs =
-> +			    (struct pt_regs *)kcb->jprobe_saved_regs.sp;
-> +			pr_err("current sp %lx does not match saved sp %lx\n",
-> +			       orig_sp, stack_addr);
-> +			pr_err("Saved registers for jprobe %p\n", jp);
-> +			show_regs(saved_regs);
-> +			pr_err("Current registers\n");
-> +			show_regs(regs);
-> +			BUG();
-> +		}
-> +		*regs = kcb->jprobe_saved_regs;
-> +		memcpy((void *)stack_addr, kcb->jprobes_stack,
-> +		       MIN_STACK_SIZE(stack_addr));
-> +		preempt_enable_no_resched();
-> +		return 1;
-> +	}
-> +	return 0;
-> +}
-> +
-> +/* Break Handler hook */
-> +static struct break_hook kprobes_break_hook = {
-> +	.esr_mask = BRK64_ESR_MASK,
-> +	.esr_val = BRK64_ESR_KPROBES,
-> +	.fn = kprobe_breakpoint_handler,
-> +};
-> +
-> +/* Single Step handler hook */
-> +static struct step_hook kprobes_step_hook = {
-> +	.fn = kprobe_single_step_handler,
-> +};
-> +
-> +int __init arch_init_kprobes(void)
-> +{
-> +	register_break_hook(&kprobes_break_hook);
-> +	register_step_hook(&kprobes_step_hook);
-
-I really recommend you to not use this "general hook caller" for
-kprobes, since it is called from anywhere, especially, if you
-enable lockdep, read_lock can involve so many functions. This
-means you can fall into the hell of the infinite loop of the
-breakpoint exceptions...
-
-Moreover, no one remove these hook handlers from the list.
-
-Thank you,
-
-
+diff --git a/Documentation/devicetree/bindings/quirks/am33xx-bone-quirk.txt b/Documentation/devicetree/bindings/quirks/am33xx-bone-quirk.txt
+new file mode 100644
+index 0000000..239dd8d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/quirks/am33xx-bone-quirk.txt
+@@ -0,0 +1,82 @@
++am33xx Beaglebone White/Black Device Tree Bindings
++--------------------------------------------------
++
++Beaglebone boards that boot with a common device tree blob contain
++a DT quirk entry with the following properties:
++
++Required properties:
++
++- compatible : should be "ti,am33xx-bone-quirk"
++
++Required child node:
++
++- revs : Contains children nodes that identify boards
++
++  Each child node of revs must be of the following form:
++
++  Required properties:
++
++  - board-id : Contain the board ID as it appears in the EEPROM
++  - board-apply : Should contain the phandle of the quirk to apply
++
++  Optional child node:
++
++  - options : Contain a number of properties that identify options
++  that can be enabled or disabled by external means. For Linux the
++  options are selected by parsing the boot command line.
++  The properties contain a tupple of quirk phandles, the first containing
++  the enable quirk and the second the disable quirk. If the phandle is zero
++  then no quirk is applied.
++
++Any other nodes (like the quirk definitions are ignored).
++
++The following example defines two revisions (white/black) with
++board-id A335BONE for the white and A335BNLT for the black.
++For the beaglebone black we also define two options
++no-emmc and no-hdmi which when are present in the boot command line
++the emmc and hdmi are disabled.
++
++	beaglebone-quirks {
++		compatible = "ti,am33xx-bone-quirk";
++		status = "okay";
++
++		revs {
++			white {
++				board-id = "A335BONE";
++				board-apply = <&bonewhite>;
++			};
++			black {
++				board-id = "A335BNLT";
++				board-apply = <&boneblack>;
++				options {
++					no-emmc = <0 &black_enable_emmc>;
++					no-hdmi = <0 &black_enable_hdmi>;
++				};
++			};
++		};
++
++		overlays {
++			bonewhite: bonewhite {
++				/* quirk for white */
++				...
++			};
++
++			boneblack: boneblack {
++				/* quirk for black */
++				...
++			};
++
++			black_enable_hdmi: black_hdmi {
++				/* quirk to enable hdmi */
++				...
++			};
++
++			black_enable_emmc: black_emmc {
++				/* quirk to enable emmc */
++				...
++			};
++		};
++	};
++
++
++
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 5d27dfd..02129e7 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -259,6 +259,11 @@ obj-$(CONFIG_MACH_CRANEBOARD)		+= board-am3517crane.o
+ 
+ obj-$(CONFIG_MACH_SBC3530)		+= board-omap3stalker.o
+ 
++# DT quirks
++ifneq ($(CONFIG_OF_DYNAMIC),)
++obj-$(CONFIG_SOC_AM33XX)		+= am33xx-dt-quirks.o
++endif
++
+ # Platform specific device init code
+ 
+ omap-flash-$(CONFIG_MTD_NAND_OMAP2)	:= board-flash.o
+diff --git a/arch/arm/mach-omap2/am33xx-dt-quirks.c b/arch/arm/mach-omap2/am33xx-dt-quirks.c
+new file mode 100644
+index 0000000..668235c
+--- /dev/null
++++ b/arch/arm/mach-omap2/am33xx-dt-quirks.c
+@@ -0,0 +1,498 @@
++/*
++ * arch/arm/mach-omap2/am33xx-dt-quirks.c
++ *
++ * AM33xx variant DT quirks
++ *
++ * Copyright (C) 2015 Konsulko Group
++ *
++ * Author:
++ *	Pantelis Antoniou <pantelis.antoniou@konsulko.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <asm/io.h>
++#include <asm/delay.h>
++
++#include "am33xx-dt-quirks.h"
++
++/*
++ * The board IDs for am33xx board are in an I2C EEPROM
++ * We are very early in the boot process so we have to
++ * read the EEPROM directly without using the I2C layer.
++ *
++ * Note that we rely on the bootloader setting up the muxes
++ * (which is the case for u-boot).
++ */
++
++/* I2C Status Register (OMAP_I2C_STAT): */
++#define OMAP_I2C_STAT_XDR	(1 << 14)	/* TX Buffer draining */
++#define OMAP_I2C_STAT_RDR	(1 << 13)	/* RX Buffer draining */
++#define OMAP_I2C_STAT_BB	(1 << 12)	/* Bus busy */
++#define OMAP_I2C_STAT_ROVR	(1 << 11)	/* Receive overrun */
++#define OMAP_I2C_STAT_XUDF	(1 << 10)	/* Transmit underflow */
++#define OMAP_I2C_STAT_AAS	(1 << 9)	/* Address as slave */
++#define OMAP_I2C_STAT_BF	(1 << 8)	/* Bus Free */
++#define OMAP_I2C_STAT_XRDY	(1 << 4)	/* Transmit data ready */
++#define OMAP_I2C_STAT_RRDY	(1 << 3)	/* Receive data ready */
++#define OMAP_I2C_STAT_ARDY	(1 << 2)	/* Register access ready */
++#define OMAP_I2C_STAT_NACK	(1 << 1)	/* No ack interrupt enable */
++#define OMAP_I2C_STAT_AL	(1 << 0)	/* Arbitration lost int ena */
++
++/* I2C Configuration Register (OMAP_I2C_CON): */
++#define OMAP_I2C_CON_EN		(1 << 15)	/* I2C module enable */
++#define OMAP_I2C_CON_BE		(1 << 14)	/* Big endian mode */
++#define OMAP_I2C_CON_OPMODE_HS	(1 << 12)	/* High Speed support */
++#define OMAP_I2C_CON_STB	(1 << 11)	/* Start byte mode (master) */
++#define OMAP_I2C_CON_MST	(1 << 10)	/* Master/slave mode */
++#define OMAP_I2C_CON_TRX	(1 << 9)	/* TX/RX mode (master only) */
++#define OMAP_I2C_CON_XA		(1 << 8)	/* Expand address */
++#define OMAP_I2C_CON_RM		(1 << 2)	/* Repeat mode (master only) */
++#define OMAP_I2C_CON_STP	(1 << 1)	/* Stop cond (master only) */
++#define OMAP_I2C_CON_STT	(1 << 0)	/* Start condition (master) */
++
++/* register definitions */
++#define I2C_REVNB_LO		0x00
++#define I2C_REVNB_HI		0x04
++#define I2C_SYSC		0x10
++#define I2C_IRQSTATUS_RAW	0x24
++#define I2C_IRQSTATUS		0x28
++#define I2C_IRQENABLE_SET	0x2C
++#define I2C_IRQENABLE_CLR	0x30
++#define I2C_WE			0x34
++#define I2C_DMARXENABLE_SET	0x38
++#define I2C_DMATXENABLE_SET	0x3C
++#define I2C_DMARXENABLE_CLR	0x40
++#define I2C_DMATXENABLE_CLR	0x44
++#define I2C_DMARXWAKE_EN	0x48
++#define I2C_DMATXWAKE_EN	0x4C
++#define I2C_SYSS		0x90
++#define I2C_BUF			0x94
++#define I2C_CNT			0x98
++#define I2C_DATA		0x9C
++#define I2C_CON			0xA4
++#define I2C_OA			0xA8
++#define I2C_SA			0xAC
++#define I2C_PSC			0xB0
++#define I2C_SCLL		0xB4
++#define I2C_SCLH		0xB8
++#define I2C_SYSTEST		0xBC
++#define I2C_BUFSTAT		0xC0
++#define I2C_OA1			0xC4
++#define I2C_OA2			0xC8
++#define I2C_OA3			0xCC
++#define I2C_ACTOA		0xD0
++#define I2C_SBLOCK		0xD4
++
++static inline void i2c_reg_write(void __iomem *base, unsigned int reg, u16 val)
++{
++	writew_relaxed(val, base + reg);
++}
++
++static inline u16 i2c_reg_read(void __iomem *base, unsigned int reg)
++{
++	return readw_relaxed(base + reg);
++}
++
++static void flush_fifo(void __iomem *base)
++{
++	u16 stat;
++
++	while ((stat = i2c_reg_read(base, I2C_IRQSTATUS_RAW))
++			& OMAP_I2C_STAT_RRDY) {
++		(void)i2c_reg_read(base, I2C_DATA);
++		i2c_reg_write(base, I2C_IRQSTATUS, OMAP_I2C_STAT_RRDY);
++		udelay(1000);
++	};
++}
++
++static void wait_delay(void __iomem *base)
++{
++	udelay((10000000 / 100000) * 2);
++}
++
++static int wait_for_bb(void __iomem *base)
++{
++	int timeout;
++	u16 stat;
++
++	timeout = 1000;
++	while (((stat = i2c_reg_read(base, I2C_IRQSTATUS_RAW)) &
++				OMAP_I2C_STAT_BB) && timeout--) {
++		i2c_reg_write(base, I2C_IRQSTATUS, stat);
++		wait_delay(base);
++	}
++
++	if (timeout <= 0) {
++		pr_err("%s: Timeout while waiting for bus\n", __func__);
++		return -1;
++	}
++	i2c_reg_write(base, I2C_IRQSTATUS, 0xffff);
++	return 0;
++}
++
++static u16 wait_for_event(void __iomem *base)
++{
++	u16 status;
++	int timeout = 10000;
++
++	do {
++		wait_delay(base);
++		status = i2c_reg_read(base, I2C_IRQSTATUS_RAW);
++	} while (!(status & (OMAP_I2C_STAT_ROVR | OMAP_I2C_STAT_XUDF |
++		    OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_RRDY |
++		    OMAP_I2C_STAT_ARDY | OMAP_I2C_STAT_NACK |
++		    OMAP_I2C_STAT_AL)) &&
++			timeout--);
++
++	if (timeout <= 0) {
++		pr_err("%s: Timeout status=%04x\n", __func__, status);
++		i2c_reg_write(base, I2C_IRQSTATUS, 0xffff);
++		status = 0;
++	}
++
++	return status;
++}
++
++static int i2c_init(void __iomem *base, u16 psc, u16 scll, u16 sclh)
++{
++	int timeout;
++
++	/* init */
++	if (i2c_reg_read(base, I2C_CON) & OMAP_I2C_CON_EN) {
++		i2c_reg_write(base, I2C_CON, 0);
++		for (timeout = 0; timeout <= 50000; timeout += 1000)
++			udelay(1000);
++	}
++
++	/* soft reset */
++	i2c_reg_write(base, I2C_SYSC, 0x02);
++	udelay(1000);
++	i2c_reg_write(base, I2C_CON, OMAP_I2C_CON_EN);
++
++	timeout = 1000;
++	while (!(i2c_reg_read(base, I2C_SYSS) & 0x0001) && timeout--) {
++		if (timeout <= 0) {
++			pr_err("%s: Timeout in soft reset\n", __func__);
++			return -ENODEV;
++		}
++		udelay(1000);
++	}
++
++	i2c_reg_write(base, I2C_CON, 0x0000);
++	i2c_reg_write(base, I2C_PSC, psc);
++	i2c_reg_write(base, I2C_SCLL, scll);
++	i2c_reg_write(base, I2C_SCLH, sclh);
++	i2c_reg_write(base, I2C_CON, 0x8000);
++	udelay(1000);
++
++	i2c_reg_write(base, I2C_OA, 1);
++
++	/* flush fifo */
++	flush_fifo(base);
++	i2c_reg_write(base, I2C_IRQSTATUS, 0xffff);
++
++	return 0;
++}
++
++static int i2c_read(void __iomem *base, u8 chip, u16 addr,
++		unsigned int alen,
++		void *buffer, int len)
++{
++	u8 *s = buffer;
++	unsigned int i;
++	u16 status;
++	int timeout, ret;
++
++	if (alen < 0 || len < 0 || !buffer || alen > 2 ||
++			(addr + len > 0x10000))
++		return -EINVAL;
++
++	if (wait_for_bb(base) != 0) {
++		pr_err("%s: wait for bb fail\n", __func__);
++		return -ENODEV;
++	}
++
++	ret = -EINVAL;
++	i2c_reg_write(base, I2C_SA, chip);
++
++	if (alen) {
++		i2c_reg_write(base, I2C_CNT, alen);
++
++		/* Stop - Start (P-S) */
++		i2c_reg_write(base, I2C_CON, OMAP_I2C_CON_EN |
++			OMAP_I2C_CON_MST | OMAP_I2C_CON_STT |
++			OMAP_I2C_CON_STP | OMAP_I2C_CON_TRX);
++		while (alen > 0) {
++			status = wait_for_event(base);
++			if (status == 0 || (status & OMAP_I2C_STAT_NACK)) {
++				ret = -ENODEV;
++				pr_err("%s: error waiting for addr ACK\n",
++						__func__);
++				goto out;
++			}
++			if (status & OMAP_I2C_STAT_XRDY) {
++				alen--;
++				i2c_reg_write(base, I2C_DATA,
++					(addr >> (8 * alen)) & 0xff);
++				i2c_reg_write(base, I2C_IRQSTATUS,
++						OMAP_I2C_STAT_XRDY);
++			}
++		}
++
++		/* poll ARDY for last byte going out */
++		timeout = 1000;
++		do {
++			status = wait_for_event(base);
++			if (status & OMAP_I2C_STAT_ARDY)
++				break;
++			udelay(1000);
++		} while (timeout--);
++
++		if (timeout <= 0) {
++			ret = -ENODEV;
++			pr_err("%s: timeout waiting for ARDY\n",
++					__func__);
++			goto out;
++		}
++
++		i2c_reg_write(base, I2C_IRQSTATUS, OMAP_I2C_STAT_ARDY);
++
++		wait_delay(base);
++	}
++
++	i2c_reg_write(base, I2C_CNT, len);
++
++	i2c_reg_write(base, I2C_CON, OMAP_I2C_CON_EN | OMAP_I2C_CON_MST |
++		OMAP_I2C_CON_STT | OMAP_I2C_CON_STP);
++
++	i = 0;
++	while (i < len) {
++		status = wait_for_event(base);
++		if (status == 0 || (status & OMAP_I2C_STAT_NACK)) {
++			ret = -ENODEV;
++			pr_err("%s: error waiting for data ACK\n",
++					__func__);
++			goto out;
++		}
++		if (status & OMAP_I2C_STAT_RRDY) {
++			*s++ = (u8)i2c_reg_read(base, I2C_DATA);
++			i2c_reg_write(base, I2C_IRQSTATUS,
++					OMAP_I2C_STAT_RRDY);
++			i++;
++		}
++		if (status & OMAP_I2C_STAT_ARDY) {
++			i2c_reg_write(base, I2C_IRQSTATUS,
++					OMAP_I2C_STAT_ARDY);
++			break;
++		}
++	}
++
++	if (i < len)
++		pr_err("%s: short read (%u < %u)\n", __func__, i, len);
++	ret = i;
++
++out:
++	flush_fifo(base);
++	i2c_reg_write(base, I2C_IRQSTATUS, 0xffff);
++	return ret;
++}
++
++struct am335x_baseboard_id {
++	u8 magic[4];
++	u8 name[8];
++	u8 version[4];
++	u8 serial[12];
++	u8 config[32];
++	u8 mac_addr[3][6];
++};
++
++static int beaglebone_read_header(struct am335x_baseboard_id *hdr)
++{
++	void __iomem *base;
++	u32 magic;
++	int ret;
++
++	/* map I2C0 */
++	base = ioremap((phys_addr_t)0x44E0B000, 0x1000);
++	if (base == NULL) {
++		pr_err("%s: failed to ioremap\n", __func__);
++		return -ENOMEM;
++	}
++
++	ret = i2c_init(base, 0x0000, 0x00ea, 0x00ea);
++	if (ret != 0) {
++		pr_err("%s: i2c_init failed\n", __func__);
++		return ret;
++	}
++
++	/* the EEPROM is@0x50 */
++	ret = i2c_read(base, 0x50, 0, 2, hdr, sizeof(*hdr));
++	if (ret != sizeof(*hdr)) {
++		pr_err("%s: Failed to read EEPROM\n", __func__);
++		ret = ret >= 0 ? -EINVAL : ret;
++		goto out;
++	}
++
++	print_hex_dump(KERN_DEBUG, "EEPROM: ", DUMP_PREFIX_OFFSET,
++			16, 1, hdr, sizeof(*hdr), true);
++
++	/* magic value is LE */
++	magic = ((u32)hdr->magic[3] << 24) | ((u32)hdr->magic[2] << 16) |
++		((u32)hdr->magic[1] << 8) | hdr->magic[0];
++	if (magic != 0xEE3355AA) {
++		pr_err("%s: Bad EEPROM (0x%08x) %02x %02x %02x %02x\n",
++				__func__, magic,
++				hdr->magic[0], hdr->magic[1],
++				hdr->magic[2], hdr->magic[3]);
++		ret = -EINVAL;
++		goto out;
++	}
++
++	ret = 0;
++
++out:
++	iounmap(base);
++	return ret;
++}
++
++/* find whether a command line argument exists */
++static const char *command_line_arg(const char *bootargs, const char *what)
++{
++	const char *s, *e, *p;
++	int len;
++
++	len = strlen(what);
++	s = bootargs;
++	e = bootargs + strlen(bootargs);
++	for (; s < e && (p = strstr(s, what)) != NULL; s += len) {
++
++		/* if not the first arguments a space must precede */
++		if (p > bootargs && p[-1] != ' ')
++			continue;
++
++		/* skip over what */
++		p += len;
++
++		/* if not the last argument a space must follow */
++		if (p < e && *p != ' ')
++			continue;
++
++		return p;
++	}
++
++	return NULL;
++}
++
++static void __init beaglebone_dt_quirk(void)
++{
++	struct am335x_baseboard_id header;
++	struct device_node *np, *revnp, *child, *optnp, *chosen;
++	struct property *prop;
++	char name[8 + 1];
++	const char *detected_board_id, *board_id, *bootargs;
++	int i, ret;
++	phandle ph;
++
++	np = NULL;
++	revnp = NULL;
++	optnp = NULL;
++	chosen = NULL;
++
++	/* beaglebone quirks */
++	np = of_find_compatible_node(NULL, NULL, "ti,am33xx-bone-quirk");
++	if (!np || !of_device_is_available(np))
++		goto out;
++
++	revnp = of_get_child_by_name(np, "revs");
++	if (!revnp) {
++		pr_err("%s: no revs node at %pO\n", __func__, np);
++		goto out;
++	}
++	child = NULL;
++	optnp = NULL;
++	chosen = NULL;
++
++	ret = beaglebone_read_header(&header);
++	if (ret != 0) {
++		pr_err("%s: Failed to read EEPROM\n", __func__);
++		goto out;
++	}
++	memcpy(name, header.name, sizeof(header.name));
++	name[sizeof(header.name)] = '\0';
++
++	detected_board_id = name;
++
++	pr_debug("%s: Finding quirks for board_id=%s\n", __func__,
++			detected_board_id);
++	for_each_child_of_node(revnp, child) {
++		if (!of_property_read_string(child, "board-id", &board_id) &&
++			!strcmp(board_id, detected_board_id))
++			goto found;
++	}
++	pr_warn("%s: No quirks for board_id=%s\n", __func__, detected_board_id);
++	goto out;
++found:
++	pr_debug("%s: Applying quirks for board_id=%s\n", __func__,
++			board_id);
++	ret = 0;
++	for (i = 0; of_property_read_u32_index(child,
++				"board-apply", i, &ph) == 0; i++) {
++
++		ret = of_quirk_apply_by_phandle(ph);
++		if (ret != 0)
++			break;
++	}
++	if (ret != 0) {
++		pr_err("%s: Failed to apply quirk@%pO\n", __func__, child);
++		goto out;
++	}
++
++	optnp = of_get_child_by_name(child, "options");
++	chosen = of_find_node_by_path("/chosen");
++	bootargs = NULL;
++	if (chosen) {
++		if (of_property_read_string(chosen, "bootargs", &bootargs))
++			bootargs = NULL;
++		of_node_put(chosen);
++	}
++	if (optnp && bootargs) {
++		/* iterate on properties */
++		for_each_property_of_node(optnp, prop) {
++			if (!strcmp(prop->name, "name"))
++				continue;
++
++			if (command_line_arg(bootargs, prop->name))
++				i = 0;
++			else
++				i = 1;
++			if (of_property_read_u32_index(optnp,
++						prop->name, i, &ph) != 0) {
++				pr_err("%s: Failed to get phandle at %pO/%s\n",
++						__func__, optnp, prop->name);
++				continue;
++			}
++			ret = of_quirk_apply_by_phandle(ph);
++			if (ret != 0)
++				break;
++		}
++	}
++
++out:
++	of_node_put(optnp);
++	of_node_put(child);
++	of_node_put(revnp);
++	of_node_put(np);
++}
++
++void __init am33xx_dt_quirk(void)
++{
++	/* Manually issue calls for each supported board variant */
++
++	/* the beaglebone is the one supported board for now */
++	beaglebone_dt_quirk();
++}
+diff --git a/arch/arm/mach-omap2/am33xx-dt-quirks.h b/arch/arm/mach-omap2/am33xx-dt-quirks.h
+new file mode 100644
+index 0000000..8c7dbec
+--- /dev/null
++++ b/arch/arm/mach-omap2/am33xx-dt-quirks.h
+@@ -0,0 +1,10 @@
++#ifndef AM33XX_DT_QUIRKS_H
++#define AM33XX_DT_QUIRKS_H
++
++#if IS_ENABLED(OF_DYNAMIC)
++extern void __init am33xx_dt_quirk(void);
++#else
++#define am33xx_dt_quirk	NULL
++#endif
++
++#endif
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index b61c049..9922c61 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -177,6 +177,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
+ 	.init_time	= omap3_gptimer_timer_init,
+ 	.dt_compat	= am33xx_boards_compat,
+ 	.restart	= am33xx_restart,
++	.dt_quirk	= am33xx_dt_quirk,
+ MACHINE_END
+ #endif
+ 
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 64e44d6..6b4d6e0 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -155,6 +155,14 @@ static inline void am33xx_restart(enum reboot_mode mode, const char *cmd)
+ }
+ #endif
+ 
++#ifdef CONFIG_SOC_AM33XX
++void am33xx_dt_quirk(void);
++#else
++static inline void am33xx_dt_quirk(void)
++{
++}
++#endif
++
+ #ifdef CONFIG_ARCH_OMAP3
+ void omap3xxx_restart(enum reboot_mode mode, const char *cmd);
+ #else
 -- 
-Masami HIRAMATSU
-Software Platform Research Dept. Linux Technology Research Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+1.7.12
