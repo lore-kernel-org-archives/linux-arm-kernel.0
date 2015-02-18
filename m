@@ -1,34 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Feb 2015 20:48:54 +0100
-Subject: [PATCH] net/appletalk: LTPC needs virt_to_bus
-Message-ID: <6100590.gsNqMCFyRS@wuerfel>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 18 Feb 2015 20:54:46 +0100
+Subject: drm: bridge: ps8622 and ptn3460 depend on gpiolib
+In-Reply-To: <19803561.otRxsE7o5u@wuerfel>
+References: <19803561.otRxsE7o5u@wuerfel>
+Message-ID: <54E4EE06.8050101@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ltpc driver is rather outdated and does not get built on most
-platforms because it requires the ISA_DMA_API symbol. However
-there are some ARM platforms that have ISA_DMA_API but no virt_to_bus,
-and they get this build error when enabling the ltpc driver.
+Hello Arnd,
 
-drivers/net/appletalk/ltpc.c: In function 'handlefc':
-drivers/net/appletalk/ltpc.c:380:2: error: implicit declaration of function 'virt_to_bus' [-Werror=implicit-function-declaration]
-  set_dma_addr(dma,virt_to_bus(ltdmacbuf));
-  ^
+On 02/18/2015 05:09 PM, Arnd Bergmann wrote:
+> The ptn3460 driver recently started usign the gpiod interface
+> which is only available on platforms that come with GPIOLIB
+> support, resulting in a compile-time error:
+> 
+> drivers/gpu/drm/bridge/ps8622.c: In function 'ps8622_pre_enable':
+> drivers/gpu/drm/bridge/ps8622.c:368:2: error: implicit declaration of function 'gpiod_set_value' [-Werror=implicit-function-declaration]
+>   gpiod_set_value(ps8622->gpio_rst, 0);
+>   ^
+> drivers/gpu/drm/bridge/ps8622.c: In function 'ps8622_probe':
+> drivers/gpu/drm/bridge/ps8622.c:584:2: error: implicit declaration of function 'devm_gpiod_get' [-Werror=implicit-function-declaration]
+>   ps8622->gpio_slp = devm_gpiod_get(dev, "sleep");
+>   ^
+> 
+> Similarly, the newly added ps8622 driver started out with the same
+> problem.
+> 
+> This patch adds explicit Kconfig dependencies to avoid trying to
+> build invalid configurations.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: f1336e6afb ("drm/bridge: Add I2C based driver for ps8622/ps8625 bridge")
+> Fixes: af478d8823 ("drm/bridge: ptn3460: use gpiod interface")
+>
 
-This adds another dependency in Kconfig to avoid that configuration.
+Patch looks good to me.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-diff --git a/drivers/net/appletalk/Kconfig b/drivers/net/appletalk/Kconfig
-index 4ce6ca5f3d36..dc6b78e5342f 100644
---- a/drivers/net/appletalk/Kconfig
-+++ b/drivers/net/appletalk/Kconfig
-@@ -40,7 +40,7 @@ config DEV_APPLETALK
- 
- config LTPC
- 	tristate "Apple/Farallon LocalTalk PC support"
--	depends on DEV_APPLETALK && (ISA || EISA) && ISA_DMA_API
-+	depends on DEV_APPLETALK && (ISA || EISA) && ISA_DMA_API && VIRT_TO_BUS
- 	help
- 	  This allows you to use the AppleTalk PC card to connect to LocalTalk
- 	  networks. The card is also known as the Farallon PhoneNet PC card.
+Best regards,
+Javier
