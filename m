@@ -1,76 +1,71 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 18 Feb 2015 08:40:51 -0500
-Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
-In-Reply-To: <20141205110507.GB28339@e104818-lin.cambridge.arm.com>
-References: <1417707993-82290-1-git-send-email-agraf@suse.de>
- <5480F12D.90007@suse.de>
- <CAOesGMi-sVTxdo8f7vNnYMgd+meBF+Gsf3Pk5VbHEPxv5Q6iDA@mail.gmail.com>
- <3551792.oHatG1W6W1@wuerfel>
- <20141205110507.GB28339@e104818-lin.cambridge.arm.com>
-Message-ID: <54E49663.6040706@codeaurora.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 18 Feb 2015 10:40:02 -0300
+Subject: [PATCH v4 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
+In-Reply-To: <1424255528-1717-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1424255528-1717-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1424255528-1717-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54E49632.1000001@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2014 06:05 AM, Catalin Marinas wrote:
-> On Fri, Dec 05, 2014 at 10:39:40AM +0000, Arnd Bergmann wrote:
->> On Thursday 04 December 2014 15:48:50 Olof Johansson wrote:
->>> On Thu, Dec 4, 2014 at 3:41 PM, Alexander Graf <agraf@suse.de> wrote:
->>>> On 04.12.14 22:15, Olof Johansson wrote:
->>>>> On Thu, Dec 4, 2014 at 7:46 AM, Alexander Graf <agraf@suse.de> wrote:
->>>>>> With binutils 2.25 the default alignment for 32bit arm sections changed to
->>>>>> have everything 64k aligned. Armv7 binaries built with this binutils version
->>>>>> run successfully on an arm64 system.
->>>>>>
->>>>>> Since effectively there is now the chance to run armv7 code on arm64 even
->>>>>> with 64k page size, it doesn't make sense to block people from enabling
->>>>>> CONFIG_COMPAT on those configurations.
->>>>>>
->>>>>> Signed-off-by: Alexander Graf <agraf@suse.de>
->>>>>> ---
->>>>>>  arch/arm64/Kconfig | 1 -
->>>>>>  1 file changed, 1 deletion(-)
->>>>>>
->>>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>>>>> index 9532f8d..3cf4f238 100644
->>>>>> --- a/arch/arm64/Kconfig
->>>>>> +++ b/arch/arm64/Kconfig
->>>>>> @@ -409,7 +409,6 @@ source "fs/Kconfig.binfmt"
->>>>>>
->>>>>>  config COMPAT
->>>>>>         bool "Kernel support for 32-bit EL0"
->>>>>> -       depends on !ARM64_64K_PAGES
->>>>>>         select COMPAT_BINFMT_ELF
->>>>>>         select HAVE_UID16
->>>>>>         select OLD_SIGSUSPEND3
->>>>>
->>>>> This is hardly "compat". Sure, it's great to have a new binutils that
->>>>> has larger alignment, but practically not a single existing binary
->>>>> will work today if someone tries to do this.
->>>>
->>>> Yes, but IMHO that's an implementation detail. The same applies for
->>>> 32bit PPC binaries if you use 4k aligned segments. If your applications
->>>> are not aligned for your page size, you can't run them. The only
->>>> platform that managed nevertheless FWIW was IA64 ;).
->>>
->>> Yes, but there the binutils change happened early enough that by the
->>> time the kernel change went in, all major distros had binaries that
->>> were compatible.
->>
->> What is the exact symptom you see when running an unaligned user
->> space binary on 64k-pages? Do we at least print a helpful error
->> message somewhere or does it just crash?
+On 02/18/2015 07:32 AM, Maxime Ripard wrote:
+> The NDDB register holds the data that are needed by the read and write
+> commands.
 > 
-> The application doesn't even start because it cannot map page 0. It
-> looks like most 32-bit arm binaries are linked to be loaded at 32K. 
+> However, during a read PIO access, the datasheet specifies that after each 32
+> bytes read in that register, when BCH is enabled, we have to make sure that the
+> RDDREQ bit is set in the NDSR register.
+> 
+> This fixes an issue that was seen on the Armada 385, and presumably other mvebu
+> SoCs, when a read on a newly erased page would end up in the driver reporting a
+> timeout from the NAND.
+> 
+> Cc: <stable@vger.kernel.org> # v3.14
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/mtd/nand/pxa3xx_nand.c | 48 ++++++++++++++++++++++++++++++++++++------
+>  1 file changed, 42 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> index 96b0b1d27df1..bc677362bc73 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -480,6 +480,42 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
+>  	nand_writel(info, NDCR, ndcr | int_mask);
+>  }
+>  
+> +static void drain_fifo(struct pxa3xx_nand_info *info, void *data, int len)
+> +{
+> +	if (info->ecc_bch) {
+> +		int timeout;
+> +
+> +		/*
+> +		 * According to the datasheet, when reading from NDDB
+> +		 * with BCH enabled, after each 32 bytes reads, we
+> +		 * have to make sure that the NDSR.RDDREQ bit is set.
+> +		 *
+> +		 * Drain the FIFO 8 32 bits reads at a time, and skip
+> +		 * the polling on the last read.
+> +		 */
+> +		while (len > 8) {
+> +			__raw_readsl(info->mmio_base + NDDB, data, 8);
+> +
+> +			for (timeout = 0;
+> +			     !(nand_readl(info, NDSR) & NDSR_RDDREQ);
+> +			     timeout++) {
+> +				if (timeout >= 5) {
+> +					dev_err(&info->pdev->dev,
+> +						"Timeout on RDDREQ while draining the FIFO\n");
+> +					return;
+> +				}
+> +
+> +				mdelay(1);
 
-I looked at this briefly and the first problem I narrowed in on was underflow
-in the calculation of the off variable in elf_map().
+This is probably a stupid nit.. but here it goes is it any difference if
+udelay is used here?
 
-http://lxr.free-electrons.com/source/fs/binfmt_elf.c?v=3.18#L341
-
-Chris
-
+Does this makes anything better/worse?
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
