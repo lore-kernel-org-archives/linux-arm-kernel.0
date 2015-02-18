@@ -1,50 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Feb 2015 20:47:30 +0100
-Subject: [PATCH] net: smc91x: improve neponset hack
-Message-ID: <5763365.j5Nvv4LgM3@wuerfel>
+Date: Wed, 18 Feb 2015 17:09:25 +0100
+Subject: drm: bridge: ps8622 and ptn3460 depend on gpiolib
+Message-ID: <19803561.otRxsE7o5u@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The smc91x driver tries to support multiple platforms at compile
-time, but they are mutually exclusive at runtime, and not clearly
-defined.
+The ptn3460 driver recently started usign the gpiod interface
+which is only available on platforms that come with GPIOLIB
+support, resulting in a compile-time error:
 
-Trying to build for CONFIG_SA1100_ASSABET without CONFIG_ASSABET_NEPONSET
-results in this link error:
-
-drivers/built-in.o: In function `smc_drv_probe':
-:(.text+0x33310c): undefined reference to `neponset_ncr_frob'
-
-since the neponset_ncr_set function is not defined otherwise.
-
-Similarly, building for both CONFIG_SA1100_ASSABET and CONFIG_SA1100_PLEB
-results in a different build error:
-
-smsc/smc91x.c: In function 'smc_drv_probe':
-smsc/smc91x.c:2299:2: error: implicit declaration of function 'neponset_ncr_set' [-Werror=implicit-function-declaration]
-  neponset_ncr_set(NCR_ENET_OSC_EN);
+drivers/gpu/drm/bridge/ps8622.c: In function 'ps8622_pre_enable':
+drivers/gpu/drm/bridge/ps8622.c:368:2: error: implicit declaration of function 'gpiod_set_value' [-Werror=implicit-function-declaration]
+  gpiod_set_value(ps8622->gpio_rst, 0);
   ^
-smsc/smc91x.c:2299:19: error: 'NCR_ENET_OSC_EN' undeclared (first use in this function)
-  neponset_ncr_set(NCR_ENET_OSC_EN);
-                   ^
+drivers/gpu/drm/bridge/ps8622.c: In function 'ps8622_probe':
+drivers/gpu/drm/bridge/ps8622.c:584:2: error: implicit declaration of function 'devm_gpiod_get' [-Werror=implicit-function-declaration]
+  ps8622->gpio_slp = devm_gpiod_get(dev, "sleep");
+  ^
 
-This is an attempt to fix the call site responsible for both
-errors, making sure we call the function exactly when the driver
-is actually trying to run on the assabet/neponset machine. With
-this patch, I no longer see randconfig build errors in this file.
+Similarly, the newly added ps8622 driver started out with the same
+problem.
+
+This patch adds explicit Kconfig dependencies to avoid trying to
+build invalid configurations.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: f1336e6afb ("drm/bridge: Add I2C based driver for ps8622/ps8625 bridge")
+Fixes: af478d8823 ("drm/bridge: ptn3460: use gpiod interface")
 
-diff --git a/drivers/net/ethernet/smsc/smc91x.c b/drivers/net/ethernet/smsc/smc91x.c
-index 88a55f95fe09..fa3f193b5f4d 100644
---- a/drivers/net/ethernet/smsc/smc91x.c
-+++ b/drivers/net/ethernet/smsc/smc91x.c
-@@ -2355,7 +2355,7 @@ static int smc_drv_probe(struct platform_device *pdev)
- 	ret = smc_request_attrib(pdev, ndev);
- 	if (ret)
- 		goto out_release_io;
--#if defined(CONFIG_SA1100_ASSABET)
-+#if defined(CONFIG_ASSABET_NEPONSET) && !defined(CONFIG_SA1100_PLEB)
- 	neponset_ncr_set(NCR_ENET_OSC_EN);
- #endif
- 	platform_set_drvdata(pdev, ndev);
+diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+index acef3223772c..8f068a0e86a5 100644
+--- a/drivers/gpu/drm/bridge/Kconfig
++++ b/drivers/gpu/drm/bridge/Kconfig
+@@ -7,6 +7,7 @@ config DRM_PTN3460
+ 	tristate "PTN3460 DP/LVDS bridge"
+ 	depends on DRM
+ 	depends on OF
++	depends on GPIOLIB
+ 	select DRM_KMS_HELPER
+ 	select DRM_PANEL
+ 	---help---
+@@ -16,6 +17,7 @@ config DRM_PS8622
+ 	tristate "Parade eDP/LVDS bridge"
+ 	depends on DRM
+ 	depends on OF
++	depends on GPIOLIB
+ 	select DRM_PANEL
+ 	select DRM_KMS_HELPER
+ 	select BACKLIGHT_LCD_SUPPORT
