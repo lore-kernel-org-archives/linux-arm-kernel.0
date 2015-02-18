@@ -1,72 +1,46 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 18 Feb 2015 14:21:50 +0100
-Subject: [PATCH 2/2] at91sam9_wdt: Allow watchdog to reset device at
- early boot
-In-Reply-To: <6c0a3a5bcd93d18437eeed04712b4aeff201a16f.1424262664.git.timo.kokkonen@offcode.fi>
-References: <54B53160.6060309@roeck-us.net>
- <cover.1424262664.git.timo.kokkonen@offcode.fi>
- <6c0a3a5bcd93d18437eeed04712b4aeff201a16f.1424262664.git.timo.kokkonen@offcode.fi>
-Message-ID: <20150218142150.48bc2be4@bbrezillon>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Wed, 18 Feb 2015 13:40:06 +0000
+Subject: [PATCH 0/2] arm/arm64: Detect Xen support earlier
+In-Reply-To: <54E481D6.2080908@linaro.org>
+References: <1423722898-16110-1-git-send-email-julien.grall@linaro.org>
+ <1424259059.27775.17.camel@citrix.com> <54E47CBD.7060002@linaro.org>
+ <1424260988.27775.26.camel@citrix.com> <54E481D6.2080908@linaro.org>
+Message-ID: <1424266806.27775.55.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timo,
-
-On Wed, 18 Feb 2015 14:57:22 +0200
-Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
-
-> By default the driver will start a kernel timer which keeps on kicking
-> the watchdog HW until user space has opened the watchdog
-> device. Usually this is desirable as the watchdog HW is running by
-> default and the user space may not have any watchdog daemon running at
-> all.
+On Wed, 2015-02-18 at 12:13 +0000, Julien Grall wrote:
 > 
-> However, on production systems it may be mandatory that also early
-> crashes and lockups will lead to a watchdog reset, even if they happen
-> before the user space has opened the watchdog device.
+> On 18/02/2015 12:03, Ian Campbell wrote:
+> > On Wed, 2015-02-18 at 11:51 +0000, Julien Grall wrote:
+> >> Hi Ian,
+> >>
+> >> On 18/02/2015 11:30, Ian Campbell wrote:
+> >>> On Thu, 2015-02-12 at 06:34 +0000, Julien Grall wrote:
+> >>>> Hello,
+> >>>>
+> >>>> This small patch series move the detection of running on Xen earlier. This is
+> >>>> required in order to support earlyprintk via Xen and selecting the preferred
+> >>>> console.
+> >>>
+> >>> Thanks for doing this, having all of the init done in an initcall (even
+> >>> a relatively early one) has been a niggle I've wanted address for ages,
+> >>> for exactly earlyprintk and preferred console reasons.
+> >>>
+> >>> I had a very minor comment on #1 but nonetheless both patches:
+> >>> Acked-by: Ian Campbell <ian.campbell@citrix.com>
+> >>
+> >> Can I keep you ack on the first one with the __read_mostly dropped?
+> >
+> > Sure.
+> >
+> > BTW, when reposting you might want to CC the arch/arm* maintainers on
+> > this intro mail as well as just the second patch.
 > 
-> To resolve the issue, add a new device tree property
-> "early-timeout-sec" which will let the kernel timer to ping the
-> watchdog HW only as long as the specified timeout permits. The default
-> is still to use kernel timer, but more strict behavior can be enabled
-> via the device tree property.
-> 
-> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
-> ---
->  Documentation/devicetree/bindings/watchdog/watchdog.txt | 7 +++++++
->  drivers/watchdog/at91sam9_wdt.c                         | 9 ++++++++-
->  2 files changed, 15 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/watchdog/watchdog.txt b/Documentation/devicetree/bindings/watchdog/watchdog.txt
-> index 7e3686c..32647cf 100644
-> --- a/Documentation/devicetree/bindings/watchdog/watchdog.txt
-> +++ b/Documentation/devicetree/bindings/watchdog/watchdog.txt
-> @@ -4,9 +4,16 @@ using these definitions.
->  
->  Optional properties:
->  - timeout-sec: Contains the watchdog timeout in seconds.
-> +- early-timeout-sec: If present, specifies a timeout value in seconds
-> +  that the driver keeps on ticking the watchdog HW on behalf of user
-> +  space. Once this timeout expires watchdog is left to expire in
-> +  timeout-sec seconds. If this propery is set to zero, watchdog is
-> +  started (or left running) so that a reset occurs in timeout-sec
-> +  since the watchdog was started.
->  
->  Example:
->  
->  watchdog {
->  	 timeout-sec = <60>;
-> +	 early-timeout-sec = <120>;
->  };
+> Ok. I wasn't sure if this patches should go via the Xen tree or ARM one.
 
-IMHO the documentation update should be self-contained (it should be
-done in a separate patch).
+That's a question for all relevant maintainers to discuss -- and replies
+to the 0/N mail is a good place to do that. I suggest you explicitly ask
+the question in the intro next time around.
 
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Ian.
