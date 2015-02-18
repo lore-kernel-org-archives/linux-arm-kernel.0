@@ -1,39 +1,70 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 18 Feb 2015 16:08:12 +0000
-Subject: [PATCH] arm64: insn: fix compare-and-branch encodings
-In-Reply-To: <369053df4298c754061e47068834bd9640b0841b.1424273599.git.robin.murphy@arm.com>
-References: <369053df4298c754061e47068834bd9640b0841b.1424273599.git.robin.murphy@arm.com>
-Message-ID: <54E4B8EC.7090709@arm.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Wed, 18 Feb 2015 17:10:12 +0100
+Subject: [PATCH] ARM: dts: Update exynos5250-spring with mmc node changes
+Message-ID: <1424275812-6797-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oops, missed some CCs...
+Resolve a merge conflict with mmc refactoring aaa25a5a33cb ("ARM: dts:
+unuse the slot-node and deprecate the supports-highspeed for dw-mmc in
+exynos") by dropping the slot at 0 nodes, moving its bus-width property to
+the mmc node and replacing supports-highspeed with cap-{mmc,sd}-highspeed,
+matching exynos5250-snow.
 
-On 18/02/15 15:40, Robin Murphy wrote:
-> Fix cbz/cbnz having the mask offset by a bit, and add encodings for
-> tbz/tbnz so that all branch forms are represented.
->
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> ---
->   arch/arm64/include/asm/insn.h | 6 ++++--
->   1 file changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-> index e2ff32a..d2f4942 100644
-> --- a/arch/arm64/include/asm/insn.h
-> +++ b/arch/arm64/include/asm/insn.h
-> @@ -264,8 +264,10 @@ __AARCH64_INSN_FUNCS(ands,	0x7F200000, 0x6A000000)
->   __AARCH64_INSN_FUNCS(bics,	0x7F200000, 0x6A200000)
->   __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
->   __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
-> -__AARCH64_INSN_FUNCS(cbz,	0xFE000000, 0x34000000)
-> -__AARCH64_INSN_FUNCS(cbnz,	0xFE000000, 0x35000000)
-> +__AARCH64_INSN_FUNCS(cbz,	0x7F000000, 0x34000000)
-> +__AARCH64_INSN_FUNCS(cbnz,	0x7F000000, 0x35000000)
-> +__AARCH64_INSN_FUNCS(tbz,	0x7F000000, 0x36000000)
-> +__AARCH64_INSN_FUNCS(tbnz,	0x7F000000, 0x37000000)
->   __AARCH64_INSN_FUNCS(bcond,	0xFF000010, 0x54000000)
->   __AARCH64_INSN_FUNCS(svc,	0xFFE0001F, 0xD4000001)
->   __AARCH64_INSN_FUNCS(hvc,	0xFFE0001F, 0xD4000002)
->
+Cc: Jaehoon Chung <jh80.chung@samsung.com>
+Fixes: 53dd4138bb0a ("ARM: dts: Add exynos5250-spring device tree")
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ arch/arm/boot/dts/exynos5250-spring.dts | 16 ++++------------
+ 1 file changed, 4 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
+index f02775487cd4..c41600e587e0 100644
+--- a/arch/arm/boot/dts/exynos5250-spring.dts
++++ b/arch/arm/boot/dts/exynos5250-spring.dts
+@@ -429,7 +429,6 @@
+ &mmc_0 {
+ 	status = "okay";
+ 	num-slots = <1>;
+-	supports-highspeed;
+ 	broken-cd;
+ 	card-detect-delay = <200>;
+ 	samsung,dw-mshc-ciu-div = <3>;
+@@ -437,11 +436,8 @@
+ 	samsung,dw-mshc-ddr-timing = <1 2>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4 &sd0_bus8>;
+-
+-	slot at 0 {
+-		reg = <0>;
+-		bus-width = <8>;
+-	};
++	bus-width = <8>;
++	cap-mmc-highspeed;
+ };
+ 
+ /*
+@@ -451,7 +447,6 @@
+ &mmc_1 {
+ 	status = "okay";
+ 	num-slots = <1>;
+-	supports-highspeed;
+ 	broken-cd;
+ 	card-detect-delay = <200>;
+ 	samsung,dw-mshc-ciu-div = <3>;
+@@ -459,11 +454,8 @@
+ 	samsung,dw-mshc-ddr-timing = <1 2>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sd1_clk &sd1_cmd &sd1_cd &sd1_bus4>;
+-
+-	slot at 0 {
+-		reg = <0>;
+-		bus-width = <4>;
+-	};
++	bus-width = <4>;
++	cap-sd-highspeed;
+ };
+ 
+ &pinctrl_0 {
+-- 
+2.1.4
