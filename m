@@ -1,37 +1,46 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 18 Feb 2015 11:35:55 +0100
-Subject: [PATCH 09/11] ARM: berlin: rework chip and system controller
- nodes for BG2
-In-Reply-To: <20150218103322.GA16432@kwain>
-References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
- <1423671332-24580-10-git-send-email-antoine.tenart@free-electrons.com>
- <54E4699E.4010909@gmail.com> <20150218103322.GA16432@kwain>
-Message-ID: <54E46B0B.4010703@gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 18 Feb 2015 11:43:25 +0100
+Subject: __HAVE_ARCH_CMPXCHG on ARM?
+In-Reply-To: <20150202133933.GD31847@arm.com>
+References: <20150129185618.GA31459@nathan3500-linux-VM>
+ <CAM2zO=CVCZFNiSukgcgNNT0==xgLK4w5HF3Pz=dcFmrEHPtLdw@mail.gmail.com>
+ <20150202133933.GD31847@arm.com>
+Message-ID: <20150218104325.GC28763@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.02.2015 11:33, Antoine Tenart wrote:
-> On Wed, Feb 18, 2015 at 11:29:50AM +0100, Sebastian Hesselbarth wrote:
->> On 11.02.2015 17:15, Antoine Tenart wrote:
->> [...]
->>> -		chip: chip-control at ea0000 {
->>> -			compatible = "marvell,berlin2-chip-ctrl";
->>> -			#clock-cells = <1>;
->>> -			#reset-cells = <2>;
->>> +		chip: chip-controller at ea0000 {
->>> +			compatible = "marvell,berlin2-chip-ctrl", "syscon";
->>>   			reg = <0xea0000 0x400>;
->>> +			#clock-cells = <1>;
->>
->> I noticed just now, but we should either have all of clock, reset,
->> pinctrl as sub-nodes or none. Currently, this has pinctrl and reset
->> as sub-nodes but clock hooked up to chip-controller.
->
-> Of course. The clock rework is part of the other series[1] which
-> modifies the clock driver to use regmap but also move the clock into
-> its own sub-node.
+* Will Deacon | 2015-02-02 13:39:33 [+0000]:
 
-Ah, ok. I misinterpreted the addition of #clock-cells above, but it
-gets removed and re-added again.
+>> diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
+>> index 7eb18c1..a91b44e 100644
+>> --- a/arch/arm/include/asm/cmpxchg.h
+>> +++ b/arch/arm/include/asm/cmpxchg.h
+>> @@ -127,6 +127,8 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+>> 
+>>  #else  /* min ARCH >= ARMv6 */
+>> 
+>> +#define __HAVE_ARCH_CMPXCHG 1
+>
+>Is it even possible to have CONFIG_SMP=y on an architecture that doesn't
+>support native cmpxchg? Certainly, the asm-generic cmpxchg.h barfs if
+>SMP, so couldn't we just change/extend the __HAVE_ARCH_CMPXCHG check in
+>rtmutex.c to work automatically with SMP architectures? That would help
+>arm64 too.
+
+RT mutex was first introduced in 23f78d4a0 ("[PATCH] pi-futex: rt mutex core")
+which is v2.6.18. The generic cmpxchg was introduced laster in
+068fbad288 ("Add cmpxchg_local to asm-generic for per cpu atomic
+operations") which is v2.6.25.
+Back then something was required to get RT mutex working with the fast
+path on architectures without cmpxchg and this seems to be the result.
+Please correct me if I'm wrong.
+
+On the other hand, how do you implement a SMP systems without native cmpxchg()
+support? Isn't this a prerequisite?
+
+Right now I don't see a reason why we should not remove
+__HAVE_ARCH_CMPXCHG and assume cmpxchg() is always there.
+
+>Will
 
 Sebastian
