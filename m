@@ -1,34 +1,39 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed, 18 Feb 2015 19:25:53 +0100
-Subject: [PATCH 0/6] ASoC: samsung: Spring sound support
-Message-ID: <1424283959-16289-1-git-send-email-afaerber@suse.de>
+Date: Wed, 18 Feb 2015 19:25:54 +0100
+Subject: [PATCH 1/6] ASoC: max98088: Document DT bindings
+In-Reply-To: <1424283959-16289-1-git-send-email-afaerber@suse.de>
+References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
+Message-ID: <1424283959-16289-2-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-This series prepares sound support for the HP Chromebook 11.
-
-Regards,
-Andreas
-
-
-Andreas F?rber (6):
-  ASoC: max98088: Document DT bindings
-  ASoC: max98088: Add DT bindings
-  ARM: dts: Add max98089 to exynos5250-spring
-  ASoC: samsung: Document binding for max98089 based Snow driver
-  ASoC: samsung: Extend Snow driver to support max98089
-  ARM: dts: Add sound support to exynos5250-spring
-
- .../devicetree/bindings/sound/max98088.txt         | 16 ++++++++++++
- Documentation/devicetree/bindings/sound/snow.txt   |  1 +
- arch/arm/boot/dts/exynos5250-spring.dts            | 30 ++++++++++++++++++++++
- sound/soc/codecs/max98088.c                        |  8 ++++++
- sound/soc/samsung/Kconfig                          |  1 +
- sound/soc/samsung/snow.c                           |  1 +
- 6 files changed, 57 insertions(+)
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ Documentation/devicetree/bindings/sound/max98088.txt | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/sound/max98088.txt
 
+diff --git a/Documentation/devicetree/bindings/sound/max98088.txt b/Documentation/devicetree/bindings/sound/max98088.txt
+new file mode 100644
+index 000000000000..6f8fe85040ee
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/max98088.txt
+@@ -0,0 +1,16 @@
++MAX98088 audio CODEC
++
++This device supports I2C only.
++
++Required properties:
++
++- compatible : "maxim,max98088" or "maxim,max98089".
++
++- reg : The I2C address of the device.
++
++Example:
++
++max98089: codec at 10 {
++	compatible = "maxim,max98089";
++	reg = <0x10>;
++};
 -- 
 2.1.4
