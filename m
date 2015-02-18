@@ -1,31 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Feb 2015 16:29:10 +0100
-Subject: [PATCH] spi: sirf: add reset controller dependency
-Message-ID: <4553005.HBquOfbqXe@wuerfel>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 18 Feb 2015 15:40:17 +0000
+Subject: [PATCH] arm64: insn: fix compare-and-branch encodings
+Message-ID: <369053df4298c754061e47068834bd9640b0841b.1424273599.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sirf spi driver only builds correctly if the reset controller
-framework is available, otherwise we get an error:
+Fix cbz/cbnz having the mask offset by a bit, and add encodings for
+tbz/tbnz so that all branch forms are represented.
 
-drivers/spi/spi-sirf.c: In function 'spi_sirfsoc_probe':
-drivers/spi/spi-sirf.c:651:2: error: implicit declaration of function 'device_reset' [-Werror=implicit-function-declaration]
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/insn.h | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-The adds a dependency in Kconfig to prevent it from being selected
-if the resets are not available.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes:  8509c55fcb51 ("spi: sirf: reset SPI controller in init stage")
-
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index ab8dfbef6f1b..b3ae90e4c03c 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -507,6 +507,7 @@ config SPI_SH_HSPI
- config SPI_SIRF
- 	tristate "CSR SiRFprimaII SPI controller"
- 	depends on SIRF_DMA
-+	depends on RESET_CONTROLLER
- 	select SPI_BITBANG
- 	help
- 	  SPI driver for CSR SiRFprimaII SoCs
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index e2ff32a..d2f4942 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -264,8 +264,10 @@ __AARCH64_INSN_FUNCS(ands,	0x7F200000, 0x6A000000)
+ __AARCH64_INSN_FUNCS(bics,	0x7F200000, 0x6A200000)
+ __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
+ __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
+-__AARCH64_INSN_FUNCS(cbz,	0xFE000000, 0x34000000)
+-__AARCH64_INSN_FUNCS(cbnz,	0xFE000000, 0x35000000)
++__AARCH64_INSN_FUNCS(cbz,	0x7F000000, 0x34000000)
++__AARCH64_INSN_FUNCS(cbnz,	0x7F000000, 0x35000000)
++__AARCH64_INSN_FUNCS(tbz,	0x7F000000, 0x36000000)
++__AARCH64_INSN_FUNCS(tbnz,	0x7F000000, 0x37000000)
+ __AARCH64_INSN_FUNCS(bcond,	0xFF000010, 0x54000000)
+ __AARCH64_INSN_FUNCS(svc,	0xFFE0001F, 0xD4000001)
+ __AARCH64_INSN_FUNCS(hvc,	0xFFE0001F, 0xD4000002)
+-- 
+1.9.1
