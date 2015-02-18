@@ -1,49 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Feb 2015 21:55:53 +0100
-Subject: [PATCH 2/2 v2] cpufreq: s3c: remove last use of resume_clocks callback
-In-Reply-To: <7331404.XKGG8rohnR@wuerfel>
-References: <7331404.XKGG8rohnR@wuerfel>
-Message-ID: <7832522.n5E2i6JVhJ@wuerfel>
+From: liquid.acid@gmx.net (Tobias Jakobi)
+Date: Wed, 18 Feb 2015 21:59:44 +0100
+Subject: [PATCHv3 0/8] devfreq: Add generic exynos memory-bus
+ frequency driver
+In-Reply-To: <54DFE797.1020008@math.uni-bielefeld.de>
+References: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
+ <54DFE797.1020008@math.uni-bielefeld.de>
+Message-ID: <54E4FD40.8020206@gmx.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 32726d2d550 ("ARM: SAMSUNG: Remove legacy clock code")
-already removed the callback pointer, but there was one remaining
-user:
+Hello again,
 
-drivers/cpufreq/s3c24xx-cpufreq.c: In function 's3c_cpufreq_resume_clocks':
-drivers/cpufreq/s3c24xx-cpufreq.c:149:14: error: 'struct s3c_cpufreq_info' has no member named 'resume_clocks'
-  cpu_cur.info->resume_clocks();
-              ^
+Tobias Jakobi wrote
+> I've tested the series on my Odroid-X2 (by adapting the TRATS2 changes),
+> and so far I haven't seen any issues. With the system being idle one can
+> see that the 'simple_ondemand' devfreq governor clocks down both memory
+> busses to the lowest state.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 32726d2d550 ("ARM: SAMSUNG: Remove legacy clock code")
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: stable at vger.kernel.org # v3.17+
+looks I was too hasty the last time. Actually this series breaks HDMI
+output for me (or at least with 'simple_ondemand' governor, haven't
+tried with performance yet).
 
-diff --git a/drivers/cpufreq/s3c24xx-cpufreq.c b/drivers/cpufreq/s3c24xx-cpufreq.c
-index bd340a1ca87d..733aa5153e74 100644
---- a/drivers/cpufreq/s3c24xx-cpufreq.c
-+++ b/drivers/cpufreq/s3c24xx-cpufreq.c
-@@ -144,11 +144,6 @@ static void s3c_cpufreq_setfvco(struct s3c_cpufreq_config *cfg)
- 	(cfg->info->set_fvco)(cfg);
- }
- 
--static inline void s3c_cpufreq_resume_clocks(void)
--{
--	cpu_cur.info->resume_clocks();
--}
--
- static inline void s3c_cpufreq_updateclk(struct clk *clk,
- 					 unsigned int freq)
- {
-@@ -417,9 +412,6 @@ static int s3c_cpufreq_resume(struct cpufreq_policy *policy)
- 
- 	last_target = ~0;	/* invalidate last_target setting */
- 
--	/* first, find out what speed we resumed at. */
--	s3c_cpufreq_resume_clocks();
--
- 	/* whilst we will be called later on, we try and re-set the
- 	 * cpu frequencies as soon as possible so that we do not end
- 	 * up resuming devices and then immediately having to re-set
+I tried to run some simple application, but it hangs in uninterruptible
+sleep immediately, probably before the first page flip. Going to check
+this more thoroughly.
+
+Maybe some parts of the hdmi subsystem don't like the lower clocks?
+
+With best wishes,
+Tobias
