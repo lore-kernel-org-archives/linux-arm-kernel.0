@@ -1,35 +1,29 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Wed, 18 Feb 2015 11:41:52 +0000
-Subject: [PATCH 1/2] arm/xen: Correctly check if the event channel
- interrupt is present
-In-Reply-To: <1424258866.27775.15.camel@citrix.com>
-References: <1423722898-16110-1-git-send-email-julien.grall@linaro.org>	
- <1423722898-16110-2-git-send-email-julien.grall@linaro.org>
- <1424258866.27775.15.camel@citrix.com>
-Message-ID: <54E47A80.9050208@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Feb 2015 11:49:07 +0000
+Subject: [PATCH v3 1/8] ARM: multi_v7_defconfig: Enable support for ST's LPC
+ Watchdog
+In-Reply-To: <1424260154-12868-1-git-send-email-lee.jones@linaro.org>
+References: <1424260154-12868-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1424260154-12868-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ian,
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-On 18/02/2015 11:27, Ian Campbell wrote:
-> On Thu, 2015-02-12 at 06:34 +0000, Julien Grall wrote:
->> The function irq_of_parse_and_map returns 0 when the IRQ is not found.
->>
->> Furthermore xen_events_irq is only read when the CPU is bring up, so
->> it's not necessary to use the attribute __read_mostly.
->
-> Part of the purpose of __read_mostly is to move such things out of
-> sharing cachelines with other more hot read/write things, as much as it
-> is to group all the "read only" things together.
-
-Hmmm... You are right. I didn't understand this macro like that.
-
-I will resend the series with this patch drop and add Ard's patch [1].
-
-Regards,
-
-[1] https://patches.linaro.org/44633/
-
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 7afc0a2..561ca4f 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -274,6 +274,7 @@ CONFIG_WATCHDOG=y
+ CONFIG_XILINX_WATCHDOG=y
+ CONFIG_ARM_SP805_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
++CONFIG_ST_LPC_WATCHDOG=y
+ CONFIG_SUNXI_WATCHDOG=y
+ CONFIG_MESON_WATCHDOG=y
+ CONFIG_MFD_AS3722=y
 -- 
-Julien Grall
+1.9.1
