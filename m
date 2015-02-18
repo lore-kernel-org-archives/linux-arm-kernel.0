@@ -1,29 +1,33 @@
 From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez-Ortiz)
-Date: Wed, 18 Feb 2015 15:07:48 -0500
-Subject: [PATCH 1/2] Documentation: bindings: add optional fifo size property
- to AMBA UARTs
+Date: Wed, 18 Feb 2015 15:07:49 -0500
+Subject: [PATCH 2/2] drivers/tty: pl011: read fifo size from OF if present
 In-Reply-To: <1424290069-8760-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
 References: <amba uarts - arm type uarts fifo size provided by device tree>
  <1424290069-8760-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
-Message-ID: <1424290069-8760-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
+Message-ID: <1424290069-8760-3-git-send-email-jorge.ramirez-ortiz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
 ---
- Documentation/devicetree/bindings/serial/pl011.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/tty/serial/amba-pl011.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/serial/pl011.txt b/Documentation/devicetree/bindings/serial/pl011.txt
-index 5d2e840..05d1adb 100644
---- a/Documentation/devicetree/bindings/serial/pl011.txt
-+++ b/Documentation/devicetree/bindings/serial/pl011.txt
-@@ -13,5 +13,6 @@ Optional properties:
- - dmas:	   When present, may have one or two dma channels.
- 	   The first one must be named "rx", the second one
- 	   must be named "tx".
-+- fifo-size:  When present, must have the fifo size.
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 02016fc..c6a2dd8 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -84,6 +84,11 @@ struct vendor_data {
  
- See also bindings/arm/primecell.txt
+ static unsigned int get_fifosize_arm(struct amba_device *dev)
+ {
++	u32 val;
++
++	if (!of_property_read_u32(dev->dev.of_node, "fifo-size", &val))
++		return val;
++
+ 	return amba_rev(dev) < 3 ? 16 : 32;
+ }
+ 
 -- 
 1.9.1
