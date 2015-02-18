@@ -1,50 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Feb 2015 12:08:44 +0000
-Subject: [PATCH v5 1/6] mfd: fsl imx25 Touchscreen ADC driver
-In-Reply-To: <CAOMZO5BjVrcb3t1=kQQYf=-PztzDpGk8S5ApsTThGekT1yTTnA@mail.gmail.com>
-References: <1422108103-15052-1-git-send-email-mpa@pengutronix.de>
- <1422108103-15052-2-git-send-email-mpa@pengutronix.de>
- <20150216133829.GG14545@x1>
- <CAOMZO5AwbNeEhVgUuLUi-_QT0DesPBBCTvvebuA91y-P2_CNzg@mail.gmail.com>
- <20150218080156.GA5781@x1>
- <CAOMZO5BjVrcb3t1=kQQYf=-PztzDpGk8S5ApsTThGekT1yTTnA@mail.gmail.com>
-Message-ID: <20150218120844.GC22296@x1>
+From: venkappa.m@samsung.com (Venkappa Mala)
+Date: Wed, 18 Feb 2015 12:12:22 +0000 (UTC)
+Subject: [PATCH v10 4/6] ARM: add vdso user-space code
+References: <1411413485-7675-1-git-send-email-nathan_lynch@mentor.com>
+ <1411413485-7675-5-git-send-email-nathan_lynch@mentor.com>
+ <loom.20150213T053547-381@post.gmane.org>
+ <20150213105447.GB3508@e104818-lin.cambridge.arm.com>
+ <loom.20150213T124417-857@post.gmane.org> <20150213141425.GA4713@localhost>
+ <loom.20150213T153239-809@post.gmane.org>
+ <20150213153253.GA23801@e104818-lin.cambridge.arm.com>
+Message-ID: <loom.20150218T122348-60@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Feb 2015, Fabio Estevam wrote:
+Catalin Marinas <catalin.marinas <at> arm.com> writes:
 
-> On Wed, Feb 18, 2015 at 6:01 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Tue, 17 Feb 2015, Fabio Estevam wrote:
-> >
-> >> On Mon, Feb 16, 2015 at 11:38 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> >>
-> >> >> +static int mx25_tsadc_setup_irq(struct platform_device *pdev,
-> >> >> +                             struct mx25_tsadc *tsadc)
-> >> >> +{
-> >> >> +     struct device *dev = &pdev->dev;
-> >> >> +     struct device_node *np = dev->of_node;
-> >> >> +     int irq;
-> >> >> +
-> >> >> +     irq = platform_get_irq(pdev, 0);
-> >> >> +     if (irq < 0) {
-> >> >
-> >> > What if 0 is returned?
-> >>
-> >> Then  imx25.dtsi would be passing irq=0 for the ADC, which would be
-> >> totally wrong.
-> >
-> > Exactly, so it should be <=.
+
+> I highly doubt you are having a problem with [1] since you mentioned
+> Cortex-A7 which falls under [2]. If you have a _processor_
+> implementation with generic timers but no Hyp, as per the ARMv7 ARM 
+the
+> CNTVCT == CNTPCT, otherwise it is a CPU bug.
 > 
-> imx25.dtsi passes interrupts = <46>; for the touch screen controller,
-> so the irq number will never be zero.
+> What you actually have is [2] but without code to initialise the Hyp
+> mode. If your kernel is running non-secure, sane Hyp registers
+> initialisation is mandatory even when the kernel does not boot in Hyp.
+yes, cortexA7 is falling under [2]. i.e. my mistake. Thanks for the 
+correction.
 
-It doesn't matter what happens to be passed at the moment.  The
-correct thing to do is enforce correct/full error checking.  Yes <0 is
-an error, but so is =0, so encompass it in the checks.
+> Even for the kernel, this should be the case unless
+> "arm,cpu-registers-not-fw-configured" is passed in the DT (this was
+> really only meant as workaround for broken firmware; I think
+> Documentation/arm/Booting needs to be updated with the state of the
+> generic timers on entry).
+It will be good and it helps a lot if it updates.
+ 
+> IIRC there were some discussions about Linux booting in secure mode on
+> ARMv7 with no firmware to initialise the Hyp registers. If that's the
+> case for you, we could restart that discussion and try to initialise
+> CNTVOFF in the kernel running in _secure_ mode (possibly with some CPU
+> notifiers in the generic timer code).
+My test environment is like CNTVOFF initialization is not taken care in 
+the firmware, HYP mode is disabled and kernel is booted with Secure SVC 
+PL1 mode. As you have mentioned about restarting the thread, perhaps, it 
+will be good to have a discussion in the following  thread rather than 
+restarting the thread.
+arm: Handle starting up in secure mode
+https://lkml.org/lkml/2014/9/16/552
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+May I know your opinion about this one?
+
+BR,
+Venkappa
