@@ -1,37 +1,75 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 18 Feb 2015 09:57:59 -0200
-Subject: [PATCH v5 1/6] mfd: fsl imx25 Touchscreen ADC driver
-In-Reply-To: <20150218080156.GA5781@x1>
-References: <1422108103-15052-1-git-send-email-mpa@pengutronix.de>
- <1422108103-15052-2-git-send-email-mpa@pengutronix.de>
- <20150216133829.GG14545@x1>
- <CAOMZO5AwbNeEhVgUuLUi-_QT0DesPBBCTvvebuA91y-P2_CNzg@mail.gmail.com>
- <20150218080156.GA5781@x1>
-Message-ID: <CAOMZO5BjVrcb3t1=kQQYf=-PztzDpGk8S5ApsTThGekT1yTTnA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Feb 2015 11:58:53 +0000
+Subject: [PATCH 01/11] mfd: add the Berlin controller driver
+In-Reply-To: <54E4730D.1060507@gmail.com>
+References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1423671332-24580-2-git-send-email-antoine.tenart@free-electrons.com>
+ <20150216124808.GC14545@x1> <20150217092020.GC4507@kwain>
+ <20150217115447.GA3989@x1> <20150218084004.GD21937@kwain>
+ <20150218090958.GA18042@x1> <20150218092225.GE21937@kwain>
+ <20150218104023.GA22296@x1> <54E4730D.1060507@gmail.com>
+Message-ID: <20150218115853.GB22296@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 18, 2015 at 6:01 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Tue, 17 Feb 2015, Fabio Estevam wrote:
->
->> On Mon, Feb 16, 2015 at 11:38 AM, Lee Jones <lee.jones@linaro.org> wrote:
->>
->> >> +static int mx25_tsadc_setup_irq(struct platform_device *pdev,
->> >> +                             struct mx25_tsadc *tsadc)
->> >> +{
->> >> +     struct device *dev = &pdev->dev;
->> >> +     struct device_node *np = dev->of_node;
->> >> +     int irq;
->> >> +
->> >> +     irq = platform_get_irq(pdev, 0);
->> >> +     if (irq < 0) {
->> >
->> > What if 0 is returned?
->>
->> Then  imx25.dtsi would be passing irq=0 for the ADC, which would be
->> totally wrong.
->
-> Exactly, so it should be <=.
+On Wed, 18 Feb 2015, Sebastian Hesselbarth wrote:
 
-imx25.dtsi passes interrupts = <46>; for the touch screen controller,
-so the irq number will never be zero.
+> On 18.02.2015 11:40, Lee Jones wrote:
+> >On Wed, 18 Feb 2015, Antoine Tenart wrote:
+> [...]
+> >>chip: chip-controller at ea0000 {
+> >>         compatible = "marvell,berlin2q-chip-ctrl", "syscon";
+> >>         reg = <0xea0000 0x400>, <0xdd0170 0x10>;
+> >>         #clock-cells = <1>;
+> >>         clocks = <&refclk>;
+> >>         clock-names = "refclk";
+> >>
+> >>         soc_pinctrl: pin-controller {
+> >>                 compatible = "marvell,berlin2q-soc-pinctrl";
+> >>
+> >>                 twsi0_pmux: twsi0-pmux {
+> >>                         groups = "G6";
+> >>                         function = "twsi0";
+> >>                 };
+> >>
+> >>                 twsi1_pmux: twsi1-pmux {
+> >>                         groups = "G7";
+> >>                         function = "twsi1";
+> >>                 };
+> >>         };
+> >>
+> >>         chip_rst: reset {
+> >>                 compatible = "marvell,berlin2-reset";
+> >>                 #reset-cells = <2>;
+> >>         };
+> >>};
+> >
+> >This is what I'd expect to see in DT, so we're heading in the right
+> >direction.  So make to my original question, what's the point of this
+> >MFD driver, and why don't you just let DT framework register these
+> >devices for you?
+> >
+> >You issue a compatible string here, then duplicate it in the driver,
+> >why do you think this is necessary?
+> 
+> there is no DT framework that automatically probes for
+> compatible<->driver matches. You either make it "simple-bus" compatible
+> which will call of_foo_populate() or you have to register each of the
+> devices yourself. It clearly is not a bus, so if we use this as a
+> workaround, we'll get yelled at by others.
+
+I do agree that using 'simple-bus' to describe only this IP would be
+an abuse.  However, my foundation thought/argument is unchanged.  This
+'driver' is a hack.  It has no functional use besides to work around a
+problem of semantics and as such has no place in MFD.
+
+Back onto the simple-bus theme, as this is a syscon device it is a bus
+of sorts.  Have you thought about making it a child of your its syscon
+node, then using simple-bus to get the OF framework to register the
+child devices?
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
