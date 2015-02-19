@@ -1,31 +1,37 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Thu, 19 Feb 2015 03:44:14 +0100
-Subject: [PATCH v5 8/9] ARM: dts: exynos5250: add display power domain
-In-Reply-To: <1422883228-10690-9-git-send-email-m.szyprowski@samsung.com>
-References: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
- <1422883228-10690-9-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <54E54DFE.9040808@suse.de>
+From: trblinux@gmail.com (Tushar Behera)
+Date: Thu, 19 Feb 2015 09:19:05 +0530
+Subject: [alsa-devel] [PATCH 4/6] ASoC: samsung: Document binding for
+ max98089 based Snow driver
+In-Reply-To: <1424283959-16289-5-git-send-email-afaerber@suse.de>
+References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
+ <1424283959-16289-5-git-send-email-afaerber@suse.de>
+Message-ID: <54E55D31.7020807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 02.02.2015 um 14:20 schrieb Marek Szyprowski:
-> From: Andrzej Hajda <a.hajda@samsung.com>
+On 02/18/2015 11:55 PM, Andreas F?rber wrote:
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  Documentation/devicetree/bindings/sound/snow.txt | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> The patch adds domain definition and references to it in appropriate devices.
+> diff --git a/Documentation/devicetree/bindings/sound/snow.txt b/Documentation/devicetree/bindings/sound/snow.txt
+> index 6df74f15687f..1430a6bdb2ae 100644
+> --- a/Documentation/devicetree/bindings/sound/snow.txt
+> +++ b/Documentation/devicetree/bindings/sound/snow.txt
+> @@ -2,6 +2,7 @@ Audio Binding for Snow boards
+>  
+>  Required properties:
+>  - compatible : Can be one of the following,
+> +			"google,snow-audio-max98089" or
+>  			"google,snow-audio-max98090" or
+>  			"google,snow-audio-max98091" or
+>  			"google,snow-audio-max98095"
 > 
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> [mszyprow: rebased onto generic power domains dt bindings]
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-On Spring,
+Looks good.
 
-Tested-by: Andreas F?rber <afaerber@suse.de>
-
-Andreas
+Acked-by: Tushar Behera <trblinux@gmail.com>
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
-Graham Norton; HRB 21284 (AG N?rnberg)
+Tushar Behera
