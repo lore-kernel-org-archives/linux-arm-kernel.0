@@ -1,43 +1,33 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Thu, 19 Feb 2015 10:32:34 +0100
-Subject: drm: bridge: ps8622 and ptn3460 depend on gpiolib
-In-Reply-To: <19803561.otRxsE7o5u@wuerfel>
-References: <19803561.otRxsE7o5u@wuerfel>
-Message-ID: <20150219093233.GF5086@ulmo.nvidia.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 19 Feb 2015 10:37:52 +0100
+Subject: [PATCH 7/7] serial: imx: add support for half duplex rs485
+In-Reply-To: <CAFeThoCahCMGniG59k4Le3E-4P+TEi_7dxUagKWzc20WAvkMuA@mail.gmail.com>
+References: <1424292068-28197-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1424292068-28197-7-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CAFeThoCahCMGniG59k4Le3E-4P+TEi_7dxUagKWzc20WAvkMuA@mail.gmail.com>
+Message-ID: <20150219093752.GO19388@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 18, 2015 at 05:09:25PM +0100, Arnd Bergmann wrote:
-> The ptn3460 driver recently started usign the gpiod interface
-> which is only available on platforms that come with GPIOLIB
-> support, resulting in a compile-time error:
-> 
-> drivers/gpu/drm/bridge/ps8622.c: In function 'ps8622_pre_enable':
-> drivers/gpu/drm/bridge/ps8622.c:368:2: error: implicit declaration of function 'gpiod_set_value' [-Werror=implicit-function-declaration]
->   gpiod_set_value(ps8622->gpio_rst, 0);
->   ^
-> drivers/gpu/drm/bridge/ps8622.c: In function 'ps8622_probe':
-> drivers/gpu/drm/bridge/ps8622.c:584:2: error: implicit declaration of function 'devm_gpiod_get' [-Werror=implicit-function-declaration]
->   ps8622->gpio_slp = devm_gpiod_get(dev, "sleep");
->   ^
-> 
-> Similarly, the newly added ps8622 driver started out with the same
-> problem.
-> 
-> This patch adds explicit Kconfig dependencies to avoid trying to
-> build invalid configurations.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: f1336e6afb ("drm/bridge: Add I2C based driver for ps8622/ps8625 bridge")
-> Fixes: af478d8823 ("drm/bridge: ptn3460: use gpiod interface")
+Hello Aur?lien,
 
-Applied, thanks.
+On Thu, Feb 19, 2015 at 10:15:10AM +0100, aur?lien bouin wrote:
+> 2015-02-18 21:41 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> > The transmitter is expected to be controlled by the UART's RTS pin.
+> 
+> You definately can be more open in using the last patch I have sent
+> the 11th of februrary using rs485.padding[0] that give in parameter
+> the GPIO to use for transmit pin
+you have a link? Without having seen that patch this can well be a
+separate patch. And (also without having seen the patch) I wonder why
+the information which gpio to use doesn't come from the device tree but
+is supplied by userspace. I thought about expanding mctrl-gpio for that,
+but as there are a few conflicting patches to mctrl-gpio out I wanted to
+wait until the dust settles.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150219/355be74c/attachment.sig>
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
