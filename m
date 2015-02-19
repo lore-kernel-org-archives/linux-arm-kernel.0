@@ -1,43 +1,30 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Thu, 19 Feb 2015 18:56:25 +0100
-Subject: [PATCH 5/6] ASoC: samsung: Extend Snow driver to support max98089
-In-Reply-To: <CAD=FV=WkieDSSB_-a6DtH1hmq6SyZk4NAR-eXQ11hxUDMTvRfg@mail.gmail.com>
-References: <1424283959-16289-1-git-send-email-afaerber@suse.de>	<1424283959-16289-6-git-send-email-afaerber@suse.de>	<20150219094425.GB3198@finisterre.sirena.org.uk>
- <CAD=FV=WkieDSSB_-a6DtH1hmq6SyZk4NAR-eXQ11hxUDMTvRfg@mail.gmail.com>
-Message-ID: <54E623C9.7070001@suse.de>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 19 Feb 2015 18:57:24 +0100
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <20150219175518.GB26965@hawk.usersys.redhat.com>
+References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150219165731.GA26965@hawk.usersys.redhat.com>
+ <CAKv+Gu8Je3RRrgEFCZ7JUWtOgk3WqA_qdBEOPAMc3OqnKr1bwg@mail.gmail.com>
+ <20150219175518.GB26965@hawk.usersys.redhat.com>
+Message-ID: <54E62404.9040702@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 19.02.2015 um 18:44 schrieb Doug Anderson:
-> On Thu, Feb 19, 2015 at 1:44 AM, Mark Brown <broonie@kernel.org> wrote:
->> On Wed, Feb 18, 2015 at 07:25:58PM +0100, Andreas F?rber wrote:
->>
->>>  static const struct of_device_id snow_of_match[] = {
->>> +     { .compatible = "google,snow-audio-max98089", },
->>>       { .compatible = "google,snow-audio-max98090", },
->>>       { .compatible = "google,snow-audio-max98091", },
->>>       { .compatible = "google,snow-audio-max98095", },
->>
->> Since we completely ignore the CODEC in the property might it not be
->> better to just add a plain old snow-audio compatible and bind to that,
->> that way we don't need these driver updates?  Just the "snow" bit should
->> be enough to know it's one of this class of machines.
-> 
-> I think what you're suggesting is that here we should add a new
-> compatible string "google,snow-audio" instead of adding
-> "google,snow-audio-max98089" here.  Then the sound node in the spring
-> DTS would look like:
-> 
->   compatible = "google,snow-audio-max98089", "google,snow-audio";
 
-If we want to be specific just in case, was it an active decision not to
-use "google,peach-pi[t]-audio-max98..."?
 
-Again, either way works for me.
+On 19/02/2015 18:55, Andrew Jones wrote:
+>> > > (I don't have an exact number for how many times it went to EL1 because
+>> > >  access_mair() doesn't have a trace point.)
+>> > > (I got the 62873 number by testing a 3rd kernel build that only had patch
+>> > >  3/3 applied to the base, and counting kvm_toggle_cache events.)
+>> > > (The number 50 is the number of kvm_toggle_cache events *without* 3/3
+>> > >  applied.)
+>> > >
+>> > > I consider this bad news because, even considering it only goes to EL2,
+>> > > it goes a ton more than it used to. I realize patch 3/3 isn't the final
+>> > > plan for enabling traps though.
 
-Andreas
+If a full guest boots, can you try timing a kernel compile?
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
-Graham Norton; HRB 21284 (AG N?rnberg)
+Paolo
