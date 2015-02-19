@@ -1,54 +1,103 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 19 Feb 2015 20:02:56 +0300
-Subject: [PATCH 1/2] ARM: shmobile: r8a7794: add MMCIF DT support
-In-Reply-To: <20150219161012.GA3864@verge.net.au>
-References: <29687119.ELU9MoH02q@wasted.cogentembedded.com>
- <4040756.88Rqm1nt32@wasted.cogentembedded.com>
- <20150219161012.GA3864@verge.net.au>
-Message-ID: <54E61740.8030708@cogentembedded.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 19 Feb 2015 17:07:19 +0000
+Subject: [RFC PATCH 0/3] Add simple EEPROM Framework via regmap.
+Message-ID: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+This patchset adds a new simple EEPROM framework to kernel.
 
-On 02/19/2015 07:10 PM, Simon Horman wrote:
+Up until now, EEPROM drivers were stored in drivers/misc, where they all had to
+duplicate pretty much the same code to register a sysfs file, allow in-kernel
+users to access the content of the devices they were driving, etc.
+    
+This was also a problem as far as other in-kernel users were involved, since
+the solutions used were pretty much different from on driver to another, there
+was a rather big abstraction leak.
+    
+This introduction of this framework aims at solving this. It also introduces DT
+representation for consumer devices to go get the data they require (MAC
+Addresses, SoC/Revision ID, part numbers, and so on) from the EEPROMs.
+    
+Having regmap interface to this framework would give much better
+abstraction for eeproms on different buses.
 
->> Define the generic R8A7794 part of the MMCIF0 device node.
+patch 1 Introduces the EEPROM framework.
+Patch 2 migrates an existing driver to eeprom framework.
+Patch 3 Adds Qualcomm specific qfprom driver.
 
->> Based on the orginal patch by Shinobu Uehara <shinobu.uehara.xc@renesas.com>.
+Its also possible to migrate other eeprom drivers to this framework.
+Patch 3 can also be made a generic mmio-eeprom driver.
 
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Providers APIs:
+	eeprom_register/unregister();
 
->> ---
->>   arch/arm/boot/dts/r8a7794.dtsi |   11 +++++++++++
->>   1 file changed, 11 insertions(+)
+Consumers APIs:
+	eeprom_cell_get()/eeprom_cell_get_byname();
+	eeprom_cell_read()/eeprom_cell_write();
 
->> Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
->> ===================================================================
->> --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
->> +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
->> @@ -346,6 +346,17 @@
->>   		status = "disabled";
->>   	};
->>
->> +	mmcif0: mmc at ee200000 {
->> +		compatible = "renesas,mmcif-r8a7794", "renesas,sh-mmcif";
+Device Tree:
+	qfprom: qfprom at 00700000 {
+		#eeprom-cells = <2>;
+		compatible 	= "qcom,qfprom";
+		reg		= <0x00700000 0x1000>;
+	};
 
-> Please submit a patch to add "renesas,mmcif-r8a7794" to
-> Documentation/devicetree/bindings/mmc/renesas,mmcif.txt.
-> I looked and I couldn't find such a change in-tree or in-flight.
+	tsens: tsens {
+		...
+		eeproms = <&qfprom 0x404 0x10>, <&qfprom 0x414 0x10>;
+		eeprom-names = "calib", "backup_calib";
+		...
+	};
 
-    That file doesn't match the reality at all. It says:
+userspace interface:
 
-<<
-- compatible: must contain one of the following
-         - "renesas,mmcif-r8a7740" for the MMCIF found in r8a7740 SoCs
-         - "renesas,mmcif-r8a7790" for the MMCIF found in r8a7790 SoCs
-         - "renesas,mmcif-r8a7791" for the MMCIF found in r8a7791 SoCs
-         - "renesas,sh-mmcif" for the generic MMCIF
- >>
+	hexdump /sys/class/eeprom/eeprom0/eeprom
+                                                                                                                                                                                                                  
+0000000 0000 0000 0000 0000 0000 0000 0000 0000
+*
+00000a0 db10 2240 0000 e000 0c00 0c00 0000 0c00
+0000000 0000 0000 0000 0000 0000 0000 0000 0000
+...
+*
+0001000
 
-while in reality, the driver only matches on the latter string and doesn't 
-care for the SoC specific strings.
 
-WBR, Sergei
+Thanks,
+srini
+
+Maxime Ripard (2):
+  eeprom: Add a simple EEPROM framework
+  eeprom: sunxi: Move the SID driver to the eeprom framework
+
+Srinivas Kandagatla (1):
+  eeprom: qfprom: Add Qualcomm QFPROM support.
+
+ Documentation/ABI/testing/sysfs-driver-sunxi-sid   |  22 --
+ .../devicetree/bindings/eeprom/eeprom.txt          |  48 ++++
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   1 +
+ drivers/eeprom/Kconfig                             |  35 +++
+ drivers/eeprom/Makefile                            |  11 +
+ drivers/eeprom/core.c                              | 290 +++++++++++++++++++++
+ drivers/eeprom/eeprom-sunxi-sid.c                  | 125 +++++++++
+ drivers/eeprom/qfprom.c                            |  75 ++++++
+ drivers/misc/eeprom/Kconfig                        |  13 -
+ drivers/misc/eeprom/Makefile                       |   1 -
+ drivers/misc/eeprom/sunxi_sid.c                    | 156 -----------
+ include/linux/eeprom-consumer.h                    |  73 ++++++
+ include/linux/eeprom-provider.h                    |  51 ++++
+ 14 files changed, 711 insertions(+), 192 deletions(-)
+ delete mode 100644 Documentation/ABI/testing/sysfs-driver-sunxi-sid
+ create mode 100644 Documentation/devicetree/bindings/eeprom/eeprom.txt
+ create mode 100644 drivers/eeprom/Kconfig
+ create mode 100644 drivers/eeprom/Makefile
+ create mode 100644 drivers/eeprom/core.c
+ create mode 100644 drivers/eeprom/eeprom-sunxi-sid.c
+ create mode 100644 drivers/eeprom/qfprom.c
+ delete mode 100644 drivers/misc/eeprom/sunxi_sid.c
+ create mode 100644 include/linux/eeprom-consumer.h
+ create mode 100644 include/linux/eeprom-provider.h
+
+-- 
+1.9.1
