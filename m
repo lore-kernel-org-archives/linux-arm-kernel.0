@@ -1,11 +1,13 @@
 From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Thu, 19 Feb 2015 16:53:21 -0700
-Subject: [PATCH 1/2] ARM: dts: imx6qdl-sabrelite: add supported LVDS displays
-Message-ID: <1424390002-8726-1-git-send-email-eric.nelson@boundarydevices.com>
+Date: Thu, 19 Feb 2015 16:53:22 -0700
+Subject: [PATCH 2/2] ARM: dts: imx6qdl-nitrogen6x: add supported LVDS displays
+In-Reply-To: <1424390002-8726-1-git-send-email-eric.nelson@boundarydevices.com>
+References: <1424390002-8726-1-git-send-email-eric.nelson@boundarydevices.com>
+Message-ID: <1424390002-8726-2-git-send-email-eric.nelson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BD-SL-i.MX6 (SABRE Lite board) supports three companion displays:
+The Boundary Devices Nitrogen6x board supports three companion displays:
 	Okaya 1024x600
 	Hannstar 1024x768
 	LG 1280x800
@@ -15,14 +17,14 @@ for them and HDMI to make it easy for the boot loader to configure them.
 
 Signed-off-by: Eric Nelson <eric.nelson@boundarydevices.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 32 ++++++++++++++++++++++++++++++--
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 32 +++++++++++++++++++++++++++++--
  1 file changed, 30 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-index 3bddc8f..5f77dc0 100644
---- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-@@ -13,6 +13,13 @@
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index 0821812..f227f6d 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -14,6 +14,13 @@
  #include <dt-bindings/input/input.h>
  
  / {
@@ -36,7 +38,7 @@ index 3bddc8f..5f77dc0 100644
  	chosen {
  		stdout-path = &uart2;
  	};
-@@ -361,8 +368,29 @@
+@@ -380,8 +387,29 @@
  		status = "okay";
  
  		display-timings {
