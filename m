@@ -1,68 +1,71 @@
-From: panto@antoniou-consulting.com (Pantelis Antoniou)
-Date: Thu, 19 Feb 2015 20:28:13 +0200
-Subject: [PATCH 3/4] arm: am33xx: DT quirks for am33xx based beaglebone
- variants
-In-Reply-To: <20150219181656.GF32521@atomide.com>
-References: <1424271576-1952-1-git-send-email-pantelis.antoniou@konsulko.com>
- <1424271576-1952-4-git-send-email-pantelis.antoniou@konsulko.com>
- <20150219181656.GF32521@atomide.com>
-Message-ID: <9C7BFC7C-0751-4233-927F-D01AF078704B@antoniou-consulting.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 19 Feb 2015 12:23:15 -0600
+Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
+In-Reply-To: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
+References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
+Message-ID: <CAL_JsqJQcuX2cp50oHod-QAbhdMg48TaRP+gLGEO2kbFnQ3B+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Tue, Jan 27, 2015 at 1:03 AM, Pranavkumar Sawargaonkar
+<psawargaonkar@apm.com> wrote:
+> In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
+> in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
+> size due to size alignment checking in vgic driver for VCPU Control and
+> VCPU register.
+>
+> This patch corrects the sizes to be inline with the hardware spec.
 
-> On Feb 19, 2015, at 20:16 , Tony Lindgren <tony@atomide.com> wrote:
-> 
-> * Pantelis Antoniou <pantelis.antoniou@konsulko.com> [150218 07:03]:
->> Implement DT quirks for the am33xx beaglebone boards.
->> --- /dev/null
->> +++ b/arch/arm/mach-omap2/am33xx-dt-quirks.c
-> ...
->> +
->> +/*
->> + * The board IDs for am33xx board are in an I2C EEPROM
->> + * We are very early in the boot process so we have to
->> + * read the EEPROM directly without using the I2C layer.
->> + *
->> + * Note that we rely on the bootloader setting up the muxes
->> + * (which is the case for u-boot).
->> + */
->> +
->> +/* I2C Status Register (OMAP_I2C_STAT): */
->> +#define OMAP_I2C_STAT_XDR	(1 << 14)	/* TX Buffer draining */
->> +#define OMAP_I2C_STAT_RDR	(1 << 13)	/* RX Buffer draining */
->> +#define OMAP_I2C_STAT_BB	(1 << 12)	/* Bus busy */
->> +#define OMAP_I2C_STAT_ROVR	(1 << 11)	/* Receive overrun */
->> +#define OMAP_I2C_STAT_XUDF	(1 << 10)	/* Transmit underflow */
->> +#define OMAP_I2C_STAT_AAS	(1 << 9)	/* Address as slave */
->> +#define OMAP_I2C_STAT_BF	(1 << 8)	/* Bus Free */
->> +#define OMAP_I2C_STAT_XRDY	(1 << 4)	/* Transmit data ready */
->> +#define OMAP_I2C_STAT_RRDY	(1 << 3)	/* Receive data ready */
->> +#define OMAP_I2C_STAT_ARDY	(1 << 2)	/* Register access ready */
->> +#define OMAP_I2C_STAT_NACK	(1 << 1)	/* No ack interrupt enable */
->> +#define OMAP_I2C_STAT_AL	(1 << 0)	/* Arbitration lost int ena */
-> ...
-> 
-> Uhh I don't like the idea of duplicating the i2c-omap.c driver under
-> arch/arm.. And in general we should initialize things later rather
-> than earlier.
-> 
-> What's stopping doing these quirk checks later on time with just
-> a regular device driver, something like drivers/misc/bbone-quirks.c?
-> 
+This does not make sense. The GIC regions are still only 4 or 8KB and
+the h/w description should reflect that. For implementations using
+gic-400 and the addressing decode trick, the rest of the register
+range is also not safe to access given it is multiple mapped. Also,
+this wastes virtual space, but I guess we don't care on 64-bit.
 
-We have no choice; we are way early in the boot process, right after
-the device tree unflattening step.
+KVM should be fixed to only check base address alignment. Size
+alignment does not matter (if it does, then you need to fix all
+register blocks).
 
-I?ve toyed with the idea of using early platform devices but the omap-i2c driver
-would need some tender love and care to make it work, and I didn?t want to get
-bogged down with i2c driver details at this point.
+Rob
 
-> Regards,
-> 
-> Tony
-
-Regards
-
-? Pantelis
+>
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: kvmarm at lists.cs.columbia.edu
+> CC: arnd at arndb.de
+> CC: marc.zyngier at arm.com
+> CC: christoffer.dall at linaro.org
+> CC: jcm at redhat.com
+> Signed-off-by: Pranavkumar Sawargaonkar <psawargaonkar@apm.com>
+> Signed-off-by: Tushar Jagad <tjagad@apm.com>
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> ---
+>  arch/arm64/boot/dts/apm/apm-storm.dtsi |    8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> index f1ad9c2..65f0e6d 100644
+> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> @@ -81,10 +81,10 @@
+>                 compatible = "arm,cortex-a15-gic";
+>                 #interrupt-cells = <3>;
+>                 interrupt-controller;
+> -               reg = <0x0 0x78010000 0x0 0x1000>,      /* GIC Dist */
+> -                     <0x0 0x78020000 0x0 0x1000>,      /* GIC CPU */
+> -                     <0x0 0x78040000 0x0 0x2000>,      /* GIC VCPU Control */
+> -                     <0x0 0x78060000 0x0 0x2000>;      /* GIC VCPU */
+> +               reg = <0x0 0x78010000 0x0 0x10000>,     /* GIC Dist */
+> +                     <0x0 0x78020000 0x0 0x20000>,     /* GIC CPU */
+> +                     <0x0 0x78040000 0x0 0x10000>,     /* GIC VCPU Control */
+> +                     <0x0 0x78060000 0x0 0x20000>;     /* GIC VCPU */
+>                 interrupts = <1 9 0xf04>;       /* GIC Maintenence IRQ */
+>         };
+>
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
