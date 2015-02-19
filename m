@@ -1,51 +1,57 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 19 Feb 2015 10:43:10 -0500
-Subject: [PATCH v2] ARM: shmobile: r8a7791: Fix HSUSB clock to hp_clk from
- mp_clk
-Message-ID: <1424360590-6556-1-git-send-email-horms+renesas@verge.net.au>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 19 Feb 2015 16:51:38 +0100
+Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
+In-Reply-To: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
+References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
+Message-ID: <20150219155138.GA24460@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+On Tue, Jan 27, 2015 at 12:33:26PM +0530, Pranavkumar Sawargaonkar wrote:
+> In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
+> in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
+> size due to size alignment checking in vgic driver for VCPU Control and
+> VCPU register.
+> 
+> This patch corrects the sizes to be inline with the hardware spec.
+> 
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: kvmarm at lists.cs.columbia.edu
+> CC: arnd at arndb.de
+> CC: marc.zyngier at arm.com
+> CC: christoffer.dall at linaro.org
+> CC: jcm at redhat.com
+> Signed-off-by: Pranavkumar Sawargaonkar <psawargaonkar@apm.com>
+> Signed-off-by: Tushar Jagad <tjagad@apm.com>
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> ---
+>  arch/arm64/boot/dts/apm/apm-storm.dtsi |    8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> index f1ad9c2..65f0e6d 100644
+> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> @@ -81,10 +81,10 @@
+>  		compatible = "arm,cortex-a15-gic";
+>  		#interrupt-cells = <3>;
+>  		interrupt-controller;
+> -		reg = <0x0 0x78010000 0x0 0x1000>,	/* GIC Dist */
+> -		      <0x0 0x78020000 0x0 0x1000>,	/* GIC CPU */
+> -		      <0x0 0x78040000 0x0 0x2000>,	/* GIC VCPU Control */
+> -		      <0x0 0x78060000 0x0 0x2000>;	/* GIC VCPU */
+> +		reg = <0x0 0x78010000 0x0 0x10000>,	/* GIC Dist */
+> +		      <0x0 0x78020000 0x0 0x20000>,	/* GIC CPU */
+> +		      <0x0 0x78040000 0x0 0x10000>,	/* GIC VCPU Control */
+> +		      <0x0 0x78060000 0x0 0x20000>;	/* GIC VCPU */
+>  		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
+>  	};
+> 
+> --
+> 1.7.9.5
+> 
 
-HSUSB uses hp_clk rather than mp_clk for H/W register access.
+This looks good to me and works with 4K and 64K pages on the mustang I
+have at hand.
 
-Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-[horms: updated changelog]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
----
-v2 [Simon Horman]
-- Updated changelog to remove information about USB-DMAC clock which
-  did not relate to the patch. I will follow up on weather the
-  USB-DMAC clock should be mp_clk as the deleted portion of the
-  changelog stated.
----
- arch/arm/boot/dts/r8a7791.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index afba8af..cb9a9e7 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1,7 +1,7 @@
- /*
-  * Device Tree Source for the r8a7791 SoC
-  *
-- * Copyright (C) 2013-2014 Renesas Electronics Corporation
-+ * Copyright (C) 2013-2015 Renesas Electronics Corporation
-  * Copyright (C) 2013-2014 Renesas Solutions Corp.
-  * Copyright (C) 2014 Cogent Embedded Inc.
-  *
-@@ -1136,7 +1136,7 @@
- 		mstp7_clks: mstp7_clks at e615014c {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
--			clocks = <&mp_clk>,  <&mp_clk>, <&zs_clk>, <&p_clk>, <&p_clk>, <&zs_clk>,
-+			clocks = <&mp_clk>,  <&hp_clk>, <&zs_clk>, <&p_clk>, <&p_clk>, <&zs_clk>,
- 				 <&zs_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
- 				 <&zx_clk>, <&zx_clk>, <&zx_clk>;
- 			#clock-cells = <1>;
--- 
-2.1.4
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
