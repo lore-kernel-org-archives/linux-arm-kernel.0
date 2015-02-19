@@ -1,69 +1,31 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 19 Feb 2015 21:57:14 +0100
-Subject: [PATCH v2 2/8] arm64: Convert hcalls to use ISS field
-In-Reply-To: <1422660828.21823.40.camel@infradead.org>
-References: <cover.1421449714.git.geoff@infradead.org>
- <6719b2520095926ae0e8ac888663b87f2098f565.1421449714.git.geoff@infradead.org>
- <1422660828.21823.40.camel@infradead.org>
-Message-ID: <20150219205714.GC24460@cbox>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Thu, 19 Feb 2015 23:10:55 +0200
+Subject: runtime check for omap-aes bus access permission (was: Re:
+ 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
+In-Reply-To: <201502191920.41284@pali>
+References: <20131206213613.GA19648@earth.universe> <201502111339.54480@pali>
+ <CAALWOA_ngoSKjB=ZQ264Va37bBK7v41Ei45SyoYLiMdanTKnxQ@mail.gmail.com>
+ <201502191920.41284@pali>
+Message-ID: <20150219211055.GB8558@fuloong-minipc.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 30, 2015 at 03:33:48PM -0800, Geoff Levand wrote:
-> To allow for additional hcalls to be defined and to make the arm64 hcall API
-> more consistent across exception vector routines, change the hcall implementations
-> to use the ISS field of the ESR_EL2 register to specify the hcall type.
+Hi,
 
-how does this make things more consistent?  Do we have other examples of
-things using the immediate field which I'm missing?
+On Thu, Feb 19, 2015 at 07:20:41PM +0100, Pali Roh?r wrote:
+> Anyway, in Nokia Harmattan N9/N950 2.6.32 kernel is this patch:
 
-> 
-> The existing arm64 hcall implementations are limited in that they only allow
-> for two distinct hcalls; with the x0 register either zero, or not zero.  Also,
-> the API of the hyp-stub exception vector routines and the KVM exception vector
-> routines differ; hyp-stub uses a non-zero value in x0 to implement
-> __hyp_set_vectors, whereas KVM uses it to implement kvm_call_hyp.
+> +/* Do we need runtime check ? */
+> +#if __LINUX_ARM_ARCH__ < 6
+>  	{ do_bad,		SIGBUS,	 0,		"external abort on linefetch"	   },
+> +#else
+> +	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"I-cache maintenance fault"	   },
+> +#endif
 
-this seems orthogonal to the use of the immediate field vs. x0 though,
-so why it the immediate field preferred again?
+> Maybe it is related?
 
-> 
-> Define three new preprocessor macros HVC_CALL_HYP, HVC_GET_VECTORS, and
-> HVC_SET_VECTORS to be used as hcall type specifiers and convert the
-> existing __hyp_get_vectors(), __hyp_set_vectors() and kvm_call_hyp() routines
-> to use these new macros when executing an HVC call.  Also change the
-> corresponding hyp-stub and KVM el1_sync exception vector routines to use these
-> new macros.
-> 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
->  arch/arm64/include/asm/virt.h | 27 +++++++++++++++++++++++++++
->  arch/arm64/kernel/hyp-stub.S  | 32 +++++++++++++++++++++-----------
->  arch/arm64/kernel/psci.c      |  3 ++-
->  arch/arm64/kvm/hyp.S          | 16 +++++++++-------
->  4 files changed, 59 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-> index 7a5df52..eb10368 100644
-> --- a/arch/arm64/include/asm/virt.h
-> +++ b/arch/arm64/include/asm/virt.h
-> @@ -18,6 +18,33 @@
->  #ifndef __ASM__VIRT_H
->  #define __ASM__VIRT_H
->  
-> +/*
-> + * The arm64 hcall implementation uses the ISS field of the ESR_EL2 register to
-> + * specify the hcall type.  The exception handlers are allowed to use registers
-> + * x17 and x18 in their implementation.  Any routine issuing an hcall must not
-> + * expect these registers to be preserved.
-> + */
+That was unrelated. Also, the patch is also in mainline,
+see 8c0b742ca7a7d21de0ddc87eda6ef0b282e4de18 (ARM: 6134/1: Handle
+instruction cache maintenance fault properly).
 
-I thought the existing use of registers were based on the arm procedure
-call standard so we didn't have to worry about adding more caller-save
-registers.
-
-Don't we now have to start adding code around callers to make sure
-callers know that x17 and x18 may be clobbered?
-
-Thanks,
--Christoffer
+A.
