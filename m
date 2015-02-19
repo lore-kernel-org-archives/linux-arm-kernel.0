@@ -1,88 +1,40 @@
-From: mmarek@suse.cz (Michal Marek)
-Date: Thu, 19 Feb 2015 16:06:18 +0100
-Subject: [PATCH] [media] [kbuild] Add and use IS_REACHABLE macro
-In-Reply-To: <14254005.QkaJhTuY5H@wuerfel>
-References: <6116702.rrbrOqQ26P@wuerfel>
- <20150219121107.GA19684@sepie.suse.cz> <14254005.QkaJhTuY5H@wuerfel>
-Message-ID: <54E5FBEA.1000005@suse.cz>
+From: rk@ti.com (Ravikumar Kattekola)
+Date: Thu, 19 Feb 2015 20:38:29 +0530
+Subject: [PATCH 0/2] ARM: DRA7x/OMAP5: Clock: DPLL Clock fixes
+In-Reply-To: <1422724005-9415-1-git-send-email-rk@ti.com>
+References: <1422724005-9415-1-git-send-email-rk@ti.com>
+Message-ID: <54E5FC6D.7040701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 19.2.2015 v 15:53 Arnd Bergmann napsal(a):
-> On Thursday 19 February 2015 13:11:07 Michal Marek wrote:
->> On 2015-02-18 18:12, Arnd Bergmann wrote:
->>> In the media drivers, the v4l2 core knows about all submodules
->>> and calls into them from a common function. However this cannot
->>> work if the modules that get called are loadable and the
->>> core is built-in. In that case we get
->>>
->>> drivers/built-in.o: In function `set_type':
->>> drivers/media/v4l2-core/tuner-core.c:301: undefined reference to `tea5767_attach'
->>> drivers/media/v4l2-core/tuner-core.c:307: undefined reference to `tea5761_attach'
->>> drivers/media/v4l2-core/tuner-core.c:349: undefined reference to `tda9887_attach'
->>> drivers/media/v4l2-core/tuner-core.c:405: undefined reference to `xc4000_attach'
->>> [...]
->>> Ideally Kconfig would be used to avoid the case of a broken dependency,
->>> or the code restructured in a way to turn around the dependency, but either
->>> way would require much larger changes here.
->>
->> What can be done without extending kbuild is to accept
->> CONFIG_VIDEO_TUNER=y and CONFIG_MEDIA_TUNER_FOO=m, but build both into
->> the kernel, e.g.
-> 
-> Right, but
-> 
->> diff --git a/drivers/media/tuners/Kconfig b/drivers/media/tuners/Kconfig
->> index 42e5a01..d2c7e89 100644
->> --- a/drivers/media/tuners/Kconfig
->> +++ b/drivers/media/tuners/Kconfig
->> @@ -71,6 +71,11 @@ config MEDIA_TUNER_TEA5767
->>         help
->>           Say Y here to include support for the Philips TEA5767 radio tuner.
->>  
->> +config MEDIA_TUNER_TEA5767_BUILD
->> +       tristate
->> +       default VIDEO_TUNER || MEDIA_TUNER_TEA5767
->> +       depends on MEDIA_TUNER_TEA5767!=n
->> +
->>  config MEDIA_TUNER_MSI001
->>         tristate "Mirics MSi001"
->>         depends on MEDIA_SUPPORT && SPI && VIDEO_V4L2
-> 
-> We'd then have to do the same for each tuner driver that we have in the
-> kernel or that gets added later.
+On 1/31/2015 10:36 PM, Ravikumar Kattekola wrote:
+> Fix bypass clock source for a few DPLLs.
+>
+> On DRA7x/OMAP5, for a few DPLLs, both CLKINP and CLKINPULOW are connected
+> to a mux and the output from mux is routed to the bypass clkout.
+> Add a mux-clock as bypass clock with CLKINP and CLKINPULOW as parents.
+>
+> Tested against:
+> 	tree: https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git
+> 	branch: master
+> On:
+> CPU  : OMAP5432 ES2.0
+> Board: OMAP5432 uEVM
+> and
+> CPU  : DRA752 ES1.0
+> Board: DRA7xx
+>
+>
+> Ravikumar Kattekola (2):
+>    ARM: DRA7x: dts: Fix the bypass clock source for dpll_iva and others
+>    ARM: OMAP5: dts: Fix the bypass clock source for dpll_iva and others
+>
+>   arch/arm/boot/dts/dra7xx-clocks.dtsi   |   90 ++++++++++++++++++++++++++++----
+>   arch/arm/boot/dts/omap54xx-clocks.dtsi |   41 +++++++++++++--
+>   2 files changed, 118 insertions(+), 13 deletions(-)
+>
+Hi Benoit,
+     Can these fixes be looked into for 3.20-rc?
 
-Yes :-(.
-
-
->> Actually, I have hard time coming up with a kconfig syntactic sugar to
->> express such dependency. If I understand it correctly, the valid
->> configurations in this case are
->>
->> MEDIA_TUNER_TEA5767     n       m       y
->> VIDEO_TUNER     n       x       x       x
->>                 m       x       x       x
->>                 y       x               x
->>
->> I.e. only VIDEO_TUNER=y and MEDIA_TUNER_TEA5767=m is incorrect, isn't
->> it?
-> 
-> Yes, I think that is correct.
-
-OK. In this case, a kconfig extension would be really too specific: "if
-set, set to at least X but only if X is set as well."
-
-
-> We have similar problems in other areas
-> of the kernel. In theory, we could enforce the VIDEO_TUNER driver to
-> be modular here by adding lots of dependencies to it:
-> 
-> config VIDEO_TUNER
-> 	tristate
-> 	depends on MEDIA_TUNER_TEA5761 || !MEDIA_TUNER_TEA5761
-> 	depends on MEDIA_TUNER_TEA5767 || !MEDIA_TUNER_TEA5767
-> 	depends on MEDIA_TUNER_MSI001  || !MEDIA_TUNER_MSI001
-
-Nah, that's even uglier. I suggest to merge your IS_REACHABLE patch.
-
-Michal
+Regards,
+RK
