@@ -1,44 +1,48 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 19 Feb 2015 15:57:27 +0800
-Subject: [PATCH v5 59/61] dmaengine: Add a warning for drivers not using
- the generic slave caps retrieval
-In-Reply-To: <1416231775-31252-60-git-send-email-maxime.ripard@free-electrons.com>
-References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
- <1416231775-31252-60-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAOh2x=n1SC+s3hyFaOpREwVuzvqDUwb5vsTBN0As+O2h6eXbMw@mail.gmail.com>
+From: timo.kokkonen@offcode.fi (Timo Kokkonen)
+Date: Thu, 19 Feb 2015 10:01:46 +0200
+Subject: [PATCHv4 2/2] devicetree: Document generic watchdog properties
+In-Reply-To: <cover.1424332841.git.timo.kokkonen@offcode.fi>
+References: <cover.1424332841.git.timo.kokkonen@offcode.fi>
+Message-ID: <ee2cce98058443e1eda8f83296a2338cbed32421.1424332841.git.timo.kokkonen@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 9:42 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> For the slave caps retrieval to be really useful, most drivers need to
-> implement it.
->
-> Hence, we need to be slightly more aggressive, and trigger a warning at
-> registration time for drivers that don't fill their caps infos in order to
-> encourage them to implement it.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> ---
->  drivers/dma/dmaengine.c | 3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-> index 98e9431f85ec..300c8cd2786c 100644
-> --- a/drivers/dma/dmaengine.c
-> +++ b/drivers/dma/dmaengine.c
-> @@ -827,6 +827,9 @@ int dma_async_device_register(struct dma_device *device)
->         BUG_ON(!device->device_issue_pending);
->         BUG_ON(!device->dev);
->
-> +       WARN(dma_has_cap(DMA_SLAVE, device->cap_mask) && !device->directions,
-> +            "this driver doesn't support generic slave capabilities reporting\n");
-> +
->         /* note: this only matters in the
->          * CONFIG_ASYNC_TX_ENABLE_CHANNEL_SWITCH=n case
->          */
+There is no documentation for the watchdog properties that are common
+among most of the watchdog drivers. Add document where these generic
+properties can be described and told how they should be used in
+drivers.
 
-Probably you need to fix this ?
+Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+---
+ .../devicetree/bindings/watchdog/watchdog.txt        | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/watchdog.txt
 
-https://bugzilla.kernel.org/show_bug.cgi?id=90801
+diff --git a/Documentation/devicetree/bindings/watchdog/watchdog.txt b/Documentation/devicetree/bindings/watchdog/watchdog.txt
+new file mode 100644
+index 0000000..3781406
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/watchdog.txt
+@@ -0,0 +1,20 @@
++These properties are common among most watchdog drivers. Any driver
++that requires the functionality listed below should implement them
++using these definitions.
++
++Optional properties:
++- timeout-sec: Contains the watchdog timeout in seconds.
++- early-timeout-sec: If present, specify the timeout in seconds for
++  how long it can take for the watchdog daemon to take over the
++  watchdog device. If driver supports this property it must ensure the
++  watchdog hardware is running during this period and a watchdog reset
++  must occur if user space fails to open the device in time. If left
++  zero, the driver only needs to guarantee the watchdog is not
++  stopped or is started during driver init.
++
++Example:
++
++watchdog {
++	 timeout-sec = <60>;
++	 early-timeout-sec = <120>;
++};
+-- 
+2.1.0
