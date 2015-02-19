@@ -1,48 +1,47 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Thu, 19 Feb 2015 10:09:40 -0800
-Subject: imx6 GPIO1 interrupts
-Message-ID: <CAMB+bfKULf-2wJbw8LH7r345_EvTOktS6zBJnNzAh69dZPtStw@mail.gmail.com>
+From: gradator@gradator.net (Sylvain Rochet)
+Date: Thu, 19 Feb 2015 19:12:18 +0100
+Subject: [PATCH 2/4] of: DT quirks infrastructure
+In-Reply-To: <1424368919.13604.9.camel@sakura.staff.proxad.net>
+References: <1424271576-1952-3-git-send-email-pantelis.antoniou@konsulko.com>
+ <20150218154106.GC29429@leverpostej>
+ <FE61DD1C-51DA-4869-8A62-C019C3D70577@konsulko.com>
+ <20150218173115.GG29429@leverpostej>
+ <76BD1B22-BAED-4205-9B34-186907CE0217@konsulko.com>
+ <54E613E7.2020405@gmail.com>
+ <670D0881-DBF0-45E8-A502-A6DB2B77A750@konsulko.com>
+ <54E61DD2.3060002@gmail.com>
+ <53F2F94C-0C43-4A54-B8CD-EEC454A0AC19@konsulko.com>
+ <1424368919.13604.9.camel@sakura.staff.proxad.net>
+Message-ID: <20150219181218.GA5048@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Freescale imx6 has gpios use shared irqs that trigger across 16 pins
-at a time. These are supported in the mainline kernel.
+Hello,
 
-The first 8 pins on GPIO1 also have their own interrupts on the GIC.
-I have a kluge sort of working,  and am wondering what it would take
-for me to fully support these in a way that might be mainlined.
+On Thu, Feb 19, 2015 at 07:01:59PM +0100, Maxime Bizon wrote:
+> On Thu, 2015-02-19 at 19:38 +0200, Pantelis Antoniou wrote:
+> 
+> > Having to boot and tweak the bootloader settings to select the correct
+> > dtb (even if it?s present on the flash medium) takes time and is
+> > error-prone.
+> 
+> Dedicate a set of GPIO for board/PCB revision detection (it only costs a
+> few resistors connected to VCC or GND), then use that information to
+> choose the correct DTB.
 
-What I am doing:
-(error checking removed for brevity)
+Or use a 1-wire or I2C EEPROM to store your board information.
 
-        /* request the shared gpio irq to set the correct edge bits */
-        gpiod = gpiod_get(my->dev, "diffirq");
-        ret = gpiod_direction_input(gpiod);
-        fake_irq = gpiod_to_irq(gpiod);
-        ret = request_irq(fake_irq, no_action, 0, "gpio irq", mydev);
+Or, even better, if you have an I2C device, just chose a different 
+address on each board for this device and then probe I2C devices in your 
+boot loader until you found one you are looking for, this way, you don't 
+need spare GPIO at all. You don't even need to populate the same I2C 
+device on all boards, you can actually probe anything.
 
-        /* Use the ARM GPIO4 irq */
-        mydev->irq = irq_of_parse_and_map(mydev->dev->of_node, 0);
-
-        ret = request_irq(mydev->irq, my_irq_handler, 0, "my fpga", mydev);
-
-        disable_irq(mydev->irq);
-        enable_irq(mydev->irq);
-
-This seems to work, but both irq appear in /proc/interrupts, and if I
-try to change the affinity of the hard irq the gpio irq gets all the
-traffic (or something)
-
-Looking at the code in drivers/gpio/gpio-mxc.c, it seems like almost
-all the code for full hardware irq support is already there, but just
-out of reach to my brain. I think I just need the hardware irq to call
-gpio_set_irq_type() for its set_type function.
-
-What is the proper way to do this? Do I need another virtual irq_chip
-for the 8 gpio1 irqs? Can something like that be set up in the gpio
-probe, or do I need to catch it earlier when the GIC is being
-probed/initialized?
-
-...or am I way off base here?
-
-Joshua Clayton
+Sylvain
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150219/0973ca6f/attachment.sig>
