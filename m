@@ -1,43 +1,51 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Fri, 20 Feb 2015 00:47:39 +0200
-Subject: [PATCH v2 1/3] ARM: dts: omap3-pandora: add common device tree
-In-Reply-To: <1424202743-26387-2-git-send-email-marek@goldelico.com>
-References: <1424202743-26387-1-git-send-email-marek@goldelico.com>
- <1424202743-26387-2-git-send-email-marek@goldelico.com>
-Message-ID: <CANOLnOO9xPtaPTXxdZhh3KwU1Ai0XqTDOCkXgiJ7eg6bYKnDBw@mail.gmail.com>
+From: tinamdar@apm.com (Tanmay Inamdar)
+Date: Thu, 19 Feb 2015 14:53:35 -0800
+Subject: [PATCH] pci: host: xgene: fix incorrectly returned address by
+ map_bus
+In-Reply-To: <1424214840-26498-1-git-send-email-fkan@apm.com>
+References: <1424214840-26498-1-git-send-email-fkan@apm.com>
+Message-ID: <CACoXjcn7HYSjgtbx1dvQuL0xjrjCn4F_KgRs7Mj2-=OEE6jeyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 17, 2015 at 9:52 PM, Marek Belisko <marek@goldelico.com> wrote:
-> From: "H. Nikolaus Schaller" <hns@goldelico.com>
+On Tue, Feb 17, 2015 at 3:14 PM, Feng Kan <fkan@apm.com> wrote:
 >
-> This device tree allows to boot, supports the panel,
-> framebuffer, touch screen, as well as some more peripherals.
-> Since there is a OMAP3530 based 600 MHz variant and a DM3730 based
-> 1 GHz variant we must include this common device tree code
-> in one of two CPU specific device trees.
+> The generic accessor functions for pci-xgene uses map_bus
+> call that returns the base address but did not add the additional
+> offset.
 >
-> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
-> Signed-off-by: Marek Belisko <marek@goldelico.com>
+> Signed-off-by: Feng Kan <fkan@apm.com>
 > ---
->  arch/arm/boot/dts/omap3-pandora-common.dtsi | 640 ++++++++++++++++++++++++++++
->  1 file changed, 640 insertions(+)
->  create mode 100644 arch/arm/boot/dts/omap3-pandora-common.dtsi
+>  drivers/pci/host/pci-xgene.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/omap3-pandora-common.dtsi b/arch/arm/boot/dts/omap3-pandora-common.dtsi
-> new file mode 100644
-> index 0000000..78ef1ee
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-pandora-common.dtsi
-> ...
-> +
-> +       penirq_pins: pinmux_penirq_pins {
-> +               pinctrl-single,pins = <
-> +                       /* here we could enable to wakeup the cpu from suspend by a pen touch */
-> +                       OMAP3_CORE1_IOPAD(0x210c, MUX_MODE4)    /* GPIO_94 */
+> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> index aab5547..ee082c0 100644
+> --- a/drivers/pci/host/pci-xgene.c
+> +++ b/drivers/pci/host/pci-xgene.c
+> @@ -127,7 +127,7 @@ static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
+>         return false;
+>  }
+>
+> -static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+> +static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+>                               int offset)
+>  {
+>         struct xgene_pcie_port *port = bus->sysdata;
+> @@ -137,7 +137,7 @@ static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+>                 return NULL;
+>
+>         xgene_pcie_set_rtdid_reg(bus, devfn);
+> -       return xgene_pcie_get_cfg_base(bus);
+> +       return xgene_pcie_get_cfg_base(bus) + offset;
+>  }
+>
+>  static struct pci_ops xgene_pcie_ops = {
 
-We need PIN_INPUT here, otherwise the touchscreen doesn't react to pen down.
-(Sorry missed it last time).
 
+Acked-by: Tanmay Inamdar <tinamdar@apm.com>
 
-Gra?vydas
+>
+> --
+> 1.9.1
+>
