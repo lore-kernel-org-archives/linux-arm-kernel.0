@@ -1,67 +1,55 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 19 Feb 2015 17:14:56 -0500
-Subject: [PATCH v3] ARM: smp: Only expose /sys/.../cpuX/online if
- hotpluggable
-In-Reply-To: <54E51FFD.7080506@codeaurora.org>
-References: <1423874574-3494-1-git-send-email-sboyd@codeaurora.org>
- <20150218222731.GC24177@verge.net.au>
- <54E51FFD.7080506@codeaurora.org>
-Message-ID: <20150219221456.GC617@verge.net.au>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 19 Feb 2015 23:36:02 +0100
+Subject: [PATCH v7 0/5] Patches to add support for Rockchip usb PHYs.
+In-Reply-To: <1418396413-27937-1-git-send-email-lyz@rock-chips.com>
+References: <1418396413-27937-1-git-send-email-lyz@rock-chips.com>
+Message-ID: <83789848.BNM9GbusAN@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 18, 2015 at 03:27:57PM -0800, Stephen Boyd wrote:
-> On 02/18/15 14:27, Simon Horman wrote:
-> > On Fri, Feb 13, 2015 at 04:42:54PM -0800, Stephen Boyd wrote:
-> >> Writes to /sys/.../cpuX/online fail if we determine the platform
-> >> doesn't support hotplug for that CPU. Furthermore, if the cpu_die
-> >> op isn't specified the system hangs when we try to offline a CPU
-> >> and it comes right back online unexpectedly. Let's figure this
-> >> stuff out before we make the sysfs nodes so that the online file
-> >> doesn't even exist if it isn't (at least sometimes) possible to
-> >> hotplug the CPU.
-> >>
-> >> Add a new cpu_can_disable op and repoint all cpu_disable
-> >> implementations at it because all current users use the op to
-> >> indicate if a CPU can be hotplugged or not in a static fashion.
-> >> With PSCI we may need to introduce a cpu_disable op so that the
-> >> secure OS can be migrated off the CPU we're trying to hotplug.
-> >> In this case, the cpu_can_disable op will indicate that all CPUs
-> >> are hotpluggable by returning 1, but the cpu_disable op will make
-> >> a PSCI migration call and occasionally fail, denying the hotplug
-> >> of a CPU. This shouldn't be any worse than x86 where we may
-> >> indicate that all CPUs are hotpluggable but occasionally we can't
-> >> offline a CPU due to check_irq_vectors_for_cpu_disable() failing
-> >> to find a CPU to move vectors to.
-> >>
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Cc: Nicolas Pitre <nico@linaro.org>
-> >> Cc: Dave Martin <Dave.Martin@arm.com>
-> >> Cc: Simon Horman <horms@verge.net.au>
-> >> Cc: Magnus Damm <magnus.damm@gmail.com>
-> >> Cc: <linux-sh@vger.kernel.org>
-> >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> >> ---
-> >>
-> >> Changes since v2:
-> >>  * Left cpu_disable op in place
-> >>  * Split out shmobile function deletion
-> >>
-> >>  arch/arm/common/mcpm_platsmp.c       | 12 ++++--------
-> >>  arch/arm/include/asm/smp.h           | 10 ++++++++++
-> >>  arch/arm/kernel/setup.c              |  2 +-
-> >>  arch/arm/kernel/smp.c                | 15 ++++++++++++++-
-> >>  arch/arm/mach-shmobile/common.h      |  2 +-
-> >>  arch/arm/mach-shmobile/platsmp.c     |  4 ++--
-> >>  arch/arm/mach-shmobile/smp-r8a7790.c |  2 +-
-> >>  arch/arm/mach-shmobile/smp-r8a7791.c |  2 +-
-> >>  arch/arm/mach-shmobile/smp-sh73a0.c  |  2 +-
-> >>  9 files changed, 35 insertions(+), 16 deletions(-)
-> > I think it would make sense to separate the ARM-core changes
-> > from the mach-shmobile integration changes.
-> 
-> Are you saying two (three?) patches to add the op, and then move over
-> each struct smp_operations? It's all going through rmk's tree so I'll
-> leave that up to him.
+Am Freitag, 12. Dezember 2014, 23:00:08 schrieb Yunzhi Li:
+> Patches to add support for Rockchip usb phys.Add a new Rockchip
+> usb phy driver and modify dwc2 controller driver to make dwc2
+> platform devices support a generic PHY framework driver. This
+> patch set has been tested on my rk3288-evb and power off the usb
+> phys would reduce about 60mW power budget in total during sustem
+> suspend.
 
-I'm also happy to let RMK to decide what he thinks is best.
+it seems I missed a mail stating that the phy driver was applied and just
+found it in the main tree during the merge window.
+
+I've therefore applied the two dts patches for 3.21 and put the following
+on top, so that the firefly board also gets phy support
+
+
+Heiko
+
+---------- 8< --------------
+From: Heiko Stuebner <heiko@sntech.de>
+Date: Thu, 19 Feb 2015 22:46:45 +0100
+Subject: [PATCH] ARM: dts: rockchip: enable usbphy on rk3288-firefly
+
+Enable the usb phys on the firefly board.
+
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3288-firefly.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
+index e6f873a..b9dda41 100644
+--- a/arch/arm/boot/dts/rk3288-firefly.dtsi
++++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
+@@ -459,6 +459,10 @@
+ 	status = "okay";
+ };
+ 
++&usbphy {
++	status = "okay";
++};
++
+ &usb_host1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&usbhub_rst>;
+-- 
+2.1.4
