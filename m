@@ -1,51 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 19 Feb 2015 10:16:57 -0800
-Subject: [PATCH 3/4] arm: am33xx: DT quirks for am33xx based beaglebone
- variants
-In-Reply-To: <1424271576-1952-4-git-send-email-pantelis.antoniou@konsulko.com>
-References: <1424271576-1952-1-git-send-email-pantelis.antoniou@konsulko.com>
- <1424271576-1952-4-git-send-email-pantelis.antoniou@konsulko.com>
-Message-ID: <20150219181656.GF32521@atomide.com>
+From: mbizon@freebox.fr (Maxime Bizon)
+Date: Thu, 19 Feb 2015 19:22:54 +0100
+Subject: [PATCH 2/4] of: DT quirks infrastructure
+In-Reply-To: <20150219181218.GA5048@gradator.net>
+References: <1424271576-1952-3-git-send-email-pantelis.antoniou@konsulko.com>
+ <20150218154106.GC29429@leverpostej>
+ <FE61DD1C-51DA-4869-8A62-C019C3D70577@konsulko.com>
+ <20150218173115.GG29429@leverpostej>
+ <76BD1B22-BAED-4205-9B34-186907CE0217@konsulko.com>
+ <54E613E7.2020405@gmail.com>
+ <670D0881-DBF0-45E8-A502-A6DB2B77A750@konsulko.com>
+ <54E61DD2.3060002@gmail.com>
+ <53F2F94C-0C43-4A54-B8CD-EEC454A0AC19@konsulko.com>
+ <1424368919.13604.9.camel@sakura.staff.proxad.net>
+ <20150219181218.GA5048@gradator.net>
+Message-ID: <1424370174.13604.18.camel@sakura.staff.proxad.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pantelis Antoniou <pantelis.antoniou@konsulko.com> [150218 07:03]:
-> Implement DT quirks for the am33xx beaglebone boards.
-> --- /dev/null
-> +++ b/arch/arm/mach-omap2/am33xx-dt-quirks.c
-...
-> +
-> +/*
-> + * The board IDs for am33xx board are in an I2C EEPROM
-> + * We are very early in the boot process so we have to
-> + * read the EEPROM directly without using the I2C layer.
-> + *
-> + * Note that we rely on the bootloader setting up the muxes
-> + * (which is the case for u-boot).
-> + */
-> +
-> +/* I2C Status Register (OMAP_I2C_STAT): */
-> +#define OMAP_I2C_STAT_XDR	(1 << 14)	/* TX Buffer draining */
-> +#define OMAP_I2C_STAT_RDR	(1 << 13)	/* RX Buffer draining */
-> +#define OMAP_I2C_STAT_BB	(1 << 12)	/* Bus busy */
-> +#define OMAP_I2C_STAT_ROVR	(1 << 11)	/* Receive overrun */
-> +#define OMAP_I2C_STAT_XUDF	(1 << 10)	/* Transmit underflow */
-> +#define OMAP_I2C_STAT_AAS	(1 << 9)	/* Address as slave */
-> +#define OMAP_I2C_STAT_BF	(1 << 8)	/* Bus Free */
-> +#define OMAP_I2C_STAT_XRDY	(1 << 4)	/* Transmit data ready */
-> +#define OMAP_I2C_STAT_RRDY	(1 << 3)	/* Receive data ready */
-> +#define OMAP_I2C_STAT_ARDY	(1 << 2)	/* Register access ready */
-> +#define OMAP_I2C_STAT_NACK	(1 << 1)	/* No ack interrupt enable */
-> +#define OMAP_I2C_STAT_AL	(1 << 0)	/* Arbitration lost int ena */
-...
 
-Uhh I don't like the idea of duplicating the i2c-omap.c driver under
-arch/arm.. And in general we should initialize things later rather
-than earlier.
+On Thu, 2015-02-19 at 19:12 +0100, Sylvain Rochet wrote:
 
-What's stopping doing these quirk checks later on time with just
-a regular device driver, something like drivers/misc/bbone-quirks.c?
+> Or use a 1-wire or I2C EEPROM to store your board information.
 
-Regards,
+no, you don't reduce the human error probability.
 
-Tony
+eeprom needs to be preprogrammed, factory will at some point have a lot
+of eeprom with different version, and will potentially equip the wrong
+one.
+
+much more error prone than them putting the resistor at the wrong place.
+
+> Or, even better, if you have an I2C device, just chose a different 
+> address on each board for this device and then probe I2C devices in your 
+> boot loader until you found one you are looking for, this way, you don't 
+> need spare GPIO at all. You don't even need to populate the same I2C 
+> device on all boards, you can actually probe anything.
+
+I'm not a fan of schemes where not probing something is not a definitive
+sign of hardware failure.
+
+-- 
+Maxime
