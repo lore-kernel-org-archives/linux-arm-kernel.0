@@ -1,33 +1,43 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 19 Feb 2015 10:30:14 +0100
-Subject: [PATCH] backlight: pwm: handle EPROBE_DEFER while requesting the PWM
-Message-ID: <1424338214-24236-1-git-send-email-nicolas.ferre@atmel.com>
+From: treding@nvidia.com (Thierry Reding)
+Date: Thu, 19 Feb 2015 10:32:34 +0100
+Subject: drm: bridge: ps8622 and ptn3460 depend on gpiolib
+In-Reply-To: <19803561.otRxsE7o5u@wuerfel>
+References: <19803561.otRxsE7o5u@wuerfel>
+Message-ID: <20150219093233.GF5086@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When trying to request the PWM device with devm_pwm_get(), the EPROBE_DEFER
-flag is not handled properly. It can lead to the PWM not being found.
+On Wed, Feb 18, 2015 at 05:09:25PM +0100, Arnd Bergmann wrote:
+> The ptn3460 driver recently started usign the gpiod interface
+> which is only available on platforms that come with GPIOLIB
+> support, resulting in a compile-time error:
+> 
+> drivers/gpu/drm/bridge/ps8622.c: In function 'ps8622_pre_enable':
+> drivers/gpu/drm/bridge/ps8622.c:368:2: error: implicit declaration of function 'gpiod_set_value' [-Werror=implicit-function-declaration]
+>   gpiod_set_value(ps8622->gpio_rst, 0);
+>   ^
+> drivers/gpu/drm/bridge/ps8622.c: In function 'ps8622_probe':
+> drivers/gpu/drm/bridge/ps8622.c:584:2: error: implicit declaration of function 'devm_gpiod_get' [-Werror=implicit-function-declaration]
+>   ps8622->gpio_slp = devm_gpiod_get(dev, "sleep");
+>   ^
+> 
+> Similarly, the newly added ps8622 driver started out with the same
+> problem.
+> 
+> This patch adds explicit Kconfig dependencies to avoid trying to
+> build invalid configurations.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: f1336e6afb ("drm/bridge: Add I2C based driver for ps8622/ps8625 bridge")
+> Fixes: af478d8823 ("drm/bridge: ptn3460: use gpiod interface")
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/video/backlight/pwm_bl.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Applied, thanks.
 
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index 3a145a643e0d..6897f1c1bc73 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -274,6 +274,10 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 
- 	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
- 	if (IS_ERR(pb->pwm)) {
-+		ret = PTR_ERR(pb->pwm);
-+		if (ret == -EPROBE_DEFER)
-+			goto err_alloc;
-+
- 		dev_err(&pdev->dev, "unable to request PWM, trying legacy API\n");
- 		pb->legacy = true;
- 		pb->pwm = pwm_request(data->pwm_id, "pwm-backlight");
--- 
-2.1.3
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150219/355be74c/attachment.sig>
