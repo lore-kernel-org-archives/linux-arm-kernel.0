@@ -1,37 +1,46 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 19 Feb 2015 20:55:57 +0900
-Subject: [PATCH 2/2] regmap: Add range check in _regmap_raw_write()
-In-Reply-To: <54E5C4FE.5080604@linaro.org>
-References: <1424335193-7431-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424335255-7517-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20150219103156.GD3198@finisterre.sirena.org.uk>
- <54E5C4FE.5080604@linaro.org>
-Message-ID: <20150219115557.GA1581@finisterre.sirena.org.uk>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Thu, 19 Feb 2015 13:07:52 +0100
+Subject: [PATCH] ARM: socfpga: fix uart DMA binding error
+Message-ID: <1424347672-25075-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 19, 2015 at 11:11:58AM +0000, Srinivas Kandagatla wrote:
-> On 19/02/15 10:31, Mark Brown wrote:
+socfpga.dtsi is missing the DMA channels for the uart nodes.
+This will produce the following errors:
 
-> >Your changelog doesn't correspond to what the code is actually doing
-> >here...  what you're actually doing here is replacing an open coding of
-> >regmap_writeable() with calls to the function.
+	of_dma_request_slave_channel: dma-names property of node '/soc/serial0 at ffc02000' missing or empty
+	ttyS0 - failed to request DMA
 
-> Only reason for me to send this patch was that fact that _regmap_raw_write()
-> also suffers from same issue as _regmap_raw_read(), which is "access beyond
-> max_register".
+Provide the correct DMA channels to fix this.
 
-> Should I drop this patch?
-> Or
-> Adding similar check of max_register before the writing makes sense?
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+ arch/arm/boot/dts/socfpga.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-No, please go and reread your patch - neither your description above nor
-the changelog match up with what it's actually doing.  It looks like a
-perfectly sensible patch, it just doesn't do what you're saying it does.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150219/4a1a2b94/attachment.sig>
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 252c3d1bda50..9d8760956752 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -713,6 +713,9 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&l4_sp_clk>;
++			dmas = <&pdma 28>,
++			       <&pdma 29>;
++			dma-names = "tx", "rx";
+ 		};
+ 
+ 		uart1: serial1 at ffc03000 {
+@@ -722,6 +725,9 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&l4_sp_clk>;
++			dmas = <&pdma 30>,
++			       <&pdma 31>;
++			dma-names = "tx", "rx";
+ 		};
+ 
+ 		rst: rstmgr at ffd05000 {
+-- 
+2.1.4
