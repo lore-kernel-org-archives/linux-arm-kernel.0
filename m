@@ -1,57 +1,44 @@
-From: torfl6749@gmail.com (Torsten Fleischer)
-Date: Thu, 19 Feb 2015 08:54:22 +0100
-Subject: [PATCH 1/2] dma: at_hdmac: Fix calculation of the residual bytes
-In-Reply-To: <20150218150216.GE32600@odux.rfo.atmel.com>
-References: <1423387744-2410-1-git-send-email-torfl6749@gmail.com>
- <1423387744-2410-2-git-send-email-torfl6749@gmail.com>
- <20150218150216.GE32600@odux.rfo.atmel.com>
-Message-ID: <CANZ4BrQwEei8GsskU2jrDbd4z+DDoq0U8S3sa947=+EuUMavwQ@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 19 Feb 2015 15:57:27 +0800
+Subject: [PATCH v5 59/61] dmaengine: Add a warning for drivers not using
+ the generic slave caps retrieval
+In-Reply-To: <1416231775-31252-60-git-send-email-maxime.ripard@free-electrons.com>
+References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1416231775-31252-60-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAOh2x=n1SC+s3hyFaOpREwVuzvqDUwb5vsTBN0As+O2h6eXbMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ludovic,
+On Mon, Nov 17, 2014 at 9:42 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> For the slave caps retrieval to be really useful, most drivers need to
+> implement it.
+>
+> Hence, we need to be slightly more aggressive, and trigger a warning at
+> registration time for drivers that don't fill their caps infos in order to
+> encourage them to implement it.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> ---
+>  drivers/dma/dmaengine.c | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+> index 98e9431f85ec..300c8cd2786c 100644
+> --- a/drivers/dma/dmaengine.c
+> +++ b/drivers/dma/dmaengine.c
+> @@ -827,6 +827,9 @@ int dma_async_device_register(struct dma_device *device)
+>         BUG_ON(!device->device_issue_pending);
+>         BUG_ON(!device->dev);
+>
+> +       WARN(dma_has_cap(DMA_SLAVE, device->cap_mask) && !device->directions,
+> +            "this driver doesn't support generic slave capabilities reporting\n");
+> +
+>         /* note: this only matters in the
+>          * CONFIG_ASYNC_TX_ENABLE_CHANNEL_SWITCH=n case
+>          */
 
->>
->> transfer 1: residue = 975584
->> transfer 2: residue = 1048380
->>
->
-> You're right about these points. Good job. I think it should be sent to
-> stable if it can be applied properly.
->
-> For multilines comments, please follow the coding rule
-> /*
->  * my
->  * comments
->  */
->
-thanks for the hint. I will fix this in the next version of the patch.
+Probably you need to fix this ?
 
->> +     /* cookie matches to the currently running transfer */
->> +     ret = desc_first->total_len;
->> +
->> +     if (desc_first->lli.dscr) {
->> +             /* hardware linked list transfer */
->> +
->> +             /* Calculate the residue by removing the length of the child
->> +              * descriptors already transferred from the total length.
->> +              * To get the current child descriptor we can use the value of
->> +              * the channel's DSCR register and compare it against the value
->> +              * of the hardware linked list structure of each child
->> +              * descriptor. */
->> +
->> +             dscr = channel_readl(atchan, DSCR);
->> +
->> +             /* the first descriptor is currently in work */
->> +             if (desc_first->lli.dscr == dscr)
->> +                     return ret;
->>
->
-> Why returning total_len in this case? I think you can return a more accurate
-> value as you do for the last descriptor.
->
-Good point. I will add a calculation for the first descriptor.
-
-Regards
-
-Torsten
+https://bugzilla.kernel.org/show_bug.cgi?id=90801
