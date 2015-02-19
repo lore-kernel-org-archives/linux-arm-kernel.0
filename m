@@ -1,48 +1,34 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 19 Feb 2015 08:40:55 +0000
-Subject: [PATCH 2/2] regmap: Add range check in _regmap_raw_write()
-In-Reply-To: <1424335193-7431-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1424335193-7431-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1424335255-7517-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 19 Feb 2015 14:23:27 +0530
+Subject: [PATCH v5 59/61] dmaengine: Add a warning for drivers not using
+ the generic slave caps retrieval
+In-Reply-To: <20150219090917.159d3d2f@endymion.delvare>
+References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1416231775-31252-60-git-send-email-maxime.ripard@free-electrons.com>
+ <CAOh2x=n1SC+s3hyFaOpREwVuzvqDUwb5vsTBN0As+O2h6eXbMw@mail.gmail.com>
+ <20150219090917.159d3d2f@endymion.delvare>
+Message-ID: <CAKohpokmmA3wCiao0hBzecRYRvKKyVo3LSO1a=EMLJCP3OmPuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-regmap_bulk_write() ends up using the path that invokes _regmap_raw_write(),
-however _regmap_raw_write() never checks if the registers that are accessed
-are actually within the accessible range. This results in kernel crashes when
-trying to access registers beyond max_registers.
+On 19 February 2015 at 13:39, Jean Delvare <jdelvare@suse.de> wrote:
+> My understanding is that the warning message is here on purpose to
+> instruct DMA driver authors to fix their code. So if anyone need to fix
+> anything, that would be you and Andy. That being said, I suspect Andy
 
-This patch just adds check before accessing the register range.
+To some extent yes, but Andy has already tried to fix that for most of
+the drivers and so I just pointed out that something is missed.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/base/regmap/regmap.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+> already did that:
+>
+> commit 029a40e97d0db269f4a7fc02b0f29f627f628309
+> Author: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> Date:   Fri Jan 2 16:17:24 2015 +0200
+>
+>     dmaengine: dw: provide DMA capabilities
+>
+> Brian, can you please try the latest Linus or linux-next kernel (or
+> backport the above commit to your current kernel) and confirm that the
+> backtraces are no longer printed?
 
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index d480e49..32ce7b3 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -1202,16 +1202,14 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
- 	void *buf;
- 	int ret = -ENOTSUPP;
- 	size_t len;
--	int i;
-+	int i, count = val_len/map->format.val_bytes;
- 
- 	WARN_ON(!map->bus);
- 
- 	/* Check for unwritable registers before we start */
--	if (map->writeable_reg)
--		for (i = 0; i < val_len / map->format.val_bytes; i++)
--			if (!map->writeable_reg(map->dev,
--						reg + (i * map->reg_stride)))
--				return -EINVAL;
-+	for (i = 0; i < count; i++)
-+		if (!regmap_writeable(map, reg + (i * map->reg_stride)))
-+			return -EINVAL;
- 
- 	if (!map->cache_bypass && map->format.parse_val) {
- 		unsigned int ival;
--- 
-1.9.1
+Maybe yes.
