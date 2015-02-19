@@ -1,57 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Feb 2015 18:34:44 +0000
-Subject: Announce: rmk's nightly builder gets ARM64 support
-In-Reply-To: <20150219171220.GA8656@n2100.arm.linux.org.uk>
-References: <20150219171220.GA8656@n2100.arm.linux.org.uk>
-Message-ID: <20150219183444.GB8656@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 19 Feb 2015 10:36:00 -0800
+Subject: [PATCH 3/4] arm: am33xx: DT quirks for am33xx based beaglebone
+ variants
+In-Reply-To: <9C7BFC7C-0751-4233-927F-D01AF078704B@antoniou-consulting.com>
+References: <1424271576-1952-1-git-send-email-pantelis.antoniou@konsulko.com>
+ <1424271576-1952-4-git-send-email-pantelis.antoniou@konsulko.com>
+ <20150219181656.GF32521@atomide.com>
+ <9C7BFC7C-0751-4233-927F-D01AF078704B@antoniou-consulting.com>
+Message-ID: <20150219183600.GG32521@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 19, 2015 at 05:12:20PM +0000, Russell King - ARM Linux wrote:
-> Today, I have added ARM64 support to my automated nightly kernel builder.
-> Initially, this will result in ARM64 builds being tested with allnoconfig
-> and defconfig, and I shall add allmodconfig and allyesconfig to this in
-> the coming days.
+* Pantelis Antoniou <panto@antoniou-consulting.com> [150219 10:32]:
+> > On Feb 19, 2015, at 20:16 , Tony Lindgren <tony@atomide.com> wrote:
+> > 
+> > Uhh I don't like the idea of duplicating the i2c-omap.c driver under
+> > arch/arm.. And in general we should initialize things later rather
+> > than earlier.
+> > 
+> > What's stopping doing these quirk checks later on time with just
+> > a regular device driver, something like drivers/misc/bbone-quirks.c?
+> > 
 > 
-> Once that is done and stable, I will investigate adding an ARM Juno
-> platform to my boot farm so we can run the results of the builder.
-> 
-> Other recent changes have been a disk upgrade, so the builder now has
-> plenty of disk space to run the allmodconfig and allyesconfig, which
-> used to fail (or be skipped) when the disk space was low.
-> 
-> I've also added a new ARM target for building the defconfig without a
-> seed.
-> 
-> As ever, all results are in the usual place, at:
-> 
-> http://www.arm.linux.org.uk/developer/build/
+> We have no choice; we are way early in the boot process, right after
+> the device tree unflattening step.
 
-It seems that there's either something wrong with the kernel, or
-there's a problem with binutils.
+To me it seems the dt patching part should be done with minimal
+code before any driver like features..
+ 
+> I?ve toyed with the idea of using early platform devices but the omap-i2c driver
+> would need some tender love and care to make it work, and I didn?t want to get
+> bogged down with i2c driver details at this point.
 
-/tmp/cc1B9ysz.s:99: Error: selected processor does not support `aese v0.16b,v1.16b'
-/tmp/cc1B9ysz.s:207: Error: selected processor does not support `aesimc v1.16b,v0.16b'
-/tmp/cc1B9ysz.s:255: Error: selected processor does not support `aese v0.16b,v1.16b'
-/tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesd v0.16b,v2.16b'
-/tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesimc v0.16b,v0.16b'
-/tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesd v0.16b,v3.16b'
-/tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesimc v0.16b,v0.16b'
-/tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesd v0.16b,v1.16b'
-/tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesimc v0.16b,v0.16b'
-/tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesd v0.16b,v2.16b'
-/tmp/cc1B9ysz.s:455: Error: selected processor does not support `aese v0.16b,v2.16b'
-/tmp/cc1B9ysz.s:455: Error: selected processor does not support `aesmc v0.16b,v0.16b'
-/tmp/cc1B9ysz.s:455: Error: selected processor does not support `aese v0.16b,v3.16b'
-/tmp/cc1B9ysz.s:455: Error: selected processor does not support `aesmc v0.16b,v0.16b'
-/tmp/cc1B9ysz.s:455: Error: selected processor does not support `aese v0.16b,v1.16b'
-/tmp/cc1B9ysz.s:455: Error: selected processor does not support `aesmc v0.16b,v0.16b'
-/tmp/cc1B9ysz.s:455: Error: selected processor does not support `aese v0.16b,v2.16b'
-make[2]: *** [arch/arm64/crypto/aes-ce-cipher.o] Error 1
+..so how about just parse a kernel cmdline for the quirks to apply
+based on a version string or similar? That can be easily populated
+by u-boot or set manually with setenv.
 
-I've tried both the mainline git version, and the sourceware.org
-binutils-gdb.git version, both result in the same errors.
+That leaves out the need for tinkering with i2c super early in
+the kernel for revision detection.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+
+Tony
