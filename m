@@ -1,42 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Feb 2015 16:01:29 +0100
-Subject: [PATCH] spi: sirf: add reset controller dependency
-In-Reply-To: <20150219094155.GA3198@finisterre.sirena.org.uk>
-References: <4553005.HBquOfbqXe@wuerfel>
- <20150219094155.GA3198@finisterre.sirena.org.uk>
-Message-ID: <7767301.zaEX63gvjp@wuerfel>
+From: mmarek@suse.cz (Michal Marek)
+Date: Thu, 19 Feb 2015 16:06:18 +0100
+Subject: [PATCH] [media] [kbuild] Add and use IS_REACHABLE macro
+In-Reply-To: <14254005.QkaJhTuY5H@wuerfel>
+References: <6116702.rrbrOqQ26P@wuerfel>
+ <20150219121107.GA19684@sepie.suse.cz> <14254005.QkaJhTuY5H@wuerfel>
+Message-ID: <54E5FBEA.1000005@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 February 2015 18:41:55 Mark Brown wrote:
-> On Wed, Feb 18, 2015 at 04:29:10PM +0100, Arnd Bergmann wrote:
+Dne 19.2.2015 v 15:53 Arnd Bergmann napsal(a):
+> On Thursday 19 February 2015 13:11:07 Michal Marek wrote:
+>> On 2015-02-18 18:12, Arnd Bergmann wrote:
+>>> In the media drivers, the v4l2 core knows about all submodules
+>>> and calls into them from a common function. However this cannot
+>>> work if the modules that get called are loadable and the
+>>> core is built-in. In that case we get
+>>>
+>>> drivers/built-in.o: In function `set_type':
+>>> drivers/media/v4l2-core/tuner-core.c:301: undefined reference to `tea5767_attach'
+>>> drivers/media/v4l2-core/tuner-core.c:307: undefined reference to `tea5761_attach'
+>>> drivers/media/v4l2-core/tuner-core.c:349: undefined reference to `tda9887_attach'
+>>> drivers/media/v4l2-core/tuner-core.c:405: undefined reference to `xc4000_attach'
+>>> [...]
+>>> Ideally Kconfig would be used to avoid the case of a broken dependency,
+>>> or the code restructured in a way to turn around the dependency, but either
+>>> way would require much larger changes here.
+>>
+>> What can be done without extending kbuild is to accept
+>> CONFIG_VIDEO_TUNER=y and CONFIG_MEDIA_TUNER_FOO=m, but build both into
+>> the kernel, e.g.
 > 
-> > The adds a dependency in Kconfig to prevent it from being selected
-> > if the resets are not available.
+> Right, but
 > 
-> Why is this a better fix than making the reset controller API stub
-> itself out?  It's probably not such a big deal here but for devices that
-> could be integrated into SoCs with and without reset controllers it
-> seems like we might want that.
+>> diff --git a/drivers/media/tuners/Kconfig b/drivers/media/tuners/Kconfig
+>> index 42e5a01..d2c7e89 100644
+>> --- a/drivers/media/tuners/Kconfig
+>> +++ b/drivers/media/tuners/Kconfig
+>> @@ -71,6 +71,11 @@ config MEDIA_TUNER_TEA5767
+>>         help
+>>           Say Y here to include support for the Philips TEA5767 radio tuner.
+>>  
+>> +config MEDIA_TUNER_TEA5767_BUILD
+>> +       tristate
+>> +       default VIDEO_TUNER || MEDIA_TUNER_TEA5767
+>> +       depends on MEDIA_TUNER_TEA5767!=n
+>> +
+>>  config MEDIA_TUNER_MSI001
+>>         tristate "Mirics MSi001"
+>>         depends on MEDIA_SUPPORT && SPI && VIDEO_V4L2
+> 
+> We'd then have to do the same for each tuner driver that we have in the
+> kernel or that gets added later.
 
-I would prefer that too, but it's not what the reset maintainer decided
-to have, citing b424080a9e0 ("reset: Add optional resets and stubs"):
-    
-    This patch adds device_reset_optional and (devm_)reset_control_get_optional
-    variants that drivers can use to indicate they can function without control
-    over the reset line. For those functions, stubs are added so the drivers can
-    be compiled with CONFIG_RESET_CONTROLLER disabled.
-    Also, device_reset is annotated with __must_check. Drivers ignoring the return
-    value should use device_reset_optional instead.
-    
-    Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-    Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-    Reviewed-by: Marek Vasut <marex@denx.de>
-    Acked-by: Wolfram Sang <wsa@the-dreams.de>
+Yes :-(.
 
-So the stubs are provided for all functions except device_reset() and
-reset_control_get(), and drivers using the API need to either call the
-stubbed-out _optional() versions of these functions or have the explicit
-dependency.
 
-	Arnd
+>> Actually, I have hard time coming up with a kconfig syntactic sugar to
+>> express such dependency. If I understand it correctly, the valid
+>> configurations in this case are
+>>
+>> MEDIA_TUNER_TEA5767     n       m       y
+>> VIDEO_TUNER     n       x       x       x
+>>                 m       x       x       x
+>>                 y       x               x
+>>
+>> I.e. only VIDEO_TUNER=y and MEDIA_TUNER_TEA5767=m is incorrect, isn't
+>> it?
+> 
+> Yes, I think that is correct.
+
+OK. In this case, a kconfig extension would be really too specific: "if
+set, set to at least X but only if X is set as well."
+
+
+> We have similar problems in other areas
+> of the kernel. In theory, we could enforce the VIDEO_TUNER driver to
+> be modular here by adding lots of dependencies to it:
+> 
+> config VIDEO_TUNER
+> 	tristate
+> 	depends on MEDIA_TUNER_TEA5761 || !MEDIA_TUNER_TEA5761
+> 	depends on MEDIA_TUNER_TEA5767 || !MEDIA_TUNER_TEA5767
+> 	depends on MEDIA_TUNER_MSI001  || !MEDIA_TUNER_MSI001
+
+Nah, that's even uglier. I suggest to merge your IS_REACHABLE patch.
+
+Michal
