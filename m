@@ -1,47 +1,47 @@
-From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
-Date: Thu, 19 Feb 2015 13:33:18 +0100
-Subject: [PATCH 5/6] ASoC: samsung: Extend Snow driver to support max98089
-In-Reply-To: <20150219094425.GB3198@finisterre.sirena.org.uk>
-References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
- <1424283959-16289-6-git-send-email-afaerber@suse.de>
- <20150219094425.GB3198@finisterre.sirena.org.uk>
-Message-ID: <54E5D80E.3020603@suse.de>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 19 Feb 2015 13:02:03 +0000
+Subject: [PATCH 1/2] regmap: Add range check in _regmap_raw_read()
+In-Reply-To: <20150219122133.GB1581@finisterre.sirena.org.uk>
+References: <1424335193-7431-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1424335239-7475-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20150219102750.GC3198@finisterre.sirena.org.uk>
+ <54E5C347.9070105@linaro.org>
+ <20150219122133.GB1581@finisterre.sirena.org.uk>
+Message-ID: <54E5DECB.5020600@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 19.02.2015 um 10:44 schrieb Mark Brown:
-> On Wed, Feb 18, 2015 at 07:25:58PM +0100, Andreas F?rber wrote:
-> 
->>  static const struct of_device_id snow_of_match[] = {
->> +	{ .compatible = "google,snow-audio-max98089", },
->>  	{ .compatible = "google,snow-audio-max98090", },
->>  	{ .compatible = "google,snow-audio-max98091", },
->>  	{ .compatible = "google,snow-audio-max98095", },
-> 
-> Since we completely ignore the CODEC in the property might it not be
-> better to just add a plain old snow-audio compatible and bind to that,
-> that way we don't need these driver updates?  Just the "snow" bit should
-> be enough to know it's one of this class of machines.
 
-Personally I don't mind either way, but I'd rather leave that decision
-to Google/Samsung people.
 
-With all those Tegra and Rockchip based Chromebooks popping up, are
-there any further Exynos based Chromebooks planned using this driver, or
-is it the last of its kind?
+On 19/02/15 12:21, Mark Brown wrote:
+> On Thu, Feb 19, 2015 at 11:04:39AM +0000, Srinivas Kandagatla wrote:
+>> On 19/02/15 10:27, Mark Brown wrote:
+>
+>>> readability.  A cheaper check for just max_register would be less
+>>> concerning but it feels like we're trying to paper over a symptom with
+>>> this rather than fix a problem.
+>
+>> Yes, just checking max_register would solve the issue for me, I think I over
+>> done the patch.. I will resend with just max_register check.
+>
+> I'm still not happy with that, it still seems like we're just papering
+> over some other problem here which we should understand before we do
+> anything else.  Why are we generating out of bounds accesses in the
+> first place?
 
-Cheers,
-Andreas
+The culprit was in my test code, which I eventually fixed. However I 
+would have expected regmap to do some out of bound check before it tries 
+to access the register space.
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
-Graham Norton; HRB 21284 (AG N?rnberg)
+If I try to do an out of bound access via regmap_read()/write() it 
+throws up an error, which is not the same with regmap_bulk_read/write() 
+apis.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150219/4aa72b20/attachment.sig>
+I was lucky that I got a page fault as the register range was just at 
+page boundary, but in cases where the range is not at page boundary, Its 
+highly likely that it could silently corrupt other memory location( 
+specially in write cases).
+
+
+
+>
