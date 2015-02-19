@@ -1,49 +1,30 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 19 Feb 2015 20:53:55 +0100
-Subject: [PATCH v2 1/2] dma: mmp_dma: add support for legacy transition
-In-Reply-To: <54E5BB06.6000106@zonque.org> (Daniel Mack's message of "Thu, 19
- Feb 2015 11:29:26 +0100")
-References: <1423954053-21760-1-git-send-email-robert.jarzmik@free.fr>
- <1424205547-15429-1-git-send-email-robert.jarzmik@free.fr>
- <54E5BB06.6000106@zonque.org>
-Message-ID: <87mw498yp8.fsf@free.fr>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 19 Feb 2015 13:57:08 -0600
+Subject: [PATCH] arm: boot: dts: am437x-idk: fix sleep pinctrl state
+Message-ID: <1424375828-26535-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Mack <daniel@zonque.org> writes:
+we have i2c0 sleep pinctrl state but were passing
+default state anyhow. Fix that.
 
-> Hi Robert,
->
-> Thanks for pushing this topic :)
-> One minor nit:
->
->> +int mmp_pdma_toggle_reserved_channel(int legacy_channel)
->> +{
->> +	if (legacy_unavailable & (1 << legacy_channel))
->> +		return -EBUSY;
->> +	legacy_reserved ^= 1 << legacy_channel;
->> +	return 0;
->> +}
->> +EXPORT_SYMBOL_GPL(mmp_pdma_toggle_reserved_channel);
->
-> My concern is that if pxa_request_dma() is called more than once for
-> whatever reason by a legacy implementation, the toggled bit mask might
-> get out of sync.
-This is not possible.
-The first call to pxa_request_dma() sets dma_channels[i].name to a non-NULL
-value.
-The second call to pxa_request_dma() cannot take the same i as
-!dma_channels[i].name is not fullfilled.
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/boot/dts/am437x-idk-evm.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> As we know exactly on the caller site what we want to achieve, let's make the
-> API explicit with something like:
->
-> int mmp_pdma_set_reserved_channel(int legacy_channel, bool reserved)
-Even if I have no strong opinion about it, I'll let the patch as it is, unless
-you really want me to add the reserved parameter, in which case I'll release a
-v3.
-
-Cheers.
-
+diff --git a/arch/arm/boot/dts/am437x-idk-evm.dts b/arch/arm/boot/dts/am437x-idk-evm.dts
+index 22c2031dea17..378344271746 100644
+--- a/arch/arm/boot/dts/am437x-idk-evm.dts
++++ b/arch/arm/boot/dts/am437x-idk-evm.dts
+@@ -254,7 +254,7 @@
+ 	status = "okay";
+ 	pinctrl-names = "default", "sleep";
+ 	pinctrl-0 = <&i2c0_pins_default>;
+-	pinctrl-1 = <&i2c0_pins_default>;
++	pinctrl-1 = <&i2c0_pins_sleep>;
+ 	clock-frequency = <400000>;
+ 
+ 	at24 at 50 {
 -- 
-Robert
+2.3.0
