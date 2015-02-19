@@ -1,206 +1,98 @@
-From: a.bouin@gmail.com (=?UTF-8?Q?aur=C3=A9lien_bouin?=)
-Date: Thu, 19 Feb 2015 10:15:10 +0100
-Subject: [PATCH 7/7] serial: imx: add support for half duplex rs485
-In-Reply-To: <1424292068-28197-7-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1424292068-28197-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1424292068-28197-7-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CAFeThoCahCMGniG59k4Le3E-4P+TEi_7dxUagKWzc20WAvkMuA@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 19 Feb 2015 10:27:01 +0100
+Subject: [PATCH v2 4/4] clk: dt: Introduce always-on clock domain
+ documentation
+In-Reply-To: <20150218215435.GA32415@x1>
+References: <1424276101-30137-1-git-send-email-lee.jones@linaro.org>
+ <1424276101-30137-5-git-send-email-lee.jones@linaro.org>
+ <CAL_Jsq+r1BKt5B9FNPG+Y0Oi1-3RGNmRUDbpX_uDJwr45bxMXA@mail.gmail.com>
+ <20150218171230.GA30676@x1>
+ <CAL_JsqJ0sfQ-OQvYjL3X3ebH4p9HkN4iy35iT7i9S2d+yz9zYg@mail.gmail.com>
+ <20150218215435.GA32415@x1>
+Message-ID: <CAMuHMdU6DpZoi-q3pUFUX8xjnXGfTqfEYyzajZZm=-qZTk1qHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Lee,
 
-2015-02-18 21:41 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> The transmitter is expected to be controlled by the UART's RTS pin.
+On Wed, Feb 18, 2015 at 10:54 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>> >> > +Some hardware is contains bunches of clocks which must never be
+>> >> > +turned off.  If drivers a) fail to obtain a reference to any of
+>> >> > +these or b) give up a previously obtained reference during suspend,
+>> >> > +the common clk framework will attempt to disable them and the
+>> >> > +hardware can fail irrecoverably.  Usually, the only way to recover
+>> >> > +from these failures is to restart.
+>> >>
+>> >> How is (b) not a bug?
+>> >
+>> > Clocks are normally disabled during suspend.  When clocks are disabled
+>> > they give up their reference.  If references reach 0, the clock is
+>> > gated.  If one of these clocks is gated, the system will never come
+>> > out of suspend.
+>> >
+>> > How is it a bug?
+>>
+>> It a clock needs to be enabled during suspend, then the driver using
+>> it should not disable it. Anyway, suspend is a bit orthogonal to this
+>> issue.
+>
+> IMO, it's not the driver's responsibility to know which clock they are
+> using and whether it's a critical clock or not.
 
-You definately can be more open in using the last patch I have sent
-the 11th of februrary using rs485.padding[0] that give in parameter
-the GPIO to use for transmit pin
+So it's (partly) a platform/bus issue.
 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  drivers/tty/serial/imx.c | 94 +++++++++++++++++++++++++++++++++++++++++-------
->  1 file changed, 81 insertions(+), 13 deletions(-)
+>> >> While I think we need something here, I worry that this will be abused
+>> >> to be a list of clocks you have not gotten around to managing. We
+>> >
+>> > You can say that about any framework.  It's our responsibility to ask
+>> > the right questions and to disallow it from being abused.  The clocks
+>> > I use in the (real-world) example in this set are _really_ always-on.
+>> > If any of them are turned off the system will cease to perform in any
+>> > meaningful way.
+>>
+>> You cannot tell here up front whether clocks are really always-on. A
+>> reviewer is not going to know, and the submitter may not even have all
+>> the documentation and know the answer. Getting it wrong here means you
+>> have to change the dtb to fix it. Granted, it doesn't really break
+>> things in this case.
 >
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index 806b3cfb7f55..ad43019a4880 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -364,8 +364,20 @@ static void imx_stop_tx(struct uart_port *port)
->         if (sport->dma_is_enabled && sport->dma_is_txing)
->                 return;
+> We should make it clear in the documentation that this framework
+> should only be used if the clock is a critical "if it's turned off it
+> will cripple the system" one.
+
+[...]
+
+> I think the kernel's policy is a good one i.e. wait until all devices
+> are probed and have had the opportunity to take the clocks they need,
+> at which point we can usually safely gate the remainder.  These types
+> of clocks are the exception however; hence the need for this driver.
+> There are other vendors which have similar issues with their h/w.
+> These are currently using bespoke versions of this implementation, but
+> IMO a generic solution would be better.
+
+What kind of clocks are these? What do they control?
+Memory controllers? Bus controllers?
+
+They must control some device(s), so there should be one or more device
+nodes in DT that reference these clocks.
+As soon as that information is in DT, support can be added to Linux to
+make sure the "critical" clocks stay enabled, either through a real driver,
+or through platform code.
+
+>> Does simple-pm-bus help you?
 >
-> -       temp = readl(sport->port.membase + UCR1);
-> -       writel(temp & ~UCR1_TXMPTYEN, sport->port.membase + UCR1);
-> +       temp = readl(port->membase + UCR1);
-> +       writel(temp & ~UCR1_TXMPTYEN, port->membase + UCR1);
-> +
-> +       /* in rs485 mode disable transmitter if shifter is empty */
-> +       if (port->rs485.flags & SER_RS485_ENABLED &&
-> +           readl(port->membase + USR2) & USR2_TXDC) {
-> +               temp = readl(port->membase + UCR2);
-> +               temp |= UCR2_CTS;
-> +               writel(temp, port->membase + UCR2);
-> +
-> +               temp = readl(port->membase + UCR4);
-> +               temp &= ~UCR4_TCEN;
-> +               writel(temp, port->membase + UCR4);
-> +       }
->  }
->
->  /*
-> @@ -520,6 +532,17 @@ static void imx_start_tx(struct uart_port *port)
->         struct imx_port *sport = (struct imx_port *)port;
->         unsigned long temp;
->
-> +       if (port->rs485.flags & SER_RS485_ENABLED) {
-> +               /* enable transmitter and shifter empty irq */
-> +               temp = readl(port->membase + UCR2);
-> +               temp &= ~UCR2_CTS;
-> +               writel(temp, port->membase + UCR2);
-> +
-> +               temp = readl(port->membase + UCR4);
-> +               temp |= UCR4_TCEN;
-> +               writel(temp, port->membase + UCR4);
-> +       }
-> +
->         if (!sport->dma_is_enabled) {
->                 temp = readl(sport->port.membase + UCR1);
->                 writel(temp | UCR1_TXMPTYEN, sport->port.membase + UCR1);
-> @@ -661,6 +684,7 @@ static irqreturn_t imx_int(int irq, void *dev_id)
->         unsigned int sts2;
->
->         sts = readl(sport->port.membase + USR1);
-> +       sts2 = readl(sport->port.membase + USR2);
->
->         if (sts & USR1_RRDY) {
->                 if (sport->dma_is_enabled)
-> @@ -669,8 +693,10 @@ static irqreturn_t imx_int(int irq, void *dev_id)
->                         imx_rxint(irq, dev_id);
->         }
->
-> -       if (sts & USR1_TRDY &&
-> -                       readl(sport->port.membase + UCR1) & UCR1_TXMPTYEN)
-> +       if ((sts & USR1_TRDY &&
-> +            readl(sport->port.membase + UCR1) & UCR1_TXMPTYEN) ||
-> +           (sts2 & USR2_TXDC &&
-> +            readl(sport->port.membase + UCR4) & UCR4_TCEN))
->                 imx_txint(irq, dev_id);
->
->         if (sts & USR1_RTSD)
-> @@ -679,7 +705,6 @@ static irqreturn_t imx_int(int irq, void *dev_id)
->         if (sts & USR1_AWAKE)
->                 writel(USR1_AWAKE, sport->port.membase + USR1);
->
-> -       sts2 = readl(sport->port.membase + USR2);
->         if (sts2 & USR2_ORE) {
->                 dev_err(sport->port.dev, "Rx FIFO overrun\n");
->                 sport->port.icount.overrun++;
-> @@ -731,11 +756,13 @@ static void imx_set_mctrl(struct uart_port *port, unsigned int mctrl)
->         struct imx_port *sport = (struct imx_port *)port;
->         unsigned long temp;
->
-> -       temp = readl(sport->port.membase + UCR2) & ~(UCR2_CTS | UCR2_CTSC);
-> -       if (mctrl & TIOCM_RTS)
-> -               temp |= UCR2_CTS | UCR2_CTSC;
-> -
-> -       writel(temp, sport->port.membase + UCR2);
-> +       if (!(port->rs485.flags & SER_RS485_ENABLED)) {
-> +               temp = readl(sport->port.membase + UCR2);
-> +               temp &= ~(UCR2_CTS | UCR2_CTSC);
-> +               if (mctrl & TIOCM_RTS)
-> +                       temp |= UCR2_CTS | UCR2_CTSC;
-> +               writel(temp, sport->port.membase + UCR2);
-> +       }
->
->         temp = readl(sport->port.membase + uts_reg(sport)) & ~UTS_LOOP;
->         if (mctrl & TIOCM_LOOP)
-> @@ -1029,7 +1056,7 @@ static int imx_startup(struct uart_port *port)
->         temp |= UCR1_RRDYEN | UCR1_RTSDEN | UCR1_UARTEN;
->         writel(temp, sport->port.membase + UCR1);
->
-> -       temp = read(sport->port.membase + UCR4);
-> +       temp = readl(sport->port.membase + UCR4);
->         temp |= UCR4_OREN;
->         writel(temp, sport->port.membase + UCR4);
->
-> @@ -1144,7 +1171,17 @@ imx_set_termios(struct uart_port *port, struct ktermios *termios,
->         if (termios->c_cflag & CRTSCTS) {
->                 if (sport->have_rtscts) {
->                         ucr2 &= ~UCR2_IRTS;
-> -                       ucr2 |= UCR2_CTSC;
-> +
-> +                       if (port->rs485.flags & SER_RS485_ENABLED)
-> +                               /*
-> +                                * RTS is mandatory for rs485 operation, so keep
-> +                                * it under manual control and keep transmitter
-> +                                * disabled.
-> +                                */
-> +                               ucr2 |= UCR2_CTS;
-> +                       else
-> +                               ucr2 |= UCR2_CTSC;
-> +
->
->                         /* Can we enable the DMA support? */
->                         if (is_imx6q_uart(sport) && !uart_console(port)
-> @@ -1153,7 +1190,9 @@ imx_set_termios(struct uart_port *port, struct ktermios *termios,
->                 } else {
->                         termios->c_cflag &= ~CRTSCTS;
->                 }
-> -       }
-> +       } else if (port->rs485.flags & SER_RS485_ENABLED)
-> +               /* disable transmitter */
-> +               ucr2 |= UCR2_CTS;
->
->         if (termios->c_cflag & CSTOPB)
->                 ucr2 |= UCR2_STPB;
-> @@ -1374,6 +1413,34 @@ static void imx_poll_put_char(struct uart_port *port, unsigned char c)
->  }
->  #endif
->
-> +static int imx_rs485_config(struct uart_port *port,
-> +                           struct serial_rs485 *rs485conf)
-> +{
-> +       struct imx_port *sport = (struct imx_port *)port;
-> +
-> +       /* unimplemented */
-> +       rs485conf->delay_rts_before_send = 0;
-> +       rs485conf->delay_rts_after_send = 0;
-> +
-> +       /* RTS is required to control the transmitter */
-> +       if (!sport->have_rtscts)
-> +               rs485conf->flags &= ~SER_RS485_ENABLED;
-> +
-> +       if (rs485conf->flags & SER_RS485_ENABLED) {
-> +               unsigned long temp;
-> +
-> +               /* disable transmitter */
-> +               temp = readl(sport->port.membase + UCR2);
-> +               temp &= ~UCR2_CTSC;
-> +               temp |= UCR2_CTS;
-> +               writel(temp, sport->port.membase + UCR2);
-> +       }
-> +
-> +       port->rs485 = *rs485conf;
-> +
-> +       return 0;
-> +}
-> +
->  static struct uart_ops imx_pops = {
->         .tx_empty       = imx_tx_empty,
->         .set_mctrl      = imx_set_mctrl,
-> @@ -1731,6 +1798,7 @@ static int serial_imx_probe(struct platform_device *pdev)
->         sport->port.irq = rxirq;
->         sport->port.fifosize = 32;
->         sport->port.ops = &imx_pops;
-> +       sport->port.rs485_config = imx_rs485_config;
->         sport->port.flags = UPF_BOOT_AUTOCONF;
->         init_timer(&sport->timer);
->         sport->timer.function = imx_timeout;
-> --
-> 2.1.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> I have no idea what this is, and I'm struggling to grep for it too?
+
+Rob already provided a pointer.
+If you have more questions, feel free to ask!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
