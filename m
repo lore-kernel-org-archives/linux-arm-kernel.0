@@ -1,54 +1,56 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 19 Feb 2015 10:12:48 -0800
-Subject: [PATCH 2/4] of: DT quirks infrastructure
-In-Reply-To: <CAL_JsqKT3+URcad6X=i+73NLRnVstbpvFJxxT=ru7KJmp_XuVQ@mail.gmail.com>
-References: <1424271576-1952-1-git-send-email-pantelis.antoniou@konsulko.com>
- <1424271576-1952-3-git-send-email-pantelis.antoniou@konsulko.com>
- <54E54586.5070602@gmail.com>
- <CAL_JsqKT3+URcad6X=i+73NLRnVstbpvFJxxT=ru7KJmp_XuVQ@mail.gmail.com>
-Message-ID: <20150219181248.GA7713@roeck-us.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 19 Feb 2015 12:13:13 -0600
+Subject: [RESEND PATCH 2/2] arm: socfpga: Set share override bit of the l2
+ cache controller
+In-Reply-To: <1424365606-19964-2-git-send-email-dinguyen@opensource.altera.com>
+References: <1424365606-19964-1-git-send-email-dinguyen@opensource.altera.com>
+ <1424365606-19964-2-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <CAL_JsqKmbV69Q-hgnvnz-2+2T8k-Q+WcrFmewkfozKk06ZM7OA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 19, 2015 at 12:01:14PM -0600, Rob Herring wrote:
-> On Wed, Feb 18, 2015 at 8:08 PM, Frank Rowand <frowand.list@gmail.com> wrote:
-> > On 2/18/2015 6:59 AM, Pantelis Antoniou wrote:
-> >> Implement a method of applying DT quirks early in the boot sequence.
-> >>
-> >> A DT quirk is a subtree of the boot DT that can be applied to
-> >> a target in the base DT resulting in a modification of the live
-> >> tree. The format of the quirk nodes is that of a device tree overlay.
-> >
-> > The use of the word "quirk" is a different mental model for me than what
-> > this patch series appears to be addressing.  I would suggest totally
-> > removing the word "quirk" from this proposal to avoid confusing the
-> > mental models of future generations of kernel folks.
-> 
-> This comes from me as quirks are a different usecase I had in mind,
-> but one that could use a similar mechanism. Although, in the case of
-> quirks, I would expect them to be overlays built into the kernel. It
-> would be more a way to update old dtbs.
-> 
-> > What this patch series seems to be proposing is a method to apply DT
-> > overlays as soon as unflatten_device_tree() completes.  In other words,
-> > making the device tree a dynamic object, that is partially defined by
-> > the kernel during boot.  Well, to be fair, the kernel chooses among
-> > several possible alternatives encoded in the DT blob.  So the device
-> > tree is no longer a static object that describes the hardware of the
-> > system.  It may not sound like a big deal, but it seems to me to be
-> > a fundamental shift in what the device tree blob is.  Something that
-> > should be thought about carefully and not just applied as a patch to
-> > solve a point problem.
-> 
-> I agree. I would not want to see every board for an SOC become an
-> overlay for example. I think it has to be limited to truly plugable
-> h/w (e.g. capes) or minor changes. We just have to define what is
-> minor. :)
-> 
+On Thu, Feb 19, 2015 at 11:06 AM,  <dinguyen@opensource.altera.com> wrote:
+> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+>
+> By not having bit 22 set in the PL310 Auxiliary Control register (shared
+> attribute override enable) has the side effect of transforming Normal
+> Shared Non-cacheable reads into Cacheable no-allocate reads.
+>
+> Coherent DMA buffers in Linux always have a Cacheable alias via the
+> kernel linear mapping and the processor can speculatively load cache
+> lines into the PL310 controller. With bit 22 cleared, Non-cacheable
+> reads would unexpectedly hit such cache lines leading to buffer
+> corruption.
 
-Everything that isn't OIR capable but fixed at boot time. OIR can and
-should be handled with "real" overlays. OIR implies removal; I would
-assume that what is discused here is insertion-only, and runtime removal
-is neither required nor wanted. Or at least that is our use case.
+You really should be doing this in your bootloader.
 
-Guenter
+Rob
+
+>
+> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+> ---
+>  arch/arm/mach-socfpga/socfpga.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+> index a5f1fda..4ce2100 100644
+> --- a/arch/arm/mach-socfpga/socfpga.c
+> +++ b/arch/arm/mach-socfpga/socfpga.c
+> @@ -105,7 +105,8 @@ static const char *altera_dt_match[] = {
+>
+>  DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
+>         .l2c_aux_val    = L310_AUX_CTRL_DATA_PREFETCH |
+> -                         L310_AUX_CTRL_INSTR_PREFETCH,
+> +                         L310_AUX_CTRL_INSTR_PREFETCH |
+> +                         L2C_AUX_CTRL_SHARED_OVERRIDE,
+>         .l2c_aux_mask   = ~0,
+>         .smp            = smp_ops(socfpga_smp_ops),
+>         .map_io         = socfpga_map_io,
+> --
+> 2.2.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
