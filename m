@@ -1,92 +1,204 @@
-From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
-Date: Thu, 19 Feb 2015 16:41:44 +0200
-Subject: [PATCH 2/4] of: DT quirks infrastructure
-In-Reply-To: <54E54586.5070602@gmail.com>
-References: <1424271576-1952-1-git-send-email-pantelis.antoniou@konsulko.com>
- <1424271576-1952-3-git-send-email-pantelis.antoniou@konsulko.com>
- <54E54586.5070602@gmail.com>
-Message-ID: <23825C6A-7FF1-4D06-8802-F6964F71B97C@konsulko.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Thu, 19 Feb 2015 23:49:34 +0900
+Subject: [PATCH v5 5/6] arm64: Add kernel return probes support
+ (kretprobes)
+In-Reply-To: <1424214701-4899-6-git-send-email-dave.long@linaro.org>
+References: <1424214701-4899-1-git-send-email-dave.long@linaro.org>
+ <1424214701-4899-6-git-send-email-dave.long@linaro.org>
+Message-ID: <54E5F7FE.7050308@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frank,
-
-> On Feb 19, 2015, at 04:08 , Frank Rowand <frowand.list@gmail.com> wrote:
+(2015/02/18 8:11), David Long wrote:
+> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
 > 
-> On 2/18/2015 6:59 AM, Pantelis Antoniou wrote:
->> Implement a method of applying DT quirks early in the boot sequence.
->> 
->> A DT quirk is a subtree of the boot DT that can be applied to
->> a target in the base DT resulting in a modification of the live
->> tree. The format of the quirk nodes is that of a device tree overlay.
+> AArch64 ISA does not have instructions to pop the PC register
+> value from the stack(like ARM v7 has ldmia {...,pc}) without using
+> one of the general purpose registers. This means return probes
+> cannot return to the actual return address directly without
+> modifying register context, and without trapping into debug exception.
 > 
-> The use of the word "quirk" is a different mental model for me than what
-> this patch series appears to be addressing.  I would suggest totally
-> removing the word "quirk" from this proposal to avoid confusing the
-> mental models of future generations of kernel folks.
+> So, like many other architectures, we prepare a global routine
+> with NOPs which serve as a trampoline to hack away the
+> function return address by placing an extra kprobe on the
+> trampoline entry.
+> 
+> The pre-handler of this special 'trampoline' kprobe executes the return
+> probe handler functions and restores original return address in ELR_EL1.
+> This way the saved pt_regs still hold the original register context to be
+> carried back to the probed kernel function.
+
+Looks good to me.
+
+Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+
+Thanks!
+
+> 
+> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+> Signed-off-by: David A. Long <dave.long@linaro.org>
+> ---
+>  arch/arm64/Kconfig               |   1 +
+>  arch/arm64/include/asm/kprobes.h |   1 +
+>  arch/arm64/kernel/kprobes.c      | 112 ++++++++++++++++++++++++++++++++++++++-
+>  3 files changed, 113 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 9ffa8b8..a5e50e9 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -68,6 +68,7 @@ config ARM64
+>  	select HAVE_RCU_TABLE_FREE
+>  	select HAVE_SYSCALL_TRACEPOINTS
+>  	select HAVE_KPROBES
+> +	select HAVE_KRETPROBES if HAVE_KPROBES
+>  	select IRQ_DOMAIN
+>  	select MODULES_USE_ELF_RELA
+>  	select NO_BOOTMEM
+> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
+> index b35d3b9..a2de3b8 100644
+> --- a/arch/arm64/include/asm/kprobes.h
+> +++ b/arch/arm64/include/asm/kprobes.h
+> @@ -56,5 +56,6 @@ void arch_remove_kprobe(struct kprobe *);
+>  int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
+>  int kprobe_exceptions_notify(struct notifier_block *self,
+>  			     unsigned long val, void *data);
+> +void kretprobe_trampoline(void);
+>  
+>  #endif /* _ARM_KPROBES_H */
+> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+> index e157877..fb869f4 100644
+> --- a/arch/arm64/kernel/kprobes.c
+> +++ b/arch/arm64/kernel/kprobes.c
+> @@ -559,6 +559,115 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+>  	return 0;
+>  }
+>  
+> +/*
+> + * Kretprobes: kernel return probes handling
+> + *
+> + * AArch64 mode does not support popping the PC value from the
+> + * stack like on ARM 32-bit (ldmia {..,pc}), so atleast one
+> + * register need to be used to achieve branching/return.
+> + * It means return probes cannot return back to the original
+> + * return address directly without modifying the register context.
+> + *
+> + * So like other architectures, we prepare a global routine
+> + * with NOPs, which serve as trampoline address that hack away the
+> + * function return, with the exact register context.
+> + * Placing a kprobe on trampoline routine entry will trap again to
+> + * execute return probe handlers and restore original return address
+> + * in ELR_EL1, this way saved pt_regs still hold the original
+> + * register values to be carried back to the caller.
+> + */
+> +static void __used kretprobe_trampoline_holder(void)
+> +{
+> +	asm volatile (".global kretprobe_trampoline\n"
+> +			"kretprobe_trampoline:\n"
+> +			"NOP\n\t"
+> +			"NOP\n\t");
+> +}
+> +
+> +static int __kprobes
+> +trampoline_probe_handler(struct kprobe *p, struct pt_regs *regs)
+> +{
+> +	struct kretprobe_instance *ri = NULL;
+> +	struct hlist_head *head, empty_rp;
+> +	struct hlist_node *tmp;
+> +	unsigned long flags, orig_ret_addr = 0;
+> +	unsigned long trampoline_address =
+> +		(unsigned long)&kretprobe_trampoline;
+> +
+> +	INIT_HLIST_HEAD(&empty_rp);
+> +	kretprobe_hash_lock(current, &head, &flags);
+> +
+> +	/*
+> +	 * It is possible to have multiple instances associated with a given
+> +	 * task either because multiple functions in the call path have
+> +	 * a return probe installed on them, and/or more than one return
+> +	 * probe was registered for a target function.
+> +	 *
+> +	 * We can handle this because:
+> +	 *     - instances are always inserted at the head of the list
+> +	 *     - when multiple return probes are registered for the same
+> +	 *       function, the first instance's ret_addr will point to the
+> +	 *       real return address, and all the rest will point to
+> +	 *       kretprobe_trampoline
+> +	 */
+> +	hlist_for_each_entry_safe(ri, tmp, head, hlist) {
+> +		if (ri->task != current)
+> +			/* another task is sharing our hash bucket */
+> +			continue;
+> +
+> +		if (ri->rp && ri->rp->handler) {
+> +			__this_cpu_write(current_kprobe, &ri->rp->kp);
+> +			get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
+> +			ri->rp->handler(ri, regs);
+> +			__this_cpu_write(current_kprobe, NULL);
+> +		}
+> +
+> +		orig_ret_addr = (unsigned long)ri->ret_addr;
+> +		recycle_rp_inst(ri, &empty_rp);
+> +
+> +		if (orig_ret_addr != trampoline_address)
+> +			/*
+> +			 * This is the real return address. Any other
+> +			 * instances associated with this task are for
+> +			 * other calls deeper on the call stack
+> +			 */
+> +			break;
+> +	}
+> +
+> +	kretprobe_assert(ri, orig_ret_addr, trampoline_address);
+> +	/* restore the original return address */
+> +	instruction_pointer(regs) = orig_ret_addr;
+> +	reset_current_kprobe();
+> +	kretprobe_hash_unlock(current, &flags);
+> +
+> +	hlist_for_each_entry_safe(ri, tmp, &empty_rp, hlist) {
+> +		hlist_del(&ri->hlist);
+> +		kfree(ri);
+> +	}
+> +
+> +	/* return 1 so that post handlers not called */
+> +	return 1;
+> +}
+> +
+> +void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
+> +				      struct pt_regs *regs)
+> +{
+> +	ri->ret_addr = (kprobe_opcode_t *)regs->regs[30];
+> +
+> +	/* replace return addr (x30) with trampoline */
+> +	regs->regs[30] = (long)&kretprobe_trampoline;
+> +}
+> +
+> +static struct kprobe trampoline = {
+> +	.addr = (kprobe_opcode_t *) &kretprobe_trampoline,
+> +	.pre_handler = trampoline_probe_handler
+> +};
+> +
+> +int __kprobes arch_trampoline_kprobe(struct kprobe *p)
+> +{
+> +	return p->addr == (kprobe_opcode_t *) &kretprobe_trampoline;
+> +}
+> +
+>  /* Break Handler hook */
+>  static struct break_hook kprobes_break_hook = {
+>  	.esr_mask = BRK64_ESR_MASK,
+> @@ -576,5 +685,6 @@ int __init arch_init_kprobes(void)
+>  	register_break_hook(&kprobes_break_hook);
+>  	register_step_hook(&kprobes_step_hook);
+>  
+> -	return 0;
+> +	/* register trampoline for kret probe */
+> +	return register_kprobe(&trampoline);
+>  }
 > 
 
-Naming things is hard to do. Suggestions?
 
-> What this patch series seems to be proposing is a method to apply DT
-> overlays as soon as unflatten_device_tree() completes.  In other words,
-> making the device tree a dynamic object, that is partially defined by
-> the kernel during boot.  Well, to be fair, the kernel chooses among
-> several possible alternatives encoded in the DT blob.  So the device
-> tree is no longer a static object that describes the hardware of the
-> system.  It may not sound like a big deal, but it seems to me to be
-> a fundamental shift in what the device tree blob is.  Something that
-> should be thought about carefully and not just applied as a patch to
-> solve a point problem.
-> 
-
-There is a fundamental shift going on about what hardware is. It is nowhere
-as static as it used to be. It is time for the kernel to keep up.
-
-> The stated use of this proposal is to create dynamic DT blobs that can
-> describe many similar variants of a given system instead of creating
-> unique DT blobs for each different system.
-> 
-
-Yes.
-
-> I obviously have not thought through the architectural implications yet,
-> but just a quick example.  One of the issues we have been trying to fix
-> is device tree validation.  The not yet existent (except as a few proof
-> of concept attempts) validator would need to validate a device tree
-> for each dynamic variant.  Probably not a big deal, but an example of
-> the ripple effects this conceptual change implies.
-> 
-
-I don?t see what the big problem with the validator is. The ?quirk?
-are easily identified by the presence of the __overlay__ nodes and
-the validator can apply each overlay and perform the validation check 
-at each resultant tree.
- 
-> A second function that this patch is proposing is a method to enable
-> or disable devices via command line options.  If I understand
-> correctly, this is meant to solve a problem with run time overlays
-> that require disabling a device previously enabled by the DT blob.
-> If so, it seems like it could easily be implemented in a simpler
-> generic way than in the board specific code in this patch series.
-> 
-
-Disabling a device is the most common case, but other options are desired
-too. For instance changing OPPs by a command line option, etc.
-
-> I share the concerns that Mark Rutland has expressed in his comments
-> about this series.
-> 
-> < snip >
-> 
-> I have read through the patches and will have comments on the code
-> later if this proposal is seen as a good idea.
-> 
-
-OK
-
-> -Frank
-
-Regards
-
-? Pantelis
+-- 
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
