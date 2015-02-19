@@ -1,96 +1,42 @@
-From: addy.ke@rock-chips.com (addy ke)
-Date: Thu, 19 Feb 2015 18:30:35 +0800
-Subject: [PATCH v4 1/3] mmc: dw_mmc: update clock after host reach a stable
- voltage
-In-Reply-To: <CAGOxZ53ndi_hYDGBGhY-7q8aOrFid1=D=_5KEbUvzTsnybJQ3Q@mail.gmail.com>
-References: <1423828368-18456-1-git-send-email-addy.ke@rock-chips.com>
- <1423894668-8886-1-git-send-email-addy.ke@rock-chips.com>
- <1423894668-8886-2-git-send-email-addy.ke@rock-chips.com>
- <CAGOxZ53ndi_hYDGBGhY-7q8aOrFid1=D=_5KEbUvzTsnybJQ3Q@mail.gmail.com>
-Message-ID: <54E5BB4B.8090405@rock-chips.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 19 Feb 2015 19:31:56 +0900
+Subject: [PATCH 2/2] regmap: Add range check in _regmap_raw_write()
+In-Reply-To: <1424335255-7517-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1424335193-7431-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1424335255-7517-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20150219103156.GD3198@finisterre.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Alim
+On Thu, Feb 19, 2015 at 08:40:55AM +0000, Srinivas Kandagatla wrote:
+> regmap_bulk_write() ends up using the path that invokes _regmap_raw_write(),
+> however _regmap_raw_write() never checks if the registers that are accessed
+> are actually within the accessible range. This results in kernel crashes when
+> trying to access registers beyond max_registers.
+> 
+> This patch just adds check before accessing the register range.
 
-Sorry for late reply.
+>  	/* Check for unwritable registers before we start */
+> -	if (map->writeable_reg)
+> -		for (i = 0; i < val_len / map->format.val_bytes; i++)
+> -			if (!map->writeable_reg(map->dev,
+> -						reg + (i * map->reg_stride)))
+> -				return -EINVAL;
+> +	for (i = 0; i < count; i++)
+> +		if (!regmap_writeable(map, reg + (i * map->reg_stride)))
+> +			return -EINVAL;
 
-On 2015/2/16 07:28, Alim Akhtar wrote:
-> Hi Addy,
-> 
-> On Sat, Feb 14, 2015 at 11:47 AM, Addy Ke <addy.ke@rock-chips.com> wrote:
->> As show in mmc_power_up(), in MMC_POWER_UP state, the voltage isn't
->> stable and we may get 'data busy' which can't be cleaned by resetting
->> all blocks. So we should not send command to update clock in this state.
->>
->> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
->> ---
->>  drivers/mmc/host/dw_mmc.c | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->> index 4d2e3c2..3472f9b 100644
->> --- a/drivers/mmc/host/dw_mmc.c
->> +++ b/drivers/mmc/host/dw_mmc.c
->> @@ -1102,7 +1102,8 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->>                 drv_data->set_ios(slot->host, ios);
->>
->>         /* Slot specific timing and width adjustment */
->> -       dw_mci_setup_bus(slot, false);
->> +       if (ios->power_mode != MMC_POWER_UP)
->> +               dw_mci_setup_bus(slot, false);
->>
-> This looks a HACK to me.
-> If stabilizing host voltage regulator is the problem, can you try out
-> below patch, and see if this resolve your issue?
+Your changelog doesn't correspond to what the code is actually doing
+here...  what you're actually doing here is replacing an open coding of
+regmap_writeable() with calls to the function.
 
-I have test by:
-cd /sys/bus/platform/drivers/dwmmc_rockchip
-for i in $(seq 1 10000); do
-  echo "========================" $i
-  echo ff0c0000.dwmmc > unbind
-  sleep .5
-  echo ff0c0000.dwmmc > bind
-  sleep 2
-done
-
-There is no error.
-I think this patch can resolve my issue, thank you.
-
-Do you send this patch upstream, or can I put it in my patch list?
-
-> 
-> ===========
-> [PATCH] mmc: dw_mmc: Wait for host voltage regulator to be stable
-> 
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> ---
->  drivers/mmc/host/dw_mmc.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 4d2e3c2..dc10fbb 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -1202,6 +1202,9 @@ static int dw_mci_switch_voltage(struct mmc_host
-> *mmc, struct mmc_ios *ios)
->   }
->   mci_writel(host, UHS_REG, uhs);
-> 
-> + /* wait for 5ms so that host voltage regulator is stable */
-> + usleep_range(5000, 5500);
-> +
->   return 0;
->  }
-> 
-> ===============
-> 
->>         if (slot->host->state == STATE_WAITING_CMD11_DONE && ios->clock != 0)
->>                 slot->host->state = STATE_IDLE;
->> --
->> 1.8.3.2
->>
->>
-> 
-> 
-> 
+The same papering over the cracks concerns do apply here as well, it's
+not immediately obvious that this is a good fix for the issue you
+describe.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150219/dd996c3e/attachment.sig>
