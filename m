@@ -1,10 +1,10 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 19 Feb 2015 14:55:02 +0100
-Subject: [PATCH 1/6] ASoC: max98088: Document DT bindings
-In-Reply-To: <1424283959-16289-2-git-send-email-afaerber@suse.de>
+Date: Thu, 19 Feb 2015 15:05:14 +0100
+Subject: [PATCH 6/6] ARM: dts: Add sound support to exynos5250-spring
+In-Reply-To: <1424283959-16289-7-git-send-email-afaerber@suse.de>
 References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
- <1424283959-16289-2-git-send-email-afaerber@suse.de>
-Message-ID: <54E5EB36.9020007@collabora.co.uk>
+ <1424283959-16289-7-git-send-email-afaerber@suse.de>
+Message-ID: <54E5ED9A.90802@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,48 +13,46 @@ Hello Andreas,
 On 02/18/2015 07:25 PM, Andreas F?rber wrote:
 > Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
->  Documentation/devicetree/bindings/sound/max98088.txt | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/max98088.txt
+>  arch/arm/boot/dts/exynos5250-spring.dts | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/max98088.txt b/Documentation/devicetree/bindings/sound/max98088.txt
-> new file mode 100644
-> index 000000000000..6f8fe85040ee
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/max98088.txt
-> @@ -0,0 +1,16 @@
-> +MAX98088 audio CODEC
-> +
-> +This device supports I2C only.
-> +
-> +Required properties:
-> +
-> +- compatible : "maxim,max98088" or "maxim,max98089".
-> +
-> +- reg : The I2C address of the device.
-> +
-> +Example:
-> +
-> +max98089: codec at 10 {
-> +	compatible = "maxim,max98089";
-> +	reg = <0x10>;
-> +};
->
+> diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
+> index 866beb4e0597..142e0550e223 100644
+> --- a/arch/arm/boot/dts/exynos5250-spring.dts
+> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
+> @@ -49,6 +49,17 @@
+>  		};
+>  	};
+>  
+> +	sound {
+> +		compatible = "google,snow-audio-max98089";
+> +		samsung,model = "Spring-I2S-MAX98089";
+> +		samsung,i2s-controller = <&i2s0>;
+> +		samsung,audio-codec = <&max98089>;
+> +		clocks = <&pmu_system_controller 0>;
+> +		clock-names = "mclk";
 
-I see that a master clock (mclk) is added in patch 6/6 but the
-max98088 codec driver does handle this clock.
+Related to my comment in patch 1/6, "mclk" should be defined in the codec
+device node. I know that you probably used as a reference Tushar's patch
+[0] I posted recently but I just figured out that his dependency patch [1]
+mentioned in [2] handled the master clock in the ASoC machine driver but
+the final version merged handled it in the codec drivers.
 
-If the SoC XCLKOUT provides the master clock to the max98089
-codec in Spring like is the case for the max9809{0,5} codecs
-in the Snow and Peach Pit/Pi Chromebooks then you need to do
-something along the lines of the following commits:
+I asked Kukjin to drop the patch to Snow and Peach Pit/Pi and will post
+a correct version as a part of a series once I've sound working.
 
-e3048c3d2be5 ASoC: max98095: Add master clock handling
-b10ab7b838bd ASoC: max98090: Add master clock handling
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&mic_det_gpio>, <&hp_det_gpio>;
+> +	};
+> +
 
-If that's the case you also have to mention in the DT binding
-doc that "clocks" and "clock-names" are optional properties
-like Documentation/devicetree/bindings/sound/max9809{0,5}.txt.
+The mic and headphone jack detection are still not supported in the Snow
+ASoC machine driver so this pinctrl are not needed but I guess it doesn't
+hurt to have them mux'ed too.
 
 Best regards,
 Javier
+
+[0]: https://lkml.org/lkml/2015/2/6/495
+[1]: https://lkml.org/lkml/2014/5/20/4
+[2]: https://patches.linaro.org/30406/
