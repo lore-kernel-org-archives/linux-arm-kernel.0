@@ -1,49 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Feb 2015 09:07:30 +0100
-Subject: [PATCH] ARM: make of_device_ids const
-In-Reply-To: <CAGUYZuREm+XAO7mD0gxeSftStxUOADHmoZ2ngcKp218FaKOeGw@mail.gmail.com>
-References: <1424290796-18475-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <6700107.3fSsY2uIcW@wuerfel>
- <CAGUYZuREm+XAO7mD0gxeSftStxUOADHmoZ2ngcKp218FaKOeGw@mail.gmail.com>
-Message-ID: <7609298.ZvCtgk2my8@wuerfel>
+From: jdelvare@suse.de (Jean Delvare)
+Date: Thu, 19 Feb 2015 09:09:17 +0100
+Subject: [PATCH v5 59/61] dmaengine: Add a warning for drivers not using
+ the generic slave caps retrieval
+In-Reply-To: <CAOh2x=n1SC+s3hyFaOpREwVuzvqDUwb5vsTBN0As+O2h6eXbMw@mail.gmail.com>
+References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1416231775-31252-60-git-send-email-maxime.ripard@free-electrons.com>
+ <CAOh2x=n1SC+s3hyFaOpREwVuzvqDUwb5vsTBN0As+O2h6eXbMw@mail.gmail.com>
+Message-ID: <20150219090917.159d3d2f@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 February 2015 10:44:49 sanjeev sharma wrote:
-> On Thu, Feb 19, 2015 at 2:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 18 February 2015 21:19:56 Uwe Kleine-K?nig wrote:
-> >> of_device_ids (i.e. compatible strings and the respective data) are not
-> >> supposed to change at runtime. All functions working with of_device_ids
-> >> provided by <linux/of.h> work with const of_device_ids. So mark the
-> >> non-const structs in arch/arm as const, too.
-> >>
-> >> While at it also add some __initconst annotations.
-> >>
-> >> Acked-by: Jason Cooper <jason@lakedameon.net>
-> >> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Hi Viresh,
+
+On Thu, 19 Feb 2015 15:57:27 +0800, Viresh Kumar wrote:
+> On Mon, Nov 17, 2014 at 9:42 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > For the slave caps retrieval to be really useful, most drivers need to
+> > implement it.
 > >
-> > Applied to fixes branch, thanks!
+> > Hence, we need to be slightly more aggressive, and trigger a warning at
+> > registration time for drivers that don't fill their caps infos in order to
+> > encourage them to implement it.
 > >
-> >         Arnd
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > ---
+> >  drivers/dma/dmaengine.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> >
+> > diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+> > index 98e9431f85ec..300c8cd2786c 100644
+> > --- a/drivers/dma/dmaengine.c
+> > +++ b/drivers/dma/dmaengine.c
+> > @@ -827,6 +827,9 @@ int dma_async_device_register(struct dma_device *device)
+> >         BUG_ON(!device->device_issue_pending);
+> >         BUG_ON(!device->dev);
+> >
+> > +       WARN(dma_has_cap(DMA_SLAVE, device->cap_mask) && !device->directions,
+> > +            "this driver doesn't support generic slave capabilities reporting\n");
+> > +
+> >         /* note: this only matters in the
+> >          * CONFIG_ASYNC_TX_ENABLE_CHANNEL_SWITCH=n case
+> >          */
 > 
-> There are many places in driver also where this need to be fixed.I
-> have submitted couple of patches listed below and waiting for the
-> response.
+> Probably you need to fix this ?
 > 
-> serial:imx make of_device_id array const
-> pinctrl: freescale: make of_device_id array const
+> https://bugzilla.kernel.org/show_bug.cgi?id=90801
 
-I'd suggest you send them again after the merge window. Maintainers
-often miss patches coming in, or have a long backlog of patches
-to look at.
+My understanding is that the warning message is here on purpose to
+instruct DMA driver authors to fix their code. So if anyone need to fix
+anything, that would be you and Andy. That being said, I suspect Andy
+already did that:
 
-Greg is usually very good at applying patches for the serial drivers
-very quickly, but if he hasn't applied the patch within a week, it's
-probably not on his radar any more.
+commit 029a40e97d0db269f4a7fc02b0f29f627f628309
+Author: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Date:   Fri Jan 2 16:17:24 2015 +0200
 
-For the pinctrl patches, I see that Linus Walleij picked up a couple
-of them, and if he missed this one that was probably an oversight, so
-just send him a ping or send the patch again with [PATCH RESEND] in
-the subject.
+    dmaengine: dw: provide DMA capabilities
+    
+Brian, can you please try the latest Linus or linux-next kernel (or
+backport the above commit to your current kernel) and confirm that the
+backtraces are no longer printed?
 
-	Arnd
+Thanks,
+-- 
+Jean Delvare
+SUSE L3 Support
