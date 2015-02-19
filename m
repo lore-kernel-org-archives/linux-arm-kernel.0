@@ -1,63 +1,43 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 19 Feb 2015 20:39:41 +0300
-Subject: [PATCH v2] ARM: shmobile: r8a7790: Fix HSUSB clock to hp_clk
- from mp_clk
-In-Reply-To: <1424360575-6482-1-git-send-email-horms+renesas@verge.net.au>
-References: <1424360575-6482-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <54E61FDD.3060700@cogentembedded.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 19 Feb 2015 09:44:08 -0800
+Subject: [PATCH 5/6] ASoC: samsung: Extend Snow driver to support max98089
+In-Reply-To: <20150219094425.GB3198@finisterre.sirena.org.uk>
+References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
+ <1424283959-16289-6-git-send-email-afaerber@suse.de>
+ <20150219094425.GB3198@finisterre.sirena.org.uk>
+Message-ID: <CAD=FV=WkieDSSB_-a6DtH1hmq6SyZk4NAR-eXQ11hxUDMTvRfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Mark,
 
-On 02/19/2015 06:42 PM, Simon Horman wrote:
+On Thu, Feb 19, 2015 at 1:44 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Feb 18, 2015 at 07:25:58PM +0100, Andreas F?rber wrote:
+>
+>>  static const struct of_device_id snow_of_match[] = {
+>> +     { .compatible = "google,snow-audio-max98089", },
+>>       { .compatible = "google,snow-audio-max98090", },
+>>       { .compatible = "google,snow-audio-max98091", },
+>>       { .compatible = "google,snow-audio-max98095", },
+>
+> Since we completely ignore the CODEC in the property might it not be
+> better to just add a plain old snow-audio compatible and bind to that,
+> that way we don't need these driver updates?  Just the "snow" bit should
+> be enough to know it's one of this class of machines.
 
-> From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+I think what you're suggesting is that here we should add a new
+compatible string "google,snow-audio" instead of adding
+"google,snow-audio-max98089" here.  Then the sound node in the spring
+DTS would look like:
 
-> HSUSB uses hp_clk rather than mp_clk for H/W register access.
+  compatible = "google,snow-audio-max98089", "google,snow-audio";
 
-> Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> [horms: updated changelog]
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+That would allow us to later figure out that we're on a board with
+max98089 in case it became important but means that any other minor
+tweaks like this wouldn't need anything special.  I haven't tried that
+to make sure that the fallback compatible string actually works in
+this case, but it seems like the right way to go...
 
-> ---
-> v2 [Simon Horman]
-> - Updated changelog to remove information about USB-DMAC clock which
->    did not relate to the patch. I will follow up on weather the
+Sound good?
 
-    s/weather/whether/.
-
->    USB-DMAC clock should be mp_clk as the deleted portion of the
->    changelog stated.
-> ---
->   arch/arm/boot/dts/r8a7790.dtsi | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
-
-> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-> index 24de994..113edf2 100644
-> --- a/arch/arm/boot/dts/r8a7790.dtsi
-> +++ b/arch/arm/boot/dts/r8a7790.dtsi
-> @@ -1,6 +1,7 @@
->   /*
->    * Device Tree Source for the r8a7790 SoC
->    *
-> + * Copyright (C) 2015 Renesas Electronics Corporation
-
-    One-liner is hardly enough for the copyright claim. Greg KH even used to 
-say that roughly a third part of a file changed was worth it, IIRC.
-
->    * Copyright (C) 2013-2014 Renesas Solutions Corp.
->    * Copyright (C) 2014 Cogent Embedded Inc.
->    *
-> @@ -1132,7 +1133,7 @@
->   		mstp7_clks: mstp7_clks at e615014c {
->   			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
->   			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
-> -			clocks = <&mp_clk>, <&mp_clk>, <&zs_clk>, <&zs_clk>, <&p_clk>,
-> +			clocks = <&mp_clk>, <&hp_clk>, <&zs_clk>, <&zs_clk>, <&p_clk>,
->   				 <&p_clk>, <&zx_clk>, <&zx_clk>, <&zx_clk>, <&zx_clk>,
->   				 <&zx_clk>;
->   			#clock-cells = <1>;
-
-WBR, Sergei
+-Doug
