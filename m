@@ -1,29 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 19 Feb 2015 18:44:25 +0900
-Subject: [PATCH 5/6] ASoC: samsung: Extend Snow driver to support max98089
-In-Reply-To: <1424283959-16289-6-git-send-email-afaerber@suse.de>
-References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
- <1424283959-16289-6-git-send-email-afaerber@suse.de>
-Message-ID: <20150219094425.GB3198@finisterre.sirena.org.uk>
+From: a.bouin@gmail.com (=?UTF-8?Q?aur=C3=A9lien_bouin?=)
+Date: Thu, 19 Feb 2015 10:45:47 +0100
+Subject: [PATCH 7/7] serial: imx: add support for half duplex rs485
+In-Reply-To: <20150219093752.GO19388@pengutronix.de>
+References: <1424292068-28197-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1424292068-28197-7-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CAFeThoCahCMGniG59k4Le3E-4P+TEi_7dxUagKWzc20WAvkMuA@mail.gmail.com>
+ <20150219093752.GO19388@pengutronix.de>
+Message-ID: <CAFeThoC2+SGc1ZgQhbBx-pxxzpRJ-61n_fs8BZo8ChFcti3Vqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 18, 2015 at 07:25:58PM +0100, Andreas F?rber wrote:
+I hope this link will be ok :
+http://marc.info/?l=linux-kernel&m=142366865609389&q=raw
+Best regards,
 
->  static const struct of_device_id snow_of_match[] = {
-> +	{ .compatible = "google,snow-audio-max98089", },
->  	{ .compatible = "google,snow-audio-max98090", },
->  	{ .compatible = "google,snow-audio-max98091", },
->  	{ .compatible = "google,snow-audio-max98095", },
 
-Since we completely ignore the CODEC in the property might it not be
-better to just add a plain old snow-audio compatible and bind to that,
-that way we don't need these driver updates?  Just the "snow" bit should
-be enough to know it's one of this class of machines.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150219/738f8ed8/attachment.sig>
+
+2015-02-19 10:37 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Aur?lien,
+>
+> On Thu, Feb 19, 2015 at 10:15:10AM +0100, aur?lien bouin wrote:
+>> 2015-02-18 21:41 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+>> > The transmitter is expected to be controlled by the UART's RTS pin.
+>>
+>> You definately can be more open in using the last patch I have sent
+>> the 11th of februrary using rs485.padding[0] that give in parameter
+>> the GPIO to use for transmit pin
+> you have a link? Without having seen that patch this can well be a
+> separate patch. And (also without having seen the patch) I wonder why
+> the information which gpio to use doesn't come from the device tree but
+> is supplied by userspace. I thought about expanding mctrl-gpio for that,
+> but as there are a few conflicting patches to mctrl-gpio out I wanted to
+> wait until the dust settles.
+>
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
