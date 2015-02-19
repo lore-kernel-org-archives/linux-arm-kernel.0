@@ -1,204 +1,49 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Thu, 19 Feb 2015 23:49:34 +0900
-Subject: [PATCH v5 5/6] arm64: Add kernel return probes support
- (kretprobes)
-In-Reply-To: <1424214701-4899-6-git-send-email-dave.long@linaro.org>
-References: <1424214701-4899-1-git-send-email-dave.long@linaro.org>
- <1424214701-4899-6-git-send-email-dave.long@linaro.org>
-Message-ID: <54E5F7FE.7050308@hitachi.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Thu, 19 Feb 2015 15:50:47 +0100
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <54E5F847.6050602@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2015/02/18 8:11), David Long wrote:
-> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-> 
-> AArch64 ISA does not have instructions to pop the PC register
-> value from the stack(like ARM v7 has ldmia {...,pc}) without using
-> one of the general purpose registers. This means return probes
-> cannot return to the actual return address directly without
-> modifying register context, and without trapping into debug exception.
-> 
-> So, like many other architectures, we prepare a global routine
-> with NOPs which serve as a trampoline to hack away the
-> function return address by placing an extra kprobe on the
-> trampoline entry.
-> 
-> The pre-handler of this special 'trampoline' kprobe executes the return
-> probe handler functions and restores original return address in ELR_EL1.
-> This way the saved pt_regs still hold the original register context to be
-> carried back to the probed kernel function.
-
-Looks good to me.
-
-Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-
-Thanks!
-
-> 
-> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-> Signed-off-by: David A. Long <dave.long@linaro.org>
-> ---
->  arch/arm64/Kconfig               |   1 +
->  arch/arm64/include/asm/kprobes.h |   1 +
->  arch/arm64/kernel/kprobes.c      | 112 ++++++++++++++++++++++++++++++++++++++-
->  3 files changed, 113 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 9ffa8b8..a5e50e9 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -68,6 +68,7 @@ config ARM64
->  	select HAVE_RCU_TABLE_FREE
->  	select HAVE_SYSCALL_TRACEPOINTS
->  	select HAVE_KPROBES
-> +	select HAVE_KRETPROBES if HAVE_KPROBES
->  	select IRQ_DOMAIN
->  	select MODULES_USE_ELF_RELA
->  	select NO_BOOTMEM
-> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
-> index b35d3b9..a2de3b8 100644
-> --- a/arch/arm64/include/asm/kprobes.h
-> +++ b/arch/arm64/include/asm/kprobes.h
-> @@ -56,5 +56,6 @@ void arch_remove_kprobe(struct kprobe *);
->  int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
->  int kprobe_exceptions_notify(struct notifier_block *self,
->  			     unsigned long val, void *data);
-> +void kretprobe_trampoline(void);
->  
->  #endif /* _ARM_KPROBES_H */
-> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
-> index e157877..fb869f4 100644
-> --- a/arch/arm64/kernel/kprobes.c
-> +++ b/arch/arm64/kernel/kprobes.c
-> @@ -559,6 +559,115 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
->  	return 0;
->  }
->  
-> +/*
-> + * Kretprobes: kernel return probes handling
-> + *
-> + * AArch64 mode does not support popping the PC value from the
-> + * stack like on ARM 32-bit (ldmia {..,pc}), so atleast one
-> + * register need to be used to achieve branching/return.
-> + * It means return probes cannot return back to the original
-> + * return address directly without modifying the register context.
-> + *
-> + * So like other architectures, we prepare a global routine
-> + * with NOPs, which serve as trampoline address that hack away the
-> + * function return, with the exact register context.
-> + * Placing a kprobe on trampoline routine entry will trap again to
-> + * execute return probe handlers and restore original return address
-> + * in ELR_EL1, this way saved pt_regs still hold the original
-> + * register values to be carried back to the caller.
-> + */
-> +static void __used kretprobe_trampoline_holder(void)
-> +{
-> +	asm volatile (".global kretprobe_trampoline\n"
-> +			"kretprobe_trampoline:\n"
-> +			"NOP\n\t"
-> +			"NOP\n\t");
-> +}
-> +
-> +static int __kprobes
-> +trampoline_probe_handler(struct kprobe *p, struct pt_regs *regs)
-> +{
-> +	struct kretprobe_instance *ri = NULL;
-> +	struct hlist_head *head, empty_rp;
-> +	struct hlist_node *tmp;
-> +	unsigned long flags, orig_ret_addr = 0;
-> +	unsigned long trampoline_address =
-> +		(unsigned long)&kretprobe_trampoline;
-> +
-> +	INIT_HLIST_HEAD(&empty_rp);
-> +	kretprobe_hash_lock(current, &head, &flags);
-> +
-> +	/*
-> +	 * It is possible to have multiple instances associated with a given
-> +	 * task either because multiple functions in the call path have
-> +	 * a return probe installed on them, and/or more than one return
-> +	 * probe was registered for a target function.
-> +	 *
-> +	 * We can handle this because:
-> +	 *     - instances are always inserted at the head of the list
-> +	 *     - when multiple return probes are registered for the same
-> +	 *       function, the first instance's ret_addr will point to the
-> +	 *       real return address, and all the rest will point to
-> +	 *       kretprobe_trampoline
-> +	 */
-> +	hlist_for_each_entry_safe(ri, tmp, head, hlist) {
-> +		if (ri->task != current)
-> +			/* another task is sharing our hash bucket */
-> +			continue;
-> +
-> +		if (ri->rp && ri->rp->handler) {
-> +			__this_cpu_write(current_kprobe, &ri->rp->kp);
-> +			get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
-> +			ri->rp->handler(ri, regs);
-> +			__this_cpu_write(current_kprobe, NULL);
-> +		}
-> +
-> +		orig_ret_addr = (unsigned long)ri->ret_addr;
-> +		recycle_rp_inst(ri, &empty_rp);
-> +
-> +		if (orig_ret_addr != trampoline_address)
-> +			/*
-> +			 * This is the real return address. Any other
-> +			 * instances associated with this task are for
-> +			 * other calls deeper on the call stack
-> +			 */
-> +			break;
-> +	}
-> +
-> +	kretprobe_assert(ri, orig_ret_addr, trampoline_address);
-> +	/* restore the original return address */
-> +	instruction_pointer(regs) = orig_ret_addr;
-> +	reset_current_kprobe();
-> +	kretprobe_hash_unlock(current, &flags);
-> +
-> +	hlist_for_each_entry_safe(ri, tmp, &empty_rp, hlist) {
-> +		hlist_del(&ri->hlist);
-> +		kfree(ri);
-> +	}
-> +
-> +	/* return 1 so that post handlers not called */
-> +	return 1;
-> +}
-> +
-> +void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
-> +				      struct pt_regs *regs)
-> +{
-> +	ri->ret_addr = (kprobe_opcode_t *)regs->regs[30];
-> +
-> +	/* replace return addr (x30) with trampoline */
-> +	regs->regs[30] = (long)&kretprobe_trampoline;
-> +}
-> +
-> +static struct kprobe trampoline = {
-> +	.addr = (kprobe_opcode_t *) &kretprobe_trampoline,
-> +	.pre_handler = trampoline_probe_handler
-> +};
-> +
-> +int __kprobes arch_trampoline_kprobe(struct kprobe *p)
-> +{
-> +	return p->addr == (kprobe_opcode_t *) &kretprobe_trampoline;
-> +}
-> +
->  /* Break Handler hook */
->  static struct break_hook kprobes_break_hook = {
->  	.esr_mask = BRK64_ESR_MASK,
-> @@ -576,5 +685,6 @@ int __init arch_init_kprobes(void)
->  	register_break_hook(&kprobes_break_hook);
->  	register_step_hook(&kprobes_step_hook);
->  
-> -	return 0;
-> +	/* register trampoline for kret probe */
-> +	return register_kprobe(&trampoline);
->  }
-> 
 
 
--- 
-Masami HIRAMATSU
-Software Platform Research Dept. Linux Technology Research Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+On 19.02.15 11:54, Ard Biesheuvel wrote:
+> This is a 0th order approximation of how we could potentially force the guest
+> to avoid uncached mappings, at least from the moment the MMU is on. (Before
+> that, all of memory is implicitly classified as Device-nGnRnE)
+> 
+> The idea (patch #2) is to trap writes to MAIR_EL1, and replace uncached mappings
+> with cached ones. This way, there is no need to mangle any guest page tables.
+
+Would you mind to give a brief explanation on what this does? What
+happens to actually assigned devices that need to be mapped as uncached?
+What happens to DMA from such devices when the guest assumes that it's
+accessing RAM uncached and then triggers DMA?
+
+
+Alex
+
+> 
+> The downside is that, to do this correctly, we need to always trap writes to
+> the VM sysreg group, which includes registers that the guest may write to very
+> often. To reduce the associated performance hit, patch #1 introduces a fast path
+> for EL2 to perform trivial sysreg writes on behalf of the guest, without the
+> need for a full world switch to the host and back.
+> 
+> The main purpose of these patches is to quantify the performance hit, and
+> verify whether the MAIR_EL1 handling works correctly. 
+> 
+> Ard Biesheuvel (3):
+>   arm64: KVM: handle some sysreg writes in EL2
+>   arm64: KVM: mangle MAIR register to prevent uncached guest mappings
+>   arm64: KVM: keep trapping of VM sysreg writes enabled
+> 
+>  arch/arm/kvm/mmu.c               |   2 +-
+>  arch/arm64/include/asm/kvm_arm.h |   2 +-
+>  arch/arm64/kvm/hyp.S             | 101 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kvm/sys_regs.c        |  63 ++++++++++++++++++++----
+>  4 files changed, 156 insertions(+), 12 deletions(-)
+> 
