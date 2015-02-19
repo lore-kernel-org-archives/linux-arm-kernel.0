@@ -1,211 +1,92 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 19 Feb 2015 17:17:25 +0000
-Subject: [PATCH v6 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
-In-Reply-To: <CAJe_ZhcejiQ-EJubbxJoPu8kOwB0CPpxmWJyHZcwGNRzXtbNzw@mail.gmail.com>
-References: <1423188007-17047-1-git-send-email-Vincent.Yang@tw.fujitsu.com>	<1423188528-17134-1-git-send-email-Vincent.Yang@tw.fujitsu.com>	<54E46B77.4060803@arm.com>
- <CAJe_ZhcejiQ-EJubbxJoPu8kOwB0CPpxmWJyHZcwGNRzXtbNzw@mail.gmail.com>
-Message-ID: <54E61AA5.4090803@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 19 Feb 2015 17:19:35 +0000
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <20150219165731.GA26965@hawk.usersys.redhat.com>
+References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150219165731.GA26965@hawk.usersys.redhat.com>
+Message-ID: <CAKv+Gu8Je3RRrgEFCZ7JUWtOgk3WqA_qdBEOPAMc3OqnKr1bwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 19/02/15 16:10, Jassi Brar wrote:
-> On 18 February 2015 at 16:07, Sudeep Holla <sudeep.holla@arm.com> wrote:
+On 19 February 2015 at 16:57, Andrew Jones <drjones@redhat.com> wrote:
+> On Thu, Feb 19, 2015 at 10:54:43AM +0000, Ard Biesheuvel wrote:
+>> This is a 0th order approximation of how we could potentially force the guest
+>> to avoid uncached mappings, at least from the moment the MMU is on. (Before
+>> that, all of memory is implicitly classified as Device-nGnRnE)
+>>
+>> The idea (patch #2) is to trap writes to MAIR_EL1, and replace uncached mappings
+>> with cached ones. This way, there is no need to mangle any guest page tables.
+>>
+>> The downside is that, to do this correctly, we need to always trap writes to
+>> the VM sysreg group, which includes registers that the guest may write to very
+>> often. To reduce the associated performance hit, patch #1 introduces a fast path
+>> for EL2 to perform trivial sysreg writes on behalf of the guest, without the
+>> need for a full world switch to the host and back.
+>>
+>> The main purpose of these patches is to quantify the performance hit, and
+>> verify whether the MAIR_EL1 handling works correctly.
+>>
+>> Ard Biesheuvel (3):
+>>   arm64: KVM: handle some sysreg writes in EL2
+>>   arm64: KVM: mangle MAIR register to prevent uncached guest mappings
+>>   arm64: KVM: keep trapping of VM sysreg writes enabled
 >
->>> +++ b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
->>> @@ -0,0 +1,35 @@
->>> +ARM MHU Mailbox Driver
->>> +======================
->>> +
->>> +The ARM's Message-Handling-Unit (MHU) is a mailbox controller that has
->>> +3 independent channels/links to communicate with remote processor(s).
->>> + MHU links are hardwired on a platform. A link raises interrupt for any
->>> +received data. However, there is no specified way of knowing if the sent
->>
->>
->> IIUC the IP as such doesn't have this restriction, it's just the way
->> currently integrated in the SoCs. So we need to provide a way for future
->> expansion.
->>
->>> +data has been read by the remote. This driver assumes the sender polls
->>> +STAT register and the remote clears it after having read the data.
->>
->> I would rather drop any specifics about what driver does. Bindings should
->> try to confine to the underlying hardware only if possible.
->>
-> The behavior of local controller and remote firmware clubbed together
-> is what mailbox drivers have to deal with.
+> Hi Ard,
 >
->   For example, if the remote f/w doesn't clear the STAT register after
-> reading it, this driver won't have a way to know if the last tx has
-> been done or not, i.e, mhu_last_tx_done() won't work. And that
-> behavior is not decided by Linux/driver, so is in a way a h/w feature.
-
-OK then mention it as the firmware. Don't tell anything about what the
-driver assumes, that's Linux/driver specific.
-
-> Does your remote f/w not clear the STAT?
+> I took this series for test drive. Unfortunately I have bad news and worse
+> news. First, a description of the test; simply boot a guest, once at login,
+> login, and then shutdown with 'poweroff'. The guest boots through AAVMF using
+> a build from Laszlo that enables PCI, but does *not* have the 'map pci mmio
+> as cached' kludge. This test allows us to check for corrupt vram on the
+> graphical console, plus it completes a boot/shutdown cycle allowing us to
+> count sysreg traps of the boot/shutdown cycle.
 >
 
-It does.
+Thanks a lot for giving this a spin right away!
 
->>> +Mailbox Device Node:
->>> +====================
->>> +
->>> +Required properties:
->>> +--------------------
->>> +- compatible:          Shall be "arm,mhu" & "arm,primecell"
->>> +- reg:                 Contains the mailbox register address range (base
->>> +                       address and length)
->>> +- #mbox-cells          Shall be 1
->>
->> Need to explain what that one cell must represent.
->>
->>> +- interrupts:          Contains the interrupt information corresponding
->>> to
->>> +                       each of the 3 links of MHU.
->>
->> How do we handle if the middle link has no interrupt ?
->>
-> The MHU chapter in my SoC manual suggests the specification requires
-> an RX-IRQ per channel. Does your platform omit the irq?
+> So, the bad news
+>
+> Before this series we trapped 50 times on sysreg writes with the test
+> described above. With this series we trap 62873 times. But, less than
+> 20 required going to EL1.
 >
 
-What if there's a platform with broken irq, it just can skip that in DT
-if we use named interrupts in the binding.
+OK, this is very useful information. We still don't know what the
+penalty is of all those traps, but that's quite a big number indeed.
 
->> Also please that the last channel is secure only and must not be used in
->> non-secure execution.
->>
-> I am aware and it is perfectly possible to not touch the secure
-> channel from NS mode.
+> (I don't have an exact number for how many times it went to EL1 because
+>  access_mair() doesn't have a trace point.)
+> (I got the 62873 number by testing a 3rd kernel build that only had patch
+>  3/3 applied to the base, and counting kvm_toggle_cache events.)
+> (The number 50 is the number of kvm_toggle_cache events *without* 3/3
+>  applied.)
+>
+> I consider this bad news because, even considering it only goes to EL2,
+> it goes a ton more than it used to. I realize patch 3/3 isn't the final
+> plan for enabling traps though.
+>
+> And, now the worse news
+>
+> The vram corruption persists with this patch series.
 >
 
-Sorry my statement was not clear, I wanted to ask you to add that info
-to the binding.
+OK, so the primary difference is that I am not substituting for write
+back mappings, as Laszlo is doing in his patch.
+If you have energy left, would you mind having another go but use 0xff
+(not 0xbb) for the MAIR values in patch #2?
 
-[...]
-
->>> +
->>> +static bool mhu_last_tx_done(struct mbox_chan *chan)
->>> +{
->>> +       struct mhu_link *mlink = chan->con_priv;
->>> +       u32 val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
->>> +
->>> +       return (val == 0);
 >>
+>>  arch/arm/kvm/mmu.c               |   2 +-
+>>  arch/arm64/include/asm/kvm_arm.h |   2 +-
+>>  arch/arm64/kvm/hyp.S             | 101 +++++++++++++++++++++++++++++++++++++++
+>>  arch/arm64/kvm/sys_regs.c        |  63 ++++++++++++++++++++----
+>>  4 files changed, 156 insertions(+), 12 deletions(-)
 >>
->> [Nit] How about just
->>          return readl_relaxed(mlink->tx_reg + INTR_STAT_OFS) == 0;
+>> --
+>> 1.8.3.2
 >>
-> I think (val == 0) is less cluttered.
->
-
-OK
-
->>> +static int mhu_send_data(struct mbox_chan *chan, void *data)
->>> +{
->>> +       struct mhu_link *mlink = chan->con_priv;
->>> +       u32 *arg = data;
->>> +
->>> +       if (!mhu_last_tx_done(chan)) {
->>> +               dev_err(chan->mbox->dev, "Last TX(%d) pending!\n",
->>> mlink->irq);
->>> +               return -EBUSY;
->>> +       }
->>
->> Why do you need the above check when the core handles that already ?
->>
-> Our bootloader also uses mhu so we could have failed/pending bits in
-> STAT when Linux first tries to use it. However since then the driver
-> clears the STAT register upon startup, so this could probably be
-> dropped. Will do.
->
-
-Exactly, it can and you have already handled it in the probe, and it
-must be that way. Else you are confusing the state machine in the
-mailbox core and working it around in your driver, which is wrong.
-
->>> +static int mhu_startup(struct mbox_chan *chan)
->>> +{
->>> +       struct mhu_link *mlink = chan->con_priv;
->>> +       u32 val;
->>> +       int ret;
->>> +
->>> +       val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
->>> +       writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
->>> +
->>> +       ret = request_irq(mlink->irq, mhu_rx_interrupt, 0, "mhu_link",
->>> chan);
->>> +       if (ret) {
->>> +               dev_err(chan->mbox->dev,
->>> +                       "Unable to aquire IRQ %d\n", mlink->irq);
->>> +               return ret;
->>> +       }
->>
->> This proved costly(in terms of time) on Juno board in my testing,
->> requesting and setting up irq for every small packets you need to send.
->> I would prefer it to be moved to probe.
->>
-> If your usage of mailbox is so frequent that request-release of irq
-> proves expensive, maybe you could fix your client to hold onto the
-> channel for the lifetime. I don't see why your scpi_protocol.c
-> shouldn't do that, even if request_irq was in probe.
->
-
-Agreed, and that's how it's done. But I was thinking of cases where
-there are multiple clients transferring small data.
-
-[...]
-
->
->>> +
->>> +       mhu->mbox.dev = dev;
->>> +       mhu->mbox.chans = &mhu->chan[0];
->>> +       mhu->mbox.num_chans = 3;
->>> +       mhu->mbox.ops = &mhu_ops;
->>> +       mhu->mbox.txdone_irq = false;
->>> +       mhu->mbox.txdone_poll = true;
->>> +       mhu->mbox.txpoll_period = 10;
->>
->> 10ms seems to high, but if that's a derived value then I am fine.
->> On Juno, typically we get response within a millisecond, so we need not
->> get blocked on Tx even after getting Rx for 10ms. I prefer it to be set
->> to 1 ms.
->>
-> Similar on my platform.  However 1 isn't much meaning in milliseconds
-> because mod_timer works in jiffiy which is usually atleast 5ms. If we
-> are polling we can't anyway expect latency critical stuff, so 10ms
-> seems like a safe bet.
->
-
-Here you are assuming the fact about HZ value in the driver. Leave that
-to timer subsystem for the conversion(msecs_to_jiffies takes care of
-rounding) and put values based on what hardware expects IMO.
-
->>> +
->>> +static struct amba_id mhu_ids[] = {
->>> +       {
->>> +               .id     = 0x1bb098,
->>
->>
->> This is the problem. This IP has PID(0x98 0xB0 0x1B 0x00 0x04)
->> it's 5 bytes[1] . Even I had thought of AMBA initially, it doesn't fit
->> as is, may need changes to the amba core to consider this.
->>
-> How is that a problem? AMBA chooses to compare 32bits of PID for the
-> class. The PID4 might change across versions of MHU, which we could
-> figure out in the mhu driver in future.
->
-
-No that's wrong IMO. You mask is incorrect as it doesn't include PID4
-which in this case contains
-[3:0] DES_2 JEP106 continuation code that identifies the designer.
-Set to 0x4 for ARM.
-
-IMO it's not a proper comparison/match as you are not including part of
-ID that identifies the designer.
-
-Regards,
-Sudeep
+>> _______________________________________________
+>> kvmarm mailing list
+>> kvmarm at lists.cs.columbia.edu
+>> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
