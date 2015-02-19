@@ -1,54 +1,59 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 19 Feb 2015 11:10:12 -0500
-Subject: [PATCH 1/2] ARM: shmobile: r8a7794: add MMCIF DT support
-In-Reply-To: <4040756.88Rqm1nt32@wasted.cogentembedded.com>
-References: <29687119.ELU9MoH02q@wasted.cogentembedded.com>
- <4040756.88Rqm1nt32@wasted.cogentembedded.com>
-Message-ID: <20150219161012.GA3864@verge.net.au>
+From: rric@kernel.org (Robert Richter)
+Date: Thu, 19 Feb 2015 17:10:48 +0100
+Subject: [PATCH v8 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <54DD65F2.9050108@linaro.org>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <20150212100235.GA30412@rric.localhost>
+ <54DD65F2.9050108@linaro.org>
+Message-ID: <20150219161048.GD4201@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 17, 2015 at 01:59:02AM +0300, Sergei Shtylyov wrote:
-> Define the generic R8A7794 part of the MMCIF0 device node.
+On 13.02.15 10:48:18, Hanjun Guo wrote:
+> On 2015?02?12? 18:02, Robert Richter wrote:
+> >On 02.02.15 20:45:28, Hanjun Guo wrote:
+> >>This is the v8 of ACPI core patches for ARM64 based on ACPI 5.1, there are
+> >>some updates since v7:
+> >>
+> >>  - Add two more documantation to explain why we need ACPI in ARM64 servers
+> >>    by Grant, and recommendations and prohibitions on the use of the numerous
+> >>    ACPI tables and objects by Al Stone.
+> >>
+> >>  - Add two patches which is need to map acpi tables after acpi_gbl_permanent_mmap
+> >>    is set
+> >>
+> >>  - Add another patch "dt / chosen: Add linux,uefi-stub-generated-dtb property"
+> >>    to address that if firmware providing no dtb, we can try ACPI configuration data
+> >>    even if no "acpi=force" is passed in early parameters. (I think ACPI for XEN and
+> >>    kexec need consider sperately as disscussed, correct me if I'm wrong).
+> >>
+> >>  - Add CC in the patch to the subsystem maintainers and modify the subject
+> >>    of the patch to explicitly show the subsystem touched by this patch set,
+> >>    please help us to review and ack them if they make sense, thanks.
+> >>
+> >>  - Add Tested-by from Qualcomm and Redhat;
+> >>
+> >>  - Make ACPI depends on PCI suggested by Catalin;
+> >>
+> >>  - Clean up SMP init function as Lorenzo suggested, remove physical
+> >>    CPU hot-plug code in the patch;
+> >>
+> >>  - Address some comments from Marc and explicitly state that will
+> >>    implment statcked irqdomain and GIC init framework when GICv3 and
+> >>    ITS, GICv2m are implemented;
+> >>
+> >>  - Rebased on top of 3.19-rc7.
+> >
+> >Patches tested on Cavium ThunderX. For the whole series:
+> >
+> >  Tested-by: Robert Richter <rrichter@cavium.com>
+> >  Acked-by: Robert Richter <rrichter@cavium.com>
 > 
-> Based on the orginal patch by Shinobu Uehara <shinobu.uehara.xc@renesas.com>.
+> Hi Robert, thank you very much.
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> ---
->  arch/arm/boot/dts/r8a7794.dtsi |   11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -346,6 +346,17 @@
->  		status = "disabled";
->  	};
->  
-> +	mmcif0: mmc at ee200000 {
-> +		compatible = "renesas,mmcif-r8a7794", "renesas,sh-mmcif";
+> I'm going to send out v9 to address some of the comments, I think
+> your Acked-by still apply if no objection from you :)
 
-Please submit a patch to add "renesas,mmcif-r8a7794" to
-Documentation/devicetree/bindings/mmc/renesas,mmcif.txt.
-I looked and I couldn't find such a change in-tree or in-flight.
+Right, unless you hear from me. ;)
 
-> +		reg = <0 0xee200000 0 0x80>;
-> +		interrupts = <0 169 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp3_clks R8A7794_CLK_MMCIF0>;
-> +		dmas = <&dmac0 0xd1>, <&dmac0 0xd2>;
-> +		dma-names = "tx", "rx";
-> +		reg-io-width = <4>;
-> +		status = "disabled";
-> +	};
-> +
->  	clocks {
->  		#address-cells = <2>;
->  		#size-cells = <2>;
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+-Robert
