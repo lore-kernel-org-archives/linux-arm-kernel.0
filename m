@@ -1,71 +1,57 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 19 Feb 2015 12:23:15 -0600
-Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
-In-Reply-To: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
-References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
-Message-ID: <CAL_JsqJQcuX2cp50oHod-QAbhdMg48TaRP+gLGEO2kbFnQ3B+A@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Feb 2015 18:34:44 +0000
+Subject: Announce: rmk's nightly builder gets ARM64 support
+In-Reply-To: <20150219171220.GA8656@n2100.arm.linux.org.uk>
+References: <20150219171220.GA8656@n2100.arm.linux.org.uk>
+Message-ID: <20150219183444.GB8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 1:03 AM, Pranavkumar Sawargaonkar
-<psawargaonkar@apm.com> wrote:
-> In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
-> in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
-> size due to size alignment checking in vgic driver for VCPU Control and
-> VCPU register.
->
-> This patch corrects the sizes to be inline with the hardware spec.
+On Thu, Feb 19, 2015 at 05:12:20PM +0000, Russell King - ARM Linux wrote:
+> Today, I have added ARM64 support to my automated nightly kernel builder.
+> Initially, this will result in ARM64 builds being tested with allnoconfig
+> and defconfig, and I shall add allmodconfig and allyesconfig to this in
+> the coming days.
+> 
+> Once that is done and stable, I will investigate adding an ARM Juno
+> platform to my boot farm so we can run the results of the builder.
+> 
+> Other recent changes have been a disk upgrade, so the builder now has
+> plenty of disk space to run the allmodconfig and allyesconfig, which
+> used to fail (or be skipped) when the disk space was low.
+> 
+> I've also added a new ARM target for building the defconfig without a
+> seed.
+> 
+> As ever, all results are in the usual place, at:
+> 
+> http://www.arm.linux.org.uk/developer/build/
 
-This does not make sense. The GIC regions are still only 4 or 8KB and
-the h/w description should reflect that. For implementations using
-gic-400 and the addressing decode trick, the rest of the register
-range is also not safe to access given it is multiple mapped. Also,
-this wastes virtual space, but I guess we don't care on 64-bit.
+It seems that there's either something wrong with the kernel, or
+there's a problem with binutils.
 
-KVM should be fixed to only check base address alignment. Size
-alignment does not matter (if it does, then you need to fix all
-register blocks).
+/tmp/cc1B9ysz.s:99: Error: selected processor does not support `aese v0.16b,v1.16b'
+/tmp/cc1B9ysz.s:207: Error: selected processor does not support `aesimc v1.16b,v0.16b'
+/tmp/cc1B9ysz.s:255: Error: selected processor does not support `aese v0.16b,v1.16b'
+/tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesd v0.16b,v2.16b'
+/tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesimc v0.16b,v0.16b'
+/tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesd v0.16b,v3.16b'
+/tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesimc v0.16b,v0.16b'
+/tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesd v0.16b,v1.16b'
+/tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesimc v0.16b,v0.16b'
+/tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesd v0.16b,v2.16b'
+/tmp/cc1B9ysz.s:455: Error: selected processor does not support `aese v0.16b,v2.16b'
+/tmp/cc1B9ysz.s:455: Error: selected processor does not support `aesmc v0.16b,v0.16b'
+/tmp/cc1B9ysz.s:455: Error: selected processor does not support `aese v0.16b,v3.16b'
+/tmp/cc1B9ysz.s:455: Error: selected processor does not support `aesmc v0.16b,v0.16b'
+/tmp/cc1B9ysz.s:455: Error: selected processor does not support `aese v0.16b,v1.16b'
+/tmp/cc1B9ysz.s:455: Error: selected processor does not support `aesmc v0.16b,v0.16b'
+/tmp/cc1B9ysz.s:455: Error: selected processor does not support `aese v0.16b,v2.16b'
+make[2]: *** [arch/arm64/crypto/aes-ce-cipher.o] Error 1
 
-Rob
+I've tried both the mainline git version, and the sourceware.org
+binutils-gdb.git version, both result in the same errors.
 
->
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: kvmarm at lists.cs.columbia.edu
-> CC: arnd at arndb.de
-> CC: marc.zyngier at arm.com
-> CC: christoffer.dall at linaro.org
-> CC: jcm at redhat.com
-> Signed-off-by: Pranavkumar Sawargaonkar <psawargaonkar@apm.com>
-> Signed-off-by: Tushar Jagad <tjagad@apm.com>
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> ---
->  arch/arm64/boot/dts/apm/apm-storm.dtsi |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> index f1ad9c2..65f0e6d 100644
-> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> @@ -81,10 +81,10 @@
->                 compatible = "arm,cortex-a15-gic";
->                 #interrupt-cells = <3>;
->                 interrupt-controller;
-> -               reg = <0x0 0x78010000 0x0 0x1000>,      /* GIC Dist */
-> -                     <0x0 0x78020000 0x0 0x1000>,      /* GIC CPU */
-> -                     <0x0 0x78040000 0x0 0x2000>,      /* GIC VCPU Control */
-> -                     <0x0 0x78060000 0x0 0x2000>;      /* GIC VCPU */
-> +               reg = <0x0 0x78010000 0x0 0x10000>,     /* GIC Dist */
-> +                     <0x0 0x78020000 0x0 0x20000>,     /* GIC CPU */
-> +                     <0x0 0x78040000 0x0 0x10000>,     /* GIC VCPU Control */
-> +                     <0x0 0x78060000 0x0 0x20000>;     /* GIC VCPU */
->                 interrupts = <1 9 0xf04>;       /* GIC Maintenence IRQ */
->         };
->
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
