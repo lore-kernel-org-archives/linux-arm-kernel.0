@@ -1,34 +1,49 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 19 Feb 2015 14:31:26 +0100
-Subject: [PATCH v2 1/1] ARM: dts: Add mclk entry for Snow and Peach Pit/Pi
- boards
-In-Reply-To: <1423245171-25485-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1423245171-25485-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <54E5E5AE.3080001@collabora.co.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 19 Feb 2015 13:40:02 +0000
+Subject: [RFC/RFT PATCH 3/3] arm64: KVM: keep trapping of VM sysreg writes
+ enabled
+In-Reply-To: <1424343286-6792-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1424343286-6792-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <54E5E7B2.2080501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
-
-On 02/06/2015 06:52 PM, Javier Martinez Canillas wrote:
-> From: Tushar Behera <tushar.b@samsung.com>
-> 
-> On Snow, Peach Pit and Peach Pi boards, the Exynos SoC XCLKOUT output pin
-> provides the master clock (mclk) to codecs. So make them a clock consumer.
-> 
-> Signed-off-by: Tushar Behera <tushar.b@samsung.com>
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+On 19/02/15 10:54, Ard Biesheuvel wrote:
 > ---
+>  arch/arm/kvm/mmu.c               | 2 +-
+>  arch/arm64/include/asm/kvm_arm.h | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 136662547ca6..fa8ec55220ea 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -1530,7 +1530,7 @@ void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled)
+>  		stage2_flush_vm(vcpu->kvm);
+>  
+>  	/* Caches are now on, stop trapping VM ops (until a S/W op) */
+> -	if (now_enabled)
+> +	if (0)//now_enabled)
+>  		vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) & ~HCR_TVM);
+>  
+>  	trace_kvm_toggle_cache(*vcpu_pc(vcpu), was_enabled, now_enabled);
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index 8afb863f5a9e..437e1ec17539 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -75,7 +75,7 @@
+>   * FMO:		Override CPSR.F and enable signaling with VF
+>   * SWIO:	Turn set/way invalidates into set/way clean+invalidate
+>   */
+> -#define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
+> +#define HCR_GUEST_FLAGS (HCR_TSC | /* HCR_TSW | */ HCR_TWE | HCR_TWI | HCR_VM | \
 
-Please drop this patch since I took it from [0] but that patch was when
-the master clock was grabbed in the ASoC machine driver but the final
-version that got merged grabs the master clock in the codec driver so
-it has to be in the codec device node too.
+Why do we stop to trap S/W ops here? We can't let the guest issue those
+without doing anything, as this will break anything that expects the
+data to make it to memory. Think of the 32bit kernel decompressor, for
+example.
 
-I'll send the correct version soon.
-
-Best regards,
-Javier
-
-[0]: https://lkml.org/lkml/2014/5/20/4
+	M.
+-- 
+Jazz is not dead. It just smells funny...
