@@ -1,54 +1,47 @@
-From: venkappa.m@samsung.com (Venkappa Mala)
-Date: Thu, 19 Feb 2015 12:26:01 +0000 (UTC)
-Subject: [PATCH v10 4/6] ARM: add vdso user-space code
-References: <1411413485-7675-1-git-send-email-nathan_lynch@mentor.com>
- <1411413485-7675-5-git-send-email-nathan_lynch@mentor.com>
- <loom.20150213T053547-381@post.gmane.org> <54E24D7B.3050806@mentor.com>
-Message-ID: <loom.20150219T130553-695@post.gmane.org>
+From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
+Date: Thu, 19 Feb 2015 13:33:18 +0100
+Subject: [PATCH 5/6] ASoC: samsung: Extend Snow driver to support max98089
+In-Reply-To: <20150219094425.GB3198@finisterre.sirena.org.uk>
+References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
+ <1424283959-16289-6-git-send-email-afaerber@suse.de>
+ <20150219094425.GB3198@finisterre.sirena.org.uk>
+Message-ID: <54E5D80E.3020603@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nathan Lynch <Nathan_Lynch <at> mentor.com> writes:
-
-> Hi,
+Am 19.02.2015 um 10:44 schrieb Mark Brown:
+> On Wed, Feb 18, 2015 at 07:25:58PM +0100, Andreas F?rber wrote:
 > 
-> Sorry for not seeing this earlier but it doesn't look like my address
-> was in the recipients list, and I just happened to catch up on list
-> traffic today.
+>>  static const struct of_device_id snow_of_match[] = {
+>> +	{ .compatible = "google,snow-audio-max98089", },
+>>  	{ .compatible = "google,snow-audio-max98090", },
+>>  	{ .compatible = "google,snow-audio-max98091", },
+>>  	{ .compatible = "google,snow-audio-max98095", },
 > 
-> It looks like Catalin already covered everything, but just to sum up -
--
-> the patches need to be updated to avoid enabling the VDSO gettimeofday
-> on systems where CNTVCT is not usable, for whatever reason.  I do not
-> intend to enable user space / VDSO access to CNTPCT to accommodate
-> systems that don't initialize the virtual counter/offset correctly.
-> 
+> Since we completely ignore the CODEC in the property might it not be
+> better to just add a plain old snow-audio compatible and bind to that,
+> that way we don't need these driver updates?  Just the "snow" bit should
+> be enough to know it's one of this class of machines.
 
-Hello Nathan,
+Personally I don't mind either way, but I'd rather leave that decision
+to Google/Samsung people.
 
-Now, it's clear about current vDSO patch set and it is validated with 
-virtual timer/VCT by using workaround with the below results on
-ARMv7-A: CortexA7: Quad core, 1.2GHz,
+With all those Tegra and Rockchip based Chromebooks popping up, are
+there any further Exynos based Chromebooks planned using this driver, or
+is it the last of its kind?
 
-About 1 iteration (gettimeofday),
-WITHOUT VDSO   : 30-35 ?sec 
-WITH VDSO      : 4-7 ?sec
+Cheers,
+Andreas
 
-About 1000 iteration (gettimeofday),
-WITHOUT VDSO   : 27-30 msec 
-WITH VDSO      : 13-15 msec
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
+Graham Norton; HRB 21284 (AG N?rnberg)
 
-As you have mentioned about avoid enabling the VDSO gettimeofday
-on systems where CNTVCT is not usable, for whatever reason, please take 
-care about this one in the updated patch list so that the things will be 
-very clean.
-Meanwhile, i will discuss further on "firmware is broken about CNTVOFF 
-initialization zero + HYP disabled" in the following thread as mentioned 
-in the previous reply to Catalin,
-arm: Handle starting up in secure mode
-https://lkml.org/lkml/2014/9/16/552
-
-Thanks for the patch list,
-
-BR,
-Venkappa
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150219/4aa72b20/attachment.sig>
