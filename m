@@ -1,8 +1,8 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 19 Feb 2015 10:42:55 -0500
-Subject: [PATCH v2] ARM: shmobile: r8a7790: Fix HSUSB clock to hp_clk from
+Date: Thu, 19 Feb 2015 10:43:10 -0500
+Subject: [PATCH v2] ARM: shmobile: r8a7791: Fix HSUSB clock to hp_clk from
  mp_clk
-Message-ID: <1424360575-6482-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1424360590-6556-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,29 +22,30 @@ v2 [Simon Horman]
   USB-DMAC clock should be mp_clk as the deleted portion of the
   changelog stated.
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 24de994..113edf2 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -1,6 +1,7 @@
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index afba8af..cb9a9e7 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1,7 +1,7 @@
  /*
-  * Device Tree Source for the r8a7790 SoC
+  * Device Tree Source for the r8a7791 SoC
   *
-+ * Copyright (C) 2015 Renesas Electronics Corporation
+- * Copyright (C) 2013-2014 Renesas Electronics Corporation
++ * Copyright (C) 2013-2015 Renesas Electronics Corporation
   * Copyright (C) 2013-2014 Renesas Solutions Corp.
   * Copyright (C) 2014 Cogent Embedded Inc.
   *
-@@ -1132,7 +1133,7 @@
+@@ -1136,7 +1136,7 @@
  		mstp7_clks: mstp7_clks at e615014c {
- 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
  			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
--			clocks = <&mp_clk>, <&mp_clk>, <&zs_clk>, <&zs_clk>, <&p_clk>,
-+			clocks = <&mp_clk>, <&hp_clk>, <&zs_clk>, <&zs_clk>, <&p_clk>,
- 				 <&p_clk>, <&zx_clk>, <&zx_clk>, <&zx_clk>, <&zx_clk>,
- 				 <&zx_clk>;
+-			clocks = <&mp_clk>,  <&mp_clk>, <&zs_clk>, <&p_clk>, <&p_clk>, <&zs_clk>,
++			clocks = <&mp_clk>,  <&hp_clk>, <&zs_clk>, <&p_clk>, <&p_clk>, <&zs_clk>,
+ 				 <&zs_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
+ 				 <&zx_clk>, <&zx_clk>, <&zx_clk>;
  			#clock-cells = <1>;
 -- 
 2.1.4
