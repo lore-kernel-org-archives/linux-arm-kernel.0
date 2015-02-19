@@ -1,80 +1,129 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 19 Feb 2015 17:57:32 +0100
-Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
- uncached guest mappings
-In-Reply-To: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150219165731.GA26965@hawk.usersys.redhat.com>
+From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
+Date: Thu, 19 Feb 2015 19:00:18 +0200
+Subject: [PATCH 2/4] of: DT quirks infrastructure
+In-Reply-To: <54E613E7.2020405@gmail.com>
+References: <1424271576-1952-1-git-send-email-pantelis.antoniou@konsulko.com>
+ <1424271576-1952-3-git-send-email-pantelis.antoniou@konsulko.com>
+ <20150218154106.GC29429@leverpostej>
+ <FE61DD1C-51DA-4869-8A62-C019C3D70577@konsulko.com>
+ <20150218173115.GG29429@leverpostej>
+ <76BD1B22-BAED-4205-9B34-186907CE0217@konsulko.com>
+ <54E613E7.2020405@gmail.com>
+Message-ID: <670D0881-DBF0-45E8-A502-A6DB2B77A750@konsulko.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 19, 2015 at 10:54:43AM +0000, Ard Biesheuvel wrote:
-> This is a 0th order approximation of how we could potentially force the guest
-> to avoid uncached mappings, at least from the moment the MMU is on. (Before
-> that, all of memory is implicitly classified as Device-nGnRnE)
+Hi Frank,
+
+> On Feb 19, 2015, at 18:48 , Frank Rowand <frowand.list@gmail.com> wrote:
 > 
-> The idea (patch #2) is to trap writes to MAIR_EL1, and replace uncached mappings
-> with cached ones. This way, there is no need to mangle any guest page tables.
+> On 2/19/2015 6:29 AM, Pantelis Antoniou wrote:
+>> Hi Mark,
+>> 
+>>> On Feb 18, 2015, at 19:31 , Mark Rutland <mark.rutland@arm.com> wrote:
+>>> 
+>>>>>> +While this may in theory work, in practice it is very cumbersome
+>>>>>> +for the following reasons:
+>>>>>> +
+>>>>>> +1. The act of selecting a different boot device tree blob requires
+>>>>>> +a reasonably advanced bootloader with some kind of configuration or
+>>>>>> +scripting capabilities. Sadly this is not the case many times, the
+>>>>>> +bootloader is extremely dumb and can only use a single dt blob.
+>>>>> 
+>>>>> You can have several bootloader builds, or even a single build with
+>>>>> something like appended DTB to get an appropriate DTB if the same binary
+>>>>> will otherwise work across all variants of a board.
+>>>>> 
+>>>> 
+>>>> No, the same DTB will not work across all the variants of a board.
+>>> 
+>>> I wasn't on about the DTB. I was on about the loader binary, in the case
+>>> the FW/bootloader could be common even if the DTB couldn't.
+>>> 
+>>> To some extent there must be a DTB that will work across all variants
+>>> (albeit with limited utility) or the quirk approach wouldn't work?
+>>> 
+>> 
+>> That?s not correct; the only part of the DTB that needs to be common
+>> is the model property that would allow the quirk detection logic to fire.
+>> 
+>> So, there is a base DTB that will work on all variants, but that only means
+>> that it will work only up to the point that the quirk detector method
+>> can work. So while in recommended practice there are common subsets
+>> of the DTB that might work, they might be unsafe.
+>> 
+>> For instance on the beaglebone the regulator configuration is different
+>> between white and black, it is imperative you get them right otherwise
+>> you risk board damage.
+>> 
+>>>>> So it's not necessarily true that you need a complex bootloader.
+>>>>> 
+>>>> 
+>>>>>> +2. On many instances boot time is extremely critical; in some cases
+>>>>>> +there are hard requirements like having working video feeds in under
+>>>>>> +2 seconds from power-up. This leaves an extremely small time budget for
+>>>>>> +boot-up, as low as 500ms to kernel entry. The sanest way to get there
+>>>>>> +is by removing the standard bootloader from the normal boot sequence
+>>>>>> +altogether by having a very small boot shim that loads the kernel and
+>>>>>> +immediately jumps to kernel, like falcon-boot mode in u-boot does.
+>>>>> 
+>>>>> Given my previous comments above I don't see why this is relevant.
+>>>>> You're already passing _some_ DTB here, so if you can organise for the
+>>>>> board to statically provide a sane DTB that's fine, or you can resort to
+>>>>> appended DTB if it's not possible to update the board configuration.
+>>>>> 
+>>>> 
+>>>> You?re missing the point. I can?t use the same DTB for each revision of the
+>>>> board. Each board is similar but it?s not identical.
+>>> 
+>>> I think you've misunderstood my point. If you program the board with the
+>>> relevant DTB, or use appended DTB, then you will pass the correct DTB to
+>>> the kernel without need for quirks.
+>>> 
+>>> I understand that each variant is somewhat incompatible (and hence needs
+>>> its own DTB).
+>> 
+>> In theory it might work, in practice this does not. Ludovic mentioned that they
+>> have 27 different DTBs in use at the moment. At a relatively common 60k per DTB
+>> that?s 27x60k = 1.6MB of DTBs, that need to be installed.
 > 
-> The downside is that, to do this correctly, we need to always trap writes to
-> the VM sysreg group, which includes registers that the guest may write to very
-> often. To reduce the associated performance hit, patch #1 introduces a fast path
-> for EL2 to perform trivial sysreg writes on behalf of the guest, without the
-> need for a full world switch to the host and back.
+> < snip >
 > 
-> The main purpose of these patches is to quantify the performance hit, and
-> verify whether the MAIR_EL1 handling works correctly. 
+> Or you can install the correct DTB on the board.  You trust your manufacturing line
+> to install the correct resistors.  You trust your manufacturing line to install the
+> correct kernel version (eg an updated version to resolve a security issue).
 > 
-> Ard Biesheuvel (3):
->   arm64: KVM: handle some sysreg writes in EL2
->   arm64: KVM: mangle MAIR register to prevent uncached guest mappings
->   arm64: KVM: keep trapping of VM sysreg writes enabled
-
-Hi Ard,
-
-I took this series for test drive. Unfortunately I have bad news and worse
-news. First, a description of the test; simply boot a guest, once at login,
-login, and then shutdown with 'poweroff'. The guest boots through AAVMF using
-a build from Laszlo that enables PCI, but does *not* have the 'map pci mmio
-as cached' kludge. This test allows us to check for corrupt vram on the
-graphical console, plus it completes a boot/shutdown cycle allowing us to
-count sysreg traps of the boot/shutdown cycle.
-
-So, the bad news
-
-Before this series we trapped 50 times on sysreg writes with the test
-described above. With this series we trap 62873 times. But, less than
-20 required going to EL1.
-
-(I don't have an exact number for how many times it went to EL1 because
- access_mair() doesn't have a trace point.)
-(I got the 62873 number by testing a 3rd kernel build that only had patch
- 3/3 applied to the base, and counting kvm_toggle_cache events.)
-(The number 50 is the number of kvm_toggle_cache events *without* 3/3
- applied.)
-
-I consider this bad news because, even considering it only goes to EL2,
-it goes a ton more than it used to. I realize patch 3/3 isn't the final
-plan for enabling traps though.
-
-And, now the worse news
-
-The vram corruption persists with this patch series.
-
-drew
-
-
+> I thought the DT blob was supposed to follow the same standard that other OS's or
+> bootloaders understood.  Are you willing to break that?  (This is one of those
+> ripples I mentioned in my other emails.)
 > 
->  arch/arm/kvm/mmu.c               |   2 +-
->  arch/arm64/include/asm/kvm_arm.h |   2 +-
->  arch/arm64/kvm/hyp.S             | 101 +++++++++++++++++++++++++++++++++++++++
->  arch/arm64/kvm/sys_regs.c        |  63 ++++++++++++++++++++----
->  4 files changed, 156 insertions(+), 12 deletions(-)
-> 
-> -- 
-> 1.8.3.2
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+
+Trust no-one.
+
+This is one of those things that the kernel community doesn?t understand which makes people
+who push product quite mad.
+
+Engineering a product is not only about meeting customer spec, in order to turn a profit
+the whole endeavor must be engineered as well for manufacturability.
+
+Yes, you can always manually install files in the bootloader. For 1 board no problem.
+For 10 doable. For 100 I guess you can hire an extra guy. For 1 million? Guess what,
+instead of turning a profit you?re losing money if you only have a few cents of profit
+per unit.
+
+No knobs to tweak means no knobs to break. And a broken knob can have pretty bad consequences
+for a few million units. 
+
+And frankly I don?t care what other OSes do. If you were to take a look at the sorry DT support
+they have you?d be amazed.
+
+I would be very surprised if there?s another OS out there that can boot with a late Linux DTB.
+ 
+> -Frank
+
+Regards
+
+? Pantelis
+
+PS. For a real use case please take a look at the answer Guenter gave on this thread a little
+while back.
