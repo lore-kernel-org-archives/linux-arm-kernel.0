@@ -1,60 +1,105 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Wed, 18 Feb 2015 18:08:06 -0800
-Subject: [PATCH 2/4] of: DT quirks infrastructure
-In-Reply-To: <1424271576-1952-3-git-send-email-pantelis.antoniou@konsulko.com>
-References: <1424271576-1952-1-git-send-email-pantelis.antoniou@konsulko.com>
- <1424271576-1952-3-git-send-email-pantelis.antoniou@konsulko.com>
-Message-ID: <54E54586.5070602@gmail.com>
+From: b08248@gmail.com (Stuart Yoder)
+Date: Wed, 18 Feb 2015 20:16:36 -0600
+Subject: lpi-parent?
+Message-ID: <CALRxmdDejPBREBL8WY=drW+nmHSVPX9A3WmbW=t+FOpHvbeV2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/18/2015 6:59 AM, Pantelis Antoniou wrote:
-> Implement a method of applying DT quirks early in the boot sequence.
-> 
-> A DT quirk is a subtree of the boot DT that can be applied to
-> a target in the base DT resulting in a modification of the live
-> tree. The format of the quirk nodes is that of a device tree overlay.
+On Mon, Nov 24, 2014 at 8:35 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Add the documentation for the bindings describing the GICv3 ITS.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/gic-v3.txt | 39 ++++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/gic-v3.txt b/Documentation/devicetree/bindings/arm/gic-v3.txt
+> index 33cd05e..ddfade4 100644
+> --- a/Documentation/devicetree/bindings/arm/gic-v3.txt
+> +++ b/Documentation/devicetree/bindings/arm/gic-v3.txt
+> @@ -49,11 +49,29 @@ Optional
+>    occupied by the redistributors. Required if more than one such
+>    region is present.
+>
+> +Sub-nodes:
+> +
+> +GICv3 has one or more Interrupt Translation Services (ITS) that are
+> +used to route Message Signalled Interrupts (MSI) to the CPUs.
+> +
+> +These nodes must have the following properties:
+> +- compatible : Should at least contain  "arm,gic-v3-its".
+> +- msi-controller : Boolean property. Identifies the node as an MSI controller
+> +- reg: Specifies the base physical address and size of the ITS
+> +  registers.
+> +
+> +The main GIC node must contain the appropriate #address-cells,
+> +#size-cells and ranges properties for the reg property of all ITS
+> +nodes.
+> +
+>  Examples:
+>
+>         gic: interrupt-controller at 2cf00000 {
+>                 compatible = "arm,gic-v3";
+>                 #interrupt-cells = <3>;
+> +               #address-cells = <2>;
+> +               #size-cells = <2>;
+> +               ranges;
+>                 interrupt-controller;
+>                 reg = <0x0 0x2f000000 0 0x10000>,       // GICD
+>                       <0x0 0x2f100000 0 0x200000>,      // GICR
+> @@ -61,11 +79,20 @@ Examples:
+>                       <0x0 0x2c010000 0 0x2000>,        // GICH
+>                       <0x0 0x2c020000 0 0x2000>;        // GICV
+>                 interrupts = <1 9 4>;
+> +
+> +               gic-its at 2c200000 {
+> +                       compatible = "arm,gic-v3-its";
+> +                       msi-controller;
+> +                       reg = <0x0 0x2c200000 0 0x200000>;
+> +               };
+>         };
+>
+>         gic: interrupt-controller at 2c010000 {
+>                 compatible = "arm,gic-v3";
+>                 #interrupt-cells = <3>;
+> +               #address-cells = <2>;
+> +               #size-cells = <2>;
+> +               ranges;
+>                 interrupt-controller;
+>                 redistributor-stride = <0x0 0x40000>;   // 256kB stride
+>                 #redistributor-regions = <2>;
+> @@ -76,4 +103,16 @@ Examples:
+>                       <0x0 0x2c060000 0 0x2000>,        // GICH
+>                       <0x0 0x2c080000 0 0x2000>;        // GICV
+>                 interrupts = <1 9 4>;
+> +
+> +               gic-its at 2c200000 {
+> +                       compatible = "arm,gic-v3-its";
+> +                       msi-controller;
+> +                       reg = <0x0 0x2c200000 0 0x200000>;
+> +               };
+> +
+> +               gic-its at 2c400000 {
+> +                       compatible = "arm,gic-v3-its";
+> +                       msi-controller;
+> +                       reg = <0x0 0x2c400000 0 0x200000>;
+> +               };
 
-The use of the word "quirk" is a different mental model for me than what
-this patch series appears to be addressing.  I would suggest totally
-removing the word "quirk" from this proposal to avoid confusing the
-mental models of future generations of kernel folks.
+Marc,
 
-What this patch series seems to be proposing is a method to apply DT
-overlays as soon as unflatten_device_tree() completes.  In other words,
-making the device tree a dynamic object, that is partially defined by
-the kernel during boot.  Well, to be fair, the kernel chooses among
-several possible alternatives encoded in the DT blob.  So the device
-tree is no longer a static object that describes the hardware of the
-system.  It may not sound like a big deal, but it seems to me to be
-a fundamental shift in what the device tree blob is.  Something that
-should be thought about carefully and not just applied as a patch to
-solve a point problem.
+Is there a binding definition for how other nodes specify which
+gic-its node they are
+associated with.
 
-The stated use of this proposal is to create dynamic DT blobs that can
-describe many similar variants of a given system instead of creating
-unique DT blobs for each different system.
+In some proof of concept kernel code we are using the property "lpi-parent"
+to specify the association of a bus node (that uses message interrupts)
+to the GIC ITS:
 
-I obviously have not thought through the architectural implications yet,
-but just a quick example.  One of the issues we have been trying to fix
-is device tree validation.  The not yet existent (except as a few proof
-of concept attempts) validator would need to validate a device tree
-for each dynamic variant.  Probably not a big deal, but an example of
-the ripple effects this conceptual change implies.
+    lpi-parent = <&its>;
 
-A second function that this patch is proposing is a method to enable
-or disable devices via command line options.  If I understand
-correctly, this is meant to solve a problem with run time overlays
-that require disabling a device previously enabled by the DT blob.
-If so, it seems like it could easily be implemented in a simpler
-generic way than in the board specific code in this patch series.
+I am not remember at all if that property came as a suggestion from some
+side discussion with you or if we just made that up.  Wanted to see what
+your thoughts were on how to do this.
 
-I share the concerns that Mark Rutland has expressed in his comments
-about this series.
-
-< snip >
-
-I have read through the patches and will have comments on the code
-later if this proposal is seen as a good idea.
-
--Frank
+Thanks,
+Stuart
