@@ -1,79 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Feb 2015 10:28:10 +0000
-Subject: [PATCH v2 4/4] clk: dt: Introduce always-on clock domain
- documentation
-In-Reply-To: <CAMuHMdW=kV+zx=Uq7y7SyrH3eQyWsdfWjuLFMAKQjPhX-QaPPA@mail.gmail.com>
-References: <1424276101-30137-5-git-send-email-lee.jones@linaro.org>
- <CAL_Jsq+r1BKt5B9FNPG+Y0Oi1-3RGNmRUDbpX_uDJwr45bxMXA@mail.gmail.com>
- <20150218171230.GA30676@x1>
- <CAL_JsqJ0sfQ-OQvYjL3X3ebH4p9HkN4iy35iT7i9S2d+yz9zYg@mail.gmail.com>
- <20150218215435.GA32415@x1>
- <CAMuHMdU6DpZoi-q3pUFUX8xjnXGfTqfEYyzajZZm=-qZTk1qHQ@mail.gmail.com>
- <20150219094200.GB12212@x1>
- <CAMuHMdW+np0_zUhBOXVBN_7ztM5Z=xN5-mE-P_wR35BggQxerQ@mail.gmail.com>
- <20150219101106.GD12212@x1>
- <CAMuHMdW=kV+zx=Uq7y7SyrH3eQyWsdfWjuLFMAKQjPhX-QaPPA@mail.gmail.com>
-Message-ID: <20150219102810.GE12212@x1>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 19 Feb 2015 19:27:50 +0900
+Subject: [PATCH 1/2] regmap: Add range check in _regmap_raw_read()
+In-Reply-To: <1424335239-7475-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1424335193-7431-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1424335239-7475-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20150219102750.GC3198@finisterre.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Feb 2015, Geert Uytterhoeven wrote:
+On Thu, Feb 19, 2015 at 08:40:39AM +0000, Srinivas Kandagatla wrote:
 
-> Hi Lee,
-> 
-> On Thu, Feb 19, 2015 at 11:11 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Thu, 19 Feb 2015, Geert Uytterhoeven wrote:
-> >> On Thu, Feb 19, 2015 at 10:42 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> >> >> What kind of clocks are these? What do they control?
-> >> >> Memory controllers? Bus controllers?
-> >> >>
-> >> >> They must control some device(s), so there should be one or more device
-> >> >> nodes in DT that reference these clocks.
-> >> >> As soon as that information is in DT, support can be added to Linux to
-> >> >> make sure the "critical" clocks stay enabled, either through a real driver,
-> >> >> or through platform code.
-> >> >
-> >> > Some do, some don't.  For instance, we have one clock which controls
-> >> > SPI and I2C that must not be turned off.  We discovered this then when
-> >> > a suspend was attempted and the board refused to resume.  This clock
-> >> > also runs one of the critical interconnects that runs from the a9.  It
-> >> > would be wrong to remove the clk_disable() attempt from the SPI/I2C
-> >> > drivers because the same IP on another board might be controlled by a
-> >> > different clock which is able to be gated.
-> >> >
-> >> > There are also clocks which control other interconnects that are not
-> >> > connected to any device drivers.  If we fail to take references for
-> >> > them before clk_disable_unused() is called, again the board hangs.  We
-> >> > even lose JTAG support.
-> >>
-> >> Interconnects are buses. Can't you represent those buses in the DT
-> >> hierarchy, and give them clocks properties?
-> >
-> > So instead of this nice succinct, simple, cover all bases
-> > (interconnects was just an example, there are bound to be others),
-> > generic framework, you are suggesting to write drivers for devices
-> > which other than "don't turn my clocks off", Linux can't actually see
-> > or control?
-> 
-> DT describes the hardware, not behavior.
+> +	/* Check for readable registers before we start */
+> +	for (i = 0; i < count; i++)
+> +		if (!regmap_readable(map, reg + (i * map->reg_stride)))
+> +			return -EINVAL;
 
-Okay so ...
-
-/*
- * ICNs are not visible/controllable in Linux, but references to their
- * clocks must be obtained and retained or the platform will become
- * irrecoverably unresponsive.
- */
-interconnects at 0 {
-       compatible = "always-on-clk-domain";
-       clocks = <&clk_s_c0_flexgen CLK_ICN_SBC>,
-                <&clk_s_c0_flexgen CLK_ICN_LMI>,
-                <&clk_s_c0_flexgen CLK_ICN_CPU>,
-                <&clk_s_c0_flexgen CLK_TX_ICN_DMU>;
-};
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+That's starting to look pretty expensive especially if what we're
+looking for is just max_register really...  This is one of the reasons
+we're not religious about checking for readability everywhere, and
+obviously even if we avoid triggering this particular thing we still
+have to cope with both the caller and devices that didn't specify
+readability.  A cheaper check for just max_register would be less
+concerning but it feels like we're trying to paper over a symptom with
+this rather than fix a problem.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150219/11ae3d1f/attachment.sig>
