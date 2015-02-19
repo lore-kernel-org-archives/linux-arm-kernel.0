@@ -1,33 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 19 Feb 2015 21:21:33 +0900
-Subject: [PATCH 1/2] regmap: Add range check in _regmap_raw_read()
-In-Reply-To: <54E5C347.9070105@linaro.org>
-References: <1424335193-7431-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424335239-7475-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20150219102750.GC3198@finisterre.sirena.org.uk>
- <54E5C347.9070105@linaro.org>
-Message-ID: <20150219122133.GB1581@finisterre.sirena.org.uk>
+From: venkappa.m@samsung.com (Venkappa Mala)
+Date: Thu, 19 Feb 2015 12:26:01 +0000 (UTC)
+Subject: [PATCH v10 4/6] ARM: add vdso user-space code
+References: <1411413485-7675-1-git-send-email-nathan_lynch@mentor.com>
+ <1411413485-7675-5-git-send-email-nathan_lynch@mentor.com>
+ <loom.20150213T053547-381@post.gmane.org> <54E24D7B.3050806@mentor.com>
+Message-ID: <loom.20150219T130553-695@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 19, 2015 at 11:04:39AM +0000, Srinivas Kandagatla wrote:
-> On 19/02/15 10:27, Mark Brown wrote:
+Nathan Lynch <Nathan_Lynch <at> mentor.com> writes:
 
-> >readability.  A cheaper check for just max_register would be less
-> >concerning but it feels like we're trying to paper over a symptom with
-> >this rather than fix a problem.
+> Hi,
+> 
+> Sorry for not seeing this earlier but it doesn't look like my address
+> was in the recipients list, and I just happened to catch up on list
+> traffic today.
+> 
+> It looks like Catalin already covered everything, but just to sum up -
+-
+> the patches need to be updated to avoid enabling the VDSO gettimeofday
+> on systems where CNTVCT is not usable, for whatever reason.  I do not
+> intend to enable user space / VDSO access to CNTPCT to accommodate
+> systems that don't initialize the virtual counter/offset correctly.
+> 
 
-> Yes, just checking max_register would solve the issue for me, I think I over
-> done the patch.. I will resend with just max_register check.
+Hello Nathan,
 
-I'm still not happy with that, it still seems like we're just papering
-over some other problem here which we should understand before we do
-anything else.  Why are we generating out of bounds accesses in the
-first place?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150219/43da5572/attachment.sig>
+Now, it's clear about current vDSO patch set and it is validated with 
+virtual timer/VCT by using workaround with the below results on
+ARMv7-A: CortexA7: Quad core, 1.2GHz,
+
+About 1 iteration (gettimeofday),
+WITHOUT VDSO   : 30-35 ?sec 
+WITH VDSO      : 4-7 ?sec
+
+About 1000 iteration (gettimeofday),
+WITHOUT VDSO   : 27-30 msec 
+WITH VDSO      : 13-15 msec
+
+As you have mentioned about avoid enabling the VDSO gettimeofday
+on systems where CNTVCT is not usable, for whatever reason, please take 
+care about this one in the updated patch list so that the things will be 
+very clean.
+Meanwhile, i will discuss further on "firmware is broken about CNTVOFF 
+initialization zero + HYP disabled" in the following thread as mentioned 
+in the previous reply to Catalin,
+arm: Handle starting up in secure mode
+https://lkml.org/lkml/2014/9/16/552
+
+Thanks for the patch list,
+
+BR,
+Venkappa
