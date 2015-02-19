@@ -1,44 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 19 Feb 2015 18:59:56 +0100
-Subject: [PATCH v4 0/6] ARM: shmobile: r8a73a4/ape6evm: Complete
- multiplatform support
-In-Reply-To: <CAMuHMdWsjWC4k_qp=8nZQj_rAJdUpZMcJjV7uJUePy9G5ij3CA@mail.gmail.com>
-References: <1424185486-3017-1-git-send-email-geert+renesas@glider.be>
- <20150218212044.GD12754@verge.net.au>
- <CAMuHMdWsjWC4k_qp=8nZQj_rAJdUpZMcJjV7uJUePy9G5ij3CA@mail.gmail.com>
-Message-ID: <CAMuHMdW_nzRWjuiEXZDNrQf_ws_msxLqt6yX7Z6QZuAsyLDgGw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 19 Feb 2015 12:01:14 -0600
+Subject: [PATCH 2/4] of: DT quirks infrastructure
+In-Reply-To: <54E54586.5070602@gmail.com>
+References: <1424271576-1952-1-git-send-email-pantelis.antoniou@konsulko.com>
+ <1424271576-1952-3-git-send-email-pantelis.antoniou@konsulko.com>
+ <54E54586.5070602@gmail.com>
+Message-ID: <CAL_JsqKT3+URcad6X=i+73NLRnVstbpvFJxxT=ru7KJmp_XuVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 19, 2015 at 6:44 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Wed, Feb 18, 2015 at 10:20 PM, Simon Horman <horms@verge.net.au> wrote:
->> With this patch applied I am able to NFS boot the ape6evm using
->> multiplatform using the shmobile_defconfig with CONFIG_MMC disabled.
+On Wed, Feb 18, 2015 at 8:08 PM, Frank Rowand <frowand.list@gmail.com> wrote:
+> On 2/18/2015 6:59 AM, Pantelis Antoniou wrote:
+>> Implement a method of applying DT quirks early in the boot sequence.
 >>
->> For reference the boot log for shmobile_defconfig (without CONFIG_MMC
->> disabled) is as follows:
+>> A DT quirk is a subtree of the boot DT that can be applied to
+>> a target in the base DT resulting in a modification of the live
+>> tree. The format of the quirk nodes is that of a device tree overlay.
 >
->> sh_mmcif ee200000.mmc: Timeout waiting for 1 on CMD0
->
-> I hadn't really planned to do a renesas-drivers release today, but as I can
-> reproduce the hang with renesas-devel-20150218-v3.19, but not with my local
-> tree, I made a release.
->
-> Shmobile-defconfig from renesas-drivers-2015-02-19-v3.19 boots fine on my
-> ape6evm. It seems there are still +100 mmc commits in -next that are not yet
-> in upstream.
+> The use of the word "quirk" is a different mental model for me than what
+> this patch series appears to be addressing.  I would suggest totally
+> removing the word "quirk" from this proposal to avoid confusing the
+> mental models of future generations of kernel folks.
 
-Correction: they are upstream. They're just not yet in renesas-devel.
-Better luck on Monday, after -rc1 ;-)
+This comes from me as quirks are a different usecase I had in mind,
+but one that could use a similar mechanism. Although, in the case of
+quirks, I would expect them to be overlays built into the kernel. It
+would be more a way to update old dtbs.
 
-Gr{oetje,eeting}s,
+> What this patch series seems to be proposing is a method to apply DT
+> overlays as soon as unflatten_device_tree() completes.  In other words,
+> making the device tree a dynamic object, that is partially defined by
+> the kernel during boot.  Well, to be fair, the kernel chooses among
+> several possible alternatives encoded in the DT blob.  So the device
+> tree is no longer a static object that describes the hardware of the
+> system.  It may not sound like a big deal, but it seems to me to be
+> a fundamental shift in what the device tree blob is.  Something that
+> should be thought about carefully and not just applied as a patch to
+> solve a point problem.
 
-                        Geert
+I agree. I would not want to see every board for an SOC become an
+overlay for example. I think it has to be limited to truly plugable
+h/w (e.g. capes) or minor changes. We just have to define what is
+minor. :)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Rob
