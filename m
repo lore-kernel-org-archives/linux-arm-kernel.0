@@ -1,67 +1,49 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Thu, 19 Feb 2015 10:01:45 +0200
-Subject: [PATCHv4 1/2] at91sam9_wdt: Allow watchdog to reset device at early
- boot
-In-Reply-To: <cover.1424332841.git.timo.kokkonen@offcode.fi>
-References: <cover.1424332841.git.timo.kokkonen@offcode.fi>
-Message-ID: <a9518888bc8d8473fbeea486ec17bc0a55afa309.1424332841.git.timo.kokkonen@offcode.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Feb 2015 09:07:30 +0100
+Subject: [PATCH] ARM: make of_device_ids const
+In-Reply-To: <CAGUYZuREm+XAO7mD0gxeSftStxUOADHmoZ2ngcKp218FaKOeGw@mail.gmail.com>
+References: <1424290796-18475-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <6700107.3fSsY2uIcW@wuerfel>
+ <CAGUYZuREm+XAO7mD0gxeSftStxUOADHmoZ2ngcKp218FaKOeGw@mail.gmail.com>
+Message-ID: <7609298.ZvCtgk2my8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By default the driver will start a kernel timer which keeps on kicking
-the watchdog HW until user space has opened the watchdog
-device. Usually this is desirable as the watchdog HW is running by
-default and the user space may not have any watchdog daemon running at
-all.
+On Thursday 19 February 2015 10:44:49 sanjeev sharma wrote:
+> On Thu, Feb 19, 2015 at 2:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 18 February 2015 21:19:56 Uwe Kleine-K?nig wrote:
+> >> of_device_ids (i.e. compatible strings and the respective data) are not
+> >> supposed to change at runtime. All functions working with of_device_ids
+> >> provided by <linux/of.h> work with const of_device_ids. So mark the
+> >> non-const structs in arch/arm as const, too.
+> >>
+> >> While at it also add some __initconst annotations.
+> >>
+> >> Acked-by: Jason Cooper <jason@lakedameon.net>
+> >> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> >
+> > Applied to fixes branch, thanks!
+> >
+> >         Arnd
+> 
+> There are many places in driver also where this need to be fixed.I
+> have submitted couple of patches listed below and waiting for the
+> response.
+> 
+> serial:imx make of_device_id array const
+> pinctrl: freescale: make of_device_id array const
 
-However, on production systems it may be mandatory that also early
-crashes and lockups will lead to a watchdog reset, even if they happen
-before the user space has opened the watchdog device.
+I'd suggest you send them again after the merge window. Maintainers
+often miss patches coming in, or have a long backlog of patches
+to look at.
 
-To resolve the issue, add a new device tree property
-"early-timeout-sec" which will let the kernel timer to ping the
-watchdog HW only as long as the specified timeout permits. The default
-is still to use kernel timer, but more strict behavior can be enabled
-via the device tree property.
+Greg is usually very good at applying patches for the serial drivers
+very quickly, but if he hasn't applied the patch within a week, it's
+probably not on his radar any more.
 
-Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
----
- drivers/watchdog/at91sam9_wdt.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+For the pinctrl patches, I see that Linus Walleij picked up a couple
+of them, and if he missed this one that was probably an oversight, so
+just send him a ping or send the patch again with [PATCH RESEND] in
+the subject.
 
-diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index 6df9405..1b40bfa 100644
---- a/drivers/watchdog/at91sam9_wdt.c
-+++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -89,6 +89,8 @@ struct at91wdt {
- 	u32 mr_mask;
- 	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
- 	bool nowayout;
-+	/* Timeout in jiffies for stopping the early timer */
-+	unsigned long early_timer;
- 	unsigned int irq;
- };
- 
-@@ -122,7 +124,8 @@ static void at91_ping(unsigned long data)
- {
- 	struct at91wdt *wdt = (struct at91wdt *)data;
- 	if (time_before(jiffies, wdt->next_heartbeat) ||
--	    !watchdog_active(&wdt->wdd)) {
-+		(time_before(jiffies, wdt->early_timer) &&
-+			!watchdog_active(&wdt->wdd))) {
- 		at91_wdt_reset(wdt);
- 		mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
- 	} else {
-@@ -316,6 +319,10 @@ static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
- 
- 	wdt->mr |= max | ((max - min) << 16);
- 
-+	if (!of_property_read_u32_index(np, "early-timeout-sec", 0,
-+					(u32 *)&wdt->early_timer))
-+		wdt->early_timer = wdt->early_timer * HZ + jiffies;
-+
- 	return 0;
- }
- #else
--- 
-2.1.0
+	Arnd
