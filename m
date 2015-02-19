@@ -1,42 +1,63 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 19 Feb 2015 09:48:33 -0800
-Subject: [PATCH 1/6] ASoC: max98088: Document DT bindings
-In-Reply-To: <54E5EF73.2090302@suse.de>
-References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
- <1424283959-16289-2-git-send-email-afaerber@suse.de>
- <54E5EB36.9020007@collabora.co.uk> <54E5EF73.2090302@suse.de>
-Message-ID: <CAD=FV=VoFnbEsKi4mDDkaTrTXboJmm0UNV5iCk1CvV5ndEZtsA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 19 Feb 2015 12:55:02 -0500
+Subject: [PATCH 1/2] ARM: shmobile: r8a7794: add MMCIF DT support
+In-Reply-To: <54E61740.8030708@cogentembedded.com>
+References: <29687119.ELU9MoH02q@wasted.cogentembedded.com>
+ <4040756.88Rqm1nt32@wasted.cogentembedded.com>
+ <20150219161012.GA3864@verge.net.au>
+ <54E61740.8030708@cogentembedded.com>
+Message-ID: <20150219175458.GA18262@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas,
+On Thu, Feb 19, 2015 at 08:02:56PM +0300, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 02/19/2015 07:10 PM, Simon Horman wrote:
+> 
+> >>Define the generic R8A7794 part of the MMCIF0 device node.
+> 
+> >>Based on the orginal patch by Shinobu Uehara <shinobu.uehara.xc@renesas.com>.
+> 
+> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> >>---
+> >>  arch/arm/boot/dts/r8a7794.dtsi |   11 +++++++++++
+> >>  1 file changed, 11 insertions(+)
+> 
+> >>Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
+> >>===================================================================
+> >>--- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
+> >>+++ renesas/arch/arm/boot/dts/r8a7794.dtsi
+> >>@@ -346,6 +346,17 @@
+> >>  		status = "disabled";
+> >>  	};
+> >>
+> >>+	mmcif0: mmc at ee200000 {
+> >>+		compatible = "renesas,mmcif-r8a7794", "renesas,sh-mmcif";
+> 
+> >Please submit a patch to add "renesas,mmcif-r8a7794" to
+> >Documentation/devicetree/bindings/mmc/renesas,mmcif.txt.
+> >I looked and I couldn't find such a change in-tree or in-flight.
+> 
+>    That file doesn't match the reality at all. It says:
+> 
+> <<
+> - compatible: must contain one of the following
+>         - "renesas,mmcif-r8a7740" for the MMCIF found in r8a7740 SoCs
+>         - "renesas,mmcif-r8a7790" for the MMCIF found in r8a7790 SoCs
+>         - "renesas,mmcif-r8a7791" for the MMCIF found in r8a7791 SoCs
+>         - "renesas,sh-mmcif" for the generic MMCIF
+> >>
+> 
+> while in reality, the driver only matches on the latter string and doesn't
+> care for the SoC specific strings.
 
-On Thu, Feb 19, 2015 at 6:13 AM, Andreas F?rber <afaerber@suse.de> wrote:
->> I see that a master clock (mclk) is added in patch 6/6 but the
->> max98088 codec driver does handle this clock.
->>
->> If the SoC XCLKOUT provides the master clock to the max98089
->> codec in Spring like is the case for the max9809{0,5} codecs
->> in the Snow and Peach Pit/Pi Chromebooks then you need to do
->> something along the lines of the following commits:
->>
->> e3048c3d2be5 ASoC: max98095: Add master clock handling
->> b10ab7b838bd ASoC: max98090: Add master clock handling
->>
->> If that's the case you also have to mention in the DT binding
->> doc that "clocks" and "clock-names" are optional properties
->> like Documentation/devicetree/bindings/sound/max9809{0,5}.txt.
->
-> When I prepared this patch, I believe it was a straight copy from
-> max98090. Sounds like they changed since then.
->
-> My 6/6 adopted the mclk clock from your now-cancelled v2 patch for Snow,
-> assuming it would be the same on all Chromebooks. I tested that last
-> change by checking for errors in dmesg.
->
-> Doug, can you advise on how the clock wiring is for Spring?
+By documenting the binding in that file it exists and may be used in DT
+nodes. It may or may not be used by the driver now or in the future.
 
-I can confirm that XCLKOUT is connected to the codec MCLK on the
-Spring schematics I have.
+For better or worse this one way that bindings may be handled.
 
--Doug
+Strictly speaking it shouldn't be used in DT before it exists,
+even only in the documentation. But in this case its just a minor
+update to an existing scheme so it seems unlikely to be rejected.
