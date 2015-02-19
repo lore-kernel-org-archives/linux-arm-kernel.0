@@ -1,40 +1,42 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 19 Feb 2015 18:44:35 +0100
-Subject: [PATCH v4 0/6] ARM: shmobile: r8a73a4/ape6evm: Complete
- multiplatform support
-In-Reply-To: <20150218212044.GD12754@verge.net.au>
-References: <1424185486-3017-1-git-send-email-geert+renesas@glider.be>
- <20150218212044.GD12754@verge.net.au>
-Message-ID: <CAMuHMdWsjWC4k_qp=8nZQj_rAJdUpZMcJjV7uJUePy9G5ij3CA@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 19 Feb 2015 09:48:33 -0800
+Subject: [PATCH 1/6] ASoC: max98088: Document DT bindings
+In-Reply-To: <54E5EF73.2090302@suse.de>
+References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
+ <1424283959-16289-2-git-send-email-afaerber@suse.de>
+ <54E5EB36.9020007@collabora.co.uk> <54E5EF73.2090302@suse.de>
+Message-ID: <CAD=FV=VoFnbEsKi4mDDkaTrTXboJmm0UNV5iCk1CvV5ndEZtsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Andreas,
 
-On Wed, Feb 18, 2015 at 10:20 PM, Simon Horman <horms@verge.net.au> wrote:
-> With this patch applied I am able to NFS boot the ape6evm using
-> multiplatform using the shmobile_defconfig with CONFIG_MMC disabled.
+On Thu, Feb 19, 2015 at 6:13 AM, Andreas F?rber <afaerber@suse.de> wrote:
+>> I see that a master clock (mclk) is added in patch 6/6 but the
+>> max98088 codec driver does handle this clock.
+>>
+>> If the SoC XCLKOUT provides the master clock to the max98089
+>> codec in Spring like is the case for the max9809{0,5} codecs
+>> in the Snow and Peach Pit/Pi Chromebooks then you need to do
+>> something along the lines of the following commits:
+>>
+>> e3048c3d2be5 ASoC: max98095: Add master clock handling
+>> b10ab7b838bd ASoC: max98090: Add master clock handling
+>>
+>> If that's the case you also have to mention in the DT binding
+>> doc that "clocks" and "clock-names" are optional properties
+>> like Documentation/devicetree/bindings/sound/max9809{0,5}.txt.
 >
-> For reference the boot log for shmobile_defconfig (without CONFIG_MMC
-> disabled) is as follows:
+> When I prepared this patch, I believe it was a straight copy from
+> max98090. Sounds like they changed since then.
+>
+> My 6/6 adopted the mclk clock from your now-cancelled v2 patch for Snow,
+> assuming it would be the same on all Chromebooks. I tested that last
+> change by checking for errors in dmesg.
+>
+> Doug, can you advise on how the clock wiring is for Spring?
 
-> sh_mmcif ee200000.mmc: Timeout waiting for 1 on CMD0
+I can confirm that XCLKOUT is connected to the codec MCLK on the
+Spring schematics I have.
 
-I hadn't really planned to do a renesas-drivers release today, but as I can
-reproduce the hang with renesas-devel-20150218-v3.19, but not with my local
-tree, I made a release.
-
-Shmobile-defconfig from renesas-drivers-2015-02-19-v3.19 boots fine on my
-ape6evm. It seems there are still +100 mmc commits in -next that are not yet
-in upstream.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-Doug
