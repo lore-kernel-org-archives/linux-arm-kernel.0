@@ -1,46 +1,49 @@
-From: zlim.lnx@gmail.com (Z Lim)
-Date: Thu, 19 Feb 2015 11:33:51 -0800
-Subject: [PATCH] arm64: insn: fix compare-and-branch encodings
-In-Reply-To: <54E4B8EC.7090709@arm.com>
-References: <369053df4298c754061e47068834bd9640b0841b.1424273599.git.robin.murphy@arm.com>
- <54E4B8EC.7090709@arm.com>
-Message-ID: <CABg9mctwRkCwbBJRSGXy1NYJkQXnLDmE-DpFLd3AjfygJx1dCA@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 19 Feb 2015 20:53:55 +0100
+Subject: [PATCH v2 1/2] dma: mmp_dma: add support for legacy transition
+In-Reply-To: <54E5BB06.6000106@zonque.org> (Daniel Mack's message of "Thu, 19
+ Feb 2015 11:29:26 +0100")
+References: <1423954053-21760-1-git-send-email-robert.jarzmik@free.fr>
+ <1424205547-15429-1-git-send-email-robert.jarzmik@free.fr>
+ <54E5BB06.6000106@zonque.org>
+Message-ID: <87mw498yp8.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 18, 2015 at 8:08 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> Oops, missed some CCs...
+Daniel Mack <daniel@zonque.org> writes:
+
+> Hi Robert,
 >
-> On 18/02/15 15:40, Robin Murphy wrote:
->>
->> Fix cbz/cbnz having the mask offset by a bit, and add encodings for
->> tbz/tbnz so that all branch forms are represented.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> Acked-by: Will Deacon <will.deacon@arm.com>
->> ---
->>   arch/arm64/include/asm/insn.h | 6 ++++--
->>   1 file changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
->> index e2ff32a..d2f4942 100644
->> --- a/arch/arm64/include/asm/insn.h
->> +++ b/arch/arm64/include/asm/insn.h
->> @@ -264,8 +264,10 @@ __AARCH64_INSN_FUNCS(ands, 0x7F200000, 0x6A000000)
->>   __AARCH64_INSN_FUNCS(bics,    0x7F200000, 0x6A200000)
->>   __AARCH64_INSN_FUNCS(b,               0xFC000000, 0x14000000)
->>   __AARCH64_INSN_FUNCS(bl,      0xFC000000, 0x94000000)
->> -__AARCH64_INSN_FUNCS(cbz,      0xFE000000, 0x34000000)
->> -__AARCH64_INSN_FUNCS(cbnz,     0xFE000000, 0x35000000)
->> +__AARCH64_INSN_FUNCS(cbz,      0x7F000000, 0x34000000)
->> +__AARCH64_INSN_FUNCS(cbnz,     0x7F000000, 0x35000000)
->> +__AARCH64_INSN_FUNCS(tbz,      0x7F000000, 0x36000000)
->> +__AARCH64_INSN_FUNCS(tbnz,     0x7F000000, 0x37000000)
->>   __AARCH64_INSN_FUNCS(bcond,   0xFF000010, 0x54000000)
->>   __AARCH64_INSN_FUNCS(svc,     0xFFE0001F, 0xD4000001)
->>   __AARCH64_INSN_FUNCS(hvc,     0xFFE0001F, 0xD4000002)
->>
+> Thanks for pushing this topic :)
+> One minor nit:
+>
+>> +int mmp_pdma_toggle_reserved_channel(int legacy_channel)
+>> +{
+>> +	if (legacy_unavailable & (1 << legacy_channel))
+>> +		return -EBUSY;
+>> +	legacy_reserved ^= 1 << legacy_channel;
+>> +	return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(mmp_pdma_toggle_reserved_channel);
+>
+> My concern is that if pxa_request_dma() is called more than once for
+> whatever reason by a legacy implementation, the toggled bit mask might
+> get out of sync.
+This is not possible.
+The first call to pxa_request_dma() sets dma_channels[i].name to a non-NULL
+value.
+The second call to pxa_request_dma() cannot take the same i as
+!dma_channels[i].name is not fullfilled.
 
-Looks good to me, as described in ARMv8 ARM.
+> As we know exactly on the caller site what we want to achieve, let's make the
+> API explicit with something like:
+>
+> int mmp_pdma_set_reserved_channel(int legacy_channel, bool reserved)
+Even if I have no strong opinion about it, I'll let the patch as it is, unless
+you really want me to add the reserved parameter, in which case I'll release a
+v3.
 
-Acked-by: Zi Shen Lim <zlim.lnx@gmail.com>
+Cheers.
+
+-- 
+Robert
