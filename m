@@ -1,55 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 19 Feb 2015 15:31:07 +0000
-Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
- uncached guest mappings
-In-Reply-To: <54E600D5.4070803@suse.de>
-References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
- <54E5F847.6050602@suse.de>
- <CAKv+Gu9zciD-KuRXbQhLJBgW6i4jk0-=hG6UrBWr6-g-uZkO1A@mail.gmail.com>
- <54E600D5.4070803@suse.de>
-Message-ID: <CAKv+Gu-RCG-px7gN=S8WKSvbY2hmLiN04fziKyBHtxmsCLc8YQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Feb 2015 16:38:19 +0100
+Subject: [PATCH v2] crypto: atmel: fix bogus select
+Message-ID: <6741924.K1MvntTk7u@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 February 2015 at 15:27, Alexander Graf <agraf@suse.de> wrote:
->
->
-> On 19.02.15 15:56, Ard Biesheuvel wrote:
->> On 19 February 2015 at 14:50, Alexander Graf <agraf@suse.de> wrote:
->>>
->>>
->>> On 19.02.15 11:54, Ard Biesheuvel wrote:
->>>> This is a 0th order approximation of how we could potentially force the guest
->>>> to avoid uncached mappings, at least from the moment the MMU is on. (Before
->>>> that, all of memory is implicitly classified as Device-nGnRnE)
->>>>
->>>> The idea (patch #2) is to trap writes to MAIR_EL1, and replace uncached mappings
->>>> with cached ones. This way, there is no need to mangle any guest page tables.
->>>
->>> Would you mind to give a brief explanation on what this does? What
->>> happens to actually assigned devices that need to be mapped as uncached?
->>> What happens to DMA from such devices when the guest assumes that it's
->>> accessing RAM uncached and then triggers DMA?
->>>
->>
->> On ARM, stage 2 mappings that are more strict will supersede stage 1
->> mappings, so the idea is to use cached mappings exclusively for stage
->> 1 so that the host is fully in control of the actual memory attributes
->> by setting the attributes at stage 2. This also makes sense because
->> the host will ultimately know better whether some range that the guest
->> thinks is a device is actually a device or just emulated (no stage 2
->> mapping), backed by host memory (such as the NOR flash read case) or
->> backed by a passthrough device.
->
-> Ok, so that means if the guest maps RAM as uncached, it will actually
-> end up as cached memory. Now if the guest triggers a DMA request to a
-> passed through device to that RAM, it will conflict with the cache.
->
-> I don't know whether it's a big deal, but it's the scenario that came up
-> with the approach above before when I talked to people about it.
->
+The Atmel at91 crypto driver unconditionally selects AT_HDMAC,
+which results in a Kconfig warning if that driver is not enabled:
 
-Well, I am using write-through read+write allocate, which hopefully
-means that the actual RAM is kept in sync with the cache, but I must
-confess I am a bit out of my depth here with the fine print in the ARM
-ARM.
+warning: (CRYPTO_DEV_ATMEL_AES) selects AT_HDMAC which has unmet direct dependencies (DMADEVICES && ARCH_AT91)
+
+The crypty driver itself does not actually have a dependency
+on a particular dma engine, other than this being the one that
+is used in at91.
+
+Removing the 'select' gets rid of the warning, but can cause
+the driver to be unusable if the HDMAC is not enabled at the
+same time. To work around that, this patch clarifies the runtime
+dependency to be '(ARCH_AT91 && AT_XDMAC)', but adds an alternative
+for COMPILE_TEST, which lets the driver get build on all systems.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+v2: as a result of the discussion with Ludovic, clarify the
+dependency.
+
+Please apply for 3.21 if there are no further comments.
+
+diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+index 2fb0fdfc87df..562125183690 100644
+--- a/drivers/crypto/Kconfig
++++ b/drivers/crypto/Kconfig
+@@ -342,13 +342,12 @@ config CRYPTO_DEV_BFIN_CRC
+ 
+ config CRYPTO_DEV_ATMEL_AES
+ 	tristate "Support for Atmel AES hw accelerator"
+-	depends on ARCH_AT91
++	depends on (ARCH_AT91 && AT_XDMAC) || COMPILE_TEST
+ 	select CRYPTO_CBC
+ 	select CRYPTO_ECB
+ 	select CRYPTO_AES
+ 	select CRYPTO_ALGAPI
+ 	select CRYPTO_BLKCIPHER
+-	select AT_HDMAC
+ 	help
+ 	  Some Atmel processors have AES hw accelerator.
+ 	  Select this if you want to use the Atmel module for
