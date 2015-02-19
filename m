@@ -1,48 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Feb 2015 16:38:19 +0100
-Subject: [PATCH v2] crypto: atmel: fix bogus select
-Message-ID: <6741924.K1MvntTk7u@wuerfel>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 19 Feb 2015 10:42:55 -0500
+Subject: [PATCH v2] ARM: shmobile: r8a7790: Fix HSUSB clock to hp_clk from
+ mp_clk
+Message-ID: <1424360575-6482-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Atmel at91 crypto driver unconditionally selects AT_HDMAC,
-which results in a Kconfig warning if that driver is not enabled:
+From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
 
-warning: (CRYPTO_DEV_ATMEL_AES) selects AT_HDMAC which has unmet direct dependencies (DMADEVICES && ARCH_AT91)
+HSUSB uses hp_clk rather than mp_clk for H/W register access.
 
-The crypty driver itself does not actually have a dependency
-on a particular dma engine, other than this being the one that
-is used in at91.
+Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+[horms: updated changelog]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Removing the 'select' gets rid of the warning, but can cause
-the driver to be unusable if the HDMAC is not enabled at the
-same time. To work around that, this patch clarifies the runtime
-dependency to be '(ARCH_AT91 && AT_XDMAC)', but adds an alternative
-for COMPILE_TEST, which lets the driver get build on all systems.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
-v2: as a result of the discussion with Ludovic, clarify the
-dependency.
+v2 [Simon Horman]
+- Updated changelog to remove information about USB-DMAC clock which
+  did not relate to the patch. I will follow up on weather the
+  USB-DMAC clock should be mp_clk as the deleted portion of the
+  changelog stated.
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Please apply for 3.21 if there are no further comments.
-
-diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-index 2fb0fdfc87df..562125183690 100644
---- a/drivers/crypto/Kconfig
-+++ b/drivers/crypto/Kconfig
-@@ -342,13 +342,12 @@ config CRYPTO_DEV_BFIN_CRC
- 
- config CRYPTO_DEV_ATMEL_AES
- 	tristate "Support for Atmel AES hw accelerator"
--	depends on ARCH_AT91
-+	depends on (ARCH_AT91 && AT_XDMAC) || COMPILE_TEST
- 	select CRYPTO_CBC
- 	select CRYPTO_ECB
- 	select CRYPTO_AES
- 	select CRYPTO_ALGAPI
- 	select CRYPTO_BLKCIPHER
--	select AT_HDMAC
- 	help
- 	  Some Atmel processors have AES hw accelerator.
- 	  Select this if you want to use the Atmel module for
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 24de994..113edf2 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1,6 +1,7 @@
+ /*
+  * Device Tree Source for the r8a7790 SoC
+  *
++ * Copyright (C) 2015 Renesas Electronics Corporation
+  * Copyright (C) 2013-2014 Renesas Solutions Corp.
+  * Copyright (C) 2014 Cogent Embedded Inc.
+  *
+@@ -1132,7 +1133,7 @@
+ 		mstp7_clks: mstp7_clks at e615014c {
+ 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
+-			clocks = <&mp_clk>, <&mp_clk>, <&zs_clk>, <&zs_clk>, <&p_clk>,
++			clocks = <&mp_clk>, <&hp_clk>, <&zs_clk>, <&zs_clk>, <&p_clk>,
+ 				 <&p_clk>, <&zx_clk>, <&zx_clk>, <&zx_clk>, <&zx_clk>,
+ 				 <&zx_clk>;
+ 			#clock-cells = <1>;
+-- 
+2.1.4
