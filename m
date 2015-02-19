@@ -1,105 +1,52 @@
-From: b08248@gmail.com (Stuart Yoder)
-Date: Wed, 18 Feb 2015 20:16:36 -0600
-Subject: lpi-parent?
-Message-ID: <CALRxmdDejPBREBL8WY=drW+nmHSVPX9A3WmbW=t+FOpHvbeV2g@mail.gmail.com>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Thu, 19 Feb 2015 03:42:39 +0100
+Subject: [PATCH v5 7/9] ARM: dts: Exynos: add 'hdmi' clock to mixer nodes
+In-Reply-To: <1422883228-10690-8-git-send-email-m.szyprowski@samsung.com>
+References: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
+ <1422883228-10690-8-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <54E54D9F.2060207@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 24, 2014 at 8:35 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Add the documentation for the bindings describing the GICv3 ITS.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Am 02.02.2015 um 14:20 schrieb Marek Szyprowski:
+> Mixed block needs to control hdmi clock to properly perform power on/off
+> operation, so add 'hdmi' clock also to mixer nodes.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > ---
->  Documentation/devicetree/bindings/arm/gic-v3.txt | 39 ++++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/arm/gic-v3.txt b/Documentation/devicetree/bindings/arm/gic-v3.txt
-> index 33cd05e..ddfade4 100644
-> --- a/Documentation/devicetree/bindings/arm/gic-v3.txt
-> +++ b/Documentation/devicetree/bindings/arm/gic-v3.txt
-> @@ -49,11 +49,29 @@ Optional
->    occupied by the redistributors. Required if more than one such
->    region is present.
->
-> +Sub-nodes:
-> +
-> +GICv3 has one or more Interrupt Translation Services (ITS) that are
-> +used to route Message Signalled Interrupts (MSI) to the CPUs.
-> +
-> +These nodes must have the following properties:
-> +- compatible : Should at least contain  "arm,gic-v3-its".
-> +- msi-controller : Boolean property. Identifies the node as an MSI controller
-> +- reg: Specifies the base physical address and size of the ITS
-> +  registers.
-> +
-> +The main GIC node must contain the appropriate #address-cells,
-> +#size-cells and ranges properties for the reg property of all ITS
-> +nodes.
-> +
->  Examples:
->
->         gic: interrupt-controller at 2cf00000 {
->                 compatible = "arm,gic-v3";
->                 #interrupt-cells = <3>;
-> +               #address-cells = <2>;
-> +               #size-cells = <2>;
-> +               ranges;
->                 interrupt-controller;
->                 reg = <0x0 0x2f000000 0 0x10000>,       // GICD
->                       <0x0 0x2f100000 0 0x200000>,      // GICR
-> @@ -61,11 +79,20 @@ Examples:
->                       <0x0 0x2c010000 0 0x2000>,        // GICH
->                       <0x0 0x2c020000 0 0x2000>;        // GICV
->                 interrupts = <1 9 4>;
-> +
-> +               gic-its at 2c200000 {
-> +                       compatible = "arm,gic-v3-its";
-> +                       msi-controller;
-> +                       reg = <0x0 0x2c200000 0 0x200000>;
-> +               };
->         };
->
->         gic: interrupt-controller at 2c010000 {
->                 compatible = "arm,gic-v3";
->                 #interrupt-cells = <3>;
-> +               #address-cells = <2>;
-> +               #size-cells = <2>;
-> +               ranges;
->                 interrupt-controller;
->                 redistributor-stride = <0x0 0x40000>;   // 256kB stride
->                 #redistributor-regions = <2>;
-> @@ -76,4 +103,16 @@ Examples:
->                       <0x0 0x2c060000 0 0x2000>,        // GICH
->                       <0x0 0x2c080000 0 0x2000>;        // GICV
->                 interrupts = <1 9 4>;
-> +
-> +               gic-its at 2c200000 {
-> +                       compatible = "arm,gic-v3-its";
-> +                       msi-controller;
-> +                       reg = <0x0 0x2c200000 0 0x200000>;
-> +               };
-> +
-> +               gic-its at 2c400000 {
-> +                       compatible = "arm,gic-v3-its";
-> +                       msi-controller;
-> +                       reg = <0x0 0x2c400000 0 0x200000>;
-> +               };
+>  arch/arm/boot/dts/exynos5250.dtsi | 5 +++--
+>  arch/arm/boot/dts/exynos5420.dtsi | 5 +++--
+>  2 files changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index 9bb1b0b738f5..e8c67fdb69fb 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -732,8 +732,9 @@
+>  		compatible = "samsung,exynos5250-mixer";
+>  		reg = <0x14450000 0x10000>;
+>  		interrupts = <0 94 0>;
+> -		clocks = <&clock CLK_MIXER>, <&clock CLK_SCLK_HDMI>;
+> -		clock-names = "mixer", "sclk_hdmi";
+> +		clocks = <&clock CLK_MIXER>, <&clock CLK_HDMI>,
+> +			 <&clock CLK_SCLK_HDMI>;
+> +		clock-names = "mixer", "hdmi", "sclk_hdmi";
+>  	};
+>  
+>  	dp_phy: video-phy at 10040720 {
+[snip]
 
-Marc,
+Tested-by: Andreas F?rber <afaerber@suse.de>
 
-Is there a binding definition for how other nodes specify which
-gic-its node they are
-associated with.
+Without this patch, next-20150218 exynos drm mixer fails to locate the
+hdmi clock on Spring.
 
-In some proof of concept kernel code we are using the property "lpi-parent"
-to specify the association of a bus node (that uses message interrupts)
-to the GIC ITS:
+Kukjin, can you please queue the remaining patches 1-8?
 
-    lpi-parent = <&its>;
+Regards,
+Andreas
 
-I am not remember at all if that property came as a suggestion from some
-side discussion with you or if we just made that up.  Wanted to see what
-your thoughts were on how to do this.
-
-Thanks,
-Stuart
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
+Graham Norton; HRB 21284 (AG N?rnberg)
