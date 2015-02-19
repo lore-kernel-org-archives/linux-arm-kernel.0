@@ -1,48 +1,97 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Thu, 19 Feb 2015 21:25:49 +0100
-Subject: runtime check for omap-aes bus access permission (was: Re:
- 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
-In-Reply-To: <201502191920.41284@pali>
-References: <20131206213613.GA19648@earth.universe> <201502111339.54480@pali>
- <CAALWOA_ngoSKjB=ZQ264Va37bBK7v41Ei45SyoYLiMdanTKnxQ@mail.gmail.com>
- <201502191920.41284@pali>
-Message-ID: <CAALWOA_XkYmHx_uLo9MgX7Eec2Yrx1eooe=QE2=8whV=woP-Zw@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 19 Feb 2015 21:48:09 +0100
+Subject: [PATCH 1/6] ASoC: max98088: Document DT bindings
+In-Reply-To: <54E6314E.5060509@suse.de>
+References: <1424283959-16289-1-git-send-email-afaerber@suse.de>	<1424283959-16289-2-git-send-email-afaerber@suse.de>	<54E5EB36.9020007@collabora.co.uk>	<54E5EF73.2090302@suse.de>
+ <CAD=FV=VoFnbEsKi4mDDkaTrTXboJmm0UNV5iCk1CvV5ndEZtsA@mail.gmail.com>
+ <54E62E1C.4030105@suse.de> <54E6314E.5060509@suse.de>
+Message-ID: <54E64C09.5000505@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 February 2015 at 22:14, Pali Roh?r <pali.rohar@gmail.com> wrote:
-> Can you help us with above problem? How to catch external abort
-> on non-linefetch in kernel driver and prevent kernel panic?
+Hello Andreas,
 
-Actually it's a synchronous bus error that you want to catch, which
-however is misreported by linux as "external abort on non-linefetch"
-(... but a bus error on a linefetch would produce exactly the same
-error).  Also, ARM apparently uses the term "external abort" as
-umbrella term for aborts triggered outside the MMU, which includes not
-just bus errors but also (uncorrectable) parity/ECC errors.
+We already talked over irc but for completeness I'll comment here
+as well.
 
-Anyhow, the core question you mean to ask is: can the "exception"
-mechanism current already in place to trap MMU faults in e.g.
-put_user() easily be extended to allow drivers to trap synchronous bus
-errors?  My impression is that this would in fact be quite easy and I
-even outlined a suggested patch, but I'm still a kernel newbie so I
-may be way off course.
+On 02/19/2015 07:54 PM, Andreas F?rber wrote:
+> Am 19.02.2015 um 19:40 schrieb Andreas F?rber:
+>> Am 19.02.2015 um 18:48 schrieb Doug Anderson:
+>>> On Thu, Feb 19, 2015 at 6:13 AM, Andreas F?rber <afaerber@suse.de> wrote:
+>>>>> I see that a master clock (mclk) is added in patch 6/6 but the
+>>>>> max98088 codec driver does handle this clock.
 
-Although its main use would be for auto-probing, it's maybe worth
-mentioning I've met at least one peripheral which also reports bus
-errors when writing inappropriate/unsupported *values* to a register.
-(Of course when using posted writes you won't get an abort anyhow in
-that case, it's only reported via interconnect error logs.)
+Sorry, I wanted to say " the driver *does not* handle this clock" but
+fortunately you understood what I meant :)
 
+>>>>>
+>>>>> If the SoC XCLKOUT provides the master clock to the max98089
+>>>>> codec in Spring like is the case for the max9809{0,5} codecs
+>>>>> in the Snow and Peach Pit/Pi Chromebooks then you need to do
+>>>>> something along the lines of the following commits:
+>>>>>
+>>>>> e3048c3d2be5 ASoC: max98095: Add master clock handling
+>>>>> b10ab7b838bd ASoC: max98090: Add master clock handling
+>>>>>
+>>>>> If that's the case you also have to mention in the DT binding
+>>>>> doc that "clocks" and "clock-names" are optional properties
+>>>>> like Documentation/devicetree/bindings/sound/max9809{0,5}.txt.
+>>>>
+>>>> When I prepared this patch, I believe it was a straight copy from
+>>>> max98090. Sounds like they changed since then.
+>>>>
+>>>> My 6/6 adopted the mclk clock from your now-cancelled v2 patch for Snow,
+>>>> assuming it would be the same on all Chromebooks. I tested that last
+>>>> change by checking for errors in dmesg.
+>>>>
+>>>> Doug, can you advise on how the clock wiring is for Spring?
+>>>
+>>> I can confirm that XCLKOUT is connected to the codec MCLK on the
+>>> Spring schematics I have.
+>> 
+>> Thanks! I updated max98088 and had it working on first boot, but on
+>> second boot it complained about the frequency:
+>>
+>> [    7.896834] max98088 7-0010: revision A
+>> [    7.912776] snow-audio sound: HiFi <-> 3830000.i2s mapping ok
+>> [    7.919367] max98088 7-0010: Invalid master clock frequency
+>> [    7.919429] snow-audio sound: ASoC: Spring-I2S-MAX98089 late_probe()
+>> failed: -22
+>> [    7.920019] snow-audio sound: snd_soc_register_card failed (-22)
+>> [    7.920109] snow-audio: probe of sound failed with error -22
+>
 
-On 19 February 2015 at 19:20, Pali Roh?r <pali.rohar@gmail.com> wrote:
-> Anyway, in Nokia Harmattan N9/N950 2.6.32 kernel is this patch
+I had the same error on Snow but even on the first boot and after doing some
+code archeology, I found the following commit [0] in a Samsung downstream
+tree that solves the issue.
 
-In mainline linux the same fix-up is done at runtime rather than
-compile time (in exceptions_init() at the bottom of fault.c). Either
-way, in my post of the 11th I also mentioned that it looks wrong to
-me. I-cache maintenance fault is really a special case in the fault
-decoding logic since it means "although you got here via DAbort and
-the relevant address is in DFAR, the exception happened on the
-instruction side so you need to fetch the fault status from IFSR
-instead."
+The problem is that clk_round_rate(max98095->mclk, freq) returns 0 as the
+rounded rate if XCLOUT is not allowed to be re-parented on rate change.
+
+With Tushar's patch I see that clk_round_rate() returns 24000000 (24MHz)
+so the codec driver setups the correct PLL clock.
+
+You mentioned that it does make the error go away but still audio is not
+working on Spring. Let's see if someone has an idea of what could be missing.
+ 
+> Reproducible on third boot.
+> 
+> On a suspicion, the fourth boot I waited for the double-beep of the
+> firmware (waiting for Ctrl+d/u), and then it did work.
+> 
+> So it seems the mclk is not always set up properly by the kernel,
+> relying on firmware. Who's in charge of setting that clock up?
+>
+
+Right, it seems audio is only working due the firmware doing some previous
+setup. Probably it works on every boot if you have "sound init" as a part of
+the u-boot boot commands?
+
+> Regards,
+> Andreas
+>
+
+Best regards,
+Javier
+
+[0]: https://github.com/exynos-reference/kernel/commit/34ae055b32e621409a92dea6a29f65b723798f33
