@@ -1,57 +1,54 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 19 Feb 2015 16:51:38 +0100
-Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
-In-Reply-To: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
-References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
-Message-ID: <20150219155138.GA24460@cbox>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 19 Feb 2015 11:10:12 -0500
+Subject: [PATCH 1/2] ARM: shmobile: r8a7794: add MMCIF DT support
+In-Reply-To: <4040756.88Rqm1nt32@wasted.cogentembedded.com>
+References: <29687119.ELU9MoH02q@wasted.cogentembedded.com>
+ <4040756.88Rqm1nt32@wasted.cogentembedded.com>
+Message-ID: <20150219161012.GA3864@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 12:33:26PM +0530, Pranavkumar Sawargaonkar wrote:
-> In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
-> in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
-> size due to size alignment checking in vgic driver for VCPU Control and
-> VCPU register.
+On Tue, Feb 17, 2015 at 01:59:02AM +0300, Sergei Shtylyov wrote:
+> Define the generic R8A7794 part of the MMCIF0 device node.
 > 
-> This patch corrects the sizes to be inline with the hardware spec.
+> Based on the orginal patch by Shinobu Uehara <shinobu.uehara.xc@renesas.com>.
 > 
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: kvmarm at lists.cs.columbia.edu
-> CC: arnd at arndb.de
-> CC: marc.zyngier at arm.com
-> CC: christoffer.dall at linaro.org
-> CC: jcm at redhat.com
-> Signed-off-by: Pranavkumar Sawargaonkar <psawargaonkar@apm.com>
-> Signed-off-by: Tushar Jagad <tjagad@apm.com>
-> Signed-off-by: Feng Kan <fkan@apm.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
 > ---
->  arch/arm64/boot/dts/apm/apm-storm.dtsi |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+>  arch/arm/boot/dts/r8a7794.dtsi |   11 +++++++++++
+>  1 file changed, 11 insertions(+)
 > 
-> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> index f1ad9c2..65f0e6d 100644
-> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> @@ -81,10 +81,10 @@
->  		compatible = "arm,cortex-a15-gic";
->  		#interrupt-cells = <3>;
->  		interrupt-controller;
-> -		reg = <0x0 0x78010000 0x0 0x1000>,	/* GIC Dist */
-> -		      <0x0 0x78020000 0x0 0x1000>,	/* GIC CPU */
-> -		      <0x0 0x78040000 0x0 0x2000>,	/* GIC VCPU Control */
-> -		      <0x0 0x78060000 0x0 0x2000>;	/* GIC VCPU */
-> +		reg = <0x0 0x78010000 0x0 0x10000>,	/* GIC Dist */
-> +		      <0x0 0x78020000 0x0 0x20000>,	/* GIC CPU */
-> +		      <0x0 0x78040000 0x0 0x10000>,	/* GIC VCPU Control */
-> +		      <0x0 0x78060000 0x0 0x20000>;	/* GIC VCPU */
->  		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
+> Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
+> +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
+> @@ -346,6 +346,17 @@
+>  		status = "disabled";
 >  	};
+>  
+> +	mmcif0: mmc at ee200000 {
+> +		compatible = "renesas,mmcif-r8a7794", "renesas,sh-mmcif";
+
+Please submit a patch to add "renesas,mmcif-r8a7794" to
+Documentation/devicetree/bindings/mmc/renesas,mmcif.txt.
+I looked and I couldn't find such a change in-tree or in-flight.
+
+> +		reg = <0 0xee200000 0 0x80>;
+> +		interrupts = <0 169 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp3_clks R8A7794_CLK_MMCIF0>;
+> +		dmas = <&dmac0 0xd1>, <&dmac0 0xd2>;
+> +		dma-names = "tx", "rx";
+> +		reg-io-width = <4>;
+> +		status = "disabled";
+> +	};
+> +
+>  	clocks {
+>  		#address-cells = <2>;
+>  		#size-cells = <2>;
 > 
 > --
-> 1.7.9.5
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-
-This looks good to me and works with 4K and 64K pages on the mustang I
-have at hand.
-
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
