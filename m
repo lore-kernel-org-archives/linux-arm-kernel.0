@@ -1,68 +1,64 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 19 Feb 2015 22:13:42 +0300
-Subject: [PATCH 1/2] ARM: shmobile: r8a7794: add MMCIF DT support
-In-Reply-To: <20150219175458.GA18262@verge.net.au>
-References: <29687119.ELU9MoH02q@wasted.cogentembedded.com>
- <4040756.88Rqm1nt32@wasted.cogentembedded.com>
- <20150219161012.GA3864@verge.net.au> <54E61740.8030708@cogentembedded.com>
- <20150219175458.GA18262@verge.net.au>
-Message-ID: <54E635E6.1010409@cogentembedded.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 19 Feb 2015 11:16:48 -0800
+Subject: [PATCH] mmc: dw_mmc: rockchip: add support MMC_CAP_RUNTIME_RESUME
+ capability
+In-Reply-To: <1423812140-24196-1-git-send-email-addy.ke@rock-chips.com>
+References: <1423812140-24196-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <CAD=FV=XyaoF_yeWcNW=w9WYJb91KkLYoKNpTmkeQhEPWcSkiLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2015 08:55 PM, Simon Horman wrote:
+Addy,
 
->>>> Define the generic R8A7794 part of the MMCIF0 device node.
+On Thu, Feb 12, 2015 at 11:22 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
+> To support HS200 and UHS mode, mmc core will call init_card() to
+> execute tuning:
+> - sdio: init_card can be executed at runtime resume.
+> - sd and mmc: init_card can be executed at resume or runtime resume,
+>   which depends on MMC_CAP_RUNTIME_RESUME capability.
+>
+> On rk3288 SoC, host will get DRTO interrupt when host send command
+> to read tuning data. This will spend more than 111ms:
+> drto_ms = drto_clks * 1000 / bus_hz = 111ms.
+>
+> And the total tuning time will be more than 400ms.
+>
+> So we should add MMC_CAP_RUNTIME_RESUME capability to execute tuning
+> at runtime resume. Only if we do so, can we pass resume test.
+>
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+>  drivers/mmc/host/dw_mmc-rockchip.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
+> index e2a726a..e5f57b5 100644
+> --- a/drivers/mmc/host/dw_mmc-rockchip.c
+> +++ b/drivers/mmc/host/dw_mmc-rockchip.c
+> @@ -76,12 +76,20 @@ static int dw_mci_rockchip_init(struct dw_mci *host)
+>         return 0;
+>  }
+>
+> +/* Common capabilities of RK3288 SoC */
+> +static unsigned long dw_mci_rk3288_dwmmc_caps[4] = {
+> +       MMC_CAP_RUNTIME_RESUME, /* emmc */
+> +       MMC_CAP_RUNTIME_RESUME, /* sdmmc */
+> +       0, /* sdio0 */
+> +       0, /* sdio1 */
 
->>>> Based on the orginal patch by Shinobu Uehara <shinobu.uehara.xc@renesas.com>.
+Why not add it for all 4 slots?  On the board you're working on the
+"SDIO" slot always has an SDIO module in it, but there is nothing
+restricting someone from actually adding a physical slot here and
+plugging in a real SD card.  In that case you'd want
+MMC_CAP_RUNTIME_RESUME there too, right?  With that addition you could
+add my Reviewed-by.
 
->>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Other than that this seems OK to me.  I'd imagine that eventually we
+could get tuning to be a bit faster, maybe by tweaking timeouts.
+Specifically the SD Card Spec that I see (in the "Tuning Command" part
+of the Physical Layer Specification) talks about being able to
+complete tuning in <= 150ms.  ...but even then speeding up resume time
+by 2 * 150ms = 300ms seems like a good thing.
 
->>>> ---
->>>>   arch/arm/boot/dts/r8a7794.dtsi |   11 +++++++++++
->>>>   1 file changed, 11 insertions(+)
 
->>>> Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
->>>> ===================================================================
->>>> --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
->>>> +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
->>>> @@ -346,6 +346,17 @@
->>>>   		status = "disabled";
->>>>   	};
->>>>
->>>> +	mmcif0: mmc at ee200000 {
->>>> +		compatible = "renesas,mmcif-r8a7794", "renesas,sh-mmcif";
-
->>> Please submit a patch to add "renesas,mmcif-r8a7794" to
->>> Documentation/devicetree/bindings/mmc/renesas,mmcif.txt.
->>> I looked and I couldn't find such a change in-tree or in-flight.
-
->>     That file doesn't match the reality at all. It says:
-
->> <<
->> - compatible: must contain one of the following
->>          - "renesas,mmcif-r8a7740" for the MMCIF found in r8a7740 SoCs
->>          - "renesas,mmcif-r8a7790" for the MMCIF found in r8a7790 SoCs
->>          - "renesas,mmcif-r8a7791" for the MMCIF found in r8a7791 SoCs
->>          - "renesas,sh-mmcif" for the generic MMCIF
->>>>
-
->> while in reality, the driver only matches on the latter string and doesn't
->> care for the SoC specific strings.
-
-> By documenting the binding in that file it exists and may be used in DT
-> nodes. It may or may not be used by the driver now or in the future.
-
-    What's the use of binding the driver doesn't understand?
-
-> For better or worse this one way that bindings may be handled.
-
-> Strictly speaking it shouldn't be used in DT before it exists,
-> even only in the documentation. But in this case its just a minor
-> update to an existing scheme so it seems unlikely to be rejected.
-
-    I don't think the minor update will be rejected, I just wanted to say that 
-the binding should be edited to better reflect the reality as well. And it 
-falls on my shoulders, unfortunately. :-)
-
-WBR, Sergei
+-Doug
