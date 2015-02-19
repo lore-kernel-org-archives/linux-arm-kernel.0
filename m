@@ -1,20 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Feb 2015 00:35:49 +0000
-Subject: [PATCH] net: smc91x: improve neponset hack
-In-Reply-To: <5763365.j5Nvv4LgM3@wuerfel>
-References: <5763365.j5Nvv4LgM3@wuerfel>
-Message-ID: <20150219003549.GY8656@n2100.arm.linux.org.uk>
+From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
+Date: Wed, 18 Feb 2015 16:46:48 -0800
+Subject: [PATCH 1/2] phy: usbphy: Add dt documentation for Broadcom Cygnus
+ USB PHY driver
+In-Reply-To: <11865413.8NsXkQ6AUR@wuerfel>
+References: <1424200821-16368-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <2797126.uqvyZJisPk@wuerfel> <54E3AD2E.8050902@broadcom.com>
+ <11865413.8NsXkQ6AUR@wuerfel>
+Message-ID: <54E53278.70705@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 18, 2015 at 08:47:30PM +0100, Arnd Bergmann wrote:
-> The smc91x driver tries to support multiple platforms at compile
-> time, but they are mutually exclusive at runtime, and not clearly
-> defined.
 
-I'd prefer to rework this to fix that properly.  From what I remember,
-the whole SA11x0 stuff in this driver was a mess.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+On 15-02-18 07:15 AM, Arnd Bergmann wrote:
+> On Tuesday 17 February 2015 13:05:50 Arun Ramamurthy wrote:
+>> On 15-02-17 12:53 PM, Arnd Bergmann wrote:
+>>> On Tuesday 17 February 2015 12:00:49 Arun Ramamurthy wrote:
+>>>> Arnd, I patched the ehci and ohci driver to accept multiple phys so they
+>>>> require different names and cannot both be "usb". That patch was
+>>>> accepted by Alen Stern but I did not update the bindings documentation.
+>>>> I will send out another patch for that. Could we go with the naming
+>>>> scheme of "usb" + "p" + port number or do you have other suggestions?
+>>>
+>>> I don't have a good idea, but I think it would be best if the first
+>>> phy could remain named "usb" for compatibility with the existing binding.
+>>>
+>> The patch was written in a way that all the existing and new drivers can
+>> continue to use "usb" if they are using only one phy so that we remain
+>> compatible. The names need to be different only if more than one phy is
+>> specified. In such cases i don't think the first phy should be "usb" as
+>> it would be confusing to have
+>>          phy-names = "usb","usbp1"
+>
+> I see your patch now, as 7e7a0e67f2c ("usb: ehci-platform: add support for
+> multiple phys per controller"), and I'm not too happy about the way you
+> did this.
+
+> We already concluded that there should have been a binding change
+> to go along with this, and that would have caught the fact that you
+> circumvent the API here by reading the phy names manually. That
+> part should never have made it into the kernel.
+>
+> I think we can do this either by defining specific names for the
+> phy, or by changing the generic PHY binding to allow anonymous
+> phy references (leaving out "phy-names" entirely), and adding a
+> proper API for that.
+>
+Thanks Arnd, I will wait for Alan's comments before proceeding. I am 
+happy to patch the ehci-platform driver to use a new api instead of 
+devm_phy_get if that is the best option.
+
+>> Should I run this by Alan Stern?
+>
+> I've added him to Cc here. He clearly didn't know the background about
+> the DT binding change, and should not need to, but he may have an opinion
+> on what names we should use.
+>
+
+>>> What is the reason for having two phys in your case? Are these
+>>> identical phy devices connected to a single controller or do they
+>>> server different purposes?
+>>>
+>> Yes, we have three identical phys connected to a single host controller
+>> and one of the phys is also connected to the device controller
+>
+> Ok, no problem with that, let's just make sure we come up with a
+> good binding for it.
+>
+> 	Arnd
+>
