@@ -1,37 +1,48 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 19 Feb 2015 13:05:19 -0500
-Subject: [PATCH v4 0/6] ARM: shmobile: r8a73a4/ape6evm: Complete
- multiplatform support
-In-Reply-To: <CAMuHMdW_nzRWjuiEXZDNrQf_ws_msxLqt6yX7Z6QZuAsyLDgGw@mail.gmail.com>
-References: <1424185486-3017-1-git-send-email-geert+renesas@glider.be>
- <20150218212044.GD12754@verge.net.au>
- <CAMuHMdWsjWC4k_qp=8nZQj_rAJdUpZMcJjV7uJUePy9G5ij3CA@mail.gmail.com>
- <CAMuHMdW_nzRWjuiEXZDNrQf_ws_msxLqt6yX7Z6QZuAsyLDgGw@mail.gmail.com>
-Message-ID: <20150219180519.GE18262@verge.net.au>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Thu, 19 Feb 2015 10:09:40 -0800
+Subject: imx6 GPIO1 interrupts
+Message-ID: <CAMB+bfKULf-2wJbw8LH7r345_EvTOktS6zBJnNzAh69dZPtStw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 19, 2015 at 06:59:56PM +0100, Geert Uytterhoeven wrote:
-> On Thu, Feb 19, 2015 at 6:44 PM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
-> > On Wed, Feb 18, 2015 at 10:20 PM, Simon Horman <horms@verge.net.au> wrote:
-> >> With this patch applied I am able to NFS boot the ape6evm using
-> >> multiplatform using the shmobile_defconfig with CONFIG_MMC disabled.
-> >>
-> >> For reference the boot log for shmobile_defconfig (without CONFIG_MMC
-> >> disabled) is as follows:
-> >
-> >> sh_mmcif ee200000.mmc: Timeout waiting for 1 on CMD0
-> >
-> > I hadn't really planned to do a renesas-drivers release today, but as I can
-> > reproduce the hang with renesas-devel-20150218-v3.19, but not with my local
-> > tree, I made a release.
-> >
-> > Shmobile-defconfig from renesas-drivers-2015-02-19-v3.19 boots fine on my
-> > ape6evm. It seems there are still +100 mmc commits in -next that are not yet
-> > in upstream.
-> 
-> Correction: they are upstream. They're just not yet in renesas-devel.
-> Better luck on Monday, after -rc1 ;-)
+Freescale imx6 has gpios use shared irqs that trigger across 16 pins
+at a time. These are supported in the mainline kernel.
 
-Nice :)
+The first 8 pins on GPIO1 also have their own interrupts on the GIC.
+I have a kluge sort of working,  and am wondering what it would take
+for me to fully support these in a way that might be mainlined.
+
+What I am doing:
+(error checking removed for brevity)
+
+        /* request the shared gpio irq to set the correct edge bits */
+        gpiod = gpiod_get(my->dev, "diffirq");
+        ret = gpiod_direction_input(gpiod);
+        fake_irq = gpiod_to_irq(gpiod);
+        ret = request_irq(fake_irq, no_action, 0, "gpio irq", mydev);
+
+        /* Use the ARM GPIO4 irq */
+        mydev->irq = irq_of_parse_and_map(mydev->dev->of_node, 0);
+
+        ret = request_irq(mydev->irq, my_irq_handler, 0, "my fpga", mydev);
+
+        disable_irq(mydev->irq);
+        enable_irq(mydev->irq);
+
+This seems to work, but both irq appear in /proc/interrupts, and if I
+try to change the affinity of the hard irq the gpio irq gets all the
+traffic (or something)
+
+Looking at the code in drivers/gpio/gpio-mxc.c, it seems like almost
+all the code for full hardware irq support is already there, but just
+out of reach to my brain. I think I just need the hardware irq to call
+gpio_set_irq_type() for its set_type function.
+
+What is the proper way to do this? Do I need another virtual irq_chip
+for the 8 gpio1 irqs? Can something like that be set up in the gpio
+probe, or do I need to catch it earlier when the GIC is being
+probed/initialized?
+
+...or am I way off base here?
+
+Joshua Clayton
