@@ -1,49 +1,80 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Thu, 19 Feb 2015 15:50:47 +0100
-Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
- uncached guest mappings
-In-Reply-To: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <54E5F847.6050602@suse.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Feb 2015 15:53:07 +0100
+Subject: [PATCH] [media] [kbuild] Add and use IS_REACHABLE macro
+In-Reply-To: <20150219121107.GA19684@sepie.suse.cz>
+References: <6116702.rrbrOqQ26P@wuerfel> <20150219121107.GA19684@sepie.suse.cz>
+Message-ID: <14254005.QkaJhTuY5H@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 19.02.15 11:54, Ard Biesheuvel wrote:
-> This is a 0th order approximation of how we could potentially force the guest
-> to avoid uncached mappings, at least from the moment the MMU is on. (Before
-> that, all of memory is implicitly classified as Device-nGnRnE)
+On Thursday 19 February 2015 13:11:07 Michal Marek wrote:
+> On 2015-02-18 18:12, Arnd Bergmann wrote:
+> > In the media drivers, the v4l2 core knows about all submodules
+> > and calls into them from a common function. However this cannot
+> > work if the modules that get called are loadable and the
+> > core is built-in. In that case we get
+> > 
+> > drivers/built-in.o: In function `set_type':
+> > drivers/media/v4l2-core/tuner-core.c:301: undefined reference to `tea5767_attach'
+> > drivers/media/v4l2-core/tuner-core.c:307: undefined reference to `tea5761_attach'
+> > drivers/media/v4l2-core/tuner-core.c:349: undefined reference to `tda9887_attach'
+> > drivers/media/v4l2-core/tuner-core.c:405: undefined reference to `xc4000_attach'
+> > [...]
+> > Ideally Kconfig would be used to avoid the case of a broken dependency,
+> > or the code restructured in a way to turn around the dependency, but either
+> > way would require much larger changes here.
 > 
-> The idea (patch #2) is to trap writes to MAIR_EL1, and replace uncached mappings
-> with cached ones. This way, there is no need to mangle any guest page tables.
+> What can be done without extending kbuild is to accept
+> CONFIG_VIDEO_TUNER=y and CONFIG_MEDIA_TUNER_FOO=m, but build both into
+> the kernel, e.g.
 
-Would you mind to give a brief explanation on what this does? What
-happens to actually assigned devices that need to be mapped as uncached?
-What happens to DMA from such devices when the guest assumes that it's
-accessing RAM uncached and then triggers DMA?
+Right, but
 
+> diff --git a/drivers/media/tuners/Kconfig b/drivers/media/tuners/Kconfig
+> index 42e5a01..d2c7e89 100644
+> --- a/drivers/media/tuners/Kconfig
+> +++ b/drivers/media/tuners/Kconfig
+> @@ -71,6 +71,11 @@ config MEDIA_TUNER_TEA5767
+>         help
+>           Say Y here to include support for the Philips TEA5767 radio tuner.
+>  
+> +config MEDIA_TUNER_TEA5767_BUILD
+> +       tristate
+> +       default VIDEO_TUNER || MEDIA_TUNER_TEA5767
+> +       depends on MEDIA_TUNER_TEA5767!=n
+> +
+>  config MEDIA_TUNER_MSI001
+>         tristate "Mirics MSi001"
+>         depends on MEDIA_SUPPORT && SPI && VIDEO_V4L2
 
-Alex
+We'd then have to do the same for each tuner driver that we have in the
+kernel or that gets added later. My patch was intended to just restore
+the previous behavior that was accidentally changed as part of a misguided
+cleanup.
 
+> Actually, I have hard time coming up with a kconfig syntactic sugar to
+> express such dependency. If I understand it correctly, the valid
+> configurations in this case are
 > 
-> The downside is that, to do this correctly, we need to always trap writes to
-> the VM sysreg group, which includes registers that the guest may write to very
-> often. To reduce the associated performance hit, patch #1 introduces a fast path
-> for EL2 to perform trivial sysreg writes on behalf of the guest, without the
-> need for a full world switch to the host and back.
+> MEDIA_TUNER_TEA5767     n       m       y
+> VIDEO_TUNER     n       x       x       x
+>                 m       x       x       x
+>                 y       x               x
 > 
-> The main purpose of these patches is to quantify the performance hit, and
-> verify whether the MAIR_EL1 handling works correctly. 
-> 
-> Ard Biesheuvel (3):
->   arm64: KVM: handle some sysreg writes in EL2
->   arm64: KVM: mangle MAIR register to prevent uncached guest mappings
->   arm64: KVM: keep trapping of VM sysreg writes enabled
-> 
->  arch/arm/kvm/mmu.c               |   2 +-
->  arch/arm64/include/asm/kvm_arm.h |   2 +-
->  arch/arm64/kvm/hyp.S             | 101 +++++++++++++++++++++++++++++++++++++++
->  arch/arm64/kvm/sys_regs.c        |  63 ++++++++++++++++++++----
->  4 files changed, 156 insertions(+), 12 deletions(-)
-> 
+> I.e. only VIDEO_TUNER=y and MEDIA_TUNER_TEA5767=m is incorrect, isn't
+> it?
+
+Yes, I think that is correct. We have similar problems in other areas
+of the kernel. In theory, we could enforce the VIDEO_TUNER driver to
+be modular here by adding lots of dependencies to it:
+
+config VIDEO_TUNER
+	tristate
+	depends on MEDIA_TUNER_TEA5761 || !MEDIA_TUNER_TEA5761
+	depends on MEDIA_TUNER_TEA5767 || !MEDIA_TUNER_TEA5767
+	depends on MEDIA_TUNER_MSI001  || !MEDIA_TUNER_MSI001
+
+but that would also soon get out of hand, and we probably need another
+indirection here too, for each symbol that selects VIDEO_TUNER.
+
+	Arnd
