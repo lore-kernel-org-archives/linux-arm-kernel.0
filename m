@@ -1,106 +1,67 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 19 Feb 2015 18:44:59 +0000
-Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
- uncached guest mappings
-In-Reply-To: <20150219175518.GB26965@hawk.usersys.redhat.com>
-References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150219165731.GA26965@hawk.usersys.redhat.com>
- <CAKv+Gu8Je3RRrgEFCZ7JUWtOgk3WqA_qdBEOPAMc3OqnKr1bwg@mail.gmail.com>
- <20150219175518.GB26965@hawk.usersys.redhat.com>
-Message-ID: <6A67286C-392A-49FF-B60F-03F4CF5ACF1F@linaro.org>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Thu, 19 Feb 2015 19:54:06 +0100
+Subject: [PATCH 1/6] ASoC: max98088: Document DT bindings
+In-Reply-To: <54E62E1C.4030105@suse.de>
+References: <1424283959-16289-1-git-send-email-afaerber@suse.de>	<1424283959-16289-2-git-send-email-afaerber@suse.de>	<54E5EB36.9020007@collabora.co.uk>	<54E5EF73.2090302@suse.de>
+ <CAD=FV=VoFnbEsKi4mDDkaTrTXboJmm0UNV5iCk1CvV5ndEZtsA@mail.gmail.com>
+ <54E62E1C.4030105@suse.de>
+Message-ID: <54E6314E.5060509@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On 19 feb. 2015, at 17:55, Andrew Jones <drjones@redhat.com> wrote:
+Am 19.02.2015 um 19:40 schrieb Andreas F?rber:
+> Am 19.02.2015 um 18:48 schrieb Doug Anderson:
+>> On Thu, Feb 19, 2015 at 6:13 AM, Andreas F?rber <afaerber@suse.de> wrote:
+>>>> I see that a master clock (mclk) is added in patch 6/6 but the
+>>>> max98088 codec driver does handle this clock.
+>>>>
+>>>> If the SoC XCLKOUT provides the master clock to the max98089
+>>>> codec in Spring like is the case for the max9809{0,5} codecs
+>>>> in the Snow and Peach Pit/Pi Chromebooks then you need to do
+>>>> something along the lines of the following commits:
+>>>>
+>>>> e3048c3d2be5 ASoC: max98095: Add master clock handling
+>>>> b10ab7b838bd ASoC: max98090: Add master clock handling
+>>>>
+>>>> If that's the case you also have to mention in the DT binding
+>>>> doc that "clocks" and "clock-names" are optional properties
+>>>> like Documentation/devicetree/bindings/sound/max9809{0,5}.txt.
+>>>
+>>> When I prepared this patch, I believe it was a straight copy from
+>>> max98090. Sounds like they changed since then.
+>>>
+>>> My 6/6 adopted the mclk clock from your now-cancelled v2 patch for Snow,
+>>> assuming it would be the same on all Chromebooks. I tested that last
+>>> change by checking for errors in dmesg.
+>>>
+>>> Doug, can you advise on how the clock wiring is for Spring?
+>>
+>> I can confirm that XCLKOUT is connected to the codec MCLK on the
+>> Spring schematics I have.
 > 
->> On Thu, Feb 19, 2015 at 05:19:35PM +0000, Ard Biesheuvel wrote:
->>> On 19 February 2015 at 16:57, Andrew Jones <drjones@redhat.com> wrote:
->>>> On Thu, Feb 19, 2015 at 10:54:43AM +0000, Ard Biesheuvel wrote:
->>>> This is a 0th order approximation of how we could potentially force the guest
->>>> to avoid uncached mappings, at least from the moment the MMU is on. (Before
->>>> that, all of memory is implicitly classified as Device-nGnRnE)
->>>> 
->>>> The idea (patch #2) is to trap writes to MAIR_EL1, and replace uncached mappings
->>>> with cached ones. This way, there is no need to mangle any guest page tables.
->>>> 
->>>> The downside is that, to do this correctly, we need to always trap writes to
->>>> the VM sysreg group, which includes registers that the guest may write to very
->>>> often. To reduce the associated performance hit, patch #1 introduces a fast path
->>>> for EL2 to perform trivial sysreg writes on behalf of the guest, without the
->>>> need for a full world switch to the host and back.
->>>> 
->>>> The main purpose of these patches is to quantify the performance hit, and
->>>> verify whether the MAIR_EL1 handling works correctly.
->>>> 
->>>> Ard Biesheuvel (3):
->>>>  arm64: KVM: handle some sysreg writes in EL2
->>>>  arm64: KVM: mangle MAIR register to prevent uncached guest mappings
->>>>  arm64: KVM: keep trapping of VM sysreg writes enabled
->>> 
->>> Hi Ard,
->>> 
->>> I took this series for test drive. Unfortunately I have bad news and worse
->>> news. First, a description of the test; simply boot a guest, once at login,
->>> login, and then shutdown with 'poweroff'. The guest boots through AAVMF using
->>> a build from Laszlo that enables PCI, but does *not* have the 'map pci mmio
->>> as cached' kludge. This test allows us to check for corrupt vram on the
->>> graphical console, plus it completes a boot/shutdown cycle allowing us to
->>> count sysreg traps of the boot/shutdown cycle.
->> 
->> Thanks a lot for giving this a spin right away!
->> 
->>> So, the bad news
->>> 
->>> Before this series we trapped 50 times on sysreg writes with the test
->>> described above. With this series we trap 62873 times. But, less than
->>> 20 required going to EL1.
->> 
->> OK, this is very useful information. We still don't know what the
->> penalty is of all those traps, but that's quite a big number indeed.
->> 
->>> (I don't have an exact number for how many times it went to EL1 because
->>> access_mair() doesn't have a trace point.)
->>> (I got the 62873 number by testing a 3rd kernel build that only had patch
->>> 3/3 applied to the base, and counting kvm_toggle_cache events.)
->>> (The number 50 is the number of kvm_toggle_cache events *without* 3/3
->>> applied.)
->>> 
->>> I consider this bad news because, even considering it only goes to EL2,
->>> it goes a ton more than it used to. I realize patch 3/3 isn't the final
->>> plan for enabling traps though.
->>> 
->>> And, now the worse news
->>> 
->>> The vram corruption persists with this patch series.
->> 
->> OK, so the primary difference is that I am not substituting for write
->> back mappings, as Laszlo is doing in his patch.
->> If you have energy left, would you mind having another go but use 0xff
->> (not 0xbb) for the MAIR values in patch #2?
+> Thanks! I updated max98088 and had it working on first boot, but on
+> second boot it complained about the frequency:
 > 
-> Yup, a bit energy left, and, yup, 0xff fixes it
+> [    7.896834] max98088 7-0010: revision A
+> [    7.912776] snow-audio sound: HiFi <-> 3830000.i2s mapping ok
+> [    7.919367] max98088 7-0010: Invalid master clock frequency
+> [    7.919429] snow-audio sound: ASoC: Spring-I2S-MAX98089 late_probe()
+> failed: -22
+> [    7.920019] snow-audio sound: snd_soc_register_card failed (-22)
+> [    7.920109] snow-audio: probe of sound failed with error -22
 
-ok so that means we'd need to map as writeback cacheable by default, and restrict it as necessary at stage 2.
+Reproducible on third boot.
 
-thanks
+On a suspicion, the fourth boot I waited for the double-beep of the
+firmware (waiting for Ctrl+d/u), and then it did work.
 
+So it seems the mclk is not always set up properly by the kernel,
+relying on firmware. Who's in charge of setting that clock up?
 
-> Thanks,
-> drew
-> 
->> 
->>>> 
->>>> arch/arm/kvm/mmu.c               |   2 +-
->>>> arch/arm64/include/asm/kvm_arm.h |   2 +-
->>>> arch/arm64/kvm/hyp.S             | 101 +++++++++++++++++++++++++++++++++++++++
->>>> arch/arm64/kvm/sys_regs.c        |  63 ++++++++++++++++++++----
->>>> 4 files changed, 156 insertions(+), 12 deletions(-)
->>>> 
->>>> --
->>>> 1.8.3.2
->>>> 
->>>> _______________________________________________
->>>> kvmarm mailing list
->>>> kvmarm at lists.cs.columbia.edu
->>>> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
+Graham Norton; HRB 21284 (AG N?rnberg)
