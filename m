@@ -1,98 +1,33 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 19 Feb 2015 10:27:01 +0100
-Subject: [PATCH v2 4/4] clk: dt: Introduce always-on clock domain
- documentation
-In-Reply-To: <20150218215435.GA32415@x1>
-References: <1424276101-30137-1-git-send-email-lee.jones@linaro.org>
- <1424276101-30137-5-git-send-email-lee.jones@linaro.org>
- <CAL_Jsq+r1BKt5B9FNPG+Y0Oi1-3RGNmRUDbpX_uDJwr45bxMXA@mail.gmail.com>
- <20150218171230.GA30676@x1>
- <CAL_JsqJ0sfQ-OQvYjL3X3ebH4p9HkN4iy35iT7i9S2d+yz9zYg@mail.gmail.com>
- <20150218215435.GA32415@x1>
-Message-ID: <CAMuHMdU6DpZoi-q3pUFUX8xjnXGfTqfEYyzajZZm=-qZTk1qHQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 19 Feb 2015 10:30:14 +0100
+Subject: [PATCH] backlight: pwm: handle EPROBE_DEFER while requesting the PWM
+Message-ID: <1424338214-24236-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+When trying to request the PWM device with devm_pwm_get(), the EPROBE_DEFER
+flag is not handled properly. It can lead to the PWM not being found.
 
-On Wed, Feb 18, 2015 at 10:54 PM, Lee Jones <lee.jones@linaro.org> wrote:
->> >> > +Some hardware is contains bunches of clocks which must never be
->> >> > +turned off.  If drivers a) fail to obtain a reference to any of
->> >> > +these or b) give up a previously obtained reference during suspend,
->> >> > +the common clk framework will attempt to disable them and the
->> >> > +hardware can fail irrecoverably.  Usually, the only way to recover
->> >> > +from these failures is to restart.
->> >>
->> >> How is (b) not a bug?
->> >
->> > Clocks are normally disabled during suspend.  When clocks are disabled
->> > they give up their reference.  If references reach 0, the clock is
->> > gated.  If one of these clocks is gated, the system will never come
->> > out of suspend.
->> >
->> > How is it a bug?
->>
->> It a clock needs to be enabled during suspend, then the driver using
->> it should not disable it. Anyway, suspend is a bit orthogonal to this
->> issue.
->
-> IMO, it's not the driver's responsibility to know which clock they are
-> using and whether it's a critical clock or not.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/video/backlight/pwm_bl.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-So it's (partly) a platform/bus issue.
-
->> >> While I think we need something here, I worry that this will be abused
->> >> to be a list of clocks you have not gotten around to managing. We
->> >
->> > You can say that about any framework.  It's our responsibility to ask
->> > the right questions and to disallow it from being abused.  The clocks
->> > I use in the (real-world) example in this set are _really_ always-on.
->> > If any of them are turned off the system will cease to perform in any
->> > meaningful way.
->>
->> You cannot tell here up front whether clocks are really always-on. A
->> reviewer is not going to know, and the submitter may not even have all
->> the documentation and know the answer. Getting it wrong here means you
->> have to change the dtb to fix it. Granted, it doesn't really break
->> things in this case.
->
-> We should make it clear in the documentation that this framework
-> should only be used if the clock is a critical "if it's turned off it
-> will cripple the system" one.
-
-[...]
-
-> I think the kernel's policy is a good one i.e. wait until all devices
-> are probed and have had the opportunity to take the clocks they need,
-> at which point we can usually safely gate the remainder.  These types
-> of clocks are the exception however; hence the need for this driver.
-> There are other vendors which have similar issues with their h/w.
-> These are currently using bespoke versions of this implementation, but
-> IMO a generic solution would be better.
-
-What kind of clocks are these? What do they control?
-Memory controllers? Bus controllers?
-
-They must control some device(s), so there should be one or more device
-nodes in DT that reference these clocks.
-As soon as that information is in DT, support can be added to Linux to
-make sure the "critical" clocks stay enabled, either through a real driver,
-or through platform code.
-
->> Does simple-pm-bus help you?
->
-> I have no idea what this is, and I'm struggling to grep for it too?
-
-Rob already provided a pointer.
-If you have more questions, feel free to ask!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index 3a145a643e0d..6897f1c1bc73 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -274,6 +274,10 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 
+ 	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
+ 	if (IS_ERR(pb->pwm)) {
++		ret = PTR_ERR(pb->pwm);
++		if (ret == -EPROBE_DEFER)
++			goto err_alloc;
++
+ 		dev_err(&pdev->dev, "unable to request PWM, trying legacy API\n");
+ 		pb->legacy = true;
+ 		pb->pwm = pwm_request(data->pwm_id, "pwm-backlight");
+-- 
+2.1.3
