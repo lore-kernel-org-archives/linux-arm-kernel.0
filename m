@@ -1,29 +1,60 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Fri, 20 Feb 2015 00:55:14 +0200
-Subject: [PATCH v2 0/3] ARM: dts: add openpandora device support
-In-Reply-To: <1424202743-26387-1-git-send-email-marek@goldelico.com>
-References: <1424202743-26387-1-git-send-email-marek@goldelico.com>
-Message-ID: <CANOLnOOMLxDV6vQagfRaS7_YY6at91BbL0jPKkNQn-tYDnJEuw@mail.gmail.com>
+From: eric.nelson@boundarydevices.com (Eric Nelson)
+Date: Thu, 19 Feb 2015 16:04:17 -0700
+Subject: [PATCH] ARM: dts: imx6qdl-sabrelite: enable HDMI
+Message-ID: <1424387057-5575-1-git-send-email-eric.nelson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 17, 2015 at 9:52 PM, Marek Belisko <marek@goldelico.com> wrote:
-> changes from v1:
-> - add new boards to makefile in patch 2,3 (don't add them
-> in separate commit together), fix gpmc issues (reported by Tony Lindgren)
->
-> - fix various issues reported by Grazvydas Ignotas
-> (drop internal pullups from pinmux as external are in place,
-> fix gpio buttons active state ...)
->
-> This series of patches adds initial device tree support for the
-> OpenPandora. The most important parts are working (display, keyboard,
-> touch, charging, fuel gauge, musb port, sd/mmc ports, leds, buttons).
+Enable HDMI channel and the I2C port it uses for DDC.
 
-All of these have been tested to be working, after adding missing
-input flag for touchscreen. Well except musb, but I often have trouble
-with that in mainline, probably not a problem with this dts.
-Tested-by: Grazvydas Ignotas <notasas@gmail.com>
+Signed-off-by: Eric Nelson <eric.nelson@boundarydevices.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-And FWIW, the patches have been
-Reviewed-by: Grazvydas Ignotas <notasas@gmail.com>
+diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+index 0a36129..3bddc8f 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+@@ -173,6 +173,11 @@
+ 	status = "okay";
+ };
+ 
++&hdmi {
++	ddc-i2c-bus = <&i2c2>;
++	status = "okay";
++};
++
+ &i2c1 {
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
+@@ -188,6 +193,13 @@
+ 	};
+ };
+ 
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++};
++
+ &iomuxc {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_hog>;
+@@ -265,6 +277,13 @@
+ 			>;
+ 		};
+ 
++		pinctrl_i2c2: i2c2grp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
++				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
++			>;
++		};
++
+ 		pinctrl_pwm1: pwm1grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD1_DAT3__PWM1_OUT 0x1b0b1
+-- 
+1.9.1
