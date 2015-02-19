@@ -1,57 +1,96 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Thu, 19 Feb 2015 11:29:26 +0100
-Subject: [PATCH v2 1/2] dma: mmp_dma: add support for legacy transition
-In-Reply-To: <1424205547-15429-1-git-send-email-robert.jarzmik@free.fr>
-References: <1423954053-21760-1-git-send-email-robert.jarzmik@free.fr>
- <1424205547-15429-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <54E5BB06.6000106@zonque.org>
+From: addy.ke@rock-chips.com (addy ke)
+Date: Thu, 19 Feb 2015 18:30:35 +0800
+Subject: [PATCH v4 1/3] mmc: dw_mmc: update clock after host reach a stable
+ voltage
+In-Reply-To: <CAGOxZ53ndi_hYDGBGhY-7q8aOrFid1=D=_5KEbUvzTsnybJQ3Q@mail.gmail.com>
+References: <1423828368-18456-1-git-send-email-addy.ke@rock-chips.com>
+ <1423894668-8886-1-git-send-email-addy.ke@rock-chips.com>
+ <1423894668-8886-2-git-send-email-addy.ke@rock-chips.com>
+ <CAGOxZ53ndi_hYDGBGhY-7q8aOrFid1=D=_5KEbUvzTsnybJQ3Q@mail.gmail.com>
+Message-ID: <54E5BB4B.8090405@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+Hi, Alim
 
-Thanks for pushing this topic :)
+Sorry for late reply.
 
-On 02/17/2015 09:39 PM, Robert Jarzmik wrote:
-> In order to achieve smooth transition of pxa drivers from old legacy dma
-> handling to new dmaengine, introduce a function to "hide" dma physical
-> channels from dmaengine.
+On 2015/2/16 07:28, Alim Akhtar wrote:
+> Hi Addy,
 > 
-> This is temporary situation where pxa dma will be handled in 2 places :
->  - arch/arm/plat-pxa/dma.c
->  - drivers/dma/mmp_pdma.c
+> On Sat, Feb 14, 2015 at 11:47 AM, Addy Ke <addy.ke@rock-chips.com> wrote:
+>> As show in mmc_power_up(), in MMC_POWER_UP state, the voltage isn't
+>> stable and we may get 'data busy' which can't be cleaned by resetting
+>> all blocks. So we should not send command to update clock in this state.
+>>
+>> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+>> ---
+>>  drivers/mmc/host/dw_mmc.c | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>> index 4d2e3c2..3472f9b 100644
+>> --- a/drivers/mmc/host/dw_mmc.c
+>> +++ b/drivers/mmc/host/dw_mmc.c
+>> @@ -1102,7 +1102,8 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>>                 drv_data->set_ios(slot->host, ios);
+>>
+>>         /* Slot specific timing and width adjustment */
+>> -       dw_mci_setup_bus(slot, false);
+>> +       if (ios->power_mode != MMC_POWER_UP)
+>> +               dw_mci_setup_bus(slot, false);
+>>
+> This looks a HACK to me.
+> If stabilizing host voltage regulator is the problem, can you try out
+> below patch, and see if this resolve your issue?
+
+I have test by:
+cd /sys/bus/platform/drivers/dwmmc_rockchip
+for i in $(seq 1 10000); do
+  echo "========================" $i
+  echo ff0c0000.dwmmc > unbind
+  sleep .5
+  echo ff0c0000.dwmmc > bind
+  sleep 2
+done
+
+There is no error.
+I think this patch can resolve my issue, thank you.
+
+Do you send this patch upstream, or can I put it in my patch list?
+
 > 
-> The resources, ie. dma channels, will be controlled by mmp_dma. The
-> legacy code will request or release a channel with
-> mmp_pdma_toggle_reserved_channel().
+> ===========
+> [PATCH] mmc: dw_mmc: Wait for host voltage regulator to be stable
 > 
-> This is not very pretty, but it ensures both legacy and dmaengine
-> consumers can live in the same kernel until the conversion is done.
-
-I like the approach. I actually thought the legacy DMA driver would
-claim the io port range, which would have made the two drivers mutually
-exclusive. But it doesn't, so this can in fact work, even though it's
-really not pretty. Also, it's limited to one single instance of the
-mmp-pdma driver, but that reflects reality, so I'm fine.
-
-One minor nit:
-
-> +int mmp_pdma_toggle_reserved_channel(int legacy_channel)
-> +{
-> +	if (legacy_unavailable & (1 << legacy_channel))
-> +		return -EBUSY;
-> +	legacy_reserved ^= 1 << legacy_channel;
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(mmp_pdma_toggle_reserved_channel);
-
-My concern is that if pxa_request_dma() is called more than once for
-whatever reason by a legacy implementation, the toggled bit mask might
-get out of sync. As we know exactly on the caller site what we want to
-achieve, let's make the API explicit with something like:
-
-int mmp_pdma_set_reserved_channel(int legacy_channel, bool reserved)
-
-
-Thanks,
-Daniel
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
+>  drivers/mmc/host/dw_mmc.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 4d2e3c2..dc10fbb 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -1202,6 +1202,9 @@ static int dw_mci_switch_voltage(struct mmc_host
+> *mmc, struct mmc_ios *ios)
+>   }
+>   mci_writel(host, UHS_REG, uhs);
+> 
+> + /* wait for 5ms so that host voltage regulator is stable */
+> + usleep_range(5000, 5500);
+> +
+>   return 0;
+>  }
+> 
+> ===============
+> 
+>>         if (slot->host->state == STATE_WAITING_CMD11_DONE && ios->clock != 0)
+>>                 slot->host->state = STATE_IDLE;
+>> --
+>> 1.8.3.2
+>>
+>>
+> 
+> 
+> 
