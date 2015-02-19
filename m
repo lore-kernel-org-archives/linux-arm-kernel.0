@@ -1,52 +1,38 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 19 Feb 2015 11:01:57 -0800
-Subject: [PATCH 5/6] ASoC: samsung: Extend Snow driver to support max98089
-In-Reply-To: <54E623C9.7070001@suse.de>
-References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
- <1424283959-16289-6-git-send-email-afaerber@suse.de>
- <20150219094425.GB3198@finisterre.sirena.org.uk>
- <CAD=FV=WkieDSSB_-a6DtH1hmq6SyZk4NAR-eXQ11hxUDMTvRfg@mail.gmail.com>
- <54E623C9.7070001@suse.de>
-Message-ID: <CAD=FV=U1613Wv0Lyda_O80j6tTt2sPz++Z5cwzcjAQb=L-qkeA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 19 Feb 2015 20:03:48 +0100
+Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
+In-Reply-To: <CAL_JsqJQcuX2cp50oHod-QAbhdMg48TaRP+gLGEO2kbFnQ3B+A@mail.gmail.com>
+References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
+ <CAL_JsqJQcuX2cp50oHod-QAbhdMg48TaRP+gLGEO2kbFnQ3B+A@mail.gmail.com>
+Message-ID: <20150219190348.GB24460@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas,
+On Thu, Feb 19, 2015 at 12:23:15PM -0600, Rob Herring wrote:
+> On Tue, Jan 27, 2015 at 1:03 AM, Pranavkumar Sawargaonkar
+> <psawargaonkar@apm.com> wrote:
+> > In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
+> > in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
+> > size due to size alignment checking in vgic driver for VCPU Control and
+> > VCPU register.
+> >
+> > This patch corrects the sizes to be inline with the hardware spec.
+> 
+> This does not make sense. The GIC regions are still only 4 or 8KB and
+> the h/w description should reflect that. For implementations using
+> gic-400 and the addressing decode trick, the rest of the register
+> range is also not safe to access given it is multiple mapped. Also,
+> this wastes virtual space, but I guess we don't care on 64-bit.
+> 
+> KVM should be fixed to only check base address alignment. Size
+> alignment does not matter (if it does, then you need to fix all
+> register blocks).
+> 
+It matters if you want to ensure that the 64K page you are assigning to
+a guest for the GIC virtual CPU interface contains only GIC virtual CPU
+mappings, and not other random stuff that the guest is not allowed to
+touch.
 
-On Thu, Feb 19, 2015 at 9:56 AM, Andreas F?rber <afaerber@suse.de> wrote:
-> Am 19.02.2015 um 18:44 schrieb Doug Anderson:
->> On Thu, Feb 19, 2015 at 1:44 AM, Mark Brown <broonie@kernel.org> wrote:
->>> On Wed, Feb 18, 2015 at 07:25:58PM +0100, Andreas F?rber wrote:
->>>
->>>>  static const struct of_device_id snow_of_match[] = {
->>>> +     { .compatible = "google,snow-audio-max98089", },
->>>>       { .compatible = "google,snow-audio-max98090", },
->>>>       { .compatible = "google,snow-audio-max98091", },
->>>>       { .compatible = "google,snow-audio-max98095", },
->>>
->>> Since we completely ignore the CODEC in the property might it not be
->>> better to just add a plain old snow-audio compatible and bind to that,
->>> that way we don't need these driver updates?  Just the "snow" bit should
->>> be enough to know it's one of this class of machines.
->>
->> I think what you're suggesting is that here we should add a new
->> compatible string "google,snow-audio" instead of adding
->> "google,snow-audio-max98089" here.  Then the sound node in the spring
->> DTS would look like:
->>
->>   compatible = "google,snow-audio-max98089", "google,snow-audio";
->
-> If we want to be specific just in case, was it an active decision not to
-> use "google,peach-pi[t]-audio-max98..."?
->
-> Again, either way works for me.
+How else should this be enforced?
 
-I don't think it was an active decision, but I am certainly nowhere
-near an audio expert and I don't think I made that particular decision
-(I could be wrong).
-
-One could make the argument that "snow" describes the general hookup
-style of the hardware and then you list the actual codec after that,
-but that's a pretty weak argument...
-
--Doug
+-Christoffer
