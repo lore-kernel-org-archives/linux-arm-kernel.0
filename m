@@ -1,33 +1,34 @@
-From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
-Date: Thu, 19 Feb 2015 22:29:06 +0900
-Subject: [PATCH/RFC] ARM: shmobile: r8a7791: Fix IPMMU-GP clock to device tree
-Message-ID: <1424352546-27313-1-git-send-email-ykaneko0929@gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 19 Feb 2015 14:31:26 +0100
+Subject: [PATCH v2 1/1] ARM: dts: Add mclk entry for Snow and Peach Pit/Pi
+ boards
+In-Reply-To: <1423245171-25485-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1423245171-25485-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <54E5E5AE.3080001@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+Hello Kukjin,
 
-Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
-Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
----
+On 02/06/2015 06:52 PM, Javier Martinez Canillas wrote:
+> From: Tushar Behera <tushar.b@samsung.com>
+> 
+> On Snow, Peach Pit and Peach Pi boards, the Exynos SoC XCLKOUT output pin
+> provides the master clock (mclk) to codecs. So make them a clock consumer.
+> 
+> Signed-off-by: Tushar Behera <tushar.b@samsung.com>
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+> 
 
-This patch is based on devel branch of Simon Horman's renesas tree.
+Please drop this patch since I took it from [0] but that patch was when
+the master clock was grabbed in the ASoC machine driver but the final
+version that got merged grabs the master clock in the codec driver so
+it has to be in the codec device node too.
 
- arch/arm/boot/dts/r8a7791.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I'll send the correct version soon.
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index afba8af..1e75a5f 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1154,7 +1154,7 @@
- 		mstp8_clks: mstp8_clks at e6150990 {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
--			clocks = <&zg_clk>, <&hp_clk>, <&zg_clk>, <&zg_clk>,
-+			clocks = <&zx_clk>, <&hp_clk>, <&zg_clk>, <&zg_clk>,
- 			         <&zg_clk>, <&p_clk>, <&zs_clk>, <&zs_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
--- 
-1.9.1
+Best regards,
+Javier
+
+[0]: https://lkml.org/lkml/2014/5/20/4
