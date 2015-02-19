@@ -1,31 +1,37 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 19 Feb 2015 12:03:55 -0600
-Subject: [PATCH 2/2] arm: configs: omap2plus_defconfig: enable TPS62362
- regulator
-In-Reply-To: <1424369035-26423-1-git-send-email-balbi@ti.com>
-References: <1424369035-26423-1-git-send-email-balbi@ti.com>
-Message-ID: <1424369035-26423-2-git-send-email-balbi@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 19 Feb 2015 13:05:19 -0500
+Subject: [PATCH v4 0/6] ARM: shmobile: r8a73a4/ape6evm: Complete
+ multiplatform support
+In-Reply-To: <CAMuHMdW_nzRWjuiEXZDNrQf_ws_msxLqt6yX7Z6QZuAsyLDgGw@mail.gmail.com>
+References: <1424185486-3017-1-git-send-email-geert+renesas@glider.be>
+ <20150218212044.GD12754@verge.net.au>
+ <CAMuHMdWsjWC4k_qp=8nZQj_rAJdUpZMcJjV7uJUePy9G5ij3CA@mail.gmail.com>
+ <CAMuHMdW_nzRWjuiEXZDNrQf_ws_msxLqt6yX7Z6QZuAsyLDgGw@mail.gmail.com>
+Message-ID: <20150219180519.GE18262@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This regulator is used on AM437x Industrial Development Kit.
+On Thu, Feb 19, 2015 at 06:59:56PM +0100, Geert Uytterhoeven wrote:
+> On Thu, Feb 19, 2015 at 6:44 PM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+> > On Wed, Feb 18, 2015 at 10:20 PM, Simon Horman <horms@verge.net.au> wrote:
+> >> With this patch applied I am able to NFS boot the ape6evm using
+> >> multiplatform using the shmobile_defconfig with CONFIG_MMC disabled.
+> >>
+> >> For reference the boot log for shmobile_defconfig (without CONFIG_MMC
+> >> disabled) is as follows:
+> >
+> >> sh_mmcif ee200000.mmc: Timeout waiting for 1 on CMD0
+> >
+> > I hadn't really planned to do a renesas-drivers release today, but as I can
+> > reproduce the hang with renesas-devel-20150218-v3.19, but not with my local
+> > tree, I made a release.
+> >
+> > Shmobile-defconfig from renesas-drivers-2015-02-19-v3.19 boots fine on my
+> > ape6evm. It seems there are still +100 mmc commits in -next that are not yet
+> > in upstream.
+> 
+> Correction: they are upstream. They're just not yet in renesas-devel.
+> Better luck on Monday, after -rc1 ;-)
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/configs/omap2plus_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index b7386524c356..8ff1a988c0f4 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -248,6 +248,7 @@ CONFIG_TWL6040_CORE=y
- CONFIG_REGULATOR_PALMAS=y
- CONFIG_REGULATOR_PBIAS=y
- CONFIG_REGULATOR_TI_ABB=y
-+CONFIG_REGULATOR_TPS62360=m
- CONFIG_REGULATOR_TPS65023=y
- CONFIG_REGULATOR_TPS6507X=y
- CONFIG_REGULATOR_TPS65217=y
--- 
-2.3.0
+Nice :)
