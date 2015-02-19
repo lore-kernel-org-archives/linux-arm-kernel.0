@@ -1,61 +1,67 @@
 From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Thu, 19 Feb 2015 10:01:44 +0200
-Subject: [PATCHv4 0/2] watchdog: Introduce "early-timeout-sec" property
-Message-ID: <cover.1424332841.git.timo.kokkonen@offcode.fi>
+Date: Thu, 19 Feb 2015 10:01:45 +0200
+Subject: [PATCHv4 1/2] at91sam9_wdt: Allow watchdog to reset device at early
+ boot
+In-Reply-To: <cover.1424332841.git.timo.kokkonen@offcode.fi>
+References: <cover.1424332841.git.timo.kokkonen@offcode.fi>
+Message-ID: <a9518888bc8d8473fbeea486ec17bc0a55afa309.1424332841.git.timo.kokkonen@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we have no means to adjust the watchdog behavior on early
-start up before user space has opened the device. The generic behavior
-among the watchdog drivers is to not start the watchdog at all (or
-disable it, if possible, or in case at91sam9_wdt, start a kernel timer
-that keeps on pinging the watchdog on behalf of user space until a
-watchdog daemon opens it). This unfortunately opens a time window
-between starting the driver and starting the user space watchdog
-daemon where a crash in the kernel or user space might prevent the
-watchdog from ever resetting the device at all. This is obviously bad
-on production systems.
+By default the driver will start a kernel timer which keeps on kicking
+the watchdog HW until user space has opened the watchdog
+device. Usually this is desirable as the watchdog HW is running by
+default and the user space may not have any watchdog daemon running at
+all.
 
-Introduce a new device tree property that, when set, changes the
-watchdog driver behavior in such way that there no longer is any
-window where crash is not caught by the watchdog. In atmel HW we need
-to use a kernel timer to ping the watchdog for the duration of the
-timeout, but that is trivial as we already have a timer there that
-keeps pinging it until the watchdog device is open. The documentation
-however only states how the driver should behave, not how it should be
-implemented in some other watchdog hardware.
+However, on production systems it may be mandatory that also early
+crashes and lockups will lead to a watchdog reset, even if they happen
+before the user space has opened the watchdog device.
 
-Patch revision history:
+To resolve the issue, add a new device tree property
+"early-timeout-sec" which will let the kernel timer to ping the
+watchdog HW only as long as the specified timeout permits. The default
+is still to use kernel timer, but more strict behavior can be enabled
+via the device tree property.
 
--v4: Binding documentation is now separated completely from the driver
-  patch. The documentation no longer makes any assumptions about how
-  the actual implementation is made, it just describes the actual
-  behavior the driver should implement in order to satisfy the
-  requirement.
+Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+---
+ drivers/watchdog/at91sam9_wdt.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-- v3: Rename the property to "early-timeout-sec" and use it as a
-  timeout value that stops the timer in the atmel driver after the
-  timeout expires. A watchdog.txt is also introduced for documenting
-  the common watchdog properties, including now this one and
-  "timeout-sec" property.
-
-- v2: Rename the property to "enable-early-reset" as the behavior
-  itself is not atmel specific. This way other drivers are free to
-  implement same behavior with the same property name.
-
-- v1: Propose property name "atmle,no-early-timer" for disabling the
-  timer that keeps the atmel watchdog running until user space opens
-  the device.
-
-
-Timo Kokkonen (2):
-  at91sam9_wdt: Allow watchdog to reset device at early boot
-  devicetree: Document generic watchdog properties
-
- .../devicetree/bindings/watchdog/watchdog.txt        | 20 ++++++++++++++++++++
- drivers/watchdog/at91sam9_wdt.c                      |  9 ++++++++-
- 2 files changed, 28 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/watchdog/watchdog.txt
-
+diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+index 6df9405..1b40bfa 100644
+--- a/drivers/watchdog/at91sam9_wdt.c
++++ b/drivers/watchdog/at91sam9_wdt.c
+@@ -89,6 +89,8 @@ struct at91wdt {
+ 	u32 mr_mask;
+ 	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
+ 	bool nowayout;
++	/* Timeout in jiffies for stopping the early timer */
++	unsigned long early_timer;
+ 	unsigned int irq;
+ };
+ 
+@@ -122,7 +124,8 @@ static void at91_ping(unsigned long data)
+ {
+ 	struct at91wdt *wdt = (struct at91wdt *)data;
+ 	if (time_before(jiffies, wdt->next_heartbeat) ||
+-	    !watchdog_active(&wdt->wdd)) {
++		(time_before(jiffies, wdt->early_timer) &&
++			!watchdog_active(&wdt->wdd))) {
+ 		at91_wdt_reset(wdt);
+ 		mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
+ 	} else {
+@@ -316,6 +319,10 @@ static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
+ 
+ 	wdt->mr |= max | ((max - min) << 16);
+ 
++	if (!of_property_read_u32_index(np, "early-timeout-sec", 0,
++					(u32 *)&wdt->early_timer))
++		wdt->early_timer = wdt->early_timer * HZ + jiffies;
++
+ 	return 0;
+ }
+ #else
 -- 
 2.1.0
