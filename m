@@ -1,54 +1,54 @@
-From: jdelvare@suse.de (Jean Delvare)
-Date: Fri, 20 Feb 2015 20:46:42 +0100
-Subject: [PATCH] iommu/io-pgtable-arm: Add built time dependency
-In-Reply-To: <20150220191943.GB1767@arm.com>
-References: <20150220194445.4225d56b@endymion.delvare>
- <20150220191943.GB1767@arm.com>
-Message-ID: <20150220204642.04b1f0d8@endymion.delvare>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 20 Feb 2015 20:47:56 +0100
+Subject: [PATCH v2 02/18] ARM: ARMv7M: Enlarge vector table to 256 entries
+In-Reply-To: <1424455277-29983-3-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1424455277-29983-3-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <20150220194756.GS19388@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On Fri, 20 Feb 2015 19:19:43 +0000, Will Deacon wrote:
-> On Fri, Feb 20, 2015 at 06:44:45PM +0000, Jean Delvare wrote:
-> > If io-pgtable-arm is an ARM-specific driver then configuration option
-> > IOMMU_IO_PGTABLE_LPAE should not be presented to the user by default
-> > for non-ARM kernels.
-> > 
-> > Signed-off-by: Jean Delvare <jdelvare@suse.de>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Joerg Roedel <joro@8bytes.org>
-> > ---
-> >  drivers/iommu/Kconfig |    1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > --- linux-3.20-rc0.orig/drivers/iommu/Kconfig	2015-02-20 17:24:46.838955014 +0100
-> > +++ linux-3.20-rc0/drivers/iommu/Kconfig	2015-02-20 19:38:45.804582668 +0100
-> > @@ -23,6 +23,7 @@ config IOMMU_IO_PGTABLE
-> >  config IOMMU_IO_PGTABLE_LPAE
-> >  	bool "ARMv7/v8 Long Descriptor Format"
-> >  	select IOMMU_IO_PGTABLE
-> > +	depends on ARM || COMPILE_TEST
-> >  	help
-> >  	  Enable support for the ARM long descriptor pagetable format.
-> >  	  This allocator supports 4K/2M/1G, 16K/32M and 64K/512M page
+On Fri, Feb 20, 2015 at 07:01:01PM +0100, Maxime Coquelin wrote:
+> From Cortex-M reference manuals, the nvic supports up to 240 interrupts.
+> So the number of entries in vectors table is up to 256.
 > 
-> So this code doesn't actually *depend* on any arch code at all. In fact,
-> having it built and booted on x86 revealed a couple of bugs that I've
-> since fixed. I'd rather let this run everywhere, but if people insist on
-> the false dependency, so be it but we should add ARM64 to the mix too.
+> This patch adds a new config flag to specify the number of external interrupts.
+> Some ifdeferies are added in order to respect the natural alignment without
+> wasting too much space on smaller systems.
+> 
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> ---
+>  arch/arm/kernel/entry-v7m.S | 13 +++++++++----
+>  arch/arm/mm/Kconfig         | 15 +++++++++++++++
+>  2 files changed, 24 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
+> index 8944f49..68cde36 100644
+> --- a/arch/arm/kernel/entry-v7m.S
+> +++ b/arch/arm/kernel/entry-v7m.S
+> @@ -117,9 +117,14 @@ ENTRY(__switch_to)
+>  ENDPROC(__switch_to)
+>  
+>  	.data
+> -	.align	8
+> +#if CONFIG_CPUV7M_NUM_IRQ <= 112
+I would have called this CONFIG_CPU_V7M_NUM_IRQ to match the already
+existing CPU_V7M symbol.
 
-Oh, I'm not insisting on anything ;-) If the code is useful on other
-architectures then just ignore this patch. But if the only point of
-using it on other architectures is to reveal bugs which would not have
-triggered otherwise, then that's what COMPILE_TEST is there for.
+> +	.align	9
+> +#else
+> +	.align	10
+> +#endif
+> +
 
->From the option description and help text, it really looks
-ARM-specific, so if it is not, the help text at least should be
-improved.
+Other than that:
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Thanks,
+Who do you target to apply this series?
+
+Best regards
+Uwe
+
 -- 
-Jean Delvare
-SUSE L3 Support
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
