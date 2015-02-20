@@ -1,61 +1,44 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 20 Feb 2015 22:37:20 +0100
-Subject: [PATCH v2 14/18] ARM: Add STM32 family machine
-In-Reply-To: <20150220200019.GU19388@pengutronix.de>
-References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1424455277-29983-15-git-send-email-mcoquelin.stm32@gmail.com>
- <20150220200019.GU19388@pengutronix.de>
-Message-ID: <1424468240.24292.5.camel@x220>
+From: dianders@google.com (Doug Anderson)
+Date: Fri, 20 Feb 2015 13:43:16 -0800
+Subject: [PATCH v2] mmc: dw_mmc: fix bug that cause mmc_test failture
+In-Reply-To: <1424400925-3867-1-git-send-email-addy.ke@rock-chips.com>
+References: <1422273849-29773-1-git-send-email-addy.ke@rock-chips.com>
+ <1424400925-3867-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <CAD=FV=Vz6Rq9wFjvKAnzuKgXAqeVE2FafoOhtf3VaYO63bRUAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-02-20 at 21:00 +0100, Uwe Kleine-K?nig wrote:
-> On Fri, Feb 20, 2015 at 07:01:13PM +0100, Maxime Coquelin wrote:
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 97d07ed..cfd9532 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -774,6 +774,28 @@ config ARCH_OMAP1
-> >  	help
-> >  	  Support for older TI OMAP1 (omap7xx, omap15xx or omap16xx)
-> >  
-> > +config ARCH_STM32
-> > +	bool "STMicrolectronics STM32"
-> > +	depends on !MMU
-> > +	select ARCH_REQUIRE_GPIOLIB
-> > +	select ARM_NVIC
-> > +	select AUTO_ZRELADDR
-> > +	select ARCH_HAS_RESET_CONTROLLER
-> > +	select RESET_CONTROLLER
-> > +	select PINCTRL
-> > +	select PINCTRL_STM32
-> > +	select CLKSRC_OF
-> > +	select ARMV7M_SYSTICK
-> > +	select COMMON_CLK
-> > +	select CPU_V7M
-> > +	select GENERIC_CLOCKEVENTS
-> > +	select NO_DMA
-> > +	select NO_IOPORT_MAP
-> > +	select SPARSE_IRQ
-> > +	select USE_OF
-> Please sort this list alphabetically.
+Addy,
 
-And drop
-    select NO_DMA
+On Thu, Feb 19, 2015 at 6:55 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
+> The STOP command can terminate a data transfer between a memory card and
+> mmc controller.
+>
+> As show in Synopsys DesignWare Cores Mobile Stroage Host Databook:
+> Data timeout and Data end-bit error will terminate further data transfer
+> by mmc controller. So we should not send abort command to terminate a
+> data transfer again if we got DRTO and EBE interrupt.
+>
+> After this patch, all mmc_test cases can pass on RK3288-Pink2 board.
+>
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+> Changes in v2:
+> - DRTO and EBE are both set, should not send abort command too,
+>   suggested by Doug Anderson.
+>
+>  drivers/mmc/host/dw_mmc.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
 
-You copied that from ARCH_EFM32, but it's pointless on arm (as arch/arm/
-doesn't provide a NO_DMA Kconfig symbol).
+I also suggested that you change the subject to "mmc: dw_mmc: fix
+mmc_test by not sending abort for DRTO / EBE errors" which you didn't
+do.  ...I guess that's not critical.  Perhaps Jaehoon (who is
+collecting patches for Ulf now I think) can adjust the subject when he
+applies.
 
-I submitted a patch last year to drop it from ARCH_EFM32, which Uwe
-Acked, but then nothing happened. I'm to blame, as I should have sent a
-reminder.
+In any case, v2 fixes my problems and seems OK to me.
 
-> > +	help
-> > +	  Support for STMicorelectronics STM32 processors.
-> > +
-> >  endchoice
-> >  
-> >  menu "Multiple platform selection"
+Reviewed-by: Doug Anderson <dianders@chromium.org>
 
-
-Paul Bolle
+On rk3288 on a 3.14 kernel w/ lotsa backports:
+Tested-by: Doug Anderson <dianders@chromium.org>
