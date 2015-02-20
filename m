@@ -1,42 +1,31 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Fri, 20 Feb 2015 12:41:36 +0100
-Subject: [PATCH] clockevents: Add (missing) default case for switch blocks
-In-Reply-To: <20150220113753.GP5029@twins.programming.kicks-ass.net>
-References: <6291e308ab77a480c6b1732e16108c5fe6f66afa.1424412815.git.viresh.kumar@linaro.org>
- <20150220083842.GA20387@gmail.com>
- <20150220084807.GJ21418@twins.programming.kicks-ass.net>
- <20150220093659.GA23469@gmail.com>
- <20150220113753.GP5029@twins.programming.kicks-ass.net>
-Message-ID: <20150220114136.GA27483@gmail.com>
+From: jk@ozlabs.org (Jeremy Kerr)
+Date: Fri, 20 Feb 2015 19:45:58 +0800
+Subject: Announce: rmk's nightly builder gets ARM64 support
+In-Reply-To: <20150220094035.GE8656@n2100.arm.linux.org.uk>
+References: <20150219171220.GA8656@n2100.arm.linux.org.uk>
+ <20150219183444.GB8656@n2100.arm.linux.org.uk>
+ <20150220092003.GB31692@arm.com>
+ <CAKv+Gu_5fOinMVYbk99unmEDSqCF3Z7QdXiQTw0VrrWW16Oc6w@mail.gmail.com>
+ <20150220094035.GE8656@n2100.arm.linux.org.uk>
+Message-ID: <54E71E76.1090702@ozlabs.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all,
 
-* Peter Zijlstra <peterz@infradead.org> wrote:
-
-> On Fri, Feb 20, 2015 at 10:36:59AM +0100, Ingo Molnar wrote:
-
-> > > But it does mean we need to be able to add values to 
-> > > the enum.
-> > 
-> > So I'm confused: if we are using proper callbacks (like 
-> > my example outlined) , why is a 'mode enum' needed at 
-> > all?
+> Maybe we need to get jk's blog post updated - it's currently on of
+> the top hits in google, so this is probably going to trip up a lot of
+> people if they follow the instructions there.
 > 
-> Ah, its because the enum is shared between two different 
-> use-cases. The one is the clockevent driver for the 
-> clock_event_device::set_mode() call, and one is the 
-> clockevent core call: clockevent_set_mode().
+> http://jk.ozlabs.org/docs/arm64-toolchain/
 > 
-> The previous patch changed the driver interface, but 
-> retained the sharing of the enum across both interfaces.
-> 
-> Maybe we should break that enum into two; one for devices 
-> and one for the core interface and avoid the problem that 
-> way.
+> So it sounds like possibly the binutils part of those instructions is
+> fine, it's the gcc part which isn't.
 
-Yeah, that would do the trick.
+I'd be happy to update it, or provide a link to more up-to-date
+instructions, if there's something around - just let me know.
 
-Thanks,
+Cheers,
 
-	Ingo
+
+Jeremy
