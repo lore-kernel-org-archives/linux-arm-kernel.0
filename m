@@ -1,105 +1,61 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 19 Feb 2015 18:36:32 -0800
-Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
-In-Reply-To: <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <54E69DB0.60701@codeaurora.org>
+From: addy.ke@rock-chips.com (Addy Ke)
+Date: Fri, 20 Feb 2015 10:37:40 +0800
+Subject: [PATCH v2] mmc: dw_mmc: rockchip: add support MMC_CAP_RUNTIME_RESUME
+ capability
+In-Reply-To: <1423812140-24196-1-git-send-email-addy.ke@rock-chips.com>
+References: <1423812140-24196-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <1424399860-3394-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/15 09:08, Srinivas Kandagatla wrote:
-> diff --git a/drivers/Kconfig b/drivers/Kconfig
-> index c70d6e4..d7afc82 100644
-> --- a/drivers/Kconfig
-> +++ b/drivers/Kconfig
-> @@ -184,4 +184,6 @@ source "drivers/thunderbolt/Kconfig"
->  
->  source "drivers/android/Kconfig"
->  
-> +source "drivers/eeprom/Kconfig"
-> +
->  endmenu
-> diff --git a/drivers/Makefile b/drivers/Makefile
-> index 527a6da..57eb5b0 100644
-> --- a/drivers/Makefile
-> +++ b/drivers/Makefile
-> @@ -165,3 +165,4 @@ obj-$(CONFIG_RAS)		+= ras/
->  obj-$(CONFIG_THUNDERBOLT)	+= thunderbolt/
->  obj-$(CONFIG_CORESIGHT)		+= coresight/
->  obj-$(CONFIG_ANDROID)		+= android/
-> +obj-$(CONFIG_EEPROM)		+= eeprom/
-> diff --git a/drivers/eeprom/Kconfig b/drivers/eeprom/Kconfig
-> new file mode 100644
-> index 0000000..2c5452a
-> --- /dev/null
-> +++ b/drivers/eeprom/Kconfig
-> @@ -0,0 +1,19 @@
-> +menuconfig EEPROM
-> +	bool "EEPROM Support"
-> +	depends on OF
+To support HS200 and UHS mode, mmc core will call init_card() to
+execute tuning:
+- sdio: init_card can be executed at runtime resume.
+- sd and mmc: init_card can be executed at resume or runtime resume,
+  which depends on MMC_CAP_RUNTIME_RESUME capability.
 
-Doesn't this need some sort of select REGMAP somewhere?
+On rk3288 SoC, host will get DRTO interrupt when host send command
+to read tuning data. This will spend more than 111ms:
+drto_ms = drto_clks * 1000 / bus_hz = 111ms.
 
-Also, why do we need to use regmap for the eeprom framework read/write
-ops? I liked the simple eeprom::{read,write} API that Maxime had. The
-regmap part could be a regmap-eeprom driver that implements read/write
-ops like you've done in the core.
+And the total tuning time will be more than 400ms.
 
-> +	help
-> +	  Support for EEPROM alike devices.
-> +
-> +	  This framework is designed to provide a generic interface to EEPROM
-> +	  from both the Linux Kernel and the userspace.
-> +
-> +	  If unsure, say no.
-> +
-> +if EEPROM
-> +
-> +config EEPROM_DEBUG
-> +	bool "EEPROM debug support"
-> +	help
-> +	  Say yes here to enable debugging support.
-> +
-> +endif
->
-> diff --git a/include/linux/eeprom-provider.h b/include/linux/eeprom-provider.h
-> new file mode 100644
-> index 0000000..3943c2f
-> --- /dev/null
-> +++ b/include/linux/eeprom-provider.h
-> @@ -0,0 +1,51 @@
-> +/*
-> + * EEPROM framework provider.
-> + *
-> + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> + * Copyright (C) 2013 Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#ifndef _LINUX_EEPROM_PROVIDER_H
-> +#define _LINUX_EEPROM_PROVIDER_H
-> +
-> +#include <linux/device.h>
-> +#include <linux/regmap.h>
-> +#include <linux/list.h>
-> +
-> +struct eeprom_device {
-> +	struct regmap		*regmap;
-> +	int			stride;
-> +	size_t			size;
-> +	struct device		*dev;
-> +
-> +	/* Internal to framework */
-> +	struct device		edev;
-> +	int			id;
-> +	struct list_head	list;
+So we should add MMC_CAP_RUNTIME_RESUME capability to execute tuning
+at runtime resume. Only if we do so, can we pass resume test.
 
-Should there be a module owner here to handle module removal?
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+---
+Changes in v2:
+- add this capability for all 4 slots, suggested by Doug Anderson.
 
+ drivers/mmc/host/dw_mmc-rockchip.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
+index e2a726a..dbf166f 100644
+--- a/drivers/mmc/host/dw_mmc-rockchip.c
++++ b/drivers/mmc/host/dw_mmc-rockchip.c
+@@ -76,12 +76,20 @@ static int dw_mci_rockchip_init(struct dw_mci *host)
+ 	return 0;
+ }
+ 
++/* Common capabilities of RK3288 SoC */
++static unsigned long dw_mci_rk3288_dwmmc_caps[4] = {
++	MMC_CAP_RUNTIME_RESUME, /* emmc */
++	MMC_CAP_RUNTIME_RESUME, /* sdmmc */
++	MMC_CAP_RUNTIME_RESUME, /* sdio0 */
++	MMC_CAP_RUNTIME_RESUME, /* sdio1 */
++};
+ static const struct dw_mci_drv_data rk2928_drv_data = {
+ 	.prepare_command        = dw_mci_rockchip_prepare_command,
+ 	.init			= dw_mci_rockchip_init,
+ };
+ 
+ static const struct dw_mci_drv_data rk3288_drv_data = {
++	.caps			= dw_mci_rk3288_dwmmc_caps,
+ 	.prepare_command        = dw_mci_rockchip_prepare_command,
+ 	.set_ios		= dw_mci_rk3288_set_ios,
+ 	.setup_clock    = dw_mci_rk3288_setup_clock,
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.8.3.2
