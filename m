@@ -1,119 +1,45 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 20 Feb 2015 10:06:10 -0600
-Subject: [PATCH v4 4/4] phy: add phy-hi6220-usb
-In-Reply-To: <54E75665.6050205@linaro.org>
-References: <1423726646-30336-1-git-send-email-zhangfei.gao@linaro.org>
- <1423726646-30336-5-git-send-email-zhangfei.gao@linaro.org>
- <20150220144119.GB1707@saruman.tx.rr.com>
- <54E75665.6050205@linaro.org>
-Message-ID: <20150220160610.GB6430@saruman.tx.rr.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 20 Feb 2015 08:09:53 -0800
+Subject: [PATCH 2/2] at91sam9_wdt: Allow watchdog to reset device at
+ early boot
+In-Reply-To: <00B1658F-2F3A-4B90-ADCA-275770832180@jcrosoft.com>
+References: <54B53160.6060309@roeck-us.net>
+ <cover.1424262664.git.timo.kokkonen@offcode.fi>
+ <cover.1424262664.git.timo.kokkonen@offcode.fi>
+ <6c0a3a5bcd93d18437eeed04712b4aeff201a16f.1424262664.git.timo.kokkonen@offcode.fi>
+ <00B1658F-2F3A-4B90-ADCA-275770832180@jcrosoft.com>
+Message-ID: <20150220160953.GA22752@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Feb 20, 2015 at 11:44:37PM +0800, zhangfei wrote:
-> Hi, Balbi
+On Fri, Feb 20, 2015 at 03:48:22PM +0800, Jean-Christophe PLAGNIOL-VILLARD wrote:
 > 
-> On 02/20/2015 10:41 PM, Felipe Balbi wrote:
+> > On Feb 18, 2015, at 8:57 PM, Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
+> > 
+> > By default the driver will start a kernel timer which keeps on kicking
+> > the watchdog HW until user space has opened the watchdog
+> > device. Usually this is desirable as the watchdog HW is running by
+> > default and the user space may not have any watchdog daemon running at
+> > all.
+> > 
+> > However, on production systems it may be mandatory that also early
+> > crashes and lockups will lead to a watchdog reset, even if they happen
+> > before the user space has opened the watchdog device.
+> > 
+> > To resolve the issue, add a new device tree property
+> > "early-timeout-sec" which will let the kernel timer to ping the
+> > watchdog HW only as long as the specified timeout permits. The default
+> > is still to use kernel timer, but more strict behavior can be enabled
+> > via the device tree property.
+> > 
+> > Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+> > ---
+> > Documentation/devicetree/bindings/watchdog/watchdog.txt | 7 +++++++
+> > drivers/watchdog/at91sam9_wdt.c                         | 9 ++++++++-
 > 
-> >>+static void hi6220_start_peripheral(struct hi6220_priv *priv, bool on)
-> >>+{
-> >>+	struct usb_otg *otg = priv->phy.otg;
-> >>+
-> >>+	if (!otg->gadget)
-> >>+		return;
-> >>+
-> >>+	if (on)
-> >>+		usb_gadget_connect(otg->gadget);
-> >>+	else
-> >>+		usb_gadget_disconnect(otg->gadget);
-> >
-> >why is the PHY fiddling with pullups ?
+> This should not be handled by the driver but the kernel in a generic way
 > 
-> We use this to enable/disable otg gadget mode.
+Sure, and it has been in the back of my mind for a couple of years.
+Care to submit a set of patches to implement it ?
 
-I got that, but the pullups don't belong to the PHY, they belong to the
-gadget.
-
-> The gpio_id & gpio_vbus are used to distinguish otg gadget mode or
-> host mode.
-> When micro usb or otg device attached to otg, gpio_vbus falling down.
-> And gpio_id = 1 is micro usb, gpio_id = 0 is otg device.
-
-all of that I understood clearly :-)
-
-> So when micro usb attached, we enable gadget mode; while micro usb
-> detached, we disable gadget mode, and dwc2 will automatically set to
-> host mode.
-
-that's all fine, I'm concerned about letting the PHY fiddle with
-something it doesn't own. If I am to change pullups rules in udc-core,
-this is likely to break down miserably and I don't want to have to go
-through that.
-
-> >>+static void hi6220_detect_work(struct work_struct *work)
-> >>+{
-> >>+	struct hi6220_priv *priv =
-> >>+		container_of(work, struct hi6220_priv, work.work);
-> >>+	int gpio_id, gpio_vbus;
-> >>+	enum usb_otg_state state;
-> >>+
-> >>+	if (!gpio_is_valid(priv->gpio_id) || !gpio_is_valid(priv->gpio_vbus))
-> >>+		return;
-> >>+
-> >>+	gpio_id = gpio_get_value_cansleep(priv->gpio_id);
-> >>+	gpio_vbus = gpio_get_value_cansleep(priv->gpio_vbus);
-> >
-> >looks like this should be using extcon
-> Not used extcon before.
-> However, we need gpio_vbus interrupt.
-> Checked phy-tahvo.c and phy-omap-otg.c, not find extcon related with
-> interrupt.
-> Will investigate tomorrow.
-
-drivers/extcon/extcon-gpio.c
-
-> >>+	if (gpio_vbus == 0) {
-> >>+		if (gpio_id == 1)
-> >>+			state = OTG_STATE_B_PERIPHERAL;
-> >>+		else
-> >>+			state = OTG_STATE_A_HOST;
-> >>+	} else {
-> >>+		state = OTG_STATE_A_HOST;
-> >>+	}
-> >>+
-> >>+	if (priv->state != state) {
-> >>+		hi6220_start_peripheral(priv, state == OTG_STATE_B_PERIPHERAL);
-> >>+		priv->state = state;
-> >>+	}
-> >>+}
-> >>+
-> >>+static irqreturn_t hiusb_gpio_intr(int irq, void *data)
-> >>+{
-> >>+	struct hi6220_priv *priv = (struct hi6220_priv *)data;
-> >>+
-> >>+	/* add debounce time */
-> >>+	schedule_delayed_work(&priv->work, msecs_to_jiffies(100));
-> >
-> >this is really bad. We have threaded interrupt support, right ?
-> 
-> Since we use two gpio to distinguish gadget mode or host mode.
-> Debounce time can introduce more accuracy.
-
-gpio_set_debounce() ?
-
-> I think threaded interrupt can not be used for adding debounce time.
-> Here add debounce is just for safety.
-
-add the debounce to the gpio itself.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150220/355bfe35/attachment-0001.sig>
+Guenter
