@@ -1,27 +1,61 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 20 Feb 2015 16:28:59 -0500 (EST)
-Subject: [PATCH] net/appletalk: LTPC needs virt_to_bus
-In-Reply-To: <6100590.gsNqMCFyRS@wuerfel>
-References: <6100590.gsNqMCFyRS@wuerfel>
-Message-ID: <20150220.162859.1939233097658138953.davem@davemloft.net>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 20 Feb 2015 22:37:20 +0100
+Subject: [PATCH v2 14/18] ARM: Add STM32 family machine
+In-Reply-To: <20150220200019.GU19388@pengutronix.de>
+References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1424455277-29983-15-git-send-email-mcoquelin.stm32@gmail.com>
+ <20150220200019.GU19388@pengutronix.de>
+Message-ID: <1424468240.24292.5.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 18 Feb 2015 20:48:54 +0100
+On Fri, 2015-02-20 at 21:00 +0100, Uwe Kleine-K?nig wrote:
+> On Fri, Feb 20, 2015 at 07:01:13PM +0100, Maxime Coquelin wrote:
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 97d07ed..cfd9532 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -774,6 +774,28 @@ config ARCH_OMAP1
+> >  	help
+> >  	  Support for older TI OMAP1 (omap7xx, omap15xx or omap16xx)
+> >  
+> > +config ARCH_STM32
+> > +	bool "STMicrolectronics STM32"
+> > +	depends on !MMU
+> > +	select ARCH_REQUIRE_GPIOLIB
+> > +	select ARM_NVIC
+> > +	select AUTO_ZRELADDR
+> > +	select ARCH_HAS_RESET_CONTROLLER
+> > +	select RESET_CONTROLLER
+> > +	select PINCTRL
+> > +	select PINCTRL_STM32
+> > +	select CLKSRC_OF
+> > +	select ARMV7M_SYSTICK
+> > +	select COMMON_CLK
+> > +	select CPU_V7M
+> > +	select GENERIC_CLOCKEVENTS
+> > +	select NO_DMA
+> > +	select NO_IOPORT_MAP
+> > +	select SPARSE_IRQ
+> > +	select USE_OF
+> Please sort this list alphabetically.
 
-> The ltpc driver is rather outdated and does not get built on most
-> platforms because it requires the ISA_DMA_API symbol. However
-> there are some ARM platforms that have ISA_DMA_API but no virt_to_bus,
-> and they get this build error when enabling the ltpc driver.
-> 
-> drivers/net/appletalk/ltpc.c: In function 'handlefc':
-> drivers/net/appletalk/ltpc.c:380:2: error: implicit declaration of function 'virt_to_bus' [-Werror=implicit-function-declaration]
->   set_dma_addr(dma,virt_to_bus(ltdmacbuf));
->   ^
-> 
-> This adds another dependency in Kconfig to avoid that configuration.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+And drop
+    select NO_DMA
 
-Applied, thank you.
+You copied that from ARCH_EFM32, but it's pointless on arm (as arch/arm/
+doesn't provide a NO_DMA Kconfig symbol).
+
+I submitted a patch last year to drop it from ARCH_EFM32, which Uwe
+Acked, but then nothing happened. I'm to blame, as I should have sent a
+reminder.
+
+> > +	help
+> > +	  Support for STMicorelectronics STM32 processors.
+> > +
+> >  endchoice
+> >  
+> >  menu "Multiple platform selection"
+
+
+Paul Bolle
