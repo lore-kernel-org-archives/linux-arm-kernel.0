@@ -1,35 +1,54 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 20 Feb 2015 15:42:05 +0200
-Subject: [PATCH 4/5] ARM: DTS: omap5: Correct the dma controller's property
- names
-In-Reply-To: <1424439726-31994-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1424439726-31994-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1424439726-31994-5-git-send-email-peter.ujfalusi@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 20 Feb 2015 15:48:13 +0200
+Subject: [PATCH 9/9] RFC: ARM: DRA7: enable DSS_DESHDCP_CLKEN
+In-Reply-To: <54E72FB0.6000604@ti.com>
+References: <1423840286-18377-1-git-send-email-tomi.valkeinen@ti.com>	<1423840286-18377-10-git-send-email-tomi.valkeinen@ti.com>
+ <CAGo_u6p89ot-eNwK65otoYsLM6NXeh929=SBG6uKAsX8Tnd_RQ@mail.gmail.com>
+ <54DE1B7E.10505@ti.com> <54E71EA2.3030803@ti.com> <54E72FB0.6000604@ti.com>
+Message-ID: <54E73B1D.3050908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the Documentation/devicetree/bindings/dma/dma.txt the
-dma-channels and dma-requests property should not have '#'.
+On 20/02/15 14:59, Tero Kristo wrote:
+> On 02/20/2015 01:46 PM, Tomi Valkeinen wrote:
+>> On 13/02/15 17:42, Tero Kristo wrote:
+>>> On 02/13/2015 05:25 PM, Nishanth Menon wrote:
+>>
+>>>> I would probably wait for control module to become syscon and probably
+>>>> model this as syscon clk - I thin we should be seeing a series
+>>>> sometime soon.
+>>>
+>>> Yeah, I will be posting a series in a bit, just running some final tests
+>>> on it.
+>>
+>> I did the above with Tero's series. Adding the DES HDCP clock works ok.
+>>
+>> However, I'm not able to do this in HWMOD framework. To enable the DSS
+>> IP block I need to enable both the DSS func clock and the DES HDCP
+>> clock, but the HWMOD framework only allows one mainclock.
+>>
+>> I added the HDCP clock as an opt clock, but those are not enabled
+>> intially by the HWMOD framework, and the call in omap_hwmod.c:_enable()
+>> to soc_ops.wait_target_ready(oh) calls fails.
+>>
+>> So... Any ideas how to proceed?
+> 
+> Add the clock enable at the end of dra7xx_dt_clk_init()?
+> 
+> You need to disable the clock at some point though.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/boot/dts/omap5.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Where would I disable it? And if the clock is disabled, doesn't this
+again fail when the dss driver tries to enable the IP block? The driver
+can enable the HDCP opt clock only later, when the IP block should be up
+already.
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index b321fdf42c9f..eb6653cbe3f8 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -238,8 +238,8 @@
- 				     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
- 			#dma-cells = <1>;
--			#dma-channels = <32>;
--			#dma-requests = <127>;
-+			dma-channels = <32>;
-+			dma-requests = <127>;
- 		};
- 
- 		gpio1: gpio at 4ae10000 {
--- 
-2.3.0
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150220/4cb3a54c/attachment.sig>
