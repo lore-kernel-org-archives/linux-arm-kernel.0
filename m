@@ -1,69 +1,120 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 21 Feb 2015 00:33:17 +0800
-Subject: [PATCH 2/2] at91sam9_wdt: Allow watchdog to reset device at early
- boot
-In-Reply-To: <20150220085151.3b599de8@bbrezillon>
-References: <54B53160.6060309@roeck-us.net>
- <cover.1424262664.git.timo.kokkonen@offcode.fi>
- <cover.1424262664.git.timo.kokkonen@offcode.fi>
- <6c0a3a5bcd93d18437eeed04712b4aeff201a16f.1424262664.git.timo.kokkonen@offcode.fi>
- <00B1658F-2F3A-4B90-ADCA-275770832180@jcrosoft.com>
- <20150220085151.3b599de8@bbrezillon>
-Message-ID: <E7DD67EB-CA34-48EA-838D-3EBBF74CAEBD@jcrosoft.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Fri, 20 Feb 2015 11:34:35 -0500
+Subject: [PATCH 2/4] of: DT quirks infrastructure
+In-Reply-To: <9EDB5290-5C9F-42C1-826A-B38CC8C01F9B@konsulko.com>
+References: <1424271576-1952-3-git-send-email-pantelis.antoniou@konsulko.com>
+ <20150218154106.GC29429@leverpostej>
+ <FE61DD1C-51DA-4869-8A62-C019C3D70577@konsulko.com>
+ <20150218173115.GG29429@leverpostej>
+ <76BD1B22-BAED-4205-9B34-186907CE0217@konsulko.com>
+ <54E613E7.2020405@gmail.com>
+ <670D0881-DBF0-45E8-A502-A6DB2B77A750@konsulko.com>
+ <54E61DD2.3060002@gmail.com>
+ <53F2F94C-0C43-4A54-B8CD-EEC454A0AC19@konsulko.com>
+ <54E742F2.80506@hurleysoftware.com>
+ <20150220143533.GA29908@odux.rfo.atmel.com> <54E74BF6.208@hurleysoftware.com>
+ <F2A28070-4A8D-4869-8E2A-6AA744EECCCE@konsulko.com>
+ <54E751BF.3000604@hurleysoftware.com>
+ <9EDB5290-5C9F-42C1-826A-B38CC8C01F9B@konsulko.com>
+Message-ID: <54E7621B.6040100@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 02/20/2015 10:38 AM, Pantelis Antoniou wrote:
+> Hi Peter,
+> 
+>> On Feb 20, 2015, at 17:24 , Peter Hurley <peter@hurleysoftware.com> wrote:
+>>
+>> On 02/20/2015 10:02 AM, Pantelis Antoniou wrote:
+>>> Hi Peter,
+>>>
+>>>> On Feb 20, 2015, at 17:00 , Peter Hurley <peter@hurleysoftware.com> wrote:
+>>>>
+>>>> On 02/20/2015 09:35 AM, Ludovic Desroches wrote:
 
-> On Feb 20, 2015, at 3:51 PM, Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> 
-> Hi Jean-Christophe,
-> 
-> On Fri, 20 Feb 2015 15:48:22 +0800
-> Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> 
->> 
->>> On Feb 18, 2015, at 8:57 PM, Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
->>> 
->>> By default the driver will start a kernel timer which keeps on kicking
->>> the watchdog HW until user space has opened the watchdog
->>> device. Usually this is desirable as the watchdog HW is running by
->>> default and the user space may not have any watchdog daemon running at
->>> all.
->>> 
->>> However, on production systems it may be mandatory that also early
->>> crashes and lockups will lead to a watchdog reset, even if they happen
->>> before the user space has opened the watchdog device.
->>> 
->>> To resolve the issue, add a new device tree property
->>> "early-timeout-sec" which will let the kernel timer to ping the
->>> watchdog HW only as long as the specified timeout permits. The default
->>> is still to use kernel timer, but more strict behavior can be enabled
->>> via the device tree property.
->>> 
->>> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
->>> ---
->>> Documentation/devicetree/bindings/watchdog/watchdog.txt | 7 +++++++
->>> drivers/watchdog/at91sam9_wdt.c                         | 9 ++++++++-
->> 
->> This should not be handled by the driver but the kernel in a generic way
-> 
-> Could you detail a bit more what you have in mind ?
+[...]
 
-move this timeout on the linux thread that keep alive the watchdog not in the driver
+>>>>> As you said, we can imagine many reasons to have a failure during the
+>>>>> production, having several DTB files will increase the risk.
+>>>>
+>>>> It's interesting that you don't see the added complexity of open-coding
+>>>> the i2c driver or mixing DTS fragments for different designs as increased risk
+>>>> (for us all).
+>>>>
+>>>>
+>>>
+>>> You don?t have to use it.
+>>
+>>> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+>>> index 5d27dfd..02129e7 100644
+>>> --- a/arch/arm/mach-omap2/Makefile
+>>> +++ b/arch/arm/mach-omap2/Makefile
+>>> @@ -259,6 +259,11 @@ obj-$(CONFIG_MACH_CRANEBOARD)		+= board-am3517crane.o
+>>>
+>>> obj-$(CONFIG_MACH_SBC3530)		+= board-omap3stalker.o
+>>>
+>>> +# DT quirks
+>>> +ifneq ($(CONFIG_OF_DYNAMIC),)
+>>> +obj-$(CONFIG_SOC_AM33XX)		+= am33xx-dt-quirks.o
+>>> +endif
+>>
+>> Won't this automatically be included on my Black that supports DT overlays?
+>>
+> 
+> Yes it will. It is a grand total of 498 lines of code, and the total size of
+> the code segment is about 2.2K.
+> 
+> You do realize that you?re probably booting a multi-platform kernel on the 
+> black right? Including things for all 2xxx/3xxx and 44xx platforms?
+> For instance:
+> 
+>> ~/ti/kernels/linux-github.git $ wc -l arch/arm/mach-omap2/*44xx*.c
+>>    443 arch/arm/mach-omap2/clockdomains44xx_data.c
+>>    526 arch/arm/mach-omap2/cminst44xx.c
+>>    251 arch/arm/mach-omap2/cpuidle44xx.c
+>>    250 arch/arm/mach-omap2/dpll44xx.c
+>>   4864 arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>>    295 arch/arm/mach-omap2/pm44xx.c
+>>    358 arch/arm/mach-omap2/powerdomains44xx_data.c
+>>     62 arch/arm/mach-omap2/prcm_mpu44xx.c
+>>    770 arch/arm/mach-omap2/prm44xx.c
+>>    210 arch/arm/mach-omap2/prminst44xx.c
+>>    117 arch/arm/mach-omap2/vc44xx_data.c
+>>    130 arch/arm/mach-omap2/voltagedomains44xx_data.c
+>>    104 arch/arm/mach-omap2/vp44xx_data.c
+>>   8380 total
+> 
+> I bet those things are far larger than 2.2K. And I also bet that in the
+> tradeoff analysis that the board maintainer did things came down to 
+> increasing complexity so that he can consolidate the kernels for all the
+> other platforms he has to support besides the black.
 
-Best Regards,
-J.
+Not that it really matters, but I'm not using any of that.
+
+
+>>> Some people really do though. As for increased risk
+>>> I expect to see arguments instead of a statement.
+>>
+>> No one is wasting your time with random arguments. Please keep your tone civil.
+>>
 > 
-> Best Regards,
-> 
-> Boris
-> 
-> -- 
-> Boris Brezillon, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> A statement like 'increasing risk for all of us' is very open ended. What is
+> the risk? How much of it exists?
+
+My point was simply that this trades reduced complexity in one area
+with increased complexity in another area.
+
+For you, that trade-off is worth it, but for others, not so much.
+
+FWIW, I agree that some mechanism is required to support the other
+use cases. I just don't think ease of manufacturing, when the
+submit configuration is the BeagleBone, is where I would hang my hat.
+
+
+> If I offended you I?m really sorry though, I meant no such thing.
+
+In re-reading it, I realize I shouldn't have taken offense. Thanks anyway
+for the apology.
+
+Regards,
+Peter Hurley
