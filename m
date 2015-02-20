@@ -1,44 +1,38 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 20 Feb 2015 11:13:06 -0800
-Subject: [PATCH RFC v9 01/20] clk: divider: Correct parent clk round rate
- if no bestdiv is normally found
-In-Reply-To: <20150216112724.GN8656@n2100.arm.linux.org.uk>
-References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
- <1423720903-24806-2-git-send-email-Ying.Liu@freescale.com>
- <20150212093356.GR12209@pengutronix.de> <20150212103944.GA1290@victor>
- <20150212122405.GW12209@pengutronix.de>
- <20150212125646.GT8656@n2100.arm.linux.org.uk>
- <20150212134131.GX12209@pengutronix.de> <54DE0BB8.7070004@ti.com>
- <20150213185713.GA12209@pengutronix.de>
- <20150216112724.GN8656@n2100.arm.linux.org.uk>
-Message-ID: <20150220191306.421.58746@quantum>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 20 Feb 2015 19:19:43 +0000
+Subject: [PATCH] iommu/io-pgtable-arm: Add built time dependency
+In-Reply-To: <20150220194445.4225d56b@endymion.delvare>
+References: <20150220194445.4225d56b@endymion.delvare>
+Message-ID: <20150220191943.GB1767@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Russell King - ARM Linux (2015-02-16 03:27:24)
-> On Fri, Feb 13, 2015 at 07:57:13PM +0100, Sascha Hauer wrote:
-> > I agree that it's a bit odd, but I think it has to be like this.
-> > Consider that you request a rate of 100Hz, but the clock can only
-> > produce 99.5Hz, so due to rounding clk_round_rate() returns 99Hz.
-> > Now when you request 99Hz from clk_set_rate() the 99.5Hz value
-> > can't be used because it's too high.
+On Fri, Feb 20, 2015 at 06:44:45PM +0000, Jean Delvare wrote:
+> If io-pgtable-arm is an ARM-specific driver then configuration option
+> IOMMU_IO_PGTABLE_LPAE should not be presented to the user by default
+> for non-ARM kernels.
 > 
-> Math rounding rules normally state that anything of .5 and greater
-> should be rounded up, not rounded down.  So, for 99.5Hz, you really
-> ought to be returning 100Hz, not 99Hz.
+> Signed-off-by: Jean Delvare <jdelvare@suse.de>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> ---
+>  drivers/iommu/Kconfig |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> However, you do have a point for 99.4Hz, which would be returned as
-> 99Hz, and when set, it would result in something which isn't 99.4Hz.
+> --- linux-3.20-rc0.orig/drivers/iommu/Kconfig	2015-02-20 17:24:46.838955014 +0100
+> +++ linux-3.20-rc0/drivers/iommu/Kconfig	2015-02-20 19:38:45.804582668 +0100
+> @@ -23,6 +23,7 @@ config IOMMU_IO_PGTABLE
+>  config IOMMU_IO_PGTABLE_LPAE
+>  	bool "ARMv7/v8 Long Descriptor Format"
+>  	select IOMMU_IO_PGTABLE
+> +	depends on ARM || COMPILE_TEST
+>  	help
+>  	  Enable support for the ARM long descriptor pagetable format.
+>  	  This allocator supports 4K/2M/1G, 16K/32M and 64K/512M page
 
-More practically, this again raises the issue of whether or not unsigned
-long rate should be in millihertz or something other than hertz.
+So this code doesn't actually *depend* on any arch code at all. In fact,
+having it built and booted on x86 revealed a couple of bugs that I've
+since fixed. I'd rather let this run everywhere, but if people insist on
+the false dependency, so be it but we should add ARM64 to the mix too.
 
-And then that question again raises the issue of making rate 64-bit...
-
-Regards,
-Mike
-
-> 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+Will
