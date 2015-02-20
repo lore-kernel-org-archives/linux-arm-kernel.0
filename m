@@ -1,126 +1,122 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 20 Feb 2015 11:57:41 +0100 (CET)
-Subject: [PATCH RFC 2/3] power: mxs_power: add driver for mxs power
- subsystem
-In-Reply-To: <964800678.25817.1422996087477.JavaMail.open-xchange@oxbaltgw04.schlund.de>
-References: <1416514477-19190-1-git-send-email-stefan.wahren@i2se.com>
- <1416514477-19190-3-git-send-email-stefan.wahren@i2se.com>
- <20150121230148.GJ13715@earth.universe> <54C0AFE4.3020701@i2se.com>
- <20150125150431.GE2719@earth.universe>
- <1719204322.245040.1422301605670.JavaMail.open-xchange@oxbaltgw03.schlund.de>
- <20150127001629.GP21293@sirena.org.uk>
- <1954124242.301697.1422383709733.JavaMail.open-xchange@oxbaltgw09.schlund.de>
- <20150127194346.GN21293@sirena.org.uk>
- <443299280.47516.1422483725178.JavaMail.open-xchange@oxbaltgw03.schlund.de>
- <20150128225937.GA12749@earth.universe>
- <964800678.25817.1422996087477.JavaMail.open-xchange@oxbaltgw04.schlund.de>
-Message-ID: <1766258118.893447.1424429861770.JavaMail.open-xchange@oxbaltgw03.schlund.de>
+Date: Fri, 20 Feb 2015 12:09:44 +0100 (CET)
+Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
+ registers
+In-Reply-To: <1705379122.406018.1423686677196.JavaMail.open-xchange@oxbaltgw01.schlund.de>
+References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
+ <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
+ <54DA020C.6030703@i2se.com>
+ <CAOMZO5DGCP1p1vetwWHpSbe2qywA8DhWRRq22egMDFSw11uq4w@mail.gmail.com>
+ <54DA0DE7.5050708@i2se.com>
+ <CAOMZO5AtFOThRjcAgMVbrbkcrJbehouSxoH03VUGJrRdWXnS_Q@mail.gmail.com>
+ <462270270.419156.1423603473431.JavaMail.open-xchange@oxbaltgw02.schlund.de>
+ <CAOMZO5B4mxP6RBkbsbj=wC6bZJgtreoo5S_NhYuki6kW=Y=QFw@mail.gmail.com>
+ <1705379122.406018.1423686677196.JavaMail.open-xchange@oxbaltgw01.schlund.de>
+Message-ID: <1590447717.894708.1424430584776.JavaMail.open-xchange@oxbaltgw03.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Stefan Wahren <stefan.wahren@i2se.com> hat am 3. Februar 2015 um 21:41
+Hi Fabio,
+
+> Stefan Wahren <stefan.wahren@i2se.com> hat am 11. Februar 2015 um 21:31
 > geschrieben:
 >
 >
-> Hi Sebastian,
+> Hi Fabio,
 >
-> > Sebastian Reichel <sre@kernel.org> hat am 28. Januar 2015 um 23:59
+> > Fabio Estevam <festevam@gmail.com> hat am 11. Februar 2015 um 17:58
 > > geschrieben:
 > >
 > >
-> > Hi,
+> > Hi Stefan,
 > >
-> > On Wed, Jan 28, 2015 at 11:22:05PM +0100, Stefan Wahren wrote:
-> > > > Mark Brown <broonie@kernel.org> hat am 27. Januar 2015 um 20:43
-> > > > geschrieben:
-> > > > On Tue, Jan 27, 2015 at 07:35:09PM +0100, Stefan Wahren wrote:
-> > > >
-> > > changing the switching frequency is not a common feature for this IC. In
-> > > most
-> > > cases the clock for the DC-DC switching frequency runs at 24 MHz
-> > > (ref_xtal).
-> > > Unfortunatelly this could cause interferences for example in UHF band. So
-> > > switching to ref_pll and changing clock divider is a option to avoid such
-> > > interferences without changing hardware.
+> > On Tue, Feb 10, 2015 at 7:24 PM, Stefan Wahren <stefan.wahren@i2se.com>
+> > wrote:
+> > > Hi Fabio,
 > > >
-> > > I decided to implement it as a module parameter, because i see it's a
-> > > configuration option.
+> > >> Fabio Estevam <festevam@gmail.com> hat am 10. Februar 2015 um 16:06
+> > >> geschrieben:
+> > >>
+> > >>
+> > >> Hi Stefan,
+> > >>
+> > >> On Tue, Feb 10, 2015 at 11:55 AM, Stefan Wahren <stefan.wahren@i2se.com>
+> > >> wrote:
+> > >>
+> > >> > Could you apply only the clk-imx28.c part of my patch and see what
+> > >> > happens?
+> > >>
+> > >> If I apply only the clk-imx28.c part of your patch I can successfully
+> > >> probe the SPI NOR.
+> > >
+> > > thanks this is very helpful. I built the linux-next for my Duckbill and
+> > > add
+> > > the
+> > > SSP2 section from imx28-evk.dts into imx28-duckbill.dts.
+> > >
+> > > Without my patch i get the following for HW_CLKCTRL_FRAC0:
+> > >
+> > > ./memwatch -a 0x800401B0
+> > >
+> > > 0x800401b0: 0x5e5b5513
+> > >
+> > > With my patch i get:
+> > >
+> > > ./memwatch -a 0x800401B0
+> > >
+> > > 0x800401b0: 0x5e1b5513
 > >
-> > I think its best to use a DT property then. That way it can be set
-> > appropiatly for boards known to use a band, which could have
-> > interference problems.
-> >
-> > So just add a simple property (without a subnode). If I understand
-> > Mark correctly, there's a high chance more drivers will need to
-> > describe the switching frequency, so I suggest to use a vendor
-> > independent property name:
-> >
-> > switching-frequency = <12345>;
+> > I always get 0x5e5b5513 with or without your patch.
 >
-> i'm not sure. So here is the complete current state (power and regulator
-> binding
-> from imx28.dtsi) including my suggestion for the new property:
+> very strange. Do you have any idea why IO1_STABLE is permanent low?
 >
-> power: power at 80044000 {
-> compatible = "fsl,imx28-power"; /* handled by mxs_power.c */
-> #address-cells = <1>;
-> #size-cells = <1>;
-> reg = <0x80044000 0x2000>;
-> interrupts = <6>;
-> switching-frequency = <24000000>; /* new property */
-> ranges;
+> Here are the register dumps as requested by Mike.
 >
-> reg_vddd: regulator at 80044040 {
-> reg = <0x80044040 0x10>,
-> <0x80044010 0x10>,
-> <0x800440c0 0x10>;
-> reg-names = "base-address",
-> "v5ctrl-address",
-> "status-address";
-> compatible = "fsl,imx28-vddd"; /* handled by mxs-regulator.c */
-> regulator-name = "vddd";
-> regulator-min-microvolt = <1350000>;
-> regulator-max-microvolt = <1550000>;
-> vddd-supply = <&reg_vdda>;
-> };
+> Without this patch after boot
 >
-> reg_vdda: regulator at 80044050 {
-> reg = <0x80044050 0x10>,
-> <0x80044010 0x10>,
-> <0x800440c0 0x10>;
-> reg-names = "base-address",
-> "v5ctrl-address",
-> "status-address";
-> compatible = "fsl,imx28-vdda"; /* handled by mxs-regulator.c */
-> regulator-name = "vdda";
-> regulator-min-microvolt = <1725000>;
-> regulator-max-microvolt = <1950000>;
-> vdda-supply = <&reg_vddio>;
-> };
+> 0x80040000: 0x00060000
+> 0x80040010: 0x800004b1
+> 0x80040050: 0x00011001
+> 0x80040080: 0x64000001
+> 0x80040090: 0x00000001
+> 0x800400a0: 0x80000001
+> 0x800400b0: 0x00000002
+> 0x800400c0: 0xa0000001
+> 0x800401b0: 0x5e5b5513
+> 0x800401c0: 0x00929292
+> 0x800401d0: 0x00004104
 >
-> reg_vddio: regulator at 80044060 {
-> reg = <0x80044060 0x10>,
-> <0x80044010 0x10>,
-> <0x800440c0 0x10>;
-> reg-names = "base-address",
-> "v5ctrl-address",
-> "status-address";
-> compatible = "fsl,imx28-vddio"; /* handled by mxs-regulator.c */
-> regulator-name = "vddio";
-> regulator-min-microvolt = <3000000>;
-> regulator-max-microvolt = <3575000>;
-> regulator-microvolt-offset = <80000>;
-> };
-> };
+> With this patch after boot
 >
-> Please correct me if i'm wrong.
->
-> Stefan
+> 0x80040000: 0x00060000
+> 0x80040010: 0x800004b1
+> 0x80040050: 0x00011001
+> 0x80040080: 0x64000001
+> 0x80040090: 0x00000001
+> 0x800400a0: 0x80000001
+> 0x800400b0: 0x00000002
+> 0x800400c0: 0xa0000001
+> 0x800401b0: 0x5e1b5513
+> 0x800401c0: 0x00929292
+> 0x800401d0: 0x00004104
 
-Gentle Ping.
+just for the records here is the register dump for the case "patch V2 on
+Duckbill with U-Boot instead of imx-bootlets":
+
+0x80040000: 0x00060000
+0x80040010: 0x800004b1
+0x80040050: 0x00011001
+0x80040080: 0x64000001
+0x80040090: 0x00000005
+0x800400a0: 0x80000001
+0x800400b0: 0x00000002
+0x800400c0: 0xa0000001
+0x800401b0: 0x5e5b5513
+0x800401c0: 0x00929292
+0x800401d0: 0x00004104
+
+So the issue with IO1_STABLE seems to come from the bootloader.
+
+Do you have any idea which i.MX28 registers additionally could be relevant?
 
 Stefan
-
->
-> >
-> > -- Sebastian
