@@ -1,25 +1,40 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 20 Feb 2015 11:49:22 -0200
-Subject: Announce: rmk's nightly builder gets ARM64 support
-In-Reply-To: <20150220133806.GG8656@n2100.arm.linux.org.uk>
-References: <20150219171220.GA8656@n2100.arm.linux.org.uk>
- <20150219183444.GB8656@n2100.arm.linux.org.uk>
- <20150220092003.GB31692@arm.com>
- <CAKv+Gu_5fOinMVYbk99unmEDSqCF3Z7QdXiQTw0VrrWW16Oc6w@mail.gmail.com>
- <20150220094035.GE8656@n2100.arm.linux.org.uk>
- <20150220102009.GF8656@n2100.arm.linux.org.uk>
- <CAOMZO5Aqx_SQ1oaML=hiVzzJMJ2bNTAsjk-dWFLkETaV4_JO+A@mail.gmail.com>
- <20150220133806.GG8656@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5BgrWGciKt0pjpbtX4wP0CgWWN39BcSjnSD89MxKEpBCg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 20 Feb 2015 13:53:13 +0000
+Subject: [PATCH] arm64: Guard asm/assembler.h against multiple inclusions
+Message-ID: <1424440393-28458-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 11:38 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+asm/assembler.h lacks the usual guard against multiple inclusion,
+leading to a compilation failure if it is accidentally included
+twice.
 
-> From what I can see, this doesn't _build_ a compiler.  It grabs
-> gcc-linaro-aarch64-linux-gnu-4.9-2014.08_linux.tar.xz from
-> http://releases.linaro.org/14.08/components/toolchain/binaries
-> and installs that - which contains a load of binaries.
+Using the classic #ifndef/#define/#endif construct solves the issue.
 
-That's correct. It uses the pre-built binaries from Linaro.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/assembler.h | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 5901480..750bac4 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -20,6 +20,9 @@
+ #error "Only include this from assembly code"
+ #endif
+ 
++#ifndef __ASM_ASSEMBLER_H
++#define __ASM_ASSEMBLER_H
++
+ #include <asm/ptrace.h>
+ #include <asm/thread_info.h>
+ 
+@@ -155,3 +158,5 @@ lr	.req	x30		// link register
+ #endif
+ 	orr	\rd, \lbits, \hbits, lsl #32
+ 	.endm
++
++#endif	/* __ASM_ASSEMBLER_H */
+-- 
+2.1.4
