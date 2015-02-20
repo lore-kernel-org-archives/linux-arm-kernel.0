@@ -1,62 +1,90 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Feb 2015 14:22:08 +0000
-Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
- demuxer chip
-In-Reply-To: <20150211173823.30c42c6a@bbrezillon>
-References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
- <2437801.56xPyk3atd@vostro.rjw.lan>
- <20150211151237.GN9154@leverpostej>
- <1487331.cgC9j5u0aF@vostro.rjw.lan>
- <20150211155720.GQ9154@leverpostej>
- <20150211171515.55d5066f@bbrezillon>
- <20150211163231.GR9154@leverpostej>
- <20150211173823.30c42c6a@bbrezillon>
-Message-ID: <20150220142208.GJ13659@leverpostej>
+From: drjones@redhat.com (Andrew Jones)
+Date: Fri, 20 Feb 2015 15:29:05 +0100
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <54E62404.9040702@redhat.com>
+References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150219165731.GA26965@hawk.usersys.redhat.com>
+ <CAKv+Gu8Je3RRrgEFCZ7JUWtOgk3WqA_qdBEOPAMc3OqnKr1bwg@mail.gmail.com>
+ <20150219175518.GB26965@hawk.usersys.redhat.com>
+ <54E62404.9040702@redhat.com>
+Message-ID: <20150220142905.GA10942@hawk.usersys.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
-
-On Wed, Feb 11, 2015 at 04:38:23PM +0000, Boris Brezillon wrote:
-
-[...]
-
-> For the list of impacted drivers, you can have a look at this series [1]
-> (patches 2 to 5), and I'll take care of the testing part once every one
-> has agreed on the solution ;-).
+On Thu, Feb 19, 2015 at 06:57:24PM +0100, Paolo Bonzini wrote:
 > 
-> [1]https://lkml.org/lkml/2014/12/15/552
+> 
+> On 19/02/2015 18:55, Andrew Jones wrote:
+> >> > > (I don't have an exact number for how many times it went to EL1 because
+> >> > >  access_mair() doesn't have a trace point.)
+> >> > > (I got the 62873 number by testing a 3rd kernel build that only had patch
+> >> > >  3/3 applied to the base, and counting kvm_toggle_cache events.)
+> >> > > (The number 50 is the number of kvm_toggle_cache events *without* 3/3
+> >> > >  applied.)
+> >> > >
+> >> > > I consider this bad news because, even considering it only goes to EL2,
+> >> > > it goes a ton more than it used to. I realize patch 3/3 isn't the final
+> >> > > plan for enabling traps though.
+> 
+> If a full guest boots, can you try timing a kernel compile?
+>
 
-Looking at those:
+Guests boot. I used an 8 vcpu, 14G memory guest; compiled the kernel 4
+times inside the guest for each host kernel; base and mair. I dropped
+the time from the first run of each set, and captured the other 3.
+Command line used below. Time is from the
+  Elapsed (wall clock) time (h:mm:ss or m:ss):
+output of /usr/bin/time - the host's wall clock.
 
-* The pmc looks like it could be a valid use of the new flag. It also
-  seems to function as an irqchip.
-  
-  Do any of its child IRQs need to be handled during the suspend-resume
-  cycle? If so using IRQF_NO_SUSPEND would seem to be valid.
+  /usr/bin/time --verbose ssh $VM 'cd kernel && make -s clean && make -s -j8'
 
-* atmel_serial seems to be intended to be used as a wakeup device (given
-  it calls device_set_wakeup_enable). Therefore it needs to call
-  enable_irq_wake, and when it does so it can share an IRQ with other
-  interrupts, just not IRQF_NO_SUSPEND interrupts.
-  
-  None of the approaches thus far can fix the fundamental mismatch
-  between wakeup interrupts and IRQF_NO_SUSPEND interrupts.
+Results:
+base: 3:06.11 3:07.00 3:10.93
+mair: 3:08.47 3:06.75 3:04.76
 
-* Similarly, rtc-at91rm9200 and rtc-at91sam9 are intended to be used as 
-  wakeup devices. They call enable_irq_wake (though don't bother
-  checking the return value). They can share an IRQ with other
-  interrupts, just not IRQF_NO_SUSPEND interrupts.
+So looks like the 3 orders of magnitude greater number of traps
+(only to el2) don't impact kernel compiles.
 
-* at91sam9_wdt seems to be fundamentally incompatible with suspend. If
-  the watchdog cannot be disabled, and you need to handle it during
-  suspend, then it needs to be a wakeup interrupt, not an
-  IRQF_NO_SUSPEND interrupt.
+Then I thought I'd be able to quick measure the number of cycles
+a trap to el2 takes with this kvm-unit-tests test
 
-As far as I can see, the flag or virtual irqchip approaches only help
-the PMC case, and even then might not be necessary. All the others seem
-to be relying on guarantees the genirq layer don't provide, and fixing
-that would mean moving them further from IRQF_NO_SUSPEND.
+int main(void)
+{
+	unsigned long start, end;
+	unsigned int sctlr;
 
-Thanks,
-Mark.
+	asm volatile(
+	"	mrs %0, sctlr_el1\n"
+	"	msr pmcr_el0, %1\n"
+	: "=&r" (sctlr) : "r" (5));
+
+	asm volatile(
+	"	mrs %0, pmccntr_el0\n"
+	"	msr sctlr_el1, %2\n"
+	"	mrs %1, pmccntr_el0\n"
+	: "=&r" (start), "=&r" (end) : "r" (sctlr));
+
+	printf("%llx\n", end - start);
+	return 0;
+}
+
+after applying this patch to kvm
+
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index bb91b6fc63861..5de39d740aa58 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -770,7 +770,7 @@
+ 
+ 	mrs	x2, mdcr_el2
+ 	and	x2, x2, #MDCR_EL2_HPMN_MASK
+-	orr	x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
++//	orr	x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
+ 	orr	x2, x2, #(MDCR_EL2_TDRA | MDCR_EL2_TDOSA)
+ 
+ 	// Check for KVM_ARM64_DEBUG_DIRTY, and set debug to trap
+
+But I get zero for the cycle count. Not sure what I'm missing.
+
+drew
