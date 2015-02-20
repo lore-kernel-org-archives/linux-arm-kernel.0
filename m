@@ -1,40 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Feb 2015 13:53:13 +0000
-Subject: [PATCH] arm64: Guard asm/assembler.h against multiple inclusions
-Message-ID: <1424440393-28458-1-git-send-email-marc.zyngier@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 20 Feb 2015 07:53:50 -0600
+Subject: [RESEND PATCH 2/2] arm: socfpga: Set share override bit of the l2
+ cache controller
+In-Reply-To: <54E6DF09.9060505@gmail.com>
+References: <1424365606-19964-1-git-send-email-dinguyen@opensource.altera.com>
+ <1424365606-19964-2-git-send-email-dinguyen@opensource.altera.com>
+ <CAL_JsqKmbV69Q-hgnvnz-2+2T8k-Q+WcrFmewkfozKk06ZM7OA@mail.gmail.com>
+ <54E6DF09.9060505@gmail.com>
+Message-ID: <CAL_Jsq+iBr+Pczkr_7YrcmbsfStx3yk6mYPhA-Gcb8oAtwNbxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-asm/assembler.h lacks the usual guard against multiple inclusion,
-leading to a compilation failure if it is accidentally included
-twice.
+On Fri, Feb 20, 2015 at 1:15 AM, Dinh Nguyen <dinh.linux@gmail.com> wrote:
+> Hi Rob,
+>
+> On 2/19/15 12:13 PM, Rob Herring wrote:
+>> On Thu, Feb 19, 2015 at 11:06 AM,  <dinguyen@opensource.altera.com> wrote:
+>>> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+>>>
+>>> By not having bit 22 set in the PL310 Auxiliary Control register (shared
+>>> attribute override enable) has the side effect of transforming Normal
+>>> Shared Non-cacheable reads into Cacheable no-allocate reads.
+>>>
+>>> Coherent DMA buffers in Linux always have a Cacheable alias via the
+>>> kernel linear mapping and the processor can speculatively load cache
+>>> lines into the PL310 controller. With bit 22 cleared, Non-cacheable
+>>> reads would unexpectedly hit such cache lines leading to buffer
+>>> corruption.
+>>
+>> You really should be doing this in your bootloader.
+>>
+>
+> Can I ask what is your reasoning for doing this in the bootloader? It's
+> seems like this is such a nice mechanism to do it here.
 
-Using the classic #ifndef/#define/#endif construct solves the issue.
+Primarily, this register is secure only and we try to avoid secure
+mode setup in the kernel.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/assembler.h | 5 +++++
- 1 file changed, 5 insertions(+)
+Russell also has had a patch to do this generically in his patch queue
+forever. If we want this in the kernel, then we should apply that.
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 5901480..750bac4 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -20,6 +20,9 @@
- #error "Only include this from assembly code"
- #endif
- 
-+#ifndef __ASM_ASSEMBLER_H
-+#define __ASM_ASSEMBLER_H
-+
- #include <asm/ptrace.h>
- #include <asm/thread_info.h>
- 
-@@ -155,3 +158,5 @@ lr	.req	x30		// link register
- #endif
- 	orr	\rd, \lbits, \hbits, lsl #32
- 	.endm
-+
-+#endif	/* __ASM_ASSEMBLER_H */
--- 
-2.1.4
+Rob
