@@ -1,36 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Feb 2015 13:57:44 +0000
-Subject: [RESEND PATCH 2/2] arm: socfpga: Set share override bit of the
- l2 cache controller
-In-Reply-To: <CAL_Jsq+iBr+Pczkr_7YrcmbsfStx3yk6mYPhA-Gcb8oAtwNbxg@mail.gmail.com>
-References: <1424365606-19964-1-git-send-email-dinguyen@opensource.altera.com>
- <1424365606-19964-2-git-send-email-dinguyen@opensource.altera.com>
- <CAL_JsqKmbV69Q-hgnvnz-2+2T8k-Q+WcrFmewkfozKk06ZM7OA@mail.gmail.com>
- <54E6DF09.9060505@gmail.com>
- <CAL_Jsq+iBr+Pczkr_7YrcmbsfStx3yk6mYPhA-Gcb8oAtwNbxg@mail.gmail.com>
-Message-ID: <20150220135744.GH8656@n2100.arm.linux.org.uk>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 20 Feb 2015 19:28:36 +0530
+Subject: [PATCH] clockevents: Add (missing) default case for switch blocks
+In-Reply-To: <20150220132220.GB28882@gmail.com>
+References: <6291e308ab77a480c6b1732e16108c5fe6f66afa.1424412815.git.viresh.kumar@linaro.org>
+ <20150220083842.GA20387@gmail.com>
+ <20150220084807.GJ21418@twins.programming.kicks-ass.net>
+ <20150220093659.GA23469@gmail.com>
+ <20150220113753.GP5029@twins.programming.kicks-ass.net>
+ <20150220114136.GA27483@gmail.com>
+ <CAKohpokmCof2P8Un+i5eOS3BQhH_pMNATH4xkbbhw5TqJFEy9Q@mail.gmail.com>
+ <20150220132220.GB28882@gmail.com>
+Message-ID: <CAKohpokEV7EatQROgzQBWPRPFEn8OsMo5EHa+q1FMwBESwiU3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 07:53:50AM -0600, Rob Herring wrote:
-> On Fri, Feb 20, 2015 at 1:15 AM, Dinh Nguyen <dinh.linux@gmail.com> wrote:
-> > Can I ask what is your reasoning for doing this in the bootloader? It's
-> > seems like this is such a nice mechanism to do it here.
-> 
-> Primarily, this register is secure only and we try to avoid secure
-> mode setup in the kernel.
-> 
-> Russell also has had a patch to do this generically in his patch queue
-> forever. If we want this in the kernel, then we should apply that.
+On 20 February 2015 at 18:52, Ingo Molnar <mingo@kernel.org> wrote:
+>
+> * Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>> +       CLOCK_EVT_DEV_MODE_UNUSED = 0,
+>
+> What is 'unused' - not initialized yet?
 
-I discarded it.  In general, we want boot loaders or firmware to
-configure the basic properties of the caches, rather than having the
-kernel do it for exactly the reasons you say above.
+Unused. Initially all clockevent devices are supposed to be in this
+mode but later if another device replaces an existing one, the existing
+one is put into this mode.
 
-Yes, there are some cache features which can only be enabled in
-combination with CPU features, and those the kernel _has_ to know
-about, but the basic setup should be done outside the kernel.
+>> +       CLOCK_EVT_DEV_MODE_SHUTDOWN,
+>> +       CLOCK_EVT_DEV_MODE_PERIODIC,
+>> +       CLOCK_EVT_DEV_MODE_ONESHOT,
+>> +       CLOCK_EVT_DEV_MODE_RESUME,
+>
+> What is 'resume' mode?
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Introduced with: 18de5bc4c1f1 ("clockevents: fix resume logic") and is only
+called during system resume to resume the clockevent devices before resuming
+the tick. Only few implementations do meaningful stuff here.
+
+>> +       CLOCK_EVT_DEV_MODE_ONESHOT_STOPPED,  /* This would be the new
+>> mode which I will add later */
+>
+> What does this mode express?
+
+I have added it here to show how things would look like eventually,
+but it wouldn't
+be present in the patch which splits the enum into two parts..
+
+Its only important for NOHZ_FULL (IDLE ? Maybe). When we decide that the tick
+(LOWRES) or hrtimer interrupt (HIGHRES) isn't required for indefinite
+period of time
+(i.e. no timers/hrtimers are present to serve), we skip reprogramming
+the clockevent
+device. But its already reprogrammed from the tick-handler and so will
+fire atleast
+once again.
+
+The case is worst for implementations where the underlying hardware doesn't have
+support for ONESHOT mode. And so they emulate ONESHOT over PERIODIC.
+And in those cases, these spurious interrupts come at a rate last programmed for
+the clockevent device. And that is mostly tick-rate..
+
+> So for state machines it's important to document the states
+> and the transitions between them very clearly - please
+> start with that.
+
+Sure.
+
+> Also, this should not be in a generic header, it should be
+> somewhere internal in kernel/time/.
+
+Right. But there are some excellent drivers which are comparing things against
+dev->mode (i.e. enum clock_event_dev_mode now..). I need to fix them as well
+first to push this into some internal header.
+
+>> Ofcourse, we also need to replace 'clock_event_mode' with
+>> 'clock_event_dev_mode' and 'CLOCK_EVT_MODE_*' with
+>> 'CLOCK_EVT_DEV_MODE_*' in all core code..
+>
+> Yes.
+
+Thanks for your suggestions.
