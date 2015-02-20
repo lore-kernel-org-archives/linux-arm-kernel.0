@@ -1,32 +1,64 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 20 Feb 2015 08:59:24 +0000
-Subject: [PATCH] component: fix build warning on arm64 builds
-Message-ID: <E1YOjQi-0002Tw-QT@rmk-PC.arm.linux.org.uk>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 20 Feb 2015 10:13:22 +0100
+Subject: [PATCH v2] crypto: atmel: fix bogus select
+In-Reply-To: <6741924.K1MvntTk7u@wuerfel>
+References: <6741924.K1MvntTk7u@wuerfel>
+Message-ID: <20150220091322.GN32600@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix:
-drivers/base/component.c: In function 'find_components':
-drivers/base/component.c:97:3: warning: format '%u' expects argument of type 'unsigned int', but argument 4 has type 'size_t' [-Wformat]
-on ARM64 builds.
+Hi Arnd,
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/base/component.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Thu, Feb 19, 2015 at 04:38:19PM +0100, Arnd Bergmann wrote:
+> The Atmel at91 crypto driver unconditionally selects AT_HDMAC,
+> which results in a Kconfig warning if that driver is not enabled:
+> 
+> warning: (CRYPTO_DEV_ATMEL_AES) selects AT_HDMAC which has unmet direct dependencies (DMADEVICES && ARCH_AT91)
+> 
+> The crypty driver itself does not actually have a dependency
+> on a particular dma engine, other than this being the one that
+> is used in at91.
+> 
+> Removing the 'select' gets rid of the warning, but can cause
+> the driver to be unusable if the HDMAC is not enabled at the
+> same time. To work around that, this patch clarifies the runtime
+> dependency to be '(ARCH_AT91 && AT_XDMAC)', but adds an alternative
+> for COMPILE_TEST, which lets the driver get build on all systems.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> v2: as a result of the discussion with Ludovic, clarify the
+> dependency.
+> 
+> Please apply for 3.21 if there are no further comments.
+> 
+> diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+> index 2fb0fdfc87df..562125183690 100644
+> --- a/drivers/crypto/Kconfig
+> +++ b/drivers/crypto/Kconfig
+> @@ -342,13 +342,12 @@ config CRYPTO_DEV_BFIN_CRC
+>  
+>  config CRYPTO_DEV_ATMEL_AES
+>  	tristate "Support for Atmel AES hw accelerator"
+> -	depends on ARCH_AT91
+> +	depends on (ARCH_AT91 && AT_XDMAC) || COMPILE_TEST
 
-diff --git a/drivers/base/component.c b/drivers/base/component.c
-index a6f2050d17b7..d99b06b341fb 100644
---- a/drivers/base/component.c
-+++ b/drivers/base/component.c
-@@ -94,7 +94,7 @@ static int find_components(struct master *master)
- 	for (i = 0; i < match->num; i++) {
- 		struct component *c;
- 
--		dev_dbg(master->dev, "Looking for component %u\n", i);
-+		dev_dbg(master->dev, "Looking for component %zu\n", i);
- 
- 		if (match->compare[i].component)
- 			continue;
--- 
-1.8.3.1
+Sorry maybe my explanation was not clear. When I said add AT_XDMAC it
+was not to replace AT_HDMAC but to have something like:
+
+ARCH_AT91 && (AT_HDMAC || AT_XDMAC)
+
+>  	select CRYPTO_CBC
+>  	select CRYPTO_ECB
+>  	select CRYPTO_AES
+>  	select CRYPTO_ALGAPI
+>  	select CRYPTO_BLKCIPHER
+> -	select AT_HDMAC
+>  	help
+>  	  Some Atmel processors have AES hw accelerator.
+>  	  Select this if you want to use the Atmel module for
+>
+
+Regards
+
+Ludovic
