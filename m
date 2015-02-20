@@ -1,111 +1,82 @@
-From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
-Date: Fri, 20 Feb 2015 19:37:08 +0200
-Subject: [PATCH 2/4] of: DT quirks infrastructure
-In-Reply-To: <CAL_JsqLENvqsG+vjK740Aw4yKYONwHB1b-B7mKvE_iAZ1JSdNw@mail.gmail.com>
-References: <1424271576-1952-3-git-send-email-pantelis.antoniou@konsulko.com>
- <20150218154106.GC29429@leverpostej>
- <FE61DD1C-51DA-4869-8A62-C019C3D70577@konsulko.com>
- <20150218173115.GG29429@leverpostej>
- <76BD1B22-BAED-4205-9B34-186907CE0217@konsulko.com>
- <54E613E7.2020405@gmail.com>
- <670D0881-DBF0-45E8-A502-A6DB2B77A750@konsulko.com>
- <54E61DD2.3060002@gmail.com>
- <53F2F94C-0C43-4A54-B8CD-EEC454A0AC19@konsulko.com>
- <54E742F2.80506@hurleysoftware.com>
- <20150220143533.GA29908@odux.rfo.atmel.com>
- <CAL_JsqLENvqsG+vjK740Aw4yKYONwHB1b-B7mKvE_iAZ1JSdNw@mail.gmail.com>
-Message-ID: <37628878-C4B4-49F6-9000-B993250F54AB@konsulko.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Feb 2015 17:46:41 +0000
+Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
+In-Reply-To: <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20150220174641.GI8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Thu, Feb 19, 2015 at 05:08:28PM +0000, Srinivas Kandagatla wrote:
+> +static struct class eeprom_class = {
+> +	.name		= "eeprom",
+> +	.dev_groups	= eeprom_dev_groups,
+> +};
+> +
+> +int eeprom_register(struct eeprom_device *eeprom)
+> +{
+> +	int rval;
+> +
+> +	if (!eeprom->regmap || !eeprom->size) {
+> +		dev_err(eeprom->dev, "Regmap not found\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	eeprom->id = ida_simple_get(&eeprom_ida, 0, 0, GFP_KERNEL);
+> +	if (eeprom->id < 0)
+> +		return eeprom->id;
+> +
+> +	eeprom->edev.class = &eeprom_class;
+> +	eeprom->edev.parent = eeprom->dev;
+> +	eeprom->edev.of_node = eeprom->dev ? eeprom->dev->of_node : NULL;
+> +	dev_set_name(&eeprom->edev, "eeprom%d", eeprom->id);
+> +
+> +	device_initialize(&eeprom->edev);
+> +
+> +	dev_dbg(&eeprom->edev, "Registering eeprom device %s\n",
+> +		dev_name(&eeprom->edev));
+> +
+> +	rval = device_add(&eeprom->edev);
+> +	if (rval)
+> +		return rval;
+> +
+> +	mutex_lock(&eeprom_list_mutex);
+> +	list_add(&eeprom->list, &eeprom_list);
+> +	mutex_unlock(&eeprom_list_mutex);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(eeprom_register);
+> +
+> +int eeprom_unregister(struct eeprom_device *eeprom)
+> +{
+> +	device_del(&eeprom->edev);
+> +
+> +	mutex_lock(&eeprom_list_mutex);
+> +	list_del(&eeprom->list);
+> +	mutex_unlock(&eeprom_list_mutex);
+> +
+> +	return 0;
 
-> On Feb 20, 2015, at 19:30 , Rob Herring <robherring2@gmail.com> wrote:
-> 
-> On Fri, Feb 20, 2015 at 8:35 AM, Ludovic Desroches
-> <ludovic.desroches@atmel.com> wrote:
->> On Fri, Feb 20, 2015 at 09:21:38AM -0500, Peter Hurley wrote:
->>> On 02/19/2015 12:38 PM, Pantelis Antoniou wrote:
->>>> 
->>>>> On Feb 19, 2015, at 19:30 , Frank Rowand <frowand.list@gmail.com> wrote:
->>>>> 
->>>>> On 2/19/2015 9:00 AM, Pantelis Antoniou wrote:
->>>>>> Hi Frank,
-> 
-> [...]
-> 
->>>>>> This is one of those things that the kernel community doesn?t understand which makes people
->>>>>> who push product quite mad.
->>>>>> 
->>>>>> Engineering a product is not only about meeting customer spec, in order to turn a profit
->>>>>> the whole endeavor must be engineered as well for manufacturability.
->>>>>> 
->>>>>> Yes, you can always manually install files in the bootloader. For 1 board no problem.
->>>>>> For 10 doable. For 100 I guess you can hire an extra guy. For 1 million? Guess what,
->>>>>> instead of turning a profit you?re losing money if you only have a few cents of profit
->>>>>> per unit.
->>>>> 
->>>>> I'm not installing physical components manually.  Why would I be installing software
->>>>> manually?  (rhetorical question)
->>>>> 
->>>> 
->>>> Because on high volume product runs the flash comes preprogrammed and is soldered as is.
->>>> 
->>>> Having a single binary to flash to every revision of the board makes logistics considerably
->>>> easier.
->>>> 
->>>> Having to boot and tweak the bootloader settings to select the correct dtb (even if it?s present
->>>> on the flash medium) takes time and is error-prone.
->>>> 
->>>> Factory time == money, errors == money.
->>>> 
->>>>>> 
->>>>>> No knobs to tweak means no knobs to break. And a broken knob can have pretty bad consequences
->>>>>> for a few million units.
->>>>> 
->>>>> And you produce a few million units before testing that the first one off the line works?
->>>>> 
->>>> 
->>>> The first one off the line works. The rest will get some burn in and functional testing if you?re
->>>> lucky. In many cases where the product is very cheap it might make financial sense to just ship
->>>> as is and deal with recalls, if you?re reasonably happy after a little bit of statistical sampling.
->>>> 
->>>> Hardware is hard :)
->>> 
->>> I'm failing to see how this series improves your manufacturing process at all.
->>> 
->>> 1. Won't you have to provide the factory with different eeprom images for the
->>>   White and Black?  You _trust_ them to get that right, or more likely, you
->>>   have process control procedures in place so that you don't get 1 million Blacks
->>>   flashed with the White eeprom image.
->>> 
->>> 2. The White and Black use different memory technology so it's not as if the
->>>   eMMC from the Black will end up on the White SMT line (or vice versa).
->>> 
->>> 3  For that matter, why wouldn't you worry that all the microSD cards intended
->>>   for the White were accidentally assembled with the first 50,000 Blacks; at
->>>   that point you're losing a lot more than a few cents of profit. And that has
->>>   nothing to do with what image you provided.
->>> 
->> 
->> As you said, we can imagine many reasons to have a failure during the
->> production, having several DTB files will increase the risk.
-> 
-> Then package them as a single file. You can even use DT to do that.
-> See u-boot FIT image.
-> 
+There's problems with this.  "edev" is embedded into eeprom, and "edev"
+is a refcounted structure - it has a lifetime, and the lifetime of
+eeprom is thus determined by edev.
 
-In the ideal case there is no u-boot, and no bootloader.
+What this means is that calling eeprom_unregister() and then freeing
+the eeprom structure is a potentially unsafe operation - the memory
+backing edev must only be freed when the release method for the
+struct device has been called.
 
-Packaging 27 difference DTBs, as in the Atmel people case, differing in only a few 
-properties seems a waste of space, no?  
+> +struct eeprom_device {
+> +	struct regmap		*regmap;
+> +	int			stride;
+> +	size_t			size;
+> +	struct device		*dev;
 
-We keep on dancing around the issue, namely that DT does not have a quirk/variant
-mechanism. I feel that it is a glaring omission. We can?t keep shoveling crap over
-the fence to firmware and expect it to get buried there.
+Failing to understand and address the driver model life time issues is
+a major blocker for this patch.  Sorry.
 
-> Rob
-
-Regards
-
-? Pantelis
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
