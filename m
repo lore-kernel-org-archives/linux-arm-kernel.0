@@ -1,92 +1,47 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 20 Feb 2015 19:00:22 +0000
-Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
-In-Reply-To: <20150220174641.GI8656@n2100.arm.linux.org.uk>
-References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20150220174641.GI8656@n2100.arm.linux.org.uk>
-Message-ID: <54E78446.8050800@linaro.org>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Fri, 20 Feb 2015 20:03:05 +0100
+Subject: Announce: rmk's nightly builder gets ARM64 support
+In-Reply-To: <20150220102009.GF8656@n2100.arm.linux.org.uk>
+References: <20150219171220.GA8656@n2100.arm.linux.org.uk>
+ <20150219183444.GB8656@n2100.arm.linux.org.uk>
+ <20150220092003.GB31692@arm.com>
+ <CAKv+Gu_5fOinMVYbk99unmEDSqCF3Z7QdXiQTw0VrrWW16Oc6w@mail.gmail.com>
+ <20150220094035.GE8656@n2100.arm.linux.org.uk>
+ <20150220102009.GF8656@n2100.arm.linux.org.uk>
+Message-ID: <20150220190305.GO15673@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Feb 20, 2015 at 10:20:09AM +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 20, 2015 at 09:40:35AM +0000, Russell King - ARM Linux wrote:
+> > On Fri, Feb 20, 2015 at 09:24:39AM +0000, Ard Biesheuvel wrote:
+> > > Yes, this looks like a GCC problem, not binutils, since there are
+> > > other .S files in the same folder that contain crypto instructions
+> > > that build fine. This particular one is a .c file with AES
+> > > instructions in inline asm() (and we pass -march=armv8-a+crypto)
+> > 
+> > Maybe we need to get jk's blog post updated - it's currently on of
+> > the top hits in google, so this is probably going to trip up a lot of
+> > people if they follow the instructions there.
+> > 
+> > http://jk.ozlabs.org/docs/arm64-toolchain/
+> > 
+> > So it sounds like possibly the binutils part of those instructions is
+> > fine, it's the gcc part which isn't.
+> 
+> Note that it would also be useful to know where to get a working gcc
+> from (preferably in source form - I doubt there's any Fedora 14
+> binaries around.)
 
+We have an arm 64 bit toolchain in OSELAS.Toolchain:
+http://git.pengutronix.de/?p=OSELAS.Toolchain.git
 
-On 20/02/15 17:46, Russell King - ARM Linux wrote:
-> On Thu, Feb 19, 2015 at 05:08:28PM +0000, Srinivas Kandagatla wrote:
->> +static struct class eeprom_class = {
->> +	.name		= "eeprom",
->> +	.dev_groups	= eeprom_dev_groups,
->> +};
->> +
->> +int eeprom_register(struct eeprom_device *eeprom)
->> +{
->> +	int rval;
->> +
->> +	if (!eeprom->regmap || !eeprom->size) {
->> +		dev_err(eeprom->dev, "Regmap not found\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	eeprom->id = ida_simple_get(&eeprom_ida, 0, 0, GFP_KERNEL);
->> +	if (eeprom->id < 0)
->> +		return eeprom->id;
->> +
->> +	eeprom->edev.class = &eeprom_class;
->> +	eeprom->edev.parent = eeprom->dev;
->> +	eeprom->edev.of_node = eeprom->dev ? eeprom->dev->of_node : NULL;
->> +	dev_set_name(&eeprom->edev, "eeprom%d", eeprom->id);
->> +
->> +	device_initialize(&eeprom->edev);
->> +
->> +	dev_dbg(&eeprom->edev, "Registering eeprom device %s\n",
->> +		dev_name(&eeprom->edev));
->> +
->> +	rval = device_add(&eeprom->edev);
->> +	if (rval)
->> +		return rval;
->> +
->> +	mutex_lock(&eeprom_list_mutex);
->> +	list_add(&eeprom->list, &eeprom_list);
->> +	mutex_unlock(&eeprom_list_mutex);
->> +
->> +	return 0;
->> +}
->> +EXPORT_SYMBOL(eeprom_register);
->> +
->> +int eeprom_unregister(struct eeprom_device *eeprom)
->> +{
->> +	device_del(&eeprom->edev);
->> +
->> +	mutex_lock(&eeprom_list_mutex);
->> +	list_del(&eeprom->list);
->> +	mutex_unlock(&eeprom_list_mutex);
->> +
->> +	return 0;
->
-> There's problems with this.  "edev" is embedded into eeprom, and "edev"
-> is a refcounted structure - it has a lifetime, and the lifetime of
-> eeprom is thus determined by edev.
->
-> What this means is that calling eeprom_unregister() and then freeing
-> the eeprom structure is a potentially unsafe operation - the memory
-> backing edev must only be freed when the release method for the
-> struct device has been called.
+with this ptxconfig:
+http://git.pengutronix.de/?p=OSELAS.Toolchain.git;a=blob;f=ptxconfigs/aarch64-v8a-linux-gnu_gcc-4.9.2_glibc-2.20_binutils-2.24_kernel-3.16-sanitized.ptxconfig
 
-Thats a good catch, Yes I see the issue.
-
-Moving the struct eeprom_device allocation to eeprom core.c should 
-address this issue. This makes eeprom self contained and can safely free 
-the eeprom_device memory in eeprom_class.eeprom_release().
-
-Will fix this in next version.
-
->
->> +struct eeprom_device {
->> +	struct regmap		*regmap;
->> +	int			stride;
->> +	size_t			size;
->> +	struct device		*dev;
->
-> Failing to understand and address the driver model life time issues is
-> a major blocker for this patch.  Sorry.
->
+rsc
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
