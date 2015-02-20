@@ -1,43 +1,133 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 20 Feb 2015 13:46:42 +0200
-Subject: [PATCH 9/9] RFC: ARM: DRA7: enable DSS_DESHDCP_CLKEN
-In-Reply-To: <54DE1B7E.10505@ti.com>
-References: <1423840286-18377-1-git-send-email-tomi.valkeinen@ti.com>	<1423840286-18377-10-git-send-email-tomi.valkeinen@ti.com>
- <CAGo_u6p89ot-eNwK65otoYsLM6NXeh929=SBG6uKAsX8Tnd_RQ@mail.gmail.com>
- <54DE1B7E.10505@ti.com>
-Message-ID: <54E71EA2.3030803@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 20 Feb 2015 17:26:49 +0530
+Subject: [PATCH] clockevents: Add (missing) default case for switch blocks
+In-Reply-To: <20150220114136.GA27483@gmail.com>
+References: <6291e308ab77a480c6b1732e16108c5fe6f66afa.1424412815.git.viresh.kumar@linaro.org>
+ <20150220083842.GA20387@gmail.com>
+ <20150220084807.GJ21418@twins.programming.kicks-ass.net>
+ <20150220093659.GA23469@gmail.com>
+ <20150220113753.GP5029@twins.programming.kicks-ass.net>
+ <20150220114136.GA27483@gmail.com>
+Message-ID: <CAKohpokmCof2P8Un+i5eOS3BQhH_pMNATH4xkbbhw5TqJFEy9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/02/15 17:42, Tero Kristo wrote:
-> On 02/13/2015 05:25 PM, Nishanth Menon wrote:
+On 20 February 2015 at 17:11, Ingo Molnar <mingo@kernel.org> wrote:
+>
+> * Peter Zijlstra <peterz@infradead.org> wrote:
 
->> I would probably wait for control module to become syscon and probably
->> model this as syscon clk - I thin we should be seeing a series
->> sometime soon.
-> 
-> Yeah, I will be posting a series in a bit, just running some final tests
-> on it.
+>> Maybe we should break that enum into two; one for devices
+>> and one for the core interface and avoid the problem that
+>> way.
+>
+> Yeah, that would do the trick.
 
-I did the above with Tero's series. Adding the DES HDCP clock works ok.
+Thanks for your suggestions. Just to confirm (before I spam lists with
+patches), is
+this somewhat similar to what you are looking for ?
 
-However, I'm not able to do this in HWMOD framework. To enable the DSS
-IP block I need to enable both the DSS func clock and the DES HDCP
-clock, but the HWMOD framework only allows one mainclock.
+diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
+index 59af26b54d15..80b669cb836d 100644
+--- a/include/linux/clockchips.h
++++ b/include/linux/clockchips.h
+@@ -32,17 +32,24 @@ enum clock_event_nofitiers {
+ struct clock_event_device;
+ struct module;
 
-I added the HDCP clock as an opt clock, but those are not enabled
-intially by the HWMOD framework, and the call in omap_hwmod.c:_enable()
-to soc_ops.wait_target_ready(oh) calls fails.
+-/* Clock event mode commands */
++/* Clock event mode commands for legacy ->set_mode(): OBSOLETE */
+ enum clock_event_mode {
+        CLOCK_EVT_MODE_UNUSED = 0,
+        CLOCK_EVT_MODE_SHUTDOWN,
+        CLOCK_EVT_MODE_PERIODIC,
+        CLOCK_EVT_MODE_ONESHOT,
+        CLOCK_EVT_MODE_RESUME,
+-
+-       /* Legacy ->set_mode() callback doesn't support below modes */
+ };
 
-So... Any ideas how to proceed?
++/* Clock event modes, only for core's internal use */
++enum clock_event_dev_mode {
++       CLOCK_EVT_DEV_MODE_UNUSED = 0,
++       CLOCK_EVT_DEV_MODE_SHUTDOWN,
++       CLOCK_EVT_DEV_MODE_PERIODIC,
++       CLOCK_EVT_DEV_MODE_ONESHOT,
++       CLOCK_EVT_DEV_MODE_RESUME,
++       CLOCK_EVT_DEV_MODE_ONESHOT_STOPPED,  /* This would be the new
+mode which I will add later */
++};
++
+ /*
+  * Clock event features
+  */
+diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
+index 489642b08d64..16555d3db94d 100644
+--- a/kernel/time/clockevents.c
++++ b/kernel/time/clockevents.c
+@@ -95,14 +95,18 @@ u64 clockevent_delta2ns(unsigned long latch,
+struct clock_event_device *evt)
+ EXPORT_SYMBOL_GPL(clockevent_delta2ns);
 
- Tomi
+ static int __clockevents_set_mode(struct clock_event_device *dev,
+-                                 enum clock_event_mode mode)
++                                 enum clock_event_dev_mode mode)
+ {
+        /* Transition with legacy set_mode() callback */
+        if (dev->set_mode) {
+                /* Legacy callback doesn't support new modes */
+-               if (mode > CLOCK_EVT_MODE_RESUME)
++               if (mode > CLOCK_EVT_DEV_MODE_RESUME)
+                        return -ENOSYS;
+-               dev->set_mode(mode, dev);
++               /*
++                * 'clock_event_dev_mode' and 'clock_event_mode' have 1-to-1
++                * mapping until *_RESUME, and so a simple cast will work.
++                */
++               dev->set_mode((enum clock_event_mode)mode, dev);
+                return 0;
+        }
+
+@@ -111,29 +115,29 @@ static int __clockevents_set_mode(struct
+clock_event_device *dev,
+
+        /* Transition with new mode-specific callbacks */
+        switch (mode) {
+-       case CLOCK_EVT_MODE_UNUSED:
++       case CLOCK_EVT_DEV_MODE_UNUSED:
+                /*
+                 * This is an internal state, which is guaranteed to go from
+                 * SHUTDOWN to UNUSED. No driver interaction required.
+                 */
+                return 0;
+
+-       case CLOCK_EVT_MODE_SHUTDOWN:
++       case CLOCK_EVT_DEV_MODE_SHUTDOWN:
+                return dev->set_mode_shutdown(dev);
+
+-       case CLOCK_EVT_MODE_PERIODIC:
++       case CLOCK_EVT_DEV_MODE_PERIODIC:
+                /* Core internal bug */
+                if (!(dev->features & CLOCK_EVT_FEAT_PERIODIC))
+                        return -ENOSYS;
+                return dev->set_mode_periodic(dev);
+
+-       case CLOCK_EVT_MODE_ONESHOT:
++       case CLOCK_EVT_DEV_MODE_ONESHOT:
+                /* Core internal bug */
+                if (!(dev->features & CLOCK_EVT_FEAT_ONESHOT))
+                        return -ENOSYS;
+                return dev->set_mode_oneshot(dev);
+
+-       case CLOCK_EVT_MODE_RESUME:
++       case CLOCK_EVT_DEV_MODE_RESUME:
+                /* Optional callback */
+                if (dev->set_mode_resume)
+                        return dev->set_mode_resume(dev);
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150220/960560ce/attachment.sig>
+
+Ofcourse, we also need to replace 'clock_event_mode' with 'clock_event_dev_mode'
+and 'CLOCK_EVT_MODE_*' with 'CLOCK_EVT_DEV_MODE_*' in all core code..
+
+--
+viresh
