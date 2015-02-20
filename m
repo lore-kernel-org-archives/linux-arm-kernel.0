@@ -1,70 +1,56 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Fri, 20 Feb 2015 11:52:19 +0100
-Subject: [PATCH] clockevents: Add (missing) default case for switch blocks
-In-Reply-To: <CAKohpok3r5ZPCqECQQOZeGiFM-w3yesMjZRuj_ky0PxH7ijAXA@mail.gmail.com>
-References: <6291e308ab77a480c6b1732e16108c5fe6f66afa.1424412815.git.viresh.kumar@linaro.org>
- <20150220083842.GA20387@gmail.com>
- <20150220084807.GJ21418@twins.programming.kicks-ass.net>
- <20150220093659.GA23469@gmail.com>
- <CAKohpok3r5ZPCqECQQOZeGiFM-w3yesMjZRuj_ky0PxH7ijAXA@mail.gmail.com>
-Message-ID: <20150220105219.GA26933@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 20 Feb 2015 10:57:43 +0000
+Subject: [PATCH] arm64: fix pt_regs location in Exception stack dump
+In-Reply-To: <1424411928-1122-1-git-send-email-hc.yen@mediatek.com>
+References: <1424411928-1122-1-git-send-email-hc.yen@mediatek.com>
+Message-ID: <20150220105743.GD31692@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-* Viresh Kumar <viresh.kumar@linaro.org> wrote:
+On Fri, Feb 20, 2015 at 05:58:48AM +0000, HC Yen wrote:
+> In __exception_irq_entry functions, they could allocate some space on
+> stack before pt_regs. Here is the prologue of gic_handle_irq():
 
-> > So why is a 'default' mode needed then? It makes the 
-> > addition of new modes to the legacy handler easier, 
-> > which looks backwards.
-> 
-> The requirement was to add another mode ONESHOT_STOPPED 
-> [1], to be supported only by the new per-mode callbacks..
+I don't think this is specific to __exception_irq_entry functions -- it
+looks to me like unwind_frame is making assumptions about the prologue
+that aren't enforced by the PCS.
 
-Why would a callback need any flag, and why would a flag be 
-visible to old legacy callbacks?
+In which case, the 'frame->sp = fp + 0x10' is really bogus. We're probably
+better off just doing 'frame->sp = fp' and adding a comment that the
+frame record can live anywhere in the stack frame. That doesn't solve your
+backtrace case, but at least it stops us pretending that adding 16 buys
+us anything.
 
-> We have got a clear check in core with the patch Peter 
-> mentioned above, which doesn't let us call legacy 
-> ->set_mode() for the newer modes.
-> 
->         if (dev->set_mode) {
->                 /* Legacy callback doesn't support new modes */
->                 if (mode > CLOCK_EVT_MODE_RESUME)
->                        return -ENOSYS;
->                dev->set_mode(mode, dev);
->                return 0;
->         }
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index 1ef2940..a564429 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -90,12 +90,12 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+>  	set_fs(fs);
+>  }
+>  
+> -static void dump_backtrace_entry(unsigned long where, unsigned long stack)
+> +static void dump_backtrace_entry(unsigned long where, unsigned long frame)
+>  {
+>  	print_ip_sym(where);
+>  	if (in_exception_text(where))
+> -		dump_mem("", "Exception stack", stack,
+> -			 stack + sizeof(struct pt_regs));
+> +		dump_mem("", "Exception stack",
+> +			 frame - sizeof(struct pt_regs), frame);
+>  }
+>  
+>  static void dump_instr(const char *lvl, struct pt_regs *regs)
+> @@ -164,7 +164,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+>  		ret = unwind_frame(&frame);
+>  		if (ret < 0)
+>  			break;
+> -		dump_backtrace_entry(where, frame.sp);
+> +		dump_backtrace_entry(where, frame.fp);
 
-So here is where one of your problems comes from: why did 
-you add CLOCK_EVT_MODE_RESUME to the interface? Phase it 
-out, it's a legacy interface - new callbacks shouldn't need 
-any mode flags to begin with.
+I'm afraid I'm not following this. What guarantees that frame.fp points
+to the end of the pt_regs structure on an exception?
 
-> > So I'm confused: if we are using proper callbacks (like 
-> > my example outlined) , why is a 'mode enum' needed at 
-> > all?
-> 
-> The enum has two uses today:
-> 
-> - pass mode to the legacy ->set_mode() callback, which 
-> isn't required for the new callbacks.
-
-But this is misguided, as per above.
-
-> - flag for clockevent core's internal state machine, 
->   which it would still require. For example, it checks 
->   new-mode != old-mode before changing the mode..
-
-Internal state machine state should be decoupled from any 
-interface flags - especially when the interface is legacy.
-
-> I believe the enum is still required for the state 
-> machine, even with new per-mode callbacks.
-
-That needs to be fixed first then, before introducing new 
-API variants.
-
-Thanks,
-
-	Ingo
+Will
