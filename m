@@ -1,19 +1,17 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 20 Feb 2015 15:51:20 -0500
-Subject: [PATCH v2] ARM: shmobile: r8a7791: add ADSP clocks
-In-Reply-To: <54E792EC.4090807@cogentembedded.com>
-References: <4692589.Khlcz7yVTN@wasted.cogentembedded.com>
- <54E792EC.4090807@cogentembedded.com>
-Message-ID: <20150220205117.GD20237@verge.net.au>
+Date: Fri, 20 Feb 2015 15:52:16 -0500
+Subject: [PATCH] ARM: shmobile: r8a7790: add ADSP clocks
+In-Reply-To: <54E79337.9090500@cogentembedded.com>
+References: <1909663.BCLINDXhVH@wasted.cogentembedded.com>
+ <54E79337.9090500@cogentembedded.com>
+Message-ID: <20150220205216.GE20237@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 11:02:52PM +0300, Sergei Shtylyov wrote:
-> Hello.
+On Fri, Feb 20, 2015 at 11:04:07PM +0300, Sergei Shtylyov wrote:
+> On 12/30/2014 11:21 PM, Sergei Shtylyov wrote:
 > 
-> On 12/30/2014 11:20 PM, Sergei Shtylyov wrote:
-> 
-> >Add the ADSP clocks to the CPG and MSTP5 nodes of the R8A7791 device tree.
+> >Add the ADSP clocks to the CPG and MSTP5 nodes of the R8A7790 device tree.
 > 
 > >Based on the original patch by Konstantin Kozhevnikov
 > ><konstantin.kozhevnikov@cogentembedded.com>.
@@ -22,11 +20,13 @@ On Fri, Feb 20, 2015 at 11:02:52PM +0300, Sergei Shtylyov wrote:
 > 
 > >---
 > >The patch is against 'renesas-devel-20141229-v3.19-rc2' tag of Simon Horman's
-> >'renesas.git' repo plus the R8A7791 CAN patches posted last week. It depends on
-> >the patch adding the ADSP clock support to  the 'clk-rcar-gen2' driver in order
+> >'renesas.git' repo plus the R8A7790 CAN patches posted earlier. It depends on
+> >the patch adding the ADSP clock support to the 'clk-rcar-gen2' driver in order
 > >to work.
 > 
->    That patch now sits in Mike's tree and should soon be merged by Linus.
-> Simon, please consider merging this patch.
+>    Simon, please consider merging this patch as well.
 
-Thanks, done.
+Thanks done.
+
+I plan to do a push of renesas-devel shortly.
+Please let me know if you have anything else that I should wait for.
