@@ -1,61 +1,58 @@
 From: addy.ke@rock-chips.com (Addy Ke)
-Date: Fri, 20 Feb 2015 10:37:40 +0800
-Subject: [PATCH v2] mmc: dw_mmc: rockchip: add support MMC_CAP_RUNTIME_RESUME
- capability
-In-Reply-To: <1423812140-24196-1-git-send-email-addy.ke@rock-chips.com>
-References: <1423812140-24196-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <1424399860-3394-1-git-send-email-addy.ke@rock-chips.com>
+Date: Fri, 20 Feb 2015 10:55:25 +0800
+Subject: [PATCH v2] mmc: dw_mmc: fix bug that cause mmc_test failture
+In-Reply-To: <1422273849-29773-1-git-send-email-addy.ke@rock-chips.com>
+References: <1422273849-29773-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <1424400925-3867-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support HS200 and UHS mode, mmc core will call init_card() to
-execute tuning:
-- sdio: init_card can be executed at runtime resume.
-- sd and mmc: init_card can be executed at resume or runtime resume,
-  which depends on MMC_CAP_RUNTIME_RESUME capability.
+The STOP command can terminate a data transfer between a memory card and
+mmc controller.
 
-On rk3288 SoC, host will get DRTO interrupt when host send command
-to read tuning data. This will spend more than 111ms:
-drto_ms = drto_clks * 1000 / bus_hz = 111ms.
+As show in Synopsys DesignWare Cores Mobile Stroage Host Databook:
+Data timeout and Data end-bit error will terminate further data transfer
+by mmc controller. So we should not send abort command to terminate a
+data transfer again if we got DRTO and EBE interrupt.
 
-And the total tuning time will be more than 400ms.
+After this patch, all mmc_test cases can pass on RK3288-Pink2 board.
 
-So we should add MMC_CAP_RUNTIME_RESUME capability to execute tuning
-at runtime resume. Only if we do so, can we pass resume test.
-
-Reviewed-by: Doug Anderson <dianders@chromium.org>
 Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
 ---
 Changes in v2:
-- add this capability for all 4 slots, suggested by Doug Anderson.
+- DRTO and EBE are both set, should not send abort command too,
+  suggested by Doug Anderson. 
 
- drivers/mmc/host/dw_mmc-rockchip.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/mmc/host/dw_mmc.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
-index e2a726a..dbf166f 100644
---- a/drivers/mmc/host/dw_mmc-rockchip.c
-+++ b/drivers/mmc/host/dw_mmc-rockchip.c
-@@ -76,12 +76,20 @@ static int dw_mci_rockchip_init(struct dw_mci *host)
- 	return 0;
- }
- 
-+/* Common capabilities of RK3288 SoC */
-+static unsigned long dw_mci_rk3288_dwmmc_caps[4] = {
-+	MMC_CAP_RUNTIME_RESUME, /* emmc */
-+	MMC_CAP_RUNTIME_RESUME, /* sdmmc */
-+	MMC_CAP_RUNTIME_RESUME, /* sdio0 */
-+	MMC_CAP_RUNTIME_RESUME, /* sdio1 */
-+};
- static const struct dw_mci_drv_data rk2928_drv_data = {
- 	.prepare_command        = dw_mci_rockchip_prepare_command,
- 	.init			= dw_mci_rockchip_init,
- };
- 
- static const struct dw_mci_drv_data rk3288_drv_data = {
-+	.caps			= dw_mci_rk3288_dwmmc_caps,
- 	.prepare_command        = dw_mci_rockchip_prepare_command,
- 	.set_ios		= dw_mci_rk3288_set_ios,
- 	.setup_clock    = dw_mci_rk3288_setup_clock,
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 4d2e3c2..a27048a 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -1520,7 +1520,10 @@ static void dw_mci_tasklet_func(unsigned long priv)
+ 			if (test_and_clear_bit(EVENT_DATA_ERROR,
+ 					       &host->pending_events)) {
+ 				dw_mci_stop_dma(host);
+-				send_stop_abort(host, data);
++				if (data->stop ||
++				    !(host->data_status & (SDMMC_INT_DRTO |
++							   SDMMC_INT_EBE)))
++					send_stop_abort(host, data);
+ 				state = STATE_DATA_ERROR;
+ 				break;
+ 			}
+@@ -1547,7 +1550,10 @@ static void dw_mci_tasklet_func(unsigned long priv)
+ 			if (test_and_clear_bit(EVENT_DATA_ERROR,
+ 					       &host->pending_events)) {
+ 				dw_mci_stop_dma(host);
+-				send_stop_abort(host, data);
++				if (data->stop ||
++				    !(host->data_status & (SDMMC_INT_DRTO |
++							   SDMMC_INT_EBE)))
++					send_stop_abort(host, data);
+ 				state = STATE_DATA_ERROR;
+ 				break;
+ 			}
 -- 
 1.8.3.2
