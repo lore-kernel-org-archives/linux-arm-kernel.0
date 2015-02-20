@@ -1,44 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Feb 2015 13:38:06 +0000
-Subject: Announce: rmk's nightly builder gets ARM64 support
-In-Reply-To: <CAOMZO5Aqx_SQ1oaML=hiVzzJMJ2bNTAsjk-dWFLkETaV4_JO+A@mail.gmail.com>
-References: <20150219171220.GA8656@n2100.arm.linux.org.uk>
- <20150219183444.GB8656@n2100.arm.linux.org.uk>
- <20150220092003.GB31692@arm.com>
- <CAKv+Gu_5fOinMVYbk99unmEDSqCF3Z7QdXiQTw0VrrWW16Oc6w@mail.gmail.com>
- <20150220094035.GE8656@n2100.arm.linux.org.uk>
- <20150220102009.GF8656@n2100.arm.linux.org.uk>
- <CAOMZO5Aqx_SQ1oaML=hiVzzJMJ2bNTAsjk-dWFLkETaV4_JO+A@mail.gmail.com>
-Message-ID: <20150220133806.GG8656@n2100.arm.linux.org.uk>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 20 Feb 2015 15:42:02 +0200
+Subject: [PATCH 1/5] ARM: DTS: omap2: Correct the dma controller's property
+ names
+In-Reply-To: <1424439726-31994-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1424439726-31994-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1424439726-31994-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 08:35:31AM -0200, Fabio Estevam wrote:
-> Hi Russell,
-> 
-> On Fri, Feb 20, 2015 at 8:20 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> 
-> > Note that it would also be useful to know where to get a working gcc
-> > from (preferably in source form - I doubt there's any Fedora 14
-> > binaries around.)
-> 
-> The kbuild robot uses the following method:
-> 
-> wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross
-> -O ~/bin/make.cross
-> chmod +x ~/bin/make.cross
-> 
-> make.cross ARCH=arm64  defconfig
-> make.cross ARCH=arm64
-> 
-> This builds 3.19 fine.
+According to the Documentation/devicetree/bindings/dma/dma.txt the
+dma-channels and dma-requests property should not have '#'.
 
->From what I can see, this doesn't _build_ a compiler.  It grabs
-gcc-linaro-aarch64-linux-gnu-4.9-2014.08_linux.tar.xz from
-http://releases.linaro.org/14.08/components/toolchain/binaries
-and installs that - which contains a load of binaries.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/boot/dts/omap2.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
+index 59d1c297bb30..578fa2a54dce 100644
+--- a/arch/arm/boot/dts/omap2.dtsi
++++ b/arch/arm/boot/dts/omap2.dtsi
+@@ -87,8 +87,8 @@
+ 				     <14>,
+ 				     <15>;
+ 			#dma-cells = <1>;
+-			#dma-channels = <32>;
+-			#dma-requests = <64>;
++			dma-channels = <32>;
++			dma-requests = <64>;
+ 		};
+ 
+ 		i2c1: i2c at 48070000 {
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.3.0
