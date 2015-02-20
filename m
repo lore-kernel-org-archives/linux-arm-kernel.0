@@ -1,92 +1,54 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 20 Feb 2015 20:43:58 +0100
-Subject: [PATCH 2/2] at91sam9_wdt: Allow watchdog to reset device at
- early boot
-In-Reply-To: <20150220162855.GB22752@roeck-us.net>
-References: <54B53160.6060309@roeck-us.net>
- <cover.1424262664.git.timo.kokkonen@offcode.fi>
- <6c0a3a5bcd93d18437eeed04712b4aeff201a16f.1424262664.git.timo.kokkonen@offcode.fi>
- <54E49AA5.40008@roeck-us.net> <20150218151713.7a718311@bbrezillon>
- <54E4A6C4.4070706@roeck-us.net> <20150218160033.GK11529@piout.net>
- <CAL_JsqLj=bGTWr1aUMRNMjC+xmftMLjUHnGu5M337jNdDDOsZA@mail.gmail.com>
- <54E57F4F.5040300@offcode.fi>
- <CAL_Jsq+p=dEE0hz3B+nMG_Y1zNeZiJhfQXzDQ6b8xyKcc2VBJg@mail.gmail.com>
- <20150220162855.GB22752@roeck-us.net>
-Message-ID: <20150220204358.775a9967@bbrezillon>
+From: jdelvare@suse.de (Jean Delvare)
+Date: Fri, 20 Feb 2015 20:46:42 +0100
+Subject: [PATCH] iommu/io-pgtable-arm: Add built time dependency
+In-Reply-To: <20150220191943.GB1767@arm.com>
+References: <20150220194445.4225d56b@endymion.delvare>
+ <20150220191943.GB1767@arm.com>
+Message-ID: <20150220204642.04b1f0d8@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Feb 2015 08:28:55 -0800
-Guenter Roeck <linux@roeck-us.net> wrote:
+Hi Will,
 
-> On Fri, Feb 20, 2015 at 08:06:23AM -0600, Rob Herring wrote:
-> > On Thu, Feb 19, 2015 at 12:14 AM, Timo Kokkonen
-> > <timo.kokkonen@offcode.fi> wrote:
-> > > Hi,
-> > >
-
-[...]
-
-> > > What I am proposing here is a way to solve this without hacking. I was told
-> > > to think also a way to defer starting the watchdog for a given timeout so
-> > > that user space would have more time to wake up, which sounded like a good
-> > > idea. And this obviously needs to be implemented so that the watchdog is
-> > > guaranteed to reset the device should there be a crash of any kind that
-> > > prevents the watchdog daemon from starting up. There are a lot of details
-> > > that need to be taken care of properly and therefore watchdog core can't do
-> > > much about it, which is why I thought there is no much point trying to do it
-> > > in watchdog core.
+On Fri, 20 Feb 2015 19:19:43 +0000, Will Deacon wrote:
+> On Fri, Feb 20, 2015 at 06:44:45PM +0000, Jean Delvare wrote:
+> > If io-pgtable-arm is an ARM-specific driver then configuration option
+> > IOMMU_IO_PGTABLE_LPAE should not be presented to the user by default
+> > for non-ARM kernels.
 > > 
-> > Deferring would assume that the watchdog is not already enabled.
+> > Signed-off-by: Jean Delvare <jdelvare@suse.de>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Joerg Roedel <joro@8bytes.org>
+> > ---
+> >  drivers/iommu/Kconfig |    1 +
+> >  1 file changed, 1 insertion(+)
 > > 
-> > Putting in how long the kernel should service the watchdog in DT is
-> > like putting soft or hard lockup detection times into DT. These are
-> > kernel settings. If you need to change this, you should update your
-> > kernel or kernel settings, not the DT.
-> > 
-> The time to userspace handover may differ from HW variant to HW variant.
-> Some may load faster, some may load slower.
+> > --- linux-3.20-rc0.orig/drivers/iommu/Kconfig	2015-02-20 17:24:46.838955014 +0100
+> > +++ linux-3.20-rc0/drivers/iommu/Kconfig	2015-02-20 19:38:45.804582668 +0100
+> > @@ -23,6 +23,7 @@ config IOMMU_IO_PGTABLE
+> >  config IOMMU_IO_PGTABLE_LPAE
+> >  	bool "ARMv7/v8 Long Descriptor Format"
+> >  	select IOMMU_IO_PGTABLE
+> > +	depends on ARM || COMPILE_TEST
+> >  	help
+> >  	  Enable support for the ARM long descriptor pagetable format.
+> >  	  This allocator supports 4K/2M/1G, 16K/32M and 64K/512M page
 > 
-> Similar, the runtime watchdog timeout may be different from system
-> to system.  On a system with faster CPU, and/or one with faster io,
-> one may want (or need) a faster watchdog timeout. I assumed that
-> was accepted and understood when the timeout-sec property was
-> introduced a long time ago, but maybe not.
-> 
-> Yes, the problem should be resolved in a generic way. This has been
-> on my mind for a long time, including the problem if a watchdog should
-> or should not stay or become enabled during early boot. All those are
-> system properties which should be addressed generically, and there
-> should be a means to express those properties in devicetree.
-> 
-> Problem goes back into the old back-and-forth of what can be in devicetree
-> or not. Sorting that out always takes a long time and a substantial amount
-> of effort. Unfortunately, I don't have that time (writing the code would
-> probably be trivial in comparison).
+> So this code doesn't actually *depend* on any arch code at all. In fact,
+> having it built and booted on x86 revealed a couple of bugs that I've
+> since fixed. I'd rather let this run everywhere, but if people insist on
+> the false dependency, so be it but we should add ARM64 to the mix too.
 
-I once promised myself to propose this stupid idea, so here it is:
-How about creating a new concept called CT (for Config Tree), that
-would reuse the DT syntax and tree representation and add system config
-information to the appropriate devices (something like an overlay
-you'll put on top of your DT).
+Oh, I'm not insisting on anything ;-) If the code is useful on other
+architectures then just ignore this patch. But if the only point of
+using it on other architectures is to reveal bugs which would not have
+triggered otherwise, then that's what COMPILE_TEST is there for.
 
-This way nobody could ever complain about config information being
-stored in the DT, and people needing system config (like the one
-described here) could put them in this CT.
-CT files would be stored in files with a .cts or .ctsi extension, ...
-I'm stopping here, I think you got my point.
+>From the option description and help text, it really looks
+ARM-specific, so if it is not, the help text at least should be
+improved.
 
-Joke apart, I've had the same kind of discussion quite often lately.
-While I understand DT guys concern to control which property should go
-into the DT which ones should not, some system config are better
-described next to the device they are attached to rather than in the
-cmdline.
-
-Best Regards,
-
-Boris
-
+Thanks,
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Jean Delvare
+SUSE L3 Support
