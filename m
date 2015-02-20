@@ -1,56 +1,126 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 Feb 2015 10:57:43 +0000
-Subject: [PATCH] arm64: fix pt_regs location in Exception stack dump
-In-Reply-To: <1424411928-1122-1-git-send-email-hc.yen@mediatek.com>
-References: <1424411928-1122-1-git-send-email-hc.yen@mediatek.com>
-Message-ID: <20150220105743.GD31692@arm.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 20 Feb 2015 11:57:41 +0100 (CET)
+Subject: [PATCH RFC 2/3] power: mxs_power: add driver for mxs power
+ subsystem
+In-Reply-To: <964800678.25817.1422996087477.JavaMail.open-xchange@oxbaltgw04.schlund.de>
+References: <1416514477-19190-1-git-send-email-stefan.wahren@i2se.com>
+ <1416514477-19190-3-git-send-email-stefan.wahren@i2se.com>
+ <20150121230148.GJ13715@earth.universe> <54C0AFE4.3020701@i2se.com>
+ <20150125150431.GE2719@earth.universe>
+ <1719204322.245040.1422301605670.JavaMail.open-xchange@oxbaltgw03.schlund.de>
+ <20150127001629.GP21293@sirena.org.uk>
+ <1954124242.301697.1422383709733.JavaMail.open-xchange@oxbaltgw09.schlund.de>
+ <20150127194346.GN21293@sirena.org.uk>
+ <443299280.47516.1422483725178.JavaMail.open-xchange@oxbaltgw03.schlund.de>
+ <20150128225937.GA12749@earth.universe>
+ <964800678.25817.1422996087477.JavaMail.open-xchange@oxbaltgw04.schlund.de>
+Message-ID: <1766258118.893447.1424429861770.JavaMail.open-xchange@oxbaltgw03.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+> Stefan Wahren <stefan.wahren@i2se.com> hat am 3. Februar 2015 um 21:41
+> geschrieben:
+>
+>
+> Hi Sebastian,
+>
+> > Sebastian Reichel <sre@kernel.org> hat am 28. Januar 2015 um 23:59
+> > geschrieben:
+> >
+> >
+> > Hi,
+> >
+> > On Wed, Jan 28, 2015 at 11:22:05PM +0100, Stefan Wahren wrote:
+> > > > Mark Brown <broonie@kernel.org> hat am 27. Januar 2015 um 20:43
+> > > > geschrieben:
+> > > > On Tue, Jan 27, 2015 at 07:35:09PM +0100, Stefan Wahren wrote:
+> > > >
+> > > changing the switching frequency is not a common feature for this IC. In
+> > > most
+> > > cases the clock for the DC-DC switching frequency runs at 24 MHz
+> > > (ref_xtal).
+> > > Unfortunatelly this could cause interferences for example in UHF band. So
+> > > switching to ref_pll and changing clock divider is a option to avoid such
+> > > interferences without changing hardware.
+> > >
+> > > I decided to implement it as a module parameter, because i see it's a
+> > > configuration option.
+> >
+> > I think its best to use a DT property then. That way it can be set
+> > appropiatly for boards known to use a band, which could have
+> > interference problems.
+> >
+> > So just add a simple property (without a subnode). If I understand
+> > Mark correctly, there's a high chance more drivers will need to
+> > describe the switching frequency, so I suggest to use a vendor
+> > independent property name:
+> >
+> > switching-frequency = <12345>;
+>
+> i'm not sure. So here is the complete current state (power and regulator
+> binding
+> from imx28.dtsi) including my suggestion for the new property:
+>
+> power: power at 80044000 {
+> compatible = "fsl,imx28-power"; /* handled by mxs_power.c */
+> #address-cells = <1>;
+> #size-cells = <1>;
+> reg = <0x80044000 0x2000>;
+> interrupts = <6>;
+> switching-frequency = <24000000>; /* new property */
+> ranges;
+>
+> reg_vddd: regulator at 80044040 {
+> reg = <0x80044040 0x10>,
+> <0x80044010 0x10>,
+> <0x800440c0 0x10>;
+> reg-names = "base-address",
+> "v5ctrl-address",
+> "status-address";
+> compatible = "fsl,imx28-vddd"; /* handled by mxs-regulator.c */
+> regulator-name = "vddd";
+> regulator-min-microvolt = <1350000>;
+> regulator-max-microvolt = <1550000>;
+> vddd-supply = <&reg_vdda>;
+> };
+>
+> reg_vdda: regulator at 80044050 {
+> reg = <0x80044050 0x10>,
+> <0x80044010 0x10>,
+> <0x800440c0 0x10>;
+> reg-names = "base-address",
+> "v5ctrl-address",
+> "status-address";
+> compatible = "fsl,imx28-vdda"; /* handled by mxs-regulator.c */
+> regulator-name = "vdda";
+> regulator-min-microvolt = <1725000>;
+> regulator-max-microvolt = <1950000>;
+> vdda-supply = <&reg_vddio>;
+> };
+>
+> reg_vddio: regulator at 80044060 {
+> reg = <0x80044060 0x10>,
+> <0x80044010 0x10>,
+> <0x800440c0 0x10>;
+> reg-names = "base-address",
+> "v5ctrl-address",
+> "status-address";
+> compatible = "fsl,imx28-vddio"; /* handled by mxs-regulator.c */
+> regulator-name = "vddio";
+> regulator-min-microvolt = <3000000>;
+> regulator-max-microvolt = <3575000>;
+> regulator-microvolt-offset = <80000>;
+> };
+> };
+>
+> Please correct me if i'm wrong.
+>
+> Stefan
 
-On Fri, Feb 20, 2015 at 05:58:48AM +0000, HC Yen wrote:
-> In __exception_irq_entry functions, they could allocate some space on
-> stack before pt_regs. Here is the prologue of gic_handle_irq():
+Gentle Ping.
 
-I don't think this is specific to __exception_irq_entry functions -- it
-looks to me like unwind_frame is making assumptions about the prologue
-that aren't enforced by the PCS.
+Stefan
 
-In which case, the 'frame->sp = fp + 0x10' is really bogus. We're probably
-better off just doing 'frame->sp = fp' and adding a comment that the
-frame record can live anywhere in the stack frame. That doesn't solve your
-backtrace case, but at least it stops us pretending that adding 16 buys
-us anything.
-
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index 1ef2940..a564429 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -90,12 +90,12 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
->  	set_fs(fs);
->  }
->  
-> -static void dump_backtrace_entry(unsigned long where, unsigned long stack)
-> +static void dump_backtrace_entry(unsigned long where, unsigned long frame)
->  {
->  	print_ip_sym(where);
->  	if (in_exception_text(where))
-> -		dump_mem("", "Exception stack", stack,
-> -			 stack + sizeof(struct pt_regs));
-> +		dump_mem("", "Exception stack",
-> +			 frame - sizeof(struct pt_regs), frame);
->  }
->  
->  static void dump_instr(const char *lvl, struct pt_regs *regs)
-> @@ -164,7 +164,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
->  		ret = unwind_frame(&frame);
->  		if (ret < 0)
->  			break;
-> -		dump_backtrace_entry(where, frame.sp);
-> +		dump_backtrace_entry(where, frame.fp);
-
-I'm afraid I'm not following this. What guarantees that frame.fp points
-to the end of the pt_regs structure on an exception?
-
-Will
+>
+> >
+> > -- Sebastian
