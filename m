@@ -1,81 +1,92 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 20 Feb 2015 18:16:40 +0100
-Subject: [PATCH 2/2] at91sam9_wdt: Allow watchdog to reset device at
- early boot
-In-Reply-To: <E7DD67EB-CA34-48EA-838D-3EBBF74CAEBD@jcrosoft.com>
-References: <54B53160.6060309@roeck-us.net>
- <cover.1424262664.git.timo.kokkonen@offcode.fi>
- <cover.1424262664.git.timo.kokkonen@offcode.fi>
- <6c0a3a5bcd93d18437eeed04712b4aeff201a16f.1424262664.git.timo.kokkonen@offcode.fi>
- <00B1658F-2F3A-4B90-ADCA-275770832180@jcrosoft.com>
- <20150220085151.3b599de8@bbrezillon>
- <E7DD67EB-CA34-48EA-838D-3EBBF74CAEBD@jcrosoft.com>
-Message-ID: <20150220181640.57b21432@bbrezillon>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 20 Feb 2015 11:30:12 -0600
+Subject: [PATCH 2/4] of: DT quirks infrastructure
+In-Reply-To: <20150220143533.GA29908@odux.rfo.atmel.com>
+References: <1424271576-1952-3-git-send-email-pantelis.antoniou@konsulko.com>
+ <20150218154106.GC29429@leverpostej>
+ <FE61DD1C-51DA-4869-8A62-C019C3D70577@konsulko.com>
+ <20150218173115.GG29429@leverpostej>
+ <76BD1B22-BAED-4205-9B34-186907CE0217@konsulko.com>
+ <54E613E7.2020405@gmail.com>
+ <670D0881-DBF0-45E8-A502-A6DB2B77A750@konsulko.com>
+ <54E61DD2.3060002@gmail.com>
+ <53F2F94C-0C43-4A54-B8CD-EEC454A0AC19@konsulko.com>
+ <54E742F2.80506@hurleysoftware.com>
+ <20150220143533.GA29908@odux.rfo.atmel.com>
+Message-ID: <CAL_JsqLENvqsG+vjK740Aw4yKYONwHB1b-B7mKvE_iAZ1JSdNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
+On Fri, Feb 20, 2015 at 8:35 AM, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
+> On Fri, Feb 20, 2015 at 09:21:38AM -0500, Peter Hurley wrote:
+>> On 02/19/2015 12:38 PM, Pantelis Antoniou wrote:
+>> >
+>> >> On Feb 19, 2015, at 19:30 , Frank Rowand <frowand.list@gmail.com> wrote:
+>> >>
+>> >> On 2/19/2015 9:00 AM, Pantelis Antoniou wrote:
+>> >>> Hi Frank,
 
-On Sat, 21 Feb 2015 00:33:17 +0800
-Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+[...]
 
-> 
-> > On Feb 20, 2015, at 3:51 PM, Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> > 
-> > Hi Jean-Christophe,
-> > 
-> > On Fri, 20 Feb 2015 15:48:22 +0800
-> > Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> > 
-> >> 
-> >>> On Feb 18, 2015, at 8:57 PM, Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
-> >>> 
-> >>> By default the driver will start a kernel timer which keeps on kicking
-> >>> the watchdog HW until user space has opened the watchdog
-> >>> device. Usually this is desirable as the watchdog HW is running by
-> >>> default and the user space may not have any watchdog daemon running at
-> >>> all.
-> >>> 
-> >>> However, on production systems it may be mandatory that also early
-> >>> crashes and lockups will lead to a watchdog reset, even if they happen
-> >>> before the user space has opened the watchdog device.
-> >>> 
-> >>> To resolve the issue, add a new device tree property
-> >>> "early-timeout-sec" which will let the kernel timer to ping the
-> >>> watchdog HW only as long as the specified timeout permits. The default
-> >>> is still to use kernel timer, but more strict behavior can be enabled
-> >>> via the device tree property.
-> >>> 
-> >>> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
-> >>> ---
-> >>> Documentation/devicetree/bindings/watchdog/watchdog.txt | 7 +++++++
-> >>> drivers/watchdog/at91sam9_wdt.c                         | 9 ++++++++-
-> >> 
-> >> This should not be handled by the driver but the kernel in a generic way
-> > 
-> > Could you detail a bit more what you have in mind ?
-> 
-> move this timeout on the linux thread that keep alive the watchdog not in the driver
+>> >>> This is one of those things that the kernel community doesn?t understand which makes people
+>> >>> who push product quite mad.
+>> >>>
+>> >>> Engineering a product is not only about meeting customer spec, in order to turn a profit
+>> >>> the whole endeavor must be engineered as well for manufacturability.
+>> >>>
+>> >>> Yes, you can always manually install files in the bootloader. For 1 board no problem.
+>> >>> For 10 doable. For 100 I guess you can hire an extra guy. For 1 million? Guess what,
+>> >>> instead of turning a profit you?re losing money if you only have a few cents of profit
+>> >>> per unit.
+>> >>
+>> >> I'm not installing physical components manually.  Why would I be installing software
+>> >> manually?  (rhetorical question)
+>> >>
+>> >
+>> > Because on high volume product runs the flash comes preprogrammed and is soldered as is.
+>> >
+>> > Having a single binary to flash to every revision of the board makes logistics considerably
+>> > easier.
+>> >
+>> > Having to boot and tweak the bootloader settings to select the correct dtb (even if it?s present
+>> > on the flash medium) takes time and is error-prone.
+>> >
+>> > Factory time == money, errors == money.
+>> >
+>> >>>
+>> >>> No knobs to tweak means no knobs to break. And a broken knob can have pretty bad consequences
+>> >>> for a few million units.
+>> >>
+>> >> And you produce a few million units before testing that the first one off the line works?
+>> >>
+>> >
+>> > The first one off the line works. The rest will get some burn in and functional testing if you?re
+>> > lucky. In many cases where the product is very cheap it might make financial sense to just ship
+>> > as is and deal with recalls, if you?re reasonably happy after a little bit of statistical sampling.
+>> >
+>> > Hardware is hard :)
+>>
+>> I'm failing to see how this series improves your manufacturing process at all.
+>>
+>> 1. Won't you have to provide the factory with different eeprom images for the
+>>    White and Black?  You _trust_ them to get that right, or more likely, you
+>>    have process control procedures in place so that you don't get 1 million Blacks
+>>    flashed with the White eeprom image.
+>>
+>> 2. The White and Black use different memory technology so it's not as if the
+>>    eMMC from the Black will end up on the White SMT line (or vice versa).
+>>
+>> 3  For that matter, why wouldn't you worry that all the microSD cards intended
+>>    for the White were accidentally assembled with the first 50,000 Blacks; at
+>>    that point you're losing a lot more than a few cents of profit. And that has
+>>    nothing to do with what image you provided.
+>>
+>
+> As you said, we can imagine many reasons to have a failure during the
+> production, having several DTB files will increase the risk.
 
-AFAIK there's no such thing (if there is, could you point me to the
-source file where this thread is defined ?), and each driver are
-registering their own timer (if they need one).
-If you're suggesting to add such common logic to watchdog core, why
-don't you propose something ?
+Then package them as a single file. You can even use DT to do that.
+See u-boot FIT image.
 
-Timo's need is quite generic, but nobody seemed to bother with that
-before.
-Moreover, using an at91 specific implementation does not prevent
-migrating to a more generic implementation when it's available.
-Actually, it's rather difficult to design a generic infrastructure until
-you have dealt with several devices requiring the same feature, and
-that's obviously not the case here.
-
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Rob
