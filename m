@@ -1,98 +1,73 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 20 Feb 2015 15:53:47 +0100
-Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
- demuxer chip
-In-Reply-To: <20150220142208.GJ13659@leverpostej>
-References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
- <2437801.56xPyk3atd@vostro.rjw.lan>
- <20150211151237.GN9154@leverpostej>
- <1487331.cgC9j5u0aF@vostro.rjw.lan>
- <20150211155720.GQ9154@leverpostej>
- <20150211171515.55d5066f@bbrezillon>
- <20150211163231.GR9154@leverpostej>
- <20150211173823.30c42c6a@bbrezillon>
- <20150220142208.GJ13659@leverpostej>
-Message-ID: <20150220155347.1477b02d@bbrezillon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Feb 2015 14:53:46 +0000
+Subject: [PATCH] genirq: better describe IRQF_NO_SUSPEND semantics
+Message-ID: <1424444026-31231-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+The IRQF_NO_SUSPEND flag is intended to be used for interrupts required
+to be enabled during the suspend-resume cycle. This mostly consists of
+IPIs and timer interrupts, potentially including chained irqchip
+interrupts if these are necessary to handle timers or IPIs. If an
+interrupt does not fall into one of the aforementioned categories,
+requesting it with IRQF_NO_SUSPEND is likely incorrect.
 
-On Fri, 20 Feb 2015 14:22:08 +0000
-Mark Rutland <mark.rutland@arm.com> wrote:
+Using IRQF_NO_SUSPEND does not guarantee that the interrupt can wake the
+system from a suspended state. For an interrupt to be able to trigger a
+wakeup, it may be necessary to program various components of the system.
+In these cases it is necessary to use {enable,disabled}_irq_wake.
 
-> Hi Boris,
-> 
-> On Wed, Feb 11, 2015 at 04:38:23PM +0000, Boris Brezillon wrote:
-> 
-> [...]
-> 
-> > For the list of impacted drivers, you can have a look at this series [1]
-> > (patches 2 to 5), and I'll take care of the testing part once every one
-> > has agreed on the solution ;-).
-> > 
-> > [1]https://lkml.org/lkml/2014/12/15/552
-> 
-> Looking at those:
-> 
-> * The pmc looks like it could be a valid use of the new flag. It also
->   seems to function as an irqchip.
->   
->   Do any of its child IRQs need to be handled during the suspend-resume
->   cycle? If so using IRQF_NO_SUSPEND would seem to be valid.
+Unfortunately, several drivers assume that IRQF_NO_SUSPEND ensures that
+an IRQ can wake up the system, and the documentation can be read
+ambiguously w.r.t. this property.
 
-No they don't, they are used for clock activation only, and thus should
-be disabled on suspend.
+This patch updates the documentation regarding IRQF_NO_SUSPEND to make
+this caveat explicit, hopefully making future misuse rarer. Cleanup of
+existing misuse will occur as part of later patch series.
 
-> 
-> * atmel_serial seems to be intended to be used as a wakeup device (given
->   it calls device_set_wakeup_enable). Therefore it needs to call
->   enable_irq_wake, and when it does so it can share an IRQ with other
->   interrupts, just not IRQF_NO_SUSPEND interrupts.
+Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+Cc: Ian Campbell <ian.campbell@citrix.com>
+Cc: Jonathan Corbet <corbet@lwn.net>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+---
+ Documentation/power/suspend-and-interrupts.txt | 6 ++++--
+ include/linux/interrupt.h                      | 4 +++-
+ 2 files changed, 7 insertions(+), 3 deletions(-)
 
-I'll have a look, but AFAIR serial core already taking care of that.
-
->   
->   None of the approaches thus far can fix the fundamental mismatch
->   between wakeup interrupts and IRQF_NO_SUSPEND interrupts.
-> 
-> * Similarly, rtc-at91rm9200 and rtc-at91sam9 are intended to be used as 
->   wakeup devices. They call enable_irq_wake (though don't bother
->   checking the return value). They can share an IRQ with other
->   interrupts, just not IRQF_NO_SUSPEND interrupts.
-
-Yep.
-
-> 
-> * at91sam9_wdt seems to be fundamentally incompatible with suspend. If
->   the watchdog cannot be disabled, and you need to handle it during
->   suspend, then it needs to be a wakeup interrupt, not an
->   IRQF_NO_SUSPEND interrupt.
-
-You forgot the PIT timer, which is the one in cause here (no other
-drivers are specifying this IRQF_NO_SUSPEND flag), and, as you already
-know, a timer sets the IRQF_NO_SUSPEND flag.
-
-> 
-> As far as I can see, the flag or virtual irqchip approaches only help
-> the PMC case, and even then might not be necessary. All the others seem
-> to be relying on guarantees the genirq layer don't provide, and fixing
-> that would mean moving them further from IRQF_NO_SUSPEND.
-
-I don't know what you're trying to prove here, but I never said my goal
-was to set IRQF_NO_SUSPEND flags on existing at91 drivers ?
-The problem here, is that all those IPs are sharing the irq line with a
-timer which sets IRQF_NO_SUSPEND.
-
-I just want to be able to share an irq line with a timer and other
-devices that do not set IRQF_NO_SUSPEND.
-Could we focus on that ?
-
-Best Regards,
-
-Boris
-
+diff --git a/Documentation/power/suspend-and-interrupts.txt b/Documentation/power/suspend-and-interrupts.txt
+index 2f9c5a5..50493c9 100644
+--- a/Documentation/power/suspend-and-interrupts.txt
++++ b/Documentation/power/suspend-and-interrupts.txt
+@@ -40,8 +40,10 @@ but also to IPIs and to some other special-purpose interrupts.
+ 
+ The IRQF_NO_SUSPEND flag is used to indicate that to the IRQ subsystem when
+ requesting a special-purpose interrupt.  It causes suspend_device_irqs() to
+-leave the corresponding IRQ enabled so as to allow the interrupt to work all
+-the time as expected.
++leave the corresponding IRQ enabled so as to allow the interrupt to work as
++expected during the suspend-resume cycle, but does not guarantee that the
++interrupt will wake the system from a suspended state -- for such cases it is
++necessary to use enable_irq_wake().
+ 
+ Note that the IRQF_NO_SUSPEND flag affects the entire IRQ and not just one
+ user of it.  Thus, if the IRQ is shared, all of the interrupt handlers installed
+diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+index d9b05b5..606771c 100644
+--- a/include/linux/interrupt.h
++++ b/include/linux/interrupt.h
+@@ -52,7 +52,9 @@
+  * IRQF_ONESHOT - Interrupt is not reenabled after the hardirq handler finished.
+  *                Used by threaded interrupts which need to keep the
+  *                irq line disabled until the threaded handler has been run.
+- * IRQF_NO_SUSPEND - Do not disable this IRQ during suspend
++ * IRQF_NO_SUSPEND - Do not disable this IRQ during suspend.  Does not guarantee
++ *                   that this interrupt will wake the system from a suspended
++ *                   state.  See Documentation/power/suspend-and-interrupts.txt
+  * IRQF_FORCE_RESUME - Force enable it on resume even if IRQF_NO_SUSPEND is set
+  * IRQF_NO_THREAD - Interrupt cannot be threaded
+  * IRQF_EARLY_RESUME - Resume IRQ early during syscore instead of at device
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
