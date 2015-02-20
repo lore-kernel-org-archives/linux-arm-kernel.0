@@ -1,42 +1,51 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 20 Feb 2015 12:11:34 +0100
-Subject: [PATCH 03/10] devicetree: bindings: add Device Tree bindings
- for Armada 39x pin-muxing controller
-In-Reply-To: <20150206170521.GX25985@lunn.ch>
-References: <1423238276-9206-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1423238276-9206-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20150206170521.GX25985@lunn.ch>
-Message-ID: <20150220121134.25cb865c@free-electrons.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 20 Feb 2015 19:19:26 +0800
+Subject: [PATCH v10 0/2] mfd: axp20x: Add DT binding documentation
+Message-ID: <1424431168-25157-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+Hi everyone,
 
-On Fri, 6 Feb 2015 18:05:21 +0100, Andrew Lunn wrote:
+This is v10 of the axp20x series. v10 reverts back to the DT bindings
+from v8. This is the binding currently supported by the kernel drivers
+since 3.18. Mark Brown raised concern on the needless changes to
+active regulator bindings in v9.
 
-> I wondering if there should be an explanation for the less common
-> names here. I'm guessing dev is a device bus of some sort? What is
-> xsmi? Some sort of extended System Management Interface? And m?
+Maxime, I dropped your Acked-by because of all the changes I've made.
+Please have a look again.
 
-"dev" is the Device Bus indeed, used for example for NOR or NAND.
+Mark (Brown), please take a look at the regulator bits in the second
+patch. If it looks good, could you give your Acked-by?
 
-"m" stands for memory. The m(decc) signal is asserted when a memory ECC
-error occurred, while the m(vtt) signal is the DRAM VTT Power Control
-signal. No idea what this is.
+I hope we can get this series merged so we can move on to adding
+AXP221 support.
 
-"xsmi" is indeed some other SMI bus, not clear yet how it compares to
-the regular SMI bus.
 
-Both "dev" and "m" are already used by many of the existing pinctrl DT
-bindings for Marvell platforms, so I'm not sure documenting them
-specifically in the Armada 39x pinctrl DT binding document makes a lot
-of sense. Where should we document them, then? In the generic
-'marvell,mvebu-pinctrl.txt' DT binding file ?
+Regards,
+ChenYu
 
-Best regards,
 
-Thomas
+Changes since v9:
+
+    - Revert to bindings in v8
+    - Dropped new patches in v9
+    - x-powers,dcdc-workmode default changed to "current hardware setting",
+      matching the regulator driver.
+    - Reorganized regulator related properties into separate section.
+      This should make it easier to read and also update for newer PMICs.
+    - Regulator nodes should only be listed if they are to be managed by
+      the OS.
+
+
+Carlo Caione (2):
+  mfd: AXP20x: Add bindings documentation
+  dt-bindings: add vendor-prefix for X-Powers
+
+ Documentation/devicetree/bindings/mfd/axp20x.txt   | 96 ++++++++++++++++++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ 2 files changed, 97 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.1.4
