@@ -1,68 +1,43 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Fri, 20 Feb 2015 10:36:59 +0100
-Subject: [PATCH] clockevents: Add (missing) default case for switch blocks
-In-Reply-To: <20150220084807.GJ21418@twins.programming.kicks-ass.net>
-References: <6291e308ab77a480c6b1732e16108c5fe6f66afa.1424412815.git.viresh.kumar@linaro.org>
- <20150220083842.GA20387@gmail.com>
- <20150220084807.GJ21418@twins.programming.kicks-ass.net>
-Message-ID: <20150220093659.GA23469@gmail.com>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Fri, 20 Feb 2015 07:37:16 -0200
+Subject: [PATCH] [media] [kbuild] Add and use IS_REACHABLE macro
+In-Reply-To: <5822078.VORY4BTfEj@wuerfel>
+References: <6116702.rrbrOqQ26P@wuerfel> <14254005.QkaJhTuY5H@wuerfel>
+ <54E5FBEA.1000005@suse.cz> <5822078.VORY4BTfEj@wuerfel>
+Message-ID: <20150220073716.64560682@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Em Fri, 20 Feb 2015 10:29:42 +0100
+Arnd Bergmann <arnd@arndb.de> escreveu:
 
-* Peter Zijlstra <peterz@infradead.org> wrote:
-
-> > So this whole approach looks fragile for several reasons:
+> On Thursday 19 February 2015 16:06:18 Michal Marek wrote:
+> > > We have similar problems in other areas
+> > > of the kernel. In theory, we could enforce the VIDEO_TUNER driver to
+> > > be modular here by adding lots of dependencies to it:
+> > > 
+> > > config VIDEO_TUNER
+> > >       tristate
+> > >       depends on MEDIA_TUNER_TEA5761 || !MEDIA_TUNER_TEA5761
+> > >       depends on MEDIA_TUNER_TEA5767 || !MEDIA_TUNER_TEA5767
+> > >       depends on MEDIA_TUNER_MSI001  || !MEDIA_TUNER_MSI001
 > > 
-> >    - 'mode setting' callbacks are just bad by design
-> >      because they mix several functions into the same entry
-> >      point, complicating the handler functions 
-> >      unnecessarily. We should reduce complexity, not expand 
-> >      on it.
+> > Nah, that's even uglier. I suggest to merge your IS_REACHABLE patch.
 > > 
-> >    - now by adding 'default' you hide from drivers the
-> >      ability to easily discover whether it has been updated
-> >      to some new core clockevents mode setting feature or
-> >      not.
 > 
-> So this patch was a follow on from bd624d75db21 
-> ("clockevents: Introduce mode specific callbacks").
+> Ok, can I take this as an ack from your side to merge the
+> include/linux/kconfig.h part of the patch through the linux-media
+> tree?
 > 
-> That patch changes the set_mode() interface; and provides 
-> per mode functions.
+> I thought about splitting up the patch into two, but that would
+> just make merging it harder because we'd still have the dependency.
 
-So why is a 'default' mode needed then? It makes the 
-addition of new modes to the legacy handler easier, which 
-looks backwards.
+It is likely better if I merge at the linux-media tree. This way,
+we can avoid conflicts with those headers, if this is ok for
+Marek.
 
-> New (and updated) drivers should not use ->set_mode() 
-> anymore, but it was felt that we do not want to go do 
-> flag day changes.
+Regards,
+Mauro
 
-I fully agree that we don't want flag day changes, but make 
-it really apparent that it's an obsolete interface:
-
-  - rename it to set_mode_obsolete()
-
-  - try to convert as many of the easy cases as possible - 
-    the overwhelming majority of mode setting functions 
-    look reasonably simple.
-
-  - get rid of the mode enum in the core, and rename the 
-    mode bits to CLOCK_EVT_MODE_OBSOLETE_XXX.
-
-etc.
-
-> And it allows for adding optional modes; not every driver 
-> needs to go implement all mode functions if there is a 
-> sane default action.
 > 
-> But it does mean we need to be able to add values to the 
-> enum.
-
-So I'm confused: if we are using proper callbacks (like my 
-example outlined) , why is a 'mode enum' needed at all?
-
-Thanks,
-
-	Ingo
+> 	Arnd
