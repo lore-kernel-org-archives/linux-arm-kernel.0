@@ -1,84 +1,85 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Fri, 20 Feb 2015 13:09:58 -0500
-Subject: [PATCH 2/4] of: DT quirks infrastructure
-In-Reply-To: <20150220164753.GC22752@roeck-us.net>
-References: <1424271576-1952-3-git-send-email-pantelis.antoniou@konsulko.com>
- <20150218154106.GC29429@leverpostej>
- <FE61DD1C-51DA-4869-8A62-C019C3D70577@konsulko.com>
- <20150218173115.GG29429@leverpostej>
- <76BD1B22-BAED-4205-9B34-186907CE0217@konsulko.com>
- <54E613E7.2020405@gmail.com>
- <670D0881-DBF0-45E8-A502-A6DB2B77A750@konsulko.com>
- <54E61DD2.3060002@gmail.com>
- <53F2F94C-0C43-4A54-B8CD-EEC454A0AC19@konsulko.com>
- <54E742F2.80506@hurleysoftware.com> <20150220164753.GC22752@roeck-us.net>
-Message-ID: <54E77876.9020500@hurleysoftware.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 20 Feb 2015 10:21:34 -0800
+Subject: [PATCHv2 10/15] clk: mvebu: extend common code to allow an
+ optional refclk
+In-Reply-To: <1424451874-25375-11-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1424451874-25375-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1424451874-25375-11-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20150220182134.421.95366@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
-
-On 02/20/2015 11:47 AM, Guenter Roeck wrote:
-
-[...]
-
-> I am open to hearing your suggestions for our use case, where the CPU card with
-> the eeprom is manufactured separately from its carier cards.
-
-I think your use case may be more compelling than two flavors of Beaglebone
-(one of which is pretty much a dead stick), but it's also less clear what your
-design constraints are (not that I really want to know, 'cause I don't).
-
-But the logical extension of this is an N-way dtb that supports unrelated SOCs,
-and I think most would agree that's not an acceptable outcome.
-
-My thought was that every design that can afford an EEPROM to probe can afford
-a bootloader to select the appropriate dtb, and can afford the extra space
-required for multiple dtbs.
-
-I'm not naysaying; I just want to elicit enough information so the community
-can make informed decisions.
-
-> I assume you might suggest that manufacturing should (re-)program the EEPROM
-> on the CPU card after it was inserted into the carrier.
+Quoting Thomas Petazzoni (2015-02-20 09:04:29)
+> The Armada 39x, contrary to its predecessor, has a configurable
+> reference clock frequency, of either 25 Mhz, or 40 Mhz. For the
+> previous SoCs, it was fixed to 25 Mhz and described directly as such
+> in the Device Tree.
 > 
-> Problem is though that the CPU card may be inserted into ts carrier outside
-> manufacturing, at the final stages of assembly or in product repair. Those
-> groups would typically not even have the means to (re-)program the eeprom.
-> Besides, manufacturing would, quite understandably, go ballistic if we demand
-> that they start programming EEPROMs after insertion into carrier, and no longer
-> use pre-programmed EEPROMs.
+> For Armada 39x, we need to read certain registers to know whether the
+> frequency is 25 or 40 Mhz. Therefore, this commit extends the common
+> mvebu clock code to allow the SoC-specific code to say it wants to
+> register a reference clock, by giving a non-NULL ->get_refclk_freq()
+> function pointer in its coreclk_soc_desc structure.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-I agree; that would be The Wrong Way.
-
-> Note that it is not feasible to put the necessary EEPROM onto the carrier
-> either. Maybe in a later design. Maybe that makes sense, and we will go along
-> that route at some point. However, forcing a specific hardware solution
-> due to software limitations, ie lack of ability by core software to handle
-> the different carries, seems to be not the right decision to make on an
-> OS level.
-
-Agreed; hardware is what it is.
-
-
-> In the PCI world it has long since been accepted that the world is not perfect.  
-> The argument here is pretty much equivalent to demanding that PCI drop its
-> quirks mechanism, to force the HW manufacturers to finally get it right from
-> the beginning. I somehow suspect that this won't happen.
-
-I was thinking back to the introductions of fast DEVSEL# and AGP :(
-
-> Instead of questioning the need for a mechanism such as the one proposed by
-> Pantelis, I think our time would be better spent arguing if it is the right
-> mechanism and, if not, how it can be improved.
-
-My thoughts exactly. Apologies if something I wrote came across as
-"You Shall Not Pass" :)
-
-One issue seems to be the moving target that is the compelling use case(s).
-The initial submission implied it was the Beaglebone, which comes with
-4GB eMMC/microSD so naturally the argument for space-savings with DTBs doesn't
-fly. That has since been clarified so no need to rehash that.
+Looks fine to me. I'll apply after -rc1 drops.
 
 Regards,
-Peter Hurley
+Mike
+
+> ---
+>  drivers/clk/mvebu/common.c | 17 +++++++++++++++++
+>  drivers/clk/mvebu/common.h |  1 +
+>  2 files changed, 18 insertions(+)
+> 
+> diff --git a/drivers/clk/mvebu/common.c b/drivers/clk/mvebu/common.c
+> index 0d4d121..15b370f 100644
+> --- a/drivers/clk/mvebu/common.c
+> +++ b/drivers/clk/mvebu/common.c
+> @@ -121,6 +121,11 @@ void __init mvebu_coreclk_setup(struct device_node *np,
+>  
+>         /* Allocate struct for TCLK, cpu clk, and core ratio clocks */
+>         clk_data.clk_num = 2 + desc->num_ratios;
+> +
+> +       /* One more clock for the optional refclk */
+> +       if (desc->get_refclk_freq)
+> +               clk_data.clk_num += 1;
+> +
+>         clk_data.clks = kzalloc(clk_data.clk_num * sizeof(struct clk *),
+>                                 GFP_KERNEL);
+>         if (WARN_ON(!clk_data.clks)) {
+> @@ -162,6 +167,18 @@ void __init mvebu_coreclk_setup(struct device_node *np,
+>                 WARN_ON(IS_ERR(clk_data.clks[2+n]));
+>         };
+>  
+> +       /* Register optional refclk */
+> +       if (desc->get_refclk_freq) {
+> +               const char *name = "refclk";
+> +               of_property_read_string_index(np, "clock-output-names",
+> +                                             2 + desc->num_ratios, &name);
+> +               rate = desc->get_refclk_freq(base);
+> +               clk_data.clks[2 + desc->num_ratios] =
+> +                       clk_register_fixed_rate(NULL, name, NULL,
+> +                                               CLK_IS_ROOT, rate);
+> +               WARN_ON(IS_ERR(clk_data.clks[2 + desc->num_ratios]));
+> +       }
+> +
+>         /* SAR register isn't needed anymore */
+>         iounmap(base);
+>  
+> diff --git a/drivers/clk/mvebu/common.h b/drivers/clk/mvebu/common.h
+> index 783b563..f0de6c8 100644
+> --- a/drivers/clk/mvebu/common.h
+> +++ b/drivers/clk/mvebu/common.h
+> @@ -30,6 +30,7 @@ struct coreclk_soc_desc {
+>         u32 (*get_tclk_freq)(void __iomem *sar);
+>         u32 (*get_cpu_freq)(void __iomem *sar);
+>         void (*get_clk_ratio)(void __iomem *sar, int id, int *mult, int *div);
+> +       u32 (*get_refclk_freq)(void __iomem *sar);
+>         bool (*is_sscg_enabled)(void __iomem *sar);
+>         u32 (*fix_sscg_deviation)(u32 system_clk);
+>         const struct coreclk_ratio *ratios;
+> -- 
+> 2.1.0
+> 
