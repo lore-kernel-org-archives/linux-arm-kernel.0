@@ -1,59 +1,71 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 20 Feb 2015 22:48:28 +0100
-Subject: [PATCH v2 04/18] clocksource: Add ARM System timer driver
-In-Reply-To: <20150220195437.GT19388@pengutronix.de>
-References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1424455277-29983-5-git-send-email-mcoquelin.stm32@gmail.com>
- <20150220195437.GT19388@pengutronix.de>
-Message-ID: <1424468908.24292.10.camel@x220>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 20 Feb 2015 16:52:16 -0500
+Subject: [PATCH v10 4/6] ARM: add vdso user-space code
+In-Reply-To: <loom.20150218T122348-60@post.gmane.org>
+References: <1411413485-7675-1-git-send-email-nathan_lynch@mentor.com>
+ <1411413485-7675-5-git-send-email-nathan_lynch@mentor.com>
+ <loom.20150213T053547-381@post.gmane.org>
+ <20150213105447.GB3508@e104818-lin.cambridge.arm.com>
+ <loom.20150213T124417-857@post.gmane.org> <20150213141425.GA4713@localhost>
+ <loom.20150213T153239-809@post.gmane.org>
+ <20150213153253.GA23801@e104818-lin.cambridge.arm.com>
+ <loom.20150218T122348-60@post.gmane.org>
+Message-ID: <54E7AC90.40209@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-02-20 at 20:54 +0100, Uwe Kleine-K?nig wrote:
-> On Fri, Feb 20, 2015 at 07:01:03PM +0100, Maxime Coquelin wrote:
-> > This patch adds clocksource support for ARMv7-M's System timer,
-> > also known as SysTick.
-> > 
-> > Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> > ---
-> >  drivers/clocksource/Kconfig          |  7 ++++
-> >  drivers/clocksource/Makefile         |  1 +
-> >  drivers/clocksource/armv7m_systick.c | 78 ++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 86 insertions(+)
-> >  create mode 100644 drivers/clocksource/armv7m_systick.c
-> > 
-> > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> > index fc01ec2..fb6011e 100644
-> > --- a/drivers/clocksource/Kconfig
-> > +++ b/drivers/clocksource/Kconfig
-> > @@ -124,6 +124,13 @@ config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
-> >  	help
-> >  	 Use ARM global timer clock source as sched_clock
-> >  
-> > +config ARMV7M_SYSTICK
-> > +	bool
-> I assume this symbol is enabled later in the series.
+Hi Venkappa,
 
-Yes, I noticed it was selected in 14/18 ("ARM: Add STM32 family
-machine").
-
-> Would it make sense
-> to allow enabing the symbol for compile test coverage?
+On 02/18/2015 07:12 AM, Venkappa Mala wrote:
+> Catalin Marinas <catalin.marinas <at> arm.com> writes:
 > 
-> > +	select CLKSRC_OF if OF
-> What happens if ARMV7M_SYSTICK=y but OF=n? Doesn't the driver fail to
-> compile?
 > 
-> > +	select CLKSRC_MMIO
-> > +	help
-> > +	  This options enables support for the ARMv7M system timer unit
-> the right spelling is ARMv7-M.
+>> I highly doubt you are having a problem with [1] since you mentioned
+>> Cortex-A7 which falls under [2]. If you have a _processor_
+>> implementation with generic timers but no Hyp, as per the ARMv7 ARM 
+> the
+>> CNTVCT == CNTPCT, otherwise it is a CPU bug.
+>>
+>> What you actually have is [2] but without code to initialise the Hyp
+>> mode. If your kernel is running non-secure, sane Hyp registers
+>> initialisation is mandatory even when the kernel does not boot in Hyp.
+> yes, cortexA7 is falling under [2]. i.e. my mistake. Thanks for the 
+> correction.
+> 
+>> Even for the kernel, this should be the case unless
+>> "arm,cpu-registers-not-fw-configured" is passed in the DT (this was
+>> really only meant as workaround for broken firmware; I think
+>> Documentation/arm/Booting needs to be updated with the state of the
+>> generic timers on entry).
+> It will be good and it helps a lot if it updates.
+>  
+>> IIRC there were some discussions about Linux booting in secure mode on
+>> ARMv7 with no firmware to initialise the Hyp registers. If that's the
+>> case for you, we could restart that discussion and try to initialise
+>> CNTVOFF in the kernel running in _secure_ mode (possibly with some CPU
+>> notifiers in the generic timer code).
+> My test environment is like CNTVOFF initialization is not taken care in 
+> the firmware, HYP mode is disabled and kernel is booted with Secure SVC 
+> PL1 mode. As you have mentioned about restarting the thread, perhaps, it 
+> will be good to have a discussion in the following  thread rather than 
+> restarting the thread.
+> arm: Handle starting up in secure mode
+> https://lkml.org/lkml/2014/9/16/552
+> 
+> May I know your opinion about this one?
 
-This Kconfig entry has no prompt, so no one is going to see this text
-during make *config. Perhaps this should be made a comment. In that case
-the right spelling should still be used.
+Catalin pointed out that accesses to NSACR may trap. I have not yet found a
+reason why trying to write to CNTFRQ wouldn't work. Peter pointed out that
+VBAR can't be used on systems without the security extensions, so something
+has to be changed there as well.
 
-Thanks,
+In the long term I may be able to post an updated version, but I have no idea
+how long that might take. In the short term feel free to CC me on any related
+work you do, which I might be able to review, test, or both.
 
+Chris
 
-Paul Bolle
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
