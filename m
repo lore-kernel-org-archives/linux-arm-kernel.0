@@ -1,288 +1,126 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 20 Feb 2015 08:27:27 +0000
-Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
-In-Reply-To: <20150219181230.GC795@lunn.ch>
-References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20150219181230.GC795@lunn.ch>
-Message-ID: <54E6EFEF.2000200@linaro.org>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Fri, 20 Feb 2015 09:38:42 +0100
+Subject: [PATCH] clockevents: Add (missing) default case for switch blocks
+In-Reply-To: <6291e308ab77a480c6b1732e16108c5fe6f66afa.1424412815.git.viresh.kumar@linaro.org>
+References: <6291e308ab77a480c6b1732e16108c5fe6f66afa.1424412815.git.viresh.kumar@linaro.org>
+Message-ID: <20150220083842.GA20387@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Andrew for your comments,
 
-On 19/02/15 18:12, Andrew Lunn wrote:
->> +
->> +Required properties:
->> +
->> +eeproms: List of phandle and data cell specifier triplet, one triplet
->> +	 for each data cell the device might be interested in. The
->> +	 triplet consists of the phandle to the eeprom provider, then
->> +	 the offset in byte within that storage device, and the length
->
-> bytes
->
->> +	 in byte of the data we care about.
->
-> bytes
-Yep will fix it in next version.
->
->> +
->> +Optional properties:
->> +
->> +eeprom-names: List of data cell name strings sorted in the same order
->> + 	      as the resets property. Consumers drivers will use
->
-> resets? I guess this text was cut/paste from the reset documentation?\
->
-I think so. Will fix it.
->> + 	      eeprom-names to differentiate between multiple cells,
->> + 	      and hence being able to know what these cells are for.
->> +
->> +For example:
->> +
->> +	device {
->> +		eeproms = <&at24 14 42>;
->
-> I like to use 42, but is it realistic to have a soc-rev-id which is 42
-> bytes long?  How about using 42 as the offset and a sensible length of
-> say 4?
-Ok, will fix it..
->
->> +		eeprom-names = "soc-rev-id";
->> +menuconfig EEPROM
->> +	bool "EEPROM Support"
->> +	depends on OF
->> +	help
->> +	  Support for EEPROM alike devices.
->
-> like.
-Ok
->
->> +
->> +	  This framework is designed to provide a generic interface to EEPROM
->
-> EPROMs
-Ok.
->
->> +
->> +
->> +static ssize_t bin_attr_eeprom_read_write(struct kobject *kobj,
->> +				    char *buf, loff_t offset,
->> +				    size_t count, bool read)
->> +{
->> +	struct device *dev = container_of(kobj, struct device, kobj);
->> +	struct eeprom_device *eeprom = container_of(dev, struct eeprom_device,
->> +						    edev);
->> +	int rc;
->> +
->> +	if (offset > eeprom->size)
->> +		return 0;
->> +
->> +	if (offset + count > eeprom->size)
->> +		count = eeprom->size - offset;
->> +
->> +	if (read)
->> +		rc = regmap_bulk_read(eeprom->regmap, offset,
->> +				      buf, count/eeprom->stride);
->
-> This division will round down, so you could get one less byte than
-> what you expected, and the value you actually return. It seems like
-> there should be a check here, the count is a multiple of stride and
-> return an error if it is not.
-Thats a good catch, I will fix this for other such instances too.
->
->> +	else
->> +		rc = regmap_bulk_write(eeprom->regmap, offset,
->> +				       buf, count/eeprom->stride);
->> +
->> +	if (IS_ERR_VALUE(rc))
->> +		return 0;
->> +
->
-> I don't think returning 0 here, and above is the best thing to
-> do. Return the real error code from regmap, or EINVAL or some other
-> error code for going off the end of the eerpom.
-Ok, I will fix the return value here for both the cases.
+* Viresh Kumar <viresh.kumar@linaro.org> wrote:
 
->
->> +	return count;
->> +}
->> +
->> +static ssize_t bin_attr_eeprom_read(struct file *filp, struct kobject *kobj,
->> +				    struct bin_attribute *attr,
->> +				    char *buf, loff_t offset, size_t count)
->> +{
->> +	return bin_attr_eeprom_read_write(kobj, buf, offset, count, true);
->> +}
->> +
->> +static ssize_t bin_attr_eeprom_write(struct file *filp, struct kobject *kobj,
->> +				     struct bin_attribute *attr,
->> +				     char *buf, loff_t offset, size_t count)
->> +{
->> +	return bin_attr_eeprom_read_write(kobj, buf, offset, count, false);
->> +}
->>
->
-> These two functions seem to be identical. So just have one of them?
+> Many clockevent drivers are using a switch block for handling modes in their
+> ->set_mode() callback. Some of these do not have a 'default' case and adding a
+> new mode in the 'enum clock_event_mode', starts giving following warnings for
+> these platforms about unhandled modes (e.g. XXX).
+> 
+> 	warning: enumeration value ?XXX? not handled in switch [-Wswitch]
+> 
+> This patch adds default cases for them.
+> 
+> In order to keep things simple, add following to the switch blocks:
+> 
+> 	default:
+> 		break;
+> 
+> This can lead to different behavior for individual cases.
+> 
+> 1) Some of the drivers don't have any special stuff in their ->set_mode()
+>    callback before or after the switch blocks. And so this default case would
+>    simply return for them without any updates to the clockevent device.
+> 
+> 2) But in some cases, the clockevent device is disabled/stopped as soon as we
+>    enter the ->set_mode() callback and is enabled within the switch block or
+>    after it. And the clockevent device *may* stay disabled for default case.
 
-One is read and other is write.. there is a true and false flag at the 
-end of the call to bin_attr_eeprom_read_write().
->
-> +
->> +static struct bin_attribute bin_attr_eeprom = {
->> +	.attr	= {
->> +		.name	= "eeprom",
->> +		.mode	= 0660,
->
-> Symbolic values like S_IRUGO | S_IWUSR would be better.
-Yep, thats correct, I will fix it.
->
-> Are you also sure you want group write?
->
-S_IWUSR should be enough.
+So this whole approach looks fragile for several reasons:
 
->> +	},
->> +	.read	= bin_attr_eeprom_read,
->> +	.write	= bin_attr_eeprom_write,
->> +};
->> +
->> +static struct eeprom_cell *__eeprom_cell_get(struct device_node *node,
->> +					     int index)
->> +{
->> +	struct of_phandle_args args;
->> +	struct eeprom_cell *cell;
->> +	struct eeprom_device *e, *eeprom = NULL;
->> +	int ret;
->> +
->> +	ret = of_parse_phandle_with_args(node, "eeproms",
->> +					 "#eeprom-cells", index, &args);
->> +	if (ret)
->> +		return ERR_PTR(ret);
->> +
->> +	if (args.args_count != 2)
->> +		return ERR_PTR(-EINVAL);
->> +
->> +	mutex_lock(&eeprom_list_mutex);
->> +
->> +	list_for_each_entry(e, &eeprom_list, list) {
->> +		if (args.np == e->edev.of_node) {
->> +			eeprom = e;
->> +			break;
->> +		}
->> +	}
->> +	mutex_unlock(&eeprom_list_mutex);
->
-> Shouldn't you increment a reference count to the eeprom here?  You are
-> going to have trouble if the eeprom is unregistered and there is a
-> call still referring to it.
-Yes, Stephen Byod also pointed the same, having owner in eeprom_device 
-should fix this.
-I will fix it in next version.
+   - 'mode setting' callbacks are just bad by design
+     because they mix several functions into the same entry
+     point, complicating the handler functions 
+     unnecessarily. We should reduce complexity, not expand 
+     on it.
 
->
->> +
->> +	if (!eeprom)
->> +		return ERR_PTR(-EPROBE_DEFER);
->> +
->> +	cell = kzalloc(sizeof(*cell), GFP_KERNEL);
->> +	if (!cell)
->> +		return ERR_PTR(-ENOMEM);
->> +
->> +	cell->eeprom = eeprom;
->> +	cell->offset = args.args[0];
->> +	cell->count = args.args[1];
->> +
->> +	return cell;
->> +}
->> +
->> +
->> diff --git a/include/linux/eeprom-consumer.h b/include/linux/eeprom-consumer.h
->> new file mode 100644
->> index 0000000..706ae9d
->> --- /dev/null
->> +++ b/include/linux/eeprom-consumer.h
->> @@ -0,0 +1,73 @@
->> +/*
->> + * EEPROM framework consumer.
->> + *
->> + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> + * Copyright (C) 2013 Maxime Ripard <maxime.ripard@free-electrons.com>
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2.  This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + */
->> +
->> +#ifndef _LINUX_EEPROM_CONSUMER_H
->> +#define _LINUX_EEPROM_CONSUMER_H
->> +
->> +struct eeprom_cell;
->> +
->> +/**
->> + * eeprom_cell_get(): Get eeprom cell of device form a given index.
->
-> of a device for a
->
-Ok, will be fixed in next version.
->> + *
->> + * @dev: Device that will be interacted with
->> + * @index: Index of the eeprom cell.
->> + *
->> + * The return value will be an ERR_PTR() on error or a valid pointer
->> + * to a struct eeprom_cell.  The eeprom_cell will be freed by the
->> + * eeprom_cell_put().
->> + */
->> +struct eeprom_cell *eeprom_cell_get(struct device *dev, int index);
->> +
->> +/**
->> + * eeprom_cell_get(): Get eeprom cell of device form a given name.
->
-> same again
-Ok, will be fixed in next version.
->
->> + *
->> + * @dev: Device that will be interacted with
->> + * @name: Name of the eeprom cell.
->> + *
->> + * The return value will be an ERR_PTR() on error or a valid pointer
->> + * to a struct eeprom_cell.  The eeprom_cell will be freed by the
->> + * eeprom_cell_put().
->> + */
->> +struct eeprom_cell *eeprom_cell_get_byname(struct device *dev,
->> +					   const char *name);
->> +
->> +/**
->> + * eeprom_cell_put(): Release previously allocated eeprom cell.
->> + *
->> + * @cell: Previously allocated eeprom cell by eeprom_cell_get()
->> + * or eeprom_cell_get_byname().
->> + */
->> +void eeprom_cell_put(struct eeprom_cell *cell);
->> +
->> +/**
->> + * eeprom_cell_read(): Read a given eeprom cell
->> + *
->> + * @cell: eeprom cell to be read.
->> + * @len: pointer to length of cell which will be populated on successful read.
->> + *
->> + * The return value will be an ERR_PTR() on error or a valid pointer
->> + * to a char * bufffer.  The buffer should be freed by the consumer with a
->> + * kfree().
->> + */
->> +char *eeprom_cell_read(struct eeprom_cell *cell, ssize_t *len);
->
-> Would void * be better than char *? I guess the contents is mostly
-> data, not strings.
-Yes, thats sounds sensible.
->
->        Andrew
->
->> +
->> +/**
+   - now by adding 'default' you hide from drivers the
+     ability to easily discover whether it has been updated
+     to some new core clockevents mode setting feature or
+     not.
 
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+So NAK: the real solution would be to eliminate 'mode 
+setting' altogether: treat it as a legacy, introduce 
+properly separated callbacks and function pointer callback 
+driver templates, and let drivers fill in (or not) 
+individual entries. Clockevents core can mandate certain 
+entries to be filled in, or allow NULL with some default 
+behavior.
+
+The ->set_mode() approach allows none of this. It is 
+ioctl()-alike interface design, and that is a singularly 
+bad design for the aforementioned reasons.
+
+So to give a quick example what I have in mind, I looked up 
+a random clockevents driver callback from your patch 
+(arch/arm/mach-mmp/time.c):
+
+static void timer_set_mode(enum clock_event_mode mode,
+			   struct clock_event_device *dev)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	switch (mode) {
+	case CLOCK_EVT_MODE_ONESHOT:
+	case CLOCK_EVT_MODE_UNUSED:
+	case CLOCK_EVT_MODE_SHUTDOWN:
+		/* disable the matching interrupt */
+		__raw_writel(0x00, mmp_timer_base + TMR_IER(0));
+		break;
+	case CLOCK_EVT_MODE_RESUME:
+	case CLOCK_EVT_MODE_PERIODIC:
+		break;
+	default:
+		break;
+	}
+	local_irq_restore(flags);
+}
+
+Instead of that I'd let the driver define just a single 
+function:
+
+static void mmp_timer_disable(struct clock_event_device *dev __unused)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	__raw_writel(0x00, mmp_timer_base + TMR_IER(0));
+	local_irq_restore(flags);
+}
+
+
+static struct clockevents_driver mmp_clockevents {
+	.clock_event__oneshot	= mmp_timer_disable,
+	.clock_event__shutdown	= mmp_timer_disable,
+
+	/* clock_event__resume and __periodic are NULL */
+};
+
+See how much cleaner and easier to read it all is?
+
+Note how the NULL entries express a 'don't do anything' 
+default in a natural fashion. It's also future proof: if a 
+new callback is added to 'struct clockevents_driver' then 
+it's filled in with NULL and the clockevents core may 
+define a default behavior, without having to touch the 
+driver.
+
+It's also _faster_: no function call needed and there's a 
+pointless local_irq_save()/restore() call optimized out as 
+well.
+
+So let's clean up the clockevents mode setting design, 
+okay?
+
+Thanks,
+
+	Ingo
