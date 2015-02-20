@@ -1,50 +1,119 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 20 Feb 2015 17:06:13 +0100
-Subject: [PATCH] pwm: atmel-hlcdc: add errata handling for sama5d4
-In-Reply-To: <1424447898-2791-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1424447898-2791-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20150220170613.424edbb5@bbrezillon>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 20 Feb 2015 10:06:10 -0600
+Subject: [PATCH v4 4/4] phy: add phy-hi6220-usb
+In-Reply-To: <54E75665.6050205@linaro.org>
+References: <1423726646-30336-1-git-send-email-zhangfei.gao@linaro.org>
+ <1423726646-30336-5-git-send-email-zhangfei.gao@linaro.org>
+ <20150220144119.GB1707@saruman.tx.rr.com>
+ <54E75665.6050205@linaro.org>
+Message-ID: <20150220160610.GB6430@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hi,
 
-On Fri, 20 Feb 2015 16:58:18 +0100
-Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-
-> sama5d4 SoC also has an errata on the HLCDC PWM. It is the same as the sama5d3
-> that is forbidding the use of div1 prescaler.
+On Fri, Feb 20, 2015 at 11:44:37PM +0800, zhangfei wrote:
+> Hi, Balbi
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-The "atmel,sama5d4-hlcdc" compatible string is not yet documented in
-the atmel-hlcdc MFD driver binding, but this shouldn't hurt, so
-
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-> ---
->  drivers/pwm/pwm-atmel-hlcdc.c | 4 ++++
->  1 file changed, 4 insertions(+)
+> On 02/20/2015 10:41 PM, Felipe Balbi wrote:
 > 
-> diff --git a/drivers/pwm/pwm-atmel-hlcdc.c b/drivers/pwm/pwm-atmel-hlcdc.c
-> index 522f7075bb1a..fa5feaba25a5 100644
-> --- a/drivers/pwm/pwm-atmel-hlcdc.c
-> +++ b/drivers/pwm/pwm-atmel-hlcdc.c
-> @@ -225,6 +225,10 @@ static const struct of_device_id atmel_hlcdc_dt_ids[] = {
->  		.compatible = "atmel,sama5d3-hlcdc",
->  		.data = &atmel_hlcdc_pwm_sama5d3_errata,
->  	},
-> +	{
-> +		.compatible = "atmel,sama5d4-hlcdc",
-> +		.data = &atmel_hlcdc_pwm_sama5d3_errata,
-> +	},
->  	{ /* sentinel */ },
->  };
->  
+> >>+static void hi6220_start_peripheral(struct hi6220_priv *priv, bool on)
+> >>+{
+> >>+	struct usb_otg *otg = priv->phy.otg;
+> >>+
+> >>+	if (!otg->gadget)
+> >>+		return;
+> >>+
+> >>+	if (on)
+> >>+		usb_gadget_connect(otg->gadget);
+> >>+	else
+> >>+		usb_gadget_disconnect(otg->gadget);
+> >
+> >why is the PHY fiddling with pullups ?
+> 
+> We use this to enable/disable otg gadget mode.
 
+I got that, but the pullups don't belong to the PHY, they belong to the
+gadget.
 
+> The gpio_id & gpio_vbus are used to distinguish otg gadget mode or
+> host mode.
+> When micro usb or otg device attached to otg, gpio_vbus falling down.
+> And gpio_id = 1 is micro usb, gpio_id = 0 is otg device.
+
+all of that I understood clearly :-)
+
+> So when micro usb attached, we enable gadget mode; while micro usb
+> detached, we disable gadget mode, and dwc2 will automatically set to
+> host mode.
+
+that's all fine, I'm concerned about letting the PHY fiddle with
+something it doesn't own. If I am to change pullups rules in udc-core,
+this is likely to break down miserably and I don't want to have to go
+through that.
+
+> >>+static void hi6220_detect_work(struct work_struct *work)
+> >>+{
+> >>+	struct hi6220_priv *priv =
+> >>+		container_of(work, struct hi6220_priv, work.work);
+> >>+	int gpio_id, gpio_vbus;
+> >>+	enum usb_otg_state state;
+> >>+
+> >>+	if (!gpio_is_valid(priv->gpio_id) || !gpio_is_valid(priv->gpio_vbus))
+> >>+		return;
+> >>+
+> >>+	gpio_id = gpio_get_value_cansleep(priv->gpio_id);
+> >>+	gpio_vbus = gpio_get_value_cansleep(priv->gpio_vbus);
+> >
+> >looks like this should be using extcon
+> Not used extcon before.
+> However, we need gpio_vbus interrupt.
+> Checked phy-tahvo.c and phy-omap-otg.c, not find extcon related with
+> interrupt.
+> Will investigate tomorrow.
+
+drivers/extcon/extcon-gpio.c
+
+> >>+	if (gpio_vbus == 0) {
+> >>+		if (gpio_id == 1)
+> >>+			state = OTG_STATE_B_PERIPHERAL;
+> >>+		else
+> >>+			state = OTG_STATE_A_HOST;
+> >>+	} else {
+> >>+		state = OTG_STATE_A_HOST;
+> >>+	}
+> >>+
+> >>+	if (priv->state != state) {
+> >>+		hi6220_start_peripheral(priv, state == OTG_STATE_B_PERIPHERAL);
+> >>+		priv->state = state;
+> >>+	}
+> >>+}
+> >>+
+> >>+static irqreturn_t hiusb_gpio_intr(int irq, void *data)
+> >>+{
+> >>+	struct hi6220_priv *priv = (struct hi6220_priv *)data;
+> >>+
+> >>+	/* add debounce time */
+> >>+	schedule_delayed_work(&priv->work, msecs_to_jiffies(100));
+> >
+> >this is really bad. We have threaded interrupt support, right ?
+> 
+> Since we use two gpio to distinguish gadget mode or host mode.
+> Debounce time can introduce more accuracy.
+
+gpio_set_debounce() ?
+
+> I think threaded interrupt can not be used for adding debounce time.
+> Here add debounce is just for safety.
+
+add the debounce to the gpio itself.
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150220/355bfe35/attachment-0001.sig>
