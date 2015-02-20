@@ -1,41 +1,46 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 20 Feb 2015 11:03:56 -0800
-Subject: [PATCH v4 0/3] about data busy
-In-Reply-To: <1423894668-8886-1-git-send-email-addy.ke@rock-chips.com>
+Date: Fri, 20 Feb 2015 11:05:26 -0800
+Subject: [PATCH v4 1/3] mmc: dw_mmc: update clock after host reach a
+ stable voltage
+In-Reply-To: <CAD=FV=VSYQs8p9m_+dmXmkMmxgqzDA6EGZ9Vfy3wsby5k5NitQ@mail.gmail.com>
 References: <1423828368-18456-1-git-send-email-addy.ke@rock-chips.com>
  <1423894668-8886-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <CAD=FV=U6T23wsJGCb2VoE7bQ=D2FdPgPGa+Fnp6aUBPXgiO5Zg@mail.gmail.com>
+ <1423894668-8886-2-git-send-email-addy.ke@rock-chips.com>
+ <CAGOxZ53ndi_hYDGBGhY-7q8aOrFid1=D=_5KEbUvzTsnybJQ3Q@mail.gmail.com>
+ <CAD=FV=V9aK-78GJ_eWkpZZdVT_5Zu8ehxg_o3NtnpD2wyRuh7Q@mail.gmail.com>
+ <CAD=FV=VSYQs8p9m_+dmXmkMmxgqzDA6EGZ9Vfy3wsby5k5NitQ@mail.gmail.com>
+Message-ID: <CAD=FV=VgvwRvTZrbpMB8EKNNDzUvcCsQKs_uC_RMuc83swu_yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Feb 13, 2015 at 10:17 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
-> patch 1: This patch can fix bug that controller is still data busy after
->          reset all blocks. After this patch, I still get data busy in
->          set_ios().
+On Thu, Feb 19, 2015 at 5:04 PM, Doug Anderson <dianders@chromium.org> wrote:
+> Hi,
 >
-> patch 2: This patch fix bug 'Timeout sending command'. After patch1 and
->          patch2, there is no mmc errors after:
->          cd /sys/bus/platform/drivers/dwmmc_rockchip
->          for i in $(seq 1 10000); do
->                 echo "========================" $i
->                 echo ff0c0000.dwmmc > unbind
->                 sleep .5
->                 echo ff0c0000.dwmmc > bind
->                 sleep 2
->         done
+> On Thu, Feb 19, 2015 at 3:49 PM, Doug Anderson <dianders@chromium.org> wrote:
+>> I've got that coded up but I'm still testing it...  If you want to try
+>> it too, you can find it at
+>> <https://chromium-review.googlesource.com/251341>.
+>>
+>> Note that without my patch I find that I _really_ need Addy's patch to
+>> make sure that the card isn't busy in setup_bus.  With my patch Addy's
+>> code catches the card busy less often.  I'm still trying to see if
+>> there's a way to totally remove the need for his setup_bus and still
+>> trying to grok all the patches flying around...
 >
-> patch3: This patch fix bug that there is data busy before sdio send CMD53.
->         But This patch is necessary for sd and mmc too.
+> Ah, this might be the magic needed:
 >
-> Addy Ke (3):
->   mmc: dw_mmc: update clock after host reach a stable voltage
->   mmc: dw_mmc: fix bug that cause 'Timeout sending command'
->   mmc: dw_mmc: Don't start command while data busy
+> https://chromium-review.googlesource.com/251344
 >
->  drivers/mmc/host/dw_mmc.c | 41 ++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 40 insertions(+), 1 deletion(-)
+>
+> I think that together with the previous patch things are happy for me
+> without any of Addy's patches, though it's the end of my work day and
+> I haven't given this nearly as much testing as I'd like.
+>
+> I'll continue testing tomorrow and then post both patches together upstream.
+
+OK, posted three patches upstream...
 
 A little hard to follow all the patches flying around (so I'll
 probably reply a few different places with the same info), but I
