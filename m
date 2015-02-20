@@ -1,77 +1,42 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 19 Feb 2015 22:38:05 -0600
-Subject: [PATCH v4 4/4] phy: add phy-hi6220-usb
-In-Reply-To: <54E6A4E9.4030401@linaro.org>
-References: <1423726646-30336-1-git-send-email-zhangfei.gao@linaro.org>
- <1423726646-30336-5-git-send-email-zhangfei.gao@linaro.org>
- <54E4249C.9050404@ti.com> <54E426B5.4070206@linaro.org>
- <20150218143546.GD3651@saruman.tx.rr.com>
- <54E6A4E9.4030401@linaro.org>
-Message-ID: <20150220043805.GA22128@saruman.tx.rr.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 20 Feb 2015 11:54:24 +0530
+Subject: [PATCH v5 59/61] dmaengine: Add a warning for drivers not using
+ the generic slave caps retrieval
+In-Reply-To: <CAKohpokmmA3wCiao0hBzecRYRvKKyVo3LSO1a=EMLJCP3OmPuQ@mail.gmail.com>
+References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1416231775-31252-60-git-send-email-maxime.ripard@free-electrons.com>
+ <CAOh2x=n1SC+s3hyFaOpREwVuzvqDUwb5vsTBN0As+O2h6eXbMw@mail.gmail.com>
+ <20150219090917.159d3d2f@endymion.delvare>
+ <CAKohpokmmA3wCiao0hBzecRYRvKKyVo3LSO1a=EMLJCP3OmPuQ@mail.gmail.com>
+Message-ID: <20150220062424.GW21387@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 11:07:21AM +0800, zhangfei wrote:
-> Hi, Balbi
+On Thu, Feb 19, 2015 at 02:23:27PM +0530, Viresh Kumar wrote:
+> On 19 February 2015 at 13:39, Jean Delvare <jdelvare@suse.de> wrote:
+> > My understanding is that the warning message is here on purpose to
+> > instruct DMA driver authors to fix their code. So if anyone need to fix
+> > anything, that would be you and Andy. That being said, I suspect Andy
 > 
-> On 02/18/2015 10:35 PM, Felipe Balbi wrote:
-> >On Wed, Feb 18, 2015 at 01:44:21PM +0800, zhangfei wrote:
-> >>Hi, Kishon
-> >>
-> >>On 02/18/2015 01:35 PM, Kishon Vijay Abraham I wrote:
-> >>>Hi,
-> >>>
-> >>>On Thursday 12 February 2015 01:07 PM, Zhangfei Gao wrote:
-> >>>>Add usb phy controller for hi6220 platform
-> >>>>
-> >>>>Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> >>>>---
-> >>>>  drivers/phy/Kconfig          |   9 ++
-> >>>>  drivers/phy/Makefile         |   1 +
-> >>>>  drivers/phy/phy-hi6220-usb.c | 306
-> >>>>+++++++++++++++++++++++++++++++++++++++++++
-> >>>>  3 files changed, 316 insertions(+)
-> >>>>  create mode 100644 drivers/phy/phy-hi6220-usb.c
-> >>>
-> >>>why is this driver in drivers/phy when it doesn't use the generic PHY
-> >>>framework at all?
-> >>>
-> >>
-> >>Balbi recommended "new drivers only on drivers/phy/", including usb
-> >>phy.
+> To some extent yes, but Andy has already tried to fix that for most of
+> the drivers and so I just pointed out that something is missed.
+> 
+> > already did that:
 > >
-> >but it should use the API too. It's not only about a directory, you need
-> >to use the new API.
+> > commit 029a40e97d0db269f4a7fc02b0f29f627f628309
+> > Author: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> > Date:   Fri Jan 2 16:17:24 2015 +0200
 > >
-> >>So Move drivers/usb/phy/phy-hi6220-usb.c to
-> >>drivers/phy/phy-hi6220-usb.c, required by Balbi.
+> >     dmaengine: dw: provide DMA capabilities
 > >
-> >you're reading what I stated the way you like.
+> > Brian, can you please try the latest Linus or linux-next kernel (or
+> > backport the above commit to your current kernel) and confirm that the
+> > backtraces are no longer printed?
 > 
-> Sorry for my bad understanding.
-> 
-> Still not clear about the otg_set_peripheral, which is required in
-> phy-hi6220-usb.c
-> 
-> 1. drivers/usb/dwc2/gadget.c use
-> otg_set_peripheral(hsotg->uphy->otg, &hsotg->gadget);
-> 
-> 2. include/linux/phy/phy.h
-> struct phy do not have member otg, while struct usb_phy has.
-> 
-> Could you give more hints?
-
-your set_peripheral doesn't do anything, just holds a pointer. Might as
-well not implement it. I'll review your driver more fully tomorrow.
-
-There a few things which must be changed.
+> Maybe yes.
+This warning was intentionally added to help move driver use the right
+method. And I have applied patch from Andy for this, so this should be no
+longer seen on Linus's tree
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150219/9aa797c1/attachment.sig>
+~Vinod
