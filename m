@@ -1,54 +1,25 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 20 Feb 2015 15:48:13 +0200
-Subject: [PATCH 9/9] RFC: ARM: DRA7: enable DSS_DESHDCP_CLKEN
-In-Reply-To: <54E72FB0.6000604@ti.com>
-References: <1423840286-18377-1-git-send-email-tomi.valkeinen@ti.com>	<1423840286-18377-10-git-send-email-tomi.valkeinen@ti.com>
- <CAGo_u6p89ot-eNwK65otoYsLM6NXeh929=SBG6uKAsX8Tnd_RQ@mail.gmail.com>
- <54DE1B7E.10505@ti.com> <54E71EA2.3030803@ti.com> <54E72FB0.6000604@ti.com>
-Message-ID: <54E73B1D.3050908@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 20 Feb 2015 11:49:22 -0200
+Subject: Announce: rmk's nightly builder gets ARM64 support
+In-Reply-To: <20150220133806.GG8656@n2100.arm.linux.org.uk>
+References: <20150219171220.GA8656@n2100.arm.linux.org.uk>
+ <20150219183444.GB8656@n2100.arm.linux.org.uk>
+ <20150220092003.GB31692@arm.com>
+ <CAKv+Gu_5fOinMVYbk99unmEDSqCF3Z7QdXiQTw0VrrWW16Oc6w@mail.gmail.com>
+ <20150220094035.GE8656@n2100.arm.linux.org.uk>
+ <20150220102009.GF8656@n2100.arm.linux.org.uk>
+ <CAOMZO5Aqx_SQ1oaML=hiVzzJMJ2bNTAsjk-dWFLkETaV4_JO+A@mail.gmail.com>
+ <20150220133806.GG8656@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5BgrWGciKt0pjpbtX4wP0CgWWN39BcSjnSD89MxKEpBCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/02/15 14:59, Tero Kristo wrote:
-> On 02/20/2015 01:46 PM, Tomi Valkeinen wrote:
->> On 13/02/15 17:42, Tero Kristo wrote:
->>> On 02/13/2015 05:25 PM, Nishanth Menon wrote:
->>
->>>> I would probably wait for control module to become syscon and probably
->>>> model this as syscon clk - I thin we should be seeing a series
->>>> sometime soon.
->>>
->>> Yeah, I will be posting a series in a bit, just running some final tests
->>> on it.
->>
->> I did the above with Tero's series. Adding the DES HDCP clock works ok.
->>
->> However, I'm not able to do this in HWMOD framework. To enable the DSS
->> IP block I need to enable both the DSS func clock and the DES HDCP
->> clock, but the HWMOD framework only allows one mainclock.
->>
->> I added the HDCP clock as an opt clock, but those are not enabled
->> intially by the HWMOD framework, and the call in omap_hwmod.c:_enable()
->> to soc_ops.wait_target_ready(oh) calls fails.
->>
->> So... Any ideas how to proceed?
-> 
-> Add the clock enable at the end of dra7xx_dt_clk_init()?
-> 
-> You need to disable the clock at some point though.
+On Fri, Feb 20, 2015 at 11:38 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Where would I disable it? And if the clock is disabled, doesn't this
-again fail when the dss driver tries to enable the IP block? The driver
-can enable the HDCP opt clock only later, when the IP block should be up
-already.
+> From what I can see, this doesn't _build_ a compiler.  It grabs
+> gcc-linaro-aarch64-linux-gnu-4.9-2014.08_linux.tar.xz from
+> http://releases.linaro.org/14.08/components/toolchain/binaries
+> and installs that - which contains a load of binaries.
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150220/4cb3a54c/attachment.sig>
+That's correct. It uses the pre-built binaries from Linaro.
