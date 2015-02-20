@@ -1,84 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Feb 2015 09:40:35 +0000
-Subject: Announce: rmk's nightly builder gets ARM64 support
-In-Reply-To: <CAKv+Gu_5fOinMVYbk99unmEDSqCF3Z7QdXiQTw0VrrWW16Oc6w@mail.gmail.com>
-References: <20150219171220.GA8656@n2100.arm.linux.org.uk>
- <20150219183444.GB8656@n2100.arm.linux.org.uk>
- <20150220092003.GB31692@arm.com>
- <CAKv+Gu_5fOinMVYbk99unmEDSqCF3Z7QdXiQTw0VrrWW16Oc6w@mail.gmail.com>
-Message-ID: <20150220094035.GE8656@n2100.arm.linux.org.uk>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Fri, 20 Feb 2015 10:50:04 +0100
+Subject: [PATCH] ARM: OMAP2+: Return correct error values from device and
+ hwmod
+In-Reply-To: <20150220082226.GB14057@amd>
+References: <1424389302-24380-1-git-send-email-pali.rohar@gmail.com>
+ <20150220082226.GB14057@amd>
+Message-ID: <201502201050.04334@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 09:24:39AM +0000, Ard Biesheuvel wrote:
-> On 20 February 2015 at 09:20, Will Deacon <will.deacon@arm.com> wrote:
-> > [adding Ard]
-> >
-> > On Thu, Feb 19, 2015 at 06:34:44PM +0000, Russell King - ARM Linux wrote:
-> >> On Thu, Feb 19, 2015 at 05:12:20PM +0000, Russell King - ARM Linux wrote:
-> >> > Today, I have added ARM64 support to my automated nightly kernel builder.
-> >> > Initially, this will result in ARM64 builds being tested with allnoconfig
-> >> > and defconfig, and I shall add allmodconfig and allyesconfig to this in
-> >> > the coming days.
-> >> >
-> >> > Once that is done and stable, I will investigate adding an ARM Juno
-> >> > platform to my boot farm so we can run the results of the builder.
-> >> >
-> >> > Other recent changes have been a disk upgrade, so the builder now has
-> >> > plenty of disk space to run the allmodconfig and allyesconfig, which
-> >> > used to fail (or be skipped) when the disk space was low.
-> >> >
-> >> > I've also added a new ARM target for building the defconfig without a
-> >> > seed.
-> >> >
-> >> > As ever, all results are in the usual place, at:
-> >> >
-> >> > http://www.arm.linux.org.uk/developer/build/
-> >>
-> >> It seems that there's either something wrong with the kernel, or
-> >> there's a problem with binutils.
-> >>
-> >> /tmp/cc1B9ysz.s:99: Error: selected processor does not support `aese v0.16b,v1.16b'
-> >> /tmp/cc1B9ysz.s:207: Error: selected processor does not support `aesimc v1.16b,v0.16b'
-> >> /tmp/cc1B9ysz.s:255: Error: selected processor does not support `aese v0.16b,v1.16b'
-> >> /tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesd v0.16b,v2.16b'
-> >> /tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesimc v0.16b,v0.16b'
-> >> /tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesd v0.16b,v3.16b'
-> >> /tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesimc v0.16b,v0.16b'
-> >> /tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesd v0.16b,v1.16b'
-> >> /tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesimc v0.16b,v0.16b'
-> >> /tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesd v0.16b,v2.16b'
-> >> /tmp/cc1B9ysz.s:455: Error: selected processor does not support `aese v0.16b,v2.16b'
-> >> /tmp/cc1B9ysz.s:455: Error: selected processor does not support `aesmc v0.16b,v0.16b'
-> >> /tmp/cc1B9ysz.s:455: Error: selected processor does not support `aese v0.16b,v3.16b'
-> >> /tmp/cc1B9ysz.s:455: Error: selected processor does not support `aesmc v0.16b,v0.16b'
-> >> /tmp/cc1B9ysz.s:455: Error: selected processor does not support `aese v0.16b,v1.16b'
-> >> /tmp/cc1B9ysz.s:455: Error: selected processor does not support `aesmc v0.16b,v0.16b'
-> >> /tmp/cc1B9ysz.s:455: Error: selected processor does not support `aese v0.16b,v2.16b'
-> >> make[2]: *** [arch/arm64/crypto/aes-ce-cipher.o] Error 1
-> >>
-> >> I've tried both the mainline git version, and the sourceware.org
-> >> binutils-gdb.git version, both result in the same errors.
-> >
-> > It sounds like GCC isn't propagating the march flags down to the assembler,
-> > since we take care in arch/arm64/crypto/Makefile to pass the '+crypto'
-> > option for these files.
-> >
+On Friday 20 February 2015 09:22:26 Pavel Machek wrote:
+> On Fri 2015-02-20 00:41:41, Pali Roh?r wrote:
+> > Without this patch function pm_runtime_get_sync() returns 0
+> > even when some omap subfunction fails. This patch properly
+> > propagate error codes from omap functions back to caller.
+> > 
+> > This patch fix problem, when loading omap-aes driver in qemu
+> > cause kernel oops.
 > 
-> Yes, this looks like a GCC problem, not binutils, since there are
-> other .S files in the same folder that contain crypto instructions
-> that build fine. This particular one is a .c file with AES
-> instructions in inline asm() (and we pass -march=armv8-a+crypto)
+> "fixes"
+> 
+> > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+> 
+> Acked-by: Pavel Machek <pavel@ucw.cz>
+> 
+> > @@ -3350,16 +3350,17 @@ int omap_hwmod_enable(struct
+> > omap_hwmod *oh)
+> > 
+> >   */
+> >  
+> >  int omap_hwmod_idle(struct omap_hwmod *oh)
+> >  {
+> > 
+> > +	int r;
+> > 
+> >  	unsigned long flags;
+> >  	
+> >  	if (!oh)
+> >  	
+> >  		return -EINVAL;
+> >  	
+> >  	spin_lock_irqsave(&oh->_lock, flags);
+> > 
+> > -	_idle(oh);
+> > +	r = _idle(oh);
+> > 
+> >  	spin_unlock_irqrestore(&oh->_lock, flags);
+> > 
+> > -	return 0;
+> > +	return r;
+> > 
+> >  }
+> 
+> Normally, such variable is called ret or res...
+> 
+> 									Pavel
 
-Maybe we need to get jk's blog post updated - it's currently on of
-the top hits in google, so this is probably going to trip up a lot of
-people if they follow the instructions there.
-
-http://jk.ozlabs.org/docs/arm64-toolchain/
-
-So it sounds like possibly the binutils part of those instructions is
-fine, it's the gcc part which isn't.
+In other parts of this code is used name "r" not "ret".
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150220/66029e73/attachment.sig>
