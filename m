@@ -1,47 +1,60 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Fri, 20 Feb 2015 20:03:05 +0100
-Subject: Announce: rmk's nightly builder gets ARM64 support
-In-Reply-To: <20150220102009.GF8656@n2100.arm.linux.org.uk>
-References: <20150219171220.GA8656@n2100.arm.linux.org.uk>
- <20150219183444.GB8656@n2100.arm.linux.org.uk>
- <20150220092003.GB31692@arm.com>
- <CAKv+Gu_5fOinMVYbk99unmEDSqCF3Z7QdXiQTw0VrrWW16Oc6w@mail.gmail.com>
- <20150220094035.GE8656@n2100.arm.linux.org.uk>
- <20150220102009.GF8656@n2100.arm.linux.org.uk>
-Message-ID: <20150220190305.GO15673@pengutronix.de>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 20 Feb 2015 11:03:56 -0800
+Subject: [PATCH v4 0/3] about data busy
+In-Reply-To: <1423894668-8886-1-git-send-email-addy.ke@rock-chips.com>
+References: <1423828368-18456-1-git-send-email-addy.ke@rock-chips.com>
+ <1423894668-8886-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <CAD=FV=U6T23wsJGCb2VoE7bQ=D2FdPgPGa+Fnp6aUBPXgiO5Zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 10:20:09AM +0000, Russell King - ARM Linux wrote:
-> On Fri, Feb 20, 2015 at 09:40:35AM +0000, Russell King - ARM Linux wrote:
-> > On Fri, Feb 20, 2015 at 09:24:39AM +0000, Ard Biesheuvel wrote:
-> > > Yes, this looks like a GCC problem, not binutils, since there are
-> > > other .S files in the same folder that contain crypto instructions
-> > > that build fine. This particular one is a .c file with AES
-> > > instructions in inline asm() (and we pass -march=armv8-a+crypto)
-> > 
-> > Maybe we need to get jk's blog post updated - it's currently on of
-> > the top hits in google, so this is probably going to trip up a lot of
-> > people if they follow the instructions there.
-> > 
-> > http://jk.ozlabs.org/docs/arm64-toolchain/
-> > 
-> > So it sounds like possibly the binutils part of those instructions is
-> > fine, it's the gcc part which isn't.
-> 
-> Note that it would also be useful to know where to get a working gcc
-> from (preferably in source form - I doubt there's any Fedora 14
-> binaries around.)
+Hi,
 
-We have an arm 64 bit toolchain in OSELAS.Toolchain:
-http://git.pengutronix.de/?p=OSELAS.Toolchain.git
+On Fri, Feb 13, 2015 at 10:17 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
+> patch 1: This patch can fix bug that controller is still data busy after
+>          reset all blocks. After this patch, I still get data busy in
+>          set_ios().
+>
+> patch 2: This patch fix bug 'Timeout sending command'. After patch1 and
+>          patch2, there is no mmc errors after:
+>          cd /sys/bus/platform/drivers/dwmmc_rockchip
+>          for i in $(seq 1 10000); do
+>                 echo "========================" $i
+>                 echo ff0c0000.dwmmc > unbind
+>                 sleep .5
+>                 echo ff0c0000.dwmmc > bind
+>                 sleep 2
+>         done
+>
+> patch3: This patch fix bug that there is data busy before sdio send CMD53.
+>         But This patch is necessary for sd and mmc too.
+>
+> Addy Ke (3):
+>   mmc: dw_mmc: update clock after host reach a stable voltage
+>   mmc: dw_mmc: fix bug that cause 'Timeout sending command'
+>   mmc: dw_mmc: Don't start command while data busy
+>
+>  drivers/mmc/host/dw_mmc.c | 41 ++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 40 insertions(+), 1 deletion(-)
 
-with this ptxconfig:
-http://git.pengutronix.de/?p=OSELAS.Toolchain.git;a=blob;f=ptxconfigs/aarch64-v8a-linux-gnu_gcc-4.9.2_glibc-2.20_binutils-2.24_kernel-3.16-sanitized.ptxconfig
+A little hard to follow all the patches flying around (so I'll
+probably reply a few different places with the same info), but I
+believe that all of Addy's patches (with the exception of the one
+intended to fix mmc_test which needs to be spun by him for a bugfix)
+can be replaced with:
 
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+* mmc: dw_mmc: Don't start commands while busy
+  https://patchwork.kernel.org/patch/5858221/
+
+* mmc: dw_mmc: Make sure we only adjust the clock when power is on
+  https://patchwork.kernel.org/patch/5858261/
+
+* mmc: dw_mmc: Give a good reset after we give power
+  https://patchwork.kernel.org/patch/5858281/
+
+
+In order to avoid further spreading info out among several patches,
+I'd request that you don't respond here but instead respond to my
+posted patches.  Thanks!
+
+-Doug
