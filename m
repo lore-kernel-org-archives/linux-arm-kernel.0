@@ -1,44 +1,59 @@
-From: dianders@google.com (Doug Anderson)
-Date: Fri, 20 Feb 2015 13:43:16 -0800
-Subject: [PATCH v2] mmc: dw_mmc: fix bug that cause mmc_test failture
-In-Reply-To: <1424400925-3867-1-git-send-email-addy.ke@rock-chips.com>
-References: <1422273849-29773-1-git-send-email-addy.ke@rock-chips.com>
- <1424400925-3867-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <CAD=FV=Vz6Rq9wFjvKAnzuKgXAqeVE2FafoOhtf3VaYO63bRUAA@mail.gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 20 Feb 2015 22:48:28 +0100
+Subject: [PATCH v2 04/18] clocksource: Add ARM System timer driver
+In-Reply-To: <20150220195437.GT19388@pengutronix.de>
+References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1424455277-29983-5-git-send-email-mcoquelin.stm32@gmail.com>
+ <20150220195437.GT19388@pengutronix.de>
+Message-ID: <1424468908.24292.10.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Addy,
+On Fri, 2015-02-20 at 20:54 +0100, Uwe Kleine-K?nig wrote:
+> On Fri, Feb 20, 2015 at 07:01:03PM +0100, Maxime Coquelin wrote:
+> > This patch adds clocksource support for ARMv7-M's System timer,
+> > also known as SysTick.
+> > 
+> > Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> > ---
+> >  drivers/clocksource/Kconfig          |  7 ++++
+> >  drivers/clocksource/Makefile         |  1 +
+> >  drivers/clocksource/armv7m_systick.c | 78 ++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 86 insertions(+)
+> >  create mode 100644 drivers/clocksource/armv7m_systick.c
+> > 
+> > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> > index fc01ec2..fb6011e 100644
+> > --- a/drivers/clocksource/Kconfig
+> > +++ b/drivers/clocksource/Kconfig
+> > @@ -124,6 +124,13 @@ config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+> >  	help
+> >  	 Use ARM global timer clock source as sched_clock
+> >  
+> > +config ARMV7M_SYSTICK
+> > +	bool
+> I assume this symbol is enabled later in the series.
 
-On Thu, Feb 19, 2015 at 6:55 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
-> The STOP command can terminate a data transfer between a memory card and
-> mmc controller.
->
-> As show in Synopsys DesignWare Cores Mobile Stroage Host Databook:
-> Data timeout and Data end-bit error will terminate further data transfer
-> by mmc controller. So we should not send abort command to terminate a
-> data transfer again if we got DRTO and EBE interrupt.
->
-> After this patch, all mmc_test cases can pass on RK3288-Pink2 board.
->
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
-> ---
-> Changes in v2:
-> - DRTO and EBE are both set, should not send abort command too,
->   suggested by Doug Anderson.
->
->  drivers/mmc/host/dw_mmc.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
+Yes, I noticed it was selected in 14/18 ("ARM: Add STM32 family
+machine").
 
-I also suggested that you change the subject to "mmc: dw_mmc: fix
-mmc_test by not sending abort for DRTO / EBE errors" which you didn't
-do.  ...I guess that's not critical.  Perhaps Jaehoon (who is
-collecting patches for Ulf now I think) can adjust the subject when he
-applies.
+> Would it make sense
+> to allow enabing the symbol for compile test coverage?
+> 
+> > +	select CLKSRC_OF if OF
+> What happens if ARMV7M_SYSTICK=y but OF=n? Doesn't the driver fail to
+> compile?
+> 
+> > +	select CLKSRC_MMIO
+> > +	help
+> > +	  This options enables support for the ARMv7M system timer unit
+> the right spelling is ARMv7-M.
 
-In any case, v2 fixes my problems and seems OK to me.
+This Kconfig entry has no prompt, so no one is going to see this text
+during make *config. Perhaps this should be made a comment. In that case
+the right spelling should still be used.
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+Thanks,
 
-On rk3288 on a 3.14 kernel w/ lotsa backports:
-Tested-by: Doug Anderson <dianders@chromium.org>
+
+Paul Bolle
