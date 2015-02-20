@@ -1,122 +1,42 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 20 Feb 2015 12:09:44 +0100 (CET)
-Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
- registers
-In-Reply-To: <1705379122.406018.1423686677196.JavaMail.open-xchange@oxbaltgw01.schlund.de>
-References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
- <CAOMZO5DOgdUYsRUU3TXgJY+JhjF8xC_XY8EJFcrM7NHiPmSMOQ@mail.gmail.com>
- <54DA020C.6030703@i2se.com>
- <CAOMZO5DGCP1p1vetwWHpSbe2qywA8DhWRRq22egMDFSw11uq4w@mail.gmail.com>
- <54DA0DE7.5050708@i2se.com>
- <CAOMZO5AtFOThRjcAgMVbrbkcrJbehouSxoH03VUGJrRdWXnS_Q@mail.gmail.com>
- <462270270.419156.1423603473431.JavaMail.open-xchange@oxbaltgw02.schlund.de>
- <CAOMZO5B4mxP6RBkbsbj=wC6bZJgtreoo5S_NhYuki6kW=Y=QFw@mail.gmail.com>
- <1705379122.406018.1423686677196.JavaMail.open-xchange@oxbaltgw01.schlund.de>
-Message-ID: <1590447717.894708.1424430584776.JavaMail.open-xchange@oxbaltgw03.schlund.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 20 Feb 2015 12:11:34 +0100
+Subject: [PATCH 03/10] devicetree: bindings: add Device Tree bindings
+ for Armada 39x pin-muxing controller
+In-Reply-To: <20150206170521.GX25985@lunn.ch>
+References: <1423238276-9206-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1423238276-9206-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20150206170521.GX25985@lunn.ch>
+Message-ID: <20150220121134.25cb865c@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Dear Andrew Lunn,
 
-> Stefan Wahren <stefan.wahren@i2se.com> hat am 11. Februar 2015 um 21:31
-> geschrieben:
->
->
-> Hi Fabio,
->
-> > Fabio Estevam <festevam@gmail.com> hat am 11. Februar 2015 um 17:58
-> > geschrieben:
-> >
-> >
-> > Hi Stefan,
-> >
-> > On Tue, Feb 10, 2015 at 7:24 PM, Stefan Wahren <stefan.wahren@i2se.com>
-> > wrote:
-> > > Hi Fabio,
-> > >
-> > >> Fabio Estevam <festevam@gmail.com> hat am 10. Februar 2015 um 16:06
-> > >> geschrieben:
-> > >>
-> > >>
-> > >> Hi Stefan,
-> > >>
-> > >> On Tue, Feb 10, 2015 at 11:55 AM, Stefan Wahren <stefan.wahren@i2se.com>
-> > >> wrote:
-> > >>
-> > >> > Could you apply only the clk-imx28.c part of my patch and see what
-> > >> > happens?
-> > >>
-> > >> If I apply only the clk-imx28.c part of your patch I can successfully
-> > >> probe the SPI NOR.
-> > >
-> > > thanks this is very helpful. I built the linux-next for my Duckbill and
-> > > add
-> > > the
-> > > SSP2 section from imx28-evk.dts into imx28-duckbill.dts.
-> > >
-> > > Without my patch i get the following for HW_CLKCTRL_FRAC0:
-> > >
-> > > ./memwatch -a 0x800401B0
-> > >
-> > > 0x800401b0: 0x5e5b5513
-> > >
-> > > With my patch i get:
-> > >
-> > > ./memwatch -a 0x800401B0
-> > >
-> > > 0x800401b0: 0x5e1b5513
-> >
-> > I always get 0x5e5b5513 with or without your patch.
->
-> very strange. Do you have any idea why IO1_STABLE is permanent low?
->
-> Here are the register dumps as requested by Mike.
->
-> Without this patch after boot
->
-> 0x80040000: 0x00060000
-> 0x80040010: 0x800004b1
-> 0x80040050: 0x00011001
-> 0x80040080: 0x64000001
-> 0x80040090: 0x00000001
-> 0x800400a0: 0x80000001
-> 0x800400b0: 0x00000002
-> 0x800400c0: 0xa0000001
-> 0x800401b0: 0x5e5b5513
-> 0x800401c0: 0x00929292
-> 0x800401d0: 0x00004104
->
-> With this patch after boot
->
-> 0x80040000: 0x00060000
-> 0x80040010: 0x800004b1
-> 0x80040050: 0x00011001
-> 0x80040080: 0x64000001
-> 0x80040090: 0x00000001
-> 0x800400a0: 0x80000001
-> 0x800400b0: 0x00000002
-> 0x800400c0: 0xa0000001
-> 0x800401b0: 0x5e1b5513
-> 0x800401c0: 0x00929292
-> 0x800401d0: 0x00004104
+On Fri, 6 Feb 2015 18:05:21 +0100, Andrew Lunn wrote:
 
-just for the records here is the register dump for the case "patch V2 on
-Duckbill with U-Boot instead of imx-bootlets":
+> I wondering if there should be an explanation for the less common
+> names here. I'm guessing dev is a device bus of some sort? What is
+> xsmi? Some sort of extended System Management Interface? And m?
 
-0x80040000: 0x00060000
-0x80040010: 0x800004b1
-0x80040050: 0x00011001
-0x80040080: 0x64000001
-0x80040090: 0x00000005
-0x800400a0: 0x80000001
-0x800400b0: 0x00000002
-0x800400c0: 0xa0000001
-0x800401b0: 0x5e5b5513
-0x800401c0: 0x00929292
-0x800401d0: 0x00004104
+"dev" is the Device Bus indeed, used for example for NOR or NAND.
 
-So the issue with IO1_STABLE seems to come from the bootloader.
+"m" stands for memory. The m(decc) signal is asserted when a memory ECC
+error occurred, while the m(vtt) signal is the DRAM VTT Power Control
+signal. No idea what this is.
 
-Do you have any idea which i.MX28 registers additionally could be relevant?
+"xsmi" is indeed some other SMI bus, not clear yet how it compares to
+the regular SMI bus.
 
-Stefan
+Both "dev" and "m" are already used by many of the existing pinctrl DT
+bindings for Marvell platforms, so I'm not sure documenting them
+specifically in the Armada 39x pinctrl DT binding document makes a lot
+of sense. Where should we document them, then? In the generic
+'marvell,mvebu-pinctrl.txt' DT binding file ?
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
