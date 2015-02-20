@@ -1,74 +1,45 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 20 Feb 2015 15:14:55 +0100
-Subject: [PATCH 09/10] ARM: mvebu: add Device Tree files for Armada 39x
- SoC and board
-In-Reply-To: <20150206172153.GY25985@lunn.ch>
-References: <1423238276-9206-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1423238276-9206-10-git-send-email-thomas.petazzoni@free-electrons.com>
- <20150206172153.GY25985@lunn.ch>
-Message-ID: <20150220151455.461b97bb@free-electrons.com>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Fri, 20 Feb 2015 08:15:00 -0600
+Subject: [PATCH 1/1 v2] ARM: coresight: fix system halt when etm enable
+ and add nosmp to command line
+In-Reply-To: <54E6DFDB.8070603@de.bosch.com>
+References: <1424354275-18747-1-git-send-email-Frank.Li@freescale.com>
+ <54E6DFDB.8070603@de.bosch.com>
+Message-ID: <CAHrpEqQ0KURi0vXz8Xmj78ybwBi0YzrdsKkrKpHCQUS6WhCMVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+On Fri, Feb 20, 2015 at 1:18 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+> Hi Frank,
+>
+> On 19.02.2015 14:57, Frank.Li at freescale.com wrote:
+>>
+>> From: Frank Li <Frank.Li@freescale.com>
+>>
+>> when nosmp set, only 1 core enabled. try to access disable core will halt.
+>> dts need added arm,primecell-periphid =  <id> for none-boot core
+>> otherwise amba_device_add will halt when read peripheral id.
+>>
+>> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+>
+>
+>
+> Just out of interest: Do you have the coresight patches working on i.MX6,
+> now?
 
-On Fri, 6 Feb 2015 18:21:53 +0100, Andrew Lunn wrote:
+No,  i.MX6 have bugs about coresight.
+I worked at MX7.
 
-> > +	chosen {
-> > +		bootargs = "console=ttyS0,115200 earlyprintk";
-> > +	};
-> > +
-> 
-> Arnd has been encouraging people not use earlyprintk here.  Also a
-> stdout-path would be nice. We also seem to be missing aliases for the
-> serial ports.
+best regards
+Frank Li
 
-Right.
-
-
-> > +		internal-regs {
-> > +                        i2c at 11000 {
-> > +				pinctrl-0 = <&i2c0_pins>;
-> > +				pinctrl-names = "default";
-> > +                                status = "okay";
-> > +                                clock-frequency = <100000>;
-> > +                        };
-> > +
-> > +			serial at 12000 {
-> > +				pinctrl-0 = <&uart0_pins>;
-> > +				pinctrl-names = "default";
-> > +				status = "okay";
-> > +			};
-> > +
-> 
-> Tab vs space issue here somewhere? Probably the i2c node.
-
-Yes, fixed.
-
-> > +			pinctrl at 18000 {
-> > +				uart0_pins: uart0-pins {
-> > +					marvell,pins = "mpp0", "mpp1";
-> > +					marvell,function = "ua0";
-> > +				};
-> > +
-> > +				uart1_pins: uart1-pins {
-> > +					marvell,pins = "mpp19", "mpp20";
-> > +					marvell,function = "ua1";
-> > +				};
-> 
-> Does it make sense to put there in the .dtsi file? I know there are
-> other choices, but generally board manufacturers tend to follow the
-> reference design.
-
-I am not really convinced here: there are really many possible pin
-muxing possibilities. Various pins for UART0 and UART1, whether you use
-CTS/RTS or not, etc. I believe this is really the sort of pin mux
-configuration that is best left at the board level.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>
+> I.e. is
+>
+> http://www.spinics.net/lists/arm-kernel/msg397864.html
+>
+> clarified, now?
+>
+> Best regards
+>
+> Dirk
