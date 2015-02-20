@@ -1,65 +1,44 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 20 Feb 2015 11:05:26 -0800
-Subject: [PATCH v4 1/3] mmc: dw_mmc: update clock after host reach a
- stable voltage
-In-Reply-To: <CAD=FV=VSYQs8p9m_+dmXmkMmxgqzDA6EGZ9Vfy3wsby5k5NitQ@mail.gmail.com>
-References: <1423828368-18456-1-git-send-email-addy.ke@rock-chips.com>
- <1423894668-8886-1-git-send-email-addy.ke@rock-chips.com>
- <1423894668-8886-2-git-send-email-addy.ke@rock-chips.com>
- <CAGOxZ53ndi_hYDGBGhY-7q8aOrFid1=D=_5KEbUvzTsnybJQ3Q@mail.gmail.com>
- <CAD=FV=V9aK-78GJ_eWkpZZdVT_5Zu8ehxg_o3NtnpD2wyRuh7Q@mail.gmail.com>
- <CAD=FV=VSYQs8p9m_+dmXmkMmxgqzDA6EGZ9Vfy3wsby5k5NitQ@mail.gmail.com>
-Message-ID: <CAD=FV=VgvwRvTZrbpMB8EKNNDzUvcCsQKs_uC_RMuc83swu_yA@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 20 Feb 2015 11:13:06 -0800
+Subject: [PATCH RFC v9 01/20] clk: divider: Correct parent clk round rate
+ if no bestdiv is normally found
+In-Reply-To: <20150216112724.GN8656@n2100.arm.linux.org.uk>
+References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
+ <1423720903-24806-2-git-send-email-Ying.Liu@freescale.com>
+ <20150212093356.GR12209@pengutronix.de> <20150212103944.GA1290@victor>
+ <20150212122405.GW12209@pengutronix.de>
+ <20150212125646.GT8656@n2100.arm.linux.org.uk>
+ <20150212134131.GX12209@pengutronix.de> <54DE0BB8.7070004@ti.com>
+ <20150213185713.GA12209@pengutronix.de>
+ <20150216112724.GN8656@n2100.arm.linux.org.uk>
+Message-ID: <20150220191306.421.58746@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Quoting Russell King - ARM Linux (2015-02-16 03:27:24)
+> On Fri, Feb 13, 2015 at 07:57:13PM +0100, Sascha Hauer wrote:
+> > I agree that it's a bit odd, but I think it has to be like this.
+> > Consider that you request a rate of 100Hz, but the clock can only
+> > produce 99.5Hz, so due to rounding clk_round_rate() returns 99Hz.
+> > Now when you request 99Hz from clk_set_rate() the 99.5Hz value
+> > can't be used because it's too high.
+> 
+> Math rounding rules normally state that anything of .5 and greater
+> should be rounded up, not rounded down.  So, for 99.5Hz, you really
+> ought to be returning 100Hz, not 99Hz.
+> 
+> However, you do have a point for 99.4Hz, which would be returned as
+> 99Hz, and when set, it would result in something which isn't 99.4Hz.
 
-On Thu, Feb 19, 2015 at 5:04 PM, Doug Anderson <dianders@chromium.org> wrote:
-> Hi,
->
-> On Thu, Feb 19, 2015 at 3:49 PM, Doug Anderson <dianders@chromium.org> wrote:
->> I've got that coded up but I'm still testing it...  If you want to try
->> it too, you can find it at
->> <https://chromium-review.googlesource.com/251341>.
->>
->> Note that without my patch I find that I _really_ need Addy's patch to
->> make sure that the card isn't busy in setup_bus.  With my patch Addy's
->> code catches the card busy less often.  I'm still trying to see if
->> there's a way to totally remove the need for his setup_bus and still
->> trying to grok all the patches flying around...
->
-> Ah, this might be the magic needed:
->
-> https://chromium-review.googlesource.com/251344
->
->
-> I think that together with the previous patch things are happy for me
-> without any of Addy's patches, though it's the end of my work day and
-> I haven't given this nearly as much testing as I'd like.
->
-> I'll continue testing tomorrow and then post both patches together upstream.
+More practically, this again raises the issue of whether or not unsigned
+long rate should be in millihertz or something other than hertz.
 
-OK, posted three patches upstream...
+And then that question again raises the issue of making rate 64-bit...
 
-A little hard to follow all the patches flying around (so I'll
-probably reply a few different places with the same info), but I
-believe that all of Addy's patches (with the exception of the one
-intended to fix mmc_test which needs to be spun by him for a bugfix)
-can be replaced with:
+Regards,
+Mike
 
-* mmc: dw_mmc: Don't start commands while busy
-  https://patchwork.kernel.org/patch/5858221/
-
-* mmc: dw_mmc: Make sure we only adjust the clock when power is on
-  https://patchwork.kernel.org/patch/5858261/
-
-* mmc: dw_mmc: Give a good reset after we give power
-  https://patchwork.kernel.org/patch/5858281/
-
-
-In order to avoid further spreading info out among several patches,
-I'd request that you don't respond here but instead respond to my
-posted patches.  Thanks!
-
--Doug
+> 
+> -- 
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
