@@ -1,36 +1,49 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 20 Feb 2015 18:04:23 +0100
-Subject: [PATCHv2 04/15] ARM: mvebu: use IRQ macros to define the SDHCI
- interrupt on Armada 38x
+Date: Fri, 20 Feb 2015 18:04:25 +0100
+Subject: [PATCHv2 06/15] devicetree: bindings: add DT binding for the Marvell
+ Armada 39x SoC family
 In-Reply-To: <1424451874-25375-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1424451874-25375-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1424451874-25375-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1424451874-25375-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 38x SDHCI controller definition in the SoC Device Tree file
-is using hardcoded values instead of the nice GIC and IRQ macros
-provided by DT header files. This commit fixes that, which allows the
-SDHCI interrupt definition to be consistent with was is done in the
-rest of the file.
+The Marvell Armada 39x is a family of two SoCs: the Armada 390 and the
+Armada 398, with a slightly different number of interfaces. This
+commit introduces the Device Tree binding that documents the top-level
+compatible strings for Armada 39x based platforms.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-38x.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/armada-39x.txt | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/armada-39x.txt
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 8c76a8d..0f0cc41 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -542,7 +542,7 @@
- 			sdhci at d8000 {
- 				compatible = "marvell,armada-380-sdhci";
- 				reg = <0xd8000 0x1000>, <0xdc000 0x100>;
--				interrupts = <0 25 0x4>;
-+				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&gateclk 17>;
- 				mrvl,clk-delay-cycles = <0x1F>;
- 				status = "disabled";
+diff --git a/Documentation/devicetree/bindings/arm/armada-39x.txt b/Documentation/devicetree/bindings/arm/armada-39x.txt
+new file mode 100644
+index 0000000..53d4ff9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/armada-39x.txt
+@@ -0,0 +1,20 @@
++Marvell Armada 39x Platforms Device Tree Bindings
++-------------------------------------------------
++
++Boards with a SoC of the Marvell Armada 39x family shall have the
++following property:
++
++Required root node property:
++
++ - compatible: must contain "marvell,armada390"
++
++In addition, boards using the Marvell Armada 398 SoC shall have the
++following property before the previous one:
++
++Required root node property:
++
++compatible: must contain "marvell,armada398"
++
++Example:
++
++compatible = "marvell,a398-db", "marvell,armada398", "marvell,armada390";
 -- 
 2.1.0
