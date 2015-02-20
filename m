@@ -1,23 +1,40 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 20 Feb 2015 10:24:05 +0000
-Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
-In-Reply-To: <54E6ECEA.7020604@linaro.org>
-References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
- <54E69DB0.60701@codeaurora.org> <54E6ECEA.7020604@linaro.org>
-Message-ID: <54E70B45.3010203@linaro.org>
+From: mmarek@suse.cz (Michal Marek)
+Date: Fri, 20 Feb 2015 11:24:18 +0100
+Subject: [PATCH] [media] [kbuild] Add and use IS_REACHABLE macro
+In-Reply-To: <5822078.VORY4BTfEj@wuerfel>
+References: <6116702.rrbrOqQ26P@wuerfel> <14254005.QkaJhTuY5H@wuerfel>
+ <54E5FBEA.1000005@suse.cz> <5822078.VORY4BTfEj@wuerfel>
+Message-ID: <54E70B52.9040708@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 20/02/15 08:14, Srinivas Kandagatla wrote:
+On 2015-02-20 10:29, Arnd Bergmann wrote:
+> On Thursday 19 February 2015 16:06:18 Michal Marek wrote:
+>>> We have similar problems in other areas
+>>> of the kernel. In theory, we could enforce the VIDEO_TUNER driver to
+>>> be modular here by adding lots of dependencies to it:
+>>>
+>>> config VIDEO_TUNER
+>>>       tristate
+>>>       depends on MEDIA_TUNER_TEA5761 || !MEDIA_TUNER_TEA5761
+>>>       depends on MEDIA_TUNER_TEA5767 || !MEDIA_TUNER_TEA5767
+>>>       depends on MEDIA_TUNER_MSI001  || !MEDIA_TUNER_MSI001
 >>
->> Doesn't this need some sort of select REGMAP somewhere?
-> May be depends REGMAP would be good.
-You are right, just realized that
-it should be "select REGMAP"
+>> Nah, that's even uglier. I suggest to merge your IS_REACHABLE patch.
+>>
+> 
+> Ok, can I take this as an ack from your side to merge the
+> include/linux/kconfig.h part of the patch through the linux-media
+> tree?
 
-and for QFPROM it should be "select REGMAP_MMIO"
+Yes. If you want
 
---srini
+Acked-by: Michal Marek <mmarek@suse.cz> [kconfig]
+
+
+> I thought about splitting up the patch into two, but that would
+> just make merging it harder because we'd still have the dependency.
+
+Agreed, no need to pedantically split patches just for the sake of it.
+
+Michal
