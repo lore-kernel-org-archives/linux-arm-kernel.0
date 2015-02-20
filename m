@@ -1,28 +1,40 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 20 Feb 2015 17:17:49 +0100
-Subject: [PATCH] genirq: fix virtual irq demuxer related comments
-In-Reply-To: <20150220161259.GL13659@leverpostej>
-References: <20150210150013.GD7119@twins.programming.kicks-ass.net>
- <1423582992-8154-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150210161425.GZ21418@twins.programming.kicks-ass.net>
- <20150220161259.GL13659@leverpostej>
-Message-ID: <20150220161749.GR5029@twins.programming.kicks-ass.net>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 20 Feb 2015 17:20:22 +0100
+Subject: [PATCH] cpufreq: exynos: allow build for !THERMAL or !CPU_THERMAL
+ cases
+Message-ID: <2275232.48muFcOOQv@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 04:12:59PM +0000, Mark Rutland wrote:
-> Hi Peter,
-> 
-> On Tue, Feb 10, 2015 at 04:14:25PM +0000, Peter Zijlstra wrote:
-> > On Tue, Feb 10, 2015 at 04:43:12PM +0100, Boris Brezillon wrote:
-> > > Replace remaining 'Dumb' occurrences by 'Virtual'.
-> > > Remove inappropriate notes in kerneldoc headers.
-> > > 
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > 
-> > Thanks, squished into the other one.
-> 
-> Would you be able to drop the virtual demuxer patch(es) for now?
+Allow driver build for !THERMAL or !CPU_THERMAL cases.
 
-Yeah, its commented out. With a comment saying I should track this
-thread ;-)
+The new dependency rule is the same as the one that CPUFREQ_DT
+option has (for cpufreq-dt driver which has the same issue with
+using of_cpufreq_cooling_register()).
+
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Eduardo Valentin <edubezval@gmail.com>
+Cc: Lukasz Majewski <l.majewski@samsung.com>
+Fixes: 8b2b4a4e5366 ("cpufreq: exynos: allow modular build")
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ drivers/cpufreq/Kconfig.arm | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 1b06fc4..f4df4af3 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -28,7 +28,8 @@ config ARM_VEXPRESS_SPC_CPUFREQ
+ config ARM_EXYNOS_CPUFREQ
+ 	tristate "SAMSUNG EXYNOS CPUfreq Driver"
+ 	depends on CPU_EXYNOS4210 || SOC_EXYNOS4212 || SOC_EXYNOS4412 || SOC_EXYNOS5250
+-	depends on THERMAL
++	# if CPU_THERMAL is on and THERMAL=m, ARM_EXYNOS_CPUFREQ cannot be =y:
++	depends on !CPU_THERMAL || THERMAL
+ 	help
+ 	  This adds the CPUFreq driver for Samsung EXYNOS platforms.
+ 	  Supported SoC versions are:
+-- 
+1.8.2.3
