@@ -1,64 +1,39 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 20 Feb 2015 09:48:07 +0100
-Subject: [PATCH] clockevents: Add (missing) default case for switch blocks
-In-Reply-To: <20150220083842.GA20387@gmail.com>
-References: <6291e308ab77a480c6b1732e16108c5fe6f66afa.1424412815.git.viresh.kumar@linaro.org>
- <20150220083842.GA20387@gmail.com>
-Message-ID: <20150220084807.GJ21418@twins.programming.kicks-ass.net>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 20 Feb 2015 14:21:14 +0530
+Subject: [PATCH 2/2] ARM: dts: dra7: remove ti,hwmod property from pcie phy
+In-Reply-To: <1424422274-27946-1-git-send-email-kishon@ti.com>
+References: <1424422274-27946-1-git-send-email-kishon@ti.com>
+Message-ID: <1424422274-27946-2-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 09:38:42AM +0100, Ingo Molnar wrote:
-> 
-> * Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> 
-> > Many clockevent drivers are using a switch block for handling modes in their
-> > ->set_mode() callback. Some of these do not have a 'default' case and adding a
-> > new mode in the 'enum clock_event_mode', starts giving following warnings for
-> > these platforms about unhandled modes (e.g. XXX).
-> > 
-> > 	warning: enumeration value ?XXX? not handled in switch [-Wswitch]
-> > 
-> > This patch adds default cases for them.
-> > 
-> > In order to keep things simple, add following to the switch blocks:
-> > 
-> > 	default:
-> > 		break;
-> > 
-> > This can lead to different behavior for individual cases.
-> > 
-> > 1) Some of the drivers don't have any special stuff in their ->set_mode()
-> >    callback before or after the switch blocks. And so this default case would
-> >    simply return for them without any updates to the clockevent device.
-> > 
-> > 2) But in some cases, the clockevent device is disabled/stopped as soon as we
-> >    enter the ->set_mode() callback and is enabled within the switch block or
-> >    after it. And the clockevent device *may* stay disabled for default case.
-> 
-> So this whole approach looks fragile for several reasons:
-> 
->    - 'mode setting' callbacks are just bad by design
->      because they mix several functions into the same entry
->      point, complicating the handler functions 
->      unnecessarily. We should reduce complexity, not expand 
->      on it.
-> 
->    - now by adding 'default' you hide from drivers the
->      ability to easily discover whether it has been updated
->      to some new core clockevents mode setting feature or
->      not.
+Now that we don't have hwmod entry for pcie PHY remove the
+ti,hwmod property from PCIE PHY's
 
-So this patch was a follow on from bd624d75db21 ("clockevents: Introduce
-mode specific callbacks").
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/dra7.dtsi |    2 --
+ 1 file changed, 2 deletions(-)
 
-That patch changes the set_mode() interface; and provides per mode
-functions.
-
-New (and updated) drivers should not use ->set_mode() anymore, but it
-was felt that we do not want to go do flag day changes.
-
-And it allows for adding optional modes; not every driver needs to go
-implement all mode functions if there is a sane default action.
-
-But it does mean we need to be able to add values to the enum.
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 5827fed..18a904d 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -1111,7 +1111,6 @@
+ 					      "wkupclk", "refclk",
+ 					      "div-clk", "phy-div";
+ 				#phy-cells = <0>;
+-				ti,hwmods = "pcie1-phy";
+ 			};
+ 
+ 			pcie2_phy: pciephy at 4a095000 {
+@@ -1130,7 +1129,6 @@
+ 					      "wkupclk", "refclk",
+ 					      "div-clk", "phy-div";
+ 				#phy-cells = <0>;
+-				ti,hwmods = "pcie2-phy";
+ 				status = "disabled";
+ 			};
+ 		};
+-- 
+1.7.9.5
