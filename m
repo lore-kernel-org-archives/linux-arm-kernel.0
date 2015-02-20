@@ -1,71 +1,111 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 20 Feb 2015 16:52:16 -0500
-Subject: [PATCH v10 4/6] ARM: add vdso user-space code
-In-Reply-To: <loom.20150218T122348-60@post.gmane.org>
-References: <1411413485-7675-1-git-send-email-nathan_lynch@mentor.com>
- <1411413485-7675-5-git-send-email-nathan_lynch@mentor.com>
- <loom.20150213T053547-381@post.gmane.org>
- <20150213105447.GB3508@e104818-lin.cambridge.arm.com>
- <loom.20150213T124417-857@post.gmane.org> <20150213141425.GA4713@localhost>
- <loom.20150213T153239-809@post.gmane.org>
- <20150213153253.GA23801@e104818-lin.cambridge.arm.com>
- <loom.20150218T122348-60@post.gmane.org>
-Message-ID: <54E7AC90.40209@codeaurora.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 20 Feb 2015 16:01:55 -0600
+Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
+In-Reply-To: <54E78A31.9020306@linaro.org>
+References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <CAL_Jsq+SeuoojgTpv1y_aPJ_jzDr3HqZhYEBQ3_vYGBHvcccug@mail.gmail.com>
+ <54E78A31.9020306@linaro.org>
+Message-ID: <CAL_Jsq+mvpRjYfL_8OseTDCB-6aBhwhNKLBQXXJeVQLDwWm8Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Venkappa,
-
-On 02/18/2015 07:12 AM, Venkappa Mala wrote:
-> Catalin Marinas <catalin.marinas <at> arm.com> writes:
-> 
-> 
->> I highly doubt you are having a problem with [1] since you mentioned
->> Cortex-A7 which falls under [2]. If you have a _processor_
->> implementation with generic timers but no Hyp, as per the ARMv7 ARM 
-> the
->> CNTVCT == CNTPCT, otherwise it is a CPU bug.
+On Fri, Feb 20, 2015 at 1:25 PM, Srinivas Kandagatla
+<srinivas.kandagatla@linaro.org> wrote:
+>
+>
+> On 20/02/15 17:21, Rob Herring wrote:
 >>
->> What you actually have is [2] but without code to initialise the Hyp
->> mode. If your kernel is running non-secure, sane Hyp registers
->> initialisation is mandatory even when the kernel does not boot in Hyp.
-> yes, cortexA7 is falling under [2]. i.e. my mistake. Thanks for the 
-> correction.
-> 
->> Even for the kernel, this should be the case unless
->> "arm,cpu-registers-not-fw-configured" is passed in the DT (this was
->> really only meant as workaround for broken firmware; I think
->> Documentation/arm/Booting needs to be updated with the state of the
->> generic timers on entry).
-> It will be good and it helps a lot if it updates.
->  
->> IIRC there were some discussions about Linux booting in secure mode on
->> ARMv7 with no firmware to initialise the Hyp registers. If that's the
->> case for you, we could restart that discussion and try to initialise
->> CNTVOFF in the kernel running in _secure_ mode (possibly with some CPU
->> notifiers in the generic timer code).
-> My test environment is like CNTVOFF initialization is not taken care in 
-> the firmware, HYP mode is disabled and kernel is booted with Secure SVC 
-> PL1 mode. As you have mentioned about restarting the thread, perhaps, it 
-> will be good to have a discussion in the following  thread rather than 
-> restarting the thread.
-> arm: Handle starting up in secure mode
-> https://lkml.org/lkml/2014/9/16/552
-> 
-> May I know your opinion about this one?
+>> On Thu, Feb 19, 2015 at 11:08 AM, Srinivas Kandagatla
+>> <srinivas.kandagatla@linaro.org> wrote:
+>>>
+>>> From: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>>
+>>> Up until now, EEPROM drivers were stored in drivers/misc, where they all
+>>> had to
+>>> duplicate pretty much the same code to register a sysfs file, allow
+>>> in-kernel
+>>> users to access the content of the devices they were driving, etc.
+>>>
+>>> This was also a problem as far as other in-kernel users were involved,
+>>> since
+>>> the solutions used were pretty much different from on driver to another,
+>>> there
+>>> was a rather big abstraction leak.
+>>>
+>>> This introduction of this framework aims at solving this. It also
+>>> introduces DT
+>>> representation for consumer devices to go get the data they require (MAC
+>>> Addresses, SoC/Revision ID, part numbers, and so on) from the EEPROMs.
+>>>
+>>> Having regmap interface to this framework would give much better
+>>> abstraction for eeproms on different buses.
+>>>
+>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>> [srinivas.kandagatla: Moved to regmap based and cleanedup apis]
+>>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>>> ---
+>>>   .../devicetree/bindings/eeprom/eeprom.txt          |  48 ++++
+>>>   drivers/Kconfig                                    |   2 +
+>>>   drivers/Makefile                                   |   1 +
+>>>   drivers/eeprom/Kconfig                             |  19 ++
+>>>   drivers/eeprom/Makefile                            |   9 +
+>>>   drivers/eeprom/core.c                              | 290
+>>> +++++++++++++++++++++
+>>>   include/linux/eeprom-consumer.h                    |  73 ++++++
+>>>   include/linux/eeprom-provider.h                    |  51 ++++
+>>
+>>
+>> Who is going to be the maintainer for this?
+>
+>
+> Am happy to be one.
 
-Catalin pointed out that accesses to NSACR may trap. I have not yet found a
-reason why trying to write to CNTFRQ wouldn't work. Peter pointed out that
-VBAR can't be used on systems without the security extensions, so something
-has to be changed there as well.
+So please add a MAINTAINERS entry.
 
-In the long term I may be able to post an updated version, but I have no idea
-how long that might take. In the short term feel free to CC me on any related
-work you do, which I might be able to review, test, or both.
+[...]
 
-Chris
+>>> += Data consumers =
+>>> +
+>>> +Required properties:
+>>> +
+>>> +eeproms: List of phandle and data cell specifier triplet, one triplet
+>>> +        for each data cell the device might be interested in. The
+>>> +        triplet consists of the phandle to the eeprom provider, then
+>>> +        the offset in byte within that storage device, and the length
+>>> +        in byte of the data we care about.
+>>
+>>
+>> The problem with this is it assumes you know who the consumer is and
+>> that it is a DT node. For example, how would you describe a serial
+>> number?
+>
+> Correct me if I miss understood.
+> Is serial number any different?
+> Am hoping that the eeprom consumer would be aware of offset and size of
+> serial number in the eeprom
+>
+> Cant the consumer do:
+>
+> eeprom-consumer {
+>         eeproms = <&at24 0 4>;
+>         eeprom-names = "device-serial-number";
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Yes, but who is "eeprom-consumer"? DT nodes generally describe a h/w
+block, but it this case, the consumer depends on the OS, not the h/w.
+I'm not saying you can't describe where things are, but I don't think
+you should imply who is the consumer and doing so is unnecessarily
+complicated.
+
+Also, the layout of EEPROM is likely very much platform specific. Some
+could have a more complex structure perhaps with key ids and linked
+list structure.
+
+I would do something more simple that is just a list of keys and their
+location like this:
+
+device-serial-number = <start size>;
+key1 = <start size>;
+key2 = <start size>;
+
+Rob
