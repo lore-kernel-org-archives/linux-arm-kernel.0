@@ -1,58 +1,62 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Fri, 20 Feb 2015 10:55:25 +0800
-Subject: [PATCH v2] mmc: dw_mmc: fix bug that cause mmc_test failture
-In-Reply-To: <1422273849-29773-1-git-send-email-addy.ke@rock-chips.com>
-References: <1422273849-29773-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <1424400925-3867-1-git-send-email-addy.ke@rock-chips.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Fri, 20 Feb 2015 11:07:21 +0800
+Subject: [PATCH v4 4/4] phy: add phy-hi6220-usb
+In-Reply-To: <20150218143546.GD3651@saruman.tx.rr.com>
+References: <1423726646-30336-1-git-send-email-zhangfei.gao@linaro.org>
+ <1423726646-30336-5-git-send-email-zhangfei.gao@linaro.org>
+ <54E4249C.9050404@ti.com> <54E426B5.4070206@linaro.org>
+ <20150218143546.GD3651@saruman.tx.rr.com>
+Message-ID: <54E6A4E9.4030401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The STOP command can terminate a data transfer between a memory card and
-mmc controller.
+Hi, Balbi
 
-As show in Synopsys DesignWare Cores Mobile Stroage Host Databook:
-Data timeout and Data end-bit error will terminate further data transfer
-by mmc controller. So we should not send abort command to terminate a
-data transfer again if we got DRTO and EBE interrupt.
+On 02/18/2015 10:35 PM, Felipe Balbi wrote:
+> On Wed, Feb 18, 2015 at 01:44:21PM +0800, zhangfei wrote:
+>> Hi, Kishon
+>>
+>> On 02/18/2015 01:35 PM, Kishon Vijay Abraham I wrote:
+>>> Hi,
+>>>
+>>> On Thursday 12 February 2015 01:07 PM, Zhangfei Gao wrote:
+>>>> Add usb phy controller for hi6220 platform
+>>>>
+>>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>>> ---
+>>>>   drivers/phy/Kconfig          |   9 ++
+>>>>   drivers/phy/Makefile         |   1 +
+>>>>   drivers/phy/phy-hi6220-usb.c | 306
+>>>> +++++++++++++++++++++++++++++++++++++++++++
+>>>>   3 files changed, 316 insertions(+)
+>>>>   create mode 100644 drivers/phy/phy-hi6220-usb.c
+>>>
+>>> why is this driver in drivers/phy when it doesn't use the generic PHY
+>>> framework at all?
+>>>
+>>
+>> Balbi recommended "new drivers only on drivers/phy/", including usb
+>> phy.
+>
+> but it should use the API too. It's not only about a directory, you need
+> to use the new API.
+>
+>> So Move drivers/usb/phy/phy-hi6220-usb.c to
+>> drivers/phy/phy-hi6220-usb.c, required by Balbi.
+>
+> you're reading what I stated the way you like.
 
-After this patch, all mmc_test cases can pass on RK3288-Pink2 board.
+Sorry for my bad understanding.
 
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
----
-Changes in v2:
-- DRTO and EBE are both set, should not send abort command too,
-  suggested by Doug Anderson. 
+Still not clear about the otg_set_peripheral, which is required in 
+phy-hi6220-usb.c
 
- drivers/mmc/host/dw_mmc.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+1. drivers/usb/dwc2/gadget.c use
+otg_set_peripheral(hsotg->uphy->otg, &hsotg->gadget);
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 4d2e3c2..a27048a 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -1520,7 +1520,10 @@ static void dw_mci_tasklet_func(unsigned long priv)
- 			if (test_and_clear_bit(EVENT_DATA_ERROR,
- 					       &host->pending_events)) {
- 				dw_mci_stop_dma(host);
--				send_stop_abort(host, data);
-+				if (data->stop ||
-+				    !(host->data_status & (SDMMC_INT_DRTO |
-+							   SDMMC_INT_EBE)))
-+					send_stop_abort(host, data);
- 				state = STATE_DATA_ERROR;
- 				break;
- 			}
-@@ -1547,7 +1550,10 @@ static void dw_mci_tasklet_func(unsigned long priv)
- 			if (test_and_clear_bit(EVENT_DATA_ERROR,
- 					       &host->pending_events)) {
- 				dw_mci_stop_dma(host);
--				send_stop_abort(host, data);
-+				if (data->stop ||
-+				    !(host->data_status & (SDMMC_INT_DRTO |
-+							   SDMMC_INT_EBE)))
-+					send_stop_abort(host, data);
- 				state = STATE_DATA_ERROR;
- 				break;
- 			}
--- 
-1.8.3.2
+2. include/linux/phy/phy.h
+struct phy do not have member otg, while struct usb_phy has.
+
+Could you give more hints?
+
+Thanks
