@@ -1,23 +1,105 @@
-From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Thu, 19 Feb 2015 18:27:26 -0700
-Subject: [PATCH] ARM: dts: imx6qdl-sabrelite: enable HDMI
-In-Reply-To: <1424387057-5575-1-git-send-email-eric.nelson@boundarydevices.com>
-References: <1424387057-5575-1-git-send-email-eric.nelson@boundarydevices.com>
-Message-ID: <54E68D7E.8050802@boundarydevices.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 19 Feb 2015 18:36:32 -0800
+Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
+In-Reply-To: <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <54E69DB0.60701@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2015 04:04 PM, Eric Nelson wrote:
-> Enable HDMI channel and the I2C port it uses for DDC.
-> 
-> Signed-off-by: Eric Nelson <eric.nelson@boundarydevices.com>
-> ---
->  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
+On 02/19/15 09:08, Srinivas Kandagatla wrote:
+> diff --git a/drivers/Kconfig b/drivers/Kconfig
+> index c70d6e4..d7afc82 100644
+> --- a/drivers/Kconfig
+> +++ b/drivers/Kconfig
+> @@ -184,4 +184,6 @@ source "drivers/thunderbolt/Kconfig"
+>  
+>  source "drivers/android/Kconfig"
+>  
+> +source "drivers/eeprom/Kconfig"
+> +
+>  endmenu
+> diff --git a/drivers/Makefile b/drivers/Makefile
+> index 527a6da..57eb5b0 100644
+> --- a/drivers/Makefile
+> +++ b/drivers/Makefile
+> @@ -165,3 +165,4 @@ obj-$(CONFIG_RAS)		+= ras/
+>  obj-$(CONFIG_THUNDERBOLT)	+= thunderbolt/
+>  obj-$(CONFIG_CORESIGHT)		+= coresight/
+>  obj-$(CONFIG_ANDROID)		+= android/
+> +obj-$(CONFIG_EEPROM)		+= eeprom/
+> diff --git a/drivers/eeprom/Kconfig b/drivers/eeprom/Kconfig
+> new file mode 100644
+> index 0000000..2c5452a
+> --- /dev/null
+> +++ b/drivers/eeprom/Kconfig
+> @@ -0,0 +1,19 @@
+> +menuconfig EEPROM
+> +	bool "EEPROM Support"
+> +	depends on OF
 
-Nak.
+Doesn't this need some sort of select REGMAP somewhere?
 
-An earlier patch set already added this (commits d951534, 8eedffe5).
+Also, why do we need to use regmap for the eeprom framework read/write
+ops? I liked the simple eeprom::{read,write} API that Maxime had. The
+regmap part could be a regmap-eeprom driver that implements read/write
+ops like you've done in the core.
 
-Sorry for the noise.
+> +	help
+> +	  Support for EEPROM alike devices.
+> +
+> +	  This framework is designed to provide a generic interface to EEPROM
+> +	  from both the Linux Kernel and the userspace.
+> +
+> +	  If unsure, say no.
+> +
+> +if EEPROM
+> +
+> +config EEPROM_DEBUG
+> +	bool "EEPROM debug support"
+> +	help
+> +	  Say yes here to enable debugging support.
+> +
+> +endif
+>
+> diff --git a/include/linux/eeprom-provider.h b/include/linux/eeprom-provider.h
+> new file mode 100644
+> index 0000000..3943c2f
+> --- /dev/null
+> +++ b/include/linux/eeprom-provider.h
+> @@ -0,0 +1,51 @@
+> +/*
+> + * EEPROM framework provider.
+> + *
+> + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> + * Copyright (C) 2013 Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#ifndef _LINUX_EEPROM_PROVIDER_H
+> +#define _LINUX_EEPROM_PROVIDER_H
+> +
+> +#include <linux/device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/list.h>
+> +
+> +struct eeprom_device {
+> +	struct regmap		*regmap;
+> +	int			stride;
+> +	size_t			size;
+> +	struct device		*dev;
+> +
+> +	/* Internal to framework */
+> +	struct device		edev;
+> +	int			id;
+> +	struct list_head	list;
+
+Should there be a module owner here to handle module removal?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
