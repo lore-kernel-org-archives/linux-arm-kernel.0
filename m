@@ -1,49 +1,80 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Feb 2015 18:59:52 +0200
-Subject: [PATCH 9/9] RFC: ARM: DRA7: enable DSS_DESHDCP_CLKEN
-In-Reply-To: <54E73B1D.3050908@ti.com>
-References: <1423840286-18377-1-git-send-email-tomi.valkeinen@ti.com>	<1423840286-18377-10-git-send-email-tomi.valkeinen@ti.com>
- <CAGo_u6p89ot-eNwK65otoYsLM6NXeh929=SBG6uKAsX8Tnd_RQ@mail.gmail.com>
- <54DE1B7E.10505@ti.com> <54E71EA2.3030803@ti.com> <54E72FB0.6000604@ti.com>
- <54E73B1D.3050908@ti.com>
-Message-ID: <54E76808.2030405@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 20 Feb 2015 18:04:20 +0100
+Subject: [PATCHv2 01/15] ARM: mvebu: add __initconst specifiers on
+ DT_MACHINE_START dt_compat tables
+In-Reply-To: <1424451874-25375-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1424451874-25375-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1424451874-25375-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2015 03:48 PM, Tomi Valkeinen wrote:
-> On 20/02/15 14:59, Tero Kristo wrote:
->> On 02/20/2015 01:46 PM, Tomi Valkeinen wrote:
->>> On 13/02/15 17:42, Tero Kristo wrote:
->>>> On 02/13/2015 05:25 PM, Nishanth Menon wrote:
->>>
->>>>> I would probably wait for control module to become syscon and probably
->>>>> model this as syscon clk - I thin we should be seeing a series
->>>>> sometime soon.
->>>>
->>>> Yeah, I will be posting a series in a bit, just running some final tests
->>>> on it.
->>>
->>> I did the above with Tero's series. Adding the DES HDCP clock works ok.
->>>
->>> However, I'm not able to do this in HWMOD framework. To enable the DSS
->>> IP block I need to enable both the DSS func clock and the DES HDCP
->>> clock, but the HWMOD framework only allows one mainclock.
->>>
->>> I added the HDCP clock as an opt clock, but those are not enabled
->>> intially by the HWMOD framework, and the call in omap_hwmod.c:_enable()
->>> to soc_ops.wait_target_ready(oh) calls fails.
->>>
->>> So... Any ideas how to proceed?
->>
->> Add the clock enable at the end of dra7xx_dt_clk_init()?
->>
->> You need to disable the clock at some point though.
->
-> Where would I disable it? And if the clock is disabled, doesn't this
-> again fail when the dss driver tries to enable the IP block? The driver
-> can enable the HDCP opt clock only later, when the IP block should be up
-> already.
+As suggested by Stephen Boyd, this commit adds the __initconst
+specifier to the dt_compat table declarations used by the
+DT_MACHINE_START structures in mach-mvebu land.
 
-I guess in the display driver itself.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/board-v7.c | 6 +++---
+ arch/arm/mach-mvebu/dove.c     | 2 +-
+ arch/arm/mach-mvebu/kirkwood.c | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
--Tero
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index 89a139e..31b66f2 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -184,7 +184,7 @@ static void __init mvebu_dt_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-static const char * const armada_370_xp_dt_compat[] = {
++static const char * const armada_370_xp_dt_compat[] __initconst = {
+ 	"marvell,armada-370-xp",
+ 	NULL,
+ };
+@@ -205,7 +205,7 @@ DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
+ 	.dt_compat	= armada_370_xp_dt_compat,
+ MACHINE_END
+ 
+-static const char * const armada_375_dt_compat[] = {
++static const char * const armada_375_dt_compat[] __initconst = {
+ 	"marvell,armada375",
+ 	NULL,
+ };
+@@ -219,7 +219,7 @@ DT_MACHINE_START(ARMADA_375_DT, "Marvell Armada 375 (Device Tree)")
+ 	.dt_compat	= armada_375_dt_compat,
+ MACHINE_END
+ 
+-static const char * const armada_38x_dt_compat[] = {
++static const char * const armada_38x_dt_compat[] __initconst = {
+ 	"marvell,armada380",
+ 	"marvell,armada385",
+ 	NULL,
+diff --git a/arch/arm/mach-mvebu/dove.c b/arch/arm/mach-mvebu/dove.c
+index b50464e..5a17415 100644
+--- a/arch/arm/mach-mvebu/dove.c
++++ b/arch/arm/mach-mvebu/dove.c
+@@ -27,7 +27,7 @@ static void __init dove_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-static const char * const dove_dt_compat[] = {
++static const char * const dove_dt_compat[] __initconst = {
+ 	"marvell,dove",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-mvebu/kirkwood.c b/arch/arm/mach-mvebu/kirkwood.c
+index 6b53108..925f75f 100644
+--- a/arch/arm/mach-mvebu/kirkwood.c
++++ b/arch/arm/mach-mvebu/kirkwood.c
+@@ -186,7 +186,7 @@ static void __init kirkwood_dt_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, auxdata, NULL);
+ }
+ 
+-static const char * const kirkwood_dt_board_compat[] = {
++static const char * const kirkwood_dt_board_compat[] __initconst = {
+ 	"marvell,kirkwood",
+ 	NULL
+ };
+-- 
+2.1.0
