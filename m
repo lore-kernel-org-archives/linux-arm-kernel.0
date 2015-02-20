@@ -1,174 +1,62 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Fri, 20 Feb 2015 09:21:38 -0500
-Subject: [PATCH 2/4] of: DT quirks infrastructure
-In-Reply-To: <53F2F94C-0C43-4A54-B8CD-EEC454A0AC19@konsulko.com>
-References: <1424271576-1952-1-git-send-email-pantelis.antoniou@konsulko.com>
- <1424271576-1952-3-git-send-email-pantelis.antoniou@konsulko.com>
- <20150218154106.GC29429@leverpostej>
- <FE61DD1C-51DA-4869-8A62-C019C3D70577@konsulko.com>
- <20150218173115.GG29429@leverpostej>
- <76BD1B22-BAED-4205-9B34-186907CE0217@konsulko.com>
- <54E613E7.2020405@gmail.com>
- <670D0881-DBF0-45E8-A502-A6DB2B77A750@konsulko.com>
- <54E61DD2.3060002@gmail.com>
- <53F2F94C-0C43-4A54-B8CD-EEC454A0AC19@konsulko.com>
-Message-ID: <54E742F2.80506@hurleysoftware.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Feb 2015 14:22:08 +0000
+Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
+ demuxer chip
+In-Reply-To: <20150211173823.30c42c6a@bbrezillon>
+References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
+ <2437801.56xPyk3atd@vostro.rjw.lan>
+ <20150211151237.GN9154@leverpostej>
+ <1487331.cgC9j5u0aF@vostro.rjw.lan>
+ <20150211155720.GQ9154@leverpostej>
+ <20150211171515.55d5066f@bbrezillon>
+ <20150211163231.GR9154@leverpostej>
+ <20150211173823.30c42c6a@bbrezillon>
+Message-ID: <20150220142208.GJ13659@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2015 12:38 PM, Pantelis Antoniou wrote:
-> 
->> On Feb 19, 2015, at 19:30 , Frank Rowand <frowand.list@gmail.com> wrote:
->>
->> On 2/19/2015 9:00 AM, Pantelis Antoniou wrote:
->>> Hi Frank,
->>>
->>>> On Feb 19, 2015, at 18:48 , Frank Rowand <frowand.list@gmail.com> wrote:
->>>>
->>>> On 2/19/2015 6:29 AM, Pantelis Antoniou wrote:
->>>>> Hi Mark,
->>>>>
->>>>>> On Feb 18, 2015, at 19:31 , Mark Rutland <mark.rutland@arm.com> wrote:
->>>>>>
->>>>>>>>> +While this may in theory work, in practice it is very cumbersome
->>>>>>>>> +for the following reasons:
->>>>>>>>> +
->>>>>>>>> +1. The act of selecting a different boot device tree blob requires
->>>>>>>>> +a reasonably advanced bootloader with some kind of configuration or
->>>>>>>>> +scripting capabilities. Sadly this is not the case many times, the
->>>>>>>>> +bootloader is extremely dumb and can only use a single dt blob.
->>>>>>>>
->>>>>>>> You can have several bootloader builds, or even a single build with
->>>>>>>> something like appended DTB to get an appropriate DTB if the same binary
->>>>>>>> will otherwise work across all variants of a board.
->>>>>>>>
->>>>>>>
->>>>>>> No, the same DTB will not work across all the variants of a board.
->>>>>>
->>>>>> I wasn't on about the DTB. I was on about the loader binary, in the case
->>>>>> the FW/bootloader could be common even if the DTB couldn't.
->>>>>>
->>>>>> To some extent there must be a DTB that will work across all variants
->>>>>> (albeit with limited utility) or the quirk approach wouldn't work?
->>>>>>
->>>>>
->>>>> That?s not correct; the only part of the DTB that needs to be common
->>>>> is the model property that would allow the quirk detection logic to fire.
->>>>>
->>>>> So, there is a base DTB that will work on all variants, but that only means
->>>>> that it will work only up to the point that the quirk detector method
->>>>> can work. So while in recommended practice there are common subsets
->>>>> of the DTB that might work, they might be unsafe.
->>>>>
->>>>> For instance on the beaglebone the regulator configuration is different
->>>>> between white and black, it is imperative you get them right otherwise
->>>>> you risk board damage.
->>>>>
->>>>>>>> So it's not necessarily true that you need a complex bootloader.
->>>>>>>>
->>>>>>>
->>>>>>>>> +2. On many instances boot time is extremely critical; in some cases
->>>>>>>>> +there are hard requirements like having working video feeds in under
->>>>>>>>> +2 seconds from power-up. This leaves an extremely small time budget for
->>>>>>>>> +boot-up, as low as 500ms to kernel entry. The sanest way to get there
->>>>>>>>> +is by removing the standard bootloader from the normal boot sequence
->>>>>>>>> +altogether by having a very small boot shim that loads the kernel and
->>>>>>>>> +immediately jumps to kernel, like falcon-boot mode in u-boot does.
->>>>>>>>
->>>>>>>> Given my previous comments above I don't see why this is relevant.
->>>>>>>> You're already passing _some_ DTB here, so if you can organise for the
->>>>>>>> board to statically provide a sane DTB that's fine, or you can resort to
->>>>>>>> appended DTB if it's not possible to update the board configuration.
->>>>>>>>
->>>>>>>
->>>>>>> You?re missing the point. I can?t use the same DTB for each revision of the
->>>>>>> board. Each board is similar but it?s not identical.
->>>>>>
->>>>>> I think you've misunderstood my point. If you program the board with the
->>>>>> relevant DTB, or use appended DTB, then you will pass the correct DTB to
->>>>>> the kernel without need for quirks.
->>>>>>
->>>>>> I understand that each variant is somewhat incompatible (and hence needs
->>>>>> its own DTB).
->>>>>
->>>>> In theory it might work, in practice this does not. Ludovic mentioned that they
->>>>> have 27 different DTBs in use at the moment. At a relatively common 60k per DTB
->>>>> that?s 27x60k = 1.6MB of DTBs, that need to be installed.
->>>>
->>>> < snip >
->>>>
->>>> Or you can install the correct DTB on the board.  You trust your manufacturing line
->>>> to install the correct resistors.  You trust your manufacturing line to install the
->>>> correct kernel version (eg an updated version to resolve a security issue).
->>>>
->>>> I thought the DT blob was supposed to follow the same standard that other OS's or
->>>> bootloaders understood.  Are you willing to break that?  (This is one of those
->>>> ripples I mentioned in my other emails.)
->>>>
->>>
->>> Trust no-one.
->>>
->>> This is one of those things that the kernel community doesn?t understand which makes people
->>> who push product quite mad.
->>>
->>> Engineering a product is not only about meeting customer spec, in order to turn a profit
->>> the whole endeavor must be engineered as well for manufacturability.
->>>
->>> Yes, you can always manually install files in the bootloader. For 1 board no problem.
->>> For 10 doable. For 100 I guess you can hire an extra guy. For 1 million? Guess what,
->>> instead of turning a profit you?re losing money if you only have a few cents of profit
->>> per unit.
->>
->> I'm not installing physical components manually.  Why would I be installing software
->> manually?  (rhetorical question)
->>
-> 
-> Because on high volume product runs the flash comes preprogrammed and is soldered as is.
-> 
-> Having a single binary to flash to every revision of the board makes logistics considerably
-> easier.
-> 
-> Having to boot and tweak the bootloader settings to select the correct dtb (even if it?s present
-> on the flash medium) takes time and is error-prone.
-> 
-> Factory time == money, errors == money.
-> 
->>>
->>> No knobs to tweak means no knobs to break. And a broken knob can have pretty bad consequences
->>> for a few million units. 
->>
->> And you produce a few million units before testing that the first one off the line works?
->>
-> 
-> The first one off the line works. The rest will get some burn in and functional testing if you?re
-> lucky. In many cases where the product is very cheap it might make financial sense to just ship
-> as is and deal with recalls, if you?re reasonably happy after a little bit of statistical sampling.
-> 
-> Hardware is hard :)
+Hi Boris,
 
-I'm failing to see how this series improves your manufacturing process at all.
+On Wed, Feb 11, 2015 at 04:38:23PM +0000, Boris Brezillon wrote:
 
-1. Won't you have to provide the factory with different eeprom images for the
-   White and Black?  You _trust_ them to get that right, or more likely, you
-   have process control procedures in place so that you don't get 1 million Blacks
-   flashed with the White eeprom image.
+[...]
 
-2. The White and Black use different memory technology so it's not as if the
-   eMMC from the Black will end up on the White SMT line (or vice versa).
+> For the list of impacted drivers, you can have a look at this series [1]
+> (patches 2 to 5), and I'll take care of the testing part once every one
+> has agreed on the solution ;-).
+> 
+> [1]https://lkml.org/lkml/2014/12/15/552
 
-3  For that matter, why wouldn't you worry that all the microSD cards intended
-   for the White were accidentally assembled with the first 50,000 Blacks; at
-   that point you're losing a lot more than a few cents of profit. And that has
-   nothing to do with what image you provided.
+Looking at those:
 
-3. The factory is just as likely to use some other customer's image by accident,
-   so you're just as likely to have the same failure rate if you have no test
-   process at the factory.
+* The pmc looks like it could be a valid use of the new flag. It also
+  seems to function as an irqchip.
+  
+  Do any of its child IRQs need to be handled during the suspend-resume
+  cycle? If so using IRQF_NO_SUSPEND would seem to be valid.
 
-4. If you're using offline programming, the image has to be tested after
-   reflow anyway.
+* atmel_serial seems to be intended to be used as a wakeup device (given
+  it calls device_set_wakeup_enable). Therefore it needs to call
+  enable_irq_wake, and when it does so it can share an IRQ with other
+  interrupts, just not IRQF_NO_SUSPEND interrupts.
+  
+  None of the approaches thus far can fix the fundamental mismatch
+  between wakeup interrupts and IRQF_NO_SUSPEND interrupts.
 
-IOW, your QA process will not change at all == same cost.
+* Similarly, rtc-at91rm9200 and rtc-at91sam9 are intended to be used as 
+  wakeup devices. They call enable_irq_wake (though don't bother
+  checking the return value). They can share an IRQ with other
+  interrupts, just not IRQF_NO_SUSPEND interrupts.
 
-Regards,
-Peter Hurley
+* at91sam9_wdt seems to be fundamentally incompatible with suspend. If
+  the watchdog cannot be disabled, and you need to handle it during
+  suspend, then it needs to be a wakeup interrupt, not an
+  IRQF_NO_SUSPEND interrupt.
+
+As far as I can see, the flag or virtual irqchip approaches only help
+the PMC case, and even then might not be necessary. All the others seem
+to be relying on guarantees the genirq layer don't provide, and fixing
+that would mean moving them further from IRQF_NO_SUSPEND.
+
+Thanks,
+Mark.
