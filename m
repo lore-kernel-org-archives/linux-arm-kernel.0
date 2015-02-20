@@ -1,117 +1,94 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Feb 2015 10:41:56 +0000
-Subject: lpi-parent?
-In-Reply-To: <CALRxmdDejPBREBL8WY=drW+nmHSVPX9A3WmbW=t+FOpHvbeV2g@mail.gmail.com>
-References: <CALRxmdDejPBREBL8WY=drW+nmHSVPX9A3WmbW=t+FOpHvbeV2g@mail.gmail.com>
-Message-ID: <54E70F74.2070005@arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 20 Feb 2015 11:42:31 +0100
+Subject: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access Engine driver
+ support
+In-Reply-To: <20150220062934.GX21387@intel.com>
+References: <1413374436-14410-1-git-send-email-sthokal@xilinx.com>
+ <3236720.MHeqOodrCV@wuerfel>
+ <7dc11ef7ccec49bcb052c30b9aa916c3@BL2FFO11FD044.protection.gbl>
+ <1967130.oYyZRWCcEF@wuerfel>
+ <add9a23928b44aa48965e993bb17f53b@BL2FFO11FD027.protection.gbl>
+ <20150212093445.GM21387@intel.com>
+ <ed439c7a25d0465d9dbf4c06987d42a1@BY2FFO11FD018.protection.gbl>
+ <20150220062934.GX21387@intel.com>
+Message-ID: <ad1002303e814d53866349674d22fc11@BY2FFO11FD039.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stuart,
+Hi Vinod,
 
-On 19/02/15 02:16, Stuart Yoder wrote:
-> On Mon, Nov 24, 2014 at 8:35 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> Add the documentation for the bindings describing the GICv3 ITS.
+On 02/20/2015 07:29 AM, Vinod Koul wrote:
+> On Sat, Feb 14, 2015 at 02:21:52PM +0000, Appana Durga Kedareswara Rao wrote:
+>> Hi Vinod,
 >>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  Documentation/devicetree/bindings/arm/gic-v3.txt | 39 ++++++++++++++++++++++++
->>  1 file changed, 39 insertions(+)
 >>
->> diff --git a/Documentation/devicetree/bindings/arm/gic-v3.txt b/Documentation/devicetree/bindings/arm/gic-v3.txt
->> index 33cd05e..ddfade4 100644
->> --- a/Documentation/devicetree/bindings/arm/gic-v3.txt
->> +++ b/Documentation/devicetree/bindings/arm/gic-v3.txt
->> @@ -49,11 +49,29 @@ Optional
->>    occupied by the redistributors. Required if more than one such
->>    region is present.
+>>> -----Original Message-----
+>>> From: Vinod Koul [mailto:vinod.koul at intel.com]
+>>> Sent: Thursday, February 12, 2015 3:05 PM
+>>> To: Appana Durga Kedareswara Rao
+>>> Cc: Arnd Bergmann; linux-arm-kernel at lists.infradead.org;
+>>> devicetree at vger.kernel.org; Srikanth Vemula; linux-
+>>> kernel at vger.kernel.org; Srikanth Thokala; dmaengine at vger.kernel.org;
+>>> robh+dt at kernel.org; Michal Simek; Anirudha Sarangi;
+>>> grant.likely at linaro.org; dan.j.williams at intel.com
+>>> Subject: Re: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access Engine
+>>> driver support
+>>>
+>>> On Thu, Jan 29, 2015 at 11:24:41AM +0000, Appana Durga Kedareswara Rao
+>>> wrote:
+>>>>>  Earlier in the driver we are embedding dma_slave_config into custom
+>>>>> structs But Lars suggested to modify it. please refer to the below
+>>>>> thread for more details.
+>>>>>  http://www.spinics.net/lists/dmaengine/msg00010.html
+>>>>>
+>>>>>  And later we thought of creating a separate private member in
+>>>>> dma_slave_config for sharing additional configuration between slave
+>>>>> device and dma engine Or a new dma_ctrl_cmd like
+>>>>>
+>>> FSLDMA_EXTERNAL_START(http://www.kernelhub.org/?msg=405535&p=2 )
+>>>>>
+>>>>>  Finally Vinod was ok with the existing suggestion so we dropped the
+>>>>> above thought.
+>>>>>
+>>>>>  @Vinod : Could you please comment on this.
+>>> FSLDMA_EXTERNAL_START has been removed, and you cna use the removal
+>>> as a guidance of how to solve your issue
+>>>
 >>
->> +Sub-nodes:
->> +
->> +GICv3 has one or more Interrupt Translation Services (ITS) that are
->> +used to route Message Signalled Interrupts (MSI) to the CPUs.
->> +
->> +These nodes must have the following properties:
->> +- compatible : Should at least contain  "arm,gic-v3-its".
->> +- msi-controller : Boolean property. Identifies the node as an MSI controller
->> +- reg: Specifies the base physical address and size of the ITS
->> +  registers.
->> +
->> +The main GIC node must contain the appropriate #address-cells,
->> +#size-cells and ranges properties for the reg property of all ITS
->> +nodes.
->> +
->>  Examples:
+> Please limit you mailer to set wrap at 80 chars, otherwise it becomes
+> unreadable
+> 
+>> The current VDMA driver that got merged in the open source and the
+>> current patch (dma: xilinx dma v4) Srikanth T submitted both contains the
+>> Similar implementation that you pointed as above(I mean similar to the
+>> free scale dma driver).
 >>
->>         gic: interrupt-controller at 2cf00000 {
->>                 compatible = "arm,gic-v3";
->>                 #interrupt-cells = <3>;
->> +               #address-cells = <2>;
->> +               #size-cells = <2>;
->> +               ranges;
->>                 interrupt-controller;
->>                 reg = <0x0 0x2f000000 0 0x10000>,       // GICD
->>                       <0x0 0x2f100000 0 0x200000>,      // GICR
->> @@ -61,11 +79,20 @@ Examples:
->>                       <0x0 0x2c010000 0 0x2000>,        // GICH
->>                       <0x0 0x2c020000 0 0x2000>;        // GICV
->>                 interrupts = <1 9 4>;
->> +
->> +               gic-its at 2c200000 {
->> +                       compatible = "arm,gic-v3-its";
->> +                       msi-controller;
->> +                       reg = <0x0 0x2c200000 0 0x200000>;
->> +               };
->>         };
+>> The discussion starts here is why we need the header file(Xilinx_dma.h) in
+>> the include/linux/amba/Xilinx_dma.h  folder.
 >>
->>         gic: interrupt-controller at 2c010000 {
->>                 compatible = "arm,gic-v3";
->>                 #interrupt-cells = <3>;
->> +               #address-cells = <2>;
->> +               #size-cells = <2>;
->> +               ranges;
->>                 interrupt-controller;
->>                 redistributor-stride = <0x0 0x40000>;   // 256kB stride
->>                 #redistributor-regions = <2>;
->> @@ -76,4 +103,16 @@ Examples:
->>                       <0x0 0x2c060000 0 0x2000>,        // GICH
->>                       <0x0 0x2c080000 0 0x2000>;        // GICV
->>                 interrupts = <1 9 4>;
->> +
->> +               gic-its at 2c200000 {
->> +                       compatible = "arm,gic-v3-its";
->> +                       msi-controller;
->> +                       reg = <0x0 0x2c200000 0 0x200000>;
->> +               };
->> +
->> +               gic-its at 2c400000 {
->> +                       compatible = "arm,gic-v3-its";
->> +                       msi-controller;
->> +                       reg = <0x0 0x2c400000 0 0x200000>;
->> +               };
+>> Like for FSL DMA it is got defined (fsl_dma_external_start) as a function
+>> prototype in include/linux/fsldma.h And it is being getting used in the
+>> drivers/misc/carma/carma-fpga-program.c
+>>
+>> Similarly in the Xilinx VDMA driver(xilinx_vdma_channel_set_config )
+>> defined as a function prototype in the include/linux/amba/xilinx_dma.h And
+>> is being used by Xilinx videos  drivers.  Those video driver need to use
+>> the (xilinx_vdma_channel_set_config) which requires this global header
+>> file.
+>>
+>> Could you please suggest us whether that header file (Xilinx_dma.h) should
+>> be there  in include/linux/amba or we should move it to include/linux?
+>> And any functional comments for this v4 patch?
+> Let me ask you a question, what is the relation of xilinx_dma with amba?
 > 
-> Marc,
-> 
-> Is there a binding definition for how other nodes specify which
-> gic-its node they are
-> associated with.
-> 
-> In some proof of concept kernel code we are using the property "lpi-parent"
-> to specify the association of a bus node (that uses message interrupts)
-> to the GIC ITS:
-> 
->     lpi-parent = <&its>;
-> 
-> I am not remember at all if that property came as a suggestion from some
-> side discussion with you or if we just made that up.  Wanted to see what
-> your thoughts were on how to do this.
+> If none then only include/linux/ seems to be the right choice. If not then
+> amba maybe okay but you need to provide justfication why it should be in amba?
 
-I don't think I suggested this. But if you need to describe this
-relation, why not use 'msi-parent' instead? That would seem to fit what
-you want to describe.
+I see your point. I think there is real reason to have this header in amba.
+The reason for that was that xilinx_dma.h was added there.
+
+Anyway there is include/linux/dma/ folder. Is it ok to move xilinx_dma.h there
+too? The same with this dma one.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Michal
