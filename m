@@ -1,80 +1,76 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Fri, 20 Feb 2015 01:36:56 +0100
-Subject: [PATCH 1/6] ASoC: max98088: Document DT bindings
-In-Reply-To: <54E64C09.5000505@collabora.co.uk>
-References: <1424283959-16289-1-git-send-email-afaerber@suse.de>	<1424283959-16289-2-git-send-email-afaerber@suse.de>	<54E5EB36.9020007@collabora.co.uk>	<54E5EF73.2090302@suse.de>
- <CAD=FV=VoFnbEsKi4mDDkaTrTXboJmm0UNV5iCk1CvV5ndEZtsA@mail.gmail.com>
- <54E62E1C.4030105@suse.de> <54E6314E.5060509@suse.de>
- <54E64C09.5000505@collabora.co.uk>
-Message-ID: <54E681A8.6040702@suse.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 20 Feb 2015 01:44:35 +0100
+Subject: [PATCH v4 0/3] add support for Firefly-RK3288 and Rayeager PX2
+ boards
+In-Reply-To: <2137926.nqOiED5bzz@diego>
+References: <1422189576-19478-1-git-send-email-naobsd@gmail.com>
+ <2137926.nqOiED5bzz@diego>
+Message-ID: <142441781.gJtRx3FmLT@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 19.02.2015 um 21:48 schrieb Javier Martinez Canillas:
-> On 02/19/2015 07:54 PM, Andreas F?rber wrote:
->> Am 19.02.2015 um 19:40 schrieb Andreas F?rber:
->>> I updated max98088 and had it working on first boot, but on
->>> second boot it complained about the frequency:
->>>
->>> [    7.896834] max98088 7-0010: revision A
->>> [    7.912776] snow-audio sound: HiFi <-> 3830000.i2s mapping ok
->>> [    7.919367] max98088 7-0010: Invalid master clock frequency
->>> [    7.919429] snow-audio sound: ASoC: Spring-I2S-MAX98089 late_probe()
->>> failed: -22
->>> [    7.920019] snow-audio sound: snd_soc_register_card failed (-22)
->>> [    7.920109] snow-audio: probe of sound failed with error -22
->>
+Am Montag, 26. Januar 2015, 02:22:55 schrieb Heiko St?bner:
+> Am Sonntag, 25. Januar 2015, 21:39:33 schrieb FUKAUMI Naoki:
+> > This series adds support for following Rockchip SoC based boards.
+> > 
+> >  - Firefly, Firefly-RK3288 (both beta and mass production version)
+> >  - ChipSPARK, Rayeager PX2
 > 
-> I had the same error on Snow but even on the first boot and after doing some
-> code archeology, I found the following commit [0] in a Samsung downstream
-> tree that solves the issue.
+> I've applied this series with Andy's Tested-by for the Rayeager board and my
+> Tested-by for the Firefly.
 > 
-> The problem is that clk_round_rate(max98095->mclk, freq) returns 0 as the
-> rounded rate if XCLOUT is not allowed to be re-parented on rate change.
-
-Same on Spring:
-
-diff --git a/sound/soc/codecs/max98088.c b/sound/soc/codecs/max98088.c
-index 1aa81321afba..46dc64675c26 100644
---- a/sound/soc/codecs/max98088.c
-+++ b/sound/soc/codecs/max98088.c
-@@ -1365,6 +1365,7 @@ static int max98088_dai_set_sysclk(struct
-snd_soc_dai *dai,
-
-        if (!IS_ERR(max98088->mclk)) {
-                freq = clk_round_rate(max98088->mclk, freq);
-+               dev_warn(codec->dev, "freq = %u\n", freq);
-                clk_set_rate(max98088->mclk, freq);
-        }
-
-
-> With Tushar's patch I see that clk_round_rate() returns 24000000 (24MHz)
-> so the codec driver setups the correct PLL clock.
-
-Ditto. With the clkout reparenting patch, clk_round_rate() returns 24MHz
-just like when double-beep-initialized. However when not
-double-beep-initialized, the driver initializes, but no audible output,
-so there must be another missing puzzle piece.
-
->> On a suspicion, the fourth boot I waited for the double-beep of the
->> firmware (waiting for Ctrl+d/u), and then it did work.
->>
->> So it seems the mclk is not always set up properly by the kernel,
->> relying on firmware. Who's in charge of setting that clock up?
+> One caveat, I had to remove the gmac node from the firefly dtsi, as the
+> whole gmac series goes through the network tree, so the dtb won't compile
+> either in my tree or arm-soc due to the missing core node.
 > 
-> Right, it seems audio is only working due the firmware doing some previous
-> setup. Probably it works on every boot if you have "sound init" as a part of
-> the u-boot boot commands?
+> I'll try to see if I can get the separate gmac node in when everything is
+> combined in 3.20-rc1.
 
-Indeed it does, 24 MHz without the reparenting patch, and sound working.
+I've added the missing gmac config now to my dts-branch for 3.21 (or
+whatever it might get called), with the following patch:
 
-'sound init' code:
-https://github.com/afaerber/u-boot/blob/spring/drivers/sound/max98088.c
+----------- 8< ------------
+From: Heiko Stuebner <heiko@sntech.de>
+Date: Fri, 20 Feb 2015 01:31:57 +0100
+Subject: [PATCH] ARM: dts: rockchip: enable gmac on rk3288-firefly
 
-Regards,
-Andreas
+This was left out of the original firefly board definition due to the
+ethernet support going completely through the network tree, making the
+underlying nodes unavailable.
 
+Now that everything is present enable the gmac on the firefly.
+
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3288-firefly.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
+index b9dda41..b54dd78 100644
+--- a/arch/arm/boot/dts/rk3288-firefly.dtsi
++++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
+@@ -179,6 +179,22 @@
+ 	status = "okay";
+ };
+ 
++&gmac {
++	assigned-clocks = <&cru SCLK_MAC>;
++	assigned-clock-parents = <&ext_gmac>;
++	clock_in_out = "input";
++	pinctrl-names = "default";
++	pinctrl-0 = <&rgmii_pins>, <&phy_rst>, <&phy_pmeb>, <&phy_int>;
++	phy-supply = <&vcc_lan>;
++	phy-mode = "rgmii";
++	snps,reset-active-low;
++	snps,reset-delays-us = <0 10000 1000000>;
++	snps,reset-gpio = <&gpio4 8 GPIO_ACTIVE_LOW>;
++	tx_delay = <0x30>;
++	rx_delay = <0x10>;
++	status = "ok";
++};
++
+ &hdmi {
+ 	ddc-i2c-bus = <&i2c5>;
+ 	status = "okay";
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
-Graham Norton; HRB 21284 (AG N?rnberg)
+2.1.4
