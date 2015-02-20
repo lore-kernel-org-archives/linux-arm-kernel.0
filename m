@@ -1,36 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Feb 2015 10:20:09 +0000
-Subject: Announce: rmk's nightly builder gets ARM64 support
-In-Reply-To: <20150220094035.GE8656@n2100.arm.linux.org.uk>
-References: <20150219171220.GA8656@n2100.arm.linux.org.uk>
- <20150219183444.GB8656@n2100.arm.linux.org.uk>
- <20150220092003.GB31692@arm.com>
- <CAKv+Gu_5fOinMVYbk99unmEDSqCF3Z7QdXiQTw0VrrWW16Oc6w@mail.gmail.com>
- <20150220094035.GE8656@n2100.arm.linux.org.uk>
-Message-ID: <20150220102009.GF8656@n2100.arm.linux.org.uk>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Fri, 20 Feb 2015 11:22:05 +0100
+Subject: [PATCH dt] ARM: BCM5301X: Fix default state of power LEDs on Netgear
+ R6250
+Message-ID: <1424427725-9380-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 09:40:35AM +0000, Russell King - ARM Linux wrote:
-> On Fri, Feb 20, 2015 at 09:24:39AM +0000, Ard Biesheuvel wrote:
-> > Yes, this looks like a GCC problem, not binutils, since there are
-> > other .S files in the same folder that contain crypto instructions
-> > that build fine. This particular one is a .c file with AES
-> > instructions in inline asm() (and we pass -march=armv8-a+crypto)
-> 
-> Maybe we need to get jk's blog post updated - it's currently on of
-> the top hits in google, so this is probably going to trip up a lot of
-> people if they follow the instructions there.
-> 
-> http://jk.ozlabs.org/docs/arm64-toolchain/
-> 
-> So it sounds like possibly the binutils part of those instructions is
-> fine, it's the gcc part which isn't.
+We want green LED to be enabled by default.
 
-Note that it would also be useful to know where to get a working gcc
-from (preferably in source form - I doubt there's any Fedora 14
-binaries around.)
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+ arch/arm/boot/dts/bcm4708-netgear-r6250.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+index f18c9d9..2ed9e57 100644
+--- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
++++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+@@ -45,13 +45,13 @@
+ 		power0 {
+ 			label = "bcm53xx:green:power";
+ 			gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
+-			linux,default-trigger = "default-off";
++			linux,default-trigger = "default-on";
+ 		};
+ 
+ 		power1 {
+ 			label = "bcm53xx:amber:power";
+ 			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
+-			linux,default-trigger = "default-on";
++			linux,default-trigger = "default-off";
+ 		};
+ 
+ 		usb {
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.8.4.5
