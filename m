@@ -1,111 +1,55 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 20 Feb 2015 16:01:55 -0600
-Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
-In-Reply-To: <54E78A31.9020306@linaro.org>
-References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
- <CAL_Jsq+SeuoojgTpv1y_aPJ_jzDr3HqZhYEBQ3_vYGBHvcccug@mail.gmail.com>
- <54E78A31.9020306@linaro.org>
-Message-ID: <CAL_Jsq+mvpRjYfL_8OseTDCB-6aBhwhNKLBQXXJeVQLDwWm8Nw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 20 Feb 2015 16:09:29 -0600
+Subject: [PATCH] pci: host: xgene: fix incorrectly returned address by
+ map_bus
+In-Reply-To: <1424214840-26498-1-git-send-email-fkan@apm.com>
+References: <1424214840-26498-1-git-send-email-fkan@apm.com>
+Message-ID: <CAL_JsqJY24ptfEcA2EQ32M=4-KdQ5xac-j45EZp3aXT8uBM8EQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 1:25 PM, Srinivas Kandagatla
-<srinivas.kandagatla@linaro.org> wrote:
+On Tue, Feb 17, 2015 at 5:14 PM, Feng Kan <fkan@apm.com> wrote:
+> The generic accessor functions for pci-xgene uses map_bus
+> call that returns the base address but did not add the additional
+> offset.
+>
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> ---
+>  drivers/pci/host/pci-xgene.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+
+Thanks.
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+>
+> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> index aab5547..ee082c0 100644
+> --- a/drivers/pci/host/pci-xgene.c
+> +++ b/drivers/pci/host/pci-xgene.c
+> @@ -127,7 +127,7 @@ static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
+>         return false;
+>  }
+>
+> -static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+> +static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+>                               int offset)
+>  {
+>         struct xgene_pcie_port *port = bus->sysdata;
+> @@ -137,7 +137,7 @@ static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+>                 return NULL;
+>
+>         xgene_pcie_set_rtdid_reg(bus, devfn);
+> -       return xgene_pcie_get_cfg_base(bus);
+> +       return xgene_pcie_get_cfg_base(bus) + offset;
+>  }
+>
+>  static struct pci_ops xgene_pcie_ops = {
+> --
+> 1.9.1
 >
 >
-> On 20/02/15 17:21, Rob Herring wrote:
->>
->> On Thu, Feb 19, 2015 at 11:08 AM, Srinivas Kandagatla
->> <srinivas.kandagatla@linaro.org> wrote:
->>>
->>> From: Maxime Ripard <maxime.ripard@free-electrons.com>
->>>
->>> Up until now, EEPROM drivers were stored in drivers/misc, where they all
->>> had to
->>> duplicate pretty much the same code to register a sysfs file, allow
->>> in-kernel
->>> users to access the content of the devices they were driving, etc.
->>>
->>> This was also a problem as far as other in-kernel users were involved,
->>> since
->>> the solutions used were pretty much different from on driver to another,
->>> there
->>> was a rather big abstraction leak.
->>>
->>> This introduction of this framework aims at solving this. It also
->>> introduces DT
->>> representation for consumer devices to go get the data they require (MAC
->>> Addresses, SoC/Revision ID, part numbers, and so on) from the EEPROMs.
->>>
->>> Having regmap interface to this framework would give much better
->>> abstraction for eeproms on different buses.
->>>
->>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>> [srinivas.kandagatla: Moved to regmap based and cleanedup apis]
->>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->>> ---
->>>   .../devicetree/bindings/eeprom/eeprom.txt          |  48 ++++
->>>   drivers/Kconfig                                    |   2 +
->>>   drivers/Makefile                                   |   1 +
->>>   drivers/eeprom/Kconfig                             |  19 ++
->>>   drivers/eeprom/Makefile                            |   9 +
->>>   drivers/eeprom/core.c                              | 290
->>> +++++++++++++++++++++
->>>   include/linux/eeprom-consumer.h                    |  73 ++++++
->>>   include/linux/eeprom-provider.h                    |  51 ++++
->>
->>
->> Who is going to be the maintainer for this?
->
->
-> Am happy to be one.
-
-So please add a MAINTAINERS entry.
-
-[...]
-
->>> += Data consumers =
->>> +
->>> +Required properties:
->>> +
->>> +eeproms: List of phandle and data cell specifier triplet, one triplet
->>> +        for each data cell the device might be interested in. The
->>> +        triplet consists of the phandle to the eeprom provider, then
->>> +        the offset in byte within that storage device, and the length
->>> +        in byte of the data we care about.
->>
->>
->> The problem with this is it assumes you know who the consumer is and
->> that it is a DT node. For example, how would you describe a serial
->> number?
->
-> Correct me if I miss understood.
-> Is serial number any different?
-> Am hoping that the eeprom consumer would be aware of offset and size of
-> serial number in the eeprom
->
-> Cant the consumer do:
->
-> eeprom-consumer {
->         eeproms = <&at24 0 4>;
->         eeprom-names = "device-serial-number";
-
-Yes, but who is "eeprom-consumer"? DT nodes generally describe a h/w
-block, but it this case, the consumer depends on the OS, not the h/w.
-I'm not saying you can't describe where things are, but I don't think
-you should imply who is the consumer and doing so is unnecessarily
-complicated.
-
-Also, the layout of EEPROM is likely very much platform specific. Some
-could have a more complex structure perhaps with key ids and linked
-list structure.
-
-I would do something more simple that is just a list of keys and their
-location like this:
-
-device-serial-number = <start size>;
-key1 = <start size>;
-key2 = <start size>;
-
-Rob
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
