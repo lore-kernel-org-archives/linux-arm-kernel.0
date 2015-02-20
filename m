@@ -1,57 +1,32 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Feb 2015 12:37:38 -0800
-Subject: [PATCH v2 1/2] ARM: perf: Preparatory work for Scorpion PMU
- support
-In-Reply-To: <20150220193034.GD1767@arm.com>
-References: <1423851849-6069-1-git-send-email-sboyd@codeaurora.org>
- <1423851849-6069-2-git-send-email-sboyd@codeaurora.org>
- <20150220193034.GD1767@arm.com>
-Message-ID: <20150220203738.GE24928@codeaurora.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 20 Feb 2015 15:51:20 -0500
+Subject: [PATCH v2] ARM: shmobile: r8a7791: add ADSP clocks
+In-Reply-To: <54E792EC.4090807@cogentembedded.com>
+References: <4692589.Khlcz7yVTN@wasted.cogentembedded.com>
+ <54E792EC.4090807@cogentembedded.com>
+Message-ID: <20150220205117.GD20237@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20, Will Deacon wrote:
-> On Fri, Feb 13, 2015 at 06:24:08PM +0000, Stephen Boyd wrote:
-> > Do some things to make the Krait PMU support code generic enough
-> > to be used by the Scorpion PMU support code.
-> > 
-> >  * Rename the venum register functions to be venum instead of krait
-> >    specific because the same registers exist on Scorpion
-> > 
-> >  * Add a krait_decode_event() function to decode our Krait specific
-> >    event encoding that's the same on Scorpion (modulo an extra region).
-> > 
-> >  * Drop krait from krait_clear_pmresrn_group() so it can be used
-> >    by Scorpion code
-> > 
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > ---
-> >  arch/arm/kernel/perf_event_v7.c | 87 ++++++++++++++++++++++-------------------
-> >  1 file changed, 46 insertions(+), 41 deletions(-)
+On Fri, Feb 20, 2015 at 11:02:52PM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> [...]
+> On 12/30/2014 11:20 PM, Sergei Shtylyov wrote:
 > 
-> > +static void krait_decode_event(u32 event, unsigned int *region,
-> > +		unsigned int *group, unsigned int *code, bool *venum, bool *cpu)
-> > +{
-> > +	if (region)
-> > +		*region = (event >> 12) & 0xf;
-> > +	if (group)
-> > +		*group  = (event >> 0)  & 0xf;
-> > +	if (code)
-> > +		*code   = (event >> 4) & 0xff;
-> > +	if (venum)
-> > +		*venum  = !!(event & VENUM_EVENT);
-> > +	if (cpu)
-> > +		*cpu = !!(event & KRAIT_EVENT);
-> > +}
+> >Add the ADSP clocks to the CPG and MSTP5 nodes of the R8A7791 device tree.
 > 
-> Maybe worth sticking these fields in a struct? Failing that, just using
-> macros for each one and using them in-line isn't so bad.
+> >Based on the original patch by Konstantin Kozhevnikov
+> ><konstantin.kozhevnikov@cogentembedded.com>.
 > 
+> >Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> >---
+> >The patch is against 'renesas-devel-20141229-v3.19-rc2' tag of Simon Horman's
+> >'renesas.git' repo plus the R8A7791 CAN patches posted last week. It depends on
+> >the patch adding the ADSP clock support to  the 'clk-rcar-gen2' driver in order
+> >to work.
+> 
+>    That patch now sits in Mike's tree and should soon be merged by Linus.
+> Simon, please consider merging this patch.
 
-Ok let's see how a macro goes. Is there any advantage either way?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks, done.
