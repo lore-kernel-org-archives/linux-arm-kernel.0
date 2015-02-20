@@ -1,133 +1,39 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 20 Feb 2015 17:26:49 +0530
-Subject: [PATCH] clockevents: Add (missing) default case for switch blocks
-In-Reply-To: <20150220114136.GA27483@gmail.com>
-References: <6291e308ab77a480c6b1732e16108c5fe6f66afa.1424412815.git.viresh.kumar@linaro.org>
- <20150220083842.GA20387@gmail.com>
- <20150220084807.GJ21418@twins.programming.kicks-ass.net>
- <20150220093659.GA23469@gmail.com>
- <20150220113753.GP5029@twins.programming.kicks-ass.net>
- <20150220114136.GA27483@gmail.com>
-Message-ID: <CAKohpokmCof2P8Un+i5eOS3BQhH_pMNATH4xkbbhw5TqJFEy9Q@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 20 Feb 2015 13:12:15 +0100
+Subject: [PATCH 1/6] ASoC: max98088: Document DT bindings
+In-Reply-To: <54E681A8.6040702@suse.de>
+References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
+ <1424283959-16289-2-git-send-email-afaerber@suse.de>
+ <54E5EB36.9020007@collabora.co.uk> <54E5EF73.2090302@suse.de>
+ <CAD=FV=VoFnbEsKi4mDDkaTrTXboJmm0UNV5iCk1CvV5ndEZtsA@mail.gmail.com>
+ <54E62E1C.4030105@suse.de> <54E6314E.5060509@suse.de>
+ <54E64C09.5000505@collabora.co.uk> <54E681A8.6040702@suse.de>
+Message-ID: <54E7249F.2020900@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 February 2015 at 17:11, Ingo Molnar <mingo@kernel.org> wrote:
+On 20/02/15 01:36, Andreas F?rber wrote:
+>>> >> So it seems the mclk is not always set up properly by the kernel,
+>>> >> relying on firmware. Who's in charge of setting that clock up?
+>> > 
+>> > Right, it seems audio is only working due the firmware doing some previous
+>> > setup. Probably it works on every boot if you have "sound init" as a part of
+>> > the u-boot boot commands?
 >
-> * Peter Zijlstra <peterz@infradead.org> wrote:
+> Indeed it does, 24 MHz without the reparenting patch, and sound working.
 
->> Maybe we should break that enum into two; one for devices
->> and one for the core interface and avoid the problem that
->> way.
->
-> Yeah, that would do the trick.
+You can have parent of the CLKOUT clock set by the clk core if it is
+specified in device tree in the PMU (the clkout clock supplier) device
+node.
 
-Thanks for your suggestions. Just to confirm (before I spam lists with
-patches), is
-this somewhat similar to what you are looking for ?
+Similarly as we did for the Odroix U3:
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/exynos4412-odroid-common.dtsi#n39
 
-diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
-index 59af26b54d15..80b669cb836d 100644
---- a/include/linux/clockchips.h
-+++ b/include/linux/clockchips.h
-@@ -32,17 +32,24 @@ enum clock_event_nofitiers {
- struct clock_event_device;
- struct module;
+Relying on the clk_set_rate() to set the parent clock is not optimal
+IMO. Presumably you need to set select stable parent clock for clkout
+like XXTI. But I'm not very familiar with exyno5250 and that might be
+something different.
 
--/* Clock event mode commands */
-+/* Clock event mode commands for legacy ->set_mode(): OBSOLETE */
- enum clock_event_mode {
-        CLOCK_EVT_MODE_UNUSED = 0,
-        CLOCK_EVT_MODE_SHUTDOWN,
-        CLOCK_EVT_MODE_PERIODIC,
-        CLOCK_EVT_MODE_ONESHOT,
-        CLOCK_EVT_MODE_RESUME,
--
--       /* Legacy ->set_mode() callback doesn't support below modes */
- };
-
-+/* Clock event modes, only for core's internal use */
-+enum clock_event_dev_mode {
-+       CLOCK_EVT_DEV_MODE_UNUSED = 0,
-+       CLOCK_EVT_DEV_MODE_SHUTDOWN,
-+       CLOCK_EVT_DEV_MODE_PERIODIC,
-+       CLOCK_EVT_DEV_MODE_ONESHOT,
-+       CLOCK_EVT_DEV_MODE_RESUME,
-+       CLOCK_EVT_DEV_MODE_ONESHOT_STOPPED,  /* This would be the new
-mode which I will add later */
-+};
-+
- /*
-  * Clock event features
-  */
-diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-index 489642b08d64..16555d3db94d 100644
---- a/kernel/time/clockevents.c
-+++ b/kernel/time/clockevents.c
-@@ -95,14 +95,18 @@ u64 clockevent_delta2ns(unsigned long latch,
-struct clock_event_device *evt)
- EXPORT_SYMBOL_GPL(clockevent_delta2ns);
-
- static int __clockevents_set_mode(struct clock_event_device *dev,
--                                 enum clock_event_mode mode)
-+                                 enum clock_event_dev_mode mode)
- {
-        /* Transition with legacy set_mode() callback */
-        if (dev->set_mode) {
-                /* Legacy callback doesn't support new modes */
--               if (mode > CLOCK_EVT_MODE_RESUME)
-+               if (mode > CLOCK_EVT_DEV_MODE_RESUME)
-                        return -ENOSYS;
--               dev->set_mode(mode, dev);
-+               /*
-+                * 'clock_event_dev_mode' and 'clock_event_mode' have 1-to-1
-+                * mapping until *_RESUME, and so a simple cast will work.
-+                */
-+               dev->set_mode((enum clock_event_mode)mode, dev);
-                return 0;
-        }
-
-@@ -111,29 +115,29 @@ static int __clockevents_set_mode(struct
-clock_event_device *dev,
-
-        /* Transition with new mode-specific callbacks */
-        switch (mode) {
--       case CLOCK_EVT_MODE_UNUSED:
-+       case CLOCK_EVT_DEV_MODE_UNUSED:
-                /*
-                 * This is an internal state, which is guaranteed to go from
-                 * SHUTDOWN to UNUSED. No driver interaction required.
-                 */
-                return 0;
-
--       case CLOCK_EVT_MODE_SHUTDOWN:
-+       case CLOCK_EVT_DEV_MODE_SHUTDOWN:
-                return dev->set_mode_shutdown(dev);
-
--       case CLOCK_EVT_MODE_PERIODIC:
-+       case CLOCK_EVT_DEV_MODE_PERIODIC:
-                /* Core internal bug */
-                if (!(dev->features & CLOCK_EVT_FEAT_PERIODIC))
-                        return -ENOSYS;
-                return dev->set_mode_periodic(dev);
-
--       case CLOCK_EVT_MODE_ONESHOT:
-+       case CLOCK_EVT_DEV_MODE_ONESHOT:
-                /* Core internal bug */
-                if (!(dev->features & CLOCK_EVT_FEAT_ONESHOT))
-                        return -ENOSYS;
-                return dev->set_mode_oneshot(dev);
-
--       case CLOCK_EVT_MODE_RESUME:
-+       case CLOCK_EVT_DEV_MODE_RESUME:
-                /* Optional callback */
-                if (dev->set_mode_resume)
-                        return dev->set_mode_resume(dev);
-
-
-
-Ofcourse, we also need to replace 'clock_event_mode' with 'clock_event_dev_mode'
-and 'CLOCK_EVT_MODE_*' with 'CLOCK_EVT_DEV_MODE_*' in all core code..
-
---
-viresh
+-- 
+Regards,
+Sylwester
