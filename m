@@ -1,81 +1,78 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 20 Feb 2015 19:28:36 +0530
-Subject: [PATCH] clockevents: Add (missing) default case for switch blocks
-In-Reply-To: <20150220132220.GB28882@gmail.com>
-References: <6291e308ab77a480c6b1732e16108c5fe6f66afa.1424412815.git.viresh.kumar@linaro.org>
- <20150220083842.GA20387@gmail.com>
- <20150220084807.GJ21418@twins.programming.kicks-ass.net>
- <20150220093659.GA23469@gmail.com>
- <20150220113753.GP5029@twins.programming.kicks-ass.net>
- <20150220114136.GA27483@gmail.com>
- <CAKohpokmCof2P8Un+i5eOS3BQhH_pMNATH4xkbbhw5TqJFEy9Q@mail.gmail.com>
- <20150220132220.GB28882@gmail.com>
-Message-ID: <CAKohpokEV7EatQROgzQBWPRPFEn8OsMo5EHa+q1FMwBESwiU3w@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 20 Feb 2015 14:03:53 +0000
+Subject: Announce: rmk's nightly builder gets ARM64 support
+In-Reply-To: <CAOMZO5BgrWGciKt0pjpbtX4wP0CgWWN39BcSjnSD89MxKEpBCg@mail.gmail.com>
+References: <20150219171220.GA8656@n2100.arm.linux.org.uk>
+ <20150219183444.GB8656@n2100.arm.linux.org.uk>
+ <20150220092003.GB31692@arm.com>
+ <CAKv+Gu_5fOinMVYbk99unmEDSqCF3Z7QdXiQTw0VrrWW16Oc6w@mail.gmail.com>
+ <20150220094035.GE8656@n2100.arm.linux.org.uk>
+ <20150220102009.GF8656@n2100.arm.linux.org.uk>
+ <CAOMZO5Aqx_SQ1oaML=hiVzzJMJ2bNTAsjk-dWFLkETaV4_JO+A@mail.gmail.com>
+ <20150220133806.GG8656@n2100.arm.linux.org.uk>
+ <CAOMZO5BgrWGciKt0pjpbtX4wP0CgWWN39BcSjnSD89MxKEpBCg@mail.gmail.com>
+Message-ID: <CAKv+Gu99XCwnFjzJsRQ8SYD36CRYLh36wU3zD-94kbQtoc_ieA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 February 2015 at 18:52, Ingo Molnar <mingo@kernel.org> wrote:
+On 20 February 2015 at 13:49, Fabio Estevam <festevam@gmail.com> wrote:
+> On Fri, Feb 20, 2015 at 11:38 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
 >
-> * Viresh Kumar <viresh.kumar@linaro.org> wrote:
->> +       CLOCK_EVT_DEV_MODE_UNUSED = 0,
+>> From what I can see, this doesn't _build_ a compiler.  It grabs
+>> gcc-linaro-aarch64-linux-gnu-4.9-2014.08_linux.tar.xz from
+>> http://releases.linaro.org/14.08/components/toolchain/binaries
+>> and installs that - which contains a load of binaries.
 >
-> What is 'unused' - not initialized yet?
+> That's correct. It uses the pre-built binaries from Linaro.
 
-Unused. Initially all clockevent devices are supposed to be in this
-mode but later if another device replaces an existing one, the existing
-one is put into this mode.
+OK, so this is the command line GCC uses to invoke the assembler when
+building aes-ce-cipher.o
 
->> +       CLOCK_EVT_DEV_MODE_SHUTDOWN,
->> +       CLOCK_EVT_DEV_MODE_PERIODIC,
->> +       CLOCK_EVT_DEV_MODE_ONESHOT,
->> +       CLOCK_EVT_DEV_MODE_RESUME,
->
-> What is 'resume' mode?
+ /usr/local/gcc-linaro-aarch64-linux-gnu-4.9-2014.07_linux/bin/../lib/gcc/aarch64-linux-gnu/4.9.1/../../../../aarch64-linux-gnu/bin/as
+-v -I /home/ard/linux-2.6/arch/arm64/include -I
+arch/arm64/include/generated/uapi -I arch/arm64/include/generated -I
+/home/ard/linux-2.6/include -I include -I
+/home/ard/linux-2.6/arch/arm64/include/uapi -I
+arch/arm64/include/generated/uapi -I /home/ard/linux-2.6/include/uapi
+-I include/generated/uapi -I /home/ard/linux-2.6/arch/arm64/crypto -I
+arch/arm64/crypto -EL -march=armv8-a+crypto -mabi=lp64 -o
+arch/arm64/crypto/aes-ce-cipher.o /tmp/ccqUB3dr.s
 
-Introduced with: 18de5bc4c1f1 ("clockevents: fix resume logic") and is only
-called during system resume to resume the clockevent devices before resuming
-the tick. Only few implementations do meaningful stuff here.
+So in my case, it correctly relays the -march option to GAS, and it
+builds fine. Note that I am not using a bare metal compiler, but I
+don't think that that should make a difference.
 
->> +       CLOCK_EVT_DEV_MODE_ONESHOT_STOPPED,  /* This would be the new
->> mode which I will add later */
->
-> What does this mode express?
+GCC -v output:
 
-I have added it here to show how things would look like eventually,
-but it wouldn't
-be present in the patch which splits the enum into two parts..
+Using built-in specs.
+COLLECT_GCC=aarch64-linux-gnu-gcc
+COLLECT_LTO_WRAPPER=/usr/local/gcc-linaro-aarch64-linux-gnu-4.9-2014.07_linux/bin/../libexec/gcc/aarch64-linux-gnu/4.9.1/lto-wrapper
+Target: aarch64-linux-gnu
+Configured with:
+/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/.build/src/gcc-linaro-4.9-2014.06/configure
+--build=i686-build_pc-linux-gnu --host=i686-build_pc-linux-gnu
+--target=aarch64-linux-gnu
+--prefix=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/install
+--with-sysroot=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/install/aarch64-linux-gnu/libc
+--enable-languages=c,c++,fortran --disable-multilib --enable-multiarch
+--with-arch=armv8-a --with-pkgversion='crosstool-NG
+linaro-1.13.1-4.9-2014.07 - Linaro GCC 4.9-2014.06'
+--with-bugurl=https://bugs.launchpad.net/gcc-linaro
+--enable-__cxa_atexit --disable-libmudflap --enable-libgomp
+--disable-libssp
+--with-gmp=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/.build/aarch64-linux-gnu/build/static
+--with-mpfr=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/.build/aarch64-linux-gnu/build/static
+--with-mpc=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/.build/aarch64-linux-gnu/build/static
+--with-isl=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/.build/aarch64-linux-gnu/build/static
+--with-cloog=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/.build/aarch64-linux-gnu/build/static
+--with-libelf=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/.build/aarch64-linux-gnu/build/static
+--enable-threads=posix --disable-libstdcxx-pch
+--enable-linker-build-id --enable-plugin
+--with-local-prefix=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/install/aarch64-linux-gnu/libc
+--enable-c99 --enable-long-long
+Thread model: posix
+gcc version 4.9.1 20140529 (prerelease) (crosstool-NG
+linaro-1.13.1-4.9-2014.07 - Linaro GCC 4.9-2014.06)
 
-Its only important for NOHZ_FULL (IDLE ? Maybe). When we decide that the tick
-(LOWRES) or hrtimer interrupt (HIGHRES) isn't required for indefinite
-period of time
-(i.e. no timers/hrtimers are present to serve), we skip reprogramming
-the clockevent
-device. But its already reprogrammed from the tick-handler and so will
-fire atleast
-once again.
-
-The case is worst for implementations where the underlying hardware doesn't have
-support for ONESHOT mode. And so they emulate ONESHOT over PERIODIC.
-And in those cases, these spurious interrupts come at a rate last programmed for
-the clockevent device. And that is mostly tick-rate..
-
-> So for state machines it's important to document the states
-> and the transitions between them very clearly - please
-> start with that.
-
-Sure.
-
-> Also, this should not be in a generic header, it should be
-> somewhere internal in kernel/time/.
-
-Right. But there are some excellent drivers which are comparing things against
-dev->mode (i.e. enum clock_event_dev_mode now..). I need to fix them as well
-first to push this into some internal header.
-
->> Ofcourse, we also need to replace 'clock_event_mode' with
->> 'clock_event_dev_mode' and 'CLOCK_EVT_MODE_*' with
->> 'CLOCK_EVT_DEV_MODE_*' in all core code..
->
-> Yes.
-
-Thanks for your suggestions.
+Anyone care to try the same with the non-working toolchain?
