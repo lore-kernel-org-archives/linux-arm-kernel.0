@@ -1,39 +1,44 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 20 Feb 2015 13:12:15 +0100
-Subject: [PATCH 1/6] ASoC: max98088: Document DT bindings
-In-Reply-To: <54E681A8.6040702@suse.de>
-References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
- <1424283959-16289-2-git-send-email-afaerber@suse.de>
- <54E5EB36.9020007@collabora.co.uk> <54E5EF73.2090302@suse.de>
- <CAD=FV=VoFnbEsKi4mDDkaTrTXboJmm0UNV5iCk1CvV5ndEZtsA@mail.gmail.com>
- <54E62E1C.4030105@suse.de> <54E6314E.5060509@suse.de>
- <54E64C09.5000505@collabora.co.uk> <54E681A8.6040702@suse.de>
-Message-ID: <54E7249F.2020900@samsung.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 20 Feb 2015 14:16:27 +0200
+Subject: [PATCH] video: fbdev: make of_device_id array const
+In-Reply-To: <1423479747-17899-1-git-send-email-sanjeev_sharma@mentor.com>
+References: <1423479747-17899-1-git-send-email-sanjeev_sharma@mentor.com>
+Message-ID: <54E7259B.7080101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/02/15 01:36, Andreas F?rber wrote:
->>> >> So it seems the mclk is not always set up properly by the kernel,
->>> >> relying on firmware. Who's in charge of setting that clock up?
->> > 
->> > Right, it seems audio is only working due the firmware doing some previous
->> > setup. Probably it works on every boot if you have "sound init" as a part of
->> > the u-boot boot commands?
->
-> Indeed it does, 24 MHz without the reparenting patch, and sound working.
+On 09/02/15 13:02, Sanjeev Sharma wrote:
+> Make of_device_id array const.
+> 
+> Signed-off-by: Sanjeev Sharma <Sanjeev_Sharma@mentor.com>
+> ---
+>  drivers/video/fbdev/imxfb.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/video/fbdev/imxfb.c b/drivers/video/fbdev/imxfb.c
+> index 3b6a3c8..84d1d29 100644
+> --- a/drivers/video/fbdev/imxfb.c
+> +++ b/drivers/video/fbdev/imxfb.c
+> @@ -183,7 +183,7 @@ static struct platform_device_id imxfb_devtype[] = {
+>  };
+>  MODULE_DEVICE_TABLE(platform, imxfb_devtype);
+>  
+> -static struct of_device_id imxfb_of_dev_id[] = {
+> +static const struct of_device_id imxfb_of_dev_id[] = {
+>  	{
+>  		.compatible = "fsl,imx1-fb",
+>  		.data = &imxfb_devtype[IMX1_FB],
+> 
 
-You can have parent of the CLKOUT clock set by the clk core if it is
-specified in device tree in the PMU (the clkout clock supplier) device
-node.
+Thanks, queued for 3.21.
 
-Similarly as we did for the Odroix U3:
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/exynos4412-odroid-common.dtsi#n39
+ Tomi
 
-Relying on the clk_set_rate() to set the parent clock is not optimal
-IMO. Presumably you need to set select stable parent clock for clkout
-like XXTI. But I'm not very familiar with exyno5250 and that might be
-something different.
 
--- 
-Regards,
-Sylwester
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150220/d99b0c51/attachment.sig>
