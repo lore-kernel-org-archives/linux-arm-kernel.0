@@ -1,32 +1,39 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 20 Feb 2015 15:52:16 -0500
-Subject: [PATCH] ARM: shmobile: r8a7790: add ADSP clocks
-In-Reply-To: <54E79337.9090500@cogentembedded.com>
-References: <1909663.BCLINDXhVH@wasted.cogentembedded.com>
- <54E79337.9090500@cogentembedded.com>
-Message-ID: <20150220205216.GE20237@verge.net.au>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 20 Feb 2015 16:23:08 -0500 (EST)
+Subject: [PATCH] net: smc91x: improve neponset hack
+In-Reply-To: <5754481.gFE9BvLjh0@wuerfel>
+References: <5763365.j5Nvv4LgM3@wuerfel>
+ <20150219003549.GY8656@n2100.arm.linux.org.uk>
+ <5754481.gFE9BvLjh0@wuerfel>
+Message-ID: <20150220.162308.1371481451879675649.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 11:04:07PM +0300, Sergei Shtylyov wrote:
-> On 12/30/2014 11:21 PM, Sergei Shtylyov wrote:
-> 
-> >Add the ADSP clocks to the CPG and MSTP5 nodes of the R8A7790 device tree.
-> 
-> >Based on the original patch by Konstantin Kozhevnikov
-> ><konstantin.kozhevnikov@cogentembedded.com>.
-> 
-> >Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> >---
-> >The patch is against 'renesas-devel-20141229-v3.19-rc2' tag of Simon Horman's
-> >'renesas.git' repo plus the R8A7790 CAN patches posted earlier. It depends on
-> >the patch adding the ADSP clock support to the 'clk-rcar-gen2' driver in order
-> >to work.
-> 
->    Simon, please consider merging this patch as well.
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 20 Feb 2015 16:47:06 +0100
 
-Thanks done.
+> On Thursday 19 February 2015 00:35:49 Russell King - ARM Linux wrote:
+>> On Wed, Feb 18, 2015 at 08:47:30PM +0100, Arnd Bergmann wrote:
+>> > The smc91x driver tries to support multiple platforms at compile
+>> > time, but they are mutually exclusive at runtime, and not clearly
+>> > defined.
+>> 
+>> I'd prefer to rework this to fix that properly.  From what I remember,
+>> the whole SA11x0 stuff in this driver was a mess.
+> 
+> I guess that's reasonable. I've looked through the driver and it seems we
+> did most of the multiplatform work but left a few things alone that should
+> have been converted a long time ago.
+> 
+> Can you check if the approach below makes sense to you?
+> 
+> I've verified that each machine that defines an smc91x device now sets
+> the correct platform data, irq flags and access width, which should be
+> enough to collapse all the CONFIG_ARM cases into one.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I plan to do a push of renesas-devel shortly.
-Please let me know if you have anything else that I should wait for.
+This is a nice cleanup but for 'net' to fix the build error I prefer
+the original one-line patch.
+
+We can apply this thing here to net-next.
