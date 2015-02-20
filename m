@@ -1,64 +1,67 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 20 Feb 2015 10:13:22 +0100
-Subject: [PATCH v2] crypto: atmel: fix bogus select
-In-Reply-To: <6741924.K1MvntTk7u@wuerfel>
-References: <6741924.K1MvntTk7u@wuerfel>
-Message-ID: <20150220091322.GN32600@odux.rfo.atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 20 Feb 2015 09:20:03 +0000
+Subject: Announce: rmk's nightly builder gets ARM64 support
+In-Reply-To: <20150219183444.GB8656@n2100.arm.linux.org.uk>
+References: <20150219171220.GA8656@n2100.arm.linux.org.uk>
+ <20150219183444.GB8656@n2100.arm.linux.org.uk>
+Message-ID: <20150220092003.GB31692@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+[adding Ard]
 
-On Thu, Feb 19, 2015 at 04:38:19PM +0100, Arnd Bergmann wrote:
-> The Atmel at91 crypto driver unconditionally selects AT_HDMAC,
-> which results in a Kconfig warning if that driver is not enabled:
+On Thu, Feb 19, 2015 at 06:34:44PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Feb 19, 2015 at 05:12:20PM +0000, Russell King - ARM Linux wrote:
+> > Today, I have added ARM64 support to my automated nightly kernel builder.
+> > Initially, this will result in ARM64 builds being tested with allnoconfig
+> > and defconfig, and I shall add allmodconfig and allyesconfig to this in
+> > the coming days.
+> > 
+> > Once that is done and stable, I will investigate adding an ARM Juno
+> > platform to my boot farm so we can run the results of the builder.
+> > 
+> > Other recent changes have been a disk upgrade, so the builder now has
+> > plenty of disk space to run the allmodconfig and allyesconfig, which
+> > used to fail (or be skipped) when the disk space was low.
+> > 
+> > I've also added a new ARM target for building the defconfig without a
+> > seed.
+> > 
+> > As ever, all results are in the usual place, at:
+> > 
+> > http://www.arm.linux.org.uk/developer/build/
 > 
-> warning: (CRYPTO_DEV_ATMEL_AES) selects AT_HDMAC which has unmet direct dependencies (DMADEVICES && ARCH_AT91)
+> It seems that there's either something wrong with the kernel, or
+> there's a problem with binutils.
 > 
-> The crypty driver itself does not actually have a dependency
-> on a particular dma engine, other than this being the one that
-> is used in at91.
+> /tmp/cc1B9ysz.s:99: Error: selected processor does not support `aese v0.16b,v1.16b'
+> /tmp/cc1B9ysz.s:207: Error: selected processor does not support `aesimc v1.16b,v0.16b'
+> /tmp/cc1B9ysz.s:255: Error: selected processor does not support `aese v0.16b,v1.16b'
+> /tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesd v0.16b,v2.16b'
+> /tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesimc v0.16b,v0.16b'
+> /tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesd v0.16b,v3.16b'
+> /tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesimc v0.16b,v0.16b'
+> /tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesd v0.16b,v1.16b'
+> /tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesimc v0.16b,v0.16b'
+> /tmp/cc1B9ysz.s:389: Error: selected processor does not support `aesd v0.16b,v2.16b'
+> /tmp/cc1B9ysz.s:455: Error: selected processor does not support `aese v0.16b,v2.16b'
+> /tmp/cc1B9ysz.s:455: Error: selected processor does not support `aesmc v0.16b,v0.16b'
+> /tmp/cc1B9ysz.s:455: Error: selected processor does not support `aese v0.16b,v3.16b'
+> /tmp/cc1B9ysz.s:455: Error: selected processor does not support `aesmc v0.16b,v0.16b'
+> /tmp/cc1B9ysz.s:455: Error: selected processor does not support `aese v0.16b,v1.16b'
+> /tmp/cc1B9ysz.s:455: Error: selected processor does not support `aesmc v0.16b,v0.16b'
+> /tmp/cc1B9ysz.s:455: Error: selected processor does not support `aese v0.16b,v2.16b'
+> make[2]: *** [arch/arm64/crypto/aes-ce-cipher.o] Error 1
 > 
-> Removing the 'select' gets rid of the warning, but can cause
-> the driver to be unusable if the HDMAC is not enabled at the
-> same time. To work around that, this patch clarifies the runtime
-> dependency to be '(ARCH_AT91 && AT_XDMAC)', but adds an alternative
-> for COMPILE_TEST, which lets the driver get build on all systems.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> v2: as a result of the discussion with Ludovic, clarify the
-> dependency.
-> 
-> Please apply for 3.21 if there are no further comments.
-> 
-> diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-> index 2fb0fdfc87df..562125183690 100644
-> --- a/drivers/crypto/Kconfig
-> +++ b/drivers/crypto/Kconfig
-> @@ -342,13 +342,12 @@ config CRYPTO_DEV_BFIN_CRC
->  
->  config CRYPTO_DEV_ATMEL_AES
->  	tristate "Support for Atmel AES hw accelerator"
-> -	depends on ARCH_AT91
-> +	depends on (ARCH_AT91 && AT_XDMAC) || COMPILE_TEST
+> I've tried both the mainline git version, and the sourceware.org
+> binutils-gdb.git version, both result in the same errors.
 
-Sorry maybe my explanation was not clear. When I said add AT_XDMAC it
-was not to replace AT_HDMAC but to have something like:
+It sounds like GCC isn't propagating the march flags down to the assembler,
+since we take care in arch/arm64/crypto/Makefile to pass the '+crypto'
+option for these files.
 
-ARCH_AT91 && (AT_HDMAC || AT_XDMAC)
+It's weird that nobody else is reporting this. I'm not saying that we
+shouldn't look at fixing it, but I'd like to understand why you're hitting
+this and I'm not as it could reveal a gap in our build testing.
 
->  	select CRYPTO_CBC
->  	select CRYPTO_ECB
->  	select CRYPTO_AES
->  	select CRYPTO_ALGAPI
->  	select CRYPTO_BLKCIPHER
-> -	select AT_HDMAC
->  	help
->  	  Some Atmel processors have AES hw accelerator.
->  	  Select this if you want to use the Atmel module for
->
-
-Regards
-
-Ludovic
+Will
