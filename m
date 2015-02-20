@@ -1,97 +1,55 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 20 Feb 2015 15:50:36 +0800
-Subject: [PATCH] pinctrl: at91: move lock/unlock_as_irq calls into
- request/release resources methods
-In-Reply-To: <BC36A77B-9986-495E-8F86-C80E9D0F0C63@jcrosoft.com>
-References: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
- <BC36A77B-9986-495E-8F86-C80E9D0F0C63@jcrosoft.com>
-Message-ID: <95765FA2-E9BF-4A66-B46D-2491869B0A14@jcrosoft.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 20 Feb 2015 08:51:51 +0100
+Subject: [PATCH 2/2] at91sam9_wdt: Allow watchdog to reset device at
+ early boot
+In-Reply-To: <00B1658F-2F3A-4B90-ADCA-275770832180@jcrosoft.com>
+References: <54B53160.6060309@roeck-us.net>
+ <cover.1424262664.git.timo.kokkonen@offcode.fi>
+ <cover.1424262664.git.timo.kokkonen@offcode.fi>
+ <6c0a3a5bcd93d18437eeed04712b4aeff201a16f.1424262664.git.timo.kokkonen@offcode.fi>
+ <00B1658F-2F3A-4B90-ADCA-275770832180@jcrosoft.com>
+Message-ID: <20150220085151.3b599de8@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jean-Christophe,
 
-> On Feb 9, 2015, at 10:50 PM, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> 
-> 
->> On Feb 9, 2015, at 2:23 AM, Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
->> 
->> The gpiochip_lock_as_irq call can fail and return an error, while the
->> irq_startup is not expected to fail (returns an unsigned int which is not
->> checked by irq core code).
->> 
->> irq_request/release_resources functions have been created to address this
->> problem.
->> 
->> Move gpiochip_lock/unlock_as_irq calls into
->> irq_request/release_resources functions to prevent using a gpio as an irq
->> if the gpiochip_lock_as_irq call failed.
->> 
->> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->> ?
-> 
-> I?m travelling will take a look end of the week
+On Fri, 20 Feb 2015 15:48:22 +0800
+Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
 
-just get back from travelling will take a look after Chinese new year
-as all my hw are at the office
+> 
+> > On Feb 18, 2015, at 8:57 PM, Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
+> > 
+> > By default the driver will start a kernel timer which keeps on kicking
+> > the watchdog HW until user space has opened the watchdog
+> > device. Usually this is desirable as the watchdog HW is running by
+> > default and the user space may not have any watchdog daemon running at
+> > all.
+> > 
+> > However, on production systems it may be mandatory that also early
+> > crashes and lockups will lead to a watchdog reset, even if they happen
+> > before the user space has opened the watchdog device.
+> > 
+> > To resolve the issue, add a new device tree property
+> > "early-timeout-sec" which will let the kernel timer to ping the
+> > watchdog HW only as long as the specified timeout permits. The default
+> > is still to use kernel timer, but more strict behavior can be enabled
+> > via the device tree property.
+> > 
+> > Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+> > ---
+> > Documentation/devicetree/bindings/watchdog/watchdog.txt | 7 +++++++
+> > drivers/watchdog/at91sam9_wdt.c                         | 9 ++++++++-
+> 
+> This should not be handled by the driver but the kernel in a generic way
+
+Could you detail a bit more what you have in mind ?
 
 Best Regards,
-J.
-> 
-> Best Regards,
-> J.
->> drivers/pinctrl/pinctrl-at91.c | 17 +++++++----------
->> 1 file changed, 7 insertions(+), 10 deletions(-)
->> 
->> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
->> index f4cd0b9..a481406 100644
->> --- a/drivers/pinctrl/pinctrl-at91.c
->> +++ b/drivers/pinctrl/pinctrl-at91.c
->> @@ -1477,28 +1477,25 @@ static void gpio_irq_ack(struct irq_data *d)
->> 	/* the interrupt is already cleared before by reading ISR */
->> }
->> 
->> -static unsigned int gpio_irq_startup(struct irq_data *d)
->> +static int gpio_irq_request_res(struct irq_data *d)
->> {
->> 	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
->> 	unsigned	pin = d->hwirq;
->> 	int ret;
->> 
->> 	ret = gpiochip_lock_as_irq(&at91_gpio->chip, pin);
->> -	if (ret) {
->> +	if (ret)
->> 		dev_err(at91_gpio->chip.dev, "unable to lock pind %lu IRQ\n",
->> 			d->hwirq);
->> -		return ret;
->> -	}
->> -	gpio_irq_unmask(d);
->> -	return 0;
->> +
->> +	return ret;
->> }
->> 
->> -static void gpio_irq_shutdown(struct irq_data *d)
->> +static void gpio_irq_release_res(struct irq_data *d)
->> {
->> 	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
->> 	unsigned	pin = d->hwirq;
->> 
->> -	gpio_irq_mask(d);
->> 	gpiochip_unlock_as_irq(&at91_gpio->chip, pin);
->> }
->> 
->> @@ -1577,8 +1574,8 @@ void at91_pinctrl_gpio_resume(void)
->> static struct irq_chip gpio_irqchip = {
->> 	.name		= "GPIO",
->> 	.irq_ack	= gpio_irq_ack,
->> -	.irq_startup	= gpio_irq_startup,
->> -	.irq_shutdown	= gpio_irq_shutdown,
->> +	.irq_request_resources = gpio_irq_request_res,
->> +	.irq_release_resources = gpio_irq_release_res,
->> 	.irq_disable	= gpio_irq_mask,
->> 	.irq_mask	= gpio_irq_mask,
->> 	.irq_unmask	= gpio_irq_unmask,
->> -- 
->> 1.9.1
->> 
-> 
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
