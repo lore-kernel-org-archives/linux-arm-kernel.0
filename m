@@ -1,56 +1,30 @@
-From: mathieu@codeaurora.org (Mathieu Olivari)
-Date: Fri, 20 Feb 2015 18:19:35 -0800
-Subject: [PATCH 2/3] ARM: qcom: add description of KPSS WDT for IPQ8064
-In-Reply-To: <1424485176-8348-1-git-send-email-mathieu@codeaurora.org>
-References: <1424485176-8348-1-git-send-email-mathieu@codeaurora.org>
-Message-ID: <1424485176-8348-3-git-send-email-mathieu@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 21 Feb 2015 11:40:25 +0900
+Subject: [PATCH 5/6] ASoC: samsung: Extend Snow driver to support max98089
+In-Reply-To: <CAD=FV=WkieDSSB_-a6DtH1hmq6SyZk4NAR-eXQ11hxUDMTvRfg@mail.gmail.com>
+References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
+ <1424283959-16289-6-git-send-email-afaerber@suse.de>
+ <20150219094425.GB3198@finisterre.sirena.org.uk>
+ <CAD=FV=WkieDSSB_-a6DtH1hmq6SyZk4NAR-eXQ11hxUDMTvRfg@mail.gmail.com>
+Message-ID: <20150221024025.GB6236@finisterre.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the watchdog related entries to the Krait Processor Sub-system
-(KPSS) timer IPQ8064 devicetree section. Also, add a fixed-clock
-description of SLEEP_CLK, which will do for now.
+On Thu, Feb 19, 2015 at 09:44:08AM -0800, Doug Anderson wrote:
+> On Thu, Feb 19, 2015 at 1:44 AM, Mark Brown <broonie@kernel.org> wrote:
 
-Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-Signed-off-by: Mathieu Olivari <mathieu@codeaurora.org>
----
- arch/arm/boot/dts/qcom-ipq8064.dtsi | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+> I think what you're suggesting is that here we should add a new
+> compatible string "google,snow-audio" instead of adding
+> "google,snow-audio-max98089" here.  Then the sound node in the spring
+> DTS would look like:
 
-diff --git a/arch/arm/boot/dts/qcom-ipq8064.dtsi b/arch/arm/boot/dts/qcom-ipq8064.dtsi
-index cb225da..d01f618 100644
---- a/arch/arm/boot/dts/qcom-ipq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-ipq8064.dtsi
-@@ -60,6 +60,14 @@
- 		};
- 	};
- 
-+	clocks {
-+		sleep_clk: sleep_clk {
-+			compatible = "fixed-clock";
-+			clock-frequency = <32768>;
-+			#clock-cells = <0>;
-+		};
-+	};
-+
- 	soc: soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -89,10 +97,14 @@
- 			compatible = "qcom,kpss-timer", "qcom,msm-timer";
- 			interrupts = <1 1 0x301>,
- 				     <1 2 0x301>,
--				     <1 3 0x301>;
-+				     <1 3 0x301>,
-+				     <1 4 0x301>,
-+				     <1 5 0x301>;
- 			reg = <0x0200a000 0x100>;
- 			clock-frequency = <25000000>,
- 					  <32768>;
-+			clocks = <&sleep_clk>;
-+			clock-names = "sleep";
- 			cpu-offset = <0x80000>;
- 		};
- 
--- 
-1.9.1
+>   compatible = "google,snow-audio-max98089", "google,snow-audio";
+
+Yes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150221/746cb36c/attachment.sig>
