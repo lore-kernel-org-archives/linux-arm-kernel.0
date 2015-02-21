@@ -1,24 +1,21 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 21 Feb 2015 09:58:57 +0100
-Subject: [PATCH 1/7] serial: imx: drop members from driver data that are
- only used during probe
-In-Reply-To: <1424292068-28197-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1424292068-28197-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20150221085857.GW19388@pengutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 21 Feb 2015 18:36:11 +0900
+Subject: [PATCH v2] ASoC: Samsung: add missing I2C/SPI dependencies
+In-Reply-To: <8075847.dUio9f5hRh@wuerfel>
+References: <8075847.dUio9f5hRh@wuerfel>
+Message-ID: <20150221093611.GJ6236@finisterre.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Greg,
+On Wed, Feb 18, 2015 at 09:35:08PM +0100, Arnd Bergmann wrote:
+> A few sound drivers for the samsung platforms are missing dependencies
+> on I2C or SPI, which can lead to build errors like
 
-On Wed, Feb 18, 2015 at 09:41:02PM +0100, Uwe Kleine-K?nig wrote:
-> [... several changes to drivers/tty/serial/imx.c ...]
-I noticed that some changes to this driver were merged after v3.19, some
-of them conflict with my patches. I will rebase and resend once
-v3.20-rc1 (however this will be called) is out.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150221/13c9ecae/attachment.sig>
