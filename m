@@ -1,30 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 21 Feb 2015 11:40:25 +0900
-Subject: [PATCH 5/6] ASoC: samsung: Extend Snow driver to support max98089
-In-Reply-To: <CAD=FV=WkieDSSB_-a6DtH1hmq6SyZk4NAR-eXQ11hxUDMTvRfg@mail.gmail.com>
-References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
- <1424283959-16289-6-git-send-email-afaerber@suse.de>
- <20150219094425.GB3198@finisterre.sirena.org.uk>
- <CAD=FV=WkieDSSB_-a6DtH1hmq6SyZk4NAR-eXQ11hxUDMTvRfg@mail.gmail.com>
-Message-ID: <20150221024025.GB6236@finisterre.sirena.org.uk>
+From: cmetcalf@ezchip.com (Chris Metcalf)
+Date: Fri, 20 Feb 2015 23:05:15 -0500
+Subject: [PATCH] compat: Fix endian issue in union sigval
+In-Reply-To: <20150214112220.GB10246@MBP.local>
+References: <1423563011-12377-1-git-send-email-bamvor.zhangjian@huawei.com>
+ <20150210122718.GC32052@e104818-lin.cambridge.arm.com>
+ <54DB3B60.4050100@huawei.com>
+ <20150211154054.GD9058@e104818-lin.cambridge.arm.com>
+ <54DDAF2B.2070707@huawei.com>
+ <20150213104455.GA3508@e104818-lin.cambridge.arm.com>
+ <54DE730D.3090100@ezchip.com> <20150214112220.GB10246@MBP.local>
+Message-ID: <54E803FB.901@ezchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 19, 2015 at 09:44:08AM -0800, Doug Anderson wrote:
-> On Thu, Feb 19, 2015 at 1:44 AM, Mark Brown <broonie@kernel.org> wrote:
+On 2/14/2015 6:22 AM, Catalin Marinas wrote:
+> 1. user populates sival_int compat_sigevent and invokes
+>     compat_sys_mq_notify()
+> 2. kernel get_compat_sigevent() copies compat_sigevent into the native
+>     sigevent. compat and native sival_int are the same, no problem so
+>     far. The other half of 64-bit sival_ptr is zeroed by a memset in this
+>     function (this other half can be top or bottom, depending on
+>     endianness)
+> 3. signal is about to be delivered to user via arch code. The
+>     compat_ptr(from->si_ptr) conversion always takes the least
+>     significant part of the native si_ptr. On big endian 64-bit, this is
+>     zero because get_compat_sigevent() populated the top part of si_ptr
+>     with si_int.
 
-> I think what you're suggesting is that here we should add a new
-> compatible string "google,snow-audio" instead of adding
-> "google,snow-audio-max98089" here.  Then the sound node in the spring
-> DTS would look like:
+Thanks, that makes sense.  I was missing the fact that the conversion
+issue was actually around the in-kernel 64-bit version of the structure.
+Using si_int consistently does seem like it should do the right thing;
+I'll post a patch for tilegx32 big-endian to do the right thing here.
 
->   compatible = "google,snow-audio-max98089", "google,snow-audio";
-
-Yes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150221/746cb36c/attachment.sig>
+-- 
+Chris Metcalf, EZChip Semiconductor
+http://www.ezchip.com
