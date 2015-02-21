@@ -1,19 +1,37 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 22 Feb 2015 01:25:09 +0300
-Subject: [PATCH 0/2] Add R8A7794/SILK board SDHI DT support
-Message-ID: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Sun, 22 Feb 2015 08:58:15 +0900
+Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
+In-Reply-To: <CAL_JsqLcBOC+AnVe7oATjg2g6Fz2vqwacu8QzS4tXMaxxOP_Xg@mail.gmail.com>
+References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
+ <CAL_JsqJQcuX2cp50oHod-QAbhdMg48TaRP+gLGEO2kbFnQ3B+A@mail.gmail.com>
+ <20150219190348.GB24460@cbox>
+ <CAL_JsqLcBOC+AnVe7oATjg2g6Fz2vqwacu8QzS4tXMaxxOP_Xg@mail.gmail.com>
+Message-ID: <CAFEAcA9pg5v_+RAehwf5XWopgeJtWfDb+Xej+579ikeiRjhg_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 22 February 2015 at 06:56, Rob Herring <robherring2@gmail.com> wrote:
+> On Thu, Feb 19, 2015 at 1:03 PM, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+>> It matters if you want to ensure that the 64K page you are assigning to
+>> a guest for the GIC virtual CPU interface contains only GIC virtual CPU
+>> mappings, and not other random stuff that the guest is not allowed to
+>> touch.
+>
+> Good point.
+>
+>> How else should this be enforced?
+>
+> Rely on correct h/w design? You'll have to repeat this every time you
+> want to do pass-thru of a device.
 
-   Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
-'renesas-devel-20150220-v3.19' tag. Here we add the SDHI device tree support
-for the R8A7794-based SILK board. It depends on the other R8A7794/SILK patches
-in order to apply, on the R8A7794 GPIO patches in order to apply/compile, and
-on the R8A7794 SDHI PFC driver patch in order for the pins to be configured.
+The idea is that the device tree lets us describe whether
+the hardware design is correct or not :-)
 
-[1/2] ARM: shmobile: r8a7794: add SDHI DT support
-[2/2] ARM: shmobile: silk: add SDHI0/1 DT support
+> What do you do if 64K mapping is not supported? Fallback to emulation
+> of the CPU interface?
 
-WBR, Sergei
+In this case KVM can't be supported -- use 4K host pages with this
+hardware, or don't use KVM...
+
+-- PMM
