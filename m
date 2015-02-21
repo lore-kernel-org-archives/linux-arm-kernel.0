@@ -1,37 +1,86 @@
-From: cmetcalf@ezchip.com (Chris Metcalf)
-Date: Fri, 20 Feb 2015 23:05:15 -0500
-Subject: [PATCH] compat: Fix endian issue in union sigval
-In-Reply-To: <20150214112220.GB10246@MBP.local>
-References: <1423563011-12377-1-git-send-email-bamvor.zhangjian@huawei.com>
- <20150210122718.GC32052@e104818-lin.cambridge.arm.com>
- <54DB3B60.4050100@huawei.com>
- <20150211154054.GD9058@e104818-lin.cambridge.arm.com>
- <54DDAF2B.2070707@huawei.com>
- <20150213104455.GA3508@e104818-lin.cambridge.arm.com>
- <54DE730D.3090100@ezchip.com> <20150214112220.GB10246@MBP.local>
-Message-ID: <54E803FB.901@ezchip.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 21 Feb 2015 09:56:20 +0100
+Subject: [PATCH RFC v9 01/20] clk: divider: Correct parent clk round rate
+ if no bestdiv is normally found
+In-Reply-To: <20150212122405.GW12209@pengutronix.de>
+References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
+ <1423720903-24806-2-git-send-email-Ying.Liu@freescale.com>
+ <20150212093356.GR12209@pengutronix.de>
+ <20150212103944.GA1290@victor>
+ <20150212122405.GW12209@pengutronix.de>
+Message-ID: <20150221085620.GV19388@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/14/2015 6:22 AM, Catalin Marinas wrote:
-> 1. user populates sival_int compat_sigevent and invokes
->     compat_sys_mq_notify()
-> 2. kernel get_compat_sigevent() copies compat_sigevent into the native
->     sigevent. compat and native sival_int are the same, no problem so
->     far. The other half of 64-bit sival_ptr is zeroed by a memset in this
->     function (this other half can be top or bottom, depending on
->     endianness)
-> 3. signal is about to be delivered to user via arch code. The
->     compat_ptr(from->si_ptr) conversion always takes the least
->     significant part of the native si_ptr. On big endian 64-bit, this is
->     zero because get_compat_sigevent() populated the top part of si_ptr
->     with si_int.
+Hello,
 
-Thanks, that makes sense.  I was missing the fact that the conversion
-issue was actually around the in-kernel 64-bit version of the structure.
-Using si_int consistently does seem like it should do the right thing;
-I'll post a patch for tilegx32 big-endian to do the right thing here.
+On Thu, Feb 12, 2015 at 01:24:05PM +0100, Sascha Hauer wrote:
+> On Thu, Feb 12, 2015 at 06:39:45PM +0800, Liu Ying wrote:
+> > On Thu, Feb 12, 2015 at 10:33:56AM +0100, Sascha Hauer wrote:
+> > > On Thu, Feb 12, 2015 at 02:01:24PM +0800, Liu Ying wrote:
+> > > > If no best divider is normally found, we will try to use the maximum divider.
+> > > > We should not set the parent clock rate to be 1Hz by force for being rounded.
+> > > > Instead, we should take the maximum divider as a base and calculate a correct
+> > > > parent clock rate for being rounded.
+> > > 
+> > > Please add an explanation why you think the current code is wrong and
+> > > what this actually fixes, maybe an example?
+> > 
+> > The MIPI DSI panel's pixel clock rate is 26.4MHz and it's derived from PLL5 on
+> > the MX6DL SabreSD board.
+> > 
+> > These are the clock tree summaries with or without the patch applied:
+> > 1) With the patch applied:
+> > pll5_bypass_src                       1            1    24000000          0 0
+> >    pll5                               1            1   844800048          0 0
+> >       pll5_bypass                     1            1   844800048          0 0
+> >          pll5_video                   1            1   844800048          0 0
+> >             pll5_post_div             1            1   211200012          0 0
+> >                pll5_video_div           1            1   211200012        0 0
+> >                   ipu1_di0_pre_sel           1            1   211200012   0 0
+> >                      ipu1_di0_pre           1            1    26400002    0 0
+> >                         ipu1_di0_sel           1            1    26400002 0 0
+> >                            ipu1_di0           1            1    26400002  0 0
+> > 
+> > 2) Without the patch applied:
+> > pll5_bypass_src                       1            1    24000000          0 0
+> >    pll5                               1            1   648000000          0 0
+> >       pll5_bypass                     1            1   648000000          0 0
+> >          pll5_video                   1            1   648000000          0 0
+> >             pll5_post_div             1            1   162000000          0 0
+> >                pll5_video_div           1            1    40500000        0 0
+> >                   ipu1_di0_pre_sel           1            1    40500000   0 0
+> >                      ipu1_di0_pre           1            1    20250000    0 0
+> >                         ipu1_di0_sel           1            1    20250000 0 0
+> >                            ipu1_di0           1            1    20250000  0 0
+> 
+> This seems to be broken since:
+> 
+> | commit b11d282dbea27db1788893115dfca8a7856bf205
+> | Author: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> | Date:   Thu Feb 13 12:03:59 2014 +0200
+> | 
+> |     clk: divider: fix rate calculation for fractional rates
+> 
+> This patch fixed a case when clk_set_rate(clk_round_rate(rate)) resulted
+> in a lower frequency than clk_round_rate(rate) returned.
+> 
+> Since then the MULT_ROUND_UP in clk_divider_bestdiv() is inconsistent to
+> the rest of the divider. Maybe this should be a simple rate * i now, but
+> I'm unsure what side effects this has.
+I think this is the right fix that I found, too, while fixing all
+problems that your test code with the three dividers shows (at least the
+subset of all problem I was able to identify).
+
+> I think your patch only fixes the behaviour in your case by accident,
+> it's not a correct fix for this issue.
+Right.
+
+I will follow up with a patch (and two more that fix different things).
+
+Best regards
+Uwe
 
 -- 
-Chris Metcalf, EZChip Semiconductor
-http://www.ezchip.com
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
