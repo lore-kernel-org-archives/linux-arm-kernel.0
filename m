@@ -1,421 +1,168 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 21 Feb 2015 14:19:17 -0200
-Subject: [PATCH 1/2] ARM: dts: imx6: factor out pinmux for edm1 module
-In-Reply-To: <20150220185351.GN15673@pengutronix.de>
-References: <1424457195-8796-1-git-send-email-m.grzeschik@pengutronix.de>
- <20150220185351.GN15673@pengutronix.de>
-Message-ID: <CAOMZO5BayhgpffnJp-XDf+r1Od+PDT7_dAoc_0wmtLM9u5b=TA@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Sat, 21 Feb 2015 10:21:02 -0600
+Subject: [PATCH v4 4/4] phy: add phy-hi6220-usb
+In-Reply-To: <54E89E29.4010807@linaro.org>
+References: <1423726646-30336-1-git-send-email-zhangfei.gao@linaro.org>
+ <1423726646-30336-5-git-send-email-zhangfei.gao@linaro.org>
+ <20150220144119.GB1707@saruman.tx.rr.com>
+ <54E75665.6050205@linaro.org>
+ <20150220160610.GB6430@saruman.tx.rr.com>
+ <54E89E29.4010807@linaro.org>
+Message-ID: <20150221162102.GA1784@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+Hi,
 
-On Fri, Feb 20, 2015 at 4:53 PM, Robert Schwebel
-<r.schwebel@pengutronix.de> wrote:
-> Adding Fabio to Cc, who brought Wandboard into the kernel. Could you
-> give Michael's patch a try? We don't have a Wandboard here for testing,
-> so this should get a Tested-By from you (or somebody else with hardware)
-> before applying.
+On Sat, Feb 21, 2015 at 11:03:05PM +0800, zhangfei wrote:
+> >>>>+static void hi6220_start_peripheral(struct hi6220_priv *priv, bool on)
+> >>>>+{
+> >>>>+	struct usb_otg *otg = priv->phy.otg;
+> >>>>+
+> >>>>+	if (!otg->gadget)
+> >>>>+		return;
+> >>>>+
+> >>>>+	if (on)
+> >>>>+		usb_gadget_connect(otg->gadget);
+> >>>>+	else
+> >>>>+		usb_gadget_disconnect(otg->gadget);
+> >>>
+> >>>why is the PHY fiddling with pullups ?
+> >>
+> >>We use this to enable/disable otg gadget mode.
+> >
+> >I got that, but the pullups don't belong to the PHY, they belong to the
+> >gadget.
+> >
+> >>The gpio_id & gpio_vbus are used to distinguish otg gadget mode or
+> >>host mode.
+> >>When micro usb or otg device attached to otg, gpio_vbus falling down.
+> >>And gpio_id = 1 is micro usb, gpio_id = 0 is otg device.
+> >
+> >all of that I understood clearly :-)
+> >
+> >>So when micro usb attached, we enable gadget mode; while micro usb
+> >>detached, we disable gadget mode, and dwc2 will automatically set to
+> >>host mode.
+> >
+> >that's all fine, I'm concerned about letting the PHY fiddle with
+> >something it doesn't own. If I am to change pullups rules in udc-core,
+> >this is likely to break down miserably and I don't want to have to go
+> >through that.
+> 
+> Thanks for the clarifying.
 
-I don't have access to my Wandboard currently, but I am adding Alfonso
-and John in case they could test this patch.
+no problem.
 
-Regards,
+> How about using usb_gadget_vbus_connect/disconnect, which are used in many
+> files under drivers/usb/phy.
+> There is no vbus_session in dwc2/gadget.c, I thought it would be same as
+> pullup.
+> 
+> However, usb_gadget_vbus_connect still need para gadget, where should we put
+> this file, drivers/usb/phy or drivers/phy
 
-Fabio Estevam
+drivers/phy, if the framework misses anything you need, it's a great
+opportunity to give back to the community by extending the framework.
 
-> rsc
->
-> On Fri, Feb 20, 2015 at 07:33:14PM +0100, Michael Grzeschik wrote:
->> Thw Wandboard is using the EDM1-CF-IMX6 module which is
->> defined under the edm standard.
->>
->> http://www.edm-standard.org/
->>
->> As this module is used on more boards this patch moves the default
->> pinmux settings into the special file imx6qdl-edm1.dtsi.
->>
->> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
->> ---
->>  arch/arm/boot/dts/imx6qdl-edm1.dtsi      | 231 +++++++++++++++++++++++++++++++
->>  arch/arm/boot/dts/imx6qdl-wandboard.dtsi |  99 +------------
->>  2 files changed, 233 insertions(+), 97 deletions(-)
->>  create mode 100644 arch/arm/boot/dts/imx6qdl-edm1.dtsi
->>
->> diff --git a/arch/arm/boot/dts/imx6qdl-edm1.dtsi b/arch/arm/boot/dts/imx6qdl-edm1.dtsi
->> new file mode 100644
->> index 0000000..b42605b
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/imx6qdl-edm1.dtsi
->> @@ -0,0 +1,231 @@
->> +&iomuxc {
->> +     pinctrl-names = "default";
->> +
->> +     imx6qdl-edm1 {
->> +
->> +             pinctrl_audmux: audmuxgrp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_CSI0_DAT7__AUD3_RXD          0x130b0
->> +                             MX6QDL_PAD_CSI0_DAT4__AUD3_TXC          0x130b0
->> +                             MX6QDL_PAD_CSI0_DAT5__AUD3_TXD          0x110b0
->> +                             MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS         0x130b0
->> +                             MX6QDL_PAD_GPIO_0__CCM_CLKO1            0x130b0
->> +                     >;
->> +             };
->> +
->> +             pinctrl_enet: enetgrp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_ENET_MDIO__ENET_MDIO         0x1b0b0
->> +                             MX6QDL_PAD_ENET_MDC__ENET_MDC           0x1b0b0
->> +                             MX6QDL_PAD_RGMII_TXC__RGMII_TXC         0x1b0b0
->> +                             MX6QDL_PAD_RGMII_TD0__RGMII_TD0         0x1b0b0
->> +                             MX6QDL_PAD_RGMII_TD1__RGMII_TD1         0x1b0b0
->> +                             MX6QDL_PAD_RGMII_TD2__RGMII_TD2         0x1b0b0
->> +                             MX6QDL_PAD_RGMII_TD3__RGMII_TD3         0x1b0b0
->> +                             MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL   0x1b0b0
->> +                             MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK    0x1b0b0
->> +                             MX6QDL_PAD_RGMII_RXC__RGMII_RXC         0x1b0b0
->> +                             MX6QDL_PAD_RGMII_RD0__RGMII_RD0         0x1b0b0
->> +                             MX6QDL_PAD_RGMII_RD1__RGMII_RD1         0x1b0b0
->> +                             MX6QDL_PAD_RGMII_RD2__RGMII_RD2         0x1b0b0
->> +                             MX6QDL_PAD_RGMII_RD3__RGMII_RD3         0x1b0b0
->> +                             MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL   0x1b0b0
->> +                             MX6QDL_PAD_GPIO_16__ENET_REF_CLK        0x4001b0a8
->> +                             MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28       0x180b0
->> +                             MX6QDL_PAD_EIM_D29__GPIO3_IO29          0x000b1
->> +                             MX6QDL_PAD_GPIO_6__ENET_IRQ             0x000b1
->> +                     >;
->> +             };
->> +
->> +             pinctrl_i2c1: i2c1grp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_EIM_D21__I2C1_SCL            0x4001b8b1
->> +                             MX6QDL_PAD_EIM_D28__I2C1_SDA            0x4001b8b1
->> +                     >;
->> +             };
->> +
->> +
->> +             pinctrl_i2c2: i2c2grp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_KEY_COL3__I2C2_SCL           0x4001b8b1
->> +                             MX6QDL_PAD_KEY_ROW3__I2C2_SDA           0x4001b8b1
->> +                     >;
->> +             };
->> +
->> +
->> +             pinctrl_i2c3: i2c3grp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_GPIO_3__I2C3_SCL             0x4001b8b1
->> +                             MX6QDL_PAD_GPIO_16__I2C3_SDA            0x4001b8b1
->> +                     >;
->> +             };
->> +
->> +             pinctrl_spdif: spdifgrp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_ENET_RXD0__SPDIF_OUT         0x1b0b0
->> +                     >;
->> +             };
->> +
->> +             pinctrl_uart1: uart1grp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA    0x1b0b1
->> +                             MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA    0x1b0b1
->> +                     >;
->> +             };
->> +
->> +             pinctrl_uart1_rtscts: uart1_rtsctsgrp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_EIM_D19__UART1_CTS_B         0x1b0b1
->> +                             MX6QDL_PAD_EIM_D20__UART1_RTS_B         0x1b0b1
->> +                     >;
->> +             };
->> +
->> +             pinctrl_uart2: uart2grp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA      0x1b0b1
->> +                             MX6QDL_PAD_SD4_DAT4__UART2_RX_DATA      0x1b0b1
->> +                     >;
->> +             };
->> +
->> +
->> +             pinctrl_uart2_rtscts: uart2_rtsctsgrp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_SD4_DAT5__UART2_RTS_B        0x1b0b1
->> +                             MX6QDL_PAD_SD4_DAT6__UART2_CTS_B        0x1b0b1
->> +                     >;
->> +             };
->> +
->> +             pinctrl_usbotg: usbotggrp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_GPIO_9__GPIO1_IO09           0x17059
->> +                             MX6QDL_PAD_GPIO_1__USB_OTG_ID           0x17059
->> +                             MX6QDL_PAD_EIM_D22__GPIO3_IO22          0x000b0
->> +                     >;
->> +             };
->> +
->> +             pinctrl_usbh1: usbh1grp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_GPIO_17__GPIO7_IO12          0x17059
->> +                             MX6QDL_PAD_EIM_D30__GPIO3_IO30          0x1b0b0
->> +                     >;
->> +             };
->> +
->> +             pinctrl_usdhc1: usdhc1grp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_SD1_CMD__SD1_CMD             0x17059
->> +                             MX6QDL_PAD_SD1_CLK__SD1_CLK             0x10059
->> +                             MX6QDL_PAD_SD1_DAT0__SD1_DATA0          0x17059
->> +                             MX6QDL_PAD_SD1_DAT1__SD1_DATA1          0x17059
->> +                             MX6QDL_PAD_SD1_DAT2__SD1_DATA2          0x17059
->> +                             MX6QDL_PAD_SD1_DAT3__SD1_DATA3          0x17059
->> +                             MX6QDL_PAD_GPIO_2__GPIO1_IO02           0x80000000
->> +                     >;
->> +             };
->> +
->> +             pinctrl_usdhc2: usdhc2grp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_SD2_CMD__SD2_CMD             0x17059
->> +                             MX6QDL_PAD_SD2_CLK__SD2_CLK             0x10059
->> +                             MX6QDL_PAD_SD2_DAT0__SD2_DATA0          0x17059
->> +                             MX6QDL_PAD_SD2_DAT1__SD2_DATA1          0x17059
->> +                             MX6QDL_PAD_SD2_DAT2__SD2_DATA2          0x17059
->> +                             MX6QDL_PAD_SD2_DAT3__SD2_DATA3          0x17059
->> +                     >;
->> +             };
->> +
->> +             pinctrl_usdhc3: usdhc3grp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_SD3_CMD__SD3_CMD             0x17059
->> +                             MX6QDL_PAD_SD3_CLK__SD3_CLK             0x10059
->> +                             MX6QDL_PAD_SD3_DAT0__SD3_DATA0          0x17059
->> +                             MX6QDL_PAD_SD3_DAT1__SD3_DATA1          0x17059
->> +                             MX6QDL_PAD_SD3_DAT2__SD3_DATA2          0x17059
->> +                             MX6QDL_PAD_SD3_DAT3__SD3_DATA3          0x17059
->> +                             MX6QDL_PAD_SD3_DAT4__SD3_DATA4          0x17059
->> +                             MX6QDL_PAD_SD3_DAT5__SD3_DATA5          0x17059
->> +                             MX6QDL_PAD_SD3_DAT6__SD3_DATA6          0x17059
->> +                             MX6QDL_PAD_SD3_DAT7__SD3_DATA7          0x17059
->> +                             MX6QDL_PAD_EIM_DA9__GPIO3_IO09          0x80000000
->> +                     >;
->> +             };
->> +
->> +             pinctrl_gpmi_nand: gpminandgrp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_NANDF_CLE__NAND_CLE          0x0b0b1
->> +                             MX6QDL_PAD_NANDF_ALE__NAND_ALE          0x0b0b1
->> +                             MX6QDL_PAD_NANDF_WP_B__NAND_WP_B        0x0b0b1
->> +                             MX6QDL_PAD_NANDF_RB0__NAND_READY_B      0x0b000
->> +                             MX6QDL_PAD_NANDF_CS0__NAND_CE0_B        0x0b0b1
->> +                             MX6QDL_PAD_SD4_CMD__NAND_RE_B           0x0b0b1
->> +                             MX6QDL_PAD_SD4_CLK__NAND_WE_B           0x0b0b1
->> +                             MX6QDL_PAD_NANDF_D0__NAND_DATA00        0x0b0b1
->> +                             MX6QDL_PAD_NANDF_D1__NAND_DATA01        0x0b0b1
->> +                             MX6QDL_PAD_NANDF_D2__NAND_DATA02        0x0b0b1
->> +                             MX6QDL_PAD_NANDF_D3__NAND_DATA03        0x0b0b1
->> +                             MX6QDL_PAD_NANDF_D4__NAND_DATA04        0x0b0b1
->> +                             MX6QDL_PAD_NANDF_D5__NAND_DATA05        0x0b0b1
->> +                             MX6QDL_PAD_NANDF_D6__NAND_DATA06        0x0b0b1
->> +                             MX6QDL_PAD_NANDF_D7__NAND_DATA07        0x0b0b1
->> +                     >;
->> +             };
->> +
->> +             pinctrl_pwm3: pwm3grp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_SD4_DAT1__PWM3_OUT           0x80000000
->> +                     >;
->> +             };
->> +
->> +             pinctrl_disp0_1: disp0grp-1 {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK      0x10
->> +                             MX6QDL_PAD_DI0_PIN15__IPU1_DI0_PIN15            0x10
->> +                             MX6QDL_PAD_DI0_PIN2__IPU1_DI0_PIN02             0x10
->> +                             MX6QDL_PAD_DI0_PIN3__IPU1_DI0_PIN03             0x10
->> +                             MX6QDL_PAD_DI0_PIN4__IPU1_DI0_PIN04             0x10
->> +                             MX6QDL_PAD_DISP0_DAT0__IPU1_DISP0_DATA00        0x10
->> +                             MX6QDL_PAD_DISP0_DAT1__IPU1_DISP0_DATA01        0x10
->> +                             MX6QDL_PAD_DISP0_DAT2__IPU1_DISP0_DATA02        0x10
->> +                             MX6QDL_PAD_DISP0_DAT3__IPU1_DISP0_DATA03        0x10
->> +                             MX6QDL_PAD_DISP0_DAT4__IPU1_DISP0_DATA04        0x10
->> +                             MX6QDL_PAD_DISP0_DAT5__IPU1_DISP0_DATA05        0x10
->> +                             MX6QDL_PAD_DISP0_DAT6__IPU1_DISP0_DATA06        0x10
->> +                             MX6QDL_PAD_DISP0_DAT7__IPU1_DISP0_DATA07        0x10
->> +                             MX6QDL_PAD_DISP0_DAT8__IPU1_DISP0_DATA08        0x10
->> +                             MX6QDL_PAD_DISP0_DAT9__IPU1_DISP0_DATA09        0x10
->> +                             MX6QDL_PAD_DISP0_DAT10__IPU1_DISP0_DATA10       0x10
->> +                             MX6QDL_PAD_DISP0_DAT11__IPU1_DISP0_DATA11       0x10
->> +                             MX6QDL_PAD_DISP0_DAT12__IPU1_DISP0_DATA12       0x10
->> +                             MX6QDL_PAD_DISP0_DAT13__IPU1_DISP0_DATA13       0x10
->> +                             MX6QDL_PAD_DISP0_DAT14__IPU1_DISP0_DATA14       0x10
->> +                             MX6QDL_PAD_DISP0_DAT15__IPU1_DISP0_DATA15       0x10
->> +                             MX6QDL_PAD_DISP0_DAT16__IPU1_DISP0_DATA16       0x10
->> +                             MX6QDL_PAD_DISP0_DAT17__IPU1_DISP0_DATA17       0x10
->> +                             MX6QDL_PAD_DISP0_DAT18__IPU1_DISP0_DATA18       0x10
->> +                             MX6QDL_PAD_DISP0_DAT19__IPU1_DISP0_DATA19       0x10
->> +                             MX6QDL_PAD_DISP0_DAT20__IPU1_DISP0_DATA20       0x10
->> +                             MX6QDL_PAD_DISP0_DAT21__IPU1_DISP0_DATA21       0x10
->> +                             MX6QDL_PAD_DISP0_DAT22__IPU1_DISP0_DATA22       0x10
->> +                             MX6QDL_PAD_DISP0_DAT23__IPU1_DISP0_DATA23       0x10
->> +                             MX6QDL_PAD_SD4_DAT2__GPIO2_IO10                 0x10
->> +                             MX6QDL_PAD_SD4_DAT3__GPIO2_IO11                 0x10
->> +                     >;
->> +             };
->> +
->> +             pinctrl_flexcan1: flexcan1grp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_GPIO_18__GPIO7_IO13          0x1b0b0
->> +                             MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX        0x1b0b0
->> +                             MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX        0x1b0b0
->> +                     >;
->> +             };
->> +
->> +             pinctrl_flexcan2: flexcan2grp {
->> +                     fsl,pins = <
->> +                             MX6QDL_PAD_GPIO_7__GPIO1_IO07           0x1b0b0
->> +                             MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX        0x1b0b0
->> +                             MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX        0x1b0b0
->> +                     >;
->> +             };
->> +     };
->> +};
->> +
->> diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
->> index 5fb0916..4cc9251 100644
->> --- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
->> +++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
->> @@ -9,6 +9,8 @@
->>   *
->>   */
->>
->> +#include "imx6qdl-edm1.dtsi"
->> +
->>  / {
->>       regulators {
->>               compatible = "simple-bus";
->> @@ -94,64 +96,6 @@
->>
->>       imx6qdl-wandboard {
->>
->> -             pinctrl_audmux: audmuxgrp {
->> -                     fsl,pins = <
->> -                             MX6QDL_PAD_CSI0_DAT7__AUD3_RXD          0x130b0
->> -                             MX6QDL_PAD_CSI0_DAT4__AUD3_TXC          0x130b0
->> -                             MX6QDL_PAD_CSI0_DAT5__AUD3_TXD          0x110b0
->> -                             MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS         0x130b0
->> -                     >;
->> -             };
->> -
->> -             pinctrl_enet: enetgrp {
->> -                     fsl,pins = <
->> -                             MX6QDL_PAD_ENET_MDIO__ENET_MDIO         0x1b0b0
->> -                             MX6QDL_PAD_ENET_MDC__ENET_MDC           0x1b0b0
->> -                             MX6QDL_PAD_RGMII_TXC__RGMII_TXC         0x1b0b0
->> -                             MX6QDL_PAD_RGMII_TD0__RGMII_TD0         0x1b0b0
->> -                             MX6QDL_PAD_RGMII_TD1__RGMII_TD1         0x1b0b0
->> -                             MX6QDL_PAD_RGMII_TD2__RGMII_TD2         0x1b0b0
->> -                             MX6QDL_PAD_RGMII_TD3__RGMII_TD3         0x1b0b0
->> -                             MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL   0x1b0b0
->> -                             MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK    0x1b0b0
->> -                             MX6QDL_PAD_RGMII_RXC__RGMII_RXC         0x1b0b0
->> -                             MX6QDL_PAD_RGMII_RD0__RGMII_RD0         0x1b0b0
->> -                             MX6QDL_PAD_RGMII_RD1__RGMII_RD1         0x1b0b0
->> -                             MX6QDL_PAD_RGMII_RD2__RGMII_RD2         0x1b0b0
->> -                             MX6QDL_PAD_RGMII_RD3__RGMII_RD3         0x1b0b0
->> -                             MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL   0x1b0b0
->> -                             MX6QDL_PAD_GPIO_16__ENET_REF_CLK        0x4001b0a8
->> -                             MX6QDL_PAD_GPIO_6__ENET_IRQ             0x000b1
->> -                     >;
->> -             };
->> -
->> -             pinctrl_i2c1: i2c1grp {
->> -                     fsl,pins = <
->> -                             MX6QDL_PAD_EIM_D21__I2C1_SCL            0x4001b8b1
->> -                             MX6QDL_PAD_EIM_D28__I2C1_SDA            0x4001b8b1
->> -                     >;
->> -             };
->> -
->> -             pinctrl_i2c2: i2c2grp {
->> -                     fsl,pins = <
->> -                             MX6QDL_PAD_KEY_COL3__I2C2_SCL           0x4001b8b1
->> -                             MX6QDL_PAD_KEY_ROW3__I2C2_SDA           0x4001b8b1
->> -                     >;
->> -             };
->> -
->> -             pinctrl_spdif: spdifgrp {
->> -                     fsl,pins = <
->> -                             MX6QDL_PAD_ENET_RXD0__SPDIF_OUT         0x1b0b0
->> -                     >;
->> -             };
->> -
->> -             pinctrl_uart1: uart1grp {
->> -                     fsl,pins = <
->> -                             MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA    0x1b0b1
->> -                             MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA    0x1b0b1
->> -                     >;
->> -             };
->> -
->>               pinctrl_uart3: uart3grp {
->>                       fsl,pins = <
->>                               MX6QDL_PAD_EIM_D24__UART3_TX_DATA       0x1b0b1
->> @@ -160,45 +104,6 @@
->>                               MX6QDL_PAD_EIM_EB3__UART3_RTS_B         0x1b0b1
->>                       >;
->>               };
->> -
->> -             pinctrl_usbotg: usbotggrp {
->> -                     fsl,pins = <
->> -                             MX6QDL_PAD_GPIO_1__USB_OTG_ID           0x17059
->> -                     >;
->> -             };
->> -
->> -             pinctrl_usdhc1: usdhc1grp {
->> -                     fsl,pins = <
->> -                             MX6QDL_PAD_SD1_CMD__SD1_CMD             0x17059
->> -                             MX6QDL_PAD_SD1_CLK__SD1_CLK             0x10059
->> -                             MX6QDL_PAD_SD1_DAT0__SD1_DATA0          0x17059
->> -                             MX6QDL_PAD_SD1_DAT1__SD1_DATA1          0x17059
->> -                             MX6QDL_PAD_SD1_DAT2__SD1_DATA2          0x17059
->> -                             MX6QDL_PAD_SD1_DAT3__SD1_DATA3          0x17059
->> -                     >;
->> -             };
->> -
->> -             pinctrl_usdhc2: usdhc2grp {
->> -                     fsl,pins = <
->> -                             MX6QDL_PAD_SD2_CMD__SD2_CMD             0x17059
->> -                             MX6QDL_PAD_SD2_CLK__SD2_CLK             0x10059
->> -                             MX6QDL_PAD_SD2_DAT0__SD2_DATA0          0x17059
->> -                             MX6QDL_PAD_SD2_DAT1__SD2_DATA1          0x17059
->> -                             MX6QDL_PAD_SD2_DAT2__SD2_DATA2          0x17059
->> -                             MX6QDL_PAD_SD2_DAT3__SD2_DATA3          0x17059
->> -                     >;
->> -             };
->> -
->> -             pinctrl_usdhc3: usdhc3grp {
->> -                     fsl,pins = <
->> -                             MX6QDL_PAD_SD3_CMD__SD3_CMD             0x17059
->> -                             MX6QDL_PAD_SD3_CLK__SD3_CLK             0x10059
->> -                             MX6QDL_PAD_SD3_DAT0__SD3_DATA0          0x17059
->> -                             MX6QDL_PAD_SD3_DAT1__SD3_DATA1          0x17059
->> -                             MX6QDL_PAD_SD3_DAT2__SD3_DATA2          0x17059
->> -                             MX6QDL_PAD_SD3_DAT3__SD3_DATA3          0x17059
->> -                     >;
->> -             };
->>       };
->>  };
->>
->> --
->> 2.1.4
->>
->>
->>
->
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Scratching one's own itch kinda thing...
+
+> >>>>+static void hi6220_detect_work(struct work_struct *work)
+> >>>>+{
+> >>>>+	struct hi6220_priv *priv =
+> >>>>+		container_of(work, struct hi6220_priv, work.work);
+> >>>>+	int gpio_id, gpio_vbus;
+> >>>>+	enum usb_otg_state state;
+> >>>>+
+> >>>>+	if (!gpio_is_valid(priv->gpio_id) || !gpio_is_valid(priv->gpio_vbus))
+> >>>>+		return;
+> >>>>+
+> >>>>+	gpio_id = gpio_get_value_cansleep(priv->gpio_id);
+> >>>>+	gpio_vbus = gpio_get_value_cansleep(priv->gpio_vbus);
+> >>>
+> >>>looks like this should be using extcon
+> >>Not used extcon before.
+> >>However, we need gpio_vbus interrupt.
+> >>Checked phy-tahvo.c and phy-omap-otg.c, not find extcon related with
+> >>interrupt.
+> >>Will investigate tomorrow.
+> >
+> >drivers/extcon/extcon-gpio.c
+> I think there is no need to use extcon, gpio is clear enough.
+> extcon-gpio.c even do not support dt.
+
+well, add DT. The whole idea of free software is that we improve on
+things we already have. EXTCON is *the* API to handle such things.
+
+Quite frankly, though, Roger Quadros (now in Cc) has been working to get
+DT support on extcon-gpio, so perhaps wait for that and base your
+patches on top of his.
+
+Now your statement that GPIO is clear enough is completely bogus to me.
+
+Why do we have fixed regulators with GPIO enable signals, right ? Might
+as well just fiddle with the GPIO directly, right ? Wrong, the idea of
+using these frameworks is to encapsulate implementation details and make
+sure that if things change from one board to another, we can still use
+our SW without major modifications.
+
+> >>>>+	if (gpio_vbus == 0) {
+> >>>>+		if (gpio_id == 1)
+> >>>>+			state = OTG_STATE_B_PERIPHERAL;
+> >>>>+		else
+> >>>>+			state = OTG_STATE_A_HOST;
+> >>>>+	} else {
+> >>>>+		state = OTG_STATE_A_HOST;
+> >>>>+	}
+> >>>>+
+> >>>>+	if (priv->state != state) {
+> >>>>+		hi6220_start_peripheral(priv, state == OTG_STATE_B_PERIPHERAL);
+> >>>>+		priv->state = state;
+> >>>>+	}
+> >>>>+}
+> >>>>+
+> >>>>+static irqreturn_t hiusb_gpio_intr(int irq, void *data)
+> >>>>+{
+> >>>>+	struct hi6220_priv *priv = (struct hi6220_priv *)data;
+> >>>>+
+> >>>>+	/* add debounce time */
+> >>>>+	schedule_delayed_work(&priv->work, msecs_to_jiffies(100));
+> >>>
+> >>>this is really bad. We have threaded interrupt support, right ?
+> >>
+> >>Since we use two gpio to distinguish gadget mode or host mode.
+> >>Debounce time can introduce more accuracy.
+> >
+> >gpio_set_debounce() ?
+> Not all gpio.c support set_debounce, including gpio-pl061.c.
+
+then the framework should implement it in SW. That was the whole idea of
+adding set_debounce() to gpiolib. If the controller can't handle it,
+gpiolib handles it in SW. Again, encapsulating details.
+
+> >>I think threaded interrupt can not be used for adding debounce time.
+> >>Here add debounce is just for safety.
+> >
+> >add the debounce to the gpio itself.
+> 
+> Here the debounce added only for safety.
+> gpio_id may mis-report when unplug usb, but it is correct for plug usb & otg
+> device.
+> So debounce can be omitted.
+> If you think using delayed work for debounce is ugly, it is fine switch to
+> threaded_irq.
+
+debounce might be very well needed. We *do* want to filter out the
+transient period. I'm just telling you there are better ways of doing
+so; and your response to that is "let's just remove it" and I'm not
+really comfortable with that attitude.
+
+That's the attitude of a lazy person which, I hope, you are not ;)
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150221/9223c82f/attachment.sig>
