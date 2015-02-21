@@ -1,82 +1,20 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 21 Feb 2015 09:56:20 +0100
-Subject: [PATCH RFC v9 01/20] clk: divider: Correct parent clk round rate
- if no bestdiv is normally found
-In-Reply-To: <20150212122405.GW12209@pengutronix.de>
-References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
- <1423720903-24806-2-git-send-email-Ying.Liu@freescale.com>
- <20150212093356.GR12209@pengutronix.de>
- <20150212103944.GA1290@victor>
- <20150212122405.GW12209@pengutronix.de>
-Message-ID: <20150221085620.GV19388@pengutronix.de>
+Date: Sat, 21 Feb 2015 09:58:57 +0100
+Subject: [PATCH 1/7] serial: imx: drop members from driver data that are
+ only used during probe
+In-Reply-To: <1424292068-28197-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1424292068-28197-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20150221085857.GW19388@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello Greg,
 
-On Thu, Feb 12, 2015 at 01:24:05PM +0100, Sascha Hauer wrote:
-> On Thu, Feb 12, 2015 at 06:39:45PM +0800, Liu Ying wrote:
-> > On Thu, Feb 12, 2015 at 10:33:56AM +0100, Sascha Hauer wrote:
-> > > On Thu, Feb 12, 2015 at 02:01:24PM +0800, Liu Ying wrote:
-> > > > If no best divider is normally found, we will try to use the maximum divider.
-> > > > We should not set the parent clock rate to be 1Hz by force for being rounded.
-> > > > Instead, we should take the maximum divider as a base and calculate a correct
-> > > > parent clock rate for being rounded.
-> > > 
-> > > Please add an explanation why you think the current code is wrong and
-> > > what this actually fixes, maybe an example?
-> > 
-> > The MIPI DSI panel's pixel clock rate is 26.4MHz and it's derived from PLL5 on
-> > the MX6DL SabreSD board.
-> > 
-> > These are the clock tree summaries with or without the patch applied:
-> > 1) With the patch applied:
-> > pll5_bypass_src                       1            1    24000000          0 0
-> >    pll5                               1            1   844800048          0 0
-> >       pll5_bypass                     1            1   844800048          0 0
-> >          pll5_video                   1            1   844800048          0 0
-> >             pll5_post_div             1            1   211200012          0 0
-> >                pll5_video_div           1            1   211200012        0 0
-> >                   ipu1_di0_pre_sel           1            1   211200012   0 0
-> >                      ipu1_di0_pre           1            1    26400002    0 0
-> >                         ipu1_di0_sel           1            1    26400002 0 0
-> >                            ipu1_di0           1            1    26400002  0 0
-> > 
-> > 2) Without the patch applied:
-> > pll5_bypass_src                       1            1    24000000          0 0
-> >    pll5                               1            1   648000000          0 0
-> >       pll5_bypass                     1            1   648000000          0 0
-> >          pll5_video                   1            1   648000000          0 0
-> >             pll5_post_div             1            1   162000000          0 0
-> >                pll5_video_div           1            1    40500000        0 0
-> >                   ipu1_di0_pre_sel           1            1    40500000   0 0
-> >                      ipu1_di0_pre           1            1    20250000    0 0
-> >                         ipu1_di0_sel           1            1    20250000 0 0
-> >                            ipu1_di0           1            1    20250000  0 0
-> 
-> This seems to be broken since:
-> 
-> | commit b11d282dbea27db1788893115dfca8a7856bf205
-> | Author: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> | Date:   Thu Feb 13 12:03:59 2014 +0200
-> | 
-> |     clk: divider: fix rate calculation for fractional rates
-> 
-> This patch fixed a case when clk_set_rate(clk_round_rate(rate)) resulted
-> in a lower frequency than clk_round_rate(rate) returned.
-> 
-> Since then the MULT_ROUND_UP in clk_divider_bestdiv() is inconsistent to
-> the rest of the divider. Maybe this should be a simple rate * i now, but
-> I'm unsure what side effects this has.
-I think this is the right fix that I found, too, while fixing all
-problems that your test code with the three dividers shows (at least the
-subset of all problem I was able to identify).
-
-> I think your patch only fixes the behaviour in your case by accident,
-> it's not a correct fix for this issue.
-Right.
-
-I will follow up with a patch (and two more that fix different things).
+On Wed, Feb 18, 2015 at 09:41:02PM +0100, Uwe Kleine-K?nig wrote:
+> [... several changes to drivers/tty/serial/imx.c ...]
+I noticed that some changes to this driver were merged after v3.19, some
+of them conflict with my patches. I will rebase and resend once
+v3.20-rc1 (however this will be called) is out.
 
 Best regards
 Uwe
