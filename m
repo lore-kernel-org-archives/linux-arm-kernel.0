@@ -1,105 +1,99 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 21 Feb 2015 16:27:18 -0200
-Subject: [PATCH v2] ARM: dts: imx25-pdk: Add LCD support
-Message-ID: <1424543238-2721-1-git-send-email-festevam@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 21 Feb 2015 22:41:10 +0100
+Subject: [GIT PULL] ARM: SoC fixes for 3.20-rc1
+Message-ID: <51637341.9W2BTyGyEA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+The following changes since commit cc4f9c2a91b7be7b3590bb1cbe8148873556aa3f:
 
-Add support for the CLAA057VC01CW display.
+  Merge tag '64bit-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2015-02-17 09:47:46 -0800)
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Remove extra blan lines
-- Keep the nodes sorted
+are available in the git repository at:
 
- arch/arm/boot/dts/imx25-pdk.dts | 58 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 
-diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
-index 9c21b15..dd45e69 100644
---- a/arch/arm/boot/dts/imx25-pdk.dts
-+++ b/arch/arm/boot/dts/imx25-pdk.dts
-@@ -75,6 +75,27 @@
- 		mux-int-port = <1>;
- 		mux-ext-port = <4>;
- 	};
-+
-+	wvga: display {
-+		model = "CLAA057VC01CW";
-+		bits-per-pixel = <16>;
-+		fsl,pcr = <0xfa208b80>;
-+		bus-width = <18>;
-+		native-mode = <&wvga_timings>;
-+		display-timings {
-+			wvga_timings: 640x480 {
-+				hactive = <640>;
-+				vactive = <480>;
-+				hback-porch = <45>;
-+				hfront-porch = <114>;
-+				hsync-len = <1>;
-+				vback-porch = <33>;
-+				vfront-porch = <11>;
-+				vsync-len = <1>;
-+				clock-frequency = <25200000>;
-+			};
-+		};
-+	};
- };
- 
- &audmux {
-@@ -190,6 +211,33 @@
- 			>;
- 		};
- 
-+		pinctrl_lcd: lcdgrp {
-+			fsl,pins = <
-+				MX25_PAD_LD0__LD0		0xe0
-+				MX25_PAD_LD1__LD1		0xe0
-+				MX25_PAD_LD2__LD2		0xe0
-+				MX25_PAD_LD3__LD3		0xe0
-+				MX25_PAD_LD4__LD4		0xe0
-+				MX25_PAD_LD5__LD5		0xe0
-+				MX25_PAD_LD6__LD6		0xe0
-+				MX25_PAD_LD7__LD7		0xe0
-+				MX25_PAD_LD8__LD8		0xe0
-+				MX25_PAD_LD9__LD9		0xe0
-+				MX25_PAD_LD10__LD10		0xe0
-+				MX25_PAD_LD11__LD11		0xe0
-+				MX25_PAD_LD12__LD12		0xe0
-+				MX25_PAD_LD13__LD13		0xe0
-+				MX25_PAD_LD14__LD14		0xe0
-+				MX25_PAD_LD15__LD15		0xe0
-+				MX25_PAD_GPIO_E__LD16		0xe0
-+				MX25_PAD_GPIO_F__LD17		0xe0
-+				MX25_PAD_HSYNC__HSYNC		0xe0
-+				MX25_PAD_VSYNC__VSYNC		0xe0
-+				MX25_PAD_LSCLK__LSCLK		0xe0
-+				MX25_PAD_OE_ACD__OE_ACD		0xe0
-+				MX25_PAD_CONTRAST__CONTRAST	0xe0
-+			>;
-+		};
- 
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
-@@ -202,6 +250,16 @@
- 	};
- };
- 
-+&lcdc {
-+	display = <&wvga>;
-+	fsl,lpccr = <0x00a903ff>;
-+	fsl,lscr1 = <0x00120300>;
-+	fsl,dmacr = <0x00020010>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_lcd>;
-+	status = "okay";
-+};
-+
- &nfc {
- 	nand-on-flash-bbt;
- 	status = "okay";
--- 
-1.9.1
+for you to fetch changes up to 444d2d33d8564f95df851ddaca80f640ca36934d:
+
+  ARM: make of_device_ids const (2015-02-19 09:44:25 +0100)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 3.20-rc1
+
+A few fixes that came in too late to make it into the first set of pull
+requests but would still be nice to have in -rc1. The majority of these
+are trivial build fixes for bugs that I found myself using randconfig
+testing, and a set of two patches from Uwe to mark DT strings as 'const'
+where appropriate, to resolve inconsistent section attributes.
+
+----------------------------------------------------------------
+
+Arnd Bergmann (12):
+      ARM: vexpress: use ARM_CPU_SUSPEND if needed
+      ARM: BCM: put back ARCH_MULTI_V7 dependency for mobile
+      ARM: davinci: davinci_cfg_reg cannot be init
+      ARM: davinci: multi-soc kernels require AUTO_ZRELADDR
+      ARM: at91: fix pm declarations
+      ARM: prima2: do not select SMP_ON_UP
+      ARM: ixp4xx: fix {in,out}s{bwl} data types
+      ARM: rockchip: make rockchip_suspend_init conditional
+      ARM: sti: always enable RESET_CONTROLLER
+      ARM: mvebu: build armada375-smp code conditionally
+      ARM: rockchip: force built-in regulator support for PM
+      Merge tag 'arm-soc/for-3.20/dts' of http://github.com/broadcom/stblinux into fixes
+
+Florian Fainelli (1):
+      ARM: dts: BCM63xx: fix L2 cache properties
+
+Paul Bolle (1):
+      ARM: mm: Remove Kconfig symbol CACHE_PL310
+
+Ray Jui (1):
+      ARM: dts: add I2C device nodes for Broadcom Cygnus
+
+Uwe Kleine-K?nig (2):
+      ARM: make arrays containing machine compatible strings const
+      ARM: make of_device_ids const
+
+ arch/arm/boot/dts/bcm-cygnus.dtsi       | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/bcm63138.dtsi         |  5 +++--
+ arch/arm/kernel/perf_event_cpu.c        |  2 +-
+ arch/arm/mach-at91/Kconfig              |  1 -
+ arch/arm/mach-at91/at91rm9200_time.c    |  2 +-
+ arch/arm/mach-at91/generic.h            |  8 ++++----
+ arch/arm/mach-at91/pm.c                 |  4 ++--
+ arch/arm/mach-axxia/axxia.c             |  2 +-
+ arch/arm/mach-bcm/Kconfig               |  4 ++--
+ arch/arm/mach-bcm/brcmstb.c             |  2 +-
+ arch/arm/mach-davinci/Kconfig           |  2 ++
+ arch/arm/mach-davinci/da8xx-dt.c        |  2 +-
+ arch/arm/mach-davinci/mux.c             |  4 ++--
+ arch/arm/mach-exynos/exynos.c           |  2 +-
+ arch/arm/mach-exynos/suspend.c          |  2 +-
+ arch/arm/mach-highbank/highbank.c       |  2 +-
+ arch/arm/mach-hisi/hisilicon.c          |  8 ++++----
+ arch/arm/mach-imx/mmdc.c                |  2 +-
+ arch/arm/mach-ixp4xx/include/mach/io.h  | 19 +++++++++++++------
+ arch/arm/mach-keystone/keystone.c       |  2 +-
+ arch/arm/mach-keystone/pm_domain.c      |  2 +-
+ arch/arm/mach-mmp/time.c                |  2 +-
+ arch/arm/mach-mvebu/coherency.c         |  2 +-
+ arch/arm/mach-mvebu/pmsu.c              |  2 +-
+ arch/arm/mach-mvebu/system-controller.c |  2 +-
+ arch/arm/mach-nspire/nspire.c           |  2 +-
+ arch/arm/mach-omap2/omap4-common.c      |  2 +-
+ arch/arm/mach-omap2/prm3xxx.c           |  2 +-
+ arch/arm/mach-omap2/prm44xx.c           |  2 +-
+ arch/arm/mach-prima2/Kconfig            |  1 -
+ arch/arm/mach-prima2/common.c           |  6 +++---
+ arch/arm/mach-prima2/platsmp.c          |  2 +-
+ arch/arm/mach-rockchip/Kconfig          |  1 +
+ arch/arm/mach-rockchip/pm.h             |  6 ++++++
+ arch/arm/mach-s5pv210/s5pv210.c         |  2 +-
+ arch/arm/mach-shmobile/setup-emev2.c    |  2 +-
+ arch/arm/mach-sti/Kconfig               |  1 +
+ arch/arm/mach-ux500/pm_domains.c        |  2 +-
+ arch/arm/mach-versatile/versatile_dt.c  |  2 +-
+ arch/arm/mach-vexpress/Kconfig          |  1 +
+ arch/arm/mm/Kconfig                     |  7 -------
+ 41 files changed, 88 insertions(+), 58 deletions(-)
