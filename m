@@ -1,51 +1,18 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 21 Feb 2015 15:56:17 -0600
-Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
-In-Reply-To: <20150219190348.GB24460@cbox>
-References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
- <CAL_JsqJQcuX2cp50oHod-QAbhdMg48TaRP+gLGEO2kbFnQ3B+A@mail.gmail.com>
- <20150219190348.GB24460@cbox>
-Message-ID: <CAL_JsqLcBOC+AnVe7oATjg2g6Fz2vqwacu8QzS4tXMaxxOP_Xg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 22 Feb 2015 01:10:19 +0300
+Subject: [PATCH 0/2] Add R8A7794 GPIO DT support
+Message-ID: <6954455.LyoCrfjM8R@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 19, 2015 at 1:03 PM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Thu, Feb 19, 2015 at 12:23:15PM -0600, Rob Herring wrote:
->> On Tue, Jan 27, 2015 at 1:03 AM, Pranavkumar Sawargaonkar
->> <psawargaonkar@apm.com> wrote:
->> > In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
->> > in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
->> > size due to size alignment checking in vgic driver for VCPU Control and
->> > VCPU register.
->> >
->> > This patch corrects the sizes to be inline with the hardware spec.
->>
->> This does not make sense. The GIC regions are still only 4 or 8KB and
->> the h/w description should reflect that. For implementations using
->> gic-400 and the addressing decode trick, the rest of the register
->> range is also not safe to access given it is multiple mapped. Also,
->> this wastes virtual space, but I guess we don't care on 64-bit.
->>
->> KVM should be fixed to only check base address alignment. Size
->> alignment does not matter (if it does, then you need to fix all
->> register blocks).
->>
-> It matters if you want to ensure that the 64K page you are assigning to
-> a guest for the GIC virtual CPU interface contains only GIC virtual CPU
-> mappings, and not other random stuff that the guest is not allowed to
-> touch.
+Hello.
 
-Good point.
+   Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-20150220-v3.19' tag. Here we add the GPIO device tree support
+for the R8A7794 SoC. It depends on the R8A7794 PFC/MMCIF device tree patches
+posted recently in order to apply.
 
-> How else should this be enforced?
+[1/2] ARM: shmobile: r8a7794: add GPIO clocks
+[2/2] ARM: shmobile: r8a7794: add GPIO DT support
 
-Rely on correct h/w design? You'll have to repeat this every time you
-want to do pass-thru of a device.
-
-What do you do if 64K mapping is not supported? Fallback to emulation
-of the CPU interface?
-
-Are there other DTSs that need to be fixed?
-
-Rob
+WBR, Sergei
