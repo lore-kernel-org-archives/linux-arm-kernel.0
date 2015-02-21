@@ -1,137 +1,172 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Sat, 21 Feb 2015 23:03:05 +0800
-Subject: [PATCH v4 4/4] phy: add phy-hi6220-usb
-In-Reply-To: <20150220160610.GB6430@saruman.tx.rr.com>
-References: <1423726646-30336-1-git-send-email-zhangfei.gao@linaro.org>
- <1423726646-30336-5-git-send-email-zhangfei.gao@linaro.org>
- <20150220144119.GB1707@saruman.tx.rr.com> <54E75665.6050205@linaro.org>
- <20150220160610.GB6430@saruman.tx.rr.com>
-Message-ID: <54E89E29.4010807@linaro.org>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Sat, 21 Feb 2015 16:08:21 +0100
+Subject: [PATCH] ARM: imx/iomux-v3: allow pad_list to be const
+Message-ID: <1424531301-7075-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Balbi
+Also fix all machine files to make use of it and while at it also make
+the pad lists __initconst.
 
-On 02/21/2015 12:06 AM, Felipe Balbi wrote:
-> Hi,
->
-> On Fri, Feb 20, 2015 at 11:44:37PM +0800, zhangfei wrote:
->> Hi, Balbi
->>
->> On 02/20/2015 10:41 PM, Felipe Balbi wrote:
->>
->>>> +static void hi6220_start_peripheral(struct hi6220_priv *priv, bool on)
->>>> +{
->>>> +	struct usb_otg *otg = priv->phy.otg;
->>>> +
->>>> +	if (!otg->gadget)
->>>> +		return;
->>>> +
->>>> +	if (on)
->>>> +		usb_gadget_connect(otg->gadget);
->>>> +	else
->>>> +		usb_gadget_disconnect(otg->gadget);
->>>
->>> why is the PHY fiddling with pullups ?
->>
->> We use this to enable/disable otg gadget mode.
->
-> I got that, but the pullups don't belong to the PHY, they belong to the
-> gadget.
->
->> The gpio_id & gpio_vbus are used to distinguish otg gadget mode or
->> host mode.
->> When micro usb or otg device attached to otg, gpio_vbus falling down.
->> And gpio_id = 1 is micro usb, gpio_id = 0 is otg device.
->
-> all of that I understood clearly :-)
->
->> So when micro usb attached, we enable gadget mode; while micro usb
->> detached, we disable gadget mode, and dwc2 will automatically set to
->> host mode.
->
-> that's all fine, I'm concerned about letting the PHY fiddle with
-> something it doesn't own. If I am to change pullups rules in udc-core,
-> this is likely to break down miserably and I don't want to have to go
-> through that.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
-Thanks for the clarifying.
+I already sent a similar patch before, see
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/181242.
 
-How about using usb_gadget_vbus_connect/disconnect, which are used in 
-many files under drivers/usb/phy.
-There is no vbus_session in dwc2/gadget.c, I thought it would be same as 
-pullup.
+Shawn didn't want to take the patch back then as it touched some files he
+wanted to remove. Assuming his changes are through now, I'm resending :-)
 
-However, usb_gadget_vbus_connect still need para gadget, where should we 
-put this file, drivers/usb/phy or drivers/phy
+Best regards
+Uwe
 
->
->>>> +static void hi6220_detect_work(struct work_struct *work)
->>>> +{
->>>> +	struct hi6220_priv *priv =
->>>> +		container_of(work, struct hi6220_priv, work.work);
->>>> +	int gpio_id, gpio_vbus;
->>>> +	enum usb_otg_state state;
->>>> +
->>>> +	if (!gpio_is_valid(priv->gpio_id) || !gpio_is_valid(priv->gpio_vbus))
->>>> +		return;
->>>> +
->>>> +	gpio_id = gpio_get_value_cansleep(priv->gpio_id);
->>>> +	gpio_vbus = gpio_get_value_cansleep(priv->gpio_vbus);
->>>
->>> looks like this should be using extcon
->> Not used extcon before.
->> However, we need gpio_vbus interrupt.
->> Checked phy-tahvo.c and phy-omap-otg.c, not find extcon related with
->> interrupt.
->> Will investigate tomorrow.
->
-> drivers/extcon/extcon-gpio.c
-I think there is no need to use extcon, gpio is clear enough.
-extcon-gpio.c even do not support dt.
+ arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c | 2 +-
+ arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c | 2 +-
+ arch/arm/mach-imx/iomux-v3.c                   | 5 +++--
+ arch/arm/mach-imx/iomux-v3.h                   | 3 ++-
+ arch/arm/mach-imx/mach-cpuimx35.c              | 2 +-
+ arch/arm/mach-imx/mach-eukrea_cpuimx25.c       | 2 +-
+ arch/arm/mach-imx/mach-mx25_3ds.c              | 2 +-
+ arch/arm/mach-imx/mach-mx35_3ds.c              | 2 +-
+ arch/arm/mach-imx/mach-pcm043.c                | 2 +-
+ arch/arm/mach-imx/mach-vpr200.c                | 2 +-
+ 10 files changed, 13 insertions(+), 11 deletions(-)
 
->
->>>> +	if (gpio_vbus == 0) {
->>>> +		if (gpio_id == 1)
->>>> +			state = OTG_STATE_B_PERIPHERAL;
->>>> +		else
->>>> +			state = OTG_STATE_A_HOST;
->>>> +	} else {
->>>> +		state = OTG_STATE_A_HOST;
->>>> +	}
->>>> +
->>>> +	if (priv->state != state) {
->>>> +		hi6220_start_peripheral(priv, state == OTG_STATE_B_PERIPHERAL);
->>>> +		priv->state = state;
->>>> +	}
->>>> +}
->>>> +
->>>> +static irqreturn_t hiusb_gpio_intr(int irq, void *data)
->>>> +{
->>>> +	struct hi6220_priv *priv = (struct hi6220_priv *)data;
->>>> +
->>>> +	/* add debounce time */
->>>> +	schedule_delayed_work(&priv->work, msecs_to_jiffies(100));
->>>
->>> this is really bad. We have threaded interrupt support, right ?
->>
->> Since we use two gpio to distinguish gadget mode or host mode.
->> Debounce time can introduce more accuracy.
->
-> gpio_set_debounce() ?
-Not all gpio.c support set_debounce, including gpio-pl061.c.
-
->
->> I think threaded interrupt can not be used for adding debounce time.
->> Here add debounce is just for safety.
->
-> add the debounce to the gpio itself.
-
-Here the debounce added only for safety.
-gpio_id may mis-report when unplug usb, but it is correct for plug usb & 
-otg device.
-So debounce can be omitted.
-If you think using delayed work for debounce is ugly, it is fine switch 
-to threaded_irq.
-
-Thanks
+diff --git a/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
+index e77cc3af6db2..10e53818e003 100644
+--- a/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
+@@ -35,7 +35,7 @@
+ #include "iomux-mx25.h"
+ #include "mx25.h"
+ 
+-static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
++static const iomux_v3_cfg_t eukrea_mbimxsd_pads[] __initconst = {
+ 	/* LCD */
+ 	MX25_PAD_LD0__LD0,
+ 	MX25_PAD_LD1__LD1,
+diff --git a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
+index 14d6c8249b76..6edc940e0865 100644
+--- a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
+@@ -100,7 +100,7 @@ static struct mx3fb_platform_data mx3fb_pdata __initdata = {
+ 	.num_modes	= ARRAY_SIZE(fb_modedb),
+ };
+ 
+-static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
++static const iomux_v3_cfg_t eukrea_mbimxsd_pads[] __initconst = {
+ 	/* LCD */
+ 	MX35_PAD_LD0__IPU_DISPB_DAT_0,
+ 	MX35_PAD_LD1__IPU_DISPB_DAT_1,
+diff --git a/arch/arm/mach-imx/iomux-v3.c b/arch/arm/mach-imx/iomux-v3.c
+index d61f9606fc56..a53b2e64f98d 100644
+--- a/arch/arm/mach-imx/iomux-v3.c
++++ b/arch/arm/mach-imx/iomux-v3.c
+@@ -56,9 +56,10 @@ int mxc_iomux_v3_setup_pad(iomux_v3_cfg_t pad)
+ 	return 0;
+ }
+ 
+-int mxc_iomux_v3_setup_multiple_pads(iomux_v3_cfg_t *pad_list, unsigned count)
++int mxc_iomux_v3_setup_multiple_pads(const iomux_v3_cfg_t *pad_list,
++		unsigned count)
+ {
+-	iomux_v3_cfg_t *p = pad_list;
++	const iomux_v3_cfg_t *p = pad_list;
+ 	int i;
+ 	int ret;
+ 
+diff --git a/arch/arm/mach-imx/iomux-v3.h b/arch/arm/mach-imx/iomux-v3.h
+index 2fa3b5430102..5f4bbf124832 100644
+--- a/arch/arm/mach-imx/iomux-v3.h
++++ b/arch/arm/mach-imx/iomux-v3.h
+@@ -131,7 +131,8 @@ int mxc_iomux_v3_setup_pad(iomux_v3_cfg_t pad);
+  * setups mutliple pads
+  * convenient way to call the above function with tables
+  */
+-int mxc_iomux_v3_setup_multiple_pads(iomux_v3_cfg_t *pad_list, unsigned count);
++int mxc_iomux_v3_setup_multiple_pads(const iomux_v3_cfg_t *pad_list,
++		unsigned count);
+ 
+ /*
+  * Initialise the iomux controller
+diff --git a/arch/arm/mach-imx/mach-cpuimx35.c b/arch/arm/mach-imx/mach-cpuimx35.c
+index 62a6e02f4763..922ffd6ca039 100644
+--- a/arch/arm/mach-imx/mach-cpuimx35.c
++++ b/arch/arm/mach-imx/mach-cpuimx35.c
+@@ -75,7 +75,7 @@ static struct i2c_board_info eukrea_cpuimx35_i2c_devices[] = {
+ 	},
+ };
+ 
+-static iomux_v3_cfg_t eukrea_cpuimx35_pads[] = {
++static const iomux_v3_cfg_t eukrea_cpuimx35_pads[] __initconst = {
+ 	/* UART1 */
+ 	MX35_PAD_CTS1__UART1_CTS,
+ 	MX35_PAD_RTS1__UART1_RTS,
+diff --git a/arch/arm/mach-imx/mach-eukrea_cpuimx25.c b/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
+index b2ee6e009fe4..026321918843 100644
+--- a/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
++++ b/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
+@@ -45,7 +45,7 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
+ 
+-static iomux_v3_cfg_t eukrea_cpuimx25_pads[] = {
++static const iomux_v3_cfg_t eukrea_cpuimx25_pads[] __initconst = {
+ 	/* FEC - RMII */
+ 	MX25_PAD_FEC_MDC__FEC_MDC,
+ 	MX25_PAD_FEC_MDIO__FEC_MDIO,
+diff --git a/arch/arm/mach-imx/mach-mx25_3ds.c b/arch/arm/mach-imx/mach-mx25_3ds.c
+index 0d01e367b062..584248a5e1e9 100644
+--- a/arch/arm/mach-imx/mach-mx25_3ds.c
++++ b/arch/arm/mach-imx/mach-mx25_3ds.c
+@@ -50,7 +50,7 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
+ 
+-static iomux_v3_cfg_t mx25pdk_pads[] = {
++static const iomux_v3_cfg_t mx25pdk_pads[] __initconst = {
+ 	MX25_PAD_FEC_MDC__FEC_MDC,
+ 	MX25_PAD_FEC_MDIO__FEC_MDIO,
+ 	MX25_PAD_FEC_TDATA0__FEC_TDATA0,
+diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
+index 72cd77d21f63..7e315f00648d 100644
+--- a/arch/arm/mach-imx/mach-mx35_3ds.c
++++ b/arch/arm/mach-imx/mach-mx35_3ds.c
+@@ -166,7 +166,7 @@ static struct platform_device *devices[] __initdata = {
+ 	&mx35pdk_flash,
+ };
+ 
+-static iomux_v3_cfg_t mx35pdk_pads[] = {
++static const iomux_v3_cfg_t mx35pdk_pads[] __initconst = {
+ 	/* UART1 */
+ 	MX35_PAD_CTS1__UART1_CTS,
+ 	MX35_PAD_RTS1__UART1_RTS,
+diff --git a/arch/arm/mach-imx/mach-pcm043.c b/arch/arm/mach-imx/mach-pcm043.c
+index b623bcaca76c..e447e59c0604 100644
+--- a/arch/arm/mach-imx/mach-pcm043.c
++++ b/arch/arm/mach-imx/mach-pcm043.c
+@@ -129,7 +129,7 @@ static struct platform_device *devices[] __initdata = {
+ 	&pcm043_flash,
+ };
+ 
+-static iomux_v3_cfg_t pcm043_pads[] = {
++static const iomux_v3_cfg_t pcm043_pads[] __initconst = {
+ 	/* UART1 */
+ 	MX35_PAD_CTS1__UART1_CTS,
+ 	MX35_PAD_RTS1__UART1_RTS,
+diff --git a/arch/arm/mach-imx/mach-vpr200.c b/arch/arm/mach-imx/mach-vpr200.c
+index 97836e94451c..27a8f7e3ec08 100644
+--- a/arch/arm/mach-imx/mach-vpr200.c
++++ b/arch/arm/mach-imx/mach-vpr200.c
+@@ -161,7 +161,7 @@ static struct i2c_board_info vpr200_i2c_devices[] = {
+ 	}
+ };
+ 
+-static iomux_v3_cfg_t vpr200_pads[] = {
++static const iomux_v3_cfg_t vpr200_pads[] __initconst = {
+ 	/* UART1 */
+ 	MX35_PAD_TXD1__UART1_TXD_MUX,
+ 	MX35_PAD_RXD1__UART1_RXD_MUX,
+-- 
+2.1.4
