@@ -1,45 +1,153 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sun, 22 Feb 2015 12:49:20 +0100
-Subject: [PATCH v6]: clk: Add common clock support for Mediatek MT8135 and
- MT8173
-Message-ID: <1424605765-19751-1-git-send-email-s.hauer@pengutronix.de>
+Date: Sun, 22 Feb 2015 12:49:22 +0100
+Subject: [PATCH 2/5] clk: mediatek: Add reset controller support
+In-Reply-To: <1424605765-19751-1-git-send-email-s.hauer@pengutronix.de>
+References: <1424605765-19751-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1424605765-19751-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset contains the initial common clock support for Mediatek SoCs.
-Mediatek SoC's clock architecture comprises of various PLLs, dividers, muxes
-and clock gates.
+The pericfg and infracfg units also provide reset lines to several
+other SoC internal units. Add support for the reset controller.
 
-Sascha
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/clk/mediatek/Makefile  |  1 +
+ drivers/clk/mediatek/clk-mtk.h | 10 +++++
+ drivers/clk/mediatek/reset.c   | 99 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 110 insertions(+)
+ create mode 100644 drivers/clk/mediatek/reset.c
 
-Changes in v2:
-- Re-ordered patchset. Fold include/dt-bindings and DT document in 1st patch.
-
-Changes in v3:
-- Rebase to 3.19-rc1.
-- Refine code. Remove unneed functions, debug logs and comments, and fine tune
-  error logs.
-
-Changes in v4:
-- Support MT8173 platform.
-- Re-ordered patchset. driver/clk/Makefile in 2nd patch.
-- Extract the common part definition(mtk_gate/mtk_pll/mtk_mux) from
-  clk-mt8135.c/clk-mt8173.c to clk-mtk.c.
-- Refine code. Rmove unnessacary debug information and unsed defines,
-  add prefix "mtk_" for static functions.
-- Remove flag CLK_IGNORE_UNUSED and set flag CLK_SET_RATE_PARENT on
-  gate/mux/fixed-factor.
-- Use spin_lock_irqsave(&clk_ops_lock, flags) instead of mtk_clk_lock.
-- Example above include a node for the clock controller itself, followed
-  by the i2c controller example above.
-
-Changes in v5:
-- Add reset controller support for pericfg/infracfg
-- Use regmap for the gates
-- remove now unnecessary spinlock for the gates
-- Add PMIC wrapper support as of v3
-
-Changes in v6:
-- rework PLL support, only a fraction of original size now
-- Move binding docs to Documentation/devicetree/bindings/arm/mediatek since
-  the units are not really clock specific (they contain reset controllers)
+diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
+index c384e97..0b6f1c3 100644
+--- a/drivers/clk/mediatek/Makefile
++++ b/drivers/clk/mediatek/Makefile
+@@ -1 +1,2 @@
+ obj-y += clk-mtk.o clk-pll.o clk-gate.o
++obj-$(CONFIG_RESET_CONTROLLER) += reset.o
+diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+index c7c0d35..fb61040 100644
+--- a/drivers/clk/mediatek/clk-mtk.h
++++ b/drivers/clk/mediatek/clk-mtk.h
+@@ -161,4 +161,14 @@ static inline void mtk_register_reset_controller(struct device_node *np,
+ }
+ #endif
+ 
++#ifdef CONFIG_RESET_CONTROLLER
++void mtk_register_reset_controller(struct device_node *np,
++			unsigned int num_regs, int regofs);
++#else
++static inline void mtk_register_reset_controller(struct device_node *np,
++			unsigned int num_regs, int regofs)
++{
++}
++#endif
++
+ #endif /* __DRV_CLK_MTK_H */
+diff --git a/drivers/clk/mediatek/reset.c b/drivers/clk/mediatek/reset.c
+new file mode 100644
+index 0000000..3a85a53
+--- /dev/null
++++ b/drivers/clk/mediatek/reset.c
+@@ -0,0 +1,99 @@
++/*
++ * Copyright (c) 2014 MediaTek Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
++
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/reset-controller.h>
++#include <linux/slab.h>
++
++#include "clk-mtk.h"
++
++struct mtk_reset {
++	struct regmap *regmap;
++	int regofs;
++	struct reset_controller_dev rcdev;
++};
++
++static int mtk_reset_assert(struct reset_controller_dev *rcdev,
++			      unsigned long id)
++{
++	struct mtk_reset *data = container_of(rcdev, struct mtk_reset, rcdev);
++
++	return regmap_update_bits(data->regmap, data->regofs + ((id / 32) << 2),
++			BIT(id % 32), ~0);
++}
++
++static int mtk_reset_deassert(struct reset_controller_dev *rcdev,
++				unsigned long id)
++{
++	struct mtk_reset *data = container_of(rcdev, struct mtk_reset, rcdev);
++
++	return regmap_update_bits(data->regmap, data->regofs + ((id / 32) << 2),
++			BIT(id % 32), 0);
++}
++
++static int mtk_reset(struct reset_controller_dev *rcdev,
++			      unsigned long id)
++{
++	int ret;
++
++	ret = mtk_reset_assert(rcdev, id);
++	if (ret)
++		return ret;
++
++	return mtk_reset_deassert(rcdev, id);
++}
++
++static struct reset_control_ops mtk_reset_ops = {
++	.assert = mtk_reset_assert,
++	.deassert = mtk_reset_deassert,
++	.reset = mtk_reset,
++};
++
++void mtk_register_reset_controller(struct device_node *np,
++			unsigned int num_regs, int regofs)
++{
++	struct mtk_reset *data;
++	int ret;
++	struct regmap *regmap;
++
++	regmap = syscon_node_to_regmap(np);
++	if (IS_ERR(regmap)) {
++		pr_err("Cannot find regmap for %s: %ld\n", np->full_name,
++				PTR_ERR(regmap));
++		return;
++	}
++
++	data = kzalloc(sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return;
++
++	data->regmap = regmap;
++	data->regofs = regofs;
++	data->rcdev.owner = THIS_MODULE;
++	data->rcdev.nr_resets = num_regs * 32;
++	data->rcdev.ops = &mtk_reset_ops;
++	data->rcdev.of_node = np;
++
++	ret = reset_controller_register(&data->rcdev);
++	if (ret) {
++		pr_err("could not register reset controller: %d\n", ret);
++		kfree(data);
++		return;
++	}
++}
+-- 
+2.1.4
