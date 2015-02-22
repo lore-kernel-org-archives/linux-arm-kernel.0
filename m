@@ -1,40 +1,50 @@
 From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Sun, 22 Feb 2015 18:51:02 +0100
-Subject: [PATCHv3 0/2] drm: atmel-hlcdc: PM support
-Message-ID: <1424627464-16869-1-git-send-email-sylvain.rochet@finsecur.com>
+Date: Sun, 22 Feb 2015 18:51:04 +0100
+Subject: [PATCHv3 2/2] drm: atmel-hlcdc: Add pinctrl PM select sleep,
+ default state in CRTC suspend/resume
+In-Reply-To: <1424627464-16869-1-git-send-email-sylvain.rochet@finsecur.com>
+References: <1424627464-16869-1-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <1424627464-16869-3-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds basic PM support for Atmel HLCDC.
+Some LCD panels have back-powering issue when un-powered, allows users
+to use an alternate pinctrl "sleep" in order to clamp outputs to a
+wanted state at suspend.
 
-This series depends on:
+Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-[PATCH] drm: atmel-hlcdc: remove useless pm_runtime_put_sync in probe
-  <1423841785-23105-1-git-send-email-boris.brezillon@free-electrons.com>
-[PATCH v3] drm: atmel-hlcdc: Atomic mode-setting conversion
-  <1423842415-23412-1-git-send-email-boris.brezillon@free-electrons.com>
-
-Changes since v2:
-  * Save previous state of crtc's so we don't enable them unconditionally
-    at resume.
-  * Remove obsolete use of drm_driver.suspend and drm_driver.resume
-    callbacks
-  * Merged atmel_hlcdc_dc_suspend to atmel_hlcdc_dc_drm_suspend and
-    atmel_hlcdc_dc_resume to atmel_hlcdc_dc_drm_resume since we don't
-    need the previous callbacks anymore
-  * Removed useless check of drm_dev in suspend/resume functions
-
-Changes since v1:
-  * (*crtc_funcs->disable)(crtc) replaced to crtc_funcs->disable(crtc)
-
-Sylvain Rochet (2):
-  drm: atmel-hlcdc: Add PM suspend/resume support
-  drm: atmel-hlcdc: Add pinctrl PM select sleep,default state in CRTC
-    suspend/resume
-
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c |  3 ++
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c   | 47 ++++++++++++++++++++++++++
- 2 files changed, 50 insertions(+)
-
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+index 79c9a19..decd9ea 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+@@ -21,6 +21,7 @@
+ #include <linux/clk.h>
+ #include <linux/pm.h>
+ #include <linux/pm_runtime.h>
++#include <linux/pinctrl/consumer.h>
+ 
+ #include <drm/drm_crtc.h>
+ #include <drm/drm_crtc_helper.h>
+@@ -156,6 +157,7 @@ static void atmel_hlcdc_crtc_disable(struct drm_crtc *c)
+ 		cpu_relax();
+ 
+ 	clk_disable_unprepare(crtc->dc->hlcdc->sys_clk);
++	pinctrl_pm_select_sleep_state(dev->dev);
+ 
+ 	pm_runtime_allow(dev->dev);
+ 
+@@ -178,6 +180,7 @@ static void atmel_hlcdc_crtc_enable(struct drm_crtc *c)
+ 
+ 	pm_runtime_forbid(dev->dev);
+ 
++	pinctrl_pm_select_default_state(dev->dev);
+ 	clk_prepare_enable(crtc->dc->hlcdc->sys_clk);
+ 
+ 	regmap_write(regmap, ATMEL_HLCDC_EN, ATMEL_HLCDC_PIXEL_CLK);
 -- 
 2.1.4
