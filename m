@@ -1,78 +1,104 @@
-From: vincent.stehle@laposte.net (=?UTF-8?q?Vincent=20Stehl=C3=A9?=)
-Date: Sun, 22 Feb 2015 17:09:06 +0100
-Subject: [PATCH linux-next] iommu: Enable LPAE pagetable on ARM only
-Message-ID: <1424621346-7822-1-git-send-email-vincent.stehle@laposte.net>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 22 Feb 2015 17:41:52 +0100
+Subject: dmaengine, virt-dma and reusable transfers
+Message-ID: <87bnkl7van.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LPAE iommu page table makes sense only for ARM architecture. Add the
-corresponding dependency in Kconfig.
+Hi Russell and Vinod,
 
-This fixes the following runtime warnings on PA-RISC architecture:
+I've made the patch in [1] in order to be able to reuse descriptors,
+ie. resubmit completed transfers once they are completed.
 
-  WARNING: at drivers/iommu/io-pgtable-arm.c:413
-  Modules linked in:
-  CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.19.0-next-20150222-00002-gc420256 #2
-  task: 17ca0000 ti: 17ca8000 task.ti: 17ca8000
-  
-       YZrvWESTHLNXBCVMcbcbcbcbOGFRQPDI
-  PSW: 00000000000001001111111100001111 Not tainted
-  r00-03  0004ff0f 0000001b 104871b0 17ca83c0
-  r04-07  00001000 00000000 00000000 00000000
-  r08-11  00000000 40001000 1013b36c 17ca8248
-  r12-15  00000080 17e712c0 00000000 17c5e100
-  r16-19  0000000c 105d8eb0 40001000 ffffffff
-  r20-23  00000000 00800020 1048717c 00000000
-  r24-27  00001000 00000000 00000009 10774ce0
-  r28-31  00000000 00000027 17ca8480 10486d44
-  sr00-03  00000000 00000000 00000000 00000000
-  sr04-07  00000000 00000000 00000000 00000000
-  
-  IASQ: 00000000 00000000 IAOQ: 10486df4 10486df8
-   IIR: 03ffe01f    ISR: 00000000  IOR: 17c86e54
-   CPU:        0   CR30: 17ca8000 CR31: 00000002
-   ORIG_R28: 00000001
-   IAOQ[0]: __arm_lpae_unmap+0x144/0x4cc
-   IAOQ[1]: __arm_lpae_unmap+0x148/0x4cc
-   RP(r2): arm_lpae_unmap+0x34/0x6c
-  Backtrace:
-   [<104871b0>] arm_lpae_unmap+0x34/0x6c
-   [<10127944>] 0x10127944
-   [<10168ee0>] do_one_initcall+0x128/0x1dc
-   [<101028fc>] 0x101028fc
-   [<10161b48>] kernel_init+0x1c/0x118
-   [<1015d01c>] end_fault_vector+0x1c/0x24
-   [<101762ec>] save_stack_trace+0x28/0x60
+As I'm not sure I understand all the dmaengine slave API, nor the virt-dma
+fully, I'd like you to have an eye on it first.
 
-Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
+Thanks for your time.
 
-
-Hi,
-
-This can be seen with e.g. Linux next-20150222 on parisc with allmodconfig.
-
-Best regards,
-
-V.
-
-
- drivers/iommu/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index baa0d97..c73fd72 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -22,6 +22,7 @@ config IOMMU_IO_PGTABLE
- 
- config IOMMU_IO_PGTABLE_LPAE
- 	bool "ARMv7/v8 Long Descriptor Format"
-+	depends on ARM
- 	select IOMMU_IO_PGTABLE
- 	help
- 	  Enable support for the ARM long descriptor pagetable format.
 -- 
-2.1.4
+Robert
+
+[1]
+>From 74d7007efcc0e7bfa5d36b2934e5b4ad61e29022 Mon Sep 17 00:00:00 2001
+From: Robert Jarzmik <robert.jarzmik@free.fr>
+Date: Sun, 22 Feb 2015 17:19:34 +0100
+Subject: [PATCH] dmaengine: virt-dma: don't always free descriptor upon
+ completion
+
+This patch attempts to enhance the case of a transfer submitted multiple
+times, and where the cost of creating the descriptors chain is not
+negligible.
+
+This happens with big video buffers (several megabytes, ie. several
+thousands of linked descriptors in one scatter-gather list). In these
+cases, a video driver would want to do :
+ - tx = dmaengine_prep_slave_sg()
+ - dma_engine_submit(tx);
+ - dma_async_issue_pending()
+ - wait for video completion
+ - read video data (or not, skipping a frame is also possible)
+
+ - dma_engine_submit(tx)
+   => here, the descriptors chain recalculation will take time
+   => the dma coherent allocation over and over might create holes in
+      the dma pool, which is counter-productive.
+ - dma_async_issue_pending()
+ - etc ...
+
+In order to cope with this case, virt-dma is modified to prevent freeing
+the descriptors upon completion if DMA_PREP_CONTINUE flag is set in the
+transfer.
+
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ drivers/dma/virt-dma.c | 7 +++++--
+ drivers/dma/virt-dma.h | 2 ++
+ 2 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/dma/virt-dma.c b/drivers/dma/virt-dma.c
+index 6f80432..1e4fd18 100644
+--- a/drivers/dma/virt-dma.c
++++ b/drivers/dma/virt-dma.c
+@@ -83,8 +83,10 @@ static void vchan_complete(unsigned long arg)
+ 		cb_data = vd->tx.callback_param;
+ 
+ 		list_del(&vd->node);
+-
+-		vc->desc_free(vd);
++		if (vd->tx.flags & DMA_PREP_CONTINUE)
++			list_add(&vd->node, &vc->desc_submittable);
++		else
++			vc->desc_free(vd);
+ 
+ 		if (cb)
+ 			cb(cb_data);
+@@ -108,6 +110,7 @@ void vchan_init(struct virt_dma_chan *vc, struct dma_device *dmadev)
+ 	dma_cookie_init(&vc->chan);
+ 
+ 	spin_lock_init(&vc->lock);
++	INIT_LIST_HEAD(&vc->desc_submittable);
+ 	INIT_LIST_HEAD(&vc->desc_submitted);
+ 	INIT_LIST_HEAD(&vc->desc_issued);
+ 	INIT_LIST_HEAD(&vc->desc_completed);
+diff --git a/drivers/dma/virt-dma.h b/drivers/dma/virt-dma.h
+index 181b952..3772032 100644
+--- a/drivers/dma/virt-dma.h
++++ b/drivers/dma/virt-dma.h
+@@ -29,6 +29,7 @@ struct virt_dma_chan {
+ 	spinlock_t lock;
+ 
+ 	/* protected by vc.lock */
++	struct list_head desc_submittable;
+ 	struct list_head desc_submitted;
+ 	struct list_head desc_issued;
+ 	struct list_head desc_completed;
+@@ -134,6 +135,7 @@ static inline struct virt_dma_desc *vchan_next_desc(struct virt_dma_chan *vc)
+ static inline void vchan_get_all_descriptors(struct virt_dma_chan *vc,
+ 	struct list_head *head)
+ {
++	list_splice_tail_init(&vc->desc_submittable, head);
+ 	list_splice_tail_init(&vc->desc_submitted, head);
+ 	list_splice_tail_init(&vc->desc_issued, head);
+ 	list_splice_tail_init(&vc->desc_completed, head);
+-- 
+2.1.0
