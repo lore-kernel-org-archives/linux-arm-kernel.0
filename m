@@ -1,94 +1,70 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 22 Feb 2015 15:32:11 +0100
-Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
-In-Reply-To: <CAL_Jsq+mvpRjYfL_8OseTDCB-6aBhwhNKLBQXXJeVQLDwWm8Nw@mail.gmail.com>
-References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
- <CAL_Jsq+SeuoojgTpv1y_aPJ_jzDr3HqZhYEBQ3_vYGBHvcccug@mail.gmail.com>
- <54E78A31.9020306@linaro.org>
- <CAL_Jsq+mvpRjYfL_8OseTDCB-6aBhwhNKLBQXXJeVQLDwWm8Nw@mail.gmail.com>
-Message-ID: <20150222143211.GX25269@lukather>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 22 Feb 2015 17:54:13 +0300
+Subject: [PATCH 2/2] ARM: shmobile: silk: add SDHI0/1 DT support
+In-Reply-To: <CANqRtoRnDzTSvKYcNDHKHbeaN7jp1VvKnk1jTHDvNt1oyBzwKg@mail.gmail.com>
+References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>	<2348421.LHyZ4ZOiiG@wasted.cogentembedded.com>
+ <CANqRtoRnDzTSvKYcNDHKHbeaN7jp1VvKnk1jTHDvNt1oyBzwKg@mail.gmail.com>
+Message-ID: <54E9ED95.8070702@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 04:01:55PM -0600, Rob Herring wrote:
-> [...]
-> 
-> >>> += Data consumers =
-> >>> +
-> >>> +Required properties:
-> >>> +
-> >>> +eeproms: List of phandle and data cell specifier triplet, one triplet
-> >>> +        for each data cell the device might be interested in. The
-> >>> +        triplet consists of the phandle to the eeprom provider, then
-> >>> +        the offset in byte within that storage device, and the length
-> >>> +        in byte of the data we care about.
-> >>
-> >>
-> >> The problem with this is it assumes you know who the consumer is and
-> >> that it is a DT node. For example, how would you describe a serial
-> >> number?
-> >
-> > Correct me if I miss understood.
-> > Is serial number any different?
-> > Am hoping that the eeprom consumer would be aware of offset and size of
-> > serial number in the eeprom
-> >
-> > Cant the consumer do:
-> >
-> > eeprom-consumer {
-> >         eeproms = <&at24 0 4>;
-> >         eeprom-names = "device-serial-number";
-> 
-> Yes, but who is "eeprom-consumer"?
+Hello.
 
-Any device that should lookup values in one of the EEPROM.
+On 02/22/2015 03:45 AM, Magnus Damm wrote:
 
-> DT nodes generally describe a h/w block, but it this case, the
-> consumer depends on the OS, not the h/w. 
+>> Define the SILK board dependent parts of the SDHI0  (connected to SDIO Wi-Fi
+>> chip)  and SDHI1  (connected to micro-SD slot) device nodes along with the
+>> necessary voltage regulators.
 
-Not really, or at least, not more than any similar binding we
-currently have.
+>> Based on the original patch by Vladimir Barinov
+>> <vladimir.barinov@cogentembedded.com>.
 
-The fact that a MAC-address for the first ethernet chip is stored at a
-given offset in a given eeprom has nothing to do with the OS.
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-> I'm not saying you can't describe where things are, but I don't
-> think you should imply who is the consumer and doing so is
-> unnecessarily complicated.
+> Thanks for your patch. One question - above you write that SDHI1 is micro-SD...
 
-If you only take the case of a serial number, indeed. If you take
-other usage into account, you can't really do without it.
+    Yes, have double-checked now.
 
-> Also, the layout of EEPROM is likely very much platform specific.
+>> @@ -100,3 +159,25 @@
+>>          non-removable;
+>>          status = "okay";
+>>   };
+>> +
+>> +&sdhi0 {
+>> +       pinctrl-0 = <&sdhi0_pins>;
+>> +       pinctrl-names = "default";
+>> +
+>> +       vmmc-supply = <&vcc_sdhi0>;
+>> +       vqmmc-supply = <&vccq_sdhi0>;
+>> +       cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
+>> +       wp-gpios = <&gpio6 7 GPIO_ACTIVE_LOW>;
+>> +       status = "okay";
+>> +};
+>> +
+>> +&sdhi1 {
+>> +       pinctrl-0 = <&sdhi1_pins>;
+>> +       pinctrl-names = "default";
+>> +
+>> +       vmmc-supply = <&vcc_sdhi1>;
+>> +       vqmmc-supply = <&vccq_sdhi1>;
+>> +       cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
+>> +       wp-gpios = <&gpio6 15 GPIO_ACTIVE_LOW>;
+>> +       status = "okay";
+>> +};
 
-Indeed, which is why it should be in the DT.
+> ... however here the WP signal is assigned.
 
-> Some could have a more complex structure perhaps with key ids and
-> linked list structure.
+> I believe micro-SD doesn't use the WP signal, so either I'm wrong or
+> the patch needs to be updated to reflect reality. =)
 
-Then just request the size of the whole list, and parse it afterwards
-in your driver?
+    Both seem correct: SD1_WP signal is just tied to VCCQ_SD1. Do you think we 
+should still drop it?
 
-> I would do something more simple that is just a list of keys and their
-> location like this:
-> 
-> device-serial-number = <start size>;
-> key1 = <start size>;
-> key2 = <start size>;
+> Also, I doubt that an on-board SDIO module makes use of CD and/or WP signals?
 
-I'm sorry, but what's the difference?
+    Those two are tied to VCCQ_SD0 as well. Do you think we should drop them?
 
-Maxime
+> Thanks,
+> / magnus
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150222/56c06781/attachment.sig>
+WBR, Sergei
