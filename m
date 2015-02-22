@@ -1,50 +1,86 @@
 From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Sun, 22 Feb 2015 18:51:04 +0100
-Subject: [PATCHv3 2/2] drm: atmel-hlcdc: Add pinctrl PM select sleep,
- default state in CRTC suspend/resume
+Date: Sun, 22 Feb 2015 18:51:03 +0100
+Subject: [PATCHv3 1/2] drm: atmel-hlcdc: Add PM suspend/resume support
 In-Reply-To: <1424627464-16869-1-git-send-email-sylvain.rochet@finsecur.com>
 References: <1424627464-16869-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <1424627464-16869-3-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <1424627464-16869-2-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some LCD panels have back-powering issue when un-powered, allows users
-to use an alternate pinctrl "sleep" in order to clamp outputs to a
-wanted state at suspend.
+On suspend: switch off CRTC if not already suspended with runtime PM
+
+On resume: switch on CRTC if we were not already suspended from runtime
+PM while suspending.
 
 Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 47 ++++++++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-index 79c9a19..decd9ea 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-@@ -21,6 +21,7 @@
- #include <linux/clk.h>
- #include <linux/pm.h>
- #include <linux/pm_runtime.h>
-+#include <linux/pinctrl/consumer.h>
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+index 22c3cca..c4bb1f9 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+@@ -559,6 +559,52 @@ static int atmel_hlcdc_dc_drm_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
- #include <drm/drm_crtc.h>
- #include <drm/drm_crtc_helper.h>
-@@ -156,6 +157,7 @@ static void atmel_hlcdc_crtc_disable(struct drm_crtc *c)
- 		cpu_relax();
- 
- 	clk_disable_unprepare(crtc->dc->hlcdc->sys_clk);
-+	pinctrl_pm_select_sleep_state(dev->dev);
- 
- 	pm_runtime_allow(dev->dev);
- 
-@@ -178,6 +180,7 @@ static void atmel_hlcdc_crtc_enable(struct drm_crtc *c)
- 
- 	pm_runtime_forbid(dev->dev);
- 
-+	pinctrl_pm_select_default_state(dev->dev);
- 	clk_prepare_enable(crtc->dc->hlcdc->sys_clk);
- 
- 	regmap_write(regmap, ATMEL_HLCDC_EN, ATMEL_HLCDC_PIXEL_CLK);
++#ifdef CONFIG_PM
++static int atmel_hlcdc_dc_drm_suspend(struct device *dev)
++{
++	struct drm_device *drm_dev = dev_get_drvdata(dev);
++	struct drm_crtc *crtc;
++
++	if (pm_runtime_suspended(dev))
++		return 0;
++
++	drm_modeset_lock_all(drm_dev);
++	list_for_each_entry(crtc, &drm_dev->mode_config.crtc_list, head) {
++		struct drm_crtc_helper_funcs *crtc_funcs = crtc->helper_private;
++		if (crtc->enabled) {
++			crtc_funcs->disable(crtc);
++			/* save enable state for resume */
++			crtc->enabled = true;
++		}
++	}
++	drm_modeset_unlock_all(drm_dev);
++	return 0;
++}
++
++static int atmel_hlcdc_dc_drm_resume(struct device *dev)
++{
++	struct drm_device *drm_dev = dev_get_drvdata(dev);
++	struct drm_crtc *crtc;
++
++	if (pm_runtime_suspended(dev))
++		return 0;
++
++	drm_modeset_lock_all(drm_dev);
++	list_for_each_entry(crtc, &drm_dev->mode_config.crtc_list, head) {
++		struct drm_crtc_helper_funcs *crtc_funcs = crtc->helper_private;
++		if (crtc->enabled) {
++			crtc->enabled = false;
++			crtc_funcs->enable(crtc);
++		}
++	}
++	drm_modeset_unlock_all(drm_dev);
++	return 0;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(atmel_hlcdc_dc_drm_pm_ops,
++		atmel_hlcdc_dc_drm_suspend, atmel_hlcdc_dc_drm_resume);
++
+ static const struct of_device_id atmel_hlcdc_dc_of_match[] = {
+ 	{ .compatible = "atmel,hlcdc-display-controller" },
+ 	{ },
+@@ -569,6 +615,7 @@ static struct platform_driver atmel_hlcdc_dc_platform_driver = {
+ 	.remove	= atmel_hlcdc_dc_drm_remove,
+ 	.driver	= {
+ 		.name	= "atmel-hlcdc-display-controller",
++		.pm	= &atmel_hlcdc_dc_drm_pm_ops,
+ 		.of_match_table = atmel_hlcdc_dc_of_match,
+ 	},
+ };
 -- 
 2.1.4
