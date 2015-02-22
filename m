@@ -1,37 +1,64 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Sun, 22 Feb 2015 08:58:15 +0900
-Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
-In-Reply-To: <CAL_JsqLcBOC+AnVe7oATjg2g6Fz2vqwacu8QzS4tXMaxxOP_Xg@mail.gmail.com>
-References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
- <CAL_JsqJQcuX2cp50oHod-QAbhdMg48TaRP+gLGEO2kbFnQ3B+A@mail.gmail.com>
- <20150219190348.GB24460@cbox>
- <CAL_JsqLcBOC+AnVe7oATjg2g6Fz2vqwacu8QzS4tXMaxxOP_Xg@mail.gmail.com>
-Message-ID: <CAFEAcA9pg5v_+RAehwf5XWopgeJtWfDb+Xej+579ikeiRjhg_Q@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Sat, 21 Feb 2015 16:45:45 -0800
+Subject: [PATCH 2/2] ARM: shmobile: silk: add SDHI0/1 DT support
+In-Reply-To: <2348421.LHyZ4ZOiiG@wasted.cogentembedded.com>
+References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
+ <2348421.LHyZ4ZOiiG@wasted.cogentembedded.com>
+Message-ID: <CANqRtoRnDzTSvKYcNDHKHbeaN7jp1VvKnk1jTHDvNt1oyBzwKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 February 2015 at 06:56, Rob Herring <robherring2@gmail.com> wrote:
-> On Thu, Feb 19, 2015 at 1:03 PM, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
->> It matters if you want to ensure that the 64K page you are assigning to
->> a guest for the GIC virtual CPU interface contains only GIC virtual CPU
->> mappings, and not other random stuff that the guest is not allowed to
->> touch.
+Hi Sergei,
+
+On Sat, Feb 21, 2015 at 2:27 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Define the SILK board dependent parts of the SDHI0  (connected to SDIO Wi-Fi
+> chip)  and SDHI1  (connected to micro-SD slot) device nodes along with the
+> necessary voltage regulators.
 >
-> Good point.
+> Based on the original patch by Vladimir Barinov
+> <vladimir.barinov@cogentembedded.com>.
 >
->> How else should this be enforced?
->
-> Rely on correct h/w design? You'll have to repeat this every time you
-> want to do pass-thru of a device.
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-The idea is that the device tree lets us describe whether
-the hardware design is correct or not :-)
+Thanks for your patch. One question - above you write that SDHI1 is micro-SD...
 
-> What do you do if 64K mapping is not supported? Fallback to emulation
-> of the CPU interface?
+> @@ -100,3 +159,25 @@
+>         non-removable;
+>         status = "okay";
+>  };
+> +
+> +&sdhi0 {
+> +       pinctrl-0 = <&sdhi0_pins>;
+> +       pinctrl-names = "default";
+> +
+> +       vmmc-supply = <&vcc_sdhi0>;
+> +       vqmmc-supply = <&vccq_sdhi0>;
+> +       cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
+> +       wp-gpios = <&gpio6 7 GPIO_ACTIVE_LOW>;
+> +       status = "okay";
+> +};
+> +
+> +&sdhi1 {
+> +       pinctrl-0 = <&sdhi1_pins>;
+> +       pinctrl-names = "default";
+> +
+> +       vmmc-supply = <&vcc_sdhi1>;
+> +       vqmmc-supply = <&vccq_sdhi1>;
+> +       cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
+> +       wp-gpios = <&gpio6 15 GPIO_ACTIVE_LOW>;
+> +       status = "okay";
+> +};
 
-In this case KVM can't be supported -- use 4K host pages with this
-hardware, or don't use KVM...
+... however here the WP signal is assigned.
 
--- PMM
+I believe micro-SD doesn't use the WP signal, so either I'm wrong or
+the patch needs to be updated to reflect reality. =)
+
+Also, I doubt that an on-board SDIO module makes use of CD and/or WP signals?
+
+Any ideas?
+
+Thanks,
+
+/ magnus
