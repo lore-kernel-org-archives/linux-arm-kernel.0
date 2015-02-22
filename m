@@ -1,191 +1,242 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Sun, 22 Feb 2015 11:10:36 +0800
-Subject: [PATCH v4 4/4] phy: add phy-hi6220-usb
-In-Reply-To: <20150221162102.GA1784@saruman.tx.rr.com>
-References: <1423726646-30336-1-git-send-email-zhangfei.gao@linaro.org>
- <1423726646-30336-5-git-send-email-zhangfei.gao@linaro.org>
- <20150220144119.GB1707@saruman.tx.rr.com> <54E75665.6050205@linaro.org>
- <20150220160610.GB6430@saruman.tx.rr.com> <54E89E29.4010807@linaro.org>
- <20150221162102.GA1784@saruman.tx.rr.com>
-Message-ID: <54E948AC.2010609@linaro.org>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sun, 22 Feb 2015 10:19:23 +0200
+Subject: [PATCH 2/2] mtd: nand: driver for Conexant Digicolor NAND Flash
+ Controller
+In-Reply-To: <20150219115223.40378b17@bbrezillon>
+References: <e6a998f130c40cee0a72e23b4f7f65bece0d6b21.1423739332.git.baruch@tkos.co.il>
+ <ffec2fc232083355fdb171efb9daf59686ac2fed.1423739332.git.baruch@tkos.co.il>
+ <20150219001704.40874da0@bbrezillon>
+ <20150219094301.GE2937@tarshish>
+ <20150219115223.40378b17@bbrezillon>
+Message-ID: <20150222081923.GB2402@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Balbi
+Hi Boris,
 
-On 02/22/2015 12:21 AM, Felipe Balbi wrote:
-> Hi,
->
-> On Sat, Feb 21, 2015 at 11:03:05PM +0800, zhangfei wrote:
->>>>>> +static void hi6220_start_peripheral(struct hi6220_priv *priv, bool on)
->>>>>> +{
->>>>>> +	struct usb_otg *otg = priv->phy.otg;
->>>>>> +
->>>>>> +	if (!otg->gadget)
->>>>>> +		return;
->>>>>> +
->>>>>> +	if (on)
->>>>>> +		usb_gadget_connect(otg->gadget);
->>>>>> +	else
->>>>>> +		usb_gadget_disconnect(otg->gadget);
->>>>>
->>>>> why is the PHY fiddling with pullups ?
->>>>
->>>> We use this to enable/disable otg gadget mode.
->>>
->>> I got that, but the pullups don't belong to the PHY, they belong to the
->>> gadget.
->>>
->>>> The gpio_id & gpio_vbus are used to distinguish otg gadget mode or
->>>> host mode.
->>>> When micro usb or otg device attached to otg, gpio_vbus falling down.
->>>> And gpio_id = 1 is micro usb, gpio_id = 0 is otg device.
->>>
->>> all of that I understood clearly :-)
->>>
->>>> So when micro usb attached, we enable gadget mode; while micro usb
->>>> detached, we disable gadget mode, and dwc2 will automatically set to
->>>> host mode.
->>>
->>> that's all fine, I'm concerned about letting the PHY fiddle with
->>> something it doesn't own. If I am to change pullups rules in udc-core,
->>> this is likely to break down miserably and I don't want to have to go
->>> through that.
->>
->> Thanks for the clarifying.
->
-> no problem.
->
->> How about using usb_gadget_vbus_connect/disconnect, which are used in many
->> files under drivers/usb/phy.
->> There is no vbus_session in dwc2/gadget.c, I thought it would be same as
->> pullup.
->>
->> However, usb_gadget_vbus_connect still need para gadget, where should we put
->> this file, drivers/usb/phy or drivers/phy
->
-> drivers/phy, if the framework misses anything you need, it's a great
-> opportunity to give back to the community by extending the framework.
+On Thu, Feb 19, 2015 at 11:52:23AM +0100, Boris Brezillon wrote:
+> On Thu, 19 Feb 2015 11:43:01 +0200
+> Baruch Siach <baruch@tkos.co.il> wrote:
+> > On Thu, Feb 19, 2015 at 12:17:04AM +0100, Boris Brezillon wrote:
+> > > On Thu, 12 Feb 2015 13:10:19 +0200
+> > > Baruch Siach <baruch@tkos.co.il> wrote:
+> > I understand you concern. However, since I don't have the needed hardware 
+> > to test the multi nand chip setup I want to keep the code simple. These 
+> > two fields are separated from the others by a blank line on purpose, and 
+> > I'll also add a comment to explain that these are per nand chip files.
+> 
+> I'm not asking you to support multiple chips right now.
+> What I'm asking here is to dispatch NFC and NAND fields in different
+> structures:
+> 
+> struct digicolor_nand {
+> 	struct mtd_info		mtd;
+> 	struct nand_chip	nand;
+> 
+> 	u32 nand_cs;
+> 	int t_ccs;
+> }
+> 
+> struct digicolor_nfc {
+> 	struct nand_hw_control	base;
+> 	void __iomem		*regs;
+> 	struct device		*dev;
+> 
+> 	unsigned long		clk_rate;
+> 
+> 	u32 ale_cmd;
+> 	u32 ale_data;
+> 	int ale_data_bytes;
+> 
+> 	/* Only support one NAND for now */
+> 	struct digicolor_nand	nand;
+> };
+> 
+> You'll keep the same logic except that this separation will be clearly
+> visible.
 
-Sorry, I am a little confused.
-I need some concrete suggestion for the next step of this patch, which 
-is required for the community board, hikey board.
+Sounds reasonable. Will do.
 
-Do you mean in the future we need use hsotg->phy instead of hsotg->uphy.
-         struct phy *phy;
-         struct usb_phy *uphy;
-usb_phy has many members that struct phy does not have, including otg.
-struct usb_otg          *otg;
-Is that mean we need port such member from usb_phy to phy.
+[...]
 
-Besides, are you ok with using usb_gadget_vbus_connect/disconnect.
+> > It's just that the INT flag name is quite long, and it make the code using 
+> > it less readable IMO. Maybe some macro trickery would do the job here.
+> 
+> Yep, if that's about avoiding over 80 character lines you could define
+> such a macro:
+> 
+> #define NFC_RDY(flag)		NFC_INT_ ## flag ## _READY
 
->
-> Scratching one's own itch kinda thing...
->
->>>>>> +static void hi6220_detect_work(struct work_struct *work)
->>>>>> +{
->>>>>> +	struct hi6220_priv *priv =
->>>>>> +		container_of(work, struct hi6220_priv, work.work);
->>>>>> +	int gpio_id, gpio_vbus;
->>>>>> +	enum usb_otg_state state;
->>>>>> +
->>>>>> +	if (!gpio_is_valid(priv->gpio_id) || !gpio_is_valid(priv->gpio_vbus))
->>>>>> +		return;
->>>>>> +
->>>>>> +	gpio_id = gpio_get_value_cansleep(priv->gpio_id);
->>>>>> +	gpio_vbus = gpio_get_value_cansleep(priv->gpio_vbus);
->>>>>
->>>>> looks like this should be using extcon
->>>> Not used extcon before.
->>>> However, we need gpio_vbus interrupt.
->>>> Checked phy-tahvo.c and phy-omap-otg.c, not find extcon related with
->>>> interrupt.
->>>> Will investigate tomorrow.
->>>
->>> drivers/extcon/extcon-gpio.c
->> I think there is no need to use extcon, gpio is clear enough.
->> extcon-gpio.c even do not support dt.
->
-> well, add DT. The whole idea of free software is that we improve on
-> things we already have. EXTCON is *the* API to handle such things.
+Thanks for the tip. Will do.
 
-I think I am still not understanding extcon-gpio, not sure why need use 
-this API here.
+[...]
 
-Here two gpio requires, one gpio as interrupt, in the interrupt handler, 
-we detect the gpio status judging the otg status.
-extcon-gpio.c use the interrupt, then can we also use the gpio interrupt.
-Using extcon-gpio is used for saving gpio_request?
+> > I have no control of that. This command goes into a pipe that is managed 
+> > at the hardware level. If the nand device does not activate the ready/busy 
+> > signal, the pipe will just stall, and the command FIFO will overflow (the 
+> > command FIFO has 8 entries). So you will notice the error eventually.
+> 
+> My point is: you should not return 1 if the NAND is not ready,
+> waiting forever is not what I'm suggesting here, but you should find a
+> way to return the actual NAND chip R/B status.
+> If you don't have any solution to do that from your controller then you
+> might consider relying on the default dev_ready implementation which is
+> sending a NAND STATUS command to retrieve the R/B status.
+> 
+> What I'll say is in contradiction with what's done in the sunxi
+> driver :-) (actually I'm considering fixing that), but after taking a
+> closer look, dev_ready should only return the status of the NAND, and
+> not wait for the NAND to be ready.
+> The function responsible for waiting is waitfunc, maybe this is the one
+> you should overload.
 
->
-> Quite frankly, though, Roger Quadros (now in Cc) has been working to get
-> DT support on extcon-gpio, so perhaps wait for that and base your
-> patches on top of his.
->
-> Now your statement that GPIO is clear enough is completely bogus to me.
->
-> Why do we have fixed regulators with GPIO enable signals, right ? Might
-> as well just fiddle with the GPIO directly, right ? Wrong, the idea of
-> using these frameworks is to encapsulate implementation details and make
-> sure that if things change from one board to another, we can still use
-> our SW without major modifications.
->
->>>>>> +	if (gpio_vbus == 0) {
->>>>>> +		if (gpio_id == 1)
->>>>>> +			state = OTG_STATE_B_PERIPHERAL;
->>>>>> +		else
->>>>>> +			state = OTG_STATE_A_HOST;
->>>>>> +	} else {
->>>>>> +		state = OTG_STATE_A_HOST;
->>>>>> +	}
->>>>>> +
->>>>>> +	if (priv->state != state) {
->>>>>> +		hi6220_start_peripheral(priv, state == OTG_STATE_B_PERIPHERAL);
->>>>>> +		priv->state = state;
->>>>>> +	}
->>>>>> +}
->>>>>> +
->>>>>> +static irqreturn_t hiusb_gpio_intr(int irq, void *data)
->>>>>> +{
->>>>>> +	struct hi6220_priv *priv = (struct hi6220_priv *)data;
->>>>>> +
->>>>>> +	/* add debounce time */
->>>>>> +	schedule_delayed_work(&priv->work, msecs_to_jiffies(100));
->>>>>
->>>>> this is really bad. We have threaded interrupt support, right ?
->>>>
->>>> Since we use two gpio to distinguish gadget mode or host mode.
->>>> Debounce time can introduce more accuracy.
->>>
->>> gpio_set_debounce() ?
->> Not all gpio.c support set_debounce, including gpio-pl061.c.
->
-> then the framework should implement it in SW. That was the whole idea of
-> adding set_debounce() to gpiolib. If the controller can't handle it,
-> gpiolib handles it in SW. Again, encapsulating details.
->
->>>> I think threaded interrupt can not be used for adding debounce time.
->>>> Here add debounce is just for safety.
->>>
->>> add the debounce to the gpio itself.
->>
->> Here the debounce added only for safety.
->> gpio_id may mis-report when unplug usb, but it is correct for plug usb & otg
->> device.
->> So debounce can be omitted.
->> If you think using delayed work for debounce is ugly, it is fine switch to
->> threaded_irq.
->
-> debounce might be very well needed. We *do* want to filter out the
-> transient period. I'm just telling you there are better ways of doing
-> so; and your response to that is "let's just remove it" and I'm not
-> really comfortable with that attitude.
->
-> That's the attitude of a lazy person which, I hope, you are not ;)
+OK. I'll look into overloading waitfunc.
 
-Understand.
-What I mean here is gpio_id is not used when unplug, it is only used 
-after plug.
+[...]
 
-Thanks
+> > > > +static void digicolor_nfc_cmd_ctrl(struct mtd_info *mtd, int cmd,
+> > > > +				   unsigned int ctrl)
+> > > > +{
+> > > > +	struct nand_chip *chip = mtd->priv;
+> > > > +	struct digicolor_nfc *nfc = chip->priv;
+> > > > +	u32 cs = nfc->nand_cs;
+> > > > +
+> > > > +	if (ctrl & NAND_CLE) {
+> > > > +		digicolor_nfc_cmd_write(nfc,
+> > > > +					CMD_CLE | CMD_CHIP_ENABLE(cs) | cmd);
+> > > > +		if (cmd == NAND_CMD_RNDOUTSTART || cmd == NAND_CMD_RNDIN) {
+> > > > +			digicolor_nfc_wait_ns(nfc, nfc->t_ccs);
+> > > > +		} else if (cmd == NAND_CMD_RESET) {
+> > > > +			digicolor_nfc_wait_ns(nfc, 200);
+> > > > +			digicolor_nfc_dev_ready(mtd);
+> > > > +		}
+> > > 
+> > > These wait and dev_ready calls are supposed to be part of the generic
+> > > cmdfunc implementation, did you encounter any issues when relying on the
+> > > default implementation ?
+> > 
+> > The generic code just waits. This doesn't help here. Hardware does all the 
+> > command processing in its own schedule. To make the hardware wait I must 
+> > explicitly insert a wait command into the pipe.
+> 
+> I'm not sure to understand here.
+> There's a difference between:
+> 1/ waiting for a NAND command to be send on the NAND bus
+> 2/ waiting for the NAND to be ready (for DATA read or after a PROGRAM
+>    operation)
+> 
+> NAND core is taking care of the 2/, but 1/ is your responsibility
+> (and this is what you have to wait for here).
+
+The generic code in nand_command_lp() sends NAND_CMD_STATUS immediately after 
+NAND_CMD_RESET. According to the datasheet you must wait tWB (200ns max) 
+before sending any command, including NAND_CMD_STATUS. Setting chip_delay is 
+not enough as I explain above. That's way I added digicolor_nfc_wait_ns(). 
+That timed wait is what I referred to. You are right that the 
+digicolor_nfc_dev_ready() call is not needed here. Will remove.
+
+[...]
+
+> > > > +	while (len >= 4) {
+> > > > +		if (digicolor_nfc_wait_ready(nfc, op))
+> > > > +			return;
+> > > > +		if (op == DATA_READ)
+> > > > +			*pr++ = readl_relaxed(nfc->regs + NFC_DATA);
+> > > > +		else
+> > > > +			writel_relaxed(*pw++, nfc->regs + NFC_DATA);
+> > > > +		len -= 4;
+> > > > +	}
+> > > 
+> > > How about using readsl/writesl here (instead of this loop) ?
+> > 
+> > How can I add the wait condition in readsl/writesl?
+> 
+> Are you sure you have to wait after each readl access (is NFC_DATA
+> interfaced with a FIFO or directly doing PIO access) ?
+
+That's what the datasheet says. There is no mention of data FIFO in the 
+datasheet.
+
+[...]
+
+> > > > +	/*
+> > > > +	 * Maximum assert/deassert time; asynchronous SDR mode 0
+> > > > +	 * Deassert time = max(tWH,tREH) = 30ns
+> > > > +	 * Assert time = max(tRC,tRP,tWC,tWP) = 100ns
+> > > > +	 * Sample time = 0
+> > > > +	 */
+> > > > +	timing |= TIMING_DEASSERT(DIV_ROUND_UP(30, ns_per_clk));
+> > > > +	timing |= TIMING_ASSERT(DIV_ROUND_UP(100, ns_per_clk));
+> > > > +	timing |= TIMING_SAMPLE(0);
+> > > > +	writel_relaxed(timing, nfc->regs + NFC_TIMING_CONFIG);
+> > > > +	writel_relaxed(NFC_CONTROL_ENABLE, nfc->regs + NFC_CONTROL);
+> > > 
+> > > Helper functions are provided to extract timings from ONFI timing modes
+> > > (either those defined by the chip if it supports ONFI commands, or
+> > > those extracted from the datasheet):
+> > > 
+> > > http://lxr.free-electrons.com/source/include/linux/mtd/nand.h#L976
+> > 
+> > I wanted to keep that for future improvement. The NAND chip on the EVK board 
+> > is actually an old style one, neither ONFI nor JEDEC. I expect to test this 
+> > driver on our target hardware that should have something newer.
+> 
+> Timings are not only related to ONFI chips, and
+> onfi_timing_mode_default is extracted from the nand_ids table which is
+> describing non-ONFI chips.
+> 
+> This is not my call to make, but IMHO, dynamic NAND timing
+> configuration should be mandatory for new drivers.
+
+I'll look into this for v2.
+
+> > > > +static int digicolor_nfc_ecc_init(struct digicolor_nfc *nfc,
+> > > > +				  struct device_node *np)
+> > > > +{
+> > > > +	struct mtd_info *mtd = &nfc->mtd;
+> > > > +	struct nand_chip *chip = &nfc->nand;
+> > > > +	int bch_data_range, bch_t, steps, mode, i;
+> > > > +	u32 ctrl = NFC_CONTROL_ENABLE | NFC_CONTROL_BCH_KCONFIG;
+> > > > +	struct nand_ecclayout *layout;
+> > > > +
+> > > > +	mode = of_get_nand_ecc_mode(np);
+> > > > +	if (mode < 0)
+> > > > +		return mode;
+> > > > +	if (mode != NAND_ECC_HW_SYNDROME) {
+> > > > +		dev_err(nfc->dev, "unsupported ECC mode\n");
+> > > > +		return -EINVAL;
+> > > > +	}
+> > > > +
+> > > > +	bch_data_range = of_get_nand_ecc_step_size(np);
+> > > > +	if (bch_data_range < 0)
+> > > > +		return bch_data_range;
+> > > > +	if (bch_data_range != 512 && bch_data_range != 1024) {
+> > > > +		dev_err(nfc->dev, "unsupported nand-ecc-step-size value\n");
+> > > > +		return -EINVAL;
+> > > > +	}
+> > > > +	if (bch_data_range == 1024)
+> > > > +		ctrl |= NFC_CONTROL_BCH_DATA_FIELD_RANGE_1024;
+> > > > +	steps = mtd->writesize / bch_data_range;
+> > > > +
+> > > > +	bch_t = of_get_nand_ecc_strength(np);
+> > > > +	if (bch_t < 0)
+> > > > +		return bch_t;
+> > > 
+> > > You should fallback to datasheet values (ecc_strength_ds and
+> > > ecc_step_ds) if ECC strength and step are not specified in the DT.
+> > 
+> > I can only choose from a fix number of strength configuration alternatives. 
+> > Should I choose the lowest value that is larger than ecc_strength_ds?
+> 
+> Yep, this applies to both cases (information extracted from the DT and
+> _ds values).
+
+OK. Will do.
+
+Thanks again for your valuable feedback,
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
