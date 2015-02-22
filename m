@@ -1,64 +1,113 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Sat, 21 Feb 2015 16:45:45 -0800
-Subject: [PATCH 2/2] ARM: shmobile: silk: add SDHI0/1 DT support
-In-Reply-To: <2348421.LHyZ4ZOiiG@wasted.cogentembedded.com>
-References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
- <2348421.LHyZ4ZOiiG@wasted.cogentembedded.com>
-Message-ID: <CANqRtoRnDzTSvKYcNDHKHbeaN7jp1VvKnk1jTHDvNt1oyBzwKg@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Sat, 21 Feb 2015 18:53:27 -0800
+Subject: [PATCH 00/27] Convert seq_<foo> output calls to return void
+Message-ID: <cover.1424573328.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+As Al Viro said:
 
-On Sat, Feb 21, 2015 at 2:27 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Define the SILK board dependent parts of the SDHI0  (connected to SDIO Wi-Fi
-> chip)  and SDHI1  (connected to micro-SD slot) device nodes along with the
-> necessary voltage regulators.
->
-> Based on the original patch by Vladimir Barinov
-> <vladimir.barinov@cogentembedded.com>.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+we are getting well-meaning folks who try to check that return value,
+again and again, getting it wrong every time.   Typical idiocies:
+        * return some kind of error out of ->show() on overflows.  Pointless
+*and* wrong - only hard errors (== fail read(2) with that) should be
+reported that way; the caller does detect overflow and retires with bigger
+buffer just fine.
+        * keep checking it after every sodding call of seq_...(), screwing
+the cleanups up more often than not.  Pointless, unless you are doing some
+seriously expensive calculations to produce something you are going to print.
+seq_...() are no-ops in case when overflow has already happened.
 
-Thanks for your patch. One question - above you write that SDHI1 is micro-SD...
+seq_has_overflowed() is only for situations when you really want to skip
+a serious amount of work generating the data that would end up being
+discarded and recalculated again when the caller grabs a bigger buffer and
+calls you again.  And more often than not it's an indication of ->show()
+trying to do the work of iterator - e.g. when you have single_open() with
+->show() printing the entire hash table of some sort all in one record.
 
-> @@ -100,3 +159,25 @@
->         non-removable;
->         status = "okay";
->  };
-> +
-> +&sdhi0 {
-> +       pinctrl-0 = <&sdhi0_pins>;
-> +       pinctrl-names = "default";
-> +
-> +       vmmc-supply = <&vcc_sdhi0>;
-> +       vqmmc-supply = <&vccq_sdhi0>;
-> +       cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
-> +       wp-gpios = <&gpio6 7 GPIO_ACTIVE_LOW>;
-> +       status = "okay";
-> +};
-> +
-> +&sdhi1 {
-> +       pinctrl-0 = <&sdhi1_pins>;
-> +       pinctrl-names = "default";
-> +
-> +       vmmc-supply = <&vcc_sdhi1>;
-> +       vqmmc-supply = <&vccq_sdhi1>;
-> +       cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
-> +       wp-gpios = <&gpio6 15 GPIO_ACTIVE_LOW>;
-> +       status = "okay";
-> +};
+Most of the time checking return value of seq_...() is better replaced with
+not doing that.  And "must check return value and Do Something(tm)" is too
+strong habit for enough people to cause recurring trouble.
 
-... however here the WP signal is assigned.
+Joe Perches (27):
+  staging: lustre: Convert "return seq_printf(...)" uses
+  staging: lustre: Convert seq_ hash functions to return void
+  staging: lustre: Convert uses of "int rc = seq_printf(...)"
+  staging: lustre: Convert remaining uses of "= seq_printf(...)"
+  x86: mtrr: if: Remove use of seq_printf return value
+  power: wakeup: Remove use of seq_printf return value
+  ipmi: Remove use of seq_printf return value
+  rtc: Remove use of seq_printf return value
+  ipc: Remove use of seq_printf return value
+  pxa27x_udc: Remove use of seq_printf return value
+  microblaze: mb: Remove use of seq_printf return value
+  nios2: cpuinfo: Remove use of seq_printf return value
+  ARM: plat-pxa: Remove use of seq_printf return value
+  openrisc: Remove use of seq_printf return value
+  cris: Remove use of seq_printf return value
+  mfd: ab8500-debugfs: Remove use of seq_printf return value
+  staging: i2o: Remove use of seq_printf return value
+  staging: rtl8192x: Remove use of seq_printf return value
+  s390: Remove use of seq_printf return value
+  i8k: Remove use of seq_printf return value
+  watchdog: bcm281xx: Remove use of seq_printf return value
+  proc: Remove use of seq_printf return value
+  cgroup: Remove use of seq_printf return value
+  tracing: Remove use of seq_printf return value
+  lru_cache: Remove use of seq_printf return value
+  parisc: Remove use of seq_printf return value
+  regulator: dbx500: Remove use of seq_puts/seq_printf return value
 
-I believe micro-SD doesn't use the WP signal, so either I'm wrong or
-the patch needs to be updated to reflect reality. =)
+ arch/arm/plat-pxa/dma.c                            | 111 ++++++------
+ arch/cris/arch-v10/kernel/setup.c                  |  58 +++---
+ arch/cris/arch-v32/kernel/setup.c                  |  62 +++----
+ arch/microblaze/kernel/cpu/mb.c                    | 149 ++++++++--------
+ arch/nios2/kernel/cpuinfo.c                        |  77 ++++----
+ arch/openrisc/kernel/setup.c                       |  50 +++---
+ arch/s390/pci/pci_debug.c                          |   6 +-
+ arch/x86/kernel/cpu/mtrr/if.c                      |  12 +-
+ drivers/base/power/wakeup.c                        |  16 +-
+ drivers/char/i8k.c                                 |  16 +-
+ drivers/char/ipmi/ipmi_msghandler.c                |  12 +-
+ drivers/char/ipmi/ipmi_si_intf.c                   |  26 +--
+ drivers/char/ipmi/ipmi_ssif.c                      |   4 +-
+ drivers/mfd/ab8500-debugfs.c                       | 196 +++++++++++++--------
+ drivers/parisc/ccio-dma.c                          |  54 +++---
+ drivers/parisc/sba_iommu.c                         |  86 +++++----
+ drivers/regulator/dbx500-prcmu.c                   |  32 +---
+ drivers/rtc/rtc-cmos.c                             |  36 ++--
+ drivers/rtc/rtc-ds1305.c                           |   6 +-
+ drivers/rtc/rtc-mrst.c                             |  16 +-
+ drivers/rtc/rtc-tegra.c                            |   4 +-
+ drivers/s390/cio/blacklist.c                       |  12 +-
+ drivers/staging/i2o/i2o_proc.c                     |  18 +-
+ .../lustre/include/linux/libcfs/libcfs_hash.h      |   4 +-
+ drivers/staging/lustre/lustre/fid/lproc_fid.c      |  23 ++-
+ drivers/staging/lustre/lustre/libcfs/hash.c        |  13 +-
+ drivers/staging/lustre/lustre/llite/lproc_llite.c  | 117 ++++++------
+ drivers/staging/lustre/lustre/lmv/lproc_lmv.c      |  18 +-
+ drivers/staging/lustre/lustre/lov/lproc_lov.c      |  30 ++--
+ drivers/staging/lustre/lustre/mdc/lproc_mdc.c      |   6 +-
+ .../lustre/lustre/obdclass/linux/linux-module.c    |  38 ++--
+ .../lustre/lustre/obdclass/lprocfs_status.c        | 108 ++++++------
+ drivers/staging/lustre/lustre/obdclass/lu_object.c |  25 +--
+ drivers/staging/lustre/lustre/osc/lproc_osc.c      |  67 +++----
+ .../staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c    |  25 +--
+ drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    |  82 +++++----
+ drivers/staging/rtl8192e/rtllib_module.c           |   4 +-
+ .../staging/rtl8192u/ieee80211/ieee80211_module.c  |   4 +-
+ drivers/usb/gadget/udc/pxa27x_udc.c                | 132 +++++++-------
+ drivers/watchdog/bcm_kona_wdt.c                    |  27 +--
+ fs/proc/array.c                                    |   4 +-
+ fs/proc/base.c                                     |  82 +++++----
+ ipc/msg.c                                          |  34 ++--
+ ipc/sem.c                                          |  26 +--
+ ipc/shm.c                                          |  42 ++---
+ ipc/util.c                                         |   6 +-
+ kernel/cgroup.c                                    |   4 +-
+ kernel/trace/trace_stack.c                         |   4 +-
+ lib/lru_cache.c                                    |   9 +-
+ 49 files changed, 1050 insertions(+), 943 deletions(-)
 
-Also, I doubt that an on-board SDIO module makes use of CD and/or WP signals?
-
-Any ideas?
-
-Thanks,
-
-/ magnus
+-- 
+2.1.2
