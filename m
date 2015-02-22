@@ -1,70 +1,78 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 22 Feb 2015 17:54:13 +0300
-Subject: [PATCH 2/2] ARM: shmobile: silk: add SDHI0/1 DT support
-In-Reply-To: <CANqRtoRnDzTSvKYcNDHKHbeaN7jp1VvKnk1jTHDvNt1oyBzwKg@mail.gmail.com>
-References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>	<2348421.LHyZ4ZOiiG@wasted.cogentembedded.com>
- <CANqRtoRnDzTSvKYcNDHKHbeaN7jp1VvKnk1jTHDvNt1oyBzwKg@mail.gmail.com>
-Message-ID: <54E9ED95.8070702@cogentembedded.com>
+From: vincent.stehle@laposte.net (=?UTF-8?q?Vincent=20Stehl=C3=A9?=)
+Date: Sun, 22 Feb 2015 17:09:06 +0100
+Subject: [PATCH linux-next] iommu: Enable LPAE pagetable on ARM only
+Message-ID: <1424621346-7822-1-git-send-email-vincent.stehle@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+LPAE iommu page table makes sense only for ARM architecture. Add the
+corresponding dependency in Kconfig.
 
-On 02/22/2015 03:45 AM, Magnus Damm wrote:
+This fixes the following runtime warnings on PA-RISC architecture:
 
->> Define the SILK board dependent parts of the SDHI0  (connected to SDIO Wi-Fi
->> chip)  and SDHI1  (connected to micro-SD slot) device nodes along with the
->> necessary voltage regulators.
+  WARNING: at drivers/iommu/io-pgtable-arm.c:413
+  Modules linked in:
+  CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.19.0-next-20150222-00002-gc420256 #2
+  task: 17ca0000 ti: 17ca8000 task.ti: 17ca8000
+  
+       YZrvWESTHLNXBCVMcbcbcbcbOGFRQPDI
+  PSW: 00000000000001001111111100001111 Not tainted
+  r00-03  0004ff0f 0000001b 104871b0 17ca83c0
+  r04-07  00001000 00000000 00000000 00000000
+  r08-11  00000000 40001000 1013b36c 17ca8248
+  r12-15  00000080 17e712c0 00000000 17c5e100
+  r16-19  0000000c 105d8eb0 40001000 ffffffff
+  r20-23  00000000 00800020 1048717c 00000000
+  r24-27  00001000 00000000 00000009 10774ce0
+  r28-31  00000000 00000027 17ca8480 10486d44
+  sr00-03  00000000 00000000 00000000 00000000
+  sr04-07  00000000 00000000 00000000 00000000
+  
+  IASQ: 00000000 00000000 IAOQ: 10486df4 10486df8
+   IIR: 03ffe01f    ISR: 00000000  IOR: 17c86e54
+   CPU:        0   CR30: 17ca8000 CR31: 00000002
+   ORIG_R28: 00000001
+   IAOQ[0]: __arm_lpae_unmap+0x144/0x4cc
+   IAOQ[1]: __arm_lpae_unmap+0x148/0x4cc
+   RP(r2): arm_lpae_unmap+0x34/0x6c
+  Backtrace:
+   [<104871b0>] arm_lpae_unmap+0x34/0x6c
+   [<10127944>] 0x10127944
+   [<10168ee0>] do_one_initcall+0x128/0x1dc
+   [<101028fc>] 0x101028fc
+   [<10161b48>] kernel_init+0x1c/0x118
+   [<1015d01c>] end_fault_vector+0x1c/0x24
+   [<101762ec>] save_stack_trace+0x28/0x60
 
->> Based on the original patch by Vladimir Barinov
->> <vladimir.barinov@cogentembedded.com>.
+Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
 
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-> Thanks for your patch. One question - above you write that SDHI1 is micro-SD...
+Hi,
 
-    Yes, have double-checked now.
+This can be seen with e.g. Linux next-20150222 on parisc with allmodconfig.
 
->> @@ -100,3 +159,25 @@
->>          non-removable;
->>          status = "okay";
->>   };
->> +
->> +&sdhi0 {
->> +       pinctrl-0 = <&sdhi0_pins>;
->> +       pinctrl-names = "default";
->> +
->> +       vmmc-supply = <&vcc_sdhi0>;
->> +       vqmmc-supply = <&vccq_sdhi0>;
->> +       cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
->> +       wp-gpios = <&gpio6 7 GPIO_ACTIVE_LOW>;
->> +       status = "okay";
->> +};
->> +
->> +&sdhi1 {
->> +       pinctrl-0 = <&sdhi1_pins>;
->> +       pinctrl-names = "default";
->> +
->> +       vmmc-supply = <&vcc_sdhi1>;
->> +       vqmmc-supply = <&vccq_sdhi1>;
->> +       cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
->> +       wp-gpios = <&gpio6 15 GPIO_ACTIVE_LOW>;
->> +       status = "okay";
->> +};
+Best regards,
 
-> ... however here the WP signal is assigned.
+V.
 
-> I believe micro-SD doesn't use the WP signal, so either I'm wrong or
-> the patch needs to be updated to reflect reality. =)
 
-    Both seem correct: SD1_WP signal is just tied to VCCQ_SD1. Do you think we 
-should still drop it?
+ drivers/iommu/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-> Also, I doubt that an on-board SDIO module makes use of CD and/or WP signals?
-
-    Those two are tied to VCCQ_SD0 as well. Do you think we should drop them?
-
-> Thanks,
-> / magnus
-
-WBR, Sergei
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index baa0d97..c73fd72 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -22,6 +22,7 @@ config IOMMU_IO_PGTABLE
+ 
+ config IOMMU_IO_PGTABLE_LPAE
+ 	bool "ARMv7/v8 Long Descriptor Format"
++	depends on ARM
+ 	select IOMMU_IO_PGTABLE
+ 	help
+ 	  Enable support for the ARM long descriptor pagetable format.
+-- 
+2.1.4
