@@ -1,50 +1,45 @@
-From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
-Date: Sun, 22 Feb 2015 21:31:31 +0000
-Subject: [PATCH] ARM: bcm2835: Add header file for pinctrl constants
-In-Reply-To: <5700696.0jJhSRhno5@wuerfel>
-References: <1424624396-812-1-git-send-email-ckeepax@opensource.wolfsonmicro.com>
- <5700696.0jJhSRhno5@wuerfel>
-Message-ID: <20150222213131.GA9837@opensource.wolfsonmicro.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 23 Feb 2015 08:44:18 +0900
+Subject: [PATCHv3 0/8] devfreq: Add generic exynos memory-bus frequency
+ driver
+In-Reply-To: <54E4FD40.8020206@gmx.net>
+References: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
+ <54DFE797.1020008@math.uni-bielefeld.de> <54E4FD40.8020206@gmx.net>
+Message-ID: <54EA69D2.7010706@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 22, 2015 at 09:13:23PM +0100, Arnd Bergmann wrote:
-> On Sunday 22 February 2015 16:59:56 Charles Keepax wrote:
-> > +
-> > +/* IRQ Flags */
-> > +#define BCM2835_PIN_IRQ_RISING                         1
-> > +#define BCM2835_PIN_IRQ_FALLING                                2
-> > +#define BCM2835_PIN_IRQ_EDGE   (BCM2835_PIN_IRQ_RISING | \
-> > +                                BCM2835_PIN_IRQ_FALLING)
-> > +#define BCM2835_PIN_IRQ_LOW                            4
-> > +#define BCM2835_PIN_IRQ_HIGH                           8
-> 
-> Are these different from the standard definitions?
-> 
-> > +/* Pin Function Settings */
-> > +#define BCM2835_PIN_FUNC_GPIO_IN                       0
-> > +#define BCM2835_PIN_FUNC_GPIO_OUT                      1
-> > +#define BCM2835_PIN_FUNC_ALT5                          2
-> > +#define BCM2835_PIN_FUNC_ALT4                          3
-> > +#define BCM2835_PIN_FUNC_ALT0                          4
-> > +#define BCM2835_PIN_FUNC_ALT1                          5
-> > +#define BCM2835_PIN_FUNC_ALT2                          6
-> > +#define BCM2835_PIN_FUNC_ALT3                          7
-> 
-> Why are these required? They don't seem to be used by any driver,
-> which leads me to suspect that they are just the hardware numbers.
-> 
-> In that case, don't add any syntactical sugar like that and just
-> use the hardware numbers directly.
+Hi Tobias,
 
-Yeah they are just hardware numbers, I wasn't aware there was a
-preference to use the numbers directly in which case just ignore
-this patch.
+First of all, thanks for your test.
 
+On 02/19/2015 05:59 AM, Tobias Jakobi wrote:
+> Hello again,
 > 
-> What's with the strange mapping of numbers anyway?
+> Tobias Jakobi wrote
+>> I've tested the series on my Odroid-X2 (by adapting the TRATS2 changes),
+>> and so far I haven't seen any issues. With the system being idle one can
+>> see that the 'simple_ondemand' devfreq governor clocks down both memory
+>> busses to the lowest state.
+> 
+> looks I was too hasty the last time. Actually this series breaks HDMI
+> output for me (or at least with 'simple_ondemand' governor, haven't
+> tried with performance yet).
+> 
+> I tried to run some simple application, but it hangs in uninterruptible
+> sleep immediately, probably before the first page flip. Going to check
+> this more thoroughly.
+> 
+> Maybe some parts of the hdmi subsystem don't like the lower clocks?
 
-You would need to ask Broadcom that :-)
+As you thought, when maintaining lower clock of memory bus frequency,
+some issue related to multimedia feature will happen.
+
+Separately, We have to check the miminum lower clock for working of multimedia feature.
+and then multimedia or other IP have to request it to DVFS driver (memory busfreq driver).
+But, latest mainline kernel currently has not some way to inform minimum clock to DVFS driver.
+
+So, If you check the miminum clock for hdmi, I'll use this clock as minumu frequency of dvfs table.
 
 Thanks,
-Charles
+Chanwoo Choi
