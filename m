@@ -1,22 +1,22 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 23 Feb 2015 12:08:16 +0100
-Subject: [PATCH 1/2] ARM: shmobile: r8a7794: add GPIO clocks
-In-Reply-To: <1831753.Dnjo3xKPJv@wasted.cogentembedded.com>
+Date: Mon, 23 Feb 2015 12:11:27 +0100
+Subject: [PATCH 2/2] ARM: shmobile: r8a7794: add GPIO DT support
+In-Reply-To: <3082195.zNdUtZ8oMM@wasted.cogentembedded.com>
 References: <6954455.LyoCrfjM8R@wasted.cogentembedded.com>
- <1831753.Dnjo3xKPJv@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdXG0KzgjR65uAS-tDd+L_E+eRPj2SHR+58T9Pgk0G1tVw@mail.gmail.com>
+ <3082195.zNdUtZ8oMM@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdXAg42G2KXtkcZeQwwQ63fmkm9CHA3Lq35hXK=HKyoFKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 21, 2015 at 11:11 PM, Sergei Shtylyov
+On Sat, Feb 21, 2015 at 11:12 PM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
-> Describe the GPIO clocks in the R8A7794 device tree.
+> Describe GPIO[0-6] controllers in the R8A7794 device tree.
 >
-> Based on the original patch by Koji Matsuoka <koji.matsuoka.xm@renesas.com>.
+> Based on original patch by Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>.
 >
 > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-?by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 Gr{oetje,eeting}s,
 
