@@ -1,52 +1,39 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 23 Feb 2015 16:04:08 +0100
-Subject: [PATCH] [media] s5p-jpeg: Clear JPEG_CODEC_ON bits in sw reset
- function
-In-Reply-To: <1418797339-27877-1-git-send-email-tony.kn@samsung.com>
-References: <1418797339-27877-1-git-send-email-tony.kn@samsung.com>
-Message-ID: <54EB4168.7090007@samsung.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Mon, 23 Feb 2015 16:04:18 +0100
+Subject: [PATCH 0/3] Add DT support for netxbig LEDs
+Message-ID: <1424703861-20903-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On 17/12/14 07:22, Tony K Nadackal wrote:
-> Bits EXYNOS4_DEC_MODE and EXYNOS4_ENC_MODE do not get cleared
-> on software reset. These bits need to be cleared explicitly.
-> 
-> Signed-off-by: Tony K Nadackal <tony.kn@samsung.com>
-> ---
-> This patch is created and tested on top of linux-next-20141210.
-> It can be cleanly applied on media-next and kgene/for-next.
-> 
-> 
->  drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-> index ab6d6f43..e53f13a 100644
-> --- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-> +++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-> @@ -21,6 +21,10 @@ void exynos4_jpeg_sw_reset(void __iomem *base)
->  	unsigned int reg;
->  
->  	reg = readl(base + EXYNOS4_JPEG_CNTL_REG);
-> +	writel(reg & ~(EXYNOS4_DEC_MODE | EXYNOS4_ENC_MODE),
-> +				base + EXYNOS4_JPEG_CNTL_REG);
-> +
-> +	reg = readl(base + EXYNOS4_JPEG_CNTL_REG);
+This patch series adds DT support for the LEDs found on the Kirkwood-based
+LaCie boards 2Big and 5Big Network v2.
 
-Do we really need the second read? Wouldn't it also work as below ?
+Simon
 
-  	reg = readl(base + EXYNOS4_JPEG_CNTL_REG);
+Simon Guinot (3):
+  leds: netxbig: add device tree binding
+  ARM: Kirkwood: add LED DT entries for netxbig boards
+  ARM: mvebu: remove static LED setup for netxbig boards
 
-+	reg &= ~(EXYNOS4_DEC_MODE | EXYNOS4_ENC_MODE);
-+	writel(reg, base + EXYNOS4_JPEG_CNTL_REG);
+ .../devicetree/bindings/gpio/netxbig-gpio-ext.txt  |  22 ++
+ .../devicetree/bindings/leds/leds-netxbig.txt      |  90 ++++++++
+ arch/arm/boot/dts/kirkwood-net5big.dts             |  60 +++++
+ arch/arm/boot/dts/kirkwood-netxbig.dtsi            |  80 +++++++
+ arch/arm/mach-mvebu/Kconfig                        |   7 -
+ arch/arm/mach-mvebu/Makefile                       |   1 -
+ arch/arm/mach-mvebu/board.h                        |  21 --
+ arch/arm/mach-mvebu/kirkwood.c                     |   4 -
+ arch/arm/mach-mvebu/netxbig.c                      | 191 ----------------
+ drivers/leds/leds-netxbig.c                        | 244 +++++++++++++++++++--
+ include/dt-bindings/leds/leds-netxbig.h            |  18 ++
+ 11 files changed, 493 insertions(+), 245 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/netxbig-gpio-ext.txt
+ create mode 100644 Documentation/devicetree/bindings/leds/leds-netxbig.txt
+ delete mode 100644 arch/arm/mach-mvebu/board.h
+ delete mode 100644 arch/arm/mach-mvebu/netxbig.c
+ create mode 100644 include/dt-bindings/leds/leds-netxbig.h
 
-?
->  	writel(reg & ~EXYNOS4_SOFT_RESET_HI, base + EXYNOS4_JPEG_CNTL_REG);
->  
->  	udelay(100);
---
-Thanks,
-Sylwester
+-- 
+2.1.1
