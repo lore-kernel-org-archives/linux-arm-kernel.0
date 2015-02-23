@@ -1,53 +1,36 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 23 Feb 2015 16:27:02 +0100
-Subject: [PATCHv2 04/15] ARM: mvebu: use IRQ macros to define the SDHCI
- interrupt on Armada 38x
-In-Reply-To: <1424451874-25375-5-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1424451874-25375-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1424451874-25375-5-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <54EB46C6.6020506@free-electrons.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 23 Feb 2015 16:28:09 +0100
+Subject: [PATCH 1/2] touchscreen devicetree binding: Add touchscreen-swap-x-y
+ property
+Message-ID: <1424705290-19172-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On devices with a native portrait screen a landscape touchscreen / digitizer
+may be used, this happens e.g. on ebook readers. In this case the X and Y
+axis of the touchscreen are swapped compared to the screen.
 
-On 20/02/2015 18:04, Thomas Petazzoni wrote:
-> The Armada 38x SDHCI controller definition in the SoC Device Tree file
-> is using hardcoded values instead of the nice GIC and IRQ macros
-> provided by DT header files. This commit fixes that, which allows the
-> SDHCI interrupt definition to be consistent with was is done in the
-> rest of the file.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Add a touchscreen-swap-x-y property which drivers can use to see if they
+need to swap the axis to make the touchscreen coordinates match the screen
+coordinates.
 
-I already submitted this fix as part of the "fixes and improvements for SDHCI" series.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Thanks,
-
-Gregory
-
-> ---
->  arch/arm/boot/dts/armada-38x.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index 8c76a8d..0f0cc41 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -542,7 +542,7 @@
->  			sdhci at d8000 {
->  				compatible = "marvell,armada-380-sdhci";
->  				reg = <0xd8000 0x1000>, <0xdc000 0x100>;
-> -				interrupts = <0 25 0x4>;
-> +				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
->  				clocks = <&gateclk 17>;
->  				mrvl,clk-delay-cycles = <0x1F>;
->  				status = "disabled";
-> 
-
-
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt b/Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt
+index d8e0616..12401a1 100644
+--- a/Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt
++++ b/Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt
+@@ -16,6 +16,8 @@ Optional properties for Touchscreens:
+ 				  controller)
+  - touchscreen-inverted-x	: X axis is inverted (boolean)
+  - touchscreen-inverted-y	: Y axis is inverted (boolean)
++ - touchscreen-swap-x-y		: X and Y axis are swapped (boolean)
++				  Swapping is done after inverting the axis
+ 
+ Deprecated properties for Touchscreens:
+  - x-size			: deprecated name for touchscreen-size-x
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.3.0
