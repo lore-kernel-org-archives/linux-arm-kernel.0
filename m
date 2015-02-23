@@ -1,52 +1,56 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 23 Feb 2015 11:28:12 +0100
-Subject: Build regressions/improvements in v4.0-rc1
-In-Reply-To: <5721217.aGU5oqfDWo@wuerfel>
-References: <1424680402-3477-1-git-send-email-geert@linux-m68k.org>
- <5900255.NhXvduRnha@wuerfel>
- <CAMuHMdVMCvw1euM0c2AYrYibO4ObZLV6F_-CDPZZ6x44D6Hwug@mail.gmail.com>
- <5721217.aGU5oqfDWo@wuerfel>
-Message-ID: <CAMuHMdUTCvQw1q-dJcx9dAnFEXtfJYs+rbVS4KdZgi-3cbSC7g@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 23 Feb 2015 11:32:14 +0100
+Subject: [PATCHv3 0/2] drm: atmel-hlcdc: PM support
+In-Reply-To: <1424627464-16869-1-git-send-email-sylvain.rochet@finsecur.com>
+References: <1424627464-16869-1-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <20150223113214.584ee794@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 23, 2015 at 11:24 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 23 February 2015 10:14:55 Geert Uytterhoeven wrote:
->> On Mon, Feb 23, 2015 at 10:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> >> >   + /home/kisskb/slave/src/fs/dax.c: error: implicit declaration of function 'copy_user_page' [-Werror=implicit-function-declaration]:  => 266:2
+Hi Sylvain,
 
-> I checked the other architectures, and found that the same is missing on
-> ARC, so we should add both:
->
-> diff --git a/fs/Kconfig b/fs/Kconfig
-> index ec35851e5b71..a24d496787d6 100644
-> --- a/fs/Kconfig
-> +++ b/fs/Kconfig
-> @@ -36,7 +36,7 @@ source "fs/nilfs2/Kconfig"
->  config FS_DAX
->         bool "Direct Access (DAX) support"
->         depends on MMU
-> -       depends on !(ARM || MIPS || SPARC)
-> +       depends on !(ARC || ARM || MIPS || SH || SPARC)
->         help
->           Direct Access (DAX) can be used on memory-backed block devices.
->           If the block device supports DAX and the filesystem supports DAX,
->
->
-> It's also not implemented on c6x and blackfin, but both of them have
-> MMU=n, so they are already excluded.
+On Sun, 22 Feb 2015 18:51:02 +0100
+Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
 
-Exactly.
+> This series adds basic PM support for Atmel HLCDC.
+> 
+> This series depends on:
+> 
+> [PATCH] drm: atmel-hlcdc: remove useless pm_runtime_put_sync in probe
+>   <1423841785-23105-1-git-send-email-boris.brezillon@free-electrons.com>
+> [PATCH v3] drm: atmel-hlcdc: Atomic mode-setting conversion
+>   <1423842415-23412-1-git-send-email-boris.brezillon@free-electrons.com>
 
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Thanks, I'll queue the series to my drm-atmel-hlcdc-devel branch (with
+Andrzej's Reviewed-by).
 
-Gr{oetje,eeting}s,
+> 
+> Changes since v2:
+>   * Save previous state of crtc's so we don't enable them unconditionally
+>     at resume.
+>   * Remove obsolete use of drm_driver.suspend and drm_driver.resume
+>     callbacks
+>   * Merged atmel_hlcdc_dc_suspend to atmel_hlcdc_dc_drm_suspend and
+>     atmel_hlcdc_dc_resume to atmel_hlcdc_dc_drm_resume since we don't
+>     need the previous callbacks anymore
+>   * Removed useless check of drm_dev in suspend/resume functions
+> 
+> Changes since v1:
+>   * (*crtc_funcs->disable)(crtc) replaced to crtc_funcs->disable(crtc)
+> 
+> Sylvain Rochet (2):
+>   drm: atmel-hlcdc: Add PM suspend/resume support
+>   drm: atmel-hlcdc: Add pinctrl PM select sleep,default state in CRTC
+>     suspend/resume
+> 
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c |  3 ++
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c   | 47 ++++++++++++++++++++++++++
+>  2 files changed, 50 insertions(+)
+> 
 
-                        Geert
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
