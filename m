@@ -1,35 +1,48 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Mon, 23 Feb 2015 10:46:44 +0100
-Subject: [PATCH 2/3] clk: divider: fix selection of divider when rounding
- to closest
-In-Reply-To: <1424515225-6929-3-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20150221085620.GV19388@pengutronix.de>
- <1424515225-6929-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1424515225-6929-3-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <54EAF704.9030706@st.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 23 Feb 2015 10:45:44 +0100
+Subject: [PATCH] ARM: sunxi: Have ARCH_SUNXI select RESET_CONTROLLER for
+ clock driver usage
+In-Reply-To: <1423477400-30520-1-git-send-email-wens@csie.org>
+References: <1423477400-30520-1-git-send-email-wens@csie.org>
+Message-ID: <20150223094544.GC25269@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Uwe,
+On Mon, Feb 09, 2015 at 06:23:20PM +0800, Chen-Yu Tsai wrote:
+> As the sunxi usb clocks all contain a reset controller, it is not
+> possible to build the sunxi clock driver without RESET_CONTROLLER
+> enabled. Doing so results in an undefined symbol error:
+> 
+>     drivers/built-in.o: In function `sunxi_gates_clk_setup':
+>     linux/drivers/clk/sunxi/clk-sunxi.c:1071: undefined reference to
+> 	`reset_controller_register'
+> 
+> This is possible if building a minimal kernel without PHY_SUN4I_USB.
+> 
+> The dependency issue is made visible at compile time instead of
+> link time by the new A80 mmc clocks, which also use a reset control
+> itself.
+> 
+> This patch makes ARCH_SUNXI select ARCH_HAS_RESET_CONTROLLER and
+> RESET_CONTROLLER.
+> 
+> Reported-by: Lourens Rozema <ik@lourensrozema.nl>
+> Fixes: 559482d1f950 ARM: sunxi: Split the various SoCs support in Kconfig
+> Cc: <stable@vger.kernel.org> # 3.16+
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-On 02/21/2015 11:40 AM, Uwe Kleine-K?nig wrote:
-> It's an invalid approach to assume that among two divider values
-> the one nearer the exact divider is the better one.
->
-> Assume a parent rate of 1000 Hz, a divider with CLK_DIVIDER_POWER_OF_TWO
-> and a target rate of 89 Hz. The exact divider is ~ 11.236 so 8 and 16
-> are the candidates to choose from yielding rates 125 Hz and 62.5 Hz
-> respectivly. While 8 is nearer to 11.236 than 16 is, the latter is still
-> the better divider as 62.5 is nearer to 89 than 125 is.
->
-> Fixes: 774b514390b1 (clk: divider: Add round to closest divider)
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->   drivers/clk/clk-divider.c | 6 +++++-
->   1 file changed, 5 insertions(+), 1 deletion(-)
+Applied with Arnd Acked-by.
 
-For this one too, you can add my:
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
-
-Thanks,
 Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150223/992ecf70/attachment.sig>
