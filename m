@@ -1,86 +1,36 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 23 Feb 2015 16:32:39 +0000
-Subject: [PATCH v2] drivers/base: cacheinfo: validate device node for all the
- caches
-In-Reply-To: <1424095816-4414-1-git-send-email-sudeep.holla@arm.com>
-References: <1424095816-4414-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1424709159-13152-1-git-send-email-sudeep.holla@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 23 Feb 2015 17:36:32 +0100
+Subject: [PATCH v2 1/2] touchscreen devicetree binding: Add
+ touchscreen-swap-x-y property
+Message-ID: <1424709393-5838-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On architectures that depend on DT for obtaining cache hierarcy, we need
-to validate the device node for all the cache indices, failing to do so
-might result in wrong information being exposed to the userspace.
+On devices with a native portrait screen a landscape touchscreen / digitizer
+may be used, this happens e.g. on ebook readers. In this case the X and Y
+axis of the touchscreen are swapped compared to the screen.
 
-This is quite possible on initial/incomplete versions of the device
-trees. In such cases, it's better to bail out if all the required device
-nodes are not present.
+Add a touchscreen-swap-x-y property which drivers can use to see if they
+need to swap the axis to make the touchscreen coordinates match the screen
+coordinates.
 
-This patch adds checks for the validation of device node for all the
-caches and doesn't initialise the cacheinfo if there's any error.
-
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Reported-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/base/cacheinfo.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-v1->v2:
- - Updated log information as suggested by Mark
- - Added Mark's ACK
-
-Hi Greg,
-
-Can you please pick this fix for the next rc ?
-
-Without this there's possibility that erroneous information is exposed
-to userspace on architecture depending on DT especially if DT lacks
-cache hierarcy information.
-
-Regards,
-Sudeep
-
-diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
-index 6e64563361f0..9c2ba1c97c42 100644
---- a/drivers/base/cacheinfo.c
-+++ b/drivers/base/cacheinfo.c
-@@ -62,15 +62,21 @@ static int cache_setup_of_node(unsigned int cpu)
- 		return -ENOENT;
- 	}
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt b/Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt
+index d8e0616..12401a1 100644
+--- a/Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt
++++ b/Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt
+@@ -16,6 +16,8 @@ Optional properties for Touchscreens:
+ 				  controller)
+  - touchscreen-inverted-x	: X axis is inverted (boolean)
+  - touchscreen-inverted-y	: Y axis is inverted (boolean)
++ - touchscreen-swap-x-y		: X and Y axis are swapped (boolean)
++				  Swapping is done after inverting the axis
  
--	while (np && index < cache_leaves(cpu)) {
-+	while (index < cache_leaves(cpu)) {
- 		this_leaf = this_cpu_ci->info_list + index;
- 		if (this_leaf->level != 1)
- 			np = of_find_next_cache_node(np);
- 		else
- 			np = of_node_get(np);/* cpu node itself */
-+		if (!np)
-+			break;
- 		this_leaf->of_node = np;
- 		index++;
- 	}
-+
-+	if (index != cache_leaves(cpu)) /* not all OF nodes populated */
-+		return -ENOENT;
-+
- 	return 0;
- }
- 
-@@ -189,8 +195,11 @@ static int detect_cache_attributes(unsigned int cpu)
- 	 * will be set up here only if they are not populated already
- 	 */
- 	ret = cache_shared_cpu_map_setup(cpu);
--	if (ret)
-+	if (ret) {
-+		pr_warn("Unable to detect cache hierarcy from DT for CPU %d\n",
-+			cpu);
- 		goto free_ci;
-+	}
- 	return 0;
- 
- free_ci:
+ Deprecated properties for Touchscreens:
+  - x-size			: deprecated name for touchscreen-size-x
 -- 
-1.9.1
+2.3.0
