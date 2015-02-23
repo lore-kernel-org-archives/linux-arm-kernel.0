@@ -1,39 +1,96 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Feb 2015 23:01:18 +0100
-Subject: [PATCH] spi: sirf: add reset controller dependency
-In-Reply-To: <20150221094458.GM6236@finisterre.sirena.org.uk>
-References: <4553005.HBquOfbqXe@wuerfel> <7767301.zaEX63gvjp@wuerfel>
- <20150221094458.GM6236@finisterre.sirena.org.uk>
-Message-ID: <6170208.Z0Upu48JrX@wuerfel>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 23 Feb 2015 14:07:30 -0800
+Subject: [PATCH 0/3] arm: msm: Use timer DT node for qcom watchdog config
+In-Reply-To: <5879121.Ud0l5ICsCF@wuerfel>
+References: <1424485176-8348-1-git-send-email-mathieu@codeaurora.org>
+ <5879121.Ud0l5ICsCF@wuerfel>
+Message-ID: <54EBA4A2.1050607@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 21 February 2015 18:44:58 Mark Brown wrote:
-> On Thu, Feb 19, 2015 at 04:01:29PM +0100, Arnd Bergmann wrote:
-> 
-> > So the stubs are provided for all functions except device_reset() and
-> > reset_control_get(), and drivers using the API need to either call the
-> > stubbed-out _optional() versions of these functions or have the explicit
-> > dependency.
-> 
-> In that case a dependency seems wrong, I'd expect to see a select - it's
-> a bit obscure to have to grovel around to figure out what magic options
-> are needed to make things turn on and resets feel more like a utility
-> thing than a control bus (which tend to be the things we depend on).
-> Dunno, perhaps I'm wrong?
+On 02/23/15 13:35, Arnd Bergmann wrote:
+> On Friday 20 February 2015 18:19:33 Mathieu Olivari wrote:
+>> This change is done as a follow-up to the following thread:
+>> https://lkml.org/lkml/2014/10/1/436
+>>
+>> qcom-wdt is currently assuming the presence of a dedicated node in DT
+>> to gets its configuration. However, on msm architecture, the watchdog is
+>> usually part of the timer block. So this patch-set is changing the driver
+>> and slightly enhancing the timer DT bindings to provide the relevant clocks
+>> and interrupts.
+>>
+>> Mathieu Olivari (3):
+>>   watchdog: qcom: use timer devicetree binding
+>>   ARM: qcom: add description of KPSS WDT for IPQ8064
+>>   ARM: msm: add watchdog entries to DT timer binding doc
+>>
+>>  Documentation/devicetree/bindings/arm/msm/timer.txt | 16 +++++++++++++---
+>>  arch/arm/boot/dts/qcom-ipq8064.dtsi                 | 14 +++++++++++++-
+>>  drivers/watchdog/qcom-wdt.c                         | 21 +++++++++++++++------
+>>  3 files changed, 41 insertions(+), 10 deletions(-)
+>>
+>>
+> What about the binding document in
+> Documentation/devicetree/bindings/watchdog/qcom-wdt.txt?
+>
+>
 
-Mixing 'select' and 'depends on' causes recursive dependencies, and
-there are already lots of drivers that do 'depends on RESET_CONTROLLER'.
+We can rewrite it for platforms starting with msm8974 and beyond or
+delete it and write a new binding. It's a similar hardware block split
+out from the timers and then made to use a SPI instead of a PPI for the
+interrupt sources. We also lost the CPU remapping feature so there is
+really only one watchdog instead of 2 per cpu. Oh and the register
+offsets are different, but otherwise the registers are the same.
 
-Most users of this symbol seem to follow the strategy of selecting
-RESET_CONTROLLER when a driver is there to provide the functionality,
-but depending on it when a driver uses it. We are however a bit
-inconsistent here and it would be nice to clean it up.
+---8<-----
 
-In this particular patch, I'm just following what others do.
+From: Stephen Boyd <sboyd@codeaurora.org>
+Subject: [PATCH] Documentation: qcom-wdt: Update binding for individual block
 
-We should probably 'select ARCH_HAS_RESET_CONTROLLER' unconditionally
-for ARM ARCH_MULTIPLATFORM, as it's a bit silly to select both
-ARCH_HAS_RESET_CONTROLLER and RESET_CONTROLLER from platform code.
+On msm8974 and beyond the KPSS watchdog is split out of the timer
+block and made to be a single instance instead of per-cpu. Let's
+update the binding to reflect this and replace the binding that
+is handled by the qcom,kpss-timer binding.
 
-	Arnd
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ Documentation/devicetree/bindings/watchdog/qcom-wdt.txt | 13 +++++--------
+ 1 file changed, 5 insertions(+), 8 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/watchdog/qcom-wdt.txt b/Documentation/devicetree/bindings/watchdog/qcom-wdt.txt
+index 4726924d034e..78b92bec4c3a 100644
+--- a/Documentation/devicetree/bindings/watchdog/qcom-wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/qcom-wdt.txt
+@@ -2,14 +2,10 @@ Qualcomm Krait Processor Sub-system (KPSS) Watchdog
+ ---------------------------------------------------
+ 
+ Required properties :
+-- compatible : shall contain only one of the following:
+-
+-			"qcom,kpss-wdt-msm8960"
+-			"qcom,kpss-wdt-apq8064"
+-			"qcom,kpss-wdt-ipq8064"
+-
++- compatible : shall contain "qcom,kpss-wdt"
+ - reg : shall contain base register location and length
+ - clocks : shall contain the input clock
++- interrupts : shall contain the bark and bite interrupts in that order
+ 
+ Optional properties :
+ - timeout-sec : shall contain the default watchdog timeout in seconds,
+@@ -17,8 +13,9 @@ Optional properties :
+ 
+ Example:
+ 	watchdog at 208a038 {
+-		compatible = "qcom,kpss-wdt-ipq8064";
+-		reg = <0x0208a038 0x40>;
++		compatible = "qcom,kpss-wdt";
++		reg = <0xf9017000 0x1000>;
++		interrupts = <0 3 0>, <0 4 0>;
+ 		clocks = <&sleep_clk>;
+ 		timeout-sec = <10>;
+ 	};
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
