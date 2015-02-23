@@ -1,56 +1,65 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 23 Feb 2015 11:32:14 +0100
-Subject: [PATCHv3 0/2] drm: atmel-hlcdc: PM support
-In-Reply-To: <1424627464-16869-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <1424627464-16869-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <20150223113214.584ee794@bbrezillon>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Mon, 23 Feb 2015 11:33:31 +0100
+Subject: [PATCH v2 02/18] ARM: ARMv7M: Enlarge vector table to 256 entries
+In-Reply-To: <20150220194756.GS19388@pengutronix.de>
+References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1424455277-29983-3-git-send-email-mcoquelin.stm32@gmail.com>
+ <20150220194756.GS19388@pengutronix.de>
+Message-ID: <CALszF6CB9YU7ashQ-y_zx58Mkf=sbrBfa2dAOdQm7FkmcuE7PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylvain,
+2015-02-20 20:47 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> On Fri, Feb 20, 2015 at 07:01:01PM +0100, Maxime Coquelin wrote:
+>> From Cortex-M reference manuals, the nvic supports up to 240 interrupts.
+>> So the number of entries in vectors table is up to 256.
+>>
+>> This patch adds a new config flag to specify the number of external interrupts.
+>> Some ifdeferies are added in order to respect the natural alignment without
+>> wasting too much space on smaller systems.
+>>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> ---
+>>  arch/arm/kernel/entry-v7m.S | 13 +++++++++----
+>>  arch/arm/mm/Kconfig         | 15 +++++++++++++++
+>>  2 files changed, 24 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
+>> index 8944f49..68cde36 100644
+>> --- a/arch/arm/kernel/entry-v7m.S
+>> +++ b/arch/arm/kernel/entry-v7m.S
+>> @@ -117,9 +117,14 @@ ENTRY(__switch_to)
+>>  ENDPROC(__switch_to)
+>>
+>>       .data
+>> -     .align  8
+>> +#if CONFIG_CPUV7M_NUM_IRQ <= 112
+> I would have called this CONFIG_CPU_V7M_NUM_IRQ to match the already
+> existing CPU_V7M symbol.
 
-On Sun, 22 Feb 2015 18:51:02 +0100
-Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
+That's better indeed.
+It will be changed in v3.
 
-> This series adds basic PM support for Atmel HLCDC.
-> 
-> This series depends on:
-> 
-> [PATCH] drm: atmel-hlcdc: remove useless pm_runtime_put_sync in probe
->   <1423841785-23105-1-git-send-email-boris.brezillon@free-electrons.com>
-> [PATCH v3] drm: atmel-hlcdc: Atomic mode-setting conversion
->   <1423842415-23412-1-git-send-email-boris.brezillon@free-electrons.com>
+>
+>> +     .align  9
+>> +#else
+>> +     .align  10
+>> +#endif
+>> +
+>
+> Other than that:
+> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>
+> Who do you target to apply this series?
 
-Thanks, I'll queue the series to my drm-atmel-hlcdc-devel branch (with
-Andrzej's Reviewed-by).
+I guess it should go through Russell's Patch Tracking System?
 
-> 
-> Changes since v2:
->   * Save previous state of crtc's so we don't enable them unconditionally
->     at resume.
->   * Remove obsolete use of drm_driver.suspend and drm_driver.resume
->     callbacks
->   * Merged atmel_hlcdc_dc_suspend to atmel_hlcdc_dc_drm_suspend and
->     atmel_hlcdc_dc_resume to atmel_hlcdc_dc_drm_resume since we don't
->     need the previous callbacks anymore
->   * Removed useless check of drm_dev in suspend/resume functions
-> 
-> Changes since v1:
->   * (*crtc_funcs->disable)(crtc) replaced to crtc_funcs->disable(crtc)
-> 
-> Sylvain Rochet (2):
->   drm: atmel-hlcdc: Add PM suspend/resume support
->   drm: atmel-hlcdc: Add pinctrl PM select sleep,default state in CRTC
->     suspend/resume
-> 
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c |  3 ++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c   | 47 ++++++++++++++++++++++++++
->  2 files changed, 50 insertions(+)
-> 
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks,
+Maxime
+>
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
