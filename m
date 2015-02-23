@@ -1,23 +1,70 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 24 Feb 2015 07:00:50 +0900
-Subject: [PATCH 1/2] ARM: shmobile: r8a7794: add SDHI DT support
-In-Reply-To: <CAMuHMdU9PS07hhvi1rLoE3q7J_Q2wmOJm=CGyN67w8p4PvW5Yw@mail.gmail.com>
+Date: Tue, 24 Feb 2015 07:01:16 +0900
+Subject: [PATCH 2/2] ARM: shmobile: silk: add SDHI0/1 DT support
+In-Reply-To: <54E9ED95.8070702@cogentembedded.com>
 References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
- <4571288.SFHfW35Ob9@wasted.cogentembedded.com>
- <CAMuHMdU9PS07hhvi1rLoE3q7J_Q2wmOJm=CGyN67w8p4PvW5Yw@mail.gmail.com>
-Message-ID: <20150223220049.GB29878@verge.net.au>
+ <2348421.LHyZ4ZOiiG@wasted.cogentembedded.com>
+ <CANqRtoRnDzTSvKYcNDHKHbeaN7jp1VvKnk1jTHDvNt1oyBzwKg@mail.gmail.com>
+ <54E9ED95.8070702@cogentembedded.com>
+Message-ID: <20150223220116.GC29878@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 23, 2015 at 12:16:47PM +0100, Geert Uytterhoeven wrote:
-> On Sat, Feb 21, 2015 at 11:26 PM, Sergei Shtylyov
-> <sergei.shtylyov@cogentembedded.com> wrote:
-> > Define the generic R8A7794 parts of the SDHI[012] device nodes.
-> >
-> > Based on the orginal patch by Shinobu Uehara <shinobu.uehara.xc@renesas.com>.
-> >
-> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On Sun, Feb 22, 2015 at 05:54:13PM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> On 02/22/2015 03:45 AM, Magnus Damm wrote:
+> 
+> >>Define the SILK board dependent parts of the SDHI0  (connected to SDIO Wi-Fi
+> >>chip)  and SDHI1  (connected to micro-SD slot) device nodes along with the
+> >>necessary voltage regulators.
+> 
+> >>Based on the original patch by Vladimir Barinov
+> >><vladimir.barinov@cogentembedded.com>.
+> 
+> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> >Thanks for your patch. One question - above you write that SDHI1 is micro-SD...
+> 
+>    Yes, have double-checked now.
+> 
+> >>@@ -100,3 +159,25 @@
+> >>         non-removable;
+> >>         status = "okay";
+> >>  };
+> >>+
+> >>+&sdhi0 {
+> >>+       pinctrl-0 = <&sdhi0_pins>;
+> >>+       pinctrl-names = "default";
+> >>+
+> >>+       vmmc-supply = <&vcc_sdhi0>;
+> >>+       vqmmc-supply = <&vccq_sdhi0>;
+> >>+       cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
+> >>+       wp-gpios = <&gpio6 7 GPIO_ACTIVE_LOW>;
+> >>+       status = "okay";
+> >>+};
+> >>+
+> >>+&sdhi1 {
+> >>+       pinctrl-0 = <&sdhi1_pins>;
+> >>+       pinctrl-names = "default";
+> >>+
+> >>+       vmmc-supply = <&vcc_sdhi1>;
+> >>+       vqmmc-supply = <&vccq_sdhi1>;
+> >>+       cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
+> >>+       wp-gpios = <&gpio6 15 GPIO_ACTIVE_LOW>;
+> >>+       status = "okay";
+> >>+};
+> 
+> >... however here the WP signal is assigned.
+> 
+> >I believe micro-SD doesn't use the WP signal, so either I'm wrong or
+> >the patch needs to be updated to reflect reality. =)
+> 
+>    Both seem correct: SD1_WP signal is just tied to VCCQ_SD1. Do you think
+> we should still drop it?
+> 
+> >Also, I doubt that an on-board SDIO module makes use of CD and/or WP signals?
+> 
+>    Those two are tied to VCCQ_SD0 as well. Do you think we should drop them?
 
-Thanks, I have queued this up.
+I am holding off on queuing this up until some consensus is reached.
