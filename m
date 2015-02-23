@@ -1,96 +1,149 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Mon, 23 Feb 2015 09:29:41 +0200
-Subject: [PATCH 2/2] at91sam9_wdt: Allow watchdog to reset device at early
- boot
-In-Reply-To: <20150220180646.GA26698@roeck-us.net>
-References: <54B53160.6060309@roeck-us.net>
- <cover.1424262664.git.timo.kokkonen@offcode.fi>
- <cover.1424262664.git.timo.kokkonen@offcode.fi>
- <6c0a3a5bcd93d18437eeed04712b4aeff201a16f.1424262664.git.timo.kokkonen@offcode.fi>
- <00B1658F-2F3A-4B90-ADCA-275770832180@jcrosoft.com>
- <20150220085151.3b599de8@bbrezillon>
- <E7DD67EB-CA34-48EA-838D-3EBBF74CAEBD@jcrosoft.com>
- <20150220181640.57b21432@bbrezillon> <20150220180646.GA26698@roeck-us.net>
-Message-ID: <54EAD6E5.8090104@offcode.fi>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 23 Feb 2015 08:30:09 +0100
+Subject: [PATCH 2/4] of: DT quirks infrastructure
+In-Reply-To: <20150220184818.GC26698@roeck-us.net>
+References: <20150218173115.GG29429@leverpostej>
+ <76BD1B22-BAED-4205-9B34-186907CE0217@konsulko.com>
+ <54E613E7.2020405@gmail.com>
+ <670D0881-DBF0-45E8-A502-A6DB2B77A750@konsulko.com>
+ <54E61DD2.3060002@gmail.com>
+ <53F2F94C-0C43-4A54-B8CD-EEC454A0AC19@konsulko.com>
+ <54E742F2.80506@hurleysoftware.com>
+ <20150220164753.GC22752@roeck-us.net>
+ <54E77876.9020500@hurleysoftware.com>
+ <20150220184818.GC26698@roeck-us.net>
+Message-ID: <20150223073009.GE29908@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Feb 20, 2015 at 10:48:18AM -0800, Guenter Roeck wrote:
+> On Fri, Feb 20, 2015 at 01:09:58PM -0500, Peter Hurley wrote:
+> > Hi Guenter,
+> > 
+> > On 02/20/2015 11:47 AM, Guenter Roeck wrote:
+> > 
+> > [...]
+> > 
+> > > I am open to hearing your suggestions for our use case, where the CPU card with
+> > > the eeprom is manufactured separately from its carier cards.
+> > 
+> > I think your use case may be more compelling than two flavors of Beaglebone
+> > (one of which is pretty much a dead stick), but it's also less clear what your
+> > design constraints are (not that I really want to know, 'cause I don't).
+> > 
+> > But the logical extension of this is an N-way dtb that supports unrelated SOCs,
+> > and I think most would agree that's not an acceptable outcome.
+> > 
+> With this logic you can pretty much refuse to accept anything new, anywhere.
+> Including everything old, for that matter.
+> 
+> Food can be abused to poison people, therefore no one should be permitted to
+> distribute food. Houses can be abused to falsely imprison people, therefore
+> no one should live in houses. And don't even start talking about guns.
+> Everything can be abused, therefore we should not do anything.
+> 
+> Discussions about possible abuse are for sure valid, and reducing the potential
+> for abuse is a worthy goal, but not as argument to reject a solution for an
+> existing and real roblem outright.
+> 
+> > My thought was that every design that can afford an EEPROM to probe can afford
+> > a bootloader to select the appropriate dtb, and can afford the extra space
+> > required for multiple dtbs.
+> > 
+> There are many more use cases where this is simply not the case. Another one,
+> for example, is a system where the devicetree is loaded through u-boot using
+> tftp. In this case, u-boot would have some information about the hardware
+> to request the correct devicetree file, but it may not know about hardware
+> variants.
+> 
+> Sure, one could solve that problem by making u-boot aware of such variants
+> and maintaining a large number of dtb files as you suggest. That means,
+> however, that there would be that need to maintain all those dtb files
+> just to address minor differences, and having modify every piece of the
+> system for each new variant. In essence you put a lot of burden on pretty
+> much everyone from software to manufacturing to testing, plus possibly
+> hardware, just for the purpose of rejecting a relatively simple solution
+> for the problem Pantelis' patch set is trying to address.
+> 
 
-On 20.02.2015 20:06, Guenter Roeck wrote:
-> On Fri, Feb 20, 2015 at 06:16:40PM +0100, Boris Brezillon wrote:
->> Hi Jean-Christophe,
->>
->> On Sat, 21 Feb 2015 00:33:17 +0800
->> Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
->>
->>
->> Timo's need is quite generic, but nobody seemed to bother with that
->> before.
->
-> The problem has been discussed before. There are even some patches,
-> but they were too specific and limited in scope for my liking.
->
-> As I said in my other reply, to move forward we would need
-> someone who has the time and energy to get an agreement with the
-> DT folks about an acceptable means to express the properties needed
-> for a specific hardware, and to actually implement the necessary code.
->
->> Moreover, using an at91 specific implementation does not prevent
->> migrating to a more generic implementation when it's available.
->> Actually, it's rather difficult to design a generic infrastructure until
->> you have dealt with several devices requiring the same feature, and
->> that's obviously not the case here.
->>
-> Absolutely agree. If we can not even get a property like the one suggested
-> here accepted, it is completely pointless to even think about a more
-> generic solution that would work for all watchdog drivers.
->
+Other example that show how it becomes a mess. Tell me if we do that in
+a wrong way but I don't think.
 
-I'm not really sure that I understand what we are really arguing here, 
-but seems that this is not getting any forward unless we get in touch 
-with the DT people who get to decide whether this kind of property 
-belongs to device tree or not. Who are these people anyway? Which list 
-should I write an email to get in touch with them? Why are we not CC'ing 
-them already?
+We have the following source files:
+- a dtsi file for the SoC family
+- a dtsi file for SoC variant enabling the devices available
+- a dtsi file for the CPU module describing components on this module:
+  the ethernet phy, the nand flash, etc.
+- a dtsi file for the motherboard
+- several dtsi files for different kind of display modules
+- many dts file for the final board, it includes the SoC variant, the
+  CPU module, the motherboard and one of the display module if needed.
 
-Anyway, the way I tried to express it in the v4 patch set, we have a 
-generic device tree property that does not try to imply any sort of 
-implementation or HW details. The description in watchdog.txt tries to 
-state the purpose of the property clearly so that other driver writers 
-could make other drivers to support it correctly. And then there is at91 
-specific implementation because that's the only watchdog hardware 
-currently on my desk that I can easily test it with.
+At the end we have something like this (from our github, not all these
+boards have been sent to the mainline)
 
-I can't think of how I could make this more generic, not without making 
-more changes to the way drivers initialize itself with the watchdog 
-core. And that would require changing a lot of drivers, at least if we 
-intend to make it work so that the watchdog core takes care of this 
-instead of the driver. It's a nice idea but I think it's overly complex 
-given the amount of functionality there needs to be in different drivers 
-and the diversity between drivers.
+arch/arm/boot/dts/sama5d3.dtsi
+arch/arm/boot/dts/sama5d34ek_pda7.dts
+arch/arm/boot/dts/sama5d36ek_revc_pda7.dts
+arch/arm/boot/dts/sama5d31ek.dts
+arch/arm/boot/dts/sama5d34ek_revc.dts
+arch/arm/boot/dts/sama5d3xcm.dtsi
+arch/arm/boot/dts/sama5d31ek_pda4.dts
+arch/arm/boot/dts/sama5d34ek_revc_pda4.dts
+arch/arm/boot/dts/sama5d3xdm.dtsi
+arch/arm/boot/dts/sama5d31ek_pda7.dts
+arch/arm/boot/dts/sama5d34ek_revc_pda7.dts
+arch/arm/boot/dts/sama5d3xdm_pda4.dtsi
+arch/arm/boot/dts/sama5d31ek_revc.dts
+arch/arm/boot/dts/sama5d35ek.dts
+arch/arm/boot/dts/sama5d3xdm_pda7.dtsi
+arch/arm/boot/dts/sama5d31ek_revc_pda4.dts
+arch/arm/boot/dts/sama5d35ek_revc.dts
+arch/arm/boot/dts/sama5d3xek.its
+arch/arm/boot/dts/sama5d31ek_revc_pda7.dts
+arch/arm/boot/dts/sama5d36ek.dts
+arch/arm/boot/dts/sama5d3xek_pda4.its
+arch/arm/boot/dts/sama5d33ek.dts
+arch/arm/boot/dts/sama5d36ek_cmp.dts
+arch/arm/boot/dts/sama5d3xek_pda7.its
+arch/arm/boot/dts/sama5d33ek_pda4.dts
+arch/arm/boot/dts/sama5d36ek_cmp_pins_sleep.dtsi
+arch/arm/boot/dts/sama5d3xmb.dtsi
+arch/arm/boot/dts/sama5d33ek_pda7.dts
+arch/arm/boot/dts/sama5d36ek_hdmi.dts
+arch/arm/boot/dts/sama5d3xmb_revc.dtsi
+arch/arm/boot/dts/sama5d33ek_revc.dts
+arch/arm/boot/dts/sama5d36ek_pda4.dts
+arch/arm/boot/dts/sama5d3xmb_revc_isi.dtsi
+arch/arm/boot/dts/sama5d33ek_revc_pda4.dts
+arch/arm/boot/dts/sama5d36ek_pda7.dts
+arch/arm/boot/dts/sama5d4.dtsi
+arch/arm/boot/dts/sama5d33ek_revc_pda7.dts
+arch/arm/boot/dts/sama5d36ek_revc.dts
+arch/arm/boot/dts/sama5d4ek.dts
+arch/arm/boot/dts/sama5d34ek.dts
+arch/arm/boot/dts/sama5d36ek_revc_cmp.dts
+arch/arm/boot/dts/sama5d4ek_hdmi.dts
+arch/arm/boot/dts/sama5d34ek_pda4.dts
+arch/arm/boot/dts/sama5d36ek_revc_pda4.dts
+arch/arm/boot/dts/sama5d4ek_pin_sleep_state.dtsi
 
-To me there is nothing wrong with having this done also via a kernel 
-configuration option. We could simply have 
-CONFIG_WATCHDOG_EARLY_TIMEOUT_SEC option that works exactly the same way 
-as the proposed device tree property. To make it clear only some drivers 
-support this option, we could let each driver select an enabler config 
-option CONFIG_WATCHDOG_HAS_DEFERRABLE_EARLY_RESET or such that is used 
-to hide the config option unless we are building a watchdog that 
-supports the given option. Or something like that. But that would be 
-less flexible, as if we want to run the same kernel binary on different 
-arm boards we can't make these values per board any more. The use case I 
-am dealing with doesn't care about this, but I was thinking someone else 
-might care. Which is why I thought it should be run time configurable 
-via device tree instead of a compile time option.
 
-But now that I have mentioned arm boards, I noticed we are talking about 
-generic behaviour and there are also watchdogs running on architectures 
-where device trees are not supported. That said, it might be better to 
-make it compile time configurable now and add other configuration 
-options later.
+> Ultimately, no matter what the kernel community ends up doing, Pantelis'
+> solution or something similar _will_ find its way into our system.
+> I would very much prefer to have the code upstream, but we will carry
+> his patches along in our vendor branch if necessary. The functionality
+> and its benefits for our development, manufacturing, and testing process
+> are way too valuable to ignore, and it actually solves problems for which
+> we don't have an acceptable solution today. I would be quite surprised
+> if other vendors would not end up doing the same.
 
-Any thoughts about that?
+We'll probably do the same. Beaglebone is only an example.
 
-Thanks,
--Timo
+> 
+> Guenter
+
+
+Regards
+
+Ludovic
