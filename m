@@ -1,44 +1,86 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 23 Feb 2015 17:25:48 +0100
-Subject: [RESEND PATCH] ARM: EXYNOS: Fix failed second suspend on Exynos4
-In-Reply-To: <1424256325-16659-1-git-send-email-k.kozlowski@samsung.com>
-References: <1424256325-16659-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <2802418.zt8CxNGGkT@amdc1032>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 23 Feb 2015 16:32:39 +0000
+Subject: [PATCH v2] drivers/base: cacheinfo: validate device node for all the
+ caches
+In-Reply-To: <1424095816-4414-1-git-send-email-sudeep.holla@arm.com>
+References: <1424095816-4414-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1424709159-13152-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On architectures that depend on DT for obtaining cache hierarcy, we need
+to validate the device node for all the cache indices, failing to do so
+might result in wrong information being exposed to the userspace.
 
-Hi,
+This is quite possible on initial/incomplete versions of the device
+trees. In such cases, it's better to bail out if all the required device
+nodes are not present.
 
-On Wednesday, February 18, 2015 11:45:25 AM Krzysztof Kozlowski wrote:
-> On Exynos4412 boards (Trats2, Odroid U3) after enabling L2 cache in
-> 56b60b8bce4a ("ARM: 8265/1: dts: exynos4: Add nodes for L2 cache
-> controller") the second suspend to RAM failed. First suspend worked fine
-> but the next one hang just after powering down of secondary CPUs (system
-> consumed energy as it would be running but was not responsive).
-> 
-> The issue was caused by enabling delayed reset assertion for CPU0 just
-> after issuing power down of cores. This was introduced for Exynos4 in
-> 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off").
-> 
-> The whole behavior is not well documented but after checking with vendor
-> code this should be done like this (on Exynos4):
-> 1. Enable delayed reset assertion when system is running (for all CPUs).
-> 2. Disable delayed reset assertion before suspending the system.
->    This can be done after powering off secondary CPUs.
-> 3. Re-enable the delayed reset assertion when system is resumed.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Fixes: 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off")
-> Cc: <stable@vger.kernel.org>
+This patch adds checks for the validation of device node for all the
+caches and doesn't initialise the cacheinfo if there's any error.
 
-It turned out that this patch is also needed to fix cpuidle AFTR mode
-hang on Trats2.
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Reported-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ drivers/base/cacheinfo.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-Tested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+v1->v2:
+ - Updated log information as suggested by Mark
+ - Added Mark's ACK
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Hi Greg,
+
+Can you please pick this fix for the next rc ?
+
+Without this there's possibility that erroneous information is exposed
+to userspace on architecture depending on DT especially if DT lacks
+cache hierarcy information.
+
+Regards,
+Sudeep
+
+diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
+index 6e64563361f0..9c2ba1c97c42 100644
+--- a/drivers/base/cacheinfo.c
++++ b/drivers/base/cacheinfo.c
+@@ -62,15 +62,21 @@ static int cache_setup_of_node(unsigned int cpu)
+ 		return -ENOENT;
+ 	}
+ 
+-	while (np && index < cache_leaves(cpu)) {
++	while (index < cache_leaves(cpu)) {
+ 		this_leaf = this_cpu_ci->info_list + index;
+ 		if (this_leaf->level != 1)
+ 			np = of_find_next_cache_node(np);
+ 		else
+ 			np = of_node_get(np);/* cpu node itself */
++		if (!np)
++			break;
+ 		this_leaf->of_node = np;
+ 		index++;
+ 	}
++
++	if (index != cache_leaves(cpu)) /* not all OF nodes populated */
++		return -ENOENT;
++
+ 	return 0;
+ }
+ 
+@@ -189,8 +195,11 @@ static int detect_cache_attributes(unsigned int cpu)
+ 	 * will be set up here only if they are not populated already
+ 	 */
+ 	ret = cache_shared_cpu_map_setup(cpu);
+-	if (ret)
++	if (ret) {
++		pr_warn("Unable to detect cache hierarcy from DT for CPU %d\n",
++			cpu);
+ 		goto free_ci;
++	}
+ 	return 0;
+ 
+ free_ci:
+-- 
+1.9.1
