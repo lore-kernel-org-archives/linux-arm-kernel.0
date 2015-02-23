@@ -1,22 +1,49 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon, 23 Feb 2015 10:34:52 +0000
-Subject: [STLinux Kernel] [PATCH v2 3/4] clk: Provide an always-on clock
- domain framework
-In-Reply-To: <1424276101-30137-4-git-send-email-lee.jones@linaro.org>
-References: <1424276101-30137-1-git-send-email-lee.jones@linaro.org>
- <1424276101-30137-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150223103452.GC14142@griffinp-ThinkPad-X1-Carbon-2nd>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 23 Feb 2015 11:54:03 +0100
+Subject: [PATCH v8 0/3] Add of-graph helpers to loop over endpoints and find
+ ports by id
+Message-ID: <1424688846-10909-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi,
 
-On Wed, 18 Feb 2015, Lee Jones wrote:
-> +/*
-> + * ST Clock Domain
+Since there now is a merge conflict in imx-drm-core, I've rebased the series
+onto v4.0-rc1. Also a new driver touched by this change appeared, so the first
+patch now includes a fix for am437x-vfpe, too. I'd be happy to get an ack for
+that.
 
-minor nit, as v2 is a generic driver, comment needs updating.
+This series converts all existing users of of_graph_get_next_endpoint that pass
+a non-NULL prev argument to the function and decrement its refcount themselves
+to stop doing that. The of_node_put is moved into of_graph_get_next_endpoint
+instead.
+This allows to add a for_each_endpoint_of_node helper macro to loop over all
+endpoints in a device tree node.
 
-regards,
+Changes since v8:
+ - Rebased onto v4.0-rc1
+ - Added fix to am437x-vpfe
 
-Peter.
+The previous version can be found here: https://lkml.org/lkml/2014/12/23/219
+
+regards
+Philipp
+
+Philipp Zabel (3):
+  of: Decrement refcount of previous endpoint in
+    of_graph_get_next_endpoint
+  of: Add for_each_endpoint_of_node helper macro
+  of: Add of_graph_get_port_by_id function
+
+ drivers/coresight/of_coresight.c                  | 13 ++-----
+ drivers/gpu/drm/imx/imx-drm-core.c                | 11 +-----
+ drivers/gpu/drm/rcar-du/rcar_du_kms.c             | 15 +++------
+ drivers/media/platform/am437x/am437x-vpfe.c       |  1 -
+ drivers/media/platform/soc_camera/soc_camera.c    |  3 +-
+ drivers/of/base.c                                 | 41 ++++++++++++++++++-----
+ drivers/video/fbdev/omap2/dss/omapdss-boot-init.c |  7 +---
+ include/linux/of_graph.h                          | 18 ++++++++++
+ 8 files changed, 61 insertions(+), 48 deletions(-)
+
+-- 
+2.1.4
