@@ -1,129 +1,42 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 23 Feb 2015 10:15:59 +0100
-Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
-In-Reply-To: <CAL_Jsq+mvpRjYfL_8OseTDCB-6aBhwhNKLBQXXJeVQLDwWm8Nw@mail.gmail.com>
-References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
- <CAL_Jsq+SeuoojgTpv1y_aPJ_jzDr3HqZhYEBQ3_vYGBHvcccug@mail.gmail.com>
- <54E78A31.9020306@linaro.org>
- <CAL_Jsq+mvpRjYfL_8OseTDCB-6aBhwhNKLBQXXJeVQLDwWm8Nw@mail.gmail.com>
-Message-ID: <20150223091559.GA28214@pengutronix.de>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Mon, 23 Feb 2015 10:42:12 +0100
+Subject: [PATCH 3/3] clk: divider: fix calculation of initial best divider
+ when rounding to closest
+In-Reply-To: <1424515225-6929-4-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20150221085620.GV19388@pengutronix.de>
+ <1424515225-6929-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1424515225-6929-4-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <54EAF5F4.3070509@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 04:01:55PM -0600, Rob Herring wrote:
-> On Fri, Feb 20, 2015 at 1:25 PM, Srinivas Kandagatla
-> <srinivas.kandagatla@linaro.org> wrote:
-> >
-> >
-> > On 20/02/15 17:21, Rob Herring wrote:
-> >>
-> >> On Thu, Feb 19, 2015 at 11:08 AM, Srinivas Kandagatla
-> >> <srinivas.kandagatla@linaro.org> wrote:
-> >>>
-> >>> From: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >>>
-> >>> Up until now, EEPROM drivers were stored in drivers/misc, where they all
-> >>> had to
-> >>> duplicate pretty much the same code to register a sysfs file, allow
-> >>> in-kernel
-> >>> users to access the content of the devices they were driving, etc.
-> >>>
-> >>> This was also a problem as far as other in-kernel users were involved,
-> >>> since
-> >>> the solutions used were pretty much different from on driver to another,
-> >>> there
-> >>> was a rather big abstraction leak.
-> >>>
-> >>> This introduction of this framework aims at solving this. It also
-> >>> introduces DT
-> >>> representation for consumer devices to go get the data they require (MAC
-> >>> Addresses, SoC/Revision ID, part numbers, and so on) from the EEPROMs.
-> >>>
-> >>> Having regmap interface to this framework would give much better
-> >>> abstraction for eeproms on different buses.
-> >>>
-> >>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >>> [srinivas.kandagatla: Moved to regmap based and cleanedup apis]
-> >>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> >>> ---
-> >>>   .../devicetree/bindings/eeprom/eeprom.txt          |  48 ++++
-> >>>   drivers/Kconfig                                    |   2 +
-> >>>   drivers/Makefile                                   |   1 +
-> >>>   drivers/eeprom/Kconfig                             |  19 ++
-> >>>   drivers/eeprom/Makefile                            |   9 +
-> >>>   drivers/eeprom/core.c                              | 290
-> >>> +++++++++++++++++++++
-> >>>   include/linux/eeprom-consumer.h                    |  73 ++++++
-> >>>   include/linux/eeprom-provider.h                    |  51 ++++
-> >>
-> >>
-> >> Who is going to be the maintainer for this?
-> >
-> >
-> > Am happy to be one.
-> 
-> So please add a MAINTAINERS entry.
-> 
-> [...]
-> 
-> >>> += Data consumers =
-> >>> +
-> >>> +Required properties:
-> >>> +
-> >>> +eeproms: List of phandle and data cell specifier triplet, one triplet
-> >>> +        for each data cell the device might be interested in. The
-> >>> +        triplet consists of the phandle to the eeprom provider, then
-> >>> +        the offset in byte within that storage device, and the length
-> >>> +        in byte of the data we care about.
-> >>
-> >>
-> >> The problem with this is it assumes you know who the consumer is and
-> >> that it is a DT node. For example, how would you describe a serial
-> >> number?
-> >
-> > Correct me if I miss understood.
-> > Is serial number any different?
-> > Am hoping that the eeprom consumer would be aware of offset and size of
-> > serial number in the eeprom
-> >
-> > Cant the consumer do:
-> >
-> > eeprom-consumer {
-> >         eeproms = <&at24 0 4>;
-> >         eeprom-names = "device-serial-number";
-> 
-> Yes, but who is "eeprom-consumer"? DT nodes generally describe a h/w
-> block, but it this case, the consumer depends on the OS, not the h/w.
-> I'm not saying you can't describe where things are, but I don't think
-> you should imply who is the consumer and doing so is unnecessarily
-> complicated.
-> 
-> Also, the layout of EEPROM is likely very much platform specific. Some
-> could have a more complex structure perhaps with key ids and linked
-> list structure.
-> 
-> I would do something more simple that is just a list of keys and their
-> location like this:
-> 
-> device-serial-number = <start size>;
-> key1 = <start size>;
-> key2 = <start size>;
+Hi Uwe,
 
-Maybe better a node instead of a property. That would allow to use the
-standard reg property to describe the position in the eeprom. Also it
-would give consumers in dt a possibility to use a phandle to point to a
-variable:
+On 02/21/2015 11:40 AM, Uwe Kleine-K?nig wrote:
+> Similar to the reasoning for the previous commit
+>
+> 	DIV_ROUND_CLOSEST(parent_rate, rate)
+>
+> might not be the best integer divisor to get a good approximation for
+> rate from parent_rate (given the metric for CLK_DIVIDER_ROUND_CLOSEST).
+>
+> For example assume a parent rate of 1000 Hz and a target rate of 700.
+> Using DIV_ROUND_CLOSEST the suggested divisor gets calculated to 1
+> resulting in a target rate of 1000 with a delta of 300 to the desired
+> rate. With choosing 2 as divisor however the resulting rate is 500 which
+> is nearer to 700.
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>   drivers/clk/clk-divider.c | 13 +++++++------
+>   1 file changed, 7 insertions(+), 6 deletions(-)
+>
 
-	serial_number: var at c {
-		reg = <0xc 0x8>;
-		name = <?>;
-	};
+This is correct. Thanks for fixing this.
 
-Sascha
+You can add my:
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+
+Best regards,
+Maxime
