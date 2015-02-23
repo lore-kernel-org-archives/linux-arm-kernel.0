@@ -1,43 +1,79 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Mon, 23 Feb 2015 19:43:55 +0100
-Subject: [PATCHv3] mvebu: add Linksys WRT1900AC (Mamba) support
-In-Reply-To: <54EB7255.7090806@free-electrons.com>
-References: <1424089864-15651-1-git-send-email-kaloz@openwrt.org>
- <54EB7255.7090806@free-electrons.com>
-Message-ID: <op.xuiwzhcu2s3iss@ecaz>
+From: panto@antoniou-consulting.com (Pantelis Antoniou)
+Date: Mon, 23 Feb 2015 20:48:39 +0200
+Subject: [PATCH 3/4] arm: am33xx: DT quirks for am33xx based beaglebone
+ variants
+In-Reply-To: <54EB73DC.4090507@hurleysoftware.com>
+References: <1424271576-1952-1-git-send-email-pantelis.antoniou@konsulko.com>
+ <1424271576-1952-4-git-send-email-pantelis.antoniou@konsulko.com>
+ <20150219181656.GF32521@atomide.com>
+ <9C7BFC7C-0751-4233-927F-D01AF078704B@antoniou-consulting.com>
+ <20150219183600.GG32521@atomide.com>
+ <145DEB3E-A20E-4390-84B1-4B30E7C3D841@antoniou-consulting.com>
+ <54EB73DC.4090507@hurleysoftware.com>
+Message-ID: <8252298C-4249-49F8-91CA-8398ADEB1348@antoniou-consulting.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+Hi Peter,
 
-On Mon, 23 Feb 2015 19:32:53 +0100, Gregory CLEMENT  
-<gregory.clement@free-electrons.com> wrote:
+> On Feb 23, 2015, at 20:39 , Peter Hurley <peter@hurleysoftware.com> wrote:
+> 
+> Hi Pantelis,
+> 
+> On 02/19/2015 01:44 PM, Pantelis Antoniou wrote:
+>> Hi Tony,
+>> 
+>>> On Feb 19, 2015, at 20:36 , Tony Lindgren <tony@atomide.com> wrote:
+>>> 
+>>> * Pantelis Antoniou <panto@antoniou-consulting.com> [150219 10:32]:
+>>>>> On Feb 19, 2015, at 20:16 , Tony Lindgren <tony@atomide.com> wrote:
+>>>>> 
+>>>>> Uhh I don't like the idea of duplicating the i2c-omap.c driver under
+>>>>> arch/arm.. And in general we should initialize things later rather
+>>>>> than earlier.
+>>>>> 
+>>>>> What's stopping doing these quirk checks later on time with just
+>>>>> a regular device driver, something like drivers/misc/bbone-quirks.c?
+>>>>> 
+>>>> 
+>>>> We have no choice; we are way early in the boot process, right after
+>>>> the device tree unflattening step.
+>>> 
+>>> To me it seems the dt patching part should be done with minimal
+>>> code before any driver like features..
+>>> 
+>> 
+>> The way it?s done right now is with minimal code. Reading the EEPROM
+>> is required.
+>> 
+>>>> I?ve toyed with the idea of using early platform devices but the omap-i2c driver
+>>>> would need some tender love and care to make it work, and I didn?t want to get
+>>>> bogged down with i2c driver details at this point.
+>>> 
+>>> ..so how about just parse a kernel cmdline for the quirks to apply
+>>> based on a version string or similar? That can be easily populated
+>>> by u-boot or set manually with setenv.
+>>> 
+>>> That leaves out the need for tinkering with i2c super early in
+>>> the kernel for revision detection.
+>>> 
+>> 
+>> You assume there?s going to be a bootloader?
+> 
+> So does this patch.
+> 
 
-...
+Proof of concept, first iteration? The beaglebone is just the prototype stage.
 
->> @@ -0,0 +1,348 @@
->> +/*
->> + * Device Tree file for the Linksys WRT1900AC (Mamba).
->> + *
->> + * Note: this board is shipped with a new generation boot loader that
->> + * remaps internal registers at 0xf1000000. Therefore, if earlyprintk
->> + * is used, the CONFIG_DEBUG_MVEBU_UART_ALTERNATE option should be
->
-> This symbol name has been removed and DEBUG_MVEBU_UART0_ALTERNATE would
-> be used instead.
->
-> Besides this,
->
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->
-> You don't have to resend a new version for this, I can amend
-> your patch while applying it. So unless there is new comments
-> I will add your patch to the mvebu tree in a couple of days.
+>> diff --git a/arch/arm/mach-omap2/am33xx-dt-quirks.c b/arch/arm/mach-omap2/am33xx-dt-quirks.c
+> [...]
+>> + * Note that we rely on the bootloader setting up the muxes
+>> + * (which is the case for u-boot).
+> 
+> Regards,
+> Peter Hurley
+> 
 
-I knew I will forget something - this has been noted by Andrew back then  
-:) Thank you for taking care of this.
+Regards
 
-
-Best,
-
-Imre
+? Pantelis
