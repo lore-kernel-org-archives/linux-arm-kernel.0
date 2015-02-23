@@ -1,30 +1,47 @@
-From: tranmanphong@gmail.com (Phong Tran)
-Date: Mon, 23 Feb 2015 17:21:39 +0700
-Subject: [PATCH] PCI: xgene: Fix the map_bus callback prototype
-Message-ID: <1424686899-7869-1-git-send-email-tranmanphong@gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 23 Feb 2015 11:22:02 +0100
+Subject: [PATCH] spi: xilinx: Use standard num-cs binding
+In-Reply-To: <20150214053543.GL9110@finisterre.sirena.org.uk>
+References: <67f3c196833c427a489ca2c530d08987a6b5ee2a.1421412912.git.michal.simek@xilinx.com>
+ <CAHTX3dJRGhwo7FW+VJxfEJmx-9FdjFN5EnxG0RRDfMOm3=VU4A@mail.gmail.com>
+ <20150214053543.GL9110@finisterre.sirena.org.uk>
+Message-ID: <54EAFF4A.1080605@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The return value should be void __iomem *.
-Tested by compile only.
+Hi Mark,
 
-Signed-off-by: Phong Tran <tranmanphong@gmail.com>
----
- drivers/pci/host/pci-xgene.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 02/14/2015 06:35 AM, Mark Brown wrote:
+> On Wed, Feb 11, 2015 at 12:07:20PM +0100, Michal Simek wrote:
+>> 2015-01-16 13:55 GMT+01:00 Michal Simek <michal.simek@xilinx.com>:
+> 
+>>> Use standard num-cs binding property and setup
+>>> "xlnx,num-ss-bits" as deprecated.
+> 
+>> Any update on this one?
+> 
+> Don't send content free quoted pings, they're just adding to the e-mail
+> volume and hence wasting people's time.
 
-diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-index aab5547..9c3bfd8 100644
---- a/drivers/pci/host/pci-xgene.c
-+++ b/drivers/pci/host/pci-xgene.c
-@@ -127,7 +127,7 @@ static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
- 	return false;
- }
- 
--static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
-+static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
- 			      int offset)
- {
- 	struct xgene_pcie_port *port = bus->sysdata;
+How do you want me to send ping on pending patches?
+Just send them with RESEND prefix?
+I just want to clarify this.
+
+Thanks,
+Michal
+
 -- 
-2.1.0
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150223/3ed33e2e/attachment.sig>
