@@ -1,32 +1,95 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 23 Feb 2015 10:50:26 -0600
-Subject: [PATCHv2 05/15] ARM: mvebu: add stdout-path to all armada-*.dts
-In-Reply-To: <54EB4E9B.6010001@free-electrons.com>
-References: <1424451874-25375-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1424451874-25375-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <54EB4E9B.6010001@free-electrons.com>
-Message-ID: <CAL_JsqJZJMkH953hq0_sOvEEu9o4pXxs0sdP5=7c2EXXNSyA9A@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 23 Feb 2015 18:52:41 +0200
+Subject: [PATCH linux-next] iommu: Enable LPAE pagetable on ARM only
+In-Reply-To: <1424621346-7822-1-git-send-email-vincent.stehle@laposte.net>
+References: <1424621346-7822-1-git-send-email-vincent.stehle@laposte.net>
+Message-ID: <2868840.GyWYJOzqWH@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 23, 2015 at 10:00 AM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Thomas,
->
-> On 20/02/2015 18:04, Thomas Petazzoni wrote:
->> This commit adds the stdout-path property in /chosen for all Armada
->> boards that were not yet carrying this property.
->
-> I though the main motivation for using the stdout-path property was
-> for removing the earlyprintk in the command line. Arnd told that there
-> should be a mean to use stdout-path instead of earlyprintk.
->
-> So what about going further and removing "earlyprintk" in the same time?
+Hi Vincent,
 
-Not exactly, stdout-path allows for removing "console" from the
-command line. earlyprintk is a debug/developer option, so it should
-not be in a default command line IMO.
+Thank you for the patch.
 
-So bootargs should be removed entirely.
+On Sunday 22 February 2015 17:09:06 Vincent Stehl? wrote:
+> LPAE iommu page table makes sense only for ARM architecture. Add the
+> corresponding dependency in Kconfig.
+> 
+> This fixes the following runtime warnings on PA-RISC architecture:
 
-Rob
+I suppose this is caused by the selftest code ?
+
+>   WARNING: at drivers/iommu/io-pgtable-arm.c:413
+>   Modules linked in:
+>   CPU: 0 PID: 1 Comm: swapper/0 Not tainted
+> 3.19.0-next-20150222-00002-gc420256 #2 task: 17ca0000 ti: 17ca8000 task.ti:
+> 17ca8000
+> 
+>        YZrvWESTHLNXBCVMcbcbcbcbOGFRQPDI
+>   PSW: 00000000000001001111111100001111 Not tainted
+>   r00-03  0004ff0f 0000001b 104871b0 17ca83c0
+>   r04-07  00001000 00000000 00000000 00000000
+>   r08-11  00000000 40001000 1013b36c 17ca8248
+>   r12-15  00000080 17e712c0 00000000 17c5e100
+>   r16-19  0000000c 105d8eb0 40001000 ffffffff
+>   r20-23  00000000 00800020 1048717c 00000000
+>   r24-27  00001000 00000000 00000009 10774ce0
+>   r28-31  00000000 00000027 17ca8480 10486d44
+>   sr00-03  00000000 00000000 00000000 00000000
+>   sr04-07  00000000 00000000 00000000 00000000
+> 
+>   IASQ: 00000000 00000000 IAOQ: 10486df4 10486df8
+>    IIR: 03ffe01f    ISR: 00000000  IOR: 17c86e54
+>    CPU:        0   CR30: 17ca8000 CR31: 00000002
+>    ORIG_R28: 00000001
+>    IAOQ[0]: __arm_lpae_unmap+0x144/0x4cc
+>    IAOQ[1]: __arm_lpae_unmap+0x148/0x4cc
+>    RP(r2): arm_lpae_unmap+0x34/0x6c
+>   Backtrace:
+>    [<104871b0>] arm_lpae_unmap+0x34/0x6c
+>    [<10127944>] 0x10127944
+>    [<10168ee0>] do_one_initcall+0x128/0x1dc
+>    [<101028fc>] 0x101028fc
+>    [<10161b48>] kernel_init+0x1c/0x118
+>    [<1015d01c>] end_fault_vector+0x1c/0x24
+>    [<101762ec>] save_stack_trace+0x28/0x60
+> 
+> Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+> 
+> 
+> Hi,
+> 
+> This can be seen with e.g. Linux next-20150222 on parisc with allmodconfig.
+> 
+> Best regards,
+> 
+> V.
+> 
+> 
+>  drivers/iommu/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index baa0d97..c73fd72 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -22,6 +22,7 @@ config IOMMU_IO_PGTABLE
+> 
+>  config IOMMU_IO_PGTABLE_LPAE
+>  	bool "ARMv7/v8 Long Descriptor Format"
+> +	depends on ARM
+
+How about ARM || COMPILE_TEST ? It can still be useful to compile the module 
+on other architectures.
+
+>  	select IOMMU_IO_PGTABLE
+>  	help
+>  	  Enable support for the ARM long descriptor pagetable format.
+
+-- 
+Regards,
+
+Laurent Pinchart
