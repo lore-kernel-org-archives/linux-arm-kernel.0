@@ -1,36 +1,55 @@
-From: vincent.stehle@laposte.net (=?windows-1252?Q?Vincent_Stehl=E9?=)
-Date: Tue, 24 Feb 2015 00:36:10 +0100
-Subject: [PATCH linux-next] iommu: Enable LPAE pagetable on ARM only
-In-Reply-To: <2868840.GyWYJOzqWH@avalon>
-References: <1424621346-7822-1-git-send-email-vincent.stehle@laposte.net>
- <2868840.GyWYJOzqWH@avalon>
-Message-ID: <54EBB96A.4050401@bergerie>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 23 Feb 2015 20:42:55 -0300
+Subject: Regression: v4.0-rc1: iMX6: Hummingboard fails due to drivers/clk
+ changes
+In-Reply-To: <20150223223255.GQ8656@n2100.arm.linux.org.uk>
+References: <20150223223255.GQ8656@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5ASkXoVb9KrqF4Us18-rZ7k3XqjSdhcKyO_ParXXHoWbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/23/2015 05:52 PM, Laurent Pinchart wrote:
-(runtime warning)
-> I suppose this is caused by the selftest code ?
+Hi Russell,
 
-Hi Laurent,
+On Mon, Feb 23, 2015 at 7:32 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> All,
+>
+> I just tried my SolidRun patch set on top of v4.0-rc1, and it fails to
+> boot.  The kernel itself finishes booting, but it is unable to DHCP (for
+> root-NFS) - nothing appears on the network.
+>
+> At first, I thought this would be a network driver bug, but reverting
+> the mainline changes there didn't fix the regression.  Then I wondered
+> if it was something in arch/arm/mach-imx, but no.
+>
+> When reverting all drivers/clk changes (and corresponding include/linux/*.h)
+> between v3.19 and v4.0-rc1, I find that the regression is fixed.
+>
+> It seems that some CCF change is causing a regression somewhere in the
+> clock tree on iMX6 CPUs.
+>
+> Unfortunately, without networking running, I can't dump the clock tree
+> to find out what's different, and bisecting will be a major pain (needing
+> each bisect point to be merged with my patch set, built and tested.)
+>
+> Has anyone else seen this?
 
-Thanks for your feedback. You are right, this is the selftest code. Here
-are the traces just before the first warnings:
+Just tried it and I confirm that NFS fails to mount on a imx6q-hummingboard:
 
-  arm-lpae io-pgtable: selftest: pgsize_bitmap 0x40201000, IAS 32^M
-  arm-lpae io-pgtable: selftest: pgsize_bitmap 0x40201000, IAS 36^M
-  arm-lpae io-pgtable: selftest: pgsize_bitmap 0x40201000, IAS 40^M
+[    1.882023] fec 2188000.ethernet eth0: Freescale FEC PHY driver
+[Atheros 8035 ethernet] (mii_bus:phy_addr=2188000.ethernet:00, irq)
+[    1.894409] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
+[    1.954662] hub 2-1:1.0: USB hub found
+[    1.958864] hub 2-1:1.0: 4 ports detected
+[    3.882249] fec 2188000.ethernet eth0: Link is Up - 100Mbps/Full -
+flow control rx/tx
+[    3.890900] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready
+[    3.912131] Sending DHCP requests ...
 
-There are a number of failed selftests and warnings, and in the end the
-PA-RISC machine won't boot.
+(Gets stuck here)
 
-..
-> How about ARM || COMPILE_TEST ? It can still be useful to compile the module 
-> on other architectures.
+I haven't seen this problem on other imx6 boards though running the same kernel.
 
-I think you are right and this is how it should be; thank you for the
-tips, I did not know about COMPILE_TEST. I'll resend a patch v2 right away.
+Regards,
 
-Best regards,
-
-V.
+Fabio Estevam
