@@ -1,144 +1,83 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 23 Feb 2015 09:51:54 +0100
-Subject: [PATCH 2/2] at91sam9_wdt: Allow watchdog to reset device at
- early boot
-In-Reply-To: <54EAD6E5.8090104@offcode.fi>
-References: <54B53160.6060309@roeck-us.net>
- <cover.1424262664.git.timo.kokkonen@offcode.fi>
- <cover.1424262664.git.timo.kokkonen@offcode.fi>
- <6c0a3a5bcd93d18437eeed04712b4aeff201a16f.1424262664.git.timo.kokkonen@offcode.fi>
- <00B1658F-2F3A-4B90-ADCA-275770832180@jcrosoft.com>
- <20150220085151.3b599de8@bbrezillon>
- <E7DD67EB-CA34-48EA-838D-3EBBF74CAEBD@jcrosoft.com>
- <20150220181640.57b21432@bbrezillon>
- <20150220180646.GA26698@roeck-us.net> <54EAD6E5.8090104@offcode.fi>
-Message-ID: <20150223095154.63218331@bbrezillon>
+From: jdelvare@suse.de (Jean Delvare)
+Date: Mon, 23 Feb 2015 09:59:58 +0100
+Subject: [PATCH] iommu/io-pgtable-arm: Add built time dependency
+In-Reply-To: <20150222130942.GB9591@arm.com>
+References: <20150220194445.4225d56b@endymion.delvare>
+ <20150220191943.GB1767@arm.com>
+ <20150220204642.04b1f0d8@endymion.delvare>
+ <20150222130942.GB9591@arm.com>
+Message-ID: <20150223095958.3bd450e3@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timo,
+Hi Will,
 
-On Mon, 23 Feb 2015 09:29:41 +0200
-Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
-
-> Hi,
+On Sun, 22 Feb 2015 13:09:42 +0000, Will Deacon wrote:
+> On Fri, Feb 20, 2015 at 07:46:42PM +0000, Jean Delvare wrote:
+> > On Fri, 20 Feb 2015 19:19:43 +0000, Will Deacon wrote:
+> > > On Fri, Feb 20, 2015 at 06:44:45PM +0000, Jean Delvare wrote:
+> > > > If io-pgtable-arm is an ARM-specific driver then configuration option
+> > > > IOMMU_IO_PGTABLE_LPAE should not be presented to the user by default
+> > > > for non-ARM kernels.
+> > > > 
+> > > > Signed-off-by: Jean Delvare <jdelvare@suse.de>
+> > > > Cc: Will Deacon <will.deacon@arm.com>
+> > > > Cc: Joerg Roedel <joro@8bytes.org>
+> > > > ---
+> > > >  drivers/iommu/Kconfig |    1 +
+> > > >  1 file changed, 1 insertion(+)
+> > > > 
+> > > > --- linux-3.20-rc0.orig/drivers/iommu/Kconfig	2015-02-20 17:24:46.838955014 +0100
+> > > > +++ linux-3.20-rc0/drivers/iommu/Kconfig	2015-02-20 19:38:45.804582668 +0100
+> > > > @@ -23,6 +23,7 @@ config IOMMU_IO_PGTABLE
+> > > >  config IOMMU_IO_PGTABLE_LPAE
+> > > >  	bool "ARMv7/v8 Long Descriptor Format"
+> > > >  	select IOMMU_IO_PGTABLE
+> > > > +	depends on ARM || COMPILE_TEST
+> > > >  	help
+> > > >  	  Enable support for the ARM long descriptor pagetable format.
+> > > >  	  This allocator supports 4K/2M/1G, 16K/32M and 64K/512M page
+> > > 
+> > > So this code doesn't actually *depend* on any arch code at all. In fact,
+> > > having it built and booted on x86 revealed a couple of bugs that I've
+> > > since fixed. I'd rather let this run everywhere, but if people insist on
+> > > the false dependency, so be it but we should add ARM64 to the mix too.
+> > 
+> > Oh, I'm not insisting on anything ;-) If the code is useful on other
+> > architectures then just ignore this patch. But if the only point of
+> > using it on other architectures is to reveal bugs which would not have
+> > triggered otherwise, then that's what COMPILE_TEST is there for.
 > 
-> On 20.02.2015 20:06, Guenter Roeck wrote:
-> > On Fri, Feb 20, 2015 at 06:16:40PM +0100, Boris Brezillon wrote:
-> >> Hi Jean-Christophe,
-> >>
-> >> On Sat, 21 Feb 2015 00:33:17 +0800
-> >> Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> >>
-> >>
-> >> Timo's need is quite generic, but nobody seemed to bother with that
-> >> before.
-> >
-> > The problem has been discussed before. There are even some patches,
-> > but they were too specific and limited in scope for my liking.
-> >
-> > As I said in my other reply, to move forward we would need
-> > someone who has the time and energy to get an agreement with the
-> > DT folks about an acceptable means to express the properties needed
-> > for a specific hardware, and to actually implement the necessary code.
-> >
-> >> Moreover, using an at91 specific implementation does not prevent
-> >> migrating to a more generic implementation when it's available.
-> >> Actually, it's rather difficult to design a generic infrastructure until
-> >> you have dealt with several devices requiring the same feature, and
-> >> that's obviously not the case here.
-> >>
-> > Absolutely agree. If we can not even get a property like the one suggested
-> > here accepted, it is completely pointless to even think about a more
-> > generic solution that would work for all watchdog drivers.
-> >
+> Sure, COMPILE_TEST should definitely be there if we add a dependency, but
+> actually the issues raised so far were by *running* the code (there are
+> some boot-time self-tests).
+
+Thanks for the clarification. That's unusual but I think this still fits
+in the spirit of COMPILE_TEST. I don't think it would make sense to add
+a separate option got 
+
+> > From the option description and help text, it really looks
+> > ARM-specific, so if it is not, the help text at least should be
+> > improved.
 > 
-> I'm not really sure that I understand what we are really arguing here, 
-> but seems that this is not getting any forward unless we get in touch 
-> with the DT people who get to decide whether this kind of property 
-> belongs to device tree or not. Who are these people anyway? Which list 
-> should I write an email to get in touch with them? Why are we not CC'ing 
-> them already?
+> It's ARM-specific in that the users of the page table code are IOMMUs
+> typically present in ARM SoCs. However, there's no reason why you couldn't
+> stick one of these IOMMUs in another SoC in the same way that you can use
+> an Intel NIC on a PowerPC box.
 
-I thought they were in the recipient list, but they are not.
-If you want to be sure to include all the relevant maintainers and MLs
-you can use scripts/get_maintainer.pl, this would have given you the DT
-maintainers and DT ML.
+Well, plugging a card in a PCI slot is something everyone can actually
+do. IOMMUs are at a lower level and must be part of the mainboard by
+design. So the comparison does not really hold.
 
-BTW, the discussion has already started (Rob is a DT maintainer) ;-).
+My purpose is to make kernel configuration easier and faster by skipping
+irrelevant questions, and also to avoid that code ends up being built
+in distribution kernels for targets that don't need it. The
+COMPILE_TEST ensures that the code is still build on allmodconfig and
+allyesconfig kernels so test coverage should not be affected.
 
-> 
-> Anyway, the way I tried to express it in the v4 patch set, we have a 
-> generic device tree property that does not try to imply any sort of 
-> implementation or HW details. The description in watchdog.txt tries to 
-> state the purpose of the property clearly so that other driver writers 
-> could make other drivers to support it correctly. And then there is at91 
-> specific implementation because that's the only watchdog hardware 
-> currently on my desk that I can easily test it with.
+I'll send an updated patch with ARM64 added as you suggested.
 
-The debate here is not whether the property is generic enough or not,
-but whether it is hardware or software related.
-DTs are supposed to describe HW and not the use you make of it (HW
-configuration), the problem is: sometime you have to describe that to
-get your hardware to work properly.
-
-> 
-> I can't think of how I could make this more generic, not without making 
-> more changes to the way drivers initialize itself with the watchdog 
-> core. And that would require changing a lot of drivers, at least if we 
-> intend to make it work so that the watchdog core takes care of this 
-> instead of the driver. It's a nice idea but I think it's overly complex 
-> given the amount of functionality there needs to be in different drivers 
-> and the diversity between drivers.
-> 
-> To me there is nothing wrong with having this done also via a kernel 
-> configuration option. We could simply have 
-> CONFIG_WATCHDOG_EARLY_TIMEOUT_SEC option that works exactly the same way 
-> as the proposed device tree property. To make it clear only some drivers 
-> support this option, we could let each driver select an enabler config 
-> option CONFIG_WATCHDOG_HAS_DEFERRABLE_EARLY_RESET or such that is used 
-> to hide the config option unless we are building a watchdog that 
-> supports the given option. Or something like that. But that would be 
-> less flexible, as if we want to run the same kernel binary on different 
-> arm boards we can't make these values per board any more. The use case I 
-> am dealing with doesn't care about this, but I was thinking someone else 
-> might care. Which is why I thought it should be run time configurable 
-> via device tree instead of a compile time option.
-
-IMHO, a viable alternative to the early-timeout-sec property would be a
-module parameter passed through the kernel cmdline.
-But as I said, attaching such parameters to the appropriate watchdog
-device (say you have several watchdogs in your system) is not as easy as
-using the DT representation.
-
-Is early-timeout-sec generic enough to be global to the watchdog
-framework ?
-
-> 
-> But now that I have mentioned arm boards, I noticed we are talking about 
-> generic behaviour and there are also watchdogs running on architectures 
-> where device trees are not supported. That said, it might be better to 
-> make it compile time configurable now and add other configuration 
-> options later.
-
-As long as the early_timeout_sec is part of the generic watchdog
-struct, your driver shouldn't care where the value comes from (pdata,
-DT, ACPI, ...), this is why making DT parsing code part of the core is
-a better approach IMO.
-
-> 
-> Any thoughts about that?
-
-As I said, the Kconfig option does not seem the right approach to
-me, using a module parameter would be more appropriate IMO.
-
-
-Best Regards,
-
-Boris
-
-
+Thanks,
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Jean Delvare
+SUSE L3 Support
