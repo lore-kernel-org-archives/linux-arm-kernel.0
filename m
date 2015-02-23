@@ -1,45 +1,68 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 23 Feb 2015 12:11:05 -0700
-Subject: [PATCH] ARM: bcm2835: Add header file for pinctrl constants
-In-Reply-To: <5700696.0jJhSRhno5@wuerfel>
-References: <1424624396-812-1-git-send-email-ckeepax@opensource.wolfsonmicro.com>
- <5700696.0jJhSRhno5@wuerfel>
-Message-ID: <54EB7B49.8050706@wwwdotorg.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 23 Feb 2015 20:12:15 +0100
+Subject: [PATCH] ARM: mvebu: Disable CPU Idle on Armada 38x
+In-Reply-To: <1423245844-28701-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1423245844-28701-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20150223201215.039fa38b@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2015 01:13 PM, Arnd Bergmann wrote:
-> On Sunday 22 February 2015 16:59:56 Charles Keepax wrote:
->> +
->> +/* IRQ Flags */
->> +#define BCM2835_PIN_IRQ_RISING                         1
->> +#define BCM2835_PIN_IRQ_FALLING                                2
->> +#define BCM2835_PIN_IRQ_EDGE   (BCM2835_PIN_IRQ_RISING | \
->> +                                BCM2835_PIN_IRQ_FALLING)
->> +#define BCM2835_PIN_IRQ_LOW                            4
->> +#define BCM2835_PIN_IRQ_HIGH                           8
->
-> Are these different from the standard definitions?
->
->> +/* Pin Function Settings */
->> +#define BCM2835_PIN_FUNC_GPIO_IN                       0
->> +#define BCM2835_PIN_FUNC_GPIO_OUT                      1
->> +#define BCM2835_PIN_FUNC_ALT5                          2
->> +#define BCM2835_PIN_FUNC_ALT4                          3
->> +#define BCM2835_PIN_FUNC_ALT0                          4
->> +#define BCM2835_PIN_FUNC_ALT1                          5
->> +#define BCM2835_PIN_FUNC_ALT2                          6
->> +#define BCM2835_PIN_FUNC_ALT3                          7
->
-> Why are these required? They don't seem to be used by any driver,
-> which leads me to suspect that they are just the hardware numbers.
->
-> In that case, don't add any syntactical sugar like that and just
-> use the hardware numbers directly.
->
-> What's with the strange mapping of numbers anyway?
+Dear Gregory CLEMENT,
 
-Especially given that the number->semantics meaning is a little 
-non-linear it seems like using #defines/... to document what the numbers 
-mean seems reasonable. It allows easily validating the DT files without 
-having to go look up the meaning of the numbers in the documentation.
+On Fri,  6 Feb 2015 19:04:04 +0100, Gregory CLEMENT wrote:
+> On Armada 38x SoCs, under heavy I/O load, the system hangs when CPU
+> Idle is enabled. Waiting for a solution to this issue, this patch
+> disables the CPU Idle support for this SoC.
+> 
+> As CPU Hot plug support also uses some of the CPU Idle functions it is
+> also affected by the same issue. This patch disables it also for the
+> Armada 38x SoCs.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: <stable@vger.kernel.org> # v3.17 +
+> ---
+>  arch/arm/mach-mvebu/pmsu.c | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+> index d8ab605a44fa..05c8625bbc40 100644
+> --- a/arch/arm/mach-mvebu/pmsu.c
+> +++ b/arch/arm/mach-mvebu/pmsu.c
+> @@ -476,12 +476,22 @@ static int __init mvebu_v7_cpu_pm_init(void)
+>  		return 0;
+>  	of_node_put(np);
+>  
+> +	/*
+> +	 * Currently the CPU Idle support for Armada 38x is broken, as
+> +	 * the CPU Hotplug uses some of the CPU Idle functions it is
+> +	 * broken too, so let's disable it
+> +	 */
+> +	if (of_machine_is_compatible("marvell,armada380")) {
+> +		cpu_hotplug_disable();
+> +		pr_warn("CPU Hotplug support is currently broken on Armada 38x: disabling");
+> +	}
+
+There's one thing that annoys me with this part disabling CPU hotplug:
+it will prevent suspend to RAM, even though suspend to RAM is most
+likely safe with regard to the PCIe/PL310 deadlock problem. CPU hotplug
+support is needed for suspend to RAM, as secondary CPUs are all turned
+off towards the end of the suspend process, before really entering the
+suspend to RAM state.
+
+And since this happens after calling the ->suspend() hook on all
+devices, we are normally in a quiet state in terms of PCIe traffic,
+which should normally avoid the PL310 issue.
+
+So, we would have basically to discriminate between CPU hotplug done at
+"run time" and CPU hotplug done as part of the suspend to RAM and
+resume sequence. Maybe this cpu_hotplug_disable() still allows the form
+of CPU hotplug needed by suspend to RAM, but since would have to be
+verified.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
