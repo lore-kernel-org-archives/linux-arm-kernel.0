@@ -1,189 +1,102 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 23 Feb 2015 16:04:20 +0100
-Subject: [PATCH 2/3] ARM: Kirkwood: add LED DT entries for netxbig boards
-In-Reply-To: <1424703861-20903-1-git-send-email-simon.guinot@sequanux.org>
-References: <1424703861-20903-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <1424703861-20903-3-git-send-email-simon.guinot@sequanux.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 24 Feb 2015 00:04:15 +0900
+Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
+In-Reply-To: <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20150223150415.GF6236@finisterre.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DT entries for the LEDs found on the Kirkwood-based
-LaCie boards 2Big and 5Big Network v2.
+On Thu, Feb 19, 2015 at 05:08:28PM +0000, Srinivas Kandagatla wrote:
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
----
- arch/arm/boot/dts/kirkwood-net5big.dts  | 60 +++++++++++++++++++++++++
- arch/arm/boot/dts/kirkwood-netxbig.dtsi | 80 +++++++++++++++++++++++++++++++++
- 2 files changed, 140 insertions(+)
+>  .../devicetree/bindings/eeprom/eeprom.txt          |  48 ++++
+>  drivers/Kconfig                                    |   2 +
+>  drivers/Makefile                                   |   1 +
+>  drivers/eeprom/Kconfig                             |  19 ++
+>  drivers/eeprom/Makefile                            |   9 +
+>  drivers/eeprom/core.c                              | 290 +++++++++++++++++++++
+>  include/linux/eeprom-consumer.h                    |  73 ++++++
+>  include/linux/eeprom-provider.h                    |  51 ++++
 
-diff --git a/arch/arm/boot/dts/kirkwood-net5big.dts b/arch/arm/boot/dts/kirkwood-net5big.dts
-index 36155b749d9f..3cc5e469df06 100644
---- a/arch/arm/boot/dts/kirkwood-net5big.dts
-+++ b/arch/arm/boot/dts/kirkwood-net5big.dts
-@@ -86,6 +86,66 @@
- 			 clock-frequency = <32768>;
- 	       };
- 	};
-+
-+	netxbig-leds {
-+		blue-sata2 {
-+			label = "netxbig:blue:sata2";
-+			mode-addr = <5>;
-+			mode-val = <NETXBIG_LED_OFF 0
-+				    NETXBIG_LED_ON 7
-+				    NETXBIG_LED_SATA 1
-+				    NETXBIG_LED_TIMER1 3>;
-+			bright-addr = <2>;
-+			bright-max = <7>;
-+		};
-+		red-sata2 {
-+			label = "netxbig:red:sata2";
-+			mode-addr = <5>;
-+			mode-val = <NETXBIG_LED_OFF 0
-+				    NETXBIG_LED_ON 2
-+				    NETXBIG_LED_TIMER1 4>;
-+			bright-addr = <2>;
-+			bright-max = <7>;
-+		};
-+		blue-sata3 {
-+			label = "netxbig:blue:sata3";
-+			mode-addr = <6>;
-+			mode-val = <NETXBIG_LED_OFF 0
-+				    NETXBIG_LED_ON 7
-+				    NETXBIG_LED_SATA 1
-+				    NETXBIG_LED_TIMER1 3>;
-+			bright-addr = <2>;
-+			bright-max = <7>;
-+		};
-+		red-sata3 {
-+			label = "netxbig:red:sata3";
-+			mode-addr = <6>;
-+			mode-val = <NETXBIG_LED_OFF 0
-+				    NETXBIG_LED_ON 2
-+				    NETXBIG_LED_TIMER1 4>;
-+			bright-addr = <2>;
-+			bright-max = <7>;
-+		};
-+		blue-sata4 {
-+			label = "netxbig:blue:sata4";
-+			mode-addr = <7>;
-+			mode-val = <NETXBIG_LED_OFF 0
-+				    NETXBIG_LED_ON 7
-+				    NETXBIG_LED_SATA 1
-+				    NETXBIG_LED_TIMER1 3>;
-+			bright-addr = <2>;
-+			bright-max = <7>;
-+		};
-+		red-sata4 {
-+			label = "netxbig:red:sata4";
-+			mode-addr = <7>;
-+			mode-val = <NETXBIG_LED_OFF 0
-+				    NETXBIG_LED_ON 2
-+				    NETXBIG_LED_TIMER1 4>;
-+			bright-addr = <2>;
-+			bright-max = <7>;
-+		};
-+	};
- };
- 
- &mdio {
-diff --git a/arch/arm/boot/dts/kirkwood-netxbig.dtsi b/arch/arm/boot/dts/kirkwood-netxbig.dtsi
-index b0cfb7cd30b9..5e7ed1c7e1b2 100644
---- a/arch/arm/boot/dts/kirkwood-netxbig.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-netxbig.dtsi
-@@ -13,6 +13,7 @@
-  * warranty of any kind, whether express or implied.
- */
- 
-+#include <dt-bindings/leds/leds-netxbig.h>
- #include "kirkwood.dtsi"
- #include "kirkwood-6281.dtsi"
- 
-@@ -105,6 +106,85 @@
- 			gpio = <&gpio0 16 GPIO_ACTIVE_HIGH>;
- 		};
- 	};
-+
-+	netxbig_gpio_ext: netxbig-gpio-ext {
-+		compatible = "lacie,netxbig-gpio-ext";
-+
-+		addr-gpios = <&gpio1 15 GPIO_ACTIVE_HIGH
-+			      &gpio1 16 GPIO_ACTIVE_HIGH
-+			      &gpio1 17 GPIO_ACTIVE_HIGH>;
-+		data-gpios = <&gpio1 12 GPIO_ACTIVE_HIGH
-+			      &gpio1 13 GPIO_ACTIVE_HIGH
-+			      &gpio1 14 GPIO_ACTIVE_HIGH>;
-+		enable-gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	netxbig-leds {
-+		compatible = "lacie,netxbig-leds";
-+
-+		gpio-ext = <&netxbig_gpio_ext>;
-+
-+		timers = <NETXBIG_LED_TIMER1 500 500
-+			  NETXBIG_LED_TIMER2 500 1000>;
-+
-+		blue-power {
-+			label = "netxbig:blue:power";
-+			mode-addr = <0>;
-+			mode-val = <NETXBIG_LED_OFF 0
-+				    NETXBIG_LED_ON 1
-+				    NETXBIG_LED_TIMER1 3
-+				    NETXBIG_LED_TIMER2 7>;
-+			bright-addr = <1>;
-+			bright-max = <7>;
-+		};
-+		red-power {
-+			label = "netxbig:red:power";
-+			mode-addr = <0>;
-+			mode-val = <NETXBIG_LED_OFF 0
-+				    NETXBIG_LED_ON 2
-+				    NETXBIG_LED_TIMER1 4>;
-+			bright-addr = <1>;
-+			bright-max = <7>;
-+		};
-+		blue-sata0 {
-+			label = "netxbig:blue:sata0";
-+			mode-addr = <3>;
-+			mode-val = <NETXBIG_LED_OFF 0
-+				    NETXBIG_LED_ON 7
-+				    NETXBIG_LED_SATA 1
-+				    NETXBIG_LED_TIMER1 3>;
-+			bright-addr = <2>;
-+			bright-max = <7>;
-+		};
-+		red-sata0 {
-+			label = "netxbig:red:sata0";
-+			mode-addr = <3>;
-+			mode-val = <NETXBIG_LED_OFF 0
-+				    NETXBIG_LED_ON 2
-+				    NETXBIG_LED_TIMER1 4>;
-+			bright-addr = <2>;
-+			bright-max = <7>;
-+		};
-+		blue-sata1 {
-+			label = "netxbig:blue:sata1";
-+			mode-addr = <4>;
-+			mode-val = <NETXBIG_LED_OFF 0
-+				    NETXBIG_LED_ON 7
-+				    NETXBIG_LED_SATA 1
-+				    NETXBIG_LED_TIMER1 3>;
-+			bright-addr = <2>;
-+			bright-max = <7>;
-+		};
-+		red-sata1 {
-+			label = "netxbig:red:sata1";
-+			mode-addr = <4>;
-+			mode-val = <NETXBIG_LED_OFF 0
-+				    NETXBIG_LED_ON 2
-+				    NETXBIG_LED_TIMER1 4>;
-+			bright-addr = <2>;
-+			bright-max = <7>;
-+		};
-+	};
- };
- 
- &mdio {
--- 
-2.1.1
+This seems to have a bunch of different things in it - there's some
+binding, there's some framework code, there's some user code for the
+framework...  splitting it up more would probably help with review.
+I'd at least make sure the framework is split from the DT code, that
+will cut down on the bulk and help make sure the framework isn't too DT
+tied.
+
+> +	if (read)
+> +		rc = regmap_bulk_read(eeprom->regmap, offset,
+> +				      buf, count/eeprom->stride);
+> +	else
+> +		rc = regmap_bulk_write(eeprom->regmap, offset,
+> +				       buf, count/eeprom->stride);
+> +
+> +	if (IS_ERR_VALUE(rc))
+> +		return 0;
+> +
+> +	return count;
+> +}
+
+> +static ssize_t bin_attr_eeprom_read(struct file *filp, struct kobject *kobj,
+> +				    struct bin_attribute *attr,
+> +				    char *buf, loff_t offset, size_t count)
+> +{
+> +	return bin_attr_eeprom_read_write(kobj, buf, offset, count, true);
+> +}
+
+I'm not sure the factoring out is actually helping the clarity here TBH.
+
+> +int eeprom_unregister(struct eeprom_device *eeprom)
+> +{
+> +	device_del(&eeprom->edev);
+> +
+> +	mutex_lock(&eeprom_list_mutex);
+> +	list_del(&eeprom->list);
+> +	mutex_unlock(&eeprom_list_mutex);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(eeprom_unregister);
+
+Here we return having dropped the lock without doing anything else with
+the eeprom, meaning the caller could delete it.
+
+> +	mutex_lock(&eeprom_list_mutex);
+> +
+> +	list_for_each_entry(e, &eeprom_list, list) {
+> +		if (args.np == e->edev.of_node) {
+> +			eeprom = e;
+> +			break;
+> +		}
+> +	}
+> +	mutex_unlock(&eeprom_list_mutex);
+
+Here we iterate the list, find the relevant eeprom and drop the lock
+while still holding a reference to the eeprom we just found.  This means
+that a removal could race with us and free the eeprom underneath us.
+I'm also not seeing anything stopping or even noticing a device being
+removed with a cell active on it.
+
+> +/**
+> + * eeprom_cell_get(): Get eeprom cell of device form a given index.
+> + *
+> + * @dev: Device that will be interacted with
+> + * @index: Index of the eeprom cell.
+> + *
+> + * The return value will be an ERR_PTR() on error or a valid pointer
+> + * to a struct eeprom_cell.  The eeprom_cell will be freed by the
+> + * eeprom_cell_put().
+> + */
+> +struct eeprom_cell *eeprom_cell_get(struct device *dev, int index);
+
+Normally the kerneldoc goes with the function definition, not the
+prototype.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150224/c2522de9/attachment.sig>
