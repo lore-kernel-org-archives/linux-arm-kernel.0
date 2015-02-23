@@ -1,50 +1,54 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 23 Feb 2015 07:55:59 +0000
-Subject: [PATCH 09/12] ARM: qcom: Add DT alias for serial port
+Date: Mon, 23 Feb 2015 07:56:09 +0000
+Subject: [PATCH 10/12] ARM: dts: apq8064: Remove incorrect gsbi2 node.
 In-Reply-To: <424678035-12862-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <424678035-12862-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1424678159-13308-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1424678169-13350-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pramod Gurav <pramod.gurav@smartplayin.com>
+Commit 8c3166f5d74b7936d29dc44f778e759c1b9fb43a (ARM: DT: apq8064: Add i2c device nodes)
+added a new gsbi2 node which is totally wrong for 2 reasons.
+First the address range is not something which maps to gsbi2 according
+to datasheet and 3.4 sources.
+Secondly 8064 devices do not use gsbi2 for i2c according to 3.4 kernel sources.
+Removing this node as this node would never get tested.
 
-Define an alias for serial port present on ifc6410 which is used as
-console.
-
-Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 4 ++++
- arch/arm/boot/dts/qcom-apq8064.dtsi        | 2 +-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/qcom-apq8064.dtsi | 20 --------------------
+ 1 file changed, 20 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-index 3164197..7a6a076 100644
---- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-@@ -5,6 +5,10 @@
- 	model = "Qualcomm APQ8064/IFC6410";
- 	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
- 
-+	aliases {
-+		serial0 = &serial0;
-+	};
-+
- 	soc {
- 		pinctrl at 800000 {
- 			i2c1_pins: i2c1 {
 diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 9c2e9b2..63edafc 100644
+index 63edafc..ba44f30 100644
 --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
 +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -232,7 +232,7 @@
- 			#size-cells = <1>;
- 			ranges;
+@@ -201,26 +201,6 @@
+ 			};
+ 		};
  
--			serial at 16640000 {
-+			serial0: serial at 16640000 {
- 				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
- 				reg = <0x16640000 0x1000>,
- 				      <0x16600000 0x1000>;
+-		gsbi2: gsbi at 12480000 {
+-			status = "disabled";
+-			compatible = "qcom,gsbi-v1.0.0";
+-			reg = <0x12480000 0x100>;
+-			clocks = <&gcc GSBI2_H_CLK>;
+-			clock-names = "iface";
+-			#address-cells = <1>;
+-			#size-cells = <1>;
+-			ranges;
+-
+-			i2c2: i2c at 124a0000 {
+-				compatible = "qcom,i2c-qup-v1.1.1";
+-				reg = <0x124a0000 0x1000>;
+-				interrupts = <0 196 IRQ_TYPE_NONE>;
+-				clocks = <&gcc GSBI2_QUP_CLK>, <&gcc GSBI2_H_CLK>;
+-				clock-names = "core", "iface";
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-			};
+-		};
+ 
+ 		gsbi7: gsbi at 16600000 {
+ 			status = "disabled";
 -- 
 1.9.1
