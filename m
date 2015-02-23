@@ -1,45 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Feb 2015 12:24:38 +0100
-Subject: Build regressions/improvements in v4.0-rc1
-In-Reply-To: <CAMuHMdUTCvQw1q-dJcx9dAnFEXtfJYs+rbVS4KdZgi-3cbSC7g@mail.gmail.com>
-References: <1424680402-3477-1-git-send-email-geert@linux-m68k.org>
- <5721217.aGU5oqfDWo@wuerfel>
- <CAMuHMdUTCvQw1q-dJcx9dAnFEXtfJYs+rbVS4KdZgi-3cbSC7g@mail.gmail.com>
-Message-ID: <6141970.YzWJy8akUr@wuerfel>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 23 Feb 2015 13:31:11 +0200
+Subject: [PATCH 06/12] ARM: DT: apq8064: add pci support in CM QS600
+In-Reply-To: <1424678135-13178-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <424678035-12862-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1424678135-13178-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <54EB0F7F.1050307@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 February 2015 11:28:12 Geert Uytterhoeven wrote:
-> On Mon, Feb 23, 2015 at 11:24 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 23 February 2015 10:14:55 Geert Uytterhoeven wrote:
-> >> On Mon, Feb 23, 2015 at 10:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> >> >   + /home/kisskb/slave/src/fs/dax.c: error: implicit declaration of function 'copy_user_page' [-Werror=implicit-function-declaration]:  => 266:2
-> 
-> > I checked the other architectures, and found that the same is missing on
-> > ARC, so we should add both:
-> >
-> > diff --git a/fs/Kconfig b/fs/Kconfig
-> > index ec35851e5b71..a24d496787d6 100644
-> > --- a/fs/Kconfig
-> > +++ b/fs/Kconfig
-> > @@ -36,7 +36,7 @@ source "fs/nilfs2/Kconfig"
-> >  config FS_DAX
-> >         bool "Direct Access (DAX) support"
-> >         depends on MMU
-> > -       depends on !(ARM || MIPS || SPARC)
-> > +       depends on !(ARC || ARM || MIPS || SH || SPARC)
-> >         help
-> >           Direct Access (DAX) can be used on memory-backed block devices.
-> >           If the block device supports DAX and the filesystem supports DAX,
-> >
-> >
-> > It's also not implemented on c6x and blackfin, but both of them have
-> > MMU=n, so they are already excluded.
-> 
-> Exactly.
-> 
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Hi Srini,
 
-Thanks, let me submit that as a proper patch with a changelog then.
+On 02/23/15 09:55, Srinivas Kandagatla wrote:
+> From: Nicolas Dechesne <nicolas.dechesne@linaro.org>
+> 
+> This patch adds PCIE support to APQ8064, tested with Ethernet on Compulab QS600 board.
+> 
+> Signed-off-by: Nicolas Dechesne <nicolas.dechesne@linaro.org>
 
-	Arnd
+Thanks for submitting these!
+I currently have a hard time submitting anything...
+
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+
+> ---
+>  arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+> index 5d75666..6e62f24 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+> +++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+> @@ -1,4 +1,5 @@
+>  #include "qcom-apq8064-v2.0.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+>  
+>  / {
+>  	model = "CompuLab CM-QS600";
+> @@ -40,6 +41,24 @@
+>  			};
+>  		};
+>  
+> +		/* on board fixed 3.3v supply */
+> +		v3p3_pcieclk: v3p3-pcieclk {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "PCIE V3P3";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		pci at 1b500000 {
+> +			status = "ok";
+> +			pcie-clk-supply	= <&v3p3_pcieclk>;
+> +			avdd-supply	= <&pm8921_s3>;
+> +			vdd-supply	= <&pm8921_lvs6>;
+> +			qcom,external-phy-refclk;
+> +			reset-gpio = <&tlmm_pinmux 27 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+>  		amba {
+>  			/* eMMC */
+>  			sdcc1: sdcc at 12400000 {
+> 
+
+-- 
+Regards,
+Igor.
