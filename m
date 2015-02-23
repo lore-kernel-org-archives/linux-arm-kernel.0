@@ -1,35 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Feb 2015 22:32:55 +0000
-Subject: Regression: v4.0-rc1: iMX6: Hummingboard fails due to drivers/clk
- changes
-Message-ID: <20150223223255.GQ8656@n2100.arm.linux.org.uk>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 23 Feb 2015 14:36:18 -0800
+Subject: [PATCH 1/7] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <be795ef7ec98669bc5aa90ec426a1ec1fbc32b6c.1423642246.git.viresh.kumar@linaro.org>
+ (Viresh Kumar's message of "Wed, 11 Feb 2015 16:16:24 +0800")
+References: <cover.1423642246.git.viresh.kumar@linaro.org>
+ <cover.1423642246.git.viresh.kumar@linaro.org>
+ <be795ef7ec98669bc5aa90ec426a1ec1fbc32b6c.1423642246.git.viresh.kumar@linaro.org>
+Message-ID: <7ha904b6hp.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+Viresh Kumar <viresh.kumar@linaro.org> writes:
 
-I just tried my SolidRun patch set on top of v4.0-rc1, and it fails to
-boot.  The kernel itself finishes booting, but it is unable to DHCP (for
-root-NFS) - nothing appears on the network.
+> Current OPP (Operating performance point) DT bindings are proven to be
+> insufficient at multiple instances.
+>
+> There had been multiple band-aid approaches to get them fixed (The latest one
+> being: http://www.mail-archive.com/devicetree at vger.kernel.org/msg53398.html).
+> For obvious reasons Rob rejected them and shown the right path forward.
+>
+> The shortcomings we are trying to solve here:
+>
+> - Getting clock sharing information between CPUs. Single shared clock vs
+>   independent clock per core vs shared clock per cluster.
+>
+> - Support for turbo modes
+>
+> - Support for intermediate frequencies or OPPs we can switch to.
+>
+> - Other per OPP settings: transition latencies, disabled status, etc.?
+>
+> - Expandability of OPPs in future.
+>
+> This patch introduces new bindings "operating-points-v2" to get these problems
+> solved. Refer to the bindings for more details.
+>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-At first, I thought this would be a network driver bug, but reverting
-the mainline changes there didn't fix the regression.  Then I wondered
-if it was something in arch/arm/mach-imx, but no.
+[...]
 
-When reverting all drivers/clk changes (and corresponding include/linux/*.h)
-between v3.19 and v4.0-rc1, I find that the regression is fixed.
+> +* OPP Descriptor Node
+> +
+> +This describes the OPPs belonging to a device. This node can have following
+> +properties:
+> +
+> +Required properties:
+> +- compatible: Allow OPPs to express their compatibility. It should be:
+> +  "operating-points-v2".
+> +- OPP nodes: One or more OPP nodes describing frequency-voltage pairs. Their
+> +  name isn't significant but their phandles can be used to reference an OPP.
+> +
+> +Optional properties:
+> +- shared-opp: Indicates that device nodes using this OPP descriptor's phandle
+> +  switch their DVFS state together, i.e. they share clock lines. 
 
-It seems that some CCF change is causing a regression somewhere in the
-clock tree on iMX6 CPUs.
+... or shared voltage rail?
 
-Unfortunately, without networking running, I can't dump the clock tree
-to find out what's different, and bisecting will be a major pain (needing
-each bisect point to be merged with my patch set, built and tested.)
+> +  Missing property means devices have independent clock lines, but they share OPPs.
 
-Has anyone else seen this?
+huh?  missing 'shared-opp' property means they share OPPs?  -ECONFUSED.
 
-Thanks.
+Maybe I missed some of the discussion of why this property is needed,
+but I'm left wondering why it's needed explicitly.  With the OPPs as
+part of the CPU nodes, shouldnt' the "shared" nature of the OPP be
+easily derived from the clock and or regulator (opp-supply) property of
+the CPU nodes?  IOW, if two CPU nodes share a clock and/or a regulator,
+the framework should know it's "shared".
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Or, were there other reasons besides clocks/regulators why this property
+was needed (if so, the documentation doesn't describe them.)
+
+Kevin
