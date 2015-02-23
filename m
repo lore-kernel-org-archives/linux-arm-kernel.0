@@ -1,68 +1,65 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 23 Feb 2015 09:29:18 -0600
+Date: Mon, 23 Feb 2015 09:29:48 -0600
 Subject: [resend PATCH v3 4/4] usb: phy: add phy-hi6220-usb
-In-Reply-To: <54DA1B63.5070007@linaro.org>
+In-Reply-To: <BN3PR0301MB0849FB28B1DAF7BEB5F3BE7881250@BN3PR0301MB0849.namprd03.prod.outlook.com>
 References: <1423559404-13058-1-git-send-email-zhangfei.gao@linaro.org>
  <1423559404-13058-5-git-send-email-zhangfei.gao@linaro.org>
  <20150210144807.GC16711@saruman.tx.rr.com>
- <54DA1B63.5070007@linaro.org>
-Message-ID: <20150223152918.GC32701@saruman.tx.rr.com>
+ <BN3PR0301MB0849FB28B1DAF7BEB5F3BE7881250@BN3PR0301MB0849.namprd03.prod.outlook.com>
+Message-ID: <20150223152948.GD32701@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 10, 2015 at 10:53:23PM +0800, zhangfei wrote:
+On Wed, Feb 11, 2015 at 01:30:53AM +0000, Peter Chen wrote:
+>  
+> > > Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> > > ---
+> > >  drivers/usb/phy/Kconfig          |   9 ++
+> > >  drivers/usb/phy/Makefile         |   1 +
+> > >  drivers/usb/phy/phy-hi6220-usb.c | 306
+> > > +++++++++++++++++++++++++++++++++++++++
+> > >  3 files changed, 316 insertions(+)
+> > >  create mode 100644 drivers/usb/phy/phy-hi6220-usb.c
+> > >
+> > > diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig index
+> > > c6d0c8e..405a3d0 100644
+> > > --- a/drivers/usb/phy/Kconfig
+> > > +++ b/drivers/usb/phy/Kconfig
+> > > @@ -173,6 +173,15 @@ config USB_MXS_PHY
+> > >
+> > >  	  MXS Phy is used by some of the i.MX SoCs, for example imx23/28/6x.
+> > >
+> > > +config USB_HI6220_PHY
+> > > +	tristate "hi6220 USB PHY support"
+> > > +	select USB_PHY
+> > > +	select MFD_SYSCON
+> > > +	help
+> > > +	  Enable this to support the HISILICON HI6220 USB PHY.
+> > > +
+> > > +	  To compile this driver as a module, choose M here.
+> > > +
+> > >  config USB_RCAR_PHY
+> > >  	tristate "Renesas R-Car USB PHY support"
+> > >  	depends on USB || USB_GADGET
+> > > diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile index
+> > > 75f2bba..00172d3 100644
+> > > --- a/drivers/usb/phy/Makefile
+> > > +++ b/drivers/usb/phy/Makefile
+> > > @@ -18,6 +18,7 @@ obj-$(CONFIG_SAMSUNG_USBPHY)		+= phy-
+> > samsung-usb.o
+> > >  obj-$(CONFIG_TWL6030_USB)		+= phy-twl6030-usb.o
+> > >  obj-$(CONFIG_USB_EHCI_TEGRA)		+= phy-tegra-usb.o
+> > >  obj-$(CONFIG_USB_GPIO_VBUS)		+= phy-gpio-vbus-usb.o
+> > > +obj-$(CONFIG_USB_HI6220_PHY)		+= phy-hi6220-usb.o
+> > 
+> > new drivers only on drivers/phy/, sorry.
+> > 
 > 
-> 
-> On 02/10/2015 10:48 PM, Felipe Balbi wrote:
-> >On Tue, Feb 10, 2015 at 05:10:04PM +0800, Zhangfei Gao wrote:
-> >>Add usb phy controller for hi6220 platform
-> >>
-> >>Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> >>---
-> >>  drivers/usb/phy/Kconfig          |   9 ++
-> >>  drivers/usb/phy/Makefile         |   1 +
-> >>  drivers/usb/phy/phy-hi6220-usb.c | 306 +++++++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 316 insertions(+)
-> >>  create mode 100644 drivers/usb/phy/phy-hi6220-usb.c
-> >>
-> >>diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
-> >>index c6d0c8e..405a3d0 100644
-> >>--- a/drivers/usb/phy/Kconfig
-> >>+++ b/drivers/usb/phy/Kconfig
-> >>@@ -173,6 +173,15 @@ config USB_MXS_PHY
-> >>
-> >>  	  MXS Phy is used by some of the i.MX SoCs, for example imx23/28/6x.
-> >>
-> >>+config USB_HI6220_PHY
-> >>+	tristate "hi6220 USB PHY support"
-> >>+	select USB_PHY
-> >>+	select MFD_SYSCON
-> >>+	help
-> >>+	  Enable this to support the HISILICON HI6220 USB PHY.
-> >>+
-> >>+	  To compile this driver as a module, choose M here.
-> >>+
-> >>  config USB_RCAR_PHY
-> >>  	tristate "Renesas R-Car USB PHY support"
-> >>  	depends on USB || USB_GADGET
-> >>diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
-> >>index 75f2bba..00172d3 100644
-> >>--- a/drivers/usb/phy/Makefile
-> >>+++ b/drivers/usb/phy/Makefile
-> >>@@ -18,6 +18,7 @@ obj-$(CONFIG_SAMSUNG_USBPHY)		+= phy-samsung-usb.o
-> >>  obj-$(CONFIG_TWL6030_USB)		+= phy-twl6030-usb.o
-> >>  obj-$(CONFIG_USB_EHCI_TEGRA)		+= phy-tegra-usb.o
-> >>  obj-$(CONFIG_USB_GPIO_VBUS)		+= phy-gpio-vbus-usb.o
-> >>+obj-$(CONFIG_USB_HI6220_PHY)		+= phy-hi6220-usb.o
-> >
-> >new drivers only on drivers/phy/, sorry.
-> >
-> OK, thanks for the info, I don't know this at all.
-> So even usb phy should be put under drivers/phy/.
-> 
-> Will change that.
+> This driver has many USB dependencies, like otg, gadget. I don't know it
+> can use generic phy currently.
 
-yes, thank you
+then we improve generic phy framework. It's about time we moved
+everything to that anyway.
 
 -- 
 balbi
@@ -72,4 +69,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150223/8e2917cc/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150223/1ab420a7/attachment.sig>
