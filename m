@@ -1,161 +1,99 @@
-From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez-Ortiz)
-Date: Mon, 23 Feb 2015 15:16:39 -0500
-Subject: [PATCH] drivers/tty: amba-pl011: defer driver probing if external dma
- is not ready.
-Message-ID: <1424722599-9215-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+From: dobatog@gmail.com (Gabriel Dobato)
+Date: Mon, 23 Feb 2015 21:27:32 +0100
+Subject: Ask for help. ARM:mvebu (CM-A510), add sound support using TLV320AIC23
+ audio-codec
+Message-ID: <54EB8D34.7040003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch addresses a race condition that happens when
-device_initcall(pl011_dma_initicall) is executed before all the devices have been
-probed - this issue was observed on an hisi_6220 SoC (HiKey board from Linaro).
+Hello,
 
-The proposed implementation uses deferred driver probing to wait for the DMA
-controller to be registered.
+I am trying to set the sound system using "simple-audio-card" and 
+TLV320AIC23B audio codec in  Compulab CM-510 SoM.
 
-Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
----
- drivers/tty/serial/amba-pl011.c | 70 +++++++++++------------------------------
- 1 file changed, 18 insertions(+), 52 deletions(-)
+This is my structure in DT, according to 
+./KERNEL/Documentation/devicetree/bindings/sound/simple-card.txt, 
+/KERNEL/Documentation/devicetree/bindings/sound/widgets.txt and the 
+source code of the audio-codec ./KERNEL/sound/soc/codecs/tlv320aic23.c :
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 8d94c19..40219e5 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -29,6 +29,7 @@
-  * and hooked into this driver.
-  */
- 
-+#define pr_fmt(fmt) "amba-pl011: "fmt
- 
- #if defined(CONFIG_SERIAL_AMBA_PL011_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
- #define SUPPORT_SYSRQ
-@@ -261,7 +262,7 @@ static void pl011_sgbuf_free(struct dma_chan *chan, struct pl011_sgbuf *sg,
- 	}
- }
- 
--static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *uap)
-+static int pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
- {
- 	/* DMA is the sole user of the platform data right now */
- 	struct amba_pl011_data *plat = dev_get_platdata(uap->port.dev);
-@@ -275,13 +276,17 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
- 	struct dma_chan *chan;
- 	dma_cap_mask_t mask;
- 
--	chan = dma_request_slave_channel(dev, "tx");
-+	chan = dma_request_slave_channel_reason(dev, "tx");
-+	if (IS_ERR(chan)) {
-+
-+		/* the dma driver has not been initialized yet */
-+		if (PTR_ERR(chan) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
- 
--	if (!chan) {
- 		/* We need platform data */
- 		if (!plat || !plat->dma_filter) {
- 			dev_info(uap->port.dev, "no DMA platform data\n");
--			return;
-+			return 0;
- 		}
- 
- 		/* Try to acquire a generic DMA engine slave TX channel */
-@@ -292,7 +297,7 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
- 						plat->dma_tx_param);
- 		if (!chan) {
- 			dev_err(uap->port.dev, "no TX DMA channel!\n");
--			return;
-+			return 0;
- 		}
- 	}
- 
-@@ -310,7 +315,7 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
- 
- 		if (!chan) {
- 			dev_err(uap->port.dev, "no RX DMA channel!\n");
--			return;
-+			return 0;
- 		}
- 	}
- 
-@@ -383,54 +388,10 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
- 		dev_info(uap->port.dev, "DMA channel RX %s\n",
- 			 dma_chan_name(uap->dmarx.chan));
- 	}
--}
--
--#ifndef MODULE
--/*
-- * Stack up the UARTs and let the above initcall be done at device
-- * initcall time, because the serial driver is called as an arch
-- * initcall, and at this time the DMA subsystem is not yet registered.
-- * At this point the driver will switch over to using DMA where desired.
-- */
--struct dma_uap {
--	struct list_head node;
--	struct uart_amba_port *uap;
--	struct device *dev;
--};
--
--static LIST_HEAD(pl011_dma_uarts);
--
--static int __init pl011_dma_initcall(void)
--{
--	struct list_head *node, *tmp;
- 
--	list_for_each_safe(node, tmp, &pl011_dma_uarts) {
--		struct dma_uap *dmau = list_entry(node, struct dma_uap, node);
--		pl011_dma_probe_initcall(dmau->dev, dmau->uap);
--		list_del(node);
--		kfree(dmau);
--	}
- 	return 0;
- }
- 
--device_initcall(pl011_dma_initcall);
--
--static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
--{
--	struct dma_uap *dmau = kzalloc(sizeof(struct dma_uap), GFP_KERNEL);
--	if (dmau) {
--		dmau->uap = uap;
--		dmau->dev = dev;
--		list_add_tail(&dmau->node, &pl011_dma_uarts);
--	}
--}
--#else
--static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
--{
--	pl011_dma_probe_initcall(dev, uap);
--}
--#endif
--
- static void pl011_dma_remove(struct uart_amba_port *uap)
- {
- 	/* TODO: remove the initcall if it has not yet executed */
-@@ -1142,8 +1103,9 @@ static inline bool pl011_dma_rx_running(struct uart_amba_port *uap)
- 
- #else
- /* Blank functions if the DMA engine is not available */
--static inline void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
-+static int pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
- {
-+	return 0;
- }
- 
- static inline void pl011_dma_remove(struct uart_amba_port *uap)
-@@ -2218,7 +2180,11 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 	uap->port.ops = &amba_pl011_pops;
- 	uap->port.flags = UPF_BOOT_AUTOCONF;
- 	uap->port.line = i;
--	pl011_dma_probe(&dev->dev, uap);
-+	ret = pl011_dma_probe(&dev->dev, uap);
-+	if (ret) {
-+		devm_kfree(&dev->dev, uap);
-+		return ret;
-+	}
- 
- 	/* Ensure interrupts from this UART are masked and cleared */
- 	writew(0, uap->port.membase + UART011_IMSC);
--- 
-1.9.1
+  sound {
+                 compatible = "simple-audio-card";
+                 simple-audio-card,name = "OnboardTLV320AIC23B";
+                 simple-audio-card,format = "i2s";
+                 simple-audio-card,bitclock-master = <&dailink_master>;
+                 simple-audio-card,frame-master = <&dailink_master>;
+                 simple-audio-card,widgets =
+                         "Microphone", "Mic Input",
+                         "Line", "Line Input",
+                         "Line", "Line Out",
+                         "Speaker", "Speaker",
+                         "Headphone", "Headphone Jack";
+
+                 simple-audio-card,routing =
+                         "Line Out", "LOUT",
+                         "Line Out", "ROUT",
+                         "Line Out", "RHPOUT",
+                         "Line Out", "LHPOUT",
+                         "LLINEIN","Line Input",
+                         "RLINEIN","Line Input",
+                          "MICIN","Mic Input";
+                 simple-audio-card,cpu {
+                                 sound-dai = <&audio0 0>;
+                         };
+                 dailink_master: simple-audio-card,codec {
+                                 sound-dai = <&opt_audio>;
+                         };
+                 };
+};
+
+
+/* TLV320AIC23 */
+&opt_audio {
+             status = "okay";
+             #sound-dai-cells= <0>;
+  };
+
+
+And this is the kernel trace:
+
+...
+tlv320aic23-codec 0-001a: Control not supported for path LLINEIN -> 
+[NULL] -> Line Input
+tlv320aic23-codec 0-001a: ASoC: no dapm match for LLINEIN --> NULL --> 
+Line Input
+tlv320aic23-codec 0-001a: ASoC: Failed to add route LLINEIN -> NULL -> 
+Line Input
+tlv320aic23-codec 0-001a: Control not supported for path RLINEIN -> 
+[NULL] -> Line Input
+tlv320aic23-codec 0-001a: ASoC: no dapm match for RLINEIN --> NULL --> 
+Line Input
+tlv320aic23-codec 0-001a: ASoC: Failed to add route RLINEIN -> NULL -> 
+Line Input
+tlv320aic23-codec 0-001a: Control not supported for path MICIN -> [NULL] 
+-> Mic Input
+tlv320aic23-codec 0-001a: ASoC: no dapm match for MICIN --> NULL --> Mic 
+Input
+tlv320aic23-codec 0-001a: ASoC: Failed to add route MICIN -> NULL -> Mic 
+Input
+usb 2-1.2: new high-speed USB device number 3 using orion-ehci
+asoc-simple-card sound: tlv320aic23-hifi <-> i2s mapping ok
+...
+
+ALSA device list:
+   #0: OnboardTLV320AIC23B
+...
+
+[....] Setting up ALSA...amixer: Invalid command!
+...
+
+
+I think I have written the node according to the documentation, but 
+probably I miss something.
+Anyone has faced a similar problem?
+
+
+I would really appreciate some kind of help.
+
+Thank you,
+
+Gabriel
