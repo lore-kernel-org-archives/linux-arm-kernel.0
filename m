@@ -1,47 +1,60 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 23 Feb 2015 11:22:02 +0100
-Subject: [PATCH] spi: xilinx: Use standard num-cs binding
-In-Reply-To: <20150214053543.GL9110@finisterre.sirena.org.uk>
-References: <67f3c196833c427a489ca2c530d08987a6b5ee2a.1421412912.git.michal.simek@xilinx.com>
- <CAHTX3dJRGhwo7FW+VJxfEJmx-9FdjFN5EnxG0RRDfMOm3=VU4A@mail.gmail.com>
- <20150214053543.GL9110@finisterre.sirena.org.uk>
-Message-ID: <54EAFF4A.1080605@monstr.eu>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Feb 2015 11:24:46 +0100
+Subject: Build regressions/improvements in v4.0-rc1
+In-Reply-To: <CAMuHMdVMCvw1euM0c2AYrYibO4ObZLV6F_-CDPZZ6x44D6Hwug@mail.gmail.com>
+References: <1424680402-3477-1-git-send-email-geert@linux-m68k.org>
+ <5900255.NhXvduRnha@wuerfel>
+ <CAMuHMdVMCvw1euM0c2AYrYibO4ObZLV6F_-CDPZZ6x44D6Hwug@mail.gmail.com>
+Message-ID: <5721217.aGU5oqfDWo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 02/14/2015 06:35 AM, Mark Brown wrote:
-> On Wed, Feb 11, 2015 at 12:07:20PM +0100, Michal Simek wrote:
->> 2015-01-16 13:55 GMT+01:00 Michal Simek <michal.simek@xilinx.com>:
+On Monday 23 February 2015 10:14:55 Geert Uytterhoeven wrote:
+> On Mon, Feb 23, 2015 at 10:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> >   + /home/kisskb/slave/src/fs/dax.c: error: implicit declaration of function 'copy_user_page' [-Werror=implicit-function-declaration]:  => 266:2
+> >
+> > DAX support was merged with 'depends on !(ARM || MIPS || SPARC)', so I don't
+> > see how this could happen.
 > 
->>> Use standard num-cs binding property and setup
->>> "xlnx,num-ss-bits" as deprecated.
+> sh is not ARM, not MIPS, not SPARC, so...?
+
+I misread your email and thought this was still under arm-randconfig.
+
+I checked the other architectures, and found that the same is missing on
+ARC, so we should add both:
+
+diff --git a/fs/Kconfig b/fs/Kconfig
+index ec35851e5b71..a24d496787d6 100644
+--- a/fs/Kconfig
++++ b/fs/Kconfig
+@@ -36,7 +36,7 @@ source "fs/nilfs2/Kconfig"
+ config FS_DAX
+ 	bool "Direct Access (DAX) support"
+ 	depends on MMU
+-	depends on !(ARM || MIPS || SPARC)
++	depends on !(ARC || ARM || MIPS || SH || SPARC)
+ 	help
+ 	  Direct Access (DAX) can be used on memory-backed block devices.
+ 	  If the block device supports DAX and the filesystem supports DAX,
+
+
+It's also not implemented on c6x and blackfin, but both of them have
+MMU=n, so they are already excluded.
+
+> >> sh-randconfig
 > 
->> Any update on this one?
+> >> >   + /home/kisskb/slave/src/sound/soc/codecs/max98357a.c: error: implicit declaration of function 'devm_gpiod_get' [-Werror=implicit-function-declaration]:  => 55:2
+> >> >   + /home/kisskb/slave/src/sound/soc/codecs/max98357a.c: error: implicit declaration of function 'gpiod_direction_output' [-Werror=implicit-function-declaration]:  => 61:2
+> >> >   + /home/kisskb/slave/src/sound/soc/codecs/max98357a.c: error: implicit declaration of function 'gpiod_set_value' [-Werror=implicit-function-declaration]:  => 30:3
+> >
+> > Something wrong in arch/sh/include/asm/gpio.h? the codec is only
+> > selectable when gpiolib is enabled, but the consumer.h header
+> > apparently does not get included here.
 > 
-> Don't send content free quoted pings, they're just adding to the e-mail
-> volume and hence wasting people's time.
+> I think it's an bad select, for which a patch has been available since
+> about 2 weeks.
 
-How do you want me to send ping on pending patches?
-Just send them with RESEND prefix?
-I just want to clarify this.
+Ah, right. I was looking at linux-next, which has the fix, so I did not
+see the problem at first.
 
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150223/3ed33e2e/attachment.sig>
+	Arnd
