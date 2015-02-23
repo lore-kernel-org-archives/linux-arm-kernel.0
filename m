@@ -1,68 +1,49 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Mon, 23 Feb 2015 07:24:04 -0500 (EST)
-Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
-In-Reply-To: <20150223120744.GA5609@cbox>
-References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
- <CAL_JsqJQcuX2cp50oHod-QAbhdMg48TaRP+gLGEO2kbFnQ3B+A@mail.gmail.com>
- <20150219190348.GB24460@cbox>
- <CAL_JsqLcBOC+AnVe7oATjg2g6Fz2vqwacu8QzS4tXMaxxOP_Xg@mail.gmail.com>
- <20150223120744.GA5609@cbox>
-Message-ID: <898480616.21888431.1424694244176.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 23 Feb 2015 12:30:46 +0000
+Subject: [PATCH] drivers: spi: fix compiler warning in spi-s3c64xx
+Message-ID: <1424694646-26002-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry about top post. Quick comment in reply to Seattle point below - yes, it does indeed support 64K and already has the right DTS.
+The Exynos 7 arm64 support now allows the S3C64xx SPI driver to be
+compiled into an ARM64 kernel, so the cast from the [rt]x_dmach int
+variable to a void* in this driver now triggers a warning.
+Add a long cast to silence the compiler.
 
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+Hi,
+
+this is only compile-tested for arm and arm64. Could someone with
+the hardware please confirm that it still works?
+
+Cheers,
+Andre.
+
+ drivers/spi/spi-s3c64xx.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 9231c34..b1c6731 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -324,7 +324,7 @@ static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
+ 
+ 		/* Acquire DMA channels */
+ 		sdd->rx_dma.ch = dma_request_slave_channel_compat(mask, filter,
+-				   (void *)sdd->rx_dma.dmach, dev, "rx");
++				   (void *)(long)sdd->rx_dma.dmach, dev, "rx");
+ 		if (!sdd->rx_dma.ch) {
+ 			dev_err(dev, "Failed to get RX DMA channel\n");
+ 			ret = -EBUSY;
+@@ -333,7 +333,7 @@ static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
+ 		spi->dma_rx = sdd->rx_dma.ch;
+ 
+ 		sdd->tx_dma.ch = dma_request_slave_channel_compat(mask, filter,
+-				   (void *)sdd->tx_dma.dmach, dev, "tx");
++				   (void *)(long)sdd->tx_dma.dmach, dev, "tx");
+ 		if (!sdd->tx_dma.ch) {
+ 			dev_err(dev, "Failed to get TX DMA channel\n");
+ 			ret = -EBUSY;
 -- 
-Computer Architect | Sent from my #ARM Powered Mobile Device
-
-On Feb 23, 2015 4:14 AM, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->
-> On Sat, Feb 21, 2015 at 03:56:17PM -0600, Rob Herring wrote: 
-> > On Thu, Feb 1On Sat, Feb 21, 2015 at 03:56:17PM -0600, Rob Herring wrote:
-> On Thu, Feb 19, 2015 at 1:03 PM, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> > On Thu, Feb 19, 2015 at 12:23:15PM -0600, Rob Herring wrote:
-> >> On Tue, Jan 27, 2015 at 1:03 AM, Pranavkumar Sawargaonkar
-> >> <psawargaonkar@apm.com> wrote:
-> >> > In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
-> >> > in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
-> >> > size due to size alignment checking in vgic driver for VCPU Control and
-> >> > VCPU register.
-> >> >
-> >> > This patch corrects the sizes to be inline with the hardware spec.
-> >>
-> >> This does not make sense. The GIC regions are still only 4 or 8KB and
-> >> the h/w description should reflect that. For implementations using
-> >> gic-400 and the addressing decode trick, the rest of the register
-> >> range is also not safe to access given it is multiple mapped. Also,
-> >> this wastes virtual space, but I guess we don't care on 64-bit.
-> >>
-> >> KVM should be fixed to only check base address alignment. Size
-> >> alignment does not matter (if it does, then you need to fix all
-> >> register blocks).
-> >>
-> > It matters if you want to ensure that the 64K page you are assigning to
-> > a guest for the GIC virtual CPU interface contains only GIC virtual CPU
-> > mappings, and not other random stuff that the guest is not allowed to
-> > touch.
-> 
-> Good point.
-> 
-> > How else should this be enforced?
-> 
-> Rely on correct h/w design? You'll have to repeat this every time you
-> want to do pass-thru of a device.
-> 
-> What do you do if 64K mapping is not supported? Fallback to emulation
-> of the CPU interface?
-
-Agree with Peter on these two points.
-
-> 
-> Are there other DTSs that need to be fixed?
-> 
-Not sure really, AMD Seattle works with 64K pages IIRC.
-
-Thanks,
--Christoffer
+1.7.9.5
