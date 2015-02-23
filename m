@@ -1,75 +1,59 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 23 Feb 2015 12:47:22 +0100
-Subject: [PATCH v4 01/20] power_supply: Add driver private data
+Date: Mon, 23 Feb 2015 12:47:25 +0100
+Subject: [PATCH v4 04/20] power_supply: sysfs: Use power_supply_*() API for
+ accessing function attrs
 In-Reply-To: <1424692061-30624-1-git-send-email-k.kozlowski@samsung.com>
 References: <1424692061-30624-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1424692061-30624-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1424692061-30624-5-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow drivers to store private data inside power_supply structure for
-later usage in power supply operations.
-
-Usage of driver private data is necessary to access driver's state
-container object from power supply calls (like get_property()) if struct
-'power_supply' is a stored there as a pointer, for example:
-
-struct some_driver_info {
-	struct i2c_client       *client;
-	struct power_supply     *power_supply;
-	...
-}
-
-In such case one cannot use container_of() and must store pointer to
-state container as private data.
+Replace direct calls to power supply function attributes with wrappers.
+Wrappers provide safe access in case of unregistering the power
+supply (e.g. by removing the driver). Replace:
+ - get_property -> power_supply_get_property
+ - set_property -> power_supply_set_property
+ - property_is_writeable -> power_supply_property_is_writeable
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Acked-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
+Acked-by: Pavel Machek <pavel@ucw.cz>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Reviewed-by: Sebastian Reichel <sre@kernel.org>
-Acked-by: Pavel Machek <pavel@ucw.cz>
 ---
- drivers/power/power_supply_core.c | 6 ++++++
- include/linux/power_supply.h      | 4 ++++
- 2 files changed, 10 insertions(+)
+ drivers/power/power_supply_sysfs.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
-index 694e8cddd5c1..84ef3f40e7bf 100644
---- a/drivers/power/power_supply_core.c
-+++ b/drivers/power/power_supply_core.c
-@@ -629,6 +629,12 @@ void power_supply_unregister(struct power_supply *psy)
- }
- EXPORT_SYMBOL_GPL(power_supply_unregister);
+diff --git a/drivers/power/power_supply_sysfs.c b/drivers/power/power_supply_sysfs.c
+index 62653f50a524..f817aab80813 100644
+--- a/drivers/power/power_supply_sysfs.c
++++ b/drivers/power/power_supply_sysfs.c
+@@ -76,7 +76,7 @@ static ssize_t power_supply_show_property(struct device *dev,
+ 	if (off == POWER_SUPPLY_PROP_TYPE) {
+ 		value.intval = psy->type;
+ 	} else {
+-		ret = psy->get_property(psy, off, &value);
++		ret = power_supply_get_property(psy, off, &value);
  
-+void *power_supply_get_drvdata(struct power_supply *psy)
-+{
-+	return psy->drv_data;
-+}
-+EXPORT_SYMBOL_GPL(power_supply_get_drvdata);
-+
- static int __init power_supply_class_init(void)
- {
- 	power_supply_class = class_create(THIS_MODULE, "power_supply");
-diff --git a/include/linux/power_supply.h b/include/linux/power_supply.h
-index 096dbced02ac..a5743f24e03e 100644
---- a/include/linux/power_supply.h
-+++ b/include/linux/power_supply.h
-@@ -209,6 +209,9 @@ struct power_supply {
- 	/* For APM emulation, think legacy userspace. */
- 	int use_for_apm;
+ 		if (ret < 0) {
+ 			if (ret == -ENODATA)
+@@ -125,7 +125,7 @@ static ssize_t power_supply_store_property(struct device *dev,
  
-+	/* Driver private data */
-+	void *drv_data;
-+
- 	/* private */
- 	struct device *dev;
- 	struct work_struct changed_work;
-@@ -281,6 +284,7 @@ extern int power_supply_register_no_ws(struct device *parent,
- extern void power_supply_unregister(struct power_supply *psy);
- extern int power_supply_powers(struct power_supply *psy, struct device *dev);
+ 	value.intval = long_val;
  
-+extern void *power_supply_get_drvdata(struct power_supply *psy);
- /* For APM emulation, think legacy userspace. */
- extern struct class *power_supply_class;
+-	ret = psy->set_property(psy, off, &value);
++	ret = power_supply_set_property(psy, off, &value);
+ 	if (ret < 0)
+ 		return ret;
  
+@@ -223,7 +223,7 @@ static umode_t power_supply_attr_is_visible(struct kobject *kobj,
+ 
+ 		if (property == attrno) {
+ 			if (psy->property_is_writeable &&
+-			    psy->property_is_writeable(psy, property) > 0)
++			    power_supply_property_is_writeable(psy, property) > 0)
+ 				mode |= S_IWUSR;
+ 
+ 			return mode;
 -- 
 1.9.1
