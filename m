@@ -1,45 +1,23 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 23 Feb 2015 06:10:59 -0800
-Subject: [PATCH] ARM: Kirkwood: enable GPIO fan alarm support for 2Big
- Network v2
-In-Reply-To: <1424696523-14855-1-git-send-email-simon.guinot@sequanux.org>
-References: <1424696523-14855-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <54EB34F3.4000500@roeck-us.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 23 Feb 2015 23:21:35 +0900
+Subject: [PATCH] drivers: spi: fix compiler warning in spi-s3c64xx
+In-Reply-To: <1424694646-26002-1-git-send-email-andre.przywara@arm.com>
+References: <1424694646-26002-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <20150223142135.GC6236@finisterre.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/23/2015 05:02 AM, Simon Guinot wrote:
-> On the LaCie 2Big Network v2 (net2big_v2) board, the fan alarm is not
-> wired to the I2C fan controller but to a separe GPIO. This GPIO can be
-> controlled by using the gpio-fan driver.
->
-> This patch adds the gpio-fan alarm description in the net2big_v2 DTS.
->
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> ---
->   arch/arm/boot/dts/kirkwood-net2big.dts | 5 +++++
->   1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/kirkwood-net2big.dts b/arch/arm/boot/dts/kirkwood-net2big.dts
-> index 53dc37a3b687..e4f7e497379f 100644
-> --- a/arch/arm/boot/dts/kirkwood-net2big.dts
-> +++ b/arch/arm/boot/dts/kirkwood-net2big.dts
-> @@ -27,6 +27,11 @@
->   		device_type = "memory";
->   		reg = <0x00000000 0x10000000>;
->   	};
-> +
-> +	gpio_fan {
-> +		compatible = "gpio-fan";
-> +		alarm-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
-> +	};
->   };
->
->   &regulators {
->
-Again, wrong solution, and conceptually wrong as well from a dt perspective.
+On Mon, Feb 23, 2015 at 12:30:46PM +0000, Andre Przywara wrote:
+> The Exynos 7 arm64 support now allows the S3C64xx SPI driver to be
+> compiled into an ARM64 kernel, so the cast from the [rt]x_dmach int
+> variable to a void* in this driver now triggers a warning.
+> Add a long cast to silence the compiler.
 
-The alarm signal should be handled by the g762 driver, and the alarm-gpios
-property should be added to the g762 description.
-
-Guenter
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150223/315b1899/attachment.sig>
