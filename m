@@ -1,364 +1,432 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 23 Feb 2015 18:28:11 +0000
-Subject: [PATCH 2/2] ARM: kernel: add outer cache support for cacheinfo
- implementation
-In-Reply-To: <1424716091-22914-1-git-send-email-sudeep.holla@arm.com>
-References: <1424716091-22914-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1424716091-22914-2-git-send-email-sudeep.holla@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 23 Feb 2015 19:32:53 +0100
+Subject: [PATCHv3] mvebu: add Linksys WRT1900AC (Mamba) support
+In-Reply-To: <1424089864-15651-1-git-send-email-kaloz@openwrt.org>
+References: <1424089864-15651-1-git-send-email-kaloz@openwrt.org>
+Message-ID: <54EB7255.7090806@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support outer cache in the cacheinfo infrastructure, a new
-function 'get_info' is added to outer_cache_fns. This function is used
-to get the outer cache information namely: line size, number of ways of
-associativity and number of sets.
+Hi Imre,
 
-This patch adds 'get_info' supports to all L2 cache implementations on
-ARM except Marvell's Feroceon L2 cache.
+On 16/02/2015 13:31, Imre Kaloz wrote:
+> The Linksys WRT1900AC (Mamba) is a router that has
+> 
+> - 2 mini-PCIe slots with Marvell 88W8864 radios
+> - 1 USB 3.0 port
+> - 1 USB 2.0/eSATAp port
+> - 2 Ethernet interfaces connected to a 88E6172 switch (1x WAN + 4x LAN)
+> - 128MB NAND flash
+> - 256MB RAM
+> 
+> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+> ---
+> Changes since v2:
+>   * added tlc59116 leds
+>   * added an extra partition for the unused space
+>   * added serial console pinout
+>   * renamed the dts to armada-xp-linksys-mamba.dts
+> 
+> Changes since v1:
+>   * add dual license
+>   * lower SPI speed to meet the chip's maximum
+>   * pinctrl cleanups based on Andrew Lunn's suggestions
+> ---
+>  arch/arm/boot/dts/Makefile                    |   1 +
+>  arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 348 ++++++++++++++++++++++++++
+>  2 files changed, 349 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 91bd5bd..a84063f 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -541,6 +541,7 @@ dtb-$(CONFIG_MACH_ARMADA_XP) += \
+>  	armada-xp-db.dtb \
+>  	armada-xp-gp.dtb \
+>  	armada-xp-lenovo-ix4-300d.dtb \
+> +	armada-xp-linksys-mamba.dtb \
+>  	armada-xp-matrix.dtb \
+>  	armada-xp-netgear-rn2120.dtb \
+>  	armada-xp-openblocks-ax3-4.dtb \
+> diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> new file mode 100644
+> index 0000000..0a3d1d6
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> @@ -0,0 +1,348 @@
+> +/*
+> + * Device Tree file for the Linksys WRT1900AC (Mamba).
+> + *
+> + * Note: this board is shipped with a new generation boot loader that
+> + * remaps internal registers at 0xf1000000. Therefore, if earlyprintk
+> + * is used, the CONFIG_DEBUG_MVEBU_UART_ALTERNATE option should be
 
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/include/asm/outercache.h |  9 +++++++++
- arch/arm/kernel/cacheinfo.c       | 14 +++++++++++++-
- arch/arm/mm/cache-l2x0.c          | 35 ++++++++++++++++++++++++++++++++++-
- arch/arm/mm/cache-tauros2.c       | 36 ++++++++++++++++++++++++++++++++++++
- arch/arm/mm/cache-xsc3l2.c        | 17 +++++++++++++++++
- 5 files changed, 109 insertions(+), 2 deletions(-)
+This symbol name has been removed and DEBUG_MVEBU_UART0_ALTERNATE would
+be used instead.
 
-diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-index 563b92fc2f41..ba16c7e1661d 100644
---- a/arch/arm/include/asm/outercache.h
-+++ b/arch/arm/include/asm/outercache.h
-@@ -25,7 +25,10 @@
- 
- struct l2x0_regs;
- 
-+struct cacheinfo;
-+
- struct outer_cache_fns {
-+	void (*get_info)(struct cacheinfo *);
- 	void (*inv_range)(unsigned long, unsigned long);
- 	void (*clean_range)(unsigned long, unsigned long);
- 	void (*flush_range)(unsigned long, unsigned long);
-@@ -115,6 +118,11 @@ static inline void outer_resume(void)
- 		outer_cache.resume();
- }
- 
-+static inline void outer_get_info(struct cacheinfo *this_leaf)
-+{
-+	if (outer_cache.get_info)
-+		outer_cache.get_info(this_leaf);
-+}
- #else
- 
- static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
-@@ -126,6 +134,7 @@ static inline void outer_flush_range(phys_addr_t start, phys_addr_t end)
- static inline void outer_flush_all(void) { }
- static inline void outer_disable(void) { }
- static inline void outer_resume(void) { }
-+static inline void outer_get_info(struct cacheinfo *this_leaf) { }
- 
- #endif
- 
-diff --git a/arch/arm/kernel/cacheinfo.c b/arch/arm/kernel/cacheinfo.c
-index 0c4a67dcbcaf..c6c32fdb037e 100644
---- a/arch/arm/kernel/cacheinfo.c
-+++ b/arch/arm/kernel/cacheinfo.c
-@@ -24,6 +24,7 @@
- #include <linux/of.h>
- 
- #include <asm/cputype.h>
-+#include <asm/outercache.h>
- #include <asm/processor.h>
- #include <asm/system_info.h>
- 
-@@ -227,11 +228,19 @@ static inline enum cache_type get_cache_type(int level)
- 	return __get_cache_type(level);
- }
- 
-+static inline void __outer_ci_leaf_init(struct cacheinfo *this_leaf)
-+{
-+	outer_get_info(this_leaf);
-+	BUG_ON(this_leaf->type == CACHE_TYPE_SEPARATE);
-+}
-+
- static void ci_leaf_init(struct cacheinfo *this_leaf,
- 			 enum cache_type type, unsigned int level)
- {
- 	this_leaf->level = level;
--	if (cache_is_armv7())
-+	if (type == CACHE_TYPE_NOCACHE)	/* must be outer cache */
-+		__outer_ci_leaf_init(this_leaf);
-+	else if (cache_is_armv7())
- 		__armv7_ci_leaf_init(type, this_leaf);
- 	else
- 		__ci_leaf_init(type, this_leaf);
-@@ -255,6 +264,9 @@ static int __init_cache_level(unsigned int cpu)
- 	this_cpu_ci->num_levels = level;
- 	this_cpu_ci->num_leaves = leaves;
- 
-+	if (IS_ENABLED(CONFIG_OUTER_CACHE) && outer_cache.get_info)
-+		this_cpu_ci->num_leaves++, this_cpu_ci->num_levels++;
-+
- 	return 0;
- }
- 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index c6c7696b8db9..9955635a1c77 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -17,6 +17,7 @@
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-  */
- #include <linux/cpu.h>
-+#include <linux/cacheinfo.h>
- #include <linux/err.h>
- #include <linux/init.h>
- #include <linux/smp.h>
-@@ -121,6 +122,22 @@ static void l2c_configure(void __iomem *base)
- 	l2c_write_sec(l2x0_saved_regs.aux_ctrl, base, L2X0_AUX_CTRL);
- }
- 
-+static void __l2x0_getinfo(struct cacheinfo *this_leaf)
-+{
-+	unsigned int assoc = get_count_order(l2x0_way_mask);
-+
-+	this_leaf->size = l2x0_size;
-+	this_leaf->coherency_line_size = CACHE_LINE_SIZE;
-+	this_leaf->ways_of_associativity = assoc;
-+	this_leaf->number_of_sets = l2x0_size / (assoc * CACHE_LINE_SIZE);
-+}
-+
-+static void l2x0_getinfo(struct cacheinfo *this_leaf)
-+{
-+	this_leaf->type = CACHE_TYPE_UNIFIED;
-+	__l2x0_getinfo(this_leaf);
-+}
-+
- /*
-  * Enable the L2 cache controller.  This function must only be
-  * called when the cache controller is known to be disabled.
-@@ -260,6 +277,7 @@ static const struct l2c_init_data l2c210_data __initconst = {
- 		.disable = l2c_disable,
- 		.sync = l2c210_sync,
- 		.resume = l2c_resume,
-+		.get_info = l2x0_getinfo,
- 	},
- };
- 
-@@ -417,6 +435,7 @@ static const struct l2c_init_data l2c220_data = {
- 		.disable = l2c_disable,
- 		.sync = l2c220_sync,
- 		.resume = l2c_resume,
-+		.get_info = l2x0_getinfo,
- 	},
- };
- 
-@@ -771,6 +790,7 @@ static const struct l2c_init_data l2c310_init_fns __initconst = {
- 		.disable = l2c310_disable,
- 		.sync = l2c210_sync,
- 		.resume = l2c310_resume,
-+		.get_info = l2x0_getinfo,
- 	},
- };
- 
-@@ -860,7 +880,6 @@ static int __init __l2c_init(const struct l2c_init_data *data,
- 		data->enable(l2x0_base, aux, data->num_lock);
- 
- 	outer_cache = fns;
--
- 	/*
- 	 * It is strange to save the register state before initialisation,
- 	 * but hey, this is what the DT implementations decided to do.
-@@ -1074,6 +1093,7 @@ static const struct l2c_init_data of_l2c210_data __initconst = {
- 		.disable     = l2c_disable,
- 		.sync        = l2c210_sync,
- 		.resume      = l2c_resume,
-+		.get_info    = l2x0_getinfo,
- 	},
- };
- 
-@@ -1092,6 +1112,7 @@ static const struct l2c_init_data of_l2c220_data __initconst = {
- 		.disable     = l2c_disable,
- 		.sync        = l2c220_sync,
- 		.resume      = l2c_resume,
-+		.get_info    = l2x0_getinfo,
- 	},
- };
- 
-@@ -1220,6 +1241,7 @@ static const struct l2c_init_data of_l2c310_data __initconst = {
- 		.disable     = l2c310_disable,
- 		.sync        = l2c210_sync,
- 		.resume      = l2c310_resume,
-+		.get_info    = l2x0_getinfo,
- 	},
- };
- 
-@@ -1248,6 +1270,7 @@ static const struct l2c_init_data of_l2c310_coherent_data __initconst = {
- 		.flush_all   = l2c210_flush_all,
- 		.disable     = l2c310_disable,
- 		.resume      = l2c310_resume,
-+		.get_info    = l2x0_getinfo,
- 	},
- };
- 
-@@ -1409,6 +1432,12 @@ static void __init aurora_of_parse(const struct device_node *np,
- 	*aux_mask &= ~mask;
- }
- 
-+static void aurora_no_outer_data_getinfo(struct cacheinfo *this_leaf)
-+{
-+	this_leaf->type = CACHE_TYPE_INST;
-+	__l2x0_getinfo(this_leaf);
-+}
-+
- static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
- 	.type = "Aurora",
- 	.way_size_0 = SZ_4K,
-@@ -1425,6 +1454,7 @@ static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
- 		.disable     = aurora_disable,
- 		.sync	     = aurora_cache_sync,
- 		.resume      = l2c_resume,
-+		.get_info    = l2x0_getinfo,
- 	},
- };
- 
-@@ -1438,6 +1468,7 @@ static const struct l2c_init_data of_aurora_no_outer_data __initconst = {
- 	.save  = aurora_save,
- 	.outer_cache = {
- 		.resume      = l2c_resume,
-+		.get_info    = aurora_no_outer_data_getinfo,
- 	},
- };
- 
-@@ -1594,6 +1625,7 @@ static const struct l2c_init_data of_bcm_l2x0_data __initconst = {
- 		.disable     = l2c310_disable,
- 		.sync        = l2c210_sync,
- 		.resume      = l2c310_resume,
-+		.get_info    = l2x0_getinfo,
- 	},
- };
- 
-@@ -1625,6 +1657,7 @@ static const struct l2c_init_data of_tauros3_data __initconst = {
- 	/* Tauros3 broadcasts L1 cache operations to L2 */
- 	.outer_cache = {
- 		.resume      = l2c_resume,
-+		.get_info    = l2x0_getinfo,
- 	},
- };
- 
-diff --git a/arch/arm/mm/cache-tauros2.c b/arch/arm/mm/cache-tauros2.c
-index 1e373d268c04..0cff878c588e 100644
---- a/arch/arm/mm/cache-tauros2.c
-+++ b/arch/arm/mm/cache-tauros2.c
-@@ -14,6 +14,7 @@
-  *   Document ID MV-S105190-00, Rev 0.7, March 14 2008.
-  */
- 
-+#include <linux/cacheinfo.h>
- #include <linux/init.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-@@ -60,6 +61,7 @@ static inline void tauros2_inv_pa(unsigned long addr)
-  * noninclusive.
-  */
- #define CACHE_LINE_SIZE		32
-+#define CACHE_LINE_SHIFT	5
- 
- static void tauros2_inv_range(unsigned long start, unsigned long end)
- {
-@@ -131,6 +133,39 @@ static void tauros2_resume(void)
- 	"mcr	p15, 0, %0, c1, c0, 0 @Enable L2 Cache\n\t"
- 	: : "r" (0x0));
- }
-+
-+/*
-+ *  +----------------------------------------+
-+ *  | 11 10 9  8 | 7  6  5  4  3 | 2 |  1  0 |
-+ *  +----------------------------------------+
-+ *  |  way size  | associativity | - |line_sz|
-+ *  +----------------------------------------+
-+ */
-+#define L2CTR_ASSOCIAT_SHIFT	3
-+#define L2CTR_ASSOCIAT_MASK	0x1F
-+#define L2CTR_WAYSIZE_SHIFT	8
-+#define L2CTR_WAYSIZE_MASK	0xF
-+#define CACHE_WAY_PER_SET(l2ctr)	\
-+	(((l2_ctr) >> L2CTR_ASSOCIAT_SHIFT) & L2CTR_ASSOCIAT_MASK)
-+#define CACHE_WAY_SIZE(l2ctr)		\
-+	(8192 << (((l2ctr) >> L2CTR_WAYSIZE_SHIFT) & L2CTR_WAYSIZE_MASK))
-+#define CACHE_SET_SIZE(l2ctr)	(CACHE_WAY_SIZE(l2ctr) >> CACHE_LINE_SHIFT)
-+
-+static void tauros2_getinfo(struct cacheinfo *this_leaf)
-+{
-+	unsigned int l2_ctr;
-+
-+	__asm__("mrc p15, 1, %0, c0, c0, 1" : "=r" (l2_ctr));
-+
-+	this_leaf->type = CACHE_TYPE_UNIFIED;
-+	this_leaf->coherency_line_size = CACHE_LINE_SIZE;
-+	this_leaf->ways_of_associativity = CACHE_WAY_PER_SET(l2_ctr);
-+	this_leaf->number_of_sets = CACHE_SET_SIZE(l2_ctr);
-+	this_leaf->size = this_leaf->coherency_line_size *
-+			  this_leaf->number_of_sets *
-+			  this_leaf->ways_of_associativity;
-+}
-+
- #endif
- 
- static inline u32 __init read_extra_features(void)
-@@ -226,6 +261,7 @@ static void __init tauros2_internal_init(unsigned int features)
- 		outer_cache.flush_range = tauros2_flush_range;
- 		outer_cache.disable = tauros2_disable;
- 		outer_cache.resume = tauros2_resume;
-+		outer_cache.get_info = tauros2_getinfo;
- 	}
- #endif
- 
-diff --git a/arch/arm/mm/cache-xsc3l2.c b/arch/arm/mm/cache-xsc3l2.c
-index 6c3edeb66e74..175bf44eb039 100644
---- a/arch/arm/mm/cache-xsc3l2.c
-+++ b/arch/arm/mm/cache-xsc3l2.c
-@@ -16,6 +16,7 @@
-  * along with this program; if not, write to the Free Software
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-  */
-+#include <linux/cacheinfo.h>
- #include <linux/init.h>
- #include <linux/highmem.h>
- #include <asm/cp15.h>
-@@ -201,6 +202,21 @@ static void xsc3_l2_flush_range(unsigned long start, unsigned long end)
- 	dsb();
- }
- 
-+static void xsc3_l2_getinfo(struct cacheinfo *this_leaf)
-+{
-+	unsigned long l2ctype;
-+
-+	__asm__("mrc p15, 1, %0, c0, c0, 1" : "=r" (l2ctype));
-+
-+	this_leaf->type = CACHE_TYPE_UNIFIED;
-+	this_leaf->coherency_line_size = CACHE_LINE_SIZE;
-+	this_leaf->ways_of_associativity = CACHE_WAY_PER_SET;
-+	this_leaf->number_of_sets = CACHE_SET_SIZE(l2ctype);
-+	this_leaf->size = this_leaf->coherency_line_size *
-+			  this_leaf->number_of_sets *
-+			  this_leaf->ways_of_associativity;
-+}
-+
- static int __init xsc3_l2_init(void)
- {
- 	if (!cpu_is_xsc3() || !xsc3_l2_present())
-@@ -213,6 +229,7 @@ static int __init xsc3_l2_init(void)
- 		outer_cache.inv_range = xsc3_l2_inv_range;
- 		outer_cache.clean_range = xsc3_l2_clean_range;
- 		outer_cache.flush_range = xsc3_l2_flush_range;
-+		outer_cache.get_info    = xsc3_l2_getinfo;
- 	}
- 
- 	return 0;
+Besides this,
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+You don't have to resend a new version for this, I can amend
+your patch while applying it. So unless there is new comments
+I will add your patch to the mvebu tree in a couple of days.
+
+
+Thanks,
+
+Gregory
+
+
+
+> + * used.
+> + *
+> + * Copyright (C) 2014 Imre Kaloz <kaloz@openwrt.org>
+> + *
+> + * Based on armada-xp-axpwifiap.dts:
+> + *
+> + *     Copyright (C) 2013 Marvell
+> + *
+> + *     Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is licensed under the terms of the GNU General Public
+> + *     License version 2.  This program is licensed "as is" without
+> + *     any warranty of any kind, whether express or implied.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+> +#include "armada-xp-mv78230.dtsi"
+> +
+> +/ {
+> +	model = "Linksys WRT1900AC";
+> +	compatible = "linksys,mamba", "marvell,armadaxp-mv78230",
+> +		     "marvell,armadaxp", "marvell,armada-370-xp";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200";
+> +		stdout-path = &uart0;
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x00000000 0x00000000 0x10000000>; /* 256MB */
+> +	};
+> +
+> +	soc {
+> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+> +			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
+> +
+> +		pcie-controller {
+> +			status = "okay";
+> +
+> +			/* Etron EJ168 USB 3.0 controller */
+> +			pcie at 1,0 {
+> +				/* Port 0, Lane 0 */
+> +				status = "okay";
+> +			};
+> +
+> +			/* First mini-PCIe port */
+> +			pcie at 2,0 {
+> +				/* Port 0, Lane 1 */
+> +				status = "okay";
+> +			};
+> +
+> +			/* Second mini-PCIe port */
+> +			pcie at 3,0 {
+> +				/* Port 0, Lane 3 */
+> +				status = "okay";
+> +			};
+> +		};
+> +
+> +		internal-regs {
+> +
+> +			/* J10: VCC, NC, RX, NC, TX, GND  */
+> +			serial at 12000 {
+> +				status = "okay";
+> +			};
+> +
+> +			sata at a0000 {
+> +				nr-ports = <1>;
+> +				status = "okay";
+> +			};
+> +
+> +			ethernet at 70000 {
+> +				pinctrl-0 = <&ge0_rgmii_pins>;
+> +				pinctrl-names = "default";
+> +				status = "okay";
+> +				phy-mode = "rgmii-id";
+> +				fixed-link {
+> +					speed = <1000>;
+> +					full-duplex;
+> +				};
+> +			};
+> +
+> +			ethernet at 74000 {
+> +				pinctrl-0 = <&ge1_rgmii_pins>;
+> +				pinctrl-names = "default";
+> +				status = "okay";
+> +				phy-mode = "rgmii-id";
+> +				fixed-link {
+> +					speed = <1000>;
+> +					full-duplex;
+> +				};
+> +			};
+> +
+> +			/* USB part of the eSATA/USB 2.0 port */
+> +			usb at 50000 {
+> +				status = "okay";
+> +			};
+> +
+> +			i2c at 11000 {
+> +				status = "okay";
+> +				clock-frequency = <100000>;
+> +
+> +				tmp421 at 4c {
+> +					compatible = "ti,tmp421";
+> +					reg = <0x4c>;
+> +				};
+> +
+> +				tlc59116 at 68 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +					#gpio-cells = <2>;
+> +					compatible = "ti,tlc59116";
+> +					reg = <0x68>;
+> +
+> +					wan_amber at 0 {
+> +						label = "mamba:amber:wan";
+> +						reg = <0x0>;
+> +					};
+> +
+> +					wan_white at 1 {
+> +						label = "mamba:white:wan";
+> +						reg = <0x1>;
+> +					};
+> +
+> +					wlan_2g at 2 {
+> +						label = "mamba:white:wlan_2g";
+> +						reg = <0x2>;
+> +					};
+> +
+> +					wlan_5g at 3 {
+> +						label = "mamba:white:wlan_5g";
+> +						reg = <0x3>;
+> +					};
+> +
+> +					esata at 4 {
+> +						label = "mamba:white:esata";
+> +						reg = <0x4>;
+> +					};
+> +
+> +					usb2 at 5 {
+> +						label = "mamba:white:usb2";
+> +						reg = <0x5>;
+> +					};
+> +
+> +					usb3_1 at 6 {
+> +						label = "mamba:white:usb3_1";
+> +						reg = <0x6>;
+> +					};
+> +
+> +					usb3_2 at 7 {
+> +						label = "mamba:white:usb3_2";
+> +						reg = <0x7>;
+> +					};
+> +
+> +					wps_white at 8 {
+> +						label = "mamba:white:wps";
+> +						reg = <0x8>;
+> +					};
+> +
+> +					wps_amber at 9 {
+> +						label = "mamba:amber:wps";
+> +						reg = <0x9>;
+> +					};
+> +				};
+> +			};
+> +
+> +			nand at d0000 {
+> +				status = "okay";
+> +				num-cs = <1>;
+> +				marvell,nand-keep-config;
+> +				marvell,nand-enable-arbiter;
+> +				nand-on-flash-bbt;
+> +				nand-ecc-strength = <4>;
+> +				nand-ecc-step-size = <512>;
+> +
+> +				partition at 0 {
+> +					label = "u-boot";
+> +					reg = <0x0000000 0x100000>;  /* 1MB */
+> +					read-only;
+> +				};
+> +
+> +				partition at 100000 {
+> +					label = "u_env";
+> +					reg = <0x100000 0x40000>;    /* 256KB */
+> +				};
+> +
+> +				partition at 140000 {
+> +					label = "s_env";
+> +					reg = <0x140000 0x40000>;    /* 256KB */
+> +				};
+> +
+> +				partition at 900000 {
+> +					label = "devinfo";
+> +					reg = <0x900000 0x100000>;   /* 1MB */
+> +					read-only;
+> +				};
+> +
+> +				/* kernel1 overlaps with rootfs1 by design */
+> +				partition at a00000 {
+> +					label = "kernel1";
+> +					reg = <0xa00000 0x2800000>;  /* 40MB */
+> +				};
+> +
+> +				partition at d00000 {
+> +					label = "rootfs1";
+> +					reg = <0xd00000 0x2500000>;  /* 37MB */
+> +				};
+> +
+> +				/* kernel2 overlaps with rootfs2 by design */
+> +				partition at 3200000 {
+> +					label = "kernel2";
+> +					reg = <0x3200000 0x2800000>; /* 40MB */
+> +				};
+> +
+> +				partition at 3500000 {
+> +					label = "rootfs2";
+> +					reg = <0x3500000 0x2500000>; /* 37MB */
+> +				};
+> +
+> +				/*
+> +				 * 38MB, last MB is for the BBT, not writable */
+> +				 */
+> +				partition at 5a00000 {
+> +					label = "syscfg";
+> +					reg = <0x5a00000 0x2600000>;
+> +				};
+> +
+> +				/*
+> +				 * Unused area between "s_env" and "devinfo".
+> +				 * Moved here because otherwise the renumbered
+> +				 * partitions would break the bootloader
+> +				 * supplied bootargs
+> +				 */
+> +				partition at 180000 {
+> +					label = "unused_area";
+> +					reg = <0x180000 0x780000>;   /* 7.5MB */
+> +				};
+> +			};
+> +
+> +			spi0: spi at 10600 {
+> +				status = "okay";
+> +
+> +				spi-flash at 0 {
+> +					#address-cells = <1>;
+> +					#size-cells = <1>;
+> +					compatible = "everspin,mr25h256";
+> +					reg = <0>; /* Chip select 0 */
+> +					spi-max-frequency = <40000000>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-0 = <&keys_pin>;
+> +		pinctrl-names = "default";
+> +
+> +		button at 1 {
+> +			label = "WPS";
+> +			linux,code = <KEY_WPS_BUTTON>;
+> +			gpios = <&gpio1 0 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		button at 2 {
+> +			label = "Factory Reset Button";
+> +			linux,code = <KEY_RESTART>;
+> +			gpios = <&gpio1 1 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +
+> +	gpio-leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-0 = <&power_led_pin>;
+> +		pinctrl-names = "default";
+> +
+> +		power {
+> +			label = "mamba:white:power";
+> +			gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
+> +			default-state = "on";
+> +		};
+> +	};
+> +
+> +	gpio_fan {
+> +		/* SUNON HA4010V4-0000-C99 */
+> +		compatible = "gpio-fan";
+> +		gpios = <&gpio0 24 0>;
+> +
+> +		gpio-fan,speed-map = <0    0
+> +				      4500 1>;
+> +	};
+> +};
+> +
+> +&pinctrl {
+> +
+> +	keys_pin: keys-pin {
+> +		marvell,pins = "mpp32", "mpp33";
+> +		marvell,function = "gpio";
+> +	};
+> +
+> +	power_led_pin: power-led-pin {
+> +		marvell,pins = "mpp40";
+> +		marvell,function = "gpio";
+> +	};
+> +
+> +	gpio_fan_pin: gpio-fan-pin {
+> +		marvell,pins = "mpp24";
+> +		marvell,function = "gpio";
+> +	};
+> +};
+> 
+
+
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
