@@ -1,52 +1,42 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 23 Feb 2015 08:32:58 +0100
-Subject: [PATCH 1/3] clk: divider: fix calculation of maximal parent rate
- for a given divider
-In-Reply-To: <1424515225-6929-2-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20150221085620.GV19388@pengutronix.de>
- <1424515225-6929-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1424515225-6929-2-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20150223073258.GJ12209@pengutronix.de>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 23 Feb 2015 07:53:55 +0000
+Subject: [PATCH 00/12] ARM: dts: apq8064 dt patches.
+Message-ID: <1424678035-12862-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 21, 2015 at 11:40:23AM +0100, Uwe Kleine-K?nig wrote:
-> The rate provided at the output of a clk-divider is calculated as:
-> 
-> 	DIV_ROUND_UP(parent_rate, div)
-> 
-> since commit b11d282dbea2 (clk: divider: fix rate calculation for
-> fractional rates). So to yield a rate not bigger than r parent_rate
-> must be <= r * div.
-> 
-> The effect of choosing a parent rate that is too big as was done before
-> this patch results in wrongly ruling out good dividers.
-> 
-> Note that this is not a complete fix as __clk_round_rate might return a
-> value >= its 2nd parameter. Also for dividers with
-> CLK_DIVIDER_ROUND_CLOSEST set the calculation is not accurate. But this
-> fixes the test case by Sascha Hauer that uses a chain of three dividers
-> under a fixed clock.
-> 
-> Fixes: b11d282dbea2 (clk: divider: fix rate calculation for fractional rates)
-> Suggested-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Hi Kumar, 
+Now that the rpm header file dependency is resolved, Could you
+queue these dt patches for rc2.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-This gives clk_round_rate/clk_set_rate on dividers a consistent
-behaviour. Also the testcases I posted seem to work fine.
+Thanks,
+srini
 
-The only thing that might not be nice is that when a divider can only
-output fractional rates then the next higher integer value has to be used
-for clk_round_rate/clk_set_rate. A consumer should probably make no
-assumptions whether 333.333Hz is rounded up or down and use 334Hz to be
-sure anyway.
+Nicolas Dechesne (3):
+  ARM: DT: apq8064: add pci support in CM QS600
+  ARM: DT: apq8064: Add usb host support to CM QS-600
+  ARM: DT: apq8064: Add USB OTG support for CM QS-600
 
-Sascha
+Pramod Gurav (1):
+  ARM: qcom: Add DT alias for serial port
+
+Rob Clark (1):
+  ARM: dts: APQ8064: Add MDP support
+
+Srinivas Kandagatla (7):
+  ARM: dts: apq8064: add RPM regulators support
+  ARM: dts: apq8064: Add usb host support.
+  ARM: dts: apq8064: Add USB OTG support
+  ARM: dts: apq8064: Add SATA controller support.
+  ARM: dts: apq8064: Remove incorrect gsbi2 node.
+  ARM: dts: Move i2c1 pinctrl to apq8064.dtsi
+  ARM: dts: apq8064 add i2c3 node for panel.
+
+ arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts |  49 +++
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts  |  98 +++++-
+ arch/arm/boot/dts/qcom-apq8064.dtsi         | 499 +++++++++++++++++++++++++++-
+ 3 files changed, 629 insertions(+), 17 deletions(-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.9.1
