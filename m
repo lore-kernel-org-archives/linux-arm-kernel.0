@@ -1,96 +1,44 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 22 Feb 2015 18:57:34 -0600
-Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
-In-Reply-To: <20150222143211.GX25269@lukather>
-References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
- <CAL_Jsq+SeuoojgTpv1y_aPJ_jzDr3HqZhYEBQ3_vYGBHvcccug@mail.gmail.com>
- <54E78A31.9020306@linaro.org>
- <CAL_Jsq+mvpRjYfL_8OseTDCB-6aBhwhNKLBQXXJeVQLDwWm8Nw@mail.gmail.com>
- <20150222143211.GX25269@lukather>
-Message-ID: <CAL_JsqLqqw5DyUqCaOTSKPwF-Ms5EU4f_OPoW9YVpMCo8A_bbw@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 23 Feb 2015 10:07:50 +0530
+Subject: [PATCH] cpufreq: exynos: allow build for !THERMAL or !CPU_THERMAL
+ cases
+In-Reply-To: <2275232.48muFcOOQv@amdc1032>
+References: <2275232.48muFcOOQv@amdc1032>
+Message-ID: <CAKohpomXnpdLtMpnWeFWdGDCE4t8iEz5aDxA=PhTcR-UKjQM6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 22, 2015 at 8:32 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Fri, Feb 20, 2015 at 04:01:55PM -0600, Rob Herring wrote:
->> [...]
->>
->> >>> += Data consumers =
->> >>> +
->> >>> +Required properties:
->> >>> +
->> >>> +eeproms: List of phandle and data cell specifier triplet, one triplet
->> >>> +        for each data cell the device might be interested in. The
->> >>> +        triplet consists of the phandle to the eeprom provider, then
->> >>> +        the offset in byte within that storage device, and the length
->> >>> +        in byte of the data we care about.
->> >>
->> >>
->> >> The problem with this is it assumes you know who the consumer is and
->> >> that it is a DT node. For example, how would you describe a serial
->> >> number?
->> >
->> > Correct me if I miss understood.
->> > Is serial number any different?
->> > Am hoping that the eeprom consumer would be aware of offset and size of
->> > serial number in the eeprom
->> >
->> > Cant the consumer do:
->> >
->> > eeprom-consumer {
->> >         eeproms = <&at24 0 4>;
->> >         eeprom-names = "device-serial-number";
->>
->> Yes, but who is "eeprom-consumer"?
+On 20 February 2015 at 21:50, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+> Allow driver build for !THERMAL or !CPU_THERMAL cases.
 >
-> Any device that should lookup values in one of the EEPROM.
+> The new dependency rule is the same as the one that CPUFREQ_DT
+> option has (for cpufreq-dt driver which has the same issue with
+> using of_cpufreq_cooling_register()).
 >
->> DT nodes generally describe a h/w block, but it this case, the
->> consumer depends on the OS, not the h/w.
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Eduardo Valentin <edubezval@gmail.com>
+> Cc: Lukasz Majewski <l.majewski@samsung.com>
+> Fixes: 8b2b4a4e5366 ("cpufreq: exynos: allow modular build")
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  drivers/cpufreq/Kconfig.arm | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 >
-> Not really, or at least, not more than any similar binding we
-> currently have.
->
-> The fact that a MAC-address for the first ethernet chip is stored at a
-> given offset in a given eeprom has nothing to do with the OS.
+> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> index 1b06fc4..f4df4af3 100644
+> --- a/drivers/cpufreq/Kconfig.arm
+> +++ b/drivers/cpufreq/Kconfig.arm
+> @@ -28,7 +28,8 @@ config ARM_VEXPRESS_SPC_CPUFREQ
+>  config ARM_EXYNOS_CPUFREQ
+>         tristate "SAMSUNG EXYNOS CPUfreq Driver"
+>         depends on CPU_EXYNOS4210 || SOC_EXYNOS4212 || SOC_EXYNOS4412 || SOC_EXYNOS5250
+> -       depends on THERMAL
+> +       # if CPU_THERMAL is on and THERMAL=m, ARM_EXYNOS_CPUFREQ cannot be =y:
+> +       depends on !CPU_THERMAL || THERMAL
+>         help
+>           This adds the CPUFreq driver for Samsung EXYNOS platforms.
+>           Supported SoC versions are:
 
-So MAC address would be a valid use to link to a h/w device, but there
-are certainly cases that don't correspond to a device.
-
->> I'm not saying you can't describe where things are, but I don't
->> think you should imply who is the consumer and doing so is
->> unnecessarily complicated.
->
-> If you only take the case of a serial number, indeed. If you take
-> other usage into account, you can't really do without it.
->
->> Also, the layout of EEPROM is likely very much platform specific.
->
-> Indeed, which is why it should be in the DT.
-
-Agreed. I'm not saying the layout should not be.
-
->> Some could have a more complex structure perhaps with key ids and
->> linked list structure.
->
-> Then just request the size of the whole list, and parse it afterwards
-> in your driver?
->
->> I would do something more simple that is just a list of keys and their
->> location like this:
->>
->> device-serial-number = <start size>;
->> key1 = <start size>;
->> key2 = <start size>;
->
-> I'm sorry, but what's the difference?
-
-It can describe the layout completely whether the fields are tied to a
-h/w device or not.
-
-What I would like to see here is the entire layout described covering
-both types of fields.
-
-Rob
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
