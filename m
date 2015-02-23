@@ -1,30 +1,67 @@
-From: keith.busch@intel.com (Keith Busch)
-Date: Mon, 23 Feb 2015 16:01:23 +0000 (UTC)
-Subject: [PATCH] NVMe: add explicit BLK_DEV_INTEGRITY dependency
-In-Reply-To: <6241161.LKiT8yUlIj@wuerfel>
-References: <6241161.LKiT8yUlIj@wuerfel>
-Message-ID: <alpine.LNX.2.00.1502231559290.32385@localhost.lm.intel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 23 Feb 2015 17:07:26 +0100
+Subject: [PATCHv2 06/15] devicetree: bindings: add DT binding for the
+ Marvell Armada 39x SoC family
+In-Reply-To: <1424451874-25375-7-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1424451874-25375-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1424451874-25375-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <54EB503E.5010502@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Feb 2015, Arnd Bergmann wrote:
-> A patch that was added to 4.0-rc1 in the last minute caused a
-> build break in the NVMe driver unless integrity support is
-> also enabled:
->
-> drivers/block/nvme-core.c: In function 'nvme_dif_remap':
-> drivers/block/nvme-core.c:523:24: error: dereferencing pointer to incomplete type
->  pmap = kmap_atomic(bip->bip_vec->bv_page) + bip->bip_vec->bv_offset;
->                        ^
-> drivers/block/nvme-core.c:523:49: error: dereferencing pointer to incomplete type
->  pmap = kmap_atomic(bip->bip_vec->bv_page) + bip->bip_vec->bv_offset;
->                                                 ^
->
-> This changes the Kconfig entry for NVMe to depend on that
-> support, to avoid the build error. Using 'select' would work
-> as well, but might have unintended side-effects when users
-> do not actually want the integerity support.
+Hi Thomas,
 
-Thanks for the catch. We do want users to be able to use this with and
-without blk-integrity, so I'll send a patch using conditional functions
-between appropriate ifdef's like how scsi and block handle this.
+On 20/02/2015 18:04, Thomas Petazzoni wrote:
+> The Marvell Armada 39x is a family of two SoCs: the Armada 390 and the
+> Armada 398, with a slightly different number of interfaces. This
+> commit introduces the Device Tree binding that documents the top-level
+> compatible strings for Armada 39x based platforms.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+Thanks,
+
+Gregory
+
+> ---
+>  Documentation/devicetree/bindings/arm/armada-39x.txt | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/armada-39x.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/armada-39x.txt b/Documentation/devicetree/bindings/arm/armada-39x.txt
+> new file mode 100644
+> index 0000000..53d4ff9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/armada-39x.txt
+> @@ -0,0 +1,20 @@
+> +Marvell Armada 39x Platforms Device Tree Bindings
+> +-------------------------------------------------
+> +
+> +Boards with a SoC of the Marvell Armada 39x family shall have the
+> +following property:
+> +
+> +Required root node property:
+> +
+> + - compatible: must contain "marvell,armada390"
+> +
+> +In addition, boards using the Marvell Armada 398 SoC shall have the
+> +following property before the previous one:
+> +
+> +Required root node property:
+> +
+> +compatible: must contain "marvell,armada398"
+> +
+> +Example:
+> +
+> +compatible = "marvell,a398-db", "marvell,armada398", "marvell,armada390";
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
