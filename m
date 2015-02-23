@@ -1,102 +1,129 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Feb 2015 00:04:15 +0900
-Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
-In-Reply-To: <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20150223150415.GF6236@finisterre.sirena.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 23 Feb 2015 16:07:26 +0100
+Subject: [PATCH 7/8] ARM: dts: dove: Add internal i2c multiplexer node
+In-Reply-To: <1424199129-22099-8-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1424199129-22099-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1424199129-22099-8-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <54EB422E.6030502@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 19, 2015 at 05:08:28PM +0000, Srinivas Kandagatla wrote:
+Hi Sebastian,
 
->  .../devicetree/bindings/eeprom/eeprom.txt          |  48 ++++
->  drivers/Kconfig                                    |   2 +
->  drivers/Makefile                                   |   1 +
->  drivers/eeprom/Kconfig                             |  19 ++
->  drivers/eeprom/Makefile                            |   9 +
->  drivers/eeprom/core.c                              | 290 +++++++++++++++++++++
->  include/linux/eeprom-consumer.h                    |  73 ++++++
->  include/linux/eeprom-provider.h                    |  51 ++++
+On 17/02/2015 19:52, Sebastian Hesselbarth wrote:
+> This adds a i2c-mux-pinctrl node to dove.dtsi for the internal i2c
+> mux found on Dove SoCs. Up to now, we had no board using any of the
+> two additional i2c busses, so make sure the change does not break
+> any existing boards.
+> 
+> Therefore, we rename the i2c-controller node label to "i2c" and
+> enable it by default. Also, the dedicated sub-bus (now "i2c0") is
+> enabled by default. The two optional sub-busses require additional
+> external pin-muxing, so disable them by default.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-This seems to have a bunch of different things in it - there's some
-binding, there's some framework code, there's some user code for the
-framework...  splitting it up more would probably help with review.
-I'd at least make sure the framework is split from the DT code, that
-will cut down on the bulk and help make sure the framework isn't too DT
-tied.
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-> +	if (read)
-> +		rc = regmap_bulk_read(eeprom->regmap, offset,
-> +				      buf, count/eeprom->stride);
-> +	else
-> +		rc = regmap_bulk_write(eeprom->regmap, offset,
-> +				       buf, count/eeprom->stride);
+
+Thanks,
+
+Gregory
+
+> ---
+> Wolfram,
+> 
+> Actually, I was hoping that default pin hog mechanism
+> (pinctrl-names = "default") could also be used from i2c mux nodes
+> and devices. Anyway, I had a look at i2c-core/mux code and failed
+> how to achieve that easily. Instead I decided, it would also be ok
+> to put the pin hog into the i2c controller node where pins will be
+> bound by standard platform device code.
+> 
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Gabriel Dobato <dobatog@gmail.com>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: linux-i2c at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/boot/dts/dove.dtsi | 40 ++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 38 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> index 9ad829523a13..b3340e862b0e 100644
+> --- a/arch/arm/boot/dts/dove.dtsi
+> +++ b/arch/arm/boot/dts/dove.dtsi
+> @@ -28,6 +28,42 @@
+>  		};
+>  	};
+>  
+> +	i2c-mux {
+> +		compatible = "i2c-mux-pinctrl";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
 > +
-> +	if (IS_ERR_VALUE(rc))
-> +		return 0;
+> +		i2c-parent = <&i2c>;
 > +
-> +	return count;
-> +}
-
-> +static ssize_t bin_attr_eeprom_read(struct file *filp, struct kobject *kobj,
-> +				    struct bin_attribute *attr,
-> +				    char *buf, loff_t offset, size_t count)
-> +{
-> +	return bin_attr_eeprom_read_write(kobj, buf, offset, count, true);
-> +}
-
-I'm not sure the factoring out is actually helping the clarity here TBH.
-
-> +int eeprom_unregister(struct eeprom_device *eeprom)
-> +{
-> +	device_del(&eeprom->edev);
+> +		pinctrl-names = "i2c0", "i2c1", "i2c2";
+> +		pinctrl-0 = <&pmx_i2cmux_0>;
+> +		pinctrl-1 = <&pmx_i2cmux_1>;
+> +		pinctrl-2 = <&pmx_i2cmux_2>;
 > +
-> +	mutex_lock(&eeprom_list_mutex);
-> +	list_del(&eeprom->list);
-> +	mutex_unlock(&eeprom_list_mutex);
+> +		i2c0: i2c at 0 {
+> +			reg = <0>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "okay";
+> +		};
 > +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(eeprom_unregister);
-
-Here we return having dropped the lock without doing anything else with
-the eeprom, meaning the caller could delete it.
-
-> +	mutex_lock(&eeprom_list_mutex);
+> +		i2c1: i2c at 1 {
+> +			reg = <1>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			/* Requires pmx_i2c1 on i2c controller node */
+> +			status = "disabled";
+> +		};
 > +
-> +	list_for_each_entry(e, &eeprom_list, list) {
-> +		if (args.np == e->edev.of_node) {
-> +			eeprom = e;
-> +			break;
-> +		}
-> +	}
-> +	mutex_unlock(&eeprom_list_mutex);
+> +		i2c2: i2c at 2 {
+> +			reg = <2>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			/* Requires pmx_i2c2 on i2c controller node */
+> +			status = "disabled";
+> +		};
+> +	};
+> +
+>  	l2: l2-cache {
+>  		compatible = "marvell,tauros2-cache";
+>  		marvell,tauros2-cache-features = <0>;
+> @@ -123,7 +159,7 @@
+>  				status = "disabled";
+>  			};
+>  
+> -			i2c0: i2c-ctrl at 11000 {
+> +			i2c: i2c-ctrl at 11000 {
+>  				compatible = "marvell,mv64xxx-i2c";
+>  				reg = <0x11000 0x20>;
+>  				#address-cells = <1>;
+> @@ -132,7 +168,7 @@
+>  				clock-frequency = <400000>;
+>  				timeout-ms = <1000>;
+>  				clocks = <&core_clk 0>;
+> -				status = "disabled";
+> +				status = "okay";
+>  			};
+>  
+>  			uart0: serial at 12000 {
+> 
 
-Here we iterate the list, find the relevant eeprom and drop the lock
-while still holding a reference to the eeprom we just found.  This means
-that a removal could race with us and free the eeprom underneath us.
-I'm also not seeing anything stopping or even noticing a device being
-removed with a cell active on it.
 
-> +/**
-> + * eeprom_cell_get(): Get eeprom cell of device form a given index.
-> + *
-> + * @dev: Device that will be interacted with
-> + * @index: Index of the eeprom cell.
-> + *
-> + * The return value will be an ERR_PTR() on error or a valid pointer
-> + * to a struct eeprom_cell.  The eeprom_cell will be freed by the
-> + * eeprom_cell_put().
-> + */
-> +struct eeprom_cell *eeprom_cell_get(struct device *dev, int index);
-
-Normally the kerneldoc goes with the function definition, not the
-prototype.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150224/c2522de9/attachment.sig>
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
