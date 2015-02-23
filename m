@@ -1,55 +1,137 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 23 Feb 2015 17:13:34 +0000
-Subject: [PATCHv2 05/15] ARM: mvebu: add stdout-path to all armada-*.dts
-In-Reply-To: <1424451874-25375-6-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1424451874-25375-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1424451874-25375-6-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20150223171334.GP9714@leverpostej>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 23 Feb 2015 09:23:44 -0800
+Subject: [PATCH v2 3/4] clk: Provide an always-on clock domain framework
+In-Reply-To: <1424276101-30137-4-git-send-email-lee.jones@linaro.org>
+References: <1424276101-30137-1-git-send-email-lee.jones@linaro.org>
+ <1424276101-30137-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150223172344.421.62815@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 05:04:24PM +0000, Thomas Petazzoni wrote:
-> This commit adds the stdout-path property in /chosen for all Armada
-> boards that were not yet carrying this property.
+Quoting Lee Jones (2015-02-18 08:15:00)
+> Much h/w contain clocks which if turned off would prove fatal.  The
+> only way to recover is to restart the board(s).  This driver takes
+> references to clocks which are required to be always-on in order to
+> prevent the common clk framework from trying to turn them off during
+> the clk_disabled_unused() procedure.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  arch/arm/boot/dts/armada-370-db.dts              | 1 +
->  arch/arm/boot/dts/armada-370-mirabox.dts         | 1 +
->  arch/arm/boot/dts/armada-370-netgear-rn102.dts   | 1 +
->  arch/arm/boot/dts/armada-370-netgear-rn104.dts   | 1 +
->  arch/arm/boot/dts/armada-370-rd.dts              | 1 +
->  arch/arm/boot/dts/armada-375-db.dts              | 1 +
->  arch/arm/boot/dts/armada-388-db.dts              | 1 +
->  arch/arm/boot/dts/armada-388-rd.dts              | 1 +
->  arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 1 +
->  arch/arm/boot/dts/armada-xp-db.dts               | 1 +
->  arch/arm/boot/dts/armada-xp-gp.dts               | 1 +
->  arch/arm/boot/dts/armada-xp-matrix.dts           | 1 +
->  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   | 1 +
->  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 1 +
->  14 files changed, 14 insertions(+)
+>  drivers/clk/Makefile    |  1 +
+>  drivers/clk/clkdomain.c | 63 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 64 insertions(+)
+>  create mode 100644 drivers/clk/clkdomain.c
 > 
-> diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-> index e993c46..286bedd 100644
-> --- a/arch/arm/boot/dts/armada-370-db.dts
-> +++ b/arch/arm/boot/dts/armada-370-db.dts
-> @@ -56,6 +56,7 @@
->  
->  	chosen {
->  		bootargs = "console=ttyS0,115200 earlyprintk";
-> +		stdout-path = &uart0;
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index d5fba5b..d9e2718 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -3,6 +3,7 @@ obj-$(CONFIG_HAVE_CLK)          += clk-devres.o
+>  obj-$(CONFIG_CLKDEV_LOOKUP)    += clkdev.o
+>  obj-$(CONFIG_COMMON_CLK)       += clk.o
+>  obj-$(CONFIG_COMMON_CLK)       += clk-divider.o
+> +obj-$(CONFIG_COMMON_CLK)       += clkdomain.o
+>  obj-$(CONFIG_COMMON_CLK)       += clk-fixed-factor.o
+>  obj-$(CONFIG_COMMON_CLK)       += clk-fixed-rate.o
+>  obj-$(CONFIG_COMMON_CLK)       += clk-gate.o
+> diff --git a/drivers/clk/clkdomain.c b/drivers/clk/clkdomain.c
+> new file mode 100644
+> index 0000000..8c83f99
+> --- /dev/null
+> +++ b/drivers/clk/clkdomain.c
 
-stdout-path can now take a config too (including the rate), which will
-avoid any reliance on the serial core choosing the right rate by
-default.
+Naming is hard. I'm not sure clkdomain.c is the best expression. Maybe
+clk-alwon.c? I see ALWON used alot amongst hardware people who live in a
+world of eight-character naming limitations.
 
-If you have an alias serial0, this could be:
+> @@ -0,0 +1,63 @@
+> +/*
+> + * ST Clock Domain
+> + *
+> + * Copyright (C) 2015 STMicroelectronics ? All Rights Reserved
+> + *
+> + * Author: Lee Jones <lee.jones@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/clk-private.h>
 
-	stdout-path = "serial0:115200n8";
+If this header still existed I would berate you mercilessly. Luckily for
+you it no longer exists and only causes a compile error ;-)
 
-Otherwise you can use the full path instead of serial0.
+> +#include <linux/clk-provider.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +
+> +static void ao_clock_domain_hog_clock(struct platform_device *pdev, int index)
+> +{
+> +       struct device_node *np = pdev->dev.of_node;
+> +       struct clk *clk;
+> +       int ret;
+> +
+> +       clk = of_clk_get(np, index);
+> +       if (IS_ERR(clk)) {
+> +               dev_warn(&pdev->dev, "Failed get clock %s[%d]: %li\n",
+> +                        np->full_name, index, PTR_ERR(clk));
+> +               return;
+> +       }
+> +
+> +       ret = clk_prepare_enable(clk);
+> +       if (ret)
+> +               dev_warn(&pdev->dev, "Failed to enable clock: %s\n", clk->name);
+> +}
+> +
+> +static int ao_clock_domain_probe(struct platform_device *pdev)
+> +{
+> +       struct device_node *np = pdev->dev.of_node;
+> +       int nclks, i;
+> +
+> +       nclks = of_count_phandle_with_args(np, "clocks", "#clock-cells");
 
-That's documented in Documentation/devicetree/bindings/chosen.txt
+Minor nitpick: please use of_clk_get_parent_count. I spent a solid 5
+minutes writing that function and I need people to use it so I can get a
+return on my investment.
 
-Mark.
+Otherwise the patch looks good. I believe that this method is targeting
+always-on clock in a production environment, which is different from the
+CLK_IGNORE_UNUSED stuff which typically is helpful while bringing up new
+hardware or dealing with a platform that has incomplete driver support.
+
+I wonder if there is a clever way for existing clock providers
+(expressed in DT) to use this without having to create a separate node
+of clocks with the "always-on-clk-domain" flag. Possibly the common
+clock binding could declare some always-on flag that is standardized?
+Then the framework core could use this code easily. Not sure if that is
+a good idea though...
+
+Regards,
+Mike
+
+> +
+> +       for (i = 0; i < nclks; i++)
+> +               ao_clock_domain_hog_clock(pdev, i);
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct of_device_id ao_clock_domain_match[] = {
+> +       { .compatible = "always-on-clk-domain" },
+> +       { },
+> +};
+> +
+> +static struct platform_driver ao_clock_domain_driver = {
+> +       .probe = ao_clock_domain_probe,
+> +       .driver = {
+> +               .name = "always-on-clk-domain",
+> +               .of_match_table = ao_clock_domain_match,
+> +       },
+> +};
+> +module_platform_driver(ao_clock_domain_driver);
+> -- 
+> 1.9.1
+> 
