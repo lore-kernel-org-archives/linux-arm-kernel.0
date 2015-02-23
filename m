@@ -1,114 +1,37 @@
 From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 23 Feb 2015 13:58:54 +0100
-Subject: [PATCH] hwmon: (gpio-fan) allow to use alarm support alone from DT
-Message-ID: <1424696334-14767-1-git-send-email-simon.guinot@sequanux.org>
+Date: Mon, 23 Feb 2015 14:02:03 +0100
+Subject: [PATCH] ARM: Kirkwood: enable GPIO fan alarm support for 2Big Network
+ v2
+Message-ID: <1424696523-14855-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some boards, such as the LaCie 2Big Network v2 or 2Big NAS (based on
-Marvell Kirkwood SoCs), an I2C fan controller is used but the alarm
-signal is wired to a separate GPIO. Unfortunately, the gpio-fan driver
-can't be used to handle GPIO alarm alone from DT: an error is returned
-if the "gpios" DT property is missing.
+On the LaCie 2Big Network v2 (net2big_v2) board, the fan alarm is not
+wired to the I2C fan controller but to a separe GPIO. This GPIO can be
+controlled by using the gpio-fan driver.
 
-This patch allows to use the gpio-fan driver even if the "alarm-gpios"
-DT property is defined alone.
+This patch adds the gpio-fan alarm description in the net2big_v2 DTS.
 
 Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
 ---
- .../devicetree/bindings/gpio/gpio-fan.txt          |  6 ++-
- drivers/hwmon/gpio-fan.c                           | 44 +++++++++++-----------
- 2 files changed, 27 insertions(+), 23 deletions(-)
+ arch/arm/boot/dts/kirkwood-net2big.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-fan.txt b/Documentation/devicetree/bindings/gpio/gpio-fan.txt
-index 2dd457a3469a..a4c5d15b72e6 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-fan.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-fan.txt
-@@ -2,16 +2,18 @@ Bindings for fan connected to GPIO lines
- 
- Required properties:
- - compatible : "gpio-fan"
+diff --git a/arch/arm/boot/dts/kirkwood-net2big.dts b/arch/arm/boot/dts/kirkwood-net2big.dts
+index 53dc37a3b687..e4f7e497379f 100644
+--- a/arch/arm/boot/dts/kirkwood-net2big.dts
++++ b/arch/arm/boot/dts/kirkwood-net2big.dts
+@@ -27,6 +27,11 @@
+ 		device_type = "memory";
+ 		reg = <0x00000000 0x10000000>;
+ 	};
 +
-+Optional properties:
- - gpios: Specifies the pins that map to bits in the control value,
-   ordered MSB-->LSB.
- - gpio-fan,speed-map: A mapping of possible fan RPM speeds and the
-   control value that should be set to achieve them. This array
-   must have the RPM values in ascending order.
--
--Optional properties:
- - alarm-gpios: This pin going active indicates something is wrong with
-   the fan, and a udev event will be fired.
++	gpio_fan {
++		compatible = "gpio-fan";
++		alarm-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
++	};
+ };
  
-+Note: At least one the "gpios" and "alarm-gpios" properties should be set.
-+
- Examples:
- 
- 	gpio_fan {
-diff --git a/drivers/hwmon/gpio-fan.c b/drivers/hwmon/gpio-fan.c
-index 36abf814b8c7..c241f5b0b7cf 100644
---- a/drivers/hwmon/gpio-fan.c
-+++ b/drivers/hwmon/gpio-fan.c
-@@ -404,10 +404,32 @@ static int gpio_fan_get_of_pdata(struct device *dev,
- 
- 	node = dev->of_node;
- 
-+	/* Alarm GPIO if one exists */
-+	if (of_gpio_named_count(node, "alarm-gpios") > 0) {
-+		struct gpio_fan_alarm *alarm;
-+		int val;
-+		enum of_gpio_flags flags;
-+
-+		alarm = devm_kzalloc(dev, sizeof(struct gpio_fan_alarm),
-+					GFP_KERNEL);
-+		if (!alarm)
-+			return -ENOMEM;
-+
-+		val = of_get_named_gpio_flags(node, "alarm-gpios", 0, &flags);
-+		if (val < 0)
-+			return val;
-+		alarm->gpio = val;
-+		alarm->active_low = flags & OF_GPIO_ACTIVE_LOW;
-+
-+		pdata->alarm = alarm;
-+	}
-+
- 	/* Fill GPIO pin array */
- 	pdata->num_ctrl = of_gpio_count(node);
- 	if (pdata->num_ctrl <= 0) {
--		dev_err(dev, "gpios DT property empty / missing");
-+		if (pdata->alarm)
-+			return 0;
-+		dev_err(dev, "DT properties empty / missing");
- 		return -ENODEV;
- 	}
- 	ctrl = devm_kzalloc(dev, pdata->num_ctrl * sizeof(unsigned),
-@@ -460,26 +482,6 @@ static int gpio_fan_get_of_pdata(struct device *dev,
- 	}
- 	pdata->speed = speed;
- 
--	/* Alarm GPIO if one exists */
--	if (of_gpio_named_count(node, "alarm-gpios") > 0) {
--		struct gpio_fan_alarm *alarm;
--		int val;
--		enum of_gpio_flags flags;
--
--		alarm = devm_kzalloc(dev, sizeof(struct gpio_fan_alarm),
--					GFP_KERNEL);
--		if (!alarm)
--			return -ENOMEM;
--
--		val = of_get_named_gpio_flags(node, "alarm-gpios", 0, &flags);
--		if (val < 0)
--			return val;
--		alarm->gpio = val;
--		alarm->active_low = flags & OF_GPIO_ACTIVE_LOW;
--
--		pdata->alarm = alarm;
--	}
--
- 	return 0;
- }
- 
+ &regulators {
 -- 
 2.1.1
