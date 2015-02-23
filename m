@@ -1,24 +1,45 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 23 Feb 2015 11:05:18 -0800
-Subject: [PATCH 2/3] ARM: qcom: add description of KPSS WDT for IPQ8064
-In-Reply-To: <1424485176-8348-3-git-send-email-mathieu@codeaurora.org>
-References: <1424485176-8348-1-git-send-email-mathieu@codeaurora.org>
- <1424485176-8348-3-git-send-email-mathieu@codeaurora.org>
-Message-ID: <54EB79EE.5000205@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 23 Feb 2015 12:11:05 -0700
+Subject: [PATCH] ARM: bcm2835: Add header file for pinctrl constants
+In-Reply-To: <5700696.0jJhSRhno5@wuerfel>
+References: <1424624396-812-1-git-send-email-ckeepax@opensource.wolfsonmicro.com>
+ <5700696.0jJhSRhno5@wuerfel>
+Message-ID: <54EB7B49.8050706@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/15 18:19, Mathieu Olivari wrote:
-> Add the watchdog related entries to the Krait Processor Sub-system
-> (KPSS) timer IPQ8064 devicetree section. Also, add a fixed-clock
-> description of SLEEP_CLK, which will do for now.
+On 02/22/2015 01:13 PM, Arnd Bergmann wrote:
+> On Sunday 22 February 2015 16:59:56 Charles Keepax wrote:
+>> +
+>> +/* IRQ Flags */
+>> +#define BCM2835_PIN_IRQ_RISING                         1
+>> +#define BCM2835_PIN_IRQ_FALLING                                2
+>> +#define BCM2835_PIN_IRQ_EDGE   (BCM2835_PIN_IRQ_RISING | \
+>> +                                BCM2835_PIN_IRQ_FALLING)
+>> +#define BCM2835_PIN_IRQ_LOW                            4
+>> +#define BCM2835_PIN_IRQ_HIGH                           8
 >
-> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> Signed-off-by: Mathieu Olivari <mathieu@codeaurora.org>
+> Are these different from the standard definitions?
 >
+>> +/* Pin Function Settings */
+>> +#define BCM2835_PIN_FUNC_GPIO_IN                       0
+>> +#define BCM2835_PIN_FUNC_GPIO_OUT                      1
+>> +#define BCM2835_PIN_FUNC_ALT5                          2
+>> +#define BCM2835_PIN_FUNC_ALT4                          3
+>> +#define BCM2835_PIN_FUNC_ALT0                          4
+>> +#define BCM2835_PIN_FUNC_ALT1                          5
+>> +#define BCM2835_PIN_FUNC_ALT2                          6
+>> +#define BCM2835_PIN_FUNC_ALT3                          7
+>
+> Why are these required? They don't seem to be used by any driver,
+> which leads me to suspect that they are just the hardware numbers.
+>
+> In that case, don't add any syntactical sugar like that and just
+> use the hardware numbers directly.
+>
+> What's with the strange mapping of numbers anyway?
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Especially given that the number->semantics meaning is a little 
+non-linear it seems like using #defines/... to document what the numbers 
+mean seems reasonable. It allows easily validating the DT files without 
+having to go look up the meaning of the numbers in the documentation.
