@@ -1,38 +1,44 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 23 Feb 2015 18:40:15 +0100
-Subject: [PATCH v9 5/5] ARM: dts: imx6qdl: Allow disabling the PU regulator,
- add a enable ramp delay
-In-Reply-To: <1424713215-3357-1-git-send-email-p.zabel@pengutronix.de>
-References: <1424713215-3357-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1424713215-3357-6-git-send-email-p.zabel@pengutronix.de>
+Date: Mon, 23 Feb 2015 18:40:10 +0100
+Subject: [PATCH v9 0/5] i.MX6 PU power domain support
+Message-ID: <1424713215-3357-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PU regulator is enabled during boot, but not necessarily always-on.
-It can be disabled by the generic pm domain framework when the PU power
-domain is shut down. The ramp delay of 150 us might be a bit conservative,
-the value is taken from the Freescale kernel.
+this is a rebased and updated version of the series I sent previously:
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
+http://www.spinics.net/lists/arm-kernel/msg360709.html
+
 Changes since v8:
- - Removed regulator-boot-on, this depends on the bootloader
----
- arch/arm/boot/dts/imx6qdl.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ - Updated DT documentation example with IRQ_TYPE_... and
+   IMX6QDL_CLK_... defines
+ - Made PU regulator optional to support i.MX6SX, suggested by
+   Robin Gong
+ - Removed regulator_enable() call in the probe function, stopped
+   disabling the regulator in imx6q_pm_pu_power_off() - the regulator
+   framework will disable unused regulators.
+ - Changed the GPC driver to enable pu power if CONFIG_PM is not
+   enabled, as some bootloaders disable pu power on boot.
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 7ab00a4..4b12ac0 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -598,7 +598,7 @@
- 					regulator-name = "vddpu";
- 					regulator-min-microvolt = <725000>;
- 					regulator-max-microvolt = <1450000>;
--					regulator-always-on;
-+					regulator-enable-ramp-delay = <150>;
- 					anatop-reg-offset = <0x140>;
- 					anatop-vol-bit-shift = <9>;
- 					anatop-vol-bit-width = <5>;
+regards
+Philipp
+
+Philipp Zabel (6):
+  Documentation: Add device tree bindings for Freescale i.MX GPC
+  ARM: imx6: gpc: Add PU power domain for GPU/VPU
+  ARM: dts: imx6qdl: Add power-domain information to gpc node
+  ARM: dts: imx6sl: Add power-domain information to gpc node
+  ARM: dts: imx6qdl: Allow disabling the PU regulator, add a enable ramp
+    delay
+  ARM: imx6: gpc: Allow PU regulator bypass
+
+ .../devicetree/bindings/power/fsl,imx-gpc.txt      |  59 ++++++
+ arch/arm/boot/dts/imx6qdl.dtsi                     |  10 +-
+ arch/arm/boot/dts/imx6sl.dtsi                      |   4 +
+ arch/arm/mach-imx/Kconfig                          |   1 +
+ arch/arm/mach-imx/gpc.c                            | 216 +++++++++++++++++++++
+ 5 files changed, 289 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+
 -- 
 2.1.4
