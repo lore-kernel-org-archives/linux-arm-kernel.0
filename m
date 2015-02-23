@@ -1,59 +1,221 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 23 Feb 2015 16:59:28 +0100
-Subject: [PATCH 2/3] ARM: shmobile: r8a7740: Remove restart callback
-In-Reply-To: <1424707169-23007-1-git-send-email-geert+renesas@glider.be>
-References: <1424707169-23007-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1424707169-23007-3-git-send-email-geert+renesas@glider.be>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 23 Feb 2015 17:00:27 +0100
+Subject: [PATCHv2 05/15] ARM: mvebu: add stdout-path to all armada-*.dts
+In-Reply-To: <1424451874-25375-6-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1424451874-25375-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1424451874-25375-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <54EB4E9B.6010001@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the restart handling hack from the r8a7740 generic multiplatform
-case.
+Hi Thomas,
 
-Restart on DT-based r8a7740 platforms is now handled through the
-R-Mobile reset driver.
+On 20/02/2015 18:04, Thomas Petazzoni wrote:
+> This commit adds the stdout-path property in /chosen for all Armada
+> boards that were not yet carrying this property.
 
-This reverts commit 1174c712afa2779f ("ARM: shmobile: r8a7740: Add
-restart callback").
+I though the main motivation for using the stdout-path property was
+for removing the earlyprintk in the command line. Arnd told that there
+should be a mean to use stdout-path instead of earlyprintk.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-To avoid losing functionality, this depends on:
-  - commit fa0f8d6700857457 ("power: reset: Add reset driver for
-    R-Mobile platforms"), which is in v4.0-rc1,
-  - commit aba07789d811b6cf ("ARM: shmobile: r8a7740 dtsi: Add PM domain
-    support"), which is in v4.0-rc1,
-  - "ARM: shmobile: Enable R-Mobile reset driver in multiplatform
-    defconfig", which is the first patch of this series.
----
- arch/arm/mach-shmobile/setup-r8a7740.c | 8 --------
- 1 file changed, 8 deletions(-)
+So what about going further and removing "earlyprintk" in the same time?
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index dd64caf792160198..9832e48396a40a92 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -842,13 +842,6 @@ static void __init r8a7740_generic_init(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
--#define RESCNT2 IOMEM(0xe6188020)
--static void r8a7740_restart(enum reboot_mode mode, const char *cmd)
--{
--	/* Do soft power on reset */
--	writel(1 << 31, RESCNT2);
--}
--
- static const char *r8a7740_boards_compat_dt[] __initdata = {
- 	"renesas,r8a7740",
- 	NULL,
-@@ -861,7 +854,6 @@ DT_MACHINE_START(R8A7740_DT, "Generic R8A7740 (Flattened Device Tree)")
- 	.init_machine	= r8a7740_generic_init,
- 	.init_late	= shmobile_init_late,
- 	.dt_compat	= r8a7740_boards_compat_dt,
--	.restart	= r8a7740_restart,
- MACHINE_END
- 
- #endif /* CONFIG_USE_OF */
+Thanks,
+
+Gregory
+
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-370-db.dts              | 1 +
+>  arch/arm/boot/dts/armada-370-mirabox.dts         | 1 +
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts   | 1 +
+>  arch/arm/boot/dts/armada-370-netgear-rn104.dts   | 1 +
+>  arch/arm/boot/dts/armada-370-rd.dts              | 1 +
+>  arch/arm/boot/dts/armada-375-db.dts              | 1 +
+>  arch/arm/boot/dts/armada-388-db.dts              | 1 +
+>  arch/arm/boot/dts/armada-388-rd.dts              | 1 +
+>  arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 1 +
+>  arch/arm/boot/dts/armada-xp-db.dts               | 1 +
+>  arch/arm/boot/dts/armada-xp-gp.dts               | 1 +
+>  arch/arm/boot/dts/armada-xp-matrix.dts           | 1 +
+>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   | 1 +
+>  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 1 +
+>  14 files changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+> index e993c46..286bedd 100644
+> --- a/arch/arm/boot/dts/armada-370-db.dts
+> +++ b/arch/arm/boot/dts/armada-370-db.dts
+> @@ -56,6 +56,7 @@
+>  
+>  	chosen {
+>  		bootargs = "console=ttyS0,115200 earlyprintk";
+> +		stdout-path = &uart0;
+>  	};
+>  
+>  	memory {
+> diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+> index b10ceb4..ec77b86 100644
+> --- a/arch/arm/boot/dts/armada-370-mirabox.dts
+> +++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+> @@ -52,6 +52,7 @@
+>  
+>  	chosen {
+>  		bootargs = "console=ttyS0,115200 earlyprintk";
+> +		stdout-path = &uart0;
+>  	};
+>  
+>  	memory {
+> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> index 7c5c4ff..8c786cf 100644
+> --- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> +++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> @@ -54,6 +54,7 @@
+>  
+>  	chosen {
+>  		bootargs = "console=ttyS0,115200 earlyprintk";
+> +		stdout-path = &uart0;
+>  	};
+>  
+>  	memory {
+> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+> index 1de53b5..1d64532 100644
+> --- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+> +++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+> @@ -54,6 +54,7 @@
+>  
+>  	chosen {
+>  		bootargs = "console=ttyS0,115200 earlyprintk";
+> +		stdout-path = &uart0;
+>  	};
+>  
+>  	memory {
+> diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+> index 6ae36a3..f40d35b 100644
+> --- a/arch/arm/boot/dts/armada-370-rd.dts
+> +++ b/arch/arm/boot/dts/armada-370-rd.dts
+> @@ -65,6 +65,7 @@
+>  
+>  	chosen {
+>  		bootargs = "console=ttyS0,115200 earlyprintk";
+> +		stdout-path = &uart0;
+>  	};
+>  
+>  	memory {
+> diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
+> index 0440891..033665c 100644
+> --- a/arch/arm/boot/dts/armada-375-db.dts
+> +++ b/arch/arm/boot/dts/armada-375-db.dts
+> @@ -56,6 +56,7 @@
+>  
+>  	chosen {
+>  		bootargs = "console=ttyS0,115200 earlyprintk";
+> +		stdout-path = &uart0;
+>  	};
+>  
+>  	memory {
+> diff --git a/arch/arm/boot/dts/armada-388-db.dts b/arch/arm/boot/dts/armada-388-db.dts
+> index af6c74e..c56ccd74 100644
+> --- a/arch/arm/boot/dts/armada-388-db.dts
+> +++ b/arch/arm/boot/dts/armada-388-db.dts
+> @@ -55,6 +55,7 @@
+>  
+>  	chosen {
+>  		bootargs = "console=ttyS0,115200 earlyprintk";
+> +		stdout-path = &uart0;
+>  	};
+>  
+>  	memory {
+> diff --git a/arch/arm/boot/dts/armada-388-rd.dts b/arch/arm/boot/dts/armada-388-rd.dts
+> index d99baac..e17edbb 100644
+> --- a/arch/arm/boot/dts/armada-388-rd.dts
+> +++ b/arch/arm/boot/dts/armada-388-rd.dts
+> @@ -56,6 +56,7 @@
+>  
+>  	chosen {
+>  		bootargs = "console=ttyS0,115200 earlyprintk";
+> +		stdout-path = &uart0;
+>  	};
+>  
+>  	memory {
+> diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> index c1fbab2..a7fd474 100644
+> --- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> +++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> @@ -60,6 +60,7 @@
+>  
+>  	chosen {
+>  		bootargs = "console=ttyS0,115200 earlyprintk";
+> +		stdout-path = &uart0;
+>  	};
+>  
+>  	memory {
+> diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+> index 48bdafe..a12e159 100644
+> --- a/arch/arm/boot/dts/armada-xp-db.dts
+> +++ b/arch/arm/boot/dts/armada-xp-db.dts
+> @@ -65,6 +65,7 @@
+>  
+>  	chosen {
+>  		bootargs = "console=ttyS0,115200 earlyprintk";
+> +		stdout-path = &uart0;
+>  	};
+>  
+>  	memory {
+> diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+> index 206aebb..8a2e49e 100644
+> --- a/arch/arm/boot/dts/armada-xp-gp.dts
+> +++ b/arch/arm/boot/dts/armada-xp-gp.dts
+> @@ -66,6 +66,7 @@
+>  
+>  	chosen {
+>  		bootargs = "console=ttyS0,115200 earlyprintk";
+> +		stdout-path = &uart0;
+>  	};
+>  
+>  	memory {
+> diff --git a/arch/arm/boot/dts/armada-xp-matrix.dts b/arch/arm/boot/dts/armada-xp-matrix.dts
+> index 56f958e..3e81f22 100644
+> --- a/arch/arm/boot/dts/armada-xp-matrix.dts
+> +++ b/arch/arm/boot/dts/armada-xp-matrix.dts
+> @@ -53,6 +53,7 @@
+>  
+>  	chosen {
+>  		bootargs = "console=ttyS0,115200 earlyprintk";
+> +		stdout-path = &uart0;
+>  	};
+>  
+>  	memory {
+> diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> index a7ceafd..508a395 100644
+> --- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> +++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> @@ -54,6 +54,7 @@
+>  
+>  	chosen {
+>  		bootargs = "console=ttyS0,115200 earlyprintk";
+> +		stdout-path = &uart0;
+>  	};
+>  
+>  	memory {
+> diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> index 0c76d9f..7b2ea2060 100644
+> --- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> +++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> @@ -55,6 +55,7 @@
+>  
+>  	chosen {
+>  		bootargs = "console=ttyS0,115200 earlyprintk";
+> +		stdout-path = &uart0;
+>  	};
+>  
+>  	memory {
+> 
+
+
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
