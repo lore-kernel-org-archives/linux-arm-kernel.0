@@ -1,48 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 Feb 2015 10:45:44 +0100
-Subject: [PATCH] ARM: sunxi: Have ARCH_SUNXI select RESET_CONTROLLER for
- clock driver usage
-In-Reply-To: <1423477400-30520-1-git-send-email-wens@csie.org>
-References: <1423477400-30520-1-git-send-email-wens@csie.org>
-Message-ID: <20150223094544.GC25269@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Feb 2015 11:08:50 +0100
+Subject: [PATCH] NVMe: add explicit BLK_DEV_INTEGRITY dependency
+Message-ID: <6241161.LKiT8yUlIj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 09, 2015 at 06:23:20PM +0800, Chen-Yu Tsai wrote:
-> As the sunxi usb clocks all contain a reset controller, it is not
-> possible to build the sunxi clock driver without RESET_CONTROLLER
-> enabled. Doing so results in an undefined symbol error:
-> 
->     drivers/built-in.o: In function `sunxi_gates_clk_setup':
->     linux/drivers/clk/sunxi/clk-sunxi.c:1071: undefined reference to
-> 	`reset_controller_register'
-> 
-> This is possible if building a minimal kernel without PHY_SUN4I_USB.
-> 
-> The dependency issue is made visible at compile time instead of
-> link time by the new A80 mmc clocks, which also use a reset control
-> itself.
-> 
-> This patch makes ARCH_SUNXI select ARCH_HAS_RESET_CONTROLLER and
-> RESET_CONTROLLER.
-> 
-> Reported-by: Lourens Rozema <ik@lourensrozema.nl>
-> Fixes: 559482d1f950 ARM: sunxi: Split the various SoCs support in Kconfig
-> Cc: <stable@vger.kernel.org> # 3.16+
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+A patch that was added to 4.0-rc1 in the last minute caused a
+build break in the NVMe driver unless integrity support is
+also enabled:
 
-Applied with Arnd Acked-by.
+drivers/block/nvme-core.c: In function 'nvme_dif_remap':
+drivers/block/nvme-core.c:523:24: error: dereferencing pointer to incomplete type
+  pmap = kmap_atomic(bip->bip_vec->bv_page) + bip->bip_vec->bv_offset;
+                        ^
+drivers/block/nvme-core.c:523:49: error: dereferencing pointer to incomplete type
+  pmap = kmap_atomic(bip->bip_vec->bv_page) + bip->bip_vec->bv_offset;
+                                                 ^
 
-Maxime
+This changes the Kconfig entry for NVMe to depend on that
+support, to avoid the build error. Using 'select' would work
+as well, but might have unintended side-effects when users
+do not actually want the integerity support.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150223/992ecf70/attachment.sig>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: e1e5e5641e6f ("NVMe: Metadata format support")
+---
+Found on ARM randconfig builds
+
+diff --git a/drivers/block/Kconfig b/drivers/block/Kconfig
+index 1b8094d4d7af..e386dd5b94e9 100644
+--- a/drivers/block/Kconfig
++++ b/drivers/block/Kconfig
+@@ -312,7 +312,7 @@ config BLK_DEV_NBD
+ 
+ config BLK_DEV_NVME
+ 	tristate "NVM Express block device"
+-	depends on PCI
++	depends on PCI && BLK_DEV_INTEGRITY
+ 	---help---
+ 	  The NVM Express driver is for solid state drives directly
+ 	  connected to the PCI or PCI Express bus.  If you know you
