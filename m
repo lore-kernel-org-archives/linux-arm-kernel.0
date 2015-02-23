@@ -1,70 +1,73 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 23 Feb 2015 06:49:50 -0800
-Subject: [PATCH] ARM: Kirkwood: enable GPIO fan alarm support for 2Big
- Network v2
-In-Reply-To: <20150223144049.GU1509@kw.sim.vm.gnt>
-References: <1424696523-14855-1-git-send-email-simon.guinot@sequanux.org>
- <54EB34F3.4000500@roeck-us.net> <20150223144049.GU1509@kw.sim.vm.gnt>
-Message-ID: <54EB3E0E.7070503@roeck-us.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 23 Feb 2015 15:54:10 +0100
+Subject: [PATCH 3/8] ARM: dts: dove: Fix uart[23] reg property
+In-Reply-To: <1424199129-22099-4-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1424199129-22099-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1424199129-22099-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <54EB3F12.5040207@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/23/2015 06:40 AM, Simon Guinot wrote:
-> On Mon, Feb 23, 2015 at 06:10:59AM -0800, Guenter Roeck wrote:
->> On 02/23/2015 05:02 AM, Simon Guinot wrote:
->>> On the LaCie 2Big Network v2 (net2big_v2) board, the fan alarm is not
->>> wired to the I2C fan controller but to a separe GPIO. This GPIO can be
->>> controlled by using the gpio-fan driver.
->>>
->>> This patch adds the gpio-fan alarm description in the net2big_v2 DTS.
->>>
->>> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
->>> ---
->>>   arch/arm/boot/dts/kirkwood-net2big.dts | 5 +++++
->>>   1 file changed, 5 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/kirkwood-net2big.dts b/arch/arm/boot/dts/kirkwood-net2big.dts
->>> index 53dc37a3b687..e4f7e497379f 100644
->>> --- a/arch/arm/boot/dts/kirkwood-net2big.dts
->>> +++ b/arch/arm/boot/dts/kirkwood-net2big.dts
->>> @@ -27,6 +27,11 @@
->>>   		device_type = "memory";
->>>   		reg = <0x00000000 0x10000000>;
->>>   	};
->>> +
->>> +	gpio_fan {
->>> +		compatible = "gpio-fan";
->>> +		alarm-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
->>> +	};
->>>   };
->>>
->>>   &regulators {
->>>
->> Again, wrong solution, and conceptually wrong as well from a dt perspective.
->>
->> The alarm signal should be handled by the g762 driver, and the alarm-gpios
->> property should be added to the g762 description.
->
-> OK. Then you think it would be better to add support for alarm GPIOs
-> support in the g762. The problem is that we should have to find a
-> generic way to do that. After all, we could want the very same
-> modification for a bunch of fan drivers.
->
-Can't help it. After all, the interrupt handling logic is different for each chip,
-and there are non-DT systems out there.
+Hi Sebastian,
 
-The g762 property should probably be something like
+On 17/02/2015 19:52, Sebastian Hesselbarth wrote:
+> Fix Dove's register addresses of uart2 and uart3 nodes that seem to
+> be broken since ages due to a copy-and-paste error.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-	g762 at 3e {
-                 compatible = "gmt,g762";
-                 reg = <0x3e>;
-                 clocks = <&g762_clk>;
-		interrupt-parent = <&gpio0>;
-		interrupts = <25 GPIO_ACTIVE_LOW>;
-         };
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-struct i2c_client has an irq field, and as far as I can see it is filled in
-automatically from the dt node. So all the driver should have to do is to
-implement an interrupt handler.
 
-Guenter
+> ---
+> Please consider for stable back to v3.7
+
+If nobody complains about it, I will add the Cc tag for
+the stable team when applying this patch to the mvebu tree
+
+
+Thanks,
+
+Gregory
+
+> 
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Gabriel Dobato <dobatog@gmail.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/boot/dts/dove.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> index a5441d5482a6..3cc8b8320345 100644
+> --- a/arch/arm/boot/dts/dove.dtsi
+> +++ b/arch/arm/boot/dts/dove.dtsi
+> @@ -154,7 +154,7 @@
+>  
+>  			uart2: serial at 12200 {
+>  				compatible = "ns16550a";
+> -				reg = <0x12000 0x100>;
+> +				reg = <0x12200 0x100>;
+>  				reg-shift = <2>;
+>  				interrupts = <9>;
+>  				clocks = <&core_clk 0>;
+> @@ -163,7 +163,7 @@
+>  
+>  			uart3: serial at 12300 {
+>  				compatible = "ns16550a";
+> -				reg = <0x12100 0x100>;
+> +				reg = <0x12300 0x100>;
+>  				reg-shift = <2>;
+>  				interrupts = <10>;
+>  				clocks = <&core_clk 0>;
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
