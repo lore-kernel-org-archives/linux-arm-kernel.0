@@ -1,111 +1,115 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 23 Feb 2015 18:14:48 +0000
-Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
- demuxer chip
-In-Reply-To: <20150223180057.513b069c@bbrezillon>
-References: <20150211151237.GN9154@leverpostej>
- <1487331.cgC9j5u0aF@vostro.rjw.lan>
- <20150211155720.GQ9154@leverpostej>
- <20150211171515.55d5066f@bbrezillon>
- <20150211163231.GR9154@leverpostej>
- <20150211173823.30c42c6a@bbrezillon>
- <20150220142208.GJ13659@leverpostej>
- <20150220155347.1477b02d@bbrezillon>
- <20150220151655.GK13659@leverpostej>
- <20150223180057.513b069c@bbrezillon>
-Message-ID: <20150223181448.GQ9714@leverpostej>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 23 Feb 2015 19:16:07 +0100
+Subject: [PATCHv2 13/15] ARM: mvebu: add core support for Armada 39x
+In-Reply-To: <1424451874-25375-14-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1424451874-25375-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1424451874-25375-14-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <54EB6E67.5070400@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 23, 2015 at 05:00:57PM +0000, Boris Brezillon wrote:
-> Hi Mark,
+Hi Thomas,
+
+
+On 20/02/2015 18:04, Thomas Petazzoni wrote:
+> This commit adds the core support for Armada 39x, which is quite
+> simple:
 > 
-> Thanks for the clarification, and sorry if I've been a bit harsh to you
-> in my previous answer, but this whole shared irq thing is starting to
-> drive me crazy.
-
-No worries. Having lost a few days exploring the core and call sites,
-and having seen how widesrpead IRQF_NO_SUSPEND misuse is, it's beginning
-to grate on me too.
-
-[...]
-
-> On at91 platforms, irq line 1 is shared by a timer (PIT) and some
-> devices that can register themselves as wakeup sources (especially the
-> RTC IP).
-> I doubt at91 users will agree on dropping either of these features (the
-> timer or the wakeup on RTC/UART/...), so, can we try to find a solution
-> that would both make irq, DT and at91 guys happy (that doesn't sound
-> like an easy task :-)) ?
-
->From the DT side, I think all the necessary information is there. We
-know how the interrupts are wired, so nothing needs to change w.r.t. the
-topology description. I hope that we have sufficient information to when
-a device may operate and raise interrupts during suspend.
-
-So the fun part is how we solve this within Linux.
-
-> The whole problem here is that we can't have both IRQF_NO_SUSPEND flag
-> set on one of the shared action and others that are configuring the irq
-> as a wakeup source, because it would always lead to the system being
-> woken up (even when the only thing we were supposed to do is handle the
-> timer event).
+>  - a new Kconfig option which selects the appropriate clock and
+>    pinctrl drivers as well as other common features (GIC, L2 cache,
+>    SMP, etc.)
 > 
-> This is because irq_may_run [1], which is called to decide whether we
-> should handle this irq or just wake the system up [2], will always
-> return true if at least one of the shared action has tagged the irq
-> line as a wakeup source.
-
-I assume you mean we return false in this case (having triggered the
-wakeup within irq_pm_check_wakeup, which returned true), but otherwise
-agreed.
-
-I can envisage problems if the irq handler of a wakeup device can't be
-run safely until resume time, though I'm not sure if that happens in
-practice given the device is necessarily going to be active.
-
-> Sorry for summarizing things you most likely already know, but I want
-> to be sure I'm actually understanding it correctly.
+>  - a new DT_MACHINE_START which references the top-level compatible
+>    strings supported for the Marvell Armada 39x.
 > 
-> Now, let's look at how this could be solved.
-> Here is a proposal [3] that does the following:
+>  - a new SMP enable-method. The mechanism to enable CPUs for Armada
+>    39x appears to be the same as Armada 38x. However, we do not want
+>    to use marvell,armada-380-smp in the Device Tree, in the case of
+>    the discovery of a subtle difference in the future, which would
+>    require changing the Device Tree. And the enable-method isn't a
+>    compatible string: you can't specify several values and expect a
+>    fallback on the second string if the first one isn't
+>    supported. Therefore, we simply declare the SMP enable method
+>    "marvell,armada-390-smp" as doing the same thing as the
+>    "marvell,armada-380-smp" one.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/Kconfig      | 14 ++++++++++++++
+>  arch/arm/mach-mvebu/board-v7.c   | 14 ++++++++++++++
+>  arch/arm/mach-mvebu/platsmp-a9.c |  2 ++
+>  3 files changed, 30 insertions(+)
+> 
+> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> index c1e4567..9747316 100644
+> --- a/arch/arm/mach-mvebu/Kconfig
+> +++ b/arch/arm/mach-mvebu/Kconfig
+> @@ -64,6 +64,20 @@ config MACH_ARMADA_38X
+>  	  Say 'Y' here if you want your kernel to support boards based
+>  	  on the Marvell Armada 380/385 SoC with device tree.
+>  
+> +config MACH_ARMADA_39X
+> +	bool "Marvell Armada 39x boards" if ARCH_MULTI_V7
 
-This would be a lot easier to follow/review as an RFC post to the
-mailing list. Otherwise I have some high-level comments on the stuff
-below, which I think matches the shape of what we discussed on IRC.
+As you don't select it by default we should update the mvebu_v7_defconfig
+with this symbol.
 
->  1/ prevent a system wakeup when at least one of the action handler
->     has set the IRQF_NO_SUSPEND flag
+Thanks,
 
-We might need to add some logic to enable_irq_wake and
-irq_pm_install_action to prevent some of the horrible mismatch cases we
-can get here (e.g. if we have a wakeup handler, a IRQF_NO_SUSPEND
-handler, and another handler which is neither). We may need to
-reconsider temporarily stashing the other potential interrupts.
+Gregory
 
-Do we perhaps need an IRQF_SHARED_WAKEUP_SIBLING_OK for timer drivers to
-assert their handlers are safe for the whole suspend period rather than
-just the period they expect to be enabled for? Or do those always
-happen to be safe in practice?
+> +	select ARM_GIC
+> +	select ARMADA_39X_CLK
+> +	select CACHE_L2X0
+> +	select HAVE_ARM_SCU
+> +	select HAVE_ARM_TWD if SMP
+> +	select HAVE_SMP
+> +	select MACH_MVEBU_V7
+> +	select PINCTRL_ARMADA_39X
+> +	help
+> +	  Say 'Y' here if you want your kernel to support boards based
+> +	  on the Marvell Armada 39x SoC with device tree.
+> +
+>  config MACH_ARMADA_XP
+>  	bool "Marvell Armada XP boards" if ARCH_MULTI_V7
+>  	select ARMADA_XP_CLK
+> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+> index 31b66f2..afee908 100644
+> --- a/arch/arm/mach-mvebu/board-v7.c
+> +++ b/arch/arm/mach-mvebu/board-v7.c
+> @@ -232,3 +232,17 @@ DT_MACHINE_START(ARMADA_38X_DT, "Marvell Armada 380/385 (Device Tree)")
+>  	.restart	= mvebu_restart,
+>  	.dt_compat	= armada_38x_dt_compat,
+>  MACHINE_END
+> +
+> +static const char * const armada_39x_dt_compat[] __initconst = {
+> +	"marvell,armada390",
+> +	"marvell,armada398",
+> +	NULL,
+> +};
+> +
+> +DT_MACHINE_START(ARMADA_39X_DT, "Marvell Armada 39x (Device Tree)")
+> +	.l2c_aux_val	= 0,
+> +	.l2c_aux_mask	= ~0,
+> +	.init_irq       = mvebu_init_irq,
+> +	.restart	= mvebu_restart,
+> +	.dt_compat	= armada_39x_dt_compat,
+> +MACHINE_END
+> diff --git a/arch/arm/mach-mvebu/platsmp-a9.c b/arch/arm/mach-mvebu/platsmp-a9.c
+> index 2ec1a42..df0a9cc 100644
+> --- a/arch/arm/mach-mvebu/platsmp-a9.c
+> +++ b/arch/arm/mach-mvebu/platsmp-a9.c
+> @@ -110,3 +110,5 @@ CPU_METHOD_OF_DECLARE(mvebu_armada_375_smp, "marvell,armada-375-smp",
+>  		      &mvebu_cortex_a9_smp_ops);
+>  CPU_METHOD_OF_DECLARE(mvebu_armada_380_smp, "marvell,armada-380-smp",
+>  		      &armada_38x_smp_ops);
+> +CPU_METHOD_OF_DECLARE(mvebu_armada_390_smp, "marvell,armada-390-smp",
+> +		      &armada_38x_smp_ops);
+> 
 
->  2/ Add a few helpers to deal with system wakeup from drivers code
 
-The irq_pm_force_wakeup part looks like what I had in mind.
-
->  3/ Rework the at91 RTC driver to show how such weird cases could be
->     handled
-
-It might be simpler to do this with a PM notifier within the driver
-rather than having to traverse all the irq_descs, though perhaps not.
-
-> Of course, I'll need the IRQF_SHARED_TIMER_OK patch to prevent the
-> WARN_ON backtrace.
-
-That should be fine; it's backed up in the list archive ;)
-
-> Please, let me know if I missed anything important, share your opinion
-> on this proposal, and feel free to propose any other solution.
-
-Hopefully the above covers that!
-
-Mark.
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
