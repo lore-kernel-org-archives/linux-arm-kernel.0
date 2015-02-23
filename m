@@ -1,143 +1,186 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 23 Feb 2015 14:39:34 -0600
-Subject: [PATCH v5 0/7] irqchip: Move OMAP{4,
- 5}/DRA7 to use stacked domains
-In-Reply-To: <20150223203237.GA30588@kahuna>
-References: <1424713459-6824-1-git-send-email-marc.zyngier@arm.com>
- <20150223203237.GA30588@kahuna>
-Message-ID: <54EB9006.70000@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 23 Feb 2015 14:58:12 -0600
+Subject: [PATCH] drivers/tty: amba-pl011: defer driver probing if external
+ dma is not ready.
+In-Reply-To: <1424722599-9215-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+References: <1424722599-9215-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+Message-ID: <CAL_JsqJbGCOCCiMn6ok1j=R2EUF7YYRP4Si06wh3Vg0OnuXvag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/23/2015 02:32 PM, Nishanth Menon wrote:
-> On 17:44-20150223, Marc Zyngier wrote:
->> This series is extracted from [4], which is trying to remove all
->> traces of gic_arch_extn from the tree. As some maintainers are more
->> responsive than others (understatement of the year...), I've decided
->> to split it per sub-arch, and get it moving, at least partially.
->>
->> This series addresses OMAP{4,5} by converting the WUGEN to stacked
->> domains. The DRA7 crossbar gets the same treatment.
->>
->> It is worth realizing that:
->>
->> - I haven't been able to test this as much as I would have wanted to
->>   (it's only been tested on omap4 and omap5).
->>
->> - This actively *breaks* existing setups. Once you boot a new kernel
->>   with an old DT, suspend/resume *will* be broken. Old kernels on a
->>   new DT won't even boot! You've been warned. This really outline the
->>   necessity of actually describing the HW in device trees...
->>
->> Based on 4.0-rc1.
->>
->> * From v4: [4]
->> - Extracted from the full series
->> - Rebased on 4.0-rc1
->>
->> * From v3 [3]:
->> - Rebased on top of the patch working around hardcoded IRQ on OMAP4/5 [4]
->> - Fixed more iMX6 DTs (Stephan)
->> - Fixed Exynos4/5 DTs
->>
->> * From v2 [2]:
->> - Addressed numerous comments from Thierry
->> - Merged bug fixes from Nishanth
->> - Merged bug fix from Stefan
->>
->> * From v1 [1]:
->> - Rebased on 3.19-rc3
->> - Fixed a number of additional platforms
->> - Added crossbar conversion to stacked domains
->> - Merged bug fixes from Nishanth
->>
->> [4]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317531.html
->> [3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315385.html
->> [2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314041.html
->> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/307338.html
->>
->> Marc Zyngier (7):
->>   genirq: Add irqchip_set_wake_parent
->>   irqchip: crossbar: convert dra7 crossbar to stacked domains
->>   DT: update ti,irq-crossbar binding
->>   irqchip: GIC: get rid of routable domain
->>   DT: arm,gic: kill arm,routable-irqs
->>   DT: omap4/5: add binding for the wake-up generator
->>   ARM: omap: convert wakeupgen to stacked domains
->>
->>  Documentation/devicetree/bindings/arm/gic.txt      |   6 -
->>  .../devicetree/bindings/arm/omap/crossbar.txt      |  18 +-
->>  .../interrupt-controller/ti,omap4-wugen-mpu        |  33 ++++
->>  arch/arm/boot/dts/am4372.dtsi                      |  11 +-
->>  arch/arm/boot/dts/am437x-gp-evm.dts                |   1 -
->>  arch/arm/boot/dts/am437x-sk-evm.dts                |   1 -
->>  arch/arm/boot/dts/am43x-epos-evm.dts               |   1 -
->>  arch/arm/boot/dts/am57xx-beagle-x15.dts            |   3 +-
->>  arch/arm/boot/dts/dra7-evm.dts                     |   2 +-
->>  arch/arm/boot/dts/dra7.dtsi                        |  43 +++--
->>  arch/arm/boot/dts/dra72-evm.dts                    |   1 -
->>  arch/arm/boot/dts/dra72x.dtsi                      |   3 +-
->>  arch/arm/boot/dts/dra74x.dtsi                      |   5 +-
->>  arch/arm/boot/dts/omap4-duovero.dtsi               |   2 -
->>  arch/arm/boot/dts/omap4-panda-common.dtsi          |   8 +-
->>  arch/arm/boot/dts/omap4-sdp.dts                    |   8 +-
->>  arch/arm/boot/dts/omap4-var-som-om44.dtsi          |   2 -
->>  arch/arm/boot/dts/omap4.dtsi                       |  18 +-
->>  arch/arm/boot/dts/omap5-cm-t54.dts                 |   1 -
->>  arch/arm/boot/dts/omap5-uevm.dts                   |   2 -
->>  arch/arm/boot/dts/omap5.dtsi                       |  26 ++-
->>  arch/arm/mach-omap2/omap-wakeupgen.c               | 125 ++++++++++---
->>  arch/arm/mach-omap2/omap-wakeupgen.h               |   1 -
->>  arch/arm/mach-omap2/omap4-common.c                 |  21 +--
->>  drivers/irqchip/irq-crossbar.c                     | 207 ++++++++++++---------
->>  drivers/irqchip/irq-gic.c                          |  59 +-----
->>  include/linux/irq.h                                |   1 +
->>  include/linux/irqchip/arm-gic.h                    |   6 -
->>  include/linux/irqchip/irq-crossbar.h               |  11 --
->>  kernel/irq/chip.c                                  |  16 ++
->>  30 files changed, 364 insertions(+), 278 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu
->>  delete mode 100644 include/linux/irqchip/irq-crossbar.h
-> 
-> marc-test-irq (Applied the series to v4.0-rc1) - boot logs:
->  1:                     am335x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469913
->  2:                      am335x-sk: BOOT: PASS: http://paste.ubuntu.org.cn/2469914
->  3:                     am3517-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469915
->  4:                      am37x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469916
->  5:                      am437x-sk: BOOT: PASS: http://paste.ubuntu.org.cn/2469917
->  6:                    am43xx-epos: BOOT: PASS: http://paste.ubuntu.org.cn/2469918
->  7:                   am43xx-gpevm: BOOT: PASS: http://paste.ubuntu.org.cn/2469919
->  8:                 BeagleBoard-XM: BOOT: PASS: http://paste.ubuntu.org.cn/2469920
->  9:            beagleboard-vanilla: BOOT: PASS: http://paste.ubuntu.org.cn/2469928
-> 10:               beaglebone-black: BOOT: PASS: http://paste.ubuntu.org.cn/2469932
-> 11:                     beaglebone: BOOT: PASS: http://paste.ubuntu.org.cn/2469936
-> 12:                     craneboard: BOOT: PASS: http://paste.ubuntu.org.cn/2469941
-> 13:                     dra72x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469945
-> 14:                     dra7xx-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469946
-> 15:         OMAP3430-Labrador(LDP): BOOT: PASS: http://paste.ubuntu.org.cn/2469947
-> 16:                           n900: BOOT: PASS: http://paste.ubuntu.org.cn/2469948
-> 17:                      omap5-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469949
-> 18:                  pandaboard-es: BOOT: PASS: http://paste.ubuntu.org.cn/2469950
-> 19:             pandaboard-vanilla: BOOT: PASS: http://paste.ubuntu.org.cn/2469951
-> 20:                        sdp2430: BOOT: PASS: http://paste.ubuntu.org.cn/2469952
-> 21:                        sdp3430: BOOT: PASS: http://paste.ubuntu.org.cn/2469953
-> 22:                        sdp4430: BOOT: PASS: http://paste.ubuntu.org.cn/2469954
-> TOTAL = 22 boards, Booted Boards = 22, No Boot boards = 0
-> 
-> (also tested beagleboard-x15 which was not on farm: http://paste.ubuntu.org.cn/2470017  - looks good as well).
-Noticed that I missed proper info about x15 here.. anyways..
++spear maintainers
 
-http://paste.ubuntu.org.cn/2470017 was vanilla v4.0-rc1
-http://pastebin.ubuntu.com/10377375/ is with this series applied on top.
+On Mon, Feb 23, 2015 at 2:16 PM, Jorge Ramirez-Ortiz
+<jorge.ramirez-ortiz@linaro.org> wrote:
+> This patch addresses a race condition that happens when
+> device_initcall(pl011_dma_initicall) is executed before all the devices have been
+> probed - this issue was observed on an hisi_6220 SoC (HiKey board from Linaro).
+>
+> The proposed implementation uses deferred driver probing to wait for the DMA
+> controller to be registered.
 
-> 
-> Comparative boot logs for v4.0-rc1:
-> https://github.com/nmenon/kernel-test-logs/tree/v4.0-rc1
-> 
-> Will dig in detail a little later.. but nothing major stuck out to me.
+This is going to break implementations using platform data rather than
+DT for the DMA channel resolving. The only user is spear3xx. Ideally,
+we should fix spear3xx to use DT for the DMA channels. That would
+mainly require making the pl08x driver DT enabled and dts updates.
 
+To fix this in the pl011 driver, you are going to need to split up the
+DT and platform data paths keeping the list used for the platform
+data. The platform data is only used for DMA and is mutually exclusive
+with DT, so in probe you can do something like this:
 
+if (pdata)
+  pdata_dma_probe();
+else if (of_dma_probe() == -EPROBE_DEFER)
+  return -EPROBE_DEFER;
 
--- 
-Regards,
-Nishanth Menon
+Rob
+
+>
+> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+> ---
+>  drivers/tty/serial/amba-pl011.c | 70 +++++++++++------------------------------
+>  1 file changed, 18 insertions(+), 52 deletions(-)
+>
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 8d94c19..40219e5 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -29,6 +29,7 @@
+>   * and hooked into this driver.
+>   */
+>
+> +#define pr_fmt(fmt) "amba-pl011: "fmt
+>
+>  #if defined(CONFIG_SERIAL_AMBA_PL011_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+>  #define SUPPORT_SYSRQ
+> @@ -261,7 +262,7 @@ static void pl011_sgbuf_free(struct dma_chan *chan, struct pl011_sgbuf *sg,
+>         }
+>  }
+>
+> -static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *uap)
+> +static int pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
+>  {
+>         /* DMA is the sole user of the platform data right now */
+>         struct amba_pl011_data *plat = dev_get_platdata(uap->port.dev);
+> @@ -275,13 +276,17 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
+>         struct dma_chan *chan;
+>         dma_cap_mask_t mask;
+>
+> -       chan = dma_request_slave_channel(dev, "tx");
+> +       chan = dma_request_slave_channel_reason(dev, "tx");
+> +       if (IS_ERR(chan)) {
+> +
+> +               /* the dma driver has not been initialized yet */
+> +               if (PTR_ERR(chan) == -EPROBE_DEFER)
+> +                       return -EPROBE_DEFER;
+>
+> -       if (!chan) {
+>                 /* We need platform data */
+>                 if (!plat || !plat->dma_filter) {
+>                         dev_info(uap->port.dev, "no DMA platform data\n");
+> -                       return;
+> +                       return 0;
+>                 }
+>
+>                 /* Try to acquire a generic DMA engine slave TX channel */
+> @@ -292,7 +297,7 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
+>                                                 plat->dma_tx_param);
+>                 if (!chan) {
+>                         dev_err(uap->port.dev, "no TX DMA channel!\n");
+> -                       return;
+> +                       return 0;
+>                 }
+>         }
+>
+> @@ -310,7 +315,7 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
+>
+>                 if (!chan) {
+>                         dev_err(uap->port.dev, "no RX DMA channel!\n");
+> -                       return;
+> +                       return 0;
+>                 }
+>         }
+>
+> @@ -383,54 +388,10 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
+>                 dev_info(uap->port.dev, "DMA channel RX %s\n",
+>                          dma_chan_name(uap->dmarx.chan));
+>         }
+> -}
+> -
+> -#ifndef MODULE
+> -/*
+> - * Stack up the UARTs and let the above initcall be done at device
+> - * initcall time, because the serial driver is called as an arch
+> - * initcall, and at this time the DMA subsystem is not yet registered.
+> - * At this point the driver will switch over to using DMA where desired.
+> - */
+> -struct dma_uap {
+> -       struct list_head node;
+> -       struct uart_amba_port *uap;
+> -       struct device *dev;
+> -};
+> -
+> -static LIST_HEAD(pl011_dma_uarts);
+> -
+> -static int __init pl011_dma_initcall(void)
+> -{
+> -       struct list_head *node, *tmp;
+>
+> -       list_for_each_safe(node, tmp, &pl011_dma_uarts) {
+> -               struct dma_uap *dmau = list_entry(node, struct dma_uap, node);
+> -               pl011_dma_probe_initcall(dmau->dev, dmau->uap);
+> -               list_del(node);
+> -               kfree(dmau);
+> -       }
+>         return 0;
+>  }
+>
+> -device_initcall(pl011_dma_initcall);
+> -
+> -static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
+> -{
+> -       struct dma_uap *dmau = kzalloc(sizeof(struct dma_uap), GFP_KERNEL);
+> -       if (dmau) {
+> -               dmau->uap = uap;
+> -               dmau->dev = dev;
+> -               list_add_tail(&dmau->node, &pl011_dma_uarts);
+> -       }
+> -}
+> -#else
+> -static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
+> -{
+> -       pl011_dma_probe_initcall(dev, uap);
+> -}
+> -#endif
+> -
+>  static void pl011_dma_remove(struct uart_amba_port *uap)
+>  {
+>         /* TODO: remove the initcall if it has not yet executed */
+> @@ -1142,8 +1103,9 @@ static inline bool pl011_dma_rx_running(struct uart_amba_port *uap)
+>
+>  #else
+>  /* Blank functions if the DMA engine is not available */
+> -static inline void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
+> +static int pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
+>  {
+> +       return 0;
+>  }
+>
+>  static inline void pl011_dma_remove(struct uart_amba_port *uap)
+> @@ -2218,7 +2180,11 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+>         uap->port.ops = &amba_pl011_pops;
+>         uap->port.flags = UPF_BOOT_AUTOCONF;
+>         uap->port.line = i;
+> -       pl011_dma_probe(&dev->dev, uap);
+> +       ret = pl011_dma_probe(&dev->dev, uap);
+> +       if (ret) {
+> +               devm_kfree(&dev->dev, uap);
+> +               return ret;
+> +       }
+>
+>         /* Ensure interrupts from this UART are masked and cleared */
+>         writew(0, uap->port.membase + UART011_IMSC);
+> --
+> 1.9.1
+>
