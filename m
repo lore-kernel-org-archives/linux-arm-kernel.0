@@ -1,51 +1,54 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 Feb 2015 17:45:34 +0000
-Subject: [PATCH v5 2/2] DT: exynos: update PMU binding
-In-Reply-To: <1424713534-7112-1-git-send-email-marc.zyngier@arm.com>
-References: <1424713534-7112-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1424713534-7112-3-git-send-email-marc.zyngier@arm.com>
+Date: Mon, 23 Feb 2015 17:45:52 +0000
+Subject: [PATCH v5 1/4] irqchip: gic: add an entry point to set up irqchip
+ flags
+In-Reply-To: <1424713555-7201-1-git-send-email-marc.zyngier@arm.com>
+References: <1424713555-7201-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1424713555-7201-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the fact that some Exynos PMUs are capable of acting as
-an interrupt controller.
+A common use of gic_arch_extn is to set up additional flags
+to the GIC irqchip. It looks like a benign enough hack that
+doesn't really require the users of that feature to be converted
+to stacked domains.
+
+Add a gic_set_irqchip_flags() function that platform code can
+call instead of using the dreaded gic_arch_extn.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/devicetree/bindings/arm/samsung/pmu.txt | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ drivers/irqchip/irq-gic.c       | 5 +++++
+ include/linux/irqchip/arm-gic.h | 1 +
+ 2 files changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-index 67b2113..2d6356d 100644
---- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-@@ -29,10 +29,27 @@ Properties:
-  - clocks : list of phandles and specifiers to all input clocks listed in
- 		clock-names property.
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index e3ca6da..6004d84 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -880,6 +880,11 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
+ 	.xlate = gic_irq_domain_xlate,
+ };
  
-+Optional properties:
++void gic_set_irqchip_flags(unsigned long flags)
++{
++	gic_chip.flags |= flags;
++}
 +
-+Some PMUs are capable of behaving as an interrupt controller (mostly
-+to wake up a suspended PMU). In which case, they can have the
-+following properties:
-+
-+- interrupt-controller: indicate that said PMU is an interrupt controller
-+
-+- #interrupt-cells: must be identical to the that of the parent interrupt
-+  controller.
-+
-+- interrupt-parent: a phandle indicating which interrupt controller
-+  this PMU signals interrupts to.
-+
- Example :
- pmu_system_controller: system-controller at 10040000 {
- 	compatible = "samsung,exynos5250-pmu", "syscon";
- 	reg = <0x10040000 0x5000>;
-+	interrupt-controller;
-+	#interrupt-cells = <3>;
-+	interrupt-parent = <&gic>;
- 	#clock-cells = <1>;
- 	clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
- 			"clkout4", "clkout8", "clkout9";
+ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 			   void __iomem *dist_base, void __iomem *cpu_base,
+ 			   u32 percpu_offset, struct device_node *node)
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 3978c5b..36ec4ae 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -97,6 +97,7 @@ struct device_node;
+ 
+ extern struct irq_chip gic_arch_extn;
+ 
++void gic_set_irqchip_flags(unsigned long flags);
+ void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
+ 		    u32 offset, struct device_node *);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
 -- 
 2.1.4
