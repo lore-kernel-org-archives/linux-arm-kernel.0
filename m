@@ -1,49 +1,114 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 23 Feb 2015 12:30:46 +0000
-Subject: [PATCH] drivers: spi: fix compiler warning in spi-s3c64xx
-Message-ID: <1424694646-26002-1-git-send-email-andre.przywara@arm.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Mon, 23 Feb 2015 13:58:54 +0100
+Subject: [PATCH] hwmon: (gpio-fan) allow to use alarm support alone from DT
+Message-ID: <1424696334-14767-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Exynos 7 arm64 support now allows the S3C64xx SPI driver to be
-compiled into an ARM64 kernel, so the cast from the [rt]x_dmach int
-variable to a void* in this driver now triggers a warning.
-Add a long cast to silence the compiler.
+On some boards, such as the LaCie 2Big Network v2 or 2Big NAS (based on
+Marvell Kirkwood SoCs), an I2C fan controller is used but the alarm
+signal is wired to a separate GPIO. Unfortunately, the gpio-fan driver
+can't be used to handle GPIO alarm alone from DT: an error is returned
+if the "gpios" DT property is missing.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+This patch allows to use the gpio-fan driver even if the "alarm-gpios"
+DT property is defined alone.
+
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
 ---
-Hi,
+ .../devicetree/bindings/gpio/gpio-fan.txt          |  6 ++-
+ drivers/hwmon/gpio-fan.c                           | 44 +++++++++++-----------
+ 2 files changed, 27 insertions(+), 23 deletions(-)
 
-this is only compile-tested for arm and arm64. Could someone with
-the hardware please confirm that it still works?
-
-Cheers,
-Andre.
-
- drivers/spi/spi-s3c64xx.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 9231c34..b1c6731 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -324,7 +324,7 @@ static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-fan.txt b/Documentation/devicetree/bindings/gpio/gpio-fan.txt
+index 2dd457a3469a..a4c5d15b72e6 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio-fan.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio-fan.txt
+@@ -2,16 +2,18 @@ Bindings for fan connected to GPIO lines
  
- 		/* Acquire DMA channels */
- 		sdd->rx_dma.ch = dma_request_slave_channel_compat(mask, filter,
--				   (void *)sdd->rx_dma.dmach, dev, "rx");
-+				   (void *)(long)sdd->rx_dma.dmach, dev, "rx");
- 		if (!sdd->rx_dma.ch) {
- 			dev_err(dev, "Failed to get RX DMA channel\n");
- 			ret = -EBUSY;
-@@ -333,7 +333,7 @@ static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
- 		spi->dma_rx = sdd->rx_dma.ch;
+ Required properties:
+ - compatible : "gpio-fan"
++
++Optional properties:
+ - gpios: Specifies the pins that map to bits in the control value,
+   ordered MSB-->LSB.
+ - gpio-fan,speed-map: A mapping of possible fan RPM speeds and the
+   control value that should be set to achieve them. This array
+   must have the RPM values in ascending order.
+-
+-Optional properties:
+ - alarm-gpios: This pin going active indicates something is wrong with
+   the fan, and a udev event will be fired.
  
- 		sdd->tx_dma.ch = dma_request_slave_channel_compat(mask, filter,
--				   (void *)sdd->tx_dma.dmach, dev, "tx");
-+				   (void *)(long)sdd->tx_dma.dmach, dev, "tx");
- 		if (!sdd->tx_dma.ch) {
- 			dev_err(dev, "Failed to get TX DMA channel\n");
- 			ret = -EBUSY;
++Note: At least one the "gpios" and "alarm-gpios" properties should be set.
++
+ Examples:
+ 
+ 	gpio_fan {
+diff --git a/drivers/hwmon/gpio-fan.c b/drivers/hwmon/gpio-fan.c
+index 36abf814b8c7..c241f5b0b7cf 100644
+--- a/drivers/hwmon/gpio-fan.c
++++ b/drivers/hwmon/gpio-fan.c
+@@ -404,10 +404,32 @@ static int gpio_fan_get_of_pdata(struct device *dev,
+ 
+ 	node = dev->of_node;
+ 
++	/* Alarm GPIO if one exists */
++	if (of_gpio_named_count(node, "alarm-gpios") > 0) {
++		struct gpio_fan_alarm *alarm;
++		int val;
++		enum of_gpio_flags flags;
++
++		alarm = devm_kzalloc(dev, sizeof(struct gpio_fan_alarm),
++					GFP_KERNEL);
++		if (!alarm)
++			return -ENOMEM;
++
++		val = of_get_named_gpio_flags(node, "alarm-gpios", 0, &flags);
++		if (val < 0)
++			return val;
++		alarm->gpio = val;
++		alarm->active_low = flags & OF_GPIO_ACTIVE_LOW;
++
++		pdata->alarm = alarm;
++	}
++
+ 	/* Fill GPIO pin array */
+ 	pdata->num_ctrl = of_gpio_count(node);
+ 	if (pdata->num_ctrl <= 0) {
+-		dev_err(dev, "gpios DT property empty / missing");
++		if (pdata->alarm)
++			return 0;
++		dev_err(dev, "DT properties empty / missing");
+ 		return -ENODEV;
+ 	}
+ 	ctrl = devm_kzalloc(dev, pdata->num_ctrl * sizeof(unsigned),
+@@ -460,26 +482,6 @@ static int gpio_fan_get_of_pdata(struct device *dev,
+ 	}
+ 	pdata->speed = speed;
+ 
+-	/* Alarm GPIO if one exists */
+-	if (of_gpio_named_count(node, "alarm-gpios") > 0) {
+-		struct gpio_fan_alarm *alarm;
+-		int val;
+-		enum of_gpio_flags flags;
+-
+-		alarm = devm_kzalloc(dev, sizeof(struct gpio_fan_alarm),
+-					GFP_KERNEL);
+-		if (!alarm)
+-			return -ENOMEM;
+-
+-		val = of_get_named_gpio_flags(node, "alarm-gpios", 0, &flags);
+-		if (val < 0)
+-			return val;
+-		alarm->gpio = val;
+-		alarm->active_low = flags & OF_GPIO_ACTIVE_LOW;
+-
+-		pdata->alarm = alarm;
+-	}
+-
+ 	return 0;
+ }
+ 
 -- 
-1.7.9.5
+2.1.1
