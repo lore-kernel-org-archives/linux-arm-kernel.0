@@ -1,45 +1,55 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 23 Feb 2015 08:44:18 +0900
-Subject: [PATCHv3 0/8] devfreq: Add generic exynos memory-bus frequency
- driver
-In-Reply-To: <54E4FD40.8020206@gmx.net>
-References: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
- <54DFE797.1020008@math.uni-bielefeld.de> <54E4FD40.8020206@gmx.net>
-Message-ID: <54EA69D2.7010706@samsung.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Mon, 23 Feb 2015 00:28:42 +0000
+Subject: [PATCH 1/2] ARM: shmobile: r8a7794: add SDHI DT support
+In-Reply-To: <4571288.SFHfW35Ob9@wasted.cogentembedded.com>
+References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
+ <4571288.SFHfW35Ob9@wasted.cogentembedded.com>
+Message-ID: <87oaolpj0c.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tobias,
 
-First of all, thanks for your test.
+Hi Sergei, Magnus, Simon
 
-On 02/19/2015 05:59 AM, Tobias Jakobi wrote:
-> Hello again,
+> Define the generic R8A7794 parts of the SDHI[012] device nodes.
 > 
-> Tobias Jakobi wrote
->> I've tested the series on my Odroid-X2 (by adapting the TRATS2 changes),
->> and so far I haven't seen any issues. With the system being idle one can
->> see that the 'simple_ondemand' devfreq governor clocks down both memory
->> busses to the lowest state.
+> Based on the orginal patch by Shinobu Uehara <shinobu.uehara.xc@renesas.com>.
 > 
-> looks I was too hasty the last time. Actually this series breaks HDMI
-> output for me (or at least with 'simple_ondemand' governor, haven't
-> tried with performance yet).
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> I tried to run some simple application, but it hangs in uninterruptible
-> sleep immediately, probably before the first page flip. Going to check
-> this more thoroughly.
-> 
-> Maybe some parts of the hdmi subsystem don't like the lower clocks?
+> ---
+(snip)
+> +	sdhi0: sd at ee100000 {
+> +		compatible = "renesas,sdhi-r8a7794";
+> +		reg = <0 0xee100000 0 0x200>;
+> +		interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp3_clks R8A7794_CLK_SDHI0>;
+> +		status = "disabled";
+> +	};
+> +
+> +	sdhi1: sd at ee140000 {
+> +		compatible = "renesas,sdhi-r8a7794";
+> +		reg = <0 0xee140000 0 0x100>;
+> +		interrupts = <0 167 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp3_clks R8A7794_CLK_SDHI1>;
+> +		status = "disabled";
+> +	};
+> +
+> +	sdhi2: sd at ee160000 {
+> +		compatible = "renesas,sdhi-r8a7794";
+> +		reg = <0 0xee160000 0 0x100>;
+> +		interrupts = <0 168 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp3_clks R8A7794_CLK_SDHI2>;
+> +		status = "disabled";
+> +	};
 
-As you thought, when maintaining lower clock of memory bus frequency,
-some issue related to multimedia feature will happen.
+This patch and r8a7791.dtsi have sdhi0/1/2.
+But, according to datasheet, it is sdhi0/2/3.
+(Only R-Car H2 have sdhi1)
 
-Separately, We have to check the miminum lower clock for working of multimedia feature.
-and then multimedia or other IP have to request it to DVFS driver (memory busfreq driver).
-But, latest mainline kernel currently has not some way to inform minimum clock to DVFS driver.
+I don't care so match about this, but
+I think following datasheet is no-confusion if possible.
 
-So, If you check the miminum clock for hdmi, I'll use this clock as minumu frequency of dvfs table.
-
-Thanks,
-Chanwoo Choi
+Best regards
+---
+Kuninori Morimoto
