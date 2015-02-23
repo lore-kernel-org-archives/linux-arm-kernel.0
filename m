@@ -1,54 +1,56 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 23 Feb 2015 07:56:09 +0000
-Subject: [PATCH 10/12] ARM: dts: apq8064: Remove incorrect gsbi2 node.
+Date: Mon, 23 Feb 2015 07:56:17 +0000
+Subject: [PATCH 11/12] ARM: dts: Move i2c1 pinctrl to apq8064.dtsi
 In-Reply-To: <424678035-12862-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <424678035-12862-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1424678169-13350-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1424678177-13392-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 8c3166f5d74b7936d29dc44f778e759c1b9fb43a (ARM: DT: apq8064: Add i2c device nodes)
-added a new gsbi2 node which is totally wrong for 2 reasons.
-First the address range is not something which maps to gsbi2 according
-to datasheet and 3.4 sources.
-Secondly 8064 devices do not use gsbi2 for i2c according to 3.4 kernel sources.
-Removing this node as this node would never get tested.
+I2C1 pinctrl is not really specific to a board, moving to SOC dtsi would
+avoid redefining this in every board.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8064.dtsi | 20 --------------------
- 1 file changed, 20 deletions(-)
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 7 -------
+ arch/arm/boot/dts/qcom-apq8064.dtsi        | 7 +++++++
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
+diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+index 7a6a076..ab7aee2 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+@@ -11,13 +11,6 @@
+ 
+ 	soc {
+ 		pinctrl at 800000 {
+-			i2c1_pins: i2c1 {
+-				mux {
+-					pins = "gpio20", "gpio21";
+-					function = "gsbi1";
+-				};
+-			};
+-
+ 			card_detect: card_detect {
+ 				mux {
+ 					pins = "gpio26";
 diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 63edafc..ba44f30 100644
+index ba44f30..09077a0 100644
 --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
 +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -201,26 +201,6 @@
+@@ -115,6 +115,13 @@
+ 					function = "ps_hold";
+ 				};
  			};
++
++			i2c1_pins: i2c1 {
++				mux {
++					pins = "gpio20", "gpio21";
++					function = "gsbi1";
++				};
++			};
  		};
  
--		gsbi2: gsbi at 12480000 {
--			status = "disabled";
--			compatible = "qcom,gsbi-v1.0.0";
--			reg = <0x12480000 0x100>;
--			clocks = <&gcc GSBI2_H_CLK>;
--			clock-names = "iface";
--			#address-cells = <1>;
--			#size-cells = <1>;
--			ranges;
--
--			i2c2: i2c at 124a0000 {
--				compatible = "qcom,i2c-qup-v1.1.1";
--				reg = <0x124a0000 0x1000>;
--				interrupts = <0 196 IRQ_TYPE_NONE>;
--				clocks = <&gcc GSBI2_QUP_CLK>, <&gcc GSBI2_H_CLK>;
--				clock-names = "core", "iface";
--				#address-cells = <1>;
--				#size-cells = <0>;
--			};
--		};
- 
- 		gsbi7: gsbi at 16600000 {
- 			status = "disabled";
+ 		intc: interrupt-controller at 2000000 {
 -- 
 1.9.1
