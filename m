@@ -1,89 +1,38 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 23 Feb 2015 18:40:11 +0100
-Subject: [PATCH v9 1/5] Documentation: Add device tree bindings for Freescale
- i.MX GPC
+Date: Mon, 23 Feb 2015 18:40:15 +0100
+Subject: [PATCH v9 5/5] ARM: dts: imx6qdl: Allow disabling the PU regulator,
+ add a enable ramp delay
 In-Reply-To: <1424713215-3357-1-git-send-email-p.zabel@pengutronix.de>
 References: <1424713215-3357-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1424713215-3357-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1424713215-3357-6-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6 contains a power controller that controls power gating and
-sequencing for the SoC's power domains.
+The PU regulator is enabled during boot, but not necessarily always-on.
+It can be disabled by the generic pm domain framework when the PU power
+domain is shut down. The ramp delay of 150 us might be a bit conservative,
+the value is taken from the Freescale kernel.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
 Changes since v8:
- - Updated example with IRQ_TYPE_... and IMX6QDL_CLK_... defines
+ - Removed regulator-boot-on, this depends on the bootloader
 ---
- .../devicetree/bindings/power/fsl,imx-gpc.txt      | 59 ++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+ arch/arm/boot/dts/imx6qdl.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-new file mode 100644
-index 0000000..65cc034
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-@@ -0,0 +1,59 @@
-+Freescale i.MX General Power Controller
-+=======================================
-+
-+The i.MX6Q General Power Control (GPC) block contains DVFS load tracking
-+counters and Power Gating Control (PGC) for the CPU and PU (GPU/VPU) power
-+domains.
-+
-+Required properties:
-+- compatible: Should be "fsl,imx6q-gpc" or "fsl,imx6sl-gpc"
-+- reg: should be register base and length as documented in the
-+  datasheet
-+- interrupts: Should contain GPC interrupt request 1
-+- pu-supply: Link to the LDO regulator powering the PU power domain
-+- clocks: Clock phandles to devices in the PU power domain that need
-+	  to be enabled during domain power-up for reset propagation.
-+- #power-domain-cells: Should be 1, see below:
-+
-+The gpc node is a power-controller as documented by the generic power domain
-+bindings in Documentation/devicetree/bindings/power/power_domain.txt.
-+
-+Example:
-+
-+	gpc: gpc at 020dc000 {
-+		compatible = "fsl,imx6q-gpc";
-+		reg = <0x020dc000 0x4000>;
-+		interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 90 IRQ_TYPE_LEVEL_HIGH>;
-+		pu-supply = <&reg_pu>;
-+		clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
-+			 <&clks IMX6QDL_CLK_GPU3D_SHADER>,
-+			 <&clks IMX6QDL_CLK_GPU2D_CORE>,
-+			 <&clks IMX6QDL_CLK_GPU2D_AXI>,
-+			 <&clks IMX6QDL_CLK_OPENVG_AXI>,
-+			 <&clks IMX6QDL_CLK_VPU_AXI>;
-+		#power-domain-cells = <1>;
-+	};
-+
-+
-+Specifying power domain for IP modules
-+======================================
-+
-+IP cores belonging to a power domain should contain a 'power-domains' property
-+that is a phandle pointing to the gpc device node and a DOMAIN_INDEX specifying
-+the power domain the device belongs to.
-+
-+Example of a device that is part of the PU power domain:
-+
-+	vpu: vpu at 02040000 {
-+		reg = <0x02040000 0x3c000>;
-+		/* ... */
-+		power-domains = <&gpc 1>;
-+		/* ... */
-+	};
-+
-+The following DOMAIN_INDEX values are valid for i.MX6Q:
-+ARM_DOMAIN     0
-+PU_DOMAIN      1
-+The following additional DOMAIN_INDEX value is valid for i.MX6SL:
-+DISPLAY_DOMAIN 2
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 7ab00a4..4b12ac0 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -598,7 +598,7 @@
+ 					regulator-name = "vddpu";
+ 					regulator-min-microvolt = <725000>;
+ 					regulator-max-microvolt = <1450000>;
+-					regulator-always-on;
++					regulator-enable-ramp-delay = <150>;
+ 					anatop-reg-offset = <0x140>;
+ 					anatop-vol-bit-shift = <9>;
+ 					anatop-vol-bit-width = <5>;
 -- 
 2.1.4
