@@ -1,130 +1,52 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 23 Feb 2015 15:56:07 +0100
-Subject: [PATCH 6/8] ARM: dts: dove: Add some more common pinctrl settings
-In-Reply-To: <1424199129-22099-7-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1424199129-22099-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1424199129-22099-7-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <54EB3F87.5060506@free-electrons.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 23 Feb 2015 16:04:08 +0100
+Subject: [PATCH] [media] s5p-jpeg: Clear JPEG_CODEC_ON bits in sw reset
+ function
+In-Reply-To: <1418797339-27877-1-git-send-email-tony.kn@samsung.com>
+References: <1418797339-27877-1-git-send-email-tony.kn@samsung.com>
+Message-ID: <54EB4168.7090007@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+Hi,
 
-On 17/02/2015 19:52, Sebastian Hesselbarth wrote:
-> This add common pinctrl settings for pcie[01]_clkreq, spi1, i2c[23],
-> and internal i2c mux. These settings have either one or two options
-> only, so put them into the SoC dtsi instead of repeating them on
-> board level.
+On 17/12/14 07:22, Tony K Nadackal wrote:
+> Bits EXYNOS4_DEC_MODE and EXYNOS4_ENC_MODE do not get cleared
+> on software reset. These bits need to be cleared explicitly.
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Signed-off-by: Tony K Nadackal <tony.kn@samsung.com>
+> ---
+> This patch is created and tested on top of linux-next-20141210.
+> It can be cleanly applied on media-next and kgene/for-next.
+> 
+> 
+>  drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> index ab6d6f43..e53f13a 100644
+> --- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> +++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> @@ -21,6 +21,10 @@ void exynos4_jpeg_sw_reset(void __iomem *base)
+>  	unsigned int reg;
+>  
+>  	reg = readl(base + EXYNOS4_JPEG_CNTL_REG);
+> +	writel(reg & ~(EXYNOS4_DEC_MODE | EXYNOS4_ENC_MODE),
+> +				base + EXYNOS4_JPEG_CNTL_REG);
+> +
+> +	reg = readl(base + EXYNOS4_JPEG_CNTL_REG);
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Do we really need the second read? Wouldn't it also work as below ?
 
+  	reg = readl(base + EXYNOS4_JPEG_CNTL_REG);
 
++	reg &= ~(EXYNOS4_DEC_MODE | EXYNOS4_ENC_MODE);
++	writel(reg, base + EXYNOS4_JPEG_CNTL_REG);
+
+?
+>  	writel(reg & ~EXYNOS4_SOFT_RESET_HI, base + EXYNOS4_JPEG_CNTL_REG);
+>  
+>  	udelay(100);
+--
 Thanks,
-
-Gregory
-
-> ---
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Gabriel Dobato <dobatog@gmail.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/boot/dts/dove.dtsi | 52 +++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> index 81209bd9525a..9ad829523a13 100644
-> --- a/arch/arm/boot/dts/dove.dtsi
-> +++ b/arch/arm/boot/dts/dove.dtsi
-> @@ -451,6 +451,11 @@
->  					marvell,function = "gpio";
->  				};
->  
-> +				pmx_pcie1_clkreq: pmx-pcie1-clkreq {
-> +					marvell,pins = "mpp9";
-> +					marvell,function = "pex1";
-> +				};
-> +
->  				pmx_gpio_10: pmx-gpio-10 {
->  					marvell,pins = "mpp10";
->  					marvell,function = "gpio";
-> @@ -461,6 +466,11 @@
->  					marvell,function = "gpio";
->  				};
->  
-> +				pmx_pcie0_clkreq: pmx-pcie0-clkreq {
-> +					marvell,pins = "mpp11";
-> +					marvell,function = "pex0";
-> +				};
-> +
->  				pmx_gpio_12: pmx-gpio-12 {
->  					marvell,pins = "mpp12";
->  					marvell,function = "gpio";
-> @@ -566,6 +576,18 @@
->  					marvell,function = "gpio";
->  				};
->  
-> +				pmx_spi1_4_7: pmx-spi1-4-7 {
-> +					marvell,pins = "mpp4", "mpp5",
-> +						"mpp6", "mpp7";
-> +					marvell,function = "spi1";
-> +				};
-> +
-> +				pmx_spi1_20_23: pmx-spi1-20-23 {
-> +					marvell,pins = "mpp20", "mpp21",
-> +						"mpp22", "mpp23";
-> +					marvell,function = "spi1";
-> +				};
-> +
->  				pmx_uart1: pmx-uart1 {
->  					marvell,pins = "mpp_uart1";
->  					marvell,function = "uart1";
-> @@ -585,6 +607,36 @@
->  					marvell,pins = "mpp_nand";
->  					marvell,function = "gpo";
->  				};
-> +
-> +				pmx_i2c1: pmx-i2c1 {
-> +					marvell,pins = "mpp17", "mpp19";
-> +					marvell,function = "twsi";
-> +				};
-> +
-> +				pmx_i2c2: pmx-i2c2 {
-> +					marvell,pins = "mpp_audio1";
-> +					marvell,function = "twsi";
-> +				};
-> +
-> +				pmx_ssp_i2c2: pmx-ssp-i2c2 {
-> +					marvell,pins = "mpp_audio1";
-> +					marvell,function = "ssp/twsi";
-> +				};
-> +
-> +				pmx_i2cmux_0: pmx-i2cmux-0 {
-> +					marvell,pins = "twsi";
-> +					marvell,function = "twsi-opt1";
-> +				};
-> +
-> +				pmx_i2cmux_1: pmx-i2cmux-1 {
-> +					marvell,pins = "twsi";
-> +					marvell,function = "twsi-opt2";
-> +				};
-> +
-> +				pmx_i2cmux_2: pmx-i2cmux-2 {
-> +					marvell,pins = "twsi";
-> +					marvell,function = "twsi-opt3";
-> +				};
->  			};
->  
->  			core_clk: core-clocks at d0214 {
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Sylwester
