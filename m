@@ -1,22 +1,35 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 23 Feb 2015 23:18:36 +0100
-Subject: [PATCH v4 00/20] power_supply: Allow safe usage of power supply
-In-Reply-To: <1424692061-30624-1-git-send-email-k.kozlowski@samsung.com>
-References: <1424692061-30624-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20150223221836.GA4929@amd>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Feb 2015 22:32:55 +0000
+Subject: Regression: v4.0-rc1: iMX6: Hummingboard fails due to drivers/clk
+ changes
+Message-ID: <20150223223255.GQ8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-> 
-> The patchset fixes invalid memory accesses in certain race scenarios by
-> moving ownership of struct power_supply to the core. All drivers are
-> modified.
+All,
 
-Ok, who can apply the patches? Sebastian?
+I just tried my SolidRun patch set on top of v4.0-rc1, and it fails to
+boot.  The kernel itself finishes booting, but it is unable to DHCP (for
+root-NFS) - nothing appears on the network.
 
-									Pavel
+At first, I thought this would be a network driver bug, but reverting
+the mainline changes there didn't fix the regression.  Then I wondered
+if it was something in arch/arm/mach-imx, but no.
+
+When reverting all drivers/clk changes (and corresponding include/linux/*.h)
+between v3.19 and v4.0-rc1, I find that the regression is fixed.
+
+It seems that some CCF change is causing a regression somewhere in the
+clock tree on iMX6 CPUs.
+
+Unfortunately, without networking running, I can't dump the clock tree
+to find out what's different, and bisecting will be a major pain (needing
+each bisect point to be merged with my patch set, built and tested.)
+
+Has anyone else seen this?
+
+Thanks.
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
