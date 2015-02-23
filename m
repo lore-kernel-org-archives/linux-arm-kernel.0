@@ -1,115 +1,397 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 23 Feb 2015 19:16:07 +0100
-Subject: [PATCHv2 13/15] ARM: mvebu: add core support for Armada 39x
-In-Reply-To: <1424451874-25375-14-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1424451874-25375-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1424451874-25375-14-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <54EB6E67.5070400@free-electrons.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 23 Feb 2015 18:28:10 +0000
+Subject: [PATCH 1/2] ARM: kernel: add support for cpu cache information
+Message-ID: <1424716091-22914-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+This patch adds support for cacheinfo on ARM platforms.
 
+On ARMv7, the cache hierarchy can be identified through Cache Level ID
+register(CLIDR) while the cache geometry is provided by Cache Size ID
+register(CCSIDR).
 
-On 20/02/2015 18:04, Thomas Petazzoni wrote:
-> This commit adds the core support for Armada 39x, which is quite
-> simple:
-> 
->  - a new Kconfig option which selects the appropriate clock and
->    pinctrl drivers as well as other common features (GIC, L2 cache,
->    SMP, etc.)
-> 
->  - a new DT_MACHINE_START which references the top-level compatible
->    strings supported for the Marvell Armada 39x.
-> 
->  - a new SMP enable-method. The mechanism to enable CPUs for Armada
->    39x appears to be the same as Armada 38x. However, we do not want
->    to use marvell,armada-380-smp in the Device Tree, in the case of
->    the discovery of a subtle difference in the future, which would
->    require changing the Device Tree. And the enable-method isn't a
->    compatible string: you can't specify several values and expect a
->    fallback on the second string if the first one isn't
->    supported. Therefore, we simply declare the SMP enable method
->    "marvell,armada-390-smp" as doing the same thing as the
->    "marvell,armada-380-smp" one.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/mach-mvebu/Kconfig      | 14 ++++++++++++++
->  arch/arm/mach-mvebu/board-v7.c   | 14 ++++++++++++++
->  arch/arm/mach-mvebu/platsmp-a9.c |  2 ++
->  3 files changed, 30 insertions(+)
-> 
-> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-> index c1e4567..9747316 100644
-> --- a/arch/arm/mach-mvebu/Kconfig
-> +++ b/arch/arm/mach-mvebu/Kconfig
-> @@ -64,6 +64,20 @@ config MACH_ARMADA_38X
->  	  Say 'Y' here if you want your kernel to support boards based
->  	  on the Marvell Armada 380/385 SoC with device tree.
->  
-> +config MACH_ARMADA_39X
-> +	bool "Marvell Armada 39x boards" if ARCH_MULTI_V7
+On architecture versions before ARMv7, CLIDR and CCSIDR is not
+implemented. The cache type register(CTR) provides both cache hierarchy
+and geometry if implemented. For implementations that doesn't support
+CTR, we need to list the probable value of CTR if it was implemented
+along with the cpuid for the sake of simplicity to handle them.
 
-As you don't select it by default we should update the mvebu_v7_defconfig
-with this symbol.
+Since the architecture doesn't provide any way of detecting the cpus
+sharing particular cache, device tree is used fo the same purpose.
+On non-DT platforms, first level caches are per-cpu while higher level
+caches are assumed system-wide.
 
-Thanks,
+This is based on the newly introduced generic cacheinfo infrastructure
+through the commit 246246cbde5e ("drivers: base: support cpu cache
+information interface to userspace via sysfs")
 
-Gregory
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/kernel/Makefile    |   1 +
+ arch/arm/kernel/cacheinfo.c | 282 ++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/Kconfig         |  13 ++
+ 3 files changed, 296 insertions(+)
+ create mode 100644 arch/arm/kernel/cacheinfo.c
 
-> +	select ARM_GIC
-> +	select ARMADA_39X_CLK
-> +	select CACHE_L2X0
-> +	select HAVE_ARM_SCU
-> +	select HAVE_ARM_TWD if SMP
-> +	select HAVE_SMP
-> +	select MACH_MVEBU_V7
-> +	select PINCTRL_ARMADA_39X
-> +	help
-> +	  Say 'Y' here if you want your kernel to support boards based
-> +	  on the Marvell Armada 39x SoC with device tree.
-> +
->  config MACH_ARMADA_XP
->  	bool "Marvell Armada XP boards" if ARCH_MULTI_V7
->  	select ARMADA_XP_CLK
-> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-> index 31b66f2..afee908 100644
-> --- a/arch/arm/mach-mvebu/board-v7.c
-> +++ b/arch/arm/mach-mvebu/board-v7.c
-> @@ -232,3 +232,17 @@ DT_MACHINE_START(ARMADA_38X_DT, "Marvell Armada 380/385 (Device Tree)")
->  	.restart	= mvebu_restart,
->  	.dt_compat	= armada_38x_dt_compat,
->  MACHINE_END
-> +
-> +static const char * const armada_39x_dt_compat[] __initconst = {
-> +	"marvell,armada390",
-> +	"marvell,armada398",
-> +	NULL,
-> +};
-> +
-> +DT_MACHINE_START(ARMADA_39X_DT, "Marvell Armada 39x (Device Tree)")
-> +	.l2c_aux_val	= 0,
-> +	.l2c_aux_mask	= ~0,
-> +	.init_irq       = mvebu_init_irq,
-> +	.restart	= mvebu_restart,
-> +	.dt_compat	= armada_39x_dt_compat,
-> +MACHINE_END
-> diff --git a/arch/arm/mach-mvebu/platsmp-a9.c b/arch/arm/mach-mvebu/platsmp-a9.c
-> index 2ec1a42..df0a9cc 100644
-> --- a/arch/arm/mach-mvebu/platsmp-a9.c
-> +++ b/arch/arm/mach-mvebu/platsmp-a9.c
-> @@ -110,3 +110,5 @@ CPU_METHOD_OF_DECLARE(mvebu_armada_375_smp, "marvell,armada-375-smp",
->  		      &mvebu_cortex_a9_smp_ops);
->  CPU_METHOD_OF_DECLARE(mvebu_armada_380_smp, "marvell,armada-380-smp",
->  		      &armada_38x_smp_ops);
-> +CPU_METHOD_OF_DECLARE(mvebu_armada_390_smp, "marvell,armada-390-smp",
-> +		      &armada_38x_smp_ops);
-> 
-
-
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 902397dd1000..2551b1a179eb 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -29,6 +29,7 @@ obj-y		+= entry-v7m.o v7m.o
+ else
+ obj-y		+= entry-armv.o
+ endif
++obj-$(CONFIG_CPU_HAS_CACHE) += cacheinfo.o
+ 
+ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+ obj-$(CONFIG_ISA_DMA_API)	+= dma.o
+diff --git a/arch/arm/kernel/cacheinfo.c b/arch/arm/kernel/cacheinfo.c
+new file mode 100644
+index 000000000000..0c4a67dcbcaf
+--- /dev/null
++++ b/arch/arm/kernel/cacheinfo.c
+@@ -0,0 +1,282 @@
++/*
++ *  ARM cacheinfo support
++ *
++ *  Copyright (C) 2015 ARM Ltd.
++ *  All Rights Reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/bitops.h>
++#include <linux/cacheinfo.h>
++#include <linux/cpu.h>
++#include <linux/compiler.h>
++#include <linux/of.h>
++
++#include <asm/cputype.h>
++#include <asm/processor.h>
++#include <asm/system_info.h>
++
++#define cache_is_armv7() \
++	(cpu_architecture() >= CPU_ARCH_ARMv7 && !armv6_extended())
++#define MAX_CACHE_LEVEL		(cache_is_armv7() ? 7 : 1)
++
++#define CTR_CTYPE_SHIFT		24
++#define CTR_CTYPE_MASK		(1 << CTR_CTYPE_SHIFT)
++
++struct ctr_info {
++	unsigned int cpuid_part;
++	unsigned int ctr;
++};
++
++/*
++ *  Cache Type Register
++ *  +---------------------------------+
++ *  | 31 29 | 28 25 |24| 23 12 | 11 0 |
++ *  +---------------------------------+
++ *  | 0 0 0 | Ctype | S| Dsize | Isize|
++ *  +---------------------------------+
++ * The table below encodes only Dsize and Isize
++ */
++static struct ctr_info cache_ctr_list[] = {
++	{0x4400a100, 0x0016A16A }, /* SA-110:  32kB D$, 32kB I$ */
++	{0x4400a110, 0x0012A16A }, /* SA-1100: 16kB D$, 32kB I$ */
++	{0x6900b110, 0x0012A16A }, /* SA-1110: 16kB D$, 32kB I$ */
++};
++
++/*
++ * List of CPUs reported as ARMv7 but don't implement CLIDR,
++ * CSSELR and CCSIDR. Cache information is still available from CTR
++ */
++static int armv6_ext_cpuid_part[] = {
++	0x4100b020, /* ARM11MP */
++	0x4100b760, /* ARM1176 */
++};
++
++static bool armv6_extended(void)
++{
++	int i, cpuid_part = read_cpuid_part();
++
++	for (i = 0; i < ARRAY_SIZE(armv6_ext_cpuid_part); i++)
++		if (armv6_ext_cpuid_part[i] == cpuid_part)
++			return true;
++	return false;
++}
++
++static int get_unimplemented_ctr(unsigned int *ctr)
++{
++	int i, cpuid_part = read_cpuid_part();
++
++	for (i = 0; i < ARRAY_SIZE(cache_ctr_list); i++)
++		if (cache_ctr_list[i].cpuid_part == cpuid_part) {
++			*ctr = cache_ctr_list[i].ctr;
++			return 0;
++		}
++	return -ENOENT;
++}
++
++static unsigned int get_ctr(void)
++{
++	unsigned int ctr;
++
++	if (get_unimplemented_ctr(&ctr))
++		ctr = read_cpuid_cachetype();
++	return ctr;
++}
++
++static enum cache_type __get_cache_type(int level)
++{
++	if (level > MAX_CACHE_LEVEL)
++		return CACHE_TYPE_NOCACHE;
++	return get_ctr() & CTR_CTYPE_MASK ?
++		CACHE_TYPE_SEPARATE : CACHE_TYPE_UNIFIED;
++}
++
++/*
++ *  +---------------------------------+
++ *  | 9  8  7  6 | 5  4  3 | 2 | 1  0 |
++ *  +---------------------------------+
++ *  |    size    |  assoc  | m |  len |
++ *  +---------------------------------+
++ * linelen        = 1 << (len + 3)
++ * multiplier     = 2 + m
++ * nsets          = 1 << (size + 6 - assoc - len)
++ * associativity  = multiplier << (assoc - 1)
++ * cache_size     = multiplier << (size + 8)
++ */
++#define CTR_LINESIZE_MASK	0x3
++#define CTR_MULTIPLIER_SHIFT	2
++#define CTR_MULTIPLIER_MASK	0x1
++#define CTR_ASSOCIAT_SHIFT	3
++#define CTR_ASSOCIAT_MASK	0x7
++#define CTR_SIZE_SHIFT		6
++#define CTR_SIZE_MASK		0xF
++#define CTR_DCACHE_SHIFT	12
++
++static void __ci_leaf_init(enum cache_type type, struct cacheinfo *this_leaf)
++{
++	unsigned int size, multiplier, assoc, len, tmp = get_ctr();
++
++	if (type == CACHE_TYPE_DATA)
++		tmp >>= CTR_DCACHE_SHIFT;
++
++	len = tmp & CTR_LINESIZE_MASK;
++	size = (tmp >> CTR_SIZE_SHIFT) & CTR_SIZE_MASK;
++	assoc = (tmp >> CTR_ASSOCIAT_SHIFT) & CTR_ASSOCIAT_MASK;
++	multiplier = ((tmp >> CTR_MULTIPLIER_SHIFT) & CTR_MULTIPLIER_MASK) + 2;
++
++	this_leaf->type = type;
++	this_leaf->coherency_line_size = 1 << (len + 3);
++	this_leaf->number_of_sets = 1 << (size + 6 - assoc - len);
++	this_leaf->ways_of_associativity = multiplier << (assoc - 1);
++	this_leaf->size = multiplier << (size + 8);
++}
++
++/* Ctypen, bits[3(n - 1) + 2 : 3(n - 1)], for n = 1 to 7 */
++#define CLIDR_CTYPE_SHIFT(level)	(3 * (level - 1))
++#define CLIDR_CTYPE_MASK(level)		(7 << CLIDR_CTYPE_SHIFT(level))
++#define CLIDR_CTYPE(clidr, level)	\
++	(((clidr) & CLIDR_CTYPE_MASK(level)) >> CLIDR_CTYPE_SHIFT(level))
++
++static inline enum cache_type __armv7_get_cache_type(int level)
++{
++	unsigned int clidr;
++
++	if (level > MAX_CACHE_LEVEL)
++		return CACHE_TYPE_NOCACHE;
++	asm volatile ("mrc p15, 1, %0, c0, c0, 1" : "=r" (clidr));
++	return CLIDR_CTYPE(clidr, level);
++}
++
++/*
++ * NumSets, bits[27:13] - (Number of sets in cache) - 1
++ * Associativity, bits[12:3] - (Associativity of cache) - 1
++ * LineSize, bits[2:0] - (Log2(Number of words in cache line)) - 2
++ */
++#define CCSIDR_WRITE_THROUGH		BIT(31)
++#define CCSIDR_WRITE_BACK		BIT(30)
++#define CCSIDR_READ_ALLOCATE		BIT(29)
++#define CCSIDR_WRITE_ALLOCATE		BIT(28)
++#define CCSIDR_LINESIZE_MASK		0x7
++#define CCSIDR_LINESIZE(x)		((x) & CCSIDR_LINESIZE_MASK)
++#define CCSIDR_ASSOCIATIVITY_SHIFT	3
++#define CCSIDR_ASSOCIATIVITY_MASK	0x3ff
++#define CCSIDR_ASSOCIATIVITY(x)	\
++	(((x) >> CCSIDR_ASSOCIATIVITY_SHIFT) & CCSIDR_ASSOCIATIVITY_MASK)
++#define CCSIDR_NUMSETS_SHIFT		13
++#define CCSIDR_NUMSETS_MASK		0x7fff
++#define CCSIDR_NUMSETS(x) \
++	(((x) >> CCSIDR_NUMSETS_SHIFT) & CCSIDR_NUMSETS_MASK)
++
++#define CACHE_LINESIZE(x)		(16 << CCSIDR_LINESIZE(x))
++#define CACHE_NUMSETS(x)		(CCSIDR_NUMSETS(x) + 1)
++#define CACHE_ASSOCIATIVITY(x)		(CCSIDR_ASSOCIATIVITY(x) + 1)
++
++/*
++ * Cache Size Selection Register(CSSELR) selects which Cache Size ID
++ * Register(CCSIDR) is accessible by specifying the required cache
++ * level and the cache type. We need to ensure that no one else changes
++ * CSSELR by calling this in non-preemtible context
++ */
++static u32 __attribute_const__ cache_get_ccsidr(u32 csselr)
++{
++	u32 ccsidr;
++
++	/* Put value into CSSELR */
++	asm volatile ("mcr p15, 2, %0, c0, c0, 0" : : "r" (csselr));
++	isb();
++	/* Read result out of CCSIDR */
++	asm volatile ("mrc p15, 1, %0, c0, c0, 0" : "=r" (ccsidr));
++
++	return ccsidr;
++}
++
++static void __armv7_ci_leaf_init(enum cache_type type,
++				 struct cacheinfo *this_leaf)
++{
++	bool is_icache = type & CACHE_TYPE_INST;
++	u32 tmp = cache_get_ccsidr((this_leaf->level - 1) << 1 | is_icache);
++
++	this_leaf->type = type;
++	this_leaf->coherency_line_size = CACHE_LINESIZE(tmp);
++	this_leaf->number_of_sets = CACHE_NUMSETS(tmp);
++	this_leaf->ways_of_associativity = CACHE_ASSOCIATIVITY(tmp);
++	this_leaf->size = this_leaf->number_of_sets *
++	    this_leaf->coherency_line_size * this_leaf->ways_of_associativity;
++	this_leaf->attributes =
++		((tmp & CCSIDR_WRITE_THROUGH) ? CACHE_WRITE_THROUGH : 0) |
++		((tmp & CCSIDR_WRITE_BACK) ? CACHE_WRITE_BACK : 0) |
++		((tmp & CCSIDR_READ_ALLOCATE) ? CACHE_READ_ALLOCATE : 0) |
++		((tmp & CCSIDR_WRITE_ALLOCATE) ? CACHE_WRITE_ALLOCATE : 0);
++}
++
++static inline enum cache_type get_cache_type(int level)
++{
++	if (cache_is_armv7())
++		return __armv7_get_cache_type(level);
++	return __get_cache_type(level);
++}
++
++static void ci_leaf_init(struct cacheinfo *this_leaf,
++			 enum cache_type type, unsigned int level)
++{
++	this_leaf->level = level;
++	if (cache_is_armv7())
++		__armv7_ci_leaf_init(type, this_leaf);
++	else
++		__ci_leaf_init(type, this_leaf);
++}
++
++static int __init_cache_level(unsigned int cpu)
++{
++	unsigned int ctype, level, leaves;
++	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
++
++	for (level = 1, leaves = 0; level <= MAX_CACHE_LEVEL; level++) {
++		ctype = get_cache_type(level);
++		if (ctype == CACHE_TYPE_NOCACHE) {
++			level--;
++			break;
++		}
++		/* Separate instruction and data caches */
++		leaves += (ctype == CACHE_TYPE_SEPARATE) ? 2 : 1;
++	}
++
++	this_cpu_ci->num_levels = level;
++	this_cpu_ci->num_leaves = leaves;
++
++	return 0;
++}
++
++static int __populate_cache_leaves(unsigned int cpu)
++{
++	unsigned int level, idx;
++	enum cache_type type;
++	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
++	struct cacheinfo *this_leaf = this_cpu_ci->info_list;
++
++	for (idx = 0, level = 1; level <= this_cpu_ci->num_levels &&
++	     idx < this_cpu_ci->num_leaves; idx++, level++) {
++		type = get_cache_type(level);
++		if (type == CACHE_TYPE_SEPARATE) {
++			ci_leaf_init(this_leaf++, CACHE_TYPE_DATA, level);
++			ci_leaf_init(this_leaf++, CACHE_TYPE_INST, level);
++		} else {
++			ci_leaf_init(this_leaf++, type, level);
++		}
++	}
++	return 0;
++}
++
++DEFINE_SMP_CALL_CACHE_FUNCTION(init_cache_level)
++DEFINE_SMP_CALL_CACHE_FUNCTION(populate_cache_leaves)
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 9b4f29e595a4..355ebf108eda 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -494,30 +494,42 @@ config CPU_PABRT_V7
+ # The cache model
+ config CPU_CACHE_V4
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config CPU_CACHE_V4WT
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config CPU_CACHE_V4WB
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config CPU_CACHE_V6
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config CPU_CACHE_V7
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config CPU_CACHE_NOP
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config CPU_CACHE_VIVT
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config CPU_CACHE_VIPT
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config CPU_CACHE_FA
+ 	bool
++	select CPU_HAS_CACHE
++
++config CPU_HAS_CACHE
++	bool
+ 
+ if MMU
+ # The copy-page model
+@@ -846,6 +858,7 @@ config DMA_CACHE_RWFO
+ 
+ config OUTER_CACHE
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config OUTER_CACHE_SYNC
+ 	bool
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.9.1
