@@ -1,29 +1,53 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 23 Feb 2015 16:26:06 +0100
-Subject: [PATCH] [media] s5p-jpeg: Fix crash in jpeg isr due to multiple
- interrupts.
-In-Reply-To: <1418797512-30226-1-git-send-email-tony.kn@samsung.com>
-References: <1418797512-30226-1-git-send-email-tony.kn@samsung.com>
-Message-ID: <54EB468E.2050505@samsung.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 23 Feb 2015 16:27:02 +0100
+Subject: [PATCHv2 04/15] ARM: mvebu: use IRQ macros to define the SDHCI
+ interrupt on Armada 38x
+In-Reply-To: <1424451874-25375-5-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1424451874-25375-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1424451874-25375-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <54EB46C6.6020506@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/12/14 07:25, Tony K Nadackal wrote:
-> In case of corrupt images, multiple interrupts may occur
-> due to different error scenarios.
-> 
-> Since we are removing the src and dest buffers in the first
-> interrupt itself, crash occurs in the second error interrupts.
-> 
-> Disable the global interrupt before we start processing
-> the interrupt avoid the crash.
-> 
-> Disable System interrupt in isr to avoid the crash below.
+Hi Thomas,
 
-Rather than disabling all interrupts, is there no way to check
-the interrupt reason from some status register and decide
-whether we return the buffers or just ignore the interrupt ?
+On 20/02/2015 18:04, Thomas Petazzoni wrote:
+> The Armada 38x SDHCI controller definition in the SoC Device Tree file
+> is using hardcoded values instead of the nice GIC and IRQ macros
+> provided by DT header files. This commit fixes that, which allows the
+> SDHCI interrupt definition to be consistent with was is done in the
+> rest of the file.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+I already submitted this fix as part of the "fixes and improvements for SDHCI" series.
+
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm/boot/dts/armada-38x.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index 8c76a8d..0f0cc41 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -542,7 +542,7 @@
+>  			sdhci at d8000 {
+>  				compatible = "marvell,armada-380-sdhci";
+>  				reg = <0xd8000 0x1000>, <0xdc000 0x100>;
+> -				interrupts = <0 25 0x4>;
+> +				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&gateclk 17>;
+>  				mrvl,clk-delay-cycles = <0x1F>;
+>  				status = "disabled";
+> 
+
 
 -- 
-Thanks,
-Sylwester
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
