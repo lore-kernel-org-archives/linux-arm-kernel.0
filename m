@@ -1,44 +1,38 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 23 Feb 2015 18:40:10 +0100
-Subject: [PATCH v9 0/5] i.MX6 PU power domain support
-Message-ID: <1424713215-3357-1-git-send-email-p.zabel@pengutronix.de>
+Date: Mon, 23 Feb 2015 18:40:14 +0100
+Subject: [PATCH v9 4/5] ARM: dts: imx6sl: Add power-domain information to gpc
+ node
+In-Reply-To: <1424713215-3357-1-git-send-email-p.zabel@pengutronix.de>
+References: <1424713215-3357-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1424713215-3357-5-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this is a rebased and updated version of the series I sent previously:
+The PGC that is part of GPC controls isolation and power sequencing of the
+power domains. The PU power domain will be handled by the generic pm domain
+framework. It needs a phandle to the PU regulator to turn off power when
+the domain is disabled and a list of clocks to be enabled during powerup
+for reset propagation.
 
-http://www.spinics.net/lists/arm-kernel/msg360709.html
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6sl.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Changes since v8:
- - Updated DT documentation example with IRQ_TYPE_... and
-   IMX6QDL_CLK_... defines
- - Made PU regulator optional to support i.MX6SX, suggested by
-   Robin Gong
- - Removed regulator_enable() call in the probe function, stopped
-   disabling the regulator in imx6q_pm_pu_power_off() - the regulator
-   framework will disable unused regulators.
- - Changed the GPC driver to enable pu power if CONFIG_PM is not
-   enabled, as some bootloaders disable pu power on boot.
-
-regards
-Philipp
-
-Philipp Zabel (6):
-  Documentation: Add device tree bindings for Freescale i.MX GPC
-  ARM: imx6: gpc: Add PU power domain for GPU/VPU
-  ARM: dts: imx6qdl: Add power-domain information to gpc node
-  ARM: dts: imx6sl: Add power-domain information to gpc node
-  ARM: dts: imx6qdl: Allow disabling the PU regulator, add a enable ramp
-    delay
-  ARM: imx6: gpc: Allow PU regulator bypass
-
- .../devicetree/bindings/power/fsl,imx-gpc.txt      |  59 ++++++
- arch/arm/boot/dts/imx6qdl.dtsi                     |  10 +-
- arch/arm/boot/dts/imx6sl.dtsi                      |   4 +
- arch/arm/mach-imx/Kconfig                          |   1 +
- arch/arm/mach-imx/gpc.c                            | 216 +++++++++++++++++++++
- 5 files changed, 289 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 36ab8e0..79d2007 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -604,6 +604,10 @@
+ 				compatible = "fsl,imx6sl-gpc", "fsl,imx6q-gpc";
+ 				reg = <0x020dc000 0x4000>;
+ 				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>;
++				pu-supply = <&reg_pu>;
++				clocks = <&clks IMX6SL_CLK_GPU2D_OVG>,
++					 <&clks IMX6SL_CLK_GPU2D_PODF>;
++				#power-domain-cells = <1>;
+ 			};
+ 
+ 			gpr: iomuxc-gpr at 020e0000 {
 -- 
 2.1.4
