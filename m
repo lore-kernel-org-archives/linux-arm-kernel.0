@@ -1,73 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Feb 2015 23:53:50 +0000
-Subject: Regression: v4.0-rc1: iMX6: Hummingboard fails due to
- drivers/clk changes
-In-Reply-To: <CAOMZO5ASkXoVb9KrqF4Us18-rZ7k3XqjSdhcKyO_ParXXHoWbg@mail.gmail.com>
-References: <20150223223255.GQ8656@n2100.arm.linux.org.uk>
- <CAOMZO5ASkXoVb9KrqF4Us18-rZ7k3XqjSdhcKyO_ParXXHoWbg@mail.gmail.com>
-Message-ID: <20150223235350.GS8656@n2100.arm.linux.org.uk>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 24 Feb 2015 08:55:29 +0900
+Subject: [PATCHv3 0/8] devfreq: Add generic exynos memory-bus frequency
+ driver
+In-Reply-To: <54EB8645.4060608@math.uni-bielefeld.de>
+References: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
+ <54DFE797.1020008@math.uni-bielefeld.de> <54E4FD40.8020206@gmx.net>
+ <54EA69D2.7010706@samsung.com> <54EB8645.4060608@math.uni-bielefeld.de>
+Message-ID: <54EBBDF1.1030306@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 23, 2015 at 08:42:55PM -0300, Fabio Estevam wrote:
-> Hi Russell,
-> 
-> On Mon, Feb 23, 2015 at 7:32 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > All,
-> >
-> > I just tried my SolidRun patch set on top of v4.0-rc1, and it fails to
-> > boot.  The kernel itself finishes booting, but it is unable to DHCP (for
-> > root-NFS) - nothing appears on the network.
-> >
-> > At first, I thought this would be a network driver bug, but reverting
-> > the mainline changes there didn't fix the regression.  Then I wondered
-> > if it was something in arch/arm/mach-imx, but no.
-> >
-> > When reverting all drivers/clk changes (and corresponding include/linux/*.h)
-> > between v3.19 and v4.0-rc1, I find that the regression is fixed.
-> >
-> > It seems that some CCF change is causing a regression somewhere in the
-> > clock tree on iMX6 CPUs.
-> >
-> > Unfortunately, without networking running, I can't dump the clock tree
-> > to find out what's different, and bisecting will be a major pain (needing
-> > each bisect point to be merged with my patch set, built and tested.)
-> >
-> > Has anyone else seen this?
-> 
-> Just tried it and I confirm that NFS fails to mount on a imx6q-hummingboard:
-> 
-> [    1.882023] fec 2188000.ethernet eth0: Freescale FEC PHY driver
-> [Atheros 8035 ethernet] (mii_bus:phy_addr=2188000.ethernet:00, irq)
-> [    1.894409] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
-> [    1.954662] hub 2-1:1.0: USB hub found
-> [    1.958864] hub 2-1:1.0: 4 ports detected
-> [    3.882249] fec 2188000.ethernet eth0: Link is Up - 100Mbps/Full -
-> flow control rx/tx
-> [    3.890900] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready
-> [    3.912131] Sending DHCP requests ...
-> 
-> (Gets stuck here)
-> 
-> I haven't seen this problem on other imx6 boards though running the
-> same kernel.
+Hi Tobias,
 
-The reason appears to be a lack of packets coming out of the ethernet.
-Why that is, I'm not sure (maybe a gated GPIO16 clock to the phy?)
-Given that the phy state seems frozen - it doesn't detect the cable
-being disconnected - this seems highly likely.
+On 02/24/2015 04:57 AM, Tobias Jakobi wrote:
+> Hello Chanwoo!
+> 
+> Chanwoo Choi wrote:
+>> As you thought, when maintaining lower clock of memory bus frequency,
+>> some issue related to multimedia feature will happen.
+>>
+>> Separately, We have to check the miminum lower clock for working of multimedia feature.
+>> and then multimedia or other IP have to request it to DVFS driver (memory busfreq driver).
+>> But, latest mainline kernel currently has not some way to inform minimum clock to DVFS driver.
+>>
+>> So, If you check the miminum clock for hdmi, I'll use this clock as minumu frequency of dvfs table.
+>>
+>> Thanks,
+>> Chanwoo Choi
+>>
+> 
+> First I have to apologize. I didn't check carefully. Actually it's not
+> the HDMI subsystem which seems to hang during my test, but the G2D
+> subsystem.
+> 
+> Here's a snippet of the kernel log with drm.debug=0xff:
+> [ 1157.911264] [drm:drm_framebuffer_reference] ee144e00: FB ID: 27 (2)
+> [ 1157.911271] [drm:drm_framebuffer_unreference] ee37fb80: FB ID: 25 (2)
+> [ 1157.911277] [drm:drm_framebuffer_unreference] ee144e00: FB ID: 27 (3)
+> [ 1157.911315] [drm:drm_ioctl] pid=2569, dev=0xe200, auth=1,
+> EXYNOS_G2D_GET_VER
+> [ 1158.434439] [drm:drm_ioctl] pid=2569, dev=0xe200, auth=1,
+> EXYNOS_G2D_SET_CMDLIST
+> [ 1158.434536] [drm:drm_ioctl] pid=2569, dev=0xe200, auth=1, EXYNOS_G2D_EXEC
+> [ 1158.437484] [drm:drm_vm_close_locked] 0xaf840000,0x00140000
+> [ 1158.437507] [drm:drm_ioctl] pid=2569, dev=0xe200, auth=1,
+> DRM_IOCTL_GEM_CLOSE
+> [ 1158.437524] [drm:exynos_drm_gem_destroy] handle count = 0
+> [ 1158.437532] [drm:lowlevel_buffer_deallocate] dma_addr(0x20500000),
+> size(0x140000)
+> [ 1158.437810] [drm:drm_ioctl] pid=2569, dev=0xe200, auth=1,
+> EXYNOS_GEM_CREATE
+> [ 1158.437819] [drm:exynos_drm_init_buf] desired size = 0x256000
+> [ 1158.437851] [drm:exynos_drm_gem_init] created file object = 0xe97c8d00
+> [ 1158.445506] [drm:lowlevel_buffer_allocate] dma_addr(0x21400000),
+> size(0x256000)
+> [ 1158.445535] [drm:exynos_drm_gem_handle_create] gem handle = 0x1
+> [ 1158.445556] [drm:drm_ioctl] pid=2569, dev=0xe200, auth=1,
+> DRM_IOCTL_MODE_MAP_DUMB
+> [ 1158.445570] [drm:exynos_drm_gem_dumb_map_offset] offset = 0x101c2000
+> [ 1158.445600] [drm:drm_vm_open_locked] 0xaec15000,0x00256000
+> [ 1158.445608] [drm:update_vm_cache_attr] flags = 0x0
+> [ 1158.457696] [drm:drm_ioctl] pid=2569, dev=0xe200, auth=1,
+> EXYNOS_G2D_SET_CMDLIST
+> [ 1158.457745] [drm:drm_ioctl] pid=2569, dev=0xe200, auth=1, EXYNOS_G2D_EXEC
+> 
+> 
+> So G2D_EXEC seems to work once, but the second time it hangs forever. I
+> even fail at attaching gdb to the application then (gdb then also hangs
+> in D state).
+> 
+> If I just use the 'vsynced page flipping' test, then everything works:
+> ./modetest -M exynos -s 16 at 13:1280x720 -v
+> setting mode 1280x720-60Hz at XR24 on connectors 16, crtc 13
+> freq: 61.08Hz
+> freq: 60.00Hz
+> freq: 60.00Hz
+> <etc.>
+> 
+> I'm going to do some tests with the G2D in the next time, checking how
+> much I can lower MIF/INT clocks before the engine becomes unstable.
 
-Looking at imx6q_1588_init(), this could be a problem:
+Thanks for your test. If you have any question or help, please feel free to ask me.
 
-        ptp_clk = of_clk_get(np, 2);
-        enet_ref = clk_get_sys(NULL, "enet_ref");
-        clksel = ptp_clk == enet_ref ? IMX6Q_GPR1_ENET_CLK_SEL_ANATOP :
-                                       IMX6Q_GPR1_ENET_CLK_SEL_PAD;
+I'm working to implemnet new generic exynos memoby-bus frequency driver (exynos-busfreq.c).
+because this version of patch-set used the 'virtual operating-points'.
+So, I'm working to implment this drvier without 'virtual operation-points'.
+After finishing the implmentaion, I'll add you to mailing list ac Cc.
 
-since ptp_clk and enet_ref will _never_ be the same pointer.  Forcing
-that test to be always true fixes the problem.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Best Regards,
+Chanwoo Choi
