@@ -1,81 +1,86 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 23 Feb 2015 16:14:56 +0100
-Subject: [PATCHv2 02/15] ARM: mvebu: fix usb@ unit address on Armada 38x
- to match register address
-In-Reply-To: <1424451874-25375-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1424451874-25375-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1424451874-25375-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <54EB43F0.5000900@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 23 Feb 2015 15:14:54 +0000
+Subject: [PATCH] drivers/base: cacheinfo: validate device node for all
+ the caches
+In-Reply-To: <1424095816-4414-1-git-send-email-sudeep.holla@arm.com>
+References: <1424095816-4414-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20150223151454.GL9714@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On 20/02/2015 18:04, Thomas Petazzoni wrote:
-> On Marvell Armada 38x, the USB2 controller registers are at 0x58000,
-> so the corresponding Device Tree node should have a unit address of
-> 58000, and not 50000. We were using 50000 due to an incorrect
-> copy/pastebin of Armada 370/XP code.
+On Mon, Feb 16, 2015 at 02:10:16PM +0000, Sudeep Holla wrote:
+> On architectures that depend on DT for obtaining cache hierarcy, we need
+> to validate the device node for all the cache indices, failing to do so
+> might result in wrong information being exposed to the userspace.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> This is quite possible on initial/incomplete versions of the device
+> trees. In such cases, it's better to bail out if all the required device
+> nodes are not present.
+> 
+> This patch adds checks for the validation of device node for all the
+> caches and doesn't initialise the cacheinfo if there's any error.
+> 
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Reported-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/base/cacheinfo.c | 12 ++++++++++--
+>  1 file changed, 10 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
+> index 6e64563361f0..7015bf05c828 100644
+> --- a/drivers/base/cacheinfo.c
+> +++ b/drivers/base/cacheinfo.c
+> @@ -62,15 +62,21 @@ static int cache_setup_of_node(unsigned int cpu)
+>  		return -ENOENT;
+>  	}
+>  
+> -	while (np && index < cache_leaves(cpu)) {
+> +	while (index < cache_leaves(cpu)) {
+>  		this_leaf = this_cpu_ci->info_list + index;
+>  		if (this_leaf->level != 1)
+>  			np = of_find_next_cache_node(np);
+>  		else
+>  			np = of_node_get(np);/* cpu node itself */
+> +		if (!np)
+> +			break;
+>  		this_leaf->of_node = np;
+>  		index++;
+>  	}
+> +
+> +	if (index != cache_leaves(cpu)) /* not all OF nodes populated */
+> +		return -ENOENT;
+> +
+>  	return 0;
+>  }
+>  
+> @@ -189,8 +195,10 @@ static int detect_cache_attributes(unsigned int cpu)
+>  	 * will be set up here only if they are not populated already
+>  	 */
+>  	ret = cache_shared_cpu_map_setup(cpu);
+> -	if (ret)
+> +	if (ret) {
+> +		pr_err("failed to setup cache hierarcy from DT\n");
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+It would probably be better if this were something like:
 
+pr_warn("Unable to detect cache hierarcy from DT for CPU %d\n",
+	cpu);
+
+Otherwise, this looks sane to me, and it would be nice to have this in
+ASAP so as to avoid exposing erroneous information to userspace. So:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
 Thanks,
+Mark.
 
-Gregory
-
-> ---
->  arch/arm/boot/dts/armada-388-db.dts | 2 +-
->  arch/arm/boot/dts/armada-388-gp.dts | 2 +-
->  arch/arm/boot/dts/armada-38x.dtsi   | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
+>  		goto free_ci;
+> +	}
+>  	return 0;
+>  
+>  free_ci:
+> -- 
+> 1.9.1
 > 
-> diff --git a/arch/arm/boot/dts/armada-388-db.dts b/arch/arm/boot/dts/armada-388-db.dts
-> index 16512ef..af6c74e 100644
-> --- a/arch/arm/boot/dts/armada-388-db.dts
-> +++ b/arch/arm/boot/dts/armada-388-db.dts
-> @@ -99,7 +99,7 @@
->  				phy-mode = "rgmii-id";
->  			};
->  
-> -			usb at 50000 {
-> +			usb at 58000 {
->  				status = "ok";
->  			};
->  
-> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-> index 590b383..3ff0573 100644
-> --- a/arch/arm/boot/dts/armada-388-gp.dts
-> +++ b/arch/arm/boot/dts/armada-388-gp.dts
-> @@ -135,7 +135,7 @@
->  			};
->  
->  			/* CON4 */
-> -			usb at 50000 {
-> +			usb at 58000 {
->  				vcc-supply = <&reg_usb2_0_vbus>;
->  				status = "okay";
->  			};
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index 54ebce7..96d7cf0 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -435,7 +435,7 @@
->  				status = "disabled";
->  			};
->  
-> -			usb at 50000 {
-> +			usb at 58000 {
->  				compatible = "marvell,orion-ehci";
->  				reg = <0x58000 0x500>;
->  				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
 > 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
