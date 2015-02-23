@@ -1,81 +1,125 @@
-From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
-Date: Mon, 23 Feb 2015 20:57:57 +0100
-Subject: [PATCHv3 0/8] devfreq: Add generic exynos memory-bus
- frequency driver
-In-Reply-To: <54EA69D2.7010706@samsung.com>
-References: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
- <54DFE797.1020008@math.uni-bielefeld.de> <54E4FD40.8020206@gmx.net>
- <54EA69D2.7010706@samsung.com>
-Message-ID: <54EB8645.4060608@math.uni-bielefeld.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 23 Feb 2015 21:16:22 +0100
+Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
+ demuxer chip
+In-Reply-To: <20150223181448.GQ9714@leverpostej>
+References: <20150211151237.GN9154@leverpostej>
+ <1487331.cgC9j5u0aF@vostro.rjw.lan>
+ <20150211155720.GQ9154@leverpostej>
+ <20150211171515.55d5066f@bbrezillon>
+ <20150211163231.GR9154@leverpostej>
+ <20150211173823.30c42c6a@bbrezillon>
+ <20150220142208.GJ13659@leverpostej>
+ <20150220155347.1477b02d@bbrezillon>
+ <20150220151655.GK13659@leverpostej>
+ <20150223180057.513b069c@bbrezillon>
+ <20150223181448.GQ9714@leverpostej>
+Message-ID: <20150223211622.37cf3ca1@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Chanwoo!
+On Mon, 23 Feb 2015 18:14:48 +0000
+Mark Rutland <mark.rutland@arm.com> wrote:
 
-Chanwoo Choi wrote:
-> As you thought, when maintaining lower clock of memory bus frequency,
-> some issue related to multimedia feature will happen.
+
+[...]
+
+> > This is because irq_may_run [1], which is called to decide whether we
+> > should handle this irq or just wake the system up [2], will always
+> > return true if at least one of the shared action has tagged the irq
+> > line as a wakeup source.
 > 
-> Separately, We have to check the miminum lower clock for working of multimedia feature.
-> and then multimedia or other IP have to request it to DVFS driver (memory busfreq driver).
-> But, latest mainline kernel currently has not some way to inform minimum clock to DVFS driver.
+> I assume you mean we return false in this case (having triggered the
+> wakeup within irq_pm_check_wakeup, which returned true), but otherwise
+> agreed.
+
+Yep, I meant 'return false'.
+
+
 > 
-> So, If you check the miminum clock for hdmi, I'll use this clock as minumu frequency of dvfs table.
+> I can envisage problems if the irq handler of a wakeup device can't be
+> run safely until resume time, though I'm not sure if that happens in
+> practice given the device is necessarily going to be active.
+
+Isn't that the purpose of the
+IRQF_NO_SUSPEND_SAFE/IRQF_SHARED_TIMER_OK/IRQF_SHARED_WAKEUP_SIBLING_OK
+flag ? 
+
 > 
-> Thanks,
-> Chanwoo Choi
+> > Sorry for summarizing things you most likely already know, but I want
+> > to be sure I'm actually understanding it correctly.
+> > 
+> > Now, let's look at how this could be solved.
+> > Here is a proposal [3] that does the following:
 > 
+> This would be a lot easier to follow/review as an RFC post to the
+> mailing list.
 
-First I have to apologize. I didn't check carefully. Actually it's not
-the HDMI subsystem which seems to hang during my test, but the G2D
-subsystem.
+Yep, that was the plan, just wanted to make sure I had correctly
+understood the problem before posting an RFC.
 
-Here's a snippet of the kernel log with drm.debug=0xff:
-[ 1157.911264] [drm:drm_framebuffer_reference] ee144e00: FB ID: 27 (2)
-[ 1157.911271] [drm:drm_framebuffer_unreference] ee37fb80: FB ID: 25 (2)
-[ 1157.911277] [drm:drm_framebuffer_unreference] ee144e00: FB ID: 27 (3)
-[ 1157.911315] [drm:drm_ioctl] pid=2569, dev=0xe200, auth=1,
-EXYNOS_G2D_GET_VER
-[ 1158.434439] [drm:drm_ioctl] pid=2569, dev=0xe200, auth=1,
-EXYNOS_G2D_SET_CMDLIST
-[ 1158.434536] [drm:drm_ioctl] pid=2569, dev=0xe200, auth=1, EXYNOS_G2D_EXEC
-[ 1158.437484] [drm:drm_vm_close_locked] 0xaf840000,0x00140000
-[ 1158.437507] [drm:drm_ioctl] pid=2569, dev=0xe200, auth=1,
-DRM_IOCTL_GEM_CLOSE
-[ 1158.437524] [drm:exynos_drm_gem_destroy] handle count = 0
-[ 1158.437532] [drm:lowlevel_buffer_deallocate] dma_addr(0x20500000),
-size(0x140000)
-[ 1158.437810] [drm:drm_ioctl] pid=2569, dev=0xe200, auth=1,
-EXYNOS_GEM_CREATE
-[ 1158.437819] [drm:exynos_drm_init_buf] desired size = 0x256000
-[ 1158.437851] [drm:exynos_drm_gem_init] created file object = 0xe97c8d00
-[ 1158.445506] [drm:lowlevel_buffer_allocate] dma_addr(0x21400000),
-size(0x256000)
-[ 1158.445535] [drm:exynos_drm_gem_handle_create] gem handle = 0x1
-[ 1158.445556] [drm:drm_ioctl] pid=2569, dev=0xe200, auth=1,
-DRM_IOCTL_MODE_MAP_DUMB
-[ 1158.445570] [drm:exynos_drm_gem_dumb_map_offset] offset = 0x101c2000
-[ 1158.445600] [drm:drm_vm_open_locked] 0xaec15000,0x00256000
-[ 1158.445608] [drm:update_vm_cache_attr] flags = 0x0
-[ 1158.457696] [drm:drm_ioctl] pid=2569, dev=0xe200, auth=1,
-EXYNOS_G2D_SET_CMDLIST
-[ 1158.457745] [drm:drm_ioctl] pid=2569, dev=0xe200, auth=1, EXYNOS_G2D_EXEC
+> Otherwise I have some high-level comments on the stuff
+> below, which I think matches the shape of what we discussed on IRC.
+> 
+> >  1/ prevent a system wakeup when at least one of the action handler
+> >     has set the IRQF_NO_SUSPEND flag
+> 
+> We might need to add some logic to enable_irq_wake and
+> irq_pm_install_action to prevent some of the horrible mismatch cases we
+> can get here (e.g. if we have a wakeup handler, a IRQF_NO_SUSPEND
+> handler, and another handler which is neither). We may need to
+> reconsider temporarily stashing the other potential interrupts.
 
+Actually if we force users to pass the IRQF_XXX_SAFE (I'm tired writing
+all the potential names :-)), when mixing IRQF_NO_SUSPEND
+and !IRQF_NO_SUSPEND handlers, we shouldn't bother deactivating normal
+handlers (those without IRQF_NO_SUSPEND), 'cause they claimed they could
+safely be called in suspended state.
 
-So G2D_EXEC seems to work once, but the second time it hangs forever. I
-even fail at attaching gdb to the application then (gdb then also hangs
-in D state).
+> 
+> Do we perhaps need an IRQF_SHARED_WAKEUP_SIBLING_OK for timer drivers to
+> assert their handlers are safe for the whole suspend period rather than
+> just the period they expect to be enabled for? Or do those always
+> happen to be safe in practice?
 
-If I just use the 'vsynced page flipping' test, then everything works:
-./modetest -M exynos -s 16 at 13:1280x720 -v
-setting mode 1280x720-60Hz at XR24 on connectors 16, crtc 13
-freq: 61.08Hz
-freq: 60.00Hz
-freq: 60.00Hz
-<etc.>
+I thought they were always safe...
 
-I'm going to do some tests with the G2D in the next time, checking how
-much I can lower MIF/INT clocks before the engine becomes unstable.
+> 
+> >  2/ Add a few helpers to deal with system wakeup from drivers code
+> 
+> The irq_pm_force_wakeup part looks like what I had in mind.
+> 
+> >  3/ Rework the at91 RTC driver to show how such weird cases could be
+> >     handled
+> 
+> It might be simpler to do this with a PM notifier within the driver
+> rather than having to traverse all the irq_descs, though perhaps not.
 
-With best wishes,
-Tobias
+I'm not sure to understand that one. Where am I traversing irq_descs
+(irq_to_desc, which is called when testing wakeup_armed status, is a
+direct table indexing operation) ?
+Moreover, I'm not sure when the PM_POST_SUSPEND event is sent, and
+testing the WAKEUP_ARMED flag should be safe in all cases, right ?
+
+> 
+> > Of course, I'll need the IRQF_SHARED_TIMER_OK patch to prevent the
+> > WARN_ON backtrace.
+> 
+> That should be fine; it's backed up in the list archive ;)
+> 
+> > Please, let me know if I missed anything important, share your opinion
+> > on this proposal, and feel free to propose any other solution.
+> 
+> Hopefully the above covers that!
+
+Yes it does.
+Thanks for the review.
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
