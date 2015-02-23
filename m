@@ -1,83 +1,74 @@
-From: jdelvare@suse.de (Jean Delvare)
-Date: Mon, 23 Feb 2015 09:59:58 +0100
-Subject: [PATCH] iommu/io-pgtable-arm: Add built time dependency
-In-Reply-To: <20150222130942.GB9591@arm.com>
-References: <20150220194445.4225d56b@endymion.delvare>
- <20150220191943.GB1767@arm.com>
- <20150220204642.04b1f0d8@endymion.delvare>
- <20150222130942.GB9591@arm.com>
-Message-ID: <20150223095958.3bd450e3@endymion.delvare>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Feb 2015 10:03:10 +0100
+Subject: Build regressions/improvements in v4.0-rc1
+In-Reply-To: <CAMuHMdXnVLtiSxqwz7ah5faPUx_8piN5eOdNKQtKNwOgT73FqA@mail.gmail.com>
+References: <1424680402-3477-1-git-send-email-geert@linux-m68k.org>
+ <CAMuHMdXnVLtiSxqwz7ah5faPUx_8piN5eOdNKQtKNwOgT73FqA@mail.gmail.com>
+Message-ID: <5900255.NhXvduRnha@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On Sun, 22 Feb 2015 13:09:42 +0000, Will Deacon wrote:
-> On Fri, Feb 20, 2015 at 07:46:42PM +0000, Jean Delvare wrote:
-> > On Fri, 20 Feb 2015 19:19:43 +0000, Will Deacon wrote:
-> > > On Fri, Feb 20, 2015 at 06:44:45PM +0000, Jean Delvare wrote:
-> > > > If io-pgtable-arm is an ARM-specific driver then configuration option
-> > > > IOMMU_IO_PGTABLE_LPAE should not be presented to the user by default
-> > > > for non-ARM kernels.
-> > > > 
-> > > > Signed-off-by: Jean Delvare <jdelvare@suse.de>
-> > > > Cc: Will Deacon <will.deacon@arm.com>
-> > > > Cc: Joerg Roedel <joro@8bytes.org>
-> > > > ---
-> > > >  drivers/iommu/Kconfig |    1 +
-> > > >  1 file changed, 1 insertion(+)
-> > > > 
-> > > > --- linux-3.20-rc0.orig/drivers/iommu/Kconfig	2015-02-20 17:24:46.838955014 +0100
-> > > > +++ linux-3.20-rc0/drivers/iommu/Kconfig	2015-02-20 19:38:45.804582668 +0100
-> > > > @@ -23,6 +23,7 @@ config IOMMU_IO_PGTABLE
-> > > >  config IOMMU_IO_PGTABLE_LPAE
-> > > >  	bool "ARMv7/v8 Long Descriptor Format"
-> > > >  	select IOMMU_IO_PGTABLE
-> > > > +	depends on ARM || COMPILE_TEST
-> > > >  	help
-> > > >  	  Enable support for the ARM long descriptor pagetable format.
-> > > >  	  This allocator supports 4K/2M/1G, 16K/32M and 64K/512M page
-> > > 
-> > > So this code doesn't actually *depend* on any arch code at all. In fact,
-> > > having it built and booted on x86 revealed a couple of bugs that I've
-> > > since fixed. I'd rather let this run everywhere, but if people insist on
-> > > the false dependency, so be it but we should add ARM64 to the mix too.
-> > 
-> > Oh, I'm not insisting on anything ;-) If the code is useful on other
-> > architectures then just ignore this patch. But if the only point of
-> > using it on other architectures is to reveal bugs which would not have
-> > triggered otherwise, then that's what COMPILE_TEST is there for.
+On Monday 23 February 2015 09:45:43 Geert Uytterhoeven wrote:
+> On Mon, Feb 23, 2015 at 9:33 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+> > Below is the list of build error/warning regressions/improvements in
+> > v4.0-rc1[1] compared to v3.19[2].
+> >
+> > Summarized:
+> >   - build errors: +11/-10
 > 
-> Sure, COMPILE_TEST should definitely be there if we add a dependency, but
-> actually the issues raised so far were by *running* the code (there are
-> some boot-time self-tests).
-
-Thanks for the clarification. That's unusual but I think this still fits
-in the spirit of COMPILE_TEST. I don't think it would make sense to add
-a separate option got 
-
-> > From the option description and help text, it really looks
-> > ARM-specific, so if it is not, the help text at least should be
-> > improved.
+> > [1] http://kisskb.ellerman.id.au/kisskb/head/8494/ (256 out of 257 configs)
+> > [2] http://kisskb.ellerman.id.au/kisskb/head/8427/ (255 out of 257 configs)
+> >
+> >
+> > *** ERRORS ***
+> >
+> > 11 regressions:
+> >   + /home/kisskb/slave/src/arch/arm/include/asm/atomic.h: error: #error SMP not supported on pre-ARMv6 CPUs:  => 137:2
+> >   + /home/kisskb/slave/src/arch/arm/include/asm/cmpxchg.h: error: #error "SMP is not supported on this platform":  => 114:2
 > 
-> It's ARM-specific in that the users of the page table code are IOMMUs
-> typically present in ARM SoCs. However, there's no reason why you couldn't
-> stick one of these IOMMUs in another SoC in the same way that you can use
-> an Intel NIC on a PowerPC box.
+> arm-randconfig
+> 
+> SMP does depend on CPU_V6K || CPU_V7 and on HAVE_SMP... strange...
 
-Well, plugging a card in a PCI slot is something everyone can actually
-do. IOMMUs are at a lower level and must be part of the mainboard by
-design. So the comparison does not really hold.
+V6/V7 and  the earlier V4/V5 are normally mutually exclusive, but we sometimes
+screw up the dependencies for some platform, in which case you can end up
+with a config that includes both and gives the above error. I'll have a look.
 
-My purpose is to make kernel configuration easier and faster by skipping
-irrelevant questions, and also to avoid that code ends up being built
-in distribution kernels for targets that don't need it. The
-COMPILE_TEST ensures that the code is still build on allmodconfig and
-allyesconfig kernels so test coverage should not be affected.
+I thought I'd fixed all the bugs we introduced in the merge window in yesterday's
+fixes branch.
 
-I'll send an updated patch with ARM64 added as you suggested.
+There is one known problem for mach-realview in this area, for which
+I have a fix.
 
-Thanks,
--- 
-Jean Delvare
-SUSE L3 Support
+> >   + /home/kisskb/slave/src/fs/dax.c: error: implicit declaration of function 'copy_user_page' [-Werror=implicit-function-declaration]:  => 266:2
+
+DAX support was merged with 'depends on !(ARM || MIPS || SPARC)', so I don't
+see how this could happen.
+
+> sh-randconfig
+> 
+> >   + /home/kisskb/slave/src/sound/soc/codecs/max98357a.c: error: implicit declaration of function 'devm_gpiod_get' [-Werror=implicit-function-declaration]:  => 55:2
+> >   + /home/kisskb/slave/src/sound/soc/codecs/max98357a.c: error: implicit declaration of function 'gpiod_direction_output' [-Werror=implicit-function-declaration]:  => 61:2
+> >   + /home/kisskb/slave/src/sound/soc/codecs/max98357a.c: error: implicit declaration of function 'gpiod_set_value' [-Werror=implicit-function-declaration]:  => 30:3
+
+Something wrong in arch/sh/include/asm/gpio.h? the codec is only
+selectable when gpiolib is enabled, but the consumer.h header
+apparently does not get included here.
+
+> s390-allyesconfig
+> s390-allmodconfig
+> parisc-allmodconfig
+> sh-allmodconfig
+> sh-allyesconfig
+> cris-allyesconfig
+> cris-allmodconfig
+> mips-allmodconfig
+> 
+> >   + error: asm9260_timer.c: undefined reference to `of_io_request_and_map':  => .init.text+0x4014), .init.text+0x5c84)
+
+asm9260 is arm-specific, we probably need to refine the dependencies here
+to ensure that OF_ADDRESS is set. Need to think about what the best set of
+dependencies is.
+
+	Arnd
