@@ -1,74 +1,70 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 23 Feb 2015 16:50 +0200
-Subject: [PATCH v8 1/3] of: Decrement refcount of previous endpoint in
- of_graph_get_next_endpoint
-In-Reply-To: <1424688846-10909-2-git-send-email-p.zabel@pengutronix.de>
-References: <1424688846-10909-1-git-send-email-p.zabel@pengutronix.de>
- <1424688846-10909-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <5913850.Ssk1TlHgDf@avalon>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 23 Feb 2015 06:49:50 -0800
+Subject: [PATCH] ARM: Kirkwood: enable GPIO fan alarm support for 2Big
+ Network v2
+In-Reply-To: <20150223144049.GU1509@kw.sim.vm.gnt>
+References: <1424696523-14855-1-git-send-email-simon.guinot@sequanux.org>
+ <54EB34F3.4000500@roeck-us.net> <20150223144049.GU1509@kw.sim.vm.gnt>
+Message-ID: <54EB3E0E.7070503@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On 02/23/2015 06:40 AM, Simon Guinot wrote:
+> On Mon, Feb 23, 2015 at 06:10:59AM -0800, Guenter Roeck wrote:
+>> On 02/23/2015 05:02 AM, Simon Guinot wrote:
+>>> On the LaCie 2Big Network v2 (net2big_v2) board, the fan alarm is not
+>>> wired to the I2C fan controller but to a separe GPIO. This GPIO can be
+>>> controlled by using the gpio-fan driver.
+>>>
+>>> This patch adds the gpio-fan alarm description in the net2big_v2 DTS.
+>>>
+>>> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+>>> ---
+>>>   arch/arm/boot/dts/kirkwood-net2big.dts | 5 +++++
+>>>   1 file changed, 5 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/kirkwood-net2big.dts b/arch/arm/boot/dts/kirkwood-net2big.dts
+>>> index 53dc37a3b687..e4f7e497379f 100644
+>>> --- a/arch/arm/boot/dts/kirkwood-net2big.dts
+>>> +++ b/arch/arm/boot/dts/kirkwood-net2big.dts
+>>> @@ -27,6 +27,11 @@
+>>>   		device_type = "memory";
+>>>   		reg = <0x00000000 0x10000000>;
+>>>   	};
+>>> +
+>>> +	gpio_fan {
+>>> +		compatible = "gpio-fan";
+>>> +		alarm-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
+>>> +	};
+>>>   };
+>>>
+>>>   &regulators {
+>>>
+>> Again, wrong solution, and conceptually wrong as well from a dt perspective.
+>>
+>> The alarm signal should be handled by the g762 driver, and the alarm-gpios
+>> property should be added to the g762 description.
+>
+> OK. Then you think it would be better to add support for alarm GPIOs
+> support in the g762. The problem is that we should have to find a
+> generic way to do that. After all, we could want the very same
+> modification for a bunch of fan drivers.
+>
+Can't help it. After all, the interrupt handling logic is different for each chip,
+and there are non-DT systems out there.
 
-Thank you for the patch.
+The g762 property should probably be something like
 
-Benoit, please see below for a possible issue in the am437x-vpfe driver.
+	g762 at 3e {
+                 compatible = "gmt,g762";
+                 reg = <0x3e>;
+                 clocks = <&g762_clk>;
+		interrupt-parent = <&gpio0>;
+		interrupts = <25 GPIO_ACTIVE_LOW>;
+         };
 
-On Monday 23 February 2015 11:54:04 Philipp Zabel wrote:
-> Decrementing the reference count of the previous endpoint node allows to
-> use the of_graph_get_next_endpoint function in a for_each_... style macro.
-> All current users of this function that pass a non-NULL prev parameter
-> (that is, soc_camera and imx-drm) are changed to not decrement the passed
-> prev argument's refcount themselves.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> ---
-> Changes since v7:
->  - Rebased onto v4.0-rc1
->  - Added fix for am437x-vpfe
-> ---
->  drivers/coresight/of_coresight.c                  | 13 ++-----------
->  drivers/gpu/drm/imx/imx-drm-core.c                | 11 +----------
->  drivers/gpu/drm/rcar-du/rcar_du_kms.c             | 15 ++++-----------
->  drivers/media/platform/am437x/am437x-vpfe.c       |  1 -
->  drivers/media/platform/soc_camera/soc_camera.c    |  3 ++-
->  drivers/of/base.c                                 |  9 +--------
->  drivers/video/fbdev/omap2/dss/omapdss-boot-init.c |  7 +------
->  7 files changed, 11 insertions(+), 48 deletions(-)
+struct i2c_client has an irq field, and as far as I can see it is filled in
+automatically from the dt node. So all the driver should have to do is to
+implement an interrupt handler.
 
-[snip]
-
-> diff --git a/drivers/media/platform/am437x/am437x-vpfe.c
-> b/drivers/media/platform/am437x/am437x-vpfe.c index 56a5cb0..0d07fca 100644
-> --- a/drivers/media/platform/am437x/am437x-vpfe.c
-> +++ b/drivers/media/platform/am437x/am437x-vpfe.c
-> @@ -2504,7 +2504,6 @@ vpfe_get_pdata(struct platform_device *pdev)
->  					     GFP_KERNEL);
->  		pdata->asd[i]->match_type = V4L2_ASYNC_MATCH_OF;
->  		pdata->asd[i]->match.of.node = rem;
-> -		of_node_put(endpoint);
->  		of_node_put(rem);
->  	}
-
-For the am47x-vpfe driver,
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-Benoit, there seems to be a refcount issue with rem. The node pointer is 
-assigned to pdata->asd[i]->match.of.node, which should require a reference, 
-but you then call of_node_put(rem), releasing the only reference held. Isn't 
-that a problem ?
-
-Furthermore, on the next iteration, if an error occurs the goto done will 
-result in of_node_put(rem) being called again, releasing a reference that you 
-don't hold. I've sent a patch to fix that.
-
--- 
-Regards,
-
-Laurent Pinchart
+Guenter
