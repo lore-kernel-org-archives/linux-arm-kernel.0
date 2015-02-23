@@ -1,60 +1,46 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 23 Feb 2015 13:13:55 +0100
-Subject: [RESEND PATCH 2/2] arm: socfpga: Set share override bit of the
- l2 cache controller
-In-Reply-To: <CAL_JsqKmbV69Q-hgnvnz-2+2T8k-Q+WcrFmewkfozKk06ZM7OA@mail.gmail.com>
-References: <1424365606-19964-1-git-send-email-dinguyen@opensource.altera.com>
- <1424365606-19964-2-git-send-email-dinguyen@opensource.altera.com>
- <CAL_JsqKmbV69Q-hgnvnz-2+2T8k-Q+WcrFmewkfozKk06ZM7OA@mail.gmail.com>
-Message-ID: <20150223121355.GA29491@Nokia-N900>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Mon, 23 Feb 2015 13:23:21 +0100
+Subject: [alsa-devel] [PATCH] ASoC: max98088: Add master clock handling
+In-Reply-To: <54EAE4DF.3040607@collabora.co.uk>
+References: <1424283959-16289-3-git-send-email-afaerber@suse.de>
+ <1424373526-4135-1-git-send-email-afaerber@suse.de>
+ <54E6A9AB.4070401@gmail.com> <54EAE4DF.3040607@collabora.co.uk>
+Message-ID: <54EB1BB9.4030205@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2015-02-19 12:13:13, Rob Herring wrote:
-> On Thu, Feb 19, 2015 at 11:06 AM,  <dinguyen@opensource.altera.com> wrote:
-> > From: Dinh Nguyen <dinguyen@opensource.altera.com>
-> >
-> > By not having bit 22 set in the PL310 Auxiliary Control register (shared
-> > attribute override enable) has the side effect of transforming Normal
-> > Shared Non-cacheable reads into Cacheable no-allocate reads.
-> >
-> > Coherent DMA buffers in Linux always have a Cacheable alias via the
-> > kernel linear mapping and the processor can speculatively load cache
-> > lines into the PL310 controller. With bit 22 cleared, Non-cacheable
-> > reads would unexpectedly hit such cache lines leading to buffer
-> > corruption.
-> 
-> You really should be doing this in your bootloader.
->
+Hi,
 
-You mean... in all your bootloaders? Because there's more
-than one.
-
-And as both bootloaders need it, it makes sense to do it 
-in kernel, afaict.
-							Pavel
-> >  DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
-> >         .l2c_aux_val    = L310_AUX_CTRL_DATA_PREFETCH |
-> > -                         L310_AUX_CTRL_INSTR_PREFETCH,
-> > +                         L310_AUX_CTRL_INSTR_PREFETCH |
-> > +                         L2C_AUX_CTRL_SHARED_OVERRIDE,
-> >         .l2c_aux_mask   = ~0,
-> >         .smp            = smp_ops(socfpga_smp_ops),
-> >         .map_io         = socfpga_map_io,
-> > --
-> > 2.2.1
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Am 23.02.2015 um 09:29 schrieb Javier Martinez Canillas:
+> On 02/20/2015 04:27 AM, Tushar Behera wrote:
+>> On 02/20/2015 12:48 AM, Andreas F?rber wrote:
+>>> If master clock is provided through device tree, then update
+>>> the master clock frequency during set_sysclk.
+>>>
+>>> Cc: Tushar Behera <tushar.behera@linaro.org>
+>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>> ---
+>>>  sound/soc/codecs/max98088.c | 24 ++++++++++++++++++++++++
+>>>  1 file changed, 24 insertions(+)
+>>>
+>>
+>> Looks good.
+>>
+>> Acked-by: Tushar Behera <trblinux@gmail.com>
+>>
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Looks good to me as well.
+> 
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+
+Thanks guys. One self-doubt: Is there any downside to returning
+-EPROBE_DEFER after regcache_mark_dirty(max98088->regmap)? I.e., should
+I move the last hunk some lines up to be the very first thing executed?
+
+Cheers,
+Andreas
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
+Graham Norton; HRB 21284 (AG N?rnberg)
