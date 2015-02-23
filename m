@@ -1,82 +1,102 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 23 Feb 2015 11:03:26 +0530
-Subject: [PATCH] clockevents: Add (missing) default case for switch blocks
-In-Reply-To: <20150220140432.GA31928@gmail.com>
-References: <6291e308ab77a480c6b1732e16108c5fe6f66afa.1424412815.git.viresh.kumar@linaro.org>
- <20150220083842.GA20387@gmail.com>
- <20150220084807.GJ21418@twins.programming.kicks-ass.net>
- <20150220093659.GA23469@gmail.com>
- <20150220113753.GP5029@twins.programming.kicks-ass.net>
- <20150220114136.GA27483@gmail.com>
- <CAKohpokmCof2P8Un+i5eOS3BQhH_pMNATH4xkbbhw5TqJFEy9Q@mail.gmail.com>
- <20150220132220.GB28882@gmail.com>
- <CAKohpokEV7EatQROgzQBWPRPFEn8OsMo5EHa+q1FMwBESwiU3w@mail.gmail.com>
- <20150220140432.GA31928@gmail.com>
-Message-ID: <CAKohponv=aR7Ae_z7zbnDDeJ-mCFwdxB3wR-O4boBeMKYdUJLA@mail.gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 23 Feb 2015 08:00:06 +0100
+Subject: [PATCH 2/4] of: DT quirks infrastructure
+In-Reply-To: <CAL_JsqLENvqsG+vjK740Aw4yKYONwHB1b-B7mKvE_iAZ1JSdNw@mail.gmail.com>
+References: <FE61DD1C-51DA-4869-8A62-C019C3D70577@konsulko.com>
+ <20150218173115.GG29429@leverpostej>
+ <76BD1B22-BAED-4205-9B34-186907CE0217@konsulko.com>
+ <54E613E7.2020405@gmail.com>
+ <670D0881-DBF0-45E8-A502-A6DB2B77A750@konsulko.com>
+ <54E61DD2.3060002@gmail.com>
+ <53F2F94C-0C43-4A54-B8CD-EEC454A0AC19@konsulko.com>
+ <54E742F2.80506@hurleysoftware.com>
+ <20150220143533.GA29908@odux.rfo.atmel.com>
+ <CAL_JsqLENvqsG+vjK740Aw4yKYONwHB1b-B7mKvE_iAZ1JSdNw@mail.gmail.com>
+Message-ID: <20150223070006.GD29908@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 February 2015 at 19:34, Ingo Molnar <mingo@kernel.org> wrote:
->
-> * Viresh Kumar <viresh.kumar@linaro.org> wrote:
+Hi Rob,
 
->> Unused. Initially all clockevent devices are supposed to
->> be in this mode but later if another device replaces an
->> existing one, the existing one is put into this mode.
->
-> I'd suggest to rename it to MODE_INIT - at first glance it
-> gave me the impression that it's some sort of API
-> placeholder - i.e. an unused flag or so.
+On Fri, Feb 20, 2015 at 11:30:12AM -0600, Rob Herring wrote:
+> On Fri, Feb 20, 2015 at 8:35 AM, Ludovic Desroches
+> <ludovic.desroches@atmel.com> wrote:
+> > On Fri, Feb 20, 2015 at 09:21:38AM -0500, Peter Hurley wrote:
+> >> On 02/19/2015 12:38 PM, Pantelis Antoniou wrote:
+> >> >
+> >> >> On Feb 19, 2015, at 19:30 , Frank Rowand <frowand.list@gmail.com> wrote:
+> >> >>
+> >> >> On 2/19/2015 9:00 AM, Pantelis Antoniou wrote:
+> >> >>> Hi Frank,
+> 
+> [...]
+> 
+> >> >>> This is one of those things that the kernel community doesn?t understand which makes people
+> >> >>> who push product quite mad.
+> >> >>>
+> >> >>> Engineering a product is not only about meeting customer spec, in order to turn a profit
+> >> >>> the whole endeavor must be engineered as well for manufacturability.
+> >> >>>
+> >> >>> Yes, you can always manually install files in the bootloader. For 1 board no problem.
+> >> >>> For 10 doable. For 100 I guess you can hire an extra guy. For 1 million? Guess what,
+> >> >>> instead of turning a profit you?re losing money if you only have a few cents of profit
+> >> >>> per unit.
+> >> >>
+> >> >> I'm not installing physical components manually.  Why would I be installing software
+> >> >> manually?  (rhetorical question)
+> >> >>
+> >> >
+> >> > Because on high volume product runs the flash comes preprogrammed and is soldered as is.
+> >> >
+> >> > Having a single binary to flash to every revision of the board makes logistics considerably
+> >> > easier.
+> >> >
+> >> > Having to boot and tweak the bootloader settings to select the correct dtb (even if it?s present
+> >> > on the flash medium) takes time and is error-prone.
+> >> >
+> >> > Factory time == money, errors == money.
+> >> >
+> >> >>>
+> >> >>> No knobs to tweak means no knobs to break. And a broken knob can have pretty bad consequences
+> >> >>> for a few million units.
+> >> >>
+> >> >> And you produce a few million units before testing that the first one off the line works?
+> >> >>
+> >> >
+> >> > The first one off the line works. The rest will get some burn in and functional testing if you?re
+> >> > lucky. In many cases where the product is very cheap it might make financial sense to just ship
+> >> > as is and deal with recalls, if you?re reasonably happy after a little bit of statistical sampling.
+> >> >
+> >> > Hardware is hard :)
+> >>
+> >> I'm failing to see how this series improves your manufacturing process at all.
+> >>
+> >> 1. Won't you have to provide the factory with different eeprom images for the
+> >>    White and Black?  You _trust_ them to get that right, or more likely, you
+> >>    have process control procedures in place so that you don't get 1 million Blacks
+> >>    flashed with the White eeprom image.
+> >>
+> >> 2. The White and Black use different memory technology so it's not as if the
+> >>    eMMC from the Black will end up on the White SMT line (or vice versa).
+> >>
+> >> 3  For that matter, why wouldn't you worry that all the microSD cards intended
+> >>    for the White were accidentally assembled with the first 50,000 Blacks; at
+> >>    that point you're losing a lot more than a few cents of profit. And that has
+> >>    nothing to do with what image you provided.
+> >>
+> >
+> > As you said, we can imagine many reasons to have a failure during the
+> > production, having several DTB files will increase the risk.
+> 
+> Then package them as a single file. You can even use DT to do that.
+> See u-boot FIT image.
+> 
+> Rob
 
-Sorry, if I wasn't able to clarify this earlier. The impression you got
-at first glance is correct. And it should be UNUSED only instead of
-INIT. Its not about if the the device is initialized or not, but if it is used
-or not. And that's why there is no callback for this in the new per-mode
-callbacks.
+It is acualyy what we did but we are not happy with this solution
+because as said previously we rely on U-Boot and on dts/dtsi side we
+have too many files.
 
-> Also, I'd suggest to rename all 'modes' to true state
-> machine naming: STATE_INITIALIZED, STATE_SHUT_DOWN,
-> STATE_PERIODIC, STATE_RESUMED, etc.: if these are enums for
+Regards
 
-I thought so initially and it looked like the diff will be huge as all the
-variables for the enum, i.e. 'mode', need to be renamed to 'state'..
-
-But, if you are okay with it then I would be happy to do that..
-
-> states and not state transition names, see my later
-> questions:
->
->> >> +       CLOCK_EVT_DEV_MODE_SHUTDOWN,
->> >> +       CLOCK_EVT_DEV_MODE_PERIODIC,
->> >> +       CLOCK_EVT_DEV_MODE_ONESHOT,
->> >> +       CLOCK_EVT_DEV_MODE_RESUME,
->> >
->> > What is 'resume' mode?
->>
->> Introduced with: 18de5bc4c1f1 ("clockevents: fix resume
->> logic") and is only called during system resume to resume
->> the clockevent devices before resuming the tick. Only few
->> implementations do meaningful stuff here.
->
-> So is it a state that a clockevents device reaches, or a
-> state transition? The two purposes seem to be mixed up in
-> the nomenclature.
-
-Where all other modes are states, 'resume' probably represents
-transition. It is immediately followed by a transition to ONESHOT or
-PERIODIC mode and so it is just a preliminary step before moving to
-final states during resume. We *may* not need to keep this in the
-states enum..
-
->> Its only important for NOHZ_FULL (IDLE ? Maybe). When we
->> decide that the tick (LOWRES) or hrtimer interrupt
->> (HIGHRES) isn't required for indefinite period of time
->> (i.e. no timers/hrtimers are present to serve), we skip
->> reprogramming the clockevent device. But its already
->> reprogrammed from the tick-handler and so will fire
->> atleast once again.
->
-> So this new 'mode' appears to be a true state of the
-> device?
-
-Yes.
+Ludovic
