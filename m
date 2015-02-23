@@ -1,155 +1,123 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 23 Feb 2015 12:47:24 +0100
-Subject: [PATCH v4 03/20] power_supply: Add API for safe access of power supply
- function attrs
+Date: Mon, 23 Feb 2015 12:47:39 +0100
+Subject: [PATCH v4 18/20] power_supply: bq2415x_charger: Decrement the power
+ supply's device reference counter
 In-Reply-To: <1424692061-30624-1-git-send-email-k.kozlowski@samsung.com>
 References: <1424692061-30624-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1424692061-30624-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1424692061-30624-19-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add simple wrappers for accessing power supply's function attributes:
- - get_property -> power_supply_get_property
- - set_property -> power_supply_set_property
- - property_is_writeable -> power_supply_property_is_writeable
- - external_power_changed -> power_supply_external_power_changed
-
-This API along with atomic usage counter adds a safe way of accessing a
-power supply from another driver. If power supply is unregistered after
-obtaining reference to it by some driver, then the API wrappers won't be
-executed in invalid (freed) context.
-
-Next patch changing the ownership of power supply class is still needed
-to fully fix race conditions in accessing freed power supply.
+Use power_supply_put() to decrement the power supply's device reference
+counter (increased by power_supply_get_by_name() or
+power_supply_get_by_phandle()).
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Acked-by: Pavel Machek <pavel@ucw.cz>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Reviewed-by: Sebastian Reichel <sre@kernel.org>
-Acked-by: Pavel Machek <pavel@ucw.cz>
 ---
- drivers/power/power_supply_core.c | 47 ++++++++++++++++++++++++++++++++++++++-
- include/linux/power_supply.h      | 16 +++++++++++++
- 2 files changed, 62 insertions(+), 1 deletion(-)
+ drivers/power/bq2415x_charger.c | 31 ++++++++++++++++++-------------
+ 1 file changed, 18 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
-index b748391c3e17..0521681b3674 100644
---- a/drivers/power/power_supply_core.c
-+++ b/drivers/power/power_supply_core.c
-@@ -314,7 +314,9 @@ EXPORT_SYMBOL_GPL(power_supply_is_system_supplied);
- 
- int power_supply_set_battery_charged(struct power_supply *psy)
- {
--	if (psy->type == POWER_SUPPLY_TYPE_BATTERY && psy->set_charged) {
-+	if (atomic_read(&psy->use_cnt) >= 0 &&
-+			psy->type == POWER_SUPPLY_TYPE_BATTERY &&
-+			psy->set_charged) {
- 		psy->set_charged(psy);
- 		return 0;
+diff --git a/drivers/power/bq2415x_charger.c b/drivers/power/bq2415x_charger.c
+index cb92022df8eb..27f197ad8053 100644
+--- a/drivers/power/bq2415x_charger.c
++++ b/drivers/power/bq2415x_charger.c
+@@ -1601,27 +1601,27 @@ static int bq2415x_probe(struct i2c_client *client,
+ 		ret = of_property_read_u32(np, "ti,current-limit",
+ 				&bq->init_data.current_limit);
+ 		if (ret)
+-			goto error_2;
++			goto error_3;
+ 		ret = of_property_read_u32(np, "ti,weak-battery-voltage",
+ 				&bq->init_data.weak_battery_voltage);
+ 		if (ret)
+-			goto error_2;
++			goto error_3;
+ 		ret = of_property_read_u32(np, "ti,battery-regulation-voltage",
+ 				&bq->init_data.battery_regulation_voltage);
+ 		if (ret)
+-			goto error_2;
++			goto error_3;
+ 		ret = of_property_read_u32(np, "ti,charge-current",
+ 				&bq->init_data.charge_current);
+ 		if (ret)
+-			goto error_2;
++			goto error_3;
+ 		ret = of_property_read_u32(np, "ti,termination-current",
+ 				&bq->init_data.termination_current);
+ 		if (ret)
+-			goto error_2;
++			goto error_3;
+ 		ret = of_property_read_u32(np, "ti,resistor-sense",
+ 				&bq->init_data.resistor_sense);
+ 		if (ret)
+-			goto error_2;
++			goto error_3;
+ 	} else {
+ 		memcpy(&bq->init_data, pdata, sizeof(bq->init_data));
  	}
-@@ -366,6 +368,47 @@ struct power_supply *power_supply_get_by_phandle(struct device_node *np,
- EXPORT_SYMBOL_GPL(power_supply_get_by_phandle);
- #endif /* CONFIG_OF */
+@@ -1631,19 +1631,19 @@ static int bq2415x_probe(struct i2c_client *client,
+ 	ret = bq2415x_power_supply_init(bq);
+ 	if (ret) {
+ 		dev_err(bq->dev, "failed to register power supply: %d\n", ret);
+-		goto error_2;
++		goto error_3;
+ 	}
  
-+int power_supply_get_property(struct power_supply *psy,
-+			    enum power_supply_property psp,
-+			    union power_supply_propval *val)
-+{
-+	if (atomic_read(&psy->use_cnt) <= 0)
-+		return -ENODEV;
-+
-+	return psy->get_property(psy, psp, val);
-+}
-+EXPORT_SYMBOL_GPL(power_supply_get_property);
-+
-+int power_supply_set_property(struct power_supply *psy,
-+			    enum power_supply_property psp,
-+			    const union power_supply_propval *val)
-+{
-+	if (atomic_read(&psy->use_cnt) <= 0 || !psy->set_property)
-+		return -ENODEV;
-+
-+	return psy->set_property(psy, psp, val);
-+}
-+EXPORT_SYMBOL_GPL(power_supply_set_property);
-+
-+int power_supply_property_is_writeable(struct power_supply *psy,
-+					enum power_supply_property psp)
-+{
-+	if (atomic_read(&psy->use_cnt) <= 0 || !psy->property_is_writeable)
-+		return -ENODEV;
-+
-+	return psy->property_is_writeable(psy, psp);
-+}
-+EXPORT_SYMBOL_GPL(power_supply_property_is_writeable);
-+
-+void power_supply_external_power_changed(struct power_supply *psy)
-+{
-+	if (atomic_read(&psy->use_cnt) <= 0 || !psy->external_power_changed)
-+		return;
-+
-+	psy->external_power_changed(psy);
-+}
-+EXPORT_SYMBOL_GPL(power_supply_external_power_changed);
-+
- int power_supply_powers(struct power_supply *psy, struct device *dev)
+ 	ret = bq2415x_sysfs_init(bq);
+ 	if (ret) {
+ 		dev_err(bq->dev, "failed to create sysfs entries: %d\n", ret);
+-		goto error_3;
++		goto error_4;
+ 	}
+ 
+ 	ret = bq2415x_set_defaults(bq);
+ 	if (ret) {
+ 		dev_err(bq->dev, "failed to set default values: %d\n", ret);
+-		goto error_4;
++		goto error_5;
+ 	}
+ 
+ 	if (bq->notify_psy) {
+@@ -1651,7 +1651,7 @@ static int bq2415x_probe(struct i2c_client *client,
+ 		ret = power_supply_reg_notifier(&bq->nb);
+ 		if (ret) {
+ 			dev_err(bq->dev, "failed to reg notifier: %d\n", ret);
+-			goto error_5;
++			goto error_6;
+ 		}
+ 
+ 		/* Query for initial reported_mode and set it */
+@@ -1671,11 +1671,14 @@ static int bq2415x_probe(struct i2c_client *client,
+ 	dev_info(bq->dev, "driver registered\n");
+ 	return 0;
+ 
++error_6:
+ error_5:
+-error_4:
+ 	bq2415x_sysfs_exit(bq);
+-error_3:
++error_4:
+ 	bq2415x_power_supply_exit(bq);
++error_3:
++	if (bq->notify_psy)
++		power_supply_put(bq->notify_psy);
+ error_2:
+ 	kfree(name);
+ error_1:
+@@ -1692,8 +1695,10 @@ static int bq2415x_remove(struct i2c_client *client)
  {
- 	return sysfs_create_link(&psy->dev->kobj, &dev->kobj, "powers");
-@@ -555,6 +598,7 @@ static int __power_supply_register(struct device *parent,
- 	dev->release = power_supply_dev_release;
- 	dev_set_drvdata(dev, psy);
- 	psy->dev = dev;
-+	atomic_inc(&psy->use_cnt);
- 	if (cfg) {
- 		psy->drv_data = cfg->drv_data;
- 		psy->of_node = cfg->of_node;
-@@ -629,6 +673,7 @@ EXPORT_SYMBOL_GPL(power_supply_register_no_ws);
+ 	struct bq2415x_device *bq = i2c_get_clientdata(client);
  
- void power_supply_unregister(struct power_supply *psy)
- {
-+	WARN_ON(atomic_dec_return(&psy->use_cnt));
- 	cancel_work_sync(&psy->changed_work);
- 	sysfs_remove_link(&psy->dev->kobj, "powers");
- 	power_supply_remove_triggers(psy);
-diff --git a/include/linux/power_supply.h b/include/linux/power_supply.h
-index b203a26d5c54..5d460995f38d 100644
---- a/include/linux/power_supply.h
-+++ b/include/linux/power_supply.h
-@@ -199,6 +199,12 @@ struct power_supply {
- 	size_t num_supplies;
- 	struct device_node *of_node;
+-	if (bq->notify_psy)
++	if (bq->notify_psy) {
+ 		power_supply_unreg_notifier(&bq->nb);
++		power_supply_put(bq->notify_psy);
++	}
  
-+	/*
-+	 * Functions for drivers implementing power supply class.
-+	 * These shouldn't be called directly by other drivers for accessing
-+	 * this power supply. Instead use power_supply_*() functions (for
-+	 * example power_supply_get_property()).
-+	 */
- 	int (*get_property)(struct power_supply *psy,
- 			    enum power_supply_property psp,
- 			    union power_supply_propval *val);
-@@ -227,6 +233,7 @@ struct power_supply {
- 	struct work_struct changed_work;
- 	spinlock_t changed_lock;
- 	bool changed;
-+	atomic_t use_cnt;
- #ifdef CONFIG_THERMAL
- 	struct thermal_zone_device *tzd;
- 	struct thermal_cooling_device *tcd;
-@@ -287,6 +294,15 @@ extern int power_supply_is_system_supplied(void);
- static inline int power_supply_is_system_supplied(void) { return -ENOSYS; }
- #endif
- 
-+extern int power_supply_get_property(struct power_supply *psy,
-+			    enum power_supply_property psp,
-+			    union power_supply_propval *val);
-+extern int power_supply_set_property(struct power_supply *psy,
-+			    enum power_supply_property psp,
-+			    const union power_supply_propval *val);
-+extern int power_supply_property_is_writeable(struct power_supply *psy,
-+					enum power_supply_property psp);
-+extern void power_supply_external_power_changed(struct power_supply *psy);
- extern int power_supply_register(struct device *parent,
- 				 struct power_supply *psy,
- 				 const struct power_supply_config *cfg);
+ 	bq2415x_sysfs_exit(bq);
+ 	bq2415x_power_supply_exit(bq);
 -- 
 1.9.1
