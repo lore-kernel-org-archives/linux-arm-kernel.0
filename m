@@ -1,70 +1,39 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 24 Feb 2015 07:01:16 +0900
-Subject: [PATCH 2/2] ARM: shmobile: silk: add SDHI0/1 DT support
-In-Reply-To: <54E9ED95.8070702@cogentembedded.com>
-References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
- <2348421.LHyZ4ZOiiG@wasted.cogentembedded.com>
- <CANqRtoRnDzTSvKYcNDHKHbeaN7jp1VvKnk1jTHDvNt1oyBzwKg@mail.gmail.com>
- <54E9ED95.8070702@cogentembedded.com>
-Message-ID: <20150223220116.GC29878@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Feb 2015 23:01:18 +0100
+Subject: [PATCH] spi: sirf: add reset controller dependency
+In-Reply-To: <20150221094458.GM6236@finisterre.sirena.org.uk>
+References: <4553005.HBquOfbqXe@wuerfel> <7767301.zaEX63gvjp@wuerfel>
+ <20150221094458.GM6236@finisterre.sirena.org.uk>
+Message-ID: <6170208.Z0Upu48JrX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 22, 2015 at 05:54:13PM +0300, Sergei Shtylyov wrote:
-> Hello.
+On Saturday 21 February 2015 18:44:58 Mark Brown wrote:
+> On Thu, Feb 19, 2015 at 04:01:29PM +0100, Arnd Bergmann wrote:
 > 
-> On 02/22/2015 03:45 AM, Magnus Damm wrote:
+> > So the stubs are provided for all functions except device_reset() and
+> > reset_control_get(), and drivers using the API need to either call the
+> > stubbed-out _optional() versions of these functions or have the explicit
+> > dependency.
 > 
-> >>Define the SILK board dependent parts of the SDHI0  (connected to SDIO Wi-Fi
-> >>chip)  and SDHI1  (connected to micro-SD slot) device nodes along with the
-> >>necessary voltage regulators.
-> 
-> >>Based on the original patch by Vladimir Barinov
-> >><vladimir.barinov@cogentembedded.com>.
-> 
-> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> >Thanks for your patch. One question - above you write that SDHI1 is micro-SD...
-> 
->    Yes, have double-checked now.
-> 
-> >>@@ -100,3 +159,25 @@
-> >>         non-removable;
-> >>         status = "okay";
-> >>  };
-> >>+
-> >>+&sdhi0 {
-> >>+       pinctrl-0 = <&sdhi0_pins>;
-> >>+       pinctrl-names = "default";
-> >>+
-> >>+       vmmc-supply = <&vcc_sdhi0>;
-> >>+       vqmmc-supply = <&vccq_sdhi0>;
-> >>+       cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
-> >>+       wp-gpios = <&gpio6 7 GPIO_ACTIVE_LOW>;
-> >>+       status = "okay";
-> >>+};
-> >>+
-> >>+&sdhi1 {
-> >>+       pinctrl-0 = <&sdhi1_pins>;
-> >>+       pinctrl-names = "default";
-> >>+
-> >>+       vmmc-supply = <&vcc_sdhi1>;
-> >>+       vqmmc-supply = <&vccq_sdhi1>;
-> >>+       cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
-> >>+       wp-gpios = <&gpio6 15 GPIO_ACTIVE_LOW>;
-> >>+       status = "okay";
-> >>+};
-> 
-> >... however here the WP signal is assigned.
-> 
-> >I believe micro-SD doesn't use the WP signal, so either I'm wrong or
-> >the patch needs to be updated to reflect reality. =)
-> 
->    Both seem correct: SD1_WP signal is just tied to VCCQ_SD1. Do you think
-> we should still drop it?
-> 
-> >Also, I doubt that an on-board SDIO module makes use of CD and/or WP signals?
-> 
->    Those two are tied to VCCQ_SD0 as well. Do you think we should drop them?
+> In that case a dependency seems wrong, I'd expect to see a select - it's
+> a bit obscure to have to grovel around to figure out what magic options
+> are needed to make things turn on and resets feel more like a utility
+> thing than a control bus (which tend to be the things we depend on).
+> Dunno, perhaps I'm wrong?
 
-I am holding off on queuing this up until some consensus is reached.
+Mixing 'select' and 'depends on' causes recursive dependencies, and
+there are already lots of drivers that do 'depends on RESET_CONTROLLER'.
+
+Most users of this symbol seem to follow the strategy of selecting
+RESET_CONTROLLER when a driver is there to provide the functionality,
+but depending on it when a driver uses it. We are however a bit
+inconsistent here and it would be nice to clean it up.
+
+In this particular patch, I'm just following what others do.
+
+We should probably 'select ARCH_HAS_RESET_CONTROLLER' unconditionally
+for ARM ARCH_MULTIPLATFORM, as it's a bit silly to select both
+ARCH_HAS_RESET_CONTROLLER and RESET_CONTROLLER from platform code.
+
+	Arnd
