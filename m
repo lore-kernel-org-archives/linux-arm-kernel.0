@@ -1,93 +1,47 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 23 Feb 2015 10:39:20 -0600
-Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
-In-Reply-To: <20150223120744.GA5609@cbox>
-References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
- <CAL_JsqJQcuX2cp50oHod-QAbhdMg48TaRP+gLGEO2kbFnQ3B+A@mail.gmail.com>
- <20150219190348.GB24460@cbox>
- <CAL_JsqLcBOC+AnVe7oATjg2g6Fz2vqwacu8QzS4tXMaxxOP_Xg@mail.gmail.com>
- <20150223120744.GA5609@cbox>
-Message-ID: <CAL_JsqJ6E+05psDCXS7k74Mz-DgSEroQ2ODpe2Bp2_50fL3imA@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 23 Feb 2015 17:46:17 +0100
+Subject: [PATCH 1/6] ASoC: max98088: Document DT bindings
+In-Reply-To: <54E7249F.2020900@samsung.com>
+References: <1424283959-16289-1-git-send-email-afaerber@suse.de>
+ <1424283959-16289-2-git-send-email-afaerber@suse.de>
+ <54E5EB36.9020007@collabora.co.uk> <54E5EF73.2090302@suse.de>
+ <CAD=FV=VoFnbEsKi4mDDkaTrTXboJmm0UNV5iCk1CvV5ndEZtsA@mail.gmail.com>
+ <54E62E1C.4030105@suse.de> <54E6314E.5060509@suse.de>
+ <54E64C09.5000505@collabora.co.uk> <54E681A8.6040702@suse.de>
+ <54E7249F.2020900@samsung.com>
+Message-ID: <54EB5959.90606@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 23, 2015 at 6:07 AM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Sat, Feb 21, 2015 at 03:56:17PM -0600, Rob Herring wrote:
->> On Thu, Feb 19, 2015 at 1:03 PM, Christoffer Dall
->> <christoffer.dall@linaro.org> wrote:
->> > On Thu, Feb 19, 2015 at 12:23:15PM -0600, Rob Herring wrote:
->> >> On Tue, Jan 27, 2015 at 1:03 AM, Pranavkumar Sawargaonkar
->> >> <psawargaonkar@apm.com> wrote:
->> >> > In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
->> >> > in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
->> >> > size due to size alignment checking in vgic driver for VCPU Control and
->> >> > VCPU register.
->> >> >
->> >> > This patch corrects the sizes to be inline with the hardware spec.
->> >>
->> >> This does not make sense. The GIC regions are still only 4 or 8KB and
->> >> the h/w description should reflect that. For implementations using
->> >> gic-400 and the addressing decode trick, the rest of the register
->> >> range is also not safe to access given it is multiple mapped. Also,
->> >> this wastes virtual space, but I guess we don't care on 64-bit.
->> >>
->> >> KVM should be fixed to only check base address alignment. Size
->> >> alignment does not matter (if it does, then you need to fix all
->> >> register blocks).
->> >>
->> > It matters if you want to ensure that the 64K page you are assigning to
->> > a guest for the GIC virtual CPU interface contains only GIC virtual CPU
->> > mappings, and not other random stuff that the guest is not allowed to
->> > touch.
+Hello Sylwester,
+
+On 02/20/2015 01:12 PM, Sylwester Nawrocki wrote:
+> On 20/02/15 01:36, Andreas F?rber wrote:
+>>>> >> So it seems the mclk is not always set up properly by the kernel,
+>>>> >> relying on firmware. Who's in charge of setting that clock up?
+>>> > 
+>>> > Right, it seems audio is only working due the firmware doing some previous
+>>> > setup. Probably it works on every boot if you have "sound init" as a part of
+>>> > the u-boot boot commands?
 >>
->> Good point.
->>
->> > How else should this be enforced?
->>
->> Rely on correct h/w design? You'll have to repeat this every time you
->> want to do pass-thru of a device.
->>
->> What do you do if 64K mapping is not supported? Fallback to emulation
->> of the CPU interface?
->
-> Agree with Peter on these two points.
->
->>
->> Are there other DTSs that need to be fixed?
->>
-> Not sure really, AMD Seattle works with 64K pages IIRC.
+>> Indeed it does, 24 MHz without the reparenting patch, and sound working.
+> 
+> You can have parent of the CLKOUT clock set by the clk core if it is
+> specified in device tree in the PMU (the clkout clock supplier) device
+> node.
+> 
+> Similarly as we did for the Odroix U3:
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/exynos4412-odroid-common.dtsi#n39
+> 
+> Relying on the clk_set_rate() to set the parent clock is not optimal
+> IMO. Presumably you need to set select stable parent clock for clkout
+> like XXTI. But I'm not very familiar with exyno5250 and that might be
+> something different.
+> 
 
-Well, looks we have been inconsistent here:
+Thanks a lot for your suggestion. I'll drop Tushar's patch to allow
+clkout to be reparent during set_rate then and change his DTS patch
+to set a default parent for CLKOUT using "assigned-clock-parents".
 
-arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi-           reg = <0x0
-0xe1110000 0 0x1000>,
-arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi-                 <0x0
-0xe112f000 0 0x2000>,
-arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi-                 <0x0
-0xe1140000 0 0x10000>,
-arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi-                 <0x0
-0xe1160000 0 0x10000>;
-
-arch/arm64/boot/dts/arm/juno.dts-               reg = <0x0 0x2c010000 0 0x1000>,
-arch/arm64/boot/dts/arm/juno.dts-                     <0x0 0x2c02f000 0 0x2000>,
-arch/arm64/boot/dts/arm/juno.dts-                     <0x0 0x2c04f000 0 0x2000>,
-arch/arm64/boot/dts/arm/juno.dts-                     <0x0 0x2c06f000 0 0x2000>;
-
-If we are going to use 64K sizes, can we have some consistency here
-please. Which ranges really need 64KB sizes? It should only be the
-VCPU interface. right? Why does XGene need 128K? If XGene is doing
-address swizzling, then the CPU and VCPU base addresses are wrong.
-Seattle is also wrong for the VCPU, but no one has noticed because we
-don't use the DIR register IIRC.
-
-XGene should also add an "arm,gic-400" compatible string or something
-XGene specific if in fact it is not GIC-400.
-
-I think perhaps we need a specific compatible property to indicate a
-GIC-400 with address swizzling. While we could get away with using the
-aliased addresses, that seems to be hard to get right and we may
-regret not doing it in the long term. It would indicate at least it is
-64K page safe for example.
-
-Rob
+Best regards,
+Javier
