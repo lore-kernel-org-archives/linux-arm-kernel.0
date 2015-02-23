@@ -1,59 +1,37 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 23 Feb 2015 13:07:44 +0100
-Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
-In-Reply-To: <CAL_JsqLcBOC+AnVe7oATjg2g6Fz2vqwacu8QzS4tXMaxxOP_Xg@mail.gmail.com>
-References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
- <CAL_JsqJQcuX2cp50oHod-QAbhdMg48TaRP+gLGEO2kbFnQ3B+A@mail.gmail.com>
- <20150219190348.GB24460@cbox>
- <CAL_JsqLcBOC+AnVe7oATjg2g6Fz2vqwacu8QzS4tXMaxxOP_Xg@mail.gmail.com>
-Message-ID: <20150223120744.GA5609@cbox>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Feb 2015 12:14:37 +0000
+Subject: stand-alone kvmtool
+In-Reply-To: <54E5C16D.3060109@oracle.com>
+References: <54DDD465.3050300@arm.com>
+ <54E5C16D.3060109@oracle.com>
+Message-ID: <20150223121437.GO8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 21, 2015 at 03:56:17PM -0600, Rob Herring wrote:
-> On Thu, Feb 19, 2015 at 1:03 PM, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> > On Thu, Feb 19, 2015 at 12:23:15PM -0600, Rob Herring wrote:
-> >> On Tue, Jan 27, 2015 at 1:03 AM, Pranavkumar Sawargaonkar
-> >> <psawargaonkar@apm.com> wrote:
-> >> > In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
-> >> > in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
-> >> > size due to size alignment checking in vgic driver for VCPU Control and
-> >> > VCPU register.
-> >> >
-> >> > This patch corrects the sizes to be inline with the hardware spec.
-> >>
-> >> This does not make sense. The GIC regions are still only 4 or 8KB and
-> >> the h/w description should reflect that. For implementations using
-> >> gic-400 and the addressing decode trick, the rest of the register
-> >> range is also not safe to access given it is multiple mapped. Also,
-> >> this wastes virtual space, but I guess we don't care on 64-bit.
-> >>
-> >> KVM should be fixed to only check base address alignment. Size
-> >> alignment does not matter (if it does, then you need to fix all
-> >> register blocks).
-> >>
-> > It matters if you want to ensure that the 64K page you are assigning to
-> > a guest for the GIC virtual CPU interface contains only GIC virtual CPU
-> > mappings, and not other random stuff that the guest is not allowed to
-> > touch.
-> 
-> Good point.
-> 
-> > How else should this be enforced?
-> 
-> Rely on correct h/w design? You'll have to repeat this every time you
-> want to do pass-thru of a device.
-> 
-> What do you do if 64K mapping is not supported? Fallback to emulation
-> of the CPU interface?
+On Thu, Feb 19, 2015 at 05:56:45AM -0500, Sasha Levin wrote:
+> What inconvenience is caused by having it sit inside the kernel tree
+> beyond an increased requirement in disk space?
 
-Agree with Peter on these two points.
+I've come across this problem with the perf tools - luckily, the perf
+tools allow the source to be exported from the kernel tree, but it is
+far from a good solution.
 
-> 
-> Are there other DTSs that need to be fixed?
-> 
-Not sure really, AMD Seattle works with 64K pages IIRC.
+The problem is when you're primarily cross-building the kernel on a
+system where you don't have the target libraries (because, eg, you're
+running in a build environment for multiple different target systems.)
+Having to build userspace tools in that scenario is a _major_ pita.
 
-Thanks,
--Christoffer
+Yes, of course it's possible to pull the 1GB of kernel GIT respository
+down onto the target just to build some silly userspace tool, but when
+your rootfs lives on an 8GB SD card or a USB memory stick (as is the
+case with the ARM Juno 64-bit platform), and when the userspace tool
+somehow depends on the kernel source tree being configured, it really
+starts getting painful.
+
+TBH, I don't much care provided there is a way to export a source
+tarball for the tool from the kernel (like perf does) which can then
+be transferred to the target and built there.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
