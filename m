@@ -1,22 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Feb 2015 19:36:21 +0000
-Subject: [PATCH 1/2] ARM: kernel: add support for cpu cache information
-In-Reply-To: <1424716091-22914-1-git-send-email-sudeep.holla@arm.com>
-References: <1424716091-22914-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20150223193621.GP8656@n2100.arm.linux.org.uk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 23 Feb 2015 20:39:06 +0100
+Subject: [PATCH v4 1/5] ARM: dts: pxa: add pwri2c to pxa device-tree
+In-Reply-To: <87y4o04k21.fsf@free.fr> (Robert Jarzmik's message of "Sat, 14
+ Feb 2015 15:57:58 +0100")
+References: <1423761758-29159-1-git-send-email-robert.jarzmik@free.fr>
+ <87y4o04k21.fsf@free.fr>
+Message-ID: <87pp905sf9.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 23, 2015 at 06:28:10PM +0000, Sudeep Holla wrote:
-> This patch adds support for cacheinfo on ARM platforms.
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-These patches should carry with them the justification for exporting
-this information to userspace.
+> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+>
+>> pxa27x variant has 2 I2C busses on the SoC :
+>>  - the casual I2C
+>>  - the power I2C, normally driving power regulators, and capable of
+>>  receiving orders on core frequency modifications
+>>
+>> Add the missing pwri2c to pxa27x description.
+>>
+>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>
+> Hi Rob, Mark, Sergei,
+>
+> I'd like to queue that into the pxa/dt tree next week.
+> Could I have a "Reviewed-by" ?
+Queued in pxa/dt.
 
-"Because we can" is not a good reason; once exported, this information
-becomes a userspace API that we have to maintain, and thus it comes
-with a non-zero support cost going forward.
+Cheers.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Robert
