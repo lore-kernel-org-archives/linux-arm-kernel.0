@@ -1,86 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 23 Feb 2015 15:14:54 +0000
-Subject: [PATCH] drivers/base: cacheinfo: validate device node for all
- the caches
-In-Reply-To: <1424095816-4414-1-git-send-email-sudeep.holla@arm.com>
-References: <1424095816-4414-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20150223151454.GL9714@leverpostej>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 23 Feb 2015 16:16:39 +0100
+Subject: [PATCHv2 03/15] ARM: mvebu: add missing UART alias on Armada 38x
+In-Reply-To: <1424451874-25375-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1424451874-25375-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1424451874-25375-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <54EB4457.50208@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 16, 2015 at 02:10:16PM +0000, Sudeep Holla wrote:
-> On architectures that depend on DT for obtaining cache hierarcy, we need
-> to validate the device node for all the cache indices, failing to do so
-> might result in wrong information being exposed to the userspace.
-> 
-> This is quite possible on initial/incomplete versions of the device
-> trees. In such cases, it's better to bail out if all the required device
-> nodes are not present.
-> 
-> This patch adds checks for the validation of device node for all the
-> caches and doesn't initialise the cacheinfo if there's any error.
-> 
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Reported-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  drivers/base/cacheinfo.c | 12 ++++++++++--
->  1 file changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
-> index 6e64563361f0..7015bf05c828 100644
-> --- a/drivers/base/cacheinfo.c
-> +++ b/drivers/base/cacheinfo.c
-> @@ -62,15 +62,21 @@ static int cache_setup_of_node(unsigned int cpu)
->  		return -ENOENT;
->  	}
->  
-> -	while (np && index < cache_leaves(cpu)) {
-> +	while (index < cache_leaves(cpu)) {
->  		this_leaf = this_cpu_ci->info_list + index;
->  		if (this_leaf->level != 1)
->  			np = of_find_next_cache_node(np);
->  		else
->  			np = of_node_get(np);/* cpu node itself */
-> +		if (!np)
-> +			break;
->  		this_leaf->of_node = np;
->  		index++;
->  	}
-> +
-> +	if (index != cache_leaves(cpu)) /* not all OF nodes populated */
-> +		return -ENOENT;
-> +
->  	return 0;
->  }
->  
-> @@ -189,8 +195,10 @@ static int detect_cache_attributes(unsigned int cpu)
->  	 * will be set up here only if they are not populated already
->  	 */
->  	ret = cache_shared_cpu_map_setup(cpu);
-> -	if (ret)
-> +	if (ret) {
-> +		pr_err("failed to setup cache hierarcy from DT\n");
+Hi Thomas,
 
-It would probably be better if this were something like:
+On 20/02/2015 18:04, Thomas Petazzoni wrote:
+> The Armada 38x had an alias for UART0, but not UART1. This commit
+> fixes that.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-pr_warn("Unable to detect cache hierarcy from DT for CPU %d\n",
-	cpu);
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Otherwise, this looks sane to me, and it would be nice to have this in
-ASAP so as to avoid exposing erroneous information to userspace. So:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 
 Thanks,
-Mark.
 
->  		goto free_ci;
-> +	}
->  	return 0;
+Gregory
+
+> ---
+>  arch/arm/boot/dts/armada-38x.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index 96d7cf0..8c76a8d 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -216,7 +216,7 @@
+>  				status = "disabled";
+>  			};
 >  
->  free_ci:
-> -- 
-> 1.9.1
+> -			serial at 12100 {
+> +			uart1: serial at 12100 {
+>  				compatible = "snps,dw-apb-uart";
+>  				reg = <0x12100 0x100>;
+>  				reg-shift = <2>;
 > 
-> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
