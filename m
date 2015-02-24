@@ -1,47 +1,69 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 24 Feb 2015 10:29:57 -0600
-Subject: [PATCH] ARM64: Add new Xilinx ZynqMP SoC
-In-Reply-To: <9bffa4683bd6478993de6bea1d3027af@BN1AFFO11FD048.protection.gbl>
-References: <8ac3037c175711dec0adcd0d898be7d9722e0ed0.1424764548.git.michal.simek@xilinx.com>
- <CAL_JsqKkVHaf_U0nU9nqa2q5XwfsuCu-ZWVEHx6b5Mv9Hgen1Q@mail.gmail.com>
- <9bffa4683bd6478993de6bea1d3027af@BN1AFFO11FD048.protection.gbl>
-Message-ID: <CAL_JsqJVdZMwweta=N-P-d=C6JNsXk0BsGcrexe2yDPm7c5pfg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 24 Feb 2015 16:30:21 +0000
+Subject: [PATCH] arm64: Fix text patching logic when using fixmap
+Message-ID: <1424795421-26630-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 24, 2015 at 8:58 AM, Michal Simek <michal.simek@xilinx.com> wrote:
-> On 02/24/2015 03:42 PM, Rob Herring wrote:
->> On Tue, Feb 24, 2015 at 1:56 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->>> Initial version of device tree for Xilinx ZynqMP SoC.
->>>
->>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->>> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
->>> ---
->>
->> [...]
->>
->>> +               gic: interrupt-controller at f9010000 {
->>> +                       compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
->>
->> gic-400, right?
->
-> yep
->
->>
->>> +                       #interrupt-cells = <3>;
->>> +                       reg = <0x0 0xf9010000 0x10000>,
->>> +                             <0x0 0xf9020000 0x20000>,
->>> +                             <0x0 0xf9040000 0x20000>,
->>> +                             <0x0 0xf9060000 0x20000>;
->>
->> These addresses are wrong if you are doing address swizzling to do 64K
->> offsets. We don't really have an answer yet as to what is the right
->> way. See the XGene GIC discussion[1].
->
-> Is this better for GICC?
-> <0x0 0xf902f000 0x2000>
+Patch 2f896d586610 ("arm64: use fixmap for text patching") changed
+the way we patch the kernel text, using a fixmap when the kernel or
+modules are flagged as read only.
 
-Yes, and the VCPU interface needs this as well. As far as sizes, we're
-still discussing that.
+Unfortunately, a flaw in the logic makes it fall over when patching
+modules without CONFIG_DEBUG_SET_MODULE_RONX enabled:
 
-Rob
+[...]
+[   32.032636] Call trace:
+[   32.032716] [<fffffe00003da0dc>] __copy_to_user+0x2c/0x60
+[   32.032837] [<fffffe0000099f08>] __aarch64_insn_write+0x94/0xf8
+[   32.033027] [<fffffe000009a0a0>] aarch64_insn_patch_text_nosync+0x18/0x58
+[   32.033200] [<fffffe000009c3ec>] ftrace_modify_code+0x58/0x84
+[   32.033363] [<fffffe000009c4e4>] ftrace_make_nop+0x3c/0x58
+[   32.033532] [<fffffe0000164420>] ftrace_process_locs+0x3d0/0x5c8
+[   32.033709] [<fffffe00001661cc>] ftrace_module_init+0x28/0x34
+[   32.033882] [<fffffe0000135148>] load_module+0xbb8/0xfc4
+[   32.034044] [<fffffe0000135714>] SyS_finit_module+0x94/0xc4
+[...]
+
+This is triggered by the use of virt_to_page() on a module address,
+which ends to pointing to Nowhereland if you're lucky, or corrupt
+your precious data if not.
+
+This patch fixes the logic by mimicking what is done on arm:
+- If we're patching a module and CONFIG_DEBUG_SET_MODULE_RONX is set,
+  use vmalloc_to_page().
+- If we're patching the kernel and CONFIG_DEBUG_RODATA is set,
+  use virt_to_page().
+- Otherwise, use the provided address, as we can write to it directly.
+
+Tested on 4.0-rc1 as a KVM guest.
+
+Reported-by: Richard W.M. Jones <rjones@redhat.com>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Laura Abbott <lauraa@codeaurora.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kernel/insn.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 27d4864..c8eca88 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -87,8 +87,10 @@ static void __kprobes *patch_map(void *addr, int fixmap)
+ 
+ 	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
+ 		page = vmalloc_to_page(addr);
+-	else
++	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
+ 		page = virt_to_page(addr);
++	else
++		return addr;
+ 
+ 	BUG_ON(!page);
+ 	set_fixmap(fixmap, page_to_phys(page));
+-- 
+2.1.4
