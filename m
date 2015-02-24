@@ -1,220 +1,81 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 24 Feb 2015 11:47:42 +0900
-Subject: [PATCH v4] pinctrl: exynos: Add support for Exynos5433
-Message-ID: <1424746062-14424-1-git-send-email-cw00.choi@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 23 Feb 2015 19:01:42 -0800
+Subject: New l3-noc error with CPUFREQ_DT built-in with v4.0-rc1
+In-Reply-To: <20150224023505.GQ32521@atomide.com>
+References: <20150223235947.GC25954@atomide.com>
+ <20150224015903.GP32521@atomide.com>
+ <20150224022433.GB5198@saruman.tx.rr.com>
+ <20150224023505.GQ32521@atomide.com>
+Message-ID: <20150224030141.GR32521@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds driver data for Exynos5433 SoC. Exynos5433 includes 228 multi-
-functional input/output port pins and 135 memory port pins. There are 41 general
-port groups and 2 memory port groups.
+* Tony Lindgren <tony@atomide.com> [150223 18:43]:
+> * Felipe Balbi <balbi@ti.com> [150223 18:28]:
+> > Hi,
+> > 
+> > On Mon, Feb 23, 2015 at 05:59:04PM -0800, Tony Lindgren wrote:
+> > > * Tony Lindgren <tony@atomide.com> [150223 16:09]:
+> > > > Hi Nishanth,
+> > > > 
+> > > > Olof told me about a new L3 error happening on omap5-uevm with
+> > > > v4.0-rc1:
+> > > > 
+> > > > WARNING: CPU: 0 PID: 0 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x214/0x340()
+> > > > 4000000.ocp:L3 Custom Error: MASTER MPU TARGET L4PER2 (Idle): Data Access in Supervisor mode during Functional access
+> > > > ...
+> > > > 
+> > > > I tried bisecting this with no luck, but narrowed it down to
+> > > > having CONFIG_CPUFREQ_DT=y causing it, while =m wont' trigger
+> > > > it. This got changed by commit 40d1746d2eee ("ARM:
+> > > > omap2plus_defconfig: use CONFIG_CPUFREQ_DT").
+> > > > 
+> > > > Any ideas?
+> > > 
+> > > Hmm so setting CONFIG_CPUFREQ_DT=m in arch/arm/configs/omap2plus_defconfig
+> > > produces the same output with make omap2plus_defconfig as with =y.. So
+> > > CPUFREQ_DT can't be the real cause of the problem.
+> > > 
+> > > It's now looking like the l3-noc warning does not get triggered on
+> > > every boot.
+> > > 
+> > > It also seems the zImage triggering the error does not trigger the
+> > > error on every boot. To trigger the error, it seems the device needs to
+> > > be powered down for at least 10 or so seconds between the boots.
+> > > So far no luck reproducing the error on v3.19.
+> > > 
+> > > The easy way to reproduce is to power down omap5 for at least 10 seconds,
+> > > make omap2lus_defconfig on v4.0-rc1 and boot it.
+> > > 
+> > > And so far it looks like next-20150204 works and next-20150209
+> > > failed at once so far. But of course I would not trust anything
+> > > at this point :)
+> > 
+> > got a log of the failure ? Is it pointing to a device or one of the L4s?
+> 
+> Well mostly the MASTER MPU TARGET L4PER2, the following stack dump is
+> really the stack dump of the l3_interrupt_handler.
+>  
+> > Might be worth to boot with just the bare minimum (UART & timers) and
+> > disable everything else. You might need to build busybox and append that
+> > to the kernel so you don't need to rely on MMC/USB/etc for rootfs.
+> > 
+> > After that, you could start enabling modules one by one (as modules, not
+> > built-in) and loading them one by one to see which one causes the
+> > failure. Big PITA, I know, but I can't think of any other way to go
+> > about this.
+> 
+> It seems the best way to deal with this is to make the l3_handle_target
+> actually show the address where the error happened to limit it down
+> to a single device..
 
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Thomas Abraham <thomas.abraham@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Inki Dae <inki.dae@samsung.com>
-Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
----
-Changes from v3:
-- Rebase it on Linux 4.0-rc1
-- Add acked messgae of Tomasz Figa
-Changes from v2:
-- Rebase it on v3.19-rc5
+Looks like the address is 0 for "Custom Error". Anyways, reverting
+a fix for similar issue found on omap3 so far seems to help, that's
+3d009c8c61f9 ("gpio: omap: Fix bad device access with setup_irq()").
 
- drivers/pinctrl/samsung/pinctrl-exynos.c  | 153 ++++++++++++++++++++++++++++++
- drivers/pinctrl/samsung/pinctrl-samsung.c |   2 +
- drivers/pinctrl/samsung/pinctrl-samsung.h |   1 +
- 3 files changed, 156 insertions(+)
+That got merged very late for v3.19, so it certainly explains why
+it was not noticed until now.
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-index c8f83f9..d273fda 100644
---- a/drivers/pinctrl/samsung/pinctrl-exynos.c
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -1240,6 +1240,159 @@ const struct samsung_pin_ctrl exynos5420_pin_ctrl[] __initconst = {
- 	},
- };
- 
-+/* pin banks of exynos5433 pin-controller - ALIVE */
-+static const struct samsung_pin_bank_data exynos5433_pin_banks0[] = {
-+	EXYNOS_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
-+	EXYNOS_PIN_BANK_EINTW(8, 0x020, "gpa1", 0x04),
-+	EXYNOS_PIN_BANK_EINTW(8, 0x040, "gpa2", 0x08),
-+	EXYNOS_PIN_BANK_EINTW(8, 0x060, "gpa3", 0x0c),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - AUD */
-+static const struct samsung_pin_bank_data exynos5433_pin_banks1[] = {
-+	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz0", 0x00),
-+	EXYNOS_PIN_BANK_EINTG(4, 0x020, "gpz1", 0x04),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - CPIF */
-+static const struct samsung_pin_bank_data exynos5433_pin_banks2[] = {
-+	EXYNOS_PIN_BANK_EINTG(2, 0x000, "gpv6", 0x00),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - eSE */
-+static const struct samsung_pin_bank_data exynos5433_pin_banks3[] = {
-+	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj2", 0x00),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - FINGER */
-+static const struct samsung_pin_bank_data exynos5433_pin_banks4[] = {
-+	EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpd5", 0x00),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - FSYS */
-+static const struct samsung_pin_bank_data exynos5433_pin_banks5[] = {
-+	EXYNOS_PIN_BANK_EINTG(6, 0x000, "gph1", 0x00),
-+	EXYNOS_PIN_BANK_EINTG(7, 0x020, "gpr4", 0x04),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x040, "gpr0", 0x08),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x060, "gpr1", 0x0c),
-+	EXYNOS_PIN_BANK_EINTG(2, 0x080, "gpr2", 0x10),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x0a0, "gpr3", 0x14),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - IMEM */
-+static const struct samsung_pin_bank_data exynos5433_pin_banks6[] = {
-+	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpf0", 0x00),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - NFC */
-+static const struct samsung_pin_bank_data exynos5433_pin_banks7[] = {
-+	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj0", 0x00),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - PERIC */
-+static const struct samsung_pin_bank_data exynos5433_pin_banks8[] = {
-+	EXYNOS_PIN_BANK_EINTG(6, 0x000, "gpv7", 0x00),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x020, "gpb0", 0x04),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpc0", 0x08),
-+	EXYNOS_PIN_BANK_EINTG(2, 0x060, "gpc1", 0x0c),
-+	EXYNOS_PIN_BANK_EINTG(6, 0x080, "gpc2", 0x10),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x0a0, "gpc3", 0x14),
-+	EXYNOS_PIN_BANK_EINTG(2, 0x0c0, "gpg0", 0x18),
-+	EXYNOS_PIN_BANK_EINTG(4, 0x0e0, "gpd0", 0x1c),
-+	EXYNOS_PIN_BANK_EINTG(6, 0x100, "gpd1", 0x20),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x120, "gpd2", 0x24),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x140, "gpd4", 0x28),
-+	EXYNOS_PIN_BANK_EINTG(2, 0x160, "gpd8", 0x2c),
-+	EXYNOS_PIN_BANK_EINTG(7, 0x180, "gpd6", 0x30),
-+	EXYNOS_PIN_BANK_EINTG(3, 0x1a0, "gpd7", 0x34),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x1c0, "gpg1", 0x38),
-+	EXYNOS_PIN_BANK_EINTG(2, 0x1e0, "gpg2", 0x3c),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x200, "gpg3", 0x40),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - TOUCH */
-+static const struct samsung_pin_bank_data exynos5433_pin_banks9[] = {
-+	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj1", 0x00),
-+};
-+
-+/*
-+ * Samsung pinctrl driver data for Exynos5433 SoC. Exynos5433 SoC includes
-+ * ten gpio/pin-mux/pinconfig controllers.
-+ */
-+const struct samsung_pin_ctrl exynos5433_pin_ctrl[] = {
-+	{
-+		/* pin-controller instance 0 data */
-+		.pin_banks	= exynos5433_pin_banks0,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks0),
-+		.eint_wkup_init = exynos_eint_wkup_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+	}, {
-+		/* pin-controller instance 1 data */
-+		.pin_banks	= exynos5433_pin_banks1,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks1),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+	}, {
-+		/* pin-controller instance 2 data */
-+		.pin_banks	= exynos5433_pin_banks2,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks2),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+	}, {
-+		/* pin-controller instance 3 data */
-+		.pin_banks	= exynos5433_pin_banks3,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks3),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+	}, {
-+		/* pin-controller instance 4 data */
-+		.pin_banks	= exynos5433_pin_banks4,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks4),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+	}, {
-+		/* pin-controller instance 5 data */
-+		.pin_banks	= exynos5433_pin_banks5,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks5),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+	}, {
-+		/* pin-controller instance 6 data */
-+		.pin_banks	= exynos5433_pin_banks6,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks6),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+	}, {
-+		/* pin-controller instance 7 data */
-+		.pin_banks	= exynos5433_pin_banks7,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks7),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+	}, {
-+		/* pin-controller instance 8 data */
-+		.pin_banks	= exynos5433_pin_banks8,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks8),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+	}, {
-+		/* pin-controller instance 9 data */
-+		.pin_banks	= exynos5433_pin_banks9,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks9),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+	},
-+};
-+
- /* pin banks of exynos7 pin-controller - ALIVE */
- static const struct samsung_pin_bank_data exynos7_pin_banks0[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-index ec580af..ed165ba 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-@@ -1239,6 +1239,8 @@ static const struct of_device_id samsung_pinctrl_dt_match[] = {
- 		.data = (void *)exynos5260_pin_ctrl },
- 	{ .compatible = "samsung,exynos5420-pinctrl",
- 		.data = (void *)exynos5420_pin_ctrl },
-+	{ .compatible = "samsung,exynos5433-pinctrl",
-+		.data = (void *)exynos5433_pin_ctrl },
- 	{ .compatible = "samsung,s5pv210-pinctrl",
- 		.data = (void *)s5pv210_pin_ctrl },
- 	{ .compatible = "samsung,exynos7-pinctrl",
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
-index 1b8c013..c1239ff 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.h
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
-@@ -271,6 +271,7 @@ extern const struct samsung_pin_ctrl exynos4415_pin_ctrl[];
- extern const struct samsung_pin_ctrl exynos5250_pin_ctrl[];
- extern const struct samsung_pin_ctrl exynos5260_pin_ctrl[];
- extern const struct samsung_pin_ctrl exynos5420_pin_ctrl[];
-+extern const struct samsung_pin_ctrl exynos5433_pin_ctrl[];
- extern const struct samsung_pin_ctrl exynos7_pin_ctrl[];
- extern const struct samsung_pin_ctrl s3c64xx_pin_ctrl[];
- extern const struct samsung_pin_ctrl s3c2412_pin_ctrl[];
--- 
-1.8.5.5
+Regards,
+
+Tony
