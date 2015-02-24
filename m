@@ -1,46 +1,72 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 24 Feb 2015 13:56:54 +0900
-Subject: [PATCH 1/2] thermal: exynos: Fix wrong control of power down detection
- mode for Exynos7
+Date: Tue, 24 Feb 2015 13:56:55 +0900
+Subject: [PATCH 2/2] thermal: exynos: Clean-up code to use oneline entry for
+ exynos compatible table
 In-Reply-To: <1424753815-15113-1-git-send-email-cw00.choi@samsung.com>
 References: <1424753815-15113-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1424753815-15113-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1424753815-15113-3-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the wrong control of PD_DET_EN (power down detection mode)
-for Exynos7 because exynos7_tmu_control() always enables the power down detection
-mode regardless 'on' parameter.
+This patch cleanup the code to use oneline for entry of exynos compatible
+table.
 
 Cc: Zhang Rui <rui.zhang@intel.com>
 Cc: Eduardo Valentin <edubezval@gmail.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Lukasz Majewski <l.majewski@samsung.com>
 ---
- drivers/thermal/samsung/exynos_tmu.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/thermal/samsung/exynos_tmu.c | 38 ++++++++++--------------------------
+ 1 file changed, 10 insertions(+), 28 deletions(-)
 
 diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index 933cd80..a60f527 100644
+index a60f527..1d30b09 100644
 --- a/drivers/thermal/samsung/exynos_tmu.c
 +++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -682,6 +682,7 @@ static void exynos7_tmu_control(struct platform_device *pdev, bool on)
+@@ -919,34 +919,16 @@ static irqreturn_t exynos_tmu_irq(int irq, void *id)
+ }
  
- 	if (on) {
- 		con |= (1 << EXYNOS_TMU_CORE_EN_SHIFT);
-+		con |= (1 << EXYNOS7_PD_DET_EN_SHIFT);
- 		interrupt_en =
- 			(of_thermal_is_trip_valid(tz, 7)
- 			<< EXYNOS7_TMU_INTEN_RISE7_SHIFT) |
-@@ -704,9 +705,9 @@ static void exynos7_tmu_control(struct platform_device *pdev, bool on)
- 			interrupt_en << EXYNOS_TMU_INTEN_FALL0_SHIFT;
- 	} else {
- 		con &= ~(1 << EXYNOS_TMU_CORE_EN_SHIFT);
-+		con &= ~(1 << EXYNOS7_PD_DET_EN_SHIFT);
- 		interrupt_en = 0; /* Disable all interrupts */
- 	}
--	con |= 1 << EXYNOS7_PD_DET_EN_SHIFT;
+ static const struct of_device_id exynos_tmu_match[] = {
+-	{
+-		.compatible = "samsung,exynos3250-tmu",
+-	},
+-	{
+-		.compatible = "samsung,exynos4210-tmu",
+-	},
+-	{
+-		.compatible = "samsung,exynos4412-tmu",
+-	},
+-	{
+-		.compatible = "samsung,exynos5250-tmu",
+-	},
+-	{
+-		.compatible = "samsung,exynos5260-tmu",
+-	},
+-	{
+-		.compatible = "samsung,exynos5420-tmu",
+-	},
+-	{
+-		.compatible = "samsung,exynos5420-tmu-ext-triminfo",
+-	},
+-	{
+-		.compatible = "samsung,exynos5440-tmu",
+-	},
+-	{
+-		.compatible = "samsung,exynos7-tmu",
+-	},
+-	{},
++	{ .compatible = "samsung,exynos3250-tmu", },
++	{ .compatible = "samsung,exynos4210-tmu", },
++	{ .compatible = "samsung,exynos4412-tmu", },
++	{ .compatible = "samsung,exynos5250-tmu", },
++	{ .compatible = "samsung,exynos5260-tmu", },
++	{ .compatible = "samsung,exynos5420-tmu", },
++	{ .compatible = "samsung,exynos5420-tmu-ext-triminfo", },
++	{ .compatible = "samsung,exynos5440-tmu", },
++	{ .compatible = "samsung,exynos7-tmu", },
++	{ /* sentinel */ },
+ };
+ MODULE_DEVICE_TABLE(of, exynos_tmu_match);
  
- 	writel(interrupt_en, data->base + EXYNOS7_TMU_REG_INTEN);
- 	writel(con, data->base + EXYNOS_TMU_REG_CONTROL);
 -- 
 1.8.5.5
