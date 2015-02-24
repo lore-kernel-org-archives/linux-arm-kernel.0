@@ -1,53 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 24 Feb 2015 14:43:16 +0000
-Subject: [RFC PATCH] arm64: mm: increase VA range of identity map
-In-Reply-To: <CAKv+Gu-z9ZpOxMsrZ4mg=ZB-ftVe2kNiY5rci8Yk_W_U-OXqnA@mail.gmail.com>
-References: <1424775342-30588-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150224120341.GC27420@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-z9ZpOxMsrZ4mg=ZB-ftVe2kNiY5rci8Yk_W_U-OXqnA@mail.gmail.com>
-Message-ID: <20150224144316.GD27420@e104818-lin.cambridge.arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 24 Feb 2015 08:46:39 -0600
+Subject: New l3-noc error with CPUFREQ_DT built-in with v4.0-rc1
+In-Reply-To: <20150224032450.GT32521@atomide.com>
+References: <20150223235947.GC25954@atomide.com>
+ <20150224015903.GP32521@atomide.com>
+ <20150224022433.GB5198@saruman.tx.rr.com>
+ <20150224023505.GQ32521@atomide.com>
+ <20150224030141.GR32521@atomide.com>
+ <20150224031547.GB15941@saruman.tx.rr.com>
+ <20150224032107.GS32521@atomide.com>
+ <20150224032450.GT32521@atomide.com>
+Message-ID: <20150224144639.GE29829@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 24, 2015 at 12:18:26PM +0000, Ard Biesheuvel wrote:
-> On 24 February 2015 at 12:03, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Tue, Feb 24, 2015 at 10:55:42AM +0000, Ard Biesheuvel wrote:
-> >> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> >> index f800d45ea226..19f6297a472b 100644
-> >> --- a/arch/arm64/include/asm/memory.h
-> >> +++ b/arch/arm64/include/asm/memory.h
-> >> @@ -42,12 +42,14 @@
-> >>   * PAGE_OFFSET - the virtual address of the start of the kernel image (top
-> >>   *            (VA_BITS - 1))
-> >>   * VA_BITS - the maximum number of bits for virtual addresses.
-> >> + * MAX_VA_BITS - architectural max value for VA_BITS
-> >>   * TASK_SIZE - the maximum size of a user space task.
-> >>   * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
-> >>   * The module space lives between the addresses given by TASK_SIZE
-> >>   * and PAGE_OFFSET - it must be within 128MB of the kernel text.
-> >>   */
-> >>  #define VA_BITS                      (CONFIG_ARM64_VA_BITS)
-> >> +#define MAX_VA_BITS          48
-> >
-> > Can we determine this dynamically based on the phys address? So on
-> > hardware that doesn't need such large idmap, it would stick to the host
-> > configured levels.
+Hi,
+
+On Mon, Feb 23, 2015 at 07:24:50PM -0800, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [150223 19:29]:
+> > * Felipe Balbi <balbi@ti.com> [150223 19:19]:
+> > > On Mon, Feb 23, 2015 at 07:01:42PM -0800, Tony Lindgren wrote:
+> > > > * Tony Lindgren <tony@atomide.com> [150223 18:43]:
+> > > > 
+> > > > Looks like the address is 0 for "Custom Error". Anyways, reverting
+> > > 
+> > > yeah, that's because the error comes from l4per2, not l3 :-)
+> > 
+> > Right so it seems :)
+> >  
+> > > > a fix for similar issue found on omap3 so far seems to help, that's
+> > > > 3d009c8c61f9 ("gpio: omap: Fix bad device access with setup_irq()").
+> > > 
+> > > if we revert that, we regress omap3, right ?
+> > 
+> > Yes we saw that getting triggered on omap3/4 before 3d009c8c61f9.
+> > 
+> > Now looking at the stack trace again, it actually has something:
+> > 
+> > ...
+> > [<c05999a4>] (__irq_svc) from [<c0599164>] (_raw_spin_unlock_irqrestore+0x34/0x44)
+> > [<c0599164>] (_raw_spin_unlock_irqrestore) from [<c0027120>] (omap_hwmod_idle+0x34/0x44)
+> > [<c0027120>] (omap_hwmod_idle) from [<c00283f8>] (omap_device_idle+0x38/0x78)
+> > [<c00283f8>] (omap_device_idle) from [<c0028454>] (_od_runtime_suspend+0x1c/0x24)
+> > [<c0028454>] (_od_runtime_suspend) from [<c03b5214>] (__rpm_callback+0x2c/0x60)
+> > [<c03b5214>] (__rpm_callback) from [<c03b5268>] (rpm_callback+0x20/0x80)
+> > [<c03b5268>] (rpm_callback) from [<c03b56b8>] (rpm_suspend+0xe8/0x55c)
+> > [<c03b56b8>] (rpm_suspend) from [<c03b6bdc>] (pm_runtime_work+0x74/0xa8)
+> > [<c03b6bdc>] (pm_runtime_work) from [<c0054608>] (process_one_work+0x1b0/0x4a0)
+> > ...
+> > 
+> > If it's the gpio-omap, there's probably some confusion still in
+> > the driver regarding the GPIO bank idle status. Anyways, will look
+> > more into it tomorrow.
 > 
-> I guess we could. Is there a benefit to keeping TCR.T0SZ as high as
-> possible if you are adding the additional level anyway?
-> It only costs us one page regardless, and only if the runtime check
-> shows that system RAM exceeds VA_BITS
+> And now I'm seeing the error with 3d009c8c61f9 reverted, so it
+> does not seem to be that either..
 
-It's not the page that we may waste in the idmap table but higher T0SZ
-implies deeper translation tables, so an additional page table walk
-during power up/down sequences.
-
-We could populate the idmap table as maximum number of levels
-permanently (based on MAX_VA_BITS) but set T0SZ according to the SoC
-needs and TTBR0_EL1 may need to skip the first page of the original
-idmap (we do something similar in arch/arm/mm/proc-v7-3level.S with
-TTBR1_OFFSET since for 1GB of kernel linear mapping we only need 2
-levels but swapper_pg_dir is always 3).
+well, that's good :-)
 
 -- 
-Catalin
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150224/9fbfc700/attachment.sig>
