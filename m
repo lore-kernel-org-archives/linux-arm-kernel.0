@@ -1,109 +1,32 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 24 Feb 2015 11:33:02 +0100
-Subject: [PATCH linux-next] iommu: Enable LPAE pagetable on ARM only
-In-Reply-To: <2868840.GyWYJOzqWH@avalon>
-References: <1424621346-7822-1-git-send-email-vincent.stehle@laposte.net>
- <2868840.GyWYJOzqWH@avalon>
-Message-ID: <CAMuHMdXpSbEdrQ=1-m_MBv6RUb92waZ0BjLr1p790R9+L3Z8ww@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 24 Feb 2015 11:39:25 +0100
+Subject: [PATCH] clk: divider: return real rate instead of divider value
+Message-ID: <2011929.fOsbjMkSp9@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 23, 2015 at 5:52 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Sunday 22 February 2015 17:09:06 Vincent Stehl? wrote:
->> LPAE iommu page table makes sense only for ARM architecture. Add the
->> corresponding dependency in Kconfig.
->>
->> This fixes the following runtime warnings on PA-RISC architecture:
->
-> I suppose this is caused by the selftest code ?
->
->>   WARNING: at drivers/iommu/io-pgtable-arm.c:413
->>   Modules linked in:
->>   CPU: 0 PID: 1 Comm: swapper/0 Not tainted
->> 3.19.0-next-20150222-00002-gc420256 #2 task: 17ca0000 ti: 17ca8000 task.ti:
->> 17ca8000
->>
->>        YZrvWESTHLNXBCVMcbcbcbcbOGFRQPDI
->>   PSW: 00000000000001001111111100001111 Not tainted
->>   r00-03  0004ff0f 0000001b 104871b0 17ca83c0
->>   r04-07  00001000 00000000 00000000 00000000
->>   r08-11  00000000 40001000 1013b36c 17ca8248
->>   r12-15  00000080 17e712c0 00000000 17c5e100
->>   r16-19  0000000c 105d8eb0 40001000 ffffffff
->>   r20-23  00000000 00800020 1048717c 00000000
->>   r24-27  00001000 00000000 00000009 10774ce0
->>   r28-31  00000000 00000027 17ca8480 10486d44
->>   sr00-03  00000000 00000000 00000000 00000000
->>   sr04-07  00000000 00000000 00000000 00000000
->>
->>   IASQ: 00000000 00000000 IAOQ: 10486df4 10486df8
->>    IIR: 03ffe01f    ISR: 00000000  IOR: 17c86e54
->>    CPU:        0   CR30: 17ca8000 CR31: 00000002
->>    ORIG_R28: 00000001
->>    IAOQ[0]: __arm_lpae_unmap+0x144/0x4cc
->>    IAOQ[1]: __arm_lpae_unmap+0x148/0x4cc
->>    RP(r2): arm_lpae_unmap+0x34/0x6c
->>   Backtrace:
->>    [<104871b0>] arm_lpae_unmap+0x34/0x6c
->>    [<10127944>] 0x10127944
->>    [<10168ee0>] do_one_initcall+0x128/0x1dc
->>    [<101028fc>] 0x101028fc
->>    [<10161b48>] kernel_init+0x1c/0x118
->>    [<1015d01c>] end_fault_vector+0x1c/0x24
->>    [<101762ec>] save_stack_trace+0x28/0x60
->>
->> Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
->> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> ---
->>
->>
->> Hi,
->>
->> This can be seen with e.g. Linux next-20150222 on parisc with allmodconfig.
->>
->> Best regards,
->>
->> V.
->>
->>
->>  drivers/iommu/Kconfig | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
->> index baa0d97..c73fd72 100644
->> --- a/drivers/iommu/Kconfig
->> +++ b/drivers/iommu/Kconfig
->> @@ -22,6 +22,7 @@ config IOMMU_IO_PGTABLE
->>
->>  config IOMMU_IO_PGTABLE_LPAE
->>       bool "ARMv7/v8 Long Descriptor Format"
->> +     depends on ARM
->
-> How about ARM || COMPILE_TEST ? It can still be useful to compile the module
-> on other architectures.
+Commit bca9690b9426 ("clk: divider: Make generic for usage elsewhere")
+returned only the divider value for read-only dividers instead of the
+actual rate.
 
-COMPILE_TEST is meant for test-compiling drivers or subsystems that are not
-useful on all platforms. IMHO COMPILE_TEST kernels are still supposed to boot
-without ill effects.
+Fixes: bca9690b9426 ("clk: divider: Make generic for usage elsewhere")
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/clk/clk-divider.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Now, I understand the issue on PA-RISC is with the selftest, not with the actual
-IOMMU_IO_PGTABLE_LPAE module? Then IOMMU_IO_PGTABLE_LPAE
-can depend on ARM || COMPILE_TEST (|| ARM64, cfr. Laurent's later email).
-
-But the selftest should protect itself against running on non-ARM, either
-by making IOMMU_IO_PGTABLE_LPAE_SELFTEST depend on ARM(64)
-(without "|| COMPILE_TEST"), or by adding a check to arm_lpae_do_selftests(),
-to please all compile-testers.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index a213455..5b4c018 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -355,7 +355,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+ 		bestdiv = readl(divider->reg) >> divider->shift;
+ 		bestdiv &= div_mask(divider->width);
+ 		bestdiv = _get_div(divider->table, bestdiv, divider->flags);
+-		return bestdiv;
++		return DIV_ROUND_UP(*prate, bestdiv);
+ 	}
+ 
+ 	return divider_round_rate(hw, rate, prate, divider->table,
+-- 
+2.1.4
