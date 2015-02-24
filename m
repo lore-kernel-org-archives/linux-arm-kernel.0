@@ -1,61 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 24 Feb 2015 18:11:37 +0000
-Subject: [PATCH] arm64: annotate psci invoke functions as notrace
-In-Reply-To: <20150224175950.GA28145@redhat.com>
-References: <20150218172638.GB1772@redacted.bos.redhat.com>
- <20150224175950.GA28145@redhat.com>
-Message-ID: <20150224181137.GY9714@leverpostej>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 24 Feb 2015 18:15:53 +0000
+Subject: [PATCH 0/2] Remove pl011 startup glitches and avoid dummy TX during
+ startup
+Message-ID: <1424801755-16242-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 24, 2015 at 05:59:50PM +0000, Richard W.M. Jones wrote:
-> On Wed, Feb 18, 2015 at 12:26:38PM -0500, Kyle McMartin wrote:
-> > Using GCC 5 to build the kernel with ftrace enabled, we encounter the
-> > following error as a result of the mcount prologue changing the expected
-> > register use of the function parameters,
-> > 
-> > /tmp/cc8Kpn7A.s: Assembler messages:
-> > /tmp/cc8Kpn7A.s:41: Error: .err encountered
-> > /tmp/cc8Kpn7A.s:42: Error: .err encountered
-> > /tmp/cc8Kpn7A.s:43: Error: .err encountered
-> > /tmp/cc8Kpn7A.s:101: Error: .err encountered
-> > /tmp/cc8Kpn7A.s:102: Error: .err encountered
-> > /tmp/cc8Kpn7A.s:103: Error: .err encountered
-> > scripts/Makefile.build:257: recipe for target 'arch/arm64/kernel/psci.o' failed
-> > 
-> > Fix this by annotating the function as notrace, to suppress the
-> > generation of profiling prologues and epilogues on the function.
-> > 
-> > Signed-off-by: Kyle McMartin <kyle@redhat.com>
-> > 
-> > --- a/arch/arm64/kernel/psci.c
-> > +++ b/arch/arm64/kernel/psci.c
-> > @@ -113,7 +113,7 @@ static void psci_power_state_unpack(u32 power_state,
-> >   * The following two functions are invoked via the invoke_psci_fn pointer
-> >   * and will not be inlined, allowing us to piggyback on the AAPCS.
-> >   */
-> > -static noinline int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
-> > +static noinline notrace int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
-> >  					 u64 arg2)
-> >  {
-> >  	asm volatile(
-> > @@ -128,7 +128,7 @@ static noinline int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
-> >  	return function_id;
-> >  }
-> >  
-> > -static noinline int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1,
-> > +static noinline notrace int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1,
-> >  					 u64 arg2)
-> >  {
-> >  	asm volatile(
-> 
-> I need this patch in order to compile the upstream kernel on aarch64
-> using gcc 5.  Can it not be added temporarily while the longer term
-> fix, whatever that is, is worked out?
+This is a major rework of a previously-posted patch [1].
 
-As I mentioned in my reply, Will was waiting for -rc1 to post our
-patches (which move this out to asm for arm and arm64). He's out of the
-office today, but I expect they will be posted tomorrow (and hopefully
-queued shortly thereafter).
+This addresses a number of overlapping issues:
 
-Mark.
+ * interaction of the dummy TX in pl011_startup() with hardware that
+   doesn't suppress transmission when in loopback mode, causing
+   glitches / corruption at the receiver;
+
+ * lack of support for loopback mode in the SBSA Generic UART;
+
+ * issues with the models/simulators that pretend to have an
+   unreasonably high baud rate (making it impossible to fill the
+   FIFO in some situations).
+
+
+The general approach in this series is to remove the dummy TX and
+start in a timer-based polled IO mode instead.  If and when a TX IRQ
+occurs, we switch to interrupt-driven mode for future processing.
+
+If the data written to the UART is a small enough trickle, we may
+never using the TX IRQ, but the UART would not stream constantly in
+any case unless there is enough data being written to stop the FIFO
+ever emptying.
+
+
+I've kept the second patch separate in case someone can think of a
+reason why it might not work...
+
+There is some context overlap with Jorge's probe deferral patch, but
+the merge is straightforward.
+
+
+Tested on ARM Juno and the ARM fast models only for now.
+
+Any review/testing from other folks would be appreciated.
+
+Cheers
+Dave
+
+
+[1] [RFC PATCH] serial: amba-pl011: Kickstart TX by explicit FIFO fill
+    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315248.html
+
+Dave Martin (2):
+  serial/amba-pl011: Activate TX IRQ passively
+  serial/amba-pl011: Leave the TX IRQ alone when the UART is not open
+
+ drivers/tty/serial/amba-pl011.c |  164 +++++++++++++++++++++++++++------------
+ 1 file changed, 113 insertions(+), 51 deletions(-)
+
+-- 
+1.7.10.4
