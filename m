@@ -1,66 +1,32 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 24 Feb 2015 02:23:48 +0200
-Subject: [PATCH v3 linux-next] iommu: Enable LPAE pagetable on ARM and
- ARM64 only
-In-Reply-To: <1424737221-1193-1-git-send-email-vincent.stehle@laposte.net>
-References: <3203874.zEMjzr0PS0@avalon>
- <1424737221-1193-1-git-send-email-vincent.stehle@laposte.net>
-Message-ID: <6851919.VIGEV8htgx@avalon>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 23 Feb 2015 21:25:00 -0300
+Subject: Regression: v4.0-rc1: iMX6: Hummingboard fails due to drivers/clk
+ changes
+In-Reply-To: <20150223235350.GS8656@n2100.arm.linux.org.uk>
+References: <20150223223255.GQ8656@n2100.arm.linux.org.uk>
+ <CAOMZO5ASkXoVb9KrqF4Us18-rZ7k3XqjSdhcKyO_ParXXHoWbg@mail.gmail.com>
+ <20150223235350.GS8656@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5D+pSDEct2ne+7Yurn2Jd-2+ArhgZfWYPO98bRyoEpOrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 February 2015 01:20:21 Vincent Stehl? wrote:
-> LPAE iommu page table makes sense only for ARM and ARM64 architectures. Add
-> the corresponding dependency in Kconfig (and enable for COMPILE_TEST, too,
-> as per Laurent's suggestion).
-> 
-> Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
-> Suggested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+On Mon, Feb 23, 2015 at 8:53 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Now,
+> The reason appears to be a lack of packets coming out of the ethernet.
+> Why that is, I'm not sure (maybe a gated GPIO16 clock to the phy?)
+> Given that the phy state seems frozen - it doesn't detect the cable
+> being disconnected - this seems highly likely.
+>
+> Looking at imx6q_1588_init(), this could be a problem:
+>
+>         ptp_clk = of_clk_get(np, 2);
+>         enet_ref = clk_get_sys(NULL, "enet_ref");
+>         clksel = ptp_clk == enet_ref ? IMX6Q_GPR1_ENET_CLK_SEL_ANATOP :
+>                                        IMX6Q_GPR1_ENET_CLK_SEL_PAD;
+>
+> since ptp_clk and enet_ref will _never_ be the same pointer.  Forcing
+> that test to be always true fixes the problem.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
-> 
-> On 02/24/2015 01:02 AM, Laurent Pinchart wrote:
-> > Shouldn't this be ARM || ARM64 || COMPILE_TEST ?
-> 
-> Hi Laurent,
-> 
-> It makes perfect sense; thanks. I completely forgot, as I have yet to see
-> one of those. Here is v3 of the patch.
-> 
-> Best regards,
-> 
-> V.
-> 
-> 
-> Changes since v2:
-> - Add condition on ARM64
-> 
-> Changes since v1:
-> - Add condition on COMPILE_TEST
-> 
-> 
->  drivers/iommu/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> index baa0d97..a440922 100644
-> --- a/drivers/iommu/Kconfig
-> +++ b/drivers/iommu/Kconfig
-> @@ -22,6 +22,7 @@ config IOMMU_IO_PGTABLE
-> 
->  config IOMMU_IO_PGTABLE_LPAE
->  	bool "ARMv7/v8 Long Descriptor Format"
-> +	depends on ARM || ARM64 || COMPILE_TEST
->  	select IOMMU_IO_PGTABLE
->  	help
->  	  Enable support for the ARM long descriptor pagetable format.
-
--- 
-Regards,
-
-Laurent Pinchart
+You are right. With such change imx6q-hummingboard can NFS mount (and
+so does imx6q-sabresd).
