@@ -1,36 +1,70 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 24 Feb 2015 18:01:27 +0900
-Subject: [PATCH v4 2/8] arm64: dts: exynos: Add dts files for 64-bit
- Exynos5433 SoC
-In-Reply-To: <19309272.tlWX2xvTnx@wuerfel>
-References: <1424755011-15999-1-git-send-email-cw00.choi@samsung.com>
- <1424755011-15999-3-git-send-email-cw00.choi@samsung.com>
- <19309272.tlWX2xvTnx@wuerfel>
-Message-ID: <54EC3DE7.7070306@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 24 Feb 2015 09:04:26 +0000
+Subject: [PATCH v5 0/7] irqchip: Move OMAP{4,
+ 5}/DRA7 to use stacked domains
+In-Reply-To: <20150223230205.GJ32521@atomide.com>
+References: <1424713459-6824-1-git-send-email-marc.zyngier@arm.com>
+ <20150223230205.GJ32521@atomide.com>
+Message-ID: <54EC3E9A.5010807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/2015 05:33 PM, Arnd Bergmann wrote:
-> On Tuesday 24 February 2015 14:16:45 Chanwoo Choi wrote:
->> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC based on
->> Octal core CPUs (quad Cortex-A57 and quad Cortex-A53). And Exynos5433 supports
->> PSCI (Power State Coordination Interface) v0.1.
+On 23/02/15 23:02, Tony Lindgren wrote:
+> * Marc Zyngier <marc.zyngier@arm.com> [150223 09:48]:
+>> This series is extracted from [4], which is trying to remove all
+>> traces of gic_arch_extn from the tree. As some maintainers are more
+>> responsive than others (understatement of the year...), I've decided
+>> to split it per sub-arch, and get it moving, at least partially.
 >>
->> This patch includes following dt node to support Exynos5433 SoC:
->> 1. Octa core for big.LITTLE architecture
->> - Cortex-A53 LITTLE Quad-core
->> - Cortex-A57 big Quad-core
->> - Support PSCI v0.1
+>> This series addresses OMAP{4,5} by converting the WUGEN to stacked
+>> domains. The DRA7 crossbar gets the same treatment.
+>>
+>> It is worth realizing that:
+>>
+>> - I haven't been able to test this as much as I would have wanted to
+>>   (it's only been tested on omap4 and omap5).
+>>
+>> - This actively *breaks* existing setups. Once you boot a new kernel
+>>   with an old DT, suspend/resume *will* be broken. Old kernels on a
+>>   new DT won't even boot! You've been warned. This really outline the
+>>   necessity of actually describing the HW in device trees...
 > 
-> Should we try to come up with a way to better share parts of this with the
-> exynos5 dtsi files you already have in arm32? I suspect that there is a
-> significant overlap.
+> Could we parse still the old binding and produce warning for the
+> case when a new kernel is booted with the old DT? That would make
+> it easier for people to debug what's going on.
 
-Currently, 32-bit Exynos5 SoC (which is included in arch/arm/boot/dts)
-didn't support the Cortex-A53/A57 and PSCI.
+There's a number of strategies:
+- Looking up the default, top-level interrupt controller:
+  if that's the GIC, scream.
+- Lookup the crossbar:
+  if it exists, but is not an interrupt controller, scream as well.
+- Lookup the WUGEN:
+  if it doesn't exist, scream again.
 
-The 32-bit Exynos5 SoC support the Coretex-A7 or A15 and big.LITTLE Exynos5 SoC
-use the MCPM (Multi-Cluster PM) driver for secondary cpu on/off instead of PSCI.
+The last one is pretty easy to implement:
 
-Thanks,
-Chanwoo Choi
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index fba1ba7..7bb116a 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -277,6 +277,12 @@ void __init omap_gic_of_init(void)
+ {
+ 	struct device_node *np;
+ 
++	intc_node = of_find_matching_node(NULL, intc_match);
++	if (WARN_ON(!intc_node)) {
++		pr_err("No WUGEN found in DT, system will misbehave.\n");
++		pr_err("UPDATE YOUR DEVICE TREE!\n");
++	}
++
+ 	/* Extract GIC distributor and TWD bases for OMAP4460 ROM Errata WA */
+ 	if (!cpu_is_omap446x())
+ 		goto skip_errata_init;
+
+This should cover both OMAP4, OMAP5 and DRA7.
+
+What do you think?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
