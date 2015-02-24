@@ -1,66 +1,34 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 24 Feb 2015 09:42:15 +0100
-Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
- demuxer chip
-In-Reply-To: <5209097.N5537nGsQV@vostro.rjw.lan>
-References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
- <5225828.OI8hbGqrC4@vostro.rjw.lan>
- <20150220103144.GI13659@leverpostej>
- <5209097.N5537nGsQV@vostro.rjw.lan>
-Message-ID: <20150224094215.13416570@bbrezillon>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 24 Feb 2015 17:43:16 +0900
+Subject: [PATCH] ASoC: improve usage of gpiod API
+In-Reply-To: <1424532804-23789-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1424532804-23789-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20150224084316.GA6236@finisterre.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+On Sat, Feb 21, 2015 at 04:33:24PM +0100, Uwe Kleine-K?nig wrote:
+> Since 39b2bbe3d715 (gpio: add flags argument to gpiod_get*() functions)
+> which appeared in v3.17-rc1, the gpiod_get* functions take an additional
+> parameter that allows to specify direction and initial value for
+> output. Simplify drivers accordingly.
 
-On Tue, 24 Feb 2015 02:02:59 +0100
-"Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
+Applied, thanks.  However...
 
-> On Friday, February 20, 2015 10:31:44 AM Mark Rutland wrote:
-> > [...]
-> 
-> [cut]
->  
-> > Given all of the above I'll go back to the IRQF_SHARED_TIMER_OK approach
-> > you proposed, along with documentation updates and comments at usage
-> > sites to make it clear when it is valid to use.
-> > 
-> > Thank you for bearing with me so far.
-> 
-> No prob. :-)
-> 
-> Actually, there's one more approach possible.  Thomas might not like it, but
-> here it goes anyway for consideration.
-> 
-> What about making it possible to provide a special irqaction to be called
-> while suspended for the shared IRQF_NO_SUSPEND interrupts.
-> 
-> Say we have a "suspended_action" pointer in struct irq_desc in addition to
-> "action" and we swap them in suspend_device_irq() if desc->no_suspend_depth is
-> nonzero and "suspended_action" is not NULL (and then back in resume_irq()).
-> Then, the platform might supply "suspended_action" that will do the right
-> thing for the IRQ.
-> 
-> So the requirement would be to have "suspended_action" set to start with
-> and then the WARN_ON() in irq_pm_install_action() may check if that is present
-> and only trigger the warning if it isn't.
-> 
-> Thoughs?
+>  sound/soc/codecs/adau1977.c | 17 +++++------------
+>  sound/soc/codecs/cs35l32.c  | 19 ++++++-------------
+>  sound/soc/codecs/cs4265.c   | 19 ++++++-------------
+>  sound/soc/codecs/sta350.c   | 30 +++++++++---------------------
+>  sound/soc/codecs/tas2552.c  | 13 +++----------
+>  5 files changed, 29 insertions(+), 69 deletions(-)
 
-That should work for my case.
-Note that I also proposed a version that does not touch the irq_desc
-struct, but I had to add an irq_is_wakeup_armed helper function to
-test in which state the irq handler is called. Your solution would make
-this easier.
-
-Could you remind me what was Thomas concern regarding this suspended
-action list approach ?
-
-Boris
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+...as this touches a bunch of drivers it would have been nicer to send
+it as a series of changes - that minimizes the risk of collisions with
+other changes as a problem with one driver won't affect the others.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150224/c5b7e4da/attachment.sig>
