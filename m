@@ -1,34 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Feb 2015 17:43:16 +0900
-Subject: [PATCH] ASoC: improve usage of gpiod API
-In-Reply-To: <1424532804-23789-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1424532804-23789-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20150224084316.GA6236@finisterre.sirena.org.uk>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 24 Feb 2015 17:45:31 +0900
+Subject: [RESEND PATCH] ARM: EXYNOS: Fix failed second suspend on Exynos4
+In-Reply-To: <1424764762.2877.3.camel@AMDC1943>
+References: <1424256325-16659-1-git-send-email-k.kozlowski@samsung.com>
+ <54EBE43C.1020901@samsung.com> <1424764762.2877.3.camel@AMDC1943>
+Message-ID: <54EC3A2B.9000603@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 21, 2015 at 04:33:24PM +0100, Uwe Kleine-K?nig wrote:
-> Since 39b2bbe3d715 (gpio: add flags argument to gpiod_get*() functions)
-> which appeared in v3.17-rc1, the gpiod_get* functions take an additional
-> parameter that allows to specify direction and initial value for
-> output. Simplify drivers accordingly.
+On 02/24/2015 04:59 PM, Krzysztof Kozlowski wrote:
+> On wto, 2015-02-24 at 11:38 +0900, Chanwoo Choi wrote:
+>> Hi Krzysztof,
+>>
+>> I tested this patch for suspend-to-ram on Exynos4412-based trats2 board.
+>> When I tested suspend-to-ram repetitively, I faced on hang issue of
+>> suspend-to-ram for Exynos4 as before.
+>>
+>> Could you send .config file for test?
+> 
+> I am testing on exynos_defconfig with some stuff enabled (nothing
+> special: regulators, chargers, PM_ADVANCED_DEBUG, extcon etc.). However
+> sometimes I also see hangs related to MMC. But I believe this issue is
+> present for some time and is not related to my DELAYED_RESET_ASSERTION
+> changes.
 
-Applied, thanks.  However...
+I understand. I think we have to resolve the remaining hang issue for Exynos4 suspend-to-ram.
 
->  sound/soc/codecs/adau1977.c | 17 +++++------------
->  sound/soc/codecs/cs35l32.c  | 19 ++++++-------------
->  sound/soc/codecs/cs4265.c   | 19 ++++++-------------
->  sound/soc/codecs/sta350.c   | 30 +++++++++---------------------
->  sound/soc/codecs/tas2552.c  | 13 +++----------
->  5 files changed, 29 insertions(+), 69 deletions(-)
-
-...as this touches a bunch of drivers it would have been nicer to send
-it as a series of changes - that minimizes the risk of collisions with
-other changes as a problem with one driver won't affect the others.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150224/c5b7e4da/attachment.sig>
+Thanks,
+Chanwoo Choi
