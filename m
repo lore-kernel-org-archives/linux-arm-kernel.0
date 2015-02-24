@@ -1,56 +1,66 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 24 Feb 2015 17:52:01 +0900
-Subject: [PATCH v4 2/8] arm64: dts: exynos: Add dts files for 64-bit
- Exynos5433 SoC
-In-Reply-To: <7139111.LGA4lhSjob@wuerfel>
-References: <1424755011-15999-1-git-send-email-cw00.choi@samsung.com>
- <1424755011-15999-3-git-send-email-cw00.choi@samsung.com>
- <7139111.LGA4lhSjob@wuerfel>
-Message-ID: <54EC3BB1.1020701@samsung.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Tue, 24 Feb 2015 14:22:29 +0530
+Subject: [RFC PATCH v4 3/4] arm64:thunder: Add initial dts for Cavium's
+ Thunder SoC in 2 Node topology.
+In-Reply-To: <CAFpQJXUvux+b9hYx_ZY-1hor0HRFFgh=e4vCYyJiDHrDC9Y=tQ@mail.gmail.com>
+References: <1421924755-26029-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1421924755-26029-4-git-send-email-gkulkarni@caviumnetworks.com>
+ <2882934.brFyhkGPyE@wuerfel> <1885509.Z0Gm3e3FlX@wuerfel>
+ <CAFpQJXUvux+b9hYx_ZY-1hor0HRFFgh=e4vCYyJiDHrDC9Y=tQ@mail.gmail.com>
+Message-ID: <CAFpQJXXkXatxRcfpA1DjuuiUf3vup3DV+dACyGxT=TDkrO8rNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/2015 05:35 PM, Arnd Bergmann wrote:
-> On Tuesday 24 February 2015 14:16:45 Chanwoo Choi wrote:
->> +       aliases {
->> +               pinctrl0 = &pinctrl_alive;
->> +               pinctrl1 = &pinctrl_aud;
->> +               pinctrl2 = &pinctrl_cpif;
->> +               pinctrl3 = &pinctrl_ese;
->> +               pinctrl4 = &pinctrl_finger;
->> +               pinctrl5 = &pinctrl_fsys;
->> +               pinctrl6 = &pinctrl_imem;
->> +               pinctrl7 = &pinctrl_nfc;
->> +               pinctrl8 = &pinctrl_peric;
->> +               pinctrl9 = &pinctrl_touch;
->> +               serial0 = &serial_0;
->> +               serial1 = &serial_1;
->> +               serial2 = &serial_2;
->> +               i2c0 = &hsi2c_0;
->> +               i2c1 = &hsi2c_1;
->> +               i2c2 = &hsi2c_2;
->> +               i2c3 = &hsi2c_3;
->> +               i2c4 = &hsi2c_4;
->> +               i2c5 = &hsi2c_5;
->> +               i2c6 = &hsi2c_6;
->> +               i2c7 = &hsi2c_7;
->> +               i2c8 = &hsi2c_8;
->> +               i2c9 = &hsi2c_9;
->> +               i2c10 = &hsi2c_10;
->> +               i2c11 = &hsi2c_11;
->> +       };
->> +
+Hi Arnd,
+
+On Fri, Jan 23, 2015 at 6:07 PM, Ganapatrao Kulkarni
+<gpkulkarni@gmail.com> wrote:
+> Hi Arnd,
+>
+> On Thu, Jan 22, 2015 at 11:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Thursday 22 January 2015 17:47:13 Arnd Bergmann wrote:
+>>>
+>>> This seems wrong still: The clusters and cores do not have unique
+>>> numbers. I believe the code will not work correctly, and it won't
+>>> be compliant with the binding from patch 2.
+>>>
+>>> I think the right way here would be to use
+>>>
+>>>         arm,associativity = <0 2 47>;
+>>>
+>>> for cpu at 20f, and
+>>>
+>>>         arm,associativity = <1 3 48>;
+>>>
+>>> for cpu at 10000. Your previous version used the numbers from
+>>> the reg property, which should be fine as well if that helps:
+>>>
+>>>
+>>>         arm,associativity = <0x0 0x200 0x20f>;
+>>>
+>>>         arm,associativity = <0x10000 0x10000 0x10000>;
+>>>
+>>> which should have the same effect as above, as long as the code
+>>> can handle the numbers not being consecutive.
+>>>
+>>>
 >>
-> 
-> Can you put the aliases into the per-board files? There might be boards that
-> do not support all the uarts and all the i2c controllers but only want to
-> provide aliases for a subset of them, without holes in the numbering.
+>> Upon further consideration, I think your patch is correct after
+>> all, but let me check again on PowerPC machines.
+> i have removed, board id which was in previous patch, to keep the
+> associativity aligned to mpidr, ie. socket,cluster id and core id.
+> both previous and current mappings holds good for our design.
+> our topology is 2 sockets(aff2=0and 1) , each having 3
+> clusters(aff1=0to2)and each cluster having 16 cores(aff0:0to15)
+> in associativity property, for our case, only first id(socket id) is
+> mapped to numa, others are mentioned only to describe the topology.
+>>
+>>         Arnd
+any further comments, how we go about these patches?
+please suggest.
 
-OK, I'm not opposite with you opinion.
+> thanks
+> Ganapat
 
-But, I have a question.
-If we put the aliases into the board dts file instaed of SoC dtsi,
-each board dts file may use the different alias name about same phandle.
-
-Thanks,
-Chanwoo Choi
+thanks
+Ganapat
