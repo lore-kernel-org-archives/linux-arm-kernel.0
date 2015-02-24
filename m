@@ -1,102 +1,62 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 24 Feb 2015 18:36:03 +0100
-Subject: [PATCH] cpuidle: mvebu: update cpuidle thresholds for Armada
- XP SOCs
-In-Reply-To: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
-References: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
-Message-ID: <54ECB683.6060705@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 24 Feb 2015 17:42:59 +0000
+Subject: [PATCH v3 0/4] clk: st: New always-on clock domain
+In-Reply-To: <1424799222-9301-1-git-send-email-lee.jones@linaro.org>
+References: <1424799222-9301-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150224174259.GD21323@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastien,
+On Tue, 24 Feb 2015, Lee Jones wrote:
 
-On 13/02/2015 15:55, s. rannou wrote:
-> Originally, the thresholds used in the cpuidle driver for Armada SOCs
-> were temporarily chosen, leaving room for improvements.
+> v2 => v3:
+>   - Ensure DT actually reflects h/w
+>     - i.e. Nodes should not contain a mishmash of different IP
+>       blocks, but should identify related h/w.  In the current
+>       example we use interconnects
+>   - Change naming from clkdomain to clk-always-on
+>   - Place "do not abuse" warning in documentation
 > 
-> This commit updates the thresholds for the Armada XP SOCs with values
-> that positively impact performances:
+> v1 => v2:
+>   - Turned the ST specific driver into a generic one
+>   
+> Hardware can have a bunch of clocks which must not be turned off.
+> If drivers a) fail to obtain a reference to any of these or b) give
+> up a previously obtained reference during suspend, the common clk
+> framework will attempt to turn them off and the hardware will
+> subsequently die.  The only way to recover from this failure is to
+> restart.
+>   
+> To avoid either of these two scenarios from catastrophically
+> disabling the running system we have implemented a clock domain
+> where clocks are consumed and references are taken, thus preventing
+> them from being shut down by the framework.
 > 
->                                 without patch  with patch   vendor kernel
->  - iperf localhost (gbit/sec)   ~3.7           ~6.4         ~5.4
->  - ioping tmpfs (iops)          ~163k          ~206k        ~179k
->  - ioping tmpfs (mib/s)         ~636           ~805         ~699
+> *** BLURB HERE ***
+
+*grumble*, that's annoying, as I removed this.
+
+I guess Git caches the patches before sending them.
+
+> Lee Jones (4):
+>   ARM: sti: stih407-family: Supply defines for CLOCKGEN A0
+>   ARM: sti: stih407-family: Add platform interconnects to always-on clk
+>     domain
+>   clk: Provide an always-on clock domain framework
+>   clk: dt: Introduce always-on clock domain documentation
 > 
-> The idle power consumption is negatively impacted (proportionally less
-> than the performance gain), and we are still performing better than
-> the vendor kernel here:
+>  .../devicetree/bindings/clock/clk-always-on.txt    | 35 ++++++++++++
+>  arch/arm/boot/dts/stih407-family.dtsi              | 15 ++++++
+>  drivers/clk/Makefile                               |  1 +
+>  drivers/clk/clk-always-on.c                        | 62 ++++++++++++++++++++++
+>  include/dt-bindings/clock/stih407-clks.h           |  4 ++
+>  5 files changed, 117 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/clk-always-on.txt
+>  create mode 100644 drivers/clk/clk-always-on.c
 > 
->                                 without patch   with patch  vendor kernel
->  - power consumption idle (W)   ~2.4            ~3.2        ~4.4
->  - power consumption busy (W)   ~8.6            ~8.3        ~8.6
-> 
-> There is still room for improvement regarding the value of these
-> thresholds, they were chosen to mimic the vendor kernel.
-> 
-> This patch only impacts Armada XP SOCs and was tested on Online Labs
-> C1 boards. A similar approach can be taken to improve the performances
-> of the Armada 370 and Armada 38x SOCs.
-> 
-> Thanks a lot to Thomas Petazzoni, Gregory Clement and Willy Tarreau
-> for the discussions and tips around this topic.
-
-Thanks for your work and all the test you have done. As you mentioned
-there should be still room for improvement, but this patch is already
-a step in the good direction. So you can add my:
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-While this driver is related to mvebu SoCs, it is not part of the mvebu subsystem
-but of the PM subsystem and should be taken by its maintainers. I added them
-in copy as well as the pm list.
-
-Daniel and Rafael,
-if you didn't get the original email I can bounced if needed. I also wonder
-it it would worth applying it on the stable branch. What do you think about it?
-
-Thanks,
-
-Gregory
-
-
-
-> 
-> Signed-off-by: Sebastien Rannou <mxs@sbrk.org>
-> ---
->  drivers/cpuidle/cpuidle-mvebu-v7.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
-> index 38e6861..3716a1f 100644
-> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
-> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
-> @@ -50,17 +50,17 @@ static struct cpuidle_driver armadaxp_idle_driver = {
->  	.states[0]		= ARM_CPUIDLE_WFI_STATE,
->  	.states[1]		= {
->  		.enter			= mvebu_v7_enter_idle,
-> -		.exit_latency		= 10,
-> +		.exit_latency		= 100,
->  		.power_usage		= 50,
-> -		.target_residency	= 100,
-> +		.target_residency	= 1000,
->  		.name			= "MV CPU IDLE",
->  		.desc			= "CPU power down",
->  	},
->  	.states[2]		= {
->  		.enter			= mvebu_v7_enter_idle,
-> -		.exit_latency		= 100,
-> +		.exit_latency		= 1000,
->  		.power_usage		= 5,
-> -		.target_residency	= 1000,
-> +		.target_residency	= 10000,
->  		.flags			= MVEBU_V7_FLAG_DEEP_IDLE,
->  		.name			= "MV CPU DEEP IDLE",
->  		.desc			= "CPU and L2 Fabric power down",
-> 
-
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
