@@ -1,16 +1,16 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Feb 2015 19:01:42 -0800
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 23 Feb 2015 21:12:34 -0600
 Subject: New l3-noc error with CPUFREQ_DT built-in with v4.0-rc1
 In-Reply-To: <20150224023505.GQ32521@atomide.com>
 References: <20150223235947.GC25954@atomide.com>
  <20150224015903.GP32521@atomide.com>
  <20150224022433.GB5198@saruman.tx.rr.com>
  <20150224023505.GQ32521@atomide.com>
-Message-ID: <20150224030141.GR32521@atomide.com>
+Message-ID: <20150224031234.GA15941@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150223 18:43]:
+On Mon, Feb 23, 2015 at 06:35:06PM -0800, Tony Lindgren wrote:
 > * Felipe Balbi <balbi@ti.com> [150223 18:28]:
 > > Hi,
 > > 
@@ -69,13 +69,25 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > actually show the address where the error happened to limit it down
 > to a single device..
 
-Looks like the address is 0 for "Custom Error". Anyways, reverting
-a fix for similar issue found on omap3 so far seems to help, that's
-3d009c8c61f9 ("gpio: omap: Fix bad device access with setup_irq()").
+you can't really do that from within l3. It doesn't have enough
+information to figure that out. Since it pointed you to l4per2, then you
+need to decode l4per2's debug registers. That has never been
+implemented, though. What happened here is that l4per2 detected the
+bogus access from one of the devices attached to it and passed the error
+up to l3. Since we only have l3 decoding, that's what you see and it
+ends up being really cryptic.
 
-That got merged very late for v3.19, so it certainly explains why
-it was not noticed until now.
+If you decode l4per2's registers, I'm sure it'll point you to a real
+device. I guess just to prove the concept, you just hack it inside l3
+irq handler, though ideally we would have a real drivers/bus/omap-l4.c,
+or something like that.
 
-Regards,
-
-Tony
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150223/39e82c45/attachment-0001.sig>
