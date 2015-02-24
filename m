@@ -1,45 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Feb 2015 10:47:27 +0100
-Subject: [PATCH] mmc: sunxi: avoid invalid pointer calculation
-Message-ID: <27509084.spYfayGTeo@wuerfel>
+Date: Tue, 24 Feb 2015 10:48:57 +0100
+Subject: [PATCH v4 2/8] arm64: dts: exynos: Add dts files for 64-bit
+ Exynos5433 SoC
+In-Reply-To: <54EC3BB1.1020701@samsung.com>
+References: <1424755011-15999-1-git-send-email-cw00.choi@samsung.com>
+ <7139111.LGA4lhSjob@wuerfel> <54EC3BB1.1020701@samsung.com>
+Message-ID: <7412525.l6YnQcTxtg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sunxi mmc driver tries to calculate a dma address by using pointer
-arithmetic, which causes a warning when dma_addr_t is wider than a pointer:
+On Tuesday 24 February 2015 17:52:01 Chanwoo Choi wrote:
+> 
+> But, I have a question.
+> If we put the aliases into the board dts file instaed of SoC dtsi,
+> each board dts file may use the different alias name about same phandle.
 
-drivers/mmc/host/sunxi-mmc.c: In function 'sunxi_mmc_init_idma_des':
-drivers/mmc/host/sunxi-mmc.c:296:35: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-  struct sunxi_idma_des *pdes_pa = (struct sunxi_idma_des *)host->sg_dma;
-                                   ^
+Yes, that is the idea. In particular with the uarts, the intention is
+that the numbering of the device nodes in /dev is the same that is
+printed on the board (if any), which may be different from the numbering
+internal to the SoC.
 
-To avoid this warning and to simplify the logic, this changes
-the code to avoid the cast and calculate the correct address
-manually. The behavior should be unchanged.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index e8a4218b5726..c326ac965806 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -293,7 +293,7 @@ static void sunxi_mmc_init_idma_des(struct sunxi_mmc_host *host,
- 				    struct mmc_data *data)
- {
- 	struct sunxi_idma_des *pdes = (struct sunxi_idma_des *)host->sg_cpu;
--	struct sunxi_idma_des *pdes_pa = (struct sunxi_idma_des *)host->sg_dma;
-+	dma_addr_t next_desc = host->sg_dma;
- 	int i, max_len = (1 << host->idma_des_size_bits);
- 
- 	for (i = 0; i < data->sg_len; i++) {
-@@ -305,8 +305,9 @@ static void sunxi_mmc_init_idma_des(struct sunxi_mmc_host *host,
- 		else
- 			pdes[i].buf_size = data->sg[i].length;
- 
-+		next_desc += sizeof(struct sunxi_idma_des);
- 		pdes[i].buf_addr_ptr1 = sg_dma_address(&data->sg[i]);
--		pdes[i].buf_addr_ptr2 = (u32)&pdes_pa[i + 1];
-+		pdes[i].buf_addr_ptr2 = (u32)next_desc;
- 	}
- 
- 	pdes[0].config |= SDXC_IDMAC_DES0_FD;
+	Arnd 
