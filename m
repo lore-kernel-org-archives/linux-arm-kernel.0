@@ -1,56 +1,85 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Tue, 24 Feb 2015 12:23:36 -0500
-Subject: [PATCH v2 2/2] ARM: perf: Add support for Scorpion PMUs
-In-Reply-To: <20150220201627.GD24928@codeaurora.org>
-References: <1423851849-6069-1-git-send-email-sboyd@codeaurora.org>
- <1423851849-6069-3-git-send-email-sboyd@codeaurora.org>
- <20150220193552.GE1767@arm.com>
- <20150220201627.GD24928@codeaurora.org>
-Message-ID: <CAJ5Y-eYLeeNDcBtdvMf-k0XGxq-P21FDq-VMHPJsp4=ccuemig@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 24 Feb 2015 11:33:57 -0600
+Subject: MUSB dual-role on AM335x behaving weirdly
+In-Reply-To: <20150224165050.GX25269@lukather>
+References: <20150121160631.GH4367@lukather>
+ <CADYTM3b40_u4Twt27PBVH4dC9ErDnFEi0AUzs_aJRM3mMHaBCQ@mail.gmail.com>
+ <54C0A8C9.3040201@visionsystems.de>
+ <20150205132142.GD2079@lukather> <20150224103911.GR25269@lukather>
+ <20150224145401.GH29829@saruman.tx.rr.com>
+ <20150224165050.GX25269@lukather>
+Message-ID: <20150224173357.GB25042@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 February 2015 at 15:16, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 02/20, Will Deacon wrote:
->> On Fri, Feb 13, 2015 at 06:24:09PM +0000, Stephen Boyd wrote:
->>
->> > +static void scorpion_evt_setup(int idx, u32 config_base)
->> > +{
->> > +       u32 val;
->> > +       u32 mask;
->> > +       u32 vval, fval;
->> > +       unsigned int region;
->> > +       unsigned int group;
->> > +       unsigned int code;
->> > +       unsigned int group_shift;
->> > +       bool venum_event;
->> > +
->> > +       krait_decode_event(config_base, &region, &group, &code, &venum_event,
->> > +                          NULL);
->> > +
->> > +       group_shift = group * 8;
->> > +       mask = 0xff << group_shift;
->> > +
->> > +       /* Configure evtsel for the region and group */
->> > +       if (venum_event)
->> > +               val = SCORPION_VLPM_GROUP0;
->> > +       else
->> > +               val = scorpion_get_pmresrn_event(region);
->> > +       val += group;
->> > +       /* Mix in mode-exclusion bits */
->> > +       val |= config_base & (ARMV7_EXCLUDE_USER | ARMV7_EXCLUDE_PL1);
->> > +       armv7_pmnc_write_evtsel(idx, val);
->> > +
->> > +       asm volatile("mcr p15, 0, %0, c9, c15, 0" : : "r" (0));
->>
->> What's this guy doing?
->
-> This is the same as Krait. It's clearing some implementation
-> defined register. From what I can tell it's a per-event register
-> (i.e. PMSELR decides which event this register write actually
-> affects) and we do this here to reset this register to some
-> defined value, zero. Otherwise the reset value of this register
-> is UNPREDICTABLE and that would be bad. I think we might be able
-> to move it to the pmu reset path, but I don't know. Ashwin?
+Hi,
 
-Will have to check once I get to office tomorrow.
+On Tue, Feb 24, 2015 at 05:50:50PM +0100, Maxime Ripard wrote:
+> Hi Felipe,
+> 
+> On Tue, Feb 24, 2015 at 08:54:01AM -0600, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Tue, Feb 24, 2015 at 11:39:11AM +0100, Maxime Ripard wrote:
+> > > On Thu, Feb 05, 2015 at 02:21:42PM +0100, Maxime Ripard wrote:
+> > > > Hi,
+> > > > 
+> > > > On Thu, Jan 22, 2015 at 08:37:45AM +0100, Yegor Yefremov wrote:
+> > > > > I have the same experience with 3.15. The switching is working when
+> > > > > CONFIG_USB_MUSB_DUAL_ROLE is set and dr_mode = "otg". But since 3.16
+
+since 3.16 ?
+
+> > > > > it seems to be broken. Still had no time to bisect this.
+> > > > 
+> > > > I've been giving a few versions (from v3.15 to Tuesday's linux-next) a
+> > > > try, and I always see the same behaviour now:
+> > > > 
+> > > >   - Booting as a gadget (ie, with a USB cable plugged in), and
+> > > >     swapping the cable for a (real, this time) USB OTG cable with a
+> > > >     USB key never works. When the device is plugged, all I get is
+> > > > 
+> > > > [  262.944846] usb 1-1: new high-speed USB device number 2 using musb-hdrc
+> > > > [  278.064748] usb 1-1: device descriptor read/64, error -110
+> > > > 
+> > > >     Putting in back in gadget results with a load of continuous:
+> > > > [  315.258839] musb_bus_suspend 2484: trying to suspend as a_wait_vfall while active
+> > > > 
+> > > >   - Booting as a host, or with nothing connected to it actually work,
+> > > >     up to a few plug-a-device-then-plug-a-host cycles, where you end
+> > > >     up with the following logs when disconnecting the device (somehow,
+> > > >     it always happens when it is set in host mode).
+> > > > 
+> > > > [   12.969075] CAUTION: musb: Babble Interrupt Occurred
+> > > > [   12.974445] CAUTION: musb: Babble Interrupt Occurred
+> > > > [   12.979637] musb_stage0_irq 789: unhandled DISCONNECT transition (a_wait_bcon)
+> > > > [   12.988498] usb 1-1: USB disconnect, device number 2
+> > > > [   13.071849] musb-hdrc musb-hdrc.0.auto: Restarting MUSB to recover from Babble
+> > > > 
+> > > >     Plugging back our USB cable, with the AM335x acting as a device
+> > > >     work once. Then, when it switches to the host mode, we end up with
+> > > >     the same scenario than in the coldplug as gadget case: USB read
+> > > >     error, before then having all the a_wait_vfall messages.
+> > > 
+> > > Guys, any ideas/hints?
+> > 
+> > which platform are you using ? I guess the only way to move here would
+> > be to bisect between 3.15 and 3.16 to find the offending commit.
+> 
+> 3.15 didn't work either unfortunately. I had the behaviour described
+> above on all kernel between 3.15 and a 4.0-rc1-ish.
+> 
+> This is on an custom design based on the am335x.
+
+has it ever worked ? I don't have a board here which can do dual role.
+BBB has a mini-B only on the peripheral port.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150224/94530cd6/attachment.sig>
