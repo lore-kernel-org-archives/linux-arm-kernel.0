@@ -1,1798 +1,600 @@
-From: rsahu@apm.com (Rameshwar Prasad Sahu)
-Date: Tue, 24 Feb 2015 18:23:57 +0530
-Subject: [PATCH v6 1/3] dmaengine: Add support for APM X-Gene SoC DMA engine
- driver
-In-Reply-To: <1424782439-31485-1-git-send-email-rsahu@apm.com>
-References: <1424782439-31485-1-git-send-email-rsahu@apm.com>
-Message-ID: <1424782439-31485-2-git-send-email-rsahu@apm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 Feb 2015 14:02:15 +0100
+Subject: [PATCH] spi: sirf: add reset controller dependency
+In-Reply-To: <20150224075018.GM6236@finisterre.sirena.org.uk>
+References: <4553005.HBquOfbqXe@wuerfel> <6170208.Z0Upu48JrX@wuerfel>
+ <20150224075018.GM6236@finisterre.sirena.org.uk>
+Message-ID: <6951359.9Y8ugYfjuJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements the APM X-Gene SoC DMA engine driver. The APM X-Gene
-SoC DMA engine consists of 4 DMA channels for performing DMA operations.
-These DMA operations include memory copy and scatter-gather memory copy
-offloading.
+On Tuesday 24 February 2015 16:50:18 Mark Brown wrote:
+> On Mon, Feb 23, 2015 at 11:01:18PM +0100, Arnd Bergmann wrote:
+> > On Saturday 21 February 2015 18:44:58 Mark Brown wrote:
+> 
+> > > In that case a dependency seems wrong, I'd expect to see a select - it's
+> > > a bit obscure to have to grovel around to figure out what magic options
+> > > are needed to make things turn on and resets feel more like a utility
+> > > thing than a control bus (which tend to be the things we depend on).
+> > > Dunno, perhaps I'm wrong?
+> 
+> > Mixing 'select' and 'depends on' causes recursive dependencies, and
+> > there are already lots of drivers that do 'depends on RESET_CONTROLLER'.
+> 
+> Well, perhaps that's the cleanup we should be doing then...  one of the
+> big problems with some of the other randconfig work there's been is that
+> a lot of the patches just add dependencies without looking at if that
+> makes sense.
 
-Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
-Signed-off-by: Loc Ho <lho@apm.com>
----
- drivers/dma/Kconfig     |    8 +
- drivers/dma/Makefile    |    1 +
- drivers/dma/xgene-dma.c | 1738 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 1747 insertions(+)
- create mode 100755 drivers/dma/xgene-dma.c
+I've tried sanitizing the logic more globally now. The approach below
+gets rid of most of the Kconfig logic and just ensures that things work
+out of the box, by having drivers that call reset_controller_register
+'select RESET_CONTROLLER', but letting drivers that use the API
+link correctly all the time.
 
+At the same time, I try to improve the behavior of device_reset_optional(),
+which now returns success if the subsystem is disabled and no 'resets'
+property is present, while the device_reset() call always fails if
+the subsystem is disabled.
+
+Any comments?
+
+	Arnd
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 6aa2a766be66..fb568fb18047 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -311,6 +311,7 @@ choice
+ 
+ config ARCH_MULTIPLATFORM
+ 	bool "Allow multiple platforms to be selected"
++	select ARCH_HAS_RESET_CONTROLLER
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_HAS_SG_CHAIN
+ 	select ARM_PATCH_PHYS_VIRT
+diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
+index 3e40a947f3ea..b595683d9138 100644
+--- a/arch/arm/mach-berlin/Kconfig
++++ b/arch/arm/mach-berlin/Kconfig
+@@ -1,6 +1,5 @@
+ menuconfig ARCH_BERLIN
+ 	bool "Marvell Berlin SoCs" if ARCH_MULTI_V7
+-	select ARCH_HAS_RESET_CONTROLLER
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_GIC
+ 	select DW_APB_ICTL
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index e8627e04e1e6..dae7d996790e 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -56,7 +56,6 @@ config HAVE_IMX_MMDC
+ 
+ config HAVE_IMX_SRC
+ 	def_bool y if SMP
+-	select ARCH_HAS_RESET_CONTROLLER
+ 
+ config IMX_HAVE_IOMUX_V1
+ 	bool
+diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
+index 3d788d7d3b7b..1bd074de8c62 100644
+--- a/arch/arm/mach-mmp/Kconfig
++++ b/arch/arm/mach-mmp/Kconfig
+@@ -91,6 +91,7 @@ config MACH_MMP_DT
+ 	select PINCTRL_SINGLE
+ 	select COMMON_CLK
+ 	select ARCH_HAS_RESET_CONTROLLER
++	select RESET_CONTROLLER
+ 	select CPU_MOHAWK
+ 	help
+ 	  Include support for Marvell MMP2 based platforms using
+@@ -105,6 +106,7 @@ config MACH_MMP2_DT
+ 	select PINCTRL_SINGLE
+ 	select COMMON_CLK
+ 	select ARCH_HAS_RESET_CONTROLLER
++	select RESET_CONTROLLER
+ 	select CPU_PJ4
+ 	help
+ 	  Include support for Marvell MMP2 based platforms using
+diff --git a/arch/arm/mach-prima2/Kconfig b/arch/arm/mach-prima2/Kconfig
+index e03d8b5c9ad0..629a24d5ce1e 100644
+--- a/arch/arm/mach-prima2/Kconfig
++++ b/arch/arm/mach-prima2/Kconfig
+@@ -1,6 +1,5 @@
+ menuconfig ARCH_SIRF
+ 	bool "CSR SiRF" if ARCH_MULTI_V7
+-	select ARCH_HAS_RESET_CONTROLLER
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_IRQ_CHIP
+ 	select NO_IOPORT_MAP
+diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
+index ae4eb7cc4bcc..17d2df427c3c 100644
+--- a/arch/arm/mach-rockchip/Kconfig
++++ b/arch/arm/mach-rockchip/Kconfig
+@@ -2,7 +2,6 @@ config ARCH_ROCKCHIP
+ 	bool "Rockchip RK2928 and RK3xxx SOCs" if ARCH_MULTI_V7
+ 	select PINCTRL
+ 	select PINCTRL_ROCKCHIP
+-	select ARCH_HAS_RESET_CONTROLLER
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_GIC
+@@ -12,6 +11,7 @@ config ARCH_ROCKCHIP
+ 	select HAVE_ARM_TWD if SMP
+ 	select DW_APB_TIMER_OF
+ 	select REGULATOR if PM
++	select RESET_CONTROLLER
+ 	select ROCKCHIP_TIMER
+ 	select ARM_GLOBAL_TIMER
+ 	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
+index 3b1ac463a494..f25e626ed3fc 100644
+--- a/arch/arm/mach-sti/Kconfig
++++ b/arch/arm/mach-sti/Kconfig
+@@ -5,7 +5,6 @@ menuconfig ARCH_STI
+ 	select PINCTRL
+ 	select PINCTRL_ST
+ 	select MFD_SYSCON
+-	select ARCH_HAS_RESET_CONTROLLER
+ 	select HAVE_ARM_SCU if SMP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_ERRATA_754322
+@@ -13,7 +12,6 @@ menuconfig ARCH_STI
+ 	select ARM_ERRATA_775420
+ 	select PL310_ERRATA_753970 if CACHE_L2X0
+ 	select PL310_ERRATA_769419 if CACHE_L2X0
+-	select RESET_CONTROLLER
+ 	help
+ 	  Include support for STiH41x SOCs like STiH415/416 using the device tree
+ 	  for discovery
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index 3c84be680d7d..9a9689ebc047 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -1,13 +1,11 @@
+ menuconfig ARCH_SUNXI
+ 	bool "Allwinner SoCs" if ARCH_MULTI_V7
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select ARCH_HAS_RESET_CONTROLLER
+ 	select CLKSRC_MMIO
+ 	select GENERIC_IRQ_CHIP
+ 	select PINCTRL
+ 	select RESET_CONTROLLER
+ 	select SUN4I_TIMER
+-	select RESET_CONTROLLER
+ 
+ if ARCH_SUNXI
+ 
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 1bc811a74a9f..0949a060fa72 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -44,7 +44,7 @@ extern void __init sun6i_reset_init(void);
+ static void __init sun6i_timer_init(void)
+ {
+ 	of_clk_init(NULL);
+-	if (IS_ENABLED(CONFIG_RESET_CONTROLLER))
++	if (IS_ENABLED(CONFIG_RESET_SUNXI))
+ 		sun6i_reset_init();
+ 	clocksource_of_init();
+ }
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 5d1a318f1302..4488966c2841 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -8,7 +8,6 @@ menuconfig ARCH_TEGRA
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+ 	select PINCTRL
+-	select ARCH_HAS_RESET_CONTROLLER
+ 	select RESET_CONTROLLER
+ 	select SOC_BUS
+ 	select USB_ULPI if USB_PHY
 diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index a874b6e..0e05831 100644
+index a874b6ec6650..cc87138f43e7 100644
 --- a/drivers/dma/Kconfig
 +++ b/drivers/dma/Kconfig
-@@ -425,6 +425,14 @@ config IMG_MDC_DMA
+@@ -403,7 +403,6 @@ config XILINX_VDMA
+ config DMA_SUN6I
+ 	tristate "Allwinner A31 SoCs DMA support"
+ 	depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
+-	depends on RESET_CONTROLLER
+ 	select DMA_ENGINE
+ 	select DMA_VIRTUAL_CHANNELS
  	help
- 	  Enable support for the IMG multi-threaded DMA controller (MDC).
-
-+config XGENE_DMA
-+	tristate "APM X-Gene DMA support"
-+	depends on ARCH_XGENE
-+	select DMA_ENGINE
-+	select ASYNC_TX_ENABLE_CHANNEL_SWITCH
-+	help
-+	  Enable support for the APM X-Gene SoC DMA engine.
-+
- config DMA_ENGINE
+diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
+index 35215f6867d3..cb21e3821244 100644
+--- a/drivers/gpu/drm/rockchip/Kconfig
++++ b/drivers/gpu/drm/rockchip/Kconfig
+@@ -1,7 +1,6 @@
+ config DRM_ROCKCHIP
+ 	tristate "DRM Support for Rockchip"
+ 	depends on DRM && ROCKCHIP_IOMMU
+-	depends on RESET_CONTROLLER
+ 	select DRM_KMS_HELPER
+ 	select DRM_KMS_FB_HELPER
+ 	select DRM_PANEL
+diff --git a/drivers/gpu/drm/sti/Kconfig b/drivers/gpu/drm/sti/Kconfig
+index 0670aa17409d..8b9527dcf8c7 100644
+--- a/drivers/gpu/drm/sti/Kconfig
++++ b/drivers/gpu/drm/sti/Kconfig
+@@ -1,7 +1,6 @@
+ config DRM_STI
+ 	tristate "DRM Support for STMicroelectronics SoC stiH41x Series"
+ 	depends on DRM && (SOC_STIH415 || SOC_STIH416 || ARCH_MULTIPLATFORM) && HAVE_DMA_ATTRS
+-	depends on RESET_CONTROLLER
+ 	select DRM_KMS_HELPER
+ 	select DRM_GEM_CMA_HELPER
+ 	select DRM_KMS_CMA_HELPER
+diff --git a/drivers/gpu/drm/tegra/Kconfig b/drivers/gpu/drm/tegra/Kconfig
+index 74d9d621453d..a188994027f9 100644
+--- a/drivers/gpu/drm/tegra/Kconfig
++++ b/drivers/gpu/drm/tegra/Kconfig
+@@ -3,7 +3,6 @@ config DRM_TEGRA
+ 	depends on ARCH_TEGRA || (ARM && COMPILE_TEST)
+ 	depends on COMMON_CLK
+ 	depends on DRM
+-	depends on RESET_CONTROLLER
+ 	select DRM_KMS_HELPER
+ 	select DRM_MIPI_DSI
+ 	select DRM_PANEL
+diff --git a/drivers/gpu/ipu-v3/Kconfig b/drivers/gpu/ipu-v3/Kconfig
+index aefdff95356d..08766c6e7856 100644
+--- a/drivers/gpu/ipu-v3/Kconfig
++++ b/drivers/gpu/ipu-v3/Kconfig
+@@ -1,7 +1,6 @@
+ config IMX_IPUV3_CORE
+ 	tristate "IPUv3 core support"
+ 	depends on SOC_IMX5 || SOC_IMX6Q || ARCH_MULTIPLATFORM
+-	depends on RESET_CONTROLLER
+ 	select GENERIC_IRQ_CHIP
+ 	help
+ 	  Choose this if you have a i.MX5/6 system and want to use the Image
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index 22da9c2ffa22..e9dae74b98a7 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -829,7 +829,6 @@ config I2C_STU300
+ 
+ config I2C_SUN6I_P2WI
+ 	tristate "Allwinner sun6i internal P2WI controller"
+-	depends on RESET_CONTROLLER
+ 	depends on MACH_SUN6I || COMPILE_TEST
+ 	help
+ 	  If you say yes to this option, support will be included for the
+diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
+index 545b442253e4..33c195780554 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
++++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
+@@ -1,7 +1,6 @@
+ config STMMAC_ETH
+ 	tristate "STMicroelectronics 10/100/1000 Ethernet driver"
+ 	depends on HAS_IOMEM && HAS_DMA
+-	depends on RESET_CONTROLLER
+ 	select MII
+ 	select PHYLIB
+ 	select CRC32
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index 2962de205ba7..561742b7f4b3 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -17,7 +17,8 @@ config GENERIC_PHY
+ 
+ config PHY_BERLIN_USB
+ 	tristate "Marvell Berlin USB PHY Driver"
+-	depends on ARCH_BERLIN && RESET_CONTROLLER && HAS_IOMEM && OF
++	depends on ARCH_BERLIN || COMPILE_TEST
++	depends on HAS_IOMEM && OF
+ 	select GENERIC_PHY
+ 	help
+ 	  Enable this to support the USB PHY on Marvell Berlin SoCs.
+@@ -164,8 +165,8 @@ config PHY_HIX5HD2_SATA
+ 
+ config PHY_SUN4I_USB
+ 	tristate "Allwinner sunxi SoC USB PHY driver"
+-	depends on ARCH_SUNXI && HAS_IOMEM && OF
+-	depends on RESET_CONTROLLER
++	depends on ARCH_SUNXI || COMPILE_TEST
++	depends on HAS_IOMEM && OF
+ 	select GENERIC_PHY
+ 	help
+ 	  Enable this to support the transceiver that is part of Allwinner
+@@ -269,7 +270,6 @@ config PHY_XGENE
+ 
+ config PHY_STIH407_USB
+ 	tristate "STMicroelectronics USB2 picoPHY driver for STiH407 family"
+-	depends on RESET_CONTROLLER
+ 	depends on ARCH_STI || COMPILE_TEST
+ 	select GENERIC_PHY
+ 	help
+diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+index 2eb893e0ea1e..9fd24783be61 100644
+--- a/drivers/pinctrl/sunxi/Kconfig
++++ b/drivers/pinctrl/sunxi/Kconfig
+@@ -27,7 +27,6 @@ config PINCTRL_SUN6I_A31S
+ 
+ config PINCTRL_SUN6I_A31_R
+ 	def_bool MACH_SUN6I
+-	depends on RESET_CONTROLLER
+ 	select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN7I_A20
+@@ -40,7 +39,6 @@ config PINCTRL_SUN8I_A23
+ 
+ config PINCTRL_SUN8I_A23_R
+ 	def_bool MACH_SUN8I
+-	depends on RESET_CONTROLLER
+ 	select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN9I_A80
+diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+index 0615f50a14cd..12026a1893b5 100644
+--- a/drivers/reset/Kconfig
++++ b/drivers/reset/Kconfig
+@@ -1,15 +1,24 @@
+-config ARCH_HAS_RESET_CONTROLLER
++config RESET_CONTROLLER
  	bool
-
-diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
-index f915f61..06c1576 100644
---- a/drivers/dma/Makefile
-+++ b/drivers/dma/Makefile
-@@ -51,3 +51,4 @@ obj-$(CONFIG_INTEL_MIC_X100_DMA) += mic_x100_dma.o
- obj-$(CONFIG_NBPFAXI_DMA) += nbpfaxi.o
- obj-$(CONFIG_DMA_SUN6I) += sun6i-dma.o
- obj-$(CONFIG_IMG_MDC_DMA) += img-mdc-dma.o
-+obj-$(CONFIG_XGENE_DMA) += xgene-dma.o
-diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
-new file mode 100755
-index 0000000..e736c2e
---- /dev/null
-+++ b/drivers/dma/xgene-dma.c
-@@ -0,0 +1,1738 @@
+ 
+-menuconfig RESET_CONTROLLER
+-	bool "Reset Controller Support"
+-	default y if ARCH_HAS_RESET_CONTROLLER
+-	help
+-	  Generic Reset Controller support.
++menu "Reset Controller Support"
++	depends on ARCH_HAS_RESET_CONTROLLER || COMPILE_TEST
+ 
+-	  This framework is designed to abstract reset handling of devices
+-	  via GPIOs or SoC-internal reset controller modules.
++config RESET_SOCFPGA
++	bool "Altera SOCFPGA reset controller" if COMPILE_TEST
++	default ARCH_SOCFPGA
++	select RESET_CONTROLLER
+ 
+-	  If unsure, say no.
++config RESET_BERLIN
++	bool "Marvell Berlin reset controller" if COMPILE_TEST
++	default ARCH_BERLIN
++	select RESET_CONTROLLER
++
++config RESET_SUNXI
++	bool "Allwinner reset controller" if COMPILE_TEST
++	default ARCH_SUNXI
++	select RESET_CONTROLLER
+ 
+ source "drivers/reset/sti/Kconfig"
++
++endmenu
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 157d421f755b..14d3850847b8 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -1,5 +1,5 @@
+ obj-$(CONFIG_RESET_CONTROLLER) += core.o
+-obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+-obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
+-obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+-obj-$(CONFIG_ARCH_STI) += sti/
++obj-$(CONFIG_RESET_SOCFPGA) += reset-socfpga.o
++obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
++obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
++obj-$(CONFIG_RESET_STI_SYSCFG) += sti/
+diff --git a/drivers/reset/sti/Kconfig b/drivers/reset/sti/Kconfig
+index f8c15a37fb35..ef9bb8675577 100644
+--- a/drivers/reset/sti/Kconfig
++++ b/drivers/reset/sti/Kconfig
+@@ -1,19 +1,19 @@
+-if ARCH_STI
++if ARCH_STI || COMPILE_TEST
+ 
+-config STI_RESET_SYSCFG
++config RESET_STI_SYSCFG
+ 	bool
+ 	select RESET_CONTROLLER
+ 
+-config STIH415_RESET
+-	bool
+-	select STI_RESET_SYSCFG
++config RESET_STIH415
++	bool "STmicroelectronics STiH415 reset controller" if COMPILE_TEST
++	select RESET_STI_SYSCFG
+ 
+-config STIH416_RESET
+-	bool
+-	select STI_RESET_SYSCFG
++config RESET_STIH416
++	bool "STmicroelectronics STiH416 reset controller" if COMPILE_TEST
++	select RESET_STI_SYSCFG
+ 
+-config STIH407_RESET
+-	bool
+-	select STI_RESET_SYSCFG
++config RESET_STIH407
++	bool "STmicroelectronics STiH407 reset controller" if COMPILE_TEST
++	select RESET_STI_SYSCFG
+ 
+ endif
+diff --git a/drivers/reset/sti/Makefile b/drivers/reset/sti/Makefile
+index dc85dfbe56a9..445bdddf45b9 100644
+--- a/drivers/reset/sti/Makefile
++++ b/drivers/reset/sti/Makefile
+@@ -1,5 +1,5 @@
+-obj-$(CONFIG_STI_RESET_SYSCFG) += reset-syscfg.o
++obj-$(CONFIG_RESET_STI_SYSCFG) += reset-syscfg.o
+ 
+-obj-$(CONFIG_STIH415_RESET) += reset-stih415.o
+-obj-$(CONFIG_STIH416_RESET) += reset-stih416.o
+-obj-$(CONFIG_STIH407_RESET) += reset-stih407.o
++obj-$(CONFIG_RESET_STIH415) += reset-stih415.o
++obj-$(CONFIG_RESET_STIH416) += reset-stih416.o
++obj-$(CONFIG_RESET_STIH407) += reset-stih407.o
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index b3ae90e4c03c..e0fb9ecac3d0 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -507,7 +507,6 @@ config SPI_SH_HSPI
+ config SPI_SIRF
+ 	tristate "CSR SiRFprimaII SPI controller"
+ 	depends on SIRF_DMA
+-	depends on RESET_CONTROLLER
+ 	select SPI_BITBANG
+ 	help
+ 	  SPI driver for CSR SiRFprimaII SoCs
+@@ -528,7 +527,6 @@ config SPI_SUN4I
+ config SPI_SUN6I
+ 	tristate "Allwinner A31 SPI controller"
+ 	depends on ARCH_SUNXI || COMPILE_TEST
+-	depends on RESET_CONTROLLER
+ 	help
+ 	  This enables using the SPI controller on the Allwinner A31 SoCs.
+ 
+@@ -542,7 +540,7 @@ config SPI_MXS
+ config SPI_TEGRA114
+ 	tristate "NVIDIA Tegra114 SPI Controller"
+ 	depends on (ARCH_TEGRA && TEGRA20_APB_DMA) || COMPILE_TEST
+-	depends on RESET_CONTROLLER && HAS_DMA
++	depends on HAS_DMA
+ 	help
+ 	  SPI driver for NVIDIA Tegra114 SPI Controller interface. This controller
+ 	  is different than the older SoCs SPI controller and also register interface
+@@ -551,7 +549,6 @@ config SPI_TEGRA114
+ config SPI_TEGRA20_SFLASH
+ 	tristate "Nvidia Tegra20 Serial flash Controller"
+ 	depends on ARCH_TEGRA || COMPILE_TEST
+-	depends on RESET_CONTROLLER
+ 	help
+ 	  SPI driver for Nvidia Tegra20 Serial flash Controller interface.
+ 	  The main usecase of this controller is to use spi flash as boot
+@@ -560,7 +557,7 @@ config SPI_TEGRA20_SFLASH
+ config SPI_TEGRA20_SLINK
+ 	tristate "Nvidia Tegra20/Tegra30 SLINK Controller"
+ 	depends on (ARCH_TEGRA && TEGRA20_APB_DMA) || COMPILE_TEST
+-	depends on RESET_CONTROLLER && HAS_DMA
++	depends on HAS_DMA
+ 	help
+ 	  SPI driver for Nvidia Tegra20/Tegra30 SLINK Controller interface.
+ 
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index af40db0df58e..e89fd2dfef81 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -157,8 +157,7 @@ config SPEAR_THERMAL
+ 
+ config ROCKCHIP_THERMAL
+ 	tristate "Rockchip thermal driver"
+-	depends on ARCH_ROCKCHIP
+-	depends on RESET_CONTROLLER
++	depends on ARCH_ROCKCHIP || COMPILE_TEST
+ 	help
+ 	  Rockchip thermal driver provides support for Temperature sensor
+ 	  ADC (TS-ADC) found on Rockchip SoCs. It supports one critical
+diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
+index 52d3d58252e1..aabbf02c54bc 100644
+--- a/drivers/usb/phy/Kconfig
++++ b/drivers/usb/phy/Kconfig
+@@ -140,7 +140,6 @@ config USB_ISP1301
+ config USB_MSM_OTG
+ 	tristate "Qualcomm on-chip USB OTG controller support"
+ 	depends on (USB || USB_GADGET) && (ARCH_MSM || ARCH_QCOM || COMPILE_TEST)
+-	depends on RESET_CONTROLLER
+ 	select USB_PHY
+ 	help
+ 	  Enable this to support the USB OTG transceiver on Qualcomm chips. It
+diff --git a/include/linux/reset.h b/include/linux/reset.h
+index da5602bd77d7..72b9d4b67023 100644
+--- a/include/linux/reset.h
++++ b/include/linux/reset.h
+@@ -40,50 +40,73 @@ struct reset_control *of_reset_control_get(struct device_node *node,
+ 
+ #else
+ 
++static inline struct reset_control *reset_control_get(struct device *dev, const char *id)
++{
++	return ERR_PTR(-ENOSYS);
++}
++
++static inline struct reset_control *devm_reset_control_get(struct device *dev, const char *id)
++{
++	return ERR_PTR(-ENOSYS);
++}
++
++static inline int __must_check device_reset(struct device *dev)
++{
++	return -ENOSYS;
++}
++
+ static inline int reset_control_reset(struct reset_control *rstc)
+ {
+-	WARN_ON(1);
++	WARN_ON(rstc != NULL);
+ 	return 0;
+ }
+ 
+ static inline int reset_control_assert(struct reset_control *rstc)
+ {
+-	WARN_ON(1);
++	WARN_ON(rstc != NULL);
+ 	return 0;
+ }
+ 
+ static inline int reset_control_deassert(struct reset_control *rstc)
+ {
+-	WARN_ON(1);
++	WARN_ON(rstc != NULL);
+ 	return 0;
+ }
+ 
+ static inline int reset_control_status(struct reset_control *rstc)
+ {
+-	WARN_ON(1);
++	WARN_ON(rstc != NULL);
+ 	return 0;
+ }
+ 
+ static inline void reset_control_put(struct reset_control *rstc)
+ {
+-	WARN_ON(1);
++	WARN_ON(rstc != NULL);
+ }
+ 
+ static inline int device_reset_optional(struct device *dev)
+ {
+-	return -ENOSYS;
++	if (of_property_read_bool(dev->of_node, "resets"))
++		return -ENOSYS;
++
++	return 0;
+ }
+ 
 +/*
-+ * Applied Micro X-Gene SoC DMA engine Driver
-+ *
-+ * Copyright (c) 2015, Applied Micro Circuits Corporation
-+ * Authors: Rameshwar Prasad Sahu <rsahu@apm.com>
-+ *	    Loc Ho <lho@apm.com>
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * NOTE: PM support is currently not available.
++ * We intentionally return NULL here when no resets are specified
++ * or when building without DT, which is interpreted as 'success'
++ * if reset controller support is left out from the kernel.
 + */
-+
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/dmaengine.h>
-+#include <linux/dmapool.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+
-+#include "dmaengine.h"
-+
-+/* DMA ring csr registers and bit definations */
-+#define DMA_RING_CONFIG			0x04
-+#define DMA_RING_ENABLE			BIT(31)
-+#define DMA_RING_ID			0x08
-+#define DMA_RING_ID_SETUP(v)		((v) | BIT(31))
-+#define DMA_RING_ID_BUF			0x0C
-+#define DMA_RING_ID_BUF_SETUP(v)	(((v) << 9) | BIT(21))
-+#define DMA_RING_THRESLD0_SET1		0x30
-+#define DMA_RING_THRESLD0_SET1_VAL	0X64
-+#define DMA_RING_THRESLD1_SET1		0x34
-+#define DMA_RING_THRESLD1_SET1_VAL	0xC8
-+#define DMA_RING_HYSTERESIS		0x68
-+#define DMA_RING_HYSTERESIS_VAL		0xFFFFFFFF
-+#define DMA_RING_STATE			0x6C
-+#define DMA_RING_STATE_WR_BASE		0x70
-+#define DMA_RING_NE_INT_MODE		0x017C
-+#define DMA_RING_NE_INT_MODE_SET(m, v)	\
-+	((m) = ((m) & ~BIT(31 - (v))) | BIT(31 - (v)))
-+#define DMA_RING_NE_INT_MODE_RESET(m, v)	\
-+	((m) &= (~BIT(31 - (v))))
-+#define DMA_RING_CLKEN			0xC208
-+#define DMA_RING_SRST			0xC200
-+#define DMA_RING_MEM_RAM_SHUTDOWN	0xD070
-+#define DMA_RING_BLK_MEM_RDY		0xD074
-+#define DMA_RING_BLK_MEM_RDY_VAL	0xFFFFFFFF
-+#define DMA_RING_DESC_CNT(v)		(((v) & 0x0001FFFE) >> 1)
-+#define DMA_RING_ID_GET(owner, num)	(((owner) << 6) | (num))
-+#define DMA_RING_DST_ID(v)		((1 << 10) | (v))
-+#define DMA_RING_CMD_OFFSET		0x2C
-+#define DMA_RING_CMD_BASE_OFFSET(v)	((v) << 6)
-+#define DMA_RING_COHERENT_SET(m)	(((u32 *)(m))[2] |= BIT(4))
-+#define DMA_RING_ADDRL_SET(m, v)	(((u32 *)(m))[2] |= (((v) >> 8) << 5))
-+#define DMA_RING_ADDRH_SET(m, v)	(((u32 *)(m))[3] |= ((v) >> 35))
-+#define DMA_RING_ACCEPTLERR_SET(m)	(((u32 *)(m))[3] |= BIT(19))
-+#define DMA_RING_SIZE_SET(m, v)		(((u32 *)(m))[3] |= ((v) << 23))
-+#define DMA_RING_RECOMBBUF_SET(m)	(((u32 *)(m))[3] |= BIT(27))
-+#define DMA_RING_RECOMTIMEOUTL_SET(m)	(((u32 *)(m))[3] |= (0x7 << 28))
-+#define DMA_RING_RECOMTIMEOUTH_SET(m)	(((u32 *)(m))[4] |= 0x3)
-+#define DMA_RING_SELTHRSH_SET(m)	(((u32 *)(m))[4] |= BIT(3))
-+#define DMA_RING_TYPE_SET(m, v)		(((u32 *)(m))[4] |= ((v) << 19))
-+
-+/* DMA device csr registers and bit definitions */
-+#define DMA_IPBRR		0x0
-+#define DMA_DEV_ID_RD(v)	((v) & 0x00000FFF)
-+#define DMA_BUS_ID_RD(v)	(((v) >> 12) & 3)
-+#define DMA_REV_NO_RD(v)	(((v) >> 14) & 3)
-+#define DMA_GCR			0x10
-+#define DMA_CH_SETUP(v)		((v) = ((v) & ~0x000FFFFF) | 0x000AAFFF)
-+#define DMA_ENABLE(v)		((v) |= BIT(31))
-+#define DMA_DISABLE(v)		((v) &= ~BIT(31))
-+#define DMA_INT			0x70
-+#define DMA_INT_MASK		0x74
-+#define DMA_INT_ALL_MASK	0xFFFFFFFF
-+#define DMA_INT_ALL_UNMASK	0x0
-+#define DMA_INT_MASK_SHIFT	0x14
-+#define DMA_RING_INT0_MASK	0x90A0
-+#define DMA_RING_INT1_MASK	0x90A8
-+#define DMA_RING_INT2_MASK	0x90B0
-+#define DMA_RING_INT3_MASK	0x90B8
-+#define DMA_RING_INT4_MASK	0x90C0
-+#define DMA_CFG_RING_WQ_ASSOC	0x90E0
-+#define DMA_ASSOC_RING_MNGR1	0xFFFFFFFF
-+#define DMA_MEM_RAM_SHUTDOWN	0xD070
-+#define DMA_BLK_MEM_RDY		0xD074
-+#define DMA_BLK_MEM_RDY_VAL	0xFFFFFFFF
-+
-+/* DMA Descriptor format */
-+#define DMA_DESC_ELERR_RD(m)		(((m) >> 46) & 0x3)
-+#define DMA_DESC_NV_SET(m)		(((u64 *)(m))[0] |= BIT_ULL(50))
-+#define DMA_DESC_IN_SET(m)		(((u64 *)(m))[0] |= BIT_ULL(55))
-+#define DMA_DESC_RTYPE_SET(m, v)	(((u64 *)(m))[0] |= ((u64)(v) << 56))
-+#define DMA_DESC_LERR_RD(m)		(((m) >> 60) & 0x7)
-+#define DMA_DESC_BUFADDR_SET(m, v)	(((u64 *)(m))[0] |= (v))
-+#define DMA_DESC_BUFLEN_SET(m, v)	(((u64 *)(m))[0] |= ((u64)(v) << 48))
-+#define DMA_DESC_C_SET(m)		(((u64 *)(m))[1] |= BIT_ULL(63))
-+#define DMA_DESC_DR_SET(m)		(((u64 *)(m))[2] |= BIT_ULL(61))
-+#define DMA_DESC_DST_ADDR_SET(m, v)	(((u64 *)(m))[3] |= (v))
-+#define DMA_DESC_H0ENQ_NUM_SET(m, v)	(((u64 *)(m))[3] |= ((u64)(v) << 48))
-+#define DMA_DESC_STATUS(x, y)		(((x) << 4) | (y))
-+
-+/* DMA descriptor empty s/w signature */
-+#define DMA_DESC_EMPTY_INDEX		0
-+#define DMA_DESC_EMPTY_SIGNATURE	~0ULL
-+#define DMA_DESC_SET_EMPTY(m)		\
-+	(((u64 *)(m))[DMA_DESC_EMPTY_INDEX] = DMA_DESC_EMPTY_SIGNATURE)
-+#define DMA_DESC_IS_EMPTY(m)		\
-+	(((u64 *)(m))[DMA_DESC_EMPTY_INDEX] == DMA_DESC_EMPTY_SIGNATURE)
-+
-+/* DMA configurable parameters defines */
-+#define DMA_RING_NUM			512
-+#define DMA_BUFNUM			0x0
-+#define DMA_CPU_BUFNUM			0x18
-+#define DMA_RING_OWNER_DMA		0x03
-+#define DMA_RING_OWNER_CPU		0x0F
-+#define DMA_RING_TYPE_REGULAR		0x01
-+#define DMA_RING_WQ_DESC_SIZE		32
-+#define DMA_RING_NUM_CONFIG		5
-+#define DMA_MAX_CHANNEL			4
-+#define DMA_MAX_BYTE_CNT		0x4000	/* 16 KB */
-+#define DMA_MAX_64B_DESC_BYTE_CNT	0x14000	/* 80 KB */
-+#define DMA_16K_BUFFER_LEN_CODE		0x0
-+#define DMA_INVALID_LEN_CODE		0x7800
-+
-+/* DMA descriptor error codes */
-+#define ERR_DESC_AXI		0x01
-+#define ERR_BAD_DESC		0x02
-+#define ERR_READ_DATA_AXI	0x03
-+#define ERR_WRITE_DATA_AXI	0x04
-+#define ERR_FBP_TIMEOUT		0x05
-+#define ERR_ECC			0x06
-+#define ERR_DIFF_SIZE		0x08
-+#define ERR_SCT_GAT_LEN		0x09
-+#define ERR_CRC_ERR		0x11
-+#define ERR_CHKSUM		0x12
-+#define ERR_DIF			0x13
-+
-+/* DMA error interrupt codes */
-+#define ERR_DIF_SIZE_INT	0x0
-+#define ERR_GS_ERR_INT		0x1
-+#define ERR_FPB_TIMEO_INT	0x2
-+#define ERR_WFIFO_OVF_INT	0x3
-+#define ERR_RFIFO_OVF_INT	0x4
-+#define ERR_WR_TIMEO_INT	0x5
-+#define ERR_RD_TIMEO_INT	0x6
-+#define ERR_WR_ERR_INT		0x7
-+#define ERR_RD_ERR_INT		0x8
-+#define ERR_BAD_DESC_INT	0x9
-+#define ERR_DESC_DST_INT	0xA
-+#define ERR_DESC_SRC_INT	0xB
-+
-+/* Define to dump DMA descriptor */
-+#define DMA_DESC_ERR_DUMP(desc)	\
-+	print_hex_dump(KERN_ERR, "X-Gene DMA: Rx ERR DESC ",	\
-+			DUMP_PREFIX_ADDRESS, 16, 8, (desc), 32, 0)
-+
-+#define to_dma_desc_sw(tx)	\
-+	container_of(tx, struct xgene_dma_desc_sw, tx)
-+#define to_dma_chan(dchan)	\
-+	container_of(dchan, struct xgene_dma_chan, dma_chan)
-+
-+#define chan_dbg(chan, fmt, arg...)	\
-+	dev_dbg(chan->dev, "%s: " fmt, chan->name, ##arg)
-+#define chan_err(chan, fmt, arg...)	\
-+	dev_err(chan->dev, "%s: " fmt, chan->name, ##arg)
-+
-+struct xgene_dma_desc_hw {
-+	u64 m0;
-+	u64 m1;
-+	u64 m2;
-+	u64 m3;
-+};
-+
-+enum xgene_dma_ring_cfgsize {
-+	DMA_RING_CFG_SIZE_512B,
-+	DMA_RING_CFG_SIZE_2KB,
-+	DMA_RING_CFG_SIZE_16KB,
-+	DMA_RING_CFG_SIZE_64KB,
-+	DMA_RING_CFG_SIZE_512KB,
-+	DMA_RING_CFG_SIZE_INVALID
-+};
-+
-+struct xgene_dma_ring {
-+	struct xgene_dma *pdma;
-+	u8 buf_num;
-+	u16 id;
-+	u16 num;
-+	u16 head;
-+	u16 owner;
-+	u16 slots;
-+	u16 dst_ring_num;
-+	u32 size;
-+	void __iomem *cmd;
-+	void __iomem *cmd_base;
-+	dma_addr_t desc_paddr;
-+	u32 state[DMA_RING_NUM_CONFIG];
-+	enum xgene_dma_ring_cfgsize cfgsize;
-+	union {
-+		void *desc_vaddr;
-+		struct xgene_dma_desc_hw *desc_hw;
-+	};
-+};
-+
-+struct xgene_dma_desc_sw {
-+	struct xgene_dma_desc_hw desc1;
-+	struct xgene_dma_desc_hw desc2;
-+	u8 desc_cnt;
-+	struct list_head node;
-+	struct list_head tx_list;
-+	struct dma_async_tx_descriptor tx;
-+};
-+
-+/**
-+ * struct xgene_dma_chan - internal representation of an DMA channel
-+ * @dma_chan: dmaengine channel object member
-+ * @pdma: DMA device structure reference
-+ * @dev: struct device reference for dma mapping api
-+ * @id: raw id of this channel
-+ * @rx_irq: channel IRQ
-+ * @name: name of DMA channel
-+ * @lock: serializes enqueue/dequeue operations to the descriptor pool
-+ * @pending: number of transaction request pushed to DMA controller for
-+ *	execution, but still waiting for completion,
-+ * @ld_pending: descriptors which are queued to run, but have not yet been
-+ *	submitted to the hardware for execution
-+ * @ld_running: descriptors which are currently being executing by the hardware
-+ * @ld_completed: descriptors which have finished execution by the hardware.
-+ *	These descriptors have already had their cleanup actions run. They
-+ *	are waiting for the ACK bit to be set by the async tx API.
-+ * @desc_pool: descriptor pool for DMA operations
-+ * @tasklet: bottom half where all completed descriptors cleans
-+ * @tx_ring: transmit ring descriptor that we use to prepare actual
-+ *	descriptors for further executions
-+ * @rx_ring: receive ring descriptor that we use to get completed DMA
-+ *	descriptors during cleanup time
-+ */
-+struct xgene_dma_chan {
-+	struct dma_chan dma_chan;
-+	struct xgene_dma *pdma;
-+	struct device *dev;
-+	int id;
-+	int rx_irq;
-+	char name[8];
-+	spinlock_t lock;
-+	int pending;
-+	struct list_head ld_pending;
-+	struct list_head ld_running;
-+	struct list_head ld_completed;
-+	struct dma_pool *desc_pool;
-+	struct tasklet_struct tasklet;
-+	struct xgene_dma_ring tx_ring;
-+	struct xgene_dma_ring rx_ring;
-+};
-+
-+/**
-+ * struct xgene_dma - internal representation of an DMA device
-+ * @err_irq: DMA error irq number
-+ * @ring_num: start id number for DMA ring
-+ * @csr_dma: base for DMA register access
-+ * @csr_ring: base for DMA ring register access
-+ * @csr_ring_cmd: base for DMA ring command register access
-+ * @dma_dev: embedded struct dma_device
-+ * @chan: reference to DMA channels
-+ */
-+struct xgene_dma {
-+	struct device *dev;
-+	struct clk *clk;
-+	int err_irq;
-+	int ring_num;
-+	void __iomem *csr_dma;
-+	void __iomem *csr_ring;
-+	void __iomem *csr_ring_cmd;
-+	struct dma_device dma_dev[DMA_MAX_CHANNEL];
-+	struct xgene_dma_chan chan[DMA_MAX_CHANNEL];
-+};
-+
-+static const char * const xgene_dma_desc_hw_err[] = {
-+	[ERR_DESC_AXI] = "AXI error when reading src/dst link list",
-+	[ERR_BAD_DESC] = "ERR or El_ERR fields not set to zero in desc",
-+	[ERR_READ_DATA_AXI] = "AXI error when reading data",
-+	[ERR_WRITE_DATA_AXI] = "AXI error when writing data",
-+	[ERR_FBP_TIMEOUT] = "Timeout on bufpool fetch",
-+	[ERR_ECC] = "ECC double bit error",
-+	[ERR_DIFF_SIZE] = "Bufpool too small to hold all the DIF result",
-+	[ERR_SCT_GAT_LEN] = "Gather and scatter data length not same",
-+	[ERR_CRC_ERR] = "CRC error",
-+	[ERR_CHKSUM] = "Checksum error",
-+	[ERR_DIF] = "DIF error",
-+};
-+
-+static const char * const xgene_dma_err[] = {
-+	[ERR_DIF_SIZE_INT] = "DIF size error",
-+	[ERR_GS_ERR_INT] = "Gather scatter not same size error",
-+	[ERR_FPB_TIMEO_INT] = "Free pool time out error",
-+	[ERR_WFIFO_OVF_INT] = "Write FIFO over flow error",
-+	[ERR_RFIFO_OVF_INT] = "Read FIFO over flow error",
-+	[ERR_WR_TIMEO_INT] = "Write time out error",
-+	[ERR_RD_TIMEO_INT] = "Read time out error",
-+	[ERR_WR_ERR_INT] = "HBF bus write error",
-+	[ERR_RD_ERR_INT] = "HBF bus read error",
-+	[ERR_BAD_DESC_INT] = "Ring descriptor HE0 not set error",
-+	[ERR_DESC_DST_INT] = "HFB reading dst link address error",
-+	[ERR_DESC_SRC_INT] = "HFB reading src link address error",
-+};
-+
-+static void xgene_dma_cpu_to_le64(u64 *desc, int count)
-+{
-+	int i;
-+
-+	for (i = 0; i < count; i++)
-+		desc[i] = cpu_to_le64(desc[i]);
-+}
-+
-+static u16 xgene_dma_encode_len(u32 len)
-+{
-+	return (len < DMA_MAX_BYTE_CNT) ?
-+		len : DMA_16K_BUFFER_LEN_CODE;
-+}
-+
-+static u32 xgene_dma_ring_desc_cnt(struct xgene_dma_ring *ring)
-+{
-+	u32 __iomem *cmd_base = ring->cmd_base;
-+	u32 ring_state = ioread32(&cmd_base[1]);
-+
-+	return DMA_RING_DESC_CNT(ring_state);
-+}
-+
-+static void xgene_dma_set_src_buffer(void *ext8, size_t *len,
-+				     dma_addr_t *paddr)
-+{
-+	size_t nbytes = (*len < DMA_MAX_BYTE_CNT) ?
-+			*len : DMA_MAX_BYTE_CNT;
-+
-+	DMA_DESC_BUFADDR_SET(ext8, *paddr);
-+	DMA_DESC_BUFLEN_SET(ext8, xgene_dma_encode_len(*len));
-+	*len -= nbytes;
-+	*paddr += nbytes;
-+}
-+
-+static void xgene_dma_invalidate_buffer(void *ext8)
-+{
-+	DMA_DESC_BUFLEN_SET(ext8, DMA_INVALID_LEN_CODE);
-+}
-+
-+static void *xgene_dma_lookup_ext8(u64 *desc, int idx)
-+{
-+	return (idx % 2) ? (desc + idx - 1) : (desc + idx + 1);
-+}
-+
-+static void xgene_dma_init_desc(void *desc, u16 dst_ring_num)
-+{
-+	DMA_DESC_C_SET(desc); /* Coherent IO */
-+	DMA_DESC_IN_SET(desc);
-+	DMA_DESC_DR_SET(desc);
-+	DMA_DESC_RTYPE_SET(desc, DMA_RING_OWNER_DMA);
-+	DMA_DESC_H0ENQ_NUM_SET(desc, dst_ring_num);
-+}
-+
-+static void xgene_dma_prep_cpy_desc(struct xgene_dma_chan *chan,
-+				    struct xgene_dma_desc_sw *desc_sw,
-+				    dma_addr_t dst, dma_addr_t src,
-+				    size_t len)
-+{
-+	struct xgene_dma_ring *ring = &chan->tx_ring;
-+	void *desc1, *desc2;
-+	int i;
-+
-+	/* Get 1st descriptor */
-+	desc1 = &desc_sw->desc1;
-+	xgene_dma_init_desc(desc1, ring->dst_ring_num);
-+	DMA_DESC_DST_ADDR_SET(desc1, dst);
-+
-+	/* Set 1st source address */
-+	xgene_dma_set_src_buffer(desc1 + 8, &len, &src);
-+
-+	if (len <= 0) {
-+		desc2 = NULL;
-+		desc_sw->desc_cnt = 1;
-+		goto skip_additional_src;
-+	}
-+
-+	/*
-+	 * We need to split this source buffer,
-+	 * and need to use 2nd descriptor
-+	 */
-+	desc2 = &desc_sw->desc2;
-+	DMA_DESC_NV_SET(desc1);
-+
-+	/* Set 2nd to 5th source address */
-+	for (i = 0; i < 4 && len; i++)
-+		xgene_dma_set_src_buffer(xgene_dma_lookup_ext8(desc2, i),
-+					 &len, &src);
-+
-+	/* Invalidate unused source address field */
-+	for (; i < 4; i++)
-+		xgene_dma_invalidate_buffer(xgene_dma_lookup_ext8(desc2, i));
-+
-+	desc_sw->desc_cnt = 2;
-+
-+skip_additional_src:
-+	/* Hardware stores descriptor in little endian format */
-+	xgene_dma_cpu_to_le64(desc1, 4);
-+	if (desc2)
-+		xgene_dma_cpu_to_le64(desc2, 4);
-+}
-+
-+static dma_cookie_t xgene_dma_tx_submit(struct dma_async_tx_descriptor *tx)
-+{
-+	struct xgene_dma_desc_sw *desc;
-+	struct xgene_dma_chan *chan;
-+	dma_cookie_t cookie;
-+
-+	if (unlikely(!tx))
-+		return -EINVAL;
-+
-+	chan = to_dma_chan(tx->chan);
-+	desc = to_dma_desc_sw(tx);
-+
-+	spin_lock_bh(&chan->lock);
-+
-+	cookie = dma_cookie_assign(tx);
-+
-+	/* Add this transaction list onto the tail of the pending queue */
-+	list_splice_tail_init(&desc->tx_list, &chan->ld_pending);
-+
-+	spin_unlock_bh(&chan->lock);
-+
-+	return cookie;
-+}
-+
-+static void xgene_dma_free_descriptor(struct xgene_dma_chan *chan,
-+				      struct xgene_dma_desc_sw *desc)
-+{
-+	list_del(&desc->node);
-+	chan_dbg(chan, "LD %p free\n", desc);
-+	dma_pool_free(chan->desc_pool, desc, desc->tx.phys);
-+}
-+
-+static struct xgene_dma_desc_sw *xgene_dma_alloc_descriptor(
-+				 struct xgene_dma_chan *chan)
-+{
-+	struct xgene_dma_desc_sw *desc;
-+	dma_addr_t phys;
-+
-+	desc = dma_pool_alloc(chan->desc_pool, GFP_NOWAIT, &phys);
-+	if (!desc) {
-+		chan_dbg(chan, "Failed to allocate LDs\n");
-+		return NULL;
-+	}
-+
-+	memset(desc, 0, sizeof(*desc));
-+
-+	INIT_LIST_HEAD(&desc->tx_list);
-+	desc->tx.phys = phys;
-+	desc->tx.tx_submit = xgene_dma_tx_submit;
-+	dma_async_tx_descriptor_init(&desc->tx, &chan->dma_chan);
-+
-+	chan_dbg(chan, "LD %p allocated\n", desc);
-+
-+	return desc;
-+}
-+
-+/**
-+ * xgene_dma_clean_completed_descriptor - free all descriptors which
-+ * has been completed and acked
-+ * @chan: DMA channel
-+ *
-+ * This function is used on all completed and acked descriptors.
-+ * All descriptors should only be freed in this function.
-+ */
-+static void xgene_dma_clean_completed_descriptor(struct xgene_dma_chan *chan)
-+{
-+	struct xgene_dma_desc_sw *desc, *_desc;
-+
-+	/* Run the callback for each descriptor, in order */
-+	list_for_each_entry_safe(desc, _desc, &chan->ld_completed, node) {
-+		if (async_tx_test_ack(&desc->tx))
-+			xgene_dma_free_descriptor(chan, desc);
-+	}
-+}
-+
-+/**
-+ * xgene_dma_run_tx_complete_actions - cleanup a single link descriptor
-+ * @chan: DMA channel
-+ * @desc: descriptor to cleanup and free
-+ *
-+ * This function is used on a descriptor which has been executed by the DMA
-+ * controller. It will run any callbacks, submit any dependencies.
-+ */
-+static void xgene_dma_run_tx_complete_actions(struct xgene_dma_chan *chan,
-+					      struct xgene_dma_desc_sw *desc)
-+{
-+	struct dma_async_tx_descriptor *tx = &desc->tx;
-+
-+	if (tx->cookie == 0)
-+		return;
-+
-+	dma_cookie_complete(tx);
-+
-+	/* Run the link descriptor callback function */
-+	if (tx->callback)
-+		tx->callback(tx->callback_param);
-+
-+	dma_descriptor_unmap(tx);
-+
-+	/* Run any dependencies */
-+	dma_run_dependencies(tx);
-+}
-+
-+/**
-+ * xgene_dma_clean_running_descriptor - move the completed descriptor from
-+ * ld_running to ld_completed
-+ * @chan: DMA channel
-+ * @desc: the descriptor which is completed
-+ *
-+ * Free the descriptor directly if acked by async_tx api, or move it to
-+ * queue ld_completed.
-+ */
-+static void xgene_dma_clean_running_descriptor(struct xgene_dma_chan *chan,
-+					       struct xgene_dma_desc_sw *desc)
-+{
-+	/* Remove from the list of transactions */
-+	list_del(&desc->node);
-+
-+	/*
-+	 * the client is allowed to attach dependent operations
-+	 * until 'ack' is set
-+	 */
-+	if (!async_tx_test_ack(&desc->tx)) {
-+		/*
-+		 * Move this descriptor to the list of descriptors which is
-+		 * completed, but still awaiting the 'ack' bit to be set.
-+		 */
-+		list_add_tail(&desc->node, &chan->ld_completed);
-+		return;
-+	}
-+
-+	chan_dbg(chan, "LD %p free\n", desc);
-+	dma_pool_free(chan->desc_pool, desc, desc->tx.phys);
-+}
-+
-+/**
-+ * xgene_chan_xfer_ld_pending - push any pending transactions to hw
-+ * @chan : DMA channel
-+ *
-+ * LOCKING: must hold chan->desc_lock
-+ */
-+static void xgene_chan_xfer_ld_pending(struct xgene_dma_chan *chan)
-+{
-+	struct xgene_dma_ring *ring = &chan->tx_ring;
-+	struct xgene_dma_desc_sw *desc_sw, *_desc_sw;
-+	struct xgene_dma_desc_hw *desc_hw;
-+
-+	/*
-+	 * If the list of pending descriptors is empty, then we
-+	 * don't need to do any work at all
-+	 */
-+	if (list_empty(&chan->ld_pending)) {
-+		chan_dbg(chan, "No pending LDs\n");
-+		return;
-+	}
-+
-+	/*
-+	 * Move elements from the queue of pending transactions onto the list
-+	 * of running transactions and push it to hw for further executions
-+	 */
-+
-+	list_for_each_entry_safe(desc_sw, _desc_sw, &chan->ld_pending, node) {
-+		/*
-+		 * Check if have pushed max number of transactions to hw
-+		 * as capable, so let's stop here and will push remaining
-+		 * elements from pening ld queue after completing some
-+		 * descriptors that we have already pushed
-+		 */
-+		if ((chan->pending >= ring->slots) ||
-+		    (xgene_dma_ring_desc_cnt(ring) > (ring->slots - 2)))
-+			break;
-+
-+		/* Get hw descriptor from DMA tx ring */
-+		desc_hw = &ring->desc_hw[ring->head];
-+
-+		/*
-+		 * Increment the head count to point next
-+		 * descriptor for next time
-+		 */
-+		if (++ring->head == ring->slots)
-+			ring->head = 0;
-+
-+		/* Copy prepared sw descriptor data to hw descriptor */
-+		memcpy(desc_hw, &desc_sw->desc1, sizeof(*desc_hw));
-+
-+		/*
-+		 * Check if we have prepared 64B descriptor,
-+		 * in this case we need one more hw descriptor
-+		 */
-+		if (desc_sw->desc_cnt == 2) {
-+			desc_hw = &ring->desc_hw[ring->head];
-+
-+			if (++ring->head == ring->slots)
-+				ring->head = 0;
-+
-+			memcpy(desc_hw, &desc_sw->desc2, sizeof(*desc_hw));
-+		}
-+
-+		/*
-+		 * Delete this element from ld pending queue and append it to
-+		 * ld running queue
-+		 */
-+		list_move_tail(&desc_sw->node, &chan->ld_running);
-+
-+		/* Increment the pending transaction count */
-+		chan->pending++;
-+
-+		/* Notify the hw that we have descriptor ready for execution */
-+		iowrite32(desc_sw->desc_cnt, ring->cmd);
-+	}
-+}
-+
-+/**
-+ * xgene_dma_cleanup_descriptors - cleanup link descriptors which are completed
-+ * and move them to ld_completed to free until flag 'ack' is set
-+ * @chan: DMA channel
-+ *
-+ * This function is used on descriptors which have been executed by the DMA
-+ * controller. It will run any callbacks, submit any dependencies, then
-+ * free these descriptors if flag 'ack' is set.
-+ */
-+static void xgene_dma_cleanup_descriptors(struct xgene_dma_chan *chan)
-+{
-+	struct xgene_dma_ring *ring = &chan->rx_ring;
-+	struct xgene_dma_desc_sw *desc_sw, *_desc_sw;
-+	struct xgene_dma_desc_hw *desc_hw;
-+	u8 status;
-+
-+	/* Clean already completed and acked descriptors */
-+	xgene_dma_clean_completed_descriptor(chan);
-+
-+	/* Run the callback for each descriptor, in order */
-+	list_for_each_entry_safe(desc_sw, _desc_sw, &chan->ld_running, node) {
-+		/* Get subsequent hw descriptor from DMA rx ring */
-+		desc_hw = &ring->desc_hw[ring->head];
-+
-+		/* Check if this descriptor has been completed */
-+		if (unlikely(DMA_DESC_IS_EMPTY(desc_hw)))
-+			break;
-+
-+		if (++ring->head == ring->slots)
-+			ring->head = 0;
-+
-+		/* Check if we have any error with DMA transactions */
-+		status = DMA_DESC_STATUS(
-+				DMA_DESC_ELERR_RD(le64_to_cpu(desc_hw->m0)),
-+				DMA_DESC_LERR_RD(le64_to_cpu(desc_hw->m0)));
-+		if (status) {
-+			chan_err(chan, "%s\n", xgene_dma_desc_hw_err[status]);
-+			DMA_DESC_ERR_DUMP(desc_hw);
-+		}
-+
-+		/* Notify the hw about this completed descriptor */
-+		iowrite32(-1, ring->cmd);
-+
-+		/* Mark this hw descriptor as processed */
-+		DMA_DESC_SET_EMPTY(desc_hw);
-+
-+		xgene_dma_run_tx_complete_actions(chan, desc_sw);
-+
-+		xgene_dma_clean_running_descriptor(chan, desc_sw);
-+
-+		/*
-+		 * Decrement the pending transaction count
-+		 * as we have processed one
-+		 */
-+		chan->pending--;
-+	}
-+
-+	/*
-+	 * Start any pending transactions automatically
-+	 *
-+	 * In the ideal case, we keep the DMA controller busy while we go
-+	 * ahead and free the descriptors below.
-+	 */
-+	xgene_chan_xfer_ld_pending(chan);
-+}
-+
-+static int xgene_dma_alloc_chan_resources(struct dma_chan *dchan)
-+{
-+	struct xgene_dma_chan *chan = to_dma_chan(dchan);
-+
-+	/* Has this channel already been allocated? */
-+	if (chan->desc_pool)
-+		return 1;
-+
-+	chan->desc_pool = dma_pool_create(chan->name, chan->dev,
-+					  sizeof(struct xgene_dma_desc_sw),
-+					  0, 0);
-+	if (!chan->desc_pool) {
-+		chan_err(chan, "Failed to allocate descriptor pool\n");
-+		return -ENOMEM;
-+	}
-+
-+	chan_dbg(chan, "Allocate descripto pool\n");
-+
-+	return 1;
-+}
-+
-+/**
-+ * xgene_dma_free_desc_list - Free all descriptors in a queue
-+ * @chan: DMA channel
-+ * @list: the list to free
-+ *
-+ * LOCKING: must hold chan->desc_lock
-+ */
-+static void xgene_dma_free_desc_list(struct xgene_dma_chan *chan,
-+				     struct list_head *list)
-+{
-+	struct xgene_dma_desc_sw *desc, *_desc;
-+
-+	list_for_each_entry_safe(desc, _desc, list, node)
-+		xgene_dma_free_descriptor(chan, desc);
-+}
-+
-+static void xgene_dma_free_desc_list_reverse(struct xgene_dma_chan *chan,
-+					     struct list_head *list)
-+{
-+	struct xgene_dma_desc_sw *desc, *_desc;
-+
-+	list_for_each_entry_safe_reverse(desc, _desc, list, node)
-+		xgene_dma_free_descriptor(chan, desc);
-+}
-+
-+static void xgene_dma_free_chan_resources(struct dma_chan *dchan)
-+{
-+	struct xgene_dma_chan *chan = to_dma_chan(dchan);
-+
-+	chan_dbg(chan, "Free all resources\n");
-+
-+	if (!chan->desc_pool)
-+		return;
-+
-+	spin_lock_bh(&chan->lock);
-+
-+	/* Process all running descriptor */
-+	xgene_dma_cleanup_descriptors(chan);
-+
-+	/* Clean all link descriptor queues */
-+	xgene_dma_free_desc_list(chan, &chan->ld_pending);
-+	xgene_dma_free_desc_list(chan, &chan->ld_running);
-+	xgene_dma_free_desc_list(chan, &chan->ld_completed);
-+
-+	/* Delete this channel DMA pool */
-+	dma_pool_destroy(chan->desc_pool);
-+	chan->desc_pool = NULL;
-+
-+	spin_unlock_bh(&chan->lock);
-+}
-+
-+static struct dma_async_tx_descriptor *xgene_dma_prep_memcpy(
-+	struct dma_chan *dchan, dma_addr_t dst, dma_addr_t src,
-+	size_t len, unsigned long flags)
-+{
-+	struct xgene_dma_desc_sw *first = NULL, *new;
-+	struct xgene_dma_chan *chan;
-+	size_t copy;
-+
-+	if (unlikely(!dchan || (len == 0)))
-+		return NULL;
-+
-+	chan = to_dma_chan(dchan);
-+
-+	do {
-+		/* Allocate the link descriptor from DMA pool */
-+		new = xgene_dma_alloc_descriptor(chan);
-+		if (!new)
-+			goto fail;
-+
-+		/* Create the largest transaction possible */
-+		copy = min_t(size_t, len, DMA_MAX_64B_DESC_BYTE_CNT);
-+
-+		/* Prepare DMA descriptor */
-+		xgene_dma_prep_cpy_desc(chan, new, dst, src, copy);
-+
-+		if (!first)
-+			first = new;
-+
-+		new->tx.cookie = 0;
-+		async_tx_ack(&new->tx);
-+
-+		/* Update metadata */
-+		len -= copy;
-+		dst += copy;
-+		src += copy;
-+
-+		/* Insert the link descriptor to the LD ring */
-+		list_add_tail(&new->node, &first->tx_list);
-+	} while (len);
-+
-+	new->tx.flags = flags; /* client is in control of this ack */
-+	new->tx.cookie = -EBUSY;
-+	list_splice(&first->tx_list, &new->tx_list);
-+
-+	return &new->tx;
-+
-+fail:
-+	if (!first)
-+		return NULL;
-+
-+	xgene_dma_free_desc_list_reverse(chan, &first->tx_list);
-+	return NULL;
-+}
-+
-+static struct dma_async_tx_descriptor *xgene_dma_prep_sg(
-+	struct dma_chan *dchan, struct scatterlist *dst_sg,
-+	unsigned int dst_nents, struct scatterlist *src_sg,
-+	unsigned int src_nents, unsigned long flags)
-+{
-+	struct xgene_dma_desc_sw *first = NULL, *new = NULL;
-+	struct xgene_dma_chan *chan;
-+	size_t dst_avail, src_avail;
-+	dma_addr_t dst, src;
-+	size_t len;
-+
-+	if (unlikely(!dchan))
-+		return NULL;
-+
-+	if (unlikely(dst_nents == 0 || src_nents == 0))
-+		return NULL;
-+
-+	if (unlikely(!dst_sg || !src_sg))
-+		return NULL;
-+
-+	chan = to_dma_chan(dchan);
-+
-+	/* Get prepared for the loop */
-+	dst_avail = sg_dma_len(dst_sg);
-+	src_avail = sg_dma_len(src_sg);
-+	dst_nents--;
-+	src_nents--;
-+
-+	/* Run until we are out of scatterlist entries */
-+	while (true) {
-+		/* Create the largest transaction possible */
-+		len = min_t(size_t, src_avail, dst_avail);
-+		len = min_t(size_t, len, DMA_MAX_64B_DESC_BYTE_CNT);
-+		if (len == 0)
-+			goto fetch;
-+
-+		dst = sg_dma_address(dst_sg) + sg_dma_len(dst_sg) - dst_avail;
-+		src = sg_dma_address(src_sg) + sg_dma_len(src_sg) - src_avail;
-+
-+		/* Allocate the link descriptor from DMA pool */
-+		new = xgene_dma_alloc_descriptor(chan);
-+		if (!new)
-+			goto fail;
-+
-+		/* Prepare DMA descriptor */
-+		xgene_dma_prep_cpy_desc(chan, new, dst, src, len);
-+
-+		if (!first)
-+			first = new;
-+
-+		new->tx.cookie = 0;
-+		async_tx_ack(&new->tx);
-+
-+		/* update metadata */
-+		dst_avail -= len;
-+		src_avail -= len;
-+
-+		/* Insert the link descriptor to the LD ring */
-+		list_add_tail(&new->node, &first->tx_list);
-+
-+fetch:
-+		/* fetch the next dst scatterlist entry */
-+		if (dst_avail == 0) {
-+			/* no more entries: we're done */
-+			if (dst_nents == 0)
-+				break;
-+
-+			/* fetch the next entry: if there are no more: done */
-+			dst_sg = sg_next(dst_sg);
-+			if (!dst_sg)
-+				break;
-+
-+			dst_nents--;
-+			dst_avail = sg_dma_len(dst_sg);
-+		}
-+
-+		/* fetch the next src scatterlist entry */
-+		if (src_avail == 0) {
-+			/* no more entries: we're done */
-+			if (src_nents == 0)
-+				break;
-+
-+			/* fetch the next entry: if there are no more: done */
-+			src_sg = sg_next(src_sg);
-+			if (!src_sg)
-+				break;
-+
-+			src_nents--;
-+			src_avail = sg_dma_len(src_sg);
-+		}
-+	}
-+
-+	if (!new)
-+		return NULL;
-+
-+	new->tx.flags = flags; /* client is in control of this ack */
-+	new->tx.cookie = -EBUSY;
-+	list_splice(&first->tx_list, &new->tx_list);
-+
-+	return &new->tx;
-+
-+fail:
-+	if (!first)
-+		return NULL;
-+
-+	xgene_dma_free_desc_list_reverse(chan, &first->tx_list);
-+	return NULL;
-+}
-+
-+static void xgene_dma_issue_pending(struct dma_chan *dchan)
-+{
-+	struct xgene_dma_chan *chan = to_dma_chan(dchan);
-+
-+	spin_lock_bh(&chan->lock);
-+	xgene_chan_xfer_ld_pending(chan);
-+	spin_unlock_bh(&chan->lock);
-+}
-+
-+static enum dma_status xgene_dma_tx_status(struct dma_chan *dchan,
-+					   dma_cookie_t cookie,
-+					   struct dma_tx_state *txstate)
-+{
-+	struct xgene_dma_chan *chan = to_dma_chan(dchan);
-+	enum dma_status status;
-+
-+	status = dma_cookie_status(dchan, cookie, txstate);
-+	if (status == DMA_COMPLETE)
-+		return status;
-+
-+	/* Cleanup any running and executed descriptors */
-+	spin_lock_bh(&chan->lock);
-+	xgene_dma_cleanup_descriptors(chan);
-+	spin_unlock_bh(&chan->lock);
-+
-+	return dma_cookie_status(dchan, cookie, txstate);
-+}
-+
-+static void xgene_dma_tasklet_cb(unsigned long data)
-+{
-+	struct xgene_dma_chan *chan = (struct xgene_dma_chan *)data;
-+
-+	spin_lock_bh(&chan->lock);
-+
-+	/* Run all cleanup for descriptors which have been completed */
-+	xgene_dma_cleanup_descriptors(chan);
-+
-+	/* Re-enable DMA channel IRQ */
-+	enable_irq(chan->rx_irq);
-+
-+	spin_unlock_bh(&chan->lock);
-+}
-+
-+static irqreturn_t xgene_dma_chan_ring_isr(int irq, void *id)
-+{
-+	struct xgene_dma_chan *chan = (struct xgene_dma_chan *)id;
-+
-+	BUG_ON(!chan);
-+
-+	/*
-+	 * Disable DMA channel IRQ until we process completed
-+	 * descriptors
-+	 */
-+	disable_irq_nosync(chan->rx_irq);
-+
-+	/*
-+	 * Schedule the tasklet to handle all cleanup of the current
-+	 * transaction. It will start a new transaction if there is
-+	 * one pending.
-+	 */
-+	tasklet_schedule(&chan->tasklet);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static irqreturn_t xgene_dma_err_isr(int irq, void *id)
-+{
-+	struct xgene_dma *pdma = (struct xgene_dma *)id;
-+	unsigned long int_mask;
-+	u32 val, i;
-+
-+	val = ioread32(pdma->csr_dma + DMA_INT);
-+
-+	/* Clear DMA interrupts */
-+	iowrite32(val, pdma->csr_dma + DMA_INT);
-+
-+	/* Print DMA error info */
-+	int_mask = val >> DMA_INT_MASK_SHIFT;
-+	for_each_set_bit(i, &int_mask, ARRAY_SIZE(xgene_dma_err))
-+		dev_err(pdma->dev,
-+			"Interrupt status 0x%08X %s\n", val, xgene_dma_err[i]);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static void xgene_dma_wr_ring_state(struct xgene_dma_ring *ring)
-+{
-+	int i;
-+
-+	iowrite32(ring->num, ring->pdma->csr_ring + DMA_RING_STATE);
-+
-+	for (i = 0; i < DMA_RING_NUM_CONFIG; i++)
-+		iowrite32(ring->state[i], ring->pdma->csr_ring +
-+			  DMA_RING_STATE_WR_BASE + (i * 4));
-+}
-+
-+static void xgene_dma_clr_ring_state(struct xgene_dma_ring *ring)
-+{
-+	memset(ring->state, 0, sizeof(u32) * DMA_RING_NUM_CONFIG);
-+	xgene_dma_wr_ring_state(ring);
-+}
-+
-+static void xgene_dma_setup_ring(struct xgene_dma_ring *ring)
-+{
-+	void *ring_cfg = ring->state;
-+	u64 addr = ring->desc_paddr;
-+	void *desc;
-+	u32 i, val;
-+
-+	ring->slots = ring->size / DMA_RING_WQ_DESC_SIZE;
-+
-+	/* Clear DMA ring state */
-+	xgene_dma_clr_ring_state(ring);
-+
-+	/* Set DMA ring type */
-+	DMA_RING_TYPE_SET(ring_cfg, DMA_RING_TYPE_REGULAR);
-+
-+	if (ring->owner == DMA_RING_OWNER_DMA) {
-+		/* Set recombination buffer and timeout */
-+		DMA_RING_RECOMBBUF_SET(ring_cfg);
-+		DMA_RING_RECOMTIMEOUTL_SET(ring_cfg);
-+		DMA_RING_RECOMTIMEOUTH_SET(ring_cfg);
-+	}
-+
-+	/* Initialize DMA ring state */
-+	DMA_RING_SELTHRSH_SET(ring_cfg);
-+	DMA_RING_ACCEPTLERR_SET(ring_cfg);
-+	DMA_RING_COHERENT_SET(ring_cfg);
-+	DMA_RING_ADDRL_SET(ring_cfg, addr);
-+	DMA_RING_ADDRH_SET(ring_cfg, addr);
-+	DMA_RING_SIZE_SET(ring_cfg, ring->cfgsize);
-+
-+	/* Write DMA ring configurations */
-+	xgene_dma_wr_ring_state(ring);
-+
-+	/* Set DMA ring id */
-+	iowrite32(DMA_RING_ID_SETUP(ring->id),
-+		  ring->pdma->csr_ring + DMA_RING_ID);
-+
-+	/* Set DMA ring buffer */
-+	iowrite32(DMA_RING_ID_BUF_SETUP(ring->num),
-+		  ring->pdma->csr_ring + DMA_RING_ID_BUF);
-+
-+	if (ring->owner != DMA_RING_OWNER_CPU)
-+		return;
-+
-+	/* Set empty signature to DMA Rx ring descriptors */
-+	for (i = 0; i < ring->slots; i++) {
-+		desc = &ring->desc_hw[i];
-+		DMA_DESC_SET_EMPTY(desc);
-+	}
-+
-+	/* Enable DMA Rx ring interrupt */
-+	val = ioread32(ring->pdma->csr_ring + DMA_RING_NE_INT_MODE);
-+	DMA_RING_NE_INT_MODE_SET(val, ring->buf_num);
-+	iowrite32(val, ring->pdma->csr_ring + DMA_RING_NE_INT_MODE);
-+}
-+
-+static void xgene_dma_clear_ring(struct xgene_dma_ring *ring)
-+{
-+	u32 ring_id, val;
-+
-+	if (ring->owner == DMA_RING_OWNER_CPU) {
-+		/* Disable DMA Rx ring interrupt */
-+		val = ioread32(ring->pdma->csr_ring + DMA_RING_NE_INT_MODE);
-+		DMA_RING_NE_INT_MODE_RESET(val, ring->buf_num);
-+		iowrite32(val, ring->pdma->csr_ring + DMA_RING_NE_INT_MODE);
-+	}
-+
-+	/* Clear DMA ring state */
-+	ring_id = DMA_RING_ID_SETUP(ring->id);
-+	iowrite32(ring_id, ring->pdma->csr_ring + DMA_RING_ID);
-+
-+	iowrite32(0, ring->pdma->csr_ring + DMA_RING_ID_BUF);
-+	xgene_dma_clr_ring_state(ring);
-+}
-+
-+static void xgene_dma_set_ring_cmd(struct xgene_dma_ring *ring)
-+{
-+	ring->cmd_base = ring->pdma->csr_ring_cmd +
-+			DMA_RING_CMD_BASE_OFFSET((ring->num - DMA_RING_NUM));
-+	ring->cmd = ring->cmd_base + DMA_RING_CMD_OFFSET;
-+}
-+
-+static int xgene_dma_get_ring_size(struct xgene_dma_chan *chan,
-+				   enum xgene_dma_ring_cfgsize cfgsize)
-+{
-+	int size;
-+
-+	switch (cfgsize) {
-+	case DMA_RING_CFG_SIZE_512B:
-+		size = 0x200;
-+		break;
-+	case DMA_RING_CFG_SIZE_2KB:
-+		size = 0x800;
-+		break;
-+	case DMA_RING_CFG_SIZE_16KB:
-+		size = 0x4000;
-+		break;
-+	case DMA_RING_CFG_SIZE_64KB:
-+		size = 0x10000;
-+		break;
-+	case DMA_RING_CFG_SIZE_512KB:
-+		size = 0x80000;
-+		break;
-+	default:
-+		chan_err(chan, "Unsupported cfg ring size %d\n", cfgsize);
-+		return -EINVAL;
-+	}
-+
-+	return size;
-+}
-+
-+static void xgene_dma_delete_ring_one(struct xgene_dma_ring *ring)
-+{
-+	/* Clear DMA ring configurations */
-+	xgene_dma_clear_ring(ring);
-+
-+	/* De-allocate DMA ring descriptor */
-+	if (ring->desc_vaddr) {
-+		dma_free_coherent(ring->pdma->dev, ring->size,
-+				  ring->desc_vaddr, ring->desc_paddr);
-+		ring->desc_vaddr = NULL;
-+	}
-+}
-+
-+static void xgene_dma_delete_chan_rings(struct xgene_dma_chan *chan)
-+{
-+	xgene_dma_delete_ring_one(&chan->rx_ring);
-+	xgene_dma_delete_ring_one(&chan->tx_ring);
-+}
-+
-+static int xgene_dma_create_ring_one(struct xgene_dma_chan *chan,
-+				     struct xgene_dma_ring *ring,
-+				     enum xgene_dma_ring_cfgsize cfgsize)
-+{
-+	/* Setup DMA ring descriptor variables */
-+	ring->pdma = chan->pdma;
-+	ring->cfgsize = cfgsize;
-+	ring->num = chan->pdma->ring_num++;
-+	ring->id = DMA_RING_ID_GET(ring->owner, ring->buf_num);
-+
-+	ring->size = xgene_dma_get_ring_size(chan, cfgsize);
-+	if (ring->size <= 0)
-+		return ring->size;
-+
-+	/* Allocate memory for DMA ring descriptor */
-+	ring->desc_vaddr = dma_zalloc_coherent(chan->dev, ring->size,
-+					       &ring->desc_paddr, GFP_KERNEL);
-+	if (!ring->desc_vaddr) {
-+		chan_err(chan, "Failed to allocate ring desc\n");
-+		return -ENOMEM;
-+	}
-+
-+	/* Configure and enable DMA ring */
-+	xgene_dma_set_ring_cmd(ring);
-+	xgene_dma_setup_ring(ring);
-+
-+	return 0;
-+}
-+
-+static int xgene_dma_create_chan_rings(struct xgene_dma_chan *chan)
-+{
-+	struct xgene_dma_ring *rx_ring = &chan->rx_ring;
-+	struct xgene_dma_ring *tx_ring = &chan->tx_ring;
-+	int ret;
-+
-+	/* Create DMA Rx ring descriptor */
-+	rx_ring->owner = DMA_RING_OWNER_CPU;
-+	rx_ring->buf_num = DMA_CPU_BUFNUM + chan->id;
-+
-+	ret = xgene_dma_create_ring_one(chan, rx_ring, DMA_RING_CFG_SIZE_64KB);
-+	if (ret)
-+		return ret;
-+
-+	chan_dbg(chan, "Rx ring id 0x%X num %d desc 0x%p\n",
-+		 rx_ring->id, rx_ring->num, rx_ring->desc_vaddr);
-+
-+	/* Create DMA Tx ring descriptor */
-+	tx_ring->owner = DMA_RING_OWNER_DMA;
-+	tx_ring->buf_num = DMA_BUFNUM + chan->id;
-+
-+	ret = xgene_dma_create_ring_one(chan, tx_ring, DMA_RING_CFG_SIZE_64KB);
-+	if (ret) {
-+		xgene_dma_delete_ring_one(rx_ring);
-+		return ret;
-+	}
-+
-+	tx_ring->dst_ring_num = DMA_RING_DST_ID(rx_ring->num);
-+
-+	chan_dbg(chan,
-+		 "Tx ring id 0x%X num %d desc 0x%p\n",
-+		 tx_ring->id, tx_ring->num, tx_ring->desc_vaddr);
-+
-+	return ret;
-+}
-+
-+static int xgene_dma_init_rings(struct xgene_dma *pdma)
-+{
-+	int ret, i, j;
-+
-+	for (i = 0; i < DMA_MAX_CHANNEL; i++) {
-+		ret = xgene_dma_create_chan_rings(&pdma->chan[i]);
-+		if (ret) {
-+			for (j = 0; j < i; j++)
-+				xgene_dma_delete_chan_rings(&pdma->chan[j]);
-+			return ret;
-+		}
-+	}
-+
-+	return ret;
-+}
-+
-+static void xgene_dma_enable(struct xgene_dma *pdma)
-+{
-+	u32 val;
-+
-+	/* Configure and enable DMA engine */
-+	val = ioread32(pdma->csr_dma + DMA_GCR);
-+	DMA_CH_SETUP(val);
-+	DMA_ENABLE(val);
-+	iowrite32(val, pdma->csr_dma + DMA_GCR);
-+}
-+
-+static void xgene_dma_disable(struct xgene_dma *pdma)
-+{
-+	u32 val;
-+
-+	val = ioread32(pdma->csr_dma + DMA_GCR);
-+	DMA_DISABLE(val);
-+	iowrite32(val, pdma->csr_dma + DMA_GCR);
-+}
-+
-+static void xgene_dma_mask_interrupts(struct xgene_dma *pdma)
-+{
-+	/*
-+	 * Mask DMA ring overflow, underflow and
-+	 * AXI write/read error interrupts
-+	 */
-+	iowrite32(DMA_INT_ALL_MASK, pdma->csr_dma + DMA_RING_INT0_MASK);
-+	iowrite32(DMA_INT_ALL_MASK, pdma->csr_dma + DMA_RING_INT1_MASK);
-+	iowrite32(DMA_INT_ALL_MASK, pdma->csr_dma + DMA_RING_INT2_MASK);
-+	iowrite32(DMA_INT_ALL_MASK, pdma->csr_dma + DMA_RING_INT3_MASK);
-+	iowrite32(DMA_INT_ALL_MASK, pdma->csr_dma + DMA_RING_INT4_MASK);
-+
-+	/* Mask DMA error interrupts */
-+	iowrite32(DMA_INT_ALL_MASK, pdma->csr_dma + DMA_INT_MASK);
-+}
-+
-+static void xgene_dma_unmask_interrupts(struct xgene_dma *pdma)
-+{
-+	/*
-+	 * Unmask DMA ring overflow, underflow and
-+	 * AXI write/read error interrupts
-+	 */
-+	iowrite32(DMA_INT_ALL_UNMASK, pdma->csr_dma + DMA_RING_INT0_MASK);
-+	iowrite32(DMA_INT_ALL_UNMASK, pdma->csr_dma + DMA_RING_INT1_MASK);
-+	iowrite32(DMA_INT_ALL_UNMASK, pdma->csr_dma + DMA_RING_INT2_MASK);
-+	iowrite32(DMA_INT_ALL_UNMASK, pdma->csr_dma + DMA_RING_INT3_MASK);
-+	iowrite32(DMA_INT_ALL_UNMASK, pdma->csr_dma + DMA_RING_INT4_MASK);
-+
-+	/* Unmask DMA error interrupts */
-+	iowrite32(DMA_INT_ALL_UNMASK, pdma->csr_dma + DMA_INT_MASK);
-+}
-+
-+static void xgene_dma_init_hw(struct xgene_dma *pdma)
-+{
-+	u32 val;
-+
-+	/* Associate DMA ring to corresponding ring HW */
-+	iowrite32(DMA_ASSOC_RING_MNGR1,
-+		  pdma->csr_dma + DMA_CFG_RING_WQ_ASSOC);
-+
-+	xgene_dma_enable(pdma);
-+	xgene_dma_unmask_interrupts(pdma);
-+
-+	/* Get DMA id and version info */
-+	val = ioread32(pdma->csr_dma + DMA_IPBRR);
-+
-+	/* DMA device info */
-+	dev_info(pdma->dev,
-+		 "X-Gene DMA v%d.%02d.%02d driver registered %d channels",
-+		 DMA_REV_NO_RD(val), DMA_BUS_ID_RD(val),
-+		 DMA_DEV_ID_RD(val), DMA_MAX_CHANNEL);
-+}
-+
-+int xgene_dma_init_ring_mngr(struct xgene_dma *pdma)
-+{
-+	if (ioread32(pdma->csr_ring + DMA_RING_CLKEN) &&
-+	    (!ioread32(pdma->csr_ring + DMA_RING_SRST)))
-+		return 0;
-+
-+	iowrite32(0x3, pdma->csr_ring + DMA_RING_CLKEN);
-+	iowrite32(0x0, pdma->csr_ring + DMA_RING_SRST);
-+
-+	/* Bring up memory */
-+	iowrite32(0x0, pdma->csr_ring + DMA_RING_MEM_RAM_SHUTDOWN);
-+
-+	/* Force a barrier */
-+	ioread32(pdma->csr_ring + DMA_RING_MEM_RAM_SHUTDOWN);
-+
-+	/* reset may take up to 1ms */
-+	usleep_range(1000, 1100);
-+
-+	if (ioread32(pdma->csr_ring + DMA_RING_BLK_MEM_RDY)
-+		!= DMA_RING_BLK_MEM_RDY_VAL) {
-+		dev_err(pdma->dev,
-+			"Failed to release ring mngr memory from shutdown\n");
-+		return -ENODEV;
-+	}
-+
-+	/* program threshold set 1 and all hysteresis */
-+	iowrite32(DMA_RING_THRESLD0_SET1_VAL,
-+		  pdma->csr_ring + DMA_RING_THRESLD0_SET1);
-+	iowrite32(DMA_RING_THRESLD1_SET1_VAL,
-+		  pdma->csr_ring + DMA_RING_THRESLD1_SET1);
-+	iowrite32(DMA_RING_HYSTERESIS_VAL,
-+		  pdma->csr_ring + DMA_RING_HYSTERESIS);
-+
-+	/* Enable QPcore and assign error queue */
-+	iowrite32(DMA_RING_ENABLE, pdma->csr_ring + DMA_RING_CONFIG);
-+
-+	return 0;
-+}
-+
-+static int xgene_dma_init_mem(struct xgene_dma *pdma)
-+{
-+	int ret;
-+
-+	ret = xgene_dma_init_ring_mngr(pdma);
-+	if (ret)
-+		return ret;
-+
-+	/* Bring up memory */
-+	iowrite32(0x0, pdma->csr_dma + DMA_MEM_RAM_SHUTDOWN);
-+
-+	/* Force a barrier */
-+	ioread32(pdma->csr_dma + DMA_MEM_RAM_SHUTDOWN);
-+
-+	/* reset may take up to 1ms */
-+	usleep_range(1000, 1100);
-+
-+	if (ioread32(pdma->csr_dma + DMA_BLK_MEM_RDY)
-+		!= DMA_BLK_MEM_RDY_VAL) {
-+		dev_err(pdma->dev,
-+			"Failed to release DMA memory from shutdown\n");
-+		return -ENODEV;
-+	}
-+
-+	return 0;
-+}
-+
-+static int xgene_dma_request_irqs(struct xgene_dma *pdma)
-+{
-+	struct xgene_dma_chan *chan;
-+	int ret, i, j;
-+
-+	/* Register DMA error irq */
-+	ret = devm_request_irq(pdma->dev, pdma->err_irq, xgene_dma_err_isr,
-+			       0, "dma_error", pdma);
-+	if (ret) {
-+		dev_err(pdma->dev,
-+			"Failed to register error IRQ %d\n", pdma->err_irq);
-+		return ret;
-+	}
-+
-+	/* Register DMA channel rx irq */
-+	for (i = 0; i < DMA_MAX_CHANNEL; i++) {
-+		chan = &pdma->chan[i];
-+		ret = devm_request_irq(chan->dev, chan->rx_irq,
-+				       xgene_dma_chan_ring_isr,
-+				       0, chan->name, chan);
-+		if (ret) {
-+			chan_err(chan, "Failed to register Rx IRQ %d\n",
-+				 chan->rx_irq);
-+			devm_free_irq(pdma->dev, pdma->err_irq, pdma);
-+
-+			for (j = 0; j < i; j++) {
-+				chan = &pdma->chan[i];
-+				devm_free_irq(chan->dev, chan->rx_irq, chan);
-+			}
-+
-+			return ret;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static void xgene_dma_free_irqs(struct xgene_dma *pdma)
-+{
-+	struct xgene_dma_chan *chan;
-+	int i;
-+
-+	/* Free DMA device error irq */
-+	devm_free_irq(pdma->dev, pdma->err_irq, pdma);
-+
-+	for (i = 0; i < DMA_MAX_CHANNEL; i++) {
-+		chan = &pdma->chan[i];
-+		devm_free_irq(chan->dev, chan->rx_irq, chan);
-+	}
-+}
-+
-+static void xgene_dma_set_caps(struct xgene_dma_chan *chan,
-+			       struct dma_device *dma_dev)
-+{
-+	/* Initialize DMA device capability mask */
-+	dma_cap_zero(dma_dev->cap_mask);
-+
-+	/* Set DMA device capability */
-+	dma_cap_set(DMA_MEMCPY, dma_dev->cap_mask);
-+	dma_cap_set(DMA_SG, dma_dev->cap_mask);
-+
-+	/* Set base and prep routines */
-+	dma_dev->dev = chan->dev;
-+	dma_dev->device_alloc_chan_resources = xgene_dma_alloc_chan_resources;
-+	dma_dev->device_free_chan_resources = xgene_dma_free_chan_resources;
-+	dma_dev->device_issue_pending = xgene_dma_issue_pending;
-+	dma_dev->device_tx_status = xgene_dma_tx_status;
-+	dma_dev->device_prep_dma_memcpy = xgene_dma_prep_memcpy;
-+	dma_dev->device_prep_dma_sg = xgene_dma_prep_sg;
-+}
-+
-+static int xgene_dma_async_register(struct xgene_dma *pdma, int id)
-+{
-+	struct xgene_dma_chan *chan = &pdma->chan[id];
-+	struct dma_device *dma_dev = &pdma->dma_dev[id];
-+	int ret;
-+
-+	chan->dma_chan.device = dma_dev;
-+
-+	spin_lock_init(&chan->lock);
-+	INIT_LIST_HEAD(&chan->ld_pending);
-+	INIT_LIST_HEAD(&chan->ld_running);
-+	INIT_LIST_HEAD(&chan->ld_completed);
-+	tasklet_init(&chan->tasklet, xgene_dma_tasklet_cb,
-+		     (unsigned long)chan);
-+
-+	chan->pending = 0;
-+	chan->desc_pool = NULL;
-+	dma_cookie_init(&chan->dma_chan);
-+
-+	/* Setup dma device capabilities and prep routines */
-+	xgene_dma_set_caps(chan, dma_dev);
-+
-+	/* Initialize DMA device list head */
-+	INIT_LIST_HEAD(&dma_dev->channels);
-+	list_add_tail(&chan->dma_chan.device_node, &dma_dev->channels);
-+
-+	/* Register with Linux async DMA framework*/
-+	ret = dma_async_device_register(dma_dev);
-+	if (ret) {
-+		chan_err(chan, "Failed to register async device %d", ret);
-+		tasklet_kill(&chan->tasklet);
-+
-+		return ret;
-+	}
-+
-+	/* DMA capability info */
-+	dev_info(pdma->dev,
-+		 "%s: CAPABILITY ( %s%s)\n", dma_chan_name(&chan->dma_chan),
-+		 dma_has_cap(DMA_MEMCPY, dma_dev->cap_mask) ? "MEMCPY " : "",
-+		 dma_has_cap(DMA_SG, dma_dev->cap_mask) ? "SGCPY " : "");
-+
-+	return 0;
-+}
-+
-+static int xgene_dma_init_async(struct xgene_dma *pdma)
-+{
-+	int ret, i, j;
-+
-+	for (i = 0; i < DMA_MAX_CHANNEL ; i++) {
-+		ret = xgene_dma_async_register(pdma, i);
-+		if (ret) {
-+			for (j = 0; j < i; j++) {
-+				dma_async_device_unregister(&pdma->dma_dev[j]);
-+				tasklet_kill(&pdma->chan[j].tasklet);
-+			}
-+
-+			return ret;
-+		}
-+	}
-+
-+	return ret;
-+}
-+
-+static void xgene_dma_async_unregister(struct xgene_dma *pdma)
-+{
-+	int i;
-+
-+	for (i = 0; i < DMA_MAX_CHANNEL; i++)
-+		dma_async_device_unregister(&pdma->dma_dev[i]);
-+}
-+
-+static void xgene_dma_init_channels(struct xgene_dma *pdma)
-+{
-+	struct xgene_dma_chan *chan;
-+	int i;
-+
-+	pdma->ring_num = DMA_RING_NUM;
-+
-+	for (i = 0; i < DMA_MAX_CHANNEL; i++) {
-+		chan = &pdma->chan[i];
-+		chan->dev = pdma->dev;
-+		chan->pdma = pdma;
-+		chan->id = i;
-+		sprintf(chan->name, "chan%d", chan->id);
-+	}
-+}
-+
-+static int xgene_dma_get_resources(struct platform_device *pdev,
-+				   struct xgene_dma *pdma)
-+{
-+	struct resource *res;
-+	int irq, i;
-+
-+	/* Get DMA csr region */
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dma_csr");
-+	if (!res) {
-+		dev_err(&pdev->dev, "Failed to get csr region\n");
-+		return -ENXIO;
-+	}
-+
-+	pdma->csr_dma = devm_ioremap(&pdev->dev, res->start,
-+				     resource_size(res));
-+	if (IS_ERR(pdma->csr_dma)) {
-+		dev_err(&pdev->dev, "Failed to ioremap csr region");
-+		return PTR_ERR(pdma->csr_dma);
-+	}
-+
-+	/* Get DMA ring csr region */
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ring_csr");
-+	if (!res) {
-+		dev_err(&pdev->dev, "Failed to get ring csr region\n");
-+		return -ENXIO;
-+	}
-+
-+	pdma->csr_ring =  devm_ioremap(&pdev->dev, res->start,
-+				       resource_size(res));
-+	if (IS_ERR(pdma->csr_ring)) {
-+		dev_err(&pdev->dev, "Failed to ioremap ring csr region");
-+		return PTR_ERR(pdma->csr_ring);
-+	}
-+
-+	/* Get DMA ring cmd csr region */
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+					   "ring_cmd_csr");
-+	if (!res) {
-+		dev_err(&pdev->dev, "Failed to get ring cmd csr region\n");
-+		return -ENXIO;
-+	}
-+
-+	pdma->csr_ring_cmd = devm_ioremap(&pdev->dev, res->start,
-+					  resource_size(res));
-+	if (IS_ERR(pdma->csr_ring_cmd)) {
-+		dev_err(&pdev->dev, "Failed to ioremap ring cmd csr region");
-+		return PTR_ERR(pdma->csr_ring_cmd);
-+	}
-+
-+	/* Get DMA error interrupt */
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq <= 0) {
-+		dev_err(&pdev->dev, "Failed to get Error IRQ\n");
-+		return -ENXIO;
-+	}
-+
-+	pdma->err_irq = irq;
-+
-+	/* Get DMA Rx ring descriptor interrupts for all DMA channels */
-+	for (i = 1; i <= DMA_MAX_CHANNEL; i++) {
-+		irq = platform_get_irq(pdev, i);
-+		if (irq <= 0) {
-+			dev_err(&pdev->dev, "Failed to get Rx IRQ\n");
-+			return -ENXIO;
-+		}
-+
-+		pdma->chan[i - 1].rx_irq = irq;
-+	}
-+
-+	return 0;
-+}
-+
-+static int xgene_dma_probe(struct platform_device *pdev)
-+{
-+	struct xgene_dma *pdma;
-+	int ret, i;
-+
-+	pdma = devm_kzalloc(&pdev->dev, sizeof(*pdma), GFP_KERNEL);
-+	if (!pdma)
-+		return -ENOMEM;
-+
-+	pdma->dev = &pdev->dev;
-+	platform_set_drvdata(pdev, pdma);
-+
-+	ret = xgene_dma_get_resources(pdev, pdma);
-+	if (ret)
-+		return ret;
-+
-+	pdma->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(pdma->clk)) {
-+		dev_err(&pdev->dev, "Failed to get clk\n");
-+		return PTR_ERR(pdma->clk);
-+	}
-+
-+	/* Enable clk before accessing registers */
-+	ret = clk_prepare_enable(pdma->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to enable clk %d\n", ret);
-+		return ret;
-+	}
-+
-+	/* Remove DMA RAM out of shutdown */
-+	ret = xgene_dma_init_mem(pdma);
-+	if (ret)
-+		goto err_clk_enable;
-+
-+	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(42));
-+	if (ret) {
-+		dev_err(&pdev->dev, "No usable DMA configuration\n");
-+		goto err_dma_mask;
-+	}
-+
-+	/* Initialize DMA channels software state */
-+	xgene_dma_init_channels(pdma);
-+
-+	/* Configue DMA rings */
-+	ret = xgene_dma_init_rings(pdma);
-+	if (ret)
-+		goto err_clk_enable;
-+
-+	ret = xgene_dma_request_irqs(pdma);
-+	if (ret)
-+		goto err_request_irq;
-+
-+	/* Configure and enable DMA engine */
-+	xgene_dma_init_hw(pdma);
-+
-+	/* Register DMA device with linux async framework */
-+	ret = xgene_dma_init_async(pdma);
-+	if (ret)
-+		goto err_async_init;
-+
-+	return 0;
-+
-+err_async_init:
-+	xgene_dma_free_irqs(pdma);
-+
-+err_request_irq:
-+	for (i = 0; i < DMA_MAX_CHANNEL; i++)
-+		xgene_dma_delete_chan_rings(&pdma->chan[i]);
-+
-+err_dma_mask:
-+err_clk_enable:
-+	clk_disable_unprepare(pdma->clk);
-+
-+	return ret;
-+}
-+
-+static int xgene_dma_remove(struct platform_device *pdev)
-+{
-+	struct xgene_dma *pdma = platform_get_drvdata(pdev);
-+	struct xgene_dma_chan *chan;
-+	int i;
-+
-+	xgene_dma_async_unregister(pdma);
-+
-+	/* Mask interrupts and disable DMA engine */
-+	xgene_dma_mask_interrupts(pdma);
-+	xgene_dma_disable(pdma);
-+	xgene_dma_free_irqs(pdma);
-+
-+	for (i = 0; i < DMA_MAX_CHANNEL; i++) {
-+		chan = &pdma->chan[i];
-+		tasklet_kill(&chan->tasklet);
-+		xgene_dma_delete_chan_rings(chan);
-+	}
-+
-+	clk_disable_unprepare(pdma->clk);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id xgene_dma_of_match_ptr[] = {
-+	{.compatible = "apm,xgene-dma",},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, xgene_dma_of_match_ptr);
-+
-+static struct platform_driver xgene_dma_driver = {
-+	.probe = xgene_dma_probe,
-+	.remove = xgene_dma_remove,
-+	.driver = {
-+		.name = "X-Gene-DMA",
-+		.owner = THIS_MODULE,
-+		.of_match_table = xgene_dma_of_match_ptr,
-+	},
-+};
-+
-+module_platform_driver(xgene_dma_driver);
-+
-+MODULE_DESCRIPTION("APM X-Gene SoC DMA driver");
-+MODULE_AUTHOR("Rameshwar Prasad Sahu <rsahu@apm.com>");
-+MODULE_AUTHOR("Loc Ho <lho@apm.com>");
-+MODULE_LICENSE("GPL");
-+MODULE_VERSION("1.0");
---
-1.8.2.1
+ static inline struct reset_control *reset_control_get_optional(
+ 					struct device *dev, const char *id)
+ {
+-	return ERR_PTR(-ENOSYS);
++	return ERR_PTR(device_reset_optional(dev));
+ }
+ 
+ static inline struct reset_control *devm_reset_control_get_optional(
+ 					struct device *dev, const char *id)
+ {
+-	return ERR_PTR(-ENOSYS);
++	return reset_control_get_optional(dev, id);
+ }
+ 
+ static inline struct reset_control *of_reset_control_get(
+diff --git a/sound/soc/tegra/Kconfig b/sound/soc/tegra/Kconfig
+index a6768f832c6f..70f58bd43a56 100644
+--- a/sound/soc/tegra/Kconfig
++++ b/sound/soc/tegra/Kconfig
+@@ -2,7 +2,6 @@ config SND_SOC_TEGRA
+ 	tristate "SoC Audio for the Tegra System-on-Chip"
+ 	depends on (ARCH_TEGRA && TEGRA20_APB_DMA) || COMPILE_TEST
+ 	depends on COMMON_CLK
+-	depends on RESET_CONTROLLER
+ 	select REGMAP_MMIO
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM
+ 	help
