@@ -1,43 +1,39 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 24 Feb 2015 15:58:47 +0100
-Subject: [PATCH] ARM64: Add new Xilinx ZynqMP SoC
-In-Reply-To: <CAL_JsqKkVHaf_U0nU9nqa2q5XwfsuCu-ZWVEHx6b5Mv9Hgen1Q@mail.gmail.com>
-References: <8ac3037c175711dec0adcd0d898be7d9722e0ed0.1424764548.git.michal.simek@xilinx.com>
- <CAL_JsqKkVHaf_U0nU9nqa2q5XwfsuCu-ZWVEHx6b5Mv9Hgen1Q@mail.gmail.com>
-Message-ID: <9bffa4683bd6478993de6bea1d3027af@BN1AFFO11FD048.protection.gbl>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 24 Feb 2015 15:02:30 +0000
+Subject: [PATCH] ARM: vexpress: update CONFIG_USB_ISP1760 option
+Message-ID: <1424790150-8450-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/2015 03:42 PM, Rob Herring wrote:
-> On Tue, Feb 24, 2015 at 1:56 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->> Initial version of device tree for Xilinx ZynqMP SoC.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
->> ---
-> 
-> [...]
-> 
->> +               gic: interrupt-controller at f9010000 {
->> +                       compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
-> 
-> gic-400, right?
+Commt 7ef077a8ad35 ("usb: isp1760: Move driver from drivers/usb/host/
+to drivers/usb/isp1760/") moved the isp1760 driver and changed the
+Kconfig option. This makes CONFIG_USB_ISP1760_HCD not selectable
+directly anymore. This results in driver being not compiled in when
+using vexpress_defconfig and the USB is non-functional.
 
-yep
+This patch updates the CONFIG_USB_ISP1760_HCD to CONFIG_USB_ISP1760 to
+get back USB functional on vexpress platforms.
 
-> 
->> +                       #interrupt-cells = <3>;
->> +                       reg = <0x0 0xf9010000 0x10000>,
->> +                             <0x0 0xf9020000 0x20000>,
->> +                             <0x0 0xf9040000 0x20000>,
->> +                             <0x0 0xf9060000 0x20000>;
-> 
-> These addresses are wrong if you are doing address swizzling to do 64K
-> offsets. We don't really have an answer yet as to what is the right
-> way. See the XGene GIC discussion[1].
+Cc: Liviu Dudau <liviu.dudau@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm/configs/vexpress_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Is this better for GICC?
-<0x0 0xf902f000 0x2000>
-
-Thanks,
-Michal
+diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
+index f489fdaa19b8..37fe607a4ede 100644
+--- a/arch/arm/configs/vexpress_defconfig
++++ b/arch/arm/configs/vexpress_defconfig
+@@ -118,8 +118,8 @@ CONFIG_HID_ZEROPLUS=y
+ CONFIG_USB=y
+ CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+ CONFIG_USB_MON=y
+-CONFIG_USB_ISP1760_HCD=y
+ CONFIG_USB_STORAGE=y
++CONFIG_USB_ISP1760=y
+ CONFIG_MMC=y
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_NEW_LEDS=y
+-- 
+1.9.1
