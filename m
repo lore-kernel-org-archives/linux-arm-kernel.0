@@ -1,93 +1,130 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 24 Feb 2015 10:56:01 +0100
-Subject: [RFC PATCH 2/3] genirq: add helper functions to deal with wakeup on
- shared IRQF_NO_SUSPEND IRQs
+Date: Tue, 24 Feb 2015 10:56:02 +0100
+Subject: [RFC PATCH 3/3] rtc: at91sam9: properly act when IRQ handler is
+ called in suspended state
 In-Reply-To: <1424771762-16343-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1424771762-16343-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1424771762-16343-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1424771762-16343-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add two helper functions to help drivers that are sharing IRQs with
-timer devices (or other devices setting the IRQF_NO_SUSPEND flag) deal
-with system wakeup and state detection.
-
-Such drivers should expect their IRQ handler to be called in 2 different
-contexts:
-1/ the system is resumed and the handler should act normally
-2/ the system is suspended and the handler should wake it up, and
-   potentially save the received events so that they could be taken care
-   of when the resume callback is called
-
-irq_is_wakeup_armed provides mean to test the current state (true means
-the system is suspended).
-
-irq_pm_force_wakeup provides mean to force a system wakeup.
+The IRQ line used by the RTC device is often shared with the system timer
+(PIT) on at91 platforms.
+Since timers are registering their handlers with IRQF_NO_SUSPEND, we should
+expect being called in suspended state, and properly wake the system up
+when this is the case.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- include/linux/interrupt.h |  3 +++
- kernel/irq/manage.c       | 16 ++++++++++++++++
- kernel/irq/pm.c           |  6 ++++++
- 3 files changed, 25 insertions(+)
+ drivers/rtc/rtc-at91sam9.c | 62 ++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 51 insertions(+), 11 deletions(-)
 
-diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-index d9b05b5..052a3b2 100644
---- a/include/linux/interrupt.h
-+++ b/include/linux/interrupt.h
-@@ -356,6 +356,9 @@ static inline int disable_irq_wake(unsigned int irq)
- 	return irq_set_irq_wake(irq, 0);
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index 2183fd2..8cf9c1b 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -77,6 +77,8 @@ struct sam9_rtc {
+ 	unsigned int		gpbr_offset;
+ 	int 			irq;
+ 	struct clk		*sclk;
++	unsigned long		events;
++	spinlock_t		lock;
+ };
+ 
+ #define rtt_readl(rtc, field) \
+@@ -271,14 +273,9 @@ static int at91_rtc_proc(struct device *dev, struct seq_file *seq)
+ 	return 0;
  }
  
-+bool irq_is_wakeup_armed(unsigned int irq);
+-/*
+- * IRQ handler for the RTC
+- */
+-static irqreturn_t at91_rtc_interrupt(int irq, void *_rtc)
++static irqreturn_t at91_rtc_cache_events(struct sam9_rtc *rtc)
+ {
+-	struct sam9_rtc *rtc = _rtc;
+ 	u32 sr, mr;
+-	unsigned long events = 0;
+ 
+ 	/* Shared interrupt may be for another device.  Note: reading
+ 	 * SR clears it, so we must only read it in this irq handler!
+@@ -290,18 +287,54 @@ static irqreturn_t at91_rtc_interrupt(int irq, void *_rtc)
+ 
+ 	/* alarm status */
+ 	if (sr & AT91_RTT_ALMS)
+-		events |= (RTC_AF | RTC_IRQF);
++		rtc->events |= (RTC_AF | RTC_IRQF);
+ 
+ 	/* timer update/increment */
+ 	if (sr & AT91_RTT_RTTINC)
+-		events |= (RTC_UF | RTC_IRQF);
++		rtc->events |= (RTC_UF | RTC_IRQF);
 +
-+void irq_pm_force_wakeup(void);
- 
- #ifdef CONFIG_IRQ_FORCED_THREADING
- extern bool force_irqthreads;
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 196a06f..5424be0 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -551,6 +551,22 @@ int irq_set_irq_wake(unsigned int irq, unsigned int on)
- }
- EXPORT_SYMBOL(irq_set_irq_wake);
- 
-+bool irq_is_wakeup_armed(unsigned int irq)
++	return IRQ_HANDLED;
++}
++
++static void at91_rtc_flush_events(struct sam9_rtc *rtc)
 +{
-+	unsigned long flags;
-+	struct irq_desc *desc = irq_get_desc_buslock(irq, &flags, IRQ_GET_DESC_CHECK_GLOBAL);
-+	bool ret;
++	if (!rtc->events)
++		return;
+ 
+-	rtc_update_irq(rtc->rtcdev, 1, events);
++	rtc_update_irq(rtc->rtcdev, 1, rtc->events);
++	rtc->events = 0;
+ 
+ 	pr_debug("%s: num=%ld, events=0x%02lx\n", __func__,
+-		events >> 8, events & 0x000000FF);
++		rtc->events >> 8, rtc->events & 0x000000FF);
++}
+ 
+-	return IRQ_HANDLED;
++/*
++ * IRQ handler for the RTC
++ */
++static irqreturn_t at91_rtc_interrupt(int irq, void *_rtc)
++{
++	struct sam9_rtc *rtc = _rtc;
++	int ret;
 +
-+	if (!desc)
-+		return false;
++	spin_lock(&rtc->lock);
 +
-+	ret = irqd_is_wakeup_armed(&desc->irq_data);
++	ret = at91_rtc_cache_events(rtc);
 +
-+	irq_put_desc_busunlock(desc, flags);
++	/* We're called in suspended state */
++	if (irq_is_wakeup_armed(irq)) {
++		/* Mask irqs coming from this peripheral */
++		rtt_writel(rtc, MR,
++			   rtt_readl(rtc, MR) &
++			   ~(AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN));
++		/* Trigger a system wakeup */
++		irq_pm_force_wakeup();
++	} else {
++		at91_rtc_flush_events(rtc);
++	}
++
++	spin_unlock(&rtc->lock);
++
 +	return ret;
-+}
-+EXPORT_SYMBOL(irq_is_wakeup_armed);
-+
- /*
-  * Internal function that tells the architecture code whether a
-  * particular irq has been exclusively allocated or is available
-diff --git a/kernel/irq/pm.c b/kernel/irq/pm.c
-index 1743162..1110a37 100644
---- a/kernel/irq/pm.c
-+++ b/kernel/irq/pm.c
-@@ -28,6 +28,12 @@ bool irq_pm_check_wakeup(struct irq_desc *desc)
- 	return false;
  }
  
-+void irq_pm_force_wakeup(void)
-+{
-+	pm_system_wakeup();
-+}
-+EXPORT_SYMBOL_GPL(irq_pm_force_wakeup);
+ static const struct rtc_class_ops at91_rtc_ops = {
+@@ -499,10 +532,17 @@ static int at91_rtc_resume(struct device *dev)
+ 	u32		mr;
+ 
+ 	if (rtc->imr) {
++		unsigned long flags;
 +
- /*
-  * Called from __setup_irq() with desc->lock held after @action has
-  * been installed in the action chain.
+ 		if (device_may_wakeup(dev))
+ 			disable_irq_wake(rtc->irq);
+ 		mr = rtt_readl(rtc, MR);
+ 		rtt_writel(rtc, MR, mr | rtc->imr);
++
++		spin_lock_irqsave(&rtc->lock, flags);
++		at91_rtc_cache_events(rtc);
++		at91_rtc_flush_events(rtc);
++		spin_unlock_irqrestore(&rtc->lock, flags);
+ 	}
+ 
+ 	return 0;
 -- 
 1.9.1
