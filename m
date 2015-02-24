@@ -1,64 +1,43 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 24 Feb 2015 16:42:42 +0100
-Subject: [PATCH] ARM: EXYNOS: Handle of_find_device_by_node and kstrdup
- failures
-In-Reply-To: <1422984529-17729-1-git-send-email-k.kozlowski@samsung.com>
-References: <1422984529-17729-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1424792562.6775.3.camel@AMDC1943>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Tue, 24 Feb 2015 15:44:27 +0000
+Subject: question about PMU interrupt in binding
+Message-ID: <CY1PR0301MB0748CE5D60F401F4D395E3C387160@CY1PR0301MB0748.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On wto, 2015-02-03 at 18:28 +0100, Krzysztof Kozlowski wrote:
-> Prevent possible NULL pointer dereference of pointer returned by
-> of_find_device_by_node(). Handle this by skipping such power domain.
+Stephen/Will,
+
+Had a question about the definition of "interrupts" in the
+PMU binding:
+
+> commit d84c47837d800c0db1c9f2015a1565504417f812
+> Author: Stephen Boyd <sboyd@codeaurora.org>
+> Date:   Fri Feb 7 21:01:24 2014 +0000
 > 
-> Additionally fail the init on kstrdup() failure. Such case is actually
-> not fatal because the name for power domain allocated by kstrdup() is
-> used only in printk. Still as a precaution handle this as an error
-> condition.
+>     devicetree: bindings: Document Krait performance monitor units (PMU)
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Hi Kukjin,
-
-What is the status of this patch and the "ARM: EXYNOS: Handle of
-of_iomap() failure". The latter should be in your tree but I cannot find
-it.
-
-Best regards,
-Krzysztof
-
-> ---
->  arch/arm/mach-exynos/pm_domains.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+>     Document the Krait PMU compatible string.
 > 
-> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-> index fd7640a6b503..4c6c29ba58ef 100644
-> --- a/arch/arm/mach-exynos/pm_domains.c
-> +++ b/arch/arm/mach-exynos/pm_domains.c
-> @@ -116,6 +116,12 @@ static __init int exynos4_pm_init_power_domain(void)
->  		struct device *dev;
->  
->  		pdev = of_find_device_by_node(np);
-> +		if (!pdev) {
-> +			pr_err("%s: failed to find device for node %s\n",
-> +					__func__, np->name);
-> +			of_node_put(np);
-> +			continue;
-> +		}
->  		dev = &pdev->dev;
->  
->  		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
-> @@ -126,6 +132,12 @@ static __init int exynos4_pm_init_power_domain(void)
->  		}
->  
->  		pd->pd.name = kstrdup(np->name, GFP_KERNEL);
-> +		if (!pd->pd.name) {
-> +			kfree(pd);
-> +			of_node_put(np);
-> +			return -ENOMEM;
-> +		}
-> +
->  		pd->name = pd->pd.name;
->  		pd->base = of_iomap(np, 0);
->  		if (!pd->base) {
+>     Cc: <devicetree@vger.kernel.org>
+>     Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>     Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+> index 3e1e498..ce73144 100644
+> --- a/Documentation/devicetree/bindings/arm/pmu.txt
+> +++ b/Documentation/devicetree/bindings/arm/pmu.txt
+> @@ -16,7 +16,14 @@ Required properties:
+>         "arm,arm11mpcore-pmu"
+>         "arm,arm1176-pmu"
+>         "arm,arm1136-pmu"
+> -- interrupts : 1 combined interrupt or 1 per core.
+> +       "qcom,krait-pmu"
+> +- interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
+> +               interrupt (PPI) then 1 interrupt should be specified.
+
+If the interrupt is per-cpu do you mean 1 interrupt _per cpu_ should
+be specified?  As written it seems to say _only_  "1 interrupt" should be
+specificed.
+
+Thanks,
+Stuart
