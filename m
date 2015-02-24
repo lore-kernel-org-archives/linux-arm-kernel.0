@@ -1,36 +1,36 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 24 Feb 2015 20:42:16 +0530
-Subject: [PATCH] clockevents: Add (missing) default case for switch blocks
-In-Reply-To: <20150224145407.GA26609@gmail.com>
-References: <20150220093659.GA23469@gmail.com>
- <20150220113753.GP5029@twins.programming.kicks-ass.net>
- <20150220114136.GA27483@gmail.com>
- <CAKohpokmCof2P8Un+i5eOS3BQhH_pMNATH4xkbbhw5TqJFEy9Q@mail.gmail.com>
- <20150220132220.GB28882@gmail.com>
- <CAKohpokEV7EatQROgzQBWPRPFEn8OsMo5EHa+q1FMwBESwiU3w@mail.gmail.com>
- <20150220140432.GA31928@gmail.com>
- <CAKohponv=aR7Ae_z7zbnDDeJ-mCFwdxB3wR-O4boBeMKYdUJLA@mail.gmail.com>
- <20150223163706.GA12551@gmail.com> <54EC5C69.2010909@linaro.org>
- <20150224145407.GA26609@gmail.com>
-Message-ID: <CAKohpomGa7+rh1a0=H6V=i5Qfr5N9i3gmPW+V=xQnmfQTZceTA@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 24 Feb 2015 15:14:14 +0000
+Subject: [PATCH] arm64: Add L2 cache topology to ARM Ltd boards/models
+In-Reply-To: <1542574.d99bFx24pn@wuerfel>
+References: <1421841750-26722-1-git-send-email-sudeep.holla@arm.com>
+ <1542574.d99bFx24pn@wuerfel>
+Message-ID: <54EC9546.50005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 February 2015 at 20:24, Ingo Molnar <mingo@kernel.org> wrote:
-> And here's the diffstat:
+Hi Arnd,
 
-Sorry for not providing that :(
-
->  arch/arm/common/bL_switcher.c |    8 +--
->  include/linux/clockchips.h    |   48 ++++++++++++------
->  kernel/time/clockevents.c     |  109 ++++++++++++++++++++++++------------------
->  kernel/time/tick-broadcast.c  |   22 ++++----
->  kernel/time/tick-common.c     |    9 +--
->  kernel/time/tick-internal.h   |    1
->  kernel/time/tick-oneshot.c    |    6 +-
->  kernel/time/timer_list.c      |   16 +++---
->  8 files changed, 129 insertions(+), 90 deletions(-)
+On 21/01/15 14:43, Arnd Bergmann wrote:
+> On Wednesday 21 January 2015 12:02:30 Sudeep Holla wrote:
+>>
+>> Hi Arnd/Olof,
+>>
+>> Though this patch and commit 5d425c18653731af6 ("arm64: kernel: add
+>> support for cpu cache information") which is in -next(via arm64) are
+>> dependent to provide desired functionality, then can go indepedently
+>> if you think there could be conflicts if this change is taken via arm64.
+>> If not, Catalin can pick up with your acks after the review.
 >
-> Not too bad I think.
+> I think it would be better to take this through arm-soc. It's not
+> extremely likely to cause conflicts, but as you say there are no
+> strict dependencies on which goes in first, so there is no harm
+> in merging them separately.
+>
 
-Thanks, I will send the patches now after some rework.
+I think this patch got missed for -rc1. The arm64 architectural
+support patch for cacheinfo got merged via arm64 tree. It would be good
+if this is also merged so that cache information can be exposed
+to the user-space on ARM Ltd boards.
+
+Regards,
+Sudeep
