@@ -1,76 +1,36 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 24 Feb 2015 22:32:57 +0800
-Subject: [PATCH 2/4] i2c: sunxi: Add Reduced Serial Bus (RSB) DT bindings
- documentation
-In-Reply-To: <16025407.hQRFhlbHKD@wuerfel>
-References: <1424773744-15106-1-git-send-email-wens@csie.org>
- <9851276.8ZCd3XfZle@wuerfel>
- <CAGb2v66ru6Yurt1CFn-zocAuqen8GWSm8y9dHRf=-OOcc-DR7g@mail.gmail.com>
- <16025407.hQRFhlbHKD@wuerfel>
-Message-ID: <CAGb2v675oV60cont4JPX0Cy-5oaqXSz+74kC4JFeJYja6SSV+A@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 24 Feb 2015 08:42:37 -0600
+Subject: [PATCH] ARM64: Add new Xilinx ZynqMP SoC
+In-Reply-To: <8ac3037c175711dec0adcd0d898be7d9722e0ed0.1424764548.git.michal.simek@xilinx.com>
+References: <8ac3037c175711dec0adcd0d898be7d9722e0ed0.1424764548.git.michal.simek@xilinx.com>
+Message-ID: <CAL_JsqKkVHaf_U0nU9nqa2q5XwfsuCu-ZWVEHx6b5Mv9Hgen1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 24, 2015 at 10:17 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 24 February 2015 22:01:26 Chen-Yu Tsai wrote:
->> On Tue, Feb 24, 2015 at 6:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Tuesday 24 February 2015 18:29:02 Chen-Yu Tsai wrote:
->> >>
->> >> +       rsb at 01f03400 {
->> >> +               compatible = "allwinner,sun8i-a23-rsb";
->> >> +               reg = <0x01f03400 0x400>;
->> >> +               interrupts = <0 39 4>;
->> >> +               clocks = <&apb0_gates 3>;
->> >> +               clock-frequency = <3000000>;
->> >> +               resets = <&apb0_rst 3>;
->> >> +
->> >> +               axp223: pmic at 2d {
->> >> +                       compatible = "x-powers,axp223", "x-powers,axp221";
->> >> +                       reg = <0x2d>;
->> >> +                       allwinner,rsb-hw-addr = <0x3e3>;
->> >> +
->> >> +                       /* ... */
->> >> +               };
->> >> +       };
->>
->> > I don't really understand the need for having two addresses (runtime
->> > and hardware). Could the runtime address be configured at runtime?
->>
->> You can, though the driver doesn't support this. I don't think the
->> I2C subsystem allows arbitrary device insertion during normal
->> operation, but maybe i2c-dev? I've tried using different addresses
->> for devices so they do get changed during the probe phase, just
->> to be sure that the code works, and it's not just sitting at
->> the address the bootloader used.
->>
->> In any case, the distinction is more like burnt-in or hardwired
->> addresses vs software configurable addresses.
+On Tue, Feb 24, 2015 at 1:56 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+> Initial version of device tree for Xilinx ZynqMP SoC.
 >
-> The simplest binding would the probably be to only put the
-> hardware address into the 'reg' property and always assign the
-> logical addresses dynamically.
->
-> Would that add a lot of complexity or does it have any other
-> downsides?
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
 
-The hardware address is 12 bits wide. Any address higher than
-0x3ff will be rejected by the I2C core. The AC100 is at 0xe89.
+[...]
 
-Assigning addresses dynamically means the driver has to keep
-a lookup table to map the hardware address to the logical
-address to issue the command to.
+> +               gic: interrupt-controller at f9010000 {
+> +                       compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
 
-There's also the issue of dynamically assigned address colliding
-with unlisted devices, though I think this would only happen in
-the development / bring up phase of the device.
+gic-400, right?
 
-I think the first issue pretty much rules out putting the
-hardware address into 'reg'.
+> +                       #interrupt-cells = <3>;
+> +                       reg = <0x0 0xf9010000 0x10000>,
+> +                             <0x0 0xf9020000 0x20000>,
+> +                             <0x0 0xf9040000 0x20000>,
+> +                             <0x0 0xf9060000 0x20000>;
 
-Putting the logical address in the 'reg' property allows the
-user to poke unlisted devices using i2c-tools, though this
-is not so useful to the average user.
+These addresses are wrong if you are doing address swizzling to do 64K
+offsets. We don't really have an answer yet as to what is the right
+way. See the XGene GIC discussion[1].
 
+Rob
 
-Regards,
-ChenYu
+[1] https://www.mail-archive.com/devicetree at vger.kernel.org/msg62547.html
