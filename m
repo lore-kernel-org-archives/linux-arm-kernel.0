@@ -1,68 +1,141 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 24 Feb 2015 08:54:01 -0600
-Subject: MUSB dual-role on AM335x behaving weirdly
-In-Reply-To: <20150224103911.GR25269@lukather>
-References: <20150121160631.GH4367@lukather>
- <CADYTM3b40_u4Twt27PBVH4dC9ErDnFEi0AUzs_aJRM3mMHaBCQ@mail.gmail.com>
- <54C0A8C9.3040201@visionsystems.de>
- <20150205132142.GD2079@lukather> <20150224103911.GR25269@lukather>
-Message-ID: <20150224145401.GH29829@saruman.tx.rr.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Tue, 24 Feb 2015 15:55:31 +0100
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <20150220153626.GB10942@hawk.usersys.redhat.com>
+References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150219165731.GA26965@hawk.usersys.redhat.com>
+ <CAKv+Gu8Je3RRrgEFCZ7JUWtOgk3WqA_qdBEOPAMc3OqnKr1bwg@mail.gmail.com>
+ <20150219175518.GB26965@hawk.usersys.redhat.com>
+ <54E62404.9040702@redhat.com>
+ <20150220142905.GA10942@hawk.usersys.redhat.com>
+ <CAKv+Gu-YUzmnACZQi98OPRgKKL+gAGqwWYq2-_dwCdNqcktNUg@mail.gmail.com>
+ <20150220153626.GB10942@hawk.usersys.redhat.com>
+Message-ID: <20150224145529.GA5498@hawk.usersys.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Feb 24, 2015 at 11:39:11AM +0100, Maxime Ripard wrote:
-> On Thu, Feb 05, 2015 at 02:21:42PM +0100, Maxime Ripard wrote:
-> > Hi,
+On Fri, Feb 20, 2015 at 04:36:26PM +0100, Andrew Jones wrote:
+> On Fri, Feb 20, 2015 at 02:37:25PM +0000, Ard Biesheuvel wrote:
+> > On 20 February 2015 at 14:29, Andrew Jones <drjones@redhat.com> wrote:
+> > > So looks like the 3 orders of magnitude greater number of traps
+> > > (only to el2) don't impact kernel compiles.
+> > >
 > > 
-> > On Thu, Jan 22, 2015 at 08:37:45AM +0100, Yegor Yefremov wrote:
-> > > I have the same experience with 3.15. The switching is working when
-> > > CONFIG_USB_MUSB_DUAL_ROLE is set and dr_mode = "otg". But since 3.16
-> > > it seems to be broken. Still had no time to bisect this.
+> > OK, good! That was what I was hoping for, obviously.
 > > 
-> > I've been giving a few versions (from v3.15 to Tuesday's linux-next) a
-> > try, and I always see the same behaviour now:
+> > > Then I thought I'd be able to quick measure the number of cycles
+> > > a trap to el2 takes with this kvm-unit-tests test
+> > >
+> > > int main(void)
+> > > {
+> > >         unsigned long start, end;
+> > >         unsigned int sctlr;
+> > >
+> > >         asm volatile(
+> > >         "       mrs %0, sctlr_el1\n"
+> > >         "       msr pmcr_el0, %1\n"
+> > >         : "=&r" (sctlr) : "r" (5));
+> > >
+> > >         asm volatile(
+> > >         "       mrs %0, pmccntr_el0\n"
+> > >         "       msr sctlr_el1, %2\n"
+> > >         "       mrs %1, pmccntr_el0\n"
+> > >         : "=&r" (start), "=&r" (end) : "r" (sctlr));
+> > >
+> > >         printf("%llx\n", end - start);
+> > >         return 0;
+> > > }
+> > >
+> > > after applying this patch to kvm
+> > >
+> > > diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> > > index bb91b6fc63861..5de39d740aa58 100644
+> > > --- a/arch/arm64/kvm/hyp.S
+> > > +++ b/arch/arm64/kvm/hyp.S
+> > > @@ -770,7 +770,7 @@
+> > >
+> > >         mrs     x2, mdcr_el2
+> > >         and     x2, x2, #MDCR_EL2_HPMN_MASK
+> > > -       orr     x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
+> > > +//     orr     x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
+> > >         orr     x2, x2, #(MDCR_EL2_TDRA | MDCR_EL2_TDOSA)
+> > >
+> > >         // Check for KVM_ARM64_DEBUG_DIRTY, and set debug to trap
+> > >
+> > > But I get zero for the cycle count. Not sure what I'm missing.
+> > >
 > > 
-> >   - Booting as a gadget (ie, with a USB cable plugged in), and
-> >     swapping the cable for a (real, this time) USB OTG cable with a
-> >     USB key never works. When the device is plugged, all I get is
-> > 
-> > [  262.944846] usb 1-1: new high-speed USB device number 2 using musb-hdrc
-> > [  278.064748] usb 1-1: device descriptor read/64, error -110
-> > 
-> >     Putting in back in gadget results with a load of continuous:
-> > [  315.258839] musb_bus_suspend 2484: trying to suspend as a_wait_vfall while active
-> > 
-> >   - Booting as a host, or with nothing connected to it actually work,
-> >     up to a few plug-a-device-then-plug-a-host cycles, where you end
-> >     up with the following logs when disconnecting the device (somehow,
-> >     it always happens when it is set in host mode).
-> > 
-> > [   12.969075] CAUTION: musb: Babble Interrupt Occurred
-> > [   12.974445] CAUTION: musb: Babble Interrupt Occurred
-> > [   12.979637] musb_stage0_irq 789: unhandled DISCONNECT transition (a_wait_bcon)
-> > [   12.988498] usb 1-1: USB disconnect, device number 2
-> > [   13.071849] musb-hdrc musb-hdrc.0.auto: Restarting MUSB to recover from Babble
-> > 
-> >     Plugging back our USB cable, with the AM335x acting as a device
-> >     work once. Then, when it switches to the host mode, we end up with
-> >     the same scenario than in the coldplug as gadget case: USB read
-> >     error, before then having all the a_wait_vfall messages.
+> > No clue tbh. Does the counter work as expected in the host?
+> >
 > 
-> Guys, any ideas/hints?
+> Guess not. I dropped the test into a module_init and inserted
+> it on the host. Always get zero for pmccntr_el0 reads. Or, if
+> I set it to something non-zero with a write, then I always get
+> that back - no increments. pmcr_el0 looks OK... I had forgotten
+> to set bit 31 of pmcntenset_el0, but doing that still doesn't
+> help. Anyway, I assume the problem is me. I'll keep looking to
+> see what I'm missing.
+>
 
-which platform are you using ? I guess the only way to move here would
-be to bisect between 3.15 and 3.16 to find the offending commit.
+I returned to this and see that the problem was indeed me. I needed yet
+another enable bit set (the filter register needed to be instructed to
+count cycles while in el2). I've attached the code for the curious.
+The numbers are mean=6999, std_dev=242. Run on the host, or in a guest
+running on a host without this patch series (after TVM traps have been
+disabled), I get a pretty consistent 40.
 
-cheers
+I checked how many vm-sysreg traps we do during the kernel compile
+benchmark. It's 124924. So it's a bit strange that we don't see the
+benchmark taking 10 to 20 seconds longer on average. I should probably
+double check my runs. In any case, while I like the approach of this
+series, the overhead is looking non-negligible.
 
--- 
-balbi
+drew
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150224/2214b21b/attachment.sig>
+#include <libcflat.h>
+
+static void prep_cc(void)
+{
+	asm volatile(
+	"	msr pmovsclr_el0, %0\n"
+	"	msr pmccfiltr_el0, %1\n"
+	"	msr pmcntenset_el0, %2\n"
+	"	msr pmcr_el0, %3\n"
+	"	isb\n"
+	:
+	: "r" (1 << 31), "r" (1 << 27), "r" (1 << 31),
+	  "r" (1 << 6 | 1 << 2 | 1 << 0));
+}
+
+int main(void)
+{
+	unsigned long start, end;
+	unsigned int sctlr;
+	int i, zeros = 0;
+
+	asm volatile("mrs %0, sctlr_el1" : "=&r" (sctlr));
+	prep_cc();
+
+	for (i = 0; i < 100000; ++i) {
+		asm volatile(
+		"	mrs %0, pmccntr_el0\n"
+		"	msr sctlr_el1, %2\n"
+		"	mrs %1, pmccntr_el0\n"
+		"	isb\n"
+		: "=&r" (start), "=&r" (end) : "r" (sctlr));
+
+		if ((i % 10) == 0)
+			printf("\n");
+
+		printf(" %d", end - start);
+
+		if ((end - start) == 0) {
+			++zeros;
+			prep_cc();
+		}
+	}
+
+	printf("\nnum zero counts = %d\n", zeros);
+	return 0;
+}
