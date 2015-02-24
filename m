@@ -1,158 +1,65 @@
-From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez-Ortiz)
-Date: Tue, 24 Feb 2015 17:02:08 -0500
-Subject: [PATCH] drivers/tty: amba-pl011: defer driver probing if external
- dma is not ready.
-In-Reply-To: <54ECD1E6.2070909@linaro.org>
-References: <1424749613-24765-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <17223432.USFTMF6ThS@wuerfel> <54ECD1E6.2070909@linaro.org>
-Message-ID: <54ECF4E0.7010005@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 24 Feb 2015 22:54:31 +0100
+Subject: Ask for help. ARM:mvebu (CM-A510),
+ add sound support using TLV320AIC23 audio-codec
+In-Reply-To: <54ECEA1D.6090306@gmail.com>
+References: <54EB8D34.7040003@gmail.com> <54EC3956.4070505@gmail.com>
+ <54ECEA1D.6090306@gmail.com>
+Message-ID: <54ECF317.10603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/2015 02:32 PM, Jorge Ramirez-Ortiz wrote:
-> On 02/24/2015 03:29 AM, Arnd Bergmann wrote:
->> On Monday 23 February 2015 22:46:53 Jorge Ramirez-Ortiz wrote:
->>> This patch addresses a race condition that happens when
->>> device_initcall(pl011_dma_initicall) is executed before all the devices have been
->>> probed - this issue was observed on an hisi_6220 SoC (HiKey board from Linaro).
->> How do you want to handle the case where there is a DMA channel in DT, but
->> no driver for it built into the kernel?
->
-> In my view that should be fixed in the of-dma and the acpi-dma implementation
-> (just don't return EPROBE_DEFER a second time since the driver wasn't found
-> after the late_initcall associated to deferred probing). That would allow
-> drivers that use the defer probing mechanism to wait for optional controllers to
-> complete their probing sequence if those controllers don't become available.
->
-> In any case, I can track the pending requests (up to twelve, one per UART) with
-> a list in the driver.
-> If a second request to probe fails with EPROBE_DEFER we can conclude that the
-> driver is not present.
->
-> I have tested such an implementation and it works as expected.
-> would that be acceptable?
+On 24.02.2015 22:16, Gabriel Dobato wrote:
+>> Looking at sound/soc/codecs/tlv320aic23.c:
+>>
+>> static const struct snd_soc_dapm_route tlv320aic23_intercon[] = {
+>>     /* Output Mixer */
+>>     {"Output Mixer", "Line Bypass Switch", "Line Input"},
+>>     {"Output Mixer", "Playback Switch", "DAC"},
+>>     {"Output Mixer", "Mic Sidetone Switch", "Mic Input"},
+>>
+>>     /* Outputs */
+>>     {"RHPOUT", NULL, "Output Mixer"},
+>>     {"LHPOUT", NULL, "Output Mixer"},
+>>     {"LOUT", NULL, "Output Mixer"},
+>>     {"ROUT", NULL, "Output Mixer"},
+>>
+>>     /* Inputs */
+>>     {"Line Input", "NULL", "LLINEIN"},
+>>     {"Line Input", "NULL", "RLINEIN"},
+>>
+>>     {"Mic Input", "NULL", "MICIN"},
+>>
+>>     /* input mux */
+>>     {"Capture Source", "Line", "Line Input"},
+>>     {"Capture Source", "Mic", "Mic Input"},
+>>     {"ADC", NULL, "Capture Source"},
+>>
+>> };
+>>
+>> The lines with the failing routes really look suspicious, i.e.
+>> there is strings "NULL" where I'd expect plain NULL.
+>>
+> You were right, as always :) , I have changed them and now errors are
+> not reported. Now, in the boot trace I find:
 
-Something along these lines
+Mind to send a proper patch fixing the above? Make sure you run
+./scripts/checkpatch.pl and ./scripts/get_maintainer.pl on the
+patch. It should give you an idea of proper code style and what
+people/lists to send it to. I am sure, google will help you with
+how to prepare proper kernel patches, too.
 
-+struct dma_deferred {
-+       struct list_head node;
-+       struct device *dev;
-+};
-+
-+static LIST_HEAD(dma_deferred_reqs);
-+
-+static int pl011_handle_dma_probe_defer(struct device *dev)
-+{
-+       struct list_head *node, *tmp;
-+       struct dma_deferred *entry;
-+
-+       list_for_each_safe(node, tmp, &dma_deferred_reqs) {
-+               entry = list_entry(node, struct dma_deferred, node);
-+               if (entry->dev == dev) {
-+                       dev_warn(dev, "DMA driver not present \n");
-+                       list_del(node);
-+                       kfree(entry);
-+                       return -ENODEV;
-+               }
-+       }
-+
-+       entry = kzalloc(sizeof(struct dma_deferred), GFP_KERNEL);
-+       if (entry) {
-+               entry->dev = dev;
-+               list_add_tail(&entry->node, &dma_deferred_reqs);
-+               dev_info(dev, "DMA controller not ready \n");
-+               return -EPROBE_DEFER;
-+       }
-+
-+       return 0;
-+}
-+
-+static int pl011_dma_probe(struct device *dev, struct uart_amba_port *uap,
-+       void (*queue_dma_probe)(struct device *, struct uart_amba_port *))
- {
-        /* DMA is the sole user of the platform data right now */
-        struct amba_pl011_data *plat = dev_get_platdata(uap->port.dev);
-@@ -275,15 +310,25 @@ static void pl011_dma_probe_initcall(struct device *dev,
-struct uart_amba_port *
-        struct dma_chan *chan;
-        dma_cap_mask_t mask;
- 
--       chan = dma_request_slave_channel(dev, "tx");
-+       if (queue_dma_probe && plat && plat->dma_filter) {
-+               (*queue_dma_probe)(dev, uap);
-+               return 0;
-+       }
-+
-+       chan = dma_request_slave_channel_reason(dev, "tx");
-+       if (IS_ERR(chan)) {
-+
-+               /* the dma driver has not been initialized yet */
-+               if (PTR_ERR(chan) == -EPROBE_DEFER)
-+                       return pl011_handle_dma_probe_defer(dev);
-+
-+               dev_info(uap->port.dev, "no OF or ACPI data \n");
+> but after rootfs is up, this msg appears in dmesg:
+>
+> platform sound: Driver asoc-simple-card requests probe deferral
 
+This is, as always, a missing dependency of simple-card node.
 
+Either you are missing drivers for Dove audio (kirkwood-i2s) or
+one of the drivers involved in your simple-card fails.
 
+Look for errors in your dmesg output - also please name the
+kernel version you are working with. There have been some changes
+in clk handling that break a bunch of drivers in 4.0-rc1.
 
->
->>> @@ -275,15 +277,23 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
->>>         struct dma_chan *chan;
->>>         dma_cap_mask_t mask;
->>>  
->>> -       chan = dma_request_slave_channel(dev, "tx");
->>> +       if (queue_dma_probe && plat && plat->dma_filter) {
->>> +               (*queue_dma_probe)(dev, uap);
->>> +               return 0;
->>> +       }
->>> +
->>> +       chan = dma_request_slave_channel_reason(dev, "tx");
->>> +       if (IS_ERR(chan)) {
->>> +
->>> +               /* the dma driver has not been initialized yet */
->>> +               if (PTR_ERR(chan) == -EPROBE_DEFER)
->>> +                       return -EPROBE_DEFER;
->>>  
->>> -       if (!chan) {
->>>                 /* We need platform data */
->>>                 if (!plat || !plat->dma_filter) {
->>>                         dev_info(uap->port.dev, "no DMA platform data\n");
->>> -                       return;
->>> +                       return 0;
->>>                 }
->> It would be nice to print the error code here now that you know it
->> and can tell the difference between no DMA channel being supplied
->> and the DMA channel from the DT properties being unavailable.
-> ACKd
->>>                 /* Try to acquire a generic DMA engine slave TX channel */
->>>                 dma_cap_zero(mask);
->>>                 dma_cap_set(DMA_SLAVE, mask);
->>> @@ -292,7 +302,7 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
->>>                                                 plat->dma_tx_param);
->>>                 if (!chan) {
->>>                         dev_err(uap->port.dev, "no TX DMA channel!\n");
->>> -                       return;
->>> +                       return 0;
->>>                 }
->>>         }
->>>  
->>> @@ -310,7 +320,7 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
->>>  
->>>                 if (!chan) {
->>>                         dev_err(uap->port.dev, "no RX DMA channel!\n");
->>> -                       return;
->>> +                       return 0;
->>>                 }
->>>         }
->> I think the condition is wrong now that 'chan' contains a ERR_PTR
->> value in case of failure.
-> Actually that is not the case on the RX DMA case: on the RX DMA case, chan
-> contains either NULL or a valid pointer (not an ERR_PTR value)
->
-> chan only contains an ERR_PTR on the first attempt to access the DMA controller
-> (just so we can handle the defer probing case)
-> On subsequent accesses, it assumes that it is there (since it would have been
-> deferred if it wasn't).
->
->
->
+Sebastian
