@@ -1,36 +1,30 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 24 Feb 2015 17:04:46 +0100
-Subject: [RFC 01/11] i2c: add quirk structure to describe adapter flaws
-In-Reply-To: <20150119150514.GB3820@katana>
-References: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
- <1420824103-24169-2-git-send-email-wsa@the-dreams.de>
- <1421387408.9323.10.camel@mtksdaap41>
- <20150119150514.GB3820@katana>
-Message-ID: <20150224160446.GB19444@katana>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Tue, 24 Feb 2015 10:10:43 -0600
+Subject: [PATCH] ARM: dts: am335x-bone*: usb0 is hardwired for peripheral
+Message-ID: <1424794243-23394-1-git-send-email-robertcnelson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 04:05:15PM +0100, Wolfram Sang wrote:
-> 
-> > > +	struct i2c_adapter_quirks *quirks;
-> > >  };
-> > >  #define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
-> > >  
-> > 
-> > I suggest to add const.
-> > 	const struct i2c_adapter_quirks *quirks;
-> > 
-> > also, in i2c-core.c, should modify:
-> > 	const struct i2c_adapter_quirks *q = adap->quirks;
-> 
-> Thanks, I'll think about it.
+Fixes: http://bugs.elinux.org/issues/127
 
-And added it...
+the bb.org community was seeing random reboots before this change.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150224/722b5c05/attachment.sig>
+Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+---
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+index 6cc25ed..2c6248d 100644
+--- a/arch/arm/boot/dts/am335x-bone-common.dtsi
++++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+@@ -195,6 +195,7 @@
+ 
+ &usb0 {
+ 	status = "okay";
++	dr_mode = "peripheral";
+ };
+ 
+ &usb1 {
+-- 
+2.1.4
