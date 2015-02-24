@@ -1,70 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 24 Feb 2015 09:04:26 +0000
-Subject: [PATCH v5 0/7] irqchip: Move OMAP{4,
- 5}/DRA7 to use stacked domains
-In-Reply-To: <20150223230205.GJ32521@atomide.com>
-References: <1424713459-6824-1-git-send-email-marc.zyngier@arm.com>
- <20150223230205.GJ32521@atomide.com>
-Message-ID: <54EC3E9A.5010807@arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 24 Feb 2015 09:12:43 +0000
+Subject: [PATCH 1/2] regmap: Add range check in _regmap_raw_read()
+In-Reply-To: <20150224085524.GC6236@finisterre.sirena.org.uk>
+References: <1424335193-7431-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1424335239-7475-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20150219102750.GC3198@finisterre.sirena.org.uk>
+ <54E5C347.9070105@linaro.org>
+ <20150219122133.GB1581@finisterre.sirena.org.uk>
+ <54E5DECB.5020600@linaro.org>
+ <20150224085524.GC6236@finisterre.sirena.org.uk>
+Message-ID: <54EC408B.60209@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/02/15 23:02, Tony Lindgren wrote:
-> * Marc Zyngier <marc.zyngier@arm.com> [150223 09:48]:
->> This series is extracted from [4], which is trying to remove all
->> traces of gic_arch_extn from the tree. As some maintainers are more
->> responsive than others (understatement of the year...), I've decided
->> to split it per sub-arch, and get it moving, at least partially.
->>
->> This series addresses OMAP{4,5} by converting the WUGEN to stacked
->> domains. The DRA7 crossbar gets the same treatment.
->>
->> It is worth realizing that:
->>
->> - I haven't been able to test this as much as I would have wanted to
->>   (it's only been tested on omap4 and omap5).
->>
->> - This actively *breaks* existing setups. Once you boot a new kernel
->>   with an old DT, suspend/resume *will* be broken. Old kernels on a
->>   new DT won't even boot! You've been warned. This really outline the
->>   necessity of actually describing the HW in device trees...
-> 
-> Could we parse still the old binding and produce warning for the
-> case when a new kernel is booted with the old DT? That would make
-> it easier for people to debug what's going on.
 
-There's a number of strategies:
-- Looking up the default, top-level interrupt controller:
-  if that's the GIC, scream.
-- Lookup the crossbar:
-  if it exists, but is not an interrupt controller, scream as well.
-- Lookup the WUGEN:
-  if it doesn't exist, scream again.
 
-The last one is pretty easy to implement:
+On 24/02/15 08:55, Mark Brown wrote:
+> On Thu, Feb 19, 2015 at 01:02:03PM +0000, Srinivas Kandagatla wrote:
+>
+>> The culprit was in my test code, which I eventually fixed. However I would
+>> have expected regmap to do some out of bound check before it tries to access
+>> the register space.
+>
+>> If I try to do an out of bound access via regmap_read()/write() it throws up
+>> an error, which is not the same with regmap_bulk_read/write() apis.
+>
+>> I was lucky that I got a page fault as the register range was just at page
+>> boundary, but in cases where the range is not at page boundary, Its highly
+>> likely that it could silently corrupt other memory location( specially in
+>> write cases).
+>
+> The risk of page faults mostly only applies to memory mapped register
+> maps - most register maps are on other buses where things are a bit less
+> clear, we do often have writes to undocumented registers which aren't
 
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index fba1ba7..7bb116a 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -277,6 +277,12 @@ void __init omap_gic_of_init(void)
- {
- 	struct device_node *np;
- 
-+	intc_node = of_find_matching_node(NULL, intc_match);
-+	if (WARN_ON(!intc_node)) {
-+		pr_err("No WUGEN found in DT, system will misbehave.\n");
-+		pr_err("UPDATE YOUR DEVICE TREE!\n");
-+	}
-+
- 	/* Extract GIC distributor and TWD bases for OMAP4460 ROM Errata WA */
- 	if (!cpu_is_omap446x())
- 		goto skip_errata_init;
+Yes, my test was on memory mapped registers.
 
-This should cover both OMAP4, OMAP5 and DRA7.
+> included in the readability checks (indeed it's rare for anything to
+> actually give us writability information for the write side).  As
+> covered in earlier messages a part of this is a performance tradeoff,
+> it's potentially expensive for us to do the checks on bulk I/O but for
+> single register access it's much cheaper relative to the operation as a
+> whole.
 
-What do you think?
+I totally agree with you on the performance overhead of checking every 
+read/write, But on the other hand adding a single range check is better 
+than no check with less/nil performance overhead.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+> It's particularly interesting for MMIO actually as these devices are by
+> far the most performance intensive, we don't have all the costs of the
+> bus to mask what regmap is doing.
+>
