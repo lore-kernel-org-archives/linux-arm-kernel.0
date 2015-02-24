@@ -1,66 +1,46 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Tue, 24 Feb 2015 13:39:37 -0800
-Subject: [PATCH v5 0/7] irqchip: Move OMAP{4,
- 5}/DRA7 to use stacked domains
-In-Reply-To: <1424713459-6824-1-git-send-email-marc.zyngier@arm.com>
-References: <1424713459-6824-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <54ECEF99.6080204@oracle.com>
+From: cmetcalf@ezchip.com (Chris Metcalf)
+Date: Tue, 24 Feb 2015 16:54:17 -0500
+Subject: [PATCH] compat: Fix endian issue in union sigval
+In-Reply-To: <20150214112220.GB10246@MBP.local>
+References: <1423563011-12377-1-git-send-email-bamvor.zhangjian@huawei.com>
+ <20150210122718.GC32052@e104818-lin.cambridge.arm.com>
+ <54DB3B60.4050100@huawei.com>
+ <20150211154054.GD9058@e104818-lin.cambridge.arm.com>
+ <54DDAF2B.2070707@huawei.com>
+ <20150213104455.GA3508@e104818-lin.cambridge.arm.com>
+ <54DE730D.3090100@ezchip.com> <20150214112220.GB10246@MBP.local>
+Message-ID: <54ECF309.3020509@ezchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/23/2015 9:44 AM, Marc Zyngier wrote:
-> This series is extracted from [4], which is trying to remove all
-> traces of gic_arch_extn from the tree. As some maintainers are more
-> responsive than others (understatement of the year...), I've decided
-> to split it per sub-arch, and get it moving, at least partially.
+On 2/14/2015 6:22 AM, Catalin Marinas wrote:
+> 1. user populates sival_int compat_sigevent and invokes
+>     compat_sys_mq_notify()
+> 2. kernel get_compat_sigevent() copies compat_sigevent into the native
+>     sigevent. compat and native sival_int are the same, no problem so
+>     far. The other half of 64-bit sival_ptr is zeroed by a memset in this
+>     function (this other half can be top or bottom, depending on
+>     endianness)
+> 3. signal is about to be delivered to user via arch code. The
+>     compat_ptr(from->si_ptr) conversion always takes the least
+>     significant part of the native si_ptr. On big endian 64-bit, this is
+>     zero because get_compat_sigevent() populated the top part of si_ptr
+>     with si_int.
 >
-> This series addresses OMAP{4,5} by converting the WUGEN to stacked
-> domains. The DRA7 crossbar gets the same treatment.
->
-> It is worth realizing that:
->
-> - I haven't been able to test this as much as I would have wanted to
->    (it's only been tested on omap4 and omap5).
->
-> - This actively *breaks* existing setups. Once you boot a new kernel
->    with an old DT, suspend/resume *will* be broken. Old kernels on a
->    new DT won't even boot! You've been warned. This really outline the
->    necessity of actually describing the HW in device trees...
->
-> Based on 4.0-rc1.
->
-> * From v4: [4]
-> - Extracted from the full series
-> - Rebased on 4.0-rc1
->
-> * From v3 [3]:
-> - Rebased on top of the patch working around hardcoded IRQ on OMAP4/5 [4]
-> - Fixed more iMX6 DTs (Stephan)
-> - Fixed Exynos4/5 DTs
->
-> * From v2 [2]:
-> - Addressed numerous comments from Thierry
-> - Merged bug fixes from Nishanth
-> - Merged bug fix from Stefan
->
-> * From v1 [1]:
-> - Rebased on 3.19-rc3
-> - Fixed a number of additional platforms
-> - Added crossbar conversion to stacked domains
-> - Merged bug fixes from Nishanth
->
-> [4]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317531.html
-> [3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315385.html
-> [2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314041.html
-> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/307338.html
->
-> Marc Zyngier (7):
->    genirq: Add irqchip_set_wake_parent
->    irqchip: crossbar: convert dra7 crossbar to stacked domains
->    DT: update ti,irq-crossbar binding
->    irqchip: GIC: get rid of routable domain
->    DT: arm,gic: kill arm,routable-irqs
->    DT: omap4/5: add binding for the wake-up generator
->    ARM: omap: convert wakeupgen to stacked domains
->
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+> So delivering such signals to compat user always sets si_int to 0.
+> Little endian is fine.
+
+I looked at this again as I was getting ready to do a tile patch, and realized
+why tile and arm64 are different here: tile does a field-by-field copy in
+copy_siginfo_from_user32(), like parisc and s390.  As a result, we initialize
+the 64-bit kernel si_ptr value by cast from the 32-bit user si_ptr value, rather
+than blindly writing into the lower-addressed half of the 64-bit sigval.
+
+As a result, I think I will leave the existing code alone, though unfortunately
+that leaves it somewhat unique in manipulating the si_ptr field directly.
+But I think the s390 and parisc copy_siginfo_from_user32 leave the high
+bits of si_ptr uninitialized, which also strikes me as a bad idea in general.
+
+-- 
+Chris Metcalf, EZChip Semiconductor
+http://www.ezchip.com
