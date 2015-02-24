@@ -1,64 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 24 Feb 2015 14:53:07 +0000
-Subject: [RFC PATCH] arm64: mm: increase VA range of identity map
-In-Reply-To: <20150224144316.GD27420@e104818-lin.cambridge.arm.com>
-References: <1424775342-30588-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150224120341.GC27420@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-z9ZpOxMsrZ4mg=ZB-ftVe2kNiY5rci8Yk_W_U-OXqnA@mail.gmail.com>
- <20150224144316.GD27420@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu_zPFy78pGjnMFr2pK4jfAgUqFxMDjN0EoDPF0+0a=bdg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 24 Feb 2015 23:52:09 +0900
+Subject: [PATCH] spi: xilinx: Use standard num-cs binding
+In-Reply-To: <54EAFF4A.1080605@monstr.eu>
+References: <67f3c196833c427a489ca2c530d08987a6b5ee2a.1421412912.git.michal.simek@xilinx.com>
+ <CAHTX3dJRGhwo7FW+VJxfEJmx-9FdjFN5EnxG0RRDfMOm3=VU4A@mail.gmail.com>
+ <20150214053543.GL9110@finisterre.sirena.org.uk>
+ <54EAFF4A.1080605@monstr.eu>
+Message-ID: <20150224145209.GP6236@finisterre.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 February 2015 at 14:43, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Feb 24, 2015 at 12:18:26PM +0000, Ard Biesheuvel wrote:
->> On 24 February 2015 at 12:03, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Tue, Feb 24, 2015 at 10:55:42AM +0000, Ard Biesheuvel wrote:
->> >> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
->> >> index f800d45ea226..19f6297a472b 100644
->> >> --- a/arch/arm64/include/asm/memory.h
->> >> +++ b/arch/arm64/include/asm/memory.h
->> >> @@ -42,12 +42,14 @@
->> >>   * PAGE_OFFSET - the virtual address of the start of the kernel image (top
->> >>   *            (VA_BITS - 1))
->> >>   * VA_BITS - the maximum number of bits for virtual addresses.
->> >> + * MAX_VA_BITS - architectural max value for VA_BITS
->> >>   * TASK_SIZE - the maximum size of a user space task.
->> >>   * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
->> >>   * The module space lives between the addresses given by TASK_SIZE
->> >>   * and PAGE_OFFSET - it must be within 128MB of the kernel text.
->> >>   */
->> >>  #define VA_BITS                      (CONFIG_ARM64_VA_BITS)
->> >> +#define MAX_VA_BITS          48
->> >
->> > Can we determine this dynamically based on the phys address? So on
->> > hardware that doesn't need such large idmap, it would stick to the host
->> > configured levels.
->>
->> I guess we could. Is there a benefit to keeping TCR.T0SZ as high as
->> possible if you are adding the additional level anyway?
->> It only costs us one page regardless, and only if the runtime check
->> shows that system RAM exceeds VA_BITS
->
-> It's not the page that we may waste in the idmap table but higher T0SZ
-> implies deeper translation tables, so an additional page table walk
-> during power up/down sequences.
->
+On Mon, Feb 23, 2015 at 11:22:02AM +0100, Michal Simek wrote:
+> On 02/14/2015 06:35 AM, Mark Brown wrote:
 
-OK, but the patch only modifies T0SZ from the default if the system
-RAM is observed to be out of reach at runtime, and so MAX_VA_BITS is
-only used in that case. For both 4k and 64k pages, this will configure
-one additional level of translation. Does it still matter then which
-exact T0SZ value is used between the possible values that all
-correspond with 4 levels, for instance?
+> > Don't send content free quoted pings, they're just adding to the e-mail
+> > volume and hence wasting people's time.
 
-I think it is cleaner to use the PA of KERNEL_END, as you suggest, so
-I am removing MAX_VA_BITS anyway, but I am just curious.
+> How do you want me to send ping on pending patches?
+> Just send them with RESEND prefix?
+> I just want to clarify this.
 
-> We could populate the idmap table as maximum number of levels
-> permanently (based on MAX_VA_BITS) but set T0SZ according to the SoC
-> needs and TTBR0_EL1 may need to skip the first page of the original
-> idmap (we do something similar in arch/arm/mm/proc-v7-3level.S with
-> TTBR1_OFFSET since for 1GB of kernel linear mapping we only need 2
-> levels but swapper_pg_dir is always 3).
->
+Reposting is helpful if things have been forgotten.  Though in this case
+I'm deliberately leaving it for a while because of the nagging (since I
+don't want people to get the impression that it's helpful).  Plus I'm
+travelling.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150224/67f36da7/attachment-0001.sig>
