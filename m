@@ -1,48 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Feb 2015 17:55:24 +0900
-Subject: [PATCH 1/2] regmap: Add range check in _regmap_raw_read()
-In-Reply-To: <54E5DECB.5020600@linaro.org>
-References: <1424335193-7431-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424335239-7475-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20150219102750.GC3198@finisterre.sirena.org.uk>
- <54E5C347.9070105@linaro.org>
- <20150219122133.GB1581@finisterre.sirena.org.uk>
- <54E5DECB.5020600@linaro.org>
-Message-ID: <20150224085524.GC6236@finisterre.sirena.org.uk>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 24 Feb 2015 18:01:27 +0900
+Subject: [PATCH v4 2/8] arm64: dts: exynos: Add dts files for 64-bit
+ Exynos5433 SoC
+In-Reply-To: <19309272.tlWX2xvTnx@wuerfel>
+References: <1424755011-15999-1-git-send-email-cw00.choi@samsung.com>
+ <1424755011-15999-3-git-send-email-cw00.choi@samsung.com>
+ <19309272.tlWX2xvTnx@wuerfel>
+Message-ID: <54EC3DE7.7070306@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 19, 2015 at 01:02:03PM +0000, Srinivas Kandagatla wrote:
+On 02/24/2015 05:33 PM, Arnd Bergmann wrote:
+> On Tuesday 24 February 2015 14:16:45 Chanwoo Choi wrote:
+>> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC based on
+>> Octal core CPUs (quad Cortex-A57 and quad Cortex-A53). And Exynos5433 supports
+>> PSCI (Power State Coordination Interface) v0.1.
+>>
+>> This patch includes following dt node to support Exynos5433 SoC:
+>> 1. Octa core for big.LITTLE architecture
+>> - Cortex-A53 LITTLE Quad-core
+>> - Cortex-A57 big Quad-core
+>> - Support PSCI v0.1
+> 
+> Should we try to come up with a way to better share parts of this with the
+> exynos5 dtsi files you already have in arm32? I suspect that there is a
+> significant overlap.
 
-> The culprit was in my test code, which I eventually fixed. However I would
-> have expected regmap to do some out of bound check before it tries to access
-> the register space.
+Currently, 32-bit Exynos5 SoC (which is included in arch/arm/boot/dts)
+didn't support the Cortex-A53/A57 and PSCI.
 
-> If I try to do an out of bound access via regmap_read()/write() it throws up
-> an error, which is not the same with regmap_bulk_read/write() apis.
+The 32-bit Exynos5 SoC support the Coretex-A7 or A15 and big.LITTLE Exynos5 SoC
+use the MCPM (Multi-Cluster PM) driver for secondary cpu on/off instead of PSCI.
 
-> I was lucky that I got a page fault as the register range was just at page
-> boundary, but in cases where the range is not at page boundary, Its highly
-> likely that it could silently corrupt other memory location( specially in
-> write cases).
-
-The risk of page faults mostly only applies to memory mapped register
-maps - most register maps are on other buses where things are a bit less
-clear, we do often have writes to undocumented registers which aren't
-included in the readability checks (indeed it's rare for anything to
-actually give us writability information for the write side).  As
-covered in earlier messages a part of this is a performance tradeoff,
-it's potentially expensive for us to do the checks on bulk I/O but for
-single register access it's much cheaper relative to the operation as a
-whole.
-
-It's particularly interesting for MMIO actually as these devices are by
-far the most performance intensive, we don't have all the costs of the
-bus to mask what regmap is doing.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150224/4ce5ec1d/attachment.sig>
+Thanks,
+Chanwoo Choi
