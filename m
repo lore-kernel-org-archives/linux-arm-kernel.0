@@ -1,63 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 24 Feb 2015 16:22:37 +0000
-Subject: [RFC PATCH] arm64: mm: increase VA range of identity map
-In-Reply-To: <CAKv+Gu_zPFy78pGjnMFr2pK4jfAgUqFxMDjN0EoDPF0+0a=bdg@mail.gmail.com>
-References: <1424775342-30588-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150224120341.GC27420@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-z9ZpOxMsrZ4mg=ZB-ftVe2kNiY5rci8Yk_W_U-OXqnA@mail.gmail.com>
- <20150224144316.GD27420@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_zPFy78pGjnMFr2pK4jfAgUqFxMDjN0EoDPF0+0a=bdg@mail.gmail.com>
-Message-ID: <20150224162237.GE27420@e104818-lin.cambridge.arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 24 Feb 2015 10:29:57 -0600
+Subject: [PATCH] ARM64: Add new Xilinx ZynqMP SoC
+In-Reply-To: <9bffa4683bd6478993de6bea1d3027af@BN1AFFO11FD048.protection.gbl>
+References: <8ac3037c175711dec0adcd0d898be7d9722e0ed0.1424764548.git.michal.simek@xilinx.com>
+ <CAL_JsqKkVHaf_U0nU9nqa2q5XwfsuCu-ZWVEHx6b5Mv9Hgen1Q@mail.gmail.com>
+ <9bffa4683bd6478993de6bea1d3027af@BN1AFFO11FD048.protection.gbl>
+Message-ID: <CAL_JsqJVdZMwweta=N-P-d=C6JNsXk0BsGcrexe2yDPm7c5pfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 24, 2015 at 02:53:07PM +0000, Ard Biesheuvel wrote:
-> On 24 February 2015 at 14:43, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Tue, Feb 24, 2015 at 12:18:26PM +0000, Ard Biesheuvel wrote:
-> >> On 24 February 2015 at 12:03, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> > On Tue, Feb 24, 2015 at 10:55:42AM +0000, Ard Biesheuvel wrote:
-> >> >> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> >> >> index f800d45ea226..19f6297a472b 100644
-> >> >> --- a/arch/arm64/include/asm/memory.h
-> >> >> +++ b/arch/arm64/include/asm/memory.h
-> >> >> @@ -42,12 +42,14 @@
-> >> >>   * PAGE_OFFSET - the virtual address of the start of the kernel image (top
-> >> >>   *            (VA_BITS - 1))
-> >> >>   * VA_BITS - the maximum number of bits for virtual addresses.
-> >> >> + * MAX_VA_BITS - architectural max value for VA_BITS
-> >> >>   * TASK_SIZE - the maximum size of a user space task.
-> >> >>   * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
-> >> >>   * The module space lives between the addresses given by TASK_SIZE
-> >> >>   * and PAGE_OFFSET - it must be within 128MB of the kernel text.
-> >> >>   */
-> >> >>  #define VA_BITS                      (CONFIG_ARM64_VA_BITS)
-> >> >> +#define MAX_VA_BITS          48
-> >> >
-> >> > Can we determine this dynamically based on the phys address? So on
-> >> > hardware that doesn't need such large idmap, it would stick to the host
-> >> > configured levels.
-> >>
-> >> I guess we could. Is there a benefit to keeping TCR.T0SZ as high as
-> >> possible if you are adding the additional level anyway?
-> >> It only costs us one page regardless, and only if the runtime check
-> >> shows that system RAM exceeds VA_BITS
-> >
-> > It's not the page that we may waste in the idmap table but higher T0SZ
-> > implies deeper translation tables, so an additional page table walk
-> > during power up/down sequences.
-> 
-> OK, but the patch only modifies T0SZ from the default if the system
-> RAM is observed to be out of reach at runtime, and so MAX_VA_BITS is
-> only used in that case. For both 4k and 64k pages, this will configure
-> one additional level of translation.
+On Tue, Feb 24, 2015 at 8:58 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+> On 02/24/2015 03:42 PM, Rob Herring wrote:
+>> On Tue, Feb 24, 2015 at 1:56 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>>> Initial version of device tree for Xilinx ZynqMP SoC.
+>>>
+>>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>>> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+>>> ---
+>>
+>> [...]
+>>
+>>> +               gic: interrupt-controller at f9010000 {
+>>> +                       compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+>>
+>> gic-400, right?
+>
+> yep
+>
+>>
+>>> +                       #interrupt-cells = <3>;
+>>> +                       reg = <0x0 0xf9010000 0x10000>,
+>>> +                             <0x0 0xf9020000 0x20000>,
+>>> +                             <0x0 0xf9040000 0x20000>,
+>>> +                             <0x0 0xf9060000 0x20000>;
+>>
+>> These addresses are wrong if you are doing address swizzling to do 64K
+>> offsets. We don't really have an answer yet as to what is the right
+>> way. See the XGene GIC discussion[1].
+>
+> Is this better for GICC?
+> <0x0 0xf902f000 0x2000>
 
-Ah, I missed the cbz over the idmap_t0sz setting in your patch.
+Yes, and the VCPU interface needs this as well. As far as sizes, we're
+still discussing that.
 
-> Does it still matter then which
-> exact T0SZ value is used between the possible values that all
-> correspond with 4 levels, for instance?
-
-Not really, we go for a maximum of one extra level anyway.
-
--- 
-Catalin
+Rob
