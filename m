@@ -1,19 +1,80 @@
-From: rhgadsdon@gmail.com (Robert Gadsdon)
-Date: Tue, 24 Feb 2015 15:56:40 -0800
-Subject: Regression: v4.0-rc1: iMX6: Hummingboard fails due to drivers/clk
- changes
-In-Reply-To: <CAOMZO5D+pSDEct2ne+7Yurn2Jd-2+ArhgZfWYPO98bRyoEpOrQ@mail.gmail.com>
-References: <20150223223255.GQ8656@n2100.arm.linux.org.uk>
- <CAOMZO5ASkXoVb9KrqF4Us18-rZ7k3XqjSdhcKyO_ParXXHoWbg@mail.gmail.com>
- <20150223235350.GS8656@n2100.arm.linux.org.uk>
- <CAOMZO5D+pSDEct2ne+7Yurn2Jd-2+ArhgZfWYPO98bRyoEpOrQ@mail.gmail.com>
-Message-ID: <54ED0FB8.6020103@gmail.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue, 24 Feb 2015 15:58:57 -0800
+Subject: [PATCH] arm64: Fix text patching logic when using fixmap
+In-Reply-To: <1424795421-26630-1-git-send-email-marc.zyngier@arm.com>
+References: <1424795421-26630-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <54ED1041.2090708@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have applied the change to mach-imx6q.c for 4.0-rc1 on a CuBox-i4Pro,
-and eth0/networking now works correctly, again.
+On 2/24/2015 8:30 AM, Marc Zyngier wrote:
+> Patch 2f896d586610 ("arm64: use fixmap for text patching") changed
+> the way we patch the kernel text, using a fixmap when the kernel or
+> modules are flagged as read only.
+>
+> Unfortunately, a flaw in the logic makes it fall over when patching
+> modules without CONFIG_DEBUG_SET_MODULE_RONX enabled:
+>
+> [...]
+> [   32.032636] Call trace:
+> [   32.032716] [<fffffe00003da0dc>] __copy_to_user+0x2c/0x60
+> [   32.032837] [<fffffe0000099f08>] __aarch64_insn_write+0x94/0xf8
+> [   32.033027] [<fffffe000009a0a0>] aarch64_insn_patch_text_nosync+0x18/0x58
+> [   32.033200] [<fffffe000009c3ec>] ftrace_modify_code+0x58/0x84
+> [   32.033363] [<fffffe000009c4e4>] ftrace_make_nop+0x3c/0x58
+> [   32.033532] [<fffffe0000164420>] ftrace_process_locs+0x3d0/0x5c8
+> [   32.033709] [<fffffe00001661cc>] ftrace_module_init+0x28/0x34
+> [   32.033882] [<fffffe0000135148>] load_module+0xbb8/0xfc4
+> [   32.034044] [<fffffe0000135714>] SyS_finit_module+0x94/0xc4
+> [...]
+>
+> This is triggered by the use of virt_to_page() on a module address,
+> which ends to pointing to Nowhereland if you're lucky, or corrupt
+> your precious data if not.
+>
+> This patch fixes the logic by mimicking what is done on arm:
+> - If we're patching a module and CONFIG_DEBUG_SET_MODULE_RONX is set,
+>    use vmalloc_to_page().
+> - If we're patching the kernel and CONFIG_DEBUG_RODATA is set,
+>    use virt_to_page().
+> - Otherwise, use the provided address, as we can write to it directly.
+>
+> Tested on 4.0-rc1 as a KVM guest.
+>
+> Reported-by: Richard W.M. Jones <rjones@redhat.com>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Laura Abbott <lauraa@codeaurora.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   arch/arm64/kernel/insn.c | 4 +++-
+>   1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 27d4864..c8eca88 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -87,8 +87,10 @@ static void __kprobes *patch_map(void *addr, int fixmap)
+>
+>   	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
+>   		page = vmalloc_to_page(addr);
+> -	else
+> +	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
+>   		page = virt_to_page(addr);
+> +	else
+> +		return addr;
+>
+>   	BUG_ON(!page);
+>   	set_fixmap(fixmap, page_to_phys(page));
+>
 
-Thanks!
+Looks like I dropped this incorrectly between v6 and v7.
 
-Robert Gadsdon.
+Acked-by: Laura Abbott <lauraa@codeaurora.org>
+
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
