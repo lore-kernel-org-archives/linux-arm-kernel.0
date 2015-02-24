@@ -1,57 +1,116 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Feb 2015 19:24:50 -0800
-Subject: New l3-noc error with CPUFREQ_DT built-in with v4.0-rc1
-In-Reply-To: <20150224032107.GS32521@atomide.com>
-References: <20150223235947.GC25954@atomide.com>
- <20150224015903.GP32521@atomide.com>
- <20150224022433.GB5198@saruman.tx.rr.com>
- <20150224023505.GQ32521@atomide.com>
- <20150224030141.GR32521@atomide.com>
- <20150224031547.GB15941@saruman.tx.rr.com>
- <20150224032107.GS32521@atomide.com>
-Message-ID: <20150224032450.GT32521@atomide.com>
+From: anton@samba.org (Anton Blanchard)
+Date: Tue, 24 Feb 2015 14:30:28 +1100
+Subject: [PATCH 1/7] Add die_spin_lock_{irqsave,irqrestore}
+In-Reply-To: <1424748634-9153-1-git-send-email-anton@samba.org>
+References: <1424748634-9153-1-git-send-email-anton@samba.org>
+Message-ID: <1424748634-9153-2-git-send-email-anton@samba.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150223 19:29]:
-> * Felipe Balbi <balbi@ti.com> [150223 19:19]:
-> > On Mon, Feb 23, 2015 at 07:01:42PM -0800, Tony Lindgren wrote:
-> > > * Tony Lindgren <tony@atomide.com> [150223 18:43]:
-> > > 
-> > > Looks like the address is 0 for "Custom Error". Anyways, reverting
-> > 
-> > yeah, that's because the error comes from l4per2, not l3 :-)
-> 
-> Right so it seems :)
->  
-> > > a fix for similar issue found on omap3 so far seems to help, that's
-> > > 3d009c8c61f9 ("gpio: omap: Fix bad device access with setup_irq()").
-> > 
-> > if we revert that, we regress omap3, right ?
-> 
-> Yes we saw that getting triggered on omap3/4 before 3d009c8c61f9.
-> 
-> Now looking at the stack trace again, it actually has something:
-> 
-> ...
-> [<c05999a4>] (__irq_svc) from [<c0599164>] (_raw_spin_unlock_irqrestore+0x34/0x44)
-> [<c0599164>] (_raw_spin_unlock_irqrestore) from [<c0027120>] (omap_hwmod_idle+0x34/0x44)
-> [<c0027120>] (omap_hwmod_idle) from [<c00283f8>] (omap_device_idle+0x38/0x78)
-> [<c00283f8>] (omap_device_idle) from [<c0028454>] (_od_runtime_suspend+0x1c/0x24)
-> [<c0028454>] (_od_runtime_suspend) from [<c03b5214>] (__rpm_callback+0x2c/0x60)
-> [<c03b5214>] (__rpm_callback) from [<c03b5268>] (rpm_callback+0x20/0x80)
-> [<c03b5268>] (rpm_callback) from [<c03b56b8>] (rpm_suspend+0xe8/0x55c)
-> [<c03b56b8>] (rpm_suspend) from [<c03b6bdc>] (pm_runtime_work+0x74/0xa8)
-> [<c03b6bdc>] (pm_runtime_work) from [<c0054608>] (process_one_work+0x1b0/0x4a0)
-> ...
-> 
-> If it's the gpio-omap, there's probably some confusion still in
-> the driver regarding the GPIO bank idle status. Anyways, will look
-> more into it tomorrow.
+Many architectures have their own oops locking code that allows
+the lock to be taken recursively. Create a common version.
 
-And now I'm seeing the error with 3d009c8c61f9 reverted, so it
-does not seem to be that either..
+Avoid creating generic locking functions, so they can't be
+abused in other parts of the kernel.
 
-Regards,
+Signed-off-by: Anton Blanchard <anton@samba.org>
+---
+ include/linux/die_lock.h | 23 +++++++++++++++++++++++
+ lib/Makefile             |  1 +
+ lib/die_lock.c           | 43 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 67 insertions(+)
+ create mode 100644 include/linux/die_lock.h
+ create mode 100644 lib/die_lock.c
 
-Tony
+diff --git a/include/linux/die_lock.h b/include/linux/die_lock.h
+new file mode 100644
+index 0000000..540d09d
+--- /dev/null
++++ b/include/linux/die_lock.h
+@@ -0,0 +1,23 @@
++#ifndef __LINUX_DIE_LOCK_H
++#define __LINUX_DIE_LOCK_H
++
++#include <linux/typecheck.h>
++
++/**
++ * die_spin_lock_irqsave - lock die spinlock
++ * @flags: interrupt state is saved here
++ *
++ * The die spinlock is used to serialise output during oopses, BUGs and
++ * WARNs. It can be taken recursively so that nested oopses will not
++ * lock up.
++ */
++unsigned long __die_spin_lock_irqsave(void);
++#define die_spin_lock_irqsave(flags)			\
++	do {						\
++		typecheck(unsigned long, flags);	\
++		flags = __die_spin_lock_irqsave();	\
++	} while (0)
++
++void die_spin_unlock_irqrestore(unsigned long flags);
++
++#endif /* __LINUX_DIE_LOCK_H */
+diff --git a/lib/Makefile b/lib/Makefile
+index 3c3b30b..7d87a80 100644
+--- a/lib/Makefile
++++ b/lib/Makefile
+@@ -28,6 +28,7 @@ obj-y += bcd.o div64.o sort.o parser.o halfmd4.o debug_locks.o random32.o \
+ 	 bsearch.o find_last_bit.o find_next_bit.o llist.o memweight.o kfifo.o \
+ 	 percpu-refcount.o percpu_ida.o rhashtable.o reciprocal_div.o
+ obj-y += string_helpers.o
++obj-y += die_lock.o
+ obj-$(CONFIG_TEST_STRING_HELPERS) += test-string_helpers.o
+ obj-y += kstrtox.o
+ obj-$(CONFIG_TEST_KSTRTOX) += test-kstrtox.o
+diff --git a/lib/die_lock.c b/lib/die_lock.c
+new file mode 100644
+index 0000000..5d2de2e
+--- /dev/null
++++ b/lib/die_lock.c
+@@ -0,0 +1,43 @@
++#include <linux/spinlock.h>
++#include <linux/smp.h>
++
++static arch_spinlock_t die_lock = __ARCH_SPIN_LOCK_UNLOCKED;
++static int die_owner = -1;
++static unsigned int die_nest_count;
++
++unsigned long __die_spin_lock_irqsave(void)
++{
++	unsigned long flags;
++	int cpu;
++
++	/* racy, but better than risking deadlock. */
++	raw_local_irq_save(flags);
++
++	cpu = smp_processor_id();
++	if (!arch_spin_trylock(&die_lock)) {
++		if (cpu != die_owner)
++			arch_spin_lock(&die_lock);
++	}
++	die_nest_count++;
++	die_owner = cpu;
++
++	return flags;
++}
++
++/**
++ * die_spin_unlock_irqrestore - Unlock die spinlock
++ * @flags: interrupt state to restore
++ *
++ * Unlock die spinlock and restore interrupt state. This must be
++ * paired with die_spin_lock_irqsave.
++ */
++void die_spin_unlock_irqrestore(unsigned long flags)
++{
++	die_nest_count--;
++	if (!die_nest_count) {
++		die_owner = -1;
++		/* Nest count reaches zero, release the lock. */
++		arch_spin_unlock(&die_lock);
++	}
++	raw_local_irq_restore(flags);
++}
+-- 
+2.1.0
