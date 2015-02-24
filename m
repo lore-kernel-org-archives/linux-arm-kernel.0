@@ -1,35 +1,47 @@
-From: fkan@apm.com (Feng Kan)
-Date: Tue, 24 Feb 2015 15:40:21 -0800
-Subject: [PATCH] arm64: enable PTE type bit in the mask for pte_modify
-Message-ID: <1424821221-16396-1-git-send-email-fkan@apm.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Tue, 24 Feb 2015 17:55:05 -0600
+Subject: [BUG] ARM: socfpga: L2 cache init
+In-Reply-To: <20150217222817.GS8656@n2100.arm.linux.org.uk>
+References: <20150206103946.GM15692@pengutronix.de>
+ <20150206110557.GY8656@n2100.arm.linux.org.uk>
+ <20150209155314.GA7994@pengutronix.de>
+ <54D8E3BB.3060505@opensource.altera.com>
+ <20150209185820.GB7994@pengutronix.de>
+ <20150209213017.GC7994@pengutronix.de>
+ <54DD2BB3.3090507@opensource.altera.com>
+ <20150213080106.GD7994@pengutronix.de>
+ <CADhT+wfbZb+u7a-aCi71rh9xFMuphOvqiyEgEYpmmTQtujLcVg@mail.gmail.com>
+ <20150217222817.GS8656@n2100.arm.linux.org.uk>
+Message-ID: <CADhT+wcpWcfca6JWLAfpQm_yPHOpTRRbCpiikUEs0ha1NHq3TQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Caught during Trinity testing. The pte_modify does not allow
-modification for PTE type bit. This cause the test to hang
-the system. It is found that the PTE can't transit from an
-inaccessible page (b00) to a valid page (b11) because the mask
-does not allow it. This happens when a big block of mmaped
-memory is set the PROT_NONE, then the a small piece is broken
-off and set to PROT_WRITE | PROT_READ cause a huge page split.
+On Tue, Feb 17, 2015 at 4:28 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Feb 17, 2015 at 04:00:47PM -0600, Dinh Nguyen wrote:
+>> On Fri, Feb 13, 2015 at 2:01 AM, Steffen Trumtrar
+>> <s.trumtrar@pengutronix.de> wrote:
+>> > Yes, seems very likely that Russell is right.
+>>
+>> The bug doesn't happen if I disable the L2. Digging more...
+>
+> What ensures that the value written to socfpga_cpu1start_addr (by
+> of_property_read_u32() in socfpga_sysmgr_init(), called at .init_irq
+> time) is visible to the secondary CPU?
 
-Signed-off-by: Feng Kan <fkan@apm.com>
----
- arch/arm64/include/asm/pgtable.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Yes, I was able use a JTAG debugger and can see that the
+secondary CPU is not seeing socfpga_cpu1start_addr correctly when the
+error occurs.
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index a26a574..8255b52 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -462,7 +462,7 @@ static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
- static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
- {
- 	const pteval_t mask = PTE_USER | PTE_PXN | PTE_UXN | PTE_RDONLY |
--			      PTE_PROT_NONE | PTE_VALID | PTE_WRITE;
-+			      PTE_PROT_NONE | PTE_WRITE | PTE_TYPE_MASK;
- 	pte_val(pte) = (pte_val(pte) & ~mask) | (pgprot_val(newprot) & mask);
- 	return pte;
- }
--- 
-1.9.1
+>
+> From what I can see, the physical address written there is not
+> guaranteed to be flushed from all levels of cache.
+>
+> The flush_cache_all() in socfpga_boot_secondary() won't do the job -
+> that won't touch the L2C-310.
+>
+
+Do you have a recommendation on what should be done?
+
+Thanks,
+Dinh
