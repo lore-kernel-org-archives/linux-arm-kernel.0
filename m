@@ -1,148 +1,44 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 24 Feb 2015 15:18:44 -0800
-Subject: [PATCH v2 1/2] Input: touchscreen-iproc: Add Broadcom iProc
- touchscreen driver
-In-Reply-To: <54DBA34E.8090400@broadcom.com>
-References: <jonathar@broadcom.com>
- <1419027470-7969-1-git-send-email-jonathar@broadcom.com>
- <1419027470-7969-2-git-send-email-jonathar@broadcom.com>
- <20150115010256.GC9134@dtor-ws> <54B753C7.6000006@broadcom.com>
- <20150115060713.GA2694@dtor-ws> <54B81A4A.9020905@broadcom.com>
- <54DBA34E.8090400@broadcom.com>
-Message-ID: <20150224231844.GA39158@dtor-ws>
+From: nathan_lynch@mentor.com (Nathan Lynch)
+Date: Tue, 24 Feb 2015 17:21:07 -0600
+Subject: [PATCH] arm64: vdso: minor ABI fix for clock_getres
+Message-ID: <1424820067-13112-1-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jonathan,
+The vdso implementation of clock_getres currently returns 0 (success)
+whenever a null timespec is provided by the caller, regardless of the
+clock id supplied.
 
+This behavior is incorrect.  It should fall back to syscall when an
+unrecognized clock id is passed, even when the timespec argument is
+null.  This ensures that clock_getres always returns an error for
+invalid clock ids.
 
-On Wed, Feb 11, 2015 at 10:45:34AM -0800, Jonathan Richardson wrote:
-> Pinging maintainers... Am I ok to go ahead with the current rotation
-> implementation? I haven't heard anything further. Any feedback on naming
-> conventions from DT people?
->
+Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+---
+ arch/arm64/kernel/vdso/gettimeofday.S | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-I believe we should go with touchscreen-inverted-x,
-touchscreen-inverted-y and touchscreen-swapped-x-y properties since
-rotation can't really describe all permutations of potential
-connections.
-
-I'll be taking Hans de Goede's patch adding this new property to the
-bindings (adjusting the name slightly).
-
-Thanks.
-
-> Thanks!
-> 
-> On 15-01-15 11:51 AM, Jonathan Richardson wrote:
-> > Hi Dmitry,
-> > 
-> > On 15-01-14 10:07 PM, Dmitry Torokhov wrote:
-> >> On Wed, Jan 14, 2015 at 09:44:39PM -0800, Scott Branden wrote:
-> >>> On 15-01-14 05:02 PM, Dmitry Torokhov wrote:
-> >>>> Hi Jonathan,
-> >>>>
-> >>>> On Fri, Dec 19, 2014 at 02:17:49PM -0800, Jonathan Richardson wrote:
-> >>>>> +	if (of_property_read_u32(np, "scanning_period", &val) >= 0) {
-> >>>>> +		if (val < 1 || val > 256) {
-> >>>>> +			dev_err(dev, "scanning_period must be [1-256]\n");
-> >>>>> +			return -EINVAL;
-> >>>>> +		}
-> >>>>> +		priv->cfg_params.scanning_period = val;
-> >>>>> +	}
-> >>>>> +
-> >>>>> +	if (of_property_read_u32(np, "debounce_timeout", &val) >= 0) {
-> >>>>> +		if (val < 0 || val > 255) {
-> >>>>> +			dev_err(dev, "debounce_timeout must be [0-255]\n");
-> >>>>> +			return -EINVAL;
-> >>>>> +		}
-> >>>>> +		priv->cfg_params.debounce_timeout = val;
-> >>>>> +	}
-> >>>>> +
-> >>>>> +	if (of_property_read_u32(np, "settling_timeout", &val) >= 0) {
-> >>>>> +		if (val < 0 || val > 11) {
-> >>>>> +			dev_err(dev, "settling_timeout must be [0-11]\n");
-> >>>>> +			return -EINVAL;
-> >>>>> +		}
-> >>>>> +		priv->cfg_params.settling_timeout = val;
-> >>>>> +	}
-> >>>>> +
-> >>>>> +	if (of_property_read_u32(np, "touch_timeout", &val) >= 0) {
-> >>>>> +		if (val < 0 || val > 255) {
-> >>>>> +			dev_err(dev, "touch_timeout must be [0-255]\n");
-> >>>>> +			return -EINVAL;
-> >>>>> +		}
-> >>>>> +		priv->cfg_params.touch_timeout = val;
-> >>>>> +	}
-> >>>>> +
-> >>>>> +	if (of_property_read_u32(np, "average_data", &val) >= 0) {
-> >>>>> +		if (val < 0 || val > 8) {
-> >>>>> +			dev_err(dev, "average_data must be [0-8]\n");
-> >>>>> +			return -EINVAL;
-> >>>>> +		}
-> >>>>> +		priv->cfg_params.average_data = val;
-> >>>>> +	}
-> >>>>> +
-> >>>>> +	if (of_property_read_u32(np, "fifo_threshold", &val) >= 0) {
-> >>>>> +		if (val < 0 || val > 31) {
-> >>>>> +			dev_err(dev, "fifo_threshold must be [0-31]\n");
-> >>>>> +			return -EINVAL;
-> >>>>> +		}
-> >>>>> +		priv->cfg_params.fifo_threshold = val;
-> >>>>> +	}
-> >>>>
-> >>>> I think these are dveice specific and thus should have "brcm," prefix.
-> >>> I'm confused as to why we need the brcm prefix?  Other device tree
-> >>> bindings we have for other drivers do not need such prefix.
-> >>
-> >> Properties that are not standard on the system (reg, interrupts,
-> >> clkocks, etc) or subsystem level customarily carry the vendor prefix so
-> >> that they do not clash with newly added global or subsystem properties.
-> >>
-> >>>  Is this
-> >>> convention documented somewhere?
-> >>
-> >> Not sure. I glanced through Documentation/devicetree and do not see it
-> >> spelled out. Device tree overlords, what say you?
-> > 
-> > Let me know. I haven't seen this before either. I will change the
-> > entries to use dashes though instead of underscores but will wait until
-> > these other issues are decided on before sending out another patch.
-> > 
-> >>
-> >>>>
-> >>>>> +
-> >>>>> +	priv->ts_rotation = TS_ROTATION_0;
-> >>>>> +	if (of_property_read_u32(np, "ts-rotation", &val) >= 0) {
-> >>>>> +		priv->ts_rotation = val;
-> >>>>> +		dev_dbg(dev, "ts rotation [%d] degrees\n",
-> >>>>> +			90 * priv->ts_rotation);
-> >>>>> +	}
-> >>>>
-> >>>> This I am not quite sure about - if we want rotation or swap+invert. You
-> >>>> are CCed on another email (tsc2007) that talks about need of generic
-> >>>> touchscreen transforms in input core/of bindings.
-> >>> Does such generic binding exist today?  If not, I would like to go
-> >>> with this implementation and update to the new binding if/when it
-> >>> exists?
-> >>
-> >> Not yet but there several people interested. I think we have enough time
-> >> till 3.20 to hash it out properly.
-> > 
-> > I think the rotation is simpler personally. Everyone would understand
-> > rotation refers to how it's oriented but I'm not sure everyone would
-> > immediately know how it is wired. Let me know what is decided and I'll
-> > make any changes required.
-> > 
-> > Thanks,
-> > Jon
-> > 
-> > 
-> >>
-> >> Thanks.
-> >>
-> > 
-> 
-
+diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
+index fe652ffd34c2..efa79e8d4196 100644
+--- a/arch/arm64/kernel/vdso/gettimeofday.S
++++ b/arch/arm64/kernel/vdso/gettimeofday.S
+@@ -174,8 +174,6 @@ ENDPROC(__kernel_clock_gettime)
+ /* int __kernel_clock_getres(clockid_t clock_id, struct timespec *res); */
+ ENTRY(__kernel_clock_getres)
+ 	.cfi_startproc
+-	cbz	w1, 3f
+-
+ 	cmp	w0, #CLOCK_REALTIME
+ 	ccmp	w0, #CLOCK_MONOTONIC, #0x4, ne
+ 	b.ne	1f
+@@ -188,6 +186,7 @@ ENTRY(__kernel_clock_getres)
+ 	b.ne	4f
+ 	ldr	x2, 6f
+ 2:
++	cbz	w1, 3f
+ 	stp	xzr, x2, [x1]
+ 
+ 3:	/* res == NULL. */
 -- 
-Dmitry
+1.9.3
