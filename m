@@ -1,199 +1,72 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 24 Feb 2015 11:38:52 +0900
-Subject: [RESEND PATCH] ARM: EXYNOS: Fix failed second suspend on Exynos4
-In-Reply-To: <1424256325-16659-1-git-send-email-k.kozlowski@samsung.com>
-References: <1424256325-16659-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <54EBE43C.1020901@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 23 Feb 2015 18:35:06 -0800
+Subject: New l3-noc error with CPUFREQ_DT built-in with v4.0-rc1
+In-Reply-To: <20150224022433.GB5198@saruman.tx.rr.com>
+References: <20150223235947.GC25954@atomide.com>
+ <20150224015903.GP32521@atomide.com>
+ <20150224022433.GB5198@saruman.tx.rr.com>
+Message-ID: <20150224023505.GQ32521@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+* Felipe Balbi <balbi@ti.com> [150223 18:28]:
+> Hi,
+> 
+> On Mon, Feb 23, 2015 at 05:59:04PM -0800, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [150223 16:09]:
+> > > Hi Nishanth,
+> > > 
+> > > Olof told me about a new L3 error happening on omap5-uevm with
+> > > v4.0-rc1:
+> > > 
+> > > WARNING: CPU: 0 PID: 0 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x214/0x340()
+> > > 4000000.ocp:L3 Custom Error: MASTER MPU TARGET L4PER2 (Idle): Data Access in Supervisor mode during Functional access
+> > > ...
+> > > 
+> > > I tried bisecting this with no luck, but narrowed it down to
+> > > having CONFIG_CPUFREQ_DT=y causing it, while =m wont' trigger
+> > > it. This got changed by commit 40d1746d2eee ("ARM:
+> > > omap2plus_defconfig: use CONFIG_CPUFREQ_DT").
+> > > 
+> > > Any ideas?
+> > 
+> > Hmm so setting CONFIG_CPUFREQ_DT=m in arch/arm/configs/omap2plus_defconfig
+> > produces the same output with make omap2plus_defconfig as with =y.. So
+> > CPUFREQ_DT can't be the real cause of the problem.
+> > 
+> > It's now looking like the l3-noc warning does not get triggered on
+> > every boot.
+> > 
+> > It also seems the zImage triggering the error does not trigger the
+> > error on every boot. To trigger the error, it seems the device needs to
+> > be powered down for at least 10 or so seconds between the boots.
+> > So far no luck reproducing the error on v3.19.
+> > 
+> > The easy way to reproduce is to power down omap5 for at least 10 seconds,
+> > make omap2lus_defconfig on v4.0-rc1 and boot it.
+> > 
+> > And so far it looks like next-20150204 works and next-20150209
+> > failed at once so far. But of course I would not trust anything
+> > at this point :)
+> 
+> got a log of the failure ? Is it pointing to a device or one of the L4s?
 
-I tested this patch for suspend-to-ram on Exynos4412-based trats2 board.
-When I tested suspend-to-ram repetitively, I faced on hang issue of
-suspend-to-ram for Exynos4 as before.
+Well mostly the MASTER MPU TARGET L4PER2, the following stack dump is
+really the stack dump of the l3_interrupt_handler.
+ 
+> Might be worth to boot with just the bare minimum (UART & timers) and
+> disable everything else. You might need to build busybox and append that
+> to the kernel so you don't need to rely on MMC/USB/etc for rootfs.
+> 
+> After that, you could start enabling modules one by one (as modules, not
+> built-in) and loading them one by one to see which one causes the
+> failure. Big PITA, I know, but I can't think of any other way to go
+> about this.
 
-Could you send .config file for test?
+It seems the best way to deal with this is to make the l3_handle_target
+actually show the address where the error happened to limit it down
+to a single device..
 
-Thanks,
-Chanwoo Choi
+Regards,
 
-On 02/18/2015 07:45 PM, Krzysztof Kozlowski wrote:
-> On Exynos4412 boards (Trats2, Odroid U3) after enabling L2 cache in
-> 56b60b8bce4a ("ARM: 8265/1: dts: exynos4: Add nodes for L2 cache
-> controller") the second suspend to RAM failed. First suspend worked fine
-> but the next one hang just after powering down of secondary CPUs (system
-> consumed energy as it would be running but was not responsive).
-> 
-> The issue was caused by enabling delayed reset assertion for CPU0 just
-> after issuing power down of cores. This was introduced for Exynos4 in
-> 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off").
-> 
-> The whole behavior is not well documented but after checking with vendor
-> code this should be done like this (on Exynos4):
-> 1. Enable delayed reset assertion when system is running (for all CPUs).
-> 2. Disable delayed reset assertion before suspending the system.
->    This can be done after powering off secondary CPUs.
-> 3. Re-enable the delayed reset assertion when system is resumed.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Fixes: 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off")
-> Cc: <stable@vger.kernel.org>
-> ---
->  arch/arm/mach-exynos/common.h  |  2 ++
->  arch/arm/mach-exynos/exynos.c  | 27 +++++++++++++++++++++++++++
->  arch/arm/mach-exynos/platsmp.c | 39 ++-------------------------------------
->  arch/arm/mach-exynos/suspend.c |  3 +++
->  4 files changed, 34 insertions(+), 37 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index f70eca7ee705..0ef8d4b47102 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -153,6 +153,8 @@ extern void exynos_enter_aftr(void);
->  
->  extern struct cpuidle_exynos_data cpuidle_coupled_exynos_data;
->  
-> +extern void exynos_set_delayed_reset_assertion(bool enable);
-> +
->  extern void s5p_init_cpu(void __iomem *cpuid_addr);
->  extern unsigned int samsung_rev(void);
->  extern void __iomem *cpu_boot_reg_base(void);
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index 2013f73797ed..e2f46295eed7 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -166,6 +166,33 @@ static void __init exynos_init_io(void)
->  	exynos_map_io();
->  }
->  
-> +/*
-> + * Set or clear the USE_DELAYED_RESET_ASSERTION option. Used by smp code
-> + * and suspend.
-> + *
-> + * This is necessary only on Exynos4 SoCs. When system is running
-> + * USE_DELAYED_RESET_ASSERTION should be set so the ARM CLK clock down
-> + * feature could properly detect global idle state when secondary CPU is
-> + * powered down.
-> + *
-> + * However this should not be set when such system is going into suspend.
-> + */
-> +void exynos_set_delayed_reset_assertion(bool enable)
-> +{
-> +	if (soc_is_exynos4()) {
-> +		unsigned int tmp, core_id;
-> +
-> +		for (core_id = 0; core_id < num_possible_cpus(); core_id++) {
-> +			tmp = pmu_raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
-> +			if (enable)
-> +				tmp |= S5P_USE_DELAYED_RESET_ASSERTION;
-> +			else
-> +				tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
-> +			pmu_raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
-> +		}
-> +	}
-> +}
-> +
->  static const struct of_device_id exynos_dt_pmu_match[] = {
->  	{ .compatible = "samsung,exynos3250-pmu" },
->  	{ .compatible = "samsung,exynos4210-pmu" },
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index 3f32c47a6d74..19d5c87c842c 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -34,30 +34,6 @@
->  
->  extern void exynos4_secondary_startup(void);
->  
-> -/*
-> - * Set or clear the USE_DELAYED_RESET_ASSERTION option, set on Exynos4 SoCs
-> - * during hot-(un)plugging CPUx.
-> - *
-> - * The feature can be cleared safely during first boot of secondary CPU.
-> - *
-> - * Exynos4 SoCs require setting USE_DELAYED_RESET_ASSERTION during powering
-> - * down a CPU so the CPU idle clock down feature could properly detect global
-> - * idle state when CPUx is off.
-> - */
-> -static void exynos_set_delayed_reset_assertion(u32 core_id, bool enable)
-> -{
-> -	if (soc_is_exynos4()) {
-> -		unsigned int tmp;
-> -
-> -		tmp = pmu_raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
-> -		if (enable)
-> -			tmp |= S5P_USE_DELAYED_RESET_ASSERTION;
-> -		else
-> -			tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
-> -		pmu_raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
-> -	}
-> -}
-> -
->  #ifdef CONFIG_HOTPLUG_CPU
->  static inline void cpu_leave_lowpower(u32 core_id)
->  {
-> @@ -73,8 +49,6 @@ static inline void cpu_leave_lowpower(u32 core_id)
->  	  : "=&r" (v)
->  	  : "Ir" (CR_C), "Ir" (0x40)
->  	  : "cc");
-> -
-> -	 exynos_set_delayed_reset_assertion(core_id, false);
->  }
->  
->  static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
-> @@ -87,14 +61,6 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
->  		/* Turn the CPU off on next WFI instruction. */
->  		exynos_cpu_power_down(core_id);
->  
-> -		/*
-> -		 * Exynos4 SoCs require setting
-> -		 * USE_DELAYED_RESET_ASSERTION so the CPU idle
-> -		 * clock down feature could properly detect
-> -		 * global idle state when CPUx is off.
-> -		 */
-> -		exynos_set_delayed_reset_assertion(core_id, true);
-> -
->  		wfi();
->  
->  		if (pen_release == core_id) {
-> @@ -355,9 +321,6 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  		udelay(10);
->  	}
->  
-> -	/* No harm if this is called during first boot of secondary CPU */
-> -	exynos_set_delayed_reset_assertion(core_id, false);
-> -
->  	/*
->  	 * now the secondary core is starting up let it run its
->  	 * calibrations, then wait for it to finish
-> @@ -404,6 +367,8 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
->  
->  	exynos_sysram_init();
->  
-> +	exynos_set_delayed_reset_assertion(true);
-> +
->  	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
->  		scu_enable(scu_base_addr());
->  
-> diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-> index 666ec3e5b03f..d4da035cc88a 100644
-> --- a/arch/arm/mach-exynos/suspend.c
-> +++ b/arch/arm/mach-exynos/suspend.c
-> @@ -235,6 +235,8 @@ static void exynos_pm_enter_sleep_mode(void)
->  
->  static void exynos_pm_prepare(void)
->  {
-> +	exynos_set_delayed_reset_assertion(false);
-> +
->  	/* Set wake-up mask registers */
->  	exynos_pm_set_wakeup_mask();
->  
-> @@ -383,6 +385,7 @@ early_wakeup:
->  
->  	/* Clear SLEEP mode set in INFORM1 */
->  	pmu_raw_writel(0x0, S5P_INFORM1);
-> +	exynos_set_delayed_reset_assertion(true);
->  }
->  
->  static void exynos3250_pm_resume(void)
-> 
+Tony
