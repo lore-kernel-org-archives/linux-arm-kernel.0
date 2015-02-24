@@ -1,39 +1,73 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 24 Feb 2015 15:02:30 +0000
-Subject: [PATCH] ARM: vexpress: update CONFIG_USB_ISP1760 option
-Message-ID: <1424790150-8450-1-git-send-email-sudeep.holla@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 24 Feb 2015 07:03:08 -0800
+Subject: [PATCH v5 0/7] irqchip: Move OMAP{4,5}/DRA7 to use stacked domains
+In-Reply-To: <54EC3E9A.5010807@arm.com>
+References: <1424713459-6824-1-git-send-email-marc.zyngier@arm.com>
+ <20150223230205.GJ32521@atomide.com> <54EC3E9A.5010807@arm.com>
+Message-ID: <20150224150308.GU32521@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commt 7ef077a8ad35 ("usb: isp1760: Move driver from drivers/usb/host/
-to drivers/usb/isp1760/") moved the isp1760 driver and changed the
-Kconfig option. This makes CONFIG_USB_ISP1760_HCD not selectable
-directly anymore. This results in driver being not compiled in when
-using vexpress_defconfig and the USB is non-functional.
+* Marc Zyngier <marc.zyngier@arm.com> [150224 01:08]:
+> On 23/02/15 23:02, Tony Lindgren wrote:
+> > * Marc Zyngier <marc.zyngier@arm.com> [150223 09:48]:
+> >> This series is extracted from [4], which is trying to remove all
+> >> traces of gic_arch_extn from the tree. As some maintainers are more
+> >> responsive than others (understatement of the year...), I've decided
+> >> to split it per sub-arch, and get it moving, at least partially.
+> >>
+> >> This series addresses OMAP{4,5} by converting the WUGEN to stacked
+> >> domains. The DRA7 crossbar gets the same treatment.
+> >>
+> >> It is worth realizing that:
+> >>
+> >> - I haven't been able to test this as much as I would have wanted to
+> >>   (it's only been tested on omap4 and omap5).
+> >>
+> >> - This actively *breaks* existing setups. Once you boot a new kernel
+> >>   with an old DT, suspend/resume *will* be broken. Old kernels on a
+> >>   new DT won't even boot! You've been warned. This really outline the
+> >>   necessity of actually describing the HW in device trees...
+> > 
+> > Could we parse still the old binding and produce warning for the
+> > case when a new kernel is booted with the old DT? That would make
+> > it easier for people to debug what's going on.
+> 
+> There's a number of strategies:
+> - Looking up the default, top-level interrupt controller:
+>   if that's the GIC, scream.
+> - Lookup the crossbar:
+>   if it exists, but is not an interrupt controller, scream as well.
+> - Lookup the WUGEN:
+>   if it doesn't exist, scream again.
+> 
+> The last one is pretty easy to implement:
+> 
+> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+> index fba1ba7..7bb116a 100644
+> --- a/arch/arm/mach-omap2/omap4-common.c
+> +++ b/arch/arm/mach-omap2/omap4-common.c
+> @@ -277,6 +277,12 @@ void __init omap_gic_of_init(void)
+>  {
+>  	struct device_node *np;
+>  
+> +	intc_node = of_find_matching_node(NULL, intc_match);
+> +	if (WARN_ON(!intc_node)) {
+> +		pr_err("No WUGEN found in DT, system will misbehave.\n");
+> +		pr_err("UPDATE YOUR DEVICE TREE!\n");
+> +	}
+> +
+>  	/* Extract GIC distributor and TWD bases for OMAP4460 ROM Errata WA */
+>  	if (!cpu_is_omap446x())
+>  		goto skip_errata_init;
+> 
+> This should cover both OMAP4, OMAP5 and DRA7.
+> 
+> What do you think?
 
-This patch updates the CONFIG_USB_ISP1760_HCD to CONFIG_USB_ISP1760 to
-get back USB functional on vexpress platforms.
+This should do the job for the case of old dtb and people trying to
+suspend the device.
 
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/configs/vexpress_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks,
 
-diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
-index f489fdaa19b8..37fe607a4ede 100644
---- a/arch/arm/configs/vexpress_defconfig
-+++ b/arch/arm/configs/vexpress_defconfig
-@@ -118,8 +118,8 @@ CONFIG_HID_ZEROPLUS=y
- CONFIG_USB=y
- CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
- CONFIG_USB_MON=y
--CONFIG_USB_ISP1760_HCD=y
- CONFIG_USB_STORAGE=y
-+CONFIG_USB_ISP1760=y
- CONFIG_MMC=y
- CONFIG_MMC_ARMMMCI=y
- CONFIG_NEW_LEDS=y
--- 
-1.9.1
+Tony
