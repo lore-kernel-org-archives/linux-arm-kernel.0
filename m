@@ -1,130 +1,29 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 24 Feb 2015 10:56:02 +0100
-Subject: [RFC PATCH 3/3] rtc: at91sam9: properly act when IRQ handler is
- called in suspended state
-In-Reply-To: <1424771762-16343-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1424771762-16343-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1424771762-16343-4-git-send-email-boris.brezillon@free-electrons.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Tue, 24 Feb 2015 09:56:14 +0000
+Subject: [PATCH 1/7] Add die_spin_lock_{irqsave,irqrestore}
+In-Reply-To: <20150224064107.GB15387@gmail.com>
+References: <1424748634-9153-1-git-send-email-anton@samba.org>
+ <1424748634-9153-2-git-send-email-anton@samba.org>
+ <20150224064107.GB15387@gmail.com>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6D1CAE9BD3@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IRQ line used by the RTC device is often shared with the system timer
-(PIT) on at91 platforms.
-Since timers are registering their handlers with IRQF_NO_SUSPEND, we should
-expect being called in suspended state, and properly wake the system up
-when this is the case.
+From: Ingo Molnar
+...
+> So why not trylock and time out here after a few seconds,
+> instead of indefinitely supressing some potentially vital
+> output due to some other CPU crashing/locking with the lock
+> held?
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/rtc/rtc-at91sam9.c | 62 ++++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 51 insertions(+), 11 deletions(-)
+I've used that for status requests that usually lock a table
+to get a consistent view.
+If trylock times out assume that the data is actually stable
+and access it anyway. Remember the pid doing the access and
+next time it tries to acquire the same lock do a trylock with
+no timeout.
+That way if (when) there is a locking fubar (or a driver oops
+with a lock held) at least some of the relevant status commands
+will work.
 
-diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-index 2183fd2..8cf9c1b 100644
---- a/drivers/rtc/rtc-at91sam9.c
-+++ b/drivers/rtc/rtc-at91sam9.c
-@@ -77,6 +77,8 @@ struct sam9_rtc {
- 	unsigned int		gpbr_offset;
- 	int 			irq;
- 	struct clk		*sclk;
-+	unsigned long		events;
-+	spinlock_t		lock;
- };
- 
- #define rtt_readl(rtc, field) \
-@@ -271,14 +273,9 @@ static int at91_rtc_proc(struct device *dev, struct seq_file *seq)
- 	return 0;
- }
- 
--/*
-- * IRQ handler for the RTC
-- */
--static irqreturn_t at91_rtc_interrupt(int irq, void *_rtc)
-+static irqreturn_t at91_rtc_cache_events(struct sam9_rtc *rtc)
- {
--	struct sam9_rtc *rtc = _rtc;
- 	u32 sr, mr;
--	unsigned long events = 0;
- 
- 	/* Shared interrupt may be for another device.  Note: reading
- 	 * SR clears it, so we must only read it in this irq handler!
-@@ -290,18 +287,54 @@ static irqreturn_t at91_rtc_interrupt(int irq, void *_rtc)
- 
- 	/* alarm status */
- 	if (sr & AT91_RTT_ALMS)
--		events |= (RTC_AF | RTC_IRQF);
-+		rtc->events |= (RTC_AF | RTC_IRQF);
- 
- 	/* timer update/increment */
- 	if (sr & AT91_RTT_RTTINC)
--		events |= (RTC_UF | RTC_IRQF);
-+		rtc->events |= (RTC_UF | RTC_IRQF);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static void at91_rtc_flush_events(struct sam9_rtc *rtc)
-+{
-+	if (!rtc->events)
-+		return;
- 
--	rtc_update_irq(rtc->rtcdev, 1, events);
-+	rtc_update_irq(rtc->rtcdev, 1, rtc->events);
-+	rtc->events = 0;
- 
- 	pr_debug("%s: num=%ld, events=0x%02lx\n", __func__,
--		events >> 8, events & 0x000000FF);
-+		rtc->events >> 8, rtc->events & 0x000000FF);
-+}
- 
--	return IRQ_HANDLED;
-+/*
-+ * IRQ handler for the RTC
-+ */
-+static irqreturn_t at91_rtc_interrupt(int irq, void *_rtc)
-+{
-+	struct sam9_rtc *rtc = _rtc;
-+	int ret;
-+
-+	spin_lock(&rtc->lock);
-+
-+	ret = at91_rtc_cache_events(rtc);
-+
-+	/* We're called in suspended state */
-+	if (irq_is_wakeup_armed(irq)) {
-+		/* Mask irqs coming from this peripheral */
-+		rtt_writel(rtc, MR,
-+			   rtt_readl(rtc, MR) &
-+			   ~(AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN));
-+		/* Trigger a system wakeup */
-+		irq_pm_force_wakeup();
-+	} else {
-+		at91_rtc_flush_events(rtc);
-+	}
-+
-+	spin_unlock(&rtc->lock);
-+
-+	return ret;
- }
- 
- static const struct rtc_class_ops at91_rtc_ops = {
-@@ -499,10 +532,17 @@ static int at91_rtc_resume(struct device *dev)
- 	u32		mr;
- 
- 	if (rtc->imr) {
-+		unsigned long flags;
-+
- 		if (device_may_wakeup(dev))
- 			disable_irq_wake(rtc->irq);
- 		mr = rtt_readl(rtc, MR);
- 		rtt_writel(rtc, MR, mr | rtc->imr);
-+
-+		spin_lock_irqsave(&rtc->lock, flags);
-+		at91_rtc_cache_events(rtc);
-+		at91_rtc_flush_events(rtc);
-+		spin_unlock_irqrestore(&rtc->lock, flags);
- 	}
- 
- 	return 0;
--- 
-1.9.1
+	David
