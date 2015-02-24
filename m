@@ -1,29 +1,23 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 24 Feb 2015 20:06:36 +0100
-Subject: [PATCH 2/2] leds/pwm: Don't disable pwm when setting brightness
- to 0
-In-Reply-To: <1151818200.134325.1424804213026.JavaMail.open-xchange@oxbsltgw03.schlund.de>
-References: <1423734290-19750-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1423734290-19750-3-git-send-email-u.kleine-koenig@pengutronix.de>
- <1151818200.134325.1424804213026.JavaMail.open-xchange@oxbsltgw03.schlund.de>
-Message-ID: <20150224190636.GG7789@pengutronix.de>
+From: jonathar@broadcom.com (Jonathan Richardson)
+Date: Tue, 24 Feb 2015 11:13:10 -0800
+Subject: [PATCH 0/1] Enable Broadcom Cygnus BCM958305K
+In-Reply-To: <Jonathan Richardson <jonathar@broadcom.com>
+References: <Jonathan Richardson <jonathar@broadcom.com>
+Message-ID: <1424805191-10675-1-git-send-email-jonathar@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stefan,
+This patchset adds a DTS file to enable the BCM58305 Wireless Audio reference
+design based on Cygnus. It will be kept up to date as Cygnus drivers are
+accepted into the mainline.
 
-On Tue, Feb 24, 2015 at 07:56:52PM +0100, Stefan Wahren wrote:
-> After replacing "i" with "priv->num_leds" in this patch we are able to use pwm
-> led with trigger heartbeat.
-Right, that's what I did in my tree to to please the build robot :-)
+Jonathan Richardson (1):
+  ARM: dts: Enable Broadcom Cygnus BCM958305K
 
-> This is the functional part of this issue, since the warning has been fixed [1]
-Can I interpret this as an Tested-by: for this patch and an Ack for
-patch 1?
-
-Best regards
-Uwe
+ arch/arm/boot/dts/Makefile       |    3 ++-
+ arch/arm/boot/dts/bcm958305k.dts |   53 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 55 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/bcm958305k.dts
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.9.5
