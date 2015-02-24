@@ -1,52 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 24 Feb 2015 09:17:09 +0100
-Subject: [PATCH v3 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
-In-Reply-To: <20150224034548.GC18140@ld-irv-0074>
-References: <1424091072-7738-1-git-send-email-maxime.ripard@free-electrons.com>
- <1424091072-7738-2-git-send-email-maxime.ripard@free-electrons.com>
- <87oaotaa6r.fsf@free.fr> <20150216205825.GG25269@lukather>
- <87k2zha69p.fsf@free.fr> <20150217103740.GK25269@lukather>
- <877fvga2mb.fsf@free.fr> <54E3777B.20607@free-electrons.com>
- <20150224034548.GC18140@ld-irv-0074>
-Message-ID: <20150224081709.GM25269@lukather>
+From: troglobit@gmail.com (Troglobit)
+Date: Tue, 24 Feb 2015 09:26:39 +0100 (CET)
+Subject: [PATCH] pci-versatile.c: Update for API change in
+ list_for_each_entry()
+Message-ID: <alpine.DEB.2.10.1502240916240.26214@luthien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
 
-On Mon, Feb 23, 2015 at 07:45:48PM -0800, Brian Norris wrote:
-> On Tue, Feb 17, 2015 at 02:16:43PM -0300, Ezequiel Garcia wrote:
-> > On 02/17/2015 02:07 PM, Robert Jarzmik wrote:
-> > > It will be Brian choice eventually, but if you say that you will submit that
-> > > approach for next cycle, and yours for stable, and that for next you'll convert
-> > > mdelay() to msleep(), I'll stop arguing.
-> > 
-> > How about you push a proper patchset with this alternative (and a nice
-> > cover letter explaining the need for a threaded irq) so we can discuss
-> > properly this new turn?
-> 
-> I think both Maxime's change (polling a new HW bit) and Robert J's
-> change (move to a threaded IRQ) are good. I'll take another look, but I
-> expect I'll take Maxime's v4 for the 4.0 cycle, and Robert J's v2 for
-> 4.1 (or will we just jump straight to 5.0? I never know).
+In Linux 4.0-rc1 ARM Versatile PCI build fails to build due to what
+appears to be an API update.  This patch is a very simple correction,
+merely posted as a heads-up to the maintainers.  Hopefully a better
+fix can be forwarded to Linus.
 
-That's what I would expect too.
+Signed-off-by: Joachim Nilsson <troglobit@gmail.com>
 
-> Will I see a patch to convert to msleep() and/or a jiffies timeout
-> in the near future?
+---
+  drivers/pci/host/pci-versatile.c | 2 +-
+  1 file changed, 1 insertion(+), 1 deletion(-)
 
-As soon as both patches are merged.
+diff --git a/drivers/pci/host/pci-versatile.c b/drivers/pci/host/pci-versatile.c
+index 1ec694a..464bf49 100644
+--- a/drivers/pci/host/pci-versatile.c
++++ b/drivers/pci/host/pci-versatile.c
+@@ -80,7 +80,7 @@ static int versatile_pci_parse_request_of_pci_ranges(struct device *dev,
+  	if (err)
+  		return err;
 
-Maxime
+-	resource_list_for_each_entry(win, res, list) {
++	resource_list_for_each_entry(win, res) {
+  		struct resource *parent, *res = win->res;
 
+  		switch (resource_type(res)) {
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150224/5b08ae21/attachment-0001.sig>
+1.9.1
