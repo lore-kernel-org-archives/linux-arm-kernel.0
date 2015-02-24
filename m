@@ -1,56 +1,60 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 24 Feb 2015 16:21:17 +0200
-Subject: [PATCH 0/6] dmaengine/dra7x: DMA router (crossbar support)
-Message-ID: <1424787683-19151-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Tue, 24 Feb 2015 16:21:22 +0200
+Subject: [PATCH 5/6] dmaengine: omap-dma: Remove mapping between virtual
+ channels and requests
+In-Reply-To: <1424787683-19151-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1424787683-19151-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1424787683-19151-6-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Do not direct map the virtual channels to sDMA request number. When the
+sDMA is behind of a crossbar this direct mapping can cause situations when
+certain channel can not be requested since the crossbar request number
+will no longer match with the sDMA request line.
+The direct mapping for virtual channels with HW request lines will make it
+harder to implement MEM_TO_MEM mode for the driver.
 
-The series adds support for DMA router type of devices. They are used in SoCs
-which has more peripherals with DMA request lines than the DMA controller can
-handle.
-The router itself is not part of the DMA controller and it's operation should be
-transparent (as it is in the HW) for the SW stack.
-
-This series takes into accound the comments Sricharan received for his version
-of the crossbar driver:
-https://lkml.org/lkml/2014/3/7/199
-
-This implementation is not tied to any DMA driver so it is possible to use the
-framework by other vendors, also ACPI version of binding can be easy enough to
-be added.
-
-The omap-dma part of changes are based on the dma property name change series:
-https://lkml.org/lkml/2015/2/20/182
-
-but the code has fallback so it is working w/o the changes in that series.
-
-Regards,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Peter Ujfalusi (6):
-  dmaengine: of_dma: Support for DMA routers
-  dmaengine: Add driver for TI DMA crossbar on DRA7x
-  dmaengine: omap-dma: Use defines for dma channels and request count
-  dmaengine: omap-dma: Take DMA request number from DT if it is
-    available
-  dmaengine: omap-dma: Remove mapping between virtual channels and
-    requests
-  ARM: DTS: dra7x: Integrate sDMA crossbar
+ drivers/dma/omap-dma.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
- Documentation/devicetree/bindings/dma/dma.txt |  27 ++++
- arch/arm/boot/dts/dra7.dtsi                   |  57 ++++----
- drivers/dma/Kconfig                           |   4 +
- drivers/dma/Makefile                          |   1 +
- drivers/dma/dmaengine.c                       |   7 +
- drivers/dma/of-dma.c                          |  92 +++++++++++++
- drivers/dma/omap-dma.c                        |  24 +++-
- drivers/dma/ti-dma-crossbar.c                 | 191 ++++++++++++++++++++++++++
- include/linux/dmaengine.h                     |  17 +++
- include/linux/of_dma.h                        |  21 +++
- 10 files changed, 413 insertions(+), 28 deletions(-)
- create mode 100644 drivers/dma/ti-dma-crossbar.c
-
+diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+index 7def31c919f4..1d759b81e1be 100644
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/omap-dma.c
+@@ -593,6 +593,7 @@ static void omap_dma_free_chan_resources(struct dma_chan *chan)
+ 	omap_free_dma(c->dma_ch);
+ 
+ 	dev_dbg(od->ddev.dev, "freeing channel for %u\n", c->dma_sig);
++	c->dma_sig = 0;
+ }
+ 
+ static size_t omap_dma_sg_size(struct omap_sg *sg)
+@@ -1049,7 +1050,6 @@ static int omap_dma_chan_init(struct omap_dmadev *od, int dma_sig)
+ 		return -ENOMEM;
+ 
+ 	c->reg_map = od->reg_map;
+-	c->dma_sig = dma_sig;
+ 	c->vc.desc_free = omap_dma_desc_free;
+ 	vchan_init(&c->vc, &od->ddev);
+ 	INIT_LIST_HEAD(&c->node);
+@@ -1219,10 +1219,14 @@ static struct platform_driver omap_dma_driver = {
+ bool omap_dma_filter_fn(struct dma_chan *chan, void *param)
+ {
+ 	if (chan->device->dev->driver == &omap_dma_driver.driver) {
++		struct omap_dmadev *od = to_omap_dma_dev(chan->device);
+ 		struct omap_chan *c = to_omap_dma_chan(chan);
+ 		unsigned req = *(unsigned *)param;
+ 
+-		return req == c->dma_sig;
++		if (req <= od->dma_requests) {
++			c->dma_sig = req;
++			return true;
++		}
+ 	}
+ 	return false;
+ }
 -- 
 2.3.0
