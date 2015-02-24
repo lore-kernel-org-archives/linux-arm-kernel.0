@@ -1,32 +1,53 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 24 Feb 2015 17:43:19 +0300
-Subject: [PATCH 0/2] Add R8A7794 GPIO DT support
-In-Reply-To: <20150223231901.GD29878@verge.net.au>
-References: <6954455.LyoCrfjM8R@wasted.cogentembedded.com>
- <20150223220030.GA29878@verge.net.au> <20150223231901.GD29878@verge.net.au>
-Message-ID: <54EC8E07.1030301@cogentembedded.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 24 Feb 2015 14:43:16 +0000
+Subject: [RFC PATCH] arm64: mm: increase VA range of identity map
+In-Reply-To: <CAKv+Gu-z9ZpOxMsrZ4mg=ZB-ftVe2kNiY5rci8Yk_W_U-OXqnA@mail.gmail.com>
+References: <1424775342-30588-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150224120341.GC27420@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-z9ZpOxMsrZ4mg=ZB-ftVe2kNiY5rci8Yk_W_U-OXqnA@mail.gmail.com>
+Message-ID: <20150224144316.GD27420@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Feb 24, 2015 at 12:18:26PM +0000, Ard Biesheuvel wrote:
+> On 24 February 2015 at 12:03, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Tue, Feb 24, 2015 at 10:55:42AM +0000, Ard Biesheuvel wrote:
+> >> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> >> index f800d45ea226..19f6297a472b 100644
+> >> --- a/arch/arm64/include/asm/memory.h
+> >> +++ b/arch/arm64/include/asm/memory.h
+> >> @@ -42,12 +42,14 @@
+> >>   * PAGE_OFFSET - the virtual address of the start of the kernel image (top
+> >>   *            (VA_BITS - 1))
+> >>   * VA_BITS - the maximum number of bits for virtual addresses.
+> >> + * MAX_VA_BITS - architectural max value for VA_BITS
+> >>   * TASK_SIZE - the maximum size of a user space task.
+> >>   * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
+> >>   * The module space lives between the addresses given by TASK_SIZE
+> >>   * and PAGE_OFFSET - it must be within 128MB of the kernel text.
+> >>   */
+> >>  #define VA_BITS                      (CONFIG_ARM64_VA_BITS)
+> >> +#define MAX_VA_BITS          48
+> >
+> > Can we determine this dynamically based on the phys address? So on
+> > hardware that doesn't need such large idmap, it would stick to the host
+> > configured levels.
+> 
+> I guess we could. Is there a benefit to keeping TCR.T0SZ as high as
+> possible if you are adding the additional level anyway?
+> It only costs us one page regardless, and only if the runtime check
+> shows that system RAM exceeds VA_BITS
 
-On 02/24/2015 02:19 AM, Simon Horman wrote:
+It's not the page that we may waste in the idmap table but higher T0SZ
+implies deeper translation tables, so an additional page table walk
+during power up/down sequences.
 
->>>     Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
->>> 'renesas-devel-20150220-v3.19' tag. Here we add the GPIO device tree support
->>> for the R8A7794 SoC. It depends on the R8A7794 PFC/MMCIF device tree patches
->>> posted recently in order to apply.
+We could populate the idmap table as maximum number of levels
+permanently (based on MAX_VA_BITS) but set T0SZ according to the SoC
+needs and TTBR0_EL1 may need to skip the first page of the original
+idmap (we do something similar in arch/arm/mm/proc-v7-3level.S with
+TTBR1_OFFSET since for 1GB of kernel linear mapping we only need 2
+levels but swapper_pg_dir is always 3).
 
->>> [1/2] ARM: shmobile: r8a7794: add GPIO clocks
->>> [2/2] ARM: shmobile: r8a7794: add GPIO DT support
-
->> Thanks,  I have queued these up with Geert's Acks.
-
-> Sorry, I was too hasty again. I have dropped these pending the
-> dependencies being queued up.
-
-    Ah, I just didn't mention that the PFC patch is necessary for the latter 
-patch to compile (but I don't expect it to change, so IMHO you can apply the 
-PFC patch now). The former patch still can be merged, I think.
-
-WBR, Sergei
+-- 
+Catalin
