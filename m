@@ -1,43 +1,35 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 24 Feb 2015 10:38:47 +0100
-Subject: [PATCH] ARM: rockchip: Constify struct regmap_config and staticize
- local function
-Message-ID: <1424770727-5396-1-git-send-email-k.kozlowski@samsung.com>
+From: arjanvandeven@gmail.com (Arjan van de Ven)
+Date: Tue, 24 Feb 2015 01:39:46 -0800
+Subject: [PATCH 0/7] Serialise oopses, BUGs, WARNs, dump_stack, soft
+ lockups and hard lockups
+In-Reply-To: <20150224063513.GA15387@gmail.com>
+References: <1424748634-9153-1-git-send-email-anton@samba.org>
+ <20150224063513.GA15387@gmail.com>
+Message-ID: <CADyApD06_0uf4QgGVWRQyBP9pb2VRQnCOGK7M7K9kTti52usoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The regmap_config struct may be const because it is not modified by the
-driver and regmap_init() accepts pointer to const.
+>> Some architectures already have their own recursive
+>> locking for oopses and we have another version for
+>> serialising dump_stack.
+>>
+>> Create a common version and use it everywhere (oopses,
+>> BUGs, WARNs, dump_stack, soft lockups and hard lockups).
+>
+> Dunno. I've had cases where the simultaneity of the oopses
+> (i.e. their garbled nature) gave me the clue about the type
+> of race to expect.
+>
 
-Make function rockchip_get_core_reset() static because it is not used
-outside of the platsmp.c file.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/mach-rockchip/platsmp.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-index f26fcdca2445..5b4ca3c3c879 100644
---- a/arch/arm/mach-rockchip/platsmp.c
-+++ b/arch/arm/mach-rockchip/platsmp.c
-@@ -55,7 +55,7 @@ static int pmu_power_domain_is_on(int pd)
- 	return !(val & BIT(pd));
- }
- 
--struct reset_control *rockchip_get_core_reset(int cpu)
-+static struct reset_control *rockchip_get_core_reset(int cpu)
- {
- 	struct device *dev = get_cpu_device(cpu);
- 	struct device_node *np;
-@@ -201,7 +201,7 @@ static int __init rockchip_smp_prepare_sram(struct device_node *node)
- 	return 0;
- }
- 
--static struct regmap_config rockchip_pmu_regmap_config = {
-+static const struct regmap_config rockchip_pmu_regmap_config = {
- 	.reg_bits = 32,
- 	.val_bits = 32,
- 	.reg_stride = 4,
--- 
-1.9.1
+one of the question is if you want to serialize, or if you just want to label.
+If you take a cookie (could just be a monotonic increasing number) at
+the start of the oops
+and then prefix/postfix the stack printing with that number, you don't
+serialize (risk of locking up),
+but you can pretty trivially see which line  came from where..
+if you do the monotonic increasing number approach, you even get an
+ordering out of it.
+it does mean changing the dump_stack() and co function fingerprint to
+take an extra argument,
+but that is not TOO insane.
