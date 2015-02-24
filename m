@@ -1,89 +1,152 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 24 Feb 2015 12:52:20 -0800
-Subject: [GIT PULL] omap fixes against v4.0-rc1
-Message-ID: <20150224205219.GM11056@atomide.com>
+From: dobatog@gmail.com (Gabriel Dobato)
+Date: Tue, 24 Feb 2015 22:16:13 +0100
+Subject: Ask for help. ARM:mvebu (CM-A510),
+ add sound support using TLV320AIC23 audio-codec
+In-Reply-To: <54EC3956.4070505@gmail.com>
+References: <54EB8D34.7040003@gmail.com> <54EC3956.4070505@gmail.com>
+Message-ID: <54ECEA1D.6090306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+> I think that the lack of space in all three input routings can make a
+> difference. Please let know if adding it helps.
+>
+> Best regards,
+> Marcin
 
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+Marcin,
 
-are available in the git repository at:
+Thank you for your answer!. It seems that space does not matter (I have 
+checked it), but yes, it is necessary to be careful with this kind of 
+things..
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/fixes-v4.0-rc1
 
-for you to fetch changes up to 67fd14b3eca63b14429350e9eadc5fab709a8821:
+On 24/02/15 09:41, Sebastian Hesselbarth wrote:
+> The full node looks like:
+> opt_audio: audio at 1a {
+>      compatible = "ti,tlv320aic23";
+>      reg = <0x1a>;
+>      #sound-dai-cells= <0>;
+>      status = "okay";
+> };
 
-  ARM: dts: am335x-bone*: usb0 is hardwired for peripheral (2015-02-24 10:35:44 -0800)
+Yes, sorry. And regarding to audio0, the full node looks like:
 
-----------------------------------------------------------------
-Fixes for various omap devices. It's all dts and defconfig
-changes for this set:
+                         audio0: audio-controller at b0000 {
+                                 compatible = "marvell,dove-audio";
+                                 reg = <0xb0000 0x2210>;
+                                 interrupts = <19>, <20>;
+                                 clocks = <&gate_clk 12>;
+                                 clock-names = "internal";
+                                 #sound-dai-cells= <1>;
+                                 status = "okay";
+                         };
 
-- Fix wrong DMA properties for dma to avoid them getting
-  copied wrong again before we start actually using them
+> Looking at sound/soc/codecs/tlv320aic23.c:
+>
+> static const struct snd_soc_dapm_route tlv320aic23_intercon[] = {
+>     /* Output Mixer */
+>     {"Output Mixer", "Line Bypass Switch", "Line Input"},
+>     {"Output Mixer", "Playback Switch", "DAC"},
+>     {"Output Mixer", "Mic Sidetone Switch", "Mic Input"},
+>
+>     /* Outputs */
+>     {"RHPOUT", NULL, "Output Mixer"},
+>     {"LHPOUT", NULL, "Output Mixer"},
+>     {"LOUT", NULL, "Output Mixer"},
+>     {"ROUT", NULL, "Output Mixer"},
+>
+>     /* Inputs */
+>     {"Line Input", "NULL", "LLINEIN"},
+>     {"Line Input", "NULL", "RLINEIN"},
+>
+>     {"Mic Input", "NULL", "MICIN"},
+>
+>     /* input mux */
+>     {"Capture Source", "Line", "Line Input"},
+>     {"Capture Source", "Mic", "Mic Input"},
+>     {"ADC", NULL, "Capture Source"},
+>
+> };
+>
+> The lines with the failing routes really look suspicious, i.e.
+> there is strings "NULL" where I'd expect plain NULL.
+>
+> What happens if you amend the three lines and replace the "NULL"
+> with NULL?
+>
+> Sebastian
 
-- USB fixes to revert the extcon changes as the driver did not
-  get merged yet and cause issues
+Sebastian,
 
-- Omap5 and dra7 fixes to boot from sata
+You were right, as always :) , I have changed them and now errors are 
+not reported. Now, in the boot trace I find:
 
-- Fix few am437x issues for i2c and pinctrl
+...
+asoc-simple-card sound: tlv320aic23-hifi <-> i2s mapping ok
+...
 
-- Fix beaglebone for hardwared USB configuration
+...
+ALSA device list:
+   #0: OnboardTLV320AIC23B
+...
 
-- Defconfig changes for NAND, SATA and TPS62362
+but after rootfs is up, this msg appears in dmesg:
 
-- Fix n900 i2c numbering for legacy user space and smc91x
-  register offset so it works also for qemu
+platform sound: Driver asoc-simple-card requests probe deferral
 
-- Fix incomplete USB configuration for dm816x
 
-----------------------------------------------------------------
-Felipe Balbi (3):
-      ARM: dts: am437x-idk: fix TPS62362 i2c bus
-      ARM: omap2plus_defconfig: enable TPS62362 regulator
-      ARM: dts: am437x-idk: fix sleep pinctrl state
 
-Ivaylo Dimitrov (1):
-      ARM: dts: n900: fix i2c bus numbering
+In reference to the card, I get the following info:
 
-Pali Roh?r (1):
-      ARM: dts: n900: Fix offset for smc91x ethernet
+root at 192:~#cat /proc/asound/cards
+  0 [OnboardTLV320AI]: OnboardTLV320AI - OnboardTLV320AIC23B
+                       OnboardTLV320AIC23B
 
-Peter Ujfalusi (5):
-      ARM: dts: omap2: Correct the dma controller's property names
-      ARM: dts: omap3: Correct the dma controller's property names
-      ARM: dts: omap4: Correct the dma controller's property names
-      ARM: dts: omap5: Correct the dma controller's property names
-      ARM: dts: dra7: Correct the dma controller's property names
+root at 192:~# tree /proc/asound/card0/
+/proc/asound/card0/
+|-- id
+|-- pcm0c
+|   |-- info
+|   `-- sub0
+|       |-- hw_params
+|       |-- info
+|       |-- status
+|       `-- sw_params
+`-- pcm0p
+     |-- info
+     `-- sub0
+         |-- hw_params
+         |-- info
+         |-- status
+         `-- sw_params
 
-Robert Nelson (1):
-      ARM: dts: am335x-bone*: usb0 is hardwired for peripheral
+4 directories, 11 files
 
-Roger Quadros (5):
-      ARM: dts: DRA7: Fix SATA PHY node
-      ARM: dts: OMAP5: Fix SATA PHY node
-      ARM: omap2plus_defconfig: Enable OMAP NAND BCH driver
-      ARM: omap2plus_defconfig: Fix SATA boot
-      ARM: dts: dra7x-evm: beagle-x15: Fix USB Host
 
-Tony Lindgren (1):
-      ARM: dts: Fix USB dts configuration for dm816x
 
- arch/arm/boot/dts/am335x-bone-common.dtsi |  1 +
- arch/arm/boot/dts/am437x-idk-evm.dts      | 25 ++---------------------
- arch/arm/boot/dts/am57xx-beagle-x15.dts   |  8 --------
- arch/arm/boot/dts/dm8168-evm.dts          | 25 +++++++++++++++++++++++
- arch/arm/boot/dts/dm816x.dtsi             | 34 +++++++++++++++++++++++++++----
- arch/arm/boot/dts/dra7-evm.dts            |  8 --------
- arch/arm/boot/dts/dra7.dtsi               |  8 ++++----
- arch/arm/boot/dts/dra72-evm.dts           |  8 --------
- arch/arm/boot/dts/omap2.dtsi              |  4 ++--
- arch/arm/boot/dts/omap3-n900.dts          |  9 +++++++-
- arch/arm/boot/dts/omap3.dtsi              |  4 ++--
- arch/arm/boot/dts/omap4.dtsi              |  4 ++--
- arch/arm/boot/dts/omap5.dtsi              |  8 ++++----
- arch/arm/configs/omap2plus_defconfig      |  4 +++-
- 14 files changed, 83 insertions(+), 67 deletions(-)
+And if I try to reproduce some noise:
+
+root at 192:~#  cat /dev/urandom | aplay
+Playing raw data 'stdin' : Unsigned 8 bit, Rate 8000 Hz, Mono
+set_sample_rate_control:Invalid rate 48000,48000 requested
+tlv320aic23-codec 1-001a: ASoC: can't set tlv320aic23-hifi hw params: -22
+aplay: set_params:1145: Unable to install hw params:
+ACCESS:  RW_INTERLEAVED
+FORMAT:  U8
+SUBFORMAT:  STD
+SAMPLE_BITS: 8
+FRAME_BITS: 8
+CHANNELS: 1
+RATE: 8000
+PERIOD_TIME: (125333 125334)
+PERIOD_SIZE: (1002 1003)
+PERIOD_BYTES: (1002 1003)
+PERIODS: (3 4)
+BUFFER_TIME: 500000
+BUFFER_SIZE: 4000
+BUFFER_BYTES: 4000
+TICK_TIME: 0
+
+
+Gabriel
