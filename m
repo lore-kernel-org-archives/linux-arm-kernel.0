@@ -1,62 +1,81 @@
 From: anton@samba.org (Anton Blanchard)
-Date: Tue, 24 Feb 2015 14:30:27 +1100
-Subject: [PATCH 0/7] Serialise oopses, BUGs, WARNs, dump_stack,
- soft lockups and hard lockups
-Message-ID: <1424748634-9153-1-git-send-email-anton@samba.org>
+Date: Tue, 24 Feb 2015 14:30:29 +1100
+Subject: [PATCH 2/7] powerpc: Use die_spin_lock_{irqsave,irqrestore}
+In-Reply-To: <1424748634-9153-1-git-send-email-anton@samba.org>
+References: <1424748634-9153-1-git-send-email-anton@samba.org>
+Message-ID: <1424748634-9153-3-git-send-email-anton@samba.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Every now and then I end up with an undebuggable issue because multiple
-CPUs hit something at the same time and everything is interleaved:
+Replace the powerpc specific oops locking with the common one.
 
-        CR: 48000082  XER: 00000000
-        ,RI
-        c0000003dc72fd10
-        ,LE
-        d0000000065b84e8
-        Instruction dump:
-        MSR: 8000000100029033
+Signed-off-by: Anton Blanchard <anton@samba.org>
+---
+ arch/powerpc/kernel/traps.c | 24 +++---------------------
+ 1 file changed, 3 insertions(+), 21 deletions(-)
 
-Very annoying.
-
-Some architectures already have their own recursive locking for oopses
-and we have another version for serialising dump_stack.
-
-Create a common version and use it everywhere (oopses, BUGs, WARNs,
-dump_stack, soft lockups and hard lockups). A few testcases were
-used to verify the series:
-
-A trivial module to create concurrent WARNs, BUGs and oopses:
-
-http://ozlabs.org/~anton/junkcode/warnstorm.tar.gz
-
-And one to create concurrent soft and hard lockups:
-
-http://ozlabs.org/~anton/junkcode/badguy.tar.gz
-
-Anton Blanchard (7):
-  Add die_spin_lock_{irqsave,irqrestore}
-  powerpc: Use die_spin_lock_{irqsave,irqrestore}
-  arm: Use die_spin_lock_{irqsave,irqrestore}
-  x86: Use die_spin_lock_{irqsave,irqrestore}
-  watchdog: Serialise soft lockup errors with
-    die_spin_lock_{irqsave,irqrestore}
-  dump_stack: Serialise dump_stack with
-    die_spin_lock_{irqsave,irqrestore}
-  powerpc: Serialise BUG and WARNs with
-    die_spin_lock_{irqsave,irqrestore}
-
- arch/arm/kernel/traps.c     | 26 ++---------------
- arch/powerpc/kernel/traps.c | 68 ++++++++++++++++++++++++++-------------------
- arch/x86/kernel/dumpstack.c | 26 ++---------------
- include/linux/die_lock.h    | 23 +++++++++++++++
- kernel/watchdog.c           |  4 +++
- lib/Makefile                |  1 +
- lib/die_lock.c              | 43 ++++++++++++++++++++++++++++
- lib/dump_stack.c            | 40 +++-----------------------
- 8 files changed, 120 insertions(+), 111 deletions(-)
- create mode 100644 include/linux/die_lock.h
- create mode 100644 lib/die_lock.c
-
+diff --git a/arch/powerpc/kernel/traps.c b/arch/powerpc/kernel/traps.c
+index 19e4744..4cc1e72 100644
+--- a/arch/powerpc/kernel/traps.c
++++ b/arch/powerpc/kernel/traps.c
+@@ -36,6 +36,7 @@
+ #include <linux/debugfs.h>
+ #include <linux/ratelimit.h>
+ #include <linux/context_tracking.h>
++#include <linux/die_lock.h>
+ 
+ #include <asm/emulated_ops.h>
+ #include <asm/pgtable.h>
+@@ -109,14 +110,10 @@ static void pmac_backlight_unblank(void)
+ static inline void pmac_backlight_unblank(void) { }
+ #endif
+ 
+-static arch_spinlock_t die_lock = __ARCH_SPIN_LOCK_UNLOCKED;
+-static int die_owner = -1;
+-static unsigned int die_nest_count;
+ static int die_counter;
+ 
+ static unsigned __kprobes long oops_begin(struct pt_regs *regs)
+ {
+-	int cpu;
+ 	unsigned long flags;
+ 
+ 	if (debugger(regs))
+@@ -124,17 +121,7 @@ static unsigned __kprobes long oops_begin(struct pt_regs *regs)
+ 
+ 	oops_enter();
+ 
+-	/* racy, but better than risking deadlock. */
+-	raw_local_irq_save(flags);
+-	cpu = smp_processor_id();
+-	if (!arch_spin_trylock(&die_lock)) {
+-		if (cpu == die_owner)
+-			/* nested oops. should stop eventually */;
+-		else
+-			arch_spin_lock(&die_lock);
+-	}
+-	die_nest_count++;
+-	die_owner = cpu;
++	die_spin_lock_irqsave(flags);
+ 	console_verbose();
+ 	bust_spinlocks(1);
+ 	if (machine_is(powermac))
+@@ -146,15 +133,10 @@ static void __kprobes oops_end(unsigned long flags, struct pt_regs *regs,
+ 			       int signr)
+ {
+ 	bust_spinlocks(0);
+-	die_owner = -1;
+ 	add_taint(TAINT_DIE, LOCKDEP_NOW_UNRELIABLE);
+-	die_nest_count--;
+ 	oops_exit();
+ 	printk("\n");
+-	if (!die_nest_count)
+-		/* Nest count reaches zero, release the lock. */
+-		arch_spin_unlock(&die_lock);
+-	raw_local_irq_restore(flags);
++	die_spin_unlock_irqrestore(flags);
+ 
+ 	crash_fadump(regs, "die oops");
+ 
 -- 
 2.1.0
