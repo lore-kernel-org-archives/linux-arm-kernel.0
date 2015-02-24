@@ -1,65 +1,147 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 24 Feb 2015 11:39:11 +0100
-Subject: MUSB dual-role on AM335x behaving weirdly
-In-Reply-To: <20150205132142.GD2079@lukather>
-References: <20150121160631.GH4367@lukather>
- <CADYTM3b40_u4Twt27PBVH4dC9ErDnFEi0AUzs_aJRM3mMHaBCQ@mail.gmail.com>
- <54C0A8C9.3040201@visionsystems.de>
- <20150205132142.GD2079@lukather>
-Message-ID: <20150224103911.GR25269@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 24 Feb 2015 10:41:30 +0000
+Subject: [PATCH v5 0/7] irqchip: Move OMAP{4,
+ 5}/DRA7 to use stacked domains
+In-Reply-To: <54EB9006.70000@ti.com>
+References: <1424713459-6824-1-git-send-email-marc.zyngier@arm.com>
+ <20150223203237.GA30588@kahuna> <54EB9006.70000@ti.com>
+Message-ID: <54EC555A.9050903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 02:21:42PM +0100, Maxime Ripard wrote:
-> Hi,
+On 23/02/15 20:39, Nishanth Menon wrote:
+> On 02/23/2015 02:32 PM, Nishanth Menon wrote:
+>> On 17:44-20150223, Marc Zyngier wrote:
+>>> This series is extracted from [4], which is trying to remove all
+>>> traces of gic_arch_extn from the tree. As some maintainers are more
+>>> responsive than others (understatement of the year...), I've decided
+>>> to split it per sub-arch, and get it moving, at least partially.
+>>>
+>>> This series addresses OMAP{4,5} by converting the WUGEN to stacked
+>>> domains. The DRA7 crossbar gets the same treatment.
+>>>
+>>> It is worth realizing that:
+>>>
+>>> - I haven't been able to test this as much as I would have wanted to
+>>>   (it's only been tested on omap4 and omap5).
+>>>
+>>> - This actively *breaks* existing setups. Once you boot a new kernel
+>>>   with an old DT, suspend/resume *will* be broken. Old kernels on a
+>>>   new DT won't even boot! You've been warned. This really outline the
+>>>   necessity of actually describing the HW in device trees...
+>>>
+>>> Based on 4.0-rc1.
+>>>
+>>> * From v4: [4]
+>>> - Extracted from the full series
+>>> - Rebased on 4.0-rc1
+>>>
+>>> * From v3 [3]:
+>>> - Rebased on top of the patch working around hardcoded IRQ on OMAP4/5 [4]
+>>> - Fixed more iMX6 DTs (Stephan)
+>>> - Fixed Exynos4/5 DTs
+>>>
+>>> * From v2 [2]:
+>>> - Addressed numerous comments from Thierry
+>>> - Merged bug fixes from Nishanth
+>>> - Merged bug fix from Stefan
+>>>
+>>> * From v1 [1]:
+>>> - Rebased on 3.19-rc3
+>>> - Fixed a number of additional platforms
+>>> - Added crossbar conversion to stacked domains
+>>> - Merged bug fixes from Nishanth
+>>>
+>>> [4]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317531.html
+>>> [3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315385.html
+>>> [2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314041.html
+>>> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/307338.html
+>>>
+>>> Marc Zyngier (7):
+>>>   genirq: Add irqchip_set_wake_parent
+>>>   irqchip: crossbar: convert dra7 crossbar to stacked domains
+>>>   DT: update ti,irq-crossbar binding
+>>>   irqchip: GIC: get rid of routable domain
+>>>   DT: arm,gic: kill arm,routable-irqs
+>>>   DT: omap4/5: add binding for the wake-up generator
+>>>   ARM: omap: convert wakeupgen to stacked domains
+>>>
+>>>  Documentation/devicetree/bindings/arm/gic.txt      |   6 -
+>>>  .../devicetree/bindings/arm/omap/crossbar.txt      |  18 +-
+>>>  .../interrupt-controller/ti,omap4-wugen-mpu        |  33 ++++
+>>>  arch/arm/boot/dts/am4372.dtsi                      |  11 +-
+>>>  arch/arm/boot/dts/am437x-gp-evm.dts                |   1 -
+>>>  arch/arm/boot/dts/am437x-sk-evm.dts                |   1 -
+>>>  arch/arm/boot/dts/am43x-epos-evm.dts               |   1 -
+>>>  arch/arm/boot/dts/am57xx-beagle-x15.dts            |   3 +-
+>>>  arch/arm/boot/dts/dra7-evm.dts                     |   2 +-
+>>>  arch/arm/boot/dts/dra7.dtsi                        |  43 +++--
+>>>  arch/arm/boot/dts/dra72-evm.dts                    |   1 -
+>>>  arch/arm/boot/dts/dra72x.dtsi                      |   3 +-
+>>>  arch/arm/boot/dts/dra74x.dtsi                      |   5 +-
+>>>  arch/arm/boot/dts/omap4-duovero.dtsi               |   2 -
+>>>  arch/arm/boot/dts/omap4-panda-common.dtsi          |   8 +-
+>>>  arch/arm/boot/dts/omap4-sdp.dts                    |   8 +-
+>>>  arch/arm/boot/dts/omap4-var-som-om44.dtsi          |   2 -
+>>>  arch/arm/boot/dts/omap4.dtsi                       |  18 +-
+>>>  arch/arm/boot/dts/omap5-cm-t54.dts                 |   1 -
+>>>  arch/arm/boot/dts/omap5-uevm.dts                   |   2 -
+>>>  arch/arm/boot/dts/omap5.dtsi                       |  26 ++-
+>>>  arch/arm/mach-omap2/omap-wakeupgen.c               | 125 ++++++++++---
+>>>  arch/arm/mach-omap2/omap-wakeupgen.h               |   1 -
+>>>  arch/arm/mach-omap2/omap4-common.c                 |  21 +--
+>>>  drivers/irqchip/irq-crossbar.c                     | 207 ++++++++++++---------
+>>>  drivers/irqchip/irq-gic.c                          |  59 +-----
+>>>  include/linux/irq.h                                |   1 +
+>>>  include/linux/irqchip/arm-gic.h                    |   6 -
+>>>  include/linux/irqchip/irq-crossbar.h               |  11 --
+>>>  kernel/irq/chip.c                                  |  16 ++
+>>>  30 files changed, 364 insertions(+), 278 deletions(-)
+>>>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu
+>>>  delete mode 100644 include/linux/irqchip/irq-crossbar.h
+>>
+>> marc-test-irq (Applied the series to v4.0-rc1) - boot logs:
+>>  1:                     am335x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469913
+>>  2:                      am335x-sk: BOOT: PASS: http://paste.ubuntu.org.cn/2469914
+>>  3:                     am3517-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469915
+>>  4:                      am37x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469916
+>>  5:                      am437x-sk: BOOT: PASS: http://paste.ubuntu.org.cn/2469917
+>>  6:                    am43xx-epos: BOOT: PASS: http://paste.ubuntu.org.cn/2469918
+>>  7:                   am43xx-gpevm: BOOT: PASS: http://paste.ubuntu.org.cn/2469919
+>>  8:                 BeagleBoard-XM: BOOT: PASS: http://paste.ubuntu.org.cn/2469920
+>>  9:            beagleboard-vanilla: BOOT: PASS: http://paste.ubuntu.org.cn/2469928
+>> 10:               beaglebone-black: BOOT: PASS: http://paste.ubuntu.org.cn/2469932
+>> 11:                     beaglebone: BOOT: PASS: http://paste.ubuntu.org.cn/2469936
+>> 12:                     craneboard: BOOT: PASS: http://paste.ubuntu.org.cn/2469941
+>> 13:                     dra72x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469945
+>> 14:                     dra7xx-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469946
+>> 15:         OMAP3430-Labrador(LDP): BOOT: PASS: http://paste.ubuntu.org.cn/2469947
+>> 16:                           n900: BOOT: PASS: http://paste.ubuntu.org.cn/2469948
+>> 17:                      omap5-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469949
+>> 18:                  pandaboard-es: BOOT: PASS: http://paste.ubuntu.org.cn/2469950
+>> 19:             pandaboard-vanilla: BOOT: PASS: http://paste.ubuntu.org.cn/2469951
+>> 20:                        sdp2430: BOOT: PASS: http://paste.ubuntu.org.cn/2469952
+>> 21:                        sdp3430: BOOT: PASS: http://paste.ubuntu.org.cn/2469953
+>> 22:                        sdp4430: BOOT: PASS: http://paste.ubuntu.org.cn/2469954
+>> TOTAL = 22 boards, Booted Boards = 22, No Boot boards = 0
+>>
+>> (also tested beagleboard-x15 which was not on farm: http://paste.ubuntu.org.cn/2470017  - looks good as well).
+> Noticed that I missed proper info about x15 here.. anyways..
 > 
-> On Thu, Jan 22, 2015 at 08:37:45AM +0100, Yegor Yefremov wrote:
-> > I have the same experience with 3.15. The switching is working when
-> > CONFIG_USB_MUSB_DUAL_ROLE is set and dr_mode = "otg". But since 3.16
-> > it seems to be broken. Still had no time to bisect this.
+> http://paste.ubuntu.org.cn/2470017 was vanilla v4.0-rc1
+> http://pastebin.ubuntu.com/10377375/ is with this series applied on top.
 > 
-> I've been giving a few versions (from v3.15 to Tuesday's linux-next) a
-> try, and I always see the same behaviour now:
-> 
->   - Booting as a gadget (ie, with a USB cable plugged in), and
->     swapping the cable for a (real, this time) USB OTG cable with a
->     USB key never works. When the device is plugged, all I get is
-> 
-> [  262.944846] usb 1-1: new high-speed USB device number 2 using musb-hdrc
-> [  278.064748] usb 1-1: device descriptor read/64, error -110
-> 
->     Putting in back in gadget results with a load of continuous:
-> [  315.258839] musb_bus_suspend 2484: trying to suspend as a_wait_vfall while active
-> 
->   - Booting as a host, or with nothing connected to it actually work,
->     up to a few plug-a-device-then-plug-a-host cycles, where you end
->     up with the following logs when disconnecting the device (somehow,
->     it always happens when it is set in host mode).
-> 
-> [   12.969075] CAUTION: musb: Babble Interrupt Occurred
-> [   12.974445] CAUTION: musb: Babble Interrupt Occurred
-> [   12.979637] musb_stage0_irq 789: unhandled DISCONNECT transition (a_wait_bcon)
-> [   12.988498] usb 1-1: USB disconnect, device number 2
-> [   13.071849] musb-hdrc musb-hdrc.0.auto: Restarting MUSB to recover from Babble
-> 
->     Plugging back our USB cable, with the AM335x acting as a device
->     work once. Then, when it switches to the host mode, we end up with
->     the same scenario than in the coldplug as gadget case: USB read
->     error, before then having all the a_wait_vfall messages.
+>>
+>> Comparative boot logs for v4.0-rc1:
+>> https://github.com/nmenon/kernel-test-logs/tree/v4.0-rc1
+>>
+>> Will dig in detail a little later.. but nothing major stuck out to me.
 
-Guys, any ideas/hints?
+Excellent. Let me know if you spot anything. Can I otherwise add your
+"Tested-by:"?
 
 Thanks,
-Maxime
 
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150224/432a844e/attachment.sig>
+Jazz is not dead. It just smells funny...
