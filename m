@@ -1,94 +1,127 @@
-From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez-Ortiz)
-Date: Tue, 24 Feb 2015 14:32:54 -0500
-Subject: [PATCH] drivers/tty: amba-pl011: defer driver probing if external
- dma is not ready.
-In-Reply-To: <17223432.USFTMF6ThS@wuerfel>
-References: <1424749613-24765-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <17223432.USFTMF6ThS@wuerfel>
-Message-ID: <54ECD1E6.2070909@linaro.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue, 24 Feb 2015 11:54:38 -0800
+Subject: [PATCHv2] mm: Don't offset memmap for flatmem
+In-Reply-To: <54D18319.40602@codeaurora.org>
+References: <1421804273-29947-1-git-send-email-lauraa@codeaurora.org>
+ <1421888500-24364-1-git-send-email-lauraa@codeaurora.org>
+ <20150122162021.aa861aeb53c22206a19ebbcb@linux-foundation.org>
+ <54C196D0.6040900@codeaurora.org> <54C20EEC.1060809@suse.cz>
+ <20150126155617.GA2395@suse.de> <54CA3202.8020609@suse.cz>
+ <54D18319.40602@codeaurora.org>
+Message-ID: <54ECD6FE.5060503@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/2015 03:29 AM, Arnd Bergmann wrote:
-> On Monday 23 February 2015 22:46:53 Jorge Ramirez-Ortiz wrote:
->> This patch addresses a race condition that happens when
->> device_initcall(pl011_dma_initicall) is executed before all the devices have been
->> probed - this issue was observed on an hisi_6220 SoC (HiKey board from Linaro).
-> How do you want to handle the case where there is a DMA channel in DT, but
-> no driver for it built into the kernel?
+Reviving this thread because I don't think it ever got resolved.
 
-
-In my view that should be fixed in the of-dma and the acpi-dma implementation
-(just don't return EPROBE_DEFER a second time since the driver wasn't found
-after the late_initcall associated to deferred probing). That would allow
-drivers that use the defer probing mechanism to wait for optional controllers to
-complete their probing sequence if those controllers don't become available.
-
-In any case, I can track the pending requests (up to twelve, one per UART) with
-a list in the driver.
-If a second request to probe fails with EPROBE_DEFER we can conclude that the
-driver is not present.
-
-I have tested such an implementation and it works as expected.
-would that be acceptable?
-
->> @@ -275,15 +277,23 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
->>         struct dma_chan *chan;
->>         dma_cap_mask_t mask;
->>  
->> -       chan = dma_request_slave_channel(dev, "tx");
->> +       if (queue_dma_probe && plat && plat->dma_filter) {
->> +               (*queue_dma_probe)(dev, uap);
->> +               return 0;
->> +       }
->> +
->> +       chan = dma_request_slave_channel_reason(dev, "tx");
->> +       if (IS_ERR(chan)) {
->> +
->> +               /* the dma driver has not been initialized yet */
->> +               if (PTR_ERR(chan) == -EPROBE_DEFER)
->> +                       return -EPROBE_DEFER;
->>  
->> -       if (!chan) {
->>                 /* We need platform data */
->>                 if (!plat || !plat->dma_filter) {
->>                         dev_info(uap->port.dev, "no DMA platform data\n");
->> -                       return;
->> +                       return 0;
->>                 }
-> It would be nice to print the error code here now that you know it
-> and can tell the difference between no DMA channel being supplied
-> and the DMA channel from the DT properties being unavailable.
-
-ACKd
+On 2/3/2015 6:25 PM, Laura Abbott wrote:
+> On 1/29/2015 5:13 AM, Vlastimil Babka wrote:
+>> On 01/26/2015 04:56 PM, Mel Gorman wrote:
+>>> On Fri, Jan 23, 2015 at 10:05:48AM +0100, Vlastimil Babka wrote:
+>>>> On 01/23/2015 01:33 AM, Laura Abbott wrote:
+>>>>> On 1/22/2015 4:20 PM, Andrew Morton wrote:
+>>>>>>
+>>>>>> I don't think v2 addressed Vlastimil's review comment?
+>>>>>>
+>>>>>
+>>>>> We're still adding the offset to node_mem_map and then subtracting it from
+>>>>> just mem_map. Did I miss another comment somewhere?
+>>>>
+>>>> Yes that was addressed, thanks. But I don't feel comfortable acking
+>>>> it yet, as I have no idea if we are doing the right thing for
+>>>> CONFIG_HAVE_MEMBLOCK_NODE_MAP && CONFIG_FLATMEM case here.
+>>>>
+>>>> Also putting the CONFIG_FLATMEM && !CONFIG_HAVE_MEMBLOCK_NODE_MAP
+>>>> under the "if (page_to_pfn(mem_map) != pgdat->node_start_pfn)" will
+>>>> probably do the right thing, but looks like a weird test for this
+>>>> case here.
+>>>>
+>>>> I have no good suggestion though, so let's CC Mel who apparently
+>>>> wrote the ARCH_PFN_OFFSET correction?
+>>>>
+>>>
+>>> I don't recall introducing ARCH_PFN_OFFSET, are you sure it was me?  I'm just
+>>> back today after been offline a week so didn't review the patch but IIRC,
+>>> ARCH_PFN_OFFSET deals with the case where physical memory does not start
+>>> at 0. Without the offset, virtual _PAGE_OFFSET would not physical page 0.
+>>> I don't recall it being related to the alignment of node 0 so if there
+>>> are crashes due to misalignment of node 0 and the fix is ARCH_PFN_OFFSET
+>>> related then I'm surprised.
+>>
+>> You're right that ARCH_PFN_OFFSET wasn't added by you, but by commit
+>> 467bc461d2 which was a bugfix to your commit c713216dee, which did
+>>  introduce the mem_map correction code, and after which the code looked like:
+>>
+>> mem_map = NODE_DATA(0)->node_mem_map;
+>> #ifdef CONFIG_ARCH_POPULATES_NODE_MAP
+>>                 if (page_to_pfn(mem_map) != pgdat->node_start_pfn)
+>>                         mem_map -= pgdat->node_start_pfn;
+>> #endif /* CONFIG_ARCH_POPULATES_NODE_MAP */
+>>
+>>
+>> It's from 2006 so I can't expect you remember the details, but I had some
+>>  trouble finding out what this does. I assume it makes sure that mem_map points
+>>  to struct page corresponding to pfn 0, because that's what translations using
+>>  mem_map expect.
+>> But pgdat->node_mem_map points to struct page corresponding to
+>>  pgdat->node_start_pfn, which might not be 0. So it subtracts node_start_pfn
+>>  to fix that. This is OK, as the node_mem_map is allocated (in this very
+>>  function) with padding so that it covers a MAX_ORDER_NR_PAGES aligned area
+>>  where node_mem_map may point to the middle of it.
+>>
+>> Commit 467bc461d2 fixed this in case the first pfn is not 0, but ARCH_PFN_OFFSET.
+>>  So mem_map points to struct page corresponding to pfn=ARCH_PFN_OFFSET, which
+>>  is OK. But I still have few doubts:
+>>
+>> 1) The "if (page_to_pfn(mem_map) != pgdat->node_start_pfn)" sort of silently
+>>  assumes that mem_map is allocated at the beginning of the node, i.e. at
+>>  pgdat->node_start_pfn. And the only reason for this if-condition to be true,
+>>  is that we haven't corrected the page_to_pfn translation, which uses mem_map.
+>>  Is this assumption always OK to do? Shouldn't the if-condition be instead about
+>>  pgdat->node_start_pfn not being aligned?
+>>
+>> 2) The #ifdef guard is about CONFIG_ARCH_POPULATES_NODE_MAP, which is nowadays  called  > CONFIG_HAVE_MEMBLOCK_NODE_MAP. But shouldn't it be #ifdef FLATMEM instead?
+>>  After all, we are correcting value of mem_map based on page_to_pfn code
+>> variant used on FLATMEM. arm doesn't define
+>> CONFIG_ARCH_POPULATES_NODE_MAP but apparently needs this correction.
+>>
 >
->>                 /* Try to acquire a generic DMA engine slave TX channel */
->>                 dma_cap_zero(mask);
->>                 dma_cap_set(DMA_SLAVE, mask);
->> @@ -292,7 +302,7 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
->>                                                 plat->dma_tx_param);
->>                 if (!chan) {
->>                         dev_err(uap->port.dev, "no TX DMA channel!\n");
->> -                       return;
->> +                       return 0;
->>                 }
->>         }
->>  
->> @@ -310,7 +320,7 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
->>  
->>                 if (!chan) {
->>                         dev_err(uap->port.dev, "no RX DMA channel!\n");
->> -                       return;
->> +                       return 0;
->>                 }
->>         }
-> I think the condition is wrong now that 'chan' contains a ERR_PTR
-> value in case of failure.
+> Just doing #ifdef FLATMEM doesn't work because ARCH_PFN_OFFSET doesn't
+> seem to be picked up properly for NOMMU arches properly. Probably just
+> missing a header somewhere.
+>
+>> 3) The node_mem_map allocation code aligns the allocation to MAX_ORDER_NR_PAGES,
+>>  so the offset between the start of the allocated map and where node_mem_map
+>>  points to will be up to MAX_ORDER_NR_PAGES.
+>> However, here we subtract (in current kernel) (pgdat->node_start_pfn - ARCH_PFN_OFFSET).
+>>  That looks like another silent assumption, that pgdat->node_start_pfn is always
+>>  between ARCH_PFN_OFFSET and ARCH_PFN_OFFSET + MAX_ORDER_NR_PAGES. If it were
+>>  larger, the mem_map correction would subtract too much and end up below what
+>>  was allocated for node_mem_map, no? The bug report behind this patch said that
+>>  first 2MB of memory was reserved using "no-map flag using DT". Unless this somehow
+>>  translates to ARCH_PFN_OFFSET at build time, we would underflow mem_map, right?
+>>  Maybe I'm just overly paranoid here and of course ARCH_PFN_OFFSET is determined
+>>  properly on arm...
+>>
+>> If anyone can confirm my doubts or point me to what I'm missing, thanks.
+>
+> ARCH_PFN_OFFSET should always be the lowest PFN in the system, otherwise
+> I think plenty of other things are broken given how many architectures
+> make this assumption. That said, I don't think subtracting ARCH_PFN_OFFSET
+> makes it obvious why the adjustment is being made.
+>
+> Thanks,
+> Laura
+>
 
-Actually that is not the case on the RX DMA case: on the RX DMA case, chan
-contains either NULL or a valid pointer (not an ERR_PTR value)
+I was incorrect before: it isn't just NOMMU but architectures that don't use
+asm-generic/memory_model.h which failed to compile. I could respin with
+more ifdefery around the ARCH_PFN_OFFSET if that sounds reasonable.
 
-chan only contains an ERR_PTR on the first attempt to access the DMA controller
-(just so we can handle the defer probing case)
-On subsequent accesses, it assumes that it is there (since it would have been
-deferred if it wasn't).
+Thanks,
+Laura
+
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
