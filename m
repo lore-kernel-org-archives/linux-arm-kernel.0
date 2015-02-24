@@ -1,58 +1,102 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 24 Feb 2015 17:33:42 +0000
-Subject: [PATCH v3 4/4] clk: dt: Introduce always-on clock domain documentation
-In-Reply-To: <1424799222-9301-1-git-send-email-lee.jones@linaro.org>
-References: <1424799222-9301-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1424799222-9301-5-git-send-email-lee.jones@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 24 Feb 2015 18:36:03 +0100
+Subject: [PATCH] cpuidle: mvebu: update cpuidle thresholds for Armada
+ XP SOCs
+In-Reply-To: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
+References: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
+Message-ID: <54ECB683.6060705@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- .../devicetree/bindings/clock/clk-always-on.txt    | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/clk-always-on.txt
+Hi Sebastien,
 
-diff --git a/Documentation/devicetree/bindings/clock/clk-always-on.txt b/Documentation/devicetree/bindings/clock/clk-always-on.txt
-new file mode 100644
-index 0000000..d61eaca
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/clk-always-on.txt
-@@ -0,0 +1,35 @@
-+Always-on Clock Domain
-+
-+Some hardware contains bunches of clocks which must never be turned
-+off.  If drivers a) fail to obtain a reference to any of these or b)
-+give up a previously obtained reference during suspend, the common clk
-+framework will attempt to disable them and the hardware can fail
-+irrecoverably.  Usually the only way to recover from these failures is
-+to restart.
-+
-+To avoid either of these two scenarios from catastrophically disabling
-+an otherwise perfectly healthy running system, an always-on clock
-+domain has been provided.  In this implementation clocks are consumed
-+and references are taken, thus preventing them from being shut down by
-+the framework.
-+
-+This binding is not to be abused.  It is only to be used to protect
-+platforms from being crippled by gated clocks, not as a convenience
-+function to avoid using clk_disable_unused.
-+
-+We use the generic clock bindings found in:
-+  Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Required properties:
-+- compatible : Must be "clk-always-on"
-+
-+Example:
-+
-+icn {
-+	compatible = "clk-always-on";
-+	clocks = <&clk_s_c0_flexgen CLK_ICN_SBC>,
-+		 <&clk_s_c0_flexgen CLK_ICN_LMI>,
-+		 <&clk_s_c0_flexgen CLK_ICN_CPU>,
-+		 <&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
-+		 <&clk_s_a0_flexgen CLK_IC_LMI0>,
-+};
+On 13/02/2015 15:55, s. rannou wrote:
+> Originally, the thresholds used in the cpuidle driver for Armada SOCs
+> were temporarily chosen, leaving room for improvements.
+> 
+> This commit updates the thresholds for the Armada XP SOCs with values
+> that positively impact performances:
+> 
+>                                 without patch  with patch   vendor kernel
+>  - iperf localhost (gbit/sec)   ~3.7           ~6.4         ~5.4
+>  - ioping tmpfs (iops)          ~163k          ~206k        ~179k
+>  - ioping tmpfs (mib/s)         ~636           ~805         ~699
+> 
+> The idle power consumption is negatively impacted (proportionally less
+> than the performance gain), and we are still performing better than
+> the vendor kernel here:
+> 
+>                                 without patch   with patch  vendor kernel
+>  - power consumption idle (W)   ~2.4            ~3.2        ~4.4
+>  - power consumption busy (W)   ~8.6            ~8.3        ~8.6
+> 
+> There is still room for improvement regarding the value of these
+> thresholds, they were chosen to mimic the vendor kernel.
+> 
+> This patch only impacts Armada XP SOCs and was tested on Online Labs
+> C1 boards. A similar approach can be taken to improve the performances
+> of the Armada 370 and Armada 38x SOCs.
+> 
+> Thanks a lot to Thomas Petazzoni, Gregory Clement and Willy Tarreau
+> for the discussions and tips around this topic.
+
+Thanks for your work and all the test you have done. As you mentioned
+there should be still room for improvement, but this patch is already
+a step in the good direction. So you can add my:
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+While this driver is related to mvebu SoCs, it is not part of the mvebu subsystem
+but of the PM subsystem and should be taken by its maintainers. I added them
+in copy as well as the pm list.
+
+Daniel and Rafael,
+if you didn't get the original email I can bounced if needed. I also wonder
+it it would worth applying it on the stable branch. What do you think about it?
+
+Thanks,
+
+Gregory
+
+
+
+> 
+> Signed-off-by: Sebastien Rannou <mxs@sbrk.org>
+> ---
+>  drivers/cpuidle/cpuidle-mvebu-v7.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
+> index 38e6861..3716a1f 100644
+> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
+> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
+> @@ -50,17 +50,17 @@ static struct cpuidle_driver armadaxp_idle_driver = {
+>  	.states[0]		= ARM_CPUIDLE_WFI_STATE,
+>  	.states[1]		= {
+>  		.enter			= mvebu_v7_enter_idle,
+> -		.exit_latency		= 10,
+> +		.exit_latency		= 100,
+>  		.power_usage		= 50,
+> -		.target_residency	= 100,
+> +		.target_residency	= 1000,
+>  		.name			= "MV CPU IDLE",
+>  		.desc			= "CPU power down",
+>  	},
+>  	.states[2]		= {
+>  		.enter			= mvebu_v7_enter_idle,
+> -		.exit_latency		= 100,
+> +		.exit_latency		= 1000,
+>  		.power_usage		= 5,
+> -		.target_residency	= 1000,
+> +		.target_residency	= 10000,
+>  		.flags			= MVEBU_V7_FLAG_DEEP_IDLE,
+>  		.name			= "MV CPU DEEP IDLE",
+>  		.desc			= "CPU and L2 Fabric power down",
+> 
+
+
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
