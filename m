@@ -1,43 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Feb 2015 16:11:45 -0800
-Subject: [PATCH v5 0/7] irqchip: Move OMAP{4,5}/DRA7 to use stacked domains
-In-Reply-To: <20150223230205.GJ32521@atomide.com>
-References: <1424713459-6824-1-git-send-email-marc.zyngier@arm.com>
- <20150223230205.GJ32521@atomide.com>
-Message-ID: <20150224001145.GK32521@atomide.com>
+From: vincent.stehle@laposte.net (=?UTF-8?q?Vincent=20Stehl=C3=A9?=)
+Date: Tue, 24 Feb 2015 01:20:21 +0100
+Subject: [PATCH v3 linux-next] iommu: Enable LPAE pagetable on ARM and ARM64
+ only
+In-Reply-To: <3203874.zEMjzr0PS0@avalon>
+References: <3203874.zEMjzr0PS0@avalon>
+Message-ID: <1424737221-1193-1-git-send-email-vincent.stehle@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150223 15:10]:
-> * Marc Zyngier <marc.zyngier@arm.com> [150223 09:48]:
-> > This series is extracted from [4], which is trying to remove all
-> > traces of gic_arch_extn from the tree. As some maintainers are more
-> > responsive than others (understatement of the year...), I've decided
-> > to split it per sub-arch, and get it moving, at least partially.
-> > 
-> > This series addresses OMAP{4,5} by converting the WUGEN to stacked
-> > domains. The DRA7 crossbar gets the same treatment.
-> > 
-> > It is worth realizing that:
-> > 
-> > - I haven't been able to test this as much as I would have wanted to
-> >   (it's only been tested on omap4 and omap5).
-> > 
-> > - This actively *breaks* existing setups. Once you boot a new kernel
-> >   with an old DT, suspend/resume *will* be broken. Old kernels on a
-> >   new DT won't even boot! You've been warned. This really outline the
-> >   necessity of actually describing the HW in device trees...
-> 
-> Could we parse still the old binding and produce warning for the
-> case when a new kernel is booted with the old DT? That would make
-> it easier for people to debug what's going on.
+LPAE iommu page table makes sense only for ARM and ARM64 architectures. Add the
+corresponding dependency in Kconfig (and enable for COMPILE_TEST, too, as per
+Laurent's suggestion).
 
-Other than that, this series seems to behave for me. Please feel
-free to add Acked-by: Tony Lindgren <tony@atomide.com>. It Looks
-like this series should be applied into an immutable branch
-against v4.0-rc1 that I can pull in as needed to avoid merge
-conflicts with the dts files.
+Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
+Suggested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
 
-Regards,
 
-Tony
+On 02/24/2015 01:02 AM, Laurent Pinchart wrote:
+> Shouldn't this be ARM || ARM64 || COMPILE_TEST ?
+
+Hi Laurent,
+
+It makes perfect sense; thanks. I completely forgot, as I have yet to see one
+of those. Here is v3 of the patch.
+
+Best regards,
+
+V.
+
+
+Changes since v2:
+- Add condition on ARM64
+
+Changes since v1:
+- Add condition on COMPILE_TEST
+
+
+ drivers/iommu/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index baa0d97..a440922 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -22,6 +22,7 @@ config IOMMU_IO_PGTABLE
+ 
+ config IOMMU_IO_PGTABLE_LPAE
+ 	bool "ARMv7/v8 Long Descriptor Format"
++	depends on ARM || ARM64 || COMPILE_TEST
+ 	select IOMMU_IO_PGTABLE
+ 	help
+ 	  Enable support for the ARM long descriptor pagetable format.
+-- 
+2.1.4
