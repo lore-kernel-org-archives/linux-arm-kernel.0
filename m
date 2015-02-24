@@ -1,58 +1,44 @@
-From: torfl6749@gmail.com (Torsten Fleischer)
-Date: Tue, 24 Feb 2015 13:26:20 +0100
-Subject: [PATCH 1/1] spi: atmel: Fix interrupt setup for PDC transfers
-Message-ID: <CANZ4BrSBnE78Z8WeNvRhEZRdxKMhToxpwcSvf0cLpZLJxGA78Q@mail.gmail.com>
+From: rsahu@apm.com (Rameshwar Prasad Sahu)
+Date: Tue, 24 Feb 2015 18:23:56 +0530
+Subject: [PATCH v6 0/3] dmaengine: APM X-Gene SoC DMA engine driver support
+Message-ID: <1424782439-31485-1-git-send-email-rsahu@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Additionally to the current DMA transfer the PDC allows to set up a next DMA
-transfer. This is useful for larger SPI transfers.
+This patch set implements the APM X-Gene SoC DMA driver
+support to offload the DMA operations such as memory copy(memcpy),
+scatter gather memory copy.
 
-The driver currently waits for ENDRX as end of the transfer. But ENDRX is set
-when the current DMA transfer is done (RCR = 0), i.e. it doesn't include the
-next DMA transfer.
-Thus a subsequent SPI transfer could be started although there is currently a
-transfer in progress. This can cause invalid accesses to the SPI slave devices
-and to SPI transfer errors.
+v6 changes:
+	1. Maintained sw queue for pending, running, and completed
+	   requests. Used link list as queue.
+	2. Fixed issue_pending and tx_submit routines.
+	3. Fixed prep_dma routines.
+	4. Fixed free_irqs.
 
-This issue has been observed on a hardware with a M25P128 SPI NOR flash.
+v5 changes:
+	1. Minor changes in coding style.
+	2. Added DMA_CTRL_ACK flag initialization
+v4 changes:
+	1. Fixed dma-ranges property on DTS.
 
-So instead of ENDRX we should wait for RXBUFF. This flag is set if there is
-no more DMA transfer in progress (RCR = RNCR = 0).
-
-Signed-off-by: Torsten Fleischer <torfl6749@gmail.com>
+Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+Signed-off-by: Loc Ho <lho@apm.com>
 ---
- drivers/spi/spi-atmel.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 9af7841..06de340 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -764,17 +764,17 @@ static void atmel_spi_pdc_next_xfer(struct
-spi_master *master,
-  (unsigned long long)xfer->rx_dma);
-  }
+Rameshwar Prasad Sahu (3):
+  dmaengine: Add support for APM X-Gene SoC DMA engine driver
+  arm64: dts: Add APM X-Gene DMA device and DMA clock DTS nodes
+  Documentation: dma: Add APM X-Gene SoC DMA engine driver documentation
 
-- /* REVISIT: We're waiting for ENDRX before we start the next
-+ /* REVISIT: We're waiting for RXBUFF before we start the next
-  * transfer because we need to handle some difficult timing
-- * issues otherwise. If we wait for ENDTX in one transfer and
-- * then starts waiting for ENDRX in the next, it's difficult
-- * to tell the difference between the ENDRX interrupt we're
-- * actually waiting for and the ENDRX interrupt of the
-+ * issues otherwise. If we wait for TXBUFE in one transfer and
-+ * then starts waiting for RXBUFF in the next, it's difficult
-+ * to tell the difference between the RXBUFF interrupt we're
-+ * actually waiting for and the RXBUFF interrupt of the
-  * previous transfer.
-  *
-  * It should be doable, though. Just not now...
-  */
-- spi_writel(as, IER, SPI_BIT(ENDRX) | SPI_BIT(OVRES));
-+ spi_writel(as, IER, SPI_BIT(RXBUFF) | SPI_BIT(OVRES));
-  spi_writel(as, PTCR, SPI_BIT(TXTEN) | SPI_BIT(RXTEN));
- }
+ .../devicetree/bindings/dma/apm-xgene-dma.txt      |   49 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |   26 +
+ drivers/dma/Kconfig                                |    8 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/xgene-dma.c                            | 1738 ++++++++++++++++++++
+ 5 files changed, 1822 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
+ create mode 100755 drivers/dma/xgene-dma.c
 
--- 
-2.1.4
+--
+1.8.2.1
