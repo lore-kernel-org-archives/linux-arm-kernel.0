@@ -1,67 +1,68 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 24 Feb 2015 15:54:07 +0100
-Subject: [PATCH] clockevents: Add (missing) default case for switch blocks
-In-Reply-To: <54EC5C69.2010909@linaro.org>
-References: <20150220093659.GA23469@gmail.com>
- <20150220113753.GP5029@twins.programming.kicks-ass.net>
- <20150220114136.GA27483@gmail.com>
- <CAKohpokmCof2P8Un+i5eOS3BQhH_pMNATH4xkbbhw5TqJFEy9Q@mail.gmail.com>
- <20150220132220.GB28882@gmail.com>
- <CAKohpokEV7EatQROgzQBWPRPFEn8OsMo5EHa+q1FMwBESwiU3w@mail.gmail.com>
- <20150220140432.GA31928@gmail.com>
- <CAKohponv=aR7Ae_z7zbnDDeJ-mCFwdxB3wR-O4boBeMKYdUJLA@mail.gmail.com>
- <20150223163706.GA12551@gmail.com> <54EC5C69.2010909@linaro.org>
-Message-ID: <20150224145407.GA26609@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 24 Feb 2015 08:54:01 -0600
+Subject: MUSB dual-role on AM335x behaving weirdly
+In-Reply-To: <20150224103911.GR25269@lukather>
+References: <20150121160631.GH4367@lukather>
+ <CADYTM3b40_u4Twt27PBVH4dC9ErDnFEi0AUzs_aJRM3mMHaBCQ@mail.gmail.com>
+ <54C0A8C9.3040201@visionsystems.de>
+ <20150205132142.GD2079@lukather> <20150224103911.GR25269@lukather>
+Message-ID: <20150224145401.GH29829@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-* viresh kumar <viresh.kumar@linaro.org> wrote:
-
-> On Monday 23 February 2015 10:07 PM, Ingo Molnar wrote:>
-> > * Viresh Kumar <viresh.kumar@linaro.org> wrote:
+On Tue, Feb 24, 2015 at 11:39:11AM +0100, Maxime Ripard wrote:
+> On Thu, Feb 05, 2015 at 02:21:42PM +0100, Maxime Ripard wrote:
+> > Hi,
+> > 
+> > On Thu, Jan 22, 2015 at 08:37:45AM +0100, Yegor Yefremov wrote:
+> > > I have the same experience with 3.15. The switching is working when
+> > > CONFIG_USB_MUSB_DUAL_ROLE is set and dr_mode = "otg". But since 3.16
+> > > it seems to be broken. Still had no time to bisect this.
+> > 
+> > I've been giving a few versions (from v3.15 to Tuesday's linux-next) a
+> > try, and I always see the same behaviour now:
+> > 
+> >   - Booting as a gadget (ie, with a USB cable plugged in), and
+> >     swapping the cable for a (real, this time) USB OTG cable with a
+> >     USB key never works. When the device is plugged, all I get is
+> > 
+> > [  262.944846] usb 1-1: new high-speed USB device number 2 using musb-hdrc
+> > [  278.064748] usb 1-1: device descriptor read/64, error -110
+> > 
+> >     Putting in back in gadget results with a load of continuous:
+> > [  315.258839] musb_bus_suspend 2484: trying to suspend as a_wait_vfall while active
+> > 
+> >   - Booting as a host, or with nothing connected to it actually work,
+> >     up to a few plug-a-device-then-plug-a-host cycles, where you end
+> >     up with the following logs when disconnecting the device (somehow,
+> >     it always happens when it is set in host mode).
+> > 
+> > [   12.969075] CAUTION: musb: Babble Interrupt Occurred
+> > [   12.974445] CAUTION: musb: Babble Interrupt Occurred
+> > [   12.979637] musb_stage0_irq 789: unhandled DISCONNECT transition (a_wait_bcon)
+> > [   12.988498] usb 1-1: USB disconnect, device number 2
+> > [   13.071849] musb-hdrc musb-hdrc.0.auto: Restarting MUSB to recover from Babble
+> > 
+> >     Plugging back our USB cable, with the AM335x acting as a device
+> >     work once. Then, when it switches to the host mode, we end up with
+> >     the same scenario than in the coldplug as gadget case: USB read
+> >     error, before then having all the a_wait_vfall messages.
 > 
-> > Ok, could we rename it to something like DETACHED?
-> >
-> > 'UNUSED' really gives me the wrong impression - it's what
-> > we do for unused fields, unused ABI enumertion constants,
-> > etc.
-> 
-> Sure.
-> 
-> >>> Also, I'd suggest to rename all 'modes' to true state
-> >>> machine naming: STATE_INITIALIZED, STATE_SHUT_DOWN,
-> >>> STATE_PERIODIC, STATE_RESUMED, etc.: if these are enums
-> >>> for
-> >>
-> >> I thought so initially and it looked like the diff will
-> >> be huge as all the variables for the enum, i.e. 'mode',
-> >> need to be renamed to 'state'..
-> >>
-> >> But, if you are okay with it then I would be happy to do
-> >> that..
-> >
-> > Well, how does the diffstat look like?
-> >
-> > But if the conversion was scripted (i.e. is relatively
-> > secure from typos) then that's still fine IMO. Peter?
-> 
-> Here is the diff:
+> Guys, any ideas/hints?
 
-And here's the diffstat:
+which platform are you using ? I guess the only way to move here would
+be to bisect between 3.15 and 3.16 to find the offending commit.
 
- arch/arm/common/bL_switcher.c |    8 +--
- include/linux/clockchips.h    |   48 ++++++++++++------
- kernel/time/clockevents.c     |  109 ++++++++++++++++++++++++------------------
- kernel/time/tick-broadcast.c  |   22 ++++----
- kernel/time/tick-common.c     |    9 +--
- kernel/time/tick-internal.h   |    1 
- kernel/time/tick-oneshot.c    |    6 +-
- kernel/time/timer_list.c      |   16 +++---
- 8 files changed, 129 insertions(+), 90 deletions(-)
+cheers
 
-Not too bad I think.
-
-Thanks,
-
-	Ingo
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150224/2214b21b/attachment.sig>
