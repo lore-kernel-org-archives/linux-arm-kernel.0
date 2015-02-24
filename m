@@ -1,59 +1,80 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 24 Feb 2015 13:17:39 +0000
-Subject: [PATCH 0/4] arm-cci400: PMU monitoring support on ARM64
-Message-ID: <1424783863-9894-1-git-send-email-suzuki.poulose@arm.com>
+Date: Tue, 24 Feb 2015 13:17:43 +0000
+Subject: [PATCH 4/4] arm-cci: Fix CCI PMU event validation
+In-Reply-To: <1424783863-9894-1-git-send-email-suzuki.poulose@arm.com>
+References: <1424783863-9894-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1424783863-9894-5-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-This series enables the PMU monitoring support for CCI400 on ARM64.
-The existing CCI400 driver code is a mix of PMU driver and the MCPM
-driver code. The MCPM driver is only used on ARM(32) and contains
-arm32 assembly and hence can't be built on ARM64. This patch splits
-the code to
+We mask the event with the CCI_PMU_EVENT_MASK, before passing
+the config to pmu_validate_hw_event(), which causes extra bits
+to be ignored and qualifies an invalid event code as valid.
 
- - ARM_CCI400_MCPM driver - depends on ARM && V7
- - ARM_CCI400_PMU driver
+e.g,
+ $ perf stat -a -C 0 -e CCI_400/config=0x1ff,name=cycles/ sleep 1
+   Performance counter stats for 'system wide':
 
-Accessing the Peripheral ID2 register(PID2) on CCI-400, to detect
-the revision of the chipset, is a secure operation. Hence, it prevents
-us from running this on non-secure platforms. The issue is overcome by
-explicitly mentioning the revision number of the CCI PMU in the device tree
-binding. The device-tree binding has been updated with the new bindings.
+         506951142      cycles
 
-i.e,	arm-cci-400-pmu,r0 => revision 0
-	arm-cci-400-pmu,r1 => revision 1
-	arm-cci-400-pmu => (old) DEPRECATED
+       1.013879626 seconds time elapsed
 
-The old binding has been DEPRECATED and must be used only on ARM32
-system with secure access. We don't have a reliable dynamic way to detect
-if the system is running secure. This series tries to use the best safe
-method by relying on the availability of MCPM(as it was prior to the series).
-It is upto the MCPM platform driver to decide, if the system is secure before
-it goes ahead and registers its drivers and pokes the CCI. This series doesn't
-address/solve the problem of MCPM. I will be happy to use a better approach,
-if there is any.
+where, cycles has an event coding of 0xff. This patch also removes
+the unnecessary 'event' mask in pmu_write_register, since the config_base
+is set by the pmu code after the event is validated.
 
-Tested on (non-secure)TC2 and Juno.
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+ drivers/bus/arm-cci.c |   10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-Suzuki K. Poulose (4):
-  arm-cci: Rearrange code for splitting PMU vs driver code
-  arm-cci: Get rid of secure transactions for PMU driver
-  arm-cci: Split the code for PMU vs driver support
-  arm-cci: Fix CCI PMU event validation
-
- Documentation/devicetree/bindings/arm/cci.txt |    7 +-
- arch/arm/include/asm/arm-cci.h                |   42 +++
- arch/arm/mach-exynos/Kconfig                  |    2 +-
- arch/arm/mach-vexpress/Kconfig                |    4 +-
- arch/arm64/include/asm/arm-cci.h              |   27 ++
- drivers/bus/Kconfig                           |   28 +-
- drivers/bus/arm-cci.c                         |  483 ++++++++++++++-----------
- include/linux/arm-cci.h                       |    9 +-
- 8 files changed, 383 insertions(+), 219 deletions(-)
- create mode 100644 arch/arm/include/asm/arm-cci.h
- create mode 100644 arch/arm64/include/asm/arm-cci.h
-
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index 7e330fe..b0ee582 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -191,11 +191,14 @@ static int pmu_is_valid_master_event(u8 ev_code)
+ 		ev_code <= pmu->model->event_ranges[CCI_IF_MASTER].max;
+ }
+ 
+-static int pmu_validate_hw_event(u8 hw_event)
++static int pmu_validate_hw_event(u32 hw_event)
+ {
+ 	u8 ev_source = CCI_PMU_EVENT_SOURCE(hw_event);
+ 	u8 ev_code = CCI_PMU_EVENT_CODE(hw_event);
+ 
++	if (hw_event & ~CCI_PMU_EVENT_MASK)
++		return -ENOENT;
++
+ 	switch (ev_source) {
+ 	case CCI_PORT_S0:
+ 	case CCI_PORT_S1:
+@@ -265,7 +268,6 @@ static void pmu_enable_counter(int idx)
+ 
+ static void pmu_set_event(int idx, unsigned long event)
+ {
+-	event &= CCI_PMU_EVENT_MASK;
+ 	pmu_write_register(event, idx, CCI_PMU_EVT_SEL);
+ }
+ 
+@@ -282,7 +284,7 @@ static int pmu_get_event_idx(struct cci_pmu_hw_events *hw, struct perf_event *ev
+ {
+ 	struct cci_pmu *cci_pmu = to_cci_pmu(event->pmu);
+ 	struct hw_perf_event *hw_event = &event->hw;
+-	unsigned long cci_event = hw_event->config_base & CCI_PMU_EVENT_MASK;
++	unsigned long cci_event = hw_event->config_base;
+ 	int idx;
+ 
+ 	if (cci_event == CCI_PMU_CYCLES) {
+@@ -303,7 +305,7 @@ static int pmu_get_event_idx(struct cci_pmu_hw_events *hw, struct perf_event *ev
+ static int pmu_map_event(struct perf_event *event)
+ {
+ 	int mapping;
+-	u8 config = event->attr.config & CCI_PMU_EVENT_MASK;
++	u32 config = event->attr.config;
+ 
+ 	if (event->attr.type < PERF_TYPE_MAX)
+ 		return -ENOENT;
 -- 
 1.7.9.5
