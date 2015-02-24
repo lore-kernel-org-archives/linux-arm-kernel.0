@@ -1,20 +1,20 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 24 Feb 2015 08:32:08 -0800
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 24 Feb 2015 16:43:56 +0000
 Subject: [PATCH] arm64: Fix text patching logic when using fixmap
 In-Reply-To: <1424795421-26630-1-git-send-email-marc.zyngier@arm.com>
 References: <1424795421-26630-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAGXu5jKCecC1e5r6ba+zL9mR37d+CudXLXLBP+o7_Kv9yDDUTQ@mail.gmail.com>
+Message-ID: <20150224164356.GU9714@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 24, 2015 at 8:30 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+On Tue, Feb 24, 2015 at 04:30:21PM +0000, Marc Zyngier wrote:
 > Patch 2f896d586610 ("arm64: use fixmap for text patching") changed
 > the way we patch the kernel text, using a fixmap when the kernel or
 > modules are flagged as read only.
->
+> 
 > Unfortunately, a flaw in the logic makes it fall over when patching
 > modules without CONFIG_DEBUG_SET_MODULE_RONX enabled:
->
+> 
 > [...]
 > [   32.032636] Call trace:
 > [   32.032716] [<fffffe00003da0dc>] __copy_to_user+0x2c/0x60
@@ -27,20 +27,20 @@ On Tue, Feb 24, 2015 at 8:30 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 > [   32.033882] [<fffffe0000135148>] load_module+0xbb8/0xfc4
 > [   32.034044] [<fffffe0000135714>] SyS_finit_module+0x94/0xc4
 > [...]
->
+> 
 > This is triggered by the use of virt_to_page() on a module address,
 > which ends to pointing to Nowhereland if you're lucky, or corrupt
 > your precious data if not.
->
+> 
 > This patch fixes the logic by mimicking what is done on arm:
 > - If we're patching a module and CONFIG_DEBUG_SET_MODULE_RONX is set,
 >   use vmalloc_to_page().
 > - If we're patching the kernel and CONFIG_DEBUG_RODATA is set,
 >   use virt_to_page().
 > - Otherwise, use the provided address, as we can write to it directly.
->
+> 
 > Tested on 4.0-rc1 as a KVM guest.
->
+> 
 > Reported-by: Richard W.M. Jones <rjones@redhat.com>
 > Cc: Kees Cook <keescook@chromium.org>
 > Cc: Mark Rutland <mark.rutland@arm.com>
@@ -49,38 +49,33 @@ On Tue, Feb 24, 2015 at 8:30 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 > Cc: Will Deacon <will.deacon@arm.com>
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Good catch! Looks fine to me.
+This makes sense to me:
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
--Kees
+Mark.
 
 > ---
 >  arch/arm64/kernel/insn.c | 4 +++-
 >  1 file changed, 3 insertions(+), 1 deletion(-)
->
+> 
 > diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
 > index 27d4864..c8eca88 100644
 > --- a/arch/arm64/kernel/insn.c
 > +++ b/arch/arm64/kernel/insn.c
 > @@ -87,8 +87,10 @@ static void __kprobes *patch_map(void *addr, int fixmap)
->
->         if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
->                 page = vmalloc_to_page(addr);
-> -       else
-> +       else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
->                 page = virt_to_page(addr);
-> +       else
-> +               return addr;
->
->         BUG_ON(!page);
->         set_fixmap(fixmap, page_to_phys(page));
-> --
+>  
+>  	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
+>  		page = vmalloc_to_page(addr);
+> -	else
+> +	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
+>  		page = virt_to_page(addr);
+> +	else
+> +		return addr;
+>  
+>  	BUG_ON(!page);
+>  	set_fixmap(fixmap, page_to_phys(page));
+> -- 
 > 2.1.4
->
-
-
-
--- 
-Kees Cook
-Chrome OS Security
+> 
+> 
