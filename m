@@ -1,32 +1,43 @@
-From: ideal.song@samsung.com (Inha Song)
-Date: Tue, 24 Feb 2015 18:31:55 +0900
-Subject: [PATCH] ARM: dts: Add the source clock for CLKOUT register as xusbxti
-Message-ID: <1424770315-4725-1-git-send-email-ideal.song@samsung.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 24 Feb 2015 10:38:47 +0100
+Subject: [PATCH] ARM: rockchip: Constify struct regmap_config and staticize
+ local function
+Message-ID: <1424770727-5396-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the CLKOUT register source clock as xusbxti in
-PMU (Power Management Unit) dt node on Exynos3250.
+The regmap_config struct may be const because it is not modified by the
+driver and regmap_init() accepts pointer to const.
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Signed-off-by: Inha Song <ideal.song@samsung.com>
+Make function rockchip_get_core_reset() static because it is not used
+outside of the platsmp.c file.
+
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos3250.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/mach-rockchip/platsmp.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index 277b48b..aa1eb8c 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -130,6 +130,9 @@
- 		pmu_system_controller: system-controller at 10020000 {
- 			compatible = "samsung,exynos3250-pmu", "syscon";
- 			reg = <0x10020000 0x4000>;
-+			#clock-cells = <1>;
-+			clock-names = "clkout9";
-+			clocks = <&xusbxti>;
- 		};
+diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
+index f26fcdca2445..5b4ca3c3c879 100644
+--- a/arch/arm/mach-rockchip/platsmp.c
++++ b/arch/arm/mach-rockchip/platsmp.c
+@@ -55,7 +55,7 @@ static int pmu_power_domain_is_on(int pd)
+ 	return !(val & BIT(pd));
+ }
  
- 		mipi_phy: video-phy at 10020710 {
+-struct reset_control *rockchip_get_core_reset(int cpu)
++static struct reset_control *rockchip_get_core_reset(int cpu)
+ {
+ 	struct device *dev = get_cpu_device(cpu);
+ 	struct device_node *np;
+@@ -201,7 +201,7 @@ static int __init rockchip_smp_prepare_sram(struct device_node *node)
+ 	return 0;
+ }
+ 
+-static struct regmap_config rockchip_pmu_regmap_config = {
++static const struct regmap_config rockchip_pmu_regmap_config = {
+ 	.reg_bits = 32,
+ 	.val_bits = 32,
+ 	.reg_stride = 4,
 -- 
-2.0.0.390.gcb682f8
+1.9.1
