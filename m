@@ -1,67 +1,31 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 24 Feb 2015 10:10:12 -0700
-Subject: [PATCH] ARM: vexpress: update CONFIG_USB_ISP1760 option
-In-Reply-To: <54EC9611.2040403@arm.com>
-References: <1424790150-8450-1-git-send-email-sudeep.holla@arm.com>
- <CANLsYkySc5yDjozMRHB4V5qT_8B5W+swt5Gv--KvgQngiQAvCA@mail.gmail.com>
- <54EC9611.2040403@arm.com>
-Message-ID: <CANLsYkx3B1PD_RTUPZBNASULOXXOXNnKScbt-JFpKyeWbOC_Yg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 24 Feb 2015 09:15:46 -0800
+Subject: [PATCH 0/2] fix ehrpwm tbclk data on am33xx and am43xx
+In-Reply-To: <1423546542-29664-1-git-send-email-vigneshr@ti.com>
+References: <1423546542-29664-1-git-send-email-vigneshr@ti.com>
+Message-ID: <20150224171546.GB28244@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 February 2015 at 08:17, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 24/02/15 15:08, Mathieu Poirier wrote:
->>
->> On 24 February 2015 at 08:02, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>
->>> Commt 7ef077a8ad35 ("usb: isp1760: Move driver from drivers/usb/host/
->>> to drivers/usb/isp1760/") moved the isp1760 driver and changed the
->>> Kconfig option. This makes CONFIG_USB_ISP1760_HCD not selectable
->>> directly anymore. This results in driver being not compiled in when
->>> using vexpress_defconfig and the USB is non-functional.
->>>
->>> This patch updates the CONFIG_USB_ISP1760_HCD to CONFIG_USB_ISP1760 to
->>> get back USB functional on vexpress platforms.
->>>
->>> Cc: Liviu Dudau <liviu.dudau@arm.com>
->>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>> ---
->>>   arch/arm/configs/vexpress_defconfig | 2 +-
->>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/configs/vexpress_defconfig
->>> b/arch/arm/configs/vexpress_defconfig
->>> index f489fdaa19b8..37fe607a4ede 100644
->>> --- a/arch/arm/configs/vexpress_defconfig
->>> +++ b/arch/arm/configs/vexpress_defconfig
->>> @@ -118,8 +118,8 @@ CONFIG_HID_ZEROPLUS=y
->>>   CONFIG_USB=y
->>>   CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
->>>   CONFIG_USB_MON=y
->>> -CONFIG_USB_ISP1760_HCD=y
->>>   CONFIG_USB_STORAGE=y
->>> +CONFIG_USB_ISP1760=y
->>>   CONFIG_MMC=y
->>>   CONFIG_MMC_ARMMMCI=y
->>>   CONFIG_NEW_LEDS=y
->>> --
->>> 1.9.1
->>
->>
->> I tested this change and confirm that it does indeed re-activate USB
->> functionality.
->
->
-> Thanks indeed. So I assume we can add
->
-> Tested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+* Vignesh R <vigneshr@ti.com> [150209 22:43]:
+> In am33xx and am43xx, ehrpwm tbclk is derived from functional clock of
+> PWMSS. The schematics and TRMs show that there is only one input clock to
+> the PWMSS. But currently, tbclk is wrongly shown to be deriving from
+> dpll_per_m2_ck instead of functional clock l4ls_gclk in the DT.
+> 
+> Fixing ehrpwm tbclk data to reflect the right clk source.
+> Tested on beaglebone and am437x-gp-evm.
+> 
+> Vignesh R (2):
+>   ARM: dts: am33xx-clocks: Fix ehrpwm tbclk data on am33xx
+>   ARM: dts: am43xx-clocks: Fix ehrpwm tbclk data on am43xx
+> 
+>  arch/arm/boot/dts/am33xx-clocks.dtsi |  6 +++---
+>  arch/arm/boot/dts/am43xx-clocks.dtsi | 12 ++++++------
+>  2 files changed, 9 insertions(+), 9 deletions(-)
 
-You sure can.
+Tero, care to check this one too and ack if OK?
 
->
-> Regards,
-> Sudeep
->
+Thanks,
+
+Tony
