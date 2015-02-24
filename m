@@ -1,36 +1,58 @@
-From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
-Date: Tue, 24 Feb 2015 13:22:41 +0100
-Subject: [PATCHv3 0/8] devfreq: Add generic exynos memory-bus
- frequency driver
-In-Reply-To: <473523680.35451424740978095.JavaMail.weblogic@epmlwas05a>
-References: <473523680.35451424740978095.JavaMail.weblogic@epmlwas05a>
-Message-ID: <3d11219e3af0d964bd6396c6be320276@math.uni-bielefeld.de>
+From: torfl6749@gmail.com (Torsten Fleischer)
+Date: Tue, 24 Feb 2015 13:26:20 +0100
+Subject: [PATCH 1/1] spi: atmel: Fix interrupt setup for PDC transfers
+Message-ID: <CANZ4BrSBnE78Z8WeNvRhEZRdxKMhToxpwcSvf0cLpZLJxGA78Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello MyungJoo!
+Additionally to the current DMA transfer the PDC allows to set up a next DMA
+transfer. This is useful for larger SPI transfers.
 
-On 2015-02-24 02:22, MyungJoo Ham wrote:
-> Unless you are willing to wait for 2 minutes after the kernal hangs,
-> you may want to adjust "DEFAULT_HUNG_TASK_TIMEOUT" to shorter value
-> (120 --> 5 for 5 seconds). It seems that you've cut it off in the 
-> middle
-> of that "120 sec" wait.
-Thanks for the hint! Yes, I should probably adjust this value when
-doing more tests.
+The driver currently waits for ENDRX as end of the transfer. But ENDRX is set
+when the current DMA transfer is done (RCR = 0), i.e. it doesn't include the
+next DMA transfer.
+Thus a subsequent SPI transfer could be started although there is currently a
+transfer in progress. This can cause invalid accesses to the SPI slave devices
+and to SPI transfer errors.
 
+This issue has been observed on a hardware with a M25P128 SPI NOR flash.
 
-> If it's in D state (in kernel), gdb won't work as you are experiencing.
-> Sorry for not testing with HDMI; my Exynos devices do not have HDMI. :)
-Well, like I said above, the HDMI doesn't seen to be affected by the low
-MIF/INT clocks. I have tested this with 1280x720 here on my Odroid X2,
-but I also have another user (with a U3 if I remember correctly) who
-also confirms that HDMI is working in combination with devfreq and
-simple_ondemand.
+So instead of ENDRX we should wait for RXBUFF. This flag is set if there is
+no more DMA transfer in progress (RCR = RNCR = 0).
 
-I guess it's just the G2D engine that doesn't like the low clocks. Maybe
-it also affects the IPP subsystem, but I have no means to test this.
+Signed-off-by: Torsten Fleischer <torfl6749@gmail.com>
+---
+ drivers/spi/spi-atmel.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 9af7841..06de340 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -764,17 +764,17 @@ static void atmel_spi_pdc_next_xfer(struct
+spi_master *master,
+  (unsigned long long)xfer->rx_dma);
+  }
 
-With best wishes,
-Tobias
+- /* REVISIT: We're waiting for ENDRX before we start the next
++ /* REVISIT: We're waiting for RXBUFF before we start the next
+  * transfer because we need to handle some difficult timing
+- * issues otherwise. If we wait for ENDTX in one transfer and
+- * then starts waiting for ENDRX in the next, it's difficult
+- * to tell the difference between the ENDRX interrupt we're
+- * actually waiting for and the ENDRX interrupt of the
++ * issues otherwise. If we wait for TXBUFE in one transfer and
++ * then starts waiting for RXBUFF in the next, it's difficult
++ * to tell the difference between the RXBUFF interrupt we're
++ * actually waiting for and the RXBUFF interrupt of the
+  * previous transfer.
+  *
+  * It should be doable, though. Just not now...
+  */
+- spi_writel(as, IER, SPI_BIT(ENDRX) | SPI_BIT(OVRES));
++ spi_writel(as, IER, SPI_BIT(RXBUFF) | SPI_BIT(OVRES));
+  spi_writel(as, PTCR, SPI_BIT(TXTEN) | SPI_BIT(RXTEN));
+ }
+
+-- 
+2.1.4
