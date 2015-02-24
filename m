@@ -1,65 +1,66 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Tue, 24 Feb 2015 14:53:34 -0400
-Subject: [PATCH 1/2] thermal: exynos: Fix wrong control of power down
- detection mode for Exynos7
-In-Reply-To: <1424753815-15113-2-git-send-email-cw00.choi@samsung.com>
-References: <1424753815-15113-1-git-send-email-cw00.choi@samsung.com>
- <1424753815-15113-2-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20150224185333.GF3448@developer.amazonguestwifi.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 24 Feb 2015 19:56:52 +0100 (CET)
+Subject: [PATCH 2/2] leds/pwm: Don't disable pwm when setting brightness
+ to 0
+In-Reply-To: <1423734290-19750-3-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1423734290-19750-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1423734290-19750-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1151818200.134325.1424804213026.JavaMail.open-xchange@oxbsltgw03.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 24, 2015 at 01:56:54PM +0900, Chanwoo Choi wrote:
-> This patch fixes the wrong control of PD_DET_EN (power down detection mode)
-> for Exynos7 because exynos7_tmu_control() always enables the power down detection
-> mode regardless 'on' parameter.
-> 
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: Eduardo Valentin <edubezval@gmail.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Hi Uwe,
 
-Lukasz,
-
-Any objections to this code?
-
-BR,
-
-Eduardo Valentin
-
+> Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> hat am 12. Februar 2015 um
+> 10:44 geschrieben:
+>
+>
+> This fixes disabling the LED on i.MX28. The PWM hardware delays using
+> the newly set pwm-config until the beginning of a new period. It's very
+> likely that pwm_disable is called before the current period ends. In
+> case the LED was on brightness=max before the LED stays on because in
+> the disabled PWM block the period never ends.
+>
+> Also only call pwm_enable only once in the probe call back and the
+> matching pwm_disable in .remove(). Moreover the pwm is explicitly
+> initialized to off.
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > ---
->  drivers/thermal/samsung/exynos_tmu.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-> index 933cd80..a60f527 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.c
-> +++ b/drivers/thermal/samsung/exynos_tmu.c
-> @@ -682,6 +682,7 @@ static void exynos7_tmu_control(struct platform_device *pdev, bool on)
->  
->  	if (on) {
->  		con |= (1 << EXYNOS_TMU_CORE_EN_SHIFT);
-> +		con |= (1 << EXYNOS7_PD_DET_EN_SHIFT);
->  		interrupt_en =
->  			(of_thermal_is_trip_valid(tz, 7)
->  			<< EXYNOS7_TMU_INTEN_RISE7_SHIFT) |
-> @@ -704,9 +705,9 @@ static void exynos7_tmu_control(struct platform_device *pdev, bool on)
->  			interrupt_en << EXYNOS_TMU_INTEN_FALL0_SHIFT;
->  	} else {
->  		con &= ~(1 << EXYNOS_TMU_CORE_EN_SHIFT);
-> +		con &= ~(1 << EXYNOS7_PD_DET_EN_SHIFT);
->  		interrupt_en = 0; /* Disable all interrupts */
->  	}
-> -	con |= 1 << EXYNOS7_PD_DET_EN_SHIFT;
->  
->  	writel(interrupt_en, data->base + EXYNOS7_TMU_REG_INTEN);
->  	writel(con, data->base + EXYNOS_TMU_REG_CONTROL);
-> -- 
-> 1.8.5.5
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150224/bb0c2606/attachment.sig>
+> drivers/leds/leds-pwm.c | 10 +++++-----
+> 1 file changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
+> index f668500a2157..5dae0d2dc3dc 100644
+> --- a/drivers/leds/leds-pwm.c
+> +++ b/drivers/leds/leds-pwm.c
+> @@ -44,11 +44,6 @@ static void __led_pwm_set(struct led_pwm_data *led_dat)
+> int new_duty = led_dat->duty;
+>
+> pwm_config(led_dat->pwm, new_duty, led_dat->period);
+> -
+> - if (new_duty == 0)
+> - pwm_disable(led_dat->pwm);
+> - else
+> - pwm_enable(led_dat->pwm);
+> }
+>
+> static void led_pwm_work(struct work_struct *work)
+> @@ -93,6 +88,7 @@ static void led_pwm_cleanup(struct led_pwm_priv *priv)
+> led_classdev_unregister(&priv->leds[priv->num_leds].cdev);
+> if (priv->leds[priv->num_leds].can_sleep)
+> cancel_work_sync(&priv->leds[priv->num_leds].work);
+> + pwm_disable(priv->leds[i].pwm);
+> }
+> }
+>
+
+After replacing "i" with "priv->num_leds" in this patch we are able to use pwm
+led with trigger heartbeat.
+
+This is the functional part of this issue, since the warning has been fixed [1]
+
+Thanks Stefan
+
+[1] -
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/244925.html
