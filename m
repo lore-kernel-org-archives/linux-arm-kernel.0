@@ -1,44 +1,65 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Feb 2015 22:40:55 +0900
-Subject: [PATCH 1/1] spi: atmel: Fix interrupt setup for PDC transfers
-In-Reply-To: <CANZ4BrSBnE78Z8WeNvRhEZRdxKMhToxpwcSvf0cLpZLJxGA78Q@mail.gmail.com>
-References: <CANZ4BrSBnE78Z8WeNvRhEZRdxKMhToxpwcSvf0cLpZLJxGA78Q@mail.gmail.com>
-Message-ID: <20150224134055.GG6236@finisterre.sirena.org.uk>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 24 Feb 2015 22:01:26 +0800
+Subject: [PATCH 2/4] i2c: sunxi: Add Reduced Serial Bus (RSB) DT bindings
+ documentation
+In-Reply-To: <9851276.8ZCd3XfZle@wuerfel>
+References: <1424773744-15106-1-git-send-email-wens@csie.org>
+ <1424773744-15106-3-git-send-email-wens@csie.org> <9851276.8ZCd3XfZle@wuerfel>
+Message-ID: <CAGb2v66ru6Yurt1CFn-zocAuqen8GWSm8y9dHRf=-OOcc-DR7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 24, 2015 at 01:26:20PM +0100, Torsten Fleischer wrote:
+On Tue, Feb 24, 2015 at 6:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 24 February 2015 18:29:02 Chen-Yu Tsai wrote:
+>>
+>> +       rsb at 01f03400 {
+>> +               compatible = "allwinner,sun8i-a23-rsb";
+>> +               reg = <0x01f03400 0x400>;
+>> +               interrupts = <0 39 4>;
+>> +               clocks = <&apb0_gates 3>;
+>> +               clock-frequency = <3000000>;
+>> +               resets = <&apb0_rst 3>;
+>> +
+>> +               axp223: pmic at 2d {
+>> +                       compatible = "x-powers,axp223", "x-powers,axp221";
+>> +                       reg = <0x2d>;
+>> +                       allwinner,rsb-hw-addr = <0x3e3>;
+>> +
+>> +                       /* ... */
+>> +               };
+>> +       };
+>
+> The child node cannot have a 'reg' property if the parent does not
+> have #address-cells/#size-cells. You should add these as mandatory
+> properties in the list.
 
-> spi_master *master,
->   (unsigned long long)xfer->rx_dma);
->   }
-> 
-> - /* REVISIT: We're waiting for ENDRX before we start the next
-> + /* REVISIT: We're waiting for RXBUFF before we start the next
->   * transfer because we need to handle some difficult timing
-> - * issues otherwise. If we wait for ENDTX in one transfer and
-> - * then starts waiting for ENDRX in the next, it's difficult
-> - * to tell the difference between the ENDRX interrupt we're
-> - * actually waiting for and the ENDRX interrupt of the
-> + * issues otherwise. If we wait for TXBUFE in one transfer and
-> + * then starts waiting for RXBUFF in the next, it's difficult
-> + * to tell the difference between the RXBUFF interrupt we're
-> + * actually waiting for and the RXBUFF interrupt of the
->   * previous transfer.
->   *
->   * It should be doable, though. Just not now...
->   */
-> - spi_writel(as, IER, SPI_BIT(ENDRX) | SPI_BIT(OVRES));
-> + spi_writel(as, IER, SPI_BIT(RXBUFF) | SPI_BIT(OVRES));
->   spi_writel(as, PTCR, SPI_BIT(TXTEN) | SPI_BIT(RXTEN));
->  }
+Oops. I'll add them. A few of the other i2c bindings seem to be missing
+it as well. Probably why I missed it.
 
-It looks like your mail program has corrupted the patch and turned all
-tabs into spaces...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150224/a6f2fe26/attachment.sig>
+> I don't really understand the need for having two addresses (runtime
+> and hardware). Could the runtime address be configured at runtime?
+
+You can, though the driver doesn't support this. I don't think the
+I2C subsystem allows arbitrary device insertion during normal
+operation, but maybe i2c-dev? I've tried using different addresses
+for devices so they do get changed during the probe phase, just
+to be sure that the code works, and it's not just sitting at
+the address the bootloader used.
+
+In any case, the distinction is more like burnt-in or hardwired
+addresses vs software configurable addresses.
+
+> Alternatively, could you use #address-cells=<2> and put both into
+> 'reg'?
+
+I sort of looked into it, and it seems the I2C subsystem won't mind
+the extra address cell. Maxime also asked whether we could use 2
+addresses, possibly with a reg-names property. Using 2 cells is simpler
+though.
+
+I'm open to other options, but I'd like to get some input, especially
+from the device tree maintainers, before I change it.
+
+
+Regards,
+ChenYu
