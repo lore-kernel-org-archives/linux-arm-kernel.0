@@ -1,23 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Feb 2015 10:48:57 +0100
+Date: Tue, 24 Feb 2015 10:50:47 +0100
 Subject: [PATCH v4 2/8] arm64: dts: exynos: Add dts files for 64-bit
  Exynos5433 SoC
-In-Reply-To: <54EC3BB1.1020701@samsung.com>
+In-Reply-To: <54EC3DE7.7070306@samsung.com>
 References: <1424755011-15999-1-git-send-email-cw00.choi@samsung.com>
- <7139111.LGA4lhSjob@wuerfel> <54EC3BB1.1020701@samsung.com>
-Message-ID: <7412525.l6YnQcTxtg@wuerfel>
+ <19309272.tlWX2xvTnx@wuerfel> <54EC3DE7.7070306@samsung.com>
+Message-ID: <5937606.zM91rlE7sS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 February 2015 17:52:01 Chanwoo Choi wrote:
+On Tuesday 24 February 2015 18:01:27 Chanwoo Choi wrote:
+> On 02/24/2015 05:33 PM, Arnd Bergmann wrote:
+> > On Tuesday 24 February 2015 14:16:45 Chanwoo Choi wrote:
+> >> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC based on
+> >> Octal core CPUs (quad Cortex-A57 and quad Cortex-A53). And Exynos5433 supports
+> >> PSCI (Power State Coordination Interface) v0.1.
+> >>
+> >> This patch includes following dt node to support Exynos5433 SoC:
+> >> 1. Octa core for big.LITTLE architecture
+> >> - Cortex-A53 LITTLE Quad-core
+> >> - Cortex-A57 big Quad-core
+> >> - Support PSCI v0.1
+> > 
+> > Should we try to come up with a way to better share parts of this with the
+> > exynos5 dtsi files you already have in arm32? I suspect that there is a
+> > significant overlap.
 > 
-> But, I have a question.
-> If we put the aliases into the board dts file instaed of SoC dtsi,
-> each board dts file may use the different alias name about same phandle.
+> Currently, 32-bit Exynos5 SoC (which is included in arch/arm/boot/dts)
+> didn't support the Cortex-A53/A57 and PSCI.
+> 
+> The 32-bit Exynos5 SoC support the Coretex-A7 or A15 and big.LITTLE Exynos5 SoC
+> use the MCPM (Multi-Cluster PM) driver for secondary cpu on/off instead of PSCI.
+> 
 
-Yes, that is the idea. In particular with the uarts, the intention is
-that the numbering of the device nodes in /dev is the same that is
-printed on the board (if any), which may be different from the numbering
-internal to the SoC.
+Yes, I understand that. What I meant is sharing the nodes that are identical
+between e.g. all exynos54xx by using a common .dtsi file that can be included
+by 5420, 5433 and 5440.
 
-	Arnd 
+	Arnd
