@@ -1,52 +1,61 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 24 Feb 2015 18:58:05 +0100
-Subject: [PATCH] ARM64: Add new Xilinx ZynqMP SoC
-In-Reply-To: <CAL_JsqJVdZMwweta=N-P-d=C6JNsXk0BsGcrexe2yDPm7c5pfg@mail.gmail.com>
-References: <8ac3037c175711dec0adcd0d898be7d9722e0ed0.1424764548.git.michal.simek@xilinx.com>
- <CAL_JsqKkVHaf_U0nU9nqa2q5XwfsuCu-ZWVEHx6b5Mv9Hgen1Q@mail.gmail.com>
- <9bffa4683bd6478993de6bea1d3027af@BN1AFFO11FD048.protection.gbl>
- <CAL_JsqJVdZMwweta=N-P-d=C6JNsXk0BsGcrexe2yDPm7c5pfg@mail.gmail.com>
-Message-ID: <06cd583c99d44a989be62cdc2dea2ffd@BN1BFFO11FD046.protection.gbl>
+From: rjones@redhat.com (Richard W.M. Jones)
+Date: Tue, 24 Feb 2015 17:59:50 +0000
+Subject: [PATCH] arm64: annotate psci invoke functions as notrace
+In-Reply-To: <20150218172638.GB1772@redacted.bos.redhat.com>
+References: <20150218172638.GB1772@redacted.bos.redhat.com>
+Message-ID: <20150224175950.GA28145@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/2015 05:29 PM, Rob Herring wrote:
-> On Tue, Feb 24, 2015 at 8:58 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->> On 02/24/2015 03:42 PM, Rob Herring wrote:
->>> On Tue, Feb 24, 2015 at 1:56 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->>>> Initial version of device tree for Xilinx ZynqMP SoC.
->>>>
->>>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->>>> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
->>>> ---
->>>
->>> [...]
->>>
->>>> +               gic: interrupt-controller at f9010000 {
->>>> +                       compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
->>>
->>> gic-400, right?
->>
->> yep
->>
->>>
->>>> +                       #interrupt-cells = <3>;
->>>> +                       reg = <0x0 0xf9010000 0x10000>,
->>>> +                             <0x0 0xf9020000 0x20000>,
->>>> +                             <0x0 0xf9040000 0x20000>,
->>>> +                             <0x0 0xf9060000 0x20000>;
->>>
->>> These addresses are wrong if you are doing address swizzling to do 64K
->>> offsets. We don't really have an answer yet as to what is the right
->>> way. See the XGene GIC discussion[1].
->>
->> Is this better for GICC?
->> <0x0 0xf902f000 0x2000>
+On Wed, Feb 18, 2015 at 12:26:38PM -0500, Kyle McMartin wrote:
+> Using GCC 5 to build the kernel with ftrace enabled, we encounter the
+> following error as a result of the mcount prologue changing the expected
+> register use of the function parameters,
 > 
-> Yes, and the VCPU interface needs this as well. As far as sizes, we're
-> still discussing that.
+> /tmp/cc8Kpn7A.s: Assembler messages:
+> /tmp/cc8Kpn7A.s:41: Error: .err encountered
+> /tmp/cc8Kpn7A.s:42: Error: .err encountered
+> /tmp/cc8Kpn7A.s:43: Error: .err encountered
+> /tmp/cc8Kpn7A.s:101: Error: .err encountered
+> /tmp/cc8Kpn7A.s:102: Error: .err encountered
+> /tmp/cc8Kpn7A.s:103: Error: .err encountered
+> scripts/Makefile.build:257: recipe for target 'arch/arm64/kernel/psci.o' failed
+> 
+> Fix this by annotating the function as notrace, to suppress the
+> generation of profiling prologues and epilogues on the function.
+> 
+> Signed-off-by: Kyle McMartin <kyle@redhat.com>
+> 
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -113,7 +113,7 @@ static void psci_power_state_unpack(u32 power_state,
+>   * The following two functions are invoked via the invoke_psci_fn pointer
+>   * and will not be inlined, allowing us to piggyback on the AAPCS.
+>   */
+> -static noinline int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
+> +static noinline notrace int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
+>  					 u64 arg2)
+>  {
+>  	asm volatile(
+> @@ -128,7 +128,7 @@ static noinline int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
+>  	return function_id;
+>  }
+>  
+> -static noinline int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1,
+> +static noinline notrace int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1,
+>  					 u64 arg2)
+>  {
+>  	asm volatile(
 
-ok. Will test and fix. What about the rest of DT description?
+I need this patch in order to compile the upstream kernel on aarch64
+using gcc 5.  Can it not be added temporarily while the longer term
+fix, whatever that is, is worked out?
 
-Thanks,
-Michal
+Rich.
+
+-- 
+Richard Jones, Virtualization Group, Red Hat http://people.redhat.com/~rjones
+Read my programming and virtualization blog: http://rwmj.wordpress.com
+Fedora Windows cross-compiler. Compile Windows programs, test, and
+build Windows installers. Over 100 libraries supported.
+http://fedoraproject.org/wiki/MinGW
