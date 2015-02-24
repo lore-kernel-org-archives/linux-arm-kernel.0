@@ -1,62 +1,102 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 24 Feb 2015 17:42:59 +0000
-Subject: [PATCH v3 0/4] clk: st: New always-on clock domain
-In-Reply-To: <1424799222-9301-1-git-send-email-lee.jones@linaro.org>
-References: <1424799222-9301-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150224174259.GD21323@x1>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 24 Feb 2015 17:47:19 +0000
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <20150224145529.GA5498@hawk.usersys.redhat.com>
+References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150219165731.GA26965@hawk.usersys.redhat.com>
+ <CAKv+Gu8Je3RRrgEFCZ7JUWtOgk3WqA_qdBEOPAMc3OqnKr1bwg@mail.gmail.com>
+ <20150219175518.GB26965@hawk.usersys.redhat.com>
+ <54E62404.9040702@redhat.com>
+ <20150220142905.GA10942@hawk.usersys.redhat.com>
+ <CAKv+Gu-YUzmnACZQi98OPRgKKL+gAGqwWYq2-_dwCdNqcktNUg@mail.gmail.com>
+ <20150220153626.GB10942@hawk.usersys.redhat.com>
+ <20150224145529.GA5498@hawk.usersys.redhat.com>
+Message-ID: <CAKv+Gu-Uk2wg1OkoWgQe4da_EiFoEz_u8VuD8Ees6qU1UYMDvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Feb 2015, Lee Jones wrote:
+On 24 February 2015 at 14:55, Andrew Jones <drjones@redhat.com> wrote:
+> On Fri, Feb 20, 2015 at 04:36:26PM +0100, Andrew Jones wrote:
+>> On Fri, Feb 20, 2015 at 02:37:25PM +0000, Ard Biesheuvel wrote:
+>> > On 20 February 2015 at 14:29, Andrew Jones <drjones@redhat.com> wrote:
+>> > > So looks like the 3 orders of magnitude greater number of traps
+>> > > (only to el2) don't impact kernel compiles.
+>> > >
+>> >
+>> > OK, good! That was what I was hoping for, obviously.
+>> >
+>> > > Then I thought I'd be able to quick measure the number of cycles
+>> > > a trap to el2 takes with this kvm-unit-tests test
+>> > >
+>> > > int main(void)
+>> > > {
+>> > >         unsigned long start, end;
+>> > >         unsigned int sctlr;
+>> > >
+>> > >         asm volatile(
+>> > >         "       mrs %0, sctlr_el1\n"
+>> > >         "       msr pmcr_el0, %1\n"
+>> > >         : "=&r" (sctlr) : "r" (5));
+>> > >
+>> > >         asm volatile(
+>> > >         "       mrs %0, pmccntr_el0\n"
+>> > >         "       msr sctlr_el1, %2\n"
+>> > >         "       mrs %1, pmccntr_el0\n"
+>> > >         : "=&r" (start), "=&r" (end) : "r" (sctlr));
+>> > >
+>> > >         printf("%llx\n", end - start);
+>> > >         return 0;
+>> > > }
+>> > >
+>> > > after applying this patch to kvm
+>> > >
+>> > > diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+>> > > index bb91b6fc63861..5de39d740aa58 100644
+>> > > --- a/arch/arm64/kvm/hyp.S
+>> > > +++ b/arch/arm64/kvm/hyp.S
+>> > > @@ -770,7 +770,7 @@
+>> > >
+>> > >         mrs     x2, mdcr_el2
+>> > >         and     x2, x2, #MDCR_EL2_HPMN_MASK
+>> > > -       orr     x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
+>> > > +//     orr     x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
+>> > >         orr     x2, x2, #(MDCR_EL2_TDRA | MDCR_EL2_TDOSA)
+>> > >
+>> > >         // Check for KVM_ARM64_DEBUG_DIRTY, and set debug to trap
+>> > >
+>> > > But I get zero for the cycle count. Not sure what I'm missing.
+>> > >
+>> >
+>> > No clue tbh. Does the counter work as expected in the host?
+>> >
+>>
+>> Guess not. I dropped the test into a module_init and inserted
+>> it on the host. Always get zero for pmccntr_el0 reads. Or, if
+>> I set it to something non-zero with a write, then I always get
+>> that back - no increments. pmcr_el0 looks OK... I had forgotten
+>> to set bit 31 of pmcntenset_el0, but doing that still doesn't
+>> help. Anyway, I assume the problem is me. I'll keep looking to
+>> see what I'm missing.
+>>
+>
+> I returned to this and see that the problem was indeed me. I needed yet
+> another enable bit set (the filter register needed to be instructed to
+> count cycles while in el2). I've attached the code for the curious.
+> The numbers are mean=6999, std_dev=242. Run on the host, or in a guest
+> running on a host without this patch series (after TVM traps have been
+> disabled), I get a pretty consistent 40.
+>
+> I checked how many vm-sysreg traps we do during the kernel compile
+> benchmark. It's 124924. So it's a bit strange that we don't see the
+> benchmark taking 10 to 20 seconds longer on average. I should probably
+> double check my runs. In any case, while I like the approach of this
+> series, the overhead is looking non-negligible.
+>
 
-> v2 => v3:
->   - Ensure DT actually reflects h/w
->     - i.e. Nodes should not contain a mishmash of different IP
->       blocks, but should identify related h/w.  In the current
->       example we use interconnects
->   - Change naming from clkdomain to clk-always-on
->   - Place "do not abuse" warning in documentation
-> 
-> v1 => v2:
->   - Turned the ST specific driver into a generic one
->   
-> Hardware can have a bunch of clocks which must not be turned off.
-> If drivers a) fail to obtain a reference to any of these or b) give
-> up a previously obtained reference during suspend, the common clk
-> framework will attempt to turn them off and the hardware will
-> subsequently die.  The only way to recover from this failure is to
-> restart.
->   
-> To avoid either of these two scenarios from catastrophically
-> disabling the running system we have implemented a clock domain
-> where clocks are consumed and references are taken, thus preventing
-> them from being shut down by the framework.
-> 
-> *** BLURB HERE ***
-
-*grumble*, that's annoying, as I removed this.
-
-I guess Git caches the patches before sending them.
-
-> Lee Jones (4):
->   ARM: sti: stih407-family: Supply defines for CLOCKGEN A0
->   ARM: sti: stih407-family: Add platform interconnects to always-on clk
->     domain
->   clk: Provide an always-on clock domain framework
->   clk: dt: Introduce always-on clock domain documentation
-> 
->  .../devicetree/bindings/clock/clk-always-on.txt    | 35 ++++++++++++
->  arch/arm/boot/dts/stih407-family.dtsi              | 15 ++++++
->  drivers/clk/Makefile                               |  1 +
->  drivers/clk/clk-always-on.c                        | 62 ++++++++++++++++++++++
->  include/dt-bindings/clock/stih407-clks.h           |  4 ++
->  5 files changed, 117 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/clk-always-on.txt
->  create mode 100644 drivers/clk/clk-always-on.c
-> 
+Thanks a lot for producing these numbers. 125k x 7k == <1 billion
+cycles == <1 second on a >1 GHz machine, I think?
+Or am I missing something? How long does the actual compile take?
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Ard.
