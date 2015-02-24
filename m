@@ -1,32 +1,56 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 24 Feb 2015 15:25:24 +0100
-Subject: [RFC 02/11] i2c: add quirk checks to core
-In-Reply-To: <20150112120814.GE12302@n2100.arm.linux.org.uk>
-References: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
- <1420824103-24169-3-git-send-email-wsa@the-dreams.de>
- <20150112120814.GE12302@n2100.arm.linux.org.uk>
-Message-ID: <20150224142524.GB18301@katana>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 Feb 2015 14:25:57 +0000
+Subject: [PATCH 4/6] dmaengine: omap-dma: Take DMA request number from DT
+ if it is available
+In-Reply-To: <1424787683-19151-5-git-send-email-peter.ujfalusi@ti.com>
+References: <1424787683-19151-1-git-send-email-peter.ujfalusi@ti.com>
+ <1424787683-19151-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20150224142557.GH8670@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 12:08:14PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Jan 09, 2015 at 06:21:32PM +0100, Wolfram Sang wrote:
-> > +static int i2c_quirk_error(struct i2c_adapter *adap, struct i2c_msg *msg, char *err_msg)
-> > +{
-> > +	dev_err(&adap->dev, "quirk: %s (addr 0x%04x, size %u)\n", err_msg, msg->addr, msg->len);
-> > +	return -EOPNOTSUPP;
-> > +}
+On Tue, Feb 24, 2015 at 04:21:21PM +0200, Peter Ujfalusi wrote:
+> Use the dma-requests property from DT to get the number of DMA requests.
+> In case of legacy boot or failure to find the property, use the default
+> 127 as number of requests.
 > 
-> So, what happens if I open an I2C adapter, find a message which causes
-> i2c_quirk_error() to be called, and then spin repeatedly calling that...
-> Shouldn't there be some rate limiting to this?
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  drivers/dma/omap-dma.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+> index 56c33e93dd24..7def31c919f4 100644
+> --- a/drivers/dma/omap-dma.c
+> +++ b/drivers/dma/omap-dma.c
+> @@ -34,6 +34,7 @@ struct omap_dmadev {
+>  	const struct omap_dma_reg *reg_map;
+>  	struct omap_system_dma_plat_info *plat;
+>  	bool legacy;
+> +	unsigned dma_requests;
+>  	spinlock_t irq_lock;
+>  	uint32_t irq_enable_mask;
+>  	struct omap_chan *lch_map[OMAP_SDMA_CHANNELS];
+> @@ -1118,7 +1119,15 @@ static int omap_dma_probe(struct platform_device *pdev)
+>  
+>  	tasklet_init(&od->task, omap_dma_sched, (unsigned long)od);
+>  
+> -	for (i = 0; i < OMAP_SDMA_REQUESTS; i++) {
+> +	if (!pdev->dev.of_node || of_property_read_u32(pdev->dev.of_node,
+> +						       "dma-requests",
+> +						       &od->dma_requests)) {
+> +		dev_info(&pdev->dev,
+> +			 "DMA request lines not specified, using 127\n");
+> +		od->dma_requests = 127;
 
-Can be argued. Changed to dev_err_ratelimited(). Thanks!
+What happened to OMAP_SDMA_REQUESTS?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150224/018d94c3/attachment.sig>
+If you're not going to use OMAP_SDMA_REQUESTS, then don't add it.  If
+you are going to use it, please also change the dev_info() line to use
+that macro too.
+
+Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
