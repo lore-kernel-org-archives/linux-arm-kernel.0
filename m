@@ -1,55 +1,43 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 24 Feb 2015 02:02:57 +0200
-Subject: [PATCH v2 linux-next] iommu: Enable LPAE pagetable on ARM only
-In-Reply-To: <4372575.Lr7FssDpKu@avalon>
-References: <2868840.GyWYJOzqWH@avalon>
- <1424735721-32313-1-git-send-email-vincent.stehle@laposte.net>
- <4372575.Lr7FssDpKu@avalon>
-Message-ID: <3203874.zEMjzr0PS0@avalon>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 24 Feb 2015 01:26:05 +0100
+Subject: [PATCH] genirq: better describe IRQF_NO_SUSPEND semantics
+In-Reply-To: <1424444026-31231-1-git-send-email-mark.rutland@arm.com>
+References: <1424444026-31231-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <3607139.EdDhxoz0si@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
-
-On Tuesday 24 February 2015 01:58:17 Laurent Pinchart wrote:
-> On Tuesday 24 February 2015 00:55:21 Vincent Stehl? wrote:
-> > LPAE iommu page table makes sense only for ARM architecture. Add the
-> > corresponding dependency in Kconfig (and enable for COMPILE_TEST, too, as
-> > per Laurent's suggestion).
-> > 
-> > Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
-> > Suggested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
+On Friday, February 20, 2015 02:53:46 PM Mark Rutland wrote:
+> The IRQF_NO_SUSPEND flag is intended to be used for interrupts required
+> to be enabled during the suspend-resume cycle. This mostly consists of
+> IPIs and timer interrupts, potentially including chained irqchip
+> interrupts if these are necessary to handle timers or IPIs. If an
+> interrupt does not fall into one of the aforementioned categories,
+> requesting it with IRQF_NO_SUSPEND is likely incorrect.
 > 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Using IRQF_NO_SUSPEND does not guarantee that the interrupt can wake the
+> system from a suspended state. For an interrupt to be able to trigger a
+> wakeup, it may be necessary to program various components of the system.
+> In these cases it is necessary to use {enable,disabled}_irq_wake.
+> 
+> Unfortunately, several drivers assume that IRQF_NO_SUSPEND ensures that
+> an IRQ can wake up the system, and the documentation can be read
+> ambiguously w.r.t. this property.
+> 
+> This patch updates the documentation regarding IRQF_NO_SUSPEND to make
+> this caveat explicit, hopefully making future misuse rarer. Cleanup of
+> existing misuse will occur as part of later patch series.
+> 
+> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Cc: Ian Campbell <ian.campbell@citrix.com>
+> Cc: Jonathan Corbet <corbet@lwn.net>
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 
-And I of course spoke too soon :-/
+Applied to linux-pm.git/linux-next, thanks!
 
-> > ---
-> > 
-> > Changes since v1:
-> > - Add condition on COMPILE_TEST
-> > 
-> >  drivers/iommu/Kconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> > index baa0d97..27cd88d 100644
-> > --- a/drivers/iommu/Kconfig
-> > +++ b/drivers/iommu/Kconfig
-> > @@ -22,6 +22,7 @@ config IOMMU_IO_PGTABLE
-> > 
-> >  config IOMMU_IO_PGTABLE_LPAE
-> >  	bool "ARMv7/v8 Long Descriptor Format"
-> > +	depends on ARM || COMPILE_TEST
+Peter, please let me know if you don't want this to go it.
 
-Shouldn't this be ARM || ARM64 || COMPILE_TEST ?
-
-> >  	select IOMMU_IO_PGTABLE
-> >  	help
-> >  	  Enable support for the ARM long descriptor pagetable format.
-
--- 
-Regards,
-
-Laurent Pinchart
+Rafael
