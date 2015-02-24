@@ -1,32 +1,43 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 23 Feb 2015 21:25:00 -0300
-Subject: Regression: v4.0-rc1: iMX6: Hummingboard fails due to drivers/clk
- changes
-In-Reply-To: <20150223235350.GS8656@n2100.arm.linux.org.uk>
-References: <20150223223255.GQ8656@n2100.arm.linux.org.uk>
- <CAOMZO5ASkXoVb9KrqF4Us18-rZ7k3XqjSdhcKyO_ParXXHoWbg@mail.gmail.com>
- <20150223235350.GS8656@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5D+pSDEct2ne+7Yurn2Jd-2+ArhgZfWYPO98bRyoEpOrQ@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 24 Feb 2015 02:02:59 +0100
+Subject: [PATCH v4 3/5] irqchip: Add DT binding doc for the virtual irq
+ demuxer chip
+In-Reply-To: <20150220103144.GI13659@leverpostej>
+References: <1422527620-8308-1-git-send-email-boris.brezillon@free-electrons.com>
+ <5225828.OI8hbGqrC4@vostro.rjw.lan> <20150220103144.GI13659@leverpostej>
+Message-ID: <5209097.N5537nGsQV@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 23, 2015 at 8:53 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Friday, February 20, 2015 10:31:44 AM Mark Rutland wrote:
+> [...]
 
-> The reason appears to be a lack of packets coming out of the ethernet.
-> Why that is, I'm not sure (maybe a gated GPIO16 clock to the phy?)
-> Given that the phy state seems frozen - it doesn't detect the cable
-> being disconnected - this seems highly likely.
->
-> Looking at imx6q_1588_init(), this could be a problem:
->
->         ptp_clk = of_clk_get(np, 2);
->         enet_ref = clk_get_sys(NULL, "enet_ref");
->         clksel = ptp_clk == enet_ref ? IMX6Q_GPR1_ENET_CLK_SEL_ANATOP :
->                                        IMX6Q_GPR1_ENET_CLK_SEL_PAD;
->
-> since ptp_clk and enet_ref will _never_ be the same pointer.  Forcing
-> that test to be always true fixes the problem.
+[cut]
+ 
+> Given all of the above I'll go back to the IRQF_SHARED_TIMER_OK approach
+> you proposed, along with documentation updates and comments at usage
+> sites to make it clear when it is valid to use.
+> 
+> Thank you for bearing with me so far.
 
-You are right. With such change imx6q-hummingboard can NFS mount (and
-so does imx6q-sabresd).
+No prob. :-)
+
+Actually, there's one more approach possible.  Thomas might not like it, but
+here it goes anyway for consideration.
+
+What about making it possible to provide a special irqaction to be called
+while suspended for the shared IRQF_NO_SUSPEND interrupts.
+
+Say we have a "suspended_action" pointer in struct irq_desc in addition to
+"action" and we swap them in suspend_device_irq() if desc->no_suspend_depth is
+nonzero and "suspended_action" is not NULL (and then back in resume_irq()).
+Then, the platform might supply "suspended_action" that will do the right
+thing for the IRQ.
+
+So the requirement would be to have "suspended_action" set to start with
+and then the WARN_ON() in irq_pm_install_action() may check if that is present
+and only trigger the warning if it isn't.
+
+Thoughs?
+
+Rafael
