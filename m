@@ -1,29 +1,28 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Tue, 24 Feb 2015 09:56:14 +0000
-Subject: [PATCH 1/7] Add die_spin_lock_{irqsave,irqrestore}
-In-Reply-To: <20150224064107.GB15387@gmail.com>
-References: <1424748634-9153-1-git-send-email-anton@samba.org>
- <1424748634-9153-2-git-send-email-anton@samba.org>
- <20150224064107.GB15387@gmail.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D1CAE9BD3@AcuExch.aculab.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 24 Feb 2015 09:57:25 +0000
+Subject: [PATCH v5 0/7] irqchip: Move OMAP{4,
+ 5}/DRA7 to use stacked domains
+In-Reply-To: <CAJydem=O0S0dKL6pOvm79bNYinDcFVhQE0qUW43Qhvfo7voqtA@mail.gmail.com>
+References: <1424713459-6824-1-git-send-email-marc.zyngier@arm.com>
+ <20150223230205.GJ32521@atomide.com> <20150224001145.GK32521@atomide.com>
+ <CAJydem=O0S0dKL6pOvm79bNYinDcFVhQE0qUW43Qhvfo7voqtA@mail.gmail.com>
+Message-ID: <54EC4B05.6020000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ingo Molnar
-...
-> So why not trylock and time out here after a few seconds,
-> instead of indefinitely supressing some potentially vital
-> output due to some other CPU crashing/locking with the lock
-> held?
+On 24/02/15 03:45, Subramaniam Chanderashekarapuram wrote:
+> 
+> Tested this on  DRA7 for smp_affinity. Needs these minor fixes attached.
+> 
+> Note: I do not have a OMAP4/5 with me now. Hope to test that tomorrow.
+> 
+> Log for DRA7 are here:
+> http://pastebin.ubuntu.com/10382176/
 
-I've used that for status requests that usually lock a table
-to get a consistent view.
-If trylock times out assume that the data is actually stable
-and access it anyway. Remember the pid doing the access and
-next time it tries to acquire the same lock do a trylock with
-no timeout.
-That way if (when) there is a locking fubar (or a driver oops
-with a lock held) at least some of the relevant status commands
-will work.
+Looks good to me. I've folded that into the existing series.
 
-	David
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
