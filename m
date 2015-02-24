@@ -1,123 +1,172 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 24 Feb 2015 07:42:33 +0100
-Subject: Ask for help. ARM:mvebu (CM-A510), add sound support using
- TLV320AIC23 audio-codec
-In-Reply-To: <54EB8D34.7040003@gmail.com>
-References: <54EB8D34.7040003@gmail.com>
-Message-ID: <CAPv3WKdbe074TRfrLO11r6Pf6-sd7a9PXZUBVSrJ14TDHK=wBg@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 24 Feb 2015 07:08:40 +0000
+Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
+In-Reply-To: <54EBB3AC.30000@codeaurora.org>
+References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <CAL_Jsq+SeuoojgTpv1y_aPJ_jzDr3HqZhYEBQ3_vYGBHvcccug@mail.gmail.com>
+ <54E78A31.9020306@linaro.org>
+ <CAL_Jsq+mvpRjYfL_8OseTDCB-6aBhwhNKLBQXXJeVQLDwWm8Nw@mail.gmail.com>
+ <20150222143211.GX25269@lukather>
+ <CAL_JsqLqqw5DyUqCaOTSKPwF-Ms5EU4f_OPoW9YVpMCo8A_bbw@mail.gmail.com>
+ <54EBB3AC.30000@codeaurora.org>
+Message-ID: <54EC2378.5040202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriel,
+Thanks Stephen for the comments.
 
-I think that the lack of space in all three input routings can make a
-difference. Please let know if adding it helps.
+On 23/02/15 23:11, Stephen Boyd wrote:
+> On 02/22/15 16:57, Rob Herring wrote:
+>> On Sun, Feb 22, 2015 at 8:32 AM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>>> On Fri, Feb 20, 2015 at 04:01:55PM -0600, Rob Herring wrote:
+>>>> [...]
+>>>>
+>>>>>>> += Data consumers =
+>>>>>>> +
+>>>>>>> +Required properties:
+>>>>>>> +
+>>>>>>> +eeproms: List of phandle and data cell specifier triplet, one triplet
+>>>>>>> +        for each data cell the device might be interested in. The
+>>>>>>> +        triplet consists of the phandle to the eeprom provider, then
+>>>>>>> +        the offset in byte within that storage device, and the length
+>>>>>>> +        in byte of the data we care about.
+>>>>>>
+>>>>>> The problem with this is it assumes you know who the consumer is and
+>>>>>> that it is a DT node. For example, how would you describe a serial
+>>>>>> number?
+>>>>> Correct me if I miss understood.
+>>>>> Is serial number any different?
+>>>>> Am hoping that the eeprom consumer would be aware of offset and size of
+>>>>> serial number in the eeprom
+>>>>>
+>>>>> Cant the consumer do:
+>>>>>
+>>>>> eeprom-consumer {
+>>>>>          eeproms = <&at24 0 4>;
+>>>>>          eeprom-names = "device-serial-number";
+>>>> Yes, but who is "eeprom-consumer"?
+>>> Any device that should lookup values in one of the EEPROM.
+>>>
+>>>> DT nodes generally describe a h/w block, but it this case, the
+>>>> consumer depends on the OS, not the h/w.
+>>> Not really, or at least, not more than any similar binding we
+>>> currently have.
+>>>
+>>> The fact that a MAC-address for the first ethernet chip is stored at a
+>>> given offset in a given eeprom has nothing to do with the OS.
+>> So MAC address would be a valid use to link to a h/w device, but there
+>> are certainly cases that don't correspond to a device.
+>>
+>>>> I'm not saying you can't describe where things are, but I don't
+>>>> think you should imply who is the consumer and doing so is
+>>>> unnecessarily complicated.
+>>> If you only take the case of a serial number, indeed. If you take
+>>> other usage into account, you can't really do without it.
+>>>
+>>>> Also, the layout of EEPROM is likely very much platform specific.
+>>> Indeed, which is why it should be in the DT.
+>> Agreed. I'm not saying the layout should not be.
+>>
+>>>> Some could have a more complex structure perhaps with key ids and
+>>>> linked list structure.
+>>> Then just request the size of the whole list, and parse it afterwards
+>>> in your driver?
+>>>
+>>>> I would do something more simple that is just a list of keys and their
+>>>> location like this:
+>>>>
+>>>> device-serial-number = <start size>;
+>>>> key1 = <start size>;
+>>>> key2 = <start size>;
+>>> I'm sorry, but what's the difference?
+>> It can describe the layout completely whether the fields are tied to a
+>> h/w device or not.
+>>
+>> What I would like to see here is the entire layout described covering
+>> both types of fields.
+>>
+>
+> I was thinking the DT might be like this on the provider side:
+>
+>     qfprom at 1000000 {
+>        reg = <0x1000000 0x1000>;
+>        ranges = <0 0x1000000 0x1000>;
+>        compatible = "qcom,qfprom-msm8960"
+>
+>        pvs-data: pvs-data at 40 {
+>              compatible = "qcom,pvs-a";
 
-Best regards,
-Marcin
+These compatibles could be optional. As it might not be required for 
+devices which are simple and do not require any special interpretation 
+of eeprom data.
 
-2015-02-23 21:27 GMT+01:00 Gabriel Dobato <dobatog@gmail.com>:
-> Hello,
+>              reg = <0x40 0x20>,
+> 	    #eeprom-cells = <0>;
+
+Do we still need eeprom-cells if we are moving to use reg property here?
+
+>        };
 >
-> I am trying to set the sound system using "simple-audio-card" and
-> TLV320AIC23B audio codec in  Compulab CM-510 SoM.
+>         tsens-data: tmdata at 10 {
+>              compatible = "qcom,tsens-data-msm8960";
+>              reg = <0x10 4>, <0x16 4>;
+> 	    #eeprom-cells = <0>;
 >
-> This is my structure in DT, according to
-> ./KERNEL/Documentation/devicetree/bindings/sound/simple-card.txt,
-> /KERNEL/Documentation/devicetree/bindings/sound/widgets.txt and the source
-> code of the audio-codec ./KERNEL/sound/soc/codecs/tlv320aic23.c :
+>        };
 >
->  sound {
->                 compatible = "simple-audio-card";
->                 simple-audio-card,name = "OnboardTLV320AIC23B";
->                 simple-audio-card,format = "i2s";
->                 simple-audio-card,bitclock-master = <&dailink_master>;
->                 simple-audio-card,frame-master = <&dailink_master>;
->                 simple-audio-card,widgets =
->                         "Microphone", "Mic Input",
->                         "Line", "Line Input",
->                         "Line", "Line Out",
->                         "Speaker", "Speaker",
->                         "Headphone", "Headphone Jack";
+>        serial-number: serial at 50 {
+>              compatible = "qcom,serial-msm8960";
+>              reg = <0x50 4>, <0x60 4>;
+> 	    #eeprom-cells = <0>;
 >
->                 simple-audio-card,routing =
->                         "Line Out", "LOUT",
->                         "Line Out", "ROUT",
->                         "Line Out", "RHPOUT",
->                         "Line Out", "LHPOUT",
->                         "LLINEIN","Line Input",
->                         "RLINEIN","Line Input",
->                          "MICIN","Mic Input";
->                 simple-audio-card,cpu {
->                                 sound-dai = <&audio0 0>;
->                         };
->                 dailink_master: simple-audio-card,codec {
->                                 sound-dai = <&opt_audio>;
->                         };
->                 };
-> };
+>        };
+>     };
 >
+> and then on the consumer side:
 >
-> /* TLV320AIC23 */
-> &opt_audio {
->             status = "okay";
->             #sound-dai-cells= <0>;
->  };
+> 	device {
+> 		eeproms = <&serial-number>;
+> 		eeprom-names = "soc-rev-id";
+> 	};
 >
+
+Yes, this looks good, and Sasha was also recommending something on these 
+lines too. Also this addresses the use cases like serial number too.
+
 >
-> And this is the kernel trace:
+> This would solve a problem where the consumer device is some standard
+> off-the-shelf IP block that needs to get some SoC specific calibration
+> data from the eeprom. I may want to interpret the bits differently
+> depending on which eeprom is connected to my SoC. Sometimes that data
+> format may be the same across many variations of the SoC (e.g. the
+> qcom,pvs-a node) or it may be completely different for a given SoC (e.g.
+> qcom,serial-msm8960 node). I imagine for other SoCs out there it could
+> be different depending on which eeprom the board manufacturer decides to
+> wire onto their board and how they choose to program the data.
 >
-> ...
-> tlv320aic23-codec 0-001a: Control not supported for path LLINEIN -> [NULL]
-> -> Line Input
-> tlv320aic23-codec 0-001a: ASoC: no dapm match for LLINEIN --> NULL --> Line
-> Input
-> tlv320aic23-codec 0-001a: ASoC: Failed to add route LLINEIN -> NULL -> Line
-> Input
-> tlv320aic23-codec 0-001a: Control not supported for path RLINEIN -> [NULL]
-> -> Line Input
-> tlv320aic23-codec 0-001a: ASoC: no dapm match for RLINEIN --> NULL --> Line
-> Input
-> tlv320aic23-codec 0-001a: ASoC: Failed to add route RLINEIN -> NULL -> Line
-> Input
-> tlv320aic23-codec 0-001a: Control not supported for path MICIN -> [NULL] ->
-> Mic Input
-> tlv320aic23-codec 0-001a: ASoC: no dapm match for MICIN --> NULL --> Mic
-> Input
-> tlv320aic23-codec 0-001a: ASoC: Failed to add route MICIN -> NULL -> Mic
-> Input
-> usb 2-1.2: new high-speed USB device number 3 using orion-ehci
-> asoc-simple-card sound: tlv320aic23-hifi <-> i2s mapping ok
-> ...
+> So this is where I think the eeprom-cells and offset + length starts to
+> fall apart. It forces us to make up a bunch of different compatible
+> strings for our consumer device just so that we can parse the eeprom
+> that we decided to use for some SoC/board specific data. Instead I'd
+> like to see some framework that expresses exactly which eeprom is on my
+> board and how to interpret the bits in a way that doesn't require me to
+> keep refining the compatible string for my generic IP block.
 >
-> ALSA device list:
->   #0: OnboardTLV320AIC23B
-> ...
+> I worry that if we put all those details in DT we'll end up having to
+> describe individual bits like serial-number-bit-2, serial-number-bit-3,
+> etc. because sometimes these pieces of data are scattered all around the
+> eeprom and aren't contiguous or aligned on a byte boundary. It may be
+> easier to just have a way to express that this is an eeprom with this
+> specific layout and my device has data stored in there. Then the driver
+> can be told what layout it is (via compatible or some other string based
+> means if we're not using DT?) and match that up with some driver data if
+> it needs to know how to understand the bits it can read with the
+> eeprom_read() API.
+Yes this sounds more sensible to let the consumer driver interpret the 
+eeprom data than the eeprom framework itself.
+
+
+--srini
 >
-> [....] Setting up ALSA...amixer: Invalid command!
-> ...
->
->
-> I think I have written the node according to the documentation, but probably
-> I miss something.
-> Anyone has faced a similar problem?
->
->
-> I would really appreciate some kind of help.
->
-> Thank you,
->
-> Gabriel
->
->
->
->
->
->
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
