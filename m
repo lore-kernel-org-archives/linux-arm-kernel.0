@@ -1,60 +1,50 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 24 Feb 2015 18:15:53 +0000
-Subject: [PATCH 0/2] Remove pl011 startup glitches and avoid dummy TX during
- startup
-Message-ID: <1424801755-16242-1-git-send-email-Dave.Martin@arm.com>
+Date: Tue, 24 Feb 2015 18:15:55 +0000
+Subject: [PATCH 2/2] serial/amba-pl011: Leave the TX IRQ alone when the UART
+ is not open
+In-Reply-To: <1424801755-16242-1-git-send-email-Dave.Martin@arm.com>
+References: <1424801755-16242-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1424801755-16242-3-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a major rework of a previously-posted patch [1].
+Getting the TX IRQ re-asserted from scratch can be inefficient in
+some setups.
 
-This addresses a number of overlapping issues:
+This patch avoids clearing the TX IRQ across pl011_shutdown()...
+pl011_startup(), so that if the port is closed and reopened, the
+IRQ will still work afterwards without having to bootstrap it again.
 
- * interaction of the dummy TX in pl011_startup() with hardware that
-   doesn't suppress transmission when in loopback mode, causing
-   glitches / corruption at the receiver;
+The TX IRQ continues to be masked in IMSC when the UART is not in
+use.
 
- * lack of support for loopback mode in the SBSA Generic UART;
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ drivers/tty/serial/amba-pl011.c |    5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
- * issues with the models/simulators that pretend to have an
-   unreasonably high baud rate (making it impossible to fill the
-   FIFO in some situations).
-
-
-The general approach in this series is to remove the dummy TX and
-start in a timer-based polled IO mode instead.  If and when a TX IRQ
-occurs, we switch to interrupt-driven mode for future processing.
-
-If the data written to the UART is a small enough trickle, we may
-never using the TX IRQ, but the UART would not stream constantly in
-any case unless there is enough data being written to stop the FIFO
-ever emptying.
-
-
-I've kept the second patch separate in case someone can think of a
-reason why it might not work...
-
-There is some context overlap with Jorge's probe deferral patch, but
-the merge is straightforward.
-
-
-Tested on ARM Juno and the ARM fast models only for now.
-
-Any review/testing from other folks would be appreciated.
-
-Cheers
-Dave
-
-
-[1] [RFC PATCH] serial: amba-pl011: Kickstart TX by explicit FIFO fill
-    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315248.html
-
-Dave Martin (2):
-  serial/amba-pl011: Activate TX IRQ passively
-  serial/amba-pl011: Leave the TX IRQ alone when the UART is not open
-
- drivers/tty/serial/amba-pl011.c |  164 +++++++++++++++++++++++++++------------
- 1 file changed, 113 insertions(+), 51 deletions(-)
-
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 69910f7..92783fc 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1676,9 +1676,6 @@ static int pl011_startup(struct uart_port *port)
+ 
+ 	writew(uap->vendor->ifls, uap->port.membase + UART011_IFLS);
+ 
+-	/* Assume that TX IRQ doesn't work until we see one: */
+-	uap->tx_irq_seen = 0;
+-
+ 	spin_lock_irq(&uap->port.lock);
+ 
+ 	/* restore RTS and DTR */
+@@ -1742,7 +1739,7 @@ static void pl011_shutdown(struct uart_port *port)
+ 	spin_lock_irq(&uap->port.lock);
+ 	uap->im = 0;
+ 	writew(uap->im, uap->port.membase + UART011_IMSC);
+-	writew(0xffff, uap->port.membase + UART011_ICR);
++	writew(0xffff & ~UART011_TXIS, uap->port.membase + UART011_ICR);
+ 	spin_unlock_irq(&uap->port.lock);
+ 
+ 	pl011_dma_shutdown(uap);
 -- 
 1.7.10.4
