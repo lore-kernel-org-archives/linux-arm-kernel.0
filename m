@@ -1,55 +1,45 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 24 Feb 2015 14:16:48 +0900
-Subject: [PATCH v4 5/8] arm64: dts: exynos: Add PMU dt node for Exynos5433
+Date: Tue, 24 Feb 2015 14:16:50 +0900
+Subject: [PATCH v4 7/8] arm64: dts: exynos: Add ADMA dt node for Exynos5433 SoC
 In-Reply-To: <1424755011-15999-1-git-send-email-cw00.choi@samsung.com>
 References: <1424755011-15999-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1424755011-15999-6-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1424755011-15999-8-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds PMU (Power Management Unit) dt node for Exynos5433 SoC and
-set the source clock for CLKOUT register as xxti .
+From: Inha Song <ideal.song@samsung.com>
+
+This patch adds ADMA (Advanced DMA) device tree node for Exynos5433 SoC.
+In Exynos5433 SoC, ADMA is used for I2S audio interface.
 
 Cc: Kukjin Kim <kgene@kernel.org>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-[ideal.song: Add the setting of CLKOUT register]
 Signed-off-by: Inha Song <ideal.song@samsung.com>
 Acked-by: Inki Dae <inki.dae@samsung.com>
 ---
- Documentation/devicetree/bindings/arm/samsung/pmu.txt | 1 +
- arch/arm64/boot/dts/exynos/exynos5433.dtsi            | 8 ++++++++
- 2 files changed, 9 insertions(+)
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-index 67b2113..a87fc43 100644
---- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-@@ -10,6 +10,7 @@ Properties:
- 		   - "samsung,exynos5260-pmu" - for Exynos5260 SoC.
- 		   - "samsung,exynos5410-pmu" - for Exynos5410 SoC,
- 		   - "samsung,exynos5420-pmu" - for Exynos5420 SoC.
-+		   - "samsung,exynos5433-pmu" - for Exynos5433 SoC.
- 		   - "samsung,exynos7-pmu" - for Exynos7 SoC.
- 		second value must be always "syscon".
- 
 diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index 1b18fd3..84be8e2 100644
+index 1c68d9e..6becaca 100644
 --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
 +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -844,6 +844,14 @@
- 			status = "disabled";
+@@ -462,6 +462,17 @@
+ 				#dma-channels = <8>;
+ 				#dma-requests = <32>;
+ 			};
++
++			adma: adma at 11420000 {
++				compatible = "arm,pl330", "arm,primecell";
++				reg = <0x11420000 0x1000>;
++				interrupts = <0 73 0>;
++				clocks = <&cmu_aud CLK_ACLK_DMAC>;
++				clock-names = "apb_pclk";
++				#dma-cells = <1>;
++				#dma-channels = <8>;
++				#dma-requests = <32>;
++			};
  		};
  
-+		pmu_system_controller: system-controller at 105c0000 {
-+			compatible = "samsung,exynos5433-pmu", "syscon";
-+			reg = <0x105c0000 0x5008>;
-+			#clock-cells = <1>;
-+			clock-names = "clkout16";
-+			clocks = <&xxti>;
-+		};
-+
- 		timer {
- 			compatible = "arm,armv8-timer";
- 			interrupts = <1 13 0xff04>,
+ 		serial_0: serial at 14c10000 {
 -- 
 1.8.5.5
