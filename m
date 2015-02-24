@@ -1,40 +1,57 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 24 Feb 2015 08:16:08 +0100
-Subject: [PATCH] clocksource: mtk: Fix race conditions in probe code
-In-Reply-To: <1424342493-31391-1-git-send-email-matthias.bgg@gmail.com>
-References: <1424342493-31391-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <54EC2538.1070005@linaro.org>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 24 Feb 2015 08:27:19 +0100
+Subject: [PATCH 1/7] Add die_spin_lock_{irqsave,irqrestore}
+In-Reply-To: <20150224064107.GB15387@gmail.com>
+References: <1424748634-9153-1-git-send-email-anton@samba.org>
+ <1424748634-9153-2-git-send-email-anton@samba.org>
+ <20150224064107.GB15387@gmail.com>
+Message-ID: <20150224072719.GB15894@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2015 11:41 AM, Matthias Brugger wrote:
-> We have two race conditions in the probe code which could lead to a null
-> pointer dereference in the interrupt handler.
->
-> The interrupt handler accesses the clockevent device, which may not yet be
-> registered.
->
-> First race condition happens when the interrupt handler gets registered before
-> the interrupts get disabled. The second race condition happens when the
-> interrupts get enabled, but the clockevent device is not yet registered.
->
-> Fix that by disabling the interrupts before we register the interrupt and enable
-> the interrupts after the clockevent device got registered.
->
-> Reported-by: Gongbae Park <yongbae2@gmail.com>
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: stable at vger.kernel.org
-> ---
 
-Applied to my tree as a fix for 3.20.
+* Ingo Molnar <mingo@kernel.org> wrote:
 
-Thanks !
+> 
+> * Anton Blanchard <anton@samba.org> wrote:
+> 
+> > +static arch_spinlock_t die_lock = __ARCH_SPIN_LOCK_UNLOCKED;
+> > +static int die_owner = -1;
+> > +static unsigned int die_nest_count;
+> > +
+> > +unsigned long __die_spin_lock_irqsave(void)
+> > +{
+> > +	unsigned long flags;
+> > +	int cpu;
+> > +
+> > +	/* racy, but better than risking deadlock. */
+> > +	raw_local_irq_save(flags);
+> > +
+> > +	cpu = smp_processor_id();
+> > +	if (!arch_spin_trylock(&die_lock)) {
+> > +		if (cpu != die_owner)
+> > +			arch_spin_lock(&die_lock);
+> 
+> So why not trylock and time out here after a few seconds, 
+> instead of indefinitely supressing some potentially vital 
+> output due to some other CPU crashing/locking with the lock 
+> held?
 
-   -- Daniel
+[...]
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> If we fix the deadlock potential, and get a true global 
+> ordering of various oopses/warnings as they triggered (or 
+> at least timestamping them), [...]
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+If we had a global 'trouble counter' we could use that to 
+refine the spin-looping timeout: instead of using a pure 
+timeout of a few seconds, we could say 'a timeout of a few 
+seconds while the counter does not increase'.
+
+I.e. only override the locking/ordering if the owner CPU 
+does not seem to be able to make progress with printing the 
+oops/warning.
+
+Thanks,
+
+	Ingo
