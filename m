@@ -1,219 +1,469 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 24 Feb 2015 13:17:42 +0000
-Subject: [PATCH 3/4] arm-cci: Split the code for PMU vs driver support
+Date: Tue, 24 Feb 2015 13:17:40 +0000
+Subject: [PATCH 1/4] arm-cci: Rearrange code for splitting PMU vs driver code
 In-Reply-To: <1424783863-9894-1-git-send-email-suzuki.poulose@arm.com>
 References: <1424783863-9894-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1424783863-9894-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1424783863-9894-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-This patch separates the PMU driver code from the low level
-CCI driver code, and enables the CCI400-PMU for ARM64.
+No functional changes, only code re-arrangements for easier split of the
+PMU code vs low level driver code. Extracts the port handling code
+to cci_probe_ports().
 
-Introduces config options for both.
-
- - ARM_CCI400_MCPM	- controls the low level MCPM driver code for CCI
- - ARM_CCI400_PMU	- controls the PMU driver code
- - ARM_CCI400_COMMON	- CCI400 specific details shared by MCPM
-			  and PMU
-Changes:
- - ARM_CCI 		- common code for probing the CCI devices
-
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Abhilash Kesavan <a.kesavan@samsung.com>
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm/mach-exynos/Kconfig   |    2 +-
- arch/arm/mach-vexpress/Kconfig |    4 ++--
- drivers/bus/Kconfig            |   28 +++++++++++++++++++++++-----
- drivers/bus/arm-cci.c          |   25 +++++++++++++++++++++----
- include/linux/arm-cci.h        |    7 ++++++-
- 5 files changed, 53 insertions(+), 13 deletions(-)
+ drivers/bus/arm-cci.c |  330 +++++++++++++++++++++++++------------------------
+ 1 file changed, 168 insertions(+), 162 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 603820e..9bc8b4d 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -123,7 +123,7 @@ config SOC_EXYNOS5800
- config EXYNOS5420_MCPM
- 	bool "Exynos5420 Multi-Cluster PM support"
- 	depends on MCPM && SOC_EXYNOS5420
--	select ARM_CCI
-+	select ARM_CCI400_MCPM
- 	select ARM_CPU_SUSPEND
- 	help
- 	  This is needed to provide CPU and cluster power management
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index d6b16d9..097912f 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -53,7 +53,7 @@ config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
- config ARCH_VEXPRESS_DCSCB
- 	bool "Dual Cluster System Control Block (DCSCB) support"
- 	depends on MCPM
--	select ARM_CCI
-+	select ARM_CCI400_MCPM
- 	help
- 	  Support for the Dual Cluster System Configuration Block (DCSCB).
- 	  This is needed to provide CPU and cluster power management
-@@ -71,7 +71,7 @@ config ARCH_VEXPRESS_SPC
- config ARCH_VEXPRESS_TC2_PM
- 	bool "Versatile Express TC2 power management"
- 	depends on MCPM
--	select ARM_CCI
-+	select ARM_CCI400_MCPM
- 	select ARCH_VEXPRESS_SPC
- 	help
- 	  Support for CPU and cluster power management on Versatile Express
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index b99729e..91dd013 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -43,12 +43,30 @@ config OMAP_INTERCONNECT
- 	help
- 	  Driver to enable OMAP interconnect error handling driver.
- 
--config ARM_CCI
--	bool "ARM CCI driver support"
--	depends on ARM && OF && CPU_V7
-+config ARM_CCI400_MCPM
-+	bool
-+	depends on ARM && OF && CPU_V7 && MCPM
-+	help
-+	  Low level power management driver for CCI400 cache coherent
-+	  interconnect for ARM platforms.
-+
-+config ARM_CCI400_PMU
-+	bool "ARM CCI400 PMU support"
-+	depends on ARM || ARM64
-+	depends on HW_PERF_EVENTS
-+	select ARM_CCI400_COMMON
- 	help
--	  Driver supporting the CCI cache coherent interconnect for ARM
--	  platforms.
-+	  Support for PMU events monitoring on the ARM CCI cache coherent
-+	  interconnect.
-+
-+	  If unsure, say N
-+
-+config ARM_CCI400_COMMON
-+	bool
-+	select ARM_CCI
-+
-+config ARM_CCI
-+	bool
- 
- config ARM_CCN
- 	bool "ARM CCN driver support"
 diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index fe9fa46..7e330fe 100644
+index 84fd660..f27cf56 100644
 --- a/drivers/bus/arm-cci.c
 +++ b/drivers/bus/arm-cci.c
-@@ -32,6 +32,7 @@
- static void __iomem *cci_ctrl_base;
- static unsigned long cci_ctrl_phys;
+@@ -29,42 +29,29 @@
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
  
-+#ifdef CONFIG_ARM_CCI400_MCPM
+-#define DRIVER_NAME		"CCI-400"
+-#define DRIVER_NAME_PMU		DRIVER_NAME " PMU"
+-
+-#define CCI_PORT_CTRL		0x0
+-#define CCI_CTRL_STATUS		0xc
+-
+-#define CCI_ENABLE_SNOOP_REQ	0x1
+-#define CCI_ENABLE_DVM_REQ	0x2
+-#define CCI_ENABLE_REQ		(CCI_ENABLE_SNOOP_REQ | CCI_ENABLE_DVM_REQ)
++static void __iomem *cci_ctrl_base;
++static unsigned long cci_ctrl_phys;
+ 
  struct cci_nb_ports {
  	unsigned int nb_ace;
  	unsigned int nb_ace_lite;
-@@ -42,12 +43,19 @@ static const struct cci_nb_ports cci400_ports = {
- 	.nb_ace_lite = 3
  };
  
-+#define CCI400_MCPM_PORTS_DATA	(&cci400_ports)
-+#else
-+#define CCI400_MCPM_PORTS_DATA	(NULL)
-+#endif
+-enum cci_ace_port_type {
+-	ACE_INVALID_PORT = 0x0,
+-	ACE_PORT,
+-	ACE_LITE_PORT,
++static const struct cci_nb_ports cci400_ports = {
++	.nb_ace = 2,
++	.nb_ace_lite = 3
+ };
+ 
+-struct cci_ace_port {
+-	void __iomem *base;
+-	unsigned long phys;
+-	enum cci_ace_port_type type;
+-	struct device_node *dn;
++static const struct of_device_id arm_cci_matches[] = {
++	{.compatible = "arm,cci-400", .data = &cci400_ports },
++	{},
+ };
+ 
+-static struct cci_ace_port *ports;
+-static unsigned int nb_cci_ports;
+-
+-static void __iomem *cci_ctrl_base;
+-static unsigned long cci_ctrl_phys;
+-
+ #ifdef CONFIG_HW_PERF_EVENTS
+ 
++#define DRIVER_NAME		"CCI-400"
++#define DRIVER_NAME_PMU		DRIVER_NAME " PMU"
 +
- static const struct of_device_id arm_cci_matches[] = {
--	{.compatible = "arm,cci-400", .data = &cci400_ports },
-+#ifdef CONFIG_ARM_CCI400_COMMON
-+	{.compatible = "arm,cci-400", .data = CCI400_MCPM_PORTS_DATA },
-+#endif
+ #define CCI_PMCR		0x0100
+ #define CCI_PID2		0x0fe8
+ 
+@@ -75,6 +62,47 @@ static unsigned long cci_ctrl_phys;
+ #define CCI_PID2_REV_MASK	0xf0
+ #define CCI_PID2_REV_SHIFT	4
+ 
++#define CCI_PMU_EVT_SEL		0x000
++#define CCI_PMU_CNTR		0x004
++#define CCI_PMU_CNTR_CTRL	0x008
++#define CCI_PMU_OVRFLW		0x00c
++
++#define CCI_PMU_OVRFLW_FLAG	1
++
++#define CCI_PMU_CNTR_BASE(idx)	((idx) * SZ_4K)
++
++#define CCI_PMU_CNTR_MASK	((1ULL << 32) -1)
++
++#define CCI_PMU_EVENT_MASK		0xff
++#define CCI_PMU_EVENT_SOURCE(event)	((event >> 5) & 0x7)
++#define CCI_PMU_EVENT_CODE(event)	(event & 0x1f)
++
++#define CCI_PMU_MAX_HW_EVENTS 5   /* CCI PMU has 4 counters + 1 cycle counter */
++
++struct cci_pmu_hw_events {
++	struct perf_event *events[CCI_PMU_MAX_HW_EVENTS];
++	unsigned long used_mask[BITS_TO_LONGS(CCI_PMU_MAX_HW_EVENTS)];
++	raw_spinlock_t pmu_lock;
++};
++
++struct cci_pmu {
++	void __iomem *base;
++	struct pmu pmu;
++	int nr_irqs;
++	int irqs[CCI_PMU_MAX_HW_EVENTS];
++	unsigned long active_irqs;
++	struct pmu_port_event_ranges *port_ranges;
++	struct cci_pmu_hw_events hw_events;
++	struct platform_device *plat_device;
++	int num_events;
++	atomic_t active_events;
++	struct mutex reserve_mutex;
++	cpumask_t cpus;
++};
++static struct cci_pmu *pmu;
++
++#define to_cci_pmu(c)	(container_of(c, struct cci_pmu, pmu))
++
+ /* Port ids */
+ #define CCI_PORT_S0	0
+ #define CCI_PORT_S1	1
+@@ -89,17 +117,6 @@ static unsigned long cci_ctrl_phys;
+ #define CCI_REV_R1		1
+ #define CCI_REV_R1_PX		5
+ 
+-#define CCI_PMU_EVT_SEL		0x000
+-#define CCI_PMU_CNTR		0x004
+-#define CCI_PMU_CNTR_CTRL	0x008
+-#define CCI_PMU_OVRFLW		0x00c
+-
+-#define CCI_PMU_OVRFLW_FLAG	1
+-
+-#define CCI_PMU_CNTR_BASE(idx)	((idx) * SZ_4K)
+-
+-#define CCI_PMU_CNTR_MASK	((1ULL << 32) -1)
+-
+ /*
+  * Instead of an event id to monitor CCI cycles, a dedicated counter is
+  * provided. Use 0xff to represent CCI cycles and hope that no future revisions
+@@ -109,12 +126,6 @@ enum cci400_perf_events {
+ 	CCI_PMU_CYCLES = 0xff
+ };
+ 
+-#define CCI_PMU_EVENT_MASK		0xff
+-#define CCI_PMU_EVENT_SOURCE(event)	((event >> 5) & 0x7)
+-#define CCI_PMU_EVENT_CODE(event)	(event & 0x1f)
+-
+-#define CCI_PMU_MAX_HW_EVENTS 5   /* CCI PMU has 4 counters + 1 cycle counter */
+-
+ #define CCI_PMU_CYCLE_CNTR_IDX		0
+ #define CCI_PMU_CNTR0_IDX		1
+ #define CCI_PMU_CNTR_LAST(cci_pmu)	(CCI_PMU_CYCLE_CNTR_IDX + cci_pmu->num_events - 1)
+@@ -172,60 +183,6 @@ static char *const pmu_names[] = {
+ 	[CCI_REV_R1] = "CCI_400_r1",
+ };
+ 
+-struct cci_pmu_hw_events {
+-	struct perf_event *events[CCI_PMU_MAX_HW_EVENTS];
+-	unsigned long used_mask[BITS_TO_LONGS(CCI_PMU_MAX_HW_EVENTS)];
+-	raw_spinlock_t pmu_lock;
+-};
+-
+-struct cci_pmu {
+-	void __iomem *base;
+-	struct pmu pmu;
+-	int nr_irqs;
+-	int irqs[CCI_PMU_MAX_HW_EVENTS];
+-	unsigned long active_irqs;
+-	struct pmu_port_event_ranges *port_ranges;
+-	struct cci_pmu_hw_events hw_events;
+-	struct platform_device *plat_device;
+-	int num_events;
+-	atomic_t active_events;
+-	struct mutex reserve_mutex;
+-	cpumask_t cpus;
+-};
+-static struct cci_pmu *pmu;
+-
+-#define to_cci_pmu(c)	(container_of(c, struct cci_pmu, pmu))
+-
+-static bool is_duplicate_irq(int irq, int *irqs, int nr_irqs)
+-{
+-	int i;
+-
+-	for (i = 0; i < nr_irqs; i++)
+-		if (irq == irqs[i])
+-			return true;
+-
+-	return false;
+-}
+-
+-static int probe_cci_revision(void)
+-{
+-	int rev;
+-	rev = readl_relaxed(cci_ctrl_base + CCI_PID2) & CCI_PID2_REV_MASK;
+-	rev >>= CCI_PID2_REV_SHIFT;
+-
+-	if (rev < CCI_REV_R1_PX)
+-		return CCI_REV_R0;
+-	else
+-		return CCI_REV_R1;
+-}
+-
+-static struct pmu_port_event_ranges *port_range_by_rev(void)
+-{
+-	int rev = probe_cci_revision();
+-
+-	return &port_event_range[rev];
+-}
+-
+ static int pmu_is_valid_slave_event(u8 ev_code)
+ {
+ 	return pmu->port_ranges->slave_min <= ev_code &&
+@@ -265,6 +222,25 @@ static int pmu_validate_hw_event(u8 hw_event)
+ 	return -ENOENT;
+ }
+ 
++static int probe_cci_revision(void)
++{
++	int rev;
++	rev = readl_relaxed(cci_ctrl_base + CCI_PID2) & CCI_PID2_REV_MASK;
++	rev >>= CCI_PID2_REV_SHIFT;
++
++	if (rev < CCI_REV_R1_PX)
++		return CCI_REV_R0;
++	else
++		return CCI_REV_R1;
++}
++
++static struct pmu_port_event_ranges *port_range_by_rev(void)
++{
++	int rev = probe_cci_revision();
++
++	return &port_event_range[rev];
++}
++
+ static int pmu_is_valid_counter(struct cci_pmu *cci_pmu, int idx)
+ {
+ 	return CCI_PMU_CYCLE_CNTR_IDX <= idx &&
+@@ -893,6 +869,17 @@ static const struct of_device_id arm_cci_pmu_matches[] = {
  	{},
  };
  
--#ifdef CONFIG_HW_PERF_EVENTS
-+#ifdef CONFIG_ARM_CCI400_PMU
- 
- #define DRIVER_NAME		"CCI-400"
- #define DRIVER_NAME_PMU		DRIVER_NAME " PMU"
-@@ -981,6 +989,7 @@ static int cci_pmu_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	pr_info("ARM %s PMU driver probed", pmu->model->name);
- 	return 0;
- }
- 
-@@ -1019,14 +1028,16 @@ static int __init cci_platform_init(void)
- 	return platform_driver_register(&cci_platform_driver);
- }
- 
--#else /* !CONFIG_HW_PERF_EVENTS */
-+#else /* !CONFIG_ARM_CCI400_PMU */
- 
- static int __init cci_platform_init(void)
- {
- 	return 0;
- }
- 
--#endif /* CONFIG_HW_PERF_EVENTS */
-+#endif /* CONFIG_ARM_CCI400_PMU */
++static bool is_duplicate_irq(int irq, int *irqs, int nr_irqs)
++{
++	int i;
 +
-+#ifdef CONFIG_ARM_CCI400_MCPM
- 
- #define CCI_PORT_CTRL		0x0
- #define CCI_CTRL_STATUS		0xc
-@@ -1457,6 +1468,12 @@ static int cci_probe_ports(struct device_node *np)
- 
- 	return 0;
++	for (i = 0; i < nr_irqs; i++)
++		if (irq == irqs[i])
++			return true;
++
++	return false;
++}
++
+ static int cci_pmu_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res;
+@@ -963,8 +950,65 @@ static int cci_platform_probe(struct platform_device *pdev)
+ 	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
  }
-+#else /* !CONFIG_ARM_CCI400_MCPM */
-+static inline int cci_probe_ports(struct device_node *np)
+ 
++static struct platform_driver cci_pmu_driver = {
++	.driver = {
++		   .name = DRIVER_NAME_PMU,
++		   .of_match_table = arm_cci_pmu_matches,
++		  },
++	.probe = cci_pmu_probe,
++};
++
++static struct platform_driver cci_platform_driver = {
++	.driver = {
++		   .name = DRIVER_NAME,
++		   .of_match_table = arm_cci_matches,
++		  },
++	.probe = cci_platform_probe,
++};
++
++static int __init cci_platform_init(void)
++{
++	int ret;
++
++	ret = platform_driver_register(&cci_pmu_driver);
++	if (ret)
++		return ret;
++
++	return platform_driver_register(&cci_platform_driver);
++}
++
++#else /* !CONFIG_HW_PERF_EVENTS */
++
++static int __init cci_platform_init(void)
 +{
 +	return 0;
 +}
-+#endif /* CONFIG_ARM_CCI400_MCPM */
- 
- static int cci_probe(void)
- {
-diff --git a/include/linux/arm-cci.h b/include/linux/arm-cci.h
-index aede5c7..77d06f5 100644
---- a/include/linux/arm-cci.h
-+++ b/include/linux/arm-cci.h
-@@ -30,12 +30,16 @@ struct device_node;
- 
- #ifdef CONFIG_ARM_CCI
- extern bool cci_probed(void);
-+#else
-+static inline bool cci_probed(void) { return false; }
-+#endif
 +
-+#ifdef CONFIG_ARM_CCI400_MCPM
- extern int cci_ace_get_port(struct device_node *dn);
- extern int cci_disable_port_by_cpu(u64 mpidr);
- extern int __cci_control_port_by_device(struct device_node *dn, bool enable);
- extern int __cci_control_port_by_index(u32 port, bool enable);
- #else
--static inline bool cci_probed(void) { return false; }
- static inline int cci_ace_get_port(struct device_node *dn)
- {
- 	return -ENODEV;
-@@ -51,6 +55,7 @@ static inline int __cci_control_port_by_index(u32 port, bool enable)
- 	return -ENODEV;
+ #endif /* CONFIG_HW_PERF_EVENTS */
+ 
++#define CCI_PORT_CTRL		0x0
++#define CCI_CTRL_STATUS		0xc
++
++#define CCI_ENABLE_SNOOP_REQ	0x1
++#define CCI_ENABLE_DVM_REQ	0x2
++#define CCI_ENABLE_REQ		(CCI_ENABLE_SNOOP_REQ | CCI_ENABLE_DVM_REQ)
++
++enum cci_ace_port_type {
++	ACE_INVALID_PORT = 0x0,
++	ACE_PORT,
++	ACE_LITE_PORT,
++};
++
++struct cci_ace_port {
++	void __iomem *base;
++	unsigned long phys;
++	enum cci_ace_port_type type;
++	struct device_node *dn;
++};
++
++static struct cci_ace_port *ports;
++static unsigned int nb_cci_ports;
++
+ struct cpu_port {
+ 	u64 mpidr;
+ 	u32 port;
+@@ -1284,36 +1328,20 @@ int notrace __cci_control_port_by_index(u32 port, bool enable)
  }
- #endif
+ EXPORT_SYMBOL_GPL(__cci_control_port_by_index);
+ 
+-static const struct cci_nb_ports cci400_ports = {
+-	.nb_ace = 2,
+-	.nb_ace_lite = 3
+-};
+-
+-static const struct of_device_id arm_cci_matches[] = {
+-	{.compatible = "arm,cci-400", .data = &cci400_ports },
+-	{},
+-};
+-
+ static const struct of_device_id arm_cci_ctrl_if_matches[] = {
+ 	{.compatible = "arm,cci-400-ctrl-if", },
+ 	{},
+ };
+ 
+-static int cci_probe(void)
++static int cci_probe_ports(struct device_node *np)
+ {
+ 	struct cci_nb_ports const *cci_config;
+ 	int ret, i, nb_ace = 0, nb_ace_lite = 0;
+-	struct device_node *np, *cp;
++	struct device_node *cp;
+ 	struct resource res;
+ 	const char *match_str;
+ 	bool is_ace;
+ 
+-	np = of_find_matching_node(NULL, arm_cci_matches);
+-	if (!np)
+-		return -ENODEV;
+-
+-	if (!of_device_is_available(np))
+-		return -ENODEV;
+ 
+ 	cci_config = of_match_node(arm_cci_matches, np)->data;
+ 	if (!cci_config)
+@@ -1325,17 +1353,6 @@ static int cci_probe(void)
+ 	if (!ports)
+ 		return -ENOMEM;
+ 
+-	ret = of_address_to_resource(np, 0, &res);
+-	if (!ret) {
+-		cci_ctrl_base = ioremap(res.start, resource_size(&res));
+-		cci_ctrl_phys =	res.start;
+-	}
+-	if (ret || !cci_ctrl_base) {
+-		WARN(1, "unable to ioremap CCI ctrl\n");
+-		ret = -ENXIO;
+-		goto memalloc_err;
+-	}
+-
+ 	for_each_child_of_node(np, cp) {
+ 		if (!of_match_node(arm_cci_ctrl_if_matches, cp))
+ 			continue;
+@@ -1395,11 +1412,36 @@ static int cci_probe(void)
+ 	sync_cache_w(&cpu_port);
+ 	__sync_cache_range_w(ports, sizeof(*ports) * nb_cci_ports);
+ 	pr_info("ARM CCI driver probed\n");
 +
- #define cci_disable_port_by_device(dev) \
- 	__cci_control_port_by_device(dev, false)
- #define cci_enable_port_by_device(dev) \
+ 	return 0;
++}
++
++static int cci_probe(void)
++{
++	int ret;
++	struct device_node *np;
++	struct resource res;
++
++	np = of_find_matching_node(NULL, arm_cci_matches);
++	if (!np)
++		return -ENODEV;
+ 
+-memalloc_err:
++	if (!of_device_is_available(np))
++		return -ENODEV;
++
++	ret = of_address_to_resource(np, 0, &res);
++	if (!ret) {
++		cci_ctrl_base = ioremap(res.start, resource_size(&res));
++		cci_ctrl_phys =	res.start;
++	}
++	if (ret || !cci_ctrl_base) {
++		WARN(1, "unable to ioremap CCI ctrl\n");
++		ret = -ENXIO;
++		goto out;
++	}
+ 
+-	kfree(ports);
++	ret = cci_probe_ports(np);
++out:
+ 	return ret;
+ }
+ 
+@@ -1418,42 +1460,6 @@ static int cci_init(void)
+ 	return cci_init_status;
+ }
+ 
+-#ifdef CONFIG_HW_PERF_EVENTS
+-static struct platform_driver cci_pmu_driver = {
+-	.driver = {
+-		   .name = DRIVER_NAME_PMU,
+-		   .of_match_table = arm_cci_pmu_matches,
+-		  },
+-	.probe = cci_pmu_probe,
+-};
+-
+-static struct platform_driver cci_platform_driver = {
+-	.driver = {
+-		   .name = DRIVER_NAME,
+-		   .of_match_table = arm_cci_matches,
+-		  },
+-	.probe = cci_platform_probe,
+-};
+-
+-static int __init cci_platform_init(void)
+-{
+-	int ret;
+-
+-	ret = platform_driver_register(&cci_pmu_driver);
+-	if (ret)
+-		return ret;
+-
+-	return platform_driver_register(&cci_platform_driver);
+-}
+-
+-#else
+-
+-static int __init cci_platform_init(void)
+-{
+-	return 0;
+-}
+-
+-#endif
+ /*
+  * To sort out early init calls ordering a helper function is provided to
+  * check if the CCI driver has beed initialized. Function check if the driver
 -- 
 1.7.9.5
