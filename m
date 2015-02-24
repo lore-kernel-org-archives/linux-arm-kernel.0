@@ -1,85 +1,61 @@
-From: rjones@redhat.com (Richard W.M. Jones)
-Date: Tue, 24 Feb 2015 18:11:19 +0000
-Subject: [PATCH] arm64: Fix text patching logic when using fixmap
-In-Reply-To: <1424795421-26630-1-git-send-email-marc.zyngier@arm.com>
-References: <1424795421-26630-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150224181119.GS11603@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 24 Feb 2015 18:11:37 +0000
+Subject: [PATCH] arm64: annotate psci invoke functions as notrace
+In-Reply-To: <20150224175950.GA28145@redhat.com>
+References: <20150218172638.GB1772@redacted.bos.redhat.com>
+ <20150224175950.GA28145@redhat.com>
+Message-ID: <20150224181137.GY9714@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 24, 2015 at 04:30:21PM +0000, Marc Zyngier wrote:
-> Patch 2f896d586610 ("arm64: use fixmap for text patching") changed
-> the way we patch the kernel text, using a fixmap when the kernel or
-> modules are flagged as read only.
+On Tue, Feb 24, 2015 at 05:59:50PM +0000, Richard W.M. Jones wrote:
+> On Wed, Feb 18, 2015 at 12:26:38PM -0500, Kyle McMartin wrote:
+> > Using GCC 5 to build the kernel with ftrace enabled, we encounter the
+> > following error as a result of the mcount prologue changing the expected
+> > register use of the function parameters,
+> > 
+> > /tmp/cc8Kpn7A.s: Assembler messages:
+> > /tmp/cc8Kpn7A.s:41: Error: .err encountered
+> > /tmp/cc8Kpn7A.s:42: Error: .err encountered
+> > /tmp/cc8Kpn7A.s:43: Error: .err encountered
+> > /tmp/cc8Kpn7A.s:101: Error: .err encountered
+> > /tmp/cc8Kpn7A.s:102: Error: .err encountered
+> > /tmp/cc8Kpn7A.s:103: Error: .err encountered
+> > scripts/Makefile.build:257: recipe for target 'arch/arm64/kernel/psci.o' failed
+> > 
+> > Fix this by annotating the function as notrace, to suppress the
+> > generation of profiling prologues and epilogues on the function.
+> > 
+> > Signed-off-by: Kyle McMartin <kyle@redhat.com>
+> > 
+> > --- a/arch/arm64/kernel/psci.c
+> > +++ b/arch/arm64/kernel/psci.c
+> > @@ -113,7 +113,7 @@ static void psci_power_state_unpack(u32 power_state,
+> >   * The following two functions are invoked via the invoke_psci_fn pointer
+> >   * and will not be inlined, allowing us to piggyback on the AAPCS.
+> >   */
+> > -static noinline int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
+> > +static noinline notrace int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
+> >  					 u64 arg2)
+> >  {
+> >  	asm volatile(
+> > @@ -128,7 +128,7 @@ static noinline int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
+> >  	return function_id;
+> >  }
+> >  
+> > -static noinline int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1,
+> > +static noinline notrace int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1,
+> >  					 u64 arg2)
+> >  {
+> >  	asm volatile(
 > 
-> Unfortunately, a flaw in the logic makes it fall over when patching
-> modules without CONFIG_DEBUG_SET_MODULE_RONX enabled:
-> 
-> [...]
-> [   32.032636] Call trace:
-> [   32.032716] [<fffffe00003da0dc>] __copy_to_user+0x2c/0x60
-> [   32.032837] [<fffffe0000099f08>] __aarch64_insn_write+0x94/0xf8
-> [   32.033027] [<fffffe000009a0a0>] aarch64_insn_patch_text_nosync+0x18/0x58
-> [   32.033200] [<fffffe000009c3ec>] ftrace_modify_code+0x58/0x84
-> [   32.033363] [<fffffe000009c4e4>] ftrace_make_nop+0x3c/0x58
-> [   32.033532] [<fffffe0000164420>] ftrace_process_locs+0x3d0/0x5c8
-> [   32.033709] [<fffffe00001661cc>] ftrace_module_init+0x28/0x34
-> [   32.033882] [<fffffe0000135148>] load_module+0xbb8/0xfc4
-> [   32.034044] [<fffffe0000135714>] SyS_finit_module+0x94/0xc4
-> [...]
-> 
-> This is triggered by the use of virt_to_page() on a module address,
-> which ends to pointing to Nowhereland if you're lucky, or corrupt
-> your precious data if not.
-> 
-> This patch fixes the logic by mimicking what is done on arm:
-> - If we're patching a module and CONFIG_DEBUG_SET_MODULE_RONX is set,
->   use vmalloc_to_page().
-> - If we're patching the kernel and CONFIG_DEBUG_RODATA is set,
->   use virt_to_page().
-> - Otherwise, use the provided address, as we can write to it directly.
-> 
-> Tested on 4.0-rc1 as a KVM guest.
-> 
-> Reported-by: Richard W.M. Jones <rjones@redhat.com>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Laura Abbott <lauraa@codeaurora.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> I need this patch in order to compile the upstream kernel on aarch64
+> using gcc 5.  Can it not be added temporarily while the longer term
+> fix, whatever that is, is worked out?
 
-Tested and works for me, thanks!  Therefore:
+As I mentioned in my reply, Will was waiting for -rc1 to post our
+patches (which move this out to asm for arm and arm64). He's out of the
+office today, but I expect they will be posted tomorrow (and hopefully
+queued shortly thereafter).
 
-Tested-by: Richard W.M. Jones <rjones@redhat.com>
-
-Rich.
-
->  arch/arm64/kernel/insn.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 27d4864..c8eca88 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -87,8 +87,10 @@ static void __kprobes *patch_map(void *addr, int fixmap)
->  
->  	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
->  		page = vmalloc_to_page(addr);
-> -	else
-> +	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
->  		page = virt_to_page(addr);
-> +	else
-> +		return addr;
->  
->  	BUG_ON(!page);
->  	set_fixmap(fixmap, page_to_phys(page));
-> -- 
-> 2.1.4
-
--- 
-Richard Jones, Virtualization Group, Red Hat http://people.redhat.com/~rjones
-Read my programming and virtualization blog: http://rwmj.wordpress.com
-virt-p2v converts physical machines to virtual machines.  Boot with a
-live CD or over the network (PXE) and turn machines into KVM guests.
-http://libguestfs.org/virt-v2v
+Mark.
