@@ -1,33 +1,52 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 25 Feb 2015 06:52:27 -0800
-Subject: [PATCH] hwmon: (gpio-fan) allow to use alarm support alone from DT
-In-Reply-To: <20150225142924.GX1509@kw.sim.vm.gnt>
-References: <1424696334-14767-1-git-send-email-simon.guinot@sequanux.org>
- <54EB33D4.1000804@roeck-us.net> <20150223143416.GT1509@kw.sim.vm.gnt>
- <54EB3C84.30503@roeck-us.net> <20150225111430.GV1509@kw.sim.vm.gnt>
- <20150225135015.GA17992@lunn.ch> <20150225142924.GX1509@kw.sim.vm.gnt>
-Message-ID: <54EDE1AB.9020406@roeck-us.net>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 25 Feb 2015 15:54:26 +0100
+Subject: Ethernet Briding broken on APM Mustang on v4.0-rc1
+In-Reply-To: <54EDD460.8080909@redhat.com>
+References: <20150225124101.GD12827@cbox> <20150225134534.GE12827@cbox>
+ <54EDD460.8080909@redhat.com>
+Message-ID: <20150225145426.GA18388@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2015 06:29 AM, Simon Guinot wrote:
-> On Wed, Feb 25, 2015 at 02:50:15PM +0100, Andrew Lunn wrote:
->>> Handle the GPIO fan alarm feature from the fan controller driver don't
->>> look good either to me. This alarm mechanism is not a part of the fan
->>> controller itself but rather something apart. Also I am afraid that the
->>> result would really look like a hack.
->>
->> Hi Simon
->>
->> It sounds like you need to extract the alarm code from gpio-fan into a
->> little library. Then put a wrapper around it to make a gpio-fan-alarm
->> driver.
->
-> Hi Andrew,
->
-> Yes, I am working on that. I'll come back with some patches based on
-> this approach.
->
-I have not seen your patches, but from the context it sounds like a NACK.
+On Wed, Feb 25, 2015 at 07:55:44AM -0600, Mark Langsdorf wrote:
+> On 02/25/2015 07:45 AM, Christoffer Dall wrote:
+> >Update, apologies for noise,
+> >
+> >On Wed, Feb 25, 2015 at 01:41:01PM +0100, Christoffer Dall wrote:
+> >>Hi,
+> >>
+> >>Configuring bridged networking on the APM Mustang platform doesn't work
+> >>on v4.0-rc1.  It works fine on v3.19-rc1.
+> >>
+> >>When adding the interface to the bridge I get this error:
+> >>
+> >>can't add eth0 to bridge br0: Invalid argument
+> >>
+> >>Has anyone else seen this?
+> >>
+> >>Other ARMv8 platforms don't seem to be affected by this.
+> >>
+> >
+> >It seems that on v4.0-rc1 the APM ethernet card no longer gets a mac
+> >address (or rather, it gets 00:00:00:00:...) so assigning it an
+> >appropriate address naturally does the trick.
+> >
+> >I have no idea which change caused this behavior though.
+> 
+> Did you update your firmware recently? The MAC address is
+> stored as a UEFI shell variable and pushed into ACPI/DTB
+> by the firmware. At one point in the development history,
+> the symbol that held it changed from RGMII_MAC0 to MAC0.
 
-Guenter
+No, only updated my kernel.
+
+> 
+> You can reset it by going into the UEFI shell and running:
+> set MAC0 aa:bb:cc:dd:ee:ff
+> replacing aa:bb:cc:dd:ee:ff with the MAC address.
+> 
+
+I'm not running UEFI, but U-Boot and it doesn't seem like U-Boot manages
+to configure the hwaddr for Linux.
+
+-Christoffer
