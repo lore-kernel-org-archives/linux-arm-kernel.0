@@ -1,61 +1,77 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 25 Feb 2015 09:24:43 -0600
-Subject: [PATCH v2 3/4] clk: Provide an always-on clock domain framework
-In-Reply-To: <20150223172344.421.62815@quantum>
-References: <1424276101-30137-1-git-send-email-lee.jones@linaro.org>
- <1424276101-30137-4-git-send-email-lee.jones@linaro.org>
- <20150223172344.421.62815@quantum>
-Message-ID: <CAL_Jsq+N4D8fUCwrYwxLaRpbhsgi5eZy5cLpsSmp8VoTQZUqow@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 25 Feb 2015 16:15:53 +0100
+Subject: [PATCH 0/7] New eFuse subsystem
+In-Reply-To: <72BC0C8BD7BB6F45988A99382E5FBAE5444505E9@hhmail02.hh.imgtec.org>
+References: <1424864719-3390-1-git-send-email-ezequiel.garcia@imgtec.com>
+ <20150225120234.GB5062@lukather> <54EDC04E.1050107@imgtec.com>
+ <72BC0C8BD7BB6F45988A99382E5FBAE5444505E9@hhmail02.hh.imgtec.org>
+Message-ID: <20150225151553.GE5062@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 23, 2015 at 11:23 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Lee Jones (2015-02-18 08:15:00)
->> Much h/w contain clocks which if turned off would prove fatal.  The
->> only way to recover is to restart the board(s).  This driver takes
->> references to clocks which are required to be always-on in order to
->> prevent the common clk framework from trying to turn them off during
->> the clk_disabled_unused() procedure.
+Hi,
 
-[...]
+On Wed, Feb 25, 2015 at 01:12:01PM +0000, James Hartley wrote:
+> Hi Maxime, 
+> 
+> > -----Original Message-----
+> > From: Ezequiel Garcia
+> > Sent: 25 February 2015 12:30
+> > To: Maxime Ripard
+> > Cc: Thierry Reding; Stephen Warren; Arnd Bergmann; Andrew Bresticker;
+> > James Hartley; linux-arm-kernel at lists.infradead.org; linux-
+> > kernel at vger.kernel.org
+> > Subject: Re: [PATCH 0/7] New eFuse subsystem
+> > 
+> > 
+> > 
+> > On 02/25/2015 09:02 AM, Maxime Ripard wrote:
+> > > Hi Ezequiel,
+> > >
+> > > On Wed, Feb 25, 2015 at 08:45:12AM -0300, Ezequiel Garcia wrote:
+> > >> This patchset introduces a new driver subsystem, meant to support
+> > >> eFuse (alias OTP, one-time-programmable) devices.
+> > >>
+> > >> The motivation behind this work is to have a common place for drivers
+> > >> that are currently more or less scattered: the tegra efuses are in
+> > >> drivers/soc/ and the sunxi efuses in drivers/misc/eeprom.
+> > >>
+> > >> For now, there's no proposal for a generic efuse API. Instead, we
+> > >> simply group the drivers together.
+> > >>
+> > >> This patchset is the result of the initial submission for IMG
+> > >> Pistachio eFuse support [1]. Our first proposal was to follow the
+> > >> Tegra efuse, and put the Pistachio efuse in drivers/soc. After some
+> > >> discussion we finally agreed [2] to first create an efuse directoy,
+> > >> and then put all efuse drivers in it.
+> > >>
+> > >> As always, all comments are welcome!
+> > >>
+> > >> [1] http://www.spinics.net/lists/devicetree/msg59246.html
+> > >> [2] http://www.spinics.net/lists/arm-kernel/msg389325.html
+> > >
+> > > Have you looked at the EEPROM framework currently in discussions? The
+> > > two seems to be covering pretty much the same use cases.
+> > >
+> 
+> Shouldn't this be a PROM framework if it is going to support both
+> EEPROM and EFUSE/QFPROM, or am I missing something here (since an
+> eFuse is not eraseable)?
 
->> +static int ao_clock_domain_probe(struct platform_device *pdev)
->> +{
->> +       struct device_node *np = pdev->dev.of_node;
->> +       int nclks, i;
->> +
->> +       nclks = of_count_phandle_with_args(np, "clocks", "#clock-cells");
->
-> Minor nitpick: please use of_clk_get_parent_count. I spent a solid 5
-> minutes writing that function and I need people to use it so I can get a
-> return on my investment.
->
-> Otherwise the patch looks good. I believe that this method is targeting
-> always-on clock in a production environment, which is different from the
-> CLK_IGNORE_UNUSED stuff which typically is helpful while bringing up new
-> hardware or dealing with a platform that has incomplete driver support.
+Does it really matter? I mean, it's just a name after all.
 
-There is also the usecase of keep clocks on until I load a module that
-properly handles my hardware (e.g simplefb). We have a simplefb node
-with clocks and the simplefb driver jumps thru some hoops to hand-off
-clocks to the real driver. I don't really like it and don't want to
-see more examples. And there is the case of I thought I would never
-manage this clock, but kernel subsystems evolve and now I want to
-manage a clock. This should not require a DT update to do so.
+But feel free to suggest alternatives on the main thread.
 
-Neither of these may be Lee's usecase, but I want to see them covered
-by the binding.
+Maxime
 
-> I wonder if there is a clever way for existing clock providers
-> (expressed in DT) to use this without having to create a separate node
-> of clocks with the "always-on-clk-domain" flag. Possibly the common
-> clock binding could declare some always-on flag that is standardized?
-> Then the framework core could use this code easily. Not sure if that is
-> a good idea though...
-
-I would prefer to see the always on clocks just listed within the
-clock controller's node rather than creating made up nodes with clock
-properties. This should be always-on until claimed IMO, but that
-aspect is the OS's problem, not a DT problem.
-
-Rob
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150225/f30afb44/attachment.sig>
