@@ -1,70 +1,40 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 25 Feb 2015 16:39:52 +0800
-Subject: [PATCH v9 12/21] ACPI / table: Print GIC information when MADT is
- parsed
-In-Reply-To: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1424853601-6675-13-git-send-email-hanjun.guo@linaro.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 25 Feb 2015 09:42:54 +0100
+Subject: [PATCH 2/2] leds/pwm: Don't disable pwm when setting brightness
+ to 0
+In-Reply-To: <54ED8426.6090401@i2se.com>
+References: <1423734290-19750-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1423734290-19750-3-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1151818200.134325.1424804213026.JavaMail.open-xchange@oxbsltgw03.schlund.de>
+ <20150224190636.GG7789@pengutronix.de> <54ED8426.6090401@i2se.com>
+Message-ID: <20150225084254.GI7789@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When MADT is parsed, print GIC information as debug message:
+Hello Stefan,
 
-ACPI: GICC (acpi_id[0x0000] address[00000000e112f000] MPIDR[0x0] enabled)
-ACPI: GICC (acpi_id[0x0001] address[00000000e112f000] MPIDR[0x1] enabled)
-...
-ACPI: GICC (acpi_id[0x0201] address[00000000e112f000] MPIDR[0x201] enabled)
+On Wed, Feb 25, 2015 at 09:13:26AM +0100, Stefan Wahren wrote:
+> Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+Thanks.
 
-Those debug information will be very helpful to bring up early systems to
-see if acpi_id and MPIDR are matched or not as spec defined.
+> >> This is the functional part of this issue, since the warning has been fixed [1]
+> > Can I interpret this as an Tested-by: for this patch and an Ack for
+> > patch 1?
+> 
+> Sorry, but i don't think i'm the right person for acking patch 1.
+IMHO it doesn't matter who you are for an ack. You can consider it right
+and tell it. How much this ack is useful to convince a maintainer to
+take this patch is a different story.
 
-CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Tested-by: Yijing Wang <wangyijing@huawei.com>
-Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-Tested-by: Jon Masters <jcm@redhat.com>
-Tested-by: Timur Tabi <timur@codeaurora.org>
-Tested-by: Robert Richter <rrichter@cavium.com>
-Acked-by: Robert Richter <rrichter@cavium.com>
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
----
- drivers/acpi/tables.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+But given that I try to fix the problem at hand for >2 years and I'm
+stuck because Thierry isn't convinced that it's a correct way to go
+forward but also doesn't come up with an alternative I'm happy about
+everyone who gives his/her opinion. Still more if the opinion matches
+mine.
 
-diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
-index f4e5b88..2e19189 100644
---- a/drivers/acpi/tables.c
-+++ b/drivers/acpi/tables.c
-@@ -185,6 +185,28 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
- 		}
- 		break;
- 
-+	case ACPI_MADT_TYPE_GENERIC_INTERRUPT:
-+		{
-+			struct acpi_madt_generic_interrupt *p =
-+				(struct acpi_madt_generic_interrupt *)header;
-+			pr_debug("GICC (acpi_id[0x%04x] address[%llx] MPIDR[0x%llx] %s)\n",
-+				 p->uid, p->base_address,
-+				 p->arm_mpidr,
-+				 (p->flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
-+
-+		}
-+		break;
-+
-+	case ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR:
-+		{
-+			struct acpi_madt_generic_distributor *p =
-+				(struct acpi_madt_generic_distributor *)header;
-+			pr_debug("GIC Distributor (gic_id[0x%04x] address[%llx] gsi_base[%d])\n",
-+				 p->gic_id, p->base_address,
-+				 p->global_irq_base);
-+		}
-+		break;
-+
- 	default:
- 		pr_warn("Found unsupported MADT entry (type = 0x%x)\n",
- 			header->type);
+Thanks
+Uwe
+
 -- 
-1.9.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
