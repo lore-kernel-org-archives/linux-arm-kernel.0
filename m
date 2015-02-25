@@ -1,122 +1,67 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Wed, 25 Feb 2015 16:01:26 +0100
-Subject: [PATCH] ARM: Kirkwood: enable GPIO fan alarm support for 2Big
- Network v2
-In-Reply-To: <54EDDCAD.9070703@roeck-us.net>
-References: <1424696523-14855-1-git-send-email-simon.guinot@sequanux.org>
- <54EB34F3.4000500@roeck-us.net>
- <20150223144049.GU1509@kw.sim.vm.gnt>
- <54EB3E0E.7070503@roeck-us.net>
- <20150225123632.GW1509@kw.sim.vm.gnt>
- <54EDDCAD.9070703@roeck-us.net>
-Message-ID: <20150225150126.GY1509@kw.sim.vm.gnt>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Feb 2015 15:03:49 +0000
+Subject: [PATCH 0/8] Fix struct clk pointer comparing
+In-Reply-To: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20150225150349.GB8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 06:31:09AM -0800, Guenter Roeck wrote:
-> On 02/25/2015 04:36 AM, Simon Guinot wrote:
-> >On Mon, Feb 23, 2015 at 06:49:50AM -0800, Guenter Roeck wrote:
-> >>On 02/23/2015 06:40 AM, Simon Guinot wrote:
-> >>>On Mon, Feb 23, 2015 at 06:10:59AM -0800, Guenter Roeck wrote:
-> >>>>On 02/23/2015 05:02 AM, Simon Guinot wrote:
-> >>>>>On the LaCie 2Big Network v2 (net2big_v2) board, the fan alarm is not
-> >>>>>wired to the I2C fan controller but to a separe GPIO. This GPIO can be
-> >>>>>controlled by using the gpio-fan driver.
-> >>>>>
-> >>>>>This patch adds the gpio-fan alarm description in the net2big_v2 DTS.
-> >>>>>
-> >>>>>Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> >>>>>---
-> >>>>>  arch/arm/boot/dts/kirkwood-net2big.dts | 5 +++++
-> >>>>>  1 file changed, 5 insertions(+)
-> >>>>>
-> >>>>>diff --git a/arch/arm/boot/dts/kirkwood-net2big.dts b/arch/arm/boot/dts/kirkwood-net2big.dts
-> >>>>>index 53dc37a3b687..e4f7e497379f 100644
-> >>>>>--- a/arch/arm/boot/dts/kirkwood-net2big.dts
-> >>>>>+++ b/arch/arm/boot/dts/kirkwood-net2big.dts
-> >>>>>@@ -27,6 +27,11 @@
-> >>>>>  		device_type = "memory";
-> >>>>>  		reg = <0x00000000 0x10000000>;
-> >>>>>  	};
-> >>>>>+
-> >>>>>+	gpio_fan {
-> >>>>>+		compatible = "gpio-fan";
-> >>>>>+		alarm-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
-> >>>>>+	};
-> >>>>>  };
-> >>>>>
-> >>>>>  &regulators {
-> >>>>>
-> >>>>Again, wrong solution, and conceptually wrong as well from a dt perspective.
-> >>>>
-> >>>>The alarm signal should be handled by the g762 driver, and the alarm-gpios
-> >>>>property should be added to the g762 description.
-> >>>
-> >>>OK. Then you think it would be better to add support for alarm GPIOs
-> >>>support in the g762. The problem is that we should have to find a
-> >>>generic way to do that. After all, we could want the very same
-> >>>modification for a bunch of fan drivers.
-> >>>
-> >>Can't help it. After all, the interrupt handling logic is different for each chip,
-> >>and there are non-DT systems out there.
-> >>
-> >>The g762 property should probably be something like
-> >>
-> >>	g762 at 3e {
-> >>                 compatible = "gmt,g762";
-> >>                 reg = <0x3e>;
-> >>                 clocks = <&g762_clk>;
-> >>		interrupt-parent = <&gpio0>;
-> >>		interrupts = <25 GPIO_ACTIVE_LOW>;
-> >>         };
-> >>
-> >>struct i2c_client has an irq field, and as far as I can see it is filled in
-> >>automatically from the dt node. So all the driver should have to do is to
-> >>implement an interrupt handler.
-> >
-> >Is that OK to pass a GPIO line through the "interrupts" property ?
+On Wed, Feb 25, 2015 at 10:53:30PM +0800, Shawn Guo wrote:
+> On the first day back from Chinese new year holiday, I got a regression
+> report from rmk, saying Ethernet stops working on HimmingBoard with
+> v4.0-rc1.
 > 
-> Why not ? That is how it is supposed to be used. The driver neither needs
-> to know nor should know that its interrupt line is connected to a gpio pin.
+> I read through the thread [1] and found a couple of i.MX audio drivers
+> are also affected per Stephen's Coccinelle report.  That's why I came up
+> with this series based on Quentin's structclk.cocci, Stephen's result
+> and Mike's input (thanks all).
 
-Well, I think we are interested in both the interrupt signal _and_ the
-GPIO value. We need to display the later through the sysfs fan1_alarm
-file.
+Not all places need to be fixed in this way.
 
-Using the irq field from struct i2c_client is quite handy but the GPIO
-polarity information is lost...
+There are two broad cases:
 
-That's why I think we should probably use a dedicated property.
+1. Where we are trying to determine if two clocks obtained from clk_get()
+   are the same clock.  IOW:
 
-> 
-> >Moreover it seems to me that g763 controller (compatible) supports
-> >alert interrupts through SMBus. Then maybe we should save the
-> >"interrupts" property for this signal ?
-> >
-> You lost me there. The SMBus alert signal is shared among multiple chips.
-> If a system supports it, it should be connected to the alert interrupt handler
-> (in i2c-smbus.c), which would handle it and pass it to a driver's alert function.
+	probe()
+	{
+		clk1 = clk_get(dev, ...);
+		clk2 = clk_get(dev, ...);
 
-It was a question. I was not knowing the proper way for a driver to
-connect with this interrupt. Thanks for the explanation.
+		if (clk1 == clk2)
+			do_something();
+	}
 
-> 
-> >Don't you think it would be more explicit to have a separate DT
-> >property (such as "gpio-alarm") and also a dedicated field in the
-> >g762 platform data structure ?
-> >
-> 
-> No. It would add an unnecessary dependency on gpio (or, rather, gpio
-> driven interrupts) to the g762 driver, and it would limit its usability.
+2. Where we are trying to determine if a clock selected from a set of
+   previously obtained clk_get()'d clocks is the same as a one of those
+   clocks.  IOW:
 
-Considering we will have to read this GPIO, then we will have this
-dependency.
+	probe()
+	{
+		clk1 = clk_get(dev, ...);
+		clk2 = clk_get(dev, ...);
+	}
+...
+	some_fn()
+	{
+		clk = select_best_clock(clk1, clk2);
+		if (clk == previously_selected_clk) {
+			previously_selected_clk = clk;
+			do_something();
+		}
+	}
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150225/bcc20b7c/attachment.sig>
+Case 1 applies in places like the Kirkwood I2S driver, and the iMX6
+ethernet code, and it's these cases which need to be fixed.
+
+Case 2 applies in the Armada DRM driver, and these cases need not be
+"fixed".
+
+To put it a different way: case 1 is when you're testing to see whether
+two clocks refer to the same clock.  case 2 is when you're testing
+whether the cached clk cookie is the same.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
