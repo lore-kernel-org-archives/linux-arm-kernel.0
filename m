@@ -1,120 +1,76 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 25 Feb 2015 18:55:20 +0100
-Subject: [PATCH] ARM: mvebu: Disable CPU Idle on Armada 38x
-In-Reply-To: <54EC9412.7020501@free-electrons.com>
-References: <1423245844-28701-1-git-send-email-gregory.clement@free-electrons.com>
- <20150223201215.039fa38b@free-electrons.com>
- <54EC9412.7020501@free-electrons.com>
-Message-ID: <54EE0C88.50000@free-electrons.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 25 Feb 2015 09:55:33 -0800
+Subject: [PATCH 0/8] Fix struct clk pointer comparing
+In-Reply-To: <20150225150349.GB8656@n2100.arm.linux.org.uk>
+References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+ <20150225150349.GB8656@n2100.arm.linux.org.uk>
+Message-ID: <20150225175533.421.41831@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/02/2015 16:09, Gregory CLEMENT wrote:
-> Hi Thomas,
+Quoting Russell King - ARM Linux (2015-02-25 07:03:49)
+> On Wed, Feb 25, 2015 at 10:53:30PM +0800, Shawn Guo wrote:
+> > On the first day back from Chinese new year holiday, I got a regression
+> > report from rmk, saying Ethernet stops working on HimmingBoard with
+> > v4.0-rc1.
+> > 
+> > I read through the thread [1] and found a couple of i.MX audio drivers
+> > are also affected per Stephen's Coccinelle report.  That's why I came up
+> > with this series based on Quentin's structclk.cocci, Stephen's result
+> > and Mike's input (thanks all).
 > 
-> On 23/02/2015 20:12, Thomas Petazzoni wrote:
->> Dear Gregory CLEMENT,
->>
->> On Fri,  6 Feb 2015 19:04:04 +0100, Gregory CLEMENT wrote:
->>> On Armada 38x SoCs, under heavy I/O load, the system hangs when CPU
->>> Idle is enabled. Waiting for a solution to this issue, this patch
->>> disables the CPU Idle support for this SoC.
->>>
->>> As CPU Hot plug support also uses some of the CPU Idle functions it is
->>> also affected by the same issue. This patch disables it also for the
->>> Armada 38x SoCs.
->>>
->>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>> Cc: <stable@vger.kernel.org> # v3.17 +
->>> ---
->>>  arch/arm/mach-mvebu/pmsu.c | 14 ++++++++++++--
->>>  1 file changed, 12 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
->>> index d8ab605a44fa..05c8625bbc40 100644
->>> --- a/arch/arm/mach-mvebu/pmsu.c
->>> +++ b/arch/arm/mach-mvebu/pmsu.c
->>> @@ -476,12 +476,22 @@ static int __init mvebu_v7_cpu_pm_init(void)
->>>  		return 0;
->>>  	of_node_put(np);
->>>  
->>> +	/*
->>> +	 * Currently the CPU Idle support for Armada 38x is broken, as
->>> +	 * the CPU Hotplug uses some of the CPU Idle functions it is
->>> +	 * broken too, so let's disable it
->>> +	 */
->>> +	if (of_machine_is_compatible("marvell,armada380")) {
->>> +		cpu_hotplug_disable();
->>> +		pr_warn("CPU Hotplug support is currently broken on Armada 38x: disabling");
->>> +	}
->>
->> There's one thing that annoys me with this part disabling CPU hotplug:
->> it will prevent suspend to RAM, even though suspend to RAM is most
+> Not all places need to be fixed in this way.
 > 
-> Actually cpu_hotplug_disable() only disables the "regular" cpu hotlplog operation.
-> This function set the value of cpu_hotplug_disabled variable which is tested only
-> in cpu_up and cpu_down whereas during suspend(and resume) _cpu_down(and _cpu_up)
-> are directly called.
+> There are two broad cases:
 > 
-> However it raises an interesting point. The suspend/resume function modifies the
-> value of cpu_hotplug_disabled and resets it unconditionally during resume. So
-> when enabling suspend to RAM for Armada 38x, if the CPU idle issue is not solved,
-> we will have to call cpu_hotplug_disable() in the post resume path.
+> 1. Where we are trying to determine if two clocks obtained from clk_get()
+>    are the same clock.  IOW:
 > 
->> likely safe with regard to the PCIe/PL310 deadlock problem. CPU hotplug
->> support is needed for suspend to RAM, as secondary CPUs are all turned
->> off towards the end of the suspend process, before really entering the
->> suspend to RAM state.
->>
->> And since this happens after calling the ->suspend() hook on all
->> devices, we are normally in a quiet state in terms of PCIe traffic,
->> which should normally avoid the PL310 issue.
->>
->> So, we would have basically to discriminate between CPU hotplug done at
->> "run time" and CPU hotplug done as part of the suspend to RAM and
->> resume sequence. Maybe this cpu_hotplug_disable() still allows the form
->> of CPU hotplug needed by suspend to RAM, but since would have to be
->> verified.
+>         probe()
+>         {
+>                 clk1 = clk_get(dev, ...);
+>                 clk2 = clk_get(dev, ...);
 > 
-> As indicated below, cpu_hotplug_disable() won't prevent using suspend to RAM.
-> However as is, there was other part of this patch which will prevent it. In the
-> Armada 38x case, the function returns before calling the function
-> mvebu_v7_pmsu_enable_l2_powerdown_onidle() which should be needed for the suspend
-> to RAM. I also think that registering the mvebu_v7_cpu_pm_notifier would be needed
-> for the suspend to RAM.
+>                 if (clk1 == clk2)
+>                         do_something();
+>         }
+> 
+> 2. Where we are trying to determine if a clock selected from a set of
+>    previously obtained clk_get()'d clocks is the same as a one of those
+>    clocks.  IOW:
+> 
+>         probe()
+>         {
+>                 clk1 = clk_get(dev, ...);
+>                 clk2 = clk_get(dev, ...);
+>         }
+> ...
+>         some_fn()
+>         {
+>                 clk = select_best_clock(clk1, clk2);
+>                 if (clk == previously_selected_clk) {
+>                         previously_selected_clk = clk;
+>                         do_something();
+>                 }
+>         }
+> 
+> Case 1 applies in places like the Kirkwood I2S driver, and the iMX6
+> ethernet code, and it's these cases which need to be fixed.
+> 
+> Case 2 applies in the Armada DRM driver, and these cases need not be
+> "fixed".
+> 
+> To put it a different way: case 1 is when you're testing to see whether
+> two clocks refer to the same clock.  case 2 is when you're testing
+> whether the cached clk cookie is the same.
 
-Actually I was wrong, I was thinking of my first implementation. Here both functions
-are called. So when submitting the suspend to RAM support for Armada 38x, you will
-just have to take care of cpu_hotplug_disabled variable.
+It looks like patches 2, 7 and 8 are correct in this series. I'll apply
+them towards -rc2 if nobody objects.
 
-
-Gregory
-
+Regards,
+Mike
 
 > 
-> However currently there is no support for suspend to RAM for Armada 38x in mainline,
-> and I would like to keep this patch simple to apply it on the stable version.
-> 
-> What about making the changes I listed in the suspend to RAM series for the Armada 38x?
-> 
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> 
-> 
->>
->> Best regards,
->>
->> Thomas
->>
-> 
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> -- 
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
