@@ -1,43 +1,39 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Wed, 25 Feb 2015 07:55:44 -0600
-Subject: Ethernet Briding broken on APM Mustang on v4.0-rc1
-In-Reply-To: <20150225134534.GE12827@cbox>
-References: <20150225124101.GD12827@cbox> <20150225134534.GE12827@cbox>
-Message-ID: <54EDD460.8080909@redhat.com>
+From: drake@endlessm.com (Daniel Drake)
+Date: Wed, 25 Feb 2015 07:58:00 -0600
+Subject: [PATCH] ARM: dma-mapping: support non-consistent DMA attribute
+In-Reply-To: <16874142.jSTJ8OZePS@wuerfel>
+References: <1424810703-20382-1-git-send-email-drake@endlessm.com>
+ <16874142.jSTJ8OZePS@wuerfel>
+Message-ID: <CAD8Lp46KOQZMJqiqudE_0nvpaHgYxpD0qCeM2r8ZOgfzJUo6dA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2015 07:45 AM, Christoffer Dall wrote:
-> Update, apologies for noise,
->
-> On Wed, Feb 25, 2015 at 01:41:01PM +0100, Christoffer Dall wrote:
->> Hi,
+On Wed, Feb 25, 2015 at 4:24 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 24 February 2015 14:45:03 Daniel Drake wrote:
+>> Currently when arm_dma_mmap() is called, vm_page_prot is reset
+>> according to DMA attributes. Currently, writecombine is the
+>> only attribute supported; any other configuration will map uncached
+>> memory.
 >>
->> Configuring bridged networking on the APM Mustang platform doesn't work
->> on v4.0-rc1.  It works fine on v3.19-rc1.
+>> Add support for the non-consistent attribute so that cachable memory
+>> can be mapped into userspace via the dma_mmap_attrs() API.
 >>
->> When adding the interface to the bridge I get this error:
->>
->> can't add eth0 to bridge br0: Invalid argument
->>
->> Has anyone else seen this?
->>
->> Other ARMv8 platforms don't seem to be affected by this.
+>> Signed-off-by: Daniel Drake <drake@endlessm.com>
 >>
 >
-> It seems that on v4.0-rc1 the APM ethernet card no longer gets a mac
-> address (or rather, it gets 00:00:00:00:...) so assigning it an
-> appropriate address naturally does the trick.
->
-> I have no idea which change caused this behavior though.
+> How does the user process enforce consistency then?
 
-Did you update your firmware recently? The MAC address is
-stored as a UEFI shell variable and pushed into ACPI/DTB
-by the firmware. At one point in the development history,
-the symbol that held it changed from RGMII_MAC0 to MAC0.
+Hmm, good point.
 
-You can reset it by going into the UEFI shell and running:
-set MAC0 aa:bb:cc:dd:ee:ff
-replacing aa:bb:cc:dd:ee:ff with the MAC address.
+The use case here is that we're mapping certain memory shared with the
+Mali GPU into userspace, where we expect the CPU to be doing rendering
+to it, and we've measured performance improvements from having the CPU
+cache enabled. But Mali also comes alongside UMP (comparable to
+dma-buf) which provides an ioctl-based API for userspace to
+invalidate/flush caches, which we use heavily in this pipeline.
 
---Mark Langsdorf
+UMP's not going upstream, but I was wondering if this patch had any
+value in the more general case. Thinking more, perhaps not, at least
+until dma-buf grows some form of userspace cache control API.
+
+Daniel
