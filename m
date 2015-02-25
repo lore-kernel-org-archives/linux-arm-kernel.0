@@ -1,72 +1,65 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 25 Feb 2015 11:27:58 +0000
-Subject: [PATCH] drivers: cpuidle: Explictly include proc-fns.h for
- cpuidle-arm64
-In-Reply-To: <20150225111828.GA9714@leverpostej>
-References: <1424827506-12245-1-git-send-email-lauraa@codeaurora.org>
- <20150225111828.GA9714@leverpostej>
-Message-ID: <20150225112758.GB20214@red-moon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 25 Feb 2015 11:11:08 +0000
+Subject: [PATCH 1/3] arm64: mediatek: Add config option for mt8173.
+In-Reply-To: <5948977.qlhSVy9R5i@wuerfel>
+References: <1422342836-27689-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1422342836-27689-2-git-send-email-hongzhou.yang@mediatek.com>
+ <1424855242.7845.9.camel@mtksdaap41> <5948977.qlhSVy9R5i@wuerfel>
+Message-ID: <20150225111107.GA29206@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 11:18:29AM +0000, Mark Rutland wrote:
-
-[...]
-
-> >  drivers/cpuidle/cpuidle-arm64.c | 1 +
-> >  1 file changed, 1 insertion(+)
+On Wed, Feb 25, 2015 at 11:51:57AM +0100, Arnd Bergmann wrote:
+> On Wednesday 25 February 2015 17:07:22 Yingjoe Chen wrote:
+> > On Tue, 2015-01-27 at 15:13 +0800, Hongzhou Yang wrote:
+> > > From: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> > > 
+> > > The upcoming MTK pinctrl driver have a big pin table for each SoC,
+> > > and we don't want to bloat the kernel binary if we don't need it.
+> > > Add config options so we can build for one SoC only.
+> > > 
+> > > Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> > > ---
+> > >  arch/arm64/Kconfig | 6 ++++++
+> > >  1 file changed, 6 insertions(+)
+> > > 
+> > > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > > index e627ead..6213dac 100644
+> > > --- a/arch/arm64/Kconfig
+> > > +++ b/arch/arm64/Kconfig
+> > > @@ -151,9 +151,15 @@ menu "Platform selection"
+> > >  config ARCH_MEDIATEK
+> > >       bool "Mediatek MT65xx & MT81xx ARMv8 SoC"
+> > >       select ARM_GIC
+> > > +     select PINCTRL
+> > >       help
+> > >         Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
+> > >  
+> > > +config MACH_MT8173
+> > > +     bool "Mediatek 8173 Soc Supprt"
+> > > +     depends on ARCH_MEDIATEK
+> > > +     default y
+> > > +
+> > >  config ARCH_SEATTLE
+> > >       bool "AMD Seattle SoC Family"
+> > >       help
 > > 
-> > diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
-> > index 80704b9..f1d5422 100644
-> > --- a/drivers/cpuidle/cpuidle-arm64.c
-> > +++ b/drivers/cpuidle/cpuidle-arm64.c
-> > @@ -19,6 +19,7 @@
-> >  #include <linux/of.h>
-> >  
-> >  #include <asm/cpuidle.h>
-> > +#include <asm/proc-fns.h>
-> >  #include <asm/suspend.h>
+> > Hi Arnd/Matthias,
+> > 
+> > Any comments on this patch?
 > 
-> I wasn't able to apply this patch atop of v4.0-rc1 or current mainline;
-> there's no asm/suspend.h include in either of those. Which tree is this
-> based on?
+> Hi Joe,
+> 
+> Actually I just commented on a similar patch from Samsung the other
+> day, and I think we should make a more general decision about these:
+> 
+> I would rather see only one Kconfig option per SoC family and use
+> ARCH_MEDIATEK without any MACH_* options. We can have other options
+> for e.g. networking chips from Mediatek that are not closely related
+> but I would group all the phone and tablet chips under one option
+> here. Same for the other vendors of course.
 
-Yes, it does not apply to mainline, either we fix that up or here is
-the version I was sending on top of mainline.
+I agree.
 
-Thanks,
-Lorenzo
-
--- >8 --
-Subject: [PATCH] drivers: cpuidle: cpuidle-arm64: include asm/proc-fns.h
- explicitly
-
-ARM64 CPUidle driver requires the cpu_do_idle function so that it can
-be used to enter the shallowest idle state, and it is declared in
-asm/proc-fns.h.
-
-This patch adds the explicit inclusion of the asm/proc-fns.h header file
-to stop relying on implicit inclusion of the same file through implicit
-header files dependencies.
-
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-[lp: rebased/rewrote commit log]
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- drivers/cpuidle/cpuidle-arm64.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
-index 39a2c62..c8bb6c5 100644
---- a/drivers/cpuidle/cpuidle-arm64.c
-+++ b/drivers/cpuidle/cpuidle-arm64.c
-@@ -19,6 +19,7 @@
- #include <linux/of.h>
- 
- #include <asm/cpuidle.h>
-+#include <asm/proc-fns.h>
- 
- #include "dt_idle_states.h"
- 
 -- 
-2.2.1
+Catalin
