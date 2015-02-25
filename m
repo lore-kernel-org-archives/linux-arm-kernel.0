@@ -1,50 +1,51 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Wed, 25 Feb 2015 19:11:18 +0800
-Subject: [RFC PATCH v3 00/26] Early kprobe: enable kprobes at very early
- booting stage.
-In-Reply-To: <54E6B139.20909@hitachi.com>
-References: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
- <54E6B139.20909@hitachi.com>
-Message-ID: <54EDADD6.5070404@huawei.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 25 Feb 2015 11:18:29 +0000
+Subject: [PATCH] drivers: cpuidle: Explictly include proc-fns.h for
+ cpuidle-arm64
+In-Reply-To: <1424827506-12245-1-git-send-email-lauraa@codeaurora.org>
+References: <1424827506-12245-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20150225111828.GA9714@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/2/20 11:59, Masami Hiramatsu wrote:
-> Hi,
-> 
-> Sorry for replying late.
-> 
-> (2015/02/13 14:39), Wang Nan wrote:
->> I fell very sorry for people who reviewed my v2 patch series yesterday
->> at https://lkml.org/lkml/2015/2/12/234 because I didn't provide enough
->> information in commit log. This v3 patch series add those missing
->> commit messages. There are also 2 small fix based on v2:
->>
->>  1. Fixes ftrace_sort_mcount_area. Original patch doesn't work for module.
->>  2. Wraps setting of kprobes_initialized in stop_machine() context.
-> 
-> From the viewpoint of the maintenance, it seems over-engineered and
-> not general implementation. Please reconsider just initializing breakpoint
-> handler in earlier stage. Since those exceptions may happen anywhere,
-> those trap handlers setup very early stage. E.g. on x86, setup_arch()
-> setup early_trap_init() at beginning. So we just need to initialize
-> kprobes earlier.
+Hi Laura,
 
-I tried as your suggestion. For x86, int3 handler doesn't work correctly until
-trap_init(). I don't have enough time to look into this problem today (and I don't
-familiar with x86 architecture). Could you please have a look on it?
+On Wed, Feb 25, 2015 at 01:25:06AM +0000, Laura Abbott wrote:
+> cpuidle-arm64.c fails to compile with CONFIG_ARM64_64K_PAGES=y
+> 
+> /kernel/drivers/cpuidle/cpuidle-arm64.c: In function "arm64_enter_idle_state"
+> /kernel/drivers/cpuidle/cpuidle-arm64.c:42:3: error: implicit declaration of function "cpu_do_idle" [-Werror=implicit-function-declaration]
+>    cpu_do_idle();
+>    ^
+> 
+> Explicitly add the header file with the declaration of cpu_do_idle.
+> 
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 
-Thank you.
+I just hit the same problem. The fix looks sane, and it would be nice to
+have it queued ASAP.
 
-> I think this is almost enough for debugging, and very general because
-> we don't need optprobe for porting to other arch.
+> ---
+> Not sure how long this has been broken, bisect between v3.19 and master showed
+> 6b00f7efb5303418c231994c91fb8239f5ada260 as the first bad commit which
+> isn't particularly helpful. Probably some header shuffling.
+> ---
+>  drivers/cpuidle/cpuidle-arm64.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> And for ftrace-based kprobe, we can just put breakpoint on mcount call at
-> beginning. ftrace will need to check and keep it when replacing mcount-call
-> with nop. Afterward, we can cleanly update those kprobes with ftrace-based
-> kprobe.
-> 
-> So, please start with smaller changes.
-> 
-> Thank you,
-> 
+> diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
+> index 80704b9..f1d5422 100644
+> --- a/drivers/cpuidle/cpuidle-arm64.c
+> +++ b/drivers/cpuidle/cpuidle-arm64.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/of.h>
+>  
+>  #include <asm/cpuidle.h>
+> +#include <asm/proc-fns.h>
+>  #include <asm/suspend.h>
+
+I wasn't able to apply this patch atop of v4.0-rc1 or current mainline;
+there's no asm/suspend.h include in either of those. Which tree is this
+based on?
+
+Mark.
