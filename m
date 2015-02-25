@@ -1,115 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 Feb 2015 16:55:38 +0000
-Subject: [PATCH 1/3] arm64: KVM: Fix stage-2 PGD allocation to have per-page
- refcounting
-In-Reply-To: <1424883340-29940-1-git-send-email-marc.zyngier@arm.com>
-References: <1424883340-29940-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1424883340-29940-2-git-send-email-marc.zyngier@arm.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 25 Feb 2015 11:56:36 -0500
+Subject: [PATCH v10 4/6] ARM: add vdso user-space code
+In-Reply-To: <20150224101754.GA27420@e104818-lin.cambridge.arm.com>
+References: <1411413485-7675-1-git-send-email-nathan_lynch@mentor.com>
+ <1411413485-7675-5-git-send-email-nathan_lynch@mentor.com>
+ <loom.20150213T053547-381@post.gmane.org>
+ <20150213105447.GB3508@e104818-lin.cambridge.arm.com>
+ <loom.20150213T124417-857@post.gmane.org> <20150213141425.GA4713@localhost>
+ <loom.20150213T153239-809@post.gmane.org>
+ <20150213153253.GA23801@e104818-lin.cambridge.arm.com>
+ <loom.20150218T122348-60@post.gmane.org> <54E7AC90.40209@codeaurora.org>
+ <20150224101754.GA27420@e104818-lin.cambridge.arm.com>
+Message-ID: <54EDFEC4.7060600@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're using __get_free_pages with to allocate the guest's stage-2
-PGD. The standard behaviour of this function is to return a set of
-pages where only the head page has a valid refcount.
+Hi Catalin,
 
-This behaviour gets us into trouble when we're trying to increment
-the refount on a non-head page:
+On 02/24/2015 05:17 AM, Catalin Marinas wrote:
 
-page:ffff7c00cfb693c0 count:0 mapcount:0 mapping:          (null) index:0x0
-flags: 0x4000000000000000()
-page dumped because: VM_BUG_ON_PAGE((*({ __attribute__((unused)) typeof((&page->_count)->counter) __var = ( typeof((&page->_count)->counter)) 0; (volatile typeof((&page->_count)->counter) *)&((&page->_count)->counter); })) <= 0)
-BUG: failure@include/linux/mm.h:548/get_page()!
-Kernel panic - not syncing: BUG!
-CPU: 1 PID: 1695 Comm: kvm-vcpu-0 Not tainted 4.0.0-rc1+ #3825
-Hardware name: APM X-Gene Mustang board (DT)
-Call trace:
-[<ffff80000008a09c>] dump_backtrace+0x0/0x13c
-[<ffff80000008a1e8>] show_stack+0x10/0x1c
-[<ffff800000691da8>] dump_stack+0x74/0x94
-[<ffff800000690d78>] panic+0x100/0x240
-[<ffff8000000a0bc4>] stage2_get_pmd+0x17c/0x2bc
-[<ffff8000000a1dc4>] kvm_handle_guest_abort+0x4b4/0x6b0
-[<ffff8000000a420c>] handle_exit+0x58/0x180
-[<ffff80000009e7a4>] kvm_arch_vcpu_ioctl_run+0x114/0x45c
-[<ffff800000099df4>] kvm_vcpu_ioctl+0x2e0/0x754
-[<ffff8000001c0a18>] do_vfs_ioctl+0x424/0x5c8
-[<ffff8000001c0bfc>] SyS_ioctl+0x40/0x78
-CPU0: stopping
+[snip]
 
-Passing the (unintuitively named) __GFP_COMP flag to __get_free_pages
-forces the allocator to maintain a per-page refcount, which is exactly
-what we need.
+> Writing CNTFRQ from non-secure mode would trap as well.
 
-This has been tested on an X-Gene platform with a 4kB/48bit-VA host
-kernel, and kvmtool hacked to place memory in the second page of
-the hardware PGD (PUD for the host kernel).
+Are you saying it could A) cause an exception targeting the current EL/mode
+but not others, or B) cause an exception targeting the current or another EL/mode?
 
-Reported-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_mmu.h   | 7 +++++++
- arch/arm/kvm/mmu.c               | 2 +-
- arch/arm64/include/asm/kvm_mmu.h | 9 ++++++++-
- 3 files changed, 16 insertions(+), 2 deletions(-)
+[snip]
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 37ca2a4..1cac89b 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -162,6 +162,13 @@ static inline bool kvm_page_empty(void *ptr)
- 
- #define KVM_PREALLOC_LEVEL	0
- 
-+/*
-+ * We need to ensure that stage-2 PGDs are allocated with a per-page
-+ * refcount, as we fiddle with the refcounts of non-head pages.
-+ * __GFP_COMP forces the allocator to do what we want.
-+ */
-+#define KVM_GFP_S2_PGD	(GFP_KERNEL | __GFP_ZERO | __GFP_COMP)
-+
- static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
- {
- 	return 0;
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 3e6859b..a6a8252 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -666,7 +666,7 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
- 		 * Allocate actual first-level Stage-2 page table used by the
- 		 * hardware for Stage-2 page table walks.
- 		 */
--		pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, S2_PGD_ORDER);
-+		pgd = (pgd_t *)__get_free_pages(KVM_GFP_S2_PGD, S2_PGD_ORDER);
- 	}
- 
- 	if (!pgd)
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 6458b53..06c733a 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -171,6 +171,13 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
- #define KVM_PREALLOC_LEVEL	(0)
- #endif
- 
-+/*
-+ * We need to ensure that stage-2 PGDs are allocated with a per-page
-+ * refcount, as we fiddle with the refcounts of non-head pages.
-+ * __GFP_COMP forces the allocator to do what we want.
-+ */
-+#define KVM_GFP_S2_PGD	(GFP_KERNEL | __GFP_ZERO | __GFP_COMP)
-+
- /**
-  * kvm_prealloc_hwpgd - allocate inital table for VTTBR
-  * @kvm:	The KVM struct pointer for the VM.
-@@ -192,7 +199,7 @@ static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
- 	if (KVM_PREALLOC_LEVEL == 0)
- 		return 0;
- 
--	hwpgd = __get_free_pages(GFP_KERNEL | __GFP_ZERO, PTRS_PER_S2_PGD_SHIFT);
-+	hwpgd = __get_free_pages(KVM_GFP_S2_PGD, PTRS_PER_S2_PGD_SHIFT);
- 	if (!hwpgd)
- 		return -ENOMEM;
- 
+> The detection mechanism would have to involve trapping of an undefined
+> instruction but it doesn't need to be done early during boot.
+
+I put detection during early boot because I wanted to potentially change
+ELs/modes during early boot.
+
+Thanks,
+Chris
+
 -- 
-2.1.4
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
