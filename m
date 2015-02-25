@@ -1,46 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Feb 2015 11:10:42 +0000
-Subject: [PATCH] arm64: mm: remove unused functions and variable protoypes
-In-Reply-To: <1424832465-21181-1-git-send-email-yingjoe.chen@mediatek.com>
-References: <1424832465-21181-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <20150225111041.GA17366@arm.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Wed, 25 Feb 2015 12:14:30 +0100
+Subject: [PATCH] hwmon: (gpio-fan) allow to use alarm support alone from DT
+In-Reply-To: <54EB3C84.30503@roeck-us.net>
+References: <1424696334-14767-1-git-send-email-simon.guinot@sequanux.org>
+ <54EB33D4.1000804@roeck-us.net>
+ <20150223143416.GT1509@kw.sim.vm.gnt> <54EB3C84.30503@roeck-us.net>
+Message-ID: <20150225111430.GV1509@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 02:47:45AM +0000, Yingjoe Chen wrote:
-> The functions __cpu_flush_user_tlb_range and __cpu_flush_kern_tlb_range
-> were removed in commit fa48e6f780 'arm64: mm: Optimise tlb flush logic
-> where we have >4K granule'. Global variable cpu_tlb was never used in
-> arm64.
-> 
-> Remove them.
-> 
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> ---
->  arch/arm64/include/asm/tlbflush.h | 5 -----
->  1 file changed, 5 deletions(-)
+On Mon, Feb 23, 2015 at 06:43:16AM -0800, Guenter Roeck wrote:
+> On 02/23/2015 06:34 AM, Simon Guinot wrote:
+> >On Mon, Feb 23, 2015 at 06:06:12AM -0800, Guenter Roeck wrote:
+> >>On 02/23/2015 04:58 AM, Simon Guinot wrote:
+> >>>On some boards, such as the LaCie 2Big Network v2 or 2Big NAS (based on
+> >>>Marvell Kirkwood SoCs), an I2C fan controller is used but the alarm
+> >>>signal is wired to a separate GPIO. Unfortunately, the gpio-fan driver
+> >>>can't be used to handle GPIO alarm alone from DT: an error is returned
+> >>>if the "gpios" DT property is missing.
+> >>>
+> >>>This patch allows to use the gpio-fan driver even if the "alarm-gpios"
+> >>>DT property is defined alone.
+> >>>
+> >>
+> >>That is the wrong solution. The gpio alarm signal should be handled
+> >>by the fan controller driver.
+> >
+> >Hi Guenter,
+> >
+> >Sure it should, but unfortunately it is not the case. I have several
+> >boards using this mechanism (ie: a separate fan alarm GPIO). I think the
+> >idea was to reduce the board cost...
+> >
+> Well, yes, the driver for the fan controller chip needs to be updated
+> to support interrupts.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+This will not help for the boards I mentioned. As an attempt to reduce
+the board cost, a fan with 2 wires has been used. This means we don't
+have any tachymeter feedback and then the controller alarm mechanism
+can't be used. Instead a kind of hardware hack allows to have a fan
+alarm on a separate GPIO.
 
-Will
+> 
+> >Then this means I need a way to support this alarm signal and I can't
+> >find a better one than using gpio-fan. Note that this was possible with
+> >the original gpio-fan implementation (before the DT binding addition).
+> >
+> 
+> That doesn't help.
 
-> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-> index 73f0ce5..4abe9b9 100644
-> --- a/arch/arm64/include/asm/tlbflush.h
-> +++ b/arch/arm64/include/asm/tlbflush.h
-> @@ -24,11 +24,6 @@
->  #include <linux/sched.h>
->  #include <asm/cputype.h>
->  
-> -extern void __cpu_flush_user_tlb_range(unsigned long, unsigned long, struct vm_area_struct *);
-> -extern void __cpu_flush_kern_tlb_range(unsigned long, unsigned long);
-> -
-> -extern struct cpu_tlb_fns cpu_tlb;
-> -
->  /*
->   *	TLB Management
->   *	==============
-> -- 
-> 1.8.1.1.dirty
+Handle the GPIO fan alarm feature from the fan controller driver don't
+look good either to me. This alarm mechanism is not a part of the fan
+controller itself but rather something apart. Also I am afraid that the
+result would really look like a hack.
+
+Simon
+
 > 
 > 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150225/7fcd800a/attachment.sig>
