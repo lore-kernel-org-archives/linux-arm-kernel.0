@@ -1,70 +1,49 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Wed, 25 Feb 2015 13:04:47 +0100
-Subject: [PATCH v2 14/18] ARM: Add STM32 family machine
-In-Reply-To: <1424468240.24292.5.camel@x220>
-References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1424455277-29983-15-git-send-email-mcoquelin.stm32@gmail.com>
- <20150220200019.GU19388@pengutronix.de>
- <1424468240.24292.5.camel@x220>
-Message-ID: <CALszF6CGT35V71QKTrDx+1Ltrctv5F7t8Zq6Tq15zn2bZGQXwQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 25 Feb 2015 13:02:34 +0100
+Subject: [PATCH 0/7] New eFuse subsystem
+In-Reply-To: <1424864719-3390-1-git-send-email-ezequiel.garcia@imgtec.com>
+References: <1424864719-3390-1-git-send-email-ezequiel.garcia@imgtec.com>
+Message-ID: <20150225120234.GB5062@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-02-20 22:37 GMT+01:00 Paul Bolle <pebolle@tiscali.nl>:
-> On Fri, 2015-02-20 at 21:00 +0100, Uwe Kleine-K?nig wrote:
->> On Fri, Feb 20, 2015 at 07:01:13PM +0100, Maxime Coquelin wrote:
->> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> > index 97d07ed..cfd9532 100644
->> > --- a/arch/arm/Kconfig
->> > +++ b/arch/arm/Kconfig
->> > @@ -774,6 +774,28 @@ config ARCH_OMAP1
->> >     help
->> >       Support for older TI OMAP1 (omap7xx, omap15xx or omap16xx)
->> >
->> > +config ARCH_STM32
->> > +   bool "STMicrolectronics STM32"
->> > +   depends on !MMU
->> > +   select ARCH_REQUIRE_GPIOLIB
->> > +   select ARM_NVIC
->> > +   select AUTO_ZRELADDR
->> > +   select ARCH_HAS_RESET_CONTROLLER
->> > +   select RESET_CONTROLLER
->> > +   select PINCTRL
->> > +   select PINCTRL_STM32
->> > +   select CLKSRC_OF
->> > +   select ARMV7M_SYSTICK
->> > +   select COMMON_CLK
->> > +   select CPU_V7M
->> > +   select GENERIC_CLOCKEVENTS
->> > +   select NO_DMA
->> > +   select NO_IOPORT_MAP
->> > +   select SPARSE_IRQ
->> > +   select USE_OF
->> Please sort this list alphabetically.
->
-> And drop
->     select NO_DMA
->
-> You copied that from ARCH_EFM32, but it's pointless on arm (as arch/arm/
-> doesn't provide a NO_DMA Kconfig symbol).
+Hi Ezequiel,
 
-You are right, I will drop NO_DMA in v3.
+On Wed, Feb 25, 2015 at 08:45:12AM -0300, Ezequiel Garcia wrote:
+> This patchset introduces a new driver subsystem, meant to support eFuse
+> (alias OTP, one-time-programmable) devices.
+> 
+> The motivation behind this work is to have a common place for drivers
+> that are currently more or less scattered: the tegra efuses are in
+> drivers/soc/ and the sunxi efuses in drivers/misc/eeprom.
+> 
+> For now, there's no proposal for a generic efuse API. Instead, we simply
+> group the drivers together.
+> 
+> This patchset is the result of the initial submission for IMG Pistachio
+> eFuse support [1]. Our first proposal was to follow the Tegra efuse, and
+> put the Pistachio efuse in drivers/soc. After some discussion we finally
+> agreed [2] to first create an efuse directoy, and then put all efuse drivers
+> in it.
+> 
+> As always, all comments are welcome!
+> 
+> [1] http://www.spinics.net/lists/devicetree/msg59246.html
+> [2] http://www.spinics.net/lists/arm-kernel/msg389325.html
 
-Thanks,
+Have you looked at the EEPROM framework currently in discussions? The
+two seems to be covering pretty much the same use cases.
+
 Maxime
 
->
-> I submitted a patch last year to drop it from ARCH_EFM32, which Uwe
-> Acked, but then nothing happened. I'm to blame, as I should have sent a
-> reminder.
->
->> > +   help
->> > +     Support for STMicorelectronics STM32 processors.
->> > +
->> >  endchoice
->> >
->> >  menu "Multiple platform selection"
->
->
-> Paul Bolle
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150225/ca06db6f/attachment.sig>
