@@ -1,28 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Feb 2015 16:44:15 +0100
-Subject: [PATCH] ASoC: omap: fix up SND_OMAP_SOC_OMAP_ABE_TWL6040
- dependency
-In-Reply-To: <54EDEAE3.6080605@ti.com>
-References: <22890811.0MuvZ4MxOU@wuerfel> <54EDEAE3.6080605@ti.com>
-Message-ID: <2482424.WOd0SW5Oav@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 25 Feb 2015 15:48:08 +0000
+Subject: [PATCH v2 3/4] clk: Provide an always-on clock domain framework
+In-Reply-To: <CAL_Jsq+N4D8fUCwrYwxLaRpbhsgi5eZy5cLpsSmp8VoTQZUqow@mail.gmail.com>
+References: <1424276101-30137-1-git-send-email-lee.jones@linaro.org>
+ <1424276101-30137-4-git-send-email-lee.jones@linaro.org>
+ <20150223172344.421.62815@quantum>
+ <CAL_Jsq+N4D8fUCwrYwxLaRpbhsgi5eZy5cLpsSmp8VoTQZUqow@mail.gmail.com>
+Message-ID: <20150225154808.GD6688@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 February 2015 17:31:47 Peter Ujfalusi wrote:
-> Would it be better to have this changed to:
->         select COMMON_CLK_PALMAS if MFD_PALMAS
-> instead of removing.
+On Wed, 25 Feb 2015, Rob Herring wrote:
+
+> On Mon, Feb 23, 2015 at 11:23 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> > Quoting Lee Jones (2015-02-18 08:15:00)
+> >> Much h/w contain clocks which if turned off would prove fatal.  The
+> >> only way to recover is to restart the board(s).  This driver takes
+> >> references to clocks which are required to be always-on in order to
+> >> prevent the common clk framework from trying to turn them off during
+> >> the clk_disabled_unused() procedure.
 > 
-> All OMAP5 boards uses Palmas as PMIC and the boards where twl6040 audio is in
-> use the 32K clock for the codec is coming from Palmas.
-> Without this clock the twl6040 will not boot up causing errors during probe time.
+> [...]
+> 
+> >> +static int ao_clock_domain_probe(struct platform_device *pdev)
+> >> +{
+> >> +       struct device_node *np = pdev->dev.of_node;
+> >> +       int nclks, i;
+> >> +
+> >> +       nclks = of_count_phandle_with_args(np, "clocks", "#clock-cells");
+> >
+> > Minor nitpick: please use of_clk_get_parent_count. I spent a solid 5
+> > minutes writing that function and I need people to use it so I can get a
+> > return on my investment.
+> >
+> > Otherwise the patch looks good. I believe that this method is targeting
+> > always-on clock in a production environment, which is different from the
+> > CLK_IGNORE_UNUSED stuff which typically is helpful while bringing up new
+> > hardware or dealing with a platform that has incomplete driver support.
+> 
+> There is also the usecase of keep clocks on until I load a module that
+> properly handles my hardware (e.g simplefb). We have a simplefb node
+> with clocks and the simplefb driver jumps thru some hoops to hand-off
+> clocks to the real driver. I don't really like it and don't want to
+> see more examples. And there is the case of I thought I would never
+> manage this clock, but kernel subsystems evolve and now I want to
+> manage a clock. This should not require a DT update to do so.
+> 
+> Neither of these may be Lee's usecase, but I want to see them covered
+> by the binding.
+> 
+> > I wonder if there is a clever way for existing clock providers
+> > (expressed in DT) to use this without having to create a separate node
+> > of clocks with the "always-on-clk-domain" flag. Possibly the common
+> > clock binding could declare some always-on flag that is standardized?
+> > Then the framework core could use this code easily. Not sure if that is
+> > a good idea though...
+> 
+> I would prefer to see the always on clocks just listed within the
+> clock controller's node rather than creating made up nodes with clock
+> properties.
 
-It's possible to build a kernel with omap5 support and this driver but
-no palmas support, which makes the dependency it a bit strange, but I'll
-let Mark decide.
+> This should be always-on until claimed IMO, but that
+> aspect is the OS's problem, not a DT problem.
 
-Unfortunately, I've sent the changed v2 patch without fixing up the commit
-message. Instead of sending another v3 right away, I'll wait for Mark
-to comment.
+I disagree with this point.  There are likely to be many unclaimed,
+but perfectly gateable clocks in a system, which will consume power
+unnecessarily.  The clk framework does the right thing by turning all
+unclaimed clocks off IMHO.  This only leaves a small use-case where we
+need to artificially claim some which must not be gated.
 
-	Arnd
+The other way to do is, as you mentioned is list the clocks which must
+stay on in the clock source node, but this will still require a
+binding.  It will also require a much more complicated framework
+driver.
+
+    clkprovider at xxxxxxxx {
+            always-on-clks = <1, 2, 4, 5, 7>;
+    };
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
