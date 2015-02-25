@@ -1,76 +1,102 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 25 Feb 2015 16:39:46 +0800
-Subject: [PATCH v9 06/21] ACPI: fix acpi_os_ioremap for arm64
+Date: Wed, 25 Feb 2015 16:39:47 +0800
+Subject: [PATCH v9 07/21] ACPI / sleep: Introduce arm64 specific acpi_sleep.c
 In-Reply-To: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
 References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1424853601-6675-7-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1424853601-6675-8-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Salter <msalter@redhat.com>
+From: Graeme Gregory <graeme.gregory@linaro.org>
 
-The acpi_os_ioremap() function may be used to map normal RAM or IO
-regions. The current implementation simply uses ioremap_cache(). This
-will work for some architectures, but arm64 ioremap_cache() cannot be
-used to map IO regions which don't support caching. So for arm64, use
-ioremap() for non-RAM regions.
+ACPI 5.1 does not currently support S states for ARM64 hardware but
+ACPI code will call acpi_target_system_state() for device power
+management, so introduce acpi_sleep.c to allow other drivers to function
+until S states are defined.
 
-CC: Rafael J Wysocki <rjw@rjwysocki.net>
-CC: Catalin Marinas <catalin.marinas@arm.com>
+Since it is arm64 specific stub holder, so let acpi_sleep.c to ARM64
+specific.
+
+TODO: merge this with drivers/acpi/sleep.c once we fix the specification.
+
+CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+Tested-by: Yijing Wang <wangyijing@huawei.com>
+Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+Tested-by: Jon Masters <jcm@redhat.com>
+Tested-by: Timur Tabi <timur@codeaurora.org>
 Tested-by: Robert Richter <rrichter@cavium.com>
 Acked-by: Robert Richter <rrichter@cavium.com>
-Signed-off-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/arm64/include/asm/acpi.h | 13 +++++++++++++
- include/acpi/acpi_io.h        |  4 ++++
- 2 files changed, 17 insertions(+)
+ arch/arm64/kernel/Makefile     |  2 +-
+ arch/arm64/kernel/acpi_sleep.c | 28 ++++++++++++++++++++++++++++
+ drivers/acpi/Makefile          |  2 ++
+ 3 files changed, 31 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/kernel/acpi_sleep.c
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 8b837ab..40e0924 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -12,8 +12,21 @@
- #ifndef _ASM_ACPI_H
- #define _ASM_ACPI_H
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 218eb7e..4435943 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -34,7 +34,7 @@ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
+ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
+ arm64-obj-$(CONFIG_PCI)			+= pci.o
+ arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+-arm64-obj-$(CONFIG_ACPI)		+= acpi.o
++arm64-obj-$(CONFIG_ACPI)		+= acpi.o acpi_sleep.o
  
-+#include <linux/mm.h>
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/acpi_sleep.c b/arch/arm64/kernel/acpi_sleep.c
+new file mode 100644
+index 0000000..54578ef
+--- /dev/null
++++ b/arch/arm64/kernel/acpi_sleep.c
+@@ -0,0 +1,28 @@
++/*
++ *  ARM64 Specific Sleep Functionality
++ *
++ *  Copyright (C) 2013-2014, Linaro Ltd.
++ *      Author: Graeme Gregory <graeme.gregory@linaro.org>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
++ */
 +
- /* Basic configuration for ACPI */
- #ifdef	CONFIG_ACPI
-+/* ACPI table mapping after acpi_gbl_permanent_mmap is set */
-+static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
-+					    acpi_size size)
++#include <linux/acpi.h>
++
++/*
++ * Currently the ACPI 5.1 standard does not define S states in a
++ * manner which is usable for ARM64. These two stubs are sufficient
++ * that system initialises and device PM works.
++ */
++u32 acpi_target_system_state(void)
 +{
-+	if (!page_is_ram(phys >> PAGE_SHIFT))
-+		return ioremap(phys, size);
-+
-+	return ioremap_cache(phys, size);
++	return ACPI_STATE_S0;
 +}
-+#define acpi_os_ioremap acpi_os_ioremap
++EXPORT_SYMBOL_GPL(acpi_target_system_state);
 +
- #define acpi_strict 1	/* No out-of-spec workarounds on ARM64 */
- extern int acpi_disabled;
- extern int acpi_noirq;
-diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
-index 444671e..dd86c5f 100644
---- a/include/acpi/acpi_io.h
-+++ b/include/acpi/acpi_io.h
-@@ -3,11 +3,15 @@
++int __init acpi_sleep_init(void)
++{
++	return -ENOSYS;
++}
+diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+index 623b117..c32edf5 100644
+--- a/drivers/acpi/Makefile
++++ b/drivers/acpi/Makefile
+@@ -23,7 +23,9 @@ acpi-y				+= nvs.o
  
- #include <linux/io.h>
+ # Power management related files
+ acpi-y				+= wakeup.o
++ifneq (,$(findstring $(ARCH),x86 ia64))
+ acpi-y				+= sleep.o
++endif
+ acpi-y				+= device_pm.o
+ acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
  
-+#include <asm/acpi.h>
-+
-+#ifndef acpi_os_ioremap
- static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
- 					    acpi_size size)
- {
-        return ioremap_cache(phys, size);
- }
-+#endif
- 
- void __iomem *__init_refok
- acpi_os_map_iomem(acpi_physical_address phys, acpi_size size);
 -- 
 1.9.1
