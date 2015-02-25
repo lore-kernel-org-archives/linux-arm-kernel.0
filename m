@@ -1,32 +1,34 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 25 Feb 2015 16:04:59 +0100
-Subject: [PATCH] hwmon: (gpio-fan) allow to use alarm support alone from DT
-In-Reply-To: <54EDE171.7040403@roeck-us.net>
-References: <1424696334-14767-1-git-send-email-simon.guinot@sequanux.org>
- <54EB33D4.1000804@roeck-us.net>
- <20150223143416.GT1509@kw.sim.vm.gnt> <54EB3C84.30503@roeck-us.net>
- <20150225111430.GV1509@kw.sim.vm.gnt>
- <20150225135015.GA17992@lunn.ch> <54EDE171.7040403@roeck-us.net>
-Message-ID: <20150225150459.GE17992@lunn.ch>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 25 Feb 2015 15:08:53 +0000
+Subject: [PATCH 2/6] ahci: st: Update the DT example for how to obtain
+ the PHY.
+In-Reply-To: <CAL_JsqLbQWK-iZ+bH7SJzUjUZzYkdPVoDFSjaFd9TS29YOVQkA@mail.gmail.com>
+References: <1424871377-1795-1-git-send-email-peter.griffin@linaro.org>
+ <1424871377-1795-3-git-send-email-peter.griffin@linaro.org>
+ <CAL_JsqLbQWK-iZ+bH7SJzUjUZzYkdPVoDFSjaFd9TS29YOVQkA@mail.gmail.com>
+Message-ID: <20150225150853.GC5132@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> However, we need to state and check in the code that _some_ property
-> is mandatory. A driver with only optional properties doesn't make
-> sense.
+On Wed, 25 Feb 2015, Rob Herring wrote:
 
-The patch to the binding documentation said:
+> On Wed, Feb 25, 2015 at 7:36 AM, Peter Griffin <peter.griffin@linaro.org> wrote:
+> > The example is wrong in that the phys property should take a
+> > phandle to the phy port.
+> >
+> > Also with the changing over to generic PHY type constants we also
+> > update this as well.
+> >
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> 
+> We seem to have a variety of ways to describe phy's with SATA
+> controllers. Some consistency would have been nice.
 
-Note: At least one the "gpios" and "alarm-gpios" properties should be set.
+This way is the correct way.  I worked closely with Kishon to get it
+right.  He even used this code as an example at ELC, Dusseldorf.
 
-which i then suggested should be:
-
-Note: At least one of "gpios" or "alarm-gpios" properties should be set.
-
-What we could do is move this sentence into the Required Properties of
-the documentation.
-
-The patch Simon submitted also does check that this condition is
-fulfilled.
-
-	Andrew
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
