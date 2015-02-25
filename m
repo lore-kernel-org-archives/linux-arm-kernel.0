@@ -1,31 +1,38 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 25 Feb 2015 15:08:53 +0000
-Subject: [PATCH 2/6] ahci: st: Update the DT example for how to obtain
- the PHY.
-In-Reply-To: <CAL_JsqLbQWK-iZ+bH7SJzUjUZzYkdPVoDFSjaFd9TS29YOVQkA@mail.gmail.com>
+Date: Wed, 25 Feb 2015 15:10:00 +0000
+Subject: [PATCH 6/6] MAINTAINERS: Add phy-miphy28lp.c to ARCH/STI
+ architecture
+In-Reply-To: <1424871377-1795-7-git-send-email-peter.griffin@linaro.org>
 References: <1424871377-1795-1-git-send-email-peter.griffin@linaro.org>
- <1424871377-1795-3-git-send-email-peter.griffin@linaro.org>
- <CAL_JsqLbQWK-iZ+bH7SJzUjUZzYkdPVoDFSjaFd9TS29YOVQkA@mail.gmail.com>
-Message-ID: <20150225150853.GC5132@x1>
+ <1424871377-1795-7-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20150225151000.GD5132@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Feb 2015, Rob Herring wrote:
+On Wed, 25 Feb 2015, Peter Griffin wrote:
 
-> On Wed, Feb 25, 2015 at 7:36 AM, Peter Griffin <peter.griffin@linaro.org> wrote:
-> > The example is wrong in that the phys property should take a
-> > phandle to the phy port.
-> >
-> > Also with the changing over to generic PHY type constants we also
-> > update this as well.
-> >
-> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> This patch adds the phy-miphy28lp.c phy driver found on STMicroelectronics
+> stih407 family SoC's into the STI arch section of the maintainers file.
 > 
-> We seem to have a variety of ways to describe phy's with SATA
-> controllers. Some consistency would have been nice.
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  MAINTAINERS | 1 +
+>  1 file changed, 1 insertion(+)
 
-This way is the correct way.  I worked closely with Kishon to get it
-right.  He even used this code as an example at ELC, Dusseldorf.
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index ddc5a8c..1a6180a 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1457,6 +1457,7 @@ F:	drivers/clocksource/arm_global_timer.c
+>  F:	drivers/i2c/busses/i2c-st.c
+>  F:	drivers/media/rc/st_rc.c
+>  F:	drivers/mmc/host/sdhci-st.c
+> +F:	drivers/phy/phy-miphy28lp.c
+>  F:	drivers/phy/phy-stih407-usb.c
+>  F:	drivers/phy/phy-stih41x-usb.c
+>  F:	drivers/pinctrl/pinctrl-st.c
 
 -- 
 Lee Jones
