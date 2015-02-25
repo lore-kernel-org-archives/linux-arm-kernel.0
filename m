@@ -1,143 +1,126 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 25 Feb 2015 21:04:42 +0200
-Subject: [PATCHv3 32/35] ARM: OMAP4+: control: remove support for legacy pad
- read/write
+Date: Wed, 25 Feb 2015 21:04:43 +0200
+Subject: [PATCHv3 33/35] ARM: dts: omap5: add system control module node
 In-Reply-To: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
 References: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1424891085-10392-33-git-send-email-t-kristo@ti.com>
+Message-ID: <1424891085-10392-34-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap4_ctrl_pad_readl/writel are no longer used by anybody, so remove
-these. Syscon / pinctrl should be used to access the padconf area
-instead.
+Add node for system control module, and move all the existing system
+control IO space users under this new node as its children. A new node
+for scm_conf area is also added.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/control.c |   24 +-----------------------
- arch/arm/mach-omap2/control.h |    5 +----
- arch/arm/mach-omap2/io.c      |   11 ++++-------
- 3 files changed, 6 insertions(+), 34 deletions(-)
+ .../devicetree/bindings/arm/omap/ctrl.txt          |    1 +
+ arch/arm/boot/dts/omap5.dtsi                       |   76 +++++++++++++-------
+ 2 files changed, 51 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index a072f071..570bb07 100644
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -36,7 +36,6 @@
+diff --git a/Documentation/devicetree/bindings/arm/omap/ctrl.txt b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
+index 88b12b5..3574d67 100644
+--- a/Documentation/devicetree/bindings/arm/omap/ctrl.txt
++++ b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
+@@ -20,6 +20,7 @@ Required properties:
+ 		"ti,omap2-scrm"
+ 		"ti,omap3-scrm"
+ 		"ti,omap4-ctrl"
++		"ti,omap5-ctrl"
+ - reg:		Contains Control Module register address range
+ 		(base address and length)
  
- static void __iomem *omap2_ctrl_base;
- static s16 omap2_ctrl_offset;
--static void __iomem *omap4_ctrl_pad_base;
- static struct regmap *omap2_ctrl_syscon;
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index b321fdf..3fe0c8a 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -182,38 +182,62 @@
+ 			};
+ 		};
  
- #if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
-@@ -139,13 +138,9 @@ struct omap3_control_regs {
- static struct omap3_control_regs control_context;
- #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
++		scm: scm at 4a002000 {
++			compatible = "ti,omap5-ctrl", "simple-bus";
++			reg = <0x4a002000 0x800>,
++			      <0x4a002800 0x800>,
++			      <0x4ae0c000 0x800>,
++			      <0x4ae0c800 0x800>;
++			#address-cells = <2>;
++			#size-cells = <1>;
++			ranges = <0 0 0x4a002000 0x800>,
++				 <1 0 0x4a002800 0x800>,
++				 <2 0 0x4ae0c000 0x800>,
++				 <3 0 0x4ae0c800 0x800>;
++
++			scm_conf: tisyscon at 0,0 {
++				compatible = "syscon";
++				reg = <0 0x0 0x800>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++			};
++
++			omap5_pmx_core: pinmux at 1,40 {
++				compatible = "ti,omap5-padconf",
++					     "pinctrl-single";
++				reg = <1 0x40 0x01b6>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				#interrupt-cells = <1>;
++				interrupt-controller;
++				pinctrl-single,register-width = <16>;
++				pinctrl-single,function-mask = <0x7fff>;
++			};
++
++			omap5_pmx_wkup: pinmux at 3,40 {
++				compatible = "ti,omap5-padconf",
++					     "pinctrl-single";
++				reg = <3 0x40 0x0038>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				#interrupt-cells = <1>;
++				interrupt-controller;
++				pinctrl-single,register-width = <16>;
++				pinctrl-single,function-mask = <0x7fff>;
++			};
++
++			omap5_padconf_global: omap5_padconf_global at 1,5a0 {
++				compatible = "syscon";
++				reg = <1 0x5a0 0xec>;
++			};
++		};
++
+ 		counter32k: counter at 4ae04000 {
+ 			compatible = "ti,omap-counter32k";
+ 			reg = <0x4ae04000 0x40>;
+ 			ti,hwmods = "counter_32k";
+ 		};
  
--#define OMAP4_CTRL_PAD_REGADDR(reg)	(omap4_ctrl_pad_base + (reg))
+-		omap5_pmx_core: pinmux at 4a002840 {
+-			compatible = "ti,omap5-padconf", "pinctrl-single";
+-			reg = <0x4a002840 0x01b6>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			#interrupt-cells = <1>;
+-			interrupt-controller;
+-			pinctrl-single,register-width = <16>;
+-			pinctrl-single,function-mask = <0x7fff>;
+-		};
+-		omap5_pmx_wkup: pinmux at 4ae0c840 {
+-			compatible = "ti,omap5-padconf", "pinctrl-single";
+-			reg = <0x4ae0c840 0x0038>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			#interrupt-cells = <1>;
+-			interrupt-controller;
+-			pinctrl-single,register-width = <16>;
+-			pinctrl-single,function-mask = <0x7fff>;
+-		};
 -
--void __init omap2_set_globals_control(void __iomem *ctrl,
--				      void __iomem *ctrl_pad)
-+void __init omap2_set_globals_control(void __iomem *ctrl)
- {
- 	omap2_ctrl_base = ctrl;
--	omap4_ctrl_pad_base = ctrl_pad;
- }
- 
- u8 omap_ctrl_readb(u16 offset)
-@@ -218,23 +213,6 @@ void omap_ctrl_writel(u32 val, u16 offset)
- 			     val);
- }
- 
--/*
-- * On OMAP4 control pad are not addressable from control
-- * core base. So the common omap_ctrl_read/write APIs breaks
-- * Hence export separate APIs to manage the omap4 pad control
-- * registers. This APIs will work only for OMAP4
-- */
+-		omap5_padconf_global: tisyscon at 4a002da0 {
+-			compatible = "syscon";
+-			reg = <0x4A002da0 0xec>;
+-		};
 -
--u32 omap4_ctrl_pad_readl(u16 offset)
--{
--	return readl_relaxed(OMAP4_CTRL_PAD_REGADDR(offset));
--}
--
--void omap4_ctrl_pad_writel(u32 val, u16 offset)
--{
--	writel_relaxed(val, OMAP4_CTRL_PAD_REGADDR(offset));
--}
--
- #ifdef CONFIG_ARCH_OMAP3
- 
- /**
-diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
-index 5353ff4..80d2b7d 100644
---- a/arch/arm/mach-omap2/control.h
-+++ b/arch/arm/mach-omap2/control.h
-@@ -443,11 +443,9 @@
- extern u8 omap_ctrl_readb(u16 offset);
- extern u16 omap_ctrl_readw(u16 offset);
- extern u32 omap_ctrl_readl(u16 offset);
--extern u32 omap4_ctrl_pad_readl(u16 offset);
- extern void omap_ctrl_writeb(u8 val, u16 offset);
- extern void omap_ctrl_writew(u16 val, u16 offset);
- extern void omap_ctrl_writel(u32 val, u16 offset);
--extern void omap4_ctrl_pad_writel(u32 val, u16 offset);
- 
- extern void omap3_save_scratchpad_contents(void);
- extern void omap3_clear_scratchpad_contents(void);
-@@ -465,8 +463,7 @@ extern int omap3_ctrl_save_padconf(void);
- void omap3_ctrl_init(void);
- int omap2_control_base_init(void);
- int omap_control_init(void);
--extern void omap2_set_globals_control(void __iomem *ctrl,
--				      void __iomem *ctrl_pad);
-+void omap2_set_globals_control(void __iomem *ctrl);
- void __init omap3_control_legacy_iomap_init(void);
- #else
- #define omap_ctrl_readb(x)		0
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index c3fa739..6c39cc0 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -443,7 +443,7 @@ void __init omap3_init_early(void)
- 	/* XXX: remove these once OMAP3 is DT only */
- 	if (!of_have_populated_dt()) {
- 		omap2_set_globals_control(
--			OMAP2_L4_IO_ADDRESS(OMAP343X_CTRL_BASE), NULL);
-+			OMAP2_L4_IO_ADDRESS(OMAP343X_CTRL_BASE));
- 		omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP3430_PRM_BASE));
- 		omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP3430_CM_BASE),
- 				     NULL);
-@@ -631,8 +631,7 @@ void __init omap4430_init_early(void)
- {
- 	omap2_set_globals_tap(OMAP443X_CLASS,
- 			      OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE));
--	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
--				  OMAP2_L4_IO_ADDRESS(OMAP443X_CTRL_BASE));
-+	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE));
- 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP4430_PRCM_MPU_BASE));
- 	omap4xxx_check_revision();
- 	omap4xxx_check_features();
-@@ -660,8 +659,7 @@ void __init omap5_init_early(void)
- {
- 	omap2_set_globals_tap(OMAP54XX_CLASS,
- 			      OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
--	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
--				  OMAP2_L4_IO_ADDRESS(OMAP54XX_CTRL_BASE));
-+	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
- 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
- 	omap4_pm_init_early();
- 	omap2_prcm_base_init();
-@@ -686,8 +684,7 @@ void __init omap5_init_late(void)
- void __init dra7xx_init_early(void)
- {
- 	omap2_set_globals_tap(-1, OMAP2_L4_IO_ADDRESS(DRA7XX_TAP_BASE));
--	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
--				  OMAP2_L4_IO_ADDRESS(DRA7XX_CTRL_BASE));
-+	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
- 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
- 	omap4_pm_init_early();
- 	omap2_prcm_base_init();
+ 		pbias_regulator: pbias_regulator {
+ 			compatible = "ti,pbias-omap";
+ 			reg = <0x60 0x4>;
 -- 
 1.7.9.5
