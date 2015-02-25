@@ -1,71 +1,32 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 25 Feb 2015 11:57:50 +0200
-Subject: [PATCH 1/2] ARM: shmobile: r8a7794: add GPIO clocks
-In-Reply-To: <1831753.Dnjo3xKPJv@wasted.cogentembedded.com>
-References: <6954455.LyoCrfjM8R@wasted.cogentembedded.com>
- <1831753.Dnjo3xKPJv@wasted.cogentembedded.com>
-Message-ID: <4073135.p5DxpngjLk@avalon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Feb 2015 09:59:21 +0000
+Subject: [PATCH v3 linux-next] iommu: Enable LPAE pagetable on ARM and
+ ARM64 only
+In-Reply-To: <6851919.VIGEV8htgx@avalon>
+References: <3203874.zEMjzr0PS0@avalon>
+ <1424737221-1193-1-git-send-email-vincent.stehle@laposte.net>
+ <6851919.VIGEV8htgx@avalon>
+Message-ID: <20150225095921.GB20673@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-Thank you for the patch.
-
-On Sunday 22 February 2015 01:11:25 Sergei Shtylyov wrote:
-> Describe the GPIO clocks in the R8A7794 device tree.
+On Tue, Feb 24, 2015 at 12:23:48AM +0000, Laurent Pinchart wrote:
+> On Tuesday 24 February 2015 01:20:21 Vincent Stehl? wrote:
+> > LPAE iommu page table makes sense only for ARM and ARM64 architectures. Add
+> > the corresponding dependency in Kconfig (and enable for COMPILE_TEST, too,
+> > as per Laurent's suggestion).
+> > 
+> > Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
+> > Suggested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
 > 
-> Based on the original patch by Koji Matsuoka <koji.matsuoka.xm@renesas.com>.
+> Now,
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Sorry guys, I've been away from email for the past couple of days, but I
+already have an exact copy of this patch queued from somebody else!
 
-> 
-> ---
->  arch/arm/boot/dts/r8a7794.dtsi |   22 ++++++++++++++--------
->  1 file changed, 14 insertions(+), 8 deletions(-)
-> 
-> Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -651,16 +651,22 @@
->  		mstp9_clks: mstp9_clks at e6150994 {
->  			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-
-clocks";
->  			reg = <0 0xe6150994 0 4>, <0 0xe61509a4 0 4>;
-> -			clocks = <&cpg_clocks R8A7794_CLK_QSPI>, <&hp_clk>, <&hp_clk>,
-> -				<&hp_clk>, <&hp_clk>, <&hp_clk>, <&hp_clk>;
-> +			clocks = <&cp_clk>, <&cp_clk>, <&cp_clk>, <&cp_clk>,
-> +				 <&cp_clk>, <&cp_clk>, <&cp_clk>,
-> +				 <&cpg_clocks R8A7794_CLK_QSPI>, <&hp_clk>, <&hp_clk>,
-> +				 <&hp_clk>, <&hp_clk>, <&hp_clk>, <&hp_clk>;
->  			#clock-cells = <1>;
-> -			clock-indices = <
-> -				R8A7794_CLK_QSPI_MOD R8A7794_CLK_I2C5 R8A7794_CLK_I2C4
-> -				R8A7794_CLK_I2C3 R8A7794_CLK_I2C2 R8A7794_CLK_I2C1
-> -				R8A7794_CLK_I2C0
-> -			>;
-> +			clock-indices = <R8A7794_CLK_GPIO6 R8A7794_CLK_GPIO5
-> +					 R8A7794_CLK_GPIO4 R8A7794_CLK_GPIO3
-> +					 R8A7794_CLK_GPIO2 R8A7794_CLK_GPIO1
-> +					 R8A7794_CLK_GPIO0 R8A7794_CLK_QSPI_MOD
-> +					 R8A7794_CLK_I2C5 R8A7794_CLK_I2C4
-> +					 R8A7794_CLK_I2C3 R8A7794_CLK_I2C2
-> +					 R8A7794_CLK_I2C1 R8A7794_CLK_I2C0>;
->  			clock-output-names =
-> -				"qspi_mod", "i2c5", "i2c4", "i2c3", "i2c2", "i2c1", "i2c0";
-> +				"gpio6", "gpio5", "gpio4", "gpio3", "gpio2",
-> +				"gpio1", "gpio0", "qspi_mod",
-> +				"i2c5", "i2c4", "i2c3", "i2c2", "i2c1", "i2c0";
->  		};
->  		mstp11_clks: mstp11_clks at e615099c {
->  			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-
-clocks";
+  http://www.spinics.net/lists/arm-kernel/msg400030.html
 
-
--- 
-Regards,
-
-Laurent Pinchart
+Will
