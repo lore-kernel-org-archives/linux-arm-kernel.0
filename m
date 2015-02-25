@@ -1,47 +1,89 @@
-From: ezequiel.garcia@imgtec.com (Ezequiel Garcia)
-Date: Wed, 25 Feb 2015 09:30:06 -0300
-Subject: [PATCH 0/7] New eFuse subsystem
-In-Reply-To: <20150225120234.GB5062@lukather>
-References: <1424864719-3390-1-git-send-email-ezequiel.garcia@imgtec.com>
- <20150225120234.GB5062@lukather>
-Message-ID: <54EDC04E.1050107@imgtec.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Wed, 25 Feb 2015 13:36:32 +0100
+Subject: [PATCH] ARM: Kirkwood: enable GPIO fan alarm support for 2Big
+ Network v2
+In-Reply-To: <54EB3E0E.7070503@roeck-us.net>
+References: <1424696523-14855-1-git-send-email-simon.guinot@sequanux.org>
+ <54EB34F3.4000500@roeck-us.net>
+ <20150223144049.GU1509@kw.sim.vm.gnt>
+ <54EB3E0E.7070503@roeck-us.net>
+Message-ID: <20150225123632.GW1509@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/25/2015 09:02 AM, Maxime Ripard wrote:
-> Hi Ezequiel,
+On Mon, Feb 23, 2015 at 06:49:50AM -0800, Guenter Roeck wrote:
+> On 02/23/2015 06:40 AM, Simon Guinot wrote:
+> >On Mon, Feb 23, 2015 at 06:10:59AM -0800, Guenter Roeck wrote:
+> >>On 02/23/2015 05:02 AM, Simon Guinot wrote:
+> >>>On the LaCie 2Big Network v2 (net2big_v2) board, the fan alarm is not
+> >>>wired to the I2C fan controller but to a separe GPIO. This GPIO can be
+> >>>controlled by using the gpio-fan driver.
+> >>>
+> >>>This patch adds the gpio-fan alarm description in the net2big_v2 DTS.
+> >>>
+> >>>Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> >>>---
+> >>>  arch/arm/boot/dts/kirkwood-net2big.dts | 5 +++++
+> >>>  1 file changed, 5 insertions(+)
+> >>>
+> >>>diff --git a/arch/arm/boot/dts/kirkwood-net2big.dts b/arch/arm/boot/dts/kirkwood-net2big.dts
+> >>>index 53dc37a3b687..e4f7e497379f 100644
+> >>>--- a/arch/arm/boot/dts/kirkwood-net2big.dts
+> >>>+++ b/arch/arm/boot/dts/kirkwood-net2big.dts
+> >>>@@ -27,6 +27,11 @@
+> >>>  		device_type = "memory";
+> >>>  		reg = <0x00000000 0x10000000>;
+> >>>  	};
+> >>>+
+> >>>+	gpio_fan {
+> >>>+		compatible = "gpio-fan";
+> >>>+		alarm-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
+> >>>+	};
+> >>>  };
+> >>>
+> >>>  &regulators {
+> >>>
+> >>Again, wrong solution, and conceptually wrong as well from a dt perspective.
+> >>
+> >>The alarm signal should be handled by the g762 driver, and the alarm-gpios
+> >>property should be added to the g762 description.
+> >
+> >OK. Then you think it would be better to add support for alarm GPIOs
+> >support in the g762. The problem is that we should have to find a
+> >generic way to do that. After all, we could want the very same
+> >modification for a bunch of fan drivers.
+> >
+> Can't help it. After all, the interrupt handling logic is different for each chip,
+> and there are non-DT systems out there.
 > 
-> On Wed, Feb 25, 2015 at 08:45:12AM -0300, Ezequiel Garcia wrote:
->> This patchset introduces a new driver subsystem, meant to support eFuse
->> (alias OTP, one-time-programmable) devices.
->>
->> The motivation behind this work is to have a common place for drivers
->> that are currently more or less scattered: the tegra efuses are in
->> drivers/soc/ and the sunxi efuses in drivers/misc/eeprom.
->>
->> For now, there's no proposal for a generic efuse API. Instead, we simply
->> group the drivers together.
->>
->> This patchset is the result of the initial submission for IMG Pistachio
->> eFuse support [1]. Our first proposal was to follow the Tegra efuse, and
->> put the Pistachio efuse in drivers/soc. After some discussion we finally
->> agreed [2] to first create an efuse directoy, and then put all efuse drivers
->> in it.
->>
->> As always, all comments are welcome!
->>
->> [1] http://www.spinics.net/lists/devicetree/msg59246.html
->> [2] http://www.spinics.net/lists/arm-kernel/msg389325.html
+> The g762 property should probably be something like
 > 
-> Have you looked at the EEPROM framework currently in discussions? The
-> two seems to be covering pretty much the same use cases.
+> 	g762 at 3e {
+>                 compatible = "gmt,g762";
+>                 reg = <0x3e>;
+>                 clocks = <&g762_clk>;
+> 		interrupt-parent = <&gpio0>;
+> 		interrupts = <25 GPIO_ACTIVE_LOW>;
+>         };
 > 
+> struct i2c_client has an irq field, and as far as I can see it is filled in
+> automatically from the dt node. So all the driver should have to do is to
+> implement an interrupt handler.
 
-Nope, I was obviously unaware of that. Guess we'll wait until the
-discussion is settled and use that framework.
+Is that OK to pass a GPIO line through the "interrupts" property ?
+Moreover it seems to me that g763 controller (compatible) supports
+alert interrupts through SMBus. Then maybe we should save the
+"interrupts" property for this signal ?
 
-Thanks!
--- 
-Ezequiel
+Don't you think it would be more explicit to have a separate DT
+property (such as "gpio-alarm") and also a dedicated field in the
+g762 platform data structure ?
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150225/f63ba965/attachment.sig>
