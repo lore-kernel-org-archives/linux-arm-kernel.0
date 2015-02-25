@@ -1,226 +1,123 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Feb 2015 16:36:46 +0100
-Subject: [PATCH] drm: exynos: clean up dma_addr_t use
-Message-ID: <2463296.ej1sNijqo7@wuerfel>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Wed, 25 Feb 2015 15:36:19 +0000
+Subject: [PATCH 1/4] arm: KVM: export vcpi->pause state via MP_STATE ioctls
+In-Reply-To: <1424878582-26397-1-git-send-email-alex.bennee@linaro.org>
+References: <1424878582-26397-1-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1424878582-26397-2-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dma_addr_t may be 32 or 64 bits long on 32-bit CPUs, so we cannot
-cast it to a pointer without getting a compiler warning:
+To cleanly restore an SMP VM we need to ensure that the current pause
+state of each vcpu is correctly recorded. Things could get confused if
+the CPU starts running after migration restore completes when it was
+paused before it state was captured.
 
-drivers/gpu/drm/exynos/exynos_drm_buf.c: In function 'lowlevel_buffer_allocate':
-drivers/gpu/drm/exynos/exynos_drm_buf.c:109:18: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-  buf->dma_addr = (dma_addr_t)NULL;
-                  ^
+We use the existing KVM_GET/SET_MP_STATE ioctl to do this. The arm/arm64
+interface is a lot simpler as the only valid states are
+KVM_MP_STATE_RUNNABLE and KVM_MP_STATE_HALTED.
 
-The use of pointers is wrong here anyway, and so is the cast
-to the same type, and printing the value as a 32-bit instance.
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
-This patch tries for address all these issues in the exynos
-drm driver, by printing the values as %pad and removing the
-bogus type casts.
-
-I've added '& 0xffffffff' masks in a few places I found where
-a dma_addr_t is assigned to a 32-bit value, as a reminder that
-this code will not work with 64-bit dma addresses. There should
-not be any change in the generated code here.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-diff --git a/drivers/gpu/drm/exynos/exynos7_drm_decon.c b/drivers/gpu/drm/exynos/exynos7_drm_decon.c
-index 63f02e2380ae..0512157b065f 100644
---- a/drivers/gpu/drm/exynos/exynos7_drm_decon.c
-+++ b/drivers/gpu/drm/exynos/exynos7_drm_decon.c
-@@ -335,7 +335,7 @@ static void decon_win_mode_set(struct exynos_drm_crtc *crtc,
- 			win_data->offset_x, win_data->offset_y);
- 	DRM_DEBUG_KMS("ovl_width = %d, ovl_height = %d\n",
- 			win_data->ovl_width, win_data->ovl_height);
--	DRM_DEBUG_KMS("paddr = 0x%lx\n", (unsigned long)win_data->dma_addr);
-+	DRM_DEBUG_KMS("paddr = %pad\n", &win_data->dma_addr);
- 	DRM_DEBUG_KMS("fb_width = %d, crtc_width = %d\n",
- 			plane->fb_width, plane->crtc_width);
- }
-@@ -490,7 +490,7 @@ static void decon_win_commit(struct exynos_drm_crtc *crtc, int zpos)
- 	decon_shadow_protect_win(ctx, win, true);
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index b112efc..602156f 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -997,7 +997,7 @@ for vm-wide capabilities.
+ 4.38 KVM_GET_MP_STATE
  
- 	/* buffer start address */
--	val = (unsigned long)win_data->dma_addr;
-+	val = win_data->dma_addr & 0xffffffff;
- 	writel(val, ctx->regs + VIDW_BUF_START(win));
+ Capability: KVM_CAP_MP_STATE
+-Architectures: x86, s390
++Architectures: x86, s390, arm, arm64
+ Type: vcpu ioctl
+ Parameters: struct kvm_mp_state (out)
+ Returns: 0 on success; -1 on error
+@@ -1027,15 +1027,21 @@ Possible values are:
+  - KVM_MP_STATE_LOAD:            the vcpu is in a special load/startup state
+                                  [s390]
  
- 	/* buffer size */
-@@ -501,8 +501,7 @@ static void decon_win_commit(struct exynos_drm_crtc *crtc, int zpos)
- 	writel(win_data->offset_x, ctx->regs + VIDW_OFFSET_X(win));
- 	writel(win_data->offset_y, ctx->regs + VIDW_OFFSET_Y(win));
+-On x86, this ioctl is only useful after KVM_CREATE_IRQCHIP. Without an
+-in-kernel irqchip, the multiprocessing state must be maintained by userspace on
++For x86:
++
++This ioctl is only useful after KVM_CREATE_IRQCHIP.  Without an in-kernel
++irqchip, the multiprocessing state must be maintained by userspace on
+ these architectures.
  
--	DRM_DEBUG_KMS("start addr = 0x%lx\n",
--			(unsigned long)win_data->dma_addr);
-+	DRM_DEBUG_KMS("start addr = %pad\n", &win_data->dma_addr);
- 	DRM_DEBUG_KMS("ovl_width = %d, ovl_height = %d\n",
- 			win_data->ovl_width, win_data->ovl_height);
++For arm/arm64:
++
++The only states that are valid are KVM_MP_STATE_HALTED and
++KVM_MP_STATE_RUNNABLE which reflect if the vcpu is paused or not.
  
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_buf.c b/drivers/gpu/drm/exynos/exynos_drm_buf.c
-index 24994ba10e28..935157e65236 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_buf.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_buf.c
-@@ -97,16 +97,15 @@ static int lowlevel_buffer_allocate(struct drm_device *dev,
- 		goto err_free_attrs;
- 	}
+ 4.39 KVM_SET_MP_STATE
  
--	DRM_DEBUG_KMS("dma_addr(0x%lx), size(0x%lx)\n",
--			(unsigned long)buf->dma_addr,
--			buf->size);
-+	DRM_DEBUG_KMS("dma_addr(%pad), size(0x%lx)\n",
-+			&buf->dma_addr, buf->size);
+ Capability: KVM_CAP_MP_STATE
+-Architectures: x86, s390
++Architectures: x86, s390, arm, arm64
+ Type: vcpu ioctl
+ Parameters: struct kvm_mp_state (in)
+ Returns: 0 on success; -1 on error
+@@ -1043,10 +1049,16 @@ Returns: 0 on success; -1 on error
+ Sets the vcpu's current "multiprocessing state"; see KVM_GET_MP_STATE for
+ arguments.
  
- 	return ret;
+-On x86, this ioctl is only useful after KVM_CREATE_IRQCHIP. Without an
+-in-kernel irqchip, the multiprocessing state must be maintained by userspace on
++For x86:
++
++This ioctl is only useful after KVM_CREATE_IRQCHIP.  Without an in-kernel
++irqchip, the multiprocessing state must be maintained by userspace on
+ these architectures.
  
- err_free_attrs:
- 	dma_free_attrs(dev->dev, buf->size, buf->pages,
--			(dma_addr_t)buf->dma_addr, &buf->dma_attrs);
--	buf->dma_addr = (dma_addr_t)NULL;
-+		       buf->dma_addr, &buf->dma_attrs);
-+	buf->dma_addr = 0;
- err_free:
- 	if (!is_drm_iommu_supported(dev))
- 		drm_free_large(buf->pages);
-@@ -122,9 +121,8 @@ static void lowlevel_buffer_deallocate(struct drm_device *dev,
- 		return;
- 	}
++For arm/arm64:
++
++The only states that are valid are KVM_MP_STATE_HALTED and
++KVM_MP_STATE_RUNNABLE which reflect if the vcpu should be paused or not.
  
--	DRM_DEBUG_KMS("dma_addr(0x%lx), size(0x%lx)\n",
--			(unsigned long)buf->dma_addr,
--			buf->size);
-+	DRM_DEBUG_KMS("dma_addr(%pad), size(0x%lx)\n",
-+		      &buf->dma_addr, buf->size);
+ 4.40 KVM_SET_IDENTITY_MAP_ADDR
  
- 	sg_free_table(buf->sgt);
- 
-@@ -133,13 +131,13 @@ static void lowlevel_buffer_deallocate(struct drm_device *dev,
- 
- 	if (!is_drm_iommu_supported(dev)) {
- 		dma_free_attrs(dev->dev, buf->size, buf->cookie,
--				(dma_addr_t)buf->dma_addr, &buf->dma_attrs);
-+			       buf->dma_addr, &buf->dma_attrs);
- 		drm_free_large(buf->pages);
- 	} else
- 		dma_free_attrs(dev->dev, buf->size, buf->pages,
--				(dma_addr_t)buf->dma_addr, &buf->dma_attrs);
-+			       buf->dma_addr, &buf->dma_attrs);
- 
--	buf->dma_addr = (dma_addr_t)NULL;
-+	buf->dma_addr = 0;
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 5560f74..8531536 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -183,6 +183,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	case KVM_CAP_ARM_PSCI:
+ 	case KVM_CAP_ARM_PSCI_0_2:
+ 	case KVM_CAP_READONLY_MEM:
++	case KVM_CAP_MP_STATE:
+ 		r = 1;
+ 		break;
+ 	case KVM_CAP_COALESCED_MMIO:
+@@ -313,13 +314,29 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+ int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
+ 				    struct kvm_mp_state *mp_state)
+ {
+-	return -EINVAL;
++	if (vcpu->arch.pause)
++		mp_state->mp_state = KVM_MP_STATE_HALTED;
++	else
++		mp_state->mp_state = KVM_MP_STATE_RUNNABLE;
++
++	return 0;
  }
  
- struct exynos_drm_gem_buf *exynos_drm_init_buf(struct drm_device *dev,
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fb.c b/drivers/gpu/drm/exynos/exynos_drm_fb.c
-index d346d1e6eda0..b259c1bf8752 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fb.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fb.c
-@@ -290,7 +290,7 @@ struct exynos_drm_gem_buf *exynos_drm_fb_buffer(struct drm_framebuffer *fb,
- 	if (!buffer)
- 		return NULL;
- 
--	DRM_DEBUG_KMS("dma_addr = 0x%lx\n", (unsigned long)buffer->dma_addr);
-+	DRM_DEBUG_KMS("dma_addr = %pad\n", &buffer->dma_addr);
- 
- 	return buffer;
+ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
+ 				    struct kvm_mp_state *mp_state)
+ {
+-	return -EINVAL;
++	switch (mp_state->mp_state) {
++	case KVM_MP_STATE_RUNNABLE:
++		vcpu->arch.pause = false;
++		break;
++	case KVM_MP_STATE_HALTED:
++		vcpu->arch.pause = true;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
  }
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-index 925fc69af1a0..d7c0dc877e03 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-@@ -550,7 +550,7 @@ static void fimd_win_mode_set(struct exynos_drm_crtc *crtc,
- 			win_data->offset_x, win_data->offset_y);
- 	DRM_DEBUG_KMS("ovl_width = %d, ovl_height = %d\n",
- 			win_data->ovl_width, win_data->ovl_height);
--	DRM_DEBUG_KMS("paddr = 0x%lx\n", (unsigned long)win_data->dma_addr);
-+	DRM_DEBUG_KMS("paddr = %pad\n", &win_data->dma_addr);
- 	DRM_DEBUG_KMS("fb_width = %d, crtc_width = %d\n",
- 			plane->fb_width, plane->crtc_width);
- }
-@@ -671,6 +671,7 @@ static void fimd_win_commit(struct exynos_drm_crtc *crtc, int zpos)
- 	struct fimd_win_data *win_data;
- 	int win = zpos;
- 	unsigned long val, alpha, size;
-+	dma_addr_t end;
- 	unsigned int last_x;
- 	unsigned int last_y;
  
-@@ -705,16 +706,16 @@ static void fimd_win_commit(struct exynos_drm_crtc *crtc, int zpos)
- 	fimd_shadow_protect_win(ctx, win, true);
- 
- 	/* buffer start address */
--	val = (unsigned long)win_data->dma_addr;
-+	val = (u32)win_data->dma_addr & 0xffffffff;
- 	writel(val, ctx->regs + VIDWx_BUF_START(win, 0));
- 
- 	/* buffer end address */
- 	size = win_data->fb_width * win_data->ovl_height * (win_data->bpp >> 3);
--	val = (unsigned long)(win_data->dma_addr + size);
-+	end = win_data->dma_addr + size;
- 	writel(val, ctx->regs + VIDWx_BUF_END(win, 0));
- 
--	DRM_DEBUG_KMS("start addr = 0x%lx, end addr = 0x%lx, size = 0x%lx\n",
--			(unsigned long)win_data->dma_addr, val, size);
-+	DRM_DEBUG_KMS("start addr = %pad, end addr = %pad, size = 0x%lx\n",
-+			&win_data->dma_addr, end, size);
- 	DRM_DEBUG_KMS("ovl_width = %d, ovl_height = %d\n",
- 			win_data->ovl_width, win_data->ovl_height);
- 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.c b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-index 81a250830808..8f9b025bdf72 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-@@ -348,7 +348,7 @@ static void g2d_add_cmdlist_to_inuse(struct exynos_drm_g2d_private *g2d_priv,
- 	/* this links to base address of new cmdlist */
- 	lnode = list_entry(g2d_priv->inuse_cmdlist.prev,
- 				struct g2d_cmdlist_node, list);
--	lnode->cmdlist->data[lnode->cmdlist->last] = node->dma_addr;
-+	lnode->cmdlist->data[lnode->cmdlist->last] = node->dma_addr & 0xffffffff;
- 
- add_to_list:
- 	list_add_tail(&node->list, &g2d_priv->inuse_cmdlist);
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_ipp.c b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
-index d5ad17dfc24d..0b9cdd3b11d8 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_ipp.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
-@@ -546,8 +546,8 @@ static struct drm_exynos_ipp_mem_node
- 
- 			buf_info->handles[i] = qbuf->handle[i];
- 			buf_info->base[i] = *addr;
--			DRM_DEBUG_KMS("i[%d]base[0x%x]hd[0x%lx]\n", i,
--				      buf_info->base[i], buf_info->handles[i]);
-+			DRM_DEBUG_KMS("i[%d]base[%pad]hd[0x%lx]\n", i,
-+				      &buf_info->base[i], buf_info->handles[i]);
- 		}
- 	}
- 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_plane.c b/drivers/gpu/drm/exynos/exynos_drm_plane.c
-index a5616872eee7..027ff93fd9ca 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_plane.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_plane.c
-@@ -78,8 +78,8 @@ int exynos_check_plane(struct drm_plane *plane, struct drm_framebuffer *fb)
- 
- 		exynos_plane->dma_addr[i] = buffer->dma_addr;
- 
--		DRM_DEBUG_KMS("buffer: %d, dma_addr = 0x%lx\n",
--				i, (unsigned long)exynos_plane->dma_addr[i]);
-+		DRM_DEBUG_KMS("buffer: %d, dma_addr = %pad\n",
-+				i, &exynos_plane->dma_addr[i]);
- 	}
- 
- 	return 0;
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_vidi.c b/drivers/gpu/drm/exynos/exynos_drm_vidi.c
-index b886972b5888..1617088fc451 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_vidi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_vidi.c
-@@ -191,7 +191,7 @@ static void vidi_win_mode_set(struct exynos_drm_crtc *crtc,
- 			win_data->offset_x, win_data->offset_y);
- 	DRM_DEBUG_KMS("ovl_width = %d, ovl_height = %d\n",
- 			win_data->ovl_width, win_data->ovl_height);
--	DRM_DEBUG_KMS("paddr = 0x%lx\n", (unsigned long)win_data->dma_addr);
-+	DRM_DEBUG_KMS("paddr = %pad\n", &win_data->dma_addr);
- 	DRM_DEBUG_KMS("fb_width = %d, crtc_width = %d\n",
- 			plane->fb_width, plane->crtc_width);
- }
+ /**
+-- 
+2.3.0
