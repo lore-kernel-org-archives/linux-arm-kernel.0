@@ -1,58 +1,49 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Feb 2015 12:10:35 +0000
-Subject: [PATCH 1/2] arm64: psci: move psci firmware calls out of line
-Message-ID: <1424866236-12482-1-git-send-email-will.deacon@arm.com>
+Date: Wed, 25 Feb 2015 12:10:36 +0000
+Subject: [PATCH 2/2] ARM: psci: move psci firmware calls out of line
+In-Reply-To: <1424866236-12482-1-git-send-email-will.deacon@arm.com>
+References: <1424866236-12482-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1424866236-12482-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An arm64 allmodconfig fails to build with GCC 5 due to __asmeq
-assertions in the PSCI firmware calling code firing due to mcount
-preambles breaking our assumptions about register allocation of function
-arguments:
+From: Mark Rutland <mark.rutland@arm.com>
 
-  /tmp/ccDqJsJ6.s: Assembler messages:
-  /tmp/ccDqJsJ6.s:60: Error: .err encountered
-  /tmp/ccDqJsJ6.s:61: Error: .err encountered
-  /tmp/ccDqJsJ6.s:62: Error: .err encountered
-  /tmp/ccDqJsJ6.s:99: Error: .err encountered
-  /tmp/ccDqJsJ6.s:100: Error: .err encountered
-  /tmp/ccDqJsJ6.s:101: Error: .err encountered
-
-This patch fixes the issue by moving the PSCI calls out-of-line into
-their own assembly files, which are safe from the compiler's meddling
-fingers.
+arm64 builds with GCC 5 have caused the __asmeq assertions in the PSCI
+calling code to fire, so move the ARM PSCI calls out of line into their
+own assembly file for consistency and to safeguard against the same
+issue occuring with the 32-bit toolchain.
 
 Reported-by: Andy Whitcroft <apw@canonical.com>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+[will: brought into line with arm64 implementation]
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/Makefile    |  5 +++--
- arch/arm64/kernel/psci-call.S | 28 ++++++++++++++++++++++++++++
- arch/arm64/kernel/psci.c      | 37 +++----------------------------------
- 3 files changed, 34 insertions(+), 36 deletions(-)
- create mode 100644 arch/arm64/kernel/psci-call.S
+ arch/arm/kernel/Makefile    |  2 +-
+ arch/arm/kernel/psci-call.S | 31 +++++++++++++++++++++++++++++++
+ arch/arm/kernel/psci.c      | 39 +++------------------------------------
+ 3 files changed, 35 insertions(+), 37 deletions(-)
+ create mode 100644 arch/arm/kernel/psci-call.S
 
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index bef04afd6031..5ee07eee80c2 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -15,8 +15,9 @@ CFLAGS_REMOVE_return_address.o = -pg
- arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
- 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
- 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
--			   hyp-stub.o psci.o cpu_ops.o insn.o return_address.o	\
--			   cpuinfo.o cpu_errata.o alternative.o cacheinfo.o
-+			   hyp-stub.o psci.o psci-call.o cpu_ops.o insn.o	\
-+			   return_address.o cpuinfo.o cpu_errata.o		\
-+			   alternative.o cacheinfo.o
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 902397dd1000..1c1cdfa566ac 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -86,7 +86,7 @@ obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
  
- arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
- 					   sys_compat.o entry32.o		\
-diff --git a/arch/arm64/kernel/psci-call.S b/arch/arm64/kernel/psci-call.S
+ obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
+ ifeq ($(CONFIG_ARM_PSCI),y)
+-obj-y				+= psci.o
++obj-y				+= psci.o psci-call.o
+ obj-$(CONFIG_SMP)		+= psci_smp.o
+ endif
+ 
+diff --git a/arch/arm/kernel/psci-call.S b/arch/arm/kernel/psci-call.S
 new file mode 100644
-index 000000000000..cf83e61cd3b5
+index 000000000000..a78e9e1e206d
 --- /dev/null
-+++ b/arch/arm64/kernel/psci-call.S
-@@ -0,0 +1,28 @@
++++ b/arch/arm/kernel/psci-call.S
+@@ -0,0 +1,31 @@
 +/*
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -65,68 +56,80 @@ index 000000000000..cf83e61cd3b5
 + *
 + * Copyright (C) 2015 ARM Limited
 + *
-+ * Author: Will Deacon <will.deacon@arm.com>
++ * Author: Mark Rutland <mark.rutland@arm.com>
 + */
 +
 +#include <linux/linkage.h>
 +
-+/* int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1, u64 arg2) */
++#include <asm/opcodes-sec.h>
++#include <asm/opcodes-virt.h>
++
++/* int __invoke_psci_fn_hvc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
 +ENTRY(__invoke_psci_fn_hvc)
-+	hvc	#0
-+	ret
++	__HVC(0)
++	bx	lr
 +ENDPROC(__invoke_psci_fn_hvc)
 +
-+/* int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1, u64 arg2) */
++/* int __invoke_psci_fn_smc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
 +ENTRY(__invoke_psci_fn_smc)
-+	smc	#0
-+	ret
++	__SMC(0)
++	bx	lr
 +ENDPROC(__invoke_psci_fn_smc)
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index 3425f311c49e..9b8a70ae64a1 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -57,6 +57,9 @@ static struct psci_operations psci_ops;
- static int (*invoke_psci_fn)(u64, u64, u64, u64);
+diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
+index f73891b6b730..f90fdf4ce7c7 100644
+--- a/arch/arm/kernel/psci.c
++++ b/arch/arm/kernel/psci.c
+@@ -23,8 +23,6 @@
+ 
+ #include <asm/compiler.h>
+ #include <asm/errno.h>
+-#include <asm/opcodes-sec.h>
+-#include <asm/opcodes-virt.h>
+ #include <asm/psci.h>
+ #include <asm/system_misc.h>
+ 
+@@ -33,6 +31,9 @@ struct psci_operations psci_ops;
+ static int (*invoke_psci_fn)(u32, u32, u32, u32);
  typedef int (*psci_initcall_t)(const struct device_node *);
  
-+asmlinkage int __invoke_psci_fn_hvc(u64, u64, u64, u64);
-+asmlinkage int __invoke_psci_fn_smc(u64, u64, u64, u64);
++asmlinkage int __invoke_psci_fn_hvc(u32, u32, u32, u32);
++asmlinkage int __invoke_psci_fn_smc(u32, u32, u32, u32);
 +
  enum psci_function {
  	PSCI_FN_CPU_SUSPEND,
  	PSCI_FN_CPU_ON,
-@@ -109,40 +112,6 @@ static void psci_power_state_unpack(u32 power_state,
- 			PSCI_0_2_POWER_STATE_AFFL_SHIFT;
+@@ -71,40 +72,6 @@ static u32 psci_power_state_pack(struct psci_power_state state)
+ 		 & PSCI_0_2_POWER_STATE_AFFL_MASK);
  }
  
 -/*
 - * The following two functions are invoked via the invoke_psci_fn pointer
 - * and will not be inlined, allowing us to piggyback on the AAPCS.
 - */
--static noinline int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
--					 u64 arg2)
+-static noinline int __invoke_psci_fn_hvc(u32 function_id, u32 arg0, u32 arg1,
+-					 u32 arg2)
 -{
 -	asm volatile(
--			__asmeq("%0", "x0")
--			__asmeq("%1", "x1")
--			__asmeq("%2", "x2")
--			__asmeq("%3", "x3")
--			"hvc	#0\n"
+-			__asmeq("%0", "r0")
+-			__asmeq("%1", "r1")
+-			__asmeq("%2", "r2")
+-			__asmeq("%3", "r3")
+-			__HVC(0)
 -		: "+r" (function_id)
 -		: "r" (arg0), "r" (arg1), "r" (arg2));
 -
 -	return function_id;
 -}
 -
--static noinline int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1,
--					 u64 arg2)
+-static noinline int __invoke_psci_fn_smc(u32 function_id, u32 arg0, u32 arg1,
+-					 u32 arg2)
 -{
 -	asm volatile(
--			__asmeq("%0", "x0")
--			__asmeq("%1", "x1")
--			__asmeq("%2", "x2")
--			__asmeq("%3", "x3")
--			"smc	#0\n"
+-			__asmeq("%0", "r0")
+-			__asmeq("%1", "r1")
+-			__asmeq("%2", "r2")
+-			__asmeq("%3", "r3")
+-			__SMC(0)
 -		: "+r" (function_id)
 -		: "r" (arg0), "r" (arg1), "r" (arg2));
 -
