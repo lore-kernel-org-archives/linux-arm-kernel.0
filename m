@@ -1,86 +1,126 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Wed, 25 Feb 2015 16:02:33 +0000
-Subject: [PATCH 1/6] target-arm: kvm: save/restore mp state
+Date: Wed, 25 Feb 2015 16:02:36 +0000
+Subject: [PATCH 4/6] target-arm/kvm64.c: sync FP register state
 In-Reply-To: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
 References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1424880159-29348-2-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1424880159-29348-5-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the saving and restore of the current Multi-Processing state
-of the machine. While the KVM_GET/SET_MP_STATE API exposes a number of
-potential states for x86 we only use two for ARM. Either the process is
-running or not.
+From: Alex Benn?e <alex@bennee.com>
+
+For migration to work we need to sync all of the register state. This is
+especially noticeable when GCC starts using FP registers as spill
+registers even with integer programs.
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
-diff --git a/target-arm/kvm.c b/target-arm/kvm.c
-index 23cefe9..8732854 100644
---- a/target-arm/kvm.c
-+++ b/target-arm/kvm.c
-@@ -25,6 +25,7 @@
- #include "hw/arm/arm.h"
+diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
+index 8cf3a62..c60e989 100644
+--- a/target-arm/kvm64.c
++++ b/target-arm/kvm64.c
+@@ -126,9 +126,17 @@ bool kvm_arm_reg_syncs_via_cpreg_list(uint64_t regidx)
+ #define AARCH64_CORE_REG(x)   (KVM_REG_ARM64 | KVM_REG_SIZE_U64 | \
+                  KVM_REG_ARM_CORE | KVM_REG_ARM_CORE_REG(x))
  
- const KVMCapabilityInfo kvm_arch_required_capabilities[] = {
-+    KVM_CAP_INFO(MP_STATE),
-     KVM_CAP_LAST_INFO
- };
- 
-diff --git a/target-arm/machine.c b/target-arm/machine.c
-index 9446e5a..70b1bc4 100644
---- a/target-arm/machine.c
-+++ b/target-arm/machine.c
-@@ -161,6 +161,34 @@ static const VMStateInfo vmstate_cpsr = {
-     .put = put_cpsr,
- };
- 
-+#if defined CONFIG_KVM
-+static int get_mpstate(QEMUFile *f, void *opaque, size_t size)
-+{
-+    ARMCPU *cpu = opaque;
-+    struct kvm_mp_state mp_state = { .mp_state =  qemu_get_be32(f)};
-+    return kvm_vcpu_ioctl(CPU(cpu), KVM_SET_MP_STATE, &mp_state);
-+}
++/* The linux headers don't define a 128 bit wide SIMD macro for us */
++#define AARCH64_SIMD_CORE_REG(x)   (KVM_REG_ARM64 | KVM_REG_SIZE_U128 | \
++                 KVM_REG_ARM_CORE | KVM_REG_ARM_CORE_REG(x))
 +
-+static void put_mpstate(QEMUFile *f, void *opaque, size_t size)
-+{
-+    ARMCPU *cpu = opaque;
-+    struct kvm_mp_state mp_state;
-+    int ret = kvm_vcpu_ioctl(CPU(cpu), KVM_GET_MP_STATE, &mp_state);
-+    if (ret) {
-+        fprintf(stderr, "%s: failed to get MP_STATE %d/%s\n",
-+                __func__, ret, strerror(ret));
-+        abort();
-+    }
-+    qemu_put_be32(f, mp_state.mp_state);
-+}
++#define AARCH64_SIMD_CTRL_REG(x)   (KVM_REG_ARM64 | KVM_REG_SIZE_U32 | \
++                 KVM_REG_ARM_CORE | KVM_REG_ARM_CORE_REG(x))
 +
-+static const VMStateInfo vmstate_mpstate = {
-+    .name = "mpstate",
-+    .get = get_mpstate,
-+    .put = put_mpstate,
-+};
-+#endif
-+
- static void cpu_pre_save(void *opaque)
+ int kvm_arch_put_registers(CPUState *cs, int level)
  {
-     ARMCPU *cpu = opaque;
-@@ -244,6 +272,16 @@ const VMStateDescription vmstate_arm_cpu = {
-         VMSTATE_UINT32_ARRAY(env.regs, ARMCPU, 16),
-         VMSTATE_UINT64_ARRAY(env.xregs, ARMCPU, 32),
-         VMSTATE_UINT64(env.pc, ARMCPU),
-+#if defined CONFIG_KVM
-+        {
-+            .name = "mp_state",
-+            .version_id = 0,
-+            .size = sizeof(uint32_t),
-+            .info = &vmstate_mpstate,
-+            .flags = VMS_SINGLE,
-+            .offset = 0,
-+        },
-+#endif
-         {
-             .name = "cpsr",
-             .version_id = 0,
+     struct kvm_one_reg reg;
++    uint32_t fpr;
+     uint64_t val;
+     int i;
+     int ret;
+@@ -207,13 +215,36 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+         }
+     }
+ 
++    /* Advanced SIMD and FP registers */
++    for (i = 0; i < 32; i++) {
++        reg.id = AARCH64_SIMD_CORE_REG(fp_regs.vregs[i]);
++        reg.addr = (uintptr_t)(&env->vfp.regs[i]);
++        ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
++        if (ret) {
++            return ret;
++        }
++        reg.id++;
++    }
++
++    reg.addr = (uintptr_t)(&fpr);
++    fpr = vfp_get_fpsr(env);
++    reg.id = AARCH64_SIMD_CTRL_REG(fp_regs.fpsr);
++    ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
++    if (ret) {
++        return ret;
++    }
++
++    fpr = vfp_get_fpcr(env);
++    reg.id = AARCH64_SIMD_CTRL_REG(fp_regs.fpcr);
++    ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
++    if (ret) {
++        return ret;
++    }
++
+     if (!write_list_to_kvmstate(cpu)) {
+         return EINVAL;
+     }
+ 
+-    /* TODO:
+-     * FP state
+-     */
+     return ret;
+ }
+ 
+@@ -221,6 +252,7 @@ int kvm_arch_get_registers(CPUState *cs)
+ {
+     struct kvm_one_reg reg;
+     uint64_t val;
++    uint32_t fpr;
+     int i;
+     int ret;
+ 
+@@ -302,9 +334,36 @@ int kvm_arch_get_registers(CPUState *cs)
+         }
+     }
+ 
++    /* Advanced SIMD and FP registers */
++    for (i = 0; i < 32; i++) {
++        reg.id = AARCH64_SIMD_CORE_REG(fp_regs.vregs[i]);
++        reg.addr = (uintptr_t)(&env->vfp.regs[i]);
++        ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
++        if (ret) {
++            return ret;
++        }
++        reg.id++;
++    }
++
++    reg.addr = (uintptr_t)(&fpr);
++    reg.id = AARCH64_SIMD_CTRL_REG(fp_regs.fpsr);
++    ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
++    if (ret) {
++        return ret;
++    }
++    vfp_set_fpsr(env, fpr);
++
++    reg.id = AARCH64_SIMD_CTRL_REG(fp_regs.fpcr);
++    ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
++    if (ret) {
++        return ret;
++    }
++    vfp_set_fpcr(env, fpr);
++
+     if (!write_kvmstate_to_list(cpu)) {
+         return EINVAL;
+     }
++
+     /* Note that it's OK to have registers which aren't in CPUState,
+      * so we can ignore a failure return here.
+      */
 -- 
 2.3.0
