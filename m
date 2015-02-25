@@ -1,42 +1,92 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 25 Feb 2015 15:56:47 +0900
-Subject: [PATCH] ARM: shmobile: defconfig: Drop useless
- SERIAL_8250_EXTENDED=y
-In-Reply-To: <1424786964-30977-1-git-send-email-geert+renesas@glider.be>
-References: <1424786964-30977-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150225065646.GA31211@verge.net.au>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 25 Feb 2015 07:17:25 +0000
+Subject: [PATCH v6 3/6] mfd: ti_am335x_tscadc: Remove unwanted
+ reg_se_cache save
+In-Reply-To: <1420609779-11156-4-git-send-email-vigneshr@ti.com>
+References: <1420609779-11156-1-git-send-email-vigneshr@ti.com>
+ <1420609779-11156-4-git-send-email-vigneshr@ti.com>
+Message-ID: <20150225071725.GE21323@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 24, 2015 at 03:09:24PM +0100, Geert Uytterhoeven wrote:
-> SERIAL_8250_EXTENDED only serves as a guard for other Kconfig options,
-> none of which is enabled in shmobile_defconfig.
+On Wed, 07 Jan 2015, Vignesh R wrote:
+
+> In one shot mode, sequencer automatically disables all enabled steps at
+> the end of each cycle. (both ADC steps and TSC steps) Hence these steps
+> need not be saved in reg_se_cache for clearing these steps at a later
+> stage.
+> Also, when ADC wakes up Sequencer should not be busy executing any of the
+> config steps except for the charge step. Previously charge step was 1 ADC
+> clock cycle and hence it was ignored.
+> TSC steps are always disabled at the end of each conversion cycle, hence
+> there is no need to explicitly disable TSC steps by writing 0 to REG_SE.
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 > ---
->  arch/arm/configs/shmobile_defconfig | 1 -
->  1 file changed, 1 deletion(-)
+> 
+> v5:
+>  - Remove unnecessary clearing of REG_SE
+> 
+>  drivers/mfd/ti_am335x_tscadc.c       | 13 +++++--------
+>  include/linux/mfd/ti_am335x_tscadc.h |  1 +
+>  2 files changed, 6 insertions(+), 8 deletions(-)
 
-Thanks, I have queued this up.
+Applied, thanks.
 
-> 
-> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-> index d206041e822a312a..11554158fa96ca9c 100644
-> --- a/arch/arm/configs/shmobile_defconfig
-> +++ b/arch/arm/configs/shmobile_defconfig
-> @@ -93,7 +93,6 @@ CONFIG_INPUT_ADXL34X=y
->  # CONFIG_LEGACY_PTYS is not set
->  CONFIG_SERIAL_8250=y
->  CONFIG_SERIAL_8250_CONSOLE=y
-> -CONFIG_SERIAL_8250_EXTENDED=y
->  CONFIG_SERIAL_8250_EM=y
->  CONFIG_SERIAL_SH_SCI=y
->  CONFIG_SERIAL_SH_SCI_NR_UARTS=20
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
+> index 467c80e1c4ae..e4e4b22eebc9 100644
+> --- a/drivers/mfd/ti_am335x_tscadc.c
+> +++ b/drivers/mfd/ti_am335x_tscadc.c
+> @@ -68,12 +68,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+>  	DEFINE_WAIT(wait);
+>  	u32 reg;
+>  
+> -	/*
+> -	 * disable TSC steps so it does not run while the ADC is using it. If
+> -	 * write 0 while it is running (it just started or was already running)
+> -	 * then it completes all steps that were enabled and stops then.
+> -	 */
+> -	tscadc_writel(tsadc, REG_SE, 0);
+>  	reg = tscadc_readl(tsadc, REG_ADCFSM);
+>  	if (reg & SEQ_STATUS) {
+>  		tsadc->adc_waiting = true;
+> @@ -86,8 +80,12 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+>  		spin_lock_irq(&tsadc->reg_lock);
+>  		finish_wait(&tsadc->reg_se_wait, &wait);
+>  
+> +		/*
+> +		 * Sequencer should either be idle or
+> +		 * busy applying the charge step.
+> +		 */
+>  		reg = tscadc_readl(tsadc, REG_ADCFSM);
+> -		WARN_ON(reg & SEQ_STATUS);
+> +		WARN_ON((reg & SEQ_STATUS) && !(reg & CHARGE_STEP));
+>  		tsadc->adc_waiting = false;
+>  	}
+>  	tsadc->adc_in_use = true;
+> @@ -96,7 +94,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+>  void am335x_tsc_se_set_once(struct ti_tscadc_dev *tsadc, u32 val)
+>  {
+>  	spin_lock_irq(&tsadc->reg_lock);
+> -	tsadc->reg_se_cache |= val;
+>  	am335x_tscadc_need_adc(tsadc);
+>  
+>  	tscadc_writel(tsadc, REG_SE, val);
+> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+> index 3f4e994ace2b..1fd50dcfe47c 100644
+> --- a/include/linux/mfd/ti_am335x_tscadc.h
+> +++ b/include/linux/mfd/ti_am335x_tscadc.h
+> @@ -128,6 +128,7 @@
+>  
+>  /* Sequencer Status */
+>  #define SEQ_STATUS BIT(5)
+> +#define CHARGE_STEP		0x11
+>  
+>  #define ADC_CLK			3000000
+>  #define TOTAL_STEPS		16
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
