@@ -1,96 +1,168 @@
 From: al.stone@linaro.org (al.stone at linaro.org)
-Date: Tue, 24 Feb 2015 17:36:16 -0700
-Subject: [PATCH v3 0/9] Start deprecating _OSI on new architectures
-Message-ID: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
+Date: Tue, 24 Feb 2015 17:36:17 -0700
+Subject: [PATCH v3 1/9] ACPI: fix all errors reported by cleanpatch.pl in osl.c
+In-Reply-To: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
+References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
+Message-ID: <1424824585-6405-2-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Al Stone <al.stone@linaro.org>
 
-The use of the ACPI _OSI method in Linux has a long and sordid history.
-Instead of perpetuating past complications on new architectures, the 
-consensus amongst those writing the ACPI specification and those using
-it seems to be to ultimately deprecate the use of _OSI.  A change request
-has been submitted (but not yet decided upon) to modify the ACPI spec
-accordingly.
+In preparation for later splitting out some of the arch-dependent code from
+osl.c, clean up the errors reported by checkpatch.pl.  They fell into these
+classes:
 
-In the meantime, these patches rearrange the implementation of _OSI so
-that it can be deprecated, or ultimately removed completely, on at least
-arm64 platforms.  This is done by separating out the _OSI implementation
-and moving it into a new file.  For x86 and ia64, there is no change in
-functionality.  But, this allows us to provide a separate implementation
-of _OSI for arm64 that generates a warning that it has been deprecated, 
-and always returns false; i.e., that the capability being queried for, 
-whether OS name or functionality, is not supported.  Patches 0005
-through 0008 provide these changes; the first four patches are solely
-cleanup to the file drivers/acpi/osl.c made so that checkpatch will not
-complain.
+   -- remove the FSF address from the GPL notice
+   -- "foo * bar" should be "foo *bar" (and the ** variation of same)
+   -- a return is not a function, so parentheses are not required.
 
-The final patch changes the default value for the _OS_ method for arm64
-only.  Since there is no need to pretend to be older versions of Windows,
-or any other OS at all, the _OS_ method will return "Linux" on arm64.
-One can still use the acpi_os_name kernel parameter if there is a need
-to use some other value.
+Signed-off-by: Al Stone <al.stone@linaro.org>
+---
+ drivers/acpi/osl.c | 38 +++++++++++++++++---------------------
+ 1 file changed, 17 insertions(+), 21 deletions(-)
 
-The first seven patches do not depend on arm64 support for ACPI and could
-be used independently.  The last two patches make much more sense when used
-in conjunction with Hanjun's patches for ACPI 5.1 on arm64 [0].  In fact,
-patch 0008 cannot be applied without [0].
-
-These have been through some simple testing on two different x86 laptops,
-and all seems well (Lenovo t440s and t430s ThinkPads).  The arm64 code has
-been tested on an AMD Seattle system.  Unfortunately, for ia64, all I could
-do was cross-compile the code; I have no access to hardware to test on.
-
-NB: the first four patches are solely cleanup to drivers/acpi/osl.c based
-on the results from checkpatch and can be treated independently.  However,
-the remainder of the patch set assumes this cleanup has been done.  There
-are some checkpatch warnings still remaining in osl.c -- specifically about
-use of volatiles and one line of 81 characters -- that these patches 
-intentionally do not correct as they do not appear to need correcting.
-
-Changes in v3:
-  -- add in cleanup to osl.c based on checkpatch output
-  -- put arch-specific _OSI implementation in the correct place (arch/*)
-  -- modify CONFIG item names and make them so they are not user selectable
-  -- get rid of the BLACKLIST config item; it wasn't really needed.
-
-Changes in v2:
-  -- significant simplification based on Rafael's comments
-  -- ACPI spec change request has now been submitted
-
-
-[0] https://lkml.org/lkml/2015/2/2/261
-
-
-Al Stone (9):
-  ACPI: fix all errors reported by cleanpatch.pl in osl.c
-  ACPI: clear up warnings on use of printk reported by checkpatch.pl
-  ACPI: clean up checkpatch warnings for various bits of syntax
-  ACPI: clean up checkpatch warnings for items with possible semantic
-    value
-  ACPI: move acpi_os_handler() so it can be made arch-dependent later
-  ACPI: move _OSI support functions to allow arch-dependent
-    implementation
-  ACPI: enable arch-specific compilation for _OSI and the blacklist
-  ACPI: arm64: use an arch-specific ACPI _OSI method and ACPI blacklist
-  ACPI: arm64: use "Linux" as ACPI_OS_NAME for _OS on arm64
-
- arch/arm64/Kconfig                 |   6 +
- arch/arm64/kernel/Makefile         |   2 +-
- arch/arm64/kernel/acpi-blacklist.c |  20 ++
- arch/arm64/kernel/acpi-osi.c       |  25 +++
- drivers/acpi/Kconfig               |   3 +
- drivers/acpi/Makefile              |   5 +
- drivers/acpi/osi.c                 | 245 +++++++++++++++++++++++
- drivers/acpi/osl.c                 | 387 ++++++++-----------------------------
- include/acpi/acconfig.h            |   2 +
- include/acpi/platform/aclinux.h    |   4 +
- include/linux/acpi.h               |  14 +-
- 11 files changed, 406 insertions(+), 307 deletions(-)
- create mode 100644 arch/arm64/kernel/acpi-blacklist.c
- create mode 100644 arch/arm64/kernel/acpi-osi.c
- create mode 100644 drivers/acpi/osi.c
-
+diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
+index 39748bb..1dc3a3b 100644
+--- a/drivers/acpi/osl.c
++++ b/drivers/acpi/osl.c
+@@ -19,10 +19,6 @@
+  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *  GNU General Public License for more details.
+  *
+- *  You should have received a copy of the GNU General Public License
+- *  along with this program; if not, write to the Free Software
+- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- *
+  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  *
+  */
+@@ -526,7 +522,7 @@ EXPORT_SYMBOL(acpi_os_unmap_generic_address);
+ 
+ #ifdef ACPI_FUTURE_USAGE
+ acpi_status
+-acpi_os_get_physical_address(void *virt, acpi_physical_address * phys)
++acpi_os_get_physical_address(void *virt, acpi_physical_address *phys)
+ {
+ 	if (!phys || !virt)
+ 		return AE_BAD_PARAMETER;
+@@ -543,7 +539,7 @@ static char acpi_os_name[ACPI_MAX_OVERRIDE_LEN];
+ 
+ acpi_status
+ acpi_os_predefined_override(const struct acpi_predefined_names *init_val,
+-			    acpi_string * new_val)
++			    acpi_string *new_val)
+ {
+ 	if (!init_val || !new_val)
+ 		return AE_BAD_PARAMETER;
+@@ -714,8 +710,8 @@ static void acpi_table_taint(struct acpi_table_header *table)
+ 
+ 
+ acpi_status
+-acpi_os_table_override(struct acpi_table_header * existing_table,
+-		       struct acpi_table_header ** new_table)
++acpi_os_table_override(struct acpi_table_header *existing_table,
++		       struct acpi_table_header **new_table)
+ {
+ 	if (!existing_table || !new_table)
+ 		return AE_BAD_PARAMETER;
+@@ -889,7 +885,7 @@ u64 acpi_os_get_timer(void)
+ 	return time_ns;
+ }
+ 
+-acpi_status acpi_os_read_port(acpi_io_address port, u32 * value, u32 width)
++acpi_status acpi_os_read_port(acpi_io_address port, u32 *value, u32 width)
+ {
+ 	u32 dummy;
+ 
+@@ -1046,7 +1042,7 @@ acpi_os_write_memory(acpi_physical_address phys_addr, u64 value, u32 width)
+ }
+ 
+ acpi_status
+-acpi_os_read_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
++acpi_os_read_pci_configuration(struct acpi_pci_id *pci_id, u32 reg,
+ 			       u64 *value, u32 width)
+ {
+ 	int result, size;
+@@ -1074,11 +1070,11 @@ acpi_os_read_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
+ 				reg, size, &value32);
+ 	*value = value32;
+ 
+-	return (result ? AE_ERROR : AE_OK);
++	return result ? AE_ERROR : AE_OK;
+ }
+ 
+ acpi_status
+-acpi_os_write_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
++acpi_os_write_pci_configuration(struct acpi_pci_id *pci_id, u32 reg,
+ 				u64 value, u32 width)
+ {
+ 	int result, size;
+@@ -1101,7 +1097,7 @@ acpi_os_write_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
+ 				PCI_DEVFN(pci_id->device, pci_id->function),
+ 				reg, size, value);
+ 
+-	return (result ? AE_ERROR : AE_OK);
++	return result ? AE_ERROR : AE_OK;
+ }
+ 
+ static void acpi_os_execute_deferred(struct work_struct *work)
+@@ -1247,7 +1243,7 @@ bool acpi_queue_hotplug_work(struct work_struct *work)
+ }
+ 
+ acpi_status
+-acpi_os_create_semaphore(u32 max_units, u32 initial_units, acpi_handle * handle)
++acpi_os_create_semaphore(u32 max_units, u32 initial_units, acpi_handle *handle)
+ {
+ 	struct semaphore *sem = NULL;
+ 
+@@ -1735,7 +1731,7 @@ void acpi_os_release_lock(acpi_spinlock lockp, acpi_cpu_flags flags)
+  ******************************************************************************/
+ 
+ acpi_status
+-acpi_os_create_cache(char *name, u16 size, u16 depth, acpi_cache_t ** cache)
++acpi_os_create_cache(char *name, u16 size, u16 depth, acpi_cache_t **cache)
+ {
+ 	*cache = kmem_cache_create(name, size, 0, 0, NULL);
+ 	if (*cache == NULL)
+@@ -1756,10 +1752,10 @@ acpi_os_create_cache(char *name, u16 size, u16 depth, acpi_cache_t ** cache)
+  *
+  ******************************************************************************/
+ 
+-acpi_status acpi_os_purge_cache(acpi_cache_t * cache)
++acpi_status acpi_os_purge_cache(acpi_cache_t *cache)
+ {
+ 	kmem_cache_shrink(cache);
+-	return (AE_OK);
++	return AE_OK;
+ }
+ 
+ /*******************************************************************************
+@@ -1775,10 +1771,10 @@ acpi_status acpi_os_purge_cache(acpi_cache_t * cache)
+  *
+  ******************************************************************************/
+ 
+-acpi_status acpi_os_delete_cache(acpi_cache_t * cache)
++acpi_status acpi_os_delete_cache(acpi_cache_t *cache)
+ {
+ 	kmem_cache_destroy(cache);
+-	return (AE_OK);
++	return AE_OK;
+ }
+ 
+ /*******************************************************************************
+@@ -1795,10 +1791,10 @@ acpi_status acpi_os_delete_cache(acpi_cache_t * cache)
+  *
+  ******************************************************************************/
+ 
+-acpi_status acpi_os_release_object(acpi_cache_t * cache, void *object)
++acpi_status acpi_os_release_object(acpi_cache_t *cache, void *object)
+ {
+ 	kmem_cache_free(cache, object);
+-	return (AE_OK);
++	return AE_OK;
+ }
+ #endif
+ 
 -- 
 2.1.0
