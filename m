@@ -1,53 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Feb 2015 16:58:35 +0100
-Subject: [RFC PATCH] arm: asm/cmpxchg.h: Add support half-word xchg()
-In-Reply-To: <1424878581-11701-1-git-send-email-bobby.prani@gmail.com>
-References: <1424878581-11701-1-git-send-email-bobby.prani@gmail.com>
-Message-ID: <3465519.0ga9zC7F7b@wuerfel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 25 Feb 2015 10:59:48 -0500
+Subject: irqchip status (please read)
+Message-ID: <20150225155948.GH22772@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 February 2015 10:36:20 Pranith Kumar wrote:
-> This patch adds support for a half-word xchg() for ARM using ldrexh/strexh
-> instructions. It also fixes an asm comment  for __cmpxchg2.
-> 
-> Currently using a half-word xchg() results in the following splat on an ARMv7
-> machine.
-> 
-> [   45.833303] xchg: bad data size: pc 0xbe806020, ptr 0xeb18deee, size 2
-> [   45.833324] ------------[ cut here ]------------
-> [   45.837939] kernel BUG at /dvs/git/dirty/git-master_linux/kernel/arch/arm/kernel/traps.c:727!
-> 
-> Signed-off-by: Pranith Kumar <bobby.prani@gmail.com>
+All,
 
-Unfortunately, the BUG message seems incomplete, can you reproduce this
-with CONFIG_DEBUG_BUGVERBOSE enabled?
+I hate to put the burden on submitters, but I've got to keep the ball
+moving.  This will not become the status quo.
 
->  arch/arm/include/asm/cmpxchg.h | 18 +++++++++++++++++-
->  1 file changed, 17 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
-> index abb2c37..9505cca 100644
-> --- a/arch/arm/include/asm/cmpxchg.h
-> +++ b/arch/arm/include/asm/cmpxchg.h
-> @@ -50,6 +50,16 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
->  			: "r" (x), "r" (ptr)
->  			: "memory", "cc");
->  		break;
-> +	case 2:
-> +		asm volatile("@	__xchg2\n"
-> +		"1:	ldrexh	%0, [%3]\n"
-> +		"	strexh	%1, %2, [%3]\n"
-> +		"	teq	%1, #0\n"
-> +		"	bne	1b"
-> +			: "=&r" (ret), "=&r" (tmp)
-> +			: "r" (x), "r" (ptr)
-> +			: "memory", "cc");
-> +		break;
->  	case 4:
->  		asm volatile("@	__xchg4\n"
->  		"1:	ldrex	%0, [%3]\n"
+Due to changes in my work schedule, I lost track of the status of
+submissions during the last cycle and over the merge window.  Normally,
+I keep everything irqchip related in one maildir and as I push things,
+it gets flagged and I can easily tell what hasn't been handled yet.
+Unfortunately, I needed some help from Thomas last window and that
+screwed up my system (my fault entirely).
 
-Does this work on all ARMv6 or just ARMv6k?
+In order to get back on track, I've marked-as-read and archived
+everything prior to February 14th.  This is completely arbitrary and not
+ideal.  So here is what I have in my queue:
 
-	Arnd
+  [PATCH v2 0/6] enhance configuring an ITS
+  Yun Wu
+  20150215
+
+  [PATCH v3 0/8] irqchip: New driver for ST's SysCfg controlled IRQs
+  Lee Jones
+  20150218
+
+  [PATCH v5 0/6] irqchip: Move Tegra LIC to use stacked domains
+  Marc Zyngier
+  20150223
+
+  [RFC PATCH 0/3] genirq: mixing IRQF_NO_SUSPEND and wakeup sources on shared IRQs
+  Boris Brezillon
+  20150224
+
+  [PATCH v5 0/2] irqchip: Move Exynos PM to use stacked domains
+  Marc Zyngier
+  20150223
+
+  [PATCH v9 16/21] irqchip: Add GICv2 specific ACPI boot support
+  Hanjun Guo
+  20150225
+
+  [PATCH v5 0/7] irqchip: Move OMAP{4,5}/DRA7 to use stacked domains
+  Marc Zyngier
+  20150223
+
+"In my queue" means it's queued up for review, nothing more.
+
+I'm certain there are patches for consideration for this cycle which are
+not on the above list.  If they are yours, I ask you to please bear with
+me as I get back into the swing of things and please resend as soon as
+possible.
+
+Also, since Cc'ing everyone potentially needing to read this would be
+unwieldy and error-prone, if you know someone who is affected by this,
+please send them a gentle ping and a pointer to this email.
+
+thx,
+
+Jason.
