@@ -1,52 +1,44 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 25 Feb 2015 15:54:26 +0100
-Subject: Ethernet Briding broken on APM Mustang on v4.0-rc1
-In-Reply-To: <54EDD460.8080909@redhat.com>
-References: <20150225124101.GD12827@cbox> <20150225134534.GE12827@cbox>
- <54EDD460.8080909@redhat.com>
-Message-ID: <20150225145426.GA18388@cbox>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 25 Feb 2015 22:53:30 +0800
+Subject: [PATCH 0/8] Fix struct clk pointer comparing
+Message-ID: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 07:55:44AM -0600, Mark Langsdorf wrote:
-> On 02/25/2015 07:45 AM, Christoffer Dall wrote:
-> >Update, apologies for noise,
-> >
-> >On Wed, Feb 25, 2015 at 01:41:01PM +0100, Christoffer Dall wrote:
-> >>Hi,
-> >>
-> >>Configuring bridged networking on the APM Mustang platform doesn't work
-> >>on v4.0-rc1.  It works fine on v3.19-rc1.
-> >>
-> >>When adding the interface to the bridge I get this error:
-> >>
-> >>can't add eth0 to bridge br0: Invalid argument
-> >>
-> >>Has anyone else seen this?
-> >>
-> >>Other ARMv8 platforms don't seem to be affected by this.
-> >>
-> >
-> >It seems that on v4.0-rc1 the APM ethernet card no longer gets a mac
-> >address (or rather, it gets 00:00:00:00:...) so assigning it an
-> >appropriate address naturally does the trick.
-> >
-> >I have no idea which change caused this behavior though.
-> 
-> Did you update your firmware recently? The MAC address is
-> stored as a UEFI shell variable and pushed into ACPI/DTB
-> by the firmware. At one point in the development history,
-> the symbol that held it changed from RGMII_MAC0 to MAC0.
+On the first day back from Chinese new year holiday, I got a regression
+report from rmk, saying Ethernet stops working on HimmingBoard with
+v4.0-rc1.
 
-No, only updated my kernel.
+I read through the thread [1] and found a couple of i.MX audio drivers
+are also affected per Stephen's Coccinelle report.  That's why I came up
+with this series based on Quentin's structclk.cocci, Stephen's result
+and Mike's input (thanks all).
 
-> 
-> You can reset it by going into the UEFI shell and running:
-> set MAC0 aa:bb:cc:dd:ee:ff
-> replacing aa:bb:cc:dd:ee:ff with the MAC address.
-> 
+The first two patches are run-time tested and all others are
+compile-tested only.
 
-I'm not running UEFI, but U-Boot and it doesn't seem like U-Boot manages
-to configure the hwaddr for Linux.
+[1] http://thread.gmane.org/gmane.linux.kernel/1872604/focus=1880862
 
--Christoffer
+Shawn Guo (8):
+  clk: add helper function clk_is_match()
+  ARM: imx: fix struct clk pointer comparing
+  drm: armada: fix struct clk pointer comparing
+  pwm: atmel-hlcdc: fix struct clk pointer comparing
+  serial: samsung: fix struct clk pointer comparing
+  ASoC: fsl_esai: fix struct clk pointer comparing
+  ASoC: fsl_spdif: fix struct clk pointer comparing
+  ASoC: kirkwood: fix struct clk pointer comparing
+
+ arch/arm/mach-imx/mach-imx6q.c      |  5 +++--
+ drivers/clk/clk.c                   |  6 ++++++
+ drivers/gpu/drm/armada/armada_510.c |  2 +-
+ drivers/pwm/pwm-atmel-hlcdc.c       |  2 +-
+ drivers/tty/serial/samsung.c        |  2 +-
+ include/linux/clk.h                 | 16 ++++++++++++++++
+ sound/soc/fsl/fsl_esai.c            |  2 +-
+ sound/soc/fsl/fsl_spdif.c           |  4 ++--
+ sound/soc/kirkwood/kirkwood-i2s.c   |  2 +-
+ 9 files changed, 32 insertions(+), 9 deletions(-)
+
+-- 
+1.9.1
