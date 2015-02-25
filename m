@@ -1,59 +1,49 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 25 Feb 2015 17:02:03 +0100
-Subject: [RFC V2 12/12] i2c: bcm-iproc: make use of the new infrastructure for
- quirks
-In-Reply-To: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
-References: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1424880126-15047-13-git-send-email-wsa@the-dreams.de>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Wed, 25 Feb 2015 16:02:32 +0000
+Subject: [PATCH 0/6] QEMU ARM64 Migration Fixes
+Message-ID: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+In conjunction with the kernel patch series I've just sent:
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
----
- drivers/i2c/busses/i2c-bcm-iproc.c | 15 +++++++--------
- 1 file changed, 7 insertions(+), 8 deletions(-)
+  http://thread.gmane.org/gmane.comp.emulators.kvm.arm.devel/101/focus=100
 
-diff --git a/drivers/i2c/busses/i2c-bcm-iproc.c b/drivers/i2c/busses/i2c-bcm-iproc.c
-index d3c89157b33774..f9f2c2082151e2 100644
---- a/drivers/i2c/busses/i2c-bcm-iproc.c
-+++ b/drivers/i2c/busses/i2c-bcm-iproc.c
-@@ -160,14 +160,6 @@ static int bcm_iproc_i2c_xfer_single_msg(struct bcm_iproc_i2c_dev *iproc_i2c,
- 	u32 val;
- 	unsigned long time_left = msecs_to_jiffies(I2C_TIMEOUT_MESC);
- 
--	/* need to reserve one byte in the FIFO for the slave address */
--	if (msg->len > M_TX_RX_FIFO_SIZE - 1) {
--		dev_err(iproc_i2c->device,
--			"only support data length up to %u bytes\n",
--			M_TX_RX_FIFO_SIZE - 1);
--		return -EOPNOTSUPP;
--	}
--
- 	/* check if bus is busy */
- 	if (!!(readl(iproc_i2c->base + M_CMD_OFFSET) &
- 	       BIT(M_CMD_START_BUSY_SHIFT))) {
-@@ -287,6 +279,12 @@ static const struct i2c_algorithm bcm_iproc_algo = {
- 	.functionality = bcm_iproc_i2c_functionality,
- };
- 
-+static struct i2c_adapter_quirks bcm_iproc_i2c_quirks = {
-+	/* need to reserve one byte in the FIFO for the slave address */
-+	.max_read_len = M_TX_RX_FIFO_SIZE - 1,
-+	.max_write_len = M_TX_RX_FIFO_SIZE - 1,
-+};
-+
- static int bcm_iproc_i2c_cfg_speed(struct bcm_iproc_i2c_dev *iproc_i2c)
- {
- 	unsigned int bus_speed;
-@@ -413,6 +411,7 @@ static int bcm_iproc_i2c_probe(struct platform_device *pdev)
- 	i2c_set_adapdata(adap, iproc_i2c);
- 	strlcpy(adap->name, "Broadcom iProc I2C adapter", sizeof(adap->name));
- 	adap->algo = &bcm_iproc_algo;
-+	adap->quirks = &bcm_iproc_i2c_quirks;
- 	adap->dev.parent = &pdev->dev;
- 	adap->dev.of_node = pdev->dev.of_node;
- 
+These patches have been fairly heavily tested on the xgene systems
+I've got access to and I'm pretty confident we've caught all the
+corner cases.
+
+>From QEMU's point of view the fixes are fairly simple. We need to take
+a little care when restoring the GIC that config that affects the
+later restoration is restored first. The rest was simply missing
+serialisation code for SPSR and FP registers.
+
+The pl011 patch was mainly to reduce noise on re-asserting level
+triggered interrupt lines. And the cpu.h documentation was for my own
+sanity.
+
+Cheers,
+
+Alex.
+
+
+Alex Benn?e (5):
+  target-arm: kvm: save/restore mp state
+  arm_gic_kvm.c: restore config before pending IRQs
+  hw/char/pl011: don't keep setting the IRQ if nothing changed
+  target-arm/kvm64.c: sync FP register state
+  target-arm/cpu.h: document why env->spsr exists
+
+Christoffer Dall (1):
+  target-arm/kvm64: fix save/restore of SPSR regs
+
+ hw/char/pl011.c       |  12 ++++--
+ hw/intc/arm_gic_kvm.c |   7 +++-
+ target-arm/cpu.h      |   5 +++
+ target-arm/kvm.c      |   1 +
+ target-arm/kvm64.c    | 104 +++++++++++++++++++++++++++++++++++++++++++++++---
+ target-arm/machine.c  |  38 ++++++++++++++++++
+ 6 files changed, 156 insertions(+), 11 deletions(-)
+
 -- 
-2.1.4
+2.3.0
