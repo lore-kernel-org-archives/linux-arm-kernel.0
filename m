@@ -1,41 +1,66 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 25 Feb 2015 13:05:13 -0800
-Subject: [PATCH v4 1/3] mmc: dw_mmc: update clock after host reach a
- stable voltage
-In-Reply-To: <CAGOxZ53vcz96mFbb9ez3GAjZBqEQqiss_TmU1y7EQeRGTVLQdg@mail.gmail.com>
-References: <1423828368-18456-1-git-send-email-addy.ke@rock-chips.com>
- <1423894668-8886-1-git-send-email-addy.ke@rock-chips.com>
- <1423894668-8886-2-git-send-email-addy.ke@rock-chips.com>
- <CAGOxZ53ndi_hYDGBGhY-7q8aOrFid1=D=_5KEbUvzTsnybJQ3Q@mail.gmail.com>
- <CAD=FV=V9aK-78GJ_eWkpZZdVT_5Zu8ehxg_o3NtnpD2wyRuh7Q@mail.gmail.com>
- <CAGOxZ53vcz96mFbb9ez3GAjZBqEQqiss_TmU1y7EQeRGTVLQdg@mail.gmail.com>
-Message-ID: <CAD=FV=WxjQXQpRDNj8pOrcQdAgiQKrJSM1Upf=npjNEpbBLcPg@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 25 Feb 2015 22:15:45 +0100
+Subject: [PATCH V6 00/12] Tegra xHCI support
+In-Reply-To: <CAL1qeaEmSphLd=k3f6865OEO_rcwO3+Hv5KDvCN2_=7nDdZJzA@mail.gmail.com>
+References: <1416874644-12070-1-git-send-email-abrestic@chromium.org>
+ <20150225160110.GA26610@ulmo>
+ <CAL1qeaEmSphLd=k3f6865OEO_rcwO3+Hv5KDvCN2_=7nDdZJzA@mail.gmail.com>
+Message-ID: <20150225211539.GA7884@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alim,
+On Wed, Feb 25, 2015 at 09:27:36AM -0800, Andrew Bresticker wrote:
+> Hi Thierry,
+> 
+> > Sorry for taking so awfully long to look at this. I've spent some time
+> > looking at various pieces of documentation and I concluded that
+> > representing the port assignment as muxing options doesn't seem right
+> > after all. Instead I've come up with an alternate proposal (attached).
+> > Could you take a look and see if that sounds reasonable to you?
+> 
+> Thanks for taking a look at this.  I've been meaning to pick this
+> series back up, but haven't had quite enough bandwidth lately.
+> 
+> This all looks good to me, just one comment below:
+> 
+> > +PHY nodes:
+> > +----------
+> > +
+> > +An optional child node named "phys" can contain nodes describing additional
+> > +properties of each PHY. Only USB3 and UTMI PHYs can be complemented in this
+> > +way, in which case the name of each node must match one of the following:
+> > +
+> > +  usb3-0, usb3-1, utmi-0, utmi-1, utmi-2
+> > +
+> > +Required properties for USB3 PHYs:
+> > +- nvidia,lanes: specifies the name of the lane that this USB3 PHY uses
+> > +- nvidia,port: specifies the number of the USB2 port that is used for this
+> > +  USB3 PHY
+> > +
+> > +Optional properties for UTMI PHYs:
+> > +- vbus-supply: regulator providing the VBUS voltage for the UTMI pad
+> 
+> What about the HSIC PHYs?  Shouldn't they be represented as PHY nodes as well?
 
-On Tue, Feb 24, 2015 at 11:52 PM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
->>> This looks a HACK to me.
->>> If stabilizing host voltage regulator is the problem, can you try out
->>> below patch, and see if this resolve your issue?
->>
->> Actually, IMHO Alim's patch is more of a hack than Addy's.  There's
->> already a 10ms delay between "power up" and "power on" in the MMC core
->> in mmc_power_up() state.  That delay is commented as:
->>
-> Well, my suggestion (adding 5ms in switch_volatge) was based on DW_MMC
-> databook (V2.41a) section "7.4.1.2 Voltage switch Normal Scenario"
-> step #7 which says:" After the 5ms timer expires, the host voltage
-> regulator is stable".
+Yes, they could. The PCIe and SATA PHYs could as well. I haven't
+included them because they currently don't take any properties. In
+addition to that, perhaps some of the nvidia,hsic-* properties could be
+moved into the PHY nodes, too. But they're also properties of the pin,
+so keeping them in the pinmux nodes seems fine as well.
 
-So all of that should be handled by the core.  Just reading the DW_MMC
-databook can be confusing because they don't differentiate between
-what's in the SDMMC spec and what's DW_MMC specific.
+On a slightly different topic, I've been trying to wrap my head around
+the use of the nvidia,port property and my conclusion was that in fact
+one of the physical ports is shared between USB2 and USB3. That is the
+utmi-2 PHY and usb3-0 PHY go to the very same port. The vbus-supply
+specified in the Jetson TK1 DTS would support that (it's associated with
+utmi-2 but named vdd_usb3_reg, and the USB3 port doesn't work without
+it). Can you confirm that?
 
-Check out mmc_set_signal_voltage(), specifically:
-
-* During a signal voltage level switch, the clock must be gated
-* for 5 ms according to the SD spec
-
--Doug
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150225/190dae0a/attachment.sig>
