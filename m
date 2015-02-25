@@ -1,54 +1,71 @@
-From: dtor@chromium.org (Dmitry Torokhov)
-Date: Wed, 25 Feb 2015 11:33:46 -0800
-Subject: [PATCH v5 0/6] Add common clock support for Broadcom iProc
- architecture
-In-Reply-To: <1423097705-22939-1-git-send-email-rjui@broadcom.com>
-References: <rjui@broadcom.com>
- <1423097705-22939-1-git-send-email-rjui@broadcom.com>
-Message-ID: <20150225193346.GD3215@dtor-ws>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 25 Feb 2015 20:34:24 +0100
+Subject: [PATCH] ARM: i.MX6Q: Add fixup for RTL8211E Gigabit Ethernet PHY.
+In-Reply-To: <1424892206-18679-1-git-send-email-rockford@yandex.ru>
+References: <1424892206-18679-1-git-send-email-rockford@yandex.ru>
+Message-ID: <54EE23C0.7000206@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 04, 2015 at 04:54:59PM -0800, Ray Jui wrote:
-> This patchset contains the initial common clock support for Broadcom's iProc
-> family of SoCs. The iProc clock architecture comprises of various PLLs, e.g.,
-> ARMPLL, GENPLL, LCPLL0, MIPIPLL, and etc. An onboard crystal serves as the
-> basic reference clock for these PLLs. Each PLL may have several leaf clocks.
-> One special group of clocks is the ASIU clocks, which are dervied directly
-> from the crystal reference clock.
-> 
-> This patchset also contains the basic clock support for the Broadcom Cygnus
-> SoC, which implements the iProc clock architecture
-> 
-> Changes from v4:
->  - Add of_clk_get_parent_rate helper function into the clock framework
->  - Switch to use of_clk_get_parent_rate in the iProc PLL clock driver
-> 
-> Changes from v3:
->  - Fix incorrect use of passing in of_clk_src_onecell_get when adding ARM PLL
->    and other iProc PLLs as clock provider. These PLLs have zero cells in DT and
->    thefore of_clk_src_simple_get should be used instead
->  - Rename Cygnus MIPI PLL Channel 2 clock from BCM_CYGNUS_MIPIPLL_CH2_UNUSED
->    to BCM_CYGNUS_MIPIPLL_CH2_V3D, since a 3D graphic rendering engine has been
->    integrated into Cygnus revision B0 and has its core clock running off
->    MIPI PLL Channel 2
->  - Changed default MIPI PLL VCO frequency from 1.75 GHz to 2.1 GHz. This allows
->    us to derive 300 MHz V3D clock from channel 2 through the post divisor
-> 
-> Changes from v2:
->  - Re-arrange Cygnus clock/pll init functions so each init function is right
->    next to its clock table
->  - Removed #defines for number of clocks in Cygnus. Have the number of clocks
->    automatically determined based on array size of the clock table
-> 
-> Changes from v1:
->  - Separate drivers/clk/Makefile change for drivers/clk/bcm out to a standalone patch
+Adding alkml and Shawn on Cc.
 
-FWIW I tested this series on BCM958305K SVK.
+Marc
 
-Tested-by: Dmitry Torokhov <dtor@chromium.org>
+On 02/25/2015 08:23 PM, Andrey Panov wrote:
+> RTL8211E Ethernet PHY found in Embedsky E9 board is need
+> an additional initialization.
+> Taken from vendor's binary-only module.
+> 
+> Signed-off-by: Andrey Panov <rockford@yandex.ru>
+> ---
+>  arch/arm/mach-imx/mach-imx6q.c | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 4ad6e47..41708f5 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -166,6 +166,18 @@ static int ar8035_phy_fixup(struct phy_device *dev)
+>  
+>  #define PHY_ID_AR8035 0x004dd072
+>  
+> +static int rtl8211e_phy_fixup(struct phy_device *dev)
+> +{
+> +	phy_write(dev, 0x00, 0x3140);
+> +	mdelay(10);
+> +	phy_write(dev, 0x00, 0x3340);
+> +	mdelay(10);
+> +
+> +	return 0;
+> +}
+> +
+> +#define PHY_ID_RTL8211E 0x001cc915
+> +
+>  static void __init imx6q_enet_phy_init(void)
+>  {
+>  	if (IS_BUILTIN(CONFIG_PHYLIB)) {
+> @@ -177,6 +189,8 @@ static void __init imx6q_enet_phy_init(void)
+>  				ar8031_phy_fixup);
+>  		phy_register_fixup_for_uid(PHY_ID_AR8035, 0xffffffef,
+>  				ar8035_phy_fixup);
+> +		phy_register_fixup_for_uid(PHY_ID_RTL8211E, 0xffffffff,
+> +				rtl8211e_phy_fixup);
+>  	}
+>  }
+>  
+> 
 
-Thanks.
 
 -- 
-Dmitry
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150225/f34208c3/attachment.sig>
