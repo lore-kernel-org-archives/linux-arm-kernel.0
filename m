@@ -1,88 +1,66 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 25 Feb 2015 21:47:02 +0800
-Subject: [Linaro-acpi] [PATCH v3 5/9] ACPI: move acpi_os_handler() so
- it can be made arch-dependent later
-In-Reply-To: <1424824585-6405-6-git-send-email-al.stone@linaro.org>
-References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
- <1424824585-6405-6-git-send-email-al.stone@linaro.org>
-Message-ID: <54EDD256.1010009@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 25 Feb 2015 13:52:20 +0000
+Subject: [PATCH v4 0/9] mfd: watchdog: rtc: New driver for ST's LPC IP
+Message-ID: <1424872349-4155-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?02?25? 08:36, al.stone at linaro.org wrote:
-> From: Al Stone <al.stone@linaro.org>
->
-> In order to deprecate the use of _OSI for arm64 or other new architectures,
-> we need to make the default handler something we can change for various
-> platforms.  This patch moves the definition of acpi_osi_handler() -- the
-> function used by ACPICA as a callback for evaluating _OSI -- into a separate
-> file.  Subsequent patches will change which files get built so that we can
-> then build the version of _OSI we need for a particular architecture.
->
-> There is no functional change.
->
-> Signed-off-by: Al Stone <al.stone@linaro.org>
-> ---
->   drivers/acpi/Makefile |  2 +-
->   drivers/acpi/osi.c    | 95 +++++++++++++++++++++++++++++++++++++++++++++++++++
->   drivers/acpi/osl.c    | 24 -------------
->   include/linux/acpi.h  |  1 +
->   4 files changed, 97 insertions(+), 25 deletions(-)
->   create mode 100644 drivers/acpi/osi.c
->
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index 13536d8..97191eb 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -18,7 +18,7 @@ obj-y				+= acpi.o \
->   					acpica/
->
->   # All the builtin files are in the "acpi." module_param namespace.
-> -acpi-y				+= osl.o utils.o reboot.o
-> +acpi-y				+= osl.o utils.o reboot.o osi.o
->   acpi-y				+= nvs.o
->
->   # Power management related files
-> diff --git a/drivers/acpi/osi.c b/drivers/acpi/osi.c
-> new file mode 100644
-> index 0000000..f23aa70
-> --- /dev/null
-> +++ b/drivers/acpi/osi.c
-> @@ -0,0 +1,95 @@
-> +/*
-> + *  osi.c - _OSI implementation (moved from drivers/acpi/osl.c)
-> + *
-> + *  Copyright (C) 2000       Andrew Henroid
-> + *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
-> + *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
-> + *  Copyright (c) 2008 Intel Corporation
-> + *   Author: Matthew Wilcox <willy@linux.intel.com>
-> + *
-> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> + *
-> + *  This program is free software; you can redistribute it and/or modify
-> + *  it under the terms of the GNU General Public License as published by
-> + *  the Free Software Foundation; either version 2 of the License, or
-> + *  (at your option) any later version.
-> + *
-> + *  This program is distributed in the hope that it will be useful,
-> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *  GNU General Public License for more details.
-> + *
-> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> + *
-> + */
-> +
-> +#include <linux/acpi.h>
-> +
-> +#define _COMPONENT		ACPI_OS_SERVICES
-> +ACPI_MODULE_NAME("osi");
-> +
-> +#define PREFIX			"ACPI: "
+ST's Low Power Controller (LPC) controls two devices; watchdog and RTC.
+Only one of the devices can be used at any one time, which is enforced
+by the correlating MFD driver.
+  
+This driver set provides everything you need to choose one (and only
+one) of the LPC devices to run per I/P block, of which there are two
+on the enabled STiH407 h/w.
 
-Hi Al, remove PREFIX here and use pr_fmt() instead as
-I mentioned in previous patch :)
+Version 4:
+ - Use {readl,writel}_relaxed() calls
+ - Add Guenter's Reviewed-by
+ - Rebased onto v4.0-rc1
+  
+Version 3:
+ - Move Regmap pointer into core device data structure
+ - Remove error message from devm_ioremap_resource
+  
+Version 2:
+ - Only calculate keepalive once in probe()
+ - Check for a 0 clk_rate
+ - Set limits using predefined attributes from watchdog_device
+ - CONFIG_PM => CONFIG_SLEEP
+ - Call st_wdog_setup() on resume
+ - Remove MFD driver -- instead rely on driver probing mechanism
+   which continues attempting to bind to different drivers until
+   one does not return -ENODEV
 
-Thanks
-Hanjun
+Lee Jones (9):
+  mfd: dt-bindings: Provide human readable defines for LPC mode choosing
+  ARM: multi_v7_defconfig: Enable support for ST's LPC Watchdog
+  ARM: multi_v7_defconfig: Enable support for ST's LPC RTC
+  ARM: STi: DT: STiH407: Add Device Tree node for the LPC
+  watchdog: bindings: Provide ST bindings for ST's LPC Watchdog device
+  watchdog: st_wdt: Add new driver for ST's LPC Watchdog
+  rtc: bindings: Provide ST bindings for ST's LPC RTC device
+  rtc: st: add new driver for ST's LPC RTC
+  MAINTAINERS: Add Watchdog and RTC files to STI's maintainer entry
+
+ .../devicetree/bindings/rtc/rtc-st-lpc.txt         |  25 ++
+ .../devicetree/bindings/watchdog/st_lpc_wdt.txt    |  38 +++
+ MAINTAINERS                                        |   2 +
+ arch/arm/boot/dts/stih407-family.dtsi              |  20 ++
+ arch/arm/configs/multi_v7_defconfig                |   2 +
+ drivers/rtc/Kconfig                                |  12 +
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-st-lpc.c                           | 354 +++++++++++++++++++++
+ drivers/watchdog/Kconfig                           |  13 +
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/st_lpc_wdt.c                      | 333 +++++++++++++++++++
+ include/dt-bindings/mfd/st-lpc.h                   |  15 +
+ 12 files changed, 816 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
+ create mode 100644 Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
+ create mode 100644 drivers/rtc/rtc-st-lpc.c
+ create mode 100644 drivers/watchdog/st_lpc_wdt.c
+ create mode 100644 include/dt-bindings/mfd/st-lpc.h
+
+-- 
+1.9.1
