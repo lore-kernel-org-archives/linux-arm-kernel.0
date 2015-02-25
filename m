@@ -1,126 +1,109 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Wed, 25 Feb 2015 16:02:36 +0000
-Subject: [PATCH 4/6] target-arm/kvm64.c: sync FP register state
+Date: Wed, 25 Feb 2015 16:02:38 +0000
+Subject: [PATCH 5/6] target-arm/kvm64: fix save/restore of SPSR regs
 In-Reply-To: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
 References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1424880159-29348-5-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1424880159-29348-7-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alex Benn?e <alex@bennee.com>
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-For migration to work we need to sync all of the register state. This is
-especially noticeable when GCC starts using FP registers as spill
-registers even with integer programs.
+The current code was negatively indexing the cpu state array and not
+synchronizing banked spsr register state with the current mode's spsr
+state, causing occasional failures with migration.
 
+Some munging is done to take care of the aarch64 mapping and also to
+ensure the most current value of the spsr is updated to the banked
+registers (relevant for KVM<->TCG migration).
+
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
+---
+v2 (ajb)
+  - minor tweaks and clarifications
+
 diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
-index 8cf3a62..c60e989 100644
+index c60e989..1e36b0a 100644
 --- a/target-arm/kvm64.c
 +++ b/target-arm/kvm64.c
-@@ -126,9 +126,17 @@ bool kvm_arm_reg_syncs_via_cpreg_list(uint64_t regidx)
- #define AARCH64_CORE_REG(x)   (KVM_REG_ARM64 | KVM_REG_SIZE_U64 | \
-                  KVM_REG_ARM_CORE | KVM_REG_ARM_CORE_REG(x))
- 
-+/* The linux headers don't define a 128 bit wide SIMD macro for us */
-+#define AARCH64_SIMD_CORE_REG(x)   (KVM_REG_ARM64 | KVM_REG_SIZE_U128 | \
-+                 KVM_REG_ARM_CORE | KVM_REG_ARM_CORE_REG(x))
-+
-+#define AARCH64_SIMD_CTRL_REG(x)   (KVM_REG_ARM64 | KVM_REG_SIZE_U32 | \
-+                 KVM_REG_ARM_CORE | KVM_REG_ARM_CORE_REG(x))
-+
- int kvm_arch_put_registers(CPUState *cs, int level)
- {
-     struct kvm_one_reg reg;
-+    uint32_t fpr;
+@@ -140,6 +140,7 @@ int kvm_arch_put_registers(CPUState *cs, int level)
      uint64_t val;
      int i;
      int ret;
-@@ -207,13 +215,36 @@ int kvm_arch_put_registers(CPUState *cs, int level)
-         }
++    unsigned int el;
+ 
+     ARMCPU *cpu = ARM_CPU(cs);
+     CPUARMState *env = &cpu->env;
+@@ -206,9 +207,25 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+         return ret;
      }
  
-+    /* Advanced SIMD and FP registers */
-+    for (i = 0; i < 32; i++) {
-+        reg.id = AARCH64_SIMD_CORE_REG(fp_regs.vregs[i]);
-+        reg.addr = (uintptr_t)(&env->vfp.regs[i]);
-+        ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
-+        if (ret) {
-+            return ret;
-+        }
-+        reg.id++;
++    /* Saved Program State Registers
++     *
++     * Before we restore from the banked_spsr[] array we need to
++     * ensure that any modifications to env->spsr are correctly
++     * reflected and map aarch64 exception levels if required.
++     */
++    el = arm_current_el(env);
++    if (is_a64(env) && el > 0) {
++        g_assert(el == 1);
++        /* KVM maps KVM_SPSR_SVC to KVM_SPSR_EL1 for aarch64 */
++        env->banked_spsr[1] = env->banked_spsr[0];
++        env->banked_spsr[aarch64_banked_spsr_index(el)] = env->spsr;
++    } else {
++        env->banked_spsr[el] = env->spsr;
 +    }
 +
-+    reg.addr = (uintptr_t)(&fpr);
-+    fpr = vfp_get_fpsr(env);
-+    reg.id = AARCH64_SIMD_CTRL_REG(fp_regs.fpsr);
-+    ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
-+    if (ret) {
-+        return ret;
-+    }
-+
-+    fpr = vfp_get_fpcr(env);
-+    reg.id = AARCH64_SIMD_CTRL_REG(fp_regs.fpcr);
-+    ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
-+    if (ret) {
-+        return ret;
-+    }
-+
-     if (!write_list_to_kvmstate(cpu)) {
-         return EINVAL;
-     }
- 
--    /* TODO:
--     * FP state
--     */
-     return ret;
- }
- 
-@@ -221,6 +252,7 @@ int kvm_arch_get_registers(CPUState *cs)
- {
+     for (i = 0; i < KVM_NR_SPSR; i++) {
+         reg.id = AARCH64_CORE_REG(spsr[i]);
+-        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
++        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
+         ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
+         if (ret) {
+             return ret;
+@@ -253,6 +270,7 @@ int kvm_arch_get_registers(CPUState *cs)
      struct kvm_one_reg reg;
      uint64_t val;
-+    uint32_t fpr;
+     uint32_t fpr;
++    unsigned int el;
      int i;
      int ret;
  
-@@ -302,9 +334,36 @@ int kvm_arch_get_registers(CPUState *cs)
+@@ -325,15 +343,32 @@ int kvm_arch_get_registers(CPUState *cs)
+         return ret;
+     }
+ 
++    /* Fetch the SPSR registers
++     *
++     * KVM has an array of state indexed for all the possible aarch32
++     * privilage levels. Although not all are valid at all points
++     * there are some transitions possible which can access old state
++     * so it is worth keeping them all.
++     */
+     for (i = 0; i < KVM_NR_SPSR; i++) {
+         reg.id = AARCH64_CORE_REG(spsr[i]);
+-        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
++        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
+         ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
+         if (ret) {
+             return ret;
          }
      }
  
-+    /* Advanced SIMD and FP registers */
-+    for (i = 0; i < 32; i++) {
-+        reg.id = AARCH64_SIMD_CORE_REG(fp_regs.vregs[i]);
-+        reg.addr = (uintptr_t)(&env->vfp.regs[i]);
-+        ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
-+        if (ret) {
-+            return ret;
-+        }
-+        reg.id++;
++    el = arm_current_el(env);
++    if (is_a64(env) && el > 0) {
++        g_assert(el == 1);
++        /* KVM maps KVM_SPSR_SVC to KVM_SPSR_EL1 for aarch64 */
++        env->banked_spsr[0] = env->banked_spsr[1];
++        env->spsr = env->banked_spsr[aarch64_banked_spsr_index(el)];
++    } else {
++        env->spsr = env->banked_spsr[el];
 +    }
 +
-+    reg.addr = (uintptr_t)(&fpr);
-+    reg.id = AARCH64_SIMD_CTRL_REG(fp_regs.fpsr);
-+    ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
-+    if (ret) {
-+        return ret;
-+    }
-+    vfp_set_fpsr(env, fpr);
-+
-+    reg.id = AARCH64_SIMD_CTRL_REG(fp_regs.fpcr);
-+    ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
-+    if (ret) {
-+        return ret;
-+    }
-+    vfp_set_fpcr(env, fpr);
-+
-     if (!write_kvmstate_to_list(cpu)) {
-         return EINVAL;
-     }
-+
-     /* Note that it's OK to have registers which aren't in CPUState,
-      * so we can ignore a failure return here.
-      */
+     /* Advanced SIMD and FP registers */
+     for (i = 0; i < 32; i++) {
+         reg.id = AARCH64_SIMD_CORE_REG(fp_regs.vregs[i]);
 -- 
 2.3.0
