@@ -1,80 +1,41 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 25 Feb 2015 10:06:31 +0900
-Subject: [PATCH v5 0/2] irqchip: Move Exynos PM to use stacked domains
-In-Reply-To: <54EC544B.3030705@arm.com>
-References: <1424713534-7112-1-git-send-email-marc.zyngier@arm.com>
- <54EC4DF4.1010906@samsung.com> <54EC544B.3030705@arm.com>
-Message-ID: <00bb01d05097$4a7379f0$df5a6dd0$@kernel.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue, 24 Feb 2015 17:25:06 -0800
+Subject: [PATCH] drivers: cpuidle: Explictly include proc-fns.h for
+ cpuidle-arm64
+Message-ID: <1424827506-12245-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Zyngier wrote:
-> 
-> Hi Pakaj,
-> 
-Hi Marc and Pankaj,
+cpuidle-arm64.c fails to compile with CONFIG_ARM64_64K_PAGES=y
 
-> On 24/02/15 10:09, Pankaj Dubey wrote:
-> > Hi Mark,
-> >
-> > On Monday 23 February 2015 11:15 PM, Marc Zyngier wrote:
-> >> This series is extracted from [4], which is trying to remove all
-> >> traces of gic_arch_extn from the tree. As some maintainers are more
-> >> responsive than others (understatement of the year...), I've decided
-> >> to split it per sub-arch, and get it moving, at least partially.
-> >>
-> >> This series addresses Exynos by converting its PM support to a stacked
-> >> domain on top of the standard GIC.
-> >>
-> >> Based on 4.0-rc1.
-> >>
-> >> * From v4: [4]
-> >> - Extracted from the full series
-> >> - Rebased on 4.0-rc1
-> >>
-> >> * From v3 [3]:
-> >> - Rebased on top of the patch working around hardcoded IRQ on OMAP4/5 [4]
-> >> - Fixed more iMX6 DTs (Stephan)
-> >> - Fixed Exynos4/5 DTs
-> >>
-> >> * From v2 [2]:
-> >> - Addressed numerous comments from Thierry
-> >> - Merged bug fixes from Nishanth
-> >> - Merged bug fix from Stefan
-> >>
-> >> * From v1 [1]:
-> >> - Rebased on 3.19-rc3
-> >> - Fixed a number of additional platforms
-> >> - Added crossbar conversion to stacked domains
-> >> - Merged bug fixes from Nishanth
-> >>
-> >> [4]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317531.html
-> >> [3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315385.html
-> >> [2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314041.html
-> >> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/307338.html
-> >>
-> >> Marc Zyngier (2):
-> >>    ARM: exynos4/5: convert pmu wakeup to stacked domains
-> >>    DT: exynos: update PMU binding
-> >>
-> >>   .../devicetree/bindings/arm/samsung/pmu.txt        |  17 +++
-> >>   arch/arm/boot/dts/exynos4.dtsi                     |   4 +
-> >>   arch/arm/boot/dts/exynos5250.dtsi                  |   4 +
-> >>   arch/arm/boot/dts/exynos5420.dtsi                  |   4 +
-> >>   arch/arm/mach-exynos/exynos.c                      |  14 +--
-> >>   arch/arm/mach-exynos/suspend.c                     | 122 +++++++++++++++++++--
-> >>   6 files changed, 146 insertions(+), 19 deletions(-)
-> >>
-> >
-> > I tested and verified S2R functionality on Exynos5250 based SMDK5250
-> > board, and suspend-resume working fine. For testing on SMDK5250 you can
-> > add my tested-by.
-> >
-> > Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> 
-> Thanks. Will you or Kukjin get that merged directly?
-> 
-OK, I'll take this series in Samsung tree.
+/kernel/drivers/cpuidle/cpuidle-arm64.c: In function "arm64_enter_idle_state"
+/kernel/drivers/cpuidle/cpuidle-arm64.c:42:3: error: implicit declaration of function "cpu_do_idle" [-Werror=implicit-function-declaration]
+   cpu_do_idle();
+   ^
 
-Thanks,
-Kukjin
+Explicitly add the header file with the declaration of cpu_do_idle.
+
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+Not sure how long this has been broken, bisect between v3.19 and master showed
+6b00f7efb5303418c231994c91fb8239f5ada260 as the first bad commit which
+isn't particularly helpful. Probably some header shuffling.
+---
+ drivers/cpuidle/cpuidle-arm64.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
+index 80704b9..f1d5422 100644
+--- a/drivers/cpuidle/cpuidle-arm64.c
++++ b/drivers/cpuidle/cpuidle-arm64.c
+@@ -19,6 +19,7 @@
+ #include <linux/of.h>
+ 
+ #include <asm/cpuidle.h>
++#include <asm/proc-fns.h>
+ #include <asm/suspend.h>
+ 
+ #include "dt_idle_states.h"
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
