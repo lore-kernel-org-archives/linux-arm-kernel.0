@@ -1,118 +1,52 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Wed, 25 Feb 2015 18:58:19 +0100
-Subject: [PATCH v2] hwmon: (gpio-fan) allow to use alarm support alone from DT
-Message-ID: <1424887099-26551-1-git-send-email-simon.guinot@sequanux.org>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 25 Feb 2015 18:58:16 +0100
+Subject: [PATCH] locking/rtmutex: drop usage of __HAVE_ARCH_CMPXCHG
+In-Reply-To: <20150225175613.GE6823@linutronix.de>
+References: <20150225175613.GE6823@linutronix.de>
+Message-ID: <20150225175816.GF6823@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some boards, such as the LaCie 2Big Network v2 or 2Big NAS (based on
-Marvell Kirkwood SoCs), an I2C fan controller is used but the alarm
-signal is wired to a separate GPIO. Unfortunately, the gpio-fan driver
-can't be used to handle GPIO alarm alone from DT: an error is returned
-if the "gpios" DT property is missing.
+* Sebastian Andrzej Siewior | 2015-02-25 18:56:13 [+0100]:
 
-This patch allows to use the gpio-fan driver even if the "alarm-gpios"
-DT property is defined alone.
+>To put some numbers on it: preempt -RT, am335x, 10 loops of
+>100000 invocations of rt_spin_lock() + rt_spin_unlock() (time "total" is
+>the average of the 10 loops for the 100000 invocations, "loop" is
+>"total / 100000 * 1000"):
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
----
- .../devicetree/bindings/gpio/gpio-fan.txt          |  6 ++-
- drivers/hwmon/gpio-fan.c                           | 44 +++++++++++-----------
- 2 files changed, 27 insertions(+), 23 deletions(-)
+This is the test code I was running.
 
-v2 change:
-- Fix sentence in binding document about having at least one of the
-  "gpios" or "alarm-gpios" properties set.
-
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-fan.txt b/Documentation/devicetree/bindings/gpio/gpio-fan.txt
-index 2dd457a3469a..f996d428f132 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-fan.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-fan.txt
-@@ -2,16 +2,18 @@ Bindings for fan connected to GPIO lines
+diff --git a/init/main.c b/init/main.c
+index e7cb76c079d4..e74523feeddb 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -1004,6 +1004,29 @@ static noinline void __init kernel_init_freeable(void)
  
- Required properties:
- - compatible : "gpio-fan"
-+
-+Optional properties:
- - gpios: Specifies the pins that map to bits in the control value,
-   ordered MSB-->LSB.
- - gpio-fan,speed-map: A mapping of possible fan RPM speeds and the
-   control value that should be set to achieve them. This array
-   must have the RPM values in ascending order.
--
--Optional properties:
- - alarm-gpios: This pin going active indicates something is wrong with
-   the fan, and a udev event will be fired.
+ 	do_basic_setup();
  
-+Note: At least one the "gpios" or "alarm-gpios" properties must be set.
++	{
++		spinlock_t main_l;
++		int loops;
 +
- Examples:
- 
- 	gpio_fan {
-diff --git a/drivers/hwmon/gpio-fan.c b/drivers/hwmon/gpio-fan.c
-index 36abf814b8c7..c241f5b0b7cf 100644
---- a/drivers/hwmon/gpio-fan.c
-+++ b/drivers/hwmon/gpio-fan.c
-@@ -404,10 +404,32 @@ static int gpio_fan_get_of_pdata(struct device *dev,
- 
- 	node = dev->of_node;
- 
-+	/* Alarm GPIO if one exists */
-+	if (of_gpio_named_count(node, "alarm-gpios") > 0) {
-+		struct gpio_fan_alarm *alarm;
-+		int val;
-+		enum of_gpio_flags flags;
++		spin_lock_init(&main_l);
 +
-+		alarm = devm_kzalloc(dev, sizeof(struct gpio_fan_alarm),
-+					GFP_KERNEL);
-+		if (!alarm)
-+			return -ENOMEM;
++		for (loops = 0; loops < 10; loops++) {
++			ktime_t start, end;
++			int i;
 +
-+		val = of_get_named_gpio_flags(node, "alarm-gpios", 0, &flags);
-+		if (val < 0)
-+			return val;
-+		alarm->gpio = val;
-+		alarm->active_low = flags & OF_GPIO_ACTIVE_LOW;
-+
-+		pdata->alarm = alarm;
++			local_irq_disable();
++			start = ktime_get();
++			for (i = 0; i <= 100000; i++) {
++				rt_spin_lock(&main_l);
++				rt_spin_unlock(&main_l);
++			}
++			end = ktime_get();
++			local_irq_enable();
++			pr_err("%s(%d) %lld\n", __func__, __LINE__,
++			       ktime_to_us(ktime_sub(end, start)));
++		}
 +	}
 +
- 	/* Fill GPIO pin array */
- 	pdata->num_ctrl = of_gpio_count(node);
- 	if (pdata->num_ctrl <= 0) {
--		dev_err(dev, "gpios DT property empty / missing");
-+		if (pdata->alarm)
-+			return 0;
-+		dev_err(dev, "DT properties empty / missing");
- 		return -ENODEV;
- 	}
- 	ctrl = devm_kzalloc(dev, pdata->num_ctrl * sizeof(unsigned),
-@@ -460,26 +482,6 @@ static int gpio_fan_get_of_pdata(struct device *dev,
- 	}
- 	pdata->speed = speed;
- 
--	/* Alarm GPIO if one exists */
--	if (of_gpio_named_count(node, "alarm-gpios") > 0) {
--		struct gpio_fan_alarm *alarm;
--		int val;
--		enum of_gpio_flags flags;
--
--		alarm = devm_kzalloc(dev, sizeof(struct gpio_fan_alarm),
--					GFP_KERNEL);
--		if (!alarm)
--			return -ENOMEM;
--
--		val = of_get_named_gpio_flags(node, "alarm-gpios", 0, &flags);
--		if (val < 0)
--			return val;
--		alarm->gpio = val;
--		alarm->active_low = flags & OF_GPIO_ACTIVE_LOW;
--
--		pdata->alarm = alarm;
--	}
--
- 	return 0;
- }
- 
--- 
-2.1.1
+ 	/* Open the /dev/console on the rootfs, this should never fail */
+ 	if (sys_open((const char __user *) "/dev/console", O_RDWR, 0) < 0)
+ 		pr_err("Warning: unable to open an initial console.\n");
