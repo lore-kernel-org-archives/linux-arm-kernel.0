@@ -1,44 +1,87 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 25 Feb 2015 22:53:30 +0800
-Subject: [PATCH 0/8] Fix struct clk pointer comparing
-Message-ID: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+Date: Wed, 25 Feb 2015 22:53:31 +0800
+Subject: [PATCH 1/8] clk: add helper function clk_is_match()
+In-Reply-To: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1424876018-17852-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the first day back from Chinese new year holiday, I got a regression
-report from rmk, saying Ethernet stops working on HimmingBoard with
-v4.0-rc1.
+Since commit 035a61c314eb ("clk: Make clk API return per-user struct clk
+instances"), clk API users can no longer check if two struct clk
+pointers are pointing to the same hardware clock, i.e. struct clk_hw, by
+simply comparing two pointers.  That's because with the per-user clk
+change, a brand new struct clk is created whenever clients try to look
+up the clock by calling clk_get() or sister functions like clk_get_sys()
+and of_clk_get().  This changes the original behavior where the struct
+clk is only created for once when clock driver registers the clock to
+CCF in the first place.  The net change here is before commit
+035a61c314eb the struct clk pointer is unique for given hardware
+clock, while after the commit the pointers returned by clk lookup calls
+become different for the same hardware clock.
 
-I read through the thread [1] and found a couple of i.MX audio drivers
-are also affected per Stephen's Coccinelle report.  That's why I came up
-with this series based on Quentin's structclk.cocci, Stephen's result
-and Mike's input (thanks all).
+A number of client drivers detecting if two struct clk pointers point to
+the same one hardware clock by comparing the pointers are broken now.
+As a stop-gap solution, this patch adds a helper function clk_is_match()
+to test if two struct clk pointers point to the same hardware clock, so
+that these client drivers can use to fix the regression.
 
-The first two patches are run-time tested and all others are
-compile-tested only.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/clk/clk.c   |  6 ++++++
+ include/linux/clk.h | 16 ++++++++++++++++
+ 2 files changed, 22 insertions(+)
 
-[1] http://thread.gmane.org/gmane.linux.kernel/1872604/focus=1880862
-
-Shawn Guo (8):
-  clk: add helper function clk_is_match()
-  ARM: imx: fix struct clk pointer comparing
-  drm: armada: fix struct clk pointer comparing
-  pwm: atmel-hlcdc: fix struct clk pointer comparing
-  serial: samsung: fix struct clk pointer comparing
-  ASoC: fsl_esai: fix struct clk pointer comparing
-  ASoC: fsl_spdif: fix struct clk pointer comparing
-  ASoC: kirkwood: fix struct clk pointer comparing
-
- arch/arm/mach-imx/mach-imx6q.c      |  5 +++--
- drivers/clk/clk.c                   |  6 ++++++
- drivers/gpu/drm/armada/armada_510.c |  2 +-
- drivers/pwm/pwm-atmel-hlcdc.c       |  2 +-
- drivers/tty/serial/samsung.c        |  2 +-
- include/linux/clk.h                 | 16 ++++++++++++++++
- sound/soc/fsl/fsl_esai.c            |  2 +-
- sound/soc/fsl/fsl_spdif.c           |  4 ++--
- sound/soc/kirkwood/kirkwood-i2s.c   |  2 +-
- 9 files changed, 32 insertions(+), 9 deletions(-)
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index eb0152961d3c..7df4826d9c7b 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -597,6 +597,12 @@ struct clk *__clk_get_parent(struct clk *clk)
+ }
+ EXPORT_SYMBOL_GPL(__clk_get_parent);
+ 
++bool clk_is_match(struct clk *clk1, struct clk *clk2)
++{
++	return __clk_get_hw(clk1) == __clk_get_hw(clk2) ? true : false;
++}
++EXPORT_SYMBOL_GPL(clk_is_match);
++
+ static struct clk_core *clk_core_get_parent_by_index(struct clk_core *clk,
+ 							 u8 index)
+ {
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 8381bbfbc308..f8a8a6dd6a98 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -376,6 +376,17 @@ struct clk *clk_get_parent(struct clk *clk);
+  */
+ struct clk *clk_get_sys(const char *dev_id, const char *con_id);
+ 
++/**
++ * clk_is_match - test if two given struct clk pointers point to the same
++ * 		  hardware clock, i.e. struct clk_hw.
++ * @clk1: the first clk
++ * @clk2: the second clk
++ *
++ * Returns true if two clk pointers point to the same hardware clock,
++ * or false otherwise.
++ */
++bool clk_is_match(struct clk *clk1, struct clk *clk2);
++
+ #else /* !CONFIG_HAVE_CLK */
+ 
+ static inline struct clk *clk_get(struct device *dev, const char *id)
+@@ -429,6 +440,11 @@ static inline struct clk *clk_get_parent(struct clk *clk)
+ 	return NULL;
+ }
+ 
++static inline bool clk_is_match(struct clk *clk1, struct clk *clk2)
++{
++	return clk1 == clk2 ? true : false;
++}
++
+ #endif
+ 
+ /* clk_prepare_enable helps cases using clk_enable in non-atomic context. */
 -- 
 1.9.1
