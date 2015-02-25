@@ -1,228 +1,133 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 25 Feb 2015 21:04:40 +0200
-Subject: [PATCHv3 30/35] ARM: dts: omap4: add system control module node
+Date: Wed, 25 Feb 2015 21:04:44 +0200
+Subject: [PATCHv3 34/35] ARM: dts: dra7: add system control module node
 In-Reply-To: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
 References: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1424891085-10392-31-git-send-email-t-kristo@ti.com>
+Message-ID: <1424891085-10392-35-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Add node for system control module, and move all the existing system
 control IO space users under this new node as its children. A new node
-for scm_conf area is also added. DT documentation is also updated by
-this patch to reflect the existence of system control module nodes,
-separately of PRCM module.
+for scm_conf area is also added.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- .../devicetree/bindings/arm/omap/ctrl.txt          |   75 +++++++++++++++++++
- .../devicetree/bindings/arm/omap/prcm.txt          |    6 --
- arch/arm/boot/dts/omap4.dtsi                       |   76 +++++++++++++-------
- 3 files changed, 125 insertions(+), 32 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/omap/ctrl.txt
+ .../devicetree/bindings/arm/omap/ctrl.txt          |    1 +
+ arch/arm/boot/dts/dra7.dtsi                        |   60 ++++++++++++--------
+ 2 files changed, 36 insertions(+), 25 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/arm/omap/ctrl.txt b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
-new file mode 100644
-index 0000000..88b12b5
---- /dev/null
+index 3574d67..f84f4ea 100644
+--- a/Documentation/devicetree/bindings/arm/omap/ctrl.txt
 +++ b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
-@@ -0,0 +1,75 @@
-+OMAP Control Module bindings
-+
-+Control Module contains miscellaneous features under it based on SoC type.
-+Pincontrol is one common feature, and it has a specialized support
-+described in [1]. Typically some clock nodes are also under control module.
-+Syscon is used to share register level access to drivers external to
-+control module driver itself.
-+
-+See [2] for documentation about clock/clockdomain nodes.
-+
-+[1] Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-+[2] Documentation/devicetree/bindings/clock/ti/*
-+
-+Required properties:
-+- compatible:	Must be one of:
-+		"ti,am3-scrm"
-+		"ti,am4-scrm"
-+		"ti,dm814-scrm"
-+		"ti,dm816-scrm"
-+		"ti,omap2-scrm"
-+		"ti,omap3-scrm"
-+		"ti,omap4-ctrl"
-+- reg:		Contains Control Module register address range
-+		(base address and length)
-+
-+Optional properties:
-+- clocks:	clocks for this module
-+- clockdomains:	clockdomains for this module
-+
-+Examples:
-+
-+scrm: scrm at 48002000 {
-+	compatible = "ti,omap3-scrm", "simple-bus";
-+	reg = <0x48002000 0x2000>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges = <0 0x48002000 0x2000>;
-+
-+	omap3_pmx_core: pinmux at 30 {
-+		compatible = "ti,omap3-padconf",
-+			     "pinctrl-single";
-+		reg = <0x30 0x230>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		#interrupt-cells = <1>;
-+		interrupt-controller;
-+		pinctrl-single,register-width = <16>;
-+		pinctrl-single,function-mask = <0xff1f>;
-+	};
-+
-+	scm_conf: tisyscon at 270 {
-+		compatible = "syscon";
-+		reg = <0x270 0x330>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		scrm_clocks: clocks {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+	};
-+
-+	scrm_clockdomains: clockdomains {
-+	};
-+}
-+
-+&scrm_clocks {
-+	mcbsp5_mux_fck: mcbsp5_mux_fck {
-+		#clock-cells = <0>;
-+		compatible = "ti,composite-mux-clock";
-+		clocks = <&core_96m_fck>, <&mcbsp_clks>;
-+		ti,bit-shift = <4>;
-+		reg = <0x02d8>;
-+	};
-+};
-diff --git a/Documentation/devicetree/bindings/arm/omap/prcm.txt b/Documentation/devicetree/bindings/arm/omap/prcm.txt
-index 68f96f8..3eb6d7a 100644
---- a/Documentation/devicetree/bindings/arm/omap/prcm.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/prcm.txt
-@@ -10,14 +10,10 @@ documentation about the individual clock/clockdomain nodes.
- Required properties:
- - compatible:	Must be one of:
- 		"ti,am3-prcm"
--		"ti,am3-scrm"
- 		"ti,am4-prcm"
--		"ti,am4-scrm"
- 		"ti,omap2-prcm"
--		"ti,omap2-scrm"
- 		"ti,omap3-prm"
- 		"ti,omap3-cm"
--		"ti,omap3-scrm"
- 		"ti,omap4-cm1"
- 		"ti,omap4-prm"
- 		"ti,omap4-cm2"
-@@ -30,9 +26,7 @@ Required properties:
- 		"ti,dra7-cm-core-aon"
- 		"ti,dra7-cm-core"
- 		"ti,dm814-prcm"
--		"ti,dm814-scrm"
- 		"ti,dm816-prcm"
--		"ti,dm816-scrm"
- - reg:		Contains PRCM module register address range
+@@ -21,6 +21,7 @@ Required properties:
+ 		"ti,omap3-scrm"
+ 		"ti,omap4-ctrl"
+ 		"ti,omap5-ctrl"
++		"ti,dra7-ctrl"
+ - reg:		Contains Control Module register address range
  		(base address and length)
- - clocks:	clocks for this module
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 074147c..0bab7ce 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -167,38 +167,62 @@
+ 
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 5827fed..230d22d 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -203,26 +203,47 @@
  			};
  		};
  
 +		scm: scm at 4a002000 {
-+			compatible = "ti,omap4-ctrl", "simple-bus";
-+			reg = <0x4a002000 0x1000>,
-+			      <0x4a30a000 0x1000>,
-+			      <0x4a100000 0x1000>,
-+			      <0x4a31e000 0x1000>;
++			compatible = "ti,dra7-ctrl", "simple-bus";
++			reg = <0x4a002000 0x1400>,
++			      <0x4a003400 0x600>,
++			      <0x4ae0c000 0x600>;
 +			#address-cells = <2>;
 +			#size-cells = <1>;
-+			ranges = <0 0 0x4a002000 0x1000>,
-+				 <1 0 0x4a30a000 0x1000>,
-+				 <2 0 0x4a100000 0x1000>,
-+				 <3 0 0x4a31e000 0x1000>;
++			ranges = <0 0 0x4a002000 0x1400>,
++				 <1 0 0x4a003400 0x600>,
++				 <2 0 0x4ae0c000 0x600>;
 +
 +			scm_conf: tisyscon at 0,0 {
 +				compatible = "syscon";
-+				reg = <0 0x0 0x800>;
++				reg = <0 0x0 0x1400>;
 +				#address-cells = <1>;
 +				#size-cells = <1>;
 +			};
 +
-+			omap4_pmx_core: pinmux at 2,40 {
-+				compatible = "ti,omap4-padconf",
++			dra7_pmx_core: pinmux at 1,0 {
++				compatible = "ti,dra7-padconf",
 +					     "pinctrl-single";
-+				reg = <2 0x40 0x0196>;
++				reg = <1 0x0 0x0464>;
 +				#address-cells = <1>;
 +				#size-cells = <0>;
 +				#interrupt-cells = <1>;
 +				interrupt-controller;
-+				pinctrl-single,register-width = <16>;
-+				pinctrl-single,function-mask = <0x7fff>;
-+			};
-+
-+			omap4_pmx_wkup: pinmux at 3,40 {
-+				compatible = "ti,omap4-padconf",
-+					     "pinctrl-single";
-+				reg = <3 0x40 0x0038>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				#interrupt-cells = <1>;
-+				interrupt-controller;
-+				pinctrl-single,register-width = <16>;
-+				pinctrl-single,function-mask = <0x7fff>;
-+			};
-+
-+			omap4_padconf_global: omap4_padconf_global at 2,5a0 {
-+				compatible = "syscon";
-+				reg = <2 0x5a0 0x170>;
++				pinctrl-single,register-width = <32>;
++				pinctrl-single,function-mask = <0x3fffffff>;
 +			};
 +		};
 +
- 		counter32k: counter at 4a304000 {
+ 		counter32k: counter at 4ae04000 {
  			compatible = "ti,omap-counter32k";
- 			reg = <0x4a304000 0x20>;
+ 			reg = <0x4ae04000 0x40>;
  			ti,hwmods = "counter_32k";
  		};
  
--		omap4_pmx_core: pinmux at 4a100040 {
--			compatible = "ti,omap4-padconf", "pinctrl-single";
--			reg = <0x4a100040 0x0196>;
--			#address-cells = <1>;
--			#size-cells = <0>;
--			#interrupt-cells = <1>;
--			interrupt-controller;
--			pinctrl-single,register-width = <16>;
--			pinctrl-single,function-mask = <0x7fff>;
--		};
--		omap4_pmx_wkup: pinmux at 4a31e040 {
--			compatible = "ti,omap4-padconf", "pinctrl-single";
--			reg = <0x4a31e040 0x0038>;
--			#address-cells = <1>;
--			#size-cells = <0>;
--			#interrupt-cells = <1>;
--			interrupt-controller;
--			pinctrl-single,register-width = <16>;
--			pinctrl-single,function-mask = <0x7fff>;
+-		dra7_ctrl_core: ctrl_core at 4a002000 {
+-			compatible = "syscon";
+-			reg = <0x4a002000 0x6d0>;
 -		};
 -
--		omap4_padconf_global: tisyscon at 4a1005a0 {
+-		dra7_ctrl_general: tisyscon at 4a002e00 {
 -			compatible = "syscon";
--			reg = <0x4a1005a0 0x170>;
+-			reg = <0x4a002e00 0x7c>;
 -		};
 -
  		pbias_regulator: pbias_regulator {
  			compatible = "ti,pbias-omap";
- 			reg = <0x60 0x4>;
+-			reg = <0 0x4>;
+-			syscon = <&dra7_ctrl_general>;
++			reg = <0xe00 0x4>;
++			syscon = <&scm_conf>;
+ 			pbias_mmc_reg: pbias_mmc_omap5 {
+ 				regulator-name = "pbias_mmc_omap5";
+ 				regulator-min-microvolt = <1800000>;
+@@ -230,17 +251,6 @@
+ 			};
+ 		};
+ 
+-		dra7_pmx_core: pinmux at 4a003400 {
+-			compatible = "ti,dra7-padconf", "pinctrl-single";
+-			reg = <0x4a003400 0x0464>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			#interrupt-cells = <1>;
+-			interrupt-controller;
+-			pinctrl-single,register-width = <32>;
+-			pinctrl-single,function-mask = <0x3fffffff>;
+-		};
+-
+ 		sdma: dma-controller at 4a056000 {
+ 			compatible = "ti,omap4430-sdma";
+ 			reg = <0x4a056000 0x1000>;
+@@ -1410,7 +1420,7 @@
+ 			compatible = "ti,dra7-d_can";
+ 			ti,hwmods = "dcan1";
+ 			reg = <0x4ae3c000 0x2000>;
+-			syscon-raminit = <&dra7_ctrl_core 0x558 0>;
++			syscon-raminit = <&scm_conf 0x558 0>;
+ 			interrupts = <GIC_SPI 222 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&dcan1_sys_clk_mux>;
+ 			status = "disabled";
+@@ -1420,7 +1430,7 @@
+ 			compatible = "ti,dra7-d_can";
+ 			ti,hwmods = "dcan2";
+ 			reg = <0x48480000 0x2000>;
+-			syscon-raminit = <&dra7_ctrl_core 0x558 1>;
++			syscon-raminit = <&scm_conf 0x558 1>;
+ 			interrupts = <GIC_SPI 225 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&sys_clkin1>;
+ 			status = "disabled";
 -- 
 1.7.9.5
