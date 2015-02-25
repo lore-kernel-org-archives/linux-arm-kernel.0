@@ -1,71 +1,56 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 25 Feb 2015 20:34:24 +0100
-Subject: [PATCH] ARM: i.MX6Q: Add fixup for RTL8211E Gigabit Ethernet PHY.
-In-Reply-To: <1424892206-18679-1-git-send-email-rockford@yandex.ru>
-References: <1424892206-18679-1-git-send-email-rockford@yandex.ru>
-Message-ID: <54EE23C0.7000206@pengutronix.de>
+From: linux-arm@myspectrum.nl (Jeroen Hofstee)
+Date: Wed, 25 Feb 2015 20:36:51 +0100
+Subject: [RESEND][PATCH] ARM errata, 430973: update the affected revisions
+In-Reply-To: <1418131842-6752-1-git-send-email-jhofstee@victronenergy.com>
+References: <1418131842-6752-1-git-send-email-jhofstee@victronenergy.com>
+Message-ID: <54EE2453.9080301@myspectrum.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding alkml and Shawn on Cc.
+Hi,
 
-Marc
-
-On 02/25/2015 08:23 PM, Andrey Panov wrote:
-> RTL8211E Ethernet PHY found in Embedsky E9 board is need
-> an additional initialization.
-> Taken from vendor's binary-only module.
-> 
-> Signed-off-by: Andrey Panov <rockford@yandex.ru>
+On 09-12-14 14:30, Jeroen Hofstee wrote:
+> From: Jeroen Hofstee <linux-arm@myspectrum.nl>
+>
+> Update the list of revisions subject to this errata.
+>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Andreas Bie?mann <andreas.devel@googlemail.com>
+> Signed-off-by: Jeroen Hofstee <jhofstee@victronenergy.com>
 > ---
->  arch/arm/mach-imx/mach-imx6q.c | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> index 4ad6e47..41708f5 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -166,6 +166,18 @@ static int ar8035_phy_fixup(struct phy_device *dev)
->  
->  #define PHY_ID_AR8035 0x004dd072
->  
-> +static int rtl8211e_phy_fixup(struct phy_device *dev)
-> +{
-> +	phy_write(dev, 0x00, 0x3140);
-> +	mdelay(10);
-> +	phy_write(dev, 0x00, 0x3340);
-> +	mdelay(10);
-> +
-> +	return 0;
-> +}
-> +
-> +#define PHY_ID_RTL8211E 0x001cc915
-> +
->  static void __init imx6q_enet_phy_init(void)
->  {
->  	if (IS_BUILTIN(CONFIG_PHYLIB)) {
-> @@ -177,6 +189,8 @@ static void __init imx6q_enet_phy_init(void)
->  				ar8031_phy_fixup);
->  		phy_register_fixup_for_uid(PHY_ID_AR8035, 0xffffffef,
->  				ar8035_phy_fixup);
-> +		phy_register_fixup_for_uid(PHY_ID_RTL8211E, 0xffffffff,
-> +				rtl8211e_phy_fixup);
->  	}
->  }
->  
-> 
+> I don't have access to the AT400/AT401/AT490 document, but
+> Andreas was kind enough to provide this information, see
+> https://www.mail-archive.com/u-boot at lists.denx.de/msg156620.html
+>
+> Resending from an address which is subscribed to the ML...
+> ---
+>   arch/arm/Kconfig | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 89c4b5c..a2202fa 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1063,7 +1063,7 @@ config ARM_ERRATA_430973
+>   	depends on CPU_V7
+>   	help
+>   	  This option enables the workaround for the 430973 Cortex-A8
+> -	  (r1p0..r1p2) erratum. If a code sequence containing an ARM/Thumb
+> +	  (r1p0..r1p3, r1p7) erratum. If a code sequence containing an ARM/Thumb
+>   	  interworking branch is replaced with another code sequence at the
+>   	  same virtual address, whether due to self-modifying code or virtual
+>   	  to physical address re-mapping, Cortex-A8 does not recover from the
 
+It seems this is not applied yet. For completeness, this only updates 
+the description
+of the workaround, so should be safe to apply. At the moment people 
+might disable
+this workaround (since the description says its not applicable) even if 
+the cpu does
+need this workaround.
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Please consider applying this,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150225/f34208c3/attachment.sig>
+Regards,
+Jeroen
