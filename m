@@ -1,63 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Feb 2015 11:51:57 +0100
-Subject: [PATCH 1/3] arm64: mediatek: Add config option for mt8173.
-In-Reply-To: <1424855242.7845.9.camel@mtksdaap41>
-References: <1422342836-27689-1-git-send-email-hongzhou.yang@mediatek.com>
- <1422342836-27689-2-git-send-email-hongzhou.yang@mediatek.com>
- <1424855242.7845.9.camel@mtksdaap41>
-Message-ID: <5948977.qlhSVy9R5i@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 25 Feb 2015 11:08:09 +0000
+Subject: [STLinux Kernel] [PATCH v3 7/8] rtc: st: add new driver for ST's
+ LPC RTC
+In-Reply-To: <20150223101223.GA14142@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1424260154-12868-1-git-send-email-lee.jones@linaro.org>
+ <1424260154-12868-8-git-send-email-lee.jones@linaro.org>
+ <20150223101223.GA14142@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20150225110809.GH21323@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 February 2015 17:07:22 Yingjoe Chen wrote:
-> On Tue, 2015-01-27 at 15:13 +0800, Hongzhou Yang wrote:
-> > From: Hongzhou Yang <hongzhou.yang@mediatek.com>
-> > 
-> > The upcoming MTK pinctrl driver have a big pin table for each SoC,
-> > and we don't want to bloat the kernel binary if we don't need it.
-> > Add config options so we can build for one SoC only.
-> > 
-> > Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
-> > ---
-> >  arch/arm64/Kconfig | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index e627ead..6213dac 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -151,9 +151,15 @@ menu "Platform selection"
-> >  config ARCH_MEDIATEK
-> >       bool "Mediatek MT65xx & MT81xx ARMv8 SoC"
-> >       select ARM_GIC
-> > +     select PINCTRL
-> >       help
-> >         Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
-> >  
-> > +config MACH_MT8173
-> > +     bool "Mediatek 8173 Soc Supprt"
-> > +     depends on ARCH_MEDIATEK
-> > +     default y
+On Mon, 23 Feb 2015, Peter Griffin wrote:
+> On Wed, 18 Feb 2015, Lee Jones wrote:
+> 
+> > ST's Low Power Controller (LPC) controls two devices; watchdog and RTC.
+> > Only one of the devices can be used at any one time.  This is enforced
+> > by the correlating MFD driver.  This portion of the driver-set controls
+> > the Real Time Clock.
+> 
+> <snip>
+> 
+> > +{
+> > +	unsigned long flags;
 > > +
-> >  config ARCH_SEATTLE
-> >       bool "AMD Seattle SoC Family"
-> >       help
+> > +	spin_lock_irqsave(&rtc->lock, flags);
+> > +
+> > +	writel(1, rtc->ioaddr + LPC_WDT_OFF);
+> > +
+> > +	writel(msb, rtc->ioaddr + LPC_LPA_MSB_OFF);
+> > +	writel(lsb, rtc->ioaddr + LPC_LPA_LSB_OFF);
+> > +	writel(1, rtc->ioaddr + LPC_LPA_START_OFF);
+> > +
+> > +	writel(0, rtc->ioaddr + LPC_WDT_OFF);
 > 
-> Hi Arnd/Matthias,
+> I think all the writel IO accessors in this driver can be replaced
+> with the *_relaxed variant. This will avoid the overhead of taking a
+> spinlock in the l2 outer cache part of writel.
+
+Yes, there is no technical reason why we can't use the relaxed
+variants.  Will fix.
+
+> > +#ifdef CONFIG_PM_SLEEP
+> > +static int st_rtc_suspend(struct device *dev)
+> > +{
+> > +	struct st_rtc *rtc = dev_get_drvdata(dev);
+> > +
+> > +	if (device_may_wakeup(dev))
+> > +		return 0;
+> > +
+> > +	writel(1, rtc->ioaddr + LPC_WDT_OFF);
+> > +	writel(0, rtc->ioaddr + LPC_LPA_START_OFF);
+> > +	writel(0, rtc->ioaddr + LPC_WDT_OFF);
 > 
-> Any comments on this patch?
+> Is there a reason for not disabling the IP clock in suspend / resume functions?
 
-Hi Joe,
+There is.  It will stop the alarm timer, which is undesirable.
 
-Actually I just commented on a similar patch from Samsung the other
-day, and I think we should make a more general decision about these:
-
-I would rather see only one Kconfig option per SoC family and use
-ARCH_MEDIATEK without any MACH_* options. We can have other options
-for e.g. networking chips from Mediatek that are not closely related
-but I would group all the phone and tablet chips under one option
-here. Same for the other vendors of course.
-
-Any other opinions?
-
-	Arnd
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
