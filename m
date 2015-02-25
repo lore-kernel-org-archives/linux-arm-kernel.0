@@ -1,111 +1,54 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Wed, 25 Feb 2015 16:02:37 +0000
-Subject: [PATCH 5/6] target-arm/kvm64: fix save/restore of SPSR registers
-In-Reply-To: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
-References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1424880159-29348-6-git-send-email-alex.bennee@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 25 Feb 2015 17:02:00 +0100
+Subject: [RFC V2 09/12] i2c: powermac: make use of the new infrastructure for
+ quirks
+In-Reply-To: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
+References: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <1424880126-15047-10-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-The current code was negatively indexing the cpu state array and not
-synchronizing banked spsr register state with the current mode's spsr
-state, causing occasional failures with migration.
-
-Some munging is done to take care of the aarch64 mapping and also to
-ensure the most current value of the spsr is updated to the banked
-registers (relevant for KVM<->TCG migration).
-
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
-v2 (ajb)
-  - minor tweaks and clarifications
+ drivers/i2c/busses/i2c-powermac.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
-index c60e989..6d30e10 100644
---- a/target-arm/kvm64.c
-+++ b/target-arm/kvm64.c
-@@ -140,6 +140,7 @@ int kvm_arch_put_registers(CPUState *cs, int level)
-     uint64_t val;
-     int i;
-     int ret;
-+    unsigned int el;
+diff --git a/drivers/i2c/busses/i2c-powermac.c b/drivers/i2c/busses/i2c-powermac.c
+index 60a53c169ed2b3..6abcf696e3594b 100644
+--- a/drivers/i2c/busses/i2c-powermac.c
++++ b/drivers/i2c/busses/i2c-powermac.c
+@@ -153,12 +153,6 @@ static int i2c_powermac_master_xfer(	struct i2c_adapter *adap,
+ 	int			read;
+ 	int			addrdir;
  
-     ARMCPU *cpu = ARM_CPU(cs);
-     CPUARMState *env = &cpu->env;
-@@ -206,9 +207,25 @@ int kvm_arch_put_registers(CPUState *cs, int level)
-         return ret;
-     }
+-	if (num != 1) {
+-		dev_err(&adap->dev,
+-			"Multi-message I2C transactions not supported\n");
+-		return -EOPNOTSUPP;
+-	}
+-
+ 	if (msgs->flags & I2C_M_TEN)
+ 		return -EINVAL;
+ 	read = (msgs->flags & I2C_M_RD) != 0;
+@@ -205,6 +199,9 @@ static const struct i2c_algorithm i2c_powermac_algorithm = {
+ 	.functionality	= i2c_powermac_func,
+ };
  
--    for (i = 0; i < KVM_NR_SPSR; i++) {
-+    /* Saved Program State Registers
-+     *
-+     * Before we restore from the banked_spsr[] array we need to
-+     * ensure that any modifications to env->spsr are correctly
-+     * reflected and map aarch64 exception levels if required.
-+     */
-+    el = arm_current_el(env);
-+    if (is_a64(env) && el > 0) {
-+        g_assert(el == 1);
-+        /* KVM maps KVM_SPSR_SVC to KVM_SPSR_EL1 for aarch64 */
-+        env->banked_spsr[1] = env->banked_spsr[0];
-+        env->banked_spsr[aarch64_banked_spsr_index(el)] = env->spsr;
-+    } else {
-+        env->banked_spsr[el] = env->spsr;
-+    }
-+
-+    for (i=0; i<KVM_NR_SPSR; i++) {
-         reg.id = AARCH64_CORE_REG(spsr[i]);
--        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
-+        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
-         ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
-         if (ret) {
-             return ret;
-@@ -253,6 +270,7 @@ int kvm_arch_get_registers(CPUState *cs)
-     struct kvm_one_reg reg;
-     uint64_t val;
-     uint32_t fpr;
-+    unsigned int el;
-     int i;
-     int ret;
++static struct i2c_adapter_quirks i2c_powermac_quirks = {
++	.max_num_msgs = 1,
++};
  
-@@ -325,15 +343,32 @@ int kvm_arch_get_registers(CPUState *cs)
-         return ret;
-     }
+ static int i2c_powermac_remove(struct platform_device *dev)
+ {
+@@ -434,6 +431,7 @@ static int i2c_powermac_probe(struct platform_device *dev)
  
--    for (i = 0; i < KVM_NR_SPSR; i++) {
-+    /* Fetch the SPSR registers
-+     *
-+     * KVM has an array of state indexed for all the possible aarch32
-+     * privilage levels. Although not all are valid@all points
-+     * there are some transitions possible which can access old state
-+     * so it is worth keeping them all.
-+     */
-+    for (i=0; i<KVM_NR_SPSR; i++) {
-         reg.id = AARCH64_CORE_REG(spsr[i]);
--        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
-+        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
-         ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
-         if (ret) {
-             return ret;
-         }
-     }
+ 	platform_set_drvdata(dev, adapter);
+ 	adapter->algo = &i2c_powermac_algorithm;
++	adapter->quirks = &i2c_powermac_quirks;
+ 	i2c_set_adapdata(adapter, bus);
+ 	adapter->dev.parent = &dev->dev;
  
-+    el = arm_current_el(env);
-+    if (is_a64(env) && el > 0) {
-+        g_assert(el == 1);
-+        /* KVM maps KVM_SPSR_SVC to KVM_SPSR_EL1 for aarch64 */
-+        env->banked_spsr[0] = env->banked_spsr[1];
-+        env->spsr = env->banked_spsr[aarch64_banked_spsr_index(el)];
-+    } else {
-+        env->spsr = env->banked_spsr[el];
-+    }
-+
-     /* Advanced SIMD and FP registers */
-     for (i = 0; i < 32; i++) {
-         reg.id = AARCH64_SIMD_CORE_REG(fp_regs.vregs[i]);
 -- 
-2.3.0
+2.1.4
