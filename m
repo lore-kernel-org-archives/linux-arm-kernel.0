@@ -1,104 +1,228 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 25 Feb 2015 21:04:39 +0200
-Subject: [PATCHv3 29/35] ARM: dts: am4372: merge control module features under
- scrm node
+Date: Wed, 25 Feb 2015 21:04:40 +0200
+Subject: [PATCHv3 30/35] ARM: dts: omap4: add system control module node
 In-Reply-To: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
 References: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1424891085-10392-30-git-send-email-t-kristo@ti.com>
+Message-ID: <1424891085-10392-31-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves all the control module related features under scrm
-node. scm_conf area is provided to support syscon, and also the clocks
-are moved under scm_conf area.
+Add node for system control module, and move all the existing system
+control IO space users under this new node as its children. A new node
+for scm_conf area is also added. DT documentation is also updated by
+this patch to reflect the existence of system control module nodes,
+separately of PRCM module.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/am4372.dtsi |   48 +++++++++++++++++++++++------------------
- 1 file changed, 27 insertions(+), 21 deletions(-)
+ .../devicetree/bindings/arm/omap/ctrl.txt          |   75 +++++++++++++++++++
+ .../devicetree/bindings/arm/omap/prcm.txt          |    6 --
+ arch/arm/boot/dts/omap4.dtsi                       |   76 +++++++++++++-------
+ 3 files changed, 125 insertions(+), 32 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/ctrl.txt
 
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 1943fc3..f41b82a 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -57,22 +57,6 @@
- 		cache-level = <2>;
- 	};
- 
--	am43xx_control_module: control_module at 4a002000 {
--		compatible = "syscon";
--		reg = <0x44e10000 0x7f4>;
--	};
--
--	am43xx_pinmux: pinmux at 44e10800 {
--		compatible = "ti,am437-padconf", "pinctrl-single";
--		reg = <0x44e10800 0x31c>;
--		#address-cells = <1>;
--		#size-cells = <0>;
--		#interrupt-cells = <1>;
--		interrupt-controller;
--		pinctrl-single,register-width = <32>;
--		pinctrl-single,function-mask = <0xffffffff>;
--	};
--
- 	ocp {
- 		compatible = "ti,am4372-l3-noc", "simple-bus";
- 		#address-cells = <1>;
-@@ -98,12 +82,34 @@
+diff --git a/Documentation/devicetree/bindings/arm/omap/ctrl.txt b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
+new file mode 100644
+index 0000000..88b12b5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
+@@ -0,0 +1,75 @@
++OMAP Control Module bindings
++
++Control Module contains miscellaneous features under it based on SoC type.
++Pincontrol is one common feature, and it has a specialized support
++described in [1]. Typically some clock nodes are also under control module.
++Syscon is used to share register level access to drivers external to
++control module driver itself.
++
++See [2] for documentation about clock/clockdomain nodes.
++
++[1] Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
++[2] Documentation/devicetree/bindings/clock/ti/*
++
++Required properties:
++- compatible:	Must be one of:
++		"ti,am3-scrm"
++		"ti,am4-scrm"
++		"ti,dm814-scrm"
++		"ti,dm816-scrm"
++		"ti,omap2-scrm"
++		"ti,omap3-scrm"
++		"ti,omap4-ctrl"
++- reg:		Contains Control Module register address range
++		(base address and length)
++
++Optional properties:
++- clocks:	clocks for this module
++- clockdomains:	clockdomains for this module
++
++Examples:
++
++scrm: scrm at 48002000 {
++	compatible = "ti,omap3-scrm", "simple-bus";
++	reg = <0x48002000 0x2000>;
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges = <0 0x48002000 0x2000>;
++
++	omap3_pmx_core: pinmux at 30 {
++		compatible = "ti,omap3-padconf",
++			     "pinctrl-single";
++		reg = <0x30 0x230>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		#interrupt-cells = <1>;
++		interrupt-controller;
++		pinctrl-single,register-width = <16>;
++		pinctrl-single,function-mask = <0xff1f>;
++	};
++
++	scm_conf: tisyscon at 270 {
++		compatible = "syscon";
++		reg = <0x270 0x330>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		scrm_clocks: clocks {
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++	};
++
++	scrm_clockdomains: clockdomains {
++	};
++}
++
++&scrm_clocks {
++	mcbsp5_mux_fck: mcbsp5_mux_fck {
++		#clock-cells = <0>;
++		compatible = "ti,composite-mux-clock";
++		clocks = <&core_96m_fck>, <&mcbsp_clks>;
++		ti,bit-shift = <4>;
++		reg = <0x02d8>;
++	};
++};
+diff --git a/Documentation/devicetree/bindings/arm/omap/prcm.txt b/Documentation/devicetree/bindings/arm/omap/prcm.txt
+index 68f96f8..3eb6d7a 100644
+--- a/Documentation/devicetree/bindings/arm/omap/prcm.txt
++++ b/Documentation/devicetree/bindings/arm/omap/prcm.txt
+@@ -10,14 +10,10 @@ documentation about the individual clock/clockdomain nodes.
+ Required properties:
+ - compatible:	Must be one of:
+ 		"ti,am3-prcm"
+-		"ti,am3-scrm"
+ 		"ti,am4-prcm"
+-		"ti,am4-scrm"
+ 		"ti,omap2-prcm"
+-		"ti,omap2-scrm"
+ 		"ti,omap3-prm"
+ 		"ti,omap3-cm"
+-		"ti,omap3-scrm"
+ 		"ti,omap4-cm1"
+ 		"ti,omap4-prm"
+ 		"ti,omap4-cm2"
+@@ -30,9 +26,7 @@ Required properties:
+ 		"ti,dra7-cm-core-aon"
+ 		"ti,dra7-cm-core"
+ 		"ti,dm814-prcm"
+-		"ti,dm814-scrm"
+ 		"ti,dm816-prcm"
+-		"ti,dm816-scrm"
+ - reg:		Contains PRCM module register address range
+ 		(base address and length)
+ - clocks:	clocks for this module
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 074147c..0bab7ce 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -167,38 +167,62 @@
+ 			};
  		};
  
- 		scrm: scrm at 44e10000 {
--			compatible = "ti,am4-scrm";
--			reg = <0x44e10000 0x2000>;
-+			compatible = "ti,am4-scrm", "simple-bus";
-+			reg = <0x44e10000 0x1000>;
-+			#address-cells = <1>;
++		scm: scm at 4a002000 {
++			compatible = "ti,omap4-ctrl", "simple-bus";
++			reg = <0x4a002000 0x1000>,
++			      <0x4a30a000 0x1000>,
++			      <0x4a100000 0x1000>,
++			      <0x4a31e000 0x1000>;
++			#address-cells = <2>;
 +			#size-cells = <1>;
-+			ranges = <0 0x44e10000 0x1000>;
- 
--			scrm_clocks: clocks {
-+			am43xx_pinmux: pinmux at 800 {
-+				compatible = "ti,am437-padconf",
-+					     "pinctrl-single";
-+				reg = <0x800 0x31c>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+				#interrupt-cells = <1>;
-+				interrupt-controller;
-+				pinctrl-single,register-width = <32>;
-+				pinctrl-single,function-mask = <0xffffffff>;
-+			};
++			ranges = <0 0 0x4a002000 0x1000>,
++				 <1 0 0x4a30a000 0x1000>,
++				 <2 0 0x4a100000 0x1000>,
++				 <3 0 0x4a31e000 0x1000>;
 +
-+			scm_conf: tisyscon at 0 {
++			scm_conf: tisyscon at 0,0 {
 +				compatible = "syscon";
-+				reg = <0x0 0x7fc>;
++				reg = <0 0x0 0x800>;
 +				#address-cells = <1>;
 +				#size-cells = <1>;
++			};
 +
-+				scrm_clocks: clocks {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+				};
- 			};
++			omap4_pmx_core: pinmux at 2,40 {
++				compatible = "ti,omap4-padconf",
++					     "pinctrl-single";
++				reg = <2 0x40 0x0196>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				#interrupt-cells = <1>;
++				interrupt-controller;
++				pinctrl-single,register-width = <16>;
++				pinctrl-single,function-mask = <0x7fff>;
++			};
++
++			omap4_pmx_wkup: pinmux at 3,40 {
++				compatible = "ti,omap4-padconf",
++					     "pinctrl-single";
++				reg = <3 0x40 0x0038>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				#interrupt-cells = <1>;
++				interrupt-controller;
++				pinctrl-single,register-width = <16>;
++				pinctrl-single,function-mask = <0x7fff>;
++			};
++
++			omap4_padconf_global: omap4_padconf_global at 2,5a0 {
++				compatible = "syscon";
++				reg = <2 0x5a0 0x170>;
++			};
++		};
++
+ 		counter32k: counter at 4a304000 {
+ 			compatible = "ti,omap-counter32k";
+ 			reg = <0x4a304000 0x20>;
+ 			ti,hwmods = "counter_32k";
+ 		};
  
- 			scrm_clockdomains: clockdomains {
-@@ -933,7 +939,7 @@
- 			clocks = <&dcan0_fck>;
- 			clock-names = "fck";
- 			reg = <0x481cc000 0x2000>;
--			syscon-raminit = <&am43xx_control_module 0x644 0>;
-+			syscon-raminit = <&scm_conf 0x644 0>;
- 			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
- 			status = "disabled";
- 		};
-@@ -944,7 +950,7 @@
- 			clocks = <&dcan1_fck>;
- 			clock-names = "fck";
- 			reg = <0x481d0000 0x2000>;
--			syscon-raminit = <&am43xx_control_module 0x644 1>;
-+			syscon-raminit = <&scm_conf 0x644 1>;
- 			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
- 			status = "disabled";
- 		};
+-		omap4_pmx_core: pinmux at 4a100040 {
+-			compatible = "ti,omap4-padconf", "pinctrl-single";
+-			reg = <0x4a100040 0x0196>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			#interrupt-cells = <1>;
+-			interrupt-controller;
+-			pinctrl-single,register-width = <16>;
+-			pinctrl-single,function-mask = <0x7fff>;
+-		};
+-		omap4_pmx_wkup: pinmux at 4a31e040 {
+-			compatible = "ti,omap4-padconf", "pinctrl-single";
+-			reg = <0x4a31e040 0x0038>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			#interrupt-cells = <1>;
+-			interrupt-controller;
+-			pinctrl-single,register-width = <16>;
+-			pinctrl-single,function-mask = <0x7fff>;
+-		};
+-
+-		omap4_padconf_global: tisyscon at 4a1005a0 {
+-			compatible = "syscon";
+-			reg = <0x4a1005a0 0x170>;
+-		};
+-
+ 		pbias_regulator: pbias_regulator {
+ 			compatible = "ti,pbias-omap";
+ 			reg = <0x60 0x4>;
 -- 
 1.7.9.5
