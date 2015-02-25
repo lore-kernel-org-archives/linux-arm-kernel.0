@@ -1,196 +1,156 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 25 Feb 2015 21:04:18 +0200
-Subject: [PATCHv3 08/35] clk: ti: fix ti_clk_get_reg_addr error handling
+Date: Wed, 25 Feb 2015 21:04:20 +0200
+Subject: [PATCHv3 10/35] ARM: OMAP2+: PRCM: add support for static clock
+ memmap indices
 In-Reply-To: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
 References: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1424891085-10392-9-git-send-email-t-kristo@ti.com>
+Message-ID: <1424891085-10392-11-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a case where NULL can be a valid return value for
-ti_clk_get_reg_addr, specifically the case where both the provider index
-and register offsets are zero. In this case, the current error checking
-against a NULL pointer will fail. Thus, change the API to return a
-ERR_PTR value in an error case, and change all the users of this API to
-check against IS_ERR instead.
+All clock provider related drivers will now register their iomaps
+with a static index. This makes it easier to split up the individual
+drivers to their own files in subsequent patches.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Cc: Michael Turquette <mturquette@linaro.org>
 ---
- drivers/clk/ti/apll.c      |    5 +++--
- drivers/clk/ti/autoidle.c  |    2 +-
- drivers/clk/ti/clk.c       |    7 ++++---
- drivers/clk/ti/divider.c   |    4 ++--
- drivers/clk/ti/dpll.c      |    6 +++---
- drivers/clk/ti/gate.c      |    4 ++--
- drivers/clk/ti/interface.c |    2 +-
- drivers/clk/ti/mux.c       |    4 ++--
- 8 files changed, 18 insertions(+), 16 deletions(-)
+ arch/arm/mach-omap2/prcm-common.h |    8 ++++
+ arch/arm/mach-omap2/prm_common.c  |   79 +++++++++++++++++++++++--------------
+ include/linux/clk/ti.h            |    1 +
+ 3 files changed, 59 insertions(+), 29 deletions(-)
 
-diff --git a/drivers/clk/ti/apll.c b/drivers/clk/ti/apll.c
-index 72d9727..49baf38 100644
---- a/drivers/clk/ti/apll.c
-+++ b/drivers/clk/ti/apll.c
-@@ -203,7 +203,7 @@ static void __init of_dra7_apll_setup(struct device_node *node)
- 	ad->control_reg = ti_clk_get_reg_addr(node, 0);
- 	ad->idlest_reg = ti_clk_get_reg_addr(node, 1);
- 
--	if (!ad->control_reg || !ad->idlest_reg)
-+	if (IS_ERR(ad->control_reg) || IS_ERR(ad->idlest_reg))
- 		goto cleanup;
- 
- 	ad->idlest_mask = 0x1;
-@@ -384,7 +384,8 @@ static void __init of_omap2_apll_setup(struct device_node *node)
- 	ad->autoidle_reg = ti_clk_get_reg_addr(node, 1);
- 	ad->idlest_reg = ti_clk_get_reg_addr(node, 2);
- 
--	if (!ad->control_reg || !ad->autoidle_reg || !ad->idlest_reg)
-+	if (IS_ERR(ad->control_reg) || IS_ERR(ad->autoidle_reg) ||
-+	    IS_ERR(ad->idlest_reg))
- 		goto cleanup;
- 
- 	clk = clk_register(NULL, &clk_hw->hw);
-diff --git a/drivers/clk/ti/autoidle.c b/drivers/clk/ti/autoidle.c
-index 8912ff8..e75c64c 100644
---- a/drivers/clk/ti/autoidle.c
-+++ b/drivers/clk/ti/autoidle.c
-@@ -119,7 +119,7 @@ int __init of_ti_clk_autoidle_setup(struct device_node *node)
- 	clk->name = node->name;
- 	clk->reg = ti_clk_get_reg_addr(node, 0);
- 
--	if (!clk->reg) {
-+	if (IS_ERR(clk->reg)) {
- 		kfree(clk);
- 		return -EINVAL;
+diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
+index 6163d66..ee38356 100644
+--- a/arch/arm/mach-omap2/prcm-common.h
++++ b/arch/arm/mach-omap2/prcm-common.h
+@@ -518,6 +518,14 @@ struct omap_prcm_irq_setup {
+ 	.priority = _priority				\
  	}
-diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
-index e22b956..0ebe5c5 100644
---- a/drivers/clk/ti/clk.c
-+++ b/drivers/clk/ti/clk.c
-@@ -103,7 +103,8 @@ int __init ti_clk_retry_init(struct device_node *node, struct clk_hw *hw,
-  * @index: register index from the clock node
-  *
-  * Builds clock register address from device tree information. This
-- * is a struct of type clk_omap_reg.
-+ * is a struct of type clk_omap_reg. Returns a pointer to the register
-+ * address, or a pointer error value in failure.
-  */
- void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index)
+ 
++/**
++ * struct omap_prcm_init_data - PRCM driver init data
++ * @index: clock memory mapping index to be used
++ */
++struct omap_prcm_init_data {
++	int index;
++};
++
+ extern void omap_prcm_irq_cleanup(void);
+ extern int omap_prcm_register_chain_handler(
+ 	struct omap_prcm_irq_setup *irq_setup);
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index 79cee11..8ec5201 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -633,31 +633,47 @@ int prm_unregister(struct prm_ll_data *pld)
+ 	return 0;
+ }
+ 
++static struct omap_prcm_init_data prm_data = {
++	.index = TI_CLKM_PRM,
++};
++
++static struct omap_prcm_init_data cm_data = {
++	.index = TI_CLKM_CM,
++};
++
++static struct omap_prcm_init_data cm2_data = {
++	.index = TI_CLKM_CM2,
++};
++
++static struct omap_prcm_init_data scrm_data = {
++	.index = TI_CLKM_SCRM,
++};
++
+ static const struct of_device_id omap_prcm_dt_match_table[] = {
+-	{ .compatible = "ti,am3-prcm" },
+-	{ .compatible = "ti,am3-scrm" },
+-	{ .compatible = "ti,am4-prcm" },
+-	{ .compatible = "ti,am4-scrm" },
+-	{ .compatible = "ti,dm814-prcm" },
+-	{ .compatible = "ti,dm814-scrm" },
+-	{ .compatible = "ti,dm816-prcm" },
+-	{ .compatible = "ti,dm816-scrm" },
+-	{ .compatible = "ti,omap2-prcm" },
+-	{ .compatible = "ti,omap2-scrm" },
+-	{ .compatible = "ti,omap3-prm" },
+-	{ .compatible = "ti,omap3-cm" },
+-	{ .compatible = "ti,omap3-scrm" },
+-	{ .compatible = "ti,omap4-cm1" },
+-	{ .compatible = "ti,omap4-prm" },
+-	{ .compatible = "ti,omap4-cm2" },
+-	{ .compatible = "ti,omap4-scrm" },
+-	{ .compatible = "ti,omap5-prm" },
+-	{ .compatible = "ti,omap5-cm-core-aon" },
+-	{ .compatible = "ti,omap5-scrm" },
+-	{ .compatible = "ti,omap5-cm-core" },
+-	{ .compatible = "ti,dra7-prm" },
+-	{ .compatible = "ti,dra7-cm-core-aon" },
+-	{ .compatible = "ti,dra7-cm-core" },
++	{ .compatible = "ti,am3-prcm", .data = &prm_data },
++	{ .compatible = "ti,am3-scrm", .data = &scrm_data },
++	{ .compatible = "ti,am4-prcm", .data = &prm_data },
++	{ .compatible = "ti,am4-scrm", .data = &scrm_data },
++	{ .compatible = "ti,dm814-prcm", .data = &prm_data },
++	{ .compatible = "ti,dm814-scrm", .data = &scrm_data },
++	{ .compatible = "ti,dm816-prcm", .data = &prm_data },
++	{ .compatible = "ti,dm816-scrm", .data = &scrm_data },
++	{ .compatible = "ti,omap2-prcm", .data = &prm_data },
++	{ .compatible = "ti,omap2-scrm", .data = &scrm_data },
++	{ .compatible = "ti,omap3-prm", .data = &prm_data },
++	{ .compatible = "ti,omap3-cm", .data = &cm_data },
++	{ .compatible = "ti,omap3-scrm", .data = &scrm_data },
++	{ .compatible = "ti,omap4-cm1", .data = &cm_data },
++	{ .compatible = "ti,omap4-prm", .data = &prm_data },
++	{ .compatible = "ti,omap4-cm2", .data = &cm2_data },
++	{ .compatible = "ti,omap4-scrm", .data = &scrm_data },
++	{ .compatible = "ti,omap5-prm", .data = &prm_data },
++	{ .compatible = "ti,omap5-cm-core-aon", .data = &cm_data },
++	{ .compatible = "ti,omap5-scrm", .data = &scrm_data },
++	{ .compatible = "ti,omap5-cm-core", .data = &cm2_data },
++	{ .compatible = "ti,dra7-prm", .data = &prm_data },
++	{ .compatible = "ti,dra7-cm-core-aon", .data = &cm_data },
++	{ .compatible = "ti,dra7-cm-core", .data = &cm2_data },
+ 	{ }
+ };
+ 
+@@ -690,15 +706,20 @@ int __init omap_prcm_init(void)
  {
-@@ -121,14 +122,14 @@ void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index)
+ 	struct device_node *np;
+ 	void __iomem *mem;
+-	int memmap_index = 0;
++	const struct of_device_id *match;
++	const struct omap_prcm_init_data *data;
  
- 	if (i == CLK_MAX_MEMMAPS) {
- 		pr_err("clk-provider not found for %s!\n", node->name);
--		return NULL;
-+		return ERR_PTR(-ENOENT);
+ 	ti_clk_ll_ops = &omap_clk_ll_ops;
+ 
+-	for_each_matching_node(np, omap_prcm_dt_match_table) {
++	for_each_matching_node_and_match(np, omap_prcm_dt_match_table, &match) {
++		data = match->data;
++
+ 		mem = of_iomap(np, 0);
+-		clk_memmaps[memmap_index] = mem;
+-		ti_dt_clk_init_provider(np, memmap_index);
+-		memmap_index++;
++		if (!mem)
++			return -ENOMEM;
++
++		clk_memmaps[data->index] = mem;
++		ti_dt_clk_init_provider(np, data->index);
  	}
  
- 	reg->index = i;
- 
- 	if (of_property_read_u32_index(node, "reg", index, &val)) {
- 		pr_err("%s must have reg[%d]!\n", node->name, index);
--		return NULL;
-+		return ERR_PTR(-EINVAL);
- 	}
- 
- 	reg->offset = val;
-diff --git a/drivers/clk/ti/divider.c b/drivers/clk/ti/divider.c
-index 6211893..ff5f117 100644
---- a/drivers/clk/ti/divider.c
-+++ b/drivers/clk/ti/divider.c
-@@ -530,8 +530,8 @@ static int __init ti_clk_divider_populate(struct device_node *node,
- 	u32 val;
- 
- 	*reg = ti_clk_get_reg_addr(node, 0);
--	if (!*reg)
--		return -EINVAL;
-+	if (IS_ERR(*reg))
-+		return PTR_ERR(*reg);
- 
- 	if (!of_property_read_u32(node, "ti,bit-shift", &val))
- 		*shift = val;
-diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
-index 81dc469..11478a5 100644
---- a/drivers/clk/ti/dpll.c
-+++ b/drivers/clk/ti/dpll.c
-@@ -390,18 +390,18 @@ static void __init of_ti_dpll_setup(struct device_node *node,
- #endif
- 	} else {
- 		dd->idlest_reg = ti_clk_get_reg_addr(node, 1);
--		if (!dd->idlest_reg)
-+		if (IS_ERR(dd->idlest_reg))
- 			goto cleanup;
- 
- 		dd->mult_div1_reg = ti_clk_get_reg_addr(node, 2);
- 	}
- 
--	if (!dd->control_reg || !dd->mult_div1_reg)
-+	if (IS_ERR(dd->control_reg) || IS_ERR(dd->mult_div1_reg))
- 		goto cleanup;
- 
- 	if (dd->autoidle_mask) {
- 		dd->autoidle_reg = ti_clk_get_reg_addr(node, 3);
--		if (!dd->autoidle_reg)
-+		if (IS_ERR(dd->autoidle_reg))
- 			goto cleanup;
- 	}
- 
-diff --git a/drivers/clk/ti/gate.c b/drivers/clk/ti/gate.c
-index d493307..0c6fdfc 100644
---- a/drivers/clk/ti/gate.c
-+++ b/drivers/clk/ti/gate.c
-@@ -225,7 +225,7 @@ static void __init _of_ti_gate_clk_setup(struct device_node *node,
- 
- 	if (ops != &omap_gate_clkdm_clk_ops) {
- 		reg = ti_clk_get_reg_addr(node, 0);
--		if (!reg)
-+		if (IS_ERR(reg))
- 			return;
- 
- 		if (!of_property_read_u32(node, "ti,bit-shift", &val))
-@@ -264,7 +264,7 @@ _of_ti_composite_gate_clk_setup(struct device_node *node,
- 		return;
- 
- 	gate->enable_reg = ti_clk_get_reg_addr(node, 0);
--	if (!gate->enable_reg)
-+	if (IS_ERR(gate->enable_reg))
- 		goto cleanup;
- 
- 	of_property_read_u32(node, "ti,bit-shift", &val);
-diff --git a/drivers/clk/ti/interface.c b/drivers/clk/ti/interface.c
-index 265d91f..c76230d 100644
---- a/drivers/clk/ti/interface.c
-+++ b/drivers/clk/ti/interface.c
-@@ -111,7 +111,7 @@ static void __init _of_ti_interface_clk_setup(struct device_node *node,
- 	u32 val;
- 
- 	reg = ti_clk_get_reg_addr(node, 0);
--	if (!reg)
-+	if (IS_ERR(reg))
- 		return;
- 
- 	if (!of_property_read_u32(node, "ti,bit-shift", &val))
-diff --git a/drivers/clk/ti/mux.c b/drivers/clk/ti/mux.c
-index 728e253..5cdeed5 100644
---- a/drivers/clk/ti/mux.c
-+++ b/drivers/clk/ti/mux.c
-@@ -210,7 +210,7 @@ static void of_mux_clk_setup(struct device_node *node)
- 
- 	reg = ti_clk_get_reg_addr(node, 0);
- 
--	if (!reg)
-+	if (IS_ERR(reg))
- 		goto cleanup;
- 
- 	of_property_read_u32(node, "ti,bit-shift", &shift);
-@@ -283,7 +283,7 @@ static void __init of_ti_composite_mux_clk_setup(struct device_node *node)
- 
- 	mux->reg = ti_clk_get_reg_addr(node, 0);
- 
--	if (!mux->reg)
-+	if (IS_ERR(mux->reg))
- 		goto cleanup;
- 
- 	if (!of_property_read_u32(node, "ti,bit-shift", &val))
+ 	return 0;
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+index 6784400..19895a3 100644
+--- a/include/linux/clk/ti.h
++++ b/include/linux/clk/ti.h
+@@ -221,6 +221,7 @@ struct ti_dt_clk {
+ /* Static memmap indices */
+ enum {
+ 	TI_CLKM_CM = 0,
++	TI_CLKM_CM2,
+ 	TI_CLKM_PRM,
+ 	TI_CLKM_SCRM,
+ };
 -- 
 1.7.9.5
