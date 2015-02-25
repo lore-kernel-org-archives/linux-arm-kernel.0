@@ -1,33 +1,88 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 25 Feb 2015 14:45:34 +0100
-Subject: Ethernet Briding broken on APM Mustang on v4.0-rc1
-In-Reply-To: <20150225124101.GD12827@cbox>
-References: <20150225124101.GD12827@cbox>
-Message-ID: <20150225134534.GE12827@cbox>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 25 Feb 2015 21:47:02 +0800
+Subject: [Linaro-acpi] [PATCH v3 5/9] ACPI: move acpi_os_handler() so
+ it can be made arch-dependent later
+In-Reply-To: <1424824585-6405-6-git-send-email-al.stone@linaro.org>
+References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
+ <1424824585-6405-6-git-send-email-al.stone@linaro.org>
+Message-ID: <54EDD256.1010009@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update, apologies for noise,
+On 2015?02?25? 08:36, al.stone at linaro.org wrote:
+> From: Al Stone <al.stone@linaro.org>
+>
+> In order to deprecate the use of _OSI for arm64 or other new architectures,
+> we need to make the default handler something we can change for various
+> platforms.  This patch moves the definition of acpi_osi_handler() -- the
+> function used by ACPICA as a callback for evaluating _OSI -- into a separate
+> file.  Subsequent patches will change which files get built so that we can
+> then build the version of _OSI we need for a particular architecture.
+>
+> There is no functional change.
+>
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> ---
+>   drivers/acpi/Makefile |  2 +-
+>   drivers/acpi/osi.c    | 95 +++++++++++++++++++++++++++++++++++++++++++++++++++
+>   drivers/acpi/osl.c    | 24 -------------
+>   include/linux/acpi.h  |  1 +
+>   4 files changed, 97 insertions(+), 25 deletions(-)
+>   create mode 100644 drivers/acpi/osi.c
+>
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index 13536d8..97191eb 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -18,7 +18,7 @@ obj-y				+= acpi.o \
+>   					acpica/
+>
+>   # All the builtin files are in the "acpi." module_param namespace.
+> -acpi-y				+= osl.o utils.o reboot.o
+> +acpi-y				+= osl.o utils.o reboot.o osi.o
+>   acpi-y				+= nvs.o
+>
+>   # Power management related files
+> diff --git a/drivers/acpi/osi.c b/drivers/acpi/osi.c
+> new file mode 100644
+> index 0000000..f23aa70
+> --- /dev/null
+> +++ b/drivers/acpi/osi.c
+> @@ -0,0 +1,95 @@
+> +/*
+> + *  osi.c - _OSI implementation (moved from drivers/acpi/osl.c)
+> + *
+> + *  Copyright (C) 2000       Andrew Henroid
+> + *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
+> + *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
+> + *  Copyright (c) 2008 Intel Corporation
+> + *   Author: Matthew Wilcox <willy@linux.intel.com>
+> + *
+> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> + *
+> + *  This program is free software; you can redistribute it and/or modify
+> + *  it under the terms of the GNU General Public License as published by
+> + *  the Free Software Foundation; either version 2 of the License, or
+> + *  (at your option) any later version.
+> + *
+> + *  This program is distributed in the hope that it will be useful,
+> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *  GNU General Public License for more details.
+> + *
+> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> + *
+> + */
+> +
+> +#include <linux/acpi.h>
+> +
+> +#define _COMPONENT		ACPI_OS_SERVICES
+> +ACPI_MODULE_NAME("osi");
+> +
+> +#define PREFIX			"ACPI: "
 
-On Wed, Feb 25, 2015 at 01:41:01PM +0100, Christoffer Dall wrote:
-> Hi,
-> 
-> Configuring bridged networking on the APM Mustang platform doesn't work
-> on v4.0-rc1.  It works fine on v3.19-rc1.
-> 
-> When adding the interface to the bridge I get this error:
-> 
-> can't add eth0 to bridge br0: Invalid argument
-> 
-> Has anyone else seen this?
-> 
-> Other ARMv8 platforms don't seem to be affected by this.
-> 
+Hi Al, remove PREFIX here and use pr_fmt() instead as
+I mentioned in previous patch :)
 
-It seems that on v4.0-rc1 the APM ethernet card no longer gets a mac
-address (or rather, it gets 00:00:00:00:...) so assigning it an
-appropriate address naturally does the trick.
-
-I have no idea which change caused this behavior though.
-
--Christoffer
+Thanks
+Hanjun
