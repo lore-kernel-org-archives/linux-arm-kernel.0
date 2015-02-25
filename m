@@ -1,159 +1,65 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 25 Feb 2015 15:15:02 +0000
-Subject: [PATCH 1/6] phy: miphy365x: Use the generic phy type constants
- in dt-bindings/phy/phy.h
-In-Reply-To: <1424871377-1795-2-git-send-email-peter.griffin@linaro.org>
-References: <1424871377-1795-1-git-send-email-peter.griffin@linaro.org>
- <1424871377-1795-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20150225151502.GH5132@x1>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 25 Feb 2015 09:16:11 -0600
+Subject: [PATCH v5 0/7] irqchip: Move OMAP{4,
+ 5}/DRA7 to use stacked domains
+In-Reply-To: <54EC555A.9050903@arm.com>
+References: <1424713459-6824-1-git-send-email-marc.zyngier@arm.com>
+ <20150223203237.GA30588@kahuna> <54EB9006.70000@ti.com>
+ <54EC555A.9050903@arm.com>
+Message-ID: <54EDE73B.7020503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Feb 2015, Peter Griffin wrote:
-
-> Now there are generic phy type constants declared in phy.h, migrate over to
-> using them rather than defining our own. This change has been done as one
-> atomic commit to be bisectable.
+On 02/24/2015 04:41 AM, Marc Zyngier wrote:
+> On 23/02/15 20:39, Nishanth Menon wrote:
+>> On 02/23/2015 02:32 PM, Nishanth Menon wrote:
+>>> On 17:44-20150223, Marc Zyngier wrote:
+[...]
+>>>>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu
+>>>>  delete mode 100644 include/linux/irqchip/irq-crossbar.h
+>>>
+>>> marc-test-irq (Applied the series to v4.0-rc1) - boot logs:
+>>>  1:                     am335x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469913
+>>>  2:                      am335x-sk: BOOT: PASS: http://paste.ubuntu.org.cn/2469914
+>>>  3:                     am3517-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469915
+>>>  4:                      am37x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469916
+>>>  5:                      am437x-sk: BOOT: PASS: http://paste.ubuntu.org.cn/2469917
+>>>  6:                    am43xx-epos: BOOT: PASS: http://paste.ubuntu.org.cn/2469918
+>>>  7:                   am43xx-gpevm: BOOT: PASS: http://paste.ubuntu.org.cn/2469919
+>>>  8:                 BeagleBoard-XM: BOOT: PASS: http://paste.ubuntu.org.cn/2469920
+>>>  9:            beagleboard-vanilla: BOOT: PASS: http://paste.ubuntu.org.cn/2469928
+>>> 10:               beaglebone-black: BOOT: PASS: http://paste.ubuntu.org.cn/2469932
+>>> 11:                     beaglebone: BOOT: PASS: http://paste.ubuntu.org.cn/2469936
+>>> 12:                     craneboard: BOOT: PASS: http://paste.ubuntu.org.cn/2469941
+>>> 13:                     dra72x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469945
+>>> 14:                     dra7xx-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469946
+>>> 15:         OMAP3430-Labrador(LDP): BOOT: PASS: http://paste.ubuntu.org.cn/2469947
+>>> 16:                           n900: BOOT: PASS: http://paste.ubuntu.org.cn/2469948
+>>> 17:                      omap5-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2469949
+>>> 18:                  pandaboard-es: BOOT: PASS: http://paste.ubuntu.org.cn/2469950
+>>> 19:             pandaboard-vanilla: BOOT: PASS: http://paste.ubuntu.org.cn/2469951
+>>> 20:                        sdp2430: BOOT: PASS: http://paste.ubuntu.org.cn/2469952
+>>> 21:                        sdp3430: BOOT: PASS: http://paste.ubuntu.org.cn/2469953
+>>> 22:                        sdp4430: BOOT: PASS: http://paste.ubuntu.org.cn/2469954
+>>> TOTAL = 22 boards, Booted Boards = 22, No Boot boards = 0
+>>>
+>>> (also tested beagleboard-x15 which was not on farm: http://paste.ubuntu.org.cn/2470017  - looks good as well).
+>> Noticed that I missed proper info about x15 here.. anyways..
+>>
+>> http://paste.ubuntu.org.cn/2470017 was vanilla v4.0-rc1
+>> http://pastebin.ubuntu.com/10377375/ is with this series applied on top.
+>>
+>>>
+>>> Comparative boot logs for v4.0-rc1:
+>>> https://github.com/nmenon/kernel-test-logs/tree/v4.0-rc1
+>>>
+>>> Will dig in detail a little later.. but nothing major stuck out to me.
 > 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  Documentation/devicetree/bindings/phy/phy-miphy365x.txt |  8 ++++----
->  arch/arm/boot/dts/stih416.dtsi                          |  4 ++--
->  drivers/phy/phy-miphy365x.c                             | 14 +++++++-------
->  include/dt-bindings/phy/phy-miphy365x.h                 | 14 --------------
->  4 files changed, 13 insertions(+), 27 deletions(-)
->  delete mode 100644 include/dt-bindings/phy/phy-miphy365x.h
+> Excellent. Let me know if you spot anything. Can I otherwise add your
+> "Tested-by:"?
 
-Nice.
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
-> diff --git a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> index 9802d5d..8772900 100644
-> --- a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> +++ b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> @@ -20,8 +20,8 @@ Required nodes	:  A sub-node is required for each channel the controller
->  Required properties (port (child) node):
->  - #phy-cells 	: Should be 1 (See second example)
->  		  Cell after port phandle is device type from:
-> -			- MIPHY_TYPE_SATA
-> -			- MIPHY_TYPE_PCI
-> +			- PHY_TYPE_SATA
-> +			- PHY_TYPE_PCI
->  - reg        	: Address and length of register sets for each device in
->  		  "reg-names"
->  - reg-names     : The names of the register addresses corresponding to the
-> @@ -68,10 +68,10 @@ property, containing a phandle to the phy port node and a device type.
->  
->  Example:
->  
-> -#include <dt-bindings/phy/phy-miphy365x.h>
-> +#include <dt-bindings/phy/phy.h>
->  
->  	sata0: sata at fe380000 {
->  		...
-> -		phys	  = <&phy_port0 MIPHY_TYPE_SATA>;
-> +		phys	  = <&phy_port0 PHY_TYPE_SATA>;
->  		...
->  	};
-> diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-> index ea28eba..eeb7afe 100644
-> --- a/arch/arm/boot/dts/stih416.dtsi
-> +++ b/arch/arm/boot/dts/stih416.dtsi
-> @@ -10,7 +10,7 @@
->  #include "stih416-clock.dtsi"
->  #include "stih416-pinctrl.dtsi"
->  
-> -#include <dt-bindings/phy/phy-miphy365x.h>
-> +#include <dt-bindings/phy/phy.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/reset-controller/stih416-resets.h>
->  / {
-> @@ -306,7 +306,7 @@
->  			reg             = <0xfe380000 0x1000>;
->  			interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
->  			interrupt-names = "hostc";
-> -			phys	        = <&phy_port0 MIPHY_TYPE_SATA>;
-> +			phys	        = <&phy_port0 PHY_TYPE_SATA>;
->  			phy-names       = "sata-phy";
->  			resets	        = <&powerdown STIH416_SATA0_POWERDOWN>,
->  					  <&softreset STIH416_SATA0_SOFTRESET>;
-> diff --git a/drivers/phy/phy-miphy365x.c b/drivers/phy/phy-miphy365x.c
-> index 6c80154..98bffbc 100644
-> --- a/drivers/phy/phy-miphy365x.c
-> +++ b/drivers/phy/phy-miphy365x.c
-> @@ -25,7 +25,7 @@
->  #include <linux/mfd/syscon.h>
->  #include <linux/regmap.h>
->  
-> -#include <dt-bindings/phy/phy-miphy365x.h>
-> +#include <dt-bindings/phy/phy.h>
->  
->  #define HFC_TIMEOUT		100
->  
-> @@ -176,7 +176,7 @@ static u8 rx_tx_spd[] = {
->  static int miphy365x_set_path(struct miphy365x_phy *miphy_phy,
->  			      struct miphy365x_dev *miphy_dev)
->  {
-> -	bool sata = (miphy_phy->type == MIPHY_TYPE_SATA);
-> +	bool sata = (miphy_phy->type == PHY_TYPE_SATA);
->  
->  	return regmap_update_bits(miphy_dev->regmap,
->  				  miphy_phy->ctrlreg,
-> @@ -430,7 +430,7 @@ static int miphy365x_init(struct phy *phy)
->  	}
->  
->  	/* Initialise Miphy for PCIe or SATA */
-> -	if (miphy_phy->type == MIPHY_TYPE_PCIE)
-> +	if (miphy_phy->type == PHY_TYPE_PCIE)
->  		ret = miphy365x_init_pcie_port(miphy_phy, miphy_dev);
->  	else
->  		ret = miphy365x_init_sata_port(miphy_phy, miphy_dev);
-> @@ -454,8 +454,8 @@ int miphy365x_get_addr(struct device *dev, struct miphy365x_phy *miphy_phy,
->  		return ret;
->  	}
->  
-> -	if (!((!strncmp(name, "sata", 4) && type == MIPHY_TYPE_SATA) ||
-> -	      (!strncmp(name, "pcie", 4) && type == MIPHY_TYPE_PCIE)))
-> +	if (!((!strncmp(name, "sata", 4) && type == PHY_TYPE_SATA) ||
-> +	      (!strncmp(name, "pcie", 4) && type == PHY_TYPE_PCIE)))
->  		return 0;
->  
->  	miphy_phy->base = of_iomap(phynode, index);
-> @@ -498,8 +498,8 @@ static struct phy *miphy365x_xlate(struct device *dev,
->  
->  	miphy_phy->type = args->args[0];
->  
-> -	if (!(miphy_phy->type == MIPHY_TYPE_SATA ||
-> -	      miphy_phy->type == MIPHY_TYPE_PCIE)) {
-> +	if (!(miphy_phy->type == PHY_TYPE_SATA ||
-> +	      miphy_phy->type == PHY_TYPE_PCIE)) {
->  		dev_err(dev, "Unsupported device type: %d\n", miphy_phy->type);
->  		return ERR_PTR(-EINVAL);
->  	}
-> diff --git a/include/dt-bindings/phy/phy-miphy365x.h b/include/dt-bindings/phy/phy-miphy365x.h
-> deleted file mode 100644
-> index 8ef8aba..0000000
-> --- a/include/dt-bindings/phy/phy-miphy365x.h
-> +++ /dev/null
-> @@ -1,14 +0,0 @@
-> -/*
-> - * This header provides constants for the phy framework
-> - * based on the STMicroelectronics MiPHY365x.
-> - *
-> - * Author: Lee Jones <lee.jones@linaro.org>
-> - */
-> -#ifndef _DT_BINDINGS_PHY_MIPHY
-> -#define _DT_BINDINGS_PHY_MIPHY
-> -
-> -#define MIPHY_TYPE_SATA		1
-> -#define MIPHY_TYPE_PCIE		2
-> -#define MIPHY_TYPE_USB		3
-> -
-> -#endif /* _DT_BINDINGS_PHY_MIPHY */
+Yes please. Sorry that I did not respond earlier.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Nishanth Menon
