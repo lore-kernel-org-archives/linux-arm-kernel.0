@@ -1,37 +1,41 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Wed, 25 Feb 2015 10:14:19 -0600
-Subject: [PATCH] arm64: vdso: minor ABI fix for clock_getres
-In-Reply-To: <20150225160226.GL12377@arm.com>
-References: <1424820067-13112-1-git-send-email-nathan_lynch@mentor.com>
- <20150225160226.GL12377@arm.com>
-Message-ID: <54EDF4DB.5080007@mentor.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 25 Feb 2015 08:20:00 -0800
+Subject: [PATCH] hwmon: (gpio-fan) allow to use alarm support alone from DT
+In-Reply-To: <20150225150459.GE17992@lunn.ch>
+References: <1424696334-14767-1-git-send-email-simon.guinot@sequanux.org>
+ <54EB33D4.1000804@roeck-us.net>
+ <20150223143416.GT1509@kw.sim.vm.gnt> <54EB3C84.30503@roeck-us.net>
+ <20150225111430.GV1509@kw.sim.vm.gnt>
+ <20150225135015.GA17992@lunn.ch> <54EDE171.7040403@roeck-us.net>
+ <20150225150459.GE17992@lunn.ch>
+Message-ID: <20150225162000.GA25241@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2015 10:02 AM, Will Deacon wrote:
-> On Tue, Feb 24, 2015 at 11:21:07PM +0000, Nathan Lynch wrote:
->> The vdso implementation of clock_getres currently returns 0 (success)
->> whenever a null timespec is provided by the caller, regardless of the
->> clock id supplied.
->>
->> This behavior is incorrect.  It should fall back to syscall when an
->> unrecognized clock id is passed, even when the timespec argument is
->> null.  This ensures that clock_getres always returns an error for
->> invalid clock ids.
->>
->> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
->> ---
->>  arch/arm64/kernel/vdso/gettimeofday.S | 3 +--
->>  1 file changed, 1 insertion(+), 2 deletions(-)
+On Wed, Feb 25, 2015 at 04:04:59PM +0100, Andrew Lunn wrote:
+> > However, we need to state and check in the code that _some_ property
+> > is mandatory. A driver with only optional properties doesn't make
+> > sense.
 > 
-> Acked-by: Will Deacon <will.deacon@arm.com>
+> The patch to the binding documentation said:
 > 
-> Thanks, Nathan.
+> Note: At least one the "gpios" and "alarm-gpios" properties should be set.
+> 
+> which i then suggested should be:
+> 
+> Note: At least one of "gpios" or "alarm-gpios" properties should be set.
+> 
+"should" is not "must".
 
-Thank you.  I'm curious -- do you know of a use case for the VDSO
-implementation of clock_getres?  I.e. what kind of real-world workload
-sees a benefit from it?
+Guenter
 
-I'm not suggesting removing it from the arm64 vdso, but I'm considering
-dropping clock_getres from the 32-bit ARM vdso patch set since I haven't
-been able to answer this.
+> What we could do is move this sentence into the Required Properties of
+> the documentation.
+> 
+> The patch Simon submitted also does check that this condition is
+> fulfilled.
+> 
+> 	Andrew
+> 
+> 
+> 
