@@ -1,34 +1,26 @@
-From: kwestfie@codeaurora.org (Kenneth Westfield)
-Date: Wed, 25 Feb 2015 15:05:01 -0800
-Subject: [PATCH] clk: qcom: Properly change rates for ahbix clock
-In-Reply-To: <1424903527-5636-1-git-send-email-sboyd@codeaurora.org>
-References: <1424903527-5636-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150225230500.GA28241@kwestfie-linux.qualcomm.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 25 Feb 2015 17:09:25 -0600
+Subject: [PATCH v2 00/30] Refine PCI scan interfaces and make generic pci
+ host bridge
+In-Reply-To: <1421800225-26230-1-git-send-email-wangyijing@huawei.com>
+References: <1421800225-26230-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <20150225230925.GQ6220@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 02:32:07PM -0800, Stephen Boyd wrote:
-> The ahbix clock can never be turned off. To switch the rates we
-> need to switch the mux off the M/N counter to an always on source
-> (XO), reprogram the M/N counter to get the rate we want and
-> finally switch back to the M/N counter. Add a new ops structure
-> for this type of clock so that we can set the rate properly.
+On Wed, Jan 21, 2015 at 08:29:55AM +0800, Yijing Wang wrote:
+> v1->v2:
+> 	Split pci_host_bridge_list into a new patch, remove .phb_probe_mode
+> 	and rework powerpc .phb_of_scan_bus() for simpilicty suggested by
+> 	Arnd. Refresh some patch description log, and add a new patch to fix
+> 	build warning in ia64.
 > 
-> Fixes: c99e515a92e9 "clk: qcom: Add IPQ806X LPASS clock controller (LCC) driver"
-> Cc: Kenneth Westfield <kwestfie@codeaurora.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/clk/qcom/clk-rcg.c     | 30 ++++++++++++++++++++++++++++++
->  drivers/clk/qcom/clk-rcg.h     |  1 +
->  drivers/clk/qcom/lcc-ipq806x.c |  5 +----
->  3 files changed, 32 insertions(+), 4 deletions(-)
+> This series is based on Bjorn's pci-next branch.
 
-Verified soundcard instantiation on the ipq806x SOC with max98357a codec.
+Hi Yijing,
 
-Tested-by: Kenneth Westfield <kwestfie@codeaurora.org>
+Would you mind rebasing this to v4.0-rc1?  It doesn't apply quite cleanly
+any more.
 
--- 
-Kenneth Westfield
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, 
-a Linux Foundation Collaborative Project
+Thanks,
+  Bjorn
