@@ -1,163 +1,41 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 25 Feb 2015 08:36:24 -0600
-Subject: [PATCH 1/6] phy: miphy365x: Use the generic phy type constants in
- dt-bindings/phy/phy.h
-In-Reply-To: <1424871377-1795-2-git-send-email-peter.griffin@linaro.org>
-References: <1424871377-1795-1-git-send-email-peter.griffin@linaro.org>
- <1424871377-1795-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <CAL_JsqJN2ya-iDDdt63z4u=N73sMz6_N=mqQpTyf7SY7NjrAmA@mail.gmail.com>
+Date: Wed, 25 Feb 2015 08:38:42 -0600
+Subject: [PATCH V5 1/2] mmc: dw_mmc: exynos: Support eMMC's HS400 mode
+In-Reply-To: <1422499318-13726-2-git-send-email-alim.akhtar@samsung.com>
+References: <1422499318-13726-1-git-send-email-alim.akhtar@samsung.com>
+ <1422499318-13726-2-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <CAL_Jsq+Mr=WOoCjWRnHnUqo8+UmqxxHbMG3M8+kLNgfhPASteA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 7:36 AM, Peter Griffin <peter.griffin@linaro.org> wrote:
-> Now there are generic phy type constants declared in phy.h, migrate over to
-> using them rather than defining our own. This change has been done as one
-> atomic commit to be bisectable.
-
-You should note that the values of the defines are not changed. If
-they did, that would be an ABI breakage.
-
+On Wed, Jan 28, 2015 at 8:41 PM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
+> From: Seungwon Jeon <tgih.jun@samsung.com>
 >
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-
-Acked-by: Rob Herring <robh@kernel.org>
-
+> Implements HS400 mode support for exynos host driver.
+> This also include some updates as new mode is added.
+>
+> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> [Alim: addressed review comments]
 > ---
->  Documentation/devicetree/bindings/phy/phy-miphy365x.txt |  8 ++++----
->  arch/arm/boot/dts/stih416.dtsi                          |  4 ++--
->  drivers/phy/phy-miphy365x.c                             | 14 +++++++-------
->  include/dt-bindings/phy/phy-miphy365x.h                 | 14 --------------
->  4 files changed, 13 insertions(+), 27 deletions(-)
->  delete mode 100644 include/dt-bindings/phy/phy-miphy365x.h
+>  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    7 +
+>  drivers/mmc/host/dw_mmc-exynos.c                   |  185 ++++++++++++++++----
+>  drivers/mmc/host/dw_mmc-exynos.h                   |   19 +-
+>  drivers/mmc/host/dw_mmc.c                          |   16 +-
+>  drivers/mmc/host/dw_mmc.h                          |    2 +
+>  5 files changed, 195 insertions(+), 34 deletions(-)
 >
-> diff --git a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> index 9802d5d..8772900 100644
-> --- a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> +++ b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> @@ -20,8 +20,8 @@ Required nodes        :  A sub-node is required for each channel the controller
->  Required properties (port (child) node):
->  - #phy-cells   : Should be 1 (See second example)
->                   Cell after port phandle is device type from:
-> -                       - MIPHY_TYPE_SATA
-> -                       - MIPHY_TYPE_PCI
-> +                       - PHY_TYPE_SATA
-> +                       - PHY_TYPE_PCI
->  - reg          : Address and length of register sets for each device in
->                   "reg-names"
->  - reg-names     : The names of the register addresses corresponding to the
-> @@ -68,10 +68,10 @@ property, containing a phandle to the phy port node and a device type.
->
->  Example:
->
-> -#include <dt-bindings/phy/phy-miphy365x.h>
-> +#include <dt-bindings/phy/phy.h>
->
->         sata0: sata at fe380000 {
->                 ...
-> -               phys      = <&phy_port0 MIPHY_TYPE_SATA>;
-> +               phys      = <&phy_port0 PHY_TYPE_SATA>;
->                 ...
->         };
-> diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-> index ea28eba..eeb7afe 100644
-> --- a/arch/arm/boot/dts/stih416.dtsi
-> +++ b/arch/arm/boot/dts/stih416.dtsi
-> @@ -10,7 +10,7 @@
->  #include "stih416-clock.dtsi"
->  #include "stih416-pinctrl.dtsi"
->
-> -#include <dt-bindings/phy/phy-miphy365x.h>
-> +#include <dt-bindings/phy/phy.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/reset-controller/stih416-resets.h>
->  / {
-> @@ -306,7 +306,7 @@
->                         reg             = <0xfe380000 0x1000>;
->                         interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
->                         interrupt-names = "hostc";
-> -                       phys            = <&phy_port0 MIPHY_TYPE_SATA>;
-> +                       phys            = <&phy_port0 PHY_TYPE_SATA>;
->                         phy-names       = "sata-phy";
->                         resets          = <&powerdown STIH416_SATA0_POWERDOWN>,
->                                           <&softreset STIH416_SATA0_SOFTRESET>;
-> diff --git a/drivers/phy/phy-miphy365x.c b/drivers/phy/phy-miphy365x.c
-> index 6c80154..98bffbc 100644
-> --- a/drivers/phy/phy-miphy365x.c
-> +++ b/drivers/phy/phy-miphy365x.c
-> @@ -25,7 +25,7 @@
->  #include <linux/mfd/syscon.h>
->  #include <linux/regmap.h>
->
-> -#include <dt-bindings/phy/phy-miphy365x.h>
-> +#include <dt-bindings/phy/phy.h>
->
->  #define HFC_TIMEOUT            100
->
-> @@ -176,7 +176,7 @@ static u8 rx_tx_spd[] = {
->  static int miphy365x_set_path(struct miphy365x_phy *miphy_phy,
->                               struct miphy365x_dev *miphy_dev)
->  {
-> -       bool sata = (miphy_phy->type == MIPHY_TYPE_SATA);
-> +       bool sata = (miphy_phy->type == PHY_TYPE_SATA);
->
->         return regmap_update_bits(miphy_dev->regmap,
->                                   miphy_phy->ctrlreg,
-> @@ -430,7 +430,7 @@ static int miphy365x_init(struct phy *phy)
->         }
->
->         /* Initialise Miphy for PCIe or SATA */
-> -       if (miphy_phy->type == MIPHY_TYPE_PCIE)
-> +       if (miphy_phy->type == PHY_TYPE_PCIE)
->                 ret = miphy365x_init_pcie_port(miphy_phy, miphy_dev);
->         else
->                 ret = miphy365x_init_sata_port(miphy_phy, miphy_dev);
-> @@ -454,8 +454,8 @@ int miphy365x_get_addr(struct device *dev, struct miphy365x_phy *miphy_phy,
->                 return ret;
->         }
->
-> -       if (!((!strncmp(name, "sata", 4) && type == MIPHY_TYPE_SATA) ||
-> -             (!strncmp(name, "pcie", 4) && type == MIPHY_TYPE_PCIE)))
-> +       if (!((!strncmp(name, "sata", 4) && type == PHY_TYPE_SATA) ||
-> +             (!strncmp(name, "pcie", 4) && type == PHY_TYPE_PCIE)))
->                 return 0;
->
->         miphy_phy->base = of_iomap(phynode, index);
-> @@ -498,8 +498,8 @@ static struct phy *miphy365x_xlate(struct device *dev,
->
->         miphy_phy->type = args->args[0];
->
-> -       if (!(miphy_phy->type == MIPHY_TYPE_SATA ||
-> -             miphy_phy->type == MIPHY_TYPE_PCIE)) {
-> +       if (!(miphy_phy->type == PHY_TYPE_SATA ||
-> +             miphy_phy->type == PHY_TYPE_PCIE)) {
->                 dev_err(dev, "Unsupported device type: %d\n", miphy_phy->type);
->                 return ERR_PTR(-EINVAL);
->         }
-> diff --git a/include/dt-bindings/phy/phy-miphy365x.h b/include/dt-bindings/phy/phy-miphy365x.h
-> deleted file mode 100644
-> index 8ef8aba..0000000
-> --- a/include/dt-bindings/phy/phy-miphy365x.h
-> +++ /dev/null
-> @@ -1,14 +0,0 @@
-> -/*
-> - * This header provides constants for the phy framework
-> - * based on the STMicroelectronics MiPHY365x.
-> - *
-> - * Author: Lee Jones <lee.jones@linaro.org>
-> - */
-> -#ifndef _DT_BINDINGS_PHY_MIPHY
-> -#define _DT_BINDINGS_PHY_MIPHY
-> -
-> -#define MIPHY_TYPE_SATA                1
-> -#define MIPHY_TYPE_PCIE                2
-> -#define MIPHY_TYPE_USB         3
-> -
-> -#endif /* _DT_BINDINGS_PHY_MIPHY */
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+> index ee4fc05..aad9844 100644
+> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+> @@ -36,6 +36,8 @@ Required Properties:
+>    in transmit mode and CIU clock phase shift value in receive mode for double
+>    data rate mode operation. Refer notes below for the order of the cells and the
+>    valid values.
+> +* samsung,dw-mshc-hs400-timing: Specifies the value of CIU TX and RX clock phase
+> +  shift value for hs400 mode operation.
+
+What are the units?
+
+Rob
