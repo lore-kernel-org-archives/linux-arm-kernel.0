@@ -1,82 +1,25 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 25 Feb 2015 13:55:04 +0000
-Subject: [PATCH v2] arm64: mm: increase VA range of identity map
-In-Reply-To: <CAKv+Gu8hxTtM4v9jZP+dwkW_WMJz9HzmutRVSQg-oPXwDKqZzA@mail.gmail.com>
-References: <1424797703-2804-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150225123814.GC1105@localhost>
- <CAKv+Gu8hxTtM4v9jZP+dwkW_WMJz9HzmutRVSQg-oPXwDKqZzA@mail.gmail.com>
-Message-ID: <CAKv+Gu85HnywTWR5pfjs8Z=X8ZN9OKLNOWT+ske8H5d3G6NEFg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Feb 2015 13:55:12 +0000
+Subject: [PATCH 1/2] arm64: juno: Add APB registers and LEDs using syscon
+In-Reply-To: <1424866589-2988-1-git-send-email-linus.walleij@linaro.org>
+References: <1424866589-2988-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20150225135512.GE12377@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 February 2015 at 13:10, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 25 February 2015 at 12:38, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> On Tue, Feb 24, 2015 at 05:08:23PM +0000, Ard Biesheuvel wrote:
->>> --- a/arch/arm64/kernel/head.S
->>> +++ b/arch/arm64/kernel/head.S
->>> @@ -387,6 +387,28 @@ __create_page_tables:
->>>       mov     x0, x25                         // idmap_pg_dir
->>>       ldr     x3, =KERNEL_START
->>>       add     x3, x3, x28                     // __pa(KERNEL_START)
->>> +
->>> +#ifndef CONFIG_ARM64_VA_BITS_48
->>> +#define EXTRA_SHIFT  (PGDIR_SHIFT + PAGE_SHIFT - 3)
->>> +     /*
->>> +      * If VA_BITS < 48, it may be too small to allow for an ID mapping to be
->>> +      * created that covers system RAM if that is located sufficiently high
->>> +      * in the physical address space. So for the ID map, use an extended
->>> +      * virtual range in that case, by configuring an additional translation
->>> +      * level.
->>> +      */
->>> +     adrp    x5, KERNEL_END
->>> +     clz     x5, x5                  // # of leading 0's in __pa(KERNEL_END)
->>> +     cmp     x5, #TCR_T0SZ(VA_BITS)  // VA_BITS sufficiently large?
->>
->> I think we need some better comment here for people looking at this code
->> again in the future (including myself). So the VA bits needed to cover
->> KERNEL_END are calculated as (64 - clz(__pa(KERNEL_END))). T0SZ is
->> calculated as (64 - VA_BITS) which means that T0SZ is
->> clz(__pa(KERNEL_END)).
->>
->
-> OK.
->
->>> +     b.ge    1f                      // .. then skip additional level
->>> +
->>> +     adrp    x6, idmap_t0sz
->>> +     str     x5, [x6, #:lo12:idmap_t0sz]
->>> +
->>> +     create_table_entry x0, x3, EXTRA_SHIFT, PTRS_PER_PGD, x5, x6
->>
->> EXTRA_SHIFT is correctly calculated (one level more than PGDIR_SHIFT)
->> but I don't think PTRS_PER_PGD is appropriate here. For example, we had
->> in the past 39-bit VA with 64KB pages which made PTRS_PER_PGD pretty
->> small (well, it may cover the 40-bit case you are trying to fix but not
->> up to 48). So maybe define something like:
->>
->> #define EXTRA_PTRS      (1 << (48 - EXTRA_SHIFT))
->>
->
-> My assumption was that, if you are running with fewer translation
-> levels than required to map all 48 bits, it makes little sense to use
-> only half a page or less at the top level, and PTRS_PER_PGD will
-> always cover a full page (which is what we reserve at the root level
-> anyway). But perhaps this is not universally true.
->
+On Wed, Feb 25, 2015 at 12:16:29PM +0000, Linus Walleij wrote:
+> This defines the Juno "APB system registers" as a syscon device,
+> and all the LEDs controlled by the APB system registers right
+> below it using the syscon LEDs driver on top of syscon. Define
+> LED0 for heartbeat, LED1 for MMC0 activity and the following
+> four LEDs indicating CPU activity using the Linux-specific
+> DT bindings for triggers.
+> 
+> This is the pattern and same drivers as used on the legacy
+> platform device trees for the ARM Integrators and the RealView
+> PB1176.
 
-Actually, this assumption is encoded into the patch in another way as
-well: decreasing T0SZ is always assumed to result in an additional
-level of translation to be configured. However, your VA_BITS==39 on
-64k pages case would break this assumption too. So perhaps using
-MAX_VA_BITS instead of the actual size of the PA is the right thing to
-do here after all.
+Stupid question, but where are these LEDs located on the platform? I tried
+enabling this, but all it seemed to do was make hackbench slightly slower :)
 
->> Otherwise the patch looks fine to me. We have to look into fixing KVM as
->> well, ideally with sharing the same idmap with the kernel.
->>
->
-> Yes, but much of that code is shared with ARM as well, so it is not as
-> straight-forward, unfortunately.
->
-> Thanks,
-> Ard.
+Will
