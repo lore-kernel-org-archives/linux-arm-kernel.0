@@ -1,83 +1,32 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 25 Feb 2015 16:08:38 +0200
-Subject: [PATCH 2/2] ARM: shmobile: r8a7794: add GPIO DT support
-In-Reply-To: <54EDD685.1010802@cogentembedded.com>
-References: <6954455.LyoCrfjM8R@wasted.cogentembedded.com>
- <2292882.LbM0mNWfOj@avalon> <54EDD685.1010802@cogentembedded.com>
-Message-ID: <2278267.ajPYsg7oHK@avalon>
+From: grygorii.strashko@linaro.org (grygorii.strashko at linaro.org)
+Date: Wed, 25 Feb 2015 16:13:50 +0200
+Subject: [PATCH] ARM: omap-device: add missed callback for suspend-to-disk
+Message-ID: <1424873630-6054-1-git-send-email-grygorii.strashko@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
 
-On Wednesday 25 February 2015 17:04:53 Sergei Shtylyov wrote:
-> On 2/25/2015 1:11 PM, Laurent Pinchart wrote:
-> >> Describe GPIO[0-6] controllers in the R8A7794 device tree.
-> >> 
-> >> Based on original patch by Hisashi Nakamura
-> >> <hisashi.nakamura.ak@renesas.com>.
-> >> 
-> >> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >> 
-> >> ---
-> >> 
-> >>   arch/arm/boot/dts/r8a7794.dtsi |   84 +++++++++++++++++++++++++++++++++
-> >>   1 file changed, 84 insertions(+)
-> >> 
-> >> Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-> >> ===================================================================
-> >> --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-> >> +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-> >> @@ -50,6 +50,90 @@
-> 
-> [...]
-> 
-> >> +	gpio1: gpio at e6051000 {
-> >> +		compatible = "renesas,gpio-r8a7794", "renesas,gpio-rcar";
-> >> +		reg = <0 0xe6051000 0 0x50>;
-> >> +		interrupts = <0 5 IRQ_TYPE_LEVEL_HIGH>;
-> >> +		#gpio-cells = <2>;
-> >> +		gpio-controller;
-> >> +		gpio-ranges = <&pfc 0 32 32>;
-> > 
-> > This GPIO block has 26 GPIOs only.
-> 
-> [...]
-> 
-> >> +	gpio5: gpio at e6055000 {
-> >> +		compatible = "renesas,gpio-r8a7794", "renesas,gpio-rcar";
-> >> +		reg = <0 0xe6055000 0 0x50>;
-> >> +		interrupts = <0 9 IRQ_TYPE_LEVEL_HIGH>;
-> >> +		#gpio-cells = <2>;
-> >> +		gpio-controller;
-> >> +		gpio-ranges = <&pfc 0 160 32>;
-> > 
-> > This GPIO block has 28 GPIOs only.
-> > 
-> >> +		#interrupt-cells = <2>;
-> >> +		interrupt-controller;
-> >> +		clocks = <&mstp9_clks R8A7794_CLK_GPIO5>;
-> >> +	};
-> >> +
-> >> +	gpio6: gpio at e6055400 {
-> >> +		compatible = "renesas,gpio-r8a7794", "renesas,gpio-rcar";
-> >> +		reg = <0 0xe6055400 0 0x50>;
-> >> +		interrupts = <0 10 IRQ_TYPE_LEVEL_HIGH>;
-> >> +		#gpio-cells = <2>;
-> >> +		gpio-controller;
-> >> +		gpio-ranges = <&pfc 0 192 32>;
-> > 
-> > This GPIO block has 26 GPIOs only.
-> 
-> Yes, I know; I just wasn't sure what to do with the "gpio-ranges" prop of
-> the following GPIO node. Should I keep the base GPIO # or update it as well?
+Add missed callback needed for supporting suspend-to-disk (hibernation) mode.
 
-I think the base number should be kept as-is, as the pfc driver indexes GPIOs 
-using 32 * bank + offset. There are thus holes in the pfc pins array, but that 
-shouldn't be a big deal (of course if you can find an easy way to optimize 
-that, it would be welcome :-)).
+Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+---
+ arch/arm/mach-omap2/omap_device.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index fcd2c9e..345e18e 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -739,6 +739,9 @@ struct dev_pm_domain omap_device_pm_domain = {
+ 		USE_PLATFORM_PM_SLEEP_OPS
+ 		.suspend_noirq = _od_suspend_noirq,
+ 		.resume_noirq = _od_resume_noirq,
++		.freeze_noirq = _od_suspend_noirq,
++		.thaw_noirq = _od_resume_noirq,
++		.restore_noirq = _od_resume_noirq,
+ 	}
+ };
+ 
 -- 
-Regards,
-
-Laurent Pinchart
+1.9.1
