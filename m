@@ -1,55 +1,49 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 25 Feb 2015 17:01:58 +0100
-Subject: [RFC V2 07/12] i2c: axxia: make use of the new infrastructure for
- quirks
-In-Reply-To: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
-References: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1424880126-15047-8-git-send-email-wsa@the-dreams.de>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Wed, 25 Feb 2015 16:02:35 +0000
+Subject: [PATCH 3/6] hw/char/pl011: don't keep setting the IRQ if nothing
+ changed
+In-Reply-To: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
+References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1424880159-29348-4-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+While observing KVM traces I can see additional IRQ calls on pretty much
+every MMIO access which is just plain inefficient. Only update the QEMU
+IRQ level if something has actually changed from last time. Otherwise we
+may be papering over other failure modes.
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
----
- drivers/i2c/busses/i2c-axxia.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
-diff --git a/drivers/i2c/busses/i2c-axxia.c b/drivers/i2c/busses/i2c-axxia.c
-index 768a598d8d03ad..488c5d3bf9dba7 100644
---- a/drivers/i2c/busses/i2c-axxia.c
-+++ b/drivers/i2c/busses/i2c-axxia.c
-@@ -336,11 +336,6 @@ static int axxia_i2c_xfer_msg(struct axxia_i2c_dev *idev, struct i2c_msg *msg)
- 	u32 addr_1, addr_2;
- 	int ret;
- 
--	if (msg->len > 255) {
--		dev_warn(idev->dev, "unsupported length %u\n", msg->len);
--		return -EINVAL;
--	}
--
- 	idev->msg = msg;
- 	idev->msg_xfrd = 0;
- 	idev->msg_err = 0;
-@@ -454,6 +449,11 @@ static const struct i2c_algorithm axxia_i2c_algo = {
- 	.functionality = axxia_i2c_func,
- };
- 
-+static struct i2c_adapter_quirks axxia_i2c_quirks = {
-+	.max_read_len = 255,
-+	.max_write_len = 255,
-+};
+diff --git a/hw/char/pl011.c b/hw/char/pl011.c
+index 0a45115..bb554bc 100644
+--- a/hw/char/pl011.c
++++ b/hw/char/pl011.c
+@@ -36,6 +36,9 @@ typedef struct PL011State {
+     CharDriverState *chr;
+     qemu_irq irq;
+     const unsigned char *id;
 +
- static int axxia_i2c_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
-@@ -511,6 +511,7 @@ static int axxia_i2c_probe(struct platform_device *pdev)
- 	strlcpy(idev->adapter.name, pdev->name, sizeof(idev->adapter.name));
- 	idev->adapter.owner = THIS_MODULE;
- 	idev->adapter.algo = &axxia_i2c_algo;
-+	idev->adapter.quirks = &axxia_i2c_quirks;
- 	idev->adapter.dev.parent = &pdev->dev;
- 	idev->adapter.dev.of_node = pdev->dev.of_node;
++    /* not serialised, prevents pl011_update doing extra set_irqs */
++    uint32_t current_irq;
+ } PL011State;
  
+ #define PL011_INT_TX 0x20
+@@ -53,10 +56,11 @@ static const unsigned char pl011_id_luminary[8] =
+ 
+ static void pl011_update(PL011State *s)
+ {
+-    uint32_t flags;
+-
+-    flags = s->int_level & s->int_enabled;
+-    qemu_set_irq(s->irq, flags != 0);
++    uint32_t flags = s->int_level & s->int_enabled;
++    if (flags != s->current_irq) {
++        s->current_irq = flags;
++        qemu_set_irq(s->irq, s->current_irq != 0);
++    }
+ }
+ 
+ static uint64_t pl011_read(void *opaque, hwaddr offset,
 -- 
-2.1.4
+2.3.0
