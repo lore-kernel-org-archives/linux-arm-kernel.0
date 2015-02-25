@@ -1,42 +1,38 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 25 Feb 2015 14:28:06 +0000
-Subject: [STLinux Kernel] [PATCH v3 7/8] rtc: st: add new driver for ST's
- LPC RTC
-In-Reply-To: <20150225111910.GX8656@n2100.arm.linux.org.uk>
-References: <1424260154-12868-1-git-send-email-lee.jones@linaro.org>
- <1424260154-12868-8-git-send-email-lee.jones@linaro.org>
- <20150223101223.GA14142@griffinp-ThinkPad-X1-Carbon-2nd>
- <20150225111910.GX8656@n2100.arm.linux.org.uk>
-Message-ID: <20150225142806.GA2160@griffinp-ThinkPad-X1-Carbon-2nd>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Wed, 25 Feb 2015 15:29:24 +0100
+Subject: [PATCH] hwmon: (gpio-fan) allow to use alarm support alone from DT
+In-Reply-To: <20150225135015.GA17992@lunn.ch>
+References: <1424696334-14767-1-git-send-email-simon.guinot@sequanux.org>
+ <54EB33D4.1000804@roeck-us.net>
+ <20150223143416.GT1509@kw.sim.vm.gnt> <54EB3C84.30503@roeck-us.net>
+ <20150225111430.GV1509@kw.sim.vm.gnt>
+ <20150225135015.GA17992@lunn.ch>
+Message-ID: <20150225142924.GX1509@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Wed, 25 Feb 2015, Russell King - ARM Linux wrote:
-
-> On Mon, Feb 23, 2015 at 10:12:23AM +0000, Peter Griffin wrote:
-> > I think all the writel IO accessors in this driver can be replaced
-> > with the *_relaxed variant. This will avoid the overhead of taking a
-> > spinlock in the l2 outer cache part of writel.
+On Wed, Feb 25, 2015 at 02:50:15PM +0100, Andrew Lunn wrote:
+> > Handle the GPIO fan alarm feature from the fan controller driver don't
+> > look good either to me. This alarm mechanism is not a part of the fan
+> > controller itself but rather something apart. Also I am afraid that the
+> > result would really look like a hack.
 > 
-> You're really operating on old information.  With much improved L2 cache
-> support code which went in a year or so ago, for the popular L2 cache
-> controllers, we don't take a spinlock anymore - we just write to the
-> register directly.
+> Hi Simon
 > 
-> The spinlock is only present for L2C-220 controllers, which are rare.
-> 
-> Moreover, taking the spinlock is only expensive if you have things like
-> lockdep enabled, otherwise it should be inline and will be fast.
-> 
-> However, using the _relaxed variants where we can get away with weaker
-> ordering of the writes to the device is a good thing nevertheless.  I'm
-> just pointing out that your reasoning above is wrong.
+> It sounds like you need to extract the alarm code from gpio-fan into a
+> little library. Then put a wrapper around it to make a gpio-fan-alarm
+> driver.
 
-Thanks for pointing this out, I wasn't aware until now that the spinlock
-had been removed.
+Hi Andrew,
 
-regards
+Yes, I am working on that. I'll come back with some patches based on
+this approach.
 
-Peter.
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150225/794db90a/attachment.sig>
