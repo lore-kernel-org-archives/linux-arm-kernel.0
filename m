@@ -1,49 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 25 Feb 2015 13:02:34 +0100
-Subject: [PATCH 0/7] New eFuse subsystem
-In-Reply-To: <1424864719-3390-1-git-send-email-ezequiel.garcia@imgtec.com>
-References: <1424864719-3390-1-git-send-email-ezequiel.garcia@imgtec.com>
-Message-ID: <20150225120234.GB5062@lukather>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Wed, 25 Feb 2015 17:39:06 +0530
+Subject: [PATCH 1/2] thermal: exynos: Fix wrong control of power down
+ detection mode for Exynos7
+In-Reply-To: <20150225100330.0ef63a95@amdc2363>
+References: <1424753815-15113-1-git-send-email-cw00.choi@samsung.com>
+ <1424753815-15113-2-git-send-email-cw00.choi@samsung.com>
+ <20150225100330.0ef63a95@amdc2363>
+Message-ID: <CAM4voakf6oeSEdtGtHRzQ-tC6XMbsU+VNtBnqeed8J4btKA3Yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+Hi Lukasz,
 
-On Wed, Feb 25, 2015 at 08:45:12AM -0300, Ezequiel Garcia wrote:
-> This patchset introduces a new driver subsystem, meant to support eFuse
-> (alias OTP, one-time-programmable) devices.
-> 
-> The motivation behind this work is to have a common place for drivers
-> that are currently more or less scattered: the tegra efuses are in
-> drivers/soc/ and the sunxi efuses in drivers/misc/eeprom.
-> 
-> For now, there's no proposal for a generic efuse API. Instead, we simply
-> group the drivers together.
-> 
-> This patchset is the result of the initial submission for IMG Pistachio
-> eFuse support [1]. Our first proposal was to follow the Tegra efuse, and
-> put the Pistachio efuse in drivers/soc. After some discussion we finally
-> agreed [2] to first create an efuse directoy, and then put all efuse drivers
-> in it.
-> 
-> As always, all comments are welcome!
-> 
-> [1] http://www.spinics.net/lists/devicetree/msg59246.html
-> [2] http://www.spinics.net/lists/arm-kernel/msg389325.html
+On Wed, Feb 25, 2015 at 2:33 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
+> Hi Abhilash,
+>
+>> This patch fixes the wrong control of PD_DET_EN (power down detection
+>> mode) for Exynos7 because exynos7_tmu_control() always enables the
+>> power down detection mode regardless 'on' parameter.
+>>
+>> Cc: Zhang Rui <rui.zhang@intel.com>
+>> Cc: Eduardo Valentin <edubezval@gmail.com>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> ---
+>>  drivers/thermal/samsung/exynos_tmu.c | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/thermal/samsung/exynos_tmu.c
+>> b/drivers/thermal/samsung/exynos_tmu.c index 933cd80..a60f527 100644
+>> --- a/drivers/thermal/samsung/exynos_tmu.c
+>> +++ b/drivers/thermal/samsung/exynos_tmu.c
+>> @@ -682,6 +682,7 @@ static void exynos7_tmu_control(struct
+>> platform_device *pdev, bool on)
+>>       if (on) {
+>>               con |= (1 << EXYNOS_TMU_CORE_EN_SHIFT);
+>> +             con |= (1 << EXYNOS7_PD_DET_EN_SHIFT);
+>>               interrupt_en =
+>>                       (of_thermal_is_trip_valid(tz, 7)
+>>                       << EXYNOS7_TMU_INTEN_RISE7_SHIFT) |
+>> @@ -704,9 +705,9 @@ static void exynos7_tmu_control(struct
+>> platform_device *pdev, bool on) interrupt_en <<
+>> EXYNOS_TMU_INTEN_FALL0_SHIFT; } else {
+>>               con &= ~(1 << EXYNOS_TMU_CORE_EN_SHIFT);
+>> +             con &= ~(1 << EXYNOS7_PD_DET_EN_SHIFT);
+>>               interrupt_en = 0; /* Disable all interrupts */
+>>       }
+>> -     con |= 1 << EXYNOS7_PD_DET_EN_SHIFT;
+>>
+>>       writel(interrupt_en, data->base + EXYNOS7_TMU_REG_INTEN);
+>>       writel(con, data->base + EXYNOS_TMU_REG_CONTROL);
+>
+> Could you test this patch if it isn't introducing any regression on your
+> HW?
 
-Have you looked at the EEPROM framework currently in discussions? The
-two seems to be covering pretty much the same use cases.
+The patch does not cause any regression on exynos7 and seems logically correct.
 
-Maxime
+Tested-by: Abhilash Kesavan <a.kesavan@samsung.com>
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150225/ca06db6f/attachment.sig>
+
+Regards,
+Abhilash
+>
+> --
+> Best regards,
+>
+> Lukasz Majewski
+>
+> Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
