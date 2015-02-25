@@ -1,68 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Feb 2015 13:11:40 +0000
-Subject: [PATCH v2] drivers: cpuidle: cpuidle-arm64: include
- asm/proc-fns.h explicitly
-In-Reply-To: <1424869182-19725-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1424869182-19725-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20150225131140.GC12377@arm.com>
+From: James.Hartley@imgtec.com (James Hartley)
+Date: Wed, 25 Feb 2015 13:12:01 +0000
+Subject: [PATCH 0/7] New eFuse subsystem
+In-Reply-To: <54EDC04E.1050107@imgtec.com>
+References: <1424864719-3390-1-git-send-email-ezequiel.garcia@imgtec.com>
+ <20150225120234.GB5062@lukather> <54EDC04E.1050107@imgtec.com>
+Message-ID: <72BC0C8BD7BB6F45988A99382E5FBAE5444505E9@hhmail02.hh.imgtec.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 12:59:42PM +0000, Lorenzo Pieralisi wrote:
-> ARM64 CPUidle driver requires the cpu_do_idle function so that it can
-> be used to enter the shallowest idle state, and it is declared in
-> asm/proc-fns.h.
-> 
-> The current ARM64 CPUidle driver does not include asm/proc-fns.h
-> explicitly and it has so far relied on implicit inclusion from other
-> header files.
-> 
-> Owing to some header dependencies reshuffling this currently triggers
-> build failures when CONFIG_ARM64_64K_PAGES=y:
-> 
-> drivers/cpuidle/cpuidle-arm64.c: In function "arm64_enter_idle_state"
-> drivers/cpuidle/cpuidle-arm64.c:42:3: error: implicit declaration of
-> function "cpu_do_idle" [-Werror=implicit-function-declaration]
->    cpu_do_idle();
->    ^
-> 
-> This patch adds the explicit inclusion of the asm/proc-fns.h header file
-> to fix the build breakage and stop relying on implicit asm/proc-fns.h
-> inclusion.
-> 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> [lp: rewrote commit log]
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Tested-by: Mark Rutland <mark.rutland@arm.com>
-> ---
-> v2 changes:
+Hi Maxime, 
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+> -----Original Message-----
+> From: Ezequiel Garcia
+> Sent: 25 February 2015 12:30
+> To: Maxime Ripard
+> Cc: Thierry Reding; Stephen Warren; Arnd Bergmann; Andrew Bresticker;
+> James Hartley; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org
+> Subject: Re: [PATCH 0/7] New eFuse subsystem
+> 
+> 
+> 
+> On 02/25/2015 09:02 AM, Maxime Ripard wrote:
+> > Hi Ezequiel,
+> >
+> > On Wed, Feb 25, 2015 at 08:45:12AM -0300, Ezequiel Garcia wrote:
+> >> This patchset introduces a new driver subsystem, meant to support
+> >> eFuse (alias OTP, one-time-programmable) devices.
+> >>
+> >> The motivation behind this work is to have a common place for drivers
+> >> that are currently more or less scattered: the tegra efuses are in
+> >> drivers/soc/ and the sunxi efuses in drivers/misc/eeprom.
+> >>
+> >> For now, there's no proposal for a generic efuse API. Instead, we
+> >> simply group the drivers together.
+> >>
+> >> This patchset is the result of the initial submission for IMG
+> >> Pistachio eFuse support [1]. Our first proposal was to follow the
+> >> Tegra efuse, and put the Pistachio efuse in drivers/soc. After some
+> >> discussion we finally agreed [2] to first create an efuse directoy,
+> >> and then put all efuse drivers in it.
+> >>
+> >> As always, all comments are welcome!
+> >>
+> >> [1] http://www.spinics.net/lists/devicetree/msg59246.html
+> >> [2] http://www.spinics.net/lists/arm-kernel/msg389325.html
+> >
+> > Have you looked at the EEPROM framework currently in discussions? The
+> > two seems to be covering pretty much the same use cases.
+> >
 
-Catalin will pick this up for -rc2, I suspect.
+Shouldn't this be a PROM framework if it is going to support both EEPROM and EFUSE/QFPROM, or am I missing something here (since an eFuse is not eraseable)?  
 
-Will
+> 
+> Nope, I was obviously unaware of that. Guess we'll wait until the discussion is
+> settled and use that framework.
+> 
+> Thanks!
+> --
+> Ezequiel
 
-> - Picked up
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325523.html
-> - Rebased against 4.0-rc1 and rewrote commit log
-> 
->  drivers/cpuidle/cpuidle-arm64.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
-> index 39a2c62..c8bb6c5 100644
-> --- a/drivers/cpuidle/cpuidle-arm64.c
-> +++ b/drivers/cpuidle/cpuidle-arm64.c
-> @@ -19,6 +19,7 @@
->  #include <linux/of.h>
->  
->  #include <asm/cpuidle.h>
-> +#include <asm/proc-fns.h>
->  
->  #include "dt_idle_states.h"
->  
-> -- 
-> 2.2.1
-> 
-> 
+Thanks,
+James.
