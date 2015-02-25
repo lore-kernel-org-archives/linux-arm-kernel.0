@@ -1,40 +1,32 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Wed, 25 Feb 2015 19:00:19 +0100
-Subject: [PATCH v2] ARM: Kirkwood: enable GPIO fan alarm support for 2Big
- Network v2
-Message-ID: <1424887219-26652-1-git-send-email-simon.guinot@sequanux.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Feb 2015 18:01:11 +0000
+Subject: [Xen-devel] [PATCH v2 0/3] arm/arm64: Detect Xen support earlier
+In-Reply-To: <1424882440.18290.22.camel@citrix.com>
+References: <1424267513-15836-1-git-send-email-julien.grall@linaro.org>
+ <54EDF6C9.9060504@linaro.org> <20150225163417.GN12377@arm.com>
+ <1424882440.18290.22.camel@citrix.com>
+Message-ID: <20150225180111.GO12377@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the LaCie 2Big Network v2 (net2big_v2) board, the fan alarm is not
-wired to the I2C fan controller but to a separe GPIO. This GPIO can be
-controlled by using the gpio-fan driver.
+On Wed, Feb 25, 2015 at 04:40:40PM +0000, Ian Campbell wrote:
+> On Wed, 2015-02-25 at 16:34 +0000, Will Deacon wrote:
+> > On Wed, Feb 25, 2015 at 04:22:33PM +0000, Julien Grall wrote:
+> > > Hello,
+> > > 
+> > > Ping? Any comments from ARM's maintainers on theses patches (at least #2)?
+> > 
+> > I couldn't care less :)
+> > 
+> > The arm64 part is boring in the good sense of the word.
+> 
+> May Julien take that as an Acked-by? ;-)
 
-This patch adds the gpio-fan alarm description in the net2big_v2 DTS.
+For the two lines under arch/arm64, sure!
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
----
- arch/arm/boot/dts/kirkwood-net2big.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+> Given this is all about Xen really I suppose it makes most sense to take
+> it via the Xen tree.
 
-v2 change:
-- Fix node name according to the ePAPR standard.
+Fine by me.
 
-diff --git a/arch/arm/boot/dts/kirkwood-net2big.dts b/arch/arm/boot/dts/kirkwood-net2big.dts
-index 53dc37a3b687..13a44773b6df 100644
---- a/arch/arm/boot/dts/kirkwood-net2big.dts
-+++ b/arch/arm/boot/dts/kirkwood-net2big.dts
-@@ -27,6 +27,11 @@
- 		device_type = "memory";
- 		reg = <0x00000000 0x10000000>;
- 	};
-+
-+	fan {
-+		compatible = "gpio-fan";
-+		alarm-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
-+	};
- };
- 
- &regulators {
--- 
-2.1.1
+Will
