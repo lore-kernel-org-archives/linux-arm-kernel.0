@@ -1,71 +1,63 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 25 Feb 2015 19:37:37 +0900
-Subject: [PATCH v2] mmc: dw_mmc: rockchip: add support
- MMC_CAP_RUNTIME_RESUME capability
-In-Reply-To: <1424399860-3394-1-git-send-email-addy.ke@rock-chips.com>
-References: <1423812140-24196-1-git-send-email-addy.ke@rock-chips.com>
- <1424399860-3394-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <54EDA5F1.2060203@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 Feb 2015 11:51:57 +0100
+Subject: [PATCH 1/3] arm64: mediatek: Add config option for mt8173.
+In-Reply-To: <1424855242.7845.9.camel@mtksdaap41>
+References: <1422342836-27689-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1422342836-27689-2-git-send-email-hongzhou.yang@mediatek.com>
+ <1424855242.7845.9.camel@mtksdaap41>
+Message-ID: <5948977.qlhSVy9R5i@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Addy.
+On Wednesday 25 February 2015 17:07:22 Yingjoe Chen wrote:
+> On Tue, 2015-01-27 at 15:13 +0800, Hongzhou Yang wrote:
+> > From: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> > 
+> > The upcoming MTK pinctrl driver have a big pin table for each SoC,
+> > and we don't want to bloat the kernel binary if we don't need it.
+> > Add config options so we can build for one SoC only.
+> > 
+> > Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> > ---
+> >  arch/arm64/Kconfig | 6 ++++++
+> >  1 file changed, 6 insertions(+)
+> > 
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index e627ead..6213dac 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -151,9 +151,15 @@ menu "Platform selection"
+> >  config ARCH_MEDIATEK
+> >       bool "Mediatek MT65xx & MT81xx ARMv8 SoC"
+> >       select ARM_GIC
+> > +     select PINCTRL
+> >       help
+> >         Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
+> >  
+> > +config MACH_MT8173
+> > +     bool "Mediatek 8173 Soc Supprt"
+> > +     depends on ARCH_MEDIATEK
+> > +     default y
+> > +
+> >  config ARCH_SEATTLE
+> >       bool "AMD Seattle SoC Family"
+> >       help
+> 
+> Hi Arnd/Matthias,
+> 
+> Any comments on this patch?
 
-Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+Hi Joe,
 
-Thanks!
+Actually I just commented on a similar patch from Samsung the other
+day, and I think we should make a more general decision about these:
 
-Best Regards,
-Jaehoon Chung
+I would rather see only one Kconfig option per SoC family and use
+ARCH_MEDIATEK without any MACH_* options. We can have other options
+for e.g. networking chips from Mediatek that are not closely related
+but I would group all the phone and tablet chips under one option
+here. Same for the other vendors of course.
 
-On 02/20/2015 11:37 AM, Addy Ke wrote:
-> To support HS200 and UHS mode, mmc core will call init_card() to
-> execute tuning:
-> - sdio: init_card can be executed at runtime resume.
-> - sd and mmc: init_card can be executed at resume or runtime resume,
->   which depends on MMC_CAP_RUNTIME_RESUME capability.
-> 
-> On rk3288 SoC, host will get DRTO interrupt when host send command
-> to read tuning data. This will spend more than 111ms:
-> drto_ms = drto_clks * 1000 / bus_hz = 111ms.
-> 
-> And the total tuning time will be more than 400ms.
-> 
-> So we should add MMC_CAP_RUNTIME_RESUME capability to execute tuning
-> at runtime resume. Only if we do so, can we pass resume test.
-> 
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
-> ---
-> Changes in v2:
-> - add this capability for all 4 slots, suggested by Doug Anderson.
-> 
->  drivers/mmc/host/dw_mmc-rockchip.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
-> index e2a726a..dbf166f 100644
-> --- a/drivers/mmc/host/dw_mmc-rockchip.c
-> +++ b/drivers/mmc/host/dw_mmc-rockchip.c
-> @@ -76,12 +76,20 @@ static int dw_mci_rockchip_init(struct dw_mci *host)
->  	return 0;
->  }
->  
-> +/* Common capabilities of RK3288 SoC */
-> +static unsigned long dw_mci_rk3288_dwmmc_caps[4] = {
-> +	MMC_CAP_RUNTIME_RESUME, /* emmc */
-> +	MMC_CAP_RUNTIME_RESUME, /* sdmmc */
-> +	MMC_CAP_RUNTIME_RESUME, /* sdio0 */
-> +	MMC_CAP_RUNTIME_RESUME, /* sdio1 */
-> +};
->  static const struct dw_mci_drv_data rk2928_drv_data = {
->  	.prepare_command        = dw_mci_rockchip_prepare_command,
->  	.init			= dw_mci_rockchip_init,
->  };
->  
->  static const struct dw_mci_drv_data rk3288_drv_data = {
-> +	.caps			= dw_mci_rk3288_dwmmc_caps,
->  	.prepare_command        = dw_mci_rockchip_prepare_command,
->  	.set_ios		= dw_mci_rk3288_set_ios,
->  	.setup_clock    = dw_mci_rk3288_setup_clock,
-> 
+Any other opinions?
+
+	Arnd
