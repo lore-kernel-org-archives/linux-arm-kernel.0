@@ -1,31 +1,34 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 25 Feb 2015 15:54:10 -0700
-Subject: [PATCH 0/2] Add SCM warmboot support for QCOM SoCs
-Message-ID: <1424904852-12719-1-git-send-email-lina.iyer@linaro.org>
+Date: Wed, 25 Feb 2015 15:54:11 -0700
+Subject: [PATCH 1/2] ARM: qcom: Add SCM warmboot flags for quad core targets.
+In-Reply-To: <1424904852-12719-1-git-send-email-lina.iyer@linaro.org>
+References: <1424904852-12719-1-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1424904852-12719-2-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Quad core targets like APQ8074, APQ8064, APQ8084 need SCM support set up
+warm boot addresses in the Secure Monitor. Extend the SCM flags to
+support warmboot addresses for secondary cores.
 
-These patches used to be part of my cpuidle patchset, think these can go in
-independently.
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+---
+ arch/arm/mach-qcom/scm-boot.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-The patches do the following -
-
-1. Add QCOM Secure Monitor specific enumeration for warm boot on qcom targets
-2. Add an API to set up the warmboot address. Consolidate the warm boot flags
-into the implementation file 
-
-Thanks,
-Lina
-
-Lina Iyer (2):
-  ARM: qcom: Add SCM warmboot flags for quad core targets.
-  qcom: scm: Add scm_set_warm_boot_addr function
-
- arch/arm/mach-qcom/scm-boot.c | 38 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-qcom/scm-boot.h |  5 +++--
- 2 files changed, 41 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/mach-qcom/scm-boot.h b/arch/arm/mach-qcom/scm-boot.h
+index 6aabb24..02b445c 100644
+--- a/arch/arm/mach-qcom/scm-boot.h
++++ b/arch/arm/mach-qcom/scm-boot.h
+@@ -18,6 +18,8 @@
+ #define SCM_FLAG_COLDBOOT_CPU3		0x20
+ #define SCM_FLAG_WARMBOOT_CPU0		0x04
+ #define SCM_FLAG_WARMBOOT_CPU1		0x02
++#define SCM_FLAG_WARMBOOT_CPU2		0x10
++#define SCM_FLAG_WARMBOOT_CPU3		0x40
+ 
+ int scm_set_boot_addr(phys_addr_t addr, int flags);
+ 
 -- 
 2.1.0
