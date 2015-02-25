@@ -1,63 +1,40 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 24 Feb 2015 16:21:10 -0800
-Subject: [PATCH] mmc: dw_mmc: rockchip: Add DW_MCI_QUIRK_RETRY_DELAY
-In-Reply-To: <1421171497-9440-1-git-send-email-dianders@chromium.org>
-References: <1421171497-9440-1-git-send-email-dianders@chromium.org>
-Message-ID: <CAD=FV=UVb=XrWG97Qam26RFqkmABJkZHHTKM=wqj3zfQVbssRQ@mail.gmail.com>
+From: mathieu@codeaurora.org (Mathieu Olivari)
+Date: Tue, 24 Feb 2015 16:21:56 -0800
+Subject: [PATCH 2/2] ARM: dts: qcom: add stdout-path to AP148
+In-Reply-To: <1424823716-7504-1-git-send-email-mathieu@codeaurora.org>
+References: <1424823716-7504-1-git-send-email-mathieu@codeaurora.org>
+Message-ID: <1424823716-7504-2-git-send-email-mathieu@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+AP148 default console output is uart4, so this change adds a serial0
+alias to it, as well add the corresponding stdout-path.
 
-On Tue, Jan 13, 2015 at 9:51 AM, Doug Anderson <dianders@chromium.org> wrote:
-> We've seen at least one card that can get confused during all the
-> errors generated during tuning on rk3288.  These errors seem to go
-> away with DW_MCI_QUIRK_RETRY_DELAY.  That quirk is documented to be
-> for 2.11a and on rk3288 I believe we have 2.70a, but it seems to be
-> the same type of problem.
->
-> Specifically it looks like in certain error conditions (I saw this
-> with Response CRC errors) that data keeps showing up in the FIFO even
-> after the error is reported and the CD (command done) bit is set.  If
-> we don't wait for this data to finish transferring then it confuses
-> the next transaction.  In the specific failure case I ran into I found
-> that I could monitor the data_state_mc_busy bit and wait for it to
-> clear, but in other failure cases this bit was stuck at busy when we
-> saw an error.  Hence a generic big delay seems like the only option.
->
-> I have seen this on rk3288, but adding it as a quirk for all Rockchip
-> IP for now since most previous quirks have shown up on older IP as
-> well.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
-> NOTES:
-> * This is based atop Addy's patch (mmc: dw_mmc: add quirk for broken
-> data transfer over scheme) at
-> <https://patchwork.kernel.org/patch/5565431/>, but it would be trivial
-> to apply this patch without that one if that were desirable.
-> * If someone has a better solution to this problem, I'm all ears.
->
->  drivers/mmc/host/dw_mmc-rockchip.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
-> index ba92ebd..b4caf1a 100644
-> --- a/drivers/mmc/host/dw_mmc-rockchip.c
-> +++ b/drivers/mmc/host/dw_mmc-rockchip.c
-> @@ -74,7 +74,8 @@ static int dw_mci_rockchip_init(struct dw_mci *host)
->         host->sdio_id0 = 8;
->
->         /* It needs this quirk on all Rockchip SoCs */
-> -       host->pdata->quirks |= DW_MCI_QUIRK_BROKEN_DTO;
-> +       host->pdata->quirks |= DW_MCI_QUIRK_BROKEN_DTO |
-> +               DW_MCI_QUIRK_RETRY_DELAY;
->
->         return 0;
->  }
+This will avoid having to set these as chosen.
 
-All of my recent testing shows that with all of the other fixes Addy
-and I have posted recently that this one is no longer needed.  I think
-it can be considered Abandoned.
+Signed-off-by: Mathieu Olivari <mathieu@codeaurora.org>
+---
+ arch/arm/boot/dts/qcom-ipq8064-ap148.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
--Doug
+diff --git a/arch/arm/boot/dts/qcom-ipq8064-ap148.dts b/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
+index 55b2910..208bb79 100644
+--- a/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
++++ b/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
+@@ -14,6 +14,14 @@
+ 		};
+ 	};
+ 
++	alias {
++		serial0 = &uart4;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
+ 	soc {
+ 		pinmux at 800000 {
+ 			i2c4_pins: i2c4_pinmux {
+-- 
+1.9.1
