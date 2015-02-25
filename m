@@ -1,37 +1,72 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 25 Feb 2015 11:26:50 +0000
-Subject: [PATCH] ARM: fix exynos randconfig build error
-Message-ID: <E1YQa78-0000O0-A4@rmk-PC.arm.linux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 25 Feb 2015 11:27:58 +0000
+Subject: [PATCH] drivers: cpuidle: Explictly include proc-fns.h for
+ cpuidle-arm64
+In-Reply-To: <20150225111828.GA9714@leverpostej>
+References: <1424827506-12245-1-git-send-email-lauraa@codeaurora.org>
+ <20150225111828.GA9714@leverpostej>
+Message-ID: <20150225112758.GB20214@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following error was observed with SMP=n in v4.0-rc1:
+On Wed, Feb 25, 2015 at 11:18:29AM +0000, Mark Rutland wrote:
 
-arch/arm/mach-exynos/pm.c: In function 'exynos_cpu0_enter_aftr':
-arch/arm/mach-exynos/pm.c:246:4: error: implicit declaration of function 'arch_send_wakeup_ipi_mask' [-Werror=implicit-function-declaration]
+[...]
 
-As the code unconditionally calls a function only available with SMP=y,
-make the Exynos PM support depend on SMP.
+> >  drivers/cpuidle/cpuidle-arm64.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
+> > index 80704b9..f1d5422 100644
+> > --- a/drivers/cpuidle/cpuidle-arm64.c
+> > +++ b/drivers/cpuidle/cpuidle-arm64.c
+> > @@ -19,6 +19,7 @@
+> >  #include <linux/of.h>
+> >  
+> >  #include <asm/cpuidle.h>
+> > +#include <asm/proc-fns.h>
+> >  #include <asm/suspend.h>
+> 
+> I wasn't able to apply this patch atop of v4.0-rc1 or current mainline;
+> there's no asm/suspend.h include in either of those. Which tree is this
+> based on?
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Yes, it does not apply to mainline, either we fix that up or here is
+the version I was sending on top of mainline.
+
+Thanks,
+Lorenzo
+
+-- >8 --
+Subject: [PATCH] drivers: cpuidle: cpuidle-arm64: include asm/proc-fns.h
+ explicitly
+
+ARM64 CPUidle driver requires the cpu_do_idle function so that it can
+be used to enter the shallowest idle state, and it is declared in
+asm/proc-fns.h.
+
+This patch adds the explicit inclusion of the asm/proc-fns.h header file
+to stop relying on implicit inclusion of the same file through implicit
+header files dependencies.
+
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+[lp: rebased/rewrote commit log]
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
-Alternatively, the code needs fixing not to call this function on non-SMP
-platforms.
-
- arch/arm/mach-exynos/Kconfig | 1 +
+ drivers/cpuidle/cpuidle-arm64.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 603820e5aba7..55a1ada28350 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -131,6 +131,7 @@ config EXYNOS5420_MCPM
+diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
+index 39a2c62..c8bb6c5 100644
+--- a/drivers/cpuidle/cpuidle-arm64.c
++++ b/drivers/cpuidle/cpuidle-arm64.c
+@@ -19,6 +19,7 @@
+ #include <linux/of.h>
  
- config EXYNOS_CPU_SUSPEND
- 	bool
-+	depends on SMP
- 	select ARM_CPU_SUSPEND
- 	default PM_SLEEP || ARM_EXYNOS_CPUIDLE
+ #include <asm/cpuidle.h>
++#include <asm/proc-fns.h>
+ 
+ #include "dt_idle_states.h"
  
 -- 
-1.8.3.1
+2.2.1
