@@ -1,20 +1,46 @@
-From: viro@ZenIV.linux.org.uk (Al Viro)
-Date: Wed, 25 Feb 2015 21:45:00 +0000
-Subject: build warning on v4.0-rc1
-In-Reply-To: <20150225175143.GE11136@saruman.tx.rr.com>
-References: <20150225175143.GE11136@saruman.tx.rr.com>
-Message-ID: <20150225214500.GM29656@ZenIV.linux.org.uk>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Wed, 25 Feb 2015 22:57:58 +0100
+Subject: [PATCH 0/4] Armada 38x and 370 audio
+In-Reply-To: <y>
+References: <y>
+Message-ID: <1424901482-3809-1-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 11:51:43AM -0600, Felipe Balbi wrote:
-> Hi Al,
-> 
-> commit 3b994d98a815d934ab6a77a380882865982c14f9 (get rid of the second
-> argument of acct_kill()) added a new build warning when building
-> kernel/acct.c. Warning can be seen below. Revert of that commit is
-> non-trivial, so I haven't tried to check if reverting it fixes the
-> warning.
+Hi,
 
-Warning is a false positive; we really do not care about the return
-value here.
+I send a series of patches adding I2S - S/PDIF support for Marvell Armada 38x
+SoC. It is same controller as in Armada 370, however two quirks had to be taken
+into consideration:
+
+* new PLL frequency setting
+
+* exceptive pinout of I2S and S/PDIF formats
+
+Kirkwood-i2s driver was enhanced with obtaining mem resources by name. Sound
+interface was enabled for Armada 385 DB board, using simple-card DT binding for
+both I2S and S/PDIF. In addition to that minor fix was applied for Armada 370
+audio DT description (stable-CC'ed).
+
+Any comments and remarks are welcome.
+
+Best regards,
+Marcin
+
+Marcin Wojtas (4):
+  ASoC: kirkwood: enable Kirkwood driver for Armada 38x platforms
+  ARM: mvebu: add audio I2S controller to Armada 38x Device Tree
+  ARM: mvebu: add audio support to Armada 385 DB
+  ARM: mvebu: fix routing for analog audio input of Armada 370 DB
+    platform
+
+ .../devicetree/bindings/sound/mvebu-audio.txt      |  14 ++-
+ arch/arm/boot/dts/armada-370-db.dts                |   2 +-
+ arch/arm/boot/dts/armada-388-db.dts                |  69 +++++++++++
+ arch/arm/boot/dts/armada-38x.dtsi                  |  17 +++
+ sound/soc/kirkwood/kirkwood-i2s.c                  | 132 ++++++++++++++++++++-
+ sound/soc/kirkwood/kirkwood.h                      |   2 +
+ 6 files changed, 232 insertions(+), 4 deletions(-)
+
+-- 
+1.8.3.1
