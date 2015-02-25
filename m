@@ -1,59 +1,177 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Feb 2015 14:18:46 +0000
-Subject: [PATCH] ARM: dma-mapping: support non-consistent DMA attribute
-In-Reply-To: <CAD8Lp46KOQZMJqiqudE_0nvpaHgYxpD0qCeM2r8ZOgfzJUo6dA@mail.gmail.com>
-References: <1424810703-20382-1-git-send-email-drake@endlessm.com>
- <16874142.jSTJ8OZePS@wuerfel>
- <CAD8Lp46KOQZMJqiqudE_0nvpaHgYxpD0qCeM2r8ZOgfzJUo6dA@mail.gmail.com>
-Message-ID: <20150225141846.GZ8656@n2100.arm.linux.org.uk>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 25 Feb 2015 15:21:33 +0100
+Subject: [PATCH] ARM64: Add new Xilinx ZynqMP SoC
+In-Reply-To: <20150224183831.GZ9714@leverpostej>
+References: <8ac3037c175711dec0adcd0d898be7d9722e0ed0.1424764548.git.michal.simek@xilinx.com>
+ <20150224183831.GZ9714@leverpostej>
+Message-ID: <BY2FFO11FD04863C0B4C8C0A6C8EBA183E2170@BY2FFO11FD048.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 07:58:00AM -0600, Daniel Drake wrote:
-> UMP's not going upstream, but I was wondering if this patch had any
-> value in the more general case. Thinking more, perhaps not, at least
-> until dma-buf grows some form of userspace cache control API.
+Hi Mark,
 
-Which I would oppose.
+On 02/24/2015 07:38 PM, Mark Rutland wrote:
+> Hi Michal,
+> 
+> I have a few minor comments below, but generally this is looking like
+> one of the best dts submissions I've seen!
 
-The DMA API itself provides a very simple model:
+thanks appreciate it.
 
- sg = cpu owned buffer(s)
- /* cpu owns sg buffers and can read/write it */
- dma_addr = dma_map_sg(dev, sg, ...);
- /* dev owns sg buffers, it is invalid for the CPU to write to the buffer
-  * CPU writes to the buffer may very well be lost */
- dma_sync_sg_for_cpu(dev, sg, ...);
- /* cpu owns sg buffers, CPU can read/write buffer */
- dma_sync_sg_for_device(dev, sg, ...);
- /* dev owns sg buffers, it is invalid for the CPU to write to the buffer
-  * CPU writes to the buffer may very well be lost */
- dma_unmap_sg(dev, sg, ...);
- /* cpu owns sg buffers again */
+> 
+> [...]
+> 
+>> +/ {
+>> +       model = "ZynqMP EP108";
+>> +
+>> +       aliases {
+>> +               serial0 = &uart0;
+>> +       };
+>> +
+>> +       chosen {
+>> +               stdout-path = "serial0:115200n8";
+>> +       };
+> 
+> Thanks for using stdout-path with the full parameters.
+> 
+> Does your UART have earlycon support?
 
-If we're wanting to do something like this in userspace, there's too much
-chance userspace will get this ownership business wrong (we know this,
-userspace programmers basically suck - they abuse anything we give them.)
+yes earlycon support is already in the kernel.
 
-It's far better to have a proper infrastructure present for things like
-GPUs.  The good news is that we have such an infrastructure.  It's called
-DRM, and with DRM, we track things like buffers associated with the GPU,
-and we know which buffers the GPU should be accessing, and when the GPU
-has finished with them.
+btw: I found that only stdout-path has different behavior
+compare to console=ttyPS0,115200 passed via bootargs.
+But I have to look at details to be accurate.
 
-There are even implementations on x86 which (such as the Intel drivers)
-which track which domain each buffer is in, whether it's in the GPUs
-domain or the CPUs domain, and the buffer has to be in the correct domain
-for it to be operated upon.
 
-So, we already have everything necessary.
+>> +/ {
+>> +       compatible = "xlnx,zynqmp";
+>> +       #address-cells = <2>;
+>> +       #size-cells = <1>;
+> 
+> I guess this is fine, though to me it feels more natural to use
+> #size-cells = <2> in case we need to describe larger ranges for some bus
+> later.
 
-Except for MALI, we don't, because of course we're better off having a
-closed source, inherently insecure GPU driver which needs loads of crap
-exported to userspace to work efficiently.  No, sorry, we're not going
-to make this easy by providing interfaces for userspace to crap on:
-GPU drivers need to be implemented properly.
+I can fix it when it is needed.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> 
+>> +       cpus {
+>> +               #address-cells = <1>;
+>> +               #size-cells = <0>;
+>> +
+>> +               cpu at 0 {
+>> +                       compatible = "arm,cortex-a53", "arm,armv8";
+>> +                       device_type = "cpu";
+>> +                       enable-method = "psci";
+>> +                       reg = <0x0>;
+>> +               };
+>> +
+>> +               cpu at 1 {
+>> +                       compatible = "arm,cortex-a53", "arm,armv8";
+>> +                       device_type = "cpu";
+>> +                       enable-method = "psci";
+>> +                       reg = <0x1>;
+>> +               };
+>> +
+>> +               cpu at 2 {
+>> +                       compatible = "arm,cortex-a53", "arm,armv8";
+>> +                       device_type = "cpu";
+>> +                       enable-method = "psci";
+>> +                       reg = <0x2>;
+>> +               };
+>> +
+>> +               cpu at 3 {
+>> +                       compatible = "arm,cortex-a53", "arm,armv8";
+>> +                       device_type = "cpu";
+>> +                       enable-method = "psci";
+>> +                       reg = <0x3>;
+>> +               };
+>> +       };
+> 
+> These look fine.
+
+good
+
+
+>> +
+>> +       psci {
+>> +               compatible = "arm,psci-0.2";
+>> +               method = "smc";
+>> +       };
+> 
+> Neat!
+> 
+> What are you using as your implementation? Are all the mandatory
+> PSCIv0.2 features implemented (e.g. MIGRATE_INFO_TYPE)?
+
+ATF.
+
+> 
+> I take it this boots at EL2 on all CPUs?
+
+yep.
+
+> 
+> Does CPU0 hotplug work?
+
+cpu shutdown is working fine with the current firmware.
+I didn't try anything else.
+
+> 
+> Do you need to keep a CPU online or do you require MIGRATE? e.g. does
+> MIGRATE_INFO_TYPE return something other than 2 ("MP or not present")?
+
+We are not require migrate and we don't need to keep CPU online now.
+Migrate should return -1.
+
+> 
+> [...]
+> 
+>> +       amba_apu {
+>> +               compatible = "simple-bus";
+>> +               #address-cells = <2>;
+>> +               #size-cells = <1>;
+>> +               ranges;
+>> +
+>> +               timer {
+>> +                       compatible = "arm,armv8-timer";
+>> +                       interrupt-parent = <&gic>;
+>> +                       interrupts = <1 13 0xff01>,
+>> +                                    <1 14 0xff01>,
+>> +                                    <1 11 0xff01>,
+>> +                                    <1 10 0xff01>;
+>> +               };
+> 
+> The architected timer should just be under the root node, given it's a
+> component of the CPU -- it doesn't live on any bus.
+
+Fair enough - will add it there.
+
+> 
+> I take it CNTFRQ is configured appropriately on all CPUs?
+
+I believe so. :-)
+
+
+> [...]
+> 
+>> +               i2c_clk: i2c_clk {
+>> +                       compatible = "fixed-clock";
+>> +                       #clock-cells = <0x0>;
+>> +                       clock-frequency = <111111111>;
+>> +               };
+> 
+> That clock-frequency looks a little odd. Is that right?
+
+why is it odd? Is value too high?
+It is exactly what we need to get to get i2c working.
+
+> 
+> I haven't taken an in-depth look at the other nodes. They look sane at a
+> high-level, and assuming they are all already documented and supported
+> they look fine to me.
+
+I was checking that and hopefully I didn't miss anything.
+
+Thanks,
+Michal
