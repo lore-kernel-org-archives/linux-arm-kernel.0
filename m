@@ -1,56 +1,48 @@
-From: linux-arm@myspectrum.nl (Jeroen Hofstee)
-Date: Wed, 25 Feb 2015 20:36:51 +0100
-Subject: [RESEND][PATCH] ARM errata, 430973: update the affected revisions
-In-Reply-To: <1418131842-6752-1-git-send-email-jhofstee@victronenergy.com>
-References: <1418131842-6752-1-git-send-email-jhofstee@victronenergy.com>
-Message-ID: <54EE2453.9080301@myspectrum.nl>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 25 Feb 2015 21:44:32 +0200
+Subject: [PATCHv3 04/35] ARM: OMAP3+: PRM: add common APIs for
+ prm_vp_check/clear_txdone
+In-Reply-To: <20150225190930.GN11136@saruman.tx.rr.com>
+References: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
+ <1424891085-10392-5-git-send-email-t-kristo@ti.com>
+ <20150225190930.GN11136@saruman.tx.rr.com>
+Message-ID: <54EE2620.8080106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 09-12-14 14:30, Jeroen Hofstee wrote:
-> From: Jeroen Hofstee <linux-arm@myspectrum.nl>
+On 02/25/2015 09:09 PM, Felipe Balbi wrote:
+> Hi,
 >
-> Update the list of revisions subject to this errata.
+> On Wed, Feb 25, 2015 at 09:04:14PM +0200, Tero Kristo wrote:
+>> diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+>> index 2c2e7ed..79cee11 100644
+>> --- a/arch/arm/mach-omap2/prm_common.c
+>> +++ b/arch/arm/mach-omap2/prm_common.c
+>> @@ -555,6 +555,40 @@ int omap_prm_clear_mod_irqs(s16 module, u8 regs, u32 wkst_mask)
+>>   }
+>>
+>>   /**
+>> + * omap_prm_vp_check_txdone - check voltage processor TX done status
+>> + *
+>> + * Checks if voltage processor transmission has been completed.
+>> + * Returns non-zero if a transmission has completed, 0 otherwise.
+>> + */
+>> +u32 omap_prm_vp_check_txdone(u8 vp_id)
+>> +{
+>> +	if (!prm_ll_data->vp_check_txdone) {
+>> +		WARN_ONCE(1, "prm: %s: no mapping function defined\n",
+>> +			  __func__);
 >
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Andreas Bie?mann <andreas.devel@googlemail.com>
-> Signed-off-by: Jeroen Hofstee <jhofstee@victronenergy.com>
-> ---
-> I don't have access to the AT400/AT401/AT490 document, but
-> Andreas was kind enough to provide this information, see
-> https://www.mail-archive.com/u-boot at lists.denx.de/msg156620.html
+> same here:
 >
-> Resending from an address which is subscribed to the ML...
-> ---
->   arch/arm/Kconfig | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+> 	if (WARN_ONCE(!prm_ll_data->vp_check_txdone,
+> 		"prm: %s: no mapping function defined\n", __func__))
 >
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 89c4b5c..a2202fa 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1063,7 +1063,7 @@ config ARM_ERRATA_430973
->   	depends on CPU_V7
->   	help
->   	  This option enables the workaround for the 430973 Cortex-A8
-> -	  (r1p0..r1p2) erratum. If a code sequence containing an ARM/Thumb
-> +	  (r1p0..r1p3, r1p7) erratum. If a code sequence containing an ARM/Thumb
->   	  interworking branch is replaced with another code sequence at the
->   	  same virtual address, whether due to self-modifying code or virtual
->   	  to physical address re-mapping, Cortex-A8 does not recover from the
+> same for all others below
+>
 
-It seems this is not applied yet. For completeness, this only updates 
-the description
-of the workaround, so should be safe to apply. At the moment people 
-might disable
-this workaround (since the description says its not applicable) even if 
-the cpu does
-need this workaround.
+Similar convention (the one I used) is already used all over the place 
+in the same file, would probably be better to convert them all at the 
+same time if needed.
 
-Please consider applying this,
-
-Regards,
-Jeroen
+-Tero
