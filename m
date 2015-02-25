@@ -1,57 +1,48 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Wed, 25 Feb 2015 10:03:30 +0100
-Subject: [PATCH 1/2] thermal: exynos: Fix wrong control of power down
- detection mode for Exynos7
-In-Reply-To: <1424753815-15113-2-git-send-email-cw00.choi@samsung.com>
-References: <1424753815-15113-1-git-send-email-cw00.choi@samsung.com>
- <1424753815-15113-2-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20150225100330.0ef63a95@amdc2363>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Wed, 25 Feb 2015 17:07:22 +0800
+Subject: [PATCH 1/3] arm64: mediatek: Add config option for mt8173.
+In-Reply-To: <1422342836-27689-2-git-send-email-hongzhou.yang@mediatek.com>
+References: <1422342836-27689-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1422342836-27689-2-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <1424855242.7845.9.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abhilash,
-
-> This patch fixes the wrong control of PD_DET_EN (power down detection
-> mode) for Exynos7 because exynos7_tmu_control() always enables the
-> power down detection mode regardless 'on' parameter.
+On Tue, 2015-01-27 at 15:13 +0800, Hongzhou Yang wrote:
+> From: Hongzhou Yang <hongzhou.yang@mediatek.com>
 > 
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: Eduardo Valentin <edubezval@gmail.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> The upcoming MTK pinctrl driver have a big pin table for each SoC,
+> and we don't want to bloat the kernel binary if we don't need it.
+> Add config options so we can build for one SoC only.
+> 
+> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
 > ---
->  drivers/thermal/samsung/exynos_tmu.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>  arch/arm64/Kconfig | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/drivers/thermal/samsung/exynos_tmu.c
-> b/drivers/thermal/samsung/exynos_tmu.c index 933cd80..a60f527 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.c
-> +++ b/drivers/thermal/samsung/exynos_tmu.c
-> @@ -682,6 +682,7 @@ static void exynos7_tmu_control(struct
-> platform_device *pdev, bool on) 
->  	if (on) {
->  		con |= (1 << EXYNOS_TMU_CORE_EN_SHIFT);
-> +		con |= (1 << EXYNOS7_PD_DET_EN_SHIFT);
->  		interrupt_en =
->  			(of_thermal_is_trip_valid(tz, 7)
->  			<< EXYNOS7_TMU_INTEN_RISE7_SHIFT) |
-> @@ -704,9 +705,9 @@ static void exynos7_tmu_control(struct
-> platform_device *pdev, bool on) interrupt_en <<
-> EXYNOS_TMU_INTEN_FALL0_SHIFT; } else {
->  		con &= ~(1 << EXYNOS_TMU_CORE_EN_SHIFT);
-> +		con &= ~(1 << EXYNOS7_PD_DET_EN_SHIFT);
->  		interrupt_en = 0; /* Disable all interrupts */
->  	}
-> -	con |= 1 << EXYNOS7_PD_DET_EN_SHIFT;
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index e627ead..6213dac 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -151,9 +151,15 @@ menu "Platform selection"
+>  config ARCH_MEDIATEK
+>  	bool "Mediatek MT65xx & MT81xx ARMv8 SoC"
+>  	select ARM_GIC
+> +	select PINCTRL
+>  	help
+>  	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
 >  
->  	writel(interrupt_en, data->base + EXYNOS7_TMU_REG_INTEN);
->  	writel(con, data->base + EXYNOS_TMU_REG_CONTROL);
+> +config MACH_MT8173
+> +	bool "Mediatek 8173 Soc Supprt"
+> +	depends on ARCH_MEDIATEK
+> +	default y
+> +
+>  config ARCH_SEATTLE
+>  	bool "AMD Seattle SoC Family"
+>  	help
 
-Could you test this patch if it isn't introducing any regression on your
-HW?
+Hi Arnd/Matthias,
 
--- 
-Best regards,
+Any comments on this patch?
 
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Joe.C
