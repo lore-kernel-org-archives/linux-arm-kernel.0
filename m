@@ -1,189 +1,87 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 24 Feb 2015 17:30:49 -0800
-Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
-In-Reply-To: <20150224092155.GO25269@lukather>
-References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
- <CAL_Jsq+SeuoojgTpv1y_aPJ_jzDr3HqZhYEBQ3_vYGBHvcccug@mail.gmail.com>
- <54E78A31.9020306@linaro.org>
- <CAL_Jsq+mvpRjYfL_8OseTDCB-6aBhwhNKLBQXXJeVQLDwWm8Nw@mail.gmail.com>
- <20150222143211.GX25269@lukather>
- <CAL_JsqLqqw5DyUqCaOTSKPwF-Ms5EU4f_OPoW9YVpMCo8A_bbw@mail.gmail.com>
- <54EBB3AC.30000@codeaurora.org> <20150224092155.GO25269@lukather>
-Message-ID: <20150225013049.GJ24928@codeaurora.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 24 Feb 2015 19:53:17 -0600
+Subject: [PATCH v6 6/7] PCI: update dma configuration from DT
+In-Reply-To: <1423173179-10227-7-git-send-email-m-karicheri2@ti.com>
+References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
+ <1423173179-10227-7-git-send-email-m-karicheri2@ti.com>
+Message-ID: <20150225015317.GO6220@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24, Maxime Ripard wrote:
-> On Mon, Feb 23, 2015 at 03:11:40PM -0800, Stephen Boyd wrote:
-> > >>> I would do something more simple that is just a list of keys and
-> > >>> their location like this:
-> > >>>
-> > >>> device-serial-number = <start size>;
-> > >>> key1 = <start size>;
-> > >>> key2 = <start size>;
-> > >> I'm sorry, but what's the difference?
-> > > It can describe the layout completely whether the fields are tied to a
-> > > h/w device or not.
-> > >
-> > > What I would like to see here is the entire layout described covering
-> > > both types of fields.
-> > >
-> > 
-> > I was thinking the DT might be like this on the provider side:
-> > 
-> >    qfprom at 1000000 {
-> >       reg = <0x1000000 0x1000>;
-> >       ranges = <0 0x1000000 0x1000>;
-> >       compatible = "qcom,qfprom-msm8960"
-> > 
-> >       pvs-data: pvs-data at 40 {
-> >             compatible = "qcom,pvs-a";
-> >             reg = <0x40 0x20>,
-> > 	    #eeprom-cells = <0>;
-> >       };
-> > 
-> >        tsens-data: tmdata at 10 {
-> >             compatible = "qcom,tsens-data-msm8960";
-> >             reg = <0x10 4>, <0x16 4>;
-> > 	    #eeprom-cells = <0>;
-> > 
-> >       };
-> > 
-> >       serial-number: serial at 50 {
-> >             compatible = "qcom,serial-msm8960";
-> >             reg = <0x50 4>, <0x60 4>;
-> > 	    #eeprom-cells = <0>;
-> > 
-> >       };
-> >    };
-> 
-> I'm not sure the compatible is really needed.
-> 
-> A label of some sort, just like the MTD partitions do would do just
-> fine, and wouldn't have the implicit expectation that a driver will be
-> probed from that node.
+On Thu, Feb 05, 2015 at 04:52:58PM -0500, Murali Karicheri wrote:
+> If there is a DT node available for the root bridge's parent device,
+> use the dma configuration from that device node. For example, keystone
+> PCI devices would require dma_pfn_offset to be set correctly in the
+> device structure of the pci device in order to have the correct dma mask.
+> The DT node will have dma-ranges defined for this. Also support using
+> the DT property dma-coherent to allow coherent DMA operation by the
+> PCI device.
 
-I wasn't aware that compatible meant driver probe. I thought
-compatible just meant some software entity can understand what
-I've described within this node. For example, compatible for
-reserved-memory nodes doesn't mean we're going to probe a device.
+Hi Murali,
 
-> 
-> > and then on the consumer side:
-> > 
-> > 	device {
-> > 		eeproms = <&serial-number>;
-> > 		eeprom-names = "soc-rev-id";
-> > 	};
-> > 
-> > 
-> > This would solve a problem where the consumer device is some standard
-> > off-the-shelf IP block that needs to get some SoC specific calibration
-> > data from the eeprom. I may want to interpret the bits differently
-> > depending on which eeprom is connected to my SoC. Sometimes that data
-> > format may be the same across many variations of the SoC (e.g. the
-> > qcom,pvs-a node) or it may be completely different for a given SoC (e.g.
-> > qcom,serial-msm8960 node). I imagine for other SoCs out there it could
-> > be different depending on which eeprom the board manufacturer decides to
-> > wire onto their board and how they choose to program the data.
-> 
-> Oh, so you'd like to infer the data format it's stored in from the
-> compatible?
-> 
-> AFAICT, this format will be highly depending on the board itself,
-> rather than on the SoC, do you think it will scale enough?
-> 
-> > So this is where I think the eeprom-cells and offset + length starts to
-> > fall apart. It forces us to make up a bunch of different compatible
-> > strings for our consumer device just so that we can parse the eeprom
-> > that we decided to use for some SoC/board specific data. Instead I'd
-> > like to see some framework that expresses exactly which eeprom is on my
-> > board and how to interpret the bits in a way that doesn't require me to
-> > keep refining the compatible string for my generic IP block.
-> 
-> Hmmmm, apparently you don't :)
-> 
-> > I worry that if we put all those details in DT we'll end up having to
-> > describe individual bits like serial-number-bit-2, serial-number-bit-3,
-> > etc. because sometimes these pieces of data are scattered all around the
-> > eeprom and aren't contiguous or aligned on a byte boundary. It may be
-> > easier to just have a way to express that this is an eeprom with this
-> > specific layout and my device has data stored in there. Then the driver
-> > can be told what layout it is (via compatible or some other string based
-> > means if we're not using DT?) and match that up with some driver data if
-> > it needs to know how to understand the bits it can read with the
-> > eeprom_read() API.
-> 
-> I'm half convinced that the layout information will actually work for
-> more complex cases, like the linked list Rob described.
-> 
-> If such a structure is ever to be found, it would feel wrong to have
-> that in the EEPROM driver, but it would feel just as wrong to put that
-> in the client driver, that would have to handle the parsing of raw
-> data coming flashed by one single crazy board vendor.
-> 
-> Maybe we can have each cell carry a property that defines the format
-> it's stored in, and match that to some parsers plugins, starting with
-> the generic and trivial cases but still allowing for custom parsers to
-> be defined?
-> 
-> Something like
-> 
-> eeprom at 42 {
-> 	compatible = "atmel,at24something";
-> 	reg = <0x42>;
-> 
-> 	serial at 0 {
-> 		label = "board serial";
-> 		reg = <0x0 0x10>;
-> 		format = "packed";
-> 	};
-> 
-> 	opps at 10 {
-> 		label = "board serial";
-> 		reg = <0x10 0x10>, <0x40 0x10>, <0x80 0x10>;
-> 		format = "random-vendor,opp-linked-list";
-> 	};
-> };
-> 
-> That would make eeprom_read always return the same format of data to
-> the client drivers, without cripling the generic EEPROM drivers
-> either.
-> 
+I'm guessing this is the patch that actually fixes things for Keystone.
 
-Is the goal here to make eeprom_read() figure out how to return
-the next byte of data and hide the parsing logic behind the
-eeprom APIs? I imagine "random-vendor,opp-linked-list" would be
-handled by the eeprom driver and that would return OPPs byte by
-byte across the different reg properties to the eeprom consumer?
+And it looks like it should also fix things for other hardware that has
+similar characteristics.  So I'd like to include some higher-level text
+about that here.  For example:
 
-This approach concerns me because every eeprom_read() call needs
-to fit the format that the client driver is expecting. How do we
-validate that? What do we do if we have a random OPP client #1
-that expects to get the data from eeprom_read() with OPPs in
-ascending order and random OPP client #2 that expects to get the
-data from eeprom_read() with OPPs in descending order?
+  This fixes DMA on systems where DMA addresses are a constant offset
+  from CPU physical addresses.
 
-It feels like we're making the eeprom framework too smart without
-a well defined abstraction. If we were to make it so that
-eeprom_get_opps() knew what to do and parsed/populated the OPPs,
-it might work. But if we're just exporting raw data across a
-read/write API with some implementation specific mangling it
-sounds like it's going to get messy fast. And if the API is well
-defined, it would start to become rather large with many
-different types of data that need to be parsed and sometimes data
-that's only specific to a single SoC.
+(I don't know exactly how these patches all fit together, so that's
+probably not accurate, but that's the *sort* of thing I'd like to include.)
 
-I wonder how much we could get away with this approach though. If
-the eeprom driver probed and populated OPPs, made a serial number
-available via the soc device, and then we made up framework(s)
-for things like our thermal sensor calibration data and display
-panel calibration data, I would guess that covers most of my
-use-cases. The client drivers would need some sort of 'wait for
-eeprom to populate things' API or we'd need to work that into the
-new calibration framework.
+If that actually *is* what's going on, I have to wonder why this isn't
+implemented as a very simple IOMMU instead of adding dma_pfn_offset,
+which is present on all arches but only used on ARM.  In some sense that
+offset is parallel but incompatible with an IOMMU: they both translate DMA
+addresses into system RAM addresses.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I know you're not adding this, and I assume somebody explored that option
+and rejected it for good reasons.  I just missed that discussion.
+
+> This patch use the new helper function of_pci_dma_configure() to update
+> the device dma configuration.
+> 
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> 
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>  drivers/pci/probe.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 23212f8..d7dcd6c 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -6,6 +6,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/init.h>
+>  #include <linux/pci.h>
+> +#include <linux/of_pci.h>
+>  #include <linux/pci_hotplug.h>
+>  #include <linux/slab.h>
+>  #include <linux/module.h>
+> @@ -1520,6 +1521,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+>  	dev->dev.dma_mask = &dev->dma_mask;
+>  	dev->dev.dma_parms = &dev->dma_parms;
+>  	dev->dev.coherent_dma_mask = 0xffffffffull;
+> +	of_pci_dma_configure(dev);
+>  
+>  	pci_set_dma_max_seg_size(dev, 65536);
+>  	pci_set_dma_seg_boundary(dev, 0xffffffff);
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
