@@ -1,39 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Feb 2015 16:42:12 +0100
-Subject: [PATCH v2] ASoC: omap: fix up SND_OMAP_SOC_OMAP_ABE_TWL6040 dependency
+Date: Wed, 25 Feb 2015 16:44:15 +0100
+Subject: [PATCH] ASoC: omap: fix up SND_OMAP_SOC_OMAP_ABE_TWL6040
+ dependency
 In-Reply-To: <54EDEAE3.6080605@ti.com>
 References: <22890811.0MuvZ4MxOU@wuerfel> <54EDEAE3.6080605@ti.com>
-Message-ID: <2707228.SKhEXovzW4@wuerfel>
+Message-ID: <2482424.WOd0SW5Oav@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change to enable OMAP5 support on this platform was a little too
-eager in adding a 'select' for a particular clock driver that might
-not be enabled in all configurations, which in turn leads to a build
-error:
+On Wednesday 25 February 2015 17:31:47 Peter Ujfalusi wrote:
+> Would it be better to have this changed to:
+>         select COMMON_CLK_PALMAS if MFD_PALMAS
+> instead of removing.
+> 
+> All OMAP5 boards uses Palmas as PMIC and the boards where twl6040 audio is in
+> use the 32K clock for the codec is coming from Palmas.
+> Without this clock the twl6040 will not boot up causing errors during probe time.
 
-warning: (SND_OMAP_SOC_OMAP_ABE_TWL6040) selects COMMON_CLK_PALMAS which has unmet direct dependencies (COMMON_CLK && MFD_PALMAS)
-drivers/built-in.o: In function `palmas_clks_probe':
-drivers/clk/clk-palmas.c:228: undefined reference to `palmas_ext_control_req_config'
+It's possible to build a kernel with omap5 support and this driver but
+no palmas support, which makes the dependency it a bit strange, but I'll
+let Mark decide.
 
-I do not see a strong dependency here, so it's probably better to
-drop this select and to avoid adding more complexity here.
+Unfortunately, I've sent the changed v2 patch without fixing up the commit
+message. Instead of sending another v3 right away, I'll wait for Mark
+to comment.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 5163c1eede8e9 ("ASoC: omap: Kconfig: Support for omap5-uevm analog audio")
----
-v2: change the dependency as suggested by Peter
-
-diff --git a/sound/soc/omap/Kconfig b/sound/soc/omap/Kconfig
-index e7c78b0406b5..6768e4f7d7d0 100644
---- a/sound/soc/omap/Kconfig
-+++ b/sound/soc/omap/Kconfig
-@@ -105,7 +105,7 @@ config SND_OMAP_SOC_OMAP_ABE_TWL6040
- 	select SND_OMAP_SOC_MCPDM
- 	select SND_SOC_TWL6040
- 	select SND_SOC_DMIC
--	select COMMON_CLK_PALMAS if SOC_OMAP5
-+	select COMMON_CLK_PALMAS if MFD_PALMAS
- 	help
- 	  Say Y if you want to add support for SoC audio on OMAP boards using
- 	  ABE and twl6040 codec. This driver currently supports:
+	Arnd
