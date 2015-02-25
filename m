@@ -1,37 +1,48 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 25 Feb 2015 15:50:05 +0000
-Subject: [PATCH 4/6] ARM: DT: STi: STiH407: Add dwc3 usb3 DT node.
-In-Reply-To: <20150225152201.GA14329@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1424871377-1795-1-git-send-email-peter.griffin@linaro.org>
- <1424871377-1795-5-git-send-email-peter.griffin@linaro.org>
- <20150225151229.GE5132@x1>
- <20150225152201.GA14329@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20150225155005.GE6688@x1>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 25 Feb 2015 17:52:41 +0200
+Subject: [PATCH] ARM: omap-device: add missed callback for suspend-to-disk
+In-Reply-To: <20150225154445.GO11056@atomide.com>
+References: <1424873630-6054-1-git-send-email-grygorii.strashko@linaro.org>
+ <20150225154445.GO11056@atomide.com>
+Message-ID: <54EDEFC9.606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Feb 2015, Peter Griffin wrote:
+On 02/25/2015 05:44 PM, Tony Lindgren wrote:
+> * grygorii.strashko at linaro.org <grygorii.strashko@linaro.org> [150225 06:17]:
+>> From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+>>
+>> Add missed callback needed for supporting suspend-to-disk (hibernation) mode.
+>
+> Is this needed as a fix for the -rc series or are there still
+> other missing dependencies?
+>
 
-> Hi Lee,
-> 
-> On Wed, 25 Feb 2015, Lee Jones wrote:
-> 
-> > > +			resets		= <&powerdown STIH407_USB3_POWERDOWN>,
-> > > +					  <&softreset STIH407_MIPHY2_SOFTRESET>;
-> > > +			reset-names	= "powerdown",
-> > > +					  "softreset";
-> > 
-> > Nit: What's the purpose of having these on separate lines?
-> 
-> The only reason was to stay aligned with the example in
-> Documentation/devicetree/bindings/usb/dwc3-st.txt.
+This one is not critical fix.
 
-But didn't you author that too? :)
+>
+>> Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+>> ---
+>>   arch/arm/mach-omap2/omap_device.c | 3 +++
+>>   1 file changed, 3 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+>> index fcd2c9e..345e18e 100644
+>> --- a/arch/arm/mach-omap2/omap_device.c
+>> +++ b/arch/arm/mach-omap2/omap_device.c
+>> @@ -739,6 +739,9 @@ struct dev_pm_domain omap_device_pm_domain = {
+>>   		USE_PLATFORM_PM_SLEEP_OPS
+>>   		.suspend_noirq = _od_suspend_noirq,
+>>   		.resume_noirq = _od_resume_noirq,
+>> +		.freeze_noirq = _od_suspend_noirq,
+>> +		.thaw_noirq = _od_resume_noirq,
+>> +		.restore_noirq = _od_resume_noirq,
+>>   	}
+>>   };
+>>
+>> --
+>> 1.9.1
+>>
 
-I would change them both.  No need to force a line wrap if it's not required.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+regards,
+-grygorii
