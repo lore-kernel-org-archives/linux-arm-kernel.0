@@ -1,60 +1,77 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 25 Feb 2015 15:11:57 +0000
-Subject: [PATCH 1/2] arm64: juno: Add APB registers and LEDs using syscon
-In-Reply-To: <20150225150023.GJ12377@arm.com>
-References: <1424866589-2988-1-git-send-email-linus.walleij@linaro.org>
- <20150225135512.GE12377@arm.com>
- <20150225144756.GA905@e106497-lin.cambridge.arm.com>
- <20150225150023.GJ12377@arm.com>
-Message-ID: <20150225151157.GC905@e106497-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 25 Feb 2015 15:12:29 +0000
+Subject: [PATCH 4/6] ARM: DT: STi: STiH407: Add dwc3 usb3 DT node.
+In-Reply-To: <1424871377-1795-5-git-send-email-peter.griffin@linaro.org>
+References: <1424871377-1795-1-git-send-email-peter.griffin@linaro.org>
+ <1424871377-1795-5-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20150225151229.GE5132@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 03:00:23PM +0000, Will Deacon wrote:
-> On Wed, Feb 25, 2015 at 02:47:56PM +0000, Liviu Dudau wrote:
-> > On Wed, Feb 25, 2015 at 01:55:12PM +0000, Will Deacon wrote:
-> > > On Wed, Feb 25, 2015 at 12:16:29PM +0000, Linus Walleij wrote:
-> > > > This defines the Juno "APB system registers" as a syscon device,
-> > > > and all the LEDs controlled by the APB system registers right
-> > > > below it using the syscon LEDs driver on top of syscon. Define
-> > > > LED0 for heartbeat, LED1 for MMC0 activity and the following
-> > > > four LEDs indicating CPU activity using the Linux-specific
-> > > > DT bindings for triggers.
-> > > > 
-> > > > This is the pattern and same drivers as used on the legacy
-> > > > platform device trees for the ARM Integrators and the RealView
-> > > > PB1176.
-> > > 
-> > > Stupid question, but where are these LEDs located on the platform? I tried
-> > > enabling this, but all it seemed to do was make hackbench slightly slower :)
-> > 
-> > http://infocenter.arm.com/help/topic/com.arm.doc.ddi0524c/deb1353593789871.html
-> > 
-> > Section 1.3, look at the left hand side, above the user push buttons.
+On Wed, 25 Feb 2015, Peter Griffin wrote:
+
+> Now that both usb2 and usb3 phy drivers, and also the ST dwc3 glue code
+> are all present upstream, we can add the dwc3 DT node and have a working
+> usb3 controller on stih407-b2120 and stih410-b2020.
 > 
-> Right, so these LEDs are *inside* the case. Is that really something worth
-> enabling for defconfig?
-
-Depends on the case :) You might have a nice cutout in the plastic of the VExpress
-box, or have your own custom acrylic box.
-
-Maybe Linus can explain to us why he thinks this functionality is useful given
-that quite a lot of people tend to use the Juno boards inside the original boxes
-for fear of ESD accidents.
-
-Best regards,
-Liviu
-
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  arch/arm/boot/dts/stih407-family.dtsi | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
 > 
-> Will
-> 
+> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> index 186412d..18ff5a5 100644
+> --- a/arch/arm/boot/dts/stih407-family.dtsi
+> +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> @@ -7,6 +7,7 @@
+>   * publishhed by the Free Software Foundation.
+>   */
+>  #include "stih407-pinctrl.dtsi"
+> +#include <dt-bindings/phy/phy.h>
+>  #include <dt-bindings/reset-controller/stih407-resets.h>
+>  / {
+>  	#address-cells = <1>;
+> @@ -336,5 +337,30 @@
+>  				resets = <&softreset STIH407_MIPHY2_SOFTRESET>;
+>  			};
+>  		};
+> +
+> +		st_dwc3: dwc3 at 8f94000 {
+> +			compatible	= "st,stih407-dwc3";
+> +			reg		= <0x08f94000 0x1000>, <0x110 0x4>;
+> +			reg-names	= "reg-glue", "syscfg-reg";
+> +			st,syscfg	= <&syscfg_core>;
+> +			resets		= <&powerdown STIH407_USB3_POWERDOWN>,
+> +					  <&softreset STIH407_MIPHY2_SOFTRESET>;
+> +			reset-names	= "powerdown",
+> +					  "softreset";
+
+Nit: What's the purpose of having these on separate lines?
+
+Apart from that, it looks good:
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+> +			#address-cells	= <1>;
+> +			#size-cells	= <1>;
+> +			pinctrl-names	= "default";
+> +			pinctrl-0	= <&pinctrl_usb3>;
+> +			ranges;
+> +
+> +			dwc3: dwc3 at 9900000 {
+> +				compatible	= "snps,dwc3";
+> +				reg		= <0x09900000 0x100000>;
+> +				interrupts	= <GIC_SPI 155 IRQ_TYPE_NONE>;
+> +				dr_mode		= "host";
+> +				phy-names	= "usb2-phy", "usb3-phy";
+> +				phys		= <&usb2_picophy0>, <&phy_port2 PHY_TYPE_USB3>;
+> +			};
+> +		};
+>  	};
+>  };
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
