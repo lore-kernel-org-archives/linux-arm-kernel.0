@@ -1,41 +1,33 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 25 Feb 2015 08:20:00 -0800
-Subject: [PATCH] hwmon: (gpio-fan) allow to use alarm support alone from DT
-In-Reply-To: <20150225150459.GE17992@lunn.ch>
-References: <1424696334-14767-1-git-send-email-simon.guinot@sequanux.org>
- <54EB33D4.1000804@roeck-us.net>
- <20150223143416.GT1509@kw.sim.vm.gnt> <54EB3C84.30503@roeck-us.net>
- <20150225111430.GV1509@kw.sim.vm.gnt>
- <20150225135015.GA17992@lunn.ch> <54EDE171.7040403@roeck-us.net>
- <20150225150459.GE17992@lunn.ch>
-Message-ID: <20150225162000.GA25241@roeck-us.net>
+From: mxs@sbrk.org (Sebastien Rannou)
+Date: Wed, 25 Feb 2015 16:56:00 +0100 (CET)
+Subject: [PATCH] cpuidle: mvebu: update cpuidle thresholds for Armada XP
+ SOCs
+In-Reply-To: <54ED9D92.90506@linaro.org>
+References: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
+ <54ED9D92.90506@linaro.org>
+Message-ID: <alpine.LNX.2.02.1502251624570.11958@sbrk.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 04:04:59PM +0100, Andrew Lunn wrote:
-> > However, we need to state and check in the code that _some_ property
-> > is mandatory. A driver with only optional properties doesn't make
-> > sense.
-> 
-> The patch to the binding documentation said:
-> 
-> Note: At least one the "gpios" and "alarm-gpios" properties should be set.
-> 
-> which i then suggested should be:
-> 
-> Note: At least one of "gpios" or "alarm-gpios" properties should be set.
-> 
-"should" is not "must".
+Hi Daniel,
 
-Guenter
+Thanks for the explanation and thanks for the link, I wish I had read
+it beforehand.
 
-> What we could do is move this sentence into the Required Properties of
-> the documentation.
-> 
-> The patch Simon submitted also does check that this condition is
-> fulfilled.
-> 
-> 	Andrew
-> 
-> 
-> 
+On Wed, 25 Feb 2015, Daniel Lezcano wrote:
+> If you have the possibility, I would suggest to apply the right methodology to
+> find the right values by using the description in the wiki page [1]. If you
+> can access to the energy values to enter / exit the state and the power
+> consumed in each idle state, then you can mathematically compute the right
+> values.
+
+Unfortunately I don't have access to the cost of transitions between
+states, nor do I have the time taken by each transition (which I could
+have used to infer the cost). I only have the power consumption of the
+different states.
+
+I plan to find the adequate values by testing different combinations,
+but it is going to take some efforts before having a second
+patch. Since this patch already improves the situation by using the
+vendor's values, I think it is a move in the right direction, even
+though not being the most adequate values.
