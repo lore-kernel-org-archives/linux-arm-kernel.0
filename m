@@ -1,57 +1,93 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 25 Feb 2015 12:07:52 -0800
-Subject: [PATCH] clk: ti: Fix FAPLL parent enable bit handling
-In-Reply-To: <20150128170048.GO28663@atomide.com>
-References: <20150128170048.GO28663@atomide.com>
-Message-ID: <20150225200752.421.26748@quantum>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 25 Feb 2015 15:16:59 -0500 (EST)
+Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
+In-Reply-To: <alpine.LFD.2.11.1502251257410.25484@knanqh.ubzr>
+References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
+ <20150205105035.GL8656@n2100.arm.linux.org.uk>
+ <20150205142918.GA10634@linux.vnet.ibm.com>
+ <20150205161100.GQ8656@n2100.arm.linux.org.uk>
+ <20150225125610.GY8656@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1502250941210.25484@knanqh.ubzr>
+ <20150225170011.GC8656@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1502251257410.25484@knanqh.ubzr>
+Message-ID: <alpine.LFD.2.11.1502251427580.25484@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tony Lindgren (2015-01-28 09:00:49)
-> Commit 163152cbbe32 ("clk: ti: Add support for FAPLL on dm816x")
-> added basic support for the FAPLL on dm818x, but has a bug for the
-> parent PLL enable bit. The FAPLL_MAIN_PLLEN is defined as BIT(3)
-> but the code is doing a shift on it.
-> 
-> This means the parent PLL won't get disabled even if all it's child
-> synthesizers are disabled.
-> 
-> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Cc: Brian Hutchinson <b.hutchman@gmail.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+On Wed, 25 Feb 2015, Nicolas Pitre wrote:
 
-Missed this one for 3.20. Applied to clk-fixes.
-
-Regards,
-Mike
-
+> On Wed, 25 Feb 2015, Russell King - ARM Linux wrote:
 > 
-> --- a/drivers/clk/ti/fapll.c
-> +++ b/drivers/clk/ti/fapll.c
-> @@ -84,7 +84,7 @@ static int ti_fapll_enable(struct clk_hw *hw)
->         struct fapll_data *fd = to_fapll(hw);
->         u32 v = readl_relaxed(fd->base);
->  
-> -       v |= (1 << FAPLL_MAIN_PLLEN);
-> +       v |= FAPLL_MAIN_PLLEN;
->         writel_relaxed(v, fd->base);
->  
->         return 0;
-> @@ -95,7 +95,7 @@ static void ti_fapll_disable(struct clk_hw *hw)
->         struct fapll_data *fd = to_fapll(hw);
->         u32 v = readl_relaxed(fd->base);
->  
-> -       v &= ~(1 << FAPLL_MAIN_PLLEN);
-> +       v &= ~FAPLL_MAIN_PLLEN;
->         writel_relaxed(v, fd->base);
->  }
->  
-> @@ -104,7 +104,7 @@ static int ti_fapll_is_enabled(struct clk_hw *hw)
->         struct fapll_data *fd = to_fapll(hw);
->         u32 v = readl_relaxed(fd->base);
->  
-> -       return v & (1 << FAPLL_MAIN_PLLEN);
-> +       return v & FAPLL_MAIN_PLLEN;
->  }
->  
->  static unsigned long ti_fapll_recalc_rate(struct clk_hw *hw,
+> > We could just use the spin-and-poll solution instead of an IPI, but
+> > I really don't like that - when you see the complexity needed to
+> > re-initialise it each time, it quickly becomes very yucky because
+> > there is no well defined order between __cpu_die() and __cpu_kill()
+> > being called by the two respective CPUs.
+> > 
+> > The last patch I saw doing that had multiple bits to indicate success
+> > and timeout, and rather a lot of complexity to recover from failures,
+> > and reinitialise state for a second CPU going down.
+> 
+> What about a per CPU state?  That would at least avoid the need to 
+> serialize things across CPUs.  If only one CPU may write its state, that 
+> should eliminate the need for any kind of locking.
+
+Something like the following?  If according to $subject it is the 
+complete() usage that has problems, then this replacement certainly has 
+it removed while keeping things simple.  And I doubt CPU hotplug is 
+performance critical so a simple polling is certainly good enough.
+
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 86ef244c5a..f253f79a34 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -213,7 +213,7 @@ int __cpu_disable(void)
+ 	return 0;
+ }
+ 
+-static DECLARE_COMPLETION(cpu_died);
++static struct cpumask dead_cpus;
+ 
+ /*
+  * called on the thread which is asking for a CPU to be shutdown -
+@@ -221,7 +221,14 @@ static DECLARE_COMPLETION(cpu_died);
+  */
+ void __cpu_die(unsigned int cpu)
+ {
+-	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
++	int i;
++
++	for (i = 5 * HZ; i > 0; i -= 10) {
++		if (cpumask_test_cpu(cpu, &dead_cpus))
++			break;
++		schedule_timeout_uninterruptible(10);
++	}
++	if (i <= 0) {
+ 		pr_err("CPU%u: cpu didn't die\n", cpu);
+ 		return;
+ 	}
+@@ -267,12 +274,12 @@ void __ref cpu_die(void)
+ 	 * this returns, power and/or clocks can be removed@any point
+ 	 * from this CPU and its cache by platform_cpu_kill().
+ 	 */
+-	complete(&cpu_died);
++	cpumask_set_cpu(cpu, &dead_cpus);
+ 
+ 	/*
+-	 * Ensure that the cache lines associated with that completion are
++	 * Ensure that the cache line associated with that dead_cpus update is
+ 	 * written out.  This covers the case where _this_ CPU is doing the
+-	 * powering down, to ensure that the completion is visible to the
++	 * powering down, to ensure that the update is visible to the
+ 	 * CPU waiting for this one.
+ 	 */
+ 	flush_cache_louis();
+@@ -349,6 +356,8 @@ asmlinkage void secondary_start_kernel(void)
+ 	current->active_mm = mm;
+ 	cpumask_set_cpu(cpu, mm_cpumask(mm));
+ 
++	cpumask_clear_cpu(cpu, &dead_cpus);
++
+ 	cpu_init();
+ 
+ 	pr_debug("CPU%u: Booted secondary processor\n", cpu);
