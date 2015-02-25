@@ -1,87 +1,113 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 24 Feb 2015 19:53:17 -0600
-Subject: [PATCH v6 6/7] PCI: update dma configuration from DT
-In-Reply-To: <1423173179-10227-7-git-send-email-m-karicheri2@ti.com>
-References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
- <1423173179-10227-7-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20150225015317.GO6220@google.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 24 Feb 2015 18:18:00 -0800
+Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
+ instances
+In-Reply-To: <20150224140808.GG8670@n2100.arm.linux.org.uk>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <54D3C803.30706@samsung.com> <54D3CD6A.1010209@codeaurora.org>
+ <54D3EB29.4090007@codeaurora.org>
+ <20150206004210.GB8670@n2100.arm.linux.org.uk>
+ <54D41A60.8040702@codeaurora.org>
+ <20150206133920.GC8670@n2100.arm.linux.org.uk>
+ <54D5164A.30503@codeaurora.org> <20150219213233.421.11915@quantum>
+ <20150224140808.GG8670@n2100.arm.linux.org.uk>
+Message-ID: <20150225021800.421.95142@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 04:52:58PM -0500, Murali Karicheri wrote:
-> If there is a DT node available for the root bridge's parent device,
-> use the dma configuration from that device node. For example, keystone
-> PCI devices would require dma_pfn_offset to be set correctly in the
-> device structure of the pci device in order to have the correct dma mask.
-> The DT node will have dma-ranges defined for this. Also support using
-> the DT property dma-coherent to allow coherent DMA operation by the
-> PCI device.
-
-Hi Murali,
-
-I'm guessing this is the patch that actually fixes things for Keystone.
-
-And it looks like it should also fix things for other hardware that has
-similar characteristics.  So I'd like to include some higher-level text
-about that here.  For example:
-
-  This fixes DMA on systems where DMA addresses are a constant offset
-  from CPU physical addresses.
-
-(I don't know exactly how these patches all fit together, so that's
-probably not accurate, but that's the *sort* of thing I'd like to include.)
-
-If that actually *is* what's going on, I have to wonder why this isn't
-implemented as a very simple IOMMU instead of adding dma_pfn_offset,
-which is present on all arches but only used on ARM.  In some sense that
-offset is parallel but incompatible with an IOMMU: they both translate DMA
-addresses into system RAM addresses.
-
-I know you're not adding this, and I assume somebody explored that option
-and rejected it for good reasons.  I just missed that discussion.
-
-> This patch use the new helper function of_pci_dma_configure() to update
-> the device dma configuration.
+Quoting Russell King - ARM Linux (2015-02-24 06:08:08)
+> On Thu, Feb 19, 2015 at 01:32:33PM -0800, Mike Turquette wrote:
+> > Quoting Stephen Boyd (2015-02-06 11:30:18)
+> > > On 02/06/15 05:39, Russell King - ARM Linux wrote:
+> > > > On Thu, Feb 05, 2015 at 05:35:28PM -0800, Stephen Boyd wrote:
+> > > >
+> > > >> From what I can tell this code is
+> > > >> now broken because we made all clk getting functions (there's quite a
+> > > >> few...) return unique pointers every time they're called. It seems that
+> > > >> the driver wants to know if extclk and clk are the same so it can do
+> > > >> something differently in kirkwood_set_rate(). Do we need some sort of
+> > > >> clk_equal(struct clk *a, struct clk *b) function for drivers like this?
+> > > > Well, the clocks in question are the SoC internal clock (which is more or
+> > > > less fixed, but has a programmable divider) and an externally supplied
+> > > > clock, and the IP has a multiplexer on its input which allows us to select
+> > > > between those two sources.
+> > > >
+> > > > If it were possible to bind both to the same clock, it wouldn't be a
+> > > > useful configuration - nothing would be gained from doing so in terms of
+> > > > available rates.
+> > > >
+> > > > What the comparison is there for is to catch the case with legacy lookups
+> > > > where a clkdev lookup entry with a NULL connection ID results in matching
+> > > > any connection ID passed to clk_get().  If the patch changes this, then
+> > > > we will have a regression - and this is something which needs fixing
+> > > > _before_ we do this "return unique clocks".
+> > > >
+> > > 
+> > > Ok. It seems that we might need a clk_equal() or similar API after all.
+> > > My understanding is that this driver is calling clk_get() twice with
+> > > NULL for the con_id and then "extclk" in attempts to get the SoC
+> > > internal clock and the externally supplied clock. If we're using legacy
+> > > lookups then both clk_get() calls may map to the same clk_lookup entry
+> > > and before Tomeu's patch that returns unique clocks the driver could
+> > > detect this case and know that there isn't an external clock. Looking at
+> > > arch/arm/mach-dove/common.c it seems that there is only one lookup per
+> > > device and it has a wildcard NULL for con_id so both clk_get() calls
+> > > here are going to find the same lookup and get a unique struct clk pointer.
+> > > 
+> > > Why don't we make the legacy lookup more specific and actually indicate
+> > > "internal" for the con_id? Then the external clock would fail to be
+> > > found, but we can detect that case and figure out that it's not due to
+> > > probe defer, but instead due to the fact that there really isn't any
+> > > mapping. It looks like the code is already prepared for this anyway.
+> > > 
+> > > ----8<----
+> > > 
+> > > From: Stephen Boyd <sboyd@codeaurora.org>
+> > > Subject: [PATCH] ARM: dove: Remove wildcard from mvebu-audio device clk lookup
+> > > 
+> > > This i2s driver is using the wildcard nature of clkdev lookups to
+> > > figure out if there's an external clock or not. It does this by
+> > > calling clk_get() twice with NULL for the con_id first and then
+> > > "external" for the con_id the second time around and then
+> > > compares the two pointers. With DT the wildcard feature of
+> > > clk_get() is gone and so the driver has to handle an error from
+> > > the second clk_get() call as meaning "no external clock
+> > > specified". Let's use that logic even with clk lookups to
+> > > simplify the code and remove the struct clk pointer comparisons
+> > > which may not work in the future when clk_get() returns unique
+> > > pointers.
+> > > 
+> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > 
+> > Russell et al,
+> > 
+> > I'm happy to take this patch through the clock tree (where the problem
+> > shows up) with an ack.
 > 
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> It's not up to me - I don't maintain this driver.  I'm just an interested
+> party.
+
+Sure.
+
 > 
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> ---
->  drivers/pci/probe.c |    2 ++
->  1 file changed, 2 insertions(+)
+> Note that much more than just this has now broken.  The iMX6 code has
+> broken as well, and it's not going to take such a simple fix there to
+> fix it either.
 > 
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 23212f8..d7dcd6c 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -6,6 +6,7 @@
->  #include <linux/delay.h>
->  #include <linux/init.h>
->  #include <linux/pci.h>
-> +#include <linux/of_pci.h>
->  #include <linux/pci_hotplug.h>
->  #include <linux/slab.h>
->  #include <linux/module.h>
-> @@ -1520,6 +1521,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
->  	dev->dev.dma_mask = &dev->dma_mask;
->  	dev->dev.dma_parms = &dev->dma_parms;
->  	dev->dev.coherent_dma_mask = 0xffffffffull;
-> +	of_pci_dma_configure(dev);
->  
->  	pci_set_dma_max_seg_size(dev, 65536);
->  	pci_set_dma_seg_boundary(dev, 0xffffffff);
+> Please either revert the patches creating this breakage (and have another
+> attempt at the next merge window) or supply fixes for these places.
+
+Let's try the latter. Stephen used coccinelle to find similar instances
+of clk pointer comparisons[0]. As a stop-gap solution we can introduce a
+clk_is_match(struct clk *a, struct clk *b) function and sub it for the
+handful of drivers that do this behavior and use CCF.
+
+[0] http://lkml.kernel.org/r/<54E3BA20.3080205@codeaurora.org>
+
+Regards,
+Mike
+
+> 
 > -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
