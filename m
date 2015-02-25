@@ -1,31 +1,33 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 25 Feb 2015 13:36:17 +0000
-Subject: [PATCH 6/6] MAINTAINERS: Add phy-miphy28lp.c to ARCH/STI architecture
-In-Reply-To: <1424871377-1795-1-git-send-email-peter.griffin@linaro.org>
-References: <1424871377-1795-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1424871377-1795-7-git-send-email-peter.griffin@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 25 Feb 2015 14:45:34 +0100
+Subject: Ethernet Briding broken on APM Mustang on v4.0-rc1
+In-Reply-To: <20150225124101.GD12827@cbox>
+References: <20150225124101.GD12827@cbox>
+Message-ID: <20150225134534.GE12827@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the phy-miphy28lp.c phy driver found on STMicroelectronics
-stih407 family SoC's into the STI arch section of the maintainers file.
+Update, apologies for noise,
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+On Wed, Feb 25, 2015 at 01:41:01PM +0100, Christoffer Dall wrote:
+> Hi,
+> 
+> Configuring bridged networking on the APM Mustang platform doesn't work
+> on v4.0-rc1.  It works fine on v3.19-rc1.
+> 
+> When adding the interface to the bridge I get this error:
+> 
+> can't add eth0 to bridge br0: Invalid argument
+> 
+> Has anyone else seen this?
+> 
+> Other ARMv8 platforms don't seem to be affected by this.
+> 
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ddc5a8c..1a6180a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1457,6 +1457,7 @@ F:	drivers/clocksource/arm_global_timer.c
- F:	drivers/i2c/busses/i2c-st.c
- F:	drivers/media/rc/st_rc.c
- F:	drivers/mmc/host/sdhci-st.c
-+F:	drivers/phy/phy-miphy28lp.c
- F:	drivers/phy/phy-stih407-usb.c
- F:	drivers/phy/phy-stih41x-usb.c
- F:	drivers/pinctrl/pinctrl-st.c
--- 
-1.9.1
+It seems that on v4.0-rc1 the APM ethernet card no longer gets a mac
+address (or rather, it gets 00:00:00:00:...) so assigning it an
+appropriate address naturally does the trick.
+
+I have no idea which change caused this behavior though.
+
+-Christoffer
