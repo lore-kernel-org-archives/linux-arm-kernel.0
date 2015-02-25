@@ -1,71 +1,105 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 25 Feb 2015 23:21:10 +0100
-Subject: [PATCH 2/4] ARM: mvebu: add audio I2S controller to Armada 38x
- Device Tree
-In-Reply-To: <1424901482-3809-3-git-send-email-mw@semihalf.com>
-References: <y> <1424901482-3809-1-git-send-email-mw@semihalf.com>
- <1424901482-3809-3-git-send-email-mw@semihalf.com>
-Message-ID: <54EE4AD6.6090101@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 25 Feb 2015 14:32:07 -0800
+Subject: [PATCH] clk: qcom: Properly change rates for ahbix clock
+Message-ID: <1424903527-5636-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.02.2015 22:58, Marcin Wojtas wrote:
-> This commit adds the description of the I2S controller to the Marvell
-> Armada 38x SoC's Device Tree, as well as its pin configuration.
->
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> ---
->   arch/arm/boot/dts/armada-38x.dtsi | 17 +++++++++++++++++
->   1 file changed, 17 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index 1dff30a..fa21cb5 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-[...]
-> @@ -555,6 +561,17 @@
->   				status = "disabled";
->   			};
->
-> +			audio_controller: audio-controller at e8000 {
-> +				#sound-dai-cells = <1>;
-> +				compatible = "marvell,armada-380-audio";
-> +				reg = <0xe8000 0x4000>, <0x18410 0xc>, <0x18204 0x4>;
-> +				reg-names = "i2s_regs", "pll_regs", "soc_ctrl";
+The ahbix clock can never be turned off. To switch the rates we
+need to switch the mux off the M/N counter to an always on source
+(XO), reprogram the M/N counter to get the rate we want and
+finally switch back to the M/N counter. Add a new ops structure
+for this type of clock so that we can set the rate properly.
 
-Marcin,
+Fixes: c99e515a92e9 "clk: qcom: Add IPQ806X LPASS clock controller (LCC) driver"
+Cc: Kenneth Westfield <kwestfie@codeaurora.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clk/qcom/clk-rcg.c     | 30 ++++++++++++++++++++++++++++++
+ drivers/clk/qcom/clk-rcg.h     |  1 +
+ drivers/clk/qcom/lcc-ipq806x.c |  5 +----
+ 3 files changed, 32 insertions(+), 4 deletions(-)
 
-sorry but NACK. The PLL and SoC ctrl are not even close to the audio
-controller registers.
-
-> +				interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&gateclk 0>;
-> +				clock-names = "internal";
-
-How about providing access to audio PLL by a clock driver and amend the
-binding to allow for a second more precise PLL clock, e.g.
-
-	clocks = <&gateclk CLK_AUDIO>, <&pll PLL_AUDIO>;
-	clock-names = "internal", "pll";
-
-we already check for an "extclk" on Dove for the same reason but the
-name might be misleading here.
-
-Also, i2c/spdif muxing option could be handled by 38x's pinctrl driver,
-we have the same for Dove's internal i2c mux.
-
-If you want to use i2s you just add the option to the default pinctrl
-hog:
-
-	pinctrl-0 = <&i2s_pins &audio_mux_i2s>;
-	pinctrl-names = "default";
-
-Sebastian
-
-> +				status = "disabled";
-> +			};
-> +
->   			usb3 at f0000 {
->   				compatible = "marvell,armada-380-xhci";
->   				reg = <0xf0000 0x4000>,<0xf4000 0x4000>;
->
+diff --git a/drivers/clk/qcom/clk-rcg.c b/drivers/clk/qcom/clk-rcg.c
+index 0039bd7d3965..49a1b58d4f8c 100644
+--- a/drivers/clk/qcom/clk-rcg.c
++++ b/drivers/clk/qcom/clk-rcg.c
+@@ -495,6 +495,27 @@ static int clk_rcg_bypass_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	return __clk_rcg_set_rate(rcg, rcg->freq_tbl);
+ }
+ 
++static int clk_rcg_lcc_set_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long parent_rate)
++{
++	struct clk_rcg *rcg = to_clk_rcg(hw);
++	const struct freq_tbl *f;
++	int ret;
++	u32 gfm = BIT(10);
++
++	f = qcom_find_freq(rcg->freq_tbl, rate);
++	if (!f)
++		return -EINVAL;
++
++	/* Switch to XO to avoid glitches */
++	regmap_update_bits(rcg->clkr.regmap, rcg->ns_reg, gfm, 0);
++	ret = __clk_rcg_set_rate(rcg, f);
++	/* Switch back to M/N */
++	regmap_update_bits(rcg->clkr.regmap, rcg->ns_reg, gfm, gfm);
++
++	return ret;
++}
++
+ static int __clk_dyn_rcg_set_rate(struct clk_hw *hw, unsigned long rate)
+ {
+ 	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
+@@ -543,6 +564,15 @@ const struct clk_ops clk_rcg_bypass_ops = {
+ };
+ EXPORT_SYMBOL_GPL(clk_rcg_bypass_ops);
+ 
++const struct clk_ops clk_rcg_lcc_ops = {
++	.get_parent = clk_rcg_get_parent,
++	.set_parent = clk_rcg_set_parent,
++	.recalc_rate = clk_rcg_recalc_rate,
++	.determine_rate = clk_rcg_determine_rate,
++	.set_rate = clk_rcg_lcc_set_rate,
++};
++EXPORT_SYMBOL_GPL(clk_rcg_lcc_ops);
++
+ const struct clk_ops clk_dyn_rcg_ops = {
+ 	.enable = clk_enable_regmap,
+ 	.is_enabled = clk_is_enabled_regmap,
+diff --git a/drivers/clk/qcom/clk-rcg.h b/drivers/clk/qcom/clk-rcg.h
+index 687e41f91d7c..d09d06ba278e 100644
+--- a/drivers/clk/qcom/clk-rcg.h
++++ b/drivers/clk/qcom/clk-rcg.h
+@@ -96,6 +96,7 @@ struct clk_rcg {
+ 
+ extern const struct clk_ops clk_rcg_ops;
+ extern const struct clk_ops clk_rcg_bypass_ops;
++extern const struct clk_ops clk_rcg_lcc_ops;
+ 
+ #define to_clk_rcg(_hw) container_of(to_clk_regmap(_hw), struct clk_rcg, clkr)
+ 
+diff --git a/drivers/clk/qcom/lcc-ipq806x.c b/drivers/clk/qcom/lcc-ipq806x.c
+index c9ff27b4648b..fb276522173a 100644
+--- a/drivers/clk/qcom/lcc-ipq806x.c
++++ b/drivers/clk/qcom/lcc-ipq806x.c
+@@ -385,14 +385,11 @@ static struct clk_rcg ahbix_clk = {
+ 	},
+ 	.freq_tbl = clk_tbl_ahbix,
+ 	.clkr = {
+-		.enable_reg = 0x38,
+-		.enable_mask = BIT(10), /* toggle the gfmux to select mn/pxo */
+ 		.hw.init = &(struct clk_init_data){
+ 			.name = "ahbix",
+ 			.parent_names = lcc_pxo_pll4,
+ 			.num_parents = 2,
+-			.ops = &clk_rcg_ops,
+-			.flags = CLK_SET_RATE_GATE,
++			.ops = &clk_rcg_lcc_ops,
+ 		},
+ 	},
+ };
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
