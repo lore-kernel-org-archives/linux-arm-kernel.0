@@ -1,80 +1,63 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 24 Feb 2015 15:58:57 -0800
-Subject: [PATCH] arm64: Fix text patching logic when using fixmap
-In-Reply-To: <1424795421-26630-1-git-send-email-marc.zyngier@arm.com>
-References: <1424795421-26630-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <54ED1041.2090708@codeaurora.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 24 Feb 2015 16:21:10 -0800
+Subject: [PATCH] mmc: dw_mmc: rockchip: Add DW_MCI_QUIRK_RETRY_DELAY
+In-Reply-To: <1421171497-9440-1-git-send-email-dianders@chromium.org>
+References: <1421171497-9440-1-git-send-email-dianders@chromium.org>
+Message-ID: <CAD=FV=UVb=XrWG97Qam26RFqkmABJkZHHTKM=wqj3zfQVbssRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/24/2015 8:30 AM, Marc Zyngier wrote:
-> Patch 2f896d586610 ("arm64: use fixmap for text patching") changed
-> the way we patch the kernel text, using a fixmap when the kernel or
-> modules are flagged as read only.
+Hi,
+
+On Tue, Jan 13, 2015 at 9:51 AM, Doug Anderson <dianders@chromium.org> wrote:
+> We've seen at least one card that can get confused during all the
+> errors generated during tuning on rk3288.  These errors seem to go
+> away with DW_MCI_QUIRK_RETRY_DELAY.  That quirk is documented to be
+> for 2.11a and on rk3288 I believe we have 2.70a, but it seems to be
+> the same type of problem.
 >
-> Unfortunately, a flaw in the logic makes it fall over when patching
-> modules without CONFIG_DEBUG_SET_MODULE_RONX enabled:
+> Specifically it looks like in certain error conditions (I saw this
+> with Response CRC errors) that data keeps showing up in the FIFO even
+> after the error is reported and the CD (command done) bit is set.  If
+> we don't wait for this data to finish transferring then it confuses
+> the next transaction.  In the specific failure case I ran into I found
+> that I could monitor the data_state_mc_busy bit and wait for it to
+> clear, but in other failure cases this bit was stuck at busy when we
+> saw an error.  Hence a generic big delay seems like the only option.
 >
-> [...]
-> [   32.032636] Call trace:
-> [   32.032716] [<fffffe00003da0dc>] __copy_to_user+0x2c/0x60
-> [   32.032837] [<fffffe0000099f08>] __aarch64_insn_write+0x94/0xf8
-> [   32.033027] [<fffffe000009a0a0>] aarch64_insn_patch_text_nosync+0x18/0x58
-> [   32.033200] [<fffffe000009c3ec>] ftrace_modify_code+0x58/0x84
-> [   32.033363] [<fffffe000009c4e4>] ftrace_make_nop+0x3c/0x58
-> [   32.033532] [<fffffe0000164420>] ftrace_process_locs+0x3d0/0x5c8
-> [   32.033709] [<fffffe00001661cc>] ftrace_module_init+0x28/0x34
-> [   32.033882] [<fffffe0000135148>] load_module+0xbb8/0xfc4
-> [   32.034044] [<fffffe0000135714>] SyS_finit_module+0x94/0xc4
-> [...]
+> I have seen this on rk3288, but adding it as a quirk for all Rockchip
+> IP for now since most previous quirks have shown up on older IP as
+> well.
 >
-> This is triggered by the use of virt_to_page() on a module address,
-> which ends to pointing to Nowhereland if you're lucky, or corrupt
-> your precious data if not.
->
-> This patch fixes the logic by mimicking what is done on arm:
-> - If we're patching a module and CONFIG_DEBUG_SET_MODULE_RONX is set,
->    use vmalloc_to_page().
-> - If we're patching the kernel and CONFIG_DEBUG_RODATA is set,
->    use virt_to_page().
-> - Otherwise, use the provided address, as we can write to it directly.
->
-> Tested on 4.0-rc1 as a KVM guest.
->
-> Reported-by: Richard W.M. Jones <rjones@redhat.com>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Laura Abbott <lauraa@codeaurora.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 > ---
->   arch/arm64/kernel/insn.c | 4 +++-
->   1 file changed, 3 insertions(+), 1 deletion(-)
+> NOTES:
+> * This is based atop Addy's patch (mmc: dw_mmc: add quirk for broken
+> data transfer over scheme) at
+> <https://patchwork.kernel.org/patch/5565431/>, but it would be trivial
+> to apply this patch without that one if that were desirable.
+> * If someone has a better solution to this problem, I'm all ears.
 >
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 27d4864..c8eca88 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -87,8 +87,10 @@ static void __kprobes *patch_map(void *addr, int fixmap)
+>  drivers/mmc/host/dw_mmc-rockchip.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 >
->   	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
->   		page = vmalloc_to_page(addr);
-> -	else
-> +	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
->   		page = virt_to_page(addr);
-> +	else
-> +		return addr;
+> diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
+> index ba92ebd..b4caf1a 100644
+> --- a/drivers/mmc/host/dw_mmc-rockchip.c
+> +++ b/drivers/mmc/host/dw_mmc-rockchip.c
+> @@ -74,7 +74,8 @@ static int dw_mci_rockchip_init(struct dw_mci *host)
+>         host->sdio_id0 = 8;
 >
->   	BUG_ON(!page);
->   	set_fixmap(fixmap, page_to_phys(page));
+>         /* It needs this quirk on all Rockchip SoCs */
+> -       host->pdata->quirks |= DW_MCI_QUIRK_BROKEN_DTO;
+> +       host->pdata->quirks |= DW_MCI_QUIRK_BROKEN_DTO |
+> +               DW_MCI_QUIRK_RETRY_DELAY;
 >
+>         return 0;
+>  }
 
-Looks like I dropped this incorrectly between v6 and v7.
+All of my recent testing shows that with all of the other fixes Addy
+and I have posted recently that this one is no longer needed.  I think
+it can be considered Abandoned.
 
-Acked-by: Laura Abbott <lauraa@codeaurora.org>
-
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+-Doug
