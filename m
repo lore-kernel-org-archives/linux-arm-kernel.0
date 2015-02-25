@@ -1,159 +1,39 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Wed, 25 Feb 2015 15:36:22 +0000
-Subject: [PATCH 4/4] arm/arm64: KVM: Keep elrsr/aisr in sync with software
- model
-In-Reply-To: <1424878582-26397-1-git-send-email-alex.bennee@linaro.org>
-References: <1424878582-26397-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1424878582-26397-5-git-send-email-alex.bennee@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 Feb 2015 16:42:12 +0100
+Subject: [PATCH v2] ASoC: omap: fix up SND_OMAP_SOC_OMAP_ABE_TWL6040 dependency
+In-Reply-To: <54EDEAE3.6080605@ti.com>
+References: <22890811.0MuvZ4MxOU@wuerfel> <54EDEAE3.6080605@ti.com>
+Message-ID: <2707228.SKhEXovzW4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+The change to enable OMAP5 support on this platform was a little too
+eager in adding a 'select' for a particular clock driver that might
+not be enabled in all configurations, which in turn leads to a build
+error:
 
-There is an interesting bug in the vgic code, which manifests itself
-when the KVM run loop has a signal pending or needs a vmid generation
-rollover after having disabled interrupts but before actually switching
-to the guest.
+warning: (SND_OMAP_SOC_OMAP_ABE_TWL6040) selects COMMON_CLK_PALMAS which has unmet direct dependencies (COMMON_CLK && MFD_PALMAS)
+drivers/built-in.o: In function `palmas_clks_probe':
+drivers/clk/clk-palmas.c:228: undefined reference to `palmas_ext_control_req_config'
 
-In this case, we flush the vgic as usual, but we sync back the vgic
-state and exit to userspace before entering the guest.  The consequence
-is that we will be syncing the list registers back to the software model
-using the GICH_ELRSR and GICH_EISR from the last execution of the guest,
-potentially overwriting a list register containing an interrupt.
+I do not see a strong dependency here, so it's probably better to
+drop this select and to avoid adding more complexity here.
 
-This showed up during migration testing where we would capture a state
-where the VM has masked the arch timer but there were no interrupts,
-resulting in a hung test.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 5163c1eede8e9 ("ASoC: omap: Kconfig: Support for omap5-uevm analog audio")
+---
+v2: change the dependency as suggested by Peter
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Reported-by: Alex Bennee <alex.bennee@linaro.org>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 7042251..e2a676e 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -114,6 +114,7 @@ struct vgic_ops {
- 	void	(*sync_lr_elrsr)(struct kvm_vcpu *, int, struct vgic_lr);
- 	u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
- 	u64	(*get_eisr)(const struct kvm_vcpu *vcpu);
-+	void	(*clear_eisr)(struct kvm_vcpu *vcpu);
- 	u32	(*get_interrupt_status)(const struct kvm_vcpu *vcpu);
- 	void	(*enable_underflow)(struct kvm_vcpu *vcpu);
- 	void	(*disable_underflow)(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
-index a0a7b5d..f9b9c7c 100644
---- a/virt/kvm/arm/vgic-v2.c
-+++ b/virt/kvm/arm/vgic-v2.c
-@@ -72,6 +72,8 @@ static void vgic_v2_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
- {
- 	if (!(lr_desc.state & LR_STATE_MASK))
- 		vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr |= (1ULL << lr);
-+	else
-+		vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr &= ~(1ULL << lr);
- }
- 
- static u64 vgic_v2_get_elrsr(const struct kvm_vcpu *vcpu)
-@@ -84,6 +86,11 @@ static u64 vgic_v2_get_eisr(const struct kvm_vcpu *vcpu)
- 	return vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr;
- }
- 
-+static void vgic_v2_clear_eisr(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr = 0;
-+}
-+
- static u32 vgic_v2_get_interrupt_status(const struct kvm_vcpu *vcpu)
- {
- 	u32 misr = vcpu->arch.vgic_cpu.vgic_v2.vgic_misr;
-@@ -148,6 +155,7 @@ static const struct vgic_ops vgic_v2_ops = {
- 	.sync_lr_elrsr		= vgic_v2_sync_lr_elrsr,
- 	.get_elrsr		= vgic_v2_get_elrsr,
- 	.get_eisr		= vgic_v2_get_eisr,
-+	.clear_eisr		= vgic_v2_clear_eisr,
- 	.get_interrupt_status	= vgic_v2_get_interrupt_status,
- 	.enable_underflow	= vgic_v2_enable_underflow,
- 	.disable_underflow	= vgic_v2_disable_underflow,
-diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index 3a62d8a..dff0602 100644
---- a/virt/kvm/arm/vgic-v3.c
-+++ b/virt/kvm/arm/vgic-v3.c
-@@ -104,6 +104,8 @@ static void vgic_v3_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
- {
- 	if (!(lr_desc.state & LR_STATE_MASK))
- 		vcpu->arch.vgic_cpu.vgic_v3.vgic_elrsr |= (1U << lr);
-+	else
-+		vcpu->arch.vgic_cpu.vgic_v3.vgic_elrsr &= ~(1U << lr);
- }
- 
- static u64 vgic_v3_get_elrsr(const struct kvm_vcpu *vcpu)
-@@ -116,6 +118,11 @@ static u64 vgic_v3_get_eisr(const struct kvm_vcpu *vcpu)
- 	return vcpu->arch.vgic_cpu.vgic_v3.vgic_eisr;
- }
- 
-+static void vgic_v3_clear_eisr(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.vgic_cpu.vgic_v3.vgic_eisr = 0;
-+}
-+
- static u32 vgic_v3_get_interrupt_status(const struct kvm_vcpu *vcpu)
- {
- 	u32 misr = vcpu->arch.vgic_cpu.vgic_v3.vgic_misr;
-@@ -192,6 +199,7 @@ static const struct vgic_ops vgic_v3_ops = {
- 	.sync_lr_elrsr		= vgic_v3_sync_lr_elrsr,
- 	.get_elrsr		= vgic_v3_get_elrsr,
- 	.get_eisr		= vgic_v3_get_eisr,
-+	.clear_eisr		= vgic_v3_clear_eisr,
- 	.get_interrupt_status	= vgic_v3_get_interrupt_status,
- 	.enable_underflow	= vgic_v3_enable_underflow,
- 	.disable_underflow	= vgic_v3_disable_underflow,
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 3b4ded2..3690c1e 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -980,6 +980,11 @@ static inline u64 vgic_get_eisr(struct kvm_vcpu *vcpu)
- 	return vgic_ops->get_eisr(vcpu);
- }
- 
-+static inline void vgic_clear_eisr(struct kvm_vcpu *vcpu)
-+{
-+	vgic_ops->clear_eisr(vcpu);
-+}
-+
- static inline u32 vgic_get_interrupt_status(struct kvm_vcpu *vcpu)
- {
- 	return vgic_ops->get_interrupt_status(vcpu);
-@@ -1019,6 +1024,7 @@ static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
- 	vgic_set_lr(vcpu, lr_nr, vlr);
- 	clear_bit(lr_nr, vgic_cpu->lr_used);
- 	vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
-+	vgic_sync_lr_elrsr(vcpu, lr_nr, vlr);
- }
- 
- /*
-@@ -1063,6 +1069,7 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
- 		vlr.state |= LR_EOI_INT;
- 
- 	vgic_set_lr(vcpu, lr_nr, vlr);
-+	vgic_sync_lr_elrsr(vcpu, lr_nr, vlr);
- }
- 
- /*
-@@ -1258,6 +1265,14 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 	if (status & INT_STATUS_UNDERFLOW)
- 		vgic_disable_underflow(vcpu);
- 
-+	/*
-+	 * In the next iterations of the vcpu loop, if we sync the vgic state
-+	 * after flushing it, but before entering the guest (this happens for
-+	 * pending signals and vmid rollovers), then make sure we don't pick
-+	 * up any old maintenance interrupts here.
-+	 */
-+	vgic_clear_eisr(vcpu);
-+
- 	return level_pending;
- }
- 
--- 
-2.3.0
+diff --git a/sound/soc/omap/Kconfig b/sound/soc/omap/Kconfig
+index e7c78b0406b5..6768e4f7d7d0 100644
+--- a/sound/soc/omap/Kconfig
++++ b/sound/soc/omap/Kconfig
+@@ -105,7 +105,7 @@ config SND_OMAP_SOC_OMAP_ABE_TWL6040
+ 	select SND_OMAP_SOC_MCPDM
+ 	select SND_SOC_TWL6040
+ 	select SND_SOC_DMIC
+-	select COMMON_CLK_PALMAS if SOC_OMAP5
++	select COMMON_CLK_PALMAS if MFD_PALMAS
+ 	help
+ 	  Say Y if you want to add support for SoC audio on OMAP boards using
+ 	  ABE and twl6040 codec. This driver currently supports:
