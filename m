@@ -1,168 +1,183 @@
 From: al.stone@linaro.org (al.stone at linaro.org)
-Date: Tue, 24 Feb 2015 17:36:17 -0700
-Subject: [PATCH v3 1/9] ACPI: fix all errors reported by cleanpatch.pl in osl.c
+Date: Tue, 24 Feb 2015 17:36:18 -0700
+Subject: [PATCH v3 2/9] ACPI: clear up warnings on use of printk reported by
+ checkpatch.pl
 In-Reply-To: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
 References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1424824585-6405-2-git-send-email-al.stone@linaro.org>
+Message-ID: <1424824585-6405-3-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Al Stone <al.stone@linaro.org>
 
 In preparation for later splitting out some of the arch-dependent code from
-osl.c, clean up the errors reported by checkpatch.pl.  They fell into these
-classes:
-
-   -- remove the FSF address from the GPL notice
-   -- "foo * bar" should be "foo *bar" (and the ** variation of same)
-   -- a return is not a function, so parentheses are not required.
+osl.c, clear up all the warnings reported by checkpatch.pl where pr_* should
+be used instead of printk(KERN_* ...).
 
 Signed-off-by: Al Stone <al.stone@linaro.org>
 ---
- drivers/acpi/osl.c | 38 +++++++++++++++++---------------------
- 1 file changed, 17 insertions(+), 21 deletions(-)
+ drivers/acpi/osl.c | 46 +++++++++++++++++++---------------------------
+ 1 file changed, 19 insertions(+), 27 deletions(-)
 
 diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
-index 39748bb..1dc3a3b 100644
+index 1dc3a3b..865317c 100644
 --- a/drivers/acpi/osl.c
 +++ b/drivers/acpi/osl.c
-@@ -19,10 +19,6 @@
-  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  *  GNU General Public License for more details.
-  *
-- *  You should have received a copy of the GNU General Public License
-- *  along with this program; if not, write to the Free Software
-- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- *
-  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  *
-  */
-@@ -526,7 +522,7 @@ EXPORT_SYMBOL(acpi_os_unmap_generic_address);
- 
- #ifdef ACPI_FUTURE_USAGE
- acpi_status
--acpi_os_get_physical_address(void *virt, acpi_physical_address * phys)
-+acpi_os_get_physical_address(void *virt, acpi_physical_address *phys)
+@@ -141,7 +141,7 @@ static u32 acpi_osi_handler(acpi_string interface, u32 supported)
  {
- 	if (!phys || !virt)
- 		return AE_BAD_PARAMETER;
-@@ -543,7 +539,7 @@ static char acpi_os_name[ACPI_MAX_OVERRIDE_LEN];
+ 	if (!strcmp("Linux", interface)) {
  
- acpi_status
- acpi_os_predefined_override(const struct acpi_predefined_names *init_val,
--			    acpi_string * new_val)
-+			    acpi_string *new_val)
- {
- 	if (!init_val || !new_val)
- 		return AE_BAD_PARAMETER;
-@@ -714,8 +710,8 @@ static void acpi_table_taint(struct acpi_table_header *table)
- 
- 
- acpi_status
--acpi_os_table_override(struct acpi_table_header * existing_table,
--		       struct acpi_table_header ** new_table)
-+acpi_os_table_override(struct acpi_table_header *existing_table,
-+		       struct acpi_table_header **new_table)
- {
- 	if (!existing_table || !new_table)
- 		return AE_BAD_PARAMETER;
-@@ -889,7 +885,7 @@ u64 acpi_os_get_timer(void)
- 	return time_ns;
- }
- 
--acpi_status acpi_os_read_port(acpi_io_address port, u32 * value, u32 width)
-+acpi_status acpi_os_read_port(acpi_io_address port, u32 *value, u32 width)
- {
- 	u32 dummy;
- 
-@@ -1046,7 +1042,7 @@ acpi_os_write_memory(acpi_physical_address phys_addr, u64 value, u32 width)
- }
- 
- acpi_status
--acpi_os_read_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
-+acpi_os_read_pci_configuration(struct acpi_pci_id *pci_id, u32 reg,
- 			       u64 *value, u32 width)
- {
- 	int result, size;
-@@ -1074,11 +1070,11 @@ acpi_os_read_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
- 				reg, size, &value32);
- 	*value = value32;
- 
--	return (result ? AE_ERROR : AE_OK);
-+	return result ? AE_ERROR : AE_OK;
- }
- 
- acpi_status
--acpi_os_write_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
-+acpi_os_write_pci_configuration(struct acpi_pci_id *pci_id, u32 reg,
- 				u64 value, u32 width)
- {
- 	int result, size;
-@@ -1101,7 +1097,7 @@ acpi_os_write_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
- 				PCI_DEVFN(pci_id->device, pci_id->function),
- 				reg, size, value);
- 
--	return (result ? AE_ERROR : AE_OK);
-+	return result ? AE_ERROR : AE_OK;
- }
- 
- static void acpi_os_execute_deferred(struct work_struct *work)
-@@ -1247,7 +1243,7 @@ bool acpi_queue_hotplug_work(struct work_struct *work)
- }
- 
- acpi_status
--acpi_os_create_semaphore(u32 max_units, u32 initial_units, acpi_handle * handle)
-+acpi_os_create_semaphore(u32 max_units, u32 initial_units, acpi_handle *handle)
- {
- 	struct semaphore *sem = NULL;
- 
-@@ -1735,7 +1731,7 @@ void acpi_os_release_lock(acpi_spinlock lockp, acpi_cpu_flags flags)
-  ******************************************************************************/
- 
- acpi_status
--acpi_os_create_cache(char *name, u16 size, u16 depth, acpi_cache_t ** cache)
-+acpi_os_create_cache(char *name, u16 size, u16 depth, acpi_cache_t **cache)
- {
- 	*cache = kmem_cache_create(name, size, 0, 0, NULL);
- 	if (*cache == NULL)
-@@ -1756,10 +1752,10 @@ acpi_os_create_cache(char *name, u16 size, u16 depth, acpi_cache_t ** cache)
-  *
-  ******************************************************************************/
- 
--acpi_status acpi_os_purge_cache(acpi_cache_t * cache)
-+acpi_status acpi_os_purge_cache(acpi_cache_t *cache)
- {
- 	kmem_cache_shrink(cache);
--	return (AE_OK);
-+	return AE_OK;
- }
- 
- /*******************************************************************************
-@@ -1775,10 +1771,10 @@ acpi_status acpi_os_purge_cache(acpi_cache_t * cache)
-  *
-  ******************************************************************************/
- 
--acpi_status acpi_os_delete_cache(acpi_cache_t * cache)
-+acpi_status acpi_os_delete_cache(acpi_cache_t *cache)
- {
- 	kmem_cache_destroy(cache);
--	return (AE_OK);
-+	return AE_OK;
- }
- 
- /*******************************************************************************
-@@ -1795,10 +1791,10 @@ acpi_status acpi_os_delete_cache(acpi_cache_t * cache)
-  *
-  ******************************************************************************/
- 
--acpi_status acpi_os_release_object(acpi_cache_t * cache, void *object)
-+acpi_status acpi_os_release_object(acpi_cache_t *cache, void *object)
- {
- 	kmem_cache_free(cache, object);
--	return (AE_OK);
-+	return AE_OK;
- }
+-		printk_once(KERN_NOTICE FW_BUG PREFIX
++		pr_notice_once(FW_BUG PREFIX
+ 			"BIOS _OSI(Linux) query %s%s\n",
+ 			osi_linux.enable ? "honored" : "ignored",
+ 			osi_linux.cmdline ? " via cmdline" :
+@@ -230,10 +230,10 @@ void acpi_os_vprintf(const char *fmt, va_list args)
+ 	if (acpi_in_debugger) {
+ 		kdb_printf("%s", buffer);
+ 	} else {
+-		printk(KERN_CONT "%s", buffer);
++		pr_cont("%s", buffer);
+ 	}
+ #else
+-	printk(KERN_CONT "%s", buffer);
++	pr_cont("%s", buffer);
  #endif
+ }
  
+@@ -261,8 +261,7 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
+ 		else if (efi.acpi != EFI_INVALID_TABLE_ADDR)
+ 			return efi.acpi;
+ 		else {
+-			printk(KERN_ERR PREFIX
+-			       "System description tables not found\n");
++			pr_err(PREFIX "System description tables not found\n");
+ 			return 0;
+ 		}
+ 	} else if (IS_ENABLED(CONFIG_ACPI_LEGACY_TABLES_LOOKUP)) {
+@@ -372,7 +371,7 @@ acpi_os_map_iomem(acpi_physical_address phys, acpi_size size)
+ 	acpi_size pg_sz;
+ 
+ 	if (phys > ULONG_MAX) {
+-		printk(KERN_ERR PREFIX "Cannot map memory that high\n");
++		pr_err(PREFIX "Cannot map memory that high\n");
+ 		return NULL;
+ 	}
+ 
+@@ -546,8 +545,8 @@ acpi_os_predefined_override(const struct acpi_predefined_names *init_val,
+ 
+ 	*new_val = NULL;
+ 	if (!memcmp(init_val->name, "_OS_", 4) && strlen(acpi_os_name)) {
+-		printk(KERN_INFO PREFIX "Overriding _OS definition to '%s'\n",
+-		       acpi_os_name);
++		pr_info(PREFIX "Overriding _OS definition to '%s'\n",
++			acpi_os_name);
+ 		*new_val = acpi_os_name;
+ 	}
+ 
+@@ -824,15 +823,14 @@ acpi_os_install_interrupt_handler(u32 gsi, acpi_osd_handler handler,
+ 		return AE_ALREADY_ACQUIRED;
+ 
+ 	if (acpi_gsi_to_irq(gsi, &irq) < 0) {
+-		printk(KERN_ERR PREFIX "SCI (ACPI GSI %d) not registered\n",
+-		       gsi);
++		pr_err(PREFIX "SCI (ACPI GSI %d) not registered\n", gsi);
+ 		return AE_OK;
+ 	}
+ 
+ 	acpi_irq_handler = handler;
+ 	acpi_irq_context = context;
+ 	if (request_irq(irq, acpi_irq, IRQF_SHARED, "acpi", acpi_irq)) {
+-		printk(KERN_ERR PREFIX "SCI (IRQ%d) allocation failed\n", irq);
++		pr_err(PREFIX "SCI (IRQ%d) allocation failed\n", irq);
+ 		acpi_irq_handler = NULL;
+ 		return AE_NOT_ACQUIRED;
+ 	}
+@@ -1173,8 +1171,7 @@ acpi_status acpi_os_execute(acpi_execute_type type,
+ 	ret = queue_work_on(0, queue, &dpc->work);
+ 
+ 	if (!ret) {
+-		printk(KERN_ERR PREFIX
+-			  "Call to queue_work() failed.\n");
++		pr_err(PREFIX "Call to queue_work() failed.\n");
+ 		status = AE_ERROR;
+ 		kfree(dpc);
+ 	}
+@@ -1371,7 +1368,7 @@ acpi_status acpi_os_signal(u32 function, void *info)
+ {
+ 	switch (function) {
+ 	case ACPI_SIGNAL_FATAL:
+-		printk(KERN_ERR PREFIX "Fatal opcode executed\n");
++		pr_err(PREFIX "Fatal opcode executed\n");
+ 		break;
+ 	case ACPI_SIGNAL_BREAKPOINT:
+ 		/*
+@@ -1440,7 +1437,7 @@ void __init acpi_osi_setup(char *str)
+ 		return;
+ 
+ 	if (str == NULL || *str == '\0') {
+-		printk(KERN_INFO PREFIX "_OSI method disabled\n");
++		pr_info(PREFIX "_OSI method disabled\n");
+ 		acpi_gbl_create_osi_method = FALSE;
+ 		return;
+ 	}
+@@ -1498,7 +1495,7 @@ static void __init acpi_cmdline_osi_linux(unsigned int enable)
+ 
+ void __init acpi_dmi_osi_linux(int enable, const struct dmi_system_id *d)
+ {
+-	printk(KERN_NOTICE PREFIX "DMI detected: %s\n", d->ident);
++	pr_notice(PREFIX "DMI detected: %s\n", d->ident);
+ 
+ 	if (enable == -1)
+ 		return;
+@@ -1527,7 +1524,7 @@ static void __init acpi_osi_setup_late(void)
+ 		status = acpi_update_interfaces(ACPI_DISABLE_ALL_VENDOR_STRINGS);
+ 
+ 		if (ACPI_SUCCESS(status))
+-			printk(KERN_INFO PREFIX "Disabled all _OSI OS vendors\n");
++			pr_info(PREFIX "Disabled all _OSI OS vendors\n");
+ 	}
+ 
+ 	for (i = 0; i < OSI_STRING_ENTRIES_MAX; i++) {
+@@ -1540,12 +1537,12 @@ static void __init acpi_osi_setup_late(void)
+ 			status = acpi_install_interface(str);
+ 
+ 			if (ACPI_SUCCESS(status))
+-				printk(KERN_INFO PREFIX "Added _OSI(%s)\n", str);
++				pr_info(PREFIX "Added _OSI(%s)\n", str);
+ 		} else {
+ 			status = acpi_remove_interface(str);
+ 
+ 			if (ACPI_SUCCESS(status))
+-				printk(KERN_INFO PREFIX "Deleted _OSI(%s)\n", str);
++				pr_info(PREFIX "Deleted _OSI(%s)\n", str);
+ 		}
+ 	}
+ }
+@@ -1646,12 +1643,8 @@ int acpi_check_resource_conflict(const struct resource *res)
+ 	if (clash) {
+ 		if (acpi_enforce_resources != ENFORCE_RESOURCES_NO) {
+ 			if (acpi_enforce_resources == ENFORCE_RESOURCES_LAX)
+-				printk(KERN_NOTICE "ACPI: This conflict may"
+-				       " cause random problems and system"
+-				       " instability\n");
+-			printk(KERN_INFO "ACPI: If an ACPI driver is available"
+-			       " for this device, you should use it instead of"
+-			       " the native driver\n");
++				pr_notice("ACPI: This conflict may cause random problems and system instability\n");
++			pr_info("ACPI: If an ACPI driver is available for this device, you should use it instead of the native driver\n");
+ 		}
+ 		if (acpi_enforce_resources == ENFORCE_RESOURCES_STRICT)
+ 			return -EBUSY;
+@@ -1810,8 +1803,7 @@ early_param("acpi_no_static_ssdt", acpi_no_static_ssdt_setup);
+ 
+ static int __init acpi_disable_return_repair(char *s)
+ {
+-	printk(KERN_NOTICE PREFIX
+-	       "ACPI: Predefined validation mechanism disabled\n");
++	pr_notice(PREFIX "ACPI: Predefined validation mechanism disabled\n");
+ 	acpi_gbl_disable_auto_repair = TRUE;
+ 
+ 	return 1;
 -- 
 2.1.0
