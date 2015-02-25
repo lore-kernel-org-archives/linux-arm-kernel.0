@@ -1,174 +1,113 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Wed, 25 Feb 2015 13:57:27 -0700
-Subject: [Linaro-acpi] [PATCH v3 4/9] ACPI: clean up checkpatch warnings
- for items with possible semantic value
-In-Reply-To: <54EDC957.9050000@linaro.org>
-References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
- <1424824585-6405-5-git-send-email-al.stone@linaro.org>
- <54EDC957.9050000@linaro.org>
-Message-ID: <54EE3737.2040300@linaro.org>
+From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez-Ortiz)
+Date: Wed, 25 Feb 2015 16:02:54 -0500
+Subject: [PATCH] drivers/tty: amba-pl011: defer driver probing if external
+ dma is not ready.
+In-Reply-To: <7759418.HHcBTFejZY@wuerfel>
+References: <1424749613-24765-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <54ECD1E6.2070909@linaro.org> <54ECF4E0.7010005@linaro.org>
+ <7759418.HHcBTFejZY@wuerfel>
+Message-ID: <54EE387E.8040003@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2015 06:08 AM, Hanjun Guo wrote:
-> On 2015?02?25? 08:36, al.stone at linaro.org wrote:
->> From: Al Stone <al.stone@linaro.org>
+On 02/25/2015 05:22 AM, Arnd Bergmann wrote:
+> On Tuesday 24 February 2015 17:02:08 Jorge Ramirez-Ortiz wrote:
+>> On 02/24/2015 02:32 PM, Jorge Ramirez-Ortiz wrote:
+>>> On 02/24/2015 03:29 AM, Arnd Bergmann wrote:
+>>>> On Monday 23 February 2015 22:46:53 Jorge Ramirez-Ortiz wrote:
+>>>>> This patch addresses a race condition that happens when
+>>>>> device_initcall(pl011_dma_initicall) is executed before all the devices have been
+>>>>> probed - this issue was observed on an hisi_6220 SoC (HiKey board from Linaro).
+>>>> How do you want to handle the case where there is a DMA channel in DT, but
+>>>> no driver for it built into the kernel?
+>>> In my view that should be fixed in the of-dma and the acpi-dma implementation
+>>> (just don't return EPROBE_DEFER a second time since the driver wasn't found
+>>> after the late_initcall associated to deferred probing). That would allow
+>>> drivers that use the defer probing mechanism to wait for optional controllers to
+>>> complete their probing sequence if those controllers don't become available.
+>>>
+>>> In any case, I can track the pending requests (up to twelve, one per UART) with
+>>> a list in the driver.
+>>> If a second request to probe fails with EPROBE_DEFER we can conclude that the
+>>> driver is not present.
+>>>
+>>> I have tested such an implementation and it works as expected.
+>>> would that be acceptable?
+>> Something along these lines
 >>
->> In preparation for later splitting out some of the arch-dependent code from
->> osl.c, clean up some warnings from checkpatch that fall into more semantic
->> issues; none of these should change functionality, but they do touch lines
->> of code with semantic significance:
->>
->>     -- replaced #include <asm/foo.h> with #include <linux/foo.h>
->>     -- replaced extern that was only being used for sizeof() with a #define
->>     -- removed use of else after breaks/returns when not useful
->>     -- moved __initdata to the proper place in a definition
->>     -- moved EXPORT_SYMBOL to a line immediately after the function
->>     -- removed unnecessary return statements from void functions
->>
->> Signed-off-by: Al Stone <al.stone@linaro.org>
->> ---
->>   drivers/acpi/osl.c | 31 ++++++++++---------------------
->>   1 file changed, 10 insertions(+), 21 deletions(-)
->>
->> diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
->> index 46317ff..af6dda7 100644
->> --- a/drivers/acpi/osl.c
->> +++ b/drivers/acpi/osl.c
->> @@ -40,9 +40,8 @@
->>   #include <linux/list.h>
->>   #include <linux/jiffies.h>
->>   #include <linux/semaphore.h>
->> -
->> -#include <asm/io.h>
->> -#include <asm/uaccess.h>
->> +#include <linux/io.h>
->> +#include <linux/uaccess.h>
->>
->>   #include "internal.h"
->>
->> @@ -66,7 +65,7 @@ struct acpi_os_dpc {
->>   int acpi_in_debugger;
->>   EXPORT_SYMBOL(acpi_in_debugger);
->>
->> -extern char line_buf[80];
->> +#define DEBUGGER_LINE_BUFLEN    80
->>   #endif                /*ENABLE_DEBUGGER */
->>
->>   static int (*__acpi_os_prepare_sleep)(u8 sleep_state, u32 pm1a_ctrl,
->> @@ -268,10 +267,8 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
->>               return efi.acpi20;
->>           else if (efi.acpi != EFI_INVALID_TABLE_ADDR)
->>               return efi.acpi;
->> -        else {
->> -            pr_err(PREFIX "System description tables not found\n");
->> -            return 0;
->> -        }
->> +        pr_err(PREFIX "System description tables not found\n");
->> +        return 0;
->>       } else if (IS_ENABLED(CONFIG_ACPI_LEGACY_TABLES_LOOKUP)) {
->>           acpi_physical_address pa = 0;
->>
->> @@ -594,7 +591,7 @@ static const char * const table_sigs[] = {
->>   #define ACPI_HEADER_SIZE sizeof(struct acpi_table_header)
->>
->>   #define ACPI_OVERRIDE_TABLES 64
->> -static struct cpio_data __initdata acpi_initrd_files[ACPI_OVERRIDE_TABLES];
->> +static struct cpio_data acpi_initrd_files[ACPI_OVERRIDE_TABLES] __initdata;
->>
->>   #define MAP_CHUNK_SIZE   (NR_FIX_BTMAPS << PAGE_SHIFT)
->>
->> @@ -806,10 +803,10 @@ static irqreturn_t acpi_irq(int irq, void *dev_id)
->>       if (handled) {
->>           acpi_irq_handled++;
->>           return IRQ_HANDLED;
->> -    } else {
->> -        acpi_irq_not_handled++;
->> -        return IRQ_NONE;
->>       }
+>> +struct dma_deferred {
+>> +       struct list_head node;
+>> +       struct device *dev;
+>> +};
 >> +
->> +    acpi_irq_not_handled++;
->> +    return IRQ_NONE;
->>   }
->>
->>   acpi_status
->> @@ -911,7 +908,6 @@ acpi_status acpi_os_read_port(acpi_io_address port, u32
->> *value, u32 width)
->>
->>       return AE_OK;
->>   }
->> -
->>   EXPORT_SYMBOL(acpi_os_read_port);
->>
->>   acpi_status acpi_os_write_port(acpi_io_address port, u32 value, u32 width)
->> @@ -927,7 +923,6 @@ acpi_status acpi_os_write_port(acpi_io_address port, u32
->> value, u32 width)
->>
->>       return AE_OK;
->>   }
->> -
->>   EXPORT_SYMBOL(acpi_os_write_port);
->>
->>   #ifdef readq
->> @@ -1362,7 +1357,7 @@ u32 acpi_os_get_line(char *buffer)
->>       if (acpi_in_debugger) {
->>           u32 chars;
->>
->> -        kdb_read(buffer, sizeof(line_buf));
->> +        kdb_read(buffer, sizeof(DEBUGGER_LINE_BUFLEN));
-> 
-> I think kdb_read(buffer, DEBUGGER_LINE_BUFLEN); will be fine.
-> 
-> other than that,
-> 
-> Reviewd-by: Hanjun Guo <hanjun.guo@linaro.org>
-> 
-> Thanks
-> Hanjun
+>> +static LIST_HEAD(dma_deferred_reqs);
+>> +
+>> +static int pl011_handle_dma_probe_defer(struct device *dev)
+>> +{
+>> +       struct list_head *node, *tmp;
+>> +       struct dma_deferred *entry;
+>> +
+>> +       list_for_each_safe(node, tmp, &dma_deferred_reqs) {
+>> +               entry = list_entry(node, struct dma_deferred, node);
+>> +               if (entry->dev == dev) {
+>> +                       dev_warn(dev, "DMA driver not present \n");
+>> +                       list_del(node);
+>> +                       kfree(entry);
+>> +                       return -ENODEV;
+>> +               }
+>> +       }
+> I don't see how this would help: Assume you probe the uart first, it defers
+> because of missing DMA, then you probe DMA, which defers because of some
+> other resource (clock, irq, ...), then probe the uart a second time and
+> it fails, then you probe the DMA driver which succeeds because the resources
+> are there. Another case would be the DMA driver being a loadable module
+> that only gets loaded after all deferred probes from built-in drivers
+> have completed.
 
-Whups.  Boy, was that just plain wrong.  Thanks.  Fixed.
+yes you are right.
+it is just as incomplete a solution as replacing the original device_initcall by
+late_deviceinitcall (my first impulse)
 
->>
->>           /* remove the CR kdb includes */
->>           chars = strlen(buffer) - 1;
->> @@ -1490,8 +1485,6 @@ static void __init set_osi_linux(unsigned int enable)
->>           acpi_osi_setup("Linux");
->>       else
->>           acpi_osi_setup("!Linux");
->> -
->> -    return;
->>   }
->>
->>   static void __init acpi_cmdline_osi_linux(unsigned int enable)
->> @@ -1499,8 +1492,6 @@ static void __init acpi_cmdline_osi_linux(unsigned int
->> enable)
->>       osi_linux.cmdline = 1;    /* cmdline set the default and override DMI */
->>       osi_linux.dmi = 0;
->>       set_osi_linux(enable);
->> -
->> -    return;
->>   }
->>
->>   void __init acpi_dmi_osi_linux(int enable, const struct dmi_system_id *d)
->> @@ -1512,8 +1503,6 @@ void __init acpi_dmi_osi_linux(int enable, const struct
->> dmi_system_id *d)
->>
->>       osi_linux.dmi = 1;    /* DMI knows that this box asks OSI(Linux) */
->>       set_osi_linux(enable);
->> -
->> -    return;
->>   }
->>
->>   /*
->>
+>
+> I don't think we can make any reasonable assumption about the number of
+> times you need to defer the probing here.
 
+agreed.
 
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+And even if we did, the current defer probing framework would not reliably
+support it either, since it might stop sending deferred probes with requests
+still queued in the deferred_probe_pending_list.So the wait could be eternal.
+
+I believe this happens when all the in kernel drivers have been tried and the
+list is now waiting for some module to successfuly load -which would trigger the
+event that iterates through the list.
+
+If not for this particular case, maybe there is some value in extending the
+current defer driver probing behavior;
+For example having two types of defer:
+1. -EPROBE_DEFER (as per today, for ever)
+2. -EPROBE_DEFERK (ie, defer until all the in-kernel devices have been handled
+and the list is quiescent now waiting for modules)
+On this second case we could flush the list probing the device with a flag in
+struct device indicating this is indeed the last call under EPROBE_DEFERK.
+
+I am not very sure myself if this would be of use to anybody (although I would
+have probably used it on this case)
+
+>
+> Also, the UART is a rather central device, at least the one that is used
+> for the console, and we probably want to use it as early as possible even
+> if that means never attaching the dma engine.
+
+yes, defer probing clearly does not fit here.
+
+>
+> A better solution might be to move the dma_request_slave_channel_reason()
+> call out of the probe() function entirely and into the open() function:
+> we use DMA if it is available by the time the device gets opened, otherwise
+> we don't.
+
+thanks! will do that.
+
+>
+> 	Arnd
