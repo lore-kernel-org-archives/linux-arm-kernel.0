@@ -1,78 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Feb 2015 17:10:49 +0100
-Subject: [PATCH 2/4] i2c: sunxi: Add Reduced Serial Bus (RSB) DT bindings
- documentation
-In-Reply-To: <CAGb2v675oV60cont4JPX0Cy-5oaqXSz+74kC4JFeJYja6SSV+A@mail.gmail.com>
-References: <1424773744-15106-1-git-send-email-wens@csie.org>
- <16025407.hQRFhlbHKD@wuerfel>
- <CAGb2v675oV60cont4JPX0Cy-5oaqXSz+74kC4JFeJYja6SSV+A@mail.gmail.com>
-Message-ID: <2832810.NHVTmhf5rK@wuerfel>
+From: dtor@chromium.org (Dmitry Torokhov)
+Date: Wed, 25 Feb 2015 11:33:46 -0800
+Subject: [PATCH v5 0/6] Add common clock support for Broadcom iProc
+ architecture
+In-Reply-To: <1423097705-22939-1-git-send-email-rjui@broadcom.com>
+References: <rjui@broadcom.com>
+ <1423097705-22939-1-git-send-email-rjui@broadcom.com>
+Message-ID: <20150225193346.GD3215@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 February 2015 22:32:57 Chen-Yu Tsai wrote:
-> On Tue, Feb 24, 2015 at 10:17 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 24 February 2015 22:01:26 Chen-Yu Tsai wrote:
-> >> On Tue, Feb 24, 2015 at 6:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > On Tuesday 24 February 2015 18:29:02 Chen-Yu Tsai wrote:
-> >> >>
-> >> >> +       rsb at 01f03400 {
-> >> >> +               compatible = "allwinner,sun8i-a23-rsb";
-> >> >> +               reg = <0x01f03400 0x400>;
-> >> >> +               interrupts = <0 39 4>;
-> >> >> +               clocks = <&apb0_gates 3>;
-> >> >> +               clock-frequency = <3000000>;
-> >> >> +               resets = <&apb0_rst 3>;
-> >> >> +
-> >> >> +               axp223: pmic at 2d {
-> >> >> +                       compatible = "x-powers,axp223", "x-powers,axp221";
-> >> >> +                       reg = <0x2d>;
-> >> >> +                       allwinner,rsb-hw-addr = <0x3e3>;
-> >> >> +
-> >> >> +                       /* ... */
-> >> >> +               };
-> >> >> +       };
-> >>
-> >> > I don't really understand the need for having two addresses (runtime
-> >> > and hardware). Could the runtime address be configured at runtime?
-> >>
-> >> You can, though the driver doesn't support this. I don't think the
-> >> I2C subsystem allows arbitrary device insertion during normal
-> >> operation, but maybe i2c-dev? I've tried using different addresses
-> >> for devices so they do get changed during the probe phase, just
-> >> to be sure that the code works, and it's not just sitting at
-> >> the address the bootloader used.
-> >>
-> >> In any case, the distinction is more like burnt-in or hardwired
-> >> addresses vs software configurable addresses.
-> >
-> > The simplest binding would the probably be to only put the
-> > hardware address into the 'reg' property and always assign the
-> > logical addresses dynamically.
-> >
-> > Would that add a lot of complexity or does it have any other
-> > downsides?
+On Wed, Feb 04, 2015 at 04:54:59PM -0800, Ray Jui wrote:
+> This patchset contains the initial common clock support for Broadcom's iProc
+> family of SoCs. The iProc clock architecture comprises of various PLLs, e.g.,
+> ARMPLL, GENPLL, LCPLL0, MIPIPLL, and etc. An onboard crystal serves as the
+> basic reference clock for these PLLs. Each PLL may have several leaf clocks.
+> One special group of clocks is the ASIU clocks, which are dervied directly
+> from the crystal reference clock.
 > 
-> The hardware address is 12 bits wide. Any address higher than
-> 0x3ff will be rejected by the I2C core. The AC100 is at 0xe89.
+> This patchset also contains the basic clock support for the Broadcom Cygnus
+> SoC, which implements the iProc clock architecture
 > 
-> Assigning addresses dynamically means the driver has to keep
-> a lookup table to map the hardware address to the logical
-> address to issue the command to.
+> Changes from v4:
+>  - Add of_clk_get_parent_rate helper function into the clock framework
+>  - Switch to use of_clk_get_parent_rate in the iProc PLL clock driver
 > 
-> There's also the issue of dynamically assigned address colliding
-> with unlisted devices, though I think this would only happen in
-> the development / bring up phase of the device.
+> Changes from v3:
+>  - Fix incorrect use of passing in of_clk_src_onecell_get when adding ARM PLL
+>    and other iProc PLLs as clock provider. These PLLs have zero cells in DT and
+>    thefore of_clk_src_simple_get should be used instead
+>  - Rename Cygnus MIPI PLL Channel 2 clock from BCM_CYGNUS_MIPIPLL_CH2_UNUSED
+>    to BCM_CYGNUS_MIPIPLL_CH2_V3D, since a 3D graphic rendering engine has been
+>    integrated into Cygnus revision B0 and has its core clock running off
+>    MIPI PLL Channel 2
+>  - Changed default MIPI PLL VCO frequency from 1.75 GHz to 2.1 GHz. This allows
+>    us to derive 300 MHz V3D clock from channel 2 through the post divisor
 > 
-> I think the first issue pretty much rules out putting the
-> hardware address into 'reg'.
+> Changes from v2:
+>  - Re-arrange Cygnus clock/pll init functions so each init function is right
+>    next to its clock table
+>  - Removed #defines for number of clocks in Cygnus. Have the number of clocks
+>    automatically determined based on array size of the clock table
 > 
-> Putting the logical address in the 'reg' property allows the
-> user to poke unlisted devices using i2c-tools, though this
-> is not so useful to the average user.
+> Changes from v1:
+>  - Separate drivers/clk/Makefile change for drivers/clk/bcm out to a standalone patch
 
-Ok, fair enough. Your approach seems reasonable then, but it
-might be helpful to add your explanation to the changelog of the
-patch that introduces the binding.
+FWIW I tested this series on BCM958305K SVK.
 
-	Arnd
+Tested-by: Dmitry Torokhov <dtor@chromium.org>
+
+Thanks.
+
+-- 
+Dmitry
