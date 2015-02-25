@@ -1,106 +1,102 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Feb 2015 10:00:45 +0000
-Subject: [PATCH linux-next] iommu: Enable LPAE pagetable on ARM only
-In-Reply-To: <CAMuHMdXpSbEdrQ=1-m_MBv6RUb92waZ0BjLr1p790R9+L3Z8ww@mail.gmail.com>
-References: <1424621346-7822-1-git-send-email-vincent.stehle@laposte.net>
- <2868840.GyWYJOzqWH@avalon>
- <CAMuHMdXpSbEdrQ=1-m_MBv6RUb92waZ0BjLr1p790R9+L3Z8ww@mail.gmail.com>
-Message-ID: <20150225100044.GC20673@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 25 Feb 2015 11:01:54 +0100
+Subject: [PATCH] cpuidle: mvebu: update cpuidle thresholds for Armada
+ XP SOCs
+In-Reply-To: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
+References: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
+Message-ID: <54ED9D92.90506@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 24, 2015 at 10:33:02AM +0000, Geert Uytterhoeven wrote:
-> On Mon, Feb 23, 2015 at 5:52 PM, Laurent Pinchart
-> <laurent.pinchart@ideasonboard.com> wrote:
-> > On Sunday 22 February 2015 17:09:06 Vincent Stehl? wrote:
-> >> LPAE iommu page table makes sense only for ARM architecture. Add the
-> >> corresponding dependency in Kconfig.
-> >>
-> >> This fixes the following runtime warnings on PA-RISC architecture:
-> >
-> > I suppose this is caused by the selftest code ?
-> >
-> >>   WARNING: at drivers/iommu/io-pgtable-arm.c:413
-> >>   Modules linked in:
-> >>   CPU: 0 PID: 1 Comm: swapper/0 Not tainted
-> >> 3.19.0-next-20150222-00002-gc420256 #2 task: 17ca0000 ti: 17ca8000 task.ti:
-> >> 17ca8000
-> >>
-> >>        YZrvWESTHLNXBCVMcbcbcbcbOGFRQPDI
-> >>   PSW: 00000000000001001111111100001111 Not tainted
-> >>   r00-03  0004ff0f 0000001b 104871b0 17ca83c0
-> >>   r04-07  00001000 00000000 00000000 00000000
-> >>   r08-11  00000000 40001000 1013b36c 17ca8248
-> >>   r12-15  00000080 17e712c0 00000000 17c5e100
-> >>   r16-19  0000000c 105d8eb0 40001000 ffffffff
-> >>   r20-23  00000000 00800020 1048717c 00000000
-> >>   r24-27  00001000 00000000 00000009 10774ce0
-> >>   r28-31  00000000 00000027 17ca8480 10486d44
-> >>   sr00-03  00000000 00000000 00000000 00000000
-> >>   sr04-07  00000000 00000000 00000000 00000000
-> >>
-> >>   IASQ: 00000000 00000000 IAOQ: 10486df4 10486df8
-> >>    IIR: 03ffe01f    ISR: 00000000  IOR: 17c86e54
-> >>    CPU:        0   CR30: 17ca8000 CR31: 00000002
-> >>    ORIG_R28: 00000001
-> >>    IAOQ[0]: __arm_lpae_unmap+0x144/0x4cc
-> >>    IAOQ[1]: __arm_lpae_unmap+0x148/0x4cc
-> >>    RP(r2): arm_lpae_unmap+0x34/0x6c
-> >>   Backtrace:
-> >>    [<104871b0>] arm_lpae_unmap+0x34/0x6c
-> >>    [<10127944>] 0x10127944
-> >>    [<10168ee0>] do_one_initcall+0x128/0x1dc
-> >>    [<101028fc>] 0x101028fc
-> >>    [<10161b48>] kernel_init+0x1c/0x118
-> >>    [<1015d01c>] end_fault_vector+0x1c/0x24
-> >>    [<101762ec>] save_stack_trace+0x28/0x60
-> >>
-> >> Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
-> >> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> >> Cc: Will Deacon <will.deacon@arm.com>
-> >> ---
-> >>
-> >>
-> >> Hi,
-> >>
-> >> This can be seen with e.g. Linux next-20150222 on parisc with allmodconfig.
-> >>
-> >> Best regards,
-> >>
-> >> V.
-> >>
-> >>
-> >>  drivers/iommu/Kconfig | 1 +
-> >>  1 file changed, 1 insertion(+)
-> >>
-> >> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> >> index baa0d97..c73fd72 100644
-> >> --- a/drivers/iommu/Kconfig
-> >> +++ b/drivers/iommu/Kconfig
-> >> @@ -22,6 +22,7 @@ config IOMMU_IO_PGTABLE
-> >>
-> >>  config IOMMU_IO_PGTABLE_LPAE
-> >>       bool "ARMv7/v8 Long Descriptor Format"
-> >> +     depends on ARM
-> >
-> > How about ARM || COMPILE_TEST ? It can still be useful to compile the module
-> > on other architectures.
-> 
-> COMPILE_TEST is meant for test-compiling drivers or subsystems that are not
-> useful on all platforms. IMHO COMPILE_TEST kernels are still supposed to boot
-> without ill effects.
-> 
-> Now, I understand the issue on PA-RISC is with the selftest, not with the actual
-> IOMMU_IO_PGTABLE_LPAE module? Then IOMMU_IO_PGTABLE_LPAE
-> can depend on ARM || COMPILE_TEST (|| ARM64, cfr. Laurent's later email).
-> 
-> But the selftest should protect itself against running on non-ARM, either
-> by making IOMMU_IO_PGTABLE_LPAE_SELFTEST depend on ARM(64)
-> (without "|| COMPILE_TEST"), or by adding a check to arm_lpae_do_selftests(),
-> to please all compile-testers.
+On 02/13/2015 03:55 PM, s. rannou wrote:
+> Originally, the thresholds used in the cpuidle driver for Armada SOCs
+> were temporarily chosen, leaving room for improvements.
+>
+> This commit updates the thresholds for the Armada XP SOCs with values
+> that positively impact performances:
+>
+>                                  without patch  with patch   vendor kernel
+>   - iperf localhost (gbit/sec)   ~3.7           ~6.4         ~5.4
+>   - ioping tmpfs (iops)          ~163k          ~206k        ~179k
+>   - ioping tmpfs (mib/s)         ~636           ~805         ~699
+>
+> The idle power consumption is negatively impacted (proportionally less
+> than the performance gain), and we are still performing better than
+> the vendor kernel here:
+>
+>                                  without patch   with patch  vendor kernel
+>   - power consumption idle (W)   ~2.4            ~3.2        ~4.4
+>   - power consumption busy (W)   ~8.6            ~8.3        ~8.6
+>
+> There is still room for improvement regarding the value of these
+> thresholds, they were chosen to mimic the vendor kernel.
+>
+> This patch only impacts Armada XP SOCs and was tested on Online Labs
+> C1 boards. A similar approach can be taken to improve the performances
+> of the Armada 370 and Armada 38x SOCs.
+>
+> Thanks a lot to Thomas Petazzoni, Gregory Clement and Willy Tarreau
+> for the discussions and tips around this topic.
 
-Perhaps, but actually the issues reported by the self-test are *real* bugs
-that I've now got fixes for. They just don't show up on arm platforms
-because of different right shift behaviour.
+Hi Sebastien,
 
-Will
+trying to tune the target residency and the exit latency is a good idea 
+but you can have multiple results. If you increase the exit latency and 
+the target residency, then the governor will choose a shallow state, 
+thus improving the performance and degrading the power consumption. If 
+you reduce the values, then the performance will degrade but the power 
+saving will increase in an acceptable interval (until going to this 
+state does not consume more energy).
+
+If you have the possibility, I would suggest to apply the right 
+methodology to find the right values by using the description in the 
+wiki page [1]. If you can access to the energy values to enter / exit 
+the state and the power consumed in each idle state, then you can 
+mathematically compute the right values.
+
+   -- Daniel
+
+[1] 
+https://wiki.linaro.org/WorkingGroups/PowerManagement/Doc/ComputingTargetResidency
+
+>
+> Signed-off-by: Sebastien Rannou <mxs@sbrk.org>
+> ---
+>   drivers/cpuidle/cpuidle-mvebu-v7.c | 8 ++++----
+>   1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
+> index 38e6861..3716a1f 100644
+> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
+> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
+> @@ -50,17 +50,17 @@ static struct cpuidle_driver armadaxp_idle_driver = {
+>   	.states[0]		= ARM_CPUIDLE_WFI_STATE,
+>   	.states[1]		= {
+>   		.enter			= mvebu_v7_enter_idle,
+> -		.exit_latency		= 10,
+> +		.exit_latency		= 100,
+>   		.power_usage		= 50,
+> -		.target_residency	= 100,
+> +		.target_residency	= 1000,
+>   		.name			= "MV CPU IDLE",
+>   		.desc			= "CPU power down",
+>   	},
+>   	.states[2]		= {
+>   		.enter			= mvebu_v7_enter_idle,
+> -		.exit_latency		= 100,
+> +		.exit_latency		= 1000,
+>   		.power_usage		= 5,
+> -		.target_residency	= 1000,
+> +		.target_residency	= 10000,
+>   		.flags			= MVEBU_V7_FLAG_DEEP_IDLE,
+>   		.name			= "MV CPU DEEP IDLE",
+>   		.desc			= "CPU and L2 Fabric power down",
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
