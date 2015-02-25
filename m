@@ -1,27 +1,27 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Wed, 25 Feb 2015 16:38:11 +0000
-Subject: [PATCH v2 0/3] arm/arm64: Detect Xen support earlier
-In-Reply-To: <20150225163417.GN12377@arm.com>
-References: <1424267513-15836-1-git-send-email-julien.grall@linaro.org>
- <54EDF6C9.9060504@linaro.org> <20150225163417.GN12377@arm.com>
-Message-ID: <54EDFA73.7020905@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 25 Feb 2015 16:43:20 +0000
+Subject: [PATCH] arm64: enable PTE type bit in the mask for pte_modify
+In-Reply-To: <1424821221-16396-1-git-send-email-fkan@apm.com>
+References: <1424821221-16396-1-git-send-email-fkan@apm.com>
+Message-ID: <20150225164319.GF1105@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/02/15 16:34, Will Deacon wrote:
-> On Wed, Feb 25, 2015 at 04:22:33PM +0000, Julien Grall wrote:
->> Hello,
->>
->> Ping? Any comments from ARM's maintainers on theses patches (at least #2)?
+On Tue, Feb 24, 2015 at 03:40:21PM -0800, Feng Kan wrote:
+> Caught during Trinity testing. The pte_modify does not allow
+> modification for PTE type bit. This cause the test to hang
+> the system. It is found that the PTE can't transit from an
+> inaccessible page (b00) to a valid page (b11) because the mask
+> does not allow it. This happens when a big block of mmaped
+> memory is set the PROT_NONE, then the a small piece is broken
+> off and set to PROT_WRITE | PROT_READ cause a huge page split.
 > 
-> I couldn't care less :)
+> Signed-off-by: Feng Kan <fkan@apm.com>
 
-> The arm64 part is boring in the good sense of the word.
+It looks fine to me. Thanks.
 
-I will still need a ack from you or Catalin because it's touching
-arch/arm64/setup.c
-
-Regards,
+I wonder whether mprotect() to change between PROT_NONE and an
+accessible protection ever worked (I thought we tested this).
 
 -- 
-Julien Grall
+Catalin
