@@ -1,118 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 25 Feb 2015 13:04:41 -0800
-Subject: [PATCH 7/8] ASoC: fsl_spdif: fix struct clk pointer comparing
-In-Reply-To: <1424876018-17852-8-git-send-email-shawn.guo@linaro.org>
-References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
- <1424876018-17852-8-git-send-email-shawn.guo@linaro.org>
-Message-ID: <54EE38E9.3060405@codeaurora.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 25 Feb 2015 13:05:13 -0800
+Subject: [PATCH v4 1/3] mmc: dw_mmc: update clock after host reach a
+ stable voltage
+In-Reply-To: <CAGOxZ53vcz96mFbb9ez3GAjZBqEQqiss_TmU1y7EQeRGTVLQdg@mail.gmail.com>
+References: <1423828368-18456-1-git-send-email-addy.ke@rock-chips.com>
+ <1423894668-8886-1-git-send-email-addy.ke@rock-chips.com>
+ <1423894668-8886-2-git-send-email-addy.ke@rock-chips.com>
+ <CAGOxZ53ndi_hYDGBGhY-7q8aOrFid1=D=_5KEbUvzTsnybJQ3Q@mail.gmail.com>
+ <CAD=FV=V9aK-78GJ_eWkpZZdVT_5Zu8ehxg_o3NtnpD2wyRuh7Q@mail.gmail.com>
+ <CAGOxZ53vcz96mFbb9ez3GAjZBqEQqiss_TmU1y7EQeRGTVLQdg@mail.gmail.com>
+Message-ID: <CAD=FV=WxjQXQpRDNj8pOrcQdAgiQKrJSM1Upf=npjNEpbBLcPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/15 06:53, Shawn Guo wrote:
-> Since commit 035a61c314eb ("clk: Make clk API return per-user struct clk
-> instances"), clk API users can no longer check if two struct clk
-> pointers are pointing to the same hardware clock, i.e. struct clk_hw, by
-> simply comparing two pointers.  That's because with the per-user clk
-> change, a brand new struct clk is created whenever clients try to look
-> up the clock by calling clk_get() or sister functions like clk_get_sys()
-> and of_clk_get().  This changes the original behavior where the struct
-> clk is only created for once when clock driver registers the clock to
-> CCF in the first place.  The net change here is before commit
-> 035a61c314eb the struct clk pointer is unique for given hardware
-> clock, while after the commit the pointers returned by clk lookup calls
-> become different for the same hardware clock.
->
-> That said, the struct clk pointer comparing in the code doesn't work any
-> more.  Call helper function clk_is_match() instead to fix the problem.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  sound/soc/fsl/fsl_spdif.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/sound/soc/fsl/fsl_spdif.c b/sound/soc/fsl/fsl_spdif.c
-> index 75870c0ea2c9..91eb3aef7f02 100644
-> --- a/sound/soc/fsl/fsl_spdif.c
-> +++ b/sound/soc/fsl/fsl_spdif.c
-> @@ -1049,7 +1049,7 @@ static u32 fsl_spdif_txclk_caldiv(struct fsl_spdif_priv *spdif_priv,
->  				enum spdif_txrate index, bool round)
->  {
->  	const u32 rate[] = { 32000, 44100, 48000, 96000, 192000 };
-> -	bool is_sysclk = clk == spdif_priv->sysclk;
-> +	bool is_sysclk = clk_is_match(clk, spdif_priv->sysclk);
->  	u64 rate_ideal, rate_actual, sub;
->  	u32 sysclk_dfmin, sysclk_dfmax;
->  	u32 txclk_df, sysclk_df, arate;
-> @@ -1143,7 +1143,7 @@ static int fsl_spdif_probe_txclk(struct fsl_spdif_priv *spdif_priv,
->  			spdif_priv->txclk_src[index], rate[index]);
->  	dev_dbg(&pdev->dev, "use txclk df %d for %dHz sample rate\n",
->  			spdif_priv->txclk_df[index], rate[index]);
-> -	if (spdif_priv->txclk[index] == spdif_priv->sysclk)
-> +	if (clk_is_match(spdif_priv->txclk[index], spdif_priv->sysclk))
->  		dev_dbg(&pdev->dev, "use sysclk df %d for %dHz sample rate\n",
->  				spdif_priv->sysclk_df[index], rate[index]);
->  	dev_dbg(&pdev->dev, "the best rate for %dHz sample rate is %dHz\n",
+Alim,
 
-Couldn't this be fixed like this?
+On Tue, Feb 24, 2015 at 11:52 PM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+>>> This looks a HACK to me.
+>>> If stabilizing host voltage regulator is the problem, can you try out
+>>> below patch, and see if this resolve your issue?
+>>
+>> Actually, IMHO Alim's patch is more of a hack than Addy's.  There's
+>> already a 10ms delay between "power up" and "power on" in the MMC core
+>> in mmc_power_up() state.  That delay is commented as:
+>>
+> Well, my suggestion (adding 5ms in switch_volatge) was based on DW_MMC
+> databook (V2.41a) section "7.4.1.2 Voltage switch Normal Scenario"
+> step #7 which says:" After the 5ms timer expires, the host voltage
+> regulator is stable".
 
-----8<----
+So all of that should be handled by the core.  Just reading the DW_MMC
+databook can be confusing because they don't differentiate between
+what's in the SDMMC spec and what's DW_MMC specific.
 
-diff --git a/sound/soc/fsl/fsl_spdif.c b/sound/soc/fsl/fsl_spdif.c
-index af0429421fc8..1878dd62a247 100644
---- a/sound/soc/fsl/fsl_spdif.c
-+++ b/sound/soc/fsl/fsl_spdif.c
-@@ -20,6 +20,7 @@
- #include <linux/of_device.h>
- #include <linux/of_irq.h>
- #include <linux/regmap.h>
-+#include <linux/stringify.h>
- 
- #include <sound/asoundef.h>
- #include <sound/dmaengine_pcm.h>
-@@ -46,6 +47,8 @@ static u8 srpc_dpll_locked[] = { 0x0, 0x1, 0x2, 0x3, 0x4, 0xa, 0xb };
- 
- #define DEFAULT_RXCLK_SRC	1
- 
-+#define SYSCLK_NUM		5
-+
- /*
-  * SPDIF control structure
-  * Defines channel status, subcode and Q sub
-@@ -1051,10 +1054,10 @@ static const struct regmap_config fsl_spdif_regmap_config = {
- 
- static u32 fsl_spdif_txclk_caldiv(struct fsl_spdif_priv *spdif_priv,
- 				struct clk *clk, u64 savesub,
--				enum spdif_txrate index, bool round)
-+				enum spdif_txrate index, bool round,
-+				bool is_sysclk)
- {
- 	const u32 rate[] = { 32000, 44100, 48000, 96000, 192000 };
--	bool is_sysclk = clk == spdif_priv->sysclk;
- 	u64 rate_ideal, rate_actual, sub;
- 	u32 sysclk_dfmin, sysclk_dfmax;
- 	u32 txclk_df, sysclk_df, arate;
-@@ -1131,7 +1134,8 @@ static int fsl_spdif_probe_txclk(struct fsl_spdif_priv *spdif_priv,
- 			continue;
- 
- 		ret = fsl_spdif_txclk_caldiv(spdif_priv, clk, savesub, index,
--					     i == STC_TXCLK_SPDIF_ROOT);
-+					     i == STC_TXCLK_SPDIF_ROOT,
-+					     i == SYSCLK_NUM);
- 		if (savesub == ret)
- 			continue;
- 
-@@ -1210,7 +1214,8 @@ static int fsl_spdif_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Get system clock for rx clock rate calculation */
--	spdif_priv->sysclk = devm_clk_get(&pdev->dev, "rxtx5");
-+	spdif_priv->sysclk = devm_clk_get(&pdev->dev,
-+					  "rxtx" __stringify(SYSCLK_NUM));
- 	if (IS_ERR(spdif_priv->sysclk)) {
- 		dev_err(&pdev->dev, "no sys clock (rxtx5) in devicetree\n");
- 		return PTR_ERR(spdif_priv->sysclk);
+Check out mmc_set_signal_voltage(), specifically:
 
+* During a signal voltage level switch, the clock must be gated
+* for 5 ms according to the SD spec
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+-Doug
