@@ -1,37 +1,89 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 25 Feb 2015 13:17:22 +0100
-Subject: [PATCH v5 8/9] ARM: dts: exynos5250: add display power domain
-In-Reply-To: <54E54DFE.9040808@suse.de>
-References: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
- <1422883228-10690-9-git-send-email-m.szyprowski@samsung.com>
- <54E54DFE.9040808@suse.de>
-Message-ID: <54EDBD52.7070506@collabora.co.uk>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Wed, 25 Feb 2015 13:25:08 +0100
+Subject: [PATCH 1/2] thermal: exynos: Fix wrong control of power down
+ detection mode for Exynos7
+In-Reply-To: <CAM4voakf6oeSEdtGtHRzQ-tC6XMbsU+VNtBnqeed8J4btKA3Yg@mail.gmail.com>
+References: <1424753815-15113-1-git-send-email-cw00.choi@samsung.com>
+ <1424753815-15113-2-git-send-email-cw00.choi@samsung.com>
+ <20150225100330.0ef63a95@amdc2363>
+ <CAM4voakf6oeSEdtGtHRzQ-tC6XMbsU+VNtBnqeed8J4btKA3Yg@mail.gmail.com>
+Message-ID: <20150225132508.5143c9cf@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
+Hi Eduardo,
 
-On 02/19/2015 03:44 AM, Andreas F?rber wrote:
-> Am 02.02.2015 um 14:20 schrieb Marek Szyprowski:
->> From: Andrzej Hajda <a.hajda@samsung.com>
->> 
->> The patch adds domain definition and references to it in appropriate devices.
->> 
->> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
->> [mszyprow: rebased onto generic power domains dt bindings]
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Hi Lukasz,
 > 
-> On Spring,
+> On Wed, Feb 25, 2015 at 2:33 PM, Lukasz Majewski
+> <l.majewski@samsung.com> wrote:
+> > Hi Abhilash,
+> >
+> >> This patch fixes the wrong control of PD_DET_EN (power down
+> >> detection mode) for Exynos7 because exynos7_tmu_control() always
+> >> enables the power down detection mode regardless 'on' parameter.
+> >>
+> >> Cc: Zhang Rui <rui.zhang@intel.com>
+> >> Cc: Eduardo Valentin <edubezval@gmail.com>
+> >> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> >> ---
+> >>  drivers/thermal/samsung/exynos_tmu.c | 3 ++-
+> >>  1 file changed, 2 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/thermal/samsung/exynos_tmu.c
+> >> b/drivers/thermal/samsung/exynos_tmu.c index 933cd80..a60f527
+> >> 100644 --- a/drivers/thermal/samsung/exynos_tmu.c
+> >> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> >> @@ -682,6 +682,7 @@ static void exynos7_tmu_control(struct
+> >> platform_device *pdev, bool on)
+> >>       if (on) {
+> >>               con |= (1 << EXYNOS_TMU_CORE_EN_SHIFT);
+> >> +             con |= (1 << EXYNOS7_PD_DET_EN_SHIFT);
+> >>               interrupt_en =
+> >>                       (of_thermal_is_trip_valid(tz, 7)
+> >>                       << EXYNOS7_TMU_INTEN_RISE7_SHIFT) |
+> >> @@ -704,9 +705,9 @@ static void exynos7_tmu_control(struct
+> >> platform_device *pdev, bool on) interrupt_en <<
+> >> EXYNOS_TMU_INTEN_FALL0_SHIFT; } else {
+> >>               con &= ~(1 << EXYNOS_TMU_CORE_EN_SHIFT);
+> >> +             con &= ~(1 << EXYNOS7_PD_DET_EN_SHIFT);
+> >>               interrupt_en = 0; /* Disable all interrupts */
+> >>       }
+> >> -     con |= 1 << EXYNOS7_PD_DET_EN_SHIFT;
+> >>
+> >>       writel(interrupt_en, data->base + EXYNOS7_TMU_REG_INTEN);
+> >>       writel(con, data->base + EXYNOS_TMU_REG_CONTROL);
+> >
+> > Could you test this patch if it isn't introducing any regression on
+> > your HW?
 > 
-> Tested-by: Andreas F?rber <afaerber@suse.de>
+> The patch does not cause any regression on exynos7 and seems
+> logically correct.
 > 
-> Andreas
+> Tested-by: Abhilash Kesavan <a.kesavan@samsung.com>
 > 
 
-Any comments on this patch? It is needed to have
-display working on Exynos5250 machines.
+Eduardo, it is up to you if you prefer to take this fix directly or via
+the new thermal-samsung tree ?
 
+>From when shall I regard myself as a maintainer? :-)
+
+
+> 
+> Regards,
+> Abhilash
+> >
+> > --
+> > Best regards,
+> >
+> > Lukasz Majewski
+> >
+> > Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+
+
+-- 
 Best regards,
-Javier
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
