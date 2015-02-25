@@ -1,62 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 25 Feb 2015 14:50:17 +0000
-Subject: [PATCH v4] ARM: dts: add bcm2835-pwm bindings
-In-Reply-To: <1421325190-7648-1-git-send-email-bart.tanghe@thomasmore.be>
-References: <1421325190-7648-1-git-send-email-bart.tanghe@thomasmore.be>
-Message-ID: <20150225145017.GB5132@x1>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 25 Feb 2015 06:51:29 -0800
+Subject: [PATCH] hwmon: (gpio-fan) allow to use alarm support alone from DT
+In-Reply-To: <20150225135015.GA17992@lunn.ch>
+References: <1424696334-14767-1-git-send-email-simon.guinot@sequanux.org>
+ <54EB33D4.1000804@roeck-us.net> <20150223143416.GT1509@kw.sim.vm.gnt>
+ <54EB3C84.30503@roeck-us.net> <20150225111430.GV1509@kw.sim.vm.gnt>
+ <20150225135015.GA17992@lunn.ch>
+Message-ID: <54EDE171.7040403@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Jan 2015, Bart Tanghe wrote:
+On 02/25/2015 05:50 AM, Andrew Lunn wrote:
+>> Handle the GPIO fan alarm feature from the fan controller driver don't
+>> look good either to me. This alarm mechanism is not a part of the fan
+>> controller itself but rather something apart. Also I am afraid that the
+>> result would really look like a hack.
+>
+> Hi Simon
+>
+> It sounds like you need to extract the alarm code from gpio-fan into a
+> little library. Then put a wrapper around it to make a gpio-fan-alarm
+> driver.
+>
 
-> To probe the bcm2835-pwm driver properly, this dts bindings has to be added 
-> to the bcm2835 dtsi file.
-> In expectation of a bcm2835 clock driver, I've added fixed-clock clock binding. 
-> ---
-> Changes in v4:
->  - node added by reg value  
-> 
-> Signed-off-by: Bart Tanghe <bart.tanghe@thomasmore.be>
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+Please, the intend is to do the right thing, not to cause code bloat.
 
-Applied, thanks.
+If it is in fact correct that the alarm mechanism in this case is not tied
+to the fan controller, using the gpio-fan driver is ok. However, we need to
+state and check in the code that _some_ property is mandatory. A driver with
+only optional properties doesn't make sense.
 
-> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-> index 3342cb1..e8a0f13 100644
-> --- a/arch/arm/boot/dts/bcm2835.dtsi
-> +++ b/arch/arm/boot/dts/bcm2835.dtsi
-> @@ -122,6 +123,14 @@
->  			status = "disabled";
->  		};
->  
-> +                pwm: pwm at 7e20c000 {
-> +                        compatible = "brcm,bcm2835-pwm";
-> +                        reg = <0x7e20c000 0x28>;
-> +                        clocks = <&clk_pwm>;
-> +                        #pwm-cells = <2>;
-> +                        status = "disabled";
-> +                };
-> +
->  		sdhci: sdhci at 7e300000 {
->  			compatible = "brcm,bcm2835-sdhci";
->  			reg = <0x7e300000 0x100>;
-> @@ -179,5 +188,13 @@
->  			clock-output-names = "spi";
->  			clock-frequency = <250000000>;
->  		};
-> +
-> +		clk_pwm: clock at 3 {
-> +			compatible = "fixed-clock";
-> +			reg = <3>;
-> +			#clock-cells = <0>;
-> +			clock-output-names = "pwm";
-> +			clock-frequency = <9200000>;
-> +		};
->  	};
->  };
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Guenter
