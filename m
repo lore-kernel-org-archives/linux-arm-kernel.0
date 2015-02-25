@@ -1,63 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 25 Feb 2015 11:08:09 +0000
-Subject: [STLinux Kernel] [PATCH v3 7/8] rtc: st: add new driver for ST's
- LPC RTC
-In-Reply-To: <20150223101223.GA14142@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1424260154-12868-1-git-send-email-lee.jones@linaro.org>
- <1424260154-12868-8-git-send-email-lee.jones@linaro.org>
- <20150223101223.GA14142@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20150225110809.GH21323@x1>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Feb 2015 11:10:42 +0000
+Subject: [PATCH] arm64: mm: remove unused functions and variable protoypes
+In-Reply-To: <1424832465-21181-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1424832465-21181-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <20150225111041.GA17366@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Feb 2015, Peter Griffin wrote:
-> On Wed, 18 Feb 2015, Lee Jones wrote:
+On Wed, Feb 25, 2015 at 02:47:45AM +0000, Yingjoe Chen wrote:
+> The functions __cpu_flush_user_tlb_range and __cpu_flush_kern_tlb_range
+> were removed in commit fa48e6f780 'arm64: mm: Optimise tlb flush logic
+> where we have >4K granule'. Global variable cpu_tlb was never used in
+> arm64.
 > 
-> > ST's Low Power Controller (LPC) controls two devices; watchdog and RTC.
-> > Only one of the devices can be used at any one time.  This is enforced
-> > by the correlating MFD driver.  This portion of the driver-set controls
-> > the Real Time Clock.
+> Remove them.
 > 
-> <snip>
-> 
-> > +{
-> > +	unsigned long flags;
-> > +
-> > +	spin_lock_irqsave(&rtc->lock, flags);
-> > +
-> > +	writel(1, rtc->ioaddr + LPC_WDT_OFF);
-> > +
-> > +	writel(msb, rtc->ioaddr + LPC_LPA_MSB_OFF);
-> > +	writel(lsb, rtc->ioaddr + LPC_LPA_LSB_OFF);
-> > +	writel(1, rtc->ioaddr + LPC_LPA_START_OFF);
-> > +
-> > +	writel(0, rtc->ioaddr + LPC_WDT_OFF);
-> 
-> I think all the writel IO accessors in this driver can be replaced
-> with the *_relaxed variant. This will avoid the overhead of taking a
-> spinlock in the l2 outer cache part of writel.
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> ---
+>  arch/arm64/include/asm/tlbflush.h | 5 -----
+>  1 file changed, 5 deletions(-)
 
-Yes, there is no technical reason why we can't use the relaxed
-variants.  Will fix.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-> > +#ifdef CONFIG_PM_SLEEP
-> > +static int st_rtc_suspend(struct device *dev)
-> > +{
-> > +	struct st_rtc *rtc = dev_get_drvdata(dev);
-> > +
-> > +	if (device_may_wakeup(dev))
-> > +		return 0;
-> > +
-> > +	writel(1, rtc->ioaddr + LPC_WDT_OFF);
-> > +	writel(0, rtc->ioaddr + LPC_LPA_START_OFF);
-> > +	writel(0, rtc->ioaddr + LPC_WDT_OFF);
+Will
+
+> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+> index 73f0ce5..4abe9b9 100644
+> --- a/arch/arm64/include/asm/tlbflush.h
+> +++ b/arch/arm64/include/asm/tlbflush.h
+> @@ -24,11 +24,6 @@
+>  #include <linux/sched.h>
+>  #include <asm/cputype.h>
+>  
+> -extern void __cpu_flush_user_tlb_range(unsigned long, unsigned long, struct vm_area_struct *);
+> -extern void __cpu_flush_kern_tlb_range(unsigned long, unsigned long);
+> -
+> -extern struct cpu_tlb_fns cpu_tlb;
+> -
+>  /*
+>   *	TLB Management
+>   *	==============
+> -- 
+> 1.8.1.1.dirty
 > 
-> Is there a reason for not disabling the IP clock in suspend / resume functions?
-
-There is.  It will stop the alarm timer, which is undesirable.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> 
