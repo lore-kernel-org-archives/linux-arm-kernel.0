@@ -1,95 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 25 Feb 2015 12:11:29 +0100
-Subject: MUSB dual-role on AM335x behaving weirdly
-In-Reply-To: <20150224173357.GB25042@saruman.tx.rr.com>
-References: <20150121160631.GH4367@lukather>
- <CADYTM3b40_u4Twt27PBVH4dC9ErDnFEi0AUzs_aJRM3mMHaBCQ@mail.gmail.com>
- <54C0A8C9.3040201@visionsystems.de>
- <20150205132142.GD2079@lukather> <20150224103911.GR25269@lukather>
- <20150224145401.GH29829@saruman.tx.rr.com>
- <20150224165050.GX25269@lukather>
- <20150224173357.GB25042@saruman.tx.rr.com>
-Message-ID: <20150225111129.GA5062@lukather>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Wed, 25 Feb 2015 19:11:18 +0800
+Subject: [RFC PATCH v3 00/26] Early kprobe: enable kprobes at very early
+ booting stage.
+In-Reply-To: <54E6B139.20909@hitachi.com>
+References: <1423805941-61407-1-git-send-email-wangnan0@huawei.com>
+ <54E6B139.20909@hitachi.com>
+Message-ID: <54EDADD6.5070404@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 24, 2015 at 11:33:57AM -0600, Felipe Balbi wrote:
+On 2015/2/20 11:59, Masami Hiramatsu wrote:
 > Hi,
 > 
-> On Tue, Feb 24, 2015 at 05:50:50PM +0100, Maxime Ripard wrote:
-> > Hi Felipe,
-> > 
-> > On Tue, Feb 24, 2015 at 08:54:01AM -0600, Felipe Balbi wrote:
-> > > Hi,
-> > > 
-> > > On Tue, Feb 24, 2015 at 11:39:11AM +0100, Maxime Ripard wrote:
-> > > > On Thu, Feb 05, 2015 at 02:21:42PM +0100, Maxime Ripard wrote:
-> > > > > Hi,
-> > > > > 
-> > > > > On Thu, Jan 22, 2015 at 08:37:45AM +0100, Yegor Yefremov wrote:
-> > > > > > I have the same experience with 3.15. The switching is working when
-> > > > > > CONFIG_USB_MUSB_DUAL_ROLE is set and dr_mode = "otg". But since 3.16
+> Sorry for replying late.
 > 
-> since 3.16 ?
-
-That's what Yegor said. I never saw it working with 3.15 either.
-
-> > > > > > it seems to be broken. Still had no time to bisect this.
-> > > > > 
-> > > > > I've been giving a few versions (from v3.15 to Tuesday's linux-next) a
-> > > > > try, and I always see the same behaviour now:
-> > > > > 
-> > > > >   - Booting as a gadget (ie, with a USB cable plugged in), and
-> > > > >     swapping the cable for a (real, this time) USB OTG cable with a
-> > > > >     USB key never works. When the device is plugged, all I get is
-> > > > > 
-> > > > > [  262.944846] usb 1-1: new high-speed USB device number 2 using musb-hdrc
-> > > > > [  278.064748] usb 1-1: device descriptor read/64, error -110
-> > > > > 
-> > > > >     Putting in back in gadget results with a load of continuous:
-> > > > > [  315.258839] musb_bus_suspend 2484: trying to suspend as a_wait_vfall while active
-> > > > > 
-> > > > >   - Booting as a host, or with nothing connected to it actually work,
-> > > > >     up to a few plug-a-device-then-plug-a-host cycles, where you end
-> > > > >     up with the following logs when disconnecting the device (somehow,
-> > > > >     it always happens when it is set in host mode).
-> > > > > 
-> > > > > [   12.969075] CAUTION: musb: Babble Interrupt Occurred
-> > > > > [   12.974445] CAUTION: musb: Babble Interrupt Occurred
-> > > > > [   12.979637] musb_stage0_irq 789: unhandled DISCONNECT transition (a_wait_bcon)
-> > > > > [   12.988498] usb 1-1: USB disconnect, device number 2
-> > > > > [   13.071849] musb-hdrc musb-hdrc.0.auto: Restarting MUSB to recover from Babble
-> > > > > 
-> > > > >     Plugging back our USB cable, with the AM335x acting as a device
-> > > > >     work once. Then, when it switches to the host mode, we end up with
-> > > > >     the same scenario than in the coldplug as gadget case: USB read
-> > > > >     error, before then having all the a_wait_vfall messages.
-> > > > 
-> > > > Guys, any ideas/hints?
-> > > 
-> > > which platform are you using ? I guess the only way to move here would
-> > > be to bisect between 3.15 and 3.16 to find the offending commit.
-> > 
-> > 3.15 didn't work either unfortunately. I had the behaviour described
-> > above on all kernel between 3.15 and a 4.0-rc1-ish.
-> > 
-> > This is on an custom design based on the am335x.
+> (2015/02/13 14:39), Wang Nan wrote:
+>> I fell very sorry for people who reviewed my v2 patch series yesterday
+>> at https://lkml.org/lkml/2015/2/12/234 because I didn't provide enough
+>> information in commit log. This v3 patch series add those missing
+>> commit messages. There are also 2 small fix based on v2:
+>>
+>>  1. Fixes ftrace_sort_mcount_area. Original patch doesn't work for module.
+>>  2. Wraps setting of kprobes_initialized in stop_machine() context.
 > 
-> has it ever worked ? I don't have a board here which can do dual role.
-> BBB has a mini-B only on the peripheral port.
+> From the viewpoint of the maintenance, it seems over-engineered and
+> not general implementation. Please reconsider just initializing breakpoint
+> handler in earlier stage. Since those exceptions may happen anywhere,
+> those trap handlers setup very early stage. E.g. on x86, setup_arch()
+> setup early_trap_init() at beginning. So we just need to initialize
+> kprobes earlier.
 
-I don't know if it ever worked.
+I tried as your suggestion. For x86, int3 handler doesn't work correctly until
+trap_init(). I don't have enough time to look into this problem today (and I don't
+familiar with x86 architecture). Could you please have a look on it?
 
-Maxime
+Thank you.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150225/a871dc57/attachment.sig>
+> I think this is almost enough for debugging, and very general because
+> we don't need optprobe for porting to other arch.
+> 
+> And for ftrace-based kprobe, we can just put breakpoint on mcount call at
+> beginning. ftrace will need to check and keep it when replacing mcount-call
+> with nop. Afterward, we can cleanly update those kprobes with ftrace-based
+> kprobe.
+> 
+> So, please start with smaller changes.
+> 
+> Thank you,
+> 
