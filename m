@@ -1,37 +1,25 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 25 Feb 2015 10:47:45 +0800
-Subject: [PATCH] arm64: mm: remove unused functions and variable protoypes
-Message-ID: <1424832465-21181-1-git-send-email-yingjoe.chen@mediatek.com>
+From: viresh.kumar@linaro.org (viresh kumar)
+Date: Wed, 25 Feb 2015 09:15:32 +0530
+Subject: [PATCH 1/7] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <7h8ufn8c8q.fsf@deeprootsystems.com>
+References: <cover.1423642246.git.viresh.kumar@linaro.org>	<be795ef7ec98669bc5aa90ec426a1ec1fbc32b6c.1423642246.git.viresh.kumar@linaro.org>	<7ha904b6hp.fsf@deeprootsystems.com>	<CAKohpo=CRkJTkp2FXgYNwd2eEtMVRFuwJ=GPtX7+9WnQD6CK2Q@mail.gmail.com>
+ <7h8ufn8c8q.fsf@deeprootsystems.com>
+Message-ID: <54ED455C.3010700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The functions __cpu_flush_user_tlb_range and __cpu_flush_kern_tlb_range
-were removed in commit fa48e6f780 'arm64: mm: Optimise tlb flush logic
-where we have >4K granule'. Global variable cpu_tlb was never used in
-arm64.
+On Tuesday 24 February 2015 10:42 PM, Kevin Hilman wrote:
+> Viresh Kumar <viresh.kumar@linaro.org> writes:
 
-Remove them.
+> s/they share clock lines/they share clock and/or voltage lines/
 
-Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
----
- arch/arm64/include/asm/tlbflush.h | 5 -----
- 1 file changed, 5 deletions(-)
+Hmm, will update that.
 
-diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index 73f0ce5..4abe9b9 100644
---- a/arch/arm64/include/asm/tlbflush.h
-+++ b/arch/arm64/include/asm/tlbflush.h
-@@ -24,11 +24,6 @@
- #include <linux/sched.h>
- #include <asm/cputype.h>
- 
--extern void __cpu_flush_user_tlb_range(unsigned long, unsigned long, struct vm_area_struct *);
--extern void __cpu_flush_kern_tlb_range(unsigned long, unsigned long);
--
--extern struct cpu_tlb_fns cpu_tlb;
--
- /*
-  *	TLB Management
-  *	==============
--- 
-1.8.1.1.dirty
+> OK, fair enough.  Looks like it's been thought through.  
+> 
+> However, in the end, I don't think it's going to avoid the "help of some
+> algorithms."  The flag will tell you it's shared, but not how, and that
+> will likely still need to be determined.
+
+What did you mean by 'how' here? You wanted to say which devices share the
+OPP? Yeah, a small piece of code is required and that's present in my patchset.
