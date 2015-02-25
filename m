@@ -1,42 +1,55 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 25 Feb 2015 08:02:16 -0800
-Subject: [PATCH] serial: pl010 is no longer broken
-In-Reply-To: <3118156.gAoOHDhYSV@wuerfel>
-References: <3118156.gAoOHDhYSV@wuerfel>
-Message-ID: <20150225160216.GB29781@kroah.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Feb 2015 16:02:26 +0000
+Subject: [PATCH] arm64: vdso: minor ABI fix for clock_getres
+In-Reply-To: <1424820067-13112-1-git-send-email-nathan_lynch@mentor.com>
+References: <1424820067-13112-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <20150225160226.GL12377@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 04:06:09PM +0100, Arnd Bergmann wrote:
-> As more ARM platforms are moving into ARCH_MULTIPLATFORM, we can now
-> have integrator and versatile in the same kernel, and first one selects
-> this driver, causing a Kconfig warning:
+On Tue, Feb 24, 2015 at 11:21:07PM +0000, Nathan Lynch wrote:
+> The vdso implementation of clock_getres currently returns 0 (success)
+> whenever a null timespec is provided by the caller, regardless of the
+> clock id supplied.
 > 
-> warning: (ARCH_INTEGRATOR_AP) selects SERIAL_AMBA_PL010 which has unmet direct dependencies (TTY && HAS_IOMEM && ARM_AMBA && (BROKEN || !ARCH_VERSATILE))
+> This behavior is incorrect.  It should fall back to syscall when an
+> unrecognized clock id is passed, even when the timespec argument is
+> null.  This ensures that clock_getres always returns an error for
+> invalid clock ids.
 > 
-> It turns out that it has not been broken on versatile for a long time,
-> so we can remove the statement here.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index d2501f01cd03..bbb12794cc8c 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -20,7 +20,7 @@ comment "Non-8250 serial port support"
+> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+> ---
+>  arch/arm64/kernel/vdso/gettimeofday.S | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Thanks, Nathan.
+
+Will
+
+> diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
+> index fe652ffd34c2..efa79e8d4196 100644
+> --- a/arch/arm64/kernel/vdso/gettimeofday.S
+> +++ b/arch/arm64/kernel/vdso/gettimeofday.S
+> @@ -174,8 +174,6 @@ ENDPROC(__kernel_clock_gettime)
+>  /* int __kernel_clock_getres(clockid_t clock_id, struct timespec *res); */
+>  ENTRY(__kernel_clock_getres)
+>  	.cfi_startproc
+> -	cbz	w1, 3f
+> -
+>  	cmp	w0, #CLOCK_REALTIME
+>  	ccmp	w0, #CLOCK_MONOTONIC, #0x4, ne
+>  	b.ne	1f
+> @@ -188,6 +186,7 @@ ENTRY(__kernel_clock_getres)
+>  	b.ne	4f
+>  	ldr	x2, 6f
+>  2:
+> +	cbz	w1, 3f
+>  	stp	xzr, x2, [x1]
 >  
->  config SERIAL_AMBA_PL010
->  	tristate "ARM AMBA PL010 serial port support"
-> -	depends on ARM_AMBA && (BROKEN || !ARCH_VERSATILE)
-> +	depends on ARM_AMBA
->  	select SERIAL_CORE
->  	help
->  	  This selects the ARM(R) AMBA(R) PrimeCell PL010 UART.  If you have
+>  3:	/* res == NULL. */
+> -- 
+> 1.9.3
 > 
-
-Is it ok if we wait for 4.1-rc1 for this, or do you think it's really ok
-for 4.0-final?
-
-thanks,
-
-greg k-h
+> 
