@@ -1,45 +1,163 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 25 Feb 2015 08:34:14 -0600
-Subject: [PATCH 5/6] usb: dwc3: dwc3-st: Update the DT example.
-In-Reply-To: <1424871377-1795-6-git-send-email-peter.griffin@linaro.org>
+Date: Wed, 25 Feb 2015 08:36:24 -0600
+Subject: [PATCH 1/6] phy: miphy365x: Use the generic phy type constants in
+ dt-bindings/phy/phy.h
+In-Reply-To: <1424871377-1795-2-git-send-email-peter.griffin@linaro.org>
 References: <1424871377-1795-1-git-send-email-peter.griffin@linaro.org>
- <1424871377-1795-6-git-send-email-peter.griffin@linaro.org>
-Message-ID: <CAL_JsqKD1xorXX_2v=Lv4mNg7roAd6+jBKrFRQefV3eVhrQKTg@mail.gmail.com>
+ <1424871377-1795-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <CAL_JsqJN2ya-iDDdt63z4u=N73sMz6_N=mqQpTyf7SY7NjrAmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Feb 25, 2015 at 7:36 AM, Peter Griffin <peter.griffin@linaro.org> wrote:
-> There is a subtle type phys-names should be phy-names. Using the
-> current example means you don't have working usb. Also update
-> the example to use the generic phy type constants which are now
-> used for miphy28.
+> Now there are generic phy type constants declared in phy.h, migrate over to
+> using them rather than defining our own. This change has been done as one
+> atomic commit to be bisectable.
+
+You should note that the values of the defines are not changed. If
+they did, that would be an ABI breakage.
+
 >
 > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 
 Acked-by: Rob Herring <robh@kernel.org>
 
 > ---
->  Documentation/devicetree/bindings/usb/dwc3-st.txt | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  Documentation/devicetree/bindings/phy/phy-miphy365x.txt |  8 ++++----
+>  arch/arm/boot/dts/stih416.dtsi                          |  4 ++--
+>  drivers/phy/phy-miphy365x.c                             | 14 +++++++-------
+>  include/dt-bindings/phy/phy-miphy365x.h                 | 14 --------------
+>  4 files changed, 13 insertions(+), 27 deletions(-)
+>  delete mode 100644 include/dt-bindings/phy/phy-miphy365x.h
 >
-> diff --git a/Documentation/devicetree/bindings/usb/dwc3-st.txt b/Documentation/devicetree/bindings/usb/dwc3-st.txt
-> index f9d7025..6634064 100644
-> --- a/Documentation/devicetree/bindings/usb/dwc3-st.txt
-> +++ b/Documentation/devicetree/bindings/usb/dwc3-st.txt
-> @@ -62,7 +62,7 @@ st_dwc3: dwc3 at 8f94000 {
->                 reg             = <0x09900000 0x100000>;
->                 interrupts      = <GIC_SPI 155 IRQ_TYPE_NONE>;
->                 dr_mode         = "host";
-> -               phys-names      = "usb2-phy", "usb3-phy";
-> -               phys            = <&usb2_picophy2>, <&phy_port2 MIPHY_TYPE_USB>;
-> +               phy-names       = "usb2-phy", "usb3-phy";
-> +               phys            = <&usb2_picophy2>, <&phy_port2 PHY_TYPE_USB3>;
+> diff --git a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+> index 9802d5d..8772900 100644
+> --- a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+> +++ b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+> @@ -20,8 +20,8 @@ Required nodes        :  A sub-node is required for each channel the controller
+>  Required properties (port (child) node):
+>  - #phy-cells   : Should be 1 (See second example)
+>                   Cell after port phandle is device type from:
+> -                       - MIPHY_TYPE_SATA
+> -                       - MIPHY_TYPE_PCI
+> +                       - PHY_TYPE_SATA
+> +                       - PHY_TYPE_PCI
+>  - reg          : Address and length of register sets for each device in
+>                   "reg-names"
+>  - reg-names     : The names of the register addresses corresponding to the
+> @@ -68,10 +68,10 @@ property, containing a phandle to the phy port node and a device type.
+>
+>  Example:
+>
+> -#include <dt-bindings/phy/phy-miphy365x.h>
+> +#include <dt-bindings/phy/phy.h>
+>
+>         sata0: sata at fe380000 {
+>                 ...
+> -               phys      = <&phy_port0 MIPHY_TYPE_SATA>;
+> +               phys      = <&phy_port0 PHY_TYPE_SATA>;
+>                 ...
 >         };
->  };
+> diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+> index ea28eba..eeb7afe 100644
+> --- a/arch/arm/boot/dts/stih416.dtsi
+> +++ b/arch/arm/boot/dts/stih416.dtsi
+> @@ -10,7 +10,7 @@
+>  #include "stih416-clock.dtsi"
+>  #include "stih416-pinctrl.dtsi"
+>
+> -#include <dt-bindings/phy/phy-miphy365x.h>
+> +#include <dt-bindings/phy/phy.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/reset-controller/stih416-resets.h>
+>  / {
+> @@ -306,7 +306,7 @@
+>                         reg             = <0xfe380000 0x1000>;
+>                         interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
+>                         interrupt-names = "hostc";
+> -                       phys            = <&phy_port0 MIPHY_TYPE_SATA>;
+> +                       phys            = <&phy_port0 PHY_TYPE_SATA>;
+>                         phy-names       = "sata-phy";
+>                         resets          = <&powerdown STIH416_SATA0_POWERDOWN>,
+>                                           <&softreset STIH416_SATA0_SOFTRESET>;
+> diff --git a/drivers/phy/phy-miphy365x.c b/drivers/phy/phy-miphy365x.c
+> index 6c80154..98bffbc 100644
+> --- a/drivers/phy/phy-miphy365x.c
+> +++ b/drivers/phy/phy-miphy365x.c
+> @@ -25,7 +25,7 @@
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/regmap.h>
+>
+> -#include <dt-bindings/phy/phy-miphy365x.h>
+> +#include <dt-bindings/phy/phy.h>
+>
+>  #define HFC_TIMEOUT            100
+>
+> @@ -176,7 +176,7 @@ static u8 rx_tx_spd[] = {
+>  static int miphy365x_set_path(struct miphy365x_phy *miphy_phy,
+>                               struct miphy365x_dev *miphy_dev)
+>  {
+> -       bool sata = (miphy_phy->type == MIPHY_TYPE_SATA);
+> +       bool sata = (miphy_phy->type == PHY_TYPE_SATA);
+>
+>         return regmap_update_bits(miphy_dev->regmap,
+>                                   miphy_phy->ctrlreg,
+> @@ -430,7 +430,7 @@ static int miphy365x_init(struct phy *phy)
+>         }
+>
+>         /* Initialise Miphy for PCIe or SATA */
+> -       if (miphy_phy->type == MIPHY_TYPE_PCIE)
+> +       if (miphy_phy->type == PHY_TYPE_PCIE)
+>                 ret = miphy365x_init_pcie_port(miphy_phy, miphy_dev);
+>         else
+>                 ret = miphy365x_init_sata_port(miphy_phy, miphy_dev);
+> @@ -454,8 +454,8 @@ int miphy365x_get_addr(struct device *dev, struct miphy365x_phy *miphy_phy,
+>                 return ret;
+>         }
+>
+> -       if (!((!strncmp(name, "sata", 4) && type == MIPHY_TYPE_SATA) ||
+> -             (!strncmp(name, "pcie", 4) && type == MIPHY_TYPE_PCIE)))
+> +       if (!((!strncmp(name, "sata", 4) && type == PHY_TYPE_SATA) ||
+> +             (!strncmp(name, "pcie", 4) && type == PHY_TYPE_PCIE)))
+>                 return 0;
+>
+>         miphy_phy->base = of_iomap(phynode, index);
+> @@ -498,8 +498,8 @@ static struct phy *miphy365x_xlate(struct device *dev,
+>
+>         miphy_phy->type = args->args[0];
+>
+> -       if (!(miphy_phy->type == MIPHY_TYPE_SATA ||
+> -             miphy_phy->type == MIPHY_TYPE_PCIE)) {
+> +       if (!(miphy_phy->type == PHY_TYPE_SATA ||
+> +             miphy_phy->type == PHY_TYPE_PCIE)) {
+>                 dev_err(dev, "Unsupported device type: %d\n", miphy_phy->type);
+>                 return ERR_PTR(-EINVAL);
+>         }
+> diff --git a/include/dt-bindings/phy/phy-miphy365x.h b/include/dt-bindings/phy/phy-miphy365x.h
+> deleted file mode 100644
+> index 8ef8aba..0000000
+> --- a/include/dt-bindings/phy/phy-miphy365x.h
+> +++ /dev/null
+> @@ -1,14 +0,0 @@
+> -/*
+> - * This header provides constants for the phy framework
+> - * based on the STMicroelectronics MiPHY365x.
+> - *
+> - * Author: Lee Jones <lee.jones@linaro.org>
+> - */
+> -#ifndef _DT_BINDINGS_PHY_MIPHY
+> -#define _DT_BINDINGS_PHY_MIPHY
+> -
+> -#define MIPHY_TYPE_SATA                1
+> -#define MIPHY_TYPE_PCIE                2
+> -#define MIPHY_TYPE_USB         3
+> -
+> -#endif /* _DT_BINDINGS_PHY_MIPHY */
 > --
 > 1.9.1
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
