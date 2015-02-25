@@ -1,48 +1,77 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Feb 2015 16:32:44 +0000
-Subject: [PATCH] arm64: vdso: minor ABI fix for clock_getres
-In-Reply-To: <54EDF4DB.5080007@mentor.com>
-References: <1424820067-13112-1-git-send-email-nathan_lynch@mentor.com>
- <20150225160226.GL12377@arm.com> <54EDF4DB.5080007@mentor.com>
-Message-ID: <20150225163243.GM12377@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 25 Feb 2015 10:32:04 -0600
+Subject: [PATCH v4 4/4] phy: add phy-hi6220-usb
+In-Reply-To: <54EDCE04.3040404@linaro.org>
+References: <1423726646-30336-1-git-send-email-zhangfei.gao@linaro.org>
+ <1423726646-30336-5-git-send-email-zhangfei.gao@linaro.org>
+ <20150220144119.GB1707@saruman.tx.rr.com>
+ <54E75665.6050205@linaro.org>
+ <20150220160610.GB6430@saruman.tx.rr.com>
+ <54E89E29.4010807@linaro.org>
+ <20150221162102.GA1784@saruman.tx.rr.com>
+ <54E948AC.2010609@linaro.org>
+ <20150223153612.GF32701@saruman.tx.rr.com>
+ <54EDCE04.3040404@linaro.org>
+Message-ID: <20150225163204.GA11136@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 04:14:19PM +0000, Nathan Lynch wrote:
-> On 02/25/2015 10:02 AM, Will Deacon wrote:
-> > On Tue, Feb 24, 2015 at 11:21:07PM +0000, Nathan Lynch wrote:
-> >> The vdso implementation of clock_getres currently returns 0 (success)
-> >> whenever a null timespec is provided by the caller, regardless of the
-> >> clock id supplied.
+On Wed, Feb 25, 2015 at 09:28:36PM +0800, zhangfei wrote:
+> >>>>>>>>+static void hi6220_detect_work(struct work_struct *work)
+> >>>>>>>>+{
+> >>>>>>>>+	struct hi6220_priv *priv =
+> >>>>>>>>+		container_of(work, struct hi6220_priv, work.work);
+> >>>>>>>>+	int gpio_id, gpio_vbus;
+> >>>>>>>>+	enum usb_otg_state state;
+> >>>>>>>>+
+> >>>>>>>>+	if (!gpio_is_valid(priv->gpio_id) || !gpio_is_valid(priv->gpio_vbus))
+> >>>>>>>>+		return;
+> >>>>>>>>+
+> >>>>>>>>+	gpio_id = gpio_get_value_cansleep(priv->gpio_id);
+> >>>>>>>>+	gpio_vbus = gpio_get_value_cansleep(priv->gpio_vbus);
+> >>>>>>>
+> >>>>>>>looks like this should be using extcon
+> >>>>>>Not used extcon before.
+> >>>>>>However, we need gpio_vbus interrupt.
+> >>>>>>Checked phy-tahvo.c and phy-omap-otg.c, not find extcon related with
+> >>>>>>interrupt.
+> >>>>>>Will investigate tomorrow.
+> >>>>>
+> >>>>>drivers/extcon/extcon-gpio.c
+> >>>>I think there is no need to use extcon, gpio is clear enough.
+> >>>>extcon-gpio.c even do not support dt.
+> >>>
+> >>>well, add DT. The whole idea of free software is that we improve on
+> >>>things we already have. EXTCON is *the* API to handle such things.
 > >>
-> >> This behavior is incorrect.  It should fall back to syscall when an
-> >> unrecognized clock id is passed, even when the timespec argument is
-> >> null.  This ensures that clock_getres always returns an error for
-> >> invalid clock ids.
-> >>
-> >> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
-> >> ---
-> >>  arch/arm64/kernel/vdso/gettimeofday.S | 3 +--
-> >>  1 file changed, 1 insertion(+), 2 deletions(-)
-> > 
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> > 
-> > Thanks, Nathan.
+> >>I think I am still not understanding extcon-gpio, not sure why need
+> >>use this API here.
+> >
+> >because extcon is the API to use for external connectors. The same way
+> >you use regulator framework to control that single GPIO tied to an
+> >enable signal of a fixed regulator, you use extcon when you need to read
+> >that gpio signal tied to id pin of the USB connector.
+> >
+> >>Here two gpio requires, one gpio as interrupt, in the interrupt
+> >>handler, we detect the gpio status judging the otg status.
+> >>extcon-gpio.c use the interrupt, then can we also use the gpio
+> >>interrupt.  Using extcon-gpio is used for saving gpio_request?
+> >
+> >extcon is used to hide gpio_request from dwc2. dwc2 only knows about
+> >extcon, not gpios. extcon will request the gpio and use it as interrupt
+> >source. When an IRQ fires, it will read the gpio state and decide if it
+> >should broadcast a message to tell dwc2 to become host or peripheral.
 > 
-> Thank you.  I'm curious -- do you know of a use case for the VDSO
-> implementation of clock_getres?  I.e. what kind of real-world workload
-> sees a benefit from it?
+> Thanks for the kind education, understand now.
 
-No, I just implemented it for completeness (and it's also way simpler than
-the other functions!). Calling it with a NULL timespec is probably even
-less common, so an alternative to your patch would be changing the label
-of the existing cbz to hand-off to the kernel when the thing is NULL.
+hey, no problem ;-)
 
-> I'm not suggesting removing it from the arm64 vdso, but I'm considering
-> dropping clock_getres from the 32-bit ARM vdso patch set since I haven't
-> been able to answer this.
-
-Well, if there aren't any fastpath users then I'm not bothered about
-removing it from arm64 either. I'm not sure how we establish that, though.
-
-Will
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150225/dab57924/attachment.sig>
