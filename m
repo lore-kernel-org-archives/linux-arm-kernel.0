@@ -1,38 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 Feb 2015 17:17:04 +0000
-Subject: [PATCH v10 4/6] ARM: add vdso user-space code
-In-Reply-To: <54EDFEC4.7060600@codeaurora.org>
-References: <loom.20150213T053547-381@post.gmane.org>
- <20150213105447.GB3508@e104818-lin.cambridge.arm.com>
- <loom.20150213T124417-857@post.gmane.org>
- <20150213141425.GA4713@localhost>
- <loom.20150213T153239-809@post.gmane.org>
- <20150213153253.GA23801@e104818-lin.cambridge.arm.com>
- <loom.20150218T122348-60@post.gmane.org>
- <54E7AC90.40209@codeaurora.org>
- <20150224101754.GA27420@e104818-lin.cambridge.arm.com>
- <54EDFEC4.7060600@codeaurora.org>
-Message-ID: <20150225171703.GG1105@localhost>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 25 Feb 2015 09:14:51 -0800
+Subject: Dead Kconfig Option OMAP4_ERRATA_I688
+In-Reply-To: <CABv5NL-bnfV0BoH+G=nX+1eo6xeT_LN8dOFtSnwvdpcvjJhUFQ@mail.gmail.com>
+References: <CABv5NL-bnfV0BoH+G=nX+1eo6xeT_LN8dOFtSnwvdpcvjJhUFQ@mail.gmail.com>
+Message-ID: <20150225171451.GQ11056@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 11:56:36AM -0500, Christopher Covington wrote:
-> On 02/24/2015 05:17 AM, Catalin Marinas wrote:
-> > Writing CNTFRQ from non-secure mode would trap as well.
+Hi,
+
+Adding Santosh to Cc on this one.
+
+* Stefan Hengelein <stefan.hengelein@fau.de> [150225 09:13]:
+> During the research for my masters thesis i came across the
+> OMAP4_ERRATA_I688 option and realized, it is never possible to enable
+> this option.
 > 
-> Are you saying it could A) cause an exception targeting the current EL/mode
-> but not others, or B) cause an exception targeting the current or another EL/mode?
+> The a62a6e98 commit added the "&& !ARCH_MULTIPLATFORM" dependency to
+> disable this option for multiplatforms. However, because of enclosing
+> dependencies, this option isn't available for non-MULTIPLATFORM
+> configurations either.
 
-IIRC, it only traps at the current mode (if non-secure EL1 or EL2).
-
-> > The detection mechanism would have to involve trapping of an undefined
-> > instruction but it doesn't need to be done early during boot.
+Yes there is no clean way currently to enable this errata for
+multiplatform.
+ 
+> CONFIG_OMAP4_ERRATA_I688 is defined in the menu "TI OMAP/AM/DM/DRA
+> Family" which depends on ARCH_MULTI_V6 || ARCH_MULTI_V7. (in
+> arch/arm/mach-omap2/Kconfig)
 > 
-> I put detection during early boot because I wanted to potentially change
-> ELs/modes during early boot.
+> ARCH_MULTI_V6 and ARCH_MULTI_V7 however are defined in the menu
+> "Multiple platform selection" which depends on ARCH_MULTIPLATFORM (in
+> arch/arm/Kconfig)
+> 
+> Which is a contradiction.
+> 
+> There are no selects on OMAP4_ERRATA_I688, which would ignore
+> dependencies, either.
+> 
+> The question is:
+> Was disabling this option for non-MULTIPLATFORM configurations also intentional?
+> 
+> i have added a minimal example of the problem.
 
-Yes, but it is simpler to install an undef hook later in the boot
-process.
+>From what I remember the plan was to try to come up with a
+multiplatform friendly way of doing this errata. Santosh,
+any suggestions here? Should we just remove the code as it
+seems nobody has complained about it for a few years now?
 
--- 
-Catalin
+Regards,
+
+Tony
