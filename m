@@ -1,52 +1,167 @@
 From: al.stone@linaro.org (Al Stone)
-Date: Wed, 25 Feb 2015 13:56:04 -0700
-Subject: [PATCH v3 2/9] ACPI: clear up warnings on use of printk reported
- by checkpatch.pl
-In-Reply-To: <54EDC64D.8040301@linaro.org>
+Date: Wed, 25 Feb 2015 13:57:27 -0700
+Subject: [Linaro-acpi] [PATCH v3 4/9] ACPI: clean up checkpatch warnings
+ for items with possible semantic value
+In-Reply-To: <54EDC957.9050000@linaro.org>
 References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
- <1424824585-6405-3-git-send-email-al.stone@linaro.org>
- <54EDC64D.8040301@linaro.org>
-Message-ID: <54EE36E4.5070404@linaro.org>
+ <1424824585-6405-5-git-send-email-al.stone@linaro.org>
+ <54EDC957.9050000@linaro.org>
+Message-ID: <54EE3737.2040300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2015 05:55 AM, Hanjun Guo wrote:
+On 02/25/2015 06:08 AM, Hanjun Guo wrote:
 > On 2015?02?25? 08:36, al.stone at linaro.org wrote:
 >> From: Al Stone <al.stone@linaro.org>
 >>
 >> In preparation for later splitting out some of the arch-dependent code from
->> osl.c, clear up all the warnings reported by checkpatch.pl where pr_* should
->> be used instead of printk(KERN_* ...).
+>> osl.c, clean up some warnings from checkpatch that fall into more semantic
+>> issues; none of these should change functionality, but they do touch lines
+>> of code with semantic significance:
+>>
+>>     -- replaced #include <asm/foo.h> with #include <linux/foo.h>
+>>     -- replaced extern that was only being used for sizeof() with a #define
+>>     -- removed use of else after breaks/returns when not useful
+>>     -- moved __initdata to the proper place in a definition
+>>     -- moved EXPORT_SYMBOL to a line immediately after the function
+>>     -- removed unnecessary return statements from void functions
 >>
 >> Signed-off-by: Al Stone <al.stone@linaro.org>
 >> ---
->>   drivers/acpi/osl.c | 46 +++++++++++++++++++---------------------------
->>   1 file changed, 19 insertions(+), 27 deletions(-)
+>>   drivers/acpi/osl.c | 31 ++++++++++---------------------
+>>   1 file changed, 10 insertions(+), 21 deletions(-)
 >>
 >> diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
->> index 1dc3a3b..865317c 100644
+>> index 46317ff..af6dda7 100644
 >> --- a/drivers/acpi/osl.c
 >> +++ b/drivers/acpi/osl.c
->> @@ -141,7 +141,7 @@ static u32 acpi_osi_handler(acpi_string interface, u32
->> supported)
->>   {
->>       if (!strcmp("Linux", interface)) {
+>> @@ -40,9 +40,8 @@
+>>   #include <linux/list.h>
+>>   #include <linux/jiffies.h>
+>>   #include <linux/semaphore.h>
+>> -
+>> -#include <asm/io.h>
+>> -#include <asm/uaccess.h>
+>> +#include <linux/io.h>
+>> +#include <linux/uaccess.h>
 >>
->> -        printk_once(KERN_NOTICE FW_BUG PREFIX
->> +        pr_notice_once(FW_BUG PREFIX
+>>   #include "internal.h"
+>>
+>> @@ -66,7 +65,7 @@ struct acpi_os_dpc {
+>>   int acpi_in_debugger;
+>>   EXPORT_SYMBOL(acpi_in_debugger);
+>>
+>> -extern char line_buf[80];
+>> +#define DEBUGGER_LINE_BUFLEN    80
+>>   #endif                /*ENABLE_DEBUGGER */
+>>
+>>   static int (*__acpi_os_prepare_sleep)(u8 sleep_state, u32 pm1a_ctrl,
+>> @@ -268,10 +267,8 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
+>>               return efi.acpi20;
+>>           else if (efi.acpi != EFI_INVALID_TABLE_ADDR)
+>>               return efi.acpi;
+>> -        else {
+>> -            pr_err(PREFIX "System description tables not found\n");
+>> -            return 0;
+>> -        }
+>> +        pr_err(PREFIX "System description tables not found\n");
+>> +        return 0;
+>>       } else if (IS_ENABLED(CONFIG_ACPI_LEGACY_TABLES_LOOKUP)) {
+>>           acpi_physical_address pa = 0;
+>>
+>> @@ -594,7 +591,7 @@ static const char * const table_sigs[] = {
+>>   #define ACPI_HEADER_SIZE sizeof(struct acpi_table_header)
+>>
+>>   #define ACPI_OVERRIDE_TABLES 64
+>> -static struct cpio_data __initdata acpi_initrd_files[ACPI_OVERRIDE_TABLES];
+>> +static struct cpio_data acpi_initrd_files[ACPI_OVERRIDE_TABLES] __initdata;
+>>
+>>   #define MAP_CHUNK_SIZE   (NR_FIX_BTMAPS << PAGE_SHIFT)
+>>
+>> @@ -806,10 +803,10 @@ static irqreturn_t acpi_irq(int irq, void *dev_id)
+>>       if (handled) {
+>>           acpi_irq_handled++;
+>>           return IRQ_HANDLED;
+>> -    } else {
+>> -        acpi_irq_not_handled++;
+>> -        return IRQ_NONE;
+>>       }
+>> +
+>> +    acpi_irq_not_handled++;
+>> +    return IRQ_NONE;
+>>   }
+>>
+>>   acpi_status
+>> @@ -911,7 +908,6 @@ acpi_status acpi_os_read_port(acpi_io_address port, u32
+>> *value, u32 width)
+>>
+>>       return AE_OK;
+>>   }
+>> -
+>>   EXPORT_SYMBOL(acpi_os_read_port);
+>>
+>>   acpi_status acpi_os_write_port(acpi_io_address port, u32 value, u32 width)
+>> @@ -927,7 +923,6 @@ acpi_status acpi_os_write_port(acpi_io_address port, u32
+>> value, u32 width)
+>>
+>>       return AE_OK;
+>>   }
+>> -
+>>   EXPORT_SYMBOL(acpi_os_write_port);
+>>
+>>   #ifdef readq
+>> @@ -1362,7 +1357,7 @@ u32 acpi_os_get_line(char *buffer)
+>>       if (acpi_in_debugger) {
+>>           u32 chars;
+>>
+>> -        kdb_read(buffer, sizeof(line_buf));
+>> +        kdb_read(buffer, sizeof(DEBUGGER_LINE_BUFLEN));
 > 
-> I think you can use pr_fmt() and then remove all the PREFIX in
-> this patch, just
+> I think kdb_read(buffer, DEBUGGER_LINE_BUFLEN); will be fine.
 > 
-> #define pr_fmt(fmt) "ACPI: " fmt
+> other than that,
 > 
-> in top of this file before all #includes.
+> Reviewd-by: Hanjun Guo <hanjun.guo@linaro.org>
 > 
 > Thanks
 > Hanjun
 
-Argh.  Yup, you're right.  That was an oversight on my part.
-Fixed in next version.
+Whups.  Boy, was that just plain wrong.  Thanks.  Fixed.
+
+>>
+>>           /* remove the CR kdb includes */
+>>           chars = strlen(buffer) - 1;
+>> @@ -1490,8 +1485,6 @@ static void __init set_osi_linux(unsigned int enable)
+>>           acpi_osi_setup("Linux");
+>>       else
+>>           acpi_osi_setup("!Linux");
+>> -
+>> -    return;
+>>   }
+>>
+>>   static void __init acpi_cmdline_osi_linux(unsigned int enable)
+>> @@ -1499,8 +1492,6 @@ static void __init acpi_cmdline_osi_linux(unsigned int
+>> enable)
+>>       osi_linux.cmdline = 1;    /* cmdline set the default and override DMI */
+>>       osi_linux.dmi = 0;
+>>       set_osi_linux(enable);
+>> -
+>> -    return;
+>>   }
+>>
+>>   void __init acpi_dmi_osi_linux(int enable, const struct dmi_system_id *d)
+>> @@ -1512,8 +1503,6 @@ void __init acpi_dmi_osi_linux(int enable, const struct
+>> dmi_system_id *d)
+>>
+>>       osi_linux.dmi = 1;    /* DMI knows that this box asks OSI(Linux) */
+>>       set_osi_linux(enable);
+>> -
+>> -    return;
+>>   }
+>>
+>>   /*
+>>
+
 
 -- 
 ciao,
