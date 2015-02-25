@@ -1,116 +1,49 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 26 Feb 2015 08:36:23 +0900
-Subject: [PATCH 1/6] target-arm: kvm: save/restore mp state
-In-Reply-To: <1424880159-29348-2-git-send-email-alex.bennee@linaro.org>
-References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
- <1424880159-29348-2-git-send-email-alex.bennee@linaro.org>
-Message-ID: <CAFEAcA9oWeYGYcGtf8So6VrYLMXjWr4FiZ2tS+jBnDtv87jAKw@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 26 Feb 2015 08:58:07 +0900
+Subject: [PATCH/RFC] ARM: shmobile: r8a7791: Fix IPMMU-GP clock to device
+ tree
+In-Reply-To: <1424352546-27313-1-git-send-email-ykaneko0929@gmail.com>
+References: <1424352546-27313-1-git-send-email-ykaneko0929@gmail.com>
+Message-ID: <20150225235806.GM23723@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2015 at 01:02, Alex Benn?e <alex.bennee@linaro.org> wrote:
-> This adds the saving and restore of the current Multi-Processing state
-> of the machine. While the KVM_GET/SET_MP_STATE API exposes a number of
-> potential states for x86 we only use two for ARM. Either the process is
-> running or not.
+Hi,
 
-By this you mean "is the CPU in the PSCI powered down state or not",
-right?
+while I am inclined to take this patch on face value I am wondering
+if anyone is able to confirm this change against the documentation:
+I have drawn a blank there.
 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->
-> diff --git a/target-arm/kvm.c b/target-arm/kvm.c
-> index 23cefe9..8732854 100644
-> --- a/target-arm/kvm.c
-> +++ b/target-arm/kvm.c
-> @@ -25,6 +25,7 @@
->  #include "hw/arm/arm.h"
->
->  const KVMCapabilityInfo kvm_arch_required_capabilities[] = {
-> +    KVM_CAP_INFO(MP_STATE),
-
-Does this really want to be a required cap? I haven't checked,
-but assuming 'required' means what it says this presumably
-means we'll stop working on host kernels we previously ran
-fine on (even if migration didn't work there).
-
->      KVM_CAP_LAST_INFO
->  };
->
-> diff --git a/target-arm/machine.c b/target-arm/machine.c
-> index 9446e5a..70b1bc4 100644
-> --- a/target-arm/machine.c
-> +++ b/target-arm/machine.c
-> @@ -161,6 +161,34 @@ static const VMStateInfo vmstate_cpsr = {
->      .put = put_cpsr,
->  };
->
-> +#if defined CONFIG_KVM
-> +static int get_mpstate(QEMUFile *f, void *opaque, size_t size)
-> +{
-> +    ARMCPU *cpu = opaque;
-> +    struct kvm_mp_state mp_state = { .mp_state =  qemu_get_be32(f)};
-> +    return kvm_vcpu_ioctl(CPU(cpu), KVM_SET_MP_STATE, &mp_state);
-> +}
-
-Won't this break if you're running a QEMU built with KVM
-support in TCG mode on an aarch64 host?
-
-In any case, for that configuration we should be migrating the
-TCG cpu->powered_off flag, which is where we keep the PSCI
-power state for TCG.
-
-> +
-> +static void put_mpstate(QEMUFile *f, void *opaque, size_t size)
-> +{
-> +    ARMCPU *cpu = opaque;
-> +    struct kvm_mp_state mp_state;
-> +    int ret = kvm_vcpu_ioctl(CPU(cpu), KVM_GET_MP_STATE, &mp_state);
-> +    if (ret) {
-> +        fprintf(stderr, "%s: failed to get MP_STATE %d/%s\n",
-> +                __func__, ret, strerror(ret));
-> +        abort();
-> +    }
-> +    qemu_put_be32(f, mp_state.mp_state);
-> +}
-> +
-> +static const VMStateInfo vmstate_mpstate = {
-> +    .name = "mpstate",
-> +    .get = get_mpstate,
-> +    .put = put_mpstate,
-> +};
-> +#endif
-> +
->  static void cpu_pre_save(void *opaque)
->  {
->      ARMCPU *cpu = opaque;
-> @@ -244,6 +272,16 @@ const VMStateDescription vmstate_arm_cpu = {
->          VMSTATE_UINT32_ARRAY(env.regs, ARMCPU, 16),
->          VMSTATE_UINT64_ARRAY(env.xregs, ARMCPU, 32),
->          VMSTATE_UINT64(env.pc, ARMCPU),
-> +#if defined CONFIG_KVM
-> +        {
-> +            .name = "mp_state",
-> +            .version_id = 0,
-> +            .size = sizeof(uint32_t),
-> +            .info = &vmstate_mpstate,
-> +            .flags = VMS_SINGLE,
-> +            .offset = 0,
-> +        },
-> +#endif
-
-This means the migration format will be different on different
-build configurations, which seems like a really bad idea.
-
-Have you considered having the KVM state sync functions just
-sync the kernel's MP state into cpu->powered_off, and then
-migrating that flag here unconditionally?
-
->          {
->              .name = "cpsr",
->              .version_id = 0,
+On Thu, Feb 19, 2015 at 10:29:06PM +0900, Yoshihiro Kaneko wrote:
+> From: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+> 
+> Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> ---
+> 
+> This patch is based on devel branch of Simon Horman's renesas tree.
+> 
+>  arch/arm/boot/dts/r8a7791.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+> index afba8af..1e75a5f 100644
+> --- a/arch/arm/boot/dts/r8a7791.dtsi
+> +++ b/arch/arm/boot/dts/r8a7791.dtsi
+> @@ -1154,7 +1154,7 @@
+>  		mstp8_clks: mstp8_clks at e6150990 {
+>  			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
+>  			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
+> -			clocks = <&zg_clk>, <&hp_clk>, <&zg_clk>, <&zg_clk>,
+> +			clocks = <&zx_clk>, <&hp_clk>, <&zg_clk>, <&zg_clk>,
+>  			         <&zg_clk>, <&p_clk>, <&zs_clk>, <&zs_clk>;
+>  			#clock-cells = <1>;
+>  			clock-indices = <
+> -- 
+> 1.9.1
+> 
 > --
-> 2.3.0
->
-
--- PMM
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
