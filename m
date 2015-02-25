@@ -1,212 +1,116 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 25 Feb 2015 21:04:34 +0200
-Subject: [PATCHv3 24/35] ARM: OMAP2+: control: add syscon support for register
- accesses
+Date: Wed, 25 Feb 2015 21:04:37 +0200
+Subject: [PATCHv3 27/35] ARM: dts: am33xx: merge control module features under
+ scrm node
 In-Reply-To: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
 References: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1424891085-10392-25-git-send-email-t-kristo@ti.com>
+Message-ID: <1424891085-10392-28-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Control module driver needs to support syscon for register accesses, as
-the DT hierarchy for control module driver is going to be changed. All
-the control module related features will be moved under control module
-node, including clocks, pinctrl, and generic configuration register
-access. Temporary iomap is still provided very early in the boot for
-access while syscon is not yet ready.
+This patch moves all the control module related features under scrm
+node. scm_conf area is changed to use syscon, and also the clocks
+are moved under scm_conf area.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/control.c |  101 ++++++++++++++++++++++++++++++++++-------
- 1 file changed, 84 insertions(+), 17 deletions(-)
+ arch/arm/boot/dts/am33xx.dtsi |   48 ++++++++++++++++++++---------------------
+ 1 file changed, 24 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index a9aee85..45bbc5d 100644
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -15,6 +15,8 @@
- #include <linux/kernel.h>
- #include <linux/io.h>
- #include <linux/of_address.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index acd3705..bc8bbcd 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -83,20 +83,6 @@
+ 		};
+ 	};
  
- #include "soc.h"
- #include "iomap.h"
-@@ -33,7 +35,9 @@
- #define PADCONF_SAVE_DONE		0x1
+-	am33xx_control_module: control_module at 4a002000 {
+-		compatible = "syscon";
+-		reg = <0x44e10000 0x7fc>;
+-	};
+-
+-	am33xx_pinmux: pinmux at 44e10800 {
+-		compatible = "pinctrl-single";
+-		reg = <0x44e10800 0x0238>;
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		pinctrl-single,register-width = <32>;
+-		pinctrl-single,function-mask = <0x7f>;
+-	};
+-
+ 	/*
+ 	 * XXX: Use a flat representation of the AM33XX interconnect.
+ 	 * The real AM33XX interconnect network is quite complex. Since
+@@ -125,21 +111,35 @@
+ 		};
  
- static void __iomem *omap2_ctrl_base;
-+static s16 omap2_ctrl_offset;
- static void __iomem *omap4_ctrl_pad_base;
-+static struct regmap *omap2_ctrl_syscon;
+ 		scrm: scrm at 44e10000 {
+-			compatible = "ti,am3-scrm";
++			compatible = "ti,am3-scrm", "simple-bus";
+ 			reg = <0x44e10000 0x2000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x44e10000 0x2000>;
  
- #if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
- struct omap3_scratchpad {
-@@ -135,7 +139,6 @@ struct omap3_control_regs {
- static struct omap3_control_regs control_context;
- #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
+-			scrm_clocks: clocks {
++			am33xx_pinmux: pinmux at 800 {
++				compatible = "pinctrl-single";
++				reg = <0x800 0x238>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
++				pinctrl-single,register-width = <32>;
++				pinctrl-single,function-mask = <0x7f>;
+ 			};
  
--#define OMAP_CTRL_REGADDR(reg)		(omap2_ctrl_base + (reg))
- #define OMAP4_CTRL_PAD_REGADDR(reg)	(omap4_ctrl_pad_base + (reg))
- 
- void __init omap2_set_globals_control(void __iomem *ctrl,
-@@ -147,32 +150,72 @@ void __init omap2_set_globals_control(void __iomem *ctrl,
- 
- u8 omap_ctrl_readb(u16 offset)
- {
--	return readb_relaxed(OMAP_CTRL_REGADDR(offset));
-+	u32 val;
-+	u8 byte_offset = offset & 0x3;
+-			scrm_clockdomains: clockdomains {
++			scm_conf: tisyscon at 0 {
++				compatible = "syscon";
++				reg = <0x0 0x7fc>;
++				#address-cells = <1>;
++				#size-cells = <1>;
 +
-+	val = omap_ctrl_readl(offset);
-+
-+	return (val >> (byte_offset * 8)) & 0xff;
- }
++				scrm_clocks: clocks {
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
+ 			};
+-		};
  
- u16 omap_ctrl_readw(u16 offset)
- {
--	return readw_relaxed(OMAP_CTRL_REGADDR(offset));
-+	u32 val;
-+	u16 byte_offset = offset & 0x2;
-+
-+	val = omap_ctrl_readl(offset);
-+
-+	return (val >> (byte_offset * 8)) & 0xffff;
- }
+-		cm: syscon at 44e10000 {
+-			compatible = "ti,am33xx-controlmodule", "syscon";
+-			reg = <0x44e10000 0x800>;
++			scrm_clockdomains: clockdomains {
++			};
+ 		};
  
- u32 omap_ctrl_readl(u16 offset)
- {
--	return readl_relaxed(OMAP_CTRL_REGADDR(offset));
-+	u32 val;
-+
-+	offset &= 0xfffc;
-+	if (!omap2_ctrl_syscon)
-+		val = readl_relaxed(omap2_ctrl_base + offset);
-+	else
-+		regmap_read(omap2_ctrl_syscon, omap2_ctrl_offset + offset,
-+			    &val);
-+
-+	return val;
- }
+ 		intc: interrupt-controller at 48200000 {
+@@ -350,7 +350,7 @@
+ 			reg = <0x481cc000 0x2000>;
+ 			clocks = <&dcan0_fck>;
+ 			clock-names = "fck";
+-			syscon-raminit = <&am33xx_control_module 0x644 0>;
++			syscon-raminit = <&scm_conf 0x644 0>;
+ 			interrupts = <52>;
+ 			status = "disabled";
+ 		};
+@@ -361,7 +361,7 @@
+ 			reg = <0x481d0000 0x2000>;
+ 			clocks = <&dcan1_fck>;
+ 			clock-names = "fck";
+-			syscon-raminit = <&am33xx_control_module 0x644 1>;
++			syscon-raminit = <&scm_conf 0x644 1>;
+ 			interrupts = <55>;
+ 			status = "disabled";
+ 		};
+@@ -720,7 +720,7 @@
+ 			 */
+ 			interrupts = <40 41 42 43>;
+ 			ranges;
+-			syscon = <&cm>;
++			syscon = <&scm_conf>;
+ 			status = "disabled";
  
- void omap_ctrl_writeb(u8 val, u16 offset)
- {
--	writeb_relaxed(val, OMAP_CTRL_REGADDR(offset));
-+	u32 tmp;
-+	u8 byte_offset = offset & 0x3;
-+
-+	tmp = omap_ctrl_readl(offset);
-+
-+	tmp &= 0xffffffff ^ (0xff << (byte_offset * 8));
-+	tmp |= val << (byte_offset * 8);
-+
-+	omap_ctrl_writel(tmp, offset);
- }
- 
- void omap_ctrl_writew(u16 val, u16 offset)
- {
--	writew_relaxed(val, OMAP_CTRL_REGADDR(offset));
-+	u32 tmp;
-+	u8 byte_offset = offset & 0x2;
-+
-+	tmp = omap_ctrl_readl(offset);
-+
-+	tmp &= 0xffffffff ^ (0xffff << (byte_offset * 8));
-+	tmp |= val << (byte_offset * 8);
-+
-+	omap_ctrl_writel(tmp, offset);
- }
- 
- void omap_ctrl_writel(u32 val, u16 offset)
- {
--	writel_relaxed(val, OMAP_CTRL_REGADDR(offset));
-+	offset &= 0xfffc;
-+	if (!omap2_ctrl_syscon)
-+		writel_relaxed(val, omap2_ctrl_base + offset);
-+	else
-+		regmap_write(omap2_ctrl_syscon, omap2_ctrl_offset + offset,
-+			     val);
- }
- 
- /*
-@@ -611,7 +654,7 @@ void __init omap3_ctrl_init(void)
- 
- struct control_init_data {
- 	int index;
--	void __iomem *mem;
-+	s16 offset;
- };
- 
- static struct control_init_data ctrl_data = {
-@@ -638,17 +681,15 @@ int __init omap2_control_base_init(void)
- 	struct device_node *np;
- 	const struct of_device_id *match;
- 	struct control_init_data *data;
--	void __iomem *mem;
- 
- 	for_each_matching_node_and_match(np, omap_scrm_dt_match_table, &match) {
- 		data = (struct control_init_data *)match->data;
- 
--		mem = of_iomap(np, 0);
--		if (!mem)
-+		omap2_ctrl_base = of_iomap(np, 0);
-+		if (!omap2_ctrl_base)
- 			return -ENOMEM;
- 
--		omap2_ctrl_base = mem;
--		data->mem = mem;
-+		omap2_ctrl_offset = data->offset;
- 	}
- 
- 	return 0;
-@@ -662,17 +703,43 @@ int __init omap2_control_base_init(void)
-  */
- int __init omap_control_init(void)
- {
--	struct device_node *np;
-+	struct device_node *np, *scm_conf;
- 	const struct of_device_id *match;
- 	const struct omap_prcm_init_data *data;
- 	int ret;
-+	struct regmap *syscon;
- 
- 	for_each_matching_node_and_match(np, omap_scrm_dt_match_table, &match) {
- 		data = match->data;
- 
--		ret = omap2_clk_provider_init(np, data->index, NULL, data->mem);
--		if (ret)
--			return ret;
-+		/*
-+		 * Check if we have tisyscon node, if yes, use this to
-+		 * access clock registers.
-+		 */
-+		scm_conf = of_get_child_by_name(np, "tisyscon");
-+
-+		if (scm_conf) {
-+			syscon = syscon_node_to_regmap(scm_conf);
-+
-+			if (IS_ERR(syscon))
-+				return PTR_ERR(syscon);
-+
-+			omap2_ctrl_syscon = syscon;
-+
-+			ret = omap2_clk_provider_init(scm_conf, data->index,
-+						      syscon, NULL);
-+			if (ret)
-+				return ret;
-+
-+			iounmap(omap2_ctrl_base);
-+			omap2_ctrl_base = NULL;
-+		} else {
-+			/* No tisyscon found, direct access */
-+			ret = omap2_clk_provider_init(np, data->index, NULL,
-+						      omap2_ctrl_base);
-+			if (ret)
-+				return ret;
-+		}
- 	}
- 
- 	return 0;
+ 			davinci_mdio: mdio at 4a101000 {
 -- 
 1.7.9.5
