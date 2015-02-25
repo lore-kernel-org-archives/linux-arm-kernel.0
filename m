@@ -1,28 +1,100 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 25 Feb 2015 15:22:01 +0000
-Subject: [PATCH 4/6] ARM: DT: STi: STiH407: Add dwc3 usb3 DT node.
-In-Reply-To: <20150225151229.GE5132@x1>
-References: <1424871377-1795-1-git-send-email-peter.griffin@linaro.org>
- <1424871377-1795-5-git-send-email-peter.griffin@linaro.org>
- <20150225151229.GE5132@x1>
-Message-ID: <20150225152201.GA14329@griffinp-ThinkPad-X1-Carbon-2nd>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 25 Feb 2015 15:22:56 +0000
+Subject: [PATCH v2] arm64: mm: increase VA range of identity map
+In-Reply-To: <CAKv+Gu85HnywTWR5pfjs8Z=X8ZN9OKLNOWT+ske8H5d3G6NEFg@mail.gmail.com>
+References: <1424797703-2804-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150225123814.GC1105@localhost>
+ <CAKv+Gu8hxTtM4v9jZP+dwkW_WMJz9HzmutRVSQg-oPXwDKqZzA@mail.gmail.com>
+ <CAKv+Gu85HnywTWR5pfjs8Z=X8ZN9OKLNOWT+ske8H5d3G6NEFg@mail.gmail.com>
+Message-ID: <20150225152255.GE1105@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On Wed, 25 Feb 2015, Lee Jones wrote:
-
-> > +			resets		= <&powerdown STIH407_USB3_POWERDOWN>,
-> > +					  <&softreset STIH407_MIPHY2_SOFTRESET>;
-> > +			reset-names	= "powerdown",
-> > +					  "softreset";
+On Wed, Feb 25, 2015 at 01:55:04PM +0000, Ard Biesheuvel wrote:
+> On 25 February 2015 at 13:10, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 25 February 2015 at 12:38, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> On Tue, Feb 24, 2015 at 05:08:23PM +0000, Ard Biesheuvel wrote:
+> >>> --- a/arch/arm64/kernel/head.S
+> >>> +++ b/arch/arm64/kernel/head.S
+> >>> @@ -387,6 +387,28 @@ __create_page_tables:
+> >>>       mov     x0, x25                         // idmap_pg_dir
+> >>>       ldr     x3, =KERNEL_START
+> >>>       add     x3, x3, x28                     // __pa(KERNEL_START)
+> >>> +
+> >>> +#ifndef CONFIG_ARM64_VA_BITS_48
+> >>> +#define EXTRA_SHIFT  (PGDIR_SHIFT + PAGE_SHIFT - 3)
+> >>> +     /*
+> >>> +      * If VA_BITS < 48, it may be too small to allow for an ID mapping to be
+> >>> +      * created that covers system RAM if that is located sufficiently high
+> >>> +      * in the physical address space. So for the ID map, use an extended
+> >>> +      * virtual range in that case, by configuring an additional translation
+> >>> +      * level.
+> >>> +      */
+> >>> +     adrp    x5, KERNEL_END
+> >>> +     clz     x5, x5                  // # of leading 0's in __pa(KERNEL_END)
+> >>> +     cmp     x5, #TCR_T0SZ(VA_BITS)  // VA_BITS sufficiently large?
+> >>
+> >> I think we need some better comment here for people looking at this code
+> >> again in the future (including myself). So the VA bits needed to cover
+> >> KERNEL_END are calculated as (64 - clz(__pa(KERNEL_END))). T0SZ is
+> >> calculated as (64 - VA_BITS) which means that T0SZ is
+> >> clz(__pa(KERNEL_END)).
+> >>
+> >
+> > OK.
+> >
+> >>> +     b.ge    1f                      // .. then skip additional level
+> >>> +
+> >>> +     adrp    x6, idmap_t0sz
+> >>> +     str     x5, [x6, #:lo12:idmap_t0sz]
+> >>> +
+> >>> +     create_table_entry x0, x3, EXTRA_SHIFT, PTRS_PER_PGD, x5, x6
+> >>
+> >> EXTRA_SHIFT is correctly calculated (one level more than PGDIR_SHIFT)
+> >> but I don't think PTRS_PER_PGD is appropriate here. For example, we had
+> >> in the past 39-bit VA with 64KB pages which made PTRS_PER_PGD pretty
+> >> small (well, it may cover the 40-bit case you are trying to fix but not
+> >> up to 48). So maybe define something like:
+> >>
+> >> #define EXTRA_PTRS      (1 << (48 - EXTRA_SHIFT))
+> >>
+> >
+> > My assumption was that, if you are running with fewer translation
+> > levels than required to map all 48 bits, it makes little sense to use
+> > only half a page or less at the top level, and PTRS_PER_PGD will
+> > always cover a full page (which is what we reserve at the root level
+> > anyway). But perhaps this is not universally true.
 > 
-> Nit: What's the purpose of having these on separate lines?
+> Actually, this assumption is encoded into the patch in another way as
+> well: decreasing T0SZ is always assumed to result in an additional
+> level of translation to be configured. However, your VA_BITS==39 on
+> 64k pages case would break this assumption too. So perhaps using
+> MAX_VA_BITS instead of the actual size of the PA is the right thing to
+> do here after all.
 
-The only reason was to stay aligned with the example in
-Documentation/devicetree/bindings/usb/dwc3-st.txt.
+We have two options:
 
-regards,
+a) enforce that for VA_BITS != 48, the PTRS_PER_PGD is always (1 <<
+   (PAGE_SHIFT - 3)). This way we now that anything bigger than VA_BITS
+   requires more levels (currently only one more)
 
-Peter.
+b) decouple the idmap_t0sz calculation from the additional page table
+   level so we can have different idmap_t0sz but not necessarily an
+   extra level
+
+I think to keep things simple, we should go for (a) with your original
+MAX_VA_BITS when KERNEL_END cannot be covered by VA_BITS:
+
+	64 - clz(__pa(KERNEL_END) > VA_BITS
+
+You can still use PTRS_PER_PGD since we know it covers a full page but
+we need an #error somewhere in case we forget about this restriction,
+something like:
+
+#if !defined(CONFIG_ARM64_VA_BITS_48) && \
+	(8 * PTRS_PER_PGD != PAGE_SIZE)
+#error "PGD not a full page size"
+#endif
+
+-- 
+Catalin
