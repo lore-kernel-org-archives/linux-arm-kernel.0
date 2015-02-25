@@ -1,52 +1,21 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 25 Feb 2015 09:14:51 -0800
-Subject: Dead Kconfig Option OMAP4_ERRATA_I688
-In-Reply-To: <CABv5NL-bnfV0BoH+G=nX+1eo6xeT_LN8dOFtSnwvdpcvjJhUFQ@mail.gmail.com>
-References: <CABv5NL-bnfV0BoH+G=nX+1eo6xeT_LN8dOFtSnwvdpcvjJhUFQ@mail.gmail.com>
-Message-ID: <20150225171451.GQ11056@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Feb 2015 17:16:58 +0000
+Subject: [PATCH] coresight-stm: adding driver for CoreSight STM component
+In-Reply-To: <1423135651.27378.32.camel@x220>
+References: <1423088550-15780-1-git-send-email-mathieu.poirier@linaro.org>
+ <1423135651.27378.32.camel@x220>
+Message-ID: <20150225171658.GF8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Feb 05, 2015 at 12:27:31PM +0100, Paul Bolle wrote:
+> I'm _guessing_ that CPU_32v4 and CPU_32v4T are needed for the ldrd and
+> strd assembler instructions. If that's right a next _guess_ would be
+> that you also need to mention CPU_32v3 here.
 
-Adding Santosh to Cc on this one.
+No.  Double word instructions are available in some ARMv5 (ARMv5TE and
+up) and from ARMv6.
 
-* Stefan Hengelein <stefan.hengelein@fau.de> [150225 09:13]:
-> During the research for my masters thesis i came across the
-> OMAP4_ERRATA_I688 option and realized, it is never possible to enable
-> this option.
-> 
-> The a62a6e98 commit added the "&& !ARCH_MULTIPLATFORM" dependency to
-> disable this option for multiplatforms. However, because of enclosing
-> dependencies, this option isn't available for non-MULTIPLATFORM
-> configurations either.
-
-Yes there is no clean way currently to enable this errata for
-multiplatform.
- 
-> CONFIG_OMAP4_ERRATA_I688 is defined in the menu "TI OMAP/AM/DM/DRA
-> Family" which depends on ARCH_MULTI_V6 || ARCH_MULTI_V7. (in
-> arch/arm/mach-omap2/Kconfig)
-> 
-> ARCH_MULTI_V6 and ARCH_MULTI_V7 however are defined in the menu
-> "Multiple platform selection" which depends on ARCH_MULTIPLATFORM (in
-> arch/arm/Kconfig)
-> 
-> Which is a contradiction.
-> 
-> There are no selects on OMAP4_ERRATA_I688, which would ignore
-> dependencies, either.
-> 
-> The question is:
-> Was disabling this option for non-MULTIPLATFORM configurations also intentional?
-> 
-> i have added a minimal example of the problem.
-
->From what I remember the plan was to try to come up with a
-multiplatform friendly way of doing this errata. Santosh,
-any suggestions here? Should we just remove the code as it
-seems nobody has complained about it for a few years now?
-
-Regards,
-
-Tony
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
