@@ -1,309 +1,116 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 26 Feb 2015 00:35:02 +0100
-Subject: [PATCH 2/2] rockchip: efuse: add efuse driver for rk3288 efuse
-In-Reply-To: <547DD519.4080505@rock-chips.com>
-References: <1417419281-9243-1-git-send-email-jay.xu@rock-chips.com>
- <1529852.GW1hFGtilD@diego> <547DD519.4080505@rock-chips.com>
-Message-ID: <1482124.H9onLN8roL@diego>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 26 Feb 2015 08:36:23 +0900
+Subject: [PATCH 1/6] target-arm: kvm: save/restore mp state
+In-Reply-To: <1424880159-29348-2-git-send-email-alex.bennee@linaro.org>
+References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
+ <1424880159-29348-2-git-send-email-alex.bennee@linaro.org>
+Message-ID: <CAFEAcA9oWeYGYcGtf8So6VrYLMXjWr4FiZ2tS+jBnDtv87jAKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jianqun,
+On 26 February 2015 at 01:02, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> This adds the saving and restore of the current Multi-Processing state
+> of the machine. While the KVM_GET/SET_MP_STATE API exposes a number of
+> potential states for x86 we only use two for ARM. Either the process is
+> running or not.
 
-Am Dienstag, 2. Dezember 2014, 23:04:57 schrieb Jianqun:
-> ? 12/01/2014 10:10 PM, Heiko St?bner ??:
-> > Am Montag, 1. Dezember 2014, 15:34:41 schrieb Jianqun Xu:
-> >> Add driver for efuse found on rk3288 board based on rk3288 SoC.
-> >> Driver will read fuse information of chip at the boot stage of
-> >> kernel, this information new is for further usage.
-> >> 
-> >> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
-> > 
-> > General question would be, what is the purpose of this driver?
-> 
-> This driver will get efuse information, and other module will use it for
-> some useage, such as dvfs will ajust OPP according to the differences
-> between chips, that can make chips run on a powersave status
-> 
-> Also can get the chip version... but this patch only show a part feathur
+By this you mean "is the CPU in the PSCI powered down state or not",
+right?
 
-just because I noticed this today, there seems to be an eeprom [0] and efuse 
-[1] framework in the works. And as the mail from Maxime [2] suggests, both 
-should probably merge.
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>
+> diff --git a/target-arm/kvm.c b/target-arm/kvm.c
+> index 23cefe9..8732854 100644
+> --- a/target-arm/kvm.c
+> +++ b/target-arm/kvm.c
+> @@ -25,6 +25,7 @@
+>  #include "hw/arm/arm.h"
+>
+>  const KVMCapabilityInfo kvm_arch_required_capabilities[] = {
+> +    KVM_CAP_INFO(MP_STATE),
 
-So the rockchip efuse driver should probably the framework that will become of 
-those two.
+Does this really want to be a required cap? I haven't checked,
+but assuming 'required' means what it says this presumably
+means we'll stop working on host kernels we previously ran
+fine on (even if migration didn't work there).
 
+>      KVM_CAP_LAST_INFO
+>  };
+>
+> diff --git a/target-arm/machine.c b/target-arm/machine.c
+> index 9446e5a..70b1bc4 100644
+> --- a/target-arm/machine.c
+> +++ b/target-arm/machine.c
+> @@ -161,6 +161,34 @@ static const VMStateInfo vmstate_cpsr = {
+>      .put = put_cpsr,
+>  };
+>
+> +#if defined CONFIG_KVM
+> +static int get_mpstate(QEMUFile *f, void *opaque, size_t size)
+> +{
+> +    ARMCPU *cpu = opaque;
+> +    struct kvm_mp_state mp_state = { .mp_state =  qemu_get_be32(f)};
+> +    return kvm_vcpu_ioctl(CPU(cpu), KVM_SET_MP_STATE, &mp_state);
+> +}
 
-Heiko
+Won't this break if you're running a QEMU built with KVM
+support in TCG mode on an aarch64 host?
 
+In any case, for that configuration we should be migrating the
+TCG cpu->powered_off flag, which is where we keep the PSCI
+power state for TCG.
 
-[0] https://lkml.org/lkml/2015/2/19/307
-[1] https://lkml.org/lkml/2015/2/25/173
-[2] https://lkml.org/lkml/2015/2/25/191
+> +
+> +static void put_mpstate(QEMUFile *f, void *opaque, size_t size)
+> +{
+> +    ARMCPU *cpu = opaque;
+> +    struct kvm_mp_state mp_state;
+> +    int ret = kvm_vcpu_ioctl(CPU(cpu), KVM_GET_MP_STATE, &mp_state);
+> +    if (ret) {
+> +        fprintf(stderr, "%s: failed to get MP_STATE %d/%s\n",
+> +                __func__, ret, strerror(ret));
+> +        abort();
+> +    }
+> +    qemu_put_be32(f, mp_state.mp_state);
+> +}
+> +
+> +static const VMStateInfo vmstate_mpstate = {
+> +    .name = "mpstate",
+> +    .get = get_mpstate,
+> +    .put = put_mpstate,
+> +};
+> +#endif
+> +
+>  static void cpu_pre_save(void *opaque)
+>  {
+>      ARMCPU *cpu = opaque;
+> @@ -244,6 +272,16 @@ const VMStateDescription vmstate_arm_cpu = {
+>          VMSTATE_UINT32_ARRAY(env.regs, ARMCPU, 16),
+>          VMSTATE_UINT64_ARRAY(env.xregs, ARMCPU, 32),
+>          VMSTATE_UINT64(env.pc, ARMCPU),
+> +#if defined CONFIG_KVM
+> +        {
+> +            .name = "mp_state",
+> +            .version_id = 0,
+> +            .size = sizeof(uint32_t),
+> +            .info = &vmstate_mpstate,
+> +            .flags = VMS_SINGLE,
+> +            .offset = 0,
+> +        },
+> +#endif
 
+This means the migration format will be different on different
+build configurations, which seems like a really bad idea.
 
-> > I don't see any publically usable functions and the only thing happening
-> > is
-> > the
-> > 
-> > 	dev_info(efuse->dev, "leakage (%d %d %d)\n",...
-> > 
-> > output that emits some information from the efuse to the kernel log?
-> 
-> can I make it a node under some debug directory ? For now only show it in
-> boot message.
-> > In the dt-binding doc you write:
-> >> The 32x32 eFuse can only be accessed by APB bus when IO_SECURITYsel is
-> >> high.> 
-> > While the TRM also says this, IO_SECURITY is not mentioned anywhere else
-> > in
-> > the document. Is this a pin or a bit somewhere in the GRF - i.e. something
-> > whichs state is readable?
-> > 
-> > 
-> > Some more comments inline.
-> > 
-> >> ---
-> >> 
-> >>  arch/arm/mach-rockchip/efuse.c | 165
-> >> 
-> >> +++++++++++++++++++++++++++++++++++++++++ arch/arm/mach-rockchip/efuse.h
-> >> |
-> >> 15 ++++
-> >> 
-> >>  2 files changed, 180 insertions(+)
-> >>  create mode 100644 arch/arm/mach-rockchip/efuse.c
-> >>  create mode 100644 arch/arm/mach-rockchip/efuse.h
-> >> 
-> >> diff --git a/arch/arm/mach-rockchip/efuse.c
-> >> b/arch/arm/mach-rockchip/efuse.c new file mode 100644
-> >> index 0000000..326d81e
-> >> --- /dev/null
-> >> +++ b/arch/arm/mach-rockchip/efuse.c
-> > 
-> > a driver like this should probably live in something like
-> > drivers/soc/rockchip.
-> > 
-> >> @@ -0,0 +1,165 @@
-> >> +/* mach-rockchip/efuse.c
-> >> + *
-> >> + * Copyright (c) 2014 Rockchip Electronics Co. Ltd.
-> >> + * Author: Jianqun Xu <jay.xu@rock-chips.com>
-> >> + *
-> >> + * Tmis program is free software; you can redistribute it and/or modify
-> >> it
-> >> + * under the terms of version 2 of the GNU General Public License as
-> >> + * published by the Free Software Foundation.
-> >> + *
-> >> + * Tmis program is distributed in the hope that it will be useful, but
-> > 
-> > type Tmis -> This
-> > 
-> >> WITHOUT + * ANY WARRANTY; without even the implied warranty of
-> >> MERCHANTABILITY or + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> >> General Public License for + * more details.
-> >> + *
-> >> + * You should have received a copy of the GNU General Public License
-> >> along
-> >> with + * tmis program; if not, write to the Free Software Foundation,
-> >> Inc.,
-> >> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
-> >> + *
-> >> + * Tme full GNU General Public License is included in this distribution
-> >> in
-> >> the + * file called LICENSE.
-> >> + */
-> >> +
-> >> +#include <linux/kernel.h>
-> >> +#include <linux/module.h>
-> >> +#include <linux/device.h>
-> >> +#include <linux/delay.h>
-> >> +#include <linux/platform_device.h>
-> >> +#include <linux/of_address.h>
-> >> +#include <linux/io.h>
-> >> +
-> >> +#include "efuse.h"
-> >> +
-> >> +#define EFUSE_BUF_SIZE	(32)
-> >> +#define EFUSE_BUF_LKG_CPU	(23)
-> >> +#define EFUSE_BUF_LKG_GPU	(24)
-> >> +#define EFUSE_BUF_LKG_LOG	(25)
-> > 
-> > no braces needed for those numbers
-> > 
-> >> +
-> >> +struct rk_efuse_info {
-> >> +	/* Platform device */
-> >> +	struct device *dev;
-> >> +
-> >> +	/* Hardware resources */
-> >> +	void __iomem *regs;
-> >> +
-> >> +	/* buffer to store registers' values */
-> >> +	unsigned int buf[EFUSE_BUF_SIZE];
-> >> +};
-> >> +
-> >> +static void efuse_writel(struct rk_efuse_info *efuse,
-> >> +			 unsigned int value,
-> >> +			 unsigned int offset)
-> >> +{
-> >> +	writel_relaxed(value, efuse->regs + offset);
-> >> +}
-> >> +
-> >> +static unsigned int efuse_readl(struct rk_efuse_info *efuse,
-> >> +				unsigned int offset)
-> >> +{
-> >> +	return readl_relaxed(efuse->regs + offset);
-> >> +}
-> > 
-> > why these indirections for readl and writel? They don't seem to provide
-> > any
-> > additional benefit over calling writel_relaxed/readl_relaxed directly
-> > below.> 
-> >> +
-> >> +static unsigned int rockchip_efuse_leakage(struct rk_efuse_info *efuse,
-> >> +					 int channel)
-> >> +{
-> >> +	switch (channel) {
-> >> +	case EFUSE_BUF_LKG_CPU:
-> >> +	case EFUSE_BUF_LKG_GPU:
-> >> +	case EFUSE_BUF_LKG_LOG:
-> >> +		return efuse->buf[channel];
-> >> +	default:
-> >> +		dev_err(efuse->dev, "unknown channel\n");
-> >> +		return -EINVAL;
-> >> +	}
-> >> +
-> >> +	return 0;
-> >> +}
-> >> +
-> >> +static void rockchip_efuse_info(struct rk_efuse_info *efuse)
-> >> +{
-> >> +	dev_info(efuse->dev, "leakage (%d %d %d)\n",
-> >> +		 rockchip_efuse_leakage(efuse, EFUSE_BUF_LKG_CPU),
-> >> +		 rockchip_efuse_leakage(efuse, EFUSE_BUF_LKG_GPU),
-> >> +		 rockchip_efuse_leakage(efuse, EFUSE_BUF_LKG_LOG));
-> >> +}
-> >> +
-> >> +static int rockchip_efuse_init(struct rk_efuse_info *efuse)
-> >> +{
-> >> +	int start = 0;
-> >> +	int ret = 0;
-> >> +
-> >> +	efuse_writel(efuse, EFUSE_CSB, REG_EFUSE_CTRL);
-> >> +	efuse_writel(efuse, EFUSE_LOAD | EFUSE_PGENB, REG_EFUSE_CTRL);
-> >> +	udelay(2);
-> >> +
-> >> +	for (start = 0; start <= EFUSE_BUF_SIZE; start++) {
-> >> +		efuse_writel(efuse, efuse_readl(efuse, REG_EFUSE_CTRL) &
-> >> +			     (~(EFUSE_A_MASK << EFUSE_A_SHIFT)),
-> >> +			     REG_EFUSE_CTRL);
-> >> +		efuse_writel(efuse, efuse_readl(efuse, REG_EFUSE_CTRL) |
-> >> +			     ((start & EFUSE_A_MASK) << EFUSE_A_SHIFT),
-> >> +			     REG_EFUSE_CTRL);
-> >> +		udelay(2);
-> >> +		efuse_writel(efuse, efuse_readl(efuse, REG_EFUSE_CTRL) |
-> >> +			     EFUSE_STROBE, REG_EFUSE_CTRL);
-> >> +		udelay(2);
-> >> +
-> >> +		efuse->buf[start] = efuse_readl(efuse, REG_EFUSE_DOUT);
-> >> +
-> >> +		efuse_writel(efuse, efuse_readl(efuse, REG_EFUSE_CTRL) &
-> >> +			     (~EFUSE_STROBE), REG_EFUSE_CTRL);
-> >> +		udelay(2);
-> >> +	}
-> >> +
-> >> +	udelay(2);
-> >> +	efuse_writel(efuse, efuse_readl(efuse, REG_EFUSE_CTRL) |
-> >> +		     EFUSE_CSB, REG_EFUSE_CTRL);
-> >> +	udelay(2);
-> >> +
-> >> +	return ret;
-> >> +}
-> >> +
-> >> +static int rockchip_efuse_probe(struct platform_device *pdev)
-> >> +{
-> >> +	struct rk_efuse_info *efuse;
-> >> +	struct resource *mem;
-> >> +	int ret = 0;
-> >> +
-> >> +	efuse = devm_kzalloc(&pdev->dev, sizeof(*efuse), GFP_KERNEL);
-> >> +	if (!efuse)
-> >> +		return -ENOMEM;
-> >> +
-> >> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >> +	efuse->regs = devm_ioremap_resource(&pdev->dev, mem);
-> >> +	if (IS_ERR(efuse->regs))
-> >> +		return PTR_ERR(efuse->regs);
-> >> +
-> >> +	platform_set_drvdata(pdev, efuse);
-> >> +	efuse->dev = &pdev->dev;
-> >> +
-> >> +	ret = rockchip_efuse_init(efuse);
-> >> +	if (!ret)
-> >> +		rockchip_efuse_info(efuse);
-> >> +
-> >> +	return ret;
-> >> +}
-> >> +
-> >> +static const struct of_device_id rockchip_efuse_match[] = {
-> >> +	{ .compatible = "rockchip,rk3288-efuse", },
-> > 
-> > what about other Rockchip SoCs? At least the rk3188 seems to contain an
-> > efuse [though the TRM I have only directs to a RK3188 eFuse.pdf without
-> > describing the component. So I don't know if it's the same type.
-> > 
-> >> +	{},
-> >> +};
-> >> +
-> >> +static struct platform_driver rockchip_efuse_driver = {
-> >> +	.probe = rockchip_efuse_probe,
-> >> +	.driver = {
-> >> +		.name = "rk3288-efuse",
-> >> +		.owner = THIS_MODULE,
-> > 
-> > .owner gets already set through module_platform_driver
-> > 
-> >> +		.of_match_table = of_match_ptr(rockchip_efuse_match),
-> >> +	},
-> >> +};
-> >> +
-> >> +module_platform_driver(rockchip_efuse_driver);
-> >> +
-> >> +MODULE_DESCRIPTION("Rockchip eFuse Driver");
-> >> +MODULE_AUTHOR("Jianqun Xu <jay.xu@rock-chips.com>");
-> >> +MODULE_LICENSE("GPL v2");
-> >> diff --git a/arch/arm/mach-rockchip/efuse.h
-> >> b/arch/arm/mach-rockchip/efuse.h new file mode 100644
-> >> index 0000000..3fdcf6d
-> >> --- /dev/null
-> >> +++ b/arch/arm/mach-rockchip/efuse.h
-> > 
-> > why does this need to be a separate header? The stuff below could very
-> > well
-> > simply live inside the fuse.c
-> > 
-> >> @@ -0,0 +1,15 @@
-> >> +#ifndef _ARCH_ROCKCHIP_EFUSE_H_
-> >> +#define _ARCH_ROCKCHIP_EFUSE_H_
-> >> +
-> >> +/* Rockchip eFuse controller register */
-> >> +#define EFUSE_A_SHIFT		(6)
-> >> +#define EFUSE_A_MASK		(0x3FF)
-> >> +#define EFUSE_PGENB		(1 << 3)
-> > 
-> > please use BIT(3) instead of (1 << 3)
-> > Same for the bits below.
-> > 
-> >> +#define EFUSE_LOAD		(1 << 2)
-> >> +#define EFUSE_STROBE		(1 << 1)
-> >> +#define EFUSE_CSB		(1 << 0)
-> >> +
-> >> +#define REG_EFUSE_CTRL		(0x0000)
-> >> +#define REG_EFUSE_DOUT		(0x0004)
-> > 
-> > no braces necessary for basic numerals
-> > 
-> >> +
-> >> +#endif /* _ARCH_ROCKCHIP_EFUSE_H_ */
+Have you considered having the KVM state sync functions just
+sync the kernel's MP state into cpu->powered_off, and then
+migrating that flag here unconditionally?
+
+>          {
+>              .name = "cpsr",
+>              .version_id = 0,
+> --
+> 2.3.0
+>
+
+-- PMM
