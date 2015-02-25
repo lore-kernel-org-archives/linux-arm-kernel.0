@@ -1,120 +1,77 @@
 From: al.stone@linaro.org (al.stone at linaro.org)
-Date: Tue, 24 Feb 2015 17:36:24 -0700
-Subject: [PATCH v3 8/9] ACPI: arm64: use an arch-specific ACPI _OSI method and
- ACPI blacklist
+Date: Tue, 24 Feb 2015 17:36:25 -0700
+Subject: [PATCH v3 9/9] ACPI: arm64: use "Linux" as ACPI_OS_NAME for _OS on
+ arm64
 In-Reply-To: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
 References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1424824585-6405-9-git-send-email-al.stone@linaro.org>
+Message-ID: <1424824585-6405-10-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Al Stone <al.stone@linaro.org>
 
-Now that all of the _OSI functionality has been separated out, we can
-provide arch-specific functionality for it.  This also allows us to do
-the same for the acpi_blacklisted() function.  We also make sure the
-defaults for the arm64 kernel are set so that the arch-specific _OSI
-method and blacklist are always used for ACPI.
+ACPI_OS_NAME is globally defined as "Microsoft Windows NT" for now.
+That doesn't make much sense in the ARM context, so set it to "Linux"
+when CONFIG_ARM64.
 
-For arm64, any use of _OSI will issue a warning that it is deprecated.
-All use of _OSI will return false -- i.e., it will return no useful
-information to any firmware using it.  The ability to temporarily turn
-on _OSI, or turn off _OSI, or affect it in other ways from the command
-line is no longer available for arm64, either.  The blacklist for ACPI
-on arm64 is empty.  This will, of course, require ACPI to be enabled
-for arm64.
+If it is necessary to change the return value from \_OS_ (that is, return
+some value other than the default in ACPI_OS_NAME), use the kernel parameter
+"acpi_os_name=<string>".
 
+Many thanks to Rafael Wysocki for this greatly simplified form of the patch.
+
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 Signed-off-by: Al Stone <al.stone@linaro.org>
 ---
- arch/arm64/Kconfig                 |  1 +
- arch/arm64/kernel/Makefile         |  2 +-
- arch/arm64/kernel/acpi-blacklist.c | 20 ++++++++++++++++++++
- arch/arm64/kernel/acpi-osi.c       | 25 +++++++++++++++++++++++++
- 4 files changed, 47 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/kernel/acpi-blacklist.c
- create mode 100644 arch/arm64/kernel/acpi-osi.c
+ arch/arm64/Kconfig              | 5 +++++
+ include/acpi/acconfig.h         | 2 ++
+ include/acpi/platform/aclinux.h | 4 ++++
+ 3 files changed, 11 insertions(+)
 
 diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 3f08727..e441d28 100644
+index e441d28..d812113 100644
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
-@@ -7,6 +7,7 @@ config ARM64
- 	select ARCH_HAS_SG_CHAIN
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_USE_CMPXCHG_LOCKREF
-+	select ARCH_SPECIFIC_ACPI_OSI if ACPI
- 	select ARCH_SUPPORTS_ATOMIC_RMW
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 79bdd3b..b5e1268 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -35,7 +35,7 @@ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
- arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
- arm64-obj-$(CONFIG_PCI)			+= pci.o
- arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
--arm64-obj-$(CONFIG_ACPI)		+= acpi.o
-+arm64-obj-$(CONFIG_ACPI)		+= acpi.o acpi-osi.o acpi-blacklist.o
+@@ -87,6 +87,11 @@ config ARM64
+ config 64BIT
+ 	def_bool y
  
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/acpi-blacklist.c b/arch/arm64/kernel/acpi-blacklist.c
-new file mode 100644
-index 0000000..1be6a56
---- /dev/null
-+++ b/arch/arm64/kernel/acpi-blacklist.c
-@@ -0,0 +1,20 @@
-+/*
-+ *  ARM64 Specific ACPI Blacklist Support
-+ *
-+ *  Copyright (C) 2015, Linaro Ltd.
-+ *	Author: Al Stone <al.stone@linaro.org>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation.
-+ */
++config ACPI_OS_NAME
++	string
++	default "Linux"
++	depends on ACPI
 +
-+#define pr_fmt(fmt) "ACPI: " fmt
+ config ARCH_PHYS_ADDR_T_64BIT
+ 	def_bool y
+ 
+diff --git a/include/acpi/acconfig.h b/include/acpi/acconfig.h
+index 5a0a3e5..1980bf4 100644
+--- a/include/acpi/acconfig.h
++++ b/include/acpi/acconfig.h
+@@ -69,7 +69,9 @@
+  * code that will not execute the _OSI method unless _OS matches the string
+  * below.  Therefore, change this string at your own risk.
+  */
++#ifndef ACPI_OS_NAME
+ #define ACPI_OS_NAME                    "Microsoft Windows NT"
++#endif
+ 
+ /* Maximum objects in the various object caches */
+ 
+diff --git a/include/acpi/platform/aclinux.h b/include/acpi/platform/aclinux.h
+index 1ba7c19..a871cdd 100644
+--- a/include/acpi/platform/aclinux.h
++++ b/include/acpi/platform/aclinux.h
+@@ -69,6 +69,10 @@
+ #define ACPI_REDUCED_HARDWARE 1
+ #endif
+ 
++#ifdef CONFIG_ACPI_OS_NAME
++#define ACPI_OS_NAME CONFIG_ACPI_OS_NAME
++#endif
 +
-+#include <linux/acpi.h>
-+
-+/* The arm64 ACPI blacklist is currently empty.  */
-+int __init acpi_blacklisted(void)
-+{
-+	return 0;
-+}
-diff --git a/arch/arm64/kernel/acpi-osi.c b/arch/arm64/kernel/acpi-osi.c
-new file mode 100644
-index 0000000..bb351f4
---- /dev/null
-+++ b/arch/arm64/kernel/acpi-osi.c
-@@ -0,0 +1,25 @@
-+/*
-+ *  ARM64 Specific ACPI _OSI Support
-+ *
-+ *  Copyright (C) 2015, Linaro Ltd.
-+ *	Author: Al Stone <al.stone@linaro.org>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation.
-+ */
-+
-+#define pr_fmt(fmt) "ACPI: " fmt
-+
-+#include <linux/acpi.h>
-+
-+/*
-+ * Consensus is to deprecate _OSI for all new ACPI-supported architectures.
-+ * So, for arm64, reduce _OSI to a warning message, and tell the firmware
-+ * nothing of value.
-+ */
-+u32 acpi_osi_handler(acpi_string interface, u32 supported)
-+{
-+	pr_warn("_OSI was called, but is deprecated for this architecture.\n");
-+	return false;
-+}
+ #include <linux/string.h>
+ #include <linux/kernel.h>
+ #include <linux/ctype.h>
 -- 
 2.1.0
