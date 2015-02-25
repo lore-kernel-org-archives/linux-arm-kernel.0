@@ -1,72 +1,55 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 25 Feb 2015 21:04:37 +0200
-Subject: [PATCHv3 27/35] ARM: dts: am33xx: merge control module features under
- scrm node
+Date: Wed, 25 Feb 2015 21:04:35 +0200
+Subject: [PATCHv3 25/35] ARM: dts: omap24xx: merge control module features
+ under scrm node
 In-Reply-To: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
 References: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1424891085-10392-28-git-send-email-t-kristo@ti.com>
+Message-ID: <1424891085-10392-26-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves all the control module related features under scrm
-node. scm_conf area is changed to use syscon, and also the clocks
-are moved under scm_conf area.
+This patch moves all the control module related features under scrm node.
+scm_conf area is changed to use syscon, and also the clocks are moved
+under scm_conf area.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/am33xx.dtsi |   48 ++++++++++++++++++++---------------------
- 1 file changed, 24 insertions(+), 24 deletions(-)
+ arch/arm/boot/dts/omap2420.dtsi        |   33 +++++++++++++++++---------
+ arch/arm/boot/dts/omap2430-clocks.dtsi |    6 ++---
+ arch/arm/boot/dts/omap2430.dtsi        |   40 ++++++++++++++++++--------------
+ arch/arm/boot/dts/omap24xx-clocks.dtsi |    4 ++--
+ arch/arm/mach-omap2/control.c          |    7 +++++-
+ 5 files changed, 56 insertions(+), 34 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index acd3705..bc8bbcd 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -83,20 +83,6 @@
- 		};
- 	};
- 
--	am33xx_control_module: control_module at 4a002000 {
--		compatible = "syscon";
--		reg = <0x44e10000 0x7fc>;
--	};
--
--	am33xx_pinmux: pinmux at 44e10800 {
--		compatible = "pinctrl-single";
--		reg = <0x44e10800 0x0238>;
--		#address-cells = <1>;
--		#size-cells = <0>;
--		pinctrl-single,register-width = <32>;
--		pinctrl-single,function-mask = <0x7f>;
--	};
--
- 	/*
- 	 * XXX: Use a flat representation of the AM33XX interconnect.
- 	 * The real AM33XX interconnect network is quite complex. Since
-@@ -125,21 +111,35 @@
+diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
+index e2b2e93..f7d732e 100644
+--- a/arch/arm/boot/dts/omap2420.dtsi
++++ b/arch/arm/boot/dts/omap2420.dtsi
+@@ -28,12 +28,32 @@
  		};
  
- 		scrm: scrm at 44e10000 {
--			compatible = "ti,am3-scrm";
-+			compatible = "ti,am3-scrm", "simple-bus";
- 			reg = <0x44e10000 0x2000>;
+ 		scrm: scrm at 48000000 {
+-			compatible = "ti,omap2-scrm";
++			compatible = "ti,omap2-scrm", "simple-bus";
+ 			reg = <0x48000000 0x1000>;
 +			#address-cells = <1>;
 +			#size-cells = <1>;
-+			ranges = <0 0x44e10000 0x2000>;
++			ranges = <0 0x48000000 0x1000>;
  
 -			scrm_clocks: clocks {
-+			am33xx_pinmux: pinmux at 800 {
-+				compatible = "pinctrl-single";
-+				reg = <0x800 0x238>;
++			omap2420_pmx: pinmux at 30 {
++				compatible = "ti,omap2420-padconf",
++					     "pinctrl-single";
++				reg = <0x30 0x0113>;
  				#address-cells = <1>;
  				#size-cells = <0>;
-+				pinctrl-single,register-width = <32>;
-+				pinctrl-single,function-mask = <0x7f>;
- 			};
- 
--			scrm_clockdomains: clockdomains {
-+			scm_conf: tisyscon at 0 {
++				pinctrl-single,register-width = <8>;
++				pinctrl-single,function-mask = <0x3f>;
++			};
++
++			scm_conf: tisyscon at 270 {
 +				compatible = "syscon";
-+				reg = <0x0 0x7fc>;
++				reg = <0x270 0x100>;
 +				#address-cells = <1>;
 +				#size-cells = <1>;
 +
@@ -75,42 +58,162 @@ index acd3705..bc8bbcd 100644
 +					#size-cells = <0>;
 +				};
  			};
+ 
+ 			scrm_clockdomains: clockdomains {
+@@ -46,15 +66,6 @@
+ 			ti,hwmods = "counter_32k";
+ 		};
+ 
+-		omap2420_pmx: pinmux at 48000030 {
+-			compatible = "ti,omap2420-padconf", "pinctrl-single";
+-			reg = <0x48000030 0x0113>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			pinctrl-single,register-width = <8>;
+-			pinctrl-single,function-mask = <0x3f>;
 -		};
+-
+ 		gpio1: gpio at 48018000 {
+ 			compatible = "ti,omap2-gpio";
+ 			reg = <0x48018000 0x200>;
+diff --git a/arch/arm/boot/dts/omap2430-clocks.dtsi b/arch/arm/boot/dts/omap2430-clocks.dtsi
+index 805f75d..cb4b229 100644
+--- a/arch/arm/boot/dts/omap2430-clocks.dtsi
++++ b/arch/arm/boot/dts/omap2430-clocks.dtsi
+@@ -13,7 +13,7 @@
+ 		#clock-cells = <0>;
+ 		compatible = "ti,composite-mux-clock";
+ 		clocks = <&func_96m_ck>, <&mcbsp_clks>;
+-		reg = <0x02e8>;
++		reg = <0x78>;
+ 	};
  
--		cm: syscon at 44e10000 {
--			compatible = "ti,am33xx-controlmodule", "syscon";
--			reg = <0x44e10000 0x800>;
-+			scrm_clockdomains: clockdomains {
+ 	mcbsp3_fck: mcbsp3_fck {
+@@ -27,7 +27,7 @@
+ 		compatible = "ti,composite-mux-clock";
+ 		clocks = <&func_96m_ck>, <&mcbsp_clks>;
+ 		ti,bit-shift = <2>;
+-		reg = <0x02e8>;
++		reg = <0x78>;
+ 	};
+ 
+ 	mcbsp4_fck: mcbsp4_fck {
+@@ -41,7 +41,7 @@
+ 		compatible = "ti,composite-mux-clock";
+ 		clocks = <&func_96m_ck>, <&mcbsp_clks>;
+ 		ti,bit-shift = <4>;
+-		reg = <0x02e8>;
++		reg = <0x78>;
+ 	};
+ 
+ 	mcbsp5_fck: mcbsp5_fck {
+diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
+index 0dc8de2..3467d56 100644
+--- a/arch/arm/boot/dts/omap2430.dtsi
++++ b/arch/arm/boot/dts/omap2430.dtsi
+@@ -28,12 +28,32 @@
+ 		};
+ 
+ 		scrm: scrm at 49002000 {
+-			compatible = "ti,omap2-scrm";
++			compatible = "ti,omap2-scrm", "simple-bus";
+ 			reg = <0x49002000 0x1000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x49000000 0x1000>;
+ 
+-			scrm_clocks: clocks {
++			omap2430_pmx: pinmux at 30 {
++				compatible = "ti,omap2430-padconf",
++					     "pinctrl-single";
++				reg = <0x30 0x0154>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
++				pinctrl-single,register-width = <8>;
++				pinctrl-single,function-mask = <0x3f>;
 +			};
++
++			scm_conf: tisyscon at 270 {
++				compatible = "syscon";
++				reg = <0x270 0x240>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++
++				scrm_clocks: clocks {
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
+ 			};
+ 
+ 			scrm_clockdomains: clockdomains {
+@@ -46,24 +66,10 @@
+ 			ti,hwmods = "counter_32k";
  		};
  
- 		intc: interrupt-controller at 48200000 {
-@@ -350,7 +350,7 @@
- 			reg = <0x481cc000 0x2000>;
- 			clocks = <&dcan0_fck>;
- 			clock-names = "fck";
--			syscon-raminit = <&am33xx_control_module 0x644 0>;
-+			syscon-raminit = <&scm_conf 0x644 0>;
- 			interrupts = <52>;
- 			status = "disabled";
- 		};
-@@ -361,7 +361,7 @@
- 			reg = <0x481d0000 0x2000>;
- 			clocks = <&dcan1_fck>;
- 			clock-names = "fck";
--			syscon-raminit = <&am33xx_control_module 0x644 1>;
-+			syscon-raminit = <&scm_conf 0x644 1>;
- 			interrupts = <55>;
- 			status = "disabled";
- 		};
-@@ -720,7 +720,7 @@
- 			 */
- 			interrupts = <40 41 42 43>;
- 			ranges;
--			syscon = <&cm>;
+-		omap2430_pmx: pinmux at 49002030 {
+-			compatible = "ti,omap2430-padconf", "pinctrl-single";
+-			reg = <0x49002030 0x0154>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			pinctrl-single,register-width = <8>;
+-			pinctrl-single,function-mask = <0x3f>;
+-		};
+-
+-		omap2_scm_general: tisyscon at 49002270 {
+-			compatible = "syscon";
+-			reg = <0x49002270 0x240>;
+-		};
+-
+ 		pbias_regulator: pbias_regulator {
+ 			compatible = "ti,pbias-omap";
+ 			reg = <0x230 0x4>;
+-			syscon = <&omap2_scm_general>;
 +			syscon = <&scm_conf>;
- 			status = "disabled";
+ 			pbias_mmc_reg: pbias_mmc_omap2430 {
+ 				regulator-name = "pbias_mmc_omap2430";
+ 				regulator-min-microvolt = <1800000>;
+diff --git a/arch/arm/boot/dts/omap24xx-clocks.dtsi b/arch/arm/boot/dts/omap24xx-clocks.dtsi
+index a1365ca..a078b55 100644
+--- a/arch/arm/boot/dts/omap24xx-clocks.dtsi
++++ b/arch/arm/boot/dts/omap24xx-clocks.dtsi
+@@ -13,7 +13,7 @@
+ 		compatible = "ti,composite-mux-clock";
+ 		clocks = <&func_96m_ck>, <&mcbsp_clks>;
+ 		ti,bit-shift = <2>;
+-		reg = <0x0274>;
++		reg = <0x4>;
+ 	};
  
- 			davinci_mdio: mdio at 4a101000 {
+ 	mcbsp1_fck: mcbsp1_fck {
+@@ -27,7 +27,7 @@
+ 		compatible = "ti,composite-mux-clock";
+ 		clocks = <&func_96m_ck>, <&mcbsp_clks>;
+ 		ti,bit-shift = <6>;
+-		reg = <0x0274>;
++		reg = <0x4>;
+ 	};
+ 
+ 	mcbsp2_fck: mcbsp2_fck {
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index 45bbc5d..8fc7c74 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -661,10 +661,15 @@ static struct control_init_data ctrl_data = {
+ 	.index = TI_CLKM_CTRL,
+ };
+ 
++static const struct control_init_data omap2_ctrl_data = {
++	.index = TI_CLKM_CTRL,
++	.offset = -OMAP2_CONTROL_GENERAL,
++};
++
+ static const struct of_device_id omap_scrm_dt_match_table[] = {
+ 	{ .compatible = "ti,am3-scrm", .data = &ctrl_data },
+ 	{ .compatible = "ti,am4-scrm", .data = &ctrl_data },
+-	{ .compatible = "ti,omap2-scrm", .data = &ctrl_data },
++	{ .compatible = "ti,omap2-scrm", .data = &omap2_ctrl_data },
+ 	{ .compatible = "ti,omap3-scrm", .data = &ctrl_data },
+ 	{ }
+ };
 -- 
 1.7.9.5
