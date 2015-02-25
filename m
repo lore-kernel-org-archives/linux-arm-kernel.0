@@ -1,100 +1,61 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 Feb 2015 15:22:56 +0000
-Subject: [PATCH v2] arm64: mm: increase VA range of identity map
-In-Reply-To: <CAKv+Gu85HnywTWR5pfjs8Z=X8ZN9OKLNOWT+ske8H5d3G6NEFg@mail.gmail.com>
-References: <1424797703-2804-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150225123814.GC1105@localhost>
- <CAKv+Gu8hxTtM4v9jZP+dwkW_WMJz9HzmutRVSQg-oPXwDKqZzA@mail.gmail.com>
- <CAKv+Gu85HnywTWR5pfjs8Z=X8ZN9OKLNOWT+ske8H5d3G6NEFg@mail.gmail.com>
-Message-ID: <20150225152255.GE1105@localhost>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 25 Feb 2015 09:24:43 -0600
+Subject: [PATCH v2 3/4] clk: Provide an always-on clock domain framework
+In-Reply-To: <20150223172344.421.62815@quantum>
+References: <1424276101-30137-1-git-send-email-lee.jones@linaro.org>
+ <1424276101-30137-4-git-send-email-lee.jones@linaro.org>
+ <20150223172344.421.62815@quantum>
+Message-ID: <CAL_Jsq+N4D8fUCwrYwxLaRpbhsgi5eZy5cLpsSmp8VoTQZUqow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 01:55:04PM +0000, Ard Biesheuvel wrote:
-> On 25 February 2015 at 13:10, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > On 25 February 2015 at 12:38, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> On Tue, Feb 24, 2015 at 05:08:23PM +0000, Ard Biesheuvel wrote:
-> >>> --- a/arch/arm64/kernel/head.S
-> >>> +++ b/arch/arm64/kernel/head.S
-> >>> @@ -387,6 +387,28 @@ __create_page_tables:
-> >>>       mov     x0, x25                         // idmap_pg_dir
-> >>>       ldr     x3, =KERNEL_START
-> >>>       add     x3, x3, x28                     // __pa(KERNEL_START)
-> >>> +
-> >>> +#ifndef CONFIG_ARM64_VA_BITS_48
-> >>> +#define EXTRA_SHIFT  (PGDIR_SHIFT + PAGE_SHIFT - 3)
-> >>> +     /*
-> >>> +      * If VA_BITS < 48, it may be too small to allow for an ID mapping to be
-> >>> +      * created that covers system RAM if that is located sufficiently high
-> >>> +      * in the physical address space. So for the ID map, use an extended
-> >>> +      * virtual range in that case, by configuring an additional translation
-> >>> +      * level.
-> >>> +      */
-> >>> +     adrp    x5, KERNEL_END
-> >>> +     clz     x5, x5                  // # of leading 0's in __pa(KERNEL_END)
-> >>> +     cmp     x5, #TCR_T0SZ(VA_BITS)  // VA_BITS sufficiently large?
-> >>
-> >> I think we need some better comment here for people looking at this code
-> >> again in the future (including myself). So the VA bits needed to cover
-> >> KERNEL_END are calculated as (64 - clz(__pa(KERNEL_END))). T0SZ is
-> >> calculated as (64 - VA_BITS) which means that T0SZ is
-> >> clz(__pa(KERNEL_END)).
-> >>
-> >
-> > OK.
-> >
-> >>> +     b.ge    1f                      // .. then skip additional level
-> >>> +
-> >>> +     adrp    x6, idmap_t0sz
-> >>> +     str     x5, [x6, #:lo12:idmap_t0sz]
-> >>> +
-> >>> +     create_table_entry x0, x3, EXTRA_SHIFT, PTRS_PER_PGD, x5, x6
-> >>
-> >> EXTRA_SHIFT is correctly calculated (one level more than PGDIR_SHIFT)
-> >> but I don't think PTRS_PER_PGD is appropriate here. For example, we had
-> >> in the past 39-bit VA with 64KB pages which made PTRS_PER_PGD pretty
-> >> small (well, it may cover the 40-bit case you are trying to fix but not
-> >> up to 48). So maybe define something like:
-> >>
-> >> #define EXTRA_PTRS      (1 << (48 - EXTRA_SHIFT))
-> >>
-> >
-> > My assumption was that, if you are running with fewer translation
-> > levels than required to map all 48 bits, it makes little sense to use
-> > only half a page or less at the top level, and PTRS_PER_PGD will
-> > always cover a full page (which is what we reserve at the root level
-> > anyway). But perhaps this is not universally true.
-> 
-> Actually, this assumption is encoded into the patch in another way as
-> well: decreasing T0SZ is always assumed to result in an additional
-> level of translation to be configured. However, your VA_BITS==39 on
-> 64k pages case would break this assumption too. So perhaps using
-> MAX_VA_BITS instead of the actual size of the PA is the right thing to
-> do here after all.
+On Mon, Feb 23, 2015 at 11:23 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Lee Jones (2015-02-18 08:15:00)
+>> Much h/w contain clocks which if turned off would prove fatal.  The
+>> only way to recover is to restart the board(s).  This driver takes
+>> references to clocks which are required to be always-on in order to
+>> prevent the common clk framework from trying to turn them off during
+>> the clk_disabled_unused() procedure.
 
-We have two options:
+[...]
 
-a) enforce that for VA_BITS != 48, the PTRS_PER_PGD is always (1 <<
-   (PAGE_SHIFT - 3)). This way we now that anything bigger than VA_BITS
-   requires more levels (currently only one more)
+>> +static int ao_clock_domain_probe(struct platform_device *pdev)
+>> +{
+>> +       struct device_node *np = pdev->dev.of_node;
+>> +       int nclks, i;
+>> +
+>> +       nclks = of_count_phandle_with_args(np, "clocks", "#clock-cells");
+>
+> Minor nitpick: please use of_clk_get_parent_count. I spent a solid 5
+> minutes writing that function and I need people to use it so I can get a
+> return on my investment.
+>
+> Otherwise the patch looks good. I believe that this method is targeting
+> always-on clock in a production environment, which is different from the
+> CLK_IGNORE_UNUSED stuff which typically is helpful while bringing up new
+> hardware or dealing with a platform that has incomplete driver support.
 
-b) decouple the idmap_t0sz calculation from the additional page table
-   level so we can have different idmap_t0sz but not necessarily an
-   extra level
+There is also the usecase of keep clocks on until I load a module that
+properly handles my hardware (e.g simplefb). We have a simplefb node
+with clocks and the simplefb driver jumps thru some hoops to hand-off
+clocks to the real driver. I don't really like it and don't want to
+see more examples. And there is the case of I thought I would never
+manage this clock, but kernel subsystems evolve and now I want to
+manage a clock. This should not require a DT update to do so.
 
-I think to keep things simple, we should go for (a) with your original
-MAX_VA_BITS when KERNEL_END cannot be covered by VA_BITS:
+Neither of these may be Lee's usecase, but I want to see them covered
+by the binding.
 
-	64 - clz(__pa(KERNEL_END) > VA_BITS
+> I wonder if there is a clever way for existing clock providers
+> (expressed in DT) to use this without having to create a separate node
+> of clocks with the "always-on-clk-domain" flag. Possibly the common
+> clock binding could declare some always-on flag that is standardized?
+> Then the framework core could use this code easily. Not sure if that is
+> a good idea though...
 
-You can still use PTRS_PER_PGD since we know it covers a full page but
-we need an #error somewhere in case we forget about this restriction,
-something like:
+I would prefer to see the always on clocks just listed within the
+clock controller's node rather than creating made up nodes with clock
+properties. This should be always-on until claimed IMO, but that
+aspect is the OS's problem, not a DT problem.
 
-#if !defined(CONFIG_ARM64_VA_BITS_48) && \
-	(8 * PTRS_PER_PGD != PAGE_SIZE)
-#error "PGD not a full page size"
-#endif
-
--- 
-Catalin
+Rob
