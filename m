@@ -1,57 +1,30 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 25 Feb 2015 12:59:42 +0000
-Subject: [PATCH v2] drivers: cpuidle: cpuidle-arm64: include asm/proc-fns.h
- explicitly
-Message-ID: <1424869182-19725-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 25 Feb 2015 20:59:53 +0800
+Subject: [Linaro-acpi] [PATCH v3 3/9] ACPI: clean up checkpatch warnings
+ for various bits of syntax
+In-Reply-To: <1424824585-6405-4-git-send-email-al.stone@linaro.org>
+References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
+ <1424824585-6405-4-git-send-email-al.stone@linaro.org>
+Message-ID: <54EDC749.8080200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 CPUidle driver requires the cpu_do_idle function so that it can
-be used to enter the shallowest idle state, and it is declared in
-asm/proc-fns.h.
+On 2015?02?25? 08:36, al.stone at linaro.org wrote:
+> From: Al Stone<al.stone@linaro.org>
+>
+> In preparation for later splitting out some of the arch-dependent code from
+> osl.c, clean up a bunch of warnings for odd bits of syntax:
+>
+>     -- remove CVS keyword markers
+>     -- remove a space from between a function name and an opening parenthesis
+>     -- clean up all but one line > 80 characters (one just looks silly if you
+>        make it less than 80)
+>     -- add blank lines after declarations in functions
+>     -- remove extraneous braces ({})
+>
+> Signed-off-by: Al Stone<al.stone@linaro.org>
 
-The current ARM64 CPUidle driver does not include asm/proc-fns.h
-explicitly and it has so far relied on implicit inclusion from other
-header files.
+Reviewd-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Owing to some header dependencies reshuffling this currently triggers
-build failures when CONFIG_ARM64_64K_PAGES=y:
-
-drivers/cpuidle/cpuidle-arm64.c: In function "arm64_enter_idle_state"
-drivers/cpuidle/cpuidle-arm64.c:42:3: error: implicit declaration of
-function "cpu_do_idle" [-Werror=implicit-function-declaration]
-   cpu_do_idle();
-   ^
-
-This patch adds the explicit inclusion of the asm/proc-fns.h header file
-to fix the build breakage and stop relying on implicit asm/proc-fns.h
-inclusion.
-
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-[lp: rewrote commit log]
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
----
-v2 changes:
-
-- Picked up
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325523.html
-- Rebased against 4.0-rc1 and rewrote commit log
-
- drivers/cpuidle/cpuidle-arm64.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
-index 39a2c62..c8bb6c5 100644
---- a/drivers/cpuidle/cpuidle-arm64.c
-+++ b/drivers/cpuidle/cpuidle-arm64.c
-@@ -19,6 +19,7 @@
- #include <linux/of.h>
- 
- #include <asm/cpuidle.h>
-+#include <asm/proc-fns.h>
- 
- #include "dt_idle_states.h"
- 
--- 
-2.2.1
+Thanks
+Hanjun
