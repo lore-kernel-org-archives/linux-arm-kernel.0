@@ -1,65 +1,46 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 Feb 2015 11:11:08 +0000
-Subject: [PATCH 1/3] arm64: mediatek: Add config option for mt8173.
-In-Reply-To: <5948977.qlhSVy9R5i@wuerfel>
-References: <1422342836-27689-1-git-send-email-hongzhou.yang@mediatek.com>
- <1422342836-27689-2-git-send-email-hongzhou.yang@mediatek.com>
- <1424855242.7845.9.camel@mtksdaap41> <5948977.qlhSVy9R5i@wuerfel>
-Message-ID: <20150225111107.GA29206@localhost>
+Date: Wed, 25 Feb 2015 10:37:51 +0000
+Subject: [PATCH] compat: Fix endian issue in union sigval
+In-Reply-To: <54ECF309.3020509@ezchip.com>
+References: <1423563011-12377-1-git-send-email-bamvor.zhangjian@huawei.com>
+ <20150210122718.GC32052@e104818-lin.cambridge.arm.com>
+ <54DB3B60.4050100@huawei.com>
+ <20150211154054.GD9058@e104818-lin.cambridge.arm.com>
+ <54DDAF2B.2070707@huawei.com>
+ <20150213104455.GA3508@e104818-lin.cambridge.arm.com>
+ <54DE730D.3090100@ezchip.com> <20150214112220.GB10246@MBP.local>
+ <54ECF309.3020509@ezchip.com>
+Message-ID: <20150225103750.GC22206@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 11:51:57AM +0100, Arnd Bergmann wrote:
-> On Wednesday 25 February 2015 17:07:22 Yingjoe Chen wrote:
-> > On Tue, 2015-01-27 at 15:13 +0800, Hongzhou Yang wrote:
-> > > From: Hongzhou Yang <hongzhou.yang@mediatek.com>
-> > > 
-> > > The upcoming MTK pinctrl driver have a big pin table for each SoC,
-> > > and we don't want to bloat the kernel binary if we don't need it.
-> > > Add config options so we can build for one SoC only.
-> > > 
-> > > Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
-> > > ---
-> > >  arch/arm64/Kconfig | 6 ++++++
-> > >  1 file changed, 6 insertions(+)
-> > > 
-> > > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > > index e627ead..6213dac 100644
-> > > --- a/arch/arm64/Kconfig
-> > > +++ b/arch/arm64/Kconfig
-> > > @@ -151,9 +151,15 @@ menu "Platform selection"
-> > >  config ARCH_MEDIATEK
-> > >       bool "Mediatek MT65xx & MT81xx ARMv8 SoC"
-> > >       select ARM_GIC
-> > > +     select PINCTRL
-> > >       help
-> > >         Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
-> > >  
-> > > +config MACH_MT8173
-> > > +     bool "Mediatek 8173 Soc Supprt"
-> > > +     depends on ARCH_MEDIATEK
-> > > +     default y
-> > > +
-> > >  config ARCH_SEATTLE
-> > >       bool "AMD Seattle SoC Family"
-> > >       help
-> > 
-> > Hi Arnd/Matthias,
-> > 
-> > Any comments on this patch?
+On Tue, Feb 24, 2015 at 04:54:17PM -0500, Chris Metcalf wrote:
+> On 2/14/2015 6:22 AM, Catalin Marinas wrote:
+> >1. user populates sival_int compat_sigevent and invokes
+> >    compat_sys_mq_notify()
+> >2. kernel get_compat_sigevent() copies compat_sigevent into the native
+> >    sigevent. compat and native sival_int are the same, no problem so
+> >    far. The other half of 64-bit sival_ptr is zeroed by a memset in this
+> >    function (this other half can be top or bottom, depending on
+> >    endianness)
+> >3. signal is about to be delivered to user via arch code. The
+> >    compat_ptr(from->si_ptr) conversion always takes the least
+> >    significant part of the native si_ptr. On big endian 64-bit, this is
+> >    zero because get_compat_sigevent() populated the top part of si_ptr
+> >    with si_int.
+> >
+> >So delivering such signals to compat user always sets si_int to 0.
+> >Little endian is fine.
 > 
-> Hi Joe,
-> 
-> Actually I just commented on a similar patch from Samsung the other
-> day, and I think we should make a more general decision about these:
-> 
-> I would rather see only one Kconfig option per SoC family and use
-> ARCH_MEDIATEK without any MACH_* options. We can have other options
-> for e.g. networking chips from Mediatek that are not closely related
-> but I would group all the phone and tablet chips under one option
-> here. Same for the other vendors of course.
+> I looked at this again as I was getting ready to do a tile patch, and realized
+> why tile and arm64 are different here: tile does a field-by-field copy in
+> copy_siginfo_from_user32(), like parisc and s390.  As a result, we initialize
+> the 64-bit kernel si_ptr value by cast from the 32-bit user si_ptr value, rather
+> than blindly writing into the lower-addressed half of the 64-bit sigval.
 
-I agree.
+It's not about copy_siginfo_from_user32() but the generic
+get_compat_sigevent() which always uses sival_int (called from e.g.
+compat_sys_timer_create()).
 
 -- 
 Catalin
