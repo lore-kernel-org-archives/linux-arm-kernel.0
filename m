@@ -1,28 +1,27 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 25 Feb 2015 14:09:51 -0800
-Subject: [PATCH v5 1/6] clk: add of_clk_get_parent_rate function
-In-Reply-To: <1423097705-22939-2-git-send-email-rjui@broadcom.com>
-References: <Ray Jui <rjui@broadcom.com>
- <1423097705-22939-1-git-send-email-rjui@broadcom.com>
- <1423097705-22939-2-git-send-email-rjui@broadcom.com>
-Message-ID: <54EE482F.4010402@codeaurora.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 25 Feb 2015 14:14:54 -0800
+Subject: [PATCH 0/3] CONFIG_DEBUG_SET_MODULE_RONX fixups
+Message-ID: <1424902497-32141-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/15 16:55, Ray Jui wrote:
-> Sometimes a clock needs to know the rate of its parent before itself is
-> registered to the framework. An example is that a PLL may need to
-> initialize itself to a specific VCO frequency, before registering to the
-> framework. The parent rate needs to be known, for PLL multipliers and
-> divisors to be configured properly.
->
-> Introduce helper function of_clk_get_parent_rate, which can be used to
-> obtain the parent rate of a clock, given a device node and index.
->
-> Signed-off-by: Ray Jui <rjui@broadcom.com>
+Hi,
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+CONFIG_DEBUG_SET_MODULE_RONX is currently non-functional on arm and arm64
+because of changes in behavior of is_module_addr. This series fixes
+both arm and arm64 to work correctly and corrects a minor bug
+related to section alignment in modules.
+
+Laura Abbott (3):
+  arm64: Don't use is_module_addr in setting page attributes
+  arm: Don't use is_module_addr in setting page attributes
+  kernel/module.c: Update debug alignment after symtable generation
+
+ arch/arm/mm/pageattr.c   | 5 ++++-
+ arch/arm64/mm/pageattr.c | 5 ++++-
+ kernel/module.c          | 2 ++
+ 3 files changed, 10 insertions(+), 2 deletions(-)
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
