@@ -1,49 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Feb 2015 12:59:06 +0100
-Subject: [PATCH v4 2/8] arm64: dts: exynos: Add dts files for 64-bit
- Exynos5433 SoC
-In-Reply-To: <54EC5AB1.5090802@samsung.com>
-References: <1424755011-15999-1-git-send-email-cw00.choi@samsung.com>
- <7412525.l6YnQcTxtg@wuerfel> <54EC5AB1.5090802@samsung.com>
-Message-ID: <6850624.bdB2Ab6zJx@wuerfel>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 25 Feb 2015 16:04:59 +0100
+Subject: [PATCH] hwmon: (gpio-fan) allow to use alarm support alone from DT
+In-Reply-To: <54EDE171.7040403@roeck-us.net>
+References: <1424696334-14767-1-git-send-email-simon.guinot@sequanux.org>
+ <54EB33D4.1000804@roeck-us.net>
+ <20150223143416.GT1509@kw.sim.vm.gnt> <54EB3C84.30503@roeck-us.net>
+ <20150225111430.GV1509@kw.sim.vm.gnt>
+ <20150225135015.GA17992@lunn.ch> <54EDE171.7040403@roeck-us.net>
+Message-ID: <20150225150459.GE17992@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 February 2015 20:04:17 Chanwoo Choi wrote:
-> On 02/24/2015 06:48 PM, Arnd Bergmann wrote:
-> > On Tuesday 24 February 2015 17:52:01 Chanwoo Choi wrote:
-> >>
-> >> But, I have a question.
-> >> If we put the aliases into the board dts file instaed of SoC dtsi,
-> >> each board dts file may use the different alias name about same phandle.
-> > 
-> > Yes, that is the idea. In particular with the uarts, the intention is
-> > that the numbering of the device nodes in /dev is the same that is
-> > printed on the board (if any), which may be different from the numbering
-> > internal to the SoC.
-> 
-> I check the uart device with Exynos5433 SoC based on Linux 4.0-rc1
-> If some board use the serial_0 and serial_3 as following in board dtsi,
-> 
->         &serial_0 {             --> UART 0 device
->                 status = "okay";
->         };
-> 
->         &serial_3 {             --> UART 3 device
->                 status = "okay";
->         };
-> 
-> The serial core driver create the follwoing /dev/ttySACx device node
-> by using the number of alias. It maintain the same device number of internel to the SoC.
-> 
->         root at localhost:~# ls /dev/ttySAC
->         ttySAC1  ttySAC3  
-> 
+> However, we need to state and check in the code that _some_ property
+> is mandatory. A driver with only optional properties doesn't make
+> sense.
 
-I'm not completely following. So you have set the serial1 alias to
-the &serial_0 device node and serial3 to &serial_3?
+The patch to the binding documentation said:
 
-Why not use serial0=&serial_0 and serial1=&serial_3? Does the serial0
-alias have a special meaning?
+Note: At least one the "gpios" and "alarm-gpios" properties should be set.
 
-	Arnd
+which i then suggested should be:
+
+Note: At least one of "gpios" or "alarm-gpios" properties should be set.
+
+What we could do is move this sentence into the Required Properties of
+the documentation.
+
+The patch Simon submitted also does check that this condition is
+fulfilled.
+
+	Andrew
