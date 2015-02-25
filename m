@@ -1,52 +1,40 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 25 Feb 2015 18:58:16 +0100
-Subject: [PATCH] locking/rtmutex: drop usage of __HAVE_ARCH_CMPXCHG
-In-Reply-To: <20150225175613.GE6823@linutronix.de>
-References: <20150225175613.GE6823@linutronix.de>
-Message-ID: <20150225175816.GF6823@linutronix.de>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Wed, 25 Feb 2015 19:00:19 +0100
+Subject: [PATCH v2] ARM: Kirkwood: enable GPIO fan alarm support for 2Big
+ Network v2
+Message-ID: <1424887219-26652-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Andrzej Siewior | 2015-02-25 18:56:13 [+0100]:
+On the LaCie 2Big Network v2 (net2big_v2) board, the fan alarm is not
+wired to the I2C fan controller but to a separe GPIO. This GPIO can be
+controlled by using the gpio-fan driver.
 
->To put some numbers on it: preempt -RT, am335x, 10 loops of
->100000 invocations of rt_spin_lock() + rt_spin_unlock() (time "total" is
->the average of the 10 loops for the 100000 invocations, "loop" is
->"total / 100000 * 1000"):
+This patch adds the gpio-fan alarm description in the net2big_v2 DTS.
 
-This is the test code I was running.
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+---
+ arch/arm/boot/dts/kirkwood-net2big.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/init/main.c b/init/main.c
-index e7cb76c079d4..e74523feeddb 100644
---- a/init/main.c
-+++ b/init/main.c
-@@ -1004,6 +1004,29 @@ static noinline void __init kernel_init_freeable(void)
+v2 change:
+- Fix node name according to the ePAPR standard.
+
+diff --git a/arch/arm/boot/dts/kirkwood-net2big.dts b/arch/arm/boot/dts/kirkwood-net2big.dts
+index 53dc37a3b687..13a44773b6df 100644
+--- a/arch/arm/boot/dts/kirkwood-net2big.dts
++++ b/arch/arm/boot/dts/kirkwood-net2big.dts
+@@ -27,6 +27,11 @@
+ 		device_type = "memory";
+ 		reg = <0x00000000 0x10000000>;
+ 	};
++
++	fan {
++		compatible = "gpio-fan";
++		alarm-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
++	};
+ };
  
- 	do_basic_setup();
- 
-+	{
-+		spinlock_t main_l;
-+		int loops;
-+
-+		spin_lock_init(&main_l);
-+
-+		for (loops = 0; loops < 10; loops++) {
-+			ktime_t start, end;
-+			int i;
-+
-+			local_irq_disable();
-+			start = ktime_get();
-+			for (i = 0; i <= 100000; i++) {
-+				rt_spin_lock(&main_l);
-+				rt_spin_unlock(&main_l);
-+			}
-+			end = ktime_get();
-+			local_irq_enable();
-+			pr_err("%s(%d) %lld\n", __func__, __LINE__,
-+			       ktime_to_us(ktime_sub(end, start)));
-+		}
-+	}
-+
- 	/* Open the /dev/console on the rootfs, this should never fail */
- 	if (sys_open((const char __user *) "/dev/console", O_RDWR, 0) < 0)
- 		pr_err("Warning: unable to open an initial console.\n");
+ &regulators {
+-- 
+2.1.1
