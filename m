@@ -1,193 +1,86 @@
 From: al.stone@linaro.org (al.stone at linaro.org)
-Date: Tue, 24 Feb 2015 17:36:21 -0700
-Subject: [PATCH v3 5/9] ACPI: move acpi_os_handler() so it can be made
- arch-dependent later
+Date: Tue, 24 Feb 2015 17:36:23 -0700
+Subject: [PATCH v3 7/9] ACPI: enable arch-specific compilation for _OSI and
+ the blacklist
 In-Reply-To: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
 References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1424824585-6405-6-git-send-email-al.stone@linaro.org>
+Message-ID: <1424824585-6405-8-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Al Stone <al.stone@linaro.org>
 
-In order to deprecate the use of _OSI for arm64 or other new architectures,
-we need to make the default handler something we can change for various
-platforms.  This patch moves the definition of acpi_osi_handler() -- the
-function used by ACPICA as a callback for evaluating _OSI -- into a separate
-file.  Subsequent patches will change which files get built so that we can
-then build the version of _OSI we need for a particular architecture.
+Whether arch-specific functions are used or not now depends on the config
+option CONFIG_ARCH_SPECIFIC_ACPI_OSI.  By default, this is set false which
+causes the x86/ia64 versions to be used, just as is done today.  Setting
+this option true causes architecture-specific implementations to be built
+instead; this patch also provides arm64 implementations.
 
-There is no functional change.
+For x86/ia64, there is no functional change.  Other architectures will have
+to add files to provide their specific functionality.
 
 Signed-off-by: Al Stone <al.stone@linaro.org>
 ---
- drivers/acpi/Makefile |  2 +-
- drivers/acpi/osi.c    | 95 +++++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/acpi/osl.c    | 24 -------------
- include/linux/acpi.h  |  1 +
- 4 files changed, 97 insertions(+), 25 deletions(-)
- create mode 100644 drivers/acpi/osi.c
+ drivers/acpi/Kconfig  | 3 +++
+ drivers/acpi/Makefile | 7 ++++++-
+ include/linux/acpi.h  | 8 ++++++++
+ 3 files changed, 17 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index b340509..4d91f22 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -53,6 +53,9 @@ config ACPI_SLEEP
+ 	depends on SUSPEND || HIBERNATION
+ 	default y
+ 
++config ARCH_SPECIFIC_ACPI_OSI
++	def_bool n
++
+ config ACPI_PROCFS_POWER
+ 	bool "Deprecated power /proc/acpi directories"
+ 	depends on PROC_FS
 diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-index 13536d8..97191eb 100644
+index 97191eb..1428464 100644
 --- a/drivers/acpi/Makefile
 +++ b/drivers/acpi/Makefile
-@@ -18,7 +18,7 @@ obj-y				+= acpi.o \
+@@ -18,9 +18,14 @@ obj-y				+= acpi.o \
  					acpica/
  
  # All the builtin files are in the "acpi." module_param namespace.
--acpi-y				+= osl.o utils.o reboot.o
-+acpi-y				+= osl.o utils.o reboot.o osi.o
+-acpi-y				+= osl.o utils.o reboot.o osi.o
++acpi-y				+= osl.o utils.o reboot.o
  acpi-y				+= nvs.o
  
++# _OSI related files
++ifneq ($(CONFIG_ARCH_SPECIFIC_ACPI_OSI), y)
++acpi-y				+= osi.o
++endif
++
  # Power management related files
-diff --git a/drivers/acpi/osi.c b/drivers/acpi/osi.c
-new file mode 100644
-index 0000000..f23aa70
---- /dev/null
-+++ b/drivers/acpi/osi.c
-@@ -0,0 +1,95 @@
-+/*
-+ *  osi.c - _OSI implementation (moved from drivers/acpi/osl.c)
-+ *
-+ *  Copyright (C) 2000       Andrew Henroid
-+ *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
-+ *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
-+ *  Copyright (c) 2008 Intel Corporation
-+ *   Author: Matthew Wilcox <willy@linux.intel.com>
-+ *
-+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License as published by
-+ *  the Free Software Foundation; either version 2 of the License, or
-+ *  (at your option) any later version.
-+ *
-+ *  This program is distributed in the hope that it will be useful,
-+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *  GNU General Public License for more details.
-+ *
-+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-+ *
-+ */
-+
-+#include <linux/acpi.h>
-+
-+#define _COMPONENT		ACPI_OS_SERVICES
-+ACPI_MODULE_NAME("osi");
-+
-+#define PREFIX			"ACPI: "
-+
-+/*
-+ * The story of _OSI(Linux)
-+ *
-+ * From pre-history through Linux-2.6.22,
-+ * Linux responded TRUE upon a BIOS OSI(Linux) query.
-+ *
-+ * Unfortunately, reference BIOS writers got wind of this
-+ * and put OSI(Linux) in their example code, quickly exposing
-+ * this string as ill-conceived and opening the door to
-+ * an un-bounded number of BIOS incompatibilities.
-+ *
-+ * For example, OSI(Linux) was used on resume to re-POST a
-+ * video card on one system, because Linux at that time
-+ * could not do a speedy restore in its native driver.
-+ * But then upon gaining quick native restore capability,
-+ * Linux has no way to tell the BIOS to skip the time-consuming
-+ * POST -- putting Linux at a permanent performance disadvantage.
-+ * On another system, the BIOS writer used OSI(Linux)
-+ * to infer native OS support for IPMI!  On other systems,
-+ * OSI(Linux) simply got in the way of Linux claiming to
-+ * be compatible with other operating systems, exposing
-+ * BIOS issues such as skipped device initialization.
-+ *
-+ * So "Linux" turned out to be a really poor chose of
-+ * OSI string, and from Linux-2.6.23 onward we respond FALSE.
-+ *
-+ * BIOS writers should NOT query _OSI(Linux) on future systems.
-+ * Linux will complain on the console when it sees it, and return FALSE.
-+ * To get Linux to return TRUE for your system  will require
-+ * a kernel source update to add a DMI entry,
-+ * or boot with "acpi_osi=Linux"
-+ */
-+
-+static struct osi_linux {
-+	unsigned int	enable:1;
-+	unsigned int	dmi:1;
-+	unsigned int	cmdline:1;
-+	unsigned int	default_disabling:1;
-+} osi_linux = {0, 0, 0, 0};
-+
-+u32 acpi_osi_handler(acpi_string interface, u32 supported)
-+{
-+	if (!strcmp("Linux", interface)) {
-+
-+		pr_notice_once(FW_BUG PREFIX
-+			"BIOS _OSI(Linux) query %s%s\n",
-+			osi_linux.enable ? "honored" : "ignored",
-+			osi_linux.cmdline ? " via cmdline" :
-+			osi_linux.dmi ? " via DMI" : "");
-+	}
-+
-+	if (!strcmp("Darwin", interface)) {
-+		/*
-+		 * Apple firmware will behave poorly if it receives positive
-+		 * answers to "Darwin" and any other OS. Respond positively
-+		 * to Darwin and then disable all other vendor strings.
-+		 */
-+		acpi_update_interfaces(ACPI_DISABLE_ALL_VENDOR_STRINGS);
-+		supported = ACPI_UINT32_MAX;
-+	}
-+
-+	return supported;
-+}
-diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
-index af6dda7..823a08f 100644
---- a/drivers/acpi/osl.c
-+++ b/drivers/acpi/osl.c
-@@ -136,30 +136,6 @@ static struct osi_linux {
- 	unsigned int	default_disabling:1;
- } osi_linux = {0, 0, 0, 0};
- 
--static u32 acpi_osi_handler(acpi_string interface, u32 supported)
--{
--	if (!strcmp("Linux", interface)) {
--
--		pr_notice_once(FW_BUG PREFIX
--			"BIOS _OSI(Linux) query %s%s\n",
--			osi_linux.enable ? "honored" : "ignored",
--			osi_linux.cmdline ? " via cmdline" :
--			osi_linux.dmi ? " via DMI" : "");
--	}
--
--	if (!strcmp("Darwin", interface)) {
--		/*
--		 * Apple firmware will behave poorly if it receives positive
--		 * answers to "Darwin" and any other OS. Respond positively
--		 * to Darwin and then disable all other vendor strings.
--		 */
--		acpi_update_interfaces(ACPI_DISABLE_ALL_VENDOR_STRINGS);
--		supported = ACPI_UINT32_MAX;
--	}
--
--	return supported;
--}
--
- static void __init acpi_request_region(struct acpi_generic_address *gas,
- 	unsigned int length, char *desc)
- {
+ acpi-y				+= wakeup.o
+ acpi-y				+= sleep.o
 diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 9a01d5d..a7c402a 100644
+index 71cdeb6..97185a1 100644
 --- a/include/linux/acpi.h
 +++ b/include/linux/acpi.h
-@@ -281,6 +281,7 @@ static inline int acpi_video_display_switch_support(void)
+@@ -279,9 +279,17 @@ static inline int acpi_video_display_switch_support(void)
+ #endif /* defined(CONFIG_ACPI_VIDEO) || defined(CONFIG_ACPI_VIDEO_MODULE) */
+ 
  extern int acpi_blacklisted(void);
- extern void acpi_dmi_osi_linux(int enable, const struct dmi_system_id *d);
- extern void acpi_osi_setup(char *str);
-+extern u32 acpi_osi_handler(acpi_string interface, u32 supported);
++
++#ifdef CONFIG_ARCH_SPECIFIC_ACPI_OSI
++static inline void __init acpi_dmi_osi_linux(int enable,
++					     const struct dmi_system_id *d) { }
++static inline void __init acpi_osi_setup(char *str) { }
++#else
+ extern void __init acpi_dmi_osi_linux(int enable,
+ 				      const struct dmi_system_id *d);
+ extern void __init acpi_osi_setup(char *str);
++#endif
++
+ extern u32 acpi_osi_handler(acpi_string interface, u32 supported);
  
  #ifdef CONFIG_ACPI_NUMA
- int acpi_get_node(acpi_handle handle);
 -- 
 2.1.0
