@@ -1,45 +1,206 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Feb 2015 17:00:11 +0000
-Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
-In-Reply-To: <alpine.LFD.2.11.1502250941210.25484@knanqh.ubzr>
-References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
- <20150205105035.GL8656@n2100.arm.linux.org.uk>
- <20150205142918.GA10634@linux.vnet.ibm.com>
- <20150205161100.GQ8656@n2100.arm.linux.org.uk>
- <20150225125610.GY8656@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1502250941210.25484@knanqh.ubzr>
-Message-ID: <20150225170011.GC8656@n2100.arm.linux.org.uk>
+From: otavio@ossystems.com.br (Otavio Salvador)
+Date: Wed, 25 Feb 2015 14:02:19 -0300
+Subject: [PATCH] ARM: dts: warp: Add initial WaRP Board support
+Message-ID: <1424883739-374-1-git-send-email-otavio@ossystems.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 11:47:48AM -0500, Nicolas Pitre wrote:
-> I completely agree with the r/w spinlock. Something like this ought to 
-> be sufficient to make gic_raise_softirq() reentrant which is the issue 
-> here, right?  I've been stress-testing it for a while with no problems 
-> so far.
+The WaRP Board is a Wearable Reference Plaform. The board features:
 
-No.  The issue is that we need a totally lockless way to raise an IPI
-during CPU hot-unplug, so we can raise an IPI in __cpu_die() to tell
-the __cpu_kill() code that it's safe to proceed to platform code.
+ - Freescale i.MX6 SoloLite processor with 512MB of RAM
+ - Freescale FXOS8700CQ 6-axis Xtrinsic sensor
+ - Freescale Kinetis KL16 MCU
+ - Freescale Xtrinsic MMA955xL intelligent motion sensing platform
 
-As soon sa that IPI has been received, the receiving CPU can decide
-to cut power to the dying CPU.  So, it's entirely possible that power
-could be lost on the dying CPU before the unlock has become visible.
+The board implements a hybrid architecture to address the evolving
+needs of the wearables market. The platform consists of a main board
+and an example daughtercard with the ability to add additional
+daughtercards for different usage models.
 
-It's a catch-22 - the reason we're sending the IPI is for synchronisation,
-but right now we need another form of synchronisation because we're
-using a form of synchronisation...
+For more information about the project, visit:
 
-We could just use the spin-and-poll solution instead of an IPI, but
-I really don't like that - when you see the complexity needed to
-re-initialise it each time, it quickly becomes very yucky because
-there is no well defined order between __cpu_die() and __cpu_kill()
-being called by the two respective CPUs.
+ http://www.warpboard.org/
 
-The last patch I saw doing that had multiple bits to indicate success
-and timeout, and rather a lot of complexity to recover from failures,
-and reinitialise state for a second CPU going down.
+Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+---
+ arch/arm/boot/dts/Makefile        |   3 +-
+ arch/arm/boot/dts/imx6sl-warp.dts | 154 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 156 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/imx6sl-warp.dts
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a1c776b..1b49d57 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -299,7 +299,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-wandboard.dtb \
+ 	imx6q-wandboard-revb1.dtb
+ dtb-$(CONFIG_SOC_IMX6SL) += \
+-	imx6sl-evk.dtb
++	imx6sl-evk.dtb \
++	imx6sl-warp.dtb
+ dtb-$(CONFIG_SOC_IMX6SX) += \
+ 	imx6sx-sabreauto.dtb \
+ 	imx6sx-sdb.dtb
+diff --git a/arch/arm/boot/dts/imx6sl-warp.dts b/arch/arm/boot/dts/imx6sl-warp.dts
+new file mode 100644
+index 0000000..dadb92f
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6sl-warp.dts
+@@ -0,0 +1,154 @@
++/*
++ * Copyright 2014, 2015 O.S. Systems Software LTDA.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++
++#include "imx6sl.dtsi"
++
++/ {
++	model = "WaRP Board";
++	compatible = "warp,imx6sl-warp", "fsl,imx6sl";
++
++	memory {
++		reg = <0x80000000 0x20000000>;
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_usb_otg1_vbus: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "usb_otg1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio4 0 0>;
++			enable-active-high;
++		};
++
++		reg_usb_otg2_vbus: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "usb_otg2_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio4 2 0>;
++			enable-active-high;
++		};
++
++		reg_1p8v: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "1P8V";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++		};
++	};
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	status = "okay";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3>;
++	status = "okay";
++};
++
++&usbotg1 {
++	vbus-supply = <&reg_usb_otg1_vbus>;
++	dr_mode = "host";
++	disable-over-current;
++	status = "okay";
++};
++
++&usbotg2 {
++	vbus-supply = <&reg_usb_otg2_vbus>;
++	disable-over-current;
++	status = "okay";
++};
++
++&usdhc2 {
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	pinctrl-1 = <&pinctrl_usdhc2_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc2_200mhz>;
++	non-removable;
++	status = "okay";
++};
++
++&iomuxc {
++	imx6sl-warp {
++		pinctrl_uart1: uart1grp {
++			fsl,pins = <
++				MX6SL_PAD_UART1_RXD__UART1_RX_DATA	0x41b0b1
++				MX6SL_PAD_UART1_TXD__UART1_TX_DATA	0x41b0b1
++			>;
++		};
++
++		pinctrl_uart3: uart3grp {
++			fsl,pins = <
++				MX6SL_PAD_AUD_RXC__UART3_RX_DATA	0x41b0b1
++				MX6SL_PAD_AUD_RXC__UART3_TX_DATA	0x41b0b1
++			>;
++		};
++
++		pinctrl_usdhc2: usdhc2grp {
++			fsl,pins = <
++				MX6SL_PAD_SD2_CMD__SD2_CMD		0x417059
++				MX6SL_PAD_SD2_CLK__SD2_CLK		0x410059
++				MX6SL_PAD_SD2_DAT0__SD2_DATA0		0x417059
++				MX6SL_PAD_SD2_DAT1__SD2_DATA1		0x417059
++				MX6SL_PAD_SD2_DAT2__SD2_DATA2		0x417059
++				MX6SL_PAD_SD2_DAT3__SD2_DATA3		0x417059
++				MX6SL_PAD_SD2_DAT4__SD2_DATA4		0x417059
++				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x417059
++				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x417059
++				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x417059
++			>;
++		};
++
++		pinctrl_usdhc2_100mhz: usdhc2grp100mhz {
++			fsl,pins = <
++				MX6SL_PAD_SD2_CMD__SD2_CMD		0x4170b9
++				MX6SL_PAD_SD2_CLK__SD2_CLK		0x4100b9
++				MX6SL_PAD_SD2_DAT0__SD2_DATA0		0x4170b9
++				MX6SL_PAD_SD2_DAT1__SD2_DATA1		0x4170b9
++				MX6SL_PAD_SD2_DAT2__SD2_DATA2		0x4170b9
++				MX6SL_PAD_SD2_DAT3__SD2_DATA3		0x4170b9
++				MX6SL_PAD_SD2_DAT4__SD2_DATA4		0x4170b9
++				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x4170b9
++				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x4170b9
++				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x4170b9
++			>;
++		};
++
++		pinctrl_usdhc2_200mhz: usdhc2grp200mhz {
++			fsl,pins = <
++				MX6SL_PAD_SD2_CMD__SD2_CMD		0x4170f9
++				MX6SL_PAD_SD2_CLK__SD2_CLK		0x4100f9
++				MX6SL_PAD_SD2_DAT0__SD2_DATA0		0x4170f9
++				MX6SL_PAD_SD2_DAT1__SD2_DATA1		0x4170f9
++				MX6SL_PAD_SD2_DAT2__SD2_DATA2		0x4170f9
++				MX6SL_PAD_SD2_DAT3__SD2_DATA3		0x4170f9
++				MX6SL_PAD_SD2_DAT4__SD2_DATA4		0x4170f9
++				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x4170f9
++				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x4170f9
++				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x4170f9
++			>;
++		};
++	};
++};
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
