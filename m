@@ -1,54 +1,59 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 25 Feb 2015 15:45:01 -0500
-Subject: [PATCH v6 6/7] PCI: update dma configuration from DT
-In-Reply-To: <4781283.CC9oFpsHLJ@wuerfel>
-References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
- <20150225015317.GO6220@google.com> <54EDF236.40101@ti.com>
- <4781283.CC9oFpsHLJ@wuerfel>
-Message-ID: <54EE344D.5060403@ti.com>
+From: al.stone@linaro.org (Al Stone)
+Date: Wed, 25 Feb 2015 13:56:04 -0700
+Subject: [PATCH v3 2/9] ACPI: clear up warnings on use of printk reported
+ by checkpatch.pl
+In-Reply-To: <54EDC64D.8040301@linaro.org>
+References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
+ <1424824585-6405-3-git-send-email-al.stone@linaro.org>
+ <54EDC64D.8040301@linaro.org>
+Message-ID: <54EE36E4.5070404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2015 11:09 AM, Arnd Bergmann wrote:
-> On Wednesday 25 February 2015 11:03:02 Murali Karicheri wrote:
+On 02/25/2015 05:55 AM, Hanjun Guo wrote:
+> On 2015?02?25? 08:36, al.stone at linaro.org wrote:
+>> From: Al Stone <al.stone@linaro.org>
 >>
->>> (I don't know exactly how these patches all fit together, so that's
->>> probably not accurate, but that's the *sort* of thing I'd like to include.)
->>>
->>> If that actually *is* what's going on, I have to wonder why this isn't
->>> implemented as a very simple IOMMU instead of adding dma_pfn_offset,
->>> which is present on all arches but only used on ARM.  In some sense that
->>> offset is parallel but incompatible with an IOMMU: they both translate DMA
->>> addresses into system RAM addresses.
+>> In preparation for later splitting out some of the arch-dependent code from
+>> osl.c, clear up all the warnings reported by checkpatch.pl where pr_* should
+>> be used instead of printk(KERN_* ...).
 >>
->> I don't have much history on any previous discussion on the subject you
->> are referring to. I assume it would have happened when
->> of_dma_configure() was first introduced. On Keystone, we don't have
->> IOMMU support and dma_pfn_offset is needed to translate DMA address to
->> System RAM address and vice-versa. So this has to be supported for
->> Keystone. There can be enhancement for IOMMU with out impacting this
->> feature for Keystone.
->
-> The direction we are taking with IOMMU in general is opposite to what Bjorn
-> is suggesting: I believe what he wants to say is that we should use the
-> traditional approach of having a specialized dma_map_ops implementation
-> for this, just like we do for IOMMU implementations on x86, IA64 or PowerPC.
->
-> However, with the recent explosion of IOMMU implementations on ARM, we
-> are moving towards having a single dma_map_ops structure for all of them,
-> and that structure does not work with the keystone hardware. Instead,
-> the normal ARM dma_map_ops have been changed to handle the offset,
-> which is the same thing we do on PowerPC.
->
-Arnd,
+>> Signed-off-by: Al Stone <al.stone@linaro.org>
+>> ---
+>>   drivers/acpi/osl.c | 46 +++++++++++++++++++---------------------------
+>>   1 file changed, 19 insertions(+), 27 deletions(-)
+>>
+>> diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
+>> index 1dc3a3b..865317c 100644
+>> --- a/drivers/acpi/osl.c
+>> +++ b/drivers/acpi/osl.c
+>> @@ -141,7 +141,7 @@ static u32 acpi_osi_handler(acpi_string interface, u32
+>> supported)
+>>   {
+>>       if (!strcmp("Linux", interface)) {
+>>
+>> -        printk_once(KERN_NOTICE FW_BUG PREFIX
+>> +        pr_notice_once(FW_BUG PREFIX
+> 
+> I think you can use pr_fmt() and then remove all the PREFIX in
+> this patch, just
+> 
+> #define pr_fmt(fmt) "ACPI: " fmt
+> 
+> in top of this file before all #includes.
+> 
+> Thanks
+> Hanjun
 
-Thanks for the clarification.
-
-Murali
-
-> 	Arnd
-
+Argh.  Yup, you're right.  That was an oversight on my part.
+Fixed in next version.
 
 -- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Linaro Enterprise Group
+al.stone at linaro.org
+-----------------------------------
