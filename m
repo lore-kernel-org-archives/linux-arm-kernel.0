@@ -1,34 +1,25 @@
 From: bobby.prani@gmail.com (Pranith Kumar)
-Date: Wed, 25 Feb 2015 12:32:08 -0500
+Date: Wed, 25 Feb 2015 12:34:35 -0500
 Subject: [RFC PATCH] arm: asm/cmpxchg.h: Add support half-word xchg()
-In-Reply-To: <20150225170250.GD8656@n2100.arm.linux.org.uk>
+In-Reply-To: <20150225171427.GE8656@n2100.arm.linux.org.uk>
 References: <1424878581-11701-1-git-send-email-bobby.prani@gmail.com>
- <3465519.0ga9zC7F7b@wuerfel> <20150225170250.GD8656@n2100.arm.linux.org.uk>
-Message-ID: <CAJhHMCCUi0_HfDh56512QpkjK1u-DAeiQRhLkb2cYZdU0L0wRg@mail.gmail.com>
+ <3465519.0ga9zC7F7b@wuerfel>
+ <CAJhHMCCoFhi2a=qtO3EkX_Y-iy0C=STUt0ULtXMAyGEZJR_Vtw@mail.gmail.com>
+ <16818946.F4B9s6bbtr@wuerfel> <20150225171427.GE8656@n2100.arm.linux.org.uk>
+Message-ID: <CAJhHMCA74zi3qeAYTUKMsbVzxhggpzRzYKahj2WWApJ6g=hkLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 12:02 PM, Russell King - ARM Linux
+On Wed, Feb 25, 2015 at 12:14 PM, Russell King - ARM Linux
 <linux@arm.linux.org.uk> wrote:
->> Unfortunately, the BUG message seems incomplete, can you reproduce this
->> with CONFIG_DEBUG_BUGVERBOSE enabled?
+> Actually, I think we ought to get rid of __bad_xchg() so that cases
+> like this cause a link error instead of a runtime error, just like we
+> do in other cases as well.
 >
-> That isn't because CONFIG_DEBUG_BUGVERBOSE isn't set.  It's because
-> the message author decided that the remainder of the kernel bug message
-> wasn't useful to report.  After all, it's just a load of hex numbers
-> and symbolic information.  Who would want that junk.
->
-> (Some people really don't get this: we print stuff from the kernel
-> because it gives _us_ useful information to debug problems like this,
-> but because they don't understand it themselves, they decide they can
-> omit it from their bug reports...)
->
+> That's something that goes back ages (it used to be called something
+> like invalidptr in 2.0 kernels...)
 
-I apologize for not pasting the entire back trace. It was in a test
-module I wrote testing synchronization primitives and did not think
-the back trace would be useful to report.
-
-I will include verbose details from now on.
+That sounds like a good idea. I will cook up a patch doing this.
 
 Thanks!
 -- 
