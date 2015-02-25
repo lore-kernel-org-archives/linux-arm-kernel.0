@@ -1,101 +1,46 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Wed, 25 Feb 2015 15:01:38 -0400
-Subject: [PATCH 1/2] thermal: exynos: Fix wrong control of power down
- detection mode for Exynos7
-In-Reply-To: <20150225132508.5143c9cf@amdc2363>
-References: <1424753815-15113-1-git-send-email-cw00.choi@samsung.com>
- <1424753815-15113-2-git-send-email-cw00.choi@samsung.com>
- <20150225100330.0ef63a95@amdc2363>
- <CAM4voakf6oeSEdtGtHRzQ-tC6XMbsU+VNtBnqeed8J4btKA3Yg@mail.gmail.com>
- <20150225132508.5143c9cf@amdc2363>
-Message-ID: <20150225190137.GI2306@developer.amazonguestwifi.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 25 Feb 2015 21:04:10 +0200
+Subject: [PATCHv3 00/35] ARM: OMAP2+: PRCM / SCM cleanups against 4.0-rc1
+Message-ID: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 01:25:08PM +0100, Lukasz Majewski wrote:
-> Hi Eduardo,
-> 
-> > Hi Lukasz,
-> > 
-> > On Wed, Feb 25, 2015 at 2:33 PM, Lukasz Majewski
-> > <l.majewski@samsung.com> wrote:
-> > > Hi Abhilash,
-> > >
-> > >> This patch fixes the wrong control of PD_DET_EN (power down
-> > >> detection mode) for Exynos7 because exynos7_tmu_control() always
-> > >> enables the power down detection mode regardless 'on' parameter.
-> > >>
-> > >> Cc: Zhang Rui <rui.zhang@intel.com>
-> > >> Cc: Eduardo Valentin <edubezval@gmail.com>
-> > >> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> > >> ---
-> > >>  drivers/thermal/samsung/exynos_tmu.c | 3 ++-
-> > >>  1 file changed, 2 insertions(+), 1 deletion(-)
-> > >>
-> > >> diff --git a/drivers/thermal/samsung/exynos_tmu.c
-> > >> b/drivers/thermal/samsung/exynos_tmu.c index 933cd80..a60f527
-> > >> 100644 --- a/drivers/thermal/samsung/exynos_tmu.c
-> > >> +++ b/drivers/thermal/samsung/exynos_tmu.c
-> > >> @@ -682,6 +682,7 @@ static void exynos7_tmu_control(struct
-> > >> platform_device *pdev, bool on)
-> > >>       if (on) {
-> > >>               con |= (1 << EXYNOS_TMU_CORE_EN_SHIFT);
-> > >> +             con |= (1 << EXYNOS7_PD_DET_EN_SHIFT);
-> > >>               interrupt_en =
-> > >>                       (of_thermal_is_trip_valid(tz, 7)
-> > >>                       << EXYNOS7_TMU_INTEN_RISE7_SHIFT) |
-> > >> @@ -704,9 +705,9 @@ static void exynos7_tmu_control(struct
-> > >> platform_device *pdev, bool on) interrupt_en <<
-> > >> EXYNOS_TMU_INTEN_FALL0_SHIFT; } else {
-> > >>               con &= ~(1 << EXYNOS_TMU_CORE_EN_SHIFT);
-> > >> +             con &= ~(1 << EXYNOS7_PD_DET_EN_SHIFT);
-> > >>               interrupt_en = 0; /* Disable all interrupts */
-> > >>       }
-> > >> -     con |= 1 << EXYNOS7_PD_DET_EN_SHIFT;
-> > >>
-> > >>       writel(interrupt_en, data->base + EXYNOS7_TMU_REG_INTEN);
-> > >>       writel(con, data->base + EXYNOS_TMU_REG_CONTROL);
-> > >
-> > > Could you test this patch if it isn't introducing any regression on
-> > > your HW?
-> > 
-> > The patch does not cause any regression on exynos7 and seems
-> > logically correct.
-> > 
-> > Tested-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> > 
-> 
-> Eduardo, it is up to you if you prefer to take this fix directly or via
-> the new thermal-samsung tree ?
-> 
-> From when shall I regard myself as a maintainer? :-)
-> 
+Hi,
 
-Yeah. Go ahead and collect it.
+Changes in this set compared to v2:
 
-> 
-> > 
-> > Regards,
-> > Abhilash
-> > >
-> > > --
-> > > Best regards,
-> > >
-> > > Lukasz Majewski
-> > >
-> > > Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
-> 
-> 
-> -- 
-> Best regards,
-> 
-> Lukasz Majewski
-> 
-> Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150225/ecc22b37/attachment.sig>
+- Changed the SCM module DT node layout to address Tony's comments;
+  only scm-conf area / any other necessary portions are syscon mapped.
+  Rest of the IO space is only mapped by the underlying drivers.
+- Added patch for changing omap4 display driver to use syscon instead
+  of legacy padconf register read/write.
+- Changed clock provider infrastructure patches to address some earlier
+  comments from Paul; basically the IO mapping for clock drivers is
+  always done at the clock provider level and not moved to the clock
+  driver (patch 10-12.)
+- Changed ordering of patches a bit, the first part of this set should
+  be now more trivial for merging purposes (patch 1-9)
+- Dropped patches already merged from v2 set
+- Some misc fixes added: patch 8-9, patch 28.
+
+Testing done:
+- am335x-evm: boot
+- am335x-sk: boot
+- am43xx-epos: boot
+- am43xx-gpevm: boot
+- omap3-beagle-xm: boot
+- omap3-beagle: boot, suspend-resume ret/off, cpuidle ret/off
+- am335x-bone: boot
+- am335x-bone-black: boot
+- dra7-evm: boot
+- omap4-panda-es: boot, suspend-resume ret, cpuidle ret
+- omap4-panda: boot
+- omap2430-sdp: boot
+- omap3430-sdp: boot
+- omap4430-sdp: boot
+
+Test branch pushed at:
+- tree: https://github.com/t-kristo/linux-pm.git
+- branch: 4.0-rc1-prcm-cleanup
+
+-Tero
