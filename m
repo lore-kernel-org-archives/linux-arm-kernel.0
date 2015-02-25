@@ -1,51 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 25 Feb 2015 11:18:29 +0000
-Subject: [PATCH] drivers: cpuidle: Explictly include proc-fns.h for
- cpuidle-arm64
-In-Reply-To: <1424827506-12245-1-git-send-email-lauraa@codeaurora.org>
-References: <1424827506-12245-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20150225111828.GA9714@leverpostej>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Feb 2015 11:19:11 +0000
+Subject: [STLinux Kernel] [PATCH v3 7/8] rtc: st: add new driver for ST's
+ LPC RTC
+In-Reply-To: <20150223101223.GA14142@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1424260154-12868-1-git-send-email-lee.jones@linaro.org>
+ <1424260154-12868-8-git-send-email-lee.jones@linaro.org>
+ <20150223101223.GA14142@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20150225111910.GX8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+On Mon, Feb 23, 2015 at 10:12:23AM +0000, Peter Griffin wrote:
+> I think all the writel IO accessors in this driver can be replaced
+> with the *_relaxed variant. This will avoid the overhead of taking a
+> spinlock in the l2 outer cache part of writel.
 
-On Wed, Feb 25, 2015 at 01:25:06AM +0000, Laura Abbott wrote:
-> cpuidle-arm64.c fails to compile with CONFIG_ARM64_64K_PAGES=y
-> 
-> /kernel/drivers/cpuidle/cpuidle-arm64.c: In function "arm64_enter_idle_state"
-> /kernel/drivers/cpuidle/cpuidle-arm64.c:42:3: error: implicit declaration of function "cpu_do_idle" [-Werror=implicit-function-declaration]
->    cpu_do_idle();
->    ^
-> 
-> Explicitly add the header file with the declaration of cpu_do_idle.
-> 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+You're really operating on old information.  With much improved L2 cache
+support code which went in a year or so ago, for the popular L2 cache
+controllers, we don't take a spinlock anymore - we just write to the
+register directly.
 
-I just hit the same problem. The fix looks sane, and it would be nice to
-have it queued ASAP.
+The spinlock is only present for L2C-220 controllers, which are rare.
 
-> ---
-> Not sure how long this has been broken, bisect between v3.19 and master showed
-> 6b00f7efb5303418c231994c91fb8239f5ada260 as the first bad commit which
-> isn't particularly helpful. Probably some header shuffling.
-> ---
->  drivers/cpuidle/cpuidle-arm64.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
-> index 80704b9..f1d5422 100644
-> --- a/drivers/cpuidle/cpuidle-arm64.c
-> +++ b/drivers/cpuidle/cpuidle-arm64.c
-> @@ -19,6 +19,7 @@
->  #include <linux/of.h>
->  
->  #include <asm/cpuidle.h>
-> +#include <asm/proc-fns.h>
->  #include <asm/suspend.h>
+Moreover, taking the spinlock is only expensive if you have things like
+lockdep enabled, otherwise it should be inline and will be fast.
 
-I wasn't able to apply this patch atop of v4.0-rc1 or current mainline;
-there's no asm/suspend.h include in either of those. Which tree is this
-based on?
+However, using the _relaxed variants where we can get away with weaker
+ordering of the writes to the device is a good thing nevertheless.  I'm
+just pointing out that your reasoning above is wrong.
 
-Mark.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
