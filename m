@@ -1,77 +1,48 @@
-From: jasper@endlessm.com (Jasper St. Pierre)
-Date: Wed, 25 Feb 2015 08:31:30 -0800
-Subject: [PATCH] ARM: dma-mapping: support non-consistent DMA attribute
-In-Reply-To: <20150225144208.GA8656@n2100.arm.linux.org.uk>
-References: <1424810703-20382-1-git-send-email-drake@endlessm.com>
- <16874142.jSTJ8OZePS@wuerfel>
- <CAD8Lp46KOQZMJqiqudE_0nvpaHgYxpD0qCeM2r8ZOgfzJUo6dA@mail.gmail.com>
- <20150225141846.GZ8656@n2100.arm.linux.org.uk>
- <CAD8Lp46de18aC+6cQUyn3hZV3HhLHNMsOuxSoQVg+5hU7vPMdA@mail.gmail.com>
- <20150225144208.GA8656@n2100.arm.linux.org.uk>
-Message-ID: <CABqkSC+Pgc2tZm8X+wuk4zL7=QebqL9yzX3LNZec0WfaGNr-bw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Feb 2015 16:32:44 +0000
+Subject: [PATCH] arm64: vdso: minor ABI fix for clock_getres
+In-Reply-To: <54EDF4DB.5080007@mentor.com>
+References: <1424820067-13112-1-git-send-email-nathan_lynch@mentor.com>
+ <20150225160226.GL12377@arm.com> <54EDF4DB.5080007@mentor.com>
+Message-ID: <20150225163243.GM12377@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 6:42 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Feb 25, 2015 at 08:30:38AM -0600, Daniel Drake wrote:
->> Fair enough, what you're describing does sound like a better model.
->> Thanks for explaining.
->>
->> I'm still a little unclear on how DRM solves this particular problem
->> though. At the point when the buffer is CPU-owned, it can be mapped
->> into userspace with CPU caches enabled, right?
->
-> Whether a buffer is mapped or not is an entirely separate issue.
-> We have many cases where the kernel has the buffer mapped into its
-> lowmem region while the device is doing DMA.  Having a buffer mapped
-> into userspace is no different.
->
-> What DRM can do is track the state of the buffer: the DRM model is that
-> you talk to the GPU through DRM, which means that you submit a command
-> stream, along with identifiers for the buffers you want the command
-> stream to operate on.
->
-> DRM can then scan the state of those buffers, and perform the appropriate
-> DMA API operation on the buffers to flip them over to device ownership.
->
-> When userspace wants to access the buffer later, it needs to ask DRM
-> whether the buffer is safe to access - this causes DRM to check whether
-> the buffer is still being used for a render operation, and can then
-> flip the buffer back to CPU ownership.
->
-> The idea that a buffer needs to be constantly mapped and unmapped in
-> userspace would create its own problems: there is a cost to setting up
-> and tearing down the mappings.
->
-> As with anything performance related, the less work you can do, the faster
-> you will appear to be: that applies very much here.  If you can avoid
-> having to setup and tear down mappings, if you can avoid having to do
-> cache maintanence all the time, you will gain extra performance quite
-> simply because you're not wasting CPU cycles doing stuff which is not
-> absolutely necessary.
->
-> I would put some of this into practice with etnaviv-drm, but I've decided
-> to walk away from that project and just look after the work which I once
-> did on it as a fork.
+On Wed, Feb 25, 2015 at 04:14:19PM +0000, Nathan Lynch wrote:
+> On 02/25/2015 10:02 AM, Will Deacon wrote:
+> > On Tue, Feb 24, 2015 at 11:21:07PM +0000, Nathan Lynch wrote:
+> >> The vdso implementation of clock_getres currently returns 0 (success)
+> >> whenever a null timespec is provided by the caller, regardless of the
+> >> clock id supplied.
+> >>
+> >> This behavior is incorrect.  It should fall back to syscall when an
+> >> unrecognized clock id is passed, even when the timespec argument is
+> >> null.  This ensures that clock_getres always returns an error for
+> >> invalid clock ids.
+> >>
+> >> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+> >> ---
+> >>  arch/arm64/kernel/vdso/gettimeofday.S | 3 +--
+> >>  1 file changed, 1 insertion(+), 2 deletions(-)
+> > 
+> > Acked-by: Will Deacon <will.deacon@arm.com>
+> > 
+> > Thanks, Nathan.
+> 
+> Thank you.  I'm curious -- do you know of a use case for the VDSO
+> implementation of clock_getres?  I.e. what kind of real-world workload
+> sees a benefit from it?
 
-We are using DRM. The DRM CMA helpers use the DMA APIs to allocate
-memory from the CMA region, and we wanted to speed it up by using
-cached buffers.
+No, I just implemented it for completeness (and it's also way simpler than
+the other functions!). Calling it with a NULL timespec is probably even
+less common, so an alternative to your patch would be changing the label
+of the existing cbz to hand-off to the kernel when the thing is NULL.
 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/gpu/drm/drm_gem_cma_helper.c#n85
+> I'm not suggesting removing it from the arm64 vdso, but I'm considering
+> dropping clock_getres from the 32-bit ARM vdso patch set since I haven't
+> been able to answer this.
 
-We tried dma_alloc_attrs, but found that setting
-DMA_ATTR_NON_CONSISTENT didn't work correctly. Hence, this patch.
+Well, if there aren't any fastpath users then I'm not bothered about
+removing it from arm64 either. I'm not sure how we establish that, though.
 
-Should the DRM CMA helpers not be using the DMA APIs to allocate
-memory from the CMA region?
-
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
-
-
-
--- 
-  Jasper
+Will
