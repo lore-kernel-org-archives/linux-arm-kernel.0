@@ -1,56 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 Feb 2015 12:38:14 +0000
-Subject: [PATCH v2] arm64: mm: increase VA range of identity map
-In-Reply-To: <1424797703-2804-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1424797703-2804-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150225123814.GC1105@localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Feb 2015 12:41:00 +0000
+Subject: [PATCH v2] iommu/io-pgtable-arm: Add built time dependency
+In-Reply-To: <20150223100521.45108573@endymion.delvare>
+References: <20150223100521.45108573@endymion.delvare>
+Message-ID: <20150225124059.GB12377@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 24, 2015 at 05:08:23PM +0000, Ard Biesheuvel wrote:
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -387,6 +387,28 @@ __create_page_tables:
->  	mov	x0, x25				// idmap_pg_dir
->  	ldr	x3, =KERNEL_START
->  	add	x3, x3, x28			// __pa(KERNEL_START)
-> +
-> +#ifndef CONFIG_ARM64_VA_BITS_48
-> +#define EXTRA_SHIFT	(PGDIR_SHIFT + PAGE_SHIFT - 3)
-> +	/*
-> +	 * If VA_BITS < 48, it may be too small to allow for an ID mapping to be
-> +	 * created that covers system RAM if that is located sufficiently high
-> +	 * in the physical address space. So for the ID map, use an extended
-> +	 * virtual range in that case, by configuring an additional translation
-> +	 * level.
-> +	 */
-> +	adrp	x5, KERNEL_END
-> +	clz	x5, x5			// # of leading 0's in __pa(KERNEL_END)
-> +	cmp	x5, #TCR_T0SZ(VA_BITS)	// VA_BITS sufficiently large?
+On Mon, Feb 23, 2015 at 09:05:21AM +0000, Jean Delvare wrote:
+> If io-pgtable-arm is an ARM-specific driver then configuration option
+> IOMMU_IO_PGTABLE_LPAE should not be presented to the user by default
+> for non-ARM kernels.
+> 
+> Signed-off-by: Jean Delvare <jdelvare@suse.de>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> ---
+> Changes since v1:
+>  * Added ARM64 as suggested by Will Deacon.
 
-I think we need some better comment here for people looking at this code
-again in the future (including myself). So the VA bits needed to cover
-KERNEL_END are calculated as (64 - clz(__pa(KERNEL_END))). T0SZ is
-calculated as (64 - VA_BITS) which means that T0SZ is
-clz(__pa(KERNEL_END)).
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-> +	b.ge	1f			// .. then skip additional level
-> +
-> +	adrp	x6, idmap_t0sz
-> +	str	x5, [x6, #:lo12:idmap_t0sz]
-> +
-> +	create_table_entry x0, x3, EXTRA_SHIFT, PTRS_PER_PGD, x5, x6
+Joerg, you may as well pick this on up directly too :)
 
-EXTRA_SHIFT is correctly calculated (one level more than PGDIR_SHIFT)
-but I don't think PTRS_PER_PGD is appropriate here. For example, we had
-in the past 39-bit VA with 64KB pages which made PTRS_PER_PGD pretty
-small (well, it may cover the 40-bit case you are trying to fix but not
-up to 48). So maybe define something like:
+Cheers,
 
-#define EXTRA_PTRS	(1 << (48 - EXTRA_SHIFT))
+Will
 
-Otherwise the patch looks fine to me. We have to look into fixing KVM as
-well, ideally with sharing the same idmap with the kernel.
-
--- 
-Catalin
+>  drivers/iommu/Kconfig |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> --- linux-4.0-rc1.orig/drivers/iommu/Kconfig	2015-02-20 17:24:46.838955014 +0100
+> +++ linux-4.0-rc1/drivers/iommu/Kconfig	2015-02-23 10:03:06.487667832 +0100
+> @@ -23,6 +23,7 @@ config IOMMU_IO_PGTABLE
+>  config IOMMU_IO_PGTABLE_LPAE
+>  	bool "ARMv7/v8 Long Descriptor Format"
+>  	select IOMMU_IO_PGTABLE
+> +	depends on ARM || ARM64 || COMPILE_TEST
+>  	help
+>  	  Enable support for the ARM long descriptor pagetable format.
+>  	  This allocator supports 4K/2M/1G, 16K/32M and 64K/512M page
+> 
+> 
+> -- 
+> Jean Delvare
+> SUSE L3 Support
+> 
