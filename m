@@ -1,89 +1,59 @@
 From: ezequiel.garcia@imgtec.com (Ezequiel Garcia)
-Date: Wed, 25 Feb 2015 08:47:50 -0300
-Subject: [PATCH 6/7] efuse: Move Sunxi fuse driver
-Message-ID: <1424864870-3517-1-git-send-email-ezequiel.garcia@imgtec.com>
+Date: Wed, 25 Feb 2015 08:48:11 -0300
+Subject: [PATCH 7/7] ARM: sunxi: Rename EFUSE_SUNXI option in defconfigs
+Message-ID: <1424864891-3571-1-git-send-email-ezequiel.garcia@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Sunxi SoC eFuse support is currently located under drivers/eeprom,
-although the driver is not an eeprom. This commit just moves the driver
-to drivers/efuse. There's no functionality change.
+After the Sunxi eFuse driver move, the config is renamed.
+Update the defconfigs.
 
 Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@imgtec.com>
 ---
- drivers/efuse/Kconfig                      | 12 ++++++++++++
- drivers/efuse/Makefile                     |  1 +
- drivers/{misc/eeprom => efuse}/sunxi_sid.c |  0
- drivers/misc/eeprom/Kconfig                | 13 -------------
- drivers/misc/eeprom/Makefile               |  1 -
- 5 files changed, 13 insertions(+), 14 deletions(-)
- rename drivers/{misc/eeprom => efuse}/sunxi_sid.c (100%)
+ arch/arm/configs/multi_v7_defconfig | 2 +-
+ arch/arm/configs/sunxi_defconfig    | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/efuse/Kconfig b/drivers/efuse/Kconfig
-index b84e06b..a91a16e 100644
---- a/drivers/efuse/Kconfig
-+++ b/drivers/efuse/Kconfig
-@@ -6,5 +6,17 @@ config EFUSE_TEGRA
- 	help
- 	  Support for the eFuses available on Tegra SoCs
- 
-+config EFUSE_SUNXI_SID
-+	tristate "Allwinner sunxi security ID support"
-+	depends on ARCH_SUNXI && SYSFS
-+	help
-+	  This is a driver for the 'security ID' available on various Allwinner
-+	  devices.
-+
-+	  Due to the potential risks involved with changing e-fuses,
-+	  this driver is read-only.
-+
-+	  This driver can also be built as a module. If so, the module
-+	  will be called sunxi_sid.
- 
- endmenu
-diff --git a/drivers/efuse/Makefile b/drivers/efuse/Makefile
-index b69a0d6..30f8d5e 100644
---- a/drivers/efuse/Makefile
-+++ b/drivers/efuse/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_EFUSE_TEGRA)	+= tegra/
-+obj-$(CONFIG_EFUSE_SUNXI_SID)	+= sunxi_sid.o
-diff --git a/drivers/misc/eeprom/sunxi_sid.c b/drivers/efuse/sunxi_sid.c
-similarity index 100%
-rename from drivers/misc/eeprom/sunxi_sid.c
-rename to drivers/efuse/sunxi_sid.c
-diff --git a/drivers/misc/eeprom/Kconfig b/drivers/misc/eeprom/Kconfig
-index 9536852f..04f2e1f 100644
---- a/drivers/misc/eeprom/Kconfig
-+++ b/drivers/misc/eeprom/Kconfig
-@@ -96,17 +96,4 @@ config EEPROM_DIGSY_MTC_CFG
- 
- 	  If unsure, say N.
- 
--config EEPROM_SUNXI_SID
--	tristate "Allwinner sunxi security ID support"
--	depends on ARCH_SUNXI && SYSFS
--	help
--	  This is a driver for the 'security ID' available on various Allwinner
--	  devices.
--
--	  Due to the potential risks involved with changing e-fuses,
--	  this driver is read-only.
--
--	  This driver can also be built as a module. If so, the module
--	  will be called sunxi_sid.
--
- endmenu
-diff --git a/drivers/misc/eeprom/Makefile b/drivers/misc/eeprom/Makefile
-index 9507aec..fc1e81d 100644
---- a/drivers/misc/eeprom/Makefile
-+++ b/drivers/misc/eeprom/Makefile
-@@ -4,5 +4,4 @@ obj-$(CONFIG_EEPROM_LEGACY)	+= eeprom.o
- obj-$(CONFIG_EEPROM_MAX6875)	+= max6875.o
- obj-$(CONFIG_EEPROM_93CX6)	+= eeprom_93cx6.o
- obj-$(CONFIG_EEPROM_93XX46)	+= eeprom_93xx46.o
--obj-$(CONFIG_EEPROM_SUNXI_SID)	+= sunxi_sid.o
- obj-$(CONFIG_EEPROM_DIGSY_MTC_CFG) += digsy_mtc_eeprom.o
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index e8a4c95..caa84d2 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -145,7 +145,6 @@ CONFIG_ICS932S401=y
+ CONFIG_APDS9802ALS=y
+ CONFIG_ISL29003=y
+ CONFIG_EEPROM_AT24=y
+-CONFIG_EEPROM_SUNXI_SID=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_BLK_DEV_SR=y
+ CONFIG_SCSI_MULTI_LUN=y
+@@ -463,6 +462,7 @@ CONFIG_MSM_MMCC_8974=y
+ CONFIG_TEGRA_IOMMU_GART=y
+ CONFIG_TEGRA_IOMMU_SMMU=y
+ CONFIG_MEMORY=y
++CONFIG_EFUSE_SUNXI_SID=y
+ CONFIG_TI_AEMIF=y
+ CONFIG_IIO=y
+ CONFIG_XILINX_XADC=y
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index 38840a8..484c06f 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -30,7 +30,6 @@ CONFIG_IP_PNP_BOOTP=y
+ # CONFIG_WIRELESS is not set
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+-CONFIG_EEPROM_SUNXI_SID=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_ATA=y
+ CONFIG_AHCI_SUNXI=y
+@@ -105,6 +104,7 @@ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_SUN6I=y
+ CONFIG_RTC_DRV_SUNXI=y
+ # CONFIG_IOMMU_SUPPORT is not set
++CONFIG_EFUSE_SUNXI_SID=y
+ CONFIG_PHY_SUN4I_USB=y
+ CONFIG_EXT4_FS=y
+ CONFIG_VFAT_FS=y
 -- 
 2.3.0
