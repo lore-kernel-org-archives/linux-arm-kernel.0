@@ -1,43 +1,43 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 25 Feb 2015 14:14:55 -0800
-Subject: [PATCH 1/3] arm64: Don't use is_module_addr in setting page attributes
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 25 Feb 2015 14:17:55 -0800
+Subject: [PATCH 0/3] CONFIG_DEBUG_SET_MODULE_RONX fixups
 In-Reply-To: <1424902497-32141-1-git-send-email-lauraa@codeaurora.org>
 References: <1424902497-32141-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1424902497-32141-2-git-send-email-lauraa@codeaurora.org>
+Message-ID: <CAGXu5jKKn1f7bnp3Ezsc3o_iqV19Gu62-83ub3s7Rwu=oK7kBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 25, 2015 at 2:14 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> Hi,
+>
+> CONFIG_DEBUG_SET_MODULE_RONX is currently non-functional on arm and arm64
+> because of changes in behavior of is_module_addr. This series fixes
+> both arm and arm64 to work correctly and corrects a minor bug
+> related to section alignment in modules.
+>
+> Laura Abbott (3):
+>   arm64: Don't use is_module_addr in setting page attributes
+>   arm: Don't use is_module_addr in setting page attributes
+>   kernel/module.c: Update debug alignment after symtable generation
+>
+>  arch/arm/mm/pageattr.c   | 5 ++++-
+>  arch/arm64/mm/pageattr.c | 5 ++++-
+>  kernel/module.c          | 2 ++
+>  3 files changed, 10 insertions(+), 2 deletions(-)
 
-The set_memory_* functions currently only support module
-addresses. The addresses are validated using is_module_addr.
-That function is special though and relies on internal state
-in the module subsystem to work properly. At the time of
-module initialization and calling set_memory_*, it's too early
-for is_module_addr to work properly so it always returns
-false. Rather than be subject to the whims of the module state,
-just bounds check against the module virtual address range.
+Thanks for fixing this!
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm64/mm/pageattr.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Out of curiosity, which change broke DEBUG_SET_MODULE_RONX ? (i.e.
+does this need a CC: stable, and if so, through which release?)
 
-diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-index bb0ea94..1d3ec3d 100644
---- a/arch/arm64/mm/pageattr.c
-+++ b/arch/arm64/mm/pageattr.c
-@@ -51,7 +51,10 @@ static int change_memory_common(unsigned long addr, int numpages,
- 		WARN_ON_ONCE(1);
- 	}
- 
--	if (!is_module_address(start) || !is_module_address(end - 1))
-+	if (start < MODULES_VADDR || start >= MODULES_END)
-+		return -EINVAL;
-+
-+	if (end < MODULES_VADDR || end >= MODULES_END)
- 		return -EINVAL;
- 
- 	data.set_mask = set_mask;
+Regardless, consider them:
+
+Reviewed-by: Kees Cook <keescook@chromium.org>
+
+Thanks!
+
+-Kees
+
 -- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Kees Cook
+Chrome OS Security
