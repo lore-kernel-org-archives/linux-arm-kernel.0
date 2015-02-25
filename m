@@ -1,77 +1,55 @@
-From: al.stone@linaro.org (al.stone at linaro.org)
-Date: Tue, 24 Feb 2015 17:36:25 -0700
-Subject: [PATCH v3 9/9] ACPI: arm64: use "Linux" as ACPI_OS_NAME for _OS on
- arm64
-In-Reply-To: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
-References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1424824585-6405-10-git-send-email-al.stone@linaro.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 25 Feb 2015 09:54:02 +0900
+Subject: [PATCH] clk: samsung: Add CLKOUT driver support for Exynos3250
+ SoC.
+In-Reply-To: <1424769751-4633-1-git-send-email-ideal.song@samsung.com>
+References: <1424769751-4633-1-git-send-email-ideal.song@samsung.com>
+Message-ID: <CA+Ln22Hb9vx707=smWZwGqc9-JuSYvQ_dPcRbpPFZOF=ZgzUbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Al Stone <al.stone@linaro.org>
+Hi Inha,
 
-ACPI_OS_NAME is globally defined as "Microsoft Windows NT" for now.
-That doesn't make much sense in the ARM context, so set it to "Linux"
-when CONFIG_ARM64.
+Thanks for the patch. Please see my comments inline.
 
-If it is necessary to change the return value from \_OS_ (that is, return
-some value other than the default in ACPI_OS_NAME), use the kernel parameter
-"acpi_os_name=<string>".
+2015-02-24 18:22 GMT+09:00 Inha Song <ideal.song@samsung.com>:
+> This patch add CLKOUT driver support for Exynos3250 SoC.
 
-Many thanks to Rafael Wysocki for this greatly simplified form of the patch.
+Could you please add a little more information? I know that it might
+be pretty obvious to people familiar with this driver and/or hardware,
+but it might be a good idea to explicitly say that the CLKOUT
+controller is compatible with Exynos4, so only a new compatible string
+is added.
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Al Stone <al.stone@linaro.org>
----
- arch/arm64/Kconfig              | 5 +++++
- include/acpi/acconfig.h         | 2 ++
- include/acpi/platform/aclinux.h | 4 ++++
- 3 files changed, 11 insertions(+)
+On the other hand, do you really need to add a new compatible string
+if an existing one can be reused? The reason why the DT property is
+called "compatible" is to be able to use the same compatible strings
+on different devices, because they are compatible, even though the
+string might have its name after only one of them. If there is some
+additional reason to add a new compatible string, please write this in
+commit message.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index e441d28..d812113 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -87,6 +87,11 @@ config ARM64
- config 64BIT
- 	def_bool y
- 
-+config ACPI_OS_NAME
-+	string
-+	default "Linux"
-+	depends on ACPI
-+
- config ARCH_PHYS_ADDR_T_64BIT
- 	def_bool y
- 
-diff --git a/include/acpi/acconfig.h b/include/acpi/acconfig.h
-index 5a0a3e5..1980bf4 100644
---- a/include/acpi/acconfig.h
-+++ b/include/acpi/acconfig.h
-@@ -69,7 +69,9 @@
-  * code that will not execute the _OSI method unless _OS matches the string
-  * below.  Therefore, change this string at your own risk.
-  */
-+#ifndef ACPI_OS_NAME
- #define ACPI_OS_NAME                    "Microsoft Windows NT"
-+#endif
- 
- /* Maximum objects in the various object caches */
- 
-diff --git a/include/acpi/platform/aclinux.h b/include/acpi/platform/aclinux.h
-index 1ba7c19..a871cdd 100644
---- a/include/acpi/platform/aclinux.h
-+++ b/include/acpi/platform/aclinux.h
-@@ -69,6 +69,10 @@
- #define ACPI_REDUCED_HARDWARE 1
- #endif
- 
-+#ifdef CONFIG_ACPI_OS_NAME
-+#define ACPI_OS_NAME CONFIG_ACPI_OS_NAME
-+#endif
-+
- #include <linux/string.h>
- #include <linux/kernel.h>
- #include <linux/ctype.h>
--- 
-2.1.0
+>
+> Signed-off-by: Inha Song <ideal.song@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos-clkout.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/clk/samsung/clk-exynos-clkout.c b/drivers/clk/samsung/clk-exynos-clkout.c
+> index 3a7cb25..1c02e73 100644
+> --- a/drivers/clk/samsung/clk-exynos-clkout.c
+> +++ b/drivers/clk/samsung/clk-exynos-clkout.c
+> @@ -142,6 +142,8 @@ CLK_OF_DECLARE(exynos4212_clkout, "samsung,exynos4212-pmu",
+>                 exynos4_clkout_init);
+>  CLK_OF_DECLARE(exynos4412_clkout, "samsung,exynos4412-pmu",
+>                 exynos4_clkout_init);
+> +CLK_OF_DECLARE(exynos3250_clkout, "samsung,exynos3250-pmu",
+> +               exynos4_clkout_init);
+
+Are you sure that the PMU DEBUG register on Exynos3250 is indeed
+compatible with Exynos4 and not with newer SoCs? AFAIR, the only
+difference was the number of bits (4 on Exynos4 and 5 on Exynos5?) of
+the main mux.
+
+Best regards,
+Tomasz
