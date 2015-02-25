@@ -1,143 +1,88 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Feb 2015 12:10:36 +0000
-Subject: [PATCH 2/2] ARM: psci: move psci firmware calls out of line
-In-Reply-To: <1424866236-12482-1-git-send-email-will.deacon@arm.com>
-References: <1424866236-12482-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1424866236-12482-2-git-send-email-will.deacon@arm.com>
+From: yegor.yefremov@visionsystems.de (Yegor Yefremov)
+Date: Wed, 25 Feb 2015 13:11:22 +0100
+Subject: MUSB dual-role on AM335x behaving weirdly
+In-Reply-To: <20150225111129.GA5062@lukather>
+References: <20150121160631.GH4367@lukather>
+ <CADYTM3b40_u4Twt27PBVH4dC9ErDnFEi0AUzs_aJRM3mMHaBCQ@mail.gmail.com>
+ <54C0A8C9.3040201@visionsystems.de> <20150205132142.GD2079@lukather>
+ <20150224103911.GR25269@lukather> <20150224145401.GH29829@saruman.tx.rr.com>
+ <20150224165050.GX25269@lukather> <20150224173357.GB25042@saruman.tx.rr.com>
+ <20150225111129.GA5062@lukather>
+Message-ID: <54EDBBEA.8030509@visionsystems.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+On 25.02.2015 12:11, Maxime Ripard wrote:
+> On Tue, Feb 24, 2015 at 11:33:57AM -0600, Felipe Balbi wrote:
+>> Hi,
+>>
+>> On Tue, Feb 24, 2015 at 05:50:50PM +0100, Maxime Ripard wrote:
+>>> Hi Felipe,
+>>>
+>>> On Tue, Feb 24, 2015 at 08:54:01AM -0600, Felipe Balbi wrote:
+>>>> Hi,
+>>>>
+>>>> On Tue, Feb 24, 2015 at 11:39:11AM +0100, Maxime Ripard wrote:
+>>>>> On Thu, Feb 05, 2015 at 02:21:42PM +0100, Maxime Ripard wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> On Thu, Jan 22, 2015 at 08:37:45AM +0100, Yegor Yefremov wrote:
+>>>>>>> I have the same experience with 3.15. The switching is working when
+>>>>>>> CONFIG_USB_MUSB_DUAL_ROLE is set and dr_mode = "otg". But since 3.16
+>>
+>> since 3.16 ?
+> 
+> That's what Yegor said. I never saw it working with 3.15 either.
 
-arm64 builds with GCC 5 have caused the __asmeq assertions in the PSCI
-calling code to fire, so move the ARM PSCI calls out of line into their
-own assembly file for consistency and to safeguard against the same
-issue occuring with the 32-bit toolchain.
+I've used 3.15.1 and 3.15.2 with this set of patches: https://github.com/visionsystemsgmbh/onrisc_br_bsp/tree/master/board/vscom/kernel-patches/linux-3.15
 
-Reported-by: Andy Whitcroft <apw@canonical.com>
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-[will: brought into line with arm64 implementation]
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/Makefile    |  2 +-
- arch/arm/kernel/psci-call.S | 31 +++++++++++++++++++++++++++++++
- arch/arm/kernel/psci.c      | 39 +++------------------------------------
- 3 files changed, 35 insertions(+), 37 deletions(-)
- create mode 100644 arch/arm/kernel/psci-call.S
+And it worked so far. The system: http://www.visionsystems.de/produkte/baltos-ir-5221.html
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 902397dd1000..1c1cdfa566ac 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -86,7 +86,7 @@ obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
- 
- obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
- ifeq ($(CONFIG_ARM_PSCI),y)
--obj-y				+= psci.o
-+obj-y				+= psci.o psci-call.o
- obj-$(CONFIG_SMP)		+= psci_smp.o
- endif
- 
-diff --git a/arch/arm/kernel/psci-call.S b/arch/arm/kernel/psci-call.S
-new file mode 100644
-index 000000000000..a78e9e1e206d
---- /dev/null
-+++ b/arch/arm/kernel/psci-call.S
-@@ -0,0 +1,31 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Copyright (C) 2015 ARM Limited
-+ *
-+ * Author: Mark Rutland <mark.rutland@arm.com>
-+ */
-+
-+#include <linux/linkage.h>
-+
-+#include <asm/opcodes-sec.h>
-+#include <asm/opcodes-virt.h>
-+
-+/* int __invoke_psci_fn_hvc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
-+ENTRY(__invoke_psci_fn_hvc)
-+	__HVC(0)
-+	bx	lr
-+ENDPROC(__invoke_psci_fn_hvc)
-+
-+/* int __invoke_psci_fn_smc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
-+ENTRY(__invoke_psci_fn_smc)
-+	__SMC(0)
-+	bx	lr
-+ENDPROC(__invoke_psci_fn_smc)
-diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
-index f73891b6b730..f90fdf4ce7c7 100644
---- a/arch/arm/kernel/psci.c
-+++ b/arch/arm/kernel/psci.c
-@@ -23,8 +23,6 @@
- 
- #include <asm/compiler.h>
- #include <asm/errno.h>
--#include <asm/opcodes-sec.h>
--#include <asm/opcodes-virt.h>
- #include <asm/psci.h>
- #include <asm/system_misc.h>
- 
-@@ -33,6 +31,9 @@ struct psci_operations psci_ops;
- static int (*invoke_psci_fn)(u32, u32, u32, u32);
- typedef int (*psci_initcall_t)(const struct device_node *);
- 
-+asmlinkage int __invoke_psci_fn_hvc(u32, u32, u32, u32);
-+asmlinkage int __invoke_psci_fn_smc(u32, u32, u32, u32);
-+
- enum psci_function {
- 	PSCI_FN_CPU_SUSPEND,
- 	PSCI_FN_CPU_ON,
-@@ -71,40 +72,6 @@ static u32 psci_power_state_pack(struct psci_power_state state)
- 		 & PSCI_0_2_POWER_STATE_AFFL_MASK);
- }
- 
--/*
-- * The following two functions are invoked via the invoke_psci_fn pointer
-- * and will not be inlined, allowing us to piggyback on the AAPCS.
-- */
--static noinline int __invoke_psci_fn_hvc(u32 function_id, u32 arg0, u32 arg1,
--					 u32 arg2)
--{
--	asm volatile(
--			__asmeq("%0", "r0")
--			__asmeq("%1", "r1")
--			__asmeq("%2", "r2")
--			__asmeq("%3", "r3")
--			__HVC(0)
--		: "+r" (function_id)
--		: "r" (arg0), "r" (arg1), "r" (arg2));
--
--	return function_id;
--}
--
--static noinline int __invoke_psci_fn_smc(u32 function_id, u32 arg0, u32 arg1,
--					 u32 arg2)
--{
--	asm volatile(
--			__asmeq("%0", "r0")
--			__asmeq("%1", "r1")
--			__asmeq("%2", "r2")
--			__asmeq("%3", "r3")
--			__SMC(0)
--		: "+r" (function_id)
--		: "r" (arg0), "r" (arg1), "r" (arg2));
--
--	return function_id;
--}
--
- static int psci_get_version(void)
- {
- 	int err;
--- 
-2.1.4
+>>>>>>> it seems to be broken. Still had no time to bisect this.
+>>>>>>
+>>>>>> I've been giving a few versions (from v3.15 to Tuesday's linux-next) a
+>>>>>> try, and I always see the same behaviour now:
+>>>>>>
+>>>>>>   - Booting as a gadget (ie, with a USB cable plugged in), and
+>>>>>>     swapping the cable for a (real, this time) USB OTG cable with a
+>>>>>>     USB key never works. When the device is plugged, all I get is
+>>>>>>
+>>>>>> [  262.944846] usb 1-1: new high-speed USB device number 2 using musb-hdrc
+>>>>>> [  278.064748] usb 1-1: device descriptor read/64, error -110
+>>>>>>
+>>>>>>     Putting in back in gadget results with a load of continuous:
+>>>>>> [  315.258839] musb_bus_suspend 2484: trying to suspend as a_wait_vfall while active
+>>>>>>
+>>>>>>   - Booting as a host, or with nothing connected to it actually work,
+>>>>>>     up to a few plug-a-device-then-plug-a-host cycles, where you end
+>>>>>>     up with the following logs when disconnecting the device (somehow,
+>>>>>>     it always happens when it is set in host mode).
+>>>>>>
+>>>>>> [   12.969075] CAUTION: musb: Babble Interrupt Occurred
+>>>>>> [   12.974445] CAUTION: musb: Babble Interrupt Occurred
+>>>>>> [   12.979637] musb_stage0_irq 789: unhandled DISCONNECT transition (a_wait_bcon)
+>>>>>> [   12.988498] usb 1-1: USB disconnect, device number 2
+>>>>>> [   13.071849] musb-hdrc musb-hdrc.0.auto: Restarting MUSB to recover from Babble
+>>>>>>
+>>>>>>     Plugging back our USB cable, with the AM335x acting as a device
+>>>>>>     work once. Then, when it switches to the host mode, we end up with
+>>>>>>     the same scenario than in the coldplug as gadget case: USB read
+>>>>>>     error, before then having all the a_wait_vfall messages.
+>>>>>
+>>>>> Guys, any ideas/hints?
+>>>>
+>>>> which platform are you using ? I guess the only way to move here would
+>>>> be to bisect between 3.15 and 3.16 to find the offending commit.
+>>>
+>>> 3.15 didn't work either unfortunately. I had the behaviour described
+>>> above on all kernel between 3.15 and a 4.0-rc1-ish.
+>>>
+>>> This is on an custom design based on the am335x.
+>>
+>> has it ever worked ? I don't have a board here which can do dual role.
+>> BBB has a mini-B only on the peripheral port.
+> 
+> I don't know if it ever worked.
+> 
+> Maxime
+> 
