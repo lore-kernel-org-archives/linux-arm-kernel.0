@@ -1,53 +1,101 @@
-From: mporter@konsulko.com (Matt Porter)
-Date: Wed, 25 Feb 2015 13:52:41 -0500
-Subject: [PATCH v2] ARM: dts: am335x-bone-common: enable aes and sham
-Message-ID: <1424890361-31848-1-git-send-email-mporter@konsulko.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Wed, 25 Feb 2015 15:01:38 -0400
+Subject: [PATCH 1/2] thermal: exynos: Fix wrong control of power down
+ detection mode for Exynos7
+In-Reply-To: <20150225132508.5143c9cf@amdc2363>
+References: <1424753815-15113-1-git-send-email-cw00.choi@samsung.com>
+ <1424753815-15113-2-git-send-email-cw00.choi@samsung.com>
+ <20150225100330.0ef63a95@amdc2363>
+ <CAM4voakf6oeSEdtGtHRzQ-tC6XMbsU+VNtBnqeed8J4btKA3Yg@mail.gmail.com>
+ <20150225132508.5143c9cf@amdc2363>
+Message-ID: <20150225190137.GI2306@developer.amazonguestwifi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Beaglebone Black doesn't have AES and SHAM enabled like the
-original Beaglebone White dts. This breaks applications that
-leverage the crypto blocks so fix this by enabling these nodes
-in the am335x-bone-common.dtsi. With this change, enabling the
-nodes in am335x-bone.dts is no longer required so remove them.
+On Wed, Feb 25, 2015 at 01:25:08PM +0100, Lukasz Majewski wrote:
+> Hi Eduardo,
+> 
+> > Hi Lukasz,
+> > 
+> > On Wed, Feb 25, 2015 at 2:33 PM, Lukasz Majewski
+> > <l.majewski@samsung.com> wrote:
+> > > Hi Abhilash,
+> > >
+> > >> This patch fixes the wrong control of PD_DET_EN (power down
+> > >> detection mode) for Exynos7 because exynos7_tmu_control() always
+> > >> enables the power down detection mode regardless 'on' parameter.
+> > >>
+> > >> Cc: Zhang Rui <rui.zhang@intel.com>
+> > >> Cc: Eduardo Valentin <edubezval@gmail.com>
+> > >> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> > >> ---
+> > >>  drivers/thermal/samsung/exynos_tmu.c | 3 ++-
+> > >>  1 file changed, 2 insertions(+), 1 deletion(-)
+> > >>
+> > >> diff --git a/drivers/thermal/samsung/exynos_tmu.c
+> > >> b/drivers/thermal/samsung/exynos_tmu.c index 933cd80..a60f527
+> > >> 100644 --- a/drivers/thermal/samsung/exynos_tmu.c
+> > >> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> > >> @@ -682,6 +682,7 @@ static void exynos7_tmu_control(struct
+> > >> platform_device *pdev, bool on)
+> > >>       if (on) {
+> > >>               con |= (1 << EXYNOS_TMU_CORE_EN_SHIFT);
+> > >> +             con |= (1 << EXYNOS7_PD_DET_EN_SHIFT);
+> > >>               interrupt_en =
+> > >>                       (of_thermal_is_trip_valid(tz, 7)
+> > >>                       << EXYNOS7_TMU_INTEN_RISE7_SHIFT) |
+> > >> @@ -704,9 +705,9 @@ static void exynos7_tmu_control(struct
+> > >> platform_device *pdev, bool on) interrupt_en <<
+> > >> EXYNOS_TMU_INTEN_FALL0_SHIFT; } else {
+> > >>               con &= ~(1 << EXYNOS_TMU_CORE_EN_SHIFT);
+> > >> +             con &= ~(1 << EXYNOS7_PD_DET_EN_SHIFT);
+> > >>               interrupt_en = 0; /* Disable all interrupts */
+> > >>       }
+> > >> -     con |= 1 << EXYNOS7_PD_DET_EN_SHIFT;
+> > >>
+> > >>       writel(interrupt_en, data->base + EXYNOS7_TMU_REG_INTEN);
+> > >>       writel(con, data->base + EXYNOS_TMU_REG_CONTROL);
+> > >
+> > > Could you test this patch if it isn't introducing any regression on
+> > > your HW?
+> > 
+> > The patch does not cause any regression on exynos7 and seems
+> > logically correct.
+> > 
+> > Tested-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> > 
+> 
+> Eduardo, it is up to you if you prefer to take this fix directly or via
+> the new thermal-samsung tree ?
+> 
+> From when shall I regard myself as a maintainer? :-)
+> 
 
-Signed-off-by: Matt Porter <mporter@konsulko.com>
----
- arch/arm/boot/dts/am335x-bone-common.dtsi | 8 ++++++++
- arch/arm/boot/dts/am335x-bone.dts         | 8 --------
- 2 files changed, 8 insertions(+), 8 deletions(-)
+Yeah. Go ahead and collect it.
 
-diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index 6cc25ed..12cdb2b 100644
---- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-+++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -300,3 +300,11 @@
- 	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
- 	cd-inverted;
- };
-+
-+&aes {
-+	status = "okay";
-+};
-+
-+&sham {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index 83d40f7..6b849372 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -24,11 +24,3 @@
- &mmc1 {
- 	vmmc-supply = <&ldo3_reg>;
- };
--
--&sham {
--	status = "okay";
--};
--
--&aes {
--	status = "okay";
--};
--- 
-1.8.4
+> 
+> > 
+> > Regards,
+> > Abhilash
+> > >
+> > > --
+> > > Best regards,
+> > >
+> > > Lukasz Majewski
+> > >
+> > > Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+> 
+> 
+> -- 
+> Best regards,
+> 
+> Lukasz Majewski
+> 
+> Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150225/ecc22b37/attachment.sig>
