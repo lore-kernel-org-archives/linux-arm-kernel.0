@@ -1,58 +1,28 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 26 Feb 2015 00:10:38 +0200
-Subject: [PATCH 2/2] ARM: shmobile: r8a7794: add GPIO DT support
-In-Reply-To: <CAMuHMdU9QD_4UOBPm850HtUPAOOEY4JA7cztpUyKSGog6VYUNA@mail.gmail.com>
-References: <6954455.LyoCrfjM8R@wasted.cogentembedded.com>
- <2292882.LbM0mNWfOj@avalon>
- <CAMuHMdU9QD_4UOBPm850HtUPAOOEY4JA7cztpUyKSGog6VYUNA@mail.gmail.com>
-Message-ID: <2384891.X25TSvzAnx@avalon>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 25 Feb 2015 14:09:51 -0800
+Subject: [PATCH v5 1/6] clk: add of_clk_get_parent_rate function
+In-Reply-To: <1423097705-22939-2-git-send-email-rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+ <1423097705-22939-1-git-send-email-rjui@broadcom.com>
+ <1423097705-22939-2-git-send-email-rjui@broadcom.com>
+Message-ID: <54EE482F.4010402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+On 02/04/15 16:55, Ray Jui wrote:
+> Sometimes a clock needs to know the rate of its parent before itself is
+> registered to the framework. An example is that a PLL may need to
+> initialize itself to a specific VCO frequency, before registering to the
+> framework. The parent rate needs to be known, for PLL multipliers and
+> divisors to be configured properly.
+>
+> Introduce helper function of_clk_get_parent_rate, which can be used to
+> obtain the parent rate of a clock, given a device node and index.
+>
+> Signed-off-by: Ray Jui <rjui@broadcom.com>
 
-On Wednesday 25 February 2015 11:27:37 Geert Uytterhoeven wrote:
-> On Wed, Feb 25, 2015 at 11:11 AM, Laurent Pinchart wrote:
-> >> --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-> >> +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-> >> @@ -50,6 +50,90 @@
-> >> 
-> >> +     gpio1: gpio at e6051000 {
-> >> +             compatible = "renesas,gpio-r8a7794", "renesas,gpio-rcar";
-> >> +             reg = <0 0xe6051000 0 0x50>;
-> >> +             interrupts = <0 5 IRQ_TYPE_LEVEL_HIGH>;
-> >> +             #gpio-cells = <2>;
-> >> +             gpio-controller;
-> >> +             gpio-ranges = <&pfc 0 32 32>;
-> > 
-> > This GPIO block has 26 GPIOs only.
-> > 
-> >> +     gpio5: gpio at e6055000 {
-> >> +             compatible = "renesas,gpio-r8a7794", "renesas,gpio-rcar";
-> >> +             reg = <0 0xe6055000 0 0x50>;
-> >> +             interrupts = <0 9 IRQ_TYPE_LEVEL_HIGH>;
-> >> +             #gpio-cells = <2>;
-> >> +             gpio-controller;
-> >> +             gpio-ranges = <&pfc 0 160 32>;
-> > 
-> > This GPIO block has 28 GPIOs only.
-> > 
-> >> +     gpio6: gpio at e6055400 {
-> >> +             compatible = "renesas,gpio-r8a7794", "renesas,gpio-rcar";
-> >> +             reg = <0 0xe6055400 0 0x50>;
-> >> +             interrupts = <0 10 IRQ_TYPE_LEVEL_HIGH>;
-> >> +             #gpio-cells = <2>;
-> >> +             gpio-controller;
-> >> +             gpio-ranges = <&pfc 0 192 32>;
-> > 
-> > This GPIO block has 26 GPIOs only.
-> 
-> I guess you hear me coming... r8a779[01].dtsi need to be fixed, too.
-
-Yes. We're first investigating issues in the pfc driver and/or pinctrl core 
-due to holes in GPIO banks pins though.
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
-Regards,
-
-Laurent Pinchart
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
