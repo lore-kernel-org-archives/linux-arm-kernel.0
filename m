@@ -1,9 +1,9 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 25 Feb 2015 22:53:32 +0800
-Subject: [PATCH 2/8] ARM: imx: fix struct clk pointer comparing
+Date: Wed, 25 Feb 2015 22:53:33 +0800
+Subject: [PATCH 3/8] drm: armada: fix struct clk pointer comparing
 In-Reply-To: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
 References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1424876018-17852-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1424876018-17852-4-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,24 +25,21 @@ more.  Call helper function clk_is_match() instead to fix the problem.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/mach-imx6q.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/armada/armada_510.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 4ad6e473cf83..9de3412af406 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -211,8 +211,9 @@ static void __init imx6q_1588_init(void)
- 	 * set bit IOMUXC_GPR1[21].  Or the PTP clock must be from pad
- 	 * (external OSC), and we need to clear the bit.
- 	 */
--	clksel = ptp_clk == enet_ref ? IMX6Q_GPR1_ENET_CLK_SEL_ANATOP :
--				       IMX6Q_GPR1_ENET_CLK_SEL_PAD;
-+	clksel = clk_is_match(ptp_clk, enet_ref) ?
-+				IMX6Q_GPR1_ENET_CLK_SEL_ANATOP :
-+				IMX6Q_GPR1_ENET_CLK_SEL_PAD;
- 	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
- 	if (!IS_ERR(gpr))
- 		regmap_update_bits(gpr, IOMUXC_GPR1,
+diff --git a/drivers/gpu/drm/armada/armada_510.c b/drivers/gpu/drm/armada/armada_510.c
+index ad3d2ebf95c9..862deafe8b24 100644
+--- a/drivers/gpu/drm/armada/armada_510.c
++++ b/drivers/gpu/drm/armada/armada_510.c
+@@ -53,7 +53,7 @@ static int armada510_crtc_compute_clock(struct armada_crtc *dcrtc,
+ 	if (IS_ERR(clk))
+ 		return PTR_ERR(clk);
+ 
+-	if (dcrtc->clk != clk) {
++	if (!clk_is_match(dcrtc->clk, clk)) {
+ 		ret = clk_prepare_enable(clk);
+ 		if (ret)
+ 			return ret;
 -- 
 1.9.1
