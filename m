@@ -1,86 +1,72 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 25 Feb 2015 19:30:50 +0100
-Subject: [PATCH v2] ARM: mvebu: Disable CPU Idle on Armada 38x
-Message-ID: <1424889050-1008-1-git-send-email-gregory.clement@free-electrons.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Wed, 25 Feb 2015 12:33:19 -0600
+Subject: [PATCH] arm64: vdso: minor ABI fix for clock_getres
+In-Reply-To: <20150225163243.GM12377@arm.com>
+References: <1424820067-13112-1-git-send-email-nathan_lynch@mentor.com>
+ <20150225160226.GL12377@arm.com> <54EDF4DB.5080007@mentor.com>
+ <20150225163243.GM12377@arm.com>
+Message-ID: <54EE156F.7090907@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Armada 38x SoCs, under heavy I/O load, the system hangs when CPU
-Idle is enabled. Waiting for a solution to this issue, this patch
-disables the CPU Idle support for this SoC.
+On 02/25/2015 10:32 AM, Will Deacon wrote:
+> On Wed, Feb 25, 2015 at 04:14:19PM +0000, Nathan Lynch wrote:
+>> On 02/25/2015 10:02 AM, Will Deacon wrote:
+>>> On Tue, Feb 24, 2015 at 11:21:07PM +0000, Nathan Lynch wrote:
+>>>> The vdso implementation of clock_getres currently returns 0 (success)
+>>>> whenever a null timespec is provided by the caller, regardless of the
+>>>> clock id supplied.
+>>>>
+>>>> This behavior is incorrect.  It should fall back to syscall when an
+>>>> unrecognized clock id is passed, even when the timespec argument is
+>>>> null.  This ensures that clock_getres always returns an error for
+>>>> invalid clock ids.
+>>>>
+>>>> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+>>>> ---
+>>>>  arch/arm64/kernel/vdso/gettimeofday.S | 3 +--
+>>>>  1 file changed, 1 insertion(+), 2 deletions(-)
+>>>
+>>> Acked-by: Will Deacon <will.deacon@arm.com>
+>>>
+>>> Thanks, Nathan.
+>>
+>> Thank you.  I'm curious -- do you know of a use case for the VDSO
+>> implementation of clock_getres?  I.e. what kind of real-world workload
+>> sees a benefit from it?
+> 
+> No, I just implemented it for completeness (and it's also way simpler than
+> the other functions!).
 
-As CPU Hot plug support also uses some of the CPU Idle functions it is
-also affected by the same issue. This patch disables it also for the
-Armada 38x SoCs.
-
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: <stable@vger.kernel.org> # v3.17 +
----
-Hi,
-
-The previous code raised a warning about the unused
-armada_38x_cpuidle_init() function. So I moved the warn message inside
-the function itself and then I continued to call this function.
-
-I also fixed a missing bracket.
-
-And finally I only registered the cpuilde platform driver if there was
-really something to register.
-
-Gregory
+Yeah it was the first function I implemented for the arm32 vdso :-)
 
 
- arch/arm/mach-mvebu/pmsu.c | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+> Calling it with a NULL timespec is probably even
+> less common, so an alternative to your patch would be changing the label
+> of the existing cbz to hand-off to the kernel when the thing is NULL.
 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 8b9f5e202ccf..2145f192662f 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -415,6 +415,9 @@ static __init int armada_38x_cpuidle_init(void)
- 	void __iomem *mpsoc_base;
- 	u32 reg;
- 
-+	pr_warn("CPU Idle is currently broken on Armada 38x: disabling");
-+	return 0;
-+
- 	np = of_find_compatible_node(NULL, NULL,
- 				     "marvell,armada-380-coherency-fabric");
- 	if (!np)
-@@ -469,13 +472,23 @@ static __init int armada_xp_cpuidle_init(void)
- static int __init mvebu_v7_cpu_pm_init(void)
- {
- 	struct device_node *np;
--	int ret;
-+	int ret = 0;
- 
- 	np = of_find_matching_node(NULL, of_pmsu_table);
- 	if (!np)
- 		return 0;
- 	of_node_put(np);
- 
-+	/*
-+	 * Currently the CPU Idle support for Armada 38x is broken, as
-+	 * the CPU Hotplug uses some of the CPU Idle functions it is
-+	 * broken too, so let's disable it
-+	 */
-+	if (of_machine_is_compatible("marvell,armada380")) {
-+		cpu_hotplug_disable();
-+		pr_warn("CPU Hotplug support is currently broken on Armada 38x: disabling");
-+	}
-+
- 	if (of_machine_is_compatible("marvell,armadaxp"))
- 		ret = armada_xp_cpuidle_init();
- 	else if (of_machine_is_compatible("marvell,armada370"))
-@@ -489,7 +502,8 @@ static int __init mvebu_v7_cpu_pm_init(void)
- 		return ret;
- 
- 	mvebu_v7_pmsu_enable_l2_powerdown_onidle();
--	platform_device_register(&mvebu_v7_cpuidle_device);
-+	if (mvebu_v7_cpuidle_device.name)
-+		platform_device_register(&mvebu_v7_cpuidle_device);
- 	cpu_pm_register_notifier(&mvebu_v7_cpu_pm_notifier);
- 
- 	return 0;
--- 
-2.1.0
+Yes, but I'll leave it alone unless you'd prefer that to this patch.
+
+
+>> I'm not suggesting removing it from the arm64 vdso, but I'm considering
+>> dropping clock_getres from the 32-bit ARM vdso patch set since I haven't
+>> been able to answer this.
+> 
+> Well, if there aren't any fastpath users then I'm not bothered about
+> removing it from arm64 either. I'm not sure how we establish that, though.
+
+FWIW x86 has never implemented it, which makes me think there's little
+demand for it.
+
+I stumbled upon another reason to omit clock_getres from the arm32 vdso.
+ If you have CONFIG_HIGHRES_TIMERS=y and the kernel doesn't switch to
+high-res mode for whatever reason (this happens for me in qemu), the
+vdso clock_getres returns a different result than the syscall does:
+
+# vdsotest clock-getres-monotonic verify
+clock resolutions differ:
+        [0, 10000000] (kernel)
+        [0, 1] (vDSO)
+
+Not sure whether this is a concern for arm64 since I think the only way
+to provoke it there is to boot with clocksource=jiffies.
