@@ -1,34 +1,24 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 25 Feb 2015 13:52:29 +0000
-Subject: [PATCH v4 9/9] MAINTAINERS: Add Watchdog and RTC files to STI's
- maintainer entry
-In-Reply-To: <1424872349-4155-1-git-send-email-lee.jones@linaro.org>
-References: <1424872349-4155-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1424872349-4155-10-git-send-email-lee.jones@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 25 Feb 2015 14:50:15 +0100
+Subject: [PATCH] hwmon: (gpio-fan) allow to use alarm support alone from DT
+In-Reply-To: <20150225111430.GV1509@kw.sim.vm.gnt>
+References: <1424696334-14767-1-git-send-email-simon.guinot@sequanux.org>
+ <54EB33D4.1000804@roeck-us.net>
+ <20150223143416.GT1509@kw.sim.vm.gnt> <54EB3C84.30503@roeck-us.net>
+ <20150225111430.GV1509@kw.sim.vm.gnt>
+Message-ID: <20150225135015.GA17992@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- MAINTAINERS | 2 ++
- 1 file changed, 2 insertions(+)
+> Handle the GPIO fan alarm feature from the fan controller driver don't
+> look good either to me. This alarm mechanism is not a part of the fan
+> controller itself but rather something apart. Also I am afraid that the
+> result would really look like a hack.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ddc5a8c..19af007 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1461,10 +1461,12 @@ F:	drivers/phy/phy-stih407-usb.c
- F:	drivers/phy/phy-stih41x-usb.c
- F:	drivers/pinctrl/pinctrl-st.c
- F:	drivers/reset/sti/
-+F:	drivers/rtc/rtc-st-lpc.c
- F:	drivers/tty/serial/st-asc.c
- F:	drivers/usb/dwc3/dwc3-st.c
- F:	drivers/usb/host/ehci-st.c
- F:	drivers/usb/host/ohci-st.c
-+F:	drivers/watchdog/st_lpc_wdt.c
- F:	drivers/ata/ahci_st.c
- 
- ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
--- 
-1.9.1
+Hi Simon
+
+It sounds like you need to extract the alarm code from gpio-fan into a
+little library. Then put a wrapper around it to make a gpio-fan-alarm
+driver.
+
+	Andrew
