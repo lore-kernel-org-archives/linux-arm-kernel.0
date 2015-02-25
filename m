@@ -1,101 +1,86 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 25 Feb 2015 10:26:29 -0800
-Subject: [PATCH v2 3/4] clk: Provide an always-on clock domain framework
-In-Reply-To: <20150225154808.GD6688@x1>
-References: <1424276101-30137-1-git-send-email-lee.jones@linaro.org>
- <1424276101-30137-4-git-send-email-lee.jones@linaro.org>
- <20150223172344.421.62815@quantum>
- <CAL_Jsq+N4D8fUCwrYwxLaRpbhsgi5eZy5cLpsSmp8VoTQZUqow@mail.gmail.com>
- <20150225154808.GD6688@x1>
-Message-ID: <20150225182629.421.37835@quantum>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 25 Feb 2015 19:30:50 +0100
+Subject: [PATCH v2] ARM: mvebu: Disable CPU Idle on Armada 38x
+Message-ID: <1424889050-1008-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Lee Jones (2015-02-25 07:48:08)
-> On Wed, 25 Feb 2015, Rob Herring wrote:
-> 
-> > On Mon, Feb 23, 2015 at 11:23 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> > > Quoting Lee Jones (2015-02-18 08:15:00)
-> > >> Much h/w contain clocks which if turned off would prove fatal.  The
-> > >> only way to recover is to restart the board(s).  This driver takes
-> > >> references to clocks which are required to be always-on in order to
-> > >> prevent the common clk framework from trying to turn them off during
-> > >> the clk_disabled_unused() procedure.
-> > 
-> > [...]
-> > 
-> > >> +static int ao_clock_domain_probe(struct platform_device *pdev)
-> > >> +{
-> > >> +       struct device_node *np = pdev->dev.of_node;
-> > >> +       int nclks, i;
-> > >> +
-> > >> +       nclks = of_count_phandle_with_args(np, "clocks", "#clock-cells");
-> > >
-> > > Minor nitpick: please use of_clk_get_parent_count. I spent a solid 5
-> > > minutes writing that function and I need people to use it so I can get a
-> > > return on my investment.
-> > >
-> > > Otherwise the patch looks good. I believe that this method is targeting
-> > > always-on clock in a production environment, which is different from the
-> > > CLK_IGNORE_UNUSED stuff which typically is helpful while bringing up new
-> > > hardware or dealing with a platform that has incomplete driver support.
-> > 
-> > There is also the usecase of keep clocks on until I load a module that
-> > properly handles my hardware (e.g simplefb). We have a simplefb node
-> > with clocks and the simplefb driver jumps thru some hoops to hand-off
-> > clocks to the real driver. I don't really like it and don't want to
-> > see more examples. And there is the case of I thought I would never
-> > manage this clock, but kernel subsystems evolve and now I want to
-> > manage a clock. This should not require a DT update to do so.
-> > 
-> > Neither of these may be Lee's usecase, but I want to see them covered
-> > by the binding.
-> > 
-> > > I wonder if there is a clever way for existing clock providers
-> > > (expressed in DT) to use this without having to create a separate node
-> > > of clocks with the "always-on-clk-domain" flag. Possibly the common
-> > > clock binding could declare some always-on flag that is standardized?
-> > > Then the framework core could use this code easily. Not sure if that is
-> > > a good idea though...
-> > 
-> > I would prefer to see the always on clocks just listed within the
-> > clock controller's node rather than creating made up nodes with clock
-> > properties.
-> 
-> > This should be always-on until claimed IMO, but that
-> > aspect is the OS's problem, not a DT problem.
-> 
-> I disagree with this point.  There are likely to be many unclaimed,
-> but perfectly gateable clocks in a system, which will consume power
-> unnecessarily.  The clk framework does the right thing by turning all
-> unclaimed clocks off IMHO.  This only leaves a small use-case where we
-> need to artificially claim some which must not be gated.
+On Armada 38x SoCs, under heavy I/O load, the system hangs when CPU
+Idle is enabled. Waiting for a solution to this issue, this patch
+disables the CPU Idle support for this SoC.
 
-I might have misread both of your mails, but I think you two are
-actually in agreement. You both support a common property which lists
-the always-on clocks inside of the common clock binding, no?
+As CPU Hot plug support also uses some of the CPU Idle functions it is
+also affected by the same issue. This patch disables it also for the
+Armada 38x SoCs.
 
-> 
-> The other way to do is, as you mentioned is list the clocks which must
-> stay on in the clock source node, but this will still require a
-> binding.  It will also require a much more complicated framework
-> driver.
-> 
->     clkprovider at xxxxxxxx {
->             always-on-clks = <1, 2, 4, 5, 7>;
->     };
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: <stable@vger.kernel.org> # v3.17 +
+---
+Hi,
 
-This should pose no burden on the driver. Since always-on-clks is in the
-common clock binding it should be handled by the framework core. At
-clk_register-time we can check for always-on-clks, walk the list and see
-if we have a match. It's ugly O(n^2) but it works.
+The previous code raised a warning about the unused
+armada_38x_cpuidle_init() function. So I moved the warn message inside
+the function itself and then I continued to call this function.
 
-Thoughts?
+I also fixed a missing bracket.
 
-Mike
+And finally I only registered the cpuilde platform driver if there was
+really something to register.
 
-> -- 
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+Gregory
+
+
+ arch/arm/mach-mvebu/pmsu.c | 18 ++++++++++++++++--
+ 1 file changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 8b9f5e202ccf..2145f192662f 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -415,6 +415,9 @@ static __init int armada_38x_cpuidle_init(void)
+ 	void __iomem *mpsoc_base;
+ 	u32 reg;
+ 
++	pr_warn("CPU Idle is currently broken on Armada 38x: disabling");
++	return 0;
++
+ 	np = of_find_compatible_node(NULL, NULL,
+ 				     "marvell,armada-380-coherency-fabric");
+ 	if (!np)
+@@ -469,13 +472,23 @@ static __init int armada_xp_cpuidle_init(void)
+ static int __init mvebu_v7_cpu_pm_init(void)
+ {
+ 	struct device_node *np;
+-	int ret;
++	int ret = 0;
+ 
+ 	np = of_find_matching_node(NULL, of_pmsu_table);
+ 	if (!np)
+ 		return 0;
+ 	of_node_put(np);
+ 
++	/*
++	 * Currently the CPU Idle support for Armada 38x is broken, as
++	 * the CPU Hotplug uses some of the CPU Idle functions it is
++	 * broken too, so let's disable it
++	 */
++	if (of_machine_is_compatible("marvell,armada380")) {
++		cpu_hotplug_disable();
++		pr_warn("CPU Hotplug support is currently broken on Armada 38x: disabling");
++	}
++
+ 	if (of_machine_is_compatible("marvell,armadaxp"))
+ 		ret = armada_xp_cpuidle_init();
+ 	else if (of_machine_is_compatible("marvell,armada370"))
+@@ -489,7 +502,8 @@ static int __init mvebu_v7_cpu_pm_init(void)
+ 		return ret;
+ 
+ 	mvebu_v7_pmsu_enable_l2_powerdown_onidle();
+-	platform_device_register(&mvebu_v7_cpuidle_device);
++	if (mvebu_v7_cpuidle_device.name)
++		platform_device_register(&mvebu_v7_cpuidle_device);
+ 	cpu_pm_register_notifier(&mvebu_v7_cpu_pm_notifier);
+ 
+ 	return 0;
+-- 
+2.1.0
