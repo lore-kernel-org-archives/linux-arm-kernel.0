@@ -1,133 +1,75 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 25 Feb 2015 21:04:44 +0200
-Subject: [PATCHv3 34/35] ARM: dts: dra7: add system control module node
+Date: Wed, 25 Feb 2015 21:04:41 +0200
+Subject: [PATCHv3 31/35] ARM: OMAP4: display: convert display to use syscon
+ for dsi muxing
 In-Reply-To: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
 References: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1424891085-10392-35-git-send-email-t-kristo@ti.com>
+Message-ID: <1424891085-10392-32-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add node for system control module, and move all the existing system
-control IO space users under this new node as its children. A new node
-for scm_conf area is also added.
+The legacy control module APIs will be gone, thus convert the display
+driver to use syscon. This change should eventually be moved to
+display driver from the board directory.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- .../devicetree/bindings/arm/omap/ctrl.txt          |    1 +
- arch/arm/boot/dts/dra7.dtsi                        |   60 ++++++++++++--------
- 2 files changed, 36 insertions(+), 25 deletions(-)
+ arch/arm/mach-omap2/display.c |   15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/ctrl.txt b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
-index 3574d67..f84f4ea 100644
---- a/Documentation/devicetree/bindings/arm/omap/ctrl.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
-@@ -21,6 +21,7 @@ Required properties:
- 		"ti,omap3-scrm"
- 		"ti,omap4-ctrl"
- 		"ti,omap5-ctrl"
-+		"ti,dra7-ctrl"
- - reg:		Contains Control Module register address range
- 		(base address and length)
+diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+index 7a050f9..f492ae1 100644
+--- a/arch/arm/mach-omap2/display.c
++++ b/arch/arm/mach-omap2/display.c
+@@ -26,6 +26,8 @@
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+ #include <linux/slab.h>
++#include <linux/mfd/syscon.h>
++#include <linux/regmap.h>
  
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 5827fed..230d22d 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -203,26 +203,47 @@
- 			};
- 		};
+ #include <video/omapdss.h>
+ #include "omap_hwmod.h"
+@@ -104,6 +106,10 @@ static const struct omap_dss_hwmod_data omap4_dss_hwmod_data[] __initconst = {
+ 	{ "dss_hdmi", "omapdss_hdmi", -1 },
+ };
  
-+		scm: scm at 4a002000 {
-+			compatible = "ti,dra7-ctrl", "simple-bus";
-+			reg = <0x4a002000 0x1400>,
-+			      <0x4a003400 0x600>,
-+			      <0x4ae0c000 0x600>;
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			ranges = <0 0 0x4a002000 0x1400>,
-+				 <1 0 0x4a003400 0x600>,
-+				 <2 0 0x4ae0c000 0x600>;
++#define OMAP4_DSIPHY_SYSCON_OFFSET		0x78
 +
-+			scm_conf: tisyscon at 0,0 {
-+				compatible = "syscon";
-+				reg = <0 0x0 0x1400>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+			};
++static struct regmap *omap4_dsi_mux_syscon;
 +
-+			dra7_pmx_core: pinmux at 1,0 {
-+				compatible = "ti,dra7-padconf",
-+					     "pinctrl-single";
-+				reg = <1 0x0 0x0464>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				#interrupt-cells = <1>;
-+				interrupt-controller;
-+				pinctrl-single,register-width = <32>;
-+				pinctrl-single,function-mask = <0x3fffffff>;
-+			};
-+		};
+ static int omap4_dsi_mux_pads(int dsi_id, unsigned lanes)
+ {
+ 	u32 enable_mask, enable_shift;
+@@ -124,7 +130,7 @@ static int omap4_dsi_mux_pads(int dsi_id, unsigned lanes)
+ 		return -ENODEV;
+ 	}
+ 
+-	reg = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_DSIPHY);
++	regmap_read(omap4_dsi_mux_syscon, OMAP4_DSIPHY_SYSCON_OFFSET, &reg);
+ 
+ 	reg &= ~enable_mask;
+ 	reg &= ~pipd_mask;
+@@ -132,7 +138,7 @@ static int omap4_dsi_mux_pads(int dsi_id, unsigned lanes)
+ 	reg |= (lanes << enable_shift) & enable_mask;
+ 	reg |= (lanes << pipd_shift) & pipd_mask;
+ 
+-	omap4_ctrl_pad_writel(reg, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_DSIPHY);
++	regmap_write(omap4_dsi_mux_syscon, OMAP4_DSIPHY_SYSCON_OFFSET, reg);
+ 
+ 	return 0;
+ }
+@@ -665,5 +671,10 @@ int __init omapdss_init_of(void)
+ 		return r;
+ 	}
+ 
++	/* add DSI info for omap4 */
++	node = of_find_node_by_name(NULL, "omap4_padconf_global");
++	if (node)
++		omap4_dsi_mux_syscon = syscon_node_to_regmap(node);
 +
- 		counter32k: counter at 4ae04000 {
- 			compatible = "ti,omap-counter32k";
- 			reg = <0x4ae04000 0x40>;
- 			ti,hwmods = "counter_32k";
- 		};
- 
--		dra7_ctrl_core: ctrl_core at 4a002000 {
--			compatible = "syscon";
--			reg = <0x4a002000 0x6d0>;
--		};
--
--		dra7_ctrl_general: tisyscon at 4a002e00 {
--			compatible = "syscon";
--			reg = <0x4a002e00 0x7c>;
--		};
--
- 		pbias_regulator: pbias_regulator {
- 			compatible = "ti,pbias-omap";
--			reg = <0 0x4>;
--			syscon = <&dra7_ctrl_general>;
-+			reg = <0xe00 0x4>;
-+			syscon = <&scm_conf>;
- 			pbias_mmc_reg: pbias_mmc_omap5 {
- 				regulator-name = "pbias_mmc_omap5";
- 				regulator-min-microvolt = <1800000>;
-@@ -230,17 +251,6 @@
- 			};
- 		};
- 
--		dra7_pmx_core: pinmux at 4a003400 {
--			compatible = "ti,dra7-padconf", "pinctrl-single";
--			reg = <0x4a003400 0x0464>;
--			#address-cells = <1>;
--			#size-cells = <0>;
--			#interrupt-cells = <1>;
--			interrupt-controller;
--			pinctrl-single,register-width = <32>;
--			pinctrl-single,function-mask = <0x3fffffff>;
--		};
--
- 		sdma: dma-controller at 4a056000 {
- 			compatible = "ti,omap4430-sdma";
- 			reg = <0x4a056000 0x1000>;
-@@ -1410,7 +1420,7 @@
- 			compatible = "ti,dra7-d_can";
- 			ti,hwmods = "dcan1";
- 			reg = <0x4ae3c000 0x2000>;
--			syscon-raminit = <&dra7_ctrl_core 0x558 0>;
-+			syscon-raminit = <&scm_conf 0x558 0>;
- 			interrupts = <GIC_SPI 222 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&dcan1_sys_clk_mux>;
- 			status = "disabled";
-@@ -1420,7 +1430,7 @@
- 			compatible = "ti,dra7-d_can";
- 			ti,hwmods = "dcan2";
- 			reg = <0x48480000 0x2000>;
--			syscon-raminit = <&dra7_ctrl_core 0x558 1>;
-+			syscon-raminit = <&scm_conf 0x558 1>;
- 			interrupts = <GIC_SPI 225 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&sys_clkin1>;
- 			status = "disabled";
+ 	return 0;
+ }
 -- 
 1.7.9.5
