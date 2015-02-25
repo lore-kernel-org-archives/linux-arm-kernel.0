@@ -1,42 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Feb 2015 20:17:42 +0100
-Subject: [PATCH v2 2/2] hwrng: iproc-rng200 - Add Broadcom IPROC RNG driver
-In-Reply-To: <1424888184-22180-3-git-send-email-sbranden@broadcom.com>
-References: <1424888184-22180-3-git-send-email-sbranden@broadcom.com>
-Message-ID: <3062825.7b1oYP4yuL@wuerfel>
+From: dtor@chromium.org (Dmitry Torokhov)
+Date: Wed, 25 Feb 2015 11:29:56 -0800
+Subject: [PATCH v4 0/4] Add pinctrl support to Broadcom Cygnus SoC
+In-Reply-To: <1423015801-26967-1-git-send-email-rjui@broadcom.com>
+References: <rjui@broadcom.com>
+ <1423015801-26967-1-git-send-email-rjui@broadcom.com>
+Message-ID: <20150225192956.GB3215@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 February 2015 10:16:24 Scott Branden wrote:
-> This adds a driver for random number generator present on Broadcom
-> IPROC devices.
+On Tue, Feb 03, 2015 at 06:09:57PM -0800, Ray Jui wrote:
+> This patchset contains the initial pinctrl (IOMUX) support for the Broadcom
+> Cygnus SoC. The Cygnus IOMUX controller supports group based mux configuration
+> and allows certain pins to be muxed to GPIO function individually
 > 
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> Signed-off-by: Scott Branden <sbranden@broadcom.com>
+> Changes from v3:
+>  - Fix the driver to have more proper use of "const" in various places
+>  - Other minor improvements
+> 
+> Changes from v2:
+>  - Consolidate all Broadcom pinctrl drivers into drivers/pinctrl/bcm/*
+>  - Change the Cygnus IOMUX driver to use standard Linux pinctrl subnode
+> properties such as "function" and "groups" for pinmux configuration, instead
+> of non-standard properties such as "brcm,function" and "brcm,group"
+>  - Use real function names like "spi0", "lcd", "key", and etc. instead of HW
+> specific mux names like "alt1", "alt2", "alt3", and etc.
+>  - Add suffix "grp" to all group names
+>  - Add support to allow individual pins to be muxed to GPIO function through
+> subsystem callbacks "gpio_request_enable" and "gpio_disable_free", and get rid
+> of all GPIO groups
+>  - Other minor improvements in the driver
+> 
+> Changes from v1:
+>  - Fix a typo in device tree binding document
 
-The driver looks reasonable overall, I have just one question about
-something that sticks out:
+FWIW I tested this series on BCM958305K SVK.
 
-> +	while ((num_remaining > 0) && time_before(jiffies, idle_endtime)) {
-...
-> +
-> +		/* Are there any random numbers available? */
-> +		if ((ioread32(rng_base + RNG_FIFO_COUNT_OFFSET) &
-> +				RNG_FIFO_COUNT_RNG_FIFO_COUNT_MASK) > 0) {
-...
-> +		} else {
-> +			if (!wait)
-> +				/* Cannot wait, return immediately */
-> +				return max - num_remaining;
-> +
-> +			/* Can wait, give others chance to run */
-> +			cpu_relax();
-> +		}
-> +	}
-> +
+Tested-by: Dmitry Torokhov <dtor@chromium.org>
 
-It looks like you do a busy-loop around cpu_relax here if asked to wait.
-Is this intentional? I would normally expect either cond_resched() or
-some msleep() instead.
+Thanks.
 
-	Arnd
+-- 
+Dmitry
