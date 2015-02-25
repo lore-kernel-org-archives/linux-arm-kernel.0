@@ -1,57 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Feb 2015 14:42:08 +0000
-Subject: [PATCH] ARM: dma-mapping: support non-consistent DMA attribute
-In-Reply-To: <CAD8Lp46de18aC+6cQUyn3hZV3HhLHNMsOuxSoQVg+5hU7vPMdA@mail.gmail.com>
-References: <1424810703-20382-1-git-send-email-drake@endlessm.com>
- <16874142.jSTJ8OZePS@wuerfel>
- <CAD8Lp46KOQZMJqiqudE_0nvpaHgYxpD0qCeM2r8ZOgfzJUo6dA@mail.gmail.com>
- <20150225141846.GZ8656@n2100.arm.linux.org.uk>
- <CAD8Lp46de18aC+6cQUyn3hZV3HhLHNMsOuxSoQVg+5hU7vPMdA@mail.gmail.com>
-Message-ID: <20150225144208.GA8656@n2100.arm.linux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 25 Feb 2015 14:47:02 +0000
+Subject: [PATCH v2] arm64: mm: increase VA range of identity map
+In-Reply-To: <20150225142454.GH12377@arm.com>
+References: <1424797703-2804-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150225140130.GF12377@arm.com>
+ <CAKv+Gu8gYV9Zr3SS6fUda=MKo5DR_=megy1aOAkUOoc4-4RgMA@mail.gmail.com>
+ <20150225142454.GH12377@arm.com>
+Message-ID: <CAKv+Gu9Yptg_AE1hv6H+D-xXoudTNQk-vu5gkSn8=YwOnPc7hQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 08:30:38AM -0600, Daniel Drake wrote:
-> Fair enough, what you're describing does sound like a better model.
-> Thanks for explaining.
-> 
-> I'm still a little unclear on how DRM solves this particular problem
-> though. At the point when the buffer is CPU-owned, it can be mapped
-> into userspace with CPU caches enabled, right?
+On 25 February 2015 at 14:24, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Feb 25, 2015 at 02:15:52PM +0000, Ard Biesheuvel wrote:
+>> On 25 February 2015 at 14:01, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Tue, Feb 24, 2015 at 05:08:23PM +0000, Ard Biesheuvel wrote:
+>> >> +static inline void __cpu_set_tcr_t0sz(u64 t0sz)
+>> >> +{
+>> >> +     unsigned long tcr;
+>> >> +
+>> >> +     if (!IS_ENABLED(CONFIG_ARM64_VA_BITS_48)
+>> >> +         && unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS)))
+>> >> +             asm volatile(
+>> >> +             "       mrs     %0, tcr_el1             ;"
+>> >> +             "       bfi     %0, %1, #%2, #%3        ;"
+>> >
+>> > It's odd that you need these '#'s. Do you see issues without them?
+>> >
+>>
+>> I actually haven't tried without them. I can remove them if you prefer
+>
+> Yes, please.
+>
+>> >> +             "       msr     tcr_el1, %0             ;"
+>> >> +             "       isb"
+>> >> +             : "=&r" (tcr)
+>> >> +             : "r"(t0sz), "I"(TCR_T0SZ_OFFSET), "I"(TCR_TxSZ_WIDTH));
+>> >> +}
+>> >
+>> > Hmm, do we need a memory clobber here, or can we rely on the caller doing
+>> > having the appropriate compiler barriers?
+>> >
+>>
+>> The TCR_EL1 update only affects the lower TTBR0 mapping, so I don't
+>> think it would matter in this particular case if any memory accesses
+>> are reordered across it, would it?
+>
+> What if those accesses were intended for the identity mapping and ended
+> up being translated with stale user mappings? It could be that the
+> preempt_disable() is enough, but if so, a comment would be helpful.
+>
 
-Whether a buffer is mapped or not is an entirely separate issue.
-We have many cases where the kernel has the buffer mapped into its
-lowmem region while the device is doing DMA.  Having a buffer mapped
-into userspace is no different.
+Sorry, I don't quite follow. First of all, if that concern is valid,
+then it is equally valid without this patch. This just updates TCR_EL1
+in places where we were already assigning TTBR0_EL1 a new value.
+(Although I am not saying that means it is not my problem if there is
+an issue here.)
 
-What DRM can do is track the state of the buffer: the DRM model is that
-you talk to the GPU through DRM, which means that you submit a command
-stream, along with identifiers for the buffers you want the command
-stream to operate on.
+The function cpu_set_default_tcr_t0sz() is called from paging_init()
+and secondary_start_kernel() to set the default T0SZ value after
+having deactivated the ID map. Catalin made a point about how to order
+those operations wrt the TLB flush, and I am pretty sure the compiler
+emits the asm() blocks in program order. In either case, there is no
+user mapping, just the old mapping (the ID map) and the new invalid
+mapping (the zero page). IIUC, we would only need compiler barriers
+here to prevent it from deferring a read via the ID map until it has
+already been deactivated, if such a read was present in the code.
 
-DRM can then scan the state of those buffers, and perform the appropriate
-DMA API operation on the buffers to flip them over to device ownership.
+Then there is setup_mm_for_reboot() [which may be dead code, I think?
+It is only called from soft_restart() which doesn't seem to have any
+callers itself], which just reads some global kernel vars.
 
-When userspace wants to access the buffer later, it needs to ask DRM
-whether the buffer is safe to access - this causes DRM to check whether
-the buffer is still being used for a render operation, and can then
-flip the buffer back to CPU ownership.
-
-The idea that a buffer needs to be constantly mapped and unmapped in
-userspace would create its own problems: there is a cost to setting up
-and tearing down the mappings.
-
-As with anything performance related, the less work you can do, the faster
-you will appear to be: that applies very much here.  If you can avoid
-having to setup and tear down mappings, if you can avoid having to do
-cache maintanence all the time, you will gain extra performance quite
-simply because you're not wasting CPU cycles doing stuff which is not
-absolutely necessary.
-
-I would put some of this into practice with etnaviv-drm, but I've decided
-to walk away from that project and just look after the work which I once
-did on it as a fork.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Apologies if I am being thick here
