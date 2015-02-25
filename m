@@ -1,50 +1,94 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Wed, 25 Feb 2015 08:30:38 -0600
-Subject: [PATCH] ARM: dma-mapping: support non-consistent DMA attribute
-In-Reply-To: <20150225141846.GZ8656@n2100.arm.linux.org.uk>
-References: <1424810703-20382-1-git-send-email-drake@endlessm.com>
- <16874142.jSTJ8OZePS@wuerfel>
- <CAD8Lp46KOQZMJqiqudE_0nvpaHgYxpD0qCeM2r8ZOgfzJUo6dA@mail.gmail.com>
- <20150225141846.GZ8656@n2100.arm.linux.org.uk>
-Message-ID: <CAD8Lp46de18aC+6cQUyn3hZV3HhLHNMsOuxSoQVg+5hU7vPMdA@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 25 Feb 2015 06:31:09 -0800
+Subject: [PATCH] ARM: Kirkwood: enable GPIO fan alarm support for 2Big
+ Network v2
+In-Reply-To: <20150225123632.GW1509@kw.sim.vm.gnt>
+References: <1424696523-14855-1-git-send-email-simon.guinot@sequanux.org>
+ <54EB34F3.4000500@roeck-us.net> <20150223144049.GU1509@kw.sim.vm.gnt>
+ <54EB3E0E.7070503@roeck-us.net> <20150225123632.GW1509@kw.sim.vm.gnt>
+Message-ID: <54EDDCAD.9070703@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 8:18 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
->  sg = cpu owned buffer(s)
->  /* cpu owns sg buffers and can read/write it */
->  dma_addr = dma_map_sg(dev, sg, ...);
->  /* dev owns sg buffers, it is invalid for the CPU to write to the buffer
->   * CPU writes to the buffer may very well be lost */
->  dma_sync_sg_for_cpu(dev, sg, ...);
->  /* cpu owns sg buffers, CPU can read/write buffer */
->  dma_sync_sg_for_device(dev, sg, ...);
->  /* dev owns sg buffers, it is invalid for the CPU to write to the buffer
->   * CPU writes to the buffer may very well be lost */
->  dma_unmap_sg(dev, sg, ...);
->  /* cpu owns sg buffers again */
+On 02/25/2015 04:36 AM, Simon Guinot wrote:
+> On Mon, Feb 23, 2015 at 06:49:50AM -0800, Guenter Roeck wrote:
+>> On 02/23/2015 06:40 AM, Simon Guinot wrote:
+>>> On Mon, Feb 23, 2015 at 06:10:59AM -0800, Guenter Roeck wrote:
+>>>> On 02/23/2015 05:02 AM, Simon Guinot wrote:
+>>>>> On the LaCie 2Big Network v2 (net2big_v2) board, the fan alarm is not
+>>>>> wired to the I2C fan controller but to a separe GPIO. This GPIO can be
+>>>>> controlled by using the gpio-fan driver.
+>>>>>
+>>>>> This patch adds the gpio-fan alarm description in the net2big_v2 DTS.
+>>>>>
+>>>>> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+>>>>> ---
+>>>>>   arch/arm/boot/dts/kirkwood-net2big.dts | 5 +++++
+>>>>>   1 file changed, 5 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/kirkwood-net2big.dts b/arch/arm/boot/dts/kirkwood-net2big.dts
+>>>>> index 53dc37a3b687..e4f7e497379f 100644
+>>>>> --- a/arch/arm/boot/dts/kirkwood-net2big.dts
+>>>>> +++ b/arch/arm/boot/dts/kirkwood-net2big.dts
+>>>>> @@ -27,6 +27,11 @@
+>>>>>   		device_type = "memory";
+>>>>>   		reg = <0x00000000 0x10000000>;
+>>>>>   	};
+>>>>> +
+>>>>> +	gpio_fan {
+>>>>> +		compatible = "gpio-fan";
+>>>>> +		alarm-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
+>>>>> +	};
+>>>>>   };
+>>>>>
+>>>>>   &regulators {
+>>>>>
+>>>> Again, wrong solution, and conceptually wrong as well from a dt perspective.
+>>>>
+>>>> The alarm signal should be handled by the g762 driver, and the alarm-gpios
+>>>> property should be added to the g762 description.
+>>>
+>>> OK. Then you think it would be better to add support for alarm GPIOs
+>>> support in the g762. The problem is that we should have to find a
+>>> generic way to do that. After all, we could want the very same
+>>> modification for a bunch of fan drivers.
+>>>
+>> Can't help it. After all, the interrupt handling logic is different for each chip,
+>> and there are non-DT systems out there.
+>>
+>> The g762 property should probably be something like
+>>
+>> 	g762 at 3e {
+>>                  compatible = "gmt,g762";
+>>                  reg = <0x3e>;
+>>                  clocks = <&g762_clk>;
+>> 		interrupt-parent = <&gpio0>;
+>> 		interrupts = <25 GPIO_ACTIVE_LOW>;
+>>          };
+>>
+>> struct i2c_client has an irq field, and as far as I can see it is filled in
+>> automatically from the dt node. So all the driver should have to do is to
+>> implement an interrupt handler.
 >
-> If we're wanting to do something like this in userspace, there's too much
-> chance userspace will get this ownership business wrong (we know this,
-> userspace programmers basically suck - they abuse anything we give them.)
+> Is that OK to pass a GPIO line through the "interrupts" property ?
+
+Why not ? That is how it is supposed to be used. The driver neither needs
+to know nor should know that its interrupt line is connected to a gpio pin.
+
+> Moreover it seems to me that g763 controller (compatible) supports
+> alert interrupts through SMBus. Then maybe we should save the
+> "interrupts" property for this signal ?
 >
-> It's far better to have a proper infrastructure present for things like
-> GPUs.  The good news is that we have such an infrastructure.  It's called
-> DRM, and with DRM, we track things like buffers associated with the GPU,
-> and we know which buffers the GPU should be accessing, and when the GPU
-> has finished with them.
+You lost me there. The SMBus alert signal is shared among multiple chips.
+If a system supports it, it should be connected to the alert interrupt handler
+(in i2c-smbus.c), which would handle it and pass it to a driver's alert function.
 
-Fair enough, what you're describing does sound like a better model.
-Thanks for explaining.
+> Don't you think it would be more explicit to have a separate DT
+> property (such as "gpio-alarm") and also a dedicated field in the
+> g762 platform data structure ?
+>
 
-I'm still a little unclear on how DRM solves this particular problem
-though. At the point when the buffer is CPU-owned, it can be mapped
-into userspace with CPU caches enabled, right?
-But how can DRM do that if the dma_mmap_* API is always going to map
-it as writecombine or uncached?
-Or should DRM drivers avoid that API and use remap_pfn_range()
-directly, retaining full control of pgprot flags?
+No. It would add an unnecessary dependency on gpio (or, rather, gpio
+driven interrupts) to the g762 driver, and it would limit its usability.
 
-Thanks
-Daniel
+Guenter
