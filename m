@@ -1,26 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Feb 2015 17:04:15 +0100
-Subject: [PATCH] serial: pl010 is no longer broken
-In-Reply-To: <20150225160216.GB29781@kroah.com>
-References: <3118156.gAoOHDhYSV@wuerfel> <20150225160216.GB29781@kroah.com>
-Message-ID: <12501115.8EHeHJoUSj@wuerfel>
+Date: Wed, 25 Feb 2015 17:09:41 +0100
+Subject: [PATCH v6 6/7] PCI: update dma configuration from DT
+In-Reply-To: <54EDF236.40101@ti.com>
+References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
+ <20150225015317.GO6220@google.com> <54EDF236.40101@ti.com>
+Message-ID: <4781283.CC9oFpsHLJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 February 2015 08:02:16 Greg Kroah-Hartman wrote:
-> On Wed, Feb 25, 2015 at 04:06:09PM +0100, Arnd Bergmann wrote:
-> > As more ARM platforms are moving into ARCH_MULTIPLATFORM, we can now
-> > have integrator and versatile in the same kernel, and first one selects
-> > this driver, causing a Kconfig warning:
-> > 
-> > warning: (ARCH_INTEGRATOR_AP) selects SERIAL_AMBA_PL010 which has unmet direct dependencies (TTY && HAS_IOMEM && ARM_AMBA && (BROKEN || !ARCH_VERSATILE))
-> > 
-> > It turns out that it has not been broken on versatile for a long time,
-> > so we can remove the statement here.
+On Wednesday 25 February 2015 11:03:02 Murali Karicheri wrote:
+> 
+> > (I don't know exactly how these patches all fit together, so that's
+> > probably not accurate, but that's the *sort* of thing I'd like to include.)
+> >
+> > If that actually *is* what's going on, I have to wonder why this isn't
+> > implemented as a very simple IOMMU instead of adding dma_pfn_offset,
+> > which is present on all arches but only used on ARM.  In some sense that
+> > offset is parallel but incompatible with an IOMMU: they both translate DMA
+> > addresses into system RAM addresses.
+> 
+> I don't have much history on any previous discussion on the subject you 
+> are referring to. I assume it would have happened when 
+> of_dma_configure() was first introduced. On Keystone, we don't have 
+> IOMMU support and dma_pfn_offset is needed to translate DMA address to 
+> System RAM address and vice-versa. So this has to be supported for 
+> Keystone. There can be enhancement for IOMMU with out impacting this 
+> feature for Keystone.
 
-> Is it ok if we wait for 4.1-rc1 for this, or do you think it's really ok
-> for 4.0-final?
+The direction we are taking with IOMMU in general is opposite to what Bjorn
+is suggesting: I believe what he wants to say is that we should use the
+traditional approach of having a specialized dma_map_ops implementation
+for this, just like we do for IOMMU implementations on x86, IA64 or PowerPC.
 
-It's not urgent and should just go into 4.1.
+However, with the recent explosion of IOMMU implementations on ARM, we
+are moving towards having a single dma_map_ops structure for all of them,
+and that structure does not work with the keystone hardware. Instead,
+the normal ARM dma_map_ops have been changed to handle the offset,
+which is the same thing we do on PowerPC.
 
 	Arnd
