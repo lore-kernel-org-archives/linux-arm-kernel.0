@@ -1,48 +1,53 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 25 Feb 2015 17:52:41 +0200
-Subject: [PATCH] ARM: omap-device: add missed callback for suspend-to-disk
-In-Reply-To: <20150225154445.GO11056@atomide.com>
-References: <1424873630-6054-1-git-send-email-grygorii.strashko@linaro.org>
- <20150225154445.GO11056@atomide.com>
-Message-ID: <54EDEFC9.606@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 Feb 2015 16:58:35 +0100
+Subject: [RFC PATCH] arm: asm/cmpxchg.h: Add support half-word xchg()
+In-Reply-To: <1424878581-11701-1-git-send-email-bobby.prani@gmail.com>
+References: <1424878581-11701-1-git-send-email-bobby.prani@gmail.com>
+Message-ID: <3465519.0ga9zC7F7b@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2015 05:44 PM, Tony Lindgren wrote:
-> * grygorii.strashko at linaro.org <grygorii.strashko@linaro.org> [150225 06:17]:
->> From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
->>
->> Add missed callback needed for supporting suspend-to-disk (hibernation) mode.
->
-> Is this needed as a fix for the -rc series or are there still
-> other missing dependencies?
->
+On Wednesday 25 February 2015 10:36:20 Pranith Kumar wrote:
+> This patch adds support for a half-word xchg() for ARM using ldrexh/strexh
+> instructions. It also fixes an asm comment  for __cmpxchg2.
+> 
+> Currently using a half-word xchg() results in the following splat on an ARMv7
+> machine.
+> 
+> [   45.833303] xchg: bad data size: pc 0xbe806020, ptr 0xeb18deee, size 2
+> [   45.833324] ------------[ cut here ]------------
+> [   45.837939] kernel BUG at /dvs/git/dirty/git-master_linux/kernel/arch/arm/kernel/traps.c:727!
+> 
+> Signed-off-by: Pranith Kumar <bobby.prani@gmail.com>
 
-This one is not critical fix.
+Unfortunately, the BUG message seems incomplete, can you reproduce this
+with CONFIG_DEBUG_BUGVERBOSE enabled?
 
->
->> Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
->> ---
->>   arch/arm/mach-omap2/omap_device.c | 3 +++
->>   1 file changed, 3 insertions(+)
->>
->> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
->> index fcd2c9e..345e18e 100644
->> --- a/arch/arm/mach-omap2/omap_device.c
->> +++ b/arch/arm/mach-omap2/omap_device.c
->> @@ -739,6 +739,9 @@ struct dev_pm_domain omap_device_pm_domain = {
->>   		USE_PLATFORM_PM_SLEEP_OPS
->>   		.suspend_noirq = _od_suspend_noirq,
->>   		.resume_noirq = _od_resume_noirq,
->> +		.freeze_noirq = _od_suspend_noirq,
->> +		.thaw_noirq = _od_resume_noirq,
->> +		.restore_noirq = _od_resume_noirq,
->>   	}
->>   };
->>
->> --
->> 1.9.1
->>
+>  arch/arm/include/asm/cmpxchg.h | 18 +++++++++++++++++-
+>  1 file changed, 17 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
+> index abb2c37..9505cca 100644
+> --- a/arch/arm/include/asm/cmpxchg.h
+> +++ b/arch/arm/include/asm/cmpxchg.h
+> @@ -50,6 +50,16 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+>  			: "r" (x), "r" (ptr)
+>  			: "memory", "cc");
+>  		break;
+> +	case 2:
+> +		asm volatile("@	__xchg2\n"
+> +		"1:	ldrexh	%0, [%3]\n"
+> +		"	strexh	%1, %2, [%3]\n"
+> +		"	teq	%1, #0\n"
+> +		"	bne	1b"
+> +			: "=&r" (ret), "=&r" (tmp)
+> +			: "r" (x), "r" (ptr)
+> +			: "memory", "cc");
+> +		break;
+>  	case 4:
+>  		asm volatile("@	__xchg4\n"
+>  		"1:	ldrex	%0, [%3]\n"
 
-regards,
--grygorii
+Does this work on all ARMv6 or just ARMv6k?
+
+	Arnd
