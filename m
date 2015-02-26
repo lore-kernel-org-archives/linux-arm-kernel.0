@@ -1,100 +1,48 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 26 Feb 2015 13:10:27 +0000
-Subject: [PATCH v2 8/8] ARM: STi: DT: STiH407: Add dt nodes for sdhci and emmc.
-In-Reply-To: <1424956227-18258-1-git-send-email-peter.griffin@linaro.org>
-References: <1424956227-18258-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1424956227-18258-9-git-send-email-peter.griffin@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 26 Feb 2015 14:12:01 +0100
+Subject: [PATCH] pinctrl: at91: move lock/unlock_as_irq calls into
+ request/release resources methods
+In-Reply-To: <95765FA2-E9BF-4A66-B46D-2491869B0A14@jcrosoft.com>
+References: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
+ <BC36A77B-9986-495E-8F86-C80E9D0F0C63@jcrosoft.com>
+ <95765FA2-E9BF-4A66-B46D-2491869B0A14@jcrosoft.com>
+Message-ID: <20150226141201.670e6e18@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The nodes have been split to allow as much commonality as possible.
-The stih407 has a silicon bug with eMMC UHS modes (with top regs)
-and as such doesn't have any of the uhs dt properties.
+On Fri, 20 Feb 2015 15:50:36 +0800
+Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- arch/arm/boot/dts/stih407-family.dtsi | 30 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/stih410-b2120.dts   | 10 ++++++++++
- arch/arm/boot/dts/stihxxx-b2120.dtsi  |  8 ++++++++
- 3 files changed, 48 insertions(+)
+> 
+> > On Feb 9, 2015, at 10:50 PM, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> > 
+> > 
+> >> On Feb 9, 2015, at 2:23 AM, Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> >> 
+> >> The gpiochip_lock_as_irq call can fail and return an error, while the
+> >> irq_startup is not expected to fail (returns an unsigned int which is not
+> >> checked by irq core code).
+> >> 
+> >> irq_request/release_resources functions have been created to address this
+> >> problem.
+> >> 
+> >> Move gpiochip_lock/unlock_as_irq calls into
+> >> irq_request/release_resources functions to prevent using a gpio as an irq
+> >> if the gpiochip_lock_as_irq call failed.
+> >> 
+> >> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> >> ?
+> > 
+> > I?m travelling will take a look end of the week
+> 
+> just get back from travelling will take a look after Chinese new year
+> as all my hw are at the office
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index c06a546..77614a5 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -336,5 +336,35 @@
- 				resets = <&softreset STIH407_MIPHY2_SOFTRESET>;
- 			};
- 		};
-+
-+		mmc0: sdhci at 09060000 {
-+			compatible = "st,sdhci-stih407", "st,sdhci";
-+			status = "disabled";
-+			reg = <0x09060000 0x7ff>, <0x9061008 0x20>;
-+			reg-names = "mmc", "top-mmc-delay";
-+			interrupts = <GIC_SPI 92 IRQ_TYPE_NONE>;
-+			interrupt-names = "mmcirq";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_mmc0>;
-+			clock-names = "mmc";
-+			clocks = <&clk_s_c0_flexgen CLK_MMC_0>;
-+			bus-width = <8>;
-+			non-removable;
-+		};
-+
-+		mmc1: sdhci at 09080000 {
-+			compatible = "st,sdhci-stih407", "st,sdhci";
-+			status = "disabled";
-+			reg = <0x09080000 0x7ff>;
-+			reg-names = "mmc";
-+			interrupts = <GIC_SPI 90 IRQ_TYPE_NONE>;
-+			interrupt-names = "mmcirq";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_sd1>;
-+			clock-names = "mmc";
-+			clocks = <&clk_s_c0_flexgen CLK_MMC_1>;
-+			resets = <&softreset STIH407_MMC1_SOFTRESET>;
-+			bus-width = <4>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/stih410-b2120.dts b/arch/arm/boot/dts/stih410-b2120.dts
-index 2f61a99..16f02c5 100644
---- a/arch/arm/boot/dts/stih410-b2120.dts
-+++ b/arch/arm/boot/dts/stih410-b2120.dts
-@@ -26,4 +26,14 @@
- 	aliases {
- 		ttyAS0 = &sbc_serial0;
- 	};
-+
-+	soc {
-+
-+		mmc0: sdhci at 09060000 {
-+			max-frequency = <200000000>;
-+			sd-uhs-sdr50;
-+			sd-uhs-sdr104;
-+			sd-uhs-ddr50;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-index c1d8590..64fa0b5 100644
---- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
-+++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-@@ -47,6 +47,14 @@
- 			status = "okay";
- 		};
- 
-+		mmc0: sdhci at 09060000 {
-+			status = "okay";
-+		};
-+
-+		mmc1: sdhci at 09080000 {
-+			status = "okay";
-+		};
-+
- 		/* SSC11 to HDMI */
- 		hdmiddc: i2c at 9541000 {
- 			status = "okay";
+Ping
+
+
+
 -- 
-1.9.1
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
