@@ -1,48 +1,90 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 26 Feb 2015 16:10:15 -0600
-Subject: [PATCH 0/2] Add SCM warmboot support for QCOM SoCs
-In-Reply-To: <1424904852-12719-1-git-send-email-lina.iyer@linaro.org>
-References: <1424904852-12719-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <24986C4E-2DED-456F-A1D3-E52037540E01@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 26 Feb 2015 14:08:17 -0800
+Subject: [PATCH 2/3] soc: ti: Add wkup_m3_ipc driver
+In-Reply-To: <54EF7B90.3050702@ti.com>
+References: <1420228817-41310-1-git-send-email-d-gerlach@ti.com>
+ <1420228817-41310-3-git-send-email-d-gerlach@ti.com>
+ <20150102201643.GE4920@saruman> <54AB14E4.2010607@ti.com>
+ <20150105225134.GN4081@atomide.com> <54EF7B90.3050702@ti.com>
+Message-ID: <20150226220817.GR11056@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Feb 25, 2015, at 4:54 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
-
-> Hi,
+* Dave Gerlach <d-gerlach@ti.com> [150226 12:05]:
+> Tony,
+> On 01/05/2015 04:51 PM, Tony Lindgren wrote:
+> > * Dave Gerlach <d-gerlach@ti.com> [150105 14:51]:
+> >> Felipe,
+> >> On 01/02/2015 02:16 PM, Felipe Balbi wrote:
+> >>> On Fri, Jan 02, 2015 at 02:00:16PM -0600, Dave Gerlach wrote:
+> >>>> Introduce a wkup_m3_ipc driver to handle communication between the MPU
+> >>>> and Cortex M3 wkup_m3 present on am335x.
+> >>>>
+> >>>> This driver is responsible for actually booting the wkup_m3_rproc and
+> >>>> also handling all IPC which is done using the IPC registers in the control
+> >>>> module, a mailbox, and a separate interrupt back from the wkup_m3. A small
+> >>>> API is exposed for executing specific power commands, which include
+> >>>> configuring for low power mode, request a transition to a low power mode,
+> >>>> and status info on a previous transition.
+> >>>>
+> >>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> >>>> ---
+> >>>>  drivers/soc/ti/Kconfig       |  11 ++
+> >>>>  drivers/soc/ti/Makefile      |   1 +
+> >>>>  drivers/soc/ti/wkup_m3_ipc.c | 451 +++++++++++++++++++++++++++++++++++++++++++
+> >>>>  include/linux/wkup_m3_ipc.h  |  33 ++++
+> >>>>  4 files changed, 496 insertions(+)
+> >>>>  create mode 100644 drivers/soc/ti/wkup_m3_ipc.c
+> >>>>  create mode 100644 include/linux/wkup_m3_ipc.h
+> >>>>
+> >>>> diff --git a/drivers/soc/ti/Kconfig b/drivers/soc/ti/Kconfig
+> >>>> index 7266b21..61cda85 100644
+> >>>> --- a/drivers/soc/ti/Kconfig
+> >>>> +++ b/drivers/soc/ti/Kconfig
+> >>>> @@ -28,4 +28,15 @@ config KEYSTONE_NAVIGATOR_DMA
+> >>>>  
+> >>>>  	  If unsure, say N.
+> >>>>  
+> >>>> +config WKUP_M3_IPC
+> >>>> +	bool "TI AM33XX Wkup-M3 IPC Driver"
+> >>>
+> >>> tristate ?
+> >>
+> >> If we want to allow this and the rproc driver to be built as modules than we can
+> >> change this.
+> > 
+> > Yes please, the PM is never needed early, and should be optional.
+> > And doing that will make it a lot easier for you to do further work
+> > on your driver ;)
+> > 
+> > And it will also make it easier to add support for other SoCs as
+> > it seems the same M3 is used at least on am437x.
+> >  
 > 
-> These patches used to be part of my cpuidle patchset, think these can go in
-> independently.
-> 
-> The patches do the following -
-> 
-> 1. Add QCOM Secure Monitor specific enumeration for warm boot on qcom targets
-> 2. Add an API to set up the warmboot address. Consolidate the warm boot flags
-> into the implementation file 
-> 
-> Thanks,
-> Lina
-> 
-> Lina Iyer (2):
->  ARM: qcom: Add SCM warmboot flags for quad core targets.
->  qcom: scm: Add scm_set_warm_boot_addr function
-> 
-> arch/arm/mach-qcom/scm-boot.c | 38 ++++++++++++++++++++++++++++++++++++++
-> arch/arm/mach-qcom/scm-boot.h |  5 +++--
-> 2 files changed, 41 insertions(+), 2 deletions(-)
+> I can not build the PM code as a module at this time due to many mach-omap
+> function calls it uses which are not exported, so I need handles to all five
+> functions in this driver used in pm33xx to call from built-in PM code. Do you
+> have a preference on how these function handles get passed?
 
-Lina,
+OK, you can pass the function pointers in platform_data. Care to
+list those functions? That might allow us to make other omap PM
+code into loadable modules in drivers/* :)
+ 
+> I currently have added a pdata-quirks implementation that passes a function to
+> the wkup_m3_ipc driver through it's pdata which it then calls at probe to pass a
+> struct containing all used function pointers to the pm code that were previously
+> called directly. Is that what you would prefer or something else? I had also
+> looked at making the struct of function pointers in the driver global and just
+> picking it up from the pm code with an extern declaration or even putting a bus
+> notifier in the PM code and watching for the wkup_m3_ipc driver to be bound.
 
-Do you mind rebasing these patches on my recent SCM cleanup set.  You find it at:
+Yeah pdata-quirks.c is probably OK for populating the function pointers.
+We may have already some place in the PM code to pass it too.
+ 
+> Thought I would see what you prefer and possibly avoid an unnecessary re-spin.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git qcom/scm-cleanup
+Sounds like we're getting close to getting am335x/am437x PM code working :)
 
-thanks
+Regards,
 
-- k
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Tony
