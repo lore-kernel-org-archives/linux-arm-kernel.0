@@ -1,31 +1,60 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 26 Feb 2015 09:41:42 +0100
-Subject: [PATCH 12/32] ARM: shmobile: r8a7794: Add DMAC devices to DT
-In-Reply-To: <bd8474853f9de32a963fb06569552833f756b63d.1424849129.git.horms+renesas@verge.net.au>
-References: <cover.1424849129.git.horms+renesas@verge.net.au>
- <bd8474853f9de32a963fb06569552833f756b63d.1424849129.git.horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdW0Otk9v4M6kQYNg16a80ZJ9UMY37CxywJwmLXyNp0ZJA@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 26 Feb 2015 17:42:38 +0900
+Subject: [PATCH v4 2/8] arm64: dts: exynos: Add dts files for 64-bit
+ Exynos5433 SoC
+In-Reply-To: <54EED6E1.4060908@samsung.com>
+References: <1424755011-15999-1-git-send-email-cw00.choi@samsung.com>
+ <7412525.l6YnQcTxtg@wuerfel> <54EC5AB1.5090802@samsung.com>
+ <6850624.bdB2Ab6zJx@wuerfel> <54EED6E1.4060908@samsung.com>
+Message-ID: <54EEDC7E.9010406@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 7:21 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
->
-> Instantiate the two system DMA controllers in the r8a7794 device tree.
->
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Hi Arnd,
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On 02/26/2015 05:18 PM, Chanwoo Choi wrote:
+> On 02/24/2015 08:59 PM, Arnd Bergmann wrote:
+>> On Tuesday 24 February 2015 20:04:17 Chanwoo Choi wrote:
+>>> On 02/24/2015 06:48 PM, Arnd Bergmann wrote:
+>>>> On Tuesday 24 February 2015 17:52:01 Chanwoo Choi wrote:
+>>>>>
+>>>>> But, I have a question.
+>>>>> If we put the aliases into the board dts file instaed of SoC dtsi,
+>>>>> each board dts file may use the different alias name about same phandle.
+>>>>
+>>>> Yes, that is the idea. In particular with the uarts, the intention is
+>>>> that the numbering of the device nodes in /dev is the same that is
+>>>> printed on the board (if any), which may be different from the numbering
+>>>> internal to the SoC.
+>>>
+>>> I check the uart device with Exynos5433 SoC based on Linux 4.0-rc1
+>>> If some board use the serial_0 and serial_3 as following in board dtsi,
+>>>
+>>>         &serial_0 {             --> UART 0 device
+>>>                 status = "okay";
+>>>         };
+>>>
+>>>         &serial_3 {             --> UART 3 device
+>>>                 status = "okay";
+>>>         };
+>>>
+>>> The serial core driver create the follwoing /dev/ttySACx device node
+>>> by using the number of alias. It maintain the same device number of internel to the SoC.
+>>>
+>>>         root at localhost:~# ls /dev/ttySAC
+>>>         ttySAC1  ttySAC3  
+>>>
+>>
 
-Gr{oetje,eeting}s,
+[snip]
 
-                        Geert
+> 
+> So, I change the kernel command line about ('console' bootparam) as following:
+> because tty framework must use the 'console' bootparam to print kernel log.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+I fix the my wrong expression. Some tty driver use the 'console' bootparam.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+[snip]
+
+Thanks,
+Chanwoo Choi
