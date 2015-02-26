@@ -1,46 +1,72 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Thu, 26 Feb 2015 13:20:17 -0800
-Subject: [PATCH 01/12] ARM: dts: apq8064: add RPM regulators support
-In-Reply-To: <54EF7DFD.9020609@codeaurora.org>
-References: <424678035-12862-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424678093-12966-1-git-send-email-srinivas.kandagatla@linaro.org>
- <54EF748B.3090404@codeaurora.org> <54EF7D74.7060906@linaro.org>
- <54EF7DFD.9020609@codeaurora.org>
-Message-ID: <CAJAp7OjYicY2dZ3V9n_dGS_V3EPjH4SrniqOUBxdZn+EmyW7gw@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 26 Feb 2015 22:52:16 +0100
+Subject: [PATCH v2] drivers: cpuidle: cpuidle-arm64: include
+ asm/proc-fns.h explicitly
+In-Reply-To: <20150226182307.GD17949@e104818-lin.cambridge.arm.com>
+References: <20150226182307.GD17949@e104818-lin.cambridge.arm.com>
+Message-ID: <1948746.jvG4VxQvP1@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 12:11 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 02/26/15 12:09, Srinivas Kandagatla wrote:
->>
->>
->> On 26/02/15 19:31, Stephen Boyd wrote:
->>> On 02/22/15 23:54, Srinivas Kandagatla wrote:
->>>> +            pm8921_s5: pm8921-s5 {
->>>> +                compatible    = "qcom,rpm-pm8921-ftsmps";
->>>> +                reg        = <QCOM_RPM_PM8921_SMPS5>;
->>>> +            };
->>>> +
->>>> +            pm8921_s6: pm8921-s6 {
->>>> +                compatible    = "qcom,rpm-pm8921-ftsmps";
->>>> +                reg        = <QCOM_RPM_PM8921_SMPS6>;
->>>> +            };
->>>> +
->>>
->>> There's no RPM control for S5 and S6. Please remove. Also, has this been
->>> tested?
->>>
->> Ahh. these are SAW regulators, I will remove it from the list.
->> Obviously, I did not test all the regulators.
->
-> There are some more that don't seem to match what we have downstream.
-> L26 is also SAW related, and the usb and hdmi switches are "locally"
-> controlled via ssbi pmic writes.
->
+On Thursday, February 26, 2015 06:23:07 PM Catalin Marinas wrote:
+> On Wed, Feb 25, 2015 at 01:11:40PM +0000, Will Deacon wrote:
+> > On Wed, Feb 25, 2015 at 12:59:42PM +0000, Lorenzo Pieralisi wrote:
+> > > ARM64 CPUidle driver requires the cpu_do_idle function so that it can
+> > > be used to enter the shallowest idle state, and it is declared in
+> > > asm/proc-fns.h.
+> > > 
+> > > The current ARM64 CPUidle driver does not include asm/proc-fns.h
+> > > explicitly and it has so far relied on implicit inclusion from other
+> > > header files.
+> > > 
+> > > Owing to some header dependencies reshuffling this currently triggers
+> > > build failures when CONFIG_ARM64_64K_PAGES=y:
+> > > 
+> > > drivers/cpuidle/cpuidle-arm64.c: In function "arm64_enter_idle_state"
+> > > drivers/cpuidle/cpuidle-arm64.c:42:3: error: implicit declaration of
+> > > function "cpu_do_idle" [-Werror=implicit-function-declaration]
+> > >    cpu_do_idle();
+> > >    ^
+> > > 
+> > > This patch adds the explicit inclusion of the asm/proc-fns.h header file
+> > > to fix the build breakage and stop relying on implicit asm/proc-fns.h
+> > > inclusion.
+> > > 
+> > > Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> > > [lp: rewrote commit log]
+> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Tested-by: Mark Rutland <mark.rutland@arm.com>
+> > > ---
+> > > v2 changes:
+> > 
+> > Acked-by: Will Deacon <will.deacon@arm.com>
+> > 
+> > Catalin will pick this up for -rc2, I suspect.
+> 
+> I can merge this as long as Daniel or Rafael are fine with it.
 
-According to msm-3.4 all three are controlled by pm8xxx-regulator, but
-they are also exposed through the RPM - which I think I tested (a year
-ago or so).
+I am, thanks!
 
-Regards,
-Bjorn
+> > > - Picked up
+> > >   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325523.html
+> > > - Rebased against 4.0-rc1 and rewrote commit log
+> > > 
+> > >  drivers/cpuidle/cpuidle-arm64.c | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > > 
+> > > diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
+> > > index 39a2c62..c8bb6c5 100644
+> > > --- a/drivers/cpuidle/cpuidle-arm64.c
+> > > +++ b/drivers/cpuidle/cpuidle-arm64.c
+> > > @@ -19,6 +19,7 @@
+> > >  #include <linux/of.h>
+> > >  
+> > >  #include <asm/cpuidle.h>
+> > > +#include <asm/proc-fns.h>
+> > >  
+> > >  #include "dt_idle_states.h"
+> > >  
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
