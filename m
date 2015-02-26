@@ -1,42 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 26 Feb 2015 11:35:04 +0000
-Subject: [PATCH v3] arm64: mm: increase VA range of identity map
-In-Reply-To: <20150226112717.GA17992@localhost>
-References: <1424942215-5505-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150226112717.GA17992@localhost>
-Message-ID: <CAKv+Gu-uDbdi-3SN=obibs+iD+KJEj9s3tseseXY3vDGT26cRg@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 26 Feb 2015 20:35:18 +0900
+Subject: [PATCH 0/3] thermal: exynos: Add support for Exynos5433 TMU
+Message-ID: <1424950521-6236-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2015 at 11:27, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Feb 26, 2015 at 09:16:55AM +0000, Ard Biesheuvel wrote:
->> The page size and the number of translation levels, and hence the supported
->> virtual address range, are build-time configurables on arm64 whose optimal
->> values are use case dependent. However, in the current implementation, if
->> the system's RAM is located at a very high offset, the virtual address range
->> needs to reflect that merely because the identity mapping, which is only used
->> to enable or disable the MMU, requires the extended virtual range to map the
->> physical memory at an equal virtual offset.
->>
->> This patch relaxes that requirement, by increasing the number of translation
->> levels for the identity mapping only, and only when actually needed, i.e.,
->> when system RAM's offset is found to be out of reach at runtime.
->>
->> Tested-by: Laura Abbott <lauraa@codeaurora.org>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> The patch looks fine to me, though most likely for 4.1; in the meantime:
->
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->
+This patch add the support for Exynos5433 TMU (Thermal Management Unit).
+Exynos5433 TMU includes five sensors as following and each sensor support the
+eight rising/falling interrupt according to threshold value. Exynos5433 TMU has
+a little difference register map from Exynos4/Exynos7.
+- two temperature sensor for Cortex-A57 (ATLAS)
+- one temperature sensor for Cortex-A53 (APOLLO)
+- one temperature sensor for G3D IP
+- one temperature sensor for ISP IP
 
-Thanks. Either 4.0 or 4.1 is fine by me.
+Depends on:
+[1] [PATCH v4 0/8] arm64: Add the support for new Exynos5433 SoC
+    - https://lkml.org/lkml/2015/2/24/2
+[2] [PATCH v2 0/2] thermal: exynos: Fix NULL pointer error and bug of PD_DET_EN of Exynos7
+    - https://lkml.org/lkml/2015/2/23/778
 
-> Do you plan to look at the KVM aspect as well or we leave it with the
-> KVM maintainers?
->
+Chanwoo Choi (3):
+  thermal: exynos: Add the support for Exynos5433 TMU
+  arm64: dts: exynos: Add TMU sensor dt node for Exynos5433 SoC
+  arm64: dts: exynos: Add thermal-zones dt node for Exynos5433 SoC
 
-I am looking into that atm.
+ .../dts/exynos/exynos5433-tmu-sensor-conf.dtsi     |  22 ++
+ arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi     | 231 +++++++++++++++++++++
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi         |  56 +++++
+ drivers/thermal/samsung/exynos_tmu.c               | 161 +++++++++++++-
+ drivers/thermal/samsung/exynos_tmu.h               |   1 +
+ 5 files changed, 466 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
 
 -- 
-Ard.
+1.8.5.5
