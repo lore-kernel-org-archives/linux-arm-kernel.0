@@ -1,51 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 15:22:33 +0900
-Subject: [PATCH 4/4] ARM: shmobile: r8a7779: Remove redundant cpu_disable
- implementation
-In-Reply-To: <cover.1424931049.git.horms+renesas@verge.net.au>
-References: <cover.1424931049.git.horms+renesas@verge.net.au>
-Message-ID: <fd9454ab51fa92f43ae5b7a71c42f2ee8417c2a2.1424931049.git.horms+renesas@verge.net.au>
+Date: Thu, 26 Feb 2015 15:22:41 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.1
+Message-ID: <cover.1424931398.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-By default only the non-boot CPUs can be hotplugged if the
-smp_operations structure doesn't have the cpu_disable function
-pointer set. r8a7779_cpu_disable() implements the same logic,
-only non-boot CPUs can be hotplugged, so it's redundant to
-override the default behavior.
+Please consider these Renesas ARM based SoC updates for v4.1.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Acked-by: Magnus Damm <damm+renesas@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/smp-r8a7779.c | 7 -------
- 1 file changed, 7 deletions(-)
+Some of these changes are arguably cleanups and could have
+been queued up in the soc-cleanups-for-v4.1 branch. However,
+I am reluctant to reshuffle things between branches at this point.
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index 9fc280e..01f792f 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -124,19 +124,12 @@ static int r8a7779_cpu_kill(unsigned int cpu)
- 
- 	return 0;
- }
--
--static int r8a7779_cpu_disable(unsigned int cpu)
--{
--	/* only CPU1->3 have power domains, do not allow hotplug of CPU0 */
--	return cpu == 0 ? -EPERM : 0;
--}
- #endif /* CONFIG_HOTPLUG_CPU */
- 
- struct smp_operations r8a7779_smp_ops  __initdata = {
- 	.smp_prepare_cpus	= r8a7779_smp_prepare_cpus,
- 	.smp_boot_secondary	= r8a7779_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
--	.cpu_disable		= r8a7779_cpu_disable,
- 	.cpu_die		= shmobile_smp_scu_cpu_die,
- 	.cpu_kill		= r8a7779_cpu_kill,
- #endif
--- 
-2.1.4
+
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+
+  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v4.1
+
+for you to fetch changes up to 72016d009e6bcf6cb6a289382bfc21185122b22e:
+
+  ARM: shmobile: r8a7740: Remove restart callback (2015-02-24 08:02:49 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Updates for v4.1
+
+* Remove restart callback from r8a7740 SoC
+* Add support SOC_BUS to R-Car Gen2
+* Expose SoCs revision data for R-Car Gen2
+* Remove check for CONFIG_COMMON_CLK from R-Car Gen2 code as it is always set
+* Allow R-Car Gen2 platforms to boot with CMA enabled and HIGHMEM disabled
+
+----------------------------------------------------------------
+Geert Uytterhoeven (2):
+      ARM: shmobile: R-Car Gen2: CONFIG_COMMON_CLK is always set
+      ARM: shmobile: r8a7740: Remove restart callback
+
+Magnus Damm (1):
+      ARM: shmobile: No R-Car Gen2 CMA reservation when HIGHMEM=n
+
+Nobuhiro Iwamatsu (2):
+      ARM: shmobile: Add function to get SoCs revision data for R-Car Gen2
+      ARM: shmobile: Add support SOC_BUS to R-Car Gen2
+
+ arch/arm/mach-shmobile/Kconfig           |  1 +
+ arch/arm/mach-shmobile/rcar-gen2.h       |  1 +
+ arch/arm/mach-shmobile/setup-r8a7740.c   |  8 -----
+ arch/arm/mach-shmobile/setup-r8a7790.c   |  1 +
+ arch/arm/mach-shmobile/setup-r8a7791.c   |  1 +
+ arch/arm/mach-shmobile/setup-r8a7794.c   |  1 +
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 58 +++++++++++++++++++++++++++++---
+ 7 files changed, 58 insertions(+), 13 deletions(-)
