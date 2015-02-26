@@ -1,135 +1,102 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 26 Feb 2015 07:22:05 +0000
-Subject: [PATCH] ARM: crypto: update NEON AES module to latest OpenSSL version
-Message-ID: <1424935325-14437-1-git-send-email-ard.biesheuvel@linaro.org>
+From: rjui@broadcom.com (Ray Jui)
+Date: Wed, 25 Feb 2015 23:42:44 -0800
+Subject: [PATCH v5 1/6] clk: add of_clk_get_parent_rate function
+In-Reply-To: <20150226065155.GY12209@pengutronix.de>
+References: <rjui@broadcom.com>
+ <1423097705-22939-1-git-send-email-rjui@broadcom.com>
+ <1423097705-22939-2-git-send-email-rjui@broadcom.com>
+ <20150226055406.GB28214@pengutronix.de> <54EEB97B.6080006@broadcom.com>
+ <20150226065155.GY12209@pengutronix.de>
+Message-ID: <54EECE74.8050108@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This updates the bit sliced AES module to the latest version in the
-upstream OpenSSL repository (e620e5ae37bc). This is needed to fix a
-bug in the XTS decryption path, where data chunked in a certain way
-could trigger the ciphertext stealing code, which is not supposed to
-be active in the kernel build (The kernel implementation of XTS only
-supports round multiples of the AES block size of 16 bytes, whereas
-the conformant OpenSSL implementation of XTS supports inputs of
-arbitrary size by applying ciphertext stealing). This is fixed in
-the upstream version by adding the missing #ifndef XTS_CHAIN_TWEAK
-around the offending instructions.
+On 2/25/2015 10:51 PM, Sascha Hauer wrote:
+> On Wed, Feb 25, 2015 at 10:13:15PM -0800, Ray Jui wrote:
+>> Hi Sascha,
+>>
+>> On 2/25/2015 9:54 PM, Sascha Hauer wrote:
+>>> Hi Ray,
+>>>
+>>> On Wed, Feb 04, 2015 at 04:55:00PM -0800, Ray Jui wrote:
+>>>> Sometimes a clock needs to know the rate of its parent before itself is
+>>>> registered to the framework. An example is that a PLL may need to
+>>>> initialize itself to a specific VCO frequency, before registering to the
+>>>> framework. The parent rate needs to be known, for PLL multipliers and
+>>>> divisors to be configured properly.
+>>>>
+>>>> Introduce helper function of_clk_get_parent_rate, which can be used to
+>>>> obtain the parent rate of a clock, given a device node and index.
+>>>
+>>> I can't see how this patch helps you. First it's not guaranteed that
+>>> the parent is already registered, what do you do in this case?
+>>
+>> In the case when clock parent is not found, as you can see from the
+>> code, it simply returns zero, just like other clk get rate APIs.
+> 
+> Yes, but what do you do with the 0 result then in your PLL initialization?
+> 
 
-The upstream code also contains the change applied by Russell to
-build the code unconditionally, i.e., even if __LINUX_ARM_ARCH__ < 7,
-but implemented slightly differently.
+As of the current code, it fails the PLL frequency initialization and
+bails out. Thinking about it more, it actually makes more sense to just
+warn and still go ahead to register the clock, in which case it will use
+whatever default frequency after chip power on reset or a frequency
+configured in the bootloader.
 
-Fixes: e4e7f10bfc40 ("ARM: add support for bit sliced AES using NEON instructions")
-Reported-by: Adrian Kotelba <adrian.kotelba@gmail.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
+>>
+>> I thought the order of clock registration is based on order of the clock
+>> nodes in device tree. It makes sense to me to declare the parent clock
+>> before a child clock, so it's guaranteed that the parent is registered
+>> before the child.
+> 
+> No, you can't rely on that. The order of the device nodes may happen to
+> define the order of clock initialization now, but that may change.
+> device nodes are usually ordered by bus addresses, not by intended
+> initialization order. Even if you reorder them everything must still
+> work.
+> 
 
-This was found using the tcrypt test code, to which I recently added additional
-chunking modes. However, XTS typically operates on pages or at least on sectors,
-so this bug is unlikely to affect anyone in real life.
+Okay I get your point that the order of device nodes may not be relied
+on for device initialization order. But then another mechanism should be
+deployed to give developers the option to decide on the clock
+initialization sequence. It can be optional but it should be there.
 
-Still, please add cc stable when applying,
+>>
+>>> Then the clock framework doesn't require that you initialize the PLL
+>>> before registering. That can be done in the clk ops later.
+>>
+>> Sure it's not mandatory. But what's wrong with me choosing to initialize
+>> the PLL clock to a known frequency before registering it to the framework?
+> 
+> Appearantly you don't know the (input) frequency of the PLL when
+> registering it to the framework, so the question must be: What's wrong
+> with keeping it uninitialized?
+> 
+> If the PLL is unused then you don't care about it's initialization
+> status. If it happens to be enabled by a bootloader and still unused
+> at late_initcall time the clock framework will disable it so you
+> have a known state then. If a consumer for the PLL appears it's its
+> job to initialize it through the clk api.
+> 
+> Sascha
+> 
 
-Thanks,
-Ard.
+Okay, what we need here is to initialize the PLL to a desired frequency,
+based on device tree settings (since it will be configured differently,
+among different boards). This is a PLL that 1) has limited options of
+frequencies which it can be configured to, and 2) has multiple child
+clocks, where is a more suitable place to initialize it to the desired
+frequency than right before registering it to the framework? I know a
+lot of people do it in the bootloader, but I thought we should be given
+the flexibility of configuring it in the kernel.
 
+When you say "consumers", do you mean 1) the device driver that uses the
+PLL; or 2) the device driver that use the child clock of the PLL? If
+it's case 1), then we don't really have a device driver that directly
+uses the PLL, and I thought that's quite normal, as most PLLs don't
+directly feed into any peripherals.
 
- arch/arm/crypto/aesbs-core.S_shipped | 12 ++++++++----
- arch/arm/crypto/bsaes-armv7.pl       | 12 ++++++++----
- 2 files changed, 16 insertions(+), 8 deletions(-)
+We do have multiple device drivers that use the child clocks of the PLL,
+but it makes no sense to configure the PLL clock in any of those drivers.
 
-diff --git a/arch/arm/crypto/aesbs-core.S_shipped b/arch/arm/crypto/aesbs-core.S_shipped
-index 71e5fc7cfb18..1d1800f71c5b 100644
---- a/arch/arm/crypto/aesbs-core.S_shipped
-+++ b/arch/arm/crypto/aesbs-core.S_shipped
-@@ -58,14 +58,18 @@
- # define VFP_ABI_FRAME	0
- # define BSAES_ASM_EXTENDED_KEY
- # define XTS_CHAIN_TWEAK
--# define __ARM_ARCH__	7
-+# define __ARM_ARCH__ __LINUX_ARM_ARCH__
-+# define __ARM_MAX_ARCH__ 7
- #endif
- 
- #ifdef __thumb__
- # define adrl adr
- #endif
- 
--#if __ARM_ARCH__>=7
-+#if __ARM_MAX_ARCH__>=7
-+.arch	armv7-a
-+.fpu	neon
-+
- .text
- .syntax	unified 	@ ARMv7-capable assembler is expected to handle this
- #ifdef __thumb2__
-@@ -74,8 +78,6 @@
- .code   32
- #endif
- 
--.fpu	neon
--
- .type	_bsaes_decrypt8,%function
- .align	4
- _bsaes_decrypt8:
-@@ -2095,9 +2097,11 @@ bsaes_xts_decrypt:
- 	vld1.8	{q8}, [r0]			@ initial tweak
- 	adr	r2, .Lxts_magic
- 
-+#ifndef	XTS_CHAIN_TWEAK
- 	tst	r9, #0xf			@ if not multiple of 16
- 	it	ne				@ Thumb2 thing, sanity check in ARM
- 	subne	r9, #0x10			@ subtract another 16 bytes
-+#endif
- 	subs	r9, #0x80
- 
- 	blo	.Lxts_dec_short
-diff --git a/arch/arm/crypto/bsaes-armv7.pl b/arch/arm/crypto/bsaes-armv7.pl
-index be068db960ee..a4d3856e7d24 100644
---- a/arch/arm/crypto/bsaes-armv7.pl
-+++ b/arch/arm/crypto/bsaes-armv7.pl
-@@ -701,14 +701,18 @@ $code.=<<___;
- # define VFP_ABI_FRAME	0
- # define BSAES_ASM_EXTENDED_KEY
- # define XTS_CHAIN_TWEAK
--# define __ARM_ARCH__	7
-+# define __ARM_ARCH__ __LINUX_ARM_ARCH__
-+# define __ARM_MAX_ARCH__ 7
- #endif
- 
- #ifdef __thumb__
- # define adrl adr
- #endif
- 
--#if __ARM_ARCH__>=7
-+#if __ARM_MAX_ARCH__>=7
-+.arch	armv7-a
-+.fpu	neon
-+
- .text
- .syntax	unified 	@ ARMv7-capable assembler is expected to handle this
- #ifdef __thumb2__
-@@ -717,8 +721,6 @@ $code.=<<___;
- .code   32
- #endif
- 
--.fpu	neon
--
- .type	_bsaes_decrypt8,%function
- .align	4
- _bsaes_decrypt8:
-@@ -2076,9 +2078,11 @@ bsaes_xts_decrypt:
- 	vld1.8	{@XMM[8]}, [r0]			@ initial tweak
- 	adr	$magic, .Lxts_magic
- 
-+#ifndef	XTS_CHAIN_TWEAK
- 	tst	$len, #0xf			@ if not multiple of 16
- 	it	ne				@ Thumb2 thing, sanity check in ARM
- 	subne	$len, #0x10			@ subtract another 16 bytes
-+#endif
- 	subs	$len, #0x80
- 
- 	blo	.Lxts_dec_short
--- 
-1.8.3.2
+Ray
