@@ -1,44 +1,34 @@
-From: ben@trinity.fluff.org (Ben Dooks)
-Date: Thu, 26 Feb 2015 11:25:09 +0000
-Subject: [alsa-devel] [PATCH 1/8] clk: add helper function clk_is_match()
-In-Reply-To: <1424944618.3073.6.camel@pengutronix.de>
-References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
- <1424876018-17852-2-git-send-email-shawn.guo@linaro.org>
- <20150225172757.421.43718@quantum>
- <20150226090256.GQ30445@trinity.fluff.org>
- <1424944618.3073.6.camel@pengutronix.de>
-Message-ID: <20150226112509.GR30445@trinity.fluff.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 26 Feb 2015 11:27:18 +0000
+Subject: [PATCH v3] arm64: mm: increase VA range of identity map
+In-Reply-To: <1424942215-5505-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1424942215-5505-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150226112717.GA17992@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 10:56:58AM +0100, Philipp Zabel wrote:
-> Am Donnerstag, den 26.02.2015, 09:02 +0000 schrieb Ben Dooks:
-> > On Wed, Feb 25, 2015 at 09:27:57AM -0800, Mike Turquette wrote:
-> [...]
-> > > From: Michael Turquette <mturquette@linaro.org>
-> > > Date: Wed, 25 Feb 2015 09:11:01 -0800
-> > > Subject: [PATCH] clk: introduce clk_is_match
-> > > 
-> > > Some drivers compare struct clk pointers as a means of knowing
-> > > if the two pointers reference the same clock hardware. This behavior is
-> > > dubious (drivers must not dereference struct clk), but did not cause any
-> > > regressions until the per-user struct clk patch was merged. Now the test
-> > > for matching clk's will always fail with per-user struct clk's.
-> > > 
-> > > clk_is_match is introduced to fix the regression and prevent drivers
-> > > from comparing the pointers manually.
-> > 
-> > small observaton, clk_is_same() is linguistically nicer.
+On Thu, Feb 26, 2015 at 09:16:55AM +0000, Ard Biesheuvel wrote:
+> The page size and the number of translation levels, and hence the supported
+> virtual address range, are build-time configurables on arm64 whose optimal
+> values are use case dependent. However, in the current implementation, if
+> the system's RAM is located at a very high offset, the virtual address range
+> needs to reflect that merely because the identity mapping, which is only used
+> to enable or disable the MMU, requires the extended virtual range to map the
+> physical memory at an equal virtual offset.
 > 
-> How about clk_equal() ?
+> This patch relaxes that requirement, by increasing the number of translation
+> levels for the identity mapping only, and only when actually needed, i.e.,
+> when system RAM's offset is found to be out of reach at runtime.
+> 
+> Tested-by: Laura Abbott <lauraa@codeaurora.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-That's good, the only issue that's not clear in any of these names is
-that does this mean "the same clock", a "clock of the same rate" or a
-"clock that is equivalent to in the rate and phase but not subject to
-the same gate".
+The patch looks fine to me, though most likely for 4.1; in the meantime:
 
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+
+Do you plan to look at the KVM aspect as well or we leave it with the
+KVM maintainers?
 
 -- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+Catalin
