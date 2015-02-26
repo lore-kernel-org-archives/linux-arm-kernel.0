@@ -1,38 +1,58 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 26 Feb 2015 09:21:39 +0800
-Subject: [PATCH 0/8] Fix struct clk pointer comparing
-In-Reply-To: <54EE33C5.5010701@codeaurora.org>
-References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
- <20150225150349.GB8656@n2100.arm.linux.org.uk>
- <20150225175533.421.41831@quantum>
- <54EE33C5.5010701@codeaurora.org>
-Message-ID: <20150226012121.GC20028@dragon>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 26 Feb 2015 10:22:28 +0900
+Subject: [PATCH V5 1/2] mmc: dw_mmc: exynos: Support eMMC's HS400 mode
+In-Reply-To: <CAL_Jsq+Mr=WOoCjWRnHnUqo8+UmqxxHbMG3M8+kLNgfhPASteA@mail.gmail.com>
+References: <1422499318-13726-1-git-send-email-alim.akhtar@samsung.com>
+ <1422499318-13726-2-git-send-email-alim.akhtar@samsung.com>
+ <CAL_Jsq+Mr=WOoCjWRnHnUqo8+UmqxxHbMG3M8+kLNgfhPASteA@mail.gmail.com>
+Message-ID: <54EE7554.6060506@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 12:42:45PM -0800, Stephen Boyd wrote:
-> On 02/25/15 09:55, Mike Turquette wrote:
-> > Quoting Russell King - ARM Linux (2015-02-25 07:03:49)
-> >> Case 1 applies in places like the Kirkwood I2S driver, and the iMX6
-> >> ethernet code, and it's these cases which need to be fixed.
-> >>
-> >> Case 2 applies in the Armada DRM driver, and these cases need not be
-> >> "fixed".
-> >>
-> >> To put it a different way: case 1 is when you're testing to see whether
-> >> two clocks refer to the same clock.  case 2 is when you're testing
-> >> whether the cached clk cookie is the same.
-> > It looks like patches 2, 7 and 8 are correct in this series. I'll apply
-> > them towards -rc2 if nobody objects.
-> >
-> >
+Dear, Rob.
+
+On 02/25/2015 11:38 PM, Rob Herring wrote:
+> On Wed, Jan 28, 2015 at 8:41 PM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
+>> From: Seungwon Jeon <tgih.jun@samsung.com>
+>>
+>> Implements HS400 mode support for exynos host driver.
+>> This also include some updates as new mode is added.
+>>
+>> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
+>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> [Alim: addressed review comments]
+>> ---
+>>  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    7 +
+>>  drivers/mmc/host/dw_mmc-exynos.c                   |  185 ++++++++++++++++----
+>>  drivers/mmc/host/dw_mmc-exynos.h                   |   19 +-
+>>  drivers/mmc/host/dw_mmc.c                          |   16 +-
+>>  drivers/mmc/host/dw_mmc.h                          |    2 +
+>>  5 files changed, 195 insertions(+), 34 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+>> index ee4fc05..aad9844 100644
+>> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+>> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+>> @@ -36,6 +36,8 @@ Required Properties:
+>>    in transmit mode and CIU clock phase shift value in receive mode for double
+>>    data rate mode operation. Refer notes below for the order of the cells and the
+>>    valid values.
+>> +* samsung,dw-mshc-hs400-timing: Specifies the value of CIU TX and RX clock phase
+>> +  shift value for hs400 mode operation.
 > 
-> For patch 8 can't we use the alternative patch that I came up with
-> before? I have a patch for sound/soc/fsl/fsl_esai.c and
-> drivers/pwm/pwm-atmel-hlcdc.c which I can send shortly.
+> What are the units?
 
-This beats the idea of clk_is_match() helper.  I prefer to fix this
-generic problem in a generic way, i.e. using clk_is_match(), which
-should be much easier and safer during -rc cycle.
+Do you means what is "sumsung,dw-mshci-hs400-timing" unit?
+It's timing value for eMMC/SD/SDIO clock phase.(It's exynos specific value.)
+Using timing value can shift the H/W clock phase.
+If invalid timing value is set, eMMC/SD/SDIO can produce the CRC error.
 
-Shawn
+Do you think it can't include into device-tree?
+I want to know your thinking. let me know, plz.
+
+Best Regards,
+Jaehoon Chung
+
+> 
+> Rob
+> 
