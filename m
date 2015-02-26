@@ -1,28 +1,52 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 26 Feb 2015 11:31:23 -0800
-Subject: [PATCH 01/12] ARM: dts: apq8064: add RPM regulators support
-In-Reply-To: <1424678093-12966-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <424678035-12862-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424678093-12966-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <54EF748B.3090404@codeaurora.org>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Thu, 26 Feb 2015 11:37:20 -0800
+Subject: [PATCH v2 2/2] hwrng: iproc-rng200 - Add Broadcom IPROC RNG driver
+In-Reply-To: <3062825.7b1oYP4yuL@wuerfel>
+References: <1424888184-22180-3-git-send-email-sbranden@broadcom.com>
+ <3062825.7b1oYP4yuL@wuerfel>
+Message-ID: <54EF75F0.7000901@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/15 23:54, Srinivas Kandagatla wrote:
-> +			pm8921_s5: pm8921-s5 {
-> +				compatible	= "qcom,rpm-pm8921-ftsmps";
-> +				reg		= <QCOM_RPM_PM8921_SMPS5>;
-> +			};
-> +
-> +			pm8921_s6: pm8921-s6 {
-> +				compatible	= "qcom,rpm-pm8921-ftsmps";
-> +				reg		= <QCOM_RPM_PM8921_SMPS6>;
-> +			};
-> +
+Response inline.
 
-There's no RPM control for S5 and S6. Please remove. Also, has this been
-tested?
+On 15-02-25 11:17 AM, Arnd Bergmann wrote:
+> On Wednesday 25 February 2015 10:16:24 Scott Branden wrote:
+>> This adds a driver for random number generator present on Broadcom
+>> IPROC devices.
+>>
+>> Reviewed-by: Ray Jui <rjui@broadcom.com>
+>> Signed-off-by: Scott Branden <sbranden@broadcom.com>
+>
+> The driver looks reasonable overall, I have just one question about
+> something that sticks out:
+>
+>> +	while ((num_remaining > 0) && time_before(jiffies, idle_endtime)) {
+> ...
+>> +
+>> +		/* Are there any random numbers available? */
+>> +		if ((ioread32(rng_base + RNG_FIFO_COUNT_OFFSET) &
+>> +				RNG_FIFO_COUNT_RNG_FIFO_COUNT_MASK) > 0) {
+> ...
+>> +		} else {
+>> +			if (!wait)
+>> +				/* Cannot wait, return immediately */
+>> +				return max - num_remaining;
+>> +
+>> +			/* Can wait, give others chance to run */
+>> +			cpu_relax();
+>> +		}
+>> +	}
+>> +
+>
+> It looks like you do a busy-loop around cpu_relax here if asked to wait.
+> Is this intentional? I would normally expect either cond_resched() or
+> some msleep() instead.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+This code was following examples of other open source drivers - bcm2835 
+and exynos both use cpu_relax.  I'll have to look into this more to 
+understand.
+
+>
+> 	Arnd
+>
