@@ -1,28 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 26 Feb 2015 10:21:19 -0700
-Subject: [PATCH] ARM: kexec: Relax SMP validation to improve DT
- compatibility
-In-Reply-To: <1424947028-7438-1-git-send-email-geert+renesas@glider.be>
-References: <1424947028-7438-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <54EF560F.3070805@wwwdotorg.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 26 Feb 2015 18:20:48 +0100
+Subject: [PATCH] cpuidle: mvebu: Fix the CPU PM notifier usage
+Message-ID: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2015 03:37 AM, Geert Uytterhoeven wrote:
-> When trying to kexec into a new kernel on a platform where multiple CPU
-> cores are present, but no SMP bringup code is available yet, the
-> kexec_load system call fails with:
->
->      kexec_load failed: Invalid argument
->
-> The SMP test added to machine_kexec_prepare() in commit 2103f6cba61a8b8b
-> ("ARM: 7807/1: kexec: validate CPU hotplug support") wants to prohibit
-> kexec on SMP platforms where it cannot disable secondary CPUs.
-> However, this test is too strict: if the secondary CPUs couldn't be
-> enabled in the first place, there's no need to disable them later at
-> kexec time.  Hence skip the test in the absence of SMP bringup code.
->
-> This allows to add all CPU cores to the DTS from the beginning, without
-> having to implement SMP bringup first, improving DT compatibility.
+As stated in kernel/cpu_pm.c, "Platform is responsible for ensuring
+that cpu_pm_enter is not called twice on the same CPU before
+cpu_pm_exit is called.". In the current code in case of failure when
+calling mvebu_v7_cpu_suspend, the function cpu_pm_exit() is never
+called whereas cpu_pm_enter() was called just before.
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+This patch moves the cpu_pm_exit() in order to balance the
+cpu_pm_enter() calls.
+
+Reported-by: Fulvio Benini <fbf@libero.it>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/cpuidle/cpuidle-mvebu-v7.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
+index 38e68618513a..cefa07438ae1 100644
+--- a/drivers/cpuidle/cpuidle-mvebu-v7.c
++++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
+@@ -37,11 +37,11 @@ static int mvebu_v7_enter_idle(struct cpuidle_device *dev,
+ 		deepidle = true;
+ 
+ 	ret = mvebu_v7_cpu_suspend(deepidle);
++	cpu_pm_exit();
++
+ 	if (ret)
+ 		return ret;
+ 
+-	cpu_pm_exit();
+-
+ 	return index;
+ }
+ 
+-- 
+2.1.0
