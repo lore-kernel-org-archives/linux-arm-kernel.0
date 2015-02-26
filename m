@@ -1,30 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 26 Feb 2015 10:51:17 +0100
-Subject: [PATCH] ARM: mvebu: Fix MPIC unit address
-Message-ID: <1424944277-15745-1-git-send-email-maxime.ripard@free-electrons.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 26 Feb 2015 10:56:58 +0100
+Subject: [alsa-devel] [PATCH 1/8] clk: add helper function clk_is_match()
+In-Reply-To: <20150226090256.GQ30445@trinity.fluff.org>
+References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+ <1424876018-17852-2-git-send-email-shawn.guo@linaro.org>
+ <20150225172757.421.43718@quantum>
+ <20150226090256.GQ30445@trinity.fluff.org>
+Message-ID: <1424944618.3073.6.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The unit-address is supposed to be equal the first reg address, which is not
-the case for the MPIC, that uses the mbus-controller one. Fix this.
+Am Donnerstag, den 26.02.2015, 09:02 +0000 schrieb Ben Dooks:
+> On Wed, Feb 25, 2015 at 09:27:57AM -0800, Mike Turquette wrote:
+[...]
+> > From: Michael Turquette <mturquette@linaro.org>
+> > Date: Wed, 25 Feb 2015 09:11:01 -0800
+> > Subject: [PATCH] clk: introduce clk_is_match
+> > 
+> > Some drivers compare struct clk pointers as a means of knowing
+> > if the two pointers reference the same clock hardware. This behavior is
+> > dubious (drivers must not dereference struct clk), but did not cause any
+> > regressions until the per-user struct clk patch was merged. Now the test
+> > for matching clk's will always fail with per-user struct clk's.
+> > 
+> > clk_is_match is introduced to fix the regression and prevent drivers
+> > from comparing the pointers manually.
+> 
+> small observaton, clk_is_same() is linguistically nicer.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/armada-38x.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+How about clk_equal() ?
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 1dff30a81e24..885fcee6580c 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -368,7 +368,7 @@
- 				reg = <0x20000 0x100>, <0x20180 0x20>;
- 			};
- 
--			mpic: interrupt-controller at 20000 {
-+			mpic: interrupt-controller at 20a00 {
- 				compatible = "marvell,mpic";
- 				reg = <0x20a00 0x2d0>, <0x21070 0x58>;
- 				#interrupt-cells = <1>;
--- 
-2.3.0
+regards
+Philipp
