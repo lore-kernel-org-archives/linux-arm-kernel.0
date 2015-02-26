@@ -1,46 +1,91 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 15:22:23 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Simple PM Bus Updates for v4.1
-Message-ID: <cover.1424931637.git.horms+renesas@verge.net.au>
+Date: Thu, 26 Feb 2015 15:22:20 +0900
+Subject: [PATCH 1/5] drivers: bus: Sort Kconfig entries alphabetically
+In-Reply-To: <cover.1424931637.git.horms+renesas@verge.net.au>
+References: <cover.1424931637.git.horms+renesas@verge.net.au>
+Message-ID: <13fbf3c8d0f750a52b9ddb9be7a8251789fb62b6.1424931637.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC simple PM bus updates for v4.1.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ drivers/bus/Kconfig | 44 ++++++++++++++++++++++----------------------
+ 1 file changed, 22 insertions(+), 22 deletions(-)
 
-
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-simple-pm-bus-for-v4.1
-
-for you to fetch changes up to 89d463ea106dba530786a2815fd174f9e6eab71f:
-
-  drivers: bus: Add Simple Power-Managed Bus Driver (2015-02-24 06:36:18 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Simple PM Bus Updates for v4.1
-
-* Add Simple Power-Managed Bus Driver
-
-----------------------------------------------------------------
-Geert Uytterhoeven (5):
-      drivers: bus: Sort Kconfig entries alphabetically
-      drivers: bus: Sort Makefile entries alphabetically
-      drivers: bus: Add Simple Power-Managed Bus DT Bindings
-      drivers: bus: Add Renesas Bus State Controller (BSC) DT Bindings
-      drivers: bus: Add Simple Power-Managed Bus Driver
-
- .../devicetree/bindings/bus/renesas,bsc.txt        | 46 +++++++++++++++++
- .../devicetree/bindings/bus/simple-pm-bus.txt      | 44 ++++++++++++++++
- drivers/bus/Kconfig                                | 53 ++++++++++++--------
- drivers/bus/Makefile                               | 15 +++---
- drivers/bus/simple-pm-bus.c                        | 58 ++++++++++++++++++++++
- 5 files changed, 189 insertions(+), 27 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/bus/renesas,bsc.txt
- create mode 100644 Documentation/devicetree/bindings/bus/simple-pm-bus.txt
- create mode 100644 drivers/bus/simple-pm-bus.c
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index b99729e..6269608 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -4,6 +4,21 @@
+ 
+ menu "Bus devices"
+ 
++config ARM_CCI
++	bool "ARM CCI driver support"
++	depends on ARM && OF && CPU_V7
++	help
++	  Driver supporting the CCI cache coherent interconnect for ARM
++	  platforms.
++
++config ARM_CCN
++	bool "ARM CCN driver support"
++	depends on ARM || ARM64
++	depends on PERF_EVENTS
++	help
++	  PMU (perf) driver supporting the ARM CCN (Cache Coherent Network)
++	  interconnect.
++
+ config BRCMSTB_GISB_ARB
+ 	bool "Broadcom STB GISB bus arbiter"
+ 	depends on ARM || MIPS
+@@ -27,15 +42,6 @@ config MVEBU_MBUS
+ 	  Driver needed for the MBus configuration on Marvell EBU SoCs
+ 	  (Kirkwood, Dove, Orion5x, MV78XX0 and Armada 370/XP).
+ 
+-config OMAP_OCP2SCP
+-	tristate "OMAP OCP2SCP DRIVER"
+-	depends on ARCH_OMAP2PLUS
+-	help
+-	  Driver to enable ocp2scp module which transforms ocp interface
+-	  protocol to scp protocol. In OMAP4, USB PHY is connected via
+-	  OCP2SCP and in OMAP5, both USB PHY and SATA PHY is connected via
+-	  OCP2SCP.
+-
+ config OMAP_INTERCONNECT
+ 	tristate "OMAP INTERCONNECT DRIVER"
+ 	depends on ARCH_OMAP2PLUS
+@@ -43,20 +49,14 @@ config OMAP_INTERCONNECT
+ 	help
+ 	  Driver to enable OMAP interconnect error handling driver.
+ 
+-config ARM_CCI
+-	bool "ARM CCI driver support"
+-	depends on ARM && OF && CPU_V7
+-	help
+-	  Driver supporting the CCI cache coherent interconnect for ARM
+-	  platforms.
+-
+-config ARM_CCN
+-	bool "ARM CCN driver support"
+-	depends on ARM || ARM64
+-	depends on PERF_EVENTS
++config OMAP_OCP2SCP
++	tristate "OMAP OCP2SCP DRIVER"
++	depends on ARCH_OMAP2PLUS
+ 	help
+-	  PMU (perf) driver supporting the ARM CCN (Cache Coherent Network)
+-	  interconnect.
++	  Driver to enable ocp2scp module which transforms ocp interface
++	  protocol to scp protocol. In OMAP4, USB PHY is connected via
++	  OCP2SCP and in OMAP5, both USB PHY and SATA PHY is connected via
++	  OCP2SCP.
+ 
+ config VEXPRESS_CONFIG
+ 	bool "Versatile Express configuration bus"
+-- 
+2.1.4
