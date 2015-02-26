@@ -1,35 +1,36 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 26 Feb 2015 06:54:06 +0100
-Subject: [PATCH v5 1/6] clk: add of_clk_get_parent_rate function
-In-Reply-To: <1423097705-22939-2-git-send-email-rjui@broadcom.com>
-References: <rjui@broadcom.com>
- <1423097705-22939-1-git-send-email-rjui@broadcom.com>
- <1423097705-22939-2-git-send-email-rjui@broadcom.com>
-Message-ID: <20150226055406.GB28214@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 26 Feb 2015 13:56:10 +0800
+Subject: [PATCH] ARM: vf610: use SMP_ON_UP for Vybrid SoC
+In-Reply-To: <1421795565-3370-1-git-send-email-stefan@agner.ch>
+References: <1421795565-3370-1-git-send-email-stefan@agner.ch>
+Message-ID: <20150226055609.GE20028@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ray,
-
-On Wed, Feb 04, 2015 at 04:55:00PM -0800, Ray Jui wrote:
-> Sometimes a clock needs to know the rate of its parent before itself is
-> registered to the framework. An example is that a PLL may need to
-> initialize itself to a specific VCO frequency, before registering to the
-> framework. The parent rate needs to be known, for PLL multipliers and
-> divisors to be configured properly.
+On Wed, Jan 21, 2015 at 12:12:45AM +0100, Stefan Agner wrote:
+> The Vybrid SoC has only one Cortex-A5 core and hence should select
+> the SMP_ON_UP configuration on a SMP kernel.
 > 
-> Introduce helper function of_clk_get_parent_rate, which can be used to
-> obtain the parent rate of a clock, given a device node and index.
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-I can't see how this patch helps you. First it's not guaranteed that
-the parent is already registered, what do you do in this case?
-Then the clock framework doesn't require that you initialize the PLL
-before registering. That can be done in the clk ops later.
+Applied, thanks.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> ---
+>  arch/arm/mach-imx/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index e8627e0..b8d3ccd 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -634,6 +634,7 @@ config SOC_VF610
+>  	select ARM_GIC
+>  	select PINCTRL_VF610
+>  	select PL310_ERRATA_769419 if CACHE_L2X0
+> +	select SMP_ON_UP if SMP
+>  
+>  	help
+>  	  This enable support for Freescale Vybrid VF610 processor.
+> -- 
+> 2.2.2
+> 
