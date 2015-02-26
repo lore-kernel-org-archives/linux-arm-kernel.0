@@ -1,412 +1,146 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 26 Feb 2015 20:33:33 +0200
-Subject: [PATCH 03/11] drm: add driver for simple vga encoders
-In-Reply-To: <1422721984-27782-4-git-send-email-heiko@sntech.de>
-References: <1422721984-27782-1-git-send-email-heiko@sntech.de>
- <1422721984-27782-4-git-send-email-heiko@sntech.de>
-Message-ID: <10479896.3hQzemuBRM@avalon>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 26 Feb 2015 18:41:01 +0000
+Subject: [RFC PATCH 1/3] ARM, arm64: kvm: get rid of the bounce page
+In-Reply-To: <54EF64E8.4090605@arm.com>
+References: <1424964547-2118-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1424964547-2118-2-git-send-email-ard.biesheuvel@linaro.org>
+ <54EF458A.4090205@arm.com>
+ <CAKv+Gu_HuVuh7VE8shn4WnLfq0ankvkt2uSP2eG_2cczRAfApw@mail.gmail.com>
+ <54EF64E8.4090605@arm.com>
+Message-ID: <CAKv+Gu_iEenucbmMdrSTZFHP543=y2TGtSZ-G5GgnpgUrONEjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On 26 February 2015 at 18:24, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 26/02/15 17:31, Ard Biesheuvel wrote:
+>> On 26 February 2015 at 16:10, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On 26/02/15 15:29, Ard Biesheuvel wrote:
+>>>> The HYP init bounce page is a runtime construct that ensures that the
+>>>> HYP init code does not cross a page boundary. However, this is something
+>>>> we can do perfectly well at build time, by aligning the code appropriately.
+>>>>
+>>>> For arm64, we just align to 4 KB, and enforce that the code size is less
+>>>> than 4 KB, regardless of the chosen page size.
+>>>>
+>>>> For ARM, the whole code is less than 256 bytes, so we tweak the linker
+>>>> script to align at a power of 2 upper bound of the code size
+>>>>
+>>>> Note that this also fixes a benign off-by-one error in the original bounce
+>>>> page code, where a bounce page would be allocated unnecessarily if the code
+>>>> was exactly 1 page in size.
+>>>
+>>> I really like this simplification. Can you please check that it still
+>>> work on 32bit with this patch from Arnd?
+>>>
+>>> https://www.mail-archive.com/kvm at vger.kernel.org/msg112364.html
+>>>
+>>
+>> Yes, it does.
+>>
+>> Note that the kernel's RODATA permissions shouldn't affect whether
+>> this code is executable or not in HYP mode, so I think this code
+>> belongs in RODATA in the 1st place.
+>
+> Yup. Maybe we should do the same for arm64, shouldn't we?
+>
 
-Thank you for the patch.
+In fact, patch 2/2 of the series I sent earlier today has a similar
+side effect, by putting the HYP idmap before _stext.
 
-On Saturday 31 January 2015 17:32:56 Heiko Stuebner wrote:
-> There exist simple vga encoders without any type of management interface
-> and just maybe a simple gpio for turning it on or off. Examples for these
-> are the Analog Devices ADV7123, Chipsea CS7123 or Micronas SDA7123.
-> 
-> Add a generic encoder driver for those that can be used by drm drivers
-> using the component framework.
+>>> Another question below:
+>>>
+>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>> ---
+>>>>  arch/arm/kernel/vmlinux.lds.S   | 12 +++++++++---
+>>>>  arch/arm/kvm/init.S             | 11 +++++++++++
+>>>>  arch/arm/kvm/mmu.c              | 42 +++++------------------------------------
+>>>>  arch/arm64/kernel/vmlinux.lds.S | 18 ++++++++++++------
+>>>>  4 files changed, 37 insertions(+), 46 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+>>>> index b31aa73e8076..8179d3903dee 100644
+>>>> --- a/arch/arm/kernel/vmlinux.lds.S
+>>>> +++ b/arch/arm/kernel/vmlinux.lds.S
+>>>> @@ -23,7 +23,7 @@
+>>>>       VMLINUX_SYMBOL(__idmap_text_start) = .;                         \
+>>>>       *(.idmap.text)                                                  \
+>>>>       VMLINUX_SYMBOL(__idmap_text_end) = .;                           \
+>>>> -     . = ALIGN(32);                                                  \
+>>>> +     . = ALIGN(1 << __hyp_idmap_align_order);                        \
+>>>>       VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;                     \
+>>>>       *(.hyp.idmap.text)                                              \
+>>>>       VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
+>>>> @@ -346,8 +346,14 @@ SECTIONS
+>>>>   */
+>>>>  ASSERT((__proc_info_end - __proc_info_begin), "missing CPU support")
+>>>>  ASSERT((__arch_info_end - __arch_info_begin), "no machine record defined")
+>>>> +
+>>>>  /*
+>>>> - * The HYP init code can't be more than a page long.
+>>>> + * The HYP init code can't be more than a page long,
+>>>> + * and should not cross a page boundary.
+>>>>   * The above comment applies as well.
+>>>>   */
+>>>> -ASSERT(((__hyp_idmap_text_end - __hyp_idmap_text_start) <= PAGE_SIZE), "HYP init code too big")
+>>>> +ASSERT(((__hyp_idmap_text_end - 1) & PAGE_MASK) -
+>>>> +     (__hyp_idmap_text_start & PAGE_MASK) == 0,
+>>>> +     "HYP init code too big or unaligned")
+>>>> +ASSERT(__hyp_idmap_size <= (1 << __hyp_idmap_align_order),
+>>>> +     "__hyp_idmap_size should be <= (1 << __hyp_idmap_align_order)")
+>>>> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+>>>> index 3988e72d16ff..7a279bc8e0e1 100644
+>>>> --- a/arch/arm/kvm/init.S
+>>>> +++ b/arch/arm/kvm/init.S
+>>>> @@ -157,3 +157,14 @@ target:  @ We're now in the trampoline code, switch page tables
+>>>>  __kvm_hyp_init_end:
+>>>>
+>>>>       .popsection
+>>>> +
+>>>> +     /*
+>>>> +      * When making changes to this file, make sure that the value of
+>>>> +      * __hyp_idmap_align_order is updated if the size of the code ends up
+>>>> +      * exceeding (1 << __hyp_idmap_align_order). This helps ensure that the
+>>>> +      * code never crosses a page boundary, without wasting too much memory
+>>>> +      * on aligning to PAGE_SIZE.
+>>>> +      */
+>>>> +     .global __hyp_idmap_size, __hyp_idmap_align_order
+>>>> +     .set    __hyp_idmap_size, __kvm_hyp_init_end - __kvm_hyp_init
+>>>> +     .set    __hyp_idmap_align_order, 8
+>>>
+>>> Is there a way to generate this __hyp_idmap_align_order automatically?
+>>> We're already pretty close to this 8 bit limit...
+>>>
+>>
+>> This seems to work:
+>>
+>> #define HYP_IDMAP_ALIGN \
+>> __hyp_idmap_size <= 0x100 ? 0x100 : \
+>> __hyp_idmap_size <= 0x200 ? 0x200 : \
+>> __hyp_idmap_size <= 0x400 ? 0x400 : \
+>> __hyp_idmap_size <= 0x800 ? 0x800 : 0x1000
+>>
+>> and
+>>
+>> . = ALIGN(HYP_IDMAP_ALIGN); \
+>>
+>> and we are limited at 1 page anyway.
+>
+> Ah, excellent.
+>
+>> Should I respin and include the move to RODATA at the same time?
+>> Or would you like me to rebase onto Arnd's patch?
+>
+> [adding Arnd on CC]
+>
+> Rebasing on top of Arnd's patch seems fair, as he came up with the idea
+> the first place.
+>
 
-The rcar-du driver already handles the adi,adv7123 compatible string used by 
-this driver. A generic driver is in my opinion a very good idea, but we can't 
-break the existing support. Porting the rcar-du driver to the component model 
-is needed.
+OK, that's fine.
 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/gpu/drm/i2c/Kconfig      |   6 +
->  drivers/gpu/drm/i2c/Makefile     |   2 +
->  drivers/gpu/drm/i2c/vga-simple.c | 325 ++++++++++++++++++++++++++++++++++++
+@Arnd: I think you should move the ALIGN(32) along with the idmap bits
+into .rodata.
+Could you cc me on the updated patch? I will rebase this on top of it then.
 
-drivers/gpu/drm/i2c/ feels wrong for a platform device.
-
->  3 files changed, 333 insertions(+)
->  create mode 100644 drivers/gpu/drm/i2c/vga-simple.c
-> 
-> diff --git a/drivers/gpu/drm/i2c/Kconfig b/drivers/gpu/drm/i2c/Kconfig
-> index 22c7ed6..319f2cb 100644
-> --- a/drivers/gpu/drm/i2c/Kconfig
-> +++ b/drivers/gpu/drm/i2c/Kconfig
-> @@ -31,4 +31,10 @@ config DRM_I2C_NXP_TDA998X
->  	help
->  	  Support for NXP Semiconductors TDA998X HDMI encoders.
-> 
-> +config DRM_VGA_SIMPLE
-> +	tristate "Generic simple vga encoder"
-> +	help
-> +	  Support for vga encoder chips without any special settings
-> +	  and at most a power-control gpio.
-> +
->  endmenu
-> diff --git a/drivers/gpu/drm/i2c/Makefile b/drivers/gpu/drm/i2c/Makefile
-> index 2c72eb5..858961f 100644
-> --- a/drivers/gpu/drm/i2c/Makefile
-> +++ b/drivers/gpu/drm/i2c/Makefile
-> @@ -10,3 +10,5 @@ obj-$(CONFIG_DRM_I2C_SIL164) += sil164.o
-> 
->  tda998x-y := tda998x_drv.o
->  obj-$(CONFIG_DRM_I2C_NXP_TDA998X) += tda998x.o
-> +
-> +obj-$(CONFIG_DRM_VGA_SIMPLE) += vga-simple.o
-> diff --git a/drivers/gpu/drm/i2c/vga-simple.c
-> b/drivers/gpu/drm/i2c/vga-simple.c new file mode 100644
-> index 0000000..bb9d19c
-> --- /dev/null
-> +++ b/drivers/gpu/drm/i2c/vga-simple.c
-> @@ -0,0 +1,325 @@
-> +/*
-> + * Simple vga encoder driver
-> + *
-> + * Copyright (C) 2014 Heiko Stuebner <heiko@sntech.de>
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/component.h>
-> +#include <linux/gpio.h>
-> +#include <linux/gpio/consumer.h>
-> +#include <linux/i2c.h>
-> +#include <linux/regulator/consumer.h>
-> +#include <drm/drm_of.h>
-> +#include <drm/drmP.h>
-> +#include <drm/drm_crtc.h>
-> +#include <drm/drm_crtc_helper.h>
-> +#include <drm/drm_edid.h>
-> +
-> +#define connector_to_vga_simple(x) container_of(x, struct vga_simple,
-> connector) +#define encoder_to_vga_simple(x) container_of(x, struct
-> vga_simple, encoder) +
-> +struct vga_simple {
-> +	struct drm_connector connector;
-> +	struct drm_encoder encoder;
-> +
-> +	struct device *dev;
-> +	struct i2c_adapter *ddc;
-> +
-> +	struct regulator *vaa_reg;
-> +	struct gpio_desc *enable_gpio;
-> +
-> +	struct mutex enable_lock;
-> +	bool enabled;
-> +};
-> +
-> +/*
-> + * Connector functions
-> + */
-> +
-> +enum drm_connector_status vga_simple_detect(struct drm_connector
-> *connector, +					    bool force)
-> +{
-> +	struct vga_simple *vga = connector_to_vga_simple(connector);
-> +
-> +	if (!vga->ddc)
-> +		return connector_status_unknown;
-> +
-> +	if (drm_probe_ddc(vga->ddc))
-> +		return connector_status_connected;
-> +
-> +	return connector_status_disconnected;
-> +}
-> +
-> +void vga_simple_connector_destroy(struct drm_connector *connector)
-> +{
-> +	drm_connector_unregister(connector);
-> +	drm_connector_cleanup(connector);
-> +}
-> +
-> +struct drm_connector_funcs vga_simple_connector_funcs = {
-> +	.dpms = drm_helper_connector_dpms,
-> +	.fill_modes = drm_helper_probe_single_connector_modes,
-> +	.detect = vga_simple_detect,
-> +	.destroy = vga_simple_connector_destroy,
-> +};
-> +
-> +/*
-> + * Connector helper functions
-> + */
-> +
-> +static int vga_simple_connector_get_modes(struct drm_connector *connector)
-> +{
-> +	struct vga_simple *vga = connector_to_vga_simple(connector);
-> +	struct edid *edid;
-> +	int ret = 0;
-> +
-> +	if (!vga->ddc)
-> +		return 0;
-> +
-> +	edid = drm_get_edid(connector, vga->ddc);
-> +	if (edid) {
-> +		drm_mode_connector_update_edid_property(connector, edid);
-> +		ret = drm_add_edid_modes(connector, edid);
-> +		kfree(edid);
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static int vga_simple_connector_mode_valid(struct drm_connector *connector,
-> +					struct drm_display_mode *mode)
-> +{
-> +	return MODE_OK;
-> +}
-> +
-> +static struct drm_encoder
-> +*vga_simple_connector_best_encoder(struct drm_connector *connector)
-> +{
-> +	struct vga_simple *vga = connector_to_vga_simple(connector);
-> +
-> +	return &vga->encoder;
-> +}
-> +
-> +static struct drm_connector_helper_funcs vga_simple_connector_helper_funcs
-> = { +	.get_modes = vga_simple_connector_get_modes,
-> +	.best_encoder = vga_simple_connector_best_encoder,
-> +	.mode_valid = vga_simple_connector_mode_valid,
-> +};
-> +
-> +/*
-> + * Encoder functions
-> + */
-> +
-> +static void vga_simple_encoder_destroy(struct drm_encoder *encoder)
-> +{
-> +	drm_encoder_cleanup(encoder);
-> +}
-> +
-> +static const struct drm_encoder_funcs vga_simple_encoder_funcs = {
-> +	.destroy = vga_simple_encoder_destroy,
-> +};
-> +
-> +/*
-> + * Encoder helper functions
-> + */
-> +
-> +static void vga_simple_encoder_dpms(struct drm_encoder *encoder, int mode)
-> +{
-> +	struct vga_simple *vga = encoder_to_vga_simple(encoder);
-> +
-> +	mutex_lock(&vga->enable_lock);
-> +
-> +	switch (mode) {
-> +	case DRM_MODE_DPMS_ON:
-> +		if (vga->enabled)
-> +			goto out;
-> +
-> +		if (!IS_ERR(vga->vaa_reg))
-> +			regulator_enable(vga->vaa_reg);
-> +
-> +		if (vga->enable_gpio)
-> +			gpiod_set_value(vga->enable_gpio, 1);
-> +
-> +		vga->enabled = true;
-> +		break;
-> +	case DRM_MODE_DPMS_STANDBY:
-> +	case DRM_MODE_DPMS_SUSPEND:
-> +	case DRM_MODE_DPMS_OFF:
-> +		if (!vga->enabled)
-> +			goto out;
-> +
-> +		if (vga->enable_gpio)
-> +			gpiod_set_value(vga->enable_gpio, 0);
-> +
-> +		if (!IS_ERR(vga->vaa_reg))
-> +			regulator_enable(vga->vaa_reg);
-> +
-> +		vga->enabled = false;
-> +		break;
-> +	default:
-> +		break;
-> +	}
-> +
-> +out:
-> +	mutex_unlock(&vga->enable_lock);
-> +}
-> +
-> +static bool vga_simple_mode_fixup(struct drm_encoder *encoder,
-> +				  const struct drm_display_mode *mode,
-> +				  struct drm_display_mode *adjusted_mode)
-> +{
-> +	return true;
-> +}
-> +
-> +static void vga_simple_encoder_prepare(struct drm_encoder *encoder)
-> +{
-> +}
-> +
-> +static void vga_simple_encoder_mode_set(struct drm_encoder *encoder,
-> +					struct drm_display_mode *mode,
-> +					struct drm_display_mode *adjusted_mode)
-> +{
-> +}
-> +
-> +static void vga_simple_encoder_commit(struct drm_encoder *encoder)
-> +{
-> +	vga_simple_encoder_dpms(encoder, DRM_MODE_DPMS_ON);
-> +}
-> +
-> +static void vga_simple_encoder_disable(struct drm_encoder *encoder)
-> +{
-> +	vga_simple_encoder_dpms(encoder, DRM_MODE_DPMS_OFF);
-> +}
-> +
-> +static const struct drm_encoder_helper_funcs
-> vga_simple_encoder_helper_funcs = {
-> +	.dpms = vga_simple_encoder_dpms,
-> +	.mode_fixup = vga_simple_mode_fixup,
-> +	.prepare = vga_simple_encoder_prepare,
-> +	.mode_set = vga_simple_encoder_mode_set,
-> +	.commit = vga_simple_encoder_commit,
-> +	.disable = vga_simple_encoder_disable,
-
-this is interesting. Some users of this encoder (I'm thinking about rcar-du, 
-for which I've just posted the patches) are already ported to atomic updates, 
-while others are not. How can we support both ?
-
-> +};
-> +
-> +/*
-> + * Component helper functions
-> + */
-> +
-> +static int vga_simple_bind(struct device *dev, struct device *master,
-> +				 void *data)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct drm_device *drm = data;
-> +
-> +	struct device_node *ddc_node, *np = pdev->dev.of_node;
-> +	struct vga_simple *vga;
-> +	int ret;
-> +
-> +	if (!np)
-> +		return -ENODEV;
-> +
-> +	vga = devm_kzalloc(dev, sizeof(*vga), GFP_KERNEL);
-> +	if (!vga)
-> +		return -ENOMEM;
-> +
-> +	vga->dev = dev;
-> +	dev_set_drvdata(dev, vga);
-> +	mutex_init(&vga->enable_lock);
-> +
-> +	vga->enable_gpio = devm_gpiod_get_optional(dev, "enable",
-> +						   GPIOD_OUT_LOW);
-> +	if (IS_ERR(vga->enable_gpio)) {
-> +		ret = PTR_ERR(vga->enable_gpio);
-> +		dev_err(dev, "failed to request GPIO: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	vga->enabled = false;
-> +
-> +	ddc_node = of_parse_phandle(np, "ddc-i2c-bus", 0);
-> +	if (ddc_node) {
-> +		vga->ddc = of_find_i2c_adapter_by_node(ddc_node);
-> +		of_node_put(ddc_node);
-> +		if (!vga->ddc) {
-> +			dev_dbg(vga->dev, "failed to read ddc node\n");
-> +			return -EPROBE_DEFER;
-> +		}
-> +	} else {
-> +		dev_dbg(vga->dev, "no ddc property found\n");
-> +	}
-> +
-> +	vga->vaa_reg = devm_regulator_get_optional(dev, "vaa");
-> +
-> +	vga->encoder.possible_crtcs = drm_of_find_possible_crtcs(drm, np);
-> +	vga->encoder.of_node = np;
-> +	vga->connector.polled = DRM_CONNECTOR_POLL_CONNECT |
-> +				DRM_CONNECTOR_POLL_DISCONNECT;
-> +
-> +	drm_encoder_helper_add(&vga->encoder, &vga_simple_encoder_helper_funcs);
-> +	drm_encoder_init(drm, &vga->encoder, &vga_simple_encoder_funcs,
-> +			 DRM_MODE_ENCODER_DAC);
-> +
-> +	drm_connector_helper_add(&vga->connector,
-> +				 &vga_simple_connector_helper_funcs);
-
-I really dislike this, this is an encoder driver, not a connector driver. It 
-shouldn't be responsible for creating the connector. For all it knows, there 
-might not even be a VGA connector connected to the encoder, VGA signals could 
-be sent to a chained encoder. That might be a bit far-fetched in the VGA case, 
-but in the generic case encoder drivers shouldn't create connectors.
-
-> +	drm_connector_init(drm, &vga->connector, &vga_simple_connector_funcs,
-> +			   DRM_MODE_CONNECTOR_VGA);
-> +
-> +	drm_mode_connector_attach_encoder(&vga->connector, &vga->encoder);
-> +
-> +	return 0;
-> +}
-> +
-> +static void vga_simple_unbind(struct device *dev, struct device *master,
-> +				    void *data)
-> +{
-> +	struct vga_simple *vga = dev_get_drvdata(dev);
-> +
-> +	vga->connector.funcs->destroy(&vga->connector);
-> +	vga->encoder.funcs->destroy(&vga->encoder);
-> +}
-> +
-> +static const struct component_ops vga_simple_ops = {
-> +	.bind = vga_simple_bind,
-> +	.unbind = vga_simple_unbind,
-> +};
-> +
-> +static int vga_simple_probe(struct platform_device *pdev)
-> +{
-> +	return component_add(&pdev->dev, &vga_simple_ops);
-> +}
-> +
-> +static int vga_simple_remove(struct platform_device *pdev)
-> +{
-> +	component_del(&pdev->dev, &vga_simple_ops);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id vga_simple_ids[] = {
-> +	{ .compatible = "adi,adv7123", },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, vga_simple_ids);
-> +
-> +static struct platform_driver vga_simple_driver = {
-> +	.probe  = vga_simple_probe,
-> +	.remove = vga_simple_remove,
-> +	.driver = {
-> +		.name = "vga-simple",
-> +		.of_match_table = vga_simple_ids,
-> +	},
-> +};
-> +module_platform_driver(vga_simple_driver);
-> +
-> +MODULE_AUTHOR("Heiko Stuebner <heiko@sntech.de>");
-> +MODULE_DESCRIPTION("Simple vga converter");
-> +MODULE_LICENSE("GPL");
-
--- 
-Regards,
-
-Laurent Pinchart
+Thanks,
+Ard.
