@@ -1,182 +1,82 @@
-From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez-Ortiz)
-Date: Thu, 26 Feb 2015 10:15:21 -0500
-Subject: [PATCH v3] drivers/tty: amba: defer probing DMA availability
- until hw_init
-In-Reply-To: <CAL_JsqJvFsMesJqNi+Kwg_Xnu7oanyEzrFfk+w9msQ_XOiBGPQ@mail.gmail.com>
-References: <1424910661-26474-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <CAL_JsqJvFsMesJqNi+Kwg_Xnu7oanyEzrFfk+w9msQ_XOiBGPQ@mail.gmail.com>
-Message-ID: <54EF3889.40008@linaro.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 26 Feb 2015 16:44:16 +0100
+Subject: [RFC PATCH 0/3] genirq: mixing IRQF_NO_SUSPEND and wakeup sources
+ on shared IRQs
+In-Reply-To: <20150226090347.777c47ec@bbrezillon>
+References: <1424771762-16343-1-git-send-email-boris.brezillon@free-electrons.com>
+ <2154999.DTKV1bGBcx@vostro.rjw.lan> <20150226090347.777c47ec@bbrezillon>
+Message-ID: <20964379.cuQSlojCVH@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2015 09:12 AM, Rob Herring wrote:
-> On Wed, Feb 25, 2015 at 6:31 PM, Jorge Ramirez-Ortiz
-> <jorge.ramirez-ortiz@linaro.org> wrote:
->> Fix a race condition that happens when device_initcall(pl011_dma_initicall)
->> is executed before all the devices have been probed - this issue was observed on
->> an hisi_6220 SoC (HiKey board from Linaro).
->>
->> The deferred driver probing framework relies on late_initcall to trigger
->> deferred probes so it is just possible that, even with a valid DMA driver ready
->> to be loaded, we fail to synchronize with it.
->>
->> The proposed implementation delays probing of the DMA until the uart device is
->> opened. As hw_init is invoked on port startup and port resume - but the DMA
->> probe is only required once - we avoid calling multiple times using a new field
->> in uart_amba_port to track this scenario.
->>
->> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
->> ---
->>  drivers/tty/serial/amba-pl011.c | 66 ++++++++++-------------------------------
->>  1 file changed, 16 insertions(+), 50 deletions(-)
->>
->> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
->> index 8d94c19..3501ccc 100644
->> --- a/drivers/tty/serial/amba-pl011.c
->> +++ b/drivers/tty/serial/amba-pl011.c
->> @@ -29,6 +29,7 @@
->>   * and hooked into this driver.
->>   */
->>
->> +#define pr_fmt(fmt) "amba-pl011: "fmt
-> You can drop this I think.
+On Thursday, February 26, 2015 09:03:47 AM Boris Brezillon wrote:
+> Hi Rafael,
+> 
+> On Wed, 25 Feb 2015 22:59:36 +0100
+> "Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
+> 
+> > On Tuesday, February 24, 2015 10:55:59 AM Boris Brezillon wrote:
+> > > Hello,
+> > > 
+> > > I put the IRQF_NO_SUSPEND_SAFE/IRQF_TIMER_SIBLING_OK/WHATEVER_NAME_YOU_CHOOSE
+> > > debate aside to concentrate on another problem pointed out by Rafael and
+> > > Mark: the fact that we cannot mix IRQF_NO_SUSPEND and wakeup sources on
+> > > a shared IRQ line.
+> > > 
+> > > This is because the wakeup code is prevailing the IRQF_NO_SUSPEND case
+> > > and will trigger a system wakeup as soon as the IRQ line is tagged as a
+> > > wakeup source.
+> > > 
+> > > This series propose an approach to deal with such cases by doing the
+> > > following:
+> > > 1/ Prevent any system wakeup when at least one of the IRQ user has set
+> > >    the IRQF_NO_SUSPEND flag
+> > > 2/ Adapt IRQ handlers so that they can safely be called in suspended
+> > >    state
+> > > 3/ Let drivers decide when the system should be woken up
+> > > 
+> > > Let me know what you think of this approach.
+> > 
+> > So I have the appended patch that should deal with all that too (it doesn't
+> > rework drivers that need to share NO_SUSPEND IRQs and do wakeup, but that
+> > can be done on top of it in a straightforward way).
+> > 
+> > The idea is quite simple.  By default, the core replaces the interrupt handlers
+> > of everyone sharing NO_SUSPEND lines and not using IRQF_NO_SUSPEND with a null
+> > handler always returning IRQ_NONE at the suspend_device_irqs() time (the
+> > rationale being that if you don't use IRQF_NO_SUSPEND, then your device has
+> > no reason to generate interrupts after that point).  The original handlers are
+> > then restored by resume_device_irqs().
+> > 
+> > However, if the IRQ is configured for wakeup, there may be a reason to generate
+> > interrupts from a device not using IRQF_NO_SUSPEND.  For that, the patch adds
+> > IRQF_COND_SUSPEND that, if set, will prevent the default behavior described
+> > above from being applied to irqactions using it if the IRQs in question are
+> > configured for wakeup.  Of course, the users of IRQF_COND_SUSPEND are supposed
+> > to implement wakeup detection in their interrupt handlers and then call
+> > pm_system_wakeup() if necessary.
+> 
+> That patch sounds good to me.
 
-why not keep it? it makes the trace more readable (if debug is enabled only)
+But it is still a bit risky.  Namely, if the driver in question is sufficiently
+broken (eg. it may not suspend the device and rely on the fact that its interrupt
+handler will be run just because it is sharing a "no suspend" IRQ), we may get
+an interrupt storm.
 
->
->>  #if defined(CONFIG_SERIAL_AMBA_PL011_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
->>  #define SUPPORT_SYSRQ
->> @@ -164,6 +165,7 @@ struct uart_amba_port {
->>         bool                    using_rx_dma;
->>         struct pl011_dmarx_data dmarx;
->>         struct pl011_dmatx_data dmatx;
->> +       bool                    dma_probed;
->>  #endif
->>  };
->>
->> @@ -261,7 +263,7 @@ static void pl011_sgbuf_free(struct dma_chan *chan, struct pl011_sgbuf *sg,
->>         }
->>  }
->>
->> -static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *uap)
->> +static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
->>  {
->>         /* DMA is the sole user of the platform data right now */
->>         struct amba_pl011_data *plat = dev_get_platdata(uap->port.dev);
->> @@ -275,9 +277,16 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
->>         struct dma_chan *chan;
->>         dma_cap_mask_t mask;
->>
->> -       chan = dma_request_slave_channel(dev, "tx");
->> +       uap->dma_probed = true;
-> I would not set this to true in the case of EPROBE_DEFER. That way if
-> a DMA driver is loaded as a module some time later, DMA can be used.
-> We're not really using deferred probe here, but using it as an
-> indication that the UART is DMA capable.
+Isn't that a problem?
 
-ok. yes there is no need for the consistency I wast talking about on my previous
-reply to RMK.
-that was rubbish.
+> Could you send it on its own to the appropriate MLs ?
 
->
->> +
->> +       chan = dma_request_slave_channel_reason(dev, "tx");
->> +       if (IS_ERR(chan)) {
->> +               if (PTR_ERR(chan) == -EPROBE_DEFER) {
->> +                       dev_warn(uap->port.dev, "DMA driver not ready\n");
+Sure, I can do that, but I'd like to hear from the other people on the CC first.
 
-I'll change the warn for an info since there will be future opportunities to
-load it.
-I see value on the user knowing he might have a chance to use the DMA capability.
+> Thomas, Peter, Mark, could you share you opinion ?
+> I know I'm a bit insistent on this fix, but I'd really like to get away
+> from this warning backtrace (and the associated problems behind it) as
+> soon as possible.
+
+Yeah, me too. :-)
 
 
->> +                       return;
->> +               }
->> +               dev_info(uap->port.dev, "no OF or ACPI DMA data\n");
->>
->> -       if (!chan) {
->>                 /* We need platform data */
->>                 if (!plat || !plat->dma_filter) {
->>                         dev_info(uap->port.dev, "no DMA platform data\n");
->> @@ -383,54 +392,9 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
->>                 dev_info(uap->port.dev, "DMA channel RX %s\n",
->>                          dma_chan_name(uap->dmarx.chan));
->>         }
->> -}
->> -
->> -#ifndef MODULE
->> -/*
->> - * Stack up the UARTs and let the above initcall be done at device
->> - * initcall time, because the serial driver is called as an arch
->> - * initcall, and at this time the DMA subsystem is not yet registered.
->> - * At this point the driver will switch over to using DMA where desired.
->> - */
->> -struct dma_uap {
->> -       struct list_head node;
->> -       struct uart_amba_port *uap;
->> -       struct device *dev;
->> -};
->> -
->> -static LIST_HEAD(pl011_dma_uarts);
->> -
->> -static int __init pl011_dma_initcall(void)
->> -{
->> -       struct list_head *node, *tmp;
->> -
->> -       list_for_each_safe(node, tmp, &pl011_dma_uarts) {
->> -               struct dma_uap *dmau = list_entry(node, struct dma_uap, node);
->> -               pl011_dma_probe_initcall(dmau->dev, dmau->uap);
->> -               list_del(node);
->> -               kfree(dmau);
->> -       }
->> -       return 0;
->> -}
->> -
->> -device_initcall(pl011_dma_initcall);
->>
->> -static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
->> -{
->> -       struct dma_uap *dmau = kzalloc(sizeof(struct dma_uap), GFP_KERNEL);
->> -       if (dmau) {
->> -               dmau->uap = uap;
->> -               dmau->dev = dev;
->> -               list_add_tail(&dmau->node, &pl011_dma_uarts);
->> -       }
->> +       return;
-> You don't need an explicit return.
-
-yes, not sure how that came in.
-
->
->>  }
->> -#else
->> -static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
->> -{
->> -       pl011_dma_probe_initcall(dev, uap);
->> -}
->> -#endif
->> -interviewing
->>  static void pl011_dma_remove(struct uart_amba_port *uap)
->>  {
->>         /* TODO: remove the initcall if it has not yet executed */
->> @@ -1548,6 +1512,9 @@ static int pl011_hwinit(struct uart_port *port)
->>         uap->im = readw(uap->port.membase + UART011_IMSC);
->>         writew(UART011_RTIM | UART011_RXIM, uap->port.membase + UART011_IMSC);
->>
->> +       if (!uap->dma_probed)
->> +               pl011_dma_probe(uap->port.dev, uap);
->> +
->>         if (dev_get_platdata(uap->port.dev)) {
->>                 struct amba_pl011_data *plat;
->>
->> @@ -2218,7 +2185,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
->>         uap->port.ops = &amba_pl011_pops;
->>         uap->port.flags = UPF_BOOT_AUTOCONF;
->>         uap->port.line = i;
->> -       pl011_dma_probe(&dev->dev, uap);
->>
->>         /* Ensure interrupts from this UART are masked and cleared */
->>         writew(0, uap->port.membase + UART011_IMSC);
->> --
->> 1.9.1
->>
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
