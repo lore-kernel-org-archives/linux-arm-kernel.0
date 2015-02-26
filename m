@@ -1,49 +1,73 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 26 Feb 2015 16:24:53 -0600
-Subject: [PATCH v2] coresight-stm: adding driver for CoreSight STM
- component
-In-Reply-To: <1424907152-18808-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1424907152-18808-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <CAL_Jsq+JYc5DBXqEcpJ0O=RdO-uuz_-GR99YsgVqT=uG6CLqJg@mail.gmail.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Thu, 26 Feb 2015 14:26:02 -0800
+Subject: [PATCH v2 2/2] hwrng: iproc-rng200 - Add Broadcom IPROC RNG driver
+In-Reply-To: <4488852.TuVxKbAYde@wuerfel>
+References: <1424888184-22180-3-git-send-email-sbranden@broadcom.com>
+ <3062825.7b1oYP4yuL@wuerfel> <54EF75F0.7000901@broadcom.com>
+ <4488852.TuVxKbAYde@wuerfel>
+Message-ID: <54EF9D7A.3090707@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding Will D...
+Hi Arnd,
 
-On Wed, Feb 25, 2015 at 5:32 PM, Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
-> From: Pratik Patel <pratikp@codeaurora.org>
+Latency is 32 us for 32bits of data - commented inline.  What delay call 
+do you recommend in this case?
+
+On 15-02-26 12:15 PM, Arnd Bergmann wrote:
+> On Thursday 26 February 2015 11:37:20 Scott Branden wrote:
+>> Response inline.
+>>
+>> On 15-02-25 11:17 AM, Arnd Bergmann wrote:
+>>> On Wednesday 25 February 2015 10:16:24 Scott Branden wrote:
+>>>> This adds a driver for random number generator present on Broadcom
+>>>> IPROC devices.
+>>>>
+>>>> Reviewed-by: Ray Jui <rjui@broadcom.com>
+>>>> Signed-off-by: Scott Branden <sbranden@broadcom.com>
+>>>
+>>> The driver looks reasonable overall, I have just one question about
+>>> something that sticks out:
+>>>
+>>>> +    while ((num_remaining > 0) && time_before(jiffies, idle_endtime)) {
+>>> ...
+>>>> +
+>>>> +            /* Are there any random numbers available? */
+>>>> +            if ((ioread32(rng_base + RNG_FIFO_COUNT_OFFSET) &
+>>>> +                            RNG_FIFO_COUNT_RNG_FIFO_COUNT_MASK) > 0) {
+>>> ...
+>>>> +            } else {
+>>>> +                    if (!wait)
+>>>> +                            /* Cannot wait, return immediately */
+>>>> +                            return max - num_remaining;
+>>>> +
+>>>> +                    /* Can wait, give others chance to run */
+>>>> +                    cpu_relax();
+>>>> +            }
+>>>> +    }
+>>>> +
+>>>
+>>> It looks like you do a busy-loop around cpu_relax here if asked to wait.
+>>> Is this intentional? I would normally expect either cond_resched() or
+>>> some msleep() instead.
+>>
+>> This code was following examples of other open source drivers - bcm2835
+>> and exynos both use cpu_relax.  I'll have to look into this more to
+>> understand.
+>>
 >
-> This driver adds support for the STM CoreSight IP block,
-> allowing any system compoment (HW or SW) to log and
-> aggregate messages via a single entity.
+> The majority of the driver apparently use udelay(10) to wait, which is
+> not much better but at least consistent. The cpu_relax() call probably
+> gives better throughput.
 >
-> The STM exposes an application defined number of channels
-> called stimulus port.  Configuration is done using entries
-> in sysfs and channels made available to userspace via devfs.
+> I don't understand why none of the drivers actually attempts to
+> msleep(), but that may be because the delay is much too long.
 >
-> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
-> Changes for v2:
->  - Fixed typo in struct stm_node documentation
->  - Added CPU_32v3 to list of architecture STM can't work with
+> Can you find out what the expected latency is for new data to
+> become available on your hardware?
+RNG generates at a nominal 1 Mbps.  So to generate 32 bits of data takes
+approximately 32 us.
 
-Is this because of no strd instr only?
-
-> +#ifndef CONFIG_64BIT
-> +static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
-> +{
-> +       asm volatile("strd %1, %0"
-> +                    : "+Qo" (*(volatile u64 __force *)addr)
-> +                    : "r" (val));
-> +}
-> +#undef writeq_relaxed
-> +#define writeq_relaxed(v, c)   __raw_writeq((__force u64) cpu_to_le64(v), c)
-> +#endif
-
-We really shouldn't do private implementation here. It there really
-any reason not to allow readq/writeq generically for 32-bit or just
-for arm32?
-
-Rob
+>
+> 	Arnd
+>
