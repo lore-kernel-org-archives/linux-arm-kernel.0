@@ -1,53 +1,55 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 15:20:59 +0900
-Subject: [PATCH 02/32] ARM: shmobile: sh73a0 dtsi: Set control-parent for all
- irqpin nodes
+Date: Thu, 26 Feb 2015 15:21:00 +0900
+Subject: [PATCH 03/32] ARM: shmobile: kzm9g-reference dts: Sort i2c0 children
+ by unit address
 In-Reply-To: <cover.1424849129.git.horms+renesas@verge.net.au>
 References: <cover.1424849129.git.horms+renesas@verge.net.au>
-Message-ID: <48bdf06dd975fb01e54e0b0406de720ebeeb55c7.1424849129.git.horms+renesas@verge.net.au>
+Message-ID: <5c9e276095a9607f530f94e219daf2996b1360fa.1424849129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The sh73a0 INTC can't mask interrupts properly most likely due to a
-hardware bug. Set the control-parent property to delegate masking to the
-parent interrupt controller.
+While at it rename the ak4648 node to "codec" to describe the device's
+function instead of its model, and move its device-specific property
+after its generic properties.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 2dfd5b4..0767087 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -94,6 +94,7 @@
- 			      0 6 IRQ_TYPE_LEVEL_HIGH
- 			      0 7 IRQ_TYPE_LEVEL_HIGH
- 			      0 8 IRQ_TYPE_LEVEL_HIGH>;
-+		control-parent;
- 	};
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+index 6d32c87..0134d53 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+@@ -188,6 +188,13 @@
  
- 	irqpin1: irqpin at e6900004 {
-@@ -133,6 +134,7 @@
- 			      0 22 IRQ_TYPE_LEVEL_HIGH
- 			      0 23 IRQ_TYPE_LEVEL_HIGH
- 			      0 24 IRQ_TYPE_LEVEL_HIGH>;
-+		control-parent;
+ &i2c0 {
+ 	status = "okay";
++
++	ak4648: codec at 12 {
++		compatible = "asahi-kasei,ak4648";
++		reg = <0x12>;
++		#sound-dai-cells = <0>;
++	};
++
+ 	as3711 at 40 {
+ 		compatible = "ams,as3711";
+ 		reg = <0x40>;
+@@ -258,12 +265,6 @@
+ 			};
+ 		};
  	};
+-
+-	ak4648: ak4648 at 12 {
+-		#sound-dai-cells = <0>;
+-		compatible = "asahi-kasei,ak4648";
+-		reg = <0x12>;
+-	};
+ };
  
- 	irqpin3: irqpin at e690000c {
-@@ -152,6 +154,7 @@
- 			      0 30 IRQ_TYPE_LEVEL_HIGH
- 			      0 31 IRQ_TYPE_LEVEL_HIGH
- 			      0 32 IRQ_TYPE_LEVEL_HIGH>;
-+		control-parent;
- 	};
- 
- 	i2c0: i2c at e6820000 {
+ &i2c3 {
 -- 
 2.1.4
