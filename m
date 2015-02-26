@@ -1,66 +1,84 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 25 Feb 2015 17:28:47 -0800
-Subject: [PATCH v2] Input: sun4i-ts: add thermal driver dependency
-In-Reply-To: <1423728011-30272-1-git-send-email-wens@csie.org>
-References: <1423728011-30272-1-git-send-email-wens@csie.org>
-Message-ID: <20150226012847.GD25965@dtor-ws>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Thu, 26 Feb 2015 09:29:37 +0800
+Subject: [PATCH v3 20/30] PCI/sparc: Use pci_scan_root_bridge() for simplicity
+In-Reply-To: <1424914187-21027-1-git-send-email-wangyijing@huawei.com>
+References: <1424914187-21027-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1424914187-21027-21-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 12, 2015 at 04:00:11PM +0800, Chen-Yu Tsai wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
-> 
-> The sun4i-ts driver has had a dependency on the thermal code
-> with the addition of the thermal zone sensor support, but this
-> is not currently enforced in Kconfig, so with TOUCHSCREEN_SUN4I=y,
-> THERMAL=m and THERMAL_OF=y we get
-> 
-> drivers/built-in.o: In function `sun4i_ts_remove':
-> :(.text+0x2376f4): undefined reference to `thermal_zone_of_sensor_unregister'
-> drivers/built-in.o: In function `sun4i_ts_probe':
-> :(.text+0x237a94): undefined reference to `thermal_zone_of_sensor_register'
-> :(.text+0x237c00): undefined reference to `thermal_zone_of_sensor_unregister'
-> 
-> We need the dependency on THERMAL in order to ensure that this
-> driver becomes a loadable module if the thermal support itself
-> is modular, while the dependency on THERMAL_OF is a runtime
-> dependency and the driver will still build if it is missing.
-> It is entirely possible to build sun4i-ts without THERMAL_OF
-> just to use the hwmon sensors and/or touchscreen.
-> 
-> Fixes: 223697107949 ("Input: sun4i-ts - add thermal zone sensor support")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> [wens at csie.org: Fix description and Kconfig dependencies]
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Now we could use pci_scan_root_bridge() to scan
+pci buses, provide sparc specific pci_host_bridge_ops.
 
-Applied, thank you.
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: "David S. Miller" <davem@davemloft.net>
+CC: sparclinux at vger.kernel.org
+---
+ arch/sparc/kernel/pci.c |   32 ++++++++++++++++++++++----------
+ 1 files changed, 22 insertions(+), 10 deletions(-)
 
-> ---
-> 
-> v2 updates the Kconfig dependencies as Dmitry pointed out, and makes
-> the description be more specific on the failing config and why a
-> dependency on THERMAL_OF is not required. The failing commit hash
-> is also updated.
-> 
-> ---
->  drivers/input/touchscreen/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-> index 58917525126e..6261fd6d7c3c 100644
-> --- a/drivers/input/touchscreen/Kconfig
-> +++ b/drivers/input/touchscreen/Kconfig
-> @@ -943,6 +943,7 @@ config TOUCHSCREEN_SUN4I
->  	tristate "Allwinner sun4i resistive touchscreen controller support"
->  	depends on ARCH_SUNXI || COMPILE_TEST
->  	depends on HWMON
-> +	depends on THERMAL || !THERMAL_OF
->  	help
->  	  This selects support for the resistive touchscreen controller
->  	  found on Allwinner sunxi SoCs.
-> -- 
-> 2.1.4
-> 
-
+diff --git a/arch/sparc/kernel/pci.c b/arch/sparc/kernel/pci.c
+index 0af7c58..03e7376 100644
+--- a/arch/sparc/kernel/pci.c
++++ b/arch/sparc/kernel/pci.c
+@@ -650,12 +650,25 @@ static void pci_claim_bus_resources(struct pci_bus *bus)
+ 		pci_claim_bus_resources(child_bus);
+ }
+ 
++static void pci_host_bridge_of_scan_bus(
++		struct pci_host_bridge *host)
++{
++	struct pci_pbm_info *pbm = dev_get_drvdata(&host->dev);
++	struct device_node *node = pbm->op->dev.of_node;
++
++	pci_of_scan_bus(pbm, node, host->bus);
++}
++
++static struct pci_host_bridge_ops phb_ops = {
++	.phb_of_scan_bus = pci_host_bridge_of_scan_bus,
++};
++
+ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
+ 				 struct device *parent)
+ {
+ 	LIST_HEAD(resources);
+ 	struct device_node *node = pbm->op->dev.of_node;
+-	struct pci_bus *bus;
++	struct pci_host_bridge *host;
+ 
+ 	printk("PCI: Scanning PBM %s\n", node->full_name);
+ 
+@@ -667,23 +680,22 @@ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
+ 	pbm->busn.end	= pbm->pci_last_busno;
+ 	pbm->busn.flags	= IORESOURCE_BUS;
+ 	pci_add_resource(&resources, &pbm->busn);
+-	bus = pci_create_root_bus(parent, 
++	host = pci_scan_root_bridge(parent,
+ 			PCI_DOMBUS(pbm->index, pbm->pci_first_busno), 
+-			pbm->pci_ops, pbm, &resources);
+-	if (!bus) {
+-		printk(KERN_ERR "Failed to create bus for %s\n",
++			pbm->pci_ops, pbm, &resources, &phb_ops);
++	if (!host) {
++		printk(KERN_ERR "Failed to create host bridge for %s\n",
+ 		       node->full_name);
+ 		pci_free_resource_list(&resources);
+ 		return NULL;
+ 	}
+ 
+-	pci_of_scan_bus(pbm, node, bus);
+-	pci_bus_add_devices(bus);
+-	pci_bus_register_of_sysfs(bus);
++	pci_bus_add_devices(host->bus);
++	pci_bus_register_of_sysfs(host->bus);
+ 
+-	pci_claim_bus_resources(bus);
++	pci_claim_bus_resources(host->bus);
+ 
+-	return bus;
++	return host->bus;
+ }
+ 
+ void pcibios_fixup_bus(struct pci_bus *pbus)
 -- 
-Dmitry
+1.7.1
