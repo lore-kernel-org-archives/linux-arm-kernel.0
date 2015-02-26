@@ -1,126 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 15:20:58 +0900
-Subject: [PATCH 01/32] ARM: shmobile: r8a7740 dtsi: add remaining DIV6 clocks
+Date: Thu, 26 Feb 2015 15:20:59 +0900
+Subject: [PATCH 02/32] ARM: shmobile: sh73a0 dtsi: Set control-parent for all
+ irqpin nodes
 In-Reply-To: <cover.1424849129.git.horms+renesas@verge.net.au>
 References: <cover.1424849129.git.horms+renesas@verge.net.au>
-Message-ID: <fe7c20fa689d3b9230be0b552f667c043d11ed75.1424849129.git.horms+renesas@verge.net.au>
+Message-ID: <48bdf06dd975fb01e54e0b0406de720ebeeb55c7.1424849129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-This adds the remaining DIV6 clocks and all possible parents for the SUB
-clock.
+The sh73a0 INTC can't mask interrupts properly most likely due to a
+hardware bug. Set the control-parent property to delegate masking to the
+parent interrupt controller.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 79 +++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 78 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sh73a0.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 8a09260..83c1c3c 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -431,6 +431,18 @@
- 			clock-frequency = <27000000>;
- 			clock-output-names = "dv";
- 		};
-+		fmsick_clk: fmsick_clk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+			clock-output-names = "fmsick";
-+		};
-+		fmsock_clk: fmsock_clk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+			clock-output-names = "fmsock";
-+		};
- 		fsiack_clk: fsiack_clk {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
-@@ -459,13 +471,78 @@
- 		};
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 2dfd5b4..0767087 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -94,6 +94,7 @@
+ 			      0 6 IRQ_TYPE_LEVEL_HIGH
+ 			      0 7 IRQ_TYPE_LEVEL_HIGH
+ 			      0 8 IRQ_TYPE_LEVEL_HIGH>;
++		control-parent;
+ 	};
  
- 		/* Variable factor clocks (DIV6) */
-+		vclk1_clk: vclk1_clk at e6150008 {
-+			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
-+			reg = <0xe6150008 4>;
-+			clocks = <&pllc1_div2_clk>, <0>, <&dv_clk>,
-+				 <&cpg_clocks R8A7740_CLK_USB24S>,
-+				 <&extal1_div2_clk>, <&extalr_clk>, <0>,
-+				 <0>;
-+			#clock-cells = <0>;
-+			clock-output-names = "vclk1";
-+		};
-+		vclk2_clk: vclk2_clk at e615000c {
-+			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
-+			reg = <0xe615000c 4>;
-+			clocks = <&pllc1_div2_clk>, <0>, <&dv_clk>,
-+				 <&cpg_clocks R8A7740_CLK_USB24S>,
-+				 <&extal1_div2_clk>, <&extalr_clk>, <0>,
-+				 <0>;
-+			#clock-cells = <0>;
-+			clock-output-names = "vclk2";
-+		};
-+		fmsi_clk: fmsi_clk at e6150010 {
-+			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
-+			reg = <0xe6150010 4>;
-+			clocks = <&pllc1_div2_clk>, <&fmsick_clk>, <0>, <0>;
-+			#clock-cells = <0>;
-+			clock-output-names = "fmsi";
-+		};
-+		fmso_clk: fmso_clk at e6150014 {
-+			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
-+			reg = <0xe6150014 4>;
-+			clocks = <&pllc1_div2_clk>, <&fmsock_clk>, <0>, <0>;
-+			#clock-cells = <0>;
-+			clock-output-names = "fmso";
-+		};
-+		fsia_clk: fsia_clk at e6150018 {
-+			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
-+			reg = <0xe6150018 4>;
-+			clocks = <&pllc1_div2_clk>, <&fsiack_clk>, <0>, <0>;
-+			#clock-cells = <0>;
-+			clock-output-names = "fsia";
-+		};
- 		sub_clk: sub_clk at e6150080 {
- 			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150080 4>;
--			clocks = <&pllc1_div2_clk>;
-+			clocks = <&pllc1_div2_clk>,
-+				 <&cpg_clocks R8A7740_CLK_USB24S>, <0>, <0>;
- 			#clock-cells = <0>;
- 			clock-output-names = "sub";
- 		};
-+		spu_clk: spu_clk at e6150084 {
-+			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
-+			reg = <0xe6150084 4>;
-+			clocks = <&pllc1_div2_clk>,
-+				 <&cpg_clocks R8A7740_CLK_USB24S>, <0>, <0>;
-+			#clock-cells = <0>;
-+			clock-output-names = "spu";
-+		};
-+		vou_clk: vou_clk at e6150088 {
-+			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
-+			reg = <0xe6150088 4>;
-+			clocks = <&pllc1_div2_clk>, <&extal1_clk>, <&dv_clk>,
-+				 <0>;
-+			#clock-cells = <0>;
-+			clock-output-names = "vou";
-+		};
-+		stpro_clk: stpro_clk at e615009c {
-+			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
-+			reg = <0xe615009c 4>;
-+			clocks = <&cpg_clocks R8A7740_CLK_PLLC0>;
-+			#clock-cells = <0>;
-+			clock-output-names = "stpro";
-+		};
+ 	irqpin1: irqpin at e6900004 {
+@@ -133,6 +134,7 @@
+ 			      0 22 IRQ_TYPE_LEVEL_HIGH
+ 			      0 23 IRQ_TYPE_LEVEL_HIGH
+ 			      0 24 IRQ_TYPE_LEVEL_HIGH>;
++		control-parent;
+ 	};
  
- 		/* Fixed factor clocks */
- 		pllc1_div2_clk: pllc1_div2_clk {
+ 	irqpin3: irqpin at e690000c {
+@@ -152,6 +154,7 @@
+ 			      0 30 IRQ_TYPE_LEVEL_HIGH
+ 			      0 31 IRQ_TYPE_LEVEL_HIGH
+ 			      0 32 IRQ_TYPE_LEVEL_HIGH>;
++		control-parent;
+ 	};
+ 
+ 	i2c0: i2c at e6820000 {
 -- 
 2.1.4
