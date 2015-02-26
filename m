@@ -1,31 +1,35 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 26 Feb 2015 13:53:23 +0800
-Subject: [PATCH v2] coresight-stm: adding driver for CoreSight STM
- component
-In-Reply-To: <1424907152-18808-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1424907152-18808-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20150226055320.GA20385@dragon>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 26 Feb 2015 06:54:06 +0100
+Subject: [PATCH v5 1/6] clk: add of_clk_get_parent_rate function
+In-Reply-To: <1423097705-22939-2-git-send-email-rjui@broadcom.com>
+References: <rjui@broadcom.com>
+ <1423097705-22939-1-git-send-email-rjui@broadcom.com>
+ <1423097705-22939-2-git-send-email-rjui@broadcom.com>
+Message-ID: <20150226055406.GB28214@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 04:32:32PM -0700, Mathieu Poirier wrote:
-> diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-stm b/Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
-> new file mode 100644
-> index 000000000000..3ddb676831ab
-> --- /dev/null
-> +++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
-> @@ -0,0 +1,62 @@
-> +What:		/sys/bus/coresight/devices/<memory_map>.stm/enable_source
-> +Date:		February 2015
-> +KernelVersion:	3.20
+Hi Ray,
 
-A random comment - there will never be a v3.20 kernel.
+On Wed, Feb 04, 2015 at 04:55:00PM -0800, Ray Jui wrote:
+> Sometimes a clock needs to know the rate of its parent before itself is
+> registered to the framework. An example is that a PLL may need to
+> initialize itself to a specific VCO frequency, before registering to the
+> framework. The parent rate needs to be known, for PLL multipliers and
+> divisors to be configured properly.
+> 
+> Introduce helper function of_clk_get_parent_rate, which can be used to
+> obtain the parent rate of a clock, given a device node and index.
 
-Shawn
+I can't see how this patch helps you. First it's not guaranteed that
+the parent is already registered, what do you do in this case?
+Then the clock framework doesn't require that you initialize the PLL
+before registering. That can be done in the clk ops later.
 
-> +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-> +Description:	(RW) Enable/disable tracing on this specific trace macrocell.
-> +		Enabling the trace macrocell implies it has been configured
-> +		properly and a sink has been identidifed for it.  The path
-> +		of coresight components linking the source to the sink is
-> +		configured and managed automatically by the coresight framework.
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
