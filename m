@@ -1,61 +1,74 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 26 Feb 2015 14:02:56 +0100
-Subject: [PATCH] irqchip: armada: Fix chained per-cpu interrupts
-In-Reply-To: <54EF184A.8040607@free-electrons.com>
-References: <1424944527-16850-1-git-send-email-maxime.ripard@free-electrons.com>
- <54EEF4D4.7060102@free-electrons.com>
- <20150226104710.GB29241@lukather>
- <54EEFB04.8020200@free-electrons.com>
- <20150226111159.GD29241@lukather>
- <54EF184A.8040607@free-electrons.com>
-Message-ID: <20150226130256.GE29241@lukather>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 26 Feb 2015 13:10:19 +0000
+Subject: [PATCH v2 0/8] Add sd/emmc support for stih407 family silicon
+Message-ID: <1424956227-18258-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 01:57:46PM +0100, Gregory CLEMENT wrote:
-> On 26/02/2015 12:11, Maxime Ripard wrote:
-> > On Thu, Feb 26, 2015 at 11:52:52AM +0100, Gregory CLEMENT wrote:
-> >>>> The following function is called as soon as the MPIC is used as a secondary
-> >>>> interrupt controller. So it will be the case for the Armada 375 and Armada 39x too. It
-> >>>> also seems to not be related to be used in an SoC or an other, so I think that the
-> >>>> function name is misleading. What about just using mpic_secondary_init and
-> >>>> mpic_cpu_notifier ?
-> >>>>
-> >>>> I know we prefixed the mpic function with armada_370_xp or armada_xp, but looking
-> >>>> back, it was a mistake.
-> >>>
-> >>> I don't know, that code needs to be run only in the cases where the
-> >>> MPIC is a secondary interrupt controller, which rules out the armada
-> >>> 370/XP.
-> >>>
-> >>> I was trying to make such a distinction, but indeed the wording is
-> >>> quite poor.
-> >>>
-> >>> Do you have some suggestions?
-> >>
-> >> Yes using  mpic_secondary_init and  mpic_cpu_notifier, because what is important
-> >> is the fact that the MPIC is used as a secondary interrupt controller.
-> > 
-> > The thing is, the armada xp notifier is called
-> > armada_xp_mpic_secondary_init, with in this case secondary meaning
-> > secondary CPU. Won't that be really confusing to have another callback
-> > called mpic_secondary_init, what would only be called on !armada
-> > 370/XP, and with secondary meaning secondary interrupt controller?
-> 
-> I see let's call it mpic_cascaded_init then.
+Hi,
 
-ACK.
+This series adds sd/emmc support to the sdhci-st.c driver for stih407
+family silicon. The changes mainly involve congiguring some extra glue
+registers in the flashSS which configure the Arasan controller.
 
-Maxime
+This series also adds support for UHS modes for eMMC. To allow
+UHS HS200/SD104 modes to function correctly, due to the
+tight timing constriants, support for delay management is also added.
+Two types of delay management are supported, static delay management and
+dynamic delay management, this delay management is only available
+on eMMC pads on stih410 and later silicon.
+
+This series has been tested with stih410-b2120 on eMMC and sd, at various
+clock speeds. As part of this testing a bug was also found in the
+upstream flexgen clock set_rate implementation (now fixed upstream).
+
+    max-frequency = 200Mhz
+    /dev/mmcblk0p1:
+     Timing buffered disk reads: 270 MB in  3.02 seconds =  89.54 MB/sec
+    
+    max-frequency = 100Mhz
+    root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
+    /dev/mmcblk0p1:
+     Timing buffered disk reads: 210 MB in  3.00 seconds =  70.00 MB/sec
+    
+    max-frequency = 50Mhz
+    root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
+    /dev/mmcblk0p1:
+     Timing buffered disk reads: 118 MB in  3.00 seconds =  39.28 MB/sec
+
+It has also been tested on stih416-b2020 to ensure we have caused no
+regressions. Finally the dt documentation has been updated to reflect
+the changes in the driver code. Intrestingly it seems we are the first
+upstream platform to be using some of the uhs bindings such as
+sd-uhs-sdr104.
+
+Changes since v1:
+ - Partition the changes into smaller patches to aid review process (Ulf)
+
+regards,
+
+Peter.
+
+Peter Griffin (8):
+  mmc: sdhci-st: Add macros for register offsets and bitfields for mmcss
+    glue regs
+  mmc: sdhci-st: Add support for de-asserting reset signal and top regs
+    resource
+  mmc: sdhci-st: Add delay management functions for top registers
+    (eMMC).
+  mmc: sdhci-st: Add st_mmcss_cconfig function to configure mmcss glue
+    registers.
+  mmc: sdhci-st: Add sdhci_st_set_uhs_signaling function.
+  mmc: sdhci-st: Update the quirks for this controller.
+  mmc: sdhci-st: Update ST SDHCI binding documentation.
+  ARM: STi: DT: STiH407: Add dt nodes for sdhci and emmc.
+
+ Documentation/devicetree/bindings/mmc/sdhci-st.txt | 100 +++++-
+ arch/arm/boot/dts/stih407-family.dtsi              |  30 ++
+ arch/arm/boot/dts/stih410-b2120.dts                |  10 +
+ arch/arm/boot/dts/stihxxx-b2120.dtsi               |   8 +
+ drivers/mmc/host/sdhci-st.c                        | 344 ++++++++++++++++++++-
+ 5 files changed, 478 insertions(+), 14 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150226/fe2f2396/attachment.sig>
+1.9.1
