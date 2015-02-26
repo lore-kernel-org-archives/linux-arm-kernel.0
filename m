@@ -1,49 +1,50 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 08:58:07 +0900
-Subject: [PATCH/RFC] ARM: shmobile: r8a7791: Fix IPMMU-GP clock to device
- tree
-In-Reply-To: <1424352546-27313-1-git-send-email-ykaneko0929@gmail.com>
-References: <1424352546-27313-1-git-send-email-ykaneko0929@gmail.com>
-Message-ID: <20150225235806.GM23723@verge.net.au>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Thu, 26 Feb 2015 00:09:41 +0000
+Subject: [PATCH] clk: divider: return real rate instead of divider value
+In-Reply-To: <2011929.fOsbjMkSp9@diego>
+References: <2011929.fOsbjMkSp9@diego>
+Message-ID: <CAAG0J9-uHPg-np249ZKf3vrDCUvTvLhRbGZeGXfGqTV-XLByFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 24 February 2015 at 10:39, Heiko St?bner <heiko@sntech.de> wrote:
+> Commit bca9690b9426 ("clk: divider: Make generic for usage elsewhere")
+> returned only the divider value for read-only dividers instead of the
+> actual rate.
+>
+> Fixes: bca9690b9426 ("clk: divider: Make generic for usage elsewhere")
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-while I am inclined to take this patch on face value I am wondering
-if anyone is able to confirm this change against the documentation:
-I have drawn a blank there.
+I just created an identical patch, so
+Reviewed-by: James Hogan <james.hogan@imgtec.com>
+Tested-by: James Hogan <james.hogan@imgtec.com>
 
-On Thu, Feb 19, 2015 at 10:29:06PM +0900, Yoshihiro Kaneko wrote:
-> From: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
-> 
-> Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
-> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+Thanks
+James
+
 > ---
-> 
-> This patch is based on devel branch of Simon Horman's renesas tree.
-> 
->  arch/arm/boot/dts/r8a7791.dtsi | 2 +-
+>  drivers/clk/clk-divider.c | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-> index afba8af..1e75a5f 100644
-> --- a/arch/arm/boot/dts/r8a7791.dtsi
-> +++ b/arch/arm/boot/dts/r8a7791.dtsi
-> @@ -1154,7 +1154,7 @@
->  		mstp8_clks: mstp8_clks at e6150990 {
->  			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
->  			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
-> -			clocks = <&zg_clk>, <&hp_clk>, <&zg_clk>, <&zg_clk>,
-> +			clocks = <&zx_clk>, <&hp_clk>, <&zg_clk>, <&zg_clk>,
->  			         <&zg_clk>, <&p_clk>, <&zs_clk>, <&zs_clk>;
->  			#clock-cells = <1>;
->  			clock-indices = <
-> -- 
-> 1.9.1
-> 
+>
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index a213455..5b4c018 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -355,7 +355,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+>                 bestdiv = readl(divider->reg) >> divider->shift;
+>                 bestdiv &= div_mask(divider->width);
+>                 bestdiv = _get_div(divider->table, bestdiv, divider->flags);
+> -               return bestdiv;
+> +               return DIV_ROUND_UP(*prate, bestdiv);
+>         }
+>
+>         return divider_round_rate(hw, rate, prate, divider->table,
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> 2.1.4
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> Please read the FAQ at  http://www.tux.org/lkml/
