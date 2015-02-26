@@ -1,36 +1,33 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 26 Feb 2015 09:29:32 +0800
-Subject: [PATCH v3 15/30] PCI/IA64: Refine pci_acpi_scan_root() with generic
+Date: Thu, 26 Feb 2015 09:29:31 +0800
+Subject: [PATCH v3 14/30] PCI/x86: Refine pci_acpi_scan_root() with generic
  pci_host_bridge
 In-Reply-To: <1424914187-21027-1-git-send-email-wangyijing@huawei.com>
 References: <1424914187-21027-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1424914187-21027-16-git-send-email-wangyijing@huawei.com>
+Message-ID: <1424914187-21027-15-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yijing Wang <wangyijing0307@gmail.com>
-
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Tony Luck <tony.luck@intel.com>
-CC: Fenghua Yu <fenghua.yu@intel.com>
-CC: linux-ia64 at vger.kernel.org
+CC: Thomas Gleixner <tglx@linutronix.de>
+CC: x86 at kernel.org
 ---
- arch/ia64/pci/pci.c |   34 ++++++++++++++++++----------------
- 1 files changed, 18 insertions(+), 16 deletions(-)
+ arch/x86/pci/acpi.c |   36 ++++++++++++++++++++----------------
+ 1 files changed, 20 insertions(+), 16 deletions(-)
 
-diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
-index e4cda61..dc5354d 100644
---- a/arch/ia64/pci/pci.c
-+++ b/arch/ia64/pci/pci.c
-@@ -420,6 +420,18 @@ probe_pci_root_info(struct pci_root_info *info, struct acpi_device *device,
- 	return 0;
+diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+index 5bfe983..3feb12c 100644
+--- a/arch/x86/pci/acpi.c
++++ b/arch/x86/pci/acpi.c
+@@ -349,6 +349,18 @@ static void probe_pci_root_info(struct pci_root_info *info,
+ 			entry->res->name = info->name;
  }
  
 +static int pci_host_bridge_prepare(struct pci_host_bridge *bridge)
 +{
-+	struct pci_controller *controller = bridge->bus->sysdata;
++	struct pci_sysdata *sd = dev_get_drvdata(&bridge->dev);
 +
-+	ACPI_COMPANION_SET(&bridge->dev, controller->companion);
++	ACPI_COMPANION_SET(&bridge->dev, sd->companion);
 +	return 0;
 +}
 +
@@ -41,46 +38,50 @@ index e4cda61..dc5354d 100644
  struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
  {
  	struct acpi_device *device = root->device;
-@@ -428,7 +440,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	struct pci_controller *controller;
- 	struct pci_root_info *info = NULL;
- 	int busnum = root->secondary.start;
--	struct pci_bus *pbus;
-+	struct pci_host_bridge *host;
- 	int ret;
+@@ -359,6 +371,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	LIST_HEAD(crs_res);
+ 	LIST_HEAD(resources);
+ 	struct pci_bus *bus;
++	struct pci_host_bridge *host = NULL;
+ 	struct pci_sysdata *sd;
+ 	int node;
  
- 	controller = alloc_pci_controller(domain);
-@@ -465,26 +477,16 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	 * should handle the case here, but it appears that IA64 hasn't
- 	 * such quirk. So we just ignore the case now.
- 	 */
--	pbus = pci_create_root_bus(NULL, PCI_DOMBUS(domain, bus), 
--			&pci_root_ops, controller, &info->resources);
--	if (!pbus) {
-+	host = pci_scan_root_bridge(NULL, PCI_DOMBUS(domain, bus),
-+			&pci_root_ops, controller, &info->resources, &phb_ops);
-+	if (!host) {
- 		pci_free_resource_list(&info->resources);
- 		__release_pci_root_info(info);
- 		return NULL;
- 	}
+@@ -425,14 +438,13 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
  
--	pci_set_host_bridge_release(to_pci_host_bridge(pbus->bridge),
--			release_pci_root_info, info);
--	pci_scan_child_bus(pbus);
--	return pbus;
--}
+ 		if (!setup_mcfg_map(info, domain, (u8)root->secondary.start,
+ 					(u8)root->secondary.end, root->mcfg_addr)) 
+-			bus = pci_create_root_bus(NULL, PCI_DOMBUS(domain, busnum), 
+-					&pci_root_ops, sd, &resources);
 -
--int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
--{
--	struct pci_controller *controller = bridge->bus->sysdata;
--
--	ACPI_COMPANION_SET(&bridge->dev, controller->companion);
--	return 0;
-+	pci_set_host_bridge_release(host, release_pci_root_info, info);
-+	return host->bus;
+-		if (bus) {
+-			pci_scan_child_bus(bus);
+-			pci_set_host_bridge_release(
+-				to_pci_host_bridge(bus->bridge),
+-				release_pci_root_info, info);
++			host = pci_scan_root_bridge(NULL, PCI_DOMBUS(domain, busnum),
++					&pci_root_ops, sd, &resources, &phb_ops);
++
++		if (host) {
++			bus = host->bus;
++			pci_set_host_bridge_release(host, release_pci_root_info,
++					info);
+ 		} else {
+ 			resource_list_free(&resources);
+ 			teardown_mcfg_map(info);
+@@ -455,14 +467,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	return bus;
  }
  
- void pcibios_fixup_device_resources(struct pci_dev *dev)
+-int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+-{
+-	struct pci_sysdata *sd = bridge->bus->sysdata;
+-
+-	ACPI_COMPANION_SET(&bridge->dev, sd->companion);
+-	return 0;
+-}
+-
+ int __init pci_acpi_init(void)
+ {
+ 	struct pci_dev *dev = NULL;
 -- 
 1.7.1
