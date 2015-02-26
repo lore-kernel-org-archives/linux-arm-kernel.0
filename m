@@ -1,94 +1,42 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 26 Feb 2015 12:09:19 +0100
-Subject: [PATCH 1/8] irqchip: armada-370-xp: Simplify interrupt map, mask
- and unmask
-In-Reply-To: <54EEF83C.40003@free-electrons.com>
-References: <1424945593-20320-1-git-send-email-maxime.ripard@free-electrons.com>
- <1424945593-20320-2-git-send-email-maxime.ripard@free-electrons.com>
- <54EEF83C.40003@free-electrons.com>
-Message-ID: <20150226110919.GC29241@lukather>
+Date: Thu, 26 Feb 2015 12:11:59 +0100
+Subject: [PATCH] irqchip: armada: Fix chained per-cpu interrupts
+In-Reply-To: <54EEFB04.8020200@free-electrons.com>
+References: <1424944527-16850-1-git-send-email-maxime.ripard@free-electrons.com>
+ <54EEF4D4.7060102@free-electrons.com>
+ <20150226104710.GB29241@lukather>
+ <54EEFB04.8020200@free-electrons.com>
+Message-ID: <20150226111159.GD29241@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
-
-On Thu, Feb 26, 2015 at 11:41:00AM +0100, Gregory CLEMENT wrote:
-> Hi Maxime,
+On Thu, Feb 26, 2015 at 11:52:52AM +0100, Gregory CLEMENT wrote:
+> >> The following function is called as soon as the MPIC is used as a secondary
+> >> interrupt controller. So it will be the case for the Armada 375 and Armada 39x too. It
+> >> also seems to not be related to be used in an SoC or an other, so I think that the
+> >> function name is misleading. What about just using mpic_secondary_init and
+> >> mpic_cpu_notifier ?
+> >>
+> >> I know we prefixed the mpic function with armada_370_xp or armada_xp, but looking
+> >> back, it was a mistake.
+> > 
+> > I don't know, that code needs to be run only in the cases where the
+> > MPIC is a secondary interrupt controller, which rules out the armada
+> > 370/XP.
+> > 
+> > I was trying to make such a distinction, but indeed the wording is
+> > quite poor.
+> > 
+> > Do you have some suggestions?
 > 
-> On 26/02/2015 11:13, Maxime Ripard wrote:
-> > From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > 
-> > The map, mask and unmask is unnecessarily complicated, with a different
-> > implementation for shared and per CPU interrupts. The current code does
-> > the following:
-> > 
-> > At probe time, all interrupts are disabled and masked on all CPUs.
-> > 
-> > Shared interrupts:
-> > 
-> >  * When the interrupt is mapped(), it gets disabled and unmasked on the
-> >    calling CPU.
-> > 
-> >  * When the interrupt is unmasked(), masked(), it gets enabled and
-> >    disabled.
-> > 
-> > Per CPU interrupts:
-> > 
-> >  * When the interrupt is mapped, it gets masked on the calling CPU and
-> >    enabled.
-> > 
-> >  * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
-> >    on the calling CPU.
-> > 
-> > This commit simplifies this code, with a much simpler implementation, common
-> > to shared and per CPU interrupts.
-> > 
-> >  * When the interrupt is mapped, it's enabled.
-> > 
-> >  * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
-> >    on the calling CPU.
-> > 
-> > Tested on a Armada XP SoC with SMP and UP configurations, with chained and
-> > regular interrupts.
-> 
-> This patch doesn't only simplify the driver it changes also its
-> behavior and especially for the affinity.
+> Yes using  mpic_secondary_init and  mpic_cpu_notifier, because what is important
+> is the fact that the MPIC is used as a secondary interrupt controller.
 
-The affinity itself is not changed by that patch. The default CPU the
-interrupt handler is running on might, but as far as I know, there's
-no guarantee on the affinity of an interrupt when irq_set_affinity has
-not been called.
-
-> If a driver call irq_enable() then this functions will call
-> irq_enable() and as we didn't implement a .enable() operation, it will
-> call only our unmask() function.
-> 
-> So if the IRQ was unmasked on a CPU and a driver call an irq_enable()
-> from an other CPU then we will end up with the IRQ enabled on 2
-> different CPUs. It is a problem for 2 reasons:
-
-I guess you're talking about SPIs here, right?
-
-> - the hardware don't handle a IRQ enable on more than one CPU
-
-Oh. I would have expected one CPU to get a spurious interrupt, and the
-other to handle the interrupt as expected.
-
-> - it will modify the affinity at the hardware level because a new CPU
->   will be able to receive an IRQ whereas we setup the affinity on only
->   one CPU.
-
-I'm not seure what you mean here.
-
-The affinity is controlled by the INT_SOURCE_CTL register set, that is
-left untouched by this patch.
-
-> By only using the mask and unmask the affinity behavior is no more
-> reliable. I agree that the current code is not trivial, but adding
-> more comment instead of removing this capability should be better.
-
-That can be done too. Especially using the second patch that makes it
-a lot easier to extend the list of supported PPIs.
+The thing is, the armada xp notifier is called
+armada_xp_mpic_secondary_init, with in this case secondary meaning
+secondary CPU. Won't that be really confusing to have another callback
+called mpic_secondary_init, what would only be called on !armada
+370/XP, and with secondary meaning secondary interrupt controller?
 
 Maxime
 
@@ -102,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150226/25b544e3/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150226/dc3db871/attachment.sig>
