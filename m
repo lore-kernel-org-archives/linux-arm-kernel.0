@@ -1,70 +1,71 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Thu, 26 Feb 2015 08:13:37 -0800
-Subject: [PATCH 1/2] Input: bcm-keypad: add device tree bindings
-In-Reply-To: <20150223174913.GB604@dtor-glaptop>
-References: <sbranden@broadcom.com>
- <1423526861-29579-1-git-send-email-sbranden@broadcom.com>
- <1423526861-29579-2-git-send-email-sbranden@broadcom.com>
- <20150210005134.GA13695@dtor-ws> <54DF7C8B.3050103@broadcom.com>
- <20150216051751.GA15948@dtor-ws> <20150223174913.GB604@dtor-glaptop>
-Message-ID: <54EF4631.1090903@broadcom.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 26 Feb 2015 09:14:18 -0700
+Subject: [PATCH RESEND] coresight-stm: Bindings for System Trace Macrocell
+Message-ID: <1424967258-28573-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+The System Trace Macrocell (STM) is an IP block falling under the
+CoreSight umbrella.  It's main purpose it so expose stimulus channels
+to any system component for the purpose of information logging.
 
-Thanks for the update of no need to change any of dt-binding prefixes. 
-I just sent out a v2 patch addressing all of your other comments.
+Bindings for this IP block adds a couple of items to the current
+mandatory definition for CoreSight components.  The driver has been posted
+here[1].
 
-On 15-02-23 09:49 AM, Dmitry Torokhov wrote:
-> Hi Scott,
->
-> On Sun, Feb 15, 2015 at 09:17:51PM -0800, Dmitry Torokhov wrote:
->> On Sat, Feb 14, 2015 at 08:49:15AM -0800, Scott Branden wrote:
->>> On 15-02-09 04:51 PM, Dmitry Torokhov wrote:
->>>> On Mon, Feb 09, 2015 at 04:07:40PM -0800, Scott Branden wrote:
->>>>> +
->>>>> +- col-debounce-filter-period: The debounce period for the Column filter.
->>>>> +
->>>>> +	KEYPAD_DEBOUNCE_1_ms	=	0
->>>>> +	KEYPAD_DEBOUNCE_2_ms	=	1
->>>>> +	KEYPAD_DEBOUNCE_4_ms	=	2
->>>>> +	KEYPAD_DEBOUNCE_8_ms	=	3
->>>>
->>>>> +	KEYPAD_DEBOUNCE_16_ms	=	4
->>>>> +	KEYPAD_DEBOUNCE_32_ms	=	5
->>>>> +	KEYPAD_DEBOUNCE_64_ms	=	6
->>>>> +	KEYPAD_DEBOUNCE_128_ms	=	7
->>>>> +
->>>>> +- status-debounce-filter-period: The debounce period for the Status filter.
->>>>> +
->>>>> +	KEYPAD_DEBOUNCE_1_ms	=	0
->>>>> +	KEYPAD_DEBOUNCE_2_ms	=	1
->>>>> +	KEYPAD_DEBOUNCE_4_ms	=	2
->>>>> +	KEYPAD_DEBOUNCE_8_ms	=	3
->>>>> +	KEYPAD_DEBOUNCE_16_ms	=	4
->>>>> +	KEYPAD_DEBOUNCE_32_ms	=	5
->>>>> +	KEYPAD_DEBOUNCE_64_ms	=	6
->>>>> +	KEYPAD_DEBOUNCE_128_ms	=	7
->>>>
->>>> I could swear device-specific properties should be in form of
->>>> <vendor-prefix>,<property-name> to ensure it won't clash with changes on
->>>> subsystem level later on. Device-tree folks, what say you?
->>> I see examples with and without vendor-prefix.
->>> qcom,pm8xxx-keypad.txt does not have prefixes
->>> st-keyscan.txt does have a prefix
->>>
->>> I can't find any documented guidelines for this.
->>
->> As I mentioned I'll try to get clarification on this.
->
-> I have chatted with a couple of people on this and it is acceptable to
-> omit vendor prefix in bindings when we are using a specific driver like
-> we have here (i.e. when driver's compatible string already includes
-> vendor prefix). Vendor prefixes on properties are required when we
-> augment a generic driver's binding.
->
-> So the above 2 entries are fine as is.
->
-> Thanks.
->
+[1]. https://lkml.org/lkml/2015/2/25/743
+
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ .../devicetree/bindings/arm/coresight.txt          | 25 ++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+index a3089359aaa6..854127578718 100644
+--- a/Documentation/devicetree/bindings/arm/coresight.txt
++++ b/Documentation/devicetree/bindings/arm/coresight.txt
+@@ -17,6 +17,7 @@ its hardware characteristcs.
+ 		- "arm,coresight-tmc", "arm,primecell";
+ 		- "arm,coresight-funnel", "arm,primecell";
+ 		- "arm,coresight-etm3x", "arm,primecell";
++		- "arm,coresight-stm", "arm,primecell";
+ 
+ 	* reg: physical base address and length of the register
+ 	  set(s) of the component.
+@@ -31,6 +32,14 @@ its hardware characteristcs.
+ 	  layout using the generic DT graph presentation found in
+ 	  "bindings/graph.txt".
+ 
++* Additional required properly for System Trace Macrocells (STM):
++	* reg: along with the physical base address and length of the register
++	  set as described above, another entry is required to describe the
++	  mapping of the extended stimulus port area.
++
++	* reg-names: the only acceptable values are "stm-base" and
++	  "stm-channel-base", each corresponding to the areas defined in "reg".
++
+ * Required properties for devices that don't show up on the AMBA bus, such as
+   non-configurable replicators:
+ 
+@@ -198,3 +207,19 @@ Example:
+ 			};
+ 		};
+ 	};
++
++4. STM
++	stm at 20100000 {
++		compatible = "arm,coresight-stm", "arm,primecell";
++		reg = <0 0x20100000 0 0x1000>,
++		      <0 0x28000000 0 0x180000>;
++		reg-names = "stm-base", "stm-channel-base";
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			stm_out_port: endpoint {
++				remote-endpoint = <&main_funnel_in_port2>;
++			};
++		};
++	};
+-- 
+1.9.1
