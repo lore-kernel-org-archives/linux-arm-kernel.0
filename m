@@ -1,58 +1,36 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Thu, 26 Feb 2015 12:03:00 +1030
-Subject: [PATCH 3/3] kernel/module.c: Update debug alignment after
- symtable generation
-In-Reply-To: <1424902497-32141-4-git-send-email-lauraa@codeaurora.org>
-References: <1424902497-32141-1-git-send-email-lauraa@codeaurora.org>
- <1424902497-32141-4-git-send-email-lauraa@codeaurora.org>
-Message-ID: <87sidtlann.fsf@rustcorp.com.au>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 25 Feb 2015 23:51:23 -0600
+Subject: [PATCH v3 00/30] Refine PCI scan interfaces and make generic pci
+ host bridge
+In-Reply-To: <1424914187-21027-1-git-send-email-wangyijing@huawei.com>
+References: <1424914187-21027-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <20150226055123.GA5415@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Laura Abbott <lauraa@codeaurora.org> writes:
-> When CONFIG_DEBUG_SET_MODULE_RONX is enabled, the sizes of
-> module sections are aligned up so appropriate permissions can
-> be applied. Adjusting for the symbol table may cause them to
-> become unaligned. Make sure to re-align the sizes afterward.
->
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+On Thu, Feb 26, 2015 at 09:29:17AM +0800, Yijing Wang wrote:
+> v2->v3:
+> 	Rebase this series on v4.0-rc1.
 
-Acked-by: Rusty Russell <rusty@rustcorp.com.au>
+Hm, still doesn't apply for me:
 
-This won't clash with anything I'm planning, so happy for this to go in
-through the arm trees.  CC:stable should be fine if you want too.
-
-Thanks,
-Rusty.
-
-> ---
->  kernel/module.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/kernel/module.c b/kernel/module.c
-> index b34813f..cc93cf6 100644
-> --- a/kernel/module.c
-> +++ b/kernel/module.c
-> @@ -2313,11 +2313,13 @@ static void layout_symtab(struct module *mod, struct load_info *info)
->  	info->symoffs = ALIGN(mod->core_size, symsect->sh_addralign ?: 1);
->  	info->stroffs = mod->core_size = info->symoffs + ndst * sizeof(Elf_Sym);
->  	mod->core_size += strtab_size;
-> +	mod->core_size = debug_align(mod->core_size);
->  
->  	/* Put string table section at end of init part of module. */
->  	strsect->sh_flags |= SHF_ALLOC;
->  	strsect->sh_entsize = get_offset(mod, &mod->init_size, strsect,
->  					 info->index.str) | INIT_OFFSET_MASK;
-> +	mod->init_size = debug_align(mod->init_size);
->  	pr_debug("\t%s\n", info->secstrings + strsect->sh_name);
->  }
->  
-> -- 
-> Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+  11:48:15 ~/linux (pci/enumeration)$ git show --oneline | head -1
+  c517d838eb7d Linux 4.0-rc1
+  11:48:36 ~/linux (pci/enumeration)$ stg import -M --sign m/yw
+  Checking for changes in the working directory ... done
+  Importing patch "pci-rip-out" ... done
+  Importing patch "pci-rip-out-0" ... done
+  Importing patch "xen-pci-don-t-use-deprecated" ... done
+  Importing patch "pci-remove-deprecated" ... done
+  Importing patch "pci-rename-pci_scan_bus-to" ... done
+  Importing patch "pci-combine-pci-domain-and-bus" ... done
+  Importing patch "pci-pass-pci-domain-number" ... done
+  Importing patch "pci-introduce" ... done
+  Importing patch "pci-separate-pci_host_bridge" ... done
+  Importing patch "pci-introduce-0" ... done
+  Importing patch "pci-save-sysdata-in" ... error: patch failed: drivers/pci/host-bridge.c:58
+  error: drivers/pci/host-bridge.c: patch does not apply
+  error: patch failed: drivers/pci/probe.c:1954
+  error: drivers/pci/probe.c: patch does not apply
+  stg import: Diff does not apply cleanly
+  11:48:52 ~/linux (pci/enumeration)$ 
