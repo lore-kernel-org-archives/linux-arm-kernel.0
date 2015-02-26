@@ -1,185 +1,109 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 26 Feb 2015 14:25:29 +0000
-Subject: [PATCH v6 1/3] dmaengine: Add support for APM X-Gene SoC DMA
- engine driver
-In-Reply-To: <CAFd313xnFLn8=i+9Dmpg5SH=DcxaUcQi_Pvb-MXPZCN9=7hhtw@mail.gmail.com>
-References: <1424782439-31485-1-git-send-email-rsahu@apm.com>	<1424782439-31485-2-git-send-email-rsahu@apm.com>
- <CAFd313xnFLn8=i+9Dmpg5SH=DcxaUcQi_Pvb-MXPZCN9=7hhtw@mail.gmail.com>
-Message-ID: <54EF2CD9.8010104@codethink.co.uk>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 26 Feb 2015 15:30:51 +0100
+Subject: [PATCH v6 6/8] input: touchscreen: imx25 tcq driver
+In-Reply-To: <20150202175134.GB23909@dtor-ws>
+References: <1422540556-14828-1-git-send-email-mpa@pengutronix.de>
+ <1422540556-14828-7-git-send-email-mpa@pengutronix.de>
+ <54CA4320.4030607@gmail.com> <20150130185721.GA11695@dtor-ws>
+ <20150202160539.GS16879@pengutronix.de>
+ <20150202175134.GB23909@dtor-ws>
+Message-ID: <20150226143051.GA10070@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/02/15 12:31, Rameshwar Sahu wrote:
-> Hi Vinod,
-> 
-> 
-> On Tue, Feb 24, 2015 at 6:23 PM, Rameshwar Prasad Sahu <rsahu@apm.com> wrote:
->> This patch implements the APM X-Gene SoC DMA engine driver. The APM X-Gene
->> SoC DMA engine consists of 4 DMA channels for performing DMA operations.
->> These DMA operations include memory copy and scatter-gather memory copy
->> offloading.
->>
->> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
->> Signed-off-by: Loc Ho <lho@apm.com>
->> ---
->>  drivers/dma/Kconfig     |    8 +
->>  drivers/dma/Makefile    |    1 +
->>  drivers/dma/xgene-dma.c | 1738 +++++++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 1747 insertions(+)
->>  create mode 100755 drivers/dma/xgene-dma.c
->>
->> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
->> index a874b6e..0e05831 100644
->> --- a/drivers/dma/Kconfig
->> +++ b/drivers/dma/Kconfig
->> @@ -425,6 +425,14 @@ config IMG_MDC_DMA
->>         help
->>           Enable support for the IMG multi-threaded DMA controller (MDC).
->>
->> +config XGENE_DMA
->> +       tristate "APM X-Gene DMA support"
->> +       depends on ARCH_XGENE
->> +       select DMA_ENGINE
->> +       select ASYNC_TX_ENABLE_CHANNEL_SWITCH
->> +       help
->> +         Enable support for the APM X-Gene SoC DMA engine.
->> +
->>  config DMA_ENGINE
->>         bool
->>
->> diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
->> index f915f61..06c1576 100644
->> --- a/drivers/dma/Makefile
->> +++ b/drivers/dma/Makefile
->> @@ -51,3 +51,4 @@ obj-$(CONFIG_INTEL_MIC_X100_DMA) += mic_x100_dma.o
->>  obj-$(CONFIG_NBPFAXI_DMA) += nbpfaxi.o
->>  obj-$(CONFIG_DMA_SUN6I) += sun6i-dma.o
->>  obj-$(CONFIG_IMG_MDC_DMA) += img-mdc-dma.o
->> +obj-$(CONFIG_XGENE_DMA) += xgene-dma.o
->> diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
->> new file mode 100755
->> index 0000000..e736c2e
->> --- /dev/null
->> +++ b/drivers/dma/xgene-dma.c
->> @@ -0,0 +1,1738 @@
->> +/*
->> + * Applied Micro X-Gene SoC DMA engine Driver
->> + *
->> + * Copyright (c) 2015, Applied Micro Circuits Corporation
->> + * Authors: Rameshwar Prasad Sahu <rsahu@apm.com>
->> + *         Loc Ho <lho@apm.com>
->> + *
->> + * This program is free software; you can redistribute  it and/or modify it
->> + * under  the terms of  the GNU General  Public License as published by the
->> + * Free Software Foundation;  either version 2 of the  License, or (at your
->> + * option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + *
->> + * NOTE: PM support is currently not available.
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/delay.h>
->> +#include <linux/dma-mapping.h>
->> +#include <linux/dmaengine.h>
->> +#include <linux/dmapool.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/io.h>
->> +#include <linux/module.h>
->> +#include <linux/of_device.h>
->> +
->> +#include "dmaengine.h"
->> +
->> +/* DMA ring csr registers and bit definations */
->> +#define DMA_RING_CONFIG                        0x04
->> +#define DMA_RING_ENABLE                        BIT(31)
->> +#define DMA_RING_ID                    0x08
->> +#define DMA_RING_ID_SETUP(v)           ((v) | BIT(31))
->> +#define DMA_RING_ID_BUF                        0x0C
->> +#define DMA_RING_ID_BUF_SETUP(v)       (((v) << 9) | BIT(21))
->> +#define DMA_RING_THRESLD0_SET1         0x30
->> +#define DMA_RING_THRESLD0_SET1_VAL     0X64
->> +#define DMA_RING_THRESLD1_SET1         0x34
->> +#define DMA_RING_THRESLD1_SET1_VAL     0xC8
->> +#define DMA_RING_HYSTERESIS            0x68
->> +#define DMA_RING_HYSTERESIS_VAL                0xFFFFFFFF
->> +#define DMA_RING_STATE                 0x6C
->> +#define DMA_RING_STATE_WR_BASE         0x70
->> +#define DMA_RING_NE_INT_MODE           0x017C
->> +#define DMA_RING_NE_INT_MODE_SET(m, v) \
->> +       ((m) = ((m) & ~BIT(31 - (v))) | BIT(31 - (v)))
->> +#define DMA_RING_NE_INT_MODE_RESET(m, v)       \
->> +       ((m) &= (~BIT(31 - (v))))
->> +#define DMA_RING_CLKEN                 0xC208
->> +#define DMA_RING_SRST                  0xC200
->> +#define DMA_RING_MEM_RAM_SHUTDOWN      0xD070
->> +#define DMA_RING_BLK_MEM_RDY           0xD074
->> +#define DMA_RING_BLK_MEM_RDY_VAL       0xFFFFFFFF
->> +#define DMA_RING_DESC_CNT(v)           (((v) & 0x0001FFFE) >> 1)
->> +#define DMA_RING_ID_GET(owner, num)    (((owner) << 6) | (num))
->> +#define DMA_RING_DST_ID(v)             ((1 << 10) | (v))
->> +#define DMA_RING_CMD_OFFSET            0x2C
->> +#define DMA_RING_CMD_BASE_OFFSET(v)    ((v) << 6)
->> +#define DMA_RING_COHERENT_SET(m)       (((u32 *)(m))[2] |= BIT(4))
->> +#define DMA_RING_ADDRL_SET(m, v)       (((u32 *)(m))[2] |= (((v) >> 8) << 5))
->> +#define DMA_RING_ADDRH_SET(m, v)       (((u32 *)(m))[3] |= ((v) >> 35))
->> +#define DMA_RING_ACCEPTLERR_SET(m)     (((u32 *)(m))[3] |= BIT(19))
->> +#define DMA_RING_SIZE_SET(m, v)                (((u32 *)(m))[3] |= ((v) << 23))
->> +#define DMA_RING_RECOMBBUF_SET(m)      (((u32 *)(m))[3] |= BIT(27))
->> +#define DMA_RING_RECOMTIMEOUTL_SET(m)  (((u32 *)(m))[3] |= (0x7 << 28))
->> +#define DMA_RING_RECOMTIMEOUTH_SET(m)  (((u32 *)(m))[4] |= 0x3)
->> +#define DMA_RING_SELTHRSH_SET(m)       (((u32 *)(m))[4] |= BIT(3))
->> +#define DMA_RING_TYPE_SET(m, v)                (((u32 *)(m))[4] |= ((v) << 19))
->> +
->> +/* DMA device csr registers and bit definitions */
->> +#define DMA_IPBRR              0x0
->> +#define DMA_DEV_ID_RD(v)       ((v) & 0x00000FFF)
->> +#define DMA_BUS_ID_RD(v)       (((v) >> 12) & 3)
->> +#define DMA_REV_NO_RD(v)       (((v) >> 14) & 3)
->> +#define DMA_GCR                        0x10
->> +#define DMA_CH_SETUP(v)                ((v) = ((v) & ~0x000FFFFF) | 0x000AAFFF)
->> +#define DMA_ENABLE(v)          ((v) |= BIT(31))
->> +#define DMA_DISABLE(v)         ((v) &= ~BIT(31))
->> +#define DMA_INT                        0x70
->> +#define DMA_INT_MASK           0x74
->> +#define DMA_INT_ALL_MASK       0xFFFFFFFF
->> +#define DMA_INT_ALL_UNMASK     0x0
->> +#define DMA_INT_MASK_SHIFT     0x14
->> +#define DMA_RING_INT0_MASK     0x90A0
->> +#define DMA_RING_INT1_MASK     0x90A8
->> +#define DMA_RING_INT2_MASK     0x90B0
->> +#define DMA_RING_INT3_MASK     0x90B8
->> +#define DMA_RING_INT4_MASK     0x90C0
->> +#define DMA_CFG_RING_WQ_ASSOC  0x90E0
->> +#define DMA_ASSOC_RING_MNGR1   0xFFFFFFFF
->> +#define DMA_MEM_RAM_SHUTDOWN   0xD070
->> +#define DMA_BLK_MEM_RDY                0xD074
->> +#define DMA_BLK_MEM_RDY_VAL    0xFFFFFFFF
->> +
->> +/* DMA Descriptor format */
->> +#define DMA_DESC_ELERR_RD(m)           (((m) >> 46) & 0x3)
->> +#define DMA_DESC_NV_SET(m)             (((u64 *)(m))[0] |= BIT_ULL(50))
->> +#define DMA_DESC_IN_SET(m)             (((u64 *)(m))[0] |= BIT_ULL(55))
->> +#define DMA_DESC_RTYPE_SET(m, v)       (((u64 *)(m))[0] |= ((u64)(v) << 56))
->> +#define DMA_DESC_LERR_RD(m)            (((m) >> 60) & 0x7)
->> +#define DMA_DESC_BUFADDR_SET(m, v)     (((u64 *)(m))[0] |= (v))
->> +#define DMA_DESC_BUFLEN_SET(m, v)      (((u64 *)(m))[0] |= ((u64)(v) << 48))
->> +#define DMA_DESC_C_SET(m)              (((u64 *)(m))[1] |= BIT_ULL(63))
->> +#define DMA_DESC_DR_SET(m)             (((u64 *)(m))[2] |= BIT_ULL(61))
->> +#define DMA_DESC_DST_ADDR_SET(m, v)    (((u64 *)(m))[3] |= (v))
->> +#define DMA_DESC_H0ENQ_NUM_SET(m, v)   (((u64 *)(m))[3] |= ((u64)(v) << 48))
->> +#define DMA_DESC_STATUS(x, y)          (((x) << 4) | (y))
+Hi,
 
-This is very difficult to read.
+On Mon, Feb 02, 2015 at 09:51:34AM -0800, Dmitry Torokhov wrote:
+> On Mon, Feb 02, 2015 at 05:05:39PM +0100, Markus Pargmann wrote:
+> > Hi,
+> > 
+> > On Fri, Jan 30, 2015 at 10:57:21AM -0800, Dmitry Torokhov wrote:
+> > > On Thu, Jan 29, 2015 at 07:56:40PM +0530, Varka Bhadram wrote:
+> > > > Hi,
+> > > > 
+> > > > On Thursday 29 January 2015 07:39 PM, Markus Pargmann wrote:
+> > > > >This is a driver for the imx25 ADC/TSC module. It controls the
+> > > > >touchscreen conversion queue and creates a touchscreen input device.
+> > > > >The driver currently only supports 4 wire touchscreens. The driver uses
+> > > > >a simple conversion queue of precharge, touch detection, X measurement,
+> > > > >Y measurement, precharge and another touch detection.
+> > > > >
+> > > > >This driver uses the regmap from the parent to setup some touch specific
+> > > > >settings in the core driver and setup a idle configuration with touch
+> > > > >detection.
+> > > > >
+> > > > >Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > > > >Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > > > >Acked-by: Dmitry Torokhov <dtor@vmware.com>
+> > > > >Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > > > >---
+> > > > >  drivers/input/touchscreen/Kconfig         |   6 +
+> > > > >  drivers/input/touchscreen/Makefile        |   1 +
+> > > > >  drivers/input/touchscreen/fsl-imx25-tcq.c | 587 ++++++++++++++++++++++++++++++
+> > > > >  3 files changed, 594 insertions(+)
+> > > > >  create mode 100644 drivers/input/touchscreen/fsl-imx25-tcq.c
+> > > > >
+> > > > (...)
+> > > > 
+> > > > >+	ret = request_threaded_irq(priv->irq, mx25_tcq_irq, mx25_tcq_irq_thread,
+> > > > >+				   IRQF_ONESHOT, pdev->name, priv);
+> > > > 
+> > > > We can use devres API for request_thread_irq()...
+> > > > 
+> > > > >+	if (ret) {
+> > > > >+		dev_err(dev, "Failed requesting IRQ\n");
+> > > > >+		goto err_clk_unprepare;
+> > > > >+	}
+> > > > >+
+> > > > >+	ret = mx25_tcq_init(priv);
+> > > > >+	if (ret) {
+> > > > >+		dev_err(dev, "Failed to init tcq\n");
+> > > > >+		goto error_free_irq;
+> > > > >+	}
+> > > > >+
+> > > > >+	platform_set_drvdata(pdev, priv);
+> > > > >+
+> > > > >+	return 0;
+> > > > >+
+> > > > >+error_free_irq:
+> > > > >+	free_irq(priv->irq, priv);
+> > > > 
+> > > > This is not required if we use devres API
+> > > 
+> > > Yes it does - you do not really want to stop clocks in the middle of
+> > > servicing interrupt.
+> > 
+> > Thanks, I missed the clocks. I will not use devm here then.
+> 
+> Actually, you still can if you move clock enabling/disabling and
+> mx25_tcq_init() into input_dev->open() and ->close() callbacks. Close
+> will be called during input device un-registration which happens (given
+> your current sequence) after freeing irq by devm.
 
+Thank you. I now moved that code into open() and close(), replaced the
+irq_request() with devm_irq_request. mx25_tcq_remove() is gone now.
+
+> 
+> By the way, I used my old @vmware address by accident. Can you please
+> replace the original acked by with:
+> 
+> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+Replaced it.
+
+Thanks,
+
+Markus
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150226/38528ef2/attachment.sig>
