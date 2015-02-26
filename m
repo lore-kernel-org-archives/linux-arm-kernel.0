@@ -1,69 +1,77 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 27 Feb 2015 10:26:44 +1100
-Subject: [PATCH] Fix offset2lib issue for x86*, ARM*, PowerPC and MIPS
-In-Reply-To: <20150226143815.09386fe280c7bd8797048bb2@linux-foundation.org>
-References: <54EB735F.5030207@upv.es>
- <CAGXu5j+SBRcj+BGyxEwUzgKsB2fdzNiPY37Q=JTsf=-QbGwoGA@mail.gmail.com>
- <20150223205436.15133mg1kpyojyik@webmail.upv.es>
- <20150224073906.GA16422@gmail.com>
- <20150226143815.09386fe280c7bd8797048bb2@linux-foundation.org>
-Message-ID: <20150227102644.18a0ea5f@canb.auug.org.au>
+From: rjui@broadcom.com (Ray Jui)
+Date: Thu, 26 Feb 2015 15:32:58 -0800
+Subject: [RFC V2 12/12] i2c: bcm-iproc: make use of the new infrastructure
+ for quirks
+In-Reply-To: <1424880126-15047-13-git-send-email-wsa@the-dreams.de>
+References: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
+ <1424880126-15047-13-git-send-email-wsa@the-dreams.de>
+Message-ID: <54EFAD2A.9060501@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
 
-[Just resending to correct addresses - sorry for those who get a duplicate]
 
-On Thu, 26 Feb 2015 14:38:15 -0800 Andrew Morton <akpm@linux-foundation.org> wrote:
->
-> diff -puN fs/binfmt_elf.c~fix-offset2lib-issue-for-x86-arm-powerpc-and-mips-fix fs/binfmt_elf.c
-> --- a/fs/binfmt_elf.c~fix-offset2lib-issue-for-x86-arm-powerpc-and-mips-fix
-> +++ a/fs/binfmt_elf.c
-> @@ -22,6 +22,7 @@
->  #include <linux/slab.h>
->  #include <linux/personality.h>
->  #include <linux/elfcore.h>
-> +#include <linux/elf-randomization.h>
->  #include <linux/init.h>
->  #include <linux/highuid.h>
->  #include <linux/compiler.h>
-> @@ -2300,6 +2301,26 @@ out:
+On 2/25/2015 8:02 AM, Wolfram Sang wrote:
+> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> 
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> ---
+>  drivers/i2c/busses/i2c-bcm-iproc.c | 15 +++++++--------
+>  1 file changed, 7 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-bcm-iproc.c b/drivers/i2c/busses/i2c-bcm-iproc.c
+> index d3c89157b33774..f9f2c2082151e2 100644
+> --- a/drivers/i2c/busses/i2c-bcm-iproc.c
+> +++ b/drivers/i2c/busses/i2c-bcm-iproc.c
+> @@ -160,14 +160,6 @@ static int bcm_iproc_i2c_xfer_single_msg(struct bcm_iproc_i2c_dev *iproc_i2c,
+>  	u32 val;
+>  	unsigned long time_left = msecs_to_jiffies(I2C_TIMEOUT_MESC);
 >  
->  #endif		/* CONFIG_ELF_CORE */
+> -	/* need to reserve one byte in the FIFO for the slave address */
+> -	if (msg->len > M_TX_RX_FIFO_SIZE - 1) {
+> -		dev_err(iproc_i2c->device,
+> -			"only support data length up to %u bytes\n",
+> -			M_TX_RX_FIFO_SIZE - 1);
+> -		return -EOPNOTSUPP;
+> -	}
+> -
+>  	/* check if bus is busy */
+>  	if (!!(readl(iproc_i2c->base + M_CMD_OFFSET) &
+>  	       BIT(M_CMD_START_BUSY_SHIFT))) {
+> @@ -287,6 +279,12 @@ static const struct i2c_algorithm bcm_iproc_algo = {
+>  	.functionality = bcm_iproc_i2c_functionality,
+>  };
 >  
-> +/* Not all architectures implement mmap_rnd() */
-> +unsigned long __weak mmap_rnd(void)
-> +{
-> +}
+> +static struct i2c_adapter_quirks bcm_iproc_i2c_quirks = {
+> +	/* need to reserve one byte in the FIFO for the slave address */
+> +	.max_read_len = M_TX_RX_FIFO_SIZE - 1,
+> +	.max_write_len = M_TX_RX_FIFO_SIZE - 1,
+> +};
 > +
-> +/*
-> + * Not all architectures use randomize_et_dyn(), so use __weak to let the
-> + * linker omit it from vmlinux
-> + */
-> +unsigned long __weak randomize_et_dyn(unsigned long base)
-> +{
-> +	unsigned long ret;
-> +
-> +	if ((current->personality & ADDR_NO_RANDOMIZE) ||
-> +		!(current->flags & PF_RANDOMIZE))
-> +		return base;
-> +	ret = base + mmap_rnd();
-> +	return max(ret, base);
-> +}
-> +  
+>  static int bcm_iproc_i2c_cfg_speed(struct bcm_iproc_i2c_dev *iproc_i2c)
+>  {
+>  	unsigned int bus_speed;
+> @@ -413,6 +411,7 @@ static int bcm_iproc_i2c_probe(struct platform_device *pdev)
+>  	i2c_set_adapdata(adap, iproc_i2c);
+>  	strlcpy(adap->name, "Broadcom iProc I2C adapter", sizeof(adap->name));
+>  	adap->algo = &bcm_iproc_algo;
+> +	adap->quirks = &bcm_iproc_i2c_quirks;
+>  	adap->dev.parent = &pdev->dev;
+>  	adap->dev.of_node = pdev->dev.of_node;
+>  
+> 
 
-Didn't we have some trouble with some compilers when the weak function
-(mmap_rnd) was defined and used in the same file i.e. the wrong one was
-used?
+Change on the iproc i2c driver looks good to me. Sanity tested the
+change from Wolfram's i2c/quirks branch on Cygnus 958300K combo board.
+Sanity tested with an attempt to transfer large amount of I2C data to
+ensure the transfer is denied by the i2c-core:
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150227/3c80d6c1/attachment.sig>
+/ # cat /dev/i2c-0
+[  657.310261] i2c i2c-0: quirk: msg too long (addr 0x0000, size 4096, read)
+
+Reviewed-by: Ray Jui <rjui@broadcom.com>
+Tested-by: Ray Jui <rjui@broadcom.com>
+
+Thanks,
+
+Ray
