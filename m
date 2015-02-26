@@ -1,79 +1,59 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 15:21:24 +0900
-Subject: [PATCH 27/32] ARM: shmobile: r8a7791: add CAN clocks
+Date: Thu, 26 Feb 2015 15:21:29 +0900
+Subject: [PATCH 32/32] ARM: shmobile: r8a7794: add SDHI DT support
 In-Reply-To: <cover.1424849129.git.horms+renesas@verge.net.au>
 References: <cover.1424849129.git.horms+renesas@verge.net.au>
-Message-ID: <b324252cc18d52d5752942a8574c22229153c58f.1424849129.git.horms+renesas@verge.net.au>
+Message-ID: <b8e8ea127d00f1b0c18d8c1ae1b8388e190d5052.1424849129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-The R-Car CAN controllers can derive the CAN bus clock not only from their
-peripheral clock input (clkp1) but also from the other internal clock (clkp2)
-and external clock fed on CAN_CLK pin.  Describe those clocks in the device
-tree,  along with  the USB_EXTAL clock  from which clkp2 is derived.
+Define the generic R8A7794 parts of the SDHI[012] device nodes.
+
+Based on the orginal patch by Shinobu Uehara <shinobu.uehara.xc@renesas.com>.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi            | 23 +++++++++++++++++++++--
- include/dt-bindings/clock/r8a7791-clock.h |  1 +
- 2 files changed, 22 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7794.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index afba8af..1ebffef 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -862,15 +862,34 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index fff9497..7a3ffa5 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -340,6 +340,30 @@
+ 		status = "disabled";
+ 	};
  
-+		/* External USB clock - can be overridden by the board */
-+		usb_extal_clk: usb_extal_clk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <48000000>;
-+			clock-output-names = "usb_extal";
-+		};
++	sdhi0: sd at ee100000 {
++		compatible = "renesas,sdhi-r8a7794";
++		reg = <0 0xee100000 0 0x200>;
++		interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7794_CLK_SDHI0>;
++		status = "disabled";
++	};
 +
-+		/* External CAN clock */
-+		can_clk: can_clk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			/* This value must be overridden by the board. */
-+			clock-frequency = <0>;
-+			clock-output-names = "can_clk";
-+			status = "disabled";
-+		};
++	sdhi1: sd at ee140000 {
++		compatible = "renesas,sdhi-r8a7794";
++		reg = <0 0xee140000 0 0x100>;
++		interrupts = <0 167 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7794_CLK_SDHI1>;
++		status = "disabled";
++	};
 +
- 		/* Special CPG clocks */
- 		cpg_clocks: cpg_clocks at e6150000 {
- 			compatible = "renesas,r8a7791-cpg-clocks",
- 				     "renesas,rcar-gen2-cpg-clocks";
- 			reg = <0 0xe6150000 0 0x1000>;
--			clocks = <&extal_clk>;
-+			clocks = <&extal_clk &usb_extal_clk>;
- 			#clock-cells = <1>;
- 			clock-output-names = "main", "pll0", "pll1", "pll3",
--					     "lb", "qspi", "sdh", "sd0", "z";
-+					     "lb", "qspi", "sdh", "sd0", "z",
-+					     "rcan";
- 		};
- 
- 		/* Variable factor clocks */
-diff --git a/include/dt-bindings/clock/r8a7791-clock.h b/include/dt-bindings/clock/r8a7791-clock.h
-index f096f3f..a45a363 100644
---- a/include/dt-bindings/clock/r8a7791-clock.h
-+++ b/include/dt-bindings/clock/r8a7791-clock.h
-@@ -20,6 +20,7 @@
- #define R8A7791_CLK_SDH			6
- #define R8A7791_CLK_SD0			7
- #define R8A7791_CLK_Z			8
-+#define R8A7791_CLK_RCAN		9
- 
- /* MSTP0 */
- #define R8A7791_CLK_MSIOF0		0
++	sdhi2: sd at ee160000 {
++		compatible = "renesas,sdhi-r8a7794";
++		reg = <0 0xee160000 0 0x100>;
++		interrupts = <0 168 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7794_CLK_SDHI2>;
++		status = "disabled";
++	};
++
+ 	clocks {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
 -- 
 2.1.4
