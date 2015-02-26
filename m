@@ -1,50 +1,58 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 26 Feb 2015 22:55:10 +0100
-Subject: [PATCH] cpuidle: mvebu: Fix the CPU PM notifier usage
-In-Reply-To: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <4892716.Bf612zPN6E@vostro.rjw.lan>
+Date: Thu, 26 Feb 2015 22:55:50 +0100
+Subject: [RFC PATCH 0/3] genirq: mixing IRQF_NO_SUSPEND and wakeup sources
+ on shared IRQs
+In-Reply-To: <20150226191724.0ae4ca4e@bbrezillon>
+References: <1424771762-16343-1-git-send-email-boris.brezillon@free-electrons.com>
+ <8151717.nkhnGBri9h@vostro.rjw.lan> <20150226191724.0ae4ca4e@bbrezillon>
+Message-ID: <4291864.PMm4sVoz77@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, February 26, 2015 06:20:48 PM Gregory CLEMENT wrote:
-> As stated in kernel/cpu_pm.c, "Platform is responsible for ensuring
-> that cpu_pm_enter is not called twice on the same CPU before
-> cpu_pm_exit is called.". In the current code in case of failure when
-> calling mvebu_v7_cpu_suspend, the function cpu_pm_exit() is never
-> called whereas cpu_pm_enter() was called just before.
+On Thursday, February 26, 2015 07:17:24 PM Boris Brezillon wrote:
+> On Thu, 26 Feb 2015 19:17:03 +0100
+> "Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
 > 
-> This patch moves the cpu_pm_exit() in order to balance the
-> cpu_pm_enter() calls.
+> > On Thursday, February 26, 2015 04:47:24 PM Boris Brezillon wrote:
+> > > On Thu, 26 Feb 2015 16:44:16 +0100
+> > > "Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
 > 
-> Reported-by: Fulvio Benini <fbf@libero.it>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> [...]
+> 
+> > > > 
+> > > > But it is still a bit risky.  Namely, if the driver in question is sufficiently
+> > > > broken (eg. it may not suspend the device and rely on the fact that its interrupt
+> > > > handler will be run just because it is sharing a "no suspend" IRQ), we may get
+> > > > an interrupt storm.
+> > > > 
+> > > > Isn't that a problem?
+> > > 
+> > > For me no (I'll fix all the drivers to handle wakeup, and they are all
+> > > already masking interrupts coming from their side in the suspend
+> > > callback).
+> > > I can't talk for other people though.
+> > > The only problem I see here is that you're not informing people that
+> > > they are erroneously mixing IRQF_NO_SUSPEND and !IRQF_NO_SUSPEND anymore
+> > > (you removed the warning backtrace).
+> > > Moreover, you are replacing their handler by a stub when entering
+> > > suspend, so they might end-up receiving spurious interrupts when
+> > > suspended without knowing why ?
+> > > 
+> > > How about checking if the number of actions registered with
+> > > IRQF_NO_SUSPEND + those registered with IRQF_COND_SUSPEND (or another
+> > > flag stating that the handler can safely be called in suspended state
+> > > even if it didn't ask for NO_SUSPEND) are equal to the total number of
+> > > registered actions, and complain if it's not the case.
+> > 
+> > The same idea I had while talking to Peter over IRC.  So the patch below
+> > implements that.
+> 
+> Yep, that's what I had in mind.
 
-Should that go to "stable" too?  Which "stable" series it should go to if so?
+OK, thanks.
 
-> ---
->  drivers/cpuidle/cpuidle-mvebu-v7.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
-> index 38e68618513a..cefa07438ae1 100644
-> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
-> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
-> @@ -37,11 +37,11 @@ static int mvebu_v7_enter_idle(struct cpuidle_device *dev,
->  		deepidle = true;
->  
->  	ret = mvebu_v7_cpu_suspend(deepidle);
-> +	cpu_pm_exit();
-> +
->  	if (ret)
->  		return ret;
->  
-> -	cpu_pm_exit();
-> -
->  	return index;
->  }
->  
-> 
+I'll submit it formally, then.
+
 
 -- 
 I speak only for myself.
