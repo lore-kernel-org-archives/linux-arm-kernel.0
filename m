@@ -1,90 +1,34 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 26 Feb 2015 14:32:02 +0100
-Subject: [PATCH] pinctrl: at91: move lock/unlock_as_irq calls into
- request/release resources methods
-In-Reply-To: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <54EF2052.6030909@atmel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 26 Feb 2015 14:32:31 +0100
+Subject: [PATCH] regulator: wm8350: remove unused variable
+In-Reply-To: <2131808.TgSGZRWdu2@wuerfel>
+References: <2131808.TgSGZRWdu2@wuerfel>
+Message-ID: <CAMuHMdWAu_rkzOOqhKdQ+4u1MDv-yN4kdPy5xnvdHe_3Gn=PgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 08/02/2015 19:23, Boris Brezillon a ?crit :
-> The gpiochip_lock_as_irq call can fail and return an error, while the
-> irq_startup is not expected to fail (returns an unsigned int which is not
-> checked by irq core code).
-> 
-> irq_request/release_resources functions have been created to address this
-> problem.
-> 
-> Move gpiochip_lock/unlock_as_irq calls into
-> irq_request/release_resources functions to prevent using a gpio as an irq
-> if the gpiochip_lock_as_irq call failed.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+On Thu, Feb 26, 2015 at 11:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> After the only user of the variable has been removed, we get a valid gcc
+> warning about it:
+>
+> regulator/wm8350-regulator.c:1154:17: warning: unused variable 'wm8350' [-Wunused-variable]
+>
+> The obvious fix is to remove the variable as well.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 8f45acb5f9f34 ("regulator: wm8350: Pass NULL data with REGULATION_OUT and UNDER_VOLTAGE events")
 
-If it can speed up things:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Linus,
-can we schedule this fix during the 4.0-rc phase?
+Mea culpa. Second ack on the same patch today...
 
-Bye,
+Gr{oetje,eeting}s,
 
-> ---
->  drivers/pinctrl/pinctrl-at91.c | 17 +++++++----------
->  1 file changed, 7 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index f4cd0b9..a481406 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -1477,28 +1477,25 @@ static void gpio_irq_ack(struct irq_data *d)
->  	/* the interrupt is already cleared before by reading ISR */
->  }
->  
-> -static unsigned int gpio_irq_startup(struct irq_data *d)
-> +static int gpio_irq_request_res(struct irq_data *d)
->  {
->  	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
->  	unsigned	pin = d->hwirq;
->  	int ret;
->  
->  	ret = gpiochip_lock_as_irq(&at91_gpio->chip, pin);
-> -	if (ret) {
-> +	if (ret)
->  		dev_err(at91_gpio->chip.dev, "unable to lock pind %lu IRQ\n",
->  			d->hwirq);
-> -		return ret;
-> -	}
-> -	gpio_irq_unmask(d);
-> -	return 0;
-> +
-> +	return ret;
->  }
->  
-> -static void gpio_irq_shutdown(struct irq_data *d)
-> +static void gpio_irq_release_res(struct irq_data *d)
->  {
->  	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
->  	unsigned	pin = d->hwirq;
->  
-> -	gpio_irq_mask(d);
->  	gpiochip_unlock_as_irq(&at91_gpio->chip, pin);
->  }
->  
-> @@ -1577,8 +1574,8 @@ void at91_pinctrl_gpio_resume(void)
->  static struct irq_chip gpio_irqchip = {
->  	.name		= "GPIO",
->  	.irq_ack	= gpio_irq_ack,
-> -	.irq_startup	= gpio_irq_startup,
-> -	.irq_shutdown	= gpio_irq_shutdown,
-> +	.irq_request_resources = gpio_irq_request_res,
-> +	.irq_release_resources = gpio_irq_release_res,
->  	.irq_disable	= gpio_irq_mask,
->  	.irq_mask	= gpio_irq_mask,
->  	.irq_unmask	= gpio_irq_unmask,
-> 
+                        Geert
 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
--- 
-Nicolas Ferre
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
