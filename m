@@ -1,95 +1,87 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 25 Feb 2015 18:20:33 -0600
-Subject: [PATCH v1] of: calculate masks of the device based on dma-range
- size
-In-Reply-To: <1423677215-28968-1-git-send-email-m-karicheri2@ti.com>
-References: <1423677215-28968-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20150226002033.GR6220@google.com>
+From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
+Date: Wed, 25 Feb 2015 16:24:06 -0800
+Subject: [PATCH 1/2] phy: usbphy: Add dt documentation for Broadcom Cygnus
+ USB PHY driver
+In-Reply-To: <54E53278.70705@broadcom.com>
+References: <1424200821-16368-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <2797126.uqvyZJisPk@wuerfel> <54E3AD2E.8050902@broadcom.com>
+ <11865413.8NsXkQ6AUR@wuerfel> <54E53278.70705@broadcom.com>
+Message-ID: <54EE67A6.609@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Catalin]
+Hello Alan and Arnd
 
-On Wed, Feb 11, 2015 at 12:53:35PM -0500, Murali Karicheri wrote:
-> This patch update of_dma_configure() API to calculate the
-> masks (dma_mask and coherent_dma_mask) based on the dma-range
-> values set in DT for the device. Also limit the mask to lower
-> of the default mask and mask calculated.
-> 
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+I wanted to follow up on this patch and ascertain what I would have to 
+change. Please see below for my questions
 
-Applied with Catalin's reviewed-by to pci/iommu for v4.1, thanks!
+On 15-02-18 04:46 PM, Arun Ramamurthy wrote:
+>
+>
+> On 15-02-18 07:15 AM, Arnd Bergmann wrote:
+>> On Tuesday 17 February 2015 13:05:50 Arun Ramamurthy wrote:
+>>> On 15-02-17 12:53 PM, Arnd Bergmann wrote:
+>>>> On Tuesday 17 February 2015 12:00:49 Arun Ramamurthy wrote:
+>>>>> Arnd, I patched the ehci and ohci driver to accept multiple phys so
+>>>>> they
+>>>>> require different names and cannot both be "usb". That patch was
+>>>>> accepted by Alen Stern but I did not update the bindings
+>>>>> documentation.
+>>>>> I will send out another patch for that. Could we go with the naming
+>>>>> scheme of "usb" + "p" + port number or do you have other suggestions?
+>>>>
+>>>> I don't have a good idea, but I think it would be best if the first
+>>>> phy could remain named "usb" for compatibility with the existing
+>>>> binding.
+>>>>
+>>> The patch was written in a way that all the existing and new drivers can
+>>> continue to use "usb" if they are using only one phy so that we remain
+>>> compatible. The names need to be different only if more than one phy is
+>>> specified. In such cases i don't think the first phy should be "usb" as
+>>> it would be confusing to have
+>>>          phy-names = "usb","usbp1"
+>>
+>> I see your patch now, as 7e7a0e67f2c ("usb: ehci-platform: add support
+>> for
+>> multiple phys per controller"), and I'm not too happy about the way you
+>> did this.
+>
+>> We already concluded that there should have been a binding change
+>> to go along with this, and that would have caught the fact that you
+>> circumvent the API here by reading the phy names manually. That
+>> part should never have made it into the kernel.
+>>
+>> I think we can do this either by defining specific names for the
+>> phy, or by changing the generic PHY binding to allow anonymous
+>> phy references (leaving out "phy-names" entirely), and adding a
+>> proper API for that.
+>>
+> Thanks Arnd, I will wait for Alan's comments before proceeding. I am
+> happy to patch the ehci-platform driver to use a new api instead of
+> devm_phy_get if that is the best option.
+>
+>>> Should I run this by Alan Stern?
+>>
+>> I've added him to Cc here. He clearly didn't know the background about
+>> the DT binding change, and should not need to, but he may have an opinion
+>> on what names we should use.
+>>
+>
+Arnd, should I re patch the ehci-platform driver to avoid phy-names 
+entirely? Alan, if not do you have an opinion on what the usb phy names 
+should be? The current patch uses "usbp" + port number such as "usbp0" , 
+"usbp1" etc
 
-I agree with Catalin's comment about the "size = 1ULL << 32" line.
-I don't see how that will make a difference, so I dropped it.  The
-patch I merged is below.  Let me know if you think we do need that
-line or any other tweaks.
-
-Bjorn
-
-commit a5a1dd69080dfcf53bfd6e179f3db68e824aeaae
-Author: Murali Karicheri <m-karicheri2@ti.com>
-Date:   Wed Feb 25 17:21:04 2015 -0600
-
-    of: Calculate device DMA masks based on DT dma-range size
-    
-    Calculate the dma_mask and coherent_dma_mask based on the dma-range values
-    set in DT for the device.
-    
-    Limit the mask to lower of the default mask and mask calculated.
-    
-    Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-    Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-    CC: Joerg Roedel <joro@8bytes.org>
-    CC: Grant Likely <grant.likely@linaro.org>
-    CC: Rob Herring <robh+dt@kernel.org>
-    CC: Will Deacon <will.deacon@arm.com>
-    CC: Russell King <linux@arm.linux.org.uk>
-    CC: Arnd Bergmann <arnd@arndb.de>
-    CC: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 28e743888402..20c1332a0018 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -90,10 +90,11 @@ void of_dma_configure(struct device *dev, struct device_node *np)
- 	struct iommu_ops *iommu;
- 
- 	/*
--	 * Set default dma-mask to 32 bit.  Drivers are expected to setup
--	 * the correct supported dma_mask.
-+	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
-+	 * setup the correct supported mask.
- 	 */
--	dev->coherent_dma_mask = DMA_BIT_MASK(32);
-+	if (!dev->coherent_dma_mask)
-+		dev->coherent_dma_mask = DMA_BIT_MASK(32);
- 
- 	/*
- 	 * Set it to coherent_dma_mask by default if the architecture
-@@ -128,6 +129,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
- 
- 	dev->dma_pfn_offset = offset;
- 
-+	/*
-+	 * Limit coherent and dma mask based on size and default mask
-+	 * set by the driver.
-+	 */
-+	dev->coherent_dma_mask = min(dev->coherent_dma_mask,
-+				     DMA_BIT_MASK(ilog2(dma_addr + size)));
-+	*dev->dma_mask = min((*dev->dma_mask),
-+			     DMA_BIT_MASK(ilog2(dma_addr + size)));
-+
- 	coherent = of_dma_is_coherent(np);
- 	dev_dbg(dev, "device is%sdma coherent\n",
- 		coherent ? " " : " not ");
+>>>> What is the reason for having two phys in your case? Are these
+>>>> identical phy devices connected to a single controller or do they
+>>>> server different purposes?
+>>>>
+>>> Yes, we have three identical phys connected to a single host controller
+>>> and one of the phys is also connected to the device controller
+>>
+>> Ok, no problem with that, let's just make sure we come up with a
+>> good binding for it.
+>>
+Arnd do you have any other comments on the phy driver itself? Thank you
+>>     Arnd
+>>
