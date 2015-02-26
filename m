@@ -1,64 +1,93 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 26 Feb 2015 09:02:56 +0000
-Subject: [alsa-devel] [PATCH 1/8] clk: add helper function clk_is_match()
-In-Reply-To: <20150225172757.421.43718@quantum>
-References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
- <1424876018-17852-2-git-send-email-shawn.guo@linaro.org>
- <20150225172757.421.43718@quantum>
-Message-ID: <20150226090256.GQ30445@trinity.fluff.org>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Thu, 26 Feb 2015 10:05:08 +0100
+Subject: [PATCH 2/4] ARM: mvebu: add audio I2S controller to Armada 38x
+ Device Tree
+In-Reply-To: <54EE6942.9080800@gmail.com>
+References: <1424901482-3809-1-git-send-email-mw@semihalf.com>
+ <1424901482-3809-3-git-send-email-mw@semihalf.com>
+ <54EE4AD6.6090101@gmail.com>
+ <CAPv3WKf8b+fuB-4qVwKC57iKaNHTLZAf9VFpfDbow1Sb3YAsNw@mail.gmail.com>
+ <54EE6942.9080800@gmail.com>
+Message-ID: <CAPv3WKezrx4jkZNo3PYSOGZtiSJH09+94BaknYNN4xPkB1AxKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 09:27:57AM -0800, Mike Turquette wrote:
-> Quoting Shawn Guo (2015-02-25 06:53:31)
-> > Since commit 035a61c314eb ("clk: Make clk API return per-user struct clk
-> > instances"), clk API users can no longer check if two struct clk
-> > pointers are pointing to the same hardware clock, i.e. struct clk_hw, by
-> > simply comparing two pointers.  That's because with the per-user clk
-> > change, a brand new struct clk is created whenever clients try to look
-> > up the clock by calling clk_get() or sister functions like clk_get_sys()
-> > and of_clk_get().  This changes the original behavior where the struct
-> > clk is only created for once when clock driver registers the clock to
-> > CCF in the first place.  The net change here is before commit
-> > 035a61c314eb the struct clk pointer is unique for given hardware
-> > clock, while after the commit the pointers returned by clk lookup calls
-> > become different for the same hardware clock.
-> > 
-> > A number of client drivers detecting if two struct clk pointers point to
-> > the same one hardware clock by comparing the pointers are broken now.
-> > As a stop-gap solution, this patch adds a helper function clk_is_match()
-> > to test if two struct clk pointers point to the same hardware clock, so
-> > that these client drivers can use to fix the regression.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> Hi Shawn,
-> 
-> Thanks for the patch. I wrote a similar one last night but did not
-> finish fixing up the drivers (and thus did not post it). I prefer my
-> implementation below, and I'm happy to merge your driver fixes with it.
-> 
-> Regards,
-> Mike
-> 
-> 
-> 
-> From: Michael Turquette <mturquette@linaro.org>
-> Date: Wed, 25 Feb 2015 09:11:01 -0800
-> Subject: [PATCH] clk: introduce clk_is_match
-> 
-> Some drivers compare struct clk pointers as a means of knowing
-> if the two pointers reference the same clock hardware. This behavior is
-> dubious (drivers must not dereference struct clk), but did not cause any
-> regressions until the per-user struct clk patch was merged. Now the test
-> for matching clk's will always fail with per-user struct clk's.
-> 
-> clk_is_match is introduced to fix the regression and prevent drivers
-> from comparing the pointers manually.
+2015-02-26 1:30 GMT+01:00 Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com>:
+> On 26.02.2015 01:11, Marcin Wojtas wrote:
+>>
+>> 2015-02-25 23:21 GMT+01:00 Sebastian Hesselbarth
+>> <sebastian.hesselbarth@gmail.com>:
+>>>
+>>> On 25.02.2015 22:58, Marcin Wojtas wrote:
+>
+> [...]
+>>>
+>>> sorry but NACK. The PLL and SoC ctrl are not even close to the audio
+>>> controller registers.
+>>>
+>>>> +                               interrupts = <GIC_SPI 75
+>>>> IRQ_TYPE_LEVEL_HIGH>;
+>>>> +                               clocks = <&gateclk 0>;
+>>>> +                               clock-names = "internal";
+>>>
+>>>
+>>>
+>>> How about providing access to audio PLL by a clock driver and amend the
+>>> binding to allow for a second more precise PLL clock, e.g.
+>>>
+>>>          clocks = <&gateclk CLK_AUDIO>, <&pll PLL_AUDIO>;
+>>>          clock-names = "internal", "pll";
+>>>
+>>
+>> Good idea. Would you suggest some name for the new driver? How about
+>> clk-audio.c under drivers/clk/mvebu?
+>
+>
+> Depends on how much you know about the surrounding registers.
+>
+> If there is more clock related stuff than the audio pll, I'd
+> suggest to have a single driver for everything that isn't core clk
+> or clk gates which are already dealt with in the existing driver.
+>
+> Given that this PLL layout is most likely 38x specific, I'd just put it
+> into drivers/clk/mvebu/armada-38x.c.
+>
 
-small observaton, clk_is_same() is linguistically nicer.
+Audio PLL setting consist of 3 independent registers. Adjacent to them
+there are same regs for setting TDM PLL, however I doubt  telephony is
+going to be supported in foreseeable future (if ever). I also have
+strong suspicion that it looks the same in a39x - Thomas, can you take
+a look into spec and confirm?
 
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+>>> we already check for an "extclk" on Dove for the same reason but the
+>>> name might be misleading here.
+>>>
+>>> Also, i2c/spdif muxing option could be handled by 38x's pinctrl driver,
+>>> we have the same for Dove's internal i2c mux.
+>>>
+>>> If you want to use i2s you just add the option to the default pinctrl
+>>> hog:
+>>>
+>>>          pinctrl-0 = <&i2s_pins &audio_mux_i2s>;
+>>>          pinctrl-names = "default";
+>>>
+>>
+>> Ok, I'll try to extend pinctrl-armada-38x then.
+>
+>
+> IMHO, adding a "syscon" compatible to the system-controller node should
+> do the trick. You can reference the regmap from 38x's pinctrl driver and
+> have a specific callback for the i2s/spdif muxing. The reg property
+> range of the system-controller should be extended but that definitely
+> depends on what the you or the Free Electron guys know about the
+> register set.
+>
 
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+For muxing i2s/spdif (exactly the same pins, they have to be either
+way set to "audio" by pinctrl driver) changing single bit in "system
+control 1" register is needed. However currently unused, it is already
+a part of system-controller at 18200 regmap. Anyway the will of using
+either i2s or spdif has to be explicitly represented in DT.
+
+Marcin
