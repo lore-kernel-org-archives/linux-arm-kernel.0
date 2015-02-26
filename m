@@ -1,51 +1,42 @@
-From: dobatog@gmail.com (Gabriel Dobato)
-Date: Thu, 26 Feb 2015 12:32:27 +0100
-Subject: [PATCH 1/1] ARM: TLV320AIC23 SoC Audio Codec: Fix errors reported
- related to input routing signals.
-Message-ID: <1424950347-26241-1-git-send-email-dobatog@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 26 Feb 2015 11:35:04 +0000
+Subject: [PATCH v3] arm64: mm: increase VA range of identity map
+In-Reply-To: <20150226112717.GA17992@localhost>
+References: <1424942215-5505-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150226112717.GA17992@localhost>
+Message-ID: <CAKv+Gu-uDbdi-3SN=obibs+iD+KJEj9s3tseseXY3vDGT26cRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: dobatog <dobatog@gmail.com>
+On 26 February 2015 at 11:27, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Thu, Feb 26, 2015 at 09:16:55AM +0000, Ard Biesheuvel wrote:
+>> The page size and the number of translation levels, and hence the supported
+>> virtual address range, are build-time configurables on arm64 whose optimal
+>> values are use case dependent. However, in the current implementation, if
+>> the system's RAM is located at a very high offset, the virtual address range
+>> needs to reflect that merely because the identity mapping, which is only used
+>> to enable or disable the MMU, requires the extended virtual range to map the
+>> physical memory at an equal virtual offset.
+>>
+>> This patch relaxes that requirement, by increasing the number of translation
+>> levels for the identity mapping only, and only when actually needed, i.e.,
+>> when system RAM's offset is found to be out of reach at runtime.
+>>
+>> Tested-by: Laura Abbott <lauraa@codeaurora.org>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> The patch looks fine to me, though most likely for 4.1; in the meantime:
+>
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+>
 
-The following patch, based on stable v3.19,  corrects the errors that are reported in the boot trace in reference to the Input Signals of the audio codec TLV320AIC23:
+Thanks. Either 4.0 or 4.1 is fine by me.
 
-tlv320aic23-codec 1-001a: Control not supported for path LLINEIN -> [NULL] -> Line Input
-tlv320aic23-codec 1-001a: ASoC: no dapm match for LLINEIN --> NULL --> Line Input
-tlv320aic23-codec 1-001a: ASoC: Failed to add route LLINEIN -> NULL -> Line Input
-tlv320aic23-codec 1-001a: Control not supported for path RLINEIN -> [NULL] -> Line Input
-tlv320aic23-codec 1-001a: ASoC: no dapm match for RLINEIN --> NULL --> Line Input
-tlv320aic23-codec 1-001a: ASoC: Failed to add route RLINEIN -> NULL -> Line Input
-tlv320aic23-codec 1-001a: Control not supported for path MICIN -> [NULL] -> Mic Input
-tlv320aic23-codec 1-001a: ASoC: no dapm match for MICIN --> NULL --> Mic Input
-tlv320aic23-codec 1-001a: ASoC: Failed to add route MICIN -> NULL -> Mic Input
+> Do you plan to look at the KVM aspect as well or we leave it with the
+> KVM maintainers?
+>
 
-I am trying to set the sound system in a CM-510 (Compulab - SoM) based board with DT, using Simple-Card-Audio and  the TLV320AIC23 audio codec included in the SoM . I faced this problem and thanks to the help of Sebastian Hesselbarth who noticed the possible error located in the structure snd_soc_dapm_route tlv320aic23_intercon[] , now errors are not reported.
+I am looking into that atm.
 
-Tested on CM-510 (Compulab SoM Board).
-
-Signed-off-by: dobatog <dobatog@gmail.com>
----
- sound/soc/codecs/tlv320aic23.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/sound/soc/codecs/tlv320aic23.c b/sound/soc/codecs/tlv320aic23.c
-index cc17e7e..891f3aa 100644
---- a/sound/soc/codecs/tlv320aic23.c
-+++ b/sound/soc/codecs/tlv320aic23.c
-@@ -174,10 +174,10 @@ static const struct snd_soc_dapm_route tlv320aic23_intercon[] = {
- 	{"ROUT", NULL, "Output Mixer"},
- 
- 	/* Inputs */
--	{"Line Input", "NULL", "LLINEIN"},
--	{"Line Input", "NULL", "RLINEIN"},
-+	{"Line Input", NULL, "LLINEIN"},
-+	{"Line Input", NULL, "RLINEIN"},
- 
--	{"Mic Input", "NULL", "MICIN"},
-+	{"Mic Input", NULL, "MICIN"},
- 
- 	/* input mux */
- 	{"Capture Source", "Line", "Line Input"},
 -- 
-1.9.1
+Ard.
