@@ -1,56 +1,33 @@
-From: leilei.zhao@atmel.com (Leilei Zhao)
-Date: Thu, 26 Feb 2015 14:55:25 +0800
-Subject: [PATCH 5/5] tty/serial: at91: correct the usage of tasklet
-In-Reply-To: <1424933725-16242-1-git-send-email-leilei.zhao@atmel.com>
-References: <1424933725-16242-1-git-send-email-leilei.zhao@atmel.com>
-Message-ID: <1424933725-16242-6-git-send-email-leilei.zhao@atmel.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 26 Feb 2015 08:11:28 +0100
+Subject: [PATCH RFC V3 0/3] mxs: add ocotp support for i.MX23 and i.MX28
+In-Reply-To: <1424896026.2840.10.camel@embedded.rocks>
+References: <1424896026.2840.10.camel@embedded.rocks>
+Message-ID: <54EEC720.1020000@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tasklet may be scheduled and executed after serial port
-was shutdown, for example, DMA rx callback will schedule the
-tasklet while serial port is shutting down, especially serial
-port is sending and receiving data in a higher baud rate and
-it's killed by external program. In this case, tasklet_kill
-can only clear the current scheduling out, so tasklet should
-be disabled to prevent being executed in later scheduling.
-Otherwise, the tasklet executed after serial port was shutdown
-can lead to kernel crash.
+Hi J?rg,
 
-Signed-off-by: Leilei Zhao <leilei.zhao@atmel.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/tty/serial/atmel_serial.c |    4 ++++
- 1 file changed, 4 insertions(+)
+Am 25.02.2015 um 21:27 schrieb J?rg Krause:
+> Hi Stefan,
+>
+> sorry, I forgot to subscribe to the mailing list.
+>
+> Any news about these patches? What's missing?
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 8d28210..39ec278 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -1755,6 +1755,8 @@ static int atmel_startup(struct uart_port *port)
- 	if (retval)
- 		goto free_irq;
- 
-+	tasklet_enable(&atmel_port->tasklet);
-+
- 	/*
- 	 * Initialize DMA (if necessary)
- 	 */
-@@ -1858,6 +1860,7 @@ static void atmel_shutdown(struct uart_port *port)
- 	 * Clear out any scheduled tasklets before
- 	 * we destroy the buffers
- 	 */
-+	tasklet_disable(&atmel_port->tasklet);
- 	tasklet_kill(&atmel_port->tasklet);
- 
- 	/*
-@@ -2251,6 +2254,7 @@ static int atmel_init_port(struct atmel_uart_port *atmel_port,
- 
- 	tasklet_init(&atmel_port->tasklet, atmel_tasklet_func,
- 			(unsigned long)port);
-+	tasklet_disable(&atmel_port->tasklet);
- 
- 	memset(&atmel_port->rx_ring, 0, sizeof(atmel_port->rx_ring));
- 
--- 
-1.7.9.5
+i wait until there is a common infrastructure for OTP / eFuse driver.
+
+Please look at this discussion:
+
+http://marc.info/?l=linux-arm-kernel&m=142486510903415&w=2
+
+After these patches has been applied, i will adapt my patches here:
+
+https://github.com/lategoodbye/fsl_ocotp
+
+> Best regards
+> J?rg Krause
+>
+
+BR Stefan
