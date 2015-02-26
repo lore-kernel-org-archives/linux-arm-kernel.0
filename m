@@ -1,67 +1,79 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 15:21:15 +0900
-Subject: [PATCH 18/32] ARM: shmobile: r8a7794: Correct SDHI clock base address,
- labels and output-names
+Date: Thu, 26 Feb 2015 15:21:20 +0900
+Subject: [PATCH 23/32] ARM: shmobile: emev2 dtsi: Add PFC information
 In-Reply-To: <cover.1424849129.git.horms+renesas@verge.net.au>
 References: <cover.1424849129.git.horms+renesas@verge.net.au>
-Message-ID: <5e7e155483dfbf590be9b05e53ae954dced73253.1424849129.git.horms+renesas@verge.net.au>
+Message-ID: <e7cdf791dbc456329703424822e85eeb31fc1a54.1424849129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Correct base address of SD3 div6 clk.
-* Update div6 clock node labels
-  There appears to have been some inconsistency and confusion here as on
-  the r8a7790 these clocks are referred to as SD(HI)1 and SD(HI)2 while on
-  the r8a7791 and r8a7794 they are referred to as SD(HI)2 and SD(HI)3.
+From: Niklas S?derlund <niso@kth.se>
 
-This has no run-time affect as the clock nodes are not currently used.
+With this information all GPIOs can make use of the PFC functionality.
 
-Fixes: 8e181633e6ca96049 ("ARM: shmobile: r8a7794: Add SDHI clocks to device tree")
-Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Niklas S?derlund <niso@kth.se>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/emev2.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 63b918b..fff9497 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -365,19 +365,19 @@
- 					     "lb", "qspi", "sdh", "sd0", "z";
- 		};
- 		/* Variable factor clocks */
--		sd1_clk: sd2_clk at e6150078 {
-+		sd2_clk: sd2_clk at e6150078 {
- 			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0 0xe6150078 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
--			clock-output-names = "sd1";
-+			clock-output-names = "sd2";
- 		};
--		sd2_clk: sd3_clk at e615007c {
-+		sd3_clk: sd3_clk at e615026c {
- 			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
--			reg = <0 0xe615007c 0 4>;
-+			reg = <0 0xe615026c 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
--			clock-output-names = "sd2";
-+			clock-output-names = "sd3";
- 		};
- 		mmc0_clk: mmc0_clk at e6150240 {
- 			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
-@@ -589,7 +589,7 @@
- 		mstp3_clks: mstp3_clks at e615013c {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
--			clocks = <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
-+			clocks = <&sd3_clk>, <&sd2_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
- 			         <&mmc0_clk>, <&rclk_clk>, <&hp_clk>, <&hp_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
+diff --git a/arch/arm/boot/dts/emev2.dtsi b/arch/arm/boot/dts/emev2.dtsi
+index cc7bfe0..bb45694 100644
+--- a/arch/arm/boot/dts/emev2.dtsi
++++ b/arch/arm/boot/dts/emev2.dtsi
+@@ -169,12 +169,18 @@
+ 		clock-names = "sclk";
+ 	};
+ 
++	pfc: pfc at e0140200 {
++		compatible = "renesas,pfc-emev2";
++		reg = <0xe0140200 0x100>;
++	};
++
+ 	gpio0: gpio at e0050000 {
+ 		compatible = "renesas,em-gio";
+ 		reg = <0xe0050000 0x2c>, <0xe0050040 0x20>;
+ 		interrupts = <0 67 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 68 IRQ_TYPE_LEVEL_HIGH>;
+ 		gpio-controller;
++		gpio-ranges = <&pfc 0 0 32>;
+ 		#gpio-cells = <2>;
+ 		ngpios = <32>;
+ 		interrupt-controller;
+@@ -186,6 +192,7 @@
+ 		interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 70 IRQ_TYPE_LEVEL_HIGH>;
+ 		gpio-controller;
++		gpio-ranges = <&pfc 0 32 32>;
+ 		#gpio-cells = <2>;
+ 		ngpios = <32>;
+ 		interrupt-controller;
+@@ -197,6 +204,7 @@
+ 		interrupts = <0 71 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 72 IRQ_TYPE_LEVEL_HIGH>;
+ 		gpio-controller;
++		gpio-ranges = <&pfc 0 64 32>;
+ 		#gpio-cells = <2>;
+ 		ngpios = <32>;
+ 		interrupt-controller;
+@@ -208,6 +216,7 @@
+ 		interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 74 IRQ_TYPE_LEVEL_HIGH>;
+ 		gpio-controller;
++		gpio-ranges = <&pfc 0 96 32>;
+ 		#gpio-cells = <2>;
+ 		ngpios = <32>;
+ 		interrupt-controller;
+@@ -219,6 +228,7 @@
+ 		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 76 IRQ_TYPE_LEVEL_HIGH>;
+ 		gpio-controller;
++		gpio-ranges = <&pfc 0 128 31>;
+ 		#gpio-cells = <2>;
+ 		ngpios = <31>;
+ 		interrupt-controller;
 -- 
 2.1.4
