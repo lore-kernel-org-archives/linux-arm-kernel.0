@@ -1,65 +1,64 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 26 Feb 2015 18:08:05 +0000
-Subject: [PATCH v2 1/3] arm/xen: Correctly check if the event channel
- interrupt is present
-In-Reply-To: <1424267513-15836-2-git-send-email-julien.grall@linaro.org>
-References: <1424267513-15836-1-git-send-email-julien.grall@linaro.org>
- <1424267513-15836-2-git-send-email-julien.grall@linaro.org>
-Message-ID: <alpine.DEB.2.02.1502261807430.23507@kaball.uk.xensource.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 26 Feb 2015 18:23:07 +0000
+Subject: [PATCH v2] drivers: cpuidle: cpuidle-arm64: include
+ asm/proc-fns.h explicitly
+In-Reply-To: <20150225131140.GC12377@arm.com>
+Message-ID: <20150226182307.GD17949@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Feb 2015, Julien Grall wrote:
-> The function irq_of_parse_and_map returns 0 when the IRQ is not found.
+On Wed, Feb 25, 2015 at 01:11:40PM +0000, Will Deacon wrote:
+> On Wed, Feb 25, 2015 at 12:59:42PM +0000, Lorenzo Pieralisi wrote:
+> > ARM64 CPUidle driver requires the cpu_do_idle function so that it can
+> > be used to enter the shallowest idle state, and it is declared in
+> > asm/proc-fns.h.
+> > 
+> > The current ARM64 CPUidle driver does not include asm/proc-fns.h
+> > explicitly and it has so far relied on implicit inclusion from other
+> > header files.
+> > 
+> > Owing to some header dependencies reshuffling this currently triggers
+> > build failures when CONFIG_ARM64_64K_PAGES=y:
+> > 
+> > drivers/cpuidle/cpuidle-arm64.c: In function "arm64_enter_idle_state"
+> > drivers/cpuidle/cpuidle-arm64.c:42:3: error: implicit declaration of
+> > function "cpu_do_idle" [-Werror=implicit-function-declaration]
+> >    cpu_do_idle();
+> >    ^
+> > 
+> > This patch adds the explicit inclusion of the asm/proc-fns.h header file
+> > to fix the build breakage and stop relying on implicit asm/proc-fns.h
+> > inclusion.
+> > 
+> > Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> > [lp: rewrote commit log]
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Tested-by: Mark Rutland <mark.rutland@arm.com>
+> > ---
+> > v2 changes:
 > 
-> Futhermore, move the check before notifying the user that we are running on
-> Xen.
+> Acked-by: Will Deacon <will.deacon@arm.com>
 > 
-> Signed-off-by: Julien Grall <julien.grall@linaro.org>
-> Acked-by: Ian Campbell <ian.campbell@citrix.com>
+> Catalin will pick this up for -rc2, I suspect.
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+I can merge this as long as Daniel or Rafael are fine with it.
 
-
-> ---
->     Changes in v2:
->         - Add Ian's ack
->         - Re-add __read_mostly
-> ---
->  arch/arm/xen/enlighten.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 263a204..c8d3a17 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -51,7 +51,7 @@ EXPORT_SYMBOL_GPL(xen_have_vector_callback);
->  int xen_platform_pci_unplug = XEN_UNPLUG_ALL;
->  EXPORT_SYMBOL_GPL(xen_platform_pci_unplug);
->  
-> -static __read_mostly int xen_events_irq = -1;
-> +static __read_mostly unsigned int xen_events_irq;
->  
->  /* map fgmfn of domid to lpfn in the current domain */
->  static int map_foreign_page(unsigned long lpfn, unsigned long fgmfn,
-> @@ -251,12 +251,14 @@ static int __init xen_guest_init(void)
->  		return 0;
->  	grant_frames = res.start;
->  	xen_events_irq = irq_of_parse_and_map(node, 0);
-> +	if (!xen_events_irq) {
-> +		pr_debug("Xen event channel interrupt not found\n");
-> +		return -ENODEV;
-> +	}
-> +
->  	pr_info("Xen %s support found, events_irq=%d gnttab_frame=%pa\n",
->  			version, xen_events_irq, &grant_frames);
->  
-> -	if (xen_events_irq < 0)
-> -		return -ENODEV;
-> -
->  	xen_domain_type = XEN_HVM_DOMAIN;
->  
->  	xen_setup_features();
-> -- 
-> 2.1.4
-> 
+> > - Picked up
+> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325523.html
+> > - Rebased against 4.0-rc1 and rewrote commit log
+> > 
+> >  drivers/cpuidle/cpuidle-arm64.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
+> > index 39a2c62..c8bb6c5 100644
+> > --- a/drivers/cpuidle/cpuidle-arm64.c
+> > +++ b/drivers/cpuidle/cpuidle-arm64.c
+> > @@ -19,6 +19,7 @@
+> >  #include <linux/of.h>
+> >  
+> >  #include <asm/cpuidle.h>
+> > +#include <asm/proc-fns.h>
+> >  
+> >  #include "dt_idle_states.h"
+> >  
