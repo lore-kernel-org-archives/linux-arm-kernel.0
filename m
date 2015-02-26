@@ -1,48 +1,86 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 26 Feb 2015 18:06:00 +0200
-Subject: [PATCH] ARM: OMAP2+: hwmod: fix deassert hardreset clkdm usecounting
-Message-ID: <1424966760-30917-1-git-send-email-t-kristo@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 26 Feb 2015 17:08:00 +0100
+Subject: [PATCH, resent 00/10] ARM Realview multiplatform support
+Message-ID: <1424966890-260805-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Deasserting hardreset increases the usecount for the hwmod parent clockdomain
-always, however usecount is only decreased at end in certain error cases.
-This causes software supervised clockdomains to remain always on, preventing
-idle. Fixed by always releasing the hwmods clockdomain parent when exiting
-the function.
+This is from an old patch set of mine that I have decided to
+update to the latest kernel, hopefully getting it fully merged
+in 3.21.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Tested-by: Carlos Hernandez <ceh@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |    9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+We lose a few features here, but after discussions I've had
+in the past, it seems unlikely that anyone would miss them.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 92afb72..3be4783 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1692,16 +1692,15 @@ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
- 	if (ret == -EBUSY)
- 		pr_warn("omap_hwmod: %s: failed to hardreset\n", oh->name);
- 
--	if (!ret) {
-+	if (oh->clkdm) {
- 		/*
- 		 * Set the clockdomain to HW_AUTO, assuming that the
- 		 * previous state was HW_AUTO.
- 		 */
--		if (oh->clkdm && hwsup)
-+		if (hwsup)
- 			clkdm_allow_idle(oh->clkdm);
--	} else {
--		if (oh->clkdm)
--			clkdm_hwmod_disable(oh->clkdm, oh);
-+
-+		clkdm_hwmod_disable(oh->clkdm, oh);
- 	}
- 
- 	return ret;
+A few of the changes are for ARM core code and need at least
+an Ack from Russell, or we can try to have a shared git
+branch for these if necessary.
+
+Please review.
+
+Arnd Bergmann (10):
+  ARM: realview: remove sparsemem hack
+  ARM: realview: don't map undefined PCI registers
+  clk/realview: stop using machine headers
+  ARM: no longer force unbuffered DMA for realview
+  ARM: realview: remove private barrier implementation
+  ARM: realview: enable multiplatform
+  ARM: integrator: use explicit core module options
+  ARM: no longer make CPU targets visible separately
+  ARM: realview: make all header files local
+  ARM: realview: clean up header files
+
+[re-sent with correct mailing list address, sorry for duplicate
+ spam]
+
+ arch/arm/Kconfig                                   |  16 ---
+ arch/arm/mach-integrator/Kconfig                   | 132 ++++++++++++++++++---
+ arch/arm/mach-realview/Kconfig                     |  65 +++++++---
+ arch/arm/mach-realview/Makefile                    |   7 +-
+ .../mach-realview/{include/mach => }/board-eb.h    |   4 +-
+ .../{include/mach => }/board-pb1176.h              |   4 +-
+ .../{include/mach => }/board-pb11mp.h              |   4 +-
+ .../mach-realview/{include/mach => }/board-pba8.h  |   4 +-
+ .../mach-realview/{include/mach => }/board-pbx.h   |   4 +-
+ arch/arm/mach-realview/core.c                      |   6 +-
+ arch/arm/mach-realview/core.h                      |   2 -
+ .../mach-realview/{include/mach => }/hardware.h    |   2 -
+ arch/arm/mach-realview/include/mach/barriers.h     |   8 --
+ arch/arm/mach-realview/include/mach/irqs.h         |  40 -------
+ arch/arm/mach-realview/include/mach/memory.h       |  64 ----------
+ arch/arm/mach-realview/include/mach/uncompress.h   |  77 ------------
+ .../arm/mach-realview/{include/mach => }/irqs-eb.h |  20 +---
+ .../mach-realview/{include/mach => }/irqs-pb1176.h |  21 ----
+ .../mach-realview/{include/mach => }/irqs-pb11mp.h |  27 +----
+ .../mach-realview/{include/mach => }/irqs-pba8.h   |  23 ----
+ .../mach-realview/{include/mach => }/irqs-pbx.h    |  24 +---
+ .../mach-realview/{include/mach => }/platform.h    |   2 -
+ arch/arm/mach-realview/platsmp.c                   |   8 +-
+ arch/arm/mach-realview/realview-dt.c               |   1 -
+ arch/arm/mach-realview/realview_eb.c               |  12 +-
+ arch/arm/mach-realview/realview_pb1176.c           |   6 +-
+ arch/arm/mach-realview/realview_pb11mp.c           |  11 +-
+ arch/arm/mach-realview/realview_pba8.c             |  14 +--
+ arch/arm/mach-realview/realview_pbx.c              |  14 +--
+ arch/arm/mm/Kconfig                                |  32 +++--
+ drivers/clk/versatile/clk-realview.c               |  10 +-
+ 31 files changed, 232 insertions(+), 432 deletions(-)
+ rename arch/arm/mach-realview/{include/mach => }/board-eb.h (97%)
+ rename arch/arm/mach-realview/{include/mach => }/board-pb1176.h (97%)
+ rename arch/arm/mach-realview/{include/mach => }/board-pb11mp.h (98%)
+ rename arch/arm/mach-realview/{include/mach => }/board-pba8.h (97%)
+ rename arch/arm/mach-realview/{include/mach => }/board-pbx.h (98%)
+ rename arch/arm/mach-realview/{include/mach => }/hardware.h (95%)
+ delete mode 100644 arch/arm/mach-realview/include/mach/barriers.h
+ delete mode 100644 arch/arm/mach-realview/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-realview/include/mach/memory.h
+ delete mode 100644 arch/arm/mach-realview/include/mach/uncompress.h
+ rename arch/arm/mach-realview/{include/mach => }/irqs-eb.h (91%)
+ rename arch/arm/mach-realview/{include/mach => }/irqs-pb1176.h (88%)
+ rename arch/arm/mach-realview/{include/mach => }/irqs-pb11mp.h (90%)
+ rename arch/arm/mach-realview/{include/mach => }/irqs-pba8.h (87%)
+ rename arch/arm/mach-realview/{include/mach => }/irqs-pbx.h (90%)
+ rename arch/arm/mach-realview/{include/mach => }/platform.h (99%)
+
 -- 
-1.7.9.5
+2.1.0.rc2
