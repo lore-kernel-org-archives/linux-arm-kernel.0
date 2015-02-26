@@ -1,102 +1,113 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 26 Feb 2015 16:12:24 +0800
-Subject: [PATCH v4 30/30] PCI: Remove pci_bus_assign_domain_nr()
-In-Reply-To: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
-References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1424938344-4017-31-git-send-email-wangyijing@huawei.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 26 Feb 2015 17:18:41 +0900
+Subject: [PATCH v4 2/8] arm64: dts: exynos: Add dts files for 64-bit
+ Exynos5433 SoC
+In-Reply-To: <6850624.bdB2Ab6zJx@wuerfel>
+References: <1424755011-15999-1-git-send-email-cw00.choi@samsung.com>
+ <7412525.l6YnQcTxtg@wuerfel> <54EC5AB1.5090802@samsung.com>
+ <6850624.bdB2Ab6zJx@wuerfel>
+Message-ID: <54EED6E1.4060908@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we save the domain number in pci_host_bridge,
-we could remove pci_bus_assign_domain_nr() and
-clean the domain member in pci_bus.
+On 02/24/2015 08:59 PM, Arnd Bergmann wrote:
+> On Tuesday 24 February 2015 20:04:17 Chanwoo Choi wrote:
+>> On 02/24/2015 06:48 PM, Arnd Bergmann wrote:
+>>> On Tuesday 24 February 2015 17:52:01 Chanwoo Choi wrote:
+>>>>
+>>>> But, I have a question.
+>>>> If we put the aliases into the board dts file instaed of SoC dtsi,
+>>>> each board dts file may use the different alias name about same phandle.
+>>>
+>>> Yes, that is the idea. In particular with the uarts, the intention is
+>>> that the numbering of the device nodes in /dev is the same that is
+>>> printed on the board (if any), which may be different from the numbering
+>>> internal to the SoC.
+>>
+>> I check the uart device with Exynos5433 SoC based on Linux 4.0-rc1
+>> If some board use the serial_0 and serial_3 as following in board dtsi,
+>>
+>>         &serial_0 {             --> UART 0 device
+>>                 status = "okay";
+>>         };
+>>
+>>         &serial_3 {             --> UART 3 device
+>>                 status = "okay";
+>>         };
+>>
+>> The serial core driver create the follwoing /dev/ttySACx device node
+>> by using the number of alias. It maintain the same device number of internel to the SoC.
+>>
+>>         root at localhost:~# ls /dev/ttySAC
+>>         ttySAC1  ttySAC3  
+>>
+> 
+> I'm not completely following. So you have set the serial1 alias to
+> the &serial_0 device node and serial3 to &serial_3?
+> 
+> Why not use serial0=&serial_0 and serial1=&serial_3? Does the serial0
+> alias have a special meaning?
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
----
- drivers/pci/pci.c   |    5 -----
- drivers/pci/probe.c |   12 ++++--------
- include/linux/pci.h |    3 ---
- 3 files changed, 4 insertions(+), 16 deletions(-)
+I add following aliases and serial_1/serial_3 dt node in board dtsi:
+I tested that change the alias of serial_x node.
+	
+	aliases {
+		serial0 = &serial_1;
+		serial1 = &serial_3;
+	};
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 51ada13..287cf43 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4579,11 +4579,6 @@ void pci_host_assign_domain_nr(struct pci_host_bridge *host)
- {
- 	host->domain = pci_assign_domain_nr(host->dev.parent);
- }
--
--void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
--{
--	bus->domain_nr = pci_assign_domain_nr(parent);
--}
- #endif
- #endif
- 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 2e5997a..e6f03cf 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -480,7 +480,7 @@ void pci_read_bridge_bases(struct pci_bus *child)
- 	}
- }
- 
--static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
-+static struct pci_bus *pci_alloc_bus(void)
- {
- 	struct pci_bus *b;
- 
-@@ -495,10 +495,7 @@ static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
- 	INIT_LIST_HEAD(&b->resources);
- 	b->max_bus_speed = PCI_SPEED_UNKNOWN;
- 	b->cur_bus_speed = PCI_SPEED_UNKNOWN;
--#ifdef CONFIG_PCI_DOMAINS_GENERIC
--	if (parent)
--		b->domain_nr = parent->domain_nr;
--#endif
-+
- 	return b;
- }
- 
-@@ -645,7 +642,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
- 	/*
- 	 * Allocate a new bus, and inherit stuff from the parent..
- 	 */
--	child = pci_alloc_bus(parent);
-+	child = pci_alloc_bus();
- 	if (!child)
- 		return NULL;
- 
-@@ -1865,14 +1862,13 @@ static struct pci_bus *pci_create_root_bus(
- 	char *fmt;
- 
- 	parent = bridge->dev.parent;
--	b = pci_alloc_bus(NULL);
-+	b = pci_alloc_bus();
- 	if (!b)
- 		return NULL;
- 
- 	b->sysdata = dev_get_drvdata(&bridge->dev);
- 	b->ops = ops;
- 	b->number = b->busn_res.start = bridge->busnum;
--	pci_bus_assign_domain_nr(b, parent);
- 
- 	bridge->bus = b;
- 	b->bridge = get_device(&bridge->dev);
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 68c09da..8d82340 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -470,9 +470,6 @@ struct pci_bus {
- 	unsigned char	primary;	/* number of primary bridge */
- 	unsigned char	max_bus_speed;	/* enum pci_bus_speed */
- 	unsigned char	cur_bus_speed;	/* enum pci_bus_speed */
--#ifdef CONFIG_PCI_DOMAINS_GENERIC
--	int		domain_nr;
--#endif
- 
- 	char		name[48];
- 
--- 
-1.7.1
+	/* Add 'linux,stdout-path' property to print kernel log by using ealycon */
+	chosen {
+		linux,stdout-path = &serial_1;
+	};
+
+	[snip]
+
+	/* serial_1 is used for printing kernel log throught JIG cable */
+	&serial_1 {
+		status = "okay";
+	};
+
+	&serial_3 {
+		status = "okay";
+	};
+
+In result, serial driver create the /dev/ttySAC0 for serial_1 and /dev/ttySAC1 for serial_3.
+But, I cannot complete the kernel booting and stop it with following kernel log
+
+[    0.000000] Booting Linux on physical CPU 0x100
+[    0.000000] Initializing cgroup subsys cpuset
+[    0.000000] Initializing cgroup subsys cpu
+[    0.000000] Initializing cgroup subsys cpuacct
+[    0.000000] Linux version 4.0.0-rc1-00066-g49bfcec-dirty (cwchoi00 at chan) (gcc version 4.9.2 20140904 (prerelease) (crosstool-NG l5
+[snip]
+[    0.000000] Kernel command line: console=ttySAC1,115200 earlycon=exynos4210,0x14C20000
+[snip]
+[    0.651647] dma-pl330 15610000.pdma: Loaded driver for PL330 DMAC-341330
+[    0.651851] dma-pl330 15610000.pdma:         DBUFF-32x4bytes Num_Chans-8 Num_Peri-32 Num_Events-32
+[    0.658566] dma-pl330 15600000.pdma: Loaded driver for PL330 DMAC-341330
+[    0.662872] dma-pl330 15600000.pdma:         DBUFF-32x4bytes Num_Chans-8 Num_Peri-32 Num_Events-32
+[    0.672487] dma-pl330 11420000.adma: Loaded driver for PL330 DMAC-341330
+[ 8466.414900] dma-pl330 11420000.adma:         DBUFF-8x8bytes Num_Chans-8 Num_Peri-16 Num_Events-8
+[ 8466.481648] 14c20000.serial: ttySAC0 at MMIO 0x14c20000 (irq = 21, base_baud = 0) is a S3C6400/10
+(dont' print any kernel log)
+
+So, I change the kernel command line about ('console' bootparam) as following:
+because tty framework must use the 'console' bootparam to print kernel log.
+- original     : Kernel command line: console=ttySAC1,115200 ... (cannot the kernel log from serial driver probed)
+- modification : Kernel command line: console=ttySAC0,115200 ... (got the successful kernel booting)
+
+After modification, I got the successful kernel booting.
+
+If should use the serial_0 device and then modify the 'aliases' as following:
+I have to modify the commandline of bootloader if the commandline of bootloader is used
+instad of default kernel command line.
+
+	aliases {
+		serial0 = &serial_0;
+		serial1 = &serial_1;
+		serial2 = &serial_3;
+	};
+
+Thanks,
+Chanwoo Choi
