@@ -1,38 +1,39 @@
-From: jslaby@suse.cz (Jiri Slaby)
-Date: Thu, 26 Feb 2015 10:29:54 +0100
-Subject: [PATCH 1/5] tty/serial: at91: correct check of buf used in DMA
-In-Reply-To: <1424933725-16242-2-git-send-email-leilei.zhao@atmel.com>
-References: <1424933725-16242-1-git-send-email-leilei.zhao@atmel.com>
- <1424933725-16242-2-git-send-email-leilei.zhao@atmel.com>
-Message-ID: <54EEE792.9060706@suse.cz>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 26 Feb 2015 10:30:00 +0100
+Subject: [PATCH v4 11/20] power_supply: Change ownership from driver to
+ core
+In-Reply-To: <20150226004522.GB885@earth>
+References: <1424692061-30624-1-git-send-email-k.kozlowski@samsung.com>
+ <1424692061-30624-12-git-send-email-k.kozlowski@samsung.com>
+ <20150226004522.GB885@earth>
+Message-ID: <1424943000.27971.7.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2015, 07:55 AM, Leilei Zhao wrote:
-> We only use buf of ring In DMA rx function while using buf of xmit
-> in DMA tx function. So here we need definitively to check the buf
-> of ring which is corresponding to DMA rx function.
+On czw, 2015-02-26 at 01:45 +0100, Sebastian Reichel wrote:
+> Hi,
 > 
-> Signed-off-by: Leilei Zhao <leilei.zhao@atmel.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  drivers/tty/serial/atmel_serial.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> On Mon, Feb 23, 2015 at 12:47:32PM +0100, Krzysztof Kozlowski wrote:
+> > Change the ownership of power_supply structure from each driver
+> > implementing the class to the power supply core.
+> > 
+
+(...)
+
 > 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 846552b..460903c 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -1027,7 +1027,7 @@ static int atmel_prepare_rx_dma(struct uart_port *port)
->  	spin_lock_init(&atmel_port->lock_rx);
->  	sg_init_table(&atmel_port->sg_rx, 1);
->  	/* UART circular rx buffer is an aligned page. */
-> -	BUG_ON((int)port->state->xmit.buf & ~PAGE_MASK);
-> +	BUG_ON((int)ring->buf & ~PAGE_MASK);
+> I would like to merge this via the power supply subsystem. Some of
+> the files being patched are not under my maintainence, though. It
+> would be nice if I get an Acked-By from their maintainers.
+> 
+> As far as I can see this patch is currently missing feedback from:
+> 
+> arch/x86/platform/olpc: x86 Maintainers
+> drivers/acpi: Rafael J. Wysocki, Len Brown
+> drivers/hid: Jiri Kosina
+> drivers/platform/x86: Darren Hart
 
-Please use PAGE_ALIGNED. This will also make the bad (int) cast to dismiss.
+I'll respin with v5 because new power supply driver appeared in your
+tree (DA9150 Charger). However this does not affect other subsystems.
 
-thanks,
--- 
-js
-suse labs
+Best regards,
+Krzysztof
