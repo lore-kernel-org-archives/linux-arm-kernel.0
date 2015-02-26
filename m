@@ -1,80 +1,74 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Thu, 26 Feb 2015 11:29:52 +0100
-Subject: [PATCH v2 02/18] ARM: ARMv7M: Enlarge vector table to 256 entries
-In-Reply-To: <CALszF6CB9YU7ashQ-y_zx58Mkf=sbrBfa2dAOdQm7FkmcuE7PA@mail.gmail.com>
-References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1424455277-29983-3-git-send-email-mcoquelin.stm32@gmail.com>
- <20150220194756.GS19388@pengutronix.de>
- <CALszF6CB9YU7ashQ-y_zx58Mkf=sbrBfa2dAOdQm7FkmcuE7PA@mail.gmail.com>
-Message-ID: <CALszF6B6A=de_TK0e-iJHuW4MfD9xbd-yHZHaD-JmZXwZ9CW2A@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu, 26 Feb 2015 11:37:08 +0100
+Subject: [PATCH] ARM: kexec: Relax SMP validation to improve DT compatibility
+Message-ID: <1424947028-7438-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-02-23 11:33 GMT+01:00 Maxime Coquelin <mcoquelin.stm32@gmail.com>:
-> 2015-02-20 20:47 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
->> On Fri, Feb 20, 2015 at 07:01:01PM +0100, Maxime Coquelin wrote:
->>> From Cortex-M reference manuals, the nvic supports up to 240 interrupts.
->>> So the number of entries in vectors table is up to 256.
->>>
->>> This patch adds a new config flag to specify the number of external interrupts.
->>> Some ifdeferies are added in order to respect the natural alignment without
->>> wasting too much space on smaller systems.
->>>
->>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>> ---
->>>  arch/arm/kernel/entry-v7m.S | 13 +++++++++----
->>>  arch/arm/mm/Kconfig         | 15 +++++++++++++++
->>>  2 files changed, 24 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
->>> index 8944f49..68cde36 100644
->>> --- a/arch/arm/kernel/entry-v7m.S
->>> +++ b/arch/arm/kernel/entry-v7m.S
->>> @@ -117,9 +117,14 @@ ENTRY(__switch_to)
->>>  ENDPROC(__switch_to)
->>>
->>>       .data
->>> -     .align  8
->>> +#if CONFIG_CPUV7M_NUM_IRQ <= 112
->> I would have called this CONFIG_CPU_V7M_NUM_IRQ to match the already
->> existing CPU_V7M symbol.
->
-> That's better indeed.
-> It will be changed in v3.
->
->>
->>> +     .align  9
->>> +#else
->>> +     .align  10
->>> +#endif
->>> +
->>
->> Other than that:
->> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->>
->> Who do you target to apply this series?
->
-> I guess it should go through Russell's Patch Tracking System?
+When trying to kexec into a new kernel on a platform where multiple CPU
+cores are present, but no SMP bringup code is available yet, the
+kexec_load system call fails with:
 
-Sorry, I answered your question too quickly.
-I meant this patch should go through Russell's Patch Tracking System.
+    kexec_load failed: Invalid argument
 
-For the other patches, I think it should be picked by their respective
-maintainers.
-Or I can create an immutable tag (on github or kernel.org?) that will
-be merged by the different sub-systems?
-What would you advise?
+The SMP test added to machine_kexec_prepare() in commit 2103f6cba61a8b8b
+("ARM: 7807/1: kexec: validate CPU hotplug support") wants to prohibit
+kexec on SMP platforms where it cannot disable secondary CPUs.
+However, this test is too strict: if the secondary CPUs couldn't be
+enabled in the first place, there's no need to disable them later at
+kexec time.  Hence skip the test in the absence of SMP bringup code.
 
-Thanks,
-Maxime
+This allows to add all CPU cores to the DTS from the beginning, without
+having to implement SMP bringup first, improving DT compatibility.
 
->
-> Thanks,
-> Maxime
->>
->> Best regards
->> Uwe
->>
->> --
->> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
->> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/include/asm/smp_plat.h | 1 +
+ arch/arm/kernel/machine_kexec.c | 3 ++-
+ arch/arm/kernel/smp.c           | 5 +++++
+ 3 files changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+index 0ad7d490ee6f2657..993e5224d8f7eeeb 100644
+--- a/arch/arm/include/asm/smp_plat.h
++++ b/arch/arm/include/asm/smp_plat.h
+@@ -104,6 +104,7 @@ static inline u32 mpidr_hash_size(void)
+ 	return 1 << mpidr_hash.bits;
+ }
+ 
++extern int platform_can_secondary_boot(void);
+ extern int platform_can_cpu_hotplug(void);
+ 
+ #endif
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index de2b085ad7535da7..8bf3b7c098881b95 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -46,7 +46,8 @@ int machine_kexec_prepare(struct kimage *image)
+ 	 * and implements CPU hotplug for the current HW. If not, we won't be
+ 	 * able to kexec reliably, so fail the prepare operation.
+ 	 */
+-	if (num_possible_cpus() > 1 && !platform_can_cpu_hotplug())
++	if (num_possible_cpus() > 1 && platform_can_secondary_boot() &&
++	    !platform_can_cpu_hotplug())
+ 		return -EINVAL;
+ 
+ 	/*
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 86ef244c5a24b4fa..cca5b87581855244 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -145,6 +145,11 @@ void __init smp_init_cpus(void)
+ 		smp_ops.smp_init_cpus();
+ }
+ 
++int platform_can_secondary_boot(void)
++{
++	return !!smp_ops.smp_boot_secondary;
++}
++
+ int platform_can_cpu_hotplug(void)
+ {
+ #ifdef CONFIG_HOTPLUG_CPU
+-- 
+1.9.1
