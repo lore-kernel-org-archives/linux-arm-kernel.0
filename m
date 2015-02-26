@@ -1,57 +1,412 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 26 Feb 2015 18:31:00 +0000
-Subject: [PATCH 00/12] ARM: dts: apq8064 dt patches.
-In-Reply-To: <6ABCEF31-CD4B-4544-8F0B-7654A45C198B@codeaurora.org>
-References: <1424678035-12862-1-git-send-email-srinivas.kandagatla@linaro.org>
- <6ABCEF31-CD4B-4544-8F0B-7654A45C198B@codeaurora.org>
-Message-ID: <54EF6664.9080905@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 26 Feb 2015 20:33:33 +0200
+Subject: [PATCH 03/11] drm: add driver for simple vga encoders
+In-Reply-To: <1422721984-27782-4-git-send-email-heiko@sntech.de>
+References: <1422721984-27782-1-git-send-email-heiko@sntech.de>
+ <1422721984-27782-4-git-send-email-heiko@sntech.de>
+Message-ID: <10479896.3hQzemuBRM@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Heiko,
 
+Thank you for the patch.
 
-On 26/02/15 18:29, Kumar Gala wrote:
->
-> On Feb 23, 2015, at 1:53 AM, Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
->
->> Hi Kumar,
->> Now that the rpm header file dependency is resolved, Could you
->> queue these dt patches for rc2.
->>
->>
->> Thanks,
->> srini
->>
->> Nicolas Dechesne (3):
->>   ARM: DT: apq8064: add pci support in CM QS600
->>   ARM: DT: apq8064: Add usb host support to CM QS-600
->>   ARM: DT: apq8064: Add USB OTG support for CM QS-600
->>
->> Pramod Gurav (1):
->>   ARM: qcom: Add DT alias for serial port
->>
->> Rob Clark (1):
->>   ARM: dts: APQ8064: Add MDP support
->>
->> Srinivas Kandagatla (7):
->>   ARM: dts: apq8064: add RPM regulators support
->>   ARM: dts: apq8064: Add usb host support.
->>   ARM: dts: apq8064: Add USB OTG support
->>   ARM: dts: apq8064: Add SATA controller support.
->>   ARM: dts: apq8064: Remove incorrect gsbi2 node.
->>   ARM: dts: Move i2c1 pinctrl to apq8064.dtsi
->>   ARM: dts: apq8064 add i2c3 node for panel.
->>
->> arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts |  49 +++
->> arch/arm/boot/dts/qcom-apq8064-ifc6410.dts  |  98 +++++-
->> arch/arm/boot/dts/qcom-apq8064.dtsi         | 499 +++++++++++++++++++++++++++-
->> 3 files changed, 629 insertions(+), 17 deletions(-)
->
-> Can you scrub all the patches for interrupt usage such that we use GIC_SPI define and I think any IRQ type of 0 or NONE should really be IRQ_TYPE_LEVEL_HIGH
+On Saturday 31 January 2015 17:32:56 Heiko Stuebner wrote:
+> There exist simple vga encoders without any type of management interface
+> and just maybe a simple gpio for turning it on or off. Examples for these
+> are the Analog Devices ADV7123, Chipsea CS7123 or Micronas SDA7123.
+> 
+> Add a generic encoder driver for those that can be used by drm drivers
+> using the component framework.
 
-Yes, I will fix it.
+The rcar-du driver already handles the adi,adv7123 compatible string used by 
+this driver. A generic driver is in my opinion a very good idea, but we can't 
+break the existing support. Porting the rcar-du driver to the component model 
+is needed.
 
---srini
->
-> - k
->
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  drivers/gpu/drm/i2c/Kconfig      |   6 +
+>  drivers/gpu/drm/i2c/Makefile     |   2 +
+>  drivers/gpu/drm/i2c/vga-simple.c | 325 ++++++++++++++++++++++++++++++++++++
+
+drivers/gpu/drm/i2c/ feels wrong for a platform device.
+
+>  3 files changed, 333 insertions(+)
+>  create mode 100644 drivers/gpu/drm/i2c/vga-simple.c
+> 
+> diff --git a/drivers/gpu/drm/i2c/Kconfig b/drivers/gpu/drm/i2c/Kconfig
+> index 22c7ed6..319f2cb 100644
+> --- a/drivers/gpu/drm/i2c/Kconfig
+> +++ b/drivers/gpu/drm/i2c/Kconfig
+> @@ -31,4 +31,10 @@ config DRM_I2C_NXP_TDA998X
+>  	help
+>  	  Support for NXP Semiconductors TDA998X HDMI encoders.
+> 
+> +config DRM_VGA_SIMPLE
+> +	tristate "Generic simple vga encoder"
+> +	help
+> +	  Support for vga encoder chips without any special settings
+> +	  and at most a power-control gpio.
+> +
+>  endmenu
+> diff --git a/drivers/gpu/drm/i2c/Makefile b/drivers/gpu/drm/i2c/Makefile
+> index 2c72eb5..858961f 100644
+> --- a/drivers/gpu/drm/i2c/Makefile
+> +++ b/drivers/gpu/drm/i2c/Makefile
+> @@ -10,3 +10,5 @@ obj-$(CONFIG_DRM_I2C_SIL164) += sil164.o
+> 
+>  tda998x-y := tda998x_drv.o
+>  obj-$(CONFIG_DRM_I2C_NXP_TDA998X) += tda998x.o
+> +
+> +obj-$(CONFIG_DRM_VGA_SIMPLE) += vga-simple.o
+> diff --git a/drivers/gpu/drm/i2c/vga-simple.c
+> b/drivers/gpu/drm/i2c/vga-simple.c new file mode 100644
+> index 0000000..bb9d19c
+> --- /dev/null
+> +++ b/drivers/gpu/drm/i2c/vga-simple.c
+> @@ -0,0 +1,325 @@
+> +/*
+> + * Simple vga encoder driver
+> + *
+> + * Copyright (C) 2014 Heiko Stuebner <heiko@sntech.de>
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/component.h>
+> +#include <linux/gpio.h>
+> +#include <linux/gpio/consumer.h>
+> +#include <linux/i2c.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <drm/drm_of.h>
+> +#include <drm/drmP.h>
+> +#include <drm/drm_crtc.h>
+> +#include <drm/drm_crtc_helper.h>
+> +#include <drm/drm_edid.h>
+> +
+> +#define connector_to_vga_simple(x) container_of(x, struct vga_simple,
+> connector) +#define encoder_to_vga_simple(x) container_of(x, struct
+> vga_simple, encoder) +
+> +struct vga_simple {
+> +	struct drm_connector connector;
+> +	struct drm_encoder encoder;
+> +
+> +	struct device *dev;
+> +	struct i2c_adapter *ddc;
+> +
+> +	struct regulator *vaa_reg;
+> +	struct gpio_desc *enable_gpio;
+> +
+> +	struct mutex enable_lock;
+> +	bool enabled;
+> +};
+> +
+> +/*
+> + * Connector functions
+> + */
+> +
+> +enum drm_connector_status vga_simple_detect(struct drm_connector
+> *connector, +					    bool force)
+> +{
+> +	struct vga_simple *vga = connector_to_vga_simple(connector);
+> +
+> +	if (!vga->ddc)
+> +		return connector_status_unknown;
+> +
+> +	if (drm_probe_ddc(vga->ddc))
+> +		return connector_status_connected;
+> +
+> +	return connector_status_disconnected;
+> +}
+> +
+> +void vga_simple_connector_destroy(struct drm_connector *connector)
+> +{
+> +	drm_connector_unregister(connector);
+> +	drm_connector_cleanup(connector);
+> +}
+> +
+> +struct drm_connector_funcs vga_simple_connector_funcs = {
+> +	.dpms = drm_helper_connector_dpms,
+> +	.fill_modes = drm_helper_probe_single_connector_modes,
+> +	.detect = vga_simple_detect,
+> +	.destroy = vga_simple_connector_destroy,
+> +};
+> +
+> +/*
+> + * Connector helper functions
+> + */
+> +
+> +static int vga_simple_connector_get_modes(struct drm_connector *connector)
+> +{
+> +	struct vga_simple *vga = connector_to_vga_simple(connector);
+> +	struct edid *edid;
+> +	int ret = 0;
+> +
+> +	if (!vga->ddc)
+> +		return 0;
+> +
+> +	edid = drm_get_edid(connector, vga->ddc);
+> +	if (edid) {
+> +		drm_mode_connector_update_edid_property(connector, edid);
+> +		ret = drm_add_edid_modes(connector, edid);
+> +		kfree(edid);
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static int vga_simple_connector_mode_valid(struct drm_connector *connector,
+> +					struct drm_display_mode *mode)
+> +{
+> +	return MODE_OK;
+> +}
+> +
+> +static struct drm_encoder
+> +*vga_simple_connector_best_encoder(struct drm_connector *connector)
+> +{
+> +	struct vga_simple *vga = connector_to_vga_simple(connector);
+> +
+> +	return &vga->encoder;
+> +}
+> +
+> +static struct drm_connector_helper_funcs vga_simple_connector_helper_funcs
+> = { +	.get_modes = vga_simple_connector_get_modes,
+> +	.best_encoder = vga_simple_connector_best_encoder,
+> +	.mode_valid = vga_simple_connector_mode_valid,
+> +};
+> +
+> +/*
+> + * Encoder functions
+> + */
+> +
+> +static void vga_simple_encoder_destroy(struct drm_encoder *encoder)
+> +{
+> +	drm_encoder_cleanup(encoder);
+> +}
+> +
+> +static const struct drm_encoder_funcs vga_simple_encoder_funcs = {
+> +	.destroy = vga_simple_encoder_destroy,
+> +};
+> +
+> +/*
+> + * Encoder helper functions
+> + */
+> +
+> +static void vga_simple_encoder_dpms(struct drm_encoder *encoder, int mode)
+> +{
+> +	struct vga_simple *vga = encoder_to_vga_simple(encoder);
+> +
+> +	mutex_lock(&vga->enable_lock);
+> +
+> +	switch (mode) {
+> +	case DRM_MODE_DPMS_ON:
+> +		if (vga->enabled)
+> +			goto out;
+> +
+> +		if (!IS_ERR(vga->vaa_reg))
+> +			regulator_enable(vga->vaa_reg);
+> +
+> +		if (vga->enable_gpio)
+> +			gpiod_set_value(vga->enable_gpio, 1);
+> +
+> +		vga->enabled = true;
+> +		break;
+> +	case DRM_MODE_DPMS_STANDBY:
+> +	case DRM_MODE_DPMS_SUSPEND:
+> +	case DRM_MODE_DPMS_OFF:
+> +		if (!vga->enabled)
+> +			goto out;
+> +
+> +		if (vga->enable_gpio)
+> +			gpiod_set_value(vga->enable_gpio, 0);
+> +
+> +		if (!IS_ERR(vga->vaa_reg))
+> +			regulator_enable(vga->vaa_reg);
+> +
+> +		vga->enabled = false;
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +
+> +out:
+> +	mutex_unlock(&vga->enable_lock);
+> +}
+> +
+> +static bool vga_simple_mode_fixup(struct drm_encoder *encoder,
+> +				  const struct drm_display_mode *mode,
+> +				  struct drm_display_mode *adjusted_mode)
+> +{
+> +	return true;
+> +}
+> +
+> +static void vga_simple_encoder_prepare(struct drm_encoder *encoder)
+> +{
+> +}
+> +
+> +static void vga_simple_encoder_mode_set(struct drm_encoder *encoder,
+> +					struct drm_display_mode *mode,
+> +					struct drm_display_mode *adjusted_mode)
+> +{
+> +}
+> +
+> +static void vga_simple_encoder_commit(struct drm_encoder *encoder)
+> +{
+> +	vga_simple_encoder_dpms(encoder, DRM_MODE_DPMS_ON);
+> +}
+> +
+> +static void vga_simple_encoder_disable(struct drm_encoder *encoder)
+> +{
+> +	vga_simple_encoder_dpms(encoder, DRM_MODE_DPMS_OFF);
+> +}
+> +
+> +static const struct drm_encoder_helper_funcs
+> vga_simple_encoder_helper_funcs = {
+> +	.dpms = vga_simple_encoder_dpms,
+> +	.mode_fixup = vga_simple_mode_fixup,
+> +	.prepare = vga_simple_encoder_prepare,
+> +	.mode_set = vga_simple_encoder_mode_set,
+> +	.commit = vga_simple_encoder_commit,
+> +	.disable = vga_simple_encoder_disable,
+
+this is interesting. Some users of this encoder (I'm thinking about rcar-du, 
+for which I've just posted the patches) are already ported to atomic updates, 
+while others are not. How can we support both ?
+
+> +};
+> +
+> +/*
+> + * Component helper functions
+> + */
+> +
+> +static int vga_simple_bind(struct device *dev, struct device *master,
+> +				 void *data)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct drm_device *drm = data;
+> +
+> +	struct device_node *ddc_node, *np = pdev->dev.of_node;
+> +	struct vga_simple *vga;
+> +	int ret;
+> +
+> +	if (!np)
+> +		return -ENODEV;
+> +
+> +	vga = devm_kzalloc(dev, sizeof(*vga), GFP_KERNEL);
+> +	if (!vga)
+> +		return -ENOMEM;
+> +
+> +	vga->dev = dev;
+> +	dev_set_drvdata(dev, vga);
+> +	mutex_init(&vga->enable_lock);
+> +
+> +	vga->enable_gpio = devm_gpiod_get_optional(dev, "enable",
+> +						   GPIOD_OUT_LOW);
+> +	if (IS_ERR(vga->enable_gpio)) {
+> +		ret = PTR_ERR(vga->enable_gpio);
+> +		dev_err(dev, "failed to request GPIO: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	vga->enabled = false;
+> +
+> +	ddc_node = of_parse_phandle(np, "ddc-i2c-bus", 0);
+> +	if (ddc_node) {
+> +		vga->ddc = of_find_i2c_adapter_by_node(ddc_node);
+> +		of_node_put(ddc_node);
+> +		if (!vga->ddc) {
+> +			dev_dbg(vga->dev, "failed to read ddc node\n");
+> +			return -EPROBE_DEFER;
+> +		}
+> +	} else {
+> +		dev_dbg(vga->dev, "no ddc property found\n");
+> +	}
+> +
+> +	vga->vaa_reg = devm_regulator_get_optional(dev, "vaa");
+> +
+> +	vga->encoder.possible_crtcs = drm_of_find_possible_crtcs(drm, np);
+> +	vga->encoder.of_node = np;
+> +	vga->connector.polled = DRM_CONNECTOR_POLL_CONNECT |
+> +				DRM_CONNECTOR_POLL_DISCONNECT;
+> +
+> +	drm_encoder_helper_add(&vga->encoder, &vga_simple_encoder_helper_funcs);
+> +	drm_encoder_init(drm, &vga->encoder, &vga_simple_encoder_funcs,
+> +			 DRM_MODE_ENCODER_DAC);
+> +
+> +	drm_connector_helper_add(&vga->connector,
+> +				 &vga_simple_connector_helper_funcs);
+
+I really dislike this, this is an encoder driver, not a connector driver. It 
+shouldn't be responsible for creating the connector. For all it knows, there 
+might not even be a VGA connector connected to the encoder, VGA signals could 
+be sent to a chained encoder. That might be a bit far-fetched in the VGA case, 
+but in the generic case encoder drivers shouldn't create connectors.
+
+> +	drm_connector_init(drm, &vga->connector, &vga_simple_connector_funcs,
+> +			   DRM_MODE_CONNECTOR_VGA);
+> +
+> +	drm_mode_connector_attach_encoder(&vga->connector, &vga->encoder);
+> +
+> +	return 0;
+> +}
+> +
+> +static void vga_simple_unbind(struct device *dev, struct device *master,
+> +				    void *data)
+> +{
+> +	struct vga_simple *vga = dev_get_drvdata(dev);
+> +
+> +	vga->connector.funcs->destroy(&vga->connector);
+> +	vga->encoder.funcs->destroy(&vga->encoder);
+> +}
+> +
+> +static const struct component_ops vga_simple_ops = {
+> +	.bind = vga_simple_bind,
+> +	.unbind = vga_simple_unbind,
+> +};
+> +
+> +static int vga_simple_probe(struct platform_device *pdev)
+> +{
+> +	return component_add(&pdev->dev, &vga_simple_ops);
+> +}
+> +
+> +static int vga_simple_remove(struct platform_device *pdev)
+> +{
+> +	component_del(&pdev->dev, &vga_simple_ops);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id vga_simple_ids[] = {
+> +	{ .compatible = "adi,adv7123", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, vga_simple_ids);
+> +
+> +static struct platform_driver vga_simple_driver = {
+> +	.probe  = vga_simple_probe,
+> +	.remove = vga_simple_remove,
+> +	.driver = {
+> +		.name = "vga-simple",
+> +		.of_match_table = vga_simple_ids,
+> +	},
+> +};
+> +module_platform_driver(vga_simple_driver);
+> +
+> +MODULE_AUTHOR("Heiko Stuebner <heiko@sntech.de>");
+> +MODULE_DESCRIPTION("Simple vga converter");
+> +MODULE_LICENSE("GPL");
+
+-- 
+Regards,
+
+Laurent Pinchart
