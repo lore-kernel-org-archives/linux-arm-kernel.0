@@ -1,39 +1,74 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 26 Feb 2015 10:30:00 +0100
-Subject: [PATCH v4 11/20] power_supply: Change ownership from driver to
- core
-In-Reply-To: <20150226004522.GB885@earth>
-References: <1424692061-30624-1-git-send-email-k.kozlowski@samsung.com>
- <1424692061-30624-12-git-send-email-k.kozlowski@samsung.com>
- <20150226004522.GB885@earth>
-Message-ID: <1424943000.27971.7.camel@AMDC1943>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 26 Feb 2015 10:31:28 +0100
+Subject: [PATCH 4/8] pwm: atmel-hlcdc: fix struct clk pointer comparing
+In-Reply-To: <54EEE5EA.6000902@atmel.com>
+References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+ <1424876018-17852-5-git-send-email-shawn.guo@linaro.org>
+ <54EEE5EA.6000902@atmel.com>
+Message-ID: <20150226103128.0b120742@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On czw, 2015-02-26 at 01:45 +0100, Sebastian Reichel wrote:
-> Hi,
-> 
-> On Mon, Feb 23, 2015 at 12:47:32PM +0100, Krzysztof Kozlowski wrote:
-> > Change the ownership of power_supply structure from each driver
-> > implementing the class to the power supply core.
+Nicolas, Shawn,
+
+On Thu, 26 Feb 2015 10:22:50 +0100
+Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+
+> Le 25/02/2015 15:53, Shawn Guo a ?crit :
+> > Since commit 035a61c314eb ("clk: Make clk API return per-user struct clk
+> > instances"), clk API users can no longer check if two struct clk
+> > pointers are pointing to the same hardware clock, i.e. struct clk_hw, by
+> > simply comparing two pointers.  That's because with the per-user clk
+> > change, a brand new struct clk is created whenever clients try to look
+> > up the clock by calling clk_get() or sister functions like clk_get_sys()
+> > and of_clk_get().  This changes the original behavior where the struct
+> > clk is only created for once when clock driver registers the clock to
+> > CCF in the first place.  The net change here is before commit
+> > 035a61c314eb the struct clk pointer is unique for given hardware
+> > clock, while after the commit the pointers returned by clk lookup calls
+> > become different for the same hardware clock.
 > > 
+> > That said, the struct clk pointer comparing in the code doesn't work any
+> > more.  Call helper function clk_is_match() instead to fix the problem.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> I agree with the fix whichever name is chosen for the function in an
+> future version of this series. So you can add my:
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> Maybe Boris can double check...
 
-(...)
+Looks good to me.
+Thanks for fixing that.
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
 > 
-> I would like to merge this via the power supply subsystem. Some of
-> the files being patched are not under my maintainence, though. It
-> would be nice if I get an Acked-By from their maintainers.
+> > ---
+> >  drivers/pwm/pwm-atmel-hlcdc.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/pwm/pwm-atmel-hlcdc.c b/drivers/pwm/pwm-atmel-hlcdc.c
+> > index 522f7075bb1a..36475949b829 100644
+> > --- a/drivers/pwm/pwm-atmel-hlcdc.c
+> > +++ b/drivers/pwm/pwm-atmel-hlcdc.c
+> > @@ -97,7 +97,7 @@ static int atmel_hlcdc_pwm_config(struct pwm_chip *c,
+> >  
+> >  	pwmcfg = ATMEL_HLCDC_PWMPS(pres);
+> >  
+> > -	if (new_clk != chip->cur_clk) {
+> > +	if (!clk_is_match(new_clk, chip->cur_clk)) {
+> >  		u32 gencfg = 0;
+> >  		int ret;
+> >  
+> > 
 > 
-> As far as I can see this patch is currently missing feedback from:
 > 
-> arch/x86/platform/olpc: x86 Maintainers
-> drivers/acpi: Rafael J. Wysocki, Len Brown
-> drivers/hid: Jiri Kosina
-> drivers/platform/x86: Darren Hart
 
-I'll respin with v5 because new power supply driver appeared in your
-tree (DA9150 Charger). However this does not affect other subsystems.
 
-Best regards,
-Krzysztof
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
