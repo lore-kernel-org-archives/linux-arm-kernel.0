@@ -1,133 +1,141 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 26 Feb 2015 10:47:44 -0800
-Subject: [PATCH 2/2] qcom: scm: Add scm_set_warm_boot_addr function
-In-Reply-To: <1424904852-12719-3-git-send-email-lina.iyer@linaro.org> (Lina
- Iyer's message of "Wed, 25 Feb 2015 15:54:12 -0700")
-References: <1424904852-12719-1-git-send-email-lina.iyer@linaro.org>
- <1424904852-12719-3-git-send-email-lina.iyer@linaro.org>
-Message-ID: <7h7fv4bjcf.fsf@deeprootsystems.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 26 Feb 2015 18:51:17 +0000
+Subject: [RFC PATCH 3/3] arm64: KVM: use ID map with increased VA range
+ if required
+In-Reply-To: <CAKv+Gu8=tAb7+d1qkmY47AvKjs_mjkK=NCMqutPJg9hLV5DY0Q@mail.gmail.com>
+References: <1424964547-2118-1-git-send-email-ard.biesheuvel@linaro.org>	<1424964547-2118-4-git-send-email-ard.biesheuvel@linaro.org>	<54EF60B2.1050401@arm.com>
+ <CAKv+Gu8=tAb7+d1qkmY47AvKjs_mjkK=NCMqutPJg9hLV5DY0Q@mail.gmail.com>
+Message-ID: <54EF6B25.5010103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lina Iyer <lina.iyer@linaro.org> writes:
+On 26/02/15 18:17, Ard Biesheuvel wrote:
+> On 26 February 2015 at 18:06, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 26/02/15 15:29, Ard Biesheuvel wrote:
+>>> This patch modifies the HYP init code so it can deal with system
+>>> RAM residing at an offset which exceeds the reach of VA_BITS.
+>>>
+>>> Like for EL1, this involves configuring an additional level of
+>>> translation for the ID map. However, in case of EL2, this implies
+>>> that all translations use the extra level, as we cannot seamlessly
+>>> switch between translation tables with different numbers of
+>>> translation levels. For this reason, the ID map is merged with
+>>> the runtime HYP map, since they don't overlap anyway.
+>>>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> ---
+>>>  arch/arm64/kvm/hyp-init.S | 40 ++++++++++++++++++++++++++++++++++++++--
+>>>  1 file changed, 38 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+>>> index c3191168a994..0af16bce6316 100644
+>>> --- a/arch/arm64/kvm/hyp-init.S
+>>> +++ b/arch/arm64/kvm/hyp-init.S
+>>> @@ -20,6 +20,7 @@
+>>>  #include <asm/assembler.h>
+>>>  #include <asm/kvm_arm.h>
+>>>  #include <asm/kvm_mmu.h>
+>>> +#include <asm/pgtable-hwdef.h>
+>>>
+>>>       .text
+>>>       .pushsection    .hyp.idmap.text, "ax"
+>>> @@ -58,13 +59,44 @@ __invalid:
+>>>        */
+>>>  __do_hyp_init:
+>>>
+>>> -     msr     ttbr0_el2, x0
+>>> -
+>>>       mrs     x4, tcr_el1
+>>>       ldr     x5, =TCR_EL2_MASK
+>>>       and     x4, x4, x5
+>>>       ldr     x5, =TCR_EL2_FLAGS
+>>>       orr     x4, x4, x5
+>>> +
+>>> +#ifndef CONFIG_ARM64_VA_BITS_48
+>>> +     /*
+>>> +      * If we are running with VA_BITS < 48, we may be running with an extra
+>>> +      * level of translation in the ID map. This is only the case if system
+>>> +      * RAM is out of range for the currently configured page size and number
+>>> +      * of translation levels, in which case we will also need the extra
+>>> +      * level for the HYP ID map, or we won't be able to enable the EL2 MMU.
+>>> +      *
+>>> +      * However, at EL2, there is only one TTBR register, and we can't switch
+>>> +      * between translation tables *and* update TCR_EL2.T0SZ at the same
+>>> +      * time. Bottom line: we need the extra level in *both* our translation
+>>> +      * tables.
+>>> +      *
+>>> +      * Fortunately, there is an easy way out: the existing ID map, with the
+>>> +      * extra level, can be reused for both. The kernel image is already
+>>> +      * identity mapped at a high virtual offset, which leaves VA_BITS of
+>>> +      * address space at the low end to put our runtime HYP mappings.
+>>> +      */
+>>> +     adrp    x5, idmap_t0sz                  // get ID map TCR.T0SZ
+>>> +     ldr     x5, [x5, :lo12:idmap_t0sz]
+>>> +     cmp     x5, TCR_T0SZ(VA_BITS)           // extra level configured?
+>>> +     b.ge    1f                              // if not, skip
+>>> +
+>>> +     bfi     x4, x5, TCR_T0SZ_OFFSET, TCR_TxSZ_WIDTH
+>>> +
+>>> +     adrp    x0, idmap_pg_dir        // get root of ID map
+>>> +     orr     x5, x1, PMD_TYPE_TABLE  // table entry pointing at HYP pgd
+>>> +     str     x5, [x0]                // store at offset #0
+>>> +     mov     x1, #0
+>>> +1:
+>>
+>> Wow. This is making my head spin a bit.
+>>
+>> Nitpick: shouldn't you use PUD_TYPE_TABLE instead of PMD_TYPE_TABLE
+>> (yeah, I know, that's the same thing...)?
+>>
+> 
+> I think both are equally inappropriate, considering that this is the
+> level above PGD. But I am happy to switch one for the other ...
 
-> A core can be powered down for cpuidle or when it is hotplugged of. 
+Yeah, brainfart here. We'd need a PGD_TYPE_TABLE, but I don't think it's
+worth the hassle.
 
-s/of/off/ ?
+> 
+>>> +#endif
+>>> +     msr     ttbr0_el2, x0
+>>>       msr     tcr_el2, x4
+>>>
+>>>       ldr     x4, =VTCR_EL2_FLAGS
+>>> @@ -91,6 +123,9 @@ __do_hyp_init:
+>>>       msr     sctlr_el2, x4
+>>>       isb
+>>>
+>>> +     /* Skip the trampoline dance if we merged the boot and runtime PGDs */
+>>> +     cbz     x1, merged
+>>> +
+>>>       /* MMU is now enabled. Get ready for the trampoline dance */
+>>>       ldr     x4, =TRAMPOLINE_VA
+>>>       adr     x5, target
+>>> @@ -105,6 +140,7 @@ target: /* We're now in the trampoline code, switch page tables */
+>>>       tlbi    alle2
+>>>       dsb     sy
+>>>
+>>> +merged:
+>>>       /* Set the stack and new vectors */
+>>>       kern_hyp_va     x2
+>>>       mov     sp, x2
+>>>
+>>
+>> The one thing that worries here is that our EL1 idmap is not a strict
+>> idmap anymore. I really wonder what we can break with that...
+>>
+> 
+> Yes, that is the question I had myself. The other issue is that we
+> never remove the entry we add at the root level in this code, which I
+> don't think matters that much but it would be good if someone could
+> confirm.
 
-> In
-> either case, the warmboot return address would be different. Allow
-> setting the warmboot address for a specific cpu, optimize and write to
-> the firmware if the address is different than the previously set
-> address.
->
-> Also we do not need to export the warmboot flags. Move them into the
-> implementation file.
->
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> ---
->  arch/arm/mach-qcom/scm-boot.c | 38 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-qcom/scm-boot.h |  7 +++----
->  2 files changed, 41 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-qcom/scm-boot.c b/arch/arm/mach-qcom/scm-boot.c
-> index 45cee3e..cb73134 100644
-> --- a/arch/arm/mach-qcom/scm-boot.c
-> +++ b/arch/arm/mach-qcom/scm-boot.c
-> @@ -1,4 +1,5 @@
->  /* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-> + * Copyright (c) 2014, Linaro Ltd.
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 and
-> @@ -21,6 +22,23 @@
->  #include "scm.h"
->  #include "scm-boot.h"
->  
-> +#define SCM_FLAG_WARMBOOT_CPU0		0x04
-> +#define SCM_FLAG_WARMBOOT_CPU1		0x02
-> +#define SCM_FLAG_WARMBOOT_CPU2		0x10
-> +#define SCM_FLAG_WARMBOOT_CPU3		0x40
-> +
-> +struct scm_warmboot {
-> +	int flag;
-> +	void *entry;
-> +};
-> +
-> +static struct scm_warmboot scm_flags[] = {
-> +	{ .flag = SCM_FLAG_WARMBOOT_CPU0 },
-> +	{ .flag = SCM_FLAG_WARMBOOT_CPU1 },
-> +	{ .flag = SCM_FLAG_WARMBOOT_CPU2 },
-> +	{ .flag = SCM_FLAG_WARMBOOT_CPU3 },
-> +};
-> +
->  /*
->   * Set the cold/warm boot address for one of the CPU cores.
->   */
-> @@ -31,9 +49,29 @@ int scm_set_boot_addr(phys_addr_t addr, int flags)
->  		phys_addr_t  addr;
->  	} cmd;
->  
-> +	might_sleep();
-> +
+Do you mean having both the idmap and the runtime mappings in EL2? I'm
+trying to break it, but I don't see any obvious issues, except for the
+semi-religious fear of keeping unused mappings around....
 
-Unrelated change?
+Worse case, we could have a hyp-specific idmap, and nuke/populate the
+idmap pgd entry as we see fit. One thing at a time...
 
-Looking closer at scm_call(), looks like the might_sleep() should go
-inside scm_call() where it uses the mutex.
-
->  	cmd.addr = addr;
->  	cmd.flags = flags;
->  	return scm_call(SCM_SVC_BOOT, SCM_BOOT_ADDR,
->  			&cmd, sizeof(cmd), NULL, 0);
->  }
->  EXPORT_SYMBOL(scm_set_boot_addr);
-> +
-> +int scm_set_warm_boot_addr(void *entry, int cpu)
-> +{
-> +	int ret;
-> +
-> +	/*
-> +	 * Reassign only if we are switching from hotplug entry point
-> +	 * to cpuidle entry point or vice versa.
-> +	 */
-> +	if (entry == scm_flags[cpu].entry)
-> +		return 0;
-> +
-> +	ret = scm_set_boot_addr(virt_to_phys(entry), scm_flags[cpu].flag);
-> +	if (!ret)
-> +		scm_flags[cpu].entry  = entry;
-> +
-> +	return ret;
-> +}
-> diff --git a/arch/arm/mach-qcom/scm-boot.h b/arch/arm/mach-qcom/scm-boot.h
-> index 02b445c..97dbf58 100644
-> --- a/arch/arm/mach-qcom/scm-boot.h
-> +++ b/arch/arm/mach-qcom/scm-boot.h
-> @@ -1,4 +1,5 @@
->  /* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-> + * Copyright (c) 2014, Linaro Ltd.
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 and
-> @@ -9,6 +10,7 @@
->   * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->   * GNU General Public License for more details.
->   */
-> +
->  #ifndef __MACH_SCM_BOOT_H
->  #define __MACH_SCM_BOOT_H
->  
-> @@ -16,11 +18,8 @@
->  #define SCM_FLAG_COLDBOOT_CPU1		0x01
->  #define SCM_FLAG_COLDBOOT_CPU2		0x08
->  #define SCM_FLAG_COLDBOOT_CPU3		0x20
-> -#define SCM_FLAG_WARMBOOT_CPU0		0x04
-> -#define SCM_FLAG_WARMBOOT_CPU1		0x02
-> -#define SCM_FLAG_WARMBOOT_CPU2		0x10
-> -#define SCM_FLAG_WARMBOOT_CPU3		0x40
-
-You just added these in patch 1, and now moved them.  I would just
-squash the 2 patches together.
-
-Kevin
+	M.
+-- 
+Jazz is not dead. It just smells funny...
