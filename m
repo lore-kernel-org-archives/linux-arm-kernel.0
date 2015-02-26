@@ -1,101 +1,37 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 26 Feb 2015 21:59:08 +0800
-Subject: [PATCH] pinctrl: at91: move lock/unlock_as_irq calls into
- request/release resources methods
-In-Reply-To: <54EF2052.6030909@atmel.com>
-References: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
- <54EF2052.6030909@atmel.com>
-Message-ID: <AE6E30D8-7E58-4D18-A8F3-B903F5D85498@jcrosoft.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 26 Feb 2015 07:22:45 -0700
+Subject: [PATCH v2] coresight-stm: adding driver for CoreSight STM
+ component
+In-Reply-To: <20150226055320.GA20385@dragon>
+References: <1424907152-18808-1-git-send-email-mathieu.poirier@linaro.org>
+ <20150226055320.GA20385@dragon>
+Message-ID: <CANLsYkz6c8rN21C_JDaarJCEyaNb6C3VeqBH=_y_ERBiNLtPMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 25 February 2015 at 22:53, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Wed, Feb 25, 2015 at 04:32:32PM -0700, Mathieu Poirier wrote:
+>> diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-stm b/Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
+>> new file mode 100644
+>> index 000000000000..3ddb676831ab
+>> --- /dev/null
+>> +++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
+>> @@ -0,0 +1,62 @@
+>> +What:                /sys/bus/coresight/devices/<memory_map>.stm/enable_source
+>> +Date:                February 2015
+>> +KernelVersion:       3.20
+>
+> A random comment - there will never be a v3.20 kernel.
 
-> On Feb 26, 2015, at 9:32 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> 
-> Le 08/02/2015 19:23, Boris Brezillon a ?crit :
->> The gpiochip_lock_as_irq call can fail and return an error, while the
->> irq_startup is not expected to fail (returns an unsigned int which is not
->> checked by irq core code).
->> 
->> irq_request/release_resources functions have been created to address this
->> problem.
->> 
->> Move gpiochip_lock/unlock_as_irq calls into
->> irq_request/release_resources functions to prevent using a gpio as an irq
->> if the gpiochip_lock_as_irq call failed.
->> 
->> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> 
-> If it can speed up things:
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Linus,
-> can we schedule this fix during the 4.0-rc phase?
+That's pretty funny!  That part was obviously minted before there was
+even an hint of moving to 4.0.  Thanks for pointing it out.
 
-As I said I?ll test after CNY which finish this week for us
-
-as we only re-open the office Monday
-
-Best Regards,
-J.
-> 
-> Bye,
-> 
->> ---
->> drivers/pinctrl/pinctrl-at91.c | 17 +++++++----------
->> 1 file changed, 7 insertions(+), 10 deletions(-)
->> 
->> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
->> index f4cd0b9..a481406 100644
->> --- a/drivers/pinctrl/pinctrl-at91.c
->> +++ b/drivers/pinctrl/pinctrl-at91.c
->> @@ -1477,28 +1477,25 @@ static void gpio_irq_ack(struct irq_data *d)
->> 	/* the interrupt is already cleared before by reading ISR */
->> }
->> 
->> -static unsigned int gpio_irq_startup(struct irq_data *d)
->> +static int gpio_irq_request_res(struct irq_data *d)
->> {
->> 	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
->> 	unsigned	pin = d->hwirq;
->> 	int ret;
->> 
->> 	ret = gpiochip_lock_as_irq(&at91_gpio->chip, pin);
->> -	if (ret) {
->> +	if (ret)
->> 		dev_err(at91_gpio->chip.dev, "unable to lock pind %lu IRQ\n",
->> 			d->hwirq);
->> -		return ret;
->> -	}
->> -	gpio_irq_unmask(d);
->> -	return 0;
->> +
->> +	return ret;
->> }
->> 
->> -static void gpio_irq_shutdown(struct irq_data *d)
->> +static void gpio_irq_release_res(struct irq_data *d)
->> {
->> 	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
->> 	unsigned	pin = d->hwirq;
->> 
->> -	gpio_irq_mask(d);
->> 	gpiochip_unlock_as_irq(&at91_gpio->chip, pin);
->> }
->> 
->> @@ -1577,8 +1574,8 @@ void at91_pinctrl_gpio_resume(void)
->> static struct irq_chip gpio_irqchip = {
->> 	.name		= "GPIO",
->> 	.irq_ack	= gpio_irq_ack,
->> -	.irq_startup	= gpio_irq_startup,
->> -	.irq_shutdown	= gpio_irq_shutdown,
->> +	.irq_request_resources = gpio_irq_request_res,
->> +	.irq_release_resources = gpio_irq_release_res,
->> 	.irq_disable	= gpio_irq_mask,
->> 	.irq_mask	= gpio_irq_mask,
->> 	.irq_unmask	= gpio_irq_unmask,
->> 
-> 
-> 
-> -- 
-> Nicolas Ferre
+>
+> Shawn
+>
+>> +Contact:     Mathieu Poirier <mathieu.poirier@linaro.org>
+>> +Description: (RW) Enable/disable tracing on this specific trace macrocell.
+>> +             Enabling the trace macrocell implies it has been configured
+>> +             properly and a sink has been identidifed for it.  The path
+>> +             of coresight components linking the source to the sink is
+>> +             configured and managed automatically by the coresight framework.
