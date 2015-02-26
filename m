@@ -1,61 +1,106 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 15:21:16 +0900
-Subject: [PATCH 19/32] ARM: shmobile: r8a7791: Correct SDHI clock labels and
- output-names
+Date: Thu, 26 Feb 2015 15:21:17 +0900
+Subject: [PATCH 20/32] ARM: shmobile: koelsch: Add DU HDMI output support
 In-Reply-To: <cover.1424849129.git.horms+renesas@verge.net.au>
 References: <cover.1424849129.git.horms+renesas@verge.net.au>
-Message-ID: <2ea0d4ec39ac837e34c07b4783a7c900940e6eaf.1424849129.git.horms+renesas@verge.net.au>
+Message-ID: <83a0731b39f3bc2421960e6169f8440ca673a20f.1424849129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There appears to have been some inconsistency and confusion here as on
-the r8a7790 these clocks are referred to as SD(HI)1 and SD(HI)2 while on
-the r8a7791 and r8a7794 they are referred to as SD(HI)2 and SD(HI)3.
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Fixes: 59e79895b95892863 ("ARM: shmobile: r8a7791: Add clocks")
-Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Add DT nodes for the ADV7511 HDMI encoder and its HDMI output connector
+and configure the DISP pin group that drives the HDMI transmitter DE
+pin.
+
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 50 ++++++++++++++++++++++++++++++++++-
+ 1 file changed, 49 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 43fb58a..afba8af 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -874,19 +874,19 @@
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index a3c2780..624bb2c 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -258,6 +258,17 @@
+ 			system-clock-frequency = <11289600>;
  		};
+ 	};
++
++	hdmi-out {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con: endpoint {
++				remote-endpoint = <&adv7511_out>;
++			};
++		};
++	};
+ };
  
- 		/* Variable factor clocks */
--		sd1_clk: sd2_clk at e6150078 {
-+		sd2_clk: sd2_clk at e6150078 {
- 			compatible = "renesas,r8a7791-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0 0xe6150078 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
--			clock-output-names = "sd1";
-+			clock-output-names = "sd2";
+ &du {
+@@ -266,6 +277,11 @@
+ 	status = "okay";
+ 
+ 	ports {
++		port at 0 {
++			endpoint {
++				remote-endpoint = <&adv7511_in>;
++			};
++		};
+ 		port at 1 {
+ 			lvds_connector: endpoint {
+ 			};
+@@ -284,7 +300,7 @@
+ 	};
+ 
+ 	du_pins: du {
+-		renesas,groups = "du_rgb666", "du_sync", "du_clk_out_0";
++		renesas,groups = "du_rgb666", "du_sync", "du_disp", "du_clk_out_0";
+ 		renesas,function = "du";
+ 	};
+ 
+@@ -506,6 +522,38 @@
  		};
--		sd2_clk: sd3_clk at e615026c {
-+		sd3_clk: sd3_clk at e615026c {
- 			compatible = "renesas,r8a7791-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0 0xe615026c 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
--			clock-output-names = "sd2";
-+			clock-output-names = "sd3";
- 		};
- 		mmc0_clk: mmc0_clk at e6150240 {
- 			compatible = "renesas,r8a7791-div6-clock", "renesas,cpg-div6-clock";
-@@ -1107,7 +1107,7 @@
- 		mstp3_clks: mstp3_clks at e615013c {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
--			clocks = <&cp_clk>, <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7791_CLK_SD0>,
-+			clocks = <&cp_clk>, <&sd3_clk>, <&sd2_clk>, <&cpg_clocks R8A7791_CLK_SD0>,
- 				 <&mmc0_clk>, <&hp_clk>, <&mp_clk>, <&hp_clk>, <&mp_clk>, <&rclk_clk>,
- 				 <&hp_clk>, <&hp_clk>;
- 			#clock-cells = <1>;
+ 	};
+ 
++	hdmi at 39 {
++		compatible = "adi,adv7511w";
++		reg = <0x39>;
++		interrupt-parent = <&gpio3>;
++		interrupts = <29 IRQ_TYPE_EDGE_FALLING>;
++
++		adi,input-depth = <8>;
++		adi,input-colorspace = "rgb";
++		adi,input-clock = "1x";
++		adi,input-style = <1>;
++		adi,input-justification = "evenly";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				adv7511_in: endpoint {
++					remote-endpoint = <&du_out_rgb>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				adv7511_out: endpoint {
++					remote-endpoint = <&hdmi_con>;
++				};
++			};
++		};
++	};
++
+ 	eeprom at 50 {
+ 		compatible = "renesas,24c02";
+ 		reg = <0x50>;
 -- 
 2.1.4
