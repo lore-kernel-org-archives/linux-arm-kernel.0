@@ -1,46 +1,94 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 15:21:08 +0900
-Subject: [PATCH 11/32] ARM: shmobile: kzm9g-reference dts: Declare the full
- 512 MiB of RAM
+Date: Thu, 26 Feb 2015 15:21:11 +0900
+Subject: [PATCH 14/32] ARM: shmobile: r8a7791: Add IPMMU DT nodes
 In-Reply-To: <cover.1424849129.git.horms+renesas@verge.net.au>
 References: <cover.1424849129.git.horms+renesas@verge.net.au>
-Message-ID: <3ce1bc08efdd1c1dfba123e802604c0e853ae5db.1424849129.git.horms+renesas@verge.net.au>
+Message-ID: <f1951852ed17684f6033e96a9faf3dbe67c163ae.1424849129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Traditionally, the first 16 MiB of RAM was reserved for the RT
-processor.  However, this is incompatible with CONFIG_AUTO_ZRELADDR=y,
-which requires that the start address of physical memory is a multiple
-of 128 MiB.
+Add the seven IPMMU instances found in the r8a7791 to DT with a disabled
+status.
 
-As CONFIG_AUTO_ZRELADDR=y is enabled for multi-platform kernels, declare
-RAM to start at 0x40000000.
-
-While at it, reclaim the last 8 MiB of RAM, too, so the full 512 MiB is
-available. Note that kzm9g_defconfig still has
-CONFIG_MEMORY_START=0x41000000 and CONFIG_MEMORY_SIZE=0x1f000000, so
-before the advent of DT we scribbled over the last 8 MiB, too.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 60 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index 0156fc8..bf365f7 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -45,7 +45,7 @@
- 
- 	memory {
- 		device_type = "memory";
--		reg = <0x41000000 0x1e800000>;
-+		reg = <0x40000000 0x20000000>;
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index e35812a..43fb58a 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1384,6 +1384,66 @@
+ 		status = "disabled";
  	};
  
- 	reg_1p8v: regulator at 0 {
++	ipmmu_sy0: mmu at e6280000 {
++		compatible = "renesas,ipmmu-vmsa";
++		reg = <0 0xe6280000 0 0x1000>;
++		interrupts = <0 223 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 224 IRQ_TYPE_LEVEL_HIGH>;
++		#iommu-cells = <1>;
++		status = "disabled";
++	};
++
++	ipmmu_sy1: mmu at e6290000 {
++		compatible = "renesas,ipmmu-vmsa";
++		reg = <0 0xe6290000 0 0x1000>;
++		interrupts = <0 225 IRQ_TYPE_LEVEL_HIGH>;
++		#iommu-cells = <1>;
++		status = "disabled";
++	};
++
++	ipmmu_ds: mmu at e6740000 {
++		compatible = "renesas,ipmmu-vmsa";
++		reg = <0 0xe6740000 0 0x1000>;
++		interrupts = <0 198 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 199 IRQ_TYPE_LEVEL_HIGH>;
++		#iommu-cells = <1>;
++		status = "disabled";
++	};
++
++	ipmmu_mp: mmu at ec680000 {
++		compatible = "renesas,ipmmu-vmsa";
++		reg = <0 0xec680000 0 0x1000>;
++		interrupts = <0 226 IRQ_TYPE_LEVEL_HIGH>;
++		#iommu-cells = <1>;
++		status = "disabled";
++	};
++
++	ipmmu_mx: mmu at fe951000 {
++		compatible = "renesas,ipmmu-vmsa";
++		reg = <0 0xfe951000 0 0x1000>;
++		interrupts = <0 222 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 221 IRQ_TYPE_LEVEL_HIGH>;
++		#iommu-cells = <1>;
++		status = "disabled";
++	};
++
++	ipmmu_rt: mmu at ffc80000 {
++		compatible = "renesas,ipmmu-vmsa";
++		reg = <0 0xffc80000 0 0x1000>;
++		interrupts = <0 307 IRQ_TYPE_LEVEL_HIGH>;
++		#iommu-cells = <1>;
++		status = "disabled";
++	};
++
++	ipmmu_gp: mmu at e62a0000 {
++		compatible = "renesas,ipmmu-vmsa";
++		reg = <0 0xe62a0000 0 0x1000>;
++		interrupts = <0 260 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 261 IRQ_TYPE_LEVEL_HIGH>;
++		#iommu-cells = <1>;
++		status = "disabled";
++	};
++
+ 	rcar_sound: rcar_sound at ec500000 {
+ 		/*
+ 		 * #sound-dai-cells is required
 -- 
 2.1.4
