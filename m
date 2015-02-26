@@ -1,159 +1,38 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 26 Feb 2015 13:52:50 +0100
-Subject: [PATCH 1/8] irqchip: armada-370-xp: Simplify interrupt map, mask
- and unmask
-In-Reply-To: <20150226110919.GC29241@lukather>
-References: <1424945593-20320-1-git-send-email-maxime.ripard@free-electrons.com>
- <1424945593-20320-2-git-send-email-maxime.ripard@free-electrons.com>
- <54EEF83C.40003@free-electrons.com> <20150226110919.GC29241@lukather>
-Message-ID: <54EF1722.8090201@free-electrons.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 26 Feb 2015 20:56:44 +0800
+Subject: [PATCH v3 0/2] ARM: imx6sx-sdb: add revb board
+In-Reply-To: <1424939310-19282-1-git-send-email-peter.chen@freescale.com>
+References: <1424939310-19282-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20150226125642.GI20028@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On 26/02/2015 12:09, Maxime Ripard wrote:
-> Hi Gregory,
+On Thu, Feb 26, 2015 at 04:28:28PM +0800, Peter Chen wrote:
+> Changes for v3:
+> - Rebased on v4.0-rc1
 > 
-> On Thu, Feb 26, 2015 at 11:41:00AM +0100, Gregory CLEMENT wrote:
->> Hi Maxime,
->>
->> On 26/02/2015 11:13, Maxime Ripard wrote:
->>> From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->>>
->>> The map, mask and unmask is unnecessarily complicated, with a different
->>> implementation for shared and per CPU interrupts. The current code does
->>> the following:
->>>
->>> At probe time, all interrupts are disabled and masked on all CPUs.
->>>
->>> Shared interrupts:
->>>
->>>  * When the interrupt is mapped(), it gets disabled and unmasked on the
->>>    calling CPU.
->>>
->>>  * When the interrupt is unmasked(), masked(), it gets enabled and
->>>    disabled.
->>>
->>> Per CPU interrupts:
->>>
->>>  * When the interrupt is mapped, it gets masked on the calling CPU and
->>>    enabled.
->>>
->>>  * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
->>>    on the calling CPU.
->>>
->>> This commit simplifies this code, with a much simpler implementation, common
->>> to shared and per CPU interrupts.
->>>
->>>  * When the interrupt is mapped, it's enabled.
->>>
->>>  * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
->>>    on the calling CPU.
->>>
->>> Tested on a Armada XP SoC with SMP and UP configurations, with chained and
->>> regular interrupts.
->>
->> This patch doesn't only simplify the driver it changes also its
->> behavior and especially for the affinity.
+> Changes for v2:
 > 
-> The affinity itself is not changed by that patch. The default CPU the
-> interrupt handler is running on might, but as far as I know, there's
-> no guarantee on the affinity of an interrupt when irq_set_affinity has
-> not been called.
-
-Actually as soon as a driver do a request_irq the affinity is set in the
-__setup_irq function.
-
-
+> - Add missing Makefile entries for both dts files. [Patch 1/2] and [Patch 2/2]
+> - Delete OOP setting changed at imx6sx-sdb-reva, it is SoC feature,
+>   it doesn't need to be change unless board limitations. [Patch 1/2]
+> - Add explanation why OOP setting need to changed at imx6sx-sdb revb board. [Patch 2/2]
+> - Make imx6sx-sdb revb board as default imx6sx-sdb board. [Patch 2/2]
 > 
->> If a driver call irq_enable() then this functions will call
->> irq_enable() and as we didn't implement a .enable() operation, it will
->> call only our unmask() function.
->>
->> So if the IRQ was unmasked on a CPU and a driver call an irq_enable()
->> from an other CPU then we will end up with the IRQ enabled on 2
->> different CPUs. It is a problem for 2 reasons:
+> Hi Shawn,
 > 
-> I guess you're talking about SPIs here, right?
-
-yes
-
+> The imx6sx-sdb board has two revisions, the current mainline is the
+> reva which is experimental and will not be released, the revb board
+> is used widely for internal and external users.
 > 
->> - the hardware don't handle a IRQ enable on more than one CPU
+> The main changes between reva and revb board:
+> - OOP setting
+> - pfuse
+> - qspi
+> - can transceiver (not mainlined)
 > 
-> Oh. I would have expected one CPU to get a spurious interrupt, and the
-> other to handle the interrupt as expected.
+> Peter Chen (2):
+>   ARM: imx6sx-sdb: change default board as reva board
+>   ARM: imx6sx-sdb: add revb board and make it default
 
-Unfortunately it is not the case and the behavior is unpredictable if an
-IRQ is set for more than one CPU.
-
-> 
->> - it will modify the affinity at the hardware level because a new CPU
->>   will be able to receive an IRQ whereas we setup the affinity on only
->>   one CPU.
-> 
-> I'm not seure what you mean here.
-> 
-> The affinity is controlled by the INT_SOURCE_CTL register set, that is
-> left untouched by this patch.
-
-INT_SOURCE_CTL register and ARMADA_370_XP_INT_*_MASK_OFFS register are two
-way to access exactly the same value. So as you modify the use of the
-ARMADA_370_XP_INT_*_MASK_OFFS register you modify the affinity.
-
-With ARMADA_370_XP_INT_*_MASK_OFFS you have one register per CPU and you
-write the number of the IRQ you want to enable or disable for this CPU. Whereas
-you have one INT_SOURCE_CTL register per interrupt and there you write the CPU
-mask. But in the hardware you modify the same thing.
-
-In the case has an SPI the interrupt masks are controlled by two register, one
-at a global level and the other at the CPU level.
-
-CPU0--INT_*_MASK_OFFS--|
-                       |
-CPU1--INT_*_MASK_OFFS--|
-                       |---INT_*_ENABLE_OFFS----IRQ
-CPU2--INT_*_MASK_OFFS--|
-                       |
-CPU3--INT_*_MASK_OFFS--|
-
-So currently we only modify the INT_*_ENABLE_OFFS register for the irq_mask/unmask
-operation. And we only modify INT_*_MASK_OFFS(or INT_SOURCE_CTL as it modifies the
-same value) for the affinity.
-
-With this patch, the INT_*_ENABLE_OFFS is removed and INT_*_MASK_OFFS are modified
-in the same time for affinity and for irq_mask/unmask which could lead to some
-unexpected behaviors.
-
-For the PPI, there is no INT_*_ENABLE_OFFS register but for them we don't use
-affinity. That why the way to handle them is different from the SPI.
-
-By the way the current code in irq_mask/unmask is bogus, instead of
-if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
-we should have
-if (hwirq >  ARMADA_370_XP_MAX_PER_CPU_IRQS)
-
-
-Thanks,
-
-Gregory
-
-
-> 
->> By only using the mask and unmask the affinity behavior is no more
->> reliable. I agree that the current code is not trivial, but adding
->> more comment instead of removing this capability should be better.
-> 
-> That can be done too. Especially using the second patch that makes it
-> a lot easier to extend the list of supported PPIs.
-> 
-> Maxime
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Applied both, thanks.
