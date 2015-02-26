@@ -1,91 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 15:21:05 +0900
-Subject: [PATCH 08/32] ARM: shmobile: sh73a0 dtsi: Add missing INTCA0 clock
- for irqpin module
+Date: Thu, 26 Feb 2015 15:21:04 +0900
+Subject: [PATCH 07/32] ARM: shmobile: kzm9g-reference dts: Add st1232
+ touchscreen node
 In-Reply-To: <cover.1424849129.git.horms+renesas@verge.net.au>
 References: <cover.1424849129.git.horms+renesas@verge.net.au>
-Message-ID: <56a215d66b1eee870a6b90a8c245dfc3e503a137.1424849129.git.horms+renesas@verge.net.au>
+Message-ID: <8ac627fa8ef0f98f914690515aa3bf376d7a880d.1424849129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-This clock drives the irqpin controller modules.
-Before, it was assumed enabled by the bootloader or reset state.
-By making it available to the driver, we make sure it gets enabled when
-needed, and allow it to be managed by system or runtime PM.
+Enable the kzm9g touchscreen controller in the board's DT file.
 
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0.dtsi            | 15 +++++++++++++++
- include/dt-bindings/clock/sh73a0-clock.h |  3 +++
- 2 files changed, 18 insertions(+)
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 0767087..08f736d 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -94,6 +94,7 @@
- 			      0 6 IRQ_TYPE_LEVEL_HIGH
- 			      0 7 IRQ_TYPE_LEVEL_HIGH
- 			      0 8 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp5_clks SH73A0_CLK_INTCA0>;
- 		control-parent;
- 	};
- 
-@@ -114,6 +115,7 @@
- 			      0 14 IRQ_TYPE_LEVEL_HIGH
- 			      0 15 IRQ_TYPE_LEVEL_HIGH
- 			      0 16 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp5_clks SH73A0_CLK_INTCA0>;
- 		control-parent;
- 	};
- 
-@@ -134,6 +136,7 @@
- 			      0 22 IRQ_TYPE_LEVEL_HIGH
- 			      0 23 IRQ_TYPE_LEVEL_HIGH
- 			      0 24 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp5_clks SH73A0_CLK_INTCA0>;
- 		control-parent;
- 	};
- 
-@@ -154,6 +157,7 @@
- 			      0 30 IRQ_TYPE_LEVEL_HIGH
- 			      0 31 IRQ_TYPE_LEVEL_HIGH
- 			      0 32 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp5_clks SH73A0_CLK_INTCA0>;
- 		control-parent;
- 	};
- 
-@@ -698,5 +702,16 @@
- 			clock-output-names =
- 				"iic3", "iic4", "keysc";
- 		};
-+		mstp5_clks: mstp5_clks at e6150144 {
-+			compatible = "renesas,sh73a0-mstp-clocks", "renesas,cpg-mstp-clocks";
-+			reg = <0xe6150144 4>, <0xe615003c 4>;
-+			clocks = <&cpg_clocks SH73A0_CLK_HP>;
-+			#clock-cells = <1>;
-+			clock-indices = <
-+				SH73A0_CLK_INTCA0
-+			>;
-+			clock-output-names =
-+				"intca0";
-+		};
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+index e3723be..0156fc8 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+@@ -287,6 +287,17 @@
  	};
  };
-diff --git a/include/dt-bindings/clock/sh73a0-clock.h b/include/dt-bindings/clock/sh73a0-clock.h
-index 1dd3eb2..5336956 100644
---- a/include/dt-bindings/clock/sh73a0-clock.h
-+++ b/include/dt-bindings/clock/sh73a0-clock.h
-@@ -76,4 +76,7 @@
- #define SH73A0_CLK_IIC4		10
- #define SH73A0_CLK_KEYSC	3
  
-+/* MSTP5 */
-+#define SH73A0_CLK_INTCA0	8
++&i2c1 {
++	status = "okay";
 +
- #endif
++	touchscreen at 55 {
++		compatible = "sitronix,st1232";
++		reg = <0x55>;
++		interrupt-parent = <&irqpin1>;
++		interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
++	};
++};
++
+ &i2c3 {
+ 	pinctrl-0 = <&i2c3_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.1.4
