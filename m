@@ -1,63 +1,58 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 26 Feb 2015 16:12:17 +0800
-Subject: [PATCH v4 23/30] PCI/mvebu: Use pci_common_init_dev() to simplify code
-In-Reply-To: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
-References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1424938344-4017-24-git-send-email-wangyijing@huawei.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 26 Feb 2015 08:24:37 +0000
+Subject: [PATCH v4 11/20] power_supply: Change ownership from driver to
+ core
+In-Reply-To: <1424692061-30624-12-git-send-email-k.kozlowski@samsung.com>
+References: <1424692061-30624-1-git-send-email-k.kozlowski@samsung.com>
+ <1424692061-30624-12-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20150226082437.GH6688@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mvebu_pcie_scan_bus() is not necessary, we could use
-pci_common_init_dev() instead of pci_common_init(),
-and pass the device pointer as the parent. Then
-pci_scan_root_bus() will be called to scan the pci busses.
+On Mon, 23 Feb 2015, Krzysztof Kozlowski wrote:
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-CC: Jason Cooper <jason@lakedaemon.net>
----
- drivers/pci/host/pci-mvebu.c |   18 +-----------------
- 1 files changed, 1 insertions(+), 17 deletions(-)
+> Change the ownership of power_supply structure from each driver
+> implementing the class to the power supply core.
+> 
+> The patch changes power_supply_register() function thus all drivers
+> implementing power supply class are adjusted.
+> 
+> Each driver provides the implementation of power supply. However it
+> should not be the owner of power supply class instance because it is
+> exposed by core to other subsystems with power_supply_get_by_name().
+> These other subsystems have no knowledge when the driver will unregister
+> the power supply. This leads to several issues when driver is unbound -
+> mostly because user of power supply accesses freed memory.
+> 
+> Instead let the core own the instance of struct 'power_supply'.  Other
+> users of this power supply will still access valid memory because it
+> will be freed when device reference count reaches 0. Currently this
+> means "it will leak" but power_supply_put() call in next patches will
+> solve it.
+> 
+> This solves invalid memory references in following race condition
+> scenario:
+> 
+> Thread 1: charger manager
+> Thread 2: power supply driver, used by charger manager
+> 
+> THREAD 1 (charger manager)         THREAD 2 (power supply driver)
+> ==========================         ==============================
+> psy = power_supply_get_by_name()
+>                                    Driver unbind, .remove
+>                                      power_supply_unregister()
+>                                      Device fully removed
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 1309cfb..d5a2b70 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -750,21 +750,6 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
- 	return 1;
- }
- 
--static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
--{
--	struct mvebu_pcie *pcie = sys_to_pcie(sys);
--	struct pci_bus *bus;
--
--	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
--				  &mvebu_pcie_ops, sys, &sys->resources);
--	if (!bus)
--		return NULL;
--
--	pci_scan_child_bus(bus);
--
--	return bus;
--}
--
- static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
- 						 const struct resource *res,
- 						 resource_size_t start,
-@@ -808,12 +793,11 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
- 	hw.nr_controllers = 1;
- 	hw.private_data   = (void **)&pcie;
- 	hw.setup          = mvebu_pcie_setup;
--	hw.scan           = mvebu_pcie_scan_bus;
- 	hw.map_irq        = of_irq_parse_and_map_pci;
- 	hw.ops            = &mvebu_pcie_ops;
- 	hw.align_resource = mvebu_pcie_align_resource;
- 
--	pci_common_init(&hw);
-+	pci_common_init_dev(&pcie->pdev->dev, &hw);
- }
- 
- /*
+[...]
+
+>  include/linux/mfd/abx500/ux500_chargalg.h |  11 +-
+>  include/linux/mfd/rt5033.h                |   2 +-
+>  include/linux/mfd/wm8350/supply.h         |   6 +-
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
 -- 
-1.7.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
