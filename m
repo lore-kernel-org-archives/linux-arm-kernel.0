@@ -1,199 +1,166 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 26 Feb 2015 17:11:05 +0100
-Subject: [PATCH 06/10] ARM: realview: enable multiplatform
-In-Reply-To: <1424967068-261464-1-git-send-email-arnd@arndb.de>
-References: <1424967068-261464-1-git-send-email-arnd@arndb.de>
-Message-ID: <1424967068-261464-3-git-send-email-arnd@arndb.de>
+Date: Thu, 26 Feb 2015 17:11:35 +0100
+Subject: [PATCH 08/10] ARM: no longer make CPU targets visible separately
+In-Reply-To: <1424967096-261582-1-git-send-email-arnd@arndb.de>
+References: <1424967096-261582-1-git-send-email-arnd@arndb.de>
+Message-ID: <1424967096-261582-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All obstacles are out of the way by now, so we can finally move realview
-to multiplatform.
+Now that realview and integrator always select the correct CPU
+type themselves based on the core tiles, there is no need to
+still have them user-visible in arch/arm/mm/Kconfig. The
+ARM925T symbol has been selected by the only user for many
+years, so that can be removed along with the realview and
+integrator specific ones.
+
+This also solves randconfig build problems on realview.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/Kconfig                | 14 ----------
- arch/arm/mach-realview/Kconfig  | 58 ++++++++++++++++++++++++++++++++---------
- arch/arm/mach-realview/Makefile |  7 ++++-
- 3 files changed, 52 insertions(+), 27 deletions(-)
+ arch/arm/mm/Kconfig | 30 +++++++++++++++---------------
+ 1 file changed, 15 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 44e5879e4efc..a4f9c932c4de 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -322,20 +322,6 @@ config ARCH_MULTIPLATFORM
- 	select SPARSE_IRQ
- 	select USE_OF
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 932dde34661e..0fb3652b0f3f 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -21,7 +21,7 @@ config CPU_ARM7TDMI
  
--config ARCH_REALVIEW
--	bool "ARM Ltd. RealView family"
--	select ARCH_WANT_OPTIONAL_GPIOLIB
--	select ARM_AMBA
--	select ARM_TIMER_SP804
--	select COMMON_CLK
--	select COMMON_CLK_VERSATILE
--	select GENERIC_CLOCKEVENTS
--	select GPIO_PL061 if GPIOLIB
--	select ICST
--	select PLAT_VERSATILE
--	select PLAT_VERSATILE_SCHED_CLOCK
--	help
--	  This enables support for ARM Ltd RealView boards.
+ # ARM720T
+ config CPU_ARM720T
+-	bool "Support ARM720T processor" if (ARCH_MULTI_V4T && ARCH_INTEGRATOR)
++	bool
+ 	select CPU_32v4T
+ 	select CPU_ABRT_LV4T
+ 	select CPU_CACHE_V4
+@@ -39,7 +39,7 @@ config CPU_ARM720T
  
- config ARCH_VERSATILE
- 	bool "ARM Ltd. Versatile family"
-diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-index 055e7355ec14..650d21cb25ab 100644
---- a/arch/arm/mach-realview/Kconfig
-+++ b/arch/arm/mach-realview/Kconfig
-@@ -1,9 +1,21 @@
--menu "RealView platform type"
--	depends on ARCH_REALVIEW
-+menuconfig ARCH_REALVIEW
-+	bool "ARM Ltd. RealView family" if ARCH_MULTI_V5 || ARCH_MULTI_V6 || ARCH_MULTI_V7
-+	select ARM_AMBA
-+	select ARM_TIMER_SP804
-+	select COMMON_CLK_VERSATILE
-+	select GPIO_PL061 if GPIOLIB
-+	select ICST
-+	select PLAT_VERSATILE
-+	select PLAT_VERSATILE_SCHED_CLOCK
-+	help
-+	  This enables support for ARM Ltd RealView boards.
-+
-+if ARCH_REALVIEW
+ # ARM740T
+ config CPU_ARM740T
+-	bool "Support ARM740T processor" if (ARCH_MULTI_V4T && ARCH_INTEGRATOR)
++	bool
+ 	depends on !MMU
+ 	select CPU_32v4T
+ 	select CPU_ABRT_LV4T
+@@ -71,7 +71,7 @@ config CPU_ARM9TDMI
  
- config REALVIEW_DT
- 	bool "Support RealView(R) Device Tree based boot"
- 	select ARM_GIC
-+	select MACH_REALVIEW_EB if ARCH_MULTI_V5
- 	select MFD_SYSCON
- 	select POWER_RESET
- 	select POWER_RESET_VERSATILE
-@@ -17,14 +32,32 @@ config REALVIEW_DT
- config MACH_REALVIEW_EB
- 	bool "Support RealView(R) Emulation Baseboard"
- 	select ARM_GIC
-+	select CPU_ARM926T if ARCH_MULTI_V5
- 	help
- 	  Include support for the ARM(R) RealView(R) Emulation Baseboard
--	  platform.
-+	  platform. On an ARMv5 kernel, this will include support for
-+	  the ARM926EJ-S core tile, while on an ARMv6/v7 kernel, at least
-+	  one of the ARM1136, ARM1176, ARM11MPCore or Cortex-A9MPCore
-+	  core tile options should be enabled.
-+
-+config REALVIEW_EB_ARM1136
-+	bool "Support ARM1136J(F)-S Tile"
-+	depends on MACH_REALVIEW_EB && ARCH_MULTI_V6
-+	select CPU_V6
-+	help
-+	  Enable support for the ARM1136 tile fitted to the
-+	  Realview(R) Emulation Baseboard platform.
-+
-+config REALVIEW_EB_ARM1176
-+	bool "Support ARM1176JZ(F)-S Tile"
-+	depends on MACH_REALVIEW_EB && ARCH_MULTI_V6
-+	help
-+	  Enable support for the ARM1176 tile fitted to the
-+	  Realview(R) Emulation Baseboard platform.
+ # ARM920T
+ config CPU_ARM920T
+-	bool "Support ARM920T processor" if (ARCH_MULTI_V4T && ARCH_INTEGRATOR)
++	bool
+ 	select CPU_32v4T
+ 	select CPU_ABRT_EV4T
+ 	select CPU_CACHE_V4WT
+@@ -89,7 +89,7 @@ config CPU_ARM920T
  
- config REALVIEW_EB_A9MP
- 	bool "Support Multicore Cortex-A9 Tile"
--	depends on MACH_REALVIEW_EB
--	select CPU_V7
-+	depends on MACH_REALVIEW_EB && ARCH_MULTI_V7
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
- 	select HAVE_SMP
-@@ -35,8 +68,7 @@ config REALVIEW_EB_A9MP
+ # ARM922T
+ config CPU_ARM922T
+-	bool "Support ARM922T processor" if (ARCH_MULTI_V4T && ARCH_INTEGRATOR)
++	bool
+ 	select CPU_32v4T
+ 	select CPU_ABRT_EV4T
+ 	select CPU_CACHE_V4WT
+@@ -108,7 +108,7 @@ config CPU_ARM922T
  
- config REALVIEW_EB_ARM11MP
- 	bool "Support ARM11MPCore Tile"
--	depends on MACH_REALVIEW_EB
--	select CPU_V6K
-+	depends on MACH_REALVIEW_EB && ARCH_MULTI_V6
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
- 	select HAVE_SMP
-@@ -47,7 +79,7 @@ config REALVIEW_EB_ARM11MP
+ # ARM925T
+ config CPU_ARM925T
+- 	bool "Support ARM925T processor" if ARCH_OMAP1
++	bool
+ 	select CPU_32v4T
+ 	select CPU_ABRT_EV4T
+ 	select CPU_CACHE_V4WT
+@@ -127,7 +127,7 @@ config CPU_ARM925T
  
- config REALVIEW_EB_ARM11MP_REVB
- 	bool "Support ARM11MPCore RevB Tile"
--	depends on REALVIEW_EB_ARM11MP
-+	depends on REALVIEW_EB_ARM11MP && ARCH_MULTI_V6
- 	help
- 	  Enable support for the ARM11MPCore Revision B tile on the
- 	  Realview(R) Emulation Baseboard platform. Since there are device
-@@ -56,8 +88,8 @@ config REALVIEW_EB_ARM11MP_REVB
+ # ARM926T
+ config CPU_ARM926T
+-	bool "Support ARM926T processor" if (!ARCH_MULTIPLATFORM || ARCH_MULTI_V5) && (ARCH_INTEGRATOR || MACH_REALVIEW_EB)
++	bool
+ 	select CPU_32v5
+ 	select CPU_ABRT_EV5TJ
+ 	select CPU_CACHE_VIVT
+@@ -163,7 +163,7 @@ config CPU_FA526
  
- config MACH_REALVIEW_PB11MP
- 	bool "Support RealView(R) Platform Baseboard for ARM11MPCore"
-+	depends on ARCH_MULTI_V6
- 	select ARM_GIC
--	select CPU_V6K
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
- 	select HAVE_PATA_PLATFORM
-@@ -71,6 +103,7 @@ config MACH_REALVIEW_PB11MP
- # ARMv6 CPU without K extensions, but does have the new exclusive ops
- config MACH_REALVIEW_PB1176
- 	bool "Support RealView(R) Platform Baseboard for ARM1176JZF-S"
-+	depends on ARCH_MULTI_V6
- 	select ARM_GIC
- 	select CPU_V6
- 	select HAVE_TCM
-@@ -90,8 +123,8 @@ config REALVIEW_PB1176_SECURE_FLASH
+ # ARM940T
+ config CPU_ARM940T
+-	bool "Support ARM940T processor" if (ARCH_MULTI_V4T && ARCH_INTEGRATOR)
++	bool
+ 	depends on !MMU
+ 	select CPU_32v4T
+ 	select CPU_ABRT_NOMMU
+@@ -181,7 +181,7 @@ config CPU_ARM940T
  
- config MACH_REALVIEW_PBA8
- 	bool "Support RealView(R) Platform Baseboard for Cortex(tm)-A8 platform"
-+	depends on ARCH_MULTI_V7
- 	select ARM_GIC
--	select CPU_V7
- 	select HAVE_PATA_PLATFORM
- 	help
- 	  Include support for the ARM(R) RealView Platform Baseboard for
-@@ -99,7 +132,8 @@ config MACH_REALVIEW_PBA8
- 	  support for PCI-E and Compact Flash.
+ # ARM946E-S
+ config CPU_ARM946E
+-	bool "Support ARM946E-S processor" if (ARCH_MULTI_V5 && ARCH_INTEGRATOR)
++	bool
+ 	depends on !MMU
+ 	select CPU_32v5
+ 	select CPU_ABRT_NOMMU
+@@ -198,7 +198,7 @@ config CPU_ARM946E
  
- config MACH_REALVIEW_PBX
--	bool "Support RealView(R) Platform Baseboard Explore"
-+	bool "Support RealView(R) Platform Baseboard Explore for Cortex-A9"
-+	depends on ARCH_MULTI_V7
- 	select ARM_GIC
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
-@@ -123,4 +157,4 @@ config REALVIEW_HIGH_PHYS_OFFSET
- 	  offset. On the PBX board, disabling this option allows 1GB of
- 	  RAM to be used with HIGHMEM.
+ # ARM1020 - needs validating
+ config CPU_ARM1020
+-	bool "Support ARM1020T (rev 0) processor" if (ARCH_MULTI_V5 && ARCH_INTEGRATOR)
++	bool
+ 	select CPU_32v5
+ 	select CPU_ABRT_EV4T
+ 	select CPU_CACHE_V4WT
+@@ -216,7 +216,7 @@ config CPU_ARM1020
  
--endmenu
-+endif
-diff --git a/arch/arm/mach-realview/Makefile b/arch/arm/mach-realview/Makefile
-index e07fdf7ae8a7..ee0dfaedfa1f 100644
---- a/arch/arm/mach-realview/Makefile
-+++ b/arch/arm/mach-realview/Makefile
-@@ -1,13 +1,18 @@
- #
- # Makefile for the linux kernel.
- #
-+ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
-+	-I$(srctree)/arch/arm/plat-versatile/include
-+
+ # ARM1020E - needs validating
+ config CPU_ARM1020E
+-	bool "Support ARM1020E processor" if (ARCH_MULTI_V5 && ARCH_INTEGRATOR)
++	bool
+ 	depends on n
+ 	select CPU_32v5
+ 	select CPU_ABRT_EV4T
+@@ -229,7 +229,7 @@ config CPU_ARM1020E
  
--obj-y					:= core.o
- obj-$(CONFIG_REALVIEW_DT)		+= realview-dt.o
-+ifdef $(CONFIG_ATAGS)
-+obj-y					:= core.o
- obj-$(CONFIG_MACH_REALVIEW_EB)		+= realview_eb.o
- obj-$(CONFIG_MACH_REALVIEW_PB11MP)	+= realview_pb11mp.o
- obj-$(CONFIG_MACH_REALVIEW_PB1176)	+= realview_pb1176.o
- obj-$(CONFIG_MACH_REALVIEW_PBA8)	+= realview_pba8.o
- obj-$(CONFIG_MACH_REALVIEW_PBX)		+= realview_pbx.o
-+endif
- obj-$(CONFIG_SMP)			+= platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+ # ARM1022E
+ config CPU_ARM1022
+-	bool "Support ARM1022E processor" if (ARCH_MULTI_V5 && ARCH_INTEGRATOR)
++	bool
+ 	select CPU_32v5
+ 	select CPU_ABRT_EV4T
+ 	select CPU_CACHE_VIVT
+@@ -247,7 +247,7 @@ config CPU_ARM1022
+ 
+ # ARM1026EJ-S
+ config CPU_ARM1026
+-	bool "Support ARM1026EJ-S processor" if (ARCH_MULTI_V5 && ARCH_INTEGRATOR)
++	bool
+ 	select CPU_32v5
+ 	select CPU_ABRT_EV5T # But need Jazelle, but EV5TJ ignores bit 10
+ 	select CPU_CACHE_VIVT
+@@ -358,7 +358,7 @@ config CPU_PJ4B
+ 
+ # ARMv6
+ config CPU_V6
+-	bool "Support ARM V6 processor" if (!ARCH_MULTIPLATFORM || ARCH_MULTI_V6) && (ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX)
++	bool
+ 	select CPU_32v6
+ 	select CPU_ABRT_EV6
+ 	select CPU_CACHE_V6
+@@ -371,7 +371,7 @@ config CPU_V6
+ 
+ # ARMv6k
+ config CPU_V6K
+-	bool "Support ARM V6K processor" if (!ARCH_MULTIPLATFORM || ARCH_MULTI_V6) && (ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX)
++	bool
+ 	select CPU_32v6
+ 	select CPU_32v6K
+ 	select CPU_ABRT_EV6
+@@ -385,7 +385,7 @@ config CPU_V6K
+ 
+ # ARMv7
+ config CPU_V7
+-	bool "Support ARM V7 processor" if (!ARCH_MULTIPLATFORM || ARCH_MULTI_V7) && (ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX)
++	bool
+ 	select CPU_32v6K
+ 	select CPU_32v7
+ 	select CPU_ABRT_EV7
 -- 
 2.1.0.rc2
