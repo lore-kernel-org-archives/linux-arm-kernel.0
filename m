@@ -1,113 +1,57 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 26 Feb 2015 19:13:57 +0100
-Subject: [PATCH v2] MAINTAINERS: Add dts entries for some of the Marvell
- SoCs
-In-Reply-To: <54EF5922.2040701@lakedaemon.net>
-References: <1423237058-25431-1-git-send-email-gregory.clement@free-electrons.com>
- <54EF57AF.7070000@free-electrons.com> <54EF5922.2040701@lakedaemon.net>
-Message-ID: <54EF6265.6010807@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 26 Feb 2015 19:17:24 +0100
+Subject: [RFC PATCH 0/3] genirq: mixing IRQF_NO_SUSPEND and wakeup
+ sources on shared IRQs
+In-Reply-To: <8151717.nkhnGBri9h@vostro.rjw.lan>
+References: <1424771762-16343-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20964379.cuQSlojCVH@vostro.rjw.lan>
+ <20150226164724.4f3c5921@bbrezillon>
+ <8151717.nkhnGBri9h@vostro.rjw.lan>
+Message-ID: <20150226191724.0ae4ca4e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-On 26/02/2015 18:34, Jason Cooper wrote:
-> Gregory,
-> 
-> On 2/26/15 12:28 PM, Gregory CLEMENT wrote:
->> Hi all,
->>
->> Who should take the following patch?
->>
->> Should I apply it on the mvebu tree?
-> 
-> No, this is a conflict-ridden file.  Please resend and include 
-> 'arm at kernel.org' to the recipients.  Then ask Arnd or Olof to pick it up 
-> directly.
+On Thu, 26 Feb 2015 19:17:03 +0100
+"Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
 
-Thanks for the advice, I will do it.
+> On Thursday, February 26, 2015 04:47:24 PM Boris Brezillon wrote:
+> > On Thu, 26 Feb 2015 16:44:16 +0100
+> > "Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
 
-Gregory
+[...]
 
+> > > 
+> > > But it is still a bit risky.  Namely, if the driver in question is sufficiently
+> > > broken (eg. it may not suspend the device and rely on the fact that its interrupt
+> > > handler will be run just because it is sharing a "no suspend" IRQ), we may get
+> > > an interrupt storm.
+> > > 
+> > > Isn't that a problem?
+> > 
+> > For me no (I'll fix all the drivers to handle wakeup, and they are all
+> > already masking interrupts coming from their side in the suspend
+> > callback).
+> > I can't talk for other people though.
+> > The only problem I see here is that you're not informing people that
+> > they are erroneously mixing IRQF_NO_SUSPEND and !IRQF_NO_SUSPEND anymore
+> > (you removed the warning backtrace).
+> > Moreover, you are replacing their handler by a stub when entering
+> > suspend, so they might end-up receiving spurious interrupts when
+> > suspended without knowing why ?
+> > 
+> > How about checking if the number of actions registered with
+> > IRQF_NO_SUSPEND + those registered with IRQF_COND_SUSPEND (or another
+> > flag stating that the handler can safely be called in suspended state
+> > even if it didn't ask for NO_SUSPEND) are equal to the total number of
+> > registered actions, and complain if it's not the case.
 > 
-> thx,
-> 
-> Jason.
-> 
->>
->> Thanks,
->>
->> Gregory
->>
->>
->> On 06/02/2015 16:37, Gregory CLEMENT wrote:
->>> Since many releases, the modifications of the mvebu and berlin device
->>> tree files are merged through the mvebu subsystem. This patch makes it
->>> official in order to help the contributors using the get_maintainer.pl
->>> to find the accurate peoples.
->>>
->>> In the same time, updated the mvebu description which now includes the
->>> kirkwood SoCs and new Armada SoCs.
->>>
->>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>> Acked-by: Jason Cooper <jason@lakedaemon.net>
->>> Acked-by: Andrew Lunn <andrew@lunn.ch>
->>> ---
->>>   MAINTAINERS | 7 ++++++-
->>>   1 file changed, 6 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/MAINTAINERS b/MAINTAINERS
->>> index 5d9db6b445bc..dba52f8597e2 100644
->>> --- a/MAINTAINERS
->>> +++ b/MAINTAINERS
->>> @@ -1149,7 +1149,7 @@ ARM/MAGICIAN MACHINE SUPPORT
->>>   M:	Philipp Zabel <philipp.zabel@gmail.com>
->>>   S:	Maintained
->>>
->>> -ARM/Marvell Armada 370 and Armada XP SOC support
->>> +ARM/Marvell Kirkwood and Armada 370, 375, 38x, XP SOC support
->>>   M:	Jason Cooper <jason@lakedaemon.net>
->>>   M:	Andrew Lunn <andrew@lunn.ch>
->>>   M:	Gregory Clement <gregory.clement@free-electrons.com>
->>> @@ -1158,12 +1158,15 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>>   S:	Maintained
->>>   F:	arch/arm/mach-mvebu/
->>>   F:	drivers/rtc/armada38x-rtc
->>> +F:	arch/arm/boot/dts/armada*
->>> +F:	arch/arm/boot/dts/kirkwood*
->>>
->>>   ARM/Marvell Berlin SoC support
->>>   M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>>   L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>>   S:	Maintained
->>>   F:	arch/arm/mach-berlin/
->>> +F:	arch/arm/boot/dts/berlin*
->>>
->>>   ARM/Marvell Dove/MV78xx0/Orion SOC support
->>>   M:	Jason Cooper <jason@lakedaemon.net>
->>> @@ -1175,6 +1178,8 @@ F:	arch/arm/mach-dove/
->>>   F:	arch/arm/mach-mv78xx0/
->>>   F:	arch/arm/mach-orion5x/
->>>   F:	arch/arm/plat-orion/
->>> +F:	arch/arm/boot/dts/dove*
->>> +F:	arch/arm/boot/dts/orion5x*
->>>
->>>   ARM/Orion SoC/Technologic Systems TS-78xx platform support
->>>   M:	Alexander Clouter <alex@digriz.org.uk>
->>>
->>
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> The same idea I had while talking to Peter over IRC.  So the patch below
+> implements that.
+
+Yep, that's what I had in mind.
 
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
