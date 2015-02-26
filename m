@@ -1,49 +1,54 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 15:21:01 +0900
-Subject: [PATCH 04/32] ARM: shmobile: kzm9g-reference dts: Add ak8975
- magnetometer node
+Date: Thu, 26 Feb 2015 15:21:02 +0900
+Subject: [PATCH 05/32] ARM: shmobile: kzm9g-reference dts: Add adxl345
+ accelerometer node
 In-Reply-To: <cover.1424849129.git.horms+renesas@verge.net.au>
 References: <cover.1424849129.git.horms+renesas@verge.net.au>
-Message-ID: <56b7271c9dbf029d288e4fbcae72e405e56ae856.1424849129.git.horms+renesas@verge.net.au>
+Message-ID: <4bd1dd503aa2a6cfeb18a48d1da01662dd5124e1.1424849129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add a DT node for the AK8975 magnetometer sensor, which is connected to
-i2c0.
+Add a DT node for the ADXL345 three-axis digital accelerometer sensor,
+which is connected to i2c0.
+
+As trivial i2c devices are matched against the first compatible entry
+only, compatibility is declared with "adi,adxl34x" only for now.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Specify the device interrupt to avoid polling for end of conversion.
+The device needs an interrupt to operate properly. Specify the two
+interrupts used on the board.
 
-While at it rename the DT node to compass at c to describe the device's
-function instead of its model.
+While at it rename the DT node to accelerometer at 1d to describe the
+device's function instead of its model.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index 0134d53..873b415 100644
+index 873b415..fd16998 100644
 --- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
 +++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -189,6 +189,13 @@
- &i2c0 {
- 	status = "okay";
+@@ -202,6 +202,14 @@
+ 		#sound-dai-cells = <0>;
+ 	};
  
-+	compass at c {
-+		compatible = "asahi-kasei,ak8975";
-+		reg = <0x0c>;
++	accelerometer at 1d {
++		compatible = "adi,adxl34x";
++		reg = <0x1d>;
 +		interrupt-parent = <&irqpin3>;
-+		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
++		interrupts = <2 IRQ_TYPE_LEVEL_HIGH>,
++			     <3 IRQ_TYPE_LEVEL_HIGH>;
 +	};
 +
- 	ak4648: codec at 12 {
- 		compatible = "asahi-kasei,ak4648";
- 		reg = <0x12>;
+ 	as3711 at 40 {
+ 		compatible = "ams,as3711";
+ 		reg = <0x40>;
 -- 
 2.1.4
