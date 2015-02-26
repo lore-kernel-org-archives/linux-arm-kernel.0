@@ -1,74 +1,29 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 26 Feb 2015 11:37:08 +0100
-Subject: [PATCH] ARM: kexec: Relax SMP validation to improve DT compatibility
-Message-ID: <1424947028-7438-1-git-send-email-geert+renesas@glider.be>
+Date: Thu, 26 Feb 2015 11:40:24 +0100
+Subject: [PATCH] ARM: Enable CONFIG_GENERIC_IRQ_SHOW_LEVEL
+Message-ID: <1424947224-7797-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When trying to kexec into a new kernel on a platform where multiple CPU
-cores are present, but no SMP bringup code is available yet, the
-kexec_load system call fails with:
-
-    kexec_load failed: Invalid argument
-
-The SMP test added to machine_kexec_prepare() in commit 2103f6cba61a8b8b
-("ARM: 7807/1: kexec: validate CPU hotplug support") wants to prohibit
-kexec on SMP platforms where it cannot disable secondary CPUs.
-However, this test is too strict: if the secondary CPUs couldn't be
-enabled in the first place, there's no need to disable them later at
-kexec time.  Hence skip the test in the absence of SMP bringup code.
-
-This allows to add all CPU cores to the DTS from the beginning, without
-having to implement SMP bringup first, improving DT compatibility.
+Several interrupt controllers support both edge and level interrupts, so
+it's useful to provide that information in /proc/interrupts.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/include/asm/smp_plat.h | 1 +
- arch/arm/kernel/machine_kexec.c | 3 ++-
- arch/arm/kernel/smp.c           | 5 +++++
- 3 files changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index 0ad7d490ee6f2657..993e5224d8f7eeeb 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -104,6 +104,7 @@ static inline u32 mpidr_hash_size(void)
- 	return 1 << mpidr_hash.bits;
- }
- 
-+extern int platform_can_secondary_boot(void);
- extern int platform_can_cpu_hotplug(void);
- 
- #endif
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index de2b085ad7535da7..8bf3b7c098881b95 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -46,7 +46,8 @@ int machine_kexec_prepare(struct kimage *image)
- 	 * and implements CPU hotplug for the current HW. If not, we won't be
- 	 * able to kexec reliably, so fail the prepare operation.
- 	 */
--	if (num_possible_cpus() > 1 && !platform_can_cpu_hotplug())
-+	if (num_possible_cpus() > 1 && platform_can_secondary_boot() &&
-+	    !platform_can_cpu_hotplug())
- 		return -EINVAL;
- 
- 	/*
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 86ef244c5a24b4fa..cca5b87581855244 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -145,6 +145,11 @@ void __init smp_init_cpus(void)
- 		smp_ops.smp_init_cpus();
- }
- 
-+int platform_can_secondary_boot(void)
-+{
-+	return !!smp_ops.smp_boot_secondary;
-+}
-+
- int platform_can_cpu_hotplug(void)
- {
- #ifdef CONFIG_HOTPLUG_CPU
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 55f1d9ba4b204a36..d86b56521feabcda 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -21,6 +21,7 @@ config ARM
+ 	select GENERIC_IDLE_POLL_SETUP
+ 	select GENERIC_IRQ_PROBE
+ 	select GENERIC_IRQ_SHOW
++	select GENERIC_IRQ_SHOW_LEVEL
+ 	select GENERIC_PCI_IOMAP
+ 	select GENERIC_SCHED_CLOCK
+ 	select GENERIC_SMP_IDLE_THREAD
 -- 
 1.9.1
