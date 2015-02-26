@@ -1,45 +1,51 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Fri, 27 Feb 2015 06:30:57 +0900
-Subject: [PATCH] ARM: fix exynos randconfig build error
-In-Reply-To: <CAJKOXPf2F-g9fU9TrNXz8LPwp8fBNZ6NpaAoP15N0nbHWVesaw@mail.gmail.com>
-References: <E1YQa78-0000O0-A4@rmk-PC.arm.linux.org.uk>
- <CAJKOXPf2F-g9fU9TrNXz8LPwp8fBNZ6NpaAoP15N0nbHWVesaw@mail.gmail.com>
-Message-ID: <54EF9091.30802@kernel.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 26 Feb 2015 22:55:10 +0100
+Subject: [PATCH] cpuidle: mvebu: Fix the CPU PM notifier usage
+In-Reply-To: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <4892716.Bf612zPN6E@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/15 20:46, Krzysztof Kozlowski wrote:
-> 2015-02-25 12:26 GMT+01:00 Russell King <rmk+kernel@arm.linux.org.uk>:
->> The following error was observed with SMP=n in v4.0-rc1:
->>
->> arch/arm/mach-exynos/pm.c: In function 'exynos_cpu0_enter_aftr':
->> arch/arm/mach-exynos/pm.c:246:4: error: implicit declaration of function 'arch_send_wakeup_ipi_mask' [-Werror=implicit-function-declaration]
->>
->> As the code unconditionally calls a function only available with SMP=y,
->> make the Exynos PM support depend on SMP.
->>
->> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Thursday, February 26, 2015 06:20:48 PM Gregory CLEMENT wrote:
+> As stated in kernel/cpu_pm.c, "Platform is responsible for ensuring
+> that cpu_pm_enter is not called twice on the same CPU before
+> cpu_pm_exit is called.". In the current code in case of failure when
+> calling mvebu_v7_cpu_suspend, the function cpu_pm_exit() is never
+> called whereas cpu_pm_enter() was called just before.
 > 
-> Hi,
+> This patch moves the cpu_pm_exit() in order to balance the
+> cpu_pm_enter() calls.
 > 
-> Thanks for the patch but this already waits for Kukjin top be picked
-> up. The first patch was similar to yours (adds dependency on SMP),
-> sent on 4th of February:
-> https://patchwork.ozlabs.org/patch/436231/
-> 
-> But later Bartlomiej fixed this in other way (allowing to use cpuidle
-> on non-SMP):
-> https://patchwork.ozlabs.org/patch/436445/
-> 
-> Unfortunately none of them were picked up.
-> 
-I've missed the fix, sorry.
+> Reported-by: Fulvio Benini <fbf@libero.it>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-BTW, as you know, all of exynos SoCs are based on SMP so generally (in
-normal case) there is no reason to use non-SMP on exynos
-platforms...even though I understand the build error should be fixed...
+Should that go to "stable" too?  Which "stable" series it should go to if so?
 
-Anyway, I'll have a look Bart's patch and Russell's fix in this weekend.
+> ---
+>  drivers/cpuidle/cpuidle-mvebu-v7.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
+> index 38e68618513a..cefa07438ae1 100644
+> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
+> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
+> @@ -37,11 +37,11 @@ static int mvebu_v7_enter_idle(struct cpuidle_device *dev,
+>  		deepidle = true;
+>  
+>  	ret = mvebu_v7_cpu_suspend(deepidle);
+> +	cpu_pm_exit();
+> +
+>  	if (ret)
+>  		return ret;
+>  
+> -	cpu_pm_exit();
+> -
+>  	return index;
+>  }
+>  
+> 
 
-Thanks for your kindly pointing out.
-Kukjin
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
