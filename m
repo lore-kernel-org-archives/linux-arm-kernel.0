@@ -1,114 +1,115 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 26 Feb 2015 09:09:58 +0100
-Subject: [RFC PATCH 2/3] genirq: add helper functions to deal with
- wakeup on shared IRQF_NO_SUSPEND IRQs
-In-Reply-To: <2476478.8N4TxgeN3h@vostro.rjw.lan>
+Date: Thu, 26 Feb 2015 09:12:46 +0100
+Subject: [RFC PATCH 3/3] rtc: at91sam9: properly act when IRQ handler is
+ called in suspended state
+In-Reply-To: <1611142.77NqGpG2im@vostro.rjw.lan>
 References: <1424771762-16343-1-git-send-email-boris.brezillon@free-electrons.com>
- <1424771762-16343-3-git-send-email-boris.brezillon@free-electrons.com>
- <2476478.8N4TxgeN3h@vostro.rjw.lan>
-Message-ID: <20150226090958.6bb80e76@bbrezillon>
+ <1424771762-16343-4-git-send-email-boris.brezillon@free-electrons.com>
+ <1611142.77NqGpG2im@vostro.rjw.lan>
+Message-ID: <20150226091246.6bdae8db@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Feb 2015 23:03:14 +0100
+On Wed, 25 Feb 2015 23:05:36 +0100
 "Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
 
-> On Tuesday, February 24, 2015 10:56:01 AM Boris Brezillon wrote:
-> > Add two helper functions to help drivers that are sharing IRQs with
-> > timer devices (or other devices setting the IRQF_NO_SUSPEND flag) deal
-> > with system wakeup and state detection.
-> > 
-> > Such drivers should expect their IRQ handler to be called in 2 different
-> > contexts:
-> > 1/ the system is resumed and the handler should act normally
-> > 2/ the system is suspended and the handler should wake it up, and
-> >    potentially save the received events so that they could be taken care
-> >    of when the resume callback is called
-> > 
-> > irq_is_wakeup_armed provides mean to test the current state (true means
-> > the system is suspended).
-> > 
-> > irq_pm_force_wakeup provides mean to force a system wakeup.
+> On Tuesday, February 24, 2015 10:56:02 AM Boris Brezillon wrote:
+> > The IRQ line used by the RTC device is often shared with the system timer
+> > (PIT) on at91 platforms.
+> > Since timers are registering their handlers with IRQF_NO_SUSPEND, we should
+> > expect being called in suspended state, and properly wake the system up
+> > when this is the case.
 > > 
 > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > > ---
-> >  include/linux/interrupt.h |  3 +++
-> >  kernel/irq/manage.c       | 16 ++++++++++++++++
-> >  kernel/irq/pm.c           |  6 ++++++
-> >  3 files changed, 25 insertions(+)
+> >  drivers/rtc/rtc-at91sam9.c | 62 ++++++++++++++++++++++++++++++++++++++--------
+> >  1 file changed, 51 insertions(+), 11 deletions(-)
 > > 
-> > diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-> > index d9b05b5..052a3b2 100644
-> > --- a/include/linux/interrupt.h
-> > +++ b/include/linux/interrupt.h
-> > @@ -356,6 +356,9 @@ static inline int disable_irq_wake(unsigned int irq)
-> >  	return irq_set_irq_wake(irq, 0);
+> > diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+> > index 2183fd2..8cf9c1b 100644
+> > --- a/drivers/rtc/rtc-at91sam9.c
+> > +++ b/drivers/rtc/rtc-at91sam9.c
+> > @@ -77,6 +77,8 @@ struct sam9_rtc {
+> >  	unsigned int		gpbr_offset;
+> >  	int 			irq;
+> >  	struct clk		*sclk;
+> > +	unsigned long		events;
+> > +	spinlock_t		lock;
+> >  };
+> >  
+> >  #define rtt_readl(rtc, field) \
+> > @@ -271,14 +273,9 @@ static int at91_rtc_proc(struct device *dev, struct seq_file *seq)
+> >  	return 0;
 > >  }
 > >  
-> > +bool irq_is_wakeup_armed(unsigned int irq);
-> > +
-> > +void irq_pm_force_wakeup(void);
+> > -/*
+> > - * IRQ handler for the RTC
+> > - */
+> > -static irqreturn_t at91_rtc_interrupt(int irq, void *_rtc)
+> > +static irqreturn_t at91_rtc_cache_events(struct sam9_rtc *rtc)
+> >  {
+> > -	struct sam9_rtc *rtc = _rtc;
+> >  	u32 sr, mr;
+> > -	unsigned long events = 0;
 > >  
-> >  #ifdef CONFIG_IRQ_FORCED_THREADING
-> >  extern bool force_irqthreads;
-> > diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-> > index 196a06f..5424be0 100644
-> > --- a/kernel/irq/manage.c
-> > +++ b/kernel/irq/manage.c
-> > @@ -551,6 +551,22 @@ int irq_set_irq_wake(unsigned int irq, unsigned int on)
-> >  }
-> >  EXPORT_SYMBOL(irq_set_irq_wake);
+> >  	/* Shared interrupt may be for another device.  Note: reading
+> >  	 * SR clears it, so we must only read it in this irq handler!
+> > @@ -290,18 +287,54 @@ static irqreturn_t at91_rtc_interrupt(int irq, void *_rtc)
 > >  
-> > +bool irq_is_wakeup_armed(unsigned int irq)
-> > +{
-> > +	unsigned long flags;
-> > +	struct irq_desc *desc = irq_get_desc_buslock(irq, &flags, IRQ_GET_DESC_CHECK_GLOBAL);
-> > +	bool ret;
+> >  	/* alarm status */
+> >  	if (sr & AT91_RTT_ALMS)
+> > -		events |= (RTC_AF | RTC_IRQF);
+> > +		rtc->events |= (RTC_AF | RTC_IRQF);
+> >  
+> >  	/* timer update/increment */
+> >  	if (sr & AT91_RTT_RTTINC)
+> > -		events |= (RTC_UF | RTC_IRQF);
+> > +		rtc->events |= (RTC_UF | RTC_IRQF);
 > > +
-> > +	if (!desc)
-> > +		return false;
-> > +
-> > +	ret = irqd_is_wakeup_armed(&desc->irq_data);
-> > +
-> > +	irq_put_desc_busunlock(desc, flags);
-> > +	return ret;
+> > +	return IRQ_HANDLED;
 > > +}
-> > +EXPORT_SYMBOL(irq_is_wakeup_armed);
-> 
-> Ugly that is ...
-
-Yes, I'm not proud of it, but I wasn't sure when the handler was
-supposed to start acting as a 'suspended' handler, and I thought
-testing for this WAKEUP_ARMED bit was safer.
-Anyway, as you pointed out in your previous answer, this bit is not set
-when the IRQ line is not suspended, so this function is pretty much
-useless.
-
-> 
 > > +
-> >  /*
-> >   * Internal function that tells the architecture code whether a
-> >   * particular irq has been exclusively allocated or is available
-> > diff --git a/kernel/irq/pm.c b/kernel/irq/pm.c
-> > index 1743162..1110a37 100644
-> > --- a/kernel/irq/pm.c
-> > +++ b/kernel/irq/pm.c
-> > @@ -28,6 +28,12 @@ bool irq_pm_check_wakeup(struct irq_desc *desc)
-> >  	return false;
-> >  }
-> >  
-> > +void irq_pm_force_wakeup(void)
+> > +static void at91_rtc_flush_events(struct sam9_rtc *rtc)
 > > +{
-> > +	pm_system_wakeup();
+> > +	if (!rtc->events)
+> > +		return;
+> >  
+> > -	rtc_update_irq(rtc->rtcdev, 1, events);
+> > +	rtc_update_irq(rtc->rtcdev, 1, rtc->events);
+> > +	rtc->events = 0;
+> >  
+> >  	pr_debug("%s: num=%ld, events=0x%02lx\n", __func__,
+> > -		events >> 8, events & 0x000000FF);
+> > +		rtc->events >> 8, rtc->events & 0x000000FF);
 > > +}
-> > +EXPORT_SYMBOL_GPL(irq_pm_force_wakeup);
+> >  
+> > -	return IRQ_HANDLED;
+> > +/*
+> > + * IRQ handler for the RTC
+> > + */
+> > +static irqreturn_t at91_rtc_interrupt(int irq, void *_rtc)
+> > +{
+> > +	struct sam9_rtc *rtc = _rtc;
+> > +	int ret;
+> > +
+> > +	spin_lock(&rtc->lock);
+> > +
+> > +	ret = at91_rtc_cache_events(rtc);
+> > +
+> > +	/* We're called in suspended state */
+> > +	if (irq_is_wakeup_armed(irq)) {
 > 
-> Why don't you export pm_system_wakeup() instead and use it directly?
+> Instead of doing this, I would set a flag in the driver's ->suspend
+> callback (or in ->suspend_late, whichever is more convenient) and check
+> that flag here.
 
-Yep, I wasn't sure if pm_system_wakeup was reserved for core kernel
-parts.
-I don't have any concern exporting pm_system_wakeup instead.
+Sure, if I can start acting as a suspended handler (in other words, if
+I can safely call pm_system_wakeup) as soon as my suspend callback has
+been called, then I'm fine adding a boolean to store the device state.
 
+Thanks for your review.
+
+Boris
 
 -- 
 Boris Brezillon, Free Electrons
