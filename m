@@ -1,65 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 15:22:32 +0900
-Subject: [PATCH 3/4] ARM: shmobile: Remove mach/uncompress.h
+Date: Thu, 26 Feb 2015 15:22:33 +0900
+Subject: [PATCH 4/4] ARM: shmobile: r8a7779: Remove redundant cpu_disable
+ implementation
 In-Reply-To: <cover.1424931049.git.horms+renesas@verge.net.au>
 References: <cover.1424931049.git.horms+renesas@verge.net.au>
-Message-ID: <bb04883b2519b23bb4d3f4f7dac51cdda9a5e61d.1424931049.git.horms+renesas@verge.net.au>
+Message-ID: <fd9454ab51fa92f43ae5b7a71c42f2ee8417c2a2.1424931049.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+From: Stephen Boyd <sboyd@codeaurora.org>
 
-Convert ARCH_SHMOBILE_LEGACY to make use of <debug/uncompress.h>
-and remove the now unused <mach/uncompress.h>.
+By default only the non-boot CPUs can be hotplugged if the
+smp_operations structure doesn't have the cpu_disable function
+pointer set. r8a7779_cpu_disable() implements the same logic,
+only non-boot CPUs can be hotplugged, so it's redundant to
+override the default behavior.
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Acked-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/Kconfig.debug                           |  3 ++-
- arch/arm/mach-shmobile/include/mach/uncompress.h | 19 -------------------
- 2 files changed, 2 insertions(+), 20 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/include/mach/uncompress.h
+ arch/arm/mach-shmobile/smp-r8a7779.c | 7 -------
+ 1 file changed, 7 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 970de75..1ca8dc7 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1573,7 +1573,8 @@ config DEBUG_UNCOMPRESS
- config UNCOMPRESS_INCLUDE
- 	string
- 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
--					PLAT_SAMSUNG || ARCH_EFM32
-+					PLAT_SAMSUNG || ARCH_EFM32 || \
-+					ARCH_SHMOBILE_LEGACY
- 	default "mach/uncompress.h"
+diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
+index 9fc280e..01f792f 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7779.c
++++ b/arch/arm/mach-shmobile/smp-r8a7779.c
+@@ -124,19 +124,12 @@ static int r8a7779_cpu_kill(unsigned int cpu)
  
- config EARLY_PRINTK
-diff --git a/arch/arm/mach-shmobile/include/mach/uncompress.h b/arch/arm/mach-shmobile/include/mach/uncompress.h
-deleted file mode 100644
-index f1aee567..0000000
---- a/arch/arm/mach-shmobile/include/mach/uncompress.h
-+++ /dev/null
-@@ -1,19 +0,0 @@
--#ifndef __ASM_MACH_UNCOMPRESS_H
--#define __ASM_MACH_UNCOMPRESS_H
+ 	return 0;
+ }
 -
--/*
-- * This does not append a newline
-- */
--static void putc(int c)
+-static int r8a7779_cpu_disable(unsigned int cpu)
 -{
+-	/* only CPU1->3 have power domains, do not allow hotplug of CPU0 */
+-	return cpu == 0 ? -EPERM : 0;
 -}
--
--static inline void flush(void)
--{
--}
--
--static void arch_decomp_setup(void)
--{
--}
--
--#endif /* __ASM_MACH_UNCOMPRESS_H */
+ #endif /* CONFIG_HOTPLUG_CPU */
+ 
+ struct smp_operations r8a7779_smp_ops  __initdata = {
+ 	.smp_prepare_cpus	= r8a7779_smp_prepare_cpus,
+ 	.smp_boot_secondary	= r8a7779_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+-	.cpu_disable		= r8a7779_cpu_disable,
+ 	.cpu_die		= shmobile_smp_scu_cpu_die,
+ 	.cpu_kill		= r8a7779_cpu_kill,
+ #endif
 -- 
 2.1.4
