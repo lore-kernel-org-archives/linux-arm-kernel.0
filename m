@@ -1,45 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 26 Feb 2015 17:08:03 +0100
-Subject: [PATCH 03/10] clk/realview: stop using machine headers
-In-Reply-To: <1424966890-260805-1-git-send-email-arnd@arndb.de>
-References: <1424966890-260805-1-git-send-email-arnd@arndb.de>
-Message-ID: <1424966890-260805-4-git-send-email-arnd@arndb.de>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Thu, 26 Feb 2015 08:08:47 -0800
+Subject: [PATCH v2 0/2] Add support for Broadcom keypad controller
+In-Reply-To: <Scott Branden <sbranden@broadcom.com>
+References: <Scott Branden <sbranden@broadcom.com>
+Message-ID: <1424966930-28097-1-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to move realview into multiplatform, we have to prevent device
-drivers from accessing the machine header files.
+This series of patchsets contains the Broadcom keypad controller driver
+and device tree binding documentation.
 
-In case of the clk driver, this is very simple, we just copy the
-small set of register definitions into the driver that needs them.
+Changes from v1:
+- updated dt documentation to remove to matrix-keymap.txt
+- removed bcm_kp_remove as it is not necessary
+- removed key-interrupt-trigger-type dt binding
+- added bcm_kp_report_keys and call to process key registers
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/clk/versatile/clk-realview.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+Scott Branden (2):
+  Input: bcm-keypad: add device tree bindings
+  Input: bcm-keypad: Add Broadcom keypad controller
 
-diff --git a/drivers/clk/versatile/clk-realview.c b/drivers/clk/versatile/clk-realview.c
-index c8b523117fb7..276411f3c437 100644
---- a/drivers/clk/versatile/clk-realview.c
-+++ b/drivers/clk/versatile/clk-realview.c
-@@ -12,11 +12,15 @@
- #include <linux/io.h>
- #include <linux/clk-provider.h>
- 
--#include <mach/hardware.h>
--#include <mach/platform.h>
--
- #include "clk-icst.h"
- 
-+#define REALVIEW_SYS_OSC0_OFFSET             0x0C
-+#define REALVIEW_SYS_OSC1_OFFSET             0x10
-+#define REALVIEW_SYS_OSC2_OFFSET             0x14
-+#define REALVIEW_SYS_OSC3_OFFSET             0x18
-+#define REALVIEW_SYS_OSC4_OFFSET             0x1C	/* OSC1 for RealView/AB */
-+#define REALVIEW_SYS_LOCK_OFFSET             0x20
-+
- /*
-  * Implementation of the ARM RealView clock trees.
-  */
+ .../devicetree/bindings/input/brcm,bcm-keypad.txt  | 108 +++++
+ drivers/input/keyboard/Kconfig                     |  10 +
+ drivers/input/keyboard/Makefile                    |   1 +
+ drivers/input/keyboard/bcm-keypad.c                | 464 +++++++++++++++++++++
+ 4 files changed, 583 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/brcm,bcm-keypad.txt
+ create mode 100644 drivers/input/keyboard/bcm-keypad.c
+
 -- 
-2.1.0.rc2
+2.3.0
