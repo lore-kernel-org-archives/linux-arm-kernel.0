@@ -1,57 +1,38 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 26 Feb 2015 10:22:50 +0100
-Subject: [PATCH 4/8] pwm: atmel-hlcdc: fix struct clk pointer comparing
-In-Reply-To: <1424876018-17852-5-git-send-email-shawn.guo@linaro.org>
-References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
- <1424876018-17852-5-git-send-email-shawn.guo@linaro.org>
-Message-ID: <54EEE5EA.6000902@atmel.com>
+From: jslaby@suse.cz (Jiri Slaby)
+Date: Thu, 26 Feb 2015 10:29:54 +0100
+Subject: [PATCH 1/5] tty/serial: at91: correct check of buf used in DMA
+In-Reply-To: <1424933725-16242-2-git-send-email-leilei.zhao@atmel.com>
+References: <1424933725-16242-1-git-send-email-leilei.zhao@atmel.com>
+ <1424933725-16242-2-git-send-email-leilei.zhao@atmel.com>
+Message-ID: <54EEE792.9060706@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 25/02/2015 15:53, Shawn Guo a ?crit :
-> Since commit 035a61c314eb ("clk: Make clk API return per-user struct clk
-> instances"), clk API users can no longer check if two struct clk
-> pointers are pointing to the same hardware clock, i.e. struct clk_hw, by
-> simply comparing two pointers.  That's because with the per-user clk
-> change, a brand new struct clk is created whenever clients try to look
-> up the clock by calling clk_get() or sister functions like clk_get_sys()
-> and of_clk_get().  This changes the original behavior where the struct
-> clk is only created for once when clock driver registers the clock to
-> CCF in the first place.  The net change here is before commit
-> 035a61c314eb the struct clk pointer is unique for given hardware
-> clock, while after the commit the pointers returned by clk lookup calls
-> become different for the same hardware clock.
+On 02/26/2015, 07:55 AM, Leilei Zhao wrote:
+> We only use buf of ring In DMA rx function while using buf of xmit
+> in DMA tx function. So here we need definitively to check the buf
+> of ring which is corresponding to DMA rx function.
 > 
-> That said, the struct clk pointer comparing in the code doesn't work any
-> more.  Call helper function clk_is_match() instead to fix the problem.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-
-I agree with the fix whichever name is chosen for the function in an
-future version of this series. So you can add my:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Maybe Boris can double check...
-
+> Signed-off-by: Leilei Zhao <leilei.zhao@atmel.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > ---
->  drivers/pwm/pwm-atmel-hlcdc.c | 2 +-
+>  drivers/tty/serial/atmel_serial.c |    2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/pwm/pwm-atmel-hlcdc.c b/drivers/pwm/pwm-atmel-hlcdc.c
-> index 522f7075bb1a..36475949b829 100644
-> --- a/drivers/pwm/pwm-atmel-hlcdc.c
-> +++ b/drivers/pwm/pwm-atmel-hlcdc.c
-> @@ -97,7 +97,7 @@ static int atmel_hlcdc_pwm_config(struct pwm_chip *c,
->  
->  	pwmcfg = ATMEL_HLCDC_PWMPS(pres);
->  
-> -	if (new_clk != chip->cur_clk) {
-> +	if (!clk_is_match(new_clk, chip->cur_clk)) {
->  		u32 gencfg = 0;
->  		int ret;
->  
-> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 846552b..460903c 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -1027,7 +1027,7 @@ static int atmel_prepare_rx_dma(struct uart_port *port)
+>  	spin_lock_init(&atmel_port->lock_rx);
+>  	sg_init_table(&atmel_port->sg_rx, 1);
+>  	/* UART circular rx buffer is an aligned page. */
+> -	BUG_ON((int)port->state->xmit.buf & ~PAGE_MASK);
+> +	BUG_ON((int)ring->buf & ~PAGE_MASK);
 
+Please use PAGE_ALIGNED. This will also make the bad (int) cast to dismiss.
 
+thanks,
 -- 
-Nicolas Ferre
+js
+suse labs
