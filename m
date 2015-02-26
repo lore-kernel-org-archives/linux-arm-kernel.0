@@ -1,44 +1,66 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 25 Feb 2015 17:24:26 -0800
-Subject: [PATCH 0/8] Fix struct clk pointer comparing
-In-Reply-To: <54EE33C5.5010701@codeaurora.org>
-References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
- <20150225150349.GB8656@n2100.arm.linux.org.uk>
- <20150225175533.421.41831@quantum> <54EE33C5.5010701@codeaurora.org>
-Message-ID: <20150226012426.421.62077@quantum>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 25 Feb 2015 17:28:47 -0800
+Subject: [PATCH v2] Input: sun4i-ts: add thermal driver dependency
+In-Reply-To: <1423728011-30272-1-git-send-email-wens@csie.org>
+References: <1423728011-30272-1-git-send-email-wens@csie.org>
+Message-ID: <20150226012847.GD25965@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2015-02-25 12:42:45)
-> On 02/25/15 09:55, Mike Turquette wrote:
-> > Quoting Russell King - ARM Linux (2015-02-25 07:03:49)
-> >> Case 1 applies in places like the Kirkwood I2S driver, and the iMX6
-> >> ethernet code, and it's these cases which need to be fixed.
-> >>
-> >> Case 2 applies in the Armada DRM driver, and these cases need not be
-> >> "fixed".
-> >>
-> >> To put it a different way: case 1 is when you're testing to see whether
-> >> two clocks refer to the same clock.  case 2 is when you're testing
-> >> whether the cached clk cookie is the same.
-> > It looks like patches 2, 7 and 8 are correct in this series. I'll apply
-> > them towards -rc2 if nobody objects.
-> >
-> >
+On Thu, Feb 12, 2015 at 04:00:11PM +0800, Chen-Yu Tsai wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
 > 
-> For patch 8 can't we use the alternative patch that I came up with
-> before? I have a patch for sound/soc/fsl/fsl_esai.c and
-> drivers/pwm/pwm-atmel-hlcdc.c which I can send shortly.
-
-Probably we can use them. I'll need to spend a few minutes with both
-patches and make sure it looks good. clkdev stuff always spins my head
-around.
-
-Regards,
-Mike
-
+> The sun4i-ts driver has had a dependency on the thermal code
+> with the addition of the thermal zone sensor support, but this
+> is not currently enforced in Kconfig, so with TOUCHSCREEN_SUN4I=y,
+> THERMAL=m and THERMAL_OF=y we get
 > 
+> drivers/built-in.o: In function `sun4i_ts_remove':
+> :(.text+0x2376f4): undefined reference to `thermal_zone_of_sensor_unregister'
+> drivers/built-in.o: In function `sun4i_ts_probe':
+> :(.text+0x237a94): undefined reference to `thermal_zone_of_sensor_register'
+> :(.text+0x237c00): undefined reference to `thermal_zone_of_sensor_unregister'
+> 
+> We need the dependency on THERMAL in order to ensure that this
+> driver becomes a loadable module if the thermal support itself
+> is modular, while the dependency on THERMAL_OF is a runtime
+> dependency and the driver will still build if it is missing.
+> It is entirely possible to build sun4i-ts without THERMAL_OF
+> just to use the hwmon sensors and/or touchscreen.
+> 
+> Fixes: 223697107949 ("Input: sun4i-ts - add thermal zone sensor support")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> [wens at csie.org: Fix description and Kconfig dependencies]
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+
+Applied, thank you.
+
+> ---
+> 
+> v2 updates the Kconfig dependencies as Dmitry pointed out, and makes
+> the description be more specific on the failing config and why a
+> dependency on THERMAL_OF is not required. The failing commit hash
+> is also updated.
+> 
+> ---
+>  drivers/input/touchscreen/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+> index 58917525126e..6261fd6d7c3c 100644
+> --- a/drivers/input/touchscreen/Kconfig
+> +++ b/drivers/input/touchscreen/Kconfig
+> @@ -943,6 +943,7 @@ config TOUCHSCREEN_SUN4I
+>  	tristate "Allwinner sun4i resistive touchscreen controller support"
+>  	depends on ARCH_SUNXI || COMPILE_TEST
+>  	depends on HWMON
+> +	depends on THERMAL || !THERMAL_OF
+>  	help
+>  	  This selects support for the resistive touchscreen controller
+>  	  found on Allwinner sunxi SoCs.
 > -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+> 2.1.4
 > 
+
+-- 
+Dmitry
