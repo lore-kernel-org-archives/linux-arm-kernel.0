@@ -1,54 +1,91 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 15:21:02 +0900
-Subject: [PATCH 05/32] ARM: shmobile: kzm9g-reference dts: Add adxl345
- accelerometer node
+Date: Thu, 26 Feb 2015 15:21:05 +0900
+Subject: [PATCH 08/32] ARM: shmobile: sh73a0 dtsi: Add missing INTCA0 clock
+ for irqpin module
 In-Reply-To: <cover.1424849129.git.horms+renesas@verge.net.au>
 References: <cover.1424849129.git.horms+renesas@verge.net.au>
-Message-ID: <4bd1dd503aa2a6cfeb18a48d1da01662dd5124e1.1424849129.git.horms+renesas@verge.net.au>
+Message-ID: <56a215d66b1eee870a6b90a8c245dfc3e503a137.1424849129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add a DT node for the ADXL345 three-axis digital accelerometer sensor,
-which is connected to i2c0.
+This clock drives the irqpin controller modules.
+Before, it was assumed enabled by the bootloader or reset state.
+By making it available to the driver, we make sure it gets enabled when
+needed, and allow it to be managed by system or runtime PM.
 
-As trivial i2c devices are matched against the first compatible entry
-only, compatibility is declared with "adi,adxl34x" only for now.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-The device needs an interrupt to operate properly. Specify the two
-interrupts used on the board.
-
-While at it rename the DT node to accelerometer at 1d to describe the
-device's function instead of its model.
-
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/sh73a0.dtsi            | 15 +++++++++++++++
+ include/dt-bindings/clock/sh73a0-clock.h |  3 +++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index 873b415..fd16998 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -202,6 +202,14 @@
- 		#sound-dai-cells = <0>;
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 0767087..08f736d 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -94,6 +94,7 @@
+ 			      0 6 IRQ_TYPE_LEVEL_HIGH
+ 			      0 7 IRQ_TYPE_LEVEL_HIGH
+ 			      0 8 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp5_clks SH73A0_CLK_INTCA0>;
+ 		control-parent;
  	};
  
-+	accelerometer at 1d {
-+		compatible = "adi,adxl34x";
-+		reg = <0x1d>;
-+		interrupt-parent = <&irqpin3>;
-+		interrupts = <2 IRQ_TYPE_LEVEL_HIGH>,
-+			     <3 IRQ_TYPE_LEVEL_HIGH>;
-+	};
+@@ -114,6 +115,7 @@
+ 			      0 14 IRQ_TYPE_LEVEL_HIGH
+ 			      0 15 IRQ_TYPE_LEVEL_HIGH
+ 			      0 16 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp5_clks SH73A0_CLK_INTCA0>;
+ 		control-parent;
+ 	};
+ 
+@@ -134,6 +136,7 @@
+ 			      0 22 IRQ_TYPE_LEVEL_HIGH
+ 			      0 23 IRQ_TYPE_LEVEL_HIGH
+ 			      0 24 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp5_clks SH73A0_CLK_INTCA0>;
+ 		control-parent;
+ 	};
+ 
+@@ -154,6 +157,7 @@
+ 			      0 30 IRQ_TYPE_LEVEL_HIGH
+ 			      0 31 IRQ_TYPE_LEVEL_HIGH
+ 			      0 32 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp5_clks SH73A0_CLK_INTCA0>;
+ 		control-parent;
+ 	};
+ 
+@@ -698,5 +702,16 @@
+ 			clock-output-names =
+ 				"iic3", "iic4", "keysc";
+ 		};
++		mstp5_clks: mstp5_clks at e6150144 {
++			compatible = "renesas,sh73a0-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0xe6150144 4>, <0xe615003c 4>;
++			clocks = <&cpg_clocks SH73A0_CLK_HP>;
++			#clock-cells = <1>;
++			clock-indices = <
++				SH73A0_CLK_INTCA0
++			>;
++			clock-output-names =
++				"intca0";
++		};
+ 	};
+ };
+diff --git a/include/dt-bindings/clock/sh73a0-clock.h b/include/dt-bindings/clock/sh73a0-clock.h
+index 1dd3eb2..5336956 100644
+--- a/include/dt-bindings/clock/sh73a0-clock.h
++++ b/include/dt-bindings/clock/sh73a0-clock.h
+@@ -76,4 +76,7 @@
+ #define SH73A0_CLK_IIC4		10
+ #define SH73A0_CLK_KEYSC	3
+ 
++/* MSTP5 */
++#define SH73A0_CLK_INTCA0	8
 +
- 	as3711 at 40 {
- 		compatible = "ams,as3711";
- 		reg = <0x40>;
+ #endif
 -- 
 2.1.4
