@@ -1,93 +1,71 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Thu, 26 Feb 2015 10:05:08 +0100
-Subject: [PATCH 2/4] ARM: mvebu: add audio I2S controller to Armada 38x
- Device Tree
-In-Reply-To: <54EE6942.9080800@gmail.com>
-References: <1424901482-3809-1-git-send-email-mw@semihalf.com>
- <1424901482-3809-3-git-send-email-mw@semihalf.com>
- <54EE4AD6.6090101@gmail.com>
- <CAPv3WKf8b+fuB-4qVwKC57iKaNHTLZAf9VFpfDbow1Sb3YAsNw@mail.gmail.com>
- <54EE6942.9080800@gmail.com>
-Message-ID: <CAPv3WKezrx4jkZNo3PYSOGZtiSJH09+94BaknYNN4xPkB1AxKw@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 26 Feb 2015 10:06:15 +0100
+Subject: [PATCH] cpuidle: mvebu: update cpuidle thresholds for Armada
+ XP SOCs
+In-Reply-To: <alpine.LNX.2.02.1502251624570.11958@sbrk.org>
+References: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
+ <54ED9D92.90506@linaro.org> <alpine.LNX.2.02.1502251624570.11958@sbrk.org>
+Message-ID: <54EEE207.7090006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-02-26 1:30 GMT+01:00 Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com>:
-> On 26.02.2015 01:11, Marcin Wojtas wrote:
->>
->> 2015-02-25 23:21 GMT+01:00 Sebastian Hesselbarth
->> <sebastian.hesselbarth@gmail.com>:
->>>
->>> On 25.02.2015 22:58, Marcin Wojtas wrote:
+On 02/25/2015 04:56 PM, Sebastien Rannou wrote:
+> Hi Daniel,
 >
-> [...]
->>>
->>> sorry but NACK. The PLL and SoC ctrl are not even close to the audio
->>> controller registers.
->>>
->>>> +                               interrupts = <GIC_SPI 75
->>>> IRQ_TYPE_LEVEL_HIGH>;
->>>> +                               clocks = <&gateclk 0>;
->>>> +                               clock-names = "internal";
->>>
->>>
->>>
->>> How about providing access to audio PLL by a clock driver and amend the
->>> binding to allow for a second more precise PLL clock, e.g.
->>>
->>>          clocks = <&gateclk CLK_AUDIO>, <&pll PLL_AUDIO>;
->>>          clock-names = "internal", "pll";
->>>
->>
->> Good idea. Would you suggest some name for the new driver? How about
->> clk-audio.c under drivers/clk/mvebu?
+> Thanks for the explanation and thanks for the link, I wish I had read
+> it beforehand.
 >
+> On Wed, 25 Feb 2015, Daniel Lezcano wrote:
+>> If you have the possibility, I would suggest to apply the right methodology to
+>> find the right values by using the description in the wiki page [1]. If you
+>> can access to the energy values to enter / exit the state and the power
+>> consumed in each idle state, then you can mathematically compute the right
+>> values.
 >
-> Depends on how much you know about the surrounding registers.
->
-> If there is more clock related stuff than the audio pll, I'd
-> suggest to have a single driver for everything that isn't core clk
-> or clk gates which are already dealt with in the existing driver.
->
-> Given that this PLL layout is most likely 38x specific, I'd just put it
-> into drivers/clk/mvebu/armada-38x.c.
->
+> Unfortunately I don't have access to the cost of transitions between
+> states, nor do I have the time taken by each transition (which I could
+> have used to infer the cost). I only have the power consumption of the
+> different states.
 
-Audio PLL setting consist of 3 independent registers. Adjacent to them
-there are same regs for setting TDM PLL, however I doubt  telephony is
-going to be supported in foreseeable future (if ever). I also have
-strong suspicion that it looks the same in a39x - Thomas, can you take
-a look into spec and confirm?
+If you have the consumption for the different idle state + running, you 
+have 60% of the data :)
 
->>> we already check for an "extclk" on Dove for the same reason but the
->>> name might be misleading here.
->>>
->>> Also, i2c/spdif muxing option could be handled by 38x's pinctrl driver,
->>> we have the same for Dove's internal i2c mux.
->>>
->>> If you want to use i2s you just add the option to the default pinctrl
->>> hog:
->>>
->>>          pinctrl-0 = <&i2s_pins &audio_mux_i2s>;
->>>          pinctrl-names = "default";
->>>
->>
->> Ok, I'll try to extend pinctrl-armada-38x then.
->
->
-> IMHO, adding a "syscon" compatible to the system-controller node should
-> do the trick. You can reference the regmap from 38x's pinctrl driver and
-> have a specific callback for the i2s/spdif muxing. The reg property
-> range of the system-controller should be extended but that definitely
-> depends on what the you or the Free Electron guys know about the
-> register set.
->
+> I plan to find the adequate values by testing different combinations,
+> but it is going to take some efforts before having a second
+> patch.
 
-For muxing i2s/spdif (exactly the same pins, they have to be either
-way set to "audio" by pinctrl driver) changing single bit in "system
-control 1" register is needed. However currently unused, it is already
-a part of system-controller at 18200 regmap. Anyway the will of using
-either i2s or spdif has to be explicitly represented in DT.
+You may waste your time because of the non deterministic prediction. 
+Sometimes you will test with right values but wrong prediction and a 
+cache 50% filled, sometimes you will test with wrong values and wrong 
+prediction but a cache 20% filled etc ...
 
-Marcin
+The only way to measure accurately is to identify the cpu power rails 
+and measure the current peak when entering/exiting the different idle 
+states with a device (oscilloscope, or whatever).
+
+> Since this patch already improves the situation by using the
+> vendor's values, I think it is a move in the right direction, even
+> though not being the most adequate values.
+
+Just to clarify, vendor's values are from an out-of-tree which means it 
+does not exist from an opensource pov and hence does not enter in the 
+equation to pick the patch or not.
+
+Regarding the values you measured for perf and power, it appears we have 
+a improvement in terms of performance but with a power consumption 
+degradation.
+
+I am not against this patch, but I would like to have the ack from 
+another Armada maintainer (Jason, Andrew or Sebastian) to be sure this 
+trade-off is accepted.
+
+Thanks
+
+   -- Daniel
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
