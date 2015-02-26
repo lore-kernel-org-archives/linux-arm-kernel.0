@@ -1,47 +1,79 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 15:21:26 +0900
-Subject: [PATCH 29/32] ARM: shmobile: henninger: add CAN0 DT support
+Date: Thu, 26 Feb 2015 15:21:24 +0900
+Subject: [PATCH 27/32] ARM: shmobile: r8a7791: add CAN clocks
 In-Reply-To: <cover.1424849129.git.horms+renesas@verge.net.au>
 References: <cover.1424849129.git.horms+renesas@verge.net.au>
-Message-ID: <457acc4a6ce8fe821aed4f254e72a76c88673712.1424849129.git.horms+renesas@verge.net.au>
+Message-ID: <b324252cc18d52d5752942a8574c22229153c58f.1424849129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Define the Henninger board dependent part of the CAN0 device node.
+The R-Car CAN controllers can derive the CAN bus clock not only from their
+peripheral clock input (clkp1) but also from the other internal clock (clkp2)
+and external clock fed on CAN_CLK pin.  Describe those clocks in the device
+tree,  along with  the USB_EXTAL clock  from which clkp2 is derived.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-henninger.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/r8a7791.dtsi            | 23 +++++++++++++++++++++--
+ include/dt-bindings/clock/r8a7791-clock.h |  1 +
+ 2 files changed, 22 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-henninger.dts b/arch/arm/boot/dts/r8a7791-henninger.dts
-index d2ebf11..e33e404 100644
---- a/arch/arm/boot/dts/r8a7791-henninger.dts
-+++ b/arch/arm/boot/dts/r8a7791-henninger.dts
-@@ -141,6 +141,11 @@
- 		renesas,groups = "vin0_data8", "vin0_clk";
- 		renesas,function = "vin0";
- 	};
-+
-+	can0_pins: can0 {
-+		renesas,groups = "can0_data";
-+		renesas,function = "can0";
-+	};
- };
- 
- &scif0 {
-@@ -307,3 +312,9 @@
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index afba8af..1ebffef 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -862,15 +862,34 @@
+ 			status = "disabled";
  		};
- 	};
- };
+ 
++		/* External USB clock - can be overridden by the board */
++		usb_extal_clk: usb_extal_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <48000000>;
++			clock-output-names = "usb_extal";
++		};
 +
-+&can0 {
-+	pinctrl-0 = <&can0_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
++		/* External CAN clock */
++		can_clk: can_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			/* This value must be overridden by the board. */
++			clock-frequency = <0>;
++			clock-output-names = "can_clk";
++			status = "disabled";
++		};
++
+ 		/* Special CPG clocks */
+ 		cpg_clocks: cpg_clocks at e6150000 {
+ 			compatible = "renesas,r8a7791-cpg-clocks",
+ 				     "renesas,rcar-gen2-cpg-clocks";
+ 			reg = <0 0xe6150000 0 0x1000>;
+-			clocks = <&extal_clk>;
++			clocks = <&extal_clk &usb_extal_clk>;
+ 			#clock-cells = <1>;
+ 			clock-output-names = "main", "pll0", "pll1", "pll3",
+-					     "lb", "qspi", "sdh", "sd0", "z";
++					     "lb", "qspi", "sdh", "sd0", "z",
++					     "rcan";
+ 		};
+ 
+ 		/* Variable factor clocks */
+diff --git a/include/dt-bindings/clock/r8a7791-clock.h b/include/dt-bindings/clock/r8a7791-clock.h
+index f096f3f..a45a363 100644
+--- a/include/dt-bindings/clock/r8a7791-clock.h
++++ b/include/dt-bindings/clock/r8a7791-clock.h
+@@ -20,6 +20,7 @@
+ #define R8A7791_CLK_SDH			6
+ #define R8A7791_CLK_SD0			7
+ #define R8A7791_CLK_Z			8
++#define R8A7791_CLK_RCAN		9
+ 
+ /* MSTP0 */
+ #define R8A7791_CLK_MSIOF0		0
 -- 
 2.1.4
