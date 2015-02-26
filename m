@@ -1,57 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 26 Feb 2015 12:00:26 -0700
-Subject: [PATCH] ARM: kexec: Relax SMP validation to improve DT
- compatibility
-In-Reply-To: <20150226174206.GL8656@n2100.arm.linux.org.uk>
-References: <1424947028-7438-1-git-send-email-geert+renesas@glider.be>
- <20150226174206.GL8656@n2100.arm.linux.org.uk>
-Message-ID: <54EF6D4A.6000603@wwwdotorg.org>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Thu, 26 Feb 2015 11:00:09 -0800
+Subject: [PATCH 01/12] ARM: dts: apq8064: add RPM regulators support
+In-Reply-To: <1424678093-12966-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <424678035-12862-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1424678093-12966-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <CAJAp7OgOjsLe2c66k8ocSCpg_JtHCJbofcxjbgBoG6fd8iFPxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2015 10:42 AM, Russell King - ARM Linux wrote:
-> On Thu, Feb 26, 2015 at 11:37:08AM +0100, Geert Uytterhoeven wrote:
->> When trying to kexec into a new kernel on a platform where multiple CPU
->> cores are present, but no SMP bringup code is available yet, the
->> kexec_load system call fails with:
->>
->>      kexec_load failed: Invalid argument
->>
->> The SMP test added to machine_kexec_prepare() in commit 2103f6cba61a8b8b
->> ("ARM: 7807/1: kexec: validate CPU hotplug support") wants to prohibit
->> kexec on SMP platforms where it cannot disable secondary CPUs.
->> However, this test is too strict: if the secondary CPUs couldn't be
->> enabled in the first place, there's no need to disable them later at
->> kexec time.  Hence skip the test in the absence of SMP bringup code.
+On Sun, Feb 22, 2015 at 11:54 PM, Srinivas Kandagatla
+<srinivas.kandagatla@linaro.org> wrote:
+> This patch adds rpm node to apq8064 dt as rpm would be used by other
+> devices for regulator support. Also adds all the regulators in the rpm.
 >
-> Hmm.  I don't think we should relax it in this manner - I think there's
-> an easier solution to this.
->
->> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
->> index de2b085ad7535da7..8bf3b7c098881b95 100644
->> --- a/arch/arm/kernel/machine_kexec.c
->> +++ b/arch/arm/kernel/machine_kexec.c
->> @@ -46,7 +46,8 @@ int machine_kexec_prepare(struct kimage *image)
->>   	 * and implements CPU hotplug for the current HW. If not, we won't be
->>   	 * able to kexec reliably, so fail the prepare operation.
->>   	 */
->> -	if (num_possible_cpus() > 1 && !platform_can_cpu_hotplug())
->> +	if (num_possible_cpus() > 1 && platform_can_secondary_boot() &&
->> +	    !platform_can_cpu_hotplug())
->
-> 	if (num_online_cpus() > 1 && !platform_can_cpu_hotplug())
 
-I can't remember the call stack here. Is num_online_cpus() guaranteed 
-not to change from this point through to when the kexec actually happens?
+This looks good, with Kumars suggestion of GIT defines
+Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
->
->>   		return -EINVAL;
->
-> Neither test is actually accurate though: when we have implementations
-> where the secondary CPUs spin inside the kernel when they're "unplugged"
-> that is not sufficient to be able to kexec.
->
-> We should probably fix that, and make platform_can_cpu_hotplug() report
-> whether it really is possible to hotplug all secondary CPUs into such
-> a state that kexec can work.
->
+However, this binding is not merged yet and Stephen have requesting a
+complete redesign of the binding as well as the code. So that has to
+be concluded first, I presume.
+
+
+Separate of that, as it's highly likely that everyone will follow the
+pcb design guidelines for apq8064 the vin-supplies should be okay to
+specify at this level (and not in all board files). Perhaps also the
+switching frequencies for the SMPSs?
+
+Regards,
+Bjorn
