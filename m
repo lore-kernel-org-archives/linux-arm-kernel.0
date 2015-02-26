@@ -1,28 +1,46 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Thu, 26 Feb 2015 23:07:29 +0200
-Subject: [PATCH] ARM: OMAP: enable TWL4030_USB in omap2plus_defconfig
-Message-ID: <1424984849-13083-1-git-send-email-aaro.koskinen@iki.fi>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Thu, 26 Feb 2015 13:20:17 -0800
+Subject: [PATCH 01/12] ARM: dts: apq8064: add RPM regulators support
+In-Reply-To: <54EF7DFD.9020609@codeaurora.org>
+References: <424678035-12862-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1424678093-12966-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <54EF748B.3090404@codeaurora.org> <54EF7D74.7060906@linaro.org>
+ <54EF7DFD.9020609@codeaurora.org>
+Message-ID: <CAJAp7OjYicY2dZ3V9n_dGS_V3EPjH4SrniqOUBxdZn+EmyW7gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable TWL4030_USB which is used at least on Nokia N900/N950/N9 (OMAP3).
+On Thu, Feb 26, 2015 at 12:11 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 02/26/15 12:09, Srinivas Kandagatla wrote:
+>>
+>>
+>> On 26/02/15 19:31, Stephen Boyd wrote:
+>>> On 02/22/15 23:54, Srinivas Kandagatla wrote:
+>>>> +            pm8921_s5: pm8921-s5 {
+>>>> +                compatible    = "qcom,rpm-pm8921-ftsmps";
+>>>> +                reg        = <QCOM_RPM_PM8921_SMPS5>;
+>>>> +            };
+>>>> +
+>>>> +            pm8921_s6: pm8921-s6 {
+>>>> +                compatible    = "qcom,rpm-pm8921-ftsmps";
+>>>> +                reg        = <QCOM_RPM_PM8921_SMPS6>;
+>>>> +            };
+>>>> +
+>>>
+>>> There's no RPM control for S5 and S6. Please remove. Also, has this been
+>>> tested?
+>>>
+>> Ahh. these are SAW regulators, I will remove it from the list.
+>> Obviously, I did not test all the regulators.
+>
+> There are some more that don't seem to match what we have downstream.
+> L26 is also SAW related, and the usb and hdmi switches are "locally"
+> controlled via ssbi pmic writes.
+>
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
----
- arch/arm/configs/omap2plus_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+According to msm-3.4 all three are controlled by pm8xxx-regulator, but
+they are also exposed through the RPM - which I think I tested (a year
+ago or so).
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index b738652..8c93aa9 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -375,6 +375,7 @@ CONFIG_PWM_TWL=m
- CONFIG_PWM_TWL_LED=m
- CONFIG_OMAP_USB2=m
- CONFIG_TI_PIPE3=m
-+CONFIG_TWL4030_USB=m
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- # CONFIG_EXT3_FS_XATTR is not set
--- 
-2.2.0
+Regards,
+Bjorn
