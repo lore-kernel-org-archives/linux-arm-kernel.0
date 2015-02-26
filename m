@@ -1,55 +1,48 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Thu, 26 Feb 2015 18:25:57 +0200
-Subject: [PATCH 0/3] Add initial DT support for Qualcomm SPMI PMIC devices
-In-Reply-To: <54E6848C.1090405@codeaurora.org>
-References: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
- <54E6848C.1090405@codeaurora.org>
-Message-ID: <1424967957.2340.30.camel@mm-sol.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 26 Feb 2015 16:29:00 +0000
+Subject: [RFC PATCH 3/3] arm64: KVM: use ID map with increased VA range
+ if required
+In-Reply-To: <20150226161146.GA17949@e104818-lin.cambridge.arm.com>
+References: <1424964547-2118-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1424964547-2118-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20150226161146.GA17949@e104818-lin.cambridge.arm.com>
+Message-ID: <20150226162900.GB17949@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Stephan, 
-
-Sorry for delayed answer.
-
-On Thu, 2015-02-19 at 16:49 -0800, Stephen Boyd wrote:
-> On 02/03/15 04:17, Ivan T. Ivanov wrote:
-> > Following set of patches add initial DT support for PMIC devices
-> > found on recent Quqalcomm chipsets. Details for SPMI bus and PMIC arbiter
-> > could be found here [1].
+On Thu, Feb 26, 2015 at 04:11:47PM +0000, Catalin Marinas wrote:
+> On Thu, Feb 26, 2015 at 03:29:07PM +0000, Ard Biesheuvel wrote:
+> > +	/*
+> > +	 * If we are running with VA_BITS < 48, we may be running with an extra
+> > +	 * level of translation in the ID map. This is only the case if system
+> > +	 * RAM is out of range for the currently configured page size and number
+> > +	 * of translation levels, in which case we will also need the extra
+> > +	 * level for the HYP ID map, or we won't be able to enable the EL2 MMU.
+> > +	 *
+> > +	 * However, at EL2, there is only one TTBR register, and we can't switch
+> > +	 * between translation tables *and* update TCR_EL2.T0SZ at the same
+> > +	 * time. Bottom line: we need the extra level in *both* our translation
+> > +	 * tables.
 > 
-> Can you please put the specific compatible strings for the pmic model
-> into the nodes in addition to the generic "qcom,spmi-pmic"? We may want
-> to have regmap config tables in the future that describe the
-> cache/read/write abilities of the regsiters. If all we have is the
-> generic binding then we don't have a way to populate these tables.
-> Unless the plan there is to use the revid registers?
+> It doesn't sound too nice but I'm not sure we can do much about it.
 > 
+> > +	 *
+> > +	 * Fortunately, there is an easy way out: the existing ID map, with the
+> > +	 * extra level, can be reused for both. The kernel image is already
+> > +	 * identity mapped at a high virtual offset, which leaves VA_BITS of
+> > +	 * address space at the low end to put our runtime HYP mappings.
+> > +	 */
+> 
+> Another aspect here is that the Hyp VA starts at HYP_PAGE_OFFSET which
+> is 1 << (VA_BITS - 1). On some platforms we may get an overlap with the
+> physical memory (and the original idmap). Could we switch to the
+> dedicated hyp TTBR at this point, with the extra level? Functions like
+> __create_hyp_mapping() don't need to know about this extra level as
+> hyp_pgd only knows about 4 levels but TTBR0_EL2 would point to the extra
+> level.
 
-I would really like that we can use "revid" registers, but I don't know... 
+I meant "hyp_pgd only knows about 3 levels (or 2, depending on the
+configuration; same as the host kernel TTBR1_EL1)"
 
->From what I can see usually in one physical PMIC chip they
-are 2 USID devices.
-
-I can successfully discover following USID's on APQ8074 boards:
-
-pmic-spmi 0-00: qcom,pm8941-v1.0 detected
-pmic-spmi 0-01: qcom,pm8941-v1.0 detected
-pmic-spmi 0-04: qcom,pm8841-v0.0 detected
-pmic-spmi 0-05: qcom,pm8841-v0.0 detected
-
-Unfortunately on PM8916 only one device is detected, with USID 0.
-But they should be two, judging by downstream DTS files, right?
-
-pmic-spmi 0-00: qcom,pm8916-v0.0 detected 
-pmic-spmi 0-01: unknown device
-
-For communication with PM8916 I am using recent patches from Gilad [1].
-Maybe there are still some issues with these patches, which can cause
-this behavior or PM8916 just didn't have these registers for USID 1?
-
-Regards,
-Ivan 
-
-[1] https://lkml.org/lkml/2015/2/19/453
+-- 
+Catalin
