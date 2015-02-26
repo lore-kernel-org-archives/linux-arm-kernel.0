@@ -1,103 +1,133 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 26 Feb 2015 20:46:47 +0200
-Subject: [PATCH 04/11] dt-bindings: Add documentation for rockchip lvds
-In-Reply-To: <1422721984-27782-5-git-send-email-heiko@sntech.de>
-References: <1422721984-27782-1-git-send-email-heiko@sntech.de>
- <1422721984-27782-5-git-send-email-heiko@sntech.de>
-Message-ID: <11587309.c7unAcH6bR@avalon>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 26 Feb 2015 10:47:44 -0800
+Subject: [PATCH 2/2] qcom: scm: Add scm_set_warm_boot_addr function
+In-Reply-To: <1424904852-12719-3-git-send-email-lina.iyer@linaro.org> (Lina
+ Iyer's message of "Wed, 25 Feb 2015 15:54:12 -0700")
+References: <1424904852-12719-1-git-send-email-lina.iyer@linaro.org>
+ <1424904852-12719-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <7h7fv4bjcf.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Lina Iyer <lina.iyer@linaro.org> writes:
 
-Thank you for the patch.
+> A core can be powered down for cpuidle or when it is hotplugged of. 
 
-On Saturday 31 January 2015 17:32:57 Heiko Stuebner wrote:
-> From: Mark Yao <yzq@rock-chips.com>
-> 
-> Add binding documentation for Rockchip SoC LVDS driver.
-> 
-> Signed-off-by: Mark Yao <yzq@rock-chips.com>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+s/of/off/ ?
+
+> In
+> either case, the warmboot return address would be different. Allow
+> setting the warmboot address for a specific cpu, optimize and write to
+> the firmware if the address is different than the previously set
+> address.
+>
+> Also we do not need to export the warmboot flags. Move them into the
+> implementation file.
+>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 > ---
->  .../devicetree/bindings/video/rockchip-lvds.txt    | 59 +++++++++++++++++++
->  1 file changed, 59 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/video/rockchip-lvds.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/video/rockchip-lvds.txt
-> b/Documentation/devicetree/bindings/video/rockchip-lvds.txt new file mode
-> 100644
-> index 0000000..1616d7e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/rockchip-lvds.txt
-> @@ -0,0 +1,59 @@
-> +Rockchip RK3288 LVDS interface
-> +================================
+>  arch/arm/mach-qcom/scm-boot.c | 38 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-qcom/scm-boot.h |  7 +++----
+>  2 files changed, 41 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-qcom/scm-boot.c b/arch/arm/mach-qcom/scm-boot.c
+> index 45cee3e..cb73134 100644
+> --- a/arch/arm/mach-qcom/scm-boot.c
+> +++ b/arch/arm/mach-qcom/scm-boot.c
+> @@ -1,4 +1,5 @@
+>  /* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+> + * Copyright (c) 2014, Linaro Ltd.
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 and
+> @@ -21,6 +22,23 @@
+>  #include "scm.h"
+>  #include "scm-boot.h"
+>  
+> +#define SCM_FLAG_WARMBOOT_CPU0		0x04
+> +#define SCM_FLAG_WARMBOOT_CPU1		0x02
+> +#define SCM_FLAG_WARMBOOT_CPU2		0x10
+> +#define SCM_FLAG_WARMBOOT_CPU3		0x40
 > +
-> +Required properties:
-> +- compatible: "rockchip,rk3288-lvds";
+> +struct scm_warmboot {
+> +	int flag;
+> +	void *entry;
+> +};
 > +
-> +- reg: physical base address of the controller and length
-> +	of memory mapped region.
-> +- clocks: must include clock specifiers corresponding to entries in the
-> +	clock-names property.
-> +- clock-names: must contain "pclk_lvds"
+> +static struct scm_warmboot scm_flags[] = {
+> +	{ .flag = SCM_FLAG_WARMBOOT_CPU0 },
+> +	{ .flag = SCM_FLAG_WARMBOOT_CPU1 },
+> +	{ .flag = SCM_FLAG_WARMBOOT_CPU2 },
+> +	{ .flag = SCM_FLAG_WARMBOOT_CPU3 },
+> +};
 > +
-> +- avdd1v0-supply: regulator phandle for 1.0V analog power
-> +- avdd1v8-supply: regulator phandle for 1.8V analog power
-> +- avdd3v3-supply: regulator phandle for 3.3V analog power
+>  /*
+>   * Set the cold/warm boot address for one of the CPU cores.
+>   */
+> @@ -31,9 +49,29 @@ int scm_set_boot_addr(phys_addr_t addr, int flags)
+>  		phys_addr_t  addr;
+>  	} cmd;
+>  
+> +	might_sleep();
 > +
-> +- rockchip,grf: phandle to the general register files syscon
-> +- rockchip,panel: phandle to a panel node as described by
-> +	Documentation/devicetree/bindings/panel/*
 
-Doesn't this duplicate the information provided by the ports ?
+Unrelated change?
 
-> +- rockchip,data-mapping: should be "vesa" or "jeida",
-> +	This describes how the color bits are laid out in the
-> +	serialized LVDS signal.
-> +- rockchip,data-width : should be <18> or <24>;
-> +- rockchip,output: should be "rgb", "lvds" or "duallvds",
-> +	This describes the output face.
+Looking closer at scm_call(), looks like the might_sleep() should go
+inside scm_call() where it uses the mutex.
 
-Isn't all this panel-dependent ? Could we query the information from the panel 
-at runtime instead ?
-
-> +- ports: contain a port node with endpoint definitions as defined in
-> +	Documentation/devicetree/bindings/media/video-interfaces.txt.
+>  	cmd.addr = addr;
+>  	cmd.flags = flags;
+>  	return scm_call(SCM_SVC_BOOT, SCM_BOOT_ADDR,
+>  			&cmd, sizeof(cmd), NULL, 0);
+>  }
+>  EXPORT_SYMBOL(scm_set_boot_addr);
 > +
-> +Example:
-> +	lvds: lvds at ff96c000 {
-> +		compatible = "rockchip,rk3288-lvds";
-> +		rockchip,grf = <&grf>;
-> +		reg = <0xff96c000 0x4000>;
-> +		clocks = <&cru PCLK_LVDS_PHY>;
-> +		clock-names = "pclk_lvds";
-> +		avdd1v0-supply = <&vdd10_lcd>;
-> +		avdd1v8-supply = <&vcc18_lcd>;
-> +		avdd3v3-supply = <&vcca_33>;
-> +		rockchip,panel = <&panel>;
-> +		rockchip,data-mapping = "jeida";
-> +		rockchip,data-width = <24>;
-> +		rockchip,output = "rgb";
-> +		ports {
-> +			lvds_in: port {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				lvds_in_vopb: endpoint at 0 {
-> +					reg = <0>;
-> +					remote-endpoint = <&vopb_out_lvds>;
-> +				};
-> +				lvds_in_vopl: endpoint at 1 {
-> +					reg = <1>;
-> +					remote-endpoint = <&vopl_out_lvds>;
-> +				};
-> +			};
-> +		};
-> +	};
+> +int scm_set_warm_boot_addr(void *entry, int cpu)
+> +{
+> +	int ret;
+> +
+> +	/*
+> +	 * Reassign only if we are switching from hotplug entry point
+> +	 * to cpuidle entry point or vice versa.
+> +	 */
+> +	if (entry == scm_flags[cpu].entry)
+> +		return 0;
+> +
+> +	ret = scm_set_boot_addr(virt_to_phys(entry), scm_flags[cpu].flag);
+> +	if (!ret)
+> +		scm_flags[cpu].entry  = entry;
+> +
+> +	return ret;
+> +}
+> diff --git a/arch/arm/mach-qcom/scm-boot.h b/arch/arm/mach-qcom/scm-boot.h
+> index 02b445c..97dbf58 100644
+> --- a/arch/arm/mach-qcom/scm-boot.h
+> +++ b/arch/arm/mach-qcom/scm-boot.h
+> @@ -1,4 +1,5 @@
+>  /* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+> + * Copyright (c) 2014, Linaro Ltd.
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 and
+> @@ -9,6 +10,7 @@
+>   * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   * GNU General Public License for more details.
+>   */
+> +
+>  #ifndef __MACH_SCM_BOOT_H
+>  #define __MACH_SCM_BOOT_H
+>  
+> @@ -16,11 +18,8 @@
+>  #define SCM_FLAG_COLDBOOT_CPU1		0x01
+>  #define SCM_FLAG_COLDBOOT_CPU2		0x08
+>  #define SCM_FLAG_COLDBOOT_CPU3		0x20
+> -#define SCM_FLAG_WARMBOOT_CPU0		0x04
+> -#define SCM_FLAG_WARMBOOT_CPU1		0x02
+> -#define SCM_FLAG_WARMBOOT_CPU2		0x10
+> -#define SCM_FLAG_WARMBOOT_CPU3		0x40
 
--- 
-Regards,
+You just added these in patch 1, and now moved them.  I would just
+squash the 2 patches together.
 
-Laurent Pinchart
+Kevin
