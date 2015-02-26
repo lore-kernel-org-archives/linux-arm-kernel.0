@@ -1,92 +1,54 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 26 Feb 2015 12:34:26 -0500
-Subject: [PATCH v2] MAINTAINERS: Add dts entries for some of the Marvell
- SoCs
-In-Reply-To: <54EF57AF.7070000@free-electrons.com>
-References: <1423237058-25431-1-git-send-email-gregory.clement@free-electrons.com>
- <54EF57AF.7070000@free-electrons.com>
-Message-ID: <54EF5922.2040701@lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Feb 2015 17:42:06 +0000
+Subject: [PATCH] ARM: kexec: Relax SMP validation to improve DT
+ compatibility
+In-Reply-To: <1424947028-7438-1-git-send-email-geert+renesas@glider.be>
+References: <1424947028-7438-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20150226174206.GL8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gregory,
+On Thu, Feb 26, 2015 at 11:37:08AM +0100, Geert Uytterhoeven wrote:
+> When trying to kexec into a new kernel on a platform where multiple CPU
+> cores are present, but no SMP bringup code is available yet, the
+> kexec_load system call fails with:
+> 
+>     kexec_load failed: Invalid argument
+> 
+> The SMP test added to machine_kexec_prepare() in commit 2103f6cba61a8b8b
+> ("ARM: 7807/1: kexec: validate CPU hotplug support") wants to prohibit
+> kexec on SMP platforms where it cannot disable secondary CPUs.
+> However, this test is too strict: if the secondary CPUs couldn't be
+> enabled in the first place, there's no need to disable them later at
+> kexec time.  Hence skip the test in the absence of SMP bringup code.
 
-On 2/26/15 12:28 PM, Gregory CLEMENT wrote:
-> Hi all,
->
-> Who should take the following patch?
->
-> Should I apply it on the mvebu tree?
+Hmm.  I don't think we should relax it in this manner - I think there's
+an easier solution to this.
 
-No, this is a conflict-ridden file.  Please resend and include 
-'arm at kernel.org' to the recipients.  Then ask Arnd or Olof to pick it up 
-directly.
+> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+> index de2b085ad7535da7..8bf3b7c098881b95 100644
+> --- a/arch/arm/kernel/machine_kexec.c
+> +++ b/arch/arm/kernel/machine_kexec.c
+> @@ -46,7 +46,8 @@ int machine_kexec_prepare(struct kimage *image)
+>  	 * and implements CPU hotplug for the current HW. If not, we won't be
+>  	 * able to kexec reliably, so fail the prepare operation.
+>  	 */
+> -	if (num_possible_cpus() > 1 && !platform_can_cpu_hotplug())
+> +	if (num_possible_cpus() > 1 && platform_can_secondary_boot() &&
+> +	    !platform_can_cpu_hotplug())
 
-thx,
+	if (num_online_cpus() > 1 && !platform_can_cpu_hotplug())
 
-Jason.
+>  		return -EINVAL;
 
->
-> Thanks,
->
-> Gregory
->
->
-> On 06/02/2015 16:37, Gregory CLEMENT wrote:
->> Since many releases, the modifications of the mvebu and berlin device
->> tree files are merged through the mvebu subsystem. This patch makes it
->> official in order to help the contributors using the get_maintainer.pl
->> to find the accurate peoples.
->>
->> In the same time, updated the mvebu description which now includes the
->> kirkwood SoCs and new Armada SoCs.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> Acked-by: Jason Cooper <jason@lakedaemon.net>
->> Acked-by: Andrew Lunn <andrew@lunn.ch>
->> ---
->>   MAINTAINERS | 7 ++++++-
->>   1 file changed, 6 insertions(+), 1 deletion(-)
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 5d9db6b445bc..dba52f8597e2 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -1149,7 +1149,7 @@ ARM/MAGICIAN MACHINE SUPPORT
->>   M:	Philipp Zabel <philipp.zabel@gmail.com>
->>   S:	Maintained
->>
->> -ARM/Marvell Armada 370 and Armada XP SOC support
->> +ARM/Marvell Kirkwood and Armada 370, 375, 38x, XP SOC support
->>   M:	Jason Cooper <jason@lakedaemon.net>
->>   M:	Andrew Lunn <andrew@lunn.ch>
->>   M:	Gregory Clement <gregory.clement@free-electrons.com>
->> @@ -1158,12 +1158,15 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>   S:	Maintained
->>   F:	arch/arm/mach-mvebu/
->>   F:	drivers/rtc/armada38x-rtc
->> +F:	arch/arm/boot/dts/armada*
->> +F:	arch/arm/boot/dts/kirkwood*
->>
->>   ARM/Marvell Berlin SoC support
->>   M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>   L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>   S:	Maintained
->>   F:	arch/arm/mach-berlin/
->> +F:	arch/arm/boot/dts/berlin*
->>
->>   ARM/Marvell Dove/MV78xx0/Orion SOC support
->>   M:	Jason Cooper <jason@lakedaemon.net>
->> @@ -1175,6 +1178,8 @@ F:	arch/arm/mach-dove/
->>   F:	arch/arm/mach-mv78xx0/
->>   F:	arch/arm/mach-orion5x/
->>   F:	arch/arm/plat-orion/
->> +F:	arch/arm/boot/dts/dove*
->> +F:	arch/arm/boot/dts/orion5x*
->>
->>   ARM/Orion SoC/Technologic Systems TS-78xx platform support
->>   M:	Alexander Clouter <alex@digriz.org.uk>
->>
->
->
+Neither test is actually accurate though: when we have implementations
+where the secondary CPUs spin inside the kernel when they're "unplugged"
+that is not sufficient to be able to kexec.
+
+We should probably fix that, and make platform_can_cpu_hotplug() report
+whether it really is possible to hotplug all secondary CPUs into such
+a state that kexec can work.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
