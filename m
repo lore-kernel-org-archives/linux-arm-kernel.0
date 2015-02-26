@@ -1,72 +1,159 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 26 Feb 2015 12:48:00 +0000
-Subject: [PATCH] ARM: vexpress: update CONFIG_USB_ISP1760 option
-In-Reply-To: <CANLsYkx3B1PD_RTUPZBNASULOXXOXNnKScbt-JFpKyeWbOC_Yg@mail.gmail.com>
-References: <1424790150-8450-1-git-send-email-sudeep.holla@arm.com>	<CANLsYkySc5yDjozMRHB4V5qT_8B5W+swt5Gv--KvgQngiQAvCA@mail.gmail.com>	<54EC9611.2040403@arm.com>
- <CANLsYkx3B1PD_RTUPZBNASULOXXOXNnKScbt-JFpKyeWbOC_Yg@mail.gmail.com>
-Message-ID: <54EF1600.7000508@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 26 Feb 2015 13:52:50 +0100
+Subject: [PATCH 1/8] irqchip: armada-370-xp: Simplify interrupt map, mask
+ and unmask
+In-Reply-To: <20150226110919.GC29241@lukather>
+References: <1424945593-20320-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1424945593-20320-2-git-send-email-maxime.ripard@free-electrons.com>
+ <54EEF83C.40003@free-electrons.com> <20150226110919.GC29241@lukather>
+Message-ID: <54EF1722.8090201@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Maxime,
 
-On 24/02/15 17:10, Mathieu Poirier wrote:
-> On 24 February 2015 at 08:17, Sudeep Holla <sudeep.holla@arm.com> wrote:
+On 26/02/2015 12:09, Maxime Ripard wrote:
+> Hi Gregory,
+> 
+> On Thu, Feb 26, 2015 at 11:41:00AM +0100, Gregory CLEMENT wrote:
+>> Hi Maxime,
 >>
->>
->> On 24/02/15 15:08, Mathieu Poirier wrote:
+>> On 26/02/2015 11:13, Maxime Ripard wrote:
+>>> From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 >>>
->>> On 24 February 2015 at 08:02, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>>
->>>> Commt 7ef077a8ad35 ("usb: isp1760: Move driver from drivers/usb/host/
->>>> to drivers/usb/isp1760/") moved the isp1760 driver and changed the
->>>> Kconfig option. This makes CONFIG_USB_ISP1760_HCD not selectable
->>>> directly anymore. This results in driver being not compiled in when
->>>> using vexpress_defconfig and the USB is non-functional.
->>>>
->>>> This patch updates the CONFIG_USB_ISP1760_HCD to CONFIG_USB_ISP1760 to
->>>> get back USB functional on vexpress platforms.
->>>>
->>>> Cc: Liviu Dudau <liviu.dudau@arm.com>
->>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>>> ---
->>>>    arch/arm/configs/vexpress_defconfig | 2 +-
->>>>    1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm/configs/vexpress_defconfig
->>>> b/arch/arm/configs/vexpress_defconfig
->>>> index f489fdaa19b8..37fe607a4ede 100644
->>>> --- a/arch/arm/configs/vexpress_defconfig
->>>> +++ b/arch/arm/configs/vexpress_defconfig
->>>> @@ -118,8 +118,8 @@ CONFIG_HID_ZEROPLUS=y
->>>>    CONFIG_USB=y
->>>>    CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
->>>>    CONFIG_USB_MON=y
->>>> -CONFIG_USB_ISP1760_HCD=y
->>>>    CONFIG_USB_STORAGE=y
->>>> +CONFIG_USB_ISP1760=y
->>>>    CONFIG_MMC=y
->>>>    CONFIG_MMC_ARMMMCI=y
->>>>    CONFIG_NEW_LEDS=y
->>>> --
->>>> 1.9.1
+>>> The map, mask and unmask is unnecessarily complicated, with a different
+>>> implementation for shared and per CPU interrupts. The current code does
+>>> the following:
 >>>
+>>> At probe time, all interrupts are disabled and masked on all CPUs.
 >>>
->>> I tested this change and confirm that it does indeed re-activate USB
->>> functionality.
+>>> Shared interrupts:
+>>>
+>>>  * When the interrupt is mapped(), it gets disabled and unmasked on the
+>>>    calling CPU.
+>>>
+>>>  * When the interrupt is unmasked(), masked(), it gets enabled and
+>>>    disabled.
+>>>
+>>> Per CPU interrupts:
+>>>
+>>>  * When the interrupt is mapped, it gets masked on the calling CPU and
+>>>    enabled.
+>>>
+>>>  * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
+>>>    on the calling CPU.
+>>>
+>>> This commit simplifies this code, with a much simpler implementation, common
+>>> to shared and per CPU interrupts.
+>>>
+>>>  * When the interrupt is mapped, it's enabled.
+>>>
+>>>  * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
+>>>    on the calling CPU.
+>>>
+>>> Tested on a Armada XP SoC with SMP and UP configurations, with chained and
+>>> regular interrupts.
 >>
->>
->> Thanks indeed. So I assume we can add
->>
->> Tested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->
-> You sure can.
->
+>> This patch doesn't only simplify the driver it changes also its
+>> behavior and especially for the affinity.
+> 
+> The affinity itself is not changed by that patch. The default CPU the
+> interrupt handler is running on might, but as far as I know, there's
+> no guarantee on the affinity of an interrupt when irq_set_affinity has
+> not been called.
 
-This has to go as fix, without this USB is not enabled with
-vexpress_defconfig and breaks for people using rootfs on USB on vepress
-platform.
+Actually as soon as a driver do a request_irq the affinity is set in the
+__setup_irq function.
 
-Regards,
-Sudeep
+
+> 
+>> If a driver call irq_enable() then this functions will call
+>> irq_enable() and as we didn't implement a .enable() operation, it will
+>> call only our unmask() function.
+>>
+>> So if the IRQ was unmasked on a CPU and a driver call an irq_enable()
+>> from an other CPU then we will end up with the IRQ enabled on 2
+>> different CPUs. It is a problem for 2 reasons:
+> 
+> I guess you're talking about SPIs here, right?
+
+yes
+
+> 
+>> - the hardware don't handle a IRQ enable on more than one CPU
+> 
+> Oh. I would have expected one CPU to get a spurious interrupt, and the
+> other to handle the interrupt as expected.
+
+Unfortunately it is not the case and the behavior is unpredictable if an
+IRQ is set for more than one CPU.
+
+> 
+>> - it will modify the affinity at the hardware level because a new CPU
+>>   will be able to receive an IRQ whereas we setup the affinity on only
+>>   one CPU.
+> 
+> I'm not seure what you mean here.
+> 
+> The affinity is controlled by the INT_SOURCE_CTL register set, that is
+> left untouched by this patch.
+
+INT_SOURCE_CTL register and ARMADA_370_XP_INT_*_MASK_OFFS register are two
+way to access exactly the same value. So as you modify the use of the
+ARMADA_370_XP_INT_*_MASK_OFFS register you modify the affinity.
+
+With ARMADA_370_XP_INT_*_MASK_OFFS you have one register per CPU and you
+write the number of the IRQ you want to enable or disable for this CPU. Whereas
+you have one INT_SOURCE_CTL register per interrupt and there you write the CPU
+mask. But in the hardware you modify the same thing.
+
+In the case has an SPI the interrupt masks are controlled by two register, one
+at a global level and the other at the CPU level.
+
+CPU0--INT_*_MASK_OFFS--|
+                       |
+CPU1--INT_*_MASK_OFFS--|
+                       |---INT_*_ENABLE_OFFS----IRQ
+CPU2--INT_*_MASK_OFFS--|
+                       |
+CPU3--INT_*_MASK_OFFS--|
+
+So currently we only modify the INT_*_ENABLE_OFFS register for the irq_mask/unmask
+operation. And we only modify INT_*_MASK_OFFS(or INT_SOURCE_CTL as it modifies the
+same value) for the affinity.
+
+With this patch, the INT_*_ENABLE_OFFS is removed and INT_*_MASK_OFFS are modified
+in the same time for affinity and for irq_mask/unmask which could lead to some
+unexpected behaviors.
+
+For the PPI, there is no INT_*_ENABLE_OFFS register but for them we don't use
+affinity. That why the way to handle them is different from the SPI.
+
+By the way the current code in irq_mask/unmask is bogus, instead of
+if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
+we should have
+if (hwirq >  ARMADA_370_XP_MAX_PER_CPU_IRQS)
+
+
+Thanks,
+
+Gregory
+
+
+> 
+>> By only using the mask and unmask the affinity behavior is no more
+>> reliable. I agree that the current code is not trivial, but adding
+>> more comment instead of removing this capability should be better.
+> 
+> That can be done too. Especially using the second patch that makes it
+> a lot easier to extend the list of supported PPIs.
+> 
+> Maxime
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
