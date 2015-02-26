@@ -1,102 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 26 Feb 2015 15:29:06 +0000
-Subject: [RFC PATCH 2/3] arm64: make ID map shareable with EL2
-In-Reply-To: <1424964547-2118-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1424964547-2118-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1424964547-2118-3-git-send-email-ard.biesheuvel@linaro.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 26 Feb 2015 16:32:51 +0100
+Subject: [PATCH v5 1/6] mfd: fsl imx25 Touchscreen ADC driver
+In-Reply-To: <20150218120844.GC22296@x1>
+References: <1422108103-15052-1-git-send-email-mpa@pengutronix.de>
+ <1422108103-15052-2-git-send-email-mpa@pengutronix.de>
+ <20150216133829.GG14545@x1>
+ <CAOMZO5AwbNeEhVgUuLUi-_QT0DesPBBCTvvebuA91y-P2_CNzg@mail.gmail.com>
+ <20150218080156.GA5781@x1>
+ <CAOMZO5BjVrcb3t1=kQQYf=-PztzDpGk8S5ApsTThGekT1yTTnA@mail.gmail.com>
+ <20150218120844.GC22296@x1>
+Message-ID: <20150226153251.GD10070@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This changes the ID map creation in head.S so that it can be reused
-by KVM to ID map the HYP init code in EL2.
+On Wed, Feb 18, 2015 at 12:08:44PM +0000, Lee Jones wrote:
+> On Wed, 18 Feb 2015, Fabio Estevam wrote:
+> 
+> > On Wed, Feb 18, 2015 at 6:01 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > > On Tue, 17 Feb 2015, Fabio Estevam wrote:
+> > >
+> > >> On Mon, Feb 16, 2015 at 11:38 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > >>
+> > >> >> +static int mx25_tsadc_setup_irq(struct platform_device *pdev,
+> > >> >> +                             struct mx25_tsadc *tsadc)
+> > >> >> +{
+> > >> >> +     struct device *dev = &pdev->dev;
+> > >> >> +     struct device_node *np = dev->of_node;
+> > >> >> +     int irq;
+> > >> >> +
+> > >> >> +     irq = platform_get_irq(pdev, 0);
+> > >> >> +     if (irq < 0) {
+> > >> >
+> > >> > What if 0 is returned?
+> > >>
+> > >> Then  imx25.dtsi would be passing irq=0 for the ADC, which would be
+> > >> totally wrong.
+> > >
+> > > Exactly, so it should be <=.
+> > 
+> > imx25.dtsi passes interrupts = <46>; for the touch screen controller,
+> > so the irq number will never be zero.
+> 
+> It doesn't matter what happens to be passed at the moment.  The
+> correct thing to do is enforce correct/full error checking.  Yes <0 is
+> an error, but so is =0, so encompass it in the checks.
 
-Since the architecture defines the AP[1] bit as RES1 in page table entries
-used at EL2, we must ensure that the HYP init code is mapped with the AP[1]
-bit set. However, AP[1] means 'writable at EL0' when set at EL1, which
-automatically implies PXN == 1 (rendering the entire ID map non-executable)
-unless we also set AP[2], which means read-only at both EL0 and EL1.
+I now changed all irq < 0 checks to irq <= 0 under the assumption that
+irq 0 is always an error.
 
-To prevent having to make the entire ID map read-only, we split the ID map
-in two regions, and only set AP[2:1] == 0b11 for the first part, that covers
-the HYP .text section. Note that this also moves it to before _stext, which
-removes it from the runtime executable at EL1 region. This is a nice bonus,
-in fact, since this code should never be executable at EL1 anyway.
+Thanks,
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/head.S        | 22 ++++++++++++++++++----
- arch/arm64/kernel/vmlinux.lds.S |  2 +-
- 2 files changed, 19 insertions(+), 5 deletions(-)
+Markus
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index a3612eadab3c..0b3fb672640c 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -79,8 +79,10 @@
- 
- #ifdef CONFIG_ARM64_64K_PAGES
- #define MM_MMUFLAGS	PTE_ATTRINDX(MT_NORMAL) | PTE_FLAGS
-+#define MM_MMUFLAGS_HYP	MM_MMUFLAGS | PTE_HYP | PTE_RDONLY
- #else
- #define MM_MMUFLAGS	PMD_ATTRINDX(MT_NORMAL) | PMD_FLAGS
-+#define MM_MMUFLAGS_HYP	MM_MMUFLAGS | PMD_HYP | PMD_SECT_RDONLY
- #endif
- 
- /*
-@@ -379,8 +381,6 @@ __create_page_tables:
- 	cmp	x0, x6
- 	b.lo	1b
- 
--	ldr	x7, =MM_MMUFLAGS
--
- 	/*
- 	 * Create the identity mapping.
- 	 */
-@@ -426,9 +426,23 @@ __create_page_tables:
- #endif
- 
- 	create_pgd_entry x0, x3, x5, x6
--	ldr	x6, =KERNEL_END
-+
-+	/*
-+	 * Map the first region -which also contains the HYP text sections- with
-+	 * HYP compatible attributes, so that we can share the ID map with KVM.
-+	 */
-+	ldr	x7, =MM_MMUFLAGS_HYP
-+	adrp	x6, _stext			// __pa(_stext)
- 	mov	x5, x3				// __pa(KERNEL_START)
--	add	x6, x6, x28			// __pa(KERNEL_END)
-+	create_block_map x0, x7, x3, x5, x6
-+
-+	/*
-+	 * Map everything else with the default attributes.
-+	 */
-+	ldr	x7, =MM_MMUFLAGS
-+	adrp	x3, (_stext + BLOCK_SIZE - 1)	// next block after _stext
-+	adrp	x6, KERNEL_END
-+	mov	x5, x3
- 	create_block_map x0, x7, x3, x5, x6
- 
- 	/*
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 17383c257a7d..4874ebca4b3e 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -83,6 +83,7 @@ SECTIONS
- 	.head.text : {
- 		_text = .;
- 		HEAD_TEXT
-+		HYPERVISOR_TEXT
- 	}
- 	ALIGN_DEBUG_RO
- 	.text : {			/* Real text segment		*/
-@@ -94,7 +95,6 @@ SECTIONS
- 			TEXT_TEXT
- 			SCHED_TEXT
- 			LOCK_TEXT
--			HYPERVISOR_TEXT
- 			*(.fixup)
- 			*(.gnu.warning)
- 		. = ALIGN(16);
 -- 
-1.8.3.2
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150226/1944dc3f/attachment.sig>
