@@ -1,69 +1,32 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Thu, 26 Feb 2015 06:55:22 -0500
-Subject: [PATCH v3 3/3] of: support passing console options with
- stdout-path
-In-Reply-To: <1417110967-16284-4-git-send-email-leif.lindholm@linaro.org>
-References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
- <1417110967-16284-4-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <54EF09AA.2080706@hurleysoftware.com>
+From: ricard.wanderlof@axis.com (Ricard Wanderlof)
+Date: Thu, 26 Feb 2015 12:59:31 +0100
+Subject: [alsa-devel] [PATCH 1/8] clk: add helper function clk_is_match()
+In-Reply-To: <20150226112509.GR30445@trinity.fluff.org>
+References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+ <1424876018-17852-2-git-send-email-shawn.guo@linaro.org>
+ <20150225172757.421.43718@quantum> <20150226090256.GQ30445@trinity.fluff.org>
+ <1424944618.3073.6.camel@pengutronix.de>
+ <20150226112509.GR30445@trinity.fluff.org>
+Message-ID: <alpine.DEB.2.02.1502261259060.17631@lnxricardw1.se.axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2014 12:56 PM, Leif Lindholm wrote:
-> Support specifying console options (like with console=ttyXN,<options>)
-> by appending them to the stdout-path property after a separating ':'.
+
+On Thu, 26 Feb 2015, Ben Dooks wrote:
+
+> > > small observaton, clk_is_same() is linguistically nicer.
+> > 
+> > How about clk_equal() ?
 > 
-> Example:
->         stdout-path = "uart0:115200";
+> That's good, the only issue that's not clear in any of these names is
+> that does this mean "the same clock", a "clock of the same rate" or a
+> "clock that is equivalent to in the rate and phase but not subject to
+> the same gate".
 
-This format breaks DT earlycon because libfdt doesn't recognize ':' as a
-path terminator.
+clk_identical() ?
 
-It's simple enough to fix this directly in early_init_dt_scan_chosen_serial()
-but perhaps it would better to teach fdt_path_offset() to recognize ':'?
-
-Regards,
-Peter Hurley
-
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> ---
->  drivers/of/base.c |    9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 7f0e5f7..6d2d45e 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -37,6 +37,7 @@ EXPORT_SYMBOL(of_allnodes);
->  struct device_node *of_chosen;
->  struct device_node *of_aliases;
->  struct device_node *of_stdout;
-> +static const char *of_stdout_options;
->  
->  struct kset *of_kset;
->  
-> @@ -1844,7 +1845,7 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
->  		if (IS_ENABLED(CONFIG_PPC) && !name)
->  			name = of_get_property(of_aliases, "stdout", NULL);
->  		if (name)
-> -			of_stdout = of_find_node_by_path(name);
-> +			of_stdout = of_find_node_opts_by_path(name, &of_stdout_options);
->  	}
->  
->  	if (!of_aliases)
-> @@ -1968,9 +1969,13 @@ EXPORT_SYMBOL_GPL(of_prop_next_string);
->   */
->  bool of_console_check(struct device_node *dn, char *name, int index)
->  {
-> +	char *console_options;
-> +
->  	if (!dn || dn != of_stdout || console_set_on_cmdline)
->  		return false;
-> -	return !add_preferred_console(name, index, NULL);
-> +
-> +	console_options = kstrdup(of_stdout_options, GFP_KERNEL);
-> +	return !add_preferred_console(name, index, console_options);
->  }
->  EXPORT_SYMBOL_GPL(of_console_check);
->  
-> 
+/Ricard
+-- 
+Ricard Wolf Wanderl?f                           ricardw(at)axis.com
+Axis Communications AB, Lund, Sweden            www.axis.com
+Phone +46 46 272 2016                           Fax +46 46 13 61 30
