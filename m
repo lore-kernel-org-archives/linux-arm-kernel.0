@@ -1,143 +1,114 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 26 Feb 2015 11:41:00 +0100
-Subject: [PATCH 1/8] irqchip: armada-370-xp: Simplify interrupt map, mask
- and unmask
-In-Reply-To: <1424945593-20320-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1424945593-20320-1-git-send-email-maxime.ripard@free-electrons.com>
- <1424945593-20320-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <54EEF83C.40003@free-electrons.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 26 Feb 2015 11:43:19 +0100
+Subject: [PATCH] pinctrl: dt: at91: new binding
+In-Reply-To: <1424943294-8805-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1424943294-8805-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20150226104319.GE20718@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi Jean-Christophe,
 
-On 26/02/2015 11:13, Maxime Ripard wrote:
-> From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> 
-> The map, mask and unmask is unnecessarily complicated, with a different
-> implementation for shared and per CPU interrupts. The current code does
-> the following:
-> 
-> At probe time, all interrupts are disabled and masked on all CPUs.
-> 
-> Shared interrupts:
-> 
->  * When the interrupt is mapped(), it gets disabled and unmasked on the
->    calling CPU.
-> 
->  * When the interrupt is unmasked(), masked(), it gets enabled and
->    disabled.
-> 
-> Per CPU interrupts:
-> 
->  * When the interrupt is mapped, it gets masked on the calling CPU and
->    enabled.
-> 
->  * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
->    on the calling CPU.
-> 
-> This commit simplifies this code, with a much simpler implementation, common
-> to shared and per CPU interrupts.
-> 
->  * When the interrupt is mapped, it's enabled.
-> 
->  * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
->    on the calling CPU.
-> 
-> Tested on a Armada XP SoC with SMP and UP configurations, with chained and
-> regular interrupts.
+On Thu, Feb 26, 2015 at 10:34:54AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> Today if we want to disable a pio bank we may will siliently break pinctrl
+> configuration in the DT. This will be detected only at runtime.
 
-This patch doesn't only simplify the driver it changes also its
-behavior and especially for the affinity.
-
-If a driver call irq_enable() then this functions will call
-irq_enable() and as we didn't implement a .enable() operation, it will
-call only our unmask() function.
-
-So if the IRQ was unmasked on a CPU and a driver call an irq_enable()
-from an other CPU then we will end up with the IRQ enabled on 2
-different CPUs. It is a problem for 2 reasons:
-- the hardware don't handle a IRQ enable on more than one CPU
-- it will modify the affinity at the hardware level because a new CPU
-  will be able to receive an IRQ whereas we setup the affinity on only
-  one CPU.
-
-By only using the mask and unmask the affinity behavior is no more
-reliable. I agree that the current code is not trivial, but adding
-more comment instead of removing this capability should be better.
-
-
-Thanks,
-
-Gregory
+Do you have a case where it breaks pinctrl? I can do more tests but with
+the latest patch "pinctrl: at91: allow to have disabled gpio bank", I
+had no issue.
 
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> So move the pinctrl configuration to the bank instead of the bus.
+> This allow to detect pinctrl issue at DT compiling time when disable a bank.
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: devicetree at vger.kernel.org
 > ---
->  drivers/irqchip/irq-armada-370-xp.c | 27 ++++-----------------------
->  1 file changed, 4 insertions(+), 23 deletions(-)
+>  .../bindings/pinctrl/atmel,at91-pinctrl.txt        | 66 ++++++++++++++++++++++
+>  1 file changed, 66 insertions(+)
 > 
-> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-> index 137ee37a33ed..1caa8b579fdd 100644
-> --- a/drivers/irqchip/irq-armada-370-xp.c
-> +++ b/drivers/irqchip/irq-armada-370-xp.c
-> @@ -77,33 +77,18 @@ static DEFINE_MUTEX(msi_used_lock);
->  static phys_addr_t msi_doorbell_addr;
->  #endif
->  
-> -/*
-> - * In SMP mode:
-> - * For shared global interrupts, mask/unmask global enable bit
-> - * For CPU interrupts, mask/unmask the calling CPU's bit
-> - */
->  static void armada_370_xp_irq_mask(struct irq_data *d)
->  {
->  	irq_hw_number_t hwirq = irqd_to_hwirq(d);
->  
-> -	if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
-> -		writel(hwirq, main_int_base +
-> -				ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS);
-> -	else
-> -		writel(hwirq, per_cpu_int_base +
-> -				ARMADA_370_XP_INT_SET_MASK_OFFS);
-> +	writel(hwirq, per_cpu_int_base + ARMADA_370_XP_INT_SET_MASK_OFFS);
->  }
->  
->  static void armada_370_xp_irq_unmask(struct irq_data *d)
->  {
->  	irq_hw_number_t hwirq = irqd_to_hwirq(d);
->  
-> -	if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
-> -		writel(hwirq, main_int_base +
-> -				ARMADA_370_XP_INT_SET_ENABLE_OFFS);
-> -	else
-> -		writel(hwirq, per_cpu_int_base +
-> -				ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-> +	writel(hwirq, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
->  }
->  
->  #ifdef CONFIG_PCI_MSI
-> @@ -286,12 +271,8 @@ static struct irq_chip armada_370_xp_irq_chip = {
->  static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
->  				      unsigned int virq, irq_hw_number_t hw)
->  {
-> -	armada_370_xp_irq_mask(irq_get_irq_data(virq));
-> -	if (hw != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
-> -		writel(hw, per_cpu_int_base +
-> -			ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-> -	else
-> -		writel(hw, main_int_base + ARMADA_370_XP_INT_SET_ENABLE_OFFS);
-> +	writel(hw, main_int_base + ARMADA_370_XP_INT_SET_ENABLE_OFFS);
+> diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+> index b7a93e8..78355ee 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+> @@ -148,3 +148,69 @@ dbgu: serial at fffff200 {
+>  	pinctrl-0 = <&pinctrl_dbgu>;
+>  	status = "disabled";
+>  };
 > +
->  	irq_set_status_flags(virq, IRQ_LEVEL);
->  
->  	if (hw == ARMADA_370_XP_TIMER0_PER_CPU_IRQ) {
-> 
+> +II) New Bindings per PIO Block
+> +
+> +This allow to detect pinctrl issue at DT compiling time when disable a bank
+> +
+> +Required properties for iomux controller:
+> +- compatible: "atmel,at91rm9200-pio-pinctrl" or "atmel,at91sam9x5-pio-pinctrl"
+> +		or "atmel,sama5d3-pio-pinctrl"
+> +- atmel,mux-mask: array of mask (periph per bank) to describe if a pin can be
+> +  configured in this periph mode. All the periph and bank need to be describe.
+> +
+> +How to create such array:
+> +
+> +Each column will represent the possible peripheral of the pinctrl for the bank
+> +
+> +Take an example on the 9260
+> +Peripheral: 2 ( A and B)
+> +=>
+> +
+> +  /*    A         B     */
+> +  0xffffffff 0xffc00c3b  /* pioA */
+> +
+> +For each peripheral/bank we will descibe in a u32 if a pin can be
+> +configured in it by putting 1 to the pin bit (1 << pin)
+> +
+> +Required properties for pin configuration node:
+> +- atmel,pins: 3 integers array, represents a group of pins mux and config
+> +  setting. The format is atmel,pins = <PIN_NUM PERIPH CONFIG>.
+> +  The PERIPH 0 means gpio, PERIPH 1 is periph A, PERIPH 2 is periph B...
+> +
+> +Bits used for CONFIG:
+> +cf atmel,at91-pinctrl
+> +
+> +pioB: gpio at fffff600 {
+> +	compatible = "atmel,at91rm9200-gpio", "atmel,at91rm9200-pio-pinctrl";
+> +	reg = <0xfffff600 0x200>;
+> +	interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
+> +	#gpio-cells = <2>;
+> +	gpio-controller;
+> +	interrupt-controller;
+> +	#interrupt-cells = <2>;
+> +	clocks = <&pioB_clk>;
+> +
+> +			 /*    A         B     */
+> +	atmel,mux-mask = <0xffffffff 0x7fff3ccf>;
+> +
+> +	dbgu {
+> +		pinctrl_dbgu: dbgu-0 {
+> +			atmel,pins =
+> +				<14 0x1 0x0	/* PB14 periph A */
+> +				 15 0x1 0x1>;	/* PB15 periph A with pullup */
+> +		};
+> +	};
+
+So we have to update all device tree files, that's a lot of work...
+Moreover it adds complexity if we have a device using pins from
+different pio controllers.
+
+> +};
+> +
+> +dbgu: serial at fffff200 {
+> +	compatible = "atmel,at91sam9260-usart";
+> +	reg = <0xfffff200 0x200>;
+> +	interrupts = <1 4 7>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_dbgu>;
+> +	status = "disabled";
+> +};
+> +
+> +if you have to use multiple bank
+> +	pinctrl-0 = <&pinctrl_ip_piaa>, <&pinctrl_ip_piab>;
+
+You mean pio I think.
 
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Ludovic
