@@ -1,128 +1,63 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 26 Feb 2015 16:12:05 +0800
-Subject: [PATCH v4 11/30] PCI: Save sysdata in pci_host_bridge drvdata
+Date: Thu, 26 Feb 2015 16:12:10 +0800
+Subject: [PATCH v4 16/30] PCI/IA64: Fix the build warning about pci_domain_nr()
 In-Reply-To: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
 References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1424938344-4017-12-git-send-email-wangyijing@huawei.com>
+Message-ID: <1424938344-4017-17-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save platform specific sysdata in pci_host_bridge
-drvdata, host bridge specific operation need to
-access it before the pci bus creation.
+Should pass pci_bus * instead of pci_dev * to pci_domain_nr().
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Tony Luck <tony.luck@intel.com>
+CC: Fenghua Yu <fenghua.yu@intel.com>
+CC: linux-ia64 at vger.kernel.org
 ---
- drivers/pci/host-bridge.c |    4 +++-
- drivers/pci/probe.c       |   18 ++++++++----------
- include/linux/pci.h       |    3 ++-
- 3 files changed, 13 insertions(+), 12 deletions(-)
+ arch/ia64/sn/kernel/io_acpi_init.c |    6 +++---
+ arch/ia64/sn/kernel/io_init.c      |    2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-index 5039b3b..b42a4bb 100644
---- a/drivers/pci/host-bridge.c
-+++ b/drivers/pci/host-bridge.c
-@@ -23,7 +23,8 @@ static void pci_release_host_bridge_dev(struct device *dev)
- }
+diff --git a/arch/ia64/sn/kernel/io_acpi_init.c b/arch/ia64/sn/kernel/io_acpi_init.c
+index 0640739..2fd7414 100644
+--- a/arch/ia64/sn/kernel/io_acpi_init.c
++++ b/arch/ia64/sn/kernel/io_acpi_init.c
+@@ -364,12 +364,12 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
+         status = acpi_evaluate_integer(rootbus_handle, METHOD_NAME__SEG, NULL,
+                                        &segment);
+         if (ACPI_SUCCESS(status)) {
+-		if (segment != pci_domain_nr(dev)) {
++		if (segment != pci_domain_nr(dev->bus)) {
+ 			acpi_get_name(rootbus_handle, ACPI_FULL_PATHNAME,
+ 				&name_buffer);
+ 			printk(KERN_ERR
+ 			       "%s: Segment number mismatch, 0x%llx vs 0x%x for: %s\n",
+-			       __func__, segment, pci_domain_nr(dev),
++			       __func__, segment, pci_domain_nr(dev->bus),
+ 			       (char *)name_buffer.pointer);
+ 			kfree(name_buffer.pointer);
+ 			return 1;
+@@ -407,7 +407,7 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
+ 	/* Build up the pcidev_info.pdi_slot_host_handle */
+ 	host_devfn = get_host_devfn(pcidev_match.handle, rootbus_handle);
+ 	(*pcidev_info)->pdi_slot_host_handle =
+-			((unsigned long) pci_domain_nr(dev) << 40) |
++			((unsigned long) pci_domain_nr(dev->bus) << 40) |
+ 					/* bus == 0 */
+ 					host_devfn;
+ 	return 0;
+diff --git a/arch/ia64/sn/kernel/io_init.c b/arch/ia64/sn/kernel/io_init.c
+index bcdc5b8..a97fad4 100644
+--- a/arch/ia64/sn/kernel/io_init.c
++++ b/arch/ia64/sn/kernel/io_init.c
+@@ -164,7 +164,7 @@ sn_io_slot_fixup(struct pci_dev *dev)
+ 		panic("%s: Unable to alloc memory for sn_irq_info", __func__);
  
- struct pci_host_bridge *pci_create_host_bridge(
--		struct device *parent, u32 db, struct list_head *resources)
-+		struct device *parent, u32 db, 
-+		struct list_head *resources, void *sysdata)
- {
- 	int error;
- 	int bus = PCI_BUSNUM(db);
-@@ -58,6 +59,7 @@ struct pci_host_bridge *pci_create_host_bridge(
- 	host->dev.parent = parent;
- 	INIT_LIST_HEAD(&host->windows);
- 	host->dev.release = pci_release_host_bridge_dev;
-+	dev_set_drvdata(&host->dev, sysdata);
- 	dev_set_name(&host->dev, "pci%04x:%02x", host->domain, 
- 			host->busnum);
- 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index ec4f99d..45056cb 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1865,8 +1865,7 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
- }
- 
- static struct pci_bus *__pci_create_root_bus(
--		struct pci_host_bridge *bridge, struct pci_ops *ops,
--		void *sysdata)
-+		struct pci_host_bridge *bridge, struct pci_ops *ops)
- {
- 	int error;
- 	struct pci_bus *b;
-@@ -1882,7 +1881,7 @@ static struct pci_bus *__pci_create_root_bus(
- 	if (!b)
- 		return NULL;
- 
--	b->sysdata = sysdata;
-+	b->sysdata = dev_get_drvdata(&bridge->dev);
- 	b->ops = ops;
- 	b->number = b->busn_res.start = bridge->busnum;
- 	pci_bus_assign_domain_nr(b, parent);
-@@ -1954,11 +1953,11 @@ struct pci_bus *pci_create_root_bus(struct device *parent, u32 db,
- {
- 	struct pci_host_bridge *host;
- 
--	host = pci_create_host_bridge(parent, db, resources);
-+	host = pci_create_host_bridge(parent, db, resources, sysdata);
- 	if (!host)
- 		return NULL;
- 	
--	return __pci_create_root_bus(host, ops, sysdata);
-+	return __pci_create_root_bus(host, ops);
- }
- 
- int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
-@@ -2025,8 +2024,7 @@ void pci_bus_release_busn_res(struct pci_bus *b)
- }
- 
- static struct pci_bus *__pci_scan_root_bus(
--		struct pci_host_bridge *host, struct pci_ops *ops,
--		void *sysdata)
-+		struct pci_host_bridge *host, struct pci_ops *ops)
- {
- 	struct resource_entry *window;
- 	bool found = false;
-@@ -2039,7 +2037,7 @@ static struct pci_bus *__pci_scan_root_bus(
- 			break;
- 		}
- 
--	b = __pci_create_root_bus(host, ops, sysdata);
-+	b = __pci_create_root_bus(host, ops);
- 	if (!b) {
- 		pci_free_host_bridge(host);
- 		return NULL;
-@@ -2065,11 +2063,11 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
- {
- 	struct pci_host_bridge *host;
- 
--	host = pci_create_host_bridge(parent, db, resources);
-+	host = pci_create_host_bridge(parent, db, resources, sysdata);
- 	if (!host)
- 		return NULL;
- 
--	return __pci_scan_root_bus(host, ops, sysdata);
-+	return __pci_scan_root_bus(host, ops);
- }
- EXPORT_SYMBOL(pci_scan_root_bus);
- 
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 4d11228..74e038d 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -418,7 +418,8 @@ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
- 
- int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge);
- struct pci_host_bridge *pci_create_host_bridge(
--		struct device *parent, u32 dombus, struct list_head *resources);
-+		struct device *parent, u32 dombus, 
-+		struct list_head *resources, void *sysdata);
- /*
-  * The first PCI_BRIDGE_RESOURCE_NUM PCI bus resources (those that correspond
-  * to P2P or CardBus bridge windows) go in a table.  Additional ones (for
+ 	/* Call to retrieve pci device information needed by kernel. */
+-	status = sal_get_pcidev_info((u64) pci_domain_nr(dev),
++	status = sal_get_pcidev_info((u64) pci_domain_nr(dev->bus),
+ 		(u64) dev->bus->number,
+ 		dev->devfn,
+ 		(u64) __pa(pcidev_info),
 -- 
 1.7.1
