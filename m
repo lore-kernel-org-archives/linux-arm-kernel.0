@@ -1,84 +1,44 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 26 Feb 2015 16:12:14 +0800
-Subject: [PATCH v4 20/30] PCI/sparc: Use pci_scan_root_bridge() for simplicity
+Date: Thu, 26 Feb 2015 16:12:22 +0800
+Subject: [PATCH v4 28/30] PCI: Export find_pci_host_bridge()
 In-Reply-To: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
 References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1424938344-4017-21-git-send-email-wangyijing@huawei.com>
+Message-ID: <1424938344-4017-29-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we could use pci_scan_root_bridge() to scan
-pci buses, provide sparc specific pci_host_bridge_ops.
+Export find_pci_host_bridge().
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: "David S. Miller" <davem@davemloft.net>
-CC: sparclinux at vger.kernel.org
 ---
- arch/sparc/kernel/pci.c |   32 ++++++++++++++++++++++----------
- 1 files changed, 22 insertions(+), 10 deletions(-)
+ drivers/pci/host-bridge.c |    2 +-
+ include/linux/pci.h       |    1 +
+ 2 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/sparc/kernel/pci.c b/arch/sparc/kernel/pci.c
-index 0af7c58..03e7376 100644
---- a/arch/sparc/kernel/pci.c
-+++ b/arch/sparc/kernel/pci.c
-@@ -650,12 +650,25 @@ static void pci_claim_bus_resources(struct pci_bus *bus)
- 		pci_claim_bus_resources(child_bus);
+diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+index 4a2baa2..51e24f8 100644
+--- a/drivers/pci/host-bridge.c
++++ b/drivers/pci/host-bridge.c
+@@ -104,7 +104,7 @@ static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
+ 	return bus;
  }
  
-+static void pci_host_bridge_of_scan_bus(
-+		struct pci_host_bridge *host)
-+{
-+	struct pci_pbm_info *pbm = dev_get_drvdata(&host->dev);
-+	struct device_node *node = pbm->op->dev.of_node;
-+
-+	pci_of_scan_bus(pbm, node, host->bus);
-+}
-+
-+static struct pci_host_bridge_ops phb_ops = {
-+	.phb_of_scan_bus = pci_host_bridge_of_scan_bus,
-+};
-+
- struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
- 				 struct device *parent)
+-static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
++struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
  {
- 	LIST_HEAD(resources);
- 	struct device_node *node = pbm->op->dev.of_node;
--	struct pci_bus *bus;
-+	struct pci_host_bridge *host;
+ 	struct pci_bus *root_bus = find_pci_root_bus(bus);
  
- 	printk("PCI: Scanning PBM %s\n", node->full_name);
- 
-@@ -667,23 +680,22 @@ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
- 	pbm->busn.end	= pbm->pci_last_busno;
- 	pbm->busn.flags	= IORESOURCE_BUS;
- 	pci_add_resource(&resources, &pbm->busn);
--	bus = pci_create_root_bus(parent, 
-+	host = pci_scan_root_bridge(parent, 
- 			PCI_DOMBUS(pbm->index, pbm->pci_first_busno), 
--			pbm->pci_ops, pbm, &resources);
--	if (!bus) {
--		printk(KERN_ERR "Failed to create bus for %s\n",
-+			pbm->pci_ops, pbm, &resources, &phb_ops);
-+	if (!host) {
-+		printk(KERN_ERR "Failed to create host bridge for %s\n",
- 		       node->full_name);
- 		pci_free_resource_list(&resources);
- 		return NULL;
- 	}
- 
--	pci_of_scan_bus(pbm, node, bus);
--	pci_bus_add_devices(bus);
--	pci_bus_register_of_sysfs(bus);
-+	pci_bus_add_devices(host->bus);
-+	pci_bus_register_of_sysfs(host->bus);
- 
--	pci_claim_bus_resources(bus);
-+	pci_claim_bus_resources(host->bus);
- 
--	return bus;
-+	return host->bus;
- }
- 
- void pcibios_fixup_bus(struct pci_bus *pbus)
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 2f29e95..6ac7926 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -426,6 +426,7 @@ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+ struct pci_host_bridge *pci_create_host_bridge(
+ 		struct device *parent, u32 dombus, struct list_head *resources, 
+ 		void *sysdata, struct pci_host_bridge_ops *ops);
++struct pci_host_bridge *find_pci_host_bridge(struct pci_bus* bus);
+ /*
+  * The first PCI_BRIDGE_RESOURCE_NUM PCI bus resources (those that correspond
+  * to P2P or CardBus bridge windows) go in a table.  Additional ones (for
 -- 
 1.7.1
