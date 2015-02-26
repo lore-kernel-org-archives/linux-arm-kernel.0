@@ -1,93 +1,108 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 26 Feb 2015 10:55:27 +0100
-Subject: [PATCH] irqchip: armada: Fix chained per-cpu interrupts
-Message-ID: <1424944527-16850-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu, 26 Feb 2015 11:13:06 +0100
+Subject: [PATCH 1/8] irqchip: armada-370-xp: Simplify interrupt map,
+ mask and unmask
+In-Reply-To: <1424945593-20320-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1424945593-20320-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1424945593-20320-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the Cortex-A9-based Armada SoCs, the MPIC is not the primary interrupt
-controller. Yet, it still has to handle some per-cpu interrupt.
+From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-To do so, it is chained with the GIC using a per-cpu interrupt. However, the
-current code only call irq_set_chained_handler, which is called and enable that
-interrupt only on the boot CPU, which means that the parent per-CPU interrupt
-is never unmasked on the secondary CPUs, preventing the per-CPU interrupt to
-actually work as expected.
+The map, mask and unmask is unnecessarily complicated, with a different
+implementation for shared and per CPU interrupts. The current code does
+the following:
 
-This was not seen until now since the only MPIC PPI users were the Marvell
-timers that were not working, but not used either since the system use the ARM
-TWD by default, and the ethernet controllers, that are faking there interrupts
-as SPI, and don't really expect to have interrupts on the secondary cores
-anyway.
+At probe time, all interrupts are disabled and masked on all CPUs.
 
-Add a CPU notifier that will enable the PPI on the secondary cores when they
-are brought up.
+Shared interrupts:
 
-Cc: <stable@kernel.org> # 3.15+
+ * When the interrupt is mapped(), it gets disabled and unmasked on the
+   calling CPU.
+
+ * When the interrupt is unmasked(), masked(), it gets enabled and
+   disabled.
+
+Per CPU interrupts:
+
+ * When the interrupt is mapped, it gets masked on the calling CPU and
+   enabled.
+
+ * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
+   on the calling CPU.
+
+This commit simplifies this code, with a much simpler implementation, common
+to shared and per CPU interrupts.
+
+ * When the interrupt is mapped, it's enabled.
+
+ * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
+   on the calling CPU.
+
+Tested on a Armada XP SoC with SMP and UP configurations, with chained and
+regular interrupts.
+
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/irqchip/irq-armada-370-xp.c | 21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
+ drivers/irqchip/irq-armada-370-xp.c | 27 ++++-----------------------
+ 1 file changed, 4 insertions(+), 23 deletions(-)
 
 diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 463c235acbdc..137ee37a33ed 100644
+index 137ee37a33ed..1caa8b579fdd 100644
 --- a/drivers/irqchip/irq-armada-370-xp.c
 +++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -69,6 +69,7 @@ static void __iomem *per_cpu_int_base;
- static void __iomem *main_int_base;
- static struct irq_domain *armada_370_xp_mpic_domain;
- static u32 doorbell_mask_reg;
-+static int parent_irq;
- #ifdef CONFIG_PCI_MSI
- static struct irq_domain *armada_370_xp_msi_domain;
- static DECLARE_BITMAP(msi_used, PCI_MSI_DOORBELL_NR);
-@@ -356,6 +357,7 @@ static int armada_xp_mpic_secondary_init(struct notifier_block *nfb,
+@@ -77,33 +77,18 @@ static DEFINE_MUTEX(msi_used_lock);
+ static phys_addr_t msi_doorbell_addr;
+ #endif
+ 
+-/*
+- * In SMP mode:
+- * For shared global interrupts, mask/unmask global enable bit
+- * For CPU interrupts, mask/unmask the calling CPU's bit
+- */
+ static void armada_370_xp_irq_mask(struct irq_data *d)
  {
- 	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
- 		armada_xp_mpic_smp_cpu_init();
-+
- 	return NOTIFY_OK;
+ 	irq_hw_number_t hwirq = irqd_to_hwirq(d);
+ 
+-	if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
+-		writel(hwirq, main_int_base +
+-				ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS);
+-	else
+-		writel(hwirq, per_cpu_int_base +
+-				ARMADA_370_XP_INT_SET_MASK_OFFS);
++	writel(hwirq, per_cpu_int_base + ARMADA_370_XP_INT_SET_MASK_OFFS);
  }
  
-@@ -364,6 +366,20 @@ static struct notifier_block armada_370_xp_mpic_cpu_notifier = {
- 	.priority = 100,
- };
- 
-+static int armada_38x_mpic_secondary_init(struct notifier_block *nfb,
-+					 unsigned long action, void *hcpu)
-+{
-+	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
-+		enable_percpu_irq(parent_irq, IRQ_TYPE_NONE);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block armada_38x_mpic_cpu_notifier = {
-+	.notifier_call = armada_38x_mpic_secondary_init,
-+	.priority = 100,
-+};
-+
- #endif /* CONFIG_SMP */
- 
- static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
-@@ -539,7 +555,7 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 					     struct device_node *parent)
+ static void armada_370_xp_irq_unmask(struct irq_data *d)
  {
- 	struct resource main_int_res, per_cpu_int_res;
--	int parent_irq, nr_irqs, i;
-+	int nr_irqs, i;
- 	u32 control;
+ 	irq_hw_number_t hwirq = irqd_to_hwirq(d);
  
- 	BUG_ON(of_address_to_resource(node, 0, &main_int_res));
-@@ -587,6 +603,9 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 		register_cpu_notifier(&armada_370_xp_mpic_cpu_notifier);
- #endif
- 	} else {
-+#ifdef CONFIG_SMP
-+		register_cpu_notifier(&armada_38x_mpic_cpu_notifier);
-+#endif
- 		irq_set_chained_handler(parent_irq,
- 					armada_370_xp_mpic_handle_cascade_irq);
- 	}
+-	if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
+-		writel(hwirq, main_int_base +
+-				ARMADA_370_XP_INT_SET_ENABLE_OFFS);
+-	else
+-		writel(hwirq, per_cpu_int_base +
+-				ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
++	writel(hwirq, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
+ }
+ 
+ #ifdef CONFIG_PCI_MSI
+@@ -286,12 +271,8 @@ static struct irq_chip armada_370_xp_irq_chip = {
+ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
+ 				      unsigned int virq, irq_hw_number_t hw)
+ {
+-	armada_370_xp_irq_mask(irq_get_irq_data(virq));
+-	if (hw != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
+-		writel(hw, per_cpu_int_base +
+-			ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
+-	else
+-		writel(hw, main_int_base + ARMADA_370_XP_INT_SET_ENABLE_OFFS);
++	writel(hw, main_int_base + ARMADA_370_XP_INT_SET_ENABLE_OFFS);
++
+ 	irq_set_status_flags(virq, IRQ_LEVEL);
+ 
+ 	if (hw == ARMADA_370_XP_TIMER0_PER_CPU_IRQ) {
 -- 
 2.3.0
