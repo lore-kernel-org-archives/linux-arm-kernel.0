@@ -1,38 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 26 Feb 2015 13:01:27 -0700
-Subject: [PATCH 0/8] Add proper support for Compulab CM-A510/SBC-A510
-In-Reply-To: <54EF7684.80409@gmail.com>
-References: <1424199129-22099-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <54EF5E17.1070005@free-electrons.com> <54EF7684.80409@gmail.com>
-Message-ID: <54EF7B97.4060602@wwwdotorg.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 26 Feb 2015 12:11:41 -0800
+Subject: [PATCH 01/12] ARM: dts: apq8064: add RPM regulators support
+In-Reply-To: <54EF7D74.7060906@linaro.org>
+References: <424678035-12862-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1424678093-12966-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <54EF748B.3090404@codeaurora.org> <54EF7D74.7060906@linaro.org>
+Message-ID: <54EF7DFD.9020609@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2015 12:39 PM, Sebastian Hesselbarth wrote:
-> On 26.02.2015 18:55, Gregory CLEMENT wrote:
->> On 17/02/2015 19:52, Sebastian Hesselbarth wrote:
->>> This patch set improves current mainline support for the Compulab
->>> CM-A510 System-on-Module (SoM) and its default Compulab SBC-A510
->>> base board. Thanks to Gabriel Dobato who agreed to remote debug and
->>> test the provided DT changes.
-> [...]
->>> Sebastian Hesselbarth (8):
->>>    i2c: mux-pinctrl: Rework to honor disabled child nodes
->>>    devicetree: vendor-prefixes: Add CompuLab to known vendors
->>>    ARM: dts: dove: Fix uart[23] reg property
->>>    ARM: dts: dove: Always include gpio and interrupt-controller headers
->>>    ARM: dts: dove: Add node labels for PCIe ports 0 and 1
->>>    ARM: dts: dove: Add some more common pinctrl settings
->>>    ARM: dts: dove: Add internal i2c multiplexer node
->>>    ARM: dts: dove: Add proper support for Compulab CM-A510/SBC-A510
->>
->> Patches 3 to 6 applied on mvebu/dt
->>
->> If I understood well patches 7 and 8 depend on patch 1 which had not been
->> taken yet.
+On 02/26/15 12:09, Srinivas Kandagatla wrote:
 >
-> Correct. Once I get a Tested-by from Stephen, I'll resend the 4
-> remaining patches.
+>
+> On 26/02/15 19:31, Stephen Boyd wrote:
+>> On 02/22/15 23:54, Srinivas Kandagatla wrote:
+>>> +            pm8921_s5: pm8921-s5 {
+>>> +                compatible    = "qcom,rpm-pm8921-ftsmps";
+>>> +                reg        = <QCOM_RPM_PM8921_SMPS5>;
+>>> +            };
+>>> +
+>>> +            pm8921_s6: pm8921-s6 {
+>>> +                compatible    = "qcom,rpm-pm8921-ftsmps";
+>>> +                reg        = <QCOM_RPM_PM8921_SMPS6>;
+>>> +            };
+>>> +
+>>
+>> There's no RPM control for S5 and S6. Please remove. Also, has this been
+>> tested?
+>>
+> Ahh. these are SAW regulators, I will remove it from the list.
+> Obviously, I did not test all the regulators.
 
-Me? For which patch? I thought there was going to be a v2 of the i2c mux 
-driver patch given the comments on it, but perhaps I'm misremembering?
+There are some more that don't seem to match what we have downstream.
+L26 is also SAW related, and the usb and hdmi switches are "locally"
+controlled via ssbi pmic writes.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
