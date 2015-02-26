@@ -1,34 +1,36 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 26 Feb 2015 14:32:31 +0100
-Subject: [PATCH] regulator: wm8350: remove unused variable
-In-Reply-To: <2131808.TgSGZRWdu2@wuerfel>
-References: <2131808.TgSGZRWdu2@wuerfel>
-Message-ID: <CAMuHMdWAu_rkzOOqhKdQ+4u1MDv-yN4kdPy5xnvdHe_3Gn=PgQ@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 26 Feb 2015 15:39:23 +0200
+Subject: [PATCH] ARM: DTS: dra7xx-clocks: Add gate clock for CLKOUT2
+Message-ID: <1424957963-15418-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 11:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> After the only user of the variable has been removed, we get a valid gcc
-> warning about it:
->
-> regulator/wm8350-regulator.c:1154:17: warning: unused variable 'wm8350' [-Wunused-variable]
->
-> The obvious fix is to remove the variable as well.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 8f45acb5f9f34 ("regulator: wm8350: Pass NULL data with REGULATION_OUT and UNDER_VOLTAGE events")
+To be able to control the gate for the clkout2 clock output.
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Jyri Sarha <jsarha@ti.com>
+---
+ arch/arm/boot/dts/dra7xx-clocks.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Mea culpa. Second ack on the same patch today...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+index 4bdcbd61ce47..2a9994f73974 100644
+--- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
++++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+@@ -1421,6 +1421,14 @@
+ 		ti,dividers = <1>, <8>;
+ 	};
+ 
++	clkout2_clk: clkout2_clk {
++		#clock-cells = <0>;
++		compatible = "ti,gate-clock";
++		clocks = <&clkoutmux2_clk_mux>;
++		ti,bit-shift = <8>;
++		reg = <0x06b0>;
++	};
++
+ 	l3init_960m_gfclk: l3init_960m_gfclk {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,gate-clock";
+-- 
+2.3.0
