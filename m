@@ -1,38 +1,69 @@
-From: jcmvbkbc@gmail.com (Max Filippov)
-Date: Thu, 26 Feb 2015 14:52:09 +0300
-Subject: [PATCH 1/1] ARM: TLV320AIC23 SoC Audio Codec: Fix errors reported
- related to input routing signals.
-In-Reply-To: <1424950347-26241-1-git-send-email-dobatog@gmail.com>
-References: <1424950347-26241-1-git-send-email-dobatog@gmail.com>
-Message-ID: <CAMo8BfLtzn3J5waTMCRgUxaoC_w=aNkRCHoFP3AFoH4dP9PTkA@mail.gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Thu, 26 Feb 2015 06:55:22 -0500
+Subject: [PATCH v3 3/3] of: support passing console options with
+ stdout-path
+In-Reply-To: <1417110967-16284-4-git-send-email-leif.lindholm@linaro.org>
+References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
+ <1417110967-16284-4-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <54EF09AA.2080706@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 2:32 PM, Gabriel Dobato <dobatog@gmail.com> wrote:
-> From: dobatog <dobatog@gmail.com>
->
-> The following patch, based on stable v3.19,  corrects the errors that are reported in the boot trace in reference to the Input Signals of the audio codec TLV320AIC23:
->
-> tlv320aic23-codec 1-001a: Control not supported for path LLINEIN -> [NULL] -> Line Input
-> tlv320aic23-codec 1-001a: ASoC: no dapm match for LLINEIN --> NULL --> Line Input
-> tlv320aic23-codec 1-001a: ASoC: Failed to add route LLINEIN -> NULL -> Line Input
-> tlv320aic23-codec 1-001a: Control not supported for path RLINEIN -> [NULL] -> Line Input
-> tlv320aic23-codec 1-001a: ASoC: no dapm match for RLINEIN --> NULL --> Line Input
-> tlv320aic23-codec 1-001a: ASoC: Failed to add route RLINEIN -> NULL -> Line Input
-> tlv320aic23-codec 1-001a: Control not supported for path MICIN -> [NULL] -> Mic Input
-> tlv320aic23-codec 1-001a: ASoC: no dapm match for MICIN --> NULL --> Mic Input
-> tlv320aic23-codec 1-001a: ASoC: Failed to add route MICIN -> NULL -> Mic Input
->
-> I am trying to set the sound system in a CM-510 (Compulab - SoM) based board with DT, using Simple-Card-Audio and  the TLV320AIC23 audio codec included in the SoM . I faced this problem and thanks to the help of Sebastian Hesselbarth who noticed the possible error located in the structure snd_soc_dapm_route tlv320aic23_intercon[] , now errors are not reported.
->
-> Tested on CM-510 (Compulab SoM Board).
+On 11/27/2014 12:56 PM, Leif Lindholm wrote:
+> Support specifying console options (like with console=ttyXN,<options>)
+> by appending them to the stdout-path property after a separating ':'.
+> 
+> Example:
+>         stdout-path = "uart0:115200";
 
-Tested-by: Max Filippov <jcmvbkbc@gmail.com>
+This format breaks DT earlycon because libfdt doesn't recognize ':' as a
+path terminator.
 
-> Signed-off-by: dobatog <dobatog@gmail.com>
+It's simple enough to fix this directly in early_init_dt_scan_chosen_serial()
+but perhaps it would better to teach fdt_path_offset() to recognize ':'?
 
-I believe you need to use your real name here and in the From: line.
+Regards,
+Peter Hurley
 
--- 
-Thanks.
--- Max
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> ---
+>  drivers/of/base.c |    9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 7f0e5f7..6d2d45e 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -37,6 +37,7 @@ EXPORT_SYMBOL(of_allnodes);
+>  struct device_node *of_chosen;
+>  struct device_node *of_aliases;
+>  struct device_node *of_stdout;
+> +static const char *of_stdout_options;
+>  
+>  struct kset *of_kset;
+>  
+> @@ -1844,7 +1845,7 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
+>  		if (IS_ENABLED(CONFIG_PPC) && !name)
+>  			name = of_get_property(of_aliases, "stdout", NULL);
+>  		if (name)
+> -			of_stdout = of_find_node_by_path(name);
+> +			of_stdout = of_find_node_opts_by_path(name, &of_stdout_options);
+>  	}
+>  
+>  	if (!of_aliases)
+> @@ -1968,9 +1969,13 @@ EXPORT_SYMBOL_GPL(of_prop_next_string);
+>   */
+>  bool of_console_check(struct device_node *dn, char *name, int index)
+>  {
+> +	char *console_options;
+> +
+>  	if (!dn || dn != of_stdout || console_set_on_cmdline)
+>  		return false;
+> -	return !add_preferred_console(name, index, NULL);
+> +
+> +	console_options = kstrdup(of_stdout_options, GFP_KERNEL);
+> +	return !add_preferred_console(name, index, console_options);
+>  }
+>  EXPORT_SYMBOL_GPL(of_console_check);
+>  
+> 
