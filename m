@@ -1,45 +1,44 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 25 Feb 2015 19:23:12 -0600
-Subject: [PATCH] PCI: xgene: Fix the map_bus callback prototype
-In-Reply-To: <20150226011824.GU6220@google.com>
-References: <1424686899-7869-1-git-send-email-tranmanphong@gmail.com>
- <20150226011824.GU6220@google.com>
-Message-ID: <20150226012312.GV6220@google.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 25 Feb 2015 17:24:26 -0800
+Subject: [PATCH 0/8] Fix struct clk pointer comparing
+In-Reply-To: <54EE33C5.5010701@codeaurora.org>
+References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+ <20150225150349.GB8656@n2100.arm.linux.org.uk>
+ <20150225175533.421.41831@quantum> <54EE33C5.5010701@codeaurora.org>
+Message-ID: <20150226012426.421.62077@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 07:18:24PM -0600, Bjorn Helgaas wrote:
-> [+cc Fabio]
+Quoting Stephen Boyd (2015-02-25 12:42:45)
+> On 02/25/15 09:55, Mike Turquette wrote:
+> > Quoting Russell King - ARM Linux (2015-02-25 07:03:49)
+> >> Case 1 applies in places like the Kirkwood I2S driver, and the iMX6
+> >> ethernet code, and it's these cases which need to be fixed.
+> >>
+> >> Case 2 applies in the Armada DRM driver, and these cases need not be
+> >> "fixed".
+> >>
+> >> To put it a different way: case 1 is when you're testing to see whether
+> >> two clocks refer to the same clock.  case 2 is when you're testing
+> >> whether the cached clk cookie is the same.
+> > It looks like patches 2, 7 and 8 are correct in this series. I'll apply
+> > them towards -rc2 if nobody objects.
+> >
+> >
 > 
-> On Mon, Feb 23, 2015 at 05:21:39PM +0700, Phong Tran wrote:
-> > The return value should be void __iomem *.
-> > Tested by compile only.
-> > 
-> > Signed-off-by: Phong Tran <tranmanphong@gmail.com>
+> For patch 8 can't we use the alternative patch that I came up with
+> before? I have a patch for sound/soc/fsl/fsl_esai.c and
+> drivers/pwm/pwm-atmel-hlcdc.c which I can send shortly.
+
+Probably we can use them. I'll need to spend a few minutes with both
+patches and make sure it looks good. clkdev stuff always spins my head
+around.
+
+Regards,
+Mike
+
 > 
-> I've already applied an identical patch from Fabio Estevam.  I added
-> Arnd's ack to it and also mentioned you in the credits, Phong.
-
-Dropped in favor of a more complete fix:
-https://patchwork.ozlabs.org/patch/440759/
-
-> > ---
-> >  drivers/pci/host/pci-xgene.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-> > index aab5547..9c3bfd8 100644
-> > --- a/drivers/pci/host/pci-xgene.c
-> > +++ b/drivers/pci/host/pci-xgene.c
-> > @@ -127,7 +127,7 @@ static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
-> >  	return false;
-> >  }
-> >  
-> > -static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
-> > +static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
-> >  			      int offset)
-> >  {
-> >  	struct xgene_pcie_port *port = bus->sysdata;
-> > -- 
-> > 2.1.0
-> > 
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
