@@ -1,79 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 15:21:20 +0900
-Subject: [PATCH 23/32] ARM: shmobile: emev2 dtsi: Add PFC information
+Date: Thu, 26 Feb 2015 15:21:21 +0900
+Subject: [PATCH 24/32] ARM: shmobile: emev2-kzm9d dts: Add PFC information for
+ uart1
 In-Reply-To: <cover.1424849129.git.horms+renesas@verge.net.au>
 References: <cover.1424849129.git.horms+renesas@verge.net.au>
-Message-ID: <e7cdf791dbc456329703424822e85eeb31fc1a54.1424849129.git.horms+renesas@verge.net.au>
+Message-ID: <4a5fcc685a84751bbec5653e942fb3d61470a66c.1424849129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Niklas S?derlund <niso@kth.se>
 
-With this information all GPIOs can make use of the PFC functionality.
+Configure the pinmux on kzm9d to use the serial connector for uart1.
 
 Signed-off-by: Niklas S?derlund <niso@kth.se>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/emev2.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/emev2-kzm9d.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/emev2.dtsi b/arch/arm/boot/dts/emev2.dtsi
-index cc7bfe0..bb45694 100644
---- a/arch/arm/boot/dts/emev2.dtsi
-+++ b/arch/arm/boot/dts/emev2.dtsi
-@@ -169,12 +169,18 @@
- 		clock-names = "sclk";
+diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
+index 667d323..1944627 100644
+--- a/arch/arm/boot/dts/emev2-kzm9d.dts
++++ b/arch/arm/boot/dts/emev2-kzm9d.dts
+@@ -94,3 +94,16 @@
+ 		vdd33a-supply = <&reg_3p3v>;
  	};
- 
-+	pfc: pfc at e0140200 {
-+		compatible = "renesas,pfc-emev2";
-+		reg = <0xe0140200 0x100>;
-+	};
+ };
 +
- 	gpio0: gpio at e0050000 {
- 		compatible = "renesas,em-gio";
- 		reg = <0xe0050000 0x2c>, <0xe0050040 0x20>;
- 		interrupts = <0 67 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 68 IRQ_TYPE_LEVEL_HIGH>;
- 		gpio-controller;
-+		gpio-ranges = <&pfc 0 0 32>;
- 		#gpio-cells = <2>;
- 		ngpios = <32>;
- 		interrupt-controller;
-@@ -186,6 +192,7 @@
- 		interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 70 IRQ_TYPE_LEVEL_HIGH>;
- 		gpio-controller;
-+		gpio-ranges = <&pfc 0 32 32>;
- 		#gpio-cells = <2>;
- 		ngpios = <32>;
- 		interrupt-controller;
-@@ -197,6 +204,7 @@
- 		interrupts = <0 71 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 72 IRQ_TYPE_LEVEL_HIGH>;
- 		gpio-controller;
-+		gpio-ranges = <&pfc 0 64 32>;
- 		#gpio-cells = <2>;
- 		ngpios = <32>;
- 		interrupt-controller;
-@@ -208,6 +216,7 @@
- 		interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 74 IRQ_TYPE_LEVEL_HIGH>;
- 		gpio-controller;
-+		gpio-ranges = <&pfc 0 96 32>;
- 		#gpio-cells = <2>;
- 		ngpios = <32>;
- 		interrupt-controller;
-@@ -219,6 +228,7 @@
- 		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 76 IRQ_TYPE_LEVEL_HIGH>;
- 		gpio-controller;
-+		gpio-ranges = <&pfc 0 128 31>;
- 		#gpio-cells = <2>;
- 		ngpios = <31>;
- 		interrupt-controller;
++&pfc {
++	uart1_pins: uart at e1030000 {
++		renesas,groups = "uart1_ctrl", "uart1_data";
++		renesas,function = "uart1";
++	};
++};
++
++&uart1 {
++	pinctrl-0 = <&uart1_pins>;
++	pinctrl-names = "default";
++	status = "okay";
++};
 -- 
 2.1.4
