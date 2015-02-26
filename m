@@ -1,42 +1,41 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 26 Feb 2015 18:20:48 +0100
-Subject: [PATCH] cpuidle: mvebu: Fix the CPU PM notifier usage
-Message-ID: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Thu, 26 Feb 2015 09:28:06 -0800
+Subject: [PATCH 0/4] Add support for IPROC SDHCI controller
+In-Reply-To: <1423526791-29453-1-git-send-email-sbranden@broadcom.com>
+References: <Scott Branden <sbranden@broadcom.com>
+ <1423526791-29453-1-git-send-email-sbranden@broadcom.com>
+Message-ID: <54EF57A6.8070607@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As stated in kernel/cpu_pm.c, "Platform is responsible for ensuring
-that cpu_pm_enter is not called twice on the same CPU before
-cpu_pm_exit is called.". In the current code in case of failure when
-calling mvebu_v7_cpu_suspend, the function cpu_pm_exit() is never
-called whereas cpu_pm_enter() was called just before.
+Hi Chris,
 
-This patch moves the cpu_pm_exit() in order to balance the
-cpu_pm_enter() calls.
+I have not heard any more feedback on this patchset.  Is it in your 
+queue to review or merge into your tree?
 
-Reported-by: Fulvio Benini <fbf@libero.it>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/cpuidle/cpuidle-mvebu-v7.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thanks,
+  Scott
 
-diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
-index 38e68618513a..cefa07438ae1 100644
---- a/drivers/cpuidle/cpuidle-mvebu-v7.c
-+++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
-@@ -37,11 +37,11 @@ static int mvebu_v7_enter_idle(struct cpuidle_device *dev,
- 		deepidle = true;
- 
- 	ret = mvebu_v7_cpu_suspend(deepidle);
-+	cpu_pm_exit();
-+
- 	if (ret)
- 		return ret;
- 
--	cpu_pm_exit();
--
- 	return index;
- }
- 
--- 
-2.1.0
+On 15-02-09 04:06 PM, Scott Branden wrote:
+> This series of patchsets contains the IPROC SDHCI driver used
+> in a series of Broadcom SoCs
+> Quirks are also added to support this controller.
+>
+> Corneliu Doban (1):
+>    mmc: sdhci: do not set AUTO_CMD12 for multi-block CMD53
+>
+> Scott Branden (3):
+>    mmc: sdhci: add quirk for ACMD23 broken
+>    mmc: sdhci-iproc: add IPROC SDHCI driver
+>    mmc: sdhci-iproc: add device tree bindings
+>
+>   .../devicetree/bindings/mmc/brcm,sdhci-iproc.txt   |  23 ++
+>   drivers/mmc/host/Kconfig                           |  14 ++
+>   drivers/mmc/host/Makefile                          |   1 +
+>   drivers/mmc/host/sdhci-iproc.c                     | 241 +++++++++++++++++++++
+>   drivers/mmc/host/sdhci.c                           |   7 +-
+>   include/linux/mmc/sdhci.h                          |   2 +
+>   6 files changed, 286 insertions(+), 2 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt
+>   create mode 100644 drivers/mmc/host/sdhci-iproc.c
+>
