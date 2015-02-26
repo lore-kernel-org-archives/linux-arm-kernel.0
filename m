@@ -1,61 +1,36 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 26 Feb 2015 16:02:20 +0800
-Subject: [PATCH 1/7] ARM: vf610: add second DSPI instance
-In-Reply-To: <1422356244-15629-2-git-send-email-bhuvanchandra.dv@toradex.com>
-References: <1422356244-15629-1-git-send-email-bhuvanchandra.dv@toradex.com>
- <1422356244-15629-2-git-send-email-bhuvanchandra.dv@toradex.com>
-Message-ID: <20150226080217.GG20028@dragon>
+From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
+Date: Thu, 26 Feb 2015 09:02:35 +0100
+Subject: [PATCH RFC V3 0/3] mxs: add ocotp support for i.MX23 and i.MX28
+In-Reply-To: <54EEC720.1020000@i2se.com>
+References: <1424896026.2840.10.camel@embedded.rocks>
+ <54EEC720.1020000@i2se.com>
+Message-ID: <1424937755.27172.4.camel@embedded.rocks>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 04:27:18PM +0530, Bhuvanchandra DV wrote:
-> Acked-by: Stefan Agner <stefan@agner.ch>
-> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+Hi Stefan,
 
-Applied, thanks.
+On Do, 2015-02-26 at 08:11 +0100, Stefan Wahren wrote:
+> Hi J?rg,
+> 
+> Am 25.02.2015 um 21:27 schrieb J?rg Krause:
+> > Hi Stefan,
+> >
+> > sorry, I forgot to subscribe to the mailing list.
+> >
+> > Any news about these patches? What's missing?
+> 
+> i wait until there is a common infrastructure for OTP / eFuse driver.
+> 
+> Please look at this discussion:
+> 
+> http://marc.info/?l=linux-arm-kernel&m=142486510903415&w=2
+> 
+> After these patches has been applied, i will adapt my patches here:
+> 
+> https://github.com/lategoodbye/fsl_ocotp
 
-> ---
->  arch/arm/boot/dts/vf500.dtsi |  4 ++++
->  arch/arm/boot/dts/vfxxx.dtsi | 11 +++++++++++
->  2 files changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vf500.dtsi b/arch/arm/boot/dts/vf500.dtsi
-> index 1dbf8d2..f5f807c 100644
-> --- a/arch/arm/boot/dts/vf500.dtsi
-> +++ b/arch/arm/boot/dts/vf500.dtsi
-> @@ -66,6 +66,10 @@
->  	interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
->  };
->  
-> +&dspi1 {
-> +	interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
-> +};
-> +
->  &edma0 {
->  	interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
->  			<GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-> index a29c7ce..789744b 100644
-> --- a/arch/arm/boot/dts/vfxxx.dtsi
-> +++ b/arch/arm/boot/dts/vfxxx.dtsi
-> @@ -139,6 +139,17 @@
->  				status = "disabled";
->  			};
->  
-> +			dspi1: dspi1 at 4002d000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "fsl,vf610-dspi";
-> +				reg = <0x4002d000 0x1000>;
-> +				clocks = <&clks VF610_CLK_DSPI1>;
-> +				clock-names = "dspi";
-> +				spi-num-chipselects = <5>;
-> +				status = "disabled";
-> +			};
-> +
->  			sai2: sai at 40031000 {
->  				compatible = "fsl,vf610-sai";
->  				reg = <0x40031000 0x1000>;
-> -- 
-> 2.2.2
-> 
+These are good news! Many thanks!
+
+Best regards
+J?rg Krause
