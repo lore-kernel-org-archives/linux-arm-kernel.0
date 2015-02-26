@@ -1,71 +1,233 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 26 Feb 2015 10:06:15 +0100
-Subject: [PATCH] cpuidle: mvebu: update cpuidle thresholds for Armada
- XP SOCs
-In-Reply-To: <alpine.LNX.2.02.1502251624570.11958@sbrk.org>
-References: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
- <54ED9D92.90506@linaro.org> <alpine.LNX.2.02.1502251624570.11958@sbrk.org>
-Message-ID: <54EEE207.7090006@linaro.org>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 26 Feb 2015 09:16:27 +0000
+Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
+In-Reply-To: <20150225013049.GJ24928@codeaurora.org>
+References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <CAL_Jsq+SeuoojgTpv1y_aPJ_jzDr3HqZhYEBQ3_vYGBHvcccug@mail.gmail.com>
+ <54E78A31.9020306@linaro.org>
+ <CAL_Jsq+mvpRjYfL_8OseTDCB-6aBhwhNKLBQXXJeVQLDwWm8Nw@mail.gmail.com>
+ <20150222143211.GX25269@lukather>
+ <CAL_JsqLqqw5DyUqCaOTSKPwF-Ms5EU4f_OPoW9YVpMCo8A_bbw@mail.gmail.com>
+ <54EBB3AC.30000@codeaurora.org> <20150224092155.GO25269@lukather>
+ <20150225013049.GJ24928@codeaurora.org>
+Message-ID: <54EEE46B.6090905@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2015 04:56 PM, Sebastien Rannou wrote:
-> Hi Daniel,
+
+
+On 25/02/15 01:30, Stephen Boyd wrote:
+> On 02/24, Maxime Ripard wrote:
+>> On Mon, Feb 23, 2015 at 03:11:40PM -0800, Stephen Boyd wrote:
+>>>>>> I would do something more simple that is just a list of keys and
+>>>>>> their location like this:
+>>>>>>
+>>>>>> device-serial-number = <start size>;
+>>>>>> key1 = <start size>;
+>>>>>> key2 = <start size>;
+>>>>> I'm sorry, but what's the difference?
+>>>> It can describe the layout completely whether the fields are tied to a
+>>>> h/w device or not.
+>>>>
+>>>> What I would like to see here is the entire layout described covering
+>>>> both types of fields.
+>>>>
+>>>
+>>> I was thinking the DT might be like this on the provider side:
+>>>
+>>>     qfprom at 1000000 {
+>>>        reg = <0x1000000 0x1000>;
+>>>        ranges = <0 0x1000000 0x1000>;
+>>>        compatible = "qcom,qfprom-msm8960"
+>>>
+>>>        pvs-data: pvs-data at 40 {
+>>>              compatible = "qcom,pvs-a";
+>>>              reg = <0x40 0x20>,
+>>> 	    #eeprom-cells = <0>;
+>>>        };
+>>>
+>>>         tsens-data: tmdata at 10 {
+>>>              compatible = "qcom,tsens-data-msm8960";
+>>>              reg = <0x10 4>, <0x16 4>;
+>>> 	    #eeprom-cells = <0>;
+>>>
+>>>        };
+>>>
+>>>        serial-number: serial at 50 {
+>>>              compatible = "qcom,serial-msm8960";
+>>>              reg = <0x50 4>, <0x60 4>;
+>>> 	    #eeprom-cells = <0>;
+>>>
+>>>        };
+>>>     };
+>>
+>> I'm not sure the compatible is really needed.
+>>
+>> A label of some sort, just like the MTD partitions do would do just
+>> fine, and wouldn't have the implicit expectation that a driver will be
+>> probed from that node.
 >
-> Thanks for the explanation and thanks for the link, I wish I had read
-> it beforehand.
+> I wasn't aware that compatible meant driver probe. I thought
+> compatible just meant some software entity can understand what
+> I've described within this node. For example, compatible for
+> reserved-memory nodes doesn't mean we're going to probe a device.
 >
-> On Wed, 25 Feb 2015, Daniel Lezcano wrote:
->> If you have the possibility, I would suggest to apply the right methodology to
->> find the right values by using the description in the wiki page [1]. If you
->> can access to the energy values to enter / exit the state and the power
->> consumed in each idle state, then you can mathematically compute the right
->> values.
+>>
+>>> and then on the consumer side:
+>>>
+>>> 	device {
+>>> 		eeproms = <&serial-number>;
+>>> 		eeprom-names = "soc-rev-id";
+>>> 	};
+>>>
+>>>
+>>> This would solve a problem where the consumer device is some standard
+>>> off-the-shelf IP block that needs to get some SoC specific calibration
+>>> data from the eeprom. I may want to interpret the bits differently
+>>> depending on which eeprom is connected to my SoC. Sometimes that data
+>>> format may be the same across many variations of the SoC (e.g. the
+>>> qcom,pvs-a node) or it may be completely different for a given SoC (e.g.
+>>> qcom,serial-msm8960 node). I imagine for other SoCs out there it could
+>>> be different depending on which eeprom the board manufacturer decides to
+>>> wire onto their board and how they choose to program the data.
+>>
+>> Oh, so you'd like to infer the data format it's stored in from the
+>> compatible?
+>>
+>> AFAICT, this format will be highly depending on the board itself,
+>> rather than on the SoC, do you think it will scale enough?
+>>
+>>> So this is where I think the eeprom-cells and offset + length starts to
+>>> fall apart. It forces us to make up a bunch of different compatible
+>>> strings for our consumer device just so that we can parse the eeprom
+>>> that we decided to use for some SoC/board specific data. Instead I'd
+>>> like to see some framework that expresses exactly which eeprom is on my
+>>> board and how to interpret the bits in a way that doesn't require me to
+>>> keep refining the compatible string for my generic IP block.
+>>
+>> Hmmmm, apparently you don't :)
+>>
+>>> I worry that if we put all those details in DT we'll end up having to
+>>> describe individual bits like serial-number-bit-2, serial-number-bit-3,
+>>> etc. because sometimes these pieces of data are scattered all around the
+>>> eeprom and aren't contiguous or aligned on a byte boundary. It may be
+>>> easier to just have a way to express that this is an eeprom with this
+>>> specific layout and my device has data stored in there. Then the driver
+>>> can be told what layout it is (via compatible or some other string based
+>>> means if we're not using DT?) and match that up with some driver data if
+>>> it needs to know how to understand the bits it can read with the
+>>> eeprom_read() API.
+>>
+>> I'm half convinced that the layout information will actually work for
+>> more complex cases, like the linked list Rob described.
+>>
+>> If such a structure is ever to be found, it would feel wrong to have
+>> that in the EEPROM driver, but it would feel just as wrong to put that
+>> in the client driver, that would have to handle the parsing of raw
+>> data coming flashed by one single crazy board vendor.
+>>
+>> Maybe we can have each cell carry a property that defines the format
+>> it's stored in, and match that to some parsers plugins, starting with
+>> the generic and trivial cases but still allowing for custom parsers to
+>> be defined?
+>>
+>> Something like
+>>
+>> eeprom at 42 {
+>> 	compatible = "atmel,at24something";
+>> 	reg = <0x42>;
+>>
+>> 	serial at 0 {
+>> 		label = "board serial";
+>> 		reg = <0x0 0x10>;
+>> 		format = "packed";
+>> 	};
+>>
+>> 	opps at 10 {
+>> 		label = "board serial";
+>> 		reg = <0x10 0x10>, <0x40 0x10>, <0x80 0x10>;
+>> 		format = "random-vendor,opp-linked-list";
+>> 	};
+>> };
+>>
+>> That would make eeprom_read always return the same format of data to
+>> the client drivers, without cripling the generic EEPROM drivers
+>> either.
+>>
 >
-> Unfortunately I don't have access to the cost of transitions between
-> states, nor do I have the time taken by each transition (which I could
-> have used to infer the cost). I only have the power consumption of the
-> different states.
+> Is the goal here to make eeprom_read() figure out how to return
+> the next byte of data and hide the parsing logic behind the
+> eeprom APIs? I imagine "random-vendor,opp-linked-list" would be
+> handled by the eeprom driver and that would return OPPs byte by
+> byte across the different reg properties to the eeprom consumer?
+>
+> This approach concerns me because every eeprom_read() call needs
+> to fit the format that the client driver is expecting. How do we
+> validate that? What do we do if we have a random OPP client #1
+> that expects to get the data from eeprom_read() with OPPs in
+> ascending order and random OPP client #2 that expects to get the
+> data from eeprom_read() with OPPs in descending order?
+>
+> It feels like we're making the eeprom framework too smart without
+> a well defined abstraction. If we were to make it so that
+> eeprom_get_opps() knew what to do and parsed/populated the OPPs,
+> it might work. But if we're just exporting raw data across a
+> read/write API with some implementation specific mangling it
+> sounds like it's going to get messy fast. And if the API is well
+> defined, it would start to become rather large with many
+> different types of data that need to be parsed and sometimes data
+> that's only specific to a single SoC.
+>
+> I wonder how much we could get away with this approach though. If
+> the eeprom driver probed and populated OPPs, made a serial number
+> available via the soc device, and then we made up framework(s)
+> for things like our thermal sensor calibration data and display
+> panel calibration data, I would guess that covers most of my
+> use-cases. The client drivers would need some sort of 'wait for
+> eeprom to populate things' API or we'd need to work that into the
+> new calibration framework.
+>
+I think we are making simple eeprom framework too smart which will break 
+in future.
 
-If you have the consumption for the different idle state + running, you 
-have 60% of the data :)
+IMHO, Anything on top of eeprom interface that interprets the data 
+should not go into the eeprom framework itself, it can either live some 
+parsers/SOC specific drivers/interfaces.
 
-> I plan to find the adequate values by testing different combinations,
-> but it is going to take some efforts before having a second
-> patch.
+As Stephen pointed out earlier lets start with something like this, 
+which would provide a better abstraction to the discussed use cases like 
+serial-number and packed data in eeprom.
 
-You may waste your time because of the non deterministic prediction. 
-Sometimes you will test with right values but wrong prediction and a 
-cache 50% filled, sometimes you will test with wrong values and wrong 
-prediction but a cache 20% filled etc ...
+    qfprom at 1000000 {
+       reg = <0x1000000 0x1000>;
+       ranges = <0 0x1000000 0x1000>;
+       compatible = "qcom,qfprom-msm8960"
 
-The only way to measure accurately is to identify the cpu power rails 
-and measure the current peak when entering/exiting the different idle 
-states with a device (oscilloscope, or whatever).
+       pvs-data: pvs-data at 40 {
+             compatible = "qcom,pvs-a";
+             reg = <0x40 0x20>,
+       };
 
-> Since this patch already improves the situation by using the
-> vendor's values, I think it is a move in the right direction, even
-> though not being the most adequate values.
+        tsens-data: tmdata at 10 {
+             reg = <0x10 40>;
+       };
 
-Just to clarify, vendor's values are from an out-of-tree which means it 
-does not exist from an opensource pov and hence does not enter in the 
-equation to pick the patch or not.
+       serial-number: serial at 50 {
+             compatible = "qcom,serial-msm8960";
+             reg = <0x50 4>, <0x60 4>;
+       };
 
-Regarding the values you measured for perf and power, it appears we have 
-a improvement in terms of performance but with a power consumption 
-degradation.
+    };
 
-I am not against this patch, but I would like to have the ack from 
-another Armada maintainer (Jason, Andrew or Sebastian) to be sure this 
-trade-off is accepted.
+and then on the consumer side:
 
-Thanks
+	device {
+		eeproms = <&serial-number>;
+		eeprom-names = "soc-rev-id";
+	};
+	
+driver side:
 
-   -- Daniel
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+	eeprom_get_cell()
+	eeprom_read();
