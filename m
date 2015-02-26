@@ -1,76 +1,50 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 15:22:23 +0900
-Subject: [PATCH 4/5] drivers: bus: Add Renesas Bus State Controller (BSC) DT
- Bindings
-In-Reply-To: <cover.1424931637.git.horms+renesas@verge.net.au>
-References: <cover.1424931637.git.horms+renesas@verge.net.au>
-Message-ID: <b1e5bbd61eb7584caa61ab3b89f3a66c3d5b4dd3.1424931637.git.horms+renesas@verge.net.au>
+Date: Thu, 26 Feb 2015 15:22:32 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Cleanup for v4.1
+Message-ID: <cover.1424931049.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-The bindings for the BSC extend the bindings for "simple-pm-bus".
+Please consider these Renesas ARM based SoC cleanup for v4.1.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- .../devicetree/bindings/bus/renesas,bsc.txt        | 46 ++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/bus/renesas,bsc.txt
 
-diff --git a/Documentation/devicetree/bindings/bus/renesas,bsc.txt b/Documentation/devicetree/bindings/bus/renesas,bsc.txt
-new file mode 100644
-index 0000000..90e9472
---- /dev/null
-+++ b/Documentation/devicetree/bindings/bus/renesas,bsc.txt
-@@ -0,0 +1,46 @@
-+Renesas Bus State Controller (BSC)
-+==================================
-+
-+The Renesas Bus State Controller (BSC, sometimes called "LBSC within Bus
-+Bridge", or "External Bus Interface") can be found in several Renesas ARM SoCs.
-+It provides an external bus for connecting multiple external devices to the
-+SoC, driving several chip select lines, for e.g. NOR FLASH, Ethernet and USB.
-+
-+While the BSC is a fairly simple memory-mapped bus, it may be part of a PM
-+domain, and may have a gateable functional clock.
-+Before a device connected to the BSC can be accessed, the PM domain
-+containing the BSC must be powered on, and the functional clock
-+driving the BSC must be enabled.
-+
-+The bindings for the BSC extend the bindings for "simple-pm-bus".
-+
-+
-+Required properties
-+  - compatible: Must contain an SoC-specific value, and "renesas,bsc" and
-+		"simple-pm-bus" as fallbacks.
-+                SoC-specific values can be:
-+		"renesas,bsc-r8a73a4" for R-Mobile APE6 (r8a73a4)
-+		"renesas,bsc-sh73a0" for SH-Mobile AG5 (sh73a0)
-+  - #address-cells, #size-cells, ranges: Must describe the mapping between
-+		parent address and child address spaces.
-+  - reg: Must contain the base address and length to access the bus controller.
-+
-+Optional properties:
-+  - interrupts: Must contain a reference to the BSC interrupt, if available.
-+  - clocks: Must contain a reference to the functional clock, if available.
-+  - power-domains: Must contain a reference to the PM domain, if available.
-+
-+
-+Example:
-+
-+	bsc: bus at fec10000 {
-+		compatible = "renesas,bsc-sh73a0", "renesas,bsc",
-+			     "simple-pm-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0x20000000>;
-+		reg = <0xfec10000 0x400>;
-+		interrupts = <0 39 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&zb_clk>;
-+		power-domains = <&pd_a4s>;
-+	};
--- 
-2.1.4
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+
+  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-cleanup-for-v4.1
+
+for you to fetch changes up to fd9454ab51fa92f43ae5b7a71c42f2ee8417c2a2:
+
+  ARM: shmobile: r8a7779: Remove redundant cpu_disable implementation (2015-02-24 07:12:16 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Cleanup for v4.1
+
+* Remove redundant cpu_disable implementation from r8a7779 SoC
+* Remove mach/{uncompress,clkdev,system}.h
+
+----------------------------------------------------------------
+Magnus Damm (3):
+      ARM: shmobile: Remove mach/system.h
+      ARM: shmobile: Remove mach/clkdev.h
+      ARM: shmobile: Remove mach/uncompress.h
+
+Stephen Boyd (1):
+      ARM: shmobile: r8a7779: Remove redundant cpu_disable implementation
+
+ arch/arm/Kconfig                                 |  1 -
+ arch/arm/Kconfig.debug                           |  3 ++-
+ arch/arm/mach-shmobile/clock.c                   | 11 -----------
+ arch/arm/mach-shmobile/include/mach/clkdev.h     |  7 -------
+ arch/arm/mach-shmobile/include/mach/system.h     | 11 -----------
+ arch/arm/mach-shmobile/include/mach/uncompress.h | 19 -------------------
+ arch/arm/mach-shmobile/smp-r8a7779.c             |  7 -------
+ 7 files changed, 2 insertions(+), 57 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/clkdev.h
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/system.h
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/uncompress.h
