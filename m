@@ -1,150 +1,145 @@
-From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez-Ortiz)
-Date: Wed, 25 Feb 2015 19:31:01 -0500
-Subject: [PATCH v3] drivers/tty: amba: defer probing DMA availability until
- hw_init
-Message-ID: <1424910661-26474-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 26 Feb 2015 01:45:22 +0100
+Subject: [PATCH v4 11/20] power_supply: Change ownership from driver to
+ core
+In-Reply-To: <1424692061-30624-12-git-send-email-k.kozlowski@samsung.com>
+References: <1424692061-30624-1-git-send-email-k.kozlowski@samsung.com>
+ <1424692061-30624-12-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20150226004522.GB885@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix a race condition that happens when device_initcall(pl011_dma_initicall)
-is executed before all the devices have been probed - this issue was observed on
-an hisi_6220 SoC (HiKey board from Linaro).
+Hi,
 
-The deferred driver probing framework relies on late_initcall to trigger
-deferred probes so it is just possible that, even with a valid DMA driver ready
-to be loaded, we fail to synchronize with it.
+On Mon, Feb 23, 2015 at 12:47:32PM +0100, Krzysztof Kozlowski wrote:
+> Change the ownership of power_supply structure from each driver
+> implementing the class to the power supply core.
+> 
+> The patch changes power_supply_register() function thus all drivers
+> implementing power supply class are adjusted.
+> 
+> Each driver provides the implementation of power supply. However it
+> should not be the owner of power supply class instance because it is
+> exposed by core to other subsystems with power_supply_get_by_name().
+> These other subsystems have no knowledge when the driver will unregister
+> the power supply. This leads to several issues when driver is unbound -
+> mostly because user of power supply accesses freed memory.
+> 
+> Instead let the core own the instance of struct 'power_supply'.  Other
+> users of this power supply will still access valid memory because it
+> will be freed when device reference count reaches 0. Currently this
+> means "it will leak" but power_supply_put() call in next patches will
+> solve it.
+> 
+> This solves invalid memory references in following race condition
+> scenario:
+> 
+> Thread 1: charger manager
+> Thread 2: power supply driver, used by charger manager
+> 
+> THREAD 1 (charger manager)         THREAD 2 (power supply driver)
+> ==========================         ==============================
+> psy = power_supply_get_by_name()
+>                                    Driver unbind, .remove
+>                                      power_supply_unregister()
+>                                      Device fully removed
+> psy->get_property()
+> 
+> The 'get_property' call is executed in invalid context because the driver was
+> unbound and struct 'power_supply' memory was freed.
+> 
+> This could be observed easily with charger manager driver (here compiled
+> with max17040 fuel gauge):
+> 
+> $ cat /sys/devices/virtual/power_supply/cm-battery/capacity &
+> $ echo "1-0036" > /sys/bus/i2c/drivers/max17040/unbind
+> [   55.725123] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> [   55.732584] pgd = d98d4000
+> [   55.734060] [00000000] *pgd=5afa2831, *pte=00000000, *ppte=00000000
+> [   55.740318] Internal error: Oops: 80000007 [#1] PREEMPT SMP ARM
+> [   55.746210] Modules linked in:
+> [   55.749259] CPU: 1 PID: 2936 Comm: cat Tainted: G        W       3.19.0-rc1-next-20141226-00048-gf79f475f3c44-dirty #1496
+> [   55.760190] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+> [   55.766270] task: d9b76f00 ti: daf54000 task.ti: daf54000
+> [   55.771647] PC is at 0x0
+> [   55.774182] LR is at charger_get_property+0x2f4/0x36c
+> [   55.779201] pc : [<00000000>]    lr : [<c034b0b4>]    psr: 60000013
+> [   55.779201] sp : daf55e90  ip : 00000003  fp : 00000000
+> [   55.790657] r10: 00000000  r9 : c06e2878  r8 : d9b26c68
+> [   55.795865] r7 : dad81610  r6 : daec7410  r5 : daf55ebc  r4 : 00000000
+> [   55.802367] r3 : 00000000  r2 : daf55ebc  r1 : 0000002a  r0 : d9b26c68
+> [   55.808879] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+> [   55.815994] Control: 10c5387d  Table: 598d406a  DAC: 00000015
+> [   55.821723] Process cat (pid: 2936, stack limit = 0xdaf54210)
+> [   55.827451] Stack: (0xdaf55e90 to 0xdaf56000)
+> [   55.831795] 5e80:                                     60000013 c01459c4 0000002a c06f8ef8
+> [   55.839956] 5ea0: db651000 c06f8ef8 daebac00 c04cb668 daebac08 c0346864 00000000 c01459c4
+> [   55.848115] 5ec0: d99eaa80 c06f8ef8 00000fff 00001000 db651000 c027f25c c027f240 d99eaa80
+> [   55.856274] 5ee0: d9a06c00 c0146218 daf55f18 00001000 d99eaa80 db4c18c0 00000001 00000001
+> [   55.864468] 5f00: daf55f80 c0144c78 c0144c54 c0107f90 00015000 d99eaab0 00000000 00000000
+> [   55.872603] 5f20: 000051c7 00000000 db4c18c0 c04a9370 00015000 00001000 daf55f80 00001000
+> [   55.880763] 5f40: daf54000 00015000 00000000 c00e53dc db4c18c0 c00e548c 0000000d 00008124
+> [   55.888937] 5f60: 00000001 00000000 00000000 db4c18c0 db4c18c0 00001000 00015000 c00e5550
+> [   55.897099] 5f80: 00000000 00000000 00001000 00001000 00015000 00000003 00000003 c000f364
+> [   55.905239] 5fa0: 00000000 c000f1a0 00001000 00015000 00000003 00015000 00001000 0001333c
+> [   55.913399] 5fc0: 00001000 00015000 00000003 00000003 00000002 00000000 00000000 00000000
+> [   55.921560] 5fe0: 7fffe000 be999850 0000a225 b6f3c19c 60000010 00000003 00000000 00000000
+> [   55.929744] [<c034b0b4>] (charger_get_property) from [<c0346864>] (power_supply_show_property+0x48/0x20c)
+> [   55.939286] [<c0346864>] (power_supply_show_property) from [<c027f25c>] (dev_attr_show+0x1c/0x48)
+> [   55.948130] [<c027f25c>] (dev_attr_show) from [<c0146218>] (sysfs_kf_seq_show+0x84/0x104)
+> [   55.956298] [<c0146218>] (sysfs_kf_seq_show) from [<c0144c78>] (kernfs_seq_show+0x24/0x28)
+> [   55.964536] [<c0144c78>] (kernfs_seq_show) from [<c0107f90>] (seq_read+0x1b0/0x484)
+> [   55.972172] [<c0107f90>] (seq_read) from [<c00e53dc>] (__vfs_read+0x18/0x4c)
+> [   55.979188] [<c00e53dc>] (__vfs_read) from [<c00e548c>] (vfs_read+0x7c/0x100)
+> [   55.986304] [<c00e548c>] (vfs_read) from [<c00e5550>] (SyS_read+0x40/0x8c)
+> [   55.993164] [<c00e5550>] (SyS_read) from [<c000f1a0>] (ret_fast_syscall+0x0/0x48)
+> [   56.000626] Code: bad PC value
+> [   56.011652] ---[ end trace 7b64343fbdae8ef1 ]---
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> 
+> [for the nvec part]
+> Reviewed-by: Marc Dietrich <marvin24@gmx.de>
+> ---
+>  arch/x86/platform/olpc/olpc-xo1-sci.c     |   4 +-
+>  arch/x86/platform/olpc/olpc-xo15-sci.c    |   4 +-
+>  drivers/acpi/ac.c                         |  32 +++---
+>  drivers/acpi/battery.c                    |  55 +++++-----
+>  drivers/acpi/sbs.c                        |  68 +++++++-----
+>  drivers/hid/hid-input.c                   |  51 +++++----
+>  drivers/hid/hid-sony.c                    |  43 ++++----
+>  drivers/hid/hid-wiimote-modules.c         |  41 +++----
+>  drivers/hid/hid-wiimote.h                 |   3 +-
+>  drivers/hid/wacom.h                       |   8 +-
+>  drivers/hid/wacom_sys.c                   |  71 ++++++------
+>  drivers/platform/x86/compal-laptop.c      |  29 +++--
+>  drivers/power/[...]                       |  lots of changes
+>  drivers/staging/nvec/nvec_power.c         |  29 +++--
+>  include/linux/hid.h                       |   6 +-
+>  include/linux/mfd/abx500/ux500_chargalg.h |  11 +-
+>  include/linux/mfd/rt5033.h                |   2 +-
+>  include/linux/mfd/wm8350/supply.h         |   6 +-
+>  include/linux/power/charger-manager.h     |   3 +-
+>  include/linux/power_supply.h              |  39 ++++---
+>  80 files changed, 2172 insertions(+), 1756 deletions(-)
 
-The proposed implementation delays probing of the DMA until the uart device is
-opened. As hw_init is invoked on port startup and port resume - but the DMA
-probe is only required once - we avoid calling multiple times using a new field
-in uart_amba_port to track this scenario.
+I would like to merge this via the power supply subsystem. Some of
+the files being patched are not under my maintainence, though. It
+would be nice if I get an Acked-By from their maintainers.
 
-Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
----
- drivers/tty/serial/amba-pl011.c | 66 ++++++++++-------------------------------
- 1 file changed, 16 insertions(+), 50 deletions(-)
+As far as I can see this patch is currently missing feedback from:
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 8d94c19..3501ccc 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -29,6 +29,7 @@
-  * and hooked into this driver.
-  */
- 
-+#define pr_fmt(fmt) "amba-pl011: "fmt
- 
- #if defined(CONFIG_SERIAL_AMBA_PL011_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
- #define SUPPORT_SYSRQ
-@@ -164,6 +165,7 @@ struct uart_amba_port {
- 	bool			using_rx_dma;
- 	struct pl011_dmarx_data dmarx;
- 	struct pl011_dmatx_data	dmatx;
-+	bool			dma_probed;
- #endif
- };
- 
-@@ -261,7 +263,7 @@ static void pl011_sgbuf_free(struct dma_chan *chan, struct pl011_sgbuf *sg,
- 	}
- }
- 
--static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *uap)
-+static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
- {
- 	/* DMA is the sole user of the platform data right now */
- 	struct amba_pl011_data *plat = dev_get_platdata(uap->port.dev);
-@@ -275,9 +277,16 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
- 	struct dma_chan *chan;
- 	dma_cap_mask_t mask;
- 
--	chan = dma_request_slave_channel(dev, "tx");
-+	uap->dma_probed = true;
-+
-+	chan = dma_request_slave_channel_reason(dev, "tx");
-+	if (IS_ERR(chan)) {
-+		if (PTR_ERR(chan) == -EPROBE_DEFER) {
-+			dev_warn(uap->port.dev, "DMA driver not ready\n");
-+			return;
-+		}
-+		dev_info(uap->port.dev, "no OF or ACPI DMA data\n");
- 
--	if (!chan) {
- 		/* We need platform data */
- 		if (!plat || !plat->dma_filter) {
- 			dev_info(uap->port.dev, "no DMA platform data\n");
-@@ -383,54 +392,9 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
- 		dev_info(uap->port.dev, "DMA channel RX %s\n",
- 			 dma_chan_name(uap->dmarx.chan));
- 	}
--}
--
--#ifndef MODULE
--/*
-- * Stack up the UARTs and let the above initcall be done at device
-- * initcall time, because the serial driver is called as an arch
-- * initcall, and at this time the DMA subsystem is not yet registered.
-- * At this point the driver will switch over to using DMA where desired.
-- */
--struct dma_uap {
--	struct list_head node;
--	struct uart_amba_port *uap;
--	struct device *dev;
--};
--
--static LIST_HEAD(pl011_dma_uarts);
--
--static int __init pl011_dma_initcall(void)
--{
--	struct list_head *node, *tmp;
--
--	list_for_each_safe(node, tmp, &pl011_dma_uarts) {
--		struct dma_uap *dmau = list_entry(node, struct dma_uap, node);
--		pl011_dma_probe_initcall(dmau->dev, dmau->uap);
--		list_del(node);
--		kfree(dmau);
--	}
--	return 0;
--}
--
--device_initcall(pl011_dma_initcall);
- 
--static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
--{
--	struct dma_uap *dmau = kzalloc(sizeof(struct dma_uap), GFP_KERNEL);
--	if (dmau) {
--		dmau->uap = uap;
--		dmau->dev = dev;
--		list_add_tail(&dmau->node, &pl011_dma_uarts);
--	}
-+	return;
- }
--#else
--static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
--{
--	pl011_dma_probe_initcall(dev, uap);
--}
--#endif
--
- static void pl011_dma_remove(struct uart_amba_port *uap)
- {
- 	/* TODO: remove the initcall if it has not yet executed */
-@@ -1548,6 +1512,9 @@ static int pl011_hwinit(struct uart_port *port)
- 	uap->im = readw(uap->port.membase + UART011_IMSC);
- 	writew(UART011_RTIM | UART011_RXIM, uap->port.membase + UART011_IMSC);
- 
-+	if (!uap->dma_probed)
-+		pl011_dma_probe(uap->port.dev, uap);
-+
- 	if (dev_get_platdata(uap->port.dev)) {
- 		struct amba_pl011_data *plat;
- 
-@@ -2218,7 +2185,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 	uap->port.ops = &amba_pl011_pops;
- 	uap->port.flags = UPF_BOOT_AUTOCONF;
- 	uap->port.line = i;
--	pl011_dma_probe(&dev->dev, uap);
- 
- 	/* Ensure interrupts from this UART are masked and cleared */
- 	writew(0, uap->port.membase + UART011_IMSC);
--- 
-1.9.1
+arch/x86/platform/olpc: x86 Maintainers
+drivers/acpi: Rafael J. Wysocki, Len Brown
+drivers/hid: Jiri Kosina
+drivers/platform/x86: Darren Hart
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150226/5fa42f7d/attachment.sig>
