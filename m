@@ -1,392 +1,150 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 26 Feb 2015 14:35:36 -0600
-Subject: [PATCH 03/11] drm: add driver for simple vga encoders
-In-Reply-To: <1422721984-27782-4-git-send-email-heiko@sntech.de>
-References: <1422721984-27782-1-git-send-email-heiko@sntech.de>
- <1422721984-27782-4-git-send-email-heiko@sntech.de>
-Message-ID: <CAL_Jsq+dv5ZmAX8Y_x8eFPdHyKeM72bM35Mg3+mVF8Ut1KiHgg@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 26 Feb 2015 15:33:45 -0500 (EST)
+Subject: [PATCH 3.19-rc6 v16 2/6] irqchip: gic: Make gic_raise_softirq
+ FIQ-safe
+In-Reply-To: <1422990417-1783-3-git-send-email-daniel.thompson@linaro.org>
+References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
+ <1422990417-1783-1-git-send-email-daniel.thompson@linaro.org>
+ <1422990417-1783-3-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <alpine.LFD.2.11.1502261531590.25484@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 31, 2015 at 10:32 AM, Heiko Stuebner <heiko@sntech.de> wrote:
-> There exist simple vga encoders without any type of management interface
-> and just maybe a simple gpio for turning it on or off. Examples for these
-> are the Analog Devices ADV7123, Chipsea CS7123 or Micronas SDA7123.
->
-> Add a generic encoder driver for those that can be used by drm drivers
-> using the component framework.
+On Tue, 3 Feb 2015, Daniel Thompson wrote:
 
-What makes this specific to VGA other than DRM_MODE_CONNECTOR_VGA?
-Seems like with match data you could generalize this to any simple
-encoder chip.
+> It is currently possible for FIQ handlers to re-enter gic_raise_softirq()
+> and lock up.
+> 
+>     	gic_raise_softirq()
+> 	   lock(x);
+> -~-> FIQ
+>         handle_fiq()
+> 	   gic_raise_softirq()
+> 	      lock(x);		<-- Lockup
+> 
+> arch/arm/ uses IPIs to implement arch_irq_work_raise(), thus this issue
+> renders it difficult for FIQ handlers to safely defer work to less
+> restrictive calling contexts.
+> 
+> This patch fixes the problem by converting the cpu_map_migration_lock
+> into a rwlock making it safe to re-enter the function.
+> 
+> Note that having made it safe to re-enter gic_raise_softirq() we no
+> longer need to mask interrupts during gic_raise_softirq() because the
+> b.L migration is always performed from task context.
 
-Rob
+Very good point.
 
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Once my concerns on patch #1 are addressed, you may add my ACK to this 
+one.
+
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/gpu/drm/i2c/Kconfig      |   6 +
->  drivers/gpu/drm/i2c/Makefile     |   2 +
->  drivers/gpu/drm/i2c/vga-simple.c | 325 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 333 insertions(+)
->  create mode 100644 drivers/gpu/drm/i2c/vga-simple.c
->
-> diff --git a/drivers/gpu/drm/i2c/Kconfig b/drivers/gpu/drm/i2c/Kconfig
-> index 22c7ed6..319f2cb 100644
-> --- a/drivers/gpu/drm/i2c/Kconfig
-> +++ b/drivers/gpu/drm/i2c/Kconfig
-> @@ -31,4 +31,10 @@ config DRM_I2C_NXP_TDA998X
->         help
->           Support for NXP Semiconductors TDA998X HDMI encoders.
->
-> +config DRM_VGA_SIMPLE
-> +       tristate "Generic simple vga encoder"
-> +       help
-> +         Support for vga encoder chips without any special settings
-> +         and at most a power-control gpio.
-> +
->  endmenu
-> diff --git a/drivers/gpu/drm/i2c/Makefile b/drivers/gpu/drm/i2c/Makefile
-> index 2c72eb5..858961f 100644
-> --- a/drivers/gpu/drm/i2c/Makefile
-> +++ b/drivers/gpu/drm/i2c/Makefile
-> @@ -10,3 +10,5 @@ obj-$(CONFIG_DRM_I2C_SIL164) += sil164.o
->
->  tda998x-y := tda998x_drv.o
->  obj-$(CONFIG_DRM_I2C_NXP_TDA998X) += tda998x.o
-> +
-> +obj-$(CONFIG_DRM_VGA_SIMPLE) += vga-simple.o
-> diff --git a/drivers/gpu/drm/i2c/vga-simple.c b/drivers/gpu/drm/i2c/vga-simple.c
-> new file mode 100644
-> index 0000000..bb9d19c
-> --- /dev/null
-> +++ b/drivers/gpu/drm/i2c/vga-simple.c
-> @@ -0,0 +1,325 @@
-> +/*
-> + * Simple vga encoder driver
+>  drivers/irqchip/irq-gic.c | 38 +++++++++++++++++++++++++-------------
+>  1 file changed, 25 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index a9ed64dcc84b..c172176499f6 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -75,22 +75,25 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+>  /*
+>   * This lock is used by the big.LITTLE migration code to ensure no IPIs
+>   * can be pended on the old core after the map has been updated.
 > + *
-> + * Copyright (C) 2014 Heiko Stuebner <heiko@sntech.de>
+> + * This lock may be locked for reading from both IRQ and FIQ handlers
+> + * and therefore must not be locked for writing when these are enabled.
+>   */
+>  #ifdef CONFIG_BL_SWITCHER
+> -static DEFINE_RAW_SPINLOCK(cpu_map_migration_lock);
+> +static DEFINE_RWLOCK(cpu_map_migration_lock);
+>  
+> -static inline void bl_migration_lock(unsigned long *flags)
+> +static inline void bl_migration_lock(void)
+>  {
+> -	raw_spin_lock_irqsave(&cpu_map_migration_lock, *flags);
+> +	read_lock(&cpu_map_migration_lock);
+>  }
+>  
+> -static inline void bl_migration_unlock(unsigned long flags)
+> +static inline void bl_migration_unlock(void)
+>  {
+> -	raw_spin_unlock_irqrestore(&cpu_map_migration_lock, flags);
+> +	read_unlock(&cpu_map_migration_lock);
+>  }
+>  #else
+> -static inline void bl_migration_lock(unsigned long *flags) {}
+> -static inline void bl_migration_unlock(unsigned long flags) {}
+> +static inline void bl_migration_lock(void) {}
+> +static inline void bl_migration_unlock(void) {}
+>  #endif
+>  
+>  /*
+> @@ -640,12 +643,20 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
+>  #endif
+>  
+>  #ifdef CONFIG_SMP
+> +/*
+> + * Raise the specified IPI on all cpus set in mask.
 > + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
+> + * This function is safe to call from all calling contexts, including
+> + * FIQ handlers. It relies on bl_migration_lock() being multiply acquirable
+> + * to avoid deadlocks when the function is re-entered at different
+> + * exception levels.
 > + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/component.h>
-> +#include <linux/gpio.h>
-> +#include <linux/gpio/consumer.h>
-> +#include <linux/i2c.h>
-> +#include <linux/regulator/consumer.h>
-> +#include <drm/drm_of.h>
-> +#include <drm/drmP.h>
-> +#include <drm/drm_crtc.h>
-> +#include <drm/drm_crtc_helper.h>
-> +#include <drm/drm_edid.h>
-> +
-> +#define connector_to_vga_simple(x) container_of(x, struct vga_simple, connector)
-> +#define encoder_to_vga_simple(x) container_of(x, struct vga_simple, encoder)
-> +
-> +struct vga_simple {
-> +       struct drm_connector connector;
-> +       struct drm_encoder encoder;
-> +
-> +       struct device *dev;
-> +       struct i2c_adapter *ddc;
-> +
-> +       struct regulator *vaa_reg;
-> +       struct gpio_desc *enable_gpio;
-> +
-> +       struct mutex enable_lock;
-> +       bool enabled;
-> +};
-> +
-> +/*
-> + * Connector functions
-> + */
-> +
-> +enum drm_connector_status vga_simple_detect(struct drm_connector *connector,
-> +                                           bool force)
-> +{
-> +       struct vga_simple *vga = connector_to_vga_simple(connector);
-> +
-> +       if (!vga->ddc)
-> +               return connector_status_unknown;
-> +
-> +       if (drm_probe_ddc(vga->ddc))
-> +               return connector_status_connected;
-> +
-> +       return connector_status_disconnected;
-> +}
-> +
-> +void vga_simple_connector_destroy(struct drm_connector *connector)
-> +{
-> +       drm_connector_unregister(connector);
-> +       drm_connector_cleanup(connector);
-> +}
-> +
-> +struct drm_connector_funcs vga_simple_connector_funcs = {
-> +       .dpms = drm_helper_connector_dpms,
-> +       .fill_modes = drm_helper_probe_single_connector_modes,
-> +       .detect = vga_simple_detect,
-> +       .destroy = vga_simple_connector_destroy,
-> +};
-> +
-> +/*
-> + * Connector helper functions
-> + */
-> +
-> +static int vga_simple_connector_get_modes(struct drm_connector *connector)
-> +{
-> +       struct vga_simple *vga = connector_to_vga_simple(connector);
-> +       struct edid *edid;
-> +       int ret = 0;
-> +
-> +       if (!vga->ddc)
-> +               return 0;
-> +
-> +       edid = drm_get_edid(connector, vga->ddc);
-> +       if (edid) {
-> +               drm_mode_connector_update_edid_property(connector, edid);
-> +               ret = drm_add_edid_modes(connector, edid);
-> +               kfree(edid);
-> +       }
-> +
-> +       return ret;
-> +}
-> +
-> +static int vga_simple_connector_mode_valid(struct drm_connector *connector,
-> +                                       struct drm_display_mode *mode)
-> +{
-> +       return MODE_OK;
-> +}
-> +
-> +static struct drm_encoder
-> +*vga_simple_connector_best_encoder(struct drm_connector *connector)
-> +{
-> +       struct vga_simple *vga = connector_to_vga_simple(connector);
-> +
-> +       return &vga->encoder;
-> +}
-> +
-> +static struct drm_connector_helper_funcs vga_simple_connector_helper_funcs = {
-> +       .get_modes = vga_simple_connector_get_modes,
-> +       .best_encoder = vga_simple_connector_best_encoder,
-> +       .mode_valid = vga_simple_connector_mode_valid,
-> +};
-> +
-> +/*
-> + * Encoder functions
-> + */
-> +
-> +static void vga_simple_encoder_destroy(struct drm_encoder *encoder)
-> +{
-> +       drm_encoder_cleanup(encoder);
-> +}
-> +
-> +static const struct drm_encoder_funcs vga_simple_encoder_funcs = {
-> +       .destroy = vga_simple_encoder_destroy,
-> +};
-> +
-> +/*
-> + * Encoder helper functions
-> + */
-> +
-> +static void vga_simple_encoder_dpms(struct drm_encoder *encoder, int mode)
-> +{
-> +       struct vga_simple *vga = encoder_to_vga_simple(encoder);
-> +
-> +       mutex_lock(&vga->enable_lock);
-> +
-> +       switch (mode) {
-> +       case DRM_MODE_DPMS_ON:
-> +               if (vga->enabled)
-> +                       goto out;
-> +
-> +               if (!IS_ERR(vga->vaa_reg))
-> +                       regulator_enable(vga->vaa_reg);
-> +
-> +               if (vga->enable_gpio)
-> +                       gpiod_set_value(vga->enable_gpio, 1);
-> +
-> +               vga->enabled = true;
-> +               break;
-> +       case DRM_MODE_DPMS_STANDBY:
-> +       case DRM_MODE_DPMS_SUSPEND:
-> +       case DRM_MODE_DPMS_OFF:
-> +               if (!vga->enabled)
-> +                       goto out;
-> +
-> +               if (vga->enable_gpio)
-> +                       gpiod_set_value(vga->enable_gpio, 0);
-> +
-> +               if (!IS_ERR(vga->vaa_reg))
-> +                       regulator_enable(vga->vaa_reg);
-> +
-> +               vga->enabled = false;
-> +               break;
-> +       default:
-> +               break;
-> +       }
-> +
-> +out:
-> +       mutex_unlock(&vga->enable_lock);
-> +}
-> +
-> +static bool vga_simple_mode_fixup(struct drm_encoder *encoder,
-> +                                 const struct drm_display_mode *mode,
-> +                                 struct drm_display_mode *adjusted_mode)
-> +{
-> +       return true;
-> +}
-> +
-> +static void vga_simple_encoder_prepare(struct drm_encoder *encoder)
-> +{
-> +}
-> +
-> +static void vga_simple_encoder_mode_set(struct drm_encoder *encoder,
-> +                                       struct drm_display_mode *mode,
-> +                                       struct drm_display_mode *adjusted_mode)
-> +{
-> +}
-> +
-> +static void vga_simple_encoder_commit(struct drm_encoder *encoder)
-> +{
-> +       vga_simple_encoder_dpms(encoder, DRM_MODE_DPMS_ON);
-> +}
-> +
-> +static void vga_simple_encoder_disable(struct drm_encoder *encoder)
-> +{
-> +       vga_simple_encoder_dpms(encoder, DRM_MODE_DPMS_OFF);
-> +}
-> +
-> +static const struct drm_encoder_helper_funcs vga_simple_encoder_helper_funcs = {
-> +       .dpms = vga_simple_encoder_dpms,
-> +       .mode_fixup = vga_simple_mode_fixup,
-> +       .prepare = vga_simple_encoder_prepare,
-> +       .mode_set = vga_simple_encoder_mode_set,
-> +       .commit = vga_simple_encoder_commit,
-> +       .disable = vga_simple_encoder_disable,
-> +};
-> +
-> +/*
-> + * Component helper functions
-> + */
-> +
-> +static int vga_simple_bind(struct device *dev, struct device *master,
-> +                                void *data)
-> +{
-> +       struct platform_device *pdev = to_platform_device(dev);
-> +       struct drm_device *drm = data;
-> +
-> +       struct device_node *ddc_node, *np = pdev->dev.of_node;
-> +       struct vga_simple *vga;
-> +       int ret;
-> +
-> +       if (!np)
-> +               return -ENODEV;
-> +
-> +       vga = devm_kzalloc(dev, sizeof(*vga), GFP_KERNEL);
-> +       if (!vga)
-> +               return -ENOMEM;
-> +
-> +       vga->dev = dev;
-> +       dev_set_drvdata(dev, vga);
-> +       mutex_init(&vga->enable_lock);
-> +
-> +       vga->enable_gpio = devm_gpiod_get_optional(dev, "enable",
-> +                                                  GPIOD_OUT_LOW);
-> +       if (IS_ERR(vga->enable_gpio)) {
-> +               ret = PTR_ERR(vga->enable_gpio);
-> +               dev_err(dev, "failed to request GPIO: %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       vga->enabled = false;
-> +
-> +       ddc_node = of_parse_phandle(np, "ddc-i2c-bus", 0);
-> +       if (ddc_node) {
-> +               vga->ddc = of_find_i2c_adapter_by_node(ddc_node);
-> +               of_node_put(ddc_node);
-> +               if (!vga->ddc) {
-> +                       dev_dbg(vga->dev, "failed to read ddc node\n");
-> +                       return -EPROBE_DEFER;
-> +               }
-> +       } else {
-> +               dev_dbg(vga->dev, "no ddc property found\n");
-> +       }
-> +
-> +       vga->vaa_reg = devm_regulator_get_optional(dev, "vaa");
-> +
-> +       vga->encoder.possible_crtcs = drm_of_find_possible_crtcs(drm, np);
-> +       vga->encoder.of_node = np;
-> +       vga->connector.polled = DRM_CONNECTOR_POLL_CONNECT |
-> +                               DRM_CONNECTOR_POLL_DISCONNECT;
-> +
-> +       drm_encoder_helper_add(&vga->encoder, &vga_simple_encoder_helper_funcs);
-> +       drm_encoder_init(drm, &vga->encoder, &vga_simple_encoder_funcs,
-> +                        DRM_MODE_ENCODER_DAC);
-> +
-> +       drm_connector_helper_add(&vga->connector,
-> +                                &vga_simple_connector_helper_funcs);
-> +       drm_connector_init(drm, &vga->connector, &vga_simple_connector_funcs,
-> +                          DRM_MODE_CONNECTOR_VGA);
-> +
-> +       drm_mode_connector_attach_encoder(&vga->connector, &vga->encoder);
-> +
-> +       return 0;
-> +}
-> +
-> +static void vga_simple_unbind(struct device *dev, struct device *master,
-> +                                   void *data)
-> +{
-> +       struct vga_simple *vga = dev_get_drvdata(dev);
-> +
-> +       vga->connector.funcs->destroy(&vga->connector);
-> +       vga->encoder.funcs->destroy(&vga->encoder);
-> +}
-> +
-> +static const struct component_ops vga_simple_ops = {
-> +       .bind = vga_simple_bind,
-> +       .unbind = vga_simple_unbind,
-> +};
-> +
-> +static int vga_simple_probe(struct platform_device *pdev)
-> +{
-> +       return component_add(&pdev->dev, &vga_simple_ops);
-> +}
-> +
-> +static int vga_simple_remove(struct platform_device *pdev)
-> +{
-> +       component_del(&pdev->dev, &vga_simple_ops);
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id vga_simple_ids[] = {
-> +       { .compatible = "adi,adv7123", },
-> +       {},
-> +};
-> +MODULE_DEVICE_TABLE(of, vga_simple_ids);
-> +
-> +static struct platform_driver vga_simple_driver = {
-> +       .probe  = vga_simple_probe,
-> +       .remove = vga_simple_remove,
-> +       .driver = {
-> +               .name = "vga-simple",
-> +               .of_match_table = vga_simple_ids,
-> +       },
-> +};
-> +module_platform_driver(vga_simple_driver);
-> +
-> +MODULE_AUTHOR("Heiko Stuebner <heiko@sntech.de>");
-> +MODULE_DESCRIPTION("Simple vga converter");
-> +MODULE_LICENSE("GPL");
+>  static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>  {
+>  	int cpu;
+> -	unsigned long flags, map = 0;
+> +	unsigned long map = 0;
+>  
+> -	bl_migration_lock(&flags);
+> +	bl_migration_lock();
+>  
+>  	/* Convert our logical CPU mask into a physical one. */
+>  	for_each_cpu(cpu, mask)
+> @@ -660,7 +671,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>  	/* this always happens on GIC0 */
+>  	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+>  
+> -	bl_migration_unlock(flags);
+> +	bl_migration_unlock();
+>  }
+>  #endif
+>  
+> @@ -708,7 +719,8 @@ int gic_get_cpu_id(unsigned int cpu)
+>   * Migrate all peripheral interrupts with a target matching the current CPU
+>   * to the interface corresponding to @new_cpu_id.  The CPU interface mapping
+>   * is also updated.  Targets to other CPU interfaces are unchanged.
+> - * This must be called with IRQs locally disabled.
+> + * This must be called from a task context and with IRQ and FIQ locally
+> + * disabled.
+>   */
+>  void gic_migrate_target(unsigned int new_cpu_id)
+>  {
+> @@ -739,9 +751,9 @@ void gic_migrate_target(unsigned int new_cpu_id)
+>  	 * pending on the old cpu static. That means we can defer the
+>  	 * migration until after we have released the irq_controller_lock.
+>  	 */
+> -	raw_spin_lock(&cpu_map_migration_lock);
+> +	write_lock(&cpu_map_migration_lock);
+>  	gic_cpu_map[cpu] = 1 << new_cpu_id;
+> -	raw_spin_unlock(&cpu_map_migration_lock);
+> +	write_unlock(&cpu_map_migration_lock);
+>  
+>  	/*
+>  	 * Find all the peripheral interrupts targetting the current
+> -- 
+> 1.9.3
+> 
 > --
-> 2.1.1
->
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+> 
