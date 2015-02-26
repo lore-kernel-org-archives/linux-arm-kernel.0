@@ -1,54 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Feb 2015 17:42:06 +0000
-Subject: [PATCH] ARM: kexec: Relax SMP validation to improve DT
- compatibility
-In-Reply-To: <1424947028-7438-1-git-send-email-geert+renesas@glider.be>
-References: <1424947028-7438-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150226174206.GL8656@n2100.arm.linux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 26 Feb 2015 18:52:57 +0100
+Subject: [PATCHv3] mvebu: add Linksys WRT1900AC (Mamba) support
+In-Reply-To: <op.xuiwzhcu2s3iss@ecaz>
+References: <1424089864-15651-1-git-send-email-kaloz@openwrt.org>
+ <54EB7255.7090806@free-electrons.com> <op.xuiwzhcu2s3iss@ecaz>
+Message-ID: <54EF5D79.9060503@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 11:37:08AM +0100, Geert Uytterhoeven wrote:
-> When trying to kexec into a new kernel on a platform where multiple CPU
-> cores are present, but no SMP bringup code is available yet, the
-> kexec_load system call fails with:
+Hi Imre,
+
+On 23/02/2015 19:43, Imre Kaloz wrote:
+> Hi Gregory,
 > 
->     kexec_load failed: Invalid argument
+> On Mon, 23 Feb 2015 19:32:53 +0100, Gregory CLEMENT  
+> <gregory.clement@free-electrons.com> wrote:
 > 
-> The SMP test added to machine_kexec_prepare() in commit 2103f6cba61a8b8b
-> ("ARM: 7807/1: kexec: validate CPU hotplug support") wants to prohibit
-> kexec on SMP platforms where it cannot disable secondary CPUs.
-> However, this test is too strict: if the secondary CPUs couldn't be
-> enabled in the first place, there's no need to disable them later at
-> kexec time.  Hence skip the test in the absence of SMP bringup code.
+> ...
+> 
+>>> @@ -0,0 +1,348 @@
+>>> +/*
+>>> + * Device Tree file for the Linksys WRT1900AC (Mamba).
+>>> + *
+>>> + * Note: this board is shipped with a new generation boot loader that
+>>> + * remaps internal registers at 0xf1000000. Therefore, if earlyprintk
+>>> + * is used, the CONFIG_DEBUG_MVEBU_UART_ALTERNATE option should be
+>>
+>> This symbol name has been removed and DEBUG_MVEBU_UART0_ALTERNATE would
+>> be used instead.
+>>
+>> Besides this,
+>>
+>> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>
+>> You don't have to resend a new version for this, I can amend
+>> your patch while applying it. So unless there is new comments
+>> I will add your patch to the mvebu tree in a couple of days.
+> 
+> I knew I will forget something - this has been noted by Andrew back then  
+> :) Thank you for taking care of this.
 
-Hmm.  I don't think we should relax it in this manner - I think there's
-an easier solution to this.
 
-> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-> index de2b085ad7535da7..8bf3b7c098881b95 100644
-> --- a/arch/arm/kernel/machine_kexec.c
-> +++ b/arch/arm/kernel/machine_kexec.c
-> @@ -46,7 +46,8 @@ int machine_kexec_prepare(struct kimage *image)
->  	 * and implements CPU hotplug for the current HW. If not, we won't be
->  	 * able to kexec reliably, so fail the prepare operation.
->  	 */
-> -	if (num_possible_cpus() > 1 && !platform_can_cpu_hotplug())
-> +	if (num_possible_cpus() > 1 && platform_can_secondary_boot() &&
-> +	    !platform_can_cpu_hotplug())
+Now applied (amended) on mvebu/dt
+Thanks,
 
-	if (num_online_cpus() > 1 && !platform_can_cpu_hotplug())
+Gregory
 
->  		return -EINVAL;
+> 
+> 
+> Best,
+> 
+> Imre
+> 
 
-Neither test is actually accurate though: when we have implementations
-where the secondary CPUs spin inside the kernel when they're "unplugged"
-that is not sufficient to be able to kexec.
-
-We should probably fix that, and make platform_can_cpu_hotplug() report
-whether it really is possible to hotplug all secondary CPUs into such
-a state that kexec can work.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
