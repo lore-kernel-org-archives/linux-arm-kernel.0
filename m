@@ -1,44 +1,39 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 26 Feb 2015 16:12:22 +0800
-Subject: [PATCH v4 28/30] PCI: Export find_pci_host_bridge()
+Date: Thu, 26 Feb 2015 16:12:20 +0800
+Subject: [PATCH v4 26/30] PCI/xgene: Use pci_scan_root_bus() instead of
+ pci_create_root_bus()
 In-Reply-To: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
 References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1424938344-4017-29-git-send-email-wangyijing@huawei.com>
+Message-ID: <1424938344-4017-27-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Export find_pci_host_bridge().
+Use pci_scan_root_bus() instead of pci_create_root_bus() +
+pci_scan_child_bus() for simplicity.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Tanmay Inamdar <tinamdar@apm.com>
 ---
- drivers/pci/host-bridge.c |    2 +-
- include/linux/pci.h       |    1 +
- 2 files changed, 2 insertions(+), 1 deletions(-)
+ drivers/pci/host/pci-xgene.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-index 4a2baa2..51e24f8 100644
---- a/drivers/pci/host-bridge.c
-+++ b/drivers/pci/host-bridge.c
-@@ -104,7 +104,7 @@ static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
- 	return bus;
- }
+diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+index aab5547..0c0e632 100644
+--- a/drivers/pci/host/pci-xgene.c
++++ b/drivers/pci/host/pci-xgene.c
+@@ -499,12 +499,11 @@ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
  
--static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
-+struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
- {
- 	struct pci_bus *root_bus = find_pci_root_bus(bus);
+-	bus = pci_create_root_bus(&pdev->dev, 0,
++	bus = pci_scan_root_bus(&pdev->dev, 0,
+ 					&xgene_pcie_ops, port, &res);
+ 	if (!bus)
+ 		return -ENOMEM;
  
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 2f29e95..6ac7926 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -426,6 +426,7 @@ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
- struct pci_host_bridge *pci_create_host_bridge(
- 		struct device *parent, u32 dombus, struct list_head *resources, 
- 		void *sysdata, struct pci_host_bridge_ops *ops);
-+struct pci_host_bridge *find_pci_host_bridge(struct pci_bus* bus);
- /*
-  * The first PCI_BRIDGE_RESOURCE_NUM PCI bus resources (those that correspond
-  * to P2P or CardBus bridge windows) go in a table.  Additional ones (for
+-	pci_scan_child_bus(bus);
+ 	pci_assign_unassigned_bus_resources(bus);
+ 	pci_bus_add_devices(bus);
+ 
 -- 
 1.7.1
