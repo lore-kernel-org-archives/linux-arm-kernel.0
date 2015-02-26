@@ -1,41 +1,57 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 26 Feb 2015 18:22:41 +0000
-Subject: [PATCH v2 3/3] xen/arm: allow console=hvc0 to be omitted for
- guests
-In-Reply-To: <1424275380.20761.31.camel@citrix.com>
-References: <1424267513-15836-1-git-send-email-julien.grall@linaro.org>
- <1424267513-15836-4-git-send-email-julien.grall@linaro.org>
- <CAL_Jsq+QniOFiVXEhuS+GEEnCkUpkrmtdE5E4ZytwTzoQSDpOg@mail.gmail.com>
- <1424275380.20761.31.camel@citrix.com>
-Message-ID: <alpine.DEB.2.02.1502261817210.23507@kaball.uk.xensource.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 26 Feb 2015 18:31:00 +0000
+Subject: [PATCH 00/12] ARM: dts: apq8064 dt patches.
+In-Reply-To: <6ABCEF31-CD4B-4544-8F0B-7654A45C198B@codeaurora.org>
+References: <1424678035-12862-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <6ABCEF31-CD4B-4544-8F0B-7654A45C198B@codeaurora.org>
+Message-ID: <54EF6664.9080905@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Feb 2015, Ian Campbell wrote:
-> On Wed, 2015-02-18 at 09:50 -0600, Rob Herring wrote:
-> > On Wed, Feb 18, 2015 at 7:51 AM, Julien Grall <julien.grall@linaro.org> wrote:
-> > > From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > >
-> > > This patch registers hvc0 as the preferred console if no console
-> > > has been specified explicitly on the kernel command line.
-> > >
-> > > The purpose is to allow platform agnostic kernels and boot images
-> > > (such as distro installers) to boot in a Xen/ARM domU without the
-> > > need to modify the command line by hand.
-> > 
-> > How does this interact with DT chosen stdout-path?
-> 
-> I think it shouldn't any more than the existing calls from e.g. the 8250
-> driver to preferred_console do.
+
+
+On 26/02/15 18:29, Kumar Gala wrote:
 >
-> > Is there a node for hvc0?
-> 
-> Not a direct one, it is inferred from the presence of the general Xen
-> node.
+> On Feb 23, 2015, at 1:53 AM, Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
+>
+>> Hi Kumar,
+>> Now that the rpm header file dependency is resolved, Could you
+>> queue these dt patches for rc2.
+>>
+>>
+>> Thanks,
+>> srini
+>>
+>> Nicolas Dechesne (3):
+>>   ARM: DT: apq8064: add pci support in CM QS600
+>>   ARM: DT: apq8064: Add usb host support to CM QS-600
+>>   ARM: DT: apq8064: Add USB OTG support for CM QS-600
+>>
+>> Pramod Gurav (1):
+>>   ARM: qcom: Add DT alias for serial port
+>>
+>> Rob Clark (1):
+>>   ARM: dts: APQ8064: Add MDP support
+>>
+>> Srinivas Kandagatla (7):
+>>   ARM: dts: apq8064: add RPM regulators support
+>>   ARM: dts: apq8064: Add usb host support.
+>>   ARM: dts: apq8064: Add USB OTG support
+>>   ARM: dts: apq8064: Add SATA controller support.
+>>   ARM: dts: apq8064: Remove incorrect gsbi2 node.
+>>   ARM: dts: Move i2c1 pinctrl to apq8064.dtsi
+>>   ARM: dts: apq8064 add i2c3 node for panel.
+>>
+>> arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts |  49 +++
+>> arch/arm/boot/dts/qcom-apq8064-ifc6410.dts  |  98 +++++-
+>> arch/arm/boot/dts/qcom-apq8064.dtsi         | 499 +++++++++++++++++++++++++++-
+>> 3 files changed, 629 insertions(+), 17 deletions(-)
+>
+> Can you scrub all the patches for interrupt usage such that we use GIC_SPI define and I think any IRQ type of 0 or NONE should really be IRQ_TYPE_LEVEL_HIGH
 
-Xen PV consoles, including hvc0, as all the other Xen PV devices are
-advertised on xenstore.
+Yes, I will fix it.
 
-
-> I did vaguely consider handling a stdout-path pointing to that --
-> but it seemed a bit of an abuse.
+--srini
+>
+> - k
+>
