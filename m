@@ -1,363 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 26 Feb 2015 17:11:49 +0100
-Subject: [PATCH 09/10] ARM: realview: make all header files local
-Message-ID: <1424967109-261656-1-git-send-email-arnd@arndb.de>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Thu, 26 Feb 2015 08:13:37 -0800
+Subject: [PATCH 1/2] Input: bcm-keypad: add device tree bindings
+In-Reply-To: <20150223174913.GB604@dtor-glaptop>
+References: <sbranden@broadcom.com>
+ <1423526861-29579-1-git-send-email-sbranden@broadcom.com>
+ <1423526861-29579-2-git-send-email-sbranden@broadcom.com>
+ <20150210005134.GA13695@dtor-ws> <54DF7C8B.3050103@broadcom.com>
+ <20150216051751.GA15948@dtor-ws> <20150223174913.GB604@dtor-glaptop>
+Message-ID: <54EF4631.1090903@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nothing includes these files any more, so we can simply move them
-from arch/arm/mach-realview/include/mach/ to arch/arm/mach-realview.
+Hi Dmitry,
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-realview/{include/mach => }/board-eb.h     |  2 +-
- arch/arm/mach-realview/{include/mach => }/board-pb1176.h |  2 +-
- arch/arm/mach-realview/{include/mach => }/board-pb11mp.h |  2 +-
- arch/arm/mach-realview/{include/mach => }/board-pba8.h   |  2 +-
- arch/arm/mach-realview/{include/mach => }/board-pbx.h    |  2 +-
- arch/arm/mach-realview/core.c                            |  6 +++---
- arch/arm/mach-realview/{include/mach => }/hardware.h     |  0
- arch/arm/mach-realview/{include/mach => }/irqs-eb.h      |  0
- arch/arm/mach-realview/{include/mach => }/irqs-pb1176.h  |  0
- arch/arm/mach-realview/{include/mach => }/irqs-pb11mp.h  |  0
- arch/arm/mach-realview/{include/mach => }/irqs-pba8.h    |  0
- arch/arm/mach-realview/{include/mach => }/irqs-pbx.h     |  0
- arch/arm/mach-realview/{include/mach => }/irqs.h         | 10 +++++-----
- arch/arm/mach-realview/{include/mach => }/platform.h     |  0
- arch/arm/mach-realview/platsmp.c                         |  8 ++++----
- arch/arm/mach-realview/realview_eb.c                     |  6 +++---
- arch/arm/mach-realview/realview_pb1176.c                 |  6 +++---
- arch/arm/mach-realview/realview_pb11mp.c                 |  6 +++---
- arch/arm/mach-realview/realview_pba8.c                   |  6 +++---
- arch/arm/mach-realview/realview_pbx.c                    |  6 +++---
- arch/arm/mach-realview/{include/mach => }/uncompress.h   | 12 ++++++------
- 21 files changed, 38 insertions(+), 38 deletions(-)
- rename arch/arm/mach-realview/{include/mach => }/board-eb.h (99%)
- rename arch/arm/mach-realview/{include/mach => }/board-pb1176.h (99%)
- rename arch/arm/mach-realview/{include/mach => }/board-pb11mp.h (99%)
- rename arch/arm/mach-realview/{include/mach => }/board-pba8.h (99%)
- rename arch/arm/mach-realview/{include/mach => }/board-pbx.h (99%)
- rename arch/arm/mach-realview/{include/mach => }/hardware.h (100%)
- rename arch/arm/mach-realview/{include/mach => }/irqs-eb.h (100%)
- rename arch/arm/mach-realview/{include/mach => }/irqs-pb1176.h (100%)
- rename arch/arm/mach-realview/{include/mach => }/irqs-pb11mp.h (100%)
- rename arch/arm/mach-realview/{include/mach => }/irqs-pba8.h (100%)
- rename arch/arm/mach-realview/{include/mach => }/irqs-pbx.h (100%)
- rename arch/arm/mach-realview/{include/mach => }/irqs.h (88%)
- rename arch/arm/mach-realview/{include/mach => }/platform.h (100%)
- rename arch/arm/mach-realview/{include/mach => }/uncompress.h (91%)
+Thanks for the update of no need to change any of dt-binding prefixes. 
+I just sent out a v2 patch addressing all of your other comments.
 
-diff --git a/arch/arm/mach-realview/include/mach/board-eb.h b/arch/arm/mach-realview/board-eb.h
-similarity index 99%
-rename from arch/arm/mach-realview/include/mach/board-eb.h
-rename to arch/arm/mach-realview/board-eb.h
-index a301e61a5554..ac9c98f9a971 100644
---- a/arch/arm/mach-realview/include/mach/board-eb.h
-+++ b/arch/arm/mach-realview/board-eb.h
-@@ -21,7 +21,7 @@
- #ifndef __ASM_ARCH_BOARD_EB_H
- #define __ASM_ARCH_BOARD_EB_H
- 
--#include <mach/platform.h>
-+#include "platform.h"
- 
- /*
-  * RealView EB + ARM11MPCore peripheral addresses
-diff --git a/arch/arm/mach-realview/include/mach/board-pb1176.h b/arch/arm/mach-realview/board-pb1176.h
-similarity index 99%
-rename from arch/arm/mach-realview/include/mach/board-pb1176.h
-rename to arch/arm/mach-realview/board-pb1176.h
-index 2a15fef94730..836433dc789c 100644
---- a/arch/arm/mach-realview/include/mach/board-pb1176.h
-+++ b/arch/arm/mach-realview/board-pb1176.h
-@@ -21,7 +21,7 @@
- #ifndef __ASM_ARCH_BOARD_PB1176_H
- #define __ASM_ARCH_BOARD_PB1176_H
- 
--#include <mach/platform.h>
-+#include "platform.h"
- 
- /*
-  * Peripheral addresses
-diff --git a/arch/arm/mach-realview/include/mach/board-pb11mp.h b/arch/arm/mach-realview/board-pb11mp.h
-similarity index 99%
-rename from arch/arm/mach-realview/include/mach/board-pb11mp.h
-rename to arch/arm/mach-realview/board-pb11mp.h
-index aa2d4e02ea2c..e3a758b147ab 100644
---- a/arch/arm/mach-realview/include/mach/board-pb11mp.h
-+++ b/arch/arm/mach-realview/board-pb11mp.h
-@@ -21,7 +21,7 @@
- #ifndef __ASM_ARCH_BOARD_PB11MP_H
- #define __ASM_ARCH_BOARD_PB11MP_H
- 
--#include <mach/platform.h>
-+#include "platform.h"
- 
- /*
-  * Peripheral addresses
-diff --git a/arch/arm/mach-realview/include/mach/board-pba8.h b/arch/arm/mach-realview/board-pba8.h
-similarity index 99%
-rename from arch/arm/mach-realview/include/mach/board-pba8.h
-rename to arch/arm/mach-realview/board-pba8.h
-index 4dfc67a4f45f..84232fe942d2 100644
---- a/arch/arm/mach-realview/include/mach/board-pba8.h
-+++ b/arch/arm/mach-realview/board-pba8.h
-@@ -21,7 +21,7 @@
- #ifndef __ASM_ARCH_BOARD_PBA8_H
- #define __ASM_ARCH_BOARD_PBA8_H
- 
--#include <mach/platform.h>
-+#include "platform.h"
- 
- /*
-  * Peripheral addresses
-diff --git a/arch/arm/mach-realview/include/mach/board-pbx.h b/arch/arm/mach-realview/board-pbx.h
-similarity index 99%
-rename from arch/arm/mach-realview/include/mach/board-pbx.h
-rename to arch/arm/mach-realview/board-pbx.h
-index 848bfff6d8f1..3dab54fa9e97 100644
---- a/arch/arm/mach-realview/include/mach/board-pbx.h
-+++ b/arch/arm/mach-realview/board-pbx.h
-@@ -20,7 +20,7 @@
- #ifndef __ASM_ARCH_BOARD_PBX_H
- #define __ASM_ARCH_BOARD_PBX_H
- 
--#include <mach/platform.h>
-+#include "platform.h"
- 
- /*
-  * Peripheral addresses
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index 850e506926df..2e4d57cf65b9 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-@@ -34,7 +34,7 @@
- #include <linux/mtd/physmap.h>
- #include <linux/memblock.h>
- 
--#include <mach/hardware.h>
-+#include "hardware.h"
- #include <asm/irq.h>
- #include <asm/mach-types.h>
- #include <asm/hardware/arm_timer.h>
-@@ -45,8 +45,8 @@
- #include <asm/mach/map.h>
- 
- 
--#include <mach/platform.h>
--#include <mach/irqs.h>
-+#include "platform.h"
-+#include "irqs.h"
- #include <asm/hardware/timer-sp.h>
- 
- #include <plat/sched_clock.h>
-diff --git a/arch/arm/mach-realview/include/mach/hardware.h b/arch/arm/mach-realview/hardware.h
-similarity index 100%
-rename from arch/arm/mach-realview/include/mach/hardware.h
-rename to arch/arm/mach-realview/hardware.h
-diff --git a/arch/arm/mach-realview/include/mach/irqs-eb.h b/arch/arm/mach-realview/irqs-eb.h
-similarity index 100%
-rename from arch/arm/mach-realview/include/mach/irqs-eb.h
-rename to arch/arm/mach-realview/irqs-eb.h
-diff --git a/arch/arm/mach-realview/include/mach/irqs-pb1176.h b/arch/arm/mach-realview/irqs-pb1176.h
-similarity index 100%
-rename from arch/arm/mach-realview/include/mach/irqs-pb1176.h
-rename to arch/arm/mach-realview/irqs-pb1176.h
-diff --git a/arch/arm/mach-realview/include/mach/irqs-pb11mp.h b/arch/arm/mach-realview/irqs-pb11mp.h
-similarity index 100%
-rename from arch/arm/mach-realview/include/mach/irqs-pb11mp.h
-rename to arch/arm/mach-realview/irqs-pb11mp.h
-diff --git a/arch/arm/mach-realview/include/mach/irqs-pba8.h b/arch/arm/mach-realview/irqs-pba8.h
-similarity index 100%
-rename from arch/arm/mach-realview/include/mach/irqs-pba8.h
-rename to arch/arm/mach-realview/irqs-pba8.h
-diff --git a/arch/arm/mach-realview/include/mach/irqs-pbx.h b/arch/arm/mach-realview/irqs-pbx.h
-similarity index 100%
-rename from arch/arm/mach-realview/include/mach/irqs-pbx.h
-rename to arch/arm/mach-realview/irqs-pbx.h
-diff --git a/arch/arm/mach-realview/include/mach/irqs.h b/arch/arm/mach-realview/irqs.h
-similarity index 88%
-rename from arch/arm/mach-realview/include/mach/irqs.h
-rename to arch/arm/mach-realview/irqs.h
-index 78854f2fa323..1bd8a9a00337 100644
---- a/arch/arm/mach-realview/include/mach/irqs.h
-+++ b/arch/arm/mach-realview/irqs.h
-@@ -22,11 +22,11 @@
- #ifndef __ASM_ARCH_IRQS_H
- #define __ASM_ARCH_IRQS_H
- 
--#include <mach/irqs-eb.h>
--#include <mach/irqs-pb11mp.h>
--#include <mach/irqs-pb1176.h>
--#include <mach/irqs-pba8.h>
--#include <mach/irqs-pbx.h>
-+#include "irqs-eb.h"
-+#include "irqs-pb11mp.h"
-+#include "irqs-pb1176.h"
-+#include "irqs-pba8.h"
-+#include "irqs-pbx.h"
- 
- #define IRQ_LOCALTIMER		29
- #define IRQ_LOCALWDOG		30
-diff --git a/arch/arm/mach-realview/include/mach/platform.h b/arch/arm/mach-realview/platform.h
-similarity index 100%
-rename from arch/arm/mach-realview/include/mach/platform.h
-rename to arch/arm/mach-realview/platform.h
-diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
-index 98e3052b7933..a2331b36ccce 100644
---- a/arch/arm/mach-realview/platsmp.c
-+++ b/arch/arm/mach-realview/platsmp.c
-@@ -13,13 +13,13 @@
- #include <linux/smp.h>
- #include <linux/io.h>
- 
--#include <mach/hardware.h>
-+#include "hardware.h"
- #include <asm/mach-types.h>
- #include <asm/smp_scu.h>
- 
--#include <mach/board-eb.h>
--#include <mach/board-pb11mp.h>
--#include <mach/board-pbx.h>
-+#include "board-eb.h"
-+#include "board-pb11mp.h"
-+#include "board-pbx.h"
- 
- #include <plat/platsmp.h>
- 
-diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
-index cebfdce1c7cd..c27eab1c39f7 100644
---- a/arch/arm/mach-realview/realview_eb.c
-+++ b/arch/arm/mach-realview/realview_eb.c
-@@ -31,7 +31,7 @@
- #include <linux/platform_data/clk-realview.h>
- #include <linux/reboot.h>
- 
--#include <mach/hardware.h>
-+#include "hardware.h"
- #include <asm/irq.h>
- #include <asm/mach-types.h>
- #include <asm/pgtable.h>
-@@ -43,8 +43,8 @@
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- 
--#include <mach/board-eb.h>
--#include <mach/irqs.h>
-+#include "board-eb.h"
-+#include "irqs.h"
- 
- #include "core.h"
- 
-diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
-index ce92c1823494..e5fd1ce9051f 100644
---- a/arch/arm/mach-realview/realview_pb1176.c
-+++ b/arch/arm/mach-realview/realview_pb1176.c
-@@ -34,7 +34,7 @@
- #include <linux/reboot.h>
- #include <linux/memblock.h>
- 
--#include <mach/hardware.h>
-+#include "hardware.h"
- #include <asm/irq.h>
- #include <asm/mach-types.h>
- #include <asm/pgtable.h>
-@@ -45,8 +45,8 @@
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- 
--#include <mach/board-pb1176.h>
--#include <mach/irqs.h>
-+#include "board-pb1176.h"
-+#include "irqs.h"
- 
- #include "core.h"
- 
-diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
-index f9817bb5d8fa..10b16961f7e1 100644
---- a/arch/arm/mach-realview/realview_pb11mp.c
-+++ b/arch/arm/mach-realview/realview_pb11mp.c
-@@ -31,7 +31,7 @@
- #include <linux/platform_data/clk-realview.h>
- #include <linux/reboot.h>
- 
--#include <mach/hardware.h>
-+#include "hardware.h"
- #include <asm/irq.h>
- #include <asm/mach-types.h>
- #include <asm/pgtable.h>
-@@ -43,8 +43,8 @@
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- 
--#include <mach/board-pb11mp.h>
--#include <mach/irqs.h>
-+#include "board-pb11mp.h"
-+#include "irqs.h"
- 
- #include "core.h"
- 
-diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
-index b3549a637ff0..263e37391445 100644
---- a/arch/arm/mach-realview/realview_pba8.c
-+++ b/arch/arm/mach-realview/realview_pba8.c
-@@ -39,9 +39,9 @@
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- 
--#include <mach/hardware.h>
--#include <mach/board-pba8.h>
--#include <mach/irqs.h>
-+#include "hardware.h"
-+#include "board-pba8.h"
-+#include "irqs.h"
- 
- #include "core.h"
- 
-diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
-index f26e1e09f29e..810b15410bf2 100644
---- a/arch/arm/mach-realview/realview_pbx.c
-+++ b/arch/arm/mach-realview/realview_pbx.c
-@@ -41,9 +41,9 @@
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- 
--#include <mach/hardware.h>
--#include <mach/board-pbx.h>
--#include <mach/irqs.h>
-+#include "hardware.h"
-+#include "board-pbx.h"
-+#include "irqs.h"
- 
- #include "core.h"
- 
-diff --git a/arch/arm/mach-realview/include/mach/uncompress.h b/arch/arm/mach-realview/uncompress.h
-similarity index 91%
-rename from arch/arm/mach-realview/include/mach/uncompress.h
-rename to arch/arm/mach-realview/uncompress.h
-index cfa30d21783b..f8ac3e723628 100644
---- a/arch/arm/mach-realview/include/mach/uncompress.h
-+++ b/arch/arm/mach-realview/uncompress.h
-@@ -17,14 +17,14 @@
-  * along with this program; if not, write to the Free Software
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-  */
--#include <mach/hardware.h>
-+#include "hardware.h"
- #include <asm/mach-types.h>
- 
--#include <mach/board-eb.h>
--#include <mach/board-pb11mp.h>
--#include <mach/board-pb1176.h>
--#include <mach/board-pba8.h>
--#include <mach/board-pbx.h>
-+#include "board-eb.h"
-+#include "board-pb11mp.h"
-+#include "board-pb1176.h"
-+#include "board-pba8.h"
-+#include "board-pbx.h"
- 
- #define AMBA_UART_DR(base)	(*(volatile unsigned char *)((base) + 0x00))
- #define AMBA_UART_LCRH(base)	(*(volatile unsigned char *)((base) + 0x2c))
--- 
-2.1.0.rc2
+On 15-02-23 09:49 AM, Dmitry Torokhov wrote:
+> Hi Scott,
+>
+> On Sun, Feb 15, 2015 at 09:17:51PM -0800, Dmitry Torokhov wrote:
+>> On Sat, Feb 14, 2015 at 08:49:15AM -0800, Scott Branden wrote:
+>>> On 15-02-09 04:51 PM, Dmitry Torokhov wrote:
+>>>> On Mon, Feb 09, 2015 at 04:07:40PM -0800, Scott Branden wrote:
+>>>>> +
+>>>>> +- col-debounce-filter-period: The debounce period for the Column filter.
+>>>>> +
+>>>>> +	KEYPAD_DEBOUNCE_1_ms	=	0
+>>>>> +	KEYPAD_DEBOUNCE_2_ms	=	1
+>>>>> +	KEYPAD_DEBOUNCE_4_ms	=	2
+>>>>> +	KEYPAD_DEBOUNCE_8_ms	=	3
+>>>>
+>>>>> +	KEYPAD_DEBOUNCE_16_ms	=	4
+>>>>> +	KEYPAD_DEBOUNCE_32_ms	=	5
+>>>>> +	KEYPAD_DEBOUNCE_64_ms	=	6
+>>>>> +	KEYPAD_DEBOUNCE_128_ms	=	7
+>>>>> +
+>>>>> +- status-debounce-filter-period: The debounce period for the Status filter.
+>>>>> +
+>>>>> +	KEYPAD_DEBOUNCE_1_ms	=	0
+>>>>> +	KEYPAD_DEBOUNCE_2_ms	=	1
+>>>>> +	KEYPAD_DEBOUNCE_4_ms	=	2
+>>>>> +	KEYPAD_DEBOUNCE_8_ms	=	3
+>>>>> +	KEYPAD_DEBOUNCE_16_ms	=	4
+>>>>> +	KEYPAD_DEBOUNCE_32_ms	=	5
+>>>>> +	KEYPAD_DEBOUNCE_64_ms	=	6
+>>>>> +	KEYPAD_DEBOUNCE_128_ms	=	7
+>>>>
+>>>> I could swear device-specific properties should be in form of
+>>>> <vendor-prefix>,<property-name> to ensure it won't clash with changes on
+>>>> subsystem level later on. Device-tree folks, what say you?
+>>> I see examples with and without vendor-prefix.
+>>> qcom,pm8xxx-keypad.txt does not have prefixes
+>>> st-keyscan.txt does have a prefix
+>>>
+>>> I can't find any documented guidelines for this.
+>>
+>> As I mentioned I'll try to get clarification on this.
+>
+> I have chatted with a couple of people on this and it is acceptable to
+> omit vendor prefix in bindings when we are using a specific driver like
+> we have here (i.e. when driver's compatible string already includes
+> vendor prefix). Vendor prefixes on properties are required when we
+> augment a generic driver's binding.
+>
+> So the above 2 entries are fine as is.
+>
+> Thanks.
+>
