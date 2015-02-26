@@ -1,114 +1,38 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 26 Feb 2015 11:43:19 +0100
-Subject: [PATCH] pinctrl: dt: at91: new binding
-In-Reply-To: <1424943294-8805-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1424943294-8805-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20150226104319.GE20718@odux.rfo.atmel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 26 Feb 2015 11:43:04 +0100
+Subject: [PATCH v2 02/18] ARM: ARMv7M: Enlarge vector table to 256 entries
+In-Reply-To: <CALszF6B6A=de_TK0e-iJHuW4MfD9xbd-yHZHaD-JmZXwZ9CW2A@mail.gmail.com>
+References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1424455277-29983-3-git-send-email-mcoquelin.stm32@gmail.com>
+ <20150220194756.GS19388@pengutronix.de>
+ <CALszF6CB9YU7ashQ-y_zx58Mkf=sbrBfa2dAOdQm7FkmcuE7PA@mail.gmail.com>
+ <CALszF6B6A=de_TK0e-iJHuW4MfD9xbd-yHZHaD-JmZXwZ9CW2A@mail.gmail.com>
+Message-ID: <20150226104304.GK7789@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
-
-On Thu, Feb 26, 2015 at 10:34:54AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> Today if we want to disable a pio bank we may will siliently break pinctrl
-> configuration in the DT. This will be detected only at runtime.
-
-Do you have a case where it breaks pinctrl? I can do more tests but with
-the latest patch "pinctrl: at91: allow to have disabled gpio bank", I
-had no issue.
-
+On Thu, Feb 26, 2015 at 11:29:52AM +0100, Maxime Coquelin wrote:
+> 2015-02-23 11:33 GMT+01:00 Maxime Coquelin <mcoquelin.stm32@gmail.com>:
+> > 2015-02-20 20:47 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> >> Who do you target to apply this series?
+> >
+> > I guess it should go through Russell's Patch Tracking System?
 > 
-> So move the pinctrl configuration to the bank instead of the bus.
-> This allow to detect pinctrl issue at DT compiling time when disable a bank.
+> Sorry, I answered your question too quickly.
+> I meant this patch should go through Russell's Patch Tracking System.
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: devicetree at vger.kernel.org
-> ---
->  .../bindings/pinctrl/atmel,at91-pinctrl.txt        | 66 ++++++++++++++++++++++
->  1 file changed, 66 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
-> index b7a93e8..78355ee 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
-> @@ -148,3 +148,69 @@ dbgu: serial at fffff200 {
->  	pinctrl-0 = <&pinctrl_dbgu>;
->  	status = "disabled";
->  };
-> +
-> +II) New Bindings per PIO Block
-> +
-> +This allow to detect pinctrl issue at DT compiling time when disable a bank
-> +
-> +Required properties for iomux controller:
-> +- compatible: "atmel,at91rm9200-pio-pinctrl" or "atmel,at91sam9x5-pio-pinctrl"
-> +		or "atmel,sama5d3-pio-pinctrl"
-> +- atmel,mux-mask: array of mask (periph per bank) to describe if a pin can be
-> +  configured in this periph mode. All the periph and bank need to be describe.
-> +
-> +How to create such array:
-> +
-> +Each column will represent the possible peripheral of the pinctrl for the bank
-> +
-> +Take an example on the 9260
-> +Peripheral: 2 ( A and B)
-> +=>
-> +
-> +  /*    A         B     */
-> +  0xffffffff 0xffc00c3b  /* pioA */
-> +
-> +For each peripheral/bank we will descibe in a u32 if a pin can be
-> +configured in it by putting 1 to the pin bit (1 << pin)
-> +
-> +Required properties for pin configuration node:
-> +- atmel,pins: 3 integers array, represents a group of pins mux and config
-> +  setting. The format is atmel,pins = <PIN_NUM PERIPH CONFIG>.
-> +  The PERIPH 0 means gpio, PERIPH 1 is periph A, PERIPH 2 is periph B...
-> +
-> +Bits used for CONFIG:
-> +cf atmel,at91-pinctrl
-> +
-> +pioB: gpio at fffff600 {
-> +	compatible = "atmel,at91rm9200-gpio", "atmel,at91rm9200-pio-pinctrl";
-> +	reg = <0xfffff600 0x200>;
-> +	interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
-> +	#gpio-cells = <2>;
-> +	gpio-controller;
-> +	interrupt-controller;
-> +	#interrupt-cells = <2>;
-> +	clocks = <&pioB_clk>;
-> +
-> +			 /*    A         B     */
-> +	atmel,mux-mask = <0xffffffff 0x7fff3ccf>;
-> +
-> +	dbgu {
-> +		pinctrl_dbgu: dbgu-0 {
-> +			atmel,pins =
-> +				<14 0x1 0x0	/* PB14 periph A */
-> +				 15 0x1 0x1>;	/* PB15 periph A with pullup */
-> +		};
-> +	};
+> For the other patches, I think it should be picked by their respective
+> maintainers.
+> Or I can create an immutable tag (on github or kernel.org?) that will
+> be merged by the different sub-systems?
+> What would you advise?
+Depends on the interdependencies of your patches. If each maintainer can
+just pick up the patches affecting his area on top of (say) 4.0-rc1 that
+would be good.
 
-So we have to update all device tree files, that's a lot of work...
-Moreover it adds complexity if we have a device using pins from
-different pio controllers.
+Best regards
+Uwe
 
-> +};
-> +
-> +dbgu: serial at fffff200 {
-> +	compatible = "atmel,at91sam9260-usart";
-> +	reg = <0xfffff200 0x200>;
-> +	interrupts = <1 4 7>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_dbgu>;
-> +	status = "disabled";
-> +};
-> +
-> +if you have to use multiple bank
-> +	pinctrl-0 = <&pinctrl_ip_piaa>, <&pinctrl_ip_piab>;
-
-You mean pio I think.
-
-
-Ludovic
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
