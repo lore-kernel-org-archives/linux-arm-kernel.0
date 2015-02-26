@@ -1,131 +1,51 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 26 Feb 2015 12:27:59 -0600
-Subject: [PATCH 03/12] ARM: dts: apq8064: Add USB OTG support
-In-Reply-To: <1424678108-13052-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <424678035-12862-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424678108-13052-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1C851112-EDEB-41D3-BFA4-47840BF34017@codeaurora.org>
+Date: Thu, 26 Feb 2015 12:29:36 -0600
+Subject: [PATCH 00/12] ARM: dts: apq8064 dt patches.
+In-Reply-To: <1424678035-12862-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1424678035-12862-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <6ABCEF31-CD4B-4544-8F0B-7654A45C198B@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On Feb 23, 2015, at 1:55 AM, Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
+On Feb 23, 2015, at 1:53 AM, Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
 
-> This patch adds USB OTG support on USB1 of APQ8064 SOC.
-> Tested on IFC6410 with ethernet gadget.
+> Hi Kumar, 
+> Now that the rpm header file dependency is resolved, Could you
+> queue these dt patches for rc2.
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
-> arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 22 ++++++++++++++++++++
-> arch/arm/boot/dts/qcom-apq8064.dtsi        | 32 ++++++++++++++++++++++++++++++
-> 2 files changed, 54 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> index 40657a4..1723cdf 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> @@ -61,12 +61,25 @@
-> 				regulator-max-microvolt = <3300000>;
-> 			};
+> Thanks,
+> srini
 > 
-> +			pm8921_l4: pm8921-l4 {
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <1800000>;
-> +			};
-> +
-> 			pm8921_l23: pm8921-l23 {
-> 				regulator-min-microvolt = <1700000>;
-> 				regulator-max-microvolt = <1900000>;
-> 			};
-> 		};
+> Nicolas Dechesne (3):
+>  ARM: DT: apq8064: add pci support in CM QS600
+>  ARM: DT: apq8064: Add usb host support to CM QS-600
+>  ARM: DT: apq8064: Add USB OTG support for CM QS-600
 > 
-> +		/* OTG */
-> +		usb1_phy: phy at 12500000 {
-> +			status		= "okay";
-> +			vddcx-supply	= <&pm8921_s3>;
-> +			v3p3-supply	= <&pm8921_l3>;
-> +			v1p8-supply	= <&pm8921_l4>;
-> +		};
-> +
-> 		usb3_phy: phy at 12520000 {
-> 			status		= "okay";
-> 			vddcx-supply	= <&pm8921_s3>;
-> @@ -81,6 +94,15 @@
-> 			v1p8-supply	= <&pm8921_l23>;
-> 		};
+> Pramod Gurav (1):
+>  ARM: qcom: Add DT alias for serial port
 > 
-> +		gadget1: gadget at 12500000 {
-> +			status = "okay";
-> +		};
-> +
-> +		/* OTG */
-> +		usb1: usb at 12500000 {
-> +			status = "okay";
-> +		};
-> +
-> 		usb3: usb at 12520000 {
-> 			status = "okay";
-> 		};
-> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> index e33eb03..c251c72 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> @@ -488,6 +488,21 @@
-> 			};
-> 		};
+> Rob Clark (1):
+>  ARM: dts: APQ8064: Add MDP support
 > 
-> +		usb1_phy: phy at 12500000 {
-> +			compatible	= "qcom,usb-otg-ci";
-> +			reg		= <0x12500000 0x400>;
-> +			interrupts	= <0 100 IRQ_TYPE_NONE>;
+> Srinivas Kandagatla (7):
+>  ARM: dts: apq8064: add RPM regulators support
+>  ARM: dts: apq8064: Add usb host support.
+>  ARM: dts: apq8064: Add USB OTG support
+>  ARM: dts: apq8064: Add SATA controller support.
+>  ARM: dts: apq8064: Remove incorrect gsbi2 node.
+>  ARM: dts: Move i2c1 pinctrl to apq8064.dtsi
+>  ARM: dts: apq8064 add i2c3 node for panel.
+> 
+> arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts |  49 +++
+> arch/arm/boot/dts/qcom-apq8064-ifc6410.dts  |  98 +++++-
+> arch/arm/boot/dts/qcom-apq8064.dtsi         | 499 +++++++++++++++++++++++++++-
+> 3 files changed, 629 insertions(+), 17 deletions(-)
 
-Same comments about 0 -> GIC_SPI, and IRQ_TYPE_NONE -> IRQ_TYPE_LEVEL_HIGH
+Can you scrub all the patches for interrupt usage such that we use GIC_SPI define and I think any IRQ type of 0 or NONE should really be IRQ_TYPE_LEVEL_HIGH
 
-> +			status		= "disabled";
-> +			dr_mode		= "host";
-> +
-> +			clocks		= <&gcc USB_HS1_XCVR_CLK>,
-> +					  <&gcc USB_HS1_H_CLK>;
-> +			clock-names	= "core", "iface";
-> +
-> +			resets		= <&gcc USB_HS1_RESET>;
-> +			reset-names	= "link";
-> +		};
-> +
-> 		usb3_phy: phy at 12520000 {
-> 			compatible	= "qcom,usb-otg-ci";
-> 			reg		= <0x12520000 0x400>;
-> @@ -518,6 +533,23 @@
-> 			reset-names	= "link";
-> 		};
-> 
-> +		gadget1: gadget at 12500000 {
-> +			compatible	= "qcom,ci-hdrc";
-> +			reg		= <0x12500000 0x400>;
-> +			status		= "disabled";
-> +			dr_mode		= "peripheral";
-> +			interrupts	= <0 100 IRQ_TYPE_NONE>;
-> +			usb-phy		= <&usb1_phy>;
-> +		};
-> +
-> +		usb1: usb at 12500000 {
-> +			compatible	= "qcom,ehci-host";
-> +			reg		= <0x12500000 0x400>;
-> +			interrupts	= <0 100 IRQ_TYPE_NONE>;
-> +			status		= "disabled";
-> +			usb-phy		= <&usb1_phy>;
-> +		};
-> +
-> 		usb3: usb at 12520000 {
-> 			compatible	= "qcom,ehci-host";
-> 			reg		= <0x12520000 0x400>;
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+- k
 
 -- 
 Qualcomm Innovation Center, Inc.
