@@ -1,117 +1,75 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 26 Feb 2015 19:03:56 +0800
-Subject: [PATCH] pinctrl: dt: at91: new binding
-In-Reply-To: <20150226104319.GE20718@odux.rfo.atmel.com>
-References: <1424943294-8805-1-git-send-email-plagnioj@jcrosoft.com>
- <20150226104319.GE20718@odux.rfo.atmel.com>
-Message-ID: <F74AA2E0-606F-419D-9ADD-3C24CA0973DD@jcrosoft.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 26 Feb 2015 11:06:59 +0000
+Subject: [RFC] pwm-backlight: Allow backlight to remain disabled on boot
+In-Reply-To: <1406806970-12561-1-git-send-email-thierry.reding@gmail.com>
+References: <1406806970-12561-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20150226110659.GO6688@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On Feb 26, 2015, at 6:43 PM, Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
+On Thu, 31 Jul 2014, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
 > 
-> Hi Jean-Christophe,
+> The default for backlight devices is to be enabled immediately when
+> registering with the backlight core. This can be useful for setups that
+> use a simple framebuffer device and where the backlight cannot otherwise
+> be hooked up to the panel.
 > 
-> On Thu, Feb 26, 2015 at 10:34:54AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> Today if we want to disable a pio bank we may will siliently break pinctrl
->> configuration in the DT. This will be detected only at runtime.
+> However, when dealing with more complex setups, such as those of recent
+> ARM SoCs, this can be problematic. Since the backlight is usually setup
+> separately from the display controller, the probe order is not usually
+> deterministic. That can lead to situations where the backlight will be
+> powered up and the panel will show an uninitialized framebuffer.
 > 
-> Do you have a case where it breaks pinctrl? I can do more tests but with
-> the latest patch "pinctrl: at91: allow to have disabled gpio bank", I
-> had no issue.
-
-simple disable the PIO bank and if one device use it as pinctrl and no gpio is used in the DT
-then you get a broken platform but dtb is generated
-
-as all the node are enabled for pinctrl
-
+> Furthermore, subsystems such as DRM have advanced functionality to set
+> the power mode of a panel. In order to allow such setups to power up the
+> panel at exactly the right moment, a way is needed to prevent the
+> backlight core from powering the backlight up automatically when it is
+> registered.
 > 
->> 
->> So move the pinctrl configuration to the bank instead of the bus.
->> This allow to detect pinctrl issue at DT compiling time when disable a bank.
->> 
->> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: devicetree at vger.kernel.org
->> ---
->> .../bindings/pinctrl/atmel,at91-pinctrl.txt        | 66 ++++++++++++++++++++++
->> 1 file changed, 66 insertions(+)
->> 
->> diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
->> index b7a93e8..78355ee 100644
->> --- a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
->> +++ b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
->> @@ -148,3 +148,69 @@ dbgu: serial at fffff200 {
->> 	pinctrl-0 = <&pinctrl_dbgu>;
->> 	status = "disabled";
->> };
->> +
->> +II) New Bindings per PIO Block
->> +
->> +This allow to detect pinctrl issue at DT compiling time when disable a bank
->> +
->> +Required properties for iomux controller:
->> +- compatible: "atmel,at91rm9200-pio-pinctrl" or "atmel,at91sam9x5-pio-pinctrl"
->> +		or "atmel,sama5d3-pio-pinctrl"
->> +- atmel,mux-mask: array of mask (periph per bank) to describe if a pin can be
->> +  configured in this periph mode. All the periph and bank need to be describe.
->> +
->> +How to create such array:
->> +
->> +Each column will represent the possible peripheral of the pinctrl for the bank
->> +
->> +Take an example on the 9260
->> +Peripheral: 2 ( A and B)
->> +=>
->> +
->> +  /*    A         B     */
->> +  0xffffffff 0xffc00c3b  /* pioA */
->> +
->> +For each peripheral/bank we will descibe in a u32 if a pin can be
->> +configured in it by putting 1 to the pin bit (1 << pin)
->> +
->> +Required properties for pin configuration node:
->> +- atmel,pins: 3 integers array, represents a group of pins mux and config
->> +  setting. The format is atmel,pins = <PIN_NUM PERIPH CONFIG>.
->> +  The PERIPH 0 means gpio, PERIPH 1 is periph A, PERIPH 2 is periph B...
->> +
->> +Bits used for CONFIG:
->> +cf atmel,at91-pinctrl
->> +
->> +pioB: gpio at fffff600 {
->> +	compatible = "atmel,at91rm9200-gpio", "atmel,at91rm9200-pio-pinctrl";
->> +	reg = <0xfffff600 0x200>;
->> +	interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
->> +	#gpio-cells = <2>;
->> +	gpio-controller;
->> +	interrupt-controller;
->> +	#interrupt-cells = <2>;
->> +	clocks = <&pioB_clk>;
->> +
->> +			 /*    A         B     */
->> +	atmel,mux-mask = <0xffffffff 0x7fff3ccf>;
->> +
->> +	dbgu {
->> +		pinctrl_dbgu: dbgu-0 {
->> +			atmel,pins =
->> +				<14 0x1 0x0	/* PB14 periph A */
->> +				 15 0x1 0x1>;	/* PB15 periph A with pullup */
->> +		};
->> +	};
+> This commit introduces a new boot_off field in the platform data (and
+> also implements getting the same information from device tree). When set
+> the initial backlight power mode will be set to "off".
 > 
-> So we have to update all device tree files, that's a lot of work?
-break nothing both binding support will be in the kernel
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+> I've been meaning to send this for a while but was always holding back
+> because of the indoctrination that this type of configuration shouldn't
+> be part of device tree. However this issue was recently raised again in
+> the context of power up sequences for display panels. As described above
+> the issue is that panel datasheets recommend that the backlight attached
+> to a panel be turned on at the very last step to avoid visual glitches
+> during the panel's power up sequence. With the current implementation it
+> is typical for the backlight to be probed before the display panel. That
+> has, in many cases, the side-effect of enabling the backlight, therefore
+> making the screen content visible before it's actually initialized.
+> 
+> Some panels come up with random garbage when uninitialized, others show
+> all white. With some luck the panel will be all black and users won't
+> really notice.
+> 
+> This patch is an attempt to enable boards to override the default of
+> turning on the backlight for the pwm-backlight driver. I'm not sure if
+> there was a specific reason to turn on the backlight by default when
+> this driver was initially written, but the fact is that since it has
+> pretty much always been like this we can't really go and change the
+> default, otherwise a lot of people may end up with no backlight and no
+> clue as to how to enable it. So the only reasonable thing we can do is
+> to keep the old behaviour and give new boards a way to override it if
+> they know that some other part of the stack will enable it at the right
+> moment.
+> 
+>  .../devicetree/bindings/video/backlight/pwm-backlight.txt         | 1 +
+>  drivers/video/backlight/pwm_bl.c                                  | 8 ++++++++
+>  include/linux/pwm_backlight.h                                     | 2 ++
+>  3 files changed, 11 insertions(+)
 
-but only one enable at a time, so basically mainline will drop the old one
+Some people on the list are talking about this again.
 
-and as today 99% of the pinctrl are at SoC level so it?s not a big work at all
-> Moreover it adds complexity if we have a device using pins from
-> different pio controllers.
+What was the verdict?
 
-put 2 phandle means complexity please
-
-and it?s the key point of the new binding
-
-Best Regards,
-J.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
