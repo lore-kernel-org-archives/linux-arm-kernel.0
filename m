@@ -1,94 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 26 Feb 2015 17:11:04 +0100
-Subject: [PATCH 05/10] ARM: realview: remove private barrier implementation
-In-Reply-To: <1424967068-261464-1-git-send-email-arnd@arndb.de>
-References: <1424967068-261464-1-git-send-email-arnd@arndb.de>
-Message-ID: <1424967068-261464-2-git-send-email-arnd@arndb.de>
+Date: Thu, 26 Feb 2015 17:11:03 +0100
+Subject: [PATCH 04/10] ARM: no longer force unbuffered DMA for realview
+Message-ID: <1424967068-261464-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The realview barrier implementation tries to avoid calling outer_sync in order
-to not lock up as a result of a bug in the l220 cache controller.
+Commit 42c4dafe803dca ("ARM: 6202/1: Do not ARM_DMA_MEM_BUFFERABLE
+on RealView boards with L210/L220") changed the generic setting for
+ARM_DMA_MEM_BUFFERABLE to be disabled on any Realview kernel that includes
+support for any of the ARM11 variations. Doing this was required to
+allow doing DMA without a lockup in the l2x0 cache controller on the
+Realview platform.
 
-This gets in the way of the multiplatform support, but we can still remove
-it if we make sure that the outer_sync function never gets called, by replacing
-the function pointer with NULL, right after initialization.
+Unfortunately, in a kernel that also contains support for any ARMv7
+based machine, the same change makes it impossible to do DMA on ARMv7,
+which gets in the way of enabling multiplatform support on Realview.
+
+As confirmed by Catalin Marinas and Linus Walleij, the current
+code for Realview that we have in the kernel does not actually
+perform any DMA, and this is unlikely to change in the future.
+Therefore we can revert 42c4dafe803dca without introducing regressions,
+but we must never start using DMA on this platform in the future.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/mach-realview/Kconfig                 | 2 --
- arch/arm/mach-realview/include/mach/barriers.h | 8 --------
- arch/arm/mach-realview/realview_eb.c           | 6 ++++++
- arch/arm/mach-realview/realview_pb11mp.c       | 5 +++++
- 4 files changed, 11 insertions(+), 10 deletions(-)
- delete mode 100644 arch/arm/mach-realview/include/mach/barriers.h
+ arch/arm/mm/Kconfig | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-index 0fe63b543f5b..055e7355ec14 100644
---- a/arch/arm/mach-realview/Kconfig
-+++ b/arch/arm/mach-realview/Kconfig
-@@ -36,7 +36,6 @@ config REALVIEW_EB_A9MP
- config REALVIEW_EB_ARM11MP
- 	bool "Support ARM11MPCore Tile"
- 	depends on MACH_REALVIEW_EB
--	select ARCH_HAS_BARRIERS if SMP
- 	select CPU_V6K
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
-@@ -57,7 +56,6 @@ config REALVIEW_EB_ARM11MP_REVB
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 9b4f29e595a4..932dde34661e 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -972,8 +972,6 @@ config ARM_L1_CACHE_SHIFT
  
- config MACH_REALVIEW_PB11MP
- 	bool "Support RealView(R) Platform Baseboard for ARM11MPCore"
--	select ARCH_HAS_BARRIERS if SMP
- 	select ARM_GIC
- 	select CPU_V6K
- 	select HAVE_ARM_SCU if SMP
-diff --git a/arch/arm/mach-realview/include/mach/barriers.h b/arch/arm/mach-realview/include/mach/barriers.h
-deleted file mode 100644
-index 9a732195aa1c..000000000000
---- a/arch/arm/mach-realview/include/mach/barriers.h
-+++ /dev/null
-@@ -1,8 +0,0 @@
--/*
-- * Barriers redefined for RealView ARM11MPCore platforms with L220 cache
-- * controller to work around hardware errata causing the outer_sync()
-- * operation to deadlock the system.
-- */
--#define mb()		dsb()
--#define rmb()		dsb()
--#define wmb()		mb()
-diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
-index 64c88d657f9e..cebfdce1c7cd 100644
---- a/arch/arm/mach-realview/realview_eb.c
-+++ b/arch/arm/mach-realview/realview_eb.c
-@@ -450,6 +450,12 @@ static void __init realview_eb_init(void)
- 		 * Bits:  .... ...0 0111 1001 0000 .... .... ....
- 		 */
- 		l2x0_init(__io_address(REALVIEW_EB11MP_L220_BASE), 0x00790000, 0xfe000fff);
-+
-+		/*
-+		 * due to a bug in the l220 cache controller, we must not call
-+		 * the sync function. stub it out here instead!
-+		 */
-+		outer_cache.sync = NULL;
- #endif
- 		pmu_device.name = core_tile_a9mp() ? "armv7-pmu" : "armv6-pmu";
- 		platform_device_register(&pmu_device);
-diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
-index 15c45e25095f..f9817bb5d8fa 100644
---- a/arch/arm/mach-realview/realview_pb11mp.c
-+++ b/arch/arm/mach-realview/realview_pb11mp.c
-@@ -345,6 +345,11 @@ static void __init realview_pb11mp_init(void)
- 	 * Bits:  .... ...0 0111 1001 0000 .... .... ....
- 	 */
- 	l2x0_init(__io_address(REALVIEW_TC11MP_L220_BASE), 0x00790000, 0xfe000fff);
-+	/*
-+	 * due to a bug in the l220 cache controller, we must not call
-+	 * the sync function. stub it out here instead!
-+	 */
-+	outer_cache.sync = NULL;
- #endif
- 
- 	realview_flash_register(realview_pb11mp_flash_resource,
+ config ARM_DMA_MEM_BUFFERABLE
+ 	bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K) && !CPU_V7
+-	depends on !(MACH_REALVIEW_PB1176 || REALVIEW_EB_ARM11MP || \
+-		     MACH_REALVIEW_PB11MP)
+ 	default y if CPU_V6 || CPU_V6K || CPU_V7
+ 	help
+ 	  Historically, the kernel has used strongly ordered mappings to
 -- 
 2.1.0.rc2
