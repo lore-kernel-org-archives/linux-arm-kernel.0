@@ -1,36 +1,28 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 26 Feb 2015 15:39:23 +0200
-Subject: [PATCH] ARM: DTS: dra7xx-clocks: Add gate clock for CLKOUT2
-Message-ID: <1424957963-15418-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Thu, 26 Feb 2015 15:40:39 +0200
+Subject: [PATCH] ARM: DTS: am57xx-beagle-x15: Do not include the atl header
+Message-ID: <1424958039-15523-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To be able to control the gate for the clkout2 clock output.
+AM57xx does not have ATL block integrated.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Signed-off-by: Jyri Sarha <jsarha@ti.com>
 ---
- arch/arm/boot/dts/dra7xx-clocks.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/am57xx-beagle-x15.dts | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index 4bdcbd61ce47..2a9994f73974 100644
---- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -1421,6 +1421,14 @@
- 		ti,dividers = <1>, <8>;
- 	};
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+index 6463f9ef2b54..c1d82e830a96 100644
+--- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
++++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+@@ -8,7 +8,6 @@
+ /dts-v1/;
  
-+	clkout2_clk: clkout2_clk {
-+		#clock-cells = <0>;
-+		compatible = "ti,gate-clock";
-+		clocks = <&clkoutmux2_clk_mux>;
-+		ti,bit-shift = <8>;
-+		reg = <0x06b0>;
-+	};
-+
- 	l3init_960m_gfclk: l3init_960m_gfclk {
- 		#clock-cells = <0>;
- 		compatible = "ti,gate-clock";
+ #include "dra74x.dtsi"
+-#include <dt-bindings/clk/ti-dra7-atl.h>
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ 
 -- 
 2.3.0
