@@ -1,78 +1,51 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 26 Feb 2015 15:31:18 -0500 (EST)
-Subject: [PATCH 3.19-rc6 v16 1/6] irqchip: gic: Optimize locking in
- gic_raise_softirq
-In-Reply-To: <1422990417-1783-2-git-send-email-daniel.thompson@linaro.org>
-References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
- <1422990417-1783-1-git-send-email-daniel.thompson@linaro.org>
- <1422990417-1783-2-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <alpine.LFD.2.11.1502261449380.25484@knanqh.ubzr>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 26 Feb 2015 21:35:39 +0100
+Subject: [PATCH 0/8] Add proper support for Compulab CM-A510/SBC-A510
+In-Reply-To: <54EF7B97.4060602@wwwdotorg.org>
+References: <1424199129-22099-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <54EF5E17.1070005@free-electrons.com> <54EF7684.80409@gmail.com>
+ <54EF7B97.4060602@wwwdotorg.org>
+Message-ID: <54EF839B.1070008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Feb 2015, Daniel Thompson wrote:
+On 26.02.2015 21:01, Stephen Warren wrote:
+> On 02/26/2015 12:39 PM, Sebastian Hesselbarth wrote:
+>> On 26.02.2015 18:55, Gregory CLEMENT wrote:
+>>> On 17/02/2015 19:52, Sebastian Hesselbarth wrote:
+>>>> This patch set improves current mainline support for the Compulab
+>>>> CM-A510 System-on-Module (SoM) and its default Compulab SBC-A510
+>>>> base board. Thanks to Gabriel Dobato who agreed to remote debug and
+>>>> test the provided DT changes.
+>> [...]
+>>>> Sebastian Hesselbarth (8):
+>>>>    i2c: mux-pinctrl: Rework to honor disabled child nodes
+>>>>    devicetree: vendor-prefixes: Add CompuLab to known vendors
+>>>>    ARM: dts: dove: Fix uart[23] reg property
+>>>>    ARM: dts: dove: Always include gpio and interrupt-controller headers
+>>>>    ARM: dts: dove: Add node labels for PCIe ports 0 and 1
+>>>>    ARM: dts: dove: Add some more common pinctrl settings
+>>>>    ARM: dts: dove: Add internal i2c multiplexer node
+>>>>    ARM: dts: dove: Add proper support for Compulab CM-A510/SBC-A510
+>>>
+>>> Patches 3 to 6 applied on mvebu/dt
+>>>
+>>> If I understood well patches 7 and 8 depend on patch 1 which had not
+>>> been
+>>> taken yet.
+>>
+>> Correct. Once I get a Tested-by from Stephen, I'll resend the 4
+>> remaining patches.
+>
+> Me? For which patch? I thought there was going to be a v2 of the i2c mux
+> driver patch given the comments on it, but perhaps I'm misremembering?
 
-> Currently gic_raise_softirq() is locked using upon irq_controller_lock.
-> This lock is primarily used to make register read-modify-write sequences
-> atomic but gic_raise_softirq() uses it instead to ensure that the
-> big.LITTLE migration logic can figure out when it is safe to migrate
-> interrupts between physical cores.
-> 
-> This is sub-optimal in closely related ways:
-> 
-> 1. No locking at all is required on systems where the b.L switcher is
->    not configured.
+AFAIKS, your concerns were addressed to the wording of the binding doc
+changes. You don't need that ones to be taken care of before you can
+give the i2c-mux-pinctrl driver a functional test, do you? ;)
 
-ACK
+FWIW, it would be great if you can give patch 1 a test run on one of
+the tegra boards using i2c-mux-pinctrl. I'll address the wording
+comments if there is no issues with the driver changes.
 
-> 2. Finer grain locking can be used on systems where the b.L switcher is
->    present.
-
-NAK
-
-Consider this sequence:
-
-	CPU 1				CPU 2
-	-----				-----
-	gic_raise_softirq()		gic_migrate_target()
-	bl_migration_lock() [OK]
-	[...]				[...]
-	map |= gic_cpu_map[cpu];	bl_migration_lock() [contended]
-	bl_migration_unlock(flags);	bl_migration_lock() [OK]
-					gic_cpu_map[cpu] = 1 << new_cpu_id;
-					bl_migration_unlock(flags);
-					[...]
-					(migrate pending IPI from old CPU)
-	writel_relaxed(map to GIC_DIST_SOFTINT);
-	[this IPI is now lost]
-
-Granted, this race is apparently aready possible today.  We probably get 
-away with it because the locked sequence in gic_migrate_target() include 
-the retargetting of peripheral interrupts which gives plenti of time for 
-code execution in gic_raise_softirq() to post its IPI before the IPI 
-migration code is executed.  So in that sense it could be argued that 
-the reduced lock coverage from your patch doesn't make things any worse.  
-If anything it might even help by letting gic_migrate_target() complete 
-sooner.  But removing cpu_map_migration_lock altogether would improve 
-things even further by that logic.  I however don't think we should live 
-so dangerously.
-
-Therefore, for the lock to be effective, it has to encompass the 
-changing of the CPU map _and_ migration of pending IPIs before new IPIs 
-are allowed again.  That means the locked area has to grow not shrink.
-
-Oh, and a minor nit:
-
-> + * This lock is used by the big.LITTLE migration code to ensure no IPIs
-> + * can be pended on the old core after the map has been updated.
-> + */
-> +#ifdef CONFIG_BL_SWITCHER
-> +static DEFINE_RAW_SPINLOCK(cpu_map_migration_lock);
-> +
-> +static inline void bl_migration_lock(unsigned long *flags)
-
-Please name it gic_migration_lock. "bl_migration_lock" is a bit too 
-generic in this context.
-
-
-Nicolas
+Sebastian
