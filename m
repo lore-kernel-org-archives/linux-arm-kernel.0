@@ -1,56 +1,49 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 26 Feb 2015 15:20:35 -0700
-Subject: [PATCH 0/2] Add SCM warmboot support for QCOM SoCs
-In-Reply-To: <24986C4E-2DED-456F-A1D3-E52037540E01@codeaurora.org>
-References: <1424904852-12719-1-git-send-email-lina.iyer@linaro.org>
- <24986C4E-2DED-456F-A1D3-E52037540E01@codeaurora.org>
-Message-ID: <20150226222035.GB1250@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 26 Feb 2015 16:24:53 -0600
+Subject: [PATCH v2] coresight-stm: adding driver for CoreSight STM
+ component
+In-Reply-To: <1424907152-18808-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1424907152-18808-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <CAL_Jsq+JYc5DBXqEcpJ0O=RdO-uuz_-GR99YsgVqT=uG6CLqJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26 2015 at 15:10 -0700, Kumar Gala wrote:
->
->On Feb 25, 2015, at 4:54 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->
->> Hi,
->>
->> These patches used to be part of my cpuidle patchset, think these can go in
->> independently.
->>
->> The patches do the following -
->>
->> 1. Add QCOM Secure Monitor specific enumeration for warm boot on qcom targets
->> 2. Add an API to set up the warmboot address. Consolidate the warm boot flags
->> into the implementation file
->>
->> Thanks,
->> Lina
->>
->> Lina Iyer (2):
->>  ARM: qcom: Add SCM warmboot flags for quad core targets.
->>  qcom: scm: Add scm_set_warm_boot_addr function
->>
->> arch/arm/mach-qcom/scm-boot.c | 38 ++++++++++++++++++++++++++++++++++++++
->> arch/arm/mach-qcom/scm-boot.h |  5 +++--
->> 2 files changed, 41 insertions(+), 2 deletions(-)
->
->Lina,
->
->Do you mind rebasing these patches on my recent SCM cleanup set.  You find it at:
->
->git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git qcom/scm-cleanup
->
+Adding Will D...
 
-Sure. As suggested by Kevin H, I will merge the two patches and rebase
-on top yours and resubmit.
+On Wed, Feb 25, 2015 at 5:32 PM, Mathieu Poirier
+<mathieu.poirier@linaro.org> wrote:
+> From: Pratik Patel <pratikp@codeaurora.org>
+>
+> This driver adds support for the STM CoreSight IP block,
+> allowing any system compoment (HW or SW) to log and
+> aggregate messages via a single entity.
+>
+> The STM exposes an application defined number of channels
+> called stimulus port.  Configuration is done using entries
+> in sysfs and channels made available to userspace via devfs.
+>
+> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+> Changes for v2:
+>  - Fixed typo in struct stm_node documentation
+>  - Added CPU_32v3 to list of architecture STM can't work with
 
+Is this because of no strd instr only?
 
->thanks
->
->- k
->
->-- 
->Qualcomm Innovation Center, Inc.
->The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
->a Linux Foundation Collaborative Project
->
+> +#ifndef CONFIG_64BIT
+> +static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
+> +{
+> +       asm volatile("strd %1, %0"
+> +                    : "+Qo" (*(volatile u64 __force *)addr)
+> +                    : "r" (val));
+> +}
+> +#undef writeq_relaxed
+> +#define writeq_relaxed(v, c)   __raw_writeq((__force u64) cpu_to_le64(v), c)
+> +#endif
+
+We really shouldn't do private implementation here. It there really
+any reason not to allow readq/writeq generically for 32-bit or just
+for arm32?
+
+Rob
