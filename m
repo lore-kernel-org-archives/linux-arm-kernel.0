@@ -1,50 +1,52 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 26 Feb 2015 13:57:15 +0100
-Subject: [PATCH 1/3] mtd: atmel_nand: move the hsmc_clk from nfc node to
- nand node
-In-Reply-To: <C9CC8708-B99A-47F4-AC57-1A92B302E1C9@jcrosoft.com>
-References: <1423548885-27589-1-git-send-email-josh.wu@atmel.com>
- <20150226101857.59104e97@bbrezillon>
- <C9CC8708-B99A-47F4-AC57-1A92B302E1C9@jcrosoft.com>
-Message-ID: <20150226135715.7e6c199c@bbrezillon>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 26 Feb 2015 13:57:46 +0100
+Subject: [PATCH] irqchip: armada: Fix chained per-cpu interrupts
+In-Reply-To: <20150226111159.GD29241@lukather>
+References: <1424944527-16850-1-git-send-email-maxime.ripard@free-electrons.com>
+ <54EEF4D4.7060102@free-electrons.com> <20150226104710.GB29241@lukather>
+ <54EEFB04.8020200@free-electrons.com> <20150226111159.GD29241@lukather>
+Message-ID: <54EF184A.8040607@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
-
-On Thu, 26 Feb 2015 19:49:09 +0800
-Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-
+On 26/02/2015 12:11, Maxime Ripard wrote:
+> On Thu, Feb 26, 2015 at 11:52:52AM +0100, Gregory CLEMENT wrote:
+>>>> The following function is called as soon as the MPIC is used as a secondary
+>>>> interrupt controller. So it will be the case for the Armada 375 and Armada 39x too. It
+>>>> also seems to not be related to be used in an SoC or an other, so I think that the
+>>>> function name is misleading. What about just using mpic_secondary_init and
+>>>> mpic_cpu_notifier ?
+>>>>
+>>>> I know we prefixed the mpic function with armada_370_xp or armada_xp, but looking
+>>>> back, it was a mistake.
+>>>
+>>> I don't know, that code needs to be run only in the cases where the
+>>> MPIC is a secondary interrupt controller, which rules out the armada
+>>> 370/XP.
+>>>
+>>> I was trying to make such a distinction, but indeed the wording is
+>>> quite poor.
+>>>
+>>> Do you have some suggestions?
+>>
+>> Yes using  mpic_secondary_init and  mpic_cpu_notifier, because what is important
+>> is the fact that the MPIC is used as a secondary interrupt controller.
 > 
-> > On Feb 26, 2015, at 5:18 PM, Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> > 
-> > Hi Josh,
-> > 
-> > On Tue, 10 Feb 2015 14:14:43 +0800
-> > Josh Wu <josh.wu@atmel.com> wrote:
-> > 
-> >> Also add a new sama5d3_nand compatiable string for sama5d3 nand.
-> >> 
-> >> For sama5d3, sama5d4 chip, the pmecc became part of HSMC, they need the
-> >> HSMC clock enabled to work.
-> >> The NFC is a sub feature for current nand driver, it can be disabled.
-> >> But if HSMC clock is controlled by NFC, so disable NFC will also disable
-> >> the HSMC clock. then, it will make the PMECC fail to work.
-> >> 
-> >> So the solution is move the HSMC clock out of NFC to nand node. When
-> >> nand driver probed, it will check whether the chip has HSMC, if yes then
-> >> it will require a HSMC clock.
-> > 
-> > Do you plan to use the NAND chip without the NFC (I mean, is there a
-> > reason for not using the NFC to access the NAND ?) ?
-> > If you don't, why don't you just wait for the NFC before probing the
-> > NAND chip it is attached to, so that the hmsc clk is properly claimed.
-> you can as you can have 2 Nand on the d3 but only 1 NFC
+> The thing is, the armada xp notifier is called
+> armada_xp_mpic_secondary_init, with in this case secondary meaning
+> secondary CPU. Won't that be really confusing to have another callback
+> called mpic_secondary_init, what would only be called on !armada
+> 370/XP, and with secondary meaning secondary interrupt controller?
+> 
 
-I don't get your point ?
-You can control several NAND chips with the same NFC.
+I see let's call it mpic_cascaded_init then.
+
+> Maxime
+> 
+
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
