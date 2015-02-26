@@ -1,57 +1,75 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Thu, 26 Feb 2015 15:22:41 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.1
-Message-ID: <cover.1424931398.git.horms+renesas@verge.net.au>
+Subject: [PATCH 1/5] ARM: shmobile: No R-Car Gen2 CMA reservation when
+ HIGHMEM=n
+In-Reply-To: <cover.1424931398.git.horms+renesas@verge.net.au>
+References: <cover.1424931398.git.horms+renesas@verge.net.au>
+Message-ID: <744cadba1ae6b80b413aea87835855dcccad86fd.1424931398.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Magnus Damm <damm+renesas@opensource.se>
 
-Please consider these Renesas ARM based SoC updates for v4.1.
+Allow R-Car Gen2 platforms to boot with CMA enabled
+and HIGHMEM disabled. This patch adds code to check
+if the R-Car Gen2 specific memory reservation window
+is included in the kernel memory range or not. When
+HIGHMEM is disabled the R-Car Gen2 reservation area is
+outside the kernel memory range and in such case the
+memory reservation is simply skipped over.
 
-Some of these changes are arguably cleanups and could have
-been queued up in the soc-cleanups-for-v4.1 branch. However,
-I am reluctant to reshuffle things between branches at this point.
+Without this patch the kernel boot hangs when CMA is
+enabled and HIGHMEM is disabled on the r8a7791 Koelsch
+hardware platform:
 
+    WARNING: CPU: 1 PID: 1 at mm/cma.c:113 cma_init_reserved_areas+0x88/0x1d4()
+    ...
+    WARNING: CPU: 1 PID: 1 at mm/cma.c:121 cma_init_reserved_areas+0xf8/0x1d4()
+    ...
+    Unable to handle kernel NULL pointer dereference at virtual address 00000160
+    pgd = c0003000
+    [00000160] *pgd=80000040004003, *pmd=00000000
+    Internal error: Oops: 206 [#1] SMP ARM
+    Modules linked in:
+    CPU: 1 PID: 1 Comm: swapper/0 Tainted: G        W
+3.19.0-rc4-koelsch-01450-g7f9b6075ce12c3ea-dirty #735
+    Hardware name: Generic R8A7791 (Flattened Device Tree)
+    task: edc553c0 ti: edc56000 task.ti: edc56000
+    PC is at set_pfnblock_flags_mask+0x54/0xa0
+    LR is at 0x440
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+In the current shmobile_defconfig HIGHMEM is enabled
+while CMA is disabled, so to trigger this the kernel
+configuration for both CMA and HIGHMEM needs to be
+adjusted.
 
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v4.1
-
-for you to fetch changes up to 72016d009e6bcf6cb6a289382bfc21185122b22e:
-
-  ARM: shmobile: r8a7740: Remove restart callback (2015-02-24 08:02:49 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Updates for v4.1
-
-* Remove restart callback from r8a7740 SoC
-* Add support SOC_BUS to R-Car Gen2
-* Expose SoCs revision data for R-Car Gen2
-* Remove check for CONFIG_COMMON_CLK from R-Car Gen2 code as it is always set
-* Allow R-Car Gen2 platforms to boot with CMA enabled and HIGHMEM disabled
-
-----------------------------------------------------------------
-Geert Uytterhoeven (2):
-      ARM: shmobile: R-Car Gen2: CONFIG_COMMON_CLK is always set
-      ARM: shmobile: r8a7740: Remove restart callback
-
-Magnus Damm (1):
-      ARM: shmobile: No R-Car Gen2 CMA reservation when HIGHMEM=n
-
-Nobuhiro Iwamatsu (2):
-      ARM: shmobile: Add function to get SoCs revision data for R-Car Gen2
-      ARM: shmobile: Add support SOC_BUS to R-Car Gen2
-
- arch/arm/mach-shmobile/Kconfig           |  1 +
- arch/arm/mach-shmobile/rcar-gen2.h       |  1 +
- arch/arm/mach-shmobile/setup-r8a7740.c   |  8 -----
- arch/arm/mach-shmobile/setup-r8a7790.c   |  1 +
- arch/arm/mach-shmobile/setup-r8a7791.c   |  1 +
- arch/arm/mach-shmobile/setup-r8a7794.c   |  1 +
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 58 +++++++++++++++++++++++++++++---
- 7 files changed, 58 insertions(+), 13 deletions(-)
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+index d1fa625..8c7ec93 100644
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -21,6 +21,7 @@
+ #include <linux/dma-contiguous.h>
+ #include <linux/io.h>
+ #include <linux/kernel.h>
++#include <linux/memblock.h>
+ #include <linux/of.h>
+ #include <linux/of_fdt.h>
+ #include <asm/mach/arch.h>
+@@ -199,7 +200,7 @@ void __init rcar_gen2_reserve(void)
+ 
+ 	of_scan_flat_dt(rcar_gen2_scan_mem, &mrc);
+ #ifdef CONFIG_DMA_CMA
+-	if (mrc.size)
++	if (mrc.size && memblock_is_region_memory(mrc.base, mrc.size))
+ 		dma_contiguous_reserve_area(mrc.size, mrc.base, 0,
+ 					    &rcar_gen2_dma_contiguous, true);
+ #endif
+-- 
+2.1.4
