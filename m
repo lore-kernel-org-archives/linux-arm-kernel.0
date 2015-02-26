@@ -1,14 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 26 Feb 2015 11:36:17 +0900
-Subject: [PATCH 7/8] ASoC: fsl_spdif: fix struct clk pointer comparing
-In-Reply-To: <1424876018-17852-8-git-send-email-shawn.guo@linaro.org>
+Date: Thu, 26 Feb 2015 11:36:30 +0900
+Subject: [PATCH 8/8] ASoC: kirkwood: fix struct clk pointer comparing
+In-Reply-To: <1424876018-17852-9-git-send-email-shawn.guo@linaro.org>
 References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
- <1424876018-17852-8-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20150226023617.GG6236@finisterre.sirena.org.uk>
+ <1424876018-17852-9-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20150226023630.GH6236@finisterre.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 10:53:37PM +0800, Shawn Guo wrote:
+On Wed, Feb 25, 2015 at 10:53:38PM +0800, Shawn Guo wrote:
 > Since commit 035a61c314eb ("clk: Make clk API return per-user struct clk
 > instances"), clk API users can no longer check if two struct clk
 > pointers are pointing to the same hardware clock, i.e. struct clk_hw, by
@@ -20,4 +20,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150226/f40b117a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150226/0555aca7/attachment.sig>
