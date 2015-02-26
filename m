@@ -1,120 +1,63 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 26 Feb 2015 09:29:38 +0800
-Subject: [PATCH v3 21/30] PCI: Introduce pci_bus_child_max_busnr()
+Date: Thu, 26 Feb 2015 09:29:33 +0800
+Subject: [PATCH v3 16/30] PCI/IA64: Fix the build warning about pci_domain_nr()
 In-Reply-To: <1424914187-21027-1-git-send-email-wangyijing@huawei.com>
 References: <1424914187-21027-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1424914187-21027-22-git-send-email-wangyijing@huawei.com>
+Message-ID: <1424914187-21027-17-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes, we need to know the highest reserved
-busnr for children bus. Because parent's
-bus->busn_res could have padding in it.
-This function return the max child busnr as
-pci_scan_child_bus().
+Should pass pci_bus * instead of pci_dev * to pci_domain_nr().
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Tony Luck <tony.luck@intel.com>
+CC: Fenghua Yu <fenghua.yu@intel.com>
+CC: linux-ia64 at vger.kernel.org
 ---
- drivers/pci/hotplug/acpiphp_glue.c |   29 +----------------------------
- drivers/pci/pci.c                  |   25 ++++++++++++++++++++++++-
- include/linux/pci.h                |    2 +-
- 3 files changed, 26 insertions(+), 30 deletions(-)
+ arch/ia64/sn/kernel/io_acpi_init.c |    6 +++---
+ arch/ia64/sn/kernel/io_init.c      |    2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/pci/hotplug/acpiphp_glue.c b/drivers/pci/hotplug/acpiphp_glue.c
-index bcb90e4..84f2584 100644
---- a/drivers/pci/hotplug/acpiphp_glue.c
-+++ b/drivers/pci/hotplug/acpiphp_glue.c
-@@ -397,33 +397,6 @@ static void cleanup_bridge(struct acpiphp_bridge *bridge)
- 	acpi_unlock_hp_context();
- }
+diff --git a/arch/ia64/sn/kernel/io_acpi_init.c b/arch/ia64/sn/kernel/io_acpi_init.c
+index 0640739..2fd7414 100644
+--- a/arch/ia64/sn/kernel/io_acpi_init.c
++++ b/arch/ia64/sn/kernel/io_acpi_init.c
+@@ -364,12 +364,12 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
+         status = acpi_evaluate_integer(rootbus_handle, METHOD_NAME__SEG, NULL,
+                                        &segment);
+         if (ACPI_SUCCESS(status)) {
+-		if (segment != pci_domain_nr(dev)) {
++		if (segment != pci_domain_nr(dev->bus)) {
+ 			acpi_get_name(rootbus_handle, ACPI_FULL_PATHNAME,
+ 				&name_buffer);
+ 			printk(KERN_ERR
+ 			       "%s: Segment number mismatch, 0x%llx vs 0x%x for: %s\n",
+-			       __func__, segment, pci_domain_nr(dev),
++			       __func__, segment, pci_domain_nr(dev->bus),
+ 			       (char *)name_buffer.pointer);
+ 			kfree(name_buffer.pointer);
+ 			return 1;
+@@ -407,7 +407,7 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
+ 	/* Build up the pcidev_info.pdi_slot_host_handle */
+ 	host_devfn = get_host_devfn(pcidev_match.handle, rootbus_handle);
+ 	(*pcidev_info)->pdi_slot_host_handle =
+-			((unsigned long) pci_domain_nr(dev) << 40) |
++			((unsigned long) pci_domain_nr(dev->bus) << 40) |
+ 					/* bus == 0 */
+ 					host_devfn;
+ 	return 0;
+diff --git a/arch/ia64/sn/kernel/io_init.c b/arch/ia64/sn/kernel/io_init.c
+index bcdc5b8..a97fad4 100644
+--- a/arch/ia64/sn/kernel/io_init.c
++++ b/arch/ia64/sn/kernel/io_init.c
+@@ -164,7 +164,7 @@ sn_io_slot_fixup(struct pci_dev *dev)
+ 		panic("%s: Unable to alloc memory for sn_irq_info", __func__);
  
--/**
-- * acpiphp_max_busnr - return the highest reserved bus number under the given bus.
-- * @bus: bus to start search with
-- */
--static unsigned char acpiphp_max_busnr(struct pci_bus *bus)
--{
--	struct pci_bus *tmp;
--	unsigned char max, n;
--
--	/*
--	 * pci_bus_max_busnr will return the highest
--	 * reserved busnr for all these children.
--	 * that is equivalent to the bus->subordinate
--	 * value.  We don't want to use the parent's
--	 * bus->subordinate value because it could have
--	 * padding in it.
--	 */
--	max = bus->busn_res.start;
--
--	list_for_each_entry(tmp, &bus->children, node) {
--		n = pci_bus_max_busnr(tmp);
--		if (n > max)
--			max = n;
--	}
--	return max;
--}
--
- static void acpiphp_set_acpi_region(struct acpiphp_slot *slot)
- {
- 	struct acpiphp_func *func;
-@@ -489,7 +462,7 @@ static void enable_slot(struct acpiphp_slot *slot)
- 	LIST_HEAD(add_list);
- 
- 	acpiphp_rescan_slot(slot);
--	max = acpiphp_max_busnr(bus);
-+	max = pci_bus_child_max_busnr(bus);
- 	for (pass = 0; pass < 2; pass++) {
- 		list_for_each_entry(dev, &bus->devices, bus_list) {
- 			if (PCI_SLOT(dev->devfn) != slot->device)
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index d9e7645..2abac8f 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -121,7 +121,30 @@ unsigned char pci_bus_max_busnr(struct pci_bus *bus)
- 	}
- 	return max;
- }
--EXPORT_SYMBOL_GPL(pci_bus_max_busnr);
-+
-+unsigned char pci_bus_child_max_busnr(struct pci_bus *bus)
-+{
-+	struct pci_bus *tmp;
-+	unsigned char max, n;
-+
-+	/*
-+	 * pci_bus_max_busnr will return the highest
-+	 * reserved busnr for all these children.
-+	 * that is equivalent to the bus->subordinate
-+	 * value.  We don't want to use the parent's
-+	 * bus->subordinate value because it could have
-+	 * padding in it.
-+	 */
-+	max = bus->busn_res.start;
-+
-+	list_for_each_entry(tmp, &bus->children, node) {
-+		n = pci_bus_max_busnr(tmp);
-+		if (n > max)
-+			max = n;
-+	}
-+	return max;
-+}
-+EXPORT_SYMBOL_GPL(pci_bus_child_max_busnr);
- 
- #ifdef CONFIG_HAS_IOMEM
- void __iomem *pci_ioremap_bar(struct pci_dev *pdev, int bar)
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 3c4413c..d266d74 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1183,7 +1183,7 @@ int pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
- void pci_walk_bus(struct pci_bus *top, int (*cb)(struct pci_dev *, void *),
- 		  void *userdata);
- int pci_cfg_space_size(struct pci_dev *dev);
--unsigned char pci_bus_max_busnr(struct pci_bus *bus);
-+unsigned char pci_bus_child_max_busnr(struct pci_bus *bus);
- void pci_setup_bridge(struct pci_bus *bus);
- resource_size_t pcibios_window_alignment(struct pci_bus *bus,
- 					 unsigned long type);
+ 	/* Call to retrieve pci device information needed by kernel. */
+-	status = sal_get_pcidev_info((u64) pci_domain_nr(dev),
++	status = sal_get_pcidev_info((u64) pci_domain_nr(dev->bus),
+ 		(u64) dev->bus->number,
+ 		dev->devfn,
+ 		(u64) __pa(pcidev_info),
 -- 
 1.7.1
