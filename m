@@ -1,150 +1,33 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 26 Feb 2015 15:33:45 -0500 (EST)
-Subject: [PATCH 3.19-rc6 v16 2/6] irqchip: gic: Make gic_raise_softirq
- FIQ-safe
-In-Reply-To: <1422990417-1783-3-git-send-email-daniel.thompson@linaro.org>
-References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
- <1422990417-1783-1-git-send-email-daniel.thompson@linaro.org>
- <1422990417-1783-3-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <alpine.LFD.2.11.1502261531590.25484@knanqh.ubzr>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Fri, 27 Feb 2015 05:52:52 +0900
+Subject: [PATCH] ARM: EXYNOS: Don't use LDREX and STREX after disabling
+ cache coherency
+In-Reply-To: <54E3BFB3.5030801@codeaurora.org>
+References: <1424093802-5488-1-git-send-email-k.kozlowski@samsung.com>
+ <54E3BFB3.5030801@codeaurora.org>
+Message-ID: <54EF87A4.6090609@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Feb 2015, Daniel Thompson wrote:
+On 02/18/15 07:24, Stephen Boyd wrote:
+> On 02/16/15 05:36, Krzysztof Kozlowski wrote:
+>> During CPU shutdown the exynos_cpu_power_down() is called after
+>> disabling cache coherency and it uses LDREX and STREX instructions (by
+>> calling of_machine_is_compatible() -> kobject_get() -> kref_get()).
+>>
+>> The LDREX and STREX should not be used after disabling the cache
+>> coherency so just use soc_is_exynos().
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Fixes: adc548d77c22 ("ARM: EXYNOS: Use MCPM call-backs to support S2R on exynos5420")
+>> Cc: <stable@vger.kernel.org>
+>> Reported-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+> 
+> Looks good to me.
+> 
+> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
+Thanks for this fix, applied.
 
-> It is currently possible for FIQ handlers to re-enter gic_raise_softirq()
-> and lock up.
-> 
->     	gic_raise_softirq()
-> 	   lock(x);
-> -~-> FIQ
->         handle_fiq()
-> 	   gic_raise_softirq()
-> 	      lock(x);		<-- Lockup
-> 
-> arch/arm/ uses IPIs to implement arch_irq_work_raise(), thus this issue
-> renders it difficult for FIQ handlers to safely defer work to less
-> restrictive calling contexts.
-> 
-> This patch fixes the problem by converting the cpu_map_migration_lock
-> into a rwlock making it safe to re-enter the function.
-> 
-> Note that having made it safe to re-enter gic_raise_softirq() we no
-> longer need to mask interrupts during gic_raise_softirq() because the
-> b.L migration is always performed from task context.
-
-Very good point.
-
-Once my concerns on patch #1 are addressed, you may add my ACK to this 
-one.
-
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/irq-gic.c | 38 +++++++++++++++++++++++++-------------
->  1 file changed, 25 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index a9ed64dcc84b..c172176499f6 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -75,22 +75,25 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
->  /*
->   * This lock is used by the big.LITTLE migration code to ensure no IPIs
->   * can be pended on the old core after the map has been updated.
-> + *
-> + * This lock may be locked for reading from both IRQ and FIQ handlers
-> + * and therefore must not be locked for writing when these are enabled.
->   */
->  #ifdef CONFIG_BL_SWITCHER
-> -static DEFINE_RAW_SPINLOCK(cpu_map_migration_lock);
-> +static DEFINE_RWLOCK(cpu_map_migration_lock);
->  
-> -static inline void bl_migration_lock(unsigned long *flags)
-> +static inline void bl_migration_lock(void)
->  {
-> -	raw_spin_lock_irqsave(&cpu_map_migration_lock, *flags);
-> +	read_lock(&cpu_map_migration_lock);
->  }
->  
-> -static inline void bl_migration_unlock(unsigned long flags)
-> +static inline void bl_migration_unlock(void)
->  {
-> -	raw_spin_unlock_irqrestore(&cpu_map_migration_lock, flags);
-> +	read_unlock(&cpu_map_migration_lock);
->  }
->  #else
-> -static inline void bl_migration_lock(unsigned long *flags) {}
-> -static inline void bl_migration_unlock(unsigned long flags) {}
-> +static inline void bl_migration_lock(void) {}
-> +static inline void bl_migration_unlock(void) {}
->  #endif
->  
->  /*
-> @@ -640,12 +643,20 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
->  #endif
->  
->  #ifdef CONFIG_SMP
-> +/*
-> + * Raise the specified IPI on all cpus set in mask.
-> + *
-> + * This function is safe to call from all calling contexts, including
-> + * FIQ handlers. It relies on bl_migration_lock() being multiply acquirable
-> + * to avoid deadlocks when the function is re-entered at different
-> + * exception levels.
-> + */
->  static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->  {
->  	int cpu;
-> -	unsigned long flags, map = 0;
-> +	unsigned long map = 0;
->  
-> -	bl_migration_lock(&flags);
-> +	bl_migration_lock();
->  
->  	/* Convert our logical CPU mask into a physical one. */
->  	for_each_cpu(cpu, mask)
-> @@ -660,7 +671,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->  	/* this always happens on GIC0 */
->  	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
->  
-> -	bl_migration_unlock(flags);
-> +	bl_migration_unlock();
->  }
->  #endif
->  
-> @@ -708,7 +719,8 @@ int gic_get_cpu_id(unsigned int cpu)
->   * Migrate all peripheral interrupts with a target matching the current CPU
->   * to the interface corresponding to @new_cpu_id.  The CPU interface mapping
->   * is also updated.  Targets to other CPU interfaces are unchanged.
-> - * This must be called with IRQs locally disabled.
-> + * This must be called from a task context and with IRQ and FIQ locally
-> + * disabled.
->   */
->  void gic_migrate_target(unsigned int new_cpu_id)
->  {
-> @@ -739,9 +751,9 @@ void gic_migrate_target(unsigned int new_cpu_id)
->  	 * pending on the old cpu static. That means we can defer the
->  	 * migration until after we have released the irq_controller_lock.
->  	 */
-> -	raw_spin_lock(&cpu_map_migration_lock);
-> +	write_lock(&cpu_map_migration_lock);
->  	gic_cpu_map[cpu] = 1 << new_cpu_id;
-> -	raw_spin_unlock(&cpu_map_migration_lock);
-> +	write_unlock(&cpu_map_migration_lock);
->  
->  	/*
->  	 * Find all the peripheral interrupts targetting the current
-> -- 
-> 1.9.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
-> 
+- Kukjin
