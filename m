@@ -1,50 +1,166 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Thu, 26 Feb 2015 09:09:55 -0500
-Subject: [PATCH v3 3/3] of: support passing console options with
- stdout-path
-In-Reply-To: <20150226134646.GB8806@lunn.ch>
-References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
- <1417110967-16284-4-git-send-email-leif.lindholm@linaro.org>
- <54EF09AA.2080706@hurleysoftware.com> <20150226134646.GB8806@lunn.ch>
-Message-ID: <54EF2933.3020408@hurleysoftware.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 26 Feb 2015 08:12:57 -0600
+Subject: [PATCH v3] drivers/tty: amba: defer probing DMA availability
+ until hw_init
+In-Reply-To: <1424910661-26474-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+References: <1424910661-26474-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+Message-ID: <CAL_JsqJvFsMesJqNi+Kwg_Xnu7oanyEzrFfk+w9msQ_XOiBGPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Wed, Feb 25, 2015 at 6:31 PM, Jorge Ramirez-Ortiz
+<jorge.ramirez-ortiz@linaro.org> wrote:
+> Fix a race condition that happens when device_initcall(pl011_dma_initicall)
+> is executed before all the devices have been probed - this issue was observed on
+> an hisi_6220 SoC (HiKey board from Linaro).
+>
+> The deferred driver probing framework relies on late_initcall to trigger
+> deferred probes so it is just possible that, even with a valid DMA driver ready
+> to be loaded, we fail to synchronize with it.
+>
+> The proposed implementation delays probing of the DMA until the uart device is
+> opened. As hw_init is invoked on port startup and port resume - but the DMA
+> probe is only required once - we avoid calling multiple times using a new field
+> in uart_amba_port to track this scenario.
+>
+> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+> ---
+>  drivers/tty/serial/amba-pl011.c | 66 ++++++++++-------------------------------
+>  1 file changed, 16 insertions(+), 50 deletions(-)
+>
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 8d94c19..3501ccc 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -29,6 +29,7 @@
+>   * and hooked into this driver.
+>   */
+>
+> +#define pr_fmt(fmt) "amba-pl011: "fmt
 
-On 02/26/2015 08:46 AM, Andrew Lunn wrote:
-> On Thu, Feb 26, 2015 at 06:55:22AM -0500, Peter Hurley wrote:
->> On 11/27/2014 12:56 PM, Leif Lindholm wrote:
->>> Support specifying console options (like with console=ttyXN,<options>)
->>> by appending them to the stdout-path property after a separating ':'.
->>>
->>> Example:
->>>         stdout-path = "uart0:115200";
->>
->> This format breaks DT earlycon because libfdt doesn't recognize ':' as a
->> path terminator.
->>
->> It's simple enough to fix this directly in early_init_dt_scan_chosen_serial()
->> but perhaps it would better to teach fdt_path_offset() to recognize ':'?
-> 
-> Hi Peter
-> 
-> ePAPR says for stdout-path in Chosen:
-> 
-> A string that specifies the full path to the node representing the
-> device to be used for boot console output. If the character ":" is
-> present in the value it terminates the path. The value may be an
-> alias.
-> 
-> So it is probably wise to implement this properly.
+You can drop this I think.
 
-Sorry if I was unclear. My question was not _whether_ to fix this
-for earlycon, but rather _how_.
+>  #if defined(CONFIG_SERIAL_AMBA_PL011_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+>  #define SUPPORT_SYSRQ
+> @@ -164,6 +165,7 @@ struct uart_amba_port {
+>         bool                    using_rx_dma;
+>         struct pl011_dmarx_data dmarx;
+>         struct pl011_dmatx_data dmatx;
+> +       bool                    dma_probed;
+>  #endif
+>  };
+>
+> @@ -261,7 +263,7 @@ static void pl011_sgbuf_free(struct dma_chan *chan, struct pl011_sgbuf *sg,
+>         }
+>  }
+>
+> -static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *uap)
+> +static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
+>  {
+>         /* DMA is the sole user of the platform data right now */
+>         struct amba_pl011_data *plat = dev_get_platdata(uap->port.dev);
+> @@ -275,9 +277,16 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
+>         struct dma_chan *chan;
+>         dma_cap_mask_t mask;
+>
+> -       chan = dma_request_slave_channel(dev, "tx");
+> +       uap->dma_probed = true;
 
-IOW, is the ':' character accepted as a path terminator for
-1. all nodes, so fix this in fdt_path_offset();
-2. only chosen nodes;
-3. unique to stdout-path, so fix this in early_init_dt_scan_chosen_serial()?
+I would not set this to true in the case of EPROBE_DEFER. That way if
+a DMA driver is loaded as a module some time later, DMA can be used.
+We're not really using deferred probe here, but using it as an
+indication that the UART is DMA capable.
 
-Regards,
-Peter Hurley
+> +
+> +       chan = dma_request_slave_channel_reason(dev, "tx");
+> +       if (IS_ERR(chan)) {
+> +               if (PTR_ERR(chan) == -EPROBE_DEFER) {
+> +                       dev_warn(uap->port.dev, "DMA driver not ready\n");
+> +                       return;
+> +               }
+> +               dev_info(uap->port.dev, "no OF or ACPI DMA data\n");
+>
+> -       if (!chan) {
+>                 /* We need platform data */
+>                 if (!plat || !plat->dma_filter) {
+>                         dev_info(uap->port.dev, "no DMA platform data\n");
+> @@ -383,54 +392,9 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
+>                 dev_info(uap->port.dev, "DMA channel RX %s\n",
+>                          dma_chan_name(uap->dmarx.chan));
+>         }
+> -}
+> -
+> -#ifndef MODULE
+> -/*
+> - * Stack up the UARTs and let the above initcall be done at device
+> - * initcall time, because the serial driver is called as an arch
+> - * initcall, and at this time the DMA subsystem is not yet registered.
+> - * At this point the driver will switch over to using DMA where desired.
+> - */
+> -struct dma_uap {
+> -       struct list_head node;
+> -       struct uart_amba_port *uap;
+> -       struct device *dev;
+> -};
+> -
+> -static LIST_HEAD(pl011_dma_uarts);
+> -
+> -static int __init pl011_dma_initcall(void)
+> -{
+> -       struct list_head *node, *tmp;
+> -
+> -       list_for_each_safe(node, tmp, &pl011_dma_uarts) {
+> -               struct dma_uap *dmau = list_entry(node, struct dma_uap, node);
+> -               pl011_dma_probe_initcall(dmau->dev, dmau->uap);
+> -               list_del(node);
+> -               kfree(dmau);
+> -       }
+> -       return 0;
+> -}
+> -
+> -device_initcall(pl011_dma_initcall);
+>
+> -static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
+> -{
+> -       struct dma_uap *dmau = kzalloc(sizeof(struct dma_uap), GFP_KERNEL);
+> -       if (dmau) {
+> -               dmau->uap = uap;
+> -               dmau->dev = dev;
+> -               list_add_tail(&dmau->node, &pl011_dma_uarts);
+> -       }
+> +       return;
+
+You don't need an explicit return.
+
+>  }
+> -#else
+> -static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
+> -{
+> -       pl011_dma_probe_initcall(dev, uap);
+> -}
+> -#endif
+> -
+>  static void pl011_dma_remove(struct uart_amba_port *uap)
+>  {
+>         /* TODO: remove the initcall if it has not yet executed */
+> @@ -1548,6 +1512,9 @@ static int pl011_hwinit(struct uart_port *port)
+>         uap->im = readw(uap->port.membase + UART011_IMSC);
+>         writew(UART011_RTIM | UART011_RXIM, uap->port.membase + UART011_IMSC);
+>
+> +       if (!uap->dma_probed)
+> +               pl011_dma_probe(uap->port.dev, uap);
+> +
+>         if (dev_get_platdata(uap->port.dev)) {
+>                 struct amba_pl011_data *plat;
+>
+> @@ -2218,7 +2185,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+>         uap->port.ops = &amba_pl011_pops;
+>         uap->port.flags = UPF_BOOT_AUTOCONF;
+>         uap->port.line = i;
+> -       pl011_dma_probe(&dev->dev, uap);
+>
+>         /* Ensure interrupts from this UART are masked and cleared */
+>         writew(0, uap->port.membase + UART011_IMSC);
+> --
+> 1.9.1
+>
