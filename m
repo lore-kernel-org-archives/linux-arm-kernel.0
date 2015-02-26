@@ -1,54 +1,61 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 26 Feb 2015 15:58:41 +0800
-Subject: [PATCH v2 0/2] ARM: imx6sx-sdb: add revb board
-In-Reply-To: <1421804094-26379-1-git-send-email-peter.chen@freescale.com>
-References: <1421804094-26379-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <20150226075838.GF20028@dragon>
+Date: Thu, 26 Feb 2015 16:02:20 +0800
+Subject: [PATCH 1/7] ARM: vf610: add second DSPI instance
+In-Reply-To: <1422356244-15629-2-git-send-email-bhuvanchandra.dv@toradex.com>
+References: <1422356244-15629-1-git-send-email-bhuvanchandra.dv@toradex.com>
+ <1422356244-15629-2-git-send-email-bhuvanchandra.dv@toradex.com>
+Message-ID: <20150226080217.GG20028@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 09:34:52AM +0800, Peter Chen wrote:
-> Hi Shawn,
-> 
-> The imx6sx-sdb board has two revisions, the current mainline is the
-> reva which is experimental and will not be released, the revb board
-> is used widely for internal and external users.
-> 
-> The main changes between reva and revb board:
-> - OOP setting
-> - pfuse
-> - qspi
-> - can transceiver (not mainlined)
-> 
-> Changes for v2:
-> 
-> - Add missing Makefile entries for both dts files. [Patch 1/2] and [Patch 2/2]
-> - Delete OOP setting changed at imx6sx-sdb-reva, it is SoC feature,
->   it doesn't need to be change unless board limitations. [Patch 1/2]
-> - Add explanation why OOP setting need to changed at imx6sx-sdb revb board. [Patch 2/2]
-> - Make imx6sx-sdb revb board as default imx6sx-sdb board. [Patch 2/2]
-> 
-> Peter Chen (2):
->   ARM: imx6sx-sdb: change default board as reva board
->   ARM: imx6sx-sdb: add revb board and make it default
+On Tue, Jan 27, 2015 at 04:27:18PM +0530, Bhuvanchandra DV wrote:
+> Acked-by: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
 
-Peter,
+Applied, thanks.
 
-What branch did you generate these patches on?  I'm trying to apply
-them, but they do not apply on any reasonable branch.  Can you re-spin
-against v4.0-rc1?  Thanks.
-
-Shawn
-
+> ---
+>  arch/arm/boot/dts/vf500.dtsi |  4 ++++
+>  arch/arm/boot/dts/vfxxx.dtsi | 11 +++++++++++
+>  2 files changed, 15 insertions(+)
 > 
->  arch/arm/boot/dts/Makefile            |   3 +-
->  arch/arm/boot/dts/imx6sx-sdb-reva.dts | 143 +++++++++
->  arch/arm/boot/dts/imx6sx-sdb.dts      | 588 ++--------------------------------
->  arch/arm/boot/dts/imx6sx-sdb.dtsi     | 547 +++++++++++++++++++++++++++++++
->  4 files changed, 720 insertions(+), 561 deletions(-)
->  create mode 100644 arch/arm/boot/dts/imx6sx-sdb-reva.dts
->  create mode 100644 arch/arm/boot/dts/imx6sx-sdb.dtsi
-> 
+> diff --git a/arch/arm/boot/dts/vf500.dtsi b/arch/arm/boot/dts/vf500.dtsi
+> index 1dbf8d2..f5f807c 100644
+> --- a/arch/arm/boot/dts/vf500.dtsi
+> +++ b/arch/arm/boot/dts/vf500.dtsi
+> @@ -66,6 +66,10 @@
+>  	interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+>  };
+>  
+> +&dspi1 {
+> +	interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
+> +};
+> +
+>  &edma0 {
+>  	interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
+>  			<GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> index a29c7ce..789744b 100644
+> --- a/arch/arm/boot/dts/vfxxx.dtsi
+> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> @@ -139,6 +139,17 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			dspi1: dspi1 at 4002d000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "fsl,vf610-dspi";
+> +				reg = <0x4002d000 0x1000>;
+> +				clocks = <&clks VF610_CLK_DSPI1>;
+> +				clock-names = "dspi";
+> +				spi-num-chipselects = <5>;
+> +				status = "disabled";
+> +			};
+> +
+>  			sai2: sai at 40031000 {
+>  				compatible = "fsl,vf610-sai";
+>  				reg = <0x40031000 0x1000>;
 > -- 
-> 1.9.1
+> 2.2.2
 > 
