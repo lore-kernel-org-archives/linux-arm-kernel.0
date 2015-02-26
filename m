@@ -1,63 +1,58 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 26 Feb 2015 09:29:33 +0800
-Subject: [PATCH v3 16/30] PCI/IA64: Fix the build warning about pci_domain_nr()
+Date: Thu, 26 Feb 2015 09:29:41 +0800
+Subject: [PATCH v3 24/30] PCI/tegra: Remove redundant tegra_pcie_scan_bus()
 In-Reply-To: <1424914187-21027-1-git-send-email-wangyijing@huawei.com>
 References: <1424914187-21027-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1424914187-21027-17-git-send-email-wangyijing@huawei.com>
+Message-ID: <1424914187-21027-25-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Should pass pci_bus * instead of pci_dev * to pci_domain_nr().
+Now pci_scan_root_bus() is almost simliar to
+pci_create_root_bus() + pci_scan_child_bus().
+So we could use common pci_scan_root_bus() in
+pci_common_init_dev() to scan pci busses.
+tegra_pcie_scan_bus() is redundant, remove it.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Tony Luck <tony.luck@intel.com>
-CC: Fenghua Yu <fenghua.yu@intel.com>
-CC: linux-ia64 at vger.kernel.org
+CC: Thierry Reding <thierry.reding@gmail.com>
+CC: linux-tegra at vger.kernel.org
 ---
- arch/ia64/sn/kernel/io_acpi_init.c |    6 +++---
- arch/ia64/sn/kernel/io_init.c      |    2 +-
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/pci/host/pci-tegra.c |   16 ----------------
+ 1 files changed, 0 insertions(+), 16 deletions(-)
 
-diff --git a/arch/ia64/sn/kernel/io_acpi_init.c b/arch/ia64/sn/kernel/io_acpi_init.c
-index 0640739..2fd7414 100644
---- a/arch/ia64/sn/kernel/io_acpi_init.c
-+++ b/arch/ia64/sn/kernel/io_acpi_init.c
-@@ -364,12 +364,12 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
-         status = acpi_evaluate_integer(rootbus_handle, METHOD_NAME__SEG, NULL,
-                                        &segment);
-         if (ACPI_SUCCESS(status)) {
--		if (segment != pci_domain_nr(dev)) {
-+		if (segment != pci_domain_nr(dev->bus)) {
- 			acpi_get_name(rootbus_handle, ACPI_FULL_PATHNAME,
- 				&name_buffer);
- 			printk(KERN_ERR
- 			       "%s: Segment number mismatch, 0x%llx vs 0x%x for: %s\n",
--			       __func__, segment, pci_domain_nr(dev),
-+			       __func__, segment, pci_domain_nr(dev->bus),
- 			       (char *)name_buffer.pointer);
- 			kfree(name_buffer.pointer);
- 			return 1;
-@@ -407,7 +407,7 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
- 	/* Build up the pcidev_info.pdi_slot_host_handle */
- 	host_devfn = get_host_devfn(pcidev_match.handle, rootbus_handle);
- 	(*pcidev_info)->pdi_slot_host_handle =
--			((unsigned long) pci_domain_nr(dev) << 40) |
-+			((unsigned long) pci_domain_nr(dev->bus) << 40) |
- 					/* bus == 0 */
- 					host_devfn;
- 	return 0;
-diff --git a/arch/ia64/sn/kernel/io_init.c b/arch/ia64/sn/kernel/io_init.c
-index bcdc5b8..a97fad4 100644
---- a/arch/ia64/sn/kernel/io_init.c
-+++ b/arch/ia64/sn/kernel/io_init.c
-@@ -164,7 +164,7 @@ sn_io_slot_fixup(struct pci_dev *dev)
- 		panic("%s: Unable to alloc memory for sn_irq_info", __func__);
+diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+index 00e9272..10c0571 100644
+--- a/drivers/pci/host/pci-tegra.c
++++ b/drivers/pci/host/pci-tegra.c
+@@ -630,21 +630,6 @@ static int tegra_pcie_map_irq(const struct pci_dev *pdev, u8 slot, u8 pin)
+ 	return irq;
+ }
  
- 	/* Call to retrieve pci device information needed by kernel. */
--	status = sal_get_pcidev_info((u64) pci_domain_nr(dev),
-+	status = sal_get_pcidev_info((u64) pci_domain_nr(dev->bus),
- 		(u64) dev->bus->number,
- 		dev->devfn,
- 		(u64) __pa(pcidev_info),
+-static struct pci_bus *tegra_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+-{
+-	struct tegra_pcie *pcie = sys_to_pcie(sys);
+-	struct pci_bus *bus;
+-
+-	bus = pci_create_root_bus(pcie->dev, sys->busnr, &tegra_pcie_ops, sys,
+-				  &sys->resources);
+-	if (!bus)
+-		return NULL;
+-
+-	pci_scan_child_bus(bus);
+-
+-	return bus;
+-}
+-
+ static irqreturn_t tegra_pcie_isr(int irq, void *arg)
+ {
+ 	const char *err_msg[] = {
+@@ -1831,7 +1816,6 @@ static int tegra_pcie_enable(struct tegra_pcie *pcie)
+ 	hw.private_data = (void **)&pcie;
+ 	hw.setup = tegra_pcie_setup;
+ 	hw.map_irq = tegra_pcie_map_irq;
+-	hw.scan = tegra_pcie_scan_bus;
+ 	hw.ops = &tegra_pcie_ops;
+ 
+ 	pci_common_init_dev(pcie->dev, &hw);
 -- 
 1.7.1
