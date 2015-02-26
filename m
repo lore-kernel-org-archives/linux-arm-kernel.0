@@ -1,50 +1,86 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Thu, 26 Feb 2015 00:09:41 +0000
-Subject: [PATCH] clk: divider: return real rate instead of divider value
-In-Reply-To: <2011929.fOsbjMkSp9@diego>
-References: <2011929.fOsbjMkSp9@diego>
-Message-ID: <CAAG0J9-uHPg-np249ZKf3vrDCUvTvLhRbGZeGXfGqTV-XLByFg@mail.gmail.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Thu, 26 Feb 2015 01:11:44 +0100
+Subject: [PATCH 2/4] ARM: mvebu: add audio I2S controller to Armada 38x
+ Device Tree
+In-Reply-To: <54EE4AD6.6090101@gmail.com>
+References: <1424901482-3809-1-git-send-email-mw@semihalf.com>
+ <1424901482-3809-3-git-send-email-mw@semihalf.com>
+ <54EE4AD6.6090101@gmail.com>
+Message-ID: <CAPv3WKf8b+fuB-4qVwKC57iKaNHTLZAf9VFpfDbow1Sb3YAsNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 February 2015 at 10:39, Heiko St?bner <heiko@sntech.de> wrote:
-> Commit bca9690b9426 ("clk: divider: Make generic for usage elsewhere")
-> returned only the divider value for read-only dividers instead of the
-> actual rate.
->
-> Fixes: bca9690b9426 ("clk: divider: Make generic for usage elsewhere")
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Hi Sebastian,
 
-I just created an identical patch, so
-Reviewed-by: James Hogan <james.hogan@imgtec.com>
-Tested-by: James Hogan <james.hogan@imgtec.com>
+Thanks for your input.
 
-Thanks
-James
+2015-02-25 23:21 GMT+01:00 Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com>:
+> On 25.02.2015 22:58, Marcin Wojtas wrote:
+>>
+>> This commit adds the description of the I2S controller to the Marvell
+>> Armada 38x SoC's Device Tree, as well as its pin configuration.
+>>
+>> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+>> ---
+>>   arch/arm/boot/dts/armada-38x.dtsi | 17 +++++++++++++++++
+>>   1 file changed, 17 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/armada-38x.dtsi
+>> b/arch/arm/boot/dts/armada-38x.dtsi
+>> index 1dff30a..fa21cb5 100644
+>> --- a/arch/arm/boot/dts/armada-38x.dtsi
+>> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+>
+> [...]
+>>
+>> @@ -555,6 +561,17 @@
+>>                                 status = "disabled";
+>>                         };
+>>
+>> +                       audio_controller: audio-controller at e8000 {
+>> +                               #sound-dai-cells = <1>;
+>> +                               compatible = "marvell,armada-380-audio";
+>> +                               reg = <0xe8000 0x4000>, <0x18410 0xc>,
+>> <0x18204 0x4>;
+>> +                               reg-names = "i2s_regs", "pll_regs",
+>> "soc_ctrl";
+>
+>
+> Marcin,
+>
+> sorry but NACK. The PLL and SoC ctrl are not even close to the audio
+> controller registers.
+>
+>> +                               interrupts = <GIC_SPI 75
+>> IRQ_TYPE_LEVEL_HIGH>;
+>> +                               clocks = <&gateclk 0>;
+>> +                               clock-names = "internal";
+>
+>
+> How about providing access to audio PLL by a clock driver and amend the
+> binding to allow for a second more precise PLL clock, e.g.
+>
+>         clocks = <&gateclk CLK_AUDIO>, <&pll PLL_AUDIO>;
+>         clock-names = "internal", "pll";
+>
 
-> ---
->  drivers/clk/clk-divider.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Good idea. Would you suggest some name for the new driver? How about
+clk-audio.c under drivers/clk/mvebu?
+
+> we already check for an "extclk" on Dove for the same reason but the
+> name might be misleading here.
 >
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index a213455..5b4c018 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -355,7 +355,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
->                 bestdiv = readl(divider->reg) >> divider->shift;
->                 bestdiv &= div_mask(divider->width);
->                 bestdiv = _get_div(divider->table, bestdiv, divider->flags);
-> -               return bestdiv;
-> +               return DIV_ROUND_UP(*prate, bestdiv);
->         }
+> Also, i2c/spdif muxing option could be handled by 38x's pinctrl driver,
+> we have the same for Dove's internal i2c mux.
 >
->         return divider_round_rate(hw, rate, prate, divider->table,
-> --
-> 2.1.4
+> If you want to use i2s you just add the option to the default pinctrl
+> hog:
 >
+>         pinctrl-0 = <&i2s_pins &audio_mux_i2s>;
+>         pinctrl-names = "default";
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+
+Ok, I'll try to extend pinctrl-armada-38x then.
+
+Marcin
