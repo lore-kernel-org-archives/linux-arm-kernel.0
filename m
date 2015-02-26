@@ -1,58 +1,45 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 26 Feb 2015 10:22:28 +0900
-Subject: [PATCH V5 1/2] mmc: dw_mmc: exynos: Support eMMC's HS400 mode
-In-Reply-To: <CAL_Jsq+Mr=WOoCjWRnHnUqo8+UmqxxHbMG3M8+kLNgfhPASteA@mail.gmail.com>
-References: <1422499318-13726-1-git-send-email-alim.akhtar@samsung.com>
- <1422499318-13726-2-git-send-email-alim.akhtar@samsung.com>
- <CAL_Jsq+Mr=WOoCjWRnHnUqo8+UmqxxHbMG3M8+kLNgfhPASteA@mail.gmail.com>
-Message-ID: <54EE7554.6060506@samsung.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 25 Feb 2015 19:23:12 -0600
+Subject: [PATCH] PCI: xgene: Fix the map_bus callback prototype
+In-Reply-To: <20150226011824.GU6220@google.com>
+References: <1424686899-7869-1-git-send-email-tranmanphong@gmail.com>
+ <20150226011824.GU6220@google.com>
+Message-ID: <20150226012312.GV6220@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear, Rob.
-
-On 02/25/2015 11:38 PM, Rob Herring wrote:
-> On Wed, Jan 28, 2015 at 8:41 PM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
->> From: Seungwon Jeon <tgih.jun@samsung.com>
->>
->> Implements HS400 mode support for exynos host driver.
->> This also include some updates as new mode is added.
->>
->> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->> [Alim: addressed review comments]
->> ---
->>  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    7 +
->>  drivers/mmc/host/dw_mmc-exynos.c                   |  185 ++++++++++++++++----
->>  drivers/mmc/host/dw_mmc-exynos.h                   |   19 +-
->>  drivers/mmc/host/dw_mmc.c                          |   16 +-
->>  drivers/mmc/host/dw_mmc.h                          |    2 +
->>  5 files changed, 195 insertions(+), 34 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->> index ee4fc05..aad9844 100644
->> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->> @@ -36,6 +36,8 @@ Required Properties:
->>    in transmit mode and CIU clock phase shift value in receive mode for double
->>    data rate mode operation. Refer notes below for the order of the cells and the
->>    valid values.
->> +* samsung,dw-mshc-hs400-timing: Specifies the value of CIU TX and RX clock phase
->> +  shift value for hs400 mode operation.
+On Wed, Feb 25, 2015 at 07:18:24PM -0600, Bjorn Helgaas wrote:
+> [+cc Fabio]
 > 
-> What are the units?
-
-Do you means what is "sumsung,dw-mshci-hs400-timing" unit?
-It's timing value for eMMC/SD/SDIO clock phase.(It's exynos specific value.)
-Using timing value can shift the H/W clock phase.
-If invalid timing value is set, eMMC/SD/SDIO can produce the CRC error.
-
-Do you think it can't include into device-tree?
-I want to know your thinking. let me know, plz.
-
-Best Regards,
-Jaehoon Chung
-
+> On Mon, Feb 23, 2015 at 05:21:39PM +0700, Phong Tran wrote:
+> > The return value should be void __iomem *.
+> > Tested by compile only.
+> > 
+> > Signed-off-by: Phong Tran <tranmanphong@gmail.com>
 > 
-> Rob
-> 
+> I've already applied an identical patch from Fabio Estevam.  I added
+> Arnd's ack to it and also mentioned you in the credits, Phong.
+
+Dropped in favor of a more complete fix:
+https://patchwork.ozlabs.org/patch/440759/
+
+> > ---
+> >  drivers/pci/host/pci-xgene.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> > index aab5547..9c3bfd8 100644
+> > --- a/drivers/pci/host/pci-xgene.c
+> > +++ b/drivers/pci/host/pci-xgene.c
+> > @@ -127,7 +127,7 @@ static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
+> >  	return false;
+> >  }
+> >  
+> > -static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+> > +static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+> >  			      int offset)
+> >  {
+> >  	struct xgene_pcie_port *port = bus->sysdata;
+> > -- 
+> > 2.1.0
+> > 
