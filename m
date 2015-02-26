@@ -1,32 +1,43 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 26 Feb 2015 15:39:28 -0800
-Subject: [PATCH] Fix offset2lib issue for x86*, ARM*, PowerPC and MIPS
-In-Reply-To: <CAGXu5jJ8UM5J58CpBwP=+kHi9td0mKP0SV36HjpckEjxCzm45g@mail.gmail.com>
-References: <54EB735F.5030207@upv.es>
- <CAGXu5j+SBRcj+BGyxEwUzgKsB2fdzNiPY37Q=JTsf=-QbGwoGA@mail.gmail.com>
- <20150223205436.15133mg1kpyojyik@webmail.upv.es>
- <20150224073906.GA16422@gmail.com>
- <20150226143815.09386fe280c7bd8797048bb2@linux-foundation.org>
- <CAGXu5jJ8UM5J58CpBwP=+kHi9td0mKP0SV36HjpckEjxCzm45g@mail.gmail.com>
-Message-ID: <20150226153928.1df44df8a0d885fa71c471ce@linux-foundation.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 26 Feb 2015 17:57:32 -0600
+Subject: [PATCH v4 00/30] Refine PCI scan interfaces and make generic pci
+ host bridge
+In-Reply-To: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
+References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <20150226235732.GF25765@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Feb 2015 15:34:36 -0800 Kees Cook <keescook@chromium.org> wrote:
+On Thu, Feb 26, 2015 at 04:11:54PM +0800, Yijing Wang wrote:
+> v3->v4:
+> 	Fix the rebase issue.
 
-> >> That pointless repetition should be avoided.
-> >
-> > That's surprisingly hard!
-> >
-> > After renaming mips brk_rnd() to mmap_rnd() I had a shot.  I'm not very
-> > confident in the result.  Does that __weak trick even work?
-> 
-> In theory, it shouldn't be needed since only randomize_et_dyn will
-> call mmap_rnd, and only architectures that use randomize_et_dyn will
-> call it ... and will define mmap_rnd.
+This did apply on v4.0-rc1, but with many whitespace complaints:
 
-But randomize_et_dyn() is compiled for all architectures.  Or it was,
-until I did the CONFIG_ARCH_HAVE_ELF_ASLR thing.
+  Importing patch "pci-pass-pci-domain-number" ... <stdin>:29: trailing whitespace.
+	  bus = pci_scan_root_bus(NULL, 
+  <stdin>:44: trailing whitespace.
+      bus = pci_scan_bus_legacy(PCI_DOMBUS(hose->index, 0), 
+  <stdin>:59: trailing whitespace.
+      pbus = pci_create_root_bus(NULL, PCI_DOMBUS(domain, bus), 
+  <stdin>:74: trailing whitespace.
+      bus = pci_scan_root_bus(NULL, 
+  <stdin>:75: trailing whitespace.
+	      PCI_DOMBUS(controller->segment, busnum), 
+  warning: squelched 15 whitespace errors
+  warning: 20 lines add whitespace errors.
+  done
+  Importing patch "pci-introduce" ... done
+  Importing patch "pci-separate-pci_host_bridge" ... <stdin>:50: trailing whitespace.
+      dev_set_name(&host->dev, "pci%04x:%02x", host->domain, 
+  <stdin>:181: trailing whitespace.
+      dev_set_name(&b->dev, "%04x:%02x", bridge->domain, 
+  <stdin>:225: trailing whitespace.
+      
+  warning: 3 lines add whitespace errors.
 
-It seems odd that we have this per-arch feature but no Kconfig switch
-for it.
+I'll fix them myself this time because I want to make progress on this and
+I need something to do on the plane tomorrow, but please try to fix them
+yourself in the future.
+
+Bjorn
