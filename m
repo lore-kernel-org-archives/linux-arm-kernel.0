@@ -1,273 +1,67 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 26 Feb 2015 20:35:21 +0900
-Subject: [PATCH 3/3] arm64: dts: exynos: Add thermal-zones dt node for
- Exynos5433 SoC
-In-Reply-To: <1424950521-6236-1-git-send-email-cw00.choi@samsung.com>
-References: <1424950521-6236-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1424950521-6236-4-git-send-email-cw00.choi@samsung.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 26 Feb 2015 19:49:09 +0800
+Subject: [PATCH 1/3] mtd: atmel_nand: move the hsmc_clk from nfc node to
+ nand node
+In-Reply-To: <20150226101857.59104e97@bbrezillon>
+References: <1423548885-27589-1-git-send-email-josh.wu@atmel.com>
+ <20150226101857.59104e97@bbrezillon>
+Message-ID: <C9CC8708-B99A-47F4-AC57-1A92B302E1C9@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the thermal-zones devicetree node for Exynos5433 SoC.
-The thermal-zones has five thermal-zones and then each thermal-zone contains
-each thermal-sensor to monitor the temperature of own IP. The {atlas0|apollo}_
-thermal zone have the eight trip-points for interrupt method to detect the
-over-temperature.
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Inki Dae <inki.dae@samsung.com>
----
- arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi | 231 +++++++++++++++++++++++++
- arch/arm64/boot/dts/exynos/exynos5433.dtsi     |   1 +
- 2 files changed, 232 insertions(+)
- create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
+> On Feb 26, 2015, at 5:18 PM, Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> 
+> Hi Josh,
+> 
+> On Tue, 10 Feb 2015 14:14:43 +0800
+> Josh Wu <josh.wu@atmel.com> wrote:
+> 
+>> Also add a new sama5d3_nand compatiable string for sama5d3 nand.
+>> 
+>> For sama5d3, sama5d4 chip, the pmecc became part of HSMC, they need the
+>> HSMC clock enabled to work.
+>> The NFC is a sub feature for current nand driver, it can be disabled.
+>> But if HSMC clock is controlled by NFC, so disable NFC will also disable
+>> the HSMC clock. then, it will make the PMECC fail to work.
+>> 
+>> So the solution is move the HSMC clock out of NFC to nand node. When
+>> nand driver probed, it will check whether the chip has HSMC, if yes then
+>> it will require a HSMC clock.
+> 
+> Do you plan to use the NAND chip without the NFC (I mean, is there a
+> reason for not using the NFC to access the NAND ?) ?
+> If you don't, why don't you just wait for the NFC before probing the
+> NAND chip it is attached to, so that the hmsc clk is properly claimed.
+you can as you can have 2 Nand on the d3 but only 1 NFC
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
-new file mode 100644
-index 0000000..7ff7b0e
---- /dev/null
-+++ b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
-@@ -0,0 +1,231 @@
-+/*
-+ * Device tree sources for Exynos5433 thermal zone
-+ *
-+ * Copyright (c) 2015 Chanwoo Choi <cw00.choi@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <dt-bindings/thermal/thermal.h>
-+
-+/ {
-+thermal-zones {
-+	atlas0_thermal: atlas0-thermal {
-+		thermal-sensors = <&tmu_atlas0>;
-+		polling-delay-passive = <0>;
-+		polling-delay = <0>;
-+		trips {
-+			atlas0_alert_0: atlas0-alert-0 {
-+				temperature = <80000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas0_alert_1: atlas0-alert-1 {
-+				temperature = <85000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas0_alert_2: atlas0-alert-2 {
-+				temperature = <90000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas0_alert_3: atlas0-alert-3 {
-+				temperature = <95000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas0_alert_4: atlas0-alert-4 {
-+				temperature = <100000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas0_alert_5: atlas0-alert-5 {
-+				temperature = <105000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas0_alert_6: atlas0-alert-6 {
-+				temperature = <110000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+		};
-+	};
-+
-+	atlas1_thermal: atlas1-thermal {
-+		thermal-sensors = <&tmu_atlas1>;
-+		polling-delay-passive = <0>;
-+		polling-delay = <0>;
-+		trips {
-+			atlas1_alert_0: atlas1-alert-0 {
-+				temperature = <80000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas1_alert_1: atlas1-alert-1 {
-+				temperature = <85000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas1_alert_2: atlas1-alert-2 {
-+				temperature = <90000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas1_alert_3: atlas1-alert-3 {
-+				temperature = <95000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas1_alert_4: atlas1-alert-4 {
-+				temperature = <100000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas1_alert_5: atlas1-alert-5 {
-+				temperature = <105000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas1_alert_6: atlas1-alert-6 {
-+				temperature = <110000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+		};
-+	};
-+
-+	g3d_thermal: g3d-thermal {
-+		thermal-sensors = <&tmu_g3d>;
-+		polling-delay-passive = <0>;
-+		polling-delay = <0>;
-+		trips {
-+			g3d_alert_0: g3d-alert-0 {
-+				temperature = <80000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			g3d_alert_1: g3d-alert-1 {
-+				temperature = <85000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			g3d_alert_2: g3d-alert-2 {
-+				temperature = <90000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			g3d_alert_3: g3d-alert-3 {
-+				temperature = <95000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			g3d_alert_4: g3d-alert-4 {
-+				temperature = <100000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			g3d_alert_5: g3d-alert-5 {
-+				temperature = <105000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			g3d_alert_6: g3d-alert-6 {
-+				temperature = <110000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+		};
-+
-+	};
-+
-+	apollo_thermal: apollo-thermal {
-+		thermal-sensors = <&tmu_apollo>;
-+		polling-delay-passive = <0>;
-+		polling-delay = <0>;
-+		trips {
-+			apollo_alert_0: apollo-alert-0 {
-+				temperature = <80000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			apollo_alert_1: apollo-alert-1 {
-+				temperature = <85000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			apollo_alert_2: apollo-alert-2 {
-+				temperature = <90000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			apollo_alert_3: apollo-alert-3 {
-+				temperature = <95000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			apollo_alert_4: apollo-alert-4 {
-+				temperature = <100000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			apollo_alert_5: apollo-alert-5 {
-+				temperature = <105000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			apollo_alert_6: apollo-alert-6 {
-+				temperature = <110000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+		};
-+	};
-+
-+	isp_thermal: isp-thermal {
-+		thermal-sensors = <&tmu_isp>;
-+		polling-delay-passive = <0>;
-+		polling-delay = <0>;
-+		trips {
-+			isp_alert_0: isp-alert-0 {
-+				temperature = <80000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			isp_alert_1: isp-alert-1 {
-+				temperature = <85000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			isp_alert_2: isp-alert-2 {
-+				temperature = <90000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			isp_alert_3: isp-alert-3 {
-+				temperature = <95000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			isp_alert_4: isp-alert-4 {
-+				temperature = <100000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			isp_alert_5: isp-alert-5 {
-+				temperature = <105000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			isp_alert_6: isp-alert-6 {
-+				temperature = <110000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+		};
-+	};
-+};
-+};
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index b44ddcc..fbce27d 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -964,3 +964,4 @@
- };
- 
- #include "exynos5433-pinctrl.dtsi"
-+#include "exynos5433-tmu.dtsi"
--- 
-1.8.5.5
+Best Regards,
+J.
+> 
+> I'm not convinced that moving a clk reference out of the controller
+> node can address the fact that the nand/nand-controller DT
+> representation is inappropriate (your embedding controller specific
+> information in your NAND chip definition).
+> I think we should reconsider this problem with a controller/chip
+> approach:
+> - which parts are representing the NAND controller: the PMECC engine,
+>  the NFC if available, ...
+> - which parts are representing the NAND chip: the EBI mem range, the
+>  R/B pin, the ALE/CLE information, ...
+> 
+> And of course, we should take the EBI/SMC rework into account ;-).
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> 
+> -- 
+> Boris Brezillon, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
