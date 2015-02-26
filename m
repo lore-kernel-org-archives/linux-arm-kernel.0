@@ -1,36 +1,31 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 25 Feb 2015 23:51:23 -0600
-Subject: [PATCH v3 00/30] Refine PCI scan interfaces and make generic pci
- host bridge
-In-Reply-To: <1424914187-21027-1-git-send-email-wangyijing@huawei.com>
-References: <1424914187-21027-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <20150226055123.GA5415@google.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 26 Feb 2015 13:53:23 +0800
+Subject: [PATCH v2] coresight-stm: adding driver for CoreSight STM
+ component
+In-Reply-To: <1424907152-18808-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1424907152-18808-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20150226055320.GA20385@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 09:29:17AM +0800, Yijing Wang wrote:
-> v2->v3:
-> 	Rebase this series on v4.0-rc1.
+On Wed, Feb 25, 2015 at 04:32:32PM -0700, Mathieu Poirier wrote:
+> diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-stm b/Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
+> new file mode 100644
+> index 000000000000..3ddb676831ab
+> --- /dev/null
+> +++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
+> @@ -0,0 +1,62 @@
+> +What:		/sys/bus/coresight/devices/<memory_map>.stm/enable_source
+> +Date:		February 2015
+> +KernelVersion:	3.20
 
-Hm, still doesn't apply for me:
+A random comment - there will never be a v3.20 kernel.
 
-  11:48:15 ~/linux (pci/enumeration)$ git show --oneline | head -1
-  c517d838eb7d Linux 4.0-rc1
-  11:48:36 ~/linux (pci/enumeration)$ stg import -M --sign m/yw
-  Checking for changes in the working directory ... done
-  Importing patch "pci-rip-out" ... done
-  Importing patch "pci-rip-out-0" ... done
-  Importing patch "xen-pci-don-t-use-deprecated" ... done
-  Importing patch "pci-remove-deprecated" ... done
-  Importing patch "pci-rename-pci_scan_bus-to" ... done
-  Importing patch "pci-combine-pci-domain-and-bus" ... done
-  Importing patch "pci-pass-pci-domain-number" ... done
-  Importing patch "pci-introduce" ... done
-  Importing patch "pci-separate-pci_host_bridge" ... done
-  Importing patch "pci-introduce-0" ... done
-  Importing patch "pci-save-sysdata-in" ... error: patch failed: drivers/pci/host-bridge.c:58
-  error: drivers/pci/host-bridge.c: patch does not apply
-  error: patch failed: drivers/pci/probe.c:1954
-  error: drivers/pci/probe.c: patch does not apply
-  stg import: Diff does not apply cleanly
-  11:48:52 ~/linux (pci/enumeration)$ 
+Shawn
+
+> +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
+> +Description:	(RW) Enable/disable tracing on this specific trace macrocell.
+> +		Enabling the trace macrocell implies it has been configured
+> +		properly and a sink has been identidifed for it.  The path
+> +		of coresight components linking the source to the sink is
+> +		configured and managed automatically by the coresight framework.
