@@ -1,166 +1,101 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 26 Feb 2015 08:12:57 -0600
-Subject: [PATCH v3] drivers/tty: amba: defer probing DMA availability
- until hw_init
-In-Reply-To: <1424910661-26474-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
-References: <1424910661-26474-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
-Message-ID: <CAL_JsqJvFsMesJqNi+Kwg_Xnu7oanyEzrFfk+w9msQ_XOiBGPQ@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 26 Feb 2015 21:59:08 +0800
+Subject: [PATCH] pinctrl: at91: move lock/unlock_as_irq calls into
+ request/release resources methods
+In-Reply-To: <54EF2052.6030909@atmel.com>
+References: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
+ <54EF2052.6030909@atmel.com>
+Message-ID: <AE6E30D8-7E58-4D18-A8F3-B903F5D85498@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 6:31 PM, Jorge Ramirez-Ortiz
-<jorge.ramirez-ortiz@linaro.org> wrote:
-> Fix a race condition that happens when device_initcall(pl011_dma_initicall)
-> is executed before all the devices have been probed - this issue was observed on
-> an hisi_6220 SoC (HiKey board from Linaro).
->
-> The deferred driver probing framework relies on late_initcall to trigger
-> deferred probes so it is just possible that, even with a valid DMA driver ready
-> to be loaded, we fail to synchronize with it.
->
-> The proposed implementation delays probing of the DMA until the uart device is
-> opened. As hw_init is invoked on port startup and port resume - but the DMA
-> probe is only required once - we avoid calling multiple times using a new field
-> in uart_amba_port to track this scenario.
->
-> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
-> ---
->  drivers/tty/serial/amba-pl011.c | 66 ++++++++++-------------------------------
->  1 file changed, 16 insertions(+), 50 deletions(-)
->
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index 8d94c19..3501ccc 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -29,6 +29,7 @@
->   * and hooked into this driver.
->   */
->
-> +#define pr_fmt(fmt) "amba-pl011: "fmt
 
-You can drop this I think.
+> On Feb 26, 2015, at 9:32 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> 
+> Le 08/02/2015 19:23, Boris Brezillon a ?crit :
+>> The gpiochip_lock_as_irq call can fail and return an error, while the
+>> irq_startup is not expected to fail (returns an unsigned int which is not
+>> checked by irq core code).
+>> 
+>> irq_request/release_resources functions have been created to address this
+>> problem.
+>> 
+>> Move gpiochip_lock/unlock_as_irq calls into
+>> irq_request/release_resources functions to prevent using a gpio as an irq
+>> if the gpiochip_lock_as_irq call failed.
+>> 
+>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> 
+> If it can speed up things:
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> Linus,
+> can we schedule this fix during the 4.0-rc phase?
 
->  #if defined(CONFIG_SERIAL_AMBA_PL011_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
->  #define SUPPORT_SYSRQ
-> @@ -164,6 +165,7 @@ struct uart_amba_port {
->         bool                    using_rx_dma;
->         struct pl011_dmarx_data dmarx;
->         struct pl011_dmatx_data dmatx;
-> +       bool                    dma_probed;
->  #endif
->  };
->
-> @@ -261,7 +263,7 @@ static void pl011_sgbuf_free(struct dma_chan *chan, struct pl011_sgbuf *sg,
->         }
->  }
->
-> -static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *uap)
-> +static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
->  {
->         /* DMA is the sole user of the platform data right now */
->         struct amba_pl011_data *plat = dev_get_platdata(uap->port.dev);
-> @@ -275,9 +277,16 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
->         struct dma_chan *chan;
->         dma_cap_mask_t mask;
->
-> -       chan = dma_request_slave_channel(dev, "tx");
-> +       uap->dma_probed = true;
+As I said I?ll test after CNY which finish this week for us
 
-I would not set this to true in the case of EPROBE_DEFER. That way if
-a DMA driver is loaded as a module some time later, DMA can be used.
-We're not really using deferred probe here, but using it as an
-indication that the UART is DMA capable.
+as we only re-open the office Monday
 
-> +
-> +       chan = dma_request_slave_channel_reason(dev, "tx");
-> +       if (IS_ERR(chan)) {
-> +               if (PTR_ERR(chan) == -EPROBE_DEFER) {
-> +                       dev_warn(uap->port.dev, "DMA driver not ready\n");
-> +                       return;
-> +               }
-> +               dev_info(uap->port.dev, "no OF or ACPI DMA data\n");
->
-> -       if (!chan) {
->                 /* We need platform data */
->                 if (!plat || !plat->dma_filter) {
->                         dev_info(uap->port.dev, "no DMA platform data\n");
-> @@ -383,54 +392,9 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
->                 dev_info(uap->port.dev, "DMA channel RX %s\n",
->                          dma_chan_name(uap->dmarx.chan));
->         }
-> -}
-> -
-> -#ifndef MODULE
-> -/*
-> - * Stack up the UARTs and let the above initcall be done at device
-> - * initcall time, because the serial driver is called as an arch
-> - * initcall, and at this time the DMA subsystem is not yet registered.
-> - * At this point the driver will switch over to using DMA where desired.
-> - */
-> -struct dma_uap {
-> -       struct list_head node;
-> -       struct uart_amba_port *uap;
-> -       struct device *dev;
-> -};
-> -
-> -static LIST_HEAD(pl011_dma_uarts);
-> -
-> -static int __init pl011_dma_initcall(void)
-> -{
-> -       struct list_head *node, *tmp;
-> -
-> -       list_for_each_safe(node, tmp, &pl011_dma_uarts) {
-> -               struct dma_uap *dmau = list_entry(node, struct dma_uap, node);
-> -               pl011_dma_probe_initcall(dmau->dev, dmau->uap);
-> -               list_del(node);
-> -               kfree(dmau);
-> -       }
-> -       return 0;
-> -}
-> -
-> -device_initcall(pl011_dma_initcall);
->
-> -static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
-> -{
-> -       struct dma_uap *dmau = kzalloc(sizeof(struct dma_uap), GFP_KERNEL);
-> -       if (dmau) {
-> -               dmau->uap = uap;
-> -               dmau->dev = dev;
-> -               list_add_tail(&dmau->node, &pl011_dma_uarts);
-> -       }
-> +       return;
-
-You don't need an explicit return.
-
->  }
-> -#else
-> -static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
-> -{
-> -       pl011_dma_probe_initcall(dev, uap);
-> -}
-> -#endif
-> -
->  static void pl011_dma_remove(struct uart_amba_port *uap)
->  {
->         /* TODO: remove the initcall if it has not yet executed */
-> @@ -1548,6 +1512,9 @@ static int pl011_hwinit(struct uart_port *port)
->         uap->im = readw(uap->port.membase + UART011_IMSC);
->         writew(UART011_RTIM | UART011_RXIM, uap->port.membase + UART011_IMSC);
->
-> +       if (!uap->dma_probed)
-> +               pl011_dma_probe(uap->port.dev, uap);
-> +
->         if (dev_get_platdata(uap->port.dev)) {
->                 struct amba_pl011_data *plat;
->
-> @@ -2218,7 +2185,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
->         uap->port.ops = &amba_pl011_pops;
->         uap->port.flags = UPF_BOOT_AUTOCONF;
->         uap->port.line = i;
-> -       pl011_dma_probe(&dev->dev, uap);
->
->         /* Ensure interrupts from this UART are masked and cleared */
->         writew(0, uap->port.membase + UART011_IMSC);
-> --
-> 1.9.1
->
+Best Regards,
+J.
+> 
+> Bye,
+> 
+>> ---
+>> drivers/pinctrl/pinctrl-at91.c | 17 +++++++----------
+>> 1 file changed, 7 insertions(+), 10 deletions(-)
+>> 
+>> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+>> index f4cd0b9..a481406 100644
+>> --- a/drivers/pinctrl/pinctrl-at91.c
+>> +++ b/drivers/pinctrl/pinctrl-at91.c
+>> @@ -1477,28 +1477,25 @@ static void gpio_irq_ack(struct irq_data *d)
+>> 	/* the interrupt is already cleared before by reading ISR */
+>> }
+>> 
+>> -static unsigned int gpio_irq_startup(struct irq_data *d)
+>> +static int gpio_irq_request_res(struct irq_data *d)
+>> {
+>> 	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
+>> 	unsigned	pin = d->hwirq;
+>> 	int ret;
+>> 
+>> 	ret = gpiochip_lock_as_irq(&at91_gpio->chip, pin);
+>> -	if (ret) {
+>> +	if (ret)
+>> 		dev_err(at91_gpio->chip.dev, "unable to lock pind %lu IRQ\n",
+>> 			d->hwirq);
+>> -		return ret;
+>> -	}
+>> -	gpio_irq_unmask(d);
+>> -	return 0;
+>> +
+>> +	return ret;
+>> }
+>> 
+>> -static void gpio_irq_shutdown(struct irq_data *d)
+>> +static void gpio_irq_release_res(struct irq_data *d)
+>> {
+>> 	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
+>> 	unsigned	pin = d->hwirq;
+>> 
+>> -	gpio_irq_mask(d);
+>> 	gpiochip_unlock_as_irq(&at91_gpio->chip, pin);
+>> }
+>> 
+>> @@ -1577,8 +1574,8 @@ void at91_pinctrl_gpio_resume(void)
+>> static struct irq_chip gpio_irqchip = {
+>> 	.name		= "GPIO",
+>> 	.irq_ack	= gpio_irq_ack,
+>> -	.irq_startup	= gpio_irq_startup,
+>> -	.irq_shutdown	= gpio_irq_shutdown,
+>> +	.irq_request_resources = gpio_irq_request_res,
+>> +	.irq_release_resources = gpio_irq_release_res,
+>> 	.irq_disable	= gpio_irq_mask,
+>> 	.irq_mask	= gpio_irq_mask,
+>> 	.irq_unmask	= gpio_irq_unmask,
+>> 
+> 
+> 
+> -- 
+> Nicolas Ferre
