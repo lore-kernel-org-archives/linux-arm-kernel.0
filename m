@@ -1,47 +1,43 @@
-From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
-Date: Thu, 26 Feb 2015 00:36:05 +0000
-Subject: [PATCH v5 3/4] media: ov2640: add primary dt support
-In-Reply-To: <54ED4772.902@atmel.com>
-References: <1423560696-12304-1-git-send-email-josh.wu@atmel.com>
- <1423560696-12304-4-git-send-email-josh.wu@atmel.com>
- <CA+V-a8vkd2Q714s=o9WZZvPWJQATp=6POb8VYdSgarKxxEKqyQ@mail.gmail.com>
- <54ED4772.902@atmel.com>
-Message-ID: <CA+V-a8s_PosECku7Pzg4Rt4Mq7_mMtvo3ZGDxUByx__XEgUxcA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 26 Feb 2015 08:37:58 +0800
+Subject: [PATCH 1/8] clk: add helper function clk_is_match()
+In-Reply-To: <20150225172757.421.43718@quantum>
+References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+ <1424876018-17852-2-git-send-email-shawn.guo@linaro.org>
+ <20150225172757.421.43718@quantum>
+Message-ID: <20150226003756.GA20028@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+On Wed, Feb 25, 2015 at 09:27:57AM -0800, Mike Turquette wrote:
+> Hi Shawn,
+> 
+> Thanks for the patch. I wrote a similar one last night but did not
+> finish fixing up the drivers (and thus did not post it). I prefer my
+> implementation below, and I'm happy to merge your driver fixes with it.
 
-On Wed, Feb 25, 2015 at 3:54 AM, Josh Wu <josh.wu@atmel.com> wrote:
-> Hi, Prabhakar Lad
->
->
-> On 2/17/2015 12:48 AM, Lad, Prabhakar wrote:
->>
->> Hi Josh,
->>
->> Thanks for the patch.
->>
->> On Tue, Feb 10, 2015 at 9:31 AM, Josh Wu <josh.wu@atmel.com> wrote:
->> [Snip]
->>>
->>> -       priv->clk = v4l2_clk_get(&client->dev, "mclk");
->>> +       priv->clk = v4l2_clk_get(&client->dev, "xvclk");
->>
->> with this change don?t you need to update the board file using this
->> driver/
->> the bridge driver ?
->
-> I think no.
->
-> First, my patch should be on top of the following two patches, which changed
-> the *v4l2_clk_get()* behavior:
-> [v3,1/2] V4L: remove clock name from v4l2_clk API
-> https://patchwork.linuxtv.org/patch/28108/
-> [v4,2/2] V4L: add CCF support to the v4l2_clk API
-> https://patchwork.linuxtv.org/patch/28111/
->
-Thanks I missed the dependent patches.
+Sure, no problem.  My intention was to get rmk's HummingBoard back to
+work ASAP :)
 
-Cheers,
---Prabhakar Lad
+> From: Michael Turquette <mturquette@linaro.org>
+> Date: Wed, 25 Feb 2015 09:11:01 -0800
+> Subject: [PATCH] clk: introduce clk_is_match
+> 
+> Some drivers compare struct clk pointers as a means of knowing
+> if the two pointers reference the same clock hardware. This behavior is
+> dubious (drivers must not dereference struct clk), but did not cause any
+> regressions until the per-user struct clk patch was merged. Now the test
+> for matching clk's will always fail with per-user struct clk's.
+> 
+> clk_is_match is introduced to fix the regression and prevent drivers
+> from comparing the pointers manually.
+> 
+> Fixes: 035a61c314eb ("clk: Make clk API return per-user struct clk instances")
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
+
+> Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Signed-off-by: Michael Turquette <mturquette@linaro.org>
