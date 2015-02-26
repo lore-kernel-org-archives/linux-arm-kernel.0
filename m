@@ -1,105 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Feb 2015 11:15:39 +0000
-Subject: [PATCH 2/2] mfd: dt-bindings: Add bindings for the MediaTek
- MT6397 PMIC
-In-Reply-To: <1424607330-1829-3-git-send-email-s.hauer@pengutronix.de>
-References: <1424607330-1829-1-git-send-email-s.hauer@pengutronix.de>
- <1424607330-1829-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150226111539.GB14842@x1>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Thu, 26 Feb 2015 11:25:09 +0000
+Subject: [alsa-devel] [PATCH 1/8] clk: add helper function clk_is_match()
+In-Reply-To: <1424944618.3073.6.camel@pengutronix.de>
+References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+ <1424876018-17852-2-git-send-email-shawn.guo@linaro.org>
+ <20150225172757.421.43718@quantum>
+ <20150226090256.GQ30445@trinity.fluff.org>
+ <1424944618.3073.6.camel@pengutronix.de>
+Message-ID: <20150226112509.GR30445@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 22 Feb 2015, Sascha Hauer wrote:
+On Thu, Feb 26, 2015 at 10:56:58AM +0100, Philipp Zabel wrote:
+> Am Donnerstag, den 26.02.2015, 09:02 +0000 schrieb Ben Dooks:
+> > On Wed, Feb 25, 2015 at 09:27:57AM -0800, Mike Turquette wrote:
+> [...]
+> > > From: Michael Turquette <mturquette@linaro.org>
+> > > Date: Wed, 25 Feb 2015 09:11:01 -0800
+> > > Subject: [PATCH] clk: introduce clk_is_match
+> > > 
+> > > Some drivers compare struct clk pointers as a means of knowing
+> > > if the two pointers reference the same clock hardware. This behavior is
+> > > dubious (drivers must not dereference struct clk), but did not cause any
+> > > regressions until the per-user struct clk patch was merged. Now the test
+> > > for matching clk's will always fail with per-user struct clk's.
+> > > 
+> > > clk_is_match is introduced to fix the regression and prevent drivers
+> > > from comparing the pointers manually.
+> > 
+> > small observaton, clk_is_same() is linguistically nicer.
+> 
+> How about clk_equal() ?
 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  Documentation/devicetree/bindings/mfd/mt6397.txt | 70 ++++++++++++++++++++++++
->  1 file changed, 70 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/mt6397.txt
+That's good, the only issue that's not clear in any of these names is
+that does this mean "the same clock", a "clock of the same rate" or a
+"clock that is equivalent to in the rate and phase but not subject to
+the same gate".
 
-Binding looks pretty inert.
-
-Applied, thanks.
-
-> diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
-> new file mode 100644
-> index 0000000..15043e6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
-> @@ -0,0 +1,70 @@
-> +MediaTek MT6397 Multifunction Device Driver
-> +
-> +MT6397 is a multifunction device with the following sub modules:
-> +- Regulator
-> +- RTC
-> +- Audio codec
-> +- GPIO
-> +- Clock
-> +
-> +It is interfaced to host controller using SPI interface by a proprietary hardware
-> +called PMIC wrapper or pwrap. MT6397 MFD is a child device of pwrap.
-> +See the following for pwarp node definitions:
-> +Documentation/devicetree/bindings/soc/pwrap.txt
-> +
-> +This document describes the binding for MFD device and its sub module.
-> +
-> +Required properties:
-> +compatible: "mediatek,mt6397"
-> +
-> +Optional subnodes:
-> +
-> +- rtc
-> +	Required properties:
-> +		- compatible: "mediatek,mt6397-rtc"
-> +- regulators
-> +	Required properties:
-> +		- compatible: "mediatek,mt6397-regulator"
-> +	see Documentation/devicetree/bindings/regulator/mt6397-regulator.txt
-> +- codec
-> +	Required properties:
-> +		- compatible: "mediatek,mt6397-codec"
-> +- clk
-> +	Required properties:
-> +		- compatible: "mediatek,mt6397-clk"
-> +
-> +Example:
-> +	pwrap: pwrap at 1000f000 {
-> +		compatible = "mediatek,mt8135-pwrap";
-> +
-> +		...
-> +
-> +		pmic {
-> +			compatible = "mediatek,mt6397";
-> +
-> +			codec: mt6397codec {
-> +				compatible = "mediatek,mt6397-codec";
-> +			};
-> +
-> +			regulators {
-> +				compatible = "mediatek,mt6397-regulator";
-> +
-> +				mt6397_vpca15_reg: buck_vpca15 {
-> +					regulator-compatible = "buck_vpca15";
-> +					regulator-name = "vpca15";
-> +					regulator-min-microvolt = <850000>;
-> +					regulator-max-microvolt = <1400000>;
-> +					regulator-ramp-delay = <12500>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				mt6397_vgp4_reg: ldo_vgp4 {
-> +					regulator-compatible = "ldo_vgp4";
-> +					regulator-name = "vgp4";
-> +					regulator-min-microvolt = <1200000>;
-> +					regulator-max-microvolt = <3300000>;
-> +					regulator-enable-ramp-delay = <218>;
-> +				};
-> +			};
-> +		};
-> +	};
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
