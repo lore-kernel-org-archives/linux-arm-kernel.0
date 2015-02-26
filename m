@@ -1,41 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Feb 2015 15:21:18 +0900
-Subject: [PATCH 21/32] ARM: shmobile: r8a7790: smp: remap whole apmu region
+Date: Thu, 26 Feb 2015 15:21:23 +0900
+Subject: [PATCH 26/32] ARM: shmobile: r8a7790: add CAN DT support
 In-Reply-To: <cover.1424849129.git.horms+renesas@verge.net.au>
 References: <cover.1424849129.git.horms+renesas@verge.net.au>
-Message-ID: <1d66f72d2c79b76b7353ea4e42f33521fa839f81.1424849129.git.horms+renesas@verge.net.au>
+Message-ID: <6a7742b4eea5de4af68bb62c20ca56e38b8e5b8b.1424849129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Documentation says the last register is at 0x184 (CAxCPUCMCR), so use
-proper length. Current APMU code accesses CAxCPUnCR which is currently
-outside of the remapped area.
+Define the generic R8A7790 parts of the CAN0/1 device nodes.
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-r8a7790.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7790.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c b/arch/arm/mach-shmobile/smp-r8a7790.c
-index 9c3da13..a5bef87 100644
---- a/arch/arm/mach-shmobile/smp-r8a7790.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7790.c
-@@ -37,11 +37,11 @@ static struct rcar_sysc_ch r8a7790_ca7_scu = {
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index e872854..cd7fc05 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -792,6 +792,26 @@
+ 		};
+ 	};
  
- static struct rcar_apmu_config r8a7790_apmu_config[] = {
- 	{
--		.iomem = DEFINE_RES_MEM(0xe6152000, 0x88),
-+		.iomem = DEFINE_RES_MEM(0xe6152000, 0x188),
- 		.cpus = { 0, 1, 2, 3 },
- 	},
- 	{
--		.iomem = DEFINE_RES_MEM(0xe6151000, 0x88),
-+		.iomem = DEFINE_RES_MEM(0xe6151000, 0x188),
- 		.cpus = { 0x100, 0x0101, 0x102, 0x103 },
- 	}
- };
++	can0: can at e6e80000 {
++		compatible = "renesas,can-r8a7790";
++		reg = <0 0xe6e80000 0 0x1000>;
++		interrupts = <0 186 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R8A7790_CLK_RCAN0>,
++			 <&cpg_clocks R8A7790_CLK_RCAN>, <&can_clk>;
++		clock-names = "clkp1", "clkp2", "can_clk";
++		status = "disabled";
++	};
++
++	can1: can at e6e88000 {
++		compatible = "renesas,can-r8a7790";
++		reg = <0 0xe6e88000 0 0x1000>;
++		interrupts = <0 187 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R8A7790_CLK_RCAN1>,
++			 <&cpg_clocks R8A7790_CLK_RCAN>, <&can_clk>;
++		clock-names = "clkp1", "clkp2", "can_clk";
++		status = "disabled";
++	};
++
+ 	clocks {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
 -- 
 2.1.4
