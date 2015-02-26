@@ -1,233 +1,277 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 26 Feb 2015 09:16:27 +0000
-Subject: [RFC PATCH 1/3] eeprom: Add a simple EEPROM framework
-In-Reply-To: <20150225013049.GJ24928@codeaurora.org>
-References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1424365708-26681-1-git-send-email-srinivas.kandagatla@linaro.org>
- <CAL_Jsq+SeuoojgTpv1y_aPJ_jzDr3HqZhYEBQ3_vYGBHvcccug@mail.gmail.com>
- <54E78A31.9020306@linaro.org>
- <CAL_Jsq+mvpRjYfL_8OseTDCB-6aBhwhNKLBQXXJeVQLDwWm8Nw@mail.gmail.com>
- <20150222143211.GX25269@lukather>
- <CAL_JsqLqqw5DyUqCaOTSKPwF-Ms5EU4f_OPoW9YVpMCo8A_bbw@mail.gmail.com>
- <54EBB3AC.30000@codeaurora.org> <20150224092155.GO25269@lukather>
- <20150225013049.GJ24928@codeaurora.org>
-Message-ID: <54EEE46B.6090905@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 26 Feb 2015 09:16:55 +0000
+Subject: [PATCH v3] arm64: mm: increase VA range of identity map
+Message-ID: <1424942215-5505-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The page size and the number of translation levels, and hence the supported
+virtual address range, are build-time configurables on arm64 whose optimal
+values are use case dependent. However, in the current implementation, if
+the system's RAM is located at a very high offset, the virtual address range
+needs to reflect that merely because the identity mapping, which is only used
+to enable or disable the MMU, requires the extended virtual range to map the
+physical memory at an equal virtual offset.
 
+This patch relaxes that requirement, by increasing the number of translation
+levels for the identity mapping only, and only when actually needed, i.e.,
+when system RAM's offset is found to be out of reach at runtime.
 
-On 25/02/15 01:30, Stephen Boyd wrote:
-> On 02/24, Maxime Ripard wrote:
->> On Mon, Feb 23, 2015 at 03:11:40PM -0800, Stephen Boyd wrote:
->>>>>> I would do something more simple that is just a list of keys and
->>>>>> their location like this:
->>>>>>
->>>>>> device-serial-number = <start size>;
->>>>>> key1 = <start size>;
->>>>>> key2 = <start size>;
->>>>> I'm sorry, but what's the difference?
->>>> It can describe the layout completely whether the fields are tied to a
->>>> h/w device or not.
->>>>
->>>> What I would like to see here is the entire layout described covering
->>>> both types of fields.
->>>>
->>>
->>> I was thinking the DT might be like this on the provider side:
->>>
->>>     qfprom at 1000000 {
->>>        reg = <0x1000000 0x1000>;
->>>        ranges = <0 0x1000000 0x1000>;
->>>        compatible = "qcom,qfprom-msm8960"
->>>
->>>        pvs-data: pvs-data at 40 {
->>>              compatible = "qcom,pvs-a";
->>>              reg = <0x40 0x20>,
->>> 	    #eeprom-cells = <0>;
->>>        };
->>>
->>>         tsens-data: tmdata at 10 {
->>>              compatible = "qcom,tsens-data-msm8960";
->>>              reg = <0x10 4>, <0x16 4>;
->>> 	    #eeprom-cells = <0>;
->>>
->>>        };
->>>
->>>        serial-number: serial at 50 {
->>>              compatible = "qcom,serial-msm8960";
->>>              reg = <0x50 4>, <0x60 4>;
->>> 	    #eeprom-cells = <0>;
->>>
->>>        };
->>>     };
->>
->> I'm not sure the compatible is really needed.
->>
->> A label of some sort, just like the MTD partitions do would do just
->> fine, and wouldn't have the implicit expectation that a driver will be
->> probed from that node.
->
-> I wasn't aware that compatible meant driver probe. I thought
-> compatible just meant some software entity can understand what
-> I've described within this node. For example, compatible for
-> reserved-memory nodes doesn't mean we're going to probe a device.
->
->>
->>> and then on the consumer side:
->>>
->>> 	device {
->>> 		eeproms = <&serial-number>;
->>> 		eeprom-names = "soc-rev-id";
->>> 	};
->>>
->>>
->>> This would solve a problem where the consumer device is some standard
->>> off-the-shelf IP block that needs to get some SoC specific calibration
->>> data from the eeprom. I may want to interpret the bits differently
->>> depending on which eeprom is connected to my SoC. Sometimes that data
->>> format may be the same across many variations of the SoC (e.g. the
->>> qcom,pvs-a node) or it may be completely different for a given SoC (e.g.
->>> qcom,serial-msm8960 node). I imagine for other SoCs out there it could
->>> be different depending on which eeprom the board manufacturer decides to
->>> wire onto their board and how they choose to program the data.
->>
->> Oh, so you'd like to infer the data format it's stored in from the
->> compatible?
->>
->> AFAICT, this format will be highly depending on the board itself,
->> rather than on the SoC, do you think it will scale enough?
->>
->>> So this is where I think the eeprom-cells and offset + length starts to
->>> fall apart. It forces us to make up a bunch of different compatible
->>> strings for our consumer device just so that we can parse the eeprom
->>> that we decided to use for some SoC/board specific data. Instead I'd
->>> like to see some framework that expresses exactly which eeprom is on my
->>> board and how to interpret the bits in a way that doesn't require me to
->>> keep refining the compatible string for my generic IP block.
->>
->> Hmmmm, apparently you don't :)
->>
->>> I worry that if we put all those details in DT we'll end up having to
->>> describe individual bits like serial-number-bit-2, serial-number-bit-3,
->>> etc. because sometimes these pieces of data are scattered all around the
->>> eeprom and aren't contiguous or aligned on a byte boundary. It may be
->>> easier to just have a way to express that this is an eeprom with this
->>> specific layout and my device has data stored in there. Then the driver
->>> can be told what layout it is (via compatible or some other string based
->>> means if we're not using DT?) and match that up with some driver data if
->>> it needs to know how to understand the bits it can read with the
->>> eeprom_read() API.
->>
->> I'm half convinced that the layout information will actually work for
->> more complex cases, like the linked list Rob described.
->>
->> If such a structure is ever to be found, it would feel wrong to have
->> that in the EEPROM driver, but it would feel just as wrong to put that
->> in the client driver, that would have to handle the parsing of raw
->> data coming flashed by one single crazy board vendor.
->>
->> Maybe we can have each cell carry a property that defines the format
->> it's stored in, and match that to some parsers plugins, starting with
->> the generic and trivial cases but still allowing for custom parsers to
->> be defined?
->>
->> Something like
->>
->> eeprom at 42 {
->> 	compatible = "atmel,at24something";
->> 	reg = <0x42>;
->>
->> 	serial at 0 {
->> 		label = "board serial";
->> 		reg = <0x0 0x10>;
->> 		format = "packed";
->> 	};
->>
->> 	opps at 10 {
->> 		label = "board serial";
->> 		reg = <0x10 0x10>, <0x40 0x10>, <0x80 0x10>;
->> 		format = "random-vendor,opp-linked-list";
->> 	};
->> };
->>
->> That would make eeprom_read always return the same format of data to
->> the client drivers, without cripling the generic EEPROM drivers
->> either.
->>
->
-> Is the goal here to make eeprom_read() figure out how to return
-> the next byte of data and hide the parsing logic behind the
-> eeprom APIs? I imagine "random-vendor,opp-linked-list" would be
-> handled by the eeprom driver and that would return OPPs byte by
-> byte across the different reg properties to the eeprom consumer?
->
-> This approach concerns me because every eeprom_read() call needs
-> to fit the format that the client driver is expecting. How do we
-> validate that? What do we do if we have a random OPP client #1
-> that expects to get the data from eeprom_read() with OPPs in
-> ascending order and random OPP client #2 that expects to get the
-> data from eeprom_read() with OPPs in descending order?
->
-> It feels like we're making the eeprom framework too smart without
-> a well defined abstraction. If we were to make it so that
-> eeprom_get_opps() knew what to do and parsed/populated the OPPs,
-> it might work. But if we're just exporting raw data across a
-> read/write API with some implementation specific mangling it
-> sounds like it's going to get messy fast. And if the API is well
-> defined, it would start to become rather large with many
-> different types of data that need to be parsed and sometimes data
-> that's only specific to a single SoC.
->
-> I wonder how much we could get away with this approach though. If
-> the eeprom driver probed and populated OPPs, made a serial number
-> available via the soc device, and then we made up framework(s)
-> for things like our thermal sensor calibration data and display
-> panel calibration data, I would guess that covers most of my
-> use-cases. The client drivers would need some sort of 'wait for
-> eeprom to populate things' API or we'd need to work that into the
-> new calibration framework.
->
-I think we are making simple eeprom framework too smart which will break 
-in future.
+Tested-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v3:
+- Fix potential issue where the assumption would not hold that lowering T0SZ
+  would always result in an additional level of translation to be configured.
+- Use EXTRA_PTRS not PTRS_PER_PGD: doesn't really make a difference in practice,
+  but it looks more correct.
+- Increased verbosity of the comments
+- Dropped # prefixes for immediates in asm, per Will's request
+- Retained Laura's Tested-by tag since the emitted code is identical
 
-IMHO, Anything on top of eeprom interface that interprets the data 
-should not go into the eeprom framework itself, it can either live some 
-parsers/SOC specific drivers/interfaces.
+v2:
+- Dropped hunk regarding KVM, this will be addressed separately. Note that the
+  build is still broken on Seattle if you have KVM enabled and 4k pages with
+  3 levels of translation configured, but at least you have something to watch
+  on your console now
+- Fix ordering wrt TLB flushing
+- Set T0SZ based on actual leading zero count in __pa(KERNEL_END), the net
+  result is the same (one additional level of translation, if needed)
 
-As Stephen pointed out earlier lets start with something like this, 
-which would provide a better abstraction to the discussed use cases like 
-serial-number and packed data in eeprom.
+ arch/arm64/include/asm/mmu_context.h   | 38 ++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/page.h          |  6 ++++--
+ arch/arm64/include/asm/pgtable-hwdef.h |  7 ++++++-
+ arch/arm64/kernel/head.S               | 38 ++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/smp.c                |  1 +
+ arch/arm64/mm/mmu.c                    |  7 ++++++-
+ arch/arm64/mm/proc-macros.S            | 11 ++++++++++
+ arch/arm64/mm/proc.S                   |  3 +++
+ 8 files changed, 107 insertions(+), 4 deletions(-)
 
-    qfprom at 1000000 {
-       reg = <0x1000000 0x1000>;
-       ranges = <0 0x1000000 0x1000>;
-       compatible = "qcom,qfprom-msm8960"
-
-       pvs-data: pvs-data at 40 {
-             compatible = "qcom,pvs-a";
-             reg = <0x40 0x20>,
-       };
-
-        tsens-data: tmdata at 10 {
-             reg = <0x10 40>;
-       };
-
-       serial-number: serial at 50 {
-             compatible = "qcom,serial-msm8960";
-             reg = <0x50 4>, <0x60 4>;
-       };
-
-    };
-
-and then on the consumer side:
-
-	device {
-		eeproms = <&serial-number>;
-		eeprom-names = "soc-rev-id";
-	};
-	
-driver side:
-
-	eeprom_get_cell()
-	eeprom_read();
+diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+index a9eee33dfa62..9dea19aae40c 100644
+--- a/arch/arm64/include/asm/mmu_context.h
++++ b/arch/arm64/include/asm/mmu_context.h
+@@ -64,6 +64,44 @@ static inline void cpu_set_reserved_ttbr0(void)
+ 	: "r" (ttbr));
+ }
+ 
++/*
++ * TCR.T0SZ value to use when the ID map is active. Usually equals
++ * TCR_T0SZ(VA_BITS), unless system RAM is positioned very high in
++ * physical memory, in which case it will be smaller.
++ */
++extern u64 idmap_t0sz;
++
++static inline void __cpu_set_tcr_t0sz(u64 t0sz)
++{
++	unsigned long tcr;
++
++	if (!IS_ENABLED(CONFIG_ARM64_VA_BITS_48)
++	    && unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS)))
++		asm volatile (
++		"	mrs	%0, tcr_el1	;"
++		"	bfi	%0, %1, %2, %3	;"
++		"	msr	tcr_el1, %0	;"
++		"	isb"
++		: "=&r" (tcr)
++		: "r"(t0sz), "I"(TCR_T0SZ_OFFSET), "I"(TCR_TxSZ_WIDTH));
++}
++
++/*
++ * Set TCR.T0SZ to the value appropriate for activating the identity map.
++ */
++static inline void cpu_set_idmap_tcr_t0sz(void)
++{
++	__cpu_set_tcr_t0sz(idmap_t0sz);
++}
++
++/*
++ * Set TCR.T0SZ to its default value (based on VA_BITS)
++ */
++static inline void cpu_set_default_tcr_t0sz(void)
++{
++	__cpu_set_tcr_t0sz(TCR_T0SZ(VA_BITS));
++}
++
+ static inline void switch_new_context(struct mm_struct *mm)
+ {
+ 	unsigned long flags;
+diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
+index 22b16232bd60..3d02b1869eb8 100644
+--- a/arch/arm64/include/asm/page.h
++++ b/arch/arm64/include/asm/page.h
+@@ -33,7 +33,9 @@
+  * image. Both require pgd, pud (4 levels only) and pmd tables to (section)
+  * map the kernel. With the 64K page configuration, swapper and idmap need to
+  * map to pte level. The swapper also maps the FDT (see __create_page_tables
+- * for more information).
++ * for more information). Note that the number of ID map translation levels
++ * could be increased on the fly if system RAM is out of reach for the default
++ * VA range, so 3 pages are reserved in all cases.
+  */
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define SWAPPER_PGTABLE_LEVELS	(CONFIG_ARM64_PGTABLE_LEVELS)
+@@ -42,7 +44,7 @@
+ #endif
+ 
+ #define SWAPPER_DIR_SIZE	(SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
+-#define IDMAP_DIR_SIZE		(SWAPPER_DIR_SIZE)
++#define IDMAP_DIR_SIZE		(3 * PAGE_SIZE)
+ 
+ #ifndef __ASSEMBLY__
+ 
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index 5f930cc9ea83..847e864202cc 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -143,7 +143,12 @@
+ /*
+  * TCR flags.
+  */
+-#define TCR_TxSZ(x)		(((UL(64) - (x)) << 16) | ((UL(64) - (x)) << 0))
++#define TCR_T0SZ_OFFSET		0
++#define TCR_T1SZ_OFFSET		16
++#define TCR_T0SZ(x)		((UL(64) - (x)) << TCR_T0SZ_OFFSET)
++#define TCR_T1SZ(x)		((UL(64) - (x)) << TCR_T1SZ_OFFSET)
++#define TCR_TxSZ(x)		(TCR_T0SZ(x) | TCR_T1SZ(x))
++#define TCR_TxSZ_WIDTH		6
+ #define TCR_IRGN_NC		((UL(0) << 8) | (UL(0) << 24))
+ #define TCR_IRGN_WBWA		((UL(1) << 8) | (UL(1) << 24))
+ #define TCR_IRGN_WT		((UL(2) << 8) | (UL(2) << 24))
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 8ce88e08c030..a3612eadab3c 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -387,6 +387,44 @@ __create_page_tables:
+ 	mov	x0, x25				// idmap_pg_dir
+ 	ldr	x3, =KERNEL_START
+ 	add	x3, x3, x28			// __pa(KERNEL_START)
++
++#ifndef CONFIG_ARM64_VA_BITS_48
++#define EXTRA_SHIFT	(PGDIR_SHIFT + PAGE_SHIFT - 3)
++#define EXTRA_PTRS	(1 << (48 - EXTRA_SHIFT))
++
++	/*
++	 * If VA_BITS < 48, it may be too small to allow for an ID mapping to be
++	 * created that covers system RAM if that is located sufficiently high
++	 * in the physical address space. So for the ID map, use an extended
++	 * virtual range in that case, by configuring an additional translation
++	 * level.
++	 * First, we have to verify our assumption that the current value of
++	 * VA_BITS was chosen such that all translation levels are fully
++	 * utilised, and that lowering T0SZ will always result in an additional
++	 * translation level to be configured.
++	 */
++#if VA_BITS != EXTRA_SHIFT
++#error "Mismatch between VA_BITS and page size/number of translation levels"
++#endif
++
++	/*
++	 * Calculate the maximum allowed value for TCR_EL1.T0SZ so that the
++	 * entire kernel image can be ID mapped. As T0SZ == (64 - #bits used),
++	 * this number conveniently equals the number of leading zeroes in
++	 * the physical address of KERNEL_END.
++	 */
++	adrp	x5, KERNEL_END
++	clz	x5, x5
++	cmp	x5, TCR_T0SZ(VA_BITS)	// default T0SZ small enough?
++	b.ge	1f			// .. then skip additional level
++
++	adrp	x6, idmap_t0sz
++	str	x5, [x6, :lo12:idmap_t0sz]
++
++	create_table_entry x0, x3, EXTRA_SHIFT, EXTRA_PTRS, x5, x6
++1:
++#endif
++
+ 	create_pgd_entry x0, x3, x5, x6
+ 	ldr	x6, =KERNEL_END
+ 	mov	x5, x3				// __pa(KERNEL_START)
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 328b8ce4b007..74554dfcce73 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -151,6 +151,7 @@ asmlinkage void secondary_start_kernel(void)
+ 	 */
+ 	cpu_set_reserved_ttbr0();
+ 	flush_tlb_all();
++	cpu_set_default_tcr_t0sz();
+ 
+ 	preempt_disable();
+ 	trace_hardirqs_off();
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index c6daaf6c6f97..c4f60393383e 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -40,6 +40,8 @@
+ 
+ #include "mm.h"
+ 
++u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
++
+ /*
+  * Empty_zero_page is a special page that is used for zero-initialized data
+  * and COW.
+@@ -454,6 +456,7 @@ void __init paging_init(void)
+ 	 */
+ 	cpu_set_reserved_ttbr0();
+ 	flush_tlb_all();
++	cpu_set_default_tcr_t0sz();
+ }
+ 
+ /*
+@@ -461,8 +464,10 @@ void __init paging_init(void)
+  */
+ void setup_mm_for_reboot(void)
+ {
+-	cpu_switch_mm(idmap_pg_dir, &init_mm);
++	cpu_set_reserved_ttbr0();
+ 	flush_tlb_all();
++	cpu_set_idmap_tcr_t0sz();
++	cpu_switch_mm(idmap_pg_dir, &init_mm);
+ }
+ 
+ /*
+diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
+index 005d29e2977d..c17fdd6a19bc 100644
+--- a/arch/arm64/mm/proc-macros.S
++++ b/arch/arm64/mm/proc-macros.S
+@@ -52,3 +52,14 @@
+ 	mov	\reg, #4			// bytes per word
+ 	lsl	\reg, \reg, \tmp		// actual cache line size
+ 	.endm
++
++/*
++ * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
++ */
++	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
++#ifndef CONFIG_ARM64_VA_BITS_48
++	adrp	\tmpreg, idmap_t0sz
++	ldr	\tmpreg, [\tmpreg, #:lo12:idmap_t0sz]
++	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
++#endif
++	.endm
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 28eebfb6af76..cdd754e19b9b 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -156,6 +156,7 @@ ENTRY(cpu_do_resume)
+ 	msr	cpacr_el1, x6
+ 	msr	ttbr0_el1, x1
+ 	msr	ttbr1_el1, x7
++	tcr_set_idmap_t0sz x8, x7
+ 	msr	tcr_el1, x8
+ 	msr	vbar_el1, x9
+ 	msr	mdscr_el1, x10
+@@ -233,6 +234,8 @@ ENTRY(__cpu_setup)
+ 	 */
+ 	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
+ 			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0
++	tcr_set_idmap_t0sz	x10, x9
++
+ 	/*
+ 	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the IPS bits in
+ 	 * TCR_EL1.
+-- 
+1.8.3.2
