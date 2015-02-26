@@ -1,29 +1,34 @@
 From: leilei.zhao@atmel.com (Leilei Zhao)
-Date: Thu, 26 Feb 2015 14:55:20 +0800
-Subject: [PATCH 0/5] tty/serial: at91: fix bugs when using multiple serials
-Message-ID: <1424933725-16242-1-git-send-email-leilei.zhao@atmel.com>
+Date: Thu, 26 Feb 2015 14:55:21 +0800
+Subject: [PATCH 1/5] tty/serial: at91: correct check of buf used in DMA
+In-Reply-To: <1424933725-16242-1-git-send-email-leilei.zhao@atmel.com>
+References: <1424933725-16242-1-git-send-email-leilei.zhao@atmel.com>
+Message-ID: <1424933725-16242-2-git-send-email-leilei.zhao@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series of patches fix bugs when using multiple serial ports at the same time:
- - The using rx ring buffer in DMA is inconsistent with its allocation.
- - The serial port can't send and receive data when it's opened the second time
-   and the later if it switches to PIO when DMA channel is not available.
- - The serial port can lead to kernel crash when data is sending and receiving
-   and the program is killed.
- 
-The patches were made from branch tty-next of gregkh/tty.git repository, and 
-tested on a SAMA5D36 VB boards with 5 serial ports enabled.
+We only use buf of ring In DMA rx function while using buf of xmit
+in DMA tx function. So here we need definitively to check the buf
+of ring which is corresponding to DMA rx function.
 
-Leilei Zhao (5):
-  tty/serial: at91: correct check of buf used in DMA
-  tty/serial: at91: correct buffer size used in DMA
-  tty/serial: at91: revise the return type of atmel_init_property
-  tty/serial: at91: set ops in property init each time
-  tty/serial: at91: correct the usage of tasklet
+Signed-off-by: Leilei Zhao <leilei.zhao@atmel.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/tty/serial/atmel_serial.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- drivers/tty/serial/atmel_serial.c |   16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 846552b..460903c 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1027,7 +1027,7 @@ static int atmel_prepare_rx_dma(struct uart_port *port)
+ 	spin_lock_init(&atmel_port->lock_rx);
+ 	sg_init_table(&atmel_port->sg_rx, 1);
+ 	/* UART circular rx buffer is an aligned page. */
+-	BUG_ON((int)port->state->xmit.buf & ~PAGE_MASK);
++	BUG_ON((int)ring->buf & ~PAGE_MASK);
+ 	sg_set_page(&atmel_port->sg_rx,
+ 		    virt_to_page(ring->buf),
+ 		    ATMEL_SERIAL_RINGSIZE,
 -- 
 1.7.9.5
