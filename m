@@ -1,26 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Feb 2015 23:00:52 +0000
-Subject: [PATCH] Fix offset2lib issue for x86*, ARM*, PowerPC and MIPS
-In-Reply-To: <20150226143815.09386fe280c7bd8797048bb2@linux-foundation.org>
-References: <54EB735F.5030207@upv.es>
- <CAGXu5j+SBRcj+BGyxEwUzgKsB2fdzNiPY37Q=JTsf=-QbGwoGA@mail.gmail.com>
- <20150223205436.15133mg1kpyojyik@webmail.upv.es>
- <20150224073906.GA16422@gmail.com>
- <20150226143815.09386fe280c7bd8797048bb2@linux-foundation.org>
-Message-ID: <20150226230052.GN8656@n2100.arm.linux.org.uk>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Fri, 27 Feb 2015 01:03:07 +0200
+Subject: 3.20-rc0 breaks nfsroot over usb
+In-Reply-To: <20150226221950.GC10204@amd>
+References: <20150217185518.GA3825@amd>
+ <20150226221950.GC10204@amd>
+Message-ID: <20150226230307.GA27809@fuloong-minipc.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 02:38:15PM -0800, Andrew Morton wrote:
-> diff -puN arch/arm64/Kconfig~fix-offset2lib-issue-for-x86-arm-powerpc-and-mips-fix arch/arm64/Kconfig
-> --- a/arch/arm64/Kconfig~fix-offset2lib-issue-for-x86-arm-powerpc-and-mips-fix
-> +++ a/arch/arm64/Kconfig
-> @@ -1,4 +1,4 @@
-> -config ARM64
-> +qconfig ARM64
+Hi,
 
-Is this a typo?
+On Thu, Feb 26, 2015 at 11:19:50PM +0100, Pavel Machek wrote:
+> Ok, it seems that new config dependencies broke my kconfig. These will
+> not be enabled if you just to make oldconfig; you want to make sure
+> they are on.
+> 
+>  OMAP2430 and onwards (USB_MUSB_OMAP2PLUS) [N/m/y] (NEW)
+> TWL4030 USB Transceiver Driver (TWL4030_USB) [N/m/y/?] (NEW)
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Yes, also other users have reported "USB breakage" with 4.0-rc1 on N900
+etc caused by this.
+
+Commit fbba7db3990cb707ff91cd6507d53a0a730afe97 (usb: musb:
+add omap-control dependency) changed USB_MUSB_OMAP2PLUS to depend
+on OMAP_CONTROL_PHY but that seems to be wrong at least for OMAP3.
+omap_control_phy.h provides dummy functions when it's not enabled.
+So there should be no dependency.
+
+A.
