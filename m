@@ -1,75 +1,105 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Feb 2015 11:06:59 +0000
-Subject: [RFC] pwm-backlight: Allow backlight to remain disabled on boot
-In-Reply-To: <1406806970-12561-1-git-send-email-thierry.reding@gmail.com>
-References: <1406806970-12561-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20150226110659.GO6688@x1>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 26 Feb 2015 12:09:19 +0100
+Subject: [PATCH 1/8] irqchip: armada-370-xp: Simplify interrupt map, mask
+ and unmask
+In-Reply-To: <54EEF83C.40003@free-electrons.com>
+References: <1424945593-20320-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1424945593-20320-2-git-send-email-maxime.ripard@free-electrons.com>
+ <54EEF83C.40003@free-electrons.com>
+Message-ID: <20150226110919.GC29241@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Jul 2014, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> The default for backlight devices is to be enabled immediately when
-> registering with the backlight core. This can be useful for setups that
-> use a simple framebuffer device and where the backlight cannot otherwise
-> be hooked up to the panel.
-> 
-> However, when dealing with more complex setups, such as those of recent
-> ARM SoCs, this can be problematic. Since the backlight is usually setup
-> separately from the display controller, the probe order is not usually
-> deterministic. That can lead to situations where the backlight will be
-> powered up and the panel will show an uninitialized framebuffer.
-> 
-> Furthermore, subsystems such as DRM have advanced functionality to set
-> the power mode of a panel. In order to allow such setups to power up the
-> panel at exactly the right moment, a way is needed to prevent the
-> backlight core from powering the backlight up automatically when it is
-> registered.
-> 
-> This commit introduces a new boot_off field in the platform data (and
-> also implements getting the same information from device tree). When set
-> the initial backlight power mode will be set to "off".
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> I've been meaning to send this for a while but was always holding back
-> because of the indoctrination that this type of configuration shouldn't
-> be part of device tree. However this issue was recently raised again in
-> the context of power up sequences for display panels. As described above
-> the issue is that panel datasheets recommend that the backlight attached
-> to a panel be turned on at the very last step to avoid visual glitches
-> during the panel's power up sequence. With the current implementation it
-> is typical for the backlight to be probed before the display panel. That
-> has, in many cases, the side-effect of enabling the backlight, therefore
-> making the screen content visible before it's actually initialized.
-> 
-> Some panels come up with random garbage when uninitialized, others show
-> all white. With some luck the panel will be all black and users won't
-> really notice.
-> 
-> This patch is an attempt to enable boards to override the default of
-> turning on the backlight for the pwm-backlight driver. I'm not sure if
-> there was a specific reason to turn on the backlight by default when
-> this driver was initially written, but the fact is that since it has
-> pretty much always been like this we can't really go and change the
-> default, otherwise a lot of people may end up with no backlight and no
-> clue as to how to enable it. So the only reasonable thing we can do is
-> to keep the old behaviour and give new boards a way to override it if
-> they know that some other part of the stack will enable it at the right
-> moment.
-> 
->  .../devicetree/bindings/video/backlight/pwm-backlight.txt         | 1 +
->  drivers/video/backlight/pwm_bl.c                                  | 8 ++++++++
->  include/linux/pwm_backlight.h                                     | 2 ++
->  3 files changed, 11 insertions(+)
+Hi Gregory,
 
-Some people on the list are talking about this again.
+On Thu, Feb 26, 2015 at 11:41:00AM +0100, Gregory CLEMENT wrote:
+> Hi Maxime,
+> 
+> On 26/02/2015 11:13, Maxime Ripard wrote:
+> > From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > 
+> > The map, mask and unmask is unnecessarily complicated, with a different
+> > implementation for shared and per CPU interrupts. The current code does
+> > the following:
+> > 
+> > At probe time, all interrupts are disabled and masked on all CPUs.
+> > 
+> > Shared interrupts:
+> > 
+> >  * When the interrupt is mapped(), it gets disabled and unmasked on the
+> >    calling CPU.
+> > 
+> >  * When the interrupt is unmasked(), masked(), it gets enabled and
+> >    disabled.
+> > 
+> > Per CPU interrupts:
+> > 
+> >  * When the interrupt is mapped, it gets masked on the calling CPU and
+> >    enabled.
+> > 
+> >  * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
+> >    on the calling CPU.
+> > 
+> > This commit simplifies this code, with a much simpler implementation, common
+> > to shared and per CPU interrupts.
+> > 
+> >  * When the interrupt is mapped, it's enabled.
+> > 
+> >  * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
+> >    on the calling CPU.
+> > 
+> > Tested on a Armada XP SoC with SMP and UP configurations, with chained and
+> > regular interrupts.
+> 
+> This patch doesn't only simplify the driver it changes also its
+> behavior and especially for the affinity.
 
-What was the verdict?
+The affinity itself is not changed by that patch. The default CPU the
+interrupt handler is running on might, but as far as I know, there's
+no guarantee on the affinity of an interrupt when irq_set_affinity has
+not been called.
+
+> If a driver call irq_enable() then this functions will call
+> irq_enable() and as we didn't implement a .enable() operation, it will
+> call only our unmask() function.
+> 
+> So if the IRQ was unmasked on a CPU and a driver call an irq_enable()
+> from an other CPU then we will end up with the IRQ enabled on 2
+> different CPUs. It is a problem for 2 reasons:
+
+I guess you're talking about SPIs here, right?
+
+> - the hardware don't handle a IRQ enable on more than one CPU
+
+Oh. I would have expected one CPU to get a spurious interrupt, and the
+other to handle the interrupt as expected.
+
+> - it will modify the affinity at the hardware level because a new CPU
+>   will be able to receive an IRQ whereas we setup the affinity on only
+>   one CPU.
+
+I'm not seure what you mean here.
+
+The affinity is controlled by the INT_SOURCE_CTL register set, that is
+left untouched by this patch.
+
+> By only using the mask and unmask the affinity behavior is no more
+> reliable. I agree that the current code is not trivial, but adding
+> more comment instead of removing this capability should be better.
+
+That can be done too. Especially using the second patch that makes it
+a lot easier to extend the list of supported PPIs.
+
+Maxime
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150226/25b544e3/attachment.sig>
