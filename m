@@ -1,54 +1,57 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 26 Feb 2015 10:18:57 +0100
-Subject: [PATCH 1/3] mtd: atmel_nand: move the hsmc_clk from nfc node to
- nand node
-In-Reply-To: <1423548885-27589-1-git-send-email-josh.wu@atmel.com>
-References: <1423548885-27589-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <20150226101857.59104e97@bbrezillon>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 26 Feb 2015 10:22:50 +0100
+Subject: [PATCH 4/8] pwm: atmel-hlcdc: fix struct clk pointer comparing
+In-Reply-To: <1424876018-17852-5-git-send-email-shawn.guo@linaro.org>
+References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+ <1424876018-17852-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <54EEE5EA.6000902@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
-
-On Tue, 10 Feb 2015 14:14:43 +0800
-Josh Wu <josh.wu@atmel.com> wrote:
-
-> Also add a new sama5d3_nand compatiable string for sama5d3 nand.
+Le 25/02/2015 15:53, Shawn Guo a ?crit :
+> Since commit 035a61c314eb ("clk: Make clk API return per-user struct clk
+> instances"), clk API users can no longer check if two struct clk
+> pointers are pointing to the same hardware clock, i.e. struct clk_hw, by
+> simply comparing two pointers.  That's because with the per-user clk
+> change, a brand new struct clk is created whenever clients try to look
+> up the clock by calling clk_get() or sister functions like clk_get_sys()
+> and of_clk_get().  This changes the original behavior where the struct
+> clk is only created for once when clock driver registers the clock to
+> CCF in the first place.  The net change here is before commit
+> 035a61c314eb the struct clk pointer is unique for given hardware
+> clock, while after the commit the pointers returned by clk lookup calls
+> become different for the same hardware clock.
 > 
-> For sama5d3, sama5d4 chip, the pmecc became part of HSMC, they need the
-> HSMC clock enabled to work.
-> The NFC is a sub feature for current nand driver, it can be disabled.
-> But if HSMC clock is controlled by NFC, so disable NFC will also disable
-> the HSMC clock. then, it will make the PMECC fail to work.
+> That said, the struct clk pointer comparing in the code doesn't work any
+> more.  Call helper function clk_is_match() instead to fix the problem.
 > 
-> So the solution is move the HSMC clock out of NFC to nand node. When
-> nand driver probed, it will check whether the chip has HSMC, if yes then
-> it will require a HSMC clock.
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Do you plan to use the NAND chip without the NFC (I mean, is there a
-reason for not using the NFC to access the NAND ?) ?
-If you don't, why don't you just wait for the NFC before probing the
-NAND chip it is attached to, so that the hmsc clk is properly claimed.
+I agree with the fix whichever name is chosen for the function in an
+future version of this series. So you can add my:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-I'm not convinced that moving a clk reference out of the controller
-node can address the fact that the nand/nand-controller DT
-representation is inappropriate (your embedding controller specific
-information in your NAND chip definition).
-I think we should reconsider this problem with a controller/chip
-approach:
-- which parts are representing the NAND controller: the PMECC engine,
-  the NFC if available, ...
-- which parts are representing the NAND chip: the EBI mem range, the
-  R/B pin, the ALE/CLE information, ...
+Maybe Boris can double check...
 
-And of course, we should take the EBI/SMC rework into account ;-).
-
-Best Regards,
-
-Boris
+> ---
+>  drivers/pwm/pwm-atmel-hlcdc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pwm/pwm-atmel-hlcdc.c b/drivers/pwm/pwm-atmel-hlcdc.c
+> index 522f7075bb1a..36475949b829 100644
+> --- a/drivers/pwm/pwm-atmel-hlcdc.c
+> +++ b/drivers/pwm/pwm-atmel-hlcdc.c
+> @@ -97,7 +97,7 @@ static int atmel_hlcdc_pwm_config(struct pwm_chip *c,
+>  
+>  	pwmcfg = ATMEL_HLCDC_PWMPS(pres);
+>  
+> -	if (new_clk != chip->cur_clk) {
+> +	if (!clk_is_match(new_clk, chip->cur_clk)) {
+>  		u32 gencfg = 0;
+>  		int ret;
+>  
+> 
 
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Nicolas Ferre
