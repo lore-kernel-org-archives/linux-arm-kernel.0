@@ -1,55 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Feb 2015 10:44:15 +0000
-Subject: tlbi  va, vaa vs. val, vaal
-In-Reply-To: <20150227103347.GE3628@arm.com>
-References: <54EFB670.2070501@samsung.com> <20150227102435.GC3628@arm.com>
- <54F046F2.7020705@arm.com> <20150227103347.GE3628@arm.com>
-Message-ID: <54F04A7F.1000703@arm.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Fri, 27 Feb 2015 18:51:43 +0800
+Subject: [PATCH v9 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <54F02CB6.2090508@linaro.org>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <54EFE282.1090305@codeaurora.org> <54F02CB6.2090508@linaro.org>
+Message-ID: <54F04C3F.7040201@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/02/15 10:33, Will Deacon wrote:
-> On Fri, Feb 27, 2015 at 10:29:06AM +0000, Marc Zyngier wrote:
->> On 27/02/15 10:24, Will Deacon wrote:
->>> On Fri, Feb 27, 2015 at 12:12:32AM +0000, Mario Smarduch wrote:
->>>> I noticed kernel tlbflush.h use tlbi va*, vaa* variants instead of
->>>> val, vaal ones. Reading the manual D.5.7.2 it appears that
->>>> va*, vaa* versions invalidate intermediate caching of
->>>> translation structures.
->>>>
->>>> With stage2 enabled that may result in 20+ memory lookups
->>>> for a 4 level page table walk. That's assuming that intermediate
->>>> caching structures cache mappings from stage1 table entry to
->>>> host page.
->>>
->>> Yeah, Catalin and I discussed improving the kernel support for this,
->>> but it requires some changes to the generic mmu_gather code so that we
->>> can distinguish the leaf cases. I'd also like to see that done in a way
->>> that takes into account different granule sizes (we currently iterate
->>> over huge pages in 4k chunks). Last time I touched that, I entered a
->>> world of pain and don't plan to return there immediately :)
->>>
->>> Catalin -- feeling brave?
->>>
->>> FWIW: the new IOMMU page-table stuff I just got merged *does* make use
->>> of leaf-invalidation for the SMMU.
->>
->> Now, talking about feeling brave: who will be silly enough to port KVM
->> to the IOMMU page table code? It should just work(tm), right?
+On 2015/2/27 16:37, Hanjun Guo wrote:
+> Hi Timur,
 > 
-> I suspect you'll need to do some surgery to the interfaces, which currently
-> map directly onto the IOMMU API and therefore make nice assumptions about
-> what we get asked to map/unmap. You also probably want a wider range of
-> permissions than we use on the SMMU. Finally, the runtime nature of the
-> code (we make no assumptions about address sizes, page sizes etc) probably
-> incurs a performance hit that you may or may not care about.
+> On 2015?02?27? 11:20, Timur Tabi wrote:
+>> On 02/25/2015 02:39 AM, Hanjun Guo wrote:
+>>> Changes since v8:
+>>
+>> I'm still debugging it, but v9 on the 4.0-rc1 kernel crashes after
+>> calling the UEFI boot time services exit function.  That is, this line:
+>>
+>> status = sys_table->boottime->exit_boot_services(handle, mmap_key);
+>>
+>> in allocate_new_fdt_and_exit_boot() gets called, and then soon after it
+>> returns, the kernel crashes.  It's really early because the UEFI
+>> exception handler is called.
+>>
+>> I did not have this problem with v8 patchset on 3.19.
+> 
+> I tested this patch set on FVP base model with UEFI, and booted ok.
+> Can you boot the system without this ACPI patch set?
+> 
+>>
+>>
+>> Also, you still have a couple whitespace problems in these patches:
+>>
+>> Applying: ARM64 / ACPI: additions of ACPI documentation for arm64
+>> /local/mnt/workspace/linux.0/.git/rebase-apply/patch:607: new blank line
+>> at EOF.
+>> +
+>> /local/mnt/workspace/linux.0/.git/rebase-apply/patch:844: new blank line
+>> at EOF.
+>> +
+>> warning: 2 lines add whitespace errors.
+>> Applying: Documentation: ACPI for ARM64
+>> /local/mnt/workspace/linux.0/.git/rebase-apply/patch:517: new blank line
+>> at EOF.
+>> +
+>> warning: 1 line adds whitespace errors.
+> 
+> Weired, When I checked the patch locally there were no whitespace
+> problems:
 
-That's exactly what I want to evaluate. It would also help us to
-decouple our page-table code from the kernel macros, which bite us time
-and time again...
+I found those whitespace errors too. Please see the comments in each patch.
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Thanks,
+Shannon
