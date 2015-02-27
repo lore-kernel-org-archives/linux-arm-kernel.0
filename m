@@ -1,43 +1,54 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 27 Feb 2015 14:16:40 +0100
-Subject: [PATCH 1/1] ARM: TLV320AIC23 SoC Audio Codec: Fix errors reported
- related to input routing signals.
-In-Reply-To: <1424950347-26241-1-git-send-email-dobatog@gmail.com>
-References: <1424950347-26241-1-git-send-email-dobatog@gmail.com>
-Message-ID: <54F06E38.5020608@metafoo.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 27 Feb 2015 13:20:00 +0000
+Subject: [PATCH V4 0/6] RCU get_user_pages_fast and __get_user_pages_fast
+In-Reply-To: <54F06636.6080905@redhat.com>
+References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
+ <54F06636.6080905@redhat.com>
+Message-ID: <20150227132000.GD9011@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2015 12:32 PM, Gabriel Dobato wrote:
-> From: dobatog <dobatog@gmail.com>
->
-> The following patch, based on stable v3.19,  corrects the errors that are reported in the boot trace in reference to the Input Signals of the audio codec TLV320AIC23:
->
-> tlv320aic23-codec 1-001a: Control not supported for path LLINEIN -> [NULL] -> Line Input
-> tlv320aic23-codec 1-001a: ASoC: no dapm match for LLINEIN --> NULL --> Line Input
-> tlv320aic23-codec 1-001a: ASoC: Failed to add route LLINEIN -> NULL -> Line Input
-> tlv320aic23-codec 1-001a: Control not supported for path RLINEIN -> [NULL] -> Line Input
-> tlv320aic23-codec 1-001a: ASoC: no dapm match for RLINEIN --> NULL --> Line Input
-> tlv320aic23-codec 1-001a: ASoC: Failed to add route RLINEIN -> NULL -> Line Input
-> tlv320aic23-codec 1-001a: Control not supported for path MICIN -> [NULL] -> Mic Input
-> tlv320aic23-codec 1-001a: ASoC: no dapm match for MICIN --> NULL --> Mic Input
-> tlv320aic23-codec 1-001a: ASoC: Failed to add route MICIN -> NULL -> Mic Input
->
-> I am trying to set the sound system in a CM-510 (Compulab - SoM) based board with DT, using Simple-Card-Audio and  the TLV320AIC23 audio codec included in the SoM . I faced this problem and thanks to the help of Sebastian Hesselbarth who noticed the possible error located in the structure snd_soc_dapm_route tlv320aic23_intercon[] , now errors are not reported.
->
-> Tested on CM-510 (Compulab SoM Board).
->
-> Signed-off-by: dobatog <dobatog@gmail.com>
+Hi Jon,
 
-Hi,
+Steve is currently away, but should be back in the office next week.
 
-The patch itself looks good, but the commit message needs some work.
+On Fri, Feb 27, 2015 at 12:42:30PM +0000, Jon Masters wrote:
+> On 09/26/2014 10:03 AM, Steve Capper wrote:
+> 
+> > This series implements general forms of get_user_pages_fast and
+> > __get_user_pages_fast in core code and activates them for arm and arm64.
+> > 
+> > These are required for Transparent HugePages to function correctly, as
+> > a futex on a THP tail will otherwise result in an infinite loop (due to
+> > the core implementation of __get_user_pages_fast always returning 0).
+> > 
+> > Unfortunately, a futex on THP tail can be quite common for certain
+> > workloads; thus THP is unreliable without a __get_user_pages_fast
+> > implementation.
+> > 
+> > This series may also be beneficial for direct-IO heavy workloads and
+> > certain KVM workloads.
+> > 
+> > I appreciate that the merge window is coming very soon, and am posting
+> > this revision on the off-chance that it gets the nod for 3.18. (The changes
+> > thus far have been minimal and the feedback I've got has been mainly
+> > positive).
+> 
+> Head's up: these patches are currently implicated in a rare-to-trigger
+> hang that we are seeing on an internal kernel. An extensive effort is
+> underway to confirm whether these are the cause. Will followup.
 
-The subject line should be something like "ASoC: tlv320aic23: ..." to 
-indicate that this is for the ASoC subsystem and the tlv320aic23 driver.
+I'm currently investigating an intermittent memory corruption issue in
+v4.0-rc1 I'm able to trigger on Seattle with 4K pages and 48-bit VA,
+which may or may not be related. Sometimes it results in a hang (when
+the vectors get corrupted and the CPUs get caught in a recursive
+exception loop).
 
-The commit message should be line-wrapped at around 76 characters.
+Which architecture(s) are you hitting this on?
 
-Signed-off-by and From tag need to have your full name.
+Which configurations configuration(s)?
 
-- Lars
+What are you using to tickle the issue?
+
+Thanks,
+Mark.
