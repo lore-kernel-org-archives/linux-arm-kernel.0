@@ -1,66 +1,46 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 27 Feb 2015 08:50:34 +0000
-Subject: [PATCH v9 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <54EFE282.1090305@codeaurora.org>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <54EFE282.1090305@codeaurora.org>
-Message-ID: <CAKv+Gu-LxaX6X=qApp=zhzfmNfv=tjfscf9npFCpNW314pZvvg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Feb 2015 10:00:04 +0100
+Subject: [PATCH 4/5] ARM: shmobile: Add support SOC_BUS to R-Car Gen2
+In-Reply-To: <20150227005223.GA24717@verge.net.au>
+References: <cover.1424931398.git.horms+renesas@verge.net.au>
+ <8723510.YP2sm4Z5UY@wuerfel> <20150227005223.GA24717@verge.net.au>
+Message-ID: <2088679.zVJXCDlFW0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 February 2015 at 03:20, Timur Tabi <timur@codeaurora.org> wrote:
-> On 02/25/2015 02:39 AM, Hanjun Guo wrote:
->>
->> Changes since v8:
->
->
-> I'm still debugging it, but v9 on the 4.0-rc1 kernel crashes after calling
-> the UEFI boot time services exit function.  That is, this line:
->
-> status = sys_table->boottime->exit_boot_services(handle, mmap_key);
->
-> in allocate_new_fdt_and_exit_boot() gets called, and then soon after it
-> returns, the kernel crashes.  It's really early because the UEFI exception
-> handler is called.
->
-> I did not have this problem with v8 patchset on 3.19.
->
+On Friday 27 February 2015 09:52:23 Simon Horman wrote:
+> 
+> On Thu, Feb 26, 2015 at 04:53:39PM +0100, Arnd Bergmann wrote:
+> > On Thursday 26 February 2015 15:22:44 Simon Horman wrote:
+> > > From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+> > > 
+> > > This provides information through SOC_BUS to sysfs.
+> > > And this moves all on-SoC devices from /sys/devices/platform to
+> > > /sys/devices/socX/.
+> > > 
+> > > Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+> > > Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > ---
+> > >  arch/arm/mach-shmobile/Kconfig           |  1 +
+> > >  arch/arm/mach-shmobile/setup-rcar-gen2.c | 38 ++++++++++++++++++++++++++++----
+> > >  2 files changed, 35 insertions(+), 4 deletions(-)
+> > 
+> > I think this would be better done as a standalone driver in drivers/soc,
+> > to avoid having to add the init_machine callbacks in patch 3.
+> 
+> Could we handle this as follow-up work?
 
-Are you not seeing this on v4.0-rc1 without the patchset applied?
+That was my first idea when I looked at patch 3, but then I had the other
+comment below:
 
-Could the crash be inside the subsequent call to
-SetVirtualAddressMap() instead of inside ExitBootServices()?
+> I would not duplicate that information here. Can you find out the SoC
+> name from registers and put it here?
 
-If so, you have a firmware bug: Mark Rutland spotted a similar bug in
-the AMD Seattle firmware, which has been fixed in the mean time.
-It has to do with the firmware dereferencing the virtual mapping as it
-is being installed, which violates the UEFI spec.
+We must not introduce the user interface in one kernel and then change
+it in the next one, so I'm cautious about taking the pull request in
+the current form. Once we have agreed on what the contents of the sysfs
+files should be, I can take the patches, and then we are free to move
+the implementation later.
 
-
->
-> Also, you still have a couple whitespace problems in these patches:
->
-> Applying: ARM64 / ACPI: additions of ACPI documentation for arm64
-> /local/mnt/workspace/linux.0/.git/rebase-apply/patch:607: new blank line at
-> EOF.
-> +
-> /local/mnt/workspace/linux.0/.git/rebase-apply/patch:844: new blank line at
-> EOF.
-> +
-> warning: 2 lines add whitespace errors.
-> Applying: Documentation: ACPI for ARM64
-> /local/mnt/workspace/linux.0/.git/rebase-apply/patch:517: new blank line at
-> EOF.
-> +
-> warning: 1 line adds whitespace errors.
->
->
-> --
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the
-> Code Aurora Forum, hosted by The Linux Foundation.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	Arnd
