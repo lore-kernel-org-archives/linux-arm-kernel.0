@@ -1,101 +1,50 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 27 Feb 2015 14:06:00 +0000
-Subject: [PATCH 1/2] arm64: juno: Add APB registers and LEDs using syscon
-In-Reply-To: <CACRpkdYd7ZOMt1QxhCxzhavhcd8wcWrC2j1Ce5eGP9piX=xwkQ@mail.gmail.com>
-References: <1424866589-2988-1-git-send-email-linus.walleij@linaro.org>
- <20150225135512.GE12377@arm.com>
- <20150225144756.GA905@e106497-lin.cambridge.arm.com>
- <20150225150023.GJ12377@arm.com>
- <20150225151157.GC905@e106497-lin.cambridge.arm.com>
- <CACRpkdYd7ZOMt1QxhCxzhavhcd8wcWrC2j1Ce5eGP9piX=xwkQ@mail.gmail.com>
-Message-ID: <20150227140600.GZ905@e106497-lin.cambridge.arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 27 Feb 2015 22:19:59 +0800
+Subject: [PATCH v9 21/21] ARM64 / ACPI: additions of ACPI documentation
+ for arm64
+In-Reply-To: <54F05385.2080506@huawei.com>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <1424853601-6675-22-git-send-email-hanjun.guo@linaro.org>
+ <54F05385.2080506@huawei.com>
+Message-ID: <54F07D0F.7080904@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 01:07:42PM +0000, Linus Walleij wrote:
-> On Wed, Feb 25, 2015 at 4:11 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > On Wed, Feb 25, 2015 at 03:00:23PM +0000, Will Deacon wrote:
-> >> On Wed, Feb 25, 2015 at 02:47:56PM +0000, Liviu Dudau wrote:
-> >> > On Wed, Feb 25, 2015 at 01:55:12PM +0000, Will Deacon wrote:
-> >> > > On Wed, Feb 25, 2015 at 12:16:29PM +0000, Linus Walleij wrote:
-> >> > > > This defines the Juno "APB system registers" as a syscon device,
-> >> > > > and all the LEDs controlled by the APB system registers right
-> >> > > > below it using the syscon LEDs driver on top of syscon. Define
-> >> > > > LED0 for heartbeat, LED1 for MMC0 activity and the following
-> >> > > > four LEDs indicating CPU activity using the Linux-specific
-> >> > > > DT bindings for triggers.
-> >> > > >
-> >> > > > This is the pattern and same drivers as used on the legacy
-> >> > > > platform device trees for the ARM Integrators and the RealView
-> >> > > > PB1176.
-> >> > >
-> >> > > Stupid question, but where are these LEDs located on the platform? I tried
-> >> > > enabling this, but all it seemed to do was make hackbench slightly slower :)
-> >> >
-> >> > http://infocenter.arm.com/help/topic/com.arm.doc.ddi0524c/deb1353593789871.html
-> >> >
-> >> > Section 1.3, look at the left hand side, above the user push buttons.
-> >>
-> >> Right, so these LEDs are *inside* the case. Is that really something worth
-> >> enabling for defconfig?
-> >
-> > Depends on the case :) You might have a nice cutout in the plastic of the VExpress
-> > box, or have your own custom acrylic box.
-> 
-> Of course I take off the lid, who doesn't want to see the nice electronics.
-> This is analogous to using some other naked ARM reference design
-> like the Versatile or the RealView PB1176 where you can just put your
-> fingers on the board if you like.
-> 
-> > Maybe Linus can explain to us why he thinks this functionality is useful given
-> > that quite a lot of people tend to use the Juno boards inside the original boxes
-> > for fear of ESD accidents.
-> 
-> Wut? Ask the guy who designed the box.
-> 
-> Notice that the SD card slot is *ALSO* inside the box, do you mean we
-> should then also delete the uSD card support added in
-> commit 71f867ec130e3cc8e692366fdf8941ded27c727e
-> by yourself because the SD card slot is not reachable?
-> Notice that to access that card slot you even have to remove the
-> nice blue ARM boilerplate.
+Hi Shannon,
 
-That's not my view. I have a mobile phone with an uSD card slot, but I have to take
-the cover off (and the battery) to access it. It doesn't mean I should not be able
-to use it from kernel side because of that, only that the designer of the phone
-(and of the Juno board + box by extension) did not expect people to use it with
-covers off all the time.
+On 2015?02?27? 19:22, Shannon Zhao wrote:
+> On 2015/2/25 16:40, Hanjun Guo wrote:
+>> +Not yet implemented are:
+>> +
+>> +	-- Section 10: power source and power meter devices
+>> +
+>> +	-- Section 11: thermal management
+>> +
+>> +	-- Section 12: embedded controllers interface
+>> +
+>> +	-- Section 13: SMBus interfaces
+>> +
+>> +	-- Section 17: NUMA support (prototypes have been submitted for
+>> +	   review)
+>> +
+>>
+>
+> Here at the end of the file. Redundant blank line.
+>
+>> +ACPI is also important because hardware and OS vendors have already worked
+>> +out how to use it to support the general purpose ecosystem. The infrastructure
+>> +is in place, the bindings are in place, and the process is in place. DT does
+>> +exactly what we need it to when working with vertically integrated devices,
+>> +but we don?t have good processes for supporting what the server vendors need.
+>> +We could potentially get there with DT, but doing so doesn?t buy us anything.
+>> +ACPI already does what the hardware vendors need, Microsoft won?t collaborate
+>> +with us on DT, and the hardware vendors would still need to provide two
+>> +completely separate firmware interface; one for Linux and one for Windows.
+>> +
+>
+> And Here at the end of the file. Redundant blank line.
 
+Thanks a lot for the pointer, I will update it :)
 
-<virtual-tongue-in-cheek-on>
-I fail to see why you need to remove the SD card all the time. Surely opening
-the case once to put the uSD card in is enough? ;)
-</virtual-tongue-in-cheek-on>
-
-> 
-> The board is obviously designed to be reachable and the top part
-> of the case is obviously designed to be taken off by professional
-> users.
-
-I'm mostly on your side, Linus, I was just looking for more use cases. Like I've said,
-most of our customers seem to keep the case closed (or at least that is what they tell
-us :) ) so I'm looking for explanations on how you use the LEDs (visual debugging for
-big-LITTLE was how Lorenzo was using them on TC2 for example).
-
-Best regards,
-Liviu
-
-> 
-> Yours,
-> Linus Walleij
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Regards
+Hanjun
