@@ -1,154 +1,80 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 27 Feb 2015 16:09:55 +0100
-Subject: [PATCH 3/6] rtc: at91rm9200: rework wakeup and interrupt handling
+Date: Fri, 27 Feb 2015 16:09:56 +0100
+Subject: [PATCH 4/6] clk: at91: implement suspend/resume for the PMC irqchip
 In-Reply-To: <1425049798-5891-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1425049798-5891-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1425049798-5891-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1425049798-5891-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IRQ line used by the RTC device is usually shared with the system
-timer (PIT) on at91 platforms.
-Since timers are registering their handlers with IRQF_NO_SUSPEND, we
-should expect being called in suspended state, and properly wake the
-system up when this is the case.
-
-Set IRQF_COND_SUSPEND flag when registering the IRQ handler to inform
-irq core that it can safely be called while the system is suspended.
+The irq line used by the PMC block is shared with several peripherals
+including the init timer which is registering its handler with
+IRQF_NO_SUSPEND.
+Implement the appropriate suspend/resume callback for the PMC irqchip,
+and inform irq core that PMC irq handler can be safely called while
+the system is suspended by setting IRQF_COND_SUSPEND.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/rtc/rtc-at91rm9200.c | 62 ++++++++++++++++++++++++++++++++++----------
- 1 file changed, 48 insertions(+), 14 deletions(-)
+ drivers/clk/at91/pmc.c | 20 +++++++++++++++++++-
+ drivers/clk/at91/pmc.h |  1 +
+ 2 files changed, 20 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
-index 70a5d94..b4f7744 100644
---- a/drivers/rtc/rtc-at91rm9200.c
-+++ b/drivers/rtc/rtc-at91rm9200.c
-@@ -31,6 +31,7 @@
- #include <linux/io.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/suspend.h>
- #include <linux/uaccess.h>
- 
- #include "rtc-at91rm9200.h"
-@@ -54,6 +55,10 @@ static void __iomem *at91_rtc_regs;
- static int irq;
- static DEFINE_SPINLOCK(at91_rtc_lock);
- static u32 at91_rtc_shadow_imr;
-+static bool suspended;
-+static DEFINE_SPINLOCK(suspended_lock);
-+static unsigned long cached_events;
-+static u32 at91_rtc_imr;
- 
- static void at91_rtc_write_ier(u32 mask)
- {
-@@ -290,7 +295,9 @@ static irqreturn_t at91_rtc_interrupt(int irq, void *dev_id)
- 	struct rtc_device *rtc = platform_get_drvdata(pdev);
- 	unsigned int rtsr;
- 	unsigned long events = 0;
-+	int ret = IRQ_NONE;
- 
-+	spin_lock(&suspended_lock);
- 	rtsr = at91_rtc_read(AT91_RTC_SR) & at91_rtc_read_imr();
- 	if (rtsr) {		/* this interrupt is shared!  Is it ours? */
- 		if (rtsr & AT91_RTC_ALARM)
-@@ -304,14 +311,22 @@ static irqreturn_t at91_rtc_interrupt(int irq, void *dev_id)
- 
- 		at91_rtc_write(AT91_RTC_SCCR, rtsr);	/* clear status reg */
- 
--		rtc_update_irq(rtc, 1, events);
-+		if (!suspended) {
-+			rtc_update_irq(rtc, 1, events);
- 
--		dev_dbg(&pdev->dev, "%s(): num=%ld, events=0x%02lx\n", __func__,
--			events >> 8, events & 0x000000FF);
-+			dev_dbg(&pdev->dev, "%s(): num=%ld, events=0x%02lx\n",
-+				__func__, events >> 8, events & 0x000000FF);
-+		} else {
-+			cached_events |= events;
-+			at91_rtc_write_idr(at91_rtc_imr);
-+			pm_system_wakeup();
-+		}
- 
--		return IRQ_HANDLED;
-+		ret = IRQ_HANDLED;
- 	}
--	return IRQ_NONE;		/* not handled */
-+	spin_lock(&suspended_lock);
-+
-+	return ret;
- }
- 
- static const struct at91_rtc_config at91rm9200_config = {
-@@ -401,8 +416,8 @@ static int __init at91_rtc_probe(struct platform_device *pdev)
- 					AT91_RTC_CALEV);
- 
- 	ret = devm_request_irq(&pdev->dev, irq, at91_rtc_interrupt,
--				IRQF_SHARED,
--				"at91_rtc", pdev);
-+			       IRQF_SHARED | IRQF_COND_SUSPEND,
-+			       "at91_rtc", pdev);
- 	if (ret) {
- 		dev_err(&pdev->dev, "IRQ %d already in use.\n", irq);
- 		return ret;
-@@ -454,8 +469,6 @@ static void at91_rtc_shutdown(struct platform_device *pdev)
- 
- /* AT91RM9200 RTC Power management control */
- 
--static u32 at91_rtc_imr;
--
- static int at91_rtc_suspend(struct device *dev)
- {
- 	/* this IRQ is shared with DBGU and other hardware which isn't
-@@ -464,21 +477,42 @@ static int at91_rtc_suspend(struct device *dev)
- 	at91_rtc_imr = at91_rtc_read_imr()
- 			& (AT91_RTC_ALARM|AT91_RTC_SECEV);
- 	if (at91_rtc_imr) {
--		if (device_may_wakeup(dev))
-+		if (device_may_wakeup(dev)) {
-+			unsigned long flags;
-+
- 			enable_irq_wake(irq);
--		else
-+
-+			spin_lock_irqsave(&suspended_lock, flags);
-+			suspended = true;
-+			spin_unlock_irqrestore(&suspended_lock, flags);
-+		} else {
- 			at91_rtc_write_idr(at91_rtc_imr);
-+		}
- 	}
+diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+index f07c815..3f27d21 100644
+--- a/drivers/clk/at91/pmc.c
++++ b/drivers/clk/at91/pmc.c
+@@ -89,12 +89,29 @@ static int pmc_irq_set_type(struct irq_data *d, unsigned type)
  	return 0;
  }
  
- static int at91_rtc_resume(struct device *dev)
- {
-+	struct rtc_device *rtc = dev_get_drvdata(dev);
++static void pmc_irq_suspend(struct irq_data *d)
++{
++	struct at91_pmc *pmc = irq_data_get_irq_chip_data(d);
 +
- 	if (at91_rtc_imr) {
--		if (device_may_wakeup(dev))
-+		if (device_may_wakeup(dev)) {
-+			unsigned long flags;
++	pmc->imr = pmc_read(pmc, AT91_PMC_IMR);
++	pmc_write(pmc, AT91_PMC_IDR, pmc->imr);
++}
 +
-+			spin_lock_irqsave(&suspended_lock, flags);
++static void pmc_irq_resume(struct irq_data *d)
++{
++	struct at91_pmc *pmc = irq_data_get_irq_chip_data(d);
 +
-+			if (cached_events) {
-+				rtc_update_irq(rtc, 1, cached_events);
-+				cached_events = 0;
-+			}
++	pmc_write(pmc, AT91_PMC_IER, pmc->imr);
++}
 +
-+			suspended = false;
-+			spin_unlock_irqrestore(&suspended_lock, flags);
-+
- 			disable_irq_wake(irq);
--		else
--			at91_rtc_write_ier(at91_rtc_imr);
-+		}
-+		at91_rtc_write_ier(at91_rtc_imr);
- 	}
- 	return 0;
- }
+ static struct irq_chip pmc_irq = {
+ 	.name = "PMC",
+ 	.irq_disable = pmc_irq_mask,
+ 	.irq_mask = pmc_irq_mask,
+ 	.irq_unmask = pmc_irq_unmask,
+ 	.irq_set_type = pmc_irq_set_type,
++	.irq_suspend = pmc_irq_suspend,
++	.irq_resume = pmc_irq_resume,
+ };
+ 
+ static struct lock_class_key pmc_lock_class;
+@@ -224,7 +241,8 @@ static struct at91_pmc *__init at91_pmc_init(struct device_node *np,
+ 		goto out_free_pmc;
+ 
+ 	pmc_write(pmc, AT91_PMC_IDR, 0xffffffff);
+-	if (request_irq(pmc->virq, pmc_irq_handler, IRQF_SHARED, "pmc", pmc))
++	if (request_irq(pmc->virq, pmc_irq_handler,
++			IRQF_SHARED | IRQF_COND_SUSPEND, "pmc", pmc))
+ 		goto out_remove_irqdomain;
+ 
+ 	return pmc;
+diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
+index 52d2041..69abb08 100644
+--- a/drivers/clk/at91/pmc.h
++++ b/drivers/clk/at91/pmc.h
+@@ -33,6 +33,7 @@ struct at91_pmc {
+ 	spinlock_t lock;
+ 	const struct at91_pmc_caps *caps;
+ 	struct irq_domain *irqdomain;
++	u32 imr;
+ };
+ 
+ static inline void pmc_lock(struct at91_pmc *pmc)
 -- 
 1.9.1
