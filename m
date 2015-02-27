@@ -1,81 +1,47 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 27 Feb 2015 15:36:04 -0600
-Subject: [PATCH 4/4] firmware: qcom: scm: Move the scm driver to
- drivers/firmware
-In-Reply-To: <54F0BE39.7020302@codeaurora.org>
-References: <1424987976-14531-1-git-send-email-galak@codeaurora.org>
- <1424987976-14531-4-git-send-email-galak@codeaurora.org>
- <54F0BE39.7020302@codeaurora.org>
-Message-ID: <97A78288-DB81-4B88-BB13-D3A53C4C819E@codeaurora.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 27 Feb 2015 22:37:10 +0100
+Subject: [PATCH v3 0/4] clk: st: New always-on clock domain
+In-Reply-To: <1424799222-9301-1-git-send-email-lee.jones@linaro.org> (Lee
+ Jones's message of "Tue, 24 Feb 2015 17:33:38 +0000")
+References: <1424799222-9301-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <87385r3uk9.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Lee Jones <lee.jones@linaro.org> writes:
 
-On Feb 27, 2015, at 12:58 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> v2 => v3:
+>   - Ensure DT actually reflects h/w
+>     - i.e. Nodes should not contain a mishmash of different IP
+>       blocks, but should identify related h/w.  In the current
+>       example we use interconnects
+>   - Change naming from clkdomain to clk-always-on
+>   - Place "do not abuse" warning in documentation
+>
+> v1 => v2:
+>   - Turned the ST specific driver into a generic one
+>   
+> Hardware can have a bunch of clocks which must not be turned off.
+> If drivers a) fail to obtain a reference to any of these or b) give
+> up a previously obtained reference during suspend, the common clk
+> framework will attempt to turn them off and the hardware will
+> subsequently die.  The only way to recover from this failure is to
+> restart.
+>   
+> To avoid either of these two scenarios from catastrophically
+> disabling the running system we have implemented a clock domain
+> where clocks are consumed and references are taken, thus preventing
+> them from being shut down by the framework.
 
-> On 02/26/15 13:59, Kumar Gala wrote:
->> Architectural changes in the ARM Linux kernel tree mandate the eventual
->> removal of the mach-* directories. Move the scm driver to
->> drivers/firmware and the scm header to include/linux to support that
->> removal.
->> 
->> Signed-off-by: Kumar Gala <galak@codeaurora.org>
->> ---
->> MAINTAINERS                  |   1 +
->> arch/arm/mach-qcom/Kconfig   |   3 -
->> arch/arm/mach-qcom/Makefile  |   3 -
->> arch/arm/mach-qcom/platsmp.c |   2 +-
->> arch/arm/mach-qcom/scm.c     | 344 -------------------------------------------
->> arch/arm/mach-qcom/scm.h     |  29 ----
->> drivers/firmware/Kconfig     |   4 +
->> drivers/firmware/Makefile    |   2 +
->> drivers/firmware/qcom_scm.c  | 344 +++++++++++++++++++++++++++++++++++++++++++
->> include/linux/qcom_scm.h     |  29 ++++
->> 10 files changed, 381 insertions(+), 380 deletions(-)
->> delete mode 100644 arch/arm/mach-qcom/scm.c
->> delete mode 100644 arch/arm/mach-qcom/scm.h
->> create mode 100644 drivers/firmware/qcom_scm.c
->> create mode 100644 include/linux/qcom_scm.h
-> 
-> Can you generate this with -M -C? Or just throw
-> 
-> [diff]
->        renames = copy
-> 
-> int your git config.
-> 
-> The files are the same right?
+Hi Lee,
 
-Will, do.. I keep forgetting to make this change in .gitconfig
+I wonder why there is a need for a new clock when CLK_IGNORE_UNUSED does
+exist. What is the usecase that is covered by this patchset which is not used by
+CLK_IGNORE_UNUSED clock flag ?
 
-> 
->> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
->> index 41983883..6517132 100644
->> --- a/drivers/firmware/Kconfig
->> +++ b/drivers/firmware/Kconfig
->> @@ -132,6 +132,10 @@ config ISCSI_IBFT
->> 	  detect iSCSI boot parameters dynamically during system boot, say Y.
->> 	  Otherwise, say N.
->> 
->> +config QCOM_SCM
->> +	bool
->> +	depends on ARM || ARM64
-> 
-> No need to have depends on here if the option is hidden. Just make sure
-> it isn't selected unless the depends are true.
+And if that reason exists, I'd like to find it in the commit message.
 
-While not needed, I?d like to keep it since there is some ARM asm code.
+Cheers.
 
-> Also, the drivers/firmware/Kconfig file needs to be sourced in the
-> arch/arm/Kconfig so that we can still get this option on arm (Lina
-> noticed it isn't working on arm). It looks like arm64 is already
-> sourcing it.
-
-will fix
-
-- k
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+--
+Robert
