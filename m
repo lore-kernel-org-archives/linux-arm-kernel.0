@@ -1,28 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 Feb 2015 13:53:56 +0100
-Subject: [PATCH 07/10] ARM: integrator: use explicit core module options
-In-Reply-To: <1424967096-261582-1-git-send-email-arnd@arndb.de>
+Date: Fri, 27 Feb 2015 13:55:19 +0100
+Subject: [PATCH 08/10] ARM: no longer make CPU targets visible separately
+In-Reply-To: <1424967096-261582-2-git-send-email-arnd@arndb.de>
 References: <1424967096-261582-1-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdYNCZrkmRnnBwFJVt6w=QoBNy64jiO4+OQzZkJ=O4-RYg@mail.gmail.com>
+ <1424967096-261582-2-git-send-email-arnd@arndb.de>
+Message-ID: <CACRpkdbvECKX9FObB0mPv0yAVAQ4nmEwhaYN_sZKBi8YtRGcAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Feb 26, 2015 at 5:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> For consistency with the other platforms, this remove the CPU
-> selection logic in mm/Kconfig that was only used by integrator,
-> and adds specific options for each available core tile and core
-> module, which in turn select the correct CPUs.
+> Now that realview and integrator always select the correct CPU
+> type themselves based on the core tiles, there is no need to
+> still have them user-visible in arch/arm/mm/Kconfig. The
+> ARM925T symbol has been selected by the only user for many
+> years, so that can be removed along with the realview and
+> integrator specific ones.
 >
-> This is consistent with the new way that we do it for realview
-> and all other platforms.
+> This also solves randconfig build problems on realview.
 >
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 
-Applied, compiled, and booted on Integrator/AP with an ARM926 core
-tile.
-
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
