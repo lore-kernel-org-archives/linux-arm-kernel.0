@@ -1,61 +1,147 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 27 Feb 2015 09:46:11 -0800
-Subject: Bug in i2c-core?
-In-Reply-To: <20150227170545.GS7789@pengutronix.de>
-References: <54F0507F.6030804@armadeus.com>
- <20150227153725.7404dea1@free-electrons.com>
- <6C8798CF-7222-465B-9354-93500B584B4D@gmail.com>
- <20150227170545.GS7789@pengutronix.de>
-Message-ID: <20150227174611.GC6679@dtor-ws>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 27 Feb 2015 11:53:47 -0600
+Subject: [PATCH 3/8] ARM: make xscale iwmmxt code multiplatform aware
+In-Reply-To: <1425043775-3106827-4-git-send-email-arnd@arndb.de>
+References: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
+ <1425043775-3106827-4-git-send-email-arnd@arndb.de>
+Message-ID: <CAL_JsqJyhKQQ-9SdFkWu_Z1MKzHfxUtDjEPrDg=hYm3rnbsrFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 06:05:45PM +0100, Uwe Kleine-K?nig wrote:
-> On Fri, Feb 27, 2015 at 07:29:30AM -0800, Dmitry Torokhov wrote:
-> > On February 27, 2015 6:37:25 AM PST, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-> > >Dear S?bastien SZYMANSKI,
-> > >
-> > >On Fri, 27 Feb 2015 12:09:51 +0100, S?bastien SZYMANSKI wrote:
-> > >
-> > >>         error = input_register_device(sx8654->input);
-> > >>         if (error)
-> > >>                 return error;
-> > >
-> > >Where is your ->remove() function that unregisters the input device?
-> > 
-> > Everything seems to be allocated with devm so remove is not needed.
-> Everything is devm_* but input_register_device, right?
+On Fri, Feb 27, 2015 at 7:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> In a multiplatform configuration, we may end up building a kernel
+> for both Marvell PJ1 and an ARMv4 CPU implementation. In that
+> case, the xscale-cp0 code is built with gcc -march=armv4{,t},
+> which results in a build error from the coprocessor instructions.
+>
+> Since we know this code will only have to run on an actual xscale
+> processor, we can simply build the entire file for ARMv5TE.
+>
+> Related to this, we need to handle the iWMMXT initialization sequence
+> differently during boot, to ensure we don't try to touch xscale
+> specific registers on other CPUs from the xscale_cp0_init initcall.
+> cpu_is_xscale() used to be hardcoded to '1' in any configuration
+> that enables any XScale-compatible core, but this breaks once
+> we can have a combined kernel with MMP1 and something else.
+>
+> In this patch, I introduce two new macros, cpu_is_xscale()
+> and cpu_is_mohawk, so we can test for all three of them in
+> the iwmmxt initialization. The two existing users of
+> cpu_is_xscale() are modified accordingly, but slightly
+> change behavior for kernels that enable CPU_MOHAWK in combination
+> with CPU_XSCALE or CPU_XSC3. Previously, these would leave
+> clear PMD_BIT4 in the page tables, now they leave it untouched,
+> just like we always do for kernels that enable only CPU_MOHAWK.
+> Since the previous behavior was inconsistent, I assume it was
+> unintentional.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/include/asm/cputype.h | 27 +++++++++++++++++++++++++--
+>  arch/arm/kernel/Makefile       |  1 +
+>  arch/arm/kernel/xscale-cp0.c   |  6 ++++++
+>  arch/arm/mm/idmap.c            |  3 ++-
+>  4 files changed, 34 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+> index 819777d0e91f..7bc66e22afd7 100644
+> --- a/arch/arm/include/asm/cputype.h
+> +++ b/arch/arm/include/asm/cputype.h
+> @@ -228,10 +228,33 @@ static inline int cpu_is_xsc3(void)
+>  }
+>  #endif
+>
+> -#if !defined(CONFIG_CPU_XSCALE) && !defined(CONFIG_CPU_XSC3)
+> +#if !defined(CONFIG_CPU_XSCALE)
 
-Input is allocated with devm_* and input_register_device knows how to
-deal with that:
+You could use IS_ENABLED here.
 
-/**
- * devm_input_allocate_device - allocate managed input device
- * @dev: device owning the input device being created
- *
- * Returns prepared struct input_dev or %NULL.
- *
- * Managed input devices do not need to be explicitly unregistered or
- * freed as it will be done automatically when owner device unbinds from
- * its driver (or binding fails). Once managed input device is
- * allocated,
- * it is ready to be set up and registered in the same fashion as
- * regular
- * input device. There are no special devm_input_device_[un]register()
- * variants, regular ones work with both managed and unmanaged devices,
+>  #define        cpu_is_xscale() 0
+>  #else
+> -#define        cpu_is_xscale() 1
+> +static inline int cpu_is_xscale(void)
+> +{
+> +       unsigned int id;
+> +       id = read_cpuid_id() & 0xffffe000;
+> +
+> +       if ((id == 0x69052000) || (id == 0x69054000))
+> +               return 1;
+> +
+> +       return 0;
+> +}
+> +#endif
+> +
+> +#if !defined(CONFIG_CPU_MOHAWK)
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+And here.
 
- * should you need them. In most cases however, managed input device
- * need
- * not be explicitly unregistered or freed.
- *
- * NOTE: the owner device is set up as parent of input device and users
- * should not override it.
- */
+> +#define        cpu_is_mohawk() 0
+> +#else
+> +static inline int cpu_is_mohawk(void)
+> +{
+> +       unsigned int id;
+> +       id = read_cpuid_id() & 0xffffe000;
+> +
+> +       if (id == 0x56158000)
+> +
+> +       return 0;
+> +}
+>  #endif
+>
+>  /*
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index 902397dd1000..7840acff6cd3 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -67,6 +67,7 @@ obj-$(CONFIG_HAVE_HW_BREAKPOINT)      += hw_breakpoint.o
+>  obj-$(CONFIG_CPU_XSCALE)       += xscale-cp0.o
+>  obj-$(CONFIG_CPU_XSC3)         += xscale-cp0.o
+>  obj-$(CONFIG_CPU_MOHAWK)       += xscale-cp0.o
+> +CFLAGS_xscale-cp0.o            += -Wa,-march=armv5te
+>  obj-$(CONFIG_CPU_PJ4)          += pj4-cp0.o
+>  obj-$(CONFIG_CPU_PJ4B)         += pj4-cp0.o
+>  obj-$(CONFIG_IWMMXT)           += iwmmxt.o
+> diff --git a/arch/arm/kernel/xscale-cp0.c b/arch/arm/kernel/xscale-cp0.c
+> index bdbb8853a19b..a23420fab70e 100644
+> --- a/arch/arm/kernel/xscale-cp0.c
+> +++ b/arch/arm/kernel/xscale-cp0.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/init.h>
+>  #include <linux/io.h>
+>  #include <asm/thread_notify.h>
+> +#include <asm/cputype.h>
+>
+>  static inline void dsp_save_state(u32 *state)
+>  {
+> @@ -152,6 +153,11 @@ static int __init xscale_cp0_init(void)
+>  {
+>         u32 cp_access;
+>
+> +       /* do not attempt to probe iwmmxt on non-xscale family CPUs */
+> +       if (IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM) &&
 
+Do you really need this condition?
 
-Thanks.
-
--- 
-Dmitry
+> +           !(cpu_is_xscale() || cpu_is_xsc3() || cpu_is_mohawk()))
+> +               return 0;
+> +
+>         cp_access = xscale_cp_access_read() & ~3;
+>         xscale_cp_access_write(cp_access | 1);
+>
+> diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+> index e7a81cebbb2e..40140984db0a 100644
+> --- a/arch/arm/mm/idmap.c
+> +++ b/arch/arm/mm/idmap.c
+> @@ -86,7 +86,8 @@ static void identity_mapping_add(pgd_t *pgd, const char *text_start,
+>
+>         prot |= PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AF;
+>
+> -       if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
+> +       if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ &&
+> +           !cpu_is_xscale() && !cpu_is_xsc3())
+>                 prot |= PMD_BIT4;
+>
+>         pgd += pgd_index(addr);
+> --
+> 2.1.0.rc2
+>
