@@ -1,28 +1,32 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 27 Feb 2015 10:55:43 +0530
-Subject: [PATCH 0/7] OPP: Introduce OPP bindings V2 and supporting code
-In-Reply-To: <cover.1423642246.git.viresh.kumar@linaro.org>
-References: <cover.1423642246.git.viresh.kumar@linaro.org>
-Message-ID: <CAKohpokF0_or8aXwzWZ=bUX1Robk8THyqRpKjbaarg9NHufLmw@mail.gmail.com>
+Date: Fri, 27 Feb 2015 11:12:33 +0530
+Subject: [PATCH] clocksource: efm32: Use CLOCK_EVT_FEAT_PERIODIC for defining
+ features
+Message-ID: <3fac202ead48b50c0967c62eae92fe9786fd24a1.1425015704.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 February 2015 at 13:46, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> Now that I have received an verbal Ack from Rob Herring (in a personal
-> conversation) about the bindings, I am showing how the code looks like with
-> these new bindings.
->
-> Some part is still now done:
+We have used CLOCK_EVT_MODE_PERIODIC instead of CLOCK_EVT_FEAT_PERIODIC while
+defining features. Fix it.
 
-s/now/not
+Cc: Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/clocksource/time-efm32.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> - Interface for adding new detailed OPPs from platform code instead of DT
-> - Providing cpufreq helpers for the next OPPs
-> - Providing regulator helpers for the target/min/max ranges
->
-> Please provide feedback on how this looks like..
-
-Can we have some reviews of the code changes please ?
-
---
-viresh
+diff --git a/drivers/clocksource/time-efm32.c b/drivers/clocksource/time-efm32.c
+index bba62f9deefb..9edeab37a14b 100644
+--- a/drivers/clocksource/time-efm32.c
++++ b/drivers/clocksource/time-efm32.c
+@@ -111,7 +111,7 @@ static irqreturn_t efm32_clock_event_handler(int irq, void *dev_id)
+ static struct efm32_clock_event_ddata clock_event_ddata = {
+ 	.evtdev = {
+ 		.name = "efm32 clockevent",
+-		.features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_MODE_PERIODIC,
++		.features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
+ 		.set_mode = efm32_clock_event_set_mode,
+ 		.set_next_event = efm32_clock_event_set_next_event,
+ 		.rating = 200,
+-- 
+2.3.0.rc0.44.ga94655d
