@@ -1,51 +1,44 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 27 Feb 2015 16:04:51 -0700
-Subject: [PATCH 2/5] coresight: fixing compilation warnings picked up by 64bit
- compiler
-In-Reply-To: <1425078294-13059-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1425078294-13059-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1425078294-13059-3-git-send-email-mathieu.poirier@linaro.org>
+Date: Fri, 27 Feb 2015 16:04:49 -0700
+Subject: [PATCH 0/5] coresight: next
+Message-ID: <1425078294-13059-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compiling coresight drivers with a 64-bit compiler highlights a couple
-of formatting issues, which are fixed by this patch.
+These are the latest coresight patches that I'd like you to consider for
+inclusion in your tree.  The set is based on v4.0-rc1.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/coresight/coresight-etb10.c | 4 ++--
- drivers/coresight/coresight-tmc.c   | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+Thanks,
+Mathieu
 
-diff --git a/drivers/coresight/coresight-etb10.c b/drivers/coresight/coresight-etb10.c
-index c9acd406f0d0..40049869aecd 100644
---- a/drivers/coresight/coresight-etb10.c
-+++ b/drivers/coresight/coresight-etb10.c
-@@ -313,8 +313,8 @@ static ssize_t etb_read(struct file *file, char __user *data,
- 
- 	*ppos += len;
- 
--	dev_dbg(drvdata->dev, "%s: %d bytes copied, %d bytes left\n",
--		__func__, len, (int) (depth * 4 - *ppos));
-+	dev_dbg(drvdata->dev, "%s: %zu bytes copied, %d bytes left\n",
-+		__func__, len, (int)(depth * 4 - *ppos));
- 	return len;
- }
- 
-diff --git a/drivers/coresight/coresight-tmc.c b/drivers/coresight/coresight-tmc.c
-index 3ff232f9ddf7..030e097c4fb2 100644
---- a/drivers/coresight/coresight-tmc.c
-+++ b/drivers/coresight/coresight-tmc.c
-@@ -533,8 +533,8 @@ static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
- 
- 	*ppos += len;
- 
--	dev_dbg(drvdata->dev, "%s: %d bytes copied, %d bytes left\n",
--		__func__, len, (int) (drvdata->size - *ppos));
-+	dev_dbg(drvdata->dev, "%s: %zu bytes copied, %d bytes left\n",
-+		__func__, len, (int)(drvdata->size - *ppos));
- 	return len;
- }
- 
+Mathieu Poirier (4):
+  coresight: making cpu index lookup arm64 compliant
+  coresight: fixing compilation warnings picked up by 64bit compiler
+  coresight: Adding coresight support for arm64 architecture
+  coresight-stm: Bindings for System Trace Macrocell
+
+Pratik Patel (1):
+  coresight-stm: adding driver for CoreSight STM component
+
+ .../ABI/testing/sysfs-bus-coresight-devices-stm    |   62 ++
+ .../devicetree/bindings/arm/coresight.txt          |   28 +
+ Documentation/trace/coresight.txt                  |   88 +-
+ arch/arm/Kconfig.debug                             |   55 +-
+ arch/arm64/Kconfig.debug                           |    2 +
+ drivers/coresight/Kconfig                          |   71 ++
+ drivers/coresight/Makefile                         |    1 +
+ drivers/coresight/coresight-etb10.c                |    4 +-
+ drivers/coresight/coresight-stm.c                  | 1070 ++++++++++++++++++++
+ drivers/coresight/coresight-tmc.c                  |    4 +-
+ drivers/coresight/of_coresight.c                   |   18 +-
+ include/linux/coresight-stm.h                      |   40 +
+ include/uapi/linux/coresight-stm.h                 |   23 +
+ 13 files changed, 1394 insertions(+), 72 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
+ create mode 100644 drivers/coresight/Kconfig
+ create mode 100644 drivers/coresight/coresight-stm.c
+ create mode 100644 include/linux/coresight-stm.h
+ create mode 100644 include/uapi/linux/coresight-stm.h
+
 -- 
 1.9.1
