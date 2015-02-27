@@ -1,163 +1,110 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 26 Feb 2015 19:20:15 -0800
-Subject: [PATCH v2 06/10] mtd: pxa3xx_nand: add support for the Marvell
- Berlin nand controller
-In-Reply-To: <1423752816-26219-7-git-send-email-antoine.tenart@free-electrons.com>
-References: <1423752816-26219-1-git-send-email-antoine.tenart@free-electrons.com>
- <1423752816-26219-7-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20150227032015.GJ18140@ld-irv-0074>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 27 Feb 2015 10:07:55 +0800
+Subject: [PATCH v4 4/4] phy: add phy-hi6220-usb
+In-Reply-To: <54EEDDDE.9010608@linaro.org>
+References: <1423726646-30336-1-git-send-email-zhangfei.gao@linaro.org>
+ <1423726646-30336-5-git-send-email-zhangfei.gao@linaro.org>
+ <20150220144119.GB1707@saruman.tx.rr.com> <54E75665.6050205@linaro.org>
+ <20150220160610.GB6430@saruman.tx.rr.com> <54E89E29.4010807@linaro.org>
+ <20150221162102.GA1784@saruman.tx.rr.com> <54E948AC.2010609@linaro.org>
+ <54EC4ECA.2090300@ti.com> <54EEDDDE.9010608@linaro.org>
+Message-ID: <20150227020753.GA28634@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 12, 2015 at 03:53:32PM +0100, Antoine Tenart wrote:
-> The nand controller on Marvell Berlin SoC reuse the pxa3xx nand driver
-> as it quite close. The process of sending commands can be compared to
-> the one of the Marvell armada 370: read and write commands are done in
-> chunks.
+On Thu, Feb 26, 2015 at 04:48:30PM +0800, zhangfei wrote:
+> Hi, Roger
 > 
-> But the Berlin nand controller has some other specificities which
-> require some modifications of the pxa3xx nand driver:
-> - there are no IRQ available so we need to poll the status register: we
->   have to use our own cmdfunc Berlin function, and early on the probing
->   function.
-> - PAGEPROG are very different from the one used in the pxa3xx driver,
->   so we're using a specific process for this one
-> - the SEQIN command is equivalent to a READ0 command
+> On 02/24/2015 06:13 PM, Roger Quadros wrote:
+> >>>On Sat, Feb 21, 2015 at 11:03:05PM +0800, zhangfei wrote:
+> >>>>>>>>+static void hi6220_start_peripheral(struct hi6220_priv *priv, bool on)
+> >>>>>>>>+{
+> >>>>>>>>+    struct usb_otg *otg = priv->phy.otg;
+> >>>>>>>>+
+> >>>>>>>>+    if (!otg->gadget)
+> >>>>>>>>+        return;
+> >>>>>>>>+
+> >>>>>>>>+    if (on)
+> >>>>>>>>+        usb_gadget_connect(otg->gadget);
+> >>>>>>>>+    else
+> >>>>>>>>+        usb_gadget_disconnect(otg->gadget);
+> >>>>>>>
+> >>>>>>>why is the PHY fiddling with pullups ?
+> >>>>>>
+> >>>>>>We use this to enable/disable otg gadget mode.
+> >>>>>
+> >>>>>I got that, but the pullups don't belong to the PHY, they belong to the
+> >>>>>gadget.
+> >>>>>
+> >>>>>>The gpio_id & gpio_vbus are used to distinguish otg gadget mode or
+> >>>>>>host mode.
+> >>>>>>When micro usb or otg device attached to otg, gpio_vbus falling down.
+> >>>>>>And gpio_id = 1 is micro usb, gpio_id = 0 is otg device.
+> >>>>>
+> >>>>>all of that I understood clearly :-)
+> >>>>>
+> >>>>>>So when micro usb attached, we enable gadget mode; while micro usb
+> >>>>>>detached, we disable gadget mode, and dwc2 will automatically set to
+> >>>>>>host mode.
+> >>>>>
+> >>>>>that's all fine, I'm concerned about letting the PHY fiddle with
+> >>>>>something it doesn't own. If I am to change pullups rules in udc-core,
+> >>>>>this is likely to break down miserably and I don't want to have to go
+> >>>>>through that.
+> >>>>
+> >>>>Thanks for the clarifying.
+> >>>
+> >>>no problem.
+> >>>
+> >>>>How about using usb_gadget_vbus_connect/disconnect, which are used in many
+> >>>>files under drivers/usb/phy.
+> >>>>There is no vbus_session in dwc2/gadget.c, I thought it would be same as
+> >>>>pullup.
+> >>>>
+> >>>>However, usb_gadget_vbus_connect still need para gadget, where should we put
+> >>>>this file, drivers/usb/phy or drivers/phy
+> >>>
+> >>>drivers/phy, if the framework misses anything you need, it's a great
+> >>>opportunity to give back to the community by extending the framework.
+> >>
+> >>Sorry, I am a little confused.
+> >>I need some concrete suggestion for the next step of this patch, which is required for the community board, hikey board.
+> >>
+> >>Do you mean in the future we need use hsotg->phy instead of hsotg->uphy.
+> >>         struct phy *phy;
+> >>         struct usb_phy *uphy;
+> >>usb_phy has many members that struct phy does not have, including otg.
+> >>struct usb_otg          *otg;
+> >>Is that mean we need port such member from usb_phy to phy.
+> >
+> >In my opinion otg structure should belong to the USB core part that takes care
+> >of the OTG/DRD state machine. We still don't have a clear solution here and
+> >I'm currently investigating this.
+> >My current work is to get Dual role functionality working with DWC3 controller and TI
+> >platforms.
+> >
+> >Currently phy drivers take care of OTG operation themselves but there is an opportunity
+> >to share code and centralize USB role switching.
+> >The USB core should be the owner of the Host controller, Gadget controller and the OTG phy
+> >and should take care of the that.
 > 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->  drivers/mtd/nand/pxa3xx_nand.c | 228 ++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 202 insertions(+), 26 deletions(-)
+> Good idea.
+> If you have any patch, I will be very happy to verify.
 > 
-> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index 8ed045195d31..a74ce08ea95e 100644
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> How about adding these things in drivers/phy/phy-core.c, it is also
+> sharable, though not in usb core.
+> 
+> Just tried adding one member struct usb_otg otg to struct phy, since
+> not find any good member can hold usb_otg.
+> In drivers/phy/phy-core.c, adding extcon_register_interest,
+> phy_vbus_notifier, phy_set_peripheral, it works for me, dwc2 on
+> hikey board.
 
-> @@ -244,10 +249,11 @@ module_param(use_dma, bool, 0444);
->  MODULE_PARM_DESC(use_dma, "enable DMA for data transferring to/from NAND HW");
->  
->  static struct pxa3xx_nand_timing timing[] = {
-> -	{ 40, 80, 60, 100, 80, 100, 90000, 400, 40, },
-> -	{ 10,  0, 20,  40, 30,  40, 11123, 110, 10, },
-> -	{ 10, 25, 15,  25, 15,  30, 25000,  60, 10, },
-> -	{ 10, 35, 15,  25, 15,  25, 25000,  60, 10, },
-> +	{ 40, 80, 60, 100, 80, 100,  90000, 400, 40, },
-> +	{ 10,  0, 20,  40, 30,  40,  11123, 110, 10, },
-> +	{ 10, 25, 15,  25, 15,  30,  25000,  60, 10, },
-> +	{ 10, 35, 15,  25, 15,  25,  25000,  60, 10, },
-> +	{  5, 20, 10,  12, 10,  12, 200000, 120, 10, },
+Just thinking if we can follow struct usb_hcd and struct ehci_hcd design
+way, the generic phy just like hcd, and the usb phy like ehci hcd which
+is a private data for hcd. zhangfei, maybe you can have a try.
 
-I thought I already made it clear that I'm not adding more to these
-tables. Please rewrite this to use
-onfi_async_timing_mode_to_sdr_timings() helpers
+-- 
 
-http://lists.infradead.org/pipermail/linux-mtd/2015-February/057726.html
-
->  };
->  
->  static struct pxa3xx_nand_flash builtin_flash_types[] = {
-> @@ -260,6 +266,12 @@ static struct pxa3xx_nand_flash builtin_flash_types[] = {
->  { "512MiB 8-bit",  0xdc2c,  64, 2048,  8,  8, 4096, &timing[2] },
->  { "512MiB 16-bit", 0xcc2c,  64, 2048, 16, 16, 4096, &timing[2] },
->  { "256MiB 16-bit", 0xba20,  64, 2048, 16, 16, 2048, &timing[3] },
-> +{ },
-> +};
-> +
-> +static struct pxa3xx_nand_flash berlin_builtin_flash_types[] = {
-> +{ "4GiB 8-bit",    0xd7ec, 128, 8192,  8,  8, 4096, &timing[4] },
-> +{ },
->  };
->  
->  static u8 bbt_pattern[] = {'M', 'V', 'B', 'b', 't', '0' };
-> @@ -320,6 +332,18 @@ static struct nand_ecclayout ecc_layout_4KB_bch8bit = {
->  	.oobfree = { }
->  };
->  
-> +static struct nand_ecclayout ecc_layout_oob_128 = {
-> +        .eccbytes = 48,
-> +        .eccpos = {
-> +                   80, 81, 82, 83, 84, 85, 86, 87,
-> +                   88, 89, 90, 91, 92, 93, 94, 95,
-> +                   96, 97, 98, 99, 100, 101, 102, 103,
-> +                   104, 105, 106, 107, 108, 109, 110, 111,
-> +                   112, 113, 114, 115, 116, 117, 118, 119,
-> +                   120, 121, 122, 123, 124, 125, 126, 127},
-> +        .oobfree = { {.offset = 2, .length = 78} }
-> +};
-
-^^^ The indentation is all wrong in the above. Please use tabs.
-
-> +
->  /* Define a default flash type setting serve as flash detecting only */
->  #define DEFAULT_FLASH_TYPE (&builtin_flash_types[0])
->  
-> @@ -1452,19 +1621,24 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
->  		return -EINVAL;
->  	}
->  
-> -	num = ARRAY_SIZE(builtin_flash_types) + pdata->num_flash - 1;
-> -	for (i = 0; i < num; i++) {
-> -		if (i < pdata->num_flash)
-> -			f = pdata->flash + i;
-> -		else
-> -			f = &builtin_flash_types[i - pdata->num_flash + 1];
-> +	if (info->variant == PXA3XX_NAND_VARIANT_BERLIN2)
-> +		flash_types = berlin_builtin_flash_types;
-> +	else
-> +		flash_types = builtin_flash_types;
->  
-> -		/* find the chip in default list */
-> +	for (i = 0; i < pdata->num_flash; i++) {
-> +		f = pdata->flash + i;
->  		if (f->chip_id == id)
->  			break;
->  	}
->  
-> -	if (i >= (ARRAY_SIZE(builtin_flash_types) + pdata->num_flash - 1)) {
-> +	if (f == NULL) {
-
-The style is typically just to do:
-
-	if (!f) {
-
-> +		for (i = 0; (f = &flash_types[i]); i++)
-> +			if (f->chip_id == id)
-> +				break;
-> +	}
-> +
-> +	if (f == NULL) {
-
-Same.
-
->  		dev_err(&info->pdev->dev, "ERROR!! flash not defined!!!\n");
->  
->  		return -EINVAL;
-> @@ -1516,9 +1690,11 @@ KEEP_CONFIG:
->  	 * (aka splitted) command handling,
->  	 */
->  	if (mtd->writesize > PAGE_CHUNK_SIZE) {
-> -		if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370) {
-> +		if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370)
->  			chip->cmdfunc = nand_cmdfunc_extended;
-> -		} else {
-> +
-> +		if (info->variant != PXA3XX_NAND_VARIANT_ARMADA370 &&
-> +				info->variant != PXA3XX_NAND_VARIANT_BERLIN2) {
-
-Why did this 'else' have to get split into a separate conditional?
-Couldn't you have just made it an else-if instead? e.g.:
-
-		if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370) {
-			...
-		} else if (info->variant != PXA3XX_NAND_VARIANT_BERLIN2) {
-			...
-		}
-
-This could also be a switch/case.
-
->  			dev_err(&info->pdev->dev,
->  				"unsupported page size on this variant\n");
->  			return -ENODEV;
-
-Brian
+Best Regards,
+Peter Chen
