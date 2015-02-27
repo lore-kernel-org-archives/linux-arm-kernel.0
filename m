@@ -1,18 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Feb 2015 10:55:12 +0100
-Subject: [PATCH 2/2] w1: masters: omap_hdq: Add support for 1-wire mode
-In-Reply-To: <1425029057-5075-2-git-send-email-vigneshr@ti.com>
-References: <1425029057-5075-1-git-send-email-vigneshr@ti.com>
- <1425029057-5075-2-git-send-email-vigneshr@ti.com>
-Message-ID: <10805905.OnX7kRTk9d@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Feb 2015 10:06:13 +0000
+Subject: [RFC PATCH] ARM64: cmpxchg.h: Clear the exclusive access bit on
+ fail
+In-Reply-To: <1425016026-19766-1-git-send-email-bobby.prani@gmail.com>
+References: <1425016026-19766-1-git-send-email-bobby.prani@gmail.com>
+Message-ID: <20150227100612.GB3628@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 February 2015 14:54:17 Vignesh R wrote:
-> +- compatible : should be "ti,omap3-1w" or "ti,am43xx-hdq"
-> 
+On Fri, Feb 27, 2015 at 05:46:55AM +0000, Pranith Kumar wrote:
+> In cmpxchg(), we do a load exclusive on an address and upon a comparison fail,
+> we skip the store exclusive instruction. This can result in the exclusive bit
+> still set. If there was a store exclusive after this to the same address, that
+> will see the exclusive bit set. This should not happen.
 
-Do not use wildcards in the compatible string, use real part numbers
-if you don't know the actual name of the device.
+... and the problem with that is?
 
-	Arnd
+> We need to clear the exclusive bit in these cases.
+
+Why?
+
+Will
