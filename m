@@ -1,42 +1,33 @@
-From: bobby.prani@gmail.com (Pranith Kumar)
-Date: Fri, 27 Feb 2015 15:29:38 -0500
-Subject: [RFC PATCH] arm64: cmpxchg.h: Bring ldxr and stxr closer
-In-Reply-To: <CAJhHMCA0La6rQBndxJDnynAZ6AogEbKcCRQULZjjRTXBMzGuiA@mail.gmail.com>
-References: <1425067776-2794-1-git-send-email-bobby.prani@gmail.com>
- <20150227201526.GH24818@arm.com>
- <CAJhHMCA0La6rQBndxJDnynAZ6AogEbKcCRQULZjjRTXBMzGuiA@mail.gmail.com>
-Message-ID: <CAJhHMCDUqvxs4rwsnw69UyM5NoBTit_HoYzdWpSYibbXtRs=5g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Feb 2015 21:33:34 +0100
+Subject: [PATCH 2/3] dtb: change binding name to match with newer firmware
+ DT
+In-Reply-To: <1425067710-14879-3-git-send-email-isubramanian@apm.com>
+References: <1425067710-14879-1-git-send-email-isubramanian@apm.com>
+ <1425067710-14879-3-git-send-email-isubramanian@apm.com>
+Message-ID: <4061014.S4PDWltU3G@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 3:17 PM, Pranith Kumar <bobby.prani@gmail.com> wrote:
-> On Fri, Feb 27, 2015 at 3:15 PM, Will Deacon <will.deacon@arm.com> wrote:
->>> @@ -166,11 +166,11 @@ static inline int __cmpxchg_double(volatile void *ptr1, volatile void *ptr2,
->>>               VM_BUG_ON((unsigned long *)ptr2 - (unsigned long *)ptr1 != 1);
->>>               do {
->>>                       asm volatile("// __cmpxchg_double8\n"
->>> +                     "       mov     %w0, #0\n"
->>>                       "       ldxp    %0, %1, %2\n"
->>
->> Seriously, you might want to test this before you mindlessly make changes to
->> low-level synchronisation code. Not only is the change completely unnecessary
->> but it is actively harmful.
->>
->
-> Oops, I apologize for this. I should have looked more closely. It is
-> wrong to do this in cmpxchg_double(). What about the other cases?
->
+On Friday 27 February 2015 12:08:29 Iyappan Subramanian wrote:
+> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> index f1ad9c2..a857794 100644
+> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> @@ -622,7 +622,7 @@
+>                 };
+>  
+>                 sgenet0: ethernet at 1f210000 {
+> -                       compatible = "apm,xgene-enet";
+> +                       compatible = "apm,xgene1-sgenet";
+>                         status = "disabled";
+>                         reg = <0x0 0x1f210000 0x0 0xd100>,
+>                               <0x0 0x1f200000 0x0 0Xc300>,
+> 
 
-Hi Will,
+This will break booting the new dtb on older kernels, right?
 
-I tried looking closely on what might be the problem here. I am
-waiting on a HiKey arm64 board and I agree I should not send in
-changes without running/testing them first.
+You should normally list the most generic model in addition to the
+specific one.
 
-Could you please explain (for educational purposes) why you think this
-change is harmful?
-
-
-Thanks,
--- 
-Pranith
+	Arnd
