@@ -1,21 +1,25 @@
-From: pali.rohar@gmail.com (=?UTF-8?q?Pali=20Roh=C3=A1r?=)
-Date: Fri, 27 Feb 2015 16:55:26 +0100
-Subject: [PATCH v2 0/2] ARM: /proc/cpuinfo: DT: Add support for Revision
-In-Reply-To: <201502271645.58765@pali>
-References: <201502271645.58765@pali>
-Message-ID: <1425052528-18995-1-git-send-email-pali.rohar@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 27 Feb 2015 08:04:02 -0800
+Subject: [PATCH v2 0/3] ARM: dts: add openpandora device support
+In-Reply-To: <CAAfyv376B4CmzN7gtqdwdOE_URo0ksKDE6GXiiRjqNg0FX6WTw@mail.gmail.com>
+References: <1424202743-26387-1-git-send-email-marek@goldelico.com>
+ <CANOLnOOMLxDV6vQagfRaS7_YY6at91BbL0jPKkNQn-tYDnJEuw@mail.gmail.com>
+ <CAAfyv376B4CmzN7gtqdwdOE_URo0ksKDE6GXiiRjqNg0FX6WTw@mail.gmail.com>
+Message-ID: <20150227160402.GV11056@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for DT "/revision" and convert ATAG_REVISION to DT.
+* Belisko Marek <marek.belisko@gmail.com> [150227 00:37]:
+> Tony,
+> 
+> should I send v3 (with updates) or can you apply current version? Thanks.
 
-Pali Roh?r (2):
-  arm: devtree: Set system_rev from DT revision
-  arm: boot: convert ATAG_REVISION to DT revision field
+Well if you trust me a) to rembember to apply the patches b) remember to
+apply the ack c) remember to fix the pin d) actually get it done right
+when I do it, then sure I can apply them. Seriously, it's usually best
+to repost if changes are needed because otherwise things can go wrong
+and things can get a bit overwhelming for me here and there :)
 
- arch/arm/boot/compressed/atags_to_fdt.c |   37 +++++++++++++++++++++++++++++++
- arch/arm/kernel/devtree.c               |   20 ++++++++++++-----
- 2 files changed, 52 insertions(+), 5 deletions(-)
+Regards,
 
--- 
-1.7.9.5
+Tony
