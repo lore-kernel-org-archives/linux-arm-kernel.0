@@ -1,61 +1,71 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Feb 2015 21:14:34 +0000
-Subject: [PATCH 4/4] clk: dt: Introduce binding for always-on clock support
-In-Reply-To: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
-References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1425071674-16995-5-git-send-email-lee.jones@linaro.org>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 27 Feb 2015 15:23:57 -0600
+Subject: [PATCH 0/2] Add SCM warmboot support for QCOM SoCs
+In-Reply-To: <20150227200719.GE1678@linaro.org>
+References: <1424904852-12719-1-git-send-email-lina.iyer@linaro.org>
+ <24986C4E-2DED-456F-A1D3-E52037540E01@codeaurora.org>
+ <20150226222035.GB1250@linaro.org> <20150227200719.GE1678@linaro.org>
+Message-ID: <0A05D548-BD53-4A33-A5C7-F396E1915FFA@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- .../devicetree/bindings/clock/clock-bindings.txt   | 34 ++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-index 06fc6d5..ad17121 100644
---- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
-+++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-@@ -44,6 +44,40 @@ For example:
-   clocks by index. The names should reflect the clock output signal
-   names for the device.
- 
-+clock-always-on:    Some hardware contains bunches of clocks which must never be
-+		    turned off.  If drivers a) fail to obtain a reference to any
-+		    of these or b) give up a previously obtained reference
-+		    during suspend, the common clk framework will attempt to
-+		    disable them and a platform can fail irrecoverably as a
-+		    result.  Usually the only way to recover from these failures
-+		    is to reboot.
-+
-+		    To avoid either of these two scenarios from catastrophically
-+		    disabling an otherwise perfectly healthy running system,
-+		    clocks can be identified as always-on using this property
-+		    from inside a clocksource's node.  The CLK_IGNORE_UNUSED
-+		    flag will be applied to each clock instance named in this
-+		    property, thus preventing them from being shut down by the
-+		    framework.
-+
-+		    This property is not to be abused.  It is only to be used to
-+		    protect platforms from being crippled by gated clocks, not
-+		    as a convenience function to avoid using the framework
-+		    correctly inside device drivers.
-+
-+For example:
-+
-+    oscillator {
-+        #clock-cells = <1>;
-+        clock-output-names = "ckil", "ckih";
-+        clock-always-on = "ckil";
-+    };
-+
-+- this node defines a device with two clock outputs, just as in the
-+  example above.  The only difference being that 'ckil' is now
-+  identified as an always-on clock, so the framework will know to
-+  never attempt to gate it.
-+
- clock-indices:	   If the identifying number for the clocks in the node
- 		   is not linear from zero, then this allows the mapping of
- 		   identifiers into the clock-output-names array.
+On Feb 27, 2015, at 2:07 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+
+> On Thu, Feb 26 2015 at 15:20 -0700, Lina Iyer wrote:
+>> On Thu, Feb 26 2015 at 15:10 -0700, Kumar Gala wrote:
+>>> 
+>>> On Feb 25, 2015, at 4:54 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>>> 
+>>>> Hi,
+>>>> 
+>>>> These patches used to be part of my cpuidle patchset, think these can go in
+>>>> independently.
+>>>> 
+>>>> The patches do the following -
+>>>> 
+>>>> 1. Add QCOM Secure Monitor specific enumeration for warm boot on qcom targets
+>>>> 2. Add an API to set up the warmboot address. Consolidate the warm boot flags
+>>>> into the implementation file
+>>>> 
+>>>> Thanks,
+>>>> Lina
+>>>> 
+>>>> Lina Iyer (2):
+>>>> ARM: qcom: Add SCM warmboot flags for quad core targets.
+>>>> qcom: scm: Add scm_set_warm_boot_addr function
+>>>> 
+>>>> arch/arm/mach-qcom/scm-boot.c | 38 ++++++++++++++++++++++++++++++++++++++
+>>>> arch/arm/mach-qcom/scm-boot.h |  5 +++--
+>>>> 2 files changed, 41 insertions(+), 2 deletions(-)
+>>> 
+>>> Lina,
+>>> 
+>>> Do you mind rebasing these patches on my recent SCM cleanup set.  You find it at:
+>>> 
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git qcom/scm-cleanup
+>>> 
+>> 
+>> Sure. As suggested by Kevin H, I will merge the two patches and rebase
+>> on top yours and resubmit.
+>> 
+> I have rebased on top of yours. I will send it shortly. But please note
+> that source "driver/firmware/Kconfig" is missing in arch/arm/Kconfig for
+> the driver/firmware to build.
+
+I?ll fix this.
+
+> 
+> Also, I have a dependency on the scm_call_atomic() api introduced by
+> Stephen [1] for cpuidle. When can I expect to see that?
+> 
+> [1]. https://lkml.org/lkml/2014/8/4/765
+
+Please add the patch to your patchset.
+
+- k
+
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
