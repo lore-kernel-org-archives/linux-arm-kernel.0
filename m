@@ -1,89 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 Feb 2015 18:03:26 +0000
-Subject: [PATCH v2] drivers: cpuidle: cpuidle-arm64: include
- asm/proc-fns.h explicitly
-In-Reply-To: <20150227175431.GA30173@red-moon>
-References: <20150226182307.GD17949@e104818-lin.cambridge.arm.com>
- <54F09EFA.4090906@linaro.org> <20150227171604.GA12998@red-moon>
- <54F0A703.6090808@linaro.org>
- <20150227173422.GI17949@e104818-lin.cambridge.arm.com>
- <20150227175431.GA30173@red-moon>
-Message-ID: <20150227180325.GJ17949@e104818-lin.cambridge.arm.com>
+From: bobby.prani@gmail.com (Pranith Kumar)
+Date: Fri, 27 Feb 2015 13:25:25 -0500
+Subject: [RFC PATCH] ARM64: cmpxchg.h: Clear the exclusive access bit on
+ fail
+In-Reply-To: <20150227100612.GB3628@arm.com>
+References: <1425016026-19766-1-git-send-email-bobby.prani@gmail.com>
+ <20150227100612.GB3628@arm.com>
+Message-ID: <CAJhHMCC98dPnx=ng3zp5ZZmzOZkdPXaA1bmcQJuhQj9wb7CRhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 05:54:31PM +0000, Lorenzo Pieralisi wrote:
-> On Fri, Feb 27, 2015 at 05:34:22PM +0000, Catalin Marinas wrote:
-> > On Fri, Feb 27, 2015 at 06:18:59PM +0100, Daniel Lezcano wrote:
-> > > On 02/27/2015 06:16 PM, Lorenzo Pieralisi wrote:
-> > > >On Fri, Feb 27, 2015 at 04:44:42PM +0000, Daniel Lezcano wrote:
-> > > >>On 02/26/2015 07:23 PM, Catalin Marinas wrote:
-> > > >>>On Wed, Feb 25, 2015 at 01:11:40PM +0000, Will Deacon wrote:
-> > > >>>>On Wed, Feb 25, 2015 at 12:59:42PM +0000, Lorenzo Pieralisi wrote:
-> > > >>>>>ARM64 CPUidle driver requires the cpu_do_idle function so that it can
-> > > >>>>>be used to enter the shallowest idle state, and it is declared in
-> > > >>>>>asm/proc-fns.h.
-> > > >>>>>
-> > > >>>>>The current ARM64 CPUidle driver does not include asm/proc-fns.h
-> > > >>>>>explicitly and it has so far relied on implicit inclusion from other
-> > > >>>>>header files.
-> > > >>>>>
-> > > >>>>>Owing to some header dependencies reshuffling this currently triggers
-> > > >>>>>build failures when CONFIG_ARM64_64K_PAGES=y:
-> > > >>>>>
-> > > >>>>>drivers/cpuidle/cpuidle-arm64.c: In function "arm64_enter_idle_state"
-> > > >>>>>drivers/cpuidle/cpuidle-arm64.c:42:3: error: implicit declaration of
-> > > >>>>>function "cpu_do_idle" [-Werror=implicit-function-declaration]
-> > > >>>>>     cpu_do_idle();
-> > > >>>>>     ^
-> > > >>>>>
-> > > >>>>>This patch adds the explicit inclusion of the asm/proc-fns.h header file
-> > > >>>>>to fix the build breakage and stop relying on implicit asm/proc-fns.h
-> > > >>>>>inclusion.
-> > > >>>>>
-> > > >>>>>Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> > > >>>>>[lp: rewrote commit log]
-> > > >>>>>Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > >>>>>Tested-by: Mark Rutland <mark.rutland@arm.com>
-> > > >>>>>---
-> > > >>>>>v2 changes:
-> > > >>>>
-> > > >>>>Acked-by: Will Deacon <will.deacon@arm.com>
-> > > >>>>
-> > > >>>>Catalin will pick this up for -rc2, I suspect.
-> > > >>>
-> > > >>>I can merge this as long as Daniel or Rafael are fine with it.
-> > > >>
-> > > >>I am wondering if asm/proc-fns.h shouldn't be directly included in
-> > > >>asm/cpuidle.h, otherwise each time cpuidle.h is included somewhere we
-> > > >>have to include proc-fns.h also.
-> > > >>
-> > > >>It is not a problem for ARM64 because there is not a big number of
-> > > >>cpuidle drivers but for ARM32 it is not the case. I have a patchset
-> > > >>which put proc-fns.h inclusion directly in asm/cpuidle.h and cleanup the
-> > > >>drivers. For the sake of consistency between ARM/ARM64 may be it would
-> > > >>make sense to include in the cpuidle.h directly, no ?
-> > > >
-> > > >This patch is a build fix, and I'd rather get it in asap. We can move
-> > > >the inclusion and merge the resulting clean-up patch in your series later.
-> > > >I will put together the patch now, if Catalin has the pull request ready
-> > > >to be sent I do not see the point in delaying it though.
-> > > 
-> > > I was just suggesting to put the proc-fns.h inclusion in cpuidle.h directly.
-> > > That fixes the build also.
-> > 
-> > This would do as well, especially since you plan to clean up arch/arm as
-> > well (or just move the cpu_do_idle() prototype in asm/cpuidle.h; we
-> > moved cpu_suspend() there already).
-> 
-> What I wanted to say is that the clean-up will be merged the coming
-> cycle anyway, not now, so I wanted to avoid delaying the pull request
-> for something that could have been done later.
+On Fri, Feb 27, 2015 at 5:06 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Feb 27, 2015 at 05:46:55AM +0000, Pranith Kumar wrote:
+>> In cmpxchg(), we do a load exclusive on an address and upon a comparison fail,
+>> we skip the store exclusive instruction. This can result in the exclusive bit
+>> still set. If there was a store exclusive after this to the same address, that
+>> will see the exclusive bit set. This should not happen.
+>
+> ... and the problem with that is?
 
-Agree, but since the change is small, I'll get your reworked patch which
-doesn't touch cpuidle-arm64.c
+Consider the following scenario:
 
-Thanks.
+            P0                    P1
+            ---------------------------------
+            ldxr x7, [B]                         // exclusive bit set
+            add  x7, x7, #1
+                                str ..., [B]     // exclusive bit cleared
+cmpxchg:
+            ldxr x0, [B]                         // exclusive bit set
+            cmp  x0, #0                        // cmp fails
+            b.ne 1f                               // branch taken
+            stxr x1, [B]                         // end of cmpxchg
+1:
+            stxr x7, [B]                        // succeeds?
+
+
+    The last store exclusive succeeds since the exclusive bit is set which
+should not happen. Clearing the exclusive bit before returning from cmpxchg
+prevents this happening.
+
+Now I am not sure how likely this will happen. One can argue that a cmpxchg()
+will not happen between an external ldxr/stxr. But isn't clearing the exclusive
+bit better?
 
 -- 
-Catalin
+Pranith
