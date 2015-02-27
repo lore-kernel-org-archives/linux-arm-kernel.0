@@ -1,32 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Feb 2015 14:31:27 +0100
-Subject: [PATCH 7/8] ARM: mmp: make plat-pxa build standalone
-In-Reply-To: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
-References: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
-Message-ID: <1425043887-3107341-1-git-send-email-arnd@arndb.de>
+From: jcm@redhat.com (Jon Masters)
+Date: Fri, 27 Feb 2015 08:41:07 -0500
+Subject: [PATCH] arm64: Fix text patching logic when using fixmap
+In-Reply-To: <54F0703C.5090009@redhat.com>
+References: <1424795421-26630-1-git-send-email-marc.zyngier@arm.com>
+ <54F0703C.5090009@redhat.com>
+Message-ID: <54F073F3.5080604@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ssp.c driver in plat-pxa is the only remaining file including a
-mach/*.h header from mmp. It actually doesn't need mach/hardware.h at
-all, so we can remove the #include.
+On 02/27/2015 08:25 AM, Jon Masters wrote:
+> On 02/24/2015 11:30 AM, Marc Zyngier wrote:
+>> Patch 2f896d586610 ("arm64: use fixmap for text patching") changed
+>> the way we patch the kernel text, using a fixmap when the kernel or
+>> modules are flagged as read only.
+>>
+>> Unfortunately, a flaw in the logic makes it fall over when patching
+>> modules without CONFIG_DEBUG_SET_MODULE_RONX enabled:
+>>
+>> [...]
+>> [   32.032636] Call trace:
+>> [   32.032716] [<fffffe00003da0dc>] __copy_to_user+0x2c/0x60
+>> [   32.032837] [<fffffe0000099f08>] __aarch64_insn_write+0x94/0xf8
+>> [   32.033027] [<fffffe000009a0a0>] aarch64_insn_patch_text_nosync+0x18/0x58
+>> [   32.033200] [<fffffe000009c3ec>] ftrace_modify_code+0x58/0x84
+>> [   32.033363] [<fffffe000009c4e4>] ftrace_make_nop+0x3c/0x58
+>> [   32.033532] [<fffffe0000164420>] ftrace_process_locs+0x3d0/0x5c8
+>> [   32.033709] [<fffffe00001661cc>] ftrace_module_init+0x28/0x34
+>> [   32.033882] [<fffffe0000135148>] load_module+0xbb8/0xfc4
+>> [   32.034044] [<fffffe0000135714>] SyS_finit_module+0x94/0xc4
+>> [...]
+>>
+>> This is triggered by the use of virt_to_page() on a module address,
+>> which ends to pointing to Nowhereland if you're lucky, or corrupt
+>> your precious data if not.
+>>
+>> This patch fixes the logic by mimicking what is done on arm:
+>> - If we're patching a module and CONFIG_DEBUG_SET_MODULE_RONX is set,
+>>   use vmalloc_to_page().
+>> - If we're patching the kernel and CONFIG_DEBUG_RODATA is set,
+>>   use virt_to_page().
+>> - Otherwise, use the provided address, as we can write to it directly.
+>>
+>> Tested on 4.0-rc1 as a KVM guest.
+>>
+>> Reported-by: Richard W.M. Jones <rjones@redhat.com>
+>> Cc: Kees Cook <keescook@chromium.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Laura Abbott <lauraa@codeaurora.org>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> This fixes a crash on boot in the AHCI driver experienced by a test
+> Fedora Hosted arm64 kernel when running on various platforms.
+> 
+> Tested by me on AMD Seattle and confirmed fixing the issue.
+> 
+> Tested-by: Jon Masters <jcm@redhat.com>
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/plat-pxa/ssp.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
-index ad9529cc4203..257790259d2b 100644
---- a/arch/arm/plat-pxa/ssp.c
-+++ b/arch/arm/plat-pxa/ssp.c
-@@ -34,7 +34,6 @@
- #include <linux/of_device.h>
- 
- #include <asm/irq.h>
--#include <mach/hardware.h>
- 
- static DEFINE_MUTEX(ssp_lock);
- static LIST_HEAD(ssp_list);
--- 
-2.1.0.rc2
+(In case anyone cares also tested on APM Mustang and it fixes the same)
