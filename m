@@ -1,87 +1,62 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 27 Feb 2015 16:37:10 +0800
-Subject: [PATCH v9 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <54EFE282.1090305@codeaurora.org>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <54EFE282.1090305@codeaurora.org>
-Message-ID: <54F02CB6.2090508@linaro.org>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 27 Feb 2015 09:38:59 +0100
+Subject: [PATCH] genirq / PM: Add flag for shared NO_SUSPEND interrupt
+ lines
+In-Reply-To: <6864616.1aRDSmSsvx@vostro.rjw.lan>
+References: <1424771762-16343-1-git-send-email-boris.brezillon@free-electrons.com>
+ <8151717.nkhnGBri9h@vostro.rjw.lan>
+ <20150226191724.0ae4ca4e@bbrezillon>
+ <6864616.1aRDSmSsvx@vostro.rjw.lan>
+Message-ID: <20150227083859.GD21418@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timur,
+On Fri, Feb 27, 2015 at 12:07:55AM +0100, Rafael J. Wysocki wrote:
+> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> 
+> It currently is required that all users of NO_SUSPEND interrupt
+> lines pass the IRQF_NO_SUSPEND flag when requesting the IRQ or the
+> WARN_ON_ONCE() in irq_pm_install_action() will trigger.  That is
+> done to warn about situations in which unprepared interrupt handlers
+> may be run unnecessarily for suspended devices and may attempt to
+> access those devices by mistake.  However, it may cause drivers
+> that have no technical reasons for using IRQF_NO_SUSPEND to set
+> that flag just because they happen to share the interrupt line
+> with something like a timer.
+> 
+> Moreover, the generic handling of wakeup interrupts introduced by
+> commit 9ce7a25849e8 (genirq: Simplify wakeup mechanism) only works
+> for IRQs without any NO_SUSPEND users, so the drivers of wakeup
+> devices needing to use shared NO_SUSPEND interrupt lines for
+> signaling system wakeup generally have to detect wakeup in their
+> interrupt handlers.  Thus if they happen to share an interrupt line
+> with a NO_SUSPEND user, they also need to request that their
+> interrupt handlers be run after suspend_device_irqs().
+> 
+> In both cases the reason for using IRQF_NO_SUSPEND is not because
+> the driver in question has a genuine need to run its interrupt
+> handler after suspend_device_irqs(), but because it happens to
+> share the line with some other NO_SUSPEND user.  Otherwise, the
+> driver would do without IRQF_NO_SUSPEND just fine.
+> 
+> To make it possible to specify that condition explicitly, introduce
+> a new IRQ action handler flag for shared IRQs, IRQF_COND_SUSPEND,
+> that, when set, will indicate to the IRQ core that the interrupt
+> user is generally fine with suspending the IRQ, but it also can
+> tolerate handler invocations after suspend_device_irqs() and, in
+> particular, it is capable of detecting system wakeup and triggering
+> it as appropriate from its interrupt handler.
+> 
+> That will allow us to work around a problem with a shared timer
+> interrupt line on at91 platforms.
+> 
+> Link: http://marc.info/?l=linux-kernel&m=142252777602084&w=2
+> Link: http://marc.info/?t=142252775300011&r=1&w=2
+> Linx: https://lkml.org/lkml/2014/12/15/552
+> Reported-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
-On 2015?02?27? 11:20, Timur Tabi wrote:
-> On 02/25/2015 02:39 AM, Hanjun Guo wrote:
->> Changes since v8:
->
-> I'm still debugging it, but v9 on the 4.0-rc1 kernel crashes after
-> calling the UEFI boot time services exit function.  That is, this line:
->
-> status = sys_table->boottime->exit_boot_services(handle, mmap_key);
->
-> in allocate_new_fdt_and_exit_boot() gets called, and then soon after it
-> returns, the kernel crashes.  It's really early because the UEFI
-> exception handler is called.
->
-> I did not have this problem with v8 patchset on 3.19.
+Seems good to me. Should I take this through tip/irq ?
 
-I tested this patch set on FVP base model with UEFI, and booted ok.
-Can you boot the system without this ACPI patch set?
-
->
->
-> Also, you still have a couple whitespace problems in these patches:
->
-> Applying: ARM64 / ACPI: additions of ACPI documentation for arm64
-> /local/mnt/workspace/linux.0/.git/rebase-apply/patch:607: new blank line
-> at EOF.
-> +
-> /local/mnt/workspace/linux.0/.git/rebase-apply/patch:844: new blank line
-> at EOF.
-> +
-> warning: 2 lines add whitespace errors.
-> Applying: Documentation: ACPI for ARM64
-> /local/mnt/workspace/linux.0/.git/rebase-apply/patch:517: new blank line
-> at EOF.
-> +
-> warning: 1 line adds whitespace errors.
-
-Weired, When I checked the patch locally there were no whitespace
-problems:
-
-./scripts/checkpatch.pl 0020-Documentation-ACPI-for-ARM64.patch
-WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
-#23:
-new file mode 100644
-
-WARNING: use relative pathname instead of absolute in changelog text
-#25:
---- /dev/null
-
-total: 0 errors, 2 warnings, 506 lines checked
-
-0020-Documentation-ACPI-for-ARM64.patch has style problems, please review.
-
-./scripts/checkpatch.pl 
-0021-ARM64-ACPI-additions-of-ACPI-documentation-for-arm64.patch
-WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
-#32:
-new file mode 100644
-
-WARNING: use relative pathname instead of absolute in changelog text
-#34:
---- /dev/null
-
-WARNING: use relative pathname instead of absolute in changelog text
-#634:
---- /dev/null
-
-total: 0 errors, 3 warnings, 825 lines checked
-
-0021-ARM64-ACPI-additions-of-ACPI-documentation-for-arm64.patch has 
-style problems, please review.
-
-Can you provide me the exact line of code which have whitespace problems?
-
-Thanks
-Hanjun
+Also, should we warn if people use enable_irq_wake() where there is only
+a single descriptor with NO_SUSPEND?
