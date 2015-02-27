@@ -1,23 +1,33 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Feb 2015 10:06:13 +0000
-Subject: [RFC PATCH] ARM64: cmpxchg.h: Clear the exclusive access bit on
- fail
-In-Reply-To: <1425016026-19766-1-git-send-email-bobby.prani@gmail.com>
-References: <1425016026-19766-1-git-send-email-bobby.prani@gmail.com>
-Message-ID: <20150227100612.GB3628@arm.com>
+Date: Fri, 27 Feb 2015 10:24:35 +0000
+Subject: tlbi  va, vaa vs. val, vaal
+In-Reply-To: <54EFB670.2070501@samsung.com>
+References: <54EFB670.2070501@samsung.com>
+Message-ID: <20150227102435.GC3628@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 05:46:55AM +0000, Pranith Kumar wrote:
-> In cmpxchg(), we do a load exclusive on an address and upon a comparison fail,
-> we skip the store exclusive instruction. This can result in the exclusive bit
-> still set. If there was a store exclusive after this to the same address, that
-> will see the exclusive bit set. This should not happen.
+On Fri, Feb 27, 2015 at 12:12:32AM +0000, Mario Smarduch wrote:
+> I noticed kernel tlbflush.h use tlbi va*, vaa* variants instead of
+> val, vaal ones. Reading the manual D.5.7.2 it appears that
+> va*, vaa* versions invalidate intermediate caching of
+> translation structures.
+> 
+> With stage2 enabled that may result in 20+ memory lookups
+> for a 4 level page table walk. That's assuming that intermediate
+> caching structures cache mappings from stage1 table entry to
+> host page.
 
-... and the problem with that is?
+Yeah, Catalin and I discussed improving the kernel support for this,
+but it requires some changes to the generic mmu_gather code so that we
+can distinguish the leaf cases. I'd also like to see that done in a way
+that takes into account different granule sizes (we currently iterate
+over huge pages in 4k chunks). Last time I touched that, I entered a
+world of pain and don't plan to return there immediately :)
 
-> We need to clear the exclusive bit in these cases.
+Catalin -- feeling brave?
 
-Why?
+FWIW: the new IOMMU page-table stuff I just got merged *does* make use
+of leaf-invalidation for the SMMU.
 
 Will
