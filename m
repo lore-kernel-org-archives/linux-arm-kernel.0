@@ -1,45 +1,57 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 26 Feb 2015 21:20:34 -0600
-Subject: [PATCH v9 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <54EFE282.1090305@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 26 Feb 2015 19:37:44 -0800
+Subject: [PATCH] clk: qcom: Fix ipq806x LCC frequency tables
+Message-ID: <1425008264-18875-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2015 02:39 AM, Hanjun Guo wrote:
-> Changes since v8:
+These frequency tables list the wrong rates. Either they don't
+have the correct frequency at all, or they're specified in kHz
+instead of Hz. Fix it.
 
-I'm still debugging it, but v9 on the 4.0-rc1 kernel crashes after 
-calling the UEFI boot time services exit function.  That is, this line:
+Fixes: c99e515a92e9 "clk: qcom: Add IPQ806X LPASS clock controller (LCC) driver"
+Cc: Kenneth Westfield <kwestfie@codeaurora.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clk/qcom/lcc-ipq806x.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-status = sys_table->boottime->exit_boot_services(handle, mmap_key);
-
-in allocate_new_fdt_and_exit_boot() gets called, and then soon after it 
-returns, the kernel crashes.  It's really early because the UEFI 
-exception handler is called.
-
-I did not have this problem with v8 patchset on 3.19.
-
-
-Also, you still have a couple whitespace problems in these patches:
-
-Applying: ARM64 / ACPI: additions of ACPI documentation for arm64
-/local/mnt/workspace/linux.0/.git/rebase-apply/patch:607: new blank line 
-at EOF.
-+
-/local/mnt/workspace/linux.0/.git/rebase-apply/patch:844: new blank line 
-at EOF.
-+
-warning: 2 lines add whitespace errors.
-Applying: Documentation: ACPI for ARM64
-/local/mnt/workspace/linux.0/.git/rebase-apply/patch:517: new blank line 
-at EOF.
-+
-warning: 1 line adds whitespace errors.
-
-
+diff --git a/drivers/clk/qcom/lcc-ipq806x.c b/drivers/clk/qcom/lcc-ipq806x.c
+index fb276522173a..b23f8069fac1 100644
+--- a/drivers/clk/qcom/lcc-ipq806x.c
++++ b/drivers/clk/qcom/lcc-ipq806x.c
+@@ -294,14 +294,14 @@ static struct clk_regmap_mux pcm_clk = {
+ };
+ 
+ static struct freq_tbl clk_tbl_aif_osr[] = {
+-	{  22050, P_PLL4, 1, 147, 20480 },
+-	{  32000, P_PLL4, 1,   1,    96 },
+-	{  44100, P_PLL4, 1, 147, 10240 },
+-	{  48000, P_PLL4, 1,   1,    64 },
+-	{  88200, P_PLL4, 1, 147,  5120 },
+-	{  96000, P_PLL4, 1,   1,    32 },
+-	{ 176400, P_PLL4, 1, 147,  2560 },
+-	{ 192000, P_PLL4, 1,   1,    16 },
++	{  2822400, P_PLL4, 1, 147, 20480 },
++	{  4096000, P_PLL4, 1,   1,    96 },
++	{  5644800, P_PLL4, 1, 147, 10240 },
++	{  6144000, P_PLL4, 1,   1,    64 },
++	{ 11289600, P_PLL4, 1, 147,  5120 },
++	{ 12288000, P_PLL4, 1,   1,    32 },
++	{ 22579200, P_PLL4, 1, 147,  2560 },
++	{ 24576000, P_PLL4, 1,   1,    16 },
+ 	{ },
+ };
+ 
+@@ -360,7 +360,7 @@ static struct clk_branch spdif_clk = {
+ };
+ 
+ static struct freq_tbl clk_tbl_ahbix[] = {
+-	{ 131072, P_PLL4, 1, 1, 3 },
++	{ 131072000, P_PLL4, 1, 1, 3 },
+ 	{ },
+ };
+ 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
