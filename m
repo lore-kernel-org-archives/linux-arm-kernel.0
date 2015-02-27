@@ -1,28 +1,32 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 27 Feb 2015 08:46:01 +0100
-Subject: [PATCH] clocksource: efm32: Use CLOCK_EVT_FEAT_PERIODIC for
- defining features
-In-Reply-To: <3fac202ead48b50c0967c62eae92fe9786fd24a1.1425015704.git.viresh.kumar@linaro.org>
-References: <3fac202ead48b50c0967c62eae92fe9786fd24a1.1425015704.git.viresh.kumar@linaro.org>
-Message-ID: <20150227074601.GO7789@pengutronix.de>
+From: leilei.zhao@atmel.com (Leilei Zhao)
+Date: Fri, 27 Feb 2015 16:07:13 +0800
+Subject: [PATCH v2 0/5] tty/serial: at91: fix bugs when using multiple serials
+Message-ID: <1425024438-31355-1-git-send-email-leilei.zhao@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Viresh,
+The series of patches fix bugs when using multiple serial ports at the same time:
+ - The using rx ring buffer in DMA is inconsistent with its allocation.
+ - The serial port can't send and receive data when it's opened the second time
+   and the later if it switches to PIO when DMA channel is not available.
+ - The serial port can lead to kernel crash when data is sending and receiving
+   and the program is killed.
+ 
+The patches were made from branch tty-next of gregkh/tty.git repository, and 
+tested on a SAMA5D36 VB boards with 5 serial ports enabled.
 
-On Fri, Feb 27, 2015 at 11:12:33AM +0530, Viresh Kumar wrote:
-> We have used CLOCK_EVT_MODE_PERIODIC instead of CLOCK_EVT_FEAT_PERIODIC while
-> defining features. Fix it.
-> 
-> Cc: Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-Makes sense, thanks for catching.
+Changes from v1:
+ - Use macro PAGE_ALIGNED to simplify the expression.
 
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Leilei Zhao (5):
+  tty/serial: at91: correct check of buf used in DMA
+  tty/serial: at91: correct buffer size used in DMA
+  tty/serial: at91: revise the return type of atmel_init_property
+  tty/serial: at91: set ops in property init each time
+  tty/serial: at91: correct the usage of tasklet
 
-Best regards
-Uwe
+ drivers/tty/serial/atmel_serial.c |   18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.9.5
