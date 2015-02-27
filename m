@@ -1,58 +1,73 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 27 Feb 2015 19:33:58 +0000
-Subject: [RFC PATCH] ARM64: cmpxchg.h: Clear the exclusive access bit on
- fail
-In-Reply-To: <CAJhHMCBJB8Ca1bdapoOx9ecxAwxEPy+X5jv1VCnkCu_GRpyF8Q@mail.gmail.com>
-References: <1425016026-19766-1-git-send-email-bobby.prani@gmail.com>
- <20150227100612.GB3628@arm.com>
- <CAJhHMCC98dPnx=ng3zp5ZZmzOZkdPXaA1bmcQJuhQj9wb7CRhw@mail.gmail.com>
- <20150227183301.GL17949@e104818-lin.cambridge.arm.com>
- <CAJhHMCBwgi96jyAi0Sdi_tEephLjKuG2DQcWa=tv7d7aEbKuaA@mail.gmail.com>
- <20150227190800.GE9011@leverpostej>
- <CAJhHMCBJB8Ca1bdapoOx9ecxAwxEPy+X5jv1VCnkCu_GRpyF8Q@mail.gmail.com>
-Message-ID: <20150227193358.GF9011@leverpostej>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 27 Feb 2015 11:36:11 -0800
+Subject: [PATCH v2 2/2] ARM: perf: Add support for Scorpion PMUs
+In-Reply-To: <CAJ5Y-ea8LBji1L3Q+NMgA9+eOrDVwWNodqPDD9XsyCzi=LMj9g@mail.gmail.com>
+References: <1423851849-6069-1-git-send-email-sboyd@codeaurora.org>	<1423851849-6069-3-git-send-email-sboyd@codeaurora.org>	<20150220193552.GE1767@arm.com>	<20150220201627.GD24928@codeaurora.org>	<CAJ5Y-eYLeeNDcBtdvMf-k0XGxq-P21FDq-VMHPJsp4=ccuemig@mail.gmail.com>
+ <CAJ5Y-ea8LBji1L3Q+NMgA9+eOrDVwWNodqPDD9XsyCzi=LMj9g@mail.gmail.com>
+Message-ID: <54F0C72B.2090501@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 07:15:57PM +0000, Pranith Kumar wrote:
-> On Fri, Feb 27, 2015 at 2:08 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Fri, Feb 27, 2015 at 06:44:19PM +0000, Pranith Kumar wrote:
-> >> On Fri, Feb 27, 2015 at 1:33 PM, Catalin Marinas
-> >> <catalin.marinas@arm.com> wrote:
-> >> > It's either badly formatted or I don't get it. Are the "stxr x1" and
-> >> > "stxr x7" happening on the same CPU (P0)? If yes, that's badly written
-> >> > code, not even architecturally compliant (you are not allowed other
-> >> > memory accesses between ldxr and stxr).
-> >>
-> >> OK. Is that the same case with ldaxr (acquire) and stlxr (release)?
-> >> AFAIK, memory accesses between acquire and release exclusive
-> >> operations are allowed.
-> >
-> > The restriction on memory accesses in the middle of a load-exclusive
-> > store-exclusive sequence applies to all the load/store-exclusive
-> > variants, including ldaxr and stlxr.
-> >
-> 
-> Thanks Mark. I am trying to see where this restriction is documented.
-> Looking at: http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0802a/a64_data_transfer_alpha.html
-> I do not see that mentioned. The only restriction relevant is that a
-> stxr should use the same address as the most recent ldxr.
-> 
-> Could you please point me to the relevant documentation?
+On 02/25/15 08:58, Ashwin Chaugule wrote:
+> On 24 February 2015 at 12:23, Ashwin Chaugule
+> <ashwin.chaugule@linaro.org> wrote:
+>> On 20 February 2015 at 15:16, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>> On 02/20, Will Deacon wrote:
+>>>> On Fri, Feb 13, 2015 at 06:24:09PM +0000, Stephen Boyd wrote:
+>>>>
+>>>>> +static void scorpion_evt_setup(int idx, u32 config_base)
+>>>>> +{
+>>>>> +       u32 val;
+>>>>> +       u32 mask;
+>>>>> +       u32 vval, fval;
+>>>>> +       unsigned int region;
+>>>>> +       unsigned int group;
+>>>>> +       unsigned int code;
+>>>>> +       unsigned int group_shift;
+>>>>> +       bool venum_event;
+>>>>> +
+>>>>> +       krait_decode_event(config_base, &region, &group, &code, &venum_event,
+>>>>> +                          NULL);
+>>>>> +
+>>>>> +       group_shift = group * 8;
+>>>>> +       mask = 0xff << group_shift;
+>>>>> +
+>>>>> +       /* Configure evtsel for the region and group */
+>>>>> +       if (venum_event)
+>>>>> +               val = SCORPION_VLPM_GROUP0;
+>>>>> +       else
+>>>>> +               val = scorpion_get_pmresrn_event(region);
+>>>>> +       val += group;
+>>>>> +       /* Mix in mode-exclusion bits */
+>>>>> +       val |= config_base & (ARMV7_EXCLUDE_USER | ARMV7_EXCLUDE_PL1);
+>>>>> +       armv7_pmnc_write_evtsel(idx, val);
+>>>>> +
+>>>>> +       asm volatile("mcr p15, 0, %0, c9, c15, 0" : : "r" (0));
+>>>> What's this guy doing?
+>>> This is the same as Krait. It's clearing some implementation
+>>> defined register. From what I can tell it's a per-event register
+>>> (i.e. PMSELR decides which event this register write actually
+>>> affects) and we do this here to reset this register to some
+>>> defined value, zero. Otherwise the reset value of this register
+>>> is UNPREDICTABLE and that would be bad. I think we might be able
+>>> to move it to the pmu reset path, but I don't know. Ashwin?
+> Its a count control register (PMxEVCNTCR). Theres various conditions
+> on which you can select when to start/stop counting. e.g. start when
+> another counter register overflows. Setting it to 0 was the
+> recommended default value on Scorpions and Kraits. Reset value is
+> unpredictable. So, just need to make sure this is set every time a
+> counter is setup. Will that still work if this is moved to the reset
+> path?
+>
+>
 
-You will need to look at the latest ARMv8-A Architecture Reference
-Manual [1].
+I don't think anything in this register changes unless we reset the CPU
+or software changes it, right? We already have a hotplug notifier to
+handle the case where the CPU is hotplugged out (and may get reset) and
+we need to reset the PMU. The other case is deep idle, which we don't
+have yet but we'll need to do a save/reset/restore across idle when we
+get there. So it seems possible to move it to the PMU reset path.
 
-Table B2-2 defines the set of Load-Exclusive and Store-Exclusive
-variants, including LDAXR and STLXR.
-
-Taking this into account, take a look at the restrictions in section
-B2.10.5 "Load-Exclusive and Store-Exclusive instruction usage
-restrictions". One of the bullet points nodes that software must avoid
-explicit memory accesses between a Load-Exclusive instruction and the
-associated Store-Exclusive.
-
-Thanks,
-Mark.
-
-[1] http://infocenter.arm.com/help/topic/com.arm.doc.ddi0487a.e/index.html
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
