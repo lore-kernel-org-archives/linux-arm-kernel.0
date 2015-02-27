@@ -1,135 +1,361 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Feb 2015 14:29:30 +0100
-Subject: [PATCH 3/8] ARM: make xscale iwmmxt code multiplatform aware
+Date: Fri, 27 Feb 2015 14:29:29 +0100
+Subject: [PATCH 2/8] clk: mmp: stop using platform headers
 In-Reply-To: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
 References: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
-Message-ID: <1425043775-3106827-4-git-send-email-arnd@arndb.de>
+Message-ID: <1425043775-3106827-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a multiplatform configuration, we may end up building a kernel
-for both Marvell PJ1 and an ARMv4 CPU implementation. In that
-case, the xscale-cp0 code is built with gcc -march=armv4{,t},
-which results in a build error from the coprocessor instructions.
+The mmp clock drivers currently hardcode the physical addresses for
+the clock registers. This is generally a bad idea, and it also gets in
+the way of multiplatform builds, which make the platform header files
+inaccessible to device drivers.
 
-Since we know this code will only have to run on an actual xscale
-processor, we can simply build the entire file for ARMv5TE.
+To work around the header file problem, this patch changes the calling
+convention so the three mmp clock drivers get initialized with the base
+addresses as arguments from the platform code.
 
-Related to this, we need to handle the iWMMXT initialization sequence
-differently during boot, to ensure we don't try to touch xscale
-specific registers on other CPUs from the xscale_cp0_init initcall.
-cpu_is_xscale() used to be hardcoded to '1' in any configuration
-that enables any XScale-compatible core, but this breaks once
-we can have a combined kernel with MMP1 and something else.
-
-In this patch, I introduce two new macros, cpu_is_xscale()
-and cpu_is_mohawk, so we can test for all three of them in
-the iwmmxt initialization. The two existing users of
-cpu_is_xscale() are modified accordingly, but slightly
-change behavior for kernels that enable CPU_MOHAWK in combination
-with CPU_XSCALE or CPU_XSC3. Previously, these would leave
-clear PMD_BIT4 in the page tables, now they leave it untouched,
-just like we always do for kernels that enable only CPU_MOHAWK.
-Since the previous behavior was inconsistent, I assume it was
-unintentional.
+It would still be useful to have a larger rework of the clock drivers,
+with DT integration to let the clocks actually be probed automatically,
+and the base addresses passed as DT properties. I am unsure if anyone
+is still interested in the mmp platform, so it is possible that this
+won't happen.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Chao Xie <chao.xie@marvell.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
 ---
- arch/arm/include/asm/cputype.h | 27 +++++++++++++++++++++++++--
- arch/arm/kernel/Makefile       |  1 +
- arch/arm/kernel/xscale-cp0.c   |  6 ++++++
- arch/arm/mm/idmap.c            |  3 ++-
- 4 files changed, 34 insertions(+), 3 deletions(-)
+ arch/arm/mach-mmp/clock-mmp2.c   |  4 +++-
+ arch/arm/mach-mmp/clock-pxa168.c |  4 +++-
+ arch/arm/mach-mmp/clock-pxa910.c |  4 +++-
+ arch/arm/mach-mmp/common.h       |  3 ---
+ arch/arm/mach-mmp/mmp2.c         |  5 ++++-
+ arch/arm/mach-mmp/pxa168.c       |  5 ++++-
+ arch/arm/mach-mmp/pxa910.c       |  6 +++++-
+ drivers/clk/mmp/clk-mmp2.c       | 11 +++++------
+ drivers/clk/mmp/clk-pxa168.c     | 11 +++++------
+ drivers/clk/mmp/clk-pxa910.c     | 13 ++++++-------
+ include/linux/clk/mmp.h          | 17 +++++++++++++++++
+ 11 files changed, 55 insertions(+), 28 deletions(-)
+ create mode 100644 include/linux/clk/mmp.h
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index 819777d0e91f..7bc66e22afd7 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -228,10 +228,33 @@ static inline int cpu_is_xsc3(void)
- }
- #endif
- 
--#if !defined(CONFIG_CPU_XSCALE) && !defined(CONFIG_CPU_XSC3)
-+#if !defined(CONFIG_CPU_XSCALE)
- #define	cpu_is_xscale()	0
- #else
--#define	cpu_is_xscale()	1
-+static inline int cpu_is_xscale(void)
-+{
-+	unsigned int id;
-+	id = read_cpuid_id() & 0xffffe000;
-+
-+	if ((id == 0x69052000) || (id == 0x69054000))
-+		return 1;
-+
-+	return 0;
-+}
-+#endif
-+
-+#if !defined(CONFIG_CPU_MOHAWK)
-+#define	cpu_is_mohawk()	0
-+#else
-+static inline int cpu_is_mohawk(void)
-+{
-+	unsigned int id;
-+	id = read_cpuid_id() & 0xffffe000;
-+
-+	if (id == 0x56158000)
-+
-+	return 0;
-+}
- #endif
- 
- /*
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 902397dd1000..7840acff6cd3 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -67,6 +67,7 @@ obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
- obj-$(CONFIG_CPU_XSCALE)	+= xscale-cp0.o
- obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
- obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
-+CFLAGS_xscale-cp0.o		+= -Wa,-march=armv5te
- obj-$(CONFIG_CPU_PJ4)		+= pj4-cp0.o
- obj-$(CONFIG_CPU_PJ4B)		+= pj4-cp0.o
- obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
-diff --git a/arch/arm/kernel/xscale-cp0.c b/arch/arm/kernel/xscale-cp0.c
-index bdbb8853a19b..a23420fab70e 100644
---- a/arch/arm/kernel/xscale-cp0.c
-+++ b/arch/arm/kernel/xscale-cp0.c
-@@ -15,6 +15,7 @@
- #include <linux/init.h>
+diff --git a/arch/arm/mach-mmp/clock-mmp2.c b/arch/arm/mach-mmp/clock-mmp2.c
+index 53d77cbd6000..6847c49bbb39 100644
+--- a/arch/arm/mach-mmp/clock-mmp2.c
++++ b/arch/arm/mach-mmp/clock-mmp2.c
+@@ -4,6 +4,7 @@
+ #include <linux/list.h>
  #include <linux/io.h>
- #include <asm/thread_notify.h>
-+#include <asm/cputype.h>
+ #include <linux/clk.h>
++#include <linux/clk/mmp.h>
  
- static inline void dsp_save_state(u32 *state)
- {
-@@ -152,6 +153,11 @@ static int __init xscale_cp0_init(void)
- {
- 	u32 cp_access;
+ #include <mach/addr-map.h>
  
-+	/* do not attempt to probe iwmmxt on non-xscale family CPUs */
-+	if (IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM) &&
-+	    !(cpu_is_xscale() || cpu_is_xsc3() || cpu_is_mohawk()))
-+		return 0;
+@@ -105,7 +106,8 @@ static struct clk_lookup mmp2_clkregs[] = {
+ 	INIT_CLKREG(&clk_sdh3, "sdhci-pxav3.3", "PXA-SDHCLK"),
+ };
+ 
+-void __init mmp2_clk_init(void)
++void __init mmp2_clk_init(phys_addr_t mpmu_phys, phys_addr_t apmu_phys,
++			  phys_addr_t apbc_phys)
+ {
+ 	clkdev_add_table(ARRAY_AND_SIZE(mmp2_clkregs));
+ }
+diff --git a/arch/arm/mach-mmp/clock-pxa168.c b/arch/arm/mach-mmp/clock-pxa168.c
+index c572f219ae26..bfa54bb16449 100644
+--- a/arch/arm/mach-mmp/clock-pxa168.c
++++ b/arch/arm/mach-mmp/clock-pxa168.c
+@@ -4,6 +4,7 @@
+ #include <linux/list.h>
+ #include <linux/io.h>
+ #include <linux/clk.h>
++#include <linux/clk/mmp.h>
+ 
+ #include <mach/addr-map.h>
+ 
+@@ -85,7 +86,8 @@ static struct clk_lookup pxa168_clkregs[] = {
+ 	INIT_CLKREG(&clk_rtc, "sa1100-rtc", NULL),
+ };
+ 
+-void __init pxa168_clk_init(void)
++void __init pxa168_clk_init(phys_addr_t mpmu_phys, phys_addr_t apmu_phys,
++			    phys_addr_t apbc_phys)
+ {
+ 	clkdev_add_table(ARRAY_AND_SIZE(pxa168_clkregs));
+ }
+diff --git a/arch/arm/mach-mmp/clock-pxa910.c b/arch/arm/mach-mmp/clock-pxa910.c
+index 379e1df61c70..ef7d3dbc8731 100644
+--- a/arch/arm/mach-mmp/clock-pxa910.c
++++ b/arch/arm/mach-mmp/clock-pxa910.c
+@@ -4,6 +4,7 @@
+ #include <linux/list.h>
+ #include <linux/io.h>
+ #include <linux/clk.h>
++#include <linux/clk/mmp.h>
+ 
+ #include <mach/addr-map.h>
+ 
+@@ -61,7 +62,8 @@ static struct clk_lookup pxa910_clkregs[] = {
+ 	INIT_CLKREG(&clk_rtc, "sa1100-rtc", NULL),
+ };
+ 
+-void __init pxa910_clk_init(void)
++void __init pxa910_clk_init(phys_addr_t mpmu_phys, phys_addr_t apmu_phys,
++			    phys_addr_t apbc_phys, phys_addr_t apbcp_phys)
+ {
+ 	clkdev_add_table(ARRAY_AND_SIZE(pxa910_clkregs));
+ }
+diff --git a/arch/arm/mach-mmp/common.h b/arch/arm/mach-mmp/common.h
+index cf445bae6d77..7453a90c34bd 100644
+--- a/arch/arm/mach-mmp/common.h
++++ b/arch/arm/mach-mmp/common.h
+@@ -5,6 +5,3 @@ extern void timer_init(int irq);
+ 
+ extern void __init mmp_map_io(void);
+ extern void mmp_restart(enum reboot_mode, const char *);
+-extern void __init pxa168_clk_init(void);
+-extern void __init pxa910_clk_init(void);
+-extern void __init mmp2_clk_init(void);
+diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+index a70b5530bd42..c8914ef21f7f 100644
+--- a/arch/arm/mach-mmp/mmp2.c
++++ b/arch/arm/mach-mmp/mmp2.c
+@@ -9,6 +9,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
++#include <linux/clk/mmp.h>
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+@@ -111,7 +112,9 @@ static int __init mmp2_init(void)
+ 		mfp_init_base(MFPR_VIRT_BASE);
+ 		mfp_init_addr(mmp2_addr_map);
+ 		pxa_init_dma(IRQ_MMP2_DMA_RIQ, 16);
+-		mmp2_clk_init();
++		mmp2_clk_init(APB_PHYS_BASE + 0x50000,
++			      AXI_PHYS_BASE + 0x82800,
++			      APB_PHYS_BASE + 0x15000);
+ 	}
+ 
+ 	return 0;
+diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+index 144e997624c0..53f21554ae63 100644
+--- a/arch/arm/mach-mmp/pxa168.c
++++ b/arch/arm/mach-mmp/pxa168.c
+@@ -13,6 +13,7 @@
+ #include <linux/list.h>
+ #include <linux/io.h>
+ #include <linux/clk.h>
++#include <linux/clk/mmp.h>
+ #include <linux/platform_device.h>
+ #include <linux/platform_data/mv_usb.h>
+ 
+@@ -56,7 +57,9 @@ static int __init pxa168_init(void)
+ 		mfp_init_base(MFPR_VIRT_BASE);
+ 		mfp_init_addr(pxa168_mfp_addr_map);
+ 		pxa_init_dma(IRQ_PXA168_DMA_INT0, 32);
+-		pxa168_clk_init();
++		pxa168_clk_init(APB_PHYS_BASE + 0x50000,
++				AXI_PHYS_BASE + 0x82800,
++				APB_PHYS_BASE + 0x15000);
+ 	}
+ 
+ 	return 0;
+diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
+index eb57ee196842..545404261327 100644
+--- a/arch/arm/mach-mmp/pxa910.c
++++ b/arch/arm/mach-mmp/pxa910.c
+@@ -7,6 +7,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
++#include <linux/clk/mmp.h>
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+@@ -97,7 +98,10 @@ static int __init pxa910_init(void)
+ 		mfp_init_base(MFPR_VIRT_BASE);
+ 		mfp_init_addr(pxa910_mfp_addr_map);
+ 		pxa_init_dma(IRQ_PXA910_DMA_INT0, 32);
+-		pxa910_clk_init();
++		pxa910_clk_init(APB_PHYS_BASE + 0x50000,
++				AXI_PHYS_BASE + 0x82800,
++				APB_PHYS_BASE + 0x15000,
++				APB_PHYS_BASE + 0x3b000);
+ 	}
+ 
+ 	return 0;
+diff --git a/drivers/clk/mmp/clk-mmp2.c b/drivers/clk/mmp/clk-mmp2.c
+index 5c90a4230fa3..f7504085e4a7 100644
+--- a/drivers/clk/mmp/clk-mmp2.c
++++ b/drivers/clk/mmp/clk-mmp2.c
+@@ -16,8 +16,6 @@
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ 
+-#include <mach/addr-map.h>
+-
+ #include "clk.h"
+ 
+ #define APBC_RTC	0x0
+@@ -75,7 +73,8 @@ static const char *sdh_parent[] = {"pll1_4", "pll2", "usb_pll", "pll1"};
+ static const char *disp_parent[] = {"pll1", "pll1_16", "pll2", "vctcxo"};
+ static const char *ccic_parent[] = {"pll1_2", "pll1_16", "vctcxo"};
+ 
+-void __init mmp2_clk_init(void)
++void __init mmp2_clk_init(phys_addr_t mpmu_phys, phys_addr_t apmu_phys,
++			  phys_addr_t apbc_phys)
+ {
+ 	struct clk *clk;
+ 	struct clk *vctcxo;
+@@ -83,19 +82,19 @@ void __init mmp2_clk_init(void)
+ 	void __iomem *apmu_base;
+ 	void __iomem *apbc_base;
+ 
+-	mpmu_base = ioremap(APB_PHYS_BASE + 0x50000, SZ_4K);
++	mpmu_base = ioremap(mpmu_phys, SZ_4K);
+ 	if (mpmu_base == NULL) {
+ 		pr_err("error to ioremap MPMU base\n");
+ 		return;
+ 	}
+ 
+-	apmu_base = ioremap(AXI_PHYS_BASE + 0x82800, SZ_4K);
++	apmu_base = ioremap(apmu_phys, SZ_4K);
+ 	if (apmu_base == NULL) {
+ 		pr_err("error to ioremap APMU base\n");
+ 		return;
+ 	}
+ 
+-	apbc_base = ioremap(APB_PHYS_BASE + 0x15000, SZ_4K);
++	apbc_base = ioremap(apbc_phys, SZ_4K);
+ 	if (apbc_base == NULL) {
+ 		pr_err("error to ioremap APBC base\n");
+ 		return;
+diff --git a/drivers/clk/mmp/clk-pxa168.c b/drivers/clk/mmp/clk-pxa168.c
+index 93e967c0f972..323804f39094 100644
+--- a/drivers/clk/mmp/clk-pxa168.c
++++ b/drivers/clk/mmp/clk-pxa168.c
+@@ -16,8 +16,6 @@
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ 
+-#include <mach/addr-map.h>
+-
+ #include "clk.h"
+ 
+ #define APBC_RTC	0x28
+@@ -66,7 +64,8 @@ static const char *disp_parent[] = {"pll1_2", "pll1_12"};
+ static const char *ccic_parent[] = {"pll1_2", "pll1_12"};
+ static const char *ccic_phy_parent[] = {"pll1_6", "pll1_12"};
+ 
+-void __init pxa168_clk_init(void)
++void __init pxa168_clk_init(phys_addr_t mpmu_phys, phys_addr_t apmu_phys,
++			    phys_addr_t apbc_phys)
+ {
+ 	struct clk *clk;
+ 	struct clk *uart_pll;
+@@ -74,19 +73,19 @@ void __init pxa168_clk_init(void)
+ 	void __iomem *apmu_base;
+ 	void __iomem *apbc_base;
+ 
+-	mpmu_base = ioremap(APB_PHYS_BASE + 0x50000, SZ_4K);
++	mpmu_base = ioremap(mpmu_phys, SZ_4K);
+ 	if (mpmu_base == NULL) {
+ 		pr_err("error to ioremap MPMU base\n");
+ 		return;
+ 	}
+ 
+-	apmu_base = ioremap(AXI_PHYS_BASE + 0x82800, SZ_4K);
++	apmu_base = ioremap(apmu_phys, SZ_4K);
+ 	if (apmu_base == NULL) {
+ 		pr_err("error to ioremap APMU base\n");
+ 		return;
+ 	}
+ 
+-	apbc_base = ioremap(APB_PHYS_BASE + 0x15000, SZ_4K);
++	apbc_base = ioremap(apbc_phys, SZ_4K);
+ 	if (apbc_base == NULL) {
+ 		pr_err("error to ioremap APBC base\n");
+ 		return;
+diff --git a/drivers/clk/mmp/clk-pxa910.c b/drivers/clk/mmp/clk-pxa910.c
+index 993abcdb32cc..2e723d44e5c7 100644
+--- a/drivers/clk/mmp/clk-pxa910.c
++++ b/drivers/clk/mmp/clk-pxa910.c
+@@ -16,8 +16,6 @@
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ 
+-#include <mach/addr-map.h>
+-
+ #include "clk.h"
+ 
+ #define APBC_RTC	0x28
+@@ -64,7 +62,8 @@ static const char *disp_parent[] = {"pll1_2", "pll1_12"};
+ static const char *ccic_parent[] = {"pll1_2", "pll1_12"};
+ static const char *ccic_phy_parent[] = {"pll1_6", "pll1_12"};
+ 
+-void __init pxa910_clk_init(void)
++void __init pxa910_clk_init(phys_addr_t mpmu_phys, phys_addr_t apmu_phys,
++			    phys_addr_t apbc_phys, phys_addr_t apbcp_phys)
+ {
+ 	struct clk *clk;
+ 	struct clk *uart_pll;
+@@ -73,25 +72,25 @@ void __init pxa910_clk_init(void)
+ 	void __iomem *apbcp_base;
+ 	void __iomem *apbc_base;
+ 
+-	mpmu_base = ioremap(APB_PHYS_BASE + 0x50000, SZ_4K);
++	mpmu_base = ioremap(mpmu_phys, SZ_4K);
+ 	if (mpmu_base == NULL) {
+ 		pr_err("error to ioremap MPMU base\n");
+ 		return;
+ 	}
+ 
+-	apmu_base = ioremap(AXI_PHYS_BASE + 0x82800, SZ_4K);
++	apmu_base = ioremap(apmu_phys, SZ_4K);
+ 	if (apmu_base == NULL) {
+ 		pr_err("error to ioremap APMU base\n");
+ 		return;
+ 	}
+ 
+-	apbcp_base = ioremap(APB_PHYS_BASE + 0x3b000, SZ_4K);
++	apbcp_base = ioremap(apbcp_phys, SZ_4K);
+ 	if (apbcp_base == NULL) {
+ 		pr_err("error to ioremap APBC extension base\n");
+ 		return;
+ 	}
+ 
+-	apbc_base = ioremap(APB_PHYS_BASE + 0x15000, SZ_4K);
++	apbc_base = ioremap(apbc_phys, SZ_4K);
+ 	if (apbc_base == NULL) {
+ 		pr_err("error to ioremap APBC base\n");
+ 		return;
+diff --git a/include/linux/clk/mmp.h b/include/linux/clk/mmp.h
+new file mode 100644
+index 000000000000..607321fa2c2b
+--- /dev/null
++++ b/include/linux/clk/mmp.h
+@@ -0,0 +1,17 @@
++#ifndef __CLK_MMP_H
++#define __CLK_MMP_H
 +
- 	cp_access = xscale_cp_access_read() & ~3;
- 	xscale_cp_access_write(cp_access | 1);
- 
-diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-index e7a81cebbb2e..40140984db0a 100644
---- a/arch/arm/mm/idmap.c
-+++ b/arch/arm/mm/idmap.c
-@@ -86,7 +86,8 @@ static void identity_mapping_add(pgd_t *pgd, const char *text_start,
- 
- 	prot |= PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AF;
- 
--	if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
-+	if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ &&
-+	    !cpu_is_xscale() && !cpu_is_xsc3())
- 		prot |= PMD_BIT4;
- 
- 	pgd += pgd_index(addr);
++#include <linux/types.h>
++
++extern void pxa168_clk_init(phys_addr_t mpmu_phys,
++			    phys_addr_t apmu_phys,
++			    phys_addr_t apbc_phys);
++extern void pxa910_clk_init(phys_addr_t mpmu_phys,
++			    phys_addr_t apmu_phys,
++			    phys_addr_t apbc_phys,
++			    phys_addr_t apbcp_phys);
++extern void mmp2_clk_init(phys_addr_t mpmu_phys,
++			  phys_addr_t apmu_phys,
++			  phys_addr_t apbc_phys);
++
++#endif
 -- 
 2.1.0.rc2
