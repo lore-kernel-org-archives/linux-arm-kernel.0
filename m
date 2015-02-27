@@ -1,79 +1,135 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Fri, 27 Feb 2015 08:25:16 -0500
-Subject: [PATCH] arm64: Fix text patching logic when using fixmap
-In-Reply-To: <1424795421-26630-1-git-send-email-marc.zyngier@arm.com>
-References: <1424795421-26630-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <54F0703C.5090009@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Feb 2015 14:29:30 +0100
+Subject: [PATCH 3/8] ARM: make xscale iwmmxt code multiplatform aware
+In-Reply-To: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
+References: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
+Message-ID: <1425043775-3106827-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/2015 11:30 AM, Marc Zyngier wrote:
-> Patch 2f896d586610 ("arm64: use fixmap for text patching") changed
-> the way we patch the kernel text, using a fixmap when the kernel or
-> modules are flagged as read only.
-> 
-> Unfortunately, a flaw in the logic makes it fall over when patching
-> modules without CONFIG_DEBUG_SET_MODULE_RONX enabled:
-> 
-> [...]
-> [   32.032636] Call trace:
-> [   32.032716] [<fffffe00003da0dc>] __copy_to_user+0x2c/0x60
-> [   32.032837] [<fffffe0000099f08>] __aarch64_insn_write+0x94/0xf8
-> [   32.033027] [<fffffe000009a0a0>] aarch64_insn_patch_text_nosync+0x18/0x58
-> [   32.033200] [<fffffe000009c3ec>] ftrace_modify_code+0x58/0x84
-> [   32.033363] [<fffffe000009c4e4>] ftrace_make_nop+0x3c/0x58
-> [   32.033532] [<fffffe0000164420>] ftrace_process_locs+0x3d0/0x5c8
-> [   32.033709] [<fffffe00001661cc>] ftrace_module_init+0x28/0x34
-> [   32.033882] [<fffffe0000135148>] load_module+0xbb8/0xfc4
-> [   32.034044] [<fffffe0000135714>] SyS_finit_module+0x94/0xc4
-> [...]
-> 
-> This is triggered by the use of virt_to_page() on a module address,
-> which ends to pointing to Nowhereland if you're lucky, or corrupt
-> your precious data if not.
-> 
-> This patch fixes the logic by mimicking what is done on arm:
-> - If we're patching a module and CONFIG_DEBUG_SET_MODULE_RONX is set,
->   use vmalloc_to_page().
-> - If we're patching the kernel and CONFIG_DEBUG_RODATA is set,
->   use virt_to_page().
-> - Otherwise, use the provided address, as we can write to it directly.
-> 
-> Tested on 4.0-rc1 as a KVM guest.
-> 
-> Reported-by: Richard W.M. Jones <rjones@redhat.com>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Laura Abbott <lauraa@codeaurora.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+In a multiplatform configuration, we may end up building a kernel
+for both Marvell PJ1 and an ARMv4 CPU implementation. In that
+case, the xscale-cp0 code is built with gcc -march=armv4{,t},
+which results in a build error from the coprocessor instructions.
 
-This fixes a crash on boot in the AHCI driver experienced by a test
-Fedora Hosted arm64 kernel when running on various platforms.
+Since we know this code will only have to run on an actual xscale
+processor, we can simply build the entire file for ARMv5TE.
 
-Tested by me on AMD Seattle and confirmed fixing the issue.
+Related to this, we need to handle the iWMMXT initialization sequence
+differently during boot, to ensure we don't try to touch xscale
+specific registers on other CPUs from the xscale_cp0_init initcall.
+cpu_is_xscale() used to be hardcoded to '1' in any configuration
+that enables any XScale-compatible core, but this breaks once
+we can have a combined kernel with MMP1 and something else.
 
-Tested-by: Jon Masters <jcm@redhat.com>
+In this patch, I introduce two new macros, cpu_is_xscale()
+and cpu_is_mohawk, so we can test for all three of them in
+the iwmmxt initialization. The two existing users of
+cpu_is_xscale() are modified accordingly, but slightly
+change behavior for kernels that enable CPU_MOHAWK in combination
+with CPU_XSCALE or CPU_XSC3. Previously, these would leave
+clear PMD_BIT4 in the page tables, now they leave it untouched,
+just like we always do for kernels that enable only CPU_MOHAWK.
+Since the previous behavior was inconsistent, I assume it was
+unintentional.
 
-> ---
->  arch/arm64/kernel/insn.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 27d4864..c8eca88 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -87,8 +87,10 @@ static void __kprobes *patch_map(void *addr, int fixmap)
->  
->  	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
->  		page = vmalloc_to_page(addr);
-> -	else
-> +	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
->  		page = virt_to_page(addr);
-> +	else
-> +		return addr;
->  
->  	BUG_ON(!page);
->  	set_fixmap(fixmap, page_to_phys(page));
-> 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/include/asm/cputype.h | 27 +++++++++++++++++++++++++--
+ arch/arm/kernel/Makefile       |  1 +
+ arch/arm/kernel/xscale-cp0.c   |  6 ++++++
+ arch/arm/mm/idmap.c            |  3 ++-
+ 4 files changed, 34 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index 819777d0e91f..7bc66e22afd7 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -228,10 +228,33 @@ static inline int cpu_is_xsc3(void)
+ }
+ #endif
+ 
+-#if !defined(CONFIG_CPU_XSCALE) && !defined(CONFIG_CPU_XSC3)
++#if !defined(CONFIG_CPU_XSCALE)
+ #define	cpu_is_xscale()	0
+ #else
+-#define	cpu_is_xscale()	1
++static inline int cpu_is_xscale(void)
++{
++	unsigned int id;
++	id = read_cpuid_id() & 0xffffe000;
++
++	if ((id == 0x69052000) || (id == 0x69054000))
++		return 1;
++
++	return 0;
++}
++#endif
++
++#if !defined(CONFIG_CPU_MOHAWK)
++#define	cpu_is_mohawk()	0
++#else
++static inline int cpu_is_mohawk(void)
++{
++	unsigned int id;
++	id = read_cpuid_id() & 0xffffe000;
++
++	if (id == 0x56158000)
++
++	return 0;
++}
+ #endif
+ 
+ /*
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 902397dd1000..7840acff6cd3 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -67,6 +67,7 @@ obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+ obj-$(CONFIG_CPU_XSCALE)	+= xscale-cp0.o
+ obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
+ obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
++CFLAGS_xscale-cp0.o		+= -Wa,-march=armv5te
+ obj-$(CONFIG_CPU_PJ4)		+= pj4-cp0.o
+ obj-$(CONFIG_CPU_PJ4B)		+= pj4-cp0.o
+ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+diff --git a/arch/arm/kernel/xscale-cp0.c b/arch/arm/kernel/xscale-cp0.c
+index bdbb8853a19b..a23420fab70e 100644
+--- a/arch/arm/kernel/xscale-cp0.c
++++ b/arch/arm/kernel/xscale-cp0.c
+@@ -15,6 +15,7 @@
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <asm/thread_notify.h>
++#include <asm/cputype.h>
+ 
+ static inline void dsp_save_state(u32 *state)
+ {
+@@ -152,6 +153,11 @@ static int __init xscale_cp0_init(void)
+ {
+ 	u32 cp_access;
+ 
++	/* do not attempt to probe iwmmxt on non-xscale family CPUs */
++	if (IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM) &&
++	    !(cpu_is_xscale() || cpu_is_xsc3() || cpu_is_mohawk()))
++		return 0;
++
+ 	cp_access = xscale_cp_access_read() & ~3;
+ 	xscale_cp_access_write(cp_access | 1);
+ 
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index e7a81cebbb2e..40140984db0a 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -86,7 +86,8 @@ static void identity_mapping_add(pgd_t *pgd, const char *text_start,
+ 
+ 	prot |= PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AF;
+ 
+-	if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
++	if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ &&
++	    !cpu_is_xscale() && !cpu_is_xsc3())
+ 		prot |= PMD_BIT4;
+ 
+ 	pgd += pgd_index(addr);
+-- 
+2.1.0.rc2
