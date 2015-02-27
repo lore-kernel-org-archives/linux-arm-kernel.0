@@ -1,93 +1,26 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 27 Feb 2015 13:47:27 -0700
-Subject: [PATCH v2] qcom: scm: Add qcom_scm_set_warm_boot_addr function
-Message-ID: <1425070047-53449-1-git-send-email-lina.iyer@linaro.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 27 Feb 2015 12:49:07 -0800
+Subject: [PATCH 1/5] serial: atmel: fix error handling when
+ mctrl_gpio_init fails
+In-Reply-To: <20150227204018.GA8174@pengutronix.de>
+References: <1423751082-15888-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20150227204018.GA8174@pengutronix.de>
+Message-ID: <20150227204907.GA27277@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A core can be powered down for cpuidle or when it is hotplugged off. In
-either case, the warmboot return address would be different. Allow
-setting the warmboot address for a specific cpu, optimize and write to
-the firmware, if the address is different than the previously set
-address.
+On Fri, Feb 27, 2015 at 09:40:18PM +0100, Uwe Kleine-K?nig wrote:
+> Hello Greg,
+> 
+> probably it's just me being impatient, but I wonder about not getting
+> any feedback for the several patches I sent for drivers/tty/serial.
+> 
+> Are you just not yet in patch-collecting mode for 4.1? Although the
+> patches in this series might even be post-merge-window material.
 
-Export qcom_scm_set_warm_boot_addr function move the warm boot flags to
-implementation.
+I'm not in a patch-collecting mode for tty/serial drivers for 4.1 just
+yet, sorry, I hope to get to them next week.
 
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
----
- drivers/firmware/qcom_scm.c | 36 ++++++++++++++++++++++++++++++++++++
- include/linux/qcom_scm.h    |  5 +----
- 2 files changed, 37 insertions(+), 4 deletions(-)
+thanks,
 
-diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
-index 6e7a72b..19133ca 100644
---- a/drivers/firmware/qcom_scm.c
-+++ b/drivers/firmware/qcom_scm.c
-@@ -34,6 +34,23 @@
- #define QCOM_SCM_ERROR		-1
- #define QCOM_SCM_INTERRUPTED	1
- 
-+#define QCOM_SCM_FLAG_WARMBOOT_CPU0	0x04
-+#define QCOM_SCM_FLAG_WARMBOOT_CPU1	0x02
-+#define QCOM_SCM_FLAG_WARMBOOT_CPU2	0x10
-+#define QCOM_SCM_FLAG_WARMBOOT_CPU3	0x40
-+
-+struct scm_warmboot {
-+	int flag;
-+	void *entry;
-+};
-+
-+static struct scm_warmboot scm_flags[] = {
-+	{ .flag = QCOM_SCM_FLAG_WARMBOOT_CPU0 },
-+	{ .flag = QCOM_SCM_FLAG_WARMBOOT_CPU1 },
-+	{ .flag = QCOM_SCM_FLAG_WARMBOOT_CPU2 },
-+	{ .flag = QCOM_SCM_FLAG_WARMBOOT_CPU3 },
-+};
-+
- static DEFINE_MUTEX(qcom_scm_lock);
- 
- /**
-@@ -342,3 +359,22 @@ int qcom_scm_set_boot_addr(u32 addr, int flags)
- 			&cmd, sizeof(cmd), NULL, 0);
- }
- EXPORT_SYMBOL(qcom_scm_set_boot_addr);
-+
-+int qcom_scm_set_warm_boot_addr(void *entry, int cpu)
-+{
-+	int ret;
-+
-+	/*
-+	 * Reassign only if we are switching from hotplug entry point
-+	 * to cpuidle entry point or vice versa.
-+	 */
-+	if (entry == scm_flags[cpu].entry)
-+		return 0;
-+
-+	ret = qcom_scm_set_boot_addr(virt_to_phys(entry), scm_flags[cpu].flag);
-+	if (!ret)
-+		scm_flags[cpu].entry  = entry;
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(qcom_scm_set_warm_boot_addr);
-diff --git a/include/linux/qcom_scm.h b/include/linux/qcom_scm.h
-index 6bb84cf..fc5aae4 100644
---- a/include/linux/qcom_scm.h
-+++ b/include/linux/qcom_scm.h
-@@ -15,12 +15,9 @@
- #define QCOM_SCM_FLAG_COLDBOOT_CPU1		0x01
- #define QCOM_SCM_FLAG_COLDBOOT_CPU2		0x08
- #define QCOM_SCM_FLAG_COLDBOOT_CPU3		0x20
--#define QCOM_SCM_FLAG_WARMBOOT_CPU0		0x04
--#define QCOM_SCM_FLAG_WARMBOOT_CPU1		0x02
--#define QCOM_SCM_FLAG_WARMBOOT_CPU2		0x10
--#define QCOM_SCM_FLAG_WARMBOOT_CPU3		0x40
- 
- extern int qcom_scm_set_boot_addr(u32 addr, int flags);
-+extern int qcom_scm_set_warm_boot_addr(void *entry, int cpu);
- 
- #define QCOM_SCM_VERSION(major, minor) (((major) << 16) | ((minor) & 0xFF))
- 
--- 
-2.1.0
+greg k-h
