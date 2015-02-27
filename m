@@ -1,44 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Feb 2015 10:14:22 +0100
-Subject: [PATCH v2 2/2] hwrng: iproc-rng200 - Add Broadcom IPROC RNG driver
-In-Reply-To: <54EF9D7A.3090707@broadcom.com>
-References: <1424888184-22180-3-git-send-email-sbranden@broadcom.com>
- <4488852.TuVxKbAYde@wuerfel> <54EF9D7A.3090707@broadcom.com>
-Message-ID: <2093191.gujNGSl66k@wuerfel>
+From: vigneshr@ti.com (Vignesh R)
+Date: Fri, 27 Feb 2015 14:48:36 +0530
+Subject: [PATCH 0/2] Add support for HDQ-1W on AM43XX
+Message-ID: <1425028718-4919-1-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 26 February 2015 14:26:02 Scott Branden wrote:
-> On 15-02-26 12:15 PM, Arnd Bergmann wrote:
-> >> On 15-02-25 11:17 AM, Arnd Bergmann wrote:
-> >>> On Wednesday 25 February 2015 10:16:24 Scott Branden wrote:
-> >> This code was following examples of other open source drivers - bcm2835
-> >> and exynos both use cpu_relax.  I'll have to look into this more to
-> >> understand.
-> >>
-> >
-> > The majority of the driver apparently use udelay(10) to wait, which is
-> > not much better but at least consistent. The cpu_relax() call probably
-> > gives better throughput.
-> >
-> > I don't understand why none of the drivers actually attempts to
-> > msleep(), but that may be because the delay is much too long.
-> >
-> > Can you find out what the expected latency is for new data to
-> > become available on your hardware?
-> RNG generates at a nominal 1 Mbps.  So to generate 32 bits of data takes
-> approximately 32 us.
+Hi,
 
-The udelay(10) that the other drivers have seems about appropriate then,
-and we can independently think of a way to refine the interface.
-Please add a comment that explains the rate. Also, is there some kind
-of FIFO present in the hwrng device? If it can store close to 1ms work
-of data (1000 bits), you can just use an msleep(1) to wait for the
-pool to recover.
+This patch series adds support for HDQ-1W interface on AM43XX.
+The first patch adds hwmod entries for HDQ-1W on AM43xx.
 
-Another option would be to use usleep_range() with the exact amount
-of time to wait for, the lower bound being the minimum number of
-bytes asked for and the fifo size, the upper bound being the fifo
-size.
+The existing omap_hdq driver does not support 1-wire operations.
+The second patch enables 1-wire support in the omap_hdq driver. Support
+to Search ROM addresses and automatically load slave drivers is added
+for 1-wire mode.
 
-	Arnd
+I have tested this on am437x-gp-evm using DS18B20 as 1-wire slave.
+
+Poddar, Sourav (1):
+  ARM: OMAP2: hwmod: AM43XX: Add hwmod support for HDQ-1W
+
+Vignesh R (1):
+  w1: masters: omap_hdq: Add support for 1-wire mode
+
+ Documentation/devicetree/bindings/w1/omap-hdq.txt |   7 +-
+ Documentation/w1/masters/omap-hdq                 |   6 +
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c        |  36 ++++
+ arch/arm/mach-omap2/prcm43xx.h                    |   1 +
+ drivers/w1/masters/omap_hdq.c                     | 209 ++++++++++++++++++----
+ 5 files changed, 225 insertions(+), 34 deletions(-)
+
+-- 
+1.9.1
