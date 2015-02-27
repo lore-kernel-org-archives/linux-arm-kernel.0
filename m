@@ -1,25 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 Feb 2015 13:25:42 +0100
-Subject: [PATCH 05/10] ARM: realview: remove private barrier implementation
-In-Reply-To: <1424967068-261464-2-git-send-email-arnd@arndb.de>
-References: <1424967068-261464-1-git-send-email-arnd@arndb.de>
- <1424967068-261464-2-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdZEhg4idM3GxELcKFSbLVzcH2jrd3My359XjzOYh+xLyQ@mail.gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Fri, 27 Feb 2015 07:42:30 -0500
+Subject: [PATCH V4 0/6] RCU get_user_pages_fast and __get_user_pages_fast
+In-Reply-To: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
+References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <54F06636.6080905@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 5:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On 09/26/2014 10:03 AM, Steve Capper wrote:
 
-> The realview barrier implementation tries to avoid calling outer_sync in order
-> to not lock up as a result of a bug in the l220 cache controller.
->
-> This gets in the way of the multiplatform support, but we can still remove
-> it if we make sure that the outer_sync function never gets called, by replacing
-> the function pointer with NULL, right after initialization.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> This series implements general forms of get_user_pages_fast and
+> __get_user_pages_fast in core code and activates them for arm and arm64.
+> 
+> These are required for Transparent HugePages to function correctly, as
+> a futex on a THP tail will otherwise result in an infinite loop (due to
+> the core implementation of __get_user_pages_fast always returning 0).
+> 
+> Unfortunately, a futex on THP tail can be quite common for certain
+> workloads; thus THP is unreliable without a __get_user_pages_fast
+> implementation.
+> 
+> This series may also be beneficial for direct-IO heavy workloads and
+> certain KVM workloads.
+> 
+> I appreciate that the merge window is coming very soon, and am posting
+> this revision on the off-chance that it gets the nod for 3.18. (The changes
+> thus far have been minimal and the feedback I've got has been mainly
+> positive).
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Head's up: these patches are currently implicated in a rare-to-trigger
+hang that we are seeing on an internal kernel. An extensive effort is
+underway to confirm whether these are the cause. Will followup.
 
-Yours,
-Linus Walleij
+Jon.
