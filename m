@@ -1,53 +1,61 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Feb 2015 21:14:33 +0000
-Subject: [PATCH 3/4] clk: Provide always-on clock support
+Date: Fri, 27 Feb 2015 21:14:34 +0000
+Subject: [PATCH 4/4] clk: dt: Introduce binding for always-on clock support
 In-Reply-To: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
 References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1425071674-16995-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1425071674-16995-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lots of platforms contain clocks which if turned off would prove fatal.
-The only way to recover from these catastrophic failures is to restart
-the board(s).  Now, when a clock is registered with the framework it is
-compared against a list of provided always-on clock names which must be
-kept ungated.  If it matches, we enable the existing CLK_IGNORE_UNUSED
-flag, which will prevent the common clk framework from attempting to
-gate it during the clk_disable_unused() procedure.
-
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/clk/clk.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ .../devicetree/bindings/clock/clock-bindings.txt   | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 61c3fc5..3aab75e 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2856,6 +2856,9 @@ int of_clk_add_provider(struct device_node *np,
- 			void *data)
- {
- 	struct of_clk_provider *cp;
-+	struct property *prop;
-+	struct clk *clk;
-+	const char *clkname;
- 	int ret;
+diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+index 06fc6d5..ad17121 100644
+--- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
++++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+@@ -44,6 +44,40 @@ For example:
+   clocks by index. The names should reflect the clock output signal
+   names for the device.
  
- 	cp = kzalloc(sizeof(struct of_clk_provider), GFP_KERNEL);
-@@ -2875,6 +2878,14 @@ int of_clk_add_provider(struct device_node *np,
- 	if (ret < 0)
- 		of_clk_del_provider(np);
- 
-+	of_property_for_each_string(np, "clock-always-on", prop, clkname) {
-+		clk = __clk_lookup(clkname);
-+		if (!clk)
-+			continue;
++clock-always-on:    Some hardware contains bunches of clocks which must never be
++		    turned off.  If drivers a) fail to obtain a reference to any
++		    of these or b) give up a previously obtained reference
++		    during suspend, the common clk framework will attempt to
++		    disable them and a platform can fail irrecoverably as a
++		    result.  Usually the only way to recover from these failures
++		    is to reboot.
 +
-+		clk->core->flags |= CLK_IGNORE_UNUSED;
-+	}
++		    To avoid either of these two scenarios from catastrophically
++		    disabling an otherwise perfectly healthy running system,
++		    clocks can be identified as always-on using this property
++		    from inside a clocksource's node.  The CLK_IGNORE_UNUSED
++		    flag will be applied to each clock instance named in this
++		    property, thus preventing them from being shut down by the
++		    framework.
 +
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(of_clk_add_provider);
++		    This property is not to be abused.  It is only to be used to
++		    protect platforms from being crippled by gated clocks, not
++		    as a convenience function to avoid using the framework
++		    correctly inside device drivers.
++
++For example:
++
++    oscillator {
++        #clock-cells = <1>;
++        clock-output-names = "ckil", "ckih";
++        clock-always-on = "ckil";
++    };
++
++- this node defines a device with two clock outputs, just as in the
++  example above.  The only difference being that 'ckil' is now
++  identified as an always-on clock, so the framework will know to
++  never attempt to gate it.
++
+ clock-indices:	   If the identifying number for the clocks in the node
+ 		   is not linear from zero, then this allows the mapping of
+ 		   identifiers into the clock-output-names array.
 -- 
 1.9.1
