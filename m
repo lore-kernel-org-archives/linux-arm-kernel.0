@@ -1,168 +1,74 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 27 Feb 2015 16:04:52 -0700
-Subject: [PATCH 3/5] coresight: Adding coresight support for arm64 architecture
+Date: Fri, 27 Feb 2015 16:04:54 -0700
+Subject: [PATCH 5/5] coresight-stm: Bindings for System Trace Macrocell
 In-Reply-To: <1425078294-13059-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1425078294-13059-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1425078294-13059-4-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1425078294-13059-6-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most CoreSight blocks are 64-bit ready.  As such move configuration
-entries from "arch/arm/Kconfig.config" to the driver's subdirectory
-and source the newly created Kconfig from architecture specific
-Kconfig.debug files.
+The System Trace Macrocell (STM) is an IP block falling under the
+CoreSight umbrella.  It's main purpose it so expose stimulus channels
+to any system component for the purpose of information logging.
+
+Bindings for this IP block adds a couple of items to the current
+mandatory definition for CoreSight components.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/Kconfig.debug    | 55 +-----------------------------------------
- arch/arm64/Kconfig.debug  |  2 ++
- drivers/coresight/Kconfig | 61 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 64 insertions(+), 54 deletions(-)
- create mode 100644 drivers/coresight/Kconfig
+ .../devicetree/bindings/arm/coresight.txt          | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 970de7518341..8d14ad4e1db0 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1610,59 +1610,6 @@ config DEBUG_SET_MODULE_RONX
- 	  against certain classes of kernel exploits.
- 	  If in doubt, say "N".
+diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+index a3089359aaa6..648d50024429 100644
+--- a/Documentation/devicetree/bindings/arm/coresight.txt
++++ b/Documentation/devicetree/bindings/arm/coresight.txt
+@@ -17,6 +17,7 @@ its hardware characteristcs.
+ 		- "arm,coresight-tmc", "arm,primecell";
+ 		- "arm,coresight-funnel", "arm,primecell";
+ 		- "arm,coresight-etm3x", "arm,primecell";
++		- "arm,coresight-stm", "arm,primecell"; [1]
  
--menuconfig CORESIGHT
--	bool "CoreSight Tracing Support"
--	select ARM_AMBA
--	help
--	  This framework provides a kernel interface for the CoreSight debug
--	  and trace drivers to register themselves with. It's intended to build
--	  a topological view of the CoreSight components based on a DT
--	  specification and configure the right serie of components when a
--	  trace source gets enabled.
--
--if CORESIGHT
--config CORESIGHT_LINKS_AND_SINKS
--	bool "CoreSight Link and Sink drivers"
--	help
--	  This enables support for CoreSight link and sink drivers that are
--	  responsible for transporting and collecting the trace data
--	  respectively.  Link and sinks are dynamically aggregated with a trace
--	  entity at run time to form a complete trace path.
--
--config CORESIGHT_LINK_AND_SINK_TMC
--	bool "Coresight generic TMC driver"
--	depends on CORESIGHT_LINKS_AND_SINKS
--	help
--	  This enables support for the Trace Memory Controller driver.  Depending
--	  on its configuration the device can act as a link (embedded trace router
--	  - ETR) or sink (embedded trace FIFO).  The driver complies with the
--	  generic implementation of the component without special enhancement or
--	  added features.
--
--config CORESIGHT_SINK_TPIU
--	bool "Coresight generic TPIU driver"
--	depends on CORESIGHT_LINKS_AND_SINKS
--	help
--	  This enables support for the Trace Port Interface Unit driver, responsible
--	  for bridging the gap between the on-chip coresight components and a trace
--	  port collection engine, typically connected to an external host for use
--	  case capturing more traces than the on-board coresight memory can handle.
--
--config CORESIGHT_SINK_ETBV10
--	bool "Coresight ETBv1.0 driver"
--	depends on CORESIGHT_LINKS_AND_SINKS
--	help
--	  This enables support for the Embedded Trace Buffer version 1.0 driver
--	  that complies with the generic implementation of the component without
--	  special enhancement or added features.
-+source "drivers/coresight/Kconfig"
+ 	* reg: physical base address and length of the register
+ 	  set(s) of the component.
+@@ -31,6 +32,14 @@ its hardware characteristcs.
+ 	  layout using the generic DT graph presentation found in
+ 	  "bindings/graph.txt".
  
--config CORESIGHT_SOURCE_ETM3X
--	bool "CoreSight Embedded Trace Macrocell 3.x driver"
--	select CORESIGHT_LINKS_AND_SINKS
--	help
--	  This driver provides support for processor ETM3.x and PTM1.x modules,
--	  which allows tracing the instructions that a processor is executing
--	  This is primarily useful for instruction level tracing.  Depending
--	  the ETM version data tracing may also be available.
--endif
- endmenu
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index 4a8741073c90..5b2ffd8e6cdb 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -89,4 +89,6 @@ config DEBUG_ALIGN_RODATA
++* Additional required properties for System Trace Macrocells (STM):
++	* reg: along with the physical base address and length of the register
++	  set as described above, another entry is required to describe the
++	  mapping of the extended stimulus port area.
++
++	* reg-names: the only acceptable values are "stm-base" and
++	  "stm-stimulus-base", each corresponding to the areas defined in "reg".
++
+ * Required properties for devices that don't show up on the AMBA bus, such as
+   non-configurable replicators:
  
- 	  If in doubt, say N
- 
-+source "drivers/coresight/Kconfig"
+@@ -198,3 +207,22 @@ Example:
+ 			};
+ 		};
+ 	};
 +
- endmenu
-diff --git a/drivers/coresight/Kconfig b/drivers/coresight/Kconfig
-new file mode 100644
-index 000000000000..fc1f1ae7a49d
---- /dev/null
-+++ b/drivers/coresight/Kconfig
-@@ -0,0 +1,61 @@
-+#
-+# Coresight configuration
-+#
-+menuconfig CORESIGHT
-+	bool "CoreSight Tracing Support"
-+	select ARM_AMBA
-+	help
-+	  This framework provides a kernel interface for the CoreSight debug
-+	  and trace drivers to register themselves with. It's intended to build
-+	  a topological view of the CoreSight components based on a DT
-+	  specification and configure the right serie of components when a
-+	  trace source gets enabled.
++4. STM
++	stm at 20100000 {
++		compatible = "arm,coresight-stm", "arm,primecell";
++		reg = <0 0x20100000 0 0x1000>,
++		      <0 0x28000000 0 0x180000>;
++		reg-names = "stm-base", "stm-stimulus-base";
 +
-+if CORESIGHT
-+config CORESIGHT_LINKS_AND_SINKS
-+	bool "CoreSight Link and Sink drivers"
-+	help
-+	  This enables support for CoreSight link and sink drivers that are
-+	  responsible for transporting and collecting the trace data
-+	  respectively.  Link and sinks are dynamically aggregated with a trace
-+	  entity at run time to form a complete trace path.
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			stm_out_port: endpoint {
++				remote-endpoint = <&main_funnel_in_port2>;
++			};
++		};
++	};
 +
-+config CORESIGHT_LINK_AND_SINK_TMC
-+	bool "Coresight generic TMC driver"
-+	depends on CORESIGHT_LINKS_AND_SINKS
-+	help
-+	  This enables support for the Trace Memory Controller driver.
-+	  Depending on its configuration the device can act as a link (embedded
-+	  trace router - ETR) or sink (embedded trace FIFO).  The driver
-+	  complies with the generic implementation of the component without
-+	  special enhancement or added features.
-+
-+config CORESIGHT_SINK_TPIU
-+	bool "Coresight generic TPIU driver"
-+	depends on CORESIGHT_LINKS_AND_SINKS
-+	help
-+	  This enables support for the Trace Port Interface Unit driver,
-+	  responsible for bridging the gap between the on-chip coresight
-+	  components and a trace for bridging the gap between the on-chip
-+	  coresight components and a trace port collection engine, typically
-+	  connected to an external host for use case capturing more traces than
-+	  the on-board coresight memory can handle.
-+
-+config CORESIGHT_SINK_ETBV10
-+	bool "Coresight ETBv1.0 driver"
-+	depends on CORESIGHT_LINKS_AND_SINKS
-+	help
-+	  This enables support for the Embedded Trace Buffer version 1.0 driver
-+	  that complies with the generic implementation of the component without
-+	  special enhancement or added features.
-+
-+config CORESIGHT_SOURCE_ETM3X
-+	bool "CoreSight Embedded Trace Macrocell 3.x driver"
-+	depends on !ARM64
-+	select CORESIGHT_LINKS_AND_SINKS
-+	help
-+	  This driver provides support for processor ETM3.x and PTM1.x modules,
-+	  which allows tracing the instructions that a processor is executing
-+	  This is primarily useful for instruction level tracing.  Depending
-+	  the ETM version data tracing may also be available.
-+endif
++[1]. There is currently two version of STM: STM32 and STM500.  Both
++have the same HW interface and as such don't need an explicit binding name.
 -- 
 1.9.1
