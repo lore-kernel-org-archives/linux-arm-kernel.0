@@ -1,67 +1,63 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 27 Feb 2015 23:13:57 +0100
-Subject: [PATCH] genirq / PM: Add flag for shared NO_SUSPEND interrupt
- lines
-In-Reply-To: <20150227083859.GD21418@twins.programming.kicks-ass.net>
-References: <1424771762-16343-1-git-send-email-boris.brezillon@free-electrons.com>
- <6864616.1aRDSmSsvx@vostro.rjw.lan>
- <20150227083859.GD21418@twins.programming.kicks-ass.net>
-Message-ID: <1968084.K4YyaeZfBq@vostro.rjw.lan>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 27 Feb 2015 21:51:20 +0000
+Subject: [PATCH 3/4] clk: Provide always-on clock support
+In-Reply-To: <1425071674-16995-4-git-send-email-lee.jones@linaro.org>
+References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
+ <1425071674-16995-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150227215120.GC12821@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, February 27, 2015 09:38:59 AM Peter Zijlstra wrote:
-> On Fri, Feb 27, 2015 at 12:07:55AM +0100, Rafael J. Wysocki wrote:
-> > From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> > 
-> > It currently is required that all users of NO_SUSPEND interrupt
-> > lines pass the IRQF_NO_SUSPEND flag when requesting the IRQ or the
-> > WARN_ON_ONCE() in irq_pm_install_action() will trigger.  That is
-> > done to warn about situations in which unprepared interrupt handlers
-> > may be run unnecessarily for suspended devices and may attempt to
-> > access those devices by mistake.  However, it may cause drivers
-> > that have no technical reasons for using IRQF_NO_SUSPEND to set
-> > that flag just because they happen to share the interrupt line
-> > with something like a timer.
-> > 
-> > Moreover, the generic handling of wakeup interrupts introduced by
-> > commit 9ce7a25849e8 (genirq: Simplify wakeup mechanism) only works
-> > for IRQs without any NO_SUSPEND users, so the drivers of wakeup
-> > devices needing to use shared NO_SUSPEND interrupt lines for
-> > signaling system wakeup generally have to detect wakeup in their
-> > interrupt handlers.  Thus if they happen to share an interrupt line
-> > with a NO_SUSPEND user, they also need to request that their
-> > interrupt handlers be run after suspend_device_irqs().
-> > 
-> > In both cases the reason for using IRQF_NO_SUSPEND is not because
-> > the driver in question has a genuine need to run its interrupt
-> > handler after suspend_device_irqs(), but because it happens to
-> > share the line with some other NO_SUSPEND user.  Otherwise, the
-> > driver would do without IRQF_NO_SUSPEND just fine.
-> > 
-> > To make it possible to specify that condition explicitly, introduce
-> > a new IRQ action handler flag for shared IRQs, IRQF_COND_SUSPEND,
-> > that, when set, will indicate to the IRQ core that the interrupt
-> > user is generally fine with suspending the IRQ, but it also can
-> > tolerate handler invocations after suspend_device_irqs() and, in
-> > particular, it is capable of detecting system wakeup and triggering
-> > it as appropriate from its interrupt handler.
-> > 
-> > That will allow us to work around a problem with a shared timer
-> > interrupt line on at91 platforms.
-> > 
-> > Link: http://marc.info/?l=linux-kernel&m=142252777602084&w=2
-> > Link: http://marc.info/?t=142252775300011&r=1&w=2
-> > Linx: https://lkml.org/lkml/2014/12/15/552
-> > Reported-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+On Fri, 27 Feb 2015, Lee Jones wrote:
+
+> Lots of platforms contain clocks which if turned off would prove fatal.
+> The only way to recover from these catastrophic failures is to restart
+> the board(s).  Now, when a clock is registered with the framework it is
+> compared against a list of provided always-on clock names which must be
+> kept ungated.  If it matches, we enable the existing CLK_IGNORE_UNUSED
+> flag, which will prevent the common clk framework from attempting to
+> gate it during the clk_disable_unused() procedure.
 > 
-> Seems good to me. Should I take this through tip/irq ?
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/clk/clk.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 61c3fc5..3aab75e 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -2856,6 +2856,9 @@ int of_clk_add_provider(struct device_node *np,
+>  			void *data)
+>  {
+>  	struct of_clk_provider *cp;
+> +	struct property *prop;
+> +	struct clk *clk;
+> +	const char *clkname;
+>  	int ret;
+>  
+>  	cp = kzalloc(sizeof(struct of_clk_provider), GFP_KERNEL);
+> @@ -2875,6 +2878,14 @@ int of_clk_add_provider(struct device_node *np,
+>  	if (ret < 0)
+>  		of_clk_del_provider(np);
+>  
+> +	of_property_for_each_string(np, "clock-always-on", prop, clkname) {
+> +		clk = __clk_lookup(clkname);
+> +		if (!clk)
+> +			continue;
+> +
+> +		clk->core->flags |= CLK_IGNORE_UNUSED;
 
-I can apply it along with the previous IRQF_NO_SUSPEND documentation patch
-from Mark Rutland if you ACK it for me. :-)
+Might save a few cycles by breaking here.
 
-> Also, should we warn if people use enable_irq_wake() where there is only
-> a single descriptor with NO_SUSPEND?
+> +	}
+> +
+>  	return ret;
+>  }
+>  EXPORT_SYMBOL_GPL(of_clk_add_provider);
 
-We probably should do that, but that would be a separate patch IMO?
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
