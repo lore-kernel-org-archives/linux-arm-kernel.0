@@ -1,119 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Feb 2015 14:29:27 +0100
-Subject: [PATCH 0/8] ARM: MMP multiplatform support
-Message-ID: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
+Date: Fri, 27 Feb 2015 14:29:31 +0100
+Subject: [PATCH 4/8] ARM: mohawk: allow building with MMU disabled
+In-Reply-To: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
+References: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
+Message-ID: <1425043775-3106827-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+It is in principle possible to build an MMP kernel for
+the mohawk CPU with the MMU code disabled, except for one
+simple build error:
 
-I'd like to finally move MMP into ARCH_MULTIPLATFORM, and this is the
-surprisingly small patch set that we need in order to do this.
+proc-mohawk.S:345: Error: invalid operands (*UND* and *UND* sections) for `|'
+proc-mohawk.S:345: Error: invalid operands (*ABS* and *UND* sections) for `|'
+proc-mohawk.S:345: Error: invalid operands (*UND* and *UND* sections) for `|'
+proc-mohawk.S:345: Error: invalid operands (*UND* and *UND* sections) for `|'
+proc-mohawk.S:345: Error: undefined symbol L_PTE_USER used as an immediate value
 
-Rob Herring has done some related work already, and we need his RTC
-driver changes to also get merged in order for this to work, see also
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/391410
+This patch changes the proc-mohawk code to do the same as the
+other CPUs and not try to actually do anything for the
+cpu_mohawk_set_pte_ext function, which won't be used anyway.
 
-Please review and test if you can.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mm/proc-mohawk.S | 2 ++
+ 1 file changed, 2 insertions(+)
 
-	Arnd
-
-Arnd Bergmann (8):
-  mtd: nand: pxa3xx: disable DMA support on MMP
-  clk: mmp: stop using platform headers
-  ARM: make xscale iwmmxt code multiplatform aware
-  ARM: mohawk: allow building with MMU disabled
-  ARM: mmp: remove remaining legacy pxa-dma support
-  ARM: mmp: make all header files local
-  ARM: mmp: make plat-pxa build standalone
-  ARM: mmp: move into ARCH_MULTIPLATFORM
-
- arch/arm/Kconfig                                   | 15 --------
- arch/arm/include/asm/cputype.h                     | 27 ++++++++++++-
- arch/arm/kernel/Makefile                           |  1 +
- arch/arm/kernel/xscale-cp0.c                       |  6 +++
- arch/arm/mach-mmp/Kconfig                          | 36 +++++++++++++----
- arch/arm/mach-mmp/Makefile                         |  1 +
- arch/arm/mach-mmp/{include/mach => }/addr-map.h    |  2 -
- arch/arm/mach-mmp/aspenite.c                       |  8 ++--
- arch/arm/mach-mmp/avengers_lite.c                  |  8 ++--
- arch/arm/mach-mmp/brownstone.c                     |  8 ++--
- arch/arm/mach-mmp/clock-mmp2.c                     |  6 ++-
- arch/arm/mach-mmp/clock-pxa168.c                   |  6 ++-
- arch/arm/mach-mmp/clock-pxa910.c                   |  6 ++-
- arch/arm/mach-mmp/clock.c                          |  2 +-
- arch/arm/mach-mmp/clock.h                          |  2 -
- arch/arm/mach-mmp/common.c                         |  4 +-
- arch/arm/mach-mmp/common.h                         |  3 --
- arch/arm/mach-mmp/{include/mach => }/cputype.h     |  0
- arch/arm/mach-mmp/devices.c                        |  8 ++--
- arch/arm/mach-mmp/{include/mach => }/devices.h     |  0
- arch/arm/mach-mmp/flint.c                          |  8 ++--
- arch/arm/mach-mmp/gplugd.c                         |  6 +--
- arch/arm/mach-mmp/include/mach/dma.h               | 13 -------
- arch/arm/mach-mmp/include/mach/hardware.h          |  4 --
- arch/arm/mach-mmp/include/mach/regs-smc.h          | 37 ------------------
- arch/arm/mach-mmp/include/mach/uncompress.h        | 45 ----------------------
- arch/arm/mach-mmp/{include/mach => }/irqs.h        |  0
- arch/arm/mach-mmp/jasper.c                         |  8 ++--
- arch/arm/mach-mmp/{include/mach => }/mfp-mmp2.h    |  2 +-
- arch/arm/mach-mmp/{include/mach => }/mfp-pxa168.h  |  2 +-
- arch/arm/mach-mmp/{include/mach => }/mfp-pxa910.h  |  2 +-
- arch/arm/mach-mmp/{include/mach => }/mfp.h         |  0
- arch/arm/mach-mmp/mmp2.c                           | 23 +++++------
- arch/arm/mach-mmp/{include/mach => }/mmp2.h        |  3 +-
- arch/arm/mach-mmp/pm-mmp2.c                        | 12 +++---
- arch/arm/mach-mmp/{include/mach => }/pm-mmp2.h     |  2 +-
- arch/arm/mach-mmp/pm-pxa910.c                      | 12 +++---
- arch/arm/mach-mmp/{include/mach => }/pm-pxa910.h   |  0
- arch/arm/mach-mmp/pxa168.c                         | 29 +++++++-------
- arch/arm/mach-mmp/{include/mach => }/pxa168.h      |  5 ++-
- arch/arm/mach-mmp/pxa910.c                         | 24 ++++++------
- arch/arm/mach-mmp/{include/mach => }/pxa910.h      |  3 +-
- arch/arm/mach-mmp/{include/mach => }/regs-apbc.h   |  4 +-
- arch/arm/mach-mmp/{include/mach => }/regs-apmu.h   |  4 +-
- arch/arm/mach-mmp/{include/mach => }/regs-icu.h    |  4 +-
- arch/arm/mach-mmp/{include/mach => }/regs-timers.h |  4 +-
- arch/arm/mach-mmp/{include/mach => }/regs-usb.h    |  0
- arch/arm/mach-mmp/tavorevb.c                       |  8 ++--
- arch/arm/mach-mmp/teton_bga.c                      | 10 ++---
- arch/arm/mach-mmp/{include/mach => }/teton_bga.h   |  2 -
- arch/arm/mach-mmp/time.c                           | 11 +++---
- arch/arm/mach-mmp/ttc_dkb.c                        | 10 ++---
- arch/arm/mm/idmap.c                                |  3 +-
- arch/arm/mm/proc-mohawk.S                          |  2 +
- arch/arm/plat-pxa/Makefile                         |  3 +-
- arch/arm/plat-pxa/ssp.c                            |  1 -
- drivers/clk/mmp/clk-mmp2.c                         | 11 +++---
- drivers/clk/mmp/clk-pxa168.c                       | 11 +++---
- drivers/clk/mmp/clk-pxa910.c                       | 13 +++----
- drivers/mtd/nand/pxa3xx_nand.c                     |  2 +-
- include/linux/clk/mmp.h                            | 17 ++++++++
- 61 files changed, 229 insertions(+), 280 deletions(-)
- rename arch/arm/mach-mmp/{include/mach => }/addr-map.h (96%)
- rename arch/arm/mach-mmp/{include/mach => }/cputype.h (100%)
- rename arch/arm/mach-mmp/{include/mach => }/devices.h (100%)
- delete mode 100644 arch/arm/mach-mmp/include/mach/dma.h
- delete mode 100644 arch/arm/mach-mmp/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-mmp/include/mach/regs-smc.h
- delete mode 100644 arch/arm/mach-mmp/include/mach/uncompress.h
- rename arch/arm/mach-mmp/{include/mach => }/irqs.h (100%)
- rename arch/arm/mach-mmp/{include/mach => }/mfp-mmp2.h (99%)
- rename arch/arm/mach-mmp/{include/mach => }/mfp-pxa168.h (99%)
- rename arch/arm/mach-mmp/{include/mach => }/mfp-pxa910.h (99%)
- rename arch/arm/mach-mmp/{include/mach => }/mfp.h (100%)
- rename arch/arm/mach-mmp/{include/mach => }/mmp2.h (99%)
- rename arch/arm/mach-mmp/{include/mach => }/pm-mmp2.h (98%)
- rename arch/arm/mach-mmp/{include/mach => }/pm-pxa910.h (100%)
- rename arch/arm/mach-mmp/{include/mach => }/pxa168.h (98%)
- rename arch/arm/mach-mmp/{include/mach => }/pxa910.h (98%)
- rename arch/arm/mach-mmp/{include/mach => }/regs-apbc.h (88%)
- rename arch/arm/mach-mmp/{include/mach => }/regs-apmu.h (91%)
- rename arch/arm/mach-mmp/{include/mach => }/regs-icu.h (96%)
- rename arch/arm/mach-mmp/{include/mach => }/regs-timers.h (93%)
- rename arch/arm/mach-mmp/{include/mach => }/regs-usb.h (100%)
- rename arch/arm/mach-mmp/{include/mach => }/teton_bga.h (92%)
- create mode 100644 include/linux/clk/mmp.h
-
+diff --git a/arch/arm/mm/proc-mohawk.S b/arch/arm/mm/proc-mohawk.S
+index df18dbd88c8a..74c0d0f7f325 100644
+--- a/arch/arm/mm/proc-mohawk.S
++++ b/arch/arm/mm/proc-mohawk.S
+@@ -342,11 +342,13 @@ ENTRY(cpu_mohawk_switch_mm)
+  */
+ 	.align	5
+ ENTRY(cpu_mohawk_set_pte_ext)
++#ifdef CONFIG_MMU
+ 	armv3_set_pte_ext
+ 	mov	r0, r0
+ 	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+ 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
+ 	ret	lr
++#endif
+ 
+ .globl	cpu_mohawk_suspend_size
+ .equ	cpu_mohawk_suspend_size, 4 * 6
 -- 
 2.1.0.rc2
