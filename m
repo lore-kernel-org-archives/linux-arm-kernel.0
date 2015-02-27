@@ -1,40 +1,104 @@
-From: linus.walleij@linaro.org (Linus Walleij)
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
 Date: Fri, 27 Feb 2015 13:24:44 +0100
-Subject: [PATCH 04/10] ARM: no longer force unbuffered DMA for realview
-In-Reply-To: <1424967068-261464-1-git-send-email-arnd@arndb.de>
-References: <1424967068-261464-1-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdZ8fR5p7PvtQhkQWFwyVK-K86R-SBU9YWr0zG0VN7ruow@mail.gmail.com>
+Subject: [PATCH v2 3/4] ARM: dts: dove: Add internal i2c multiplexer node
+In-Reply-To: <1425039885-5137-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1424199129-22099-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1425039885-5137-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1425039885-5137-4-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 5:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+This adds a i2c-mux-pinctrl node to dove.dtsi for the internal i2c
+mux found on Dove SoCs. Up to now, we had no board using any of the
+two additional i2c busses, so make sure the change does not break
+any existing boards.
 
-> Commit 42c4dafe803dca ("ARM: 6202/1: Do not ARM_DMA_MEM_BUFFERABLE
-> on RealView boards with L210/L220") changed the generic setting for
-> ARM_DMA_MEM_BUFFERABLE to be disabled on any Realview kernel that includes
-> support for any of the ARM11 variations. Doing this was required to
-> allow doing DMA without a lockup in the l2x0 cache controller on the
-> Realview platform.
->
-> Unfortunately, in a kernel that also contains support for any ARMv7
-> based machine, the same change makes it impossible to do DMA on ARMv7,
-> which gets in the way of enabling multiplatform support on Realview.
->
-> As confirmed by Catalin Marinas and Linus Walleij, the current
-> code for Realview that we have in the kernel does not actually
-> perform any DMA, and this is unlikely to change in the future.
-> Therefore we can revert 42c4dafe803dca without introducing regressions,
-> but we must never start using DMA on this platform in the future.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
+Therefore, we rename the i2c-controller node label to "i2c" and
+enable it by default. Also, the dedicated sub-bus (now "i2c0") is
+enabled by default. The two optional sub-busses require additional
+external pin-muxing, so disable them by default.
 
-The only platform that I actually got it working on was ARM PB11MPCore,
-and only for the PL011 serial port (MMC for example will never work).
-Maybe AACI works, maybe. But it's not worth the effort, so:
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Gabriel Dobato <dobatog@gmail.com>
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: linux-i2c at vger.kernel.org
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/boot/dts/dove.dtsi | 40 ++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 38 insertions(+), 2 deletions(-)
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 9ad829523a13..b3340e862b0e 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -28,6 +28,42 @@
+ 		};
+ 	};
+ 
++	i2c-mux {
++		compatible = "i2c-mux-pinctrl";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		i2c-parent = <&i2c>;
++
++		pinctrl-names = "i2c0", "i2c1", "i2c2";
++		pinctrl-0 = <&pmx_i2cmux_0>;
++		pinctrl-1 = <&pmx_i2cmux_1>;
++		pinctrl-2 = <&pmx_i2cmux_2>;
++
++		i2c0: i2c at 0 {
++			reg = <0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "okay";
++		};
++
++		i2c1: i2c at 1 {
++			reg = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			/* Requires pmx_i2c1 on i2c controller node */
++			status = "disabled";
++		};
++
++		i2c2: i2c at 2 {
++			reg = <2>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			/* Requires pmx_i2c2 on i2c controller node */
++			status = "disabled";
++		};
++	};
++
+ 	l2: l2-cache {
+ 		compatible = "marvell,tauros2-cache";
+ 		marvell,tauros2-cache-features = <0>;
+@@ -123,7 +159,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			i2c0: i2c-ctrl at 11000 {
++			i2c: i2c-ctrl at 11000 {
+ 				compatible = "marvell,mv64xxx-i2c";
+ 				reg = <0x11000 0x20>;
+ 				#address-cells = <1>;
+@@ -132,7 +168,7 @@
+ 				clock-frequency = <400000>;
+ 				timeout-ms = <1000>;
+ 				clocks = <&core_clk 0>;
+-				status = "disabled";
++				status = "okay";
+ 			};
+ 
+ 			uart0: serial at 12000 {
+-- 
+2.1.0
