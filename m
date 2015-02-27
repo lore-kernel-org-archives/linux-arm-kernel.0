@@ -1,80 +1,76 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 27 Feb 2015 09:19:54 +0100
-Subject: [PATCH v5 13/20] power_supply: Increment power supply use counter when
- obtaining references
+Date: Fri, 27 Feb 2015 09:19:46 +0100
+Subject: [PATCH v5 05/20] power_supply: 88pm860x_charger: Use power_supply_*()
+ API for accessing function attrs
 In-Reply-To: <1425025201-15926-1-git-send-email-k.kozlowski@samsung.com>
 References: <1425025201-15926-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1425025201-15926-14-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1425025201-15926-6-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Increment the power_supply.use_cnt usage counter on:
- - power_supply_get_by_phandle()
- - power_supply_get_by_name()
-and decrement it on power_supply_put() call.
-
-This helps tracking of valid usage of power supply instance by
-consumers. The usage counter itself also allows safe calling of
-power_supply_get_property-like functions even when driver unregisters
-this power supply.
+Replace direct calls to power supply function attributes with wrappers.
+Wrappers provide safe access in case of unregistering the power
+supply (e.g. by removing the driver). Replace:
+ - get_property -> power_supply_get_property
+ - set_property -> power_supply_set_property
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Acked-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
+Acked-by: Pavel Machek <pavel@ucw.cz>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Reviewed-by: Sebastian Reichel <sre@kernel.org>
 ---
- drivers/power/power_supply_core.c | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
+ drivers/power/88pm860x_charger.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
-index b4ec14683b7f..2ed4a4a6b3c5 100644
---- a/drivers/power/power_supply_core.c
-+++ b/drivers/power/power_supply_core.c
-@@ -349,10 +349,16 @@ static int power_supply_match_device_by_name(struct device *dev, const void *dat
-  */
- struct power_supply *power_supply_get_by_name(const char *name)
- {
-+	struct power_supply *psy = NULL;
- 	struct device *dev = class_find_device(power_supply_class, NULL, name,
- 					power_supply_match_device_by_name);
+diff --git a/drivers/power/88pm860x_charger.c b/drivers/power/88pm860x_charger.c
+index ac352a6c03ea..98e31419d9cf 100644
+--- a/drivers/power/88pm860x_charger.c
++++ b/drivers/power/88pm860x_charger.c
+@@ -296,12 +296,13 @@ static int set_charging_fsm(struct pm860x_charger_info *info)
+ 	psy = power_supply_get_by_name(pm860x_supplied_to[0]);
+ 	if (!psy)
+ 		return -EINVAL;
+-	ret = psy->get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &data);
++	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW,
++			&data);
+ 	if (ret)
+ 		return ret;
+ 	vbatt = data.intval / 1000;
  
--	return dev ? dev_get_drvdata(dev) : NULL;
-+	if (dev) {
-+		psy = dev_get_drvdata(dev);
-+		atomic_inc(&psy->use_cnt);
-+	}
-+
-+	return psy;
- }
- EXPORT_SYMBOL_GPL(power_supply_get_by_name);
+-	ret = psy->get_property(psy, POWER_SUPPLY_PROP_PRESENT, &data);
++	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_PRESENT, &data);
+ 	if (ret)
+ 		return ret;
  
-@@ -367,6 +373,7 @@ void power_supply_put(struct power_supply *psy)
- {
- 	might_sleep();
+@@ -430,7 +431,7 @@ static irqreturn_t pm860x_temp_handler(int irq, void *data)
+ 	psy = power_supply_get_by_name(pm860x_supplied_to[0]);
+ 	if (!psy)
+ 		goto out;
+-	ret = psy->get_property(psy, POWER_SUPPLY_PROP_TEMP, &temp);
++	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_TEMP, &temp);
+ 	if (ret)
+ 		goto out;
+ 	value = temp.intval / 10;
+@@ -485,7 +486,8 @@ static irqreturn_t pm860x_done_handler(int irq, void *data)
+ 	psy = power_supply_get_by_name(pm860x_supplied_to[0]);
+ 	if (!psy)
+ 		goto out;
+-	ret = psy->get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &val);
++	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW,
++			&val);
+ 	if (ret)
+ 		goto out;
+ 	vbatt = val.intval / 1000;
+@@ -500,7 +502,8 @@ static irqreturn_t pm860x_done_handler(int irq, void *data)
+ 	if (ret < 0)
+ 		goto out;
+ 	if (vbatt > CHARGE_THRESHOLD && ret & STATUS2_CHG)
+-		psy->set_property(psy, POWER_SUPPLY_PROP_CHARGE_FULL, &val);
++		power_supply_set_property(psy, POWER_SUPPLY_PROP_CHARGE_FULL,
++				&val);
  
-+	atomic_dec(&psy->use_cnt);
- 	put_device(&psy->dev);
- }
- EXPORT_SYMBOL_GPL(power_supply_put);
-@@ -393,6 +400,7 @@ struct power_supply *power_supply_get_by_phandle(struct device_node *np,
- 							const char *property)
- {
- 	struct device_node *power_supply_np;
-+	struct power_supply *psy = NULL;
- 	struct device *dev;
- 
- 	power_supply_np = of_parse_phandle(np, property, 0);
-@@ -404,7 +412,12 @@ struct power_supply *power_supply_get_by_phandle(struct device_node *np,
- 
- 	of_node_put(power_supply_np);
- 
--	return dev ? dev_get_drvdata(dev) : NULL;
-+	if (dev) {
-+		psy = dev_get_drvdata(dev);
-+		atomic_inc(&psy->use_cnt);
-+	}
-+
-+	return psy;
- }
- EXPORT_SYMBOL_GPL(power_supply_get_by_phandle);
- #endif /* CONFIG_OF */
+ out:
+ 	mutex_unlock(&info->lock);
 -- 
 1.9.1
