@@ -1,58 +1,141 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Feb 2015 19:53:23 +0000
-Subject: [RFC PATCH] arm64: Implement cpu_relax as yield
-In-Reply-To: <CAEgOgz6Ld3r2p=j2LnaDOo+s1WxeVkgBTG9nwFW3JSyrn6WYwA@mail.gmail.com>
-References: <1424819257-22664-1-git-send-email-peter.crosthwaite@xilinx.com>
- <20150225132437.GD12377@arm.com>
- <CAEgOgz6Ld3r2p=j2LnaDOo+s1WxeVkgBTG9nwFW3JSyrn6WYwA@mail.gmail.com>
-Message-ID: <20150227195323.GC24818@arm.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri, 27 Feb 2015 13:00:31 -0700
+Subject: [PATCH 2/2] qcom: scm: Add scm_set_warm_boot_addr function
+In-Reply-To: <7h7fv4bjcf.fsf@deeprootsystems.com>
+References: <1424904852-12719-1-git-send-email-lina.iyer@linaro.org>
+ <1424904852-12719-3-git-send-email-lina.iyer@linaro.org>
+ <7h7fv4bjcf.fsf@deeprootsystems.com>
+Message-ID: <20150227200031.GD1678@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 07:43:27PM +0000, Peter Crosthwaite wrote:
-> On Wed, Feb 25, 2015 at 5:24 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Feb 24, 2015 at 11:07:37PM +0000, Peter Crosthwaite wrote:
-> >> ARM64 has the yield nop hint which has the intended semantics of
-> >> cpu_relax. Implement.
-> >>
-> >> The immediate application is ARM CPU emulators. An emulator can take
-> >> advantage of the yield hint to de-prioritise an emulated CPU in favor
-> >> of other emulation tasks. QEMU A64 SMP emulation has yield awareness,
-> >> and sees a significant boot time performance increase with this change.
-> >
-> > Could you elaborate on the QEMU SMP boot case please? Usually SMP pens
-> > for booting make use of wfe/sev to minimise the spinning overhead.
-> >
-> 
-> So I did some follow up experiments. With my patch applied I started
-> trapping instances of cpu_relax (now yielding) in gdb. I then
-> commented out the cpu_relax's one by one.
-> 
-> This one seems to be the key:
-> 
-> diff --git a/kernel/smp.c b/kernel/smp.c
-> index f38a1e6..1c692be 100644
-> --- a/kernel/smp.c
-> +++ b/kernel/smp.c
-> @@ -108,7 +108,8 @@ void __init call_function_init(void)
->  static void csd_lock_wait(struct call_single_data *csd)
->  {
->         while (csd->flags & CSD_FLAG_LOCK)
-> -               cpu_relax();
-> +               ;
-> +               //cpu_relax();
->  }
-> 
-> Hack above causes boot time delay even with my patch applied, so this
-> is causing my issue it seems.
+On Thu, Feb 26 2015 at 11:47 -0700, Kevin Hilman wrote:
+>Lina Iyer <lina.iyer@linaro.org> writes:
+>
+>> A core can be powered down for cpuidle or when it is hotplugged of.
+>
+>s/of/off/ ?
+>
 
-Ok; I was wondering whether this was going to be part of the bootloader, but
-as it's not and this feature is useful to you, then feel free to add my:
+Thanks, took care of it.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+>> In
+>> either case, the warmboot return address would be different. Allow
+>> setting the warmboot address for a specific cpu, optimize and write to
+>> the firmware if the address is different than the previously set
+>> address.
+>>
+>> Also we do not need to export the warmboot flags. Move them into the
+>> implementation file.
+>>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> ---
+>>  arch/arm/mach-qcom/scm-boot.c | 38 ++++++++++++++++++++++++++++++++++++++
+>>  arch/arm/mach-qcom/scm-boot.h |  7 +++----
+>>  2 files changed, 41 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-qcom/scm-boot.c b/arch/arm/mach-qcom/scm-boot.c
+>> index 45cee3e..cb73134 100644
+>> --- a/arch/arm/mach-qcom/scm-boot.c
+>> +++ b/arch/arm/mach-qcom/scm-boot.c
+>> @@ -1,4 +1,5 @@
+>>  /* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+>> + * Copyright (c) 2014, Linaro Ltd.
+>>   *
+>>   * This program is free software; you can redistribute it and/or modify
+>>   * it under the terms of the GNU General Public License version 2 and
+>> @@ -21,6 +22,23 @@
+>>  #include "scm.h"
+>>  #include "scm-boot.h"
+>>
+>> +#define SCM_FLAG_WARMBOOT_CPU0		0x04
+>> +#define SCM_FLAG_WARMBOOT_CPU1		0x02
+>> +#define SCM_FLAG_WARMBOOT_CPU2		0x10
+>> +#define SCM_FLAG_WARMBOOT_CPU3		0x40
+>> +
+>> +struct scm_warmboot {
+>> +	int flag;
+>> +	void *entry;
+>> +};
+>> +
+>> +static struct scm_warmboot scm_flags[] = {
+>> +	{ .flag = SCM_FLAG_WARMBOOT_CPU0 },
+>> +	{ .flag = SCM_FLAG_WARMBOOT_CPU1 },
+>> +	{ .flag = SCM_FLAG_WARMBOOT_CPU2 },
+>> +	{ .flag = SCM_FLAG_WARMBOOT_CPU3 },
+>> +};
+>> +
+>>  /*
+>>   * Set the cold/warm boot address for one of the CPU cores.
+>>   */
+>> @@ -31,9 +49,29 @@ int scm_set_boot_addr(phys_addr_t addr, int flags)
+>>  		phys_addr_t  addr;
+>>  	} cmd;
+>>
+>> +	might_sleep();
+>> +
+>
+>Unrelated change?
+>
+>Looking closer at scm_call(), looks like the might_sleep() should go
+>inside scm_call() where it uses the mutex.
+>
+Removed it from this patch.
 
-to your original patch.
+>>  	cmd.addr = addr;
+>>  	cmd.flags = flags;
+>>  	return scm_call(SCM_SVC_BOOT, SCM_BOOT_ADDR,
+>>  			&cmd, sizeof(cmd), NULL, 0);
+>>  }
+>>  EXPORT_SYMBOL(scm_set_boot_addr);
+>> +
+>> +int scm_set_warm_boot_addr(void *entry, int cpu)
+>> +{
+>> +	int ret;
+>> +
+>> +	/*
+>> +	 * Reassign only if we are switching from hotplug entry point
+>> +	 * to cpuidle entry point or vice versa.
+>> +	 */
+>> +	if (entry == scm_flags[cpu].entry)
+>> +		return 0;
+>> +
+>> +	ret = scm_set_boot_addr(virt_to_phys(entry), scm_flags[cpu].flag);
+>> +	if (!ret)
+>> +		scm_flags[cpu].entry  = entry;
+>> +
+>> +	return ret;
+>> +}
+>> diff --git a/arch/arm/mach-qcom/scm-boot.h b/arch/arm/mach-qcom/scm-boot.h
+>> index 02b445c..97dbf58 100644
+>> --- a/arch/arm/mach-qcom/scm-boot.h
+>> +++ b/arch/arm/mach-qcom/scm-boot.h
+>> @@ -1,4 +1,5 @@
+>>  /* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+>> + * Copyright (c) 2014, Linaro Ltd.
+>>   *
+>>   * This program is free software; you can redistribute it and/or modify
+>>   * it under the terms of the GNU General Public License version 2 and
+>> @@ -9,6 +10,7 @@
+>>   * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>   * GNU General Public License for more details.
+>>   */
+>> +
+>>  #ifndef __MACH_SCM_BOOT_H
+>>  #define __MACH_SCM_BOOT_H
+>>
+>> @@ -16,11 +18,8 @@
+>>  #define SCM_FLAG_COLDBOOT_CPU1		0x01
+>>  #define SCM_FLAG_COLDBOOT_CPU2		0x08
+>>  #define SCM_FLAG_COLDBOOT_CPU3		0x20
+>> -#define SCM_FLAG_WARMBOOT_CPU0		0x04
+>> -#define SCM_FLAG_WARMBOOT_CPU1		0x02
+>> -#define SCM_FLAG_WARMBOOT_CPU2		0x10
+>> -#define SCM_FLAG_WARMBOOT_CPU3		0x40
+>
+>You just added these in patch 1, and now moved them.  I would just
+>squash the 2 patches together.
+>
+Sure. Thanks!
 
-Thanks,
-
-Will
+>Kevin
