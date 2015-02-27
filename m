@@ -1,115 +1,151 @@
-From: marek@goldelico.com (Marek Belisko)
-Date: Fri, 27 Feb 2015 22:26:39 +0100
-Subject: [PATCH v3 3/3] ARM: dts: omap3-pandora: add DM3730 1 GHz version
-In-Reply-To: <1425072399-23152-1-git-send-email-marek@goldelico.com>
-References: <1425072399-23152-1-git-send-email-marek@goldelico.com>
-Message-ID: <1425072399-23152-4-git-send-email-marek@goldelico.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 27 Feb 2015 15:29:26 -0600
+Subject: [PATCH 4/4] firmware: qcom: scm: Move the scm driver to
+ drivers/firmware
+Message-ID: <1425072566-6397-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "H. Nikolaus Schaller" <hns@goldelico.com>
+Architectural changes in the ARM Linux kernel tree mandate the eventual
+removal of the mach-* directories. Move the scm driver to
+drivers/firmware and the scm header to include/linux to support that
+removal.
 
-Added Pandora 1 GHz model which is based on Classic/Rebirth
-with following changes:
-- upgraded cpu to dm3730 runs on 1GHz
-- 512 MiB DDR-333 SDRAM @ 200 MHz
-
-Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
-Tested-by: Grazvydas Ignotas <notasas@gmail.com>
-Reviewed-by: Grazvydas Ignotas <notasas@gmail.com>
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
 ---
- arch/arm/boot/dts/Makefile               |  1 +
- arch/arm/boot/dts/omap3-pandora-1ghz.dts | 70 ++++++++++++++++++++++++++++++++
- 2 files changed, 71 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3-pandora-1ghz.dts
+v2:
+* Moved to -M style diff output
+* Added in missing include of drivers/firmware/Kconfig into arch/arm/Kconfig
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index eddbeee..69f3106 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -344,6 +344,7 @@ dtb-$(CONFIG_ARCH_OMAP3) += am3517-craneboard.dtb \
- 	omap3-overo-summit.dtb \
- 	omap3-overo-tobi.dtb \
- 	omap3-pandora-600mhz.dtb \
-+	omap3-pandora-1ghz.dtb \
- 	omap3-sbc-t3517.dtb \
- 	omap3-sbc-t3530.dtb \
- 	omap3-sbc-t3730.dtb \
-diff --git a/arch/arm/boot/dts/omap3-pandora-1ghz.dts b/arch/arm/boot/dts/omap3-pandora-1ghz.dts
-new file mode 100644
-index 0000000..9619a28
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-pandora-1ghz.dts
-@@ -0,0 +1,70 @@
-+/*
-+ * Copyright (C) 2015
-+ *   Nikolaus Schaller <hns@goldelico.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+ MAINTAINERS                                             | 1 +
+ arch/arm/Kconfig                                        | 2 ++
+ arch/arm/mach-qcom/Kconfig                              | 3 ---
+ arch/arm/mach-qcom/Makefile                             | 3 ---
+ arch/arm/mach-qcom/platsmp.c                            | 2 +-
+ drivers/firmware/Kconfig                                | 4 ++++
+ drivers/firmware/Makefile                               | 2 ++
+ arch/arm/mach-qcom/scm.c => drivers/firmware/qcom_scm.c | 2 +-
+ arch/arm/mach-qcom/scm.h => include/linux/qcom_scm.h    | 0
+ 9 files changed, 11 insertions(+), 8 deletions(-)
+ rename arch/arm/mach-qcom/scm.c => drivers/firmware/qcom_scm.c (99%)
+ rename arch/arm/mach-qcom/scm.h => include/linux/qcom_scm.h (100%)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ddc5a8c..beb8aa4 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1317,6 +1317,7 @@ L:	linux-soc at vger.kernel.org
+ S:	Maintained
+ F:	arch/arm/mach-qcom/
+ F:	drivers/soc/qcom/
++F:	drivers/firmware/qcom_scm.c
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git
+ 
+ ARM/RADISYS ENP2611 MACHINE SUPPORT
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9f1f09a..7ffd151 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2160,6 +2160,8 @@ source "net/Kconfig"
+ 
+ source "drivers/Kconfig"
+ 
++source "drivers/firmware/Kconfig"
 +
-+/*
-+ * device tree for OpenPandora 1GHz with DM3730
-+ */
+ source "fs/Kconfig"
+ 
+ source "arch/arm/Kconfig.debug"
+diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
+index 48003ea..2256cd1 100644
+--- a/arch/arm/mach-qcom/Kconfig
++++ b/arch/arm/mach-qcom/Kconfig
+@@ -22,7 +22,4 @@ config ARCH_MSM8974
+ 	bool "Enable support for MSM8974"
+ 	select HAVE_ARM_ARCH_TIMER
+ 
+-config QCOM_SCM
+-	bool
+-
+ endif
+diff --git a/arch/arm/mach-qcom/Makefile b/arch/arm/mach-qcom/Makefile
+index 10b6841..e324375 100644
+--- a/arch/arm/mach-qcom/Makefile
++++ b/arch/arm/mach-qcom/Makefile
+@@ -1,5 +1,2 @@
+ obj-y			:= board.o
+ obj-$(CONFIG_SMP)	+= platsmp.o
+-obj-$(CONFIG_QCOM_SCM)	+= scm.o
+-
+-CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
+diff --git a/arch/arm/mach-qcom/platsmp.c b/arch/arm/mach-qcom/platsmp.c
+index 596e623..4b67e56 100644
+--- a/arch/arm/mach-qcom/platsmp.c
++++ b/arch/arm/mach-qcom/platsmp.c
+@@ -17,10 +17,10 @@
+ #include <linux/of_address.h>
+ #include <linux/smp.h>
+ #include <linux/io.h>
++#include <linux/qcom_scm.h>
+ 
+ #include <asm/smp_plat.h>
+ 
+-#include "scm.h"
+ 
+ #define VDD_SC1_ARRAY_CLAMP_GFS_CTL	0x35a0
+ #define SCSS_CPU1CORE_RESET		0x2d80
+diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
+index 41983883..6517132 100644
+--- a/drivers/firmware/Kconfig
++++ b/drivers/firmware/Kconfig
+@@ -132,6 +132,10 @@ config ISCSI_IBFT
+ 	  detect iSCSI boot parameters dynamically during system boot, say Y.
+ 	  Otherwise, say N.
+ 
++config QCOM_SCM
++	bool
++	depends on ARM || ARM64
 +
-+/dts-v1/;
-+
-+#include "omap36xx.dtsi"
-+#include "omap3-pandora-common.dtsi"
-+
-+/ {
-+	model = "Pandora Handheld Console 1GHz";
-+
-+	compatible = "ti,omap36xx", "ti,omap3";
-+};
-+
-+&omap3_pmx_core2 {
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+		&hsusb2_2_pins
-+		&control_pins
-+	>;
-+
-+	hsusb2_2_pins: pinmux_hsusb2_2_pins {
-+		pinctrl-single,pins = <
-+			OMAP3630_CORE2_IOPAD(0x25f0, PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
-+			OMAP3630_CORE2_IOPAD(0x25f2, PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
-+			OMAP3630_CORE2_IOPAD(0x25f4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
-+			OMAP3630_CORE2_IOPAD(0x25f6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
-+			OMAP3630_CORE2_IOPAD(0x25f8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
-+			OMAP3630_CORE2_IOPAD(0x25fa, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
-+		>;
-+	};
-+
-+	mmc3_pins: pinmux_mmc3_pins {
-+		pinctrl-single,pins = <
-+			OMAP3630_CORE2_IOPAD(0x25d8, PIN_INPUT_PULLUP | MUX_MODE2)	/* etk_clk.sdmmc3_clk */
-+			OMAP3630_CORE2_IOPAD(0x25da, PIN_INPUT_PULLUP | MUX_MODE2)	/* etk_ctl.sdmmc3_cmd */
-+			OMAP3630_CORE2_IOPAD(0x25e2, PIN_INPUT_PULLUP | MUX_MODE2)	/* etk_d3.sdmmc3_dat3 */
-+			OMAP3630_CORE2_IOPAD(0x25e4, PIN_INPUT_PULLUP | MUX_MODE2)	/* etk_d4.sdmmc3_dat0 */
-+			OMAP3630_CORE2_IOPAD(0x25e6, PIN_INPUT_PULLUP | MUX_MODE2)	/* etk_d5.sdmmc3_dat1 */
-+			OMAP3630_CORE2_IOPAD(0x25e8, PIN_INPUT_PULLUP | MUX_MODE2)	/* etk_d6.sdmmc3_dat2 */
-+		>;
-+	};
-+
-+	control_pins: pinmux_control_pins {
-+		pinctrl-single,pins = <
-+			OMAP3630_CORE2_IOPAD(0x25dc, PIN_INPUT_PULLDOWN | MUX_MODE4)	/* etk_d0.gpio_14 =  HP_SHUTDOWN */
-+			OMAP3630_CORE2_IOPAD(0x25de, PIN_OUTPUT | MUX_MODE4)		/* etk_d1.gpio_15 =  BT_SHUTDOWN */
-+			OMAP3630_CORE2_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE4)		/* etk_d2.gpio_16 =  RESET_USB_HOST */
-+			OMAP3630_CORE2_IOPAD(0x25ea, PIN_INPUT | MUX_MODE4)		/* etk_d7.gpio_21 =  WIFI IRQ */
-+			OMAP3630_CORE2_IOPAD(0x25ec, PIN_OUTPUT | MUX_MODE4)		/* etk_d8.gpio_22 =  MSECURE */
-+			OMAP3630_CORE2_IOPAD(0x25ee, PIN_OUTPUT | MUX_MODE4)		/* etk_d9.gpio_23 =  WIFI_POWER */
-+			OMAP3_WKUP_IOPAD(0x2a54, PIN_INPUT | MUX_MODE4)   		/* reserved.gpio_127 = MMC2_WP */
-+			OMAP3_WKUP_IOPAD(0x2a56, PIN_INPUT | MUX_MODE4)   		/* reserved.gpio_126 = MMC1_WP */
-+			OMAP3_WKUP_IOPAD(0x2a58, PIN_OUTPUT | MUX_MODE4)   		/* reserved.gpio_128 = LED_MMC1 */
-+			OMAP3_WKUP_IOPAD(0x2a5a, PIN_OUTPUT | MUX_MODE4)   		/* reserved.gpio_129 = LED_MMC2 */
-+
-+		>;
-+	};
-+};
+ source "drivers/firmware/google/Kconfig"
+ source "drivers/firmware/efi/Kconfig"
+ 
+diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
+index 5373dc5..3fdd391 100644
+--- a/drivers/firmware/Makefile
++++ b/drivers/firmware/Makefile
+@@ -11,6 +11,8 @@ obj-$(CONFIG_DMIID)		+= dmi-id.o
+ obj-$(CONFIG_ISCSI_IBFT_FIND)	+= iscsi_ibft_find.o
+ obj-$(CONFIG_ISCSI_IBFT)	+= iscsi_ibft.o
+ obj-$(CONFIG_FIRMWARE_MEMMAP)	+= memmap.o
++obj-$(CONFIG_QCOM_SCM)		+= qcom_scm.o
++CFLAGS_qcom_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
+ 
+ obj-$(CONFIG_GOOGLE_FIRMWARE)	+= google/
+ obj-$(CONFIG_EFI)		+= efi/
+diff --git a/arch/arm/mach-qcom/scm.c b/drivers/firmware/qcom_scm.c
+similarity index 99%
+rename from arch/arm/mach-qcom/scm.c
+rename to drivers/firmware/qcom_scm.c
+index 3e0e334..6e7a72b 100644
+--- a/arch/arm/mach-qcom/scm.c
++++ b/drivers/firmware/qcom_scm.c
+@@ -21,11 +21,11 @@
+ #include <linux/mutex.h>
+ #include <linux/errno.h>
+ #include <linux/err.h>
++#include <linux/qcom_scm.h>
+ 
+ #include <asm/outercache.h>
+ #include <asm/cacheflush.h>
+ 
+-#include "scm.h"
+ 
+ #define QCOM_SCM_ENOMEM		-5
+ #define QCOM_SCM_EOPNOTSUPP	-4
+diff --git a/arch/arm/mach-qcom/scm.h b/include/linux/qcom_scm.h
+similarity index 100%
+rename from arch/arm/mach-qcom/scm.h
+rename to include/linux/qcom_scm.h
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
