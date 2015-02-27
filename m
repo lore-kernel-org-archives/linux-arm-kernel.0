@@ -1,60 +1,79 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 27 Feb 2015 13:07:19 -0700
-Subject: [PATCH 0/2] Add SCM warmboot support for QCOM SoCs
-In-Reply-To: <20150226222035.GB1250@linaro.org>
-References: <1424904852-12719-1-git-send-email-lina.iyer@linaro.org>
- <24986C4E-2DED-456F-A1D3-E52037540E01@codeaurora.org>
- <20150226222035.GB1250@linaro.org>
-Message-ID: <20150227200719.GE1678@linaro.org>
+From: bobby.prani@gmail.com (Pranith Kumar)
+Date: Fri, 27 Feb 2015 15:09:17 -0500
+Subject: [RFC PATCH] arm64: cmpxchg.h: Bring ldxr and stxr closer
+Message-ID: <1425067776-2794-1-git-send-email-bobby.prani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26 2015 at 15:20 -0700, Lina Iyer wrote:
->On Thu, Feb 26 2015 at 15:10 -0700, Kumar Gala wrote:
->>
->>On Feb 25, 2015, at 4:54 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->>
->>>Hi,
->>>
->>>These patches used to be part of my cpuidle patchset, think these can go in
->>>independently.
->>>
->>>The patches do the following -
->>>
->>>1. Add QCOM Secure Monitor specific enumeration for warm boot on qcom targets
->>>2. Add an API to set up the warmboot address. Consolidate the warm boot flags
->>>into the implementation file
->>>
->>>Thanks,
->>>Lina
->>>
->>>Lina Iyer (2):
->>> ARM: qcom: Add SCM warmboot flags for quad core targets.
->>> qcom: scm: Add scm_set_warm_boot_addr function
->>>
->>>arch/arm/mach-qcom/scm-boot.c | 38 ++++++++++++++++++++++++++++++++++++++
->>>arch/arm/mach-qcom/scm-boot.h |  5 +++--
->>>2 files changed, 41 insertions(+), 2 deletions(-)
->>
->>Lina,
->>
->>Do you mind rebasing these patches on my recent SCM cleanup set.  You find it at:
->>
->>git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git qcom/scm-cleanup
->>
->
->Sure. As suggested by Kevin H, I will merge the two patches and rebase
->on top yours and resubmit.
->
-I have rebased on top of yours. I will send it shortly. But please note
-that source "driver/firmware/Kconfig" is missing in arch/arm/Kconfig for
-the driver/firmware to build.
+ARM64 documentation recommends keeping exclusive loads and stores as close as
+possible. Any instructions which do not depend on the value loaded should be
+moved outside. 
 
-Also, I have a dependency on the scm_call_atomic() api introduced by
-Stephen [1] for cpuidle. When can I expect to see that?
+In the current implementation of cmpxchg(), there is a mov instruction which can
+be pulled before the load exclusive instruction without any change in
+functionality. This patch does that change.
 
-[1]. https://lkml.org/lkml/2014/8/4/765
+Signed-off-by: Pranith Kumar <bobby.prani@gmail.com>
+---
+ arch/arm64/include/asm/cmpxchg.h | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-
-Thanks,
-Lina
+diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
+index cb95930..8057735 100644
+--- a/arch/arm64/include/asm/cmpxchg.h
++++ b/arch/arm64/include/asm/cmpxchg.h
+@@ -89,8 +89,8 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
+ 	case 1:
+ 		do {
+ 			asm volatile("// __cmpxchg1\n"
+-			"	ldxrb	%w1, %2\n"
+ 			"	mov	%w0, #0\n"
++			"	ldxrb	%w1, %2\n"
+ 			"	cmp	%w1, %w3\n"
+ 			"	b.ne	1f\n"
+ 			"	stxrb	%w0, %w4, %2\n"
+@@ -104,8 +104,8 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
+ 	case 2:
+ 		do {
+ 			asm volatile("// __cmpxchg2\n"
+-			"	ldxrh	%w1, %2\n"
+ 			"	mov	%w0, #0\n"
++			"	ldxrh	%w1, %2\n"
+ 			"	cmp	%w1, %w3\n"
+ 			"	b.ne	1f\n"
+ 			"	stxrh	%w0, %w4, %2\n"
+@@ -119,8 +119,8 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
+ 	case 4:
+ 		do {
+ 			asm volatile("// __cmpxchg4\n"
+-			"	ldxr	%w1, %2\n"
+ 			"	mov	%w0, #0\n"
++			"	ldxr	%w1, %2\n"
+ 			"	cmp	%w1, %w3\n"
+ 			"	b.ne	1f\n"
+ 			"	stxr	%w0, %w4, %2\n"
+@@ -134,8 +134,8 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
+ 	case 8:
+ 		do {
+ 			asm volatile("// __cmpxchg8\n"
+-			"	ldxr	%1, %2\n"
+ 			"	mov	%w0, #0\n"
++			"	ldxr	%1, %2\n"
+ 			"	cmp	%1, %3\n"
+ 			"	b.ne	1f\n"
+ 			"	stxr	%w0, %4, %2\n"
+@@ -166,11 +166,11 @@ static inline int __cmpxchg_double(volatile void *ptr1, volatile void *ptr2,
+ 		VM_BUG_ON((unsigned long *)ptr2 - (unsigned long *)ptr1 != 1);
+ 		do {
+ 			asm volatile("// __cmpxchg_double8\n"
++			"	mov	%w0, #0\n"
+ 			"	ldxp	%0, %1, %2\n"
+ 			"	eor	%0, %0, %3\n"
+ 			"	eor	%1, %1, %4\n"
+ 			"	orr	%1, %0, %1\n"
+-			"	mov	%w0, #0\n"
+ 			"	cbnz	%1, 1f\n"
+ 			"	stxp	%w0, %5, %6, %2\n"
+ 			"1:\n"
+-- 
+1.9.1
