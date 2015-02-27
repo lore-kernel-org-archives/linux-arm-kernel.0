@@ -1,49 +1,87 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Fri, 27 Feb 2015 09:33:39 +0100
-Subject: [PATCH v2 0/3] ARM: dts: add openpandora device support
-In-Reply-To: <CANOLnOOMLxDV6vQagfRaS7_YY6at91BbL0jPKkNQn-tYDnJEuw@mail.gmail.com>
-References: <1424202743-26387-1-git-send-email-marek@goldelico.com>
- <CANOLnOOMLxDV6vQagfRaS7_YY6at91BbL0jPKkNQn-tYDnJEuw@mail.gmail.com>
-Message-ID: <CAAfyv376B4CmzN7gtqdwdOE_URo0ksKDE6GXiiRjqNg0FX6WTw@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 27 Feb 2015 16:37:10 +0800
+Subject: [PATCH v9 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <54EFE282.1090305@codeaurora.org>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <54EFE282.1090305@codeaurora.org>
+Message-ID: <54F02CB6.2090508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+Hi Timur,
 
-should I send v3 (with updates) or can you apply current version? Thanks.
-
-On Thu, Feb 19, 2015 at 11:55 PM, Grazvydas Ignotas <notasas@gmail.com> wrote:
-> On Tue, Feb 17, 2015 at 9:52 PM, Marek Belisko <marek@goldelico.com> wrote:
->> changes from v1:
->> - add new boards to makefile in patch 2,3 (don't add them
->> in separate commit together), fix gpmc issues (reported by Tony Lindgren)
->>
->> - fix various issues reported by Grazvydas Ignotas
->> (drop internal pullups from pinmux as external are in place,
->> fix gpio buttons active state ...)
->>
->> This series of patches adds initial device tree support for the
->> OpenPandora. The most important parts are working (display, keyboard,
->> touch, charging, fuel gauge, musb port, sd/mmc ports, leds, buttons).
+On 2015?02?27? 11:20, Timur Tabi wrote:
+> On 02/25/2015 02:39 AM, Hanjun Guo wrote:
+>> Changes since v8:
 >
-> All of these have been tested to be working, after adding missing
-> input flag for touchscreen. Well except musb, but I often have trouble
-> with that in mainline, probably not a problem with this dts.
-> Tested-by: Grazvydas Ignotas <notasas@gmail.com>
+> I'm still debugging it, but v9 on the 4.0-rc1 kernel crashes after
+> calling the UEFI boot time services exit function.  That is, this line:
 >
-> And FWIW, the patches have been
-> Reviewed-by: Grazvydas Ignotas <notasas@gmail.com>
+> status = sys_table->boottime->exit_boot_services(handle, mmap_key);
+>
+> in allocate_new_fdt_and_exit_boot() gets called, and then soon after it
+> returns, the kernel crashes.  It's really early because the UEFI
+> exception handler is called.
+>
+> I did not have this problem with v8 patchset on 3.19.
 
-Marek
+I tested this patch set on FVP base model with UEFI, and booted ok.
+Can you boot the system without this ACPI patch set?
 
--- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
+>
+>
+> Also, you still have a couple whitespace problems in these patches:
+>
+> Applying: ARM64 / ACPI: additions of ACPI documentation for arm64
+> /local/mnt/workspace/linux.0/.git/rebase-apply/patch:607: new blank line
+> at EOF.
+> +
+> /local/mnt/workspace/linux.0/.git/rebase-apply/patch:844: new blank line
+> at EOF.
+> +
+> warning: 2 lines add whitespace errors.
+> Applying: Documentation: ACPI for ARM64
+> /local/mnt/workspace/linux.0/.git/rebase-apply/patch:517: new blank line
+> at EOF.
+> +
+> warning: 1 line adds whitespace errors.
 
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+Weired, When I checked the patch locally there were no whitespace
+problems:
+
+./scripts/checkpatch.pl 0020-Documentation-ACPI-for-ARM64.patch
+WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
+#23:
+new file mode 100644
+
+WARNING: use relative pathname instead of absolute in changelog text
+#25:
+--- /dev/null
+
+total: 0 errors, 2 warnings, 506 lines checked
+
+0020-Documentation-ACPI-for-ARM64.patch has style problems, please review.
+
+./scripts/checkpatch.pl 
+0021-ARM64-ACPI-additions-of-ACPI-documentation-for-arm64.patch
+WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
+#32:
+new file mode 100644
+
+WARNING: use relative pathname instead of absolute in changelog text
+#34:
+--- /dev/null
+
+WARNING: use relative pathname instead of absolute in changelog text
+#634:
+--- /dev/null
+
+total: 0 errors, 3 warnings, 825 lines checked
+
+0021-ARM64-ACPI-additions-of-ACPI-documentation-for-arm64.patch has 
+style problems, please review.
+
+Can you provide me the exact line of code which have whitespace problems?
+
+Thanks
+Hanjun
