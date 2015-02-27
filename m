@@ -1,10 +1,10 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 27 Feb 2015 09:19:58 +0100
-Subject: [PATCH v5 17/20] power_supply: 88pm860x_charger: Decrement the power
- supply's device reference counter
+Date: Fri, 27 Feb 2015 09:20:01 +0100
+Subject: [PATCH v5 20/20] arm: mach-pxa: Decrement the power supply's device
+ reference counter
 In-Reply-To: <1425025201-15926-1-git-send-email-k.kozlowski@samsung.com>
 References: <1425025201-15926-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1425025201-15926-18-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1425025201-15926-21-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,53 +12,28 @@ Use power_supply_put() to decrement the power supply's device reference
 counter.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: Pavel Machek <pavel@ucw.cz>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Reviewed-by: Sebastian Reichel <sre@kernel.org>
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- drivers/power/88pm860x_charger.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/mach-pxa/raumfeld.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/power/88pm860x_charger.c b/drivers/power/88pm860x_charger.c
-index a7f32a5b2299..bf822aa00c14 100644
---- a/drivers/power/88pm860x_charger.c
-+++ b/drivers/power/88pm860x_charger.c
-@@ -298,13 +298,18 @@ static int set_charging_fsm(struct pm860x_charger_info *info)
- 		return -EINVAL;
- 	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW,
- 			&data);
--	if (ret)
-+	if (ret) {
+diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
+index a762b23ac830..6dc4f025e674 100644
+--- a/arch/arm/mach-pxa/raumfeld.c
++++ b/arch/arm/mach-pxa/raumfeld.c
+@@ -758,8 +758,10 @@ static void raumfeld_power_signal_charged(void)
+ 	struct power_supply *psy =
+ 		power_supply_get_by_name(raumfeld_power_supplicants[0]);
+ 
+-	if (psy)
++	if (psy) {
+ 		power_supply_set_battery_charged(psy);
 +		power_supply_put(psy);
- 		return ret;
 +	}
- 	vbatt = data.intval / 1000;
- 
- 	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_PRESENT, &data);
--	if (ret)
-+	if (ret) {
-+		power_supply_put(psy);
- 		return ret;
-+	}
-+	power_supply_put(psy);
- 
- 	mutex_lock(&info->lock);
- 	info->present = data.intval;
-@@ -447,6 +452,7 @@ static irqreturn_t pm860x_temp_handler(int irq, void *data)
- 
- 	set_charging_fsm(info);
- out:
-+	power_supply_put(psy);
- 	return IRQ_HANDLED;
  }
  
-@@ -507,6 +513,7 @@ static irqreturn_t pm860x_done_handler(int irq, void *data)
- 
- out:
- 	mutex_unlock(&info->lock);
-+	power_supply_put(psy);
- 	dev_dbg(info->dev, "%s, Allowed: %d\n", __func__, info->allowed);
- 	set_charging_fsm(info);
- 
+ static int raumfeld_power_resume(void)
 -- 
 1.9.1
