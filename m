@@ -1,45 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Feb 2015 21:06:37 +0100
-Subject: 3.20-rc0 breaks nfsroot over usb
-In-Reply-To: <20150227153809.GS11056@atomide.com>
-References: <20150217185518.GA3825@amd>
- <20150226230307.GA27809@fuloong-minipc.musicnaut.iki.fi>
- <20150227153809.GS11056@atomide.com>
-Message-ID: <11261945.VmGdV7ZTh2@wuerfel>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri, 27 Feb 2015 13:07:19 -0700
+Subject: [PATCH 0/2] Add SCM warmboot support for QCOM SoCs
+In-Reply-To: <20150226222035.GB1250@linaro.org>
+References: <1424904852-12719-1-git-send-email-lina.iyer@linaro.org>
+ <24986C4E-2DED-456F-A1D3-E52037540E01@codeaurora.org>
+ <20150226222035.GB1250@linaro.org>
+Message-ID: <20150227200719.GE1678@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 February 2015 07:38:09 Tony Lindgren wrote:
-> * Aaro Koskinen <aaro.koskinen@iki.fi> [150226 15:06]:
-> > Hi,
-> > 
-> > On Thu, Feb 26, 2015 at 11:19:50PM +0100, Pavel Machek wrote:
-> > > Ok, it seems that new config dependencies broke my kconfig. These will
-> > > not be enabled if you just to make oldconfig; you want to make sure
-> > > they are on.
-> > > 
-> > >  OMAP2430 and onwards (USB_MUSB_OMAP2PLUS) [N/m/y] (NEW)
-> > > TWL4030 USB Transceiver Driver (TWL4030_USB) [N/m/y/?] (NEW)
-> > 
-> > Yes, also other users have reported "USB breakage" with 4.0-rc1 on N900
-> > etc caused by this.
-> > 
-> > Commit fbba7db3990cb707ff91cd6507d53a0a730afe97 (usb: musb:
-> > add omap-control dependency) changed USB_MUSB_OMAP2PLUS to depend
-> > on OMAP_CONTROL_PHY but that seems to be wrong at least for OMAP3.
-> > omap_control_phy.h provides dummy functions when it's not enabled.
-> > So there should be no dependency.
+On Thu, Feb 26 2015 at 15:20 -0700, Lina Iyer wrote:
+>On Thu, Feb 26 2015 at 15:10 -0700, Kumar Gala wrote:
+>>
+>>On Feb 25, 2015, at 4:54 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>>
+>>>Hi,
+>>>
+>>>These patches used to be part of my cpuidle patchset, think these can go in
+>>>independently.
+>>>
+>>>The patches do the following -
+>>>
+>>>1. Add QCOM Secure Monitor specific enumeration for warm boot on qcom targets
+>>>2. Add an API to set up the warmboot address. Consolidate the warm boot flags
+>>>into the implementation file
+>>>
+>>>Thanks,
+>>>Lina
+>>>
+>>>Lina Iyer (2):
+>>> ARM: qcom: Add SCM warmboot flags for quad core targets.
+>>> qcom: scm: Add scm_set_warm_boot_addr function
+>>>
+>>>arch/arm/mach-qcom/scm-boot.c | 38 ++++++++++++++++++++++++++++++++++++++
+>>>arch/arm/mach-qcom/scm-boot.h |  5 +++--
+>>>2 files changed, 41 insertions(+), 2 deletions(-)
+>>
+>>Lina,
+>>
+>>Do you mind rebasing these patches on my recent SCM cleanup set.  You find it at:
+>>
+>>git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git qcom/scm-cleanup
+>>
+>
+>Sure. As suggested by Kevin H, I will merge the two patches and rebase
+>on top yours and resubmit.
+>
+I have rebased on top of yours. I will send it shortly. But please note
+that source "driver/firmware/Kconfig" is missing in arch/arm/Kconfig for
+the driver/firmware to build.
 
-The problem I fixed was a link error when USB_MUSB_OMAP2PLUS
-is built-in but OMAP_CONTROL_PHY is a loadable module.
+Also, I have a dependency on the scm_call_atomic() api introduced by
+Stephen [1] for cpuidle. When can I expect to see that?
 
-> I guess the solution would be to make drivers/phy handle whatever
-> omap_control_usb_set_mode is doing in a generic way.
+[1]. https://lkml.org/lkml/2014/8/4/765
 
-I'm very sorry about the breakage in a patch that is marked for
-backports.
 
-Please accept my apology and the workaround patch in the
-follow-up mail.
-
-	Arnd
+Thanks,
+Lina
