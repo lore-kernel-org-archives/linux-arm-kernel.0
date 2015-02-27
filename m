@@ -1,54 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 27 Feb 2015 13:20:00 +0000
-Subject: [PATCH V4 0/6] RCU get_user_pages_fast and __get_user_pages_fast
-In-Reply-To: <54F06636.6080905@redhat.com>
-References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
- <54F06636.6080905@redhat.com>
-Message-ID: <20150227132000.GD9011@leverpostej>
+From: jcm@redhat.com (Jon Masters)
+Date: Fri, 27 Feb 2015 08:25:16 -0500
+Subject: [PATCH] arm64: Fix text patching logic when using fixmap
+In-Reply-To: <1424795421-26630-1-git-send-email-marc.zyngier@arm.com>
+References: <1424795421-26630-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <54F0703C.5090009@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-Steve is currently away, but should be back in the office next week.
-
-On Fri, Feb 27, 2015 at 12:42:30PM +0000, Jon Masters wrote:
-> On 09/26/2014 10:03 AM, Steve Capper wrote:
+On 02/24/2015 11:30 AM, Marc Zyngier wrote:
+> Patch 2f896d586610 ("arm64: use fixmap for text patching") changed
+> the way we patch the kernel text, using a fixmap when the kernel or
+> modules are flagged as read only.
 > 
-> > This series implements general forms of get_user_pages_fast and
-> > __get_user_pages_fast in core code and activates them for arm and arm64.
-> > 
-> > These are required for Transparent HugePages to function correctly, as
-> > a futex on a THP tail will otherwise result in an infinite loop (due to
-> > the core implementation of __get_user_pages_fast always returning 0).
-> > 
-> > Unfortunately, a futex on THP tail can be quite common for certain
-> > workloads; thus THP is unreliable without a __get_user_pages_fast
-> > implementation.
-> > 
-> > This series may also be beneficial for direct-IO heavy workloads and
-> > certain KVM workloads.
-> > 
-> > I appreciate that the merge window is coming very soon, and am posting
-> > this revision on the off-chance that it gets the nod for 3.18. (The changes
-> > thus far have been minimal and the feedback I've got has been mainly
-> > positive).
+> Unfortunately, a flaw in the logic makes it fall over when patching
+> modules without CONFIG_DEBUG_SET_MODULE_RONX enabled:
 > 
-> Head's up: these patches are currently implicated in a rare-to-trigger
-> hang that we are seeing on an internal kernel. An extensive effort is
-> underway to confirm whether these are the cause. Will followup.
+> [...]
+> [   32.032636] Call trace:
+> [   32.032716] [<fffffe00003da0dc>] __copy_to_user+0x2c/0x60
+> [   32.032837] [<fffffe0000099f08>] __aarch64_insn_write+0x94/0xf8
+> [   32.033027] [<fffffe000009a0a0>] aarch64_insn_patch_text_nosync+0x18/0x58
+> [   32.033200] [<fffffe000009c3ec>] ftrace_modify_code+0x58/0x84
+> [   32.033363] [<fffffe000009c4e4>] ftrace_make_nop+0x3c/0x58
+> [   32.033532] [<fffffe0000164420>] ftrace_process_locs+0x3d0/0x5c8
+> [   32.033709] [<fffffe00001661cc>] ftrace_module_init+0x28/0x34
+> [   32.033882] [<fffffe0000135148>] load_module+0xbb8/0xfc4
+> [   32.034044] [<fffffe0000135714>] SyS_finit_module+0x94/0xc4
+> [...]
+> 
+> This is triggered by the use of virt_to_page() on a module address,
+> which ends to pointing to Nowhereland if you're lucky, or corrupt
+> your precious data if not.
+> 
+> This patch fixes the logic by mimicking what is done on arm:
+> - If we're patching a module and CONFIG_DEBUG_SET_MODULE_RONX is set,
+>   use vmalloc_to_page().
+> - If we're patching the kernel and CONFIG_DEBUG_RODATA is set,
+>   use virt_to_page().
+> - Otherwise, use the provided address, as we can write to it directly.
+> 
+> Tested on 4.0-rc1 as a KVM guest.
+> 
+> Reported-by: Richard W.M. Jones <rjones@redhat.com>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Laura Abbott <lauraa@codeaurora.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-I'm currently investigating an intermittent memory corruption issue in
-v4.0-rc1 I'm able to trigger on Seattle with 4K pages and 48-bit VA,
-which may or may not be related. Sometimes it results in a hang (when
-the vectors get corrupted and the CPUs get caught in a recursive
-exception loop).
+This fixes a crash on boot in the AHCI driver experienced by a test
+Fedora Hosted arm64 kernel when running on various platforms.
 
-Which architecture(s) are you hitting this on?
+Tested by me on AMD Seattle and confirmed fixing the issue.
 
-Which configurations configuration(s)?
+Tested-by: Jon Masters <jcm@redhat.com>
 
-What are you using to tickle the issue?
-
-Thanks,
-Mark.
+> ---
+>  arch/arm64/kernel/insn.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 27d4864..c8eca88 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -87,8 +87,10 @@ static void __kprobes *patch_map(void *addr, int fixmap)
+>  
+>  	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
+>  		page = vmalloc_to_page(addr);
+> -	else
+> +	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
+>  		page = virt_to_page(addr);
+> +	else
+> +		return addr;
+>  
+>  	BUG_ON(!page);
+>  	set_fixmap(fixmap, page_to_phys(page));
+> 
