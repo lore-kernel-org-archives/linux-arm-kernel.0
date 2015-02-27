@@ -1,32 +1,37 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 27 Feb 2015 19:08:03 +0000
-Subject: [RFC PATCH] ARM64: cmpxchg.h: Clear the exclusive access bit on
- fail
-In-Reply-To: <CAJhHMCBwgi96jyAi0Sdi_tEephLjKuG2DQcWa=tv7d7aEbKuaA@mail.gmail.com>
-References: <1425016026-19766-1-git-send-email-bobby.prani@gmail.com>
- <20150227100612.GB3628@arm.com>
- <CAJhHMCC98dPnx=ng3zp5ZZmzOZkdPXaA1bmcQJuhQj9wb7CRhw@mail.gmail.com>
- <20150227183301.GL17949@e104818-lin.cambridge.arm.com>
- <CAJhHMCBwgi96jyAi0Sdi_tEephLjKuG2DQcWa=tv7d7aEbKuaA@mail.gmail.com>
-Message-ID: <20150227190800.GE9011@leverpostej>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 27 Feb 2015 20:14:39 +0100
+Subject: 3.20-rc0 breaks nfsroot over usb
+In-Reply-To: <20150226230307.GA27809@fuloong-minipc.musicnaut.iki.fi>
+References: <20150217185518.GA3825@amd> <20150226221950.GC10204@amd>
+ <20150226230307.GA27809@fuloong-minipc.musicnaut.iki.fi>
+Message-ID: <20150227191439.GC10971@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 06:44:19PM +0000, Pranith Kumar wrote:
-> On Fri, Feb 27, 2015 at 1:33 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > It's either badly formatted or I don't get it. Are the "stxr x1" and
-> > "stxr x7" happening on the same CPU (P0)? If yes, that's badly written
-> > code, not even architecturally compliant (you are not allowed other
-> > memory accesses between ldxr and stxr).
+On Fri 2015-02-27 01:03:07, Aaro Koskinen wrote:
+> Hi,
 > 
-> OK. Is that the same case with ldaxr (acquire) and stlxr (release)?
-> AFAIK, memory accesses between acquire and release exclusive
-> operations are allowed.
+> On Thu, Feb 26, 2015 at 11:19:50PM +0100, Pavel Machek wrote:
+> > Ok, it seems that new config dependencies broke my kconfig. These will
+> > not be enabled if you just to make oldconfig; you want to make sure
+> > they are on.
+> > 
+> >  OMAP2430 and onwards (USB_MUSB_OMAP2PLUS) [N/m/y] (NEW)
+> > TWL4030 USB Transceiver Driver (TWL4030_USB) [N/m/y/?] (NEW)
+> 
+> Yes, also other users have reported "USB breakage" with 4.0-rc1 on N900
+> etc caused by this.
+> 
+> Commit fbba7db3990cb707ff91cd6507d53a0a730afe97 (usb: musb:
+> add omap-control dependency) changed USB_MUSB_OMAP2PLUS to depend
 
-The restriction on memory accesses in the middle of a load-exclusive
-store-exclusive sequence applies to all the load/store-exclusive
-variants, including ldaxr and stlxr.
+Too bad noone told me. I had a lot of fun trying to bisect config
+problem. I have yet to try the nfsroot, but I guess it should be ok
+now.
 
 Thanks,
-Mark.
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
