@@ -1,88 +1,81 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Fri, 27 Feb 2015 17:35:37 -0400
-Subject: [PATCH] ARM: dts: OMAP5: fix polling intervals for thermal zones
-In-Reply-To: <1425045543-19540-1-git-send-email-t-kristo@ti.com>
-References: <1425045543-19540-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20150227213535.GA5633@developer.amazonguestwifi.org>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 27 Feb 2015 15:36:04 -0600
+Subject: [PATCH 4/4] firmware: qcom: scm: Move the scm driver to
+ drivers/firmware
+In-Reply-To: <54F0BE39.7020302@codeaurora.org>
+References: <1424987976-14531-1-git-send-email-galak@codeaurora.org>
+ <1424987976-14531-4-git-send-email-galak@codeaurora.org>
+ <54F0BE39.7020302@codeaurora.org>
+Message-ID: <97A78288-DB81-4B88-BB13-D3A53C4C819E@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 03:59:03PM +0200, Tero Kristo wrote:
-> OMAP4 has a finer counter granularity, which allows for a delay of 1000ms
-> in the thermal zone polling intervals. OMAP5 has a different counter
-> mechanism, which allows at maximum a 500ms timer. Adjust the cpu thermal
-> zone polling interval accordingly.
-> 
-> Without this patch, the polling interval information is simply ignored,
-> and the following thermal warnings are printed during boot (assuming
-> thermal is enabled);
-> 
-> [    1.545343] ti-soc-thermal 4a0021e0.bandgap: Delay 1000 ms is not supported
-> [    1.552691] ti-soc-thermal 4a0021e0.bandgap: Delay 1000 ms is not supported
-> [    1.560029] ti-soc-thermal 4a0021e0.bandgap: Delay 1000 ms is not supported
-> 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
 
-Acked-by: Eduardo Valentin <edubezval@gmail.com>
+On Feb 27, 2015, at 12:58 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
+> On 02/26/15 13:59, Kumar Gala wrote:
+>> Architectural changes in the ARM Linux kernel tree mandate the eventual
+>> removal of the mach-* directories. Move the scm driver to
+>> drivers/firmware and the scm header to include/linux to support that
+>> removal.
+>> 
+>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+>> ---
+>> MAINTAINERS                  |   1 +
+>> arch/arm/mach-qcom/Kconfig   |   3 -
+>> arch/arm/mach-qcom/Makefile  |   3 -
+>> arch/arm/mach-qcom/platsmp.c |   2 +-
+>> arch/arm/mach-qcom/scm.c     | 344 -------------------------------------------
+>> arch/arm/mach-qcom/scm.h     |  29 ----
+>> drivers/firmware/Kconfig     |   4 +
+>> drivers/firmware/Makefile    |   2 +
+>> drivers/firmware/qcom_scm.c  | 344 +++++++++++++++++++++++++++++++++++++++++++
+>> include/linux/qcom_scm.h     |  29 ++++
+>> 10 files changed, 381 insertions(+), 380 deletions(-)
+>> delete mode 100644 arch/arm/mach-qcom/scm.c
+>> delete mode 100644 arch/arm/mach-qcom/scm.h
+>> create mode 100644 drivers/firmware/qcom_scm.c
+>> create mode 100644 include/linux/qcom_scm.h
+> 
+> Can you generate this with -M -C? Or just throw
+> 
+> [diff]
+>        renames = copy
+> 
+> int your git config.
+> 
+> The files are the same right?
 
-> ---
->  arch/arm/boot/dts/omap5-core-thermal.dtsi |    2 +-
->  arch/arm/boot/dts/omap5-gpu-thermal.dtsi  |    2 +-
->  arch/arm/boot/dts/omap5.dtsi              |    4 ++++
->  3 files changed, 6 insertions(+), 2 deletions(-)
+Will, do.. I keep forgetting to make this change in .gitconfig
+
 > 
-> diff --git a/arch/arm/boot/dts/omap5-core-thermal.dtsi b/arch/arm/boot/dts/omap5-core-thermal.dtsi
-> index 19212ac..de8a3d4 100644
-> --- a/arch/arm/boot/dts/omap5-core-thermal.dtsi
-> +++ b/arch/arm/boot/dts/omap5-core-thermal.dtsi
-> @@ -13,7 +13,7 @@
->  
->  core_thermal: core_thermal {
->  	polling-delay-passive = <250>; /* milliseconds */
-> -	polling-delay = <1000>; /* milliseconds */
-> +	polling-delay = <500>; /* milliseconds */
->  
->  			/* sensor       ID */
->  	thermal-sensors = <&bandgap     2>;
-> diff --git a/arch/arm/boot/dts/omap5-gpu-thermal.dtsi b/arch/arm/boot/dts/omap5-gpu-thermal.dtsi
-> index 1b87aca..bc3090f 100644
-> --- a/arch/arm/boot/dts/omap5-gpu-thermal.dtsi
-> +++ b/arch/arm/boot/dts/omap5-gpu-thermal.dtsi
-> @@ -13,7 +13,7 @@
->  
->  gpu_thermal: gpu_thermal {
->  	polling-delay-passive = <250>; /* milliseconds */
-> -	polling-delay = <1000>; /* milliseconds */
-> +	polling-delay = <500>; /* milliseconds */
->  
->  			/* sensor       ID */
->  	thermal-sensors = <&bandgap     1>;
-> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> index b321fdf..fee1580 100644
-> --- a/arch/arm/boot/dts/omap5.dtsi
-> +++ b/arch/arm/boot/dts/omap5.dtsi
-> @@ -1079,4 +1079,8 @@
->  	};
->  };
->  
-> +&cpu_thermal {
-> +	polling-delay = <500>; /* milliseconds */
-> +};
-> +
->  /include/ "omap54xx-clocks.dtsi"
-> -- 
-> 1.7.9.5
+>> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
+>> index 41983883..6517132 100644
+>> --- a/drivers/firmware/Kconfig
+>> +++ b/drivers/firmware/Kconfig
+>> @@ -132,6 +132,10 @@ config ISCSI_IBFT
+>> 	  detect iSCSI boot parameters dynamically during system boot, say Y.
+>> 	  Otherwise, say N.
+>> 
+>> +config QCOM_SCM
+>> +	bool
+>> +	depends on ARM || ARM64
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150227/f7f0af19/attachment.sig>
+> No need to have depends on here if the option is hidden. Just make sure
+> it isn't selected unless the depends are true.
+
+While not needed, I?d like to keep it since there is some ARM asm code.
+
+> Also, the drivers/firmware/Kconfig file needs to be sourced in the
+> arch/arm/Kconfig so that we can still get this option on arm (Lina
+> noticed it isn't working on arm). It looks like arm64 is already
+> sourcing it.
+
+will fix
+
+- k
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
