@@ -1,24 +1,21 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 Feb 2015 13:20:12 +0100
-Subject: [PATCH 01/10] ARM: realview: remove sparsemem hack
-In-Reply-To: <1424966890-260805-2-git-send-email-arnd@arndb.de>
+Date: Fri, 27 Feb 2015 13:21:17 +0100
+Subject: [PATCH 02/10] ARM: realview: don't map undefined PCI registers
+In-Reply-To: <1424966890-260805-3-git-send-email-arnd@arndb.de>
 References: <1424966890-260805-1-git-send-email-arnd@arndb.de>
- <1424966890-260805-2-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdaamy0uJm=rpvB4Hf7YXdxhaC8wcA_VEAekFNU2cGsFSA@mail.gmail.com>
+ <1424966890-260805-3-git-send-email-arnd@arndb.de>
+Message-ID: <CACRpkdYe91jRBY-+_zBkZqdC7-bQVJhbaks3ygxs214Oua5YDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Feb 26, 2015 at 5:08 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> The realview-pbx platform has an elaborate way of avoiding the use of highmem
-> by redefining its phys_to_virt function. In practice this doesn't help all
-> that much, and it gets in the way of doing multiplatform builds for
-> realview.
+> PCI support for realview was never merged, and trying to build realview with
+> CONFIG_PCI enabled fails because the constants for the mapping windows are
+> not defined anywhere.
 >
-> This removes the feature and kills off the mach/memory.h file for realview.
-> We also lose the ability to do sparsemem with this patch, but that should
-> be put back into place for generic multiplatform configurations, to save
-> a little memory on PBX.
+> This removes them from the static I/O window mapping table as a preparation
+> for multiplatform support.
 >
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
