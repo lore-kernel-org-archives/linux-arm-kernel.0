@@ -1,39 +1,59 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 27 Feb 2015 09:20:01 +0100
-Subject: [PATCH v5 20/20] arm: mach-pxa: Decrement the power supply's device
- reference counter
+Date: Fri, 27 Feb 2015 09:19:45 +0100
+Subject: [PATCH v5 04/20] power_supply: sysfs: Use power_supply_*() API for
+ accessing function attrs
 In-Reply-To: <1425025201-15926-1-git-send-email-k.kozlowski@samsung.com>
 References: <1425025201-15926-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1425025201-15926-21-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1425025201-15926-5-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use power_supply_put() to decrement the power supply's device reference
-counter.
+Replace direct calls to power supply function attributes with wrappers.
+Wrappers provide safe access in case of unregistering the power
+supply (e.g. by removing the driver). Replace:
+ - get_property -> power_supply_get_property
+ - set_property -> power_supply_set_property
+ - property_is_writeable -> power_supply_property_is_writeable
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Acked-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
+Acked-by: Pavel Machek <pavel@ucw.cz>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Reviewed-by: Sebastian Reichel <sre@kernel.org>
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm/mach-pxa/raumfeld.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/power/power_supply_sysfs.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-index a762b23ac830..6dc4f025e674 100644
---- a/arch/arm/mach-pxa/raumfeld.c
-+++ b/arch/arm/mach-pxa/raumfeld.c
-@@ -758,8 +758,10 @@ static void raumfeld_power_signal_charged(void)
- 	struct power_supply *psy =
- 		power_supply_get_by_name(raumfeld_power_supplicants[0]);
+diff --git a/drivers/power/power_supply_sysfs.c b/drivers/power/power_supply_sysfs.c
+index 62653f50a524..f817aab80813 100644
+--- a/drivers/power/power_supply_sysfs.c
++++ b/drivers/power/power_supply_sysfs.c
+@@ -76,7 +76,7 @@ static ssize_t power_supply_show_property(struct device *dev,
+ 	if (off == POWER_SUPPLY_PROP_TYPE) {
+ 		value.intval = psy->type;
+ 	} else {
+-		ret = psy->get_property(psy, off, &value);
++		ret = power_supply_get_property(psy, off, &value);
  
--	if (psy)
-+	if (psy) {
- 		power_supply_set_battery_charged(psy);
-+		power_supply_put(psy);
-+	}
- }
+ 		if (ret < 0) {
+ 			if (ret == -ENODATA)
+@@ -125,7 +125,7 @@ static ssize_t power_supply_store_property(struct device *dev,
  
- static int raumfeld_power_resume(void)
+ 	value.intval = long_val;
+ 
+-	ret = psy->set_property(psy, off, &value);
++	ret = power_supply_set_property(psy, off, &value);
+ 	if (ret < 0)
+ 		return ret;
+ 
+@@ -223,7 +223,7 @@ static umode_t power_supply_attr_is_visible(struct kobject *kobj,
+ 
+ 		if (property == attrno) {
+ 			if (psy->property_is_writeable &&
+-			    psy->property_is_writeable(psy, property) > 0)
++			    power_supply_property_is_writeable(psy, property) > 0)
+ 				mode |= S_IWUSR;
+ 
+ 			return mode;
 -- 
 1.9.1
