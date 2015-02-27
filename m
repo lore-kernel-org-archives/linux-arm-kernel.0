@@ -1,43 +1,75 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 27 Feb 2015 15:11:56 -0700
-Subject: [PATCH v2] qcom: scm: Add qcom_scm_set_warm_boot_addr function
-In-Reply-To: <7AD3AAF7-E7D2-4D26-9897-46A6122E66BA@codeaurora.org>
-References: <1425070047-53449-1-git-send-email-lina.iyer@linaro.org>
- <EB14AE95-372C-4908-AD4B-D354A01197B7@codeaurora.org>
- <20150227215125.GF1678@linaro.org>
- <BAA7F8B7-B616-46B1-9753-18A8A1637BF6@codeaurora.org>
- <7AD3AAF7-E7D2-4D26-9897-46A6122E66BA@codeaurora.org>
-Message-ID: <20150227221156.GG1678@linaro.org>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 27 Feb 2015 16:14:52 -0600
+Subject: [PATCH 1/2] arm64: qcom: Add support for Qualcomm MSM8916 SoC
+Message-ID: <1425075293-14612-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27 2015 at 15:07 -0700, Kumar Gala wrote:
->>>>> +int qcom_scm_set_warm_boot_addr(void *entry, int cpu)
->>>>
->>>> I?d really like to see if we could make the set_boot_addr and set_warm_boot_addr have the same interfaces.
->>>
->>> I am working on making the interfaces similar. There is some check in
->>> the platsmp.c that uses the cold boot flag array to determine the
->>> present cpus. Do you think, we can ignore that check over there? If that
->>> can be done, I will change the interface for cold boot too.
->>
->> I don?t see any reason we can?t add qcom_scm_set_cold_boot_addr() move the flags such that they only exist in qcom_scm_set_boot_addr and make qcom_scm_set_boot_addr static.
->>
->> - k
->
->Looking at this for another minute, I think we should have the interfaces be something like:
->
->qcom_scm_set_cold_boot_addr(void * entry, cpumask_t mask);
->qcom_scm_set_warm_boot_addr(void * entry, cpumask_t mask);
+From: Abhimanyu Kapur <abhimany@codeaurora.org>
 
-Very similar to what I was thinking. I will send another patchest when I
-get to it.
+Add support for Qualcomm MSM8916 SoC in arm64 Kconfig and defconfig.
+Enable MSM serial driver utilized by MSM8916 and Qualcomm SoCs in
+general.
 
->
->- k
->
->-- 
->Qualcomm Innovation Center, Inc.
->The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
->a Linux Foundation Collaborative Project
->
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+Signed-off-by: Abhimanyu Kapur <abhimany@codeaurora.org>
+---
+ arch/arm64/Kconfig           | 18 ++++++++++++++++++
+ arch/arm64/configs/defconfig |  4 ++++
+ 2 files changed, 22 insertions(+)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1b8e973..f7af379 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -177,6 +177,24 @@ config ARCH_MEDIATEK
+ 	help
+ 	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
+ 
++config ARCH_QCOM
++	bool "Qualcomm Platforms"
++	select ARCH_REQUIRE_GPIOLIB
++	select COMMON_CLK_QCOM
++	select PINCTRL
++	select SOC_BUS
++	help
++	  This enables support for the ARMv8 based Qualcomm chipsets.
++
++config ARCH_QCOM_MSM8916
++	bool "Enable Support for Qualcomm MSM8916"
++	depends on ARCH_QCOM
++	select MSM_GCC_8916
++	select PINCTRL_MSM8916
++	help
++	  This enables support for the MSM8916 chipset. If you dont
++	  know what do here, say N
++
+ config ARCH_SEATTLE
+ 	bool "AMD Seattle SoC Family"
+ 	help
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index be1f12a..c8a0c7c 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -33,6 +33,8 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ CONFIG_ARCH_FSL_LS2085A=y
+ CONFIG_ARCH_MEDIATEK=y
++CONFIG_ARCH_QCOM=y
++CONFIG_ARCH_QCOM_MSM8916=y
+ CONFIG_ARCH_THUNDER=y
+ CONFIG_ARCH_VEXPRESS=y
+ CONFIG_ARCH_XGENE=y
+@@ -93,6 +95,8 @@ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_MT6577=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++CONFIG_SERIAL_MSM=y
++CONFIG_SERIAL_MSM_CONSOLE=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+ CONFIG_VIRTIO_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
