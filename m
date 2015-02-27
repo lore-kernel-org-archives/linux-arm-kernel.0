@@ -1,79 +1,43 @@
-From: bobby.prani@gmail.com (Pranith Kumar)
-Date: Fri, 27 Feb 2015 15:09:17 -0500
-Subject: [RFC PATCH] arm64: cmpxchg.h: Bring ldxr and stxr closer
-Message-ID: <1425067776-2794-1-git-send-email-bobby.prani@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Feb 2015 21:12:45 +0100
+Subject: [PATCH] usb: musb: fix Kconfig regression
+In-Reply-To: <20150227153809.GS11056@atomide.com>
+References: <20150217185518.GA3825@amd>
+ <20150226230307.GA27809@fuloong-minipc.musicnaut.iki.fi>
+ <20150227153809.GS11056@atomide.com>
+Message-ID: <7445620.7S2XydQea5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 documentation recommends keeping exclusive loads and stores as close as
-possible. Any instructions which do not depend on the value loaded should be
-moved outside. 
+A recent bug fix I did that was marked for stable backports
+introduced a slightly wrong dependency on CONFIG_OMAP_CONTROL_PHY.
 
-In the current implementation of cmpxchg(), there is a mov instruction which can
-be pulled before the load exclusive instruction without any change in
-functionality. This patch does that change.
+I was missing the fact that the PHY driver already stubs out the
+omap_control_usb_set_mode, and we only need to add a dependency
+to prevent the musb-omap2430 driver from being built-in when
+the phy driver is a loadable module, but we should not prevent it
+from being built altogether when the phy driver is disabled.
 
-Signed-off-by: Pranith Kumar <bobby.prani@gmail.com>
----
- arch/arm64/include/asm/cmpxchg.h | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+This changes the dependency to allow OMAP_CONTROL_PHY to
+be disabled, but to disallow USB_MUSB_OMAP2PLUS from being
+built-in if OMAP_CONTROL_PHY is a loadable module.
 
-diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
-index cb95930..8057735 100644
---- a/arch/arm64/include/asm/cmpxchg.h
-+++ b/arch/arm64/include/asm/cmpxchg.h
-@@ -89,8 +89,8 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
- 	case 1:
- 		do {
- 			asm volatile("// __cmpxchg1\n"
--			"	ldxrb	%w1, %2\n"
- 			"	mov	%w0, #0\n"
-+			"	ldxrb	%w1, %2\n"
- 			"	cmp	%w1, %w3\n"
- 			"	b.ne	1f\n"
- 			"	stxrb	%w0, %w4, %2\n"
-@@ -104,8 +104,8 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
- 	case 2:
- 		do {
- 			asm volatile("// __cmpxchg2\n"
--			"	ldxrh	%w1, %2\n"
- 			"	mov	%w0, #0\n"
-+			"	ldxrh	%w1, %2\n"
- 			"	cmp	%w1, %w3\n"
- 			"	b.ne	1f\n"
- 			"	stxrh	%w0, %w4, %2\n"
-@@ -119,8 +119,8 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
- 	case 4:
- 		do {
- 			asm volatile("// __cmpxchg4\n"
--			"	ldxr	%w1, %2\n"
- 			"	mov	%w0, #0\n"
-+			"	ldxr	%w1, %2\n"
- 			"	cmp	%w1, %w3\n"
- 			"	b.ne	1f\n"
- 			"	stxr	%w0, %w4, %2\n"
-@@ -134,8 +134,8 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
- 	case 8:
- 		do {
- 			asm volatile("// __cmpxchg8\n"
--			"	ldxr	%1, %2\n"
- 			"	mov	%w0, #0\n"
-+			"	ldxr	%1, %2\n"
- 			"	cmp	%1, %3\n"
- 			"	b.ne	1f\n"
- 			"	stxr	%w0, %4, %2\n"
-@@ -166,11 +166,11 @@ static inline int __cmpxchg_double(volatile void *ptr1, volatile void *ptr2,
- 		VM_BUG_ON((unsigned long *)ptr2 - (unsigned long *)ptr1 != 1);
- 		do {
- 			asm volatile("// __cmpxchg_double8\n"
-+			"	mov	%w0, #0\n"
- 			"	ldxp	%0, %1, %2\n"
- 			"	eor	%0, %0, %3\n"
- 			"	eor	%1, %1, %4\n"
- 			"	orr	%1, %0, %1\n"
--			"	mov	%w0, #0\n"
- 			"	cbnz	%1, 1f\n"
- 			"	stxp	%w0, %5, %6, %2\n"
- 			"1:\n"
--- 
-1.9.1
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: ca784be36cc725 ("usb: start using the control module driver")
+Cc: <stable@vger.kernel.org> # v3.9+
+Cc: Felipe Balbi <balbi@ti.com>
+
+diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
+index 14e1628483d9..39db8b603627 100644
+--- a/drivers/usb/musb/Kconfig
++++ b/drivers/usb/musb/Kconfig
+@@ -79,7 +79,8 @@ config USB_MUSB_TUSB6010
+ 
+ config USB_MUSB_OMAP2PLUS
+ 	tristate "OMAP2430 and onwards"
+-	depends on ARCH_OMAP2PLUS && USB && OMAP_CONTROL_PHY
++	depends on ARCH_OMAP2PLUS && USB
++	depends on OMAP_CONTROL_PHY || !OMAP_CONTROL_PHY
+ 	select GENERIC_PHY
+ 
+ config USB_MUSB_AM35X
