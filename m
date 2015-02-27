@@ -1,29 +1,36 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 27 Feb 2015 10:41:21 +0000
-Subject: [PATCH 1/6] phy: miphy365x: Use the generic phy type constants
- in dt-bindings/phy/phy.h
-In-Reply-To: <CAL_JsqJN2ya-iDDdt63z4u=N73sMz6_N=mqQpTyf7SY7NjrAmA@mail.gmail.com>
+Date: Fri, 27 Feb 2015 10:43:53 +0000
+Subject: [PATCH 4/6] ARM: DT: STi: STiH407: Add dwc3 usb3 DT node.
+In-Reply-To: <20150225155005.GE6688@x1>
 References: <1424871377-1795-1-git-send-email-peter.griffin@linaro.org>
- <1424871377-1795-2-git-send-email-peter.griffin@linaro.org>
- <CAL_JsqJN2ya-iDDdt63z4u=N73sMz6_N=mqQpTyf7SY7NjrAmA@mail.gmail.com>
-Message-ID: <20150227104121.GA9094@griffinp-ThinkPad-X1-Carbon-2nd>
+ <1424871377-1795-5-git-send-email-peter.griffin@linaro.org>
+ <20150225151229.GE5132@x1>
+ <20150225152201.GA14329@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20150225155005.GE6688@x1>
+Message-ID: <20150227104353.GB9094@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Lee,
 
-On Wed, 25 Feb 2015, Rob Herring wrote:
+On Wed, 25 Feb 2015, Lee Jones wrote:
 
-> On Wed, Feb 25, 2015 at 7:36 AM, Peter Griffin <peter.griffin@linaro.org> wrote:
-> > Now there are generic phy type constants declared in phy.h, migrate over to
-> > using them rather than defining our own. This change has been done as one
-> > atomic commit to be bisectable.
+> > > > +			reset-names	= "powerdown",
+> > > > +					  "softreset";
+> > > 
+> > > Nit: What's the purpose of having these on separate lines?
+> > 
+> > The only reason was to stay aligned with the example in
+> > Documentation/devicetree/bindings/usb/dwc3-st.txt.
 > 
-> You should note that the values of the defines are not changed. If
-> they did, that would be an ABI breakage.
+> But didn't you author that too? :)
 
-Yes your right, I was intending to explicity mention that, and then didn't.
-In V2 I will update the commit message, along with adding the Ack's.
+Yep
+
+> 
+> I would change them both.  No need to force a line wrap if it's not required.
+
+Ok, I'll remove it from both in v2, whilst adding the acks.
 
 regards,
 
