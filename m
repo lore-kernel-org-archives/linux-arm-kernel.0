@@ -1,99 +1,95 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 27 Feb 2015 09:09:29 -0800
-Subject: [PATCH 2/3] soc: ti: Add wkup_m3_ipc driver
-In-Reply-To: <54F0A2C4.1060401@ti.com>
-References: <1420228817-41310-1-git-send-email-d-gerlach@ti.com>
- <1420228817-41310-3-git-send-email-d-gerlach@ti.com>
- <20150102201643.GE4920@saruman> <54AB14E4.2010607@ti.com>
- <20150105225134.GN4081@atomide.com> <54EF7B90.3050702@ti.com>
- <20150226220817.GR11056@atomide.com> <54F0A2C4.1060401@ti.com>
-Message-ID: <20150227170928.GZ11056@atomide.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 27 Feb 2015 17:16:04 +0000
+Subject: [PATCH v2] drivers: cpuidle: cpuidle-arm64: include
+ asm/proc-fns.h explicitly
+In-Reply-To: <54F09EFA.4090906@linaro.org>
+References: <20150226182307.GD17949@e104818-lin.cambridge.arm.com>
+ <54F09EFA.4090906@linaro.org>
+Message-ID: <20150227171604.GA12998@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [150227 09:04]:
-> Tony,
-> On 02/26/2015 04:08 PM, Tony Lindgren wrote:
-> > * Dave Gerlach <d-gerlach@ti.com> [150226 12:05]:
-> >> Tony,
-> >> On 01/05/2015 04:51 PM, Tony Lindgren wrote:
-> >>> * Dave Gerlach <d-gerlach@ti.com> [150105 14:51]:
-> >>>> Felipe,
-> >>>> On 01/02/2015 02:16 PM, Felipe Balbi wrote:
-> >>>>> On Fri, Jan 02, 2015 at 02:00:16PM -0600, Dave Gerlach wrote:
-> >>>>>> Introduce a wkup_m3_ipc driver to handle communication between the MPU
-> >>>>>> and Cortex M3 wkup_m3 present on am335x.
-> >>>>>>
-> >>>>>> This driver is responsible for actually booting the wkup_m3_rproc and
-> >>>>>> also handling all IPC which is done using the IPC registers in the control
-> >>>>>> module, a mailbox, and a separate interrupt back from the wkup_m3. A small
-> >>>>>> API is exposed for executing specific power commands, which include
-> >>>>>> configuring for low power mode, request a transition to a low power mode,
-> >>>>>> and status info on a previous transition.
-> >>>>>>
-> >>>>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> >>>>>> ---
-> >>>>>>  drivers/soc/ti/Kconfig       |  11 ++
-> >>>>>>  drivers/soc/ti/Makefile      |   1 +
-> >>>>>>  drivers/soc/ti/wkup_m3_ipc.c | 451 +++++++++++++++++++++++++++++++++++++++++++
-> >>>>>>  include/linux/wkup_m3_ipc.h  |  33 ++++
-> >>>>>>  4 files changed, 496 insertions(+)
-> >>>>>>  create mode 100644 drivers/soc/ti/wkup_m3_ipc.c
-> >>>>>>  create mode 100644 include/linux/wkup_m3_ipc.h
-> >>>>>>
-> >>>>>> diff --git a/drivers/soc/ti/Kconfig b/drivers/soc/ti/Kconfig
-> >>>>>> index 7266b21..61cda85 100644
-> >>>>>> --- a/drivers/soc/ti/Kconfig
-> >>>>>> +++ b/drivers/soc/ti/Kconfig
-> >>>>>> @@ -28,4 +28,15 @@ config KEYSTONE_NAVIGATOR_DMA
-> >>>>>>  
-> >>>>>>  	  If unsure, say N.
-> >>>>>>  
-> >>>>>> +config WKUP_M3_IPC
-> >>>>>> +	bool "TI AM33XX Wkup-M3 IPC Driver"
-> >>>>>
-> >>>>> tristate ?
-> >>>>
-> >>>> If we want to allow this and the rproc driver to be built as modules than we can
-> >>>> change this.
+On Fri, Feb 27, 2015 at 04:44:42PM +0000, Daniel Lezcano wrote:
+> On 02/26/2015 07:23 PM, Catalin Marinas wrote:
+> > On Wed, Feb 25, 2015 at 01:11:40PM +0000, Will Deacon wrote:
+> >> On Wed, Feb 25, 2015 at 12:59:42PM +0000, Lorenzo Pieralisi wrote:
+> >>> ARM64 CPUidle driver requires the cpu_do_idle function so that it can
+> >>> be used to enter the shallowest idle state, and it is declared in
+> >>> asm/proc-fns.h.
 > >>>
-> >>> Yes please, the PM is never needed early, and should be optional.
-> >>> And doing that will make it a lot easier for you to do further work
-> >>> on your driver ;)
+> >>> The current ARM64 CPUidle driver does not include asm/proc-fns.h
+> >>> explicitly and it has so far relied on implicit inclusion from other
+> >>> header files.
 > >>>
-> >>> And it will also make it easier to add support for other SoCs as
-> >>> it seems the same M3 is used at least on am437x.
-> >>>  
+> >>> Owing to some header dependencies reshuffling this currently triggers
+> >>> build failures when CONFIG_ARM64_64K_PAGES=y:
+> >>>
+> >>> drivers/cpuidle/cpuidle-arm64.c: In function "arm64_enter_idle_state"
+> >>> drivers/cpuidle/cpuidle-arm64.c:42:3: error: implicit declaration of
+> >>> function "cpu_do_idle" [-Werror=implicit-function-declaration]
+> >>>     cpu_do_idle();
+> >>>     ^
+> >>>
+> >>> This patch adds the explicit inclusion of the asm/proc-fns.h header file
+> >>> to fix the build breakage and stop relying on implicit asm/proc-fns.h
+> >>> inclusion.
+> >>>
+> >>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> >>> [lp: rewrote commit log]
+> >>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>> Tested-by: Mark Rutland <mark.rutland@arm.com>
+> >>> ---
+> >>> v2 changes:
 > >>
-> >> I can not build the PM code as a module at this time due to many mach-omap
-> >> function calls it uses which are not exported, so I need handles to all five
-> >> functions in this driver used in pm33xx to call from built-in PM code. Do you
-> >> have a preference on how these function handles get passed?
-> > 
-> > OK, you can pass the function pointers in platform_data. Care to
-> > list those functions? That might allow us to make other omap PM
-> > code into loadable modules in drivers/* :)
+> >> Acked-by: Will Deacon <will.deacon@arm.com>
+> >>
+> >> Catalin will pick this up for -rc2, I suspect.
+> >
+> > I can merge this as long as Daniel or Rafael are fine with it.
 > 
-> Sure, apart from the dependencies I create for myself in other modules that I
-> introduce I see:
+> I am wondering if asm/proc-fns.h shouldn't be directly included in 
+> asm/cpuidle.h, otherwise each time cpuidle.h is included somewhere we 
+> have to include proc-fns.h also.
 > 
-> ERROR: "omap_pm_clkdms_setup" [arch/arm/mach-omap2/pm33xx.ko] undefined!
-> ERROR: "clkdm_for_each" [arch/arm/mach-omap2/pm33xx.ko] undefined!
-> ERROR: "clkdm_lookup" [arch/arm/mach-omap2/pm33xx.ko] undefined!
-> ERROR: "pwrdm_lookup" [arch/arm/mach-omap2/pm33xx.ko] undefined!
-> ERROR: "pwrdm_post_transition" [arch/arm/mach-omap2/pm33xx.ko] undefined!
-> ERROR: "clkdm_sleep" [arch/arm/mach-omap2/pm33xx.ko] undefined!
-> ERROR: "clkdm_wakeup" [arch/arm/mach-omap2/pm33xx.ko] undefined!
-> ERROR: "pwrdm_read_pwrst" [arch/arm/mach-omap2/pm33xx.ko] undefined!
-> ERROR: "cpu_suspend" [arch/arm/mach-omap2/pm33xx.ko] undefined!
-> ERROR: "omap_set_pwrdm_state" [arch/arm/mach-omap2/pm33xx.ko] undefined!
+> It is not a problem for ARM64 because there is not a big number of 
+> cpuidle drivers but for ARM32 it is not the case. I have a patchset 
+> which put proc-fns.h inclusion directly in asm/cpuidle.h and cleanup the 
+> drivers. For the sake of consistency between ARM/ARM64 may be it would 
+> make sense to include in the cpuidle.h directly, no ?
+
+This patch is a build fix, and I'd rather get it in asap. We can move
+the inclusion and merge the resulting clean-up patch in your series later.
+I will put together the patch now, if Catalin has the pull request ready
+to be sent I do not see the point in delaying it though.
+
+Lorenzo
+
+> >>> - Picked up
+> >>>    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325523.html
+> >>> - Rebased against 4.0-rc1 and rewrote commit log
+> >>>
+> >>>   drivers/cpuidle/cpuidle-arm64.c | 1 +
+> >>>   1 file changed, 1 insertion(+)
+> >>>
+> >>> diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
+> >>> index 39a2c62..c8bb6c5 100644
+> >>> --- a/drivers/cpuidle/cpuidle-arm64.c
+> >>> +++ b/drivers/cpuidle/cpuidle-arm64.c
+> >>> @@ -19,6 +19,7 @@
+> >>>   #include <linux/of.h>
+> >>>
+> >>>   #include <asm/cpuidle.h>
+> >>> +#include <asm/proc-fns.h>
+> >>>
+> >>>   #include "dt_idle_states.h"
+> >>>
 > 
-> So the mach-omap2 clockdomain and power domain functions along with arch arm
-> cpu_suspend code. I see similar dependencies in the other mach-omap2/pmxxxx.c
-> code also.
-
-OK thanks for the list.
-
-Regards,
-
-Tony
+> 
+> -- 
+>   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> 
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+> 
+> 
