@@ -1,54 +1,41 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Fri, 27 Feb 2015 21:22:30 +0100
-Subject: [PATCH 2/4] ARM: mvebu: add audio I2S controller to Armada 38x
- Device Tree
-In-Reply-To: <20150227150303.2c4ea0e7@free-electrons.com>
-References: <1424901482-3809-1-git-send-email-mw@semihalf.com>
- <1424901482-3809-3-git-send-email-mw@semihalf.com>
- <54EE4AD6.6090101@gmail.com>
- <CAPv3WKf8b+fuB-4qVwKC57iKaNHTLZAf9VFpfDbow1Sb3YAsNw@mail.gmail.com>
- <54EE6942.9080800@gmail.com>
- <CAPv3WKezrx4jkZNo3PYSOGZtiSJH09+94BaknYNN4xPkB1AxKw@mail.gmail.com>
- <20150227150303.2c4ea0e7@free-electrons.com>
-Message-ID: <CAPv3WKeLfFsxcC5gvZeP9DZqysZ0XtashByppeuDzRfvjxjujg@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 27 Feb 2015 14:21:59 -0600
+Subject: [PATCH] usb: musb: fix Kconfig regression
+In-Reply-To: <7445620.7S2XydQea5@wuerfel>
+References: <20150217185518.GA3825@amd>
+ <20150226230307.GA27809@fuloong-minipc.musicnaut.iki.fi>
+ <20150227153809.GS11056@atomide.com> <7445620.7S2XydQea5@wuerfel>
+Message-ID: <20150227202159.GC22641@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Thomas,
+On Fri, Feb 27, 2015 at 09:12:45PM +0100, Arnd Bergmann wrote:
+> A recent bug fix I did that was marked for stable backports
+> introduced a slightly wrong dependency on CONFIG_OMAP_CONTROL_PHY.
+> 
+> I was missing the fact that the PHY driver already stubs out the
+> omap_control_usb_set_mode, and we only need to add a dependency
+> to prevent the musb-omap2430 driver from being built-in when
+> the phy driver is a loadable module, but we should not prevent it
+> from being built altogether when the phy driver is disabled.
+> 
+> This changes the dependency to allow OMAP_CONTROL_PHY to
+> be disabled, but to disallow USB_MUSB_OMAP2PLUS from being
+> built-in if OMAP_CONTROL_PHY is a loadable module.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: ca784be36cc725 ("usb: start using the control module driver")
+> Cc: <stable@vger.kernel.org> # v3.9+
+> Cc: Felipe Balbi <balbi@ti.com>
 
-2015-02-27 15:03 GMT+01:00 Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com>:
-> Dear Marcin Wojtas,
->
-> On Thu, 26 Feb 2015 10:05:08 +0100, Marcin Wojtas wrote:
->
->> > Given that this PLL layout is most likely 38x specific, I'd just put it
->> > into drivers/clk/mvebu/armada-38x.c.
->>
->> Audio PLL setting consist of 3 independent registers. Adjacent to them
->> there are same regs for setting TDM PLL, however I doubt  telephony is
->> going to be supported in foreseeable future (if ever).
->
-> We might be supporting TDM in the future. However, I see that the TDM
-> PLL registers are nicely grouped together, and so are the audio PLL
-> registers. So maybe we can simply have a driver to handle the audio PLL
-> registers for now, and if needed in the future, add another driver for
-> the TDM PLL.
+please resend with linux-usb in Cc and myself in Cc too ;-)
 
-I've got very fresh experience of adding TDM support for A38x, it
-definitely would require longer discussion.
-
->
->> I also have strong suspicion that it looks the same in a39x - Thomas,
->> can you take a look into spec and confirm?
->
-> As far as I can see there is no audio support and no TDM support in
-> Armada 39x, and there those TDM PLL and audio PLL registers do not
-> exist.
->
-
-Given all the facts, do you think that drivers/clk/mvebu/armada-38x.c
-is a right place for adding this PLL setting support?
-
-Best regards,
-Marcin
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150227/f2421702/attachment.sig>
