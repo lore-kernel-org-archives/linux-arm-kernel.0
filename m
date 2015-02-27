@@ -1,49 +1,43 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 27 Feb 2015 15:05:47 -0600
-Subject: [PATCH v9 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <CAKv+Gu-LxaX6X=qApp=zhzfmNfv=tjfscf9npFCpNW314pZvvg@mail.gmail.com>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>	<54EFE282.1090305@codeaurora.org>
- <CAKv+Gu-LxaX6X=qApp=zhzfmNfv=tjfscf9npFCpNW314pZvvg@mail.gmail.com>
-Message-ID: <54F0DC2B.5010802@codeaurora.org>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Fri, 27 Feb 2015 13:15:57 -0800
+Subject: tlbi  va, vaa vs. val, vaal
+In-Reply-To: <20150227102435.GC3628@arm.com>
+References: <54EFB670.2070501@samsung.com> <20150227102435.GC3628@arm.com>
+Message-ID: <54F0DE8D.3030306@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2015 02:50 AM, Ard Biesheuvel wrote:
-> On 27 February 2015 at 03:20, Timur Tabi <timur@codeaurora.org> wrote:
->> On 02/25/2015 02:39 AM, Hanjun Guo wrote:
->>>
->>> Changes since v8:
+On 02/27/2015 02:24 AM, Will Deacon wrote:
+> On Fri, Feb 27, 2015 at 12:12:32AM +0000, Mario Smarduch wrote:
+>> I noticed kernel tlbflush.h use tlbi va*, vaa* variants instead of
+>> val, vaal ones. Reading the manual D.5.7.2 it appears that
+>> va*, vaa* versions invalidate intermediate caching of
+>> translation structures.
 >>
->>
->> I'm still debugging it, but v9 on the 4.0-rc1 kernel crashes after calling
->> the UEFI boot time services exit function.  That is, this line:
->>
->> status = sys_table->boottime->exit_boot_services(handle, mmap_key);
->>
->> in allocate_new_fdt_and_exit_boot() gets called, and then soon after it
->> returns, the kernel crashes.  It's really early because the UEFI exception
->> handler is called.
->>
->> I did not have this problem with v8 patchset on 3.19.
->>
->
-> Are you not seeing this on v4.0-rc1 without the patchset applied?
+>> With stage2 enabled that may result in 20+ memory lookups
+>> for a 4 level page table walk. That's assuming that intermediate
+>> caching structures cache mappings from stage1 table entry to
+>> host page.
+> 
+> Yeah, Catalin and I discussed improving the kernel support for this,
+> but it requires some changes to the generic mmu_gather code so that we
+> can distinguish the leaf cases. I'd also like to see that done in a way
+> that takes into account different granule sizes (we currently iterate
+> over huge pages in 4k chunks). Last time I touched that, I entered a
+> world of pain and don't plan to return there immediately :)
+> 
+> Catalin -- feeling brave?
+> 
+> FWIW: the new IOMMU page-table stuff I just got merged *does* make use
+> of leaf-invalidation for the SMMU.
+> 
+> Will
+> 
+Hi Will,
+  thanks for the background. I'm guessing how much of PTWalk
+is cached is implementation dependent. One old paper quotes upto 40%
+improvement for some industry benchmarks that cache all stage1/2 PTWalk
+entries.
+I guess something to benchmark.
 
-You're right -- I get the same crash even without the patchset applied.
-
-> Could the crash be inside the subsequent call to
-> SetVirtualAddressMap() instead of inside ExitBootServices()?
-
-It looks that way.  I'm going to have to debug that.
-
-> If so, you have a firmware bug: Mark Rutland spotted a similar bug in
-> the AMD Seattle firmware, which has been fixed in the mean time.
-> It has to do with the firmware dereferencing the virtual mapping as it
-> is being installed, which violates the UEFI spec.
-
-Thanks.
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+- Mario
