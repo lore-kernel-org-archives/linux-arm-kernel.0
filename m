@@ -1,64 +1,168 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 27 Feb 2015 16:04:50 -0700
-Subject: [PATCH 1/5] coresight: making cpu index lookup arm64 compliant
+Date: Fri, 27 Feb 2015 16:04:52 -0700
+Subject: [PATCH 3/5] coresight: Adding coresight support for arm64 architecture
 In-Reply-To: <1425078294-13059-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1425078294-13059-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1425078294-13059-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1425078294-13059-4-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function "get_logical_index()" is not available on arm64.
-Instead of adding the function simply using "of_get_cpu_node()" and
-comparing the return value with cpu handles yields the same
-result.
+Most CoreSight blocks are 64-bit ready.  As such move configuration
+entries from "arch/arm/Kconfig.config" to the driver's subdirectory
+and source the newly created Kconfig from architecture specific
+Kconfig.debug files.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- drivers/coresight/of_coresight.c | 18 ++++++------------
- 1 file changed, 6 insertions(+), 12 deletions(-)
+ arch/arm/Kconfig.debug    | 55 +-----------------------------------------
+ arch/arm64/Kconfig.debug  |  2 ++
+ drivers/coresight/Kconfig | 61 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 64 insertions(+), 54 deletions(-)
+ create mode 100644 drivers/coresight/Kconfig
 
-diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
-index c3efa418a86d..f3cc8e97a0f8 100644
---- a/drivers/coresight/of_coresight.c
-+++ b/drivers/coresight/of_coresight.c
-@@ -22,6 +22,7 @@
- #include <linux/platform_device.h>
- #include <linux/amba/bus.h>
- #include <linux/coresight.h>
-+#include <linux/cpumask.h>
- #include <asm/smp_plat.h>
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 970de7518341..8d14ad4e1db0 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1610,59 +1610,6 @@ config DEBUG_SET_MODULE_RONX
+ 	  against certain classes of kernel exploits.
+ 	  If in doubt, say "N".
  
- 
-@@ -113,7 +114,7 @@ static int of_coresight_alloc_memory(struct device *dev,
- struct coresight_platform_data *of_get_coresight_platform_data(
- 				struct device *dev, struct device_node *node)
- {
--	int i = 0, ret = 0;
-+	int i = 0, ret = 0, cpu;
- 	struct coresight_platform_data *pdata;
- 	struct of_endpoint endpoint, rendpoint;
- 	struct device *rdev;
-@@ -187,17 +188,10 @@ struct coresight_platform_data *of_get_coresight_platform_data(
- 	/* Affinity defaults to CPU0 */
- 	pdata->cpu = 0;
- 	dn = of_parse_phandle(node, "cpu", 0);
--	if (dn) {
--		const u32 *cell;
--		int len, index;
--		u64 hwid;
+-menuconfig CORESIGHT
+-	bool "CoreSight Tracing Support"
+-	select ARM_AMBA
+-	help
+-	  This framework provides a kernel interface for the CoreSight debug
+-	  and trace drivers to register themselves with. It's intended to build
+-	  a topological view of the CoreSight components based on a DT
+-	  specification and configure the right serie of components when a
+-	  trace source gets enabled.
 -
--		cell = of_get_property(dn, "reg", &len);
--		if (cell) {
--			hwid = of_read_number(cell, of_n_addr_cells(dn));
--			index = get_logical_index(hwid);
--			if (index != -EINVAL)
--				pdata->cpu = index;
-+	for (cpu = 0; dn && cpu < nr_cpu_ids; cpu++) {
-+		if (dn == of_get_cpu_node(cpu, NULL)) {
-+			pdata->cpu = cpu;
-+			break;
- 		}
- 	}
+-if CORESIGHT
+-config CORESIGHT_LINKS_AND_SINKS
+-	bool "CoreSight Link and Sink drivers"
+-	help
+-	  This enables support for CoreSight link and sink drivers that are
+-	  responsible for transporting and collecting the trace data
+-	  respectively.  Link and sinks are dynamically aggregated with a trace
+-	  entity at run time to form a complete trace path.
+-
+-config CORESIGHT_LINK_AND_SINK_TMC
+-	bool "Coresight generic TMC driver"
+-	depends on CORESIGHT_LINKS_AND_SINKS
+-	help
+-	  This enables support for the Trace Memory Controller driver.  Depending
+-	  on its configuration the device can act as a link (embedded trace router
+-	  - ETR) or sink (embedded trace FIFO).  The driver complies with the
+-	  generic implementation of the component without special enhancement or
+-	  added features.
+-
+-config CORESIGHT_SINK_TPIU
+-	bool "Coresight generic TPIU driver"
+-	depends on CORESIGHT_LINKS_AND_SINKS
+-	help
+-	  This enables support for the Trace Port Interface Unit driver, responsible
+-	  for bridging the gap between the on-chip coresight components and a trace
+-	  port collection engine, typically connected to an external host for use
+-	  case capturing more traces than the on-board coresight memory can handle.
+-
+-config CORESIGHT_SINK_ETBV10
+-	bool "Coresight ETBv1.0 driver"
+-	depends on CORESIGHT_LINKS_AND_SINKS
+-	help
+-	  This enables support for the Embedded Trace Buffer version 1.0 driver
+-	  that complies with the generic implementation of the component without
+-	  special enhancement or added features.
++source "drivers/coresight/Kconfig"
  
+-config CORESIGHT_SOURCE_ETM3X
+-	bool "CoreSight Embedded Trace Macrocell 3.x driver"
+-	select CORESIGHT_LINKS_AND_SINKS
+-	help
+-	  This driver provides support for processor ETM3.x and PTM1.x modules,
+-	  which allows tracing the instructions that a processor is executing
+-	  This is primarily useful for instruction level tracing.  Depending
+-	  the ETM version data tracing may also be available.
+-endif
+ endmenu
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index 4a8741073c90..5b2ffd8e6cdb 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -89,4 +89,6 @@ config DEBUG_ALIGN_RODATA
+ 
+ 	  If in doubt, say N
+ 
++source "drivers/coresight/Kconfig"
++
+ endmenu
+diff --git a/drivers/coresight/Kconfig b/drivers/coresight/Kconfig
+new file mode 100644
+index 000000000000..fc1f1ae7a49d
+--- /dev/null
++++ b/drivers/coresight/Kconfig
+@@ -0,0 +1,61 @@
++#
++# Coresight configuration
++#
++menuconfig CORESIGHT
++	bool "CoreSight Tracing Support"
++	select ARM_AMBA
++	help
++	  This framework provides a kernel interface for the CoreSight debug
++	  and trace drivers to register themselves with. It's intended to build
++	  a topological view of the CoreSight components based on a DT
++	  specification and configure the right serie of components when a
++	  trace source gets enabled.
++
++if CORESIGHT
++config CORESIGHT_LINKS_AND_SINKS
++	bool "CoreSight Link and Sink drivers"
++	help
++	  This enables support for CoreSight link and sink drivers that are
++	  responsible for transporting and collecting the trace data
++	  respectively.  Link and sinks are dynamically aggregated with a trace
++	  entity at run time to form a complete trace path.
++
++config CORESIGHT_LINK_AND_SINK_TMC
++	bool "Coresight generic TMC driver"
++	depends on CORESIGHT_LINKS_AND_SINKS
++	help
++	  This enables support for the Trace Memory Controller driver.
++	  Depending on its configuration the device can act as a link (embedded
++	  trace router - ETR) or sink (embedded trace FIFO).  The driver
++	  complies with the generic implementation of the component without
++	  special enhancement or added features.
++
++config CORESIGHT_SINK_TPIU
++	bool "Coresight generic TPIU driver"
++	depends on CORESIGHT_LINKS_AND_SINKS
++	help
++	  This enables support for the Trace Port Interface Unit driver,
++	  responsible for bridging the gap between the on-chip coresight
++	  components and a trace for bridging the gap between the on-chip
++	  coresight components and a trace port collection engine, typically
++	  connected to an external host for use case capturing more traces than
++	  the on-board coresight memory can handle.
++
++config CORESIGHT_SINK_ETBV10
++	bool "Coresight ETBv1.0 driver"
++	depends on CORESIGHT_LINKS_AND_SINKS
++	help
++	  This enables support for the Embedded Trace Buffer version 1.0 driver
++	  that complies with the generic implementation of the component without
++	  special enhancement or added features.
++
++config CORESIGHT_SOURCE_ETM3X
++	bool "CoreSight Embedded Trace Macrocell 3.x driver"
++	depends on !ARM64
++	select CORESIGHT_LINKS_AND_SINKS
++	help
++	  This driver provides support for processor ETM3.x and PTM1.x modules,
++	  which allows tracing the instructions that a processor is executing
++	  This is primarily useful for instruction level tracing.  Depending
++	  the ETM version data tracing may also be available.
++endif
 -- 
 1.9.1
