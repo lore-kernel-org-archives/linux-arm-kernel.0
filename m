@@ -1,43 +1,67 @@
-From: bobby.prani@gmail.com (Pranith Kumar)
-Date: Fri, 27 Feb 2015 14:15:57 -0500
-Subject: [RFC PATCH] ARM64: cmpxchg.h: Clear the exclusive access bit on
- fail
-In-Reply-To: <20150227190800.GE9011@leverpostej>
-References: <1425016026-19766-1-git-send-email-bobby.prani@gmail.com>
- <20150227100612.GB3628@arm.com>
- <CAJhHMCC98dPnx=ng3zp5ZZmzOZkdPXaA1bmcQJuhQj9wb7CRhw@mail.gmail.com>
- <20150227183301.GL17949@e104818-lin.cambridge.arm.com>
- <CAJhHMCBwgi96jyAi0Sdi_tEephLjKuG2DQcWa=tv7d7aEbKuaA@mail.gmail.com>
- <20150227190800.GE9011@leverpostej>
-Message-ID: <CAJhHMCBJB8Ca1bdapoOx9ecxAwxEPy+X5jv1VCnkCu_GRpyF8Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Feb 2015 20:20:47 +0100
+Subject: [PATCH 3/8] ARM: make xscale iwmmxt code multiplatform aware
+In-Reply-To: <CAL_JsqJyhKQQ-9SdFkWu_Z1MKzHfxUtDjEPrDg=hYm3rnbsrFQ@mail.gmail.com>
+References: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
+ <1425043775-3106827-4-git-send-email-arnd@arndb.de>
+ <CAL_JsqJyhKQQ-9SdFkWu_Z1MKzHfxUtDjEPrDg=hYm3rnbsrFQ@mail.gmail.com>
+Message-ID: <8633095.JZKP2JGaT3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 2:08 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Feb 27, 2015 at 06:44:19PM +0000, Pranith Kumar wrote:
->> On Fri, Feb 27, 2015 at 1:33 PM, Catalin Marinas
->> <catalin.marinas@arm.com> wrote:
->> > It's either badly formatted or I don't get it. Are the "stxr x1" and
->> > "stxr x7" happening on the same CPU (P0)? If yes, that's badly written
->> > code, not even architecturally compliant (you are not allowed other
->> > memory accesses between ldxr and stxr).
->>
->> OK. Is that the same case with ldaxr (acquire) and stlxr (release)?
->> AFAIK, memory accesses between acquire and release exclusive
->> operations are allowed.
->
-> The restriction on memory accesses in the middle of a load-exclusive
-> store-exclusive sequence applies to all the load/store-exclusive
-> variants, including ldaxr and stlxr.
->
+On Friday 27 February 2015 11:53:47 Rob Herring wrote:
+> > diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+> > index 819777d0e91f..7bc66e22afd7 100644
+> > --- a/arch/arm/include/asm/cputype.h
+> > +++ b/arch/arm/include/asm/cputype.h
+> > @@ -228,10 +228,33 @@ static inline int cpu_is_xsc3(void)
+> >  }
+> >  #endif
+> >
+> > -#if !defined(CONFIG_CPU_XSCALE) && !defined(CONFIG_CPU_XSC3)
+> > +#if !defined(CONFIG_CPU_XSCALE)
+> 
+> You could use IS_ENABLED here.
 
-Thanks Mark. I am trying to see where this restriction is documented.
-Looking at: http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0802a/a64_data_transfer_alpha.html
-I do not see that mentioned. The only restriction relevant is that a
-stxr should use the same address as the most recent ldxr.
+We use #ifdef for the same thing in the rest of the file, so I
+kept the coding style.
 
-Could you please point me to the relevant documentation?
+I could convert all three here and the PJ4, but the others
+wouldn't work because they require some other macros to be
+defined.
 
-Thanks!
--- 
-Pranith
+I think I'd rather keep it  this way for consistency, unless Russell
+prefers it to be changed to
+
+static inline int cpu_is_xscale(void)
+{
+        unsigned int id;
+
+	if (!IS_ENABLED(CONFIG_XSCALE))
+		return 0;
+
+        id = read_cpuid_id() & 0xffffe000;
+
+        if ((id == 0x69052000) || (id == 0x69054000))
+                return 1;
+
+        return 0;
+}
+
+> > @@ -152,6 +153,11 @@ static int __init xscale_cp0_init(void)
+> >  {
+> >         u32 cp_access;
+> >
+> > +       /* do not attempt to probe iwmmxt on non-xscale family CPUs */
+> > +       if (IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM) &&
+> 
+> Do you really need this condition?
+> 
+> > +           !(cpu_is_xscale() || cpu_is_xsc3() || cpu_is_mohawk()))
+> > +               return 0;
+> > +
+
+No, it was just an optimization for the other (non-multi) platforms to
+avoid reading the cpuid. I'll just drop it.
+
+	Arnd
