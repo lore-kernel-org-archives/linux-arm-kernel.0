@@ -1,46 +1,28 @@
-From: gwenhael.goavec-merou@armadeus.com (gwenhael.goavec)
-Date: Fri, 27 Feb 2015 08:42:32 +0100
-Subject: [PATCH 1/5] ARM: dts: imx28-apf28dev: Add pinctrl for USB OTG
- ID pin
-In-Reply-To: <1423836725-86061-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1423836725-86061-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20150227084232.43bad15c@x230.trabucayre.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 27 Feb 2015 08:46:01 +0100
+Subject: [PATCH] clocksource: efm32: Use CLOCK_EVT_FEAT_PERIODIC for
+ defining features
+In-Reply-To: <3fac202ead48b50c0967c62eae92fe9786fd24a1.1425015704.git.viresh.kumar@linaro.org>
+References: <3fac202ead48b50c0967c62eae92fe9786fd24a1.1425015704.git.viresh.kumar@linaro.org>
+Message-ID: <20150227074601.GO7789@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping?
+Hello Viresh,
 
-Gwen
+On Fri, Feb 27, 2015 at 11:12:33AM +0530, Viresh Kumar wrote:
+> We have used CLOCK_EVT_MODE_PERIODIC instead of CLOCK_EVT_FEAT_PERIODIC while
+> defining features. Fix it.
+> 
+> Cc: Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Makes sense, thanks for catching.
 
-On Fri, 13 Feb 2015 15:12:01 +0100
-Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com> wrote:
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> Signed-off-by: Sebastien Szymanski <sebastien.szymanski@armadeus.com>
-> ---
->  arch/arm/boot/dts/imx28-apf28dev.dts | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
-> index 1f38a05..86e8d81 100644
-> --- a/arch/arm/boot/dts/imx28-apf28dev.dts
-> +++ b/arch/arm/boot/dts/imx28-apf28dev.dts
-> @@ -143,7 +143,8 @@
->  	ahb at 80080000 {
->  		usb0: usb at 80080000 {
->  			pinctrl-names = "default";
-> -			pinctrl-0 = <&usb0_otg_apf28dev>;
-> +			pinctrl-0 = <&usb0_otg_apf28dev
-> +					&usb0_id_pins_b>;
->  			vbus-supply = <&reg_usb0_vbus>;
->  			status = "okay";
->  		};
-> -- 
-> 2.0.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
