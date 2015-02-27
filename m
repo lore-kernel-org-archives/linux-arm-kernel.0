@@ -1,49 +1,45 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 27 Feb 2015 20:15:17 +0000
-Subject: [PATCH 1/3] Documentation: dts: Update compatible field
- description for APM X-Gene
-In-Reply-To: <1425067710-14879-2-git-send-email-isubramanian@apm.com>
-References: <1425067710-14879-1-git-send-email-isubramanian@apm.com>
- <1425067710-14879-2-git-send-email-isubramanian@apm.com>
-Message-ID: <20150227201516.GA30683@leverpostej>
+From: bobby.prani@gmail.com (Pranith Kumar)
+Date: Fri, 27 Feb 2015 15:17:26 -0500
+Subject: [RFC PATCH] arm64: cmpxchg.h: Bring ldxr and stxr closer
+In-Reply-To: <20150227201526.GH24818@arm.com>
+References: <1425067776-2794-1-git-send-email-bobby.prani@gmail.com>
+ <20150227201526.GH24818@arm.com>
+Message-ID: <CAJhHMCA0La6rQBndxJDnynAZ6AogEbKcCRQULZjjRTXBMzGuiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 08:08:28PM +0000, Iyappan Subramanian wrote:
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
-> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-> ---
->  Documentation/devicetree/bindings/net/apm-xgene-enet.txt | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-> index cfcc527..5355996 100644
-> --- a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-> +++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-> @@ -4,7 +4,8 @@ Ethernet nodes are defined to describe on-chip ethernet interfaces in
->  APM X-Gene SoC.
->  
->  Required properties for all the ethernet interfaces:
-> -- compatible: Should be "apm,xgene-enet"
-> +- compatible: Should be "apm,xgene-enet", "apm,xgene1-sgenet" or
-> +  "apm,xgene1-xgenet"
+On Fri, Feb 27, 2015 at 3:15 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Feb 27, 2015 at 08:09:17PM +0000, Pranith Kumar wrote:
+>> ARM64 documentation recommends keeping exclusive loads and stores as close as
+>> possible. Any instructions which do not depend on the value loaded should be
+>> moved outside.
+>>
+>> In the current implementation of cmpxchg(), there is a mov instruction which can
+>> be pulled before the load exclusive instruction without any change in
+>> functionality. This patch does that change.
+>>
+>> Signed-off-by: Pranith Kumar <bobby.prani@gmail.com>
+>> ---
+>>  arch/arm64/include/asm/cmpxchg.h | 10 +++++-----
+>>  1 file changed, 5 insertions(+), 5 deletions(-)
+>
+> [...]
+>
+>> @@ -166,11 +166,11 @@ static inline int __cmpxchg_double(volatile void *ptr1, volatile void *ptr2,
+>>               VM_BUG_ON((unsigned long *)ptr2 - (unsigned long *)ptr1 != 1);
+>>               do {
+>>                       asm volatile("// __cmpxchg_double8\n"
+>> +                     "       mov     %w0, #0\n"
+>>                       "       ldxp    %0, %1, %2\n"
+>
+> Seriously, you might want to test this before you mindlessly make changes to
+> low-level synchronisation code. Not only is the change completely unnecessary
+> but it is actively harmful.
+>
 
-Please format this as a list. It'll be easier to read, and you can add
-more later.
+Oops, I apologize for this. I should have looked more closely. It is
+wrong to do this in cmpxchg_double(). What about the other cases?
 
-What are the diffences between these variants?
 
-Mark.
-
->  - reg: Address and length of the register set for the device. It contains the
->    information of registers in the same order as described by reg-names
->  - reg-names: Should contain the register set names
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+-- 
+Pranith
