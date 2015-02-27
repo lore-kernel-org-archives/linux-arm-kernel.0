@@ -1,34 +1,50 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Sat, 28 Feb 2015 01:51:03 +0200
-Subject: [PATCH, RESEND] usb: musb: fix Kconfig regression
-In-Reply-To: <2671702.mSdaGStNT3@wuerfel>
-References: <2671702.mSdaGStNT3@wuerfel>
-Message-ID: <20150227235103.GB590@fuloong-minipc.musicnaut.iki.fi>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Fri, 27 Feb 2015 15:52:54 -0800
+Subject: [PATCH 2/3] dtb: change binding name to match with newer firmware
+ DT
+In-Reply-To: <4061014.S4PDWltU3G@wuerfel>
+References: <1425067710-14879-1-git-send-email-isubramanian@apm.com>
+ <1425067710-14879-3-git-send-email-isubramanian@apm.com>
+ <4061014.S4PDWltU3G@wuerfel>
+Message-ID: <CAKh23Fm5HpNEfs40RTf_XtQ6ris5cCheAcY1WdLND04AwsvdSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Feb 27, 2015 at 12:33 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 27 February 2015 12:08:29 Iyappan Subramanian wrote:
+>> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> index f1ad9c2..a857794 100644
+>> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> @@ -622,7 +622,7 @@
+>>                 };
+>>
+>>                 sgenet0: ethernet at 1f210000 {
+>> -                       compatible = "apm,xgene-enet";
+>> +                       compatible = "apm,xgene1-sgenet";
+>>                         status = "disabled";
+>>                         reg = <0x0 0x1f210000 0x0 0xd100>,
+>>                               <0x0 0x1f200000 0x0 0Xc300>,
+>>
+>
+> This will break booting the new dtb on older kernels, right?
 
-On Sat, Feb 28, 2015 at 12:19:41AM +0100, Arnd Bergmann wrote:
-> A recent bug fix I did that was marked for stable backports
-> introduced a slightly wrong dependency on CONFIG_OMAP_CONTROL_PHY.
-> 
-> I was missing the fact that the PHY driver already stubs out the
-> omap_control_usb_set_mode, and we only need to add a dependency
-> to prevent the musb-omap2430 driver from being built-in when
-> the phy driver is a loadable module, but we should not prevent it
-> from being built altogether when the phy driver is disabled.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: ca784be36cc725 ("usb: start using the control module driver")
-> Acked-by: Acked-by: Pavel Machek <pavel@ucw.cz>
-> Cc: <stable@vger.kernel.org> # v3.9+
+This will not break booting older kernels.  In fact, this will fix it,
+by having the specific binding,
+older kernel that does not have support for these interfaces, will not
+call probe.
 
-This patch allows me to disable redundant CONFIG_OMAP_CONTROL_PHY
-from 4.0-rc1 .config and still get a working USB on Nokia N9. So:
+For example, 3.17 kernel that does not have support for SGMII based 1G
+and XFI 10G interfaces
+will not probe these interfaces when booted with newer dtb.
 
-Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+>
+> You should normally list the most generic model in addition to the
+> specific one.
 
-Thanks,
+If we list generic model ("xgene-enet") as well, probe will be called
+for the interfaces that the kernel does not have support for,
+which is what we are trying to fix.
 
-A.
+>
+>         Arnd
