@@ -1,55 +1,116 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Feb 2015 14:29:28 +0100
-Subject: [PATCH 1/8] mtd: nand: pxa3xx: disable DMA support on MMP
+Date: Fri, 27 Feb 2015 14:30:45 +0100
+Subject: [PATCH 5/8] ARM: mmp: remove remaining legacy pxa-dma support
 In-Reply-To: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
 References: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
-Message-ID: <1425043775-3106827-2-git-send-email-arnd@arndb.de>
+Message-ID: <1425043848-3107137-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMP platform traditionally uses ad-hoc DMA engine support
-by having the slave drivers write directly to the DMA register
-set, just as we do for PXA.
-
-Nowadays, MMP has a proper dmaengine driver, but that conflicts
-with the old method, so we cannot enable both at the same time.
-
-Independent of this, we want to have multiplatform support
-on MMP, which means the mach/dma.h header file becomes inaccessible
-to the nand driver.
-
-This patch disables the ad-hoc DMA support in the pxa3xx
-nand driver for MMP, leaving it enabled only for PXA,
-to address both of the above issues.
-
-A patch series from Daniel Mack exists that should address
-the performance impact this has over the traditional method:
-http://www.spinics.net/lists/arm-kernel/msg265162.html
-This patch series is still under review and needs more
-testing, but I hope we can merge it soon.
+All drivers have stopped using this code, so we can just
+as well stop initializing it.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Brian Norris <computersforpeace@gmail.com>
-Cc: Daniel Mack <zonque@gmail.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-mmp/include/mach/dma.h | 13 -------------
+ arch/arm/mach-mmp/mmp2.c             |  2 --
+ arch/arm/mach-mmp/pxa168.c           |  2 --
+ arch/arm/mach-mmp/pxa910.c           |  2 --
+ arch/arm/plat-pxa/Makefile           |  2 +-
+ 5 files changed, 1 insertion(+), 20 deletions(-)
+ delete mode 100644 arch/arm/mach-mmp/include/mach/dma.h
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 96b0b1d27df1..06d449591432 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -28,7 +28,7 @@
- #include <linux/of_device.h>
- #include <linux/of_mtd.h>
- 
--#if defined(CONFIG_ARCH_PXA) || defined(CONFIG_ARCH_MMP)
-+#if defined(CONFIG_ARCH_PXA)
- #define ARCH_HAS_DMA
+diff --git a/arch/arm/mach-mmp/include/mach/dma.h b/arch/arm/mach-mmp/include/mach/dma.h
+deleted file mode 100644
+index 1d6914544da4..000000000000
+--- a/arch/arm/mach-mmp/include/mach/dma.h
++++ /dev/null
+@@ -1,13 +0,0 @@
+-/*
+- * linux/arch/arm/mach-mmp/include/mach/dma.h
+- */
+-
+-#ifndef __ASM_MACH_DMA_H
+-#define __ASM_MACH_DMA_H
+-
+-#include <mach/addr-map.h>
+-
+-#define DMAC_REGS_VIRT	(APB_VIRT_BASE + 0x00000)
+-
+-#include <plat/dma.h>
+-#endif /* __ASM_MACH_DMA_H */
+diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+index c8914ef21f7f..82eb53f5136a 100644
+--- a/arch/arm/mach-mmp/mmp2.c
++++ b/arch/arm/mach-mmp/mmp2.c
+@@ -25,7 +25,6 @@
+ #include <mach/regs-apbc.h>
+ #include <mach/cputype.h>
+ #include <mach/irqs.h>
+-#include <mach/dma.h>
+ #include <mach/mfp.h>
+ #include <mach/devices.h>
+ #include <mach/mmp2.h>
+@@ -111,7 +110,6 @@ static int __init mmp2_init(void)
  #endif
+ 		mfp_init_base(MFPR_VIRT_BASE);
+ 		mfp_init_addr(mmp2_addr_map);
+-		pxa_init_dma(IRQ_MMP2_DMA_RIQ, 16);
+ 		mmp2_clk_init(APB_PHYS_BASE + 0x50000,
+ 			      AXI_PHYS_BASE + 0x82800,
+ 			      APB_PHYS_BASE + 0x15000);
+diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+index 53f21554ae63..7367f4b079e4 100644
+--- a/arch/arm/mach-mmp/pxa168.c
++++ b/arch/arm/mach-mmp/pxa168.c
+@@ -24,7 +24,6 @@
+ #include <mach/regs-apbc.h>
+ #include <mach/regs-apmu.h>
+ #include <mach/irqs.h>
+-#include <mach/dma.h>
+ #include <mach/devices.h>
+ #include <mach/mfp.h>
+ #include <linux/dma-mapping.h>
+@@ -56,7 +55,6 @@ static int __init pxa168_init(void)
+ 	if (cpu_is_pxa168()) {
+ 		mfp_init_base(MFPR_VIRT_BASE);
+ 		mfp_init_addr(pxa168_mfp_addr_map);
+-		pxa_init_dma(IRQ_PXA168_DMA_INT0, 32);
+ 		pxa168_clk_init(APB_PHYS_BASE + 0x50000,
+ 				AXI_PHYS_BASE + 0x82800,
+ 				APB_PHYS_BASE + 0x15000);
+diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
+index 545404261327..15f7be01fed8 100644
+--- a/arch/arm/mach-mmp/pxa910.c
++++ b/arch/arm/mach-mmp/pxa910.c
+@@ -23,7 +23,6 @@
+ #include <mach/regs-apbc.h>
+ #include <mach/cputype.h>
+ #include <mach/irqs.h>
+-#include <mach/dma.h>
+ #include <mach/mfp.h>
+ #include <mach/devices.h>
+ #include <mach/pm-pxa910.h>
+@@ -97,7 +96,6 @@ static int __init pxa910_init(void)
+ #endif
+ 		mfp_init_base(MFPR_VIRT_BASE);
+ 		mfp_init_addr(pxa910_mfp_addr_map);
+-		pxa_init_dma(IRQ_PXA910_DMA_INT0, 32);
+ 		pxa910_clk_init(APB_PHYS_BASE + 0x50000,
+ 				AXI_PHYS_BASE + 0x82800,
+ 				APB_PHYS_BASE + 0x15000,
+diff --git a/arch/arm/plat-pxa/Makefile b/arch/arm/plat-pxa/Makefile
+index 1fc941944912..e507aebbef52 100644
+--- a/arch/arm/plat-pxa/Makefile
++++ b/arch/arm/plat-pxa/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for code common across different PXA processor families
+ #
  
+-obj-y	:= dma.o
++obj-$(CONFIG_ARCH_PXA)		:= dma.o
+ 
+ obj-$(CONFIG_PXA3xx)		+= mfp.o
+ obj-$(CONFIG_ARCH_MMP)		+= mfp.o
 -- 
 2.1.0.rc2
