@@ -1,35 +1,28 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Fri, 27 Feb 2015 07:42:30 -0500
-Subject: [PATCH V4 0/6] RCU get_user_pages_fast and __get_user_pages_fast
-In-Reply-To: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
-References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <54F06636.6080905@redhat.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 27 Feb 2015 13:53:56 +0100
+Subject: [PATCH 07/10] ARM: integrator: use explicit core module options
+In-Reply-To: <1424967096-261582-1-git-send-email-arnd@arndb.de>
+References: <1424967096-261582-1-git-send-email-arnd@arndb.de>
+Message-ID: <CACRpkdYNCZrkmRnnBwFJVt6w=QoBNy64jiO4+OQzZkJ=O4-RYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2014 10:03 AM, Steve Capper wrote:
+On Thu, Feb 26, 2015 at 5:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> This series implements general forms of get_user_pages_fast and
-> __get_user_pages_fast in core code and activates them for arm and arm64.
-> 
-> These are required for Transparent HugePages to function correctly, as
-> a futex on a THP tail will otherwise result in an infinite loop (due to
-> the core implementation of __get_user_pages_fast always returning 0).
-> 
-> Unfortunately, a futex on THP tail can be quite common for certain
-> workloads; thus THP is unreliable without a __get_user_pages_fast
-> implementation.
-> 
-> This series may also be beneficial for direct-IO heavy workloads and
-> certain KVM workloads.
-> 
-> I appreciate that the merge window is coming very soon, and am posting
-> this revision on the off-chance that it gets the nod for 3.18. (The changes
-> thus far have been minimal and the feedback I've got has been mainly
-> positive).
+> For consistency with the other platforms, this remove the CPU
+> selection logic in mm/Kconfig that was only used by integrator,
+> and adds specific options for each available core tile and core
+> module, which in turn select the correct CPUs.
+>
+> This is consistent with the new way that we do it for realview
+> and all other platforms.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Head's up: these patches are currently implicated in a rare-to-trigger
-hang that we are seeing on an internal kernel. An extensive effort is
-underway to confirm whether these are the cause. Will followup.
+Applied, compiled, and booted on Integrator/AP with an ARM926 core
+tile.
 
-Jon.
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
