@@ -1,41 +1,23 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 27 Feb 2015 23:18:46 +0100
-Subject: [PATCH] cpuidle: mvebu: Fix the CPU PM notifier usage
-In-Reply-To: <54F0A04F.20706@linaro.org>
-References: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
- <4892716.Bf612zPN6E@vostro.rjw.lan> <54F0A04F.20706@linaro.org>
-Message-ID: <1559887.83x0eLBBFx@vostro.rjw.lan>
+From: corbet@lwn.net (Jonathan Corbet)
+Date: Fri, 27 Feb 2015 14:55:20 -0700
+Subject: [PATCH] Documentation: arm: Update for DT-only platforms
+In-Reply-To: <1423018169-31221-1-git-send-email-gregory.0xf0@gmail.com>
+References: <1423018169-31221-1-git-send-email-gregory.0xf0@gmail.com>
+Message-ID: <20150227145520.5f7032a9@lwn.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, February 27, 2015 05:50:23 PM Daniel Lezcano wrote:
-> On 02/26/2015 10:55 PM, Rafael J. Wysocki wrote:
-> > On Thursday, February 26, 2015 06:20:48 PM Gregory CLEMENT wrote:
-> >> As stated in kernel/cpu_pm.c, "Platform is responsible for ensuring
-> >> that cpu_pm_enter is not called twice on the same CPU before
-> >> cpu_pm_exit is called.". In the current code in case of failure when
-> >> calling mvebu_v7_cpu_suspend, the function cpu_pm_exit() is never
-> >> called whereas cpu_pm_enter() was called just before.
-> >>
-> >> This patch moves the cpu_pm_exit() in order to balance the
-> >> cpu_pm_enter() calls.
-> >>
-> >> Reported-by: Fulvio Benini <fbf@libero.it>
-> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >
-> > Should that go to "stable" too?  Which "stable" series it should go to if so?
-> 
-> Hi Rafael,
-> 
-> do you mind if I take this fix in my tree ?
+On Tue,  3 Feb 2015 18:49:26 -0800
+Gregory Fong <gregory.0xf0@gmail.com> wrote:
 
-Not at all, please go ahead.
+> The documentation specified that a machine type is mandatory and made
+> that assumption in a few places.  However, for DT-only platforms, the
+> current advice is that no machine type should be registered, so update
+> accordingly.
 
-> There is the same issue for cpuidle-arm64.c I fixed.
+It seems nobody has complained about this, so I've just applied it to the
+docs tree.
 
-OK
+Thanks,
 
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+jon
