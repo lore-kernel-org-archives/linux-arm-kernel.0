@@ -1,57 +1,70 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 26 Feb 2015 18:21:51 -0600
-Subject: [PATCH] pci: host: xgene: fix incorrectly returned address by
- map_bus
-In-Reply-To: <1424214840-26498-1-git-send-email-fkan@apm.com>
-References: <1424214840-26498-1-git-send-email-fkan@apm.com>
-Message-ID: <20150227002151.GG25765@google.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Fri, 27 Feb 2015 00:23:26 +0000
+Subject: [PATCH v2 1/3] ARM: shmobile: armadillo800eva: Properly specify
+ HDMI audio link format
+In-Reply-To: <20150211002802.GC7826@verge.net.au>
+References: <1421847492-8857-1-git-send-email-lars@metafoo.de>
+ <87d25wg804.wl%kuninori.morimoto.gx@renesas.com>
+ <20150211002802.GC7826@verge.net.au>
+Message-ID: <87k2z4fbfv.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 17, 2015 at 03:14:00PM -0800, Feng Kan wrote:
-> The generic accessor functions for pci-xgene uses map_bus
-> call that returns the base address but did not add the additional
-> offset.
-> 
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> ---
->  drivers/pci/host/pci-xgene.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-> index aab5547..ee082c0 100644
-> --- a/drivers/pci/host/pci-xgene.c
-> +++ b/drivers/pci/host/pci-xgene.c
-> @@ -127,7 +127,7 @@ static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
->  	return false;
->  }
->  
-> -static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
-> +static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
->  			      int offset)
->  {
->  	struct xgene_pcie_port *port = bus->sysdata;
-> @@ -137,7 +137,7 @@ static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
->  		return NULL;
->  
->  	xgene_pcie_set_rtdid_reg(bus, devfn);
-> -	return xgene_pcie_get_cfg_base(bus);
-> +	return xgene_pcie_get_cfg_base(bus) + offset;
 
-Where's the locking here?  ECAM doesn't need locking because the
-bus/dev/fn/offset is all encoded in the MMIO address.  But it looks
-like X-Gene doesn't work that way and bus/dev/fn is in the RTDID register.
+Hi Lars, Mark
 
-So it seems like X-Gene needs locking that not everybody needs.  Are you
-relying on higher-level locking somewhere?
-
->  }
->  
->  static struct pci_ops xgene_pcie_ops = {
-> -- 
-> 1.9.1
+> > > The DAI link format should be specified for the whole link rather than just
+> > > one component on the link. So move the format specification for the HDMI
+> > > audio link from the CPU component to the link itself.
+> > > 
+> > > Since the sh-mobile-hdmi DAI driver doesn't implement the set_fmt() callback
+> > > in this case there is no functional difference between only specifying the
+> > > the format for the CPU side or for the whole link, but the later it will
+> > > allow us to remove support for just specifying the format for one component.
+> > > 
+> > > Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+> > > ---
+> > 
+> > I tested these 3 patches on armadillo800eva
+> > 
+> > 	[PATCH v2 1/3] ARM: shmobile: armadillo800eva: Properly specify HDMI audio link format
+> > 	[PATCH v2 2/3] ASoC: sh: fsi: Fix clock inversion
+> > 	[PATCH v2 3/3] ASoC: simple-card: Remove support for setting differing DAI formats
+> > 
+> > Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > 
+> > 2/3 patch changed behavior for clock inversion on FSI driver.
+> > FSI + wm8978 on armadillo800eva worked without any issues,
+> > but, I don't know how much effect it has for other board.
+> > We used this inversion flags on each board for historical reasons (copy-paste),
+> > but, almost all these were not needed (except some picky board) on FSI.
+> > Maybe Lars's 2/3 patch is correct, but, it is difficult to check/confirm for all boards.
+> > And unfortunately, Renesas don't use FSI anymore.
+> > So, I think keeping current FSI driver as-is is more safety for old boards.
+> > armadillo800eva works well with below patch (as 2/3 patch)
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> Thanks, I am inclined to agree that it is best to leave things unchanged.
+> 
+> > 
+> > --------------
+> > diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+> > index 75de26c..36aaeb1 100644
+> > --- a/arch/arm/mach-shmobile/board-armadillo800eva.c
+> > +++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+> > @@ -1015,7 +1015,6 @@ static struct asoc_simple_card_info fsi_wm8978_info = {
+> >         .platform       = "sh_fsi2",
+> >         .daifmt         = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM,
+> >         .cpu_dai = {
+> > -               .fmt    = SND_SOC_DAIFMT_IB_NF,
+> >                 .name   = "fsia-dai",
+> >         },
+> >         .codec_dai = {
+> > --------------
+
+As I mentioned above (and, Simon agreed), I think we can
+agree if [2/3] patch was exchanged
+
+Best regards
+---
+Kuninori Morimoto
