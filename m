@@ -1,48 +1,68 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Fri, 27 Feb 2015 09:34:59 +0000
-Subject: [PATCH v2 3/3] xen/arm: allow console=hvc0 to be omitted for
- guests
-In-Reply-To: <alpine.DEB.2.02.1502261817210.23507@kaball.uk.xensource.com>
-References: <1424267513-15836-1-git-send-email-julien.grall@linaro.org>
- <1424267513-15836-4-git-send-email-julien.grall@linaro.org>
- <CAL_Jsq+QniOFiVXEhuS+GEEnCkUpkrmtdE5E4ZytwTzoQSDpOg@mail.gmail.com>
- <1424275380.20761.31.camel@citrix.com>
- <alpine.DEB.2.02.1502261817210.23507@kaball.uk.xensource.com>
-Message-ID: <1425029699.14641.114.camel@citrix.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 27 Feb 2015 10:39:29 +0100
+Subject: [PATCH] cpuidle: mvebu: Fix the CPU PM notifier usage
+In-Reply-To: <4892716.Bf612zPN6E@vostro.rjw.lan>
+References: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
+ <4892716.Bf612zPN6E@vostro.rjw.lan>
+Message-ID: <54F03B51.1010708@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-02-26 at 18:22 +0000, Stefano Stabellini wrote:
-> On Wed, 18 Feb 2015, Ian Campbell wrote:
-> > On Wed, 2015-02-18 at 09:50 -0600, Rob Herring wrote:
-> > > On Wed, Feb 18, 2015 at 7:51 AM, Julien Grall <julien.grall@linaro.org> wrote:
-> > > > From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > > >
-> > > > This patch registers hvc0 as the preferred console if no console
-> > > > has been specified explicitly on the kernel command line.
-> > > >
-> > > > The purpose is to allow platform agnostic kernels and boot images
-> > > > (such as distro installers) to boot in a Xen/ARM domU without the
-> > > > need to modify the command line by hand.
-> > > 
-> > > How does this interact with DT chosen stdout-path?
-> > 
-> > I think it shouldn't any more than the existing calls from e.g. the 8250
-> > driver to preferred_console do.
-> >
-> > > Is there a node for hvc0?
-> > 
-> > Not a direct one, it is inferred from the presence of the general Xen
-> > node.
-> 
-> Xen PV consoles, including hvc0, as all the other Xen PV devices are
-> advertised on xenstore.
+Hi Rafael,
 
-Do we actually use the xenstore node for hvc0? I thought we got it from
-hvmparams (so the primary it can be used before xenstore is up)
+On 26/02/2015 22:55, Rafael J. Wysocki wrote:
+> On Thursday, February 26, 2015 06:20:48 PM Gregory CLEMENT wrote:
+>> As stated in kernel/cpu_pm.c, "Platform is responsible for ensuring
+>> that cpu_pm_enter is not called twice on the same CPU before
+>> cpu_pm_exit is called.". In the current code in case of failure when
+>> calling mvebu_v7_cpu_suspend, the function cpu_pm_exit() is never
+>> called whereas cpu_pm_enter() was called just before.
+>>
+>> This patch moves the cpu_pm_exit() in order to balance the
+>> cpu_pm_enter() calls.
+>>
+>> Reported-by: Fulvio Benini <fbf@libero.it>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> Should that go to "stable" too?  Which "stable" series it should go to if so?
+
+Yes as it fixes a potential issue, you're right it should go
+to "stable". The bug was here since the introduction of the driver
+in 3.16.
+
+Thanks,
+
+Gregory
 
 > 
+>> ---
+>>  drivers/cpuidle/cpuidle-mvebu-v7.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
+>> index 38e68618513a..cefa07438ae1 100644
+>> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
+>> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
+>> @@ -37,11 +37,11 @@ static int mvebu_v7_enter_idle(struct cpuidle_device *dev,
+>>  		deepidle = true;
+>>  
+>>  	ret = mvebu_v7_cpu_suspend(deepidle);
+>> +	cpu_pm_exit();
+>> +
+>>  	if (ret)
+>>  		return ret;
+>>  
+>> -	cpu_pm_exit();
+>> -
+>>  	return index;
+>>  }
+>>  
+>>
 > 
-> > I did vaguely consider handling a stdout-path pointing to that --
-> > but it seemed a bit of an abuse.
-> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
