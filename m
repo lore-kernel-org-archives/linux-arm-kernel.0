@@ -1,40 +1,44 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 27 Feb 2015 15:59:26 +0200
-Subject: [PATCH] ARM: OMAP4+: PRM: fix omap4 version of
- prm_save_and_clear_irqen
-Message-ID: <1425045566-19580-1-git-send-email-t-kristo@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 27 Feb 2015 15:03:03 +0100
+Subject: [PATCH 2/4] ARM: mvebu: add audio I2S controller to Armada 38x
+ Device Tree
+In-Reply-To: <CAPv3WKezrx4jkZNo3PYSOGZtiSJH09+94BaknYNN4xPkB1AxKw@mail.gmail.com>
+References: <1424901482-3809-1-git-send-email-mw@semihalf.com>
+ <1424901482-3809-3-git-send-email-mw@semihalf.com>
+ <54EE4AD6.6090101@gmail.com>
+ <CAPv3WKf8b+fuB-4qVwKC57iKaNHTLZAf9VFpfDbow1Sb3YAsNw@mail.gmail.com>
+ <54EE6942.9080800@gmail.com>
+ <CAPv3WKezrx4jkZNo3PYSOGZtiSJH09+94BaknYNN4xPkB1AxKw@mail.gmail.com>
+Message-ID: <20150227150303.2c4ea0e7@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was incorrectly reading the irq status registers during the save
-and clear, instead of the irq enable. This worked because there is only
-one user for the prcm interrupts currently, namely the io-chain. Whenever
-the function was called, an io-chain interrupt was both pending and
-enabled.
+Dear Marcin Wojtas,
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/prm44xx.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On Thu, 26 Feb 2015 10:05:08 +0100, Marcin Wojtas wrote:
 
-diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-index a08a617..d6d6bc3 100644
---- a/arch/arm/mach-omap2/prm44xx.c
-+++ b/arch/arm/mach-omap2/prm44xx.c
-@@ -252,10 +252,10 @@ static void omap44xx_prm_save_and_clear_irqen(u32 *saved_mask)
- {
- 	saved_mask[0] =
- 		omap4_prm_read_inst_reg(OMAP4430_PRM_OCP_SOCKET_INST,
--					OMAP4_PRM_IRQSTATUS_MPU_OFFSET);
-+					OMAP4_PRM_IRQENABLE_MPU_OFFSET);
- 	saved_mask[1] =
- 		omap4_prm_read_inst_reg(OMAP4430_PRM_OCP_SOCKET_INST,
--					OMAP4_PRM_IRQSTATUS_MPU_2_OFFSET);
-+					OMAP4_PRM_IRQENABLE_MPU_2_OFFSET);
- 
- 	omap4_prm_write_inst_reg(0, OMAP4430_PRM_OCP_SOCKET_INST,
- 				 OMAP4_PRM_IRQENABLE_MPU_OFFSET);
+> > Given that this PLL layout is most likely 38x specific, I'd just put it
+> > into drivers/clk/mvebu/armada-38x.c.
+> 
+> Audio PLL setting consist of 3 independent registers. Adjacent to them
+> there are same regs for setting TDM PLL, however I doubt  telephony is
+> going to be supported in foreseeable future (if ever).
+
+We might be supporting TDM in the future. However, I see that the TDM
+PLL registers are nicely grouped together, and so are the audio PLL
+registers. So maybe we can simply have a driver to handle the audio PLL
+registers for now, and if needed in the future, add another driver for
+the TDM PLL.
+
+> I also have strong suspicion that it looks the same in a39x - Thomas,
+> can you take a look into spec and confirm?
+
+As far as I can see there is no audio support and no TDM support in
+Armada 39x, and there those TDM PLL and audio PLL registers do not
+exist.
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
