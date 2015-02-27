@@ -1,85 +1,75 @@
 From: pali.rohar@gmail.com (=?UTF-8?q?Pali=20Roh=C3=A1r?=)
-Date: Fri, 27 Feb 2015 16:55:27 +0100
-Subject: [PATCH v2 1/2] arm: devtree: Set system_rev from DT revision
+Date: Fri, 27 Feb 2015 16:55:28 +0100
+Subject: [PATCH v2 2/2] arm: boot: convert ATAG_REVISION to DT revision field
 In-Reply-To: <1425052528-18995-1-git-send-email-pali.rohar@gmail.com>
 References: <201502271645.58765@pali>
  <1425052528-18995-1-git-send-email-pali.rohar@gmail.com>
-Message-ID: <1425052528-18995-2-git-send-email-pali.rohar@gmail.com>
+Message-ID: <1425052528-18995-3-git-send-email-pali.rohar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With this patch "revision" DT string entry is used to set global system_rev
-variable. DT "revision" is expected to be string with one hexadecimal number.
-So "Revision" line in /proc/cpuinfo will be same as "revision" DT value.
+ATAG_REVISION is unsigned number and revision in DT is stored as hexadecimal
+string value. It means that it will be correctly parsed by kernel.
 
 Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
 ---
- arch/arm/kernel/devtree.c |   20 +++++++++++++++-----
- 1 file changed, 15 insertions(+), 5 deletions(-)
+ arch/arm/boot/compressed/atags_to_fdt.c |   37 +++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index 11c54de..7e13e27 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -19,6 +19,7 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/smp.h>
-+#include <linux/libfdt_env.h>
+diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
+index 9448aa0..b23748e 100644
+--- a/arch/arm/boot/compressed/atags_to_fdt.c
++++ b/arch/arm/boot/compressed/atags_to_fdt.c
+@@ -97,6 +97,39 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
+ 	setprop_string(fdt, "/chosen", "bootargs", cmdline);
+ }
  
- #include <asm/cputype.h>
- #include <asm/setup.h>
-@@ -26,6 +27,7 @@
- #include <asm/smp_plat.h>
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
-+#include <asm/system_info.h>
- 
- 
- #ifdef CONFIG_SMP
-@@ -204,6 +206,9 @@ static const void * __init arch_get_next_mach(const char *const **match)
- const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
- {
- 	const struct machine_desc *mdesc, *mdesc_best = NULL;
-+	unsigned long dt_root;
-+	const char *prop;
-+	int size;
- 
- #ifdef CONFIG_ARCH_MULTIPLATFORM
- 	DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
-@@ -215,17 +220,13 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
- 	if (!dt_phys || !early_init_dt_verify(phys_to_virt(dt_phys)))
- 		return NULL;
- 
-+	dt_root = of_get_flat_dt_root();
- 	mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
- 
- 	if (!mdesc) {
--		const char *prop;
--		int size;
--		unsigned long dt_root;
--
- 		early_print("\nError: unrecognized/unsupported "
- 			    "device tree compatible list:\n[ ");
- 
--		dt_root = of_get_flat_dt_root();
- 		prop = of_get_flat_dt_prop(dt_root, "compatible", &size);
- 		while (size > 0) {
- 			early_print("'%s' ", prop);
-@@ -246,5 +247,14 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
- 	/* Change machine number to match the mdesc we're using */
- 	__machine_arch_type = mdesc->nr;
- 
-+	/* Set system revision from DT */
-+	prop = of_get_flat_dt_prop(dt_root, "revision", &size);
-+	if (prop && size > 0) {
-+		char revision[11];
-+		strlcpy(revision, prop, min(size, (int)sizeof(revision)));
-+		if (kstrtouint(revision, 16, &system_rev) != 0)
-+			system_rev = 0;
++static void tohexstr(char * str, int size, unsigned int num)
++{
++	int len = 0;
++	int i, tmp;
++
++	if (size < 4) {
++		if (size > 0)
++			str[0] = 0;
++		return;
 +	}
 +
- 	return mdesc;
- }
++	str[len++] = '0';
++	str[len++] = 'x';
++
++	while (len-1 < size && num) {
++		tmp = num % 16;
++		if (tmp >= 10)
++			tmp += 'A';
++		else
++			tmp += '0';
++		str[len++] = tmp;
++		num /= 16;
++	}
++
++	str[len] = 0;
++
++	for (i = 2; i < 2+(len-2)/2; ++i) {
++		tmp = str[i];
++		str[i] = str[len-i+1];
++		str[len-i+1] = tmp;
++	}
++}
++
+ /*
+  * Convert and fold provided ATAGs into the provided FDT.
+  *
+@@ -171,6 +204,10 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
+ 					cpu_to_fdt32(atag->u.mem.size);
+ 			}
+ 
++		} else if (atag->hdr.tag == ATAG_REVISION) {
++			char revision[11];
++			tohexstr(revision, sizeof(revision), atag->u.revision.rev);
++			setprop_string(fdt, "/", "revision", revision);
+ 		} else if (atag->hdr.tag == ATAG_INITRD2) {
+ 			uint32_t initrd_start, initrd_size;
+ 			initrd_start = atag->u.initrd.start;
 -- 
 1.7.9.5
