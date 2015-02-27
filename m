@@ -1,27 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Feb 2015 14:44:08 +0100
-Subject: [PATCH 4/5] ARM: shmobile: Add support SOC_BUS to R-Car Gen2
-In-Reply-To: <CAMuHMdXU6xTNec=82wXuBqh68qt8Amc1mo2c7nGYKDQO=rqTKQ@mail.gmail.com>
-References: <cover.1424931398.git.horms+renesas@verge.net.au>
- <2088679.zVJXCDlFW0@wuerfel>
- <CAMuHMdXU6xTNec=82wXuBqh68qt8Amc1mo2c7nGYKDQO=rqTKQ@mail.gmail.com>
-Message-ID: <2529709.qprrL8H0DB@wuerfel>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 27 Feb 2015 15:59:03 +0200
+Subject: [PATCH] ARM: dts: OMAP5: fix polling intervals for thermal zones
+Message-ID: <1425045543-19540-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 February 2015 11:41:04 Geert Uytterhoeven wrote:
-> > We must not introduce the user interface in one kernel and then change
-> > it in the next one, so I'm cautious about taking the pull request in
-> > the current form. Once we have agreed on what the contents of the sysfs
-> > files should be, I can take the patches, and then we are free to move
-> > the implementation later.
-> 
-> Currently machine contains e.g. "Koelsch", which is the name of the board,
-> not of the SoC.
-> 
-> We can derive the SoC name from soc_id, e.g. 0x47 = "R-Car M2-W".
-> 
+OMAP4 has a finer counter granularity, which allows for a delay of 1000ms
+in the thermal zone polling intervals. OMAP5 has a different counter
+mechanism, which allows at maximum a 500ms timer. Adjust the cpu thermal
+zone polling interval accordingly.
 
-Yes, I think that would be best.
+Without this patch, the polling interval information is simply ignored,
+and the following thermal warnings are printed during boot (assuming
+thermal is enabled);
 
-	Arnd
+[    1.545343] ti-soc-thermal 4a0021e0.bandgap: Delay 1000 ms is not supported
+[    1.552691] ti-soc-thermal 4a0021e0.bandgap: Delay 1000 ms is not supported
+[    1.560029] ti-soc-thermal 4a0021e0.bandgap: Delay 1000 ms is not supported
+
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/omap5-core-thermal.dtsi |    2 +-
+ arch/arm/boot/dts/omap5-gpu-thermal.dtsi  |    2 +-
+ arch/arm/boot/dts/omap5.dtsi              |    4 ++++
+ 3 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap5-core-thermal.dtsi b/arch/arm/boot/dts/omap5-core-thermal.dtsi
+index 19212ac..de8a3d4 100644
+--- a/arch/arm/boot/dts/omap5-core-thermal.dtsi
++++ b/arch/arm/boot/dts/omap5-core-thermal.dtsi
+@@ -13,7 +13,7 @@
+ 
+ core_thermal: core_thermal {
+ 	polling-delay-passive = <250>; /* milliseconds */
+-	polling-delay = <1000>; /* milliseconds */
++	polling-delay = <500>; /* milliseconds */
+ 
+ 			/* sensor       ID */
+ 	thermal-sensors = <&bandgap     2>;
+diff --git a/arch/arm/boot/dts/omap5-gpu-thermal.dtsi b/arch/arm/boot/dts/omap5-gpu-thermal.dtsi
+index 1b87aca..bc3090f 100644
+--- a/arch/arm/boot/dts/omap5-gpu-thermal.dtsi
++++ b/arch/arm/boot/dts/omap5-gpu-thermal.dtsi
+@@ -13,7 +13,7 @@
+ 
+ gpu_thermal: gpu_thermal {
+ 	polling-delay-passive = <250>; /* milliseconds */
+-	polling-delay = <1000>; /* milliseconds */
++	polling-delay = <500>; /* milliseconds */
+ 
+ 			/* sensor       ID */
+ 	thermal-sensors = <&bandgap     1>;
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index b321fdf..fee1580 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -1079,4 +1079,8 @@
+ 	};
+ };
+ 
++&cpu_thermal {
++	polling-delay = <500>; /* milliseconds */
++};
++
+ /include/ "omap54xx-clocks.dtsi"
+-- 
+1.7.9.5
