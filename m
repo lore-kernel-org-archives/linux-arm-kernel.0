@@ -1,71 +1,43 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 27 Feb 2015 15:23:57 -0600
-Subject: [PATCH 0/2] Add SCM warmboot support for QCOM SoCs
-In-Reply-To: <20150227200719.GE1678@linaro.org>
-References: <1424904852-12719-1-git-send-email-lina.iyer@linaro.org>
- <24986C4E-2DED-456F-A1D3-E52037540E01@codeaurora.org>
- <20150226222035.GB1250@linaro.org> <20150227200719.GE1678@linaro.org>
-Message-ID: <0A05D548-BD53-4A33-A5C7-F396E1915FFA@codeaurora.org>
+From: marek@goldelico.com (Marek Belisko)
+Date: Fri, 27 Feb 2015 22:26:36 +0100
+Subject: [PATCH v3 0/3] ARM: dts: add openpandora device support
+Message-ID: <1425072399-23152-1-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+changes from v2:
+- fix missing PIN_INPUT for penirq node
+- added Reviewed-by and Tested-by
 
-On Feb 27, 2015, at 2:07 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+changes from v1:
+- add new boards to makefile in patch 2,3 (don't add them
+in separate commit together), fix gpmc issues (reported by Tony Lindgren)
 
-> On Thu, Feb 26 2015 at 15:20 -0700, Lina Iyer wrote:
->> On Thu, Feb 26 2015 at 15:10 -0700, Kumar Gala wrote:
->>> 
->>> On Feb 25, 2015, at 4:54 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->>> 
->>>> Hi,
->>>> 
->>>> These patches used to be part of my cpuidle patchset, think these can go in
->>>> independently.
->>>> 
->>>> The patches do the following -
->>>> 
->>>> 1. Add QCOM Secure Monitor specific enumeration for warm boot on qcom targets
->>>> 2. Add an API to set up the warmboot address. Consolidate the warm boot flags
->>>> into the implementation file
->>>> 
->>>> Thanks,
->>>> Lina
->>>> 
->>>> Lina Iyer (2):
->>>> ARM: qcom: Add SCM warmboot flags for quad core targets.
->>>> qcom: scm: Add scm_set_warm_boot_addr function
->>>> 
->>>> arch/arm/mach-qcom/scm-boot.c | 38 ++++++++++++++++++++++++++++++++++++++
->>>> arch/arm/mach-qcom/scm-boot.h |  5 +++--
->>>> 2 files changed, 41 insertions(+), 2 deletions(-)
->>> 
->>> Lina,
->>> 
->>> Do you mind rebasing these patches on my recent SCM cleanup set.  You find it at:
->>> 
->>> git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git qcom/scm-cleanup
->>> 
->> 
->> Sure. As suggested by Kevin H, I will merge the two patches and rebase
->> on top yours and resubmit.
->> 
-> I have rebased on top of yours. I will send it shortly. But please note
-> that source "driver/firmware/Kconfig" is missing in arch/arm/Kconfig for
-> the driver/firmware to build.
+- fix various issues reported by Grazvydas Ignotas
+(drop internal pullups from pinmux as external are in place,
+fix gpio buttons active state ...)
 
-I?ll fix this.
+This series of patches adds initial device tree support for the
+OpenPandora. The most important parts are working (display, keyboard,
+touch, charging, fuel gauge, musb port, sd/mmc ports, leds, buttons).
+Not yet supported are: usb host port, nubs, wifi, bluetooth, audio.
 
-> 
-> Also, I have a dependency on the scm_call_atomic() api introduced by
-> Stephen [1] for cpuidle. When can I expect to see that?
-> 
-> [1]. https://lkml.org/lkml/2014/8/4/765
+First patch add common dtsi file which is then used in 600mhz and 1ghz
+variants of openpandora which support is added in patches 2 and 3.
 
-Please add the patch to your patchset.
+H. Nikolaus Schaller (3):
+  ARM: dts: omap3-pandora: add common device tree
+  ARM: dts: omap3-pandora: add OMAP3530 600 MHz version
+  ARM: dts: omap3-pandora: add DM3730 1 GHz version
 
-- k
+ arch/arm/boot/dts/Makefile                  |   2 +
+ arch/arm/boot/dts/omap3-pandora-1ghz.dts    |  70 +++
+ arch/arm/boot/dts/omap3-pandora-600mhz.dts  |  65 +++
+ arch/arm/boot/dts/omap3-pandora-common.dtsi | 640 ++++++++++++++++++++++++++++
+ 4 files changed, 777 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omap3-pandora-1ghz.dts
+ create mode 100644 arch/arm/boot/dts/omap3-pandora-600mhz.dts
+ create mode 100644 arch/arm/boot/dts/omap3-pandora-common.dtsi
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
