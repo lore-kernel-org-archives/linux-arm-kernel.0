@@ -1,36 +1,21 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 27 Feb 2015 16:07:35 -0600
-Subject: [PATCH v2] qcom: scm: Add qcom_scm_set_warm_boot_addr function
-In-Reply-To: <BAA7F8B7-B616-46B1-9753-18A8A1637BF6@codeaurora.org>
-References: <1425070047-53449-1-git-send-email-lina.iyer@linaro.org>
- <EB14AE95-372C-4908-AD4B-D354A01197B7@codeaurora.org>
- <20150227215125.GF1678@linaro.org>
- <BAA7F8B7-B616-46B1-9753-18A8A1637BF6@codeaurora.org>
-Message-ID: <7AD3AAF7-E7D2-4D26-9897-46A6122E66BA@codeaurora.org>
+From: corbet@lwn.net (Jonathan Corbet)
+Date: Fri, 27 Feb 2015 15:08:10 -0700
+Subject: [PATCH] genirq: better describe IRQF_NO_SUSPEND semantics
+In-Reply-To: <1424444026-31231-1-git-send-email-mark.rutland@arm.com>
+References: <1424444026-31231-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20150227150810.685084df@lwn.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>> +int qcom_scm_set_warm_boot_addr(void *entry, int cpu)
->>> 
->>> I?d really like to see if we could make the set_boot_addr and set_warm_boot_addr have the same interfaces.
->> 
->> I am working on making the interfaces similar. There is some check in
->> the platsmp.c that uses the cold boot flag array to determine the
->> present cpus. Do you think, we can ignore that check over there? If that
->> can be done, I will change the interface for cold boot too.
-> 
-> I don?t see any reason we can?t add qcom_scm_set_cold_boot_addr() move the flags such that they only exist in qcom_scm_set_boot_addr and make qcom_scm_set_boot_addr static.
-> 
-> - k
+On Fri, 20 Feb 2015 14:53:46 +0000
+Mark Rutland <mark.rutland@arm.com> wrote:
 
-Looking at this for another minute, I think we should have the interfaces be something like:
+> This patch updates the documentation regarding IRQF_NO_SUSPEND to make
+> this caveat explicit, hopefully making future misuse rarer. Cleanup of
+> existing misuse will occur as part of later patch series.
 
-qcom_scm_set_cold_boot_addr(void * entry, cpumask_t mask);
-qcom_scm_set_warm_boot_addr(void * entry, cpumask_t mask);
+Applied (with Peter's ack) to the docs tree.
 
-- k
+Thanks,
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+jon
