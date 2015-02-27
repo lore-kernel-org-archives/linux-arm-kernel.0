@@ -1,147 +1,136 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 27 Feb 2015 11:53:47 -0600
-Subject: [PATCH 3/8] ARM: make xscale iwmmxt code multiplatform aware
-In-Reply-To: <1425043775-3106827-4-git-send-email-arnd@arndb.de>
-References: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
- <1425043775-3106827-4-git-send-email-arnd@arndb.de>
-Message-ID: <CAL_JsqJyhKQQ-9SdFkWu_Z1MKzHfxUtDjEPrDg=hYm3rnbsrFQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 27 Feb 2015 17:54:31 +0000
+Subject: [PATCH v2] drivers: cpuidle: cpuidle-arm64: include
+ asm/proc-fns.h explicitly
+In-Reply-To: <20150227173422.GI17949@e104818-lin.cambridge.arm.com>
+References: <20150226182307.GD17949@e104818-lin.cambridge.arm.com>
+ <54F09EFA.4090906@linaro.org> <20150227171604.GA12998@red-moon>
+ <54F0A703.6090808@linaro.org>
+ <20150227173422.GI17949@e104818-lin.cambridge.arm.com>
+Message-ID: <20150227175431.GA30173@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 7:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> In a multiplatform configuration, we may end up building a kernel
-> for both Marvell PJ1 and an ARMv4 CPU implementation. In that
-> case, the xscale-cp0 code is built with gcc -march=armv4{,t},
-> which results in a build error from the coprocessor instructions.
->
-> Since we know this code will only have to run on an actual xscale
-> processor, we can simply build the entire file for ARMv5TE.
->
-> Related to this, we need to handle the iWMMXT initialization sequence
-> differently during boot, to ensure we don't try to touch xscale
-> specific registers on other CPUs from the xscale_cp0_init initcall.
-> cpu_is_xscale() used to be hardcoded to '1' in any configuration
-> that enables any XScale-compatible core, but this breaks once
-> we can have a combined kernel with MMP1 and something else.
->
-> In this patch, I introduce two new macros, cpu_is_xscale()
-> and cpu_is_mohawk, so we can test for all three of them in
-> the iwmmxt initialization. The two existing users of
-> cpu_is_xscale() are modified accordingly, but slightly
-> change behavior for kernels that enable CPU_MOHAWK in combination
-> with CPU_XSCALE or CPU_XSC3. Previously, these would leave
-> clear PMD_BIT4 in the page tables, now they leave it untouched,
-> just like we always do for kernels that enable only CPU_MOHAWK.
-> Since the previous behavior was inconsistent, I assume it was
-> unintentional.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/include/asm/cputype.h | 27 +++++++++++++++++++++++++--
->  arch/arm/kernel/Makefile       |  1 +
->  arch/arm/kernel/xscale-cp0.c   |  6 ++++++
->  arch/arm/mm/idmap.c            |  3 ++-
->  4 files changed, 34 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-> index 819777d0e91f..7bc66e22afd7 100644
-> --- a/arch/arm/include/asm/cputype.h
-> +++ b/arch/arm/include/asm/cputype.h
-> @@ -228,10 +228,33 @@ static inline int cpu_is_xsc3(void)
->  }
->  #endif
->
-> -#if !defined(CONFIG_CPU_XSCALE) && !defined(CONFIG_CPU_XSC3)
-> +#if !defined(CONFIG_CPU_XSCALE)
+On Fri, Feb 27, 2015 at 05:34:22PM +0000, Catalin Marinas wrote:
+> On Fri, Feb 27, 2015 at 06:18:59PM +0100, Daniel Lezcano wrote:
+> > On 02/27/2015 06:16 PM, Lorenzo Pieralisi wrote:
+> > >On Fri, Feb 27, 2015 at 04:44:42PM +0000, Daniel Lezcano wrote:
+> > >>On 02/26/2015 07:23 PM, Catalin Marinas wrote:
+> > >>>On Wed, Feb 25, 2015 at 01:11:40PM +0000, Will Deacon wrote:
+> > >>>>On Wed, Feb 25, 2015 at 12:59:42PM +0000, Lorenzo Pieralisi wrote:
+> > >>>>>ARM64 CPUidle driver requires the cpu_do_idle function so that it can
+> > >>>>>be used to enter the shallowest idle state, and it is declared in
+> > >>>>>asm/proc-fns.h.
+> > >>>>>
+> > >>>>>The current ARM64 CPUidle driver does not include asm/proc-fns.h
+> > >>>>>explicitly and it has so far relied on implicit inclusion from other
+> > >>>>>header files.
+> > >>>>>
+> > >>>>>Owing to some header dependencies reshuffling this currently triggers
+> > >>>>>build failures when CONFIG_ARM64_64K_PAGES=y:
+> > >>>>>
+> > >>>>>drivers/cpuidle/cpuidle-arm64.c: In function "arm64_enter_idle_state"
+> > >>>>>drivers/cpuidle/cpuidle-arm64.c:42:3: error: implicit declaration of
+> > >>>>>function "cpu_do_idle" [-Werror=implicit-function-declaration]
+> > >>>>>     cpu_do_idle();
+> > >>>>>     ^
+> > >>>>>
+> > >>>>>This patch adds the explicit inclusion of the asm/proc-fns.h header file
+> > >>>>>to fix the build breakage and stop relying on implicit asm/proc-fns.h
+> > >>>>>inclusion.
+> > >>>>>
+> > >>>>>Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> > >>>>>[lp: rewrote commit log]
+> > >>>>>Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > >>>>>Tested-by: Mark Rutland <mark.rutland@arm.com>
+> > >>>>>---
+> > >>>>>v2 changes:
+> > >>>>
+> > >>>>Acked-by: Will Deacon <will.deacon@arm.com>
+> > >>>>
+> > >>>>Catalin will pick this up for -rc2, I suspect.
+> > >>>
+> > >>>I can merge this as long as Daniel or Rafael are fine with it.
+> > >>
+> > >>I am wondering if asm/proc-fns.h shouldn't be directly included in
+> > >>asm/cpuidle.h, otherwise each time cpuidle.h is included somewhere we
+> > >>have to include proc-fns.h also.
+> > >>
+> > >>It is not a problem for ARM64 because there is not a big number of
+> > >>cpuidle drivers but for ARM32 it is not the case. I have a patchset
+> > >>which put proc-fns.h inclusion directly in asm/cpuidle.h and cleanup the
+> > >>drivers. For the sake of consistency between ARM/ARM64 may be it would
+> > >>make sense to include in the cpuidle.h directly, no ?
+> > >
+> > >This patch is a build fix, and I'd rather get it in asap. We can move
+> > >the inclusion and merge the resulting clean-up patch in your series later.
+> > >I will put together the patch now, if Catalin has the pull request ready
+> > >to be sent I do not see the point in delaying it though.
+> > 
+> > I was just suggesting to put the proc-fns.h inclusion in cpuidle.h directly.
+> > That fixes the build also.
+> 
+> This would do as well, especially since you plan to clean up arch/arm as
+> well (or just move the cpu_do_idle() prototype in asm/cpuidle.h; we
+> moved cpu_suspend() there already).
 
-You could use IS_ENABLED here.
+What I wanted to say is that the clean-up will be merged the coming
+cycle anyway, not now, so I wanted to avoid delaying the pull request
+for something that could have been done later.
 
->  #define        cpu_is_xscale() 0
->  #else
-> -#define        cpu_is_xscale() 1
-> +static inline int cpu_is_xscale(void)
-> +{
-> +       unsigned int id;
-> +       id = read_cpuid_id() & 0xffffe000;
-> +
-> +       if ((id == 0x69052000) || (id == 0x69054000))
-> +               return 1;
-> +
-> +       return 0;
-> +}
-> +#endif
-> +
-> +#if !defined(CONFIG_CPU_MOHAWK)
+Reworked patch below (I kept the tags to avoid even more churn for a
+one-liner).
 
-And here.
+Thanks,
+Lorenzo
 
-> +#define        cpu_is_mohawk() 0
-> +#else
-> +static inline int cpu_is_mohawk(void)
-> +{
-> +       unsigned int id;
-> +       id = read_cpuid_id() & 0xffffe000;
-> +
-> +       if (id == 0x56158000)
-> +
-> +       return 0;
-> +}
->  #endif
->
->  /*
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index 902397dd1000..7840acff6cd3 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -67,6 +67,7 @@ obj-$(CONFIG_HAVE_HW_BREAKPOINT)      += hw_breakpoint.o
->  obj-$(CONFIG_CPU_XSCALE)       += xscale-cp0.o
->  obj-$(CONFIG_CPU_XSC3)         += xscale-cp0.o
->  obj-$(CONFIG_CPU_MOHAWK)       += xscale-cp0.o
-> +CFLAGS_xscale-cp0.o            += -Wa,-march=armv5te
->  obj-$(CONFIG_CPU_PJ4)          += pj4-cp0.o
->  obj-$(CONFIG_CPU_PJ4B)         += pj4-cp0.o
->  obj-$(CONFIG_IWMMXT)           += iwmmxt.o
-> diff --git a/arch/arm/kernel/xscale-cp0.c b/arch/arm/kernel/xscale-cp0.c
-> index bdbb8853a19b..a23420fab70e 100644
-> --- a/arch/arm/kernel/xscale-cp0.c
-> +++ b/arch/arm/kernel/xscale-cp0.c
-> @@ -15,6 +15,7 @@
->  #include <linux/init.h>
->  #include <linux/io.h>
->  #include <asm/thread_notify.h>
-> +#include <asm/cputype.h>
->
->  static inline void dsp_save_state(u32 *state)
->  {
-> @@ -152,6 +153,11 @@ static int __init xscale_cp0_init(void)
->  {
->         u32 cp_access;
->
-> +       /* do not attempt to probe iwmmxt on non-xscale family CPUs */
-> +       if (IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM) &&
+-- >8 --
+Subject: [PATCH] ARM64: cpuidle: add asm/proc-fns.h inclusion
 
-Do you really need this condition?
+ARM64 CPUidle driver requires the cpu_do_idle function so that it can
+be used to enter the shallowest idle state, and it is declared in
+asm/proc-fns.h.
 
-> +           !(cpu_is_xscale() || cpu_is_xsc3() || cpu_is_mohawk()))
-> +               return 0;
-> +
->         cp_access = xscale_cp_access_read() & ~3;
->         xscale_cp_access_write(cp_access | 1);
->
-> diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-> index e7a81cebbb2e..40140984db0a 100644
-> --- a/arch/arm/mm/idmap.c
-> +++ b/arch/arm/mm/idmap.c
-> @@ -86,7 +86,8 @@ static void identity_mapping_add(pgd_t *pgd, const char *text_start,
->
->         prot |= PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AF;
->
-> -       if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
-> +       if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ &&
-> +           !cpu_is_xscale() && !cpu_is_xsc3())
->                 prot |= PMD_BIT4;
->
->         pgd += pgd_index(addr);
-> --
-> 2.1.0.rc2
->
+The current ARM64 CPUidle driver does not include asm/proc-fns.h
+explicitly and it has so far relied on implicit inclusion from other
+header files.
+
+Owing to some header dependencies reshuffling this currently triggers
+build failures when CONFIG_ARM64_64K_PAGES=y:
+
+drivers/cpuidle/cpuidle-arm64.c: In function "arm64_enter_idle_state"
+drivers/cpuidle/cpuidle-arm64.c:42:3: error: implicit declaration of
+function "cpu_do_idle" [-Werror=implicit-function-declaration]
+   cpu_do_idle();
+   ^
+
+This patch adds the explicit inclusion of the asm/proc-fns.h header file
+in the arm64 asm/cpuidle.h header file, so that the build breakage is fixed
+and the required header inclusion is added to the appropriate arch back-end
+CPUidle header, already included by the CPUidle arm64 driver, where
+CPUidle arch related function declarations belong.
+
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+[lp: rewrote commit log, moved include to arm64 asm/cpuidle.h]
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/include/asm/cpuidle.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/include/asm/cpuidle.h b/arch/arm64/include/asm/cpuidle.h
+index 0710654..c60643f 100644
+--- a/arch/arm64/include/asm/cpuidle.h
++++ b/arch/arm64/include/asm/cpuidle.h
+@@ -1,6 +1,8 @@
+ #ifndef __ASM_CPUIDLE_H
+ #define __ASM_CPUIDLE_H
+ 
++#include <asm/proc-fns.h>
++
+ #ifdef CONFIG_CPU_IDLE
+ extern int cpu_init_idle(unsigned int cpu);
+ extern int cpu_suspend(unsigned long arg);
+-- 
+1.9.1
