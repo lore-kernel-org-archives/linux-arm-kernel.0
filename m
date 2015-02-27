@@ -1,50 +1,60 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 27 Feb 2015 15:52:54 -0800
-Subject: [PATCH 2/3] dtb: change binding name to match with newer firmware
- DT
-In-Reply-To: <4061014.S4PDWltU3G@wuerfel>
+Date: Fri, 27 Feb 2015 15:58:28 -0800
+Subject: [PATCH 1/3] Documentation: dts: Update compatible field
+ description for APM X-Gene
+In-Reply-To: <20150227201516.GA30683@leverpostej>
 References: <1425067710-14879-1-git-send-email-isubramanian@apm.com>
- <1425067710-14879-3-git-send-email-isubramanian@apm.com>
- <4061014.S4PDWltU3G@wuerfel>
-Message-ID: <CAKh23Fm5HpNEfs40RTf_XtQ6ris5cCheAcY1WdLND04AwsvdSQ@mail.gmail.com>
+ <1425067710-14879-2-git-send-email-isubramanian@apm.com>
+ <20150227201516.GA30683@leverpostej>
+Message-ID: <CAKh23FmLE-s_C5YUjLTQLT0_P9DT6LzmaBxJPRWY4AwXK9jQNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 12:33 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 27 February 2015 12:08:29 Iyappan Subramanian wrote:
->> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
->> index f1ad9c2..a857794 100644
->> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
->> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
->> @@ -622,7 +622,7 @@
->>                 };
+On Fri, Feb 27, 2015 at 12:15 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Feb 27, 2015 at 08:08:28PM +0000, Iyappan Subramanian wrote:
+>> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+>> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+>> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+>> ---
+>>  Documentation/devicetree/bindings/net/apm-xgene-enet.txt | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
 >>
->>                 sgenet0: ethernet at 1f210000 {
->> -                       compatible = "apm,xgene-enet";
->> +                       compatible = "apm,xgene1-sgenet";
->>                         status = "disabled";
->>                         reg = <0x0 0x1f210000 0x0 0xd100>,
->>                               <0x0 0x1f200000 0x0 0Xc300>,
+>> diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+>> index cfcc527..5355996 100644
+>> --- a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+>> +++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+>> @@ -4,7 +4,8 @@ Ethernet nodes are defined to describe on-chip ethernet interfaces in
+>>  APM X-Gene SoC.
 >>
+>>  Required properties for all the ethernet interfaces:
+>> -- compatible: Should be "apm,xgene-enet"
+>> +- compatible: Should be "apm,xgene-enet", "apm,xgene1-sgenet" or
+>> +  "apm,xgene1-xgenet"
 >
-> This will break booting the new dtb on older kernels, right?
+> Please format this as a list. It'll be easier to read, and you can add
+> more later.
 
-This will not break booting older kernels.  In fact, this will fix it,
-by having the specific binding,
-older kernel that does not have support for these interfaces, will not
-call probe.
-
-For example, 3.17 kernel that does not have support for SGMII based 1G
-and XFI 10G interfaces
-will not probe these interfaces when booted with newer dtb.
+Thanks.  I will do that.
 
 >
-> You should normally list the most generic model in addition to the
-> specific one.
+> What are the diffences between these variants?
 
-If we list generic model ("xgene-enet") as well, probe will be called
-for the interfaces that the kernel does not have support for,
-which is what we are trying to fix.
+apm,xgene-enet - binding for RGMII based 1G interface
+apm,xgene1-sgenet - binding for SGMII based 1G interface
+apm,xgene1-xgenet - binding for XFI based 10G interface
+
 
 >
->         Arnd
+> Mark.
+>
+>>  - reg: Address and length of the register set for the device. It contains the
+>>    information of registers in the same order as described by reg-names
+>>  - reg-names: Should contain the register set names
+>> --
+>> 1.9.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
