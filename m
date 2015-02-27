@@ -1,46 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Feb 2015 10:33:47 +0000
-Subject: tlbi  va, vaa vs. val, vaal
-In-Reply-To: <54F046F2.7020705@arm.com>
-References: <54EFB670.2070501@samsung.com> <20150227102435.GC3628@arm.com>
- <54F046F2.7020705@arm.com>
-Message-ID: <20150227103347.GE3628@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Feb 2015 11:34:22 +0100
+Subject: [PATCH 2/2] w1: masters: omap_hdq: Add support for 1-wire mode
+In-Reply-To: <54F04767.5070001@ti.com>
+References: <1425029057-5075-1-git-send-email-vigneshr@ti.com>
+ <10805905.OnX7kRTk9d@wuerfel> <54F04767.5070001@ti.com>
+Message-ID: <4111301.XAv3eRBo5S@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 10:29:06AM +0000, Marc Zyngier wrote:
-> On 27/02/15 10:24, Will Deacon wrote:
-> > On Fri, Feb 27, 2015 at 12:12:32AM +0000, Mario Smarduch wrote:
-> >> I noticed kernel tlbflush.h use tlbi va*, vaa* variants instead of
-> >> val, vaal ones. Reading the manual D.5.7.2 it appears that
-> >> va*, vaa* versions invalidate intermediate caching of
-> >> translation structures.
+On Friday 27 February 2015 16:01:03 Vignesh R wrote:
+> On Friday 27 February 2015 03:25 PM, Arnd Bergmann wrote:
+> > On Friday 27 February 2015 14:54:17 Vignesh R wrote:
+> >> +- compatible : should be "ti,omap3-1w" or "ti,am43xx-hdq"
 > >>
-> >> With stage2 enabled that may result in 20+ memory lookups
-> >> for a 4 level page table walk. That's assuming that intermediate
-> >> caching structures cache mappings from stage1 table entry to
-> >> host page.
 > > 
-> > Yeah, Catalin and I discussed improving the kernel support for this,
-> > but it requires some changes to the generic mmu_gather code so that we
-> > can distinguish the leaf cases. I'd also like to see that done in a way
-> > that takes into account different granule sizes (we currently iterate
-> > over huge pages in 4k chunks). Last time I touched that, I entered a
-> > world of pain and don't plan to return there immediately :)
-> > 
-> > Catalin -- feeling brave?
-> > 
-> > FWIW: the new IOMMU page-table stuff I just got merged *does* make use
-> > of leaf-invalidation for the SMMU.
+> > Do not use wildcards in the compatible string, use real part numbers
+> > if you don't know the actual name of the device.
 > 
-> Now, talking about feeling brave: who will be silly enough to port KVM
-> to the IOMMU page table code? It should just work(tm), right?
+> 
+> The DT node for hdq on AM437x is already present in mainline
+> (commit: 741cac5f00beb) and it declares compatibility as
+> "ti,am43xx-hdq". Hence, I cannot change into anything different.
+> 
 
-I suspect you'll need to do some surgery to the interfaces, which currently
-map directly onto the IOMMU API and therefore make nice assumptions about
-what we get asked to map/unmap. You also probably want a wider range of
-permissions than we use on the SMMU. Finally, the runtime nature of the
-code (we make no assumptions about address sizes, page sizes etc) probably
-incurs a performance hit that you may or may not care about.
+No, there is no driver using this device, and the binding was
+not documented, so there is no problem in changing it: nobody
+will notice a regression when it was never working before.
 
-Will
+	Arnd
