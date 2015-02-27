@@ -1,38 +1,41 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 27 Feb 2015 17:50:23 +0100
-Subject: [PATCH] cpuidle: mvebu: Fix the CPU PM notifier usage
-In-Reply-To: <4892716.Bf612zPN6E@vostro.rjw.lan>
-References: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
- <4892716.Bf612zPN6E@vostro.rjw.lan>
-Message-ID: <54F0A04F.20706@linaro.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 27 Feb 2015 08:59:44 -0800
+Subject: Bug in i2c-core?
+In-Reply-To: <54F0507F.6030804@armadeus.com>
+References: <54F0507F.6030804@armadeus.com>
+Message-ID: <20150227165944.GA6679@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2015 10:55 PM, Rafael J. Wysocki wrote:
-> On Thursday, February 26, 2015 06:20:48 PM Gregory CLEMENT wrote:
->> As stated in kernel/cpu_pm.c, "Platform is responsible for ensuring
->> that cpu_pm_enter is not called twice on the same CPU before
->> cpu_pm_exit is called.". In the current code in case of failure when
->> calling mvebu_v7_cpu_suspend, the function cpu_pm_exit() is never
->> called whereas cpu_pm_enter() was called just before.
->>
->> This patch moves the cpu_pm_exit() in order to balance the
->> cpu_pm_enter() calls.
->>
->> Reported-by: Fulvio Benini <fbf@libero.it>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->
-> Should that go to "stable" too?  Which "stable" series it should go to if so?
+On Fri, Feb 27, 2015 at 12:09:51PM +0100, S?bastien SZYMANSKI wrote:
+> Hi,
+> 
+> I am writing an I2C touchscreen driver for an i.MX6 based board. I
+> compiled it as a module and when I unload it, I get the following warning:
+> 
+> # modprobe sx8654
+> [   46.261494] input: SX8654 I2C Touchscreen as
+> /devices/soc0/soc/2100000.aips-bus/21a0000.i2c/i2c-0/0-0048/input/input1
+> # rmmod sx8654
+> [   76.435223] ------------[ cut here ]------------
+> [   76.439909] WARNING: CPU: 0 PID: 134 at fs/proc/generic.c:552
+> remove_proc_entry+0x148/0x164()
+> [   76.448582] remove_proc_entry: removing non-empty directory
+> 'irq/208', leaking at least 'sx8654'
 
-Hi Rafael,
+...
 
-do you mind if I take this fix in my tree ? There is the same issue for 
-cpuidle-arm64.c I fixed.
+> When I revert commit e4df3a0 (i2c: core: Dispose OF IRQ mapping at
+> client removal time) I don't get the warning.
+> 
+> Is this a bug in the i2c-core or am I doing something wrong in my driver?
 
+Yes, this commit breaks all drivers using devm* for IRQ management on
+OF-based systemsi because devm* cleanup happens in device code, after
+bus's remove() method returns. I'd recommend reverting and finding a
+better way (making cleanup a custom devm action as well?).
+
+Thanks.
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Dmitry
