@@ -1,59 +1,57 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 26 Feb 2015 16:20:01 -0800
-Subject: [PATCH] Fix offset2lib issue for x86*, ARM*, PowerPC and MIPS
-In-Reply-To: <CAGXu5j+3D7FrAJNLHTgEuK5wnOmUZG13xxi6eONuWiY2zKCMqQ@mail.gmail.com>
-References: <54EB735F.5030207@upv.es>
- <CAGXu5j+SBRcj+BGyxEwUzgKsB2fdzNiPY37Q=JTsf=-QbGwoGA@mail.gmail.com>
- <20150223205436.15133mg1kpyojyik@webmail.upv.es>
- <20150224073906.GA16422@gmail.com>
- <20150226143815.09386fe280c7bd8797048bb2@linux-foundation.org>
- <20150227102136.17ef1fe6@canb.auug.org.au>
- <20150226153435.df670671fb10eb9efa0fa845@linux-foundation.org>
- <CAGXu5jK0YbyL+Z=YrCfkfGbYz6=65Rr_MAXLwrF36gJa2Ce4_w@mail.gmail.com>
- <20150226160641.547657c397ecfee078779217@linux-foundation.org>
- <CAGXu5j+3D7FrAJNLHTgEuK5wnOmUZG13xxi6eONuWiY2zKCMqQ@mail.gmail.com>
-Message-ID: <CAGXu5jLVKzLC8qFr+B2N06PJ0Ap88=8KSphEiYtNH28uOBLp7g@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 26 Feb 2015 18:21:51 -0600
+Subject: [PATCH] pci: host: xgene: fix incorrectly returned address by
+ map_bus
+In-Reply-To: <1424214840-26498-1-git-send-email-fkan@apm.com>
+References: <1424214840-26498-1-git-send-email-fkan@apm.com>
+Message-ID: <20150227002151.GG25765@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 4:11 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Thu, Feb 26, 2015 at 4:06 PM, Andrew Morton
-> <akpm@linux-foundation.org> wrote:
->> On Thu, 26 Feb 2015 15:37:37 -0800 Kees Cook <keescook@chromium.org> wrote:
->>
->>> Agh, no, please let's avoid the CONFIG addition.
->>
->> That is precisely how we do this.
->>
->>> Hector mentioned in private mail that he was looking at an alternative
->>> that adds exec_base to struct mm which would avoid all this insanity.
->>>
->>> Can't we do something like:
->>>
->>> #ifndef mmap_rnd
->>> # define mmap_rnd 0
->>> #endif
->>
->> Sure, and sprinkle
->>
->> #define mmap_rnd mmap_rnd
->>
->> in five arch header files where nobody thinks to look.
->>
->> For better or for worse, we are consolidating such things into arch/*/Kconfig.
->
-> Okay, fair enough. Even with your configs (though shouldn't they be
-> ARCH_HAS or just HAVE?) I've now stumbled over the issue that we can't
-> put randomize_et_dyn in binfmt_elf because it conflicts with linking
-> against compat_binfmt_elf.
+On Tue, Feb 17, 2015 at 03:14:00PM -0800, Feng Kan wrote:
+> The generic accessor functions for pci-xgene uses map_bus
+> call that returns the base address but did not add the additional
+> offset.
+> 
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> ---
+>  drivers/pci/host/pci-xgene.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> index aab5547..ee082c0 100644
+> --- a/drivers/pci/host/pci-xgene.c
+> +++ b/drivers/pci/host/pci-xgene.c
+> @@ -127,7 +127,7 @@ static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
+>  	return false;
+>  }
+>  
+> -static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+> +static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+>  			      int offset)
+>  {
+>  	struct xgene_pcie_port *port = bus->sysdata;
+> @@ -137,7 +137,7 @@ static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+>  		return NULL;
+>  
+>  	xgene_pcie_set_rtdid_reg(bus, devfn);
+> -	return xgene_pcie_get_cfg_base(bus);
+> +	return xgene_pcie_get_cfg_base(bus) + offset;
 
-Instead of all this, how about we rework the existing CONFIG and just
-change around how s390 does this to match the other architectures and
-remove the ifdef in binfmt_elf.c at the same time? Let me work
-something up...
+Where's the locking here?  ECAM doesn't need locking because the
+bus/dev/fn/offset is all encoded in the MMIO address.  But it looks
+like X-Gene doesn't work that way and bus/dev/fn is in the RTDID register.
 
--Kees
+So it seems like X-Gene needs locking that not everybody needs.  Are you
+relying on higher-level locking somewhere?
 
--- 
-Kees Cook
-Chrome OS Security
+>  }
+>  
+>  static struct pci_ops xgene_pcie_ops = {
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
