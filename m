@@ -1,61 +1,27 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Fri, 27 Feb 2015 08:41:07 -0500
-Subject: [PATCH] arm64: Fix text patching logic when using fixmap
-In-Reply-To: <54F0703C.5090009@redhat.com>
-References: <1424795421-26630-1-git-send-email-marc.zyngier@arm.com>
- <54F0703C.5090009@redhat.com>
-Message-ID: <54F073F3.5080604@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Feb 2015 14:44:08 +0100
+Subject: [PATCH 4/5] ARM: shmobile: Add support SOC_BUS to R-Car Gen2
+In-Reply-To: <CAMuHMdXU6xTNec=82wXuBqh68qt8Amc1mo2c7nGYKDQO=rqTKQ@mail.gmail.com>
+References: <cover.1424931398.git.horms+renesas@verge.net.au>
+ <2088679.zVJXCDlFW0@wuerfel>
+ <CAMuHMdXU6xTNec=82wXuBqh68qt8Amc1mo2c7nGYKDQO=rqTKQ@mail.gmail.com>
+Message-ID: <2529709.qprrL8H0DB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2015 08:25 AM, Jon Masters wrote:
-> On 02/24/2015 11:30 AM, Marc Zyngier wrote:
->> Patch 2f896d586610 ("arm64: use fixmap for text patching") changed
->> the way we patch the kernel text, using a fixmap when the kernel or
->> modules are flagged as read only.
->>
->> Unfortunately, a flaw in the logic makes it fall over when patching
->> modules without CONFIG_DEBUG_SET_MODULE_RONX enabled:
->>
->> [...]
->> [   32.032636] Call trace:
->> [   32.032716] [<fffffe00003da0dc>] __copy_to_user+0x2c/0x60
->> [   32.032837] [<fffffe0000099f08>] __aarch64_insn_write+0x94/0xf8
->> [   32.033027] [<fffffe000009a0a0>] aarch64_insn_patch_text_nosync+0x18/0x58
->> [   32.033200] [<fffffe000009c3ec>] ftrace_modify_code+0x58/0x84
->> [   32.033363] [<fffffe000009c4e4>] ftrace_make_nop+0x3c/0x58
->> [   32.033532] [<fffffe0000164420>] ftrace_process_locs+0x3d0/0x5c8
->> [   32.033709] [<fffffe00001661cc>] ftrace_module_init+0x28/0x34
->> [   32.033882] [<fffffe0000135148>] load_module+0xbb8/0xfc4
->> [   32.034044] [<fffffe0000135714>] SyS_finit_module+0x94/0xc4
->> [...]
->>
->> This is triggered by the use of virt_to_page() on a module address,
->> which ends to pointing to Nowhereland if you're lucky, or corrupt
->> your precious data if not.
->>
->> This patch fixes the logic by mimicking what is done on arm:
->> - If we're patching a module and CONFIG_DEBUG_SET_MODULE_RONX is set,
->>   use vmalloc_to_page().
->> - If we're patching the kernel and CONFIG_DEBUG_RODATA is set,
->>   use virt_to_page().
->> - Otherwise, use the provided address, as we can write to it directly.
->>
->> Tested on 4.0-rc1 as a KVM guest.
->>
->> Reported-by: Richard W.M. Jones <rjones@redhat.com>
->> Cc: Kees Cook <keescook@chromium.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Laura Abbott <lauraa@codeaurora.org>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Friday 27 February 2015 11:41:04 Geert Uytterhoeven wrote:
+> > We must not introduce the user interface in one kernel and then change
+> > it in the next one, so I'm cautious about taking the pull request in
+> > the current form. Once we have agreed on what the contents of the sysfs
+> > files should be, I can take the patches, and then we are free to move
+> > the implementation later.
 > 
-> This fixes a crash on boot in the AHCI driver experienced by a test
-> Fedora Hosted arm64 kernel when running on various platforms.
+> Currently machine contains e.g. "Koelsch", which is the name of the board,
+> not of the SoC.
 > 
-> Tested by me on AMD Seattle and confirmed fixing the issue.
+> We can derive the SoC name from soc_id, e.g. 0x47 = "R-Car M2-W".
 > 
-> Tested-by: Jon Masters <jcm@redhat.com>
 
-(In case anyone cares also tested on APM Mustang and it fixes the same)
+Yes, I think that would be best.
+
+	Arnd
