@@ -1,45 +1,49 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 27 Feb 2015 17:21:34 +0530
-Subject: [PATCH 3/3] clockevents: Don't validate dev->mode against
- CLOCK_EVT_MODE_UNUSED for new interface
-In-Reply-To: <cover.1425037853.git.viresh.kumar@linaro.org>
-References: <cover.1425037853.git.viresh.kumar@linaro.org>
-Message-ID: <c6604fa1a77fe1fc8dcab87769857228fb1dadd5.1425037853.git.viresh.kumar@linaro.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 27 Feb 2015 12:07:51 +0000
+Subject: [PATCH] arm/arm64: KVM: fix missing unlock on error in
+ kvm_vgic_create()
+In-Reply-To: <1425037305-23292-1-git-send-email-weiyj_lk@163.com>
+References: <1425037305-23292-1-git-send-email-weiyj_lk@163.com>
+Message-ID: <54F05E17.9090904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It was a requirement in the legacy interface that drivers must initialize ->mode
-field to 'CLOCK_EVT_MODE_UNUSED'. This field isn't used anymore by the new
-interface and so should be only checked for the legacy interface.
+Hi Wei,
 
-Probably it can be dropped as well as core doesn't rely on it anymore, but lets
-keep it to support legacy interface.
+On 27/02/15 11:41, weiyj_lk at 163.com wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> Add the missing unlock before return from function kvm_vgic_create()
+> in the error handling case.
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> ---
+>  virt/kvm/arm/vgic.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 0cc6ab6..4b2c2e7 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1583,8 +1583,10 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
+>  	 * emulation. So check this here again. KVM_CREATE_DEVICE does
+>  	 * the proper checks already.
+>  	 */
+> -	if (type == KVM_DEV_TYPE_ARM_VGIC_V2 && !vgic->can_emulate_gicv2)
+> -		return -ENODEV;
+> +	if (type == KVM_DEV_TYPE_ARM_VGIC_V2 && !vgic->can_emulate_gicv2) {
+> +		ret = -ENODEV;
+> +		goto out;
+> +	}
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- kernel/time/clockevents.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Ah, good catch. Embarrassing that that could slip through ...
 
-diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-index 6e53e9a0c2e8..73689df1e4b8 100644
---- a/kernel/time/clockevents.c
-+++ b/kernel/time/clockevents.c
-@@ -450,6 +450,8 @@ static int clockevents_sanity_check(struct clock_event_device *dev)
- 		/* We shouldn't be supporting new modes now */
- 		WARN_ON(dev->set_state_periodic || dev->set_state_oneshot ||
- 			dev->set_state_shutdown || dev->tick_resume);
-+
-+		BUG_ON(dev->mode != CLOCK_EVT_MODE_UNUSED);
- 		return 0;
- 	}
- 
-@@ -479,7 +481,6 @@ void clockevents_register_device(struct clock_event_device *dev)
- {
- 	unsigned long flags;
- 
--	BUG_ON(dev->mode != CLOCK_EVT_MODE_UNUSED);
- 	BUG_ON(clockevents_sanity_check(dev));
- 
- 	/* Initialize state to DETACHED */
--- 
-2.3.0.rc0.44.ga94655d
+
+Acked-by: Andre Przywara <andre.przywara@arm.com>
+
+
+Out of curiosity: did you see it hang or was this just by looking at the
+code? I thought that I tested this case ...
+
+Cheers,
+Andre.
