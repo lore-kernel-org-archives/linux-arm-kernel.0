@@ -1,496 +1,202 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 27 Feb 2015 13:24:45 +0100
-Subject: [PATCH v2 4/4] ARM: dts: dove: Add proper support for Compulab
- CM-A510/SBC-A510
+Date: Fri, 27 Feb 2015 13:24:42 +0100
+Subject: [PATCH v2 1/4] i2c: mux-pinctrl: Rework to honor disabled child nodes
 In-Reply-To: <1425039885-5137-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1424199129-22099-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1425039885-5137-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1425039885-5137-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1425039885-5137-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Existing dts file for Compulab CM-A510 was very limited due to missing
-hardware. Now that we actually found somebody with that board, properly
-rework it to provide a CoM/SoM include and a board file for Compulab's
-SBC-A510.
+I2C mux pinctrl driver currently determines the number of sub-busses by
+counting available pinctrl-names. Unfortunately, this requires each
+incarnation of the devicetree node with different available sub-busses
+to be rewritten.
 
-Both the CM-A510 SoM and the SBC-A510 can be configured with different
-options, so we only enable a minimum set of options. The actual board
-configuration will have to be set by either the bootloader or user.
+This patch reworks i2c-mux-pinctrl driver to count the number of
+available sub-nodes instead. The rework should be compatible to the old
+way of probing for sub-busses and additionally allows to disable unused
+sub-busses with standard DT property status = "disabled".
 
-Although functionally not required, repeat even disabled nodes again
-to increse their visibility in the dtsi/dts files.
+This also amends the corresponding devicetree binding documentation to
+reflect the new functionality to disable unused sub-nodes. While at it,
+also fix two references to binding documentation files that miss an "i2c-"
+prefix.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Tested-by: Gabriel Dobato <dobatog@gmail.com>
+Tested-by: Stephen Warren <swarren@nvidia.com>
 ---
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Gregory Clement <gregory.clement@free-electrons.com>
 Cc: Gabriel Dobato <dobatog@gmail.com>
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: linux-i2c at vger.kernel.org
+Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/Makefile          |   4 +-
- arch/arm/boot/dts/dove-cm-a510.dts  |  38 -------
- arch/arm/boot/dts/dove-cm-a510.dtsi | 195 ++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/dove-sbc-a510.dts | 182 +++++++++++++++++++++++++++++++++
- 4 files changed, 379 insertions(+), 40 deletions(-)
- delete mode 100644 arch/arm/boot/dts/dove-cm-a510.dts
- create mode 100644 arch/arm/boot/dts/dove-cm-a510.dtsi
- create mode 100644 arch/arm/boot/dts/dove-sbc-a510.dts
+ .../devicetree/bindings/i2c/i2c-mux-pinctrl.txt    | 25 ++++----
+ drivers/i2c/muxes/i2c-mux-pinctrl.c                | 70 ++++++++++++++--------
+ 2 files changed, 59 insertions(+), 36 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a1c776b8dcec..aedac13a3304 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -634,12 +634,12 @@ dtb-$(CONFIG_MACH_ARMADA_XP) += \
- 	armada-xp-openblocks-ax3-4.dtb \
- 	armada-xp-synology-ds414.dtb
- dtb-$(CONFIG_MACH_DOVE) += \
--	dove-cm-a510.dtb \
- 	dove-cubox.dtb \
- 	dove-cubox-es.dtb \
- 	dove-d2plug.dtb \
- 	dove-d3plug.dtb \
--	dove-dove-db.dtb
-+	dove-dove-db.dtb \
-+	dove-sbc-a510.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += \
- 	mt6589-aquaris5.dtb \
- 	mt6592-evb.dtb \
-diff --git a/arch/arm/boot/dts/dove-cm-a510.dts b/arch/arm/boot/dts/dove-cm-a510.dts
-deleted file mode 100644
-index 50c0d6904497..000000000000
---- a/arch/arm/boot/dts/dove-cm-a510.dts
-+++ /dev/null
-@@ -1,38 +0,0 @@
--/dts-v1/;
--
--#include "dove.dtsi"
--
--/ {
--	model = "Compulab CM-A510";
--	compatible = "compulab,cm-a510", "marvell,dove";
--
--	memory {
--		device_type = "memory";
--		reg = <0x00000000 0x40000000>;
--	};
--
--	chosen {
--		bootargs = "console=ttyS0,115200n8 earlyprintk";
--	};
--};
--
--&uart0 { status = "okay"; };
--&uart1 { status = "okay"; };
--&sdio0 { status = "okay"; };
--&sdio1 { status = "okay"; };
--&sata0 { status = "okay"; };
--
--&spi0 {
--	status = "okay";
--
--	/* spi0.0: 4M Flash Winbond W25Q32BV */
--	spi-flash at 0 {
--		compatible = "st,w25q32";
--		spi-max-frequency = <20000000>;
--		reg = <0>;
--	};
--};
--
--&i2c0 {
--	  status = "okay";
--};
-diff --git a/arch/arm/boot/dts/dove-cm-a510.dtsi b/arch/arm/boot/dts/dove-cm-a510.dtsi
-new file mode 100644
-index 000000000000..ef670bd040d3
---- /dev/null
-+++ b/arch/arm/boot/dts/dove-cm-a510.dtsi
-@@ -0,0 +1,195 @@
-+/*
-+ * Device Tree include for Compulab CM-A510 System-on-Module
-+ *
-+ * Copyright (C) 2015, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-mux-pinctrl.txt b/Documentation/devicetree/bindings/i2c/i2c-mux-pinctrl.txt
+index ae8af1694e95..40cf6d86f935 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-mux-pinctrl.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-mux-pinctrl.txt
+@@ -28,21 +28,21 @@ Also required are:
+ * Standard pinctrl properties that specify the pin mux state for each child
+   bus. See ../pinctrl/pinctrl-bindings.txt.
+ 
+-* Standard I2C mux properties. See mux.txt in this directory.
++* Standard I2C mux properties. See i2c-mux.txt in this directory.
+ 
+-* I2C child bus nodes. See mux.txt in this directory.
++* I2C child bus nodes. See i2c-mux.txt in this directory.
+ 
+-For each named state defined in the pinctrl-names property, an I2C child bus
+-will be created. I2C child bus numbers are assigned based on the index into
+-the pinctrl-names property.
++For each enabled child node an I2C child bus will be created. I2C child bus
++numbers are assigned based on the order of child nodes.
+ 
+-The only exception is that no bus will be created for a state named "idle". If
+-such a state is defined, it must be the last entry in pinctrl-names. For
+-example:
++There must be a corresponding pinctrl-names entry for each enabled child
++node at the position of the child node's "reg" property. Also, there can be
++an idle pinctrl state defined at the end of possible pinctrl states. If such
++a state is defined, it must be the last entry in pinctrl-names. For example:
+ 
+-	pinctrl-names = "ddc", "pta", "idle"  ->  ddc = bus 0, pta = bus 1
+-	pinctrl-names = "ddc", "idle", "pta"  ->  Invalid ("idle" not last)
+-	pinctrl-names = "idle", "ddc", "pta"  ->  Invalid ("idle" not last)
++       pinctrl-names = "ddc", "pta", "idle"  ->  ddc = bus 0, pta = bus 1
++       pinctrl-names = "ddc", "idle", "pta"  ->  Invalid ("idle" not last)
++       pinctrl-names = "idle", "ddc", "pta"  ->  Invalid ("idle" not last)
+ 
+ Whenever an access is made to a device on a child bus, the relevant pinctrl
+ state will be programmed into hardware.
+@@ -68,6 +68,7 @@ Example:
+ 		pinctrl-1 = <&state_i2cmux_pta>;
+ 		pinctrl-2 = <&state_i2cmux_idle>;
+ 
++		/* Enabled child bus 0 */
+ 		i2c at 0 {
+ 			reg = <0>;
+ 			#address-cells = <1>;
+@@ -79,10 +80,12 @@ Example:
+ 			};
+ 		};
+ 
++		/* Disabled child bus 1 */
+ 		i2c at 1 {
+ 			reg = <1>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			status = "disabled";
+ 
+ 			eeprom {
+ 				compatible = "eeprom";
+diff --git a/drivers/i2c/muxes/i2c-mux-pinctrl.c b/drivers/i2c/muxes/i2c-mux-pinctrl.c
+index b48378c4b40d..033dacfabfdf 100644
+--- a/drivers/i2c/muxes/i2c-mux-pinctrl.c
++++ b/drivers/i2c/muxes/i2c-mux-pinctrl.c
+@@ -56,9 +56,12 @@ static int i2c_mux_pinctrl_parse_dt(struct i2c_mux_pinctrl *mux,
+ 				struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+-	int num_names, i, ret;
++	struct device_node *child;
++	struct property *prop;
++	int num_names, num_children, ret;
+ 	struct device_node *adapter_np;
+ 	struct i2c_adapter *adapter;
++	const char *state;
+ 
+ 	if (!np)
+ 		return 0;
+@@ -77,32 +80,16 @@ static int i2c_mux_pinctrl_parse_dt(struct i2c_mux_pinctrl *mux,
+ 		return num_names;
+ 	}
+ 
+-	mux->pdata->pinctrl_states = devm_kzalloc(&pdev->dev,
+-		sizeof(*mux->pdata->pinctrl_states) * num_names,
+-		GFP_KERNEL);
+-	if (!mux->pdata->pinctrl_states) {
+-		dev_err(mux->dev, "Cannot allocate pinctrl_states\n");
+-		return -ENOMEM;
++	num_children = of_get_available_child_count(np);
++	if (num_children < 0) {
++		dev_err(mux->dev, "Unable to count available children: %d\n",
++			num_children);
++		return num_children;
+ 	}
+ 
+-	for (i = 0; i < num_names; i++) {
+-		ret = of_property_read_string_index(np, "pinctrl-names", i,
+-			&mux->pdata->pinctrl_states[mux->pdata->bus_count]);
+-		if (ret < 0) {
+-			dev_err(mux->dev, "Cannot parse pinctrl-names: %d\n",
+-				ret);
+-			return ret;
+-		}
+-		if (!strcmp(mux->pdata->pinctrl_states[mux->pdata->bus_count],
+-			    "idle")) {
+-			if (i != num_names - 1) {
+-				dev_err(mux->dev, "idle state must be last\n");
+-				return -EINVAL;
+-			}
+-			mux->pdata->pinctrl_state_idle = "idle";
+-		} else {
+-			mux->pdata->bus_count++;
+-		}
++	if (num_names < num_children) {
++		dev_err(mux->dev, "Found less pinctrl states than children\n");
++		return -EINVAL;
+ 	}
+ 
+ 	adapter_np = of_parse_phandle(np, "i2c-parent", 0);
+@@ -118,6 +105,39 @@ static int i2c_mux_pinctrl_parse_dt(struct i2c_mux_pinctrl *mux,
+ 	mux->pdata->parent_bus_num = i2c_adapter_id(adapter);
+ 	put_device(&adapter->dev);
+ 
++	mux->pdata->pinctrl_states = devm_kzalloc(&pdev->dev,
++		sizeof(*mux->pdata->pinctrl_states) * num_children,
++		GFP_KERNEL);
++	if (!mux->pdata->pinctrl_states) {
++		dev_err(mux->dev, "Cannot allocate pinctrl_states\n");
++		return -ENOMEM;
++	}
 +
-+/*
-+ * The CM-A510 comes with several optional components:
-+ *
-+ * Memory options:
-+ *  D512: 512M
-+ *  D1024: 1G
-+ *
-+ * NAND options:
-+ *  N512: 512M NAND
-+ *
-+ * Ethernet options:
-+ *  E1: PHY RTL8211D on internal GbE (SMI address 0x03)
-+ *  E2: Additional ethernet NIC RTL8111D on PCIe1
-+ *
-+ * Audio options:
-+ *  A: TI TLV320AIC23b audio codec (I2C address 0x1a)
-+ *
-+ * Touchscreen options:
-+ *  I: TI TSC2046 touchscreen controller (on SPI1)
-+ *
-+ * USB options:
-+ *  U2: 2 dual-role USB2.0 ports
-+ *  U4: 2 additional USB2.0 host ports (via USB1)
-+ *
-+ * WiFi options:
-+ *  W: Broadcom BCM4319 802.11b/g/n (USI WM-N-BM-01 on SDIO1)
-+ *
-+ * GPIOs used on CM-A510:
-+ *   1 GbE PHY reset (active low)
-+ *   3 WakeUp
-+ *   8 PowerOff (active low)
-+ *  13 Touchscreen pen irq (active low)
-+ *  65 System LED (active high)
-+ *  69 USB Hub reset (active low)
-+ *  70 WLAN reset (active low)
-+ *  71 WLAN regulator (active high)
-+ */
++	of_property_for_each_string(np, "pinctrl-names", prop, state)
++		if (!strcmp(state, "idle"))
++			mux->pdata->pinctrl_state_idle = "idle";
 +
-+#include "dove.dtsi"
++	for_each_available_child_of_node(np, child) {
++		u32 reg;
 +
-+/ {
-+	model = "Compulab CM-A510";
-+	compatible = "compulab,cm-a510", "marvell,dove";
++		ret = of_property_read_u32(child, "reg", &reg);
++		if (ret < 0) {
++			dev_err(mux->dev, "Missing reg property for child node: %d\n",
++				ret);
++			return ret;
++		}
 +
-+	/*
-+	 * Set the minimum memory size here and let the
-+	 * bootloader set the real size.
-+	 */
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x20000000>;
-+	};
++		ret = of_property_read_string_index(np,
++				    "pinctrl-names", reg, &state);
++		if (ret < 0) {
++			dev_err(mux->dev, "Cannot parse pinctrl-names for mux %d: %d\n",
++				reg, ret);
++			return ret;
++		}
 +
-+	leds {
-+		compatible = "gpio-leds";
-+		/* Set upper NAND data bit to GPO */
-+		pinctrl-0 = <&pmx_nand_gpo>;
-+		pinctrl-names = "default";
++		mux->pdata->pinctrl_states[mux->pdata->bus_count++] = state;
++	}
 +
-+		system {
-+			label = "cm-a510:system:green";
-+			gpios = <&gpio2 1 GPIO_ACTIVE_HIGH>;
-+			default-state = "keep";
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		wifi_power: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "WiFi Power";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio2 7 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-+
-+/* Optional RTL8211D GbE PHY on SMI address 0x03 */
-+&ethphy {
-+	reg = <3>;
-+	status = "disabled";
-+};
-+
-+&i2c0 {
-+	/* Optional TI TLV320AIC23b audio codec */
-+	opt_audio: audio at 1a {
-+		compatible = "ti,tlv320aic23";
-+		reg = <0x1a>;
-+		status = "disabled";
-+	};
-+};
-+
-+/* Optional RTL8111D GbE NIC on PCIe1 */
-+&pcie { status = "disabled"; };
-+
-+&pcie1 {
-+	pinctrl-0 = <&pmx_pcie1_clkreq>;
-+	pinctrl-names = "default";
-+	status = "disabled";
-+};
-+
-+&pinctrl {
-+	pmx_uart2: pmx-uart2 {
-+		marvell,pins = "mpp14", "mpp15";
-+		marvell,function = "uart2";
-+	};
-+};
-+
-+/* Optional Broadcom BCM4319 802.11b/g/n WiFi module */
-+&sdio1 {
-+	non-removable;
-+	vmmc-supply = <&wifi_power>;
-+	reset-gpio = <&gpio2 6 GPIO_ACTIVE_LOW>;
-+	status = "disabled";
-+};
-+
-+&spi0 {
-+	status = "okay";
-+
-+	/* 1M Flash Winbond W25Q80BL */
-+	flash at 0 {
-+		compatible = "winbond,w25q80";
-+		spi-max-frequency = <80000000>;
-+		reg = <0>;
-+	};
-+};
-+
-+&spi1 {
-+	pinctrl-0 = <&pmx_spi1_20_23>;
-+	pinctrl-names = "default";
-+	status = "disabled";
-+
-+	/* Optional TI TSC2046 touchscreen controller */
-+	opt_touch: touchscreen at 0 {
-+		compatible = "ti,tsc2046";
-+		spi-max-frequency = <2500000>;
-+		reg = <0>;
-+		pinctrl-0 = <&pmx_gpio_13>;
-+		pinctrl-names = "default";
-+		interrupts-extended = <&gpio0 13 IRQ_TYPE_EDGE_FALLING>;
-+	};
-+};
-+
-+&uart2 {
-+	pinctrl-0 = <&pmx_uart2>;
-+	pinctrl-names = "default";
-+};
-diff --git a/arch/arm/boot/dts/dove-sbc-a510.dts b/arch/arm/boot/dts/dove-sbc-a510.dts
-new file mode 100644
-index 000000000000..38096259ecce
---- /dev/null
-+++ b/arch/arm/boot/dts/dove-sbc-a510.dts
-@@ -0,0 +1,182 @@
-+/*
-+ * Device Tree file for Compulab SBC-A510 Single Board Computer
-+ *
-+ * Copyright (C) 2015, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/*
-+ * SBC-A510 comprises a PCA9555 I2C GPIO expander its GPIO lines connected to
-+ *
-+ * 0.0 USB0 VBUS_EN (active high)
-+ * 0.1 USB0 VBUS_GOOD
-+ * 0.2 DVI transmitter TI TFP410 MSEN
-+ * 0.3 DVI transmitter TI TFP410 PD# (active low power down)
-+ * 0.4 LVDS transmitter DS90C365 PD# (active low power down)
-+ * 0.5 LCD nRST (active low reset)
-+ * 0.6 PCIe0 nRST (active low reset)
-+ * 0.7 mini-PCIe slot W_DISABLE#
-+ *
-+ * 1.0 MMC WP
-+ * 1.1 Camera Input FPC FLASH_STB and P21.5
-+ * 1.2 Camera Input FPC WE        and P21.22
-+ * 1.3 MMC VCC_EN (active high)   and P21.7
-+ * 1.4 Camera Input FPC AFTR_RST  and P21.17
-+ * 1.5 Camera Input FPC OE        and P21.19
-+ * 1.6 Camera Input FPC SNPSHT    and P21.6
-+ * 1.7 Camera Input FPC SHTR      and P21.10
-+ */
-+
-+/dts-v1/;
-+
-+#include "dove-cm-a510.dtsi"
-+
-+/ {
-+	model = "Compulab SBC-A510";
-+	compatible = "compulab,sbc-a510", "compulab,cm-a510", "marvell,dove";
-+
-+	chosen {
-+		stdout-path = &uart0;
-+	};
-+
-+	regulators {
-+		usb0_power: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "USB Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio_ext 0 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		mmc_power: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "MMC Power";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio_ext 13 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-+
-+/* Ethernet0 depends on CM-A510 option E1 */
-+&mdio { status = "disabled"; };
-+&eth { status = "disabled"; };
-+&ethphy { status = "disabled"; };
-+
-+/*
-+ * USB port 0 can be powered and monitored by I2C GPIO expander:
-+ *  VBUS_ENABLE on GPIO0, VBUS_GOOD on GPIO1
-+ */
-+&ehci0 {
-+	status = "okay";
-+	vbus-supply = <&usb0_power>;
-+};
-+
-+/* USB port 1 (and ports 2, 3 if CM-A510 has U4 option) */
-+&ehci1 { status = "okay"; };
-+
-+/*
-+ * I2C bus layout:
-+ * i2c0:
-+ *  - Audio Codec, 0x1a (option from CM-A510)
-+ *  - DVI transmitter TI TFP410, 0x39
-+ *  - HDMI/DVI DDC channel
-+ * i2c1:
-+ *  - GPIO expander, NXP PCA9555, 0x20
-+ *  - VGA DDC channel
-+ */
-+&i2c {
-+	pinctrl-0 = <&pmx_i2c1>;
-+	pinctrl-names = "default";
-+};
-+
-+&i2c0 {
-+	/* TI TFP410 DVI transmitter */
-+	dvi: video at 39 {
-+		compatible = "ti,tfp410";
-+		reg = <0x39>;
-+		powerdown-gpio = <&gpio_ext 3 GPIO_ACTIVE_LOW>;
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+
-+	/* NXP PCA9555 GPIO expander */
-+	gpio_ext: gpio at 20 {
-+		compatible = "nxp,pca9555";
-+		reg = <0x20>;
-+		#gpio-cells = <2>;
-+	};
-+};
-+
-+&pcie { status = "okay"; };
-+
-+/*
-+ * PCIe0 can be configured by Jumper E1 to be either connected to
-+ * a mini-PCIe slot or a Pericom PI7C9X111 PCIe-to-PCI bridge.
-+ */
-+&pcie0 {
-+	status = "okay";
-+	pinctrl-0 = <&pmx_pcie0_clkreq>;
-+	pinctrl-names = "default";
-+	reset-gpios = <&gpio_ext 6 GPIO_ACTIVE_LOW>;
-+};
-+
-+/* Ethernet1 depends on CM-A510 option E2 */
-+&pcie1 { status = "disabled"; };
-+
-+/* SATA connector */
-+&sata0 { status = "okay"; };
-+
-+/*
-+ * SDIO0 is connected to a MMC/SD/SDIO socket, I2C GPIO expander has
-+ *  VCC_MMC_ENABLE on GPIO13, MMC_WP on GPIO10
-+ */
-+&sdio0 {
-+	vmmc-supply = <&mmc_power>;
-+	wp-gpios = <&gpio_ext 10 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
-+/* UART0 on RS232 mini-connector */
-+&uart0 { status = "okay"; };
-+/* UART2 on pin headers */
-+&uart2 { status = "okay"; };
+ 	return 0;
+ }
+ #else
 -- 
 2.1.0
