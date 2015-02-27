@@ -1,49 +1,18 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 27 Feb 2015 09:47:35 +0000
-Subject: [PATCH v2 3/3] xen/arm: allow console=hvc0 to be omitted for
- guests
-In-Reply-To: <1425029699.14641.114.camel@citrix.com>
-References: <1424267513-15836-1-git-send-email-julien.grall@linaro.org>
- <1424267513-15836-4-git-send-email-julien.grall@linaro.org>
- <CAL_Jsq+QniOFiVXEhuS+GEEnCkUpkrmtdE5E4ZytwTzoQSDpOg@mail.gmail.com>
- <1424275380.20761.31.camel@citrix.com>
- <alpine.DEB.2.02.1502261817210.23507@kaball.uk.xensource.com>
- <1425029699.14641.114.camel@citrix.com>
-Message-ID: <alpine.DEB.2.02.1502270945130.23507@kaball.uk.xensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Feb 2015 10:55:12 +0100
+Subject: [PATCH 2/2] w1: masters: omap_hdq: Add support for 1-wire mode
+In-Reply-To: <1425029057-5075-2-git-send-email-vigneshr@ti.com>
+References: <1425029057-5075-1-git-send-email-vigneshr@ti.com>
+ <1425029057-5075-2-git-send-email-vigneshr@ti.com>
+Message-ID: <10805905.OnX7kRTk9d@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Feb 2015, Ian Campbell wrote:
-> On Thu, 2015-02-26 at 18:22 +0000, Stefano Stabellini wrote:
-> > On Wed, 18 Feb 2015, Ian Campbell wrote:
-> > > On Wed, 2015-02-18 at 09:50 -0600, Rob Herring wrote:
-> > > > On Wed, Feb 18, 2015 at 7:51 AM, Julien Grall <julien.grall@linaro.org> wrote:
-> > > > > From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > > > >
-> > > > > This patch registers hvc0 as the preferred console if no console
-> > > > > has been specified explicitly on the kernel command line.
-> > > > >
-> > > > > The purpose is to allow platform agnostic kernels and boot images
-> > > > > (such as distro installers) to boot in a Xen/ARM domU without the
-> > > > > need to modify the command line by hand.
-> > > > 
-> > > > How does this interact with DT chosen stdout-path?
-> > > 
-> > > I think it shouldn't any more than the existing calls from e.g. the 8250
-> > > driver to preferred_console do.
-> > >
-> > > > Is there a node for hvc0?
-> > > 
-> > > Not a direct one, it is inferred from the presence of the general Xen
-> > > node.
-> > 
-> > Xen PV consoles, including hvc0, as all the other Xen PV devices are
-> > advertised on xenstore.
+On Friday 27 February 2015 14:54:17 Vignesh R wrote:
+> +- compatible : should be "ti,omap3-1w" or "ti,am43xx-hdq"
 > 
-> Do we actually use the xenstore node for hvc0? I thought we got it from
-> hvmparams (so the primary it can be used before xenstore is up)
 
-We always assume that at least one PV console is available and the first
-one is a bit special because it can be setup before the xenstore driver
-for early boot messages and debugging purposes. However even the first
-console is advertised on xenstore.
+Do not use wildcards in the compatible string, use real part numbers
+if you don't know the actual name of the device.
+
+	Arnd
