@@ -1,68 +1,53 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Feb 2015 21:14:32 +0000
-Subject: [PATCH 2/4] ARM: sti: stih410-clocks: Identify critical clocks as
- always-on
+Date: Fri, 27 Feb 2015 21:14:33 +0000
+Subject: [PATCH 3/4] clk: Provide always-on clock support
 In-Reply-To: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
 References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1425071674-16995-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1425071674-16995-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Lots of platforms contain clocks which if turned off would prove fatal.
-The only way to recover is to restart the board(s).  This driver takes
-references to clocks which are required to be always-on in order to
-prevent the common clk framework from trying to turn them off during
-the clk_disabled_unused() procedure.
-
-In this patch we are identifying clocks, which if gated would render
-the STiH410 development board unserviceable.
+The only way to recover from these catastrophic failures is to restart
+the board(s).  Now, when a clock is registered with the framework it is
+compared against a list of provided always-on clock names which must be
+kept ungated.  If it matches, we enable the existing CLK_IGNORE_UNUSED
+flag, which will prevent the common clk framework from attempting to
+gate it during the clk_disable_unused() procedure.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih410-clock.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/clk/clk.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih410-clock.dtsi b/arch/arm/boot/dts/stih410-clock.dtsi
-index 6b5803a..7b257c2 100644
---- a/arch/arm/boot/dts/stih410-clock.dtsi
-+++ b/arch/arm/boot/dts/stih410-clock.dtsi
-@@ -103,6 +103,7 @@
- 				clocks = <&clk_sysin>;
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 61c3fc5..3aab75e 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -2856,6 +2856,9 @@ int of_clk_add_provider(struct device_node *np,
+ 			void *data)
+ {
+ 	struct of_clk_provider *cp;
++	struct property *prop;
++	struct clk *clk;
++	const char *clkname;
+ 	int ret;
  
- 				clock-output-names = "clk-s-a0-pll-ofd-0";
-+				clock-always-on = "clk-s-a0-pll-ofd-0";
- 			};
+ 	cp = kzalloc(sizeof(struct of_clk_provider), GFP_KERNEL);
+@@ -2875,6 +2878,14 @@ int of_clk_add_provider(struct device_node *np,
+ 	if (ret < 0)
+ 		of_clk_del_provider(np);
  
- 			clk_s_a0_flexgen: clk-s-a0-flexgen {
-@@ -115,6 +116,8 @@
- 
- 				clock-output-names = "clk-ic-lmi0",
- 						     "clk-ic-lmi1";
++	of_property_for_each_string(np, "clock-always-on", prop, clkname) {
++		clk = __clk_lookup(clkname);
++		if (!clk)
++			continue;
 +
-+				clock-always-on = "clk-ic-lmi0";
- 			};
- 		};
- 
-@@ -142,6 +145,7 @@
- 				clocks = <&clk_sysin>;
- 
- 				clock-output-names = "clk-s-c0-pll0-odf-0";
-+				clock-always-on = "clk-s-c0-pll0-odf-0";
- 			};
- 
- 			clk_s_c0_pll1: clk-s-c0-pll1 {
-@@ -204,6 +208,12 @@
- 						     "clk-clust-hades",
- 						     "clk-hwpe-hades",
- 						     "clk-fc-hades";
++		clk->core->flags |= CLK_IGNORE_UNUSED;
++	}
 +
-+				clock-always-on = "clk-icn-cpu",
-+						  "clk-tx-icn-dmu",
-+						  "clk-ext2fa9",
-+						  "clk-icn-lmi",
-+						  "clk-icn-sbc";
- 			};
- 		};
- 
+ 	return ret;
+ }
+ EXPORT_SYMBOL_GPL(of_clk_add_provider);
 -- 
 1.9.1
