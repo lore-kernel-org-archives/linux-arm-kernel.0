@@ -1,37 +1,68 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Feb 2015 21:14:30 +0000
-Subject: [PATCH 0/4] clk: Provide support for always-on clocks
-Message-ID: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
+Date: Fri, 27 Feb 2015 21:14:32 +0000
+Subject: [PATCH 2/4] ARM: sti: stih410-clocks: Identify critical clocks as
+ always-on
+In-Reply-To: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
+References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1425071674-16995-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some hardware contains bunches of clocks which must never be
-turned off.  If drivers a) fail to obtain a reference to any
-of these or b) give up a previously obtained reference
-during suspend, the common clk framework will attempt to
-disable them and a platform can fail irrecoverably as a
-result.  Usually the only way to recover from these failures
-is to reboot.
+Lots of platforms contain clocks which if turned off would prove fatal.
+The only way to recover is to restart the board(s).  This driver takes
+references to clocks which are required to be always-on in order to
+prevent the common clk framework from trying to turn them off during
+the clk_disabled_unused() procedure.
 
-To avoid either of these two scenarios from catastrophically
-disabling an otherwise perfectly healthy running system,
-clocks can be identified as always-on using this property
-from inside a clocksource's node.  The CLK_IGNORE_UNUSED
-flag will be applied to each clock instance named in this
-property, thus preventing them from being shut down by the
-framework.
+In this patch we are identifying clocks, which if gated would render
+the STiH410 development board unserviceable.
 
-Lee Jones (4):
-  ARM: sti: stih407-family: Supply defines for CLOCKGEN A0
-  ARM: sti: stih410-clocks: Identify critical clocks as always-on
-  clk: Provide always-on clock support
-  clk: dt: Introduce binding for always-on clock support
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/stih410-clock.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
- .../devicetree/bindings/clock/clock-bindings.txt   | 34 ++++++++++++++++++++++
- arch/arm/boot/dts/stih410-clock.dtsi               | 10 +++++++
- drivers/clk/clk.c                                  | 11 +++++++
- include/dt-bindings/clock/stih407-clks.h           |  4 +++
- 4 files changed, 59 insertions(+)
-
+diff --git a/arch/arm/boot/dts/stih410-clock.dtsi b/arch/arm/boot/dts/stih410-clock.dtsi
+index 6b5803a..7b257c2 100644
+--- a/arch/arm/boot/dts/stih410-clock.dtsi
++++ b/arch/arm/boot/dts/stih410-clock.dtsi
+@@ -103,6 +103,7 @@
+ 				clocks = <&clk_sysin>;
+ 
+ 				clock-output-names = "clk-s-a0-pll-ofd-0";
++				clock-always-on = "clk-s-a0-pll-ofd-0";
+ 			};
+ 
+ 			clk_s_a0_flexgen: clk-s-a0-flexgen {
+@@ -115,6 +116,8 @@
+ 
+ 				clock-output-names = "clk-ic-lmi0",
+ 						     "clk-ic-lmi1";
++
++				clock-always-on = "clk-ic-lmi0";
+ 			};
+ 		};
+ 
+@@ -142,6 +145,7 @@
+ 				clocks = <&clk_sysin>;
+ 
+ 				clock-output-names = "clk-s-c0-pll0-odf-0";
++				clock-always-on = "clk-s-c0-pll0-odf-0";
+ 			};
+ 
+ 			clk_s_c0_pll1: clk-s-c0-pll1 {
+@@ -204,6 +208,12 @@
+ 						     "clk-clust-hades",
+ 						     "clk-hwpe-hades",
+ 						     "clk-fc-hades";
++
++				clock-always-on = "clk-icn-cpu",
++						  "clk-tx-icn-dmu",
++						  "clk-ext2fa9",
++						  "clk-icn-lmi",
++						  "clk-icn-sbc";
+ 			};
+ 		};
+ 
 -- 
 1.9.1
