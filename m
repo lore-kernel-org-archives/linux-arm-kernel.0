@@ -1,33 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Feb 2015 21:33:34 +0100
-Subject: [PATCH 2/3] dtb: change binding name to match with newer firmware
- DT
-In-Reply-To: <1425067710-14879-3-git-send-email-isubramanian@apm.com>
-References: <1425067710-14879-1-git-send-email-isubramanian@apm.com>
- <1425067710-14879-3-git-send-email-isubramanian@apm.com>
-Message-ID: <4061014.S4PDWltU3G@wuerfel>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 27 Feb 2015 21:40:18 +0100
+Subject: [PATCH 1/5] serial: atmel: fix error handling when
+ mctrl_gpio_init fails
+In-Reply-To: <1423751082-15888-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1423751082-15888-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20150227204018.GA8174@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 February 2015 12:08:29 Iyappan Subramanian wrote:
-> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> index f1ad9c2..a857794 100644
-> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> @@ -622,7 +622,7 @@
->                 };
->  
->                 sgenet0: ethernet at 1f210000 {
-> -                       compatible = "apm,xgene-enet";
-> +                       compatible = "apm,xgene1-sgenet";
->                         status = "disabled";
->                         reg = <0x0 0x1f210000 0x0 0xd100>,
->                               <0x0 0x1f200000 0x0 0Xc300>,
-> 
+Hello Greg,
 
-This will break booting the new dtb on older kernels, right?
+probably it's just me being impatient, but I wonder about not getting
+any feedback for the several patches I sent for drivers/tty/serial.
 
-You should normally list the most generic model in addition to the
-specific one.
+Are you just not yet in patch-collecting mode for 4.1? Although the
+patches in this series might even be post-merge-window material.
 
-	Arnd
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
