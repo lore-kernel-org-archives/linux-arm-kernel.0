@@ -1,123 +1,170 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 27 Feb 2015 09:19:59 +0100
-Subject: [PATCH v5 18/20] power_supply: bq2415x_charger: Decrement the power
- supply's device reference counter
+Date: Fri, 27 Feb 2015 09:19:51 +0100
+Subject: [PATCH v5 10/20] power_supply: charger-manager: Use power_supply_*()
+ API for accessing function attrs
 In-Reply-To: <1425025201-15926-1-git-send-email-k.kozlowski@samsung.com>
 References: <1425025201-15926-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1425025201-15926-19-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1425025201-15926-11-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use power_supply_put() to decrement the power supply's device reference
-counter (increased by power_supply_get_by_name() or
-power_supply_get_by_phandle()).
+Replace direct calls to power supply function attributes with wrappers.
+Wrappers provide safe access in case of unregistering the power
+supply (e.g. by removing the driver). Replace:
+ - get_property -> power_supply_get_property
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Acked-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
 Acked-by: Pavel Machek <pavel@ucw.cz>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Reviewed-by: Sebastian Reichel <sre@kernel.org>
 ---
- drivers/power/bq2415x_charger.c | 31 ++++++++++++++++++-------------
- 1 file changed, 18 insertions(+), 13 deletions(-)
+ drivers/power/charger-manager.c | 37 ++++++++++++++++++++-----------------
+ 1 file changed, 20 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/power/bq2415x_charger.c b/drivers/power/bq2415x_charger.c
-index 413fcaa0f15c..10a81a8f928f 100644
---- a/drivers/power/bq2415x_charger.c
-+++ b/drivers/power/bq2415x_charger.c
-@@ -1595,27 +1595,27 @@ static int bq2415x_probe(struct i2c_client *client,
- 		ret = of_property_read_u32(np, "ti,current-limit",
- 				&bq->init_data.current_limit);
- 		if (ret)
--			goto error_2;
-+			goto error_3;
- 		ret = of_property_read_u32(np, "ti,weak-battery-voltage",
- 				&bq->init_data.weak_battery_voltage);
- 		if (ret)
--			goto error_2;
-+			goto error_3;
- 		ret = of_property_read_u32(np, "ti,battery-regulation-voltage",
- 				&bq->init_data.battery_regulation_voltage);
- 		if (ret)
--			goto error_2;
-+			goto error_3;
- 		ret = of_property_read_u32(np, "ti,charge-current",
- 				&bq->init_data.charge_current);
- 		if (ret)
--			goto error_2;
-+			goto error_3;
- 		ret = of_property_read_u32(np, "ti,termination-current",
- 				&bq->init_data.termination_current);
- 		if (ret)
--			goto error_2;
-+			goto error_3;
- 		ret = of_property_read_u32(np, "ti,resistor-sense",
- 				&bq->init_data.resistor_sense);
- 		if (ret)
--			goto error_2;
-+			goto error_3;
- 	} else {
- 		memcpy(&bq->init_data, pdata, sizeof(bq->init_data));
- 	}
-@@ -1625,19 +1625,19 @@ static int bq2415x_probe(struct i2c_client *client,
- 	ret = bq2415x_power_supply_init(bq);
- 	if (ret) {
- 		dev_err(bq->dev, "failed to register power supply: %d\n", ret);
--		goto error_2;
-+		goto error_3;
- 	}
+diff --git a/drivers/power/charger-manager.c b/drivers/power/charger-manager.c
+index df27600880b9..a5b86b60d244 100644
+--- a/drivers/power/charger-manager.c
++++ b/drivers/power/charger-manager.c
+@@ -103,8 +103,8 @@ static bool is_batt_present(struct charger_manager *cm)
+ 		if (!psy)
+ 			break;
  
- 	ret = bq2415x_sysfs_init(bq);
- 	if (ret) {
- 		dev_err(bq->dev, "failed to create sysfs entries: %d\n", ret);
--		goto error_3;
-+		goto error_4;
- 	}
+-		ret = psy->get_property(psy,
+-				POWER_SUPPLY_PROP_PRESENT, &val);
++		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_PRESENT,
++				&val);
+ 		if (ret == 0 && val.intval)
+ 			present = true;
+ 		break;
+@@ -118,8 +118,8 @@ static bool is_batt_present(struct charger_manager *cm)
+ 				continue;
+ 			}
  
- 	ret = bq2415x_set_defaults(bq);
- 	if (ret) {
- 		dev_err(bq->dev, "failed to set default values: %d\n", ret);
--		goto error_4;
-+		goto error_5;
- 	}
- 
- 	if (bq->notify_psy) {
-@@ -1645,7 +1645,7 @@ static int bq2415x_probe(struct i2c_client *client,
- 		ret = power_supply_reg_notifier(&bq->nb);
- 		if (ret) {
- 			dev_err(bq->dev, "failed to reg notifier: %d\n", ret);
--			goto error_5;
-+			goto error_6;
+-			ret = psy->get_property(psy, POWER_SUPPLY_PROP_PRESENT,
+-					&val);
++			ret = power_supply_get_property(psy,
++				POWER_SUPPLY_PROP_PRESENT, &val);
+ 			if (ret == 0 && val.intval) {
+ 				present = true;
+ 				break;
+@@ -155,7 +155,8 @@ static bool is_ext_pwr_online(struct charger_manager *cm)
+ 			continue;
  		}
  
- 		/* Query for initial reported_mode and set it */
-@@ -1665,11 +1665,14 @@ static int bq2415x_probe(struct i2c_client *client,
- 	dev_info(bq->dev, "driver registered\n");
- 	return 0;
+-		ret = psy->get_property(psy, POWER_SUPPLY_PROP_ONLINE, &val);
++		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
++				&val);
+ 		if (ret == 0 && val.intval) {
+ 			online = true;
+ 			break;
+@@ -183,7 +184,7 @@ static int get_batt_uV(struct charger_manager *cm, int *uV)
+ 	if (!fuel_gauge)
+ 		return -ENODEV;
  
-+error_6:
- error_5:
--error_4:
- 	bq2415x_sysfs_exit(bq);
--error_3:
-+error_4:
- 	bq2415x_power_supply_exit(bq);
-+error_3:
-+	if (bq->notify_psy)
-+		power_supply_put(bq->notify_psy);
- error_2:
- 	kfree(name);
- error_1:
-@@ -1686,8 +1689,10 @@ static int bq2415x_remove(struct i2c_client *client)
- {
- 	struct bq2415x_device *bq = i2c_get_clientdata(client);
+-	ret = fuel_gauge->get_property(fuel_gauge,
++	ret = power_supply_get_property(fuel_gauge,
+ 				POWER_SUPPLY_PROP_VOLTAGE_NOW, &val);
+ 	if (ret)
+ 		return ret;
+@@ -223,7 +224,8 @@ static bool is_charging(struct charger_manager *cm)
+ 		}
  
--	if (bq->notify_psy)
-+	if (bq->notify_psy) {
- 		power_supply_unreg_notifier(&bq->nb);
-+		power_supply_put(bq->notify_psy);
-+	}
+ 		/* 2. The charger should be online (ext-power) */
+-		ret = psy->get_property(psy, POWER_SUPPLY_PROP_ONLINE, &val);
++		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
++				&val);
+ 		if (ret) {
+ 			dev_warn(cm->dev, "Cannot read ONLINE value from %s\n",
+ 				 cm->desc->psy_charger_stat[i]);
+@@ -236,7 +238,8 @@ static bool is_charging(struct charger_manager *cm)
+ 		 * 3. The charger should not be FULL, DISCHARGING,
+ 		 * or NOT_CHARGING.
+ 		 */
+-		ret = psy->get_property(psy, POWER_SUPPLY_PROP_STATUS, &val);
++		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_STATUS,
++				&val);
+ 		if (ret) {
+ 			dev_warn(cm->dev, "Cannot read STATUS value from %s\n",
+ 				 cm->desc->psy_charger_stat[i]);
+@@ -279,7 +282,7 @@ static bool is_full_charged(struct charger_manager *cm)
+ 		val.intval = 0;
  
- 	bq2415x_sysfs_exit(bq);
- 	bq2415x_power_supply_exit(bq);
+ 		/* Not full if capacity of fuel gauge isn't full */
+-		ret = fuel_gauge->get_property(fuel_gauge,
++		ret = power_supply_get_property(fuel_gauge,
+ 				POWER_SUPPLY_PROP_CHARGE_FULL, &val);
+ 		if (!ret && val.intval > desc->fullbatt_full_capacity)
+ 			return true;
+@@ -296,7 +299,7 @@ static bool is_full_charged(struct charger_manager *cm)
+ 	if (desc->fullbatt_soc > 0) {
+ 		val.intval = 0;
+ 
+-		ret = fuel_gauge->get_property(fuel_gauge,
++		ret = power_supply_get_property(fuel_gauge,
+ 				POWER_SUPPLY_PROP_CAPACITY, &val);
+ 		if (!ret && val.intval >= desc->fullbatt_soc)
+ 			return true;
+@@ -580,7 +583,7 @@ static int cm_get_battery_temperature_by_psy(struct charger_manager *cm,
+ 	if (!fuel_gauge)
+ 		return -ENODEV;
+ 
+-	return fuel_gauge->get_property(fuel_gauge,
++	return power_supply_get_property(fuel_gauge,
+ 				POWER_SUPPLY_PROP_TEMP,
+ 				(union power_supply_propval *)temp);
+ }
+@@ -900,7 +903,7 @@ static int charger_get_property(struct power_supply *psy,
+ 			ret = -ENODEV;
+ 			break;
+ 		}
+-		ret = fuel_gauge->get_property(fuel_gauge,
++		ret = power_supply_get_property(fuel_gauge,
+ 				POWER_SUPPLY_PROP_CURRENT_NOW, val);
+ 		break;
+ 	case POWER_SUPPLY_PROP_TEMP:
+@@ -919,7 +922,7 @@ static int charger_get_property(struct power_supply *psy,
+ 			break;
+ 		}
+ 
+-		ret = fuel_gauge->get_property(fuel_gauge,
++		ret = power_supply_get_property(fuel_gauge,
+ 					POWER_SUPPLY_PROP_CAPACITY, val);
+ 		if (ret)
+ 			break;
+@@ -975,7 +978,7 @@ static int charger_get_property(struct power_supply *psy,
+ 				break;
+ 			}
+ 
+-			ret = fuel_gauge->get_property(fuel_gauge,
++			ret = power_supply_get_property(fuel_gauge,
+ 						POWER_SUPPLY_PROP_CHARGE_NOW,
+ 						val);
+ 			if (ret) {
+@@ -1424,7 +1427,7 @@ static int cm_init_thermal_data(struct charger_manager *cm,
+ 	int ret;
+ 
+ 	/* Verify whether fuel gauge provides battery temperature */
+-	ret = fuel_gauge->get_property(fuel_gauge,
++	ret = power_supply_get_property(fuel_gauge,
+ 					POWER_SUPPLY_PROP_TEMP, &val);
+ 
+ 	if (!ret) {
+@@ -1718,13 +1721,13 @@ static int charger_manager_probe(struct platform_device *pdev)
+ 	cm->charger_psy.num_properties = psy_default.num_properties;
+ 
+ 	/* Find which optional psy-properties are available */
+-	if (!fuel_gauge->get_property(fuel_gauge,
++	if (!power_supply_get_property(fuel_gauge,
+ 					  POWER_SUPPLY_PROP_CHARGE_NOW, &val)) {
+ 		cm->charger_psy.properties[cm->charger_psy.num_properties] =
+ 				POWER_SUPPLY_PROP_CHARGE_NOW;
+ 		cm->charger_psy.num_properties++;
+ 	}
+-	if (!fuel_gauge->get_property(fuel_gauge,
++	if (!power_supply_get_property(fuel_gauge,
+ 					  POWER_SUPPLY_PROP_CURRENT_NOW,
+ 					  &val)) {
+ 		cm->charger_psy.properties[cm->charger_psy.num_properties] =
 -- 
 1.9.1
