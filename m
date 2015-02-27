@@ -1,56 +1,68 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 27 Feb 2015 18:51:43 +0800
-Subject: [PATCH v9 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <54F02CB6.2090508@linaro.org>
+Date: Fri, 27 Feb 2015 18:53:06 +0800
+Subject: [PATCH v9 20/21] Documentation: ACPI for ARM64
+In-Reply-To: <1424853601-6675-21-git-send-email-hanjun.guo@linaro.org>
 References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <54EFE282.1090305@codeaurora.org> <54F02CB6.2090508@linaro.org>
-Message-ID: <54F04C3F.7040201@huawei.com>
+ <1424853601-6675-21-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <54F04C92.6010206@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/2/27 16:37, Hanjun Guo wrote:
-> Hi Timur,
+On 2015/2/25 16:40, Hanjun Guo wrote:
+> From: Graeme Gregory <graeme.gregory@linaro.org>
 > 
-> On 2015?02?27? 11:20, Timur Tabi wrote:
->> On 02/25/2015 02:39 AM, Hanjun Guo wrote:
->>> Changes since v8:
->>
->> I'm still debugging it, but v9 on the 4.0-rc1 kernel crashes after
->> calling the UEFI boot time services exit function.  That is, this line:
->>
->> status = sys_table->boottime->exit_boot_services(handle, mmap_key);
->>
->> in allocate_new_fdt_and_exit_boot() gets called, and then soon after it
->> returns, the kernel crashes.  It's really early because the UEFI
->> exception handler is called.
->>
->> I did not have this problem with v8 patchset on 3.19.
+> Add documentation for the guidelines of how to use ACPI
+> on ARM64.
 > 
-> I tested this patch set on FVP base model with UEFI, and booted ok.
-> Can you boot the system without this ACPI patch set?
+> Reviewed-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Reviewed-by: Yi Li <phoenix.liyi@huawei.com>
+> Reviewed-by: Mark Langsdorf <mlangsdo@redhat.com>
+> Reviewed-by: Ashwin Chaugule <ashwinc@codeaurora.org>
+> Acked-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  Documentation/arm64/arm-acpi.txt | 506 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 506 insertions(+)
+>  create mode 100644 Documentation/arm64/arm-acpi.txt
 > 
->>
->>
->> Also, you still have a couple whitespace problems in these patches:
->>
->> Applying: ARM64 / ACPI: additions of ACPI documentation for arm64
->> /local/mnt/workspace/linux.0/.git/rebase-apply/patch:607: new blank line
->> at EOF.
->> +
->> /local/mnt/workspace/linux.0/.git/rebase-apply/patch:844: new blank line
->> at EOF.
->> +
->> warning: 2 lines add whitespace errors.
->> Applying: Documentation: ACPI for ARM64
->> /local/mnt/workspace/linux.0/.git/rebase-apply/patch:517: new blank line
->> at EOF.
->> +
->> warning: 1 line adds whitespace errors.
-> 
-> Weired, When I checked the patch locally there were no whitespace
-> problems:
+> diff --git a/Documentation/arm64/arm-acpi.txt b/Documentation/arm64/arm-acpi.txt
+> new file mode 100644
+> index 0000000..24cf832
+> --- /dev/null
+> +++ b/Documentation/arm64/arm-acpi.txt
+> @@ -0,0 +1,506 @@
+> +ACPI on ARMv8 Servers
+> +---------------------
+> +ACPI can be used for ARMv8 general purpose servers designed to follow
+> +the ARM SBSA (Server Base System Architecture) [0] and SBBR (Server
+> +Base Boot Requirements) [1] specifications.  Please note that the SBBR
+> +can be retrieved simply by visiting [1], but the SBSA is currently only
+> +available to those with an ARM login due to ARM IP licensing concerns.
+> +
+> +The ARMv8 kernel implements the reduced hardware model of ACPI version
+> +5.1 or later.  Links to the specification and all external documents
+> +it refers to are managed by the UEFI Forum.  The specification is
+> +available at http://www.uefi.org/specifications and documents referenced
+> +by the specification can be found via http://www.uefi.org/acpi.
+> +
+> +If an ARMv8 system does not meet the requirements of the SBSA and SBBR,
+> +or cannot be described using the mechanisms defined in the required ACPI
+> +specifications, then ACPI may not be a good fit for the hardware.
+> +
+> +While the documents mentioned above set out the requirements for building
+> +industry-standard ARMv8 servers, they also apply to more than one operating
+> +system.  The purpose of this document is to describe the interaction between
+> +ACPI and Linux only, on an ARMv8 system -- that is, what Linux expects of
+> +ACPI and what ACPI can expect of Linux.
+> +
+> +
 
-I found those whitespace errors too. Please see the comments in each patch.
+Here. Two blank lines.
+
+> +Why ACPI on ARM?
+
 
 -- 
 Thanks,
