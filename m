@@ -1,44 +1,97 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 28 Feb 2015 00:38:59 +0100
-Subject: [PATCH v3 0/4] clk: st: New always-on clock domain
-In-Reply-To: <20150227214941.GB12821@x1> (Lee Jones's message of "Fri, 27 Feb
- 2015 21:49:41 +0000")
-References: <1424799222-9301-1-git-send-email-lee.jones@linaro.org>
- <87385r3uk9.fsf@free.fr> <20150227214941.GB12821@x1>
-Message-ID: <87sidq3ox8.fsf@free.fr>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 27 Feb 2015 15:39:26 -0800
+Subject: [PATCH v2 1/2] Input: bcm-keypad: add device tree bindings
+In-Reply-To: <1424966930-28097-2-git-send-email-sbranden@broadcom.com>
+References: <sbranden@broadcom.com>
+ <1424966930-28097-1-git-send-email-sbranden@broadcom.com>
+ <1424966930-28097-2-git-send-email-sbranden@broadcom.com>
+Message-ID: <20150227233926.GA6205@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lee Jones <lee.jones@linaro.org> writes:
+Hi Scott,
 
->> I wonder why there is a need for a new clock when CLK_IGNORE_UNUSED does
->> exist. What is the usecase that is covered by this patchset which is not used by
->> CLK_IGNORE_UNUSED clock flag ?
->> 
->> And if that reason exists, I'd like to find it in the commit message.
->
-> The problem is applying that flag in a generic way.
->
-> However, I guess you haven't seen this [1] yet?
->
-> [1] https://lkml.org/lkml/2015/2/27/548
-I have.
+On Thu, Feb 26, 2015 at 08:08:48AM -0800, Scott Branden wrote:
+> Documents the Broadcom keypad controller device tree bindings.
+> 
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Signed-off-by: Scott Branden <sbranden@broadcom.com>
+> ---
+>  .../devicetree/bindings/input/brcm,bcm-keypad.txt  | 108 +++++++++++++++++++++
+>  1 file changed, 108 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/brcm,bcm-keypad.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/input/brcm,bcm-keypad.txt b/Documentation/devicetree/bindings/input/brcm,bcm-keypad.txt
+> new file mode 100644
+> index 0000000..e16bb2d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/brcm,bcm-keypad.txt
+> @@ -0,0 +1,108 @@
+> +* Broadcom Keypad Controller device tree bindings
+> +
+> +Broadcom Keypad controller is used to interface a SoC with a matrix-type
+> +keypad device. The keypad controller supports multiple row and column lines.
+> +A key can be placed at each intersection of a unique row and a unique column.
+> +The keypad controller can sense a key-press and key-release and report the
+> +event using a interrupt to the cpu.
+> +
+> +This binding is based on the matrix-keymap binding with the following
+> +changes:
+> +
+> +keypad,num-rows and keypad,num-columns are required.
+> +
+> +Required SoC Specific Properties:
+> +- compatible: should be "brcm,bcm-keypad"
+> +
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +
+> +- interrupts: The interrupt number to the cpu.
+> +
+> +Board Specific Properties:
+> +- keypad,num-rows: Number of row lines connected to the keypad
+> +  controller.
+> +
+> +- keypad,num-columns: Number of column lines connected to the
+> +  keypad controller.
+> +
+> +- col-debounce-filter-period: The debounce period for the Column filter.
+> +
+> +	KEYPAD_DEBOUNCE_1_ms	=	0
+> +	KEYPAD_DEBOUNCE_2_ms	=	1
+> +	KEYPAD_DEBOUNCE_4_ms	=	2
+> +	KEYPAD_DEBOUNCE_8_ms	=	3
+> +	KEYPAD_DEBOUNCE_16_ms	=	4
+> +	KEYPAD_DEBOUNCE_32_ms	=	5
+> +	KEYPAD_DEBOUNCE_64_ms	=	6
+> +	KEYPAD_DEBOUNCE_128_ms	=	7
+> +
+> +- status-debounce-filter-period: The debounce period for the Status filter.
+> +
+> +	KEYPAD_DEBOUNCE_1_ms	=	0
+> +	KEYPAD_DEBOUNCE_2_ms	=	1
+> +	KEYPAD_DEBOUNCE_4_ms	=	2
+> +	KEYPAD_DEBOUNCE_8_ms	=	3
+> +	KEYPAD_DEBOUNCE_16_ms	=	4
+> +	KEYPAD_DEBOUNCE_32_ms	=	5
+> +	KEYPAD_DEBOUNCE_64_ms	=	6
+> +	KEYPAD_DEBOUNCE_128_ms	=	7
+> +
+> +- row-output-enabled: An optional property indicating whether the row or
+> +  column is being used as output. If specified the row is being used
+> +  as the output. Else defaults to column.
+> +
+> +- pull-up-enabled: An optional property indicating the Keypad scan mode.
+> +  If specified implies the keypad scan pull-up has been enabled.
+> +
+> +- linux,keypad-no-autorepeat: An optional property indicating to
+> +  not enable autorepeat feature.
 
-And yet :
- 1) This won't go in a _commit_ message (as opposed to cover-letter). Moreover
-    it doesn't specify which usecase is not covered by CLK_IGNORE_UNUSED, it
-    says, up to my understanding, that is it another way to have to
-    CLK_IGNORE_UNUSED flag applied.
+Unfortunately we've accumulated a lot of bindings for turning autorepeat
+on or off, I would prefer if we standardize on what gpio-keys is doing
+and use "autorepeat" (no "linux,") for new drivers.
 
- 2) I still fail to see why this is necessary
-    IOW why declaring the mandatory always-on clocks with the proper flag should
-    be augmented with a new clock list. Isn't the existing flag the generic way
-    ?
-
-I might not understand the real motivation behind that of course, that's why I'm
-asking.
-
-Cheers.
+Thanks.
 
 -- 
-Robert
+Dmitry
