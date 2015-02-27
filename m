@@ -1,106 +1,87 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 27 Feb 2015 15:41:44 -0500
-Subject: [PATCH v1] of: calculate masks of the device based on dma-range
- size
-In-Reply-To: <20150226002033.GR6220@google.com>
-References: <1423677215-28968-1-git-send-email-m-karicheri2@ti.com>
- <20150226002033.GR6220@google.com>
-Message-ID: <54F0D688.5090006@ti.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 27 Feb 2015 21:44:03 +0100
+Subject: bluetooth on n900 -- working patch
+In-Reply-To: <201502272015.00226@pali>
+References: <20150211104136.GA1788@amd>
+ <201502272015.00226@pali>
+Message-ID: <20150227204403.GA17650@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2015 07:20 PM, Bjorn Helgaas wrote:
-> [+cc Catalin]
->
-> On Wed, Feb 11, 2015 at 12:53:35PM -0500, Murali Karicheri wrote:
->> This patch update of_dma_configure() API to calculate the
->> masks (dma_mask and coherent_dma_mask) based on the dma-range
->> values set in DT for the device. Also limit the mask to lower
->> of the default mask and mask calculated.
->>
->> Cc: Joerg Roedel<joro@8bytes.org>
->> Cc: Grant Likely<grant.likely@linaro.org>
->> Cc: Rob Herring<robh+dt@kernel.org>
->> Cc: Bjorn Helgaas<bhelgaas@google.com>
->> Cc: Will Deacon<will.deacon@arm.com>
->> Cc: Russell King<linux@arm.linux.org.uk>
->> Cc: Arnd Bergmann<arnd@arndb.de>
->> Cc: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>
->>
->> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
->
-> Applied with Catalin's reviewed-by to pci/iommu for v4.1, thanks!
->
-> I agree with Catalin's comment about the "size = 1ULL<<  32" line.
-> I don't see how that will make a difference, so I dropped it.  The
-> patch I merged is below.  Let me know if you think we do need that
-> line or any other tweaks.
->
-> Bjorn
->
-> commit a5a1dd69080dfcf53bfd6e179f3db68e824aeaae
-> Author: Murali Karicheri<m-karicheri2@ti.com>
-> Date:   Wed Feb 25 17:21:04 2015 -0600
->
->      of: Calculate device DMA masks based on DT dma-range size
->
->      Calculate the dma_mask and coherent_dma_mask based on the dma-range values
->      set in DT for the device.
->
->      Limit the mask to lower of the default mask and mask calculated.
->
->      Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
->      Signed-off-by: Bjorn Helgaas<bhelgaas@google.com>
->      Reviewed-by: Catalin Marinas<catalin.marinas@arm.com>
->      CC: Joerg Roedel<joro@8bytes.org>
->      CC: Grant Likely<grant.likely@linaro.org>
->      CC: Rob Herring<robh+dt@kernel.org>
->      CC: Will Deacon<will.deacon@arm.com>
->      CC: Russell King<linux@arm.linux.org.uk>
->      CC: Arnd Bergmann<arnd@arndb.de>
->      CC: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>
->
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 28e743888402..20c1332a0018 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -90,10 +90,11 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->   	struct iommu_ops *iommu;
->
->   	/*
-> -	 * Set default dma-mask to 32 bit.  Drivers are expected to setup
-> -	 * the correct supported dma_mask.
-> +	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
-> +	 * setup the correct supported mask.
->   	 */
-> -	dev->coherent_dma_mask = DMA_BIT_MASK(32);
-> +	if (!dev->coherent_dma_mask)
-> +		dev->coherent_dma_mask = DMA_BIT_MASK(32);
->
->   	/*
->   	 * Set it to coherent_dma_mask by default if the architecture
-> @@ -128,6 +129,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->
->   	dev->dma_pfn_offset = offset;
->
-> +	/*
-> +	 * Limit coherent and dma mask based on size and default mask
-> +	 * set by the driver.
-> +	 */
-> +	dev->coherent_dma_mask = min(dev->coherent_dma_mask,
-> +				     DMA_BIT_MASK(ilog2(dma_addr + size)));
-> +	*dev->dma_mask = min((*dev->dma_mask),
-> +			     DMA_BIT_MASK(ilog2(dma_addr + size)));
-> +
->   	coherent = of_dma_is_coherent(np);
->   	dev_dbg(dev, "device is%sdma coherent\n",
->   		coherent ? " " : " not ");
-Bjorn,
+Hi!
 
-Thanks. Looks good to me.
+> > Here's current version of the bluetooth patch, I hope I did
+> > not miss anything. This time including dts changes, so that
+> > driver is active.
+> > 
+> > I have firmware in /lib/firmware/nokia/bcmfw.bin
+> > 
+> > Best regards,
+> > 								Pavel
+> > 
+> 
+> Do you have userspace application for initializing mac address?
 
-Murali
+bluez-5.26 should be able to do the trick. Non-mandatory patch below.
+
+I'm using
+
+../bluez-5.26/tools/btmgmt public-addr 01:02:03:04:05:06
+
+diff -ur bluez-5.26.ofic/tools/btmgmt.c bluez-5.26/tools/btmgmt.c
+--- bluez-5.26.ofic/tools/btmgmt.c	2014-12-14 12:32:19.742595000 +0100
++++ bluez-5.26/tools/btmgmt.c	2014-12-14 20:06:40.432497973 +0100
+@@ -2603,7 +2603,7 @@
+ 
+ static void static_addr_usage(void)
+ {
+-	printf("Usage: btmgmt static-addr <address>\n");
++	printf("Usage: btmgmt static-addr ??:??:??:??:??:??\n");
+ }
+ 
+ static void cmd_static_addr(struct mgmt *mgmt, uint16_t index,
+@@ -2660,7 +2660,8 @@
+ 	struct mgmt_cp_set_public_address cp;
+ 
+ 	if (argc < 2) {
+-		printf("Usage: btmgmt public-addr <address>\n");
++		printf("Usage: btmgmt public-addr ??:??:??:??:??:??\n"
++		       "Note: interface must be down for this to work\n");
+ 		exit(EXIT_FAILURE);
+ 	}
+ 
+@@ -2934,7 +2935,7 @@
+ 
+ static void add_device_usage(void)
+ {
+-	printf("Usage: btmgmt add-device [-a action] [-t type] <address>\n");
++	printf("Usage: btmgmt add-device [-a action] [-t type] ??:??:??:??:??:??\n");
+ }
+ 
+ static struct option add_device_options[] = {
+@@ -3007,7 +3008,7 @@
+ 
+ static void del_device_usage(void)
+ {
+-	printf("Usage: btmgmt del-device [-t type] <address>\n");
++	printf("Usage: btmgmt del-device [-t type] ??:??:??:??:??:??\n");
+ }
+ 
+ static struct option del_device_options[] = {
+@@ -3153,7 +3154,7 @@
+ 
+ 	printf("\n"
+ 		"For more information on the usage of each command use:\n"
+-		"\tbtmgmt <command> --help\n" );
++		"\tbtmgmt <command>\n" );
+ }
+ 
+ static struct option main_options[] = {
+Only in bluez-5.26/tools: btmgmt.c~
+
+
+
 
 -- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
