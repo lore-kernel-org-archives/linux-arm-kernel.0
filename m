@@ -1,212 +1,101 @@
-From: mporter@konsulko.com (Matt Porter)
-Date: Fri, 27 Feb 2015 09:06:00 -0500
-Subject: [PATCH] ARM: dts: imx: Add dr_mode host setting to all host-only usb
- instances
-Message-ID: <1425045960-14191-1-git-send-email-mporter@konsulko.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 27 Feb 2015 14:06:00 +0000
+Subject: [PATCH 1/2] arm64: juno: Add APB registers and LEDs using syscon
+In-Reply-To: <CACRpkdYd7ZOMt1QxhCxzhavhcd8wcWrC2j1Ce5eGP9piX=xwkQ@mail.gmail.com>
+References: <1424866589-2988-1-git-send-email-linus.walleij@linaro.org>
+ <20150225135512.GE12377@arm.com>
+ <20150225144756.GA905@e106497-lin.cambridge.arm.com>
+ <20150225150023.GJ12377@arm.com>
+ <20150225151157.GC905@e106497-lin.cambridge.arm.com>
+ <CACRpkdYd7ZOMt1QxhCxzhavhcd8wcWrC2j1Ce5eGP9piX=xwkQ@mail.gmail.com>
+Message-ID: <20150227140600.GZ905@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chipidea driver adds an extra line of spam to the log when a
-host-only chipidea instance is left set to the default of a dual role
-controller.
+On Fri, Feb 27, 2015 at 01:07:42PM +0000, Linus Walleij wrote:
+> On Wed, Feb 25, 2015 at 4:11 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > On Wed, Feb 25, 2015 at 03:00:23PM +0000, Will Deacon wrote:
+> >> On Wed, Feb 25, 2015 at 02:47:56PM +0000, Liviu Dudau wrote:
+> >> > On Wed, Feb 25, 2015 at 01:55:12PM +0000, Will Deacon wrote:
+> >> > > On Wed, Feb 25, 2015 at 12:16:29PM +0000, Linus Walleij wrote:
+> >> > > > This defines the Juno "APB system registers" as a syscon device,
+> >> > > > and all the LEDs controlled by the APB system registers right
+> >> > > > below it using the syscon LEDs driver on top of syscon. Define
+> >> > > > LED0 for heartbeat, LED1 for MMC0 activity and the following
+> >> > > > four LEDs indicating CPU activity using the Linux-specific
+> >> > > > DT bindings for triggers.
+> >> > > >
+> >> > > > This is the pattern and same drivers as used on the legacy
+> >> > > > platform device trees for the ARM Integrators and the RealView
+> >> > > > PB1176.
+> >> > >
+> >> > > Stupid question, but where are these LEDs located on the platform? I tried
+> >> > > enabling this, but all it seemed to do was make hackbench slightly slower :)
+> >> >
+> >> > http://infocenter.arm.com/help/topic/com.arm.doc.ddi0524c/deb1353593789871.html
+> >> >
+> >> > Section 1.3, look at the left hand side, above the user push buttons.
+> >>
+> >> Right, so these LEDs are *inside* the case. Is that really something worth
+> >> enabling for defconfig?
+> >
+> > Depends on the case :) You might have a nice cutout in the plastic of the VExpress
+> > box, or have your own custom acrylic box.
+> 
+> Of course I take off the lid, who doesn't want to see the nice electronics.
+> This is analogous to using some other naked ARM reference design
+> like the Versatile or the RealView PB1176 where you can just put your
+> fingers on the board if you like.
+> 
+> > Maybe Linus can explain to us why he thinks this functionality is useful given
+> > that quite a lot of people tend to use the Juno boards inside the original boxes
+> > for fear of ESD accidents.
+> 
+> Wut? Ask the guy who designed the box.
+> 
+> Notice that the SD card slot is *ALSO* inside the box, do you mean we
+> should then also delete the uSD card support added in
+> commit 71f867ec130e3cc8e692366fdf8941ded27c727e
+> by yourself because the SD card slot is not reachable?
+> Notice that to access that card slot you even have to remove the
+> nice blue ARM boilerplate.
 
-[    2.010873] ci_hdrc ci_hdrc.1: doesn't support gadget
+That's not my view. I have a mobile phone with an uSD card slot, but I have to take
+the cover off (and the battery) to access it. It doesn't mean I should not be able
+to use it from kernel side because of that, only that the designer of the phone
+(and of the Juno board + box by extension) did not expect people to use it with
+covers off all the time.
 
-Set the dr_mode property to host on all the host-only nodes
-to avoid this warning.
 
-Signed-off-by: Matt Porter <mporter@konsulko.com>
----
- arch/arm/boot/dts/imx27.dtsi   | 2 ++
- arch/arm/boot/dts/imx28.dtsi   | 1 +
- arch/arm/boot/dts/imx35.dtsi   | 1 +
- arch/arm/boot/dts/imx50.dtsi   | 3 +++
- arch/arm/boot/dts/imx51.dtsi   | 3 +++
- arch/arm/boot/dts/imx53.dtsi   | 3 +++
- arch/arm/boot/dts/imx6qdl.dtsi | 3 +++
- arch/arm/boot/dts/imx6sl.dtsi  | 1 +
- arch/arm/boot/dts/imx6sx.dtsi  | 1 +
- 9 files changed, 18 insertions(+)
+<virtual-tongue-in-cheek-on>
+I fail to see why you need to remove the SD card all the time. Surely opening
+the case once to put the uSD card in is enough? ;)
+</virtual-tongue-in-cheek-on>
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 4b063b6..6951b66 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -488,6 +488,7 @@
- 				interrupts = <54>;
- 				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
- 				fsl,usbmisc = <&usbmisc 1>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
-@@ -497,6 +498,7 @@
- 				interrupts = <55>;
- 				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
- 				fsl,usbmisc = <&usbmisc 2>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 47f68ac..02330f4 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -1197,6 +1197,7 @@
- 			interrupts = <92>;
- 			clocks = <&clks 61>;
- 			fsl,usbphy = <&usbphy1>;
-+			dr_mode = "host";
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
-index 6932928..b6478e9 100644
---- a/arch/arm/boot/dts/imx35.dtsi
-+++ b/arch/arm/boot/dts/imx35.dtsi
-@@ -318,6 +318,7 @@
- 				clocks = <&clks 73>;
- 				fsl,usbmisc = <&usbmisc 1>;
- 				fsl,usbphy = <&usbphy1>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
-index 620b0f0..e245713 100644
---- a/arch/arm/boot/dts/imx50.dtsi
-+++ b/arch/arm/boot/dts/imx50.dtsi
-@@ -197,6 +197,7 @@
- 				reg = <0x53f80200 0x0200>;
- 				interrupts = <14>;
- 				clocks = <&clks IMX5_CLK_USB_PHY2_GATE>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
-@@ -205,6 +206,7 @@
- 				reg = <0x53f80400 0x0200>;
- 				interrupts = <16>;
- 				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
-@@ -213,6 +215,7 @@
- 				reg = <0x53f80600 0x0200>;
- 				interrupts = <17>;
- 				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index c0116cf..f46fe9b 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -265,6 +265,7 @@
- 				interrupts = <14>;
- 				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
- 				fsl,usbmisc = <&usbmisc 1>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
-@@ -274,6 +275,7 @@
- 				interrupts = <16>;
- 				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
- 				fsl,usbmisc = <&usbmisc 2>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
-@@ -283,6 +285,7 @@
- 				interrupts = <17>;
- 				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
- 				fsl,usbmisc = <&usbmisc 3>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index ff4fa7e..c3e3ca9 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -309,6 +309,7 @@
- 				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
- 				fsl,usbmisc = <&usbmisc 1>;
- 				fsl,usbphy = <&usbphy1>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
-@@ -318,6 +319,7 @@
- 				interrupts = <16>;
- 				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
- 				fsl,usbmisc = <&usbmisc 2>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
-@@ -327,6 +329,7 @@
- 				interrupts = <17>;
- 				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
- 				fsl,usbmisc = <&usbmisc 3>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index d6c69ec..9347c93 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -845,6 +845,7 @@
- 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
- 				fsl,usbphy = <&usbphy2>;
- 				fsl,usbmisc = <&usbmisc 1>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
-@@ -854,6 +855,7 @@
- 				interrupts = <0 41 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
- 				fsl,usbmisc = <&usbmisc 2>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
-@@ -863,6 +865,7 @@
- 				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
- 				fsl,usbmisc = <&usbmisc 3>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 36ab8e0..9bf1db3 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -699,6 +699,7 @@
- 				interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6SL_CLK_USBOH3>;
- 				fsl,usbmisc = <&usbmisc 2>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 7a24fee..fdadd060 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -763,6 +763,7 @@
- 				fsl,usbmisc = <&usbmisc 2>;
- 				phy_type = "hsic";
- 				fsl,anatop = <&anatop>;
-+				dr_mode = "host";
- 				status = "disabled";
- 			};
- 
+> 
+> The board is obviously designed to be reachable and the top part
+> of the case is obviously designed to be taken off by professional
+> users.
+
+I'm mostly on your side, Linus, I was just looking for more use cases. Like I've said,
+most of our customers seem to keep the case closed (or at least that is what they tell
+us :) ) so I'm looking for explanations on how you use the LEDs (visual debugging for
+big-LITTLE was how Lorenzo was using them on TC2 for example).
+
+Best regards,
+Liviu
+
+> 
+> Yours,
+> Linus Walleij
+> 
+
 -- 
-1.8.4
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
