@@ -1,75 +1,91 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 27 Feb 2015 09:19:42 +0100
-Subject: [PATCH v5 01/20] power_supply: Add driver private data
+Date: Fri, 27 Feb 2015 09:19:47 +0100
+Subject: [PATCH v5 06/20] power_supply: ab8500: Use power_supply_*() API for
+ accessing function attrs
 In-Reply-To: <1425025201-15926-1-git-send-email-k.kozlowski@samsung.com>
 References: <1425025201-15926-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1425025201-15926-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1425025201-15926-7-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow drivers to store private data inside power_supply structure for
-later usage in power supply operations.
-
-Usage of driver private data is necessary to access driver's state
-container object from power supply calls (like get_property()) if struct
-'power_supply' is a stored there as a pointer, for example:
-
-struct some_driver_info {
-	struct i2c_client       *client;
-	struct power_supply     *power_supply;
-	...
-}
-
-In such case one cannot use container_of() and must store pointer to
-state container as private data.
+Replace direct calls to power supply function attributes with wrappers.
+Wrappers provide safe access in case of unregistering the power
+supply (e.g. by removing the driver). Replace:
+ - get_property -> power_supply_get_property
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Acked-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
+Acked-by: Pavel Machek <pavel@ucw.cz>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Reviewed-by: Sebastian Reichel <sre@kernel.org>
-Acked-by: Pavel Machek <pavel@ucw.cz>
 ---
- drivers/power/power_supply_core.c | 6 ++++++
- include/linux/power_supply.h      | 4 ++++
- 2 files changed, 10 insertions(+)
+ drivers/power/ab8500_btemp.c    | 2 +-
+ drivers/power/ab8500_charger.c  | 2 +-
+ drivers/power/ab8500_fg.c       | 2 +-
+ drivers/power/abx500_chargalg.c | 4 ++--
+ 4 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
-index 44c810456212..1c0978f961ea 100644
---- a/drivers/power/power_supply_core.c
-+++ b/drivers/power/power_supply_core.c
-@@ -674,6 +674,12 @@ void power_supply_unregister(struct power_supply *psy)
- }
- EXPORT_SYMBOL_GPL(power_supply_unregister);
+diff --git a/drivers/power/ab8500_btemp.c b/drivers/power/ab8500_btemp.c
+index d5683f503a4e..4d18464d6400 100644
+--- a/drivers/power/ab8500_btemp.c
++++ b/drivers/power/ab8500_btemp.c
+@@ -938,7 +938,7 @@ static int ab8500_btemp_get_ext_psy_data(struct device *dev, void *data)
+ 		enum power_supply_property prop;
+ 		prop = ext->properties[j];
  
-+void *power_supply_get_drvdata(struct power_supply *psy)
-+{
-+	return psy->drv_data;
-+}
-+EXPORT_SYMBOL_GPL(power_supply_get_drvdata);
-+
- static int __init power_supply_class_init(void)
- {
- 	power_supply_class = class_create(THIS_MODULE, "power_supply");
-diff --git a/include/linux/power_supply.h b/include/linux/power_supply.h
-index f606d6b4bd56..e30d85c0158d 100644
---- a/include/linux/power_supply.h
-+++ b/include/linux/power_supply.h
-@@ -209,6 +209,9 @@ struct power_supply {
- 	/* For APM emulation, think legacy userspace. */
- 	int use_for_apm;
+-		if (ext->get_property(ext, prop, &ret))
++		if (power_supply_get_property(ext, prop, &ret))
+ 			continue;
  
-+	/* Driver private data */
-+	void *drv_data;
-+
- 	/* private */
- 	struct device *dev;
- 	struct work_struct changed_work;
-@@ -285,6 +288,7 @@ extern int devm_power_supply_register_no_ws(struct device *parent,
- extern void power_supply_unregister(struct power_supply *psy);
- extern int power_supply_powers(struct power_supply *psy, struct device *dev);
+ 		switch (prop) {
+diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
+index cee9b9e46825..f9eb7fff1d65 100644
+--- a/drivers/power/ab8500_charger.c
++++ b/drivers/power/ab8500_charger.c
+@@ -1957,7 +1957,7 @@ static int ab8500_charger_get_ext_psy_data(struct device *dev, void *data)
+ 		enum power_supply_property prop;
+ 		prop = ext->properties[j];
  
-+extern void *power_supply_get_drvdata(struct power_supply *psy);
- /* For APM emulation, think legacy userspace. */
- extern struct class *power_supply_class;
+-		if (ext->get_property(ext, prop, &ret))
++		if (power_supply_get_property(ext, prop, &ret))
+ 			continue;
  
+ 		switch (prop) {
+diff --git a/drivers/power/ab8500_fg.c b/drivers/power/ab8500_fg.c
+index b3fddc71da1e..7f75c355efe3 100644
+--- a/drivers/power/ab8500_fg.c
++++ b/drivers/power/ab8500_fg.c
+@@ -2200,7 +2200,7 @@ static int ab8500_fg_get_ext_psy_data(struct device *dev, void *data)
+ 		enum power_supply_property prop;
+ 		prop = ext->properties[j];
+ 
+-		if (ext->get_property(ext, prop, &ret))
++		if (power_supply_get_property(ext, prop, &ret))
+ 			continue;
+ 
+ 		switch (prop) {
+diff --git a/drivers/power/abx500_chargalg.c b/drivers/power/abx500_chargalg.c
+index 0da4415cbc10..ac6f4a22f846 100644
+--- a/drivers/power/abx500_chargalg.c
++++ b/drivers/power/abx500_chargalg.c
+@@ -1001,7 +1001,7 @@ static int abx500_chargalg_get_ext_psy_data(struct device *dev, void *data)
+ 	 * property because of handling that sysfs entry on its own, this is
+ 	 * the place to get the battery capacity.
+ 	 */
+-	if (!ext->get_property(ext, POWER_SUPPLY_PROP_CAPACITY, &ret)) {
++	if (!power_supply_get_property(ext, POWER_SUPPLY_PROP_CAPACITY, &ret)) {
+ 		di->batt_data.percent = ret.intval;
+ 		capacity_updated = true;
+ 	}
+@@ -1019,7 +1019,7 @@ static int abx500_chargalg_get_ext_psy_data(struct device *dev, void *data)
+ 			ext->type == POWER_SUPPLY_TYPE_USB)
+ 			di->usb_chg = psy_to_ux500_charger(ext);
+ 
+-		if (ext->get_property(ext, prop, &ret))
++		if (power_supply_get_property(ext, prop, &ret))
+ 			continue;
+ 		switch (prop) {
+ 		case POWER_SUPPLY_PROP_PRESENT:
 -- 
 1.9.1
