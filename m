@@ -1,49 +1,43 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 27 Feb 2015 12:07:51 +0000
-Subject: [PATCH] arm/arm64: KVM: fix missing unlock on error in
- kvm_vgic_create()
-In-Reply-To: <1425037305-23292-1-git-send-email-weiyj_lk@163.com>
-References: <1425037305-23292-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <54F05E17.9090904@arm.com>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Fri, 27 Feb 2015 13:15:18 +0100
+Subject: [PATCH v4] Sound: PXA: Fix settings of PXAxxx DMA
+In-Reply-To: <54CA2B7E.5010003@tul.cz>
+References: <54CA125D.7010908@tul.cz> <54CA2B7E.5010003@tul.cz>
+Message-ID: <54F05FD6.6080702@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
+bump
 
-On 27/02/15 11:41, weiyj_lk at 163.com wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On 29.1.2015 13:45, Petr Cvek wrote:
+> Fix PXA DMA autoincrementation, so capture will not use playback settings
+> (incrementation in register space instead in target buffer).
 > 
-> Add the missing unlock before return from function kvm_vgic_create()
-> in the error handling case.
+> Regression from:
+>   'commit d65a14587a9be853a887a1407db133df1fb68e29 ("ASoC: pxa: use snd_dmaengine_dai_dma_data")'
 > 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+> Acked-by: Daniel Mack <daniel@zonque.org>
 > ---
->  virt/kvm/arm/vgic.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+>  sound/arm/pxa2xx-pcm-lib.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
 > 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 0cc6ab6..4b2c2e7 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1583,8 +1583,10 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
->  	 * emulation. So check this here again. KVM_CREATE_DEVICE does
->  	 * the proper checks already.
->  	 */
-> -	if (type == KVM_DEV_TYPE_ARM_VGIC_V2 && !vgic->can_emulate_gicv2)
-> -		return -ENODEV;
-> +	if (type == KVM_DEV_TYPE_ARM_VGIC_V2 && !vgic->can_emulate_gicv2) {
-> +		ret = -ENODEV;
-> +		goto out;
-> +	}
-
-Ah, good catch. Embarrassing that that could slip through ...
-
-
-Acked-by: Andre Przywara <andre.przywara@arm.com>
-
-
-Out of curiosity: did you see it hang or was this just by looking at the
-code? I thought that I tested this case ...
-
-Cheers,
-Andre.
+> diff --git a/sound/arm/pxa2xx-pcm-lib.c b/sound/arm/pxa2xx-pcm-lib.c
+> index 01f8fdc..f8ca3ca 100644
+> --- a/sound/arm/pxa2xx-pcm-lib.c
+> +++ b/sound/arm/pxa2xx-pcm-lib.c
+> @@ -45,7 +45,12 @@ int __pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
+>  	size_t period = params_period_bytes(params);
+>  	pxa_dma_desc *dma_desc;
+>  	dma_addr_t dma_buff_phys, next_desc_phys;
+> -	u32 dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
+> +	u32 dcmd = 0;
+> +
+> +	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+> +		dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
+> +	else
+> +		dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
+>  
+>  	/* temporary transition hack */
+>  	switch (rtd->params->addr_width) {
+> 
