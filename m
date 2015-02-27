@@ -1,70 +1,56 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Fri, 27 Feb 2015 00:23:26 +0000
-Subject: [PATCH v2 1/3] ARM: shmobile: armadillo800eva: Properly specify
- HDMI audio link format
-In-Reply-To: <20150211002802.GC7826@verge.net.au>
-References: <1421847492-8857-1-git-send-email-lars@metafoo.de>
- <87d25wg804.wl%kuninori.morimoto.gx@renesas.com>
- <20150211002802.GC7826@verge.net.au>
-Message-ID: <87k2z4fbfv.wl%kuninori.morimoto.gx@renesas.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 27 Feb 2015 09:52:23 +0900
+Subject: [PATCH 4/5] ARM: shmobile: Add support SOC_BUS to R-Car Gen2
+In-Reply-To: <8723510.YP2sm4Z5UY@wuerfel>
+References: <cover.1424931398.git.horms+renesas@verge.net.au>
+ <3a8e2822e1351c0ef8f9dd1c3e81cd5bfeb319e5.1424931398.git.horms+renesas@verge.net.au>
+ <8723510.YP2sm4Z5UY@wuerfel>
+Message-ID: <20150227005223.GA24717@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd,
 
-Hi Lars, Mark
-
-> > > The DAI link format should be specified for the whole link rather than just
-> > > one component on the link. So move the format specification for the HDMI
-> > > audio link from the CPU component to the link itself.
-> > > 
-> > > Since the sh-mobile-hdmi DAI driver doesn't implement the set_fmt() callback
-> > > in this case there is no functional difference between only specifying the
-> > > the format for the CPU side or for the whole link, but the later it will
-> > > allow us to remove support for just specifying the format for one component.
-> > > 
-> > > Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
-> > > ---
+On Thu, Feb 26, 2015 at 04:53:39PM +0100, Arnd Bergmann wrote:
+> On Thursday 26 February 2015 15:22:44 Simon Horman wrote:
+> > From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 > > 
-> > I tested these 3 patches on armadillo800eva
+> > This provides information through SOC_BUS to sysfs.
+> > And this moves all on-SoC devices from /sys/devices/platform to
+> > /sys/devices/socX/.
 > > 
-> > 	[PATCH v2 1/3] ARM: shmobile: armadillo800eva: Properly specify HDMI audio link format
-> > 	[PATCH v2 2/3] ASoC: sh: fsi: Fix clock inversion
-> > 	[PATCH v2 3/3] ASoC: simple-card: Remove support for setting differing DAI formats
-> > 
-> > Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> > 
-> > 2/3 patch changed behavior for clock inversion on FSI driver.
-> > FSI + wm8978 on armadillo800eva worked without any issues,
-> > but, I don't know how much effect it has for other board.
-> > We used this inversion flags on each board for historical reasons (copy-paste),
-> > but, almost all these were not needed (except some picky board) on FSI.
-> > Maybe Lars's 2/3 patch is correct, but, it is difficult to check/confirm for all boards.
-> > And unfortunately, Renesas don't use FSI anymore.
-> > So, I think keeping current FSI driver as-is is more safety for old boards.
-> > armadillo800eva works well with below patch (as 2/3 patch)
+> > Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+> > Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> >  arch/arm/mach-shmobile/Kconfig           |  1 +
+> >  arch/arm/mach-shmobile/setup-rcar-gen2.c | 38 ++++++++++++++++++++++++++++----
+> >  2 files changed, 35 insertions(+), 4 deletions(-)
 > 
-> 
-> Thanks, I am inclined to agree that it is best to leave things unchanged.
-> 
-> > 
-> > --------------
-> > diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> > index 75de26c..36aaeb1 100644
-> > --- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-> > +++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> > @@ -1015,7 +1015,6 @@ static struct asoc_simple_card_info fsi_wm8978_info = {
-> >         .platform       = "sh_fsi2",
-> >         .daifmt         = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM,
-> >         .cpu_dai = {
-> > -               .fmt    = SND_SOC_DAIFMT_IB_NF,
-> >                 .name   = "fsia-dai",
-> >         },
-> >         .codec_dai = {
-> > --------------
+> I think this would be better done as a standalone driver in drivers/soc,
+> to avoid having to add the init_machine callbacks in patch 3.
 
-As I mentioned above (and, Simon agreed), I think we can
-agree if [2/3] patch was exchanged
+Could we handle this as follow-up work?
 
-Best regards
----
-Kuninori Morimoto
+> >  void __init rcar_gen2_init_machine(void)
+> >  {
+> > -	system_rev = rcar_gen2_get_cut();
+> > +	struct soc_device_attribute *soc_dev_attr;
+> > +	struct soc_device *soc_dev;
+> > +	struct device *parent = NULL;
+> > +	u32 prr;
+> > +
+> > +	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
+> > +	if (!soc_dev_attr)
+> > +		goto out;
+> > +
+> > +	prr = rcar_gen2_get_prr();
+> > +	system_rev = (prr & 0xFF) + 0x10;
+> > +
+> > +	soc_dev_attr->machine = of_flat_dt_get_machine_name();
+> 
+> I would not duplicate that information here. Can you find out the SoC
+> name from registers and put it here?
+> 
+> 	ARnd
+> 
