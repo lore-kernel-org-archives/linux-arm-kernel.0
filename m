@@ -1,26 +1,29 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 27 Feb 2015 23:41:05 +0100
+From: corbet@lwn.net (Jonathan Corbet)
+Date: Fri, 27 Feb 2015 15:23:13 -0700
 Subject: [PATCH] genirq: better describe IRQF_NO_SUSPEND semantics
-In-Reply-To: <20150227150810.685084df@lwn.net>
+In-Reply-To: <1425092792.1YLq228Omk@vostro.rjw.lan>
 References: <1424444026-31231-1-git-send-email-mark.rutland@arm.com>
  <20150227150810.685084df@lwn.net>
-Message-ID: <1425092792.1YLq228Omk@vostro.rjw.lan>
+ <1425092792.1YLq228Omk@vostro.rjw.lan>
+Message-ID: <20150227152313.7247ed2c@lwn.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, February 27, 2015 03:08:10 PM Jonathan Corbet wrote:
-> On Fri, 20 Feb 2015 14:53:46 +0000
-> Mark Rutland <mark.rutland@arm.com> wrote:
+On Fri, 27 Feb 2015 23:41:05 +0100
+"Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
+
+> > Applied (with Peter's ack) to the docs tree.  
 > 
-> > This patch updates the documentation regarding IRQF_NO_SUSPEND to make
-> > this caveat explicit, hopefully making future misuse rarer. Cleanup of
-> > existing misuse will occur as part of later patch series.
+> Well, I've applied it too in the meantime. :-)
 > 
-> Applied (with Peter's ack) to the docs tree.
+> Also I'll have more commits on top of it, so it's better if it goes through
+> my tree I think, if you don't mind.
 
-Well, I've applied it too in the meantime. :-)
+Gee, I feel like I've been here before :)
 
-Also I'll have more commits on top of it, so it's better if it goes through
-my tree I think, if you don't mind.
+In the future, would you like me to avoid taking patches to
+Documentation/power?
 
-Rafael
+I'll drop it out of my tree.
+
+jon
