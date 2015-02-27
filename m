@@ -1,43 +1,23 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Fri, 27 Feb 2015 13:15:18 +0100
-Subject: [PATCH v4] Sound: PXA: Fix settings of PXAxxx DMA
-In-Reply-To: <54CA2B7E.5010003@tul.cz>
-References: <54CA125D.7010908@tul.cz> <54CA2B7E.5010003@tul.cz>
-Message-ID: <54F05FD6.6080702@tul.cz>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 27 Feb 2015 13:19:06 +0100
+Subject: [PATCH 06/10] ARM: realview: enable multiplatform
+In-Reply-To: <1424967068-261464-3-git-send-email-arnd@arndb.de>
+References: <1424967068-261464-1-git-send-email-arnd@arndb.de>
+ <1424967068-261464-3-git-send-email-arnd@arndb.de>
+Message-ID: <CACRpkdavsnXRdpQGoQVKDUOR7MRrCesX4C=wQQWrCjesGHKxaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bump
+On Thu, Feb 26, 2015 at 5:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-On 29.1.2015 13:45, Petr Cvek wrote:
-> Fix PXA DMA autoincrementation, so capture will not use playback settings
-> (incrementation in register space instead in target buffer).
-> 
-> Regression from:
->   'commit d65a14587a9be853a887a1407db133df1fb68e29 ("ASoC: pxa: use snd_dmaengine_dai_dma_data")'
-> 
-> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
-> Acked-by: Daniel Mack <daniel@zonque.org>
-> ---
->  sound/arm/pxa2xx-pcm-lib.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/sound/arm/pxa2xx-pcm-lib.c b/sound/arm/pxa2xx-pcm-lib.c
-> index 01f8fdc..f8ca3ca 100644
-> --- a/sound/arm/pxa2xx-pcm-lib.c
-> +++ b/sound/arm/pxa2xx-pcm-lib.c
-> @@ -45,7 +45,12 @@ int __pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
->  	size_t period = params_period_bytes(params);
->  	pxa_dma_desc *dma_desc;
->  	dma_addr_t dma_buff_phys, next_desc_phys;
-> -	u32 dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
-> +	u32 dcmd = 0;
-> +
-> +	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-> +		dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
-> +	else
-> +		dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
->  
->  	/* temporary transition hack */
->  	switch (rtd->params->addr_width) {
-> 
+> All obstacles are out of the way by now, so we can finally move realview
+> to multiplatform.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
