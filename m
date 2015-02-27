@@ -1,50 +1,84 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 27 Feb 2015 16:36:31 +0000
-Subject: [PATCH] ARM: advertise availability of v8 Crypto instructions
-Message-ID: <1425054991-29951-1-git-send-email-ard.biesheuvel@linaro.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 27 Feb 2015 17:44:42 +0100
+Subject: [PATCH v2] drivers: cpuidle: cpuidle-arm64: include asm/proc-fns.h
+ explicitly
+In-Reply-To: <20150226182307.GD17949@e104818-lin.cambridge.arm.com>
+References: <20150226182307.GD17949@e104818-lin.cambridge.arm.com>
+Message-ID: <54F09EFA.4090906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When running the 32-bit ARM kernel on ARMv8 capable bare metal (e.g.,
-32-bit Android userland and kernel on a Cortex-A53), or as a KVM guest
-on a 64-bit host, we should advertise the availability of the Crypto
-instructions, so that userland libraries such as OpenSSL may use them.
-(Support for the v8 Crypto instructions in the 32-bit build was added
-to OpenSSL more than six months ago)
+On 02/26/2015 07:23 PM, Catalin Marinas wrote:
+> On Wed, Feb 25, 2015 at 01:11:40PM +0000, Will Deacon wrote:
+>> On Wed, Feb 25, 2015 at 12:59:42PM +0000, Lorenzo Pieralisi wrote:
+>>> ARM64 CPUidle driver requires the cpu_do_idle function so that it can
+>>> be used to enter the shallowest idle state, and it is declared in
+>>> asm/proc-fns.h.
+>>>
+>>> The current ARM64 CPUidle driver does not include asm/proc-fns.h
+>>> explicitly and it has so far relied on implicit inclusion from other
+>>> header files.
+>>>
+>>> Owing to some header dependencies reshuffling this currently triggers
+>>> build failures when CONFIG_ARM64_64K_PAGES=y:
+>>>
+>>> drivers/cpuidle/cpuidle-arm64.c: In function "arm64_enter_idle_state"
+>>> drivers/cpuidle/cpuidle-arm64.c:42:3: error: implicit declaration of
+>>> function "cpu_do_idle" [-Werror=implicit-function-declaration]
+>>>     cpu_do_idle();
+>>>     ^
+>>>
+>>> This patch adds the explicit inclusion of the asm/proc-fns.h header file
+>>> to fix the build breakage and stop relying on implicit asm/proc-fns.h
+>>> inclusion.
+>>>
+>>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>>> [lp: rewrote commit log]
+>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> Tested-by: Mark Rutland <mark.rutland@arm.com>
+>>> ---
+>>> v2 changes:
+>>
+>> Acked-by: Will Deacon <will.deacon@arm.com>
+>>
+>> Catalin will pick this up for -rc2, I suspect.
+>
+> I can merge this as long as Daniel or Rafael are fine with it.
 
-This adds the ID feature bit detection, and sets elf_hwcap2 accordingly.
+I am wondering if asm/proc-fns.h shouldn't be directly included in 
+asm/cpuidle.h, otherwise each time cpuidle.h is included somewhere we 
+have to include proc-fns.h also.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/kernel/setup.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+It is not a problem for ARM64 because there is not a big number of 
+cpuidle drivers but for ARM32 it is not the case. I have a patchset 
+which put proc-fns.h inclusion directly in asm/cpuidle.h and cleanup the 
+drivers. For the sake of consistency between ARM/ARM64 may be it would 
+make sense to include in the cpuidle.h directly, no ?
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index e55408e96559..8d4cb1c1c9ac 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -393,6 +393,22 @@ static void __init cpuid_init_hwcaps(void)
- 	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
- 	if (vmsa >= 5)
- 		elf_hwcap |= HWCAP_LPAE;
-+
-+	/* check for supported v8 Crypto instructions on non v7-M CPUs */
-+	if (cpu_architecture() == CPU_ARCH_ARMv7) {
-+		unsigned int id = read_cpuid_ext(CPUID_EXT_ISAR5);
-+
-+		switch ((id >> 4) & 0xf) {
-+		case 2:	elf_hwcap2 |= HWCAP2_PMULL;
-+		case 1:	elf_hwcap2 |= HWCAP2_AES;
-+		}
-+		if (((id >> 8) & 0xf) == 1)
-+			elf_hwcap2 |= HWCAP2_SHA1;
-+		if (((id >> 12) & 0xf) == 1)
-+			elf_hwcap2 |= HWCAP2_SHA2;
-+		if (((id >> 16) & 0xf) == 1)
-+			elf_hwcap2 |= HWCAP2_CRC32;
-+	}
- }
- 
- static void __init elf_hwcap_fixup(void)
+>>> - Picked up
+>>>    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325523.html
+>>> - Rebased against 4.0-rc1 and rewrote commit log
+>>>
+>>>   drivers/cpuidle/cpuidle-arm64.c | 1 +
+>>>   1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
+>>> index 39a2c62..c8bb6c5 100644
+>>> --- a/drivers/cpuidle/cpuidle-arm64.c
+>>> +++ b/drivers/cpuidle/cpuidle-arm64.c
+>>> @@ -19,6 +19,7 @@
+>>>   #include <linux/of.h>
+>>>
+>>>   #include <asm/cpuidle.h>
+>>> +#include <asm/proc-fns.h>
+>>>
+>>>   #include "dt_idle_states.h"
+>>>
+
+
 -- 
-1.8.3.2
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
