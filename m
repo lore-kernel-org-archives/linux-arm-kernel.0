@@ -1,23 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 Feb 2015 13:21:17 +0100
-Subject: [PATCH 02/10] ARM: realview: don't map undefined PCI registers
-In-Reply-To: <1424966890-260805-3-git-send-email-arnd@arndb.de>
-References: <1424966890-260805-1-git-send-email-arnd@arndb.de>
- <1424966890-260805-3-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdYe91jRBY-+_zBkZqdC7-bQVJhbaks3ygxs214Oua5YDA@mail.gmail.com>
+Date: Fri, 27 Feb 2015 13:22:26 +0100
+Subject: [PATCH 03/10] clk/realview: stop using machine headers
+In-Reply-To: <1424967051-261375-1-git-send-email-arnd@arndb.de>
+References: <1424967051-261375-1-git-send-email-arnd@arndb.de>
+Message-ID: <CACRpkdb1VvkfkGf-9pJZPtR6bACuALRzFG4BaU86qxzRjT29pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 5:08 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Thu, Feb 26, 2015 at 5:10 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> PCI support for realview was never merged, and trying to build realview with
-> CONFIG_PCI enabled fails because the constants for the mapping windows are
-> not defined anywhere.
+> In order to move realview into multiplatform, we have to prevent device
+> drivers from accessing the machine header files.
 >
-> This removes them from the static I/O window mapping table as a preparation
-> for multiplatform support.
+> In case of the clk driver, this is very simple, we just copy the
+> small set of register definitions into the driver that needs them.
 >
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+Sweet. We should move this to using syscon to access the registers
+I guess but in the meantime this is still nice modularization.
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
