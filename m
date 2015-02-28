@@ -1,41 +1,49 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 27 Feb 2015 19:10:26 -0600
-Subject: [PATCH 1/2] pinctrl: am33xx: dt-bindings: fix SLEWCTRL_FAST binding
-In-Reply-To: <1425085827-4514-1-git-send-email-d-gerlach@ti.com>
-References: <1425085827-4514-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1425085827-4514-2-git-send-email-d-gerlach@ti.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Sat, 28 Feb 2015 12:36:56 +1100
+Subject: [PATCH] seccomp: switch to using asm-generic for seccomp.h
+In-Reply-To: <20150228005228.GA23638@www.outflux.net>
+References: <20150228005228.GA23638@www.outflux.net>
+Message-ID: <20150228123656.538301ef@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to AM335x TRM, Document spruh73l, Revised February 2015,
-Section 9.2.2 Pad Control Registers, setting bit 6 of the pad control
-registers actually sets the SLEWCTRL value to slow rather than fast as
-the current macro indicates. Introduce a new macro, SLEWCTRL_SLOW, that
-sets the bit, and modify SLEWCTRL_FAST to 0 but keep it for
-completeness.
+Hi Kees,
 
-Current users of the macro (i2c and mdio) are left unmodified as
-SLEWCTRL_FAST was the macro used and actual desired state. Tested on
-am335x-gp-evm with no difference in software performance seen.
+On Fri, 27 Feb 2015 16:52:29 -0800 Kees Cook <keescook@chromium.org> wrote:
+>
+> diff --git a/arch/arm/include/asm/seccomp.h b/arch/arm/include/asm/seccomp.h
+> index 52b156b341f5..66ca6a30bf5c 100644
+> --- a/arch/arm/include/asm/seccomp.h
+> +++ b/arch/arm/include/asm/seccomp.h
+> @@ -1,11 +1 @@
+> -#ifndef _ASM_ARM_SECCOMP_H
+> -#define _ASM_ARM_SECCOMP_H
+> -
+> -#include <linux/unistd.h>
+> -
+> -#define __NR_seccomp_read __NR_read
+> -#define __NR_seccomp_write __NR_write
+> -#define __NR_seccomp_exit __NR_exit
+> -#define __NR_seccomp_sigreturn __NR_rt_sigreturn
+> -
+> -#endif /* _ASM_ARM_SECCOMP_H */
+> +#include <asm-generic/seccomp.h>
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- include/dt-bindings/pinctrl/am33xx.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+I think that these cases (where you replace the file by a stub that
+just include <asm-generic/seccomp.h>) can be replaced by removing the
+file completely and adding
 
-diff --git a/include/dt-bindings/pinctrl/am33xx.h b/include/dt-bindings/pinctrl/am33xx.h
-index 2fbc804..226f772 100644
---- a/include/dt-bindings/pinctrl/am33xx.h
-+++ b/include/dt-bindings/pinctrl/am33xx.h
-@@ -13,7 +13,8 @@
- 
- #define PULL_DISABLE		(1 << 3)
- #define INPUT_EN		(1 << 5)
--#define SLEWCTRL_FAST		(1 << 6)
-+#define SLEWCTRL_SLOW		(1 << 6)
-+#define SLEWCTRL_FAST		0
- 
- /* update macro depending on INPUT_EN and PULL_ENA */
- #undef PIN_OUTPUT
+generic-y = seccomp.h
+
+to <ARCH>/include/asm/Kbuild
+
 -- 
-2.3.0
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150228/9e5ceab2/attachment.sig>
