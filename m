@@ -1,63 +1,100 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 28 Feb 2015 12:40:35 -0300
-Subject: [PATCH] ARM: mx25: Remove mach-mx25_3ds board file
-Message-ID: <1425138035-19715-1-git-send-email-festevam@gmail.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Sat, 28 Feb 2015 07:41:20 -0800
+Subject: [PATCH v2 1/2] Input: bcm-keypad: add device tree bindings
+In-Reply-To: <20150227233926.GA6205@dtor-ws>
+References: <sbranden@broadcom.com>
+ <1424966930-28097-1-git-send-email-sbranden@broadcom.com>
+ <1424966930-28097-2-git-send-email-sbranden@broadcom.com>
+ <20150227233926.GA6205@dtor-ws>
+Message-ID: <54F1E1A0.8010203@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Dmitry,
 
-imx25-pdk.dts provides a more complete support than the board file version, so
-let's get rid of the board file.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/Kconfig         |  15 ---
- arch/arm/mach-imx/Makefile        |   1 -
- arch/arm/mach-imx/mach-mx25_3ds.c | 270 --------------------------------------
- 3 files changed, 286 deletions(-)
- delete mode 100644 arch/arm/mach-imx/mach-mx25_3ds.c
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index e8627e0..aaea738 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -151,21 +151,6 @@ config MACH_MX21ADS
- 
- comment "MX25 platforms:"
- 
--config MACH_MX25_3DS
--	bool "Support MX25PDK (3DS) Platform"
--	select IMX_HAVE_PLATFORM_FLEXCAN
--	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
--	select IMX_HAVE_PLATFORM_IMX2_WDT
--	select IMX_HAVE_PLATFORM_IMXDI_RTC
--	select IMX_HAVE_PLATFORM_IMX_FB
--	select IMX_HAVE_PLATFORM_IMX_I2C
--	select IMX_HAVE_PLATFORM_IMX_KEYPAD
--	select IMX_HAVE_PLATFORM_IMX_UART
--	select IMX_HAVE_PLATFORM_MXC_EHCI
--	select IMX_HAVE_PLATFORM_MXC_NAND
--	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
--	select SOC_IMX25
--
- config MACH_EUKREA_CPUIMX25SD
- 	bool "Support Eukrea CPUIMX25 Platform"
- 	select IMX_HAVE_PLATFORM_FLEXCAN
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 8d1b101..e92ede9 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -49,7 +49,6 @@ obj-$(CONFIG_MACH_IMX1_DT) += imx1-dt.o
- obj-$(CONFIG_MACH_MX21ADS) += mach-mx21ads.o
- 
- # i.MX25 based machines
--obj-$(CONFIG_MACH_MX25_3DS) += mach-mx25_3ds.o
- obj-$(CONFIG_MACH_EUKREA_CPUIMX25SD) += mach-eukrea_cpuimx25.o
- obj-$(CONFIG_MACH_EUKREA_MBIMXSD25_BASEBOARD) += eukrea_mbimxsd25-baseboard.o
- obj-$(CONFIG_MACH_IMX25_DT) += imx25-dt.o
-diff --git a/arch/arm/mach-imx/mach-mx25_3ds.c b/arch/arm/mach-imx/mach-mx25_3ds.c
-deleted file mode 100644
-index 0d01e36..0000000
--- 
-1.9.1
+On 15-02-27 03:39 PM, Dmitry Torokhov wrote:
+> Hi Scott,
+>
+> On Thu, Feb 26, 2015 at 08:08:48AM -0800, Scott Branden wrote:
+>> Documents the Broadcom keypad controller device tree bindings.
+>>
+>> Reviewed-by: Ray Jui <rjui@broadcom.com>
+>> Signed-off-by: Scott Branden <sbranden@broadcom.com>
+>> ---
+>>   .../devicetree/bindings/input/brcm,bcm-keypad.txt  | 108 +++++++++++++++++++++
+>>   1 file changed, 108 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/input/brcm,bcm-keypad.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/input/brcm,bcm-keypad.txt b/Documentation/devicetree/bindings/input/brcm,bcm-keypad.txt
+>> new file mode 100644
+>> index 0000000..e16bb2d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/input/brcm,bcm-keypad.txt
+>> @@ -0,0 +1,108 @@
+>> +* Broadcom Keypad Controller device tree bindings
+>> +
+>> +Broadcom Keypad controller is used to interface a SoC with a matrix-type
+>> +keypad device. The keypad controller supports multiple row and column lines.
+>> +A key can be placed at each intersection of a unique row and a unique column.
+>> +The keypad controller can sense a key-press and key-release and report the
+>> +event using a interrupt to the cpu.
+>> +
+>> +This binding is based on the matrix-keymap binding with the following
+>> +changes:
+>> +
+>> +keypad,num-rows and keypad,num-columns are required.
+>> +
+>> +Required SoC Specific Properties:
+>> +- compatible: should be "brcm,bcm-keypad"
+>> +
+>> +- reg: physical base address of the controller and length of memory mapped
+>> +  region.
+>> +
+>> +- interrupts: The interrupt number to the cpu.
+>> +
+>> +Board Specific Properties:
+>> +- keypad,num-rows: Number of row lines connected to the keypad
+>> +  controller.
+>> +
+>> +- keypad,num-columns: Number of column lines connected to the
+>> +  keypad controller.
+>> +
+>> +- col-debounce-filter-period: The debounce period for the Column filter.
+>> +
+>> +	KEYPAD_DEBOUNCE_1_ms	=	0
+>> +	KEYPAD_DEBOUNCE_2_ms	=	1
+>> +	KEYPAD_DEBOUNCE_4_ms	=	2
+>> +	KEYPAD_DEBOUNCE_8_ms	=	3
+>> +	KEYPAD_DEBOUNCE_16_ms	=	4
+>> +	KEYPAD_DEBOUNCE_32_ms	=	5
+>> +	KEYPAD_DEBOUNCE_64_ms	=	6
+>> +	KEYPAD_DEBOUNCE_128_ms	=	7
+>> +
+>> +- status-debounce-filter-period: The debounce period for the Status filter.
+>> +
+>> +	KEYPAD_DEBOUNCE_1_ms	=	0
+>> +	KEYPAD_DEBOUNCE_2_ms	=	1
+>> +	KEYPAD_DEBOUNCE_4_ms	=	2
+>> +	KEYPAD_DEBOUNCE_8_ms	=	3
+>> +	KEYPAD_DEBOUNCE_16_ms	=	4
+>> +	KEYPAD_DEBOUNCE_32_ms	=	5
+>> +	KEYPAD_DEBOUNCE_64_ms	=	6
+>> +	KEYPAD_DEBOUNCE_128_ms	=	7
+>> +
+>> +- row-output-enabled: An optional property indicating whether the row or
+>> +  column is being used as output. If specified the row is being used
+>> +  as the output. Else defaults to column.
+>> +
+>> +- pull-up-enabled: An optional property indicating the Keypad scan mode.
+>> +  If specified implies the keypad scan pull-up has been enabled.
+>> +
+>> +- linux,keypad-no-autorepeat: An optional property indicating to
+>> +  not enable autorepeat feature.
+>
+> Unfortunately we've accumulated a lot of bindings for turning autorepeat
+> on or off, I would prefer if we standardize on what gpio-keys is doing
+> and use "autorepeat" (no "linux,") for new drivers.
+OK. I can change it.
+>
+> Thanks.
+>
