@@ -1,44 +1,25 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 28 Feb 2015 12:57:21 -0500 (EST)
-Subject: [PATCH] net: smc91x: use run-time configuration on all ARM
- machines
-In-Reply-To: <2226303.iMQTNXSl1n@wuerfel>
-References: <2226303.iMQTNXSl1n@wuerfel>
-Message-ID: <20150228.125721.1605776377351425463.davem@davemloft.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 28 Feb 2015 20:31:27 +0100
+Subject: [PATCH v2 2/2] hwrng: iproc-rng200 - Add Broadcom IPROC RNG driver
+In-Reply-To: <54F1E647.10106@broadcom.com>
+References: <1424888184-22180-3-git-send-email-sbranden@broadcom.com>
+ <2093191.gujNGSl66k@wuerfel> <54F1E647.10106@broadcom.com>
+Message-ID: <2555599.AxGoQ20pkj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 25 Feb 2015 16:31:57 +0100
+On Saturday 28 February 2015 08:01:11 Scott Branden wrote:
+> > The udelay(10) that the other drivers have seems about appropriate then,
+> > and we can independently think of a way to refine the interface.
+> > Please add a comment that explains the rate. Also, is there some kind
+> > of FIFO present in the hwrng device? If it can store close to 1ms work
+> > of data (1000 bits), you can just use an msleep(1) to wait for the
+> > pool to recover.
+> FIFO is 512 bits.  I will look as to whether we can live with 1/2 
+> throughput.
 
-> The smc91x driver traditionally gets configured at compile-time
-> for whichever hardware it runs on. This no longer works on
-> ARM as we continue to move to building all-in-one kernels.
-> 
-> Most ARM configurations with this driver already use run-time
-> configuration through DT or through platform_data, but a
-> few have not been converted yet.
-> 
-> I've checked all ARM boards that use this driver in their
-> legacy board files, and converted the ones that were using
-> compile-time configuration in smc91x.h to behave like the
-> other ones and provide the interrupt polarity along with
-> the MMIO configuration (width, stride) at platform device
-> creation time.
-> 
-> In particular, these combinations were previously selectable
-> in Kconfig but in fact broken:
-> 
-> - sa1100 assabet plus pleb
-> - msm combined with any other armv6/v7 platform
-> - pxa-idp combined with any non-DMA pxa variant
-> - LogicPD PXA270 combined with any other pxa
-> - nomadik combined with any other armv4/v5 platform,
->   e.g. versatile.
-> 
-> None of these seem critical enough to warrant a backport
-> to stable, but it would be nice to clean this up for good.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+In that case, I think usleep_range(min(len * 8, 500), 500)) would be
+a good compromise: it waits at most until the fifo is full, but might
+return earlier if enough bits are available to fulfill the request.
 
-Applied, thanks Arnd.
+	Arnd
