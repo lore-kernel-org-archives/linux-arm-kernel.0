@@ -1,175 +1,189 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 28 Feb 2015 13:37:48 +0000
-Subject: [PATCH 4/4] arm/arm64: KVM: Keep elrsr/aisr in sync with
- software model
-In-Reply-To: <1424878582-26397-5-git-send-email-alex.bennee@linaro.org>
-References: <1424878582-26397-1-git-send-email-alex.bennee@linaro.org>
- <1424878582-26397-5-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150228133748.16899e63@arm.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Sat, 28 Feb 2015 14:43:24 +0100
+Subject: [PATCH] ARM: sun7i: dt: Add new MK808C device
+Message-ID: <1425131004-8551-1-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Feb 2015 15:36:22 +0000
-Alex Benn?e <alex.bennee@linaro.org> wrote:
+From: Marcus Cooper <codekipper@gmail.com>
 
-> From: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> There is an interesting bug in the vgic code, which manifests itself
-> when the KVM run loop has a signal pending or needs a vmid generation
-> rollover after having disabled interrupts but before actually
-> switching to the guest.
-> 
-> In this case, we flush the vgic as usual, but we sync back the vgic
-> state and exit to userspace before entering the guest.  The
-> consequence is that we will be syncing the list registers back to the
-> software model using the GICH_ELRSR and GICH_EISR from the last
-> execution of the guest, potentially overwriting a list register
-> containing an interrupt.
-> 
-> This showed up during migration testing where we would capture a state
-> where the VM has masked the arch timer but there were no interrupts,
-> resulting in a hung test.
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Reported-by: Alex Bennee <alex.bennee@linaro.org>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+The MK808C is an A20 based android stick, with 1G RAM, 8G NAND flash,
+a RTL8723au wifi + bt combo chip, a USB host ports using USB-A receptacles,
+a mini USB-B receptacle for USB OTG, mini HDMI and a TRS connector for AV.
 
-Looks OK to me.
+This patch adds basic support for the device, more information can be found
+here (http://linux-sunxi.org/MK808C).
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+---
+ arch/arm/boot/dts/Makefile             |   1 +
+ arch/arm/boot/dts/sun7i-a20-mk808c.dts | 146 +++++++++++++++++++++++++++++++++
+ 2 files changed, 147 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-mk808c.dts
 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 7042251..e2a676e 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -114,6 +114,7 @@ struct vgic_ops {
->  	void	(*sync_lr_elrsr)(struct kvm_vcpu *, int, struct
-> vgic_lr); u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
->  	u64	(*get_eisr)(const struct kvm_vcpu *vcpu);
-> +	void	(*clear_eisr)(struct kvm_vcpu *vcpu);
->  	u32	(*get_interrupt_status)(const struct kvm_vcpu
-> *vcpu); void	(*enable_underflow)(struct kvm_vcpu *vcpu);
->  	void	(*disable_underflow)(struct kvm_vcpu *vcpu);
-> diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
-> index a0a7b5d..f9b9c7c 100644
-> --- a/virt/kvm/arm/vgic-v2.c
-> +++ b/virt/kvm/arm/vgic-v2.c
-> @@ -72,6 +72,8 @@ static void vgic_v2_sync_lr_elrsr(struct kvm_vcpu
-> *vcpu, int lr, {
->  	if (!(lr_desc.state & LR_STATE_MASK))
->  		vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr |= (1ULL <<
-> lr);
-> +	else
-> +		vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr &= ~(1ULL <<
-> lr); }
->  
->  static u64 vgic_v2_get_elrsr(const struct kvm_vcpu *vcpu)
-> @@ -84,6 +86,11 @@ static u64 vgic_v2_get_eisr(const struct kvm_vcpu
-> *vcpu) return vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr;
->  }
->  
-> +static void vgic_v2_clear_eisr(struct kvm_vcpu *vcpu)
-> +{
-> +	vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr = 0;
-> +}
-> +
->  static u32 vgic_v2_get_interrupt_status(const struct kvm_vcpu *vcpu)
->  {
->  	u32 misr = vcpu->arch.vgic_cpu.vgic_v2.vgic_misr;
-> @@ -148,6 +155,7 @@ static const struct vgic_ops vgic_v2_ops = {
->  	.sync_lr_elrsr		= vgic_v2_sync_lr_elrsr,
->  	.get_elrsr		= vgic_v2_get_elrsr,
->  	.get_eisr		= vgic_v2_get_eisr,
-> +	.clear_eisr		= vgic_v2_clear_eisr,
->  	.get_interrupt_status	= vgic_v2_get_interrupt_status,
->  	.enable_underflow	= vgic_v2_enable_underflow,
->  	.disable_underflow	= vgic_v2_disable_underflow,
-> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-> index 3a62d8a..dff0602 100644
-> --- a/virt/kvm/arm/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic-v3.c
-> @@ -104,6 +104,8 @@ static void vgic_v3_sync_lr_elrsr(struct kvm_vcpu
-> *vcpu, int lr, {
->  	if (!(lr_desc.state & LR_STATE_MASK))
->  		vcpu->arch.vgic_cpu.vgic_v3.vgic_elrsr |= (1U << lr);
-> +	else
-> +		vcpu->arch.vgic_cpu.vgic_v3.vgic_elrsr &= ~(1U <<
-> lr); }
->  
->  static u64 vgic_v3_get_elrsr(const struct kvm_vcpu *vcpu)
-> @@ -116,6 +118,11 @@ static u64 vgic_v3_get_eisr(const struct
-> kvm_vcpu *vcpu) return vcpu->arch.vgic_cpu.vgic_v3.vgic_eisr;
->  }
->  
-> +static void vgic_v3_clear_eisr(struct kvm_vcpu *vcpu)
-> +{
-> +	vcpu->arch.vgic_cpu.vgic_v3.vgic_eisr = 0;
-> +}
-> +
->  static u32 vgic_v3_get_interrupt_status(const struct kvm_vcpu *vcpu)
->  {
->  	u32 misr = vcpu->arch.vgic_cpu.vgic_v3.vgic_misr;
-> @@ -192,6 +199,7 @@ static const struct vgic_ops vgic_v3_ops = {
->  	.sync_lr_elrsr		= vgic_v3_sync_lr_elrsr,
->  	.get_elrsr		= vgic_v3_get_elrsr,
->  	.get_eisr		= vgic_v3_get_eisr,
-> +	.clear_eisr		= vgic_v3_clear_eisr,
->  	.get_interrupt_status	= vgic_v3_get_interrupt_status,
->  	.enable_underflow	= vgic_v3_enable_underflow,
->  	.disable_underflow	= vgic_v3_disable_underflow,
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 3b4ded2..3690c1e 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -980,6 +980,11 @@ static inline u64 vgic_get_eisr(struct kvm_vcpu
-> *vcpu) return vgic_ops->get_eisr(vcpu);
->  }
->  
-> +static inline void vgic_clear_eisr(struct kvm_vcpu *vcpu)
-> +{
-> +	vgic_ops->clear_eisr(vcpu);
-> +}
-> +
->  static inline u32 vgic_get_interrupt_status(struct kvm_vcpu *vcpu)
->  {
->  	return vgic_ops->get_interrupt_status(vcpu);
-> @@ -1019,6 +1024,7 @@ static void vgic_retire_lr(int lr_nr, int irq,
-> struct kvm_vcpu *vcpu) vgic_set_lr(vcpu, lr_nr, vlr);
->  	clear_bit(lr_nr, vgic_cpu->lr_used);
->  	vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
-> +	vgic_sync_lr_elrsr(vcpu, lr_nr, vlr);
->  }
->  
->  /*
-> @@ -1063,6 +1069,7 @@ static void vgic_queue_irq_to_lr(struct
-> kvm_vcpu *vcpu, int irq, vlr.state |= LR_EOI_INT;
->  
->  	vgic_set_lr(vcpu, lr_nr, vlr);
-> +	vgic_sync_lr_elrsr(vcpu, lr_nr, vlr);
->  }
->  
->  /*
-> @@ -1258,6 +1265,14 @@ static bool vgic_process_maintenance(struct
-> kvm_vcpu *vcpu) if (status & INT_STATUS_UNDERFLOW)
->  		vgic_disable_underflow(vcpu);
->  
-> +	/*
-> +	 * In the next iterations of the vcpu loop, if we sync the
-> vgic state
-> +	 * after flushing it, but before entering the guest (this
-> happens for
-> +	 * pending signals and vmid rollovers), then make sure we
-> don't pick
-> +	 * up any old maintenance interrupts here.
-> +	 */
-> +	vgic_clear_eisr(vcpu);
-> +
->  	return level_pending;
->  }
->  
-
-
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 9544768..eae7706 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -542,6 +542,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-hummingbird.dtb \
+ 	sun7i-a20-i12-tvbox.dtb \
+ 	sun7i-a20-m3.dtb \
++	sun7i-a20-mk808c.dtb \
+ 	sun7i-a20-olinuxino-lime.dtb \
+ 	sun7i-a20-olinuxino-lime2.dtb \
+ 	sun7i-a20-olinuxino-micro.dtb \
+diff --git a/arch/arm/boot/dts/sun7i-a20-mk808c.dts b/arch/arm/boot/dts/sun7i-a20-mk808c.dts
+new file mode 100644
+index 0000000..5722a03
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-mk808c.dts
+@@ -0,0 +1,146 @@
++/*
++ * Copyright 2015 Marcus Cooper
++ *
++ * Marcus Cooper <codekipper@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun7i-a20.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "mk808c";
++	compatible = "mk808c", "allwinner,sun7i-a20";
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart2;
++	};
++
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++
++	axp209: pmic at 34 {
++		compatible = "x-powers,axp209";
++		reg = <0x34>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-controller;
++		#interrupt-cells = <1>;
++	};
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins_a>;
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++	vmmc-supply = <&reg_vcc3v0>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
++	cd-inverted;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&reg_usb1_vbus {
++	status = "okay";
++};
++
++&reg_usb2_vbus {
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
++	status = "okay";
++};
 -- 
-Jazz is not dead. It just smells funny.
+2.3.1
