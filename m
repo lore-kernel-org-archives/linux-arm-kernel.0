@@ -1,26 +1,40 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 28 Feb 2015 07:45:59 -0800
-Subject: [PATCH v2] hwmon: (gpio-fan) allow to use alarm support alone
- from DT
-In-Reply-To: <1424887099-26551-1-git-send-email-simon.guinot@sequanux.org>
-References: <1424887099-26551-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <54F1E2B7.70807@roeck-us.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 28 Feb 2015 12:47:46 -0300
+Subject: [PATCH] ARM: imx: Kconfig: Fix grammar in help text
+Message-ID: <1425138466-19823-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2015 09:58 AM, Simon Guinot wrote:
-> On some boards, such as the LaCie 2Big Network v2 or 2Big NAS (based on
-> Marvell Kirkwood SoCs), an I2C fan controller is used but the alarm
-> signal is wired to a separate GPIO. Unfortunately, the gpio-fan driver
-> can't be used to handle GPIO alarm alone from DT: an error is returned
-> if the "gpios" DT property is missing.
->
-> This patch allows to use the gpio-fan driver even if the "alarm-gpios"
-> DT property is defined alone.
->
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Applied to -next.
+Use "This enables" in the Kconfig help text to fix grammar.
 
-Thanks,
-Guenter
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index aaea738..247a465 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -621,7 +621,7 @@ config SOC_VF610
+ 	select PL310_ERRATA_769419 if CACHE_L2X0
+ 
+ 	help
+-	  This enable support for Freescale Vybrid VF610 processor.
++	  This enables support for Freescale Vybrid VF610 processor.
+ 
+ choice
+ 	prompt "Clocksource for scheduler clock"
+@@ -651,7 +651,7 @@ config SOC_LS1021A
+ 	select ZONE_DMA if ARM_LPAE
+ 
+ 	help
+-	  This enable support for Freescale LS1021A processor.
++	  This enables support for Freescale LS1021A processor.
+ 
+ endif
+ 
+-- 
+1.9.1
