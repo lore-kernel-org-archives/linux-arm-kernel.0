@@ -1,312 +1,175 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 28 Feb 2015 13:30:03 +0000
-Subject: [PATCH 3/4] arm/arm64: KVM: Fix migration race in the arch timer
-In-Reply-To: <1424878582-26397-4-git-send-email-alex.bennee@linaro.org>
+Date: Sat, 28 Feb 2015 13:37:48 +0000
+Subject: [PATCH 4/4] arm/arm64: KVM: Keep elrsr/aisr in sync with
+ software model
+In-Reply-To: <1424878582-26397-5-git-send-email-alex.bennee@linaro.org>
 References: <1424878582-26397-1-git-send-email-alex.bennee@linaro.org>
- <1424878582-26397-4-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150228133003.29d59e96@arm.com>
+ <1424878582-26397-5-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20150228133748.16899e63@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Feb 2015 15:36:21 +0000
+On Wed, 25 Feb 2015 15:36:22 +0000
 Alex Benn?e <alex.bennee@linaro.org> wrote:
-
-Alex, Christoffer,
 
 > From: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> When a VCPU is no longer running, we currently check to see if it has
-> a timer scheduled in the future, and if it does, we schedule a host
-> hrtimer to notify is in case the timer expires while the VCPU is still
-> not running.  When the hrtimer fires, we mask the guest's timer and
-> inject the timer IRQ (still relying on the guest unmasking the time
-> when it receives the IRQ).
+> There is an interesting bug in the vgic code, which manifests itself
+> when the KVM run loop has a signal pending or needs a vmid generation
+> rollover after having disabled interrupts but before actually
+> switching to the guest.
 > 
-> This is all good and fine, but when migration a VM
-> (checkpoint/restore) this introduces a race.  It is unlikely, but
-> possible, for the following sequence of events to happen:
+> In this case, we flush the vgic as usual, but we sync back the vgic
+> state and exit to userspace before entering the guest.  The
+> consequence is that we will be syncing the list registers back to the
+> software model using the GICH_ELRSR and GICH_EISR from the last
+> execution of the guest, potentially overwriting a list register
+> containing an interrupt.
 > 
->  1. Userspace stops the VM
->  2. Hrtimer for VCPU is scheduled
->  3. Userspace checkpoints the VGIC state (no pending timer interrupts)
->  4. The hrtimer fires, schedules work in a workqueue
->  5. Workqueue function runs, masks the timer and injects timer
-> interrupt 6. Userspace checkpoints the timer state (timer masked)
+> This showed up during migration testing where we would capture a state
+> where the VM has masked the arch timer but there were no interrupts,
+> resulting in a hung test.
 > 
-> At restore time, you end up with a masked timer without any timer
-> interrupts and your guest halts never receiving timer interrupts.
-> 
-> Fix this by only kicking the VCPU in the workqueue function, and
-> sample the expired state of the timer when entering the guest again
-> and inject the interrupt and mask the timer only then.
-> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Reported-by: Alex Bennee <alex.bennee@linaro.org>
 > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 8531536..f7fd76e 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -269,7 +269,7 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
+
+Looks OK to me.
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 7042251..e2a676e 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -114,6 +114,7 @@ struct vgic_ops {
+>  	void	(*sync_lr_elrsr)(struct kvm_vcpu *, int, struct
+> vgic_lr); u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
+>  	u64	(*get_eisr)(const struct kvm_vcpu *vcpu);
+> +	void	(*clear_eisr)(struct kvm_vcpu *vcpu);
+>  	u32	(*get_interrupt_status)(const struct kvm_vcpu
+> *vcpu); void	(*enable_underflow)(struct kvm_vcpu *vcpu);
+>  	void	(*disable_underflow)(struct kvm_vcpu *vcpu);
+> diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+> index a0a7b5d..f9b9c7c 100644
+> --- a/virt/kvm/arm/vgic-v2.c
+> +++ b/virt/kvm/arm/vgic-v2.c
+> @@ -72,6 +72,8 @@ static void vgic_v2_sync_lr_elrsr(struct kvm_vcpu
+> *vcpu, int lr, {
+>  	if (!(lr_desc.state & LR_STATE_MASK))
+>  		vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr |= (1ULL <<
+> lr);
+> +	else
+> +		vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr &= ~(1ULL <<
+> lr); }
 >  
->  int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
->  {
-> -	return 0;
-> +	return kvm_timer_should_fire(vcpu);
+>  static u64 vgic_v2_get_elrsr(const struct kvm_vcpu *vcpu)
+> @@ -84,6 +86,11 @@ static u64 vgic_v2_get_eisr(const struct kvm_vcpu
+> *vcpu) return vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr;
 >  }
 >  
->  int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
-> diff --git a/include/kvm/arm_arch_timer.h
-> b/include/kvm/arm_arch_timer.h index b3f45a5..98cc9f4 100644
-> --- a/include/kvm/arm_arch_timer.h
-> +++ b/include/kvm/arm_arch_timer.h
-> @@ -72,6 +72,8 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu
-> *vcpu); u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
->  int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
->  
-> +bool kvm_timer_should_fire(struct kvm_vcpu *vcpu);
-> +
->  #else
->  static inline int kvm_timer_hyp_init(void)
->  {
-> @@ -96,6 +98,11 @@ static inline u64 kvm_arm_timer_get_reg(struct
-> kvm_vcpu *vcpu, u64 regid) {
->  	return 0;
->  }
-> +
-> +static inline bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
+> +static void vgic_v2_clear_eisr(struct kvm_vcpu *vcpu)
 > +{
-> +	return false;
-> +}
->  #endif
->  
->  #endif
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 6e54f35..98c95f2 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -85,13 +85,22 @@ static irqreturn_t kvm_arch_timer_handler(int
-> irq, void *dev_id) return IRQ_HANDLED;
->  }
->  
-> +/*
-> + * Work function for handling the backup timer that we schedule when
-> a vcpu is
-> + * no longer running, but had a timer programmed to fire in the
-> future.
-> + */
->  static void kvm_timer_inject_irq_work(struct work_struct *work)
->  {
->  	struct kvm_vcpu *vcpu;
->  
->  	vcpu = container_of(work, struct kvm_vcpu,
-> arch.timer_cpu.expired); vcpu->arch.timer_cpu.armed = false;
-> -	kvm_timer_inject_irq(vcpu);
-> +
-> +	/*
-> +	 * If the vcpu is blocked we want to wake it up so that it
-> will see
-> +	 * the timer has expired when entering the guest.
-> +	 */
-> +	kvm_vcpu_kick(vcpu);
->  }
->  
->  static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
-> @@ -102,6 +111,21 @@ static enum hrtimer_restart
-> kvm_timer_expire(struct hrtimer *hrt) return HRTIMER_NORESTART;
->  }
->  
-> +bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
-> +{
-> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> +	cycle_t cval, now;
-> +
-> +	if ((timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) ||
-> +		!(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE))
-> +		return false;
-> +
-> +	cval = timer->cntv_cval;
-> +	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
-> +
-> +	return cval <= now;
+> +	vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr = 0;
 > +}
 > +
->  /**
->   * kvm_timer_flush_hwstate - prepare to move the virt timer to the
-> cpu
->   * @vcpu: The vcpu pointer
-> @@ -119,6 +143,13 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu
-> *vcpu)
->  	 * populate the CPU timer again.
->  	 */
->  	timer_disarm(timer);
-> +
-> +	/*
-> +	 * If the timer expired while we were not scheduled, now is
-> the time
-> +	 * to inject it.
-> +	 */
-> +	if (kvm_timer_should_fire(vcpu))
-> +		kvm_timer_inject_irq(vcpu);
+>  static u32 vgic_v2_get_interrupt_status(const struct kvm_vcpu *vcpu)
+>  {
+>  	u32 misr = vcpu->arch.vgic_cpu.vgic_v2.vgic_misr;
+> @@ -148,6 +155,7 @@ static const struct vgic_ops vgic_v2_ops = {
+>  	.sync_lr_elrsr		= vgic_v2_sync_lr_elrsr,
+>  	.get_elrsr		= vgic_v2_get_elrsr,
+>  	.get_eisr		= vgic_v2_get_eisr,
+> +	.clear_eisr		= vgic_v2_clear_eisr,
+>  	.get_interrupt_status	= vgic_v2_get_interrupt_status,
+>  	.enable_underflow	= vgic_v2_enable_underflow,
+>  	.disable_underflow	= vgic_v2_disable_underflow,
+> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+> index 3a62d8a..dff0602 100644
+> --- a/virt/kvm/arm/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic-v3.c
+> @@ -104,6 +104,8 @@ static void vgic_v3_sync_lr_elrsr(struct kvm_vcpu
+> *vcpu, int lr, {
+>  	if (!(lr_desc.state & LR_STATE_MASK))
+>  		vcpu->arch.vgic_cpu.vgic_v3.vgic_elrsr |= (1U << lr);
+> +	else
+> +		vcpu->arch.vgic_cpu.vgic_v3.vgic_elrsr &= ~(1U <<
+> lr); }
+>  
+>  static u64 vgic_v3_get_elrsr(const struct kvm_vcpu *vcpu)
+> @@ -116,6 +118,11 @@ static u64 vgic_v3_get_eisr(const struct
+> kvm_vcpu *vcpu) return vcpu->arch.vgic_cpu.vgic_v3.vgic_eisr;
 >  }
 >  
->  /**
-> @@ -134,16 +165,9 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu
-> *vcpu) cycle_t cval, now;
->  	u64 ns;
->  
-> -	if ((timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) ||
-> -		!(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE))
-> -		return;
-> -
-> -	cval = timer->cntv_cval;
-> -	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
-> -
->  	BUG_ON(timer_is_armed(timer));
->  
-> -	if (cval <= now) {
-> +	if (kvm_timer_should_fire(vcpu)) {
->  		/*
->  		 * Timer has already expired while we were not
->  		 * looking. Inject the interrupt and carry on.
-> @@ -152,6 +176,9 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
->  		return;
->  	}
->  
-> +	cval = timer->cntv_cval;
-> +	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
+> +static void vgic_v3_clear_eisr(struct kvm_vcpu *vcpu)
+> +{
+> +	vcpu->arch.vgic_cpu.vgic_v3.vgic_eisr = 0;
+> +}
 > +
->  	ns = cyclecounter_cyc2ns(timecounter->cc, cval - now,
-> timecounter->mask, &timecounter->frac);
->  	timer_arm(timer, ns);
-
-So the first half of the patch looks perfectly OK to me...
-
+>  static u32 vgic_v3_get_interrupt_status(const struct kvm_vcpu *vcpu)
+>  {
+>  	u32 misr = vcpu->arch.vgic_cpu.vgic_v3.vgic_misr;
+> @@ -192,6 +199,7 @@ static const struct vgic_ops vgic_v3_ops = {
+>  	.sync_lr_elrsr		= vgic_v3_sync_lr_elrsr,
+>  	.get_elrsr		= vgic_v3_get_elrsr,
+>  	.get_eisr		= vgic_v3_get_eisr,
+> +	.clear_eisr		= vgic_v3_clear_eisr,
+>  	.get_interrupt_status	= vgic_v3_get_interrupt_status,
+>  	.enable_underflow	= vgic_v3_enable_underflow,
+>  	.disable_underflow	= vgic_v3_disable_underflow,
 > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index af6a521..3b4ded2 100644
+> index 3b4ded2..3690c1e 100644
 > --- a/virt/kvm/arm/vgic.c
 > +++ b/virt/kvm/arm/vgic.c
-> @@ -263,6 +263,13 @@ static int vgic_irq_is_queued(struct kvm_vcpu
-> *vcpu, int irq) return vgic_bitmap_get_irq_val(&dist->irq_queued,
-> vcpu->vcpu_id, irq); }
->  
-> +static int vgic_irq_is_active(struct kvm_vcpu *vcpu, int irq)
-> +{
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +
-> +	return vgic_bitmap_get_irq_val(&dist->irq_active,
-> vcpu->vcpu_id, irq); +}
-> +
->  static void vgic_irq_set_queued(struct kvm_vcpu *vcpu, int irq)
->  {
->  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> @@ -285,6 +292,13 @@ static void vgic_irq_set_active(struct kvm_vcpu
-> *vcpu, int irq) vgic_bitmap_set_irq_val(&dist->irq_active,
-> vcpu->vcpu_id, irq, 1); }
->  
-> +static void vgic_irq_clear_active(struct kvm_vcpu *vcpu, int irq)
-> +{
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +
-> +	vgic_bitmap_set_irq_val(&dist->irq_active, vcpu->vcpu_id,
-> irq, 0); +}
-> +
->  static int vgic_dist_irq_get_level(struct kvm_vcpu *vcpu, int irq)
->  {
->  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> @@ -634,16 +648,12 @@ bool vgic_handle_cfg_reg(u32 *reg, struct
-> kvm_exit_mmio *mmio, }
->  
->  /**
-> - * vgic_unqueue_irqs - move pending IRQs from LRs to the distributor
-> + * vgic_unqueue_irqs - move pending/active IRQs from LRs to the
-> distributor
->   * @vgic_cpu: Pointer to the vgic_cpu struct holding the LRs
->   *
-> - * Move any pending IRQs that have already been assigned to LRs back
-> to the
-> + * Move any IRQs that have already been assigned to LRs back to the
->   * emulated distributor state so that the complete emulated state
-> can be read
->   * from the main emulation structures without investigating the LRs.
-> - *
-> - * Note that IRQs in the active state in the LRs get their pending
-> state moved
-> - * to the distributor but the active state stays in the LRs, because
-> we don't
-> - * track the active state on the distributor side.
->   */
->  void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
->  {
-> @@ -919,7 +929,7 @@ static int compute_pending_for_cpu(struct
-> kvm_vcpu *vcpu) 
->  /*
->   * Update the interrupt state and determine which CPUs have pending
-> - * interrupts. Must be called with distributor lock held.
-> + * or active interrupts. Must be called with distributor lock held.
->   */
->  void vgic_update_state(struct kvm *kvm)
->  {
-> @@ -1036,6 +1046,25 @@ static void vgic_retire_disabled_irqs(struct
-> kvm_vcpu *vcpu) }
+> @@ -980,6 +980,11 @@ static inline u64 vgic_get_eisr(struct kvm_vcpu
+> *vcpu) return vgic_ops->get_eisr(vcpu);
 >  }
 >  
-> +static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
-> +				 int lr_nr, struct vgic_lr vlr)
+> +static inline void vgic_clear_eisr(struct kvm_vcpu *vcpu)
 > +{
-> +	if (vgic_irq_is_active(vcpu, irq)) {
-> +		vlr.state |= LR_STATE_ACTIVE;
-> +		kvm_debug("Set active, clear distributor: 0x%x\n",
-> vlr.state);
-> +		vgic_irq_clear_active(vcpu, irq);
-> +		vgic_update_state(vcpu->kvm);
-> +	} else if (vgic_dist_irq_is_pending(vcpu, irq)) {
-> +		vlr.state |= LR_STATE_PENDING;
-> +		kvm_debug("Set pending: 0x%x\n", vlr.state);
-> +	}
-> +
-> +	if (!vgic_irq_is_edge(vcpu, irq))
-> +		vlr.state |= LR_EOI_INT;
-> +
-> +	vgic_set_lr(vcpu, lr_nr, vlr);
+> +	vgic_ops->clear_eisr(vcpu);
 > +}
 > +
->  /*
->   * Queue an interrupt to a CPU virtual interface. Return true on
-> success,
->   * or false if it wasn't possible to queue it.
-> @@ -1063,8 +1092,7 @@ bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8
-> sgi_source_id, int irq) if (vlr.source == sgi_source_id) {
->  			kvm_debug("LR%d piggyback for IRQ%d\n", lr,
-> vlr.irq); BUG_ON(!test_bit(lr, vgic_cpu->lr_used));
-> -			vlr.state |= LR_STATE_PENDING;
-> -			vgic_set_lr(vcpu, lr, vlr);
-> +			vgic_queue_irq_to_lr(vcpu, irq, lr, vlr);
->  			return true;
->  		}
->  	}
-> @@ -1081,11 +1109,8 @@ bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8
-> sgi_source_id, int irq) 
->  	vlr.irq = irq;
->  	vlr.source = sgi_source_id;
-> -	vlr.state = LR_STATE_PENDING;
-> -	if (!vgic_irq_is_edge(vcpu, irq))
-> -		vlr.state |= LR_EOI_INT;
-> -
-> -	vgic_set_lr(vcpu, lr, vlr);
-> +	vlr.state = 0;
-> +	vgic_queue_irq_to_lr(vcpu, irq, lr, vlr);
->  
->  	return true;
+>  static inline u32 vgic_get_interrupt_status(struct kvm_vcpu *vcpu)
+>  {
+>  	return vgic_ops->get_interrupt_status(vcpu);
+> @@ -1019,6 +1024,7 @@ static void vgic_retire_lr(int lr_nr, int irq,
+> struct kvm_vcpu *vcpu) vgic_set_lr(vcpu, lr_nr, vlr);
+>  	clear_bit(lr_nr, vgic_cpu->lr_used);
+>  	vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
+> +	vgic_sync_lr_elrsr(vcpu, lr_nr, vlr);
 >  }
+>  
+>  /*
+> @@ -1063,6 +1069,7 @@ static void vgic_queue_irq_to_lr(struct
+> kvm_vcpu *vcpu, int irq, vlr.state |= LR_EOI_INT;
+>  
+>  	vgic_set_lr(vcpu, lr_nr, vlr);
+> +	vgic_sync_lr_elrsr(vcpu, lr_nr, vlr);
+>  }
+>  
+>  /*
+> @@ -1258,6 +1265,14 @@ static bool vgic_process_maintenance(struct
+> kvm_vcpu *vcpu) if (status & INT_STATUS_UNDERFLOW)
+>  		vgic_disable_underflow(vcpu);
+>  
+> +	/*
+> +	 * In the next iterations of the vcpu loop, if we sync the
+> vgic state
+> +	 * after flushing it, but before entering the guest (this
+> happens for
+> +	 * pending signals and vmid rollovers), then make sure we
+> don't pick
+> +	 * up any old maintenance interrupts here.
+> +	 */
+> +	vgic_clear_eisr(vcpu);
+> +
+>  	return level_pending;
+>  }
+>  
 
 
-... but this whole vgic rework seems rather out of place, and I can't
-really see its connection with the timer. Isn't it logically part of the
-previous patch?
 
-Thanks,
-
-	M.
 -- 
 Jazz is not dead. It just smells funny.
