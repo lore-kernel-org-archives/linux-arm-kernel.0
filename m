@@ -1,55 +1,87 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 31 Mar 2015 21:03:31 -0700
-Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
- enabled during suspend
-In-Reply-To: <CAM4voanzd-iiyTbGvZpTz4nmULJu9_VUFz3EibLB5L295K4P-Q@mail.gmail.com>
- (Abhilash Kesavan's message of "Wed, 1 Apr 2015 08:49:14 +0530")
-References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
- <1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>
- <CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>
- <551976F1.1000605@collabora.co.uk>
- <7hiodg98z7.fsf@deeprootsystems.com>
- <CAM4voanzd-iiyTbGvZpTz4nmULJu9_VUFz3EibLB5L295K4P-Q@mail.gmail.com>
-Message-ID: <7h1tk47awc.fsf@deeprootsystems.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Sun, 1 Mar 2015 00:13:54 +0100
+Subject: [GIT PULL] ARM: BCM5301X: DT changes for v3.20
+In-Reply-To: <CAOesGMjd3LLoRjFEii9Y1mpjmxqQX03F4P-CHugwK8XN3LqoQg@mail.gmail.com>
+References: <54BED7D7.80207@hauke-m.de> <20150123220111.GE20896@quad.lixom.net>
+ <54C48BA1.9080902@openwrt.org> <54D99A62.6010508@gmail.com>
+ <CAOesGMjd3LLoRjFEii9Y1mpjmxqQX03F4P-CHugwK8XN3LqoQg@mail.gmail.com>
+Message-ID: <CACna6rxY_aTrUudsYvMOAx3HdtZt4qxDAFKtDUL02s-XCXOQOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash Kesavan <kesavan.abhilash@gmail.com> writes:
-
-> On Wed, Apr 1, 2015 at 2:32 AM, Kevin Hilman <khilman@kernel.org> wrote:
->> Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
+On 10 February 2015 at 11:17, Olof Johansson <olof@lixom.net> wrote:
+> On Mon, Feb 9, 2015 at 9:42 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> Le 24/01/2015 22:22, Florian Fainelli a ?crit :
+>>>
+>>>
+>>> Le 23/01/2015 14:01, Olof Johansson a ?crit :
+>>>> On Tue, Jan 20, 2015 at 11:33:59PM +0100, Hauke Mehrtens wrote:
+>>>>> Hi Olof, Hi Arnd,
+>>>>>
+>>>>> This is a pull request with some dt updates for BCM5301X for 3.20.
+>>>>>
+>>>>> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+>>>>>
+>>>>>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+>>>>>
+>>>>> are available in the git repository at:
+>>>>>
+>>>>>   https://github.com/hauke/linux.git tags/bcm5301x-dt-2015-01-20
+>>>>>
+>>>>> for you to fetch changes up to 5b1864b899d2b591402704dd0f6528c8661f1817:
+>>>>>
+>>>>>   ARM: BCM5301X: Add DT for Buffalo WZR-900DHP (2015-01-20 23:23:25 +0100)
+>>>>
+>>>> Hi Hauke,
+>>>>
+>>>> I've merged this into next/dt now, comments below.
+>>>>
+>>>>>
+>>>>> ----------------------------------------------------------------
+>>>>> bcm5301x-dt-2015-01-20: ARM: BCM5301X: dts updates for 3.20
+>>>>>
+>>>>> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+>>>>
+>>>> No signed-off-by needed in the tag -- the fact that you have signed it is
+>>>> enough. We do ask for a few words about what's in the branch though more than
+>>>> "dts updates". Something to think about going forward.
+>>>>
+>>>> Also:
+>>>>
+>>>> We had asked that broadcom platforms go in together through Florian from
+>>>> here on out, so we don't have to deal with merge requests from each and
+>>>> every one of you since there are several subplatforms. Would that be ok
+>>>> with you?
+>>>
+>>> Humm, I had asked you and Arnd a couple times if you would actually
+>>> agree in us (bcm5301x, cygnus, brcmstb and others) doing separate pull
+>>> requests, the rationale being that:
+>>>
+>>> - the previous mach-bcm maintainers had been holding some of our
+>>> development because of their lack of responsiveness, so we did not want
+>>> to end-up creating the same (potential) situation here with centralized
+>>> pull requests
+>>>
+>>> - there is little to no code sharing happening within mach-bcm, so you
+>>> would typically only have to merge the Makefile and Kconfig portions
+>>>
+>>> That said, I still have no problems sending grouped pull requests if you
+>>> prefer this model (that is sending all broadcom related pull requests
+>>> through one maintainer).
 >>
->> [...]
->>
->>> Unfortunately I don't fully understand why this clock needs to be
->>> enabled. It would be good if someone at Samsung can explain in more
->>> detail what the real problem really is.
->>
->> +1
->>
->> Maybe Abhilash can shed some light here?
->>
->> We really should know *why* this is needed because having the fix in the
->> clock driver just doesn't seem right.  It seems like the DMA driver
->> should be managing this clock.
+>> I will get all the Broadcom changes routed through a single pull request
+>> model, let me know if you want that to change in the future.
 >
-> I think my last mail might not have reached you (was accidentally sent
-> as html). 
+> Sorry, forgot to reply earlier.
+>
+> I think that would be preferred by us, yes.
+>
+> Even though there's little code sharing, there's still the need to
+> train new maintainers on what we prefer and not, which we'd then push
+> one level further in the maintainer graph for better scaling. :)
 
-Yeah, I saw it a bit later in Javier's reply.  Thanks for doing the
-research and reporting back.
+Florian: will you handle these pull requests then? Can you share some
+git tree we can track?
 
-> We are gating the aclk266_g2d clock without checking the
-> CG_STATUS0 register bits as specified in the UM. It looks like we need
-> to keep several clocks alive or gate them only after checking the
-> CG_STATUSx register bits.
-
-I dont' know much about this clock hardware, but to me it sounds like a
-clock driver bug.  The suspend fix Javier is proposing would fix it, but
-to me it sounds like the clock driver needs to actually start checking
-these CG_STATUSx bits before gating clocks.
-
-Otherwise, we might fix this current bug but a similar one will come and
-bite us another day.
-
-Kevin
+-- 
+Rafa?
