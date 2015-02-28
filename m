@@ -1,50 +1,41 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 27 Feb 2015 18:01:11 -0800
-Subject: [PATCH] seccomp: switch to using asm-generic for seccomp.h
-In-Reply-To: <20150228123656.538301ef@canb.auug.org.au>
-References: <20150228005228.GA23638@www.outflux.net>
- <20150228123656.538301ef@canb.auug.org.au>
-Message-ID: <CAGXu5jLgbzzYQkeLmpgSGu7w7DKKTHpFE=F2_a=ayjkU6atBQQ@mail.gmail.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Sat, 28 Feb 2015 14:01:51 +0800
+Subject: [PATCH v8 0/2] mtd: hisilicon: add a new driver for NAND
+ controller of hisilicon hip04 Soc
+In-Reply-To: <20150208083514.GD3670@norris-Latitude-E6410>
+References: <1422183194-10148-1-git-send-email-wangzhou1@hisilicon.com>
+ <20150208083514.GD3670@norris-Latitude-E6410>
+Message-ID: <54F159CF.9090208@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 5:36 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi Kees,
->
-> On Fri, 27 Feb 2015 16:52:29 -0800 Kees Cook <keescook@chromium.org> wrote:
+On 2015/2/8 16:35, Brian Norris wrote:
+> On Sun, Jan 25, 2015 at 06:53:12PM +0800, Zhou Wang wrote:
+>> This patchset adds the support for NAND controller of hisilicon hip04 Soc.
+>> The NAND controller IP was developed by hisilicon and needs a new driver to
+>> support it. This patchset is based on l2-mtd/master.
 >>
->> diff --git a/arch/arm/include/asm/seccomp.h b/arch/arm/include/asm/seccomp.h
->> index 52b156b341f5..66ca6a30bf5c 100644
->> --- a/arch/arm/include/asm/seccomp.h
->> +++ b/arch/arm/include/asm/seccomp.h
->> @@ -1,11 +1 @@
->> -#ifndef _ASM_ARM_SECCOMP_H
->> -#define _ASM_ARM_SECCOMP_H
->> -
->> -#include <linux/unistd.h>
->> -
->> -#define __NR_seccomp_read __NR_read
->> -#define __NR_seccomp_write __NR_write
->> -#define __NR_seccomp_exit __NR_exit
->> -#define __NR_seccomp_sigreturn __NR_rt_sigreturn
->> -
->> -#endif /* _ASM_ARM_SECCOMP_H */
->> +#include <asm-generic/seccomp.h>
+>> I have tested this NAND flash controller driver in Hip04 D01 board using MTD
+>> test modules. All testes passed except mtd_nandbiterrs. The reason is that this
+>> NAND controller doesn't support to write raw page in ECC mode. In the test of
+>> mtd_nandbiterrs, when rewriting raw page(with some bits changed) back, this NAND
+>> controller will also produce ECC codes and write into NAND flash OOB area. As
+>> ECC codes in OOB area have been broken, read error comes out as follow.
+>>
+>> Hi Brian,
+>>
+>> As the patch have been reviewed for some time, could you consider to take this
+>> driver for v3.20? If there is something still not good, please let me know.
+> 
+> It's all looking good. Pushed to l2-mtd.git, probably for 3.20. I have
+> one or two small comments that may be worth thinking about though.
+> 
+> Brian
+> 
+> .
 >
-> I think that these cases (where you replace the file by a stub that
-> just include <asm-generic/seccomp.h>) can be replaced by removing the
-> file completely and adding
->
-> generic-y = seccomp.h
->
-> to <ARCH>/include/asm/Kbuild
+Hi Brian,
 
-Ah-ha! I thought total removal was possible, but I lacked the Kbuild
-piece. There are a lot of arch/ headers that are just the one line.
-Maybe I should send a another patch to clean up those?
+Thanks a lot.
 
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+Zhou Wang
