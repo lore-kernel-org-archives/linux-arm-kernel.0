@@ -1,29 +1,26 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Sat, 28 Feb 2015 01:01:22 -0800
-Subject: [PATCH v4 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
-In-Reply-To: <1424255528-1717-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1424255528-1717-1-git-send-email-maxime.ripard@free-electrons.com>
- <1424255528-1717-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150228090122.GA11148@brian-ubuntu>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Sat, 28 Feb 2015 14:51:17 +0530
+Subject: [PATCH 3/4] clk: Provide always-on clock support
+In-Reply-To: <1425071674-16995-4-git-send-email-lee.jones@linaro.org>
+References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
+ <1425071674-16995-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAJe_Zhf=GBb8AfnTLaGxGcZkVSm9TtdnTsmpH_MBmbMT8ViMDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 18, 2015 at 11:32:07AM +0100, Maxime Ripard wrote:
-> The NDDB register holds the data that are needed by the read and write
-> commands.
-> 
-> However, during a read PIO access, the datasheet specifies that after each 32
-> bytes read in that register, when BCH is enabled, we have to make sure that the
-> RDDREQ bit is set in the NDSR register.
-> 
-> This fixes an issue that was seen on the Armada 385, and presumably other mvebu
-> SoCs, when a read on a newly erased page would end up in the driver reporting a
-> timeout from the NAND.
-> 
-> Cc: <stable@vger.kernel.org> # v3.14
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On 28 February 2015 at 02:44, Lee Jones <lee.jones@linaro.org> wrote:
+> Lots of platforms contain clocks which if turned off would prove fatal.
+> The only way to recover from these catastrophic failures is to restart
+> the board(s).  Now, when a clock is registered with the framework it is
+> compared against a list of provided always-on clock names which must be
+> kept ungated.  If it matches, we enable the existing CLK_IGNORE_UNUSED
+> flag, which will prevent the common clk framework from attempting to
+> gate it during the clk_disable_unused() procedure.
+>
+If a clock is critical on a certain board, it could be got+enabled
+during early boot so there is always a user.
+To be able to do that from DT, maybe add a new, say, CLK_ALWAYS_ON
+flag could be made to initialize the clock with one phantom user
+already. Or just reuse the CLK_IGNORE_UNUSED?
 
-Pushed this one to linux-mtd.git. I'll try to get it out in the 4.0
-cycle. I assume patch 2 (the DT addition) will go through arm-soc.
-
-Brian
+-Jassi
