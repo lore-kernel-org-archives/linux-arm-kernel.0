@@ -1,31 +1,31 @@
-From: colin.king@canonical.com (Colin King)
-Date: Sat, 28 Feb 2015 20:22:27 +0000
-Subject: [PATCH] pinctrl: sirf: fix typo in kernel warning on a bad interruot
-Message-ID: <1425154947-7855-1-git-send-email-colin.king@canonical.com>
+From: eric@eukrea.com (Eric =?UTF-8?B?QsOpbmFyZA==?=)
+Date: Sat, 28 Feb 2015 21:24:30 +0100
+Subject: [PATCH] ARM: mx25: Remove mach-mx25_3ds board file
+In-Reply-To: <CAOMZO5Bo=YqCoCQpBRnfROLQTV+wE+wWrmJqUtMGeCaPgT3qiQ@mail.gmail.com>
+References: <1425138035-19715-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5Bo=YqCoCQpBRnfROLQTV+wE+wWrmJqUtMGeCaPgT3qiQ@mail.gmail.com>
+Message-ID: <20150228212430.50f883ab@e6520eb.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+Hi Fabio,
 
-Fix typo, "flaged" -> "flagged"
+Le Sat, 28 Feb 2015 12:42:45 -0300,
+Fabio Estevam <festevam@gmail.com> a ?crit :
+> On Sat, Feb 28, 2015 at 12:40 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> > From: Fabio Estevam <fabio.estevam@freescale.com>
+> >
+> > imx25-pdk.dts provides a more complete support than the board file version, so
+> > let's get rid of the board file.
+> >
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Do you mind if I submit a patch removing the eukrea mx25 board files?
+> 
+> If this is possible, then we can convert mx25 to a dt-only platform.
+> 
+no problem on our side, it was supposed to be removed after DT support
+for this board was accepted but it seems the patch was never sent ;-)
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/pinctrl/sirf/pinctrl-sirf.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/sirf/pinctrl-sirf.c b/drivers/pinctrl/sirf/pinctrl-sirf.c
-index 2a1f072..abc5c47 100644
---- a/drivers/pinctrl/sirf/pinctrl-sirf.c
-+++ b/drivers/pinctrl/sirf/pinctrl-sirf.c
-@@ -568,7 +568,7 @@ static void sirfsoc_gpio_handle_irq(unsigned int irq, struct irq_desc *desc)
- 	status = readl(sgpio->chip.regs + SIRFSOC_GPIO_INT_STATUS(bank->id));
- 	if (!status) {
- 		printk(KERN_WARNING
--			"%s: gpio id %d status %#x no interrupt is flaged\n",
-+			"%s: gpio id %d status %#x no interrupt is flagged\n",
- 			__func__, bank->id, status);
- 		handle_bad_irq(irq, desc);
- 		return;
--- 
-2.1.4
+Best regards,
+Eric
