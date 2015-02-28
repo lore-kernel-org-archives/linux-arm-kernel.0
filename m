@@ -1,101 +1,63 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sat, 28 Feb 2015 16:36:29 +0100
-Subject: [PATCH v4 6/9] watchdog: st_wdt: Add new driver for ST's LPC
- Watchdog
-In-Reply-To: <1424872349-4155-7-git-send-email-lee.jones@linaro.org>
-References: <1424872349-4155-1-git-send-email-lee.jones@linaro.org>
- <1424872349-4155-7-git-send-email-lee.jones@linaro.org>
-Message-ID: <1425137789.24292.44.camel@x220>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 28 Feb 2015 12:40:35 -0300
+Subject: [PATCH] ARM: mx25: Remove mach-mx25_3ds board file
+Message-ID: <1425138035-19715-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-02-25 at 13:52 +0000, Lee Jones wrote:
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> Signed-off-by: David Paris <david.paris@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/watchdog/Kconfig      |  13 ++
->  drivers/watchdog/Makefile     |   1 +
->  drivers/watchdog/st_lpc_wdt.c | 333 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 347 insertions(+)
->  create mode 100644 drivers/watchdog/st_lpc_wdt.c
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-A few nits follow.
+imx25-pdk.dts provides a more complete support than the board file version, so
+let's get rid of the board file.
 
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index 16f2023..023df6d 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -471,6 +471,19 @@ config SIRFSOC_WATCHDOG
->  	  Support for CSR SiRFprimaII and SiRFatlasVI watchdog. When
->  	  the watchdog triggers the system will be reset.
->  
-> +config ST_LPC_WATCHDOG
-> +	tristate "STMicroelectronics LPC Watchdog"
-> +	depends on ARCH_STI
-> +	depends on OF
-> +	select WATCHDOG_CORE
-> +	select MFD_ST_LPC
-> +	help
-> +	  Say Y here to include STMicroelectronics Low Power Controller
-> +	  (LPC) based Watchdog timer support.
-> +
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called st_wdt.
-> +
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/Kconfig         |  15 ---
+ arch/arm/mach-imx/Makefile        |   1 -
+ arch/arm/mach-imx/mach-mx25_3ds.c | 270 --------------------------------------
+ 3 files changed, 286 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/mach-mx25_3ds.c
 
-This calls the module st_wdt. So does the title.
-
->  config TEGRA_WATCHDOG
->  	tristate "Tegra watchdog"
->  	depends on (ARCH_TEGRA || COMPILE_TEST) && HAS_IOMEM
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index 5c19294..d98768c 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -59,6 +59,7 @@ obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
->  obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
->  obj-$(CONFIG_MOXART_WDT) += moxart_wdt.o
->  obj-$(CONFIG_SIRFSOC_WATCHDOG) += sirfsoc_wdt.o
-> +obj-$(CONFIG_ST_LPC_WATCHDOG) += st_lpc_wdt.o
-
-But this makes it st_lpc_wdt, doesn't it?
-
->  obj-$(CONFIG_QCOM_WDT) += qcom-wdt.o
->  obj-$(CONFIG_BCM_KONA_WDT) += bcm_kona_wdt.o
->  obj-$(CONFIG_TEGRA_WATCHDOG) += tegra_wdt.o
-> diff --git a/drivers/watchdog/st_lpc_wdt.c b/drivers/watchdog/st_lpc_wdt.c
-> new file mode 100644
-> index 0000000..91bb631
-> --- /dev/null
-> +++ b/drivers/watchdog/st_lpc_wdt.c
-> @@ -0,0 +1,333 @@
-> +/*
-> + * st-wdt.c - ST's LPC Watchdog
-
-Mismatch between "st-wdt.c" and the actual filename. Perhaps just remove
-"st-wdt.c - "?
-
-> + *
-> + * Copyright (C) 2014 STMicroelectronics -- All Rights Reserved
-> + *
-> + * Author: David Paris <david.paris@st.com> for STMicroelectronics
-> + *         Lee Jones <lee.jones@linaro.org> for STMicroelectronics
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public Licence
-> + * as published by the Free Software Foundation; either version
-> + * 2 of the Licence, or (at your option) any later version.
-> + */
-
-This states the license is "GPL v2 or later"
-
-[...]
-
-> +MODULE_LICENSE("GPL v2");
-
-So this should probably be
-    MODULE_LICENSE("GPL");
-
-
-Paul Bolle
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index e8627e0..aaea738 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -151,21 +151,6 @@ config MACH_MX21ADS
+ 
+ comment "MX25 platforms:"
+ 
+-config MACH_MX25_3DS
+-	bool "Support MX25PDK (3DS) Platform"
+-	select IMX_HAVE_PLATFORM_FLEXCAN
+-	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
+-	select IMX_HAVE_PLATFORM_IMX2_WDT
+-	select IMX_HAVE_PLATFORM_IMXDI_RTC
+-	select IMX_HAVE_PLATFORM_IMX_FB
+-	select IMX_HAVE_PLATFORM_IMX_I2C
+-	select IMX_HAVE_PLATFORM_IMX_KEYPAD
+-	select IMX_HAVE_PLATFORM_IMX_UART
+-	select IMX_HAVE_PLATFORM_MXC_EHCI
+-	select IMX_HAVE_PLATFORM_MXC_NAND
+-	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+-	select SOC_IMX25
+-
+ config MACH_EUKREA_CPUIMX25SD
+ 	bool "Support Eukrea CPUIMX25 Platform"
+ 	select IMX_HAVE_PLATFORM_FLEXCAN
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 8d1b101..e92ede9 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -49,7 +49,6 @@ obj-$(CONFIG_MACH_IMX1_DT) += imx1-dt.o
+ obj-$(CONFIG_MACH_MX21ADS) += mach-mx21ads.o
+ 
+ # i.MX25 based machines
+-obj-$(CONFIG_MACH_MX25_3DS) += mach-mx25_3ds.o
+ obj-$(CONFIG_MACH_EUKREA_CPUIMX25SD) += mach-eukrea_cpuimx25.o
+ obj-$(CONFIG_MACH_EUKREA_MBIMXSD25_BASEBOARD) += eukrea_mbimxsd25-baseboard.o
+ obj-$(CONFIG_MACH_IMX25_DT) += imx25-dt.o
+diff --git a/arch/arm/mach-imx/mach-mx25_3ds.c b/arch/arm/mach-imx/mach-mx25_3ds.c
+deleted file mode 100644
+index 0d01e36..0000000
+-- 
+1.9.1
