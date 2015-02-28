@@ -1,22 +1,59 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Sat, 28 Feb 2015 01:28:08 -0800
-Subject: [PATCH v2 01/10] mtd: pxa3xx_nand: initialiaze pxa3xx_flash_ids
- to 0
-In-Reply-To: <1423752816-26219-2-git-send-email-antoine.tenart@free-electrons.com>
-References: <1423752816-26219-1-git-send-email-antoine.tenart@free-electrons.com>
- <1423752816-26219-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20150228092808.GC12966@brian-ubuntu>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 28 Feb 2015 10:55:51 +0100
+Subject: [PATCHv2 05/15] ARM: mvebu: add stdout-path to all armada-*.dts
+In-Reply-To: <CAL_Jsq+tP6wBcDti7x-B6ar8esE=65Ymg_CKANeOKSe=yYhNnw@mail.gmail.com>
+References: <1424451874-25375-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1424451874-25375-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <54EB4E9B.6010001@free-electrons.com>
+ <CAL_JsqJZJMkH953hq0_sOvEEu9o4pXxs0sdP5=7c2EXXNSyA9A@mail.gmail.com>
+ <20150227174851.390d9f58@free-electrons.com>
+ <CAL_Jsq+tP6wBcDti7x-B6ar8esE=65Ymg_CKANeOKSe=yYhNnw@mail.gmail.com>
+Message-ID: <20150228105551.7b6532f8@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 12, 2015 at 03:53:27PM +0100, Antoine Tenart wrote:
-> pxa3xx_flash_ids wasn't initialized to 0, which in certain cases could
-> end up containing corrupted values in its members. Fix this to avoid
-> possible issues.
+Dear Rob Herring,
+
+On Fri, 27 Feb 2015 11:42:43 -0600, Rob Herring wrote:
+
+> > Unfortunately, this doesn't seem to work at all:
 > 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> This must have all been tested on QEMU (or Fast Models?) which ignores
+> baud rate.
 
-Applied this patch to l2-mtd.git. The others are TBD still. (Haven't
-examined all of them too closely.)
 
-Brian
+Ok.
+
+> >    So it gets the right port name, the right idx, just the options are
+> >    null. It shouldn't be an issue since the serial port is already
+> >    initialized by the bootloader.
+> 
+> I think the default baudrate is 9600, not what the bootloader set.
+
+That might explain the issue then.
+
+> You need the full path here though. But garbage should not crash things.
+
+Indeed, I was surprised that a different DT string was crashing the
+kernel.
+
+
+> > It is worth mentioning that this also happens with
+> >
+> >      stdout-path = "uart0:115200n8";
+> >
+> > which was explicitly suggested by Mark in his e-mail. uart0 is an alias
+> > to the proper DT node, since stdout-path = &uart0; works almost fine.
+> 
+> Mark forgot the '&'. So does 'stdout-path = "&uart0:115200n8";' work?
+
+I don't have the board at hand right now, will try this on Tuesday when
+coming back to the office. Thanks for the suggestion!
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
