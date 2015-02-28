@@ -1,55 +1,42 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 28 Feb 2015 17:50:46 +0100
-Subject: [PATCH] net: smc91x: use run-time configuration on all ARM
- machines
-In-Reply-To: <2226303.iMQTNXSl1n@wuerfel> (Arnd Bergmann's message of "Wed, 25
- Feb 2015 16:31:57 +0100")
-References: <2226303.iMQTNXSl1n@wuerfel>
-Message-ID: <877fv22d5l.fsf@free.fr>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 28 Feb 2015 18:43:19 +0100
+Subject: [PATCH 1/2] dt-bindings: add root compatible property for
+ PopMetal board
+In-Reply-To: <1425034741-25229-1-git-send-email-andy.yan@rock-chips.com>
+References: <1425034505-25163-1-git-send-email-andy.yan@rock-chips.com>
+ <1425034741-25229-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <20074998.Rot74D46YJ@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Hi Andy,
 
-> The smc91x driver traditionally gets configured at compile-time
-> for whichever hardware it runs on. This no longer works on
-> ARM as we continue to move to building all-in-one kernels.
->
-> Most ARM configurations with this driver already use run-time
-> configuration through DT or through platform_data, but a
-> few have not been converted yet.
->
-> I've checked all ARM boards that use this driver in their
-> legacy board files, and converted the ones that were using
-> compile-time configuration in smc91x.h to behave like the
-> other ones and provide the interrupt polarity along with
-> the MMIO configuration (width, stride) at platform device
-> creation time.
->
-> In particular, these combinations were previously selectable
-> in Kconfig but in fact broken:
->
-> - sa1100 assabet plus pleb
-> - msm combined with any other armv6/v7 platform
-> - pxa-idp combined with any non-DMA pxa variant
-> - LogicPD PXA270 combined with any other pxa
-> - nomadik combined with any other armv4/v5 platform,
->   e.g. versatile.
->
-> None of these seem critical enough to warrant a backport
-> to stable, but it would be nice to clean this up for good.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ----
-> I would like the patch to get merged through netdev, after
-> Robert and/or Linus have verified it on at least some hardware.
-For lubbock (smcs 91c96) and zylonite (smcs 91c111) :
-Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Am Freitag, 27. Februar 2015, 18:59:01 schrieb Andy Yan:
+> PopMetal board is a rk3288 based board made by ChipSpark,
+> this patch add root compatible property for it
+> 
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> 
+> ---
+> 
+>  Documentation/devicetree/bindings/arm/rockchip.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt
+> b/Documentation/devicetree/bindings/arm/rockchip.txt index 6809e4e..818d249
+> 100644
+> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
+> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+> @@ -22,3 +22,7 @@ Rockchip platforms device tree bindings
+>        - compatible = "firefly,firefly-rk3288", "rockchip,rk3288";
+>      or
+>        - compatible = "firefly,firefly-rk3288-beta", "rockchip,rk3288";
+> +
+> +- PopMetal PopMetal-RK3288 board:
 
-Cheers.
+this should probably be
+	ChipSPARK PopMetal-RK3288 board:
 
---
-Robert
 
-PS: My mainstone is a bit uncooperative right now, I'll have to convince her to
-boot in the near future ...
+> +    Required root node properties:
+> +      - compatible = "chipspark,popmetal-rk3288", "rockchip,rk3288";
