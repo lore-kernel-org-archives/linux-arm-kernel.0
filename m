@@ -1,40 +1,68 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 28 Feb 2015 16:29:02 +0100
-Subject: [PATCH v4 2/4] mfd: lubbock_cplds: add lubbock IO board
-In-Reply-To: <20150228151141.GA22302@kroah.com> (Greg Kroah-Hartman's message
- of "Sat, 28 Feb 2015 07:11:41 -0800")
-References: <20150216130549.GF14545@x1>
- <1170550770.470129293.1424093248596.JavaMail.root@zimbra1-e1.priv.proxad.net>
- <20150216162712.GR14545@x1> <87fva5a4i2.fsf@free.fr>
- <20150217074310.GT14545@x1>
- <alpine.LFD.2.11.1502171221300.22104@knanqh.ubzr>
- <20150218080719.GB5781@x1> <87a9088tam.fsf@free.fr>
- <87mw3y2wad.fsf@free.fr> <20150228151141.GA22302@kroah.com>
-Message-ID: <87h9u62gxt.fsf@free.fr>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Sat, 28 Feb 2015 07:36:02 -0800
+Subject: [PATCH v2 2/2] Input: bcm-keypad: Add Broadcom keypad controller
+In-Reply-To: <1425132978.24292.39.camel@x220>
+References: <Scott Branden <sbranden@broadcom.com>	
+ <1424966930-28097-1-git-send-email-sbranden@broadcom.com>	
+ <1424966930-28097-3-git-send-email-sbranden@broadcom.com>
+ <1425132978.24292.39.camel@x220>
+Message-ID: <54F1E062.8070609@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
 
-> On Sat, Feb 28, 2015 at 10:57:30AM +0100, Robert Jarzmik wrote:
->> Robert Jarzmik <robert.jarzmik@free.fr> writes:
->> 
->> > Hi Arnd and Greg,
->> It's been a week, backlog ping ?
+Yes, will correct.  Thanks.
+
+On 15-02-28 06:16 AM, Paul Bolle wrote:
+> On Thu, 2015-02-26 at 08:08 -0800, Scott Branden wrote:
+>> Add driver for Broadcom's keypad controller.
+>>
+>> Broadcom Keypad controller is used to interface a SoC with a matrix-type
+>> keypad device. The keypad controller supports multiple row and column lines.
+>> A key can be placed at each intersection of a unique row and a unique column.
+>> The keypad controller can sense a key-press and key-release and report the
+>> event using a interrupt to the cpu.
+>>
+>> Reviewed-by: Ray Jui <rjui@broadcom.com>
+>> Signed-off-by: Scott Branden <sbranden@broadcom.com>
+>> ---
+>>   drivers/input/keyboard/Kconfig      |  10 +
+>>   drivers/input/keyboard/Makefile     |   1 +
+>>   drivers/input/keyboard/bcm-keypad.c | 464 ++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 475 insertions(+)
+>>   create mode 100644 drivers/input/keyboard/bcm-keypad.c
 >
-> If only my backlog was just one week...
-Ah, that's bad :)
-
-> And I'm not the mfd maintainer...
-I know. The question was for the "all drivers" maintainer ... ie. you.
-
-The question was where should CPLD drivers end up, given that the mfd maintainer
-pushed back.
-
-Yet I understand you're overflowed, and I'll take it into arch/arm/plat-pxa. I
-don't think it's the right place, but it's my only fallback.
-
-Cheers.
-
--- 
-Robert
+> License nit follows.
+>
+>> diff --git a/drivers/input/keyboard/bcm-keypad.c b/drivers/input/keyboard/bcm-keypad.c
+>> new file mode 100644
+>> index 0000000..f229ac0
+>> --- /dev/null
+>> +++ b/drivers/input/keyboard/bcm-keypad.c
+>> @@ -0,0 +1,464 @@
+>> +/*
+>> + * Copyright (C) 2014 Broadcom Corporation
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation version 2.
+>
+> This states that the license is GPL v2 only.
+>
+>> + *
+>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+>> + * kind, whether express or implied; without even the implied warranty
+>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>
+> [...]
+>
+>> +MODULE_LICENSE("GPL");
+>
+> So you probably want
+>      MODULE_LICENSE("GPL v2");
+>
+>
+> Paul Bolle
+>
