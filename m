@@ -1,41 +1,35 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Sat, 28 Feb 2015 14:01:51 +0800
-Subject: [PATCH v8 0/2] mtd: hisilicon: add a new driver for NAND
- controller of hisilicon hip04 Soc
-In-Reply-To: <20150208083514.GD3670@norris-Latitude-E6410>
-References: <1422183194-10148-1-git-send-email-wangzhou1@hisilicon.com>
- <20150208083514.GD3670@norris-Latitude-E6410>
-Message-ID: <54F159CF.9090208@hisilicon.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Sat, 28 Feb 2015 08:52:23 +0100
+Subject: [STLinux Kernel] [PATCH 3/4] clk: Provide always-on clock support
+In-Reply-To: <1425071674-16995-4-git-send-email-lee.jones@linaro.org>
+References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
+ <1425071674-16995-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <54F173B7.9030305@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/2/8 16:35, Brian Norris wrote:
-> On Sun, Jan 25, 2015 at 06:53:12PM +0800, Zhou Wang wrote:
->> This patchset adds the support for NAND controller of hisilicon hip04 Soc.
->> The NAND controller IP was developed by hisilicon and needs a new driver to
->> support it. This patchset is based on l2-mtd/master.
->>
->> I have tested this NAND flash controller driver in Hip04 D01 board using MTD
->> test modules. All testes passed except mtd_nandbiterrs. The reason is that this
->> NAND controller doesn't support to write raw page in ECC mode. In the test of
->> mtd_nandbiterrs, when rewriting raw page(with some bits changed) back, this NAND
->> controller will also produce ECC codes and write into NAND flash OOB area. As
->> ECC codes in OOB area have been broken, read error comes out as follow.
->>
->> Hi Brian,
->>
->> As the patch have been reviewed for some time, could you consider to take this
->> driver for v3.20? If there is something still not good, please let me know.
-> 
-> It's all looking good. Pushed to l2-mtd.git, probably for 3.20. I have
-> one or two small comments that may be worth thinking about though.
-> 
-> Brian
-> 
-> .
->
-Hi Brian,
+Hi Lee,
 
-Thanks a lot.
+On 02/27/2015 10:14 PM, Lee Jones wrote:
+> Lots of platforms contain clocks which if turned off would prove fatal.
+> The only way to recover from these catastrophic failures is to restart
+> the board(s).  Now, when a clock is registered with the framework it is
+> compared against a list of provided always-on clock names which must be
+> kept ungated.  If it matches, we enable the existing CLK_IGNORE_UNUSED
+> flag, which will prevent the common clk framework from attempting to
+> gate it during the clk_disable_unused() procedure.
 
-Zhou Wang
+Please correct me if I'm wrong, but your patch does not fix the issue 
+you had initially.
+Let's take an example:
+A clock is critical for the system, and should never be gated, so you 
+add the CLK_IGNORE_UNUSED
+flag so that it is not disabled by clk_disable_unused() procedure.
+The same clock is also used by other IPs, for example spi 0 instance.
+When starting a spi transfer, clk_enable() is called on this clock, so 
+its usecount becomes 1.
+Once transfer done, clk_disable() is called, usecount becomes 0 and the 
+clock gets disabled: system freeze.
+
+BR,
+Maxime
