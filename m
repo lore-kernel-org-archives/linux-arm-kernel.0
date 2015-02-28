@@ -1,25 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 28 Feb 2015 20:31:27 +0100
-Subject: [PATCH v2 2/2] hwrng: iproc-rng200 - Add Broadcom IPROC RNG driver
-In-Reply-To: <54F1E647.10106@broadcom.com>
-References: <1424888184-22180-3-git-send-email-sbranden@broadcom.com>
- <2093191.gujNGSl66k@wuerfel> <54F1E647.10106@broadcom.com>
-Message-ID: <2555599.AxGoQ20pkj@wuerfel>
+Date: Sat, 28 Feb 2015 20:48:27 +0100
+Subject: [PATCH] rtc: abx805 depends on i2c
+Message-ID: <2307717.ct4mYzhCLm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 28 February 2015 08:01:11 Scott Branden wrote:
-> > The udelay(10) that the other drivers have seems about appropriate then,
-> > and we can independently think of a way to refine the interface.
-> > Please add a comment that explains the rate. Also, is there some kind
-> > of FIFO present in the hwrng device? If it can store close to 1ms work
-> > of data (1000 bits), you can just use an msleep(1) to wait for the
-> > pool to recover.
-> FIFO is 512 bits.  I will look as to whether we can live with 1/2 
-> throughput.
+The recently added X805 rtc driver uses the i2c subsystem,
+but has no Kconfig dependency, so it can result in a build
+error when i2c is disabled:
 
-In that case, I think usleep_range(min(len * 8, 500), 500)) would be
-a good compromise: it waits at most until the fifo is full, but might
-return earlier if enough bits are available to fulfill the request.
+drivers/rtc/rtc-abx805.c: In function 'abx805_read_multiple_regs':
+drivers/rtc/rtc-abx805.c:55:2: error: implicit declaration of function 'i2c_transfer' [-Werror=implicit-function-declaration]
 
-	Arnd
+This adds the obvious dependency.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 9033ab8ddd29 ("rtc: add rtc-abx805, a driver for the Abracon AB 1805 i2c rtc")
+
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index 61ea2e3b4071..80ae27ffe8ea 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -1083,6 +1083,7 @@ config RTC_DRV_AB8500
+ 
+ config RTC_DRV_ABX805
+ 	tristate "Abracon AB X805 RTC"
++	depends on I2C
+ 	help
+ 	  Select this to enable support for the Abracon AB X805 RTC.
+ 	  AB X805 is the i2c flavour of the AB 18X5 family of ultra-low-power
