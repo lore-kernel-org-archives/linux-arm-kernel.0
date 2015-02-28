@@ -1,36 +1,39 @@
-From: k.kozlowski.k@gmail.com (=?UTF-8?Q?Krzysztof_Koz=C5=82owski?=)
-Date: Sat, 28 Feb 2015 17:15:05 +0100
-Subject: smdk4412 (Samsung Galaxy S3 i9300) status
-In-Reply-To: <CAH=tA9FSPmegGofqYcatRCsBoviQxRgQFdT-FOEXytCt_Yos9w@mail.gmail.com>
-References: <CAH=tA9FSPmegGofqYcatRCsBoviQxRgQFdT-FOEXytCt_Yos9w@mail.gmail.com>
-Message-ID: <CAJKOXPeexstnOb0WLuh6Ygqb4KqVbDhYBQYdCwzXC4JtWWsifg@mail.gmail.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Sat, 28 Feb 2015 08:35:55 -0800
+Subject: [PATCH v4 0/2] Add support for Broadcom keypad controller
+In-Reply-To: <Scott Branden <sbranden@broadcom.com>
+References: <Scott Branden <sbranden@broadcom.com>
+Message-ID: <1425141357-7807-1-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-02-28 11:57 GMT+01:00, Nicolae Rosia <nicolae.rosia@gmail.com>:
-> Hello,
->
-> I want to boot my i9300 to a framebuffer console with the mainline
-> kernel. Did anyone tried this already and have a device tree for the
-> device?
+This series of patchsets contains the Broadcom keypad controller driver
+and device tree binding documentation.
 
-Hi,
+Changes from v3:
+- corrected GPL to GPL v2
 
-The Trats2 device is the other name for S3, so you can use exynos
-defconfig and exynos4412-trats2.dts.
+Changes from v2:
+- changed binding to use autorepeat
+- stylistic updates
 
-P.S. I am resending the mail because Google produced HTML which is
-banned on LKML.
+Changes from v1:
+- updated dt documentation to remove to matrix-keymap.txt
+- removed bcm_kp_remove as it is not necessary
+- removed key-interrupt-trigger-type dt binding
+- added bcm_kp_report_keys and call to process key registers
 
-Best regards,
-Krzysztof
+Scott Branden (2):
+  Input: bcm-keypad: add device tree bindings
+  Input: bcm-keypad: Add Broadcom keypad controller
 
+ .../devicetree/bindings/input/brcm,bcm-keypad.txt  | 108 +++++
+ drivers/input/keyboard/Kconfig                     |  10 +
+ drivers/input/keyboard/Makefile                    |   1 +
+ drivers/input/keyboard/bcm-keypad.c                | 463 +++++++++++++++++++++
+ 4 files changed, 582 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/brcm,bcm-keypad.txt
+ create mode 100644 drivers/input/keyboard/bcm-keypad.c
 
-> Best regards,
-> Nicolae Rosia
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+-- 
+2.3.0
