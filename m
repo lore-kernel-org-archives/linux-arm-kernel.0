@@ -1,31 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 28 Feb 2015 20:48:27 +0100
-Subject: [PATCH] rtc: abx805 depends on i2c
-Message-ID: <2307717.ct4mYzhCLm@wuerfel>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 28 Feb 2015 21:20:48 +0100
+Subject: [PATCH] ARM: ARMADA XP: WRT1900AC: Add support for the Ethernet switch
+Message-ID: <1425154848-15441-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recently added X805 rtc driver uses the i2c subsystem,
-but has no Kconfig dependency, so it can result in a build
-error when i2c is disabled:
+Add a DSA section to the DT blob representing the Ethernet switch.
 
-drivers/rtc/rtc-abx805.c: In function 'abx805_read_multiple_regs':
-drivers/rtc/rtc-abx805.c:55:2: error: implicit declaration of function 'i2c_transfer' [-Werror=implicit-function-declaration]
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+This patch requires at runtime patches in net-next,
+4c732668f98b96a0fa2645ac220fd9bbc17838c4
+---
+ arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 45 +++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-This adds the obvious dependency.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 9033ab8ddd29 ("rtc: add rtc-abx805, a driver for the Abracon AB 1805 i2c rtc")
-
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 61ea2e3b4071..80ae27ffe8ea 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -1083,6 +1083,7 @@ config RTC_DRV_AB8500
+diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+index 485a6eb86910..a2cf2154dcdb 100644
+--- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
++++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+@@ -327,6 +327,51 @@
+ 		gpio-fan,speed-map = <0    0
+ 				      4500 1>;
+ 	};
++
++	dsa at 0 {
++		compatible = "marvell,dsa";
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		dsa,ethernet = <&eth0>;
++		dsa,mii-bus = <&mdio>;
++
++		switch at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x0 0>;	/* MDIO address 0, switch 0 in tree */
++
++			port at 0 {
++				reg = <0>;
++				label = "lan4";
++			};
++
++			port at 1 {
++				reg = <1>;
++				label = "lan3";
++			};
++
++			port at 2 {
++				reg = <2>;
++				label = "lan2";
++			};
++
++			port at 3 {
++				reg = <3>;
++				label = "lan1";
++			};
++
++			port at 4 {
++				reg = <4>;
++				label = "internet";
++			};
++
++			port at 5 {
++				reg = <5>;
++				label = "cpu";
++			};
++		};
++	};
+ };
  
- config RTC_DRV_ABX805
- 	tristate "Abracon AB X805 RTC"
-+	depends on I2C
- 	help
- 	  Select this to enable support for the Abracon AB X805 RTC.
- 	  AB X805 is the i2c flavour of the AB 18X5 family of ultra-low-power
+ &pinctrl {
+-- 
+2.1.4
