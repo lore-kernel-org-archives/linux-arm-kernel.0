@@ -1,77 +1,26 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sat, 28 Feb 2015 16:45:28 +0100
-Subject: [PATCH 3/7] drivers: Introduce new eFuse subsystem stub
-In-Reply-To: <1424864719-3390-4-git-send-email-ezequiel.garcia@imgtec.com>
-References: <1424864719-3390-1-git-send-email-ezequiel.garcia@imgtec.com>
- <1424864719-3390-4-git-send-email-ezequiel.garcia@imgtec.com>
-Message-ID: <1425138328.24292.46.camel@x220>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 28 Feb 2015 07:45:59 -0800
+Subject: [PATCH v2] hwmon: (gpio-fan) allow to use alarm support alone
+ from DT
+In-Reply-To: <1424887099-26551-1-git-send-email-simon.guinot@sequanux.org>
+References: <1424887099-26551-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <54F1E2B7.70807@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-02-25 at 08:45 -0300, Ezequiel Garcia wrote:
-> This commit introduces a new eFuse subsystem stub to hold all the eFuse-like
-> device drivers. This will be used to host the currently supported Tegra
-> eFuse driver, and will allow to add support for other platforms as well.
-> 
-> Cc: Thierry Reding <treding@nvidia.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Stefan Wahren <stefan.wahren@i2se.com>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@imgtec.com>
-> ---
->  drivers/Kconfig        | 2 ++
->  drivers/Makefile       | 1 +
->  drivers/efuse/Kconfig  | 3 +++
->  drivers/efuse/Makefile | 0
->  4 files changed, 6 insertions(+)
->  create mode 100644 drivers/efuse/Kconfig
->  create mode 100644 drivers/efuse/Makefile
-> 
-> diff --git a/drivers/Kconfig b/drivers/Kconfig
-> index c0cc96b..9c0d93d 100644
-> --- a/drivers/Kconfig
-> +++ b/drivers/Kconfig
-> @@ -146,6 +146,8 @@ source "drivers/remoteproc/Kconfig"
->  
->  source "drivers/rpmsg/Kconfig"
->  
-> +source "drivers/efuse/Kconfig"
-> +
->  source "drivers/soc/Kconfig"
->  
->  source "drivers/devfreq/Kconfig"
-> diff --git a/drivers/Makefile b/drivers/Makefile
-> index 527a6da..5572728 100644
-> --- a/drivers/Makefile
-> +++ b/drivers/Makefile
-> @@ -34,6 +34,7 @@ obj-y				+= amba/
->  obj-$(CONFIG_DMADEVICES)	+= dma/
->  
->  # SOC specific infrastructure drivers.
-> +obj-y				+= efuse/
->  obj-y				+= soc/
->  
->  obj-$(CONFIG_VIRTIO)		+= virtio/
-> diff --git a/drivers/efuse/Kconfig b/drivers/efuse/Kconfig
-> new file mode 100644
-> index 0000000..617476f
-> --- /dev/null
-> +++ b/drivers/efuse/Kconfig
-> @@ -0,0 +1,3 @@
-> +menu "eFuse drivers"
-> +
-> +endmenu
+On 02/25/2015 09:58 AM, Simon Guinot wrote:
+> On some boards, such as the LaCie 2Big Network v2 or 2Big NAS (based on
+> Marvell Kirkwood SoCs), an I2C fan controller is used but the alarm
+> signal is wired to a separate GPIO. Unfortunately, the gpio-fan driver
+> can't be used to handle GPIO alarm alone from DT: an error is returned
+> if the "gpios" DT property is missing.
+>
+> This patch allows to use the gpio-fan driver even if the "alarm-gpios"
+> DT property is defined alone.
+>
+> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
 
-This adds an empty entry.
+Applied to -next.
 
-> diff --git a/drivers/efuse/Makefile b/drivers/efuse/Makefile
-> new file mode 100644
-> index 0000000..e69de29
-
-And this adds an empty file. Odd.
-
-Is there a reason why this can't be merged into 4/7?
-
-
-Paul Bolle
+Thanks,
+Guenter
