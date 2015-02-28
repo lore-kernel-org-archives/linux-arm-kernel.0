@@ -1,32 +1,41 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 27 Feb 2015 19:10:25 -0600
-Subject: [PATCH 0/2] pinctrl: dt-bindings: Fix amx3 SLEWCTRL_FAST binding
-Message-ID: <1425085827-4514-1-git-send-email-d-gerlach@ti.com>
+Date: Fri, 27 Feb 2015 19:10:27 -0600
+Subject: [PATCH 2/2] pinctrl: am43xx: dt-bindings: fix SLEWCTRL_FAST binding
+In-Reply-To: <1425085827-4514-1-git-send-email-d-gerlach@ti.com>
+References: <1425085827-4514-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <1425085827-4514-3-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently both am33xx and am43xx have the macro for SLEWCTRL_FAST
-in pinctrl dt-bindings reversed so that selecting the macro actually
-sets SLEWCTRL_SLOW in the pad control registers. These patches
-correct the bindings but leave the pinctrl states that use the binding
-*UNMODIFIED*. Previously i2c and mdio on am33xx and i2c, mdio, and
-uart on am43xx had been using this macro and selecting SLEWCTRL_FAST
-while actually programming SLEWCTRL_SLOW in the pad config registers.
+According to AM437x TRM, Document SPRUHL7B, Revised December 2014,
+Section 7.2.1 Pad Control Registers, setting bit 19 of the pad control
+registers actually sets the SLEWCTRL value to slow rather than fast as
+the current macro indicates. Introduce a new macro, SLEWCTRL_SLOW, that
+sets the bit, and modify SLEWCTRL_FAST to 0 but keep it for
+completeness.
 
-Because the intended selection was SLEWCTRL_FAST the macros are
-unchanged. I tested on am335x-gp-evm and am437x-gp-evm with no
-difference in functionality seen.
+Current users of the macro (i2c, mdio, and uart) are left unmodified as
+SLEWCTRL_FAST was the macro used and actual desired state. Tested on
+am437x-gp-evm with no difference in software performance seen.
 
-Regards,
-Dave
-
-Dave Gerlach (2):
-  pinctrl: am33xx: dt-bindings: fix SLEWCTRL_FAST binding
-  pinctrl: am43xx: dt-bindings: fix SLEWCTRL_FAST binding
-
- include/dt-bindings/pinctrl/am33xx.h | 3 ++-
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
  include/dt-bindings/pinctrl/am43xx.h | 3 ++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
+diff --git a/include/dt-bindings/pinctrl/am43xx.h b/include/dt-bindings/pinctrl/am43xx.h
+index 9c2e4f8..5f4d0189 100644
+--- a/include/dt-bindings/pinctrl/am43xx.h
++++ b/include/dt-bindings/pinctrl/am43xx.h
+@@ -18,7 +18,8 @@
+ #define PULL_DISABLE		(1 << 16)
+ #define PULL_UP			(1 << 17)
+ #define INPUT_EN		(1 << 18)
+-#define SLEWCTRL_FAST		(1 << 19)
++#define SLEWCTRL_SLOW		(1 << 19)
++#define SLEWCTRL_FAST		0
+ #define DS0_PULL_UP_DOWN_EN	(1 << 27)
+ 
+ #define PIN_OUTPUT		(PULL_DISABLE)
 -- 
 2.3.0
