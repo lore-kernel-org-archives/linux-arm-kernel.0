@@ -1,48 +1,22 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Sun,  1 Mar 2015 11:14:39 +0100
-Subject: [PATCH] arm64: mm: unexport set_memory_ro and set_memory_rw
-Message-ID: <78efa617b015b18df3f29724bffe28b4231732e6.1425204526.git.daniel@iogearbox.net>
+From: penberg@iki.fi (Pekka Enberg)
+Date: Sun, 01 Mar 2015 12:21:23 +0200
+Subject: stand-alone kvmtool
+In-Reply-To: <87mw41aqbc.fsf@linaro.org>
+References: <54DDD465.3050300@arm.com> <20150218155042.GF22017@arm.com>
+ <54EAFCE9.5030000@arm.com> <87mw41aqbc.fsf@linaro.org>
+Message-ID: <54F2E823.6030305@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This effectively unexports set_memory_ro and set_memory_rw functions from
-commit 11d91a770f1f ("arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support").
+On 2/26/15 1:02 PM, Alex Benn?e wrote:
+> If you can have it all it would be nice to preserve buildability all
+> through your history for bisecting (and the moon on a stick please ;-)
+>
+> Is the dependency on the kernel sources something that has been stable
+> over the projects history or something that's been declining/increasing
+> over time?
 
-No module user of those is in mainline kernel and we explicitly do not want
-modules to use these functions, as they i.e. RO-protect eBPF (interpreted and
-JIT'ed) images from malicious modifications/bugs.
+AFAICT, it's been mostly stable after the initial sweep to use 
+kernel-provided data structures such as lists and rbtrees.
 
-Outside of eBPF scope, I believe also other set_memory_* functions should
-be unexported on arm64 due to non-existant mainline module user. Laura
-mentioned that they have some uses for modules doing set_memory_*, but
-none that are in mainline and it's unclear if they would ever get there.
-
-Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
-Acked-by: Alexei Starovoitov <ast@plumgrid.com>
-Acked-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm64/mm/pageattr.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-index bb0ea94..8659357 100644
---- a/arch/arm64/mm/pageattr.c
-+++ b/arch/arm64/mm/pageattr.c
-@@ -70,7 +70,6 @@ int set_memory_ro(unsigned long addr, int numpages)
- 					__pgprot(PTE_RDONLY),
- 					__pgprot(PTE_WRITE));
- }
--EXPORT_SYMBOL_GPL(set_memory_ro);
- 
- int set_memory_rw(unsigned long addr, int numpages)
- {
-@@ -78,7 +77,6 @@ int set_memory_rw(unsigned long addr, int numpages)
- 					__pgprot(PTE_WRITE),
- 					__pgprot(PTE_RDONLY));
- }
--EXPORT_SYMBOL_GPL(set_memory_rw);
- 
- int set_memory_nx(unsigned long addr, int numpages)
- {
--- 
-1.9.3
+- Pekka
