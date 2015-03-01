@@ -1,63 +1,32 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 01 Mar 2015 18:20:35 +0200
-Subject: [PATCH v8 0/3] Add of-graph helpers to loop over endpoints and
- find ports by id
-In-Reply-To: <1424688846-10909-1-git-send-email-p.zabel@pengutronix.de>
-References: <1424688846-10909-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <4784761.VJqXeAqkXK@avalon>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Sun,  1 Mar 2015 21:51:16 +0530
+Subject: [PATCH] pinctrl: exynos: Remove eint_gpio_init call-back for exynos7
+ alive pinctrl block
+Message-ID: <1425226876-5122-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp and all,
+The alive pin controller on exynos7 does not support external gpio
+interrupts. Hence, remove the eint_gpio_init call-back for it. This
+fixes the following error message seen during exynos7 boot-up:
+"samsung-pinctrl 10580000.pinctrl: irq number not available"
 
-This series has been around for a long time, it seems to be time to get it 
-merged.
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+---
+ drivers/pinctrl/samsung/pinctrl-exynos.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-What's the plan ? If we wait for the v4.1 merge window there's a chance we'll 
-get more conflicts, especially on patch 1/3. Could it be merged in v4.0-rc to 
-avoid that ?
-
-On Monday 23 February 2015 11:54:03 Philipp Zabel wrote:
-> Hi,
-> 
-> Since there now is a merge conflict in imx-drm-core, I've rebased the series
-> onto v4.0-rc1. Also a new driver touched by this change appeared, so the
-> first patch now includes a fix for am437x-vfpe, too. I'd be happy to get an
-> ack for that.
-> 
-> This series converts all existing users of of_graph_get_next_endpoint that
-> pass a non-NULL prev argument to the function and decrement its refcount
-> themselves to stop doing that. The of_node_put is moved into
-> of_graph_get_next_endpoint instead.
-> This allows to add a for_each_endpoint_of_node helper macro to loop over all
-> endpoints in a device tree node.
-> 
-> Changes since v8:
->  - Rebased onto v4.0-rc1
->  - Added fix to am437x-vpfe
-> 
-> The previous version can be found here: https://lkml.org/lkml/2014/12/23/219
-> 
-> regards
-> Philipp
-> 
-> Philipp Zabel (3):
->   of: Decrement refcount of previous endpoint in
->     of_graph_get_next_endpoint
->   of: Add for_each_endpoint_of_node helper macro
->   of: Add of_graph_get_port_by_id function
-> 
->  drivers/coresight/of_coresight.c                  | 13 ++-----
->  drivers/gpu/drm/imx/imx-drm-core.c                | 11 +-----
->  drivers/gpu/drm/rcar-du/rcar_du_kms.c             | 15 +++------
->  drivers/media/platform/am437x/am437x-vpfe.c       |  1 -
->  drivers/media/platform/soc_camera/soc_camera.c    |  3 +-
->  drivers/of/base.c                                 | 41 +++++++++++++++-----
->  drivers/video/fbdev/omap2/dss/omapdss-boot-init.c |  7 +---
->  include/linux/of_graph.h                          | 18 ++++++++++
->  8 files changed, 61 insertions(+), 48 deletions(-)
-
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
+index c8f83f9..a7e9c42 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
+@@ -1324,7 +1324,6 @@ const struct samsung_pin_ctrl exynos7_pin_ctrl[] __initconst = {
+ 		/* pin-controller instance 0 Alive data */
+ 		.pin_banks	= exynos7_pin_banks0,
+ 		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks0),
+-		.eint_gpio_init = exynos_eint_gpio_init,
+ 		.eint_wkup_init = exynos_eint_wkup_init,
+ 	}, {
+ 		/* pin-controller instance 1 BUS0 data */
 -- 
-Regards,
-
-Laurent Pinchart
+2.1.0
