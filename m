@@ -1,55 +1,48 @@
 From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Sun,  1 Mar 2015 21:53:44 +0530
-Subject: [PATCH 1/3] arm64: dts: add fifo size property for uart channels on
- exynos7
+Date: Sun,  1 Mar 2015 21:53:45 +0530
+Subject: [PATCH 2/3] arm64: dts: Fix interrupt active level for the generic
+ timer on exynos7
 In-Reply-To: <1425227026-5336-1-git-send-email-a.kesavan@samsung.com>
 References: <1425227026-5336-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1425227026-5336-2-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1425227026-5336-3-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Specify the fifo sizes of the 4 uart channels on exynos7 via dt.
+Fix the exynos7 device tree to indicate that the arm generic timers
+provide an active low interrupt output. Also, update the CPU mask to
+match the number of CPUs on the SoC.
 
 Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
 ---
- arch/arm64/boot/dts/exynos/exynos7.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/boot/dts/exynos/exynos7.dtsi | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-index d7a37c3..749c4b3 100644
+index 749c4b3..c5687f9 100644
 --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
 +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-@@ -192,6 +192,7 @@
- 			clocks = <&clock_peric0 PCLK_UART0>,
- 				 <&clock_peric0 SCLK_UART0>;
- 			clock-names = "uart", "clk_uart_baud0";
-+			samsung,uart-fifosize = <64>;
- 			status = "disabled";
+@@ -10,6 +10,7 @@
+  */
+ 
+ #include <dt-bindings/clock/exynos7-clk.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
+ 
+ / {
+ 	compatible = "samsung,exynos7";
+@@ -440,10 +441,10 @@
+ 
+ 		timer {
+ 			compatible = "arm,armv8-timer";
+-			interrupts = <1 13 0xff01>,
+-				     <1 14 0xff01>,
+-				     <1 11 0xff01>,
+-				     <1 10 0xff01>;
++			interrupts = <1 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				     <1 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				     <1 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				     <1 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
  		};
  
-@@ -202,6 +203,7 @@
- 			clocks = <&clock_peric1 PCLK_UART1>,
- 				 <&clock_peric1 SCLK_UART1>;
- 			clock-names = "uart", "clk_uart_baud0";
-+			samsung,uart-fifosize = <256>;
- 			status = "disabled";
- 		};
- 
-@@ -212,6 +214,7 @@
- 			clocks = <&clock_peric1 PCLK_UART2>,
- 				 <&clock_peric1 SCLK_UART2>;
- 			clock-names = "uart", "clk_uart_baud0";
-+			samsung,uart-fifosize = <16>;
- 			status = "disabled";
- 		};
- 
-@@ -222,6 +225,7 @@
- 			clocks = <&clock_peric1 PCLK_UART3>,
- 				 <&clock_peric1 SCLK_UART3>;
- 			clock-names = "uart", "clk_uart_baud0";
-+			samsung,uart-fifosize = <64>;
- 			status = "disabled";
- 		};
- 
+ 		pmu_system_controller: system-controller at 105c0000 {
 -- 
 2.1.0
