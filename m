@@ -1,53 +1,38 @@
-From: rvolkov@v1ros.org (Roman Volkov)
-Date: Sun, 1 Mar 2015 22:49:59 +0300
-Subject: [PATCH v3 1/2] dts: vt8500: Add SDHC node to DTS file for WM8650
-In-Reply-To: <54F35371.7020608@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 01 Mar 2015 20:52:55 +0100
+Subject: [PATCH v3 0/2] WM8505/WM8650 DT fixes for SD card controller
+In-Reply-To: <1425226007-2757-1-git-send-email-rvolkov@v1ros.org>
 References: <1423130878-3894-1-git-send-email-v1ron@v1ros.org>
  <1425226007-2757-1-git-send-email-rvolkov@v1ros.org>
- <1425226007-2757-2-git-send-email-rvolkov@v1ros.org>
- <54F35371.7020608@cogentembedded.com>
-Message-ID: <20150301224959.4a106bfd@v1ron-s7>
+Message-ID: <2119510.55A8Br1LeL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? Sun, 01 Mar 2015 20:59:13 +0300
-Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> ?????:
+On Sunday 01 March 2015 19:06:45 Roman Volkov wrote:
+> This patch set enables SD controller support for WM8650 and
+> fixes minor errors in WM8505 Device Tree file.
+> 
+> Changes in v3:
+> 1. Add minor fixes for WM8505 SDHC node
+> 
+> Tested on both WM8505 and WM8650.
+> 
+> Roman Volkov (2):
+>   dts: vt8500: Add SDHC node to DTS file for WM8650
+>   dts: vt8500: Fix errors in SDHC node for WM8505
+> 
+>  arch/arm/boot/dts/wm8505.dtsi | 4 ++--
+>  arch/arm/boot/dts/wm8650.dtsi | 9 +++++++++
+>  2 files changed, 11 insertions(+), 2 deletions(-)
+> 
+> -- 
+> Hi maintainers, I see my previous versions were not applied. Could this
+> little patch set be applied for the linux-next? I don't think this is new
+> functionality, this must be considered as bugfix for existing Device Tree.
+> 
+> Any other suggestions?
 
-> On 3/1/2015 7:06 PM, Roman Volkov wrote:
-> 
-> > Since WM8650 has the same 'WMT' SDHC controller as WM8505, and the
-> > driver is already in the kernel, this node enables the controller
-> > support for WM8650
-> 
-> > Signed-off-by: Roman Volkov <rvolkov@v1ros.org>
-> > Reviewed-by: Alexey Charkov <alchark@gmail.com>
-> > ---
-> >   arch/arm/boot/dts/wm8650.dtsi | 9 +++++++++
-> >   1 file changed, 9 insertions(+)
-> 
-> > diff --git a/arch/arm/boot/dts/wm8650.dtsi
-> > b/arch/arm/boot/dts/wm8650.dtsi index b1c59a7..e12213d 100644
-> > --- a/arch/arm/boot/dts/wm8650.dtsi
-> > +++ b/arch/arm/boot/dts/wm8650.dtsi
-> > @@ -187,6 +187,15 @@
-> >   			interrupts = <43>;
-> >   		};
-> >
-> > +		sdhc at d800a000 {
-> 
->     According to the ePAPR standard, the device nodes should have
-> generic names according to their functions, so this node should be
-> named just "sd at d800a000".
-> 
-> WBR, Sergei
-> 
+According to the MAINTAINERS file, Tony Prisk should be the person to
+pick them up, but he was not the recipient of the mail.
 
-Sergei,
-
-Why not "sdmmc" or "sdhci" or "sdio" then? It would be great to name
-nodes in same way, but there is no exact requirement in ePAPR v1.1
-regarding SD/MMC controllers. Also, in Linux I don't see that someone
-strictly follows this requirement. This renaming will affect driver,
-since .compatible strings likely also need changing.
-
-Roman
+	Arnd
