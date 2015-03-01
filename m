@@ -1,43 +1,114 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon,  2 Mar 2015 00:09:02 +0100
-Subject: [PATCH] MAINTAINERS: add Freescale Vybrid SoC
-Message-ID: <1425251342-2795-1-git-send-email-stefan@agner.ch>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 1 Mar 2015 23:09:09 +0000 (UTC)
+Subject: [PATCH 1/2] ARM: OMAP2: hwmod: AM43XX: Add hwmod support for
+ HDQ-1W
+In-Reply-To: <1425029057-5075-1-git-send-email-vigneshr@ti.com>
+References: <1425029057-5075-1-git-send-email-vigneshr@ti.com>
+Message-ID: <alpine.DEB.2.02.1503012305550.9987@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Freescale Vybrid family as a own entry, along with an entry for
-the so far orphan Vybrid device tree files. Also add myself as
-a designated reviewer.
+Hi
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-This hasn't made it into the kernel since quite some time, not sure
-who would I normally address this to?
+On Fri, 27 Feb 2015, Vignesh R wrote:
 
- MAINTAINERS | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+> From: "Poddar, Sourav" <sourav.poddar@ti.com>
+> 
+> This patch adds hwmod data for hdq/1w driver on AM43xx.
+> 
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> [vigneshr at ti.com: Ported patch to v4.0-rc1]
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 36 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/prcm43xx.h             |  1 +
+>  2 files changed, 37 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> index 8eb85925e444..d4f1df28475c 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> @@ -20,6 +20,7 @@
+>  #include "omap_hwmod_33xx_43xx_common_data.h"
+>  #include "prcm43xx.h"
+>  #include "omap_hwmod_common_data.h"
+> +#include "hdq1w.h"
+>  
+>  
+>  /* IP blocks */
+> @@ -516,6 +517,33 @@ static struct omap_hwmod am43xx_dss_rfbi_hwmod = {
+>  	.parent_hwmod	= &am43xx_dss_core_hwmod,
+>  };
+>  
+> +/* HDQ1W */
+> +static struct omap_hwmod_class_sysconfig am43xx_hdq1w_sysc = {
+> +	.rev_offs       = 0x0000,
+> +	.sysc_offs      = 0x0014,
+> +	.syss_offs      = 0x0018,
+> +	.sysc_flags     = (SYSC_HAS_SOFTRESET),
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ddc5a8c..0188250 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1030,6 +1030,16 @@ F:	arch/arm/mach-mxs/
- F:	arch/arm/boot/dts/imx*
- F:	arch/arm/configs/imx*_defconfig
- 
-+ARM/FREESCALE VYBRID ARM ARCHITECTURE
-+M:	Shawn Guo <shawn.guo@linaro.org>
-+M:	Sascha Hauer <kernel@pengutronix.de>
-+R:	Stefan Agner <stefan@agner.ch>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
-+F:	arch/arm/mach-imx/*vf610*
-+F:	arch/arm/boot/dts/vf*
-+
- ARM/GLOMATION GESBC9312SX MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--- 
-2.3.0
+This is missing the SYSC_HAS_AUTOIDLE bit.  Is this intentional?
+
+> +	.sysc_fields    = &omap_hwmod_sysc_type1,
+> +};
+> +
+> +static struct omap_hwmod_class am43xx_hdq1w_hwmod_class = {
+> +	.name   = "hdq1w",
+> +	.sysc   = &am43xx_hdq1w_sysc,
+> +	.reset	= &omap_hdq1w_reset,
+> +};
+> +
+> +static struct omap_hwmod am43xx_hdq1w_hwmod = {
+> +	.name           = "hdq1w",
+> +	.class          = &am43xx_hdq1w_hwmod_class,
+> +	.clkdm_name     = "l4ls_clkdm",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_offs = AM43XX_CM_PER_HDQ1W_CLKCTRL_OFFSET,
+> +			.modulemode   = MODULEMODE_SWCTRL,
+> +		},
+> +	},
+> +};
+> +
+>  /* Interfaces */
+>  static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
+>  	.master		= &am33xx_l3_main_hwmod,
+> @@ -790,6 +818,13 @@ static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
+>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>  };
+>  
+> +static struct omap_hwmod_ocp_if am43xx_l4_ls__hdq1w = {
+> +	.master         = &am33xx_l4_ls_hwmod,
+> +	.slave          = &am43xx_hdq1w_hwmod,
+> +	.clk            = "l4ls_gclk",
+> +	.user           = OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+>  static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+>  	&am33xx_l4_wkup__synctimer,
+>  	&am43xx_l4_ls__timer8,
+> @@ -889,6 +924,7 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+>  	&am43xx_l4_ls__dss,
+>  	&am43xx_l4_ls__dss_dispc,
+>  	&am43xx_l4_ls__dss_rfbi,
+> +	&am43xx_l4_ls__hdq1w,
+>  	NULL,
+>  };
+>  
+> diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
+> index ad7b3e9977f8..48df3b55057e 100644
+> --- a/arch/arm/mach-omap2/prcm43xx.h
+> +++ b/arch/arm/mach-omap2/prcm43xx.h
+> @@ -143,5 +143,6 @@
+>  #define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
+>  #define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
+>  #define AM43XX_CM_PER_DSS_CLKCTRL_OFFSET		0x0a20
+> +#define AM43XX_CM_PER_HDQ1W_CLKCTRL_OFFSET		0x04a0
+>  
+>  #endif
+> -- 
+> 1.9.1
+> 
+
+
+- Paul
