@@ -1,22 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 1 Mar 2015 14:51:57 +0000
-Subject: [PATCH] clkdev: clk_add_alias don't put origin clock
-In-Reply-To: <1425195815-14895-1-git-send-email-ysato@users.sourceforge.jp>
-References: <1425195815-14895-1-git-send-email-ysato@users.sourceforge.jp>
-Message-ID: <20150301145157.GO8656@n2100.arm.linux.org.uk>
+From: rvolkov@v1ros.org (Roman Volkov)
+Date: Sun,  1 Mar 2015 19:06:45 +0300
+Subject: [PATCH v3 0/2] WM8505/WM8650 DT fixes for SD card controller
+In-Reply-To: <1423130878-3894-1-git-send-email-v1ron@v1ros.org>
+References: <1423130878-3894-1-git-send-email-v1ron@v1ros.org>
+Message-ID: <1425226007-2757-1-git-send-email-rvolkov@v1ros.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 01, 2015 at 04:43:35PM +0900, Yoshinori Sato wrote:
-> Refer to 'r' later.
-> So don't put in clk_add_alias.
-> 
-> Signed-off-by: Yoshinori Sato <ysato@users.sourceforge.jp>
+This patch set enables SD controller support for WM8650 and
+fixes minor errors in WM8505 Device Tree file.
 
-This isn't how I want to solve this.  I'd much rather we converted clkdev
-to use struct clk_hw internally instead.  This is something I'm looking
-into at the moment.
+Changes in v3:
+1. Add minor fixes for WM8505 SDHC node
+
+Tested on both WM8505 and WM8650.
+
+Roman Volkov (2):
+  dts: vt8500: Add SDHC node to DTS file for WM8650
+  dts: vt8500: Fix errors in SDHC node for WM8505
+
+ arch/arm/boot/dts/wm8505.dtsi | 4 ++--
+ arch/arm/boot/dts/wm8650.dtsi | 9 +++++++++
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Hi maintainers, I see my previous versions were not applied. Could this
+little patch set be applied for the linux-next? I don't think this is new
+functionality, this must be considered as bugfix for existing Device Tree.
+
+Any other suggestions?
+
+2.3.1
