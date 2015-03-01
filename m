@@ -1,32 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 01 Mar 2015 22:22 +0100
-Subject: [PATCH v4 2/8] arm64: dts: exynos: Add dts files for 64-bit
- Exynos5433 SoC
-In-Reply-To: <CAGTfZH0VVT0hMn4ooRNZxnqjUQ_hF8nHg-4NtNriayick50qgw@mail.gmail.com>
-References: <1424755011-15999-1-git-send-email-cw00.choi@samsung.com>
- <2707354.mhmQEHxoKV@wuerfel>
- <CAGTfZH0VVT0hMn4ooRNZxnqjUQ_hF8nHg-4NtNriayick50qgw@mail.gmail.com>
-Message-ID: <13467157.nyRCsNWIp6@wuerfel>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun,  1 Mar 2015 23:41:28 +0100
+Subject: [PATCH v6 2/3] irqchip: vf610-mscm: dt-bindings: add MSCM bindings
+In-Reply-To: <1425249689-32354-1-git-send-email-stefan@agner.ch>
+References: <1425249689-32354-1-git-send-email-stefan@agner.ch>
+Message-ID: <1425249689-32354-3-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 28 February 2015 09:47:01 Chanwoo Choi wrote:
-> "earlycon=exynos4210,0x14C20000" is correct bootparam. You can check
-> it on Documentation/kernel-parameters.txt as following.
-> 
->      exynos4210,<addr>
->                 Use early console provided by serial driver available
->                 on Samsung SoCs, requires selecting proper type and
->                 a correct base address of the selected UART port. The
->                 serial port must already be setup and configured.
->                 Options are not yet supported.
-> 
-> 
+Add binding documentation for CPU configuration and interrupt router
+submodule of the Miscellaneous System Control Module. The MSCM is
+used in all variants of Freescale Vybrid SoC's.
 
-But it's crazy to do this when you have a DT. Please fix the existing
-devicetree files that use this to just list 'earlycon'.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ .../arm/freescale/fsl,vf610-mscm-cpucfg.txt        | 14 +++++++++
+ .../bindings/arm/freescale/fsl,vf610-mscm-ir.txt   | 33 ++++++++++++++++++++++
+ 2 files changed, 47 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-cpucfg.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-ir.txt
 
-The syntax above only makes sense for classic board files that we
-do not support for exynos any more.
-
-	Arnd
+diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-cpucfg.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-cpucfg.txt
+new file mode 100644
+index 0000000..44aa3c4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-cpucfg.txt
+@@ -0,0 +1,14 @@
++Freescale Vybrid Miscellaneous System Control - CPU Configuration
++
++The MSCM IP contains multiple sub modules, this binding describes the first
++block of registers which contains CPU configuration information.
++
++Required properties:
++- compatible:	"fsl,vf610-mscm-cpucfg", "syscon"
++- reg:		the register range of the MSCM CPU configuration registers
++
++Example:
++	mscm_cpucfg: cpucfg at 40001000 {
++		compatible = "fsl,vf610-mscm-cpucfg", "syscon";
++		reg = <0x40001000 0x800>;
++	}
+diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-ir.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-ir.txt
+new file mode 100644
+index 0000000..669808b2a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-ir.txt
+@@ -0,0 +1,33 @@
++Freescale Vybrid Miscellaneous System Control - Interrupt Router
++
++The MSCM IP contains multiple sub modules, this binding describes the second
++block of registers which control the interrupt router. The interrupt router
++allows to configure the recipient of each peripheral interrupt. Furthermore
++it controls the directed processor interrupts. The module is available in all
++Vybrid SoC's but is only really useful in dual core configurations (VF6xx
++which comes with a Cortex-A5/Cortex-M4 combination).
++
++Required properties:
++- compatible:		"fsl,vf610-mscm-ir"
++- reg:			the register range of the MSCM Interrupt Router
++- fsl,cpucfg:		The handle to the MSCM CPU configuration node, required
++			to get the current CPU ID
++- interrupt-controller:	Identifies the node as an interrupt controller
++- #interrupt-cells:	Two cells, interrupt number and cells.
++			The hardware interrupt number according to interrupt
++			assignment of the interrupt router is required.
++			Flags get passed only when using GIC as parent. Flags
++			encoding as documented by the GIC bindings.
++- interrupt-parent:	Should be the phandle for the interrupt controller of
++			the CPU the device tree is intended to be used on. This
++			is either the node of the GIC or NVIC controller.
++
++Example:
++	mscm_ir: interrupt-controller at 40001800 {
++		compatible = "fsl,vf610-mscm-ir";
++		reg = <0x40001800 0x400>;
++		fsl,cpucfg = <&mscm_cpucfg>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		interrupt-parent = <&intc>;
++	}
+-- 
+2.3.0
