@@ -1,26 +1,27 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 02 Mar 2015 00:09:34 +0100
-Subject: [PATCH] ARM: rockchip: Constify struct regmap_config and
- staticize local function
-In-Reply-To: <1424770727-5396-1-git-send-email-k.kozlowski@samsung.com>
-References: <1424770727-5396-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <4182879.iuXeHILx18@phil>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 1 Mar 2015 23:23:12 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2+: hwmod: fix deassert hardreset clkdm
+ usecounting
+In-Reply-To: <1424966760-30917-1-git-send-email-t-kristo@ti.com>
+References: <1424966760-30917-1-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.02.1503012322080.9987@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Thu, 26 Feb 2015, Tero Kristo wrote:
 
-Am Dienstag, 24. Februar 2015, 10:38:47 schrieb Krzysztof Kozlowski:
-> The regmap_config struct may be const because it is not modified by the
-> driver and regmap_init() accepts pointer to const.
+> Deasserting hardreset increases the usecount for the hwmod parent clockdomain
+> always, however usecount is only decreased at end in certain error cases.
+> This causes software supervised clockdomains to remain always on, preventing
+> idle. Fixed by always releasing the hwmods clockdomain parent when exiting
+> the function.
 > 
-> Make function rockchip_get_core_reset() static because it is not used
-> outside of the platsmp.c file.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Tested-by: Carlos Hernandez <ceh@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Tony Lindgren <tony@atomide.com>
 
-Added to my soc branch for 4.1
+Thanks, queued for v4.0-rc fixes.
 
 
-Thanks for finding these
-Heiko
+- Paul
