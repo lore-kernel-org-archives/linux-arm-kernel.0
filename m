@@ -1,80 +1,52 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 01 Mar 2015 15:00:50 +0200
-Subject: [PATCH] clocksource: arm_arch_timer: Rename arch_timer_probed to
- reflect behaviour
-In-Reply-To: <54C56582.6080809@linaro.org>
-References: <1421488012-5098-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <54C56582.6080809@linaro.org>
-Message-ID: <1634669.Cj7rnHN4gq@avalon>
+From: hofrat@osadl.org (Nicholas Mc Guire)
+Date: Sun,  1 Mar 2015 08:20:32 -0500
+Subject: [PATCH] i2c: wmt: use msecs_to_jiffies for time conversions
+Message-ID: <1425216032-8163-1-git-send-email-hofrat@osadl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This is only an API consolidation and should make things more readable
+it replaces var * HZ / 1000 by msecs_to_jiffies(var).
 
-On Sunday 25 January 2015 22:52:02 Daniel Lezcano wrote:
-> On 01/17/2015 10:46 AM, Laurent Pinchart wrote:
-> > The arch_timer_probed function returns whether the given time doesn't
-> > need to be probed. This can be the case when the timer has been probed
-> > already, but also when it has no corresponding enabled node in DT.
-> > 
-> > Rename the function to arch_timer_need_probe and invert its return value
-> > to better reflect the function's purpose and behaviour.
-> > 
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> 
-> I would like to have an ack from Sudeep or Mark (Cc'ed) before taking
-> this patch.
+Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+---
 
-Sudeep, Mark, ping ?
+Converting milliseconds to jiffies by "val * HZ / 1000" is technically
+not wrong but msecs_to_jiffies(val) is the cleaner solution and handles
+all corner cases correctly. This is a minor API cleanup only.
 
-> > ---
-> > 
-> >   drivers/clocksource/arm_arch_timer.c | 13 +++++++------
-> >   1 file changed, 7 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/clocksource/arm_arch_timer.c
-> > b/drivers/clocksource/arm_arch_timer.c index 095c1774592c..3cbdd563a967
-> > 100644
-> > --- a/drivers/clocksource/arm_arch_timer.c
-> > +++ b/drivers/clocksource/arm_arch_timer.c
-> > @@ -660,17 +660,17 @@ static const struct of_device_id
-> > arch_timer_mem_of_match[] __initconst = {
-> >  };
-> >  static bool __init
-> > -arch_timer_probed(int type, const struct of_device_id *matches)
-> > +arch_timer_need_probe(int type, const struct of_device_id *matches)
-> >  {
-> >   	struct device_node *dn;
-> > -	bool probed = true;
-> > +	bool need_probe = false;
-> > 
-> >   	dn = of_find_matching_node(NULL, matches);
-> >   	if (dn && of_device_is_available(dn) && !(arch_timers_present &
-> >   	type))
-> > -		probed = false;
-> > +		need_probe = true;
-> > 
-> >   	of_node_put(dn);
-> > 
-> > -	return probed;
-> > +	return need_probe;
-> >   }
-> >   
-> >   static void __init arch_timer_common_init(void)
-> > @@ -679,9 +679,10 @@ static void __init arch_timer_common_init(void)
-> >   	/* Wait until both nodes are probed if we have two timers */
-> >   	if ((arch_timers_present & mask) != mask) {
-> > -		if (!arch_timer_probed(ARCH_MEM_TIMER, arch_timer_mem_of_match))
-> > +		if (arch_timer_need_probe(ARCH_MEM_TIMER,
-> > +					  arch_timer_mem_of_match))
-> >   			return;
-> > -		if (!arch_timer_probed(ARCH_CP15_TIMER, arch_timer_of_match))
-> > +		if (arch_timer_need_probe(ARCH_CP15_TIMER, arch_timer_of_match))
-> >   			return;
-> >   	}
+Note that the alignment is not exactly with the opening braces but rather
+with the last tab-stop that will not result in going over 80 char.
 
+Patch was compile-tested only for vt8500_v6_v7_defconfig 
+(implies CONFIG_I2C_WMT=y)
+
+Patch is against 4.0-rc1 (localversion-next is -next-20150227)
+
+ drivers/i2c/busses/i2c-wmt.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-wmt.c b/drivers/i2c/busses/i2c-wmt.c
+index 82ea349..26e49e6 100644
+--- a/drivers/i2c/busses/i2c-wmt.c
++++ b/drivers/i2c/busses/i2c-wmt.c
+@@ -177,7 +177,7 @@ static int wmt_i2c_write(struct i2c_adapter *adap, struct i2c_msg *pmsg,
+ 
+ 	while (xfer_len < pmsg->len) {
+ 		wait_result = wait_for_completion_timeout(&i2c_dev->complete,
+-							  500 * HZ / 1000);
++							msecs_to_jiffies(500));
+ 
+ 		if (wait_result == 0)
+ 			return -ETIMEDOUT;
+@@ -266,7 +266,7 @@ static int wmt_i2c_read(struct i2c_adapter *adap, struct i2c_msg *pmsg,
+ 
+ 	while (xfer_len < pmsg->len) {
+ 		wait_result = wait_for_completion_timeout(&i2c_dev->complete,
+-							  500 * HZ / 1000);
++							msecs_to_jiffies(500));
+ 
+ 		if (!wait_result)
+ 			return -ETIMEDOUT;
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.10.4
