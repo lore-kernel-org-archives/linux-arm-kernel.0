@@ -1,159 +1,109 @@
-From: gmazyland@gmail.com (Milan Broz)
-Date: Sat, 28 Feb 2015 23:30:57 +0100
-Subject: [PATCH] ARM: crypto: update NEON AES module to latest OpenSSL
- version
-In-Reply-To: <1424935325-14437-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1424935325-14437-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <54F241A1.1060104@gmail.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Sat, 28 Feb 2015 21:10:34 -0500
+Subject: [PATCH v4 0/15] Those patches is used for dw_hdmi audio support
+Message-ID: <1425175834-24661-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2015 08:22 AM, Ard Biesheuvel wrote:
-> This updates the bit sliced AES module to the latest version in the
-> upstream OpenSSL repository (e620e5ae37bc). This is needed to fix a
-> bug in the XTS decryption path, where data chunked in a certain way
-> could trigger the ciphertext stealing code, which is not supposed to
-> be active in the kernel build (The kernel implementation of XTS only
-> supports round multiples of the AES block size of 16 bytes, whereas
-> the conformant OpenSSL implementation of XTS supports inputs of
-> arbitrary size by applying ciphertext stealing). This is fixed in
-> the upstream version by adding the missing #ifndef XTS_CHAIN_TWEAK
-> around the offending instructions.
-> 
-> The upstream code also contains the change applied by Russell to
-> build the code unconditionally, i.e., even if __LINUX_ARM_ARCH__ < 7,
-> but implemented slightly differently.
-> 
-> Fixes: e4e7f10bfc40 ("ARM: add support for bit sliced AES using NEON instructions")
-> Reported-by: Adrian Kotelba <adrian.kotelba@gmail.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> 
-> This was found using the tcrypt test code, to which I recently added additional
-> chunking modes. However, XTS typically operates on pages or at least on sectors,
-> so this bug is unlikely to affect anyone in real life.
-> 
-> Still, please add cc stable when applying,
 
-Please apply it for stable.
+We found Designware hdmi driver only support audio clock config, we can not play sound through it.
+To add Designware HDMI Audio support, we make those patch set:
+1): fixed dw_hdmi irq bug, add irq control to suspend/resume interfaces.
+2): add suspend/resume callback for dw_hdmi rockchip driver.
+3): Warp irq control in functions.
+4): Combine hdmi_set_clock_regenerator_n() and hdmi_regenerate_cts()
+5): Adjust n/cts config order.
+6): Set ncts_atomic_write & cts_manual, according to dw_hdmi document.
+7): Add audio support for more display resolutions(eg. 800x600).
+8): Add audio support for No-CEA display resolutions.
+9): Add Audio Sample Channel Status config interfaces to dw_hdmi driver.
+10): add audio clock control interfaces to dw_hdmi driver.
+11): creat "dw_hdmi-audio" platform device in dw_hdmi driver.
+12): add codec driver for hdmi audio, callback dw_hdmi audio config functions.
+13): add sound driver for hdmi audio, creat hdmi audio sound card.
+14): add dt-bings file and add hdmi_audio node to corresponding dt file.
 
-For me, this patch fixed bug reported here
-  http://article.gmane.org/gmane.linux.kernel.device-mapper.dm-crypt/7966
-  http://www.mail-archive.com/linux-crypto at vger.kernel.org/msg13102.html
+Changes in v4:
+-Correct phy_type assignment bug
+- Combine CTS3 registers setting, reduce register operate times
+- Combine N3 registers setting
+- Add hdmi audio support when monitor support audio
+- Give HDMI_FC_AUD_SCHNL8 an readable value
+- Rename "hdmi_audio_*" to "dw_hdmi_audio_*"
+- Replace delaywork with irq thread, and add suspend/resume interfaces,
+  Replace "dw-hdmi-audio" with consecutive strings.
+- Add ".pm = &snd_soc_pm_ops,"
 
-Cryptsetup uses AF_ALG userspace crypto SKCIPHER interface and on
-Raspberry Pi2 with Neon AES implementation it fails to unlock LUKS device
-(if XTS and aes-arm-bs module is used).
+Changes in v3:
+- Clear Hotplug interrupts before dw_hdmi_fb_register
+- Wrap irq control in fucntions
+- Setting the .pm member instead of suspend/resume
+- Add ID registers parse and record
+- Combine hdmi_set_clock_regenerator_n() and hdmi_regenerate_cts()
+- Only adjust the n/cts setting order
+- Set ncts_atomic_write & cts_manual
+- Determine whether sample channel should set by desig_id.
+- Delete hdmi_audio_config interface and modify audio clock control functions
+- Remove audio_config & get_connect_status callback functions
+  and add write/read/mod register callback functions
+- Keep audio format config function in dw-hdmi-audio driver
+  and remove audio_config & get_connect_status functions,
+  move jack control to dw-hdmi-audio completely.
+- Delete the operation of jack in rockchip-hdmi-audio driver,
+  get ready to switch to simple-audio-card driver.
+- modify cpu-of-node to i2s-controller
 
-After applying this patch it works as expected.
+Changes in v2:
+- Add irq control to suspend/resume interfaces
+- Add suspend/resume support for dw_hdmi_rockchip driver
+- add more n/cts combinations for more display resolutions
+- Enable audio support for No-CEA display mode
+- Add audio sample channel status setting
+- Add audio config interfaces to dw_hdmi driver
+- Update the audio control interfaces
+- Update dw_hdmi audio control interfaces, and adjust jack report process
+- give "codec-name" & "codec-dai-name" an const name
+- remove codec-name and codec-dai-name
+- rename rockchip,rockchip-hdmi-audio.txt to rockchip,rockchip-dw-hdmi-audio.txt
 
-I did not have time to check it more in detail (we are always encrypting
-the whole sector so this should not happen... but apparently it does.)
+Daniel Kurtz (3):
+  drm: bridge/dw_hdmi: adjust n/cts setting order
+  drm: bridge/dw_hdmi: set ncts_atomic_write & cts_manual
+  drm: bridge/dw_hdmi: add audio sample channel status setting
 
-Tested-by: Milan Broz <gmazyland@gmail.com>
+Yakir Yang (12):
+  drm: bridge/dw_hdmi: add irq control to suspend/resume
+  drm: bridge/dw_hdmi: wrap irq control in fucntions
+  drm: rockchip/dw_hdmi_rockchip: add resume/suspend support
+  drm: bridge/dw_hdmi: add identification registers parse and record
+  drm: bridge/dw_hdmi: combine hdmi_set_clock_regenerator_n() and
+    hdmi_regenerate_cts()
+  drm: bridge/dw_hdmi: add audio support for more display resolutions
+  drm: bridge/dw_hdmi: enable audio support for No-CEA display
+    resolutions
+  drm: bridge/dw_hdmi: add enable/disable to dw_hdmi_audio callbacks
+  drm: bridge/dw_hdmi: creat dw-hdmi-audio platform device
+  ASoC: codec/dw-hdmi-audio: add codec driver for dw hdmi audio
+  ASoC: rockchip/rockchip-hdmi-audio: add sound driver for hdmi audio
+  dt-bindings: Add documentation for Rockchip dw-hdmi-audio
 
-Thanks,
-Milan
+ .../sound/rockchip,rockchip-dw-hdmi-audio.txt      |  12 +
+ drivers/gpu/drm/bridge/dw_hdmi.c                   | 385 ++++++++++++++++++---
+ drivers/gpu/drm/bridge/dw_hdmi.h                   |  53 ++-
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        |  16 +
+ include/drm/bridge/dw_hdmi.h                       |  17 +
+ sound/soc/codecs/Kconfig                           |   4 +
+ sound/soc/codecs/Makefile                          |   2 +
+ sound/soc/codecs/dw-hdmi-audio.c                   | 379 ++++++++++++++++++++
+ sound/soc/codecs/dw-hdmi-audio.h                   |  74 ++++
+ sound/soc/rockchip/Kconfig                         |   9 +
+ sound/soc/rockchip/Makefile                        |   2 +
+ sound/soc/rockchip/rockchip_hdmi_audio.c           | 169 +++++++++
+ 12 files changed, 1076 insertions(+), 46 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt
+ create mode 100644 sound/soc/codecs/dw-hdmi-audio.c
+ create mode 100644 sound/soc/codecs/dw-hdmi-audio.h
+ create mode 100644 sound/soc/rockchip/rockchip_hdmi_audio.c
 
-> 
-> Thanks,
-> Ard.
-> 
-> 
->  arch/arm/crypto/aesbs-core.S_shipped | 12 ++++++++----
->  arch/arm/crypto/bsaes-armv7.pl       | 12 ++++++++----
->  2 files changed, 16 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/crypto/aesbs-core.S_shipped b/arch/arm/crypto/aesbs-core.S_shipped
-> index 71e5fc7cfb18..1d1800f71c5b 100644
-> --- a/arch/arm/crypto/aesbs-core.S_shipped
-> +++ b/arch/arm/crypto/aesbs-core.S_shipped
-> @@ -58,14 +58,18 @@
->  # define VFP_ABI_FRAME	0
->  # define BSAES_ASM_EXTENDED_KEY
->  # define XTS_CHAIN_TWEAK
-> -# define __ARM_ARCH__	7
-> +# define __ARM_ARCH__ __LINUX_ARM_ARCH__
-> +# define __ARM_MAX_ARCH__ 7
->  #endif
->  
->  #ifdef __thumb__
->  # define adrl adr
->  #endif
->  
-> -#if __ARM_ARCH__>=7
-> +#if __ARM_MAX_ARCH__>=7
-> +.arch	armv7-a
-> +.fpu	neon
-> +
->  .text
->  .syntax	unified 	@ ARMv7-capable assembler is expected to handle this
->  #ifdef __thumb2__
-> @@ -74,8 +78,6 @@
->  .code   32
->  #endif
->  
-> -.fpu	neon
-> -
->  .type	_bsaes_decrypt8,%function
->  .align	4
->  _bsaes_decrypt8:
-> @@ -2095,9 +2097,11 @@ bsaes_xts_decrypt:
->  	vld1.8	{q8}, [r0]			@ initial tweak
->  	adr	r2, .Lxts_magic
->  
-> +#ifndef	XTS_CHAIN_TWEAK
->  	tst	r9, #0xf			@ if not multiple of 16
->  	it	ne				@ Thumb2 thing, sanity check in ARM
->  	subne	r9, #0x10			@ subtract another 16 bytes
-> +#endif
->  	subs	r9, #0x80
->  
->  	blo	.Lxts_dec_short
-> diff --git a/arch/arm/crypto/bsaes-armv7.pl b/arch/arm/crypto/bsaes-armv7.pl
-> index be068db960ee..a4d3856e7d24 100644
-> --- a/arch/arm/crypto/bsaes-armv7.pl
-> +++ b/arch/arm/crypto/bsaes-armv7.pl
-> @@ -701,14 +701,18 @@ $code.=<<___;
->  # define VFP_ABI_FRAME	0
->  # define BSAES_ASM_EXTENDED_KEY
->  # define XTS_CHAIN_TWEAK
-> -# define __ARM_ARCH__	7
-> +# define __ARM_ARCH__ __LINUX_ARM_ARCH__
-> +# define __ARM_MAX_ARCH__ 7
->  #endif
->  
->  #ifdef __thumb__
->  # define adrl adr
->  #endif
->  
-> -#if __ARM_ARCH__>=7
-> +#if __ARM_MAX_ARCH__>=7
-> +.arch	armv7-a
-> +.fpu	neon
-> +
->  .text
->  .syntax	unified 	@ ARMv7-capable assembler is expected to handle this
->  #ifdef __thumb2__
-> @@ -717,8 +721,6 @@ $code.=<<___;
->  .code   32
->  #endif
->  
-> -.fpu	neon
-> -
->  .type	_bsaes_decrypt8,%function
->  .align	4
->  _bsaes_decrypt8:
-> @@ -2076,9 +2078,11 @@ bsaes_xts_decrypt:
->  	vld1.8	{@XMM[8]}, [r0]			@ initial tweak
->  	adr	$magic, .Lxts_magic
->  
-> +#ifndef	XTS_CHAIN_TWEAK
->  	tst	$len, #0xf			@ if not multiple of 16
->  	it	ne				@ Thumb2 thing, sanity check in ARM
->  	subne	$len, #0x10			@ subtract another 16 bytes
-> +#endif
->  	subs	$len, #0x80
->  
->  	blo	.Lxts_dec_short
-> 
+-- 
+2.1.2
