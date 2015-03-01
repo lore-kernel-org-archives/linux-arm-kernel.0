@@ -1,28 +1,55 @@
 From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Sun,  1 Mar 2015 21:53:43 +0530
-Subject: [PATCH 0/3] Minor exynos7 device tree/config patches
-Message-ID: <1425227026-5336-1-git-send-email-a.kesavan@samsung.com>
+Date: Sun,  1 Mar 2015 21:53:44 +0530
+Subject: [PATCH 1/3] arm64: dts: add fifo size property for uart channels on
+ exynos7
+In-Reply-To: <1425227026-5336-1-git-send-email-a.kesavan@samsung.com>
+References: <1425227026-5336-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1425227026-5336-2-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 1 specifies the fifo sizes for UART channels on exnyos7. Without
-this the 4210 compatible defaults will be picked up which are different
-from that on exynos7.
-Patch 2 is based on a patch from Liviu Dudau fixing a similar issue
-for arm boards.
-Patch 3 is needed to enable support for arm64 based exynos7 platform.
+Specify the fifo sizes of the 4 uart channels on exynos7 via dt.
 
-Abhilash Kesavan (2):
-  arm64: dts: add fifo size property for uart channels on exynos7
-  arm64: dts: Fix interrupt active level for the generic timer on
-    exynos7
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+---
+ arch/arm64/boot/dts/exynos/exynos7.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Alim Akhtar (1):
-  arm64: Enable Exynos7 SOC in the defconfig
-
- arch/arm64/boot/dts/exynos/exynos7.dtsi | 13 +++++++++----
- arch/arm64/configs/defconfig            |  4 ++++
- 2 files changed, 13 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+index d7a37c3..749c4b3 100644
+--- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+@@ -192,6 +192,7 @@
+ 			clocks = <&clock_peric0 PCLK_UART0>,
+ 				 <&clock_peric0 SCLK_UART0>;
+ 			clock-names = "uart", "clk_uart_baud0";
++			samsung,uart-fifosize = <64>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -202,6 +203,7 @@
+ 			clocks = <&clock_peric1 PCLK_UART1>,
+ 				 <&clock_peric1 SCLK_UART1>;
+ 			clock-names = "uart", "clk_uart_baud0";
++			samsung,uart-fifosize = <256>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -212,6 +214,7 @@
+ 			clocks = <&clock_peric1 PCLK_UART2>,
+ 				 <&clock_peric1 SCLK_UART2>;
+ 			clock-names = "uart", "clk_uart_baud0";
++			samsung,uart-fifosize = <16>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -222,6 +225,7 @@
+ 			clocks = <&clock_peric1 PCLK_UART3>,
+ 				 <&clock_peric1 SCLK_UART3>;
+ 			clock-names = "uart", "clk_uart_baud0";
++			samsung,uart-fifosize = <64>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
 2.1.0
