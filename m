@@ -1,210 +1,123 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Sun,  1 Mar 2015 21:51:40 +0100
-Subject: [PATCH] ARM: Kirkwood: add DT description for nas2big
-Message-ID: <1425243100-318-1-git-send-email-simon.guinot@sequanux.org>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Sun, 1 Mar 2015 22:06:50 +0100 (CET)
+Subject: [PATCH v5 2/4] media: ov2640: add async probe function
+In-Reply-To: <1423560696-12304-3-git-send-email-josh.wu@atmel.com>
+References: <1423560696-12304-1-git-send-email-josh.wu@atmel.com>
+ <1423560696-12304-3-git-send-email-josh.wu@atmel.com>
+Message-ID: <Pine.LNX.4.64.1503012202460.2412@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DT description for the LaCie "2Big NAS" (nas2big).
-This NAS is an hardware upgrade of the 2Big Network v2.
+Hi Josh,
 
-Chipset and device list:
+Thanks for a patch update. I think it looks good as a first step in your 
+patch series, just a minor comment below:
 
-- CPU Marvell 88F6282 1600Mhz
-- SDRAM memory, 256MB DDR3 (2x128MB x8) 533Mhz
-- 1 Ethernet Gigabit port (PHY Marvell 88E1518)
-- Flash memory, NAND 256MB TSOP48
-- I2C EEPROM, 512 bytes (AT24 type)
-- PCIe SATA controller JMicron JMB360 (eSATA)
-- I2C fan controller GMT G762 (with a separate alarm GPIO)
-- 1 USB2 host port
-- 1 push button
-- 1 power switch
-- 2 SATA LEDs (bi-color, blue and red)
-- 1 power LED (bi-color, blue and red)
-- CPLD for LEDs and start-up management (Altera Max EMP3064)
+On Tue, 10 Feb 2015, Josh Wu wrote:
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
----
- .../devicetree/bindings/arm/marvell,kirkwood.txt   |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/kirkwood-nas2big.dts             | 144 +++++++++++++++++++++
- 3 files changed, 146 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-nas2big.dts
+> In async probe, there is a case that ov2640 is probed before the
+> host device which provided 'mclk'.
+> To support this async probe, we will get 'mclk' at first in the probe(),
+> if failed it will return -EPROBE_DEFER. That will let ov2640 wait for
+> the host device probed.
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+> 
+> Changes in v5:
+> - don't change the ov2640_s_power() code.
+> - will get 'mclk' at the beginning of ov2640_probe().
+> 
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  drivers/media/i2c/soc_camera/ov2640.c | 29 +++++++++++++++++++----------
+>  1 file changed, 19 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/media/i2c/soc_camera/ov2640.c b/drivers/media/i2c/soc_camera/ov2640.c
+> index 1fdce2f..057dd49 100644
+> --- a/drivers/media/i2c/soc_camera/ov2640.c
+> +++ b/drivers/media/i2c/soc_camera/ov2640.c
+> @@ -1068,6 +1068,10 @@ static int ov2640_probe(struct i2c_client *client,
+>  		return -ENOMEM;
+>  	}
+>  
+> +	priv->clk = v4l2_clk_get(&client->dev, "mclk");
+> +	if (IS_ERR(priv->clk))
+> +		return -EPROBE_DEFER;
+> +
+>  	v4l2_i2c_subdev_init(&priv->subdev, client, &ov2640_subdev_ops);
+>  	v4l2_ctrl_handler_init(&priv->hdl, 2);
+>  	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
+> @@ -1075,24 +1079,28 @@ static int ov2640_probe(struct i2c_client *client,
+>  	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
+>  			V4L2_CID_HFLIP, 0, 1, 1, 0);
+>  	priv->subdev.ctrl_handler = &priv->hdl;
+> -	if (priv->hdl.error)
+> -		return priv->hdl.error;
+> -
+> -	priv->clk = v4l2_clk_get(&client->dev, "mclk");
+> -	if (IS_ERR(priv->clk)) {
+> -		ret = PTR_ERR(priv->clk);
+> -		goto eclkget;
+> +	if (priv->hdl.error) {
+> +		ret = priv->hdl.error;
+> +		goto err_clk;
+>  	}
+>  
+>  	ret = ov2640_video_probe(client);
+>  	if (ret) {
+> -		v4l2_clk_put(priv->clk);
+> -eclkget:
+> -		v4l2_ctrl_handler_free(&priv->hdl);
+> +		goto err_videoprobe;
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-index 925ecbf6e7b7..4f40ff3fee4b 100644
---- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-@@ -42,6 +42,7 @@ board. Currently known boards are:
- "lacie,cloudbox"
- "lacie,inetspace_v2"
- "lacie,laplug"
-+"lacie,nas2big"
- "lacie,netspace_lite_v2"
- "lacie,netspace_max_v2"
- "lacie,netspace_mini_v2"
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a1c776b8dcec..920fd9dd7a35 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -165,6 +165,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
- 	kirkwood-lsxhl.dtb \
- 	kirkwood-mplcec4.dtb \
- 	kirkwood-mv88f6281gtw-ge.dtb \
-+	kirkwood-nas2big.dtb \
- 	kirkwood-net2big.dtb \
- 	kirkwood-net5big.dtb \
- 	kirkwood-netgear_readynas_duo_v2.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-nas2big.dts b/arch/arm/boot/dts/kirkwood-nas2big.dts
-new file mode 100644
-index 000000000000..d459c94fd1d4
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-nas2big.dts
-@@ -0,0 +1,144 @@
-+/*
-+ * Device Tree file for LaCie 2Big NAS
-+ *
-+ * Copyright (C) 2015 Seagate
-+ *
-+ * Author: Simon Guinot <simon.guinot@sequanux.org>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+*/
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/leds/leds-netxbig.h>
-+#include "kirkwood-netxbig.dtsi"
-+
-+/ {
-+	model = "LaCie 2Big NAS";
-+	compatible = "lacie,nas2big", "lacie,netxbig", "marvell,kirkwood-88f6282", "marvell,kirkwood";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x10000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8";
-+		stdout-path = &uart0;
-+	};
-+
-+	mbus {
-+		pcie-controller {
-+			status = "okay";
-+
-+			pcie at 1,0 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	ocp at f1000000 {
-+		rtc at 10300 {
-+			/* The on-chip RTC is not powered (no supercap). */
-+			status = "disabled";
-+		};
-+		spi at 10600 {
-+			/*
-+			 * A NAND flash is used instead of an SPI flash for
-+			 * the other netxbig-compatible boards.
-+			 */
-+			status = "disabled";
-+		};
-+	};
-+
-+	fan {
-+		/*
-+		 * An I2C fan controller (GMT G762) is used but alarm is
-+		 * wired to a separate GPIO.
-+		 */
-+		compatible = "gpio-fan";
-+		alarm-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
-+	};
-+
-+	regulators: regulators {
-+		status = "okay";
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-names = "default";
-+
-+		regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "hdd1power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio0 17 GPIO_ACTIVE_HIGH>;
-+		};
-+		clocks {
-+			g762_clk: g762-oscillator {
-+				compatible = "fixed-clock";
-+				#clock-cells = <0>;
-+				clock-frequency = <32768>;
-+			};
-+		};
-+	};
-+};
-+
-+&mdio {
-+	status = "okay";
-+
-+	ethphy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	/*
-+	 * An external I2C RTC (Dallas DS1337S+) is used. This allows
-+	 * to power-up the board on an RTC alarm. The external RTC can
-+	 * be kept powered, even when the SoC is off.
-+	 */
-+	rtc at 68 {
-+		compatible = "dallas,ds1307";
-+		reg = <0x68>;
-+		interrupts = <43>;
-+	};
-+	g762 at 3e {
-+		compatible = "gmt,g762";
-+		reg = <0x3e>;
-+		clocks = <&g762_clk>;
-+	};
-+};
-+
-+&nand {
-+	chip-delay = <50>;
-+	status = "okay";
-+
-+	partition at 0 {
-+		label = "U-Boot";
-+		reg = <0x0 0x100000>;
-+	};
-+
-+	partition at 100000 {
-+		label = "uImage";
-+		reg = <0x100000 0x1000000>;
-+	};
-+
-+	partition at 1100000 {
-+		label = "root";
-+		reg = <0x1100000 0x8000000>;
-+	};
-+
-+	partition at 9100000 {
-+		label = "unused";
-+		reg = <0x9100000 0x6f00000>;
-+	};
-+};
--- 
-2.1.1
+Since you add a "goto" here, you don't need an "else" after it, and the 
+"probed" success message should go down, so, just make it
+
+	ret = ov2640_video_probe(client);
+	if (ret < 0)
+		goto err_videoprobe;
+
+	ret = v4l2_async_register_subdev(&priv->subdev);
+	if (ret < 0)
+		goto err_videoprobe;
+
+	dev_info(&adapter->dev, "OV2640 Probed\n");
+
+	return 0;
+
+err_...
+
+Thanks
+Guennadi
+
+>  	} else {
+>  		dev_info(&adapter->dev, "OV2640 Probed\n");
+>  	}
+>  
+> +	ret = v4l2_async_register_subdev(&priv->subdev);
+> +	if (ret < 0)
+> +		goto err_videoprobe;
+> +
+> +	return 0;
+> +
+> +err_videoprobe:
+> +	v4l2_ctrl_handler_free(&priv->hdl);
+> +err_clk:
+> +	v4l2_clk_put(priv->clk);
+>  	return ret;
+>  }
+>  
+> @@ -1100,6 +1108,7 @@ static int ov2640_remove(struct i2c_client *client)
+>  {
+>  	struct ov2640_priv       *priv = to_ov2640(client);
+>  
+> +	v4l2_async_unregister_subdev(&priv->subdev);
+>  	v4l2_clk_put(priv->clk);
+>  	v4l2_device_unregister_subdev(&priv->subdev);
+>  	v4l2_ctrl_handler_free(&priv->hdl);
+> -- 
+> 1.9.1
+> 
