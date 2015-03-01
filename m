@@ -1,70 +1,42 @@
 From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Sun,  1 Mar 2015 14:44:31 +0200
-Subject: [PATCH v8 08/18] clk: tegra: Save/restore CCLKG_BURST_POLICY on
- suspend
+Date: Sun,  1 Mar 2015 14:44:39 +0200
+Subject: [PATCH v8 16/18] ARM: tegra: Add entries for cpufreq on Tegra124
 In-Reply-To: <1425213881-5262-1-git-send-email-mikko.perttunen@kapsi.fi>
 References: <1425213881-5262-1-git-send-email-mikko.perttunen@kapsi.fi>
-Message-ID: <1425213881-5262-9-git-send-email-mikko.perttunen@kapsi.fi>
+Message-ID: <1425213881-5262-17-git-send-email-mikko.perttunen@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 
-Save and restore this register since the LP1 restore assembly routines
-fiddle with it. Otherwise the CPU would keep running on PLLX after
-resume from suspend even when DFLL was the original clocksource.
+The Tegra124 cpufreq driver relies on certain clocks being present
+in the /cpus/cpu at 0 node.
 
 Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
-Acked-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
- drivers/clk/tegra/clk-tegra124.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/tegra124.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
-index 6c96daf..48dbeac 100644
---- a/drivers/clk/tegra/clk-tegra124.c
-+++ b/drivers/clk/tegra/clk-tegra124.c
-@@ -98,6 +98,8 @@
- #define PMC_PLLM_WB0_OVERRIDE 0x1dc
- #define PMC_PLLM_WB0_OVERRIDE_2 0x2b0
- 
-+#define CCLKG_BURST_POLICY 0x368
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index b0f860e..ab5e73d 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -915,6 +915,15 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0>;
 +
- #define UTMIP_PLL_CFG2 0x488
- #define UTMIP_PLL_CFG2_STABLE_COUNT(x) (((x) & 0xffff) << 6)
- #define UTMIP_PLL_CFG2_ACTIVE_DLY_COUNT(x) (((x) & 0x3f) << 18)
-@@ -130,6 +132,8 @@
- #ifdef CONFIG_PM_SLEEP
- static struct cpu_clk_suspend_context {
- 	u32 clk_csite_src;
-+	u32 cclkg_burst;
-+	u32 cclkg_divider;
- } tegra124_cpu_clk_sctx;
- #endif
++			clocks = <&tegra_car TEGRA124_CLK_CCLK_G>,
++				 <&tegra_car TEGRA124_CLK_CCLK_LP>,
++				 <&tegra_car TEGRA124_CLK_PLL_X>,
++				 <&tegra_car TEGRA124_CLK_PLL_P>,
++				 <&dfll>;
++			clock-names = "cpu_g", "cpu_lp", "pll_x", "pll_p", "dfll";
++			/* FIXME: what's the actual transition time? */
++			clock-latency = <300000>;
+ 		};
  
-@@ -1330,12 +1334,22 @@ static void tegra124_cpu_clock_suspend(void)
- 	tegra124_cpu_clk_sctx.clk_csite_src =
- 				readl(clk_base + CLK_SOURCE_CSITE);
- 	writel(3 << 30, clk_base + CLK_SOURCE_CSITE);
-+
-+	tegra124_cpu_clk_sctx.cclkg_burst =
-+				readl(clk_base + CCLKG_BURST_POLICY);
-+	tegra124_cpu_clk_sctx.cclkg_divider =
-+				readl(clk_base + CCLKG_BURST_POLICY + 4);
- }
- 
- static void tegra124_cpu_clock_resume(void)
- {
- 	writel(tegra124_cpu_clk_sctx.clk_csite_src,
- 				clk_base + CLK_SOURCE_CSITE);
-+
-+	writel(tegra124_cpu_clk_sctx.cclkg_burst,
-+					clk_base + CCLKG_BURST_POLICY);
-+	writel(tegra124_cpu_clk_sctx.cclkg_divider,
-+					clk_base + CCLKG_BURST_POLICY + 4);
- }
- #endif
- 
+ 		cpu at 1 {
 -- 
 2.3.0
