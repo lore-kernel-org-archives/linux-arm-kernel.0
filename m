@@ -1,69 +1,70 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 2 Mar 2015 11:33:00 +0000
-Subject: [PATCH v2 3/3] arm64: dts: add interrupt-affinity property to
- pmu node for juno
-In-Reply-To: <1425065549-24661-3-git-send-email-will.deacon@arm.com>
-References: <1425065549-24661-1-git-send-email-will.deacon@arm.com>
- <1425065549-24661-3-git-send-email-will.deacon@arm.com>
-Message-ID: <20150302113300.GG905@e106497-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 2 Mar 2015 11:37:18 +0000
+Subject: [PATCH v3 0/4] clk: st: New always-on clock domain
+In-Reply-To: <87vbij1vuk.fsf@free.fr>
+References: <1424799222-9301-1-git-send-email-lee.jones@linaro.org>
+ <87385r3uk9.fsf@free.fr> <20150227214941.GB12821@x1>
+ <87sidq3ox8.fsf@free.fr> <20150302083019.GD31325@x1>
+ <87vbij1vuk.fsf@free.fr>
+Message-ID: <20150302113718.GG32347@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 07:32:29PM +0000, Will Deacon wrote:
-> Make the Juno .dts robust against potential reordering of the CPU nodes
-> by adding an explicit interrupt-affinity property to the PMU node. While
-> we're at it, fix the PMU interrupts numbers too.
+On Mon, 02 Mar 2015, Robert Jarzmik wrote:
 
-Thanks for spotting this. I can't remember where the PMU numbers originated
-from as my GitHub version has a different set as well.
-
-Acked-by:  Liviu Dudau <Liviu.Dudau@arm.com>
-
-
+> Lee Jones <lee.jones@linaro.org> writes:
 > 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/boot/dts/arm/juno.dts | 14 ++++++++++----
->  1 file changed, 10 insertions(+), 4 deletions(-)
+> > On Sat, 28 Feb 2015, Robert Jarzmik wrote:
+> >
+> >> Lee Jones <lee.jones@linaro.org> writes:
+> >>     it doesn't specify which usecase is not covered by CLK_IGNORE_UNUSED, it
+> >>     says, up to my understanding, that is it another way to have to
+> >>     CLK_IGNORE_UNUSED flag applied.
+> >
+> > Well that is exactly what we're doing.  Is there an issue with that?
+> >
+> > This is a way to do it at a platform level.  It means we can support
+> > multiple platforms where clocksources have been switched around
+> > without writing new driver code in drivers/clk/st.
+> >
+> > If you have something else in mind, let me know.
+> >
+> >>  2) I still fail to see why this is necessary
+> >>     IOW why declaring the mandatory always-on clocks with the proper flag should
+> >>     be augmented with a new clock list. Isn't the existing flag the generic way
+> >>     ?
+> >
+> > I'm not sure what you mean by this, would you be able to expland a
+> > little?
+> >
+> >> I might not understand the real motivation behind that of course, that's why I'm
+> >> asking.
+> >
+> > Please bear in mind that we don't supply our clocks statically.  All
+> > of the information is extracted from DT, so if the always-on
+> > information does reside in there, where do you propose it comes from?
 > 
-> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-> index d429129ecb3d..c68949c0cca5 100644
-> --- a/arch/arm64/boot/dts/arm/juno.dts
-> +++ b/arch/arm64/boot/dts/arm/juno.dts
-> @@ -106,12 +106,18 @@
->  
->  	pmu {
->  		compatible = "arm,armv8-pmuv3";
-> -		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
-> +		interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
->  			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
->  			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>;
-> +			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-affinity = <&A57_0>,
-> +				     <&A57_1>,
-> +				     <&A53_0>,
-> +				     <&A53_1>,
-> +				     <&A53_2>,
-> +				     <&A53_3>;
->  	};
->  
->  	/include/ "juno-clocks.dtsi"
-> -- 
-> 2.1.4
+> I thought the standard clock binding provided a way to set this flag. Now I
+> crosschecked the binding, it doesn't ...
 > 
+> My point was I didn't want the flag to be settable from 2 different places,
+> where consistency was to be kept across different device-tree leafs.
+> 
+> > We could just write this code inside our own driver and apply the
+> > CLK_IGNORE_UNUSED at a local level, but that's not the generic
+> > solution I am searching for.
+> 
+> All right, I'm convinced now I undertand the flag was not settable from
+> devicetree binding before this patchset.
+> 
+> You can add to patch 3/4 :
+> Reviewed-by: Robert Jarzmik <robert.jarzmik@free.fr>
+
+Until told otherwise, I'm going to apply this onto the other
+patchset.  This one has already been NACKed, due to DT push-back.
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
