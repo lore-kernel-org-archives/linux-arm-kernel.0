@@ -1,40 +1,55 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 2 Mar 2015 14:22:00 -0800
-Subject: [PATCH 0/5] split ET_DYN ASLR from mmap ASLR
-In-Reply-To: <20150302132657.5507742399620e70dd0a3926@linux-foundation.org>
-References: <1425006434-3106-1-git-send-email-keescook@chromium.org>
- <20150302132657.5507742399620e70dd0a3926@linux-foundation.org>
-Message-ID: <CAGXu5j+qOntXiF_zzW-+fGWeU-tBxwSF2UVsLm5D6brNEf-XCw@mail.gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Mon, 02 Mar 2015 17:21:26 -0500
+Subject: PMD update corruption (sync question)
+In-Reply-To: <20150302105011.GD22541@e104818-lin.cambridge.arm.com>
+References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
+ <54F06636.6080905@redhat.com> <54F3C6AD.50300@redhat.com>
+ <938476184.27970130.1425275915893.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
+ <20150302105011.GD22541@e104818-lin.cambridge.arm.com>
+Message-ID: <54F4E266.8090709@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 2, 2015 at 1:26 PM, Andrew Morton <akpm@linux-foundation.org> wrote:
-> On Thu, 26 Feb 2015 19:07:09 -0800 Kees Cook <keescook@chromium.org> wrote:
->
->> This separates ET_DYN ASLR from mmap ASLR, as already done on s390. The
->> various architectures that are already randomizing mmap (arm, arm64, mips,
->> powerpc, s390, and x86), have their various forms of arch_mmap_rnd()
->> made available via the new CONFIG_ARCH_HAS_ELF_RANDOMIZE. For these
->> architectures, arch_randomize_brk() is collapsed as well.
->>
->> This is an alternative to the solutions in:
->> https://lkml.org/lkml/2015/2/23/442
->
-> "504 Gateway Time-out"
->
-> Hector's original patch had very useful descriptions of the bug, why it
-> occurred, how it was exploited it and how the patch fixes it.
->
-> Your changelogs contain none of this and can be summarized as "randomly
-> churn code around for no apparent reason".
->
-> Wanna try again?  I guess the [0/5] and [4/5] changelogs are the ones
-> to fix.
+On 03/02/2015 05:50 AM, Catalin Marinas wrote:
+> On Mon, Mar 02, 2015 at 12:58:36AM -0500, Jon Masters wrote:
 
-Ah, yes, absolutely. I will resend.
+>> Test kernels running with an explicit DSB in all PTE update cases now
+>> running overnight. Just in case.
 
--Kees
+...and stay up after 19 hours. But that's just timing I'm sure.
 
--- 
-Kees Cook
-Chrome OS Security
+> It could be hiding some other problems.
+
+I checked my GDB macros and they were correct BUT my debugger went out
+to lunch soon after that dump so I suspect it was just garbage :)
+
+Instead, for my immediate issue, I have a much more likely suspect. For
+anyone interested in the followup, you should know that hardware page
+table walkers generally do respond well when you feed them Makefiles:
+
+0x43e81c0000: 20230a23 656b614d 656c6966 726f6620  : #.# Makefile for
+0x43e81c0010: 65687420 462d4920 6563726f 69726420  :  the I-Force dri
+0x43e81c0020: 0a726576 20230a23 4a207942 6e61686f  : ver.#.# By Johan
+0x43e81c0030: 6544206e 7875656e 6f6a3c20 6e6e6168  : n Deneux <johann
+0x43e81c0040: 6e65642e 40787565 69616d67 6f632e6c  : .deneux@gmail.co
+0x43e81c0050: 230a3e6d 626f0a0a 28242d6a 464e4f43  : m>.#..obj-$(CONF
+0x43e81c0060: 4a5f4749 5453594f 5f4b4349 524f4649  : IG_JOYSTICK_IFOR
+0x43e81c0070: 09294543 69203d2b 63726f66 0a6f2e65  : CE).+= iforce.o.
+0x43e81c0080: 6f66690a 2d656372 3d3a2079 6f666920  : .iforce-y := ifo
+0x43e81c0090: 2d656372 6f2e6666 6f666920 2d656372  : rce-ff.o iforce-
+0x43e81c00a0: 6e69616d 69206f2e 63726f66 61702d65  : main.o iforce-pa
+0x43e81c00b0: 74656b63 0a6f2e73 726f6669 242d6563  : ckets.o.iforce-$
+0x43e81c00c0: 4e4f4328 5f474946 53594f4a 4b434954  : (CONFIG_JOYSTICK
+0x43e81c00d0: 4f46495f 5f454352 29323332 203d2b09  : _IFORCE_232).+=
+0x43e81c00e0: 726f6669 732d6563 6f697265 690a6f2e  : iforce-serio.o.i
+0x43e81c00f0: 63726f66 28242d65 464e4f43 4a5f4749  : force-$(CONFIG_J
+0x43e81c0100: 5453594f 5f4b4349 524f4649 555f4543  : OYSTICK_IFORCE_U
+0x43e81c0110: 09294253 69203d2b 63726f66 73752d65  : SB).+= iforce-us
+0x43e81c0120: 0a6f2e62 00000000 00000000 00000000  : b.o.............
+
+So that explains why things were falling over. It is likely indeed the
+bad DMA I have been craving all along. And this time it was so gracious
+as to give me the answer in plain ASCII :) I suspect there will be a
+patch for a certain AHCI driver in the not too distant future.
+
+Jon.
