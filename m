@@ -1,39 +1,89 @@
-From: mporter@konsulko.com (Matt Porter)
-Date: Mon, 2 Mar 2015 14:21:16 -0500
-Subject: [PATCH] ARM: dts: hummingboard: enable pcf8523 rtc for i2eX
-In-Reply-To: <20150302190616.GS8656@n2100.arm.linux.org.uk>
-References: <1425322206-30115-1-git-send-email-mporter@konsulko.com>
- <20150302190204.GR8656@n2100.arm.linux.org.uk>
- <20150302190616.GS8656@n2100.arm.linux.org.uk>
-Message-ID: <20150302192116.GA30263@beef>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 02 Mar 2015 20:23:37 +0100
+Subject: [PATCH v2 3/3] ARM: mvebu: armada-385-ap: Enable USB3 port
+In-Reply-To: <1421672474-2945-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1421672474-2945-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54F4B8B9.4010204@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[added Rabeeh]
+Hi Maxime,
 
-On Mon, Mar 02, 2015 at 07:06:16PM +0000, Russell King wrote:
-> On Mon, Mar 02, 2015 at 07:02:04PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Mar 02, 2015 at 01:50:06PM -0500, Matt Porter wrote:
-> > > The PCF8523 RTC is populated on the i2eX boards so
-> > > enable the i2c1 controller and enable the device on
-> > > that bus.
-> > 
-> > Hmm, I wonder where my update patches went... oh, they're still sitting
-> > in my excessive backlog of patches in my tree as part of my "sgtl5000
-> > hacks" patch...
+On 19/01/2015 14:01, Maxime Ripard wrote:
+> The Armada 385 AP board has a USB3 port exposed that uses a GPIO to drive the
+> VBUS line. Enable the needed drivers to support this.
 > 
-> Also note that before we accept patches to the SolidRun stuff, we should
-> first re-license the file as GPLv2/X11.
 
-Hi Russell,
+it seems that this patch was not applied yet. Patch 1 is now in
+linux-next and should be part of 4.0-rc. But what about patch 2?
 
-Given that there's no license information at all on any of these three
-dts files I think that's a good idea. I just realized I didn't copy
-Rabeeh on this and he's apparently the original submitter based on
-your work. Ideally Rabeeh should send a license update but I could do
-so if you'd like and gather some acks.
+Thanks,
 
-OTOH, did you already have a license update somewhere in your backlog
-of patches?
+Gregory
 
--Matt
+
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-385-db-ap.dts | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
+> index 3a51531eb37b..b891b4c897f5 100644
+> --- a/arch/arm/boot/dts/armada-385-db-ap.dts
+> +++ b/arch/arm/boot/dts/armada-385-db-ap.dts
+> @@ -98,6 +98,13 @@
+>  				status = "okay";
+>  			};
+>  
+> +			pinctrl at 18000 {
+> +				xhci0_vbus_pins: xhci0-vbus-pins {
+> +					marvell,pins = "mpp44";
+> +					marvell,function = "gpio";
+> +				};
+> +			};
+> +
+>  			ethernet at 30000 {
+>  				status = "okay";
+>  				phy = <&phy2>;
+> @@ -122,6 +129,11 @@
+>  				phy = <&phy0>;
+>  				phy-mode = "rgmii-id";
+>  			};
+> +
+> +			usb3 at f0000 {
+> +				status = "okay";
+> +				usb-phy = <&usb3_phy>;
+> +			};
+>  		};
+>  
+>  		pcie-controller {
+> @@ -147,4 +159,20 @@
+>  			};
+>  		};
+>  	};
+> +
+> +	usb3_phy: usb3_phy {
+> +		compatible = "usb-nop-xceiv";
+> +		vcc-supply = <&reg_xhci0_vbus>;
+> +	};
+> +
+> +	reg_xhci0_vbus: xhci0-vbus {
+> +		compatible = "regulator-fixed";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&xhci0_vbus_pins>;
+> +		regulator-name = "xhci0-vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		enable-active-high;
+> +		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+> +	};
+>  };
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
