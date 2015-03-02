@@ -1,99 +1,104 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 03 Mar 2015 04:00:14 +0900
-Subject: [GIT PULL 2/2] Samsung fixes-2 for v4.0
-Message-ID: <54F4B33E.3070803@kernel.org>
+From: al.stone@linaro.org (Al Stone)
+Date: Mon, 02 Mar 2015 12:00:21 -0700
+Subject: [PATCH v3 8/9] ACPI: arm64: use an arch-specific ACPI _OSI method
+ and ACPI blacklist
+In-Reply-To: <20150302172939.GC7919@arm.com>
+References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
+ <1424824585-6405-9-git-send-email-al.stone@linaro.org>
+ <20150302172939.GC7919@arm.com>
+Message-ID: <54F4B345.6020001@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/02/2015 10:29 AM, Will Deacon wrote:
+> Hi Al,
+> 
+> On Wed, Feb 25, 2015 at 12:36:24AM +0000, al.stone at linaro.org wrote:
+>> diff --git a/arch/arm64/kernel/acpi-blacklist.c b/arch/arm64/kernel/acpi-blacklist.c
+>> new file mode 100644
+>> index 0000000..1be6a56
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/acpi-blacklist.c
+>> @@ -0,0 +1,20 @@
+>> +/*
+>> + *  ARM64 Specific ACPI Blacklist Support
+>> + *
+>> + *  Copyright (C) 2015, Linaro Ltd.
+>> + *	Author: Al Stone <al.stone@linaro.org>
+>> + *
+>> + *  This program is free software; you can redistribute it and/or modify
+>> + *  it under the terms of the GNU General Public License version 2 as
+>> + *  published by the Free Software Foundation.
+>> + */
+>> +
+>> +#define pr_fmt(fmt) "ACPI: " fmt
+>> +
+>> +#include <linux/acpi.h>
+>> +
+>> +/* The arm64 ACPI blacklist is currently empty.  */
+>> +int __init acpi_blacklisted(void)
+>> +{
+>> +	return 0;
+>> +}
+>> diff --git a/arch/arm64/kernel/acpi-osi.c b/arch/arm64/kernel/acpi-osi.c
+>> new file mode 100644
+>> index 0000000..bb351f4
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/acpi-osi.c
+>> @@ -0,0 +1,25 @@
+>> +/*
+>> + *  ARM64 Specific ACPI _OSI Support
+>> + *
+>> + *  Copyright (C) 2015, Linaro Ltd.
+>> + *	Author: Al Stone <al.stone@linaro.org>
+>> + *
+>> + *  This program is free software; you can redistribute it and/or modify
+>> + *  it under the terms of the GNU General Public License version 2 as
+>> + *  published by the Free Software Foundation.
+>> + */
+>> +
+>> +#define pr_fmt(fmt) "ACPI: " fmt
+>> +
+>> +#include <linux/acpi.h>
+>> +
+>> +/*
+>> + * Consensus is to deprecate _OSI for all new ACPI-supported architectures.
+>> + * So, for arm64, reduce _OSI to a warning message, and tell the firmware
+>> + * nothing of value.
+>> + */
+>> +u32 acpi_osi_handler(acpi_string interface, u32 supported)
+>> +{
+>> +	pr_warn("_OSI was called, but is deprecated for this architecture.\n");
+>> +	return false;
+>> +}
+> 
+> This kinda feels backwards to me. If _OSI is going away, then the default
+> should be "the architecture doesn't need to do anything", rather than have
+> new architectures defining a bunch of empty, useless stub code.
+> 
+> Anyway we could make this the default in core code and have architectures
+> that *do* want _OSI override that behaviour, instead of the other way around?
+> 
+> Cheers,
+> 
+> Will
+> 
 
-Please pull Samsung tmu and hdmi regression fixes for v4.0 and I know
-this is quite big for fixes but I couldn't handle this series for
-previous merge window because of dependency with driver side...sorry for
-that and please pull so that we could support them in v4.0 on exynos
-platforms.
+We could do that; I personally don't have a strong preference either way,
+so I'm inclined to make it whatever structure Rafael thinks is proper since
+it affects ACPI code most.  That being said, the current patch structure
+made sense to me since it wasn't distorting existing code much -- and given
+the pure number of x86/ia64 machines vs ARM machines using ACPI, that seemed
+the more cautious approach.
 
-Thanks,
-Kukjin
+@Rafael: do you have an opinion/preference?
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-fixes-dt
-
-for you to fetch changes up to 2d2c9a8d0a4f90e298315d2f4a282d8bd5d45e5c:
-
-  ARM: dts: add display power domain for exynos5250 (2015-02-27 05:29:32
-+0900)
-
-----------------------------------------------------------------
-Samsung tmu and hdmi regression fixes for v4.0
-
-- The thermal management unit and HDMI (drm mixer driver) related
-reworks have been merged in v4.0 merge window. So if this DT changes
-are missed for v4.0, we regressions in v4.0 release for exynos
-platforms such as exynos5250, exynos5420, exynos4 SoCs.
-
-- Note since there was a dependency with driver side, this cannot
-be sent to upstream during preivous merge window and now it has been
-resolved.
-
-----------------------------------------------------------------
-Andrzej Hajda (1):
-      ARM: dts: add display power domain for exynos5250
-
-Lukasz Majewski (9):
-      ARM: dts: Enable TMU for exynos4210-trats
-      ARM: dts: Add LDO10 for TMU for exynos4412-odroid-common
-      ARM: dts: Enable TMU for exynos4412-odriod-common
-      ARM: dts: Adding CPU cooling binding for Exynos SoCs
-      ARM: dts: add TMU default definitions for exynos4412
-      ARM: dts: default trip points definition for exynos5420
-      ARM: dts: define default thermal-zones for exynos4
-      ARM: dts: Trip points and sensor configuration data for exynos5440
-      ARM: dts: Provide dt bindings identical for Exynos TMU
-
-Marek Szyprowski (6):
-      dt-bindings: document a note about power domain subdomains
-      ARM: EXYNOS: add support for sub-power domains
-      ARM: dts: add hdmi related nodes for exynos4 SoCs
-      ARM: dts: add dependency between TV and LCD0 power domains for exynos4
-      ARM: dts: enable hdmi support for exynos4412-odroid-common
-      ARM: dts: add 'hdmi' clock to mixer nodes for exynos5250 and
-exynos5420
-
-Tomasz Stanislawski (1):
-      ARM: dts: enable hdmi support for exynos4210-universal_c210
-
- .../bindings/arm/exynos/power_domain.txt           |  2 +
- .../devicetree/bindings/power/power_domain.txt     | 29 ++++++++++
- arch/arm/boot/dts/exynos3250.dtsi                  |  2 +
- arch/arm/boot/dts/exynos4-cpu-thermal.dtsi         | 52 ++++++++++++++++++
- arch/arm/boot/dts/exynos4.dtsi                     | 45 +++++++++++++++
- arch/arm/boot/dts/exynos4210-trats.dts             | 19 +++++++
- arch/arm/boot/dts/exynos4210-universal_c210.dts    | 57 +++++++++++++++++++
- arch/arm/boot/dts/exynos4210.dtsi                  | 38 ++++++++++++-
- arch/arm/boot/dts/exynos4212.dtsi                  |  5 +-
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi    | 64
-++++++++++++++++++++++
- arch/arm/boot/dts/exynos4412-tmu-sensor-conf.dtsi  | 24 ++++++++
- arch/arm/boot/dts/exynos4412-trats2.dts            | 15 +++++
- arch/arm/boot/dts/exynos4412.dtsi                  |  5 +-
- arch/arm/boot/dts/exynos4x12.dtsi                  | 12 ++++
- arch/arm/boot/dts/exynos5250.dtsi                  | 44 +++++++++++++--
- arch/arm/boot/dts/exynos5420-trip-points.dtsi      | 35 ++++++++++++
- arch/arm/boot/dts/exynos5420.dtsi                  | 33 ++++++++++-
- arch/arm/boot/dts/exynos5440-tmu-sensor-conf.dtsi  | 24 ++++++++
- arch/arm/boot/dts/exynos5440-trip-points.dtsi      | 25 +++++++++
- arch/arm/boot/dts/exynos5440.dtsi                  | 18 ++++++
- arch/arm/mach-exynos/pm_domains.c                  | 28 ++++++++++
- 21 files changed, 565 insertions(+), 11 deletions(-)
- create mode 100644 arch/arm/boot/dts/exynos4-cpu-thermal.dtsi
- create mode 100644 arch/arm/boot/dts/exynos4412-tmu-sensor-conf.dtsi
- create mode 100644 arch/arm/boot/dts/exynos5420-trip-points.dtsi
- create mode 100644 arch/arm/boot/dts/exynos5440-tmu-sensor-conf.dtsi
- create mode 100644 arch/arm/boot/dts/exynos5440-trip-points.dtsi
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Linaro Enterprise Group
+al.stone at linaro.org
+-----------------------------------
