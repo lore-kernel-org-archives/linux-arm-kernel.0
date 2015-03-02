@@ -1,81 +1,149 @@
-From: mporter@konsulko.com (Matt Porter)
-Date: Mon, 2 Mar 2015 15:50:30 -0500
-Subject: [PATCH] ARM: dts: hummingboard: enable pcf8523 rtc for i2eX
-In-Reply-To: <20150302204326.GV8656@n2100.arm.linux.org.uk>
-References: <1425322206-30115-1-git-send-email-mporter@konsulko.com>
- <20150302190204.GR8656@n2100.arm.linux.org.uk>
- <20150302190616.GS8656@n2100.arm.linux.org.uk>
- <20150302192116.GA30263@beef>
- <20150302194908.GU8656@n2100.arm.linux.org.uk>
- <20150302202540.GB30263@beef>
- <20150302204326.GV8656@n2100.arm.linux.org.uk>
-Message-ID: <20150302205030.GC30263@beef>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Mon, 2 Mar 2015 14:52:38 -0600
+Subject: [PATCH v3 3/3] firmware: qcom: scm: Support cpu power down
+ through SCM
+In-Reply-To: <1425328207-58415-4-git-send-email-lina.iyer@linaro.org>
+References: <1425328207-58415-1-git-send-email-lina.iyer@linaro.org>
+ <1425328207-58415-4-git-send-email-lina.iyer@linaro.org>
+Message-ID: <D48129A5-15F4-47BF-BA16-8B9308E3AD13@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 08:43:26PM +0000, Russell King wrote:
-> On Mon, Mar 02, 2015 at 03:25:40PM -0500, Matt Porter wrote:
-> > On Mon, Mar 02, 2015 at 07:49:08PM +0000, Russell King wrote:
-> > > It's a bit like the MMC stuff, I'm still carrying Olof's solution for
-> > > the SDIO wifi/bt power and reset control stuff, and I'm not at present
-> > > intending to do anything with it other than continue forward-porting it.
-> > > I'm not interested in wasting free time trying to re-work that to suit
-> > > some other solution, especially as people couldn't settle on a solution
-> > > when I /did/ have an interest in it (not that I have much interest in
-> > > wifi or BT - I tend to prefer old fashioned wired connections.  It also
-> > > doesn't help that the Broadcom driver seemed to be very flakey with
-> > > brcm4329 hardware for quite some time.)
-> > > 
-> > > Anyway, you can find all my kernel patches in a suitably trimmed version
-> > > of the above URL, and on http://ftp.arm.linux.org.uk/cgit/ is a huge pile
-> > > of effort I put into an accelerated X server with etnaviv and /my/ kernel
-> > > version of etnaviv drm, complete with Xv support.
-> > 
-> > Excellent, so I feel like you ultimately giving me mixed messages here.
-> 
-> Yes, I am - partly because I don't know what to do with many of the
-> patches I seem to be endlessly carrying (which depresses me).  I look
-> back to the days when I could be sure of completely emptying my tree
-> at each merge window, something which /never/ happens anymore.
-> 
-> > You said you need to take care of this licensing issue and I think you
-> > implied you'd take care of the audio and rtc stuff as you have that
-> > patch in your backlog.
-> 
-> As you may have seen, I've mailed out the licensing patch, and I've
-> also mailed out two patches - one for PWM stuff and the second one
-> being the RTC change broken out from my sgtl5000 hacks patch.
-> 
-> I've also cut a v4.0-rc1 patch set, in the usual diff.bz2, tar.bz2,
-> and separate patch forms which include those three patches.
 
-Ok, caught up on those now, thanks.
+On Mar 2, 2015, at 2:30 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
 
-> > However, sounds like you've given up on pushing
-> > the bigger things upstream given the problem with getting agreement
-> > on those pieces. Are you just going to be submitting the
-> > less controversial portions like the audio and dts updates? My goal for
-> > HB initially is just to have all the low-hanging fruit (like rtc and audio)
-> > working on mainline...besides the stuff that's already there.
+> Support powering down the calling cpu, by trapping into SCM. This
+> termination function triggers the ARM cpu to execute WFI instruction,
+> causing the power controller to safely power the cpu down.
 > 
-> RTC is the easiest bit of the problem, as you've discovered it's just
-> a matter of uncommenting the bit in DT.  (It's even better if you have
-> a battery to plug into the little connector!)
+> Caches may be flushed before powering down the cpu. If cache controller
+> is set to turn off when the cpu is powered down, then the flags argument
+> indicates to the secure mode to flush its cache lines before executing
+> WFI.The warm boot reset address for the cpu should be set before the
+> calling into this function for the cpu to resume.
 > 
-> Audio needs more than just DT changes, and there's recently been some
-> SGTL5000 patches submitted which change the way power is controlled
-> in the SGTL5000.  I don't yet know whether those patches solve the
-> problems I was seeing with the kernel powering down the SGTL5000's
-> internal regulator, thereby making the device totally inaccessible
-> until the next power cycle or not.
+> The original code for the qcom_scm_call_atomic1() comes from a patch by
+> Stephen Boyd [1]. The function scm_call_atomic1() has been cherry picked
+> and renamed to match the convention used in this file. Since there are
+> no users of scm_call_atomic2(), the function is not included.
+> 
+> [1]. https://lkml.org/lkml/2014/8/4/765
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeauraro.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+> drivers/firmware/qcom_scm.c | 57 +++++++++++++++++++++++++++++++++++++++++++++
+> include/linux/qcom_scm.h    |  6 ++++-
+> 2 files changed, 62 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
+> index 4d8ede4..994b50f 100644
+> --- a/drivers/firmware/qcom_scm.c
+> +++ b/drivers/firmware/qcom_scm.c
+> @@ -311,6 +311,45 @@ out:
+> 	return ret;
+> }
+> 
+> +#define SCM_CLASS_REGISTER	(0x2 << 8)
+> +#define SCM_MASK_IRQS		BIT(5)
+> +#define SCM_ATOMIC(svc, cmd, n) (((((svc) << 10)|((cmd) & 0x3ff)) << 12) | \
+> +				SCM_CLASS_REGISTER | \
+> +				SCM_MASK_IRQS | \
+> +				(n & 0xf))
+> +
+> +/**
+> + * qcom_scm_call_atomic1() - Send an atomic SCM command with one argument
+> + * @svc_id: service identifier
+> + * @cmd_id: command identifier
+> + * @arg1: first argument
+> + *
+> + * This shall only be used with commands that are guaranteed to be
+> + * uninterruptable, atomic and SMP safe.
+> + */
+> +static s32 qcom_scm_call_atomic1(u32 svc, u32 cmd, u32 arg1)
+> +{
+> +	int context_id;
+> +
+> +	register u32 r0 asm("r0") = SCM_ATOMIC(svc, cmd, 1);
+> +	register u32 r1 asm("r1") = (u32)&context_id;
+> +	register u32 r2 asm("r2") = arg1;
+> +
+> +	asm volatile(
+> +			__asmeq("%0", "r0")
+> +			__asmeq("%1", "r0")
+> +			__asmeq("%2", "r1")
+> +			__asmeq("%3", "r2")
+> +#ifdef REQUIRES_SEC
+> +			".arch_extension sec\n"
+> +#endif
+> +			"smc    #0      @ switch to secure world\n"
+> +			: "=r" (r0)
+> +			: "r" (r0), "r" (r1), "r" (r2)
+> +			: "r3");
+> +	return r0;
+> +}
+> +
+> u32 qcom_scm_get_version(void)
+> {
+> 	int context_id;
+> @@ -435,3 +474,21 @@ int qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
+> 	return ret;
+> }
+> EXPORT_SYMBOL(qcom_scm_set_warm_boot_addr);
+> +
+> +#define QCOM_SCM_CMD_TERMINATE_PC	0x2
+> +#define QCOM_SCM_FLUSH_FLAG_MASK	0x3
 
-Ok, I'll take a look at those here.
+why is the mask 0x3 and not 0x1?
 
-> Whether I'll get a chance to look at that this week or not, I don't
-> know... (see my privately shared G+ status from yesterday, which
-> people in my G+ circles should be able to see.)
+> +
+> +/**
+> + * qcom_scm_cpu_power_down() - Power down the cpu
+> + * @flags - Flags to flush cache
+> + *
+> + * This is an end point to power down cpu. If there was a pending interrupt,
+> + * the control would return from this function, otherwise, the cpu jumps to the
+> + * warm boot entry point set for this cpu upon reset.
+> + */
+> +void qcom_scm_cpu_power_down(u32 flags)
+> +{
+> +	qcom_scm_call_atomic1(QCOM_SCM_SVC_BOOT, QCOM_SCM_CMD_TERMINATE_PC,
+> +			flags & QCOM_SCM_FLUSH_FLAG_MASK);
+> +}
+> +EXPORT_SYMBOL(qcom_scm_cpu_power_down);
+> diff --git a/include/linux/qcom_scm.h b/include/linux/qcom_scm.h
+> index 95ef72a..0f26f44 100644
+> --- a/include/linux/qcom_scm.h
+> +++ b/include/linux/qcom_scm.h
+> @@ -1,4 +1,4 @@
+> -/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+> +/* Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
+>  * Copyright (C) 2015 Linaro Ltd.
+>  *
+>  * This program is free software; you can redistribute it and/or modify
+> @@ -13,8 +13,12 @@
+> #ifndef __QCOM_SCM_H
+> #define __QCOM_SCM_H
+> 
+> +#define QCOM_SCM_L2_ON		0x0
+> +#define QCOM_SCM_L2_OFF		0x1
 
-Aha, ok, I only saw your last public mention of the 4.0-rc1 breakage
-on the ethernet clock. Now I know why.
+One, can you move this below qcom_scm_set_warm_boot_addr so they are closer to qcom_scm_cpu_power_down.  Also, we probably need to prefix the names to be clear the flags are associated with qcom_scm_cpu_power_down.  QCOM_SCM_CPU_PWR_DOWN_{L2_ON,L2_OFF}?
 
--Matt
+> +
+> extern int qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus);
+> extern int qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus);
+> +extern void qcom_scm_cpu_power_down(u32 flags);
+> 
+> #define QCOM_SCM_VERSION(major, minor) (((major) << 16) | ((minor) & 0xFF))
+> 
+> -- 
+> 2.1.0
+> 
+
+- k
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
