@@ -1,50 +1,25 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 3 Mar 2015 00:14:57 +0800
-Subject: [PATCH] ARM: at91: pm: fix SRAM allocation
-In-Reply-To: <20150302105736.GL4094@piout.net>
-References: <1425292978-28135-1-git-send-email-alexandre.belloni@free-electrons.com>
- <7E7AE962-1BBE-4B33-9563-B91351494005@jcrosoft.com>
- <20150302105736.GL4094@piout.net>
-Message-ID: <CBAD3087-CD3D-4101-B001-D0140A46E12B@jcrosoft.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 2 Mar 2015 16:17:12 +0000
+Subject: [PATCH 00/10] ARM: s3c64xx multiplatform, help needed
+In-Reply-To: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
+References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
+Message-ID: <20150302161712.GX21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Mar 02, 2015 at 01:35:53PM +0100, Arnd Bergmann wrote:
 
-> On Mar 2, 2015, at 6:57 PM, Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-> 
-> On 02/03/2015 at 18:50:27 +0800, Jean-Christophe PLAGNIOL-VILLARD wrote :
->> 
->>> On Mar 2, 2015, at 6:42 PM, Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
->>> 
->>> On some platforms, there are multiple SRAM nodes defined in the device tree but
->>> some of them are disabled, leading to allocation failure. Try to find the first
->>> enabled SRAM node and allocate from it.
->>> 
->>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->>> ---
->>> arch/arm/mach-at91/pm.c | 20 +++++++++-----------
->>> 1 file changed, 9 insertions(+), 11 deletions(-)
->>> 
->>> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
->>> index 5e34fb143309..97cc529b6fa0 100644
->>> --- a/arch/arm/mach-at91/pm.c
->>> +++ b/arch/arm/mach-at91/pm.c
->>> @@ -272,35 +272,33 @@ static void __init at91_pm_sram_init(void)
->>> 	struct device_node *node;
->>> 	struct platform_device *pdev;
->> 
->> pdev not initialised at NULL
-> 
-> Indeed, I'll fix that. It doesn't really matter for now as all the
-> at91 DT have at least one sram node.
-except if we drop it or when we add a new SoC and forget it
+> Does anyone still have access to the hardware? I'm particularly
+> interested in seeing this patch set get tested on smartq
+> and on smdk6410, which have the majority of the hardware.
 
-Best Regards,
-J.
-> 
-> Wenyou, can you test it? If it works, I'll send v2.
-> 
-> -- 
-> Alexandre Belloni, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+I and a bunch of other people still have Cragganmore, the ex-Wolfson
+(added Charles here) people may also be able to locate a smdk6410.
+may also be a
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150302/90d0994c/attachment-0001.sig>
