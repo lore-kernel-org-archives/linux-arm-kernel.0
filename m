@@ -1,31 +1,83 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 2 Mar 2015 17:32:02 +0800
-Subject: [PATCH v2 0/2] ARM: at91: dt: at91sam9n12ek: enable udp device
-In-Reply-To: <1423533335-25135-1-git-send-email-voice.shen@atmel.com>
-References: <1423533335-25135-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <54F42E12.4010808@atmel.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 2 Mar 2015 10:53:59 +0100
+Subject: [PATCH] ARM: dts: at919260/at91sam9g20: fix SRAM device tree node
+In-Reply-To: <1425276209-4899-1-git-send-email-wenyou.yang@atmel.com>
+References: <1425276209-4899-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20150302095359.GJ4094@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hi Wenyou,
 
-On 02/10/2015 09:55 AM, Bo Shen wrote:
-> This patch series enable usb device support on at91sam9n12ek board.
->
-> Changes in v2:
->    - Base on next-20150209 (so, remove the modification of udc driver).
->    - Add pinctrl for usb1 vbus sense.
->
-> Bo Shen (2):
->    ARM: at91: dt: at91sam9n12: add udp device node
->    ARM: at91: dt: at91sam9n12ek: enable udp
+I'd prefer fixing the sram lookup in pm.c. I'll propose something
+however, I can't test on my side.
 
-Any comments for this patch series? (aka ping?)
+On 02/03/2015 at 14:03:29 +0800, Wenyou Yang wrote :
+> Fix PM does not work on the at91sam9g20ek board
+> --->8---
+> at91_pm_sram_init: failed to find sram device!
+> ---<8---
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> ---
+>  arch/arm/boot/dts/at91sam9260.dtsi |    9 +++++++--
+>  arch/arm/boot/dts/at91sam9g20.dtsi |    9 +++++----
+>  2 files changed, 12 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+> index fff0ee6..d1eb27c 100644
+> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+> @@ -69,9 +69,14 @@
+>  		};
+>  	};
+>  
+> -	sram0: sram at 002ff000 {
+> +	sram0: sram at 00200000 {
+>  		compatible = "mmio-sram";
+> -		reg = <0x002ff000 0x2000>;
+> +		reg = <0x00200000 0x1000>;
+> +	};
+> +
+> +	sram1: sram at 00300000 {
+> +		compatible = "mmio-sram";
+> +		reg = <0x00300000 0x1000>;
+>  	};
+>  
+>  	ahb {
+> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+> index f593016..eb9a62d 100644
+> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+> @@ -16,13 +16,14 @@
+>  		reg = <0x20000000 0x08000000>;
+>  	};
+>  
+> -	sram0: sram at 002ff000 {
+> -		status = "disabled";
+> +	sram0: sram at 00200000 {
+> +		compatible = "mmio-sram";
+> +		reg = <0x00200000 0x4000>;
+>  	};
+>  
+> -	sram1: sram at 002fc000 {
+> +	sram1: sram at 00300000 {
+>  		compatible = "mmio-sram";
+> -		reg = <0x002fc000 0x8000>;
+> +		reg = <0x00300000 0x4000>;
+>  	};
+>  
+>  	ahb {
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
->   arch/arm/boot/dts/at91sam9n12.dtsi  |  9 +++++++++
->   arch/arm/boot/dts/at91sam9n12ek.dts | 14 ++++++++++++++
->   2 files changed, 23 insertions(+)
->
-
-Best Regards,
-Bo Shen
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
