@@ -1,137 +1,125 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon,  2 Mar 2015 13:30:05 -0700
-Subject: [PATCH v3 1/3] firmware: qcom: scm: Clean cold boot entry to export
- only the API
+Date: Mon,  2 Mar 2015 13:30:06 -0700
+Subject: [PATCH v3 2/3] firmware: qcom: scm: Add qcom_scm_set_warm_boot_addr
+ function
 In-Reply-To: <1425328207-58415-1-git-send-email-lina.iyer@linaro.org>
 References: <1425328207-58415-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1425328207-58415-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1425328207-58415-3-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We dont need to export the SCM specific cold boot flags to the platform
-code. Export only a function to set the cold boot address.
+A core can be powered down for cpuidle or when it is hotplugged off. In
+either case, the warmboot return address would be different. Allow
+setting the warmboot address for a specific cpu, optimize and write to
+the firmware, if the address is different than the previously set
+address.
+
+Export qcom_scm_set_warm_boot_addr function move the warm boot flags to
+implementation.
 
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- arch/arm/mach-qcom/platsmp.c | 21 +++------------------
- drivers/firmware/qcom_scm.c  | 41 +++++++++++++++++++++++++++++++++++++++--
- include/linux/qcom_scm.h     |  5 +----
- 3 files changed, 43 insertions(+), 24 deletions(-)
+ drivers/firmware/qcom_scm.c | 56 +++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/qcom_scm.h    |  7 ++----
+ 2 files changed, 58 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-qcom/platsmp.c b/arch/arm/mach-qcom/platsmp.c
-index 4b67e56..5cde63a 100644
---- a/arch/arm/mach-qcom/platsmp.c
-+++ b/arch/arm/mach-qcom/platsmp.c
-@@ -319,25 +319,10 @@ static int kpssv2_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 
- static void __init qcom_smp_prepare_cpus(unsigned int max_cpus)
- {
--	int cpu, map;
--	unsigned int flags = 0;
--	static const int cold_boot_flags[] = {
--		0,
--		QCOM_SCM_FLAG_COLDBOOT_CPU1,
--		QCOM_SCM_FLAG_COLDBOOT_CPU2,
--		QCOM_SCM_FLAG_COLDBOOT_CPU3,
--	};
--
--	for_each_present_cpu(cpu) {
--		map = cpu_logical_map(cpu);
--		if (WARN_ON(map >= ARRAY_SIZE(cold_boot_flags))) {
--			set_cpu_present(cpu, false);
--			continue;
--		}
--		flags |= cold_boot_flags[map];
--	}
-+	int cpu;
- 
--	if (qcom_scm_set_boot_addr(virt_to_phys(secondary_startup_arm), flags)) {
-+	if (qcom_scm_set_cold_boot_addr(secondary_startup_arm,
-+					cpu_present_mask)) {
- 		for_each_present_cpu(cpu) {
- 			if (cpu == smp_processor_id())
- 				continue;
 diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
-index 6e7a72b..c953cc3 100644
+index c953cc3..4d8ede4 100644
 --- a/drivers/firmware/qcom_scm.c
 +++ b/drivers/firmware/qcom_scm.c
-@@ -34,6 +34,11 @@
- #define QCOM_SCM_ERROR		-1
- #define QCOM_SCM_INTERRUPTED	1
+@@ -1,4 +1,5 @@
+ /* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++ * Copyright (C) 2015 Linaro Ltd.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -39,6 +40,23 @@
+ #define QCOM_SCM_FLAG_COLDBOOT_CPU2	0x08
+ #define QCOM_SCM_FLAG_COLDBOOT_CPU3	0x20
  
-+#define QCOM_SCM_FLAG_COLDBOOT_CPU0	0x00
-+#define QCOM_SCM_FLAG_COLDBOOT_CPU1	0x01
-+#define QCOM_SCM_FLAG_COLDBOOT_CPU2	0x08
-+#define QCOM_SCM_FLAG_COLDBOOT_CPU3	0x20
++#define QCOM_SCM_FLAG_WARMBOOT_CPU0	0x04
++#define QCOM_SCM_FLAG_WARMBOOT_CPU1	0x02
++#define QCOM_SCM_FLAG_WARMBOOT_CPU2	0x10
++#define QCOM_SCM_FLAG_WARMBOOT_CPU3	0x40
++
++struct qcom_scm_entry {
++	int flag;
++	void *entry;
++};
++
++static struct qcom_scm_entry qcom_scm_wb[] = {
++	{ .flag = QCOM_SCM_FLAG_WARMBOOT_CPU0 },
++	{ .flag = QCOM_SCM_FLAG_WARMBOOT_CPU1 },
++	{ .flag = QCOM_SCM_FLAG_WARMBOOT_CPU2 },
++	{ .flag = QCOM_SCM_FLAG_WARMBOOT_CPU3 },
++};
 +
  static DEFINE_MUTEX(qcom_scm_lock);
  
  /**
-@@ -329,7 +334,7 @@ EXPORT_SYMBOL(qcom_scm_get_version);
- /*
-  * Set the cold/warm boot address for one of the CPU cores.
-  */
--int qcom_scm_set_boot_addr(u32 addr, int flags)
-+static int qcom_scm_set_boot_addr(u32 addr, int flags)
- {
- 	struct {
- 		__le32 flags;
-@@ -341,4 +346,36 @@ int qcom_scm_set_boot_addr(u32 addr, int flags)
- 	return qcom_scm_call(QCOM_SCM_SVC_BOOT, QCOM_SCM_BOOT_ADDR,
- 			&cmd, sizeof(cmd), NULL, 0);
+@@ -379,3 +397,41 @@ int qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus)
+ 	return qcom_scm_set_boot_addr(virt_to_phys(entry), flags);
  }
--EXPORT_SYMBOL(qcom_scm_set_boot_addr);
+ EXPORT_SYMBOL(qcom_scm_set_cold_boot_addr);
 +
 +/**
-+ * qcom_scm_set_cold_boot_addr() - Set the cold boot address for cpus
++ * qcom_scm_set_warm_boot_addr() - Set the warm boot address for cpus
 + * @entry: Entry point function for the cpus
 + * @cpus: The cpumask of cpus that will use the entry point
 + *
-+ * Set the cold boot address of the cpus. Any cpu outside the supported
-+ * range would be removed from the cpu present mask.
++ * Set the Linux entry point for the SCM to transfer control to when coming
++ * out of a power down. CPU power down may be executed on cpuidle or hotplug.
 + */
-+int qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus)
++int qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
 +{
++	int ret;
 +	int flags = 0;
 +	int cpu;
-+	int scm_cb_flags[] = {
-+		QCOM_SCM_FLAG_COLDBOOT_CPU0,
-+		QCOM_SCM_FLAG_COLDBOOT_CPU1,
-+		QCOM_SCM_FLAG_COLDBOOT_CPU2,
-+		QCOM_SCM_FLAG_COLDBOOT_CPU3,
-+	};
 +
-+	if (!cpus || (cpus && cpumask_empty(cpus)))
-+		return -EINVAL;
-+
++	/*
++	 * Reassign only if we are switching from hotplug entry point
++	 * to cpuidle entry point or vice versa.
++	 */
 +	for_each_cpu(cpu, cpus) {
-+		if (cpu < ARRAY_SIZE(scm_cb_flags))
-+			flags |= scm_cb_flags[cpu];
-+		else
-+			set_cpu_present(cpu, false);
++		if (entry == qcom_scm_wb[cpu].entry)
++			continue;
++		flags |= qcom_scm_wb[cpu].flag;
 +	}
 +
-+	return qcom_scm_set_boot_addr(virt_to_phys(entry), flags);
++	/* No change in entry function */
++	if (!flags)
++		return 0;
++
++	ret = qcom_scm_set_boot_addr(virt_to_phys(entry), flags);
++	if (!ret) {
++		for_each_cpu(cpu, cpus)
++			qcom_scm_wb[cpu].entry = entry;
++	}
++
++	return ret;
 +}
-+EXPORT_SYMBOL(qcom_scm_set_cold_boot_addr);
++EXPORT_SYMBOL(qcom_scm_set_warm_boot_addr);
 diff --git a/include/linux/qcom_scm.h b/include/linux/qcom_scm.h
-index 6bb84cf..68a1d88 100644
+index 68a1d88..95ef72a 100644
 --- a/include/linux/qcom_scm.h
 +++ b/include/linux/qcom_scm.h
-@@ -12,15 +12,12 @@
+@@ -1,4 +1,5 @@
+ /* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++ * Copyright (C) 2015 Linaro Ltd.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -12,12 +13,8 @@
  #ifndef __QCOM_SCM_H
  #define __QCOM_SCM_H
  
--#define QCOM_SCM_FLAG_COLDBOOT_CPU1		0x01
--#define QCOM_SCM_FLAG_COLDBOOT_CPU2		0x08
--#define QCOM_SCM_FLAG_COLDBOOT_CPU3		0x20
- #define QCOM_SCM_FLAG_WARMBOOT_CPU0		0x04
- #define QCOM_SCM_FLAG_WARMBOOT_CPU1		0x02
- #define QCOM_SCM_FLAG_WARMBOOT_CPU2		0x10
- #define QCOM_SCM_FLAG_WARMBOOT_CPU3		0x40
- 
--extern int qcom_scm_set_boot_addr(u32 addr, int flags);
-+extern int qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus);
+-#define QCOM_SCM_FLAG_WARMBOOT_CPU0		0x04
+-#define QCOM_SCM_FLAG_WARMBOOT_CPU1		0x02
+-#define QCOM_SCM_FLAG_WARMBOOT_CPU2		0x10
+-#define QCOM_SCM_FLAG_WARMBOOT_CPU3		0x40
+-
+ extern int qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus);
++extern int qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus);
  
  #define QCOM_SCM_VERSION(major, minor) (((major) << 16) | ((minor) & 0xFF))
  
