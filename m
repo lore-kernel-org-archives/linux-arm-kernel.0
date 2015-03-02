@@ -1,70 +1,18 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 2 Mar 2015 11:37:18 +0000
-Subject: [PATCH v3 0/4] clk: st: New always-on clock domain
-In-Reply-To: <87vbij1vuk.fsf@free.fr>
-References: <1424799222-9301-1-git-send-email-lee.jones@linaro.org>
- <87385r3uk9.fsf@free.fr> <20150227214941.GB12821@x1>
- <87sidq3ox8.fsf@free.fr> <20150302083019.GD31325@x1>
- <87vbij1vuk.fsf@free.fr>
-Message-ID: <20150302113718.GG32347@x1>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 2 Mar 2015 19:45:17 +0800
+Subject: [PATCH] pinctrl: imx: do not implicitly set pin regs to -1
+In-Reply-To: <1423240256-27210-1-git-send-email-stefan@agner.ch>
+References: <1423240256-27210-1-git-send-email-stefan@agner.ch>
+Message-ID: <20150302114516.GC3040@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 02 Mar 2015, Robert Jarzmik wrote:
+On Fri, Feb 06, 2015 at 05:30:56PM +0100, Stefan Agner wrote:
+> Commit 3dac1918a491 ("pinctrl: imx: detect uninitialized pins") needs
+> the values in struct imx_pin_reg to be -1. This has been done in a
+> rather unorthodox way by setting the memory to 0xff using memset...
+> Use a proper for loop to initialize the whole array with -1.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-> Lee Jones <lee.jones@linaro.org> writes:
-> 
-> > On Sat, 28 Feb 2015, Robert Jarzmik wrote:
-> >
-> >> Lee Jones <lee.jones@linaro.org> writes:
-> >>     it doesn't specify which usecase is not covered by CLK_IGNORE_UNUSED, it
-> >>     says, up to my understanding, that is it another way to have to
-> >>     CLK_IGNORE_UNUSED flag applied.
-> >
-> > Well that is exactly what we're doing.  Is there an issue with that?
-> >
-> > This is a way to do it at a platform level.  It means we can support
-> > multiple platforms where clocksources have been switched around
-> > without writing new driver code in drivers/clk/st.
-> >
-> > If you have something else in mind, let me know.
-> >
-> >>  2) I still fail to see why this is necessary
-> >>     IOW why declaring the mandatory always-on clocks with the proper flag should
-> >>     be augmented with a new clock list. Isn't the existing flag the generic way
-> >>     ?
-> >
-> > I'm not sure what you mean by this, would you be able to expland a
-> > little?
-> >
-> >> I might not understand the real motivation behind that of course, that's why I'm
-> >> asking.
-> >
-> > Please bear in mind that we don't supply our clocks statically.  All
-> > of the information is extracted from DT, so if the always-on
-> > information does reside in there, where do you propose it comes from?
-> 
-> I thought the standard clock binding provided a way to set this flag. Now I
-> crosschecked the binding, it doesn't ...
-> 
-> My point was I didn't want the flag to be settable from 2 different places,
-> where consistency was to be kept across different device-tree leafs.
-> 
-> > We could just write this code inside our own driver and apply the
-> > CLK_IGNORE_UNUSED at a local level, but that's not the generic
-> > solution I am searching for.
-> 
-> All right, I'm convinced now I undertand the flag was not settable from
-> devicetree binding before this patchset.
-> 
-> You can add to patch 3/4 :
-> Reviewed-by: Robert Jarzmik <robert.jarzmik@free.fr>
-
-Until told otherwise, I'm going to apply this onto the other
-patchset.  This one has already been NACKed, due to DT push-back.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
