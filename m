@@ -1,22 +1,28 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 2 Mar 2015 21:14:56 +0300
-Subject: [PATCH 00/10] ARM: s3c64xx multiplatform, help needed
-In-Reply-To: <20150302173737.GB17094@dtor-ws>
-References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
- <20150302173737.GB17094@dtor-ws>
-Message-ID: <CA+E=qVduX_JJMdPaaKq2G5bfBiUiQeFzCSX+ErZaFpw5SDhJFA@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 2 Mar 2015 19:15:51 +0100
+Subject: [PATCH] ARM: at91: pm: fix SRAM allocation
+In-Reply-To: <CBAD3087-CD3D-4101-B001-D0140A46E12B@jcrosoft.com>
+References: <1425292978-28135-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <7E7AE962-1BBE-4B33-9563-B91351494005@jcrosoft.com>
+ <20150302105736.GL4094@piout.net>
+ <CBAD3087-CD3D-4101-B001-D0140A46E12B@jcrosoft.com>
+Message-ID: <20150302181551.GV4094@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 2, 2015 at 8:37 PM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
+On 03/03/2015 at 00:14:57 +0800, Jean-Christophe PLAGNIOL-VILLARD wrote :
+> >> pdev not initialised at NULL
+> > 
+> > Indeed, I'll fix that. It doesn't really matter for now as all the
+> > at91 DT have at least one sram node.
+> except if we drop it or when we add a new SoC and forget it
+> 
 
-> I think Vasily had access to hardware with s3c2410_ts at some point...
+Sure, I was just saying that it doesn't matter for test purposes. It
+will be fixed in v2. I just want to make sure it is also working on g20
+before sending it.
 
-Hi,
-
-Yep, I have s3c24xx hardware to test rewritten s3c2410_ts driver. Will
-try it this weekend.
-
-Regards,
-Vasily
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
