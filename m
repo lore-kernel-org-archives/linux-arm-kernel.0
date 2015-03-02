@@ -1,132 +1,63 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 2 Mar 2015 09:22:12 -0800
-Subject: [PATCH 5/6] target-arm/kvm64: fix save/restore of SPSR regs
-In-Reply-To: <1424880159-29348-7-git-send-email-alex.bennee@linaro.org>
-References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
- <1424880159-29348-7-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150302172212.GB10137@lvm>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 2 Mar 2015 17:24:44 +0000
+Subject: [PATCH 1/1] iommu/arm-smmu: fix ARM_SMMU_FEAT_TRANS_OPS condition
+In-Reply-To: <1425315442-29584-1-git-send-email-b.reynal@virtualopensystems.com>
+References: <1425315442-29584-1-git-send-email-b.reynal@virtualopensystems.com>
+Message-ID: <20150302172444.GB7919@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-
-Seems like you accidentally sent out two copies of this patch, hopefully
-I'm reviewing the right one...
-
-On Wed, Feb 25, 2015 at 04:02:38PM +0000, Alex Benn?e wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
+On Mon, Mar 02, 2015 at 04:57:22PM +0000, Baptiste Reynal wrote:
+> This patch is a fix to "iommu/arm-smmu: add support for iova_to_phys
+> through ATS1PR".
+> According to ARM documentation, translation registers are optional even
+> in SMMUv1, so ID0_S1TS needs to be checked to verify their presence.
 > 
-> The current code was negatively indexing the cpu state array and not
-> synchronizing banked spsr register state with the current mode's spsr
-> state, causing occasional failures with migration.
-> 
-> Some munging is done to take care of the aarch64 mapping and also to
-> ensure the most current value of the spsr is updated to the banked
-> registers (relevant for KVM<->TCG migration).
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> 
+> Signed-off-by: Baptiste Reynal <b.reynal@virtualopensystems.com>
 > ---
-> v2 (ajb)
->   - minor tweaks and clarifications
+>  drivers/iommu/arm-smmu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
-> index c60e989..1e36b0a 100644
-> --- a/target-arm/kvm64.c
-> +++ b/target-arm/kvm64.c
-> @@ -140,6 +140,7 @@ int kvm_arch_put_registers(CPUState *cs, int level)
->      uint64_t val;
->      int i;
->      int ret;
-> +    unsigned int el;
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index fc13dd5..d4beca4 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1556,7 +1556,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+>  		return -ENODEV;
+>  	}
 >  
->      ARMCPU *cpu = ARM_CPU(cs);
->      CPUARMState *env = &cpu->env;
-> @@ -206,9 +207,25 @@ int kvm_arch_put_registers(CPUState *cs, int level)
->          return ret;
->      }
->  
-> +    /* Saved Program State Registers
-> +     *
-> +     * Before we restore from the banked_spsr[] array we need to
-> +     * ensure that any modifications to env->spsr are correctly
-> +     * reflected and map aarch64 exception levels if required.
-> +     */
-> +    el = arm_current_el(env);
-> +    if (is_a64(env) && el > 0) {
-> +        g_assert(el == 1);
-> +        /* KVM maps KVM_SPSR_SVC to KVM_SPSR_EL1 for aarch64 */
-> +        env->banked_spsr[1] = env->banked_spsr[0];
-> +        env->banked_spsr[aarch64_banked_spsr_index(el)] = env->spsr;
-> +    } else {
-> +        env->banked_spsr[el] = env->spsr;
+> -	if (smmu->version == 1 || (!(id & ID0_ATOSNS) && (id & ID0_S1TS))) {
+> +	if ((id & ID0_S1TS) && ((smmu->version == 1) || (id & ID0_ATOSNS))) {
+>  		smmu->features |= ARM_SMMU_FEAT_TRANS_OPS;
+>  		dev_notice(smmu->dev, "\taddress translation ops\n");
 
-is this valid if (is_a64(env) && el == 0)) ?  I thought that if you're
-in el == 0, then env->banked_spsr[x] is the most up-to-date one, not
-env->spsr ?
+I'm not sure this is a complete fix. Shouldn't we also check that the domain
+is a stage-1 domain in arm_smmu_iova_to_phys? (potential fixup below).
 
-for !is_a64(env) this looks wrong, because of the same as above if el ==
-0, but also because I think you need
-bank_number(env->uncached_cpsr & CPSR_M) to index into the array.
+Will
 
-> +    }
-> +
->      for (i = 0; i < KVM_NR_SPSR; i++) {
->          reg.id = AARCH64_CORE_REG(spsr[i]);
-> -        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
-> +        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
->          ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
->          if (ret) {
->              return ret;
-> @@ -253,6 +270,7 @@ int kvm_arch_get_registers(CPUState *cs)
->      struct kvm_one_reg reg;
->      uint64_t val;
->      uint32_t fpr;
-> +    unsigned int el;
->      int i;
->      int ret;
->  
-> @@ -325,15 +343,32 @@ int kvm_arch_get_registers(CPUState *cs)
->          return ret;
->      }
->  
-> +    /* Fetch the SPSR registers
-> +     *
-> +     * KVM has an array of state indexed for all the possible aarch32
-> +     * privilage levels. Although not all are valid at all points
-> +     * there are some transitions possible which can access old state
-> +     * so it is worth keeping them all.
-> +     */
->      for (i = 0; i < KVM_NR_SPSR; i++) {
->          reg.id = AARCH64_CORE_REG(spsr[i]);
-> -        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
-> +        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
->          ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
->          if (ret) {
->              return ret;
->          }
->      }
->  
-> +    el = arm_current_el(env);
-> +    if (is_a64(env) && el > 0) {
-> +        g_assert(el == 1);
-> +        /* KVM maps KVM_SPSR_SVC to KVM_SPSR_EL1 for aarch64 */
-> +        env->banked_spsr[0] = env->banked_spsr[1];
-> +        env->spsr = env->banked_spsr[aarch64_banked_spsr_index(el)];
-> +    } else {
-> +        env->spsr = env->banked_spsr[el];
+--->8
 
-same concern with bank_number as above.
-
-> +    }
-> +
->      /* Advanced SIMD and FP registers */
->      for (i = 0; i < 32; i++) {
->          reg.id = AARCH64_SIMD_CORE_REG(fp_regs.vregs[i]);
-> -- 
-> 2.3.0
-> 
-
-Thanks,
--Christoffer
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index fc13dd56953e..107163295cbc 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1288,12 +1288,15 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
+                return 0;
+ 
+        spin_lock_irqsave(&smmu_domain->pgtbl_lock, flags);
+-       if (smmu_domain->smmu->features & ARM_SMMU_FEAT_TRANS_OPS)
++
++       if (smmu_domain->smmu->features & ARM_SMMU_FEAT_TRANS_OPS &&
++           smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
+                ret = arm_smmu_iova_to_phys_hard(domain, iova);
+-       else
++       } else {
+                ret = ops->iova_to_phys(ops, iova);
+-       spin_unlock_irqrestore(&smmu_domain->pgtbl_lock, flags);
++       }
+ 
++       spin_unlock_irqrestore(&smmu_domain->pgtbl_lock, flags);
+        return ret;
+ }
+ 
