@@ -1,28 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 02 Mar 2015 22:49:08 +0100
-Subject: [PATCH 1/5] ARM: orion: move watchdog setup to mach-orion5x
-In-Reply-To: <20150302213306.GC2375@lunn.ch>
-References: <1425328618-894030-1-git-send-email-arnd@arndb.de>
- <1425328618-894030-2-git-send-email-arnd@arndb.de>
- <20150302213306.GC2375@lunn.ch>
-Message-ID: <3394749.y0V7GvAChk@wuerfel>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 02 Mar 2015 13:50:44 -0800
+Subject: [PATCH 00/10] initial clkdev cleanups
+In-Reply-To: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
+References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
+Message-ID: <54F4DB34.9000507@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 March 2015 22:33:06 Andrew Lunn wrote:
-> On Mon, Mar 02, 2015 at 09:36:54PM +0100, Arnd Bergmann wrote:
-> > The watchdog device node is created in plat-orion/common.c
-> > but depends on the bridge address that is platform specific,
-> > so as a preparation for orion multiplatform support, we should
-> > move it out of the common code into orion5x.
-> 
-> If i remember correctly, RMK patchset for the Dove PMU allows the
-> watchdog to be enabled for Dove.
+On 03/02/15 09:05, Russell King - ARM Linux wrote:
+> Here's some initial clkdev cleanups.  These are targetted for the next
+> merge window, and while the initial patches can be merged independently,
+> I'd prefer to keep the series together as further work on solving the
+> problems which unique struct clk's has introduced is needed.
+>
+> The initial cleanups are more about using the correct clkdev function
+> than anything else: there's no point interating over a array of
+> clk_lookup structs, adding each one in turn when we have had a function
+> which does this since forever.
 
-I see. If it helps, I could change the code here to make orion_wdt_init()
-take the resources as arguments like orion_i2c_init and others do.
+The clkdev_add_table() conversions look good.
 
-If the goal for Russell's patches is to get everything working with
-DT anyway, then the current version should work just as well.
+>
+> I'm also killing a chunk of seemingly unused code in the omap3isp driver.
+>
+> Lastly, I'm introducing a clkdev_create() helper, which combines the
+> clkdev_alloc() + clkdev_add() pattern which keeps cropping up.
+>
 
-	Arnd
+We already have a solution to that problem with clk_register_clkdev().
+Andy has done some work to make clk_register_clkdev() return a struct
+clk_lookup pointer[1]. Maybe we can do that instead of introducing a new
+clkdev_create() function. There is some benefit to having a new function
+though so that we can avoid a flag day, although it looks like the flag
+day is small in this case so it might not actually matter.
+
+[1] https://www.marc.info/?l=linux-kernel&m=142469226512289
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
