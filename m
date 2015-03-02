@@ -1,210 +1,103 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon,  2 Mar 2015 11:29:13 +0000
-Subject: [PATCH 4/5] arm-cci: Split the code for PMU vs driver support
-In-Reply-To: <1425295754-13376-1-git-send-email-suzuki.poulose@arm.com>
-References: <1425295754-13376-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1425295754-13376-5-git-send-email-suzuki.poulose@arm.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon,  2 Mar 2015 13:28:22 +0200
+Subject: [PATCH v2 1/2] mtd: nand: dt binding documentation for digicolor NFC
+Message-ID: <fb9907fecb8b57d1b44ce03b97eb62225555de9f.1425295703.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+The CX92755 SoC is one of Conexant Digicolor series of SoCs. This devicetree
+binding document describes the NAND flash controller the is shared by some SoCs
+in the Digicolor series.
 
-This patch separates the PMU driver code from the low level
-CCI driver code.
+Not all of the properties are currently actually used by the driver.
+Specifically, the driver doesn't make use of interrupts. This may change in the
+future.
 
-Introduces config options for both.
+Also worth noting that the only supported ECC mode is "hw_syndrome". In the
+future the driver may add support for additional modes.
 
- ARM_CCI400_PORT_CTRL	- controls the low level driver code for
-			  CCI400 ports.
- ARM_CCI400_PMU 	- controls the PMU driver code
- ARM_CCI400_COMMON 	- Common defintions for CCI400
-
-Also the ARM_CCI400_PORT_CTRL cannot be enabled by user. This
-should be selected by platforms which need it.
-
-This patch also changes:
- ARM_CCI - common code for probing the CCI devices. This can be
-   used for adding support for newer CCI versions(e.g, CCI-500).
-
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- arch/arm/mach-exynos/Kconfig   |    2 +-
- arch/arm/mach-vexpress/Kconfig |    4 ++--
- drivers/bus/Kconfig            |   27 +++++++++++++++++++++++----
- drivers/bus/arm-cci.c          |   24 ++++++++++++++++++++----
- include/linux/arm-cci.h        |    7 ++++++-
- 5 files changed, 52 insertions(+), 12 deletions(-)
+ .../devicetree/bindings/mtd/digicolor-nand.txt     | 71 ++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/digicolor-nand.txt
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 603820e..81064cd 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -123,7 +123,7 @@ config SOC_EXYNOS5800
- config EXYNOS5420_MCPM
- 	bool "Exynos5420 Multi-Cluster PM support"
- 	depends on MCPM && SOC_EXYNOS5420
--	select ARM_CCI
-+	select ARM_CCI400_PORT_CTRL
- 	select ARM_CPU_SUSPEND
- 	help
- 	  This is needed to provide CPU and cluster power management
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index d6b16d9..dd127f1 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -53,7 +53,7 @@ config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
- config ARCH_VEXPRESS_DCSCB
- 	bool "Dual Cluster System Control Block (DCSCB) support"
- 	depends on MCPM
--	select ARM_CCI
-+	select ARM_CCI400_PORT_CTRL
- 	help
- 	  Support for the Dual Cluster System Configuration Block (DCSCB).
- 	  This is needed to provide CPU and cluster power management
-@@ -71,7 +71,7 @@ config ARCH_VEXPRESS_SPC
- config ARCH_VEXPRESS_TC2_PM
- 	bool "Versatile Express TC2 power management"
- 	depends on MCPM
--	select ARM_CCI
-+	select ARM_CCI400_PORT_CTRL
- 	select ARCH_VEXPRESS_SPC
- 	help
- 	  Support for CPU and cluster power management on Versatile Express
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index b99729e..bdc189f 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -43,12 +43,31 @@ config OMAP_INTERCONNECT
- 	help
- 	  Driver to enable OMAP interconnect error handling driver.
- 
--config ARM_CCI
--	bool "ARM CCI driver support"
-+config ARM_CCI400_PORT_CTRL
-+	bool
- 	depends on ARM && OF && CPU_V7
-+	select ARM_CCI400_COMMON
-+	help
-+	  Low level power management driver for CCI400 cache coherent
-+	  interconnect for ARM platforms.
+diff --git a/Documentation/devicetree/bindings/mtd/digicolor-nand.txt b/Documentation/devicetree/bindings/mtd/digicolor-nand.txt
+new file mode 100644
+index 000000000000..60e2d9085b7a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/digicolor-nand.txt
+@@ -0,0 +1,71 @@
++Conexant Digicolor NAND Flash Controller (NFC)
 +
-+config ARM_CCI400_PMU
-+	bool "ARM CCI400 PMU support"
-+	depends on ARM || ARM64
-+	depends on HW_PERF_EVENTS
-+	select ARM_CCI400_COMMON
- 	help
--	  Driver supporting the CCI cache coherent interconnect for ARM
--	  platforms.
-+	  Support for PMU events monitoring on the ARM CCI cache coherent
-+	  interconnect.
++Required properties:
++- compatible : "cnxt,cx92755-nfc".
++- reg : shall contain registers location and length for data and reg.
++- interrupts : shall define the nand controller interrupt.
++- #address-cells: shall be set to 1. Encode the nand CS.
++- #size-cells : shall be set to 0.
++- clocks : shall reference nand controller clocks.
 +
-+	  If unsure, say N
++Optional children nodes:
++Children nodes represent the available nand chips.
 +
-+config ARM_CCI400_COMMON
-+	bool
-+	select ARM_CCI
++Required children properties:
++- nand-ecc-mode : must be "hw_syndrome".
++- nand-ecc-strength : must be one of 6, 7, 8, 24, 28, 30.
++- nand-ecc-step-size : must be either 512 or 1024.
 +
-+config ARM_CCI
-+	bool
- 
- config ARM_CCN
- 	bool "ARM CCN driver support"
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 56ad928..f86f096 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -32,6 +32,7 @@
- static void __iomem *cci_ctrl_base;
- static unsigned long cci_ctrl_phys;
- 
-+#ifdef CONFIG_ARM_CCI400_PORT_CTRL
- struct cci_nb_ports {
- 	unsigned int nb_ace;
- 	unsigned int nb_ace_lite;
-@@ -42,12 +43,19 @@ static const struct cci_nb_ports cci400_ports = {
- 	.nb_ace_lite = 3
- };
- 
-+#define CCI400_PORTS_DATA	(&cci400_ports)
-+#else
-+#define CCI400_PORTS_DATA	(NULL)
-+#endif
++see Documentation/devicetree/bindings/mtd/nand.txt for generic bindings.
 +
- static const struct of_device_id arm_cci_matches[] = {
--	{.compatible = "arm,cci-400", .data = &cci400_ports },
-+#ifdef CONFIG_ARM_CCI400_COMMON
-+	{.compatible = "arm,cci-400", .data = CCI400_PORTS_DATA },
-+#endif
- 	{},
- };
- 
--#ifdef CONFIG_HW_PERF_EVENTS
-+#ifdef CONFIG_ARM_CCI400_PMU
- 
- #define DRIVER_NAME		"CCI-400"
- #define DRIVER_NAME_PMU		DRIVER_NAME " PMU"
-@@ -1020,14 +1028,16 @@ static int __init cci_platform_init(void)
- 	return platform_driver_register(&cci_platform_driver);
- }
- 
--#else /* !CONFIG_HW_PERF_EVENTS */
-+#else /* !CONFIG_ARM_CCI400_PMU */
- 
- static int __init cci_platform_init(void)
- {
- 	return 0;
- }
- 
--#endif /* CONFIG_HW_PERF_EVENTS */
-+#endif /* CONFIG_ARM_CCI400_PMU */
++Each nand chip child node may optionally have partition sub-nodes. See
++Documentation/devicetree/bindings/mtd/partition.txt for partitions binding.
 +
-+#ifdef CONFIG_ARM_CCI400_PORT_CTRL
- 
- #define CCI_PORT_CTRL		0x0
- #define CCI_CTRL_STATUS		0xc
-@@ -1458,6 +1468,12 @@ static int cci_probe_ports(struct device_node *np)
- 
- 	return 0;
- }
-+#else /* !CONFIG_ARM_CCI400_PORT_CTRL */
-+static inline int cci_probe_ports(struct device_node *np)
-+{
-+	return 0;
-+}
-+#endif /* CONFIG_ARM_CCI400_PORT_CTRL */
- 
- static int cci_probe(void)
- {
-diff --git a/include/linux/arm-cci.h b/include/linux/arm-cci.h
-index aede5c7..521ec1f 100644
---- a/include/linux/arm-cci.h
-+++ b/include/linux/arm-cci.h
-@@ -30,12 +30,16 @@ struct device_node;
- 
- #ifdef CONFIG_ARM_CCI
- extern bool cci_probed(void);
-+#else
-+static inline bool cci_probed(void) { return false; }
-+#endif
++Example:
++nfc: nfc at f00a4000 {
++	compatible = "cnxt,cx92755-nfc";
++	reg = <0xf00a4000 0x200>;
++	interrupts = <26>;
++	clocks = <&main_clk>;
++	#address-cells = <1>;
++	#size-cells = <0>;
 +
-+#ifdef CONFIG_ARM_CCI400_PORT_CTRL
- extern int cci_ace_get_port(struct device_node *dn);
- extern int cci_disable_port_by_cpu(u64 mpidr);
- extern int __cci_control_port_by_device(struct device_node *dn, bool enable);
- extern int __cci_control_port_by_index(u32 port, bool enable);
- #else
--static inline bool cci_probed(void) { return false; }
- static inline int cci_ace_get_port(struct device_node *dn)
- {
- 	return -ENODEV;
-@@ -51,6 +55,7 @@ static inline int __cci_control_port_by_index(u32 port, bool enable)
- 	return -ENODEV;
- }
- #endif
++	nand at 0 {
++		reg = <0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		nand-ecc-mode = "hw_syndrome";
++		nand-ecc-step-size = <1024>;
++		nand-ecc-strength = <28>;
 +
- #define cci_disable_port_by_device(dev) \
- 	__cci_control_port_by_device(dev, false)
- #define cci_enable_port_by_device(dev) \
++		partition at 0 {
++			label = "boot";
++			reg = <0x00000000 0x00700000>;
++		};
++
++		partition at 700000 {
++			label = "splash";
++			reg = <0x00700000 0x00500000>;
++		};
++
++		partition at c00000 {
++			label = "maint";
++			reg = <0x00c00000 0x00500000>;
++		};
++
++		partition at 1100000 {
++			label = "kernel";
++			reg = <0x01100000 0x00500000>;
++		};
++
++		partition at 1600000 {
++			label = "rootfs";
++			reg = <0x01600000 0x18000000>;
++		};
++
++		partition at 19600000 {
++			label = "data1";
++			reg = <0x19600000 0x66a00000>;
++		};
++	};
++};
 -- 
-1.7.9.5
+2.1.4
