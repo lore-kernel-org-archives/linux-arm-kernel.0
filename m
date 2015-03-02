@@ -1,119 +1,25 @@
-From: adam.yh.lee@gmail.com (Adam YH Lee)
-Date: Mon,  2 Mar 2015 13:32:15 -0800
-Subject: [PATCH] rtc-twl: add DT support for RTC battery recharge
-Message-ID: <1425331935-8849-1-git-send-email-adam.yh.lee@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 2 Mar 2015 22:30:58 +0100
+Subject: [PATCH 0/5] ARM: orion5k/mv78xx0/dove multiplatform support
+In-Reply-To: <1425328618-894030-1-git-send-email-arnd@arndb.de>
+References: <1425328618-894030-1-git-send-email-arnd@arndb.de>
+Message-ID: <20150302213058.GB2375@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces device tree binding for the RTC backup battery charger
-on TWL4030.
+On Mon, Mar 02, 2015 at 09:36:53PM +0100, Arnd Bergmann wrote:
+> Hi everyone,
 
-Tested on Gumstix Overo (OMAP3) Tobi.
+Hi Arnd
 
-Signed-off-by: Adam YH Lee <adam.yh.lee@gmail.com>
----
- Documentation/devicetree/bindings/rtc/twl-rtc.txt | 20 ++++++++++++
- drivers/rtc/rtc-twl.c                             | 39 +++++++++++++++++++++++
- 2 files changed, 59 insertions(+)
+Dove already is multi-platform, when you use it in mach-mvebu.  The
+old mach-dove is there to slowly bit rot, because there is one user
+who has a lot of out of tree patches which are apparently not easy to
+make work with DT mach-mvebu Dove code.
 
-diff --git a/Documentation/devicetree/bindings/rtc/twl-rtc.txt b/Documentation/devicetree/bindings/rtc/twl-rtc.txt
-index 596e0c9..fcb0c4d 100644
---- a/Documentation/devicetree/bindings/rtc/twl-rtc.txt
-+++ b/Documentation/devicetree/bindings/rtc/twl-rtc.txt
-@@ -5,8 +5,28 @@ The TWL family (twl4030/6030) contains a RTC.
- Required properties:
- - compatible : Should be twl4030-rtc
- 
-+Optional properties:
-+- enable-battery-charge: Boolean, enable RTC battery charge
-+
-+- charge-rate : should contain trickle charge rate:
-+
-+     25uA - <0x0>
-+    150uA - <0x1>
-+    500uA - <0x2>
-+      1mA - <0x3>
-+
-+- charge-voltage : should contain charge voltage:
-+
-+     2.5v - <0x0>
-+     3.0v - <0x4>
-+     3.1v - <0x8>
-+     3.2v - <0xc>
-+
- Examples:
- 
- rtc at 0 {
-     compatible = "ti,twl4030-rtc";
-+    enable-battery-charge;
-+    charge-rate = <0x1>;
-+    charge-voltage = <0x8>;
- };
-diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
-index 1915464..0c3e855 100644
---- a/drivers/rtc/rtc-twl.c
-+++ b/drivers/rtc/rtc-twl.c
-@@ -31,6 +31,13 @@
- 
- #include <linux/i2c/twl.h>
- 
-+/*
-+ * PM_RECEIVER block register offsets (use TWL4030_MODULE_PM_RECEIVER)
-+ */
-+#define REG_BB_CFG	0x12
-+
-+/* PM_RECEIVER  BB_CFG bitfield */
-+#define BIT_PM_RECEIVER_BB_CFG_BBCHEN           0x10
- 
- /*
-  * RTC block register offsets (use TWL_MODULE_RTC)
-@@ -474,8 +481,11 @@ static struct rtc_class_ops twl_rtc_ops = {
- static int twl_rtc_probe(struct platform_device *pdev)
- {
- 	struct rtc_device *rtc;
-+	struct device_node *node = pdev->dev.of_node;
- 	int ret = -EINVAL;
- 	int irq = platform_get_irq(pdev, 0);
-+	const __be32 *charge_volt = NULL;
-+	const __be32 *charge_rate = NULL;
- 	u8 rd_reg;
- 
- 	if (irq <= 0)
-@@ -543,6 +553,35 @@ static int twl_rtc_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+#ifdef CONFIG_OF
-+	if (of_property_read_bool(node, "enable-battery-charge")  == true) {
-+		charge_rate = of_get_property(node, "charge-rate", NULL);
-+		if (charge_rate == NULL) {
-+			dev_err(&pdev->dev, "Backup battery charge rate is missing\n");
-+			return ret;
-+		}
-+		charge_volt = of_get_property(node, "charge-voltage", NULL);
-+		if (charge_volt == NULL) {
-+			dev_err(&pdev->dev, "Backup battery charge voltage is missing\n");
-+			return ret;
-+		}
-+		ret = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER,
-+				BIT_PM_RECEIVER_BB_CFG_BBCHEN |
-+				be32_to_cpup(charge_volt) |
-+				be32_to_cpup(charge_rate),
-+				REG_BB_CFG);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "Failed to enable backup battery charging\n");
-+			return ret;
-+		}
-+
-+		dev_info(&pdev->dev, "RTC backup charge enabled\n");
-+	} else {
-+		twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0x0, REG_BB_CFG);
-+		dev_info(&pdev->dev, "RTC backup charge disabled\n");
-+	}
-+#endif
-+
- 	platform_set_drvdata(pdev, rtc);
- 	return 0;
- }
--- 
-1.9.1
+> I'm trying to get all ARMv7 platforms moved over to
+> ARCH_MULTIPLATFORM
+
+It should be noted that orion5x is not an ARMv7.
+
+   Andrew
