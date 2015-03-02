@@ -1,47 +1,95 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Mar 2015 17:05:38 +0000
-Subject: [PATCH 00/10] initial clkdev cleanups
-Message-ID: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 02 Mar 2015 17:06:06 +0000
+Subject: [PATCH 01/10] media: omap3isp: remove unused clkdev
+In-Reply-To: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
+References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
+Message-ID: <E1YSTnC-0001JU-CX@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's some initial clkdev cleanups.  These are targetted for the next
-merge window, and while the initial patches can be merged independently,
-I'd prefer to keep the series together as further work on solving the
-problems which unique struct clk's has introduced is needed.
+No merged platform supplies xclks via platform data.  As we want to
+slightly change the clkdev interface, rather than fixing this unused
+code, remove it instead.
 
-The initial cleanups are more about using the correct clkdev function
-than anything else: there's no point interating over a array of
-clk_lookup structs, adding each one in turn when we have had a function
-which does this since forever.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/media/platform/omap3isp/isp.c | 18 ------------------
+ drivers/media/platform/omap3isp/isp.h |  1 -
+ include/media/omap3isp.h              |  6 ------
+ 3 files changed, 25 deletions(-)
 
-I'm also killing a chunk of seemingly unused code in the omap3isp driver.
-
-Lastly, I'm introducing a clkdev_create() helper, which combines the
-clkdev_alloc() + clkdev_add() pattern which keeps cropping up.
-
-Individual patches copied to appropriate people, but they will all appear
-on the mailing lists.
-
- arch/arm/mach-lpc32xx/clock.c                |  5 +--
- arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c | 12 ++-----
- arch/arm/mach-omap2/omap_device.c            | 24 +++++--------
- arch/arm/plat-orion/common.c                 |  6 +---
- arch/sh/kernel/cpu/sh4a/clock-sh7734.c       |  3 +-
- arch/sh/kernel/cpu/sh4a/clock-sh7757.c       |  4 +--
- arch/sh/kernel/cpu/sh4a/clock-sh7785.c       |  4 +--
- arch/sh/kernel/cpu/sh4a/clock-sh7786.c       |  4 +--
- arch/sh/kernel/cpu/sh4a/clock-shx3.c         |  4 +--
- drivers/clk/clk-s2mps11.c                    |  4 +--
- drivers/clk/clkdev.c                         | 52 +++++++++++++++++++++-------
- drivers/clk/versatile/clk-impd1.c            |  4 +--
- drivers/media/platform/omap3isp/isp.c        | 18 ----------
- drivers/media/platform/omap3isp/isp.h        |  1 -
- include/linux/clkdev.h                       |  3 ++
- include/media/omap3isp.h                     |  6 ----
- sound/soc/sh/migor.c                         |  3 +-
- 17 files changed, 68 insertions(+), 89 deletions(-)
-
+diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
+index deca80903c3a..4d8078b9d010 100644
+--- a/drivers/media/platform/omap3isp/isp.c
++++ b/drivers/media/platform/omap3isp/isp.c
+@@ -281,7 +281,6 @@ static const struct clk_init_data isp_xclk_init_data = {
+ 
+ static int isp_xclk_init(struct isp_device *isp)
+ {
+-	struct isp_platform_data *pdata = isp->pdata;
+ 	struct clk_init_data init;
+ 	unsigned int i;
+ 
+@@ -311,20 +310,6 @@ static int isp_xclk_init(struct isp_device *isp)
+ 		xclk->clk = clk_register(NULL, &xclk->hw);
+ 		if (IS_ERR(xclk->clk))
+ 			return PTR_ERR(xclk->clk);
+-
+-		if (pdata->xclks[i].con_id == NULL &&
+-		    pdata->xclks[i].dev_id == NULL)
+-			continue;
+-
+-		xclk->lookup = kzalloc(sizeof(*xclk->lookup), GFP_KERNEL);
+-		if (xclk->lookup == NULL)
+-			return -ENOMEM;
+-
+-		xclk->lookup->con_id = pdata->xclks[i].con_id;
+-		xclk->lookup->dev_id = pdata->xclks[i].dev_id;
+-		xclk->lookup->clk = xclk->clk;
+-
+-		clkdev_add(xclk->lookup);
+ 	}
+ 
+ 	return 0;
+@@ -339,9 +324,6 @@ static void isp_xclk_cleanup(struct isp_device *isp)
+ 
+ 		if (!IS_ERR(xclk->clk))
+ 			clk_unregister(xclk->clk);
+-
+-		if (xclk->lookup)
+-			clkdev_drop(xclk->lookup);
+ 	}
+ }
+ 
+diff --git a/drivers/media/platform/omap3isp/isp.h b/drivers/media/platform/omap3isp/isp.h
+index cfdfc8714b6b..d41c98bbdfe7 100644
+--- a/drivers/media/platform/omap3isp/isp.h
++++ b/drivers/media/platform/omap3isp/isp.h
+@@ -122,7 +122,6 @@ enum isp_xclk_id {
+ struct isp_xclk {
+ 	struct isp_device *isp;
+ 	struct clk_hw hw;
+-	struct clk_lookup *lookup;
+ 	struct clk *clk;
+ 	enum isp_xclk_id id;
+ 
+diff --git a/include/media/omap3isp.h b/include/media/omap3isp.h
+index 398279dd1922..a9798525d01e 100644
+--- a/include/media/omap3isp.h
++++ b/include/media/omap3isp.h
+@@ -152,13 +152,7 @@ struct isp_v4l2_subdevs_group {
+ 	} bus; /* gcc < 4.6.0 chokes on anonymous union initializers */
+ };
+ 
+-struct isp_platform_xclk {
+-	const char *dev_id;
+-	const char *con_id;
+-};
+-
+ struct isp_platform_data {
+-	struct isp_platform_xclk xclks[2];
+ 	struct isp_v4l2_subdevs_group *subdevs;
+ 	void (*set_constraints)(struct isp_device *isp, bool enable);
+ };
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.8.3.1
