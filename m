@@ -1,39 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 02 Mar 2015 22:39:21 +0100
-Subject: [PATCH 0/5] ARM: orion5k/mv78xx0/dove multiplatform support
-In-Reply-To: <20150302213058.GB2375@lunn.ch>
-References: <1425328618-894030-1-git-send-email-arnd@arndb.de>
- <20150302213058.GB2375@lunn.ch>
-Message-ID: <2171351.v0ZP8NQ0Dy@wuerfel>
+From: aaron@tastycactus.com (Aaron Brice)
+Date: Mon, 02 Mar 2015 14:39:49 -0700
+Subject: [RFC 2/5] mtd:fsl_nfc: Add hardware 45 byte BHC-ECC support for
+ 24 bit corrections.
+In-Reply-To: <87k2yzqw1r.fsf@nbsps.com>
+References: <87siupheou.fsf@nbsps.com>
+ <1389222441-4322-1-git-send-email-bpringlemeir@nbsps.com>
+ <1389222441-4322-3-git-send-email-bpringlemeir@nbsps.com>
+ <127db6b73356442d2ba12e8c011038cc@agner.ch> <87r3zaxgtr.fsf@nbsps.com>
+ <c444059de888a661fadf3d6be598a98d@agner.ch> <87lhphyjkg.fsf@nbsps.com>
+ <0bc8cec13bcf5b9cbea9cd3345815e4a@agner.ch> <8761dit9u9.fsf@nbsps.com>
+ <f3bc6eda0c826601e136f3dad91d9674@agner.ch> <87k2yzqw1r.fsf@nbsps.com>
+Message-ID: <54F4D8A5.7020500@tastycactus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 March 2015 22:30:58 Andrew Lunn wrote:
-> On Mon, Mar 02, 2015 at 09:36:53PM +0100, Arnd Bergmann wrote:
-> > Hi everyone,
-> 
-> Hi Arnd
-> 
-> Dove already is multi-platform, when you use it in mach-mvebu.  The
-> old mach-dove is there to slowly bit rot, because there is one user
-> who has a lot of out of tree patches which are apparently not easy to
-> make work with DT mach-mvebu Dove code.
+On 03/02/2015 08:05 AM, Bill Pringlemeir wrote:
+> On 28 Feb 2015, stefan at agner.ch wrote:
+>
+>> The flash chip mentioned above requires 8-bit error correction per 512
+>> byte block, hence I increased the ECC to the maximum available level
+>> (60-byte ECC, see page below). One thing which is not very nice, in
+>> order to fit the 60-byte ECC into the 64-byte OOB, I had to shorten
+>> the BBT pattern and set it at the very beginning of the page. This
+>> works fine, however this basically sets the page also to factory bad,
+>> I'm not sure if this is ok? Otherwise, we also could use a BBT pattern
+>> of length 1 (used by cafe_nand.c too).
+> I guess that is a DT option?  I wouldn't be an expert on this.  So
+> submitting it to the linux-mtd is good.
+>
+> I am also not sure if the HW ECC will work with 'sub-pages'.  I think a
+> college of your at Toradex submitted a patch to the u-boot.  I am pretty
+> sure that it could work with software ECC, but maybe disabling it is
+> easiest.
+>
+>> What do you think? I would like to respin the NFC patch, with my
+>> U-Boot changes and this change included...
+> Please go ahead.  Markus M <marb@ixxat.de> is also using the fsl_nfc
+> driver on a Freescale MPC5125 board, so it is probably good to copy your
+> patches to him.  At least, he can test on a BE platform.
+>
+> People also complained about JFFS and this version of the driver.  I
+> didn't investigate that.
 
-I understand that, but I really want to finalize this chapter
-of the multiplatform work, it's been going for too long. It's
-not the only platform that has ATAG-based board files remaining,
-and I don't see how keeping it the remaining dove board files
-out of multiplatform is going to speed up their removal.
-
-> > I'm trying to get all ARMv7 platforms moved over to
-> > ARCH_MULTIPLATFORM
-> 
-> It should be noted that orion5x is not an ARMv7.
-
-mv78xx0 as well. Yes, that would have been good to mention
-in the cover-letter, I assumed that everyone was aware of that.
-
-It would seem a bit silly to do one or two of these and not
-do the others at the same time.
-
-	Arnd
+I also noticed a problem with JFFS2 and the driver, where fs changes 
+were lost after reboot.  Didn't investigate, switched to UBIFS..
