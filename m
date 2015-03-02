@@ -1,26 +1,28 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 2 Mar 2015 18:18:20 +0100
-Subject: [PATCH 02/10] SH: use clkdev_add_table()
-In-Reply-To: <E1YSTnH-0001JY-GT@rmk-PC.arm.linux.org.uk>
+Date: Mon, 2 Mar 2015 18:22:31 +0100
+Subject: [PATCH 05/10] clkdev: add clkdev_create() helper
+In-Reply-To: <E1YSTnW-0001Jk-Tm@rmk-PC.arm.linux.org.uk>
 References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
- <E1YSTnH-0001JY-GT@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAMuHMdWJbLhVgWTqM8mC9AkqUKYYEh2Zv85mWizbHqoZNTxUMg@mail.gmail.com>
+ <E1YSTnW-0001Jk-Tm@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAMuHMdWHAu+zDKce0+ianDb=RHYR59eeMoiYBDK4PC=YMY0JXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Mar 2, 2015 at 6:06 PM, Russell King
 <rmk+kernel@arm.linux.org.uk> wrote:
-> We have always had an efficient way of registering a table of clock
-> lookups - it's called clkdev_add_table().  However, some people seem
-> to really love writing inefficient and unnecessary code.
+> --- a/include/linux/clkdev.h
+> +++ b/include/linux/clkdev.h
+> @@ -37,6 +37,9 @@ struct clk_lookup *clkdev_alloc(struct clk *clk, const char *con_id,
+>  void clkdev_add(struct clk_lookup *cl);
+>  void clkdev_drop(struct clk_lookup *cl);
 >
-> Convert SH to use the correct interface.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> +struct clk_lookup *clkdev_create(struct clk *clk, const char *con_id,
+> +       const char *dev_fmt, ...);
 
-Thanks, looks good.
+__printf(3, 4)
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+While you're at it, can you please also add the __printf attribute to
+clkdev_alloc() and clk_register_clkdev()?
 
 Gr{oetje,eeting}s,
 
