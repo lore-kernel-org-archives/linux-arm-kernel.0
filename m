@@ -1,64 +1,25 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 2 Mar 2015 14:03:29 +0800
-Subject: [PATCH] ARM: dts: at919260/at91sam9g20: fix SRAM device tree node
-Message-ID: <1425276209-4899-1-git-send-email-wenyou.yang@atmel.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 2 Mar 2015 11:44:28 +0530
+Subject: [PATCH 1/2] cpufreq: hisilicon: add acpu driver
+In-Reply-To: <1424956899-8891-2-git-send-email-leo.yan@linaro.org>
+References: <1424956899-8891-1-git-send-email-leo.yan@linaro.org>
+ <1424956899-8891-2-git-send-email-leo.yan@linaro.org>
+Message-ID: <CAKohpokN3Ljuufv5i+TsoJRanGBVZoqEqF1wmUmCzfGbcPbUZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix PM does not work on the at91sam9g20ek board
---->8---
-at91_pm_sram_init: failed to find sram device!
----<8---
+On 26 February 2015 at 18:51, Leo Yan <leo.yan@linaro.org> wrote:
+> Add acpu driver for hisilicon SoC, acpu is application processor
+> subsystem. Dependent on the H/W design, the silicon may has the coupled
+> clock domain for all clusters, or every cluster can have the dedicated
+> clock domain. So this driver will support both implementations.
+>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  drivers/cpufreq/Kconfig.arm         |   9 +
+>  drivers/cpufreq/Makefile            |   1 +
+>  drivers/cpufreq/hisi-acpu-cpufreq.c | 324 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 334 insertions(+)
+>  create mode 100644 drivers/cpufreq/hisi-acpu-cpufreq.c
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- arch/arm/boot/dts/at91sam9260.dtsi |    9 +++++++--
- arch/arm/boot/dts/at91sam9g20.dtsi |    9 +++++----
- 2 files changed, 12 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index fff0ee6..d1eb27c 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -69,9 +69,14 @@
- 		};
- 	};
- 
--	sram0: sram at 002ff000 {
-+	sram0: sram at 00200000 {
- 		compatible = "mmio-sram";
--		reg = <0x002ff000 0x2000>;
-+		reg = <0x00200000 0x1000>;
-+	};
-+
-+	sram1: sram at 00300000 {
-+		compatible = "mmio-sram";
-+		reg = <0x00300000 0x1000>;
- 	};
- 
- 	ahb {
-diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-index f593016..eb9a62d 100644
---- a/arch/arm/boot/dts/at91sam9g20.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-@@ -16,13 +16,14 @@
- 		reg = <0x20000000 0x08000000>;
- 	};
- 
--	sram0: sram at 002ff000 {
--		status = "disabled";
-+	sram0: sram at 00200000 {
-+		compatible = "mmio-sram";
-+		reg = <0x00200000 0x4000>;
- 	};
- 
--	sram1: sram at 002fc000 {
-+	sram1: sram at 00300000 {
- 		compatible = "mmio-sram";
--		reg = <0x002fc000 0x8000>;
-+		reg = <0x00300000 0x4000>;
- 	};
- 
- 	ahb {
--- 
-1.7.9.5
+What is stopping from reusing cpufreq-dt driver ?
