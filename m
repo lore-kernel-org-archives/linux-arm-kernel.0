@@ -1,33 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 2 Mar 2015 14:06:38 +0000
-Subject: [alsa-devel] [PATCH] ASoC: sam9g20_wm8731: drop machine_is_xxx
-In-Reply-To: <20150302134253.GQ4094@piout.net>
-References: <1420542872-10015-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20150106174521.GM2634@sirena.org.uk>
- <20150302134253.GQ4094@piout.net>
-Message-ID: <20150302140638.GW21293@sirena.org.uk>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 02 Mar 2015 06:10:38 -0800
+Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
+ IRQF_NO_SUSPEND
+In-Reply-To: <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
+References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <54F46F5E.3020707@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 02:42:53PM +0100, Alexandre Belloni wrote:
-> On 06/01/2015 at 17:45:21 +0000, Mark Brown wrote :
-> > On Tue, Jan 06, 2015 at 12:14:32PM +0100, Alexandre Belloni wrote:
+On 03/02/2015 01:18 AM, Boris Brezillon wrote:
+> The watchdog interrupt (only used when activating software watchdog)
+> shouldn't be suspended when entering suspend mode, because it is shared
+> with a timer device (which request the line with IRQF_NO_SUSPEND) and once
+> the watchdog "Mode Register" has been written, it cannot be changed (which
+> means we cannot disable the watchdog interrupt when entering suspend).
+>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-> > > Atmel based boards can now only be used with device tree. Drop non DT
-> > > initialization.
+Acked-by: Guenter Roeck <linux@roeck-us.net>
 
-> > Applied, thanks.
-
-> I don't see that patch in 4.0-rc1. This will lead to a compilation error
-> as all the machine_is_at91xxx have been removed.
-
-*sigh*  If something is a bug fix then please flag it as such; nothing
-in your message gives any hint that this is a fix rather than just a
-random cleanup.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150302/08a50a2b/attachment.sig>
+> ---
+>   drivers/watchdog/at91sam9_wdt.c | 3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+> index 6df9405..1443b3c 100644
+> --- a/drivers/watchdog/at91sam9_wdt.c
+> +++ b/drivers/watchdog/at91sam9_wdt.c
+> @@ -208,7 +208,8 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
+>
+>   	if ((tmp & AT91_WDT_WDFIEN) && wdt->irq) {
+>   		err = request_irq(wdt->irq, wdt_interrupt,
+> -				  IRQF_SHARED | IRQF_IRQPOLL,
+> +				  IRQF_SHARED | IRQF_IRQPOLL |
+> +				  IRQF_NO_SUSPEND,
+>   				  pdev->name, wdt);
+>   		if (err)
+>   			return err;
+>
