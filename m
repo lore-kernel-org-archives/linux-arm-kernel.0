@@ -1,38 +1,72 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  2 Mar 2015 11:48:55 +0000
-Subject: [PATCH] arm64: Documentation: clarify Image placement in physical RAM
-Message-ID: <1425296935-19097-1-git-send-email-ard.biesheuvel@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 2 Mar 2015 13:24:46 +0100
+Subject: [PATCH v2 1/2] mtd: nand: dt binding documentation for
+ digicolor NFC
+In-Reply-To: <fb9907fecb8b57d1b44ce03b97eb62225555de9f.1425295703.git.baruch@tkos.co.il>
+References: <fb9907fecb8b57d1b44ce03b97eb62225555de9f.1425295703.git.baruch@tkos.co.il>
+Message-ID: <20150302132446.5ee40c87@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The early init code maps the kernel image using statically
-allocated page tables. This means that we can only allow
-Image to be placed such that we can map its entire static
-footprint using a single table entry at all but the lowest
-level. So update the documentation to reflect that the Image
-should not cross a 512 MB boundary, which ensures the above
-on both 4k and 64k pages kernels.
+Hi Baruch,
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- Documentation/arm64/booting.txt | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+On Mon,  2 Mar 2015 13:28:22 +0200
+Baruch Siach <baruch@tkos.co.il> wrote:
 
-diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-index f3c05b5f9f08..728de8b9116c 100644
---- a/Documentation/arm64/booting.txt
-+++ b/Documentation/arm64/booting.txt
-@@ -113,8 +113,9 @@ The Image must be placed text_offset bytes from a 2MB aligned base
- address near the start of usable system RAM and called there. Memory
- below that base address is currently unusable by Linux, and therefore it
- is strongly recommended that this location is the start of system RAM.
--At least image_size bytes from the start of the image must be free for
--use by the kernel.
-+The physical memory region consisting of image_size bytes counting from
-+the start of the image must be free for use by the kernel, and must not
-+cross a 512 MB physical alignment boundary.
- 
- Any memory described to the kernel (even that below the 2MB aligned base
- address) which is not marked as reserved from the kernel e.g. with a
+> The CX92755 SoC is one of Conexant Digicolor series of SoCs. This devicetree
+> binding document describes the NAND flash controller the is shared by some SoCs
+> in the Digicolor series.
+> 
+> Not all of the properties are currently actually used by the driver.
+> Specifically, the driver doesn't make use of interrupts. This may change in the
+> future.
+> 
+> Also worth noting that the only supported ECC mode is "hw_syndrome". In the
+> future the driver may add support for additional modes.
+> 
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  .../devicetree/bindings/mtd/digicolor-nand.txt     | 71 ++++++++++++++++++++++
+>  1 file changed, 71 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/digicolor-nand.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/digicolor-nand.txt b/Documentation/devicetree/bindings/mtd/digicolor-nand.txt
+> new file mode 100644
+> index 000000000000..60e2d9085b7a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/digicolor-nand.txt
+> @@ -0,0 +1,71 @@
+> +Conexant Digicolor NAND Flash Controller (NFC)
+> +
+> +Required properties:
+> +- compatible : "cnxt,cx92755-nfc".
+> +- reg : shall contain registers location and length for data and reg.
+> +- interrupts : shall define the nand controller interrupt.
+> +- #address-cells: shall be set to 1. Encode the nand CS.
+> +- #size-cells : shall be set to 0.
+> +- clocks : shall reference nand controller clocks.
+> +
+> +Optional children nodes:
+> +Children nodes represent the available nand chips.
+> +
+> +Required children properties:
+> +- nand-ecc-mode : must be "hw_syndrome".
+
+You could fallback to hw_syndrome when this property is not provided.
+That would make it optional (and if you ever want to support other
+modes, you'll just have to explicitly specify nand-ecc-mode).
+
+> +- nand-ecc-strength : must be one of 6, 7, 8, 24, 28, 30.
+> +- nand-ecc-step-size : must be either 512 or 1024.
+
+Those 2 properties are no longer mandatory (you fallback to values
+stored in _ds if they are missing).
+
+Best Regards,
+
+Boris
+
 -- 
-1.8.3.2
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
