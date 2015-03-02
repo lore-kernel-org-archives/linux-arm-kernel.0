@@ -1,88 +1,90 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 2 Mar 2015 22:24:40 +0800
-Subject: [RFC PATCH v4 02/34] x86,
- traps: separate set_intr_gate() and cleanup early_trap_init().
+Date: Mon, 2 Mar 2015 22:24:51 +0800
+Subject: [RFC PATCH v4 13/34] early kprobes: alloc optimized kprobe before
+ memory system is ready.
 In-Reply-To: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
 References: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1425306312-3437-3-git-send-email-wangnan0@huawei.com>
+Message-ID: <1425306312-3437-14-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As early_trap_init() doesn't use IST, replace set_intr_gate_ist() and
-set_system_intr_gate_ist() with their standard counterparts.
-
-set_intr_gate() requires a trace_debug symbol which we don't have and
-won't use. This patch seprates set_intr_gate() into 2 parts, and uses
-base version in early_trap_init().
+Create static slots of 'struct optimized_kprobe', alloc such structure
+from the slots for early kprobes. This patch is for optimization for
+early kprobes.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
 ---
- arch/x86/include/asm/desc.h |  7 ++++++-
- arch/x86/kernel/traps.c     | 20 ++++++++++++--------
- 2 files changed, 18 insertions(+), 9 deletions(-)
+ kernel/kprobes.c | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
 
-diff --git a/arch/x86/include/asm/desc.h b/arch/x86/include/asm/desc.h
-index a94b82e..a0bf89f 100644
---- a/arch/x86/include/asm/desc.h
-+++ b/arch/x86/include/asm/desc.h
-@@ -376,11 +376,16 @@ static inline void _set_gate(int gate, unsigned type, void *addr,
-  * Pentium F0 0F bugfix can have resulted in the mapped
-  * IDT being write-protected.
-  */
--#define set_intr_gate(n, addr)						\
-+#define set_intr_gate_notrace(n, addr)					\
- 	do {								\
- 		BUG_ON((unsigned)n > 0xFF);				\
- 		_set_gate(n, GATE_INTERRUPT, (void *)addr, 0, 0,	\
- 			  __KERNEL_CS);					\
-+	} while (0)
-+
-+#define set_intr_gate(n, addr)						\
-+	do {								\
-+		set_intr_gate_notrace(n, addr);				\
- 		_trace_set_gate(n, GATE_INTERRUPT, (void *)trace_##addr,\
- 				0, 0, __KERNEL_CS);			\
- 	} while (0)
-diff --git a/arch/x86/kernel/traps.c b/arch/x86/kernel/traps.c
-index 4281988..9965bd1 100644
---- a/arch/x86/kernel/traps.c
-+++ b/arch/x86/kernel/traps.c
-@@ -926,16 +926,20 @@ dotraplinkage void do_iret_error(struct pt_regs *regs, long error_code)
- void __init early_trap_init(void)
- {
- 	/*
--	 * Don't set ist to DEBUG_STACK as it doesn't work until TSS is
--	 * ready in cpu_init() <-- trap_init(). Before trap_init(), CPU
--	 * runs at ring 0 so it is impossible to hit an invalid stack.
--	 * Using the original stack works well enough at this early
--	 * stage. DEBUG_STACK will be equipped after cpu_init() in
-+	 * Don't use IST to set DEBUG_STACK as it doesn't work until TSS
-+	 * is ready in cpu_init() <-- trap_init(). Before trap_init(),
-+	 * CPU runs at ring 0 so it is impossible to hit an invalid
-+	 * stack.  Using the original stack works well enough@this
-+	 * early stage. DEBUG_STACK will be equipped after cpu_init() in
- 	 * trap_init().
-+	 *
-+	 * We don't need to set trace_idt_table like set_intr_gate(),
-+	 * since we don't have trace_debug and it will be reset to
-+	 * 'debug' in trap_init() by set_intr_gate_ist().
- 	 */
--	set_intr_gate_ist(X86_TRAP_DB, &debug, 0);
-+	set_intr_gate_notrace(X86_TRAP_DB, debug);
- 	/* int3 can be called from all */
--	set_system_intr_gate_ist(X86_TRAP_BP, &int3, 0);
-+	set_system_intr_gate(X86_TRAP_BP, &int3);
- #ifdef CONFIG_X86_32
- 	set_intr_gate(X86_TRAP_PF, page_fault);
- #endif
-@@ -1015,7 +1019,7 @@ void __init trap_init(void)
+diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+index 1eb3000..ab3640b 100644
+--- a/kernel/kprobes.c
++++ b/kernel/kprobes.c
+@@ -362,6 +362,7 @@ static inline void copy_kprobe(struct kprobe *ap, struct kprobe *p)
+ }
  
- 	/*
- 	 * X86_TRAP_DB and X86_TRAP_BP have been set
--	 * in early_trap_init(). However, DEBUG_STACK works only after
-+	 * in early_trap_init(). However, ITS works only after
- 	 * cpu_init() loads TSS. See comments in early_trap_init().
- 	 */
- 	set_intr_gate_ist(X86_TRAP_DB, &debug, DEBUG_STACK);
+ #ifdef CONFIG_OPTPROBES
++DEFINE_EKPROBE_ALLOC_OPS(struct optimized_kprobe, early_aggr_kprobe, static)
+ /* NOTE: change this value only with kprobe_mutex held */
+ static bool kprobes_allow_optimization;
+ 
+@@ -391,7 +392,8 @@ static void free_aggr_kprobe(struct kprobe *p)
+ 	op = container_of(p, struct optimized_kprobe, kp);
+ 	arch_remove_optimized_kprobe(op);
+ 	arch_remove_kprobe(p);
+-	kfree(op);
++	if (likely(!ek_free_early_aggr_kprobe(op)))
++		kfree(op);
+ }
+ 
+ /* Return true(!0) if the kprobe is ready for optimization. */
+@@ -746,7 +748,11 @@ static struct kprobe *alloc_aggr_kprobe(struct kprobe *p)
+ {
+ 	struct optimized_kprobe *op;
+ 
+-	op = kzalloc(sizeof(struct optimized_kprobe), GFP_KERNEL);
++	if (unlikely(kprobes_is_early()))
++		op = ek_alloc_early_aggr_kprobe();
++	else
++		op = kzalloc(sizeof(struct optimized_kprobe), GFP_KERNEL);
++
+ 	if (!op)
+ 		return NULL;
+ 
+@@ -784,7 +790,8 @@ static void try_to_optimize_kprobe(struct kprobe *p)
+ 	if (!arch_prepared_optinsn(&op->optinsn)) {
+ 		/* If failed to setup optimizing, fallback to kprobe */
+ 		arch_remove_optimized_kprobe(op);
+-		kfree(op);
++		if (likely(!ek_free_early_aggr_kprobe(op)))
++			kfree(op);
+ 		goto out;
+ 	}
+ 
+@@ -914,6 +921,7 @@ static void __disarm_kprobe(struct kprobe *p, bool reopt)
+ #define __disarm_kprobe(p, o)			arch_disarm_kprobe(p)
+ #define kprobe_disarmed(p)			kprobe_disabled(p)
+ #define wait_for_kprobe_optimizer()		do {} while (0)
++DEFINE_EKPROBE_ALLOC_OPS(struct kprobe, early_aggr_kprobe, static)
+ 
+ /* There should be no unused kprobes can be reused without optimization */
+ static void reuse_unused_kprobe(struct kprobe *ap)
+@@ -925,11 +933,14 @@ static void reuse_unused_kprobe(struct kprobe *ap)
+ static void free_aggr_kprobe(struct kprobe *p)
+ {
+ 	arch_remove_kprobe(p);
+-	kfree(p);
++	if (likely(!ek_free_early_aggr_kprobe(p)))
++		kfree(p);
+ }
+ 
+ static struct kprobe *alloc_aggr_kprobe(struct kprobe *p)
+ {
++	if (unlikely(kprobes_is_early()))
++		return ek_alloc_early_aggr_kprobe();
+ 	return kzalloc(sizeof(struct kprobe), GFP_KERNEL);
+ }
+ #endif /* CONFIG_OPTPROBES */
 -- 
 1.8.4
