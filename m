@@ -1,63 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 2 Mar 2015 17:24:44 +0000
-Subject: [PATCH 1/1] iommu/arm-smmu: fix ARM_SMMU_FEAT_TRANS_OPS condition
-In-Reply-To: <1425315442-29584-1-git-send-email-b.reynal@virtualopensystems.com>
-References: <1425315442-29584-1-git-send-email-b.reynal@virtualopensystems.com>
-Message-ID: <20150302172444.GB7919@arm.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 02 Mar 2015 17:06:47 +0000
+Subject: [PATCH 09/10] ARM: omap2: use clkdev_create()
+In-Reply-To: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
+References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
+Message-ID: <E1YSTnr-0001K1-Do@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 04:57:22PM +0000, Baptiste Reynal wrote:
-> This patch is a fix to "iommu/arm-smmu: add support for iova_to_phys
-> through ATS1PR".
-> According to ARM documentation, translation registers are optional even
-> in SMMUv1, so ID0_S1TS needs to be checked to verify their presence.
-> 
-> Signed-off-by: Baptiste Reynal <b.reynal@virtualopensystems.com>
-> ---
->  drivers/iommu/arm-smmu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index fc13dd5..d4beca4 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1556,7 +1556,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
->  		return -ENODEV;
->  	}
->  
-> -	if (smmu->version == 1 || (!(id & ID0_ATOSNS) && (id & ID0_S1TS))) {
-> +	if ((id & ID0_S1TS) && ((smmu->version == 1) || (id & ID0_ATOSNS))) {
->  		smmu->features |= ARM_SMMU_FEAT_TRANS_OPS;
->  		dev_notice(smmu->dev, "\taddress translation ops\n");
+Rather than open coding the clkdev allocation, initialisation and
+addition, use the clkdev_create() helper.
 
-I'm not sure this is a complete fix. Shouldn't we also check that the domain
-is a stage-1 domain in arm_smmu_iova_to_phys? (potential fixup below).
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c | 12 ++----------
+ 1 file changed, 2 insertions(+), 10 deletions(-)
 
-Will
-
---->8
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index fc13dd56953e..107163295cbc 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1288,12 +1288,15 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
-                return 0;
+diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+index 85e0b0c06718..b64d717bfab6 100644
+--- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
++++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+@@ -232,14 +232,12 @@ void omap2xxx_clkt_vps_init(void)
+ 	struct clk_hw_omap *hw = NULL;
+ 	struct clk *clk;
+ 	const char *parent_name = "mpu_ck";
+-	struct clk_lookup *lookup = NULL;
  
-        spin_lock_irqsave(&smmu_domain->pgtbl_lock, flags);
--       if (smmu_domain->smmu->features & ARM_SMMU_FEAT_TRANS_OPS)
-+
-+       if (smmu_domain->smmu->features & ARM_SMMU_FEAT_TRANS_OPS &&
-+           smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
-                ret = arm_smmu_iova_to_phys_hard(domain, iova);
--       else
-+       } else {
-                ret = ops->iova_to_phys(ops, iova);
--       spin_unlock_irqrestore(&smmu_domain->pgtbl_lock, flags);
-+       }
+ 	omap2xxx_clkt_vps_late_init();
+ 	omap2xxx_clkt_vps_check_bootloader_rates();
  
-+       spin_unlock_irqrestore(&smmu_domain->pgtbl_lock, flags);
-        return ret;
+ 	hw = kzalloc(sizeof(*hw), GFP_KERNEL);
+-	lookup = kzalloc(sizeof(*lookup), GFP_KERNEL);
+-	if (!hw || !lookup)
++	if (!hw)
+ 		goto cleanup;
+ 	init.name = "virt_prcm_set";
+ 	init.ops = &virt_prcm_set_ops;
+@@ -249,15 +247,9 @@ void omap2xxx_clkt_vps_init(void)
+ 	hw->hw.init = &init;
+ 
+ 	clk = clk_register(NULL, &hw->hw);
+-
+-	lookup->dev_id = NULL;
+-	lookup->con_id = "cpufreq_ck";
+-	lookup->clk = clk;
+-
+-	clkdev_add(lookup);
++	clkdev_create(clk, "cpufreq_ck", NULL);
+ 	return;
+ cleanup:
+ 	kfree(hw);
+-	kfree(lookup);
  }
- 
+ #endif
+-- 
+1.8.3.1
