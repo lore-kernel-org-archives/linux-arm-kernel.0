@@ -1,98 +1,127 @@
-From: jonathar@broadcom.com (Jonathan Richardson)
-Date: Mon, 2 Mar 2015 14:41:10 -0800
-Subject: [PATCH RESEND 1/1] ARM: dts: Enable Broadcom Cygnus BCM958305K
-In-Reply-To: <1425336070-3414-1-git-send-email-jonathar@broadcom.com>
-References: <Jonathan Richardson <jonathar@broadcom.com>
- <1425336070-3414-1-git-send-email-jonathar@broadcom.com>
-Message-ID: <1425336070-3414-2-git-send-email-jonathar@broadcom.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 3 Mar 2015 07:44:16 +0900
+Subject: [PATCH] [RFC] ARM: shmobile: R-Car Gen2: Add da9063/da9210
+ regulator quirk
+In-Reply-To: <CAMuHMdUa6H_GYf9p8OS+ne3YvLWzi=CNi44NGmjaWjQ080B7Yw@mail.gmail.com>
+References: <1425317323-5898-1-git-send-email-geert+renesas@glider.be>
+ <20150302183246.GA25839@katana>
+ <CAMuHMdUa6H_GYf9p8OS+ne3YvLWzi=CNi44NGmjaWjQ080B7Yw@mail.gmail.com>
+Message-ID: <20150302224415.GB25163@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT file to enable the Wireless Audio reference design based on the
-BCM58305.
+On Mon, Mar 02, 2015 at 09:49:11PM +0100, Geert Uytterhoeven wrote:
+> Hi Wolfram,
+> 
+> On Mon, Mar 2, 2015 at 7:32 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> > On Mon, Mar 02, 2015 at 06:28:43PM +0100, Geert Uytterhoeven wrote:
+> >> The r8a7791/koelsch development board has da9063 and da9210 regulators.
+> >> Both regulators have their interrupt request lines tied to the same
+> >> interrupt pin (IRQ2) on the SoC.
+> >>
+> >> After boot-up, both the da9063 and da9210 seem to assert their interrupt
+> >> request lines.  Hence as soon as one driver requests this irq, it gets
+> >> stuck in an interrupt storm, as it only manages to deassert its own
+> >> interrupt request line, and the other driver hasn't installed an
+> >> interrupt handler yet.
+> >>
+> >> To handle this, install a quirk that masks the interrupts in both the
+> >> da9063 and da9210.  This quirk has to run after the i2c master driver
+> >> has been initialized, but before the i2c slave drivers are initialized.
+> >>
+> >> On koelsch, the following happens:
+> >>
+> >>   - Cold boot or reboot using the da9063 restart handler:
+> >>
+> >>       IRQ2 is asserted, installing da9063/da9210 regulator quirk
+> >>       ...
+> >>       i2c i2c-6: regulator_quirk_notify: 1, IRQC_MONITOR = 0x3fb
+> >>       i2c 6-0058: regulator_quirk_notify: 1, IRQC_MONITOR = 0x3fb
+> >>       i2c 6-0058: Detected da9063
+> >>       i2c 6-0058: Masking da9063 interrupt sources
+> >>       i2c 6-0068: regulator_quirk_notify: 1, IRQC_MONITOR = 0x3fb
+> >>       i2c 6-0068: Detected da9210
+> >>       i2c 6-0068: Masking da9210 interrupt sources
+> >>       i2c 6-0068: IRQ2 is not asserted, removing quirk
+> >>
+> >>   - Warm boot (reset button):
+> >>
+> >>       rcar_gen2_regulator_quirk: IRQ2 is not asserted, not installing quirk
+> >>
+> >> Not-yet-signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> ---
+> >> Based on the schematics, I believe r8a7790/lager is also affected.
+> >
+> > Boot log from Lager (cold boot & watchdog reboot):
+> >
+> > [    0.117037] IRQ2 is asserted, installing da9063/da9210 regulator quirk
+> > [    0.162803] i2c i2c-4: regulator_quirk_notify: 1, IRQC_MONITOR = 0xb
+> > [    0.163050] i2c-sh_mobile e6500000.i2c: I2C adapter 4, bus speed 100000 Hz
+> > [    0.164283] i2c i2c-5: regulator_quirk_notify: 1, IRQC_MONITOR = 0xb
+> > [    0.164481] i2c-sh_mobile e6510000.i2c: I2C adapter 5, bus speed 100000 Hz
+> > [    0.165836] i2c i2c-6: regulator_quirk_notify: 1, IRQC_MONITOR = 0xb
+> > [    0.166352] i2c 6-0012: regulator_quirk_notify: 1, IRQC_MONITOR = 0xb
+> > [    0.166425] i2c 6-0012: Detected ak4643
+> > [    0.166891] i2c 6-0020: regulator_quirk_notify: 1, IRQC_MONITOR = 0xb
+> > [    0.166963] i2c 6-0020: Detected adv7180
+> > [    0.167421] i2c 6-0039: regulator_quirk_notify: 1, IRQC_MONITOR = 0xb
+> > [    0.167494] i2c 6-0039: Detected adv7511w
+> > [    0.167630] i2c-sh_mobile e6520000.i2c: I2C adapter 6, bus speed 100000 Hz
+> > [    0.168805] i2c i2c-7: regulator_quirk_notify: 1, IRQC_MONITOR = 0xb
+> > [    0.169343] i2c 7-0058: regulator_quirk_notify: 1, IRQC_MONITOR = 0xb
+> > [    0.169415] i2c 7-0058: Detected da9063
+> > [    0.169479] i2c 7-0058: Masking da9063 interrupt sources
+> > [    0.175641] i2c 7-0068: regulator_quirk_notify: 1, IRQC_MONITOR = 0xb
+> > [    0.175715] i2c 7-0068: Detected da9210
+> > [    0.175778] i2c 7-0068: Masking da9210 interrupt sources
+> > [    0.176757] i2c 7-0068: IRQ2 is not asserted, removing quirk
+> >
+> > Reboot using reset:
+> >
+> > [    0.117819] rcar_gen2_regulator_quirk: IRQ2 is not asserted, not installing quirk
+> >
+> > So, not surprisingly, no difference to Koelsch. For completeness, I disabled
+> > installing the notifier and got the interrupt storm again. So:
+> >
+> > Tested-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> 
+> Thanks for testing!
+> 
+> >> +#ifdef CONFIG_I2C
+> >
+> > Is it a realistic scenario that I2C and slave drivers are modules?
+> 
+> Yes.
+> 
+> Unfortunately that's more difficult to support, as the code references
+> i2c_bus_type and i2c_adapter_type.
+> 
+> i2c_bus_type is needed to register the notifier.
+> i2c_adapter_type is needed to distinguish between i2c adapters and clients,
+> as the notifier is called for both with action BUS_NOTIFY_ADD_DEVICE.
+> 
+> >> +static int regulator_quirk_notify(struct notifier_block *nb,
+> >> +                               unsigned long action, void *data);
+> >
+> > This forward declaration can be skipped...
+> >
+> >> +
+> >> +static struct notifier_block regulator_quirk_nb = {
+> >> +     .notifier_call = regulator_quirk_notify
+> >> +};
+> >
+> > ... if you move this after the notfier function.
+> 
+> regulator_quirk_nb and regulator_quirk_notify reference each other.
+> But regulator_quirk_notify() can probably just use the passed
+> struct notifier_block pointer. Will fix.
+> 
+> > Other than that the code looks okay to me (given that this is a quirk
+> > workaround).
 
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
-Tested-by: Scott Branden <sbranden@broadcom.com>
-Signed-off-by: Jonathan Richardson <jonathar@broadcom.com>
----
- arch/arm/boot/dts/Makefile       |    3 ++-
- arch/arm/boot/dts/bcm958305k.dts |   53 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 55 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/bcm958305k.dts
+Hi Geert,
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 91bd5bd..24b6084 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -64,7 +64,8 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
- dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
- dtb-$(CONFIG_ARCH_BCM_CYGNUS) += bcm911360_entphn.dtb \
- 	bcm911360k.dtb \
--	bcm958300k.dtb
-+	bcm958300k.dtb \
-+	bcm958305k.dtb
- dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm28155-ap.dtb \
- 	bcm21664-garnet.dtb
- dtb-$(CONFIG_ARCH_BERLIN) += \
-diff --git a/arch/arm/boot/dts/bcm958305k.dts b/arch/arm/boot/dts/bcm958305k.dts
-new file mode 100644
-index 0000000..56b429a
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm958305k.dts
-@@ -0,0 +1,53 @@
-+/*
-+ *  BSD LICENSE
-+ *
-+ *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
-+ *
-+ *  Redistribution and use in source and binary forms, with or without
-+ *  modification, are permitted provided that the following conditions
-+ *  are met:
-+ *
-+ *    * Redistributions of source code must retain the above copyright
-+ *      notice, this list of conditions and the following disclaimer.
-+ *    * Redistributions in binary form must reproduce the above copyright
-+ *      notice, this list of conditions and the following disclaimer in
-+ *      the documentation and/or other materials provided with the
-+ *      distribution.
-+ *    * Neither the name of Broadcom Corporation nor the names of its
-+ *      contributors may be used to endorse or promote products derived
-+ *      from this software without specific prior written permission.
-+ *
-+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-+ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-+ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-+ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-+ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm-cygnus.dtsi"
-+
-+/ {
-+	model = "Cygnus Wireless Audio (BCM958305K)";
-+	compatible = "brcm,bcm58305", "brcm,cygnus";
-+
-+	aliases {
-+		serial0 = &uart3;
-+	};
-+
-+	chosen {
-+		stdout-path = &uart3;
-+		bootargs = "console=ttyS0,115200";
-+	};
-+
-+	uart3: serial at 18023000 {
-+		status = "okay";
-+	};
-+};
--- 
-1.7.9.5
+this seems reasonable enough to me, however, I'd like to let it hang out
+for a bit longer to see if there is any further review. To that end could
+you consider posting a non-RFC version for review if you wish to pursue
+this approach further?
