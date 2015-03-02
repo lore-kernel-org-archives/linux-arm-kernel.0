@@ -1,59 +1,20 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 02 Mar 2015 20:28:03 +0100
-Subject: [PATCH v2] ARM: Kirkwood: enable GPIO fan alarm support for 2Big
- Network v2
-In-Reply-To: <1424887219-26652-1-git-send-email-simon.guinot@sequanux.org>
-References: <1424887219-26652-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <54F4B9C3.8050602@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 02 Mar 2015 20:28:01 +0100
+Subject: [PATCH] dma: xilinx-dma: move header file to common location
+In-Reply-To: <4c3e2425e14646cb86c20d6aebdcfe22@BY2FFO11FD004.protection.gbl>
+References: <4c3e2425e14646cb86c20d6aebdcfe22@BY2FFO11FD004.protection.gbl>
+Message-ID: <2793259.VbbYy9Imif@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On 25/02/2015 19:00, Simon Guinot wrote:
-> On the LaCie 2Big Network v2 (net2big_v2) board, the fan alarm is not
-> wired to the I2C fan controller but to a separe GPIO. This GPIO can be
-> controlled by using the gpio-fan driver.
+On Monday 02 March 2015 23:24:24 Kedareswara rao Appana wrote:
+> This patch moves the xilinx_dma.h header file
+> to the include/linux/dma.
 > 
-> This patch adds the gpio-fan alarm description in the net2big_v2 DTS.
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 
-Now that the driver part had been merged, I applied this patch on
-mvebu/dt.
+Please move this header file to drivers/dma/xilinx/ directly to
+make it inaccessible by other driver. No driver should pass extra
+data structures to a dmaengine driver.
 
-Thanks,
-
-Gregory
-
-> 
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> ---
->  arch/arm/boot/dts/kirkwood-net2big.dts | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> v2 change:
-> - Fix node name according to the ePAPR standard.
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-net2big.dts b/arch/arm/boot/dts/kirkwood-net2big.dts
-> index 53dc37a3b687..13a44773b6df 100644
-> --- a/arch/arm/boot/dts/kirkwood-net2big.dts
-> +++ b/arch/arm/boot/dts/kirkwood-net2big.dts
-> @@ -27,6 +27,11 @@
->  		device_type = "memory";
->  		reg = <0x00000000 0x10000000>;
->  	};
-> +
-> +	fan {
-> +		compatible = "gpio-fan";
-> +		alarm-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
-> +	};
->  };
->  
->  &regulators {
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
