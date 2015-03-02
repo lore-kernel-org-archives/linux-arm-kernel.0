@@ -1,67 +1,24 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  2 Mar 2015 11:42:58 +0100
-Subject: [PATCH] ARM: at91: pm: fix SRAM allocation
-Message-ID: <1425292978-28135-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 2 Mar 2015 10:44:15 +0000
+Subject: [Question] How can we support outer shareable on ARM64?
+In-Reply-To: <54F41904.90303@huawei.com>
+References: <54F41904.90303@huawei.com>
+Message-ID: <20150302104414.GC22541@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms, there are multiple SRAM nodes defined in the device tree but
-some of them are disabled, leading to allocation failure. Try to find the first
-enabled SRAM node and allocate from it.
+On Mon, Mar 02, 2015 at 04:02:12PM +0800, leizhen wrote:
+> Now, both cacheable memory shareability attribute and barrier are
+> fixed to inner shareable.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/pm.c | 20 +++++++++-----------
- 1 file changed, 9 insertions(+), 11 deletions(-)
+That's correct for memory attributes. As for barriers, the mb()
+generates full system DSB.
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 5e34fb143309..97cc529b6fa0 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -272,35 +272,33 @@ static void __init at91_pm_sram_init(void)
- 	struct device_node *node;
- 	struct platform_device *pdev;
- 
--	node = of_find_compatible_node(NULL, NULL, "mmio-sram");
--	if (!node) {
--		pr_warn("%s: failed to find sram node!\n", __func__);
--		return;
-+	for_each_compatible_node(node, NULL, "mmio-sram") {
-+		pdev = of_find_device_by_node(node);
-+		if (pdev) {
-+			of_node_put(node);
-+			break;
-+		}
- 	}
- 
--	pdev = of_find_device_by_node(node);
- 	if (!pdev) {
- 		pr_warn("%s: failed to find sram device!\n", __func__);
--		goto put_node;
-+		return;
- 	}
- 
- 	sram_pool = dev_get_gen_pool(&pdev->dev);
- 	if (!sram_pool) {
- 		pr_warn("%s: sram pool unavailable!\n", __func__);
--		goto put_node;
-+		return;
- 	}
- 
- 	sram_base = gen_pool_alloc(sram_pool, at91_slow_clock_sz);
- 	if (!sram_base) {
- 		pr_warn("%s: unable to alloc ocram!\n", __func__);
--		goto put_node;
-+		return;
- 	}
- 
- 	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
- 	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz, false);
--
--put_node:
--	of_node_put(node);
- }
- #endif
- 
+> But I afraid some hardware need outer shareable.
+
+Why? All processors or devices controlled by an operating system are
+expected to be in the same inner shareable domain (see shareable memory
+in B2.8.1 in the ARMv8 ARM).
+
 -- 
-2.1.0
+Catalin
