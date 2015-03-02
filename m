@@ -1,238 +1,140 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon,  2 Mar 2015 18:20:29 +0000
-Subject: [PATCH v2 2/5] arm64: GICv3: change unsigned types for AArch32
- compatibility
-In-Reply-To: <1425320432-6325-1-git-send-email-jean-philippe.brucker@arm.com>
-References: <1425320432-6325-1-git-send-email-jean-philippe.brucker@arm.com>
-Message-ID: <1425320432-6325-3-git-send-email-jean-philippe.brucker@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 2 Mar 2015 10:27:05 -0800
+Subject: [PATCH 1/3] arm64: KVM: Fix stage-2 PGD allocation to have
+ per-page refcounting
+In-Reply-To: <1424883340-29940-2-git-send-email-marc.zyngier@arm.com>
+References: <1424883340-29940-1-git-send-email-marc.zyngier@arm.com>
+ <1424883340-29940-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150302182705.GD10137@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch does a few simple compatibility-related changes:
-- change the system register access prototypes to their actual size,
-- homogenise mpidr accesses with unsigned long,
-- force the 64bit register values to unsigned long long.
+On Wed, Feb 25, 2015 at 04:55:38PM +0000, Marc Zyngier wrote:
+> We're using __get_free_pages with to allocate the guest's stage-2
+> PGD. The standard behaviour of this function is to return a set of
+> pages where only the head page has a valid refcount.
+> 
+> This behaviour gets us into trouble when we're trying to increment
+> the refount on a non-head page:
+> 
+> page:ffff7c00cfb693c0 count:0 mapcount:0 mapping:          (null) index:0x0
+> flags: 0x4000000000000000()
+> page dumped because: VM_BUG_ON_PAGE((*({ __attribute__((unused)) typeof((&page->_count)->counter) __var = ( typeof((&page->_count)->counter)) 0; (volatile typeof((&page->_count)->counter) *)&((&page->_count)->counter); })) <= 0)
+> BUG: failure at include/linux/mm.h:548/get_page()!
+> Kernel panic - not syncing: BUG!
+> CPU: 1 PID: 1695 Comm: kvm-vcpu-0 Not tainted 4.0.0-rc1+ #3825
+> Hardware name: APM X-Gene Mustang board (DT)
+> Call trace:
+> [<ffff80000008a09c>] dump_backtrace+0x0/0x13c
+> [<ffff80000008a1e8>] show_stack+0x10/0x1c
+> [<ffff800000691da8>] dump_stack+0x74/0x94
+> [<ffff800000690d78>] panic+0x100/0x240
+> [<ffff8000000a0bc4>] stage2_get_pmd+0x17c/0x2bc
+> [<ffff8000000a1dc4>] kvm_handle_guest_abort+0x4b4/0x6b0
+> [<ffff8000000a420c>] handle_exit+0x58/0x180
+> [<ffff80000009e7a4>] kvm_arch_vcpu_ioctl_run+0x114/0x45c
+> [<ffff800000099df4>] kvm_vcpu_ioctl+0x2e0/0x754
+> [<ffff8000001c0a18>] do_vfs_ioctl+0x424/0x5c8
+> [<ffff8000001c0bfc>] SyS_ioctl+0x40/0x78
+> CPU0: stopping
+> 
+> Passing the (unintuitively named) __GFP_COMP flag to __get_free_pages
+> forces the allocator to maintain a per-page refcount, which is exactly
+> what we need.
 
-Note: the list registers are 64bit on GICv3, but the AArch32 vGIC driver
-will need to split their values into two 32bit registers: LRn and LRCn.
+There's a concerning comment with what seems to be the same kind of
+scenario in arch/tile/mm/pgtable.c:248.
 
-Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
----
- arch/arm64/include/asm/arch_gicv3.h | 31 ++++++++++++++++++-------------
- drivers/irqchip/irq-gic-v3.c        | 25 ++++++++++++-------------
- include/linux/irqchip/arm-gic-v3.h  | 18 +++++++++---------
- 3 files changed, 39 insertions(+), 35 deletions(-)
+I'm a little confused here, because it looks like prep_new_page() calls
+prep_compound_page(), which is the effect you're looking for, but it
+sets the page count of all tail pages to 0, and I think our code expects
+all page table pages with all entries clear to have a page count of 1,
+i.e. the allocation count itself, so don't we still have a discrepency
+between head and tail pages for compound allocations?
 
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index 5409dff..50d0045 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -77,15 +77,20 @@
- 
- #include <linux/stringify.h>
- 
--/* Low level accessors */
-+/*
-+ * Low-level accessors
-+ *
-+ * These system registers are 32 bits, but we make sure that the compiler
-+ * sets the GP register's most significant bits to 0 with an explicit cast.
-+ */
- 
--static inline void gic_write_eoir(u64 irq)
-+static inline void gic_write_eoir(u32 irq)
- {
--	asm volatile("msr_s " __stringify(ICC_EOIR1_EL1) ", %0" : : "r" (irq));
-+	asm volatile("msr_s " __stringify(ICC_EOIR1_EL1) ", %0" : : "r" ((u64)irq));
- 	isb();
- }
- 
--static inline u64 gic_read_iar(void)
-+static inline u32 gic_read_iar(void)
- {
- 	u64 irqstat;
- 
-@@ -93,20 +98,20 @@ static inline u64 gic_read_iar(void)
- 	return irqstat;
- }
- 
--static inline void gic_write_pmr(u64 val)
-+static inline void gic_write_pmr(u32 val)
- {
--	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
-+	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" ((u64)val));
- }
- 
--static inline void gic_write_ctlr(u64 val)
-+static inline void gic_write_ctlr(u32 val)
- {
--	asm volatile("msr_s " __stringify(ICC_CTLR_EL1) ", %0" : : "r" (val));
-+	asm volatile("msr_s " __stringify(ICC_CTLR_EL1) ", %0" : : "r" ((u64)val));
- 	isb();
- }
- 
--static inline void gic_write_grpen1(u64 val)
-+static inline void gic_write_grpen1(u32 val)
- {
--	asm volatile("msr_s " __stringify(ICC_GRPEN1_EL1) ", %0" : : "r" (val));
-+	asm volatile("msr_s " __stringify(ICC_GRPEN1_EL1) ", %0" : : "r" ((u64)val));
- 	isb();
- }
- 
-@@ -115,7 +120,7 @@ static inline void gic_write_sgi1r(u64 val)
- 	asm volatile("msr_s " __stringify(ICC_SGI1R_EL1) ", %0" : : "r" (val));
- }
- 
--static inline u64 gic_read_sre(void)
-+static inline u32 gic_read_sre(void)
- {
- 	u64 val;
- 
-@@ -123,9 +128,9 @@ static inline u64 gic_read_sre(void)
- 	return val;
- }
- 
--static inline void gic_write_sre(u64 val)
-+static inline void gic_write_sre(u32 val)
- {
--	asm volatile("msr_s " __stringify(ICC_SRE_EL1) ", %0" : : "r" (val));
-+	asm volatile("msr_s " __stringify(ICC_SRE_EL1) ", %0" : : "r" ((u64)val));
- 	isb();
- }
- 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 63fb8f6..a907235 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -222,11 +222,11 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
- 	return gic_configure_irq(irq, type, base, rwp_wait);
- }
- 
--static u64 gic_mpidr_to_affinity(u64 mpidr)
-+static u64 gic_mpidr_to_affinity(unsigned long mpidr)
- {
- 	u64 aff;
- 
--	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 32 |
-+	aff = ((u64)MPIDR_AFFINITY_LEVEL(mpidr, 3) << 32 |
- 	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
- 	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8  |
- 	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
-@@ -236,7 +236,7 @@ static u64 gic_mpidr_to_affinity(u64 mpidr)
- 
- static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
- {
--	u64 irqnr;
-+	u32 irqnr;
- 
- 	do {
- 		irqnr = gic_read_iar();
-@@ -289,7 +289,7 @@ static void __init gic_dist_init(void)
- 
- static int gic_populate_rdist(void)
- {
--	u64 mpidr = cpu_logical_map(smp_processor_id());
-+	unsigned long mpidr = cpu_logical_map(smp_processor_id());
- 	u64 typer;
- 	u32 aff;
- 	int i;
-@@ -320,10 +320,9 @@ static int gic_populate_rdist(void)
- 				u64 offset = ptr - gic_data.redist_regions[i].redist_base;
- 				gic_data_rdist_rd_base() = ptr;
- 				gic_data_rdist()->phys_base = gic_data.redist_regions[i].phys_base + offset;
--				pr_info("CPU%d: found redistributor %llx region %d:%pa\n",
--					smp_processor_id(),
--					(unsigned long long)mpidr,
--					i, &gic_data_rdist()->phys_base);
-+				pr_info("CPU%d: found redistributor %lx region %d:%pa\n",
-+					smp_processor_id(), mpidr, i,
-+					&gic_data_rdist()->phys_base);
- 				return 0;
- 			}
- 
-@@ -338,8 +337,8 @@ static int gic_populate_rdist(void)
- 	}
- 
- 	/* We couldn't even deal with ourselves... */
--	WARN(true, "CPU%d: mpidr %llx has no re-distributor!\n",
--	     smp_processor_id(), (unsigned long long)mpidr);
-+	WARN(true, "CPU%d: mpidr %lx has no re-distributor!\n",
-+	     smp_processor_id(), mpidr);
- 	return -ENODEV;
- }
- 
-@@ -417,10 +416,10 @@ static struct notifier_block gic_cpu_notifier = {
- };
- 
- static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
--				   u64 cluster_id)
-+				   unsigned long cluster_id)
- {
- 	int cpu = *base_cpu;
--	u64 mpidr = cpu_logical_map(cpu);
-+	unsigned long mpidr = cpu_logical_map(cpu);
- 	u16 tlist = 0;
- 
- 	while (cpu < nr_cpu_ids) {
-@@ -481,7 +480,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 	smp_wmb();
- 
- 	for_each_cpu_mask(cpu, *mask) {
--		u64 cluster_id = cpu_logical_map(cpu) & ~0xffUL;
-+		unsigned long cluster_id = cpu_logical_map(cpu) & ~0xffUL;
- 		u16 tlist;
- 
- 		tlist = gic_compute_target_list(&cpu, mask, cluster_id);
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index bbe9c34..0ee95c4 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -42,7 +42,7 @@
- #define GICD_ICFGR			0x0C00
- #define GICD_IGRPMODR			0x0D00
- #define GICD_NSACR			0x0E00
--#define GICD_IROUTER			0x6000
-+#define GICD_IROUTER			0x6000		/* 64bit */
- #define GICD_IDREGS			0xFFD0
- #define GICD_PIDR2			0xFFE8
- 
-@@ -91,7 +91,7 @@
- #define GICR_IIDR			0x0004
- #define GICR_TYPER			0x0008
- #define GICR_STATUSR			GICD_STATUSR
--#define GICR_WAKER			0x0014
-+#define GICR_WAKER			0x0014		/* 32bit */
- #define GICR_SETLPIR			0x0040
- #define GICR_CLRLPIR			0x0048
- #define GICR_SEIR			GICD_SEIR
-@@ -99,7 +99,7 @@
- #define GICR_PENDBASER			0x0078
- #define GICR_INVLPIR			0x00A0
- #define GICR_INVALLR			0x00B0
--#define GICR_SYNCR			0x00C0
-+#define GICR_SYNCR			0x00C0		/* 32bit */
- #define GICR_MOVLPIR			0x0100
- #define GICR_MOVALLR			0x0110
- #define GICR_IDREGS			GICD_IDREGS
-@@ -257,13 +257,13 @@
- /*
-  * Hypervisor interface registers (SRE only)
-  */
--#define ICH_LR_VIRTUAL_ID_MASK		((1UL << 32) - 1)
-+#define ICH_LR_VIRTUAL_ID_MASK		((1ULL << 32) - 1)
- 
--#define ICH_LR_EOI			(1UL << 41)
--#define ICH_LR_GROUP			(1UL << 60)
--#define ICH_LR_STATE			(3UL << 62)
--#define ICH_LR_PENDING_BIT		(1UL << 62)
--#define ICH_LR_ACTIVE_BIT		(1UL << 63)
-+#define ICH_LR_EOI			(1ULL << 41)
-+#define ICH_LR_GROUP			(1ULL << 60)
-+#define ICH_LR_STATE			(3ULL << 62)
-+#define ICH_LR_PENDING_BIT		(1ULL << 62)
-+#define ICH_LR_ACTIVE_BIT		(1ULL << 63)
- 
- #define ICH_MISR_EOI			(1 << 0)
- #define ICH_MISR_U			(1 << 1)
--- 
-2.2.0.rc1
+So I'm wondering if we should simply call split_page() on the allocation
+or if there's some other way of doing individual multiple contigous page
+allocations?  Am I seeing ghosts?
+
+> 
+> This has been tested on an X-Gene platform with a 4kB/48bit-VA host
+> kernel, and kvmtool hacked to place memory in the second page of
+> the hardware PGD (PUD for the host kernel).
+> 
+> Reported-by: Mark Rutland <mark.rutland@arm.com>
+> Tested-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_mmu.h   | 7 +++++++
+>  arch/arm/kvm/mmu.c               | 2 +-
+>  arch/arm64/include/asm/kvm_mmu.h | 9 ++++++++-
+>  3 files changed, 16 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index 37ca2a4..1cac89b 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -162,6 +162,13 @@ static inline bool kvm_page_empty(void *ptr)
+>  
+>  #define KVM_PREALLOC_LEVEL	0
+>  
+> +/*
+> + * We need to ensure that stage-2 PGDs are allocated with a per-page
+> + * refcount, as we fiddle with the refcounts of non-head pages.
+> + * __GFP_COMP forces the allocator to do what we want.
+> + */
+> +#define KVM_GFP_S2_PGD	(GFP_KERNEL | __GFP_ZERO | __GFP_COMP)
+> +
+>  static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
+>  {
+
+what about the case for kvm_prealloc_hwpgd, why doesn't it need to use
+the new GFP mask?
+
+>  	return 0;
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 3e6859b..a6a8252 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -666,7 +666,7 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+>  		 * Allocate actual first-level Stage-2 page table used by the
+>  		 * hardware for Stage-2 page table walks.
+>  		 */
+> -		pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, S2_PGD_ORDER);
+> +		pgd = (pgd_t *)__get_free_pages(KVM_GFP_S2_PGD, S2_PGD_ORDER);
+>  	}
+>  
+>  	if (!pgd)
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 6458b53..06c733a 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -171,6 +171,13 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+>  #define KVM_PREALLOC_LEVEL	(0)
+>  #endif
+>  
+> +/*
+> + * We need to ensure that stage-2 PGDs are allocated with a per-page
+> + * refcount, as we fiddle with the refcounts of non-head pages.
+> + * __GFP_COMP forces the allocator to do what we want.
+> + */
+> +#define KVM_GFP_S2_PGD	(GFP_KERNEL | __GFP_ZERO | __GFP_COMP)
+> +
+>  /**
+>   * kvm_prealloc_hwpgd - allocate inital table for VTTBR
+>   * @kvm:	The KVM struct pointer for the VM.
+> @@ -192,7 +199,7 @@ static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
+>  	if (KVM_PREALLOC_LEVEL == 0)
+>  		return 0;
+>  
+> -	hwpgd = __get_free_pages(GFP_KERNEL | __GFP_ZERO, PTRS_PER_S2_PGD_SHIFT);
+> +	hwpgd = __get_free_pages(KVM_GFP_S2_PGD, PTRS_PER_S2_PGD_SHIFT);
+>  	if (!hwpgd)
+>  		return -ENOMEM;
+>  
+> -- 
+> 2.1.4
+> 
+
+Thanks,
+-Christoffer
