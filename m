@@ -1,30 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 2 Mar 2015 18:24:24 +0000
-Subject: [PATCH v3 0/3] Scorpion PMU support
-In-Reply-To: <1425082295-10941-1-git-send-email-sboyd@codeaurora.org>
-References: <1425082295-10941-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150302182424.GE7919@arm.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Mon,  2 Mar 2015 18:20:27 +0000
+Subject: [PATCH v2 0/5] GICv3: add 32bit compatibility
+Message-ID: <1425320432-6325-1-git-send-email-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 28, 2015 at 12:11:32AM +0000, Stephen Boyd wrote:
-> These patches add support for the Scorpion PMU found on devices
-> such as msm8660, qsd8x50, etc. The first patch is some groundwork
-> to make functions more "generic". Even then we end up copying quite
-> a bit of code from the Krait part into the Scorpion part with only
-> subtle tweaks because two things happen:
-> 
->  1. We gain another "region" register, L2LPM
->  2. The way to access the region registers are with different cp15 instructions
-> 
-> I'm not sure how to make this better, suggestions are welcome. The second
-> patch is an optimization for an implementation defined register. The 
-> final patch is the one that actually adds support for Scorpion.
-> 
-> Changes from v2:
->  * New patch 2
->  * Macros instead of an inline function for patch 1
+This series adds 32bit compatibility to Marc's GICv3 driver. Only SGIs,
+PPIs and SPIs support is present, no ITS.
 
-Thanks, Stephen. I'll queue this for 4.1.
+It is now based on Linux 4.0-rc1, which contains Andre's GICv3 emulation
+series for KVM [1]. With this support along with the kvmtool patches
+mentioned in [1], it is possible to run ARM guests that use GICv3.
 
-Will
+Changes since v1 [2]:
+* rebased on 4.0-rc1
+* fix the mistakes pointed out by Russell and Vladimir
+* add a patch to select ARM_GIC_V3 under ARCH_VIRT, as suggested by Marc
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/316230.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310124.htm
+
+Cheers,
+Jean
+
+
+Jean-Philippe Brucker (5):
+  arm64: GICv3: refactor the AArch64 specific parts
+  arm64: GICv3: change unsigned types for AArch32 compatibility
+  arm64: GICv3: Specialize readq and writeq accesses
+  ARM: add 32bit support to GICv3
+  ARM: virt: select ARM_GIC_V3
+
+ arch/arm/Kconfig                    |   1 +
+ arch/arm/include/asm/arch_gicv3.h   | 182 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/arch_gicv3.h | 141 ++++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic-v3.c        |  69 ++++----------
+ include/linux/irqchip/arm-gic-v3.h  | 115 ++++++-----------------
+ 5 files changed, 369 insertions(+), 139 deletions(-)
+ create mode 100644 arch/arm/include/asm/arch_gicv3.h
+ create mode 100644 arch/arm64/include/asm/arch_gicv3.h
+
+-- 
+2.2.0.rc1
