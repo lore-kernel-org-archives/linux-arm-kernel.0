@@ -1,43 +1,22 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 2 Mar 2015 18:03:00 +0000
-Subject: EDAC on arm64
-In-Reply-To: <CAL_Jsq+ycHnjtFbmkHTn58vWNvvF81ON-nQBJ0CC5XZCLRnh-g@mail.gmail.com>
-References: <54F11133.70909@redhat.com> <20150302105919.GA4434@arm.com>
- <20150302145840.GQ22541@e104818-lin.cambridge.arm.com>
- <CAL_Jsq+ycHnjtFbmkHTn58vWNvvF81ON-nQBJ0CC5XZCLRnh-g@mail.gmail.com>
-Message-ID: <20150302180300.GA28951@e104818-lin.cambridge.arm.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 2 Mar 2015 21:14:56 +0300
+Subject: [PATCH 00/10] ARM: s3c64xx multiplatform, help needed
+In-Reply-To: <20150302173737.GB17094@dtor-ws>
+References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
+ <20150302173737.GB17094@dtor-ws>
+Message-ID: <CA+E=qVduX_JJMdPaaKq2G5bfBiUiQeFzCSX+ErZaFpw5SDhJFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 10:34:16AM -0600, Rob Herring wrote:
-> On Mon, Mar 2, 2015 at 8:58 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Mon, Mar 02, 2015 at 10:59:32AM +0000, Will Deacon wrote:
-> >> On Sat, Feb 28, 2015 at 12:52:03AM +0000, Jon Masters wrote:
-> >> > Have you considered reviving the patch you posted previously for EDAC
-> >> > support (the atomic_scrub read/write test piece dependency)?
-> >> >
-> >> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249039.html
-> >>
-> >> Well, we'd need a way to handle the non-coherent DMA case and it's really
-> >> not clear how to fix that.
-> >
-> > I agree, that's where the discussions stopped. Basically the EDAC memory
-> > writing is racy with any non-cacheable memory accesses (by CPU or
-> > device). The only way we could safely use this is only if all the
-> > devices are coherent *and* KVM is disabled. With KVM, guests may access
-> > the memory uncached, so we hit the same problem.
-> 
-> Scrubbing only prevents repeated error reporting of correctable errors
-> which only repeat on a cache miss. Perhaps we should just add an empty
-> version that is a nop. At least then we can enable EDAC and be able to
-> report errors. Otherwise, they may just be silently ignored (fine for
-> correctable, but not so good to do with uncorrectable errors).
+On Mon, Mar 2, 2015 at 8:37 PM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
 
-This looks fine to me.
+> I think Vasily had access to hardware with s3c2410_ts at some point...
 
-> Anyway, I'll leave it to someone who still has this itch to sort out.
+Hi,
 
-Maybe Jon? ;)
+Yep, I have s3c24xx hardware to test rewritten s3c2410_ts driver. Will
+try it this weekend.
 
--- 
-Catalin
+Regards,
+Vasily
