@@ -1,40 +1,54 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 2 Mar 2015 12:03:47 +0100
-Subject: [GIT PULL] ARM: meson: SoC related changes
-Message-ID: <CAOQ7t2bJ47sp=sqDqMzu3-ASyJHkfQGV=A4x1YMQn6YhzQkKVw@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 2 Mar 2015 16:34:34 +0530
+Subject: [PATCH 1/2] cpufreq: hisilicon: add acpu driver
+In-Reply-To: <20150302105025.GA8702@leoy-linaro>
+References: <1424956899-8891-1-git-send-email-leo.yan@linaro.org>
+ <1424956899-8891-2-git-send-email-leo.yan@linaro.org>
+ <CAKohpokN3Ljuufv5i+TsoJRanGBVZoqEqF1wmUmCzfGbcPbUZQ@mail.gmail.com>
+ <20150302105025.GA8702@leoy-linaro>
+Message-ID: <CAKohpok62tCenCwSRxACeWZGwotsm5sm4nTX74Bq6sAXJfZX0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof,
-In this pull request there is a small modification to Kconfig to
-enable the Meson pinctrl driver and a couple of small documentation
-patches that weren't merged.
+On 2 March 2015 at 16:20, Leo Yan <leo.yan@linaro.org> wrote:
+> i'm glad to use more general method, let me give more input so that we
+> can see if can figure out a better way. ;)
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+And I am glad to hear that :)
 
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+> 1. From hardware design, during the initialization phase, it will
+> bind every opps with its corresponding voltage, and pass these related
+> info to power controller. So later, in kernel the cpufreq driver don't
+> need manually change the voltage, it will only change the cpu clock
+> frequency and power controller will automatically handle voltage
+> related operations. This is similar with TC's SPC implementation.
+>
+> So looks likely the cpufreq-dt driver's voltage related ops are
+> redundant for this case.
 
-are available in the git repository at:
+Its okay, they wouldn't harm. You don't have to specify any regulator
+in CPUs DT node and the code will not try any fancy stuff :)
 
-  https://github.com/carlocaione/linux-meson tags/for-v4.0-rc/meson-soc
+> 2. For hi6220, it has two clusters but w/t coupled clock domain; after
+> discussion, the later series SoC will have two clusters with
+> dedicated clock domain, so we need support these two cases;
 
-for you to fetch changes up to 3cada3a4daeee52499751f0bf350b6b0655c32ef:
+Its okay..
 
-  of: Define board compatible for MINIX NEO-X8 (2015-03-02 11:00:02 +0100)
+> if support two clusters, arm_big_little.c is also good option; but it
+> cannot support coupled clock domain for two clusters; furthermore, the
+> cpufreq driver also need enable cooling cell so that it can support
+> thermal framework with cpu cooling device.
+>
+> Do u think it's reasonable to apply upper changes to arm_big_little.c?
 
-----------------------------------------------------------------
-- Add some forgotten documentation
-- Kconfig changes to enable PINCTRL
+Yes it is, but I want you to use cpufreq-dt instead. It supports multi
+clusters as well now.
 
-----------------------------------------------------------------
-Beniamino Galvani (3):
-      ARM: meson: select PINCTRL_MESON and ARCH_REQUIRE_GPIOLIB
-      of: Add vendor prefix for MINIX
-      of: Define board compatible for MINIX NEO-X8
+> 3. for the file hisi-acpu-cpufreq.c, actually it's common enough; all
+> register's related operations have been encapsulated in clk driver;
+> Especially thinking about now have many SoCs have multi-clusters and
+> only need change the frequency from clk APIs, do u think it's a good
+> idea to change this driver to be a common driver?
 
- Documentation/devicetree/bindings/arm/amlogic.txt     | 4 ++++
- Documentation/devicetree/bindings/arm/geniatech.txt   | 5 -----
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- arch/arm/mach-meson/Kconfig                           | 3 +++
- 4 files changed, 8 insertions(+), 5 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/geniatech.txt
+Just use cpufreq-dt and you wouldn't be required to make any changes at all..
