@@ -1,48 +1,64 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 2 Mar 2015 10:50:12 +0000
-Subject: PMD update corruption (sync question)
-In-Reply-To: <938476184.27970130.1425275915893.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
-References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
- <54F06636.6080905@redhat.com> <54F3C6AD.50300@redhat.com>
- <938476184.27970130.1425275915893.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
-Message-ID: <20150302105011.GD22541@e104818-lin.cambridge.arm.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon, 2 Mar 2015 18:50:25 +0800
+Subject: [PATCH 1/2] cpufreq: hisilicon: add acpu driver
+In-Reply-To: <CAKohpokN3Ljuufv5i+TsoJRanGBVZoqEqF1wmUmCzfGbcPbUZQ@mail.gmail.com>
+References: <1424956899-8891-1-git-send-email-leo.yan@linaro.org>
+ <1424956899-8891-2-git-send-email-leo.yan@linaro.org>
+ <CAKohpokN3Ljuufv5i+TsoJRanGBVZoqEqF1wmUmCzfGbcPbUZQ@mail.gmail.com>
+Message-ID: <20150302105025.GA8702@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 12:58:36AM -0500, Jon Masters wrote:
-> I've pulled a couple of all nighters reproducing this hard to trigger
-> issue and got some data. It looks like the high half of the (note always
-> userspace) PMD is all zeros or all ones, which makes me wonder if the
-> logic in update_mmu_cache might be missing something on AArch64.
+Hi Viresh,
 
-That's worrying but I can tell you offline why ;).
-
-Anyway, 64-bit writes are atomic on ARMv8, so you shouldn't see half
-updates. To make sure the compiler does not generate something weird,
-change the set_(pte|pmd|pud) to use an inline assembly with a 64-bit
-STR.
-
-One question - is the PMD a table or a block? You mentioned set_pte_at
-at some point, which leads me to think it's a (transparent) huge page,
-hence block mapping.
-
-> When a kernel is built with 64K pages and 2 levels the PMD is
-> effectively updated using set_pte_at, which explicitly won't perform a
-> DSB if the address is userspace (it expects this to happen later, in
-> update_mmu_cache as an example.
+On Mon, Mar 02, 2015 at 11:44:28AM +0530, Viresh Kumar wrote:
+> On 26 February 2015 at 18:51, Leo Yan <leo.yan@linaro.org> wrote:
+> > Add acpu driver for hisilicon SoC, acpu is application processor
+> > subsystem. Dependent on the H/W design, the silicon may has the coupled
+> > clock domain for all clusters, or every cluster can have the dedicated
+> > clock domain. So this driver will support both implementations.
+> >
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > ---
+> >  drivers/cpufreq/Kconfig.arm         |   9 +
+> >  drivers/cpufreq/Makefile            |   1 +
+> >  drivers/cpufreq/hisi-acpu-cpufreq.c | 324 ++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 334 insertions(+)
+> >  create mode 100644 drivers/cpufreq/hisi-acpu-cpufreq.c
 > 
-> Can anyone think of an obvious reason why we might not be properly
-> flushing the changes prior to them being consumed by a hardware walker?
+> What is stopping from reusing cpufreq-dt driver ?
 
-Even if you don't have that barrier, the worst that can happen is that
-you get another trap back in the kernel (from user; translation fault)
-but the page table read by the kernel is valid and normally the
-instruction restarted.
+Thanks for reviewing.
 
-> Test kernels running with an explicit DSB in all PTE update cases now
-> running overnight. Just in case.
+i'm glad to use more general method, let me give more input so that we
+can see if can figure out a better way. ;)
 
-It could be hiding some other problems.
+1. From hardware design, during the initialization phase, it will
+bind every opps with its corresponding voltage, and pass these related
+info to power controller. So later, in kernel the cpufreq driver don't
+need manually change the voltage, it will only change the cpu clock
+frequency and power controller will automatically handle voltage
+related operations. This is similar with TC's SPC implementation.
 
--- 
-Catalin
+So looks likely the cpufreq-dt driver's voltage related ops are
+redundant for this case.
+
+2. For hi6220, it has two clusters but w/t coupled clock domain; after
+discussion, the later series SoC will have two clusters with
+dedicated clock domain, so we need support these two cases;
+
+if support two clusters, arm_big_little.c is also good option; but it
+cannot support coupled clock domain for two clusters; furthermore, the
+cpufreq driver also need enable cooling cell so that it can support
+thermal framework with cpu cooling device.
+
+Do u think it's reasonable to apply upper changes to arm_big_little.c?
+
+3. for the file hisi-acpu-cpufreq.c, actually it's common enough; all
+register's related operations have been encapsulated in clk driver;
+Especially thinking about now have many SoCs have multi-clusters and
+only need change the frequency from clk APIs, do u think it's a good
+idea to change this driver to be a common driver?
+
+Thanks,
+Leo Yan
