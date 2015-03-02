@@ -1,43 +1,100 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Mon, 2 Mar 2015 18:05:19 +0100
-Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
- uncached guest mappings
-In-Reply-To: <54F49610.6090000@redhat.com>
-References: <20150219175518.GB26965@hawk.usersys.redhat.com>
- <54E62404.9040702@redhat.com>
- <20150220142905.GA10942@hawk.usersys.redhat.com>
- <CAKv+Gu-YUzmnACZQi98OPRgKKL+gAGqwWYq2-_dwCdNqcktNUg@mail.gmail.com>
- <20150220153626.GB10942@hawk.usersys.redhat.com>
- <20150224145529.GA5498@hawk.usersys.redhat.com>
- <CAKv+Gu-Uk2wg1OkoWgQe4da_EiFoEz_u8VuD8Ees6qU1UYMDvQ@mail.gmail.com>
- <20150302163146.GB9686@lvm> <54F49418.5070108@redhat.com>
- <54F49610.6090000@redhat.com>
-Message-ID: <20150302170519.GB14186@hawk.usersys.redhat.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 02 Mar 2015 17:06:11 +0000
+Subject: [PATCH 02/10] SH: use clkdev_add_table()
+In-Reply-To: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
+References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
+Message-ID: <E1YSTnH-0001JY-GT@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 05:55:44PM +0100, Laszlo Ersek wrote:
-> On 03/02/15 17:47, Paolo Bonzini wrote:
-> > 
-> > Also, we may want to invalidate the cache for dirty pages before
-> > returning the dirty bitmap, and probably should do that directly in
-> > KVM_GET_DIRTY_LOG.
-> 
-> "I agree."
-> 
-> If KVM_GET_DIRTY_LOG is supposed to be atomic fetch and clear (from
-> userspace's aspect), then the cache invalidation should be an atomic
-> part of it too (from the same aspect).
-> 
-> (Sorry if I just said something incredibly stupid.)
->
+We have always had an efficient way of registering a table of clock
+lookups - it's called clkdev_add_table().  However, some people seem
+to really love writing inefficient and unnecessary code.
 
-With the path I'm headed down, all cache maintenance operations will
-be done before exiting to userspace (and after returning). I was
-actually already letting a feature creep into this PoC by setting
-KVM_MEM_LOG_DIRTY_PAGES when we see KVM_MEM_INCOHERENT has been set,
-and the region isn't readonly. The dirty log would then be used by
-KVM internally to know exactly which pages need to be invalidated
-before the exit.
+Convert SH to use the correct interface.
 
-drew
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/sh/kernel/cpu/sh4a/clock-sh7734.c | 3 +--
+ arch/sh/kernel/cpu/sh4a/clock-sh7757.c | 4 ++--
+ arch/sh/kernel/cpu/sh4a/clock-sh7785.c | 4 ++--
+ arch/sh/kernel/cpu/sh4a/clock-sh7786.c | 4 ++--
+ arch/sh/kernel/cpu/sh4a/clock-shx3.c   | 4 ++--
+ 5 files changed, 9 insertions(+), 10 deletions(-)
+
+diff --git a/arch/sh/kernel/cpu/sh4a/clock-sh7734.c b/arch/sh/kernel/cpu/sh4a/clock-sh7734.c
+index 1fdf1ee672de..7f54bf2f453d 100644
+--- a/arch/sh/kernel/cpu/sh4a/clock-sh7734.c
++++ b/arch/sh/kernel/cpu/sh4a/clock-sh7734.c
+@@ -246,8 +246,7 @@ int __init arch_clk_init(void)
+ 	for (i = 0; i < ARRAY_SIZE(main_clks); i++)
+ 		ret |= clk_register(main_clks[i]);
+ 
+-	for (i = 0; i < ARRAY_SIZE(lookups); i++)
+-		clkdev_add(&lookups[i]);
++	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+ 
+ 	if (!ret)
+ 		ret = sh_clk_div4_register(div4_clks, ARRAY_SIZE(div4_clks),
+diff --git a/arch/sh/kernel/cpu/sh4a/clock-sh7757.c b/arch/sh/kernel/cpu/sh4a/clock-sh7757.c
+index 9a28fdb36387..e40ec2c97ad1 100644
+--- a/arch/sh/kernel/cpu/sh4a/clock-sh7757.c
++++ b/arch/sh/kernel/cpu/sh4a/clock-sh7757.c
+@@ -141,8 +141,8 @@ int __init arch_clk_init(void)
+ 
+ 	for (i = 0; i < ARRAY_SIZE(clks); i++)
+ 		ret |= clk_register(clks[i]);
+-	for (i = 0; i < ARRAY_SIZE(lookups); i++)
+-		clkdev_add(&lookups[i]);
++
++	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+ 
+ 	if (!ret)
+ 		ret = sh_clk_div4_register(div4_clks, ARRAY_SIZE(div4_clks),
+diff --git a/arch/sh/kernel/cpu/sh4a/clock-sh7785.c b/arch/sh/kernel/cpu/sh4a/clock-sh7785.c
+index 17d0ea55a5a2..8eb6e62340c9 100644
+--- a/arch/sh/kernel/cpu/sh4a/clock-sh7785.c
++++ b/arch/sh/kernel/cpu/sh4a/clock-sh7785.c
+@@ -164,8 +164,8 @@ int __init arch_clk_init(void)
+ 
+ 	for (i = 0; i < ARRAY_SIZE(clks); i++)
+ 		ret |= clk_register(clks[i]);
+-	for (i = 0; i < ARRAY_SIZE(lookups); i++)
+-		clkdev_add(&lookups[i]);
++
++	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+ 
+ 	if (!ret)
+ 		ret = sh_clk_div4_register(div4_clks, ARRAY_SIZE(div4_clks),
+diff --git a/arch/sh/kernel/cpu/sh4a/clock-sh7786.c b/arch/sh/kernel/cpu/sh4a/clock-sh7786.c
+index bec2a83f1ba5..5e50e7ebeff0 100644
+--- a/arch/sh/kernel/cpu/sh4a/clock-sh7786.c
++++ b/arch/sh/kernel/cpu/sh4a/clock-sh7786.c
+@@ -179,8 +179,8 @@ int __init arch_clk_init(void)
+ 
+ 	for (i = 0; i < ARRAY_SIZE(clks); i++)
+ 		ret |= clk_register(clks[i]);
+-	for (i = 0; i < ARRAY_SIZE(lookups); i++)
+-		clkdev_add(&lookups[i]);
++
++	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+ 
+ 	if (!ret)
+ 		ret = sh_clk_div4_register(div4_clks, ARRAY_SIZE(div4_clks),
+diff --git a/arch/sh/kernel/cpu/sh4a/clock-shx3.c b/arch/sh/kernel/cpu/sh4a/clock-shx3.c
+index 9a49a44f6f94..605221d1448a 100644
+--- a/arch/sh/kernel/cpu/sh4a/clock-shx3.c
++++ b/arch/sh/kernel/cpu/sh4a/clock-shx3.c
+@@ -138,8 +138,8 @@ int __init arch_clk_init(void)
+ 
+ 	for (i = 0; i < ARRAY_SIZE(clks); i++)
+ 		ret |= clk_register(clks[i]);
+-	for (i = 0; i < ARRAY_SIZE(lookups); i++)
+-		clkdev_add(&lookups[i]);
++
++	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+ 
+ 	if (!ret)
+ 		ret = sh_clk_div4_register(div4_clks, ARRAY_SIZE(div4_clks),
+-- 
+1.8.3.1
