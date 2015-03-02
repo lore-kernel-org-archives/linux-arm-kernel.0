@@ -1,30 +1,55 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 2 Mar 2015 13:26:57 -0800
-Subject: [PATCH 0/5] split ET_DYN ASLR from mmap ASLR
-In-Reply-To: <1425006434-3106-1-git-send-email-keescook@chromium.org>
-References: <1425006434-3106-1-git-send-email-keescook@chromium.org>
-Message-ID: <20150302132657.5507742399620e70dd0a3926@linux-foundation.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 02 Mar 2015 22:28:18 +0100
+Subject: [PATCH 0/9] ARM: samsung: randconfig build fixes
+In-Reply-To: <54F4BEFF.30407@kernel.org>
+References: <1423769746-582629-1-git-send-email-arnd@arndb.de>
+ <0b2901d04b10$d571f680$8055e380$@kernel.org> <54F4BEFF.30407@kernel.org>
+Message-ID: <2317897.q2DKQN0gWf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Feb 2015 19:07:09 -0800 Kees Cook <keescook@chromium.org> wrote:
-
-> This separates ET_DYN ASLR from mmap ASLR, as already done on s390. The
-> various architectures that are already randomizing mmap (arm, arm64, mips,
-> powerpc, s390, and x86), have their various forms of arch_mmap_rnd()
-> made available via the new CONFIG_ARCH_HAS_ELF_RANDOMIZE. For these
-> architectures, arch_randomize_brk() is collapsed as well.
+On Tuesday 03 March 2015 04:50:23 Kukjin Kim wrote:
+> On 02/18/15 09:21, Kukjin Kim wrote:
+> > Arnd Bergmann wrote:
+> >>
+> >> This is a set of mostly trivial build fixes for bugs I have encountered
+> >> in random configurations. I'm sending them separate from the other
+> >> platforms since we have a lot of them for the various samsung platforms
+> >> here.
+> >>
+> >> Kukjin, please pick them up into a fixes branch for 3.20 or send
+> >> an Ack so we can apply them directly.
+> >>
+> > Sure, I will create a branch for them in this week. IMO, would be better if I
+> > could make a non-critical fixes branch for v3.20 in Samsung tree for further
+> > other Samsung stuff for v3.20 
+> > 
+> >> Let me know if anything looks wrong with some of the patches.
+> > 
+> > OK, if anything I'll let you know.
+> > 
+> > Thanks for your pointing out.
+> > Happy new year again! (Actually it's the Lunar New Year holidays now)
+> > 
+> > - Kukjin
+> > 
+> >> Arnd Bergmann (9):
+> >>   ARM: s3c64xx: add I2C dependencies where needed
+> >>   ARM: s3c64xx: fix building without CONFIG_PM_SLEEP
+> >>   ARM: s3c64xx: fix __initdata section mismatch
+> >>   ARM: s3c24xx: use SAMSUNG_WAKEMASK for s3c2416
+> >>   ARM: s3c24xx: fix building without PM_SLEEP
+> >>   ARM: s3c24xx: fix header file inclusions
+> >>   ARM: s3c24xx: avoid a Kconfig warning
+> >>   ARM: EXYNOS: suspend requires regulator access
+> >>   ARM: EXYNOS: make exynos 4210 cpuidle build without SMP
 > 
-> This is an alternative to the solutions in:
-> https://lkml.org/lkml/2015/2/23/442
+> Arnd,
+> 
+> BTW, I can't see exynos related patches in my mailbox, I don't know the
+> reason...can you please re-send it?
 
-"504 Gateway Time-out"
+Thanks for letting me know. It was a problem on my side with git-send-email
+when sending them out. I'll send them using my normal mail client now.
 
-Hector's original patch had very useful descriptions of the bug, why it
-occurred, how it was exploited it and how the patch fixes it.
-
-Your changelogs contain none of this and can be summarized as "randomly
-churn code around for no apparent reason".
-
-Wanna try again?  I guess the [0/5] and [4/5] changelogs are the ones
-to fix.
+	Arnd
