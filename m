@@ -1,32 +1,46 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 2 Mar 2015 14:22:34 +0100
-Subject: [PATCH] ARM: at91: remove NEED_MACH_IO_H
-In-Reply-To: <2695765.t2RUmlZpTO@wuerfel>
-References: <2695765.t2RUmlZpTO@wuerfel>
-Message-ID: <20150302132234.GP4094@piout.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 2 Mar 2015 21:24:13 +0800
+Subject: [PATCH RFC v9 00/20] Add support for i.MX MIPI DSI DRM driver
+In-Reply-To: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
+References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <20150302132411.GF3040@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2015 at 14:09:57 +0100, Arnd Bergmann wrote :
-> The mach/io.h header on at91 is used to support a nonstandard I/O space
-> window for the cf card driver. This changes the driver to use pci_ioremap_io
-> in order to have the standard location, and then removes the custom
-> mach/io.h.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ----
-> I've found this patch in an old git tree of mine. I think it's still needed,
-> but see for yourselves.
-> 
+On Thu, Feb 12, 2015 at 02:01:23PM +0800, Liu Ying wrote:
+> Liu Ying (20):
+>   clk: divider: Correct parent clk round rate if no bestdiv is normally
+>     found
 
-Do you think we can take it through the at91 tree? I think my previous
-patch went through arm-soc.
+>   ARM: imx6q: Add GPR3 MIPI muxing control register field shift bits
+>     definition
+>   ARM: imx6q: clk: Add the video_27m clock
+>   ARM: imx6q: clk: Change hdmi_isfr clock's parent to be video_27m clock
+>   ARM: imx6q: clk: Change hsi_tx clock to be a shared clock gate
+>   ARM: imx6q: clk: Add support for mipi_core_cfg clock as a shared clock
+>     gate
+>   ARM: imx6q: clk: Add support for mipi_ipg clock as a shared clock gate
+>   ARM: dts: imx6qdl: Move existing MIPI DSI ports into a new 'ports'
+>     node
 
-If yes, I'll include it in the multiplatform series to reduce the number
-of conflicts in Kconfig.
+Applied above 7 i.MX patches (#2 ~ #8).
 
+Shawn
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>   drm/dsi: Add a helper to get bits per pixel of MIPI DSI pixel format
+>   Documentation: dt-bindings: Add bindings for Synopsys DW MIPI DSI DRM
+>     bridge driver
+>   drm/bridge: Add Synopsys DesignWare MIPI DSI host controller driver
+>   Documentation: dt-bindings: Add bindings for i.MX specific Synopsys DW
+>     MIPI DSI driver
+>   drm: imx: Support Synopsys DesignWare MIPI DSI host controller
+>   Documentation: dt-bindings: Add bindings for Himax HX8369A DRM panel
+>     driver
+>   drm: panel: Add support for Himax HX8369A MIPI DSI panel
+>   ARM: dtsi: imx6qdl: Add support for MIPI DSI host controller
+>   ARM: dts: imx6qdl-sabresd: Add support for TRULY TFT480800-16-E MIPI
+>     DSI panel
+>   ARM: imx_v6_v7_defconfig: Cleanup for imx drm being moved out of
+>     staging
+>   ARM: imx_v6_v7_defconfig: Add support for MIPI DSI host controller
+>   ARM: imx_v6_v7_defconfig: Add support for Himax HX8369A panel
