@@ -1,40 +1,20 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon,  2 Mar 2015 19:28:45 +0200
-Subject: [PATCH] pinctrl: at91: simplify probe error handling
-Message-ID: <2adab2d9a86d0e44051541052ace08527bdcc045.1425317325.git.baruch@tkos.co.il>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 2 Mar 2015 09:29:47 -0800
+Subject: [PATCH] arm/arm64: KVM: fix missing unlock on error in
+ kvm_vgic_create()
+In-Reply-To: <1425037305-23292-1-git-send-email-weiyj_lk@163.com>
+References: <1425037305-23292-1-git-send-email-weiyj_lk@163.com>
+Message-ID: <20150302172947.GC10137@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no code ender the 'err' label. Just return the error code directly.
+On Fri, Feb 27, 2015 at 07:41:45PM +0800, weiyj_lk at 163.com wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> Add the missing unlock before return from function kvm_vgic_create()
+> in the error handling case.
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- drivers/pinctrl/pinctrl-at91.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index f4cd0b9b2438..6cfe534ab27e 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -1240,8 +1240,7 @@ static int at91_pinctrl_probe(struct platform_device *pdev)
- 
- 	if (!info->pctl) {
- 		dev_err(&pdev->dev, "could not register AT91 pinctrl driver\n");
--		ret = -EINVAL;
--		goto err;
-+		return -EINVAL;
- 	}
- 
- 	/* We will handle a range of GPIO pins */
-@@ -1252,9 +1251,6 @@ static int at91_pinctrl_probe(struct platform_device *pdev)
- 	dev_info(&pdev->dev, "initialized AT91 pinctrl driver\n");
- 
- 	return 0;
--
--err:
--	return ret;
- }
- 
- static int at91_pinctrl_remove(struct platform_device *pdev)
--- 
-2.1.4
+Thanks, applied.
+-Christoffer
