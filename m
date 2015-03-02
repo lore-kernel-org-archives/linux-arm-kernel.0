@@ -1,77 +1,48 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 2 Mar 2015 14:40:37 +0000
-Subject: [RFC PATCH] arm64: use fixmap region for permanent FDT mapping
-In-Reply-To: <1425048823-25206-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1425048823-25206-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150302144036.GE16779@leverpostej>
+Date: Mon, 2 Mar 2015 14:45:03 +0000
+Subject: [PATCH] arm64: Documentation: clarify Image placement in
+ physical RAM
+In-Reply-To: <CAKv+Gu9SvJ4nCCtCbre-hN1WFXazXCgkX15mYNsj0ZweJAD6Qw@mail.gmail.com>
+References: <1425296935-19097-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150302142007.GD16779@leverpostej>
+ <CAKv+Gu9SvJ4nCCtCbre-hN1WFXazXCgkX15mYNsj0ZweJAD6Qw@mail.gmail.com>
+Message-ID: <20150302144502.GF16779@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 02:53:43PM +0000, Ard Biesheuvel wrote:
-> Currently, the FDT blob needs to be in the same naturally aligned
-> 512 MB region as the kernel, so that it can be mapped into the
-> kernel virtual memory space very early on using a minimal set of
-> statically allocated translation tables.
+On Mon, Mar 02, 2015 at 02:27:35PM +0000, Ard Biesheuvel wrote:
+> On 2 March 2015 at 14:20, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Mon, Mar 02, 2015 at 11:48:55AM +0000, Ard Biesheuvel wrote:
+> >> The early init code maps the kernel image using statically
+> >> allocated page tables. This means that we can only allow
+> >> Image to be placed such that we can map its entire static
+> >> footprint using a single table entry at all but the lowest
+> >> level. So update the documentation to reflect that the Image
+> >> should not cross a 512 MB boundary, which ensures the above
+> >> on both 4k and 64k pages kernels.
+> >>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >
+> > Acked-by: Mark Rutland <mark.rutland@arm.com>
+> >
 > 
-> Now that we have early fixmap support, we can relax this restriction,
-> by moving the permanent FDT mapping to the fixmap region instead.
-> This way, the FDT blob may be anywhere in memory.
+> Thanks.
+> Note that the text is still wrong wrt to the FDT:
+> 
+> """
+> The device tree blob (dtb) must be placed on an 8-byte boundary within
+> the first 512 megabytes from the start of the kernel image [...]
+> """
+> 
+> but perhaps we should discuss first if we want to relax the
+> requirement that it shares the same 512 MB aligned region with the
+> kernel.
+> (RFC patch sent out last Friday, but there are some caveats)
 
-Neat! I was hoping we'd have the chance to do this at some point.
+I think we do; I've commented in that thread.
 
-[...]
-
-> +	/*
-> +	 * Reserve 2 MB of virtual space for the FDT at the top of the fixmap
-> +	 * region. Keep this at the top so it remains 2 MB aligned.
-> +	 */
-> +#define FIX_FDT_SIZE		SZ_2M
-> +	FIX_FDT_END,
-> +	FIX_FDT = FIX_FDT_END + FIX_FDT_SIZE / PAGE_SIZE - 1,
-
-Doesn't the presence of the FIX_HOLE entry mean that this isn't 2MB
-aligned?
-
-[...]
-
->  __create_page_tables:
-> -	pgtbl	x25, x26, x28			// idmap_pg_dir and swapper_pg_dir addresses
-> +	pgtbl	x25, x26, x28	// idmap_pg_dir and swapper_pg_dir addresses
->  	mov	x27, lr
->  
->  	/*
-
-This comment should just stay where it was. It aligns with comments
-later within __create_page_tables that are left alone by this patch, so
-we don't gain anything by moving it.
-
-[...]
-
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index e8420f635bd4..7ea087d904ad 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -309,12 +309,14 @@ static void __init setup_processor(void)
->  
->  static void __init setup_machine_fdt(phys_addr_t dt_phys)
->  {
-> -	if (!dt_phys || !early_init_dt_scan(phys_to_virt(dt_phys))) {
-> +	void *dt_virt = fixmap_remap_fdt(dt_phys);
-> +
-> +	if (!dt_phys || !early_init_dt_scan(dt_virt)) {
->  		early_print("\n"
->  			"Error: invalid device tree blob at physical address 0x%p (virtual address 0x%p)\n"
-> -			"The dtb must be 8-byte aligned and passed in the first 512MB of memory\n"
-> +			"The dtb must be 8-byte aligned\n"
->  			"\nPlease check your bootloader.\n",
-> -			dt_phys, phys_to_virt(dt_phys));
-> +			dt_phys, dt_virt);
-
-We should also check that the reported size in the header doesn't cross
-a 2MB PA boundary, or we won't be able to map the whole DTB and the
-crc32 code will explode later.
-
-Otherwise this looks good!
+Assuming everyone else is happy with that, I guess these two patches
+should be kept as a series.
 
 Thanks,
 Mark.
