@@ -1,221 +1,359 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  2 Mar 2015 22:12:47 +0100
-Subject: [PATCH 5/9] ARM: at91: add soc detection infrastructure
+Date: Mon,  2 Mar 2015 22:12:51 +0100
+Subject: [PATCH 9/9] ARM: at91: remove old setup
 In-Reply-To: <1425330771-23046-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1425330771-23046-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1425330771-23046-6-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1425330771-23046-10-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+The old setup is not used anymore, remove it
 
-Add new structures and functions to handle AT91 SoC detection.
-
-[alexandre.belloni at free-electrons.com: reworked DBGU detection]
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- arch/arm/Kconfig            |   1 +
  arch/arm/mach-at91/Makefile |   2 +-
- arch/arm/mach-at91/soc.c    | 109 ++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-at91/soc.h    |  48 +++++++++++++++++++
- 4 files changed, 159 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-at91/soc.c
- create mode 100644 arch/arm/mach-at91/soc.h
+ arch/arm/mach-at91/setup.c  | 320 --------------------------------------------
+ 2 files changed, 1 insertion(+), 321 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/setup.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e7ce6612bc42..f6c5b05e8de8 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -363,6 +363,7 @@ config ARCH_AT91
- 	select IRQ_DOMAIN
- 	select PINCTRL
- 	select PINCTRL_AT91
-+	select SOC_BUS
- 	select USE_OF
- 	help
- 	  This enables support for systems based on Atmel
 diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 827fdbcce1c7..44a5c1a92b39 100644
+index 44a5c1a92b39..50c0b526dcd8 100644
 --- a/arch/arm/mach-at91/Makefile
 +++ b/arch/arm/mach-at91/Makefile
 @@ -2,7 +2,7 @@
  # Makefile for the linux kernel.
  #
  
--obj-y		:= setup.o
-+obj-y		:= setup.o soc.o
+-obj-y		:= setup.o soc.o
++obj-y		:= soc.o
  
  obj-$(CONFIG_SOC_AT91SAM9)	+= sam9_smc.o
  
-diff --git a/arch/arm/mach-at91/soc.c b/arch/arm/mach-at91/soc.c
-new file mode 100644
-index 000000000000..33c65dc56893
---- /dev/null
-+++ b/arch/arm/mach-at91/soc.c
-@@ -0,0 +1,109 @@
-+/*
-+ * Copyright (C) 2015 Atmel
-+ *
-+ * Alexandre Belloni <alexandre.belloni at free-electrons.com
-+ * Boris Brezillon <boris.brezillon@free-electrons.com
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ */
-+
-+#define pr_fmt(fmt)	"AT91: " fmt
-+
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
-+#include <linux/slab.h>
-+#include <linux/sys_soc.h>
-+
-+#include "soc.h"
-+
-+#define AT91_DBGU_CIDR			0x40
-+#define AT91_DBGU_CIDR_ARCH(x)		(((x) >> 20) & 0xff)
-+#define AT91_DBGU_CIDR_VERSION(x)	((x) & 0x1f)
-+#define AT91_DBGU_CIDR_EXT		BIT(31)
-+#define AT91_DBGU_CIDR_MATCH_MASK	0x7fffffe0
-+#define AT91_DBGU_EXID			0x44
-+
-+struct soc_device * __init at91_soc_init(const struct at91_soc_family *families)
-+{
-+	struct soc_device_attribute *soc_dev_attr;
-+	const struct at91_soc_family *family;
-+	const struct at91_soc *soc;
-+	struct soc_device *soc_dev;
-+	struct device_node *np;
-+	void __iomem *regs;
-+	u32 cidr, exid;
-+
-+
-+	np = of_find_compatible_node(NULL, NULL, "atmel,at91rm9200-dbgu");
-+	if (!np)
-+		np = of_find_compatible_node(NULL, NULL,
-+					     "atmel,at91sam9260-dbgu");
-+
-+	if (!np) {
-+		pr_warn("Could not find DBGU node");
-+		return NULL;
-+	}
-+
-+	regs = of_iomap(np, 0);
-+	of_node_put(np);
-+
-+	if (!regs) {
-+		pr_warn("Could not map DBGU iomem range");
-+		iounmap(regs);
-+		return NULL;
-+	}
-+
-+	cidr = readl(regs + AT91_DBGU_CIDR);
-+	exid = readl(regs + AT91_DBGU_EXID);
-+
-+	iounmap(regs);
-+
-+	for (family = families; family->name; family++) {
-+		if (family->id == AT91_DBGU_CIDR_ARCH(cidr))
-+			break;
-+	}
-+
-+	if (!family->name) {
-+		pr_warn("Could not find matching SoC family\n");
-+		return NULL;
-+	}
-+
-+	for (soc = family->socs; soc->name; soc++) {
-+		if (soc->cidr_match != (cidr & AT91_DBGU_CIDR_MATCH_MASK))
-+			continue;
-+
-+		if (!(cidr & AT91_DBGU_CIDR_EXT) || soc->exid_match == exid)
-+			break;
-+	}
-+
-+	if (!soc->name) {
-+		pr_warn("Could not find matching SoC description\n");
-+		return NULL;
-+	}
-+
-+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	if (!soc_dev_attr)
-+		return NULL;
-+
-+	soc_dev_attr->family = family->name;
-+	soc_dev_attr->soc_id = soc->name;
-+	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%X",
-+					   AT91_DBGU_CIDR_VERSION(cidr));
-+	soc_dev = soc_device_register(soc_dev_attr);
-+	if (IS_ERR(soc_dev)) {
-+		kfree(soc_dev_attr->revision);
-+		kfree(soc_dev_attr);
-+		pr_warn("Could not register SoC device\n");
-+		return NULL;
-+	}
-+
-+	pr_info("Detected soc type: %s, revision %X\n", soc->name,
-+		AT91_DBGU_CIDR_VERSION(cidr));
-+
-+	return soc_dev;
-+}
-diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
-new file mode 100644
-index 000000000000..8a93e65871f8
---- /dev/null
-+++ b/arch/arm/mach-at91/soc.h
-@@ -0,0 +1,48 @@
-+/*
-+ * Copyright (C) 2015 Atmel
-+ *
-+ * Boris Brezillon <boris.brezillon@free-electrons.com
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ */
-+
-+#ifndef __AT91_SOC_H
-+#define __AT91_SOC_H
-+
-+#include <linux/sys_soc.h>
-+
-+struct at91_soc {
-+	u32 cidr_match;
-+	u32 exid_match;
-+	const char *name;
-+	const char *compatible;
-+};
-+
-+struct at91_soc_family {
-+	int id;
-+	const char *name;
-+	const struct at91_soc *socs;
-+};
-+
-+#define AT91_SOC(__cidr, __exid, __name, __compatible)		\
-+	{							\
-+		.cidr_match = (__cidr),				\
-+		.exid_match = (__exid),				\
-+		.name = (__name),				\
-+		.compatible = (__compatible),			\
-+	}
-+
-+#define AT91_SOC_FAMILY(__id, __name, __socs)			\
-+	{							\
-+		.id = (__id),					\
-+		.name = (__name),				\
-+		.socs = (__socs),				\
-+	}
-+
-+struct soc_device * __init
-+at91_soc_init(const struct at91_soc_family *families);
-+
-+#endif /* __AT91_SOC_H */
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+deleted file mode 100644
+index ef778f33c488..000000000000
+--- a/arch/arm/mach-at91/setup.c
++++ /dev/null
+@@ -1,320 +0,0 @@
+-/*
+- * Copyright (C) 2007 Atmel Corporation.
+- * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+- *
+- * Under GPLv2
+- */
+-
+-#define pr_fmt(fmt)	"AT91: " fmt
+-
+-#include <linux/module.h>
+-#include <linux/io.h>
+-#include <linux/mm.h>
+-#include <linux/pm.h>
+-#include <linux/of_address.h>
+-#include <linux/pinctrl/machine.h>
+-#include <linux/clk/at91_pmc.h>
+-
+-#include <asm/system_misc.h>
+-#include <asm/mach/map.h>
+-
+-#include <mach/hardware.h>
+-#include <mach/cpu.h>
+-#include <mach/at91_dbgu.h>
+-
+-#include "generic.h"
+-#include "pm.h"
+-
+-struct at91_socinfo at91_soc_initdata;
+-EXPORT_SYMBOL(at91_soc_initdata);
+-
+-static struct map_desc at91_io_desc __initdata __maybe_unused = {
+-	.virtual	= (unsigned long)AT91_VA_BASE_SYS,
+-	.pfn		= __phys_to_pfn(AT91_BASE_SYS),
+-	.length		= SZ_16K,
+-	.type		= MT_DEVICE,
+-};
+-
+-static struct map_desc at91_alt_io_desc __initdata __maybe_unused = {
+-	.virtual	= (unsigned long)AT91_ALT_VA_BASE_SYS,
+-	.pfn		= __phys_to_pfn(AT91_ALT_BASE_SYS),
+-	.length		= 24 * SZ_1K,
+-	.type		= MT_DEVICE,
+-};
+-
+-static void __init soc_detect(u32 dbgu_base)
+-{
+-	u32 cidr, socid;
+-
+-	cidr = __raw_readl(AT91_IO_P2V(dbgu_base) + AT91_DBGU_CIDR);
+-	socid = cidr & ~AT91_CIDR_VERSION;
+-
+-	switch (socid) {
+-	case ARCH_ID_AT91RM9200:
+-		at91_soc_initdata.type = AT91_SOC_RM9200;
+-		if (at91_soc_initdata.subtype == AT91_SOC_SUBTYPE_UNKNOWN)
+-			at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
+-		break;
+-
+-	case ARCH_ID_AT91SAM9260:
+-		at91_soc_initdata.type = AT91_SOC_SAM9260;
+-		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+-		break;
+-
+-	case ARCH_ID_AT91SAM9261:
+-		at91_soc_initdata.type = AT91_SOC_SAM9261;
+-		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+-		break;
+-
+-	case ARCH_ID_AT91SAM9263:
+-		at91_soc_initdata.type = AT91_SOC_SAM9263;
+-		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+-		break;
+-
+-	case ARCH_ID_AT91SAM9G20:
+-		at91_soc_initdata.type = AT91_SOC_SAM9G20;
+-		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+-		break;
+-
+-	case ARCH_ID_AT91SAM9G45:
+-		at91_soc_initdata.type = AT91_SOC_SAM9G45;
+-		if (cidr == ARCH_ID_AT91SAM9G45ES)
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9G45ES;
+-		break;
+-
+-	case ARCH_ID_AT91SAM9RL64:
+-		at91_soc_initdata.type = AT91_SOC_SAM9RL;
+-		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+-		break;
+-
+-	case ARCH_ID_AT91SAM9X5:
+-		at91_soc_initdata.type = AT91_SOC_SAM9X5;
+-		break;
+-
+-	case ARCH_ID_AT91SAM9N12:
+-		at91_soc_initdata.type = AT91_SOC_SAM9N12;
+-		break;
+-
+-	case ARCH_ID_SAMA5:
+-		at91_soc_initdata.exid = __raw_readl(AT91_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
+-		if (at91_soc_initdata.exid & ARCH_EXID_SAMA5D3) {
+-			at91_soc_initdata.type = AT91_SOC_SAMA5D3;
+-		}
+-		break;
+-	}
+-
+-	/* at91sam9g10 */
+-	if ((socid & ~AT91_CIDR_EXT) == ARCH_ID_AT91SAM9G10) {
+-		at91_soc_initdata.type = AT91_SOC_SAM9G10;
+-		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+-	}
+-	/* at91sam9xe */
+-	else if ((cidr & AT91_CIDR_ARCH) == ARCH_FAMILY_AT91SAM9XE) {
+-		at91_soc_initdata.type = AT91_SOC_SAM9260;
+-		at91_soc_initdata.subtype = AT91_SOC_SAM9XE;
+-	}
+-
+-	if (!at91_soc_is_detected())
+-		return;
+-
+-	at91_soc_initdata.cidr = cidr;
+-
+-	/* sub version of soc */
+-	if (!at91_soc_initdata.exid)
+-		at91_soc_initdata.exid = __raw_readl(AT91_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
+-
+-	if (at91_soc_initdata.type == AT91_SOC_SAM9G45) {
+-		switch (at91_soc_initdata.exid) {
+-		case ARCH_EXID_AT91SAM9M10:
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9M10;
+-			break;
+-		case ARCH_EXID_AT91SAM9G46:
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9G46;
+-			break;
+-		case ARCH_EXID_AT91SAM9M11:
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9M11;
+-			break;
+-		}
+-	}
+-
+-	if (at91_soc_initdata.type == AT91_SOC_SAM9X5) {
+-		switch (at91_soc_initdata.exid) {
+-		case ARCH_EXID_AT91SAM9G15:
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9G15;
+-			break;
+-		case ARCH_EXID_AT91SAM9G35:
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9G35;
+-			break;
+-		case ARCH_EXID_AT91SAM9X35:
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9X35;
+-			break;
+-		case ARCH_EXID_AT91SAM9G25:
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9G25;
+-			break;
+-		case ARCH_EXID_AT91SAM9X25:
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9X25;
+-			break;
+-		}
+-	}
+-
+-	if (at91_soc_initdata.type == AT91_SOC_SAMA5D3) {
+-		switch (at91_soc_initdata.exid) {
+-		case ARCH_EXID_SAMA5D31:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D31;
+-			break;
+-		case ARCH_EXID_SAMA5D33:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D33;
+-			break;
+-		case ARCH_EXID_SAMA5D34:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D34;
+-			break;
+-		case ARCH_EXID_SAMA5D35:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D35;
+-			break;
+-		case ARCH_EXID_SAMA5D36:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D36;
+-			break;
+-		}
+-	}
+-}
+-
+-static void __init alt_soc_detect(u32 dbgu_base)
+-{
+-	u32 cidr, socid;
+-
+-	/* SoC ID */
+-	cidr = __raw_readl(AT91_ALT_IO_P2V(dbgu_base) + AT91_DBGU_CIDR);
+-	socid = cidr & ~AT91_CIDR_VERSION;
+-
+-	switch (socid) {
+-	case ARCH_ID_SAMA5:
+-		at91_soc_initdata.exid = __raw_readl(AT91_ALT_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
+-		if (at91_soc_initdata.exid & ARCH_EXID_SAMA5D3) {
+-			at91_soc_initdata.type = AT91_SOC_SAMA5D3;
+-		} else if (at91_soc_initdata.exid & ARCH_EXID_SAMA5D4) {
+-			at91_soc_initdata.type = AT91_SOC_SAMA5D4;
+-		}
+-		break;
+-	}
+-
+-	if (!at91_soc_is_detected())
+-		return;
+-
+-	at91_soc_initdata.cidr = cidr;
+-
+-	/* sub version of soc */
+-	if (!at91_soc_initdata.exid)
+-		at91_soc_initdata.exid = __raw_readl(AT91_ALT_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
+-
+-	if (at91_soc_initdata.type == AT91_SOC_SAMA5D4) {
+-		switch (at91_soc_initdata.exid) {
+-		case ARCH_EXID_SAMA5D41:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D41;
+-			break;
+-		case ARCH_EXID_SAMA5D42:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D42;
+-			break;
+-		case ARCH_EXID_SAMA5D43:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D43;
+-			break;
+-		case ARCH_EXID_SAMA5D44:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D44;
+-			break;
+-		}
+-	}
+-}
+-
+-static const char *soc_name[] = {
+-	[AT91_SOC_RM9200]	= "at91rm9200",
+-	[AT91_SOC_SAM9260]	= "at91sam9260",
+-	[AT91_SOC_SAM9261]	= "at91sam9261",
+-	[AT91_SOC_SAM9263]	= "at91sam9263",
+-	[AT91_SOC_SAM9G10]	= "at91sam9g10",
+-	[AT91_SOC_SAM9G20]	= "at91sam9g20",
+-	[AT91_SOC_SAM9G45]	= "at91sam9g45",
+-	[AT91_SOC_SAM9RL]	= "at91sam9rl",
+-	[AT91_SOC_SAM9X5]	= "at91sam9x5",
+-	[AT91_SOC_SAM9N12]	= "at91sam9n12",
+-	[AT91_SOC_SAMA5D3]	= "sama5d3",
+-	[AT91_SOC_SAMA5D4]	= "sama5d4",
+-	[AT91_SOC_UNKNOWN]	= "Unknown",
+-};
+-
+-const char *at91_get_soc_type(struct at91_socinfo *c)
+-{
+-	return soc_name[c->type];
+-}
+-EXPORT_SYMBOL(at91_get_soc_type);
+-
+-static const char *soc_subtype_name[] = {
+-	[AT91_SOC_RM9200_BGA]	= "at91rm9200 BGA",
+-	[AT91_SOC_RM9200_PQFP]	= "at91rm9200 PQFP",
+-	[AT91_SOC_SAM9XE]	= "at91sam9xe",
+-	[AT91_SOC_SAM9G45ES]	= "at91sam9g45es",
+-	[AT91_SOC_SAM9M10]	= "at91sam9m10",
+-	[AT91_SOC_SAM9G46]	= "at91sam9g46",
+-	[AT91_SOC_SAM9M11]	= "at91sam9m11",
+-	[AT91_SOC_SAM9G15]	= "at91sam9g15",
+-	[AT91_SOC_SAM9G35]	= "at91sam9g35",
+-	[AT91_SOC_SAM9X35]	= "at91sam9x35",
+-	[AT91_SOC_SAM9G25]	= "at91sam9g25",
+-	[AT91_SOC_SAM9X25]	= "at91sam9x25",
+-	[AT91_SOC_SAMA5D31]	= "sama5d31",
+-	[AT91_SOC_SAMA5D33]	= "sama5d33",
+-	[AT91_SOC_SAMA5D34]	= "sama5d34",
+-	[AT91_SOC_SAMA5D35]	= "sama5d35",
+-	[AT91_SOC_SAMA5D36]	= "sama5d36",
+-	[AT91_SOC_SAMA5D41]	= "sama5d41",
+-	[AT91_SOC_SAMA5D42]	= "sama5d42",
+-	[AT91_SOC_SAMA5D43]	= "sama5d43",
+-	[AT91_SOC_SAMA5D44]	= "sama5d44",
+-	[AT91_SOC_SUBTYPE_NONE]	= "None",
+-	[AT91_SOC_SUBTYPE_UNKNOWN] = "Unknown",
+-};
+-
+-const char *at91_get_soc_subtype(struct at91_socinfo *c)
+-{
+-	return soc_subtype_name[c->subtype];
+-}
+-EXPORT_SYMBOL(at91_get_soc_subtype);
+-
+-void __init at91_map_io(void)
+-{
+-	/* Map peripherals */
+-	iotable_init(&at91_io_desc, 1);
+-
+-	at91_soc_initdata.type = AT91_SOC_UNKNOWN;
+-	at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_UNKNOWN;
+-
+-	soc_detect(AT91_BASE_DBGU0);
+-	if (!at91_soc_is_detected())
+-		soc_detect(AT91_BASE_DBGU1);
+-
+-	if (!at91_soc_is_detected())
+-		panic(pr_fmt("Impossible to detect the SOC type"));
+-
+-	pr_info("Detected soc type: %s\n",
+-		at91_get_soc_type(&at91_soc_initdata));
+-	if (at91_soc_initdata.subtype != AT91_SOC_SUBTYPE_NONE)
+-		pr_info("Detected soc subtype: %s\n",
+-			at91_get_soc_subtype(&at91_soc_initdata));
+-}
+-
+-void __init at91_alt_map_io(void)
+-{
+-	/* Map peripherals */
+-	iotable_init(&at91_alt_io_desc, 1);
+-
+-	at91_soc_initdata.type = AT91_SOC_UNKNOWN;
+-	at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_UNKNOWN;
+-
+-	alt_soc_detect(AT91_BASE_DBGU2);
+-	if (!at91_soc_is_detected())
+-		panic("AT91: Impossible to detect the SOC type");
+-
+-	pr_info("AT91: Detected soc type: %s\n",
+-		at91_get_soc_type(&at91_soc_initdata));
+-	if (at91_soc_initdata.subtype != AT91_SOC_SUBTYPE_NONE)
+-		pr_info("AT91: Detected soc subtype: %s\n",
+-			at91_get_soc_subtype(&at91_soc_initdata));
+-}
 -- 
 2.1.0
