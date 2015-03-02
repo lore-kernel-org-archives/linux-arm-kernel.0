@@ -1,17 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 2 Mar 2015 20:46:27 +0800
-Subject: [PATCH 1/2] ARM: mxs_defconfig: Add VFAT support
-In-Reply-To: <1423260587-3225-1-git-send-email-festevam@gmail.com>
-References: <1423260587-3225-1-git-send-email-festevam@gmail.com>
-Message-ID: <20150302124625.GE3040@dragon>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon,  2 Mar 2015 12:48:36 +0000
+Subject: [PATCH 0/3] Enable ahci_st for stih407 and fix hang
+Message-ID: <1425300519-13747-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 06, 2015 at 08:09:46PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Select CONFIG_VFAT_FS by default.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Hi,
 
-Applied both, thanks.
+Now that miphy28lp phy is present upstream we can add sata DT nodes for
+stih407 family silicon. As part of testing this I found a hang
+with the current driver implmentation which does some register writes
+before enabling the IP clock. Presumably on stih416 devices the sata
+clock must have already been enabled by the targetpack/bootloader.
+
+This series also tidys up some inaccuracies in the DT documentation
+where the doc hasn't kept aligned with the driver. In addtion to these
+fixes I've also added an example for stih407 silicon.
+
+Peter Griffin (3):
+  ahci: st: Update the ahci_st DT documentation
+  ARM: DT: STi: STiH407: Add sata DT nodes.
+  ahci: st: st_configure_oob must be called after IP is clocked.
+
+ Documentation/devicetree/bindings/ata/ahci-st.txt | 45 ++++++++++++++++-------
+ arch/arm/boot/dts/stih407-family.dtsi             | 44 ++++++++++++++++++++++
+ drivers/ata/ahci_st.c                             |  6 ++-
+ 3 files changed, 80 insertions(+), 15 deletions(-)
+
+-- 
+1.9.1
