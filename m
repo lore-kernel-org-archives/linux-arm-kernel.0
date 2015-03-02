@@ -1,62 +1,47 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 02 Mar 2015 17:06:52 +0000
-Subject: [PATCH 10/10] ARM: omap2: use clkdev_add_alias()
-In-Reply-To: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
-References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
-Message-ID: <E1YSTnw-0001K5-IQ@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Mar 2015 17:05:38 +0000
+Subject: [PATCH 00/10] initial clkdev cleanups
+Message-ID: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When creating aliases of existing clkdev clocks, use clkdev_add_alias()
-isntead of open coding the lookup and clk_lookup creation.
+Here's some initial clkdev cleanups.  These are targetted for the next
+merge window, and while the initial patches can be merged independently,
+I'd prefer to keep the series together as further work on solving the
+problems which unique struct clk's has introduced is needed.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mach-omap2/omap_device.c | 24 +++++++++---------------
- 1 file changed, 9 insertions(+), 15 deletions(-)
+The initial cleanups are more about using the correct clkdev function
+than anything else: there's no point interating over a array of
+clk_lookup structs, adding each one in turn when we have had a function
+which does this since forever.
 
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index be9541e18650..521c32e7778e 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -47,7 +47,7 @@ static void _add_clkdev(struct omap_device *od, const char *clk_alias,
- 		       const char *clk_name)
- {
- 	struct clk *r;
--	struct clk_lookup *l;
-+	int rc;
- 
- 	if (!clk_alias || !clk_name)
- 		return;
-@@ -62,21 +62,15 @@ static void _add_clkdev(struct omap_device *od, const char *clk_alias,
- 		return;
- 	}
- 
--	r = clk_get(NULL, clk_name);
--	if (IS_ERR(r)) {
--		dev_err(&od->pdev->dev,
--			"clk_get for %s failed\n", clk_name);
--		return;
-+	rc = clk_add_alias(clk_alias, dev_name(&od->pdev->dev), clk_name, NULL);
-+	if (rc) {
-+		if (rc == -ENODEV || rc == -ENOMEM)
-+			dev_err(&od->pdev->dev,
-+				"clkdev_alloc for %s failed\n", clk_alias);
-+		else
-+			dev_err(&od->pdev->dev,
-+				"clk_get for %s failed\n", clk_name);
- 	}
--
--	l = clkdev_alloc(r, clk_alias, dev_name(&od->pdev->dev));
--	if (!l) {
--		dev_err(&od->pdev->dev,
--			"clkdev_alloc for %s failed\n", clk_alias);
--		return;
--	}
--
--	clkdev_add(l);
- }
- 
- /**
+I'm also killing a chunk of seemingly unused code in the omap3isp driver.
+
+Lastly, I'm introducing a clkdev_create() helper, which combines the
+clkdev_alloc() + clkdev_add() pattern which keeps cropping up.
+
+Individual patches copied to appropriate people, but they will all appear
+on the mailing lists.
+
+ arch/arm/mach-lpc32xx/clock.c                |  5 +--
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c | 12 ++-----
+ arch/arm/mach-omap2/omap_device.c            | 24 +++++--------
+ arch/arm/plat-orion/common.c                 |  6 +---
+ arch/sh/kernel/cpu/sh4a/clock-sh7734.c       |  3 +-
+ arch/sh/kernel/cpu/sh4a/clock-sh7757.c       |  4 +--
+ arch/sh/kernel/cpu/sh4a/clock-sh7785.c       |  4 +--
+ arch/sh/kernel/cpu/sh4a/clock-sh7786.c       |  4 +--
+ arch/sh/kernel/cpu/sh4a/clock-shx3.c         |  4 +--
+ drivers/clk/clk-s2mps11.c                    |  4 +--
+ drivers/clk/clkdev.c                         | 52 +++++++++++++++++++++-------
+ drivers/clk/versatile/clk-impd1.c            |  4 +--
+ drivers/media/platform/omap3isp/isp.c        | 18 ----------
+ drivers/media/platform/omap3isp/isp.h        |  1 -
+ include/linux/clkdev.h                       |  3 ++
+ include/media/omap3isp.h                     |  6 ----
+ sound/soc/sh/migor.c                         |  3 +-
+ 17 files changed, 68 insertions(+), 89 deletions(-)
+
 -- 
-1.8.3.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
