@@ -1,64 +1,51 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Mon, 2 Mar 2015 11:38:58 -0800
-Subject: [PATCH v4 2/2] Input: bcm-keypad: Add Broadcom keypad controller
-In-Reply-To: <20150228221518.GB36282@dtor-ws>
-References: <sbranden@broadcom.com>
- <1425141357-7807-1-git-send-email-sbranden@broadcom.com>
- <1425141357-7807-3-git-send-email-sbranden@broadcom.com>
- <20150228221022.GA36282@dtor-ws> <20150228221518.GB36282@dtor-ws>
-Message-ID: <54F4BC52.6030909@broadcom.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 03 Mar 2015 04:40:02 +0900
+Subject: [PATCH] ARM: fix exynos randconfig build error
+In-Reply-To: <54EF9091.30802@kernel.org>
+References: <E1YQa78-0000O0-A4@rmk-PC.arm.linux.org.uk>
+ <CAJKOXPf2F-g9fU9TrNXz8LPwp8fBNZ6NpaAoP15N0nbHWVesaw@mail.gmail.com>
+ <54EF9091.30802@kernel.org>
+Message-ID: <54F4BC92.2050405@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+On 02/27/15 06:30, Kukjin Kim wrote:
+> On 02/25/15 20:46, Krzysztof Kozlowski wrote:
+>> 2015-02-25 12:26 GMT+01:00 Russell King <rmk+kernel@arm.linux.org.uk>:
+>>> The following error was observed with SMP=n in v4.0-rc1:
+>>>
+>>> arch/arm/mach-exynos/pm.c: In function 'exynos_cpu0_enter_aftr':
+>>> arch/arm/mach-exynos/pm.c:246:4: error: implicit declaration of function 'arch_send_wakeup_ipi_mask' [-Werror=implicit-function-declaration]
+>>>
+>>> As the code unconditionally calls a function only available with SMP=y,
+>>> make the Exynos PM support depend on SMP.
+>>>
+>>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>>
+>> Hi,
+>>
+>> Thanks for the patch but this already waits for Kukjin top be picked
+>> up. The first patch was similar to yours (adds dependency on SMP),
+>> sent on 4th of February:
+>> https://patchwork.ozlabs.org/patch/436231/
+>>
+>> But later Bartlomiej fixed this in other way (allowing to use cpuidle
+>> on non-SMP):
+>> https://patchwork.ozlabs.org/patch/436445/
+>>
+>> Unfortunately none of them were picked up.
+>>
+> I've missed the fix, sorry.
+> 
+> BTW, as you know, all of exynos SoCs are based on SMP so generally (in
+> normal case) there is no reason to use non-SMP on exynos
+> platforms...even though I understand the build error should be fixed...
+> 
+> Anyway, I'll have a look Bart's patch and Russell's fix in this weekend.
+> 
 
-Yes, please improve the driver and make the local change.
+Firstly, let me take rmk's patch for the randconfig build error...BTW
+I'm still wondering exynos stuff needs to support non-SMP and need to
+think more about its usefulness?...
 
-Regards,
-  Scott
-
-On 15-02-28 02:15 PM, Dmitry Torokhov wrote:
-> On Sat, Feb 28, 2015 at 02:10:22PM -0800, Dmitry Torokhov wrote:
->> Hi Scott,
->>
->> On Sat, Feb 28, 2015 at 08:35:57AM -0800, Scott Branden wrote:
->>> +	/* Enable clock */
->>> +
->>> +	kp->clk = devm_clk_get(&pdev->dev, "peri_clk");
->>> +	if (IS_ERR(kp->clk)) {
->>> +		dev_info(&pdev->dev,
->>> +			"No clock specified. Assuming it's enabled\n");
->>
->> I was doing the final pass before applying and I think that this is not
->> quite correct, as it does not handle -EPROBE_DEFER properly which is
->> quite common. I think we should do something like this:
->>
->> 		error = PTR_ERR(kp->clk);
->> 		if (error != -ENOENT) {
->> 			if (error != -EPROBE_DEFER)
->> 				dev_err(.. "Failed to get clock" ...);
->> 			return error;
->> 		}
->> 		dev_dbg(... "No clock specified" ...);
->>
->> No need to resubmit if you are OK with this, I can make the change
->> locally.
->
-> Hmm, also bcm_kp_start() and bcm_kp_stop() should check if kp->clk is
-> valid before trying to enable/disable it.
->
-I am ok with these changes if you want to change locally.
-
->>
->>> +	}
->>> +	else {
->>
->> Checkpach should have warned you that it should have been "} else {";
->> I'll fix it up locally along with few other cosmetic changes and
->> dropping a few extra headers.
->>
->> Thanks.
->>
->> --
->> Dmitry
->
+- Kukjin
