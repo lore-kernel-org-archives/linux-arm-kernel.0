@@ -1,9 +1,9 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 02 Mar 2015 17:06:32 +0000
-Subject: [PATCH 06/10] ASOC: migor: use clkdev_create()
+Date: Mon, 02 Mar 2015 17:06:37 +0000
+Subject: [PATCH 07/10] clk: s2mps11: use clkdev_create()
 In-Reply-To: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
 References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
-Message-ID: <E1YSTnc-0001Jo-1U@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1YSTnh-0001Jt-6G@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,26 +12,28 @@ clkdev_add().  Use this instead.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- sound/soc/sh/migor.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/clk/clk-s2mps11.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/sound/soc/sh/migor.c b/sound/soc/sh/migor.c
-index 82f582344fe7..672bcd4c252b 100644
---- a/sound/soc/sh/migor.c
-+++ b/sound/soc/sh/migor.c
-@@ -162,12 +162,11 @@ static int __init migor_init(void)
- 	if (ret < 0)
- 		return ret;
+diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
+index bfa1e64e267d..9b13a303d3f8 100644
+--- a/drivers/clk/clk-s2mps11.c
++++ b/drivers/clk/clk-s2mps11.c
+@@ -242,14 +242,12 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
+ 			goto err_reg;
+ 		}
  
--	siumckb_lookup = clkdev_alloc(&siumckb_clk, "siumckb_clk", NULL);
-+	siumckb_lookup = clkdev_create(&siumckb_clk, "siumckb_clk", NULL);
- 	if (!siumckb_lookup) {
- 		ret = -ENOMEM;
- 		goto eclkdevalloc;
+-		s2mps11_clk->lookup = clkdev_alloc(s2mps11_clk->clk,
++		s2mps11_clk->lookup = clkdev_create(s2mps11_clk->clk,
+ 					s2mps11_name(s2mps11_clk), NULL);
+ 		if (!s2mps11_clk->lookup) {
+ 			ret = -ENOMEM;
+ 			goto err_lup;
+ 		}
+-
+-		clkdev_add(s2mps11_clk->lookup);
  	}
--	clkdev_add(siumckb_lookup);
  
- 	/* Port number used on this machine: port B */
- 	migor_snd_device = platform_device_alloc("soc-audio", 1);
+ 	for (i = 0; i < S2MPS11_CLKS_NUM; i++) {
 -- 
 1.8.3.1
