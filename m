@@ -1,25 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 2 Mar 2015 16:17:12 +0000
-Subject: [PATCH 00/10] ARM: s3c64xx multiplatform, help needed
-In-Reply-To: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
-References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
-Message-ID: <20150302161712.GX21293@sirena.org.uk>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon,  2 Mar 2015 17:21:59 +0100
+Subject: [PATCH 0/3] clk: meson: Add clock controller
+Message-ID: <1425313322-18567-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 01:35:53PM +0100, Arnd Bergmann wrote:
+From: Carlo Caione <carlo@endlessm.com>
 
-> Does anyone still have access to the hardware? I'm particularly
-> interested in seeing this patch set get tested on smartq
-> and on smdk6410, which have the majority of the hardware.
+This patchset introduces preliminary support for the clock controller
+found on Amlogic MesonX SoCs and enables it for the Meson8b.
 
-I and a bunch of other people still have Cragganmore, the ex-Wolfson
-(added Charles here) people may also be able to locate a smdk6410.
-may also be a
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150302/90d0994c/attachment-0001.sig>
+DTS patches with support for Meson8b SoCs will follow.
+
+Carlo Caione (3):
+  clk: meson: Add support for Meson clock controller
+  clk: meson: Document bindings for Meson8b clock controller
+  clk: meson8b: Add support for Meson8b clocks
+
+ .../bindings/clock/amlogic,meson8b-clkc.txt        |  40 +++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/meson/Makefile                         |   6 +
+ drivers/clk/meson/clk-cpu.c                        | 291 +++++++++++++++++++++
+ drivers/clk/meson/clk-pll.c                        | 231 ++++++++++++++++
+ drivers/clk/meson/clkc.c                           | 234 +++++++++++++++++
+ drivers/clk/meson/clkc.h                           | 187 +++++++++++++
+ drivers/clk/meson/meson8b-clkc.c                   | 182 +++++++++++++
+ include/dt-bindings/clock/meson8b-clkc.h           |  20 ++
+ 9 files changed, 1192 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
+ create mode 100644 drivers/clk/meson/Makefile
+ create mode 100644 drivers/clk/meson/clk-cpu.c
+ create mode 100644 drivers/clk/meson/clk-pll.c
+ create mode 100644 drivers/clk/meson/clkc.c
+ create mode 100644 drivers/clk/meson/clkc.h
+ create mode 100644 drivers/clk/meson/meson8b-clkc.c
+ create mode 100644 include/dt-bindings/clock/meson8b-clkc.h
+
+-- 
+1.9.1
