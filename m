@@ -1,42 +1,60 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 2 Mar 2015 16:57:23 -0600
-Subject: EDAC on arm64
-In-Reply-To: <20150302222704.GB13277@MBP.local>
-References: <54F11133.70909@redhat.com> <20150302105919.GA4434@arm.com>
- <20150302145840.GQ22541@e104818-lin.cambridge.arm.com>
- <CAL_Jsq+ycHnjtFbmkHTn58vWNvvF81ON-nQBJ0CC5XZCLRnh-g@mail.gmail.com>
- <20150302222704.GB13277@MBP.local>
-Message-ID: <CAL_Jsq+dx3kYAhiGV+NKXaeZZLCk55pDs26J-yaNQtCKqCHZVA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Mar 2015 23:08:15 +0000
+Subject: [PATCH 0/5] ARM: orion5k/mv78xx0/dove multiplatform support
+In-Reply-To: <2171351.v0ZP8NQ0Dy@wuerfel>
+References: <1425328618-894030-1-git-send-email-arnd@arndb.de>
+ <20150302213058.GB2375@lunn.ch> <2171351.v0ZP8NQ0Dy@wuerfel>
+Message-ID: <20150302230815.GW8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 2, 2015 at 4:27 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Mon, Mar 02, 2015 at 10:34:16AM -0600, Rob Herring wrote:
->> On Mon, Mar 2, 2015 at 8:58 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Mon, Mar 02, 2015 at 10:59:32AM +0000, Will Deacon wrote:
->> >> On Sat, Feb 28, 2015 at 12:52:03AM +0000, Jon Masters wrote:
->> >> > Have you considered reviving the patch you posted previously for EDAC
->> >> > support (the atomic_scrub read/write test piece dependency)?
->> >> >
->> >> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249039.html
->> >>
->> >> Well, we'd need a way to handle the non-coherent DMA case and it's really
->> >> not clear how to fix that.
->> >
->> > I agree, that's where the discussions stopped. Basically the EDAC memory
->> > writing is racy with any non-cacheable memory accesses (by CPU or
->> > device). The only way we could safely use this is only if all the
->> > devices are coherent *and* KVM is disabled. With KVM, guests may access
->> > the memory uncached, so we hit the same problem.
->>
->> Scrubbing only prevents repeated error reporting of correctable errors
->> which only repeat on a cache miss. Perhaps we should just add an empty
->> version that is a nop.
->
-> Can the error be cleared by a cache clean&invalidate by VA?
+On Mon, Mar 02, 2015 at 10:39:21PM +0100, Arnd Bergmann wrote:
+> On Monday 02 March 2015 22:30:58 Andrew Lunn wrote:
+> > On Mon, Mar 02, 2015 at 09:36:53PM +0100, Arnd Bergmann wrote:
+> > > Hi everyone,
+> > 
+> > Hi Arnd
+> > 
+> > Dove already is multi-platform, when you use it in mach-mvebu.  The
+> > old mach-dove is there to slowly bit rot, because there is one user
+> > who has a lot of out of tree patches which are apparently not easy to
+> > make work with DT mach-mvebu Dove code.
+> 
+> I understand that, but I really want to finalize this chapter
+> of the multiplatform work, it's been going for too long. It's
+> not the only platform that has ATAG-based board files remaining,
+> and I don't see how keeping it the remaining dove board files
+> out of multiplatform is going to speed up their removal.
 
-Yes, but only if the line is in fact dirty. If the line is clean, it
-will just make the error repeat on every access. You can't make the
-line dirty for the same reasons you've mentioned.
+I believe all the boards are already converted.  The _boards_ can be
+removed from mach-dove, as the one I care about is not in mainline,
+but that one I care about depends on the core mach-dove support.
 
-Rob
+As I've said in the past, if this gets ripped out, you will only give
+me even _more_ patches to deal with, you will only increase my workload
+still further.  I wonder whether you really intend to increase my
+workload doing stuff which isn't productive for the kernel community.
+That seems to be rather idiotic.
+
+Once I've got to the bottom of why the DT stuff sucks, then maybe I can
+switch to DT.  However, even when I'm boot testing DT mode, I need much
+of mach-dove right now (since I still need platform support code to fix
+a few bits, eg, support dynamic switching between GPU drivers to
+facilitate testing.)
+
+Let me put this a different way: if this support is removed, I'll end
+up spending this kernel cycle ignoring bug reports etc, and I'll instead
+spend my time resurecting this support in my own tree so that I can
+continue to support and test the Armada DRM driver.
+
+And remember, when you commit a change to delete files, the files get
+deleted in all git trees derived from the mainline kernel, including
+*mine* and which has to be patched back together via reverts and the
+probable other fixes.
+
+Since my Dove is the most useful and fully featured ARM platform I've
+ever had, screwing me in this way will _really_ piss me off.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
