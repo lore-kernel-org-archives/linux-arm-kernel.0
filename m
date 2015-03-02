@@ -1,214 +1,180 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon,  2 Mar 2015 13:36:03 +0100
-Subject: [PATCH 10/10] ARM: s3c64xx: allow building without board support
+Date: Mon,  2 Mar 2015 13:36:02 +0100
+Subject: [PATCH 09/10] ARM: s3c64xx: multiplatform support
 In-Reply-To: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
 References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
-Message-ID: <1425299763-4066822-11-git-send-email-arnd@arndb.de>
+Message-ID: <1425299763-4066822-10-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the code for the s3c64xx platform is only used when booting
-with ATAGS based board files, but not when using device-tree.
-
-This tries to identify all the s3c64xx specific code that is
-unneeded when CONFIG_ATAGS is not set, so we can build a smaller
-DT-only kernel if configured that way.
-
-All board support is still left intact but now depends on the
-CONFIG_ATAGS symbol that users may intentionally disable.
+After all preparation work is done, we can finally move the Kconfig
+option for s3c64xx into ARCH_MULTIPLATFORM. This implies allowing
+SAMSUNG_ATAGS for multiplatform again, but now disallowing the
+ADC driver below it, as that still has dependencies on header files.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-s3c64xx/Kconfig                     | 19 ++++++++++++++-----
- arch/arm/mach-s3c64xx/Makefile                    | 20 ++++++++++++--------
- arch/arm/mach-s3c64xx/include/mach/gpio-samsung.h |  3 +++
- arch/arm/plat-samsung/pm.c                        |  4 ----
- 4 files changed, 29 insertions(+), 17 deletions(-)
+ arch/arm/Kconfig                    | 27 ---------------------------
+ arch/arm/configs/multi_v7_defconfig |  3 +++
+ arch/arm/configs/s3c6400_defconfig  |  2 ++
+ arch/arm/mach-s3c64xx/Kconfig       | 22 +++++++++++++++++++++-
+ arch/arm/mach-s3c64xx/Makefile      |  3 +++
+ arch/arm/plat-samsung/Kconfig       |  2 +-
+ arch/arm/plat-samsung/Makefile      |  3 ++-
+ 7 files changed, 32 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index 8bdddee61520..48d1fbbdef13 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -7,18 +7,17 @@ menuconfig ARCH_S3C64XX
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_AMBA
- 	select ARM_VIC
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a6f71e402b38..0f7dd89b5eee 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -686,33 +686,6 @@ config ARCH_S3C24XX
+ 	  (<http://www.simtec.co.uk/products/EB110ITX/>), the IPAQ 1940 or the
+ 	  Samsung SMDK2410 development board (and derivatives).
+ 
+-config ARCH_S3C64XX
+-	bool "Samsung S3C64XX"
+-	select ARCH_REQUIRE_GPIOLIB
+-	select ARM_AMBA
+-	select ARM_VIC
 -	select ATAGS
- 	select CLKSRC_SAMSUNG_PWM
- 	select COMMON_CLK_SAMSUNG
+-	select CLKDEV_LOOKUP
+-	select CLKSRC_SAMSUNG_PWM
+-	select COMMON_CLK_SAMSUNG
+-	select CPU_V6K
+-	select GENERIC_CLOCKEVENTS
 -	select GPIO_SAMSUNG
-+	select GPIO_SAMSUNG if ATAGS
- 	select HAVE_S3C2410_I2C if I2C
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
- 	select HAVE_TCM
- 	select PLAT_SAMSUNG
- 	select PM_GENERIC_DOMAINS if PM
+-	select HAVE_S3C2410_I2C if I2C
+-	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+-	select HAVE_TCM
+-	select NO_IOPORT_MAP
+-	select PLAT_SAMSUNG
+-	select PM_GENERIC_DOMAINS if PM
 -	select S3C_DEV_NAND
 -	select S3C_GPIO_TRACK
 -	select SAMSUNG_ATAGS
-+	select S3C_DEV_NAND if ATAGS
-+	select S3C_GPIO_TRACK if ATAGS
-+	select SAMSUNG_ATAGS if ATAGS
- 	select SAMSUNG_WAKEMASK if PM
- 	select SAMSUNG_WDT_RESET
+-	select SAMSUNG_WAKEMASK
+-	select SAMSUNG_WDT_RESET
+-	select SPARSE_IRQ
+-	help
+-	  Samsung S3C64XX series based systems
+-
+ config ARCH_DAVINCI
+ 	bool "TI DaVinci"
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index e8a4c955241b..7bd95c167f93 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -11,6 +11,9 @@ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_CMDLINE_PARTITION=y
++CONFIG_ARCH_MULTI_V7=y
++# CONFIG_ARCH_MULTI_V5 is not set
++# CONFIG_ARCH_MULTI_V4 is not set
+ CONFIG_ARCH_VIRT=y
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_ARMADA_370=y
+diff --git a/arch/arm/configs/s3c6400_defconfig b/arch/arm/configs/s3c6400_defconfig
+index e2f9fa5bb54b..e0f66936ae02 100644
+--- a/arch/arm/configs/s3c6400_defconfig
++++ b/arch/arm/configs/s3c6400_defconfig
+@@ -5,6 +5,8 @@ CONFIG_KALLSYMS_ALL=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
++CONFIG_ARCH_MULTI_V6=y
++# CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_S3C64XX=y
+ CONFIG_S3C_BOOT_ERROR_RESET=y
+ CONFIG_MACH_SMDK6400=y
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index 26ca2427e53d..8bdddee61520 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -2,6 +2,27 @@
+ #	Simtec Electronics, Ben Dooks <ben@simtec.co.uk>
+ #
+ # Licensed under GPLv2
++menuconfig ARCH_S3C64XX
++	bool "Samsung S3C64XX" if ARCH_MULTI_V6
++	select ARCH_REQUIRE_GPIOLIB
++	select ARM_AMBA
++	select ARM_VIC
++	select ATAGS
++	select CLKSRC_SAMSUNG_PWM
++	select COMMON_CLK_SAMSUNG
++	select GPIO_SAMSUNG
++	select HAVE_S3C2410_I2C if I2C
++	select HAVE_S3C2410_WATCHDOG if WATCHDOG
++	select HAVE_TCM
++	select PLAT_SAMSUNG
++	select PM_GENERIC_DOMAINS if PM
++	select S3C_DEV_NAND
++	select S3C_GPIO_TRACK
++	select SAMSUNG_ATAGS
++	select SAMSUNG_WAKEMASK if PM
++	select SAMSUNG_WDT_RESET
++	help
++	  Samsung S3C64XX series based systems
+ 
+ if ARCH_S3C64XX
+ 
+@@ -302,7 +323,6 @@ config MACH_S3C64XX_DT
+ 	select CPU_S3C6410
+ 	select PINCTRL
+ 	select PINCTRL_S3C64XX
+-	select USE_OF
  	help
-@@ -105,6 +104,7 @@ config S3C64XX_SETUP_USB_PHY
- 
- config MACH_SMDK6400
-        bool "SMDK6400"
-+	depends on ATAGS
- 	select CPU_S3C6400
- 	select S3C64XX_SETUP_SDHCI
- 	select S3C_DEV_HSMMC1
-@@ -115,6 +115,7 @@ config MACH_SMDK6400
- 
- config MACH_ANW6410
- 	bool "A&W6410"
-+	depends on ATAGS
- 	select CPU_S3C6410
- 	select S3C64XX_SETUP_FB_24BPP
- 	select S3C_DEV_FB
-@@ -123,6 +124,7 @@ config MACH_ANW6410
- 
- config MACH_MINI6410
- 	bool "MINI6410"
-+	depends on ATAGS
- 	select CPU_S3C6410
- 	select S3C64XX_SETUP_FB_24BPP
- 	select S3C64XX_SETUP_SDHCI
-@@ -138,6 +140,7 @@ config MACH_MINI6410
- 
- config MACH_REAL6410
- 	bool "REAL6410"
-+	depends on ATAGS
- 	select CPU_S3C6410
- 	select S3C64XX_SETUP_FB_24BPP
- 	select S3C64XX_SETUP_SDHCI
-@@ -153,6 +156,7 @@ config MACH_REAL6410
- 
- config MACH_SMDK6410
- 	bool "SMDK6410"
-+	depends on ATAGS
- 	select CPU_S3C6410
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
- 	select S3C64XX_SETUP_FB_24BPP
-@@ -238,6 +242,7 @@ config SMDK6410_WM1192_EV1
- 
- config MACH_NCP
- 	bool "NCP"
-+	depends on ATAGS
- 	select CPU_S3C6410
- 	select S3C64XX_SETUP_I2C1
- 	select S3C_DEV_HSMMC1
-@@ -247,6 +252,7 @@ config MACH_NCP
- 
- config MACH_HMT
- 	bool "Airgoo HMT"
-+	depends on ATAGS
- 	select CPU_S3C6410
- 	select S3C64XX_SETUP_FB_24BPP
- 	select S3C_DEV_FB
-@@ -278,18 +284,21 @@ config MACH_SMARTQ
- 
- config MACH_SMARTQ5
- 	bool "SmartQ 5"
-+	depends on ATAGS
- 	select MACH_SMARTQ
- 	help
- 	    Machine support for the SmartQ 5
- 
- config MACH_SMARTQ7
- 	bool "SmartQ 7"
-+	depends on ATAGS
- 	select MACH_SMARTQ
- 	help
- 	    Machine support for the SmartQ 7
- 
- config MACH_WLF_CRAGG_6410
- 	bool "Wolfson Cragganmore 6410"
-+	depends on ATAGS
- 	select CPU_S3C6410
- 	select I2C
- 	select LEDS_GPIO_REGISTER
+ 	  Machine support for Samsung S3C6400/S3C6410 machines with Device Tree
+ 	  enabled.
 diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
-index 46dcdf1584d6..9f242dac9d6d 100644
+index 12f67b61ca5f..46dcdf1584d6 100644
 --- a/arch/arm/mach-s3c64xx/Makefile
 +++ b/arch/arm/mach-s3c64xx/Makefile
-@@ -8,19 +8,21 @@
- ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include -I$(srctree)/arch/arm/plat-samsung/include
- asflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include -I$(srctree)/arch/arm/plat-samsung/include
+@@ -5,6 +5,9 @@
+ #
+ # Licensed under GPLv2
  
--# Core
-+# PM
- 
--obj-y				+= common.o
-+obj-$(CONFIG_PM)		+= pm.o
-+obj-$(CONFIG_PM_SLEEP)		+= sleep.o
-+obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- 
--# Core support
-+ifdef CONFIG_SAMSUNG_ATAGS
- 
--obj-$(CONFIG_CPU_S3C6400)	+= s3c6400.o
--obj-$(CONFIG_CPU_S3C6410)	+= s3c6410.o
-+obj-$(CONFIG_PM_SLEEP)          += irq-pm.o
- 
--# PM
-+# Core
- 
--obj-$(CONFIG_PM)		+= pm.o irq-pm.o sleep.o
--obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
-+obj-y				+= common.o
-+obj-$(CONFIG_CPU_S3C6400)	+= s3c6400.o
-+obj-$(CONFIG_CPU_S3C6410)	+= s3c6410.o
- 
- # DMA support
- 
-@@ -55,4 +57,6 @@ obj-$(CONFIG_MACH_SMARTQ7)		+= mach-smartq7.o
- obj-$(CONFIG_MACH_SMDK6400)		+= mach-smdk6400.o
- obj-$(CONFIG_MACH_SMDK6410)		+= mach-smdk6410.o
- obj-$(CONFIG_MACH_WLF_CRAGG_6410)	+= mach-crag6410.o mach-crag6410-module.o
-+endif
++ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include -I$(srctree)/arch/arm/plat-samsung/include
++asflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include -I$(srctree)/arch/arm/plat-samsung/include
 +
- obj-$(CONFIG_MACH_S3C64XX_DT)		+= mach-s3c64xx-dt.o
-diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio-samsung.h b/arch/arm/mach-s3c64xx/include/mach/gpio-samsung.h
-index 9c81fac3b2d5..1d3636512e33 100644
---- a/arch/arm/mach-s3c64xx/include/mach/gpio-samsung.h
-+++ b/arch/arm/mach-s3c64xx/include/mach/gpio-samsung.h
-@@ -14,6 +14,8 @@
- #ifndef GPIO_SAMSUNG_S3C64XX_H
- #define GPIO_SAMSUNG_S3C64XX_H
+ # Core
  
-+#ifdef CONFIG_GPIO_SAMSUNG
-+
- /* GPIO bank sizes */
- #define S3C64XX_GPIO_A_NR	(8)
- #define S3C64XX_GPIO_B_NR	(7)
-@@ -90,5 +92,6 @@ enum s3c_gpio_number {
- /* define the number of gpios we need to the one after the GPQ() range */
- #define GPIO_BOARD_START (S3C64XX_GPQ(S3C64XX_GPIO_Q_NR) + 1)
+ obj-y				+= common.o
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 1df08180f2a5..6744cd28459f 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -39,7 +39,6 @@ config S3C_LOWLEVEL_UART_PORT
  
-+#endif /* GPIO_SAMSUNG */
- #endif /* GPIO_SAMSUNG_S3C64XX_H */
+ config SAMSUNG_ATAGS
+ 	def_bool n
+-	depends on !ARCH_MULTIPLATFORM
+ 	depends on ATAGS
+ 	help
+ 	   This option enables ATAGS based boot support code for
+@@ -70,6 +69,7 @@ config S3C_GPIO_TRACK
  
-diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
-index f8c0f9797dcf..a6193771bbea 100644
---- a/arch/arm/plat-samsung/pm.c
-+++ b/arch/arm/plat-samsung/pm.c
-@@ -23,14 +23,10 @@
- #include <asm/cacheflush.h>
- #include <asm/suspend.h>
+ config S3C_ADC
+ 	bool "ADC common driver support"
++	depends on !ARCH_MULTIPLATFORM
+ 	help
+ 	  Core support for the ADC block found in the Samsung SoC systems
+ 	  for drivers such as the touchscreen and hwmon to use to share
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index 7896ddf63974..d79bb442b914 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -4,7 +4,8 @@
+ #
+ # Licensed under GPLv2
  
--#ifdef CONFIG_SAMSUNG_ATAGS
- #include <mach/map.h>
--#ifndef CONFIG_ARCH_EXYNOS
- #include <mach/regs-clock.h>
- #include <mach/regs-irq.h>
--#endif
- #include <mach/irqs.h>
--#endif
+-ccflags-$(CONFIG_ARCH_MULTI_V7) += -I$(srctree)/$(src)/include
++ccflags-$(CONFIG_ARCH_S3C64XX) := -I$(srctree)/arch/arm/mach-s3c64xx/include
++ccflags-$(CONFIG_ARCH_MULTIPLATFORM) += -I$(srctree)/$(src)/include
  
- #include <asm/irq.h>
+ # Objects we always build independent of SoC choice
  
 -- 
 2.1.0.rc2
