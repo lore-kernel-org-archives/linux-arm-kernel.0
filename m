@@ -1,133 +1,67 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 2 Mar 2015 22:25:10 +0800
-Subject: [RFC PATCH v4 32/34] early kprobes: enable 'ekprobe=' cmdline option
- for early kprobes.
-In-Reply-To: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
-References: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1425306312-3437-33-git-send-email-wangnan0@huawei.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 2 Mar 2015 14:27:35 +0000
+Subject: [PATCH] arm64: Documentation: clarify Image placement in physical
+ RAM
+In-Reply-To: <20150302142007.GD16779@leverpostej>
+References: <1425296935-19097-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150302142007.GD16779@leverpostej>
+Message-ID: <CAKv+Gu9SvJ4nCCtCbre-hN1WFXazXCgkX15mYNsj0ZweJAD6Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch shows a very rough usage of arly kprobes. By adding
-kernel cmdline options such as 'ekprobe=__alloc_pages_nodemask' or
-'ekprobe=0xc00f3c2c', early kprobes are installed. When the probed
-instructions get hit, a message is printed.
+On 2 March 2015 at 14:20, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Mar 02, 2015 at 11:48:55AM +0000, Ard Biesheuvel wrote:
+>> The early init code maps the kernel image using statically
+>> allocated page tables. This means that we can only allow
+>> Image to be placed such that we can map its entire static
+>> footprint using a single table entry at all but the lowest
+>> level. So update the documentation to reflect that the Image
+>> should not cross a 512 MB boundary, which ensures the above
+>> on both 4k and 64k pages kernels.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>
 
-This patch is only a sample. I'll drop it in future.
+Thanks.
+Note that the text is still wrong wrt to the FDT:
 
-Signed-off-by: Wang Nan <wangnan0@huawei.com>
----
- kernel/kprobes.c | 84 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 84 insertions(+)
+"""
+The device tree blob (dtb) must be placed on an 8-byte boundary within
+the first 512 megabytes from the start of the kernel image [...]
+"""
 
-diff --git a/kernel/kprobes.c b/kernel/kprobes.c
-index 95754f6..56fb8c8 100644
---- a/kernel/kprobes.c
-+++ b/kernel/kprobes.c
-@@ -2224,9 +2224,12 @@ static struct notifier_block kprobe_module_nb = {
- 	.priority = 0
- };
- 
-+static LIST_HEAD(cmdline_early_kprobes_list);
-+
- void init_kprobes_early(void)
- {
- 	int i, err = 0;
-+	struct kprobe *early_kp, *tmp;
- 
- 	/* FIXME allocate the probe table, currently defined statically */
- 	/* initialize all list heads */
-@@ -2270,6 +2273,16 @@ void init_kprobes_early(void)
- 	if (!err)
- 		init_test_probes();
- #endif
-+
-+	list_for_each_entry_safe(early_kp, tmp, &cmdline_early_kprobes_list, list) {
-+		int ret;
-+
-+		list_del(&early_kp->list);
-+		INIT_LIST_HEAD(&early_kp->list);
-+		ret = register_kprobe(early_kp);
-+		printk("early kprobe: register early kprobe at %p: result = %d\n",
-+				early_kp->addr, ret);
-+	}
- }
- 
- static int __init init_kprobes(void)
-@@ -2724,3 +2737,74 @@ void init_kprobes_on_ftrace(void)
- 	convert_early_kprobes_on_ftrace();
- }
- #endif
-+
-+#ifdef CONFIG_EARLY_KPROBES
-+static int early_kprobe_pre_handler(struct kprobe *p, struct pt_regs *regs)
-+{
-+	const char *sym = NULL;
-+	char *modname, namebuf[KSYM_NAME_LEN];
-+	unsigned long offset = 0;
-+
-+	sym = kallsyms_lookup((unsigned long)p->addr, NULL,
-+			&offset, &modname, namebuf);
-+	if (sym)
-+		pr_info("Hit early kprobe at %s+0x%lx%s%s\n",
-+				sym, offset,
-+				(modname ? " " : ""),
-+				(modname ? modname : ""));
-+	else
-+		pr_info("Hit early kprobe at %p\n", p->addr);
-+	return 0;
-+}
-+
-+DEFINE_EKPROBE_ALLOC_OPS(struct kprobe, early_kprobe_setup, static);
-+static int __init early_kprobe_setup(char *p)
-+{
-+	unsigned long long addr;
-+	struct kprobe *kp;
-+	int len = strlen(p);
-+	int err;
-+
-+	if (len <= 0) {
-+		pr_err("early kprobe: wrong param: %s\n", p);
-+		return 0;
-+	}
-+
-+	if ((p[0] == '0') && (p[1] == 'x')) {
-+		err = kstrtoull(p, 16, &addr);
-+		if (err) {
-+			pr_err("early kprobe: wrong address: %p\n", p);
-+			return 0;
-+		}
-+	} else {
-+		addr = kallsyms_lookup_name(p);
-+		if (!addr) {
-+			pr_err("early kprobe: wrong symbol: %s\n", p);
-+			return 0;
-+		}
-+	}
-+
-+	if ((addr < (unsigned long)_text) ||
-+			(addr >= (unsigned long)_etext))
-+		pr_err("early kprobe: address of %p out of range\n", p);
-+
-+	kp = ek_alloc_early_kprobe_setup();
-+	if (kp == NULL) {
-+		pr_err("early kprobe: no enough early kprobe slot\n");
-+		return 0;
-+	}
-+	kp->addr = (void *)(unsigned long)(addr);
-+	kp->pre_handler = early_kprobe_pre_handler;
-+
-+	list_add(&kp->list, &cmdline_early_kprobes_list);
-+
-+	return 0;
-+}
-+#else
-+static int __init early_kprobe_setup(char *p)
-+{
-+	return 0;
-+}
-+#endif
-+
-+early_param("ekprobe", early_kprobe_setup);
+but perhaps we should discuss first if we want to relax the
+requirement that it shares the same 512 MB aligned region with the
+kernel.
+(RFC patch sent out last Friday, but there are some caveats)
+
 -- 
-1.8.4
+Ard.
+
+
+>> ---
+>>  Documentation/arm64/booting.txt | 5 +++--
+>>  1 file changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+>> index f3c05b5f9f08..728de8b9116c 100644
+>> --- a/Documentation/arm64/booting.txt
+>> +++ b/Documentation/arm64/booting.txt
+>> @@ -113,8 +113,9 @@ The Image must be placed text_offset bytes from a 2MB aligned base
+>>  address near the start of usable system RAM and called there. Memory
+>>  below that base address is currently unusable by Linux, and therefore it
+>>  is strongly recommended that this location is the start of system RAM.
+>> -At least image_size bytes from the start of the image must be free for
+>> -use by the kernel.
+>> +The physical memory region consisting of image_size bytes counting from
+>> +the start of the image must be free for use by the kernel, and must not
+>> +cross a 512 MB physical alignment boundary.
+>>
+>>  Any memory described to the kernel (even that below the 2MB aligned base
+>>  address) which is not marked as reserved from the kernel e.g. with a
+>> --
+>> 1.8.3.2
+>>
+>>
