@@ -1,61 +1,80 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 02 Mar 2015 23:01:09 +0100
-Subject: [PATCH v5] dma: Add Xilinx AXI Direct Memory Access Engine
- driver support
-In-Reply-To: <6f3b34935c0f405199cacd5312e972ac@BN1BFFO11FD017.protection.gbl>
-References: <6f3b34935c0f405199cacd5312e972ac@BN1BFFO11FD017.protection.gbl>
-Message-ID: <1425333669.24292.124.camel@x220>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 02 Mar 2015 13:54:55 -0800
+Subject: [PATCH 05/10] clkdev: add clkdev_create() helper
+In-Reply-To: <20150302210121.GE29584@n2100.arm.linux.org.uk>
+References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
+ <E1YSTnW-0001Jk-Tm@rmk-PC.arm.linux.org.uk> <54F4B50E.4070104@codeaurora.org>
+ <20150302210121.GE29584@n2100.arm.linux.org.uk>
+Message-ID: <54F4DC2F.1030904@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-03-02 at 23:25 +0530, Kedareswara rao Appana wrote:
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -425,6 +425,19 @@ config IMG_MDC_DMA
->  	help
->  	  Enable support for the IMG multi-threaded DMA controller (MDC).
->  
-> +config XILINX_DMA
-> +	tristate "Xilinx AXI DMA Engine"
-> +	depends on (ARCH_ZYNQ || MICROBLAZE)
-> +	select DMA_ENGINE
-> +	help
-> +	  Enable support for Xilinx AXI DMA Soft IP.
-> +
-> +	This engine provides high-bandwidth direct memory access
-> +	between memory and AXI4-Stream type target peripherals.
-> +	It has two stream interfaces/channels, Memory Mapped to
-> +	Stream (MM2S) and Stream to Memory Mapped (S2MM) for the
-> +	data transfers.
-> +
+On 03/02/15 13:01, Russell King - ARM Linux wrote:
+> On Mon, Mar 02, 2015 at 11:07:58AM -0800, Stephen Boyd wrote:
+>> On 03/02/15 09:06, Russell King wrote:
+>>> Add a helper to allocate and add a clk_lookup structure.  This can not
+>>> only be used in several places in clkdev.c to simplify the code, but
+>>> more importantly, can be used by callers of the clkdev code to simplify
+>>> their clkdev creation and registration.
+>>>
+>>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>>> ---
+>>>  drivers/clk/clkdev.c   | 52 ++++++++++++++++++++++++++++++++++++++------------
+>>>  include/linux/clkdev.h |  3 +++
+>>>  2 files changed, 43 insertions(+), 12 deletions(-)
+>>>
+>>> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+>>> index 043fd3633373..611b9acbad78 100644
+>>> --- a/drivers/clk/clkdev.c
+>>> +++ b/drivers/clk/clkdev.c
+>>> @@ -294,6 +294,19 @@ vclkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt,
+>>>  	return &cla->cl;
+>>>  }
+>>>  
+>>> +static struct clk_lookup *
+>>> +vclkdev_create((struct clk *clk, const char *con_id, const char *dev_fmt,
+>>> +	va_list ap)
+>>> +{
+>>> +	struct clk_lookup *cl;
+>>> +
+>>> +	cl = vclkdev_alloc(clk, con_id, dev_fmt, ap);
+>>> +	if (cl)
+>>> +		clkdev_add(cl);
+>>> +
+>>> +	return cl;
+>>> +}
+>>> +
+>>>  struct clk_lookup * __init_refok
+>>>  clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
+>>>  {
+>>> @@ -308,6 +321,28 @@ clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
+>>>  }
+>>>  EXPORT_SYMBOL(clkdev_alloc);
+>>>  
+>>> +/**
+>>> + * clkdev_create - allocate and add a clkdev lookup structure
+>>> + * @clk: struct clk to associate with all clk_lookups
+>>> + * @con_id: connection ID string on device
+>>> + * @dev_fmt: format string describing device name
+>>> + *
+>>> + * Returns a clk_lookup structure, which can be later unregistered and
+>>> + * freed.
+>> And returns NULL on failure? Any reason why we don't return an error
+>> pointer on failure?
+> Why should it when it's only error is "no memory" ?  It follows the
+> clkdev_alloc() and memory allocator pattern.
+>
+> It'd also make the error handling in places like clk_add_alias() more
+> difficult (how that happened, I don't know...) though that could probably
+> be fixed as no one seems to bother checking the return value... maybe
+> that's a reason to make it return void ;)
+>
 
-How did you test this patch? On next-20150302, running x86_64, I got:
+Ok, fair enough. Right now clk_add_alias() leaks if a driver decides to
+add an alias and then fail probe for something like probe deferral. We
+should probably make that return the clk_lookup structure too so that
+drivers can clean up.
 
-$ make ARCH=microblaze menuconfig
-  HOSTCC  scripts/basic/fixdep
-  HOSTCC  scripts/kconfig/mconf.o
-  SHIPPED scripts/kconfig/zconf.tab.c
-  SHIPPED scripts/kconfig/zconf.lex.c
-  HOSTCC  scripts/kconfig/zconf.tab.o
-  HOSTCC  scripts/kconfig/lxdialog/checklist.o
-  HOSTCC  scripts/kconfig/lxdialog/util.o
-  HOSTCC  scripts/kconfig/lxdialog/inputbox.o
-  HOSTCC  scripts/kconfig/lxdialog/textbox.o
-  HOSTCC  scripts/kconfig/lxdialog/yesno.o
-  HOSTCC  scripts/kconfig/lxdialog/menubox.o
-  HOSTLD  scripts/kconfig/mconf
-scripts/kconfig/mconf Kconfig
-drivers/dma/Kconfig:436: syntax error
-drivers/dma/Kconfig:435: unknown option "This"
-drivers/dma/Kconfig:436: unknown option "between"
-drivers/dma/Kconfig:437: unknown option "It"
-drivers/dma/Kconfig:438: unknown option "Stream"
-drivers/dma/Kconfig:439: unknown option "data"
-make[1]: *** [menuconfig] Error 1
-make: *** [menuconfig] Error 2
-
-Caused by the invalid indentation used here. You should add two spaces
-after the initial tab in lines 436 through 439.
-
-
-Paul Bolle
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
