@@ -1,74 +1,71 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 2 Mar 2015 04:13:51 +0000 (UTC)
-Subject: [GIT PULL v2] ARM: OMAP2+: first set of hwmod and PRCM fixes for
- v4.0-rc
-In-Reply-To: <alpine.DEB.2.02.1503020402460.9987@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1503020402460.9987@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1503020413320.9987@utopia.booyaka.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Mon, 2 Mar 2015 00:58:36 -0500 (EST)
+Subject: PMD update corruption (sync question)
+In-Reply-To: <54F3C6AD.50300@redhat.com>
+References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
+ <54F06636.6080905@redhat.com> <54F3C6AD.50300@redhat.com>
+Message-ID: <938476184.27970130.1425275915893.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+Test kernels running with an explicit DSB in all PTE update cases now running overnight. Just in case.
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+-- 
+Computer Architect | Sent from my #ARM Powered Mobile Device
 
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+On Mar 1, 2015 9:10 PM, Jon Masters <jcm@redhat.com> wrote:
+>
+> Hi Folks, 
+>
+> I've pulled a couple of all nighters reproducing this hard to trHi Folks,
 
-are available in the git repository at:
+I've pulled a couple of all nighters reproducing this hard to trigger
+issue and got some data. It looks like the high half of the (note always
+userspace) PMD is all zeros or all ones, which makes me wonder if the
+logic in update_mmu_cache might be missing something on AArch64.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.0-rc/omap-fixes-a
+When a kernel is built with 64K pages and 2 levels the PMD is
+effectively updated using set_pte_at, which explicitly won't perform a
+DSB if the address is userspace (it expects this to happen later, in
+update_mmu_cache as an example.
 
-for you to fetch changes up to 50f59d07e9822274a2e6034777eb4e90cfb30cfc:
+Can anyone think of an obvious reason why we might not be properly
+flushing the changes prior to them being consumed by a hardware walker?
 
-  ARM: OMAP4+: PRM: fix omap4 version of prm_save_and_clear_irqen (2015-03-01 16:58:25 -0700)
+Jon.
 
-- ----------------------------------------------------------------
-ARM: OMAP2+: first set of hwmod and PRCM fixes for v4.0-rc
-
-This series fixes the following bugs:
-
-- - a lockdep problem with the OMAP hwmod code;
-- - incorrect PCIe hwmod data for the DRA7xx chips;
-- - the clockdomain handling in the hardreset deassertion code,
-  preventing idle;
-- - the use of an IRQ status register rather than an IRQ enable register
-  in the OMAP4 PRM code.
-
-Basic build, boot, and PM test results are available here:
-
-http://www.pwsan.com/omap/testlogs/omap-hwmod-a-for-v4.0-rc/20150301165949/
-
-- ----------------------------------------------------------------
-Kishon Vijay Abraham I (1):
-      ARM: DRA7: hwmod_data: Fix hwmod data for pcie
-
-Peter Ujfalusi (1):
-      ARM: omap2+: omap_hwmod: Set unique lock_class_key per hwmod
-
-Tero Kristo (2):
-      ARM: OMAP2+: hwmod: fix deassert hardreset clkdm usecounting
-      ARM: OMAP4+: PRM: fix omap4 version of prm_save_and_clear_irqen
-
- arch/arm/mach-omap2/omap_hwmod.c          |  10 +--
- arch/arm/mach-omap2/omap_hwmod.h          |   1 +
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 103 +++++++-----------------------
- arch/arm/mach-omap2/prm44xx.c             |   4 +-
- 4 files changed, 32 insertions(+), 86 deletions(-)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAEBAgAGBQJU8+NdAAoJEMePsQ0LvSpLWAsQAIFPj9Ha4r8T78q1s/Q57HZI
-uygJxhWN2j1//z4F17Ya+Ig1MAJryBILDUitvC4IhkeWgKS5Y3TNLfYmnYiSxuJT
-pzpgnmnuF7AY2tUtQkxuxbg2JDjNFB4EAWolbEDRYlYl5dzCy+UP4uJfXl5UBRRO
-D461ZhgBzTuLcQADePMDld2o62BDZ4GQT9ItGmcnlN+oujasLbRR68EAoLLHpo1i
-sGYVlMSzduaZe+dN1SNty4QKJoI1BI9PTQ5jVCpHZGuJ0JkS94Y7ir34yDQ6Er5G
-bjan1Qv5oA2v6TmwxNAD5gcH/D+TIsemlp5uF4PANJdwLyDMNsVxI6FLxonfaCTD
-+f5rn0u8C+xAiX8X71XonYBWvglfn5csXuPD8O8RgoohnuXNF2y957sHANp6PwWT
-KLd9YCKpNzQJsy/TswlbNrOHUrkMXbO9fbA/XAsYgH7wXPmDr+55EhB5jSJZwhmU
-A0Ab4BMJqPQQwQIgzWn4Mz6ZVaDgxBRD9DIiOl+41ZiOYFS/URC0Mnx1ofMjvY5H
-pBakVSQc9IF2OmGWRjO2eEygzL2EpHGwUEaIjIWg8oy7fkZ4eZfKZ2yRfW/kshp9
-McYUngoNtYInVLULIsQ148HCWel7jpSCJO/kLq9L7cMcW/e6GjddbRyMEiAP19CF
-j1ePWtyWAWZrtwMbyOai
-=92Qe
------END PGP SIGNATURE-----
+On 02/27/2015 07:42 AM, Jon Masters wrote:
+> On 09/26/2014 10:03 AM, Steve Capper wrote:
+> 
+>> This series implements general forms of get_user_pages_fast and
+>> __get_user_pages_fast in core code and activates them for arm and arm64.
+>>
+>> These are required for Transparent HugePages to function correctly, as
+>> a futex on a THP tail will otherwise result in an infinite loop (due to
+>> the core implementation of __get_user_pages_fast always returning 0).
+>>
+>> Unfortunately, a futex on THP tail can be quite common for certain
+>> workloads; thus THP is unreliable without a __get_user_pages_fast
+>> implementation.
+>>
+>> This series may also be beneficial for direct-IO heavy workloads and
+>> certain KVM workloads.
+>>
+>> I appreciate that the merge window is coming very soon, and am posting
+>> this revision on the off-chance that it gets the nod for 3.18. (The changes
+>> thus far have been minimal and the feedback I've got has been mainly
+>> positive).
+> 
+> Head's up: these patches are currently implicated in a rare-to-trigger
+> hang that we are seeing on an internal kernel. An extensive effort is
+> underway to confirm whether these are the cause. Will followup.
+> 
+> Jon.
+> 
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+> 
