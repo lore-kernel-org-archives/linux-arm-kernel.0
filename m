@@ -1,39 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 2 Mar 2015 18:56:07 +0000
-Subject: [RFC PATCH 3/4] arm64: add support for memtest
-In-Reply-To: <1425308145-20769-4-git-send-email-vladimir.murzin@arm.com>
-References: <1425308145-20769-1-git-send-email-vladimir.murzin@arm.com>
- <1425308145-20769-4-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20150302185607.GG7919@arm.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 03 Mar 2015 03:56:16 +0900
+Subject: [GIT PULL 1/2] Samsung fixes-1 for v4.0
+Message-ID: <54F4B250.5080200@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 02:55:44PM +0000, Vladimir Murzin wrote:
-> Add support for memtest command line option.
-> 
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> ---
->  arch/arm64/mm/init.c |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index ae85da6..597831b 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -190,6 +190,8 @@ void __init bootmem_init(void)
->  	min = PFN_UP(memblock_start_of_DRAM());
->  	max = PFN_DOWN(memblock_end_of_DRAM());
->  
-> +	early_memtest(min << PAGE_SHIFT, max << PAGE_SHIFT);
-> +
->  	/*
->  	 * Sparsemem tries to allocate bootmem in memory_present(), so must be
->  	 * done after the fixed reservations.
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 
-This is really neat, thanks for doing this Vladimir!
+  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+are available in the git repository at:
 
-For the series, modulo Baruch's comments about Documentation updates.
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+tags/samsung-fixes-1
 
-Will
+for you to fetch changes up to 8a68de64e984cfc49ecc22ac18155a7fe6dbbfaf:
+
+  ARM: EXYNOS: fix exynos randconfig build error (2015-03-03 03:37:57 +0900)
+
+----------------------------------------------------------------
+Samsung fixes for v4.0
+
+- fix exynos randconfig build error with SMP=n
+- fix wrong hwirq of RTC interrupt for exynos3250
+- fix usage of LDREX and STREX after disabling cache coherency
+
+----------------------------------------------------------------
+Chanwoo Choi (1):
+      ARM: EXYNOS: Fix wrong hwirq of RTC interrupt for Exynos3250 SoC
+
+Krzysztof Kozlowski (1):
+      ARM: EXYNOS: Don't use LDREX and STREX after disabling cache coherency
+
+Russell King (1):
+      ARM: EXYNOS: fix exynos randconfig build error
+
+ arch/arm/mach-exynos/Kconfig   | 1 +
+ arch/arm/mach-exynos/platsmp.c | 3 +--
+ arch/arm/mach-exynos/suspend.c | 4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
