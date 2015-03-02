@@ -1,41 +1,54 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 2 Mar 2015 11:46:54 +0530
-Subject: [PATCH 2/2] dt-bindings: cpufreq: document for hisilicon acpu
- driver
-In-Reply-To: <1424956899-8891-3-git-send-email-leo.yan@linaro.org>
-References: <1424956899-8891-1-git-send-email-leo.yan@linaro.org>
- <1424956899-8891-3-git-send-email-leo.yan@linaro.org>
-Message-ID: <CAKohpokXT3m0jnX4R25gzcJUAf_HFj15MueOD2mhG6DRF-0uvg@mail.gmail.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Mon,  2 Mar 2015 12:32:23 +0530
+Subject: [PATCH 0/6] Add support for QCOM GDSCs
+Message-ID: <1425279749-16625-1-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For bindings you need to cc DT list, cc'd now..
+GDSCs (Global Distributed Switch Controllers) control switches
+that supply power to an on-chip power domain and hence can be
+programmed in SW to safely power collapse and restore power to the
+respective PDs. They are part of a considerable number of recent QCOM
+SoCs (This series adds support for msm8974, msm8916 and apq8084 devices)
+and are part of the Clock control block.
 
-On 26 February 2015 at 18:51, Leo Yan <leo.yan@linaro.org> wrote:
-> This adds documentation for hisilicon acpu's cpufreq driver.
->
-> OPP library is used for device tree parsing to get frequency list;
-> Furthermore, this driver can bind all CPUs to change frequency together,
-> or the two clusters can trigger the frequency change independently. This
-> is controlled by the dtb flag "hisilicon,coupled-clusters".
->
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  .../bindings/cpufreq/cpufreq-hisi-acpu.txt         | 112 +++++++++++++++++++++
->  1 file changed, 112 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-hisi-acpu.txt
+The series implements support for GDSC using the genpd framework
+modelling these as SW controllable power domains.
 
-Bindings must be added before using them and so this patch should have been 1/2.
-Apart from that, it looks like you can reuse cpufreq-dt easily without
-much trouble.
+8916 support has a dependency on the Global Clock controller support [1]
+posted by Georgi Djakov.
 
+[1] 
+https://lkml.org/lkml/2015/2/25/416
 
-> +- hisilicon,coupled-clusters: Specify whether all clusters share one clock
-> +       source. This must be defined under node cpufreq.
+Rajendra Nayak (3):
+  clk: qcom: gdsc: Prepare common clk probe to register gdscs
+  clk: qcom: gdsc: Add GDSCs in msm8916 GCC
+  clk: qcom: gdsc: Add GDSCs in apq8084 GCC
 
-> +cpufreq {
-> +       compatible = "hisilicon,hisi-acpu-cpufreq";
-> +       hisilicon,coupled-clusters = <1>;
-> +};
+Stephen Boyd (3):
+  clk: qcom: Add support for GDSCs
+  clk: qcom: gdsc: Add GDSCs in msm8974 GCC
+  clk: qcom: gdsc: Add GDSCs in msm8974 MMCC
 
-Such virtual nodes aren't allowed in DT.
+ drivers/clk/qcom/Kconfig                      |   8 ++
+ drivers/clk/qcom/Makefile                     |   1 +
+ drivers/clk/qcom/common.c                     |  27 +++++-
+ drivers/clk/qcom/common.h                     |   2 +
+ drivers/clk/qcom/gcc-apq8084.c                |  38 ++++++++
+ drivers/clk/qcom/gcc-msm8916.c                |  46 +++++++++
+ drivers/clk/qcom/gcc-msm8974.c                |  14 +++
+ drivers/clk/qcom/gdsc.c                       | 130 ++++++++++++++++++++++++++
+ drivers/clk/qcom/gdsc.h                       |  43 +++++++++
+ drivers/clk/qcom/mmcc-msm8974.c               |  54 +++++++++++
+ include/dt-bindings/clock/qcom,gcc-apq8084.h  |   6 ++
+ include/dt-bindings/clock/qcom,gcc-msm8916.h  |   8 ++
+ include/dt-bindings/clock/qcom,gcc-msm8974.h  |   3 +
+ include/dt-bindings/clock/qcom,mmcc-msm8974.h |   8 ++
+ 14 files changed, 387 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/qcom/gdsc.c
+ create mode 100644 drivers/clk/qcom/gdsc.h
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
