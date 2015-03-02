@@ -1,91 +1,119 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 02 Mar 2015 22:29:42 +0100
-Subject: [PATCH 9/9] ARM: EXYNOS: make exynos 4210 cpuidle build without SMP
-In-Reply-To: <1423769746-582629-1-git-send-email-arnd@arndb.de>
-References: <1423769746-582629-1-git-send-email-arnd@arndb.de>
-Message-ID: <2875270.gE4YDsjeJe@wuerfel>
+From: adam.yh.lee@gmail.com (Adam YH Lee)
+Date: Mon,  2 Mar 2015 13:32:15 -0800
+Subject: [PATCH] rtc-twl: add DT support for RTC battery recharge
+Message-ID: <1425331935-8849-1-git-send-email-adam.yh.lee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/mach-exynos/pm.c: In function 'exynos_cpu0_enter_aftr':
-arch/arm/mach-exynos/pm.c:246:4: error: implicit declaration of function 'arch_send_wakeup_ipi_mask' [-Werror=implicit-function-declaration]
-    arch_send_wakeup_ipi_mask(cpumask_of(1));
+This patch introduces device tree binding for the RTC backup battery charger
+on TWL4030.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Tested on Gumstix Overo (OMAP3) Tobi.
+
+Signed-off-by: Adam YH Lee <adam.yh.lee@gmail.com>
 ---
- arch/arm/mach-exynos/pm.c | 19 +++++++++++++++----
- 1 file changed, 15 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/rtc/twl-rtc.txt | 20 ++++++++++++
+ drivers/rtc/rtc-twl.c                             | 39 +++++++++++++++++++++++
+ 2 files changed, 59 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index e6209dadc00d..a91aefaee31d 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -187,6 +187,7 @@ static int exynos_cpu0_enter_aftr(void)
- {
- 	int ret = -1;
+diff --git a/Documentation/devicetree/bindings/rtc/twl-rtc.txt b/Documentation/devicetree/bindings/rtc/twl-rtc.txt
+index 596e0c9..fcb0c4d 100644
+--- a/Documentation/devicetree/bindings/rtc/twl-rtc.txt
++++ b/Documentation/devicetree/bindings/rtc/twl-rtc.txt
+@@ -5,8 +5,28 @@ The TWL family (twl4030/6030) contains a RTC.
+ Required properties:
+ - compatible : Should be twl4030-rtc
  
-+#ifdef CONFIG_SMP
- 	/*
- 	 * If the other cpu is powered on, we have to power it off, because
- 	 * the AFTR state won't work otherwise
-@@ -216,10 +217,12 @@ static int exynos_cpu0_enter_aftr(void)
- 			cpu_relax();
- 		}
- 	}
-+#endif
- 
- 	exynos_enter_aftr();
- 	ret = 0;
- 
-+#ifdef CONFIG_SMP
- abort:
- 	if (cpu_online(1)) {
- 		/*
-@@ -246,11 +249,12 @@ abort:
- 			arch_send_wakeup_ipi_mask(cpumask_of(1));
- 		}
- 	}
-+#endif
- 
- 	return ret;
- }
- 
--static int exynos_wfi_finisher(unsigned long flags)
-+static int __maybe_unused exynos_wfi_finisher(unsigned long flags)
- {
- 	cpu_do_idle();
- 
-@@ -260,7 +264,7 @@ static int exynos_wfi_finisher(unsigned long flags)
- static int exynos_cpu1_powerdown(void)
- {
- 	int ret = -1;
--
-+#ifdef CONFIG_SMP
- 	/*
- 	 * Idle sequence for cpu1
- 	 */
-@@ -282,13 +286,20 @@ cpu1_aborted:
- 	 * Notify cpu 0 that cpu 1 is awake
- 	 */
- 	atomic_set(&cpu1_wakeup, 1);
--
-+#endif
- 	return ret;
- }
- 
- static void exynos_pre_enter_aftr(void)
- {
--	__raw_writel(virt_to_phys(exynos_cpu_resume), cpu_boot_reg_base());
-+	void *reg_base;
++Optional properties:
++- enable-battery-charge: Boolean, enable RTC battery charge
 +
-+	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
-+		reg_base = pmu_base_addr + S5P_INFORM5;
-+	else
-+		reg_base = sysram_base_addr;
++- charge-rate : should contain trickle charge rate:
 +
-+	__raw_writel(virt_to_phys(exynos_cpu_resume), reg_base);
- }
++     25uA - <0x0>
++    150uA - <0x1>
++    500uA - <0x2>
++      1mA - <0x3>
++
++- charge-voltage : should contain charge voltage:
++
++     2.5v - <0x0>
++     3.0v - <0x4>
++     3.1v - <0x8>
++     3.2v - <0xc>
++
+ Examples:
  
- static void exynos_post_enter_aftr(void)
+ rtc at 0 {
+     compatible = "ti,twl4030-rtc";
++    enable-battery-charge;
++    charge-rate = <0x1>;
++    charge-voltage = <0x8>;
+ };
+diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
+index 1915464..0c3e855 100644
+--- a/drivers/rtc/rtc-twl.c
++++ b/drivers/rtc/rtc-twl.c
+@@ -31,6 +31,13 @@
+ 
+ #include <linux/i2c/twl.h>
+ 
++/*
++ * PM_RECEIVER block register offsets (use TWL4030_MODULE_PM_RECEIVER)
++ */
++#define REG_BB_CFG	0x12
++
++/* PM_RECEIVER  BB_CFG bitfield */
++#define BIT_PM_RECEIVER_BB_CFG_BBCHEN           0x10
+ 
+ /*
+  * RTC block register offsets (use TWL_MODULE_RTC)
+@@ -474,8 +481,11 @@ static struct rtc_class_ops twl_rtc_ops = {
+ static int twl_rtc_probe(struct platform_device *pdev)
+ {
+ 	struct rtc_device *rtc;
++	struct device_node *node = pdev->dev.of_node;
+ 	int ret = -EINVAL;
+ 	int irq = platform_get_irq(pdev, 0);
++	const __be32 *charge_volt = NULL;
++	const __be32 *charge_rate = NULL;
+ 	u8 rd_reg;
+ 
+ 	if (irq <= 0)
+@@ -543,6 +553,35 @@ static int twl_rtc_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++#ifdef CONFIG_OF
++	if (of_property_read_bool(node, "enable-battery-charge")  == true) {
++		charge_rate = of_get_property(node, "charge-rate", NULL);
++		if (charge_rate == NULL) {
++			dev_err(&pdev->dev, "Backup battery charge rate is missing\n");
++			return ret;
++		}
++		charge_volt = of_get_property(node, "charge-voltage", NULL);
++		if (charge_volt == NULL) {
++			dev_err(&pdev->dev, "Backup battery charge voltage is missing\n");
++			return ret;
++		}
++		ret = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER,
++				BIT_PM_RECEIVER_BB_CFG_BBCHEN |
++				be32_to_cpup(charge_volt) |
++				be32_to_cpup(charge_rate),
++				REG_BB_CFG);
++		if (ret < 0) {
++			dev_err(&pdev->dev, "Failed to enable backup battery charging\n");
++			return ret;
++		}
++
++		dev_info(&pdev->dev, "RTC backup charge enabled\n");
++	} else {
++		twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0x0, REG_BB_CFG);
++		dev_info(&pdev->dev, "RTC backup charge disabled\n");
++	}
++#endif
++
+ 	platform_set_drvdata(pdev, rtc);
+ 	return 0;
+ }
 -- 
-2.1.0.rc2
+1.9.1
