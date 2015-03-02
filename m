@@ -1,55 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 02 Mar 2015 22:28:18 +0100
-Subject: [PATCH 0/9] ARM: samsung: randconfig build fixes
-In-Reply-To: <54F4BEFF.30407@kernel.org>
+Date: Mon, 02 Mar 2015 22:28:58 +0100
+Subject: [PATCH 8/9] ARM: EXYNOS: suspend requires regulator access
+In-Reply-To: <1423769746-582629-1-git-send-email-arnd@arndb.de>
 References: <1423769746-582629-1-git-send-email-arnd@arndb.de>
- <0b2901d04b10$d571f680$8055e380$@kernel.org> <54F4BEFF.30407@kernel.org>
-Message-ID: <2317897.q2DKQN0gWf@wuerfel>
+Message-ID: <2062492.pEav958W9c@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 March 2015 04:50:23 Kukjin Kim wrote:
-> On 02/18/15 09:21, Kukjin Kim wrote:
-> > Arnd Bergmann wrote:
-> >>
-> >> This is a set of mostly trivial build fixes for bugs I have encountered
-> >> in random configurations. I'm sending them separate from the other
-> >> platforms since we have a lot of them for the various samsung platforms
-> >> here.
-> >>
-> >> Kukjin, please pick them up into a fixes branch for 3.20 or send
-> >> an Ack so we can apply them directly.
-> >>
-> > Sure, I will create a branch for them in this week. IMO, would be better if I
-> > could make a non-critical fixes branch for v3.20 in Samsung tree for further
-> > other Samsung stuff for v3.20 
-> > 
-> >> Let me know if anything looks wrong with some of the patches.
-> > 
-> > OK, if anything I'll let you know.
-> > 
-> > Thanks for your pointing out.
-> > Happy new year again! (Actually it's the Lunar New Year holidays now)
-> > 
-> > - Kukjin
-> > 
-> >> Arnd Bergmann (9):
-> >>   ARM: s3c64xx: add I2C dependencies where needed
-> >>   ARM: s3c64xx: fix building without CONFIG_PM_SLEEP
-> >>   ARM: s3c64xx: fix __initdata section mismatch
-> >>   ARM: s3c24xx: use SAMSUNG_WAKEMASK for s3c2416
-> >>   ARM: s3c24xx: fix building without PM_SLEEP
-> >>   ARM: s3c24xx: fix header file inclusions
-> >>   ARM: s3c24xx: avoid a Kconfig warning
-> >>   ARM: EXYNOS: suspend requires regulator access
-> >>   ARM: EXYNOS: make exynos 4210 cpuidle build without SMP
-> 
-> Arnd,
-> 
-> BTW, I can't see exynos related patches in my mailbox, I don't know the
-> reason...can you please re-send it?
+Building an exynos kernel without regulators but with suspend enabled results
+in a link error:
 
-Thanks for letting me know. It was a problem on my side with git-send-email
-when sending them out. I'll send them using my normal mail client now.
+arch/arm/mach-exynos/built-in.o: In function `exynos_suspend_finish':
+arch/arm/mach-exynos/suspend.c:532: undefined reference to `regulator_suspend_finish'
+arch/arm/mach-exynos/built-in.o: In function `exynos_suspend_prepare':
+arch/arm/mach-exynos/suspend.c:515: undefined reference to `regulator_suspend_prepare'
 
-	Arnd
+This adds an appropriate 'select' statement in Kconfig to ensure the symbols
+are available.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-exynos/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 603820e5aba7..f4bd06370ad8 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -22,6 +22,7 @@ menuconfig ARCH_EXYNOS
+ 	select PINCTRL
+ 	select PINCTRL_EXYNOS
+ 	select PM_GENERIC_DOMAINS if PM
++	select REGULATOR if PM_SLEEP
+ 	select S5P_DEV_MFC
+ 	select SRAM
+ 	select MFD_SYSCON
+-- 
+2.1.0.rc2
