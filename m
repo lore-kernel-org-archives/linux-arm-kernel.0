@@ -1,52 +1,42 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Tue, 3 Mar 2015 00:53:37 +0200
-Subject: [PATCH 01/10] media: omap3isp: remove unused clkdev
-In-Reply-To: <118780170.u6ZO5zJrEk@avalon>
-References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
- <E1YSTnC-0001JU-CX@rmk-PC.arm.linux.org.uk>
- <118780170.u6ZO5zJrEk@avalon>
-Message-ID: <20150302225336.GV6539@valkosipuli.retiisi.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 2 Mar 2015 16:57:23 -0600
+Subject: EDAC on arm64
+In-Reply-To: <20150302222704.GB13277@MBP.local>
+References: <54F11133.70909@redhat.com> <20150302105919.GA4434@arm.com>
+ <20150302145840.GQ22541@e104818-lin.cambridge.arm.com>
+ <CAL_Jsq+ycHnjtFbmkHTn58vWNvvF81ON-nQBJ0CC5XZCLRnh-g@mail.gmail.com>
+ <20150302222704.GB13277@MBP.local>
+Message-ID: <CAL_Jsq+dx3kYAhiGV+NKXaeZZLCk55pDs26J-yaNQtCKqCHZVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent and Russell,
+On Mon, Mar 2, 2015 at 4:27 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Mon, Mar 02, 2015 at 10:34:16AM -0600, Rob Herring wrote:
+>> On Mon, Mar 2, 2015 at 8:58 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > On Mon, Mar 02, 2015 at 10:59:32AM +0000, Will Deacon wrote:
+>> >> On Sat, Feb 28, 2015 at 12:52:03AM +0000, Jon Masters wrote:
+>> >> > Have you considered reviving the patch you posted previously for EDAC
+>> >> > support (the atomic_scrub read/write test piece dependency)?
+>> >> >
+>> >> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249039.html
+>> >>
+>> >> Well, we'd need a way to handle the non-coherent DMA case and it's really
+>> >> not clear how to fix that.
+>> >
+>> > I agree, that's where the discussions stopped. Basically the EDAC memory
+>> > writing is racy with any non-cacheable memory accesses (by CPU or
+>> > device). The only way we could safely use this is only if all the
+>> > devices are coherent *and* KVM is disabled. With KVM, guests may access
+>> > the memory uncached, so we hit the same problem.
+>>
+>> Scrubbing only prevents repeated error reporting of correctable errors
+>> which only repeat on a cache miss. Perhaps we should just add an empty
+>> version that is a nop.
+>
+> Can the error be cleared by a cache clean&invalidate by VA?
 
-On Tue, Mar 03, 2015 at 12:33:44AM +0200, Laurent Pinchart wrote:
-> Hi Russell,
-> 
-> On Monday 02 March 2015 17:06:06 Russell King wrote:
-> > No merged platform supplies xclks via platform data.  As we want to
-> > slightly change the clkdev interface, rather than fixing this unused
-> > code, remove it instead.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> There are quite a few out of tree users that I know of that might be impacted. 
-> On the other hand, out of tree isn't an excuse, and OMAP3 platforms should 
-> move to DT. The good news is that DT support for the omap3isp driver is about 
-> to get submitted, and hopefully merged in v4.1. I thus have no objection to 
-> this patch.
-> 
-> Sakari, does it conflict with the omap3isp DT support ? If so, how would you 
-> prefer to resolve the conflict ? Russell, would it be fine to merge this 
-> through Mauro's tree ?
+Yes, but only if the line is in fact dirty. If the line is clean, it
+will just make the error repeat on every access. You can't make the
+line dirty for the same reasons you've mentioned.
 
-I first thought it wouldn't conflict, but apparently it does. The
-conflicting patches are here:
-
-<URL:http://vihersipuli.retiisi.org.uk/cgi-bin/gitweb.cgi?p=~sailus/linux.git;a=commitdiff;h=a56c38208ee9200e57421b60b770fb8249935b95>
-<URL:http://vihersipuli.retiisi.org.uk/cgi-bin/gitweb.cgi?p=~sailus/linux.git;a=commitdiff;h=72374c7a69a12afc76f220ef4de983be4583f164>
-<URL:http://vihersipuli.retiisi.org.uk/cgi-bin/gitweb.cgi?p=~sailus/linux.git;a=commitdiff;h=0f0b86d64a555e308079f985812b011866e2c8f0>
-
-Tne entire set:
-
-<URL:http://vihersipuli.retiisi.org.uk/cgi-bin/gitweb.cgi?p=~sailus/linux.git;a=shortlog;h=refs/heads/rm696-051-upstream>
-
-I haven't sent that to linux-media yet but I'll do that during the coming
-couple of days.
-
--- 
-Regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+Rob
