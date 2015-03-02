@@ -1,31 +1,40 @@
-From: dev@lynxeye.de (Lucas Stach)
-Date: Mon, 02 Mar 2015 20:16:09 +0100
-Subject: [PATCH] ARM: tegra: use generated pinmux for Beaver board
-In-Reply-To: <1420591830.25483.16.camel@lynxeye.de>
-References: <1420495066-19221-1-git-send-email-dev@lynxeye.de>
- <54AB0B68.7050704@wwwdotorg.org> <1420591830.25483.16.camel@lynxeye.de>
-Message-ID: <1425323769.2182.0.camel@lynxeye.de>
+From: peter.crosthwaite@xilinx.com (Peter Crosthwaite)
+Date: Mon, 2 Mar 2015 11:19:14 -0800
+Subject: [PATCH] arm64: Implement cpu_relax as yield
+Message-ID: <ad93acf5318c404683f5654d6734316e@BL2FFO11FD047.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 07.01.2015, 01:50 +0100 schrieb Lucas Stach:
-> Am Montag, den 05.01.2015, 15:08 -0700 schrieb Stephen Warren:
-> > On 01/05/2015 02:57 PM, Lucas Stach wrote:
-> > > Replace the current incomplete pinmux setup with a proper one generated
-> > > using the tegra pinmux scripts.
-> > 
-> > I assume this is identical to the existing content, it's just that the 
-> > node sort order changed to match the auto-generation order?
-> > 
-> Yes auto-generation changes the representation of the nodes a bit, but I
-> made sure to keep the properties of the existing kernel DT pinmux where
-> they were different from the U-Boot pinmux.
-> 
-> > If so,
-> > Acked-by: Stephen Warren <swarren@nvidia.com>
-> 
-This has not been applied. Could anyone please pick this up, so it
-doesn't miss yet another merge window?
+ARM64 has the yield nop hint which has the intended semantics of
+cpu_relax. Implement.
 
-Thanks,
-Lucas
+The immediate application is ARM CPU emulators. An emulator can take
+advantage of the yield hint to de-prioritise an emulated CPU in favor
+of other emulation tasks. QEMU A64 SMP emulation has yield awareness,
+and sees a significant boot time performance increase with this change.
+
+Signed-off-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/processor.h | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index f9be30e..ac2381d 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -126,7 +126,11 @@ extern void release_thread(struct task_struct *);
+ 
+ unsigned long get_wchan(struct task_struct *p);
+ 
+-#define cpu_relax()			barrier()
++static inline void cpu_relax(void)
++{
++	asm volatile("yield" ::: "memory");
++}
++
+ #define cpu_relax_lowlatency()                cpu_relax()
+ 
+ /* Thread switching */
+-- 
+2.3.0.1.g27a12f1
