@@ -1,47 +1,29 @@
-From: bpringlemeir@nbsps.com (Bill Pringlemeir)
-Date: Mon, 02 Mar 2015 10:05:36 -0500
-Subject: [RFC 2/5] mtd:fsl_nfc: Add hardware 45 byte BHC-ECC support for
- 24 bit corrections.
-References: <87siupheou.fsf@nbsps.com>
- <1389222441-4322-1-git-send-email-bpringlemeir@nbsps.com>
- <1389222441-4322-3-git-send-email-bpringlemeir@nbsps.com>
- <127db6b73356442d2ba12e8c011038cc@agner.ch> <87r3zaxgtr.fsf@nbsps.com>
- <c444059de888a661fadf3d6be598a98d@agner.ch> <87lhphyjkg.fsf@nbsps.com>
- <0bc8cec13bcf5b9cbea9cd3345815e4a@agner.ch> <8761dit9u9.fsf@nbsps.com>
- <f3bc6eda0c826601e136f3dad91d9674@agner.ch>
-Message-ID: <87k2yzqw1r.fsf@nbsps.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 2 Mar 2015 17:14:00 +0200
+Subject: [RFC PATCH 0/4] make memtest a generic kernel feature
+In-Reply-To: <1425308145-20769-1-git-send-email-vladimir.murzin@arm.com>
+References: <1425308145-20769-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20150302151400.GI15668@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Vladimir,
 
-On 28 Feb 2015, stefan at agner.ch wrote:
+On Mon, Mar 02, 2015 at 02:55:41PM +0000, Vladimir Murzin wrote:
+> Memtest is a simple feature which fills the memory with a given set of
+> patterns and validates memory contents, if bad memory regions is detected it
+> reserves them via memblock API. Since memblock API is widely used by other
+> architectures this feature can be enabled outside of x86 world.
+> 
+> This patch set promotes memtest to live under generic mm umbrella and enables
+> memtest feature for arm/arm64.
 
-> The flash chip mentioned above requires 8-bit error correction per 512
-> byte block, hence I increased the ECC to the maximum available level
-> (60-byte ECC, see page below). One thing which is not very nice, in
-> order to fit the 60-byte ECC into the 64-byte OOB, I had to shorten
-> the BBT pattern and set it at the very beginning of the page. This
-> works fine, however this basically sets the page also to factory bad,
-> I'm not sure if this is ok? Otherwise, we also could use a BBT pattern
-> of length 1 (used by cafe_nand.c too).
+Please update the architectures list in the 'memtest' entry at 
+Documentation/kernel-parameters.txt.
 
-I guess that is a DT option?  I wouldn't be an expert on this.  So
-submitting it to the linux-mtd is good.  
+baruch
 
-I am also not sure if the HW ECC will work with 'sub-pages'.  I think a
-college of your at Toradex submitted a patch to the u-boot.  I am pretty
-sure that it could work with software ECC, but maybe disabling it is
-easiest.
-
-> What do you think? I would like to respin the NFC patch, with my
-> U-Boot changes and this change included...
-
-Please go ahead.  Markus M <marb@ixxat.de> is also using the fsl_nfc
-driver on a Freescale MPC5125 board, so it is probably good to copy your
-patches to him.  At least, he can test on a BE platform.
-
-People also complained about JFFS and this version of the driver.  I
-didn't investigate that.
-
-Thanks,
-Bill Pringlemeir.
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
