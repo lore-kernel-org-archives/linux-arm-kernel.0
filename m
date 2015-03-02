@@ -1,242 +1,71 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon,  2 Mar 2015 11:29:11 +0000
-Subject: [PATCH 2/5] arm-cci: Abstract the CCI400 PMU speicific definitions
-In-Reply-To: <1425295754-13376-1-git-send-email-suzuki.poulose@arm.com>
-References: <1425295754-13376-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1425295754-13376-3-git-send-email-suzuki.poulose@arm.com>
+Date: Mon,  2 Mar 2015 11:29:09 +0000
+Subject: [PATCH v2 0/5] arm-cci400: PMU monitoring support on ARM64
+Message-ID: <1425295754-13376-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-CCI400 has different event specifications for PMU, for revsion0 and
-revision 1. As of now, we check the revision twice, for using the
-parameters for the PMU. This patch abstracts the details of the pmu
-models in a struct (cci_pmu_model) and stores the information in cci_pmu
-at initialisation time, avoiding multiple probe operations.
+This series enables the PMU monitoring support for CCI400 on ARM64.
+The existing CCI400 driver code is a mix of PMU driver and the MCPM
+driver code. The MCPM driver is only used on ARM(32) and contains
+arm32 assembly and hence can't be built on ARM64. This patch splits
+the code to
 
-This will also help us to add new PMU versions.
+ - ARM_CCI400_PORT_CTRL driver - depends on ARM && V7
+ - ARM_CCI400_PMU driver
 
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
----
- drivers/bus/arm-cci.c |  124 ++++++++++++++++++++++++++++++-------------------
- 1 file changed, 76 insertions(+), 48 deletions(-)
+Accessing the Peripheral ID2 register(PID2) on CCI-400, to detect
+the revision of the chipset, is a secure operation. Hence, it prevents
+us from running this on non-secure platforms. The issue is overcome by
+explicitly mentioning the revision number of the CCI PMU in the device tree
+binding. The device-tree binding has been updated with the new bindings.
 
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index f27cf56..bec014b 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -79,19 +79,38 @@ static const struct of_device_id arm_cci_matches[] = {
- 
- #define CCI_PMU_MAX_HW_EVENTS 5   /* CCI PMU has 4 counters + 1 cycle counter */
- 
-+/* Types of interfaces that can generate events */
-+enum {
-+	CCI_IF_SLAVE,
-+	CCI_IF_MASTER,
-+	CCI_IF_MAX,
-+};
-+
-+struct event_range {
-+	u32 min;
-+	u32 max;
-+};
-+
- struct cci_pmu_hw_events {
- 	struct perf_event *events[CCI_PMU_MAX_HW_EVENTS];
- 	unsigned long used_mask[BITS_TO_LONGS(CCI_PMU_MAX_HW_EVENTS)];
- 	raw_spinlock_t pmu_lock;
- };
- 
-+struct cci_pmu_model {
-+	char *name;
-+	struct event_range event_ranges[CCI_IF_MAX];
-+};
-+
-+static struct cci_pmu_model cci_pmu_models[];
-+
- struct cci_pmu {
- 	void __iomem *base;
- 	struct pmu pmu;
- 	int nr_irqs;
- 	int irqs[CCI_PMU_MAX_HW_EVENTS];
- 	unsigned long active_irqs;
--	struct pmu_port_event_ranges *port_ranges;
-+	const struct cci_pmu_model *model;
- 	struct cci_pmu_hw_events hw_events;
- 	struct platform_device *plat_device;
- 	int num_events;
-@@ -152,47 +171,16 @@ enum cci400_perf_events {
- #define CCI_REV_R1_MASTER_PORT_MIN_EV	0x00
- #define CCI_REV_R1_MASTER_PORT_MAX_EV	0x11
- 
--struct pmu_port_event_ranges {
--	u8 slave_min;
--	u8 slave_max;
--	u8 master_min;
--	u8 master_max;
--};
--
--static struct pmu_port_event_ranges port_event_range[] = {
--	[CCI_REV_R0] = {
--		.slave_min = CCI_REV_R0_SLAVE_PORT_MIN_EV,
--		.slave_max = CCI_REV_R0_SLAVE_PORT_MAX_EV,
--		.master_min = CCI_REV_R0_MASTER_PORT_MIN_EV,
--		.master_max = CCI_REV_R0_MASTER_PORT_MAX_EV,
--	},
--	[CCI_REV_R1] = {
--		.slave_min = CCI_REV_R1_SLAVE_PORT_MIN_EV,
--		.slave_max = CCI_REV_R1_SLAVE_PORT_MAX_EV,
--		.master_min = CCI_REV_R1_MASTER_PORT_MIN_EV,
--		.master_max = CCI_REV_R1_MASTER_PORT_MAX_EV,
--	},
--};
--
--/*
-- * Export different PMU names for the different revisions so userspace knows
-- * because the event ids are different
-- */
--static char *const pmu_names[] = {
--	[CCI_REV_R0] = "CCI_400",
--	[CCI_REV_R1] = "CCI_400_r1",
--};
--
- static int pmu_is_valid_slave_event(u8 ev_code)
- {
--	return pmu->port_ranges->slave_min <= ev_code &&
--		ev_code <= pmu->port_ranges->slave_max;
-+	return pmu->model->event_ranges[CCI_IF_SLAVE].min <= ev_code &&
-+		ev_code <= pmu->model->event_ranges[CCI_IF_SLAVE].max;
- }
- 
- static int pmu_is_valid_master_event(u8 ev_code)
- {
--	return pmu->port_ranges->master_min <= ev_code &&
--		ev_code <= pmu->port_ranges->master_max;
-+	return pmu->model->event_ranges[CCI_IF_MASTER].min <= ev_code &&
-+		ev_code <= pmu->model->event_ranges[CCI_IF_MASTER].max;
- }
- 
- static int pmu_validate_hw_event(u8 hw_event)
-@@ -234,11 +222,9 @@ static int probe_cci_revision(void)
- 		return CCI_REV_R1;
- }
- 
--static struct pmu_port_event_ranges *port_range_by_rev(void)
-+static const struct cci_pmu_model *probe_cci_model(struct platform_device *pdev)
- {
--	int rev = probe_cci_revision();
--
--	return &port_event_range[rev];
-+	return &cci_pmu_models[probe_cci_revision()];
- }
- 
- static int pmu_is_valid_counter(struct cci_pmu *cci_pmu, int idx)
-@@ -807,9 +793,9 @@ static const struct attribute_group *pmu_attr_groups[] = {
- 
- static int cci_pmu_init(struct cci_pmu *cci_pmu, struct platform_device *pdev)
- {
--	char *name = pmu_names[probe_cci_revision()];
-+	char *name = cci_pmu->model->name;
- 	cci_pmu->pmu = (struct pmu) {
--		.name		= pmu_names[probe_cci_revision()],
-+		.name		= cci_pmu->model->name,
- 		.task_ctx_nr	= perf_invalid_context,
- 		.pmu_enable	= cci_pmu_enable,
- 		.pmu_disable	= cci_pmu_disable,
-@@ -862,6 +848,35 @@ static struct notifier_block cci_pmu_cpu_nb = {
- 	.priority	= CPU_PRI_PERF + 1,
- };
- 
-+static struct cci_pmu_model cci_pmu_models[] = {
-+	[CCI_REV_R0] = {
-+		.name = "CCI_400",
-+		.event_ranges = {
-+			[CCI_IF_SLAVE] = {
-+				CCI_REV_R0_SLAVE_PORT_MIN_EV,
-+				CCI_REV_R0_SLAVE_PORT_MAX_EV,
-+			},
-+			[CCI_IF_MASTER] = {
-+				CCI_REV_R0_MASTER_PORT_MIN_EV,
-+				CCI_REV_R0_MASTER_PORT_MAX_EV,
-+			},
-+		},
-+	},
-+	[CCI_REV_R1] = {
-+		.name = "CCI_400_r1",
-+		.event_ranges = {
-+			[CCI_IF_SLAVE] = {
-+				CCI_REV_R1_SLAVE_PORT_MIN_EV,
-+				CCI_REV_R1_SLAVE_PORT_MAX_EV,
-+			},
-+			[CCI_IF_MASTER] = {
-+				CCI_REV_R1_MASTER_PORT_MIN_EV,
-+				CCI_REV_R1_MASTER_PORT_MAX_EV,
-+			},
-+		},
-+	},
-+};
-+
- static const struct of_device_id arm_cci_pmu_matches[] = {
- 	{
- 		.compatible = "arm,cci-400-pmu",
-@@ -869,6 +884,16 @@ static const struct of_device_id arm_cci_pmu_matches[] = {
- 	{},
- };
- 
-+static inline const struct cci_pmu_model *get_cci_model(struct platform_device *pdev)
-+{
-+	const struct of_device_id *match = of_match_node(arm_cci_pmu_matches,
-+							pdev->dev.of_node);
-+	if (!match)
-+		return NULL;
-+
-+	return probe_cci_model(pdev);
-+}
-+
- static bool is_duplicate_irq(int irq, int *irqs, int nr_irqs)
- {
- 	int i;
-@@ -884,11 +909,19 @@ static int cci_pmu_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
- 	int i, ret, irq;
-+	const struct cci_pmu_model *model;
-+
-+	model = get_cci_model(pdev);
-+	if (!model) {
-+		dev_warn(&pdev->dev, "CCI PMU version not supported\n");
-+		return -EINVAL;
-+	}
- 
- 	pmu = devm_kzalloc(&pdev->dev, sizeof(*pmu), GFP_KERNEL);
- 	if (!pmu)
- 		return -ENOMEM;
- 
-+	pmu->model = model;
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pmu->base = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(pmu->base))
-@@ -920,12 +953,6 @@ static int cci_pmu_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
--	pmu->port_ranges = port_range_by_rev();
--	if (!pmu->port_ranges) {
--		dev_warn(&pdev->dev, "CCI PMU version not supported\n");
--		return -EINVAL;
--	}
--
- 	raw_spin_lock_init(&pmu->hw_events.pmu_lock);
- 	mutex_init(&pmu->reserve_mutex);
- 	atomic_set(&pmu->active_events, 0);
-@@ -939,6 +966,7 @@ static int cci_pmu_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	pr_info("ARM %s PMU driver probed", pmu->model->name);
- 	return 0;
- }
- 
+i.e,	arm-cci-400-pmu,r0 => revision 0
+	arm-cci-400-pmu,r1 => revision 1
+	arm-cci-400-pmu => (old) DEPRECATED
+
+The old binding has been DEPRECATED and must be used only on ARM32
+system with secure access. We don't have a reliable dynamic way to detect
+if the system is running secure. This series tries to use the best safe
+method by relying on the availability of MCPM(as it was prior to the series).
+It is upto the MCPM platform driver to decide, if the system is secure before
+it goes ahead and registers its drivers and pokes the CCI. This series doesn't
+address/solve the problem of MCPM. I will be happy to use a better approach,
+if there is any.
+
+Tested on (non-secure)TC2 and Juno.
+
+Change since V1 (Suggestions from Nicolas Pitre):
+
+ - Split Patch 2 to separate the 'PMU' abstraction(now Patch 2/5)
+   from the introduction of a new device-tree binding(now Patch 3/5)
+ - Rename
+	ARM_CCI400_MCPM => ARM_CCI400_PORT_CTRL
+	CCI400_MCPM_PORTS_DATA => CCI400_PORTS_DATA
+ - Select ARM_CCI400_COMMON for ARM_CCI400_PORT_CTRL
+ - Better documentation in the git commit log about the ARM_CCI config.
+ - Move the 'pr_info' to its apporpriate patch.
+
+Suzuki K. Poulose (5):
+  arm-cci: Rearrange code for splitting PMU vs driver code
+  arm-cci: Abstract the CCI400 PMU speicific definitions
+  arm-cci: Get rid of secure transactions for PMU driver
+  arm-cci: Split the code for PMU vs driver support
+  arm-cci: Fix CCI PMU event validation
+
+ Documentation/devicetree/bindings/arm/cci.txt |    7 +-
+ arch/arm/include/asm/arm-cci.h                |   42 +++
+ arch/arm/mach-exynos/Kconfig                  |    2 +-
+ arch/arm/mach-vexpress/Kconfig                |    4 +-
+ arch/arm64/include/asm/arm-cci.h              |   27 ++
+ drivers/bus/Kconfig                           |   27 +-
+ drivers/bus/arm-cci.c                         |  483 ++++++++++++++-----------
+ include/linux/arm-cci.h                       |    9 +-
+ 8 files changed, 383 insertions(+), 218 deletions(-)
+ create mode 100644 arch/arm/include/asm/arm-cci.h
+ create mode 100644 arch/arm64/include/asm/arm-cci.h
+
 -- 
 1.7.9.5
