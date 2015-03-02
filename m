@@ -1,74 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Mar 2015 20:43:26 +0000
-Subject: [PATCH] ARM: dts: hummingboard: enable pcf8523 rtc for i2eX
-In-Reply-To: <20150302202540.GB30263@beef>
-References: <1425322206-30115-1-git-send-email-mporter@konsulko.com>
- <20150302190204.GR8656@n2100.arm.linux.org.uk>
- <20150302190616.GS8656@n2100.arm.linux.org.uk>
- <20150302192116.GA30263@beef>
- <20150302194908.GU8656@n2100.arm.linux.org.uk>
- <20150302202540.GB30263@beef>
-Message-ID: <20150302204326.GV8656@n2100.arm.linux.org.uk>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 02 Mar 2015 21:47:39 +0100
+Subject: [PATCH 1/2] ARM: rockchip: decrease the wait time for resume
+In-Reply-To: <1423487543-10593-1-git-send-email-zyw@rock-chips.com>
+References: <1423487543-10593-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <30327138.BhvlayfjZW@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 03:25:40PM -0500, Matt Porter wrote:
-> On Mon, Mar 02, 2015 at 07:49:08PM +0000, Russell King wrote:
-> > It's a bit like the MMC stuff, I'm still carrying Olof's solution for
-> > the SDIO wifi/bt power and reset control stuff, and I'm not at present
-> > intending to do anything with it other than continue forward-porting it.
-> > I'm not interested in wasting free time trying to re-work that to suit
-> > some other solution, especially as people couldn't settle on a solution
-> > when I /did/ have an interest in it (not that I have much interest in
-> > wifi or BT - I tend to prefer old fashioned wired connections.  It also
-> > doesn't help that the Broadcom driver seemed to be very flakey with
-> > brcm4329 hardware for quite some time.)
-> > 
-> > Anyway, you can find all my kernel patches in a suitably trimmed version
-> > of the above URL, and on http://ftp.arm.linux.org.uk/cgit/ is a huge pile
-> > of effort I put into an accelerated X server with etnaviv and /my/ kernel
-> > version of etnaviv drm, complete with Xv support.
+Am Montag, 9. Februar 2015, 21:12:22 schrieb Chris Zhong:
+> The delay time for wait the 24MHz OSC stabilization is 750ms, and the
+> delay time for wait the external PMU stabilization is 750ms too, let's
+> decrease them to 30ms.
+
+just to understand whats happening here:
+
+The default delay time for wait the 24MHz OSC and PMU stabilization is 750ms, 
+= reset value in the register and your patch is decreasing this to 30ms.
+
+Are the new 30ms for each of the two long enough in all cases?
+
+
+Heiko
+
+
 > 
-> Excellent, so I feel like you ultimately giving me mixed messages here.
-
-Yes, I am - partly because I don't know what to do with many of the
-patches I seem to be endlessly carrying (which depresses me).  I look
-back to the days when I could be sure of completely emptying my tree
-at each merge window, something which /never/ happens anymore.
-
-> You said you need to take care of this licensing issue and I think you
-> implied you'd take care of the audio and rtc stuff as you have that
-> patch in your backlog.
-
-As you may have seen, I've mailed out the licensing patch, and I've
-also mailed out two patches - one for PWM stuff and the second one
-being the RTC change broken out from my sgtl5000 hacks patch.
-
-I've also cut a v4.0-rc1 patch set, in the usual diff.bz2, tar.bz2,
-and separate patch forms which include those three patches.
-
-> However, sounds like you've given up on pushing
-> the bigger things upstream given the problem with getting agreement
-> on those pieces. Are you just going to be submitting the
-> less controversial portions like the audio and dts updates? My goal for
-> HB initially is just to have all the low-hanging fruit (like rtc and audio)
-> working on mainline...besides the stuff that's already there.
-
-RTC is the easiest bit of the problem, as you've discovered it's just
-a matter of uncommenting the bit in DT.  (It's even better if you have
-a battery to plug into the little connector!)
-
-Audio needs more than just DT changes, and there's recently been some
-SGTL5000 patches submitted which change the way power is controlled
-in the SGTL5000.  I don't yet know whether those patches solve the
-problems I was seeing with the kernel powering down the SGTL5000's
-internal regulator, thereby making the device totally inaccessible
-until the next power cycle or not.
-
-Whether I'll get a chance to look at that this week or not, I don't
-know... (see my privately shared G+ status from yesterday, which
-people in my G+ circles should be able to see.)
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> ---
+> 
+>  arch/arm/mach-rockchip/pm.c | 3 +++
+>  arch/arm/mach-rockchip/pm.h | 4 ++++
+>  2 files changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
+> index 50cb781..a3ab397 100644
+> --- a/arch/arm/mach-rockchip/pm.c
+> +++ b/arch/arm/mach-rockchip/pm.c
+> @@ -209,6 +209,9 @@ static int rk3288_suspend_init(struct device_node *np)
+>  	memcpy(rk3288_bootram_base, rockchip_slp_cpu_resume,
+>  	       rk3288_bootram_sz);
+> 
+> +	regmap_write(pmu_regmap, RK3288_PMU_OSC_CNT, OSC_STABL_CNT_THRESH);
+> +	regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, PMU_STABL_CNT_THRESH);
+> +
+>  	return 0;
+>  }
+> 
+> diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
+> index 7d752ff..96beaa0 100644
+> --- a/arch/arm/mach-rockchip/pm.h
+> +++ b/arch/arm/mach-rockchip/pm.h
+> @@ -57,6 +57,10 @@ void __init rockchip_suspend_init(void);
+>  /* PMU_WAKEUP_CFG1 bits */
+>  #define PMU_ARMINT_WAKEUP_EN		BIT(0)
+> 
+> +/* wait 30ms for OSC stable and 30ms for pmic stable */
+> +#define OSC_STABL_CNT_THRESH	(32 * 30)
+> +#define PMU_STABL_CNT_THRESH	(32 * 30)
+> +
+>  enum rk3288_pwr_mode_con {
+>  	PMU_PWR_MODE_EN = 0,
+>  	PMU_CLK_CORE_SRC_GATE_EN,
