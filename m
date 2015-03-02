@@ -1,89 +1,68 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 2 Mar 2015 22:24:42 +0800
-Subject: [RFC PATCH v4 04/34] early kprobes: within_kprobe_blacklist_early()
- early.
+Date: Mon, 2 Mar 2015 22:24:41 +0800
+Subject: [RFC PATCH v4 03/34] x86,
+ traps: install gates using IST after cpu_init().
 In-Reply-To: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
 References: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1425306312-3437-5-git-send-email-wangnan0@huawei.com>
+Message-ID: <1425306312-3437-4-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces within_kprobe_blacklist_early(), which will be
-used when registering early kprobes.
+X86_TRAP_NMI, X86_TRAP_DF and X86_TRAP_MC use their own stack. Those
+stacks are invalid until cpu_init() installs TSS.
 
-In init_kprobes(), populate_kprobe_blacklist() is the only function
-which rely on memory system so unable to be executed at very early
-stage. Following patches will move other parts of init_kprobes() to
-early stage and leave populate_kprobe_blacklist() at its original
-position. Before populate_kprobe_blacklist(), within_kprobe_blacklist_early()
-can be used for checking blacklist.
+This patch moves setting of the 3 gates after cpu_init().
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
 ---
- kernel/kprobes.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ arch/x86/kernel/traps.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/kernel/kprobes.c b/kernel/kprobes.c
-index c90e417..427d761 100644
---- a/kernel/kprobes.c
-+++ b/kernel/kprobes.c
-@@ -68,6 +68,7 @@
+diff --git a/arch/x86/kernel/traps.c b/arch/x86/kernel/traps.c
+index 9965bd1..4000b19 100644
+--- a/arch/x86/kernel/traps.c
++++ b/arch/x86/kernel/traps.c
+@@ -966,7 +966,6 @@ void __init trap_init(void)
  #endif
  
- static int kprobes_initialized;
-+static int kprobes_blacklist_initialized;
- static struct hlist_head kprobe_table[KPROBE_TABLE_SIZE];
- static struct hlist_head kretprobe_inst_table[KPROBE_TABLE_SIZE];
+ 	set_intr_gate(X86_TRAP_DE, divide_error);
+-	set_intr_gate_ist(X86_TRAP_NMI, &nmi, NMI_STACK);
+ 	/* int4 can be called from all */
+ 	set_system_intr_gate(X86_TRAP_OF, &overflow);
+ 	set_intr_gate(X86_TRAP_BR, bounds);
+@@ -974,8 +973,6 @@ void __init trap_init(void)
+ 	set_intr_gate(X86_TRAP_NM, device_not_available);
+ #ifdef CONFIG_X86_32
+ 	set_task_gate(X86_TRAP_DF, GDT_ENTRY_DOUBLEFAULT_TSS);
+-#else
+-	set_intr_gate_ist(X86_TRAP_DF, &double_fault, DOUBLEFAULT_STACK);
+ #endif
+ 	set_intr_gate(X86_TRAP_OLD_MF, coprocessor_segment_overrun);
+ 	set_intr_gate(X86_TRAP_TS, invalid_TSS);
+@@ -985,9 +982,6 @@ void __init trap_init(void)
+ 	set_intr_gate(X86_TRAP_SPURIOUS, spurious_interrupt_bug);
+ 	set_intr_gate(X86_TRAP_MF, coprocessor_error);
+ 	set_intr_gate(X86_TRAP_AC, alignment_check);
+-#ifdef CONFIG_X86_MCE
+-	set_intr_gate_ist(X86_TRAP_MC, &machine_check, MCE_STACK);
+-#endif
+ 	set_intr_gate(X86_TRAP_XF, simd_coprocessor_error);
  
-@@ -1332,12 +1333,41 @@ bool __weak arch_within_kprobe_blacklist(unsigned long addr)
- 	       addr < (unsigned long)__kprobes_text_end;
- }
+ 	/* Reserve all the builtin and the syscall vector: */
+@@ -1017,6 +1011,14 @@ void __init trap_init(void)
+ 	 */
+ 	cpu_init();
  
-+
-+static bool within_kprobe_blacklist_early(unsigned long addr)
-+{
-+	/* Markers of _kprobe_blacklist section */
-+	extern unsigned long __start_kprobe_blacklist[];
-+	extern unsigned long __stop_kprobe_blacklist[];
-+
-+	unsigned long *start = __start_kprobe_blacklist;
-+	unsigned long *end = __stop_kprobe_blacklist;
-+	unsigned long *iter;
-+	unsigned long entry, offset = 0, size = 0;
-+
-+	for (iter = start; iter < end; iter++) {
-+		entry = arch_deref_entry_point((void *)*iter);
-+
-+		if (!kernel_text_address(entry) ||
-+		    !kallsyms_lookup_size_offset(entry, &size, &offset))
-+			continue;
-+		if (addr >= entry && addr < entry + size)
-+			return true;
-+	}
-+
-+	return false;
-+}
-+
- static bool within_kprobe_blacklist(unsigned long addr)
- {
- 	struct kprobe_blacklist_entry *ent;
- 
- 	if (arch_within_kprobe_blacklist(addr))
- 		return true;
-+
-+	if (!kprobes_blacklist_initialized)
-+		return within_kprobe_blacklist_early(addr);
++	set_intr_gate_ist(X86_TRAP_NMI, &nmi, NMI_STACK);
++#ifndef CONFIG_X86_32
++	set_intr_gate_ist(X86_TRAP_DF, &double_fault, DOUBLEFAULT_STACK);
++#endif
++#ifdef CONFIG_X86_MCE
++	set_intr_gate_ist(X86_TRAP_MC, &machine_check, MCE_STACK);
++#endif
 +
  	/*
- 	 * If there exists a kprobe_blacklist, verify and
- 	 * fail any probe registration in the prohibited area
-@@ -2147,6 +2177,7 @@ static int __init init_kprobes(void)
- 		pr_err("kprobes: failed to populate blacklist: %d\n", err);
- 		pr_err("Please take care of using kprobes.\n");
- 	}
-+	kprobes_blacklist_initialized = (err == 0);
- 
- 	if (kretprobe_blacklist_size) {
- 		/* lookup the function address from its name */
+ 	 * X86_TRAP_DB and X86_TRAP_BP have been set
+ 	 * in early_trap_init(). However, ITS works only after
 -- 
 1.8.4
