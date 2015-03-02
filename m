@@ -1,30 +1,71 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon,  2 Mar 2015 18:20:32 +0000
-Subject: [PATCH v2 5/5] ARM: virt: select ARM_GIC_V3
+Date: Mon,  2 Mar 2015 18:20:30 +0000
+Subject: [PATCH v2 3/5] arm64: GICv3: Specialize readq and writeq accesses
 In-Reply-To: <1425320432-6325-1-git-send-email-jean-philippe.brucker@arm.com>
 References: <1425320432-6325-1-git-send-email-jean-philippe.brucker@arm.com>
-Message-ID: <1425320432-6325-6-git-send-email-jean-philippe.brucker@arm.com>
+Message-ID: <1425320432-6325-4-git-send-email-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows ARM guests to use GICv3 on an arm64 host
+On 32bit platforms, we cannot assure that an I/O ldrd or strd will be
+done atomically. Besides, an hypervisor would be unable to emulate such
+accesses.
+In order to allow the AArch32 version of the driver to split them into
+two 32bit accesses while keeping the requirement for atomic writes, this
+patch specializes the IROUTER and TYPER accesses.
+Since the latter is an ID register, it won't need to be read atomically,
+but we still avoid future confusion by using gic_read_typer instead of a
+generic gic_readq.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/include/asm/arch_gicv3.h | 3 +++
+ drivers/irqchip/irq-gic-v3.c        | 6 +++---
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9f1f09a..76246cc 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -834,6 +834,7 @@ config ARCH_VIRT
- 	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
- 	select ARM_AMBA
- 	select ARM_GIC
-+	select ARM_GIC_V3
- 	select ARM_PSCI
- 	select HAVE_ARM_ARCH_TIMER
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index 50d0045..1787580 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -134,5 +134,8 @@ static inline void gic_write_sre(u32 val)
+ 	isb();
+ }
  
++#define gic_read_typer(c)		readq_relaxed(c)
++#define gic_write_irouter(v, c)		writeq_relaxed(v, c)
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ASM_ARCH_GICV3_H */
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index a907235..c52cd23 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -284,7 +284,7 @@ static void __init gic_dist_init(void)
+ 	 */
+ 	affinity = gic_mpidr_to_affinity(cpu_logical_map(smp_processor_id()));
+ 	for (i = 32; i < gic_data.irq_nr; i++)
+-		writeq_relaxed(affinity, base + GICD_IROUTER + i * 8);
++		gic_write_irouter(affinity, base + GICD_IROUTER + i * 8);
+ }
+ 
+ static int gic_populate_rdist(void)
+@@ -315,7 +315,7 @@ static int gic_populate_rdist(void)
+ 		}
+ 
+ 		do {
+-			typer = readq_relaxed(ptr + GICR_TYPER);
++			typer = gic_read_typer(ptr + GICR_TYPER);
+ 			if ((typer >> 32) == aff) {
+ 				u64 offset = ptr - gic_data.redist_regions[i].redist_base;
+ 				gic_data_rdist_rd_base() = ptr;
+@@ -516,7 +516,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 	reg = gic_dist_base(d) + GICD_IROUTER + (gic_irq(d) * 8);
+ 	val = gic_mpidr_to_affinity(cpu_logical_map(cpu));
+ 
+-	writeq_relaxed(val, reg);
++	gic_write_irouter(val, reg);
+ 
+ 	/*
+ 	 * If the interrupt was enabled, enabled it again. Otherwise,
 -- 
 2.2.0.rc1
