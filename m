@@ -1,58 +1,30 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon,  2 Mar 2015 12:48:39 +0000
-Subject: [PATCH 3/3] ahci: st: st_configure_oob must be called after IP is
- clocked.
-In-Reply-To: <1425300519-13747-1-git-send-email-peter.griffin@linaro.org>
-References: <1425300519-13747-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1425300519-13747-4-git-send-email-peter.griffin@linaro.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 2 Mar 2015 13:59:35 +0100
+Subject: [PATCH] pinctrl: imx: do not implicitly set pin regs to -1
+In-Reply-To: <20150302114516.GC3040@dragon>
+References: <1423240256-27210-1-git-send-email-stefan@agner.ch>
+ <20150302114516.GC3040@dragon>
+Message-ID: <20150302125935.GC7865@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the ahci_st driver will hang the system on probe, as the
-st_configure_oob function does some register writes before the IP
-is clocked. This patch moves the function call to after
-ahci_platform_enable_resources (which enables the IP clock), and
-resolves the hang.
+Hello Shawn
 
-Addtionally st_ahci_configure_oob should be called in the st_ahci_resume
-function, so we also rectify that ensuring it is also called after
-the IP clock has been enabled.
+On Mon, Mar 02, 2015 at 07:45:17PM +0800, Shawn Guo wrote:
+> On Fri, Feb 06, 2015 at 05:30:56PM +0100, Stefan Agner wrote:
+> > Commit 3dac1918a491 ("pinctrl: imx: detect uninitialized pins") needs
+> > the values in struct imx_pin_reg to be -1. This has been done in a
+> > rather unorthodox way by setting the memory to 0xff using memset...
+> > Use a proper for loop to initialize the whole array with -1.
+> > 
+> > Signed-off-by: Stefan Agner <stefan@agner.ch>
+> 
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+too late. This patch is part of 4.0-rc1 (4ff0f034e95d).
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- drivers/ata/ahci_st.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+Best regards
+Uwe
 
-diff --git a/drivers/ata/ahci_st.c b/drivers/ata/ahci_st.c
-index bc971af..ea0ff00 100644
---- a/drivers/ata/ahci_st.c
-+++ b/drivers/ata/ahci_st.c
-@@ -68,8 +68,6 @@ static int st_ahci_deassert_resets(struct device *dev)
- 		}
- 	}
- 
--	st_ahci_configure_oob(drv_data->hpriv->mmio);
--
- 	if (drv_data->sw_rst) {
- 		err = reset_control_deassert(drv_data->sw_rst);
- 		if (err) {
-@@ -172,6 +170,8 @@ static int st_ahci_probe(struct platform_device *pdev)
- 	if (err)
- 		return err;
- 
-+	st_ahci_configure_oob(drv_data->hpriv->mmio);
-+
- 	err = ahci_platform_init_host(pdev, hpriv, &st_ahci_port_info,
- 				      &ahci_platform_sht);
- 	if (err) {
-@@ -222,6 +222,8 @@ static int st_ahci_resume(struct device *dev)
- 		return err;
- 	}
- 
-+	st_ahci_configure_oob(drv_data->hpriv->mmio);
-+
- 	return ahci_platform_resume_host(dev);
- }
- #endif
 -- 
-1.9.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
