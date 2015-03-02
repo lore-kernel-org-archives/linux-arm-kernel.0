@@ -1,72 +1,66 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 02 Mar 2015 20:03:59 +0000
-Subject: [PATCH 2/2] ARM: dts: hummingboard: Setup pwm lines
-Message-ID: <E1YSWZL-0002Aw-B5@rmk-PC.arm.linux.org.uk>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 2 Mar 2015 12:23:42 -0800
+Subject: [PATCH v4 2/2] Input: bcm-keypad: Add Broadcom keypad controller
+In-Reply-To: <54F4BC15.4020205@broadcom.com>
+References: <sbranden@broadcom.com>
+ <1425141357-7807-1-git-send-email-sbranden@broadcom.com>
+ <1425141357-7807-3-git-send-email-sbranden@broadcom.com>
+ <20150228221022.GA36282@dtor-ws> <20150228221518.GB36282@dtor-ws>
+ <54F4BC15.4020205@broadcom.com>
+Message-ID: <20150302202342.GE17094@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rabeeh Khoury <rabeeh@solid-run.com>
+Hi Scott,
 
-Setup pwm lines as follows -
-pwm1: In case HummingBoard base carrier; this pin drives through a serial
-      capacitor the mono out of the audio jack.
-      In case HummingBoard pro the this pad can be reached by wiring to
-      C8 capacitors on the board.
-pwm2: Setup pwm2 on gpio-1 but leave the default function of the iopad as
-      a gpio.
-      The user can change the io pad mux in user space and therefore use
-      this function on gpio-1 (pin number 7 on the 26 pin header).
-pwm3,pwm4: unused
+On Mon, Mar 02, 2015 at 11:37:57AM -0800, Scott Branden wrote:
+> Hi Dmitry,
+> 
+> I don't see the need for a check of the clock in bcm_kp_start or
+> stop. See comment below.
+> 
+> On 15-02-28 02:15 PM, Dmitry Torokhov wrote:
+> >On Sat, Feb 28, 2015 at 02:10:22PM -0800, Dmitry Torokhov wrote:
+> >>Hi Scott,
+> >>
+> >>On Sat, Feb 28, 2015 at 08:35:57AM -0800, Scott Branden wrote:
+> >>>+	/* Enable clock */
+> >>>+
+> >>>+	kp->clk = devm_clk_get(&pdev->dev, "peri_clk");
+> >>>+	if (IS_ERR(kp->clk)) {
+> >>>+		dev_info(&pdev->dev,
+> >>>+			"No clock specified. Assuming it's enabled\n");
+> >>
+> >>I was doing the final pass before applying and I think that this is not
+> >>quite correct, as it does not handle -EPROBE_DEFER properly which is
+> >>quite common. I think we should do something like this:
+> >>
+> >>		error = PTR_ERR(kp->clk);
+> >>		if (error != -ENOENT) {
+> >>			if (error != -EPROBE_DEFER)
+> >>				dev_err(.. "Failed to get clock" ...);
+> >>			return error;
+> >>		}
+> >>		dev_dbg(... "No clock specified" ...);
+> >>
+> >>No need to resubmit if you are OK with this, I can make the change
+> >>locally.
+> >
+> >Hmm, also bcm_kp_start() and bcm_kp_stop() should check if kp->clk is
+> >valid before trying to enable/disable it.
+> >
+> I checked and other keyboard drivers do not check this.  I return an
+> error in bcm_kp_start if the clk enable fails.  On stop, if the clk
+> is not valid something is really, really wrong as well.
 
-Signed-off-by: Rabeeh Khoury <rabeeh@solid-run.com>
-[tweaked alias for pwm pinctrl group --rmk]
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-For acks please.
+The other drivers simply abort probe() if they can't get clock, you
+decided to allow probe() to finish and assume that clock is already
+enabled, leaving kp->clk == ERR_PTR(-ENOENT) in your version. If you try
+then calling clk_prepare_enable() with that pointer it is going to bomb,
+that is why I said you need to check pointer validity in bcm_kp_start()
+and bcm_kp_stop().
 
- arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+Thanks.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-index 93588c987d2c..c0dc5948fa3c 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-@@ -164,6 +164,10 @@
- 			>;
- 		};
- 
-+		pinctrl_hummingboard_pwm1: pwm1grp {
-+			fsl,pins = <MX6QDL_PAD_DISP0_DAT8__PWM1_OUT 0x1b0b1>;
-+		};
-+
- 		pinctrl_hummingboard_spdif: hummingboard-spdif {
- 			fsl,pins = <MX6QDL_PAD_GPIO_17__SPDIF_OUT 0x13091>;
- 		};
-@@ -203,6 +207,25 @@
- 	};
- };
- 
-+&pwm1 {
-+	 pinctrl-names = "default";
-+	 pinctrl-0 = <&pinctrl_hummingboard_pwm1>;
-+	 status = "okay";
-+};
-+
-+&pwm2 {
-+	 pinctrl-names = "default";
-+	 status = "okay";
-+};
-+
-+&pwm3 {
-+	status = "disabled";
-+};
-+
-+&pwm4 {
-+	status = "disabled";
-+};
-+
- &spdif {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hummingboard_spdif>;
 -- 
-1.8.3.1
+Dmitry
