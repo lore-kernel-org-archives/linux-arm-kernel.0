@@ -1,165 +1,145 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  2 Mar 2015 10:18:14 +0100
-Subject: [PATCH v2 2/6] rtc: at91sam9: rework wakeup and interrupt handling
+Date: Mon,  2 Mar 2015 10:18:18 +0100
+Subject: [PATCH v2 6/6] tty: serial: atmel: rework interrupt and wakeup
+ handling
 In-Reply-To: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1425287898-15093-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1425287898-15093-7-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IRQ line used by the RTC device is usually shared with the system timer
-(PIT) on at91 platforms.
-Since timers are registering their handlers with IRQF_NO_SUSPEND, we should
-expect being called in suspended state, and properly wake the system up
-when this is the case.
+The IRQ line connected to the DBGU UART is often shared with a timer device
+which request the IRQ with IRQF_NO_SUSPEND.
+Since the UART driver is correctly disabling IRQs when entering suspend
+we can safely request the IRQ with IRQF_COND_SUSPEND so that irq core
+will not complain about mixing IRQF_NO_SUSPEND and !IRQF_NO_SUSPEND.
 
-Set IRQF_COND_SUSPEND flag when registering the IRQ handler to inform
-irq core that it can safely be called while the system is suspended.
+Rework the interrupt handler to wake the system up when an interrupt
+happens on the DEBUG_UART while the system is suspended.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/rtc/rtc-at91sam9.c | 73 ++++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 61 insertions(+), 12 deletions(-)
+ drivers/tty/serial/atmel_serial.c | 49 +++++++++++++++++++++++++++++++++++----
+ 1 file changed, 45 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-index 2183fd2..5ccaee3 100644
---- a/drivers/rtc/rtc-at91sam9.c
-+++ b/drivers/rtc/rtc-at91sam9.c
-@@ -23,6 +23,7 @@
- #include <linux/io.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 846552b..4e959c4 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -47,6 +47,7 @@
+ #include <linux/gpio/consumer.h>
+ #include <linux/err.h>
+ #include <linux/irq.h>
 +#include <linux/suspend.h>
- #include <linux/clk.h>
  
- /*
-@@ -77,6 +78,9 @@ struct sam9_rtc {
- 	unsigned int		gpbr_offset;
- 	int 			irq;
- 	struct clk		*sclk;
+ #include <asm/io.h>
+ #include <asm/ioctls.h>
+@@ -173,6 +174,12 @@ struct atmel_uart_port {
+ 	bool			ms_irq_enabled;
+ 	bool			is_usart;	/* usart or uart */
+ 	struct timer_list	uart_timer;	/* uart timer */
++
 +	bool			suspended;
-+	unsigned long		events;
-+	spinlock_t		lock;
- };
- 
- #define rtt_readl(rtc, field) \
-@@ -271,14 +275,9 @@ static int at91_rtc_proc(struct device *dev, struct seq_file *seq)
- 	return 0;
- }
- 
--/*
-- * IRQ handler for the RTC
-- */
--static irqreturn_t at91_rtc_interrupt(int irq, void *_rtc)
-+static irqreturn_t at91_rtc_cache_events(struct sam9_rtc *rtc)
++	unsigned int		pending;
++	unsigned int		pending_status;
++	spinlock_t		lock_suspended;
++
+ 	int (*prepare_rx)(struct uart_port *port);
+ 	int (*prepare_tx)(struct uart_port *port);
+ 	void (*schedule_rx)(struct uart_port *port);
+@@ -1179,12 +1186,15 @@ static irqreturn_t atmel_interrupt(int irq, void *dev_id)
  {
--	struct sam9_rtc *rtc = _rtc;
- 	u32 sr, mr;
--	unsigned long events = 0;
+ 	struct uart_port *port = dev_id;
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+-	unsigned int status, pending, pass_counter = 0;
++	unsigned int status, pending, mask, pass_counter = 0;
+ 	bool gpio_handled = false;
  
- 	/* Shared interrupt may be for another device.  Note: reading
- 	 * SR clears it, so we must only read it in this irq handler!
-@@ -290,18 +289,54 @@ static irqreturn_t at91_rtc_interrupt(int irq, void *_rtc)
++	spin_lock(&atmel_port->lock_suspended);
++
+ 	do {
+ 		status = atmel_get_lines_status(port);
+-		pending = status & UART_GET_IMR(port);
++		mask = UART_GET_IMR(port);
++		pending = status & mask;
+ 		if (!gpio_handled) {
+ 			/*
+ 			 * Dealing with GPIO interrupt
+@@ -1206,11 +1216,21 @@ static irqreturn_t atmel_interrupt(int irq, void *dev_id)
+ 		if (!pending)
+ 			break;
  
- 	/* alarm status */
- 	if (sr & AT91_RTT_ALMS)
--		events |= (RTC_AF | RTC_IRQF);
-+		rtc->events |= (RTC_AF | RTC_IRQF);
++		if (atmel_port->suspended) {
++			atmel_port->pending |= pending;
++			atmel_port->pending_status = status;
++			UART_PUT_IDR(port, mask);
++			pm_system_wakeup();
++			break;
++		}
++
+ 		atmel_handle_receive(port, pending);
+ 		atmel_handle_status(port, pending, status);
+ 		atmel_handle_transmit(port, pending);
+ 	} while (pass_counter++ < ATMEL_ISR_PASS_LIMIT);
  
- 	/* timer update/increment */
- 	if (sr & AT91_RTT_RTTINC)
--		events |= (RTC_UF | RTC_IRQF);
-+		rtc->events |= (RTC_UF | RTC_IRQF);
++	spin_unlock(&atmel_port->lock_suspended);
 +
-+	return IRQ_HANDLED;
-+}
-+
-+static void at91_rtc_flush_events(struct sam9_rtc *rtc)
-+{
-+	if (!rtc->events)
-+		return;
- 
--	rtc_update_irq(rtc->rtcdev, 1, events);
-+	rtc_update_irq(rtc->rtcdev, 1, rtc->events);
-+	rtc->events = 0;
- 
- 	pr_debug("%s: num=%ld, events=0x%02lx\n", __func__,
--		events >> 8, events & 0x000000FF);
-+		rtc->events >> 8, rtc->events & 0x000000FF);
-+}
- 
--	return IRQ_HANDLED;
-+/*
-+ * IRQ handler for the RTC
-+ */
-+static irqreturn_t at91_rtc_interrupt(int irq, void *_rtc)
-+{
-+	struct sam9_rtc *rtc = _rtc;
-+	int ret;
-+
-+	spin_lock(&rtc->lock);
-+
-+	ret = at91_rtc_cache_events(rtc);
-+
-+	/* We're called in suspended state */
-+	if (rtc->suspended) {
-+		/* Mask irqs coming from this peripheral */
-+		rtt_writel(rtc, MR,
-+			   rtt_readl(rtc, MR) &
-+			   ~(AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN));
-+		/* Trigger a system wakeup */
-+		pm_system_wakeup();
-+	} else {
-+		at91_rtc_flush_events(rtc);
-+	}
-+
-+	spin_unlock(&rtc->lock);
-+
-+	return ret;
+ 	return pass_counter ? IRQ_HANDLED : IRQ_NONE;
  }
  
- static const struct rtc_class_ops at91_rtc_ops = {
-@@ -421,7 +456,8 @@ static int at91_rtc_probe(struct platform_device *pdev)
+@@ -1742,7 +1762,8 @@ static int atmel_startup(struct uart_port *port)
+ 	/*
+ 	 * Allocate the IRQ
+ 	 */
+-	retval = request_irq(port->irq, atmel_interrupt, IRQF_SHARED,
++	retval = request_irq(port->irq, atmel_interrupt,
++			IRQF_SHARED | IRQF_COND_SUSPEND,
+ 			tty ? tty->name : "atmel_serial", port);
+ 	if (retval) {
+ 		dev_err(port->dev, "atmel_startup - Can't get irq\n");
+@@ -2513,8 +2534,14 @@ static int atmel_serial_suspend(struct platform_device *pdev,
  
- 	/* register irq handler after we know what name we'll use */
- 	ret = devm_request_irq(&pdev->dev, rtc->irq, at91_rtc_interrupt,
--				IRQF_SHARED, dev_name(&rtc->rtcdev->dev), rtc);
-+			       IRQF_SHARED | IRQF_COND_SUSPEND,
-+			       dev_name(&rtc->rtcdev->dev), rtc);
- 	if (ret) {
- 		dev_dbg(&pdev->dev, "can't share IRQ %d?\n", rtc->irq);
- 		return ret;
-@@ -482,7 +518,12 @@ static int at91_rtc_suspend(struct device *dev)
- 	rtc->imr = mr & (AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN);
- 	if (rtc->imr) {
- 		if (device_may_wakeup(dev) && (mr & AT91_RTT_ALMIEN)) {
-+			unsigned long flags;
-+
- 			enable_irq_wake(rtc->irq);
-+			spin_lock_irqsave(&rtc->lock, flags);
-+			rtc->suspended = true;
-+			spin_unlock_irqrestore(&rtc->lock, flags);
- 			/* don't let RTTINC cause wakeups */
- 			if (mr & AT91_RTT_RTTINCIEN)
- 				rtt_writel(rtc, MR, mr & ~AT91_RTT_RTTINCIEN);
-@@ -499,10 +540,18 @@ static int at91_rtc_resume(struct device *dev)
- 	u32		mr;
- 
- 	if (rtc->imr) {
+ 	/* we can not wake up if we're running on slow clock */
+ 	atmel_port->may_wakeup = device_may_wakeup(&pdev->dev);
+-	if (atmel_serial_clk_will_stop())
++	if (atmel_serial_clk_will_stop()) {
 +		unsigned long flags;
 +
- 		if (device_may_wakeup(dev))
- 			disable_irq_wake(rtc->irq);
- 		mr = rtt_readl(rtc, MR);
- 		rtt_writel(rtc, MR, mr | rtc->imr);
-+
-+		spin_lock_irqsave(&rtc->lock, flags);
-+		rtc->suspended = false;
-+		at91_rtc_cache_events(rtc);
-+		at91_rtc_flush_events(rtc);
-+		spin_unlock_irqrestore(&rtc->lock, flags);
- 	}
++		spin_lock_irqsave(&atmel_port->lock_suspended, flags);
++		atmel_port->suspended = true;
++		spin_unlock_irqrestore(&atmel_port->lock_suspended, flags);
+ 		device_set_wakeup_enable(&pdev->dev, 0);
++	}
  
- 	return 0;
+ 	uart_suspend_port(&atmel_uart, port);
+ 
+@@ -2525,6 +2552,18 @@ static int atmel_serial_resume(struct platform_device *pdev)
+ {
+ 	struct uart_port *port = platform_get_drvdata(pdev);
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
++	unsigned long flags;
++
++	spin_lock_irqsave(&atmel_port->lock_suspended, flags);
++	if (atmel_port->pending) {
++		atmel_handle_receive(port, atmel_port->pending);
++		atmel_handle_status(port, atmel_port->pending,
++				    atmel_port->pending_status);
++		atmel_handle_transmit(port, atmel_port->pending);
++		atmel_port->pending = 0;
++	}
++	atmel_port->suspended = false;
++	spin_unlock_irqrestore(&atmel_port->lock_suspended, flags);
+ 
+ 	uart_resume_port(&atmel_uart, port);
+ 	device_set_wakeup_enable(&pdev->dev, atmel_port->may_wakeup);
+@@ -2593,6 +2632,8 @@ static int atmel_serial_probe(struct platform_device *pdev)
+ 	port->backup_imr = 0;
+ 	port->uart.line = ret;
+ 
++	spin_lock_init(&port->lock_suspended);
++
+ 	ret = atmel_init_gpios(port, &pdev->dev);
+ 	if (ret < 0)
+ 		dev_err(&pdev->dev, "%s",
 -- 
 1.9.1
