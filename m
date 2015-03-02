@@ -1,232 +1,162 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon,  2 Mar 2015 13:35:57 +0100
-Subject: [PATCH 04/10] ARM: s3c64xx: prepare initcalls for multiplatform
+Date: Mon,  2 Mar 2015 13:36:01 +0100
+Subject: [PATCH 08/10] ARM: s3c64xx: use common debug-ll implementation
 In-Reply-To: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
 References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
-Message-ID: <1425299763-4066822-5-git-send-email-arnd@arndb.de>
+Message-ID: <1425299763-4066822-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a multiplatform kernel, each initcall is run regardless
-of the platform it is meant for, so it must not attempt to
-access SoC-specific registers.
-
-This adds 'if (soc_is_s3c64xx)' to all initcalls that are
-specific to the s3c64xx platform, to prevent them from breaking
-other platforms once we can build them into a combined kernel.
+The uart on s3c64xx is essentially the same as on s3c24xx,
+so we can share a single assembler file. However, the addresses
+are different, and we need to add the respective Kconfig magic
+to get the right addresses.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-s3c64xx/common.c               |  4 ++--
- arch/arm/mach-s3c64xx/cpuidle.c              |  5 ++++-
- arch/arm/mach-s3c64xx/irq-pm.c               |  2 +-
- arch/arm/mach-s3c64xx/mach-crag6410-module.c |  4 ++++
- arch/arm/mach-s3c64xx/pl080.c                |  4 ++++
- arch/arm/mach-s3c64xx/pm.c                   |  4 ++++
- arch/arm/mach-s3c64xx/s3c6400.c              |  2 +-
- arch/arm/mach-s3c64xx/s3c6410.c              |  2 +-
- arch/arm/plat-samsung/gpio-samsung.c         | 11 +++++------
- arch/arm/plat-samsung/init.c                 |  5 +++++
- 10 files changed, 31 insertions(+), 12 deletions(-)
+ arch/arm/Kconfig.debug                           | 19 +++++++++++-
+ arch/arm/mach-s3c64xx/include/mach/debug-macro.S | 38 ------------------------
+ 2 files changed, 18 insertions(+), 39 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/debug-macro.S
 
-diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
-index 16547f2641a3..cca29aa49fd3 100644
---- a/arch/arm/mach-s3c64xx/common.c
-+++ b/arch/arm/mach-s3c64xx/common.c
-@@ -209,7 +209,7 @@ void __init s3c64xx_init_io(struct map_desc *mach_desc, int size)
- static __init int s3c64xx_dev_init(void)
- {
- 	/* Not applicable when using DT. */
--	if (of_have_populated_dt())
-+	if (of_have_populated_dt() || !soc_is_s3c64xx())
- 		return 0;
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 970de7518341..7af848b0f615 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -846,6 +846,7 @@ choice
+ 		depends on PLAT_SAMSUNG
+ 		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
+ 		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
++		select DEBUG_S3C64XX_UART if ARCH_S3C64XX
+ 		select DEBUG_S5PV210_UART if ARCH_S5PV210
+ 		bool "Use Samsung S3C UART 0 for low-level debug"
+ 		help
+@@ -857,6 +858,7 @@ choice
+ 		depends on PLAT_SAMSUNG
+ 		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
+ 		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
++		select DEBUG_S3C64XX_UART if ARCH_S3C64XX
+ 		select DEBUG_S5PV210_UART if ARCH_S5PV210
+ 		bool "Use Samsung S3C UART 1 for low-level debug"
+ 		help
+@@ -868,6 +870,7 @@ choice
+ 		depends on PLAT_SAMSUNG
+ 		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
+ 		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
++		select DEBUG_S3C64XX_UART if ARCH_S3C64XX
+ 		select DEBUG_S5PV210_UART if ARCH_S5PV210
+ 		bool "Use Samsung S3C UART 2 for low-level debug"
+ 		help
+@@ -878,6 +881,7 @@ choice
+ 	config DEBUG_S3C_UART3
+ 		depends on PLAT_SAMSUNG && (ARCH_EXYNOS || ARCH_S5PV210)
+ 		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
++		select DEBUG_S3C64XX_UART if ARCH_S3C64XX
+ 		select DEBUG_S5PV210_UART if ARCH_S5PV210
+ 		bool "Use Samsung S3C UART 3 for low-level debug"
+ 		help
+@@ -1225,6 +1229,9 @@ config DEBUG_S3C2410_UART
+ config DEBUG_S3C24XX_UART
+ 	bool
  
- 	subsys_system_register(&s3c64xx_subsys, NULL);
-@@ -414,7 +414,7 @@ static int __init s3c64xx_init_irq_eint(void)
- 	int irq;
- 
- 	/* On DT-enabled systems EINTs are handled by pinctrl-s3c64xx driver. */
--	if (of_have_populated_dt())
-+	if (of_have_populated_dt() || !soc_is_s3c64xx())
- 		return -ENODEV;
- 
- 	for (irq = IRQ_EINT(0); irq <= IRQ_EINT(27); irq++) {
-diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-s3c64xx/cpuidle.c
-index 2eb072440dfa..92b41c2b7314 100644
---- a/arch/arm/mach-s3c64xx/cpuidle.c
-+++ b/arch/arm/mach-s3c64xx/cpuidle.c
-@@ -18,6 +18,7 @@
- 
- #include <asm/proc-fns.h>
- 
-+#include <plat/cpu.h>
- #include <mach/map.h>
- 
- #include "regs-sys.h"
-@@ -57,6 +58,8 @@ static struct cpuidle_driver s3c64xx_cpuidle_driver = {
- 
- static int __init s3c64xx_init_cpuidle(void)
- {
--	return cpuidle_register(&s3c64xx_cpuidle_driver, NULL);
-+	if (soc_is_s3c64xx())
-+		return cpuidle_register(&s3c64xx_cpuidle_driver, NULL);
-+	return 0;
- }
- device_initcall(s3c64xx_init_cpuidle);
-diff --git a/arch/arm/mach-s3c64xx/irq-pm.c b/arch/arm/mach-s3c64xx/irq-pm.c
-index ae4ea7601f60..0bbf1faaee42 100644
---- a/arch/arm/mach-s3c64xx/irq-pm.c
-+++ b/arch/arm/mach-s3c64xx/irq-pm.c
-@@ -113,7 +113,7 @@ static struct syscore_ops s3c64xx_irq_syscore_ops = {
- static __init int s3c64xx_syscore_init(void)
- {
- 	/* Appropriate drivers (pinctrl, uart) handle this when using DT. */
--	if (of_have_populated_dt())
-+	if (of_have_populated_dt() || !soc_is_s3c64xx())
- 		return 0;
- 
- 	register_syscore_ops(&s3c64xx_irq_syscore_ops);
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-index 9c00d83f7151..be21f06e6b3f 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-@@ -29,6 +29,7 @@
- 
- #include <linux/platform_data/spi-s3c64xx.h>
- 
-+#include <plat/cpu.h>
- #include "crag6410.h"
- 
- static struct s3c64xx_spi_csinfo wm0010_spi_csinfo = {
-@@ -399,6 +400,9 @@ static struct i2c_driver wlf_gf_module_driver = {
- 
- static int __init wlf_gf_module_register(void)
- {
-+	if (!soc_is_s3c64xx())
-+		return 0;
++config DEBUG_S3C64XX_UART
++	bool
 +
- 	return i2c_add_driver(&wlf_gf_module_driver);
- }
- device_initcall(wlf_gf_module_register);
-diff --git a/arch/arm/mach-s3c64xx/pl080.c b/arch/arm/mach-s3c64xx/pl080.c
-index 901a984bddc2..89c5a62830a7 100644
---- a/arch/arm/mach-s3c64xx/pl080.c
-+++ b/arch/arm/mach-s3c64xx/pl080.c
-@@ -14,6 +14,7 @@
- #include <linux/amba/pl08x.h>
- #include <linux/of.h>
+ config DEBUG_S5PV210_UART
+ 	bool
  
-+#include <plat/cpu.h>
- #include <mach/irqs.h>
- #include <mach/map.h>
+@@ -1306,7 +1313,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA0
+ 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA1
+ 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA4
+-	default "debug/s3c24xx.S" if DEBUG_S3C24XX_UART
++	default "debug/s3c24xx.S" if DEBUG_S3C24XX_UART || DEBUG_S3C64XX_UART
+ 	default "debug/s5pv210.S" if DEBUG_S5PV210_UART
+ 	default "debug/sirf.S" if DEBUG_SIRFSOC_UART
+ 	default "debug/sti.S" if DEBUG_STI_UART
+@@ -1382,6 +1389,10 @@ config DEBUG_UART_PHYS
+ 				DEBUG_S3C2410_UART2)
+ 	default 0x78000000 if DEBUG_CNS3XXX
+ 	default 0x7c0003f8 if FOOTBRIDGE
++	default 0x7f005000 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART0
++	default 0x7f005400 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART1
++	default 0x7f005800 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART2
++	default 0x7f005c00 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART3
+ 	default 0x80010000 if DEBUG_ASM9260_UART
+ 	default 0x80070000 if DEBUG_IMX23_UART
+ 	default 0x80074000 if DEBUG_IMX28_UART
+@@ -1439,6 +1450,7 @@ config DEBUG_UART_PHYS
+ 		DEBUG_RCAR_GEN2_SCIF0 || DEBUG_RCAR_GEN2_SCIF2 || \
+ 		DEBUG_RMOBILE_SCIFA0 || DEBUG_RMOBILE_SCIFA1 || \
+ 		DEBUG_RMOBILE_SCIFA4 || DEBUG_S3C24XX_UART || \
++		DEBUG_S3C64XX_UART || \
+ 		DEBUG_UART_BCM63XX || DEBUG_ASM9260_UART || \
+ 		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0
  
-@@ -230,6 +231,9 @@ static AMBA_AHB_DEVICE(s3c64xx_dma1, "dma-pl080s.1", 0,
+@@ -1464,8 +1476,12 @@ config DEBUG_UART_VIRT
+ 	default 0xf4090000 if ARCH_LPC32XX
+ 	default 0xf4200000 if ARCH_GEMINI
+ 	default 0xf7000000 if DEBUG_SUN9I_UART0
++	default 0xf7000000 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART0
+ 	default 0xf7000000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART0 || \
+ 				DEBUG_S3C2410_UART0)
++	default 0xf7000400 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART1
++	default 0xf7000800 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART2
++	default 0xf7000c00 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART3
+ 	default 0xf7004000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART1 || \
+ 				DEBUG_S3C2410_UART1)
+ 	default 0xf7008000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART2 || \
+@@ -1528,6 +1544,7 @@ config DEBUG_UART_VIRT
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
+ 		DEBUG_MSM_UART || DEBUG_NETX_UART || \
+ 		DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
++		DEBUG_S3C64XX_UART || \
+ 		DEBUG_UART_BCM63XX || DEBUG_ASM9260_UART || \
+ 		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0
  
- static int __init s3c64xx_pl080_init(void)
- {
-+	if (!soc_is_s3c64xx())
-+		return 0;
-+
- 	/* Set all DMA configuration to be DMA, not SDMA */
- 	writel(0xffffff, S3C64XX_SDMA_SEL);
- 
-diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
-index aaf7bea4032f..1451d4cda324 100644
---- a/arch/arm/mach-s3c64xx/pm.c
-+++ b/arch/arm/mach-s3c64xx/pm.c
-@@ -22,6 +22,7 @@
- #include <mach/map.h>
- #include <mach/irqs.h>
- 
-+#include <plat/cpu.h>
- #include <plat/devs.h>
- #include <plat/pm.h>
- #include <plat/wakeup-mask.h>
-@@ -330,6 +331,9 @@ int __init s3c64xx_pm_init(void)
- 
- static __init int s3c64xx_pm_initcall(void)
- {
-+	if (!soc_is_s3c64xx())
-+		return 0;
-+
- 	pm_cpu_prep = s3c64xx_pm_prepare;
- 	pm_cpu_sleep = s3c64xx_cpu_suspend;
- 
-diff --git a/arch/arm/mach-s3c64xx/s3c6400.c b/arch/arm/mach-s3c64xx/s3c6400.c
-index 1ce48c54cd9c..0789d59e6302 100644
---- a/arch/arm/mach-s3c64xx/s3c6400.c
-+++ b/arch/arm/mach-s3c64xx/s3c6400.c
-@@ -81,7 +81,7 @@ static struct device s3c6400_dev = {
- static int __init s3c6400_core_init(void)
- {
- 	/* Not applicable when using DT. */
--	if (of_have_populated_dt())
-+	if (of_have_populated_dt() || soc_is_s3c64xx())
- 		return 0;
- 
- 	return subsys_system_register(&s3c6400_subsys, NULL);
-diff --git a/arch/arm/mach-s3c64xx/s3c6410.c b/arch/arm/mach-s3c64xx/s3c6410.c
-index b2a7930548d9..273f8a1518b2 100644
---- a/arch/arm/mach-s3c64xx/s3c6410.c
-+++ b/arch/arm/mach-s3c64xx/s3c6410.c
-@@ -84,7 +84,7 @@ static struct device s3c6410_dev = {
- static int __init s3c6410_core_init(void)
- {
- 	/* Not applicable when using DT. */
--	if (of_have_populated_dt())
-+	if (of_have_populated_dt() || !soc_is_s3c64xx())
- 		return 0;
- 
- 	return subsys_system_register(&s3c6410_subsys, NULL);
-diff --git a/arch/arm/plat-samsung/gpio-samsung.c b/arch/arm/plat-samsung/gpio-samsung.c
-index 7c288ba4dc87..37faa8eab78f 100644
---- a/arch/arm/plat-samsung/gpio-samsung.c
-+++ b/arch/arm/plat-samsung/gpio-samsung.c
-@@ -1176,14 +1176,16 @@ static __init int samsung_gpiolib_init(void)
- 	 * interfaces. For legacy (non-DT) platforms this driver is used.
- 	 */
- 	if (of_have_populated_dt())
--		return -ENODEV;
+diff --git a/arch/arm/mach-s3c64xx/include/mach/debug-macro.S b/arch/arm/mach-s3c64xx/include/mach/debug-macro.S
+deleted file mode 100644
+index c9b95325b672..000000000000
+--- a/arch/arm/mach-s3c64xx/include/mach/debug-macro.S
++++ /dev/null
+@@ -1,38 +0,0 @@
+-/* arch/arm/mach-s3c6400/include/mach/debug-macro.S
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- *	http://armlinux.simtec.co.uk/
+- *	Ben Dooks <ben@simtec.co.uk>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
 -
--	samsung_gpiolib_set_cfg(samsung_gpio_cfgs, ARRAY_SIZE(samsung_gpio_cfgs));
-+		return 0;
- 
- 	if (soc_is_s3c24xx()) {
-+		samsung_gpiolib_set_cfg(samsung_gpio_cfgs,
-+				ARRAY_SIZE(samsung_gpio_cfgs));
- 		s3c24xx_gpiolib_add_chips(s3c24xx_gpios,
- 				ARRAY_SIZE(s3c24xx_gpios), S3C24XX_VA_GPIO);
- 	} else if (soc_is_s3c64xx()) {
-+		samsung_gpiolib_set_cfg(samsung_gpio_cfgs,
-+				ARRAY_SIZE(samsung_gpio_cfgs));
- 		samsung_gpiolib_add_2bit_chips(s3c64xx_gpios_2bit,
- 				ARRAY_SIZE(s3c64xx_gpios_2bit),
- 				S3C64XX_VA_GPIO + 0xE0, 0x20);
-@@ -1192,9 +1194,6 @@ static __init int samsung_gpiolib_init(void)
- 				S3C64XX_VA_GPIO);
- 		samsung_gpiolib_add_4bit2_chips(s3c64xx_gpios_4bit2,
- 				ARRAY_SIZE(s3c64xx_gpios_4bit2));
--	} else {
--		WARN(1, "Unknown SoC in gpio-samsung, no GPIOs added\n");
--		return -ENODEV;
- 	}
- 
- 	return 0;
-diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
-index 11fbbc26e49f..3776f7e752f0 100644
---- a/arch/arm/plat-samsung/init.c
-+++ b/arch/arm/plat-samsung/init.c
-@@ -152,6 +152,11 @@ static int __init s3c_arch_init(void)
- {
- 	int ret;
- 
-+	/* init is only needed for ATAGS based platforms */
-+	if (!IS_ENABLED(CONFIG_ATAGS) ||
-+	    (!soc_is_s3c24xx() && !soc_is_s3c64xx()))
-+		return 0;
-+
- 	// do the correct init for cpu
- 
- 	if (cpu == NULL) {
+-/* pull in the relevant register and map files. */
+-
+-#include <linux/serial_s3c.h>
+-#include <mach/map.h>
+-
+-	/* note, for the boot process to work we have to keep the UART
+-	 * virtual address aligned to an 1MiB boundary for the L1
+-	 * mapping the head code makes. We keep the UART virtual address
+-	 * aligned and add in the offset when we load the value here.
+-	 */
+-
+-	.macro addruart, rp, rv, tmp
+-		ldr	\rp, = S3C_PA_UART
+-		ldr	\rv, = (S3C_VA_UART + S3C_PA_UART & 0xfffff)
+-#if CONFIG_DEBUG_S3C_UART != 0
+-		add	\rp, \rp, #(0x400 * CONFIG_DEBUG_S3C_UART)
+-		add	\rv, \rv, #(0x400 * CONFIG_DEBUG_S3C_UART)
+-#endif
+-	.endm
+-
+-/* include the reset of the code which will do the work, we're only
+- * compiling for a single cpu processor type so the default of s3c2440
+- * will be fine with us.
+- */
+-
+-#include <debug/samsung.S>
 -- 
 2.1.0.rc2
