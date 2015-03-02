@@ -1,60 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 02 Mar 2015 21:40:14 +0100
-Subject: [PATCH 0/5] ARM: orion5k/mv78xx0/dove multiplatform support
-In-Reply-To: <1425328618-894030-1-git-send-email-arnd@arndb.de>
-References: <1425328618-894030-1-git-send-email-arnd@arndb.de>
-Message-ID: <3759703.9ZVN3LdzHt@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Mar 2015 20:43:26 +0000
+Subject: [PATCH] ARM: dts: hummingboard: enable pcf8523 rtc for i2eX
+In-Reply-To: <20150302202540.GB30263@beef>
+References: <1425322206-30115-1-git-send-email-mporter@konsulko.com>
+ <20150302190204.GR8656@n2100.arm.linux.org.uk>
+ <20150302190616.GS8656@n2100.arm.linux.org.uk>
+ <20150302192116.GA30263@beef>
+ <20150302194908.GU8656@n2100.arm.linux.org.uk>
+ <20150302202540.GB30263@beef>
+Message-ID: <20150302204326.GV8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 March 2015 21:36:53 Arnd Bergmann wrote:
+On Mon, Mar 02, 2015 at 03:25:40PM -0500, Matt Porter wrote:
+> On Mon, Mar 02, 2015 at 07:49:08PM +0000, Russell King wrote:
+> > It's a bit like the MMC stuff, I'm still carrying Olof's solution for
+> > the SDIO wifi/bt power and reset control stuff, and I'm not at present
+> > intending to do anything with it other than continue forward-porting it.
+> > I'm not interested in wasting free time trying to re-work that to suit
+> > some other solution, especially as people couldn't settle on a solution
+> > when I /did/ have an interest in it (not that I have much interest in
+> > wifi or BT - I tend to prefer old fashioned wired connections.  It also
+> > doesn't help that the Broadcom driver seemed to be very flakey with
+> > brcm4329 hardware for quite some time.)
+> > 
+> > Anyway, you can find all my kernel patches in a suitably trimmed version
+> > of the above URL, and on http://ftp.arm.linux.org.uk/cgit/ is a huge pile
+> > of effort I put into an accelerated X server with etnaviv and /my/ kernel
+> > version of etnaviv drm, complete with Xv support.
+> 
+> Excellent, so I feel like you ultimately giving me mixed messages here.
 
-> This is build tested so far and survives a randconfig builder
-> for a few hundred builds without regressions, but I have not
-> done any runtime testing. Any help in testing or reviewing would
-> be much appreciated.
+Yes, I am - partly because I don't know what to do with many of the
+patches I seem to be endlessly carrying (which depresses me).  I look
+back to the days when I could be sure of completely emptying my tree
+at each merge window, something which /never/ happens anymore.
 
-It would help to send out the version that I have actually tested.
-If you want to give it a try, please apply the patch below to
-actually get mach-dove to build.
+> You said you need to take care of this licensing issue and I think you
+> implied you'd take care of the audio and rtc stuff as you have that
+> patch in your backlog.
 
-	Arnd
+As you may have seen, I've mailed out the licensing patch, and I've
+also mailed out two patches - one for PWM stuff and the second one
+being the RTC change broken out from my sgtl5000 hacks patch.
 
-diff --git a/arch/arm/mach-dove/irq.c b/arch/arm/mach-dove/irq.c
-index c9d68dbbdc08..c0d5f52713b7 100644
---- a/arch/arm/mach-dove/irq.c
-+++ b/arch/arm/mach-dove/irq.c
-@@ -13,6 +13,7 @@
- #include <linux/irq.h>
- #include <linux/gpio.h>
- #include <linux/io.h>
-+#include <asm/exception.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/irq.h>
- 
-diff --git a/arch/arm/mach-dove/irq.c b/arch/arm/mach-dove/irq.c
-index c0d5f52713b7..eed251513ca5 100644
---- a/arch/arm/mach-dove/irq.c
-+++ b/arch/arm/mach-dove/irq.c
-@@ -161,7 +161,7 @@ void __init dove_init_irq(void)
- 	writel(0, PMU_INTERRUPT_MASK);
- 	writel(0, PMU_INTERRUPT_CAUSE);
- 
--	for (i = IRQ_DOVE_PMU_START; i < NR_IRQS; i++) {
-+	for (i = IRQ_DOVE_PMU_START; i < DOVE_NR_IRQS; i++) {
- 		irq_set_chip_and_handler(i, &pmu_irq_chip, handle_level_irq);
- 		irq_set_status_flags(i, IRQ_LEVEL);
- 		set_irq_flags(i, IRQF_VALID);
-diff --git a/arch/arm/mach-dove/pm.h b/arch/arm/mach-dove/pm.h
-index 584954d26241..3e2712a89c61 100644
---- a/arch/arm/mach-dove/pm.h
-+++ b/arch/arm/mach-dove/pm.h
-@@ -61,7 +61,7 @@ static inline int pmu_to_irq(int pin)
- 
- static inline int irq_to_pmu(int irq)
- {
--	if (IRQ_DOVE_PMU_START <= irq && irq < NR_IRQS)
-+	if (IRQ_DOVE_PMU_START <= irq && irq < DOVE_NR_IRQS)
- 		return irq - IRQ_DOVE_PMU_START;
- 
- 	return -EINVAL;
+I've also cut a v4.0-rc1 patch set, in the usual diff.bz2, tar.bz2,
+and separate patch forms which include those three patches.
+
+> However, sounds like you've given up on pushing
+> the bigger things upstream given the problem with getting agreement
+> on those pieces. Are you just going to be submitting the
+> less controversial portions like the audio and dts updates? My goal for
+> HB initially is just to have all the low-hanging fruit (like rtc and audio)
+> working on mainline...besides the stuff that's already there.
+
+RTC is the easiest bit of the problem, as you've discovered it's just
+a matter of uncommenting the bit in DT.  (It's even better if you have
+a battery to plug into the little connector!)
+
+Audio needs more than just DT changes, and there's recently been some
+SGTL5000 patches submitted which change the way power is controlled
+in the SGTL5000.  I don't yet know whether those patches solve the
+problems I was seeing with the kernel powering down the SGTL5000's
+internal regulator, thereby making the device totally inaccessible
+until the next power cycle or not.
+
+Whether I'll get a chance to look at that this week or not, I don't
+know... (see my privately shared G+ status from yesterday, which
+people in my G+ circles should be able to see.)
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
