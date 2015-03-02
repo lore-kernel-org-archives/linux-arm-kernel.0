@@ -1,84 +1,27 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Mon, 2 Mar 2015 23:27:28 +0530
-Subject: [PATCH v3 1/2] dma: Add Xilinx Central DMA DT Binding Documentation
-Message-ID: <b45de5fb5ea2417e820418655e3e1fd2@BN1BFFO11FD018.protection.gbl>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Mon, 2 Mar 2015 18:03:20 +0000
+Subject: [PATCH 00/10] ARM: s3c64xx multiplatform, help needed
+In-Reply-To: <20150302161712.GX21293@sirena.org.uk>
+References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
+ <20150302161712.GX21293@sirena.org.uk>
+Message-ID: <20150302180320.GC2042@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device-tree binding documentation of Xilinx Central DMA Engine.
+On Mon, Mar 02, 2015 at 04:17:12PM +0000, Mark Brown wrote:
+> On Mon, Mar 02, 2015 at 01:35:53PM +0100, Arnd Bergmann wrote:
+> 
+> > Does anyone still have access to the hardware? I'm particularly
+> > interested in seeing this patch set get tested on smartq
+> > and on smdk6410, which have the majority of the hardware.
+> 
+> I and a bunch of other people still have Cragganmore, the ex-Wolfson
+> (added Charles here) people may also be able to locate a smdk6410.
+> may also be a
 
-Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
-Changes in v3:
-- Used proper alignment for all the properties.
-Changes in v2:
-- Change property 'xlnx,data-width' to 'xlnx,datawidth' in the description
-  to match the implementation.
+Certainly we have Cragganmores here, I think I have seen an
+smdk6410 kicking about the office unloved somewhere. I will have
+a look to see if I can unearth it somewhere.
 
- .../devicetree/bindings/dma/xilinx/xilinx_cdma.txt | 54 ++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
-
-diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
-new file mode 100644
-index 0000000..aba3b10
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
-@@ -0,0 +1,54 @@
-+Xilinx AXI CDMA engine, it does transfers between memory-mapped source
-+address and a memory-mapped destination address.
-+
-+Required properties:
-+- compatible		: Should be "xlnx,axi-cdma-1.00.a"
-+- #dma-cells		: Should be <1>, see "dmas" property below
-+- reg			: Should contain cdma registers location and length.
-+- dma-channel child node: Should have only one channel
-+
-+Optional properties:
-+- xlnx,include-sg	: Tells whether configured for Scatter-mode in
-+			  the hardware.
-+
-+Required child node properties:
-+- compatible		: It should be "xlnx,axi-cdma-channel".
-+- interrupts		: Should contain per channel CDMA interrupts.
-+- xlnx,datawidth	: Should contain the stream data width, take values
-+			  {32,64...1024}.
-+
-+Option child node properties:
-+- xlnx,include-dre	: Tells whether hardware is configured for Data
-+			  Realignment Engine.
-+
-+Example:
-+++++++++
-+
-+axi_cdma_0: axicdma at 7e200000 {
-+       compatible = "xlnx,axi-cdma-1.00.a";
-+       #dma_cells = <1>;
-+       reg = < 0x7e200000 0x10000 >;
-+       dma-channel at 7e200000 {
-+               compatible = "xlnx,axi-cdma-channel";
-+               interrupts = < 0 55 4 >;
-+               xlnx,datawidth = <0x40>;
-+       } ;
-+} ;
-+
-+
-+* DMA client
-+
-+Required properties:
-+- dmas		: a list of <[Central DMA device phandle] [Channel ID]> pairs,
-+		  where Channel ID is '0' for write/tx and '1' for read/rx
-+                  channel.
-+- dma-names	: a list of DMA channel names, one per "dmas" entry
-+
-+Example:
-+++++++++
-+
-+cdmatest_0: cdmatest at 0 {
-+       compatible ="xlnx,axi-cdma-test-1.00.a";
-+       dmas = <&axi_cdma_0 0>;
-+       dma-names = "cdma0";
-+} ;
--- 
-2.1.2
+Thanks,
+Charles
