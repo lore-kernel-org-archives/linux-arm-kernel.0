@@ -1,126 +1,73 @@
-From: vigneshr@ti.com (R, Vignesh)
-Date: Mon, 2 Mar 2015 13:57:31 +0530
-Subject: [PATCH 1/2] ARM: OMAP2: hwmod: AM43XX: Add hwmod support for
- HDQ-1W
-In-Reply-To: <alpine.DEB.2.02.1503012305550.9987@utopia.booyaka.com>
-References: <1425029057-5075-1-git-send-email-vigneshr@ti.com>
- <alpine.DEB.2.02.1503012305550.9987@utopia.booyaka.com>
-Message-ID: <54F41EF3.6080302@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 2 Mar 2015 08:30:19 +0000
+Subject: [PATCH v3 0/4] clk: st: New always-on clock domain
+In-Reply-To: <87sidq3ox8.fsf@free.fr>
+References: <1424799222-9301-1-git-send-email-lee.jones@linaro.org>
+ <87385r3uk9.fsf@free.fr> <20150227214941.GB12821@x1>
+ <87sidq3ox8.fsf@free.fr>
+Message-ID: <20150302083019.GD31325@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, 28 Feb 2015, Robert Jarzmik wrote:
 
-On 3/2/2015 4:39 AM, Paul Walmsley wrote:
-> Hi
+> Lee Jones <lee.jones@linaro.org> writes:
 > 
-> On Fri, 27 Feb 2015, Vignesh R wrote:
+> >> I wonder why there is a need for a new clock when CLK_IGNORE_UNUSED does
+> >> exist. What is the usecase that is covered by this patchset which is not used by
+> >> CLK_IGNORE_UNUSED clock flag ?
+> >> 
+> >> And if that reason exists, I'd like to find it in the commit message.
+> >
+> > The problem is applying that flag in a generic way.
+> >
+> > However, I guess you haven't seen this [1] yet?
+> >
+> > [1] https://lkml.org/lkml/2015/2/27/548
+> I have.
 > 
->> From: "Poddar, Sourav" <sourav.poddar@ti.com>
->>
->> This patch adds hwmod data for hdq/1w driver on AM43xx.
->>
->> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
->> [vigneshr at ti.com: Ported patch to v4.0-rc1]
->> Signed-off-by: Vignesh R <vigneshr@ti.com>
->> ---
->>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 36 ++++++++++++++++++++++++++++++
->>  arch/arm/mach-omap2/prcm43xx.h             |  1 +
->>  2 files changed, 37 insertions(+)
->>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
->> index 8eb85925e444..d4f1df28475c 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
->> @@ -20,6 +20,7 @@
->>  #include "omap_hwmod_33xx_43xx_common_data.h"
->>  #include "prcm43xx.h"
->>  #include "omap_hwmod_common_data.h"
->> +#include "hdq1w.h"
->>  
->>  
->>  /* IP blocks */
->> @@ -516,6 +517,33 @@ static struct omap_hwmod am43xx_dss_rfbi_hwmod = {
->>  	.parent_hwmod	= &am43xx_dss_core_hwmod,
->>  };
->>  
->> +/* HDQ1W */
->> +static struct omap_hwmod_class_sysconfig am43xx_hdq1w_sysc = {
->> +	.rev_offs       = 0x0000,
->> +	.sysc_offs      = 0x0014,
->> +	.syss_offs      = 0x0018,
->> +	.sysc_flags     = (SYSC_HAS_SOFTRESET),
-> 
-> This is missing the SYSC_HAS_AUTOIDLE bit.  Is this intentional?
+> And yet :
+>  1) This won't go in a _commit_ message (as opposed to cover-letter). Moreover
 
-Sorry.. my bad.. I didn't observe this while porting the patch.
-I will fix this and repost.
+Did you read rest of the set, or just the cover-letter?  I referenced
+0/0 because it is the thread parent and from there you can drill down
+into the commits where I believe there is adequate explanation in
+each.  If you could be more specific and tell me which commit you
+think requires more explanation, I'd be happy to take a look.
 
-Regards
-Vignesh
+>     it doesn't specify which usecase is not covered by CLK_IGNORE_UNUSED, it
+>     says, up to my understanding, that is it another way to have to
+>     CLK_IGNORE_UNUSED flag applied.
 
-> 
->> +	.sysc_fields    = &omap_hwmod_sysc_type1,
->> +};
->> +
->> +static struct omap_hwmod_class am43xx_hdq1w_hwmod_class = {
->> +	.name   = "hdq1w",
->> +	.sysc   = &am43xx_hdq1w_sysc,
->> +	.reset	= &omap_hdq1w_reset,
->> +};
->> +
->> +static struct omap_hwmod am43xx_hdq1w_hwmod = {
->> +	.name           = "hdq1w",
->> +	.class          = &am43xx_hdq1w_hwmod_class,
->> +	.clkdm_name     = "l4ls_clkdm",
->> +	.prcm = {
->> +		.omap4 = {
->> +			.clkctrl_offs = AM43XX_CM_PER_HDQ1W_CLKCTRL_OFFSET,
->> +			.modulemode   = MODULEMODE_SWCTRL,
->> +		},
->> +	},
->> +};
->> +
->>  /* Interfaces */
->>  static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
->>  	.master		= &am33xx_l3_main_hwmod,
->> @@ -790,6 +818,13 @@ static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
->>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->>  };
->>  
->> +static struct omap_hwmod_ocp_if am43xx_l4_ls__hdq1w = {
->> +	.master         = &am33xx_l4_ls_hwmod,
->> +	.slave          = &am43xx_hdq1w_hwmod,
->> +	.clk            = "l4ls_gclk",
->> +	.user           = OCP_USER_MPU | OCP_USER_SDMA,
->> +};
->> +
->>  static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
->>  	&am33xx_l4_wkup__synctimer,
->>  	&am43xx_l4_ls__timer8,
->> @@ -889,6 +924,7 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
->>  	&am43xx_l4_ls__dss,
->>  	&am43xx_l4_ls__dss_dispc,
->>  	&am43xx_l4_ls__dss_rfbi,
->> +	&am43xx_l4_ls__hdq1w,
->>  	NULL,
->>  };
->>  
->> diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
->> index ad7b3e9977f8..48df3b55057e 100644
->> --- a/arch/arm/mach-omap2/prcm43xx.h
->> +++ b/arch/arm/mach-omap2/prcm43xx.h
->> @@ -143,5 +143,6 @@
->>  #define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
->>  #define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
->>  #define AM43XX_CM_PER_DSS_CLKCTRL_OFFSET		0x0a20
->> +#define AM43XX_CM_PER_HDQ1W_CLKCTRL_OFFSET		0x04a0
->>  
->>  #endif
->> -- 
->> 1.9.1
->>
-> 
-> 
-> - Paul
-> 
+Well that is exactly what we're doing.  Is there an issue with that?
+
+This is a way to do it at a platform level.  It means we can support
+multiple platforms where clocksources have been switched around
+without writing new driver code in drivers/clk/st.
+
+If you have something else in mind, let me know.
+
+>  2) I still fail to see why this is necessary
+>     IOW why declaring the mandatory always-on clocks with the proper flag should
+>     be augmented with a new clock list. Isn't the existing flag the generic way
+>     ?
+
+I'm not sure what you mean by this, would you be able to expland a
+little?
+
+> I might not understand the real motivation behind that of course, that's why I'm
+> asking.
+
+Please bear in mind that we don't supply our clocks statically.  All
+of the information is extracted from DT, so if the always-on
+information does reside in there, where do you propose it comes from?
+
+We could just write this code inside our own driver and apply the
+CLK_IGNORE_UNUSED at a local level, but that's not the generic
+solution I am searching for.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
