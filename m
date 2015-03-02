@@ -1,33 +1,33 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 2 Mar 2015 13:31:49 +0100
-Subject: PMD update corruption (sync question)
-In-Reply-To: <1172437505.28092883.1425294374323.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
-References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
- <54F06636.6080905@redhat.com> <54F3C6AD.50300@redhat.com>
- <938476184.27970130.1425275915893.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
- <20150302105011.GD22541@e104818-lin.cambridge.arm.com>
- <1172437505.28092883.1425294374323.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
-Message-ID: <20150302123149.GK21418@twins.programming.kicks-ass.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon,  2 Mar 2015 13:35:54 +0100
+Subject: [PATCH 01/10] Input: s3c2410_ts: fix S3C_ADC dependency
+In-Reply-To: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
+References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
+Message-ID: <1425299763-4066822-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 06:06:14AM -0500, Jon Masters wrote:
+S3C_ADC is only available on machines that don't do ARCH_MULTIPLATFORM,
+so changing the 'select' into 'depends on' here helps us move to
+ARCH_MULTIPLATFORM without introducing regressions.
 
-> 64-bit writes are /usually/ atomic but alignment or compiler emiting
-> 32-bit opcodes could also do it. I agree there are a few other pieces
-> to this we will chat about separately and come back to this thread.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/input/touchscreen/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Looking at the asm will quickly tell you if its emitting 32bit stores or
-not. If it is, use WRITE_ONCE() (you should anyway I suppose) and see if
-that cures it, if not file a compiler bug, volatile stores should never
-be split.
-
-As to alignment, you can simply put a BUG_ON((unsigned long)ptep & 7);
-in there.
-
-Also:
-
-A: Because it messes up the order in which people normally read text.
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
+diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+index 58917525126e..3b4cd9ab1af0 100644
+--- a/drivers/input/touchscreen/Kconfig
++++ b/drivers/input/touchscreen/Kconfig
+@@ -326,7 +326,7 @@ config TOUCHSCREEN_ILI210X
+ config TOUCHSCREEN_S3C2410
+ 	tristate "Samsung S3C2410/generic touchscreen input driver"
+ 	depends on ARCH_S3C24XX || SAMSUNG_DEV_TS
+-	select S3C_ADC
++	depends on S3C_ADC
+ 	help
+ 	  Say Y here if you have the s3c2410 touchscreen.
+ 
+-- 
+2.1.0.rc2
