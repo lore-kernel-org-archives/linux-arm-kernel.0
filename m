@@ -1,34 +1,32 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon,  2 Mar 2015 18:20:31 +0000
-Subject: [PATCH v2 4/5] ARM: add 32bit support to GICv3
+Date: Mon,  2 Mar 2015 18:20:28 +0000
+Subject: [PATCH v2 1/5] arm64: GICv3: refactor the AArch64 specific parts
 In-Reply-To: <1425320432-6325-1-git-send-email-jean-philippe.brucker@arm.com>
 References: <1425320432-6325-1-git-send-email-jean-philippe.brucker@arm.com>
-Message-ID: <1425320432-6325-5-git-send-email-jean-philippe.brucker@arm.com>
+Message-ID: <1425320432-6325-2-git-send-email-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the system and memory-mapped register accesses in
-asm/arch_gicv3.h for 32bit architectures.
-
-This patch is a straightforward translation of the arm64 header. 64bit
-accesses are done in two times and don't need atomicity: TYPER is
-read-only, and the upper-word of IROUTER is always zero on 32bit
-architectures.
+This patch moves the GICv3 system register access helpers to
+arch/arm64/. Their 32bit counterparts will need to use mrc/mcr accesses
+instead of mrs_s/msr_s.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- arch/arm/include/asm/arch_gicv3.h | 182 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 182 insertions(+)
- create mode 100644 arch/arm/include/asm/arch_gicv3.h
+ arch/arm64/include/asm/arch_gicv3.h | 133 ++++++++++++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic-v3.c        |  38 +----------
+ include/linux/irqchip/arm-gic-v3.h  |  97 +++++---------------------
+ 3 files changed, 154 insertions(+), 114 deletions(-)
+ create mode 100644 arch/arm64/include/asm/arch_gicv3.h
 
-diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
 new file mode 100644
-index 0000000..c2c3603
+index 0000000..5409dff
 --- /dev/null
-+++ b/arch/arm/include/asm/arch_gicv3.h
-@@ -0,0 +1,182 @@
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -0,0 +1,133 @@
 +/*
-+ * arch/arm/include/asm/arch_gicv3.h
++ * arch/arm64/include/asm/arch_gicv3.h
 + *
 + * Copyright (C) 2014 ARM Ltd.
 + *
@@ -47,167 +45,311 @@ index 0000000..c2c3603
 +#ifndef __ASM_ARCH_GICV3_H
 +#define __ASM_ARCH_GICV3_H
 +
++#include <asm/sysreg.h>
++
++#define ICC_EOIR1_EL1			sys_reg(3, 0, 12, 12, 1)
++#define ICC_IAR1_EL1			sys_reg(3, 0, 12, 12, 0)
++#define ICC_SGI1R_EL1			sys_reg(3, 0, 12, 11, 5)
++#define ICC_PMR_EL1			sys_reg(3, 0, 4, 6, 0)
++#define ICC_CTLR_EL1			sys_reg(3, 0, 12, 12, 4)
++#define ICC_SRE_EL1			sys_reg(3, 0, 12, 12, 5)
++#define ICC_GRPEN1_EL1			sys_reg(3, 0, 12, 12, 7)
++
++#define ICC_SRE_EL2			sys_reg(3, 4, 12, 9, 5)
++
++/*
++ * System register definitions
++ */
++#define ICH_VSEIR_EL2			sys_reg(3, 4, 12, 9, 4)
++#define ICH_HCR_EL2			sys_reg(3, 4, 12, 11, 0)
++#define ICH_VTR_EL2			sys_reg(3, 4, 12, 11, 1)
++#define ICH_MISR_EL2			sys_reg(3, 4, 12, 11, 2)
++#define ICH_EISR_EL2			sys_reg(3, 4, 12, 11, 3)
++#define ICH_ELSR_EL2			sys_reg(3, 4, 12, 11, 5)
++#define ICH_VMCR_EL2			sys_reg(3, 4, 12, 11, 7)
++
++#define __LR0_EL2(x)			sys_reg(3, 4, 12, 12, x)
++#define __LR8_EL2(x)			sys_reg(3, 4, 12, 13, x)
++
++#define ICH_LR0_EL2			__LR0_EL2(0)
++#define ICH_LR1_EL2			__LR0_EL2(1)
++#define ICH_LR2_EL2			__LR0_EL2(2)
++#define ICH_LR3_EL2			__LR0_EL2(3)
++#define ICH_LR4_EL2			__LR0_EL2(4)
++#define ICH_LR5_EL2			__LR0_EL2(5)
++#define ICH_LR6_EL2			__LR0_EL2(6)
++#define ICH_LR7_EL2			__LR0_EL2(7)
++#define ICH_LR8_EL2			__LR8_EL2(0)
++#define ICH_LR9_EL2			__LR8_EL2(1)
++#define ICH_LR10_EL2			__LR8_EL2(2)
++#define ICH_LR11_EL2			__LR8_EL2(3)
++#define ICH_LR12_EL2			__LR8_EL2(4)
++#define ICH_LR13_EL2			__LR8_EL2(5)
++#define ICH_LR14_EL2			__LR8_EL2(6)
++#define ICH_LR15_EL2			__LR8_EL2(7)
++
++#define __AP0Rx_EL2(x)			sys_reg(3, 4, 12, 8, x)
++#define ICH_AP0R0_EL2			__AP0Rx_EL2(0)
++#define ICH_AP0R1_EL2			__AP0Rx_EL2(1)
++#define ICH_AP0R2_EL2			__AP0Rx_EL2(2)
++#define ICH_AP0R3_EL2			__AP0Rx_EL2(3)
++
++#define __AP1Rx_EL2(x)			sys_reg(3, 4, 12, 9, x)
++#define ICH_AP1R0_EL2			__AP1Rx_EL2(0)
++#define ICH_AP1R1_EL2			__AP1Rx_EL2(1)
++#define ICH_AP1R2_EL2			__AP1Rx_EL2(2)
++#define ICH_AP1R3_EL2			__AP1Rx_EL2(3)
++
 +#ifndef __ASSEMBLY__
 +
-+#include <linux/io.h>
++#include <linux/stringify.h>
 +
-+#define __ACCESS_CP15(CRn, Op1, CRm, Op2)	p15, Op1, %0, CRn, CRm, Op2
-+#define __ACCESS_CP15_64(Op1, CRm)		p15, Op1, %Q0, %R0, CRm
++/* Low level accessors */
 +
-+#define ICC_EOIR1			__ACCESS_CP15(c12, 0, c12, 1)
-+#define ICC_IAR1			__ACCESS_CP15(c12, 0, c12, 0)
-+#define ICC_SGI1R			__ACCESS_CP15_64(0, c12)
-+#define ICC_PMR				__ACCESS_CP15(c4, 0, c6, 0)
-+#define ICC_CTLR			__ACCESS_CP15(c12, 0, c12, 4)
-+#define ICC_SRE				__ACCESS_CP15(c12, 0, c12, 5)
-+#define ICC_IGRPEN1			__ACCESS_CP15(c12, 0, c12, 7)
-+
-+#define ICC_HSRE			__ACCESS_CP15(c12, 4, c9, 5)
-+
-+#define ICH_VSEIR			__ACCESS_CP15(c12, 4, c9, 4)
-+#define ICH_HCR				__ACCESS_CP15(c12, 4, c11, 0)
-+#define ICH_VTR				__ACCESS_CP15(c12, 4, c11, 1)
-+#define ICH_MISR			__ACCESS_CP15(c12, 4, c11, 2)
-+#define ICH_EISR			__ACCESS_CP15(c12, 4, c11, 3)
-+#define ICH_ELSR			__ACCESS_CP15(c12, 4, c11, 5)
-+#define ICH_VMCR			__ACCESS_CP15(c12, 4, c11, 7)
-+
-+#define __LR0(x)			__ACCESS_CP15(c12, 4, c12, x)
-+#define __LR8(x)			__ACCESS_CP15(c12, 4, c13, x)
-+
-+#define ICH_LR0				__LR0(0)
-+#define ICH_LR1				__LR0(1)
-+#define ICH_LR2				__LR0(2)
-+#define ICH_LR3				__LR0(3)
-+#define ICH_LR4				__LR0(4)
-+#define ICH_LR5				__LR0(5)
-+#define ICH_LR6				__LR0(6)
-+#define ICH_LR7				__LR0(7)
-+#define ICH_LR8				__LR8(0)
-+#define ICH_LR9				__LR8(1)
-+#define ICH_LR10			__LR8(2)
-+#define ICH_LR11			__LR8(3)
-+#define ICH_LR12			__LR8(4)
-+#define ICH_LR13			__LR8(5)
-+#define ICH_LR14			__LR8(6)
-+#define ICH_LR15			__LR8(7)
-+
-+/* LR top half */
-+#define __LRC0(x)			__ACCESS_CP15(c12, 4, c14, x)
-+#define __LRC8(x)			__ACCESS_CP15(c12, 4, c15, x)
-+
-+#define ICH_LRC0			__LRC0(0)
-+#define ICH_LRC1			__LRC0(1)
-+#define ICH_LRC2			__LRC0(2)
-+#define ICH_LRC3			__LRC0(3)
-+#define ICH_LRC4			__LRC0(4)
-+#define ICH_LRC5			__LRC0(5)
-+#define ICH_LRC6			__LRC0(6)
-+#define ICH_LRC7			__LRC0(7)
-+#define ICH_LRC8			__LRC8(0)
-+#define ICH_LRC9			__LRC8(1)
-+#define ICH_LRC10			__LRC8(2)
-+#define ICH_LRC11			__LRC8(3)
-+#define ICH_LRC12			__LRC8(4)
-+#define ICH_LRC13			__LRC8(5)
-+#define ICH_LRC14			__LRC8(6)
-+#define ICH_LRC15			__LRC8(7)
-+
-+#define __AP0Rx(x)			__ACCESS_CP15(c12, 4, c8, x)
-+#define ICH_AP0R0			__AP0Rx(0)
-+#define ICH_AP0R1			__AP0Rx(1)
-+#define ICH_AP0R2			__AP0Rx(2)
-+#define ICH_AP0R3			__AP0Rx(3)
-+
-+#define __AP1Rx(x)			__ACCESS_CP15(c12, 4, c9, x)
-+#define ICH_AP1R0			__AP1Rx(0)
-+#define ICH_AP1R1			__AP1Rx(1)
-+#define ICH_AP1R2			__AP1Rx(2)
-+#define ICH_AP1R3			__AP1Rx(3)
-+
-+/* Low-level accessors */
-+
-+static inline void gic_write_eoir(u32 irq)
++static inline void gic_write_eoir(u64 irq)
 +{
-+	asm volatile("mcr " __stringify(ICC_EOIR1) : : "r" (irq));
++	asm volatile("msr_s " __stringify(ICC_EOIR1_EL1) ", %0" : : "r" (irq));
 +	isb();
 +}
 +
-+static inline u32 gic_read_iar(void)
++static inline u64 gic_read_iar(void)
 +{
-+	u32 irqstat;
++	u64 irqstat;
 +
-+	asm volatile("mrc " __stringify(ICC_IAR1) : "=r" (irqstat));
++	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
 +	return irqstat;
 +}
 +
-+static inline void gic_write_pmr(u32 val)
++static inline void gic_write_pmr(u64 val)
 +{
-+	asm volatile("mcr " __stringify(ICC_PMR) : : "r" (val));
++	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
++}
++
++static inline void gic_write_ctlr(u64 val)
++{
++	asm volatile("msr_s " __stringify(ICC_CTLR_EL1) ", %0" : : "r" (val));
 +	isb();
 +}
 +
-+static inline void gic_write_ctlr(u32 val)
++static inline void gic_write_grpen1(u64 val)
 +{
-+	asm volatile("mcr " __stringify(ICC_CTLR) : : "r" (val));
-+	isb();
-+}
-+
-+static inline void gic_write_grpen1(u32 val)
-+{
-+	asm volatile("mcr " __stringify(ICC_IGRPEN1) : : "r" (val));
++	asm volatile("msr_s " __stringify(ICC_GRPEN1_EL1) ", %0" : : "r" (val));
 +	isb();
 +}
 +
 +static inline void gic_write_sgi1r(u64 val)
 +{
-+	asm volatile("mcrr " __stringify(ICC_SGI1R) : : "r" (val));
++	asm volatile("msr_s " __stringify(ICC_SGI1R_EL1) ", %0" : : "r" (val));
 +}
 +
-+static inline u32 gic_read_sre(void)
-+{
-+	u32 val;
-+
-+	asm volatile("mrc " __stringify(ICC_SRE) : "=r" (val));
-+	return val;
-+}
-+
-+static inline void gic_write_sre(u32 val)
-+{
-+	asm volatile("mcr " __stringify(ICC_SRE) : : "r" (val));
-+	isb();
-+}
-+
-+/*
-+ * Even in 32bit systems that use LPAE, there is no guarantee that the I/O
-+ * interface provides true 64bit atomic accesses, so using strd/ldrd doesn't
-+ * make much sense.
-+ * Moreover, 64bit I/O emulation is extremely difficult to implement on
-+ * AArch32, since the syndrome register doesn't provide any information for
-+ * them.
-+ * Consequently, the following IO helpers use 32bit accesses.
-+ *
-+ * There are only two registers that need 64bit accesses in this driver:
-+ * - GICD_IROUTERn, contain the affinity values associated to each interrupt.
-+ *   The upper-word (aff3) will always be 0, so there is no need for a lock.
-+ * - GICR_TYPER is an ID register and doesn't need atomicity.
-+ */
-+static void gic_write_irouter(u64 val, volatile void __iomem *addr)
-+{
-+	writel_relaxed((u32)val, addr);
-+	writel_relaxed((u32)(val >> 32), addr + 4);
-+}
-+
-+static inline u64 gic_read_typer(const volatile void __iomem *addr)
++static inline u64 gic_read_sre(void)
 +{
 +	u64 val;
 +
-+	val = readl_relaxed(addr);
-+	val |= (u64)readl_relaxed(addr + 4) << 32;
++	asm volatile("mrs_s %0, " __stringify(ICC_SRE_EL1) : "=r" (val));
 +	return val;
 +}
 +
-+#endif /* !__ASSEMBLY__ */
-+#endif /* !__ASM_ARCH_GICV3_H */
++static inline void gic_write_sre(u64 val)
++{
++	asm volatile("msr_s " __stringify(ICC_SRE_EL1) ", %0" : : "r" (val));
++	isb();
++}
++
++#endif /* __ASSEMBLY__ */
++#endif /* __ASM_ARCH_GICV3_H */
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 1c6dea2..63fb8f6 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -106,45 +106,13 @@ static void gic_redist_wait_for_rwp(void)
+ 	gic_do_wait_for_rwp(gic_data_rdist_rd_base());
+ }
+ 
+-/* Low level accessors */
+-static u64 __maybe_unused gic_read_iar(void)
+-{
+-	u64 irqstat;
+-
+-	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
+-	return irqstat;
+-}
+-
+-static void __maybe_unused gic_write_pmr(u64 val)
+-{
+-	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
+-}
+-
+-static void __maybe_unused gic_write_ctlr(u64 val)
+-{
+-	asm volatile("msr_s " __stringify(ICC_CTLR_EL1) ", %0" : : "r" (val));
+-	isb();
+-}
+-
+-static void __maybe_unused gic_write_grpen1(u64 val)
+-{
+-	asm volatile("msr_s " __stringify(ICC_GRPEN1_EL1) ", %0" : : "r" (val));
+-	isb();
+-}
+-
+-static void __maybe_unused gic_write_sgi1r(u64 val)
+-{
+-	asm volatile("msr_s " __stringify(ICC_SGI1R_EL1) ", %0" : : "r" (val));
+-}
+-
+ static void gic_enable_sre(void)
+ {
+ 	u64 val;
+ 
+-	asm volatile("mrs_s %0, " __stringify(ICC_SRE_EL1) : "=r" (val));
++	val = gic_read_sre();
+ 	val |= ICC_SRE_EL1_SRE;
+-	asm volatile("msr_s " __stringify(ICC_SRE_EL1) ", %0" : : "r" (val));
+-	isb();
++	gic_write_sre(val);
+ 
+ 	/*
+ 	 * Need to check that the SRE bit has actually been set. If
+@@ -153,7 +121,7 @@ static void gic_enable_sre(void)
+ 	 *
+ 	 * Kindly inform the luser.
+ 	 */
+-	asm volatile("mrs_s %0, " __stringify(ICC_SRE_EL1) : "=r" (val));
++	val = gic_read_sre();
+ 	if (!(val & ICC_SRE_EL1_SRE))
+ 		pr_err("GIC: unable to set SRE (disabled at EL2), panic ahead\n");
+ }
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 800544b..bbe9c34 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -18,8 +18,6 @@
+ #ifndef __LINUX_IRQCHIP_ARM_GIC_V3_H
+ #define __LINUX_IRQCHIP_ARM_GIC_V3_H
+ 
+-#include <asm/sysreg.h>
+-
+ /*
+  * Distributor registers. We assume we're running non-secure, with ARE
+  * being set. Secure-only and non-ARE registers are not described.
+@@ -239,6 +237,23 @@
+ #define ICC_CTLR_EL1_EOImode_drop	(1U << 1)
+ #define ICC_SRE_EL1_SRE			(1U << 0)
+ 
++#define ICC_SRE_EL2_SRE			(1 << 0)
++#define ICC_SRE_EL2_ENABLE		(1 << 3)
++
++#define ICC_IAR1_EL1_SPURIOUS		0x3ff
++
++#define ICC_SGI1R_TARGET_LIST_SHIFT	0
++#define ICC_SGI1R_TARGET_LIST_MASK	(0xffff << ICC_SGI1R_TARGET_LIST_SHIFT)
++#define ICC_SGI1R_AFFINITY_1_SHIFT	16
++#define ICC_SGI1R_AFFINITY_1_MASK	(0xff << ICC_SGI1R_AFFINITY_1_SHIFT)
++#define ICC_SGI1R_SGI_ID_SHIFT		24
++#define ICC_SGI1R_SGI_ID_MASK		(0xff << ICC_SGI1R_SGI_ID_SHIFT)
++#define ICC_SGI1R_AFFINITY_2_SHIFT	32
++#define ICC_SGI1R_AFFINITY_2_MASK	(0xffULL << ICC_SGI1R_AFFINITY_1_SHIFT)
++#define ICC_SGI1R_IRQ_ROUTING_MODE_BIT	40
++#define ICC_SGI1R_AFFINITY_3_SHIFT	48
++#define ICC_SGI1R_AFFINITY_3_MASK	(0xffULL << ICC_SGI1R_AFFINITY_1_SHIFT)
++
+ /*
+  * Hypervisor interface registers (SRE only)
+  */
+@@ -265,80 +280,10 @@
+ #define ICH_VMCR_PMR_SHIFT		24
+ #define ICH_VMCR_PMR_MASK		(0xffUL << ICH_VMCR_PMR_SHIFT)
+ 
+-#define ICC_EOIR1_EL1			sys_reg(3, 0, 12, 12, 1)
+-#define ICC_IAR1_EL1			sys_reg(3, 0, 12, 12, 0)
+-#define ICC_SGI1R_EL1			sys_reg(3, 0, 12, 11, 5)
+-#define ICC_PMR_EL1			sys_reg(3, 0, 4, 6, 0)
+-#define ICC_CTLR_EL1			sys_reg(3, 0, 12, 12, 4)
+-#define ICC_SRE_EL1			sys_reg(3, 0, 12, 12, 5)
+-#define ICC_GRPEN1_EL1			sys_reg(3, 0, 12, 12, 7)
+-
+-#define ICC_IAR1_EL1_SPURIOUS		0x3ff
+-
+-#define ICC_SRE_EL2			sys_reg(3, 4, 12, 9, 5)
+-
+-#define ICC_SRE_EL2_SRE			(1 << 0)
+-#define ICC_SRE_EL2_ENABLE		(1 << 3)
+-
+-#define ICC_SGI1R_TARGET_LIST_SHIFT	0
+-#define ICC_SGI1R_TARGET_LIST_MASK	(0xffff << ICC_SGI1R_TARGET_LIST_SHIFT)
+-#define ICC_SGI1R_AFFINITY_1_SHIFT	16
+-#define ICC_SGI1R_AFFINITY_1_MASK	(0xff << ICC_SGI1R_AFFINITY_1_SHIFT)
+-#define ICC_SGI1R_SGI_ID_SHIFT		24
+-#define ICC_SGI1R_SGI_ID_MASK		(0xff << ICC_SGI1R_SGI_ID_SHIFT)
+-#define ICC_SGI1R_AFFINITY_2_SHIFT	32
+-#define ICC_SGI1R_AFFINITY_2_MASK	(0xffULL << ICC_SGI1R_AFFINITY_1_SHIFT)
+-#define ICC_SGI1R_IRQ_ROUTING_MODE_BIT	40
+-#define ICC_SGI1R_AFFINITY_3_SHIFT	48
+-#define ICC_SGI1R_AFFINITY_3_MASK	(0xffULL << ICC_SGI1R_AFFINITY_1_SHIFT)
+-
+-/*
+- * System register definitions
+- */
+-#define ICH_VSEIR_EL2			sys_reg(3, 4, 12, 9, 4)
+-#define ICH_HCR_EL2			sys_reg(3, 4, 12, 11, 0)
+-#define ICH_VTR_EL2			sys_reg(3, 4, 12, 11, 1)
+-#define ICH_MISR_EL2			sys_reg(3, 4, 12, 11, 2)
+-#define ICH_EISR_EL2			sys_reg(3, 4, 12, 11, 3)
+-#define ICH_ELSR_EL2			sys_reg(3, 4, 12, 11, 5)
+-#define ICH_VMCR_EL2			sys_reg(3, 4, 12, 11, 7)
+-
+-#define __LR0_EL2(x)			sys_reg(3, 4, 12, 12, x)
+-#define __LR8_EL2(x)			sys_reg(3, 4, 12, 13, x)
+-
+-#define ICH_LR0_EL2			__LR0_EL2(0)
+-#define ICH_LR1_EL2			__LR0_EL2(1)
+-#define ICH_LR2_EL2			__LR0_EL2(2)
+-#define ICH_LR3_EL2			__LR0_EL2(3)
+-#define ICH_LR4_EL2			__LR0_EL2(4)
+-#define ICH_LR5_EL2			__LR0_EL2(5)
+-#define ICH_LR6_EL2			__LR0_EL2(6)
+-#define ICH_LR7_EL2			__LR0_EL2(7)
+-#define ICH_LR8_EL2			__LR8_EL2(0)
+-#define ICH_LR9_EL2			__LR8_EL2(1)
+-#define ICH_LR10_EL2			__LR8_EL2(2)
+-#define ICH_LR11_EL2			__LR8_EL2(3)
+-#define ICH_LR12_EL2			__LR8_EL2(4)
+-#define ICH_LR13_EL2			__LR8_EL2(5)
+-#define ICH_LR14_EL2			__LR8_EL2(6)
+-#define ICH_LR15_EL2			__LR8_EL2(7)
+-
+-#define __AP0Rx_EL2(x)			sys_reg(3, 4, 12, 8, x)
+-#define ICH_AP0R0_EL2			__AP0Rx_EL2(0)
+-#define ICH_AP0R1_EL2			__AP0Rx_EL2(1)
+-#define ICH_AP0R2_EL2			__AP0Rx_EL2(2)
+-#define ICH_AP0R3_EL2			__AP0Rx_EL2(3)
+-
+-#define __AP1Rx_EL2(x)			sys_reg(3, 4, 12, 9, x)
+-#define ICH_AP1R0_EL2			__AP1Rx_EL2(0)
+-#define ICH_AP1R1_EL2			__AP1Rx_EL2(1)
+-#define ICH_AP1R2_EL2			__AP1Rx_EL2(2)
+-#define ICH_AP1R3_EL2			__AP1Rx_EL2(3)
++#include <asm/arch_gicv3.h>
+ 
+ #ifndef __ASSEMBLY__
+ 
+-#include <linux/stringify.h>
+-
+ /*
+  * We need a value to serve as a irq-type for LPIs. Choose one that will
+  * hopefully pique the interest of the reviewer.
+@@ -356,12 +301,6 @@ struct rdists {
+ 	u64			flags;
+ };
+ 
+-static inline void gic_write_eoir(u64 irq)
+-{
+-	asm volatile("msr_s " __stringify(ICC_EOIR1_EL1) ", %0" : : "r" (irq));
+-	isb();
+-}
+-
+ struct irq_domain;
+ int its_cpu_init(void);
+ int its_init(struct device_node *node, struct rdists *rdists,
 -- 
 2.2.0.rc1
