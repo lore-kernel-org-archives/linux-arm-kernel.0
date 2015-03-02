@@ -1,28 +1,23 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 2 Mar 2015 19:15:51 +0100
-Subject: [PATCH] ARM: at91: pm: fix SRAM allocation
-In-Reply-To: <CBAD3087-CD3D-4101-B001-D0140A46E12B@jcrosoft.com>
-References: <1425292978-28135-1-git-send-email-alexandre.belloni@free-electrons.com>
- <7E7AE962-1BBE-4B33-9563-B91351494005@jcrosoft.com>
- <20150302105736.GL4094@piout.net>
- <CBAD3087-CD3D-4101-B001-D0140A46E12B@jcrosoft.com>
-Message-ID: <20150302181551.GV4094@piout.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 2 Mar 2015 18:18:03 +0000
+Subject: [PATCH v4] Sound: PXA: Fix settings of PXAxxx DMA
+In-Reply-To: <54F05FD6.6080702@tul.cz>
+References: <54CA125D.7010908@tul.cz> <54CA2B7E.5010003@tul.cz>
+ <54F05FD6.6080702@tul.cz>
+Message-ID: <20150302181803.GC21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2015 at 00:14:57 +0800, Jean-Christophe PLAGNIOL-VILLARD wrote :
-> >> pdev not initialised at NULL
-> > 
-> > Indeed, I'll fix that. It doesn't really matter for now as all the
-> > at91 DT have at least one sram node.
-> except if we drop it or when we add a new SoC and forget it
+On Fri, Feb 27, 2015 at 01:15:18PM +0100, Petr Cvek wrote:
+> bump
 > 
+> On 29.1.2015 13:45, Petr Cvek wrote:
 
-Sure, I was just saying that it doesn't matter for test purposes. It
-will be fixed in v2. I just want to make sure it is also working on g20
-before sending it.
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Don't send contentless, top-posted nags.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150302/debe3663/attachment.sig>
