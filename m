@@ -1,34 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Mar 2015 17:46:20 +0000
-Subject: [PATCH 05/10] clkdev: add clkdev_create() helper
-In-Reply-To: <CAMuHMdWHAu+zDKce0+ianDb=RHYR59eeMoiYBDK4PC=YMY0JXg@mail.gmail.com>
-References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
- <E1YSTnW-0001Jk-Tm@rmk-PC.arm.linux.org.uk>
- <CAMuHMdWHAu+zDKce0+ianDb=RHYR59eeMoiYBDK4PC=YMY0JXg@mail.gmail.com>
-Message-ID: <20150302174619.GD29584@n2100.arm.linux.org.uk>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 02 Mar 2015 18:47:26 +0100
+Subject: [PATCH] ARM: extend =?UTF-8?Q?SMP=5FON=5FUP=20detection=20for?=
+ =?UTF-8?Q?=20A=35=20MPCore=20devices=20with=20=31=20CPU?=
+In-Reply-To: <20150217161514.GA2236@afzal-ThinkPad-R50e>
+References: <1422662026-12968-1-git-send-email-stefan@agner.ch>
+ <20150217161514.GA2236@afzal-ThinkPad-R50e>
+Message-ID: <c0ae1b7d14bd1c21472553da3a93b58f@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 06:22:31PM +0100, Geert Uytterhoeven wrote:
-> On Mon, Mar 2, 2015 at 6:06 PM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
-> > --- a/include/linux/clkdev.h
-> > +++ b/include/linux/clkdev.h
-> > @@ -37,6 +37,9 @@ struct clk_lookup *clkdev_alloc(struct clk *clk, const char *con_id,
-> >  void clkdev_add(struct clk_lookup *cl);
-> >  void clkdev_drop(struct clk_lookup *cl);
-> >
-> > +struct clk_lookup *clkdev_create(struct clk *clk, const char *con_id,
-> > +       const char *dev_fmt, ...);
+On 2015-02-17 17:15, Afzal Mohammed wrote:
+> Hi Stefan,
 > 
-> __printf(3, 4)
+> On Sat, Jan 31, 2015 at 12:53:46AM +0100, Stefan Agner wrote:
 > 
-> While you're at it, can you please also add the __printf attribute to
-> clkdev_alloc() and clk_register_clkdev()?
+>> On the Vybrid platform this did not lead to CPU faults (so far),
+>> but is_smp checks evaluate to true which is not optimal
+>> performance wise.
+> 
+> Just curious, was the performance difference considerable ?
 
-What's the behaviour of __printf() with a NULL format string?  The
-clkdev interfaces permit that, normal printf() doesn't.
+I can see differences in the boot time stamps in the 10th ms range, not
+sure whether this is really due to the detection of the UP system or
+some side effects. I guess the change would be measurable with the right
+workload, for instance the memory policies are different for SMP system
+compared to UP systems.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+However, we use a custom configuration for the device, hence SMP is by
+default disabled anyway. But it would be nice to be able to use
+multi-platform kernels without having to worry about SMP detection...
+
+--
+Stefan
