@@ -1,167 +1,126 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 2 Mar 2015 08:26:26 +0000
-Subject: [PATCH] ARM: crypto: update NEON AES module to latest OpenSSL
- version
-In-Reply-To: <54F241A1.1060104@gmail.com>
-References: <1424935325-14437-1-git-send-email-ard.biesheuvel@linaro.org>
- <54F241A1.1060104@gmail.com>
-Message-ID: <CAKv+Gu8rLm+imbhzcPxcHO9v7FZpU3q28sJk9Cg_eFr5_EbaLA@mail.gmail.com>
+From: vigneshr@ti.com (R, Vignesh)
+Date: Mon, 2 Mar 2015 13:57:31 +0530
+Subject: [PATCH 1/2] ARM: OMAP2: hwmod: AM43XX: Add hwmod support for
+ HDQ-1W
+In-Reply-To: <alpine.DEB.2.02.1503012305550.9987@utopia.booyaka.com>
+References: <1425029057-5075-1-git-send-email-vigneshr@ti.com>
+ <alpine.DEB.2.02.1503012305550.9987@utopia.booyaka.com>
+Message-ID: <54F41EF3.6080302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 February 2015 at 22:30, Milan Broz <gmazyland@gmail.com> wrote:
-> On 02/26/2015 08:22 AM, Ard Biesheuvel wrote:
->> This updates the bit sliced AES module to the latest version in the
->> upstream OpenSSL repository (e620e5ae37bc). This is needed to fix a
->> bug in the XTS decryption path, where data chunked in a certain way
->> could trigger the ciphertext stealing code, which is not supposed to
->> be active in the kernel build (The kernel implementation of XTS only
->> supports round multiples of the AES block size of 16 bytes, whereas
->> the conformant OpenSSL implementation of XTS supports inputs of
->> arbitrary size by applying ciphertext stealing). This is fixed in
->> the upstream version by adding the missing #ifndef XTS_CHAIN_TWEAK
->> around the offending instructions.
+Hi,
+
+On 3/2/2015 4:39 AM, Paul Walmsley wrote:
+> Hi
+> 
+> On Fri, 27 Feb 2015, Vignesh R wrote:
+> 
+>> From: "Poddar, Sourav" <sourav.poddar@ti.com>
 >>
->> The upstream code also contains the change applied by Russell to
->> build the code unconditionally, i.e., even if __LINUX_ARM_ARCH__ < 7,
->> but implemented slightly differently.
+>> This patch adds hwmod data for hdq/1w driver on AM43xx.
 >>
->> Fixes: e4e7f10bfc40 ("ARM: add support for bit sliced AES using NEON instructions")
->> Reported-by: Adrian Kotelba <adrian.kotelba@gmail.com>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+>> [vigneshr at ti.com: Ported patch to v4.0-rc1]
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
 >> ---
+>>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 36 ++++++++++++++++++++++++++++++
+>>  arch/arm/mach-omap2/prcm43xx.h             |  1 +
+>>  2 files changed, 37 insertions(+)
 >>
->> This was found using the tcrypt test code, to which I recently added additional
->> chunking modes. However, XTS typically operates on pages or at least on sectors,
->> so this bug is unlikely to affect anyone in real life.
->>
->> Still, please add cc stable when applying,
->
-> Please apply it for stable.
->
-> For me, this patch fixed bug reported here
->   http://article.gmane.org/gmane.linux.kernel.device-mapper.dm-crypt/7966
->   http://www.mail-archive.com/linux-crypto at vger.kernel.org/msg13102.html
->
-> Cryptsetup uses AF_ALG userspace crypto SKCIPHER interface and on
-> Raspberry Pi2 with Neon AES implementation it fails to unlock LUKS device
-> (if XTS and aes-arm-bs module is used).
->
-> After applying this patch it works as expected.
->
-> I did not have time to check it more in detail (we are always encrypting
-> the whole sector so this should not happen... but apparently it does.)
->
-> Tested-by: Milan Broz <gmazyland@gmail.com>
->
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+>> index 8eb85925e444..d4f1df28475c 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+>> @@ -20,6 +20,7 @@
+>>  #include "omap_hwmod_33xx_43xx_common_data.h"
+>>  #include "prcm43xx.h"
+>>  #include "omap_hwmod_common_data.h"
+>> +#include "hdq1w.h"
+>>  
+>>  
+>>  /* IP blocks */
+>> @@ -516,6 +517,33 @@ static struct omap_hwmod am43xx_dss_rfbi_hwmod = {
+>>  	.parent_hwmod	= &am43xx_dss_core_hwmod,
+>>  };
+>>  
+>> +/* HDQ1W */
+>> +static struct omap_hwmod_class_sysconfig am43xx_hdq1w_sysc = {
+>> +	.rev_offs       = 0x0000,
+>> +	.sysc_offs      = 0x0014,
+>> +	.syss_offs      = 0x0018,
+>> +	.sysc_flags     = (SYSC_HAS_SOFTRESET),
+> 
+> This is missing the SYSC_HAS_AUTOIDLE bit.  Is this intentional?
 
-OK, thanks for pointing that out, and for confirming that this fixes the issue.
+Sorry.. my bad.. I didn't observe this while porting the patch.
+I will fix this and repost.
 
-Actually, I did not consider the userspace use case, but it is not
-surprising that the data ends up being pushed into the crypto layer in
-odd size chunks.
+Regards
+Vignesh
 
-@Herbert: are you ok to take this as a bug fix for stable?
-
-Thanks,
-Ard.
-
-
->>  arch/arm/crypto/aesbs-core.S_shipped | 12 ++++++++----
->>  arch/arm/crypto/bsaes-armv7.pl       | 12 ++++++++----
->>  2 files changed, 16 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/crypto/aesbs-core.S_shipped b/arch/arm/crypto/aesbs-core.S_shipped
->> index 71e5fc7cfb18..1d1800f71c5b 100644
->> --- a/arch/arm/crypto/aesbs-core.S_shipped
->> +++ b/arch/arm/crypto/aesbs-core.S_shipped
->> @@ -58,14 +58,18 @@
->>  # define VFP_ABI_FRAME       0
->>  # define BSAES_ASM_EXTENDED_KEY
->>  # define XTS_CHAIN_TWEAK
->> -# define __ARM_ARCH__        7
->> +# define __ARM_ARCH__ __LINUX_ARM_ARCH__
->> +# define __ARM_MAX_ARCH__ 7
->>  #endif
->>
->>  #ifdef __thumb__
->>  # define adrl adr
->>  #endif
->>
->> -#if __ARM_ARCH__>=7
->> +#if __ARM_MAX_ARCH__>=7
->> +.arch        armv7-a
->> +.fpu neon
+> 
+>> +	.sysc_fields    = &omap_hwmod_sysc_type1,
+>> +};
 >> +
->>  .text
->>  .syntax      unified         @ ARMv7-capable assembler is expected to handle this
->>  #ifdef __thumb2__
->> @@ -74,8 +78,6 @@
->>  .code   32
->>  #endif
->>
->> -.fpu neon
->> -
->>  .type        _bsaes_decrypt8,%function
->>  .align       4
->>  _bsaes_decrypt8:
->> @@ -2095,9 +2097,11 @@ bsaes_xts_decrypt:
->>       vld1.8  {q8}, [r0]                      @ initial tweak
->>       adr     r2, .Lxts_magic
->>
->> +#ifndef      XTS_CHAIN_TWEAK
->>       tst     r9, #0xf                        @ if not multiple of 16
->>       it      ne                              @ Thumb2 thing, sanity check in ARM
->>       subne   r9, #0x10                       @ subtract another 16 bytes
->> +#endif
->>       subs    r9, #0x80
->>
->>       blo     .Lxts_dec_short
->> diff --git a/arch/arm/crypto/bsaes-armv7.pl b/arch/arm/crypto/bsaes-armv7.pl
->> index be068db960ee..a4d3856e7d24 100644
->> --- a/arch/arm/crypto/bsaes-armv7.pl
->> +++ b/arch/arm/crypto/bsaes-armv7.pl
->> @@ -701,14 +701,18 @@ $code.=<<___;
->>  # define VFP_ABI_FRAME       0
->>  # define BSAES_ASM_EXTENDED_KEY
->>  # define XTS_CHAIN_TWEAK
->> -# define __ARM_ARCH__        7
->> +# define __ARM_ARCH__ __LINUX_ARM_ARCH__
->> +# define __ARM_MAX_ARCH__ 7
->>  #endif
->>
->>  #ifdef __thumb__
->>  # define adrl adr
->>  #endif
->>
->> -#if __ARM_ARCH__>=7
->> +#if __ARM_MAX_ARCH__>=7
->> +.arch        armv7-a
->> +.fpu neon
+>> +static struct omap_hwmod_class am43xx_hdq1w_hwmod_class = {
+>> +	.name   = "hdq1w",
+>> +	.sysc   = &am43xx_hdq1w_sysc,
+>> +	.reset	= &omap_hdq1w_reset,
+>> +};
 >> +
->>  .text
->>  .syntax      unified         @ ARMv7-capable assembler is expected to handle this
->>  #ifdef __thumb2__
->> @@ -717,8 +721,6 @@ $code.=<<___;
->>  .code   32
+>> +static struct omap_hwmod am43xx_hdq1w_hwmod = {
+>> +	.name           = "hdq1w",
+>> +	.class          = &am43xx_hdq1w_hwmod_class,
+>> +	.clkdm_name     = "l4ls_clkdm",
+>> +	.prcm = {
+>> +		.omap4 = {
+>> +			.clkctrl_offs = AM43XX_CM_PER_HDQ1W_CLKCTRL_OFFSET,
+>> +			.modulemode   = MODULEMODE_SWCTRL,
+>> +		},
+>> +	},
+>> +};
+>> +
+>>  /* Interfaces */
+>>  static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
+>>  	.master		= &am33xx_l3_main_hwmod,
+>> @@ -790,6 +818,13 @@ static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
+>>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>>  };
+>>  
+>> +static struct omap_hwmod_ocp_if am43xx_l4_ls__hdq1w = {
+>> +	.master         = &am33xx_l4_ls_hwmod,
+>> +	.slave          = &am43xx_hdq1w_hwmod,
+>> +	.clk            = "l4ls_gclk",
+>> +	.user           = OCP_USER_MPU | OCP_USER_SDMA,
+>> +};
+>> +
+>>  static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+>>  	&am33xx_l4_wkup__synctimer,
+>>  	&am43xx_l4_ls__timer8,
+>> @@ -889,6 +924,7 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+>>  	&am43xx_l4_ls__dss,
+>>  	&am43xx_l4_ls__dss_dispc,
+>>  	&am43xx_l4_ls__dss_rfbi,
+>> +	&am43xx_l4_ls__hdq1w,
+>>  	NULL,
+>>  };
+>>  
+>> diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
+>> index ad7b3e9977f8..48df3b55057e 100644
+>> --- a/arch/arm/mach-omap2/prcm43xx.h
+>> +++ b/arch/arm/mach-omap2/prcm43xx.h
+>> @@ -143,5 +143,6 @@
+>>  #define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
+>>  #define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
+>>  #define AM43XX_CM_PER_DSS_CLKCTRL_OFFSET		0x0a20
+>> +#define AM43XX_CM_PER_HDQ1W_CLKCTRL_OFFSET		0x04a0
+>>  
 >>  #endif
+>> -- 
+>> 1.9.1
 >>
->> -.fpu neon
->> -
->>  .type        _bsaes_decrypt8,%function
->>  .align       4
->>  _bsaes_decrypt8:
->> @@ -2076,9 +2078,11 @@ bsaes_xts_decrypt:
->>       vld1.8  {@XMM[8]}, [r0]                 @ initial tweak
->>       adr     $magic, .Lxts_magic
->>
->> +#ifndef      XTS_CHAIN_TWEAK
->>       tst     $len, #0xf                      @ if not multiple of 16
->>       it      ne                              @ Thumb2 thing, sanity check in ARM
->>       subne   $len, #0x10                     @ subtract another 16 bytes
->> +#endif
->>       subs    $len, #0x80
->>
->>       blo     .Lxts_dec_short
->>
->
+> 
+> 
+> - Paul
+> 
