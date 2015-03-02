@@ -1,104 +1,39 @@
-From: mporter@konsulko.com (Matt Porter)
-Date: Mon, 2 Mar 2015 15:25:40 -0500
-Subject: [PATCH] ARM: dts: hummingboard: enable pcf8523 rtc for i2eX
-In-Reply-To: <20150302194908.GU8656@n2100.arm.linux.org.uk>
-References: <1425322206-30115-1-git-send-email-mporter@konsulko.com>
- <20150302190204.GR8656@n2100.arm.linux.org.uk>
- <20150302190616.GS8656@n2100.arm.linux.org.uk>
- <20150302192116.GA30263@beef>
- <20150302194908.GU8656@n2100.arm.linux.org.uk>
-Message-ID: <20150302202540.GB30263@beef>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Mon,  2 Mar 2015 13:30:04 -0700
+Subject: [PATCH v3 0/3] firmware: qcom: scm: Add cpu power on/off support
+Message-ID: <1425328207-58415-1-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 07:49:08PM +0000, Russell King wrote:
-> On Mon, Mar 02, 2015 at 02:21:16PM -0500, Matt Porter wrote:
-> > [added Rabeeh]
-> > 
-> > On Mon, Mar 02, 2015 at 07:06:16PM +0000, Russell King wrote:
-> > > On Mon, Mar 02, 2015 at 07:02:04PM +0000, Russell King - ARM Linux wrote:
-> > > > On Mon, Mar 02, 2015 at 01:50:06PM -0500, Matt Porter wrote:
-> > > > > The PCF8523 RTC is populated on the i2eX boards so
-> > > > > enable the i2c1 controller and enable the device on
-> > > > > that bus.
-> > > > 
-> > > > Hmm, I wonder where my update patches went... oh, they're still sitting
-> > > > in my excessive backlog of patches in my tree as part of my "sgtl5000
-> > > > hacks" patch...
-> > > 
-> > > Also note that before we accept patches to the SolidRun stuff, we should
-> > > first re-license the file as GPLv2/X11.
-> > 
-> > Hi Russell,
-> > 
-> > Given that there's no license information at all on any of these three
-> > dts files I think that's a good idea. I just realized I didn't copy
-> > Rabeeh on this and he's apparently the original submitter based on
-> > your work. Ideally Rabeeh should send a license update but I could do
-> > so if you'd like and gather some acks.
-> 
-> It's more up to me, as I ended up being the initial author of the
-> mainline files - and if you look at:
-> 
-> http://www.home.arm.linux.org.uk/~rmk/cubox/hummingboard-cubox-i-v3.16-rc2-20140624/0041-sgtl5000-hacks.patch
-> 
-> you'll see the patch I refer to above, which is my own work, and it's
-> hardly changed to the 3.18 patch:
-> 
-> http://www.home.arm.linux.org.uk/~rmk/cubox/hummingboard-cubox-i-v3.18-20141216/0113-sgtl5000-hacks.patch
+Hi,
 
-Ok
+This series of patches adds SCM cold boot clean up and support for warm boot
+for QCOM quad core (and dual core) cpus.
 
-> > OTOH, did you already have a license update somewhere in your backlog
-> > of patches?
-> 
-> Well, I do now. :)
+v3 Changed:
+- Addressed review comments from Kumar.
+	+ Cleaned up the cold boot api and the warm boot api to match
+	+ Uniform qcom_scm_ prefix
+- Add support for cpu power down using scm_call_atomic1() from [1].
+	+ No longer dependent on the series from sboyd.
 
-Ok :)
+v2 Changes:
+- Merge the warm boot patches into a single patch.
 
-> I had dropped the ball on a load of kernel stuff as it seemed to be going
-> nowhere, no one seemed interested in it, and my massive backlog of patches
-> (especially things like the ethernet driver) just became far too difficult
-> both to merge into mainline and to keep forward-porting.
- 
-Understood, I recall that thread but didn't have the hardware back then.
-;)
-
-> In any case, anyone who is serious about using the SolidRun hardware runs
-> Jon Nettleton's fully featured kernel (which is the basis for SR's kernel)
-> - sadly something which mainline likely is never going to be.
-
-Right, I also make use of that kernel, of course. It's just too old
-to make me completely happy.
-
-> It's a bit like the MMC stuff, I'm still carrying Olof's solution for
-> the SDIO wifi/bt power and reset control stuff, and I'm not at present
-> intending to do anything with it other than continue forward-porting it.
-> I'm not interested in wasting free time trying to re-work that to suit
-> some other solution, especially as people couldn't settle on a solution
-> when I /did/ have an interest in it (not that I have much interest in
-> wifi or BT - I tend to prefer old fashioned wired connections.  It also
-> doesn't help that the Broadcom driver seemed to be very flakey with
-> brcm4329 hardware for quite some time.)
-> 
-> Anyway, you can find all my kernel patches in a suitably trimmed version
-> of the above URL, and on http://ftp.arm.linux.org.uk/cgit/ is a huge pile
-> of effort I put into an accelerated X server with etnaviv and /my/ kernel
-> version of etnaviv drm, complete with Xv support.
-
-Excellent, so I feel like you ultimately giving me mixed messages here.
-You said you need to take care of this licensing issue and I think you
-implied you'd take care of the audio and rtc stuff as you have that
-patch in your backlog. However, sounds like you've given up on pushing
-the bigger things upstream given the problem with getting agreement
-on those pieces. Are you just going to be submitting the
-less controversial portions like the audio and dts updates? My goal for
-HB initially is just to have all the low-hanging fruit (like rtc and audio)
-working on mainline...besides the stuff that's already there.
-
-Hrm, I also don't care about WiFi/BT on this board, I also prefer wired,
-but on a custom board I'll have to support a different WiFi/BT vendor so
-I'll take a look at that reset solution you are carrying.
+[1]. https://lkml.org/lkml/2014/8/4/765
 
 Thanks,
-Matt
+Lina
+
+Lina Iyer (3):
+  firmware: qcom: scm: Clean cold boot entry to export only the API
+  firmware: qcom: scm: Add qcom_scm_set_warm_boot_addr function
+  firmware: qcom: scm: Support cpu power down through SCM
+
+ arch/arm/mach-qcom/platsmp.c |  21 +-----
+ drivers/firmware/qcom_scm.c  | 154 ++++++++++++++++++++++++++++++++++++++++++-
+ include/linux/qcom_scm.h     |  16 ++---
+ 3 files changed, 162 insertions(+), 29 deletions(-)
+
+-- 
+2.1.0
