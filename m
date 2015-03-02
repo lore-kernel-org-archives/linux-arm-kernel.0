@@ -1,36 +1,80 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  2 Mar 2015 10:18:13 +0100
-Subject: [PATCH v2 1/6] PM / wakeup: export pm_system_wakeup symbol
+Date: Mon,  2 Mar 2015 10:18:16 +0100
+Subject: [PATCH v2 4/6] clk: at91: implement suspend/resume for the PMC irqchip
 In-Reply-To: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1425287898-15093-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1425287898-15093-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Export pm_system_wakeup function to allow irq handlers to deal with system
-wakeup.
-This is needed for shared IRQ lines where one of the handler is registered
-with IRQF_NO_SUSPEND, while the other ones want to configure it as a wakeup
-source.
-In this specific case, irq core does not handle the wakeup process and
-leave the decision to each irq handler.
+The irq line used by the PMC block is shared with several peripherals
+including the init timer which is registering its handler with
+IRQF_NO_SUSPEND.
+Implement the appropriate suspend/resume callback for the PMC irqchip,
+and inform irq core that PMC irq handler can be safely called while
+the system is suspended by setting IRQF_COND_SUSPEND.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/base/power/wakeup.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clk/at91/pmc.c | 20 +++++++++++++++++++-
+ drivers/clk/at91/pmc.h |  1 +
+ 2 files changed, 20 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/base/power/wakeup.c b/drivers/base/power/wakeup.c
-index c2744b3..aab7158 100644
---- a/drivers/base/power/wakeup.c
-+++ b/drivers/base/power/wakeup.c
-@@ -730,6 +730,7 @@ void pm_system_wakeup(void)
- 	pm_abort_suspend = true;
- 	freeze_wake();
+diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+index f07c815..3f27d21 100644
+--- a/drivers/clk/at91/pmc.c
++++ b/drivers/clk/at91/pmc.c
+@@ -89,12 +89,29 @@ static int pmc_irq_set_type(struct irq_data *d, unsigned type)
+ 	return 0;
  }
-+EXPORT_SYMBOL_GPL(pm_system_wakeup);
  
- void pm_wakeup_clear(void)
- {
++static void pmc_irq_suspend(struct irq_data *d)
++{
++	struct at91_pmc *pmc = irq_data_get_irq_chip_data(d);
++
++	pmc->imr = pmc_read(pmc, AT91_PMC_IMR);
++	pmc_write(pmc, AT91_PMC_IDR, pmc->imr);
++}
++
++static void pmc_irq_resume(struct irq_data *d)
++{
++	struct at91_pmc *pmc = irq_data_get_irq_chip_data(d);
++
++	pmc_write(pmc, AT91_PMC_IER, pmc->imr);
++}
++
+ static struct irq_chip pmc_irq = {
+ 	.name = "PMC",
+ 	.irq_disable = pmc_irq_mask,
+ 	.irq_mask = pmc_irq_mask,
+ 	.irq_unmask = pmc_irq_unmask,
+ 	.irq_set_type = pmc_irq_set_type,
++	.irq_suspend = pmc_irq_suspend,
++	.irq_resume = pmc_irq_resume,
+ };
+ 
+ static struct lock_class_key pmc_lock_class;
+@@ -224,7 +241,8 @@ static struct at91_pmc *__init at91_pmc_init(struct device_node *np,
+ 		goto out_free_pmc;
+ 
+ 	pmc_write(pmc, AT91_PMC_IDR, 0xffffffff);
+-	if (request_irq(pmc->virq, pmc_irq_handler, IRQF_SHARED, "pmc", pmc))
++	if (request_irq(pmc->virq, pmc_irq_handler,
++			IRQF_SHARED | IRQF_COND_SUSPEND, "pmc", pmc))
+ 		goto out_remove_irqdomain;
+ 
+ 	return pmc;
+diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
+index 52d2041..69abb08 100644
+--- a/drivers/clk/at91/pmc.h
++++ b/drivers/clk/at91/pmc.h
+@@ -33,6 +33,7 @@ struct at91_pmc {
+ 	spinlock_t lock;
+ 	const struct at91_pmc_caps *caps;
+ 	struct irq_domain *irqdomain;
++	u32 imr;
+ };
+ 
+ static inline void pmc_lock(struct at91_pmc *pmc)
 -- 
 1.9.1
