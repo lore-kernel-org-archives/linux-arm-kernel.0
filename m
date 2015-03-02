@@ -1,34 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 02 Mar 2015 20:40:16 +0100
-Subject: EDAC on arm64
-In-Reply-To: <20150302145840.GQ22541@e104818-lin.cambridge.arm.com>
-References: <54F11133.70909@redhat.com> <20150302105919.GA4434@arm.com>
- <20150302145840.GQ22541@e104818-lin.cambridge.arm.com>
-Message-ID: <2937202.iu6lrkO1gm@wuerfel>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Mon, 2 Mar 2015 11:41:05 -0800
+Subject: [PATCH v2 2/2] hwrng: iproc-rng200 - Add Broadcom IPROC RNG driver
+In-Reply-To: <2555599.AxGoQ20pkj@wuerfel>
+References: <1424888184-22180-3-git-send-email-sbranden@broadcom.com>
+ <2093191.gujNGSl66k@wuerfel> <54F1E647.10106@broadcom.com>
+ <2555599.AxGoQ20pkj@wuerfel>
+Message-ID: <54F4BCD1.2020401@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 March 2015 14:58:41 Catalin Marinas wrote:
-> On Mon, Mar 02, 2015 at 10:59:32AM +0000, Will Deacon wrote:
-> > On Sat, Feb 28, 2015 at 12:52:03AM +0000, Jon Masters wrote:
-> > > Have you considered reviving the patch you posted previously for EDAC
-> > > support (the atomic_scrub read/write test piece dependency)?
-> > > 
-> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249039.html
-> > 
-> > Well, we'd need a way to handle the non-coherent DMA case and it's really
-> > not clear how to fix that.
-> 
-> I agree, that's where the discussions stopped. Basically the EDAC memory
-> writing is racy with any non-cacheable memory accesses (by CPU or
-> device). The only way we could safely use this is only if all the
-> devices are coherent *and* KVM is disabled. With KVM, guests may access
-> the memory uncached, so we hit the same problem.
+Hi Arnd,
 
-Is this a setting of the host, or does the guest always have this capability?
+Thanks for the suggested change.
 
-If a guest can influence the caching of a page it has access to, I can
-imagine all sorts of security problems with malicious guests regardless
-of EDAC.
-
-	Arnd
+On 15-02-28 11:31 AM, Arnd Bergmann wrote:
+> On Saturday 28 February 2015 08:01:11 Scott Branden wrote:
+>>> The udelay(10) that the other drivers have seems about appropriate then,
+>>> and we can independently think of a way to refine the interface.
+>>> Please add a comment that explains the rate. Also, is there some kind
+>>> of FIFO present in the hwrng device? If it can store close to 1ms work
+>>> of data (1000 bits), you can just use an msleep(1) to wait for the
+>>> pool to recover.
+>> FIFO is 512 bits.  I will look as to whether we can live with 1/2
+>> throughput.
+>
+> In that case, I think usleep_range(min(len * 8, 500), 500)) would be
+> a good compromise: it waits at most until the fifo is full, but might
+> return earlier if enough bits are available to fulfill the request.
+OK, will change in next version.
+>
+> 	Arnd
+>
