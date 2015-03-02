@@ -1,41 +1,91 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 02 Mar 2015 13:50:44 -0800
-Subject: [PATCH 00/10] initial clkdev cleanups
-In-Reply-To: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
-References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
-Message-ID: <54F4DB34.9000507@codeaurora.org>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 2 Mar 2015 16:59:08 -0500
+Subject: [PATCH - V7] of/pci: Add of_pci_dma_configure() to update DMA
+ configuration
+In-Reply-To: <1425333548-8802-1-git-send-email-m-karicheri2@ti.com>
+References: <1425333548-8802-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1425333548-8802-2-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/15 09:05, Russell King - ARM Linux wrote:
-> Here's some initial clkdev cleanups.  These are targetted for the next
-> merge window, and while the initial patches can be merged independently,
-> I'd prefer to keep the series together as further work on solving the
-> problems which unique struct clk's has introduced is needed.
->
-> The initial cleanups are more about using the correct clkdev function
-> than anything else: there's no point interating over a array of
-> clk_lookup structs, adding each one in turn when we have had a function
-> which does this since forever.
+Add of_pci_dma_configure() to allow updating the DMA configuration of the
+PCI device using the configuration from DT of the parent of the root bridge
+device.  Use the newly added APIs pci_get/put_host_bridge_device() for
+implementing this.
 
-The clkdev_add_table() conversions look good.
+Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> (AMD Seattle)
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Rob Herring <robh+dt@kernel.org>
+Acked-by: Will Deacon <will.deacon@arm.com>
+CC: Joerg Roedel <joro@8bytes.org>
+CC: Grant Likely <grant.likely@linaro.org>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: Arnd Bergmann <arnd@arndb.de>
+---
+ - Based on the existing patch on arm-pci/pci/iommu for pci next (Bjorn)
+ - Fixed build issue seen on ARCH=sparc
+ drivers/of/of_pci.c    |   18 ++++++++++++++++++
+ include/linux/of_pci.h |    3 +++
+ 2 files changed, 21 insertions(+)
 
->
-> I'm also killing a chunk of seemingly unused code in the omap3isp driver.
->
-> Lastly, I'm introducing a clkdev_create() helper, which combines the
-> clkdev_alloc() + clkdev_add() pattern which keeps cropping up.
->
-
-We already have a solution to that problem with clk_register_clkdev().
-Andy has done some work to make clk_register_clkdev() return a struct
-clk_lookup pointer[1]. Maybe we can do that instead of introducing a new
-clkdev_create() function. There is some benefit to having a new function
-though so that we can avoid a flag day, although it looks like the flag
-day is small in this case so it might not actually matter.
-
-[1] https://www.marc.info/?l=linux-kernel&m=142469226512289
-
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 62426d8..86d3c38 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -2,6 +2,7 @@
+ #include <linux/export.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/of_pci.h>
+ #include <linux/slab.h>
+ 
+@@ -116,6 +117,23 @@ int of_get_pci_domain_nr(struct device_node *node)
+ }
+ EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
+ 
++/**
++ * of_pci_dma_configure - Setup DMA configuration
++ * @dev: ptr to pci_dev struct of the pci device
++ *
++ * Function to update PCI devices's DMA configuration using the same
++ * info from the OF node of root host bridge's parent.
++ */
++void of_pci_dma_configure(struct pci_dev *pci_dev)
++{
++	struct device *dev = &pci_dev->dev;
++	struct device *bridge = pci_get_host_bridge_device(pci_dev);
++
++	of_dma_configure(dev, bridge->parent->of_node);
++	pci_put_host_bridge_device(bridge);
++}
++EXPORT_SYMBOL_GPL(of_pci_dma_configure);
++
+ #if defined(CONFIG_OF_ADDRESS)
+ /**
+  * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
+diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+index ce0e5ab..29fd3fe 100644
+--- a/include/linux/of_pci.h
++++ b/include/linux/of_pci.h
+@@ -16,6 +16,7 @@ int of_pci_get_devfn(struct device_node *np);
+ int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
+ int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+ int of_get_pci_domain_nr(struct device_node *node);
++void of_pci_dma_configure(struct pci_dev *pci_dev);
+ #else
+ static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
+ {
+@@ -50,6 +51,8 @@ of_get_pci_domain_nr(struct device_node *node)
+ {
+ 	return -1;
+ }
++
++static inline void of_pci_dma_configure(struct pci_dev *pci_dev) { }
+ #endif
+ 
+ #if defined(CONFIG_OF_ADDRESS)
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.7.9.5
