@@ -1,55 +1,45 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Mon, 02 Mar 2015 17:21:26 -0500
-Subject: PMD update corruption (sync question)
-In-Reply-To: <20150302105011.GD22541@e104818-lin.cambridge.arm.com>
-References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
- <54F06636.6080905@redhat.com> <54F3C6AD.50300@redhat.com>
- <938476184.27970130.1425275915893.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
- <20150302105011.GD22541@e104818-lin.cambridge.arm.com>
-Message-ID: <54F4E266.8090709@redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 2 Mar 2015 22:25:16 +0000
+Subject: EDAC on arm64
+In-Reply-To: <2937202.iu6lrkO1gm@wuerfel>
+References: <54F11133.70909@redhat.com> <20150302105919.GA4434@arm.com>
+ <20150302145840.GQ22541@e104818-lin.cambridge.arm.com>
+ <2937202.iu6lrkO1gm@wuerfel>
+Message-ID: <20150302222502.GA13277@MBP.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2015 05:50 AM, Catalin Marinas wrote:
-> On Mon, Mar 02, 2015 at 12:58:36AM -0500, Jon Masters wrote:
+On Mon, Mar 02, 2015 at 08:40:16PM +0100, Arnd Bergmann wrote:
+> On Monday 02 March 2015 14:58:41 Catalin Marinas wrote:
+> > On Mon, Mar 02, 2015 at 10:59:32AM +0000, Will Deacon wrote:
+> > > On Sat, Feb 28, 2015 at 12:52:03AM +0000, Jon Masters wrote:
+> > > > Have you considered reviving the patch you posted previously for EDAC
+> > > > support (the atomic_scrub read/write test piece dependency)?
+> > > > 
+> > > > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249039.html
+> > > 
+> > > Well, we'd need a way to handle the non-coherent DMA case and it's really
+> > > not clear how to fix that.
+> > 
+> > I agree, that's where the discussions stopped. Basically the EDAC memory
+> > writing is racy with any non-cacheable memory accesses (by CPU or
+> > device). The only way we could safely use this is only if all the
+> > devices are coherent *and* KVM is disabled. With KVM, guests may access
+> > the memory uncached, so we hit the same problem.
+> 
+> Is this a setting of the host, or does the guest always have this capability?
 
->> Test kernels running with an explicit DSB in all PTE update cases now
->> running overnight. Just in case.
+The guest can always make it stricter than what the host set in stage 2
+(i.e. from Normal Cacheable -> NonCacheable -> Device) but never in the
+other direction.
 
-...and stay up after 19 hours. But that's just timing I'm sure.
+> If a guest can influence the caching of a page it has access to, I can
+> imagine all sorts of security problems with malicious guests regardless
+> of EDAC.
 
-> It could be hiding some other problems.
+Not as long as the host is aware of this. Basically it needs to flush
+the cache on a page when it is mapped into the guest address space (IPA)
+and flush it again when reading a page from guest.
 
-I checked my GDB macros and they were correct BUT my debugger went out
-to lunch soon after that dump so I suspect it was just garbage :)
-
-Instead, for my immediate issue, I have a much more likely suspect. For
-anyone interested in the followup, you should know that hardware page
-table walkers generally do respond well when you feed them Makefiles:
-
-0x43e81c0000: 20230a23 656b614d 656c6966 726f6620  : #.# Makefile for
-0x43e81c0010: 65687420 462d4920 6563726f 69726420  :  the I-Force dri
-0x43e81c0020: 0a726576 20230a23 4a207942 6e61686f  : ver.#.# By Johan
-0x43e81c0030: 6544206e 7875656e 6f6a3c20 6e6e6168  : n Deneux <johann
-0x43e81c0040: 6e65642e 40787565 69616d67 6f632e6c  : .deneux@gmail.co
-0x43e81c0050: 230a3e6d 626f0a0a 28242d6a 464e4f43  : m>.#..obj-$(CONF
-0x43e81c0060: 4a5f4749 5453594f 5f4b4349 524f4649  : IG_JOYSTICK_IFOR
-0x43e81c0070: 09294543 69203d2b 63726f66 0a6f2e65  : CE).+= iforce.o.
-0x43e81c0080: 6f66690a 2d656372 3d3a2079 6f666920  : .iforce-y := ifo
-0x43e81c0090: 2d656372 6f2e6666 6f666920 2d656372  : rce-ff.o iforce-
-0x43e81c00a0: 6e69616d 69206f2e 63726f66 61702d65  : main.o iforce-pa
-0x43e81c00b0: 74656b63 0a6f2e73 726f6669 242d6563  : ckets.o.iforce-$
-0x43e81c00c0: 4e4f4328 5f474946 53594f4a 4b434954  : (CONFIG_JOYSTICK
-0x43e81c00d0: 4f46495f 5f454352 29323332 203d2b09  : _IFORCE_232).+=
-0x43e81c00e0: 726f6669 732d6563 6f697265 690a6f2e  : iforce-serio.o.i
-0x43e81c00f0: 63726f66 28242d65 464e4f43 4a5f4749  : force-$(CONFIG_J
-0x43e81c0100: 5453594f 5f4b4349 524f4649 555f4543  : OYSTICK_IFORCE_U
-0x43e81c0110: 09294253 69203d2b 63726f66 73752d65  : SB).+= iforce-us
-0x43e81c0120: 0a6f2e62 00000000 00000000 00000000  : b.o.............
-
-So that explains why things were falling over. It is likely indeed the
-bad DMA I have been craving all along. And this time it was so gracious
-as to give me the answer in plain ASCII :) I suspect there will be a
-patch for a certain AHCI driver in the not too distant future.
-
-Jon.
+-- 
+Catalin
