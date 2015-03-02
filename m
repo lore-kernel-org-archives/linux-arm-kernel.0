@@ -1,37 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 2 Mar 2015 21:36:42 +0800
-Subject: [PATCH 1/5] ARM: dts: imx28-apf28dev: Add pinctrl for USB OTG ID
- pin
-In-Reply-To: <1423836725-86061-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1423836725-86061-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20150302133639.GG3040@dragon>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 02 Mar 2015 14:42:01 +0100
+Subject: [PATCH] pinctrl: imx: do not implicitly set pin regs to -1
+In-Reply-To: <20150302125935.GC7865@pengutronix.de>
+References: <1423240256-27210-1-git-send-email-stefan@agner.ch>
+ <20150302114516.GC3040@dragon> <20150302125935.GC7865@pengutronix.de>
+Message-ID: <43491e2cb2c520d8f15d90ae99a82f28@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 13, 2015 at 03:12:01PM +0100, Gwenhael Goavec-Merou wrote:
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> Signed-off-by: Sebastien Szymanski <sebastien.szymanski@armadeus.com>
-
-Applied all 5, thanks.
-
-> ---
->  arch/arm/boot/dts/imx28-apf28dev.dts | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+On 2015-03-02 13:59, Uwe Kleine-K?nig wrote:
+> Hello Shawn
 > 
-> diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
-> index 1f38a05..86e8d81 100644
-> --- a/arch/arm/boot/dts/imx28-apf28dev.dts
-> +++ b/arch/arm/boot/dts/imx28-apf28dev.dts
-> @@ -143,7 +143,8 @@
->  	ahb at 80080000 {
->  		usb0: usb at 80080000 {
->  			pinctrl-names = "default";
-> -			pinctrl-0 = <&usb0_otg_apf28dev>;
-> +			pinctrl-0 = <&usb0_otg_apf28dev
-> +					&usb0_id_pins_b>;
->  			vbus-supply = <&reg_usb0_vbus>;
->  			status = "okay";
->  		};
-> -- 
-> 2.0.5
-> 
+> On Mon, Mar 02, 2015 at 07:45:17PM +0800, Shawn Guo wrote:
+>> On Fri, Feb 06, 2015 at 05:30:56PM +0100, Stefan Agner wrote:
+>> > Commit 3dac1918a491 ("pinctrl: imx: detect uninitialized pins") needs
+>> > the values in struct imx_pin_reg to be -1. This has been done in a
+>> > rather unorthodox way by setting the memory to 0xff using memset...
+>> > Use a proper for loop to initialize the whole array with -1.
+>> >
+>> > Signed-off-by: Stefan Agner <stefan@agner.ch>
+>>
+>> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> too late. This patch is part of 4.0-rc1 (4ff0f034e95d).
+
+This is not the same patch. The patch you are mentioning is actually
+fixing a bug introduce in the change where we set -1 for uninitialized
+pins. This patch is solving the weird assignment of the initial value...
+
+--
+Stefan
