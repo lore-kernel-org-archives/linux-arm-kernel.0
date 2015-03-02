@@ -1,86 +1,67 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 2 Mar 2015 10:40:15 +0000
-Subject: [PATCH 3/4] clk: Provide always-on clock support
-In-Reply-To: <CAJe_Zhc-94afeWegEeOoL3X13y35MDJvqME1x7XMy3vVVXYedg@mail.gmail.com>
-References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
- <1425071674-16995-4-git-send-email-lee.jones@linaro.org>
- <CAJe_Zhf=GBb8AfnTLaGxGcZkVSm9TtdnTsmpH_MBmbMT8ViMDg@mail.gmail.com>
- <20150302083652.GE31325@x1>
- <CABb+yY07woiiG8e2kff_AsiFCHNP+TKYyNm_o6=f5WmFsLi8gQ@mail.gmail.com>
- <20150302101859.GB32347@x1>
- <CAJe_Zhc-94afeWegEeOoL3X13y35MDJvqME1x7XMy3vVVXYedg@mail.gmail.com>
-Message-ID: <20150302104015.GE32347@x1>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon,  2 Mar 2015 11:42:58 +0100
+Subject: [PATCH] ARM: at91: pm: fix SRAM allocation
+Message-ID: <1425292978-28135-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 02 Mar 2015, Jassi Brar wrote:
+On some platforms, there are multiple SRAM nodes defined in the device tree but
+some of them are disabled, leading to allocation failure. Try to find the first
+enabled SRAM node and allocate from it.
 
-> On 2 March 2015 at 15:48, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Mon, 02 Mar 2015, Jassi Brar wrote:
-> >
-> >> On Mon, Mar 2, 2015 at 2:06 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> >> > On Sat, 28 Feb 2015, Jassi Brar wrote:
-> >> >
-> >> >> On 28 February 2015 at 02:44, Lee Jones <lee.jones@linaro.org> wrote:
-> >> >> > Lots of platforms contain clocks which if turned off would prove fatal.
-> >> >> > The only way to recover from these catastrophic failures is to restart
-> >> >> > the board(s).  Now, when a clock is registered with the framework it is
-> >> >> > compared against a list of provided always-on clock names which must be
-> >> >> > kept ungated.  If it matches, we enable the existing CLK_IGNORE_UNUSED
-> >> >> > flag, which will prevent the common clk framework from attempting to
-> >> >> > gate it during the clk_disable_unused() procedure.
-> >> >> >
-> >> >> If a clock is critical on a certain board, it could be got+enabled
-> >> >> during early boot so there is always a user.
-> >> >
-> >> > I tried this.  There was push-back from the DT maintainers.
-> >> >
-> >> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/324417.html
-> >> >
-> >> Thanks, I wasn't aware of the history.
-> >>
-> >> >> To be able to do that from DT, maybe add a new, say, CLK_ALWAYS_ON
-> >> >> flag could be made to initialize the clock with one phantom user
-> >> >> already. Or just reuse the CLK_IGNORE_UNUSED?
-> >> >
-> >> > How is that different to what this set is doing?
-> >> >
-> >> The phantom user - that's there but none can see it.
-> >>
-> >> How about?
-> >>
-> >> +       of_property_for_each_string(np, "clock-always-on", prop, clkname) {
-> >> +               clk = __clk_lookup(clkname);
-> >> +               if (!clk)
-> >> +                       continue;
-> >> +
-> >> +               clk->core->enable_count = 1;
-> >> +               clk->core->prepare_count = 1;
-> >> +       }
-> >
-> > This is only fractionally different from the current implementation.
-> >
-> > I believe the current way it slightly nicer, as we don't have to fake
-> > the user count.
-> >
-> Well... the user is indeed there, isn't it? It's just not known to
-> Linux. So 'fake' isn't most applicable here.
-> Otherwise you might have to stub out some existing and future
-> functions for CLK_IGNORE_UNUSED. And how do we explain to userspace
-> which would see power drawn but no user of the clock?
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/pm.c | 20 +++++++++-----------
+ 1 file changed, 9 insertions(+), 11 deletions(-)
 
-I would hope that the user would know that some communication channels
-(interconnects in our case) would have to stay alive.  When everything
-is turned off, the platform is considered powered down.  Most people
-who are going to care about this stuff know that platforms consume
-power when suspended.
-
-I should think the user would be even more confused if the reference
-count was >0, but there was no information regarding who is consuming
-it.
-
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 5e34fb143309..97cc529b6fa0 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -272,35 +272,33 @@ static void __init at91_pm_sram_init(void)
+ 	struct device_node *node;
+ 	struct platform_device *pdev;
+ 
+-	node = of_find_compatible_node(NULL, NULL, "mmio-sram");
+-	if (!node) {
+-		pr_warn("%s: failed to find sram node!\n", __func__);
+-		return;
++	for_each_compatible_node(node, NULL, "mmio-sram") {
++		pdev = of_find_device_by_node(node);
++		if (pdev) {
++			of_node_put(node);
++			break;
++		}
+ 	}
+ 
+-	pdev = of_find_device_by_node(node);
+ 	if (!pdev) {
+ 		pr_warn("%s: failed to find sram device!\n", __func__);
+-		goto put_node;
++		return;
+ 	}
+ 
+ 	sram_pool = dev_get_gen_pool(&pdev->dev);
+ 	if (!sram_pool) {
+ 		pr_warn("%s: sram pool unavailable!\n", __func__);
+-		goto put_node;
++		return;
+ 	}
+ 
+ 	sram_base = gen_pool_alloc(sram_pool, at91_slow_clock_sz);
+ 	if (!sram_base) {
+ 		pr_warn("%s: unable to alloc ocram!\n", __func__);
+-		goto put_node;
++		return;
+ 	}
+ 
+ 	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
+ 	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz, false);
+-
+-put_node:
+-	of_node_put(node);
+ }
+ #endif
+ 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.1.0
