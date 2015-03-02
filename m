@@ -1,30 +1,82 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 2 Mar 2015 13:59:35 +0100
-Subject: [PATCH] pinctrl: imx: do not implicitly set pin regs to -1
-In-Reply-To: <20150302114516.GC3040@dragon>
-References: <1423240256-27210-1-git-send-email-stefan@agner.ch>
- <20150302114516.GC3040@dragon>
-Message-ID: <20150302125935.GC7865@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 02 Mar 2015 14:09:57 +0100
+Subject: [PATCH] ARM: at91: remove NEED_MACH_IO_H
+Message-ID: <2695765.t2RUmlZpTO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn
+The mach/io.h header on at91 is used to support a nonstandard I/O space
+window for the cf card driver. This changes the driver to use pci_ioremap_io
+in order to have the standard location, and then removes the custom
+mach/io.h.
 
-On Mon, Mar 02, 2015 at 07:45:17PM +0800, Shawn Guo wrote:
-> On Fri, Feb 06, 2015 at 05:30:56PM +0100, Stefan Agner wrote:
-> > Commit 3dac1918a491 ("pinctrl: imx: detect uninitialized pins") needs
-> > the values in struct imx_pin_reg to be -1. This has been done in a
-> > rather unorthodox way by setting the memory to 0xff using memset...
-> > Use a proper for loop to initialize the whole array with -1.
-> > 
-> > Signed-off-by: Stefan Agner <stefan@agner.ch>
-> 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-too late. This patch is part of 4.0-rc1 (4ff0f034e95d).
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+----
+I've found this patch in an old git tree of mine. I think it's still needed,
+but see for yourselves.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 4db6c803eaf2..b2798e25829a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -351,7 +351,6 @@ config ARCH_AT91
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKDEV_LOOKUP
+ 	select IRQ_DOMAIN
+-	select NEED_MACH_IO_H if PCCARD
+ 	select PINCTRL
+ 	select PINCTRL_AT91
+ 	select USE_OF
+diff --git a/arch/arm/mach-at91/include/mach/io.h b/arch/arm/mach-at91/include/mach/io.h
+deleted file mode 100644
+index 2d9ca0455745..000000000000
+--- a/arch/arm/mach-at91/include/mach/io.h
++++ /dev/null
+@@ -1,27 +0,0 @@
+-/*
+- * arch/arm/mach-at91/include/mach/io.h
+- *
+- *  Copyright (C) 2003 SAN People
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#ifndef __ASM_ARCH_IO_H
+-#define __ASM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT		0xFFFFFFFF
+-#define __io(a)			__typesafe_io(a)
+-
+-#endif
+diff --git a/drivers/pcmcia/at91_cf.c b/drivers/pcmcia/at91_cf.c
+index bfb799c7b343..a2b677a8abb5 100644
+--- a/drivers/pcmcia/at91_cf.c
++++ b/drivers/pcmcia/at91_cf.c
+@@ -318,12 +318,10 @@ static int at91_cf_probe(struct platform_device *pdev)
+ 		cf->socket.pci_irq = nr_irqs + 1;
+ 
+ 	/* pcmcia layer only remaps "real" memory not iospace */
+-	cf->socket.io_offset = (unsigned long) devm_ioremap(&pdev->dev,
+-					cf->phys_baseaddr + CF_IO_PHYS, SZ_2K);
+-	if (!cf->socket.io_offset) {
+-		status = -ENXIO;
++	cf->socket.io_offset = 0;
++	status = pci_ioremap_io(0, cf->phys_baseaddr + CF_IO_PHYS);
++	if (status)
+ 		goto fail0a;
+-	}
+ 
+ 	/* reserve chip-select regions */
+ 	if (!devm_request_mem_region(&pdev->dev, io->start, resource_size(io), "at91_cf")) {
