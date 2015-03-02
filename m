@@ -1,80 +1,123 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 2 Mar 2015 22:24:52 +0800
-Subject: [RFC PATCH v4 14/34] early kprobes: use stop_machine() based x86
- optimizer.
+Date: Mon, 2 Mar 2015 22:24:59 +0800
+Subject: [RFC PATCH v4 21/34] ftrace: sort ftrace entries earlier.
 In-Reply-To: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
 References: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1425306312-3437-15-git-send-email-wangnan0@huawei.com>
+Message-ID: <1425306312-3437-22-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use stop_machine() to wrap code modification for x86 when optimizing
-early kprobes. Since early kprobes are registered before smp inited,
-text_poke_bp() is not ready at that time. This patch use stop_machine()
-based code modification for early kprobes.
+By extracting mcount sorting code and sort them earliler, futher patches
+will be able to determine whether an address is on an ftrace entry or
+not using bsearch().
 
-At very early stage, stop_machine() is simply irq operations. After
-kprobes fully initianized, we will use text_poke_bp(). Only kprobes
-registered after cpu_stop_init() before init_kprobes() will use real
-stop_machine().
+ftrace_sort_mcount_area() will be called before, during and after
+ftrace_init (when module insertion). Ensure it sort kernel mcount table
+only once.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
 ---
- arch/x86/kernel/kprobes/opt.c | 28 ++++++++++++++++++++++++++--
- 1 file changed, 26 insertions(+), 2 deletions(-)
+ include/linux/ftrace.h |  2 ++
+ init/main.c            |  1 +
+ kernel/trace/ftrace.c  | 38 ++++++++++++++++++++++++++++++++++++--
+ 3 files changed, 39 insertions(+), 2 deletions(-)
 
-diff --git a/arch/x86/kernel/kprobes/opt.c b/arch/x86/kernel/kprobes/opt.c
-index 7b3b9d1..ef3c0be 100644
---- a/arch/x86/kernel/kprobes/opt.c
-+++ b/arch/x86/kernel/kprobes/opt.c
-@@ -28,6 +28,7 @@
- #include <linux/kdebug.h>
- #include <linux/kallsyms.h>
- #include <linux/ftrace.h>
-+#include <linux/stop_machine.h>
+diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
+index 1da6029..8db315a 100644
+--- a/include/linux/ftrace.h
++++ b/include/linux/ftrace.h
+@@ -701,8 +701,10 @@ static inline void __ftrace_enabled_restore(int enabled)
  
- #include <asm/cacheflush.h>
- #include <asm/desc.h>
-@@ -377,6 +378,20 @@ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op,
- 	return 0;
+ #ifdef CONFIG_FTRACE_MCOUNT_RECORD
+ extern void ftrace_init(void);
++extern void ftrace_init_early(void);
+ #else
+ static inline void ftrace_init(void) { }
++static inline void ftrace_init_early(void) { }
+ #endif
+ 
+ /*
+diff --git a/init/main.c b/init/main.c
+index 679d49e..6d269ac 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -518,6 +518,7 @@ asmlinkage __visible void __init start_kernel(void)
+ 	boot_cpu_init();
+ 	page_address_init();
+ 	pr_notice("%s", linux_banner);
++	ftrace_init_early();
+ 	setup_arch(&command_line);
+ 	init_kprobes_early();
+ 	mm_init_cpumask(&init_mm);
+diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
+index 6c6cbb1..fa3cdd3 100644
+--- a/kernel/trace/ftrace.c
++++ b/kernel/trace/ftrace.c
+@@ -112,6 +112,7 @@ ftrace_func_t ftrace_trace_function __read_mostly = ftrace_stub;
+ ftrace_func_t ftrace_pid_function __read_mostly = ftrace_stub;
+ static struct ftrace_ops global_ops;
+ static struct ftrace_ops control_ops;
++static bool kernel_mcount_sorted = false;
+ 
+ static void ftrace_ops_recurs_func(unsigned long ip, unsigned long parent_ip,
+ 				   struct ftrace_ops *op, struct pt_regs *regs);
+@@ -4743,6 +4744,32 @@ static void ftrace_swap_ips(void *a, void *b, int size)
+ 	*ipb = t;
  }
  
-+struct optimize_kprobe_early_param {
-+	struct optimized_kprobe *op;
-+	u8 *insn_buf;
-+};
-+
-+static int optimize_kprobe_stop_machine(void *data)
++static void ftrace_sort_mcount_area(unsigned long *start, unsigned long *end)
 +{
-+	struct optimize_kprobe_early_param *param = data;
++	extern unsigned long __start_mcount_loc[];
++	extern unsigned long __stop_mcount_loc[];
 +
-+	text_poke_early(param->op->kp.addr,
-+			param->insn_buf, RELATIVEJUMP_SIZE);
-+	return 0;
++	unsigned long count;
++	bool is_kernel_mcount;
++
++	count = end - start;
++	if (!count)
++		return;
++
++	is_kernel_mcount =
++		(start == __start_mcount_loc) &&
++		(end == __stop_mcount_loc);
++
++	if (is_kernel_mcount && kernel_mcount_sorted)
++		return;
++
++	sort(start, count, sizeof(*start),
++		ftrace_cmp_ips, ftrace_swap_ips);
++
++	if (is_kernel_mcount)
++		kernel_mcount_sorted = true;
 +}
 +
- /*
-  * Replace breakpoints (int3) with relative jumps.
-  * Caller must call with locking kprobe_mutex and text_mutex.
-@@ -399,8 +414,17 @@ void arch_optimize_kprobes(struct list_head *oplist)
- 		insn_buf[0] = RELATIVEJUMP_OPCODE;
- 		*(s32 *)(&insn_buf[1]) = rel;
+ static int ftrace_process_locs(struct module *mod,
+ 			       unsigned long *start,
+ 			       unsigned long *end)
+@@ -4761,8 +4788,7 @@ static int ftrace_process_locs(struct module *mod,
+ 	if (!count)
+ 		return 0;
  
--		text_poke_bp(op->kp.addr, insn_buf, RELATIVEJUMP_SIZE,
--			     op->optinsn.insn);
-+		if (unlikely(kprobes_is_early())) {
-+			struct optimize_kprobe_early_param p = {
-+				.op = op,
-+				.insn_buf = insn_buf,
-+			};
+-	sort(start, count, sizeof(*start),
+-	     ftrace_cmp_ips, ftrace_swap_ips);
++	ftrace_sort_mcount_area(start, end);
+ 
+ 	start_pg = ftrace_allocate_pages(count);
+ 	if (!start_pg)
+@@ -4965,6 +4991,14 @@ void __init ftrace_init(void)
+ 	ftrace_disabled = 1;
+ }
+ 
++void __init ftrace_init_early(void)
++{
++	extern unsigned long __start_mcount_loc[];
++	extern unsigned long __stop_mcount_loc[];
 +
-+			stop_machine(optimize_kprobe_stop_machine, &p, NULL);
-+		} else {
-+			text_poke_bp(op->kp.addr, insn_buf, RELATIVEJUMP_SIZE,
-+				     op->optinsn.insn);
-+		}
- 
- 		list_del_init(&op->list);
- 	}
++	ftrace_sort_mcount_area(__start_mcount_loc, __stop_mcount_loc);
++}
++
+ /* Do nothing if arch does not support this */
+ void __weak arch_ftrace_update_trampoline(struct ftrace_ops *ops)
+ {
 -- 
 1.8.4
