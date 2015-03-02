@@ -1,64 +1,53 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 2 Mar 2015 22:24:53 +0800
-Subject: [RFC PATCH v4 15/34] early kprobes: use stop_machine() based
- optimization method for early kprobes.
+Date: Mon, 2 Mar 2015 22:24:58 +0800
+Subject: [RFC PATCH v4 20/34] ftrace/x86: Ensure rec->flags no change when
+ failure occures.
 In-Reply-To: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
 References: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1425306312-3437-16-git-send-email-wangnan0@huawei.com>
+Message-ID: <1425306312-3437-21-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-schedule_delayed_work() doesn't work until scheduler and timer are
-ready. For early kprobes, directly call do_optimize_kprobes() should
-make things simpler. Arch code should ensure there's no conflict between
-code modification and execution using stop_machine().
-
-To avoid lock order problem, call do_optimize_kprobes() before leaving
-register_kprobe() instead of kick_kprobe_optimizer().
+Don't change rec->flags if code modification fails.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
 ---
- kernel/kprobes.c | 21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
+ arch/x86/kernel/ftrace.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/kernel/kprobes.c b/kernel/kprobes.c
-index ab3640b..2d178fc 100644
---- a/kernel/kprobes.c
-+++ b/kernel/kprobes.c
-@@ -546,7 +546,16 @@ static void do_free_cleaned_kprobes(void)
- /* Start optimizer after OPTIMIZE_DELAY passed */
- static void kick_kprobe_optimizer(void)
+diff --git a/arch/x86/kernel/ftrace.c b/arch/x86/kernel/ftrace.c
+index 8b7b0a5..7bdba65 100644
+--- a/arch/x86/kernel/ftrace.c
++++ b/arch/x86/kernel/ftrace.c
+@@ -497,6 +497,7 @@ static int finish_update(struct dyn_ftrace *rec, int enable)
  {
--	schedule_delayed_work(&optimizing_work, OPTIMIZE_DELAY);
-+	/*
-+	 * For early kprobes, scheduler and timer may not ready.  Use
-+	 * do_optimize_kprobes() and let it choose stop_machine() based
-+	 * optimizer. Instead of directly calling do_optimize_kprobes(),
-+	 * let optimization be done in register_kprobe because we can
-+	 * held many (and different) locks here in different situations
-+	 * which makes things relativly complex.
-+	 */
-+	if (likely(!kprobes_is_early()))
-+		schedule_delayed_work(&optimizing_work, OPTIMIZE_DELAY);
+ 	unsigned long ftrace_addr;
+ 	int ret;
++	unsigned long old_flags = rec->flags;
+ 
+ 	ret = ftrace_update_record(rec, enable);
+ 
+@@ -509,14 +510,18 @@ static int finish_update(struct dyn_ftrace *rec, int enable)
+ 	case FTRACE_UPDATE_MODIFY_CALL:
+ 	case FTRACE_UPDATE_MAKE_CALL:
+ 		/* converting nop to call */
+-		return finish_update_call(rec, ftrace_addr);
++		ret = finish_update_call(rec, ftrace_addr);
++		break;
+ 
+ 	case FTRACE_UPDATE_MAKE_NOP:
+ 		/* converting a call to a nop */
+-		return finish_update_nop(rec);
++		ret = finish_update_nop(rec);
++		break;
+ 	}
+ 
+-	return 0;
++	if (ret)
++		rec->flags = old_flags;
++	return ret;
  }
  
- /* Kprobe jump optimizer */
-@@ -1595,6 +1604,16 @@ int register_kprobe(struct kprobe *p)
- 	/* Try to optimize kprobe */
- 	try_to_optimize_kprobe(p);
- 
-+	/*
-+	 * Optimize early kprobes here because of locking order.
-+	 * See comments in kick_kprobe_optimizer().
-+	 */
-+	if (unlikely(kprobes_is_early())) {
-+		mutex_lock(&module_mutex);
-+		do_optimize_kprobes();
-+		mutex_unlock(&module_mutex);
-+	}
-+
- out:
- 	mutex_unlock(&kprobe_mutex);
- 
+ static void do_sync_core(void *data)
 -- 
 1.8.4
