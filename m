@@ -1,80 +1,66 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  2 Mar 2015 10:18:16 +0100
-Subject: [PATCH v2 4/6] clk: at91: implement suspend/resume for the PMC irqchip
-In-Reply-To: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1425287898-15093-5-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon,  2 Mar 2015 10:18:12 +0100
+Subject: [PATCH v2 0/6] ARM: at91: fix irq_pm_install_action WARNING
+Message-ID: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The irq line used by the PMC block is shared with several peripherals
-including the init timer which is registering its handler with
-IRQF_NO_SUSPEND.
-Implement the appropriate suspend/resume callback for the PMC irqchip,
-and inform irq core that PMC irq handler can be safely called while
-the system is suspended by setting IRQF_COND_SUSPEND.
+My apologies to those of you who already received this series, but I
+didn't increment the patch version and forgot some subsystem maintainers
+and MLs.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/clk/at91/pmc.c | 20 +++++++++++++++++++-
- drivers/clk/at91/pmc.h |  1 +
- 2 files changed, 20 insertions(+), 1 deletion(-)
+Commit cab303be91dc47942bc25de33dc1140123540800 [1] introduced a WARN_ON
+test which triggers a WARNING backtrace on at91 platforms.
+While this WARN_ON is absolutely necessary to warn users that they should
+not mix request with and without IRQF_NO_SUSPEND flags on shared IRQs,
+there is no easy way to solve this issue on at91 platforms.
 
-diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index f07c815..3f27d21 100644
---- a/drivers/clk/at91/pmc.c
-+++ b/drivers/clk/at91/pmc.c
-@@ -89,12 +89,29 @@ static int pmc_irq_set_type(struct irq_data *d, unsigned type)
- 	return 0;
- }
- 
-+static void pmc_irq_suspend(struct irq_data *d)
-+{
-+	struct at91_pmc *pmc = irq_data_get_irq_chip_data(d);
-+
-+	pmc->imr = pmc_read(pmc, AT91_PMC_IMR);
-+	pmc_write(pmc, AT91_PMC_IDR, pmc->imr);
-+}
-+
-+static void pmc_irq_resume(struct irq_data *d)
-+{
-+	struct at91_pmc *pmc = irq_data_get_irq_chip_data(d);
-+
-+	pmc_write(pmc, AT91_PMC_IER, pmc->imr);
-+}
-+
- static struct irq_chip pmc_irq = {
- 	.name = "PMC",
- 	.irq_disable = pmc_irq_mask,
- 	.irq_mask = pmc_irq_mask,
- 	.irq_unmask = pmc_irq_unmask,
- 	.irq_set_type = pmc_irq_set_type,
-+	.irq_suspend = pmc_irq_suspend,
-+	.irq_resume = pmc_irq_resume,
- };
- 
- static struct lock_class_key pmc_lock_class;
-@@ -224,7 +241,8 @@ static struct at91_pmc *__init at91_pmc_init(struct device_node *np,
- 		goto out_free_pmc;
- 
- 	pmc_write(pmc, AT91_PMC_IDR, 0xffffffff);
--	if (request_irq(pmc->virq, pmc_irq_handler, IRQF_SHARED, "pmc", pmc))
-+	if (request_irq(pmc->virq, pmc_irq_handler,
-+			IRQF_SHARED | IRQF_COND_SUSPEND, "pmc", pmc))
- 		goto out_remove_irqdomain;
- 
- 	return pmc;
-diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-index 52d2041..69abb08 100644
---- a/drivers/clk/at91/pmc.h
-+++ b/drivers/clk/at91/pmc.h
-@@ -33,6 +33,7 @@ struct at91_pmc {
- 	spinlock_t lock;
- 	const struct at91_pmc_caps *caps;
- 	struct irq_domain *irqdomain;
-+	u32 imr;
- };
- 
- static inline void pmc_lock(struct at91_pmc *pmc)
+The main reason is that the init timer is often using a shared irq line
+and thus request this irq with IRQF_NO_SUSPEND flag set, while other
+peripherals request the same irq line without this flag.
+
+This problem has recently been addressed by this patch [2] which adds
+a new IRQF_COND_SUSPEND flag, that authorize mixing IRQF_NO_SUSPEND and
+!IRQF_NO_SUSPEND as long as irq handlers setting IRQF_COND_SUSPEND
+can safely be called in suspended state.
+
+Doing this also implies taking care of system wakeup in devices handlers
+if they tag the IRQ line as a wakeup source.
+The first patch of this series exports the pm_system_wakeup symbol so
+that drivers can call pm_system_wakeup from their interrupt handler.
+
+This series then patches all at91 drivers that can have devices sharing
+their IRQ line with a timer.
+
+This series depends on [2].
+
+Best Regards,
+
+Boris
+
+[1]https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/kernel/irq/pm.c?id=cab303be91dc47942bc25de33dc1140123540800
+[2]https://lkml.org/lkml/2015/2/26/675
+
+Changes since v1:
+ - replaced the IRQF_SUSPEND_NOACTION flag by IRQF_COND_SUSPEND
+ - properly addressed wakeup handling in drivers
+
+Boris Brezillon (6):
+  PM / wakeup: export pm_system_wakeup symbol
+  rtc: at91sam9: rework wakeup and interrupt handling
+  rtc: at91rm9200: rework wakeup and interrupt handling
+  clk: at91: implement suspend/resume for the PMC irqchip
+  watchdog: at91sam9: request the irq with IRQF_NO_SUSPEND
+  tty: serial: atmel: rework interrupt and wakeup handling
+
+ drivers/base/power/wakeup.c       |  1 +
+ drivers/clk/at91/pmc.c            | 20 ++++++++++-
+ drivers/clk/at91/pmc.h            |  1 +
+ drivers/rtc/rtc-at91rm9200.c      | 62 +++++++++++++++++++++++++--------
+ drivers/rtc/rtc-at91sam9.c        | 73 ++++++++++++++++++++++++++++++++-------
+ drivers/tty/serial/atmel_serial.c | 49 +++++++++++++++++++++++---
+ drivers/watchdog/at91sam9_wdt.c   |  3 +-
+ 7 files changed, 177 insertions(+), 32 deletions(-)
+
 -- 
 1.9.1
