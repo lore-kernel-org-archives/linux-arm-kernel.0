@@ -1,79 +1,42 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Mon, 2 Mar 2015 17:53:09 +0100
-Subject: [PATCH v2 04/18] clocksource: Add ARM System timer driver
-In-Reply-To: <1424468908.24292.10.camel@x220>
-References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1424455277-29983-5-git-send-email-mcoquelin.stm32@gmail.com>
- <20150220195437.GT19388@pengutronix.de>
- <1424468908.24292.10.camel@x220>
-Message-ID: <CALszF6Bm_Y4ZLednjpmP-hMix3gA23FwLm5hViEjr1QojUY+Mg@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 3 Mar 2015 01:53:17 +0900
+Subject: [PATCH 00/10] ARM: s3c64xx multiplatform, help needed
+In-Reply-To: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
+References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
+Message-ID: <CA+Ln22HVJVN8kRdgAkhzJvuRKBYpPdk4NWmH3p+Q15wqpcgzFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul, Uwe,
+Hi Arnd,
 
-2015-02-20 22:48 GMT+01:00 Paul Bolle <pebolle@tiscali.nl>:
-> On Fri, 2015-02-20 at 20:54 +0100, Uwe Kleine-K?nig wrote:
->> On Fri, Feb 20, 2015 at 07:01:03PM +0100, Maxime Coquelin wrote:
->> > This patch adds clocksource support for ARMv7-M's System timer,
->> > also known as SysTick.
->> >
->> > Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> > ---
->> >  drivers/clocksource/Kconfig          |  7 ++++
->> >  drivers/clocksource/Makefile         |  1 +
->> >  drivers/clocksource/armv7m_systick.c | 78 ++++++++++++++++++++++++++++++++++++
->> >  3 files changed, 86 insertions(+)
->> >  create mode 100644 drivers/clocksource/armv7m_systick.c
->> >
->> > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> > index fc01ec2..fb6011e 100644
->> > --- a/drivers/clocksource/Kconfig
->> > +++ b/drivers/clocksource/Kconfig
->> > @@ -124,6 +124,13 @@ config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
->> >     help
->> >      Use ARM global timer clock source as sched_clock
->> >
->> > +config ARMV7M_SYSTICK
->> > +   bool
->> I assume this symbol is enabled later in the series.
->
-> Yes, I noticed it was selected in 14/18 ("ARM: Add STM32 family
-> machine").
->
->> Would it make sense
->> to allow enabing the symbol for compile test coverage?
->>
->> > +   select CLKSRC_OF if OF
->> What happens if ARMV7M_SYSTICK=y but OF=n? Doesn't the driver fail to
->> compile?
->>
->> > +   select CLKSRC_MMIO
->> > +   help
->> > +     This options enables support for the ARMv7M system timer unit
->> the right spelling is ARMv7-M.
->
-> This Kconfig entry has no prompt, so no one is going to see this text
-> during make *config. Perhaps this should be made a comment. In that case
-> the right spelling should still be used.
+Thanks a lot for these patches.
 
-Yes, you are right.
-Do you agree if I define it like this:
+2015-03-02 21:35 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> Hi everyone,
+>
+> I've had these patches in a private git tree for a while, and have
+> finally gotten around to clean them up some more for submission.
+> Hopefully we can get all of it merged into 4.1.
+>
+> I've done this to the best of my knowledge, but some parts are
+> a bit tricky, so I expect that there are bugs. The trickiest
+> part is the touchscreen driver. I've sent it out for review
+> last year already, but I have not found anybody who could test
+> it, and it's basically a blind rewrite of an existing driver,
+> so it's unlikely that I got it all right.
+>
+> The other parts may actually work, but it is possible that
+> I made a mistake with the ASoC driver, the sparseirq support
+> or something else.
+>
+> Does anyone still have access to the hardware? I'm particularly
+> interested in seeing this patch set get tested on smartq
+> and on smdk6410, which have the majority of the hardware.
 
-config ARMV7M_SYSTICK
-    bool "Clocksource driver for ARMv7-M System timer"
-    depends on OF && (CPU_V7M || COMPILE_TEST)
-    select CLKSRC_OF
-    select CLKSRC_MMIO
-    help
-      This options enables clocksource support for the ARMv7-M system
-      timer unit.
+I still have a tiny6410, which is compatible with mini6410, so I can
+test both DT and non-DT code paths. It also has a touchscreen using
+the on-SoC ADC. I'll give it a try this weekend. I'll try to review
+the series as well.
 
-Thanks,
-Maxime
->
-> Thanks,
->
->
-> Paul Bolle
->
+Best regards,
+Tomasz
