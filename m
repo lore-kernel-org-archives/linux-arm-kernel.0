@@ -1,188 +1,232 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon,  2 Mar 2015 13:35:55 +0100
-Subject: [PATCH 02/10] ASoC: samsung/smartq: use dynamic registration
+Date: Mon,  2 Mar 2015 13:35:57 +0100
+Subject: [PATCH 04/10] ARM: s3c64xx: prepare initcalls for multiplatform
 In-Reply-To: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
 References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
-Message-ID: <1425299763-4066822-3-git-send-email-arnd@arndb.de>
+Message-ID: <1425299763-4066822-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a prerequisite for moving s3c64xx into multiplatform configurations,
-we need to change the smartq audio driver to stop using hardcoded
-gpio numbers from the header file, and instead pass the gpio data
-through platform_data.
+In a multiplatform kernel, each initcall is run regardless
+of the platform it is meant for, so it must not attempt to
+access SoC-specific registers.
 
-In order to do that, we also move the code to use module_platform_driver
-and register the platform device using platform_device_register_simple
-and register the gpios through the gpiod API.
+This adds 'if (soc_is_s3c64xx)' to all initcalls that are
+specific to the s3c64xx platform, to prevent them from breaking
+other platforms once we can build them into a combined kernel.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-s3c64xx/mach-smartq.c | 13 +++++++
- sound/soc/samsung/smartq_wm8987.c   | 77 +++++++++++++------------------------
- 2 files changed, 40 insertions(+), 50 deletions(-)
+ arch/arm/mach-s3c64xx/common.c               |  4 ++--
+ arch/arm/mach-s3c64xx/cpuidle.c              |  5 ++++-
+ arch/arm/mach-s3c64xx/irq-pm.c               |  2 +-
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c |  4 ++++
+ arch/arm/mach-s3c64xx/pl080.c                |  4 ++++
+ arch/arm/mach-s3c64xx/pm.c                   |  4 ++++
+ arch/arm/mach-s3c64xx/s3c6400.c              |  2 +-
+ arch/arm/mach-s3c64xx/s3c6410.c              |  2 +-
+ arch/arm/plat-samsung/gpio-samsung.c         | 11 +++++------
+ arch/arm/plat-samsung/init.c                 |  5 +++++
+ 10 files changed, 31 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
-index b3d13537a7f0..327ec1f451e3 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq.c
-@@ -12,6 +12,7 @@
- #include <linux/delay.h>
- #include <linux/fb.h>
- #include <linux/gpio.h>
-+#include <linux/gpio/machine.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/pwm_backlight.h>
-@@ -379,6 +380,15 @@ void __init smartq_map_io(void)
- 	smartq_lcd_mode_set();
- }
- 
-+static struct gpiod_lookup_table smartq_audio_gpios = {
-+	.dev_id = "smartq-audio",
-+	.table = {
-+		GPIO_LOOKUP("GPL", 12, "headphone detect", 0),
-+		GPIO_LOOKUP("GPK", 12, "amplifiers shutdown", 0),
-+		{ },
-+	},
-+};
-+
- void __init smartq_machine_init(void)
+diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
+index 16547f2641a3..cca29aa49fd3 100644
+--- a/arch/arm/mach-s3c64xx/common.c
++++ b/arch/arm/mach-s3c64xx/common.c
+@@ -209,7 +209,7 @@ void __init s3c64xx_init_io(struct map_desc *mach_desc, int size)
+ static __init int s3c64xx_dev_init(void)
  {
- 	s3c_i2c0_set_platdata(NULL);
-@@ -397,4 +407,7 @@ void __init smartq_machine_init(void)
- 	WARN_ON(smartq_wifi_init());
+ 	/* Not applicable when using DT. */
+-	if (of_have_populated_dt())
++	if (of_have_populated_dt() || !soc_is_s3c64xx())
+ 		return 0;
  
- 	platform_add_devices(smartq_devices, ARRAY_SIZE(smartq_devices));
-+
-+	gpiod_add_lookup_table(&smartq_audio_gpios);
-+	platform_device_register_simple("smartq-audio", -1, NULL, 0);
+ 	subsys_system_register(&s3c64xx_subsys, NULL);
+@@ -414,7 +414,7 @@ static int __init s3c64xx_init_irq_eint(void)
+ 	int irq;
+ 
+ 	/* On DT-enabled systems EINTs are handled by pinctrl-s3c64xx driver. */
+-	if (of_have_populated_dt())
++	if (of_have_populated_dt() || !soc_is_s3c64xx())
+ 		return -ENODEV;
+ 
+ 	for (irq = IRQ_EINT(0); irq <= IRQ_EINT(27); irq++) {
+diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-s3c64xx/cpuidle.c
+index 2eb072440dfa..92b41c2b7314 100644
+--- a/arch/arm/mach-s3c64xx/cpuidle.c
++++ b/arch/arm/mach-s3c64xx/cpuidle.c
+@@ -18,6 +18,7 @@
+ 
+ #include <asm/proc-fns.h>
+ 
++#include <plat/cpu.h>
+ #include <mach/map.h>
+ 
+ #include "regs-sys.h"
+@@ -57,6 +58,8 @@ static struct cpuidle_driver s3c64xx_cpuidle_driver = {
+ 
+ static int __init s3c64xx_init_cpuidle(void)
+ {
+-	return cpuidle_register(&s3c64xx_cpuidle_driver, NULL);
++	if (soc_is_s3c64xx())
++		return cpuidle_register(&s3c64xx_cpuidle_driver, NULL);
++	return 0;
  }
-diff --git a/sound/soc/samsung/smartq_wm8987.c b/sound/soc/samsung/smartq_wm8987.c
-index 8291d2a5f152..7b6291fb55b9 100644
---- a/sound/soc/samsung/smartq_wm8987.c
-+++ b/sound/soc/samsung/smartq_wm8987.c
-@@ -13,15 +13,12 @@
-  *
-  */
+ device_initcall(s3c64xx_init_cpuidle);
+diff --git a/arch/arm/mach-s3c64xx/irq-pm.c b/arch/arm/mach-s3c64xx/irq-pm.c
+index ae4ea7601f60..0bbf1faaee42 100644
+--- a/arch/arm/mach-s3c64xx/irq-pm.c
++++ b/arch/arm/mach-s3c64xx/irq-pm.c
+@@ -113,7 +113,7 @@ static struct syscore_ops s3c64xx_irq_syscore_ops = {
+ static __init int s3c64xx_syscore_init(void)
+ {
+ 	/* Appropriate drivers (pinctrl, uart) handle this when using DT. */
+-	if (of_have_populated_dt())
++	if (of_have_populated_dt() || !soc_is_s3c64xx())
+ 		return 0;
  
--#include <linux/gpio.h>
-+#include <linux/gpio/consumer.h>
- #include <linux/module.h>
+ 	register_syscore_ops(&s3c64xx_irq_syscore_ops);
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+index 9c00d83f7151..be21f06e6b3f 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+@@ -29,6 +29,7 @@
  
- #include <sound/soc.h>
- #include <sound/jack.h>
+ #include <linux/platform_data/spi-s3c64xx.h>
  
--#include <mach/gpio-samsung.h>
--#include <asm/mach-types.h>
++#include <plat/cpu.h>
+ #include "crag6410.h"
+ 
+ static struct s3c64xx_spi_csinfo wm0010_spi_csinfo = {
+@@ -399,6 +400,9 @@ static struct i2c_driver wlf_gf_module_driver = {
+ 
+ static int __init wlf_gf_module_register(void)
+ {
++	if (!soc_is_s3c64xx())
++		return 0;
++
+ 	return i2c_add_driver(&wlf_gf_module_driver);
+ }
+ device_initcall(wlf_gf_module_register);
+diff --git a/arch/arm/mach-s3c64xx/pl080.c b/arch/arm/mach-s3c64xx/pl080.c
+index 901a984bddc2..89c5a62830a7 100644
+--- a/arch/arm/mach-s3c64xx/pl080.c
++++ b/arch/arm/mach-s3c64xx/pl080.c
+@@ -14,6 +14,7 @@
+ #include <linux/amba/pl08x.h>
+ #include <linux/of.h>
+ 
++#include <plat/cpu.h>
+ #include <mach/irqs.h>
+ #include <mach/map.h>
+ 
+@@ -230,6 +231,9 @@ static AMBA_AHB_DEVICE(s3c64xx_dma1, "dma-pl080s.1", 0,
+ 
+ static int __init s3c64xx_pl080_init(void)
+ {
++	if (!soc_is_s3c64xx())
++		return 0;
++
+ 	/* Set all DMA configuration to be DMA, not SDMA */
+ 	writel(0xffffff, S3C64XX_SDMA_SEL);
+ 
+diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+index aaf7bea4032f..1451d4cda324 100644
+--- a/arch/arm/mach-s3c64xx/pm.c
++++ b/arch/arm/mach-s3c64xx/pm.c
+@@ -22,6 +22,7 @@
+ #include <mach/map.h>
+ #include <mach/irqs.h>
+ 
++#include <plat/cpu.h>
+ #include <plat/devs.h>
+ #include <plat/pm.h>
+ #include <plat/wakeup-mask.h>
+@@ -330,6 +331,9 @@ int __init s3c64xx_pm_init(void)
+ 
+ static __init int s3c64xx_pm_initcall(void)
+ {
++	if (!soc_is_s3c64xx())
++		return 0;
++
+ 	pm_cpu_prep = s3c64xx_pm_prepare;
+ 	pm_cpu_sleep = s3c64xx_cpu_suspend;
+ 
+diff --git a/arch/arm/mach-s3c64xx/s3c6400.c b/arch/arm/mach-s3c64xx/s3c6400.c
+index 1ce48c54cd9c..0789d59e6302 100644
+--- a/arch/arm/mach-s3c64xx/s3c6400.c
++++ b/arch/arm/mach-s3c64xx/s3c6400.c
+@@ -81,7 +81,7 @@ static struct device s3c6400_dev = {
+ static int __init s3c6400_core_init(void)
+ {
+ 	/* Not applicable when using DT. */
+-	if (of_have_populated_dt())
++	if (of_have_populated_dt() || soc_is_s3c64xx())
+ 		return 0;
+ 
+ 	return subsys_system_register(&s3c6400_subsys, NULL);
+diff --git a/arch/arm/mach-s3c64xx/s3c6410.c b/arch/arm/mach-s3c64xx/s3c6410.c
+index b2a7930548d9..273f8a1518b2 100644
+--- a/arch/arm/mach-s3c64xx/s3c6410.c
++++ b/arch/arm/mach-s3c64xx/s3c6410.c
+@@ -84,7 +84,7 @@ static struct device s3c6410_dev = {
+ static int __init s3c6410_core_init(void)
+ {
+ 	/* Not applicable when using DT. */
+-	if (of_have_populated_dt())
++	if (of_have_populated_dt() || !soc_is_s3c64xx())
+ 		return 0;
+ 
+ 	return subsys_system_register(&s3c6410_subsys, NULL);
+diff --git a/arch/arm/plat-samsung/gpio-samsung.c b/arch/arm/plat-samsung/gpio-samsung.c
+index 7c288ba4dc87..37faa8eab78f 100644
+--- a/arch/arm/plat-samsung/gpio-samsung.c
++++ b/arch/arm/plat-samsung/gpio-samsung.c
+@@ -1176,14 +1176,16 @@ static __init int samsung_gpiolib_init(void)
+ 	 * interfaces. For legacy (non-DT) platforms this driver is used.
+ 	 */
+ 	if (of_have_populated_dt())
+-		return -ENODEV;
 -
- #include "i2s.h"
- #include "../codecs/wm8750.h"
+-	samsung_gpiolib_set_cfg(samsung_gpio_cfgs, ARRAY_SIZE(samsung_gpio_cfgs));
++		return 0;
  
-@@ -96,7 +93,7 @@ static struct snd_soc_jack_pin smartq_jack_pins[] = {
- 
- static struct snd_soc_jack_gpio smartq_jack_gpios[] = {
- 	{
--		.gpio		= S3C64XX_GPL(12),
-+		.gpio		= -1,
- 		.name		= "headphone detect",
- 		.report		= SND_JACK_HEADPHONE,
- 		.debounce_time	= 200,
-@@ -113,7 +110,9 @@ static int smartq_speaker_event(struct snd_soc_dapm_widget *w,
- 				struct snd_kcontrol *k,
- 				int event)
- {
--	gpio_set_value(S3C64XX_GPK(12), SND_SOC_DAPM_EVENT_OFF(event));
-+	struct gpio_desc *gpio = snd_soc_card_get_drvdata(&snd_soc_smartq);
-+
-+	gpiod_set_value(gpio, SND_SOC_DAPM_EVENT_OFF(event));
+ 	if (soc_is_s3c24xx()) {
++		samsung_gpiolib_set_cfg(samsung_gpio_cfgs,
++				ARRAY_SIZE(samsung_gpio_cfgs));
+ 		s3c24xx_gpiolib_add_chips(s3c24xx_gpios,
+ 				ARRAY_SIZE(s3c24xx_gpios), S3C24XX_VA_GPIO);
+ 	} else if (soc_is_s3c64xx()) {
++		samsung_gpiolib_set_cfg(samsung_gpio_cfgs,
++				ARRAY_SIZE(samsung_gpio_cfgs));
+ 		samsung_gpiolib_add_2bit_chips(s3c64xx_gpios_2bit,
+ 				ARRAY_SIZE(s3c64xx_gpios_2bit),
+ 				S3C64XX_VA_GPIO + 0xE0, 0x20);
+@@ -1192,9 +1194,6 @@ static __init int samsung_gpiolib_init(void)
+ 				S3C64XX_VA_GPIO);
+ 		samsung_gpiolib_add_4bit2_chips(s3c64xx_gpios_4bit2,
+ 				ARRAY_SIZE(s3c64xx_gpios_4bit2));
+-	} else {
+-		WARN(1, "Unknown SoC in gpio-samsung, no GPIOs added\n");
+-		return -ENODEV;
+ 	}
  
  	return 0;
- }
-@@ -206,62 +205,40 @@ static struct snd_soc_card snd_soc_smartq = {
- 	.num_controls = ARRAY_SIZE(wm8987_smartq_controls),
- };
- 
--static struct platform_device *smartq_snd_device;
--
--static int __init smartq_init(void)
-+static int smartq_probe(struct platform_device *pdev)
+diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
+index 11fbbc26e49f..3776f7e752f0 100644
+--- a/arch/arm/plat-samsung/init.c
++++ b/arch/arm/plat-samsung/init.c
+@@ -152,6 +152,11 @@ static int __init s3c_arch_init(void)
  {
-+	struct gpio_desc *gpio;
  	int ret;
  
--	if (!machine_is_smartq7() && !machine_is_smartq5()) {
--		pr_info("Only SmartQ is supported by this ASoC driver\n");
--		return -ENODEV;
--	}
--
--	smartq_snd_device = platform_device_alloc("soc-audio", -1);
--	if (!smartq_snd_device)
--		return -ENOMEM;
--
--	platform_set_drvdata(smartq_snd_device, &snd_soc_smartq);
--
--	ret = platform_device_add(smartq_snd_device);
--	if (ret) {
--		platform_device_put(smartq_snd_device);
--		return ret;
--	}
-+	platform_set_drvdata(pdev, &snd_soc_smartq);
++	/* init is only needed for ATAGS based platforms */
++	if (!IS_ENABLED(CONFIG_ATAGS) ||
++	    (!soc_is_s3c24xx() && !soc_is_s3c64xx()))
++		return 0;
++
+ 	// do the correct init for cpu
  
- 	/* Initialise GPIOs used by amplifiers */
--	ret = gpio_request(S3C64XX_GPK(12), "amplifiers shutdown");
--	if (ret) {
--		dev_err(&smartq_snd_device->dev, "Failed to register GPK12\n");
--		goto err_unregister_device;
-+	gpio = devm_gpiod_get(&pdev->dev, "amplifiers shutdown",
-+			      GPIOD_OUT_HIGH);
-+	if (IS_ERR(gpio)) {
-+		dev_err(&pdev->dev, "Failed to register GPK12\n");
-+		ret = PTR_ERR(gpio);
-+		goto out;
- 	}
-+	snd_soc_card_set_drvdata(&snd_soc_smartq, gpio);
- 
--	/* Disable amplifiers */
--	ret = gpio_direction_output(S3C64XX_GPK(12), 1);
--	if (ret) {
--		dev_err(&smartq_snd_device->dev, "Failed to configure GPK12\n");
--		goto err_free_gpio_amp_shut;
--	}
--
--	return 0;
--
--err_free_gpio_amp_shut:
--	gpio_free(S3C64XX_GPK(12));
--err_unregister_device:
--	platform_device_unregister(smartq_snd_device);
-+	ret = devm_snd_soc_register_card(&pdev->dev, &snd_soc_smartq);
-+	if (ret)
-+		dev_err(&pdev->dev, "Failed to register card\n");
- 
-+out:
- 	return ret;
- }
- 
--static void __exit smartq_exit(void)
--{
--	gpio_free(S3C64XX_GPK(12));
--
--	platform_device_unregister(smartq_snd_device);
--}
-+static struct platform_driver smartq_driver = {
-+	.driver = {
-+		.name = "smartq-audio",
-+		.owner = THIS_MODULE,
-+	},
-+	.probe = smartq_probe,
-+};
- 
--module_init(smartq_init);
--module_exit(smartq_exit);
-+module_platform_driver(smartq_driver);
- 
- /* Module information */
- MODULE_AUTHOR("Maurus Cuelenaere <mcuelenaere@gmail.com>");
+ 	if (cpu == NULL) {
 -- 
 2.1.0.rc2
