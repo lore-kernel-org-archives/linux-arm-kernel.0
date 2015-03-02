@@ -1,71 +1,189 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 2 Mar 2015 22:24:39 +0800
-Subject: [RFC PATCH v4 01/34] x86,
- traps: Enable DEBUG_STACK after cpu_init() for TRAP_DB/BP.
+Date: Mon, 2 Mar 2015 22:24:44 +0800
+Subject: [RFC PATCH v4 06/34] early kprobes: enable kprobe smoke test for
+ early kprobes.
 In-Reply-To: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
 References: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1425306312-3437-2-git-send-email-wangnan0@huawei.com>
+Message-ID: <1425306312-3437-7-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before this patch early_trap_init() installs DEBUG_STACK for X86_TRAP_BP
-and X86_TRAP_DB. However, DEBUG_STACK doesn't work correctly until
-cpu_init() <-- trap_init().
+Let kprobe smoke test code behavior differently depending on
+kprobes_is_early(). Following patches will test kprobes twice, one for
+early kprobes, another for normal kprobes.
 
-This patch passes 0 to set_intr_gate_ist() and
-set_system_intr_gate_ist() instead of DEBUG_STACK to let it use same
-stack as kernel, and installs DEBUG_STACK for them in trap_init().
-
-As core runs at ring 0 between early_trap_init() and trap_init(), there
-is no chance to get a bad stack before trap_init().
-
-As NMI is also enabled in trap_init(), we don't need to care about
-is_debug_stack() and related things used in arch/x86/kernel/nmi.c.
+Since this test will be executed more than once, before real test
+we should first init the ?probe structures to avoid garbage data in
+previous round trigger problem. For example, register_kprobe() denies
+to process struct kprobe with both addr and symbol_name set, but itself
+fills them both.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
 ---
- arch/x86/kernel/traps.c | 21 +++++++++++++++++++--
- 1 file changed, 19 insertions(+), 2 deletions(-)
+ kernel/test_kprobes.c | 58 +++++++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 45 insertions(+), 13 deletions(-)
 
-diff --git a/arch/x86/kernel/traps.c b/arch/x86/kernel/traps.c
-index 9d2073e..4281988 100644
---- a/arch/x86/kernel/traps.c
-+++ b/arch/x86/kernel/traps.c
-@@ -925,9 +925,17 @@ dotraplinkage void do_iret_error(struct pt_regs *regs, long error_code)
- /* Set of traps needed for early debugging. */
- void __init early_trap_init(void)
- {
--	set_intr_gate_ist(X86_TRAP_DB, &debug, DEBUG_STACK);
-+	/*
-+	 * Don't set ist to DEBUG_STACK as it doesn't work until TSS is
-+	 * ready in cpu_init() <-- trap_init(). Before trap_init(), CPU
-+	 * runs at ring 0 so it is impossible to hit an invalid stack.
-+	 * Using the original stack works well enough@this early
-+	 * stage. DEBUG_STACK will be equipped after cpu_init() in
-+	 * trap_init().
-+	 */
-+	set_intr_gate_ist(X86_TRAP_DB, &debug, 0);
- 	/* int3 can be called from all */
--	set_system_intr_gate_ist(X86_TRAP_BP, &int3, DEBUG_STACK);
-+	set_system_intr_gate_ist(X86_TRAP_BP, &int3, 0);
- #ifdef CONFIG_X86_32
- 	set_intr_gate(X86_TRAP_PF, page_fault);
- #endif
-@@ -1005,6 +1013,15 @@ void __init trap_init(void)
- 	 */
- 	cpu_init();
+diff --git a/kernel/test_kprobes.c b/kernel/test_kprobes.c
+index 0dbab6d..cce4536 100644
+--- a/kernel/test_kprobes.c
++++ b/kernel/test_kprobes.c
+@@ -22,6 +22,20 @@
  
-+	/*
-+	 * X86_TRAP_DB and X86_TRAP_BP have been set
-+	 * in early_trap_init(). However, DEBUG_STACK works only after
-+	 * cpu_init() loads TSS. See comments in early_trap_init().
-+	 */
-+	set_intr_gate_ist(X86_TRAP_DB, &debug, DEBUG_STACK);
-+	/* int3 can be called from all */
-+	set_system_intr_gate_ist(X86_TRAP_BP, &int3, DEBUG_STACK);
+ #define div_factor 3
+ 
++#define init_probe(src)	memcpy(&src, &_##src, sizeof(src))
++#define init_probes_pair(a)		\
++	do { 				\
++		init_probe(a);		\
++		init_probe(a##2);	\
++	} while(0)
 +
- 	x86_init.irqs.trap_init();
++#define init_all_probes()		\
++	do {				\
++		init_probes_pair(kp);		\
++		init_probes_pair(jp);		\
++		init_probes_pair(rp);		\
++	} while(0)
++
+ static u32 rand1, preh_val, posth_val, jph_val;
+ static int errors, handler_errors, num_tests;
+ static u32 (*target)(u32 value);
+@@ -48,11 +62,12 @@ static void kp_post_handler(struct kprobe *p, struct pt_regs *regs,
+ 	posth_val = preh_val + div_factor;
+ }
  
- #ifdef CONFIG_X86_64
+-static struct kprobe kp = {
++static struct kprobe _kp = {
+ 	.symbol_name = "kprobe_target",
+ 	.pre_handler = kp_pre_handler,
+ 	.post_handler = kp_post_handler
+ };
++static struct kprobe kp;
+ 
+ static int test_kprobe(void)
+ {
+@@ -101,11 +116,12 @@ static void kp_post_handler2(struct kprobe *p, struct pt_regs *regs,
+ 	posth_val = preh_val + div_factor;
+ }
+ 
+-static struct kprobe kp2 = {
++static struct kprobe _kp2 = {
+ 	.symbol_name = "kprobe_target2",
+ 	.pre_handler = kp_pre_handler2,
+ 	.post_handler = kp_post_handler2
+ };
++static struct kprobe kp2;
+ 
+ static int test_kprobes(void)
+ {
+@@ -166,10 +182,11 @@ static u32 j_kprobe_target(u32 value)
+ 	return 0;
+ }
+ 
+-static struct jprobe jp = {
++static struct jprobe _jp = {
+ 	.entry		= j_kprobe_target,
+ 	.kp.symbol_name = "kprobe_target"
+ };
++static struct jprobe jp;
+ 
+ static int test_jprobe(void)
+ {
+@@ -191,10 +208,11 @@ static int test_jprobe(void)
+ 	return 0;
+ }
+ 
+-static struct jprobe jp2 = {
++static struct jprobe _jp2 = {
+ 	.entry          = j_kprobe_target,
+ 	.kp.symbol_name = "kprobe_target2"
+ };
++static struct jprobe jp2;
+ 
+ static int test_jprobes(void)
+ {
+@@ -253,11 +271,12 @@ static int return_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
+ 	return 0;
+ }
+ 
+-static struct kretprobe rp = {
++static struct kretprobe _rp = {
+ 	.handler	= return_handler,
+ 	.entry_handler  = entry_handler,
+ 	.kp.symbol_name = "kprobe_target"
+ };
++static struct kretprobe rp;
+ 
+ static int test_kretprobe(void)
+ {
+@@ -296,11 +315,12 @@ static int return_handler2(struct kretprobe_instance *ri, struct pt_regs *regs)
+ 	return 0;
+ }
+ 
+-static struct kretprobe rp2 = {
++static struct kretprobe _rp2 = {
+ 	.handler	= return_handler2,
+ 	.entry_handler  = entry_handler,
+ 	.kp.symbol_name = "kprobe_target2"
+ };
++static struct kretprobe rp2;
+ 
+ static int test_kretprobes(void)
+ {
+@@ -337,15 +357,24 @@ static int test_kretprobes(void)
+ int init_test_probes(void)
+ {
+ 	int ret;
++	char *early_str;
++
++	init_all_probes();
+ 
+ 	target = kprobe_target;
+ 	target2 = kprobe_target2;
+ 
+-	do {
+-		rand1 = prandom_u32();
+-	} while (rand1 <= div_factor);
++	if (!kprobes_is_early()) {
++		do {
++			rand1 = prandom_u32();
++		} while (rand1 <= div_factor);
++		early_str = "";
++	} else {
++		rand1 = 123456789;
++		early_str = "(early) ";
++	}
+ 
+-	pr_info("started\n");
++	pr_info("%sstarted\n", early_str);
+ 	num_tests++;
+ 	ret = test_kprobe();
+ 	if (ret < 0)
+@@ -366,6 +395,8 @@ int init_test_probes(void)
+ 	if (ret < 0)
+ 		errors++;
+ 
++	if (kprobes_is_early())
++		goto out;
+ #ifdef CONFIG_KRETPROBES
+ 	num_tests++;
+ 	ret = test_kretprobe();
+@@ -378,12 +409,13 @@ int init_test_probes(void)
+ 		errors++;
+ #endif /* CONFIG_KRETPROBES */
+ 
++out:
+ 	if (errors)
+-		pr_err("BUG: %d out of %d tests failed\n", errors, num_tests);
++		pr_err("%sBUG: %d out of %d tests failed\n", early_str, errors, num_tests);
+ 	else if (handler_errors)
+-		pr_err("BUG: %d error(s) running handlers\n", handler_errors);
++		pr_err("%sBUG: %d error(s) running handlers\n", early_str, handler_errors);
+ 	else
+-		pr_info("passed successfully\n");
++		pr_info("%spassed successfully\n", early_str);
+ 
+ 	return 0;
+ }
 -- 
 1.8.4
