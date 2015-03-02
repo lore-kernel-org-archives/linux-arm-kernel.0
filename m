@@ -1,51 +1,34 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 03 Mar 2015 04:40:02 +0900
-Subject: [PATCH] ARM: fix exynos randconfig build error
-In-Reply-To: <54EF9091.30802@kernel.org>
-References: <E1YQa78-0000O0-A4@rmk-PC.arm.linux.org.uk>
- <CAJKOXPf2F-g9fU9TrNXz8LPwp8fBNZ6NpaAoP15N0nbHWVesaw@mail.gmail.com>
- <54EF9091.30802@kernel.org>
-Message-ID: <54F4BC92.2050405@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 02 Mar 2015 20:40:16 +0100
+Subject: EDAC on arm64
+In-Reply-To: <20150302145840.GQ22541@e104818-lin.cambridge.arm.com>
+References: <54F11133.70909@redhat.com> <20150302105919.GA4434@arm.com>
+ <20150302145840.GQ22541@e104818-lin.cambridge.arm.com>
+Message-ID: <2937202.iu6lrkO1gm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/15 06:30, Kukjin Kim wrote:
-> On 02/25/15 20:46, Krzysztof Kozlowski wrote:
->> 2015-02-25 12:26 GMT+01:00 Russell King <rmk+kernel@arm.linux.org.uk>:
->>> The following error was observed with SMP=n in v4.0-rc1:
->>>
->>> arch/arm/mach-exynos/pm.c: In function 'exynos_cpu0_enter_aftr':
->>> arch/arm/mach-exynos/pm.c:246:4: error: implicit declaration of function 'arch_send_wakeup_ipi_mask' [-Werror=implicit-function-declaration]
->>>
->>> As the code unconditionally calls a function only available with SMP=y,
->>> make the Exynos PM support depend on SMP.
->>>
->>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->>
->> Hi,
->>
->> Thanks for the patch but this already waits for Kukjin top be picked
->> up. The first patch was similar to yours (adds dependency on SMP),
->> sent on 4th of February:
->> https://patchwork.ozlabs.org/patch/436231/
->>
->> But later Bartlomiej fixed this in other way (allowing to use cpuidle
->> on non-SMP):
->> https://patchwork.ozlabs.org/patch/436445/
->>
->> Unfortunately none of them were picked up.
->>
-> I've missed the fix, sorry.
+On Monday 02 March 2015 14:58:41 Catalin Marinas wrote:
+> On Mon, Mar 02, 2015 at 10:59:32AM +0000, Will Deacon wrote:
+> > On Sat, Feb 28, 2015 at 12:52:03AM +0000, Jon Masters wrote:
+> > > Have you considered reviving the patch you posted previously for EDAC
+> > > support (the atomic_scrub read/write test piece dependency)?
+> > > 
+> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249039.html
+> > 
+> > Well, we'd need a way to handle the non-coherent DMA case and it's really
+> > not clear how to fix that.
 > 
-> BTW, as you know, all of exynos SoCs are based on SMP so generally (in
-> normal case) there is no reason to use non-SMP on exynos
-> platforms...even though I understand the build error should be fixed...
-> 
-> Anyway, I'll have a look Bart's patch and Russell's fix in this weekend.
-> 
+> I agree, that's where the discussions stopped. Basically the EDAC memory
+> writing is racy with any non-cacheable memory accesses (by CPU or
+> device). The only way we could safely use this is only if all the
+> devices are coherent *and* KVM is disabled. With KVM, guests may access
+> the memory uncached, so we hit the same problem.
 
-Firstly, let me take rmk's patch for the randconfig build error...BTW
-I'm still wondering exynos stuff needs to support non-SMP and need to
-think more about its usefulness?...
+Is this a setting of the host, or does the guest always have this capability?
 
-- Kukjin
+If a guest can influence the caching of a page it has access to, I can
+imagine all sorts of security problems with malicious guests regardless
+of EDAC.
+
+	Arnd
