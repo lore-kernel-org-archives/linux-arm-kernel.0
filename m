@@ -1,30 +1,35 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 2 Mar 2015 15:23:54 +0800
-Subject: [PATCH 2/2] gpio: dwapb: re-enable GPIO_DWAPB for arm64
-Message-ID: <1425281034-3324-1-git-send-email-wangkefeng.wang@huawei.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 2 Mar 2015 07:49:44 +0000
+Subject: [PATCH v4 6/9] watchdog: st_wdt: Add new driver for ST's LPC
+ Watchdog
+In-Reply-To: <1425137789.24292.44.camel@x220>
+References: <1424872349-4155-1-git-send-email-lee.jones@linaro.org>
+ <1424872349-4155-7-git-send-email-lee.jones@linaro.org>
+ <1425137789.24292.44.camel@x220>
+Message-ID: <20150302074944.GD12821@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hisilicon arm64 soc uses designWare gpio, re-enable it after
-commit 1972c97db5b(gpio: dwapb: fix compile errors).
+On Sat, 28 Feb 2015, Paul Bolle wrote:
+> On Wed, 2015-02-25 at 13:52 +0000, Lee Jones wrote:
+> > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> > Signed-off-by: David Paris <david.paris@st.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/watchdog/Kconfig      |  13 ++
+> >  drivers/watchdog/Makefile     |   1 +
+> >  drivers/watchdog/st_lpc_wdt.c | 333 ++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 347 insertions(+)
+> >  create mode 100644 drivers/watchdog/st_lpc_wdt.c
+> 
+> A few nits follow.
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- drivers/gpio/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks Paul, will fix.
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index c1e2ca3..7ca0de3 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -148,7 +148,7 @@ config GPIO_GENERIC_PLATFORM
- 
- config GPIO_DWAPB
- 	tristate "Synopsys DesignWare APB GPIO driver"
--	depends on ARM
-+	depends on ARM || ARM64
- 	depends on OF_GPIO
- 	select GPIO_GENERIC
- 	select GENERIC_IRQ_CHIP
+[...]
+
 -- 
-1.7.12.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
