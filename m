@@ -1,39 +1,47 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 2 Mar 2015 15:19:40 +0100
-Subject: [alsa-devel] [PATCH] ASoC: sam9g20_wm8731: drop machine_is_xxx
-In-Reply-To: <20150302140638.GW21293@sirena.org.uk>
-References: <1420542872-10015-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20150106174521.GM2634@sirena.org.uk>
- <20150302134253.GQ4094@piout.net>
- <20150302140638.GW21293@sirena.org.uk>
-Message-ID: <20150302141940.GR4094@piout.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 2 Mar 2015 14:20:07 +0000
+Subject: [PATCH] arm64: Documentation: clarify Image placement in
+ physical RAM
+In-Reply-To: <1425296935-19097-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1425296935-19097-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150302142007.GD16779@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2015 at 14:06:38 +0000, Mark Brown wrote :
-> On Mon, Mar 02, 2015 at 02:42:53PM +0100, Alexandre Belloni wrote:
-> > On 06/01/2015 at 17:45:21 +0000, Mark Brown wrote :
-> > > On Tue, Jan 06, 2015 at 12:14:32PM +0100, Alexandre Belloni wrote:
+On Mon, Mar 02, 2015 at 11:48:55AM +0000, Ard Biesheuvel wrote:
+> The early init code maps the kernel image using statically
+> allocated page tables. This means that we can only allow
+> Image to be placed such that we can map its entire static
+> footprint using a single table entry at all but the lowest
+> level. So update the documentation to reflect that the Image
+> should not cross a 512 MB boundary, which ensures the above
+> on both 4k and 64k pages kernels.
 > 
-> > > > Atmel based boards can now only be used with device tree. Drop non DT
-> > > > initialization.
-> 
-> > > Applied, thanks.
-> 
-> > I don't see that patch in 4.0-rc1. This will lead to a compilation error
-> > as all the machine_is_at91xxx have been removed.
-> 
-> *sigh*  If something is a bug fix then please flag it as such; nothing
-> in your message gives any hint that this is a fix rather than just a
-> random cleanup.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Well, I though this would be applied along with
-"ASoC: atmel: sam9g20_wm8731: remove useless include" which made it to
-4.0-rc1 and was also a simple cleanup.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-It was a simple cleanup until all the machine_is_at91xxx got dropped :)
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> ---
+>  Documentation/arm64/booting.txt | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+> index f3c05b5f9f08..728de8b9116c 100644
+> --- a/Documentation/arm64/booting.txt
+> +++ b/Documentation/arm64/booting.txt
+> @@ -113,8 +113,9 @@ The Image must be placed text_offset bytes from a 2MB aligned base
+>  address near the start of usable system RAM and called there. Memory
+>  below that base address is currently unusable by Linux, and therefore it
+>  is strongly recommended that this location is the start of system RAM.
+> -At least image_size bytes from the start of the image must be free for
+> -use by the kernel.
+> +The physical memory region consisting of image_size bytes counting from
+> +the start of the image must be free for use by the kernel, and must not
+> +cross a 512 MB physical alignment boundary.
+>  
+>  Any memory described to the kernel (even that below the 2MB aligned base
+>  address) which is not marked as reserved from the kernel e.g. with a
+> -- 
+> 1.8.3.2
+> 
+> 
