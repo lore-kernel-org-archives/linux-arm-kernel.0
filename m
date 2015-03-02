@@ -1,34 +1,36 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 02 Mar 2015 18:47:26 +0100
-Subject: [PATCH] ARM: extend =?UTF-8?Q?SMP=5FON=5FUP=20detection=20for?=
- =?UTF-8?Q?=20A=35=20MPCore=20devices=20with=20=31=20CPU?=
-In-Reply-To: <20150217161514.GA2236@afzal-ThinkPad-R50e>
-References: <1422662026-12968-1-git-send-email-stefan@agner.ch>
- <20150217161514.GA2236@afzal-ThinkPad-R50e>
-Message-ID: <c0ae1b7d14bd1c21472553da3a93b58f@agner.ch>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 2 Mar 2015 17:53:25 +0000
+Subject: [alsa-devel] [PATCH] ASoC: sam9g20_wm8731: drop machine_is_xxx
+In-Reply-To: <20150302141940.GR4094@piout.net>
+References: <1420542872-10015-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20150106174521.GM2634@sirena.org.uk>
+ <20150302134253.GQ4094@piout.net>
+ <20150302140638.GW21293@sirena.org.uk>
+ <20150302141940.GR4094@piout.net>
+Message-ID: <20150302175325.GZ21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-02-17 17:15, Afzal Mohammed wrote:
-> Hi Stefan,
-> 
-> On Sat, Jan 31, 2015 at 12:53:46AM +0100, Stefan Agner wrote:
-> 
->> On the Vybrid platform this did not lead to CPU faults (so far),
->> but is_smp checks evaluate to true which is not optimal
->> performance wise.
-> 
-> Just curious, was the performance difference considerable ?
+On Mon, Mar 02, 2015 at 03:19:40PM +0100, Alexandre Belloni wrote:
+> On 02/03/2015 at 14:06:38 +0000, Mark Brown wrote :
 
-I can see differences in the boot time stamps in the 10th ms range, not
-sure whether this is really due to the detection of the UP system or
-some side effects. I guess the change would be measurable with the right
-workload, for instance the memory policies are different for SMP system
-compared to UP systems.
+> > *sigh*  If something is a bug fix then please flag it as such; nothing
+> > in your message gives any hint that this is a fix rather than just a
+> > random cleanup.
 
-However, we use a custom configuration for the device, hence SMP is by
-default disabled anyway. But it would be nice to be able to use
-multi-platform kernels without having to worry about SMP detection...
+> Well, I though this would be applied along with
+> "ASoC: atmel: sam9g20_wm8731: remove useless include" which made it to
+> 4.0-rc1 and was also a simple cleanup.
 
---
-Stefan
+That's one line as opposed to an at least mechanically large change.
+
+> It was a simple cleanup until all the machine_is_at91xxx got dropped :)
+
+Which shouldn't have happened while there were still users.  :/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150302/8bfadb04/attachment.sig>
