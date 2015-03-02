@@ -1,37 +1,31 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  2 Mar 2015 10:18:17 +0100
-Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
- IRQF_NO_SUSPEND
-In-Reply-To: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 2 Mar 2015 17:32:02 +0800
+Subject: [PATCH v2 0/2] ARM: at91: dt: at91sam9n12ek: enable udp device
+In-Reply-To: <1423533335-25135-1-git-send-email-voice.shen@atmel.com>
+References: <1423533335-25135-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <54F42E12.4010808@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The watchdog interrupt (only used when activating software watchdog)
-shouldn't be suspended when entering suspend mode, because it is shared
-with a timer device (which request the line with IRQF_NO_SUSPEND) and once
-the watchdog "Mode Register" has been written, it cannot be changed (which
-means we cannot disable the watchdog interrupt when entering suspend).
+Hi Nicolas,
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/watchdog/at91sam9_wdt.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+On 02/10/2015 09:55 AM, Bo Shen wrote:
+> This patch series enable usb device support on at91sam9n12ek board.
+>
+> Changes in v2:
+>    - Base on next-20150209 (so, remove the modification of udc driver).
+>    - Add pinctrl for usb1 vbus sense.
+>
+> Bo Shen (2):
+>    ARM: at91: dt: at91sam9n12: add udp device node
+>    ARM: at91: dt: at91sam9n12ek: enable udp
 
-diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index 6df9405..1443b3c 100644
---- a/drivers/watchdog/at91sam9_wdt.c
-+++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -208,7 +208,8 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
- 
- 	if ((tmp & AT91_WDT_WDFIEN) && wdt->irq) {
- 		err = request_irq(wdt->irq, wdt_interrupt,
--				  IRQF_SHARED | IRQF_IRQPOLL,
-+				  IRQF_SHARED | IRQF_IRQPOLL |
-+				  IRQF_NO_SUSPEND,
- 				  pdev->name, wdt);
- 		if (err)
- 			return err;
--- 
-1.9.1
+Any comments for this patch series? (aka ping?)
+
+>   arch/arm/boot/dts/at91sam9n12.dtsi  |  9 +++++++++
+>   arch/arm/boot/dts/at91sam9n12ek.dts | 14 ++++++++++++++
+>   2 files changed, 23 insertions(+)
+>
+
+Best Regards,
+Bo Shen
