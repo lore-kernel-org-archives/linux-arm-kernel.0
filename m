@@ -1,71 +1,207 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon,  2 Mar 2015 11:29:09 +0000
-Subject: [PATCH v2 0/5] arm-cci400: PMU monitoring support on ARM64
-Message-ID: <1425295754-13376-1-git-send-email-suzuki.poulose@arm.com>
+Date: Mon,  2 Mar 2015 11:29:12 +0000
+Subject: [PATCH 3/5] arm-cci: Get rid of secure transactions for PMU driver
+In-Reply-To: <1425295754-13376-1-git-send-email-suzuki.poulose@arm.com>
+References: <1425295754-13376-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1425295754-13376-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-This series enables the PMU monitoring support for CCI400 on ARM64.
-The existing CCI400 driver code is a mix of PMU driver and the MCPM
-driver code. The MCPM driver is only used on ARM(32) and contains
-arm32 assembly and hence can't be built on ARM64. This patch splits
-the code to
+Avoid secure transactions while probing the CCI PMU. The
+existing code makes use of the Peripheral ID2 (PID2) register
+to determine the revision of the CCI400, which requires a
+secure transaction. This puts a limitation on the usage of the
+driver on systems running non-secure Linux(e.g, ARM64).
 
- - ARM_CCI400_PORT_CTRL driver - depends on ARM && V7
- - ARM_CCI400_PMU driver
+Updated the device-tree binding for cci pmu node to add the explicit
+revision number for the compatible field.
 
-Accessing the Peripheral ID2 register(PID2) on CCI-400, to detect
-the revision of the chipset, is a secure operation. Hence, it prevents
-us from running this on non-secure platforms. The issue is overcome by
-explicitly mentioning the revision number of the CCI PMU in the device tree
-binding. The device-tree binding has been updated with the new bindings.
+The supported strings are :
+	arm,cci-400-pmu,r0
+	arm,cci-400-pmu,r1
+	arm,cci-400-pmu - DEPRECATED. See NOTE below
 
-i.e,	arm-cci-400-pmu,r0 => revision 0
-	arm-cci-400-pmu,r1 => revision 1
-	arm-cci-400-pmu => (old) DEPRECATED
+NOTE: If the revision is not mentioned, we need to probe the cci revision,
+which could be fatal on a platform running non-secure. We need a reliable way
+to know if we can poke the CCI registers at runtime on ARM32. We depend on
+'mcpm_is_available()' when it is available. mcpm_is_available() returns true
+only when there is a registered driver for mcpm. Otherwise, we assume that we
+don't have secure access, and skips probing the revision number(ARM64 case).
 
-The old binding has been DEPRECATED and must be used only on ARM32
-system with secure access. We don't have a reliable dynamic way to detect
-if the system is running secure. This series tries to use the best safe
-method by relying on the availability of MCPM(as it was prior to the series).
-It is upto the MCPM platform driver to decide, if the system is secure before
-it goes ahead and registers its drivers and pokes the CCI. This series doesn't
-address/solve the problem of MCPM. I will be happy to use a better approach,
-if there is any.
+The MCPM should figure out if it is safe to access the CCI. Unfortunately
+there isn't a reliable way to indicate the same via dtb. This patch doesn't
+address/change the current situation. It only deals with the CCI-PMU, leaving
+the assumptions about the secure access as it has been, prior to this patch.
 
-Tested on (non-secure)TC2 and Juno.
-
-Change since V1 (Suggestions from Nicolas Pitre):
-
- - Split Patch 2 to separate the 'PMU' abstraction(now Patch 2/5)
-   from the introduction of a new device-tree binding(now Patch 3/5)
- - Rename
-	ARM_CCI400_MCPM => ARM_CCI400_PORT_CTRL
-	CCI400_MCPM_PORTS_DATA => CCI400_PORTS_DATA
- - Select ARM_CCI400_COMMON for ARM_CCI400_PORT_CTRL
- - Better documentation in the git commit log about the ARM_CCI config.
- - Move the 'pr_info' to its apporpriate patch.
-
-Suzuki K. Poulose (5):
-  arm-cci: Rearrange code for splitting PMU vs driver code
-  arm-cci: Abstract the CCI400 PMU speicific definitions
-  arm-cci: Get rid of secure transactions for PMU driver
-  arm-cci: Split the code for PMU vs driver support
-  arm-cci: Fix CCI PMU event validation
-
- Documentation/devicetree/bindings/arm/cci.txt |    7 +-
- arch/arm/include/asm/arm-cci.h                |   42 +++
- arch/arm/mach-exynos/Kconfig                  |    2 +-
- arch/arm/mach-vexpress/Kconfig                |    4 +-
- arch/arm64/include/asm/arm-cci.h              |   27 ++
- drivers/bus/Kconfig                           |   27 +-
- drivers/bus/arm-cci.c                         |  483 ++++++++++++++-----------
- include/linux/arm-cci.h                       |    9 +-
- 8 files changed, 383 insertions(+), 218 deletions(-)
+Cc: devicetree at vger.kernel.org
+Cc: Punit Agrawal <punit.agrawal@arm.com>
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+ Documentation/devicetree/bindings/arm/cci.txt |    7 +++--
+ arch/arm/include/asm/arm-cci.h                |   42 +++++++++++++++++++++++++
+ arch/arm64/include/asm/arm-cci.h              |   27 ++++++++++++++++
+ drivers/bus/arm-cci.c                         |   17 +++++++++-
+ include/linux/arm-cci.h                       |    2 ++
+ 5 files changed, 92 insertions(+), 3 deletions(-)
  create mode 100644 arch/arm/include/asm/arm-cci.h
  create mode 100644 arch/arm64/include/asm/arm-cci.h
 
+diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
+index f28d82b..0e4b6a7 100644
+--- a/Documentation/devicetree/bindings/arm/cci.txt
++++ b/Documentation/devicetree/bindings/arm/cci.txt
+@@ -94,8 +94,11 @@ specific to ARM.
+ 		- compatible
+ 			Usage: required
+ 			Value type: <string>
+-			Definition: must be "arm,cci-400-pmu"
+-
++			Definition: Supported strings are :
++				 "arm,cci-400-pmu,r0"
++				 "arm,cci-400-pmu,r1"
++				 "arm,cci-400-pmu"  - DEPRECATED, permitted only where OS has
++						      secure acces to CCI registers
+ 		- reg:
+ 			Usage: required
+ 			Value type: Integer cells. A register entry, expressed
+diff --git a/arch/arm/include/asm/arm-cci.h b/arch/arm/include/asm/arm-cci.h
+new file mode 100644
+index 0000000..936e74a
+--- /dev/null
++++ b/arch/arm/include/asm/arm-cci.h
+@@ -0,0 +1,42 @@
++/*
++ * arch/arm/include/asm/arm-cci.h
++ *
++ * Copyright (C) 2015 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __ASM_ARM_CCI_H
++#define __ASM_ARM_CCI_H
++
++#ifdef CONFIG_MCPM
++#include <asm/mcpm.h>
++
++/*
++ * We don't have a reliable way of detecting whether,
++ * if we have access to secure-only registers, unless
++ * mcpm is registered.
++ */
++static inline int platform_has_secure_cci_access(void)
++{
++	return mcpm_is_available();
++}
++
++#else
++static inline int platform_has_secure_cci_access(void)
++{
++	return 0;
++}
++#endif
++
++#endif
+diff --git a/arch/arm64/include/asm/arm-cci.h b/arch/arm64/include/asm/arm-cci.h
+new file mode 100644
+index 0000000..37bbe37
+--- /dev/null
++++ b/arch/arm64/include/asm/arm-cci.h
+@@ -0,0 +1,27 @@
++/*
++ * arch/arm64/include/asm/arm-cci.h
++ *
++ * Copyright (C) 2015 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __ASM_ARM_CCI_H
++#define __ASM_ARM_CCI_H
++
++static inline int platform_has_secure_cci_access(void)
++{
++	return 0;
++}
++
++#endif
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index bec014b..56ad928 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -224,7 +224,9 @@ static int probe_cci_revision(void)
+ 
+ static const struct cci_pmu_model *probe_cci_model(struct platform_device *pdev)
+ {
+-	return &cci_pmu_models[probe_cci_revision()];
++	if (platform_has_secure_cci_access())
++		return &cci_pmu_models[probe_cci_revision()];
++	return NULL;
+ }
+ 
+ static int pmu_is_valid_counter(struct cci_pmu *cci_pmu, int idx)
+@@ -880,6 +882,15 @@ static struct cci_pmu_model cci_pmu_models[] = {
+ static const struct of_device_id arm_cci_pmu_matches[] = {
+ 	{
+ 		.compatible = "arm,cci-400-pmu",
++		.data	= NULL,
++	},
++	{
++		.compatible = "arm,cci-400-pmu,r0",
++		.data	= &cci_pmu_models[CCI_REV_R0],
++	},
++	{
++		.compatible = "arm,cci-400-pmu,r1",
++		.data	= &cci_pmu_models[CCI_REV_R1],
+ 	},
+ 	{},
+ };
+@@ -890,7 +901,11 @@ static inline const struct cci_pmu_model *get_cci_model(struct platform_device *
+ 							pdev->dev.of_node);
+ 	if (!match)
+ 		return NULL;
++	if (match->data)
++		return match->data;
+ 
++	dev_warn(&pdev->dev, "DEPERCATED compatible property,"
++			 "requires secure access to CCI registers");
+ 	return probe_cci_model(pdev);
+ }
+ 
+diff --git a/include/linux/arm-cci.h b/include/linux/arm-cci.h
+index 79d6edf..aede5c7 100644
+--- a/include/linux/arm-cci.h
++++ b/include/linux/arm-cci.h
+@@ -24,6 +24,8 @@
+ #include <linux/errno.h>
+ #include <linux/types.h>
+ 
++#include <asm/arm-cci.h>
++
+ struct device_node;
+ 
+ #ifdef CONFIG_ARM_CCI
 -- 
 1.7.9.5
