@@ -1,26 +1,63 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 2 Mar 2015 11:35:04 -0800
-Subject: [rtc-linux] [PATCH 2/2] rtc: mediatek: Add MT63xx RTC driver
-In-Reply-To: <1425284436.8684.11.camel@mtksdaap41>
-References: <1422437276-41334-1-git-send-email-eddie.huang@mediatek.com>
- <1422437276-41334-3-git-send-email-eddie.huang@mediatek.com>
- <20150223135044.108ea32a65063a50aa36a309@linux-foundation.org>
- <1425284436.8684.11.camel@mtksdaap41>
-Message-ID: <20150302113504.59dff34c8261c9c002aebf5f@linux-foundation.org>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Mon, 2 Mar 2015 11:37:57 -0800
+Subject: [PATCH v4 2/2] Input: bcm-keypad: Add Broadcom keypad controller
+In-Reply-To: <20150228221518.GB36282@dtor-ws>
+References: <sbranden@broadcom.com>
+ <1425141357-7807-1-git-send-email-sbranden@broadcom.com>
+ <1425141357-7807-3-git-send-email-sbranden@broadcom.com>
+ <20150228221022.GA36282@dtor-ws> <20150228221518.GB36282@dtor-ws>
+Message-ID: <54F4BC15.4020205@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2 Mar 2015 16:20:36 +0800 Eddie Huang <eddie.huang@mediatek.com> wrote:
+Hi Dmitry,
 
-> > WARNING: DT compatible string "mediatek,mt6397-rtc" appears un-documented -- check ./Documentation/devicetree/bindings/
-> > #488: FILE: drivers/rtc/rtc-mt6397.c:334:
-> > +	{ .compatible = "mediatek,mt6397-rtc", },
-> > 
-> > 
-> Do you include patch "[PATCH 1/2] dt: bindings: Add Mediatek RTC driver
-> binding document" in this series ?
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/320425.html
-> 
-> I think this warning shouldn't happen if include this patch.
+I don't see the need for a check of the clock in bcm_kp_start or stop. 
+See comment below.
 
-I can't find that patch on rtc-linux or linux-kernel.  Resend, please?
+On 15-02-28 02:15 PM, Dmitry Torokhov wrote:
+> On Sat, Feb 28, 2015 at 02:10:22PM -0800, Dmitry Torokhov wrote:
+>> Hi Scott,
+>>
+>> On Sat, Feb 28, 2015 at 08:35:57AM -0800, Scott Branden wrote:
+>>> +	/* Enable clock */
+>>> +
+>>> +	kp->clk = devm_clk_get(&pdev->dev, "peri_clk");
+>>> +	if (IS_ERR(kp->clk)) {
+>>> +		dev_info(&pdev->dev,
+>>> +			"No clock specified. Assuming it's enabled\n");
+>>
+>> I was doing the final pass before applying and I think that this is not
+>> quite correct, as it does not handle -EPROBE_DEFER properly which is
+>> quite common. I think we should do something like this:
+>>
+>> 		error = PTR_ERR(kp->clk);
+>> 		if (error != -ENOENT) {
+>> 			if (error != -EPROBE_DEFER)
+>> 				dev_err(.. "Failed to get clock" ...);
+>> 			return error;
+>> 		}
+>> 		dev_dbg(... "No clock specified" ...);
+>>
+>> No need to resubmit if you are OK with this, I can make the change
+>> locally.
+>
+> Hmm, also bcm_kp_start() and bcm_kp_stop() should check if kp->clk is
+> valid before trying to enable/disable it.
+>
+I checked and other keyboard drivers do not check this.  I return an 
+error in bcm_kp_start if the clk enable fails.  On stop, if the clk is 
+not valid something is really, really wrong as well.
+>>
+>>> +	}
+>>> +	else {
+>>
+>> Checkpach should have warned you that it should have been "} else {";
+>> I'll fix it up locally along with few other cosmetic changes and
+>> dropping a few extra headers.
+>>
+>> Thanks.
+>>
+>> --
+>> Dmitry
+>
