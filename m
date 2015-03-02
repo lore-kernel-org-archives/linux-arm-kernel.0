@@ -1,52 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 2 Mar 2015 14:17:34 +0000
-Subject: [PATCH 1/3] Documentation: dts: Update compatible field
- description for APM X-Gene
-In-Reply-To: <CAKh23FmLE-s_C5YUjLTQLT0_P9DT6LzmaBxJPRWY4AwXK9jQNA@mail.gmail.com>
-References: <1425067710-14879-1-git-send-email-isubramanian@apm.com>
- <1425067710-14879-2-git-send-email-isubramanian@apm.com>
- <20150227201516.GA30683@leverpostej>
- <CAKh23FmLE-s_C5YUjLTQLT0_P9DT6LzmaBxJPRWY4AwXK9jQNA@mail.gmail.com>
-Message-ID: <20150302141734.GC16779@leverpostej>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 2 Mar 2015 15:19:40 +0100
+Subject: [alsa-devel] [PATCH] ASoC: sam9g20_wm8731: drop machine_is_xxx
+In-Reply-To: <20150302140638.GW21293@sirena.org.uk>
+References: <1420542872-10015-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20150106174521.GM2634@sirena.org.uk>
+ <20150302134253.GQ4094@piout.net>
+ <20150302140638.GW21293@sirena.org.uk>
+Message-ID: <20150302141940.GR4094@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 11:58:28PM +0000, Iyappan Subramanian wrote:
-> On Fri, Feb 27, 2015 at 12:15 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Fri, Feb 27, 2015 at 08:08:28PM +0000, Iyappan Subramanian wrote:
-> >> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> >> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
-> >> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-> >> ---
-> >>  Documentation/devicetree/bindings/net/apm-xgene-enet.txt | 3 ++-
-> >>  1 file changed, 2 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-> >> index cfcc527..5355996 100644
-> >> --- a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-> >> +++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-> >> @@ -4,7 +4,8 @@ Ethernet nodes are defined to describe on-chip ethernet interfaces in
-> >>  APM X-Gene SoC.
-> >>
-> >>  Required properties for all the ethernet interfaces:
-> >> -- compatible: Should be "apm,xgene-enet"
-> >> +- compatible: Should be "apm,xgene-enet", "apm,xgene1-sgenet" or
-> >> +  "apm,xgene1-xgenet"
-> >
-> > Please format this as a list. It'll be easier to read, and you can add
-> > more later.
+On 02/03/2015 at 14:06:38 +0000, Mark Brown wrote :
+> On Mon, Mar 02, 2015 at 02:42:53PM +0100, Alexandre Belloni wrote:
+> > On 06/01/2015 at 17:45:21 +0000, Mark Brown wrote :
+> > > On Tue, Jan 06, 2015 at 12:14:32PM +0100, Alexandre Belloni wrote:
 > 
-> Thanks.  I will do that.
+> > > > Atmel based boards can now only be used with device tree. Drop non DT
+> > > > initialization.
 > 
-> >
-> > What are the diffences between these variants?
+> > > Applied, thanks.
 > 
-> apm,xgene-enet - binding for RGMII based 1G interface
-> apm,xgene1-sgenet - binding for SGMII based 1G interface
-> apm,xgene1-xgenet - binding for XFI based 10G interface
+> > I don't see that patch in 4.0-rc1. This will lead to a compilation error
+> > as all the machine_is_at91xxx have been removed.
+> 
+> *sigh*  If something is a bug fix then please flag it as such; nothing
+> in your message gives any hint that this is a fix rather than just a
+> random cleanup.
 
-I see. If you could keep notes to this effect in the list, that would
-help to keep this obvious.
+Well, I though this would be applied along with
+"ASoC: atmel: sam9g20_wm8731: remove useless include" which made it to
+4.0-rc1 and was also a simple cleanup.
 
-Thanks,
-Mark.
+It was a simple cleanup until all the machine_is_at91xxx got dropped :)
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
