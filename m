@@ -1,103 +1,38 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Mon, 2 Mar 2015 09:59:26 +0000
-Subject: [PATCH] ARM: dts: at919260/at91sam9g20: fix SRAM device tree node
-In-Reply-To: <20150302095359.GJ4094@piout.net>
-References: <1425276209-4899-1-git-send-email-wenyou.yang@atmel.com>
- <20150302095359.GJ4094@piout.net>
-Message-ID: <B256D81BAE5131468A838E5D7A243641BFD772E3@penmbx01>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 02 Mar 2015 11:01:17 +0100
+Subject: [PATCH] platform/chrome: add missing include in cros_ec_lpc driver
+Message-ID: <6172990.aK27bmg5kF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+The newly added cros_ec_lpc driver is meant for x86 but can
+also be built on other architectures. However, the original
+version causes a compile error when built on ARM because
+of a missing #include:
 
-> -----Original Message-----
-> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
-> Sent: 2015?3?2? 17:54
-> To: Yang, Wenyou
-> Cc: Ferre, Nicolas; mark.rutland at arm.com; devicetree at vger.kernel.org;
-> linux at arm.linux.org.uk; pawel.moll at arm.com; ijc+devicetree at hellion.org.uk; linux-
-> kernel at vger.kernel.org; robh+dt at kernel.org; galak at codeaurora.org;
-> linux at maxim.org.za; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] ARM: dts: at919260/at91sam9g20: fix SRAM device tree
-> node
-> 
-> Hi Wenyou,
-> 
-> I'd prefer fixing the sram lookup in pm.c. I'll propose something however, I can't
-> test on my side.
-I can help test it if you give me your patches to me.
+drivers/platform/chrome/cros_ec_lpc.c: In function 'ec_response_timed_out':
+drivers/platform/chrome/cros_ec_lpc.c:40:3: error: implicit declaration of function 'inb' [-Werror=implicit-function-declaration]
+   if (!(inb(EC_LPC_ADDR_HOST_CMD) & EC_LPC_STATUS_BUSY_MASK))
+   ^
 
-> 
-> On 02/03/2015 at 14:03:29 +0800, Wenyou Yang wrote :
-> > Fix PM does not work on the at91sam9g20ek board
-> > --->8---
-> > at91_pm_sram_init: failed to find sram device!
-> > ---<8---
-> >
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > ---
-> >  arch/arm/boot/dts/at91sam9260.dtsi |    9 +++++++--
-> >  arch/arm/boot/dts/at91sam9g20.dtsi |    9 +++++----
-> >  2 files changed, 12 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/at91sam9260.dtsi
-> > b/arch/arm/boot/dts/at91sam9260.dtsi
-> > index fff0ee6..d1eb27c 100644
-> > --- a/arch/arm/boot/dts/at91sam9260.dtsi
-> > +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-> > @@ -69,9 +69,14 @@
-> >  		};
-> >  	};
-> >
-> > -	sram0: sram at 002ff000 {
-> > +	sram0: sram at 00200000 {
-> >  		compatible = "mmio-sram";
-> > -		reg = <0x002ff000 0x2000>;
-> > +		reg = <0x00200000 0x1000>;
-> > +	};
-> > +
-> > +	sram1: sram at 00300000 {
-> > +		compatible = "mmio-sram";
-> > +		reg = <0x00300000 0x1000>;
-> >  	};
-> >
-> >  	ahb {
-> > diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi
-> > b/arch/arm/boot/dts/at91sam9g20.dtsi
-> > index f593016..eb9a62d 100644
-> > --- a/arch/arm/boot/dts/at91sam9g20.dtsi
-> > +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-> > @@ -16,13 +16,14 @@
-> >  		reg = <0x20000000 0x08000000>;
-> >  	};
-> >
-> > -	sram0: sram at 002ff000 {
-> > -		status = "disabled";
-> > +	sram0: sram at 00200000 {
-> > +		compatible = "mmio-sram";
-> > +		reg = <0x00200000 0x4000>;
-> >  	};
-> >
-> > -	sram1: sram at 002fc000 {
-> > +	sram1: sram at 00300000 {
-> >  		compatible = "mmio-sram";
-> > -		reg = <0x002fc000 0x8000>;
-> > +		reg = <0x00300000 0x4000>;
-> >  	};
-> >
-> >  	ahb {
-> > --
-> > 1.7.9.5
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> --
-> Alexandre Belloni, Free Electrons
-> Embedded Linux, Kernel and Android engineering http://free-electrons.com
+This includes linux/io.h to make it compile reliably.
 
-Best Regards,
-Wenyou Yang
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: ec2f33ab582bf ("platform/chrome: Add cros_ec_lpc driver for x86 devices")
+Cc: Bill Richardson <wfrichar@chromium.org>
+Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Cc: Gwendal Grignou <gwendal@chromium.org>
+Cc: Olof Johansson <olof@lixom.net>
+
+diff --git a/drivers/platform/chrome/cros_ec_lpc.c b/drivers/platform/chrome/cros_ec_lpc.c
+index 822fdb36ded9..f00bf4d246a1 100644
+--- a/drivers/platform/chrome/cros_ec_lpc.c
++++ b/drivers/platform/chrome/cros_ec_lpc.c
+@@ -23,6 +23,7 @@
+ 
+ #include <linux/dmi.h>
+ #include <linux/delay.h>
++#include <linux/io.h>
+ #include <linux/mfd/cros_ec.h>
+ #include <linux/mfd/cros_ec_commands.h>
+ #include <linux/module.h>
