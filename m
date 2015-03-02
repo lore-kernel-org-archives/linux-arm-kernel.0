@@ -1,104 +1,21 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Mon, 02 Mar 2015 12:00:21 -0700
-Subject: [PATCH v3 8/9] ACPI: arm64: use an arch-specific ACPI _OSI method
- and ACPI blacklist
-In-Reply-To: <20150302172939.GC7919@arm.com>
-References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
- <1424824585-6405-9-git-send-email-al.stone@linaro.org>
- <20150302172939.GC7919@arm.com>
-Message-ID: <54F4B345.6020001@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Mar 2015 19:02:04 +0000
+Subject: [PATCH] ARM: dts: hummingboard: enable pcf8523 rtc for i2eX
+In-Reply-To: <1425322206-30115-1-git-send-email-mporter@konsulko.com>
+References: <1425322206-30115-1-git-send-email-mporter@konsulko.com>
+Message-ID: <20150302190204.GR8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2015 10:29 AM, Will Deacon wrote:
-> Hi Al,
-> 
-> On Wed, Feb 25, 2015 at 12:36:24AM +0000, al.stone at linaro.org wrote:
->> diff --git a/arch/arm64/kernel/acpi-blacklist.c b/arch/arm64/kernel/acpi-blacklist.c
->> new file mode 100644
->> index 0000000..1be6a56
->> --- /dev/null
->> +++ b/arch/arm64/kernel/acpi-blacklist.c
->> @@ -0,0 +1,20 @@
->> +/*
->> + *  ARM64 Specific ACPI Blacklist Support
->> + *
->> + *  Copyright (C) 2015, Linaro Ltd.
->> + *	Author: Al Stone <al.stone@linaro.org>
->> + *
->> + *  This program is free software; you can redistribute it and/or modify
->> + *  it under the terms of the GNU General Public License version 2 as
->> + *  published by the Free Software Foundation.
->> + */
->> +
->> +#define pr_fmt(fmt) "ACPI: " fmt
->> +
->> +#include <linux/acpi.h>
->> +
->> +/* The arm64 ACPI blacklist is currently empty.  */
->> +int __init acpi_blacklisted(void)
->> +{
->> +	return 0;
->> +}
->> diff --git a/arch/arm64/kernel/acpi-osi.c b/arch/arm64/kernel/acpi-osi.c
->> new file mode 100644
->> index 0000000..bb351f4
->> --- /dev/null
->> +++ b/arch/arm64/kernel/acpi-osi.c
->> @@ -0,0 +1,25 @@
->> +/*
->> + *  ARM64 Specific ACPI _OSI Support
->> + *
->> + *  Copyright (C) 2015, Linaro Ltd.
->> + *	Author: Al Stone <al.stone@linaro.org>
->> + *
->> + *  This program is free software; you can redistribute it and/or modify
->> + *  it under the terms of the GNU General Public License version 2 as
->> + *  published by the Free Software Foundation.
->> + */
->> +
->> +#define pr_fmt(fmt) "ACPI: " fmt
->> +
->> +#include <linux/acpi.h>
->> +
->> +/*
->> + * Consensus is to deprecate _OSI for all new ACPI-supported architectures.
->> + * So, for arm64, reduce _OSI to a warning message, and tell the firmware
->> + * nothing of value.
->> + */
->> +u32 acpi_osi_handler(acpi_string interface, u32 supported)
->> +{
->> +	pr_warn("_OSI was called, but is deprecated for this architecture.\n");
->> +	return false;
->> +}
-> 
-> This kinda feels backwards to me. If _OSI is going away, then the default
-> should be "the architecture doesn't need to do anything", rather than have
-> new architectures defining a bunch of empty, useless stub code.
-> 
-> Anyway we could make this the default in core code and have architectures
-> that *do* want _OSI override that behaviour, instead of the other way around?
-> 
-> Cheers,
-> 
-> Will
-> 
+On Mon, Mar 02, 2015 at 01:50:06PM -0500, Matt Porter wrote:
+> The PCF8523 RTC is populated on the i2eX boards so
+> enable the i2c1 controller and enable the device on
+> that bus.
 
-We could do that; I personally don't have a strong preference either way,
-so I'm inclined to make it whatever structure Rafael thinks is proper since
-it affects ACPI code most.  That being said, the current patch structure
-made sense to me since it wasn't distorting existing code much -- and given
-the pure number of x86/ia64 machines vs ARM machines using ACPI, that seemed
-the more cautious approach.
-
-@Rafael: do you have an opinion/preference?
+Hmm, I wonder where my update patches went... oh, they're still sitting
+in my excessive backlog of patches in my tree as part of my "sgtl5000
+hacks" patch...
 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
