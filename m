@@ -1,44 +1,33 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 2 Mar 2015 13:28:36 +0100
-Subject: [PATCH V2 0/8] [media] exynos-gsc: Fixup PM support
-In-Reply-To: <1421673760-2600-1-git-send-email-ulf.hansson@linaro.org>
-References: <1421673760-2600-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAPDyKFpC4Ytd7j7MRV6G27Be7TphKBc-7ZyVBveAbiHB8VMt+g@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 2 Mar 2015 13:31:49 +0100
+Subject: PMD update corruption (sync question)
+In-Reply-To: <1172437505.28092883.1425294374323.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
+References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
+ <54F06636.6080905@redhat.com> <54F3C6AD.50300@redhat.com>
+ <938476184.27970130.1425275915893.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
+ <20150302105011.GD22541@e104818-lin.cambridge.arm.com>
+ <1172437505.28092883.1425294374323.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
+Message-ID: <20150302123149.GK21418@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 January 2015 at 14:22, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> Changes in v2:
->         - Rebase patches.
->         - Adapt to changes for the PM core. Especially, the Kconfig option for
->           CONFIG_PM_RUNTIME has been removed and the runtime PM core is now
->           build for CONFIG_PM.
->
-> This patchset fixup the PM support and adds some minor improvements to
-> potentially save some more power at runtime PM suspend.
->
->
-> Ulf Hansson (8):
->   [media] exynos-gsc: Simplify clock management
->   [media] exynos-gsc: Convert gsc_m2m_resume() from int to void
->   [media] exynos-gsc: Make driver functional when CONFIG_PM is unset
->   [media] exynos-gsc: Make runtime PM callbacks available for CONFIG_PM
->   [media] exynos-gsc: Fixup clock management at ->remove()
->   [media] exynos-gsc: Do full clock gating at runtime PM suspend
->   [media] exynos-gsc: Make system PM callbacks available for
->     CONFIG_PM_SLEEP
->   [media] exynos-gsc: Simplify system PM
->
->  drivers/media/platform/exynos-gsc/gsc-core.c | 183 +++++++++++----------------
->  drivers/media/platform/exynos-gsc/gsc-core.h |   3 -
->  2 files changed, 72 insertions(+), 114 deletions(-)
->
-> --
-> 1.9.1
->
+On Mon, Mar 02, 2015 at 06:06:14AM -0500, Jon Masters wrote:
 
-I guess you guys have been busy, but it would be nice to get some
-feedback of these patches.
+> 64-bit writes are /usually/ atomic but alignment or compiler emiting
+> 32-bit opcodes could also do it. I agree there are a few other pieces
+> to this we will chat about separately and come back to this thread.
 
-Kind regards
-Uffe
+Looking at the asm will quickly tell you if its emitting 32bit stores or
+not. If it is, use WRITE_ONCE() (you should anyway I suppose) and see if
+that cures it, if not file a compiler bug, volatile stores should never
+be split.
+
+As to alignment, you can simply put a BUG_ON((unsigned long)ptep & 7);
+in there.
+
+Also:
+
+A: Because it messes up the order in which people normally read text.
+Q: Why is top-posting such a bad thing?
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
