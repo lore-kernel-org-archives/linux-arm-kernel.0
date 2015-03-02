@@ -1,35 +1,56 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 2 Mar 2015 23:19:18 +1300
-Subject: [PATCH] ARM: crypto: update NEON AES module to latest OpenSSL
- version
-In-Reply-To: <1424935325-14437-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1424935325-14437-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150302101918.GA23965@gondor.apana.org.au>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 02 Mar 2015 11:21:28 +0100
+Subject: [PATCH] platform/chrome: add missing include in cros_ec_lpc driver
+In-Reply-To: <6172990.aK27bmg5kF@wuerfel>
+References: <6172990.aK27bmg5kF@wuerfel>
+Message-ID: <54F439A8.2010606@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 07:22:05AM +0000, Ard Biesheuvel wrote:
-> This updates the bit sliced AES module to the latest version in the
-> upstream OpenSSL repository (e620e5ae37bc). This is needed to fix a
-> bug in the XTS decryption path, where data chunked in a certain way
-> could trigger the ciphertext stealing code, which is not supposed to
-> be active in the kernel build (The kernel implementation of XTS only
-> supports round multiples of the AES block size of 16 bytes, whereas
-> the conformant OpenSSL implementation of XTS supports inputs of
-> arbitrary size by applying ciphertext stealing). This is fixed in
-> the upstream version by adding the missing #ifndef XTS_CHAIN_TWEAK
-> around the offending instructions.
-> 
-> The upstream code also contains the change applied by Russell to
-> build the code unconditionally, i.e., even if __LINUX_ARM_ARCH__ < 7,
-> but implemented slightly differently.
-> 
-> Fixes: e4e7f10bfc40 ("ARM: add support for bit sliced AES using NEON instructions")
-> Reported-by: Adrian Kotelba <adrian.kotelba@gmail.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Hello Arnd,
 
-Patch applied with cc to stable.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+On 03/02/2015 11:01 AM, Arnd Bergmann wrote:
+> The newly added cros_ec_lpc driver is meant for x86 but can
+> also be built on other architectures. However, the original
+> version causes a compile error when built on ARM because
+> of a missing #include:
+> 
+> drivers/platform/chrome/cros_ec_lpc.c: In function 'ec_response_timed_out':
+> drivers/platform/chrome/cros_ec_lpc.c:40:3: error: implicit declaration of function 'inb' [-Werror=implicit-function-declaration]
+>    if (!(inb(EC_LPC_ADDR_HOST_CMD) & EC_LPC_STATUS_BUSY_MASK))
+>    ^
+> 
+> This includes linux/io.h to make it compile reliably.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: ec2f33ab582bf ("platform/chrome: Add cros_ec_lpc driver for x86 devices")
+> Cc: Bill Richardson <wfrichar@chromium.org>
+> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Cc: Gwendal Grignou <gwendal@chromium.org>
+> Cc: Olof Johansson <olof@lixom.net>
+> 
+> diff --git a/drivers/platform/chrome/cros_ec_lpc.c b/drivers/platform/chrome/cros_ec_lpc.c
+> index 822fdb36ded9..f00bf4d246a1 100644
+> --- a/drivers/platform/chrome/cros_ec_lpc.c
+> +++ b/drivers/platform/chrome/cros_ec_lpc.c
+> @@ -23,6 +23,7 @@
+>  
+>  #include <linux/dmi.h>
+>  #include <linux/delay.h>
+> +#include <linux/io.h>
+>  #include <linux/mfd/cros_ec.h>
+>  #include <linux/mfd/cros_ec_commands.h>
+>  #include <linux/module.h>
+> 
+
+I posted the exact same patch [0] on Friday along with other two fixes [1].
+
+Besides this build error fix, in the series there is another patch to make
+the driver depends on X86 || COMPILE_TEST which I believe is the best trade
+off to avoid building it unnecesarily on ARM but still get build coverage.
+
+Best regards,
+Javier
+
+[0]: https://lkml.org/lkml/2015/2/27/9
+[1]: https://lkml.org/lkml/2015/2/27/10
