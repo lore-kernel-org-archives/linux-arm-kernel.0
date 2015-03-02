@@ -1,70 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 2 Mar 2015 08:30:19 +0000
-Subject: [PATCH v3 0/4] clk: st: New always-on clock domain
-In-Reply-To: <87sidq3ox8.fsf@free.fr>
-References: <1424799222-9301-1-git-send-email-lee.jones@linaro.org>
- <87385r3uk9.fsf@free.fr> <20150227214941.GB12821@x1>
- <87sidq3ox8.fsf@free.fr>
-Message-ID: <20150302083019.GD31325@x1>
+Date: Mon, 2 Mar 2015 08:36:52 +0000
+Subject: [PATCH 3/4] clk: Provide always-on clock support
+In-Reply-To: <CAJe_Zhf=GBb8AfnTLaGxGcZkVSm9TtdnTsmpH_MBmbMT8ViMDg@mail.gmail.com>
+References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
+ <1425071674-16995-4-git-send-email-lee.jones@linaro.org>
+ <CAJe_Zhf=GBb8AfnTLaGxGcZkVSm9TtdnTsmpH_MBmbMT8ViMDg@mail.gmail.com>
+Message-ID: <20150302083652.GE31325@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 28 Feb 2015, Robert Jarzmik wrote:
+On Sat, 28 Feb 2015, Jassi Brar wrote:
 
-> Lee Jones <lee.jones@linaro.org> writes:
-> 
-> >> I wonder why there is a need for a new clock when CLK_IGNORE_UNUSED does
-> >> exist. What is the usecase that is covered by this patchset which is not used by
-> >> CLK_IGNORE_UNUSED clock flag ?
-> >> 
-> >> And if that reason exists, I'd like to find it in the commit message.
+> On 28 February 2015 at 02:44, Lee Jones <lee.jones@linaro.org> wrote:
+> > Lots of platforms contain clocks which if turned off would prove fatal.
+> > The only way to recover from these catastrophic failures is to restart
+> > the board(s).  Now, when a clock is registered with the framework it is
+> > compared against a list of provided always-on clock names which must be
+> > kept ungated.  If it matches, we enable the existing CLK_IGNORE_UNUSED
+> > flag, which will prevent the common clk framework from attempting to
+> > gate it during the clk_disable_unused() procedure.
 > >
-> > The problem is applying that flag in a generic way.
-> >
-> > However, I guess you haven't seen this [1] yet?
-> >
-> > [1] https://lkml.org/lkml/2015/2/27/548
-> I have.
-> 
-> And yet :
->  1) This won't go in a _commit_ message (as opposed to cover-letter). Moreover
+> If a clock is critical on a certain board, it could be got+enabled
+> during early boot so there is always a user.
 
-Did you read rest of the set, or just the cover-letter?  I referenced
-0/0 because it is the thread parent and from there you can drill down
-into the commits where I believe there is adequate explanation in
-each.  If you could be more specific and tell me which commit you
-think requires more explanation, I'd be happy to take a look.
+I tried this.  There was push-back from the DT maintainers.
 
->     it doesn't specify which usecase is not covered by CLK_IGNORE_UNUSED, it
->     says, up to my understanding, that is it another way to have to
->     CLK_IGNORE_UNUSED flag applied.
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/324417.html
 
-Well that is exactly what we're doing.  Is there an issue with that?
+> To be able to do that from DT, maybe add a new, say, CLK_ALWAYS_ON
+> flag could be made to initialize the clock with one phantom user
+> already. Or just reuse the CLK_IGNORE_UNUSED?
 
-This is a way to do it at a platform level.  It means we can support
-multiple platforms where clocksources have been switched around
-without writing new driver code in drivers/clk/st.
-
-If you have something else in mind, let me know.
-
->  2) I still fail to see why this is necessary
->     IOW why declaring the mandatory always-on clocks with the proper flag should
->     be augmented with a new clock list. Isn't the existing flag the generic way
->     ?
-
-I'm not sure what you mean by this, would you be able to expland a
-little?
-
-> I might not understand the real motivation behind that of course, that's why I'm
-> asking.
-
-Please bear in mind that we don't supply our clocks statically.  All
-of the information is extracted from DT, so if the always-on
-information does reside in there, where do you propose it comes from?
-
-We could just write this code inside our own driver and apply the
-CLK_IGNORE_UNUSED at a local level, but that's not the generic
-solution I am searching for.
+How is that different to what this set is doing?
 
 -- 
 Lee Jones
