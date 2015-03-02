@@ -1,70 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 2 Mar 2015 15:09:28 +0000
-Subject: [RFC PATCH] arm64: use fixmap region for permanent FDT mapping
-In-Reply-To: <CAKv+Gu8TkDRfYmf+V==m7EJyVGC-ZiCSnTtvmHtHgQtbJJo5Sw@mail.gmail.com>
-References: <1425048823-25206-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150302144036.GE16779@leverpostej>
- <CAKv+Gu8TkDRfYmf+V==m7EJyVGC-ZiCSnTtvmHtHgQtbJJo5Sw@mail.gmail.com>
-Message-ID: <20150302150928.GH16779@leverpostej>
+From: bpringlemeir@nbsps.com (Bill Pringlemeir)
+Date: Mon, 02 Mar 2015 10:05:36 -0500
+Subject: [RFC 2/5] mtd:fsl_nfc: Add hardware 45 byte BHC-ECC support for
+ 24 bit corrections.
+References: <87siupheou.fsf@nbsps.com>
+ <1389222441-4322-1-git-send-email-bpringlemeir@nbsps.com>
+ <1389222441-4322-3-git-send-email-bpringlemeir@nbsps.com>
+ <127db6b73356442d2ba12e8c011038cc@agner.ch> <87r3zaxgtr.fsf@nbsps.com>
+ <c444059de888a661fadf3d6be598a98d@agner.ch> <87lhphyjkg.fsf@nbsps.com>
+ <0bc8cec13bcf5b9cbea9cd3345815e4a@agner.ch> <8761dit9u9.fsf@nbsps.com>
+ <f3bc6eda0c826601e136f3dad91d9674@agner.ch>
+Message-ID: <87k2yzqw1r.fsf@nbsps.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 02:47:41PM +0000, Ard Biesheuvel wrote:
-> On 2 March 2015 at 14:40, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Fri, Feb 27, 2015 at 02:53:43PM +0000, Ard Biesheuvel wrote:
-> >> Currently, the FDT blob needs to be in the same naturally aligned
-> >> 512 MB region as the kernel, so that it can be mapped into the
-> >> kernel virtual memory space very early on using a minimal set of
-> >> statically allocated translation tables.
-> >>
-> >> Now that we have early fixmap support, we can relax this restriction,
-> >> by moving the permanent FDT mapping to the fixmap region instead.
-> >> This way, the FDT blob may be anywhere in memory.
-> >
-> > Neat! I was hoping we'd have the chance to do this at some point.
-> >
-> > [...]
-> >
-> >> +     /*
-> >> +      * Reserve 2 MB of virtual space for the FDT at the top of the fixmap
-> >> +      * region. Keep this at the top so it remains 2 MB aligned.
-> >> +      */
-> >> +#define FIX_FDT_SIZE         SZ_2M
-> >> +     FIX_FDT_END,
-> >> +     FIX_FDT = FIX_FDT_END + FIX_FDT_SIZE / PAGE_SIZE - 1,
-> >
-> > Doesn't the presence of the FIX_HOLE entry mean that this isn't 2MB
-> > aligned?
-> >
-> 
-> Well, the fixmap is a bit odd in this respect: FIXADDR_TOP is
-> exclusive, so FIX_HOLE is only there as a placeholder.
 
-Ah, I see.
+On 28 Feb 2015, stefan at agner.ch wrote:
 
-Given that, shouldn't the test in __set_fixmap be something like:
+> The flash chip mentioned above requires 8-bit error correction per 512
+> byte block, hence I increased the ECC to the maximum available level
+> (60-byte ECC, see page below). One thing which is not very nice, in
+> order to fit the 60-byte ECC into the 64-byte OOB, I had to shorten
+> the BBT pattern and set it at the very beginning of the page. This
+> works fine, however this basically sets the page also to factory bad,
+> I'm not sure if this is ok? Otherwise, we also could use a BBT pattern
+> of length 1 (used by cafe_nand.c too).
 
-BUG_ON(idx <= FIX_HOLE || idx >= __end_of_fixed_addresses);
+I guess that is a DT option?  I wouldn't be an expert on this.  So
+submitting it to the linux-mtd is good.  
 
-[...]
+I am also not sure if the HW ECC will work with 'sub-pages'.  I think a
+college of your at Toradex submitted a patch to the u-boot.  I am pretty
+sure that it could work with software ECC, but maybe disabling it is
+easiest.
 
-> > Otherwise this looks good!
-> >
-> 
-> Actually, there is a bit of a snag:
-> early_init_fdt_scan_reserved_mem() reserves the FDT region, but does
-> so by using __pa() to retrieve the physical offset, which doesn't work
-> now the FDT is not accessed through the linear mapping.
+> What do you think? I would like to respin the NFC patch, with my
+> U-Boot changes and this change included...
 
-Ouch.
+Please go ahead.  Markus M <marb@ixxat.de> is also using the fsl_nfc
+driver on a Freescale MPC5125 board, so it is probably good to copy your
+patches to him.  At least, he can test on a BE platform.
 
-> I will try and figure out what the best way is to work around this.
-> Any and all suggestions appreciated.
+People also complained about JFFS and this version of the driver.  I
+didn't investigate that.
 
-We can do the reservation in the arm64 code and move the core part
-behind a config option, but that's somewhat ugly. Passing the PA into
-early_init_fdt_scan_reserved_mem also feels weird.
-
-I'll have a think too.
-
-Mark.
+Thanks,
+Bill Pringlemeir.
