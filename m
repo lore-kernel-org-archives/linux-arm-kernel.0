@@ -1,44 +1,193 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 2 Mar 2015 08:16:06 +0000
-Subject: [STLinux Kernel] [PATCH 3/4] clk: Provide always-on clock support
-In-Reply-To: <54F173B7.9030305@st.com>
-References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
- <1425071674-16995-4-git-send-email-lee.jones@linaro.org>
- <54F173B7.9030305@st.com>
-Message-ID: <20150302081606.GC31325@x1>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Mon, 2 Mar 2015 16:20:36 +0800
+Subject: [rtc-linux] [PATCH 2/2] rtc: mediatek: Add MT63xx RTC driver
+In-Reply-To: <20150223135044.108ea32a65063a50aa36a309@linux-foundation.org>
+References: <1422437276-41334-1-git-send-email-eddie.huang@mediatek.com>
+ <1422437276-41334-3-git-send-email-eddie.huang@mediatek.com>
+ <20150223135044.108ea32a65063a50aa36a309@linux-foundation.org>
+Message-ID: <1425284436.8684.11.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 28 Feb 2015, Maxime Coquelin wrote:
+Hi Andrew,
 
-> Hi Lee,
+On Mon, 2015-02-23 at 13:50 -0800, Andrew Morton wrote:
+> On Wed, 28 Jan 2015 17:27:56 +0800 Eddie Huang <eddie.huang@mediatek.com> wrote:
 > 
-> On 02/27/2015 10:14 PM, Lee Jones wrote:
-> >Lots of platforms contain clocks which if turned off would prove fatal.
-> >The only way to recover from these catastrophic failures is to restart
-> >the board(s).  Now, when a clock is registered with the framework it is
-> >compared against a list of provided always-on clock names which must be
-> >kept ungated.  If it matches, we enable the existing CLK_IGNORE_UNUSED
-> >flag, which will prevent the common clk framework from attempting to
-> >gate it during the clk_disable_unused() procedure.
+> > From: Tianping Fang <tianping.fang@mediatek.com>
+> > 
+> > Add Mediatek MT63xx RTC driver
 > 
-> Please correct me if I'm wrong, but your patch does not fix the
-> issue you had initially.
-> Let's take an example:
-> A clock is critical for the system, and should never be gated, so
-> you add the CLK_IGNORE_UNUSED
-> flag so that it is not disabled by clk_disable_unused() procedure.
-> The same clock is also used by other IPs, for example spi 0 instance.
-> When starting a spi transfer, clk_enable() is called on this clock,
-> so its usecount becomes 1.
-> Once transfer done, clk_disable() is called, usecount becomes 0 and
-> the clock gets disabled: system freeze.
+> There are a couple of checkpatch warnings which should be addressed,
+> please:
+> 
+> WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
+> #150: 
+> new file mode 100644
+> 
+OK, I will update MAINTAINERS file
 
-You're right.  I also need to extend clk_core_disable() to take notice
-of CLK_IGNORE_UNUSED.
+> WARNING: DT compatible string "mediatek,mt6397-rtc" appears un-documented -- check ./Documentation/devicetree/bindings/
+> #488: FILE: drivers/rtc/rtc-mt6397.c:334:
+> +	{ .compatible = "mediatek,mt6397-rtc", },
+> 
+> 
+Do you include patch "[PATCH 1/2] dt: bindings: Add Mediatek RTC driver
+binding document" in this series ?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/320425.html
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I think this warning shouldn't happen if include this patch.
+
+
+> >
+> > ...
+> >
+> > +static void rtc_write(struct mt6397_rtc *rtc, u32 offset, u32 data)
+> > +{
+> > +	u32 addr;
+> > +
+> > +	addr = rtc->addr_base + offset;
+> > +
+> > +	if (offset < rtc->addr_range)
+> > +		regmap_write(rtc->regmap, addr, data);
+> > +}
+> 
+> regmap_read() and regmap_write() can return errors.  There is no
+> checking for this.
+Will fix it.
+
+> > ...
+> >
+> > +static int mtk_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alm)
+> > +{
+> > +	struct rtc_time *tm = &alm->time;
+> > +	struct mt6397_rtc *rtc = dev_get_drvdata(dev);
+> > +	u16 irqen, pdn2;
+> > +
+> > +	mutex_lock(&rtc->lock);
+> > +	irqen = rtc_read(rtc, RTC_IRQ_EN);
+> > +	pdn2 = rtc_read(rtc, RTC_PDN2);
+> > +	tm->tm_sec  = rtc_read(rtc, RTC_AL_SEC);
+> > +	tm->tm_min  = rtc_read(rtc, RTC_AL_MIN);
+> > +	tm->tm_hour = rtc_read(rtc, RTC_AL_HOU) & RTC_AL_HOU_MASK;
+> > +	tm->tm_mday = rtc_read(rtc, RTC_AL_DOM) & RTC_AL_DOM_MASK;
+> > +	tm->tm_mon  = rtc_read(rtc, RTC_AL_MTH) & RTC_AL_MTH_MASK;
+> > +	tm->tm_year = rtc_read(rtc, RTC_AL_YEA);
+> > +	mutex_unlock(&rtc->lock);
+> > +
+> > +	alm->enabled = !!(irqen & RTC_IRQ_EN_AL);
+> > +	alm->pending = !!(pdn2 & RTC_PDN2_PWRON_ALARM);
+> > +
+> > +	tm->tm_year += RTC_MIN_YEAR_OFFSET;
+> > +	tm->tm_mon--;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int mtk_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
+> > +{
+> > +	struct rtc_time *tm = &alm->time;
+> > +	struct mt6397_rtc *rtc = dev_get_drvdata(dev);
+> > +	u16 irqen;
+> > +
+> > +	tm->tm_year -= RTC_MIN_YEAR_OFFSET;
+> > +	tm->tm_mon++;
+> > +
+> > +	if (alm->enabled) {
+> > +		mutex_lock(&rtc->lock);
+> > +		rtc_write(rtc, RTC_AL_YEA, tm->tm_year);
+> > +		rtc_write(rtc, RTC_AL_MTH, (rtc_read(rtc, RTC_AL_MTH) &
+> > +				RTC_NEW_SPARE3) | tm->tm_mon);
+> > +		rtc_write(rtc, RTC_AL_DOM, (rtc_read(rtc, RTC_AL_DOM) &
+> > +				RTC_NEW_SPARE1) | tm->tm_mday);
+> > +		rtc_write(rtc, RTC_AL_HOU, (rtc_read(rtc, RTC_AL_HOU) &
+> > +				RTC_NEW_SPARE_FG_MASK) | tm->tm_hour);
+> > +		rtc_write(rtc, RTC_AL_MIN, tm->tm_min);
+> > +		rtc_write(rtc, RTC_AL_SEC, tm->tm_sec);
+> > +		rtc_write(rtc, RTC_AL_MASK, RTC_AL_MASK_DOW);
+> > +		rtc_write_trigger(rtc);
+> > +		irqen = rtc_read(rtc, RTC_IRQ_EN) | RTC_IRQ_EN_ONESHOT_AL;
+> > +		rtc_write(rtc, RTC_IRQ_EN, irqen);
+> > +		rtc_write_trigger(rtc);
+> > +		mutex_unlock(&rtc->lock);
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> 
+> This all looks a bit racy.  Wouldn't it be better if the testing of and
+> modification of ->enabled and ->pending were protected by the mutex?
+> 
+Will fix it.
+
+> >
+> > ...
+> >
+> > +static int mtk_rtc_probe(struct platform_device *pdev)
+> > +{
+> > +	struct mt6397_chip *mt6397_chip = dev_get_drvdata(pdev->dev.parent);
+> > +	struct mt6397_rtc *rtc;
+> > +	u32 reg[2];
+> > +	int ret = 0;
+> > +
+> > +	rtc = devm_kzalloc(&pdev->dev, sizeof(struct mt6397_rtc), GFP_KERNEL);
+> > +	if (!rtc)
+> > +		return -ENOMEM;
+> > +
+> > +	ret = of_property_read_u32_array(pdev->dev.of_node, "reg", reg, 2);
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev, "couldn't read rtc base address!\n");
+> > +		return -EINVAL;
+> > +	}
+> > +	rtc->addr_base = reg[0];
+> > +	rtc->addr_range = reg[1];
+> > +	rtc->regmap = mt6397_chip->regmap;
+> > +	rtc->dev = &pdev->dev;
+> > +	mutex_init(&rtc->lock);
+> > +
+> > +	platform_set_drvdata(pdev, rtc);
+> > +
+> > +	rtc->rtc_dev = rtc_device_register("mt6397-rtc", &pdev->dev,
+> > +				&mtk_rtc_ops, THIS_MODULE);
+> > +	if (IS_ERR(rtc->rtc_dev)) {
+> > +		dev_err(&pdev->dev, "register rtc device failed\n");
+> > +		return PTR_ERR(rtc->rtc_dev);
+> > +	}
+> > +
+> > +	rtc->irq = platform_get_irq(pdev, 0);
+> > +	if (rtc->irq < 0) {
+> > +		ret = rtc->irq;
+> > +		goto out_rtc;
+> > +	}
+> > +
+> > +	ret = devm_request_threaded_irq(&pdev->dev, rtc->irq, NULL,
+> > +			rtc_irq_handler_thread, IRQF_ONESHOT,
+> > +			"mt6397-rtc", rtc);
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev, "Failed to request alarm IRQ: %d: %d\n",
+> > +			rtc->irq, ret);
+> > +		goto out_rtc;
+> > +	}
+> > +
+> > +	device_init_wakeup(&pdev->dev, 1);
+> > +
+> > +	return 0;
+> > +
+> > +out_rtc:
+> > +	rtc_device_unregister(rtc->rtc_dev);
+> > +	return ret;
+> > +
+> > +}
+> 
+> It seems strange to request the IRQ after having registered the rtc. 
+> And possibly racy - I seem to recall another driver having issues with
+> this recently.
+> 
+> A lot of rtc drivers are requesting the IRQ after registration so
+> presumably it isn't a huge problem.  But still, wouldn't it be better
+> to defer registration until after the IRQ has been successfully
+> obtained?
+> 
+OK, will fix it.
+
+Eddie
