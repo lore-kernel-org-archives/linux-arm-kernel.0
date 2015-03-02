@@ -1,40 +1,39 @@
-From: peter.crosthwaite@xilinx.com (Peter Crosthwaite)
-Date: Mon, 2 Mar 2015 11:19:14 -0800
-Subject: [PATCH] arm64: Implement cpu_relax as yield
-Message-ID: <ad93acf5318c404683f5654d6734316e@BL2FFO11FD047.protection.gbl>
+From: mporter@konsulko.com (Matt Porter)
+Date: Mon, 2 Mar 2015 14:21:16 -0500
+Subject: [PATCH] ARM: dts: hummingboard: enable pcf8523 rtc for i2eX
+In-Reply-To: <20150302190616.GS8656@n2100.arm.linux.org.uk>
+References: <1425322206-30115-1-git-send-email-mporter@konsulko.com>
+ <20150302190204.GR8656@n2100.arm.linux.org.uk>
+ <20150302190616.GS8656@n2100.arm.linux.org.uk>
+Message-ID: <20150302192116.GA30263@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 has the yield nop hint which has the intended semantics of
-cpu_relax. Implement.
+[added Rabeeh]
 
-The immediate application is ARM CPU emulators. An emulator can take
-advantage of the yield hint to de-prioritise an emulated CPU in favor
-of other emulation tasks. QEMU A64 SMP emulation has yield awareness,
-and sees a significant boot time performance increase with this change.
+On Mon, Mar 02, 2015 at 07:06:16PM +0000, Russell King wrote:
+> On Mon, Mar 02, 2015 at 07:02:04PM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Mar 02, 2015 at 01:50:06PM -0500, Matt Porter wrote:
+> > > The PCF8523 RTC is populated on the i2eX boards so
+> > > enable the i2c1 controller and enable the device on
+> > > that bus.
+> > 
+> > Hmm, I wonder where my update patches went... oh, they're still sitting
+> > in my excessive backlog of patches in my tree as part of my "sgtl5000
+> > hacks" patch...
+> 
+> Also note that before we accept patches to the SolidRun stuff, we should
+> first re-license the file as GPLv2/X11.
 
-Signed-off-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/processor.h | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+Hi Russell,
 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index f9be30e..ac2381d 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -126,7 +126,11 @@ extern void release_thread(struct task_struct *);
- 
- unsigned long get_wchan(struct task_struct *p);
- 
--#define cpu_relax()			barrier()
-+static inline void cpu_relax(void)
-+{
-+	asm volatile("yield" ::: "memory");
-+}
-+
- #define cpu_relax_lowlatency()                cpu_relax()
- 
- /* Thread switching */
--- 
-2.3.0.1.g27a12f1
+Given that there's no license information at all on any of these three
+dts files I think that's a good idea. I just realized I didn't copy
+Rabeeh on this and he's apparently the original submitter based on
+your work. Ideally Rabeeh should send a license update but I could do
+so if you'd like and gather some acks.
+
+OTOH, did you already have a license update somewhere in your backlog
+of patches?
+
+-Matt
