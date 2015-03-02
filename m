@@ -1,71 +1,238 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon,  2 Mar 2015 18:20:30 +0000
-Subject: [PATCH v2 3/5] arm64: GICv3: Specialize readq and writeq accesses
+Date: Mon,  2 Mar 2015 18:20:29 +0000
+Subject: [PATCH v2 2/5] arm64: GICv3: change unsigned types for AArch32
+ compatibility
 In-Reply-To: <1425320432-6325-1-git-send-email-jean-philippe.brucker@arm.com>
 References: <1425320432-6325-1-git-send-email-jean-philippe.brucker@arm.com>
-Message-ID: <1425320432-6325-4-git-send-email-jean-philippe.brucker@arm.com>
+Message-ID: <1425320432-6325-3-git-send-email-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 32bit platforms, we cannot assure that an I/O ldrd or strd will be
-done atomically. Besides, an hypervisor would be unable to emulate such
-accesses.
-In order to allow the AArch32 version of the driver to split them into
-two 32bit accesses while keeping the requirement for atomic writes, this
-patch specializes the IROUTER and TYPER accesses.
-Since the latter is an ID register, it won't need to be read atomically,
-but we still avoid future confusion by using gic_read_typer instead of a
-generic gic_readq.
+This patch does a few simple compatibility-related changes:
+- change the system register access prototypes to their actual size,
+- homogenise mpidr accesses with unsigned long,
+- force the 64bit register values to unsigned long long.
+
+Note: the list registers are 64bit on GICv3, but the AArch32 vGIC driver
+will need to split their values into two 32bit registers: LRn and LRCn.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- arch/arm64/include/asm/arch_gicv3.h | 3 +++
- drivers/irqchip/irq-gic-v3.c        | 6 +++---
- 2 files changed, 6 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/arch_gicv3.h | 31 ++++++++++++++++++-------------
+ drivers/irqchip/irq-gic-v3.c        | 25 ++++++++++++-------------
+ include/linux/irqchip/arm-gic-v3.h  | 18 +++++++++---------
+ 3 files changed, 39 insertions(+), 35 deletions(-)
 
 diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index 50d0045..1787580 100644
+index 5409dff..50d0045 100644
 --- a/arch/arm64/include/asm/arch_gicv3.h
 +++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -134,5 +134,8 @@ static inline void gic_write_sre(u32 val)
+@@ -77,15 +77,20 @@
+ 
+ #include <linux/stringify.h>
+ 
+-/* Low level accessors */
++/*
++ * Low-level accessors
++ *
++ * These system registers are 32 bits, but we make sure that the compiler
++ * sets the GP register's most significant bits to 0 with an explicit cast.
++ */
+ 
+-static inline void gic_write_eoir(u64 irq)
++static inline void gic_write_eoir(u32 irq)
+ {
+-	asm volatile("msr_s " __stringify(ICC_EOIR1_EL1) ", %0" : : "r" (irq));
++	asm volatile("msr_s " __stringify(ICC_EOIR1_EL1) ", %0" : : "r" ((u64)irq));
  	isb();
  }
  
-+#define gic_read_typer(c)		readq_relaxed(c)
-+#define gic_write_irouter(v, c)		writeq_relaxed(v, c)
-+
- #endif /* __ASSEMBLY__ */
- #endif /* __ASM_ARCH_GICV3_H */
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index a907235..c52cd23 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -284,7 +284,7 @@ static void __init gic_dist_init(void)
- 	 */
- 	affinity = gic_mpidr_to_affinity(cpu_logical_map(smp_processor_id()));
- 	for (i = 32; i < gic_data.irq_nr; i++)
--		writeq_relaxed(affinity, base + GICD_IROUTER + i * 8);
-+		gic_write_irouter(affinity, base + GICD_IROUTER + i * 8);
+-static inline u64 gic_read_iar(void)
++static inline u32 gic_read_iar(void)
+ {
+ 	u64 irqstat;
+ 
+@@ -93,20 +98,20 @@ static inline u64 gic_read_iar(void)
+ 	return irqstat;
  }
  
- static int gic_populate_rdist(void)
-@@ -315,7 +315,7 @@ static int gic_populate_rdist(void)
- 		}
+-static inline void gic_write_pmr(u64 val)
++static inline void gic_write_pmr(u32 val)
+ {
+-	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
++	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" ((u64)val));
+ }
  
- 		do {
--			typer = readq_relaxed(ptr + GICR_TYPER);
-+			typer = gic_read_typer(ptr + GICR_TYPER);
- 			if ((typer >> 32) == aff) {
+-static inline void gic_write_ctlr(u64 val)
++static inline void gic_write_ctlr(u32 val)
+ {
+-	asm volatile("msr_s " __stringify(ICC_CTLR_EL1) ", %0" : : "r" (val));
++	asm volatile("msr_s " __stringify(ICC_CTLR_EL1) ", %0" : : "r" ((u64)val));
+ 	isb();
+ }
+ 
+-static inline void gic_write_grpen1(u64 val)
++static inline void gic_write_grpen1(u32 val)
+ {
+-	asm volatile("msr_s " __stringify(ICC_GRPEN1_EL1) ", %0" : : "r" (val));
++	asm volatile("msr_s " __stringify(ICC_GRPEN1_EL1) ", %0" : : "r" ((u64)val));
+ 	isb();
+ }
+ 
+@@ -115,7 +120,7 @@ static inline void gic_write_sgi1r(u64 val)
+ 	asm volatile("msr_s " __stringify(ICC_SGI1R_EL1) ", %0" : : "r" (val));
+ }
+ 
+-static inline u64 gic_read_sre(void)
++static inline u32 gic_read_sre(void)
+ {
+ 	u64 val;
+ 
+@@ -123,9 +128,9 @@ static inline u64 gic_read_sre(void)
+ 	return val;
+ }
+ 
+-static inline void gic_write_sre(u64 val)
++static inline void gic_write_sre(u32 val)
+ {
+-	asm volatile("msr_s " __stringify(ICC_SRE_EL1) ", %0" : : "r" (val));
++	asm volatile("msr_s " __stringify(ICC_SRE_EL1) ", %0" : : "r" ((u64)val));
+ 	isb();
+ }
+ 
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 63fb8f6..a907235 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -222,11 +222,11 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+ 	return gic_configure_irq(irq, type, base, rwp_wait);
+ }
+ 
+-static u64 gic_mpidr_to_affinity(u64 mpidr)
++static u64 gic_mpidr_to_affinity(unsigned long mpidr)
+ {
+ 	u64 aff;
+ 
+-	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 32 |
++	aff = ((u64)MPIDR_AFFINITY_LEVEL(mpidr, 3) << 32 |
+ 	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
+ 	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8  |
+ 	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
+@@ -236,7 +236,7 @@ static u64 gic_mpidr_to_affinity(u64 mpidr)
+ 
+ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+ {
+-	u64 irqnr;
++	u32 irqnr;
+ 
+ 	do {
+ 		irqnr = gic_read_iar();
+@@ -289,7 +289,7 @@ static void __init gic_dist_init(void)
+ 
+ static int gic_populate_rdist(void)
+ {
+-	u64 mpidr = cpu_logical_map(smp_processor_id());
++	unsigned long mpidr = cpu_logical_map(smp_processor_id());
+ 	u64 typer;
+ 	u32 aff;
+ 	int i;
+@@ -320,10 +320,9 @@ static int gic_populate_rdist(void)
  				u64 offset = ptr - gic_data.redist_regions[i].redist_base;
  				gic_data_rdist_rd_base() = ptr;
-@@ -516,7 +516,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 	reg = gic_dist_base(d) + GICD_IROUTER + (gic_irq(d) * 8);
- 	val = gic_mpidr_to_affinity(cpu_logical_map(cpu));
+ 				gic_data_rdist()->phys_base = gic_data.redist_regions[i].phys_base + offset;
+-				pr_info("CPU%d: found redistributor %llx region %d:%pa\n",
+-					smp_processor_id(),
+-					(unsigned long long)mpidr,
+-					i, &gic_data_rdist()->phys_base);
++				pr_info("CPU%d: found redistributor %lx region %d:%pa\n",
++					smp_processor_id(), mpidr, i,
++					&gic_data_rdist()->phys_base);
+ 				return 0;
+ 			}
  
--	writeq_relaxed(val, reg);
-+	gic_write_irouter(val, reg);
+@@ -338,8 +337,8 @@ static int gic_populate_rdist(void)
+ 	}
  
- 	/*
- 	 * If the interrupt was enabled, enabled it again. Otherwise,
+ 	/* We couldn't even deal with ourselves... */
+-	WARN(true, "CPU%d: mpidr %llx has no re-distributor!\n",
+-	     smp_processor_id(), (unsigned long long)mpidr);
++	WARN(true, "CPU%d: mpidr %lx has no re-distributor!\n",
++	     smp_processor_id(), mpidr);
+ 	return -ENODEV;
+ }
+ 
+@@ -417,10 +416,10 @@ static struct notifier_block gic_cpu_notifier = {
+ };
+ 
+ static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
+-				   u64 cluster_id)
++				   unsigned long cluster_id)
+ {
+ 	int cpu = *base_cpu;
+-	u64 mpidr = cpu_logical_map(cpu);
++	unsigned long mpidr = cpu_logical_map(cpu);
+ 	u16 tlist = 0;
+ 
+ 	while (cpu < nr_cpu_ids) {
+@@ -481,7 +480,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 	smp_wmb();
+ 
+ 	for_each_cpu_mask(cpu, *mask) {
+-		u64 cluster_id = cpu_logical_map(cpu) & ~0xffUL;
++		unsigned long cluster_id = cpu_logical_map(cpu) & ~0xffUL;
+ 		u16 tlist;
+ 
+ 		tlist = gic_compute_target_list(&cpu, mask, cluster_id);
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index bbe9c34..0ee95c4 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -42,7 +42,7 @@
+ #define GICD_ICFGR			0x0C00
+ #define GICD_IGRPMODR			0x0D00
+ #define GICD_NSACR			0x0E00
+-#define GICD_IROUTER			0x6000
++#define GICD_IROUTER			0x6000		/* 64bit */
+ #define GICD_IDREGS			0xFFD0
+ #define GICD_PIDR2			0xFFE8
+ 
+@@ -91,7 +91,7 @@
+ #define GICR_IIDR			0x0004
+ #define GICR_TYPER			0x0008
+ #define GICR_STATUSR			GICD_STATUSR
+-#define GICR_WAKER			0x0014
++#define GICR_WAKER			0x0014		/* 32bit */
+ #define GICR_SETLPIR			0x0040
+ #define GICR_CLRLPIR			0x0048
+ #define GICR_SEIR			GICD_SEIR
+@@ -99,7 +99,7 @@
+ #define GICR_PENDBASER			0x0078
+ #define GICR_INVLPIR			0x00A0
+ #define GICR_INVALLR			0x00B0
+-#define GICR_SYNCR			0x00C0
++#define GICR_SYNCR			0x00C0		/* 32bit */
+ #define GICR_MOVLPIR			0x0100
+ #define GICR_MOVALLR			0x0110
+ #define GICR_IDREGS			GICD_IDREGS
+@@ -257,13 +257,13 @@
+ /*
+  * Hypervisor interface registers (SRE only)
+  */
+-#define ICH_LR_VIRTUAL_ID_MASK		((1UL << 32) - 1)
++#define ICH_LR_VIRTUAL_ID_MASK		((1ULL << 32) - 1)
+ 
+-#define ICH_LR_EOI			(1UL << 41)
+-#define ICH_LR_GROUP			(1UL << 60)
+-#define ICH_LR_STATE			(3UL << 62)
+-#define ICH_LR_PENDING_BIT		(1UL << 62)
+-#define ICH_LR_ACTIVE_BIT		(1UL << 63)
++#define ICH_LR_EOI			(1ULL << 41)
++#define ICH_LR_GROUP			(1ULL << 60)
++#define ICH_LR_STATE			(3ULL << 62)
++#define ICH_LR_PENDING_BIT		(1ULL << 62)
++#define ICH_LR_ACTIVE_BIT		(1ULL << 63)
+ 
+ #define ICH_MISR_EOI			(1 << 0)
+ #define ICH_MISR_U			(1 << 1)
 -- 
 2.2.0.rc1
