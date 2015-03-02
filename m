@@ -1,160 +1,119 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Mon, 02 Mar 2015 08:50:43 +0000
-Subject: [PATCH 3/4] arm/arm64: KVM: Fix migration race in the arch timer
-In-Reply-To: <20150228133003.29d59e96@arm.com>
-References: <1424878582-26397-1-git-send-email-alex.bennee@linaro.org>
- <1424878582-26397-4-git-send-email-alex.bennee@linaro.org>
- <20150228133003.29d59e96@arm.com>
-Message-ID: <87twy36avw.fsf@linaro.org>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Mon, 2 Mar 2015 09:04:37 +0000
+Subject: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access Engine
+ driver support
+In-Reply-To: <54E70F97.30908@xilinx.com>
+References: <1413374436-14410-1-git-send-email-sthokal@xilinx.com>
+ <3236720.MHeqOodrCV@wuerfel>
+ <7dc11ef7ccec49bcb052c30b9aa916c3@BL2FFO11FD044.protection.gbl>
+ <1967130.oYyZRWCcEF@wuerfel>
+ <add9a23928b44aa48965e993bb17f53b@BL2FFO11FD027.protection.gbl>
+ <20150212093445.GM21387@intel.com>
+ <ed439c7a25d0465d9dbf4c06987d42a1@BY2FFO11FD018.protection.gbl>
+ <20150220062934.GX21387@intel.com> <54E70F97.30908@xilinx.com>
+Message-ID: <d7c0fad223754d6ebb3779312459915a@BL2FFO11FD010.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Ping !
 
-Marc Zyngier <marc.zyngier@arm.com> writes:
-
-> On Wed, 25 Feb 2015 15:36:21 +0000
-> Alex Benn?e <alex.bennee@linaro.org> wrote:
+> -----Original Message-----
+> From: Michal Simek [mailto:michal.simek at xilinx.com]
+> Sent: Friday, February 20, 2015 4:13 PM
+> To: Vinod Koul; Appana Durga Kedareswara Rao
+> Cc: Arnd Bergmann; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; Srikanth Vemula; linux-
+> kernel at vger.kernel.org; Srikanth Thokala; dmaengine at vger.kernel.org;
+> robh+dt at kernel.org; Anirudha Sarangi; grant.likely at linaro.org;
+> dan.j.williams at intel.com
+> Subject: Re: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access Engine
+> driver support
 >
-> Alex, Christoffer,
+> Hi Vinod,
 >
-<snip>
+> On 02/20/2015 07:29 AM, Vinod Koul wrote:
+> > On Sat, Feb 14, 2015 at 02:21:52PM +0000, Appana Durga Kedareswara Rao
+> wrote:
+> >> Hi Vinod,
+> >>
+> >>
+> >>> -----Original Message-----
+> >>> From: Vinod Koul [mailto:vinod.koul at intel.com]
+> >>> Sent: Thursday, February 12, 2015 3:05 PM
+> >>> To: Appana Durga Kedareswara Rao
+> >>> Cc: Arnd Bergmann; linux-arm-kernel at lists.infradead.org;
+> >>> devicetree at vger.kernel.org; Srikanth Vemula; linux-
+> >>> kernel at vger.kernel.org; Srikanth Thokala; dmaengine at vger.kernel.org;
+> >>> robh+dt at kernel.org; Michal Simek; Anirudha Sarangi;
+> >>> grant.likely at linaro.org; dan.j.williams at intel.com
+> >>> Subject: Re: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access
+> >>> Engine driver support
+> >>>
+> >>> On Thu, Jan 29, 2015 at 11:24:41AM +0000, Appana Durga Kedareswara
+> >>> Rao
+> >>> wrote:
+> >>>>>  Earlier in the driver we are embedding dma_slave_config into
+> >>>>> custom structs But Lars suggested to modify it. please refer to
+> >>>>> the below thread for more details.
+> >>>>>  http://www.spinics.net/lists/dmaengine/msg00010.html
+> >>>>>
+> >>>>>  And later we thought of creating a separate private member in
+> >>>>> dma_slave_config for sharing additional configuration between
+> >>>>> slave device and dma engine Or a new dma_ctrl_cmd like
+> >>>>>
+> >>>
+> FSLDMA_EXTERNAL_START(http://www.kernelhub.org/?msg=405535&p=2 )
+> >>>>>
+> >>>>>  Finally Vinod was ok with the existing suggestion so we dropped
+> >>>>> the above thought.
+> >>>>>
+> >>>>>  @Vinod : Could you please comment on this.
+> >>> FSLDMA_EXTERNAL_START has been removed, and you cna use the
+> removal
+> >>> as a guidance of how to solve your issue
+> >>>
+> >>
+> > Please limit you mailer to set wrap at 80 chars, otherwise it becomes
+> > unreadable
+> >
+> >> The current VDMA driver that got merged in the open source and the
+> >> current patch (dma: xilinx dma v4) Srikanth T submitted both contains
+> >> the Similar implementation that you pointed as above(I mean similar
+> >> to the free scale dma driver).
+> >>
+> >> The discussion starts here is why we need the header
+> >> file(Xilinx_dma.h) in the include/linux/amba/Xilinx_dma.h  folder.
+> >>
+> >> Like for FSL DMA it is got defined (fsl_dma_external_start) as a
+> >> function prototype in include/linux/fsldma.h And it is being getting
+> >> used in the drivers/misc/carma/carma-fpga-program.c
+> >>
+> >> Similarly in the Xilinx VDMA driver(xilinx_vdma_channel_set_config )
+> >> defined as a function prototype in the
+> >> include/linux/amba/xilinx_dma.h And is being used by Xilinx videos
+> >> drivers.  Those video driver need to use the
+> >> (xilinx_vdma_channel_set_config) which requires this global header file.
+> >>
+> >> Could you please suggest us whether that header file (Xilinx_dma.h)
+> >> should be there  in include/linux/amba or we should move it to
+> include/linux?
+> >> And any functional comments for this v4 patch?
+> > Let me ask you a question, what is the relation of xilinx_dma with amba?
+> >
+> > If none then only include/linux/ seems to be the right choice. If not
+> > then amba maybe okay but you need to provide justfication why it should
+> be in amba?
 >
-> So the first half of the patch looks perfectly OK to me...
+> I see your point. I think there is real reason to have this header in amba.
+> The reason for that was that xilinx_dma.h was added there.
 >
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->> index af6a521..3b4ded2 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -263,6 +263,13 @@ static int vgic_irq_is_queued(struct kvm_vcpu
->> *vcpu, int irq) return vgic_bitmap_get_irq_val(&dist->irq_queued,
->> vcpu->vcpu_id, irq); }
->>  
->> +static int vgic_irq_is_active(struct kvm_vcpu *vcpu, int irq)
->> +{
->> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> +
->> +	return vgic_bitmap_get_irq_val(&dist->irq_active,
->> vcpu->vcpu_id, irq); +}
->> +
->>  static void vgic_irq_set_queued(struct kvm_vcpu *vcpu, int irq)
->>  {
->>  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> @@ -285,6 +292,13 @@ static void vgic_irq_set_active(struct kvm_vcpu
->> *vcpu, int irq) vgic_bitmap_set_irq_val(&dist->irq_active,
->> vcpu->vcpu_id, irq, 1); }
->>  
->> +static void vgic_irq_clear_active(struct kvm_vcpu *vcpu, int irq)
->> +{
->> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> +
->> +	vgic_bitmap_set_irq_val(&dist->irq_active, vcpu->vcpu_id,
->> irq, 0); +}
->> +
->>  static int vgic_dist_irq_get_level(struct kvm_vcpu *vcpu, int irq)
->>  {
->>  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> @@ -634,16 +648,12 @@ bool vgic_handle_cfg_reg(u32 *reg, struct
->> kvm_exit_mmio *mmio, }
->>  
->>  /**
->> - * vgic_unqueue_irqs - move pending IRQs from LRs to the distributor
->> + * vgic_unqueue_irqs - move pending/active IRQs from LRs to the
->> distributor
->>   * @vgic_cpu: Pointer to the vgic_cpu struct holding the LRs
->>   *
->> - * Move any pending IRQs that have already been assigned to LRs back
->> to the
->> + * Move any IRQs that have already been assigned to LRs back to the
->>   * emulated distributor state so that the complete emulated state
->> can be read
->>   * from the main emulation structures without investigating the LRs.
->> - *
->> - * Note that IRQs in the active state in the LRs get their pending
->> state moved
->> - * to the distributor but the active state stays in the LRs, because
->> we don't
->> - * track the active state on the distributor side.
->>   */
->>  void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
->>  {
->> @@ -919,7 +929,7 @@ static int compute_pending_for_cpu(struct
->> kvm_vcpu *vcpu) 
->>  /*
->>   * Update the interrupt state and determine which CPUs have pending
->> - * interrupts. Must be called with distributor lock held.
->> + * or active interrupts. Must be called with distributor lock held.
->>   */
->>  void vgic_update_state(struct kvm *kvm)
->>  {
->> @@ -1036,6 +1046,25 @@ static void vgic_retire_disabled_irqs(struct
->> kvm_vcpu *vcpu) }
->>  }
->>  
->> +static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
->> +				 int lr_nr, struct vgic_lr vlr)
->> +{
->> +	if (vgic_irq_is_active(vcpu, irq)) {
->> +		vlr.state |= LR_STATE_ACTIVE;
->> +		kvm_debug("Set active, clear distributor: 0x%x\n",
->> vlr.state);
->> +		vgic_irq_clear_active(vcpu, irq);
->> +		vgic_update_state(vcpu->kvm);
->> +	} else if (vgic_dist_irq_is_pending(vcpu, irq)) {
->> +		vlr.state |= LR_STATE_PENDING;
->> +		kvm_debug("Set pending: 0x%x\n", vlr.state);
->> +	}
->> +
->> +	if (!vgic_irq_is_edge(vcpu, irq))
->> +		vlr.state |= LR_EOI_INT;
->> +
->> +	vgic_set_lr(vcpu, lr_nr, vlr);
->> +}
->> +
->>  /*
->>   * Queue an interrupt to a CPU virtual interface. Return true on
->> success,
->>   * or false if it wasn't possible to queue it.
->> @@ -1063,8 +1092,7 @@ bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8
->> sgi_source_id, int irq) if (vlr.source == sgi_source_id) {
->>  			kvm_debug("LR%d piggyback for IRQ%d\n", lr,
->> vlr.irq); BUG_ON(!test_bit(lr, vgic_cpu->lr_used));
->> -			vlr.state |= LR_STATE_PENDING;
->> -			vgic_set_lr(vcpu, lr, vlr);
->> +			vgic_queue_irq_to_lr(vcpu, irq, lr, vlr);
->>  			return true;
->>  		}
->>  	}
->> @@ -1081,11 +1109,8 @@ bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8
->> sgi_source_id, int irq) 
->>  	vlr.irq = irq;
->>  	vlr.source = sgi_source_id;
->> -	vlr.state = LR_STATE_PENDING;
->> -	if (!vgic_irq_is_edge(vcpu, irq))
->> -		vlr.state |= LR_EOI_INT;
->> -
->> -	vgic_set_lr(vcpu, lr, vlr);
->> +	vlr.state = 0;
->> +	vgic_queue_irq_to_lr(vcpu, irq, lr, vlr);
->>  
->>  	return true;
->>  }
->
->
-> ... but this whole vgic rework seems rather out of place, and I can't
-> really see its connection with the timer. Isn't it logically part of the
-> previous patch?
-
-Probably - I was going to re-factor that code with the original patch
-but it was on the todo list once we had it working. Christoffer than
-cleaned it up when he fixed the race hence it being here.
-
-Would you like it as a separate patch (between 2 and 3) or just rolled
-into the previous patch?
-
+> Anyway there is include/linux/dma/ folder. Is it ok to move xilinx_dma.h
+> there too? The same with this dma one.
 >
 > Thanks,
+> Michal
 >
-> 	M.
 
--- 
-Alex Benn?e
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
