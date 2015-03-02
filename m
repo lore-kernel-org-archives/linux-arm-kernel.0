@@ -1,67 +1,43 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 2 Mar 2015 22:24:57 +0800
-Subject: [RFC PATCH v4 19/34] ftrace: don't update record flags if code
- modification fail.
-In-Reply-To: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
-References: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1425306312-3437-20-git-send-email-wangnan0@huawei.com>
+From: yguerrini@tomshardware.fr (Yannick Guerrini)
+Date: Mon, 2 Mar 2015 15:45:05 +0100
+Subject: [PATCH] ARM: imx: Fix trivial typo in comments
+Message-ID: <1425307505-1432-1-git-send-email-yguerrini@tomshardware.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-X86 and common ftrace_replace_code() behave differently.
+change 'mutliple' to 'multiple'
 
-In x86, rec->flags get updated only when (almost) all works are done. In
-common code, rec->flags is updated before code modification, and never
-get restored when code modification fails.
-
-This patch ensures rec->flags kept its original value if
-ftrace_replace_code() fail. A later patch will correct that function
-for x86.
-
-Signed-off-by: Wang Nan <wangnan0@huawei.com>
+Signed-off-by: Yannick Guerrini <yguerrini@tomshardware.fr>
 ---
- kernel/trace/ftrace.c | 17 ++++++++++++-----
- 1 file changed, 12 insertions(+), 5 deletions(-)
+ arch/arm/mach-imx/iomux-mx3.h | 2 +-
+ arch/arm/mach-imx/iomux-v3.h  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
-index 45e5cb1..6c6cbb1 100644
---- a/kernel/trace/ftrace.c
-+++ b/kernel/trace/ftrace.c
-@@ -2254,23 +2254,30 @@ __ftrace_replace_code(struct dyn_ftrace *rec, int enable)
- 	/* This needs to be done before we call ftrace_update_record */
- 	ftrace_old_addr = ftrace_get_addr_curr(rec);
+diff --git a/arch/arm/mach-imx/iomux-mx3.h b/arch/arm/mach-imx/iomux-mx3.h
+index 0a5adba..2e4a0dd 100644
+--- a/arch/arm/mach-imx/iomux-mx3.h
++++ b/arch/arm/mach-imx/iomux-mx3.h
+@@ -114,7 +114,7 @@ enum iomux_gp_func {
+  */
+ int mxc_iomux_alloc_pin(unsigned int pin, const char *label);
+ /*
+- * setups mutliple pins
++ * setups multiple pins
+  * convenient way to call the above function with tables
+  */
+ int mxc_iomux_setup_multiple_pins(const unsigned int *pin_list, unsigned count,
+diff --git a/arch/arm/mach-imx/iomux-v3.h b/arch/arm/mach-imx/iomux-v3.h
+index 2fa3b54..cb45ae5 100644
+--- a/arch/arm/mach-imx/iomux-v3.h
++++ b/arch/arm/mach-imx/iomux-v3.h
+@@ -128,7 +128,7 @@ typedef u64 iomux_v3_cfg_t;
+ int mxc_iomux_v3_setup_pad(iomux_v3_cfg_t pad);
  
--	ret = ftrace_update_record(rec, enable);
-+	ret = ftrace_test_record(rec, enable);
- 
- 	switch (ret) {
- 	case FTRACE_UPDATE_IGNORE:
- 		return 0;
- 
- 	case FTRACE_UPDATE_MAKE_CALL:
--		return ftrace_make_call(rec, ftrace_addr);
-+		ret = ftrace_make_call(rec, ftrace_addr);
-+		break;
- 
- 	case FTRACE_UPDATE_MAKE_NOP:
--		return ftrace_make_nop(NULL, rec, ftrace_old_addr);
-+		ret = ftrace_make_nop(NULL, rec, ftrace_old_addr);
-+		break;
- 
- 	case FTRACE_UPDATE_MODIFY_CALL:
--		return ftrace_modify_call(rec, ftrace_old_addr, ftrace_addr);
-+		ret = ftrace_modify_call(rec, ftrace_old_addr, ftrace_addr);
-+		break;
- 	}
- 
--	return -1; /* unknow ftrace bug */
-+	if (ret)
-+		return -1; /* unknow ftrace bug */
-+
-+	ftrace_update_record(rec, enable);
-+	return 0;
- }
- 
- void __weak ftrace_replace_code(int enable)
+ /*
+- * setups mutliple pads
++ * setups multiple pads
+  * convenient way to call the above function with tables
+  */
+ int mxc_iomux_v3_setup_multiple_pads(iomux_v3_cfg_t *pad_list, unsigned count);
 -- 
-1.8.4
+1.9.5.msysgit.0
