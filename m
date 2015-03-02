@@ -1,68 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 2 Mar 2015 10:18:59 +0000
-Subject: [PATCH 3/4] clk: Provide always-on clock support
-In-Reply-To: <CABb+yY07woiiG8e2kff_AsiFCHNP+TKYyNm_o6=f5WmFsLi8gQ@mail.gmail.com>
-References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
- <1425071674-16995-4-git-send-email-lee.jones@linaro.org>
- <CAJe_Zhf=GBb8AfnTLaGxGcZkVSm9TtdnTsmpH_MBmbMT8ViMDg@mail.gmail.com>
- <20150302083652.GE31325@x1>
- <CABb+yY07woiiG8e2kff_AsiFCHNP+TKYyNm_o6=f5WmFsLi8gQ@mail.gmail.com>
-Message-ID: <20150302101859.GB32347@x1>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Mon, 2 Mar 2015 23:19:18 +1300
+Subject: [PATCH] ARM: crypto: update NEON AES module to latest OpenSSL
+ version
+In-Reply-To: <1424935325-14437-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1424935325-14437-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150302101918.GA23965@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 02 Mar 2015, Jassi Brar wrote:
-
-> On Mon, Mar 2, 2015 at 2:06 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Sat, 28 Feb 2015, Jassi Brar wrote:
-> >
-> >> On 28 February 2015 at 02:44, Lee Jones <lee.jones@linaro.org> wrote:
-> >> > Lots of platforms contain clocks which if turned off would prove fatal.
-> >> > The only way to recover from these catastrophic failures is to restart
-> >> > the board(s).  Now, when a clock is registered with the framework it is
-> >> > compared against a list of provided always-on clock names which must be
-> >> > kept ungated.  If it matches, we enable the existing CLK_IGNORE_UNUSED
-> >> > flag, which will prevent the common clk framework from attempting to
-> >> > gate it during the clk_disable_unused() procedure.
-> >> >
-> >> If a clock is critical on a certain board, it could be got+enabled
-> >> during early boot so there is always a user.
-> >
-> > I tried this.  There was push-back from the DT maintainers.
-> >
-> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/324417.html
-> >
-> Thanks, I wasn't aware of the history.
+On Thu, Feb 26, 2015 at 07:22:05AM +0000, Ard Biesheuvel wrote:
+> This updates the bit sliced AES module to the latest version in the
+> upstream OpenSSL repository (e620e5ae37bc). This is needed to fix a
+> bug in the XTS decryption path, where data chunked in a certain way
+> could trigger the ciphertext stealing code, which is not supposed to
+> be active in the kernel build (The kernel implementation of XTS only
+> supports round multiples of the AES block size of 16 bytes, whereas
+> the conformant OpenSSL implementation of XTS supports inputs of
+> arbitrary size by applying ciphertext stealing). This is fixed in
+> the upstream version by adding the missing #ifndef XTS_CHAIN_TWEAK
+> around the offending instructions.
 > 
-> >> To be able to do that from DT, maybe add a new, say, CLK_ALWAYS_ON
-> >> flag could be made to initialize the clock with one phantom user
-> >> already. Or just reuse the CLK_IGNORE_UNUSED?
-> >
-> > How is that different to what this set is doing?
-> >
-> The phantom user - that's there but none can see it.
+> The upstream code also contains the change applied by Russell to
+> build the code unconditionally, i.e., even if __LINUX_ARM_ARCH__ < 7,
+> but implemented slightly differently.
 > 
-> How about?
-> 
-> +       of_property_for_each_string(np, "clock-always-on", prop, clkname) {
-> +               clk = __clk_lookup(clkname);
-> +               if (!clk)
-> +                       continue;
-> +
-> +               clk->core->enable_count = 1;
-> +               clk->core->prepare_count = 1;
-> +       }
+> Fixes: e4e7f10bfc40 ("ARM: add support for bit sliced AES using NEON instructions")
+> Reported-by: Adrian Kotelba <adrian.kotelba@gmail.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-This is only fractionally different from the current implementation. 
-
-I believe the current way it slightly nicer, as we don't have to fake
-the user count.  This solution is saying "one of the drivers is still
-consuming this clock", instead, in the original implementation we're
-saying "we know there are no consumers of this clock, but keep it on
-anyway due to [insert reason here]".
-
+Patch applied with cc to stable.
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
