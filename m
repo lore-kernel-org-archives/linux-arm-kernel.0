@@ -1,109 +1,68 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 3 Mar 2015 12:52:08 -0500
-Subject: [PATCH v8 1/7] of: iommu: Add ptr to OF node arg to
- of_iommu_configure()
+Date: Tue, 3 Mar 2015 12:52:11 -0500
+Subject: [PATCH v8 4/7] PCI: Add helper functions
+ pci_get[put]_host_bridge_device()
 In-Reply-To: <1425405134-24707-1-git-send-email-m-karicheri2@ti.com>
 References: <1425405134-24707-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1425405134-24707-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1425405134-24707-5-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_iommu_configure() is called from of_dma_configure() to setup iommu ops
-using DT property.  This API is currently used for platform devices for
-which DMA configuration (including IOMMU ops) may come from the device's
-parent.  To extend this functionality for PCI devices, this API needs to
-take a parent node ptr as an argument instead of assuming device's parent.
-This is needed since for PCI, the DMA configuration may be defined in the
-DT node of the root bus bridge's parent device.  Currently only dma-range
-is used for PCI and IOMMU is not supported.  Return error if the device is
-PCI.
-
-Add "parent" parameter (a struct device_node *) to of_iommu_configure().
+Add helper functions to get/put the root bus's host bridge device.
 
 Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> (AMD Seattle)
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Rob Herring <robh+dt@kernel.org>
 Acked-by: Will Deacon <will.deacon@arm.com>
 CC: Joerg Roedel <joro@8bytes.org>
 CC: Grant Likely <grant.likely@linaro.org>
+CC: Rob Herring <robh+dt@kernel.org>
 CC: Russell King <linux@arm.linux.org.uk>
 CC: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/iommu/of_iommu.c |   10 ++++++++--
- drivers/of/platform.c    |    2 +-
- include/linux/of_iommu.h |    6 ++++--
- 3 files changed, 13 insertions(+), 5 deletions(-)
+ drivers/pci/host-bridge.c |   14 ++++++++++++++
+ include/linux/pci.h       |    3 +++
+ 2 files changed, 17 insertions(+)
 
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index af1dc6a..43429ab 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -133,19 +133,25 @@ struct iommu_ops *of_iommu_get_ops(struct device_node *np)
- 	return ops;
+diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+index 39b2dbe..3e5bbf9 100644
+--- a/drivers/pci/host-bridge.c
++++ b/drivers/pci/host-bridge.c
+@@ -23,6 +23,20 @@ static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+ 	return to_pci_host_bridge(root_bus->bridge);
  }
  
--struct iommu_ops *of_iommu_configure(struct device *dev)
-+struct iommu_ops *of_iommu_configure(struct device *dev,
-+				     struct device_node *master_np)
- {
- 	struct of_phandle_args iommu_spec;
- 	struct device_node *np;
- 	struct iommu_ops *ops = NULL;
- 	int idx = 0;
- 
-+	if (dev_is_pci(dev)) {
-+		dev_err(dev, "IOMMU is currently not supported for PCI\n");
-+		return NULL;
-+	}
++struct device *pci_get_host_bridge_device(struct pci_dev *dev)
++{
++	struct pci_bus *root_bus = find_pci_root_bus(dev->bus);
++	struct device *bridge = root_bus->bridge;
 +
- 	/*
- 	 * We don't currently walk up the tree looking for a parent IOMMU.
- 	 * See the `Notes:' section of
- 	 * Documentation/devicetree/bindings/iommu/iommu.txt
- 	 */
--	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
-+	while (!of_parse_phandle_with_args(master_np, "iommus",
- 					   "#iommu-cells", idx,
- 					   &iommu_spec)) {
- 		np = iommu_spec.np;
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index b189733..667c6f1 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -196,7 +196,7 @@ static void of_dma_configure(struct device *dev)
- 	dev_dbg(dev, "device is%sdma coherent\n",
- 		coherent ? " " : " not ");
- 
--	iommu = of_iommu_configure(dev);
-+	iommu = of_iommu_configure(dev, dev->of_node);
- 	dev_dbg(dev, "device is%sbehind an iommu\n",
- 		iommu ? " " : " not ");
- 
-diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-index 16c7554..ffbe470 100644
---- a/include/linux/of_iommu.h
-+++ b/include/linux/of_iommu.h
-@@ -12,7 +12,8 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
- 			     size_t *size);
- 
- extern void of_iommu_init(void);
--extern struct iommu_ops *of_iommu_configure(struct device *dev);
-+extern struct iommu_ops *of_iommu_configure(struct device *dev,
-+					struct device_node *master_np);
- 
- #else
- 
-@@ -24,7 +25,8 @@ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
++	kobject_get(&bridge->kobj);
++	return bridge;
++}
++
++void  pci_put_host_bridge_device(struct device *dev)
++{
++	kobject_put(&dev->kobj);
++}
++
+ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+ 				 void (*release_fn)(struct pci_host_bridge *),
+ 				 void *release_data)
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 211e9da..a379513 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -510,6 +510,9 @@ static inline struct pci_dev *pci_upstream_bridge(struct pci_dev *dev)
+ 	return dev->bus->self;
  }
  
- static inline void of_iommu_init(void) { }
--static inline struct iommu_ops *of_iommu_configure(struct device *dev)
-+static inline struct iommu_ops *of_iommu_configure(struct device *dev,
-+					 struct device_node *master_np)
++struct device *pci_get_host_bridge_device(struct pci_dev *dev);
++void pci_put_host_bridge_device(struct device *dev);
++
+ #ifdef CONFIG_PCI_MSI
+ static inline bool pci_dev_msi_enabled(struct pci_dev *pci_dev)
  {
- 	return NULL;
- }
 -- 
 1.7.9.5
