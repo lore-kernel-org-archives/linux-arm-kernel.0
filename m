@@ -1,52 +1,51 @@
-From: mporter@konsulko.com (Matt Porter)
-Date: Tue, 3 Mar 2015 10:08:09 -0500
-Subject: [PATCH] ARM: dts: imx: Add dr_mode host setting to all host-only
- usb instances
-In-Reply-To: <20150303044334.GA16617@shlinux2>
-References: <1425045960-14191-1-git-send-email-mporter@konsulko.com>
- <20150303034133.GJ20455@dragon> <20150303044334.GA16617@shlinux2>
-Message-ID: <20150303150809.GD30263@beef>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Tue, 3 Mar 2015 20:48:54 +0530
+Subject: [PATCH 3/3] mailbox: Add support for ST's Mailbox IP
+In-Reply-To: <3926609.Ff6LCkuuMX@wuerfel>
+References: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
+ <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
+ <3926609.Ff6LCkuuMX@wuerfel>
+Message-ID: <CAJe_ZhdjPa3C_TUDAPA3fS3K83FGB-GaAjVBjtsow2mp5h8NRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 12:43:36PM +0800, Peter Chen wrote:
-> On Tue, Mar 03, 2015 at 11:41:35AM +0800, Shawn Guo wrote:
-> > 
-> > On Fri, Feb 27, 2015 at 09:06:00AM -0500, Matt Porter wrote:
-> > > The chipidea driver adds an extra line of spam to the log when a
-> > > host-only chipidea instance is left set to the default of a dual role
-> > > controller.
-> > > 
-> > > [    2.010873] ci_hdrc ci_hdrc.1: doesn't support gadget
-> > > 
-> > > Set the dr_mode property to host on all the host-only nodes
-> > > to avoid this warning.
-> 
-> It is not an warning, it is dev_info.
+On 3 March 2015 at 17:04, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 03 March 2015 10:41:23 Lee Jones wrote:
+>> +
+>> +/*
+>> + * struct sti_mbox_msg - sti mailbox message description
+>> + * @dsize:             data payload size
+>> + * @pdata:             message data payload
+>> + */
+>> +struct sti_mbox_msg {
+>> +       u32             dsize;
+>> +       u8              *pdata;
+>> +};
+>
+> As mentioned in another thread, we may just want to add a 'size'
+> argument to the message send function, and a default helper for
+> messages with size of 32 bits.
+>
+Case-a) 'size' is a member of the payload structure itself
+    The extra 'size' argument would only be used for sanity check.
+    This driver seems so. Lee, can you not do without 'dsize'?
 
-True enough, it's info level but is essentially warning that, in the
-case of instances that are restricted to host only (at the SoC level),
-that the DT hardware description is incorrect. Yes, it's benign, but
-if the dtsi is corrected for those parts we don't have to see that
-message.
+Case-b) 'size' is not a member of payload structure:
+     b1)  payload is fixed length, that is 'size' := sizeof(struct my_payload)
+            Here the size argument is redundant.
 
-> In fact, imx28, imx6sl and imx6sx's second controller is dual-role
-> controller, we only set dr_mode at board's dts according to design
-> unless the controller's capability register is incorrect.
+     b2)  payload length varies
+            This case is highly unlikely because there would be no way
+for remote to know how many bytes to read as the payload. Not to mean
+we can't do without the 'size' argument.
 
-The patch doesn't set dr_mode to host on the second controller for
-the imx6sl or imx6sx, only on the third host-only controller. If
-imx28's second controller is really dual-role capable then the
-reference manual is incorrect and I can drop that hunk in v2.
-I only have imx6q and imx6d parts in hand to verify so for the rest
-I went by the RM claim of which controllers were host-only.
+Your opinion has huge weight, but I would like to be enlightened
+before agreeing.
 
-> So, sorry, I don't think this change is necessary.
+> I don't think it's good to fragment this further by adding
+> an indirect message interface in a particular driver.
+>
+For example, I am reading this again and again without getting it.
 
-I can correct the set of instances that should have dr_mode set to host
-in v2 of this. We clearly have some that should have this set in their
-SoC .dtsi to have the hardware description correct.  Will that work for
-you or do you want the SoC-specific cases of this property to be only
-reflected in the board level dts?
-
--Matt
+Thanks
+Jassi
