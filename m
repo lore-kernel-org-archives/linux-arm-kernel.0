@@ -1,78 +1,83 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 2 Mar 2015 21:30:08 -0600
-Subject: [PATCH v4 23/30] PCI/mvebu: Use pci_common_init_dev() to
- simplify code
-In-Reply-To: <1424938344-4017-24-git-send-email-wangyijing@huawei.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 3 Mar 2015 11:33:31 +0800
+Subject: [PATCH v4 03/30] xen/PCI: Don't use deprecated function
+ pci_scan_bus_parented()
+In-Reply-To: <20150303020249.GC11978@google.com>
 References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
- <1424938344-4017-24-git-send-email-wangyijing@huawei.com>
-Message-ID: <20150303033008.GL11978@google.com>
+ <1424938344-4017-4-git-send-email-wangyijing@huawei.com>
+ <20150303020249.GC11978@google.com>
+Message-ID: <54F52B8B.1010309@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 04:12:17PM +0800, Yijing Wang wrote:
-> Mvebu_pcie_scan_bus() is not necessary, we could use
-> pci_common_init_dev() instead of pci_common_init(),
-> and pass the device pointer as the parent. Then
-> pci_scan_root_bus() will be called to scan the pci busses.
+>> --- a/drivers/pci/xen-pcifront.c
+>> +++ b/drivers/pci/xen-pcifront.c
+>> @@ -446,6 +446,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+>>  				 unsigned int domain, unsigned int bus)
+>>  {
+>>  	struct pci_bus *b;
+>> +	LIST_HEAD(resources);
+>>  	struct pcifront_sd *sd = NULL;
+>>  	struct pci_bus_entry *bus_entry = NULL;
+>>  	int err = 0;
+>> @@ -470,17 +471,20 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+>>  		err = -ENOMEM;
+>>  		goto err_out;
+>>  	}
+>> +	pci_add_resource(&resources, &ioport_resource);
+>> +	pci_add_resource(&resources, &iomem_resource);
 > 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> CC: Jason Cooper <jason@lakedaemon.net>
-> ---
->  drivers/pci/host/pci-mvebu.c |   18 +-----------------
->  1 files changed, 1 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index 1309cfb..d5a2b70 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -750,21 +750,6 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
->  	return 1;
->  }
->  
-> -static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-> -{
-> -	struct mvebu_pcie *pcie = sys_to_pcie(sys);
-> -	struct pci_bus *bus;
-> -
-> -	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
-> -				  &mvebu_pcie_ops, sys, &sys->resources);
-> -	if (!bus)
-> -		return NULL;
-> -
-> -	pci_scan_child_bus(bus);
-> -
-> -	return bus;
-> -}
-> -
->  static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
->  						 const struct resource *res,
->  						 resource_size_t start,
-> @@ -808,12 +793,11 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
->  	hw.nr_controllers = 1;
->  	hw.private_data   = (void **)&pcie;
->  	hw.setup          = mvebu_pcie_setup;
-> -	hw.scan           = mvebu_pcie_scan_bus;
->  	hw.map_irq        = of_irq_parse_and_map_pci;
->  	hw.ops            = &mvebu_pcie_ops;
->  	hw.align_resource = mvebu_pcie_align_resource;
->  
-> -	pci_common_init(&hw);
-> +	pci_common_init_dev(&pcie->pdev->dev, &hw);
+> This doesn't add &busn_resource like pci_scan_bus_parented() does.
+> That might be OK, but I think we'll now emit "No busn resource found for
+> root bus, will use [bus %02x-ff]" when we didn't before.  I don't know how
+> xen-pcifront works; it would be nice if it could supply the correct
+> bus resource (and ioport and iomem).
 
-I'm not necessarily opposed to this, but it seems unrelated to the rest of
-the series.  And I think it changes the behavior slightly (now we call
-pci_common_init_dev() with &pcie->pdev->dev instead of NULL).  So I'll wait
-for an ack from Thomas and/or Jason.
+Because the pci_scan_bus_parented() add the default busn_resource for it,
+I would add the default busn_resource in pcifront_scan_root() too to fix the
+"No busn resource found ..." debug info.
 
->  }
->  
->  /*
-> -- 
-> 1.7.1
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+>>  	pcifront_init_sd(sd, domain, bus, pdev);
+>>  
+>>  	pci_lock_rescan_remove();
+>>  
+>> -	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
+>> -				  &pcifront_bus_ops, sd);
+>> +	b = pci_scan_root_bus(&pdev->xdev->dev, bus,
+>> +				  &pcifront_bus_ops, sd, &resources);
+>>  	if (!b) {
+>>  		dev_err(&pdev->xdev->dev,
+>>  			"Error creating PCI Frontend Bus!\n");
+>>  		err = -ENOMEM;
+>>  		pci_unlock_rescan_remove();
+>> +		pci_free_resource_list(&resources);
+>>  		goto err_out;
+>>  	}
+>>  
+>> @@ -488,7 +492,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+>>  
+>>  	list_add(&bus_entry->list, &pdev->root_buses);
+>>  
+>> -	/* pci_scan_bus_parented skips devices which do not have a have
+>> +	/* pci_scan_root_bus skips devices which do not have a have
+> 
+> Please fix the comment typo at the same time ("have a have").
+
+Ok.
+
+> 
+>>  	* devfn==0. The pcifront_scan_bus enumerates all devfn. */
+>>  	err = pcifront_scan_bus(pdev, domain, bus, b);
+>>  
+>> -- 
+>> 1.7.1
+>>
+> 
+> .
+> 
+
+
+-- 
+Thanks!
+Yijing
