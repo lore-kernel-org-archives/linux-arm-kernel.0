@@ -1,49 +1,58 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 04 Mar 2015 00:03:40 +0200
-Subject: Bug in i2c-core?
-In-Reply-To: <20150227165944.GA6679@dtor-ws>
-References: <54F0507F.6030804@armadeus.com> <20150227165944.GA6679@dtor-ws>
-Message-ID: <3574616.qzNqihiGp7@avalon>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Wed, 4 Mar 2015 00:09:40 +0200
+Subject: [PATCH 01/10] media: omap3isp: remove unused clkdev
+In-Reply-To: <8241179.DTounjB2Ur@avalon>
+References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
+ <20150302225336.GV6539@valkosipuli.retiisi.org.uk>
+ <20150302235435.GF29584@n2100.arm.linux.org.uk>
+ <8241179.DTounjB2Ur@avalon>
+Message-ID: <20150303220940.GX6539@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+Hi Laurent,
 
-On Friday 27 February 2015 08:59:44 Dmitry Torokhov wrote:
-> On Fri, Feb 27, 2015 at 12:09:51PM +0100, S?bastien SZYMANSKI wrote:
-> > Hi,
-> > 
-> > I am writing an I2C touchscreen driver for an i.MX6 based board. I
-> > compiled it as a module and when I unload it, I get the following warning:
-> > 
-> > # modprobe sx8654
-> > [   46.261494] input: SX8654 I2C Touchscreen as
-> > /devices/soc0/soc/2100000.aips-bus/21a0000.i2c/i2c-0/0-0048/input/input1
-> > # rmmod sx8654
-> > [   76.435223] ------------[ cut here ]------------
-> > [   76.439909] WARNING: CPU: 0 PID: 134 at fs/proc/generic.c:552
-> > remove_proc_entry+0x148/0x164()
-> > [   76.448582] remove_proc_entry: removing non-empty directory
-> > 'irq/208', leaking at least 'sx8654'
+On Tue, Mar 03, 2015 at 02:39:14AM +0200, Laurent Pinchart wrote:
+> Hi Russell,
 > 
-> ...
-> 
-> > When I revert commit e4df3a0 (i2c: core: Dispose OF IRQ mapping at
-> > client removal time) I don't get the warning.
+> On Monday 02 March 2015 23:54:35 Russell King - ARM Linux wrote:
+> > (Combining replies...)
 > > 
-> > Is this a bug in the i2c-core or am I doing something wrong in my driver?
+> > On Tue, Mar 03, 2015 at 12:53:37AM +0200, Sakari Ailus wrote:
+> > > Hi Laurent and Russell,
+> > > 
+> > > On Tue, Mar 03, 2015 at 12:33:44AM +0200, Laurent Pinchart wrote:
+> > > > Sakari, does it conflict with the omap3isp DT support ? If so, how would
+> > > > you prefer to resolve the conflict ? Russell, would it be fine to merge
+> > > > this through Mauro's tree ?
+> > 
+> > As other changes will depend on this, I'd prefer not to.  The whole
+> > "make clk_get() return a unique struct clk" wasn't well tested, and
+> > several places broke - and currently clk_add_alias() is broken as a
+> > result of that.
+> > 
+> > I'm trying to get to the longer term solution, where clkdev internally
+> > uses a struct clk_hw pointer rather than a struct clk pointer, and I
+> > want to clean stuff up first.
+> > 
+> > If omap3isp needs to keep this code, then so be it - I'll come up with
+> > a different patch improving its use of clkdev instead.
 > 
-> Yes, this commit breaks all drivers using devm* for IRQ management on
-> OF-based systemsi because devm* cleanup happens in device code, after
-> bus's remove() method returns. I'd recommend reverting and finding a
-> better way (making cleanup a custom devm action as well?).
+> I'm totally fine with removing clkdev from the omap3isp driver if that's 
+> easier for you, I'm just concerned about the merge conflict that will result.
 
-Ouch, my bad.
+There actually appears to be one more dependency, so four patches in total.
 
-Wolfram, any opinion ? The original patch fixes a real bug, so we shouldn't 
-just revert it.
+What we could also do is to rebase the omap3isp DT support set on top of
+Russell's single patch. This way there probably would be no merge conflict,
+assuming the patches are exactly the same, and you have no other patches
+changing the omap3isp driver.
+
+Alternatively we could postpone the DT support for the omap3isp, but I'd
+rather want to avoid that.
 
 -- 
-Regards,
+Kind regards,
 
-Laurent Pinchart
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
