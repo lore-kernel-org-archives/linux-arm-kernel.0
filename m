@@ -1,45 +1,70 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 3 Mar 2015 16:08:29 +0800
-Subject: [PATCH v4 12/30] PCI: Introduce pci_host_bridge_ops to support
- host specific operations
-In-Reply-To: <20150303025020.GF11978@google.com>
-References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
- <1424938344-4017-13-git-send-email-wangyijing@huawei.com>
- <20150303025020.GF11978@google.com>
-Message-ID: <54F56BFD.2060008@huawei.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 03 Mar 2015 09:10:15 +0100
+Subject: [PATCH v4 2/2] ARM: mvebu: a385-db-ap: Enable the NAND
+In-Reply-To: <1424255528-1717-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1424255528-1717-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1424255528-1717-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54F56C67.7070404@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +	if (host->ops && host->ops->phb_prepare) {
->> +		error = host->ops->phb_prepare(host);
->> +		if(error) {
-> 
-> Whitespace error.
+Hi Maxime,
 
-Will fix.
+On 18/02/2015 11:32, Maxime Ripard wrote:
+> The Armada 385 Access Point Development Board has a 1GB NAND SLC chip from
+> Micron as its main storage. Enable it.
 
-> 
->> --- a/include/linux/pci.h
->> +++ b/include/linux/pci.h
->> @@ -400,6 +400,13 @@ static inline int pci_channel_offline(struct pci_dev *pdev)
->>  	return (pdev->error_state != pci_channel_io_normal);
->>  }
->>  
->> +struct pci_host_bridge;
->> +struct pci_host_bridge_ops {
->> +	void (*phb_set_root_bus_speed)(struct pci_host_bridge *host);
->> +	int (*phb_prepare)(struct pci_host_bridge *host);
->> +	void (*phb_of_scan_bus)(struct pci_host_bridge *);
-> 
-> These function pointers don't need a "phb_" prefix.
+I wanted applying your patch but it failed. Actually it depends on your
+other patch "ARM: mvebu: armada-385-ap: Enable USB3 port" and this patch
+depend on an other patch "usb: xhci: plat: Add USB phy support" which
+hadn't been merged.
 
-Will update them.
+So either you send a new version which apply on 4.0-rc1, or we can wait for
+that "usb: xhci: plat: Add USB phy support" will be merged then I will be able
+applying "ARM: mvebu: armada-385-ap: Enable USB3 port" and finally this patch.
+As you want.
+
+
+Thanks,
+
+Gregory
+
 
 > 
-> .
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-385-db-ap.dts | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
+> index b891b4c897f5..ee648fb19075 100644
+> --- a/arch/arm/boot/dts/armada-385-db-ap.dts
+> +++ b/arch/arm/boot/dts/armada-385-db-ap.dts
+> @@ -130,6 +130,19 @@
+>  				phy-mode = "rgmii-id";
+>  			};
+>  
+> +			nfc: flash at d0000 {
+> +				status = "okay";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +
+> +				num-cs = <1>;
+> +				nand-ecc-strength = <4>;
+> +				nand-ecc-step-size = <512>;
+> +				marvell,nand-keep-config;
+> +				marvell,nand-enable-arbiter;
+> +				nand-on-flash-bbt;
+> +			};
+> +
+>  			usb3 at f0000 {
+>  				status = "okay";
+>  				usb-phy = <&usb3_phy>;
 > 
 
 
 -- 
-Thanks!
-Yijing
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
