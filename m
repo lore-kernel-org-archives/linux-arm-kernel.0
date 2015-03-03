@@ -1,58 +1,71 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 3 Mar 2015 18:32:28 +0000
-Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
- uncached guest mappings
-In-Reply-To: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150303183228.GR28951@e104818-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 3 Mar 2015 19:34:26 +0100
+Subject: [PATCH] dmaengine: at_xdmac: fix for chan conf simplification
+In-Reply-To: <54DCC7BF.6010001@atmel.com>
+References: <1423755030-14257-1-git-send-email-ludovic.desroches@atmel.com>
+ <54DCC7BF.6010001@atmel.com>
+Message-ID: <54F5FEB2.4040708@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 19, 2015 at 10:54:43AM +0000, Ard Biesheuvel wrote:
-> This is a 0th order approximation of how we could potentially force the guest
-> to avoid uncached mappings, at least from the moment the MMU is on. (Before
-> that, all of memory is implicitly classified as Device-nGnRnE)
+Le 12/02/2015 16:33, Nicolas Ferre a ?crit :
+> Le 12/02/2015 16:30, Ludovic Desroches a ?crit :
+>> When simplificating the channel configuration, the cyclic case has been
+>> forgotten. It leads to use bad configuration causing many bugs.
+>>
+>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> Oh, yes indeed, pretty important:
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-That's just for data accesses. IIRC instructions are cacheable on ARMv8
-(though I think without allocation in the unified caches).
+Vinod,
 
-> The idea (patch #2) is to trap writes to MAIR_EL1, and replace uncached mappings
-> with cached ones. This way, there is no need to mangle any guest page tables.
+Can we have this fix in 4.0 please?
 
-There is another big downside to this - breaking the guest assumptions
-about the (non-)cacheability of its mappings. It also only works for
-guests that use MAIR_EL1 (LPAE).
+Bye,
 
-We have two main cases where the guest and host cacheability do not
-match:
 
-1. During boot, as you said, when the MMU is off. What we have done in
-   the guest kernel is to invalidate the data ranges that it writes with
-   the MMU off in case there were any speculatively loaded cache lines
-   via the cacheable mappings (in the host). We don't have any nice
-   solution in the host here and MAIR_EL1 tweaking does not work
+>> ---
+>>  drivers/dma/at_xdmac.c | 7 +++----
+>>  1 file changed, 3 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+>> index 710546d..895b8bd 100644
+>> --- a/drivers/dma/at_xdmac.c
+>> +++ b/drivers/dma/at_xdmac.c
+>> @@ -664,7 +664,6 @@ at_xdmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
+>>  	struct at_xdmac_desc	*first = NULL, *prev = NULL;
+>>  	unsigned int		periods = buf_len / period_len;
+>>  	int			i;
+>> -	u32			cfg;
+>>  
+>>  	dev_dbg(chan2dev(chan), "%s: buf_addr=%pad, buf_len=%zd, period_len=%zd, dir=%s, flags=0x%lx\n",
+>>  		__func__, &buf_addr, buf_len, period_len,
+>> @@ -700,17 +699,17 @@ at_xdmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
+>>  		if (direction == DMA_DEV_TO_MEM) {
+>>  			desc->lld.mbr_sa = atchan->per_src_addr;
+>>  			desc->lld.mbr_da = buf_addr + i * period_len;
+>> -			cfg = atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG];
+>> +			desc->lld.mbr_cfg = atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG];
+>>  		} else {
+>>  			desc->lld.mbr_sa = buf_addr + i * period_len;
+>>  			desc->lld.mbr_da = atchan->per_dst_addr;
+>> -			cfg = atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG];
+>> +			desc->lld.mbr_cfg = atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG];
+>>  		}
+>>  		desc->lld.mbr_ubc = AT_XDMAC_MBR_UBC_NDV1
+>>  			| AT_XDMAC_MBR_UBC_NDEN
+>>  			| AT_XDMAC_MBR_UBC_NSEN
+>>  			| AT_XDMAC_MBR_UBC_NDE
+>> -			| period_len >> at_xdmac_get_dwidth(cfg);
+>> +			| period_len >> at_xdmac_get_dwidth(desc->lld.mbr_cfg);
+>>  
+>>  		dev_dbg(chan2dev(chan),
+>>  			 "%s: lld: mbr_sa=%pad, mbr_da=%pad, mbr_ubc=0x%08x\n",
+>>
+> 
+> 
 
-2. Guest explicitly creating a non-cacheable mapping (MMU enabled). Here
-   we have two sub-cases:
-   a) guest-only accesses to such mapping. The guest would need to
-      perform cache maintenance as required if it ever accesses such
-      memory via cacheable mappings (we do this already, see the
-      streaming DMA API)
-   b) memory shared with the host: e.g Qemu emulating DMA (frame buffer
-      etc.)
-
-This 2.b case is not any different than the OS dealing with a
-(non-)coherent DMA-capable device. If the device is coherent, the
-DMA buffer in the guest must be coherent as well, otherwise
-non-coherent. Imagine a real VGA device that always snoops CPU caches.
-You would not create a non-cacheable frame buffer mapping since the
-device cannot see the updates and only read stale cache entries.
-
-We don't (can't) have a safe set of DMA ops that would work in both
-cases. So if Qemu cannot use a non-cacheable mapping or cannot perform
-cache maintenance, the only solution is to tell the guest that such
-virtual device is cache _coherent_. This also gives you better
-performance overall anyway.
 
 -- 
-Catalin
+Nicolas Ferre
