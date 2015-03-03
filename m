@@ -1,43 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 3 Mar 2015 14:34:54 +0000
-Subject: [RFC PATCH] arm64: cmpxchg.h: Bring ldxr and stxr closer
-In-Reply-To: <CAJhHMCDUqvxs4rwsnw69UyM5NoBTit_HoYzdWpSYibbXtRs=5g@mail.gmail.com>
-References: <1425067776-2794-1-git-send-email-bobby.prani@gmail.com>
- <20150227201526.GH24818@arm.com>
- <CAJhHMCA0La6rQBndxJDnynAZ6AogEbKcCRQULZjjRTXBMzGuiA@mail.gmail.com>
- <CAJhHMCDUqvxs4rwsnw69UyM5NoBTit_HoYzdWpSYibbXtRs=5g@mail.gmail.com>
-Message-ID: <20150303143454.GN28951@e104818-lin.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue,  3 Mar 2015 15:40:58 +0100
+Subject: [PATCH v3 03/20] ARM: mvebu: add missing UART labels on Armada 38x
+In-Reply-To: <1425393675-17820-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1425393675-17820-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1425393675-17820-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 27, 2015 at 03:29:38PM -0500, Pranith Kumar wrote:
-> On Fri, Feb 27, 2015 at 3:17 PM, Pranith Kumar <bobby.prani@gmail.com> wrote:
-> > On Fri, Feb 27, 2015 at 3:15 PM, Will Deacon <will.deacon@arm.com> wrote:
-> >>> @@ -166,11 +166,11 @@ static inline int __cmpxchg_double(volatile void *ptr1, volatile void *ptr2,
-> >>>               VM_BUG_ON((unsigned long *)ptr2 - (unsigned long *)ptr1 != 1);
-> >>>               do {
-> >>>                       asm volatile("// __cmpxchg_double8\n"
-> >>> +                     "       mov     %w0, #0\n"
-> >>>                       "       ldxp    %0, %1, %2\n"
-> >>
-> >> Seriously, you might want to test this before you mindlessly make changes to
-> >> low-level synchronisation code. Not only is the change completely unnecessary
-> >> but it is actively harmful.
-> >>
-> >
-> > Oops, I apologize for this. I should have looked more closely. It is
-> > wrong to do this in cmpxchg_double(). What about the other cases?
-> 
-> I tried looking closely on what might be the problem here. I am
-> waiting on a HiKey arm64 board and I agree I should not send in
-> changes without running/testing them first.
-> 
-> Could you please explain (for educational purposes) why you think this
-> change is harmful?
+The Armada 38x had a label for UART0, but not UART1. This commit fixes
+that.
 
-Do you mean the cmpxchg_double() change? Becuase %w0 and %0 is the same
-physical register. You set it to 0 and immediately override it with
-ldxp.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-38x.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index c40d717..bb73cc3 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -216,7 +216,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			serial at 12100 {
++			uart1: serial at 12100 {
+ 				compatible = "snps,dw-apb-uart";
+ 				reg = <0x12100 0x100>;
+ 				reg-shift = <2>;
 -- 
-Catalin
+2.1.0
