@@ -1,130 +1,62 @@
-From: codekipper@gmail.com (Code Kipper)
-Date: Tue, 3 Mar 2015 21:22:32 +0100
-Subject: [PATCH] ARM: sun7i: dt: Add new MK808C device
-In-Reply-To: <20150303071342.GB4713@lukather>
-References: <1425131004-8551-1-git-send-email-codekipper@gmail.com>
- <20150303071342.GB4713@lukather>
-Message-ID: <CAEKpxB=-vtjMckh3ZHoy0mezE9U1EtKzmttdXRD5ZNztZvB_ag@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 3 Mar 2015 14:49:12 -0600
+Subject: [PATCH v1] of: calculate masks of the device based on dma-range
+ size
+In-Reply-To: <54F5F698.6000604@ti.com>
+References: <1423677215-28968-1-git-send-email-m-karicheri2@ti.com>
+ <20150226002033.GR6220@google.com> <54F5F698.6000604@ti.com>
+Message-ID: <20150303204912.GA22299@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the review Maxime,
+On Tue, Mar 03, 2015 at 12:59:52PM -0500, Murali Karicheri wrote:
+> On 02/25/2015 07:20 PM, Bjorn Helgaas wrote:
+> >[+cc Catalin]
+> >
+> >On Wed, Feb 11, 2015 at 12:53:35PM -0500, Murali Karicheri wrote:
+> >>This patch update of_dma_configure() API to calculate the
+> >>masks (dma_mask and coherent_dma_mask) based on the dma-range
+> >>values set in DT for the device. Also limit the mask to lower
+> >>of the default mask and mask calculated.
+> >>
+> >>Cc: Joerg Roedel<joro@8bytes.org>
+> >>Cc: Grant Likely<grant.likely@linaro.org>
+> >>Cc: Rob Herring<robh+dt@kernel.org>
+> >>Cc: Bjorn Helgaas<bhelgaas@google.com>
+> >>Cc: Will Deacon<will.deacon@arm.com>
+> >>Cc: Russell King<linux@arm.linux.org.uk>
+> >>Cc: Arnd Bergmann<arnd@arndb.de>
+> >>Cc: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>
+> >>
+> >>Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+> >
+> >Applied with Catalin's reviewed-by to pci/iommu for v4.1, thanks!
+> Bjorn,
+> 
+> Could you point me to this? I didn't see it on pci/iommu of your repo below.
+> 
+> arm-pci	git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git
+> (fetch)
+> 
+> a0868495 at ula0868495 ~/Project/linux-keystone $ gitlog arm-pci/pci/iommu
+> dd8a11b0f0d4ed0ad87c8d09e650f354021d7953 arm: dma-mapping: limit
+> IOMMU mapping size
+> 2a101e79dcd8733e3a353b0df2fa384980f94e1e PCI: Update DMA
+> configuration from DT
+> 3fd29d06e9aa92d9a4513e14b2dd3f0d69d4d2b7 of/pci: Add
+> of_pci_dma_configure() to update DMA configuration
+> 8243352097c468f982a9f386cb1f455672b473a2 PCI: Add helper functions
+> pci_get[put]_host_bridge_device()
+> 039f346ac880d4f894425ef6c540f3ff5c1b8dcf of: Fix size when dma-range
+> is not used
+> 2743a957f6a6317be06d02cc93d78bb2a847e427 of: Move of_dma_configure()
+> to device.c to help re-use
+> f454cd01b5bdffb1bf26a5cddac30439fa5f27a1 of: iommu: Add ptr to OF
+> node arg to of_iommu_configure()
+> c517d838eb7d07bbe9507871fab3931deccff539 Linux 4.0-rc1
 
-On 3 March 2015 at 08:13, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Sat, Feb 28, 2015 at 02:43:24PM +0100, codekipper at gmail.com wrote:
->> From: Marcus Cooper <codekipper@gmail.com>
->>
->> The MK808C is an A20 based android stick, with 1G RAM, 8G NAND flash,
->> a RTL8723au wifi + bt combo chip, a USB host ports using USB-A receptacles,
->> a mini USB-B receptacle for USB OTG, mini HDMI and a TRS connector for AV.
->>
->> This patch adds basic support for the device, more information can be found
->> here (http://linux-sunxi.org/MK808C).
->>
->> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
->> ---
->>  arch/arm/boot/dts/Makefile             |   1 +
->>  arch/arm/boot/dts/sun7i-a20-mk808c.dts | 146 +++++++++++++++++++++++++++++++++
->>  2 files changed, 147 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/sun7i-a20-mk808c.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 9544768..eae7706 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -542,6 +542,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
->>       sun7i-a20-hummingbird.dtb \
->>       sun7i-a20-i12-tvbox.dtb \
->>       sun7i-a20-m3.dtb \
->> +     sun7i-a20-mk808c.dtb \
->>       sun7i-a20-olinuxino-lime.dtb \
->>       sun7i-a20-olinuxino-lime2.dtb \
->>       sun7i-a20-olinuxino-micro.dtb \
->> diff --git a/arch/arm/boot/dts/sun7i-a20-mk808c.dts b/arch/arm/boot/dts/sun7i-a20-mk808c.dts
->> new file mode 100644
->> index 0000000..5722a03
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/sun7i-a20-mk808c.dts
->> @@ -0,0 +1,146 @@
->> +/*
->> + * Copyright 2015 Marcus Cooper
->> + *
->> + * Marcus Cooper <codekipper@gmail.com>
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This file is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + *     You should have received a copy of the GNU General Public
->> + *     License along with this file; if not, write to the Free
->> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
->> + *     MA 02110-1301 USA
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +
->> +/dts-v1/;
->> +#include "sun7i-a20.dtsi"
->> +#include "sunxi-common-regulators.dtsi"
->> +
->> +#include <dt-bindings/gpio/gpio.h>
->> +#include <dt-bindings/interrupt-controller/irq.h>
->> +#include <dt-bindings/pinctrl/sun4i-a10.h>
->
-> You don't seem to be using the pinctrl header.
->
-I'll remove this....
->> +
->> +/ {
->> +     model = "mk808c";
->> +     compatible = "mk808c", "allwinner,sun7i-a20";
->
-> the compatible must be of the format "vendor,device". Please add the
-> vendor name.
+I had applied it to my local branch, but not pushed it to kernel.org.
+I applied it along with the "get DMA configuration from parent device"
+series to pci/murali-v8 and pushed it for build testing.
 
-Ahhh....I've searched high and low for a vendors name. I listed it as
-unknown on the wiki page,
-would 'odm' be considered valid?
-CK
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+Bjorn
