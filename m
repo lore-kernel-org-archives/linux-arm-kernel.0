@@ -1,51 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 Mar 2015 10:23:06 +0100
-Subject: EDAC on arm64
-In-Reply-To: <20150302222502.GA13277@MBP.local>
-References: <54F11133.70909@redhat.com> <2937202.iu6lrkO1gm@wuerfel>
- <20150302222502.GA13277@MBP.local>
-Message-ID: <2550695.nbkPi0RDF3@wuerfel>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 03 Mar 2015 09:26:58 +0000
+Subject: [RFC PATCH 3/4] arm64: add support for memtest
+In-Reply-To: <20150302185607.GG7919@arm.com>
+References: <1425308145-20769-1-git-send-email-vladimir.murzin@arm.com>
+ <1425308145-20769-4-git-send-email-vladimir.murzin@arm.com>
+ <20150302185607.GG7919@arm.com>
+Message-ID: <54F57E62.6050206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 March 2015 22:25:16 Catalin Marinas wrote:
-> On Mon, Mar 02, 2015 at 08:40:16PM +0100, Arnd Bergmann wrote:
-> > On Monday 02 March 2015 14:58:41 Catalin Marinas wrote:
-> > > On Mon, Mar 02, 2015 at 10:59:32AM +0000, Will Deacon wrote:
-> > > > On Sat, Feb 28, 2015 at 12:52:03AM +0000, Jon Masters wrote:
-> > > > > Have you considered reviving the patch you posted previously for EDAC
-> > > > > support (the atomic_scrub read/write test piece dependency)?
-> > > > > 
-> > > > > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249039.html
-> > > > 
-> > > > Well, we'd need a way to handle the non-coherent DMA case and it's really
-> > > > not clear how to fix that.
-> > > 
-> > > I agree, that's where the discussions stopped. Basically the EDAC memory
-> > > writing is racy with any non-cacheable memory accesses (by CPU or
-> > > device). The only way we could safely use this is only if all the
-> > > devices are coherent *and* KVM is disabled. With KVM, guests may access
-> > > the memory uncached, so we hit the same problem.
-> > 
-> > Is this a setting of the host, or does the guest always have this capability?
+On 02/03/15 18:56, Will Deacon wrote:
+> On Mon, Mar 02, 2015 at 02:55:44PM +0000, Vladimir Murzin wrote:
+>> Add support for memtest command line option.
+>>
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>> ---
+>>  arch/arm64/mm/init.c |    2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+>> index ae85da6..597831b 100644
+>> --- a/arch/arm64/mm/init.c
+>> +++ b/arch/arm64/mm/init.c
+>> @@ -190,6 +190,8 @@ void __init bootmem_init(void)
+>>  	min = PFN_UP(memblock_start_of_DRAM());
+>>  	max = PFN_DOWN(memblock_end_of_DRAM());
+>>  
+>> +	early_memtest(min << PAGE_SHIFT, max << PAGE_SHIFT);
+>> +
+>>  	/*
+>>  	 * Sparsemem tries to allocate bootmem in memory_present(), so must be
+>>  	 * done after the fixed reservations.
 > 
-> The guest can always make it stricter than what the host set in stage 2
-> (i.e. from Normal Cacheable -> NonCacheable -> Device) but never in the
-> other direction.
-
-Do you have an idea what the purpose of this is? Why would a guest
-even want to mark pages as noncachable that are mapped into the
-host as cachable and that might have dirty cache lines?
-
-> > If a guest can influence the caching of a page it has access to, I can
-> > imagine all sorts of security problems with malicious guests regardless
-> > of EDAC.
+> This is really neat, thanks for doing this Vladimir!
 > 
-> Not as long as the host is aware of this. Basically it needs to flush
-> the cache on a page when it is mapped into the guest address space (IPA)
-> and flush it again when reading a page from guest.
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> For the series, modulo Baruch's comments about Documentation updates.
+> 
+> Will
+> 
 
-You have to flush and invalidate the cache line, but of course nobody
-wants to do that because it totally destroys performance.
+Thanks Will! I'll wait for awhile for other comments and repost updated
+version.
 
-	Arnd
+I wonder which tree it might go?
+
+Thanks
+Vladimir
+
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+> 
+> 
