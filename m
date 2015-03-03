@@ -1,51 +1,30 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Tue, 3 Mar 2015 20:48:54 +0530
-Subject: [PATCH 3/3] mailbox: Add support for ST's Mailbox IP
-In-Reply-To: <3926609.Ff6LCkuuMX@wuerfel>
-References: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
- <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
- <3926609.Ff6LCkuuMX@wuerfel>
-Message-ID: <CAJe_ZhdjPa3C_TUDAPA3fS3K83FGB-GaAjVBjtsow2mp5h8NRw@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 3 Mar 2015 20:49:25 +0530
+Subject: [PATCH 1/2] cpufreq-dt: support cluster level clock
+In-Reply-To: <20150303140331.GA11325@leoy-linaro>
+References: <1425387817-11382-1-git-send-email-leo.yan@linaro.org>
+ <1425387817-11382-2-git-send-email-leo.yan@linaro.org>
+ <CAKohpoksXwMRWYzSBmbV1nN5_LvUiB1Y2wfgOcCJPx+oipaXZw@mail.gmail.com>
+ <20150303140331.GA11325@leoy-linaro>
+Message-ID: <CAKohponQ1keZ3x9mK=9qchfwPF=cYKAA9aYgmu52X5NDGJLECg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 March 2015 at 17:04, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 03 March 2015 10:41:23 Lee Jones wrote:
->> +
->> +/*
->> + * struct sti_mbox_msg - sti mailbox message description
->> + * @dsize:             data payload size
->> + * @pdata:             message data payload
->> + */
->> +struct sti_mbox_msg {
->> +       u32             dsize;
->> +       u8              *pdata;
->> +};
->
-> As mentioned in another thread, we may just want to add a 'size'
-> argument to the message send function, and a default helper for
-> messages with size of 32 bits.
->
-Case-a) 'size' is a member of the payload structure itself
-    The extra 'size' argument would only be used for sanity check.
-    This driver seems so. Lee, can you not do without 'dsize'?
+On 3 March 2015 at 19:33, Leo Yan <leo.yan@linaro.org> wrote:
+> I'm just thinking to finish things in one time. From my previous
+> experience, clocks per cluster are common cases for ARM's
+> multi-clusters, so i think it's reasonable to add related support.
 
-Case-b) 'size' is not a member of payload structure:
-     b1)  payload is fixed length, that is 'size' := sizeof(struct my_payload)
-            Here the size argument is redundant.
+Yes they are common, but that will be fixed with new OPP bindings
+I am working on [1].
 
-     b2)  payload length varies
-            This case is highly unlikely because there would be no way
-for remote to know how many bytes to read as the payload. Not to mean
-we can't do without the 'size' argument.
+> Regarding of testing this patch, i created two virtual clocks for
+> every cluster and passed the test. Do u think this is acceptable?
 
-Your opinion has huge weight, but I would like to be enlightened
-before agreeing.
+Just to confirm again, we aren't going to accept or apply these
+patches. It will work without any changes for you, for now.
 
-> I don't think it's good to fragment this further by adding
-> an indirect message interface in a particular driver.
->
-For example, I am reading this again and again without getting it.
+--
+viresh
 
-Thanks
-Jassi
+[1] https://www.marc.info/?l=linaro-kernel&m=142364262800650&w=3
