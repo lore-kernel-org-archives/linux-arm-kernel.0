@@ -1,29 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 3 Mar 2015 14:03:03 +0100
-Subject: [PATCH] ARM: dts: sun6i: hummingbird: Enable IR receiver
-In-Reply-To: <1425354721-3321-1-git-send-email-wens@csie.org>
-References: <1425354721-3321-1-git-send-email-wens@csie.org>
-Message-ID: <20150303130303.GG4911@lukather>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 3 Mar 2015 14:05:09 +0100
+Subject: [PATCH v2] iommu/io-pgtable-arm: Add built time dependency
+In-Reply-To: <20150223100521.45108573@endymion.delvare>
+References: <20150223100521.45108573@endymion.delvare>
+Message-ID: <20150303130509.GA10502@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 11:52:01AM +0800, Chen-Yu Tsai wrote:
-> The A31 Hummingbird has an IR receiver.
+On Mon, Feb 23, 2015 at 10:05:21AM +0100, Jean Delvare wrote:
+> If io-pgtable-arm is an ARM-specific driver then configuration option
+> IOMMU_IO_PGTABLE_LPAE should not be presented to the user by default
+> for non-ARM kernels.
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Jean Delvare <jdelvare@suse.de>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> ---
+> Changes since v1:
+>  * Added ARM64 as suggested by Will Deacon.
+> 
+>  drivers/iommu/Kconfig |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> --- linux-4.0-rc1.orig/drivers/iommu/Kconfig	2015-02-20 17:24:46.838955014 +0100
+> +++ linux-4.0-rc1/drivers/iommu/Kconfig	2015-02-23 10:03:06.487667832 +0100
+> @@ -23,6 +23,7 @@ config IOMMU_IO_PGTABLE
+>  config IOMMU_IO_PGTABLE_LPAE
+>  	bool "ARMv7/v8 Long Descriptor Format"
+>  	select IOMMU_IO_PGTABLE
+> +	depends on ARM || ARM64 || COMPILE_TEST
+>  	help
+>  	  Enable support for the ARM long descriptor pagetable format.
+>  	  This allocator supports 4K/2M/1G, 16K/32M and 64K/512M page
 
-Applied, thanks
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150303/33b93c4e/attachment.sig>
+Applied, thanks.
