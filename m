@@ -1,122 +1,62 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 3 Mar 2015 19:42:26 +0100
-Subject: [PATCH 2/3] pm: at91: pm_slowclock: remove clocks which are
- already stopped when entering slow clock mode
-In-Reply-To: <1423116083-5986-1-git-send-email-wenyou.yang@atmel.com>
-References: <1423115977-5852-1-git-send-email-wenyou.yang@atmel.com>
- <1423116083-5986-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <54F60092.5070902@atmel.com>
+Date: Tue, 3 Mar 2015 19:50:17 +0100
+Subject: [PATCH] ARM: dts: at91sam9260: fix usart pinctrl
+In-Reply-To: <20150131111519.GI4164@piout.net>
+References: <54CB6A16.4070601@microbit.se> <20150131111519.GI4164@piout.net>
+Message-ID: <54F60269.5030207@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/02/2015 07:01, Wenyou Yang a ?crit :
-> From: Sylvain Rochet <sylvain.rochet@finsecur.com>
+Le 31/01/2015 12:15, Alexandre Belloni a ?crit :
+> (Added the maintainers in Cc)
 > 
-> Assume USB PLL and PLL B are already stopped before entering sleep mode,
-> print a warning if this isn't the case.
+> On 30/01/2015 at 12:25:10 +0100, Jonas Andersson wrote :
+>>
+>> Corrected pins used by usart3.
+>>
+>> Signed-off-by: Jonas Andersson <jonas@microbit.se>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+and stacked on top of at91-4.0-fixes: thanks!
+
 > 
-> Removed PLL B from slow clock code, all drivers are supposed to properly
-> unprepare clocks.
-> 
-> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-> Acked-by: Wenyou.Yang <wenyou.yang@atmel.com>
-
-I keep this one for 4.1 as all the USB drivers are not converted yet.
-
-Bye,
-
-
-> ---
->  arch/arm/mach-at91/pm.c           |   12 ++++++++++++
->  arch/arm/mach-at91/pm_slowclock.S |   31 -------------------------------
->  2 files changed, 12 insertions(+), 31 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-> index 9b15169..1cfd6e9 100644
-> --- a/arch/arm/mach-at91/pm.c
-> +++ b/arch/arm/mach-at91/pm.c
-> @@ -98,6 +98,18 @@ static int at91_pm_verify_clocks(void)
->  		}
->  	}
->  
-> +	/* Drivers should have previously suspended USB PLL */
-> +	if (at91_pmc_read(AT91_CKGR_UCKR) & AT91_PMC_UPLLEN) {
-> +		pr_err("AT91: PM - Suspend-to-RAM with USB PLL running\n");
-> +		return 0;
-> +	}
-> +
-> +	/* Drivers should have previously suspended PLL B */
-> +	if (at91_pmc_read(AT91_PMC_SR) & AT91_PMC_LOCKB) {
-> +		pr_err("AT91: PM - Suspend-to-RAM with PLL B running\n");
-> +		return 0;
-> +	}
-> +
->  	return 1;
->  }
->  
-> diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-> index 79dfdbe..75d8b19 100644
-> --- a/arch/arm/mach-at91/pm_slowclock.S
-> +++ b/arch/arm/mach-at91/pm_slowclock.S
-> @@ -68,15 +68,6 @@ tmp2	.req	r5
->  	beq	1b
->  	.endm
->  
-> -/*
-> - * Wait until PLLB has locked.
-> - */
-> -	.macro wait_pllblock
-> -1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
-> -	tst	tmp1, #AT91_PMC_LOCKB
-> -	beq	1b
-> -	.endm
-> -
->  	.text
->  
->  /* void at91_slow_clock(void __iomem *pmc, void __iomem *sdramc,
-> @@ -182,13 +173,6 @@ sdr_sr_done:
->  	orr	tmp1, tmp1, #(1 << 29)		/* bit 29 always set */
->  	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
->  
-> -	/* Save PLLB setting and disable it */
-> -	ldr	tmp1, [pmc, #AT91_CKGR_PLLBR]
-> -	str	tmp1, .saved_pllbr
-> -
-> -	mov	tmp1, #AT91_PMC_PLLCOUNT
-> -	str	tmp1, [pmc, #AT91_CKGR_PLLBR]
-> -
->  	/* Turn off the main oscillator */
->  	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
->  	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
-> @@ -204,18 +188,6 @@ sdr_sr_done:
->  
->  	wait_moscrdy
->  
-> -	/* Restore PLLB setting */
-> -	ldr	tmp1, .saved_pllbr
-> -	str	tmp1, [pmc, #AT91_CKGR_PLLBR]
-> -
-> -	tst	tmp1, #(AT91_PMC_MUL &  0xff0000)
-> -	bne	1f
-> -	tst	tmp1, #(AT91_PMC_MUL & ~0xff0000)
-> -	beq	2f
-> -1:
-> -	wait_pllblock
-> -2:
-> -
->  	/* Restore PLLA setting */
->  	ldr	tmp1, .saved_pllar
->  	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
-> @@ -294,9 +266,6 @@ ram_restored:
->  .saved_pllar:
->  	.word 0
->  
-> -.saved_pllbr:
-> -	.word 0
-> -
->  .saved_sam9_lpr:
->  	.word 0
->  
+>> ---
+>>  arch/arm/boot/dts/at91sam9260.dtsi | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi
+>> b/arch/arm/boot/dts/at91sam9260.dtsi
+>> index dd1313c..16ccfd9 100644
+>> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+>> @@ -489,12 +489,12 @@
+>>
+>>                      pinctrl_usart3_rts: usart3_rts-0 {
+>>                          atmel,pins =
+>> -                            <AT91_PIOB 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> /* PC8 periph B */
+>> +                            <AT91_PIOC 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> /* PC8 periph B */
+>>                      };
+>>
+>>                      pinctrl_usart3_cts: usart3_cts-0 {
+>>                          atmel,pins =
+>> -                            <AT91_PIOB 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> /* PC10 periph B */
+>> +                            <AT91_PIOC 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> /* PC10 periph B */
+>>                      };
+>>                  };
+>>
+>> -- 
+>> 1.9.3
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
 
 
