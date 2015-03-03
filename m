@@ -1,82 +1,82 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 03 Mar 2015 12:12:51 +0100
-Subject: [PATCH] cpuidle: mvebu: Fix the CPU PM notifier usage
-In-Reply-To: <54F59285.5060306@libero.it>
-References: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
- <4892716.Bf612zPN6E@vostro.rjw.lan> <54F03B51.1010708@free-electrons.com>
- <54F58D2F.2010907@linaro.org> <54F58E3B.9040302@free-electrons.com>
- <54F59285.5060306@libero.it>
-Message-ID: <54F59733.8020409@linaro.org>
+Date: Tue, 03 Mar 2015 12:28:38 +0100
+Subject: [PATCH] clocksource: arm_arch_timer: Rename arch_timer_probed
+ to reflect behaviour
+In-Reply-To: <1634669.Cj7rnHN4gq@avalon>
+References: <1421488012-5098-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <54C56582.6080809@linaro.org> <1634669.Cj7rnHN4gq@avalon>
+Message-ID: <54F59AE6.6010303@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2015 11:52 AM, Fulvio wrote:
-> Gregory CLEMENT wrote:
->> Hi Rafael,
->>
->>
->>
->> On 03/03/2015 11:30, Daniel Lezcano wrote:
->>> On 02/27/2015 10:39 AM, Gregory CLEMENT wrote:
->>>> Hi Rafael,
->>>>
->>>> On 26/02/2015 22:55, Rafael J. Wysocki wrote:
->>>>> On Thursday, February 26, 2015 06:20:48 PM Gregory CLEMENT wrote:
->>>>>> As stated in kernel/cpu_pm.c, "Platform is responsible for ensuring
->>>>>> that cpu_pm_enter is not called twice on the same CPU before
->>>>>> cpu_pm_exit is called.". In the current code in case of failure when
->>>>>> calling mvebu_v7_cpu_suspend, the function cpu_pm_exit() is never
->>>>>> called whereas cpu_pm_enter() was called just before.
->>>>>>
->>>>>> This patch moves the cpu_pm_exit() in order to balance the
->>>>>> cpu_pm_enter() calls.
->>>>>>
->>>>>> Reported-by: Fulvio Benini <fbf@libero.it>
->>>>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>>>> Should that go to "stable" too?  Which "stable" series it should go
->>>>> to if so?
->>>> Yes as it fixes a potential issue, you're right it should go
->>>> to "stable". The bug was here since the introduction of the driver
->>>> in 3.16.
->>> Hi Gregory,
->>>
->>> actually the 'stable' rules state clearly:
->>>
->>> "- It must fix a real bug that bothers people (not a, "This could be
->>> a problem..." type thing)."
->>>
->>> You say "it fixes a potential issue", so no bug has been raise yet,
->>> right ?
->>
->> Indeed nobody claimed yet having a bug related to this issue.
->>
->> Gregory
->>
-> I reported the issue, but i cannot say if it's a real bug.
-> I had random kernel panics with a Netgear ReadyNAS RN102 (armada 370 cpu):
-> http://www.readynas.com/forum/viewtopic.php?f=20&t=78697&sid=14747617286d55ac27296cdee7a3f420&start=210#p452214
+On 03/01/2015 02:00 PM, Laurent Pinchart wrote:
+> Hello,
 >
+> On Sunday 25 January 2015 22:52:02 Daniel Lezcano wrote:
+>> On 01/17/2015 10:46 AM, Laurent Pinchart wrote:
+>>> The arch_timer_probed function returns whether the given time doesn't
+>>> need to be probed. This can be the case when the timer has been probed
+>>> already, but also when it has no corresponding enabled node in DT.
+>>>
+>>> Rename the function to arch_timer_need_probe and invert its return value
+>>> to better reflect the function's purpose and behaviour.
+>>>
+>>> Signed-off-by: Laurent Pinchart
+>>> <laurent.pinchart+renesas@ideasonboard.com>
+>>
+>> I would like to have an ack from Sudeep or Mark (Cc'ed) before taking
+>> this patch.
 >
-> All i can say is that the system use the "armadaxp_idle" driver and
-> works fine when running "stress --cpu 8" in background.
+> Sudeep, Mark, ping ?
 
-Hi Fulvio,
+Last call :)
 
-so IIUC, you suggest the stress test prevent the system to use cpuidle 
-because of the busy cycles, right ?
-
-Is it possible to have the kernel panic stack ?
-
-Are you able to reproduce the kernel panic ? and test a new kernel ?
-
-Thanks
-
-   -- Daniel
-
-> I asked Netgear to provide a firmware without the idle driver to confirm
-> if it's the cause of the problem, but they did not answered.
-> Bye,
-> Fulvio
+>>> ---
+>>>
+>>>    drivers/clocksource/arm_arch_timer.c | 13 +++++++------
+>>>    1 file changed, 7 insertions(+), 6 deletions(-)
+>>>
+>>> diff --git a/drivers/clocksource/arm_arch_timer.c
+>>> b/drivers/clocksource/arm_arch_timer.c index 095c1774592c..3cbdd563a967
+>>> 100644
+>>> --- a/drivers/clocksource/arm_arch_timer.c
+>>> +++ b/drivers/clocksource/arm_arch_timer.c
+>>> @@ -660,17 +660,17 @@ static const struct of_device_id
+>>> arch_timer_mem_of_match[] __initconst = {
+>>>   };
+>>>   static bool __init
+>>> -arch_timer_probed(int type, const struct of_device_id *matches)
+>>> +arch_timer_need_probe(int type, const struct of_device_id *matches)
+>>>   {
+>>>    	struct device_node *dn;
+>>> -	bool probed = true;
+>>> +	bool need_probe = false;
+>>>
+>>>    	dn = of_find_matching_node(NULL, matches);
+>>>    	if (dn && of_device_is_available(dn) && !(arch_timers_present &
+>>>    	type))
+>>> -		probed = false;
+>>> +		need_probe = true;
+>>>
+>>>    	of_node_put(dn);
+>>>
+>>> -	return probed;
+>>> +	return need_probe;
+>>>    }
+>>>
+>>>    static void __init arch_timer_common_init(void)
+>>> @@ -679,9 +679,10 @@ static void __init arch_timer_common_init(void)
+>>>    	/* Wait until both nodes are probed if we have two timers */
+>>>    	if ((arch_timers_present & mask) != mask) {
+>>> -		if (!arch_timer_probed(ARCH_MEM_TIMER, arch_timer_mem_of_match))
+>>> +		if (arch_timer_need_probe(ARCH_MEM_TIMER,
+>>> +					  arch_timer_mem_of_match))
+>>>    			return;
+>>> -		if (!arch_timer_probed(ARCH_CP15_TIMER, arch_timer_of_match))
+>>> +		if (arch_timer_need_probe(ARCH_CP15_TIMER, arch_timer_of_match))
+>>>    			return;
+>>>    	}
+>
 
 
 -- 
