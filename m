@@ -1,16 +1,17 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 3 Mar 2015 10:24:11 +0800
-Subject: [PATCH] ARM: imx/iomux-v3: allow pad_list to be const
-In-Reply-To: <1424531301-7075-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1424531301-7075-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20150303022409.GC20455@dragon>
+Date: Tue, 3 Mar 2015 10:25:43 +0800
+Subject: [PATCH] ARM: dts: imx6qdl, Add label snvs_rtc
+In-Reply-To: <1424448249-30718-1-git-send-email-mpa@pengutronix.de>
+References: <1424448249-30718-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20150303022541.GD20455@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 21, 2015 at 04:08:21PM +0100, Uwe Kleine-K?nig wrote:
-> Also fix all machine files to make use of it and while at it also make
-> the pad lists __initconst.
+On Fri, Feb 20, 2015 at 05:04:09PM +0100, Markus Pargmann wrote:
+> It may be useful to disable the internal rtc snvs-rtc because an
+> external rtc is available. This patch adds a label so that board files
+> can disable this rtc.
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
 Applied, thanks.
