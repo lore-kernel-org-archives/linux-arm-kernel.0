@@ -1,54 +1,96 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  3 Mar 2015 10:21:57 +0800
-Subject: [PATCH 0/3] ARM: sun9i: Add support for PRCM on Allwinner A80 SoC
-Message-ID: <1425349320-2754-1-git-send-email-wens@csie.org>
+Date: Tue,  3 Mar 2015 10:22:00 +0800
+Subject: [PATCH 3/3] ARM: dts: sun9i: Add A80 PRCM clocks and reset control
+ nodes
+In-Reply-To: <1425349320-2754-1-git-send-email-wens@csie.org>
+References: <1425349320-2754-1-git-send-email-wens@csie.org>
+Message-ID: <1425349320-2754-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+This adds the PRCM clocks and reset controls to the A80 dtsi.
 
-Some time ago I sent out an RFC series, which was not merged due
-to lack of matching documentation for the SoC. A few weeks back I
-sent out a request for the documents again. I have not received a
-response. So I'm sending out the series now.
+The list of apbs clock gates is incomplete. Tests show that bits 0~20
+are mutable. We will need documents from Allwinner to complete the
+support.
 
-This series adds support for the Power Reset and Clock Management
-module on Allwinner's A80 SoC. The PRCM manages clocks and resets
-for the "special" block of peripherals, or the R/RTC block in
-earlier SoCs. These peripherals include a standby processor core,
-a timer block, a watchdog, pin controller, 1 wire interface, PS/2
-interface, a UART, the RSB controller, a DMA controller, a consumer
-IR receiver block, 2 I2C controllers, and 2 I2S controllers. We do
-not have documents for all the peripherals. Support will be added
-where possible.
+Also update clock and reset phandles for r_uart.
 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun9i-a80.dtsi | 54 +++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 53 insertions(+), 1 deletion(-)
 
-Patch 1 adds support for the apbs (apb0 in earlier SoCs) gates.
-
-Patch 2 adds sun9i-a80 support to the PRCM mfd driver
-
-Patch 3 adds the clock and reset nodes for the PRCM to the A80 DTSI.
-
-
-To Allwinner people:
-If you have any related documents or comments, please send them out.
-
-
-Regards,
-ChenYu
-
-
-Chen-Yu Tsai (3):
-  clk: sunxi: sun6i-apb0: Add support for sun9i A80 apbs gates
-  mfd: sun6i-prcm: Add support for PRCM found on Allwinner A80 SoC
-  ARM: dts: sun9i: Add A80 PRCM clocks and reset control nodes
-
- Documentation/devicetree/bindings/clock/sunxi.txt  |  1 +
- .../devicetree/bindings/mfd/sun6i-prcm.txt         |  3 +-
- arch/arm/boot/dts/sun9i-a80.dtsi                   | 54 +++++++++++++++++++-
- drivers/clk/sunxi/clk-sun6i-apb0-gates.c           |  6 +++
- drivers/mfd/sun6i-prcm.c                           | 58 ++++++++++++++++++++++
- 5 files changed, 120 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index 2f7f82cc86ba..8db78d87bdb9 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -733,13 +733,65 @@
+ 			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
++		prcm at 08001400 {
++			compatible = "allwinner,sun9i-a80-prcm";
++			reg = <0x08001400 0x200>;
++
++			cpus_clk: cpus_clk {
++				compatible = "allwinner,sun6i-a31-ar100-clk";
++				#clock-cells = <0>;
++				clocks = <&osc32k>, <&osc24M>, <&pll4>;
++				clock-output-names = "cpus";
++			};
++
++			ahbs: ahbs_clk {
++				compatible = "fixed-factor-clock";
++				#clock-cells = <0>;
++				clock-div = <1>;
++				clock-mult = <1>;
++				clocks = <&cpus_clk>;
++				clock-output-names = "ahbs";
++			};
++
++			apbs: apbs_clk {
++				compatible = "allwinner,sun8i-a23-apb0-clk";
++				#clock-cells = <0>;
++				clocks = <&ahbs>;
++				clock-output-names = "apbs";
++			};
++
++			apbs_gates: apbs_gates_clk {
++				compatible = "allwinner,sun9i-a80-apbs-gates-clk";
++				#clock-cells = <1>;
++				clocks = <&apbs>;
++				clock-output-names = "apbs_pio", "apbs_ir",
++						"apbs_timer", "apbs_rsb",
++						"apbs_uart", "apbs_1wire",
++						"apbs_i2c", "apbs_i2s0",
++						"apbs_i2s1";
++			};
++
++			r_ir_clk: r_ir_clk {
++				#clock-cells = <0>;
++				compatible = "allwinner,sun4i-a10-mod0-clk";
++				clocks = <&osc32k>, <&osc24M>;
++				clock-output-names = "r_ir";
++			};
++
++			apbs_rst: apbs_rst {
++				compatible = "allwinner,sun6i-a31-clock-reset";
++				#reset-cells = <1>;
++			};
++		};
++
+ 		r_uart: serial at 08002800 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x08002800 0x400>;
+ 			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc24M>;
++			clocks = <&apbs_gates 4>;
++			resets = <&apbs_rst 4>;
+ 			status = "disabled";
+ 		};
+ 	};
 -- 
 2.1.4
