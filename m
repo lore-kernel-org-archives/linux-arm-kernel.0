@@ -1,237 +1,128 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Tue, 03 Mar 2015 09:59:55 -0800
-Subject: [RFC/RFT PATCH 1/3] arm64: KVM: handle some sysreg writes in EL2
-In-Reply-To: <1424343286-6792-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
- <1424343286-6792-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <54F5F69B.10200@samsung.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 3 Mar 2015 12:59:52 -0500
+Subject: [PATCH v1] of: calculate masks of the device based on dma-range
+ size
+In-Reply-To: <20150226002033.GR6220@google.com>
+References: <1423677215-28968-1-git-send-email-m-karicheri2@ti.com>
+ <20150226002033.GR6220@google.com>
+Message-ID: <54F5F698.6000604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
-  couple side effects would be guest address translation may
-return attributes in PAR register it wound not expect.
-Likewise for read of MAIR registers.
+On 02/25/2015 07:20 PM, Bjorn Helgaas wrote:
+> [+cc Catalin]
+>
+> On Wed, Feb 11, 2015 at 12:53:35PM -0500, Murali Karicheri wrote:
+>> This patch update of_dma_configure() API to calculate the
+>> masks (dma_mask and coherent_dma_mask) based on the dma-range
+>> values set in DT for the device. Also limit the mask to lower
+>> of the default mask and mask calculated.
+>>
+>> Cc: Joerg Roedel<joro@8bytes.org>
+>> Cc: Grant Likely<grant.likely@linaro.org>
+>> Cc: Rob Herring<robh+dt@kernel.org>
+>> Cc: Bjorn Helgaas<bhelgaas@google.com>
+>> Cc: Will Deacon<will.deacon@arm.com>
+>> Cc: Russell King<linux@arm.linux.org.uk>
+>> Cc: Arnd Bergmann<arnd@arndb.de>
+>> Cc: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>
+>>
+>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+>
+> Applied with Catalin's reviewed-by to pci/iommu for v4.1, thanks!
+Bjorn,
 
-- Mario
+Could you point me to this? I didn't see it on pci/iommu of your repo below.
 
-On 02/19/2015 02:54 AM, Ard Biesheuvel wrote:
-> This adds handling to el1_trap() to perform some sysreg writes directly
-> in EL2, without performing the full world switch to the host and back
-> again. This is mainly for doing writes that don't need special handling,
-> but where the register is part of the group that we need to trap for
-> other reasons.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kvm/hyp.S      | 101 ++++++++++++++++++++++++++++++++++++++++++++++
->  arch/arm64/kvm/sys_regs.c |  28 ++++++++-----
->  2 files changed, 120 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index c3ca89c27c6b..e3af6840cb3f 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -26,6 +26,7 @@
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_mmu.h>
-> +#include <asm/sysreg.h>
->  
->  #define CPU_GP_REG_OFFSET(x)	(CPU_GP_REGS + x)
->  #define CPU_XREG_OFFSET(x)	CPU_GP_REG_OFFSET(CPU_USER_PT_REGS + 8*x)
-> @@ -887,6 +888,34 @@
->  1:
->  .endm
->  
-> +/*
-> + * Macro to conditionally perform a parametrised system register write. Note
-> + * that we currently only support writing x3 to a system register in class
-> + * Op0 == 3 and Op1 == 0, which is all we need at the moment.
-> + */
-> +.macro	cond_sysreg_write,op0,op1,crn,crm,op2,sreg,opreg,outlbl
-> +	.ifnc	\op0,3    ; .err ; .endif
-> +	.ifnc	\op1,0    ; .err ; .endif
-> +	.ifnc	\opreg,x3 ; .err ; .endif
-> +	cmp	\sreg, #((\crm) | ((\crn) << 4) | ((\op2) << 8))
-> +	bne	9999f
-> +	// doesn't work: msr_s sys_reg(\op0,\op1,\crn,\crm,\op2), \opreg
-> +	.inst	0xd5180003|((\crn) << 12)|((\crm) << 8)|((\op2 << 5))
-> +	b	\outlbl
-> +9999:
-> +.endm
-> +
-> +/*
-> + * Pack CRn, CRm and Op2 into 11 adjacent low bits so we can use a single
-> + * cmp instruction to compare it with a 12-bit immediate.
-> + */
-> +.macro	pack_sysreg_idx, outreg, inreg
-> +	ubfm	\outreg, \inreg, #(17 - 8), #(17 + 2)	// Op2 -> bits 8 - 10
-> +	bfm	\outreg, \inreg, #(10 - 4), #(10 + 3)	// CRn -> bits 4 - 7
-> +	bfm	\outreg, \inreg, #(1 - 0), #(1 + 3)	// CRm -> bits 0 - 3
-> +.endm
-> +
-> +
->  __save_sysregs:
->  	save_sysregs
->  	ret
-> @@ -1178,6 +1207,15 @@ el1_trap:
->  	 * x1: ESR
->  	 * x2: ESR_EC
->  	 */
-> +
+arm-pci	git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git 
+(fetch)
+
+a0868495 at ula0868495 ~/Project/linux-keystone $ gitlog arm-pci/pci/iommu
+dd8a11b0f0d4ed0ad87c8d09e650f354021d7953 arm: dma-mapping: limit IOMMU 
+mapping size
+2a101e79dcd8733e3a353b0df2fa384980f94e1e PCI: Update DMA configuration 
+from DT
+3fd29d06e9aa92d9a4513e14b2dd3f0d69d4d2b7 of/pci: Add 
+of_pci_dma_configure() to update DMA configuration
+8243352097c468f982a9f386cb1f455672b473a2 PCI: Add helper functions 
+pci_get[put]_host_bridge_device()
+039f346ac880d4f894425ef6c540f3ff5c1b8dcf of: Fix size when dma-range is 
+not used
+2743a957f6a6317be06d02cc93d78bb2a847e427 of: Move of_dma_configure() to 
+device.c to help re-use
+f454cd01b5bdffb1bf26a5cddac30439fa5f27a1 of: iommu: Add ptr to OF node 
+arg to of_iommu_configure()
+c517d838eb7d07bbe9507871fab3931deccff539 Linux 4.0-rc1
+
+Murali
+
+>
+> I agree with Catalin's comment about the "size = 1ULL<<  32" line.
+> I don't see how that will make a difference, so I dropped it.  The
+> patch I merged is below.  Let me know if you think we do need that
+> line or any other tweaks.
+>
+> Bjorn
+>
+> commit a5a1dd69080dfcf53bfd6e179f3db68e824aeaae
+> Author: Murali Karicheri<m-karicheri2@ti.com>
+> Date:   Wed Feb 25 17:21:04 2015 -0600
+>
+>      of: Calculate device DMA masks based on DT dma-range size
+>
+>      Calculate the dma_mask and coherent_dma_mask based on the dma-range values
+>      set in DT for the device.
+>
+>      Limit the mask to lower of the default mask and mask calculated.
+>
+>      Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+>      Signed-off-by: Bjorn Helgaas<bhelgaas@google.com>
+>      Reviewed-by: Catalin Marinas<catalin.marinas@arm.com>
+>      CC: Joerg Roedel<joro@8bytes.org>
+>      CC: Grant Likely<grant.likely@linaro.org>
+>      CC: Rob Herring<robh+dt@kernel.org>
+>      CC: Will Deacon<will.deacon@arm.com>
+>      CC: Russell King<linux@arm.linux.org.uk>
+>      CC: Arnd Bergmann<arnd@arndb.de>
+>      CC: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>
+>
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index 28e743888402..20c1332a0018 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -90,10 +90,11 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>   	struct iommu_ops *iommu;
+>
+>   	/*
+> -	 * Set default dma-mask to 32 bit.  Drivers are expected to setup
+> -	 * the correct supported dma_mask.
+> +	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
+> +	 * setup the correct supported mask.
+>   	 */
+> -	dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> +	if (!dev->coherent_dma_mask)
+> +		dev->coherent_dma_mask = DMA_BIT_MASK(32);
+>
+>   	/*
+>   	 * Set it to coherent_dma_mask by default if the architecture
+> @@ -128,6 +129,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>
+>   	dev->dma_pfn_offset = offset;
+>
 > +	/*
-> +	 * Find out if the exception we are about to pass to the host is a
-> +	 * write to a system register, which we may prefer to handle in EL2.
+> +	 * Limit coherent and dma mask based on size and default mask
+> +	 * set by the driver.
 > +	 */
-> +	tst	x1, #1				// direction == write (0) ?
-> +	ccmp	x2, #ESR_EL2_EC_SYS64, #0, eq	// is a sysreg access?
-> +	b.eq	4f
+> +	dev->coherent_dma_mask = min(dev->coherent_dma_mask,
+> +				     DMA_BIT_MASK(ilog2(dma_addr + size)));
+> +	*dev->dma_mask = min((*dev->dma_mask),
+> +			     DMA_BIT_MASK(ilog2(dma_addr + size)));
 > +
->  	cmp	x2, #ESR_EL2_EC_DABT
->  	mov	x0, #ESR_EL2_EC_IABT
->  	ccmp	x2, x0, #4, ne
-> @@ -1239,6 +1277,69 @@ el1_trap:
->  
->  	eret
->  
-> +4:	and	x2, x1, #(3 << 20)		// check for Op0 == 0b11
-> +	cmp	x2, #(3 << 20)
-> +	b.ne	1b
-> +	ands	x2, x1, #(7 << 14)		// check for Op1 == 0b000
-> +	b.ne	1b
-> +
-> +	/*
-> +	 * If we end up here, we are about to perform a system register write
-> +	 * with Op0 == 0b11 and Op1 == 0b000. Move the operand to x3 first, we
-> +	 * will check later if we are actually going to handle this write in EL2
-> +	 */
-> +	adr	x0, 5f
-> +	ubfx	x2, x1, #5, #5		// operand reg# in bits 9 .. 5
-> +	add	x0, x0, x2, lsl #3
-> +	br	x0
-> +5:	ldr	x3, [sp, #16]		// x0 from the stack
-> +	b	6f
-> +	ldr	x3, [sp, #24]		// x1 from the stack
-> +	b	6f
-> +	ldr	x3, [sp]		// x2 from the stack
-> +	b	6f
-> +	ldr	x3, [sp, #8]		// x3 from the stack
-> +	b	6f
-> +	.irp	reg,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30
-> +	mov	x3, x\reg
-> +	b	6f
-> +	.endr
-> +	mov	x3, xzr			// x31
-> +
-> +	/*
-> +	 * Ok, so now we have the desired value in x3, let's write it into the
-> +	 * sysreg if it's a register write we want to handle in EL2. Since these
-> +	 * are tried in order, it makes sense to put the ones used most often at
-> +	 * the top.
-> +	 */
-> +6:	pack_sysreg_idx		x2, x1
-> +	cond_sysreg_write	3,0, 2,0,0,x2,x3,7f	// TTBR0_EL1
-> +	cond_sysreg_write	3,0, 2,0,1,x2,x3,7f	// TTBR1_EL1
-> +	cond_sysreg_write	3,0, 2,0,2,x2,x3,7f	// TCR_EL1
-> +	cond_sysreg_write	3,0, 5,2,0,x2,x3,7f	// ESR_EL1
-> +	cond_sysreg_write	3,0, 6,0,0,x2,x3,7f	// FAR_EL1
-> +	cond_sysreg_write	3,0, 5,1,0,x2,x3,7f	// AFSR0_EL1
-> +	cond_sysreg_write	3,0, 5,1,1,x2,x3,7f	// AFSR1_EL1
-> +	cond_sysreg_write	3,0,10,3,0,x2,x3,7f	// AMAIR_EL1
-> +	cond_sysreg_write	3,0,13,0,1,x2,x3,7f	// CONTEXTIDR_EL1
-> +
-> +	/*
-> +	 * If we end up here, the write is to a register that we don't handle
-> +	 * in EL2. Let the host handle it instead ...
-> +	 */
-> +	b	1b
-> +
-> +	/*
-> +	 * We have handled the write. Increment the pc and return to the
-> +	 * guest.
-> +	 */
-> +7:	mrs	x0, elr_el2
-> +	add	x0, x0, #4
-> +	msr	elr_el2, x0
-> +	pop	x2, x3
-> +	pop	x0, x1
-> +	eret
-> +
->  el1_irq:
->  	push	x0, x1
->  	push	x2, x3
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index f31e8bb2bc5b..1e170eab6603 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -187,6 +187,16 @@ static bool trap_debug_regs(struct kvm_vcpu *vcpu,
->  	return true;
->  }
->  
-> +static bool access_handled_at_el2(struct kvm_vcpu *vcpu,
-> +				  const struct sys_reg_params *params,
-> +				  const struct sys_reg_desc *r)
-> +{
-> +	kvm_debug("sys_reg write at %lx should have been handled in EL2\n",
-> +		  *vcpu_pc(vcpu));
-> +	print_sys_reg_instr(params);
-> +	return false;
-> +}
-> +
->  static void reset_amair_el1(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
->  {
->  	u64 amair;
-> @@ -328,26 +338,26 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	  NULL, reset_val, CPACR_EL1, 0 },
->  	/* TTBR0_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b000),
-> -	  access_vm_reg, reset_unknown, TTBR0_EL1 },
-> +	  access_handled_at_el2, reset_unknown, TTBR0_EL1 },
->  	/* TTBR1_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b001),
-> -	  access_vm_reg, reset_unknown, TTBR1_EL1 },
-> +	  access_handled_at_el2, reset_unknown, TTBR1_EL1 },
->  	/* TCR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b010),
-> -	  access_vm_reg, reset_val, TCR_EL1, 0 },
-> +	  access_handled_at_el2, reset_val, TCR_EL1, 0 },
->  
->  	/* AFSR0_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0001), Op2(0b000),
-> -	  access_vm_reg, reset_unknown, AFSR0_EL1 },
-> +	  access_handled_at_el2, reset_unknown, AFSR0_EL1 },
->  	/* AFSR1_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0001), Op2(0b001),
-> -	  access_vm_reg, reset_unknown, AFSR1_EL1 },
-> +	  access_handled_at_el2, reset_unknown, AFSR1_EL1 },
->  	/* ESR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0010), Op2(0b000),
-> -	  access_vm_reg, reset_unknown, ESR_EL1 },
-> +	  access_handled_at_el2, reset_unknown, ESR_EL1 },
->  	/* FAR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b0110), CRm(0b0000), Op2(0b000),
-> -	  access_vm_reg, reset_unknown, FAR_EL1 },
-> +	  access_handled_at_el2, reset_unknown, FAR_EL1 },
->  	/* PAR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b0111), CRm(0b0100), Op2(0b000),
->  	  NULL, reset_unknown, PAR_EL1 },
-> @@ -364,7 +374,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	  access_vm_reg, reset_unknown, MAIR_EL1 },
->  	/* AMAIR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0011), Op2(0b000),
-> -	  access_vm_reg, reset_amair_el1, AMAIR_EL1 },
-> +	  access_handled_at_el2, reset_amair_el1, AMAIR_EL1 },
->  
->  	/* VBAR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
-> @@ -376,7 +386,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  
->  	/* CONTEXTIDR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
-> -	  access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
-> +	  access_handled_at_el2, reset_val, CONTEXTIDR_EL1, 0 },
->  	/* TPIDR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b100),
->  	  NULL, reset_unknown, TPIDR_EL1 },
-> 
+>   	coherent = of_dma_is_coherent(np);
+>   	dev_dbg(dev, "device is%sdma coherent\n",
+>   		coherent ? " " : " not ");
+
+
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
