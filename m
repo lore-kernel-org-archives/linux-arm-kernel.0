@@ -1,97 +1,163 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 3 Mar 2015 11:24:45 +0100
-Subject: [PATCH v2 1/8] mmc: sdhci-st: Add macros for register offsets
- and bitfields for mmcss glue regs
-In-Reply-To: <1424956227-18258-2-git-send-email-peter.griffin@linaro.org>
-References: <1424956227-18258-1-git-send-email-peter.griffin@linaro.org>
- <1424956227-18258-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <54F58BED.4020900@st.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 3 Mar 2015 11:25:19 +0100
+Subject: [PATCH 08/10] ARM: orion: use clkdev_create()
+In-Reply-To: <E1YSTnm-0001Jx-AM@rmk-PC.arm.linux.org.uk>
+References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
+ <E1YSTnm-0001Jx-AM@rmk-PC.arm.linux.org.uk>
+Message-ID: <20150303112519.557f43ad@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Dear Russell King,
 
-On 02/26/2015 02:10 PM, Peter Griffin wrote:
-> The stih407 family SoC's have additional glue registers in the flashSS which
-> are used to configure the Arasan controller.
->
-> This patch adds macros for the register offsets and bitfields which will be used by
-> subsequent patches to support stih407 family SoC's.
->
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+On Mon, 02 Mar 2015 17:06:42 +0000, Russell King wrote:
+> clkdev_create() is a shorter way to write clkdev_alloc() followed by
+> clkdev_add().  Use this instead.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
->   drivers/mmc/host/sdhci-st.c | 91 +++++++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 91 insertions(+)
->
-> diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
-> index 882b07e..a3bc3c3 100644
-> --- a/drivers/mmc/host/sdhci-st.c
-> +++ b/drivers/mmc/host/sdhci-st.c
-> @@ -26,6 +26,97 @@
->   
->   #include "sdhci-pltfm.h"
->   
-> +/* MMCSS glue logic to setup the HC on some ST SoCs (e.g. STiH407 family) */
-> +
-> +#define	ST_MMC_CCONFIG_REG_1		0x400
-Maybe my mail client, but I see a tab instead of a space after #define.
-> +#define ST_MMC_CCONFIG_TIMEOUT_CLK_UNIT	BIT(24)
-> +#define ST_MMC_CCONFIG_TIMEOUT_CLK_FREQ	BIT(12)
-> +#define ST_MMC_CCONFIG_TUNING_COUNT_DEFAULT	BIT(8)
-> +#define ST_MMC_CCONFIG_ASYNC_WAKEUP	BIT(0)
-> +#define ST_MMC_CCONFIG_1_DEFAULT	\
-> +				((ST_MMC_CCONFIG_TIMEOUT_CLK_UNIT) | \
-> +				 (ST_MMC_CCONFIG_TIMEOUT_CLK_FREQ) | \
-> +				 (ST_MMC_CCONFIG_TUNING_COUNT_DEFAULT))
-> +
-> +#define ST_MMC_CCONFIG_REG_2		0x404
-> +#define ST_MMC_CCONFIG_HIGH_SPEED	BIT(28)
-> +#define ST_MMC_CCONFIG_ADMA2		BIT(24)
-> +#define ST_MMC_CCONFIG_8BIT		BIT(20)
-> +#define ST_MMC_CCONFIG_MAX_BLK_LEN	16
-> +#define  MAX_BLK_LEN_1024		1
-> +#define  MAX_BLK_LEN_2048		2
-> +#define BASE_CLK_FREQ_200		0xc8
-> +#define BASE_CLK_FREQ_100		0x64
-> +#define BASE_CLK_FREQ_50		0x32
-> +#define ST_MMC_CCONFIG_2_DEFAULT \
-> +	(ST_MMC_CCONFIG_HIGH_SPEED | ST_MMC_CCONFIG_ADMA2 | \
-> +	 ST_MMC_CCONFIG_8BIT | \
-> +	 (MAX_BLK_LEN_1024 << ST_MMC_CCONFIG_MAX_BLK_LEN))
-> +
-> +#define ST_MMC_CCONFIG_REG_3			0x408
-> +#define ST_MMC_CCONFIG_EMMC_SLOT_TYPE		BIT(28)
-> +#define ST_MMC_CCONFIG_64BIT			BIT(24)
-> +#define ST_MMC_CCONFIG_ASYNCH_INTR_SUPPORT	BIT(20)
-> +#define ST_MMC_CCONFIG_1P8_VOLT			BIT(16)
-> +#define ST_MMC_CCONFIG_3P0_VOLT			BIT(12)
-> +#define ST_MMC_CCONFIG_3P3_VOLT			BIT(8)
-> +#define ST_MMC_CCONFIG_SUSP_RES_SUPPORT		BIT(4)
-> +#define ST_MMC_CCONFIG_SDMA			BIT(0)
-> +#define ST_MMC_CCONFIG_3_DEFAULT	\
-> +			 (ST_MMC_CCONFIG_ASYNCH_INTR_SUPPORT	| \
-> +			  ST_MMC_CCONFIG_3P3_VOLT		| \
-> +			  ST_MMC_CCONFIG_SUSP_RES_SUPPORT	| \
-> +			  ST_MMC_CCONFIG_SDMA)
-> +
-> +#define ST_MMC_CCONFIG_REG_4	0x40c
-> +#define ST_MMC_CCONFIG_D_DRIVER	BIT(20)
-> +#define ST_MMC_CCONFIG_C_DRIVER	BIT(16)
-> +#define ST_MMC_CCONFIG_A_DRIVER	BIT(12)
-> +#define ST_MMC_CCONFIG_DDR50	BIT(8)
-> +#define ST_MMC_CCONFIG_SDR104	BIT(4)
-> +#define ST_MMC_CCONFIG_SDR50	BIT(0)
-> +#define ST_MMC_CCONFIG_4_DEFAULT	0
-> +
-> +#define ST_MMC_CCONFIG_REG_5		0x410
-> +#define ST_MMC_CCONFIG_TUNING_FOR_SDR50	BIT(8)
-> +#define RETUNING_TIMER_CNT_MAX		0xf
-> +#define ST_MMC_CCONFIG_5_DEFAULT	0
-> +
-> +/* I/O configuration for Arasan IP */
-> +#define	ST_MMC_GP_OUTPUT	0x450
-Same Here.
+>  arch/arm/plat-orion/common.c | 6 +-----
+>  1 file changed, 1 insertion(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+> index f5b00f41c4f6..2235081a04ee 100644
+> --- a/arch/arm/plat-orion/common.c
+> +++ b/arch/arm/plat-orion/common.c
+> @@ -28,11 +28,7 @@
+>  void __init orion_clkdev_add(const char *con_id, const char *dev_id,
+>  			     struct clk *clk)
+>  {
+> -	struct clk_lookup *cl;
+> -
+> -	cl = clkdev_alloc(clk, con_id, dev_id);
+> -	if (cl)
+> -		clkdev_add(cl);
+> +	clkdev_create(clk, con_id, "%s", dev_id);
+>  }
+>  
+>  /* Create clkdev entries for all orion platforms except kirkwood.
 
-Best regards,
-Maxime
+Looks good, but instead of having orion_clkdev_add() being just an
+alias for clkdev_create(), what about going ahead and simply reoving
+orion_clkdev_add() entirely? Something like the below patch (not even
+compile tested) :
+
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index 0d1a892..ec00183 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -109,28 +109,28 @@ static void __init dove_clk_init(void)
+ 	gephy = dove_register_gate("gephy", "tclk", CLOCK_GATING_BIT_GIGA_PHY);
+ 	ge = dove_register_gate("ge", "gephy", CLOCK_GATING_BIT_GBE);
+ 
+-	orion_clkdev_add(NULL, "orion_spi.0", tclk);
+-	orion_clkdev_add(NULL, "orion_spi.1", tclk);
+-	orion_clkdev_add(NULL, "orion_wdt", tclk);
+-	orion_clkdev_add(NULL, "mv64xxx_i2c.0", tclk);
+-
+-	orion_clkdev_add(NULL, "orion-ehci.0", usb0);
+-	orion_clkdev_add(NULL, "orion-ehci.1", usb1);
+-	orion_clkdev_add(NULL, "mv643xx_eth_port.0", ge);
+-	orion_clkdev_add(NULL, "sata_mv.0", sata);
+-	orion_clkdev_add("0", "pcie", pex0);
+-	orion_clkdev_add("1", "pcie", pex1);
+-	orion_clkdev_add(NULL, "sdhci-dove.0", sdio0);
+-	orion_clkdev_add(NULL, "sdhci-dove.1", sdio1);
+-	orion_clkdev_add(NULL, "orion_nand", nand);
+-	orion_clkdev_add(NULL, "cafe1000-ccic.0", camera);
+-	orion_clkdev_add(NULL, "mvebu-audio.0", i2s0);
+-	orion_clkdev_add(NULL, "mvebu-audio.1", i2s1);
+-	orion_clkdev_add(NULL, "mv_crypto", crypto);
+-	orion_clkdev_add(NULL, "dove-ac97", ac97);
+-	orion_clkdev_add(NULL, "dove-pdma", pdma);
+-	orion_clkdev_add(NULL, MV_XOR_NAME ".0", xor0);
+-	orion_clkdev_add(NULL, MV_XOR_NAME ".1", xor1);
++	clkdev_create(tclk, NULL, "%s", "orion_spi.0");
++	clkdev_create(tclk, NULL, "%s", "orion_spi.1");
++	clkdev_create(tclk, NULL, "%s", "orion_wdt");
++	clkdev_create(tclk, NULL, "%s", "mv64xxx_i2c.0");
++
++	clkdev_create(usb0, NULL, "%s", "orion-ehci.0");
++	clkdev_create(usb1, NULL, "%s", "orion-ehci.1");
++	clkdev_create(ge, NULL, "%s", "mv643xx_eth_port.0");
++	clkdev_create(sata, NULL, "%s", "sata_mv.0");
++	clkdev_create(pex0, "0", "%s", "pcie");
++	clkdev_create(pex1, "1", "%s", "pcie");
++	clkdev_create(sdio0, NULL, "%s", "sdhci-dove.0");
++	clkdev_create(sdio1, NULL, "%s", "sdhci-dove.1");
++	clkdev_create(nand, NULL, "%s", "orion_nand");
++	clkdev_create(camera, NULL, "%s", "cafe1000-ccic.0");
++	clkdev_create(i2s0, NULL, "%s", "mvebu-audio.0");
++	clkdev_create(i2s1, NULL, "%s", "mvebu-audio.1");
++	clkdev_create(crypto, NULL, "%s", "mv_crypto");
++	clkdev_create(ac97, NULL, "%s", "dove-ac97");
++	clkdev_create(pdma, NULL, "%s", "dove-pdma");
++	clkdev_create(xor0, NULL, "%s", MV_XOR_NAME ".0");
++	clkdev_create(xor1, NULL, "%s", MV_XOR_NAME ".1");
+ }
+ 
+ /*****************************************************************************
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index f5b00f4..6ac3549 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -24,31 +24,20 @@
+ #include <mach/bridge-regs.h>
+ #include <plat/common.h>
+ 
+-/* Create a clkdev entry for a given device/clk */
+-void __init orion_clkdev_add(const char *con_id, const char *dev_id,
+-			     struct clk *clk)
+-{
+-	struct clk_lookup *cl;
+-
+-	cl = clkdev_alloc(clk, con_id, dev_id);
+-	if (cl)
+-		clkdev_add(cl);
+-}
+-
+ /* Create clkdev entries for all orion platforms except kirkwood.
+    Kirkwood has gated clocks for some of its peripherals, so creates
+    its own clkdev entries. For all the other orion devices, create
+    clkdev entries to the tclk. */
+ void __init orion_clkdev_init(struct clk *tclk)
+ {
+-	orion_clkdev_add(NULL, "orion_spi.0", tclk);
+-	orion_clkdev_add(NULL, "orion_spi.1", tclk);
+-	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".0", tclk);
+-	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".1", tclk);
+-	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".2", tclk);
+-	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".3", tclk);
+-	orion_clkdev_add(NULL, "orion_wdt", tclk);
+-	orion_clkdev_add(NULL, MV64XXX_I2C_CTLR_NAME ".0", tclk);
++	clkdev_create(tclk, NULL, "%s", "orion_spi.0");
++	clkdev_create(tclk, NULL, "%s", "orion_spi.1");
++	clkdev_create(tclk, NULL, "%s", MV643XX_ETH_NAME ".0");
++	clkdev_create(tclk, NULL, "%s", MV643XX_ETH_NAME ".1");
++	clkdev_create(tclk, NULL, "%s", MV643XX_ETH_NAME ".2");
++	clkdev_create(tclk, NULL, "%s", MV643XX_ETH_NAME ".3");
++	clkdev_create(tclk, NULL, "%s", "orion_wdt");
++	clkdev_create(tclk, NULL, "%s", MV64XXX_I2C_CTLR_NAME ".0");
+ }
+ 
+ /* Fill in the resources structure and link it into the platform
+diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
+index d9a24f6..7a06b6b 100644
+--- a/arch/arm/plat-orion/include/plat/common.h
++++ b/arch/arm/plat-orion/include/plat/common.h
+@@ -106,8 +106,5 @@ void __init orion_crypto_init(unsigned long mapbase,
+ 			      unsigned long sram_size,
+ 			      unsigned long irq);
+ 
+-void __init orion_clkdev_add(const char *con_id, const char *dev_id,
+-			     struct clk *clk);
+-
+ void __init orion_clkdev_init(struct clk *tclk);
+ #endif
+
+
+
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
