@@ -1,369 +1,68 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Mon, 2 Mar 2015 16:50:59 -0800
-Subject: [PATCH v2 2/2] hwrng: iproc-rng200 - Add Broadcom IPROC RNG driver
-In-Reply-To: <20150225184338.GA3215@dtor-ws>
-References: <sbranden@broadcom.com>
- <1424888184-22180-1-git-send-email-sbranden@broadcom.com>
- <1424888184-22180-3-git-send-email-sbranden@broadcom.com>
- <20150225184338.GA3215@dtor-ws>
-Message-ID: <54F50573.3040506@broadcom.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Mon, 2 Mar 2015 16:59:40 -0800
+Subject: [PATCH 2/3] dtb: change binding name to match with newer firmware
+ DT
+In-Reply-To: <20150302144858.GG16779@leverpostej>
+References: <1425067710-14879-1-git-send-email-isubramanian@apm.com>
+ <1425067710-14879-3-git-send-email-isubramanian@apm.com>
+ <4061014.S4PDWltU3G@wuerfel>
+ <CAKh23Fm5HpNEfs40RTf_XtQ6ris5cCheAcY1WdLND04AwsvdSQ@mail.gmail.com>
+ <20150302144858.GG16779@leverpostej>
+Message-ID: <CAKh23FmLyagk93PHuCxE1Qc=ck6Djkf9oFxjGALe1mqF+U6yPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+On Mon, Mar 2, 2015 at 6:48 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Feb 27, 2015 at 11:52:54PM +0000, Iyappan Subramanian wrote:
+>> On Fri, Feb 27, 2015 at 12:33 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Friday 27 February 2015 12:08:29 Iyappan Subramanian wrote:
+>> >> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> >> index f1ad9c2..a857794 100644
+>> >> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> >> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> >> @@ -622,7 +622,7 @@
+>> >>                 };
+>> >>
+>> >>                 sgenet0: ethernet at 1f210000 {
+>> >> -                       compatible = "apm,xgene-enet";
+>> >> +                       compatible = "apm,xgene1-sgenet";
+>> >>                         status = "disabled";
+>> >>                         reg = <0x0 0x1f210000 0x0 0xd100>,
+>> >>                               <0x0 0x1f200000 0x0 0Xc300>,
+>> >>
+>> >
+>> > This will break booting the new dtb on older kernels, right?
+>>
+>> This will not break booting older kernels.  In fact, this will fix it,
+>> by having the specific binding,
+>> older kernel that does not have support for these interfaces, will not
+>> call probe.
+>>
+>> For example, 3.17 kernel that does not have support for SGMII based 1G
+>> and XFI 10G interfaces
+>> will not probe these interfaces when booted with newer dtb.
+>
+> I'm guessing that in the existing DTBs, these nodes are always disabled?
 
-Looking at the driver based on your comments it is following models of 
-older hwrng drivers.  I will work on cleaning up based on your comments 
-as well.
+These nodes does not exist on 3.17 kernel dtb.
+The problem was reported when booted using Tianocore with Device tree,
+which has these nodes, but the 3.17 kernel does not have support for
+these nodes.
 
-On 15-02-25 10:43 AM, Dmitry Torokhov wrote:
-> Hi Scott,
 >
-> On Wed, Feb 25, 2015 at 10:16:24AM -0800, Scott Branden wrote:
->> This adds a driver for random number generator present on Broadcom
->> IPROC devices.
->>
->> Reviewed-by: Ray Jui <rjui@broadcom.com>
->> Signed-off-by: Scott Branden <sbranden@broadcom.com>
->> ---
->>   drivers/char/hw_random/Kconfig        |  13 ++
->>   drivers/char/hw_random/Makefile       |   1 +
->>   drivers/char/hw_random/iproc-rng200.c | 239 ++++++++++++++++++++++++++++++++++
->>   3 files changed, 253 insertions(+)
->>   create mode 100644 drivers/char/hw_random/iproc-rng200.c
->>
->> diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
->> index de57b38..f48cf11 100644
->> --- a/drivers/char/hw_random/Kconfig
->> +++ b/drivers/char/hw_random/Kconfig
->> @@ -101,6 +101,19 @@ config HW_RANDOM_BCM2835
->>
->>   	  If unsure, say Y.
->>
->> +config HW_RANDOM_IPROC_RNG200
->> +	tristate "Broadcom iProc RNG200 support"
->> +	depends on ARCH_BCM_IPROC
->> +	default HW_RANDOM
->> +	---help---
->> +	  This driver provides kernel-side support for the RNG200
->> +	  hardware found on the Broadcom iProc SoCs.
->> +
->> +	  To compile this driver as a module, choose M here: the
->> +	  module will be called iproc-rng200
->> +
->> +	  If unsure, say Y.
->> +
->>   config HW_RANDOM_GEODE
->>   	tristate "AMD Geode HW Random Number Generator support"
->>   	depends on X86_32 && PCI
->> diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
->> index 0b4cd57..055bb01 100644
->> --- a/drivers/char/hw_random/Makefile
->> +++ b/drivers/char/hw_random/Makefile
->> @@ -28,5 +28,6 @@ obj-$(CONFIG_HW_RANDOM_POWERNV) += powernv-rng.o
->>   obj-$(CONFIG_HW_RANDOM_EXYNOS)	+= exynos-rng.o
->>   obj-$(CONFIG_HW_RANDOM_TPM) += tpm-rng.o
->>   obj-$(CONFIG_HW_RANDOM_BCM2835) += bcm2835-rng.o
->> +obj-$(CONFIG_HW_RANDOM_IPROC_RNG200) += iproc-rng200.o
->>   obj-$(CONFIG_HW_RANDOM_MSM) += msm-rng.o
->>   obj-$(CONFIG_HW_RANDOM_XGENE) += xgene-rng.o
->> diff --git a/drivers/char/hw_random/iproc-rng200.c b/drivers/char/hw_random/iproc-rng200.c
->> new file mode 100644
->> index 0000000..4643aa9
->> --- /dev/null
->> +++ b/drivers/char/hw_random/iproc-rng200.c
->> @@ -0,0 +1,239 @@
->> +/*
->> +* Copyright (C) 2014 Broadcom Corporation
->> +*
->> +* This program is free software; you can redistribute it and/or
->> +* modify it under the terms of the GNU General Public License as
->> +* published by the Free Software Foundation version 2.
->> +*
->> +* This program is distributed "as is" WITHOUT ANY WARRANTY of any
->> +* kind, whether express or implied; without even the implied warranty
->> +* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> +* GNU General Public License for more details.
->> +*/
->> +/*
->> + * DESCRIPTION: The Broadcom iProc RNG200 Driver
->> + */
->> +
->> +#include <linux/hw_random.h>
->> +#include <linux/init.h>
->> +#include <linux/io.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_platform.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/delay.h>
->> +
->> +
->> +/* Registers */
->> +#define RNG_CTRL_OFFSET					0x00
->> +#define RNG_CTRL_RNG_RBGEN_MASK				0x00001FFF
->> +#define RNG_CTRL_RNG_RBGEN_ENABLE			0x00000001
->> +#define RNG_CTRL_RNG_RBGEN_DISABLE			0x00000000
->> +
->> +#define RNG_SOFT_RESET_OFFSET				0x04
->> +#define RNG_SOFT_RESET_RNG_SOFT_RESET_MASK		0x00000001
->> +#define RNG_SOFT_RESET_RNG_SOFT_RESET_ACTIVE		0x00000001
->> +#define RNG_SOFT_RESET_RNG_SOFT_RESET_CLEAR		0x00000000
->> +
->> +#define RBG_SOFT_RESET_OFFSET				0x08
->> +#define RBG_SOFT_RESET_RNG_SOFT_RESET_MASK		0x00000001
->> +#define RBG_SOFT_RESET_RNG_SOFT_RESET_ACTIVE		0x00000001
->> +#define RBG_SOFT_RESET_RNG_SOFT_RESET_CLEAR		0x00000000
->> +
->> +#define RNG_INT_STATUS_OFFSET				0x18
->> +#define RNG_INT_STATUS_MASTER_FAIL_LOCKOUT_IRQ_MASK	0x80000000
->> +#define RNG_INT_STATUS_STARTUP_TRANSITIONS_MET_IRQ_MASK	0x00020000
->> +#define RNG_INT_STATUS_NIST_FAIL_IRQ_MASK		0x00000020
->> +#define RNG_INT_STATUS_TOTAL_BITS_COUNT_IRQ_MASK	0x00000001
->> +
->> +#define RNG_FIFO_DATA_OFFSET				0x20
->> +
->> +#define RNG_FIFO_COUNT_OFFSET				0x24
->> +#define RNG_FIFO_COUNT_RNG_FIFO_COUNT_MASK		0x000000FF
->> +
->> +static void iproc_rng200_restart(void __iomem *rng_base)
->> +{
->> +	uint32_t val;
->> +
->> +	/* Disable RBG */
->> +	val = ioread32(rng_base + RNG_CTRL_OFFSET);
->> +	val &= ~RNG_CTRL_RNG_RBGEN_MASK;
->> +	val |= RNG_CTRL_RNG_RBGEN_DISABLE;
->> +	iowrite32(val, rng_base + RNG_CTRL_OFFSET);
->> +
->> +	/* Clear all interrupt status */
->> +	iowrite32(0xFFFFFFFFUL, rng_base + RNG_INT_STATUS_OFFSET);
->> +
->> +	/* Reset RNG and RBG */
->> +	val = ioread32(rng_base + RBG_SOFT_RESET_OFFSET);
->> +	val &= ~RBG_SOFT_RESET_RNG_SOFT_RESET_MASK;
->> +	val |= RBG_SOFT_RESET_RNG_SOFT_RESET_ACTIVE;
->> +	iowrite32(val, rng_base + RBG_SOFT_RESET_OFFSET);
->> +
->> +	val = ioread32(rng_base + RNG_SOFT_RESET_OFFSET);
->> +	val &= ~RNG_SOFT_RESET_RNG_SOFT_RESET_MASK;
->> +	val |= RNG_SOFT_RESET_RNG_SOFT_RESET_ACTIVE;
->> +	iowrite32(val, rng_base + RNG_SOFT_RESET_OFFSET);
->> +
->> +	val = ioread32(rng_base + RNG_SOFT_RESET_OFFSET);
->> +	val &= ~RNG_SOFT_RESET_RNG_SOFT_RESET_MASK;
->> +	val |= RNG_SOFT_RESET_RNG_SOFT_RESET_CLEAR;
->> +	iowrite32(val, rng_base + RNG_SOFT_RESET_OFFSET);
->> +
->> +	val = ioread32(rng_base + RBG_SOFT_RESET_OFFSET);
->> +	val &= ~RBG_SOFT_RESET_RNG_SOFT_RESET_MASK;
->> +	val |= RBG_SOFT_RESET_RNG_SOFT_RESET_CLEAR;
->> +	iowrite32(val, rng_base + RBG_SOFT_RESET_OFFSET);
->> +
->> +	/* Enable RBG */
->> +	val = ioread32(rng_base + RNG_CTRL_OFFSET);
->> +	val &= ~RNG_CTRL_RNG_RBGEN_MASK;
->> +	val |= RNG_CTRL_RNG_RBGEN_ENABLE;
->> +	iowrite32(val, rng_base + RNG_CTRL_OFFSET);
->> +}
->> +
->> +static int iproc_rng200_read(struct hwrng *rng, void *buf, size_t max,
->> +			       bool wait)
->> +{
->> +	uint32_t status = 0;
->> +	uint32_t num_remaining = max;
->> +
->> +	#define MAX_RESETS_PER_READ	1
->> +	uint32_t num_resets = 0;
->> +
->> +	#define MAX_IDLE_TIME	(1 * HZ)
->> +	unsigned long idle_endtime = jiffies + MAX_IDLE_TIME;
->> +
->> +	/* Retrieve HW RNG registers base address. */
->> +	void __iomem *rng_base = (void __iomem *)rng->priv;
->> +
->> +	while ((num_remaining > 0) && time_before(jiffies, idle_endtime)) {
->> +
->> +		/* Is RNG sane? If not, reset it. */
->> +		status = ioread32(rng_base + RNG_INT_STATUS_OFFSET);
->> +		if ((status & (RNG_INT_STATUS_MASTER_FAIL_LOCKOUT_IRQ_MASK |
->> +			RNG_INT_STATUS_NIST_FAIL_IRQ_MASK)) != 0) {
->> +
->> +			if (num_resets >= MAX_RESETS_PER_READ)
->> +				return max - num_remaining;
->> +
->> +			iproc_rng200_restart(rng_base);
->> +			num_resets++;
->> +		}
->> +
->> +		/* Are there any random numbers available? */
->> +		if ((ioread32(rng_base + RNG_FIFO_COUNT_OFFSET) &
->> +				RNG_FIFO_COUNT_RNG_FIFO_COUNT_MASK) > 0) {
->> +
->> +			if (num_remaining >= sizeof(uint32_t)) {
->> +				/* Buffer has room to store entire word */
->> +				*(uint32_t *)buf = ioread32(rng_base +
->> +							RNG_FIFO_DATA_OFFSET);
->> +				buf += sizeof(uint32_t);
->> +				num_remaining -= sizeof(uint32_t);
->> +			} else {
->> +				/* Buffer can only store partial word */
->> +				uint32_t rnd_number = ioread32(rng_base +
->> +							RNG_FIFO_DATA_OFFSET);
->> +				memcpy(buf, &rnd_number, num_remaining);
->> +				buf += num_remaining;
->> +				num_remaining = 0;
->> +			}
->> +
->> +			/* Reset the IDLE timeout */
->> +			idle_endtime = jiffies + MAX_IDLE_TIME;
->> +		} else {
->> +			if (!wait)
->> +				/* Cannot wait, return immediately */
->> +				return max - num_remaining;
->> +
->> +			/* Can wait, give others chance to run */
->> +			cpu_relax();
->> +		}
->> +	}
->> +
->> +	return max - num_remaining;
->> +}
->> +
->> +static struct hwrng iproc_rng200_ops = {
->> +	.name	= "iproc-rng200",
->> +	.read	= iproc_rng200_read,
->> +};
->
-> I would prefer if we allocated a driver-private structure that wraps
-> hwrng instead of using statically allocated singleton as I wonder how it
-> will behave if I bind/unbind the device several times.
-ok, will revamp.
->
->> +
->> +static int iproc_rng200_probe(struct platform_device *pdev)
->> +{
->> +	struct device *dev = &pdev->dev;
->> +	void __iomem *rng_base = 0;
->> +	uint32_t val = 0;
->> +	int err = 0;
->
-> There is no need to initialize all variables as it suppressed "used but
-> uninitialized" warnings from the compiler. Imagine someone adding a new
-> init operation and when they handle failure they forget to adjust error
-> code so it stays 0: for upper layers we'd signal success even though
-> our device/driver are half-bound.
-yes, will cleanup in other functions as well.
->
->> +
->> +	/* Map peripheral */
->> +	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +
->> +	if (!res) {
->> +		dev_err(dev, "failed to get rng resources\n");
->> +		return -ENODEV;
->
-> If we have platform device but it is missing parts of necessary data it
-> should be -EINVAL.
-ok
->
->> +	}
->> +
->> +	rng_base = devm_ioremap_resource(dev, res);
->> +	if (!rng_base) {
->
-> devm_ioremap_resource() returns ERR_PTR-encoded result, you need to
-> check with IS_ERR().
-ok
->
->> +		dev_err(dev, "failed to remap rng regs\n");
->> +		return -ENODEV;
->
-> 		return PTR_ERR(rng_base);
-ok
->
->> +	}
->
-> There is no clock for RNG?
-no additional clock needs to be enabled.
->
->> +
->> +	iproc_rng200_ops.priv = (unsigned long)rng_base;
->> +
->> +	/* Setup RNG. */
->> +	val = ioread32(rng_base + RNG_CTRL_OFFSET);
->> +	val &= ~RNG_CTRL_RNG_RBGEN_MASK;
->> +	val |= RNG_CTRL_RNG_RBGEN_ENABLE;
->> +	iowrite32(val, rng_base + RNG_CTRL_OFFSET);
->
-> That should be in [new] iproc_rng200_init().
-ok, it looks like you are commenting based on what is done in omap-rng. 
-  I can follow that model and move this into an init function.
->
->> +
->> +	/* Register driver */
->> +	err = hwrng_register(&iproc_rng200_ops);
->> +	if (err) {
->> +		dev_err(dev, "hwrng registration failed\n");
->> +		return err;
->> +	}
->> +	dev_info(dev, "hwrng registered\n");
->> +
->> +	return 0;
->> +}
->> +
->> +static int iproc_rng200_remove(struct platform_device *pdev)
->> +{
->> +	uint32_t val = 0;
->> +	void __iomem *rng_base = (void __iomem *)iproc_rng200_ops.priv;
->> +
->> +	/* Unregister driver */
->> +	hwrng_unregister(&iproc_rng200_ops);
->> +
->> +	/* Disable RNG hardware */
->> +	val = ioread32(rng_base + RNG_CTRL_OFFSET);
->> +	val &= ~RNG_CTRL_RNG_RBGEN_MASK;
->> +	val |= RNG_CTRL_RNG_RBGEN_DISABLE;
->> +	iowrite32(val, rng_base + RNG_CTRL_OFFSET);
->
-> That should be in [new] iproc_rng200_cleanup().
-ok, it looks like you are commenting based on what is done in omap-rng.
+> If that's the case then we don't have a problem; we'll never probe these
+> nodes for an existing DTB.
 
-I can follow that model and move this into a cleanup function.
+With this patch, the following combinations were tested,
+u-boot + 3.17 kernel + 3.17 dtb -> this patch will no effect on this
+combination, only RGMII based 1G will be probed
+u-boot + 3.19 kernel + 3.19 dtb + this patch -> all the 3 ethernet
+interfaces was probed
+Tianocore (w/ Device Tree) + 3.19 kernel + this patch -> all the 3
+ethernet interfaces were probed
+Tianocore (w/ ACPI) + 3.19 kernel + this patch -> all the 3 ethernet
+interfaces were probed
+
+
 >
->> +
->> +	return 0;
->> +}
->> +
->
-> #ifdef CONFIG_OF
->
-> maybe?
-driver will only be used with devicetree
->
->> +static const struct of_device_id iproc_rng200_of_match[] = {
->> +	{ .compatible = "brcm,iproc-rng200", },
->> +	{},
->> +};
->> +MODULE_DEVICE_TABLE(of, iproc_rng200_of_match);
->> +
->> +static struct platform_driver iproc_rng200_driver = {
->> +	.driver = {
->> +		.name = "iproc-rng200",
->> +		.of_match_table = iproc_rng200_of_match,
->> +	},
->> +	.probe		= iproc_rng200_probe,
->> +	.remove		= iproc_rng200_remove,
->> +};
->> +module_platform_driver(iproc_rng200_driver);
->> +
->> +MODULE_AUTHOR("Broadcom");
->> +MODULE_DESCRIPTION("iProc RNG200 Random Number Generator driver");
->> +MODULE_LICENSE("GPL v2");
->> --
->> 2.3.0
->>
->
-> Thanks.
->
+> Mark.
