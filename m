@@ -1,71 +1,35 @@
-From: pmladek@suse.cz (Petr Mladek)
-Date: Tue, 3 Mar 2015 18:06:33 +0100
-Subject: [PATCH 3/3] early kprobes: x86: don't try to recover ftraced
- instruction before ftrace get ready.
-In-Reply-To: <1425359345-38714-4-git-send-email-wangnan0@huawei.com>
-References: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
- <1425359345-38714-1-git-send-email-wangnan0@huawei.com>
- <1425359345-38714-4-git-send-email-wangnan0@huawei.com>
-Message-ID: <20150303170633.GG3703@dhcp128.suse.cz>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Tue, 03 Mar 2015 18:10:12 +0100
+Subject: [PATCH 1/6] target-arm: kvm: save/restore mp state
+In-Reply-To: <87zj7u59hd.fsf@linaro.org>
+References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
+ <1424880159-29348-2-git-send-email-alex.bennee@linaro.org>
+ <CAFEAcA9oWeYGYcGtf8So6VrYLMXjWr4FiZ2tS+jBnDtv87jAKw@mail.gmail.com>
+ <8761ai73j1.fsf@linaro.org> <54F595C0.5060004@redhat.com>
+ <CAFEAcA8SaBuH6izzuD6CmknSU9mbQPo0YNO=knTgRCPZ2EvXcQ@mail.gmail.com>
+ <87zj7u59hd.fsf@linaro.org>
+Message-ID: <54F5EAF4.2000206@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2015-03-03 13:09:05, Wang Nan wrote:
-> Before ftrace convertin instruction to nop, if an early kprobe is
-> registered then unregistered, without this patch its first bytes will
-> be replaced by head of NOP, which may confuse ftrace.
-> 
-> Actually, since we have a patch which convert ftrace entry to nop
-> when probing, this problem should never be triggered. Provide it for
-> safety.
-> 
-> Signed-off-by: Wang Nan <wangnan0@huawei.com>
-> ---
->  arch/x86/kernel/kprobes/core.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/x86/kernel/kprobes/core.c b/arch/x86/kernel/kprobes/core.c
-> index 87beb64..c7d304d 100644
-> --- a/arch/x86/kernel/kprobes/core.c
-> +++ b/arch/x86/kernel/kprobes/core.c
-> @@ -225,6 +225,9 @@ __recover_probed_insn(kprobe_opcode_t *buf, unsigned long addr)
->  	struct kprobe *kp;
->  	unsigned long faddr;
->  
-> +	if (!kprobes_on_ftrace_initialized)
-> +		return addr;
 
-This is not correct. The function has to return a buffer with the original
-code also when it is modified by normal kprobes. If it is a normal
-Kprobe, it reads the current code and replaces the first byte (INT3
-instruction) with the saved kp->opcode.
 
-> +
->  	kp = get_kprobe((void *)addr);
->  	faddr = ftrace_location(addr);
+On 03/03/2015 17:30, Alex Benn?e wrote:
+>> >
+>>> >>  Right now this is not migrated on ARM if I remember correctly, but
+>>> >> perhaps you'll want to add it in the future.
+>> >
+>> > ...which is why we don't need to migrate this: it just means
+>> > that migration during WFI causes an unnecessary-wakeup, which
+>> > is architecturally fine.
+> What happens when you boot a SMP system but only ever power up one of the
+> CPUs? You can't just randomly start the second CPU if it's in the
+> powered off state, who knows what it would do?
 
-IMHO, the proper fix might be to replace the above line with
+The second CPU would not be in the WFI state, which is what Peter is
+talking about.
 
-	if (kprobes_on_ftrace_initialized)
-		faddr = ftrace_location(addr);
-	else
-		faddr = 0UL;
+I agree that this state should be saved/restored.  I'm just saying that
+HALTED is not the right constant to use.
 
-By other words, it might pretend that it is not a ftrace location
-when the ftrace is not ready yet.
-
-Or is the code modified another special way when it is a ftrace location but
-ftrace has not been initialized yet?
-
-Best Regards,
-Petr
-
->  	/*
-> -- 
-> 1.8.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Paolo
