@@ -1,139 +1,143 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 2 Mar 2015 20:06:07 -0600
-Subject: [PATCH v4 05/30] PCI: Rename pci_scan_bus() to
- pci_scan_bus_legacy()
-In-Reply-To: <1424938344-4017-6-git-send-email-wangyijing@huawei.com>
-References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
- <1424938344-4017-6-git-send-email-wangyijing@huawei.com>
-Message-ID: <20150303020607.GD11978@google.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 02 Mar 2015 18:20:19 -0800
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <20150302163146.GB9686@lvm>
+References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150219165731.GA26965@hawk.usersys.redhat.com>
+ <CAKv+Gu8Je3RRrgEFCZ7JUWtOgk3WqA_qdBEOPAMc3OqnKr1bwg@mail.gmail.com>
+ <20150219175518.GB26965@hawk.usersys.redhat.com> <54E62404.9040702@redhat.com>
+ <20150220142905.GA10942@hawk.usersys.redhat.com>
+ <CAKv+Gu-YUzmnACZQi98OPRgKKL+gAGqwWYq2-_dwCdNqcktNUg@mail.gmail.com>
+ <20150220153626.GB10942@hawk.usersys.redhat.com>
+ <20150224145529.GA5498@hawk.usersys.redhat.com>
+ <CAKv+Gu-Uk2wg1OkoWgQe4da_EiFoEz_u8VuD8Ees6qU1UYMDvQ@mail.gmail.com>
+ <20150302163146.GB9686@lvm>
+Message-ID: <54F51A63.4060302@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 04:11:59PM +0800, Yijing Wang wrote:
-> Pci_scan_bus() is called by legacy pci host drivers,
-> the legacy host drivers mean they use NULL as parent
-> device, use all IO/MEM as default resources. Rename
-> pci_scan_bus() to pci_scan_bus_legacy() for better
-> readability.
+Hi Christoffer,
 
-We should mention that this changes an exported symbol, because that's
-potentially an issue for distros.
+I don't understand how can the CPU handle different cache attributes
+used by
+QEMU and Guest won't you run into B2.9 checklist? Wouldn't cache
+evictions or
+cleans wipe out guest updates to same cache line(s)?
 
-I'm not saying we can't change it, but I don't want to do it unless there's
-real benefit.  I'm not convinced of the benefit yet, but maybe I will be by
-the end of the series.
+- Mario
 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> ---
->  arch/alpha/kernel/sys_nautilus.c  |    2 +-
->  arch/m68k/coldfire/pci.c          |    2 +-
->  arch/sparc/kernel/pcic.c          |    2 +-
->  arch/unicore32/kernel/pci.c       |    2 +-
->  drivers/pci/hotplug/ibmphp_core.c |    2 +-
->  drivers/pci/probe.c               |    4 ++--
->  include/linux/pci.h               |    2 +-
->  7 files changed, 8 insertions(+), 8 deletions(-)
+
+On 03/02/2015 08:31 AM, Christoffer Dall wrote:
+> On Tue, Feb 24, 2015 at 05:47:19PM +0000, Ard Biesheuvel wrote:
+>> On 24 February 2015 at 14:55, Andrew Jones <drjones@redhat.com> wrote:
+>>> On Fri, Feb 20, 2015 at 04:36:26PM +0100, Andrew Jones wrote:
+>>>> On Fri, Feb 20, 2015 at 02:37:25PM +0000, Ard Biesheuvel wrote:
+>>>>> On 20 February 2015 at 14:29, Andrew Jones <drjones@redhat.com> wrote:
+>>>>>> So looks like the 3 orders of magnitude greater number of traps
+>>>>>> (only to el2) don't impact kernel compiles.
+>>>>>>
+>>>>>
+>>>>> OK, good! That was what I was hoping for, obviously.
+>>>>>
+>>>>>> Then I thought I'd be able to quick measure the number of cycles
+>>>>>> a trap to el2 takes with this kvm-unit-tests test
+>>>>>>
+>>>>>> int main(void)
+>>>>>> {
+>>>>>>         unsigned long start, end;
+>>>>>>         unsigned int sctlr;
+>>>>>>
+>>>>>>         asm volatile(
+>>>>>>         "       mrs %0, sctlr_el1\n"
+>>>>>>         "       msr pmcr_el0, %1\n"
+>>>>>>         : "=&r" (sctlr) : "r" (5));
+>>>>>>
+>>>>>>         asm volatile(
+>>>>>>         "       mrs %0, pmccntr_el0\n"
+>>>>>>         "       msr sctlr_el1, %2\n"
+>>>>>>         "       mrs %1, pmccntr_el0\n"
+>>>>>>         : "=&r" (start), "=&r" (end) : "r" (sctlr));
+>>>>>>
+>>>>>>         printf("%llx\n", end - start);
+>>>>>>         return 0;
+>>>>>> }
+>>>>>>
+>>>>>> after applying this patch to kvm
+>>>>>>
+>>>>>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+>>>>>> index bb91b6fc63861..5de39d740aa58 100644
+>>>>>> --- a/arch/arm64/kvm/hyp.S
+>>>>>> +++ b/arch/arm64/kvm/hyp.S
+>>>>>> @@ -770,7 +770,7 @@
+>>>>>>
+>>>>>>         mrs     x2, mdcr_el2
+>>>>>>         and     x2, x2, #MDCR_EL2_HPMN_MASK
+>>>>>> -       orr     x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
+>>>>>> +//     orr     x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
+>>>>>>         orr     x2, x2, #(MDCR_EL2_TDRA | MDCR_EL2_TDOSA)
+>>>>>>
+>>>>>>         // Check for KVM_ARM64_DEBUG_DIRTY, and set debug to trap
+>>>>>>
+>>>>>> But I get zero for the cycle count. Not sure what I'm missing.
+>>>>>>
+>>>>>
+>>>>> No clue tbh. Does the counter work as expected in the host?
+>>>>>
+>>>>
+>>>> Guess not. I dropped the test into a module_init and inserted
+>>>> it on the host. Always get zero for pmccntr_el0 reads. Or, if
+>>>> I set it to something non-zero with a write, then I always get
+>>>> that back - no increments. pmcr_el0 looks OK... I had forgotten
+>>>> to set bit 31 of pmcntenset_el0, but doing that still doesn't
+>>>> help. Anyway, I assume the problem is me. I'll keep looking to
+>>>> see what I'm missing.
+>>>>
+>>>
+>>> I returned to this and see that the problem was indeed me. I needed yet
+>>> another enable bit set (the filter register needed to be instructed to
+>>> count cycles while in el2). I've attached the code for the curious.
+>>> The numbers are mean=6999, std_dev=242. Run on the host, or in a guest
+>>> running on a host without this patch series (after TVM traps have been
+>>> disabled), I get a pretty consistent 40.
+>>>
+>>> I checked how many vm-sysreg traps we do during the kernel compile
+>>> benchmark. It's 124924. So it's a bit strange that we don't see the
+>>> benchmark taking 10 to 20 seconds longer on average. I should probably
+>>> double check my runs. In any case, while I like the approach of this
+>>> series, the overhead is looking non-negligible.
+>>>
+>>
+>> Thanks a lot for producing these numbers. 125k x 7k == <1 billion
+>> cycles == <1 second on a >1 GHz machine, I think?
+>> Or am I missing something? How long does the actual compile take?
+>>
+> I ran a sequence of benchmarks that I occasionally run (pbzip,
+> kernbench, and hackbench) and I also saw < 1% performance degradation,
+> so I think we can trust that somewhat.  (I can post the raw numbers when
+> I have ssh access to my Linux desktop - sending this from Somewhere Over
+> The Atlantic).
 > 
-> diff --git a/arch/alpha/kernel/sys_nautilus.c b/arch/alpha/kernel/sys_nautilus.c
-> index 4ae4a40..2c864bb 100644
-> --- a/arch/alpha/kernel/sys_nautilus.c
-> +++ b/arch/alpha/kernel/sys_nautilus.c
-> @@ -206,7 +206,7 @@ nautilus_init_pci(void)
->  	unsigned long memtop = max_low_pfn << PAGE_SHIFT;
->  
->  	/* Scan our single hose.  */
-> -	bus = pci_scan_bus(0, alpha_mv.pci_ops, hose);
-> +	bus = pci_scan_bus_legacy(0, alpha_mv.pci_ops, hose);
->  	hose->bus = bus;
->  	pcibios_claim_one_bus(bus);
->  
-> diff --git a/arch/m68k/coldfire/pci.c b/arch/m68k/coldfire/pci.c
-> index d45f087..0ef4dd4 100644
-> --- a/arch/m68k/coldfire/pci.c
-> +++ b/arch/m68k/coldfire/pci.c
-> @@ -312,7 +312,7 @@ static int __init mcf_pci_init(void)
->  	set_current_state(TASK_UNINTERRUPTIBLE);
->  	schedule_timeout(msecs_to_jiffies(200));
->  
-> -	rootbus = pci_scan_bus(0, &mcf_pci_ops, NULL);
-> +	rootbus = pci_scan_bus_legacy(0, &mcf_pci_ops, NULL);
->  	rootbus->resource[0] = &mcf_pci_io;
->  	rootbus->resource[1] = &mcf_pci_mem;
->  
-> diff --git a/arch/sparc/kernel/pcic.c b/arch/sparc/kernel/pcic.c
-> index 7a82fe2..f7edc97 100644
-> --- a/arch/sparc/kernel/pcic.c
-> +++ b/arch/sparc/kernel/pcic.c
-> @@ -390,7 +390,7 @@ static void __init pcic_pbm_scan_bus(struct linux_pcic *pcic)
->  {
->  	struct linux_pbm_info *pbm = &pcic->pbm;
->  
-> -	pbm->pci_bus = pci_scan_bus(pbm->pci_first_busno, &pcic_ops, pbm);
-> +	pbm->pci_bus = pci_scan_bus_legacy(pbm->pci_first_busno, &pcic_ops, pbm);
->  	if (pbm->pci_bus)
->  		pci_bus_add_devices(pbm->pci_bus);
->  #if 0 /* deadwood transplanted from sparc64 */
-> diff --git a/arch/unicore32/kernel/pci.c b/arch/unicore32/kernel/pci.c
-> index 3d82024..2e238b4 100644
-> --- a/arch/unicore32/kernel/pci.c
-> +++ b/arch/unicore32/kernel/pci.c
-> @@ -258,7 +258,7 @@ static int __init pci_common_init(void)
->  
->  	pci_puv3_preinit();
->  
-> -	puv3_bus = pci_scan_bus(0, &pci_puv3_ops, NULL);
-> +	puv3_bus = pci_scan_bus_legacy(0, &pci_puv3_ops, NULL);
->  
->  	if (!puv3_bus)
->  		panic("PCI: unable to scan bus!");
-> diff --git a/drivers/pci/hotplug/ibmphp_core.c b/drivers/pci/hotplug/ibmphp_core.c
-> index 86e3bfd..4ade1b4 100644
-> --- a/drivers/pci/hotplug/ibmphp_core.c
-> +++ b/drivers/pci/hotplug/ibmphp_core.c
-> @@ -765,7 +765,7 @@ static u8 bus_structure_fixup(u8 busno)
->  					(l != 0x0000) && (l != 0xffff)) {
->  			debug("%s - Inside bus_structure_fixup()\n",
->  							__func__);
-> -			b = pci_scan_bus(busno, ibmphp_pci_bus->ops, NULL);
-> +			b = pci_scan_bus_legacy(busno, ibmphp_pci_bus->ops, NULL);
->  			if (b)
->  				pci_bus_add_devices(b);
->  			break;
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 699a238..ccab9b1 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -2091,7 +2091,7 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
->  }
->  EXPORT_SYMBOL(pci_scan_root_bus);
->  
-> -struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops,
-> +struct pci_bus *pci_scan_bus_legacy(int bus, struct pci_ops *ops,
->  					void *sysdata)
->  {
->  	LIST_HEAD(resources);
-> @@ -2108,7 +2108,7 @@ struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops,
->  	}
->  	return b;
->  }
-> -EXPORT_SYMBOL(pci_scan_bus);
-> +EXPORT_SYMBOL(pci_scan_bus_legacy);
->  
->  /**
->   * pci_rescan_bus_bridge_resize - scan a PCI bus for devices.
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 36effb8..6dffc57 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -769,7 +769,7 @@ void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
->  void pcibios_scan_specific_bus(int busn);
->  struct pci_bus *pci_find_bus(int domain, int busnr);
->  void pci_bus_add_devices(const struct pci_bus *bus);
-> -struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata);
-> +struct pci_bus *pci_scan_bus_legacy(int bus, struct pci_ops *ops, void *sysdata);
->  struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
->  				    struct pci_ops *ops, void *sysdata,
->  				    struct list_head *resources);
-> -- 
-> 1.7.1
+> However, my concern with these patches are on two points:
+> 
+> 1. It's not a fix-all.  We still have the case where the guest expects
+> the behavior of device memory (for strong ordering for example) on a RAM
+> region, which we now break.  Similiarly this doesn't support the
+> non-coherent DMA to RAM region case.
+> 
+> 2. While the code is probably as nice as this kind of stuff gets, it
+> is non-trivial and extremely difficult to debug.  The counter-point here
+> is that we may end up handling other stuff at EL2 for performanc reasons
+> in the future.
+> 
+> Mainly because of point 1 above, I am leaning to thinking userspace
+> should do the invalidation when it knows it needs to, either through KVM
+> via a memslot flag or through some other syscall mechanism.
+> 
+> Thanks,
+> -Christoffer
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
 > 
