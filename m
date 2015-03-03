@@ -1,32 +1,53 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 3 Mar 2015 08:29:49 +0100
-Subject: [PATCH 8/9] ARM: EXYNOS: suspend requires regulator access
-In-Reply-To: <2062492.pEav958W9c@wuerfel>
-References: <1423769746-582629-1-git-send-email-arnd@arndb.de>
- <2062492.pEav958W9c@wuerfel>
-Message-ID: <CABxcv=kMCiLui82eC6MNbH80qzdyzkJfUPgD3oWWfgL4voRTWw@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 3 Mar 2015 08:31:32 +0100
+Subject: [PATCH v2 0/5] split ET_DYN ASLR from mmap ASLR
+In-Reply-To: <1425341988-1599-1-git-send-email-keescook@chromium.org>
+References: <1425341988-1599-1-git-send-email-keescook@chromium.org>
+Message-ID: <20150303073132.GA30602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
 
-On Mon, Mar 2, 2015 at 10:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Building an exynos kernel without regulators but with suspend enabled results
-> in a link error:
->
-> arch/arm/mach-exynos/built-in.o: In function `exynos_suspend_finish':
-> arch/arm/mach-exynos/suspend.c:532: undefined reference to `regulator_suspend_finish'
-> arch/arm/mach-exynos/built-in.o: In function `exynos_suspend_prepare':
-> arch/arm/mach-exynos/suspend.c:515: undefined reference to `regulator_suspend_prepare'
->
-> This adds an appropriate 'select' statement in Kconfig to ensure the symbols
-> are available.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+* Kees Cook <keescook@chromium.org> wrote:
 
-The patch looks good to me.
+> To address the "offset2lib" ASLR weakness[1], this separates ET_DYN
+> ASLR from mmap ASLR, as already done on s390. The architectures
+> that are already randomizing mmap (arm, arm64, mips, powerpc, s390,
+> and x86), have their various forms of arch_mmap_rnd() made available
+> via the new CONFIG_ARCH_HAS_ELF_RANDOMIZE. For these architectures,
+> arch_randomize_brk() is collapsed as well.
+> 
+> This is an alternative to the solutions in:
+> https://lkml.org/lkml/2015/2/23/442
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Looks good so far:
 
-Best regards,
-Javier
+Reviewed-by: Ingo Molnar <mingo@kernel.org>
+
+While reviewing this series I also noticed that the following code 
+could be factored out from architecture mmap code as well:
+
+  - arch_pick_mmap_layout() uses very similar patterns across the 
+    platforms, with only few variations. Many architectures use 
+    the same duplicated mmap_is_legacy() helper as well. There's 
+    usually just trivial differences between mmap_legacy_base() 
+    approaches as well.
+
+  - arch_mmap_rnd(): the PF_RANDOMIZE checks are needlessly
+    exposed to the arch routine - the arch routine should only 
+    concentrate on arch details, not generic flags like
+    PF_RANDOMIZE.
+
+In theory the mmap layout could be fully parametrized as well: i.e. no 
+callback functions to architectures by default at all: just 
+declarations of bits of randomization desired (or, available address 
+space bits), and perhaps an arch helper to allow 32-bit vs. 64-bit 
+address space distinctions.
+
+'Weird' architectures could provide special routines, but only by 
+overriding the default behavior, which should be generic, safe and 
+robust.
+
+Thanks,
+
+	Ingo
