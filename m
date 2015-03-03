@@ -1,62 +1,74 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 3 Mar 2015 14:53:56 -0600
-Subject: [PATCH - v7] of: Move of_dma_configure() to device.c to help
- re-use
-In-Reply-To: <54F5F59C.5000603@ti.com>
-References: <1425333548-8802-1-git-send-email-m-karicheri2@ti.com>
- <CAErSpo7MsxgVZyhpijRzVN7mVNcbN7M4A4W-UKaNs4AnmGrB6g@mail.gmail.com>
- <54F5F59C.5000603@ti.com>
-Message-ID: <CAErSpo5gPVqRrzZ3LbWvLRchr6SjxN0eve62dTJamfz+=O882Q@mail.gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Tue, 3 Mar 2015 21:58:16 +0100
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <54F5F9DC.3020206@redhat.com>
+References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
+ <54F5F090.6090707@suse.de> <54F5F9DC.3020206@redhat.com>
+Message-ID: <20150303205815.GA13911@hawk.usersys.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc linux-pci]
+On Tue, Mar 03, 2015 at 07:13:48PM +0100, Laszlo Ersek wrote:
+> On 03/03/15 18:34, Alexander Graf wrote:
+> > On 02/19/2015 11:54 AM, Ard Biesheuvel wrote:
+> >> This is a 0th order approximation of how we could potentially force
+> >> the guest
+> >> to avoid uncached mappings, at least from the moment the MMU is on.
+> >> (Before
+> >> that, all of memory is implicitly classified as Device-nGnRnE)
+> >>
+> >> The idea (patch #2) is to trap writes to MAIR_EL1, and replace
+> >> uncached mappings
+> >> with cached ones. This way, there is no need to mangle any guest page
+> >> tables.
+> >>
+> >> The downside is that, to do this correctly, we need to always trap
+> >> writes to
+> >> the VM sysreg group, which includes registers that the guest may write
+> >> to very
+> >> often. To reduce the associated performance hit, patch #1 introduces a
+> >> fast path
+> >> for EL2 to perform trivial sysreg writes on behalf of the guest,
+> >> without the
+> >> need for a full world switch to the host and back.
+> >>
+> >> The main purpose of these patches is to quantify the performance hit, and
+> >> verify whether the MAIR_EL1 handling works correctly.
+> > 
+> > I gave this a quick spin on a VM running with QEMU.
+> > 
+> >   * VGA output is still distorted, I get random junk black lines in the
+> > output in between
+> >   * When I add -device nec-usb-xhci -device usb-kbd the VM doesn't even
+> > boot up
+> 
+> Do you also have the dirty page tracking patches in your host kernel? I
+> needed both (and got them via Drew's backport, thanks) and then both VGA
+> and USB started working fine.
 
-On Tue, Mar 3, 2015 at 11:55 AM, Murali Karicheri <m-karicheri2@ti.com> wrote:
-> On 03/02/2015 10:43 PM, Bjorn Helgaas wrote:
->>
->> On Mon, Mar 2, 2015 at 3:59 PM, Murali Karicheri<m-karicheri2@ti.com>
->> wrote:
->>>
->>> Move of_dma_configure() to device.c so it can be re-used for PCI devices
->>> to
->>> obtain DMA configuration from DT.  Also add a second argument so that for
->>> PCI, the DT node of root bus host bridge can be used to obtain the DMA
->>> configuration for the slave PCI device.
->>>
->>> Tested-by: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>  (AMD
->>> Seattle)
->>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
->>> Signed-off-by: Bjorn Helgaas<bhelgaas@google.com>
->>> Reviewed-by: Catalin Marinas<catalin.marinas@arm.com>
->>> Acked-by: Will Deacon<will.deacon@arm.com>
->>> CC: Joerg Roedel<joro@8bytes.org>
->>> CC: Grant Likely<grant.likely@linaro.org>
->>> CC: Rob Herring<robh+dt@kernel.org>
->>> CC: Russell King<linux@arm.linux.org.uk>
->>> CC: Arnd Bergmann<arnd@arndb.de>
->>> ---
->>>   - Based on the existing patch applied to arm-pci/pci/iommu for pci next
->>> (Bjorn)
->>>   - Fixed the build issue reported on ARCH=x86_64
->>
->>
->> Hi Murali,
->>
->> Can you please repost the entire series with fixed patches?  It's
->> easier for me to reapply the whole thing at once than it is to keep
->> track of and fiddle with individual patches.
->>
->> Bjorn
->
-> Bjorn,
->
-> Ok. I have just posted v8 of the series including all patches.
+Assuming you have the dirty page tracking already, then you're probably
+missing the fixup to patch 2/3, s/0xbb/0xff/
 
-Thanks, I put them on a pci/murali-v8 branch for now.  I'm assuming
-you want them to go through my tree.  In the cover letter, you
-mentioned the "arm-pci iommu branch", so if that means you want them
-via an ARM tree instead of mine, just let me know.  I assume the build
-will be clean and I'll rename it back to pci/iommu.
-
-Bjorn
+> 
+> Without the MAIR patches, I got cache-line size "random" corruptions in
+> the VGA display (16 pixel wide small segments). Without dirty page
+> tracking, big chunks (sometimes even almost the entire screen) was blank.
+> 
+> Regarding USB, unless you have both of the patchsets in the host kernel,
+> the guest will indeed crash early during boot. Gerd confirmed for me
+> that "usb controller (all uhci/ehci/xhci) pci regions see both read
+> (status bits) and write (control bits) access". So if there's any
+> corruption in there, on read, that looks like a malfunctioning piece of
+> hw for the guest kernel, and in this case it happens to crash.
+> 
+> > With TCG, both bits work fine.
+> 
+> Yep.
+> 
+> Thanks
+> Laszlo
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
