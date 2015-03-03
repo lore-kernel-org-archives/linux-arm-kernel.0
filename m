@@ -1,66 +1,46 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 3 Mar 2015 16:41:54 +0800
-Subject: [PATCH v4 12/30] PCI: Introduce pci_host_bridge_ops to support
- host specific operations
-In-Reply-To: <20150303030301.GI11978@google.com>
+Date: Tue, 3 Mar 2015 16:49:46 +0800
+Subject: [PATCH v4 20/30] PCI/sparc: Use pci_scan_root_bridge() for
+ simplicity
+In-Reply-To: <20150303031059.GJ11978@google.com>
 References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
- <1424938344-4017-13-git-send-email-wangyijing@huawei.com>
- <20150303030301.GI11978@google.com>
-Message-ID: <54F573D2.6010807@huawei.com>
+ <1424938344-4017-21-git-send-email-wangyijing@huawei.com>
+ <20150303031059.GJ11978@google.com>
+Message-ID: <54F575AA.6050409@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/3 11:03, Bjorn Helgaas wrote:
-> On Thu, Feb 26, 2015 at 04:12:06PM +0800, Yijing Wang wrote:
->> Now we have weak functions like pcibios_root_bridge_prepare()
->> to setup pci host bridge, We could introduce pci_host_bridge_ops
->> which contain host bridge specific ops to setup pci_host_bridge.
->> Then host bridge driver could add pci_host_bridge_ops hooks
->> intead of weak function to setup pci_host_bridge.
->> This patch add following pci_host_bridge_ops hooks:
->>
->> pci_host_bridge_ops {
->> 	/* set root bus speed, some platform need this like powerpc */
->> 	void (*phb_set_root_bus_speed)(struct pci_host_bridge *host);
->> 	/* setup pci_host_bridge before pci_host_bridge be added to driver core */
->> 	int (*phb_prepare)(struct pci_host_bridge *host);
->> 	/* platform specific of scan hook to scan pci device */
->> 	void (*phb_of_scan_bus)(struct pci_host_bridge *);
->> }
->> We could easily extend it to support different host bridge
->> specific operations.
->>
->> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
->> ...
-> 
->> @@ -2050,10 +2052,13 @@ static struct pci_bus *__pci_scan_root_bus(
->>  		pci_bus_insert_busn_res(b, b->number, 255);
->>  	}
+>> -	pci_of_scan_bus(pbm, node, bus);
+>> -	pci_bus_add_devices(bus);
+>> -	pci_bus_register_of_sysfs(bus);
+>> +	pci_bus_add_devices(host->bus);
+>> +	pci_bus_register_of_sysfs(host->bus);
 >>  
->> -	max = pci_scan_child_bus(b);
->> -
->> -	if (!found)
->> -		pci_bus_update_busn_res_end(b, max);
->> +	if (host->ops && host->ops->phb_of_scan_bus) {
->> +		host->ops->phb_of_scan_bus(host);
+>> -	pci_claim_bus_resources(bus);
+>> +	pci_claim_bus_resources(host->bus);
 > 
-> The important thing here is not the use of OF (Open Firmware/Device Tree),
-> is it?  Why would we want "_of_" in the function name?  I assume the intent
-> is that this host bridge op performs the same function as
-> pci_scan_child_bus(), so I think the op should be called "scan_bus".
+> Isn't this a case where pci_claim_bus_resources() should be done before
+> pci_bus_add_devices()?  You didn't introduce this problem, but since you're
+> fixing similar issues, seems like we should fix this one, too.  In a patch
+> of its own, of course.
 
-Yes, because now only OF code need the private scan_child_bus, so I named it
-phb_of_scan_bus(). I agree that rename it to scan_bus.
+OK, will fix in a another patch.
 
 > 
->> +	} else {
->> +		max = pci_scan_child_bus(b);
->> +		if (!found)
->> +			pci_bus_update_busn_res_end(b, max);
->> +	}
 >>  
->>  	return b;
+>> -	return bus;
+>> +	return host->bus;
 >>  }
+>>  
+>>  void pcibios_fixup_bus(struct pci_bus *pbus)
+>> -- 
+>> 1.7.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
 > 
 > .
 > 
