@@ -1,45 +1,61 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Tue, 3 Mar 2015 13:09:04 +0800
-Subject: [PATCH 2/3] ftrace/x86: don't return error if other makes a same code
- change.
+Date: Tue, 3 Mar 2015 13:09:03 +0800
+Subject: [PATCH 1/3] early kprobes: make kprobes_on_ftrace_initialized public
+ available.
 In-Reply-To: <1425359345-38714-1-git-send-email-wangnan0@huawei.com>
 References: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
  <1425359345-38714-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1425359345-38714-3-git-send-email-wangnan0@huawei.com>
+Message-ID: <1425359345-38714-2-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In ftrace_modify_code_direct(), if the target instruction has already
-been modified by other to the desire instruction, don't return error.
+That var is useful for x86 recover_probed_instruction() for recovering
+ftraced instructions, to make it possible to determine whether the
+instruction has been converted to nop by ftrace.
 
-This patch is for early kprobe. If an early kprobe is unregistered
-before ftrace is ready, the instruction may have already been restored
-to NOP.
+I will merge this patch into next version of early kprobe series.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
 ---
- arch/x86/kernel/ftrace.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ include/linux/kprobes.h | 3 +++
+ kernel/kprobes.c        | 4 +---
+ 2 files changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/x86/kernel/ftrace.c b/arch/x86/kernel/ftrace.c
-index 0a86c7c..fba1779 100644
---- a/arch/x86/kernel/ftrace.c
-+++ b/arch/x86/kernel/ftrace.c
-@@ -121,8 +121,13 @@ ftrace_modify_code_direct(unsigned long ip, unsigned const char *old_code,
- 		return -EFAULT;
+diff --git a/include/linux/kprobes.h b/include/linux/kprobes.h
+index 2d78bbb..24eac73 100644
+--- a/include/linux/kprobes.h
++++ b/include/linux/kprobes.h
+@@ -288,6 +288,8 @@ extern const unsigned char *arch_kprobe_on_ftrace_get_old_insn(struct kprobe *kp
+ 		const unsigned char *ftrace_nop, unsigned char *dest, size_t insn_size);
  
- 	/* Make sure it is what we expect it to be */
--	if (memcmp(replaced, old_code, MCOUNT_INSN_SIZE) != 0)
--		return -EINVAL;
-+	if (memcmp(replaced, old_code, MCOUNT_INSN_SIZE) != 0) {
-+		/* Check if someone else has already done it */
-+		if (memcmp(replaced, new_code, MCOUNT_INSN_SIZE) != 0)
-+			return -EINVAL;
-+		else
-+			return 0;
-+	}
+ extern void init_kprobes_on_ftrace(void);
++extern bool kprobes_on_ftrace_initialized __read_mostly;
++
+ extern bool kprobe_fix_ftrace_make_nop(struct dyn_ftrace *rec);
+ extern const unsigned char *kprobe_on_ftrace_get_old_insn(struct dyn_ftrace *rec,
+ 		const unsigned char *ftrace_nop, unsigned char *dest, size_t insn_size);
+@@ -295,6 +297,7 @@ extern const unsigned char *kprobe_on_ftrace_get_old_insn(struct dyn_ftrace *rec
+ static inline void init_kprobes_on_ftrace(void)
+ {
+ }
++#define kprobes_on_ftrace_initialized	true
  
- 	ip = text_ip_addr(ip);
+ static inline bool kprobe_fix_ftrace_make_nop(struct dyn_ftrace *_unused)
+ {
+diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+index 1ec8e6e..2d4e671 100644
+--- a/kernel/kprobes.c
++++ b/kernel/kprobes.c
+@@ -70,9 +70,7 @@
+ static int kprobes_initialized;
+ static int kprobes_blacklist_initialized;
+ #if defined(CONFIG_KPROBES_ON_FTRACE) && defined(CONFIG_EARLY_KPROBES)
+-static bool kprobes_on_ftrace_initialized __read_mostly = false;
+-#else
+-# define kprobes_on_ftrace_initialized	false
++bool kprobes_on_ftrace_initialized __read_mostly = false;
+ #endif
  
+ bool kprobes_is_early(void)
 -- 
 1.8.4
