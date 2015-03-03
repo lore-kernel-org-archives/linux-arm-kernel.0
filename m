@@ -1,24 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 3 Mar 2015 14:14:03 +0000
-Subject: [PATCH 02/10] ASoC: samsung/smartq: use dynamic registration
-In-Reply-To: <1425299763-4066822-3-git-send-email-arnd@arndb.de>
-References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
- <1425299763-4066822-3-git-send-email-arnd@arndb.de>
-Message-ID: <20150303141403.GR21293@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 3 Mar 2015 14:14:49 +0000
+Subject: [RFC PATCH 3/4] arm64: add support for memtest
+In-Reply-To: <54F57E62.6050206@arm.com>
+References: <1425308145-20769-1-git-send-email-vladimir.murzin@arm.com>
+ <1425308145-20769-4-git-send-email-vladimir.murzin@arm.com>
+ <20150302185607.GG7919@arm.com> <54F57E62.6050206@arm.com>
+Message-ID: <20150303141449.GM28951@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 01:35:55PM +0100, Arnd Bergmann wrote:
-> As a prerequisite for moving s3c64xx into multiplatform configurations,
-> we need to change the smartq audio driver to stop using hardcoded
-> gpio numbers from the header file, and instead pass the gpio data
-> through platform_data.
+On Tue, Mar 03, 2015 at 09:26:58AM +0000, Vladimir Murzin wrote:
+> On 02/03/15 18:56, Will Deacon wrote:
+> > On Mon, Mar 02, 2015 at 02:55:44PM +0000, Vladimir Murzin wrote:
+> >> Add support for memtest command line option.
+> >>
+> >> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> >> ---
+> >>  arch/arm64/mm/init.c |    2 ++
+> >>  1 file changed, 2 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> >> index ae85da6..597831b 100644
+> >> --- a/arch/arm64/mm/init.c
+> >> +++ b/arch/arm64/mm/init.c
+> >> @@ -190,6 +190,8 @@ void __init bootmem_init(void)
+> >>  	min = PFN_UP(memblock_start_of_DRAM());
+> >>  	max = PFN_DOWN(memblock_end_of_DRAM());
+> >>  
+> >> +	early_memtest(min << PAGE_SHIFT, max << PAGE_SHIFT);
+> >> +
+> >>  	/*
+> >>  	 * Sparsemem tries to allocate bootmem in memory_present(), so must be
+> >>  	 * done after the fixed reservations.
+> > 
+> > This is really neat, thanks for doing this Vladimir!
+> > 
+> >   Acked-by: Will Deacon <will.deacon@arm.com>
+> > 
+> > For the series, modulo Baruch's comments about Documentation updates.
+> 
+> Thanks Will! I'll wait for awhile for other comments and repost updated
+> version.
+> 
+> I wonder which tree it might go?
 
-Acked-by: Mark Brown <broonie@kernel.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150303/b36dbcb7/attachment-0001.sig>
+Since it touches mm, x86, arm, arm64, I guess it could go in via the mm
+tree (akpm). We could take it via the arm64 tree as well if we have all
+the acks in place.
+
+-- 
+Catalin
