@@ -1,106 +1,88 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  3 Mar 2015 15:41:00 +0100
-Subject: [PATCH v3 05/20] ARM: mvebu: remove aliases for Ethernet devices on
- Armada 370/375/38x/XP
+Date: Tue,  3 Mar 2015 15:41:05 +0100
+Subject: [PATCH v3 10/20] devicetree: bindings: update DT bindings for Marvell
+ EBU clock support
 In-Reply-To: <1425393675-17820-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1425393675-17820-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1425393675-17820-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1425393675-17820-11-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having aliases for Ethernet devices is useless, since the networking
-subsystem unfortunately doesn't care about aliases to name network
-interfaces.
-
-Note that the 'aliases' nodes in armada-370-xp.dtsi and armada-xp.dtsi
-become empty, but that we keep it as is since a followup patch will
-re-add some aliases to it.
+With the introduction of the Marvell Armada 39x SoC, the DT bindings
+for Marvell EBU clocks need to be extended. This commit include the
+corresponding update to the Device Tree bindings documentation.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-xp.dtsi     | 2 --
- arch/arm/boot/dts/armada-375.dtsi        | 2 --
- arch/arm/boot/dts/armada-38x.dtsi        | 3 ---
- arch/arm/boot/dts/armada-xp-mv78260.dtsi | 1 -
- arch/arm/boot/dts/armada-xp-mv78460.dtsi | 1 -
- arch/arm/boot/dts/armada-xp.dtsi         | 1 -
- 6 files changed, 10 deletions(-)
+ .../devicetree/bindings/clock/mvebu-core-clock.txt        |  9 +++++++++
+ .../devicetree/bindings/clock/mvebu-gated-clock.txt       | 15 ++++++++++++++-
+ 2 files changed, 23 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 8a322ad..d36b1e5 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -59,8 +59,6 @@
- 	compatible = "marvell,armada-370-xp";
+diff --git a/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+index dc5ea5b..670c2af 100644
+--- a/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
++++ b/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+@@ -23,6 +23,14 @@ The following is a list of provided IDs and clock names on Armada 380/385:
+  2 = l2clk   (L2 Cache clock)
+  3 = ddrclk  (DDR clock)
  
- 	aliases {
--		eth0 = &eth0;
--		eth1 = &eth1;
- 	};
++The following is a list of provided IDs and clock names on Armada 39x:
++ 0 = tclk    (Internal Bus clock)
++ 1 = cpuclk  (CPU clock)
++ 2 = nbclk   (Coherent Fabric clock)
++ 3 = hclk    (SDRAM Controller Internal Clock)
++ 4 = dclk    (SDRAM Interface Clock)
++ 5 = refclk  (Reference Clock)
++
+ The following is a list of provided IDs and clock names on Kirkwood and Dove:
+  0 = tclk   (Internal Bus clock)
+  1 = cpuclk (CPU0 clock)
+@@ -39,6 +47,7 @@ Required properties:
+ 	"marvell,armada-370-core-clock" - For Armada 370 SoC core clocks
+ 	"marvell,armada-375-core-clock" - For Armada 375 SoC core clocks
+ 	"marvell,armada-380-core-clock" - For Armada 380/385 SoC core clocks
++	"marvell,armada-390-core-clock" - For Armada 39x SoC core clocks
+ 	"marvell,armada-xp-core-clock" - For Armada XP SoC core clocks
+ 	"marvell,dove-core-clock" - for Dove SoC core clocks
+ 	"marvell,kirkwood-core-clock" - for Kirkwood SoC (except mv88f6180)
+diff --git a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+index 76477be..31c7c0c 100644
+--- a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
++++ b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+@@ -1,6 +1,6 @@
+ * Gated Clock bindings for Marvell EBU SoCs
  
- 	cpus {
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index 6307e80..0d02251 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -60,8 +60,6 @@
- 		gpio0 = &gpio0;
- 		gpio1 = &gpio1;
- 		gpio2 = &gpio2;
--		ethernet0 = &eth0;
--		ethernet1 = &eth1;
- 	};
+-Marvell Armada 370/375/380/385/XP, Dove and Kirkwood allow some
++Marvell Armada 370/375/380/385/39x/XP, Dove and Kirkwood allow some
+ peripheral clocks to be gated to save some power. The clock consumer
+ should specify the desired clock by having the clock ID in its
+ "clocks" phandle cell. The clock ID is directly mapped to the
+@@ -77,6 +77,18 @@ ID	Clock		Peripheral
+ 28	xor1		XOR 1
+ 30	sata1		SATA 1
  
- 	clocks {
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index bb73cc3..044e83c 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -59,9 +59,6 @@
- 	aliases {
- 		gpio0 = &gpio0;
- 		gpio1 = &gpio1;
--		ethernet0 = &eth0;
--		ethernet1 = &eth1;
--		ethernet2 = &eth2;
- 	};
- 
- 	soc {
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index 4a7cbed..8479fdc 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -57,7 +57,6 @@
- 		gpio0 = &gpio0;
- 		gpio1 = &gpio1;
- 		gpio2 = &gpio2;
--		eth3 = &eth3;
- 	};
- 
- 	cpus {
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-index 36ce63a..661d54c 100644
---- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -57,7 +57,6 @@
- 		gpio0 = &gpio0;
- 		gpio1 = &gpio1;
- 		gpio2 = &gpio2;
--		eth3 = &eth3;
- 	};
- 
- 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 8291723..975ae64 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -57,7 +57,6 @@
- 	compatible = "marvell,armadaxp", "marvell,armada-370-xp";
- 
- 	aliases {
--		eth2 = &eth2;
- 	};
- 
- 	soc {
++The following is a list of provided IDs for Armada 39x:
++ID	Clock		Peripheral
++-----------------------------------
++5	pex1		PCIe 1
++6	pex2		PCIe 2
++7	pex3		PCIe 3
++8	pex0		PCIe 0
++9	usb3h0		USB3 Host 0
++17	sdio		SDIO
++22	xor0		XOR 0
++28	xor1		XOR 1
++
+ The following is a list of provided IDs for Armada XP:
+ ID	Clock	Peripheral
+ -----------------------------------
+@@ -152,6 +164,7 @@ Required properties:
+ 	"marvell,armada-370-gating-clock" - for Armada 370 SoC clock gating
+ 	"marvell,armada-375-gating-clock" - for Armada 375 SoC clock gating
+ 	"marvell,armada-380-gating-clock" - for Armada 380/385 SoC clock gating
++	"marvell,armada-390-gating-clock" - for Armada 39x SoC clock gating
+ 	"marvell,armada-xp-gating-clock" - for Armada XP SoC clock gating
+ 	"marvell,dove-gating-clock" - for Dove SoC clock gating
+ 	"marvell,kirkwood-gating-clock" - for Kirkwood SoC clock gating
 -- 
 2.1.0
