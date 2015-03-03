@@ -1,83 +1,36 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 2 Mar 2015 20:50:20 -0600
-Subject: [PATCH v4 12/30] PCI: Introduce pci_host_bridge_ops to support
- host specific operations
-In-Reply-To: <1424938344-4017-13-git-send-email-wangyijing@huawei.com>
+Date: Mon, 2 Mar 2015 20:52:22 -0600
+Subject: [PATCH v4 13/30] PCI: Introduce new scan function
+ pci_scan_root_bridge()
+In-Reply-To: <1424938344-4017-14-git-send-email-wangyijing@huawei.com>
 References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
- <1424938344-4017-13-git-send-email-wangyijing@huawei.com>
-Message-ID: <20150303025020.GF11978@google.com>
+ <1424938344-4017-14-git-send-email-wangyijing@huawei.com>
+Message-ID: <20150303025222.GG11978@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 04:12:06PM +0800, Yijing Wang wrote:
-> Now we have weak functions like pcibios_root_bridge_prepare()
-> to setup pci host bridge, We could introduce pci_host_bridge_ops
-> which contain host bridge specific ops to setup pci_host_bridge.
-> Then host bridge driver could add pci_host_bridge_ops hooks
-> intead of weak function to setup pci_host_bridge.
-> This patch add following pci_host_bridge_ops hooks:
-> 
-> pci_host_bridge_ops {
-> 	/* set root bus speed, some platform need this like powerpc */
-> 	void (*phb_set_root_bus_speed)(struct pci_host_bridge *host);
-> 	/* setup pci_host_bridge before pci_host_bridge be added to driver core */
-> 	int (*phb_prepare)(struct pci_host_bridge *host);
-> 	/* platform specific of scan hook to scan pci device */
-> 	void (*phb_of_scan_bus)(struct pci_host_bridge *);
-> }
-> We could easily extend it to support different host bridge
-> specific operations.
+On Thu, Feb 26, 2015 at 04:12:07PM +0800, Yijing Wang wrote:
+> Introduce new scan function pci_scan_root_bridge() to
+> support host bridge drivers that need to provide platform
+> own pci_host_bridge_ops.
 > 
 > Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 > ---
->  drivers/pci/host-bridge.c |   12 ++++++++++--
->  drivers/pci/probe.c       |   17 +++++++++++------
->  include/linux/pci.h       |   12 ++++++++++--
->  3 files changed, 31 insertions(+), 10 deletions(-)
+>  drivers/pci/probe.c |   21 +++++++++++++++++++++
+>  include/linux/pci.h |    3 +++
+>  2 files changed, 24 insertions(+), 0 deletions(-)
 > 
-> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-> index b42a4bb..4a2baa2 100644
-> --- a/drivers/pci/host-bridge.c
-> +++ b/drivers/pci/host-bridge.c
-> @@ -23,8 +23,8 @@ static void pci_release_host_bridge_dev(struct device *dev)
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 8cec6ab..b5f9ca4 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -2063,6 +2063,27 @@ static struct pci_bus *__pci_scan_root_bus(
+>  	return b;
 >  }
 >  
->  struct pci_host_bridge *pci_create_host_bridge(
-> -		struct device *parent, u32 db, 
-> -		struct list_head *resources, void *sysdata)
-> +		struct device *parent, u32 db, struct list_head *resources, 
-> +		void *sysdata, struct pci_host_bridge_ops *ops)
->  {
->  	int error;
->  	int bus = PCI_BUSNUM(db);
-> @@ -56,6 +56,7 @@ struct pci_host_bridge *pci_create_host_bridge(
->  		}
->  	mutex_unlock(&phb_mutex);
->  
-> +	host->ops = ops;
->  	host->dev.parent = parent;
->  	INIT_LIST_HEAD(&host->windows);
->  	host->dev.release = pci_release_host_bridge_dev;
-> @@ -63,6 +64,13 @@ struct pci_host_bridge *pci_create_host_bridge(
->  	dev_set_name(&host->dev, "pci%04x:%02x", host->domain, 
->  			host->busnum);
->  
-> +	if (host->ops && host->ops->phb_prepare) {
-> +		error = host->ops->phb_prepare(host);
-> +		if(error) {
+> +struct pci_host_bridge *pci_scan_root_bridge(struct device *parent,
+> +		u32 db, struct pci_ops *ops, void *sysdata,
+> +		struct list_head *resources, struct pci_host_bridge_ops *phb_ops)
 
-Whitespace error.
-
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -400,6 +400,13 @@ static inline int pci_channel_offline(struct pci_dev *pdev)
->  	return (pdev->error_state != pci_channel_io_normal);
->  }
->  
-> +struct pci_host_bridge;
-> +struct pci_host_bridge_ops {
-> +	void (*phb_set_root_bus_speed)(struct pci_host_bridge *host);
-> +	int (*phb_prepare)(struct pci_host_bridge *host);
-> +	void (*phb_of_scan_bus)(struct pci_host_bridge *);
-
-These function pointers don't need a "phb_" prefix.
+I prefer "host bridge" over "root bridge" because that's the terminology
+used by the PCI specs.
