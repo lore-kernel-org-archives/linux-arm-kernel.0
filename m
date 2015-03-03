@@ -1,53 +1,74 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 3 Mar 2015 08:31:32 +0100
-Subject: [PATCH v2 0/5] split ET_DYN ASLR from mmap ASLR
-In-Reply-To: <1425341988-1599-1-git-send-email-keescook@chromium.org>
-References: <1425341988-1599-1-git-send-email-keescook@chromium.org>
-Message-ID: <20150303073132.GA30602@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue,  3 Mar 2015 08:38:07 +0100
+Subject: [PATCH v2] ARM: at91: pm: fix SRAM allocation
+Message-ID: <1425368287-4971-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On some platforms, there are multiple SRAM nodes defined in the device tree but
+some of them are disabled, leading to allocation failure. Try to find the first
+enabled SRAM node and allocate from it.
 
-* Kees Cook <keescook@chromium.org> wrote:
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Tested-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
+Changes in v2:
+ - initialize pdev to NULL
 
-> To address the "offset2lib" ASLR weakness[1], this separates ET_DYN
-> ASLR from mmap ASLR, as already done on s390. The architectures
-> that are already randomizing mmap (arm, arm64, mips, powerpc, s390,
-> and x86), have their various forms of arch_mmap_rnd() made available
-> via the new CONFIG_ARCH_HAS_ELF_RANDOMIZE. For these architectures,
-> arch_randomize_brk() is collapsed as well.
-> 
-> This is an alternative to the solutions in:
-> https://lkml.org/lkml/2015/2/23/442
+ arch/arm/mach-at91/pm.c | 22 ++++++++++------------
+ 1 file changed, 10 insertions(+), 12 deletions(-)
 
-Looks good so far:
-
-Reviewed-by: Ingo Molnar <mingo@kernel.org>
-
-While reviewing this series I also noticed that the following code 
-could be factored out from architecture mmap code as well:
-
-  - arch_pick_mmap_layout() uses very similar patterns across the 
-    platforms, with only few variations. Many architectures use 
-    the same duplicated mmap_is_legacy() helper as well. There's 
-    usually just trivial differences between mmap_legacy_base() 
-    approaches as well.
-
-  - arch_mmap_rnd(): the PF_RANDOMIZE checks are needlessly
-    exposed to the arch routine - the arch routine should only 
-    concentrate on arch details, not generic flags like
-    PF_RANDOMIZE.
-
-In theory the mmap layout could be fully parametrized as well: i.e. no 
-callback functions to architectures by default at all: just 
-declarations of bits of randomization desired (or, available address 
-space bits), and perhaps an arch helper to allow 32-bit vs. 64-bit 
-address space distinctions.
-
-'Weird' architectures could provide special routines, but only by 
-overriding the default behavior, which should be generic, safe and 
-robust.
-
-Thanks,
-
-	Ingo
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 5e34fb143309..aa4116e9452f 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -270,37 +270,35 @@ static void __init at91_pm_sram_init(void)
+ 	phys_addr_t sram_pbase;
+ 	unsigned long sram_base;
+ 	struct device_node *node;
+-	struct platform_device *pdev;
++	struct platform_device *pdev = NULL;
+ 
+-	node = of_find_compatible_node(NULL, NULL, "mmio-sram");
+-	if (!node) {
+-		pr_warn("%s: failed to find sram node!\n", __func__);
+-		return;
++	for_each_compatible_node(node, NULL, "mmio-sram") {
++		pdev = of_find_device_by_node(node);
++		if (pdev) {
++			of_node_put(node);
++			break;
++		}
+ 	}
+ 
+-	pdev = of_find_device_by_node(node);
+ 	if (!pdev) {
+ 		pr_warn("%s: failed to find sram device!\n", __func__);
+-		goto put_node;
++		return;
+ 	}
+ 
+ 	sram_pool = dev_get_gen_pool(&pdev->dev);
+ 	if (!sram_pool) {
+ 		pr_warn("%s: sram pool unavailable!\n", __func__);
+-		goto put_node;
++		return;
+ 	}
+ 
+ 	sram_base = gen_pool_alloc(sram_pool, at91_slow_clock_sz);
+ 	if (!sram_base) {
+ 		pr_warn("%s: unable to alloc ocram!\n", __func__);
+-		goto put_node;
++		return;
+ 	}
+ 
+ 	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
+ 	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz, false);
+-
+-put_node:
+-	of_node_put(node);
+ }
+ #endif
+ 
+-- 
+2.1.0
