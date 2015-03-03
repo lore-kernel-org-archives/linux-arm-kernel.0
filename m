@@ -1,222 +1,242 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 3 Mar 2015 11:41:35 +0800
-Subject: [PATCH] ARM: dts: imx: Add dr_mode host setting to all host-only
- usb instances
-In-Reply-To: <1425045960-14191-1-git-send-email-mporter@konsulko.com>
-References: <1425045960-14191-1-git-send-email-mporter@konsulko.com>
-Message-ID: <20150303034133.GJ20455@dragon>
+From: otavio@ossystems.com.br (Otavio Salvador)
+Date: Tue,  3 Mar 2015 00:41:45 -0300
+Subject: [PATCH v2] ARM: dts: warp: Add initial WaRP Board support
+Message-ID: <1425354105-8118-1-git-send-email-otavio@ossystems.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter,
+The WaRP Board is a Wearable Reference Plaform. The board features:
 
-Can you take a look at Matt's patch below?
+ - Freescale i.MX6 SoloLite processor with 512MB of RAM
+ - Freescale FXOS8700CQ 6-axis Xtrinsic sensor
+ - Freescale Kinetis KL16 MCU
+ - Freescale Xtrinsic MMA955xL intelligent motion sensing platform
 
-Shawn
+The board implements a hybrid architecture to address the evolving
+needs of the wearables market. The platform consists of a main board
+and an example daughtercard with the ability to add additional
+daughtercards for different usage models.
 
-On Fri, Feb 27, 2015 at 09:06:00AM -0500, Matt Porter wrote:
-> The chipidea driver adds an extra line of spam to the log when a
-> host-only chipidea instance is left set to the default of a dual role
-> controller.
-> 
-> [    2.010873] ci_hdrc ci_hdrc.1: doesn't support gadget
-> 
-> Set the dr_mode property to host on all the host-only nodes
-> to avoid this warning.
-> 
-> Signed-off-by: Matt Porter <mporter@konsulko.com>
-> ---
->  arch/arm/boot/dts/imx27.dtsi   | 2 ++
->  arch/arm/boot/dts/imx28.dtsi   | 1 +
->  arch/arm/boot/dts/imx35.dtsi   | 1 +
->  arch/arm/boot/dts/imx50.dtsi   | 3 +++
->  arch/arm/boot/dts/imx51.dtsi   | 3 +++
->  arch/arm/boot/dts/imx53.dtsi   | 3 +++
->  arch/arm/boot/dts/imx6qdl.dtsi | 3 +++
->  arch/arm/boot/dts/imx6sl.dtsi  | 1 +
->  arch/arm/boot/dts/imx6sx.dtsi  | 1 +
->  9 files changed, 18 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> index 4b063b6..6951b66 100644
-> --- a/arch/arm/boot/dts/imx27.dtsi
-> +++ b/arch/arm/boot/dts/imx27.dtsi
-> @@ -488,6 +488,7 @@
->  				interrupts = <54>;
->  				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
->  				fsl,usbmisc = <&usbmisc 1>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> @@ -497,6 +498,7 @@
->  				interrupts = <55>;
->  				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
->  				fsl,usbmisc = <&usbmisc 2>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 47f68ac..02330f4 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -1197,6 +1197,7 @@
->  			interrupts = <92>;
->  			clocks = <&clks 61>;
->  			fsl,usbphy = <&usbphy1>;
-> +			dr_mode = "host";
->  			status = "disabled";
->  		};
->  
-> diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
-> index 6932928..b6478e9 100644
-> --- a/arch/arm/boot/dts/imx35.dtsi
-> +++ b/arch/arm/boot/dts/imx35.dtsi
-> @@ -318,6 +318,7 @@
->  				clocks = <&clks 73>;
->  				fsl,usbmisc = <&usbmisc 1>;
->  				fsl,usbphy = <&usbphy1>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
-> index 620b0f0..e245713 100644
-> --- a/arch/arm/boot/dts/imx50.dtsi
-> +++ b/arch/arm/boot/dts/imx50.dtsi
-> @@ -197,6 +197,7 @@
->  				reg = <0x53f80200 0x0200>;
->  				interrupts = <14>;
->  				clocks = <&clks IMX5_CLK_USB_PHY2_GATE>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> @@ -205,6 +206,7 @@
->  				reg = <0x53f80400 0x0200>;
->  				interrupts = <16>;
->  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> @@ -213,6 +215,7 @@
->  				reg = <0x53f80600 0x0200>;
->  				interrupts = <17>;
->  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-> index c0116cf..f46fe9b 100644
-> --- a/arch/arm/boot/dts/imx51.dtsi
-> +++ b/arch/arm/boot/dts/imx51.dtsi
-> @@ -265,6 +265,7 @@
->  				interrupts = <14>;
->  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
->  				fsl,usbmisc = <&usbmisc 1>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> @@ -274,6 +275,7 @@
->  				interrupts = <16>;
->  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
->  				fsl,usbmisc = <&usbmisc 2>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> @@ -283,6 +285,7 @@
->  				interrupts = <17>;
->  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
->  				fsl,usbmisc = <&usbmisc 3>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index ff4fa7e..c3e3ca9 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -309,6 +309,7 @@
->  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
->  				fsl,usbmisc = <&usbmisc 1>;
->  				fsl,usbphy = <&usbphy1>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> @@ -318,6 +319,7 @@
->  				interrupts = <16>;
->  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
->  				fsl,usbmisc = <&usbmisc 2>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> @@ -327,6 +329,7 @@
->  				interrupts = <17>;
->  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
->  				fsl,usbmisc = <&usbmisc 3>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index d6c69ec..9347c93 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -845,6 +845,7 @@
->  				clocks = <&clks IMX6QDL_CLK_USBOH3>;
->  				fsl,usbphy = <&usbphy2>;
->  				fsl,usbmisc = <&usbmisc 1>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> @@ -854,6 +855,7 @@
->  				interrupts = <0 41 IRQ_TYPE_LEVEL_HIGH>;
->  				clocks = <&clks IMX6QDL_CLK_USBOH3>;
->  				fsl,usbmisc = <&usbmisc 2>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> @@ -863,6 +865,7 @@
->  				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
->  				clocks = <&clks IMX6QDL_CLK_USBOH3>;
->  				fsl,usbmisc = <&usbmisc 3>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> index 36ab8e0..9bf1db3 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -699,6 +699,7 @@
->  				interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>;
->  				clocks = <&clks IMX6SL_CLK_USBOH3>;
->  				fsl,usbmisc = <&usbmisc 2>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-> index 7a24fee..fdadd060 100644
-> --- a/arch/arm/boot/dts/imx6sx.dtsi
-> +++ b/arch/arm/boot/dts/imx6sx.dtsi
-> @@ -763,6 +763,7 @@
->  				fsl,usbmisc = <&usbmisc 2>;
->  				phy_type = "hsic";
->  				fsl,anatop = <&anatop>;
-> +				dr_mode = "host";
->  				status = "disabled";
->  			};
->  
-> -- 
-> 1.8.4
-> 
+For more information about the project, visit:
+
+ http://www.warpboard.org/
+
+Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+---
+ arch/arm/boot/dts/Makefile        |   3 +-
+ arch/arm/boot/dts/imx6sl-warp.dts | 190 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 192 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/imx6sl-warp.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a1c776b..1b49d57 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -299,7 +299,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-wandboard.dtb \
+ 	imx6q-wandboard-revb1.dtb
+ dtb-$(CONFIG_SOC_IMX6SL) += \
+-	imx6sl-evk.dtb
++	imx6sl-evk.dtb \
++	imx6sl-warp.dtb
+ dtb-$(CONFIG_SOC_IMX6SX) += \
+ 	imx6sx-sabreauto.dtb \
+ 	imx6sx-sdb.dtb
+diff --git a/arch/arm/boot/dts/imx6sl-warp.dts b/arch/arm/boot/dts/imx6sl-warp.dts
+new file mode 100644
+index 0000000..904efc4
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6sl-warp.dts
+@@ -0,0 +1,190 @@
++/*
++ * Copyright 2014, 2015 O.S. Systems Software LTDA.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of
++ *     the License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "imx6sl.dtsi"
++
++/ {
++	model = "WaRP Board";
++	compatible = "warp,imx6sl-warp", "fsl,imx6sl";
++
++	memory {
++		reg = <0x80000000 0x20000000>;
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_usb_otg1_vbus: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "usb_otg1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio4 0 0>;
++			enable-active-high;
++		};
++
++		reg_usb_otg2_vbus: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "usb_otg2_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio4 2 0>;
++			enable-active-high;
++		};
++
++		reg_1p8v: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "1P8V";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++		};
++	};
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	status = "okay";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3>;
++	status = "okay";
++};
++
++&usbotg1 {
++	vbus-supply = <&reg_usb_otg1_vbus>;
++	dr_mode = "host";
++	disable-over-current;
++	status = "okay";
++};
++
++&usbotg2 {
++	vbus-supply = <&reg_usb_otg2_vbus>;
++	disable-over-current;
++	status = "okay";
++};
++
++&usdhc2 {
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	pinctrl-1 = <&pinctrl_usdhc2_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc2_200mhz>;
++	non-removable;
++	status = "okay";
++};
++
++&iomuxc {
++	imx6sl-warp {
++		pinctrl_uart1: uart1grp {
++			fsl,pins = <
++				MX6SL_PAD_UART1_RXD__UART1_RX_DATA	0x41b0b1
++				MX6SL_PAD_UART1_TXD__UART1_TX_DATA	0x41b0b1
++			>;
++		};
++
++		pinctrl_uart3: uart3grp {
++			fsl,pins = <
++				MX6SL_PAD_AUD_RXC__UART3_RX_DATA	0x41b0b1
++				MX6SL_PAD_AUD_RXC__UART3_TX_DATA	0x41b0b1
++			>;
++		};
++
++		pinctrl_usdhc2: usdhc2grp {
++			fsl,pins = <
++				MX6SL_PAD_SD2_CMD__SD2_CMD		0x417059
++				MX6SL_PAD_SD2_CLK__SD2_CLK		0x410059
++				MX6SL_PAD_SD2_DAT0__SD2_DATA0		0x417059
++				MX6SL_PAD_SD2_DAT1__SD2_DATA1		0x417059
++				MX6SL_PAD_SD2_DAT2__SD2_DATA2		0x417059
++				MX6SL_PAD_SD2_DAT3__SD2_DATA3		0x417059
++				MX6SL_PAD_SD2_DAT4__SD2_DATA4		0x417059
++				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x417059
++				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x417059
++				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x417059
++			>;
++		};
++
++		pinctrl_usdhc2_100mhz: usdhc2grp100mhz {
++			fsl,pins = <
++				MX6SL_PAD_SD2_CMD__SD2_CMD		0x4170b9
++				MX6SL_PAD_SD2_CLK__SD2_CLK		0x4100b9
++				MX6SL_PAD_SD2_DAT0__SD2_DATA0		0x4170b9
++				MX6SL_PAD_SD2_DAT1__SD2_DATA1		0x4170b9
++				MX6SL_PAD_SD2_DAT2__SD2_DATA2		0x4170b9
++				MX6SL_PAD_SD2_DAT3__SD2_DATA3		0x4170b9
++				MX6SL_PAD_SD2_DAT4__SD2_DATA4		0x4170b9
++				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x4170b9
++				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x4170b9
++				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x4170b9
++			>;
++		};
++
++		pinctrl_usdhc2_200mhz: usdhc2grp200mhz {
++			fsl,pins = <
++				MX6SL_PAD_SD2_CMD__SD2_CMD		0x4170f9
++				MX6SL_PAD_SD2_CLK__SD2_CLK		0x4100f9
++				MX6SL_PAD_SD2_DAT0__SD2_DATA0		0x4170f9
++				MX6SL_PAD_SD2_DAT1__SD2_DATA1		0x4170f9
++				MX6SL_PAD_SD2_DAT2__SD2_DATA2		0x4170f9
++				MX6SL_PAD_SD2_DAT3__SD2_DATA3		0x4170f9
++				MX6SL_PAD_SD2_DAT4__SD2_DATA4		0x4170f9
++				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x4170f9
++				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x4170f9
++				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x4170f9
++			>;
++		};
++	};
++};
+-- 
+2.1.4
