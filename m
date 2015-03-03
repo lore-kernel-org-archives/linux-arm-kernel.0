@@ -1,96 +1,68 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 3 Mar 2015 12:36:57 +0000
-Subject: Alignment issue with ldmia
-In-Reply-To: <54F52F4B.3060402@hisilicon.com>
-References: <54F52F4B.3060402@hisilicon.com>
-Message-ID: <20150303123638.GA5177@e103592.cambridge.arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 03 Mar 2015 13:44:34 +0100
+Subject: [PATCH] ARM: fix exynos randconfig build error
+In-Reply-To: <54F4BC92.2050405@kernel.org>
+References: <E1YQa78-0000O0-A4@rmk-PC.arm.linux.org.uk>
+ <54EF9091.30802@kernel.org> <54F4BC92.2050405@kernel.org>
+Message-ID: <14257250.yOR9pFcIkO@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 11:49:31AM +0800, chenfeng wrote:
-> There is an alignment issue with ldmia in A32 user-space with A64
-> Kernel. Since the famous taobao apk use this instruction, so we want
 
-You're exactly right, there is an issue _in userspace_.
-If userspace code is triggering an alignment fault, userspace (or
-the compiler used for building userspace) must be buggy.
+Hi,
 
-Have you identified _why_ a misaligned LDM is happening?
+On Tuesday, March 03, 2015 04:40:02 AM Kukjin Kim wrote:
+> On 02/27/15 06:30, Kukjin Kim wrote:
+> > On 02/25/15 20:46, Krzysztof Kozlowski wrote:
+> >> 2015-02-25 12:26 GMT+01:00 Russell King <rmk+kernel@arm.linux.org.uk>:
+> >>> The following error was observed with SMP=n in v4.0-rc1:
+> >>>
+> >>> arch/arm/mach-exynos/pm.c: In function 'exynos_cpu0_enter_aftr':
+> >>> arch/arm/mach-exynos/pm.c:246:4: error: implicit declaration of function 'arch_send_wakeup_ipi_mask' [-Werror=implicit-function-declaration]
+> >>>
+> >>> As the code unconditionally calls a function only available with SMP=y,
+> >>> make the Exynos PM support depend on SMP.
+> >>>
+> >>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> >>
+> >> Hi,
+> >>
+> >> Thanks for the patch but this already waits for Kukjin top be picked
+> >> up. The first patch was similar to yours (adds dependency on SMP),
+> >> sent on 4th of February:
+> >> https://patchwork.ozlabs.org/patch/436231/
+> >>
+> >> But later Bartlomiej fixed this in other way (allowing to use cpuidle
+> >> on non-SMP):
+> >> https://patchwork.ozlabs.org/patch/436445/
+> >>
+> >> Unfortunately none of them were picked up.
+> >>
+> > I've missed the fix, sorry.
+> > 
+> > BTW, as you know, all of exynos SoCs are based on SMP so generally (in
+> > normal case) there is no reason to use non-SMP on exynos
+> > platforms...even though I understand the build error should be fixed...
+> > 
+> > Anyway, I'll have a look Bart's patch and Russell's fix in this weekend.
+> > 
+> 
+> Firstly, let me take rmk's patch for the randconfig build error...BTW
 
+What is wrong with picking my patch instead?  It is non-invasive and fixes
+cpuidle support on UP (which is a regression from previous kernels)?
 
-arch/arm/ contains fixup code for emulating some unaligned accesses, 
-but it is only there for historical reasons.  No modern software
-should rely on it.
+https://lkml.org/lkml/2015/2/4/521
 
-Since compat on arm64 is not supposed to be a 100%-accurate emulation of
-arch/arm/, we should not pull in things like misalignment fixup code
-unless there is a really compelling reason...
+> I'm still wondering exynos stuff needs to support non-SMP and need to
+> think more about its usefulness?...
 
-Cheers
----Dave
+Currently UP is supported and at least I find it useful for testing/debug
+purposes.  If you want to to make Exynos SMP only thats OK but it should
+be done globally for Exynos arch support not just for cpuidle support.
 
-> to emulate this to make it work well.
-> 
-> I make a simple test case to reproduce this issue.
-> -----------------------------------------------------------------------
-> #include <stdio.h>
-> #include <stdlib.h>
-> 
-> int main()
-> {
->         char src_addr[1024];
->         char dst_addr[1024];
->         printf("--------%lx %lx\n",src_addr,dst_addr);
->         unsigned long src_reg = (unsigned long)src_addr | 1;
->         unsigned long dst_reg = (unsigned long)dst_addr | 1;
->         printf("--------%lx %lx\n",src_reg,dst_reg);
->         asm volatile("mov  r1, %0\n": : "r" (src_reg));
->         asm volatile("mov  r2, %0\n": : "r" (dst_reg));
->         asm volatile("ldmia r1!,{r2}");
->         printf("--------------------------\n");
-
-This will trigger an alignment fault -- but this does not mean that
-userspace should expect this code sequence to work.
-
-
-Cheers
----Dave
-
-> 
->         return 0;
-> }
-> ------------------------------------------------------------------------
-> 
-> I use the test case on A32 kernel with A32 user-space. It works
-> well,becase of that is a do_alignment_ldmstm emulate in
-> arch/arm/mm/alignment.c
-> 
-> So, I want to porting the code to arch/arm64.
-> 
-> The first step is getting the machine code of the unalignment
-> instruction. However I have no idea how to do this.
-> 
-> There is a commit on google master L branch to emulate the undef
-> instruction. I use these code for getting the instruction of
-> unalignment
-> case. But I found the code in arch/arm/alignment.c get the
-> instruction is 0xe8b10004 and the code in arch/arm64/kernel/traps.c
-> is different.
-> 
-> 
-> Since I arm not professional for the code, I am writting for asking
-> is there a way to get the thumb instruction when traps in kernel
-> mode.
-> 
-> 
-> 
-> 
-> 
-> 
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
