@@ -1,98 +1,139 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 3 Mar 2015 10:35:33 +0800
-Subject: [PATCH v9 1/5] Documentation: Add device tree bindings for
- Freescale i.MX GPC
-In-Reply-To: <1424713215-3357-2-git-send-email-p.zabel@pengutronix.de>
-References: <1424713215-3357-1-git-send-email-p.zabel@pengutronix.de>
- <1424713215-3357-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20150303023531.GF20455@dragon>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 2 Mar 2015 20:37:50 -0600
+Subject: [PATCH v4 09/30] PCI: Separate pci_host_bridge creation out of
+ pci_create_root_bus()
+In-Reply-To: <1424938344-4017-10-git-send-email-wangyijing@huawei.com>
+References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
+ <1424938344-4017-10-git-send-email-wangyijing@huawei.com>
+Message-ID: <20150303023750.GE11978@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 23, 2015 at 06:40:11PM +0100, Philipp Zabel wrote:
-> The i.MX6 contains a power controller that controls power gating and
-> sequencing for the SoC's power domains.
+On Thu, Feb 26, 2015 at 04:12:03PM +0800, Yijing Wang wrote:
+> This patch separate pci_host_bridge creation out
+> of pci_create_root_bus(), and try to make a generic
+> pci_host_bridge, then we could place generic PCI
+> infos like domain number in it. Also Ripping out
+> pci_host_bridge creation from pci_create_root_bus()
+> make code more better readability. Further more,
+> we could use the generic pci_host_bridge to hold
+> host bridge specific operations like
+> pcibios_root_bridge_prepare(). The changes are
+> transparent to platform host bridge drivers.
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-
-The patch (series) looks fine to me.  Can we get DT maintainer's ACK on
-this, so that I can apply the series for 4.1?
-
-Shawn
-
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 > ---
-> Changes since v8:
->  - Updated example with IRQ_TYPE_... and IMX6QDL_CLK_... defines
-> ---
->  .../devicetree/bindings/power/fsl,imx-gpc.txt      | 59 ++++++++++++++++++++++
->  1 file changed, 59 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+>  drivers/pci/host-bridge.c |   56 ++++++++++++++++++++++
+>  drivers/pci/probe.c       |  114 ++++++++++++++++++++-------------------------
+>  include/linux/pci.h       |    5 ++-
+>  3 files changed, 110 insertions(+), 65 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> new file mode 100644
-> index 0000000..65cc034
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> @@ -0,0 +1,59 @@
-> +Freescale i.MX General Power Controller
-> +=======================================
+> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+> index 39b2dbe..f304f26 100644
+> --- a/drivers/pci/host-bridge.c
+> +++ b/drivers/pci/host-bridge.c
+> @@ -8,6 +8,62 @@
+>  
+>  #include "pci.h"
+>  
+> +static void pci_release_host_bridge_dev(struct device *dev)
+> +{
+> +	struct pci_host_bridge *bridge = to_pci_host_bridge(dev);
 > +
-> +The i.MX6Q General Power Control (GPC) block contains DVFS load tracking
-> +counters and Power Gating Control (PGC) for the CPU and PU (GPU/VPU) power
-> +domains.
+> +	if (bridge->release_fn)
+> +		bridge->release_fn(bridge);
 > +
-> +Required properties:
-> +- compatible: Should be "fsl,imx6q-gpc" or "fsl,imx6sl-gpc"
-> +- reg: should be register base and length as documented in the
-> +  datasheet
-> +- interrupts: Should contain GPC interrupt request 1
-> +- pu-supply: Link to the LDO regulator powering the PU power domain
-> +- clocks: Clock phandles to devices in the PU power domain that need
-> +	  to be enabled during domain power-up for reset propagation.
-> +- #power-domain-cells: Should be 1, see below:
+> +	pci_free_resource_list(&bridge->windows);
+> +	kfree(bridge);
+> +}
 > +
-> +The gpc node is a power-controller as documented by the generic power domain
-> +bindings in Documentation/devicetree/bindings/power/power_domain.txt.
+> +struct pci_host_bridge *pci_create_host_bridge(
+> +		struct device *parent, u32 db, struct list_head *resources)
+> +{
+> +	int error;
+> +	int bus = PCI_BUSNUM(db);
+> +	int domain = PCI_DOMAIN(db);
+> +	struct pci_host_bridge *host;
+> +	struct resource_entry *window, *n;
 > +
-> +Example:
+> +	host = kzalloc(sizeof(*host), GFP_KERNEL);
+> +	if (!host)
+> +		return NULL;
 > +
-> +	gpc: gpc at 020dc000 {
-> +		compatible = "fsl,imx6q-gpc";
-> +		reg = <0x020dc000 0x4000>;
-> +		interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 90 IRQ_TYPE_LEVEL_HIGH>;
-> +		pu-supply = <&reg_pu>;
-> +		clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
-> +			 <&clks IMX6QDL_CLK_GPU3D_SHADER>,
-> +			 <&clks IMX6QDL_CLK_GPU2D_CORE>,
-> +			 <&clks IMX6QDL_CLK_GPU2D_AXI>,
-> +			 <&clks IMX6QDL_CLK_OPENVG_AXI>,
-> +			 <&clks IMX6QDL_CLK_VPU_AXI>;
-> +		#power-domain-cells = <1>;
-> +	};
+> +	host->busnum = bus;
+> +	host->domain = domain;
+> +	/* If support CONFIG_PCI_DOMAINS_GENERIC, use
+> +	 * pci_host_assign_domain_nr() to assign domain
+> +	 * number instead PCI_DOMAIN(db).
+> +	 */
+> +	pci_host_assign_domain_nr(host);
 > +
+> +	host->dev.parent = parent;
+> +	INIT_LIST_HEAD(&host->windows);
+> +	host->dev.release = pci_release_host_bridge_dev;
+> +	dev_set_name(&host->dev, "pci%04x:%02x", host->domain, 
+> +			host->busnum);
 > +
-> +Specifying power domain for IP modules
-> +======================================
+> +	error = device_register(&host->dev);
+> +	if (error) {
+> +		put_device(&host->dev);
+> +		return NULL;
+> +	}
 > +
-> +IP cores belonging to a power domain should contain a 'power-domains' property
-> +that is a phandle pointing to the gpc device node and a DOMAIN_INDEX specifying
-> +the power domain the device belongs to.
+> +	resource_list_for_each_entry_safe(window, n, resources)
+> +		list_move_tail(&window->node, &host->windows);
 > +
-> +Example of a device that is part of the PU power domain:
+> +	return host;
+> +}
+> +EXPORT_SYMBOL(pci_create_host_bridge);
+
+Why does this need to be exported?  I don't want code outside drivers/pci
+using something like this.
+
+> +void pci_free_host_bridge(struct pci_host_bridge *host)
+> +{
+> +	device_unregister(&host->dev);
+> +}
 > +
-> +	vpu: vpu at 02040000 {
-> +		reg = <0x02040000 0x3c000>;
-> +		/* ... */
-> +		power-domains = <&gpc 1>;
-> +		/* ... */
-> +	};
-> +
-> +The following DOMAIN_INDEX values are valid for i.MX6Q:
-> +ARM_DOMAIN     0
-> +PU_DOMAIN      1
-> +The following additional DOMAIN_INDEX value is valid for i.MX6SL:
-> +DISPLAY_DOMAIN 2
+>  static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
+>  {
+>  	while (bus->parent)
+> ...
+
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index efd9917..13b6b25 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -402,6 +402,7 @@ static inline int pci_channel_offline(struct pci_dev *pdev)
+>  
+>  struct pci_host_bridge {
+>  	u16	domain;
+> +	u16 busnum;
+>  	struct device dev;
+>  	struct pci_bus *bus;		/* root bus */
+>  	struct list_head windows;	/* resource_entry */
+> @@ -415,7 +416,8 @@ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+>  		     void *release_data);
+>  
+>  int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge);
+> -
+> +struct pci_host_bridge *pci_create_host_bridge(
+> +		struct device *parent, u32 dombus, struct list_head *resources);
+
+Can these function declarations go in drivers/pci/pci.h instead?  I'd
+rather not expose them to the rest of the kernel unless we have to.
+
+>  /*
+>   * The first PCI_BRIDGE_RESOURCE_NUM PCI bus resources (those that correspond
+>   * to P2P or CardBus bridge windows) go in a table.  Additional ones (for
+> @@ -774,6 +776,7 @@ struct pci_bus *pci_scan_bus_legacy(u32 dombus, struct pci_ops *ops, void *sysda
+>  struct pci_bus *pci_create_root_bus(struct device *parent, u32 dombus,
+>  				    struct pci_ops *ops, void *sysdata,
+>  				    struct list_head *resources);
+> +void pci_free_host_bridge(struct pci_host_bridge *host);
+>  int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int busmax);
+>  int pci_bus_update_busn_res_end(struct pci_bus *b, int busmax);
+>  void pci_bus_release_busn_res(struct pci_bus *b);
 > -- 
-> 2.1.4
+> 1.7.1
 > 
