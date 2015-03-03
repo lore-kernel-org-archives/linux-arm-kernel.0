@@ -1,84 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  3 Mar 2015 12:03:50 +0100
-Subject: [PATCH 5/5] arm64/efi: adapt to relaxed FDT placement requirements
-In-Reply-To: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1425380630-3684-6-git-send-email-ard.biesheuvel@linaro.org>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Tue, 03 Mar 2015 12:06:40 +0100
+Subject: [PATCH 1/6] target-arm: kvm: save/restore mp state
+In-Reply-To: <8761ai73j1.fsf@linaro.org>
+References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
+ <1424880159-29348-2-git-send-email-alex.bennee@linaro.org>
+ <CAFEAcA9oWeYGYcGtf8So6VrYLMXjWr4FiZ2tS+jBnDtv87jAKw@mail.gmail.com>
+ <8761ai73j1.fsf@linaro.org>
+Message-ID: <54F595C0.5060004@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the relaxed FDT placement requirements in place, we can change
-the allocation strategy used by the stub to put the FDT image higher
-up in memory. At the same time, reduce the minimal alignment to a
-power of 2 upper bound of the size: this way, we are still guaranteed
-not to cross a 2 MB boundary, but will potentially waste less memory
-doing so.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/efi.h            | 9 ++++-----
- drivers/firmware/efi/libstub/arm-stub.c | 2 +-
- drivers/firmware/efi/libstub/fdt.c      | 7 ++-----
- 3 files changed, 7 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index ef572206f1c3..68f7bb2ddad7 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -39,12 +39,11 @@ extern void efi_init(void);
- /* arch specific definitions used by the stub code */
- 
- /*
-- * AArch64 requires the DTB to be 8-byte aligned in the first 512MiB from
-- * start of kernel and may not cross a 2MiB boundary. We set alignment to
-- * 2MiB so we know it won't cross a 2MiB boundary.
-+ * AArch64 requires the DTB to be 8-byte aligned and not cross a 2MiB boundary.
-+ * So align to a power of 2 upper bound of the FDT size.
-  */
--#define EFI_FDT_ALIGN	SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
--#define MAX_FDT_OFFSET	SZ_512M
-+#define EFI_FDT_ALIGN(x)	roundup_pow_of_two(x)
-+#define MAX_FDT_OFFSET		ULONG_MAX
- 
- #define efi_call_early(f, ...) sys_table_arg->boottime->f(__VA_ARGS__)
- 
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index dcae482a9a17..c58c21c22dbe 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -269,7 +269,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 
- 	new_fdt_addr = fdt_addr;
- 	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
--				&new_fdt_addr, dram_base + MAX_FDT_OFFSET,
-+				&new_fdt_addr, MAX_FDT_OFFSET,
- 				initrd_addr, initrd_size, cmdline_ptr,
- 				fdt_addr, fdt_size);
- 
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index 91da56c4fd54..1a44d410a63b 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -165,10 +165,6 @@ fdt_set_fail:
- 	return EFI_LOAD_ERROR;
- }
- 
--#ifndef EFI_FDT_ALIGN
--#define EFI_FDT_ALIGN EFI_PAGE_SIZE
--#endif
--
- /*
-  * Allocate memory for a new FDT, then add EFI, commandline, and
-  * initrd related fields to the FDT.  This routine increases the
-@@ -223,7 +219,8 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 	 */
- 	new_fdt_size = fdt_size + EFI_PAGE_SIZE;
- 	while (1) {
--		status = efi_high_alloc(sys_table, new_fdt_size, EFI_FDT_ALIGN,
-+		status = efi_high_alloc(sys_table, new_fdt_size,
-+					EFI_FDT_ALIGN(new_fdt_size),
- 					new_fdt_addr, max_addr);
- 		if (status != EFI_SUCCESS) {
- 			pr_efi_err(sys_table, "Unable to allocate memory for new device tree.\n");
--- 
-1.8.3.2
+On 03/03/2015 11:56, Alex Benn?e wrote:
+> > > This adds the saving and restore of the current Multi-Processing state
+> > > of the machine. While the KVM_GET/SET_MP_STATE API exposes a number of
+> > > potential states for x86 we only use two for ARM. Either the process is
+> > > running or not.
+> >
+> > By this you mean "is the CPU in the PSCI powered down state or not",
+> > right?
+> 
+> From the vcpu's perspective it is either running or not. However it is
+> the same mechanism that is used when PSCI_0_2_FN_CPU_OFF is passed the
+> VM, internally setting vcpu->arch.paused.
+
+I suggest that you define a new MP_STATE constant for this.  HALTED in
+x86 and s390 is the state an ARM processor enters when you execute wfi.
+ Right now this is not migrated on ARM if I remember correctly, but
+perhaps you'll want to add it in the future.
+
+Paolo
