@@ -1,63 +1,82 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 3 Mar 2015 14:43:01 +0100
-Subject: [PATCH] ARM: advertise availability of v8 Crypto instructions
-In-Reply-To: <1425054991-29951-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1425054991-29951-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu_dSgtsUp8aeMwz9a6stEC3DCg8GMU5QWWTPy_oOyHCSw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 3 Mar 2015 14:58:47 +0100
+Subject: [linux-sunxi] Re: [PATCH] ARM: sun6i: dt: Add new Mele I7 device
+In-Reply-To: <54F5B51F.6030609@redhat.com>
+References: <1425131285-8640-1-git-send-email-codekipper@gmail.com>
+ <20150303071635.GC4713@lukather> <54F568F8.1040104@redhat.com>
+ <20150303082209.GE4713@lukather> <54F5B51F.6030609@redhat.com>
+Message-ID: <20150303135847.GH4911@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 February 2015 at 17:36, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> When running the 32-bit ARM kernel on ARMv8 capable bare metal (e.g.,
-> 32-bit Android userland and kernel on a Cortex-A53), or as a KVM guest
-> on a 64-bit host, we should advertise the availability of the Crypto
-> instructions, so that userland libraries such as OpenSSL may use them.
-> (Support for the v8 Crypto instructions in the 32-bit build was added
-> to OpenSSL more than six months ago)
->
-> This adds the ID feature bit detection, and sets elf_hwcap2 accordingly.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/kernel/setup.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
->
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index e55408e96559..8d4cb1c1c9ac 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -393,6 +393,22 @@ static void __init cpuid_init_hwcaps(void)
->         vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
->         if (vmsa >= 5)
->                 elf_hwcap |= HWCAP_LPAE;
-> +
-> +       /* check for supported v8 Crypto instructions on non v7-M CPUs */
+On Tue, Mar 03, 2015 at 02:20:31PM +0100, Hans de Goede wrote:
+> Hi,
+> 
+> On 03-03-15 09:22, Maxime Ripard wrote:
+> >On Tue, Mar 03, 2015 at 08:55:36AM +0100, Hans de Goede wrote:
+> >>>>+/ {
+> >>>>+	model = "Mele I7 Quad top set box";
+> >>>>+	compatible = "mele,i7", "allwinner,sun6i-a31";
+> >>>>+
+> >>>>+	chosen {
+> >>>>+		bootargs = "earlyprintk console=ttyS0,115200";
+> >>>
+> >>>Using earlyprintk by default is a bad idea if the kernel is configured
+> >>>with DEBUG_LL support for another SoC.
+> >>
+> >>While on this subject, u-boot now sets the chosen/stdout-path property
+> >>up by default, which means that the kernel will do the right thing by
+> >>default. So we we really do not need any bootargs= in our dts files.
+> >
+> >I just tested that this weekend, and it turned out that the kernel
+> >couldn't use it so far (ie, no output until init takes over and setup
+> >a TTY on ttyS0).
+> >
+> >Was it working for you?
+> 
+> Yes, note that the kernel only honors the stdout-path property if
+> there is no console= argument present if there is a console= argument
+> present on the kernel cmdline then that will overrule the stdout-path
+> property
 
-Perhaps this should be 'on v7+ (non v7-M) CPUs'
+Yeah, I removed the bootargs entirely.
 
-> +       if (cpu_architecture() == CPU_ARCH_ARMv7) {
+> Which board did you test with, and what u-boot and kernel version ?
 
-@Russell: any thoughts on this?
+I tested it on my A31 hummingbird, with allwinner's u-boot, but with
+/chosen/stdout-path hardcoded to "serial0:115200n8", with a 4.0-rc1
+kernel.
 
-Currently, v8 CPUs are identified as CPU_ARCH_ARMv7, and there is no
-point in performing this test on other architectures (including v7-M)
+But it might very well just be me. We just tested it on a Marvell
+board (that uses the same serial driver) this morning and it was fine,
+so I don't think it's really worth worrying about this :)
 
-> +               unsigned int id = read_cpuid_ext(CPUID_EXT_ISAR5);
-> +
-> +               switch ((id >> 4) & 0xf) {
-> +               case 2: elf_hwcap2 |= HWCAP2_PMULL;
-> +               case 1: elf_hwcap2 |= HWCAP2_AES;
-> +               }
-> +               if (((id >> 8) & 0xf) == 1)
-> +                       elf_hwcap2 |= HWCAP2_SHA1;
-> +               if (((id >> 12) & 0xf) == 1)
-> +                       elf_hwcap2 |= HWCAP2_SHA2;
-> +               if (((id >> 16) & 0xf) == 1)
-> +                       elf_hwcap2 |= HWCAP2_CRC32;
-> +       }
->  }
->
->  static void __init elf_hwcap_fixup(void)
-> --
-> 1.8.3.2
->
+> >>Currently we've a random mix where we do have bootargs in some, but
+> >>not in most sunxi dts files. I believe we should simply remove it
+> >>everywhere...
+> >
+> >We used to set them in SoCs that are not supported by U-boot yet, and
+> >where the bootloader won't come and patch the DT (A31, A23, A80).
+> 
+> Ah, so that is (was) the logic, following that logic we should probably
+> remove bootargs= from at least the a23 and a31 boards (basically
+> from all boards but a80).
+
+I'm not so sure about the A31, since most boards won't even boot by
+default on the SD card, and we have no way to replace U-Boot in NAND
+so far (afaik). But replacing them by stdout-path is a very good
+solution too.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150303/658d5fdd/attachment.sig>
