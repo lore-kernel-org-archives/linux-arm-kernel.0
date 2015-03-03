@@ -1,17 +1,17 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 3 Mar 2015 10:25:43 +0800
-Subject: [PATCH] ARM: dts: imx6qdl, Add label snvs_rtc
-In-Reply-To: <1424448249-30718-1-git-send-email-mpa@pengutronix.de>
-References: <1424448249-30718-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150303022541.GD20455@dragon>
+Date: Tue, 3 Mar 2015 10:27:16 +0800
+Subject: [PATCH v2] ARM: dts: imx25-pdk: Add LCD support
+In-Reply-To: <1424543238-2721-1-git-send-email-festevam@gmail.com>
+References: <1424543238-2721-1-git-send-email-festevam@gmail.com>
+Message-ID: <20150303022715.GE20455@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 05:04:09PM +0100, Markus Pargmann wrote:
-> It may be useful to disable the internal rtc snvs-rtc because an
-> external rtc is available. This patch adds a label so that board files
-> can disable this rtc.
+On Sat, Feb 21, 2015 at 04:27:18PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Add support for the CLAA057VC01CW display.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
 Applied, thanks.
