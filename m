@@ -1,124 +1,46 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 3 Mar 2015 09:12:23 +0800
-Subject: [PATCH v4 01/30] PCI: Rip out pci_bus_add_devices() from
- pci_scan_bus()
-In-Reply-To: <20150302234147.GA11978@google.com>
-References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
- <1424938344-4017-2-git-send-email-wangyijing@huawei.com>
- <20150302234147.GA11978@google.com>
-Message-ID: <54F50A77.7040703@huawei.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue,  3 Mar 2015 09:44:40 +0800
+Subject: [PATCH] mmc: sunxi: Use devm_reset_control_get_optional() for reset
+ control
+Message-ID: <1425347080-1789-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>  	pbm->pci_bus = pci_scan_bus(pbm->pci_first_busno, &pcic_ops, pbm);
->> +	if (pbm->pci_bus)
->> +		pci_bus_add_devices(pbm->pci_bus);
->>  #if 0 /* deadwood transplanted from sparc64 */
->>  	pci_fill_in_pbm_cookies(pbm->pci_bus, pbm, pbm->prom_node);
->>  	pci_record_assignments(pbm, pbm->pci_bus);
-> 
-> This is correct, but it should look like this instead:
-> 
->     if (!pbm->pci_bus)
->       return;
->   #if 0 /* deadwood ... */
->   ...
->   #endif
->     pci_bus_add_devices(pbm->pci_bus);
->   }
-> 
-> That way the mainline code is the normal path, and pci_bus_add_devices() is
-> in the correct place even if the "deadwood" code is resurrected.
-> 
+The reset control for the sunxi mmc controller is optional. Some
+newer platforms (sun6i, sun8i, sun9i) have it, while older ones
+(sun4i, sun5i, sun7i) don't.
 
-Yes, you are right, thanks!
+Use the properly stubbed _optional version so the driver does not
+fail to compile when RESET_CONTROLLER=n.
 
-> 
->> diff --git a/arch/unicore32/kernel/pci.c b/arch/unicore32/kernel/pci.c
->> index 374a055..3d82024 100644
->> --- a/arch/unicore32/kernel/pci.c
->> +++ b/arch/unicore32/kernel/pci.c
->> @@ -266,17 +266,12 @@ static int __init pci_common_init(void)
->>  	pci_fixup_irqs(pci_common_swizzle, pci_puv3_map_irq);
->>  
->>  	if (!pci_has_flag(PCI_PROBE_ONLY)) {
->> -		/*
->> -		 * Size the bridge windows.
->> -		 */
->> +		/* Size the bridge windows. */
->>  		pci_bus_size_bridges(puv3_bus);
->> -
->> -		/*
->> -		 * Assign resources.
->> -		 */
->> +		/* Assign resources. */
->>  		pci_bus_assign_resources(puv3_bus);
->>  	}
->> -
->> +	pci_bus_add_devices(puv3_bus);
->>  	return 0;
->>  }
->>  subsys_initcall(pci_common_init);
->> diff --git a/drivers/pci/hotplug/ibmphp_core.c b/drivers/pci/hotplug/ibmphp_core.c
->> index 96c5c72..86e3bfd 100644
->> --- a/drivers/pci/hotplug/ibmphp_core.c
->> +++ b/drivers/pci/hotplug/ibmphp_core.c
->> @@ -738,7 +738,7 @@ static void ibm_unconfigure_device(struct pci_func *func)
->>   */
->>  static u8 bus_structure_fixup(u8 busno)
->>  {
->> -	struct pci_bus *bus;
->> +	struct pci_bus *bus, *b;
->>  	struct pci_dev *dev;
->>  	u16 l;
->>  
->> @@ -765,7 +765,9 @@ static u8 bus_structure_fixup(u8 busno)
->>  					(l != 0x0000) && (l != 0xffff)) {
->>  			debug("%s - Inside bus_structure_fixup()\n",
->>  							__func__);
->> -			pci_scan_bus(busno, ibmphp_pci_bus->ops, NULL);
->> +			b = pci_scan_bus(busno, ibmphp_pci_bus->ops, NULL);
->> +			if (b)
->> +				pci_bus_add_devices(b);
-> 
-> Use this:
-> 
->     if (!b)
->       continue;
->     pci_bus_add_devices(b);
-> 
-> for the same reason as above.
+This patch also adds a check for deferred probing on the reset
+control.
 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Cc: <stable@vger.kernel.org> # 3.16+
+---
 
-Will update, thanks!
+Arnd had some proposals about the reset control API.
+Not sure if the sunxi-mmc driver was on that list.
 
-Thanks!
-Yijing.
+---
+ drivers/mmc/host/sunxi-mmc.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-> 
->>  			break;
->>  		}
->>  	}
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index 8d2f400..88604f2 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -2123,7 +2123,6 @@ struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops,
->>  	b = pci_create_root_bus(NULL, bus, ops, sysdata, &resources);
->>  	if (b) {
->>  		pci_scan_child_bus(b);
->> -		pci_bus_add_devices(b);
->>  	} else {
->>  		pci_free_resource_list(&resources);
->>  	}
->> -- 
->> 1.7.1
->>
-> 
-> .
-> 
-
-
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index e8a4218b5726..459ed1b601db 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -930,7 +930,9 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
+ 		return PTR_ERR(host->clk_sample);
+ 	}
+ 
+-	host->reset = devm_reset_control_get(&pdev->dev, "ahb");
++	host->reset = devm_reset_control_get_optional(&pdev->dev, "ahb");
++	if (PTR_ERR(host->reset) == -EPROBE_DEFER)
++		return PTR_ERR(host->reset);
+ 
+ 	ret = clk_prepare_enable(host->clk_ahb);
+ 	if (ret) {
 -- 
-Thanks!
-Yijing
+2.1.4
