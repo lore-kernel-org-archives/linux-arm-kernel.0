@@ -1,74 +1,34 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Tue, 03 Mar 2015 16:07:05 +0530
-Subject: [PATCH] ARM64: gic: Do not allow bypass FIQ signals to reach
- to processor
-In-Reply-To: <54F57C0A.6030906@arm.com>
-References: <b449dac39614ed462c9a479e9de0aa5300d2c7cf.1423462126.git.panand@redhat.com>
- <54DDB236.4040503@redhat.com> <54F52690.70702@redhat.com>
- <54F57C0A.6030906@arm.com>
-Message-ID: <54F58ED1.2050401@redhat.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue,  3 Mar 2015 10:41:20 +0000
+Subject: [PATCH 0/3] mailbox: New mailbox driver for ST
+Message-ID: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This set provides support for ST's Mailbox IP.
 
+In order to save IRQ lines, current platforms have been only been
+given a single interrupt for receiving messages from co-processors.
+The best way to work around this limitation is to use Mailbox 1
+(A9) as the receiving MB.  This driver/binding then has the ability
+to map the remaining Mailboxes back to Mailbox 1 where threaded
+interrupts are used to extract data to send back to the user.
 
-On Tuesday 03 March 2015 02:46 PM, Marc Zyngier wrote:
-> On 03/03/15 03:12, Pratyush Anand wrote:
->>
->> On Friday 13 February 2015 01:43 PM, Pratyush Anand wrote:
->>> Hi Jason,
->>>
->>> On Monday 09 February 2015 11:48 AM, Pratyush Anand wrote:
->>>> In some case few signals of an IP(like PMU Overflow in APM88xx0x) can be
->>>> mapped to nLEGACYFIQ, ie nFIQ of CPU. Until ARM64 supports FIQ handling,
->>>> we will get nice "Bad mode in FIQ handler detected"
->>>>
->>>> Therefore force FIQBypDisGrp1 to '1', so that bypass FIQ signal is not
->>>> signaled to the processor.
->>>>
->>>
->>> Please review this patch.
->>
->> ping
->>
->>>
->>> ~Pratyush
->>>
->>>> Signed-off-by: Pratyush Anand <panand@redhat.com>
->>>> ---
->>>>    drivers/irqchip/irq-gic.c       | 9 ++++++++-
->>>>    include/linux/irqchip/arm-gic.h | 1 +
->>>>    2 files changed, 9 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>>> index d617ee5a3d8a..525dfc966e60 100644
->>>> --- a/drivers/irqchip/irq-gic.c
->>>> +++ b/drivers/irqchip/irq-gic.c
->>>> @@ -362,7 +362,14 @@ static void gic_cpu_if_up(void)
->>>>        */
->>>>        bypass = readl(cpu_base + GIC_CPU_CTRL);
->>>>        bypass &= GICC_DIS_BYPASS_MASK;
->>>> -
->>>> +#ifdef CONFIG_ARM64
->>>> +    /* FIXME: when ARM64 starts supporting FIQ mode.
->>>> +     *
->>>> +     * Until ARM64 supports FIQ handling, force FIQBypDisGrp1 to
->>>> +     * '1', so that bypass FIQ signal is not signaled to the processor.
->>>> +     */
->>>> +    bypass |= GICC_DIS_BYPASS_FIQ_TO_CPU;
->>>> +#endif
->
-> This doesn't feel like the right approach at all. We have a bypass mask
-> already, for the same HW.
->
-> But more importantly, FIQBypDisGrp0 is only available in secure mode,
-> while the arm64 kernel only runs in non-secure. I understand that the
-> APM HW doesn't have a secure mode, but the GIC definitely has.
->
-> I suggest you move that change to your firmware, and make sure that the
-> kernel is only presented the non-secure version of the CPU interface.
->
+Lee Jones (3):
+  ARM: STi: stih407-family: Add nodes for Mailbox
+  mailbox: dt: Supply bindings for ST's Mailbox IP
+  mailbox: Add support for ST's Mailbox IP
 
-Thanks Marc for your input.
+ .../devicetree/bindings/mailbox/sti-mailbox.txt    |  66 ++
+ arch/arm/boot/dts/stih407-family.dtsi              |  67 +++
+ drivers/mailbox/Kconfig                            |   7 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/mailbox-sti.c                      | 664 +++++++++++++++++++++
+ include/linux/mailbox_sti.h                        | 128 ++++
+ 6 files changed, 934 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+ create mode 100644 drivers/mailbox/mailbox-sti.c
+ create mode 100644 include/linux/mailbox_sti.h
 
-~Pratyush
+-- 
+1.9.1
