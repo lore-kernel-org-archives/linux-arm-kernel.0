@@ -1,131 +1,98 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  3 Mar 2015 10:21:59 +0800
-Subject: [PATCH 2/3] mfd: sun6i-prcm: Add support for PRCM found on Allwinner
- A80 SoC
-In-Reply-To: <1425349320-2754-1-git-send-email-wens@csie.org>
-References: <1425349320-2754-1-git-send-email-wens@csie.org>
-Message-ID: <1425349320-2754-3-git-send-email-wens@csie.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 3 Mar 2015 10:35:33 +0800
+Subject: [PATCH v9 1/5] Documentation: Add device tree bindings for
+ Freescale i.MX GPC
+In-Reply-To: <1424713215-3357-2-git-send-email-p.zabel@pengutronix.de>
+References: <1424713215-3357-1-git-send-email-p.zabel@pengutronix.de>
+ <1424713215-3357-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20150303023531.GF20455@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the PRCM on the A80 SoC. There is little
-to no document for this at the moment. Only register offsets are
-available. However with some testing, the clock and reset controls
-seem to be the similar to the ones on the A31.
+On Mon, Feb 23, 2015 at 06:40:11PM +0100, Philipp Zabel wrote:
+> The i.MX6 contains a power controller that controls power gating and
+> sequencing for the SoC's power domains.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-One thing that needs verifying is whether the apbs divider is the same
-as the A31 or the A23. The lowest divider is different between those
-2 implementations.
+The patch (series) looks fine to me.  Can we get DT maintainer's ACK on
+this, so that I can apply the series for 4.1?
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- .../devicetree/bindings/mfd/sun6i-prcm.txt         |  3 +-
- drivers/mfd/sun6i-prcm.c                           | 58 ++++++++++++++++++++++
- 2 files changed, 60 insertions(+), 1 deletion(-)
+Shawn
 
-diff --git a/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
-index 03c5a551da55..c100abfcb2a4 100644
---- a/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
-+++ b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
-@@ -4,7 +4,8 @@ PRCM is an MFD device exposing several Power Management related devices
- (like clks and reset controllers).
- 
- Required properties:
-- - compatible: "allwinner,sun6i-a31-prcm" or "allwinner,sun8i-a23-prcm"
-+ - compatible: "allwinner,sun6i-a31-prcm", "allwinner,sun8i-a23-prcm",
-+	       "allwinner,sun9i-a80-prcm"
-  - reg: The PRCM registers range
- 
- The prcm node may contain several subdevices definitions:
-diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
-index 191173166d65..d067c77fb512 100644
---- a/drivers/mfd/sun6i-prcm.c
-+++ b/drivers/mfd/sun6i-prcm.c
-@@ -33,6 +33,22 @@ static const struct resource sun6i_a31_apb0_clk_res[] = {
- 	},
- };
- 
-+static const struct resource sun9i_a80_cpus_clk_res[] = {
-+	{
-+		.start = 0x10,
-+		.end = 0x13,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
-+static const struct resource sun9i_a80_apbs_clk_res[] = {
-+	{
-+		.start = 0x1c,
-+		.end = 0x1f,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
- static const struct resource sun6i_a31_apb0_gates_clk_res[] = {
- 	{
- 		.start = 0x28,
-@@ -111,6 +127,39 @@ static const struct mfd_cell sun8i_a23_prcm_subdevs[] = {
- 	},
- };
- 
-+static const struct mfd_cell sun9i_a80_prcm_subdevs[] = {
-+	{
-+		.name = "sun6i-a31-ar100-clk",
-+		.of_compatible = "allwinner,sun6i-a31-ar100-clk",
-+		.num_resources = ARRAY_SIZE(sun9i_a80_cpus_clk_res),
-+		.resources = sun9i_a80_cpus_clk_res,
-+	},
-+	{
-+		.name = "sun8i-a23-apb0-clk",
-+		.of_compatible = "allwinner,sun8i-a23-apb0-clk",
-+		.num_resources = ARRAY_SIZE(sun9i_a80_apbs_clk_res),
-+		.resources = sun9i_a80_apbs_clk_res,
-+	},
-+	{
-+		.name = "sun6i-a31-apb0-gates-clk",
-+		.of_compatible = "allwinner,sun9i-a80-apbs-gates-clk",
-+		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_gates_clk_res),
-+		.resources = sun6i_a31_apb0_gates_clk_res,
-+	},
-+	{
-+		.name = "sun6i-a31-ir-clk",
-+		.of_compatible = "allwinner,sun4i-a10-mod0-clk",
-+		.num_resources = ARRAY_SIZE(sun6i_a31_ir_clk_res),
-+		.resources = sun6i_a31_ir_clk_res,
-+	},
-+	{
-+		.name = "sun6i-a31-apb0-clock-reset",
-+		.of_compatible = "allwinner,sun6i-a31-clock-reset",
-+		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_rstc_res),
-+		.resources = sun6i_a31_apb0_rstc_res,
-+	},
-+};
-+
- static const struct prcm_data sun6i_a31_prcm_data = {
- 	.nsubdevs = ARRAY_SIZE(sun6i_a31_prcm_subdevs),
- 	.subdevs = sun6i_a31_prcm_subdevs,
-@@ -121,6 +170,11 @@ static const struct prcm_data sun8i_a23_prcm_data = {
- 	.subdevs = sun8i_a23_prcm_subdevs,
- };
- 
-+static const struct prcm_data sun9i_a80_prcm_data = {
-+	.nsubdevs = ARRAY_SIZE(sun9i_a80_prcm_subdevs),
-+	.subdevs = sun9i_a80_prcm_subdevs,
-+};
-+
- static const struct of_device_id sun6i_prcm_dt_ids[] = {
- 	{
- 		.compatible = "allwinner,sun6i-a31-prcm",
-@@ -130,6 +184,10 @@ static const struct of_device_id sun6i_prcm_dt_ids[] = {
- 		.compatible = "allwinner,sun8i-a23-prcm",
- 		.data = &sun8i_a23_prcm_data,
- 	},
-+	{
-+		.compatible = "allwinner,sun9i-a80-prcm",
-+		.data = &sun9i_a80_prcm_data,
-+	},
- 	{ /* sentinel */ },
- };
- 
--- 
-2.1.4
+> ---
+> Changes since v8:
+>  - Updated example with IRQ_TYPE_... and IMX6QDL_CLK_... defines
+> ---
+>  .../devicetree/bindings/power/fsl,imx-gpc.txt      | 59 ++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+> new file mode 100644
+> index 0000000..65cc034
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+> @@ -0,0 +1,59 @@
+> +Freescale i.MX General Power Controller
+> +=======================================
+> +
+> +The i.MX6Q General Power Control (GPC) block contains DVFS load tracking
+> +counters and Power Gating Control (PGC) for the CPU and PU (GPU/VPU) power
+> +domains.
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,imx6q-gpc" or "fsl,imx6sl-gpc"
+> +- reg: should be register base and length as documented in the
+> +  datasheet
+> +- interrupts: Should contain GPC interrupt request 1
+> +- pu-supply: Link to the LDO regulator powering the PU power domain
+> +- clocks: Clock phandles to devices in the PU power domain that need
+> +	  to be enabled during domain power-up for reset propagation.
+> +- #power-domain-cells: Should be 1, see below:
+> +
+> +The gpc node is a power-controller as documented by the generic power domain
+> +bindings in Documentation/devicetree/bindings/power/power_domain.txt.
+> +
+> +Example:
+> +
+> +	gpc: gpc at 020dc000 {
+> +		compatible = "fsl,imx6q-gpc";
+> +		reg = <0x020dc000 0x4000>;
+> +		interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <0 90 IRQ_TYPE_LEVEL_HIGH>;
+> +		pu-supply = <&reg_pu>;
+> +		clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
+> +			 <&clks IMX6QDL_CLK_GPU3D_SHADER>,
+> +			 <&clks IMX6QDL_CLK_GPU2D_CORE>,
+> +			 <&clks IMX6QDL_CLK_GPU2D_AXI>,
+> +			 <&clks IMX6QDL_CLK_OPENVG_AXI>,
+> +			 <&clks IMX6QDL_CLK_VPU_AXI>;
+> +		#power-domain-cells = <1>;
+> +	};
+> +
+> +
+> +Specifying power domain for IP modules
+> +======================================
+> +
+> +IP cores belonging to a power domain should contain a 'power-domains' property
+> +that is a phandle pointing to the gpc device node and a DOMAIN_INDEX specifying
+> +the power domain the device belongs to.
+> +
+> +Example of a device that is part of the PU power domain:
+> +
+> +	vpu: vpu at 02040000 {
+> +		reg = <0x02040000 0x3c000>;
+> +		/* ... */
+> +		power-domains = <&gpc 1>;
+> +		/* ... */
+> +	};
+> +
+> +The following DOMAIN_INDEX values are valid for i.MX6Q:
+> +ARM_DOMAIN     0
+> +PU_DOMAIN      1
+> +The following additional DOMAIN_INDEX value is valid for i.MX6SL:
+> +DISPLAY_DOMAIN 2
+> -- 
+> 2.1.4
+> 
