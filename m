@@ -1,89 +1,74 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 03 Mar 2015 11:34:35 +0100
-Subject: [PATCH] cpuidle: mvebu: Fix the CPU PM notifier usage
-In-Reply-To: <54F58D2F.2010907@linaro.org>
-References: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
- <4892716.Bf612zPN6E@vostro.rjw.lan> <54F03B51.1010708@free-electrons.com>
- <54F58D2F.2010907@linaro.org>
-Message-ID: <54F58E3B.9040302@free-electrons.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Tue, 03 Mar 2015 16:07:05 +0530
+Subject: [PATCH] ARM64: gic: Do not allow bypass FIQ signals to reach
+ to processor
+In-Reply-To: <54F57C0A.6030906@arm.com>
+References: <b449dac39614ed462c9a479e9de0aa5300d2c7cf.1423462126.git.panand@redhat.com>
+ <54DDB236.4040503@redhat.com> <54F52690.70702@redhat.com>
+ <54F57C0A.6030906@arm.com>
+Message-ID: <54F58ED1.2050401@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
 
 
-
-On 03/03/2015 11:30, Daniel Lezcano wrote:
-> On 02/27/2015 10:39 AM, Gregory CLEMENT wrote:
->> Hi Rafael,
+On Tuesday 03 March 2015 02:46 PM, Marc Zyngier wrote:
+> On 03/03/15 03:12, Pratyush Anand wrote:
 >>
->> On 26/02/2015 22:55, Rafael J. Wysocki wrote:
->>> On Thursday, February 26, 2015 06:20:48 PM Gregory CLEMENT wrote:
->>>> As stated in kernel/cpu_pm.c, "Platform is responsible for ensuring
->>>> that cpu_pm_enter is not called twice on the same CPU before
->>>> cpu_pm_exit is called.". In the current code in case of failure when
->>>> calling mvebu_v7_cpu_suspend, the function cpu_pm_exit() is never
->>>> called whereas cpu_pm_enter() was called just before.
->>>>
->>>> This patch moves the cpu_pm_exit() in order to balance the
->>>> cpu_pm_enter() calls.
->>>>
->>>> Reported-by: Fulvio Benini <fbf@libero.it>
->>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> On Friday 13 February 2015 01:43 PM, Pratyush Anand wrote:
+>>> Hi Jason,
 >>>
->>> Should that go to "stable" too?  Which "stable" series it should go to if so?
+>>> On Monday 09 February 2015 11:48 AM, Pratyush Anand wrote:
+>>>> In some case few signals of an IP(like PMU Overflow in APM88xx0x) can be
+>>>> mapped to nLEGACYFIQ, ie nFIQ of CPU. Until ARM64 supports FIQ handling,
+>>>> we will get nice "Bad mode in FIQ handler detected"
+>>>>
+>>>> Therefore force FIQBypDisGrp1 to '1', so that bypass FIQ signal is not
+>>>> signaled to the processor.
+>>>>
+>>>
+>>> Please review this patch.
 >>
->> Yes as it fixes a potential issue, you're right it should go
->> to "stable". The bug was here since the introduction of the driver
->> in 3.16.
-> 
-> Hi Gregory,
-> 
-> actually the 'stable' rules state clearly:
-> 
-> "- It must fix a real bug that bothers people (not a, "This could be a 
-> problem..." type thing)."
-> 
-> You say "it fixes a potential issue", so no bug has been raise yet, right ?
-
-Indeed nobody claimed yet having a bug related to this issue.
-
-Gregory
-
-
-> 
+>> ping
+>>
+>>>
+>>> ~Pratyush
+>>>
+>>>> Signed-off-by: Pratyush Anand <panand@redhat.com>
 >>>> ---
->>>>   drivers/cpuidle/cpuidle-mvebu-v7.c | 4 ++--
->>>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>>>    drivers/irqchip/irq-gic.c       | 9 ++++++++-
+>>>>    include/linux/irqchip/arm-gic.h | 1 +
+>>>>    2 files changed, 9 insertions(+), 1 deletion(-)
 >>>>
->>>> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
->>>> index 38e68618513a..cefa07438ae1 100644
->>>> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
->>>> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
->>>> @@ -37,11 +37,11 @@ static int mvebu_v7_enter_idle(struct cpuidle_device *dev,
->>>>   		deepidle = true;
->>>>
->>>>   	ret = mvebu_v7_cpu_suspend(deepidle);
->>>> +	cpu_pm_exit();
->>>> +
->>>>   	if (ret)
->>>>   		return ret;
->>>>
->>>> -	cpu_pm_exit();
+>>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>>>> index d617ee5a3d8a..525dfc966e60 100644
+>>>> --- a/drivers/irqchip/irq-gic.c
+>>>> +++ b/drivers/irqchip/irq-gic.c
+>>>> @@ -362,7 +362,14 @@ static void gic_cpu_if_up(void)
+>>>>        */
+>>>>        bypass = readl(cpu_base + GIC_CPU_CTRL);
+>>>>        bypass &= GICC_DIS_BYPASS_MASK;
 >>>> -
->>>>   	return index;
->>>>   }
->>>>
->>>>
->>>
->>
->>
-> 
-> 
+>>>> +#ifdef CONFIG_ARM64
+>>>> +    /* FIXME: when ARM64 starts supporting FIQ mode.
+>>>> +     *
+>>>> +     * Until ARM64 supports FIQ handling, force FIQBypDisGrp1 to
+>>>> +     * '1', so that bypass FIQ signal is not signaled to the processor.
+>>>> +     */
+>>>> +    bypass |= GICC_DIS_BYPASS_FIQ_TO_CPU;
+>>>> +#endif
+>
+> This doesn't feel like the right approach at all. We have a bypass mask
+> already, for the same HW.
+>
+> But more importantly, FIQBypDisGrp0 is only available in secure mode,
+> while the arm64 kernel only runs in non-secure. I understand that the
+> APM HW doesn't have a secure mode, but the GIC definitely has.
+>
+> I suggest you move that change to your firmware, and make sure that the
+> kernel is only presented the non-secure version of the CPU interface.
+>
 
+Thanks Marc for your input.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+~Pratyush
