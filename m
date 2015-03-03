@@ -1,146 +1,86 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Tue, 03 Mar 2015 10:56:34 +0000
-Subject: [PATCH 1/6] target-arm: kvm: save/restore mp state
-In-Reply-To: <CAFEAcA9oWeYGYcGtf8So6VrYLMXjWr4FiZ2tS+jBnDtv87jAKw@mail.gmail.com>
-References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
- <1424880159-29348-2-git-send-email-alex.bennee@linaro.org>
- <CAFEAcA9oWeYGYcGtf8So6VrYLMXjWr4FiZ2tS+jBnDtv87jAKw@mail.gmail.com>
-Message-ID: <8761ai73j1.fsf@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 3 Mar 2015 10:57:05 +0000
+Subject: EDAC on arm64
+In-Reply-To: <2550695.nbkPi0RDF3@wuerfel>
+References: <54F11133.70909@redhat.com> <2937202.iu6lrkO1gm@wuerfel>
+ <20150302222502.GA13277@MBP.local> <2550695.nbkPi0RDF3@wuerfel>
+Message-ID: <20150303105705.GF28951@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Mar 03, 2015 at 10:23:06AM +0100, Arnd Bergmann wrote:
+> On Monday 02 March 2015 22:25:16 Catalin Marinas wrote:
+> > On Mon, Mar 02, 2015 at 08:40:16PM +0100, Arnd Bergmann wrote:
+> > > On Monday 02 March 2015 14:58:41 Catalin Marinas wrote:
+> > > > On Mon, Mar 02, 2015 at 10:59:32AM +0000, Will Deacon wrote:
+> > > > > On Sat, Feb 28, 2015 at 12:52:03AM +0000, Jon Masters wrote:
+> > > > > > Have you considered reviving the patch you posted previously for EDAC
+> > > > > > support (the atomic_scrub read/write test piece dependency)?
+> > > > > > 
+> > > > > > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249039.html
+> > > > > 
+> > > > > Well, we'd need a way to handle the non-coherent DMA case and it's really
+> > > > > not clear how to fix that.
+> > > > 
+> > > > I agree, that's where the discussions stopped. Basically the EDAC memory
+> > > > writing is racy with any non-cacheable memory accesses (by CPU or
+> > > > device). The only way we could safely use this is only if all the
+> > > > devices are coherent *and* KVM is disabled. With KVM, guests may access
+> > > > the memory uncached, so we hit the same problem.
+> > > 
+> > > Is this a setting of the host, or does the guest always have this capability?
+> > 
+> > The guest can always make it stricter than what the host set in stage 2
+> > (i.e. from Normal Cacheable -> NonCacheable -> Device) but never in the
+> > other direction.
+> 
+> Do you have an idea what the purpose of this is? Why would a guest
+> even want to mark pages as noncachable that are mapped into the
+> host as cachable and that might have dirty cache lines?
 
-Peter Maydell <peter.maydell@linaro.org> writes:
+The stage 1 / stage 2 attributes combination works such that the
+hypervisor can impose more stricter attributes or none at all (in which
+case it is up to the guest to decide what it needs). So for example
+devices mapped into the guest address space (e.g. the GIC) are marked as
+Device memory in stage 2 so that the guest could never map them as
+Normal Cacheable memory (with some bad consequences).
 
-> On 26 February 2015 at 01:02, Alex Benn?e <alex.bennee@linaro.org> wrote:
->> This adds the saving and restore of the current Multi-Processing state
->> of the machine. While the KVM_GET/SET_MP_STATE API exposes a number of
->> potential states for x86 we only use two for ARM. Either the process is
->> running or not.
->
-> By this you mean "is the CPU in the PSCI powered down state or not",
-> right?
+The other direction is that the guest may want to create a stricter
+mapping than what the host wants. A possible reason is some frame
+buffer or anything else where the guest assumes that by creating a
+non-cacheable mapping it won't need to do cache maintenance. That's why
+when KVM maps a page into the guest address space, it flushes the cache
+so there are no dirty lines. Since the host would not write to such page
+again, it won't dirty the cache (and if the guest does, it needs to deal
+with it itself).
 
->From the vcpu's perspective it is either running or not. However it is
-the same mechanism that is used when PSCI_0_2_FN_CPU_OFF is passed the
-VM, internally setting vcpu->arch.paused.
+There are some scenarios where this does not work well: a virtual frame
+buffer emulated by Qemu where the guest thinks it is non-cacheable and
+Qemu maps it as cacheable. The only sane solution here is to tell the
+guest that the (virtual) frame buffer device is DMA coherent and that it
+should use a cacheable mapping. But I don't think the host should
+somehow (transparently) upgrade the cacheability that the guest thinks
+it has.
 
->
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->>
->> diff --git a/target-arm/kvm.c b/target-arm/kvm.c
->> index 23cefe9..8732854 100644
->> --- a/target-arm/kvm.c
->> +++ b/target-arm/kvm.c
->> @@ -25,6 +25,7 @@
->>  #include "hw/arm/arm.h"
->>
->>  const KVMCapabilityInfo kvm_arch_required_capabilities[] = {
->> +    KVM_CAP_INFO(MP_STATE),
->
-> Does this really want to be a required cap? I haven't checked,
-> but assuming 'required' means what it says this presumably
-> means we'll stop working on host kernels we previously ran
-> fine on (even if migration didn't work there).
+> > > If a guest can influence the caching of a page it has access to, I can
+> > > imagine all sorts of security problems with malicious guests regardless
+> > > of EDAC.
+> > 
+> > Not as long as the host is aware of this. Basically it needs to flush
+> > the cache on a page when it is mapped into the guest address space (IPA)
+> > and flush it again when reading a page from guest.
+> 
+> You have to flush and invalidate the cache line, but of course nobody
+> wants to do that because it totally destroys performance.
 
-You are right, I'll move the CAP check to the kvm_enabled() leg of
-get/set functions.
+There are two cases when the cache needs flushing: (1) when a page is
+mapped into the guest address space (done lazily via the page faulting
+mechanism) and (2) when the host reads a page already mapped in the
+guest address space (e.g. swapping out). They indeed take some time but
+none of them are on a critical path.
 
->
->>      KVM_CAP_LAST_INFO
->>  };
->>
->> diff --git a/target-arm/machine.c b/target-arm/machine.c
->> index 9446e5a..70b1bc4 100644
->> --- a/target-arm/machine.c
->> +++ b/target-arm/machine.c
->> @@ -161,6 +161,34 @@ static const VMStateInfo vmstate_cpsr = {
->>      .put = put_cpsr,
->>  };
->>
->> +#if defined CONFIG_KVM
->> +static int get_mpstate(QEMUFile *f, void *opaque, size_t size)
->> +{
->> +    ARMCPU *cpu = opaque;
->> +    struct kvm_mp_state mp_state = { .mp_state =  qemu_get_be32(f)};
->> +    return kvm_vcpu_ioctl(CPU(cpu), KVM_SET_MP_STATE, &mp_state);
->> +}
->
-> Won't this break if you're running a QEMU built with KVM
-> support in TCG mode on an aarch64 host?
->
-> In any case, for that configuration we should be migrating the
-> TCG cpu->powered_off flag, which is where we keep the PSCI
-> power state for TCG.
-
-Yeah, I'll make the access functions aware of the mode. In itself it
-won't enable KVM<->TCG migration though!
-
->
->> +
->> +static void put_mpstate(QEMUFile *f, void *opaque, size_t size)
->> +{
->> +    ARMCPU *cpu = opaque;
->> +    struct kvm_mp_state mp_state;
->> +    int ret = kvm_vcpu_ioctl(CPU(cpu), KVM_GET_MP_STATE, &mp_state);
->> +    if (ret) {
->> +        fprintf(stderr, "%s: failed to get MP_STATE %d/%s\n",
->> +                __func__, ret, strerror(ret));
->> +        abort();
->> +    }
->> +    qemu_put_be32(f, mp_state.mp_state);
->> +}
->> +
->> +static const VMStateInfo vmstate_mpstate = {
->> +    .name = "mpstate",
->> +    .get = get_mpstate,
->> +    .put = put_mpstate,
->> +};
->> +#endif
->> +
->>  static void cpu_pre_save(void *opaque)
->>  {
->>      ARMCPU *cpu = opaque;
->> @@ -244,6 +272,16 @@ const VMStateDescription vmstate_arm_cpu = {
->>          VMSTATE_UINT32_ARRAY(env.regs, ARMCPU, 16),
->>          VMSTATE_UINT64_ARRAY(env.xregs, ARMCPU, 32),
->>          VMSTATE_UINT64(env.pc, ARMCPU),
->> +#if defined CONFIG_KVM
->> +        {
->> +            .name = "mp_state",
->> +            .version_id = 0,
->> +            .size = sizeof(uint32_t),
->> +            .info = &vmstate_mpstate,
->> +            .flags = VMS_SINGLE,
->> +            .offset = 0,
->> +        },
->> +#endif
->
-> This means the migration format will be different on different
-> build configurations, which seems like a really bad idea.
->
-> Have you considered having the KVM state sync functions just
-> sync the kernel's MP state into cpu->powered_off, and then
-> migrating that flag here unconditionally?
-
-I was looking at using:
-
-  .field_exists = mpstate_valid
-
-for the field. If we have the field in the migration stream and the
-kernel doesn't have the capability to set the state we need to fail hard
-right?
-
-
->
->>          {
->>              .name = "cpsr",
->>              .version_id = 0,
->> --
->> 2.3.0
->>
->
-> -- PMM
+(and maybe at some point we'll get fully transparent caches on ARM as
+well, so we don't have to worry about cache maintenance)
 
 -- 
-Alex Benn?e
+Catalin
