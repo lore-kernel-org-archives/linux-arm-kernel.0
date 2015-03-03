@@ -1,42 +1,115 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 3 Mar 2015 19:40:34 +0100
-Subject: [PATCH] ARM: at91/defconfig: remove CONFIG_SYSFS_DEPRECATED
-In-Reply-To: <1423173576-10888-1-git-send-email-anthony.harivel@emtrion.de>
-References: <1423173576-10888-1-git-send-email-anthony.harivel@emtrion.de>
-Message-ID: <54F60022.7090500@atmel.com>
+Date: Tue, 3 Mar 2015 19:41:33 +0100
+Subject: [PATCH 1/3] pm: at91: pm_slowclock: fix suspend/resume hang up
+ in timeouts
+In-Reply-To: <1423116037-5921-1-git-send-email-wenyou.yang@atmel.com>
+References: <1423115977-5852-1-git-send-email-wenyou.yang@atmel.com>
+ <1423116037-5921-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <54F6005D.6000308@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/02/2015 22:59, Anthony Harivel a ?crit :
-> Recent distributions and userspace tools after 2009/2010 depend on
-> the existence of /sys/class/block/, and will not work with this option enabled.
+Le 05/02/2015 07:00, Wenyou Yang a ?crit :
+> From: Sylvain Rochet <sylvain.rochet@finsecur.com>
 > 
-> Signed-off-by: Anthony Harivel <anthony.harivel@emtrion.de>
+> Removed timeout on XTAL, PLL lock and Master Clock Ready, hang if
+> something went wrong instead of continuing in unknown condition. There
+> is not much we can do if a PLL lock never ends, we are running in SRAM
+> and we will not be able to connect back the sdram or ddram in order to
+> be able to fire up a message or just panic.
+> 
+> As a bonus, not decounting the timeout register in slow clock mode
+> reduce cumulated suspend time and resume time from ~17ms to ~15ms.
+> 
+> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+> Acked-by: Wenyou.Yang <wenyou.yang@atmel.com>
 
-Okay:
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-and added to at91-4.0-fixes.
-
+and stacked in at91-4.0-fixes.
 thanks!
 
 > ---
->  arch/arm/configs/sama5_defconfig | 2 --
->  1 file changed, 2 deletions(-)
+>  arch/arm/mach-at91/pm_slowclock.S |   33 ++++-----------------------------
+>  1 file changed, 4 insertions(+), 29 deletions(-)
 > 
-> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-> index c9089c9..59b48563 100644
-> --- a/arch/arm/configs/sama5_defconfig
-> +++ b/arch/arm/configs/sama5_defconfig
-> @@ -3,8 +3,6 @@
->  CONFIG_SYSVIPC=y
->  CONFIG_IRQ_DOMAIN_DEBUG=y
->  CONFIG_LOG_BUF_SHIFT=14
-> -CONFIG_SYSFS_DEPRECATED=y
-> -CONFIG_SYSFS_DEPRECATED_V2=y
->  CONFIG_BLK_DEV_INITRD=y
->  CONFIG_EMBEDDED=y
->  CONFIG_SLAB=y
+> diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
+> index 2001877..79dfdbe 100644
+> --- a/arch/arm/mach-at91/pm_slowclock.S
+> +++ b/arch/arm/mach-at91/pm_slowclock.S
+> @@ -34,11 +34,6 @@
+>   */
+>  #undef SLOWDOWN_MASTER_CLOCK
+>  
+> -#define MCKRDY_TIMEOUT		1000
+> -#define MOSCRDY_TIMEOUT 	1000
+> -#define PLLALOCK_TIMEOUT	1000
+> -#define PLLBLOCK_TIMEOUT	1000
+> -
+>  pmc	.req	r0
+>  sdramc	.req	r1
+>  ramc1	.req	r2
+> @@ -50,56 +45,36 @@ tmp2	.req	r5
+>   * Wait until master clock is ready (after switching master clock source)
+>   */
+>  	.macro wait_mckrdy
+> -	mov	tmp2, #MCKRDY_TIMEOUT
+> -1:	sub	tmp2, tmp2, #1
+> -	cmp	tmp2, #0
+> -	beq	2f
+> -	ldr	tmp1, [pmc, #AT91_PMC_SR]
+> +1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+>  	tst	tmp1, #AT91_PMC_MCKRDY
+>  	beq	1b
+> -2:
+>  	.endm
+>  
+>  /*
+>   * Wait until master oscillator has stabilized.
+>   */
+>  	.macro wait_moscrdy
+> -	mov	tmp2, #MOSCRDY_TIMEOUT
+> -1:	sub	tmp2, tmp2, #1
+> -	cmp	tmp2, #0
+> -	beq	2f
+> -	ldr	tmp1, [pmc, #AT91_PMC_SR]
+> +1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+>  	tst	tmp1, #AT91_PMC_MOSCS
+>  	beq	1b
+> -2:
+>  	.endm
+>  
+>  /*
+>   * Wait until PLLA has locked.
+>   */
+>  	.macro wait_pllalock
+> -	mov	tmp2, #PLLALOCK_TIMEOUT
+> -1:	sub	tmp2, tmp2, #1
+> -	cmp	tmp2, #0
+> -	beq	2f
+> -	ldr	tmp1, [pmc, #AT91_PMC_SR]
+> +1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+>  	tst	tmp1, #AT91_PMC_LOCKA
+>  	beq	1b
+> -2:
+>  	.endm
+>  
+>  /*
+>   * Wait until PLLB has locked.
+>   */
+>  	.macro wait_pllblock
+> -	mov	tmp2, #PLLBLOCK_TIMEOUT
+> -1:	sub	tmp2, tmp2, #1
+> -	cmp	tmp2, #0
+> -	beq	2f
+> -	ldr	tmp1, [pmc, #AT91_PMC_SR]
+> +1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+>  	tst	tmp1, #AT91_PMC_LOCKB
+>  	beq	1b
+> -2:
+>  	.endm
+>  
+>  	.text
 > 
 
 
