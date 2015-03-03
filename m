@@ -1,73 +1,126 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Tue, 3 Mar 2015 12:10:36 +0530
-Subject: [PATCH v6 4/7] clk: Add clock driver for mb86s7x
-In-Reply-To: <20150227012822.421.16727@quantum>
-References: <1423188007-17047-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1423188649-17216-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <20150227012822.421.16727@quantum>
-Message-ID: <CAJe_ZhcBvWuoKTRO6nRfyoeTXNUwykkvGtpbcRb3oxdoNqbcjQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 3 Mar 2015 08:13:42 +0100
+Subject: [PATCH] ARM: sun7i: dt: Add new MK808C device
+In-Reply-To: <1425131004-8551-1-git-send-email-codekipper@gmail.com>
+References: <1425131004-8551-1-git-send-email-codekipper@gmail.com>
+Message-ID: <20150303071342.GB4713@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 February 2015 at 06:58, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Vincent Yang (2015-02-05 18:10:49)
->> From: Jassi Brar <jaswinder.singh@linaro.org>
->>
->>  The CRG11 clock controller is managed by remote f/w.
->> This driver simply maps Linux CLK ops onto mailbox api.
->>
->> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
->> Signed-off-by: Andy Green <andy.green@linaro.org>
->> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
->> Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
->> ---
->>  .../bindings/clock/fujitsu,mb86s70-crg11.txt       |  26 ++
->>  drivers/clk/Makefile                               |   1 +
->>  drivers/clk/clk-mb86s7x.c                          | 386 +++++++++++++++++++++
->>  3 files changed, 413 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
->>  create mode 100644 drivers/clk/clk-mb86s7x.c
->>
->> diff --git a/Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt b/Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
->> new file mode 100644
->> index 0000000..3323962
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
->> @@ -0,0 +1,26 @@
->> +Fujitsu CRG11 clock driver bindings
->> +-----------------------------------
->> +
->> +Required properties :
->> +- compatible : Shall contain "fujitsu,mb86s70-crg11"
->> +- #clock-cells : Shall be 3 {cntrlr domain port}
->> +
->> +The consumer specifies the desired clock pointing to its phandle.
->> +
->> +Example:
->> +
->> +       clock: crg11 {
->> +               compatible = "fujitsu,mb86s70-crg11";
->> +               #clock-cells = <3>;
->> +       };
->> +
->> +       mhu: mhu0 at 2b1f0000 {
->> +               #mbox-cells = <1>;
->> +               compatible = "arm,mhu";
->> +               reg = <0 0x2B1F0000 0x1000>;
->> +               interrupts = <0 36 4>, /* LP Non-Sec */
->> +                            <0 35 4>, /* HP Non-Sec */
->> +                            <0 37 4>; /* Secure */
->> +               clocks = <&clock 0 2 1>; /* Cntrlr:0 Domain:2 Port:1 */
->
-> Some preprocessor definitions would be better than hardcoding the values
-> for Cntrlr, Domain and Port. The DT include chroot should help you
-> here. Doing so will help you maintain this stuff into the future :-)
->
-What macros do you have in mind? I was actually made to get rid of
-macros in earlier version, but the implementation was different then.
-I hope
-     #clock-cells : Shall be 3 {cntrlr domain port}
-in the binding should be telling enough.
+Hi,
 
-Thanks
-jassi
+On Sat, Feb 28, 2015 at 02:43:24PM +0100, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+> 
+> The MK808C is an A20 based android stick, with 1G RAM, 8G NAND flash,
+> a RTL8723au wifi + bt combo chip, a USB host ports using USB-A receptacles,
+> a mini USB-B receptacle for USB OTG, mini HDMI and a TRS connector for AV.
+> 
+> This patch adds basic support for the device, more information can be found
+> here (http://linux-sunxi.org/MK808C).
+> 
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> ---
+>  arch/arm/boot/dts/Makefile             |   1 +
+>  arch/arm/boot/dts/sun7i-a20-mk808c.dts | 146 +++++++++++++++++++++++++++++++++
+>  2 files changed, 147 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun7i-a20-mk808c.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 9544768..eae7706 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -542,6 +542,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+>  	sun7i-a20-hummingbird.dtb \
+>  	sun7i-a20-i12-tvbox.dtb \
+>  	sun7i-a20-m3.dtb \
+> +	sun7i-a20-mk808c.dtb \
+>  	sun7i-a20-olinuxino-lime.dtb \
+>  	sun7i-a20-olinuxino-lime2.dtb \
+>  	sun7i-a20-olinuxino-micro.dtb \
+> diff --git a/arch/arm/boot/dts/sun7i-a20-mk808c.dts b/arch/arm/boot/dts/sun7i-a20-mk808c.dts
+> new file mode 100644
+> index 0000000..5722a03
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun7i-a20-mk808c.dts
+> @@ -0,0 +1,146 @@
+> +/*
+> + * Copyright 2015 Marcus Cooper
+> + *
+> + * Marcus Cooper <codekipper@gmail.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + *     You should have received a copy of the GNU General Public
+> + *     License along with this file; if not, write to the Free
+> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+> + *     MA 02110-1301 USA
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "sun7i-a20.dtsi"
+> +#include "sunxi-common-regulators.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+
+You don't seem to be using the pinctrl header.
+
+> +
+> +/ {
+> +	model = "mk808c";
+> +	compatible = "mk808c", "allwinner,sun7i-a20";
+
+the compatible must be of the format "vendor,device". Please add the
+vendor name.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150303/57647b46/attachment.sig>
