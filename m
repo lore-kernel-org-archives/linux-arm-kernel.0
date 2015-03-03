@@ -1,47 +1,128 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 3 Mar 2015 12:55:40 -0500
-Subject: [PATCH - v7] of: Move of_dma_configure() to device.c to help
- re-use
-In-Reply-To: <CAErSpo7MsxgVZyhpijRzVN7mVNcbN7M4A4W-UKaNs4AnmGrB6g@mail.gmail.com>
-References: <1425333548-8802-1-git-send-email-m-karicheri2@ti.com>
- <CAErSpo7MsxgVZyhpijRzVN7mVNcbN7M4A4W-UKaNs4AnmGrB6g@mail.gmail.com>
-Message-ID: <54F5F59C.5000603@ti.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 3 Mar 2015 09:56:02 -0800
+Subject: [PATCH v2] seccomp: switch to using asm-generic for seccomp.h
+In-Reply-To: <20150303083002.GA1207@gmail.com>
+References: <20150302231254.GA4857@www.outflux.net>
+ <20150303083002.GA1207@gmail.com>
+Message-ID: <CAGXu5jKs4_c2jcOzTA2tVQThToVfMUO31GF5+6CXtwA+KKj5_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2015 10:43 PM, Bjorn Helgaas wrote:
-> On Mon, Mar 2, 2015 at 3:59 PM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
->> Move of_dma_configure() to device.c so it can be re-used for PCI devices to
->> obtain DMA configuration from DT.  Also add a second argument so that for
->> PCI, the DT node of root bus host bridge can be used to obtain the DMA
->> configuration for the slave PCI device.
->>
->> Tested-by: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>  (AMD Seattle)
->> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
->> Signed-off-by: Bjorn Helgaas<bhelgaas@google.com>
->> Reviewed-by: Catalin Marinas<catalin.marinas@arm.com>
->> Acked-by: Will Deacon<will.deacon@arm.com>
->> CC: Joerg Roedel<joro@8bytes.org>
->> CC: Grant Likely<grant.likely@linaro.org>
->> CC: Rob Herring<robh+dt@kernel.org>
->> CC: Russell King<linux@arm.linux.org.uk>
->> CC: Arnd Bergmann<arnd@arndb.de>
->> ---
->>   - Based on the existing patch applied to arm-pci/pci/iommu for pci next (Bjorn)
->>   - Fixed the build issue reported on ARCH=x86_64
+On Tue, Mar 3, 2015 at 12:30 AM, Ingo Molnar <mingo@kernel.org> wrote:
 >
-> Hi Murali,
+> * Kees Cook <keescook@chromium.org> wrote:
 >
-> Can you please repost the entire series with fixed patches?  It's
-> easier for me to reapply the whole thing at once than it is to keep
-> track of and fiddle with individual patches.
+>> Most architectures don't need to do anything special for the strict
+>> seccomp syscall entries. Remove the redundant headers and reduce the
+>> others.
 >
-> Bjorn
-Bjorn,
+>>  19 files changed, 27 insertions(+), 137 deletions(-)
+>
+> Lovely cleanup factor.
+>
+> Just to make sure, are you sure the 32-bit details are identical
+> across architectures?
 
-Ok. I have just posted v8 of the series including all patches.
+I did "gcc -E -dM" style output comparisons on the architectures I had
+compilers for, and the buildbot hasn't complained on any of the others
+(though see the bottom of this email).
 
-FYI.
+>
+> For example some architectures did this:
+>
+>> --- a/arch/microblaze/include/asm/seccomp.h
+>> +++ /dev/null
+>> @@ -1,16 +0,0 @@
+>> -#ifndef _ASM_MICROBLAZE_SECCOMP_H
+>> -#define _ASM_MICROBLAZE_SECCOMP_H
+>> -
+>> -#include <linux/unistd.h>
+>> -
+>> -#define __NR_seccomp_read            __NR_read
+>> -#define __NR_seccomp_write           __NR_write
+>> -#define __NR_seccomp_exit            __NR_exit
+>> -#define __NR_seccomp_sigreturn               __NR_sigreturn
+>> -
+>> -#define __NR_seccomp_read_32         __NR_read
+>> -#define __NR_seccomp_write_32                __NR_write
+>> -#define __NR_seccomp_exit_32         __NR_exit
+>> -#define __NR_seccomp_sigreturn_32    __NR_sigreturn
+
+The asm-generic uses the same syscall numbers from both 64 and 32,
+which matches most architectures, and those are the ones that had
+their seccomp.h entirely eliminated.
+
+> others did this:
+>
+>> diff --git a/arch/x86/include/asm/seccomp_64.h b/arch/x86/include/asm/seccomp_64.h
+>> deleted file mode 100644
+>> index 84ec1bd161a5..000000000000
+>> --- a/arch/x86/include/asm/seccomp_64.h
+>> +++ /dev/null
+>> @@ -1,17 +0,0 @@
+>> -#ifndef _ASM_X86_SECCOMP_64_H
+>> -#define _ASM_X86_SECCOMP_64_H
+>> -
+>> -#include <linux/unistd.h>
+>> -#include <asm/ia32_unistd.h>
+>> -
+>> -#define __NR_seccomp_read __NR_read
+>> -#define __NR_seccomp_write __NR_write
+>> -#define __NR_seccomp_exit __NR_exit
+>> -#define __NR_seccomp_sigreturn __NR_rt_sigreturn
+>> -
+>> -#define __NR_seccomp_read_32 __NR_ia32_read
+>> -#define __NR_seccomp_write_32 __NR_ia32_write
+>> -#define __NR_seccomp_exit_32 __NR_ia32_exit
+>> -#define __NR_seccomp_sigreturn_32 __NR_ia32_sigreturn
+>> -
+>> -#endif /* _ASM_X86_SECCOMP_64_H */
+
+Well, this was x86's split config that was consolidated into the file below:
+
+>
+> While in yet another case you kept the syscall mappings:
+>
+>> --- a/arch/x86/include/asm/seccomp.h
+>> +++ b/arch/x86/include/asm/seccomp.h
+>> @@ -1,5 +1,20 @@
+>> +#ifndef _ASM_X86_SECCOMP_H
+>> +#define _ASM_X86_SECCOMP_H
+>> +
+>> +#include <asm/unistd.h>
+>> +
+>> +#ifdef CONFIG_COMPAT
+>> +#include <asm/ia32_unistd.h>
+>> +#define __NR_seccomp_read_32         __NR_ia32_read
+>> +#define __NR_seccomp_write_32                __NR_ia32_write
+>> +#define __NR_seccomp_exit_32         __NR_ia32_exit
+>> +#define __NR_seccomp_sigreturn_32    __NR_ia32_sigreturn
+>> +#endif
+>> +
+>>  #ifdef CONFIG_X86_32
+>> -# include <asm/seccomp_32.h>
+>> -#else
+>> -# include <asm/seccomp_64.h>
+>> +#define __NR_seccomp_sigreturn               __NR_sigreturn
+>>  #endif
+>> +
+>> +#include <asm-generic/seccomp.h>
+>> +
+>> +#endif /* _ASM_X86_SECCOMP_H */
+>
+> It might all be correct, but it's not obvious to me.
+
+The x86 change was the most complex as it removed a seccomp_32. and
+seccomp_64.h file and merged into a single asm/seccomp.h to provide
+overrides for the _32 #defines.
+
+However, in looking at it now... I see some flip/flopping of
+__NR_sigreturn and __NR_rt_sigreturn between some of the
+architectures. Let me study that and send a v3. I think there are some
+accidental changes on microblaze and powerpc.
+
+-Kees
+
 -- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+Kees Cook
+Chrome OS Security
