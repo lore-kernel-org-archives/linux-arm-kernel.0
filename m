@@ -1,36 +1,31 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 3 Mar 2015 14:05:09 +0100
-Subject: [PATCH v2] iommu/io-pgtable-arm: Add built time dependency
-In-Reply-To: <20150223100521.45108573@endymion.delvare>
-References: <20150223100521.45108573@endymion.delvare>
-Message-ID: <20150303130509.GA10502@8bytes.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 3 Mar 2015 18:40:23 +0530
+Subject: [PATCH 1/2] cpufreq-dt: support cluster level clock
+In-Reply-To: <1425387817-11382-2-git-send-email-leo.yan@linaro.org>
+References: <1425387817-11382-1-git-send-email-leo.yan@linaro.org>
+ <1425387817-11382-2-git-send-email-leo.yan@linaro.org>
+Message-ID: <CAKohpoksXwMRWYzSBmbV1nN5_LvUiB1Y2wfgOcCJPx+oipaXZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 23, 2015 at 10:05:21AM +0100, Jean Delvare wrote:
-> If io-pgtable-arm is an ARM-specific driver then configuration option
-> IOMMU_IO_PGTABLE_LPAE should not be presented to the user by default
-> for non-ARM kernels.
-> 
-> Signed-off-by: Jean Delvare <jdelvare@suse.de>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> ---
-> Changes since v1:
->  * Added ARM64 as suggested by Will Deacon.
-> 
->  drivers/iommu/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> --- linux-4.0-rc1.orig/drivers/iommu/Kconfig	2015-02-20 17:24:46.838955014 +0100
-> +++ linux-4.0-rc1/drivers/iommu/Kconfig	2015-02-23 10:03:06.487667832 +0100
-> @@ -23,6 +23,7 @@ config IOMMU_IO_PGTABLE
->  config IOMMU_IO_PGTABLE_LPAE
->  	bool "ARMv7/v8 Long Descriptor Format"
->  	select IOMMU_IO_PGTABLE
-> +	depends on ARM || ARM64 || COMPILE_TEST
->  	help
->  	  Enable support for the ARM long descriptor pagetable format.
->  	  This allocator supports 4K/2M/1G, 16K/32M and 64K/512M page
+On 3 March 2015 at 18:33, Leo Yan <leo.yan@linaro.org> wrote:
+> In the previous code, cpufreq-dt driver support single clock shared by
+> all CPUs or every CPU has dedicated clock; but it cannot support cluster
+> level clock domain, which is very common implementation for ARM SoCs.
+>
+> So this patch add the support for cluster level clock; which use the
+> platform parameter "clk_domain_boundary" to indicate whether the clock
+> domain is bound to system level, cluster level or CPU level.
+>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 
-Applied, thanks.
+No. We aren't going to do it this way. You just test your current SoC where
+all CPUs share clock line. The other SoC that might come later, where
+clocks are per cluster, can be handled later.
+
+So, for now you don't need any changes in the driver I believe.
+
+Please let me know if my understanding is wrong somewhere.
+
+--
+viresh
