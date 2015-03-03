@@ -1,29 +1,52 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 03 Mar 2015 12:07:40 +0100
-Subject: [PATCH RFC v9 09/20] drm/dsi: Add a helper to get bits per
- pixel of MIPI DSI pixel format
-In-Reply-To: <1423720903-24806-10-git-send-email-Ying.Liu@freescale.com>
-References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
- <1423720903-24806-10-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1425380860.3146.49.camel@pengutronix.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 03 Mar 2015 12:16:57 +0100
+Subject: [PATCH v2 5/5] clocksource: sun5i: Add clock notifiers
+In-Reply-To: <20150303085204.GA4911@lukather>
+References: <1422265856-27631-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1422265856-27631-6-git-send-email-maxime.ripard@free-electrons.com>
+ <54C62368.7050600@linaro.org> <20150126143541.GG31568@lukather>
+ <20150303085204.GA4911@lukather>
+Message-ID: <54F59829.2070205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/03/2015 09:52 AM, Maxime Ripard wrote:
+> On Mon, Jan 26, 2015 at 03:35:41PM +0100, Maxime Ripard wrote:
+>>>> +static int sun5i_rate_cb_clksrc(struct notifier_block *nb,
+>>>> +				unsigned long event, void *data)
+>>>> +{
+>>>> +	struct clk_notifier_data *ndata = data;
+>>>> +	struct sun5i_timer *timer = to_sun5i_timer(nb);
+>>>> +	struct sun5i_timer_clksrc *cs = container_of(timer,
+>>>> +						     struct sun5i_timer_clksrc, timer);
+>>>> +
+>>>> +	switch (event) {
+>>>> +	case PRE_RATE_CHANGE:
+>>>> +		clocksource_unregister(&cs->clksrc);
+>>>> +		break;
+>>>> +
+>>>> +	case POST_RATE_CHANGE:
+>>>> +		clocksource_register_hz(&cs->clksrc, ndata->new_rate);
+>>>> +		break;
+>>>
+>>> Why clocksource_unregister couldn't be in the POST_RATE_CHANGE ?
+>>
+>> Wouldn't that leave a (small, I agree) window where the timer would
+>> run at a rate different to the one it has been registered with?
+>
+> Ping?
 
-Am Donnerstag, den 12.02.2015, 14:01 +0800 schrieb Liu Ying:
-> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
-> ---
-> v8->v9:
->  * Rebase onto the imx-drm/next branch of Philipp Zabel's open git repository.
+Hi Maxime,
 
-I can't test this myself for lack of hardware, but I see no further
-issues with patches 09 - 13 except for the use of
-imx_drm_encoder_get_mux_id. I'll either rebase my patches that remove it
-or fix it up when applying.
+except I missed something, there were a couple of comments and I was 
+waiting a V3.
 
-Thierry, may I take these patches through imx-drm, or would you rather I
-waited for you to pick up the drm/dsi and drm/bridge patches?
+   -- Daniel
 
-regards
-Philipp
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
