@@ -1,74 +1,57 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Tue, 3 Mar 2015 21:58:16 +0100
-Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
- uncached guest mappings
-In-Reply-To: <54F5F9DC.3020206@redhat.com>
-References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
- <54F5F090.6090707@suse.de> <54F5F9DC.3020206@redhat.com>
-Message-ID: <20150303205815.GA13911@hawk.usersys.redhat.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 03 Mar 2015 16:47:32 -0500
+Subject: [PATCH v2 2/8] arm64: Convert hcalls to use ISS field
+In-Reply-To: <1425338536.9265.2.camel@infradead.org>
+References: <cover.1421449714.git.geoff@infradead.org>
+ <6719b2520095926ae0e8ac888663b87f2098f565.1421449714.git.geoff@infradead.org>
+ <1422660828.21823.40.camel@infradead.org> <20150219205714.GC24460@cbox>
+ <1424902170.17282.9.camel@infradead.org> <20150302221355.GA12902@lvm>
+ <1425338536.9265.2.camel@infradead.org>
+Message-ID: <54F62BF4.1070306@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 07:13:48PM +0100, Laszlo Ersek wrote:
-> On 03/03/15 18:34, Alexander Graf wrote:
-> > On 02/19/2015 11:54 AM, Ard Biesheuvel wrote:
-> >> This is a 0th order approximation of how we could potentially force
-> >> the guest
-> >> to avoid uncached mappings, at least from the moment the MMU is on.
-> >> (Before
-> >> that, all of memory is implicitly classified as Device-nGnRnE)
-> >>
-> >> The idea (patch #2) is to trap writes to MAIR_EL1, and replace
-> >> uncached mappings
-> >> with cached ones. This way, there is no need to mangle any guest page
-> >> tables.
-> >>
-> >> The downside is that, to do this correctly, we need to always trap
-> >> writes to
-> >> the VM sysreg group, which includes registers that the guest may write
-> >> to very
-> >> often. To reduce the associated performance hit, patch #1 introduces a
-> >> fast path
-> >> for EL2 to perform trivial sysreg writes on behalf of the guest,
-> >> without the
-> >> need for a full world switch to the host and back.
-> >>
-> >> The main purpose of these patches is to quantify the performance hit, and
-> >> verify whether the MAIR_EL1 handling works correctly.
-> > 
-> > I gave this a quick spin on a VM running with QEMU.
-> > 
-> >   * VGA output is still distorted, I get random junk black lines in the
-> > output in between
-> >   * When I add -device nec-usb-xhci -device usb-kbd the VM doesn't even
-> > boot up
-> 
-> Do you also have the dirty page tracking patches in your host kernel? I
-> needed both (and got them via Drew's backport, thanks) and then both VGA
-> and USB started working fine.
+Hi Geoff,
 
-Assuming you have the dirty page tracking already, then you're probably
-missing the fixup to patch 2/3, s/0xbb/0xff/
+On 03/02/2015 06:22 PM, Geoff Levand wrote:
+> Hi Christoffer,
+> 
+> On Mon, 2015-03-02 at 14:13 -0800, Christoffer Dall wrote:
+>> On Wed, Feb 25, 2015 at 02:09:30PM -0800, Geoff Levand wrote:
+>>> The current hyp-stub vector implementation, which uses x0, is limited
+>>> to two hyper calls; __hyp_get_vectors and __hyp_set_vectors.  To
+>>> support cpu_soft_restart() we need a third hyper call, one which
+>>> allows for code to be executed at EL2.  My proposed use of the
+>>> immediate value of the hvc instruction will allow for 2^16 distinct
+>>> hyper calls.  
+>>
+>> right, but using x0 allows for 2^64 distinct hypercalls.  Just to be
+>> clear, I'm fine with using immediate field if there are no good reasons
+>> not to, I was just curious as to what direct benefit it has.  After
+>> thinking about it a bit, from my point of view, the benefit would be the
+>> clarity that x0 is first argument like a normal procedure call, so no
+>> need to shift things around.  Is this part of the equation or am I
+>> missing the overall purpose here?
+> 
+> Yes, in general it will make marshaling of args, etc. easier.  Also,
+> to me, if we are going to change the implementation it seems to be
+> the most natural way.
 
-> 
-> Without the MAIR patches, I got cache-line size "random" corruptions in
-> the VGA display (16 pixel wide small segments). Without dirty page
-> tracking, big chunks (sometimes even almost the entire screen) was blank.
-> 
-> Regarding USB, unless you have both of the patchsets in the host kernel,
-> the guest will indeed crash early during boot. Gerd confirmed for me
-> that "usb controller (all uhci/ehci/xhci) pci regions see both read
-> (status bits) and write (control bits) access". So if there's any
-> corruption in there, on read, that looks like a malfunctioning piece of
-> hw for the guest kernel, and in this case it happens to crash.
-> 
-> > With TCG, both bits work fine.
-> 
-> Yep.
-> 
-> Thanks
-> Laszlo
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+>From reading the architecture documentation, I too expected the hypervisor
+call instruction's immediate and the instruction specific syndrome to be used.
+However I vaguely recall someone pointing out that reading the exception
+syndrome register and extracting the instruction specific syndrome is bound to
+take longer than simply using a general purpose register.
+
+One might also consider alignment with the SMC Calling Convention document
+[1], which while originally written for SMC, is also used for HVC by PSCI [2].
+
+1. http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0028a/index.html
+2. http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0022c/index.html
+
+Chris
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
