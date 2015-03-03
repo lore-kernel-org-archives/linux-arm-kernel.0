@@ -1,247 +1,227 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 Mar 2015 10:13:21 -0600
-Subject: [PATCH v5] drivers/tty: amba: defer probing DMA availability
- until hw_init
-In-Reply-To: <1424969811-11197-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
-References: <1424969811-11197-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <1424969811-11197-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
-Message-ID: <CAL_Jsq+1ayOsYH+dyexnyiLTuW4=ervVFdU6HL7GLtKQGCt9Ew@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 3 Mar 2015 10:16:08 -0600
+Subject: [PATCH - v7] of: Move of_dma_configure() to device.c to help
+ re-use
+In-Reply-To: <1425333548-8802-1-git-send-email-m-karicheri2@ti.com>
+References: <1425333548-8802-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <CAL_JsqLt_vNUW9a7b65iKuM7sWGU2e9CHC_Wnkcbc0ibajGkOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 10:56 AM, Jorge Ramirez-Ortiz
-<jorge.ramirez-ortiz@linaro.org> wrote:
-> Fix a race condition that happens when device_initcall(pl011_dma_initicall)
-> is executed before all the devices have been probed - this issue was observed on
-> an hisi_6220 SoC (HiKey board from Linaro).
+On Mon, Mar 2, 2015 at 3:59 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+> Move of_dma_configure() to device.c so it can be re-used for PCI devices to
+> obtain DMA configuration from DT.  Also add a second argument so that for
+> PCI, the DT node of root bus host bridge can be used to obtain the DMA
+> configuration for the slave PCI device.
 >
-> The deferred driver probing framework relies on late_initcall to trigger
-> deferred probes so it is just possible that, even with a valid DMA driver ready
-> to be loaded, we fail to synchronize with it.
->
-> The proposed implementation delays probing of the DMA until the uart device is
-> opened. As hw_init is invoked on port startup and port resume - but the DMA
-> probe is only required once - we avoid calling multiple times using a new field
-> in uart_amba_port to track this scenario.
->
-> This commit allows for subsequent attempts to associate an external DMA if the
-> DMA driver was deferred at UART hw_init time.
->
-> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> (AMD Seattle)
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> CC: Joerg Roedel <joro@8bytes.org>
+> CC: Grant Likely <grant.likely@linaro.org>
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: Arnd Bergmann <arnd@arndb.de>
 
-You need to send this to Greg KH and linux-serial if you want it applied.
+Acked-by: Rob Herring <robh@kernel.org>
 
-[...]
-
-> @@ -261,10 +262,11 @@ static void pl011_sgbuf_free(struct dma_chan *chan, struct pl011_sgbuf *sg,
->         }
+> ---
+>  - Based on the existing patch applied to arm-pci/pci/iommu for pci next (Bjorn)
+>  - Fixed the build issue reported on ARCH=x86_64
+>  drivers/of/device.c       |   59 +++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/of/platform.c     |   58 ++------------------------------------------
+>  include/linux/of_device.h |    2 ++
+>  3 files changed, 63 insertions(+), 56 deletions(-)
+>
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index 46d6c75c..31a7875 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -2,6 +2,9 @@
+>  #include <linux/kernel.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_iommu.h>
+> +#include <linux/dma-mapping.h>
+>  #include <linux/init.h>
+>  #include <linux/module.h>
+>  #include <linux/mod_devicetable.h>
+> @@ -66,6 +69,62 @@ int of_device_add(struct platform_device *ofdev)
+>         return device_add(&ofdev->dev);
 >  }
 >
-> -static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *uap)
-> +static void pl011_dma_probe(struct uart_amba_port *uap)
->  {
->         /* DMA is the sole user of the platform data right now */
-> -       struct amba_pl011_data *plat = dev_get_platdata(uap->port.dev);
-> +       struct device *const uap_dev = uap->port.dev;
-
-Call this "dev" so you don't have all the needless renaming.
-
-With that change:
-
-Reviewed-by: Rob Herring <robh@kernel.org>
-
-> +       struct amba_pl011_data *plat = dev_get_platdata(uap_dev);
->         struct dma_slave_config tx_conf = {
->                 .dst_addr = uap->port.mapbase + UART01x_DR,
->                 .dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE,
-> @@ -275,12 +277,19 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
->         struct dma_chan *chan;
->         dma_cap_mask_t mask;
->
-> -       chan = dma_request_slave_channel(dev, "tx");
-> +       uap->dma_probed = true;
+> +/**
+> + * of_dma_configure - Setup DMA configuration
+> + * @dev:       Device to apply DMA configuration
+> + * @np:                Pointer to OF node having DMA configuration
+> + *
+> + * Try to get devices's DMA configuration from DT and update it
+> + * accordingly.
+> + *
+> + * If platform code needs to use its own special DMA configuration, it
+> + * can use a platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE events
+> + * to fix up DMA configuration.
+> + */
+> +void of_dma_configure(struct device *dev, struct device_node *np)
+> +{
+> +       u64 dma_addr, paddr, size;
+> +       int ret;
+> +       bool coherent;
+> +       unsigned long offset;
+> +       struct iommu_ops *iommu;
 > +
-> +       chan = dma_request_slave_channel_reason(uap_dev, "tx");
-> +       if (IS_ERR(chan)) {
-> +               if (PTR_ERR(chan) == -EPROBE_DEFER) {
-> +                       dev_info(uap_dev, "DMA driver not ready\n");
-> +                       uap->dma_probed = false;
-> +                       return;
-> +               }
->
-> -       if (!chan) {
->                 /* We need platform data */
->                 if (!plat || !plat->dma_filter) {
-> -                       dev_info(uap->port.dev, "no DMA platform data\n");
-> +                       dev_info(uap_dev, "no DMA platform data\n");
->                         return;
->                 }
->
-> @@ -291,7 +300,7 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
->                 chan = dma_request_channel(mask, plat->dma_filter,
->                                                 plat->dma_tx_param);
->                 if (!chan) {
-> -                       dev_err(uap->port.dev, "no TX DMA channel!\n");
-> +                       dev_err(uap_dev, "no TX DMA channel!\n");
->                         return;
->                 }
->         }
-> @@ -299,17 +308,17 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
->         dmaengine_slave_config(chan, &tx_conf);
->         uap->dmatx.chan = chan;
->
-> -       dev_info(uap->port.dev, "DMA channel TX %s\n",
-> +       dev_info(uap_dev, "DMA channel TX %s\n",
->                  dma_chan_name(uap->dmatx.chan));
->
->         /* Optionally make use of an RX channel as well */
-> -       chan = dma_request_slave_channel(dev, "rx");
-> +       chan = dma_request_slave_channel(uap_dev, "rx");
->
->         if (!chan && plat->dma_rx_param) {
->                 chan = dma_request_channel(mask, plat->dma_filter, plat->dma_rx_param);
->
->                 if (!chan) {
-> -                       dev_err(uap->port.dev, "no RX DMA channel!\n");
-> +                       dev_err(uap_dev, "no RX DMA channel!\n");
->                         return;
->                 }
->         }
-> @@ -333,7 +342,7 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
->                         if (caps.residue_granularity ==
->                                         DMA_RESIDUE_GRANULARITY_DESCRIPTOR) {
->                                 dma_release_channel(chan);
-> -                               dev_info(uap->port.dev,
-> +                               dev_info(uap_dev,
->                                         "RX DMA disabled - no residue processing\n");
->                                 return;
->                         }
-> @@ -362,75 +371,29 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
->                                         plat->dma_rx_poll_timeout;
->                         else
->                                 uap->dmarx.poll_timeout = 3000;
-> -               } else if (!plat && dev->of_node) {
-> +               } else if (!plat && uap_dev->of_node) {
->                         uap->dmarx.auto_poll_rate = of_property_read_bool(
-> -                                               dev->of_node, "auto-poll");
-> +                                               uap_dev->of_node, "auto-poll");
->                         if (uap->dmarx.auto_poll_rate) {
->                                 u32 x;
->
-> -                               if (0 == of_property_read_u32(dev->of_node,
-> +                               if (0 == of_property_read_u32(uap_dev->of_node,
->                                                 "poll-rate-ms", &x))
->                                         uap->dmarx.poll_rate = x;
->                                 else
->                                         uap->dmarx.poll_rate = 100;
-> -                               if (0 == of_property_read_u32(dev->of_node,
-> +                               if (0 == of_property_read_u32(uap_dev->of_node,
->                                                 "poll-timeout-ms", &x))
->                                         uap->dmarx.poll_timeout = x;
->                                 else
->                                         uap->dmarx.poll_timeout = 3000;
->                         }
->                 }
-> -               dev_info(uap->port.dev, "DMA channel RX %s\n",
-> +               dev_info(uap_dev, "DMA channel RX %s\n",
->                          dma_chan_name(uap->dmarx.chan));
->         }
+> +       /*
+> +        * Set default dma-mask to 32 bit.  Drivers are expected to setup
+> +        * the correct supported dma_mask.
+> +        */
+> +       dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> +
+> +       /*
+> +        * Set it to coherent_dma_mask by default if the architecture
+> +        * code has not set it.
+> +        */
+> +       if (!dev->dma_mask)
+> +               dev->dma_mask = &dev->coherent_dma_mask;
+> +
+> +       ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+> +       if (ret < 0) {
+> +               dma_addr = offset = 0;
+> +               size = dev->coherent_dma_mask;
+> +       } else {
+> +               offset = PFN_DOWN(paddr - dma_addr);
+> +               dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+> +       }
+> +
+> +       dev->dma_pfn_offset = offset;
+> +
+> +       coherent = of_dma_is_coherent(np);
+> +       dev_dbg(dev, "device is%sdma coherent\n",
+> +               coherent ? " " : " not ");
+> +
+> +       iommu = of_iommu_configure(dev, np);
+> +       dev_dbg(dev, "device is%sbehind an iommu\n",
+> +               iommu ? " " : " not ");
+> +
+> +       arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
+> +}
+> +EXPORT_SYMBOL_GPL(of_dma_configure);
+> +
+>  int of_device_register(struct platform_device *pdev)
+>  {
+>         device_initialize(&pdev->dev);
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 667c6f1..a01f57c 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -19,7 +19,6 @@
+>  #include <linux/slab.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_device.h>
+> -#include <linux/of_iommu.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/platform_device.h>
+> @@ -150,59 +149,6 @@ struct platform_device *of_device_alloc(struct device_node *np,
 >  }
+>  EXPORT_SYMBOL(of_device_alloc);
 >
-> -#ifndef MODULE
-> -/*
-> - * Stack up the UARTs and let the above initcall be done at device
-> - * initcall time, because the serial driver is called as an arch
-> - * initcall, and at this time the DMA subsystem is not yet registered.
-> - * At this point the driver will switch over to using DMA where desired.
+> -/**
+> - * of_dma_configure - Setup DMA configuration
+> - * @dev:       Device to apply DMA configuration
+> - *
+> - * Try to get devices's DMA configuration from DT and update it
+> - * accordingly.
+> - *
+> - * In case if platform code need to use own special DMA configuration,it
+> - * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
+> - * to fix up DMA configuration.
 > - */
-> -struct dma_uap {
-> -       struct list_head node;
-> -       struct uart_amba_port *uap;
-> -       struct device *dev;
-> -};
-> -
-> -static LIST_HEAD(pl011_dma_uarts);
-> -
-> -static int __init pl011_dma_initcall(void)
+> -static void of_dma_configure(struct device *dev)
 > -{
-> -       struct list_head *node, *tmp;
+> -       u64 dma_addr, paddr, size;
+> -       int ret;
+> -       bool coherent;
+> -       unsigned long offset;
+> -       struct iommu_ops *iommu;
 > -
-> -       list_for_each_safe(node, tmp, &pl011_dma_uarts) {
-> -               struct dma_uap *dmau = list_entry(node, struct dma_uap, node);
-> -               pl011_dma_probe_initcall(dmau->dev, dmau->uap);
-> -               list_del(node);
-> -               kfree(dmau);
+> -       /*
+> -        * Set default dma-mask to 32 bit. Drivers are expected to setup
+> -        * the correct supported dma_mask.
+> -        */
+> -       dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> -
+> -       /*
+> -        * Set it to coherent_dma_mask by default if the architecture
+> -        * code has not set it.
+> -        */
+> -       if (!dev->dma_mask)
+> -               dev->dma_mask = &dev->coherent_dma_mask;
+> -
+> -       ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
+> -       if (ret < 0) {
+> -               dma_addr = offset = 0;
+> -               size = dev->coherent_dma_mask;
+> -       } else {
+> -               offset = PFN_DOWN(paddr - dma_addr);
+> -               dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
 > -       }
-> -       return 0;
+> -       dev->dma_pfn_offset = offset;
+> -
+> -       coherent = of_dma_is_coherent(dev->of_node);
+> -       dev_dbg(dev, "device is%sdma coherent\n",
+> -               coherent ? " " : " not ");
+> -
+> -       iommu = of_iommu_configure(dev, dev->of_node);
+> -       dev_dbg(dev, "device is%sbehind an iommu\n",
+> -               iommu ? " " : " not ");
+> -
+> -       arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
 > -}
 > -
-> -device_initcall(pl011_dma_initcall);
-> -
-> -static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
-> -{
-> -       struct dma_uap *dmau = kzalloc(sizeof(struct dma_uap), GFP_KERNEL);
-> -       if (dmau) {
-> -               dmau->uap = uap;
-> -               dmau->dev = dev;
-> -               list_add_tail(&dmau->node, &pl011_dma_uarts);
-> -       }
-> -}
-> -#else
-> -static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
-> -{
-> -       pl011_dma_probe_initcall(dev, uap);
-> -}
-> -#endif
-> -
->  static void pl011_dma_remove(struct uart_amba_port *uap)
+>  static void of_dma_deconfigure(struct device *dev)
 >  {
->         /* TODO: remove the initcall if it has not yet executed */
-> @@ -1142,7 +1105,7 @@ static inline bool pl011_dma_rx_running(struct uart_amba_port *uap)
+>         arch_teardown_dma_ops(dev);
+> @@ -236,7 +182,7 @@ static struct platform_device *of_platform_device_create_pdata(
 >
->  #else
->  /* Blank functions if the DMA engine is not available */
-> -static inline void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
-> +static inline void pl011_dma_probe(struct uart_amba_port *uap)
->  {
+>         dev->dev.bus = &platform_bus_type;
+>         dev->dev.platform_data = platform_data;
+> -       of_dma_configure(&dev->dev);
+> +       of_dma_configure(&dev->dev, dev->dev.of_node);
+>
+>         if (of_device_add(dev) != 0) {
+>                 of_dma_deconfigure(&dev->dev);
+> @@ -299,7 +245,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+>                 dev_set_name(&dev->dev, "%s", bus_id);
+>         else
+>                 of_device_make_bus_id(&dev->dev);
+> -       of_dma_configure(&dev->dev);
+> +       of_dma_configure(&dev->dev, dev->dev.of_node);
+>
+>         /* Allow the HW Peripheral ID to be overridden */
+>         prop = of_get_property(node, "arm,primecell-periphid", NULL);
+> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+> index ef37021..be70cb4 100644
+> --- a/include/linux/of_device.h
+> +++ b/include/linux/of_device.h
+> @@ -53,6 +53,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+>         return of_node_get(cpu_dev->of_node);
 >  }
 >
-> @@ -1548,6 +1511,9 @@ static int pl011_hwinit(struct uart_port *port)
->         uap->im = readw(uap->port.membase + UART011_IMSC);
->         writew(UART011_RTIM | UART011_RXIM, uap->port.membase + UART011_IMSC);
+> +void of_dma_configure(struct device *dev, struct device_node *np);
+>  #else /* CONFIG_OF */
 >
-> +       if (!uap->dma_probed)
-> +               pl011_dma_probe(uap);
-> +
->         if (dev_get_platdata(uap->port.dev)) {
->                 struct amba_pl011_data *plat;
+>  static inline int of_driver_match_device(struct device *dev,
+> @@ -90,6 +91,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+>  {
+>         return NULL;
+>  }
+> +static inline void of_dma_configure(struct device *dev, struct device_node *np) { }
+>  #endif /* CONFIG_OF */
 >
-> @@ -2218,7 +2184,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
->         uap->port.ops = &amba_pl011_pops;
->         uap->port.flags = UPF_BOOT_AUTOCONF;
->         uap->port.line = i;
-> -       pl011_dma_probe(&dev->dev, uap);
->
->         /* Ensure interrupts from this UART are masked and cleared */
->         writew(0, uap->port.membase + UART011_IMSC);
-> @@ -2233,7 +2198,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
->         if (!amba_reg.state) {
->                 ret = uart_register_driver(&amba_reg);
->                 if (ret < 0) {
-> -                       pr_err("Failed to register AMBA-PL011 driver\n");
-> +                       dev_err(&dev->dev,
-> +                               "Failed to register AMBA-PL011 driver\n");
->                         return ret;
->                 }
->         }
-> @@ -2242,7 +2208,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
->         if (ret) {
->                 amba_ports[i] = NULL;
->                 uart_unregister_driver(&amba_reg);
-> -               pl011_dma_remove(uap);
->         }
->
->         return ret;
+>  #endif /* _LINUX_OF_DEVICE_H */
 > --
-> 1.9.1
+> 1.7.9.5
 >
