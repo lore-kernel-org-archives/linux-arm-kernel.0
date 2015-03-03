@@ -1,219 +1,78 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 3 Mar 2015 11:29:39 +0800
-Subject: [PATCH] ARM: dts: warp: Add initial WaRP Board support
-In-Reply-To: <1424883739-374-1-git-send-email-otavio@ossystems.com.br>
-References: <1424883739-374-1-git-send-email-otavio@ossystems.com.br>
-Message-ID: <20150303032937.GI20455@dragon>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 2 Mar 2015 21:30:08 -0600
+Subject: [PATCH v4 23/30] PCI/mvebu: Use pci_common_init_dev() to
+ simplify code
+In-Reply-To: <1424938344-4017-24-git-send-email-wangyijing@huawei.com>
+References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
+ <1424938344-4017-24-git-send-email-wangyijing@huawei.com>
+Message-ID: <20150303033008.GL11978@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 02:02:19PM -0300, Otavio Salvador wrote:
-> The WaRP Board is a Wearable Reference Plaform. The board features:
+On Thu, Feb 26, 2015 at 04:12:17PM +0800, Yijing Wang wrote:
+> Mvebu_pcie_scan_bus() is not necessary, we could use
+> pci_common_init_dev() instead of pci_common_init(),
+> and pass the device pointer as the parent. Then
+> pci_scan_root_bus() will be called to scan the pci busses.
 > 
->  - Freescale i.MX6 SoloLite processor with 512MB of RAM
->  - Freescale FXOS8700CQ 6-axis Xtrinsic sensor
->  - Freescale Kinetis KL16 MCU
->  - Freescale Xtrinsic MMA955xL intelligent motion sensing platform
-> 
-> The board implements a hybrid architecture to address the evolving
-> needs of the wearables market. The platform consists of a main board
-> and an example daughtercard with the ability to add additional
-> daughtercards for different usage models.
-> 
-> For more information about the project, visit:
-> 
->  http://www.warpboard.org/
-> 
-> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
-
-Pretty neat!  Only one comment about dts license below.
-
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> CC: Jason Cooper <jason@lakedaemon.net>
 > ---
->  arch/arm/boot/dts/Makefile        |   3 +-
->  arch/arm/boot/dts/imx6sl-warp.dts | 154 ++++++++++++++++++++++++++++++++++++++
->  2 files changed, 156 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/imx6sl-warp.dts
+>  drivers/pci/host/pci-mvebu.c |   18 +-----------------
+>  1 files changed, 1 insertions(+), 17 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index a1c776b..1b49d57 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -299,7 +299,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6q-wandboard.dtb \
->  	imx6q-wandboard-revb1.dtb
->  dtb-$(CONFIG_SOC_IMX6SL) += \
-> -	imx6sl-evk.dtb
-> +	imx6sl-evk.dtb \
-> +	imx6sl-warp.dtb
->  dtb-$(CONFIG_SOC_IMX6SX) += \
->  	imx6sx-sabreauto.dtb \
->  	imx6sx-sdb.dtb
-> diff --git a/arch/arm/boot/dts/imx6sl-warp.dts b/arch/arm/boot/dts/imx6sl-warp.dts
-> new file mode 100644
-> index 0000000..dadb92f
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6sl-warp.dts
-> @@ -0,0 +1,154 @@
-> +/*
-> + * Copyright 2014, 2015 O.S. Systems Software LTDA.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index 1309cfb..d5a2b70 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -750,21 +750,6 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+>  	return 1;
+>  }
+>  
+> -static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+> -{
+> -	struct mvebu_pcie *pcie = sys_to_pcie(sys);
+> -	struct pci_bus *bus;
+> -
+> -	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
+> -				  &mvebu_pcie_ops, sys, &sys->resources);
+> -	if (!bus)
+> -		return NULL;
+> -
+> -	pci_scan_child_bus(bus);
+> -
+> -	return bus;
+> -}
+> -
+>  static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
+>  						 const struct resource *res,
+>  						 resource_size_t start,
+> @@ -808,12 +793,11 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
+>  	hw.nr_controllers = 1;
+>  	hw.private_data   = (void **)&pcie;
+>  	hw.setup          = mvebu_pcie_setup;
+> -	hw.scan           = mvebu_pcie_scan_bus;
+>  	hw.map_irq        = of_irq_parse_and_map_pci;
+>  	hw.ops            = &mvebu_pcie_ops;
+>  	hw.align_resource = mvebu_pcie_align_resource;
+>  
+> -	pci_common_init(&hw);
+> +	pci_common_init_dev(&pcie->pdev->dev, &hw);
 
-It's preferred to use GPL/X11 dual license for new dts files.  See
-arch/arm/boot/dts/imx6q-tbs2910.dts for example.
+I'm not necessarily opposed to this, but it seems unrelated to the rest of
+the series.  And I think it changes the behavior slightly (now we call
+pci_common_init_dev() with &pcie->pdev->dev instead of NULL).  So I'll wait
+for an ack from Thomas and/or Jason.
 
-Shawn
-
-> +
-> +/dts-v1/;
-> +
-> +#include "imx6sl.dtsi"
-> +
-> +/ {
-> +	model = "WaRP Board";
-> +	compatible = "warp,imx6sl-warp", "fsl,imx6sl";
-> +
-> +	memory {
-> +		reg = <0x80000000 0x20000000>;
-> +	};
-> +
-> +	regulators {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		reg_usb_otg1_vbus: regulator at 0 {
-> +			compatible = "regulator-fixed";
-> +			reg = <0>;
-> +			regulator-name = "usb_otg1_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&gpio4 0 0>;
-> +			enable-active-high;
-> +		};
-> +
-> +		reg_usb_otg2_vbus: regulator at 1 {
-> +			compatible = "regulator-fixed";
-> +			reg = <1>;
-> +			regulator-name = "usb_otg2_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&gpio4 2 0>;
-> +			enable-active-high;
-> +		};
-> +
-> +		reg_1p8v: regulator at 2 {
-> +			compatible = "regulator-fixed";
-> +			reg = <2>;
-> +			regulator-name = "1P8V";
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <1800000>;
-> +		};
-> +	};
-> +};
-> +
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1>;
-> +	status = "okay";
-> +};
-> +
-> +&uart3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart3>;
-> +	status = "okay";
-> +};
-> +
-> +&usbotg1 {
-> +	vbus-supply = <&reg_usb_otg1_vbus>;
-> +	dr_mode = "host";
-> +	disable-over-current;
-> +	status = "okay";
-> +};
-> +
-> +&usbotg2 {
-> +	vbus-supply = <&reg_usb_otg2_vbus>;
-> +	disable-over-current;
-> +	status = "okay";
-> +};
-> +
-> +&usdhc2 {
-> +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-> +	pinctrl-0 = <&pinctrl_usdhc2>;
-> +	pinctrl-1 = <&pinctrl_usdhc2_100mhz>;
-> +	pinctrl-2 = <&pinctrl_usdhc2_200mhz>;
-> +	non-removable;
-> +	status = "okay";
-> +};
-> +
-> +&iomuxc {
-> +	imx6sl-warp {
-> +		pinctrl_uart1: uart1grp {
-> +			fsl,pins = <
-> +				MX6SL_PAD_UART1_RXD__UART1_RX_DATA	0x41b0b1
-> +				MX6SL_PAD_UART1_TXD__UART1_TX_DATA	0x41b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart3: uart3grp {
-> +			fsl,pins = <
-> +				MX6SL_PAD_AUD_RXC__UART3_RX_DATA	0x41b0b1
-> +				MX6SL_PAD_AUD_RXC__UART3_TX_DATA	0x41b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc2: usdhc2grp {
-> +			fsl,pins = <
-> +				MX6SL_PAD_SD2_CMD__SD2_CMD		0x417059
-> +				MX6SL_PAD_SD2_CLK__SD2_CLK		0x410059
-> +				MX6SL_PAD_SD2_DAT0__SD2_DATA0		0x417059
-> +				MX6SL_PAD_SD2_DAT1__SD2_DATA1		0x417059
-> +				MX6SL_PAD_SD2_DAT2__SD2_DATA2		0x417059
-> +				MX6SL_PAD_SD2_DAT3__SD2_DATA3		0x417059
-> +				MX6SL_PAD_SD2_DAT4__SD2_DATA4		0x417059
-> +				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x417059
-> +				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x417059
-> +				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x417059
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc2_100mhz: usdhc2grp100mhz {
-> +			fsl,pins = <
-> +				MX6SL_PAD_SD2_CMD__SD2_CMD		0x4170b9
-> +				MX6SL_PAD_SD2_CLK__SD2_CLK		0x4100b9
-> +				MX6SL_PAD_SD2_DAT0__SD2_DATA0		0x4170b9
-> +				MX6SL_PAD_SD2_DAT1__SD2_DATA1		0x4170b9
-> +				MX6SL_PAD_SD2_DAT2__SD2_DATA2		0x4170b9
-> +				MX6SL_PAD_SD2_DAT3__SD2_DATA3		0x4170b9
-> +				MX6SL_PAD_SD2_DAT4__SD2_DATA4		0x4170b9
-> +				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x4170b9
-> +				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x4170b9
-> +				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x4170b9
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc2_200mhz: usdhc2grp200mhz {
-> +			fsl,pins = <
-> +				MX6SL_PAD_SD2_CMD__SD2_CMD		0x4170f9
-> +				MX6SL_PAD_SD2_CLK__SD2_CLK		0x4100f9
-> +				MX6SL_PAD_SD2_DAT0__SD2_DATA0		0x4170f9
-> +				MX6SL_PAD_SD2_DAT1__SD2_DATA1		0x4170f9
-> +				MX6SL_PAD_SD2_DAT2__SD2_DATA2		0x4170f9
-> +				MX6SL_PAD_SD2_DAT3__SD2_DATA3		0x4170f9
-> +				MX6SL_PAD_SD2_DAT4__SD2_DATA4		0x4170f9
-> +				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x4170f9
-> +				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x4170f9
-> +				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x4170f9
-> +			>;
-> +		};
-> +	};
-> +};
+>  }
+>  
+>  /*
 > -- 
-> 2.1.4
+> 1.7.1
 > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
