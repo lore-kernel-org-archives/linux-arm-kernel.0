@@ -1,64 +1,62 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 3 Mar 2015 19:50:17 +0100
-Subject: [PATCH] ARM: dts: at91sam9260: fix usart pinctrl
-In-Reply-To: <20150131111519.GI4164@piout.net>
-References: <54CB6A16.4070601@microbit.se> <20150131111519.GI4164@piout.net>
-Message-ID: <54F60269.5030207@atmel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 03 Mar 2015 19:54:00 +0100
+Subject: [PATCH v2 5/7] ARM: mvebu: Enable Performance Monitor Unit on
+ Armada 375 SoC
+In-Reply-To: <1425379400-4346-6-git-send-email-maxime.ripard@free-electrons.com>
+References: <1425379400-4346-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1425379400-4346-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54F60348.9010000@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 31/01/2015 12:15, Alexandre Belloni a ?crit :
-> (Added the maintainers in Cc)
-> 
-> On 30/01/2015 at 12:25:10 +0100, Jonas Andersson wrote :
->>
->> Corrected pins used by usart3.
->>
->> Signed-off-by: Jonas Andersson <jonas@microbit.se>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Hi Maxime,
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-and stacked on top of at91-4.0-fixes: thanks!
+On 03/03/2015 11:43, Maxime Ripard wrote:
+> From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> 
+> The Armada 375 SoC has a Cortex-A9 CPU, and so the PMU is available
+> to be used. This commit enables it in the devicetree.
+
+This patch (and the following one) had been intensively disscussed in the first
+series sent by Ezequiel. So:
+
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+Thanks,
+
+Gregory
+
 
 > 
->> ---
->>  arch/arm/boot/dts/at91sam9260.dtsi | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi
->> b/arch/arm/boot/dts/at91sam9260.dtsi
->> index dd1313c..16ccfd9 100644
->> --- a/arch/arm/boot/dts/at91sam9260.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
->> @@ -489,12 +489,12 @@
->>
->>                      pinctrl_usart3_rts: usart3_rts-0 {
->>                          atmel,pins =
->> -                            <AT91_PIOB 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;
->> /* PC8 periph B */
->> +                            <AT91_PIOC 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;
->> /* PC8 periph B */
->>                      };
->>
->>                      pinctrl_usart3_cts: usart3_cts-0 {
->>                          atmel,pins =
->> -                            <AT91_PIOB 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;
->> /* PC10 periph B */
->> +                            <AT91_PIOC 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;
->> /* PC10 periph B */
->>                      };
->>                  };
->>
->> -- 
->> 1.9.3
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-375.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+> index ba3c57e0af72..6c8fb3bcd6ef 100644
+> --- a/arch/arm/boot/dts/armada-375.dtsi
+> +++ b/arch/arm/boot/dts/armada-375.dtsi
+> @@ -96,6 +96,11 @@
+>  		};
+>  	};
+>  
+> +	pmu {
+> +		compatible = "arm,cortex-a9-pmu";
+> +		interrupts-extended = <&mpic 3>;
+> +	};
+> +
+>  	soc {
+>  		compatible = "marvell,armada375-mbus", "simple-bus";
+>  		#address-cells = <2>;
 > 
 
 
 -- 
-Nicolas Ferre
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
