@@ -1,25 +1,96 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 3 Mar 2015 09:44:06 +0000
-Subject: [PATCH] [RFC] ARM: shmobile: R-Car Gen2: Add da9063/da9210
- regulator quirk
-In-Reply-To: <1425317323-5898-1-git-send-email-geert+renesas@glider.be>
-References: <1425317323-5898-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150303094406.GI21293@sirena.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue,  3 Mar 2015 11:27:23 +0100
+Subject: [PATCH v2] irqchip: armada: Fix chained per-cpu interrupts
+Message-ID: <1425378443-28822-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 06:28:43PM +0100, Geert Uytterhoeven wrote:
-> The r8a7791/koelsch development board has da9063 and da9210 regulators.
-> Both regulators have their interrupt request lines tied to the same
-> interrupt pin (IRQ2) on the SoC.
+On the Cortex-A9-based Armada SoCs, the MPIC is not the primary interrupt
+controller. Yet, it still has to handle some per-cpu interrupt.
 
-Reviewed-by: Mark Brown <broonie@kernel.org>
+To do so, it is chained with the GIC using a per-cpu interrupt. However, the
+current code only call irq_set_chained_handler, which is called and enable that
+interrupt only on the boot CPU, which means that the parent per-CPU interrupt
+is never unmasked on the secondary CPUs, preventing the per-CPU interrupt to
+actually work as expected.
 
-This is all rather fun isn't it?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150303/3c87650d/attachment.sig>
+This was not seen until now since the only MPIC PPI users were the Marvell
+timers that were not working, but not used either since the system use the ARM
+TWD by default, and the ethernet controllers, that are faking there interrupts
+as SPI, and don't really expect to have interrupts on the secondary cores
+anyway.
+
+Add a CPU notifier that will enable the PPI on the secondary cores when they
+are brought up.
+
+Cc: <stable@vger.kernel.org> # 3.15+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+Changes from v1:
+  - Renamed the function and notifier names
+
+ drivers/irqchip/irq-armada-370-xp.c | 21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index 463c235acbdc..4387dae14e45 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -69,6 +69,7 @@ static void __iomem *per_cpu_int_base;
+ static void __iomem *main_int_base;
+ static struct irq_domain *armada_370_xp_mpic_domain;
+ static u32 doorbell_mask_reg;
++static int parent_irq;
+ #ifdef CONFIG_PCI_MSI
+ static struct irq_domain *armada_370_xp_msi_domain;
+ static DECLARE_BITMAP(msi_used, PCI_MSI_DOORBELL_NR);
+@@ -356,6 +357,7 @@ static int armada_xp_mpic_secondary_init(struct notifier_block *nfb,
+ {
+ 	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
+ 		armada_xp_mpic_smp_cpu_init();
++
+ 	return NOTIFY_OK;
+ }
+ 
+@@ -364,6 +366,20 @@ static struct notifier_block armada_370_xp_mpic_cpu_notifier = {
+ 	.priority = 100,
+ };
+ 
++static int mpic_cascaded_secondary_init(struct notifier_block *nfb,
++					unsigned long action, void *hcpu)
++{
++	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
++		enable_percpu_irq(parent_irq, IRQ_TYPE_NONE);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block mpic_cascaded_cpu_notifier = {
++	.notifier_call = mpic_cascaded_secondary_init,
++	.priority = 100,
++};
++
+ #endif /* CONFIG_SMP */
+ 
+ static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
+@@ -539,7 +555,7 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 					     struct device_node *parent)
+ {
+ 	struct resource main_int_res, per_cpu_int_res;
+-	int parent_irq, nr_irqs, i;
++	int nr_irqs, i;
+ 	u32 control;
+ 
+ 	BUG_ON(of_address_to_resource(node, 0, &main_int_res));
+@@ -587,6 +603,9 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 		register_cpu_notifier(&armada_370_xp_mpic_cpu_notifier);
+ #endif
+ 	} else {
++#ifdef CONFIG_SMP
++		register_cpu_notifier(&mpic_cascaded_cpu_notifier);
++#endif
+ 		irq_set_chained_handler(parent_irq,
+ 					armada_370_xp_mpic_handle_cascade_irq);
+ 	}
+-- 
+2.3.0
