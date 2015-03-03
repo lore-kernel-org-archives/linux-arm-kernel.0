@@ -1,115 +1,135 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 3 Mar 2015 19:41:33 +0100
-Subject: [PATCH 1/3] pm: at91: pm_slowclock: fix suspend/resume hang up
- in timeouts
-In-Reply-To: <1423116037-5921-1-git-send-email-wenyou.yang@atmel.com>
+Date: Tue, 3 Mar 2015 19:41:57 +0100
+Subject: [PATCH 3/3] pm: at91: Workaround DDRSDRC self-refresh bug with
+ LPDDR1 memories.
+In-Reply-To: <1423116129-6026-1-git-send-email-wenyou.yang@atmel.com>
 References: <1423115977-5852-1-git-send-email-wenyou.yang@atmel.com>
- <1423116037-5921-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <54F6005D.6000308@atmel.com>
+ <1423116129-6026-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <54F60075.8080207@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/02/2015 07:00, Wenyou Yang a ?crit :
-> From: Sylvain Rochet <sylvain.rochet@finsecur.com>
+Le 05/02/2015 07:02, Wenyou Yang a ?crit :
+> From: Peter Rosin <peda@axentia.se>
 > 
-> Removed timeout on XTAL, PLL lock and Master Clock Ready, hang if
-> something went wrong instead of continuing in unknown condition. There
-> is not much we can do if a PLL lock never ends, we are running in SRAM
-> and we will not be able to connect back the sdram or ddram in order to
-> be able to fire up a message or just panic.
+> The DDRSDR controller fails miserably to put LPDDR1 memories in
+> self-refresh. Force the controller to think it has DDR2 memories
+> during the self-refresh period, as the DDR2 self-refresh spec is
+> equivalent to LPDDR1, and is correctly implemented in the
+> controller.
 > 
-> As a bonus, not decounting the timeout register in slow clock mode
-> reduce cumulated suspend time and resume time from ~17ms to ~15ms.
+> Assume that the second controller has the same fault, but that is
+> untested.
 > 
-> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-> Acked-by: Wenyou.Yang <wenyou.yang@atmel.com>
+> Signed-off-by: Peter Rosin <peda@axentia.se>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Stacked in at91-4.0-fixes.
 
-and stacked in at91-4.0-fixes.
-thanks!
+Bye,
+
 
 > ---
->  arch/arm/mach-at91/pm_slowclock.S |   33 ++++-----------------------------
->  1 file changed, 4 insertions(+), 29 deletions(-)
+>  arch/arm/mach-at91/pm_slowclock.S  |   43 +++++++++++++++++++++++++++++++-----
+>  include/soc/at91/at91sam9_ddrsdr.h |    2 +-
+>  2 files changed, 39 insertions(+), 6 deletions(-)
 > 
 > diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-> index 2001877..79dfdbe 100644
+> index 75d8b19..487ae1e 100644
 > --- a/arch/arm/mach-at91/pm_slowclock.S
 > +++ b/arch/arm/mach-at91/pm_slowclock.S
-> @@ -34,11 +34,6 @@
->   */
->  #undef SLOWDOWN_MASTER_CLOCK
+> @@ -109,6 +109,16 @@ ddr_sr_enable:
+>  	cmp	memctrl, #AT91_MEMCTRL_DDRSDR
+>  	bne	sdr_sr_enable
 >  
-> -#define MCKRDY_TIMEOUT		1000
-> -#define MOSCRDY_TIMEOUT 	1000
-> -#define PLLALOCK_TIMEOUT	1000
-> -#define PLLBLOCK_TIMEOUT	1000
-> -
->  pmc	.req	r0
->  sdramc	.req	r1
->  ramc1	.req	r2
-> @@ -50,56 +45,36 @@ tmp2	.req	r5
->   * Wait until master clock is ready (after switching master clock source)
->   */
->  	.macro wait_mckrdy
-> -	mov	tmp2, #MCKRDY_TIMEOUT
-> -1:	sub	tmp2, tmp2, #1
-> -	cmp	tmp2, #0
-> -	beq	2f
-> -	ldr	tmp1, [pmc, #AT91_PMC_SR]
-> +1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
->  	tst	tmp1, #AT91_PMC_MCKRDY
->  	beq	1b
-> -2:
->  	.endm
+> +	/* LPDDR1 --> force DDR2 mode during self-refresh */
+> +	ldr	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
+> +	str	tmp1, .saved_sam9_mdr
+> +	bic	tmp1, tmp1, #~AT91_DDRSDRC_MD
+> +	cmp	tmp1, #AT91_DDRSDRC_MD_LOW_POWER_DDR
+> +	ldreq	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
+> +	biceq	tmp1, tmp1, #AT91_DDRSDRC_MD
+> +	orreq	tmp1, tmp1, #AT91_DDRSDRC_MD_DDR2
+> +	streq	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
+> +
+>  	/* prepare for DDRAM self-refresh mode */
+>  	ldr	tmp1, [sdramc, #AT91_DDRSDRC_LPR]
+>  	str	tmp1, .saved_sam9_lpr
+> @@ -117,14 +127,26 @@ ddr_sr_enable:
 >  
->  /*
->   * Wait until master oscillator has stabilized.
->   */
->  	.macro wait_moscrdy
-> -	mov	tmp2, #MOSCRDY_TIMEOUT
-> -1:	sub	tmp2, tmp2, #1
-> -	cmp	tmp2, #0
-> -	beq	2f
-> -	ldr	tmp1, [pmc, #AT91_PMC_SR]
-> +1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
->  	tst	tmp1, #AT91_PMC_MOSCS
->  	beq	1b
-> -2:
->  	.endm
+>  	/* figure out if we use the second ram controller */
+>  	cmp	ramc1, #0
+> -	ldrne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
+> -	strne	tmp2, .saved_sam9_lpr1
+> -	bicne	tmp2, #AT91_DDRSDRC_LPCB
+> -	orrne	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
+> +	beq	ddr_no_2nd_ctrl
+> +
+> +	ldr	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
+> +	str	tmp2, .saved_sam9_mdr1
+> +	bic	tmp2, tmp2, #~AT91_DDRSDRC_MD
+> +	cmp	tmp2, #AT91_DDRSDRC_MD_LOW_POWER_DDR
+> +	ldreq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
+> +	biceq	tmp2, tmp2, #AT91_DDRSDRC_MD
+> +	orreq	tmp2, tmp2, #AT91_DDRSDRC_MD_DDR2
+> +	streq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
+> +
+> +	ldr	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
+> +	str	tmp2, .saved_sam9_lpr1
+> +	bic	tmp2, #AT91_DDRSDRC_LPCB
+> +	orr	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
 >  
->  /*
->   * Wait until PLLA has locked.
->   */
->  	.macro wait_pllalock
-> -	mov	tmp2, #PLLALOCK_TIMEOUT
-> -1:	sub	tmp2, tmp2, #1
-> -	cmp	tmp2, #0
-> -	beq	2f
-> -	ldr	tmp1, [pmc, #AT91_PMC_SR]
-> +1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
->  	tst	tmp1, #AT91_PMC_LOCKA
->  	beq	1b
-> -2:
->  	.endm
+>  	/* Enable DDRAM self-refresh mode */
+> +	str	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
+> +ddr_no_2nd_ctrl:
+>  	str	tmp1, [sdramc, #AT91_DDRSDRC_LPR]
+> -	strne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
 >  
->  /*
->   * Wait until PLLB has locked.
->   */
->  	.macro wait_pllblock
-> -	mov	tmp2, #PLLBLOCK_TIMEOUT
-> -1:	sub	tmp2, tmp2, #1
-> -	cmp	tmp2, #0
-> -	beq	2f
-> -	ldr	tmp1, [pmc, #AT91_PMC_SR]
-> +1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
->  	tst	tmp1, #AT91_PMC_LOCKB
->  	beq	1b
-> -2:
->  	.endm
+>  	b	sdr_sr_done
 >  
->  	.text
+> @@ -236,12 +258,17 @@ sdr_sr_done:
+>  	 */
+>  	cmp	memctrl, #AT91_MEMCTRL_DDRSDR
+>  	bne	sdr_en_restore
+> +	/* Restore MDR in case of LPDDR1 */
+> +	ldr	tmp1, .saved_sam9_mdr
+> +	str	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
+>  	/* Restore LPR on AT91 with DDRAM */
+>  	ldr	tmp1, .saved_sam9_lpr
+>  	str	tmp1, [sdramc, #AT91_DDRSDRC_LPR]
+>  
+>  	/* if we use the second ram controller */
+>  	cmp	ramc1, #0
+> +	ldrne	tmp2, .saved_sam9_mdr1
+> +	strne	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
+>  	ldrne	tmp2, .saved_sam9_lpr1
+>  	strne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
+>  
+> @@ -272,5 +299,11 @@ ram_restored:
+>  .saved_sam9_lpr1:
+>  	.word 0
+>  
+> +.saved_sam9_mdr:
+> +	.word 0
+> +
+> +.saved_sam9_mdr1:
+> +	.word 0
+> +
+>  ENTRY(at91_slow_clock_sz)
+>  	.word .-at91_slow_clock
+> diff --git a/include/soc/at91/at91sam9_ddrsdr.h b/include/soc/at91/at91sam9_ddrsdr.h
+> index 0210797..dc10c52 100644
+> --- a/include/soc/at91/at91sam9_ddrsdr.h
+> +++ b/include/soc/at91/at91sam9_ddrsdr.h
+> @@ -92,7 +92,7 @@
+>  #define		AT91_DDRSDRC_UPD_MR	(3 << 20)	 /* Update load mode register and extended mode register */
+>  
+>  #define AT91_DDRSDRC_MDR	0x20	/* Memory Device Register */
+> -#define		AT91_DDRSDRC_MD		(3 << 0)		/* Memory Device Type */
+> +#define		AT91_DDRSDRC_MD		(7 << 0)	/* Memory Device Type */
+>  #define			AT91_DDRSDRC_MD_SDR		0
+>  #define			AT91_DDRSDRC_MD_LOW_POWER_SDR	1
+>  #define			AT91_DDRSDRC_MD_LOW_POWER_DDR	3
 > 
 
 
