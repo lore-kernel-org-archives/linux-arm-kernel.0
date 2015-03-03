@@ -1,68 +1,64 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 2 Mar 2015 21:24:12 -0600
-Subject: [PATCH v4 22/30] PCI/Parisc: Use pci_scan_root_bus() for
- simplicity
-In-Reply-To: <1424938344-4017-23-git-send-email-wangyijing@huawei.com>
-References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
- <1424938344-4017-23-git-send-email-wangyijing@huawei.com>
-Message-ID: <20150303032412.GK11978@google.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Tue, 3 Mar 2015 03:25:10 +0000
+Subject: [PATCH] ARM: at91: pm: fix SRAM allocation
+In-Reply-To: <20150302105736.GL4094@piout.net>
+References: <1425292978-28135-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <7E7AE962-1BBE-4B33-9563-B91351494005@jcrosoft.com>
+ <20150302105736.GL4094@piout.net>
+Message-ID: <B256D81BAE5131468A838E5D7A243641BFD77A1C@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 04:12:16PM +0800, Yijing Wang wrote:
-> From: Yijing Wang <wangyijing0307@gmail.com>
+Hi Alexandre,
 
-When you write subject lines, I think it's friendly to run
-"git log --oneline" on the file you're changing, and make yours
-match the previous ones.
-
-  $ git log --oneline drivers/parisc/dino.c
-  3f05536d226d PCI/Parisc: Use pci_scan_root_bus() for simplicity
-  3335f75a8877 parisc: dino: fix %d confusingly prefixed with 0x in format string
-  3fad9b8d597f drivers/parisc: Use printf extension %pR for struct resource
-  0fe763c570ad Drivers: misc: remove __dev* attributes.
-  0b79ca2a800d parisc/PCI: Use list_for_each_entry() for bus->devices traversal
-  30aa80da43a5 parisc/PCI: register busn_res for root buses
-  ...
-
-Yours doesn't match any of them, but "parisc/PCI" seems the best match.
-
-> Now pci_bus_add_devices() has been ripped out
-> from pci_scan_root_bus(), we could use pci_scan_root_bus()
-> instead of pci_create_root_bus() + pci_scan_child_bus()
-> for simplicity. We could also remove the pci bus
-> resource(dino_current_bus,255) and pci_bus_update_busn_res_end(),
-> because pci_scan_root_bus() would do the same thing.
+> -----Original Message-----
+> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
+> Sent: 2015?3?2? 18:58
+> To: Jean-Christophe PLAGNIOL-VILLARD
+> Cc: Ferre, Nicolas; Yang, Wenyou; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org
+> Subject: Re: [PATCH] ARM: at91: pm: fix SRAM allocation
 > 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> CC: "James E.J. Bottomley" <jejb@parisc-linux.org>
-> CC: linux-parisc at vger.kernel.org
-> ---
->  drivers/parisc/dino.c    |   11 ++---------
->  drivers/parisc/lba_pci.c |    7 ++-----
->  2 files changed, 4 insertions(+), 14 deletions(-)
+> On 02/03/2015 at 18:50:27 +0800, Jean-Christophe PLAGNIOL-VILLARD wrote :
+> >
+> > > On Mar 2, 2015, at 6:42 PM, Alexandre Belloni <alexandre.belloni@free-
+> electrons.com> wrote:
+> > >
+> > > On some platforms, there are multiple SRAM nodes defined in the
+> > > device tree but some of them are disabled, leading to allocation
+> > > failure. Try to find the first enabled SRAM node and allocate from it.
+> > >
+> > > Signed-off-by: Alexandre Belloni
+> > > <alexandre.belloni@free-electrons.com>
+> > > ---
+> > > arch/arm/mach-at91/pm.c | 20 +++++++++-----------
+> > > 1 file changed, 9 insertions(+), 11 deletions(-)
+> > >
+> > > diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c index
+> > > 5e34fb143309..97cc529b6fa0 100644
+> > > --- a/arch/arm/mach-at91/pm.c
+> > > +++ b/arch/arm/mach-at91/pm.c
+> > > @@ -272,35 +272,33 @@ static void __init at91_pm_sram_init(void)
+> > > 	struct device_node *node;
+> > > 	struct platform_device *pdev;
+> >
+> > pdev not initialised at NULL
 > 
-> diff --git a/drivers/parisc/dino.c b/drivers/parisc/dino.c
-> index a0580af..e5ee339 100644
-> --- a/drivers/parisc/dino.c
-> +++ b/drivers/parisc/dino.c
-> @@ -977,15 +977,11 @@ static int __init dino_probe(struct parisc_device *dev)
->  	if (dino_dev->hba.gmmio_space.flags)
->  		pci_add_resource(&resources, &dino_dev->hba.gmmio_space);
->  
-> -	dino_dev->hba.bus_num.start = dino_current_bus;
-> -	dino_dev->hba.bus_num.end = 255;
-> -	dino_dev->hba.bus_num.flags = IORESOURCE_BUS;
-> -	pci_add_resource(&resources, &dino_dev->hba.bus_num);
+> Indeed, I'll fix that. It doesn't really matter for now as all the
+> at91 DT have at least one sram node.
+> 
+> Wenyou, can you test it? If it works, I'll send v2.
+It works. Thanks.
 
-I know pci_scan_root_bus() does default to bus 0-255, but I don't really
-like that behavior, and I think it's a bug for drivers like this to rely on
-that.  The PCI core has no way to discover the actual bus number range, and
-the only reason it supplies a default is because it was inconvenient to
-change all the callers.  The host bridge driver is the only code that has
-any chance of discovering and/or configuring the correct range.
+Tested it on the AT91SAM9G20EK, AT91SAM9G35EK and SAMA5D36EK board.
 
-So I think it's more correct to leave the existing code here, even though
-this code is is likely incorrect.  At least then if we trip over an issue
-with the bus range being incorrect, it will be clear that the fix should
-be in dino.c rather than the PCI core.
+Tested-by: Wenyou Yang <wenyou.yang@atmel.com>
+
+> 
+> --
+> Alexandre Belloni, Free Electrons
+> Embedded Linux, Kernel and Android engineering http://free-electrons.com
+
+
+Best Regards,
+Wenyou Yang
