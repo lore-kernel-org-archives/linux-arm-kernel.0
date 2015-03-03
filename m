@@ -1,109 +1,60 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  3 Mar 2015 10:32:24 +0100
-Subject: [PATCH 1/5] MFD/OF: document MFD devices and handle simple-mfd
+Date: Tue,  3 Mar 2015 10:32:25 +0100
+Subject: [PATCH 2/5] ARM: dts: update syscons to use simple-mfd
 In-Reply-To: <1425375148-4369-1-git-send-email-linus.walleij@linaro.org>
 References: <1425375148-4369-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1425375148-4369-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1425375148-4369-3-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This defines a new compatible option for MFD devices "simple-mfd" that will
-make the OF core spawn child devices for all subnodes of that MFD device.
-It is optional but handy for things like syscon and possibly other
-simpler MFD devices.
+The Integrators and the RealView use simple MFD devices with register bit
+LEDs as subnodes, update these to use the "simple-mfd" compatible property
+so that subdevices get spawned from the MFD nexi.
 
-Since there was no file to put the documentation in, I took this opportunity
-to make a small writeup on MFD devices and add the compatible definition
-there.
-
-Suggested-by: Lee Jones <lee.jones@linaro.org>
 Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Devicetree <devicetree@vger.kernel.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Lee Jones <lee.jones@linaro.org>
 Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-I make the patch to the OF core in this one, it makes much more sense since
-it's a oneliner
+ arch/arm/boot/dts/arm-realview-pb1176.dts | 2 +-
+ arch/arm/boot/dts/integrator.dtsi         | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-Lee: this is a (tested!) implementation of your suggestion for simple-mfd.
-If you can eventually ACK this from the MFD side, I think it should be
-funneled through the ARM SoC tree.
-
-Grant/Rob: if either of you can ACK the change to the OF core likewise it can
-be taken through ARM SoC.
-
-DT binings maintainers: there is some background discussion on this here:
-http://marc.info/?l=linux-arm-kernel&m=142486676603889&w=2
-http://marc.info/?l=devicetree&m=142166313621469&w=2
----
- Documentation/devicetree/bindings/mfd/mfd.txt | 40 +++++++++++++++++++++++++++
- drivers/of/platform.c                         |  1 +
- 2 files changed, 41 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/mfd.txt
-
-diff --git a/Documentation/devicetree/bindings/mfd/mfd.txt b/Documentation/devicetree/bindings/mfd/mfd.txt
-new file mode 100644
-index 000000000000..cc057438abe8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/mfd.txt
-@@ -0,0 +1,40 @@
-+Multi-Function Devices (MFD)
-+
-+These devices comprise a nexus for heterogeneous hardware blocks spawning
-+multiple child devices.
-+
-+A typical MFD can be:
-+
-+- A mixed signal ASIC on an external bus, sometimes a PMIC (power management
-+  integrated circuit) that is manufactured in a lower technology node (rough
-+  silicon) that handles analog drivers for things like audio amplifiers, LED
-+  drivers, level shifters, PHY (physical interfaces to things like USB or
-+  ethernet), regulators etc.
-+
-+- A range of memory registers containing "miscellaneous system registers" also
-+  known as a system controller "syscon" or any other memory range containing a
-+  mix of unrelated registers.
-+
-+Optional properties:
-+
-+- compatible : "simple-mfd" - this signifies that the operating system should
-+  spawn child devices for all the subnodes of the MFD device akin to how
-+  "simple-bus" inidicates when to spawn children for a simple memory-mapped
-+  bus. For more complex devices, when the nexus driver has to probe registers
-+  to figure out what children exist etc, this should not be used. In the latter
-+  case the child devices will be instantiated by the operating system.
-+
-+Example:
-+
-+foo at 1000 {
-+		compatible = "syscon", "simple-mfd";
-+		reg = <0x010000 0x1000>;
-+
-+		led at 08.0 {
-+			compatible = "register-bit-led";
-+			offset = <0x08>;
-+			mask = <0x01>;
-+			label = "myled";
-+			default-state = "on";
-+		};
-+};
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index b189733a1539..969ba4e1460c 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -26,6 +26,7 @@
+diff --git a/arch/arm/boot/dts/arm-realview-pb1176.dts b/arch/arm/boot/dts/arm-realview-pb1176.dts
+index ff26c7ed8c41..1bc64cda819e 100644
+--- a/arch/arm/boot/dts/arm-realview-pb1176.dts
++++ b/arch/arm/boot/dts/arm-realview-pb1176.dts
+@@ -114,7 +114,7 @@
+ 		ranges;
  
- const struct of_device_id of_default_bus_match_table[] = {
- 	{ .compatible = "simple-bus", },
-+	{ .compatible = "simple-mfd", },
- #ifdef CONFIG_ARM_AMBA
- 	{ .compatible = "arm,amba-bus", },
- #endif /* CONFIG_ARM_AMBA */
+ 		syscon: syscon at 10000000 {
+-			compatible = "arm,realview-pb1176-syscon", "syscon";
++			compatible = "arm,realview-pb1176-syscon", "syscon", "simple-mfd";
+ 			reg = <0x10000000 0x1000>;
+ 
+ 			led at 08.0 {
+diff --git a/arch/arm/boot/dts/integrator.dtsi b/arch/arm/boot/dts/integrator.dtsi
+index 28e38f8c6b0f..3807d4f46ef7 100644
+--- a/arch/arm/boot/dts/integrator.dtsi
++++ b/arch/arm/boot/dts/integrator.dtsi
+@@ -6,7 +6,7 @@
+ 
+ / {
+ 	core-module at 10000000 {
+-		compatible = "arm,core-module-integrator", "syscon";
++		compatible = "arm,core-module-integrator", "syscon", "simple-mfd";
+ 		reg = <0x10000000 0x200>;
+ 
+ 		/* Use core module LED to indicate CPU load */
+@@ -95,7 +95,7 @@
+ 
+ 		syscon {
+ 			/* Debug registers mapped as syscon */
+-			compatible = "syscon";
++			compatible = "syscon", "simple-mfd";
+ 			reg = <0x1a000000 0x10>;
+ 
+ 			led at 04.0 {
 -- 
 1.9.3
