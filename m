@@ -1,59 +1,57 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Tue, 03 Mar 2015 16:30:54 +0000
-Subject: [PATCH 1/6] target-arm: kvm: save/restore mp state
-In-Reply-To: <CAFEAcA8SaBuH6izzuD6CmknSU9mbQPo0YNO=knTgRCPZ2EvXcQ@mail.gmail.com>
-References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
- <1424880159-29348-2-git-send-email-alex.bennee@linaro.org>
- <CAFEAcA9oWeYGYcGtf8So6VrYLMXjWr4FiZ2tS+jBnDtv87jAKw@mail.gmail.com>
- <8761ai73j1.fsf@linaro.org> <54F595C0.5060004@redhat.com>
- <CAFEAcA8SaBuH6izzuD6CmknSU9mbQPo0YNO=knTgRCPZ2EvXcQ@mail.gmail.com>
-Message-ID: <87zj7u59hd.fsf@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 3 Mar 2015 16:37:40 +0000
+Subject: [RFC PATCH 0/4] make memtest a generic kernel feature
+In-Reply-To: <1425308145-20769-1-git-send-email-vladimir.murzin@arm.com>
+References: <1425308145-20769-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20150303163740.GA10239@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Mar 02, 2015 at 02:55:41PM +0000, Vladimir Murzin wrote:
+> Hi,
 
-Peter Maydell <peter.maydell@linaro.org> writes:
+Hi Vladimir,
+ 
+> Memtest is a simple feature which fills the memory with a given set of
+> patterns and validates memory contents, if bad memory regions is detected it
+> reserves them via memblock API. Since memblock API is widely used by other
+> architectures this feature can be enabled outside of x86 world.
+> 
+> This patch set promotes memtest to live under generic mm umbrella and enables
+> memtest feature for arm/arm64.
+> 
+> Patches are built on top of 4.0-rc1
 
-> On 3 March 2015 at 20:06, Paolo Bonzini <pbonzini@redhat.com> wrote:
->>
->>
->> On 03/03/2015 11:56, Alex Benn?e wrote:
->>> > > This adds the saving and restore of the current Multi-Processing state
->>> > > of the machine. While the KVM_GET/SET_MP_STATE API exposes a number of
->>> > > potential states for x86 we only use two for ARM. Either the process is
->>> > > running or not.
->>> >
->>> > By this you mean "is the CPU in the PSCI powered down state or not",
->>> > right?
->>>
->>> From the vcpu's perspective it is either running or not. However it is
->>> the same mechanism that is used when PSCI_0_2_FN_CPU_OFF is passed the
->>> VM, internally setting vcpu->arch.paused.
->
-> Well, it has to be (ABI defined to be) identical with being PSCI
-> powered down/up, because that's how userspace is going to be
-> treating it. If we might tell userspace we're in the "not running"
-> state for other cases than PSCI-powered-down then we probably need
-> to consider separating those out into separate states.
->
->> I suggest that you define a new MP_STATE constant for this.  HALTED in
->> x86 and s390 is the state an ARM processor enters when you execute wfi.
->
-> Architecturally the CPU doesn't have to enter any state at all
-> if you execute a WFI -- it might be implemented as "go to low
-> power state and wait for an interrupt" or "go low power but
-> maybe be unnecessarily woken up" or "nop, do nothing"...
->
->>  Right now this is not migrated on ARM if I remember correctly, but
->> perhaps you'll want to add it in the future.
->
-> ...which is why we don't need to migrate this: it just means
-> that migration during WFI causes an unnecessary-wakeup, which
-> is architecturally fine.
+Thanks for putting this together. I've found this extremely useful for
+tracking down an issue with some errant DMA on an arm64 platform. For
+the first three patches:
 
-What happens when you boot a SMP system but only ever power up one of the
-CPUs? You can't just randomly start the second CPU if it's in the
-powered off state, who knows what it would do?
+Tested-by: Mark Rutland <mark.rutland@arm.com>
 
--- 
-Alex Benn?e
+Thanks,
+Mark.
+
+> 
+> Vladimir Murzin (4):
+>   mm: move memtest under /mm
+>   memtest: use phys_addr_t for physical addresses
+>   arm64: add support for memtest
+>   arm: add support for memtest
+> 
+>  arch/arm/mm/init.c          |    3 ++
+>  arch/arm64/mm/init.c        |    2 +
+>  arch/x86/Kconfig            |   11 ----
+>  arch/x86/include/asm/e820.h |    8 ---
+>  arch/x86/mm/Makefile        |    2 -
+>  arch/x86/mm/memtest.c       |  118 -------------------------------------------
+>  include/linux/memblock.h    |    8 +++
+>  lib/Kconfig.debug           |   11 ++++
+>  mm/Makefile                 |    1 +
+>  mm/memtest.c                |  118 +++++++++++++++++++++++++++++++++++++++++++
+>  10 files changed, 143 insertions(+), 139 deletions(-)
+>  delete mode 100644 arch/x86/mm/memtest.c
+>  create mode 100644 mm/memtest.c
+> 
+> -- 
+> 1.7.9.5
+> 
