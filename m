@@ -1,33 +1,97 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 03 Mar 2015 12:06:40 +0100
-Subject: [PATCH 1/6] target-arm: kvm: save/restore mp state
-In-Reply-To: <8761ai73j1.fsf@linaro.org>
-References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
- <1424880159-29348-2-git-send-email-alex.bennee@linaro.org>
- <CAFEAcA9oWeYGYcGtf8So6VrYLMXjWr4FiZ2tS+jBnDtv87jAKw@mail.gmail.com>
- <8761ai73j1.fsf@linaro.org>
-Message-ID: <54F595C0.5060004@redhat.com>
+From: thunder.leizhen@huawei.com (leizhen)
+Date: Tue, 3 Mar 2015 19:05:09 +0800
+Subject: [RFC PATCH v2 3/3] arm64: hook up IOMMU dma_ops
+In-Reply-To: <482b3b109a3d4818b1b1e693f488a919cf1bb707.1423226542.git.robin.murphy@arm.com>
+References: <cover.1423226542.git.robin.murphy@arm.com>
+ <482b3b109a3d4818b1b1e693f488a919cf1bb707.1423226542.git.robin.murphy@arm.com>
+Message-ID: <54F59565.7000807@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/03/2015 11:56, Alex Benn?e wrote:
-> > > This adds the saving and restore of the current Multi-Processing state
-> > > of the machine. While the KVM_GET/SET_MP_STATE API exposes a number of
-> > > potential states for x86 we only use two for ARM. Either the process is
-> > > running or not.
-> >
-> > By this you mean "is the CPU in the PSCI powered down state or not",
-> > right?
+On 2015/2/6 22:55, Robin Murphy wrote:
+> With iommu_dma_ops in place, hook them up to the configuration code, so
+> IOMMU-fronted devices will get them automatically.
 > 
-> From the vcpu's perspective it is either running or not. However it is
-> the same mechanism that is used when PSCI_0_2_FN_CPU_OFF is passed the
-> VM, internally setting vcpu->arch.paused.
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  arch/arm64/Kconfig                   |  1 +
+>  arch/arm64/include/asm/dma-mapping.h | 11 ++++++-----
+>  arch/arm64/mm/dma-mapping.c          | 15 +++++++++++++++
+>  3 files changed, 22 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index b1f9a20..e2abcdc 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -66,6 +66,7 @@ config ARM64
+>  	select HAVE_PERF_USER_STACK_DUMP
+>  	select HAVE_RCU_TABLE_FREE
+>  	select HAVE_SYSCALL_TRACEPOINTS
+> +	select IOMMU_DMA if IOMMU_SUPPORT
 
-I suggest that you define a new MP_STATE constant for this.  HALTED in
-x86 and s390 is the state an ARM processor enters when you execute wfi.
- Right now this is not migrated on ARM if I remember correctly, but
-perhaps you'll want to add it in the future.
+IOMMU_SUPPORT is selected above, so "if IOMMU_SUPPORT" can be omitted.
+And I suggest putting "select IOMMU_DMA" next to "select IOMMU_SUPPORT".
 
-Paolo
+>  	select IRQ_DOMAIN
+>  	select MODULES_USE_ELF_RELA
+>  	select NO_BOOTMEM
+> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+> index c1b271f..5246d1a 100644
+> --- a/arch/arm64/include/asm/dma-mapping.h
+> +++ b/arch/arm64/include/asm/dma-mapping.h
+> @@ -45,11 +45,8 @@ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+>  		return __generic_dma_ops(dev);
+>  }
+>  
+> -static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+> -				      struct iommu_ops *iommu, bool coherent)
+> -{
+> -	dev->archdata.dma_coherent = coherent;
+> -}
+> +void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+> +			struct iommu_ops *iommu, bool coherent);
+>  #define arch_setup_dma_ops	arch_setup_dma_ops
+>  
+>  /* do not use this function in a driver */
+> @@ -63,6 +60,10 @@ static inline bool is_device_dma_coherent(struct device *dev)
+>  #include <asm-generic/dma-mapping-common.h>
+>  
+>  #ifdef CONFIG_IOMMU_DMA
+> +
+> +void arch_teardown_dma_ops(struct device *dev);
+> +#define arch_teardown_dma_ops	arch_teardown_dma_ops
+> +
+>  static inline struct iommu_dma_domain *get_dma_domain(struct device *dev)
+>  {
+>  	return dev->archdata.dma_domain;
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 28e771c..2a30673 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -752,6 +752,14 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>  	iommu_dma_release_domain(dma_domain);
+>  }
+>  
+> +void arch_teardown_dma_ops(struct device *dev)
+> +{
+> +	if (dev->archdata.dma_domain) {
+> +		iommu_dma_detach_device(dev);
+> +		dev->archdata.dma_ops = NULL;
+> +	}
+> +}
+> +
+>  #else
+>  
+>  static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+> @@ -759,3 +767,10 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>  { }
+>  
+>  #endif  /* CONFIG_IOMMU_DMA */
+> +
+> +void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+> +			struct iommu_ops *iommu, bool coherent)
+> +{
+> +	dev->archdata.dma_coherent = coherent;
+> +	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
+> +}
+> 
