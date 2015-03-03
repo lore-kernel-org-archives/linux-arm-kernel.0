@@ -1,51 +1,50 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Tue, 03 Mar 2015 18:34:08 +0100
-Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
- uncached guest mappings
-In-Reply-To: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <54F5F090.6090707@suse.de>
+From: rockford@yandex.ru (Andrey Panov)
+Date: Tue,  3 Mar 2015 20:42:59 +0300
+Subject: [PATCH] ARM: i.MX6Q: Add fixup for RTL8211E Gigabit Ethernet PHY
+Message-ID: <1425404579-30591-1-git-send-email-rockford@yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2015 11:54 AM, Ard Biesheuvel wrote:
-> This is a 0th order approximation of how we could potentially force the guest
-> to avoid uncached mappings, at least from the moment the MMU is on. (Before
-> that, all of memory is implicitly classified as Device-nGnRnE)
->
-> The idea (patch #2) is to trap writes to MAIR_EL1, and replace uncached mappings
-> with cached ones. This way, there is no need to mangle any guest page tables.
->
-> The downside is that, to do this correctly, we need to always trap writes to
-> the VM sysreg group, which includes registers that the guest may write to very
-> often. To reduce the associated performance hit, patch #1 introduces a fast path
-> for EL2 to perform trivial sysreg writes on behalf of the guest, without the
-> need for a full world switch to the host and back.
->
-> The main purpose of these patches is to quantify the performance hit, and
-> verify whether the MAIR_EL1 handling works correctly.
+RTL8211E Ethernet PHY found in Embedsky E9 board is need
+an additional initialization.
+Taken from vendor's binary-only module.
 
-I gave this a quick spin on a VM running with QEMU.
+Signed-off-by: Andrey Panov <rockford@yandex.ru>
+---
+ arch/arm/mach-imx/mach-imx6q.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-   * VGA output is still distorted, I get random junk black lines in the 
-output in between
-   * When I add -device nec-usb-xhci -device usb-kbd the VM doesn't even 
-boot up
-
-With TCG, both bits work fine.
-
-
-Alex
-
->
-> Ard Biesheuvel (3):
->    arm64: KVM: handle some sysreg writes in EL2
->    arm64: KVM: mangle MAIR register to prevent uncached guest mappings
->    arm64: KVM: keep trapping of VM sysreg writes enabled
->
->   arch/arm/kvm/mmu.c               |   2 +-
->   arch/arm64/include/asm/kvm_arm.h |   2 +-
->   arch/arm64/kvm/hyp.S             | 101 +++++++++++++++++++++++++++++++++++++++
->   arch/arm64/kvm/sys_regs.c        |  63 ++++++++++++++++++++----
->   4 files changed, 156 insertions(+), 12 deletions(-)
->
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 4ad6e47..41708f5 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -166,6 +166,18 @@ static int ar8035_phy_fixup(struct phy_device *dev)
+ 
+ #define PHY_ID_AR8035 0x004dd072
+ 
++static int rtl8211e_phy_fixup(struct phy_device *dev)
++{
++	phy_write(dev, 0x00, 0x3140);
++	mdelay(10);
++	phy_write(dev, 0x00, 0x3340);
++	mdelay(10);
++
++	return 0;
++}
++
++#define PHY_ID_RTL8211E 0x001cc915
++
+ static void __init imx6q_enet_phy_init(void)
+ {
+ 	if (IS_BUILTIN(CONFIG_PHYLIB)) {
+@@ -177,6 +189,8 @@ static void __init imx6q_enet_phy_init(void)
+ 				ar8031_phy_fixup);
+ 		phy_register_fixup_for_uid(PHY_ID_AR8035, 0xffffffef,
+ 				ar8035_phy_fixup);
++		phy_register_fixup_for_uid(PHY_ID_RTL8211E, 0xffffffff,
++				rtl8211e_phy_fixup);
+ 	}
+ }
+ 
+-- 
+2.1.4
