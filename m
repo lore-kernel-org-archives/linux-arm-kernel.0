@@ -1,79 +1,43 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon,  2 Mar 2015 16:19:46 -0800
-Subject: [PATCH 3/5] mm: move randomize_et_dyn into ELF_ET_DYN_BASE
-In-Reply-To: <1425341988-1599-1-git-send-email-keescook@chromium.org>
-References: <1425341988-1599-1-git-send-email-keescook@chromium.org>
-Message-ID: <1425341988-1599-4-git-send-email-keescook@chromium.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 03 Mar 2015 02:39:14 +0200
+Subject: [PATCH 01/10] media: omap3isp: remove unused clkdev
+In-Reply-To: <20150302235435.GF29584@n2100.arm.linux.org.uk>
+References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
+ <20150302225336.GV6539@valkosipuli.retiisi.org.uk>
+ <20150302235435.GF29584@n2100.arm.linux.org.uk>
+Message-ID: <8241179.DTounjB2Ur@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for moving ET_DYN randomization into the ELF loader
-(which requires a static ELF_ET_DYN_BASE), this redefines s390's existing
-ET_DYN randomization away from a separate function (randomize_et_dyn)
-and into ELF_ET_DYN_BASE and a call to arch_mmap_rnd(). This refactoring
-results in the same ET_DYN randomization on s390. Additionally removes
-a copy/pasted unused arm64 extern.
+Hi Russell,
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- arch/arm64/include/asm/elf.h |  1 -
- arch/s390/include/asm/elf.h  |  9 +++++----
- arch/s390/mm/mmap.c          | 11 -----------
- 3 files changed, 5 insertions(+), 16 deletions(-)
+On Monday 02 March 2015 23:54:35 Russell King - ARM Linux wrote:
+> (Combining replies...)
+> 
+> On Tue, Mar 03, 2015 at 12:53:37AM +0200, Sakari Ailus wrote:
+> > Hi Laurent and Russell,
+> > 
+> > On Tue, Mar 03, 2015 at 12:33:44AM +0200, Laurent Pinchart wrote:
+> > > Sakari, does it conflict with the omap3isp DT support ? If so, how would
+> > > you prefer to resolve the conflict ? Russell, would it be fine to merge
+> > > this through Mauro's tree ?
+> 
+> As other changes will depend on this, I'd prefer not to.  The whole
+> "make clk_get() return a unique struct clk" wasn't well tested, and
+> several places broke - and currently clk_add_alias() is broken as a
+> result of that.
+> 
+> I'm trying to get to the longer term solution, where clkdev internally
+> uses a struct clk_hw pointer rather than a struct clk pointer, and I
+> want to clean stuff up first.
+> 
+> If omap3isp needs to keep this code, then so be it - I'll come up with
+> a different patch improving its use of clkdev instead.
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 1f65be393139..f724db00b235 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -125,7 +125,6 @@ typedef struct user_fpsimd_state elf_fpregset_t;
-  * the loader.  We need to make sure that it is out of the way of the program
-  * that it will "exec", and that there is sufficient room for the brk.
-  */
--extern unsigned long randomize_et_dyn(unsigned long base);
- #define ELF_ET_DYN_BASE	(2 * TASK_SIZE_64 / 3)
- 
- /*
-diff --git a/arch/s390/include/asm/elf.h b/arch/s390/include/asm/elf.h
-index c9df40b5c0ac..9ed68e7ee856 100644
---- a/arch/s390/include/asm/elf.h
-+++ b/arch/s390/include/asm/elf.h
-@@ -161,10 +161,11 @@ extern unsigned int vdso_enabled;
- /* This is the location that an ET_DYN program is loaded if exec'ed.  Typical
-    use of this is to invoke "./ld.so someprog" to test out a new version of
-    the loader.  We need to make sure that it is out of the way of the program
--   that it will "exec", and that there is sufficient room for the brk.  */
--
--extern unsigned long randomize_et_dyn(void);
--#define ELF_ET_DYN_BASE		randomize_et_dyn()
-+   that it will "exec", and that there is sufficient room for the brk. 64-bit
-+   tasks are aligned to 4GB. */
-+#define ELF_ET_DYN_BASE (arch_mmap_rnd() + (is_32bit_task() ? \
-+				(STACK_TOP / 3 * 2) : \
-+				(STACK_TOP / 3 * 2) & ~((1UL << 32) - 1)))
- 
- /* This yields a mask that user programs can use to figure out what
-    instruction set this CPU supports. */
-diff --git a/arch/s390/mm/mmap.c b/arch/s390/mm/mmap.c
-index 77759e35671b..ec4c20448aef 100644
---- a/arch/s390/mm/mmap.c
-+++ b/arch/s390/mm/mmap.c
-@@ -179,17 +179,6 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
- 	return addr;
- }
- 
--unsigned long randomize_et_dyn(void)
--{
--	unsigned long base;
--
--	base = STACK_TOP / 3 * 2;
--	if (!is_32bit_task())
--		/* Align to 4GB */
--		base &= ~((1UL << 32) - 1);
--	return base + arch_mmap_rnd();
--}
--
- #ifndef CONFIG_64BIT
- 
- /*
+I'm totally fine with removing clkdev from the omap3isp driver if that's 
+easier for you, I'm just concerned about the merge conflict that will result.
+
 -- 
-1.9.1
+Regards,
+
+Laurent Pinchart
