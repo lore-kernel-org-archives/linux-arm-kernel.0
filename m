@@ -1,73 +1,67 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 3 Mar 2015 17:35:22 +0800
-Subject: [PATCH v4 28/30] PCI: Export find_pci_host_bridge()
-In-Reply-To: <20150303034048.GM11978@google.com>
-References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
- <1424938344-4017-29-git-send-email-wangyijing@huawei.com>
- <20150303034048.GM11978@google.com>
-Message-ID: <54F5805A.7080000@huawei.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 3 Mar 2015 10:37:52 +0100
+Subject: [PATCH] [RFC] ARM: shmobile: R-Car Gen2: Add da9063/da9210
+ regulator quirk
+In-Reply-To: <20150302224415.GB25163@verge.net.au>
+References: <1425317323-5898-1-git-send-email-geert+renesas@glider.be>
+ <20150302183246.GA25839@katana>
+ <CAMuHMdUa6H_GYf9p8OS+ne3YvLWzi=CNi44NGmjaWjQ080B7Yw@mail.gmail.com>
+ <20150302224415.GB25163@verge.net.au>
+Message-ID: <CAMuHMdUhk+5_1SghtmP=Gb_Qr+Ojgd93Ke0jLSJBk6yvWgA1ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/3 11:40, Bjorn Helgaas wrote:
-> On Thu, Feb 26, 2015 at 04:12:22PM +0800, Yijing Wang wrote:
->> Export find_pci_host_bridge().
+Hi Simon,
+
+On Mon, Mar 2, 2015 at 11:44 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Mar 02, 2015 at 09:49:11PM +0100, Geert Uytterhoeven wrote:
+>> On Mon, Mar 2, 2015 at 7:32 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>> > On Mon, Mar 02, 2015 at 06:28:43PM +0100, Geert Uytterhoeven wrote:
+>> >> The r8a7791/koelsch development board has da9063 and da9210 regulators.
+>> >> Both regulators have their interrupt request lines tied to the same
+>> >> interrupt pin (IRQ2) on the SoC.
+>> >>
+>> >> After boot-up, both the da9063 and da9210 seem to assert their interrupt
+>> >> request lines.  Hence as soon as one driver requests this irq, it gets
+>> >> stuck in an interrupt storm, as it only manages to deassert its own
+>> >> interrupt request line, and the other driver hasn't installed an
+>> >> interrupt handler yet.
+>> >>
+>> >> To handle this, install a quirk that masks the interrupts in both the
+>> >> da9063 and da9210.  This quirk has to run after the i2c master driver
+>> >> has been initialized, but before the i2c slave drivers are initialized.
+
+>> >> +#ifdef CONFIG_I2C
+>> >
+>> > Is it a realistic scenario that I2C and slave drivers are modules?
 >>
->> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
->> ---
->>  drivers/pci/host-bridge.c |    2 +-
->>  include/linux/pci.h       |    1 +
->>  2 files changed, 2 insertions(+), 1 deletions(-)
+>> Yes.
 >>
->> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
->> index 4a2baa2..51e24f8 100644
->> --- a/drivers/pci/host-bridge.c
->> +++ b/drivers/pci/host-bridge.c
->> @@ -104,7 +104,7 @@ static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
->>  	return bus;
->>  }
->>  
->> -static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
->> +struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
-> 
-> Please name this "pci_find_host_bridge()" or similar so it looks like other
-> PCI functions.
-
-OK, will rename it to "pci_find_host_bridge()" like others.
-
-
-> 
->>  {
->>  	struct pci_bus *root_bus = find_pci_root_bus(bus);
->>  
->> diff --git a/include/linux/pci.h b/include/linux/pci.h
->> index 2f29e95..6ac7926 100644
->> --- a/include/linux/pci.h
->> +++ b/include/linux/pci.h
->> @@ -426,6 +426,7 @@ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
->>  struct pci_host_bridge *pci_create_host_bridge(
->>  		struct device *parent, u32 dombus, struct list_head *resources, 
->>  		void *sysdata, struct pci_host_bridge_ops *ops);
->> +struct pci_host_bridge *find_pci_host_bridge(struct pci_bus* bus);
-> 
-> I'm not sure this needs to be in include/linux/pci.h.  Wouldn't
-> drivers/pci/pci.h be enough?
-
-It's enough for this series, so I would move it to drivers/pci/pci.h, thanks!
-
-
-> 
->>  /*
->>   * The first PCI_BRIDGE_RESOURCE_NUM PCI bus resources (those that correspond
->>   * to P2P or CardBus bridge windows) go in a table.  Additional ones (for
->> -- 
->> 1.7.1
+>> Unfortunately that's more difficult to support, as the code references
+>> i2c_bus_type and i2c_adapter_type.
 >>
-> 
-> .
-> 
+>> i2c_bus_type is needed to register the notifier.
+>> i2c_adapter_type is needed to distinguish between i2c adapters and clients,
+>> as the notifier is called for both with action BUS_NOTIFY_ADD_DEVICE.
 
+Given we already have a few "select I2C" under arch/arm, I guess it won't
+hurt much to let ARCH_R8A7790 and ARCH_R8A7791 select I2C, too.
 
--- 
-Thanks!
-Yijing
+> this seems reasonable enough to me, however, I'd like to let it hang out
+> for a bit longer to see if there is any further review. To that end could
+> you consider posting a non-RFC version for review if you wish to pursue
+> this approach further?
+
+Sure, will do after a bit of more cooking, and updating with the findings of
+more test results, if needed.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
