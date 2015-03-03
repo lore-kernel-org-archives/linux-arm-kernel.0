@@ -1,37 +1,147 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Mar 2015 23:54:35 +0000
-Subject: [PATCH 01/10] media: omap3isp: remove unused clkdev
-In-Reply-To: <20150302225336.GV6539@valkosipuli.retiisi.org.uk>
-References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
- <E1YSTnC-0001JU-CX@rmk-PC.arm.linux.org.uk>
- <118780170.u6ZO5zJrEk@avalon>
- <20150302225336.GV6539@valkosipuli.retiisi.org.uk>
-Message-ID: <20150302235435.GF29584@n2100.arm.linux.org.uk>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 2 Mar 2015 16:04:18 -0800
+Subject: [PATCH v4 1/2] Input: bcm-keypad: add device tree bindings
+In-Reply-To: <1425141357-7807-2-git-send-email-sbranden@broadcom.com>
+References: <sbranden@broadcom.com>
+ <1425141357-7807-1-git-send-email-sbranden@broadcom.com>
+ <1425141357-7807-2-git-send-email-sbranden@broadcom.com>
+Message-ID: <20150303000418.GA30787@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Combining replies...)
-
-On Tue, Mar 03, 2015 at 12:53:37AM +0200, Sakari Ailus wrote:
-> Hi Laurent and Russell,
+On Sat, Feb 28, 2015 at 08:35:56AM -0800, Scott Branden wrote:
+> Documents the Broadcom keypad controller device tree bindings.
 > 
-> On Tue, Mar 03, 2015 at 12:33:44AM +0200, Laurent Pinchart wrote:
-> > Sakari, does it conflict with the omap3isp DT support ? If so, how would you 
-> > prefer to resolve the conflict ? Russell, would it be fine to merge this 
-> > through Mauro's tree ?
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Signed-off-by: Scott Branden <sbranden@broadcom.com>
 
-As other changes will depend on this, I'd prefer not to.  The whole
-"make clk_get() return a unique struct clk" wasn't well tested, and
-several places broke - and currently clk_add_alias() is broken as a
-result of that.
+I folded this into the patch adding the driver itself and queued for
+4.1.
 
-I'm trying to get to the longer term solution, where clkdev internally
-uses a struct clk_hw pointer rather than a struct clk pointer, and I
-want to clean stuff up first.
+Thank you.
 
-If omap3isp needs to keep this code, then so be it - I'll come up with
-a different patch improving its use of clkdev instead.
+> ---
+>  .../devicetree/bindings/input/brcm,bcm-keypad.txt  | 108 +++++++++++++++++++++
+>  1 file changed, 108 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/brcm,bcm-keypad.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/input/brcm,bcm-keypad.txt b/Documentation/devicetree/bindings/input/brcm,bcm-keypad.txt
+> new file mode 100644
+> index 0000000..b77f50b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/brcm,bcm-keypad.txt
+> @@ -0,0 +1,108 @@
+> +* Broadcom Keypad Controller device tree bindings
+> +
+> +Broadcom Keypad controller is used to interface a SoC with a matrix-type
+> +keypad device. The keypad controller supports multiple row and column lines.
+> +A key can be placed at each intersection of a unique row and a unique column.
+> +The keypad controller can sense a key-press and key-release and report the
+> +event using a interrupt to the cpu.
+> +
+> +This binding is based on the matrix-keymap binding with the following
+> +changes:
+> +
+> +keypad,num-rows and keypad,num-columns are required.
+> +
+> +Required SoC Specific Properties:
+> +- compatible: should be "brcm,bcm-keypad"
+> +
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +
+> +- interrupts: The interrupt number to the cpu.
+> +
+> +Board Specific Properties:
+> +- keypad,num-rows: Number of row lines connected to the keypad
+> +  controller.
+> +
+> +- keypad,num-columns: Number of column lines connected to the
+> +  keypad controller.
+> +
+> +- col-debounce-filter-period: The debounce period for the Column filter.
+> +
+> +	KEYPAD_DEBOUNCE_1_ms	=	0
+> +	KEYPAD_DEBOUNCE_2_ms	=	1
+> +	KEYPAD_DEBOUNCE_4_ms	=	2
+> +	KEYPAD_DEBOUNCE_8_ms	=	3
+> +	KEYPAD_DEBOUNCE_16_ms	=	4
+> +	KEYPAD_DEBOUNCE_32_ms	=	5
+> +	KEYPAD_DEBOUNCE_64_ms	=	6
+> +	KEYPAD_DEBOUNCE_128_ms	=	7
+> +
+> +- status-debounce-filter-period: The debounce period for the Status filter.
+> +
+> +	KEYPAD_DEBOUNCE_1_ms	=	0
+> +	KEYPAD_DEBOUNCE_2_ms	=	1
+> +	KEYPAD_DEBOUNCE_4_ms	=	2
+> +	KEYPAD_DEBOUNCE_8_ms	=	3
+> +	KEYPAD_DEBOUNCE_16_ms	=	4
+> +	KEYPAD_DEBOUNCE_32_ms	=	5
+> +	KEYPAD_DEBOUNCE_64_ms	=	6
+> +	KEYPAD_DEBOUNCE_128_ms	=	7
+> +
+> +- row-output-enabled: An optional property indicating whether the row or
+> +  column is being used as output. If specified the row is being used
+> +  as the output. Else defaults to column.
+> +
+> +- pull-up-enabled: An optional property indicating the Keypad scan mode.
+> +  If specified implies the keypad scan pull-up has been enabled.
+> +
+> +- autorepeat: Boolean, Enable auto repeat feature of Linux input
+> +	  subsystem (optional).
+> +
+> +- linux,keymap: The keymap for keys as described in the binding document
+> +  devicetree/bindings/input/matrix-keymap.txt.
+> +
+> +Example:
+> +#include "dt-bindings/input/input.h"
+> +
+> +/ {
+> +	keypad: keypad at 180ac000 {
+> +		/* Required SoC specific properties */
+> +		compatible = "brcm,bcm-keypad";
+> +
+> +		/* Required Board specific properties */
+> +		keypad,num-rows = <5>;
+> +		keypad,num-columns = <5>;
+> +		status = "okay";
+> +
+> +		linux,keymap = <MATRIX_KEY(0x00, 0x02, KEY_F) /* key_forward */
+> +		MATRIX_KEY(0x00, 0x03, KEY_HOME) /* key_home */
+> +		MATRIX_KEY(0x00, 0x04, KEY_M) /* key_message */
+> +		MATRIX_KEY(0x01, 0x00, KEY_A) /* key_contacts */
+> +		MATRIX_KEY(0x01, 0x01, KEY_1) /* key_1 */
+> +		MATRIX_KEY(0x01, 0x02, KEY_2) /* key_2 */
+> +		MATRIX_KEY(0x01, 0x03, KEY_3) /* key_3 */
+> +		MATRIX_KEY(0x01, 0x04, KEY_S) /* key_speaker */
+> +		MATRIX_KEY(0x02, 0x00, KEY_P) /* key_phone */
+> +		MATRIX_KEY(0x02, 0x01, KEY_4) /* key_4 */
+> +		MATRIX_KEY(0x02, 0x02, KEY_5) /* key_5 */
+> +		MATRIX_KEY(0x02, 0x03, KEY_6) /* key_6 */
+> +		MATRIX_KEY(0x02, 0x04, KEY_VOLUMEUP) /* key_vol_up */
+> +		MATRIX_KEY(0x03, 0x00, KEY_C) /* key_call_log */
+> +		MATRIX_KEY(0x03, 0x01, KEY_7) /* key_7 */
+> +		MATRIX_KEY(0x03, 0x02, KEY_8) /* key_8 */
+> +		MATRIX_KEY(0x03, 0x03, KEY_9) /* key_9 */
+> +		MATRIX_KEY(0x03, 0x04, KEY_VOLUMEDOWN) /* key_vol_down */
+> +		MATRIX_KEY(0x04, 0x00, KEY_H) /* key_headset */
+> +		MATRIX_KEY(0x04, 0x01, KEY_KPASTERISK) /* key_* */
+> +		MATRIX_KEY(0x04, 0x02, KEY_0) /* key_0 */
+> +		MATRIX_KEY(0x04, 0x03, KEY_GRAVE) /* key_# */
+> +		MATRIX_KEY(0x04, 0x04, KEY_MUTE) /* key_mute */
+> +		>;
+> +
+> +		/* Optional board specific properties */
+> +		col-debounce-filter-period = <5>;
+> +		row-output-enabled;
+> +		pull-up-enabled;
+> +
+> +	};
+> +};
+> -- 
+> 2.3.0
+> 
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Dmitry
