@@ -1,31 +1,89 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 3 Mar 2015 11:34:15 +0100
-Subject: [PATCH v2 2/8] mmc: sdhci-st: Add support for de-asserting reset
- signal and top regs resource
-In-Reply-To: <1424956227-18258-3-git-send-email-peter.griffin@linaro.org>
-References: <1424956227-18258-1-git-send-email-peter.griffin@linaro.org>
- <1424956227-18258-3-git-send-email-peter.griffin@linaro.org>
-Message-ID: <54F58E27.10401@st.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 03 Mar 2015 11:34:35 +0100
+Subject: [PATCH] cpuidle: mvebu: Fix the CPU PM notifier usage
+In-Reply-To: <54F58D2F.2010907@linaro.org>
+References: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
+ <4892716.Bf612zPN6E@vostro.rjw.lan> <54F03B51.1010708@free-electrons.com>
+ <54F58D2F.2010907@linaro.org>
+Message-ID: <54F58E3B.9040302@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hi Rafael,
 
-On 02/26/2015 02:10 PM, Peter Griffin wrote:
-> STiH407 family SoC's can have a reset signal for the controller which needs to
-> be managed. Also the eMMC controller has some additional 'top' memory mapped
-> registers which are used to manage the dynamic and static delay required for
-> UHS modes. This patch adds support for creating the mapping, which will be used
-> by subsequent patches.
->
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> ---
->   drivers/mmc/host/sdhci-st.c | 52 ++++++++++++++++++++++++++++++++++++++++++---
->   1 file changed, 49 insertions(+), 3 deletions(-)
->
 
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-Thanks,
-Maxime
+On 03/03/2015 11:30, Daniel Lezcano wrote:
+> On 02/27/2015 10:39 AM, Gregory CLEMENT wrote:
+>> Hi Rafael,
+>>
+>> On 26/02/2015 22:55, Rafael J. Wysocki wrote:
+>>> On Thursday, February 26, 2015 06:20:48 PM Gregory CLEMENT wrote:
+>>>> As stated in kernel/cpu_pm.c, "Platform is responsible for ensuring
+>>>> that cpu_pm_enter is not called twice on the same CPU before
+>>>> cpu_pm_exit is called.". In the current code in case of failure when
+>>>> calling mvebu_v7_cpu_suspend, the function cpu_pm_exit() is never
+>>>> called whereas cpu_pm_enter() was called just before.
+>>>>
+>>>> This patch moves the cpu_pm_exit() in order to balance the
+>>>> cpu_pm_enter() calls.
+>>>>
+>>>> Reported-by: Fulvio Benini <fbf@libero.it>
+>>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>>
+>>> Should that go to "stable" too?  Which "stable" series it should go to if so?
+>>
+>> Yes as it fixes a potential issue, you're right it should go
+>> to "stable". The bug was here since the introduction of the driver
+>> in 3.16.
+> 
+> Hi Gregory,
+> 
+> actually the 'stable' rules state clearly:
+> 
+> "- It must fix a real bug that bothers people (not a, "This could be a 
+> problem..." type thing)."
+> 
+> You say "it fixes a potential issue", so no bug has been raise yet, right ?
+
+Indeed nobody claimed yet having a bug related to this issue.
+
+Gregory
+
+
+> 
+>>>> ---
+>>>>   drivers/cpuidle/cpuidle-mvebu-v7.c | 4 ++--
+>>>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
+>>>> index 38e68618513a..cefa07438ae1 100644
+>>>> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
+>>>> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
+>>>> @@ -37,11 +37,11 @@ static int mvebu_v7_enter_idle(struct cpuidle_device *dev,
+>>>>   		deepidle = true;
+>>>>
+>>>>   	ret = mvebu_v7_cpu_suspend(deepidle);
+>>>> +	cpu_pm_exit();
+>>>> +
+>>>>   	if (ret)
+>>>>   		return ret;
+>>>>
+>>>> -	cpu_pm_exit();
+>>>> -
+>>>>   	return index;
+>>>>   }
+>>>>
+>>>>
+>>>
+>>
+>>
+> 
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
