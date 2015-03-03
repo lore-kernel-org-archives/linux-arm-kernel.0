@@ -1,57 +1,49 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 03 Mar 2015 16:47:32 -0500
-Subject: [PATCH v2 2/8] arm64: Convert hcalls to use ISS field
-In-Reply-To: <1425338536.9265.2.camel@infradead.org>
-References: <cover.1421449714.git.geoff@infradead.org>
- <6719b2520095926ae0e8ac888663b87f2098f565.1421449714.git.geoff@infradead.org>
- <1422660828.21823.40.camel@infradead.org> <20150219205714.GC24460@cbox>
- <1424902170.17282.9.camel@infradead.org> <20150302221355.GA12902@lvm>
- <1425338536.9265.2.camel@infradead.org>
-Message-ID: <54F62BF4.1070306@codeaurora.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 04 Mar 2015 00:03:40 +0200
+Subject: Bug in i2c-core?
+In-Reply-To: <20150227165944.GA6679@dtor-ws>
+References: <54F0507F.6030804@armadeus.com> <20150227165944.GA6679@dtor-ws>
+Message-ID: <3574616.qzNqihiGp7@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+Hi Dmitry,
 
-On 03/02/2015 06:22 PM, Geoff Levand wrote:
-> Hi Christoffer,
+On Friday 27 February 2015 08:59:44 Dmitry Torokhov wrote:
+> On Fri, Feb 27, 2015 at 12:09:51PM +0100, S?bastien SZYMANSKI wrote:
+> > Hi,
+> > 
+> > I am writing an I2C touchscreen driver for an i.MX6 based board. I
+> > compiled it as a module and when I unload it, I get the following warning:
+> > 
+> > # modprobe sx8654
+> > [   46.261494] input: SX8654 I2C Touchscreen as
+> > /devices/soc0/soc/2100000.aips-bus/21a0000.i2c/i2c-0/0-0048/input/input1
+> > # rmmod sx8654
+> > [   76.435223] ------------[ cut here ]------------
+> > [   76.439909] WARNING: CPU: 0 PID: 134 at fs/proc/generic.c:552
+> > remove_proc_entry+0x148/0x164()
+> > [   76.448582] remove_proc_entry: removing non-empty directory
+> > 'irq/208', leaking at least 'sx8654'
 > 
-> On Mon, 2015-03-02 at 14:13 -0800, Christoffer Dall wrote:
->> On Wed, Feb 25, 2015 at 02:09:30PM -0800, Geoff Levand wrote:
->>> The current hyp-stub vector implementation, which uses x0, is limited
->>> to two hyper calls; __hyp_get_vectors and __hyp_set_vectors.  To
->>> support cpu_soft_restart() we need a third hyper call, one which
->>> allows for code to be executed at EL2.  My proposed use of the
->>> immediate value of the hvc instruction will allow for 2^16 distinct
->>> hyper calls.  
->>
->> right, but using x0 allows for 2^64 distinct hypercalls.  Just to be
->> clear, I'm fine with using immediate field if there are no good reasons
->> not to, I was just curious as to what direct benefit it has.  After
->> thinking about it a bit, from my point of view, the benefit would be the
->> clarity that x0 is first argument like a normal procedure call, so no
->> need to shift things around.  Is this part of the equation or am I
->> missing the overall purpose here?
+> ...
 > 
-> Yes, in general it will make marshaling of args, etc. easier.  Also,
-> to me, if we are going to change the implementation it seems to be
-> the most natural way.
+> > When I revert commit e4df3a0 (i2c: core: Dispose OF IRQ mapping at
+> > client removal time) I don't get the warning.
+> > 
+> > Is this a bug in the i2c-core or am I doing something wrong in my driver?
+> 
+> Yes, this commit breaks all drivers using devm* for IRQ management on
+> OF-based systemsi because devm* cleanup happens in device code, after
+> bus's remove() method returns. I'd recommend reverting and finding a
+> better way (making cleanup a custom devm action as well?).
 
->From reading the architecture documentation, I too expected the hypervisor
-call instruction's immediate and the instruction specific syndrome to be used.
-However I vaguely recall someone pointing out that reading the exception
-syndrome register and extracting the instruction specific syndrome is bound to
-take longer than simply using a general purpose register.
+Ouch, my bad.
 
-One might also consider alignment with the SMC Calling Convention document
-[1], which while originally written for SMC, is also used for HVC by PSCI [2].
-
-1. http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0028a/index.html
-2. http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0022c/index.html
-
-Chris
+Wolfram, any opinion ? The original patch fixes a real bug, so we shouldn't 
+just revert it.
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards,
+
+Laurent Pinchart
