@@ -1,41 +1,83 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  3 Mar 2015 12:03:48 +0100
-Subject: [PATCH 3/5] arm64: Documentation: clarify Image placement in physical
- RAM
+Date: Tue,  3 Mar 2015 12:03:49 +0100
+Subject: [PATCH 4/5] arm64/efi: ensure that Image does not cross a 512 MB
+ boundary
 In-Reply-To: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1425380630-3684-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1425380630-3684-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The early init code maps the kernel image using statically
-allocated page tables. This means that we can only allow
-Image to be placed such that we can map its entire static
-footprint using a single table entry at all but the lowest
-level. So update the documentation to reflect that the Image
-should not cross a 512 MB boundary, which ensures the above
-on both 4k and 64k pages kernels.
+Update the Image placement logic used by the stub to make absolutely
+sure that Image is placed in such a way that the early init code will
+always be able to map it. This means the entire static memory footprint
+of Image should be inside the same naturally aligned 512 MB region.
+
+First of all, the preferred offset of dram_base + TEXT_OFFSET is only
+suitable if it doesn't result in the Image crossing a 512 MB
+alignment boundary, which could be the case if dram_base itself
+is close to the end of a naturally aligned 512 MB region.
+
+Also, when moving the kernel Image, we need to verify that the new
+destination region does not cross a 512 MB alignment boundary either.
+If that is the case, we retry the allocation with the alignment
+chosen such that the resulting region will always be suitable.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- Documentation/arm64/booting.txt | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/efi-stub.c | 38 ++++++++++++++++++++++++++++++++------
+ 1 file changed, 32 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-index bdc35fc97ac8..49f17b1632f1 100644
---- a/Documentation/arm64/booting.txt
-+++ b/Documentation/arm64/booting.txt
-@@ -112,8 +112,9 @@ The Image must be placed text_offset bytes from a 2MB aligned base
- address near the start of usable system RAM and called there. Memory
- below that base address is currently unusable by Linux, and therefore it
- is strongly recommended that this location is the start of system RAM.
--At least image_size bytes from the start of the image must be free for
--use by the kernel.
-+The physical memory region consisting of image_size bytes counting from
-+the start of the image must be free for use by the kernel, and must not
-+cross a 512 MB physical alignment boundary.
+diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+index f5374065ad53..5f8175979be8 100644
+--- a/arch/arm64/kernel/efi-stub.c
++++ b/arch/arm64/kernel/efi-stub.c
+@@ -22,14 +22,40 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table,
+ 					efi_loaded_image_t *image)
+ {
+ 	efi_status_t status;
+-	unsigned long kernel_size, kernel_memsize = 0;
++	unsigned long kernel_size, kernel_memsize;
++	unsigned long preferred_offset;
  
- Any memory described to the kernel (even that below the 2MB aligned base
- address) which is not marked as reserved from the kernel e.g. with a
+-	/* Relocate the image, if required. */
+ 	kernel_size = _edata - _text;
+-	if (*image_addr != (dram_base + TEXT_OFFSET)) {
+-		kernel_memsize = kernel_size + (_end - _edata);
+-		status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
+-				       SZ_2M, reserve_addr);
++	kernel_memsize = kernel_size + (_end - _edata);
++
++	/*
++	 * The kernel Image should be located as close as possible to the base
++	 * of system RAM, but must not cross a 512 MB alignment boundary.
++	 */
++	preferred_offset = dram_base + TEXT_OFFSET;
++	if ((preferred_offset & (SZ_512M - 1)) + kernel_memsize > SZ_512M)
++		preferred_offset = round_up(dram_base, SZ_512M) + TEXT_OFFSET;
++
++	if (*image_addr != preferred_offset) {
++		unsigned long alloc_size = kernel_memsize + TEXT_OFFSET;
++		unsigned long alloc_align = SZ_2M;
++
++again:
++		status = efi_low_alloc(sys_table, alloc_size, alloc_align,
++				       reserve_addr);
++
++		/*
++		 * Check whether the new allocation crosses a 512 MB alignment
++		 * boundary. If so, retry with the alignment set to a power of
++		 * two upper bound of the allocation size. That is guaranteed
++		 * to produce a suitable allocation, but may waste more memory.
++		 */
++		if (status == EFI_SUCCESS &&
++		    ((*reserve_addr & (SZ_512M - 1)) + alloc_size) > SZ_512M) {
++			efi_free(sys_table, alloc_size, *reserve_addr);
++			alloc_align = roundup_pow_of_two(alloc_size);
++			goto again;
++		}
+ 		if (status != EFI_SUCCESS) {
+ 			pr_efi_err(sys_table, "Failed to relocate kernel\n");
+ 			return status;
 -- 
 1.8.3.2
