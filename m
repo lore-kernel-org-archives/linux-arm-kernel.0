@@ -1,81 +1,71 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  3 Mar 2015 13:27:47 +0100
-Subject: [PATCH] arm64: remove __switch_data object from head.S
-Message-ID: <1425385667-16082-1-git-send-email-ard.biesheuvel@linaro.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue,  3 Mar 2015 13:29:31 +0100
+Subject: [PATCH 0/6] ARM: cpuidle: Unify the ARM64/ARM DT approach
+Message-ID: <1425385777-14766-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes the confusing __switch_data object from head.S,
-and replaces it with standard PC-relative references to the
-various symbols it encapsulates.
+There is a big number of cpuidle drivers for the ARM architecture.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/head.S | 35 +++++++++++++----------------------
- 1 file changed, 13 insertions(+), 22 deletions(-)
+These drivers have been cleaned up and grouped into the drivers/cpuidle
+directory to keep track of the changes more easily and ensure the code
+is following the same scheme across the drivers.
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 66675d27fea3..2afaf6b8e4e8 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -263,7 +263,7 @@ ENTRY(stext)
- 	 * On return, the CPU will be ready for the MMU to be turned on and
- 	 * the TCR will have been set.
- 	 */
--	ldr	x27, __switch_data		// address to jump to after
-+	ldr	x27, =__mmap_switched		// address to jump to after
- 						// MMU has been enabled
- 	adrp	lr, __enable_mmu		// return (PIC) address
- 	add	lr, lr, #:lo12:__enable_mmu
-@@ -397,37 +397,28 @@ __create_page_tables:
- ENDPROC(__create_page_tables)
- 	.ltorg
- 
--	.align	3
--	.type	__switch_data, %object
--__switch_data:
--	.quad	__mmap_switched
--	.quad	__bss_start			// x6
--	.quad	__bss_stop			// x7
--	.quad	processor_id			// x4
--	.quad	__fdt_pointer			// x5
--	.quad	memstart_addr			// x6
--	.quad	init_thread_union + THREAD_START_SP // sp
--
- /*
-- * The following fragment of code is executed with the MMU on in MMU mode, and
-- * uses absolute addresses; this is not position independent.
-+ * The following fragment of code is executed with the MMU enabled.
-  */
- __mmap_switched:
--	adr	x3, __switch_data + 8
-+	adrp	x6, __bss_start
-+	adrp	x7, __bss_stop
-+	add	x6, x6, :lo12:__bss_start
-+	add	x7, x7, :lo12:__bss_stop
- 
--	ldp	x6, x7, [x3], #16
- 1:	cmp	x6, x7
- 	b.hs	2f
- 	str	xzr, [x6], #8			// Clear BSS
- 	b	1b
- 2:
--	ldp	x4, x5, [x3], #16
--	ldr	x6, [x3], #8
--	ldr	x16, [x3]
-+	ldr	x16, =(init_thread_union + THREAD_START_SP)
- 	mov	sp, x16
--	str	x22, [x4]			// Save processor ID
--	str	x21, [x5]			// Save FDT pointer
--	str	x24, [x6]			// Save PHYS_OFFSET
-+	adrp	x4, processor_id
-+	adrp	x5, __fdt_pointer
-+	adrp	x6, memstart_addr
-+	str	x22, [x4, :lo12:processor_id]	// Save processor ID
-+	str	x21, [x5, :lo12:__fdt_pointer]	// Save FDT pointer
-+	str	x24, [x6, :lo12:memstart_addr]	// Save PHYS_OFFSET
- 	mov	x29, #0
- 	b	start_kernel
- ENDPROC(__mmap_switched)
+That had the benefit of simplifying the code and factor out a lot of common
+parts. Beside that, as the drivers belong to the 'drivers' directory, we had
+to split the arch specific bits and the generic code in order to keep
+everything self contained. The platform driver paradigm was used for this
+purpose.
+
+Unfortunately, this approach is now no longer accepted and a different solution
+must be provided to reach the same goal: one example is the Qualcomm cpuidle
+driver upstreaming attempt [1].
+
+In the meantime, ARM64 developed a generic cpuidle driver based on DT definition.
+
+The DT definition provides an 'enable-method' to specify one of the cpu
+operations (PSCI, ...).
+
+This patchset unify this driver with ARM32, using the same DT definition.
+
+Thanks with this patchset we can use the 'enable-method' to specify a cpu
+operations, hence get rid of the platform driver approach and go further in the
+cpuidle driver flexibility via the DT.
+
+Daniel Lezcano (6):
+  ARM: cpuidle: Remove duplicate header inclusion
+  ARM: cpuidle: Add a cpuidle ops structure to be used for DT
+  ARM64: cpuidle: Replace cpu_suspend by the common ARM/ARM64 function
+  ARM64: cpuidle: Rename cpu_init_idle to a common function name
+  ARM64: cpuidle: Remove arm64 reference
+  ARM: cpuidle: Enable the ARM64 driver for both ARM32/ARM64
+
+ arch/arm/include/asm/cpuidle.h                     | 12 +++
+ arch/arm/include/asm/cpuidle_ops.h                 |  3 +
+ arch/arm/kernel/cpuidle.c                          | 87 +++++++++++++++++++++-
+ arch/arm/mach-davinci/cpuidle.c                    |  1 -
+ arch/arm/mach-imx/cpuidle-imx6q.c                  |  1 -
+ arch/arm/mach-imx/cpuidle-imx6sl.c                 |  1 -
+ arch/arm/mach-imx/cpuidle-imx6sx.c                 |  1 -
+ arch/arm/mach-omap2/cpuidle44xx.c                  |  1 -
+ arch/arm/mach-tegra/cpuidle-tegra20.c              |  1 -
+ arch/arm/mach-tegra/cpuidle-tegra30.c              |  1 -
+ arch/arm64/include/asm/cpuidle.h                   |  9 ++-
+ arch/arm64/kernel/cpuidle.c                        |  2 +-
+ drivers/cpuidle/Kconfig                            |  7 +-
+ drivers/cpuidle/Kconfig.arm                        | 10 +++
+ drivers/cpuidle/Kconfig.arm64                      | 13 ----
+ drivers/cpuidle/Makefile                           |  5 +-
+ drivers/cpuidle/{cpuidle-arm64.c => cpuidle-arm.c} | 38 +++++-----
+ drivers/cpuidle/cpuidle-at91.c                     |  1 -
+ drivers/cpuidle/cpuidle-exynos.c                   |  1 -
+ drivers/cpuidle/cpuidle-kirkwood.c                 |  1 -
+ drivers/cpuidle/cpuidle-ux500.c                    |  1 -
+ drivers/cpuidle/cpuidle-zynq.c                     |  1 -
+ 22 files changed, 139 insertions(+), 59 deletions(-)
+ create mode 100644 arch/arm/include/asm/cpuidle_ops.h
+ delete mode 100644 drivers/cpuidle/Kconfig.arm64
+ rename drivers/cpuidle/{cpuidle-arm64.c => cpuidle-arm.c} (72%)
+
 -- 
-1.8.3.2
+1.9.1
