@@ -1,128 +1,74 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 3 Mar 2015 12:59:52 -0500
-Subject: [PATCH v1] of: calculate masks of the device based on dma-range
- size
-In-Reply-To: <20150226002033.GR6220@google.com>
-References: <1423677215-28968-1-git-send-email-m-karicheri2@ti.com>
- <20150226002033.GR6220@google.com>
-Message-ID: <54F5F698.6000604@ti.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 3 Mar 2015 10:03:22 -0800
+Subject: [PATCH v2 0/5] split ET_DYN ASLR from mmap ASLR
+In-Reply-To: <20150303073132.GA30602@gmail.com>
+References: <1425341988-1599-1-git-send-email-keescook@chromium.org>
+ <20150303073132.GA30602@gmail.com>
+Message-ID: <CAGXu5j+qJLeRx2xx=890OxHp8kjd=ws8zg3_JYPNJd_6p2xoYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2015 07:20 PM, Bjorn Helgaas wrote:
-> [+cc Catalin]
+On Mon, Mar 2, 2015 at 11:31 PM, Ingo Molnar <mingo@kernel.org> wrote:
 >
-> On Wed, Feb 11, 2015 at 12:53:35PM -0500, Murali Karicheri wrote:
->> This patch update of_dma_configure() API to calculate the
->> masks (dma_mask and coherent_dma_mask) based on the dma-range
->> values set in DT for the device. Also limit the mask to lower
->> of the default mask and mask calculated.
+> * Kees Cook <keescook@chromium.org> wrote:
+>
+>> To address the "offset2lib" ASLR weakness[1], this separates ET_DYN
+>> ASLR from mmap ASLR, as already done on s390. The architectures
+>> that are already randomizing mmap (arm, arm64, mips, powerpc, s390,
+>> and x86), have their various forms of arch_mmap_rnd() made available
+>> via the new CONFIG_ARCH_HAS_ELF_RANDOMIZE. For these architectures,
+>> arch_randomize_brk() is collapsed as well.
 >>
->> Cc: Joerg Roedel<joro@8bytes.org>
->> Cc: Grant Likely<grant.likely@linaro.org>
->> Cc: Rob Herring<robh+dt@kernel.org>
->> Cc: Bjorn Helgaas<bhelgaas@google.com>
->> Cc: Will Deacon<will.deacon@arm.com>
->> Cc: Russell King<linux@arm.linux.org.uk>
->> Cc: Arnd Bergmann<arnd@arndb.de>
->> Cc: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>
->>
->> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+>> This is an alternative to the solutions in:
+>> https://lkml.org/lkml/2015/2/23/442
 >
-> Applied with Catalin's reviewed-by to pci/iommu for v4.1, thanks!
-Bjorn,
+> Looks good so far:
+>
+> Reviewed-by: Ingo Molnar <mingo@kernel.org>
+>
+> While reviewing this series I also noticed that the following code
+> could be factored out from architecture mmap code as well:
+>
+>   - arch_pick_mmap_layout() uses very similar patterns across the
+>     platforms, with only few variations. Many architectures use
+>     the same duplicated mmap_is_legacy() helper as well. There's
+>     usually just trivial differences between mmap_legacy_base()
+>     approaches as well.
 
-Could you point me to this? I didn't see it on pci/iommu of your repo below.
+I was nervous to start refactoring this code, but it's true: most of
+it is the same.
 
-arm-pci	git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git 
-(fetch)
+>   - arch_mmap_rnd(): the PF_RANDOMIZE checks are needlessly
+>     exposed to the arch routine - the arch routine should only
+>     concentrate on arch details, not generic flags like
+>     PF_RANDOMIZE.
 
-a0868495 at ula0868495 ~/Project/linux-keystone $ gitlog arm-pci/pci/iommu
-dd8a11b0f0d4ed0ad87c8d09e650f354021d7953 arm: dma-mapping: limit IOMMU 
-mapping size
-2a101e79dcd8733e3a353b0df2fa384980f94e1e PCI: Update DMA configuration 
-from DT
-3fd29d06e9aa92d9a4513e14b2dd3f0d69d4d2b7 of/pci: Add 
-of_pci_dma_configure() to update DMA configuration
-8243352097c468f982a9f386cb1f455672b473a2 PCI: Add helper functions 
-pci_get[put]_host_bridge_device()
-039f346ac880d4f894425ef6c540f3ff5c1b8dcf of: Fix size when dma-range is 
-not used
-2743a957f6a6317be06d02cc93d78bb2a847e427 of: Move of_dma_configure() to 
-device.c to help re-use
-f454cd01b5bdffb1bf26a5cddac30439fa5f27a1 of: iommu: Add ptr to OF node 
-arg to of_iommu_configure()
-c517d838eb7d07bbe9507871fab3931deccff539 Linux 4.0-rc1
+Yeah, excellent point. I will send a follow-up patch to move this into
+binfmt_elf instead. I'd like to avoid removing it in any of the other
+patches since each was attempting a single step in the refactoring.
 
-Murali
+> In theory the mmap layout could be fully parametrized as well: i.e. no
+> callback functions to architectures by default at all: just
+> declarations of bits of randomization desired (or, available address
+> space bits), and perhaps an arch helper to allow 32-bit vs. 64-bit
+> address space distinctions.
 
->
-> I agree with Catalin's comment about the "size = 1ULL<<  32" line.
-> I don't see how that will make a difference, so I dropped it.  The
-> patch I merged is below.  Let me know if you think we do need that
-> line or any other tweaks.
->
-> Bjorn
->
-> commit a5a1dd69080dfcf53bfd6e179f3db68e824aeaae
-> Author: Murali Karicheri<m-karicheri2@ti.com>
-> Date:   Wed Feb 25 17:21:04 2015 -0600
->
->      of: Calculate device DMA masks based on DT dma-range size
->
->      Calculate the dma_mask and coherent_dma_mask based on the dma-range values
->      set in DT for the device.
->
->      Limit the mask to lower of the default mask and mask calculated.
->
->      Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
->      Signed-off-by: Bjorn Helgaas<bhelgaas@google.com>
->      Reviewed-by: Catalin Marinas<catalin.marinas@arm.com>
->      CC: Joerg Roedel<joro@8bytes.org>
->      CC: Grant Likely<grant.likely@linaro.org>
->      CC: Rob Herring<robh+dt@kernel.org>
->      CC: Will Deacon<will.deacon@arm.com>
->      CC: Russell King<linux@arm.linux.org.uk>
->      CC: Arnd Bergmann<arnd@arndb.de>
->      CC: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>
->
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 28e743888402..20c1332a0018 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -90,10 +90,11 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->   	struct iommu_ops *iommu;
->
->   	/*
-> -	 * Set default dma-mask to 32 bit.  Drivers are expected to setup
-> -	 * the correct supported dma_mask.
-> +	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
-> +	 * setup the correct supported mask.
->   	 */
-> -	dev->coherent_dma_mask = DMA_BIT_MASK(32);
-> +	if (!dev->coherent_dma_mask)
-> +		dev->coherent_dma_mask = DMA_BIT_MASK(32);
->
->   	/*
->   	 * Set it to coherent_dma_mask by default if the architecture
-> @@ -128,6 +129,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->
->   	dev->dma_pfn_offset = offset;
->
-> +	/*
-> +	 * Limit coherent and dma mask based on size and default mask
-> +	 * set by the driver.
-> +	 */
-> +	dev->coherent_dma_mask = min(dev->coherent_dma_mask,
-> +				     DMA_BIT_MASK(ilog2(dma_addr + size)));
-> +	*dev->dma_mask = min((*dev->dma_mask),
-> +			     DMA_BIT_MASK(ilog2(dma_addr + size)));
-> +
->   	coherent = of_dma_is_coherent(np);
->   	dev_dbg(dev, "device is%sdma coherent\n",
->   		coherent ? " " : " not ");
+Yeah, I was considering that too, since each architecture has a nearly
+identical arch_mmap_rnd() at this point. Only the size of the entropy
+was changing.
 
+> 'Weird' architectures could provide special routines, but only by
+> overriding the default behavior, which should be generic, safe and
+> robust.
+
+Yeah, quite true. Should entropy size be a #define like
+ELF_ET_DYN_BASE? Something like ASLR_MMAP_ENTROPY and
+ASLR_MMAP_ENTROPY_32? Is there a common function for determining a
+compat task? That seemed to be per-arch too. Maybe
+arch_mmap_entropy()?
+
+-Kees
 
 -- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+Kees Cook
+Chrome OS Security
