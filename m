@@ -1,217 +1,145 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 03 Mar 2015 17:23:52 +0100
-Subject: [GIT PULL 1/2] Samsung fixes-1 for v4.0
-In-Reply-To: <1651242.NSDETIvUSP@amdc1032>
-References: <54F4B250.5080200@kernel.org> <1651242.NSDETIvUSP@amdc1032>
-Message-ID: <5506858.hZnoOahndE@amdc1032>
+From: pmladek@suse.cz (Petr Mladek)
+Date: Tue, 3 Mar 2015 17:29:24 +0100
+Subject: [RFC PATCH v4 23/34] ftrace: notify kprobe when ftrace is
+ initialized.
+In-Reply-To: <1425306312-3437-24-git-send-email-wangnan0@huawei.com>
+References: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
+ <1425306312-3437-24-git-send-email-wangnan0@huawei.com>
+Message-ID: <20150303162924.GF3703@dhcp128.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 03, 2015 04:48:39 PM Bartlomiej Zolnierkiewicz wrote:
+On Mon 2015-03-02 22:25:01, Wang Nan wrote:
+> Makes ftrace calls init_kprobes_on_ftrace() when ftrace_init()
+> finished. Before this call, marks kprobes on ftrace with
+> 'KPROBE_FLAG_FTRACE_EARLY' instead of 'KPROBE_FLAG_FTRACE' to make
+> kprobe not to kprobe treats these kprobes as ftrace kprobes.
 > 
-> Hi,
+> Following patches should convert such kprobes into kprobes on ftrace.
 > 
-> On Tuesday, March 03, 2015 03:56:16 AM Kukjin Kim wrote:
-> > The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-> > 
-> >   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > tags/samsung-fixes-1
-> > 
-> > for you to fetch changes up to 8a68de64e984cfc49ecc22ac18155a7fe6dbbfaf:
-> > 
-> >   ARM: EXYNOS: fix exynos randconfig build error (2015-03-03 03:37:57 +0900)
-> > 
-> > ----------------------------------------------------------------
-> > Samsung fixes for v4.0
-> > 
-> > - fix exynos randconfig build error with SMP=n
-> > - fix wrong hwirq of RTC interrupt for exynos3250
-> > - fix usage of LDREX and STREX after disabling cache coherency
-> > 
-> > ----------------------------------------------------------------
-> > Chanwoo Choi (1):
-> >       ARM: EXYNOS: Fix wrong hwirq of RTC interrupt for Exynos3250 SoC
-> > 
-> > Krzysztof Kozlowski (1):
-> >       ARM: EXYNOS: Don't use LDREX and STREX after disabling cache coherency
-> > 
-> > Russell King (1):
-> >       ARM: EXYNOS: fix exynos randconfig build error
-> 
-> Has anyone actually tested this patch with SMP=n && PM_SLEEP=y
-> or SMP=n && CONFIG_ARM_EXYNOS_CPUIDLE=y?
-> 
-> The patch is just insufficient as it prevents build of
-
-By insufficient here I mean compeltely bogus.  I don't mean to be rude
-howeover since the wrong patch was picked please let me explain it in
-more technical details.
-
-What the patch does is adding an SMP dependency to EXYNOS_CPU_SUSPEND
-option in order to "fix" SMP=n build:
-
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -131,6 +131,7 @@ config EXYNOS5420_MCPM
- 
- config EXYNOS_CPU_SUSPEND
-        bool
-+       depends on SMP
-        select ARM_CPU_SUSPEND
-        default PM_SLEEP || ARM_EXYNOS_CPUIDLE
- 
-Please note that the EXYNOS_CPU_SUSPEND option itself will be
-selected only if PM_SLEEP=y or ARM_EXYNOS_CPUIDLE=y.
-
-Now lets look at arch/arm/mach-exynos/Makefile:
-
-...
-obj-$(CONFIG_ARCH_EXYNOS)       += exynos.o pmu.o exynos-smc.o firmware.o
-
-obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o sleep.o
-obj-$(CONFIG_PM_SLEEP)          += suspend.o
-...
-
-Code in suspend.c references code from from pm.c and sleep.S.
-It will fail to link for PM_SLEEP=y as seen below:
-
-> arch/arm/mach-exynos/pm.o and arch/arm/mach-exynos/sleep.o
-> for SMP=n.  Both files are needed for PM_SLEEP=y code that
-> resides in arch/arm/mach-exynos/suspend.c:
-> 
->   LD      init/built-in.o
-> arch/arm/mach-exynos/built-in.o: In function `exynos_save_cp15':
-> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/firmware.c:36: undefined reference to `exynos_cpu_resume_ns'
-> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/firmware.c:36: undefined reference to `cp15_save_power'
-> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/firmware.c:36: undefined reference to `cp15_save_diag'
-> arch/arm/mach-exynos/built-in.o: In function `exynos5420_pm_resume':
-> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:435: undefined reference to `exynos_pm_central_resume'
-> arch/arm/mach-exynos/built-in.o: In function `__virt_to_phys':
-> /home/bzolnier/sam/linux-sprc/./arch/arm/include/asm/memory.h:228: undefined reference to `exynos_cpu_resume'
-> /home/bzolnier/sam/linux-sprc/./arch/arm/include/asm/memory.h:228: undefined reference to `exynos_cpu_resume'
-> arch/arm/mach-exynos/built-in.o: In function `exynos3250_pm_resume':
-> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:395: undefined reference to `exynos_pm_central_resume'
-> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:405: undefined reference to `exynos_cpu_restore_register'
-> arch/arm/mach-exynos/built-in.o: In function `exynos_pm_resume':
-> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:365: undefined reference to `exynos_pm_central_resume'
-> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:382: undefined reference to `exynos_cpu_restore_register'
-> arch/arm/mach-exynos/built-in.o: In function `exynos_pm_prepare':
-> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:253: undefined reference to `exynos_cpu_resume'
-> arch/arm/mach-exynos/built-in.o: In function `exynos_pm_suspend':
-> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:322: undefined reference to `exynos_pm_central_suspend'
-> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:329: undefined reference to `exynos_cpu_save_register'
-> arch/arm/mach-exynos/built-in.o: In function `exynos5420_pm_suspend':
-> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:338: undefined reference to `exynos_pm_central_suspend'
-> arch/arm/mach-exynos/built-in.o: In function `exynos_dt_machine_init':
-> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/exynos.c:284: undefined reference to `cpuidle_coupled_exynos_data'
-> arch/arm/mach-exynos/built-in.o:(.data+0x70): undefined reference to `exynos_enter_aftr'
-> make: *** [vmlinux] Error 1
-> 
-> Moreover it still allows to select Exynos cpuidle support
-> (CONFIG_ARM_EXYNOS_CPUIDLE=y) with SMP=n which results in:
-
-Code in exynos.c that is covered with CONFIG_ARM_EXYNOS_CPUIDLE
-ifdefs references code from pm.c for case when ARM_EXYNOS_CPUIDLE=y
-and will also fail to link:
-
->   LD      init/built-in.o
-> arch/arm/mach-exynos/built-in.o: In function `exynos_dt_machine_init':
-> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/exynos.c:284: undefined reference to `cpuidle_coupled_exynos_data'
-> arch/arm/mach-exynos/built-in.o:(.data+0x70): undefined reference to `exynos_enter_aftr'
-> make: *** [vmlinux] Error 1
-
-So the SMP=n kernel won't link when PM_SLEEP=y or ARM_EXYNOS_CPUIDLE=y
-is selected.  Now please take look at the config EXYNOS_CPU_SUSPEND
-option again and recall that it is selected only if PM_SLEEP=y or
-ARM_EXYNOS_CPUIDLE=y is set.  Yes..  the patch doesn't actually fix
-anything...
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> The full solution for issue that "ARM: EXYNOS: fix exynos randconfig
-> build error" patch attempted to fix has been posted by me on 4th of
-> February (https://lkml.org/lkml/2015/2/4/521) and for completness is
-> also included below.  It fixes a v4.0-rc1 regression caused by
-> a recent addition of cpuidle coupled support for Exynos4210 SoC.
-> It makes only the new Exynos4210 coupled cpuidle support to be
-> dependent on SMP.  On UP cpuidle will use the old non-coupled code
-> for Exynos4210 which is an expected behavior (as it was in v3.19).
-> The patch has been tested on Exynos4210 Origen board with both SMP
-> and UP kernels and in both cases it worked fine.
-> 
-> 
-> From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Subject: [PATCH] ARM: EXYNOS: cpuidle: Fix build breakage on !SMP
-> 
-> The Exynos cpuidle driver has coupled cpuidle built-in so it cannot be
-> built without SMP:
-> 
-> arch/arm/mach-exynos/pm.c: In function ?exynos_cpu0_enter_aftr?:
-> arch/arm/mach-exynos/pm.c:246:4: error: implicit declaration of function ?arch_send_wakeup_ipi_mask? [-Werror=implicit-function-declaration]
-> arch/arm/mach-exynos/built-in.o: In function `exynos_pre_enter_aftr':
-> ../arch/arm/mach-exynos/pm.c:300: undefined reference to `cpu_boot_reg_base'
-> arch/arm/mach-exynos/built-in.o: In function `exynos_cpu1_powerdown':
-> ../arch/arm/mach-exynos/pm.c:282: undefined reference to `exynos_cpu_power_down'
-> 
-> Fix it by adding missing checks for SMP.
-> 
-> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
 > ---
->  arch/arm/mach-exynos/exynos.c    |    2 +-
->  arch/arm/mach-exynos/pm.c        |    2 ++
->  drivers/cpuidle/cpuidle-exynos.c |    3 ++-
->  3 files changed, 5 insertions(+), 2 deletions(-)
+>  include/linux/kprobes.h | 11 +++++++++++
+>  kernel/kprobes.c        | 17 ++++++++++++++++-
+>  kernel/trace/ftrace.c   |  2 ++
+>  3 files changed, 29 insertions(+), 1 deletion(-)
 > 
-> Index: b/arch/arm/mach-exynos/exynos.c
-> ===================================================================
-> --- a/arch/arm/mach-exynos/exynos.c	2015-02-04 18:30:23.555819717 +0100
-> +++ b/arch/arm/mach-exynos/exynos.c	2015-02-04 18:43:23.539807815 +0100
-> @@ -211,7 +211,7 @@ static void __init exynos_dt_machine_ini
->  	if (!IS_ENABLED(CONFIG_SMP))
->  		exynos_sysram_init();
+> diff --git a/include/linux/kprobes.h b/include/linux/kprobes.h
+> index bb2b2c6..96dc842 100644
+> --- a/include/linux/kprobes.h
+> +++ b/include/linux/kprobes.h
+> @@ -130,6 +130,8 @@ struct kprobe {
+>  				   * this flag is only for optimized_kprobe.
+>  				   */
+>  #define KPROBE_FLAG_FTRACE	8 /* probe is using ftrace */
+> +/* probe will use ftrace, but ftrace is not ready when registering */
+> +#define KPROBE_FLAG_FTRACE_EARLY	16
 >  
-> -#ifdef CONFIG_ARM_EXYNOS_CPUIDLE
-> +#if defined(CONFIG_SMP) && defined(CONFIG_ARM_EXYNOS_CPUIDLE)
->  	if (of_machine_is_compatible("samsung,exynos4210"))
->  		exynos_cpuidle.dev.platform_data = &cpuidle_coupled_exynos_data;
+>  /* Has this kprobe gone ? */
+>  static inline int kprobe_gone(struct kprobe *p)
+> @@ -269,6 +271,14 @@ extern void show_registers(struct pt_regs *regs);
+>  extern void kprobes_inc_nmissed_count(struct kprobe *p);
+>  extern bool arch_within_kprobe_blacklist(unsigned long addr);
+>  
+> +#if defined(CONFIG_EARLY_KPROBES) && defined(CONFIG_KPROBES_ON_FTRACE)
+> +extern void init_kprobes_on_ftrace(void);
+> +#else
+> +static inline void init_kprobes_on_ftrace(void)
+> +{
+> +}
+> +#endif // CONFIG_EARLY_KPROBES && CONFIG_KPROBES_ON_FTRACE
+> +
+>  #ifdef CONFIG_EARLY_KPROBES
+>  
+>  #define NR_EARLY_KPROBES_SLOTS	CONFIG_NR_EARLY_KPROBES_SLOTS
+> @@ -453,6 +463,7 @@ extern int proc_kprobes_optimization_handler(struct ctl_table *table,
+>  extern void kprobe_ftrace_handler(unsigned long ip, unsigned long parent_ip,
+>  				  struct ftrace_ops *ops, struct pt_regs *regs);
+>  extern int arch_prepare_kprobe_ftrace(struct kprobe *p);
+> +
 >  #endif
-> Index: b/arch/arm/mach-exynos/pm.c
-> ===================================================================
-> --- a/arch/arm/mach-exynos/pm.c	2015-02-04 18:30:23.563819719 +0100
-> +++ b/arch/arm/mach-exynos/pm.c	2015-02-04 18:47:32.951804008 +0100
-> @@ -181,6 +181,7 @@ void exynos_enter_aftr(void)
->  	cpu_pm_exit();
->  }
 >  
-> +#if defined(CONFIG_SMP) && defined(CONFIG_ARM_EXYNOS_CPUIDLE)
->  static atomic_t cpu1_wakeup = ATOMIC_INIT(0);
+>  int arch_check_ftrace_location(struct kprobe *p);
+> diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+> index 4b7b20a..b5e13ba 100644
+> --- a/kernel/kprobes.c
+> +++ b/kernel/kprobes.c
+> @@ -69,6 +69,11 @@
 >  
->  static int exynos_cpu0_enter_aftr(void)
-> @@ -302,3 +303,4 @@ struct cpuidle_exynos_data cpuidle_coupl
->  	.pre_enter_aftr		= exynos_pre_enter_aftr,
->  	.post_enter_aftr		= exynos_post_enter_aftr,
->  };
-> +#endif /* CONFIG_SMP && CONFIG_ARM_EXYNOS_CPUIDLE */
-> Index: b/drivers/cpuidle/cpuidle-exynos.c
-> ===================================================================
-> --- a/drivers/cpuidle/cpuidle-exynos.c	2015-02-04 18:30:32.935819577 +0100
-> +++ b/drivers/cpuidle/cpuidle-exynos.c	2015-02-04 18:46:01.619805400 +0100
-> @@ -117,7 +117,8 @@ static int exynos_cpuidle_probe(struct p
+>  static int kprobes_initialized;
+>  static int kprobes_blacklist_initialized;
+> +#if defined(CONFIG_KPROBES_ON_FTRACE) && defined(CONFIG_EARLY_KPROBES)
+> +static bool kprobes_on_ftrace_initialized __read_mostly = false;
+> +#else
+> +# define kprobes_on_ftrace_initialized	false
+> +#endif
+>  
+>  bool kprobes_is_early(void)
 >  {
->  	int ret;
+> @@ -1497,7 +1502,10 @@ int __weak arch_check_ftrace_location(struct kprobe *p)
+>  		/* Given address is not on the instruction boundary */
+>  		if ((unsigned long)p->addr != ftrace_addr)
+>  			return -EILSEQ;
+> -		p->flags |= KPROBE_FLAG_FTRACE;
+> +		if (unlikely(!kprobes_on_ftrace_initialized))
+> +			p->flags |= KPROBE_FLAG_FTRACE_EARLY;
+> +		else
+> +			p->flags |= KPROBE_FLAG_FTRACE;
+>  #else	/* !CONFIG_KPROBES_ON_FTRACE */
+>  		return -EINVAL;
+>  #endif
+> @@ -2574,3 +2582,10 @@ module_init(init_kprobes);
 >  
-> -	if (of_machine_is_compatible("samsung,exynos4210")) {
-> +	if (IS_ENABLED(CONFIG_SMP) &&
-> +	    of_machine_is_compatible("samsung,exynos4210")) {
->  		exynos_cpuidle_pdata = pdev->dev.platform_data;
+>  /* defined in arch/.../kernel/kprobes.c */
+>  EXPORT_SYMBOL_GPL(jprobe_return);
+> +
+> +#if defined(CONFIG_KPROBES_ON_FTRACE) && defined(CONFIG_EARLY_KPROBES)
+> +void init_kprobes_on_ftrace(void)
+> +{
+> +	kprobes_on_ftrace_initialized = true;
+
+This flag is later used to decide whether the location is modified by
+ftrace or by kprobe, see https://lkml.org/lkml/2015/3/3/4
+
+Therefore you need to convert the probes and set the flag atomically. By
+other words, you need to set this flag at the end of
+convert_early_kprobes_on_ftrace() when you still hold kprobe_mutex.
+Or you need to take the mutex already in init_kprobes_on_frace()
+around both changes.
+
+Note that I check only this aspect of this patchset because it was
+affected by my fix of the kprobe recovery code.
+
+Best Regards,
+Petr
+
+> +}
+> +#endif
+> diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
+> index 7fa88d0..5cb0269 100644
+> --- a/kernel/trace/ftrace.c
+> +++ b/kernel/trace/ftrace.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/kthread.h>
+>  #include <linux/uaccess.h>
+>  #include <linux/bsearch.h>
+> +#include <linux/kprobes.h>
+>  #include <linux/module.h>
+>  #include <linux/ftrace.h>
+>  #include <linux/sysctl.h>
+> @@ -5022,6 +5023,7 @@ void __init ftrace_init(void)
+>  	if (ret)
+>  		pr_warning("Failed to register trace ftrace module exit notifier\n");
 >  
->  		ret = cpuidle_register(&exynos_coupled_idle_driver,
+> +	init_kprobes_on_ftrace();
+>  	set_ftrace_early_filters();
+>  
+>  	return;
+> -- 
+> 1.8.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
