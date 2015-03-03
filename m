@@ -1,70 +1,50 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 3 Mar 2015 11:46:10 +0800
-Subject: [PATCH v4 09/30] PCI: Separate pci_host_bridge creation out of
- pci_create_root_bus()
-In-Reply-To: <20150303023750.GE11978@google.com>
-References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
- <1424938344-4017-10-git-send-email-wangyijing@huawei.com>
- <20150303023750.GE11978@google.com>
-Message-ID: <54F52E82.80003@huawei.com>
+From: puck.chen@hisilicon.com (chenfeng)
+Date: Tue, 3 Mar 2015 11:49:31 +0800
+Subject: Alignment issue with ldmia
+Message-ID: <54F52F4B.3060402@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +
->> +	resource_list_for_each_entry_safe(window, n, resources)
->> +		list_move_tail(&window->node, &host->windows);
->> +
->> +	return host;
->> +}
->> +EXPORT_SYMBOL(pci_create_host_bridge);
-> 
-> Why does this need to be exported?  I don't want code outside drivers/pci
-> using something like this.
+There is an alignment issue with ldmia in A32 user-space with A64 
+Kernel. Since the famous taobao apk use this instruction, so we want to 
+emulate this to make it work well.
 
-OK, I will unexport it, if some drivers really want to export it, we could do
-it when needed.
+I make a simple test case to reproduce this issue.
+-----------------------------------------------------------------------
+#include <stdio.h>
+#include <stdlib.h>
 
-> 
->> +void pci_free_host_bridge(struct pci_host_bridge *host)
->>  struct pci_host_bridge {
->>  	u16	domain;
->> +	u16 busnum;
->>  	struct device dev;
->>  	struct pci_bus *bus;		/* root bus */
->>  	struct list_head windows;	/* resource_entry */
->> @@ -415,7 +416,8 @@ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
->>  		     void *release_data);
->>  
->>  int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge);
->> -
->> +struct pci_host_bridge *pci_create_host_bridge(
->> +		struct device *parent, u32 dombus, struct list_head *resources);
-> 
-> Can these function declarations go in drivers/pci/pci.h instead?  I'd
-> rather not expose them to the rest of the kernel unless we have to.
+int main()
+{
+         char src_addr[1024];
+         char dst_addr[1024];
+         printf("--------%lx %lx\n",src_addr,dst_addr);
+         unsigned long src_reg = (unsigned long)src_addr | 1;
+         unsigned long dst_reg = (unsigned long)dst_addr | 1;
+         printf("--------%lx %lx\n",src_reg,dst_reg);
+         asm volatile("mov  r1, %0\n": : "r" (src_reg));
+         asm volatile("mov  r2, %0\n": : "r" (dst_reg));
+         asm volatile("ldmia r1!,{r2}");
+         printf("--------------------------\n");
 
-I would move it in drivers/pci/pci.h, thanks.
+         return 0;
+}
+------------------------------------------------------------------------
 
-> 
->>  /*
->>   * The first PCI_BRIDGE_RESOURCE_NUM PCI bus resources (those that correspond
->>   * to P2P or CardBus bridge windows) go in a table.  Additional ones (for
->> @@ -774,6 +776,7 @@ struct pci_bus *pci_scan_bus_legacy(u32 dombus, struct pci_ops *ops, void *sysda
->>  struct pci_bus *pci_create_root_bus(struct device *parent, u32 dombus,
->>  				    struct pci_ops *ops, void *sysdata,
->>  				    struct list_head *resources);
->> +void pci_free_host_bridge(struct pci_host_bridge *host);
->>  int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int busmax);
->>  int pci_bus_update_busn_res_end(struct pci_bus *b, int busmax);
->>  void pci_bus_release_busn_res(struct pci_bus *b);
->> -- 
->> 1.7.1
->>
-> 
-> .
-> 
+I use the test case on A32 kernel with A32 user-space. It works 
+well,becase of that is a do_alignment_ldmstm emulate in 
+arch/arm/mm/alignment.c
+
+So, I want to porting the code to arch/arm64.
+
+The first step is getting the machine code of the unalignment 
+instruction. However I have no idea how to do this.
+
+There is a commit on google master L branch to emulate the undef 
+instruction. I use these code for getting the instruction of unalignment
+case. But I found the code in arch/arm/alignment.c get the instruction 
+is 0xe8b10004 and the code in arch/arm64/kernel/traps.c is different.
 
 
--- 
-Thanks!
-Yijing
+Since I arm not professional for the code, I am writting for asking is 
+there a way to get the thumb instruction when traps in kernel mode.
