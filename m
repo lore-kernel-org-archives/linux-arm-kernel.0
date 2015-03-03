@@ -1,48 +1,46 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 3 Mar 2015 09:56:46 +0100
-Subject: [PATCH v2 0/6] ARM: at91: fix irq_pm_install_action WARNING
-In-Reply-To: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150303085646.GA3892@piout.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Mar 2015 10:02:12 +0100
+Subject: [PATCH v7 1/8] ARM: dt: Binding documentation for imx25 ADC/TSC
+In-Reply-To: <1425369498-25541-2-git-send-email-mpa@pengutronix.de>
+References: <1425369498-25541-1-git-send-email-mpa@pengutronix.de>
+ <1425369498-25541-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <2620642.Qp1W4O8uh6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2015 at 10:18:12 +0100, Boris Brezillon wrote :
-> My apologies to those of you who already received this series, but I
-> didn't increment the patch version and forgot some subsystem maintainers
-> and MLs.
-> 
-> Commit cab303be91dc47942bc25de33dc1140123540800 [1] introduced a WARN_ON
-> test which triggers a WARNING backtrace on at91 platforms.
-> While this WARN_ON is absolutely necessary to warn users that they should
-> not mix request with and without IRQF_NO_SUSPEND flags on shared IRQs,
-> there is no easy way to solve this issue on at91 platforms.
-> 
-> The main reason is that the init timer is often using a shared irq line
-> and thus request this irq with IRQF_NO_SUSPEND flag set, while other
-> peripherals request the same irq line without this flag.
-> 
-> This problem has recently been addressed by this patch [2] which adds
-> a new IRQF_COND_SUSPEND flag, that authorize mixing IRQF_NO_SUSPEND and
-> !IRQF_NO_SUSPEND as long as irq handlers setting IRQF_COND_SUSPEND
-> can safely be called in suspended state.
-> 
-> Doing this also implies taking care of system wakeup in devices handlers
-> if they tag the IRQ line as a wakeup source.
-> The first patch of this series exports the pm_system_wakeup symbol so
-> that drivers can call pm_system_wakeup from their interrupt handler.
-> 
-> This series then patches all at91 drivers that can have devices sharing
-> their IRQ line with a timer.
-> 
-> This series depends on [2].
+On Tuesday 03 March 2015 08:58:11 Markus Pargmann wrote:
+> +Example:
+> +       tscadc: tscadc at 50030000 {
+> +               compatible = "fsl,imx25-tsadc";
+> +               reg = <0x50030000 0xc>;
+> +               interrupts = <46>;
+> +               clocks = <&clks 119>;
+> +               clock-names = "ipg";
+> +               interrupt-controller;
+> +               #interrupt-cells = <1>;
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               ranges;
+> +
+> +               tsc: tcq at 50030400 {
+> +                       compatible = "fsl,imx25-tcq";
+> +                       reg = <0x50030400 0x60>;
+> +                       ...
+> +               };
+> +
+> +               adc: gcq at 50030800 {
+> +                       compatible = "fsl,imx25-gcq";
+> +                       reg = <0x50030800 0x60>;
+> +                       ...
+> +               };
+> +       };
 > 
 
-For the whole series:
-Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+I wonder if we should just treat this MFD as a single IIO device
+that also registers to the input layer.
 
+Are there any other registers in the 0x50030000-0x50031000
+range, or could the fsl,imx25-tcq and fsl,imx25-gcq devices
+be reused outside of a fsl,imx25-tsadc device?
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Arnd
