@@ -1,39 +1,41 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  3 Mar 2015 12:03:45 +0100
-Subject: [PATCH 0/5] arm64: update/clarify/relax Image and FDT placement rules
-Message-ID: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Tue,  3 Mar 2015 12:03:48 +0100
+Subject: [PATCH 3/5] arm64: Documentation: clarify Image placement in physical
+ RAM
+In-Reply-To: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1425380630-3684-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series came about after Mark Rutland brought up the fact that the current
-FDT placement logic used by the EFI stub is flawed. But actually, it turned out
-that the documentation for both the Image and FDT placement was incorrect as
-well, or confusing at the very least.
+The early init code maps the kernel image using statically
+allocated page tables. This means that we can only allow
+Image to be placed such that we can map its entire static
+footprint using a single table entry at all but the lowest
+level. So update the documentation to reflect that the Image
+should not cross a 512 MB boundary, which ensures the above
+on both 4k and 64k pages kernels.
 
-So this series does two things:
-- It relaxes the FDT placement requirements, and updates the documentation and
-  EFI stub FDT placement logic accordingly.
-- It clarifies the Image placement requirements in the documentation, and brings
-  the EFI stub Image placement logic in line with it
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ Documentation/arm64/booting.txt | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Ard Biesheuvel (5):
-  of/fdt: allow FDT virtual address outside of linear direct mapping
-  arm64: use fixmap region for permanent FDT mapping
-  arm64: Documentation: clarify Image placement in physical RAM
-  arm64/efi: ensure that Image does not cross a 512 MB boundary
-  arm64/efi: adapt to relaxed FDT placement requirements
-
- Documentation/arm64/booting.txt         | 12 +++----
- arch/arm64/include/asm/efi.h            |  9 +++--
- arch/arm64/include/asm/fixmap.h         |  9 +++++
- arch/arm64/kernel/Makefile              |  1 +
- arch/arm64/kernel/efi-stub.c            | 38 ++++++++++++++++----
- arch/arm64/kernel/head.S                | 38 +-------------------
- arch/arm64/kernel/setup.c               | 62 +++++++++++++++++++++++++++++----
- drivers/firmware/efi/libstub/arm-stub.c |  2 +-
- drivers/firmware/efi/libstub/fdt.c      |  7 ++--
- drivers/of/fdt.c                        | 14 +++++++-
- 10 files changed, 125 insertions(+), 67 deletions(-)
-
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index bdc35fc97ac8..49f17b1632f1 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -112,8 +112,9 @@ The Image must be placed text_offset bytes from a 2MB aligned base
+ address near the start of usable system RAM and called there. Memory
+ below that base address is currently unusable by Linux, and therefore it
+ is strongly recommended that this location is the start of system RAM.
+-At least image_size bytes from the start of the image must be free for
+-use by the kernel.
++The physical memory region consisting of image_size bytes counting from
++the start of the image must be free for use by the kernel, and must not
++cross a 512 MB physical alignment boundary.
+ 
+ Any memory described to the kernel (even that below the 2MB aligned base
+ address) which is not marked as reserved from the kernel e.g. with a
 -- 
 1.8.3.2
