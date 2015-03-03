@@ -1,103 +1,91 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 3 Mar 2015 09:30:02 +0100
-Subject: [PATCH v2] seccomp: switch to using asm-generic for seccomp.h
-In-Reply-To: <20150302231254.GA4857@www.outflux.net>
-References: <20150302231254.GA4857@www.outflux.net>
-Message-ID: <20150303083002.GA1207@gmail.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 3 Mar 2015 16:35:15 +0800
+Subject: [PATCH v4 16/30] PCI/IA64: Fix the build warning about
+ pci_domain_nr()
+In-Reply-To: <20150303025622.GH11978@google.com>
+References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
+ <1424938344-4017-17-git-send-email-wangyijing@huawei.com>
+ <20150303025622.GH11978@google.com>
+Message-ID: <54F57243.8040905@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2015/3/3 10:56, Bjorn Helgaas wrote:
+> On Thu, Feb 26, 2015 at 04:12:10PM +0800, Yijing Wang wrote:
+>> Should pass pci_bus * instead of pci_dev * to pci_domain_nr().
+>>
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>> CC: Tony Luck <tony.luck@intel.com>
+>> CC: Fenghua Yu <fenghua.yu@intel.com>
+>> CC: linux-ia64 at vger.kernel.org
+>> ---
+>>  arch/ia64/sn/kernel/io_acpi_init.c |    6 +++---
+>>  arch/ia64/sn/kernel/io_init.c      |    2 +-
+>>  2 files changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/ia64/sn/kernel/io_acpi_init.c b/arch/ia64/sn/kernel/io_acpi_init.c
+>> index 0640739..2fd7414 100644
+>> --- a/arch/ia64/sn/kernel/io_acpi_init.c
+>> +++ b/arch/ia64/sn/kernel/io_acpi_init.c
+>> @@ -364,12 +364,12 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
+>>          status = acpi_evaluate_integer(rootbus_handle, METHOD_NAME__SEG, NULL,
+>>                                         &segment);
+>>          if (ACPI_SUCCESS(status)) {
+>> -		if (segment != pci_domain_nr(dev)) {
+>> +		if (segment != pci_domain_nr(dev->bus)) {
+> 
+> This is completely unrelated to the series, isn't it?  It looks like this
+> is a bug fix that should be handled separately and marked for stable.
 
-* Kees Cook <keescook@chromium.org> wrote:
+Yes, it's a separate patch, I would move it out of this series, and post it out separately.
 
-> Most architectures don't need to do anything special for the strict
-> seccomp syscall entries. Remove the redundant headers and reduce the
-> others.
+Thanks!
+Yijing.
 
->  19 files changed, 27 insertions(+), 137 deletions(-)
+> 
+>>  			acpi_get_name(rootbus_handle, ACPI_FULL_PATHNAME,
+>>  				&name_buffer);
+>>  			printk(KERN_ERR
+>>  			       "%s: Segment number mismatch, 0x%llx vs 0x%x for: %s\n",
+>> -			       __func__, segment, pci_domain_nr(dev),
+>> +			       __func__, segment, pci_domain_nr(dev->bus),
+>>  			       (char *)name_buffer.pointer);
+>>  			kfree(name_buffer.pointer);
+>>  			return 1;
+>> @@ -407,7 +407,7 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
+>>  	/* Build up the pcidev_info.pdi_slot_host_handle */
+>>  	host_devfn = get_host_devfn(pcidev_match.handle, rootbus_handle);
+>>  	(*pcidev_info)->pdi_slot_host_handle =
+>> -			((unsigned long) pci_domain_nr(dev) << 40) |
+>> +			((unsigned long) pci_domain_nr(dev->bus) << 40) |
+>>  					/* bus == 0 */
+>>  					host_devfn;
+>>  	return 0;
+>> diff --git a/arch/ia64/sn/kernel/io_init.c b/arch/ia64/sn/kernel/io_init.c
+>> index bcdc5b8..a97fad4 100644
+>> --- a/arch/ia64/sn/kernel/io_init.c
+>> +++ b/arch/ia64/sn/kernel/io_init.c
+>> @@ -164,7 +164,7 @@ sn_io_slot_fixup(struct pci_dev *dev)
+>>  		panic("%s: Unable to alloc memory for sn_irq_info", __func__);
+>>  
+>>  	/* Call to retrieve pci device information needed by kernel. */
+>> -	status = sal_get_pcidev_info((u64) pci_domain_nr(dev),
+>> +	status = sal_get_pcidev_info((u64) pci_domain_nr(dev->bus),
+>>  		(u64) dev->bus->number,
+>>  		dev->devfn,
+>>  		(u64) __pa(pcidev_info),
+>> -- 
+>> 1.7.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> .
+> 
 
-Lovely cleanup factor.
 
-Just to make sure, are you sure the 32-bit details are identical 
-across architectures?
-
-For example some architectures did this:
-
-> --- a/arch/microblaze/include/asm/seccomp.h
-> +++ /dev/null
-> @@ -1,16 +0,0 @@
-> -#ifndef _ASM_MICROBLAZE_SECCOMP_H
-> -#define _ASM_MICROBLAZE_SECCOMP_H
-> -
-> -#include <linux/unistd.h>
-> -
-> -#define __NR_seccomp_read		__NR_read
-> -#define __NR_seccomp_write		__NR_write
-> -#define __NR_seccomp_exit		__NR_exit
-> -#define __NR_seccomp_sigreturn		__NR_sigreturn
-> -
-> -#define __NR_seccomp_read_32		__NR_read
-> -#define __NR_seccomp_write_32		__NR_write
-> -#define __NR_seccomp_exit_32		__NR_exit
-> -#define __NR_seccomp_sigreturn_32	__NR_sigreturn
-
-others did this:
-
-> diff --git a/arch/x86/include/asm/seccomp_64.h b/arch/x86/include/asm/seccomp_64.h
-> deleted file mode 100644
-> index 84ec1bd161a5..000000000000
-> --- a/arch/x86/include/asm/seccomp_64.h
-> +++ /dev/null
-> @@ -1,17 +0,0 @@
-> -#ifndef _ASM_X86_SECCOMP_64_H
-> -#define _ASM_X86_SECCOMP_64_H
-> -
-> -#include <linux/unistd.h>
-> -#include <asm/ia32_unistd.h>
-> -
-> -#define __NR_seccomp_read __NR_read
-> -#define __NR_seccomp_write __NR_write
-> -#define __NR_seccomp_exit __NR_exit
-> -#define __NR_seccomp_sigreturn __NR_rt_sigreturn
-> -
-> -#define __NR_seccomp_read_32 __NR_ia32_read
-> -#define __NR_seccomp_write_32 __NR_ia32_write
-> -#define __NR_seccomp_exit_32 __NR_ia32_exit
-> -#define __NR_seccomp_sigreturn_32 __NR_ia32_sigreturn
-> -
-> -#endif /* _ASM_X86_SECCOMP_64_H */
-
-While in yet another case you kept the syscall mappings:
-
-> --- a/arch/x86/include/asm/seccomp.h
-> +++ b/arch/x86/include/asm/seccomp.h
-> @@ -1,5 +1,20 @@
-> +#ifndef _ASM_X86_SECCOMP_H
-> +#define _ASM_X86_SECCOMP_H
-> +
-> +#include <asm/unistd.h>
-> +
-> +#ifdef CONFIG_COMPAT
-> +#include <asm/ia32_unistd.h>
-> +#define __NR_seccomp_read_32		__NR_ia32_read
-> +#define __NR_seccomp_write_32		__NR_ia32_write
-> +#define __NR_seccomp_exit_32		__NR_ia32_exit
-> +#define __NR_seccomp_sigreturn_32	__NR_ia32_sigreturn
-> +#endif
-> +
->  #ifdef CONFIG_X86_32
-> -# include <asm/seccomp_32.h>
-> -#else
-> -# include <asm/seccomp_64.h>
-> +#define __NR_seccomp_sigreturn		__NR_sigreturn
->  #endif
-> +
-> +#include <asm-generic/seccomp.h>
-> +
-> +#endif /* _ASM_X86_SECCOMP_H */
-
-It might all be correct, but it's not obvious to me.
-
-Thanks,
-
-	Ingo
+-- 
+Thanks!
+Yijing
