@@ -1,50 +1,65 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 3 Mar 2015 16:12:07 +0800
-Subject: [PATCH v4 13/30] PCI: Introduce new scan function
- pci_scan_root_bridge()
-In-Reply-To: <20150303025222.GG11978@google.com>
-References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
- <1424938344-4017-14-git-send-email-wangyijing@huawei.com>
- <20150303025222.GG11978@google.com>
-Message-ID: <54F56CD7.8080906@huawei.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 3 Mar 2015 00:19:58 -0800
+Subject: [PATCH 0/3] Add initial DT support for Qualcomm SPMI PMIC devices
+In-Reply-To: <1424967957.2340.30.camel@mm-sol.com>
+References: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
+ <54E6848C.1090405@codeaurora.org>
+ <1424967957.2340.30.camel@mm-sol.com>
+Message-ID: <20150303081958.GA6293@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/3 10:52, Bjorn Helgaas wrote:
-> On Thu, Feb 26, 2015 at 04:12:07PM +0800, Yijing Wang wrote:
->> Introduce new scan function pci_scan_root_bridge() to
->> support host bridge drivers that need to provide platform
->> own pci_host_bridge_ops.
->>
->> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
->> ---
->>  drivers/pci/probe.c |   21 +++++++++++++++++++++
->>  include/linux/pci.h |    3 +++
->>  2 files changed, 24 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index 8cec6ab..b5f9ca4 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -2063,6 +2063,27 @@ static struct pci_bus *__pci_scan_root_bus(
->>  	return b;
->>  }
->>  
->> +struct pci_host_bridge *pci_scan_root_bridge(struct device *parent,
->> +		u32 db, struct pci_ops *ops, void *sysdata,
->> +		struct list_head *resources, struct pci_host_bridge_ops *phb_ops)
+On 02/26, Ivan T. Ivanov wrote:
 > 
-> I prefer "host bridge" over "root bridge" because that's the terminology
-> used by the PCI specs.
-
-OK, I will use "host bridge" instead of "root bridge".
-
-
+> Hi Stephan, 
 > 
-> .
+> Sorry for delayed answer.
 > 
+> On Thu, 2015-02-19 at 16:49 -0800, Stephen Boyd wrote:
+> > On 02/03/15 04:17, Ivan T. Ivanov wrote:
+> > > Following set of patches add initial DT support for PMIC devices
+> > > found on recent Quqalcomm chipsets. Details for SPMI bus and PMIC arbiter
+> > > could be found here [1].
+> > 
+> > Can you please put the specific compatible strings for the pmic model
+> > into the nodes in addition to the generic "qcom,spmi-pmic"? We may want
+> > to have regmap config tables in the future that describe the
+> > cache/read/write abilities of the regsiters. If all we have is the
+> > generic binding then we don't have a way to populate these tables.
+> > Unless the plan there is to use the revid registers?
+> > 
+> 
+> I would really like that we can use "revid" registers, but I don't know... 
+> 
+> From what I can see usually in one physical PMIC chip they
+> are 2 USID devices.
+> 
+> I can successfully discover following USID's on APQ8074 boards:
+> 
+> pmic-spmi 0-00: qcom,pm8941-v1.0 detected
+> pmic-spmi 0-01: qcom,pm8941-v1.0 detected
+> pmic-spmi 0-04: qcom,pm8841-v0.0 detected
+> pmic-spmi 0-05: qcom,pm8841-v0.0 detected
+> 
+> Unfortunately on PM8916 only one device is detected, with USID 0.
+> But they should be two, judging by downstream DTS files, right?
+> 
+> pmic-spmi 0-00: qcom,pm8916-v0.0 detected 
+> pmic-spmi 0-01: unknown device
+> 
+> For communication with PM8916 I am using recent patches from Gilad [1].
+> Maybe there are still some issues with these patches, which can cause
+> this behavior or PM8916 just didn't have these registers for USID 1?
+> 
+> Regards,
+> Ivan 
 
+Hmm... do you have 4 total rev-id nodes on apq8074? I only see
+one rev-id node per pmic (2 total), so I'm a little lost how the
+correct pmic version is detected on the 0-01 and 0-05 devices in
+your example above. Maybe I've missed something though, I'll have
+to check in a few hours when I'm in the office.
 
 -- 
-Thanks!
-Yijing
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
