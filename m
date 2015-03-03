@@ -1,37 +1,70 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 2 Mar 2015 21:43:48 -0600
-Subject: [PATCH - v7] of: Move of_dma_configure() to device.c to help
- re-use
-In-Reply-To: <1425333548-8802-1-git-send-email-m-karicheri2@ti.com>
-References: <1425333548-8802-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <CAErSpo7MsxgVZyhpijRzVN7mVNcbN7M4A4W-UKaNs4AnmGrB6g@mail.gmail.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 3 Mar 2015 11:46:10 +0800
+Subject: [PATCH v4 09/30] PCI: Separate pci_host_bridge creation out of
+ pci_create_root_bus()
+In-Reply-To: <20150303023750.GE11978@google.com>
+References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
+ <1424938344-4017-10-git-send-email-wangyijing@huawei.com>
+ <20150303023750.GE11978@google.com>
+Message-ID: <54F52E82.80003@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 2, 2015 at 3:59 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
-> Move of_dma_configure() to device.c so it can be re-used for PCI devices to
-> obtain DMA configuration from DT.  Also add a second argument so that for
-> PCI, the DT node of root bus host bridge can be used to obtain the DMA
-> configuration for the slave PCI device.
->
-> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> (AMD Seattle)
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> CC: Joerg Roedel <joro@8bytes.org>
-> CC: Grant Likely <grant.likely@linaro.org>
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: Arnd Bergmann <arnd@arndb.de>
-> ---
->  - Based on the existing patch applied to arm-pci/pci/iommu for pci next (Bjorn)
->  - Fixed the build issue reported on ARCH=x86_64
+>> +
+>> +	resource_list_for_each_entry_safe(window, n, resources)
+>> +		list_move_tail(&window->node, &host->windows);
+>> +
+>> +	return host;
+>> +}
+>> +EXPORT_SYMBOL(pci_create_host_bridge);
+> 
+> Why does this need to be exported?  I don't want code outside drivers/pci
+> using something like this.
 
-Hi Murali,
+OK, I will unexport it, if some drivers really want to export it, we could do
+it when needed.
 
-Can you please repost the entire series with fixed patches?  It's
-easier for me to reapply the whole thing at once than it is to keep
-track of and fiddle with individual patches.
+> 
+>> +void pci_free_host_bridge(struct pci_host_bridge *host)
+>>  struct pci_host_bridge {
+>>  	u16	domain;
+>> +	u16 busnum;
+>>  	struct device dev;
+>>  	struct pci_bus *bus;		/* root bus */
+>>  	struct list_head windows;	/* resource_entry */
+>> @@ -415,7 +416,8 @@ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+>>  		     void *release_data);
+>>  
+>>  int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge);
+>> -
+>> +struct pci_host_bridge *pci_create_host_bridge(
+>> +		struct device *parent, u32 dombus, struct list_head *resources);
+> 
+> Can these function declarations go in drivers/pci/pci.h instead?  I'd
+> rather not expose them to the rest of the kernel unless we have to.
 
-Bjorn
+I would move it in drivers/pci/pci.h, thanks.
+
+> 
+>>  /*
+>>   * The first PCI_BRIDGE_RESOURCE_NUM PCI bus resources (those that correspond
+>>   * to P2P or CardBus bridge windows) go in a table.  Additional ones (for
+>> @@ -774,6 +776,7 @@ struct pci_bus *pci_scan_bus_legacy(u32 dombus, struct pci_ops *ops, void *sysda
+>>  struct pci_bus *pci_create_root_bus(struct device *parent, u32 dombus,
+>>  				    struct pci_ops *ops, void *sysdata,
+>>  				    struct list_head *resources);
+>> +void pci_free_host_bridge(struct pci_host_bridge *host);
+>>  int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int busmax);
+>>  int pci_bus_update_busn_res_end(struct pci_bus *b, int busmax);
+>>  void pci_bus_release_busn_res(struct pci_bus *b);
+>> -- 
+>> 1.7.1
+>>
+> 
+> .
+> 
+
+
+-- 
+Thanks!
+Yijing
