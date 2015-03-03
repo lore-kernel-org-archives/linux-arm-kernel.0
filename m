@@ -1,74 +1,65 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 3 Mar 2015 10:03:22 -0800
-Subject: [PATCH v2 0/5] split ET_DYN ASLR from mmap ASLR
-In-Reply-To: <20150303073132.GA30602@gmail.com>
-References: <1425341988-1599-1-git-send-email-keescook@chromium.org>
- <20150303073132.GA30602@gmail.com>
-Message-ID: <CAGXu5j+qJLeRx2xx=890OxHp8kjd=ws8zg3_JYPNJd_6p2xoYQ@mail.gmail.com>
+From: lersek@redhat.com (Laszlo Ersek)
+Date: Tue, 03 Mar 2015 19:13:48 +0100
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <54F5F090.6090707@suse.de>
+References: <1424343286-6792-1-git-send-email-ard.biesheuvel@linaro.org>
+ <54F5F090.6090707@suse.de>
+Message-ID: <54F5F9DC.3020206@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 2, 2015 at 11:31 PM, Ingo Molnar <mingo@kernel.org> wrote:
->
-> * Kees Cook <keescook@chromium.org> wrote:
->
->> To address the "offset2lib" ASLR weakness[1], this separates ET_DYN
->> ASLR from mmap ASLR, as already done on s390. The architectures
->> that are already randomizing mmap (arm, arm64, mips, powerpc, s390,
->> and x86), have their various forms of arch_mmap_rnd() made available
->> via the new CONFIG_ARCH_HAS_ELF_RANDOMIZE. For these architectures,
->> arch_randomize_brk() is collapsed as well.
+On 03/03/15 18:34, Alexander Graf wrote:
+> On 02/19/2015 11:54 AM, Ard Biesheuvel wrote:
+>> This is a 0th order approximation of how we could potentially force
+>> the guest
+>> to avoid uncached mappings, at least from the moment the MMU is on.
+>> (Before
+>> that, all of memory is implicitly classified as Device-nGnRnE)
 >>
->> This is an alternative to the solutions in:
->> https://lkml.org/lkml/2015/2/23/442
->
-> Looks good so far:
->
-> Reviewed-by: Ingo Molnar <mingo@kernel.org>
->
-> While reviewing this series I also noticed that the following code
-> could be factored out from architecture mmap code as well:
->
->   - arch_pick_mmap_layout() uses very similar patterns across the
->     platforms, with only few variations. Many architectures use
->     the same duplicated mmap_is_legacy() helper as well. There's
->     usually just trivial differences between mmap_legacy_base()
->     approaches as well.
+>> The idea (patch #2) is to trap writes to MAIR_EL1, and replace
+>> uncached mappings
+>> with cached ones. This way, there is no need to mangle any guest page
+>> tables.
+>>
+>> The downside is that, to do this correctly, we need to always trap
+>> writes to
+>> the VM sysreg group, which includes registers that the guest may write
+>> to very
+>> often. To reduce the associated performance hit, patch #1 introduces a
+>> fast path
+>> for EL2 to perform trivial sysreg writes on behalf of the guest,
+>> without the
+>> need for a full world switch to the host and back.
+>>
+>> The main purpose of these patches is to quantify the performance hit, and
+>> verify whether the MAIR_EL1 handling works correctly.
+> 
+> I gave this a quick spin on a VM running with QEMU.
+> 
+>   * VGA output is still distorted, I get random junk black lines in the
+> output in between
+>   * When I add -device nec-usb-xhci -device usb-kbd the VM doesn't even
+> boot up
 
-I was nervous to start refactoring this code, but it's true: most of
-it is the same.
+Do you also have the dirty page tracking patches in your host kernel? I
+needed both (and got them via Drew's backport, thanks) and then both VGA
+and USB started working fine.
 
->   - arch_mmap_rnd(): the PF_RANDOMIZE checks are needlessly
->     exposed to the arch routine - the arch routine should only
->     concentrate on arch details, not generic flags like
->     PF_RANDOMIZE.
+Without the MAIR patches, I got cache-line size "random" corruptions in
+the VGA display (16 pixel wide small segments). Without dirty page
+tracking, big chunks (sometimes even almost the entire screen) was blank.
 
-Yeah, excellent point. I will send a follow-up patch to move this into
-binfmt_elf instead. I'd like to avoid removing it in any of the other
-patches since each was attempting a single step in the refactoring.
+Regarding USB, unless you have both of the patchsets in the host kernel,
+the guest will indeed crash early during boot. Gerd confirmed for me
+that "usb controller (all uhci/ehci/xhci) pci regions see both read
+(status bits) and write (control bits) access". So if there's any
+corruption in there, on read, that looks like a malfunctioning piece of
+hw for the guest kernel, and in this case it happens to crash.
 
-> In theory the mmap layout could be fully parametrized as well: i.e. no
-> callback functions to architectures by default at all: just
-> declarations of bits of randomization desired (or, available address
-> space bits), and perhaps an arch helper to allow 32-bit vs. 64-bit
-> address space distinctions.
+> With TCG, both bits work fine.
 
-Yeah, I was considering that too, since each architecture has a nearly
-identical arch_mmap_rnd() at this point. Only the size of the entropy
-was changing.
+Yep.
 
-> 'Weird' architectures could provide special routines, but only by
-> overriding the default behavior, which should be generic, safe and
-> robust.
-
-Yeah, quite true. Should entropy size be a #define like
-ELF_ET_DYN_BASE? Something like ASLR_MMAP_ENTROPY and
-ASLR_MMAP_ENTROPY_32? Is there a common function for determining a
-compat task? That seemed to be per-arch too. Maybe
-arch_mmap_entropy()?
-
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+Thanks
+Laszlo
