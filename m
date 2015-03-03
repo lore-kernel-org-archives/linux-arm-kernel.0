@@ -1,41 +1,50 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Tue, 03 Mar 2015 17:56:47 +0200
-Subject: [PATCH 00/10] initial clkdev cleanups
-In-Reply-To: <54F4DB34.9000507@codeaurora.org>
-References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
- <54F4DB34.9000507@codeaurora.org>
-Message-ID: <1425398207.14897.152.camel@linux.intel.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 03 Mar 2015 16:00:12 +0000
+Subject: [PATCH v2 0/5] arm-cci400: PMU monitoring support on ARM64
+In-Reply-To: <1425295754-13376-1-git-send-email-suzuki.poulose@arm.com>
+References: <1425295754-13376-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <54F5DA8C.7080609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-03-02 at 13:50 -0800, Stephen Boyd wrote:
-> On 03/02/15 09:05, Russell King - ARM Linux wrote:
-> > Here's some initial clkdev cleanups.  These are targetted for the next
-> > merge window, and while the initial patches can be merged independently,
-> > I'd prefer to keep the series together as further work on solving the
-> > problems which unique struct clk's has introduced is needed.
 
 
-> > I'm also killing a chunk of seemingly unused code in the omap3isp driver.
-> >
-> > Lastly, I'm introducing a clkdev_create() helper, which combines the
-> > clkdev_alloc() + clkdev_add() pattern which keeps cropping up.
-> >
-> 
-> We already have a solution to that problem with clk_register_clkdev().
-> Andy has done some work to make clk_register_clkdev() return a struct
-> clk_lookup pointer[1]. Maybe we can do that instead of introducing a new
-> clkdev_create() function. There is some benefit to having a new function
-> though so that we can avoid a flag day, although it looks like the flag
-> day is small in this case so it might not actually matter.
+On 02/03/15 11:29, Suzuki K. Poulose wrote:
+> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+>
+> This series enables the PMU monitoring support for CCI400 on ARM64.
+> The existing CCI400 driver code is a mix of PMU driver and the MCPM
+> driver code. The MCPM driver is only used on ARM(32) and contains
+> arm32 assembly and hence can't be built on ARM64. This patch splits
+> the code to
+>
+>   - ARM_CCI400_PORT_CTRL driver - depends on ARM && V7
+>   - ARM_CCI400_PMU driver
+>
+> Accessing the Peripheral ID2 register(PID2) on CCI-400, to detect
+> the revision of the chipset, is a secure operation. Hence, it prevents
+> us from running this on non-secure platforms. The issue is overcome by
+> explicitly mentioning the revision number of the CCI PMU in the device tree
+> binding. The device-tree binding has been updated with the new bindings.
+>
+> i.e,	arm-cci-400-pmu,r0 => revision 0
+> 	arm-cci-400-pmu,r1 => revision 1
+> 	arm-cci-400-pmu => (old) DEPRECATED
+>
+> The old binding has been DEPRECATED and must be used only on ARM32
+> system with secure access. We don't have a reliable dynamic way to detect
+> if the system is running secure. This series tries to use the best safe
+> method by relying on the availability of MCPM(as it was prior to the series).
+> It is upto the MCPM platform driver to decide, if the system is secure before
+> it goes ahead and registers its drivers and pokes the CCI. This series doesn't
+> address/solve the problem of MCPM. I will be happy to use a better approach,
+> if there is any.
+>
+> Tested on (non-secure)TC2 and Juno.
+>
 
-> [1] https://www.marc.info/?l=linux-kernel&m=142469226512289
+For the series:
+Tested-by: Sudeep Holla <sudeep.holla@arm.com> (on secure/MCPM TC2)
 
-Agree with Stephen, why should we have the second function doing the
-same? Just name changing?
-
-I think you may just incorporate that patch into your series.
-
--- 
-Andy Shevchenko <andriy.shevchenko@intel.com>
-Intel Finland Oy
+Regards,
+Sudeep
