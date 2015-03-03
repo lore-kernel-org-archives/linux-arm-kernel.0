@@ -1,50 +1,41 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 3 Mar 2015 20:51:37 +0900
-Subject: [PATCH 1/6] target-arm: kvm: save/restore mp state
-In-Reply-To: <54F595C0.5060004@redhat.com>
-References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
- <1424880159-29348-2-git-send-email-alex.bennee@linaro.org>
- <CAFEAcA9oWeYGYcGtf8So6VrYLMXjWr4FiZ2tS+jBnDtv87jAKw@mail.gmail.com>
- <8761ai73j1.fsf@linaro.org> <54F595C0.5060004@redhat.com>
-Message-ID: <CAFEAcA8SaBuH6izzuD6CmknSU9mbQPo0YNO=knTgRCPZ2EvXcQ@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 03 Mar 2015 11:56:21 +0000
+Subject: [PATCH] clocksource: arm_arch_timer: Rename arch_timer_probed
+ to reflect behaviour
+In-Reply-To: <1634669.Cj7rnHN4gq@avalon>
+References: <1421488012-5098-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <54C56582.6080809@linaro.org> <1634669.Cj7rnHN4gq@avalon>
+Message-ID: <54F5A165.4010408@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 March 2015 at 20:06, Paolo Bonzini <pbonzini@redhat.com> wrote:
+
+
+On 01/03/15 13:00, Laurent Pinchart wrote:
+> Hello,
 >
->
-> On 03/03/2015 11:56, Alex Benn?e wrote:
->> > > This adds the saving and restore of the current Multi-Processing state
->> > > of the machine. While the KVM_GET/SET_MP_STATE API exposes a number of
->> > > potential states for x86 we only use two for ARM. Either the process is
->> > > running or not.
->> >
->> > By this you mean "is the CPU in the PSCI powered down state or not",
->> > right?
+> On Sunday 25 January 2015 22:52:02 Daniel Lezcano wrote:
+>> On 01/17/2015 10:46 AM, Laurent Pinchart wrote:
+>>> The arch_timer_probed function returns whether the given time doesn't
+>>> need to be probed. This can be the case when the timer has been probed
+>>> already, but also when it has no corresponding enabled node in DT.
+>>>
+>>> Rename the function to arch_timer_need_probe and invert its return value
+>>> to better reflect the function's purpose and behaviour.
+>>>
+>>> Signed-off-by: Laurent Pinchart
+>>> <laurent.pinchart+renesas@ideasonboard.com>
 >>
->> From the vcpu's perspective it is either running or not. However it is
->> the same mechanism that is used when PSCI_0_2_FN_CPU_OFF is passed the
->> VM, internally setting vcpu->arch.paused.
+>> I would like to have an ack from Sudeep or Mark (Cc'ed) before taking
+>> this patch.
+>
+> Sudeep, Mark, ping ?
+>
 
-Well, it has to be (ABI defined to be) identical with being PSCI
-powered down/up, because that's how userspace is going to be
-treating it. If we might tell userspace we're in the "not running"
-state for other cases than PSCI-powered-down then we probably need
-to consider separating those out into separate states.
+Looks fine to me. I just wanted to test on KVM which I had broke once
+previously though this change is pretty straight forward and simple.
 
-> I suggest that you define a new MP_STATE constant for this.  HALTED in
-> x86 and s390 is the state an ARM processor enters when you execute wfi.
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 
-Architecturally the CPU doesn't have to enter any state at all
-if you execute a WFI -- it might be implemented as "go to low
-power state and wait for an interrupt" or "go low power but
-maybe be unnecessarily woken up" or "nop, do nothing"...
-
->  Right now this is not migrated on ARM if I remember correctly, but
-> perhaps you'll want to add it in the future.
-
-...which is why we don't need to migrate this: it just means
-that migration during WFI causes an unnecessary-wakeup, which
-is architecturally fine.
-
--- PMM
+Regards,
+Sudeep
