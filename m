@@ -1,65 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 3 Mar 2015 00:19:58 -0800
-Subject: [PATCH 0/3] Add initial DT support for Qualcomm SPMI PMIC devices
-In-Reply-To: <1424967957.2340.30.camel@mm-sol.com>
-References: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
- <54E6848C.1090405@codeaurora.org>
- <1424967957.2340.30.camel@mm-sol.com>
-Message-ID: <20150303081958.GA6293@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 3 Mar 2015 09:22:09 +0100
+Subject: [linux-sunxi] Re: [PATCH] ARM: sun6i: dt: Add new Mele I7 device
+In-Reply-To: <54F568F8.1040104@redhat.com>
+References: <1425131285-8640-1-git-send-email-codekipper@gmail.com>
+ <20150303071635.GC4713@lukather> <54F568F8.1040104@redhat.com>
+Message-ID: <20150303082209.GE4713@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26, Ivan T. Ivanov wrote:
+On Tue, Mar 03, 2015 at 08:55:36AM +0100, Hans de Goede wrote:
+> >>+/ {
+> >>+	model = "Mele I7 Quad top set box";
+> >>+	compatible = "mele,i7", "allwinner,sun6i-a31";
+> >>+
+> >>+	chosen {
+> >>+		bootargs = "earlyprintk console=ttyS0,115200";
+> >
+> >Using earlyprintk by default is a bad idea if the kernel is configured
+> >with DEBUG_LL support for another SoC.
 > 
-> Hi Stephan, 
-> 
-> Sorry for delayed answer.
-> 
-> On Thu, 2015-02-19 at 16:49 -0800, Stephen Boyd wrote:
-> > On 02/03/15 04:17, Ivan T. Ivanov wrote:
-> > > Following set of patches add initial DT support for PMIC devices
-> > > found on recent Quqalcomm chipsets. Details for SPMI bus and PMIC arbiter
-> > > could be found here [1].
-> > 
-> > Can you please put the specific compatible strings for the pmic model
-> > into the nodes in addition to the generic "qcom,spmi-pmic"? We may want
-> > to have regmap config tables in the future that describe the
-> > cache/read/write abilities of the regsiters. If all we have is the
-> > generic binding then we don't have a way to populate these tables.
-> > Unless the plan there is to use the revid registers?
-> > 
-> 
-> I would really like that we can use "revid" registers, but I don't know... 
-> 
-> From what I can see usually in one physical PMIC chip they
-> are 2 USID devices.
-> 
-> I can successfully discover following USID's on APQ8074 boards:
-> 
-> pmic-spmi 0-00: qcom,pm8941-v1.0 detected
-> pmic-spmi 0-01: qcom,pm8941-v1.0 detected
-> pmic-spmi 0-04: qcom,pm8841-v0.0 detected
-> pmic-spmi 0-05: qcom,pm8841-v0.0 detected
-> 
-> Unfortunately on PM8916 only one device is detected, with USID 0.
-> But they should be two, judging by downstream DTS files, right?
-> 
-> pmic-spmi 0-00: qcom,pm8916-v0.0 detected 
-> pmic-spmi 0-01: unknown device
-> 
-> For communication with PM8916 I am using recent patches from Gilad [1].
-> Maybe there are still some issues with these patches, which can cause
-> this behavior or PM8916 just didn't have these registers for USID 1?
-> 
-> Regards,
-> Ivan 
+> While on this subject, u-boot now sets the chosen/stdout-path property
+> up by default, which means that the kernel will do the right thing by
+> default. So we we really do not need any bootargs= in our dts files.
 
-Hmm... do you have 4 total rev-id nodes on apq8074? I only see
-one rev-id node per pmic (2 total), so I'm a little lost how the
-correct pmic version is detected on the 0-01 and 0-05 devices in
-your example above. Maybe I've missed something though, I'll have
-to check in a few hours when I'm in the office.
+I just tested that this weekend, and it turned out that the kernel
+couldn't use it so far (ie, no output until init takes over and setup
+a TTY on ttyS0).
+
+Was it working for you?
+
+> Currently we've a random mix where we do have bootargs in some, but
+> not in most sunxi dts files. I believe we should simply remove it
+> everywhere...
+
+We used to set them in SoCs that are not supported by U-boot yet, and
+where the bootloader won't come and patch the DT (A31, A23, A80).
+
+Maxime
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150303/844d5e5d/attachment-0001.sig>
