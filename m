@@ -1,30 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 Mar 2015 12:34:37 +0100
-Subject: [PATCH 3/3] mailbox: Add support for ST's Mailbox IP
-In-Reply-To: <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
-References: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
- <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <3926609.Ff6LCkuuMX@wuerfel>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 3 Mar 2015 20:51:37 +0900
+Subject: [PATCH 1/6] target-arm: kvm: save/restore mp state
+In-Reply-To: <54F595C0.5060004@redhat.com>
+References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
+ <1424880159-29348-2-git-send-email-alex.bennee@linaro.org>
+ <CAFEAcA9oWeYGYcGtf8So6VrYLMXjWr4FiZ2tS+jBnDtv87jAKw@mail.gmail.com>
+ <8761ai73j1.fsf@linaro.org> <54F595C0.5060004@redhat.com>
+Message-ID: <CAFEAcA8SaBuH6izzuD6CmknSU9mbQPo0YNO=knTgRCPZ2EvXcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 March 2015 10:41:23 Lee Jones wrote:
-> +
-> +/*
-> + * struct sti_mbox_msg - sti mailbox message description
-> + * @dsize:             data payload size
-> + * @pdata:             message data payload
-> + */
-> +struct sti_mbox_msg {
-> +       u32             dsize;
-> +       u8              *pdata;
-> +};
+On 3 March 2015 at 20:06, Paolo Bonzini <pbonzini@redhat.com> wrote:
+>
+>
+> On 03/03/2015 11:56, Alex Benn?e wrote:
+>> > > This adds the saving and restore of the current Multi-Processing state
+>> > > of the machine. While the KVM_GET/SET_MP_STATE API exposes a number of
+>> > > potential states for x86 we only use two for ARM. Either the process is
+>> > > running or not.
+>> >
+>> > By this you mean "is the CPU in the PSCI powered down state or not",
+>> > right?
+>>
+>> From the vcpu's perspective it is either running or not. However it is
+>> the same mechanism that is used when PSCI_0_2_FN_CPU_OFF is passed the
+>> VM, internally setting vcpu->arch.paused.
 
-As mentioned in another thread, we may just want to add a 'size'
-argument to the message send function, and a default helper for
-messages with size of 32 bits.
+Well, it has to be (ABI defined to be) identical with being PSCI
+powered down/up, because that's how userspace is going to be
+treating it. If we might tell userspace we're in the "not running"
+state for other cases than PSCI-powered-down then we probably need
+to consider separating those out into separate states.
 
-I don't think it's good to fragment this further by adding
-an indirect message interface in a particular driver.
+> I suggest that you define a new MP_STATE constant for this.  HALTED in
+> x86 and s390 is the state an ARM processor enters when you execute wfi.
 
-	Arnd
+Architecturally the CPU doesn't have to enter any state at all
+if you execute a WFI -- it might be implemented as "go to low
+power state and wait for an interrupt" or "go low power but
+maybe be unnecessarily woken up" or "nop, do nothing"...
+
+>  Right now this is not migrated on ARM if I remember correctly, but
+> perhaps you'll want to add it in the future.
+
+...which is why we don't need to migrate this: it just means
+that migration during WFI causes an unnecessary-wakeup, which
+is architecturally fine.
+
+-- PMM
