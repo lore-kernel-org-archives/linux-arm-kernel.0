@@ -1,68 +1,102 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 03 Mar 2015 13:44:34 +0100
-Subject: [PATCH] ARM: fix exynos randconfig build error
-In-Reply-To: <54F4BC92.2050405@kernel.org>
-References: <E1YQa78-0000O0-A4@rmk-PC.arm.linux.org.uk>
- <54EF9091.30802@kernel.org> <54F4BC92.2050405@kernel.org>
-Message-ID: <14257250.yOR9pFcIkO@amdc1032>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 03 Mar 2015 13:51:40 +0100
+Subject: [PATCH] cpuidle: mvebu: Fix the CPU PM notifier usage
+In-Reply-To: <54F59285.5060306@libero.it>
+References: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
+ <4892716.Bf612zPN6E@vostro.rjw.lan> <54F03B51.1010708@free-electrons.com>
+ <54F58D2F.2010907@linaro.org> <54F58E3B.9040302@free-electrons.com>
+ <54F59285.5060306@libero.it>
+Message-ID: <54F5AE5C.6060006@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Fulvio,
 
-Hi,
+On 03/03/2015 11:52, Fulvio wrote:
+> Gregory CLEMENT wrote:
+>> Hi Rafael,
+>>
+>>
+>>
+>> On 03/03/2015 11:30, Daniel Lezcano wrote:
+>>   
+>>> On 02/27/2015 10:39 AM, Gregory CLEMENT wrote:
+>>>     
+>>>> Hi Rafael,
+>>>>
+>>>> On 26/02/2015 22:55, Rafael J. Wysocki wrote:
+>>>>       
+>>>>> On Thursday, February 26, 2015 06:20:48 PM Gregory CLEMENT wrote:
+>>>>>         
+>>>>>> As stated in kernel/cpu_pm.c, "Platform is responsible for ensuring
+>>>>>> that cpu_pm_enter is not called twice on the same CPU before
+>>>>>> cpu_pm_exit is called.". In the current code in case of failure when
+>>>>>> calling mvebu_v7_cpu_suspend, the function cpu_pm_exit() is never
+>>>>>> called whereas cpu_pm_enter() was called just before.
+>>>>>>
+>>>>>> This patch moves the cpu_pm_exit() in order to balance the
+>>>>>> cpu_pm_enter() calls.
+>>>>>>
+>>>>>> Reported-by: Fulvio Benini <fbf@libero.it>
+>>>>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>>>>>           
+>>>>> Should that go to "stable" too?  Which "stable" series it should go to if so?
+>>>>>         
+>>>> Yes as it fixes a potential issue, you're right it should go
+>>>> to "stable". The bug was here since the introduction of the driver
+>>>> in 3.16.
+>>>>       
+>>> Hi Gregory,
+>>>
+>>> actually the 'stable' rules state clearly:
+>>>
+>>> "- It must fix a real bug that bothers people (not a, "This could be a 
+>>> problem..." type thing)."
+>>>
+>>> You say "it fixes a potential issue", so no bug has been raise yet, right ?
+>>>     
+>>
+>> Indeed nobody claimed yet having a bug related to this issue.
+>>
+>> Gregory
+>>
+>>   
+> I reported the issue, but i cannot say if it's a real bug.
+> I had random kernel panics with a Netgear ReadyNAS RN102 (armada 370 cpu):
+> http://www.readynas.com/forum/viewtopic.php?f=20&t=78697&sid=14747617286d55ac27296cdee7a3f420&start=210#p452214
 
-On Tuesday, March 03, 2015 04:40:02 AM Kukjin Kim wrote:
-> On 02/27/15 06:30, Kukjin Kim wrote:
-> > On 02/25/15 20:46, Krzysztof Kozlowski wrote:
-> >> 2015-02-25 12:26 GMT+01:00 Russell King <rmk+kernel@arm.linux.org.uk>:
-> >>> The following error was observed with SMP=n in v4.0-rc1:
-> >>>
-> >>> arch/arm/mach-exynos/pm.c: In function 'exynos_cpu0_enter_aftr':
-> >>> arch/arm/mach-exynos/pm.c:246:4: error: implicit declaration of function 'arch_send_wakeup_ipi_mask' [-Werror=implicit-function-declaration]
-> >>>
-> >>> As the code unconditionally calls a function only available with SMP=y,
-> >>> make the Exynos PM support depend on SMP.
-> >>>
-> >>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> >>
-> >> Hi,
-> >>
-> >> Thanks for the patch but this already waits for Kukjin top be picked
-> >> up. The first patch was similar to yours (adds dependency on SMP),
-> >> sent on 4th of February:
-> >> https://patchwork.ozlabs.org/patch/436231/
-> >>
-> >> But later Bartlomiej fixed this in other way (allowing to use cpuidle
-> >> on non-SMP):
-> >> https://patchwork.ozlabs.org/patch/436445/
-> >>
-> >> Unfortunately none of them were picked up.
-> >>
-> > I've missed the fix, sorry.
-> > 
-> > BTW, as you know, all of exynos SoCs are based on SMP so generally (in
-> > normal case) there is no reason to use non-SMP on exynos
-> > platforms...even though I understand the build error should be fixed...
-> > 
-> > Anyway, I'll have a look Bart's patch and Russell's fix in this weekend.
-> > 
+I didn't know you experimented random kernel panics and that you thought
+it was related to the CPU Idle driver.
+
 > 
-> Firstly, let me take rmk's patch for the randconfig build error...BTW
+> All i can say is that the system use the "armadaxp_idle" driver and 
+> works fine when running "stress --cpu 8" in background.
+> I asked Netgear to provide a firmware without the idle driver to confirm 
+> if it's the cause of the problem, but they did not answered.
 
-What is wrong with picking my patch instead?  It is non-invasive and fixes
-cpuidle support on UP (which is a regression from previous kernels)?
+I think that if you disable all the state using by doing an
 
-https://lkml.org/lkml/2015/2/4/521
+echo 1 > /sys/devices/system/cpu/cpu0/cpuidle/stateNUM/disable
 
-> I'm still wondering exynos stuff needs to support non-SMP and need to
-> think more about its usefulness?...
+where NUM is the nuymbert of the state. Then it should disable the
+cpuidle on the fly.
 
-Currently UP is supported and at least I find it useful for testing/debug
-purposes.  If you want to to make Exynos SMP only thats OK but it should
-be done globally for Exynos arch support not just for cpuidle support.
+Daniel, is it correct?
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Or if you can modify your bootargs, then just add cpuidle.off=1 to the kernel
+command line.
+
+Thanks,
+
+Gregory
+
+> Bye,
+> Fulvio
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
