@@ -1,82 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 3 Mar 2015 14:58:47 +0100
-Subject: [linux-sunxi] Re: [PATCH] ARM: sun6i: dt: Add new Mele I7 device
-In-Reply-To: <54F5B51F.6030609@redhat.com>
-References: <1425131285-8640-1-git-send-email-codekipper@gmail.com>
- <20150303071635.GC4713@lukather> <54F568F8.1040104@redhat.com>
- <20150303082209.GE4713@lukather> <54F5B51F.6030609@redhat.com>
-Message-ID: <20150303135847.GH4911@lukather>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 3 Mar 2015 22:03:31 +0800
+Subject: [PATCH 1/2] cpufreq-dt: support cluster level clock
+In-Reply-To: <CAKohpoksXwMRWYzSBmbV1nN5_LvUiB1Y2wfgOcCJPx+oipaXZw@mail.gmail.com>
+References: <1425387817-11382-1-git-send-email-leo.yan@linaro.org>
+ <1425387817-11382-2-git-send-email-leo.yan@linaro.org>
+ <CAKohpoksXwMRWYzSBmbV1nN5_LvUiB1Y2wfgOcCJPx+oipaXZw@mail.gmail.com>
+Message-ID: <20150303140331.GA11325@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 02:20:31PM +0100, Hans de Goede wrote:
-> Hi,
-> 
-> On 03-03-15 09:22, Maxime Ripard wrote:
-> >On Tue, Mar 03, 2015 at 08:55:36AM +0100, Hans de Goede wrote:
-> >>>>+/ {
-> >>>>+	model = "Mele I7 Quad top set box";
-> >>>>+	compatible = "mele,i7", "allwinner,sun6i-a31";
-> >>>>+
-> >>>>+	chosen {
-> >>>>+		bootargs = "earlyprintk console=ttyS0,115200";
-> >>>
-> >>>Using earlyprintk by default is a bad idea if the kernel is configured
-> >>>with DEBUG_LL support for another SoC.
-> >>
-> >>While on this subject, u-boot now sets the chosen/stdout-path property
-> >>up by default, which means that the kernel will do the right thing by
-> >>default. So we we really do not need any bootargs= in our dts files.
+On Tue, Mar 03, 2015 at 06:40:23PM +0530, Viresh Kumar wrote:
+> On 3 March 2015 at 18:33, Leo Yan <leo.yan@linaro.org> wrote:
+> > In the previous code, cpufreq-dt driver support single clock shared by
+> > all CPUs or every CPU has dedicated clock; but it cannot support cluster
+> > level clock domain, which is very common implementation for ARM SoCs.
 > >
-> >I just tested that this weekend, and it turned out that the kernel
-> >couldn't use it so far (ie, no output until init takes over and setup
-> >a TTY on ttyS0).
+> > So this patch add the support for cluster level clock; which use the
+> > platform parameter "clk_domain_boundary" to indicate whether the clock
+> > domain is bound to system level, cluster level or CPU level.
 > >
-> >Was it working for you?
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
 > 
-> Yes, note that the kernel only honors the stdout-path property if
-> there is no console= argument present if there is a console= argument
-> present on the kernel cmdline then that will overrule the stdout-path
-> property
-
-Yeah, I removed the bootargs entirely.
-
-> Which board did you test with, and what u-boot and kernel version ?
-
-I tested it on my A31 hummingbird, with allwinner's u-boot, but with
-/chosen/stdout-path hardcoded to "serial0:115200n8", with a 4.0-rc1
-kernel.
-
-But it might very well just be me. We just tested it on a Marvell
-board (that uses the same serial driver) this morning and it was fine,
-so I don't think it's really worth worrying about this :)
-
-> >>Currently we've a random mix where we do have bootargs in some, but
-> >>not in most sunxi dts files. I believe we should simply remove it
-> >>everywhere...
-> >
-> >We used to set them in SoCs that are not supported by U-boot yet, and
-> >where the bootloader won't come and patch the DT (A31, A23, A80).
+> No. We aren't going to do it this way. You just test your current SoC where
+> all CPUs share clock line. The other SoC that might come later, where
+> clocks are per cluster, can be handled later.
 > 
-> Ah, so that is (was) the logic, following that logic we should probably
-> remove bootargs= from at least the a23 and a31 boards (basically
-> from all boards but a80).
+> So, for now you don't need any changes in the driver I believe.
 
-I'm not so sure about the A31, since most boards won't even boot by
-default on the SD card, and we have no way to replace U-Boot in NAND
-so far (afaik). But replacing them by stdout-path is a very good
-solution too.
+Correct, current SoC shares one clock line.
 
-Maxime
+I'm just thinking to finish things in one time. From my previous
+experience, clocks per cluster are common cases for ARM's
+multi-clusters, so i think it's reasonable to add related support.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150303/658d5fdd/attachment.sig>
+Regarding of testing this patch, i created two virtual clocks for
+every cluster and passed the test. Do u think this is acceptable?
+
+Thanks,
+Leo Yan
