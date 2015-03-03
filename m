@@ -1,51 +1,49 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 3 Mar 2015 16:49:46 +0800
-Subject: [PATCH v4 20/30] PCI/sparc: Use pci_scan_root_bridge() for
- simplicity
-In-Reply-To: <20150303031059.GJ11978@google.com>
-References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
- <1424938344-4017-21-git-send-email-wangyijing@huawei.com>
- <20150303031059.GJ11978@google.com>
-Message-ID: <54F575AA.6050409@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 3 Mar 2015 09:52:04 +0100
+Subject: [PATCH v2 5/5] clocksource: sun5i: Add clock notifiers
+In-Reply-To: <20150126143541.GG31568@lukather>
+References: <1422265856-27631-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1422265856-27631-6-git-send-email-maxime.ripard@free-electrons.com>
+ <54C62368.7050600@linaro.org> <20150126143541.GG31568@lukather>
+Message-ID: <20150303085204.GA4911@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> -	pci_of_scan_bus(pbm, node, bus);
->> -	pci_bus_add_devices(bus);
->> -	pci_bus_register_of_sysfs(bus);
->> +	pci_bus_add_devices(host->bus);
->> +	pci_bus_register_of_sysfs(host->bus);
->>  
->> -	pci_claim_bus_resources(bus);
->> +	pci_claim_bus_resources(host->bus);
+On Mon, Jan 26, 2015 at 03:35:41PM +0100, Maxime Ripard wrote:
+> > >+static int sun5i_rate_cb_clksrc(struct notifier_block *nb,
+> > >+				unsigned long event, void *data)
+> > >+{
+> > >+	struct clk_notifier_data *ndata = data;
+> > >+	struct sun5i_timer *timer = to_sun5i_timer(nb);
+> > >+	struct sun5i_timer_clksrc *cs = container_of(timer,
+> > >+						     struct sun5i_timer_clksrc, timer);
+> > >+
+> > >+	switch (event) {
+> > >+	case PRE_RATE_CHANGE:
+> > >+		clocksource_unregister(&cs->clksrc);
+> > >+		break;
+> > >+
+> > >+	case POST_RATE_CHANGE:
+> > >+		clocksource_register_hz(&cs->clksrc, ndata->new_rate);
+> > >+		break;
+> > 
+> > Why clocksource_unregister couldn't be in the POST_RATE_CHANGE ?
 > 
-> Isn't this a case where pci_claim_bus_resources() should be done before
-> pci_bus_add_devices()?  You didn't introduce this problem, but since you're
-> fixing similar issues, seems like we should fix this one, too.  In a patch
-> of its own, of course.
+> Wouldn't that leave a (small, I agree) window where the timer would
+> run at a rate different to the one it has been registered with?
 
-OK, will fix in a another patch.
+Ping?
 
-> 
->>  
->> -	return bus;
->> +	return host->bus;
->>  }
->>  
->>  void pcibios_fixup_bus(struct pci_bus *pbus)
->> -- 
->> 1.7.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
-> 
-> .
-> 
-
+Maxime
 
 -- 
-Thanks!
-Yijing
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150303/8f71e32a/attachment-0001.sig>
