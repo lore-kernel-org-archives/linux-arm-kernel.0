@@ -1,49 +1,46 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 3 Mar 2015 11:57:47 +0100
-Subject: [PATCH v2 6/8] mmc: sdhci-st: Update the quirks for this
- controller.
-In-Reply-To: <1424956227-18258-7-git-send-email-peter.griffin@linaro.org>
-References: <1424956227-18258-1-git-send-email-peter.griffin@linaro.org>
- <1424956227-18258-7-git-send-email-peter.griffin@linaro.org>
-Message-ID: <54F593AB.5080400@st.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue,  3 Mar 2015 11:58:06 +0100
+Subject: [PATCH trivial/resend 1/9] ARM: KVM: Spelling s/auxilliary/auxiliary/
+In-Reply-To: <1425380294-26137-1-git-send-email-geert+renesas@glider.be>
+References: <1425380294-26137-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1425380294-26137-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+Resending trivial patches submitted in 2014.
 
-On 02/26/2015 02:10 PM, Peter Griffin wrote:
-> Some additional quirks need to be enabled now we support UHS
-> modes. This avoids some spurious warnings like
->
-> "Got data interrupt 0x00000002 even though no data operation was in progress"
->
-> Testing on stih410-b2120 board achieves the following speeds
-> with HS200 eMMC card.
->
-> max-frequency = 200Mhz
-> /dev/mmcblk0p1:
->   Timing buffered disk reads: 270 MB in  3.02 seconds =  89.54 MB/sec
->
-> max-frequency = 100Mhz
-> root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
-> /dev/mmcblk0p1:
->   Timing buffered disk reads: 210 MB in  3.00 seconds =  70.00 MB/sec
->
-> max-frequency = 50Mhz
-> root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
-> /dev/mmcblk0p1:
->   Timing buffered disk reads: 118 MB in  3.00 seconds =  39.28 MB/sec
->
-> This is better than the 3.10 kernel which achieves 77.59 MB/sec
-> at 200Mhz clock (same board/soc/eMMC).
->
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> ---
->   drivers/mmc/host/sdhci-st.c | 5 ++++-
->   1 file changed, 4 insertions(+), 1 deletion(-)
->
+ arch/arm/include/asm/kvm_asm.h   | 2 +-
+ arch/arm64/include/asm/kvm_asm.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
-
-Thanks,
-Maxime
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 25410b2d8bc1046c..194c91b610ffecfd 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -23,7 +23,7 @@
+ #define c0_MPIDR	1	/* MultiProcessor ID Register */
+ #define c0_CSSELR	2	/* Cache Size Selection Register */
+ #define c1_SCTLR	3	/* System Control Register */
+-#define c1_ACTLR	4	/* Auxilliary Control Register */
++#define c1_ACTLR	4	/* Auxiliary Control Register */
+ #define c1_CPACR	5	/* Coprocessor Access Control */
+ #define c2_TTBR0	6	/* Translation Table Base Register 0 */
+ #define c2_TTBR0_high	7	/* TTBR0 top 32 bits */
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index 4f7310fa77f01acd..c4c11d20ca172cf7 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -27,7 +27,7 @@
+ #define	MPIDR_EL1	1	/* MultiProcessor Affinity Register */
+ #define	CSSELR_EL1	2	/* Cache Size Selection Register */
+ #define	SCTLR_EL1	3	/* System Control Register */
+-#define	ACTLR_EL1	4	/* Auxilliary Control Register */
++#define	ACTLR_EL1	4	/* Auxiliary Control Register */
+ #define	CPACR_EL1	5	/* Coprocessor Access Control */
+ #define	TTBR0_EL1	6	/* Translation Table Base Register 0 */
+ #define	TTBR1_EL1	7	/* Translation Table Base Register 1 */
+-- 
+1.9.1
