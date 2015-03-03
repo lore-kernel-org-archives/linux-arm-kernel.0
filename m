@@ -1,41 +1,82 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 3 Mar 2015 19:19:45 +0100
-Subject: [PATCH 1/1] ARM: at91sam9263/dt: Fixup sram1 device tree node
-In-Reply-To: <1424853304-32197-1-git-send-email-alexanders83@web.de>
-References: <1424853304-32197-1-git-send-email-alexanders83@web.de>
-Message-ID: <54F5FB41.3000506@atmel.com>
+Date: Tue, 3 Mar 2015 19:21:21 +0100
+Subject: [PATCH v2] ARM: at91: pm: fix SRAM allocation
+In-Reply-To: <1425368287-4971-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1425368287-4971-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <54F5FBA1.7000005@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 25/02/2015 09:35, Alexander Stein a ?crit :
-> Commit ff04660e48b20 ("ARM: at91/dt: add SRAM nodes") used the same base
-> address for sram0 and sram1 leading to the following warning:
-> WARNING: CPU: 0 PID: 1 at fs/sysfs/dir.c:31 sysfs_warn_dup+0x50/0x70()
-> sysfs: cannot create duplicate filename '/devices/platform/300000.sram'
-> Fix the base address for sram1.
+Le 03/03/2015 08:38, Alexandre Belloni a ?crit :
+> On some platforms, there are multiple SRAM nodes defined in the device tree but
+> some of them are disabled, leading to allocation failure. Try to find the first
+> enabled SRAM node and allocate from it.
 > 
-> Signed-off-by: Alexander Stein <alexanders83@web.de>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Tested-by: Wenyou Yang <wenyou.yang@atmel.com>
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Added to at91-4.0-fixes. Thanks.
+and added to at91-4.0-fixes. Thanks.
 
 > ---
->  arch/arm/boot/dts/at91sam9263.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Changes in v2:
+>  - initialize pdev to NULL
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> index cdb7d03..76bb849 100644
-> --- a/arch/arm/boot/dts/at91sam9263.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> @@ -69,7 +69,7 @@
+>  arch/arm/mach-at91/pm.c | 22 ++++++++++------------
+>  1 file changed, 10 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index 5e34fb143309..aa4116e9452f 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -270,37 +270,35 @@ static void __init at91_pm_sram_init(void)
+>  	phys_addr_t sram_pbase;
+>  	unsigned long sram_base;
+>  	struct device_node *node;
+> -	struct platform_device *pdev;
+> +	struct platform_device *pdev = NULL;
 >  
->  	sram1: sram at 00500000 {
->  		compatible = "mmio-sram";
-> -		reg = <0x00300000 0x4000>;
-> +		reg = <0x00500000 0x4000>;
->  	};
+> -	node = of_find_compatible_node(NULL, NULL, "mmio-sram");
+> -	if (!node) {
+> -		pr_warn("%s: failed to find sram node!\n", __func__);
+> -		return;
+> +	for_each_compatible_node(node, NULL, "mmio-sram") {
+> +		pdev = of_find_device_by_node(node);
+> +		if (pdev) {
+> +			of_node_put(node);
+> +			break;
+> +		}
+>  	}
 >  
->  	ahb {
+> -	pdev = of_find_device_by_node(node);
+>  	if (!pdev) {
+>  		pr_warn("%s: failed to find sram device!\n", __func__);
+> -		goto put_node;
+> +		return;
+>  	}
+>  
+>  	sram_pool = dev_get_gen_pool(&pdev->dev);
+>  	if (!sram_pool) {
+>  		pr_warn("%s: sram pool unavailable!\n", __func__);
+> -		goto put_node;
+> +		return;
+>  	}
+>  
+>  	sram_base = gen_pool_alloc(sram_pool, at91_slow_clock_sz);
+>  	if (!sram_base) {
+>  		pr_warn("%s: unable to alloc ocram!\n", __func__);
+> -		goto put_node;
+> +		return;
+>  	}
+>  
+>  	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
+>  	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz, false);
+> -
+> -put_node:
+> -	of_node_put(node);
+>  }
+>  #endif
+>  
 > 
 
 
