@@ -1,233 +1,91 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 3 Mar 2015 12:43:36 +0800
-Subject: [PATCH] ARM: dts: imx: Add dr_mode host setting to all host-only
- usb instances
-In-Reply-To: <20150303034133.GJ20455@dragon>
-References: <1425045960-14191-1-git-send-email-mporter@konsulko.com>
- <20150303034133.GJ20455@dragon>
-Message-ID: <20150303044334.GA16617@shlinux2>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Tue, 03 Mar 2015 13:57:41 +0800
+Subject: [PATCH 2/2] ARM: rockchip: disable watchdog during suspend
+In-Reply-To: <19262192.YHbflRWDXo@phil>
+References: <1423487543-10593-1-git-send-email-zyw@rock-chips.com>
+ <1423487543-10593-2-git-send-email-zyw@rock-chips.com>
+ <19262192.YHbflRWDXo@phil>
+Message-ID: <54F54D55.8040200@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 11:41:35AM +0800, Shawn Guo wrote:
-> 
-> On Fri, Feb 27, 2015 at 09:06:00AM -0500, Matt Porter wrote:
-> > The chipidea driver adds an extra line of spam to the log when a
-> > host-only chipidea instance is left set to the default of a dual role
-> > controller.
-> > 
-> > [    2.010873] ci_hdrc ci_hdrc.1: doesn't support gadget
-> > 
-> > Set the dr_mode property to host on all the host-only nodes
-> > to avoid this warning.
 
-It is not an warning, it is dev_info.
+On 03/03/2015 04:50 AM, Heiko Stuebner wrote:
+> Hi Chris,
+>
+> Am Montag, 9. Februar 2015, 21:12:23 schrieb Chris Zhong:
+>> The watchdog clock should be disable in dw_wdt_suspend, but we set a
+>> dummy clock to watchdog for rk3288. So the watchdog will continue to
+>> work during suspend. And we switch the system clock to 32khz from 24Mhz,
+>> during suspend, so the watchdog timer over count will increase to
+>> 755 times, about 12.5 hours, the original value is 60 seconds. So
+>> watchdog will reset the system over a night,  but voltage are all
+>> incorrect, then it hang on reset.
+>>
+>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>> Signed-off-by: Daniel Kurtz <djkurtz@google.com>
+> The SGRF is not writeable in all bootmodes (I've talked with Doug about this
+> to verify I remembered this correctly), so handling the sgrf gate for the
+> watchdog is not safe for all possible boards.
+>
+> Why not simply turn off the watchdog in the driver during suspend?
+I think SGRF is writeable, since we would set this RK3288_SGRF_SOC_CON0 
+register when suspend.
+and this SGRF_PCLK_WDT_GATE is one bit of RK3288_SGRF_SOC_CON0.
 
-In fact, imx28, imx6sl and imx6sx's second controller is dual-role
-controller, we only set dr_mode at board's dts according to design
-unless the controller's capability register is incorrect.
-
-So, sorry, I don't think this change is necessary.
-
-> > 
-> > Signed-off-by: Matt Porter <mporter@konsulko.com>
-> > ---
-> >  arch/arm/boot/dts/imx27.dtsi   | 2 ++
-> >  arch/arm/boot/dts/imx28.dtsi   | 1 +
-> >  arch/arm/boot/dts/imx35.dtsi   | 1 +
-> >  arch/arm/boot/dts/imx50.dtsi   | 3 +++
-> >  arch/arm/boot/dts/imx51.dtsi   | 3 +++
-> >  arch/arm/boot/dts/imx53.dtsi   | 3 +++
-> >  arch/arm/boot/dts/imx6qdl.dtsi | 3 +++
-> >  arch/arm/boot/dts/imx6sl.dtsi  | 1 +
-> >  arch/arm/boot/dts/imx6sx.dtsi  | 1 +
-> >  9 files changed, 18 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> > index 4b063b6..6951b66 100644
-> > --- a/arch/arm/boot/dts/imx27.dtsi
-> > +++ b/arch/arm/boot/dts/imx27.dtsi
-> > @@ -488,6 +488,7 @@
-> >  				interrupts = <54>;
-> >  				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
-> >  				fsl,usbmisc = <&usbmisc 1>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > @@ -497,6 +498,7 @@
-> >  				interrupts = <55>;
-> >  				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
-> >  				fsl,usbmisc = <&usbmisc 2>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> > index 47f68ac..02330f4 100644
-> > --- a/arch/arm/boot/dts/imx28.dtsi
-> > +++ b/arch/arm/boot/dts/imx28.dtsi
-> > @@ -1197,6 +1197,7 @@
-> >  			interrupts = <92>;
-> >  			clocks = <&clks 61>;
-> >  			fsl,usbphy = <&usbphy1>;
-> > +			dr_mode = "host";
-> >  			status = "disabled";
-> >  		};
-> >  
-> > diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
-> > index 6932928..b6478e9 100644
-> > --- a/arch/arm/boot/dts/imx35.dtsi
-> > +++ b/arch/arm/boot/dts/imx35.dtsi
-> > @@ -318,6 +318,7 @@
-> >  				clocks = <&clks 73>;
-> >  				fsl,usbmisc = <&usbmisc 1>;
-> >  				fsl,usbphy = <&usbphy1>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
-> > index 620b0f0..e245713 100644
-> > --- a/arch/arm/boot/dts/imx50.dtsi
-> > +++ b/arch/arm/boot/dts/imx50.dtsi
-> > @@ -197,6 +197,7 @@
-> >  				reg = <0x53f80200 0x0200>;
-> >  				interrupts = <14>;
-> >  				clocks = <&clks IMX5_CLK_USB_PHY2_GATE>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > @@ -205,6 +206,7 @@
-> >  				reg = <0x53f80400 0x0200>;
-> >  				interrupts = <16>;
-> >  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > @@ -213,6 +215,7 @@
-> >  				reg = <0x53f80600 0x0200>;
-> >  				interrupts = <17>;
-> >  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-> > index c0116cf..f46fe9b 100644
-> > --- a/arch/arm/boot/dts/imx51.dtsi
-> > +++ b/arch/arm/boot/dts/imx51.dtsi
-> > @@ -265,6 +265,7 @@
-> >  				interrupts = <14>;
-> >  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
-> >  				fsl,usbmisc = <&usbmisc 1>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > @@ -274,6 +275,7 @@
-> >  				interrupts = <16>;
-> >  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
-> >  				fsl,usbmisc = <&usbmisc 2>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > @@ -283,6 +285,7 @@
-> >  				interrupts = <17>;
-> >  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
-> >  				fsl,usbmisc = <&usbmisc 3>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> > index ff4fa7e..c3e3ca9 100644
-> > --- a/arch/arm/boot/dts/imx53.dtsi
-> > +++ b/arch/arm/boot/dts/imx53.dtsi
-> > @@ -309,6 +309,7 @@
-> >  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
-> >  				fsl,usbmisc = <&usbmisc 1>;
-> >  				fsl,usbphy = <&usbphy1>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > @@ -318,6 +319,7 @@
-> >  				interrupts = <16>;
-> >  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
-> >  				fsl,usbmisc = <&usbmisc 2>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > @@ -327,6 +329,7 @@
-> >  				interrupts = <17>;
-> >  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
-> >  				fsl,usbmisc = <&usbmisc 3>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> > index d6c69ec..9347c93 100644
-> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> > @@ -845,6 +845,7 @@
-> >  				clocks = <&clks IMX6QDL_CLK_USBOH3>;
-> >  				fsl,usbphy = <&usbphy2>;
-> >  				fsl,usbmisc = <&usbmisc 1>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > @@ -854,6 +855,7 @@
-> >  				interrupts = <0 41 IRQ_TYPE_LEVEL_HIGH>;
-> >  				clocks = <&clks IMX6QDL_CLK_USBOH3>;
-> >  				fsl,usbmisc = <&usbmisc 2>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > @@ -863,6 +865,7 @@
-> >  				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
-> >  				clocks = <&clks IMX6QDL_CLK_USBOH3>;
-> >  				fsl,usbmisc = <&usbmisc 3>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> > index 36ab8e0..9bf1db3 100644
-> > --- a/arch/arm/boot/dts/imx6sl.dtsi
-> > +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> > @@ -699,6 +699,7 @@
-> >  				interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>;
-> >  				clocks = <&clks IMX6SL_CLK_USBOH3>;
-> >  				fsl,usbmisc = <&usbmisc 2>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-> > index 7a24fee..fdadd060 100644
-> > --- a/arch/arm/boot/dts/imx6sx.dtsi
-> > +++ b/arch/arm/boot/dts/imx6sx.dtsi
-> > @@ -763,6 +763,7 @@
-> >  				fsl,usbmisc = <&usbmisc 2>;
-> >  				phy_type = "hsic";
-> >  				fsl,anatop = <&anatop>;
-> > +				dr_mode = "host";
-> >  				status = "disabled";
-> >  			};
-> >  
-> > -- 
-> > 1.8.4
-> > 
-
--- 
-
-Best Regards,
-Peter Chen
+I tried to set wdt_en(WDT_CR[bit 0]) to 0 in watchdog driver, but that 
+would cause system reboot.
+>
+> Heiko
+>
+>> ---
+>>
+>>   arch/arm/mach-rockchip/pm.c | 11 ++++++++---
+>>   arch/arm/mach-rockchip/pm.h |  2 ++
+>>   2 files changed, 10 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
+>> index a3ab397..b07d886 100644
+>> --- a/arch/arm/mach-rockchip/pm.c
+>> +++ b/arch/arm/mach-rockchip/pm.c
+>> @@ -75,9 +75,13 @@ static void rk3288_slp_mode_set(int level)
+>>   	regmap_read(pmu_regmap, RK3288_PMU_PWRMODE_CON,
+>>   		    &rk3288_pmu_pwr_mode_con);
+>>
+>> -	/* set bit 8 so that system will resume to FAST_BOOT_ADDR */
+>> +	/*
+>> +	 * SGRF_FAST_BOOT_EN - system to boot from FAST_BOOT_ADDR
+>> +	 * PCLK_WDT_GATE - disable WDT during suspend.
+>> +	 */
+>>   	regmap_write(sgrf_regmap, RK3288_SGRF_SOC_CON0,
+>> -		     SGRF_FAST_BOOT_EN | SGRF_FAST_BOOT_EN_WRITE);
+>> +		     SGRF_PCLK_WDT_GATE | SGRF_FAST_BOOT_EN
+>> +		     | SGRF_PCLK_WDT_GATE_WRITE | SGRF_FAST_BOOT_EN_WRITE);
+>>
+>>   	/* booting address of resuming system is from this register value */
+>>   	regmap_write(sgrf_regmap, RK3288_SGRF_FAST_BOOT_ADDR,
+>> @@ -122,7 +126,8 @@ static void rk3288_slp_mode_set_resume(void)
+>>   		     rk3288_pmu_pwr_mode_con);
+>>
+>>   	regmap_write(sgrf_regmap, RK3288_SGRF_SOC_CON0,
+>> -		     rk3288_sgrf_soc_con0 | SGRF_FAST_BOOT_EN_WRITE);
+>> +		     rk3288_sgrf_soc_con0 | SGRF_PCLK_WDT_GATE_WRITE
+>> +		     | SGRF_FAST_BOOT_EN_WRITE);
+>>   }
+>>
+>>   static int rockchip_lpmode_enter(unsigned long arg)
+>> diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
+>> index 96beaa0..d463978 100644
+>> --- a/arch/arm/mach-rockchip/pm.h
+>> +++ b/arch/arm/mach-rockchip/pm.h
+>> @@ -44,6 +44,8 @@ void __init rockchip_suspend_init(void);
+>>
+>>   #define RK3288_SGRF_SOC_CON0		(0x0000)
+>>   #define RK3288_SGRF_FAST_BOOT_ADDR	(0x0120)
+>> +#define SGRF_PCLK_WDT_GATE		BIT(6)
+>> +#define SGRF_PCLK_WDT_GATE_WRITE	BIT(22)
+>>   #define SGRF_FAST_BOOT_EN		BIT(8)
+>>   #define SGRF_FAST_BOOT_EN_WRITE		BIT(24)
+>
+>
+>
