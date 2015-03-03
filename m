@@ -1,242 +1,80 @@
 From: otavio@ossystems.com.br (Otavio Salvador)
-Date: Tue,  3 Mar 2015 00:41:45 -0300
-Subject: [PATCH v2] ARM: dts: warp: Add initial WaRP Board support
-Message-ID: <1425354105-8118-1-git-send-email-otavio@ossystems.com.br>
+Date: Tue, 3 Mar 2015 00:43:02 -0300
+Subject: [PATCH] ARM: dts: warp: Add initial WaRP Board support
+In-Reply-To: <20150303032937.GI20455@dragon>
+References: <1424883739-374-1-git-send-email-otavio@ossystems.com.br>
+ <20150303032937.GI20455@dragon>
+Message-ID: <CAP9ODKotqeJW6sYg=Z9Xgu4QHa07G+q1ZJddZsZ9EUUMsN6N7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The WaRP Board is a Wearable Reference Plaform. The board features:
+Hello Shawn,
 
- - Freescale i.MX6 SoloLite processor with 512MB of RAM
- - Freescale FXOS8700CQ 6-axis Xtrinsic sensor
- - Freescale Kinetis KL16 MCU
- - Freescale Xtrinsic MMA955xL intelligent motion sensing platform
+On Tue, Mar 3, 2015 at 12:29 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Wed, Feb 25, 2015 at 02:02:19PM -0300, Otavio Salvador wrote:
+>> The WaRP Board is a Wearable Reference Plaform. The board features:
+>>
+>>  - Freescale i.MX6 SoloLite processor with 512MB of RAM
+>>  - Freescale FXOS8700CQ 6-axis Xtrinsic sensor
+>>  - Freescale Kinetis KL16 MCU
+>>  - Freescale Xtrinsic MMA955xL intelligent motion sensing platform
+>>
+>> The board implements a hybrid architecture to address the evolving
+>> needs of the wearables market. The platform consists of a main board
+>> and an example daughtercard with the ability to add additional
+>> daughtercards for different usage models.
+>>
+>> For more information about the project, visit:
+>>
+>>  http://www.warpboard.org/
+>>
+>> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+>
+> Pretty neat!  Only one comment about dts license below.
+>
+>> ---
+>>  arch/arm/boot/dts/Makefile        |   3 +-
+>>  arch/arm/boot/dts/imx6sl-warp.dts | 154 ++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 156 insertions(+), 1 deletion(-)
+>>  create mode 100644 arch/arm/boot/dts/imx6sl-warp.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index a1c776b..1b49d57 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -299,7 +299,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+>>       imx6q-wandboard.dtb \
+>>       imx6q-wandboard-revb1.dtb
+>>  dtb-$(CONFIG_SOC_IMX6SL) += \
+>> -     imx6sl-evk.dtb
+>> +     imx6sl-evk.dtb \
+>> +     imx6sl-warp.dtb
+>>  dtb-$(CONFIG_SOC_IMX6SX) += \
+>>       imx6sx-sabreauto.dtb \
+>>       imx6sx-sdb.dtb
+>> diff --git a/arch/arm/boot/dts/imx6sl-warp.dts b/arch/arm/boot/dts/imx6sl-warp.dts
+>> new file mode 100644
+>> index 0000000..dadb92f
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/imx6sl-warp.dts
+>> @@ -0,0 +1,154 @@
+>> +/*
+>> + * Copyright 2014, 2015 O.S. Systems Software LTDA.
+>> + *
+>> + * The code contained herein is licensed under the GNU General Public
+>> + * License. You may obtain a copy of the GNU General Public License
+>> + * Version 2 or later at the following locations:
+>> + *
+>> + * http://www.opensource.org/licenses/gpl-license.html
+>> + * http://www.gnu.org/copyleft/gpl.html
+>> + */
+>
+> It's preferred to use GPL/X11 dual license for new dts files.  See
+> arch/arm/boot/dts/imx6q-tbs2910.dts for example.
 
-The board implements a hybrid architecture to address the evolving
-needs of the wearables market. The platform consists of a main board
-and an example daughtercard with the ability to add additional
-daughtercards for different usage models.
+I sent a v2 changing it. Thanks for the remark :)
 
-For more information about the project, visit:
-
- http://www.warpboard.org/
-
-Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
----
- arch/arm/boot/dts/Makefile        |   3 +-
- arch/arm/boot/dts/imx6sl-warp.dts | 190 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 192 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/imx6sl-warp.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a1c776b..1b49d57 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -299,7 +299,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-wandboard.dtb \
- 	imx6q-wandboard-revb1.dtb
- dtb-$(CONFIG_SOC_IMX6SL) += \
--	imx6sl-evk.dtb
-+	imx6sl-evk.dtb \
-+	imx6sl-warp.dtb
- dtb-$(CONFIG_SOC_IMX6SX) += \
- 	imx6sx-sabreauto.dtb \
- 	imx6sx-sdb.dtb
-diff --git a/arch/arm/boot/dts/imx6sl-warp.dts b/arch/arm/boot/dts/imx6sl-warp.dts
-new file mode 100644
-index 0000000..904efc4
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6sl-warp.dts
-@@ -0,0 +1,190 @@
-+/*
-+ * Copyright 2014, 2015 O.S. Systems Software LTDA.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of
-+ *     the License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this file; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6sl.dtsi"
-+
-+/ {
-+	model = "WaRP Board";
-+	compatible = "warp,imx6sl-warp", "fsl,imx6sl";
-+
-+	memory {
-+		reg = <0x80000000 0x20000000>;
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_usb_otg1_vbus: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			regulator-name = "usb_otg1_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio4 0 0>;
-+			enable-active-high;
-+		};
-+
-+		reg_usb_otg2_vbus: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "usb_otg2_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio4 2 0>;
-+			enable-active-high;
-+		};
-+
-+		reg_1p8v: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "1P8V";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+		};
-+	};
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3>;
-+	status = "okay";
-+};
-+
-+&usbotg1 {
-+	vbus-supply = <&reg_usb_otg1_vbus>;
-+	dr_mode = "host";
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usbotg2 {
-+	vbus-supply = <&reg_usb_otg2_vbus>;
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-+	pinctrl-0 = <&pinctrl_usdhc2>;
-+	pinctrl-1 = <&pinctrl_usdhc2_100mhz>;
-+	pinctrl-2 = <&pinctrl_usdhc2_200mhz>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	imx6sl-warp {
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				MX6SL_PAD_UART1_RXD__UART1_RX_DATA	0x41b0b1
-+				MX6SL_PAD_UART1_TXD__UART1_TX_DATA	0x41b0b1
-+			>;
-+		};
-+
-+		pinctrl_uart3: uart3grp {
-+			fsl,pins = <
-+				MX6SL_PAD_AUD_RXC__UART3_RX_DATA	0x41b0b1
-+				MX6SL_PAD_AUD_RXC__UART3_TX_DATA	0x41b0b1
-+			>;
-+		};
-+
-+		pinctrl_usdhc2: usdhc2grp {
-+			fsl,pins = <
-+				MX6SL_PAD_SD2_CMD__SD2_CMD		0x417059
-+				MX6SL_PAD_SD2_CLK__SD2_CLK		0x410059
-+				MX6SL_PAD_SD2_DAT0__SD2_DATA0		0x417059
-+				MX6SL_PAD_SD2_DAT1__SD2_DATA1		0x417059
-+				MX6SL_PAD_SD2_DAT2__SD2_DATA2		0x417059
-+				MX6SL_PAD_SD2_DAT3__SD2_DATA3		0x417059
-+				MX6SL_PAD_SD2_DAT4__SD2_DATA4		0x417059
-+				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x417059
-+				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x417059
-+				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x417059
-+			>;
-+		};
-+
-+		pinctrl_usdhc2_100mhz: usdhc2grp100mhz {
-+			fsl,pins = <
-+				MX6SL_PAD_SD2_CMD__SD2_CMD		0x4170b9
-+				MX6SL_PAD_SD2_CLK__SD2_CLK		0x4100b9
-+				MX6SL_PAD_SD2_DAT0__SD2_DATA0		0x4170b9
-+				MX6SL_PAD_SD2_DAT1__SD2_DATA1		0x4170b9
-+				MX6SL_PAD_SD2_DAT2__SD2_DATA2		0x4170b9
-+				MX6SL_PAD_SD2_DAT3__SD2_DATA3		0x4170b9
-+				MX6SL_PAD_SD2_DAT4__SD2_DATA4		0x4170b9
-+				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x4170b9
-+				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x4170b9
-+				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x4170b9
-+			>;
-+		};
-+
-+		pinctrl_usdhc2_200mhz: usdhc2grp200mhz {
-+			fsl,pins = <
-+				MX6SL_PAD_SD2_CMD__SD2_CMD		0x4170f9
-+				MX6SL_PAD_SD2_CLK__SD2_CLK		0x4100f9
-+				MX6SL_PAD_SD2_DAT0__SD2_DATA0		0x4170f9
-+				MX6SL_PAD_SD2_DAT1__SD2_DATA1		0x4170f9
-+				MX6SL_PAD_SD2_DAT2__SD2_DATA2		0x4170f9
-+				MX6SL_PAD_SD2_DAT3__SD2_DATA3		0x4170f9
-+				MX6SL_PAD_SD2_DAT4__SD2_DATA4		0x4170f9
-+				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x4170f9
-+				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x4170f9
-+				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x4170f9
-+			>;
-+		};
-+	};
-+};
 -- 
-2.1.4
+Otavio Salvador                             O.S. Systems
+http://www.ossystems.com.br        http://code.ossystems.com.br
+Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
