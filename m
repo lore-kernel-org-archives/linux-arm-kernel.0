@@ -1,40 +1,61 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 3 Mar 2015 10:59:24 +0100
-Subject: [PATCH v2 3/3] ARM: mvebu: armada-385-ap: Enable USB3 port
-In-Reply-To: <54F4B8B9.4010204@free-electrons.com>
-References: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
- <1421672474-2945-4-git-send-email-maxime.ripard@free-electrons.com>
- <54F4B8B9.4010204@free-electrons.com>
-Message-ID: <20150303095924.GF4911@lukather>
+From: david.lanzendoerfer@o2s.ch (David =?ISO-8859-1?Q?Lanzend=F6rfer?=)
+Date: Tue, 03 Mar 2015 11:06:24 +0100
+Subject: [PATCH] mmc: sunxi: Use devm_reset_control_get_optional() for
+ reset control
+In-Reply-To: <1425347080-1789-1-git-send-email-wens@csie.org>
+References: <1425347080-1789-1-git-send-email-wens@csie.org>
+Message-ID: <1772084.aQtZdtMheX@dizzy-6.o2s.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 08:23:37PM +0100, Gregory CLEMENT wrote:
-> Hi Maxime,
+Acked-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+
+> The reset control for the sunxi mmc controller is optional. Some
+> newer platforms (sun6i, sun8i, sun9i) have it, while older ones
+> (sun4i, sun5i, sun7i) don't.
 > 
-> On 19/01/2015 14:01, Maxime Ripard wrote:
-> > The Armada 385 AP board has a USB3 port exposed that uses a GPIO to drive the
-> > VBUS line. Enable the needed drivers to support this.
-> > 
+> Use the properly stubbed _optional version so the driver does not
+> fail to compile when RESET_CONTROLLER=n.
 > 
-> it seems that this patch was not applied yet. Patch 1 is now in
-> linux-next and should be part of 4.0-rc. But what about patch 2?
-
-IIRC, Greg or Matthias said that Matthias would look into these
-patches after the merge window.
-
-It still didn't happen though.
-
-Maxime
+> This patch also adds a check for deferred probing on the reset
+> control.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Cc: <stable@vger.kernel.org> # 3.16+
+> ---
+> 
+> Arnd had some proposals about the reset control API.
+> Not sure if the sunxi-mmc driver was on that list.
+> 
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index e8a4218b5726..459ed1b601db 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -930,7 +930,9 @@ static int sunxi_mmc_resource_request(struct
+> sunxi_mmc_host *host, return PTR_ERR(host->clk_sample);
+>  	}
+> 
+> -	host->reset = devm_reset_control_get(&pdev->dev, "ahb");
+> +	host->reset = devm_reset_control_get_optional(&pdev->dev, "ahb");
+> +	if (PTR_ERR(host->reset) == -EPROBE_DEFER)
+> +		return PTR_ERR(host->reset);
+> 
+>  	ret = clk_prepare_enable(host->clk_ahb);
+>  	if (ret) {
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+David Lanzend?rfer
+OpenSourceSupport GmbH
+System engineer and supporter
+http://www.o2s.ch/
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150303/662951ce/attachment.sig>
+Size: 181 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150303/fb3f9b06/attachment.sig>
