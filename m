@@ -1,64 +1,219 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Tue, 3 Mar 2015 03:25:10 +0000
-Subject: [PATCH] ARM: at91: pm: fix SRAM allocation
-In-Reply-To: <20150302105736.GL4094@piout.net>
-References: <1425292978-28135-1-git-send-email-alexandre.belloni@free-electrons.com>
- <7E7AE962-1BBE-4B33-9563-B91351494005@jcrosoft.com>
- <20150302105736.GL4094@piout.net>
-Message-ID: <B256D81BAE5131468A838E5D7A243641BFD77A1C@penmbx01>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 3 Mar 2015 11:29:39 +0800
+Subject: [PATCH] ARM: dts: warp: Add initial WaRP Board support
+In-Reply-To: <1424883739-374-1-git-send-email-otavio@ossystems.com.br>
+References: <1424883739-374-1-git-send-email-otavio@ossystems.com.br>
+Message-ID: <20150303032937.GI20455@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
-
-> -----Original Message-----
-> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
-> Sent: 2015?3?2? 18:58
-> To: Jean-Christophe PLAGNIOL-VILLARD
-> Cc: Ferre, Nicolas; Yang, Wenyou; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org
-> Subject: Re: [PATCH] ARM: at91: pm: fix SRAM allocation
+On Wed, Feb 25, 2015 at 02:02:19PM -0300, Otavio Salvador wrote:
+> The WaRP Board is a Wearable Reference Plaform. The board features:
 > 
-> On 02/03/2015 at 18:50:27 +0800, Jean-Christophe PLAGNIOL-VILLARD wrote :
-> >
-> > > On Mar 2, 2015, at 6:42 PM, Alexandre Belloni <alexandre.belloni@free-
-> electrons.com> wrote:
-> > >
-> > > On some platforms, there are multiple SRAM nodes defined in the
-> > > device tree but some of them are disabled, leading to allocation
-> > > failure. Try to find the first enabled SRAM node and allocate from it.
-> > >
-> > > Signed-off-by: Alexandre Belloni
-> > > <alexandre.belloni@free-electrons.com>
-> > > ---
-> > > arch/arm/mach-at91/pm.c | 20 +++++++++-----------
-> > > 1 file changed, 9 insertions(+), 11 deletions(-)
-> > >
-> > > diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c index
-> > > 5e34fb143309..97cc529b6fa0 100644
-> > > --- a/arch/arm/mach-at91/pm.c
-> > > +++ b/arch/arm/mach-at91/pm.c
-> > > @@ -272,35 +272,33 @@ static void __init at91_pm_sram_init(void)
-> > > 	struct device_node *node;
-> > > 	struct platform_device *pdev;
-> >
-> > pdev not initialised at NULL
+>  - Freescale i.MX6 SoloLite processor with 512MB of RAM
+>  - Freescale FXOS8700CQ 6-axis Xtrinsic sensor
+>  - Freescale Kinetis KL16 MCU
+>  - Freescale Xtrinsic MMA955xL intelligent motion sensing platform
 > 
-> Indeed, I'll fix that. It doesn't really matter for now as all the
-> at91 DT have at least one sram node.
+> The board implements a hybrid architecture to address the evolving
+> needs of the wearables market. The platform consists of a main board
+> and an example daughtercard with the ability to add additional
+> daughtercards for different usage models.
 > 
-> Wenyou, can you test it? If it works, I'll send v2.
-It works. Thanks.
-
-Tested it on the AT91SAM9G20EK, AT91SAM9G35EK and SAMA5D36EK board.
-
-Tested-by: Wenyou Yang <wenyou.yang@atmel.com>
-
+> For more information about the project, visit:
 > 
-> --
-> Alexandre Belloni, Free Electrons
-> Embedded Linux, Kernel and Android engineering http://free-electrons.com
+>  http://www.warpboard.org/
+> 
+> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
 
+Pretty neat!  Only one comment about dts license below.
 
-Best Regards,
-Wenyou Yang
+> ---
+>  arch/arm/boot/dts/Makefile        |   3 +-
+>  arch/arm/boot/dts/imx6sl-warp.dts | 154 ++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 156 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/imx6sl-warp.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index a1c776b..1b49d57 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -299,7 +299,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+>  	imx6q-wandboard.dtb \
+>  	imx6q-wandboard-revb1.dtb
+>  dtb-$(CONFIG_SOC_IMX6SL) += \
+> -	imx6sl-evk.dtb
+> +	imx6sl-evk.dtb \
+> +	imx6sl-warp.dtb
+>  dtb-$(CONFIG_SOC_IMX6SX) += \
+>  	imx6sx-sabreauto.dtb \
+>  	imx6sx-sdb.dtb
+> diff --git a/arch/arm/boot/dts/imx6sl-warp.dts b/arch/arm/boot/dts/imx6sl-warp.dts
+> new file mode 100644
+> index 0000000..dadb92f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6sl-warp.dts
+> @@ -0,0 +1,154 @@
+> +/*
+> + * Copyright 2014, 2015 O.S. Systems Software LTDA.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+
+It's preferred to use GPL/X11 dual license for new dts files.  See
+arch/arm/boot/dts/imx6q-tbs2910.dts for example.
+
+Shawn
+
+> +
+> +/dts-v1/;
+> +
+> +#include "imx6sl.dtsi"
+> +
+> +/ {
+> +	model = "WaRP Board";
+> +	compatible = "warp,imx6sl-warp", "fsl,imx6sl";
+> +
+> +	memory {
+> +		reg = <0x80000000 0x20000000>;
+> +	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		reg_usb_otg1_vbus: regulator at 0 {
+> +			compatible = "regulator-fixed";
+> +			reg = <0>;
+> +			regulator-name = "usb_otg1_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio4 0 0>;
+> +			enable-active-high;
+> +		};
+> +
+> +		reg_usb_otg2_vbus: regulator at 1 {
+> +			compatible = "regulator-fixed";
+> +			reg = <1>;
+> +			regulator-name = "usb_otg2_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio4 2 0>;
+> +			enable-active-high;
+> +		};
+> +
+> +		reg_1p8v: regulator at 2 {
+> +			compatible = "regulator-fixed";
+> +			reg = <2>;
+> +			regulator-name = "1P8V";
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <1800000>;
+> +		};
+> +	};
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1>;
+> +	status = "okay";
+> +};
+> +
+> +&uart3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart3>;
+> +	status = "okay";
+> +};
+> +
+> +&usbotg1 {
+> +	vbus-supply = <&reg_usb_otg1_vbus>;
+> +	dr_mode = "host";
+> +	disable-over-current;
+> +	status = "okay";
+> +};
+> +
+> +&usbotg2 {
+> +	vbus-supply = <&reg_usb_otg2_vbus>;
+> +	disable-over-current;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc2 {
+> +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+> +	pinctrl-0 = <&pinctrl_usdhc2>;
+> +	pinctrl-1 = <&pinctrl_usdhc2_100mhz>;
+> +	pinctrl-2 = <&pinctrl_usdhc2_200mhz>;
+> +	non-removable;
+> +	status = "okay";
+> +};
+> +
+> +&iomuxc {
+> +	imx6sl-warp {
+> +		pinctrl_uart1: uart1grp {
+> +			fsl,pins = <
+> +				MX6SL_PAD_UART1_RXD__UART1_RX_DATA	0x41b0b1
+> +				MX6SL_PAD_UART1_TXD__UART1_TX_DATA	0x41b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart3: uart3grp {
+> +			fsl,pins = <
+> +				MX6SL_PAD_AUD_RXC__UART3_RX_DATA	0x41b0b1
+> +				MX6SL_PAD_AUD_RXC__UART3_TX_DATA	0x41b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_usdhc2: usdhc2grp {
+> +			fsl,pins = <
+> +				MX6SL_PAD_SD2_CMD__SD2_CMD		0x417059
+> +				MX6SL_PAD_SD2_CLK__SD2_CLK		0x410059
+> +				MX6SL_PAD_SD2_DAT0__SD2_DATA0		0x417059
+> +				MX6SL_PAD_SD2_DAT1__SD2_DATA1		0x417059
+> +				MX6SL_PAD_SD2_DAT2__SD2_DATA2		0x417059
+> +				MX6SL_PAD_SD2_DAT3__SD2_DATA3		0x417059
+> +				MX6SL_PAD_SD2_DAT4__SD2_DATA4		0x417059
+> +				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x417059
+> +				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x417059
+> +				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x417059
+> +			>;
+> +		};
+> +
+> +		pinctrl_usdhc2_100mhz: usdhc2grp100mhz {
+> +			fsl,pins = <
+> +				MX6SL_PAD_SD2_CMD__SD2_CMD		0x4170b9
+> +				MX6SL_PAD_SD2_CLK__SD2_CLK		0x4100b9
+> +				MX6SL_PAD_SD2_DAT0__SD2_DATA0		0x4170b9
+> +				MX6SL_PAD_SD2_DAT1__SD2_DATA1		0x4170b9
+> +				MX6SL_PAD_SD2_DAT2__SD2_DATA2		0x4170b9
+> +				MX6SL_PAD_SD2_DAT3__SD2_DATA3		0x4170b9
+> +				MX6SL_PAD_SD2_DAT4__SD2_DATA4		0x4170b9
+> +				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x4170b9
+> +				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x4170b9
+> +				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x4170b9
+> +			>;
+> +		};
+> +
+> +		pinctrl_usdhc2_200mhz: usdhc2grp200mhz {
+> +			fsl,pins = <
+> +				MX6SL_PAD_SD2_CMD__SD2_CMD		0x4170f9
+> +				MX6SL_PAD_SD2_CLK__SD2_CLK		0x4100f9
+> +				MX6SL_PAD_SD2_DAT0__SD2_DATA0		0x4170f9
+> +				MX6SL_PAD_SD2_DAT1__SD2_DATA1		0x4170f9
+> +				MX6SL_PAD_SD2_DAT2__SD2_DATA2		0x4170f9
+> +				MX6SL_PAD_SD2_DAT3__SD2_DATA3		0x4170f9
+> +				MX6SL_PAD_SD2_DAT4__SD2_DATA4		0x4170f9
+> +				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x4170f9
+> +				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x4170f9
+> +				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x4170f9
+> +			>;
+> +		};
+> +	};
+> +};
+> -- 
+> 2.1.4
+> 
