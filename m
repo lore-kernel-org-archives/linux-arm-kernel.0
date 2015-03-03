@@ -1,47 +1,38 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 3 Mar 2015 20:05:56 +0100
-Subject: [PATCH] ARM: at91: pm: fix at91rm9200 standby
-In-Reply-To: <1425409102-29337-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1425409102-29337-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54F60614.8070307@atmel.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Tue,  3 Mar 2015 11:39:38 -0800
+Subject: [PATCH v2 0/3] drivers: net: xgene: Fix backward compatibility of
+ newer firmware with older kernel
+Message-ID: <1425411581-25463-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/03/2015 19:58, Alexandre Belloni a ?crit :
-> at91rm9200 standby and suspend to ram has been broken since
-> 00482a4078f4. It is wrongly using AT91_BASE_SYS which is a physical address
-> and actually doesn't correspond to any register on at91rm9200.
-> 
-> Use the correct at91_ramc_base[0] instead.
-> 
-> Fixes: 00482a4078f4 (ARM: at91: implement the standby function for pm/cpuidle)
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Kernel 3.17 driver supports only RGMII ethernet interface.
+Since the Tianocore DT contains same compatibility string for RGMII,
+SGMII based 1G and XFI based 10G interfaces, crash happens when probe called
+on SGMII based 1G and XFI based 10G interface.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-and immediately added to at91-4.0-fixes.
+This patch fixes the backward compatibility of the older driver with the
+newer firmware by making the binding unique so that the older driver won't
+recognize the non-supported interfaces.
 
-Thanks. Bye,
+v2: Address comments from v1
+* updated cover letter subject line with net: xgene
+* Documentation: formatted compatible string values as list
 
-> ---
->  arch/arm/mach-at91/pm.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-> index d2c89963af2d..86c0aa819d25 100644
-> --- a/arch/arm/mach-at91/pm.h
-> +++ b/arch/arm/mach-at91/pm.h
-> @@ -44,7 +44,7 @@ static inline void at91rm9200_standby(void)
->  		"    mcr    p15, 0, %0, c7, c0, 4\n\t"
->  		"    str    %5, [%1, %2]"
->  		:
-> -		: "r" (0), "r" (AT91_BASE_SYS), "r" (AT91RM9200_SDRAMC_LPR),
-> +		: "r" (0), "r" (at91_ramc_base[0]), "r" (AT91RM9200_SDRAMC_LPR),
->  		  "r" (1), "r" (AT91RM9200_SDRAMC_SRR),
->  		  "r" (lpr));
->  }
-> 
+v1:
+* Initial version
+---
 
+Iyappan Subramanian (3):
+  Documentation: dts: Update compatible field description for APM X-Gene
+  dtb: change binding name to match with newer firmware DT
+  drivers: net: xgene: fix new firmware backward compatibility with
+    older driver
+
+ Documentation/devicetree/bindings/net/apm-xgene-enet.txt | 5 ++++-
+ arch/arm64/boot/dts/apm/apm-storm.dtsi                   | 4 ++--
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c         | 4 ++++
+ 3 files changed, 10 insertions(+), 3 deletions(-)
 
 -- 
-Nicolas Ferre
+1.9.1
