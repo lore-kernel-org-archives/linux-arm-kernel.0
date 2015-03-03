@@ -1,51 +1,55 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Tue, 3 Mar 2015 11:38:47 +0800
-Subject: [RFC PATCH v2 2/3] arm64: add IOMMU dma_ops
-In-Reply-To: <54E24D50.408@arm.com>
-References: <cover.1423226542.git.robin.murphy@arm.com>
- <058e038009ac708a40197c80e07410914c2a162e.1423226542.git.robin.murphy@arm.com>
- <1423543151.18280.2.camel@mtksdaap41> <54D9F486.10501@arm.com>
- <1423901011.27922.7.camel@mhfsdcap03> <54E24D50.408@arm.com>
-Message-ID: <1425353927.4555.10.camel@mhfsdcap03>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 2 Mar 2015 21:40:48 -0600
+Subject: [PATCH v4 28/30] PCI: Export find_pci_host_bridge()
+In-Reply-To: <1424938344-4017-29-git-send-email-wangyijing@huawei.com>
+References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
+ <1424938344-4017-29-git-send-email-wangyijing@huawei.com>
+Message-ID: <20150303034048.GM11978@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-02-16 at 20:04 +0000, Robin Murphy wrote:
-
-> >       2)int (*domain_init)(struct iommu_domain *domain);
-> >         About this function, it will alloc pagetable for the iommu
-> > domain. And We expect the pagetable memory is uncacheable, so try to
-> > call "dma_alloc_coherent", unfortunately the "struct device *" can't be
-> > passed into this function. so is it possible if adding a parameter in
-> > this function.
+On Thu, Feb 26, 2015 at 04:12:22PM +0800, Yijing Wang wrote:
+> Export find_pci_host_bridge().
 > 
-> ...one of the ideas of the new of_iommu_configure framework is that 
-> iommu_ops structures can represent individual IOMMU devices if 
-> necessary. The ops->priv pointer was included for that purpose, but 
-> isn't very clean so Will has plans to remove it again - it's easy enough 
-> to achieve the same effect by having the driver embed the ops in its 
-> private instance data instead. I've done that with the ARM SMMU driver 
-> which has a similar issue of needing hardware details at domain_init() 
-> time (no patches ready yet but I have an iommu/dev branch on top of the 
-> iommu/dma branch with some current work-in-progress bits)
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> ---
+>  drivers/pci/host-bridge.c |    2 +-
+>  include/linux/pci.h       |    1 +
+>  2 files changed, 2 insertions(+), 1 deletions(-)
 > 
-> Thanks,
-> Robin.
+> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+> index 4a2baa2..51e24f8 100644
+> --- a/drivers/pci/host-bridge.c
+> +++ b/drivers/pci/host-bridge.c
+> @@ -104,7 +104,7 @@ static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
+>  	return bus;
+>  }
+>  
+> -static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+> +struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+
+Please name this "pci_find_host_bridge()" or similar so it looks like other
+PCI functions.
+
+>  {
+>  	struct pci_bus *root_bus = find_pci_root_bus(bus);
+>  
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index 2f29e95..6ac7926 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -426,6 +426,7 @@ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+>  struct pci_host_bridge *pci_create_host_bridge(
+>  		struct device *parent, u32 dombus, struct list_head *resources, 
+>  		void *sysdata, struct pci_host_bridge_ops *ops);
+> +struct pci_host_bridge *find_pci_host_bridge(struct pci_bus* bus);
+
+I'm not sure this needs to be in include/linux/pci.h.  Wouldn't
+drivers/pci/pci.h be enough?
+
+>  /*
+>   * The first PCI_BRIDGE_RESOURCE_NUM PCI bus resources (those that correspond
+>   * to P2P or CardBus bridge windows) go in a table.  Additional ones (for
+> -- 
+> 1.7.1
 > 
-Dear Robin,
-        Thanks very much for your suggestion.
-
-        I have a more question: how to do cache maintenance in arm64.
-
-        a) "__dma_flush_range" can not be expected to used directly.
-        b) Following Documentation\DMA-API.txt, section: Streaming DMA
-mappings. dma_map_single should be used, But I am not sure how to pass
-the first "struct device *".
-         We have a device which call arch_setup_dma_ops to create the
-iommu domain, if we use this device, it will enter __iommu_map_page;
-        If we input NULL for dmap_map_single, it will assert at
-dma_capable in swiotlb_map_page...
-
-        And normally, we always need do cache maintenance only for some
-bytes in the pagetable but not whole a page. Then is there a easy way to
-do the cache maintenance?
