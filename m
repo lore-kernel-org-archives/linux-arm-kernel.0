@@ -1,40 +1,81 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 3 Mar 2015 13:23:09 +0100
-Subject: [PATCH 0/3] Enable ahci_st for stih407 and fix hang
-In-Reply-To: <1425300519-13747-1-git-send-email-peter.griffin@linaro.org>
-References: <1425300519-13747-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <54F5A7AD.9000906@st.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue,  3 Mar 2015 13:27:47 +0100
+Subject: [PATCH] arm64: remove __switch_data object from head.S
+Message-ID: <1425385667-16082-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+This removes the confusing __switch_data object from head.S,
+and replaces it with standard PC-relative references to the
+various symbols it encapsulates.
 
-On 03/02/2015 01:48 PM, Peter Griffin wrote:
-> Hi,
->
-> Now that miphy28lp phy is present upstream we can add sata DT nodes for
-> stih407 family silicon. As part of testing this I found a hang
-> with the current driver implmentation which does some register writes
-> before enabling the IP clock. Presumably on stih416 devices the sata
-> clock must have already been enabled by the targetpack/bootloader.
->
-> This series also tidys up some inaccuracies in the DT documentation
-> where the doc hasn't kept aligned with the driver. In addtion to these
-> fixes I've also added an example for stih407 silicon.
->
-> Peter Griffin (3):
->    ahci: st: Update the ahci_st DT documentation
->    ARM: DT: STi: STiH407: Add sata DT nodes.
->    ahci: st: st_configure_oob must be called after IP is clocked.
->
->   Documentation/devicetree/bindings/ata/ahci-st.txt | 45 ++++++++++++++++-------
->   arch/arm/boot/dts/stih407-family.dtsi             | 44 ++++++++++++++++++++++
->   drivers/ata/ahci_st.c                             |  6 ++-
->   3 files changed, 80 insertions(+), 15 deletions(-)
->
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/head.S | 35 +++++++++++++----------------------
+ 1 file changed, 13 insertions(+), 22 deletions(-)
 
-For the series, you can add my:
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
-
-Thanks,
-Maxime
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 66675d27fea3..2afaf6b8e4e8 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -263,7 +263,7 @@ ENTRY(stext)
+ 	 * On return, the CPU will be ready for the MMU to be turned on and
+ 	 * the TCR will have been set.
+ 	 */
+-	ldr	x27, __switch_data		// address to jump to after
++	ldr	x27, =__mmap_switched		// address to jump to after
+ 						// MMU has been enabled
+ 	adrp	lr, __enable_mmu		// return (PIC) address
+ 	add	lr, lr, #:lo12:__enable_mmu
+@@ -397,37 +397,28 @@ __create_page_tables:
+ ENDPROC(__create_page_tables)
+ 	.ltorg
+ 
+-	.align	3
+-	.type	__switch_data, %object
+-__switch_data:
+-	.quad	__mmap_switched
+-	.quad	__bss_start			// x6
+-	.quad	__bss_stop			// x7
+-	.quad	processor_id			// x4
+-	.quad	__fdt_pointer			// x5
+-	.quad	memstart_addr			// x6
+-	.quad	init_thread_union + THREAD_START_SP // sp
+-
+ /*
+- * The following fragment of code is executed with the MMU on in MMU mode, and
+- * uses absolute addresses; this is not position independent.
++ * The following fragment of code is executed with the MMU enabled.
+  */
+ __mmap_switched:
+-	adr	x3, __switch_data + 8
++	adrp	x6, __bss_start
++	adrp	x7, __bss_stop
++	add	x6, x6, :lo12:__bss_start
++	add	x7, x7, :lo12:__bss_stop
+ 
+-	ldp	x6, x7, [x3], #16
+ 1:	cmp	x6, x7
+ 	b.hs	2f
+ 	str	xzr, [x6], #8			// Clear BSS
+ 	b	1b
+ 2:
+-	ldp	x4, x5, [x3], #16
+-	ldr	x6, [x3], #8
+-	ldr	x16, [x3]
++	ldr	x16, =(init_thread_union + THREAD_START_SP)
+ 	mov	sp, x16
+-	str	x22, [x4]			// Save processor ID
+-	str	x21, [x5]			// Save FDT pointer
+-	str	x24, [x6]			// Save PHYS_OFFSET
++	adrp	x4, processor_id
++	adrp	x5, __fdt_pointer
++	adrp	x6, memstart_addr
++	str	x22, [x4, :lo12:processor_id]	// Save processor ID
++	str	x21, [x5, :lo12:__fdt_pointer]	// Save FDT pointer
++	str	x24, [x6, :lo12:memstart_addr]	// Save PHYS_OFFSET
+ 	mov	x29, #0
+ 	b	start_kernel
+ ENDPROC(__mmap_switched)
+-- 
+1.8.3.2
