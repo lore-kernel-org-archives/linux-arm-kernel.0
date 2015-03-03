@@ -1,100 +1,92 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 03 Mar 2015 10:09:21 +0100
-Subject: [PATCH] ARM: ARMADA XP: WRT1900AC: Add support for the Ethernet
- switch
-In-Reply-To: <1425154848-15441-1-git-send-email-andrew@lunn.ch>
-References: <1425154848-15441-1-git-send-email-andrew@lunn.ch>
-Message-ID: <54F57A41.1040102@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 03 Mar 2015 09:16:58 +0000
+Subject: [PATCH] ARM64: gic: Do not allow bypass FIQ signals to reach
+ to processor
+In-Reply-To: <54F52690.70702@redhat.com>
+References: <b449dac39614ed462c9a479e9de0aa5300d2c7cf.1423462126.git.panand@redhat.com>
+ <54DDB236.4040503@redhat.com> <54F52690.70702@redhat.com>
+Message-ID: <54F57C0A.6030906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-On 28/02/2015 21:20, Andrew Lunn wrote:
-> Add a DSA section to the DT blob representing the Ethernet switch.
+On 03/03/15 03:12, Pratyush Anand wrote:
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
-> This patch requires at runtime patches in net-next,
-> 4c732668f98b96a0fa2645ac220fd9bbc17838c4
+> On Friday 13 February 2015 01:43 PM, Pratyush Anand wrote:
+>> Hi Jason,
+>>
+>> On Monday 09 February 2015 11:48 AM, Pratyush Anand wrote:
+>>> In some case few signals of an IP(like PMU Overflow in APM88xx0x) can be
+>>> mapped to nLEGACYFIQ, ie nFIQ of CPU. Until ARM64 supports FIQ handling,
+>>> we will get nice "Bad mode in FIQ handler detected"
+>>>
+>>> Therefore force FIQBypDisGrp1 to '1', so that bypass FIQ signal is not
+>>> signaled to the processor.
+>>>
+>>
+>> Please review this patch.
+> 
+> ping
+> 
+>>
+>> ~Pratyush
+>>
+>>> Signed-off-by: Pratyush Anand <panand@redhat.com>
+>>> ---
+>>>   drivers/irqchip/irq-gic.c       | 9 ++++++++-
+>>>   include/linux/irqchip/arm-gic.h | 1 +
+>>>   2 files changed, 9 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>>> index d617ee5a3d8a..525dfc966e60 100644
+>>> --- a/drivers/irqchip/irq-gic.c
+>>> +++ b/drivers/irqchip/irq-gic.c
+>>> @@ -362,7 +362,14 @@ static void gic_cpu_if_up(void)
+>>>       */
+>>>       bypass = readl(cpu_base + GIC_CPU_CTRL);
+>>>       bypass &= GICC_DIS_BYPASS_MASK;
+>>> -
+>>> +#ifdef CONFIG_ARM64
+>>> +    /* FIXME: when ARM64 starts supporting FIQ mode.
+>>> +     *
+>>> +     * Until ARM64 supports FIQ handling, force FIQBypDisGrp1 to
+>>> +     * '1', so that bypass FIQ signal is not signaled to the processor.
+>>> +     */
+>>> +    bypass |= GICC_DIS_BYPASS_FIQ_TO_CPU;
+>>> +#endif
 
-This dts fragment looks sane. The dependencies is only at runtime so
-it is less annoying for bissectability. So I tend applying it, however
-what happens if patch 4c732668f98b96a0fa2645ac220fd9bbc17838c4 is not
-present. Does the kernel crash? Or does it only make the Ethernet
-switch not available?
+This doesn't feel like the right approach at all. We have a bypass mask
+already, for the same HW.
 
+But more importantly, FIQBypDisGrp0 is only available in secure mode,
+while the arm64 kernel only runs in non-secure. I understand that the
+APM HW doesn't have a secure mode, but the GIC definitely has.
+
+I suggest you move that change to your firmware, and make sure that the
+kernel is only presented the non-secure version of the CPU interface.
 
 Thanks,
 
-Gregory
+	M.
 
-
-> ---
->  arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 45 +++++++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-> index 485a6eb86910..a2cf2154dcdb 100644
-> --- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-> +++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-> @@ -327,6 +327,51 @@
->  		gpio-fan,speed-map = <0    0
->  				      4500 1>;
->  	};
-> +
-> +	dsa at 0 {
-> +		compatible = "marvell,dsa";
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		dsa,ethernet = <&eth0>;
-> +		dsa,mii-bus = <&mdio>;
-> +
-> +		switch at 0 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0x0 0>;	/* MDIO address 0, switch 0 in tree */
-> +
-> +			port at 0 {
-> +				reg = <0>;
-> +				label = "lan4";
-> +			};
-> +
-> +			port at 1 {
-> +				reg = <1>;
-> +				label = "lan3";
-> +			};
-> +
-> +			port at 2 {
-> +				reg = <2>;
-> +				label = "lan2";
-> +			};
-> +
-> +			port at 3 {
-> +				reg = <3>;
-> +				label = "lan1";
-> +			};
-> +
-> +			port at 4 {
-> +				reg = <4>;
-> +				label = "internet";
-> +			};
-> +
-> +			port at 5 {
-> +				reg = <5>;
-> +				label = "cpu";
-> +			};
-> +		};
-> +	};
->  };
->  
->  &pinctrl {
+>>>       writel_relaxed(bypass | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
+>>>   }
+>>>
+>>> diff --git a/include/linux/irqchip/arm-gic.h
+>>> b/include/linux/irqchip/arm-gic.h
+>>> index 71d706d5f169..c9fdd1972625 100644
+>>> --- a/include/linux/irqchip/arm-gic.h
+>>> +++ b/include/linux/irqchip/arm-gic.h
+>>> @@ -25,6 +25,7 @@
+>>>   #define GICC_INT_PRI_THRESHOLD        0xf0
+>>>   #define GICC_IAR_INT_ID_MASK        0x3ff
+>>>   #define GICC_INT_SPURIOUS        1023
+>>> +#define GICC_DIS_BYPASS_FIQ_TO_CPU    (1 << 5)
+>>>   #define GICC_DIS_BYPASS_MASK        0x1e0
+>>>
+>>>   #define GIC_DIST_CTRL            0x000
+>>>
 > 
 
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
