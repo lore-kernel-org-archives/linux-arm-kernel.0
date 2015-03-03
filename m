@@ -1,119 +1,96 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 03 Mar 2015 13:35:04 +0100
-Subject: [PATCH 9/9] ARM: EXYNOS: make exynos 4210 cpuidle build without
- SMP
-In-Reply-To: <2875270.gE4YDsjeJe@wuerfel>
-References: <1423769746-582629-1-git-send-email-arnd@arndb.de>
- <2875270.gE4YDsjeJe@wuerfel>
-Message-ID: <5040084.lEIUokD8Gn@amdc1032>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 3 Mar 2015 12:36:57 +0000
+Subject: Alignment issue with ldmia
+In-Reply-To: <54F52F4B.3060402@hisilicon.com>
+References: <54F52F4B.3060402@hisilicon.com>
+Message-ID: <20150303123638.GA5177@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Mar 03, 2015 at 11:49:31AM +0800, chenfeng wrote:
+> There is an alignment issue with ldmia in A32 user-space with A64
+> Kernel. Since the famous taobao apk use this instruction, so we want
 
-Hi,
+You're exactly right, there is an issue _in userspace_.
+If userspace code is triggering an alignment fault, userspace (or
+the compiler used for building userspace) must be buggy.
 
-Have you seen my patch from 4th February?
+Have you identified _why_ a misaligned LDM is happening?
 
-	https://lkml.org/lkml/2015/2/4/521
 
-I think that it is cleaner as it doesn't add new ifdefs,
-results in less code being compiled for UP and doesn't
-open-code cpu_boot_reg_base().  It has also been tested
-on Exynos4210 Origen board.
+arch/arm/ contains fixup code for emulating some unaligned accesses, 
+but it is only there for historical reasons.  No modern software
+should rely on it.
 
-PS Please cc: me and Daniel on Exynos cpuidle changes
-(MAINTAINERS file contains a relevant entry).
+Since compat on arm64 is not supposed to be a 100%-accurate emulation of
+arch/arm/, we should not pull in things like misalignment fixup code
+unless there is a really compelling reason...
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Cheers
+---Dave
 
-On Monday, March 02, 2015 10:29:42 PM Arnd Bergmann wrote:
-> arch/arm/mach-exynos/pm.c: In function 'exynos_cpu0_enter_aftr':
-> arch/arm/mach-exynos/pm.c:246:4: error: implicit declaration of function 'arch_send_wakeup_ipi_mask' [-Werror=implicit-function-declaration]
->     arch_send_wakeup_ipi_mask(cpumask_of(1));
+> to emulate this to make it work well.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-exynos/pm.c | 19 +++++++++++++++----
->  1 file changed, 15 insertions(+), 4 deletions(-)
+> I make a simple test case to reproduce this issue.
+> -----------------------------------------------------------------------
+> #include <stdio.h>
+> #include <stdlib.h>
 > 
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index e6209dadc00d..a91aefaee31d 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -187,6 +187,7 @@ static int exynos_cpu0_enter_aftr(void)
->  {
->  	int ret = -1;
->  
-> +#ifdef CONFIG_SMP
->  	/*
->  	 * If the other cpu is powered on, we have to power it off, because
->  	 * the AFTR state won't work otherwise
-> @@ -216,10 +217,12 @@ static int exynos_cpu0_enter_aftr(void)
->  			cpu_relax();
->  		}
->  	}
-> +#endif
->  
->  	exynos_enter_aftr();
->  	ret = 0;
->  
-> +#ifdef CONFIG_SMP
->  abort:
->  	if (cpu_online(1)) {
->  		/*
-> @@ -246,11 +249,12 @@ abort:
->  			arch_send_wakeup_ipi_mask(cpumask_of(1));
->  		}
->  	}
-> +#endif
->  
->  	return ret;
->  }
->  
-> -static int exynos_wfi_finisher(unsigned long flags)
-> +static int __maybe_unused exynos_wfi_finisher(unsigned long flags)
->  {
->  	cpu_do_idle();
->  
-> @@ -260,7 +264,7 @@ static int exynos_wfi_finisher(unsigned long flags)
->  static int exynos_cpu1_powerdown(void)
->  {
->  	int ret = -1;
-> -
-> +#ifdef CONFIG_SMP
->  	/*
->  	 * Idle sequence for cpu1
->  	 */
-> @@ -282,13 +286,20 @@ cpu1_aborted:
->  	 * Notify cpu 0 that cpu 1 is awake
->  	 */
->  	atomic_set(&cpu1_wakeup, 1);
-> -
-> +#endif
->  	return ret;
->  }
->  
->  static void exynos_pre_enter_aftr(void)
->  {
-> -	__raw_writel(virt_to_phys(exynos_cpu_resume), cpu_boot_reg_base());
-> +	void *reg_base;
-> +
-> +	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
-> +		reg_base = pmu_base_addr + S5P_INFORM5;
-> +	else
-> +		reg_base = sysram_base_addr;
-> +
-> +	__raw_writel(virt_to_phys(exynos_cpu_resume), reg_base);
->  }
->  
->  static void exynos_post_enter_aftr(void)
+> int main()
+> {
+>         char src_addr[1024];
+>         char dst_addr[1024];
+>         printf("--------%lx %lx\n",src_addr,dst_addr);
+>         unsigned long src_reg = (unsigned long)src_addr | 1;
+>         unsigned long dst_reg = (unsigned long)dst_addr | 1;
+>         printf("--------%lx %lx\n",src_reg,dst_reg);
+>         asm volatile("mov  r1, %0\n": : "r" (src_reg));
+>         asm volatile("mov  r2, %0\n": : "r" (dst_reg));
+>         asm volatile("ldmia r1!,{r2}");
+>         printf("--------------------------\n");
+
+This will trigger an alignment fault -- but this does not mean that
+userspace should expect this code sequence to work.
+
+
+Cheers
+---Dave
+
 > 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+>         return 0;
+> }
+> ------------------------------------------------------------------------
+> 
+> I use the test case on A32 kernel with A32 user-space. It works
+> well,becase of that is a do_alignment_ldmstm emulate in
+> arch/arm/mm/alignment.c
+> 
+> So, I want to porting the code to arch/arm64.
+> 
+> The first step is getting the machine code of the unalignment
+> instruction. However I have no idea how to do this.
+> 
+> There is a commit on google master L branch to emulate the undef
+> instruction. I use these code for getting the instruction of
+> unalignment
+> case. But I found the code in arch/arm/alignment.c get the
+> instruction is 0xe8b10004 and the code in arch/arm64/kernel/traps.c
+> is different.
+> 
+> 
+> Since I arm not professional for the code, I am writting for asking
+> is there a way to get the thumb instruction when traps in kernel
+> mode.
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
