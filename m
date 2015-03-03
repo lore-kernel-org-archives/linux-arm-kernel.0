@@ -1,32 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 3 Mar 2015 04:39:36 +0000 (UTC)
-Subject: [PATCH v2 1/3] ARM: OMAP2: hwmod: AM43XX: Add hwmod support for
- HDQ-1W
-In-Reply-To: <1425293374-30878-2-git-send-email-vigneshr@ti.com>
-References: <1425293374-30878-1-git-send-email-vigneshr@ti.com>
- <1425293374-30878-2-git-send-email-vigneshr@ti.com>
-Message-ID: <alpine.DEB.2.02.1503030439090.29683@utopia.booyaka.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Tue, 3 Mar 2015 13:09:05 +0800
+Subject: [PATCH 3/3] early kprobes: x86: don't try to recover ftraced
+ instruction before ftrace get ready.
+In-Reply-To: <1425359345-38714-1-git-send-email-wangnan0@huawei.com>
+References: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
+ <1425359345-38714-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1425359345-38714-4-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2 Mar 2015, Vignesh R wrote:
+Before ftrace convertin instruction to nop, if an early kprobe is
+registered then unregistered, without this patch its first bytes will
+be replaced by head of NOP, which may confuse ftrace.
 
-> From: "Poddar, Sourav" <sourav.poddar@ti.com>
-> 
-> These adds hwmod data for hdq/1w driver on AM43xx.
-> 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
-> Change log:
-> v2:
->  * Add SYSC_HAS_AUTOIDLE flag.
-> 
->  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 36 ++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/prcm43xx.h             |  1 +
->  2 files changed, 37 insertions(+)
-> 
+Actually, since we have a patch which convert ftrace entry to nop
+when probing, this problem should never be triggered. Provide it for
+safety.
 
-Thanks, queued for v4.1.
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+---
+ arch/x86/kernel/kprobes/core.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-
-- Paul
+diff --git a/arch/x86/kernel/kprobes/core.c b/arch/x86/kernel/kprobes/core.c
+index 87beb64..c7d304d 100644
+--- a/arch/x86/kernel/kprobes/core.c
++++ b/arch/x86/kernel/kprobes/core.c
+@@ -225,6 +225,9 @@ __recover_probed_insn(kprobe_opcode_t *buf, unsigned long addr)
+ 	struct kprobe *kp;
+ 	unsigned long faddr;
+ 
++	if (!kprobes_on_ftrace_initialized)
++		return addr;
++
+ 	kp = get_kprobe((void *)addr);
+ 	faddr = ftrace_location(addr);
+ 	/*
+-- 
+1.8.4
