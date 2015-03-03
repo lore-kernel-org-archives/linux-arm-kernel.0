@@ -1,53 +1,50 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 3 Mar 2015 08:13:42 +0100
-Subject: [PATCH] ARM: sun7i: dt: Add new MK808C device
-In-Reply-To: <1425131004-8551-1-git-send-email-codekipper@gmail.com>
-References: <1425131004-8551-1-git-send-email-codekipper@gmail.com>
-Message-ID: <20150303071342.GB4713@lukather>
+Date: Tue, 3 Mar 2015 08:16:35 +0100
+Subject: [PATCH] ARM: sun6i: dt: Add new Mele I7 device
+In-Reply-To: <1425131285-8640-1-git-send-email-codekipper@gmail.com>
+References: <1425131285-8640-1-git-send-email-codekipper@gmail.com>
+Message-ID: <20150303071635.GC4713@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sat, Feb 28, 2015 at 02:43:24PM +0100, codekipper at gmail.com wrote:
+On Sat, Feb 28, 2015 at 02:48:05PM +0100, codekipper at gmail.com wrote:
 > From: Marcus Cooper <codekipper@gmail.com>
 > 
-> The MK808C is an A20 based android stick, with 1G RAM, 8G NAND flash,
-> a RTL8723au wifi + bt combo chip, a USB host ports using USB-A receptacles,
-> a mini USB-B receptacle for USB OTG, mini HDMI and a TRS connector for AV.
+> The Mele I7 is a Allwinner A31 based Android TV box, with 1G RAM,
+> 8GB NAND flash, a RTL8188etv wifi chip, 3 USB Host ports using
+> USB-A receptacles, a micro USB-B receptacle for USB OTG, HDMI out,
+> a TRS connector for A/V, SPDIF and IrDA.
 > 
-> This patch adds basic support for the device, more information can be found
-> here (http://linux-sunxi.org/MK808C).
+> This patch adds basic support for the device, more information can
+> be found here (http://linux-sunxi.org/Mele_I7).
 > 
 > Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 > ---
->  arch/arm/boot/dts/Makefile             |   1 +
->  arch/arm/boot/dts/sun7i-a20-mk808c.dts | 146 +++++++++++++++++++++++++++++++++
->  2 files changed, 147 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun7i-a20-mk808c.dts
+>  arch/arm/boot/dts/Makefile         |   1 +
+>  arch/arm/boot/dts/sun6i-a31-i7.dts | 150 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 151 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun6i-a31-i7.dts
 > 
 > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 9544768..eae7706 100644
+> index eae7706..8d9d5ea 100644
 > --- a/arch/arm/boot/dts/Makefile
 > +++ b/arch/arm/boot/dts/Makefile
-> @@ -542,6 +542,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
->  	sun7i-a20-hummingbird.dtb \
->  	sun7i-a20-i12-tvbox.dtb \
->  	sun7i-a20-m3.dtb \
-> +	sun7i-a20-mk808c.dtb \
->  	sun7i-a20-olinuxino-lime.dtb \
->  	sun7i-a20-olinuxino-lime2.dtb \
->  	sun7i-a20-olinuxino-micro.dtb \
-> diff --git a/arch/arm/boot/dts/sun7i-a20-mk808c.dts b/arch/arm/boot/dts/sun7i-a20-mk808c.dts
+> @@ -532,6 +532,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
+>  	sun6i-a31-app4-evb1.dtb \
+>  	sun6i-a31-colombus.dtb \
+>  	sun6i-a31-hummingbird.dtb \
+> +	sun6i-a31-i7.dtb \
+>  	sun6i-a31-m9.dtb \
+>  	sun6i-a31s-cs908.dtb
+>  dtb-$(CONFIG_MACH_SUN7I) += \
+> diff --git a/arch/arm/boot/dts/sun6i-a31-i7.dts b/arch/arm/boot/dts/sun6i-a31-i7.dts
 > new file mode 100644
-> index 0000000..5722a03
+> index 0000000..43fdcd5
 > --- /dev/null
-> +++ b/arch/arm/boot/dts/sun7i-a20-mk808c.dts
-> @@ -0,0 +1,146 @@
+> +++ b/arch/arm/boot/dts/sun6i-a31-i7.dts
+> @@ -0,0 +1,150 @@
 > +/*
-> + * Copyright 2015 Marcus Cooper
-> + *
-> + * Marcus Cooper <codekipper@gmail.com>
+> + * Copyright 2015 Marcus Cooper <codekipper@gmail.com>
 > + *
 > + * This file is dual-licensed: you can use it either under the terms
 > + * of the GPL or the X11 license, at your option. Note that this dual
@@ -94,23 +91,25 @@ On Sat, Feb 28, 2015 at 02:43:24PM +0100, codekipper at gmail.com wrote:
 > + */
 > +
 > +/dts-v1/;
-> +#include "sun7i-a20.dtsi"
+> +#include "sun6i-a31.dtsi"
 > +#include "sunxi-common-regulators.dtsi"
 > +
 > +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
 > +#include <dt-bindings/pinctrl/sun4i-a10.h>
-
-You don't seem to be using the pinctrl header.
-
 > +
 > +/ {
-> +	model = "mk808c";
-> +	compatible = "mk808c", "allwinner,sun7i-a20";
+> +	model = "Mele I7 Quad top set box";
+> +	compatible = "mele,i7", "allwinner,sun6i-a31";
+> +
+> +	chosen {
+> +		bootargs = "earlyprintk console=ttyS0,115200";
 
-the compatible must be of the format "vendor,device". Please add the
-vendor name.
+Using earlyprintk by default is a bad idea if the kernel is configured
+with DEBUG_LL support for another SoC.
 
+I removed it and applied the patche.
+
+Thanks!
 Maxime
 
 -- 
@@ -123,4 +122,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150303/57647b46/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150303/7752827a/attachment-0001.sig>
