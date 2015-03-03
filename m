@@ -1,58 +1,57 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Wed, 4 Mar 2015 00:09:40 +0200
-Subject: [PATCH 01/10] media: omap3isp: remove unused clkdev
-In-Reply-To: <8241179.DTounjB2Ur@avalon>
-References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
- <20150302225336.GV6539@valkosipuli.retiisi.org.uk>
- <20150302235435.GF29584@n2100.arm.linux.org.uk>
- <8241179.DTounjB2Ur@avalon>
-Message-ID: <20150303220940.GX6539@valkosipuli.retiisi.org.uk>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 03 Mar 2015 14:35:51 -0800
+Subject: [PATCH v2 2/8] arm64: Convert hcalls to use ISS field
+In-Reply-To: <54F62BF4.1070306@codeaurora.org>
+References: <cover.1421449714.git.geoff@infradead.org>
+ <6719b2520095926ae0e8ac888663b87f2098f565.1421449714.git.geoff@infradead.org>
+ <1422660828.21823.40.camel@infradead.org> <20150219205714.GC24460@cbox>
+ <1424902170.17282.9.camel@infradead.org> <20150302221355.GA12902@lvm>
+ <1425338536.9265.2.camel@infradead.org> <54F62BF4.1070306@codeaurora.org>
+Message-ID: <1425422151.9265.13.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Hi Christopher,
 
-On Tue, Mar 03, 2015 at 02:39:14AM +0200, Laurent Pinchart wrote:
-> Hi Russell,
+On Tue, 2015-03-03 at 16:47 -0500, Christopher Covington wrote:
+> On 03/02/2015 06:22 PM, Geoff Levand wrote:
+> > Yes, in general it will make marshaling of args, etc. easier.  Also,
+> > to me, if we are going to change the implementation it seems to be
+> > the most natural way.
 > 
-> On Monday 02 March 2015 23:54:35 Russell King - ARM Linux wrote:
-> > (Combining replies...)
-> > 
-> > On Tue, Mar 03, 2015 at 12:53:37AM +0200, Sakari Ailus wrote:
-> > > Hi Laurent and Russell,
-> > > 
-> > > On Tue, Mar 03, 2015 at 12:33:44AM +0200, Laurent Pinchart wrote:
-> > > > Sakari, does it conflict with the omap3isp DT support ? If so, how would
-> > > > you prefer to resolve the conflict ? Russell, would it be fine to merge
-> > > > this through Mauro's tree ?
-> > 
-> > As other changes will depend on this, I'd prefer not to.  The whole
-> > "make clk_get() return a unique struct clk" wasn't well tested, and
-> > several places broke - and currently clk_add_alias() is broken as a
-> > result of that.
-> > 
-> > I'm trying to get to the longer term solution, where clkdev internally
-> > uses a struct clk_hw pointer rather than a struct clk pointer, and I
-> > want to clean stuff up first.
-> > 
-> > If omap3isp needs to keep this code, then so be it - I'll come up with
-> > a different patch improving its use of clkdev instead.
+> From reading the architecture documentation, I too expected the hypervisor
+> call instruction's immediate and the instruction specific syndrome to be used.
+> However I vaguely recall someone pointing out that reading the exception
+> syndrome register and extracting the instruction specific syndrome is bound to
+> take longer than simply using a general purpose register.
 > 
-> I'm totally fine with removing clkdev from the omap3isp driver if that's 
-> easier for you, I'm just concerned about the merge conflict that will result.
+> One might also consider alignment with the SMC Calling Convention document
+> [1], which while originally written for SMC, is also used for HVC by PSCI [2].
+> 
+> 1. http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0028a/index.html
+> 2. http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0022c/index.html
 
-There actually appears to be one more dependency, so four patches in total.
+On looking at the SMC document, I found this:
+ 
+  The SMC instruction encodes an immediate value as defined by the ARM
+  architecture [1][2]. The size of this and mechanism to access the
+  immediate value differ between the ARM instruction sets. Additionally,
+  it is time consuming for 32-bit Secure Monitor code to access this
+  immediate value. Consequently:
 
-What we could also do is to rebase the omap3isp DT support set on top of
-Russell's single patch. This way there probably would be no merge conflict,
-assuming the patches are exactly the same, and you have no other patches
-changing the omap3isp driver.
+   o An SMC immediate value of Zero must be used.
+   o All other SMC immediate values are reserved. 
 
-Alternatively we could postpone the DT support for the omap3isp, but I'd
-rather want to avoid that.
+The first problem of differing access methods does not exist for our
+case, the kernel will always use the same method.
 
--- 
-Kind regards,
+As for the second problem, the current implementation already reads
+esr_el2.  The new code just adds an AND instruction to mask the ISS
+field.  I don't think this would be more overhead than shifting
+registers.
 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+One alternative would be to use a high register, say x7, and limit the
+hcalls to args x0-x6, but I don't think this gains much over using the
+immediate.
+
+-Geoff
