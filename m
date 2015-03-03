@@ -1,64 +1,41 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  3 Mar 2015 15:40:57 +0100
-Subject: [PATCH v3 02/20] ARM: mvebu: fix usb@ unit address on Armada 38x to
- match register address
+Date: Tue,  3 Mar 2015 15:40:59 +0100
+Subject: [PATCH v3 04/20] ARM: mvebu: add UART labels to Armada 375
 In-Reply-To: <1425393675-17820-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1425393675-17820-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1425393675-17820-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1425393675-17820-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Marvell Armada 38x, the USB2 controller registers are at 0x58000,
-so the corresponding Device Tree node should have a unit address of
-58000, and not 50000. We were using 50000 due to an incorrect
-copy/pastebin of Armada 370/XP code.
+This commit adds the standard uart0 and uart1 DT labels to the Device
+Tree description of the Marvell Armada 375 SoC.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-388-db.dts | 2 +-
- arch/arm/boot/dts/armada-388-gp.dts | 2 +-
- arch/arm/boot/dts/armada-38x.dtsi   | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/armada-375.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-388-db.dts b/arch/arm/boot/dts/armada-388-db.dts
-index 16512ef..af6c74e 100644
---- a/arch/arm/boot/dts/armada-388-db.dts
-+++ b/arch/arm/boot/dts/armada-388-db.dts
-@@ -99,7 +99,7 @@
- 				phy-mode = "rgmii-id";
- 			};
- 
--			usb at 50000 {
-+			usb at 58000 {
- 				status = "ok";
- 			};
- 
-diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-index 590b383..3ff0573 100644
---- a/arch/arm/boot/dts/armada-388-gp.dts
-+++ b/arch/arm/boot/dts/armada-388-gp.dts
-@@ -135,7 +135,7 @@
- 			};
- 
- 			/* CON4 */
--			usb at 50000 {
-+			usb at 58000 {
- 				vcc-supply = <&reg_usb2_0_vbus>;
- 				status = "okay";
- 			};
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 1dff30a..c40d717 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -435,7 +435,7 @@
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index ba3c57e..6307e80 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -276,7 +276,7 @@
  				status = "disabled";
  			};
  
--			usb at 50000 {
-+			usb at 58000 {
- 				compatible = "marvell,orion-ehci";
- 				reg = <0x58000 0x500>;
- 				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
+-			serial at 12000 {
++			uart0: serial at 12000 {
+ 				compatible = "snps,dw-apb-uart";
+ 				reg = <0x12000 0x100>;
+ 				reg-shift = <2>;
+@@ -286,7 +286,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			serial at 12100 {
++			uart1: serial at 12100 {
+ 				compatible = "snps,dw-apb-uart";
+ 				reg = <0x12100 0x100>;
+ 				reg-shift = <2>;
 -- 
 2.1.0
