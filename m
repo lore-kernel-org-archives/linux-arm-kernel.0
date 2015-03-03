@@ -1,75 +1,71 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 2 Mar 2015 20:56:22 -0600
-Subject: [PATCH v4 16/30] PCI/IA64: Fix the build warning about
- pci_domain_nr()
-In-Reply-To: <1424938344-4017-17-git-send-email-wangyijing@huawei.com>
-References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
- <1424938344-4017-17-git-send-email-wangyijing@huawei.com>
-Message-ID: <20150303025622.GH11978@google.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 3 Mar 2015 10:57:01 +0800
+Subject: [PATCH] ARM: i.MX6Q: Add fixup for RTL8211E Gigabit Ethernet PHY.
+In-Reply-To: <54EE23C0.7000206@pengutronix.de>
+References: <1424892206-18679-1-git-send-email-rockford@yandex.ru>
+ <54EE23C0.7000206@pengutronix.de>
+Message-ID: <20150303025700.GH20455@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 04:12:10PM +0800, Yijing Wang wrote:
-> Should pass pci_bus * instead of pci_dev * to pci_domain_nr().
-> 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> CC: Tony Luck <tony.luck@intel.com>
-> CC: Fenghua Yu <fenghua.yu@intel.com>
-> CC: linux-ia64 at vger.kernel.org
-> ---
->  arch/ia64/sn/kernel/io_acpi_init.c |    6 +++---
->  arch/ia64/sn/kernel/io_init.c      |    2 +-
->  2 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/ia64/sn/kernel/io_acpi_init.c b/arch/ia64/sn/kernel/io_acpi_init.c
-> index 0640739..2fd7414 100644
-> --- a/arch/ia64/sn/kernel/io_acpi_init.c
-> +++ b/arch/ia64/sn/kernel/io_acpi_init.c
-> @@ -364,12 +364,12 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
->          status = acpi_evaluate_integer(rootbus_handle, METHOD_NAME__SEG, NULL,
->                                         &segment);
->          if (ACPI_SUCCESS(status)) {
-> -		if (segment != pci_domain_nr(dev)) {
-> +		if (segment != pci_domain_nr(dev->bus)) {
+On Wed, Feb 25, 2015 at 08:34:24PM +0100, Marc Kleine-Budde wrote:
+> Adding alkml and Shawn on Cc.
 
-This is completely unrelated to the series, isn't it?  It looks like this
-is a bug fix that should be handled separately and marked for stable.
+@Andrey, can you please resend the patch to LAKML and copy me?
 
->  			acpi_get_name(rootbus_handle, ACPI_FULL_PATHNAME,
->  				&name_buffer);
->  			printk(KERN_ERR
->  			       "%s: Segment number mismatch, 0x%llx vs 0x%x for: %s\n",
-> -			       __func__, segment, pci_domain_nr(dev),
-> +			       __func__, segment, pci_domain_nr(dev->bus),
->  			       (char *)name_buffer.pointer);
->  			kfree(name_buffer.pointer);
->  			return 1;
-> @@ -407,7 +407,7 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
->  	/* Build up the pcidev_info.pdi_slot_host_handle */
->  	host_devfn = get_host_devfn(pcidev_match.handle, rootbus_handle);
->  	(*pcidev_info)->pdi_slot_host_handle =
-> -			((unsigned long) pci_domain_nr(dev) << 40) |
-> +			((unsigned long) pci_domain_nr(dev->bus) << 40) |
->  					/* bus == 0 */
->  					host_devfn;
->  	return 0;
-> diff --git a/arch/ia64/sn/kernel/io_init.c b/arch/ia64/sn/kernel/io_init.c
-> index bcdc5b8..a97fad4 100644
-> --- a/arch/ia64/sn/kernel/io_init.c
-> +++ b/arch/ia64/sn/kernel/io_init.c
-> @@ -164,7 +164,7 @@ sn_io_slot_fixup(struct pci_dev *dev)
->  		panic("%s: Unable to alloc memory for sn_irq_info", __func__);
->  
->  	/* Call to retrieve pci device information needed by kernel. */
-> -	status = sal_get_pcidev_info((u64) pci_domain_nr(dev),
-> +	status = sal_get_pcidev_info((u64) pci_domain_nr(dev->bus),
->  		(u64) dev->bus->number,
->  		dev->devfn,
->  		(u64) __pa(pcidev_info),
+Shawn
+
+> 
+> Marc
+> 
+> On 02/25/2015 08:23 PM, Andrey Panov wrote:
+> > RTL8211E Ethernet PHY found in Embedsky E9 board is need
+> > an additional initialization.
+> > Taken from vendor's binary-only module.
+> > 
+> > Signed-off-by: Andrey Panov <rockford@yandex.ru>
+> > ---
+> >  arch/arm/mach-imx/mach-imx6q.c | 14 ++++++++++++++
+> >  1 file changed, 14 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> > index 4ad6e47..41708f5 100644
+> > --- a/arch/arm/mach-imx/mach-imx6q.c
+> > +++ b/arch/arm/mach-imx/mach-imx6q.c
+> > @@ -166,6 +166,18 @@ static int ar8035_phy_fixup(struct phy_device *dev)
+> >  
+> >  #define PHY_ID_AR8035 0x004dd072
+> >  
+> > +static int rtl8211e_phy_fixup(struct phy_device *dev)
+> > +{
+> > +	phy_write(dev, 0x00, 0x3140);
+> > +	mdelay(10);
+> > +	phy_write(dev, 0x00, 0x3340);
+> > +	mdelay(10);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +#define PHY_ID_RTL8211E 0x001cc915
+> > +
+> >  static void __init imx6q_enet_phy_init(void)
+> >  {
+> >  	if (IS_BUILTIN(CONFIG_PHYLIB)) {
+> > @@ -177,6 +189,8 @@ static void __init imx6q_enet_phy_init(void)
+> >  				ar8031_phy_fixup);
+> >  		phy_register_fixup_for_uid(PHY_ID_AR8035, 0xffffffef,
+> >  				ar8035_phy_fixup);
+> > +		phy_register_fixup_for_uid(PHY_ID_RTL8211E, 0xffffffff,
+> > +				rtl8211e_phy_fixup);
+> >  	}
+> >  }
+> >  
+> > 
+> 
+> 
 > -- 
-> 1.7.1
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
