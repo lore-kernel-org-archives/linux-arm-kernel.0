@@ -1,83 +1,51 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 3 Mar 2015 11:33:31 +0800
-Subject: [PATCH v4 03/30] xen/PCI: Don't use deprecated function
- pci_scan_bus_parented()
-In-Reply-To: <20150303020249.GC11978@google.com>
-References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
- <1424938344-4017-4-git-send-email-wangyijing@huawei.com>
- <20150303020249.GC11978@google.com>
-Message-ID: <54F52B8B.1010309@huawei.com>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Tue, 3 Mar 2015 11:38:47 +0800
+Subject: [RFC PATCH v2 2/3] arm64: add IOMMU dma_ops
+In-Reply-To: <54E24D50.408@arm.com>
+References: <cover.1423226542.git.robin.murphy@arm.com>
+ <058e038009ac708a40197c80e07410914c2a162e.1423226542.git.robin.murphy@arm.com>
+ <1423543151.18280.2.camel@mtksdaap41> <54D9F486.10501@arm.com>
+ <1423901011.27922.7.camel@mhfsdcap03> <54E24D50.408@arm.com>
+Message-ID: <1425353927.4555.10.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> --- a/drivers/pci/xen-pcifront.c
->> +++ b/drivers/pci/xen-pcifront.c
->> @@ -446,6 +446,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
->>  				 unsigned int domain, unsigned int bus)
->>  {
->>  	struct pci_bus *b;
->> +	LIST_HEAD(resources);
->>  	struct pcifront_sd *sd = NULL;
->>  	struct pci_bus_entry *bus_entry = NULL;
->>  	int err = 0;
->> @@ -470,17 +471,20 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
->>  		err = -ENOMEM;
->>  		goto err_out;
->>  	}
->> +	pci_add_resource(&resources, &ioport_resource);
->> +	pci_add_resource(&resources, &iomem_resource);
-> 
-> This doesn't add &busn_resource like pci_scan_bus_parented() does.
-> That might be OK, but I think we'll now emit "No busn resource found for
-> root bus, will use [bus %02x-ff]" when we didn't before.  I don't know how
-> xen-pcifront works; it would be nice if it could supply the correct
-> bus resource (and ioport and iomem).
+On Mon, 2015-02-16 at 20:04 +0000, Robin Murphy wrote:
 
-Because the pci_scan_bus_parented() add the default busn_resource for it,
-I would add the default busn_resource in pcifront_scan_root() too to fix the
-"No busn resource found ..." debug info.
-
+> >       2)int (*domain_init)(struct iommu_domain *domain);
+> >         About this function, it will alloc pagetable for the iommu
+> > domain. And We expect the pagetable memory is uncacheable, so try to
+> > call "dma_alloc_coherent", unfortunately the "struct device *" can't be
+> > passed into this function. so is it possible if adding a parameter in
+> > this function.
 > 
->>  	pcifront_init_sd(sd, domain, bus, pdev);
->>  
->>  	pci_lock_rescan_remove();
->>  
->> -	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
->> -				  &pcifront_bus_ops, sd);
->> +	b = pci_scan_root_bus(&pdev->xdev->dev, bus,
->> +				  &pcifront_bus_ops, sd, &resources);
->>  	if (!b) {
->>  		dev_err(&pdev->xdev->dev,
->>  			"Error creating PCI Frontend Bus!\n");
->>  		err = -ENOMEM;
->>  		pci_unlock_rescan_remove();
->> +		pci_free_resource_list(&resources);
->>  		goto err_out;
->>  	}
->>  
->> @@ -488,7 +492,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
->>  
->>  	list_add(&bus_entry->list, &pdev->root_buses);
->>  
->> -	/* pci_scan_bus_parented skips devices which do not have a have
->> +	/* pci_scan_root_bus skips devices which do not have a have
+> ...one of the ideas of the new of_iommu_configure framework is that 
+> iommu_ops structures can represent individual IOMMU devices if 
+> necessary. The ops->priv pointer was included for that purpose, but 
+> isn't very clean so Will has plans to remove it again - it's easy enough 
+> to achieve the same effect by having the driver embed the ops in its 
+> private instance data instead. I've done that with the ARM SMMU driver 
+> which has a similar issue of needing hardware details at domain_init() 
+> time (no patches ready yet but I have an iommu/dev branch on top of the 
+> iommu/dma branch with some current work-in-progress bits)
 > 
-> Please fix the comment typo at the same time ("have a have").
-
-Ok.
-
+> Thanks,
+> Robin.
 > 
->>  	* devfn==0. The pcifront_scan_bus enumerates all devfn. */
->>  	err = pcifront_scan_bus(pdev, domain, bus, b);
->>  
->> -- 
->> 1.7.1
->>
-> 
-> .
-> 
+Dear Robin,
+        Thanks very much for your suggestion.
 
+        I have a more question: how to do cache maintenance in arm64.
 
--- 
-Thanks!
-Yijing
+        a) "__dma_flush_range" can not be expected to used directly.
+        b) Following Documentation\DMA-API.txt, section: Streaming DMA
+mappings. dma_map_single should be used, But I am not sure how to pass
+the first "struct device *".
+         We have a device which call arch_setup_dma_ops to create the
+iommu domain, if we use this device, it will enter __iommu_map_page;
+        If we input NULL for dmap_map_single, it will assert at
+dma_capable in swiotlb_map_page...
+
+        And normally, we always need do cache maintenance only for some
+bytes in the pagetable but not whole a page. Then is there a easy way to
+do the cache maintenance?
