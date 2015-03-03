@@ -1,96 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  3 Mar 2015 11:27:23 +0100
-Subject: [PATCH v2] irqchip: armada: Fix chained per-cpu interrupts
-Message-ID: <1425378443-28822-1-git-send-email-maxime.ripard@free-electrons.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 03 Mar 2015 11:30:07 +0100
+Subject: [PATCH] cpuidle: mvebu: Fix the CPU PM notifier usage
+In-Reply-To: <54F03B51.1010708@free-electrons.com>
+References: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
+ <4892716.Bf612zPN6E@vostro.rjw.lan> <54F03B51.1010708@free-electrons.com>
+Message-ID: <54F58D2F.2010907@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the Cortex-A9-based Armada SoCs, the MPIC is not the primary interrupt
-controller. Yet, it still has to handle some per-cpu interrupt.
+On 02/27/2015 10:39 AM, Gregory CLEMENT wrote:
+> Hi Rafael,
+>
+> On 26/02/2015 22:55, Rafael J. Wysocki wrote:
+>> On Thursday, February 26, 2015 06:20:48 PM Gregory CLEMENT wrote:
+>>> As stated in kernel/cpu_pm.c, "Platform is responsible for ensuring
+>>> that cpu_pm_enter is not called twice on the same CPU before
+>>> cpu_pm_exit is called.". In the current code in case of failure when
+>>> calling mvebu_v7_cpu_suspend, the function cpu_pm_exit() is never
+>>> called whereas cpu_pm_enter() was called just before.
+>>>
+>>> This patch moves the cpu_pm_exit() in order to balance the
+>>> cpu_pm_enter() calls.
+>>>
+>>> Reported-by: Fulvio Benini <fbf@libero.it>
+>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>
+>> Should that go to "stable" too?  Which "stable" series it should go to if so?
+>
+> Yes as it fixes a potential issue, you're right it should go
+> to "stable". The bug was here since the introduction of the driver
+> in 3.16.
 
-To do so, it is chained with the GIC using a per-cpu interrupt. However, the
-current code only call irq_set_chained_handler, which is called and enable that
-interrupt only on the boot CPU, which means that the parent per-CPU interrupt
-is never unmasked on the secondary CPUs, preventing the per-CPU interrupt to
-actually work as expected.
+Hi Gregory,
 
-This was not seen until now since the only MPIC PPI users were the Marvell
-timers that were not working, but not used either since the system use the ARM
-TWD by default, and the ethernet controllers, that are faking there interrupts
-as SPI, and don't really expect to have interrupts on the secondary cores
-anyway.
+actually the 'stable' rules state clearly:
 
-Add a CPU notifier that will enable the PPI on the secondary cores when they
-are brought up.
+"- It must fix a real bug that bothers people (not a, "This could be a 
+problem..." type thing)."
 
-Cc: <stable@vger.kernel.org> # 3.15+
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
-Changes from v1:
-  - Renamed the function and notifier names
+You say "it fixes a potential issue", so no bug has been raise yet, right ?
 
- drivers/irqchip/irq-armada-370-xp.c | 21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
+>>> ---
+>>>   drivers/cpuidle/cpuidle-mvebu-v7.c | 4 ++--
+>>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
+>>> index 38e68618513a..cefa07438ae1 100644
+>>> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
+>>> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
+>>> @@ -37,11 +37,11 @@ static int mvebu_v7_enter_idle(struct cpuidle_device *dev,
+>>>   		deepidle = true;
+>>>
+>>>   	ret = mvebu_v7_cpu_suspend(deepidle);
+>>> +	cpu_pm_exit();
+>>> +
+>>>   	if (ret)
+>>>   		return ret;
+>>>
+>>> -	cpu_pm_exit();
+>>> -
+>>>   	return index;
+>>>   }
+>>>
+>>>
+>>
+>
+>
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 463c235acbdc..4387dae14e45 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -69,6 +69,7 @@ static void __iomem *per_cpu_int_base;
- static void __iomem *main_int_base;
- static struct irq_domain *armada_370_xp_mpic_domain;
- static u32 doorbell_mask_reg;
-+static int parent_irq;
- #ifdef CONFIG_PCI_MSI
- static struct irq_domain *armada_370_xp_msi_domain;
- static DECLARE_BITMAP(msi_used, PCI_MSI_DOORBELL_NR);
-@@ -356,6 +357,7 @@ static int armada_xp_mpic_secondary_init(struct notifier_block *nfb,
- {
- 	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
- 		armada_xp_mpic_smp_cpu_init();
-+
- 	return NOTIFY_OK;
- }
- 
-@@ -364,6 +366,20 @@ static struct notifier_block armada_370_xp_mpic_cpu_notifier = {
- 	.priority = 100,
- };
- 
-+static int mpic_cascaded_secondary_init(struct notifier_block *nfb,
-+					unsigned long action, void *hcpu)
-+{
-+	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
-+		enable_percpu_irq(parent_irq, IRQ_TYPE_NONE);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block mpic_cascaded_cpu_notifier = {
-+	.notifier_call = mpic_cascaded_secondary_init,
-+	.priority = 100,
-+};
-+
- #endif /* CONFIG_SMP */
- 
- static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
-@@ -539,7 +555,7 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 					     struct device_node *parent)
- {
- 	struct resource main_int_res, per_cpu_int_res;
--	int parent_irq, nr_irqs, i;
-+	int nr_irqs, i;
- 	u32 control;
- 
- 	BUG_ON(of_address_to_resource(node, 0, &main_int_res));
-@@ -587,6 +603,9 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 		register_cpu_notifier(&armada_370_xp_mpic_cpu_notifier);
- #endif
- 	} else {
-+#ifdef CONFIG_SMP
-+		register_cpu_notifier(&mpic_cascaded_cpu_notifier);
-+#endif
- 		irq_set_chained_handler(parent_irq,
- 					armada_370_xp_mpic_handle_cascade_irq);
- 	}
+
 -- 
-2.3.0
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
