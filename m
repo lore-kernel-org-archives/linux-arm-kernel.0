@@ -1,227 +1,217 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 3 Mar 2015 10:16:08 -0600
-Subject: [PATCH - v7] of: Move of_dma_configure() to device.c to help
- re-use
-In-Reply-To: <1425333548-8802-1-git-send-email-m-karicheri2@ti.com>
-References: <1425333548-8802-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <CAL_JsqLt_vNUW9a7b65iKuM7sWGU2e9CHC_Wnkcbc0ibajGkOw@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 03 Mar 2015 17:23:52 +0100
+Subject: [GIT PULL 1/2] Samsung fixes-1 for v4.0
+In-Reply-To: <1651242.NSDETIvUSP@amdc1032>
+References: <54F4B250.5080200@kernel.org> <1651242.NSDETIvUSP@amdc1032>
+Message-ID: <5506858.hZnoOahndE@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 2, 2015 at 3:59 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
-> Move of_dma_configure() to device.c so it can be re-used for PCI devices to
-> obtain DMA configuration from DT.  Also add a second argument so that for
-> PCI, the DT node of root bus host bridge can be used to obtain the DMA
-> configuration for the slave PCI device.
->
-> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> (AMD Seattle)
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> CC: Joerg Roedel <joro@8bytes.org>
-> CC: Grant Likely <grant.likely@linaro.org>
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: Arnd Bergmann <arnd@arndb.de>
+On Tuesday, March 03, 2015 04:48:39 PM Bartlomiej Zolnierkiewicz wrote:
+> 
+> Hi,
+> 
+> On Tuesday, March 03, 2015 03:56:16 AM Kukjin Kim wrote:
+> > The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+> > 
+> >   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > tags/samsung-fixes-1
+> > 
+> > for you to fetch changes up to 8a68de64e984cfc49ecc22ac18155a7fe6dbbfaf:
+> > 
+> >   ARM: EXYNOS: fix exynos randconfig build error (2015-03-03 03:37:57 +0900)
+> > 
+> > ----------------------------------------------------------------
+> > Samsung fixes for v4.0
+> > 
+> > - fix exynos randconfig build error with SMP=n
+> > - fix wrong hwirq of RTC interrupt for exynos3250
+> > - fix usage of LDREX and STREX after disabling cache coherency
+> > 
+> > ----------------------------------------------------------------
+> > Chanwoo Choi (1):
+> >       ARM: EXYNOS: Fix wrong hwirq of RTC interrupt for Exynos3250 SoC
+> > 
+> > Krzysztof Kozlowski (1):
+> >       ARM: EXYNOS: Don't use LDREX and STREX after disabling cache coherency
+> > 
+> > Russell King (1):
+> >       ARM: EXYNOS: fix exynos randconfig build error
+> 
+> Has anyone actually tested this patch with SMP=n && PM_SLEEP=y
+> or SMP=n && CONFIG_ARM_EXYNOS_CPUIDLE=y?
+> 
+> The patch is just insufficient as it prevents build of
 
-Acked-by: Rob Herring <robh@kernel.org>
+By insufficient here I mean compeltely bogus.  I don't mean to be rude
+howeover since the wrong patch was picked please let me explain it in
+more technical details.
 
+What the patch does is adding an SMP dependency to EXYNOS_CPU_SUSPEND
+option in order to "fix" SMP=n build:
+
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -131,6 +131,7 @@ config EXYNOS5420_MCPM
+ 
+ config EXYNOS_CPU_SUSPEND
+        bool
++       depends on SMP
+        select ARM_CPU_SUSPEND
+        default PM_SLEEP || ARM_EXYNOS_CPUIDLE
+ 
+Please note that the EXYNOS_CPU_SUSPEND option itself will be
+selected only if PM_SLEEP=y or ARM_EXYNOS_CPUIDLE=y.
+
+Now lets look at arch/arm/mach-exynos/Makefile:
+
+...
+obj-$(CONFIG_ARCH_EXYNOS)       += exynos.o pmu.o exynos-smc.o firmware.o
+
+obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o sleep.o
+obj-$(CONFIG_PM_SLEEP)          += suspend.o
+...
+
+Code in suspend.c references code from from pm.c and sleep.S.
+It will fail to link for PM_SLEEP=y as seen below:
+
+> arch/arm/mach-exynos/pm.o and arch/arm/mach-exynos/sleep.o
+> for SMP=n.  Both files are needed for PM_SLEEP=y code that
+> resides in arch/arm/mach-exynos/suspend.c:
+> 
+>   LD      init/built-in.o
+> arch/arm/mach-exynos/built-in.o: In function `exynos_save_cp15':
+> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/firmware.c:36: undefined reference to `exynos_cpu_resume_ns'
+> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/firmware.c:36: undefined reference to `cp15_save_power'
+> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/firmware.c:36: undefined reference to `cp15_save_diag'
+> arch/arm/mach-exynos/built-in.o: In function `exynos5420_pm_resume':
+> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:435: undefined reference to `exynos_pm_central_resume'
+> arch/arm/mach-exynos/built-in.o: In function `__virt_to_phys':
+> /home/bzolnier/sam/linux-sprc/./arch/arm/include/asm/memory.h:228: undefined reference to `exynos_cpu_resume'
+> /home/bzolnier/sam/linux-sprc/./arch/arm/include/asm/memory.h:228: undefined reference to `exynos_cpu_resume'
+> arch/arm/mach-exynos/built-in.o: In function `exynos3250_pm_resume':
+> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:395: undefined reference to `exynos_pm_central_resume'
+> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:405: undefined reference to `exynos_cpu_restore_register'
+> arch/arm/mach-exynos/built-in.o: In function `exynos_pm_resume':
+> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:365: undefined reference to `exynos_pm_central_resume'
+> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:382: undefined reference to `exynos_cpu_restore_register'
+> arch/arm/mach-exynos/built-in.o: In function `exynos_pm_prepare':
+> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:253: undefined reference to `exynos_cpu_resume'
+> arch/arm/mach-exynos/built-in.o: In function `exynos_pm_suspend':
+> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:322: undefined reference to `exynos_pm_central_suspend'
+> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:329: undefined reference to `exynos_cpu_save_register'
+> arch/arm/mach-exynos/built-in.o: In function `exynos5420_pm_suspend':
+> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/suspend.c:338: undefined reference to `exynos_pm_central_suspend'
+> arch/arm/mach-exynos/built-in.o: In function `exynos_dt_machine_init':
+> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/exynos.c:284: undefined reference to `cpuidle_coupled_exynos_data'
+> arch/arm/mach-exynos/built-in.o:(.data+0x70): undefined reference to `exynos_enter_aftr'
+> make: *** [vmlinux] Error 1
+> 
+> Moreover it still allows to select Exynos cpuidle support
+> (CONFIG_ARM_EXYNOS_CPUIDLE=y) with SMP=n which results in:
+
+Code in exynos.c that is covered with CONFIG_ARM_EXYNOS_CPUIDLE
+ifdefs references code from pm.c for case when ARM_EXYNOS_CPUIDLE=y
+and will also fail to link:
+
+>   LD      init/built-in.o
+> arch/arm/mach-exynos/built-in.o: In function `exynos_dt_machine_init':
+> /home/bzolnier/sam/linux-sprc/arch/arm/mach-exynos/exynos.c:284: undefined reference to `cpuidle_coupled_exynos_data'
+> arch/arm/mach-exynos/built-in.o:(.data+0x70): undefined reference to `exynos_enter_aftr'
+> make: *** [vmlinux] Error 1
+
+So the SMP=n kernel won't link when PM_SLEEP=y or ARM_EXYNOS_CPUIDLE=y
+is selected.  Now please take look at the config EXYNOS_CPU_SUSPEND
+option again and recall that it is selected only if PM_SLEEP=y or
+ARM_EXYNOS_CPUIDLE=y is set.  Yes..  the patch doesn't actually fix
+anything...
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+> The full solution for issue that "ARM: EXYNOS: fix exynos randconfig
+> build error" patch attempted to fix has been posted by me on 4th of
+> February (https://lkml.org/lkml/2015/2/4/521) and for completness is
+> also included below.  It fixes a v4.0-rc1 regression caused by
+> a recent addition of cpuidle coupled support for Exynos4210 SoC.
+> It makes only the new Exynos4210 coupled cpuidle support to be
+> dependent on SMP.  On UP cpuidle will use the old non-coupled code
+> for Exynos4210 which is an expected behavior (as it was in v3.19).
+> The patch has been tested on Exynos4210 Origen board with both SMP
+> and UP kernels and in both cases it worked fine.
+> 
+> 
+> From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Subject: [PATCH] ARM: EXYNOS: cpuidle: Fix build breakage on !SMP
+> 
+> The Exynos cpuidle driver has coupled cpuidle built-in so it cannot be
+> built without SMP:
+> 
+> arch/arm/mach-exynos/pm.c: In function ?exynos_cpu0_enter_aftr?:
+> arch/arm/mach-exynos/pm.c:246:4: error: implicit declaration of function ?arch_send_wakeup_ipi_mask? [-Werror=implicit-function-declaration]
+> arch/arm/mach-exynos/built-in.o: In function `exynos_pre_enter_aftr':
+> ../arch/arm/mach-exynos/pm.c:300: undefined reference to `cpu_boot_reg_base'
+> arch/arm/mach-exynos/built-in.o: In function `exynos_cpu1_powerdown':
+> ../arch/arm/mach-exynos/pm.c:282: undefined reference to `exynos_cpu_power_down'
+> 
+> Fix it by adding missing checks for SMP.
+> 
+> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 > ---
->  - Based on the existing patch applied to arm-pci/pci/iommu for pci next (Bjorn)
->  - Fixed the build issue reported on ARCH=x86_64
->  drivers/of/device.c       |   59 +++++++++++++++++++++++++++++++++++++++++++++
->  drivers/of/platform.c     |   58 ++------------------------------------------
->  include/linux/of_device.h |    2 ++
->  3 files changed, 63 insertions(+), 56 deletions(-)
->
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 46d6c75c..31a7875 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -2,6 +2,9 @@
->  #include <linux/kernel.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_iommu.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/init.h>
->  #include <linux/module.h>
->  #include <linux/mod_devicetable.h>
-> @@ -66,6 +69,62 @@ int of_device_add(struct platform_device *ofdev)
->         return device_add(&ofdev->dev);
+>  arch/arm/mach-exynos/exynos.c    |    2 +-
+>  arch/arm/mach-exynos/pm.c        |    2 ++
+>  drivers/cpuidle/cpuidle-exynos.c |    3 ++-
+>  3 files changed, 5 insertions(+), 2 deletions(-)
+> 
+> Index: b/arch/arm/mach-exynos/exynos.c
+> ===================================================================
+> --- a/arch/arm/mach-exynos/exynos.c	2015-02-04 18:30:23.555819717 +0100
+> +++ b/arch/arm/mach-exynos/exynos.c	2015-02-04 18:43:23.539807815 +0100
+> @@ -211,7 +211,7 @@ static void __init exynos_dt_machine_ini
+>  	if (!IS_ENABLED(CONFIG_SMP))
+>  		exynos_sysram_init();
+>  
+> -#ifdef CONFIG_ARM_EXYNOS_CPUIDLE
+> +#if defined(CONFIG_SMP) && defined(CONFIG_ARM_EXYNOS_CPUIDLE)
+>  	if (of_machine_is_compatible("samsung,exynos4210"))
+>  		exynos_cpuidle.dev.platform_data = &cpuidle_coupled_exynos_data;
+>  #endif
+> Index: b/arch/arm/mach-exynos/pm.c
+> ===================================================================
+> --- a/arch/arm/mach-exynos/pm.c	2015-02-04 18:30:23.563819719 +0100
+> +++ b/arch/arm/mach-exynos/pm.c	2015-02-04 18:47:32.951804008 +0100
+> @@ -181,6 +181,7 @@ void exynos_enter_aftr(void)
+>  	cpu_pm_exit();
 >  }
->
-> +/**
-> + * of_dma_configure - Setup DMA configuration
-> + * @dev:       Device to apply DMA configuration
-> + * @np:                Pointer to OF node having DMA configuration
-> + *
-> + * Try to get devices's DMA configuration from DT and update it
-> + * accordingly.
-> + *
-> + * If platform code needs to use its own special DMA configuration, it
-> + * can use a platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE events
-> + * to fix up DMA configuration.
-> + */
-> +void of_dma_configure(struct device *dev, struct device_node *np)
-> +{
-> +       u64 dma_addr, paddr, size;
-> +       int ret;
-> +       bool coherent;
-> +       unsigned long offset;
-> +       struct iommu_ops *iommu;
-> +
-> +       /*
-> +        * Set default dma-mask to 32 bit.  Drivers are expected to setup
-> +        * the correct supported dma_mask.
-> +        */
-> +       dev->coherent_dma_mask = DMA_BIT_MASK(32);
-> +
-> +       /*
-> +        * Set it to coherent_dma_mask by default if the architecture
-> +        * code has not set it.
-> +        */
-> +       if (!dev->dma_mask)
-> +               dev->dma_mask = &dev->coherent_dma_mask;
-> +
-> +       ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
-> +       if (ret < 0) {
-> +               dma_addr = offset = 0;
-> +               size = dev->coherent_dma_mask;
-> +       } else {
-> +               offset = PFN_DOWN(paddr - dma_addr);
-> +               dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
-> +       }
-> +
-> +       dev->dma_pfn_offset = offset;
-> +
-> +       coherent = of_dma_is_coherent(np);
-> +       dev_dbg(dev, "device is%sdma coherent\n",
-> +               coherent ? " " : " not ");
-> +
-> +       iommu = of_iommu_configure(dev, np);
-> +       dev_dbg(dev, "device is%sbehind an iommu\n",
-> +               iommu ? " " : " not ");
-> +
-> +       arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
-> +}
-> +EXPORT_SYMBOL_GPL(of_dma_configure);
-> +
->  int of_device_register(struct platform_device *pdev)
+>  
+> +#if defined(CONFIG_SMP) && defined(CONFIG_ARM_EXYNOS_CPUIDLE)
+>  static atomic_t cpu1_wakeup = ATOMIC_INIT(0);
+>  
+>  static int exynos_cpu0_enter_aftr(void)
+> @@ -302,3 +303,4 @@ struct cpuidle_exynos_data cpuidle_coupl
+>  	.pre_enter_aftr		= exynos_pre_enter_aftr,
+>  	.post_enter_aftr		= exynos_post_enter_aftr,
+>  };
+> +#endif /* CONFIG_SMP && CONFIG_ARM_EXYNOS_CPUIDLE */
+> Index: b/drivers/cpuidle/cpuidle-exynos.c
+> ===================================================================
+> --- a/drivers/cpuidle/cpuidle-exynos.c	2015-02-04 18:30:32.935819577 +0100
+> +++ b/drivers/cpuidle/cpuidle-exynos.c	2015-02-04 18:46:01.619805400 +0100
+> @@ -117,7 +117,8 @@ static int exynos_cpuidle_probe(struct p
 >  {
->         device_initialize(&pdev->dev);
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 667c6f1..a01f57c 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -19,7 +19,6 @@
->  #include <linux/slab.h>
->  #include <linux/of_address.h>
->  #include <linux/of_device.h>
-> -#include <linux/of_iommu.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  #include <linux/platform_device.h>
-> @@ -150,59 +149,6 @@ struct platform_device *of_device_alloc(struct device_node *np,
->  }
->  EXPORT_SYMBOL(of_device_alloc);
->
-> -/**
-> - * of_dma_configure - Setup DMA configuration
-> - * @dev:       Device to apply DMA configuration
-> - *
-> - * Try to get devices's DMA configuration from DT and update it
-> - * accordingly.
-> - *
-> - * In case if platform code need to use own special DMA configuration,it
-> - * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
-> - * to fix up DMA configuration.
-> - */
-> -static void of_dma_configure(struct device *dev)
-> -{
-> -       u64 dma_addr, paddr, size;
-> -       int ret;
-> -       bool coherent;
-> -       unsigned long offset;
-> -       struct iommu_ops *iommu;
-> -
-> -       /*
-> -        * Set default dma-mask to 32 bit. Drivers are expected to setup
-> -        * the correct supported dma_mask.
-> -        */
-> -       dev->coherent_dma_mask = DMA_BIT_MASK(32);
-> -
-> -       /*
-> -        * Set it to coherent_dma_mask by default if the architecture
-> -        * code has not set it.
-> -        */
-> -       if (!dev->dma_mask)
-> -               dev->dma_mask = &dev->coherent_dma_mask;
-> -
-> -       ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
-> -       if (ret < 0) {
-> -               dma_addr = offset = 0;
-> -               size = dev->coherent_dma_mask;
-> -       } else {
-> -               offset = PFN_DOWN(paddr - dma_addr);
-> -               dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
-> -       }
-> -       dev->dma_pfn_offset = offset;
-> -
-> -       coherent = of_dma_is_coherent(dev->of_node);
-> -       dev_dbg(dev, "device is%sdma coherent\n",
-> -               coherent ? " " : " not ");
-> -
-> -       iommu = of_iommu_configure(dev, dev->of_node);
-> -       dev_dbg(dev, "device is%sbehind an iommu\n",
-> -               iommu ? " " : " not ");
-> -
-> -       arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
-> -}
-> -
->  static void of_dma_deconfigure(struct device *dev)
->  {
->         arch_teardown_dma_ops(dev);
-> @@ -236,7 +182,7 @@ static struct platform_device *of_platform_device_create_pdata(
->
->         dev->dev.bus = &platform_bus_type;
->         dev->dev.platform_data = platform_data;
-> -       of_dma_configure(&dev->dev);
-> +       of_dma_configure(&dev->dev, dev->dev.of_node);
->
->         if (of_device_add(dev) != 0) {
->                 of_dma_deconfigure(&dev->dev);
-> @@ -299,7 +245,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
->                 dev_set_name(&dev->dev, "%s", bus_id);
->         else
->                 of_device_make_bus_id(&dev->dev);
-> -       of_dma_configure(&dev->dev);
-> +       of_dma_configure(&dev->dev, dev->dev.of_node);
->
->         /* Allow the HW Peripheral ID to be overridden */
->         prop = of_get_property(node, "arm,primecell-periphid", NULL);
-> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-> index ef37021..be70cb4 100644
-> --- a/include/linux/of_device.h
-> +++ b/include/linux/of_device.h
-> @@ -53,6 +53,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
->         return of_node_get(cpu_dev->of_node);
->  }
->
-> +void of_dma_configure(struct device *dev, struct device_node *np);
->  #else /* CONFIG_OF */
->
->  static inline int of_driver_match_device(struct device *dev,
-> @@ -90,6 +91,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
->  {
->         return NULL;
->  }
-> +static inline void of_dma_configure(struct device *dev, struct device_node *np) { }
->  #endif /* CONFIG_OF */
->
->  #endif /* _LINUX_OF_DEVICE_H */
-> --
-> 1.7.9.5
->
+>  	int ret;
+>  
+> -	if (of_machine_is_compatible("samsung,exynos4210")) {
+> +	if (IS_ENABLED(CONFIG_SMP) &&
+> +	    of_machine_is_compatible("samsung,exynos4210")) {
+>  		exynos_cpuidle_pdata = pdev->dev.platform_data;
+>  
+>  		ret = cpuidle_register(&exynos_coupled_idle_driver,
