@@ -1,25 +1,23 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 03 Mar 2015 19:56:37 +0100
-Subject: [PATCH v2 4/7] ARM: mvebu: Enable Performance Monitor Unit on
- Armada XP/370 SoCs
-In-Reply-To: <1425379400-4346-5-git-send-email-maxime.ripard@free-electrons.com>
+Date: Tue, 03 Mar 2015 19:57:03 +0100
+Subject: [PATCH v2 7/7] ARM: mvebu: Enable perf support in
+ mvebu_v7_defconfig
+In-Reply-To: <1425379400-4346-8-git-send-email-maxime.ripard@free-electrons.com>
 References: <1425379400-4346-1-git-send-email-maxime.ripard@free-electrons.com>
- <1425379400-4346-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <54F603E5.50507@free-electrons.com>
+ <1425379400-4346-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54F603FF.8080605@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Maxime,
 
 On 03/03/2015 11:43, Maxime Ripard wrote:
-> The Armada 370 and XP SoCs have Cortex-A9 compatible CPUs, and with a
-> Performance Monitoring Unit.
+> From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > 
-> Enable it so that we can have hardware-assisted perf support.
-> 
+> Now that Armada 375/38x have support for the PMU, this commit enables perf
+> events in the defconfig.
 
-I guess the fact, that unlike for the Armada 375 and Armada 38x, the
-interrupt controller is not cascaded doesn't change the binding.
+
 
 Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
@@ -28,28 +26,25 @@ Thanks,
 
 Gregory
 
-
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  arch/arm/boot/dts/armada-370-xp.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
+>  arch/arm/configs/mvebu_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 8a322ad57e5f..508ceb7c967a 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -73,6 +73,11 @@
->  		};
->  	};
->  
-> +	pmu {
-> +		compatible = "arm,cortex-a9-pmu";
-> +		interrupts-extended = <&mpic 3>;
-> +	};
-> +
->  	soc {
->  		#address-cells = <2>;
->  		#size-cells = <1>;
+> diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+> index 73673e95f23c..b53606cdff26 100644
+> --- a/arch/arm/configs/mvebu_v7_defconfig
+> +++ b/arch/arm/configs/mvebu_v7_defconfig
+> @@ -5,6 +5,7 @@ CONFIG_HIGH_RES_TIMERS=y
+>  CONFIG_LOG_BUF_SHIFT=14
+>  CONFIG_BLK_DEV_INITRD=y
+>  CONFIG_EXPERT=y
+> +CONFIG_PERF_EVENTS=y
+>  CONFIG_SLAB=y
+>  CONFIG_MODULES=y
+>  CONFIG_MODULE_UNLOAD=y
 > 
 
 
