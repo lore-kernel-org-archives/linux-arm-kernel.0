@@ -1,38 +1,33 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  3 Mar 2015 15:41:13 +0100
-Subject: [PATCH v3 18/20] Documentation: arm: update supported Marvell EBU
- processors
+Date: Tue,  3 Mar 2015 15:41:15 +0100
+Subject: [PATCH v3 20/20] ARM: configs: enable Marvell Armada 39x in
+ multi_v7_defconfig
 In-Reply-To: <1425393675-17820-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1425393675-17820-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1425393675-17820-19-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1425393675-17820-21-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we support Armada 39x, let's add this family of SoC to the
-Marvell documentation, and a reference to a link with more details
-about those processors. Unfortunately, no datasheet is publicly
-available at this time.
+Following the introduction of the Marvell Armada 39x support, let's
+enable this support by default in multi_v7_defconfig.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: <arm@kernel.org>
 ---
- Documentation/arm/Marvell/README | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
-index 1745379..18a775d 100644
---- a/Documentation/arm/Marvell/README
-+++ b/Documentation/arm/Marvell/README
-@@ -96,6 +96,11 @@ EBU Armada family
- 	88F6820
- 	88F6828
- 
-+  Armada 390/398 Flavors:
-+	88F6920
-+	88F6928
-+    Product infos: http://www.marvell.com/embedded-processors/armada-39x/
-+
-   Armada XP Flavors:
-         MV78230
-         MV78260
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index e8a4c95..32d5399 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -16,6 +16,7 @@ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_375=y
+ CONFIG_MACH_ARMADA_38X=y
++CONFIG_MACH_ARMADA_39X=y
+ CONFIG_MACH_ARMADA_XP=y
+ CONFIG_MACH_DOVE=y
+ CONFIG_ARCH_BCM=y
 -- 
 2.1.0
