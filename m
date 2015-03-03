@@ -1,60 +1,119 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 03 Mar 2015 12:28:17 +0100
-Subject: [RESEND PATCH] ARM: EXYNOS: Fix failed second suspend on Exynos4
-In-Reply-To: <2802418.zt8CxNGGkT@amdc1032>
-References: <1424256325-16659-1-git-send-email-k.kozlowski@samsung.com>
- <2802418.zt8CxNGGkT@amdc1032>
-Message-ID: <13977718.vr52PylqCh@amdc1032>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Tue, 03 Mar 2015 13:33:42 +0200
+Subject: [PATCH v8 15/18] cpufreq: Add cpufreq driver for Tegra124
+In-Reply-To: <1425286186.24292.76.camel@x220>
+References: <1425213881-5262-1-git-send-email-mikko.perttunen@kapsi.fi>	
+ <1425213881-5262-16-git-send-email-mikko.perttunen@kapsi.fi>
+ <1425286186.24292.76.camel@x220>
+Message-ID: <54F59C16.2010401@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/02/2015 10:49 AM, Paul Bolle wrote:
+> On Sun, 2015-03-01 at 14:44 +0200, Mikko Perttunen wrote:
+>> --- a/drivers/cpufreq/Kconfig.arm
+>> +++ b/drivers/cpufreq/Kconfig.arm
+>> @@ -256,6 +256,13 @@ config ARM_TEGRA20_CPUFREQ
+>>   	help
+>>   	  This adds the CPUFreq driver support for Tegra20 SOCs.
+>>
+>> +config ARM_TEGRA124_CPUFREQ
+>> +	bool "Tegra124 CPUFreq support"
+>
+> This adds a bool Kconfig symbol...
+>
+>> +	depends on ARCH_TEGRA && CPUFREQ_DT
+>> +	default y
+>> +	help
+>> +	  This adds the CPUFreq driver support for Tegra124 SOCs.
+>> +
+>>   config ARM_PXA2xx_CPUFREQ
+>>   	tristate "Intel PXA2xx CPUfreq driver"
+>>   	depends on PXA27x || PXA25x
+>> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+>> index 312d9c3..d478b83 100644
+>> --- a/drivers/cpufreq/Makefile
+>> +++ b/drivers/cpufreq/Makefile
+>> @@ -77,6 +77,7 @@ obj-$(CONFIG_ARM_SA1100_CPUFREQ)	+= sa1100-cpufreq.o
+>>   obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
+>>   obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
+>>   obj-$(CONFIG_ARM_TEGRA20_CPUFREQ)	+= tegra20-cpufreq.o
+>> +obj-$(CONFIG_ARM_TEGRA124_CPUFREQ)	+= tegra124-cpufreq.o
+>
+> ... so this object will either not be built or be built-in.
+>
+>>   obj-$(CONFIG_ARM_VEXPRESS_SPC_CPUFREQ)	+= vexpress-spc-cpufreq.o
+>>
+>>   ##################################################################################
+>> diff --git a/drivers/cpufreq/tegra124-cpufreq.c b/drivers/cpufreq/tegra124-cpufreq.c
+>> new file mode 100644
+>> index 0000000..45778ce
+>> --- /dev/null
+>> +++ b/drivers/cpufreq/tegra124-cpufreq.c
+>> @@ -0,0 +1,217 @@
+>> +/*
+>> + * Tegra 124 cpufreq driver
+>> + *
+>> + * This software is licensed under the terms of the GNU General Public
+>> + * License version 2, as published by the Free Software Foundation, and
+>> + * may be copied, distributed, and modified under those terms.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/cpufreq-dt.h>
+>> +#include <linux/err.h>
+>> +#include <linux/init.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>
+> Is linux/module.h needed?
+>
+>> +#include <linux/of_device.h>
+>> +#include <linux/of.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/pm_opp.h>
+>> +#include <linux/regulator/consumer.h>
+>> +#include <linux/types.h>
+>
+> [...]
+>
+>> +static struct platform_driver tegra124_cpufreq_platdrv = {
+>> +	.driver = {
+>> +		.name	= "cpufreq-tegra124",
+>> +		.owner	= THIS_MODULE,
+>
+> .owner will always be, in short, NULL.
+>
+>> +	},
+>> +	.probe		= tegra124_cpufreq_probe,
+>> +	.remove		= tegra124_cpufreq_remove,
+>> +};
+>
+> [...]
+>
+>> +module_init(tegra_cpufreq_init);
+>
+> This might as well be, I think, device_initcall().
+>
+>> +MODULE_AUTHOR("Tuomas Tynkkynen <ttynkkynen@nvidia.com>");
+>> +MODULE_DESCRIPTION("cpufreq driver for NVIDIA Tegra124");
+>> +MODULE_LICENSE("GPL v2");
+>
+> The strings in these macros will always be preprocessed away, because
+> this driver cannot become a module.
+>
+>
+> Paul Bolle
+>
 
-Hi Kukjin,
+Well noticed! I changed the config symbol to be tristate.
 
-It has been a month since this regression fix was originally posted:
-	https://lkml.org/lkml/2015/2/3/481
-
-Could you please review/apply it?  Thank you.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-On Monday, February 23, 2015 05:25:48 PM Bartlomiej Zolnierkiewicz wrote:
-> 
-> Hi,
-> 
-> On Wednesday, February 18, 2015 11:45:25 AM Krzysztof Kozlowski wrote:
-> > On Exynos4412 boards (Trats2, Odroid U3) after enabling L2 cache in
-> > 56b60b8bce4a ("ARM: 8265/1: dts: exynos4: Add nodes for L2 cache
-> > controller") the second suspend to RAM failed. First suspend worked fine
-> > but the next one hang just after powering down of secondary CPUs (system
-> > consumed energy as it would be running but was not responsive).
-> > 
-> > The issue was caused by enabling delayed reset assertion for CPU0 just
-> > after issuing power down of cores. This was introduced for Exynos4 in
-> > 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off").
-> > 
-> > The whole behavior is not well documented but after checking with vendor
-> > code this should be done like this (on Exynos4):
-> > 1. Enable delayed reset assertion when system is running (for all CPUs).
-> > 2. Disable delayed reset assertion before suspending the system.
-> >    This can be done after powering off secondary CPUs.
-> > 3. Re-enable the delayed reset assertion when system is resumed.
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Fixes: 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off")
-> > Cc: <stable@vger.kernel.org>
-> 
-> It turned out that this patch is also needed to fix cpuidle AFTR mode
-> hang on Trats2.
-> 
-> Tested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> 
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
+Thanks,
+Mikko Perttunen
