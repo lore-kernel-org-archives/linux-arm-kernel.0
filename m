@@ -1,55 +1,46 @@
-From: fbf@libero.it (Fulvio)
-Date: Tue, 03 Mar 2015 15:58:21 +0100
-Subject: [PATCH] cpuidle: mvebu: Fix the CPU PM notifier usage
-In-Reply-To: <54F5AE5C.6060006@free-electrons.com>
-References: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
- <4892716.Bf612zPN6E@vostro.rjw.lan> <54F03B51.1010708@free-electrons.com>
- <54F58D2F.2010907@linaro.org> <54F58E3B.9040302@free-electrons.com>
- <54F59285.5060306@libero.it> <54F5AE5C.6060006@free-electrons.com>
-Message-ID: <54F5CC0D.6060509@libero.it>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 3 Mar 2015 09:58:58 -0500
+Subject: [PATCH - v7] of: Move of_dma_configure() to device.c to help
+ re-use
+In-Reply-To: <CAErSpo7MsxgVZyhpijRzVN7mVNcbN7M4A4W-UKaNs4AnmGrB6g@mail.gmail.com>
+References: <1425333548-8802-1-git-send-email-m-karicheri2@ti.com>
+ <CAErSpo7MsxgVZyhpijRzVN7mVNcbN7M4A4W-UKaNs4AnmGrB6g@mail.gmail.com>
+Message-ID: <54F5CC32.6050603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> I didn't know you experimented random kernel panics and that you thought
-> it was related to the CPU Idle driver.
+On 03/02/2015 10:43 PM, Bjorn Helgaas wrote:
+> On Mon, Mar 2, 2015 at 3:59 PM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
+>> Move of_dma_configure() to device.c so it can be re-used for PCI devices to
+>> obtain DMA configuration from DT.  Also add a second argument so that for
+>> PCI, the DT node of root bus host bridge can be used to obtain the DMA
+>> configuration for the slave PCI device.
+>>
+>> Tested-by: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>  (AMD Seattle)
+>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+>> Signed-off-by: Bjorn Helgaas<bhelgaas@google.com>
+>> Reviewed-by: Catalin Marinas<catalin.marinas@arm.com>
+>> Acked-by: Will Deacon<will.deacon@arm.com>
+>> CC: Joerg Roedel<joro@8bytes.org>
+>> CC: Grant Likely<grant.likely@linaro.org>
+>> CC: Rob Herring<robh+dt@kernel.org>
+>> CC: Russell King<linux@arm.linux.org.uk>
+>> CC: Arnd Bergmann<arnd@arndb.de>
+>> ---
+>>   - Based on the existing patch applied to arm-pci/pci/iommu for pci next (Bjorn)
+>>   - Fixed the build issue reported on ARCH=x86_64
 >
->   
->> All i can say is that the system use the "armadaxp_idle" driver and 
->> works fine when running "stress --cpu 8" in background.
->> I asked Netgear to provide a firmware without the idle driver to confirm 
->> if it's the cause of the problem, but they did not answered.
->>     
+> Hi Murali,
 >
-> I think that if you disable all the state using by doing an
+> Can you please repost the entire series with fixed patches?  It's
+> easier for me to reapply the whole thing at once than it is to keep
+> track of and fiddle with individual patches.
 >
-> echo 1 > /sys/devices/system/cpu/cpu0/cpuidle/stateNUM/disable
->
-> where NUM is the nuymbert of the state. Then it should disable the
-> cpuidle on the fly.
->   
-Thanks, i'll try that as soon as possible (i gave back the unit to my 
-client) and report back.
+> Bjorn
+Ok Fine. Will post now.
 
-However, the description of the cpu_pm_enter function state:
-"Must be called on the affected CPU with interrupts disabled.  Platform 
-is responsible for ensuring that cpu_pm_enter is not called twice on the 
-same CPU before cpu_pm_exit is called. Notified drivers can include VFP  
-co-processor, interrupt controller and its PM extensions, local CPU  
-timers context save/restore which shouldn't be interrupted. Hence it  
-must be called with interrupts disabled."
+Murali
 
-and the point is: it that an invariant? Do current code and future code 
-safely assume that cpu_pm_enter is not called twice?
-For example if cpu_pm_enter do "context save" and cpu_pm_exit do 
-"context restore", calling twice cpu_pm_enter will overwrite the 
-previous saved context: is that safe in all circumstances?
-
-I assume the rule " It must fix a real bug that bothers people (not a, 
-"This could be a problem..." type thing)." is to avoid committing 
-useless changes that may introduce new bugs, but i do not think that 
-apply to this case: a bug report from an unknown user (me) should change 
-nothing.
-
-Bye,
-Fulvio
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
