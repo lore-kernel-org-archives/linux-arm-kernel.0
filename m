@@ -1,83 +1,84 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  3 Mar 2015 12:03:49 +0100
-Subject: [PATCH 4/5] arm64/efi: ensure that Image does not cross a 512 MB
- boundary
+Date: Tue,  3 Mar 2015 12:03:50 +0100
+Subject: [PATCH 5/5] arm64/efi: adapt to relaxed FDT placement requirements
 In-Reply-To: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1425380630-3684-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1425380630-3684-6-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the Image placement logic used by the stub to make absolutely
-sure that Image is placed in such a way that the early init code will
-always be able to map it. This means the entire static memory footprint
-of Image should be inside the same naturally aligned 512 MB region.
-
-First of all, the preferred offset of dram_base + TEXT_OFFSET is only
-suitable if it doesn't result in the Image crossing a 512 MB
-alignment boundary, which could be the case if dram_base itself
-is close to the end of a naturally aligned 512 MB region.
-
-Also, when moving the kernel Image, we need to verify that the new
-destination region does not cross a 512 MB alignment boundary either.
-If that is the case, we retry the allocation with the alignment
-chosen such that the resulting region will always be suitable.
+With the relaxed FDT placement requirements in place, we can change
+the allocation strategy used by the stub to put the FDT image higher
+up in memory. At the same time, reduce the minimal alignment to a
+power of 2 upper bound of the size: this way, we are still guaranteed
+not to cross a 2 MB boundary, but will potentially waste less memory
+doing so.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/efi-stub.c | 38 ++++++++++++++++++++++++++++++++------
- 1 file changed, 32 insertions(+), 6 deletions(-)
+ arch/arm64/include/asm/efi.h            | 9 ++++-----
+ drivers/firmware/efi/libstub/arm-stub.c | 2 +-
+ drivers/firmware/efi/libstub/fdt.c      | 7 ++-----
+ 3 files changed, 7 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-index f5374065ad53..5f8175979be8 100644
---- a/arch/arm64/kernel/efi-stub.c
-+++ b/arch/arm64/kernel/efi-stub.c
-@@ -22,14 +22,40 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table,
- 					efi_loaded_image_t *image)
- {
- 	efi_status_t status;
--	unsigned long kernel_size, kernel_memsize = 0;
-+	unsigned long kernel_size, kernel_memsize;
-+	unsigned long preferred_offset;
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index ef572206f1c3..68f7bb2ddad7 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -39,12 +39,11 @@ extern void efi_init(void);
+ /* arch specific definitions used by the stub code */
  
--	/* Relocate the image, if required. */
- 	kernel_size = _edata - _text;
--	if (*image_addr != (dram_base + TEXT_OFFSET)) {
--		kernel_memsize = kernel_size + (_end - _edata);
--		status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
--				       SZ_2M, reserve_addr);
-+	kernel_memsize = kernel_size + (_end - _edata);
-+
-+	/*
-+	 * The kernel Image should be located as close as possible to the base
-+	 * of system RAM, but must not cross a 512 MB alignment boundary.
-+	 */
-+	preferred_offset = dram_base + TEXT_OFFSET;
-+	if ((preferred_offset & (SZ_512M - 1)) + kernel_memsize > SZ_512M)
-+		preferred_offset = round_up(dram_base, SZ_512M) + TEXT_OFFSET;
-+
-+	if (*image_addr != preferred_offset) {
-+		unsigned long alloc_size = kernel_memsize + TEXT_OFFSET;
-+		unsigned long alloc_align = SZ_2M;
-+
-+again:
-+		status = efi_low_alloc(sys_table, alloc_size, alloc_align,
-+				       reserve_addr);
-+
-+		/*
-+		 * Check whether the new allocation crosses a 512 MB alignment
-+		 * boundary. If so, retry with the alignment set to a power of
-+		 * two upper bound of the allocation size. That is guaranteed
-+		 * to produce a suitable allocation, but may waste more memory.
-+		 */
-+		if (status == EFI_SUCCESS &&
-+		    ((*reserve_addr & (SZ_512M - 1)) + alloc_size) > SZ_512M) {
-+			efi_free(sys_table, alloc_size, *reserve_addr);
-+			alloc_align = roundup_pow_of_two(alloc_size);
-+			goto again;
-+		}
+ /*
+- * AArch64 requires the DTB to be 8-byte aligned in the first 512MiB from
+- * start of kernel and may not cross a 2MiB boundary. We set alignment to
+- * 2MiB so we know it won't cross a 2MiB boundary.
++ * AArch64 requires the DTB to be 8-byte aligned and not cross a 2MiB boundary.
++ * So align to a power of 2 upper bound of the FDT size.
+  */
+-#define EFI_FDT_ALIGN	SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
+-#define MAX_FDT_OFFSET	SZ_512M
++#define EFI_FDT_ALIGN(x)	roundup_pow_of_two(x)
++#define MAX_FDT_OFFSET		ULONG_MAX
+ 
+ #define efi_call_early(f, ...) sys_table_arg->boottime->f(__VA_ARGS__)
+ 
+diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+index dcae482a9a17..c58c21c22dbe 100644
+--- a/drivers/firmware/efi/libstub/arm-stub.c
++++ b/drivers/firmware/efi/libstub/arm-stub.c
+@@ -269,7 +269,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 
+ 	new_fdt_addr = fdt_addr;
+ 	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
+-				&new_fdt_addr, dram_base + MAX_FDT_OFFSET,
++				&new_fdt_addr, MAX_FDT_OFFSET,
+ 				initrd_addr, initrd_size, cmdline_ptr,
+ 				fdt_addr, fdt_size);
+ 
+diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+index 91da56c4fd54..1a44d410a63b 100644
+--- a/drivers/firmware/efi/libstub/fdt.c
++++ b/drivers/firmware/efi/libstub/fdt.c
+@@ -165,10 +165,6 @@ fdt_set_fail:
+ 	return EFI_LOAD_ERROR;
+ }
+ 
+-#ifndef EFI_FDT_ALIGN
+-#define EFI_FDT_ALIGN EFI_PAGE_SIZE
+-#endif
+-
+ /*
+  * Allocate memory for a new FDT, then add EFI, commandline, and
+  * initrd related fields to the FDT.  This routine increases the
+@@ -223,7 +219,8 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 	 */
+ 	new_fdt_size = fdt_size + EFI_PAGE_SIZE;
+ 	while (1) {
+-		status = efi_high_alloc(sys_table, new_fdt_size, EFI_FDT_ALIGN,
++		status = efi_high_alloc(sys_table, new_fdt_size,
++					EFI_FDT_ALIGN(new_fdt_size),
+ 					new_fdt_addr, max_addr);
  		if (status != EFI_SUCCESS) {
- 			pr_efi_err(sys_table, "Failed to relocate kernel\n");
- 			return status;
+ 			pr_efi_err(sys_table, "Unable to allocate memory for new device tree.\n");
 -- 
 1.8.3.2
