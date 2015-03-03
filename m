@@ -1,48 +1,90 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 3 Mar 2015 12:52:14 -0500
-Subject: [PATCH v8 7/7] arm: dma-mapping: limit IOMMU mapping size
-In-Reply-To: <1425405134-24707-1-git-send-email-m-karicheri2@ti.com>
-References: <1425405134-24707-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1425405134-24707-8-git-send-email-m-karicheri2@ti.com>
+Date: Tue, 3 Mar 2015 12:52:07 -0500
+Subject: [PATCH v8 0/7] PCI: get DMA configuration from parent device
+Message-ID: <1425405134-24707-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm_iommu_create_mapping() has size parameter of size_t and
-arm_setup_iommu_dma_ops() can take a value higher than that
-when this is called from the OF code.  So limit the size to
-SIZE_MAX.
-
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> (AMD Seattle)
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-CC: Joerg Roedel <joro@8bytes.org>
-CC: Grant Likely <grant.likely@linaro.org>
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Russell King <linux@arm.linux.org.uk>
-CC: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mm/dma-mapping.c |    7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 170a116..fc81a38 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -2027,6 +2027,13 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 	if (!iommu)
- 		return false;
+This series is already applied on arm-pci iommu branch for next, but
+kbuild test robot reported build errors on x86_64 and sparc. So I am
+sending v8 to help apply on arm-pci iommu branch.
  
-+	/*
-+	 * currently arm_iommu_create_mapping() takes a max of size_t
-+	 * for size param. So check this limit for now.
-+	 */
-+	if (size > SIZE_MAX)
-+		return false;
-+
- 	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
- 	if (IS_ERR(mapping)) {
- 		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
+Here is the original cover letter of the series.
+
+This patch add an important capability to PCI driver on Keystone. I hope to
+have this merged to the upstream branch so that it is available for v3.20.
+Also would like thank everyone for the contribution.
+
+PCI devices on Keystone doesn't have correct dma_pfn_offset set. This patch
+add capability to set the dma configuration such as dma-mask, dma_pfn_offset,
+and dma ops etc using the information from DT. The prior RFCs and discussions
+are available at [1] and [2] below.
+
+[2] : https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg790244.html
+[1] : http://www.gossamer-threads.com/lists/linux/kernel/2024591
+
+Change history:
+	v8 - On request from Bjorn, I am resending the whole series with also
+	     ack from Rob Herring against 2/7
+	v7 - Used for re-spinning 2/7 and 6/7. Fixed build issues on x86_64 and
+	     sparc reported by kbuild test robot
+	v6 - Rebased to v3.19-v7
+	   - Addressed some minor comments about node name and DT size validation.
+	   - Pulled out 8/8 of v5 and plan to send a patch for enhancing
+	     of_dma_configure() to use size to calculate dma mask.
+	   - Added Acks from reviewers.
+	v5 - moved the dma_mask update in device from ARM specific API to
+	     of_dma_configure to allow this across other architecture as well
+	   - improved sanity check for DT dma-range size in of_dma_configure()
+	   - moved API to get parent bridge device to PCI (host-bridge.c)
+	v4 - moved size adjustments in of_iommu_configure() to a separate patch
+	   - consistent node name comment from Rob
+	   - patch 6 added for dma_mask adjustment and iommu mapping size
+	     limiting.
+	v3 - addressed comments to re-use of_dma_configure() for PCI
+	   - To help re-use, change of_iommu_configure() function argument
+		- Move of_dma_configure to of/device.c
+		- Limit the of_iommu_configure to non pci devices
+	v2 - update size to coherent_dma_mask + 1 if dma-range info is missing
+	   - also check the np for null.
+	v1 - updates based on the comments against initial RFC.
+	   - Added a helper function to get the OF node of the parent
+	   - Added an API in of_pci.c to update DMA configuration of the pci
+	     device.
+
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+Acked-by: Murali Karicheri <m-karicheri2@ti.com>
+
+Murali Karicheri (7):
+  of: iommu: Add ptr to OF node arg to of_iommu_configure()
+  of: Move of_dma_configure() to device.c to help re-use
+  of: Fix size when dma-range is not used
+  PCI: Add helper functions pci_get[put]_host_bridge_device()
+  of/pci: Add of_pci_dma_configure() to update DMA configuration
+  PCI: Update DMA configuration from DT
+  arm: dma-mapping: limit IOMMU mapping size
+
+ arch/arm/mm/dma-mapping.c |    7 +++++
+ drivers/iommu/of_iommu.c  |   10 ++++--
+ drivers/of/device.c       |   74 +++++++++++++++++++++++++++++++++++++++++++++
+ drivers/of/of_pci.c       |   18 +++++++++++
+ drivers/of/platform.c     |   58 ++---------------------------------
+ drivers/pci/host-bridge.c |   14 +++++++++
+ drivers/pci/probe.c       |    2 ++
+ include/linux/of_device.h |    3 ++
+ include/linux/of_iommu.h  |    6 ++--
+ include/linux/of_pci.h    |    3 ++
+ include/linux/pci.h       |    3 ++
+ 11 files changed, 138 insertions(+), 60 deletions(-)
+
 -- 
 1.7.9.5
