@@ -1,114 +1,64 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue,  3 Mar 2015 13:29:37 +0100
-Subject: [PATCH 6/6] ARM: cpuidle: Enable the ARM64 driver for both ARM32/ARM64
-In-Reply-To: <1425385777-14766-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1425385777-14766-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1425385777-14766-7-git-send-email-daniel.lezcano@linaro.org>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 3 Mar 2015 09:32:42 -0300
+Subject: [PATCH v2] ARM: mx25: Remove mach-mx25_3ds board file
+Message-ID: <1425385962-3109-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM32 and ARM64 have the same DT definitions and the same approaches.
+imx25-pdk.dts provides a more complete support than the board file version, so
+let's get rid of the board file.
 
-The generic ARM cpuidle driver can be put in common for those two
-architectures.
-
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- drivers/cpuidle/Kconfig                            |  7 +------
- drivers/cpuidle/Kconfig.arm                        | 10 ++++++++++
- drivers/cpuidle/Kconfig.arm64                      | 13 -------------
- drivers/cpuidle/Makefile                           |  5 +----
- drivers/cpuidle/{cpuidle-arm64.c => cpuidle-arm.c} |  0
- 5 files changed, 12 insertions(+), 23 deletions(-)
- delete mode 100644 drivers/cpuidle/Kconfig.arm64
- rename drivers/cpuidle/{cpuidle-arm64.c => cpuidle-arm.c} (100%)
+Changes since v1:
+- Rebased against imx/cleanup branch
 
-diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-index c5029c1..8c7930b 100644
---- a/drivers/cpuidle/Kconfig
-+++ b/drivers/cpuidle/Kconfig
-@@ -29,15 +29,10 @@ config DT_IDLE_STATES
- 	bool
+ arch/arm/mach-imx/Kconfig         |  15 ---
+ arch/arm/mach-imx/Makefile        |   1 -
+ arch/arm/mach-imx/mach-mx25_3ds.c | 270 --------------------------------------
+ 3 files changed, 286 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/mach-mx25_3ds.c
+
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index f9d17f3..247a465 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -151,21 +151,6 @@ config MACH_MX21ADS
  
- menu "ARM CPU Idle Drivers"
--depends on ARM
-+depends on ARM || ARM64
- source "drivers/cpuidle/Kconfig.arm"
- endmenu
+ comment "MX25 platforms:"
  
--menu "ARM64 CPU Idle Drivers"
--depends on ARM64
--source "drivers/cpuidle/Kconfig.arm64"
--endmenu
+-config MACH_MX25_3DS
+-	bool "Support MX25PDK (3DS) Platform"
+-	select IMX_HAVE_PLATFORM_FLEXCAN
+-	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
+-	select IMX_HAVE_PLATFORM_IMX2_WDT
+-	select IMX_HAVE_PLATFORM_IMXDI_RTC
+-	select IMX_HAVE_PLATFORM_IMX_FB
+-	select IMX_HAVE_PLATFORM_IMX_I2C
+-	select IMX_HAVE_PLATFORM_IMX_KEYPAD
+-	select IMX_HAVE_PLATFORM_IMX_UART
+-	select IMX_HAVE_PLATFORM_MXC_EHCI
+-	select IMX_HAVE_PLATFORM_MXC_NAND
+-	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+-	select SOC_IMX25
 -
- menu "MIPS CPU Idle Drivers"
- depends on MIPS
- source "drivers/cpuidle/Kconfig.mips"
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index 8e07c94..f08043e 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -14,6 +14,16 @@ config ARM_BIG_LITTLE_CPUIDLE
- 	  define different C-states for little and big cores through the
- 	  multiple CPU idle drivers infrastructure.
+ config MACH_EUKREA_CPUIMX25SD
+ 	bool "Support Eukrea CPUIMX25 Platform"
+ 	select IMX_HAVE_PLATFORM_FLEXCAN
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 8d1b101..e92ede9 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -49,7 +49,6 @@ obj-$(CONFIG_MACH_IMX1_DT) += imx1-dt.o
+ obj-$(CONFIG_MACH_MX21ADS) += mach-mx21ads.o
  
-+config ARM_CPUIDLE
-+	bool "Generic ARM/ARM64 CPU idle Driver"
-+	select DT_IDLE_STATES
-+	help
-+	  Select this to enable generic cpuidle driver for ARM.
-+	  It provides a generic idle driver whose idle states are configured
-+	  at run-time through DT nodes. The CPUidle suspend backend is
-+	  initialized by calling the CPU operations init idle hook
-+	  provided by architecture code.
-+
- config ARM_CLPS711X_CPUIDLE
- 	bool "CPU Idle Driver for CLPS711X processors"
- 	depends on ARCH_CLPS711X || COMPILE_TEST
-diff --git a/drivers/cpuidle/Kconfig.arm64 b/drivers/cpuidle/Kconfig.arm64
+ # i.MX25 based machines
+-obj-$(CONFIG_MACH_MX25_3DS) += mach-mx25_3ds.o
+ obj-$(CONFIG_MACH_EUKREA_CPUIMX25SD) += mach-eukrea_cpuimx25.o
+ obj-$(CONFIG_MACH_EUKREA_MBIMXSD25_BASEBOARD) += eukrea_mbimxsd25-baseboard.o
+ obj-$(CONFIG_MACH_IMX25_DT) += imx25-dt.o
+diff --git a/arch/arm/mach-imx/mach-mx25_3ds.c b/arch/arm/mach-imx/mach-mx25_3ds.c
 deleted file mode 100644
-index 6effb36..0000000
---- a/drivers/cpuidle/Kconfig.arm64
-+++ /dev/null
-@@ -1,13 +0,0 @@
--#
--# ARM64 CPU Idle drivers
--#
--
--config ARM64_CPUIDLE
--	bool "Generic ARM64 CPU idle Driver"
--	select DT_IDLE_STATES
--	help
--	  Select this to enable generic cpuidle driver for ARM64.
--	  It provides a generic idle driver whose idle states are configured
--	  at run-time through DT nodes. The CPUidle suspend backend is
--	  initialized by calling the CPU operations init idle hook
--	  provided by architecture code.
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index 4d177b9..3ba81b1 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -17,16 +17,13 @@ obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
- obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
- obj-$(CONFIG_ARM_AT91_CPUIDLE)          += cpuidle-at91.o
- obj-$(CONFIG_ARM_EXYNOS_CPUIDLE)        += cpuidle-exynos.o
-+obj-$(CONFIG_ARM_CPUIDLE)		+= cpuidle-arm.o
- 
- ###############################################################################
- # MIPS drivers
- obj-$(CONFIG_MIPS_CPS_CPUIDLE)		+= cpuidle-cps.o
- 
- ###############################################################################
--# ARM64 drivers
--obj-$(CONFIG_ARM64_CPUIDLE)		+= cpuidle-arm64.o
--
--###############################################################################
- # POWERPC drivers
- obj-$(CONFIG_PSERIES_CPUIDLE)		+= cpuidle-pseries.o
- obj-$(CONFIG_POWERNV_CPUIDLE)		+= cpuidle-powernv.o
-diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm.c
-similarity index 100%
-rename from drivers/cpuidle/cpuidle-arm64.c
-rename to drivers/cpuidle/cpuidle-arm.c
+index 584248a..0000000
 -- 
 1.9.1
