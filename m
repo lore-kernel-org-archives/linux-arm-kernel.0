@@ -1,36 +1,73 @@
-From: ysato@users.sourceforge.jp (Yoshinori Sato)
-Date: Tue, 03 Mar 2015 15:40:07 +0900
-Subject: [PATCH] clkdev: clk_add_alias don't put origin clock
-In-Reply-To: <20150301145157.GO8656@n2100.arm.linux.org.uk>
-References: <1425195815-14895-1-git-send-email-ysato@users.sourceforge.jp>
- <20150301145157.GO8656@n2100.arm.linux.org.uk>
-Message-ID: <87oaoafut4.wl-ysato@users.sourceforge.jp>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Tue, 3 Mar 2015 12:10:36 +0530
+Subject: [PATCH v6 4/7] clk: Add clock driver for mb86s7x
+In-Reply-To: <20150227012822.421.16727@quantum>
+References: <1423188007-17047-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1423188649-17216-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <20150227012822.421.16727@quantum>
+Message-ID: <CAJe_ZhcBvWuoKTRO6nRfyoeTXNUwykkvGtpbcRb3oxdoNqbcjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Sun, 1 Mar 2015 14:51:57 +0000,
-Russell King - ARM Linux wrote:
-> 
-> On Sun, Mar 01, 2015 at 04:43:35PM +0900, Yoshinori Sato wrote:
-> > Refer to 'r' later.
-> > So don't put in clk_add_alias.
-> > 
-> > Signed-off-by: Yoshinori Sato <ysato@users.sourceforge.jp>
-> 
-> This isn't how I want to solve this.  I'd much rather we converted clkdev
-> to use struct clk_hw internally instead.  This is something I'm looking
-> into at the moment.
-> 
+On 27 February 2015 at 06:58, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Vincent Yang (2015-02-05 18:10:49)
+>> From: Jassi Brar <jaswinder.singh@linaro.org>
+>>
+>>  The CRG11 clock controller is managed by remote f/w.
+>> This driver simply maps Linux CLK ops onto mailbox api.
+>>
+>> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+>> Signed-off-by: Andy Green <andy.green@linaro.org>
+>> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+>> Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
+>> ---
+>>  .../bindings/clock/fujitsu,mb86s70-crg11.txt       |  26 ++
+>>  drivers/clk/Makefile                               |   1 +
+>>  drivers/clk/clk-mb86s7x.c                          | 386 +++++++++++++++++++++
+>>  3 files changed, 413 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
+>>  create mode 100644 drivers/clk/clk-mb86s7x.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt b/Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
+>> new file mode 100644
+>> index 0000000..3323962
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
+>> @@ -0,0 +1,26 @@
+>> +Fujitsu CRG11 clock driver bindings
+>> +-----------------------------------
+>> +
+>> +Required properties :
+>> +- compatible : Shall contain "fujitsu,mb86s70-crg11"
+>> +- #clock-cells : Shall be 3 {cntrlr domain port}
+>> +
+>> +The consumer specifies the desired clock pointing to its phandle.
+>> +
+>> +Example:
+>> +
+>> +       clock: crg11 {
+>> +               compatible = "fujitsu,mb86s70-crg11";
+>> +               #clock-cells = <3>;
+>> +       };
+>> +
+>> +       mhu: mhu0 at 2b1f0000 {
+>> +               #mbox-cells = <1>;
+>> +               compatible = "arm,mhu";
+>> +               reg = <0 0x2B1F0000 0x1000>;
+>> +               interrupts = <0 36 4>, /* LP Non-Sec */
+>> +                            <0 35 4>, /* HP Non-Sec */
+>> +                            <0 37 4>; /* Secure */
+>> +               clocks = <&clock 0 2 1>; /* Cntrlr:0 Domain:2 Port:1 */
+>
+> Some preprocessor definitions would be better than hardcoding the values
+> for Cntrlr, Domain and Port. The DT include chroot should help you
+> here. Doing so will help you maintain this stuff into the future :-)
+>
+What macros do you have in mind? I was actually made to get rid of
+macros in earlier version, but the implementation was different then.
+I hope
+     #clock-cells : Shall be 3 {cntrlr domain port}
+in the binding should be telling enough.
 
-OK.
-It's checked a little more.
-
-Thanks.
-
-> -- 
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
-
--- 
-Yoshinori Sato
-<ysato@users.sourceforge.jp>
+Thanks
+jassi
