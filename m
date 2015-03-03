@@ -1,54 +1,45 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 3 Mar 2015 12:18:46 +0200
-Subject: [PATCH] mtd: nand: pxa3xx: Switch FIFO draining to jiffies-based
- timeout
-In-Reply-To: <1425376529-1860-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1425376529-1860-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150303101846.GO15668@tarshish>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue,  3 Mar 2015 11:16:45 +0100
+Subject: [PATCH v5] ARM: mvebu: a385-db-ap: Enable the NAND
+Message-ID: <1425377805-20573-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+The Armada 385 Access Point Development Board has a 1GB NAND SLC chip from
+Micron as its main storage. Enable it.
 
-On Tue, Mar 03, 2015 at 10:55:29AM +0100, Maxime Ripard wrote:
-> Now that the driver handles the FIFO draining in a threaded interrupt, we can
-> base our timeout on jiffies and sleeping, instead of using mdelay.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/mtd/nand/pxa3xx_nand.c | 9 ++++-----
->  1 file changed, 4 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index 3f09f2e9aeb4..1eb957c347cd 100644
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -496,16 +496,15 @@ static void drain_fifo(struct pxa3xx_nand_info *info, void *data, int len)
->  		while (len > 8) {
->  			__raw_readsl(info->mmio_base + NDDB, data, 8);
->  
-> -			for (timeout = 0;
-> -			     !(nand_readl(info, NDSR) & NDSR_RDDREQ);
-> -			     timeout++) {
-> -				if (timeout >= 5) {
-> +			timeout = jiffies + msecs_to_jiffies(5);
-> +			while (!(nand_readl(info, NDSR) & NDSR_RDDREQ)) {
-> +				if (!time_before(jiffies, timeout)) {
->  					dev_err(&info->pdev->dev,
->  						"Timeout on RDDREQ while draining the FIFO\n");
->  					return;
->  				}
->  
-> -				mdelay(1);
-> +				msleep(1);
->  			}
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+Changes from v4:
+  - Rebased on top of 4.0-rc1
 
-You may want to consider using readl_relaxed_poll_timeout() from 
-linux/iopoll.h, which was introduced in v4.0-rc1.
 
-baruch
+ arch/arm/boot/dts/armada-385-db-ap.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
+diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
+index 57b9119fb3e0..9e33f7d7276b 100644
+--- a/arch/arm/boot/dts/armada-385-db-ap.dts
++++ b/arch/arm/boot/dts/armada-385-db-ap.dts
+@@ -150,6 +150,19 @@
+ 				phy = <&phy0>;
+ 				phy-mode = "rgmii-id";
+ 			};
++
++			nfc: flash at d0000 {
++				status = "okay";
++				#address-cells = <1>;
++				#size-cells = <1>;
++
++				num-cs = <1>;
++				nand-ecc-strength = <4>;
++				nand-ecc-step-size = <512>;
++				marvell,nand-keep-config;
++				marvell,nand-enable-arbiter;
++				nand-on-flash-bbt;
++			};
+ 		};
+ 
+ 		pcie-controller {
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+2.3.0
