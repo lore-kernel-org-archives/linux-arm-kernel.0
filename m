@@ -1,56 +1,89 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 3 Mar 2015 12:52:13 -0500
-Subject: [PATCH v8 6/7] PCI: Update DMA configuration from DT
+Date: Tue, 3 Mar 2015 12:52:12 -0500
+Subject: [PATCH v8 5/7] of/pci: Add of_pci_dma_configure() to update DMA
+ configuration
 In-Reply-To: <1425405134-24707-1-git-send-email-m-karicheri2@ti.com>
 References: <1425405134-24707-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1425405134-24707-7-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1425405134-24707-6-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If there is a DT node available for the root bridge's parent device, use
-the DMA configuration from that device node.  For example, Keystone PCI
-devices would require dma_pfn_offset to be set correctly in the device
-structure of the PCI device in order to have the correct DMA mask.  The DT
-node will have dma-ranges defined for this.  Also support using the DT
-property dma-coherent to allow coherent DMA operation by the PCI device.
-
-Use the new helper function of_pci_dma_configure() to update the device DMA
-configuration.  This fixes DMA on systems where DMA addresses are a
-constant offset from CPU physical addresses.
+Add of_pci_dma_configure() to allow updating the DMA configuration of the
+PCI device using the configuration from DT of the parent of the root bridge
+device.  Use the newly added APIs pci_get/put_host_bridge_device() for
+implementing this.
 
 Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> (AMD Seattle)
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Rob Herring <robh+dt@kernel.org>
 Acked-by: Will Deacon <will.deacon@arm.com>
 CC: Joerg Roedel <joro@8bytes.org>
 CC: Grant Likely <grant.likely@linaro.org>
-CC: Rob Herring <robh+dt@kernel.org>
 CC: Russell King <linux@arm.linux.org.uk>
 CC: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/pci/probe.c |    2 ++
- 1 file changed, 2 insertions(+)
+ drivers/of/of_pci.c    |   18 ++++++++++++++++++
+ include/linux/of_pci.h |    3 +++
+ 2 files changed, 21 insertions(+)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 8d2f400..413c1dd 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -6,6 +6,7 @@
- #include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/pci.h>
-+#include <linux/of_pci.h>
- #include <linux/pci_hotplug.h>
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 62426d8..86d3c38 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -2,6 +2,7 @@
+ #include <linux/export.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/of_pci.h>
  #include <linux/slab.h>
- #include <linux/module.h>
-@@ -1520,6 +1521,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
- 	dev->dev.dma_mask = &dev->dma_mask;
- 	dev->dev.dma_parms = &dev->dma_parms;
- 	dev->dev.coherent_dma_mask = 0xffffffffull;
-+	of_pci_dma_configure(dev);
  
- 	pci_set_dma_max_seg_size(dev, 65536);
- 	pci_set_dma_seg_boundary(dev, 0xffffffff);
+@@ -116,6 +117,23 @@ int of_get_pci_domain_nr(struct device_node *node)
+ }
+ EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
+ 
++/**
++ * of_pci_dma_configure - Setup DMA configuration
++ * @dev: ptr to pci_dev struct of the pci device
++ *
++ * Function to update PCI devices's DMA configuration using the same
++ * info from the OF node of root host bridge's parent.
++ */
++void of_pci_dma_configure(struct pci_dev *pci_dev)
++{
++	struct device *dev = &pci_dev->dev;
++	struct device *bridge = pci_get_host_bridge_device(pci_dev);
++
++	of_dma_configure(dev, bridge->parent->of_node);
++	pci_put_host_bridge_device(bridge);
++}
++EXPORT_SYMBOL_GPL(of_pci_dma_configure);
++
+ #if defined(CONFIG_OF_ADDRESS)
+ /**
+  * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
+diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+index ce0e5ab..29fd3fe 100644
+--- a/include/linux/of_pci.h
++++ b/include/linux/of_pci.h
+@@ -16,6 +16,7 @@ int of_pci_get_devfn(struct device_node *np);
+ int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
+ int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+ int of_get_pci_domain_nr(struct device_node *node);
++void of_pci_dma_configure(struct pci_dev *pci_dev);
+ #else
+ static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
+ {
+@@ -50,6 +51,8 @@ of_get_pci_domain_nr(struct device_node *node)
+ {
+ 	return -1;
+ }
++
++static inline void of_pci_dma_configure(struct pci_dev *pci_dev) { }
+ #endif
+ 
+ #if defined(CONFIG_OF_ADDRESS)
 -- 
 1.7.9.5
