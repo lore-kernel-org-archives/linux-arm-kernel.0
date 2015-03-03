@@ -1,38 +1,35 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Tue,  3 Mar 2015 11:39:38 -0800
-Subject: [PATCH v2 0/3] drivers: net: xgene: Fix backward compatibility of
- newer firmware with older kernel
-Message-ID: <1425411581-25463-1-git-send-email-isubramanian@apm.com>
+Date: Tue,  3 Mar 2015 11:39:39 -0800
+Subject: [PATCH v2 1/3] Documentation: dts: Update compatible field
+ description for APM X-Gene
+In-Reply-To: <1425411581-25463-1-git-send-email-isubramanian@apm.com>
+References: <1425411581-25463-1-git-send-email-isubramanian@apm.com>
+Message-ID: <1425411581-25463-2-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kernel 3.17 driver supports only RGMII ethernet interface.
-Since the Tianocore DT contains same compatibility string for RGMII,
-SGMII based 1G and XFI based 10G interfaces, crash happens when probe called
-on SGMII based 1G and XFI based 10G interface.
-
-This patch fixes the backward compatibility of the older driver with the
-newer firmware by making the binding unique so that the older driver won't
-recognize the non-supported interfaces.
-
-v2: Address comments from v1
-* updated cover letter subject line with net: xgene
-* Documentation: formatted compatible string values as list
-
-v1:
-* Initial version
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
 ---
-
-Iyappan Subramanian (3):
-  Documentation: dts: Update compatible field description for APM X-Gene
-  dtb: change binding name to match with newer firmware DT
-  drivers: net: xgene: fix new firmware backward compatibility with
-    older driver
-
  Documentation/devicetree/bindings/net/apm-xgene-enet.txt | 5 ++++-
- arch/arm64/boot/dts/apm/apm-storm.dtsi                   | 4 ++--
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c         | 4 ++++
- 3 files changed, 10 insertions(+), 3 deletions(-)
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
+diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+index cfcc527..6151999 100644
+--- a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
++++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+@@ -4,7 +4,10 @@ Ethernet nodes are defined to describe on-chip ethernet interfaces in
+ APM X-Gene SoC.
+ 
+ Required properties for all the ethernet interfaces:
+-- compatible: Should be "apm,xgene-enet"
++- compatible: Should state binding information from the following list,
++  - "apm,xgene-enet":    RGMII based 1G interface
++  - "apm,xgene1-sgenet": SGMII based 1G interface
++  - "apm,xgene1-xgenet": XFI based 10G interface
+ - reg: Address and length of the register set for the device. It contains the
+   information of registers in the same order as described by reg-names
+ - reg-names: Should contain the register set names
 -- 
 1.9.1
