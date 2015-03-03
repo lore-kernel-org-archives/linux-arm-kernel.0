@@ -1,33 +1,33 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 03 Mar 2015 09:28:39 +0000
-Subject: [RFC PATCH 0/4] make memtest a generic kernel feature
-In-Reply-To: <20150302151400.GI15668@tarshish>
-References: <1425308145-20769-1-git-send-email-vladimir.murzin@arm.com>
- <20150302151400.GI15668@tarshish>
-Message-ID: <54F57EC7.1060202@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue,  3 Mar 2015 10:32:23 +0100
+Subject: [PATCH 0/5] simple-mfd and syscon LEDs
+Message-ID: <1425375148-4369-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/15 15:14, Baruch Siach wrote:
-> Hi Vladimir,
-> 
-> On Mon, Mar 02, 2015 at 02:55:41PM +0000, Vladimir Murzin wrote:
->> Memtest is a simple feature which fills the memory with a given set of
->> patterns and validates memory contents, if bad memory regions is detected it
->> reserves them via memblock API. Since memblock API is widely used by other
->> architectures this feature can be enabled outside of x86 world.
->>
->> This patch set promotes memtest to live under generic mm umbrella and enables
->> memtest feature for arm/arm64.
-> 
-> Please update the architectures list in the 'memtest' entry at 
-> Documentation/kernel-parameters.txt.
+This patch series implements a suggestion from Lee Jones on how to
+resolve the dilemma with subnodes under syscons that do things like
+the simple syscon LEDs.
 
-Thanks for pointing at it. I'll add updates for documentation to my next
-version.
+Please see the bigger picture, this is not about LEDs only but any
+simple subnodes under an MFD.
 
-Vladimir
+Linus Walleij (5):
+  MFD/OF: document MFD devices and handle simple-mfd
+  ARM: dts: update syscons to use simple-mfd
+  leds: syscon: instantiate from platform device
+  arm64: juno: Add APB registers and LEDs using syscon
+  arm64: add LEDs and some trigger support to defconfig
 
-> 
-> baruch
-> 
+ Documentation/devicetree/bindings/mfd/mfd.txt |  40 ++++++
+ arch/arm/boot/dts/arm-realview-pb1176.dts     |   2 +-
+ arch/arm/boot/dts/integrator.dtsi             |   4 +-
+ arch/arm64/boot/dts/arm/juno-motherboard.dtsi |  68 +++++++++++
+ arch/arm64/configs/defconfig                  |   6 +
+ drivers/leds/leds-syscon.c                    | 170 +++++++++++++-------------
+ drivers/of/platform.c                         |   1 +
+ 7 files changed, 203 insertions(+), 88 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/mfd.txt
+
+-- 
+1.9.3
