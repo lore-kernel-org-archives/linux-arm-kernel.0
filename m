@@ -1,41 +1,70 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 03 Mar 2015 11:56:21 +0000
-Subject: [PATCH] clocksource: arm_arch_timer: Rename arch_timer_probed
- to reflect behaviour
-In-Reply-To: <1634669.Cj7rnHN4gq@avalon>
-References: <1421488012-5098-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <54C56582.6080809@linaro.org> <1634669.Cj7rnHN4gq@avalon>
-Message-ID: <54F5A165.4010408@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 03 Mar 2015 12:15:58 +0000
+Subject: [RFC PATCH v2 2/3] arm64: add IOMMU dma_ops
+In-Reply-To: <1425353927.4555.10.camel@mhfsdcap03>
+References: <cover.1423226542.git.robin.murphy@arm.com>			
+ <058e038009ac708a40197c80e07410914c2a162e.1423226542.git.robin.murphy@arm.com>		
+ <1423543151.18280.2.camel@mtksdaap41> <54D9F486.10501@arm.com>	
+ <1423901011.27922.7.camel@mhfsdcap03> <54E24D50.408@arm.com>
+ <1425353927.4555.10.camel@mhfsdcap03>
+Message-ID: <54F5A5FE.3040506@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 01/03/15 13:00, Laurent Pinchart wrote:
-> Hello,
+On 03/03/15 03:38, Yong Wu wrote:
+> On Mon, 2015-02-16 at 20:04 +0000, Robin Murphy wrote:
 >
-> On Sunday 25 January 2015 22:52:02 Daniel Lezcano wrote:
->> On 01/17/2015 10:46 AM, Laurent Pinchart wrote:
->>> The arch_timer_probed function returns whether the given time doesn't
->>> need to be probed. This can be the case when the timer has been probed
->>> already, but also when it has no corresponding enabled node in DT.
->>>
->>> Rename the function to arch_timer_need_probe and invert its return value
->>> to better reflect the function's purpose and behaviour.
->>>
->>> Signed-off-by: Laurent Pinchart
->>> <laurent.pinchart+renesas@ideasonboard.com>
+>>>        2)int (*domain_init)(struct iommu_domain *domain);
+>>>          About this function, it will alloc pagetable for the iommu
+>>> domain. And We expect the pagetable memory is uncacheable, so try to
+>>> call "dma_alloc_coherent", unfortunately the "struct device *" can't be
+>>> passed into this function. so is it possible if adding a parameter in
+>>> this function.
 >>
->> I would like to have an ack from Sudeep or Mark (Cc'ed) before taking
->> this patch.
+>> ...one of the ideas of the new of_iommu_configure framework is that
+>> iommu_ops structures can represent individual IOMMU devices if
+>> necessary. The ops->priv pointer was included for that purpose, but
+>> isn't very clean so Will has plans to remove it again - it's easy enough
+>> to achieve the same effect by having the driver embed the ops in its
+>> private instance data instead. I've done that with the ARM SMMU driver
+>> which has a similar issue of needing hardware details at domain_init()
+>> time (no patches ready yet but I have an iommu/dev branch on top of the
+>> iommu/dma branch with some current work-in-progress bits)
+>>
+>> Thanks,
+>> Robin.
+>>
+> Dear Robin,
+>          Thanks very much for your suggestion.
 >
-> Sudeep, Mark, ping ?
+>          I have a more question: how to do cache maintenance in arm64.
 >
+>          a) "__dma_flush_range" can not be expected to used directly.
+>          b) Following Documentation\DMA-API.txt, section: Streaming DMA
+> mappings. dma_map_single should be used, But I am not sure how to pass
+> the first "struct device *".
+>           We have a device which call arch_setup_dma_ops to create the
+> iommu domain, if we use this device, it will enter __iommu_map_page;
+>          If we input NULL for dmap_map_single, it will assert at
+> dma_capable in swiotlb_map_page...
 
-Looks fine to me. I just wanted to test on KVM which I had broke once
-previously though this change is pretty straight forward and simple.
+Consider that the IOMMU's page table walker is a DMA master in its own 
+right, and that is the device you're mapping the page tables for. 
+Therefore your IOMMU driver needs to have access to the struct device of 
+the IOMMU itself to use for the page-table-related mappings. Also, be 
+sure to set the IOMMU's DMA mask correctly to prevent SWIOTLB bounce 
+buffers being created in the process (which as I've found generally ends 
+in disaster).
 
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+>          And normally, we always need do cache maintenance only for some
+> bytes in the pagetable but not whole a page. Then is there a easy way to
+> do the cache maintenance?
 
-Regards,
-Sudeep
+For a noncoherent device, dma_map_single() will end up calling 
+__dma_map_area() with the page offset and size of the original request, 
+so the updated part gets flushed by VA, and the rest of the page isn't 
+touched if it doesn't need to be. On the other hand if the page tables 
+were allocated with dma_alloc_coherent() in the first place, then just 
+calling dma_sync_single_for_device() for the updated region should suffice.
+
+Robin.
