@@ -1,64 +1,94 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Tue, 03 Mar 2015 09:46:41 -0800
-Subject: [RFC PATCH 1/4] mm: move memtest under /mm
-In-Reply-To: <54F57D4C.9010909@arm.com>
-References: <1425308145-20769-1-git-send-email-vladimir.murzin@arm.com>
- <1425308145-20769-2-git-send-email-vladimir.murzin@arm.com>
- <54F513C0.4000706@infradead.org> <54F57D4C.9010909@arm.com>
-Message-ID: <54F5F381.30104@infradead.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 3 Mar 2015 11:47:44 -0600
+Subject: [PATCH 1/5] MFD/OF: document MFD devices and handle simple-mfd
+In-Reply-To: <1425375148-4369-2-git-send-email-linus.walleij@linaro.org>
+References: <1425375148-4369-1-git-send-email-linus.walleij@linaro.org>
+ <1425375148-4369-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAL_JsqLjooPxPdG2+fqSJToyWCtZHB=FvkqCUt+WgHExNo7D=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/15 01:22, Vladimir Murzin wrote:
-> On 03/03/15 01:52, Randy Dunlap wrote:
->> On 03/02/15 06:55, Vladimir Murzin wrote:
->>> There is nothing platform dependent in the core memtest code, so other platform
->>> might benefit of this feature too.
->>>
->>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->>> ---
->>>  arch/x86/Kconfig            |   11 ----
->>>  arch/x86/include/asm/e820.h |    8 ---
->>>  arch/x86/mm/Makefile        |    2 -
->>>  arch/x86/mm/memtest.c       |  118 -------------------------------------------
->>>  include/linux/memblock.h    |    8 +++
->>>  lib/Kconfig.debug           |   11 ++++
->>>  mm/Makefile                 |    1 +
->>>  mm/memtest.c                |  118 +++++++++++++++++++++++++++++++++++++++++++
->>>  8 files changed, 138 insertions(+), 139 deletions(-)
->>>  delete mode 100644 arch/x86/mm/memtest.c
->>>  create mode 100644 mm/memtest.c
->>
->>> diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
->>> index c5cefb3..8eb064fd 100644
->>> --- a/lib/Kconfig.debug
->>> +++ b/lib/Kconfig.debug
->>> @@ -1732,6 +1732,17 @@ config TEST_UDELAY
->>>  
->>>  	  If unsure, say N.
->>>  
->>> +config MEMTEST
->>> +	bool "Memtest"
->>> +	---help---
->>> +	  This option adds a kernel parameter 'memtest', which allows memtest
->>> +	  to be set.
->>> +	        memtest=0, mean disabled; -- default
->>> +	        memtest=1, mean do 1 test pattern;
->>> +	        ...
->>> +	        memtest=4, mean do 4 test patterns.
->>
->> This sort of implies a max of 4 test patterns, but it seems to be 17
->> if I counted correctly, so if someone wants to test all of the possible
->> 'memtest' patterns, they would need to use 'memtest=17', is that correct?
->>
-> 
-> Yes, that correct. Additional patterns were introduced since 63823126
-> "x86: memtest: add additional (regular) test patterns", but looks like
-> Kconfig was not updated that time. Do you want me to fold updates for
-> that info or make a separate patch?
+On Tue, Mar 3, 2015 at 3:32 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> This defines a new compatible option for MFD devices "simple-mfd" that will
+> make the OF core spawn child devices for all subnodes of that MFD device.
+> It is optional but handy for things like syscon and possibly other
+> simpler MFD devices.
+>
+> Since there was no file to put the documentation in, I took this opportunity
+> to make a small writeup on MFD devices and add the compatible definition
+> there.
+>
+> Suggested-by: Lee Jones <lee.jones@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Devicetree <devicetree@vger.kernel.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> I make the patch to the OF core in this one, it makes much more sense since
+> it's a oneliner
+>
+> Lee: this is a (tested!) implementation of your suggestion for simple-mfd.
+> If you can eventually ACK this from the MFD side, I think it should be
+> funneled through the ARM SoC tree.
+>
+> Grant/Rob: if either of you can ACK the change to the OF core likewise it can
+> be taken through ARM SoC.
+>
+> DT binings maintainers: there is some background discussion on this here:
+> http://marc.info/?l=linux-arm-kernel&m=142486676603889&w=2
+> http://marc.info/?l=devicetree&m=142166313621469&w=2
+> ---
+>  Documentation/devicetree/bindings/mfd/mfd.txt | 40 +++++++++++++++++++++++++++
+>  drivers/of/platform.c                         |  1 +
+>  2 files changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/mfd.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mfd/mfd.txt b/Documentation/devicetree/bindings/mfd/mfd.txt
+> new file mode 100644
+> index 000000000000..cc057438abe8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/mfd.txt
+> @@ -0,0 +1,40 @@
+> +Multi-Function Devices (MFD)
+> +
+> +These devices comprise a nexus for heterogeneous hardware blocks spawning
+> +multiple child devices.
+> +
+> +A typical MFD can be:
+> +
+> +- A mixed signal ASIC on an external bus, sometimes a PMIC (power management
+> +  integrated circuit) that is manufactured in a lower technology node (rough
+> +  silicon) that handles analog drivers for things like audio amplifiers, LED
+> +  drivers, level shifters, PHY (physical interfaces to things like USB or
+> +  ethernet), regulators etc.
+> +
+> +- A range of memory registers containing "miscellaneous system registers" also
+> +  known as a system controller "syscon" or any other memory range containing a
+> +  mix of unrelated registers.
+> +
+> +Optional properties:
+> +
+> +- compatible : "simple-mfd" - this signifies that the operating system should
+> +  spawn child devices for all the subnodes of the MFD device akin to how
+> +  "simple-bus" inidicates when to spawn children for a simple memory-mapped
+> +  bus. For more complex devices, when the nexus driver has to probe registers
+> +  to figure out what children exist etc, this should not be used. In the latter
+> +  case the child devices will be instantiated by the operating system.
 
-Either is OK with me but it probably should be a separate patch.
+If you point of_platform_populate to the parent node, it should
+instantiate all children regardless of "simple-bus" or any other
+match. The match is to probe the grandchildren. I could be mistaken,
+but that's how it works at the root level. You don't have a driver
+probe for the parent, so you want the top level of_platform_populate
+call to instantiate these devices?
 
-Thanks.
--- 
-~Randy
+Why does simple-bus not work for you? After all, it is not
+"simple-memory-map-bus."
+
+Rob
