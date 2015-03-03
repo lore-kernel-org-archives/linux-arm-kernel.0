@@ -1,66 +1,51 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 03 Mar 2015 09:22:20 +0000
-Subject: [RFC PATCH 1/4] mm: move memtest under /mm
-In-Reply-To: <54F513C0.4000706@infradead.org>
-References: <1425308145-20769-1-git-send-email-vladimir.murzin@arm.com>
- <1425308145-20769-2-git-send-email-vladimir.murzin@arm.com>
- <54F513C0.4000706@infradead.org>
-Message-ID: <54F57D4C.9010909@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Mar 2015 10:23:06 +0100
+Subject: EDAC on arm64
+In-Reply-To: <20150302222502.GA13277@MBP.local>
+References: <54F11133.70909@redhat.com> <2937202.iu6lrkO1gm@wuerfel>
+ <20150302222502.GA13277@MBP.local>
+Message-ID: <2550695.nbkPi0RDF3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/15 01:52, Randy Dunlap wrote:
-> On 03/02/15 06:55, Vladimir Murzin wrote:
->> There is nothing platform dependent in the core memtest code, so other platform
->> might benefit of this feature too.
->>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->> ---
->>  arch/x86/Kconfig            |   11 ----
->>  arch/x86/include/asm/e820.h |    8 ---
->>  arch/x86/mm/Makefile        |    2 -
->>  arch/x86/mm/memtest.c       |  118 -------------------------------------------
->>  include/linux/memblock.h    |    8 +++
->>  lib/Kconfig.debug           |   11 ++++
->>  mm/Makefile                 |    1 +
->>  mm/memtest.c                |  118 +++++++++++++++++++++++++++++++++++++++++++
->>  8 files changed, 138 insertions(+), 139 deletions(-)
->>  delete mode 100644 arch/x86/mm/memtest.c
->>  create mode 100644 mm/memtest.c
+On Monday 02 March 2015 22:25:16 Catalin Marinas wrote:
+> On Mon, Mar 02, 2015 at 08:40:16PM +0100, Arnd Bergmann wrote:
+> > On Monday 02 March 2015 14:58:41 Catalin Marinas wrote:
+> > > On Mon, Mar 02, 2015 at 10:59:32AM +0000, Will Deacon wrote:
+> > > > On Sat, Feb 28, 2015 at 12:52:03AM +0000, Jon Masters wrote:
+> > > > > Have you considered reviving the patch you posted previously for EDAC
+> > > > > support (the atomic_scrub read/write test piece dependency)?
+> > > > > 
+> > > > > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249039.html
+> > > > 
+> > > > Well, we'd need a way to handle the non-coherent DMA case and it's really
+> > > > not clear how to fix that.
+> > > 
+> > > I agree, that's where the discussions stopped. Basically the EDAC memory
+> > > writing is racy with any non-cacheable memory accesses (by CPU or
+> > > device). The only way we could safely use this is only if all the
+> > > devices are coherent *and* KVM is disabled. With KVM, guests may access
+> > > the memory uncached, so we hit the same problem.
+> > 
+> > Is this a setting of the host, or does the guest always have this capability?
 > 
->> diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
->> index c5cefb3..8eb064fd 100644
->> --- a/lib/Kconfig.debug
->> +++ b/lib/Kconfig.debug
->> @@ -1732,6 +1732,17 @@ config TEST_UDELAY
->>  
->>  	  If unsure, say N.
->>  
->> +config MEMTEST
->> +	bool "Memtest"
->> +	---help---
->> +	  This option adds a kernel parameter 'memtest', which allows memtest
->> +	  to be set.
->> +	        memtest=0, mean disabled; -- default
->> +	        memtest=1, mean do 1 test pattern;
->> +	        ...
->> +	        memtest=4, mean do 4 test patterns.
-> 
-> This sort of implies a max of 4 test patterns, but it seems to be 17
-> if I counted correctly, so if someone wants to test all of the possible
-> 'memtest' patterns, they would need to use 'memtest=17', is that correct?
-> 
+> The guest can always make it stricter than what the host set in stage 2
+> (i.e. from Normal Cacheable -> NonCacheable -> Device) but never in the
+> other direction.
 
-Yes, that correct. Additional patterns were introduced since 63823126
-"x86: memtest: add additional (regular) test patterns", but looks like
-Kconfig was not updated that time. Do you want me to fold updates for
-that info or make a separate patch?
+Do you have an idea what the purpose of this is? Why would a guest
+even want to mark pages as noncachable that are mapped into the
+host as cachable and that might have dirty cache lines?
 
-Thanks
-Vladimir
+> > If a guest can influence the caching of a page it has access to, I can
+> > imagine all sorts of security problems with malicious guests regardless
+> > of EDAC.
+> 
+> Not as long as the host is aware of this. Basically it needs to flush
+> the cache on a page when it is mapped into the guest address space (IPA)
+> and flush it again when reading a page from guest.
 
-> 
->> +	  If you are unsure how to answer this question, answer N.
-> 
-> Thanks,
-> 
+You have to flush and invalidate the cache line, but of course nobody
+wants to do that because it totally destroys performance.
+
+	Arnd
