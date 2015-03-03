@@ -1,57 +1,99 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 2 Mar 2015 21:03:01 -0600
-Subject: [PATCH v4 12/30] PCI: Introduce pci_host_bridge_ops to support
- host specific operations
-In-Reply-To: <1424938344-4017-13-git-send-email-wangyijing@huawei.com>
+Date: Mon, 2 Mar 2015 21:10:59 -0600
+Subject: [PATCH v4 20/30] PCI/sparc: Use pci_scan_root_bridge() for
+ simplicity
+In-Reply-To: <1424938344-4017-21-git-send-email-wangyijing@huawei.com>
 References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
- <1424938344-4017-13-git-send-email-wangyijing@huawei.com>
-Message-ID: <20150303030301.GI11978@google.com>
+ <1424938344-4017-21-git-send-email-wangyijing@huawei.com>
+Message-ID: <20150303031059.GJ11978@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 04:12:06PM +0800, Yijing Wang wrote:
-> Now we have weak functions like pcibios_root_bridge_prepare()
-> to setup pci host bridge, We could introduce pci_host_bridge_ops
-> which contain host bridge specific ops to setup pci_host_bridge.
-> Then host bridge driver could add pci_host_bridge_ops hooks
-> intead of weak function to setup pci_host_bridge.
-> This patch add following pci_host_bridge_ops hooks:
-> 
-> pci_host_bridge_ops {
-> 	/* set root bus speed, some platform need this like powerpc */
-> 	void (*phb_set_root_bus_speed)(struct pci_host_bridge *host);
-> 	/* setup pci_host_bridge before pci_host_bridge be added to driver core */
-> 	int (*phb_prepare)(struct pci_host_bridge *host);
-> 	/* platform specific of scan hook to scan pci device */
-> 	void (*phb_of_scan_bus)(struct pci_host_bridge *);
-> }
-> We could easily extend it to support different host bridge
-> specific operations.
+On Thu, Feb 26, 2015 at 04:12:14PM +0800, Yijing Wang wrote:
+> Now we could use pci_scan_root_bridge() to scan
+> pci buses, provide sparc specific pci_host_bridge_ops.
 > 
 > Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> ...
-
-> @@ -2050,10 +2052,13 @@ static struct pci_bus *__pci_scan_root_bus(
->  		pci_bus_insert_busn_res(b, b->number, 255);
+> CC: "David S. Miller" <davem@davemloft.net>
+> CC: sparclinux at vger.kernel.org
+> ---
+>  arch/sparc/kernel/pci.c |   32 ++++++++++++++++++++++----------
+>  1 files changed, 22 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/sparc/kernel/pci.c b/arch/sparc/kernel/pci.c
+> index 0af7c58..03e7376 100644
+> --- a/arch/sparc/kernel/pci.c
+> +++ b/arch/sparc/kernel/pci.c
+> @@ -650,12 +650,25 @@ static void pci_claim_bus_resources(struct pci_bus *bus)
+>  		pci_claim_bus_resources(child_bus);
+>  }
+>  
+> +static void pci_host_bridge_of_scan_bus(
+> +		struct pci_host_bridge *host)
+> +{
+> +	struct pci_pbm_info *pbm = dev_get_drvdata(&host->dev);
+> +	struct device_node *node = pbm->op->dev.of_node;
+> +
+> +	pci_of_scan_bus(pbm, node, host->bus);
+> +}
+> +
+> +static struct pci_host_bridge_ops phb_ops = {
+> +	.phb_of_scan_bus = pci_host_bridge_of_scan_bus,
+> +};
+> +
+>  struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
+>  				 struct device *parent)
+>  {
+>  	LIST_HEAD(resources);
+>  	struct device_node *node = pbm->op->dev.of_node;
+> -	struct pci_bus *bus;
+> +	struct pci_host_bridge *host;
+>  
+>  	printk("PCI: Scanning PBM %s\n", node->full_name);
+>  
+> @@ -667,23 +680,22 @@ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
+>  	pbm->busn.end	= pbm->pci_last_busno;
+>  	pbm->busn.flags	= IORESOURCE_BUS;
+>  	pci_add_resource(&resources, &pbm->busn);
+> -	bus = pci_create_root_bus(parent, 
+> +	host = pci_scan_root_bridge(parent, 
+>  			PCI_DOMBUS(pbm->index, pbm->pci_first_busno), 
+> -			pbm->pci_ops, pbm, &resources);
+> -	if (!bus) {
+> -		printk(KERN_ERR "Failed to create bus for %s\n",
+> +			pbm->pci_ops, pbm, &resources, &phb_ops);
+> +	if (!host) {
+> +		printk(KERN_ERR "Failed to create host bridge for %s\n",
+>  		       node->full_name);
+>  		pci_free_resource_list(&resources);
+>  		return NULL;
 >  	}
 >  
-> -	max = pci_scan_child_bus(b);
-> -
-> -	if (!found)
-> -		pci_bus_update_busn_res_end(b, max);
-> +	if (host->ops && host->ops->phb_of_scan_bus) {
-> +		host->ops->phb_of_scan_bus(host);
-
-The important thing here is not the use of OF (Open Firmware/Device Tree),
-is it?  Why would we want "_of_" in the function name?  I assume the intent
-is that this host bridge op performs the same function as
-pci_scan_child_bus(), so I think the op should be called "scan_bus".
-
-> +	} else {
-> +		max = pci_scan_child_bus(b);
-> +		if (!found)
-> +			pci_bus_update_busn_res_end(b, max);
-> +	}
+> -	pci_of_scan_bus(pbm, node, bus);
+> -	pci_bus_add_devices(bus);
+> -	pci_bus_register_of_sysfs(bus);
+> +	pci_bus_add_devices(host->bus);
+> +	pci_bus_register_of_sysfs(host->bus);
 >  
->  	return b;
+> -	pci_claim_bus_resources(bus);
+> +	pci_claim_bus_resources(host->bus);
+
+Isn't this a case where pci_claim_bus_resources() should be done before
+pci_bus_add_devices()?  You didn't introduce this problem, but since you're
+fixing similar issues, seems like we should fix this one, too.  In a patch
+of its own, of course.
+
+>  
+> -	return bus;
+> +	return host->bus;
 >  }
+>  
+>  void pcibios_fixup_bus(struct pci_bus *pbus)
+> -- 
+> 1.7.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
