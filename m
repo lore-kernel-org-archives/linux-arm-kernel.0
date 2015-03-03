@@ -1,101 +1,109 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  3 Mar 2015 11:43:14 +0100
-Subject: [PATCH v2 1/7] irqchip: armada-370-xp: Initialize per cpu registers
- when CONFIG_SMP=N
+Date: Tue,  3 Mar 2015 11:43:16 +0100
+Subject: [PATCH v2 3/7] irqchip: armada-370-xp: Enable the PMU interrupts
 In-Reply-To: <1425379400-4346-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1425379400-4346-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1425379400-4346-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1425379400-4346-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+In order to let the Performance Monitoring Unit interrupts flowing in the MPIC,
+we need to unmask these interrupts in the Coherency Fabric Local Interrupt Mask
+Register.
 
-The irqchip driver called armada_xp_mpic_smp_cpu_init() when CONFIG_SMP=Y
-to initialize some per cpu registers. The function is called on each
-CPU by calling it explicitly on the boot CPU and then using a CPU notifier
-for the non boot CPUs.
+Since this register is a CPU-local register, unmasking this interrupt needs to
+be done on the boot CPU when the driver initializes, but also on the secondary
+CPU when they are brought up.
 
-This commit removes the CONFIG_SMP constrain, so the per cpu registers are
-also initialized when CONFIG_SMP=N, which is the right thing to do.
-
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/irqchip/irq-armada-370-xp.c | 47 ++++++++++++++++++-------------------
- 1 file changed, 23 insertions(+), 24 deletions(-)
+ drivers/irqchip/irq-armada-370-xp.c | 23 ++++++++++++++++++++---
+ 1 file changed, 20 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 4387dae14e45..b455c876974e 100644
+index ea57fba263cf..b36373c019ba 100644
 --- a/drivers/irqchip/irq-armada-370-xp.c
 +++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -308,28 +308,6 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
- 	return 0;
- }
+@@ -38,6 +38,8 @@
+ /* Interrupt Controller Registers Map */
+ #define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
+ #define ARMADA_370_XP_INT_CLEAR_MASK_OFFS	(0x4C)
++#define ARMADA_370_XP_INT_FABRIC_MASK_OFFS	(0x54)
++#define ARMADA_370_XP_INT_CAUSE_PERF(cpu)	(1 << cpu)
  
--#ifdef CONFIG_SMP
--static void armada_mpic_send_doorbell(const struct cpumask *mask,
--				      unsigned int irq)
--{
--	int cpu;
--	unsigned long map = 0;
--
--	/* Convert our logical CPU mask into a physical one. */
--	for_each_cpu(cpu, mask)
--		map |= 1 << cpu_logical_map(cpu);
--
--	/*
--	 * Ensure that stores to Normal memory are visible to the
--	 * other CPUs before issuing the IPI.
--	 */
--	dsb();
--
--	/* submit softirq */
--	writel((map << 8) | irq, main_int_base +
--		ARMADA_370_XP_SW_TRIG_INT_OFFS);
--}
--
- static void armada_xp_mpic_smp_cpu_init(void)
+ #define ARMADA_370_XP_INT_CONTROL		(0x00)
+ #define ARMADA_370_XP_INT_SET_ENABLE_OFFS	(0x30)
+@@ -56,6 +58,7 @@
+ #define ARMADA_370_XP_MAX_PER_CPU_IRQS		(28)
+ 
+ #define ARMADA_370_XP_TIMER0_PER_CPU_IRQ	(5)
++#define ARMADA_370_XP_FABRIC_IRQ		(3)
+ 
+ #define IPI_DOORBELL_START                      (0)
+ #define IPI_DOORBELL_END                        (8)
+@@ -81,6 +84,7 @@ static inline bool is_percpu_irq(irq_hw_number_t irq)
  {
- 	u32 control;
-@@ -352,6 +330,28 @@ static void armada_xp_mpic_smp_cpu_init(void)
+ 	switch (irq) {
+ 	case ARMADA_370_XP_TIMER0_PER_CPU_IRQ:
++	case ARMADA_370_XP_FABRIC_IRQ:
+ 		return true;
+ 	default:
+ 		return false;
+@@ -340,6 +344,15 @@ static void armada_xp_mpic_smp_cpu_init(void)
  	writel(0, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
  }
  
-+#ifdef CONFIG_SMP
-+static void armada_mpic_send_doorbell(const struct cpumask *mask,
-+				      unsigned int irq)
++static void armada_xp_mpic_perf_init(void)
 +{
-+	int cpu;
-+	unsigned long map = 0;
++	unsigned long cpuid = cpu_logical_map(smp_processor_id());
 +
-+	/* Convert our logical CPU mask into a physical one. */
-+	for_each_cpu(cpu, mask)
-+		map |= 1 << cpu_logical_map(cpu);
-+
-+	/*
-+	 * Ensure that stores to Normal memory are visible to the
-+	 * other CPUs before issuing the IPI.
-+	 */
-+	dsb();
-+
-+	/* submit softirq */
-+	writel((map << 8) | irq, main_int_base +
-+		ARMADA_370_XP_SW_TRIG_INT_OFFS);
++	/* Enable Performance Counter Overflow interrupts */
++	writel(ARMADA_370_XP_INT_CAUSE_PERF(cpuid),
++	       per_cpu_int_base + ARMADA_370_XP_INT_FABRIC_MASK_OFFS);
 +}
 +
+ #ifdef CONFIG_SMP
+ static void armada_mpic_send_doorbell(const struct cpumask *mask,
+ 				      unsigned int irq)
+@@ -365,8 +378,10 @@ static void armada_mpic_send_doorbell(const struct cpumask *mask,
  static int armada_xp_mpic_secondary_init(struct notifier_block *nfb,
  					 unsigned long action, void *hcpu)
  {
-@@ -588,9 +588,8 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+-	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
++	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN) {
++		armada_xp_mpic_perf_init();
+ 		armada_xp_mpic_smp_cpu_init();
++	}
  
+ 	return NOTIFY_OK;
+ }
+@@ -379,8 +394,10 @@ static struct notifier_block armada_370_xp_mpic_cpu_notifier = {
+ static int mpic_cascaded_secondary_init(struct notifier_block *nfb,
+ 					unsigned long action, void *hcpu)
+ {
+-	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
++	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN) {
++		armada_xp_mpic_perf_init();
+ 		enable_percpu_irq(parent_irq, IRQ_TYPE_NONE);
++	}
+ 
+ 	return NOTIFY_OK;
+ }
+@@ -389,7 +406,6 @@ static struct notifier_block mpic_cascaded_cpu_notifier = {
+ 	.notifier_call = mpic_cascaded_secondary_init,
+ 	.priority = 100,
+ };
+-
+ #endif /* CONFIG_SMP */
+ 
+ static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
+@@ -599,6 +615,7 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
  	BUG_ON(!armada_370_xp_mpic_domain);
  
--#ifdef CONFIG_SMP
-+	/* Setup for the boot CPU */
+ 	/* Setup for the boot CPU */
++	armada_xp_mpic_perf_init();
  	armada_xp_mpic_smp_cpu_init();
--#endif
  
  	armada_370_xp_msi_init(node, main_int_res.start);
- 
 -- 
 2.3.0
