@@ -1,33 +1,29 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue,  3 Mar 2015 21:03:37 +0800
-Subject: [PATCH 2/2] ARM: mvebu: update cpufreq-dt's platform data
-In-Reply-To: <1425387817-11382-1-git-send-email-leo.yan@linaro.org>
-References: <1425387817-11382-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1425387817-11382-3-git-send-email-leo.yan@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 3 Mar 2015 14:03:03 +0100
+Subject: [PATCH] ARM: dts: sun6i: hummingbird: Enable IR receiver
+In-Reply-To: <1425354721-3321-1-git-send-email-wens@csie.org>
+References: <1425354721-3321-1-git-send-email-wens@csie.org>
+Message-ID: <20150303130303.GG4911@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change to use cpufreq-dt's platform data of clk_domain_boundary; in
-the old code the initial value is true, that means every CPU has the
-dedicated clock. So assign as CPUFREQ_DT_CLK_PER_CPU.
+On Tue, Mar 03, 2015 at 11:52:01AM +0800, Chen-Yu Tsai wrote:
+> The A31 Hummingbird has an IR receiver.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm/mach-mvebu/pmsu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Applied, thanks
 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 8b9f5e2..1fd3f89 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -573,7 +573,7 @@ int mvebu_pmsu_dfs_request(int cpu)
- }
- 
- struct cpufreq_dt_platform_data cpufreq_dt_pd = {
--	.independent_clocks = true,
-+	.clk_domain_boundary = CPUFREQ_DT_CLK_PER_CPU,
- };
- 
- static int __init armada_xp_pmsu_cpufreq_init(void)
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150303/33b93c4e/attachment.sig>
