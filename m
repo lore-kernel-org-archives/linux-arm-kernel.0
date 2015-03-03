@@ -1,54 +1,98 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 03 Mar 2015 16:41:03 +0100
-Subject: [PATCH] clocksource: arm_arch_timer: Rename arch_timer_probed
- to reflect behaviour
-In-Reply-To: <54F5A165.4010408@arm.com>
-References: <1421488012-5098-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <54C56582.6080809@linaro.org> <1634669.Cj7rnHN4gq@avalon>
- <54F5A165.4010408@arm.com>
-Message-ID: <54F5D60F.9040602@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 03 Mar 2015 15:44:18 +0000
+Subject: [PATCH 3/5] arm-cci: Get rid of secure transactions for PMU driver
+In-Reply-To: <1425295754-13376-4-git-send-email-suzuki.poulose@arm.com>
+References: <1425295754-13376-1-git-send-email-suzuki.poulose@arm.com>
+ <1425295754-13376-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <54F5D6D2.7000801@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2015 12:56 PM, Sudeep Holla wrote:
+
+
+On 02/03/15 11:29, Suzuki K. Poulose wrote:
+> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 >
+> Avoid secure transactions while probing the CCI PMU. The
+> existing code makes use of the Peripheral ID2 (PID2) register
+> to determine the revision of the CCI400, which requires a
+> secure transaction. This puts a limitation on the usage of the
+> driver on systems running non-secure Linux(e.g, ARM64).
 >
-> On 01/03/15 13:00, Laurent Pinchart wrote:
->> Hello,
->>
->> On Sunday 25 January 2015 22:52:02 Daniel Lezcano wrote:
->>> On 01/17/2015 10:46 AM, Laurent Pinchart wrote:
->>>> The arch_timer_probed function returns whether the given time doesn't
->>>> need to be probed. This can be the case when the timer has been probed
->>>> already, but also when it has no corresponding enabled node in DT.
->>>>
->>>> Rename the function to arch_timer_need_probe and invert its return
->>>> value
->>>> to better reflect the function's purpose and behaviour.
->>>>
->>>> Signed-off-by: Laurent Pinchart
->>>> <laurent.pinchart+renesas@ideasonboard.com>
->>>
->>> I would like to have an ack from Sudeep or Mark (Cc'ed) before taking
->>> this patch.
->>
->> Sudeep, Mark, ping ?
->>
+> Updated the device-tree binding for cci pmu node to add the explicit
+> revision number for the compatible field.
 >
-> Looks fine to me. I just wanted to test on KVM which I had broke once
-> previously though this change is pretty straight forward and simple.
+> The supported strings are :
+> 	arm,cci-400-pmu,r0
+> 	arm,cci-400-pmu,r1
+> 	arm,cci-400-pmu - DEPRECATED. See NOTE below
 >
-> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> NOTE: If the revision is not mentioned, we need to probe the cci revision,
+> which could be fatal on a platform running non-secure. We need a reliable way
+> to know if we can poke the CCI registers at runtime on ARM32. We depend on
+> 'mcpm_is_available()' when it is available. mcpm_is_available() returns true
+> only when there is a registered driver for mcpm. Otherwise, we assume that we
+> don't have secure access, and skips probing the revision number(ARM64 case).
+>
+> The MCPM should figure out if it is safe to access the CCI. Unfortunately
+> there isn't a reliable way to indicate the same via dtb. This patch doesn't
+> address/change the current situation. It only deals with the CCI-PMU, leaving
+> the assumptions about the secure access as it has been, prior to this patch.
+>
+> Cc: devicetree at vger.kernel.org
+> Cc: Punit Agrawal <punit.agrawal@arm.com>
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> ---
+>   Documentation/devicetree/bindings/arm/cci.txt |    7 +++--
+>   arch/arm/include/asm/arm-cci.h                |   42 +++++++++++++++++++++++++
+>   arch/arm64/include/asm/arm-cci.h              |   27 ++++++++++++++++
+>   drivers/bus/arm-cci.c                         |   17 +++++++++-
+>   include/linux/arm-cci.h                       |    2 ++
+>   5 files changed, 92 insertions(+), 3 deletions(-)
+>   create mode 100644 arch/arm/include/asm/arm-cci.h
+>   create mode 100644 arch/arm64/include/asm/arm-cci.h
+>
 
-I applied the patch for 4.1.
+[...]
 
-Thanks !
-   -- Daniel
+> diff --git a/arch/arm/include/asm/arm-cci.h b/arch/arm/include/asm/arm-cci.h
+> new file mode 100644
+> index 0000000..936e74a
+> --- /dev/null
+> +++ b/arch/arm/include/asm/arm-cci.h
+> @@ -0,0 +1,42 @@
+> +/*
+> + * arch/arm/include/asm/arm-cci.h
+> + *
+> + * Copyright (C) 2015 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef __ASM_ARM_CCI_H
+> +#define __ASM_ARM_CCI_H
+> +
+> +#ifdef CONFIG_MCPM
+> +#include <asm/mcpm.h>
+> +
+> +/*
+> + * We don't have a reliable way of detecting whether,
+> + * if we have access to secure-only registers, unless
+> + * mcpm is registered.
+> + */
+> +static inline int platform_has_secure_cci_access(void)
 
+bool instead of int might be more apt here ?
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Regards,
+Sudeep
