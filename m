@@ -1,89 +1,859 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  3 Mar 2015 10:41:22 +0000
-Subject: [PATCH 2/3] mailbox: dt: Supply bindings for ST's Mailbox IP
+Date: Tue,  3 Mar 2015 10:41:23 +0000
+Subject: [PATCH 3/3] mailbox: Add support for ST's Mailbox IP
 In-Reply-To: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
 References: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1425379283-1567-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ST's platforms currently support a maximum of 5 channels, one for
+each of the co-processors situated on the platforms.  The
+difficulty with this IP is the fact that there is only one RX IRQ,
+which requires some special handling within the driver.  In this
+implementation channel 1, which is always the A9 channel, is
+divided and allocated to each of the remaining Mailbox channels in
+order for them to use it as their RX channel.
+
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- .../devicetree/bindings/mailbox/sti-mailbox.txt    | 66 ++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+ drivers/mailbox/Kconfig       |   7 +
+ drivers/mailbox/Makefile      |   2 +
+ drivers/mailbox/mailbox-sti.c | 664 ++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mailbox_sti.h   | 128 ++++++++
+ 4 files changed, 801 insertions(+)
+ create mode 100644 drivers/mailbox/mailbox-sti.c
+ create mode 100644 include/linux/mailbox_sti.h
 
-diff --git a/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+index c04fed9..b524806 100644
+--- a/drivers/mailbox/Kconfig
++++ b/drivers/mailbox/Kconfig
+@@ -45,4 +45,11 @@ config PCC
+ 	  states). Select this driver if your platform implements the
+ 	  PCC clients mentioned above.
+ 
++config STI_MBOX
++	tristate "STI Mailbox framework support"
++	depends on ARCH_STI && OF
++	help
++	  Mailbox implementation for STMicroelectonics family chips with
++	  hardware for interprocessor communication.
++
+ endif
+diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
+index dd412c2..d0b2f05 100644
+--- a/drivers/mailbox/Makefile
++++ b/drivers/mailbox/Makefile
+@@ -7,3 +7,5 @@ obj-$(CONFIG_PL320_MBOX)	+= pl320-ipc.o
+ obj-$(CONFIG_OMAP2PLUS_MBOX)	+= omap-mailbox.o
+ 
+ obj-$(CONFIG_PCC)		+= pcc.o
++
++obj-$(CONFIG_STI_MBOX)		+= mailbox-sti.o
+diff --git a/drivers/mailbox/mailbox-sti.c b/drivers/mailbox/mailbox-sti.c
 new file mode 100644
-index 0000000..c965c13
+index 0000000..c5e52fc
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
-@@ -0,0 +1,66 @@
-+ST Microelectronics Mailbox Driver
++++ b/drivers/mailbox/mailbox-sti.c
+@@ -0,0 +1,664 @@
++/*
++ * STi Mailbox
++ *
++ * Copyright (C) 2015 ST Microelectronics
++ *
++ * Author: Alexandre Torgue <alexandre.torgue@st.com> for ST Microelectronics
++ * Author: Olivier Lebreton <olivier.lebreton@st.com> for ST Microelectronics
++ * Author: Loic Pallardy <loic.pallardy@st.com> for ST Microelectronics
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
 +
-+Required properties:
-+- compatible		: Should be "st,stih407-mailbox"
-+- reg			: Offset and length of the register set for the device
-+- reg-names		: Should contain the reg name "mbox-reg".
-+- st,name		: Name of the mailbox
-+- st,mbox-chans		: Mbox/channels descriptor data private to each channel.
-+			  The 4 cells represent the following data:
-+				Cell #1 (rx_id) - rx mbox num in an instance.
-+				Cell #2 (rx_inst) - rx mbox instance num.
-+				Cell #3 (tx_id) - tx mbox num in an instance.
-+				Cell #4 (tx_inst) - tx mbox instance num.
++#include <linux/bitops.h>
++#include <linux/err.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/irqdomain.h>
++#include <linux/mailbox_controller.h>
++#include <linux/mailbox_sti.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
 +
-+			  Note that an IP Mailbox is composed by 4 instances and
-+			  each instance is composed by 32 mailboxes.
-+			  You define here the configuration of a channel (at
-+			  framework level).
++#define REG_MBOX_INT_STA_VAL	0x04
++#define REG_MBOX_INT_STA_SET	0x24
++#define REG_MBOX_INT_STA_CLR	0x44
++#define REG_MBOX_ENA_VAL	0x64
++#define REG_MBOX_ENA_SET	0x84
++#define REG_MBOX_ENA_CLR	0xa4
 +
-+Optional properties
-+- st,mbox-rx		: Indicaties if the mailbox can be used as Rx mailbox.
-+- st,mbox-rx-id		: If a Rx mailbox is affected to a Tx mailbox (to have
-+			  full-duplex channel), this field indiactes the Id of
-+			  the Rx mailbox to use.
-+- interrupts		: Contains the IRQ line for a RX mailbox.
-+- interrupt-names	: Should contain the interrupt name.
++#define ALL_MBOX_BITS(_nb)	(BIT(_nb) - 1)
 +
-+Examples:
++/*
++ * A Mailbox can be used in several configurations:
++ *	- Only for TX dir (no IRQ)
++ *	- Only for RX dir (one IRQ on A9)
++ *	- Both
++ * Max number of mailbox on our SoC (currently 5)
++ * mdev_rx represents potential Rx mailbox which could be used by a channel
++ */
++#define MBOX_HW_MAX		5
++#define MBOX_NO_RX		0xff
 +
-+mailbox0: mailbox at 0 {
-+	compatible = "st,stih407-mailbox";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	#mbox-cells = <1>;
-+	reg = <0x8f00000 0x1000>;
-+	reg-names = "mbox-reg";
-+	interrupts = <GIC_SPI 1 IRQ_TYPE_NONE>;
-+	interrupt-names = "mb0_irq";
-+	st,name = "a9";
-+	st,mbox-rx;
-+	st,mbox-rx-id = <0>;
-+	st,mbox-chans = <0 1 0 1>;
++static struct sti_mbox_device mdev_rxs[MBOX_HW_MAX];
++
++static DEFINE_SPINLOCK(sti_mbox_irqs_lock);
++
++/* Mailbox H/W preparations */
++static struct irq_chip sti_mbox_irq_chip;
++
++static inline bool sti_mbox_chan_is_rx(struct sti_mbox_dev_data *mbox)
++{
++	return ((mbox->rx_id != MBOX_NO_RX) && (mbox->rx_inst != MBOX_NO_RX));
++}
++
++static inline bool sti_mbox_chan_is_tx(struct sti_mbox_dev_data *mbox)
++{
++	return ((mbox->tx_id != MBOX_NO_RX) && (mbox->tx_inst != MBOX_NO_RX));
++}
++
++/* Message management */
++static void sti_mbox_read(struct sti_mbox_dev_data *mbox,
++			  struct sti_mbox_msg *msg)
++{
++	struct sti_mbox_data *md = &mbox->mdata;
++	void __iomem *hdr = md->rx_addr;
++
++	/* Read data payload */
++	msg->dsize = readb(hdr);
++	msg->pdata = (u8*)++hdr;
++}
++
++static void sti_mbox_write(struct sti_mbox_dev_data *mbox, void *data)
++{
++	struct sti_mbox_data *md = &mbox->mdata;
++	struct sti_mbox_msg *msg = (struct sti_mbox_msg *)data;
++	u32 len = msg->dsize;
++	void __iomem *hdr;
++	u8 *wrb;
++	unsigned int j;
++
++	hdr = md->tx_addr;
++
++	/* Payload size */
++	writeb((u8)len, hdr);
++
++	wrb = msg->pdata;
++	if (!wrb)
++		return;
++
++	/* Payload data */
++	for (j = 0, hdr++; j < len; j++, wrb++, hdr++)
++		writeb(*wrb, hdr);
++}
++
++/* Mailbox IRQ handle functions */
++static void sti_mbox_enable_irq(struct sti_mbox_instance *mbinst, u32 msk)
++{
++	struct sti_mbox_device *mdev = mbinst->parent;
++	struct sti_mbox_attribute *p = mdev->cfg;
++	void __iomem *base;
++	unsigned long flags;
++
++	base = mdev->mdev_rx->mbox_reg_base + (mbinst->id * p->num_inst);
++	spin_lock_irqsave(&sti_mbox_irqs_lock, flags);
++	mbinst->irq_msk |= msk;
++
++	writel_relaxed(msk, base + p->reg_ena_set);
++
++	spin_unlock_irqrestore(&sti_mbox_irqs_lock, flags);
++}
++
++static void sti_mbox_disable_irq(struct sti_mbox_instance *mbinst, u32 msk)
++{
++	struct sti_mbox_device *mdev = mbinst->parent;
++	struct sti_mbox_attribute *p = mdev->cfg;
++	void __iomem *base;
++	unsigned long flags;
++
++	base = mdev->mdev_rx->mbox_reg_base + (mbinst->id * p->num_inst);
++	spin_lock_irqsave(&sti_mbox_irqs_lock, flags);
++	mbinst->irq_msk &= ~msk;
++	writel_relaxed(msk, base + p->reg_ena_clr);
++	spin_unlock_irqrestore(&sti_mbox_irqs_lock, flags);
++}
++
++static void sti_mbox_clr_irq(struct sti_mbox_instance *mbinst, u32 msk)
++{
++	struct sti_mbox_device *mdev = mbinst->parent;
++	struct sti_mbox_attribute *p = mdev->cfg;
++	void __iomem *base;
++
++	base = mdev->mdev_rx->mbox_reg_base + (mbinst->id * p->num_inst);
++	writel_relaxed(msk, base + p->reg_clr);
++}
++
++static irqreturn_t sti_mbox_thread_interrupt(int irq, void *data)
++{
++	struct mbox_chan *chan = data;
++	struct sti_mbox_dev_data *mbox = chan->con_priv;
++	struct sti_mbox_device *mdev_rx = mbox->parent->mdev_rx;
++
++	mbox_chan_received_data(chan, (void *)mbox->msg);
++	sti_mbox_enable_irq(mdev_rx->mbinst[mbox->rx_inst], BIT(mbox->rx_id));
++
++	return IRQ_HANDLED;
++}
++
++static irqreturn_t sti_mbox_interrupt(int irq, void *data)
++{
++	struct mbox_chan *chan = data;
++	struct sti_mbox_dev_data *mbox = chan->con_priv;
++	struct sti_mbox_data *md = &mbox->mdata;
++	struct sti_mbox_device *mdev_rx = mbox->parent->mdev_rx;
++
++	sti_mbox_disable_irq(mdev_rx->mbinst[mbox->rx_inst], BIT(mbox->rx_id));
++
++	if (md->rx_addr != NULL)
++		sti_mbox_read(mbox, mbox->msg);
++
++	return IRQ_WAKE_THREAD;
++}
++
++
++static irqreturn_t sti_mbox_irq_handler(int irq, void *data)
++{
++	struct sti_mbox_device *mdev_rx = data;
++	struct sti_mbox_attribute *p = mdev_rx->cfg;
++	struct irq_domain *mbox_irq_domain;
++	void __iomem *base;
++	u32 irq_chan;
++	unsigned long bits = 0;
++	u8 n;
++	int i;
++
++	base = mdev_rx->mbox_reg_base + mdev_rx->cfg->reg_val;
++
++	for (i = 0; i < p->num_inst; i++) {
++		bits = readl_relaxed(base + (i * p->num_inst));
++		if (bits)
++			break;
++	}
++
++	if (unlikely(!bits))
++		return IRQ_NONE;
++
++	mbox_irq_domain = mdev_rx->mbinst[i]->irq_domain;
++
++	for (n = 0; bits; n++) {
++		if (test_and_clear_bit(n, &bits)) {
++
++			irq_chan = irq_find_mapping(mbox_irq_domain, n);
++			if (mdev_rx->mbinst[i]->irq_msk & BIT(n)) {
++				generic_handle_irq(irq_chan);
++				sti_mbox_clr_irq(mdev_rx->mbinst[i], BIT(n));
++
++			} else
++				dev_warn(mdev_rx->dev,
++					 "Unexpected mailbox interrupt\n"
++					 "mask: %x\n",
++					 mdev_rx->mbinst[i]->irq_msk);
++		}
++	}
++	return IRQ_HANDLED;
++}
++
++/* Channel management */
++static int sti_mbox_startup(struct mbox_chan *chan)
++{
++	struct sti_mbox_dev_data *mbox = chan->con_priv;
++	struct sti_mbox_device *mdev = mbox->parent;
++	char name[32];
++	int ret = 0;
++
++	/* Allocate Rx msg per channel */
++	mbox->msg = devm_kzalloc(mdev->dev, sizeof(struct sti_mbox_device),
++				  GFP_KERNEL);
++	if (!mbox->msg)
++		return -ENOMEM;
++
++	if (sti_mbox_chan_is_rx(mbox)) {
++		snprintf(name, sizeof(name), "%s-%d", mdev->name,
++			 mbox->chan_id);
++		/* IRQ automatically enabled */
++		ret = request_threaded_irq(mbox->irq, sti_mbox_interrupt,
++					   sti_mbox_thread_interrupt,
++					   IRQF_SHARED, name, chan);
++		if (ret)
++			dev_err(mdev->dev,
++				"failed to register mailbox interrupt:%d\n",
++				ret);
++	}
++
++	return ret;
++}
++
++static void sti_mbox_shutdown(struct mbox_chan *chan)
++{
++	struct sti_mbox_dev_data *mbox = chan->con_priv;
++	struct sti_mbox_device *mdev = mbox->parent;
++
++	/* IRQ automatically disabled */
++	free_irq(mbox->irq, chan);
++
++	/* Free Rx msg */
++	devm_kfree(mdev->dev, mbox->msg);
++}
++
++static bool sti_mbox_tx_is_ready(struct mbox_chan *chan)
++{
++	struct sti_mbox_dev_data *mbox = chan->con_priv;
++	struct sti_mbox_device *mdev = mbox->parent;
++	struct sti_mbox_attribute *p = mdev->cfg;
++	void __iomem *base;
++
++	/*
++	 *  Check if tx mbox has got a pending interrupt, and if it is enabled
++	 *  before sending a new message
++	 */
++	base = mdev->mbox_reg_base + (p->num_inst * mbox->tx_inst);
++
++	if (!(readl_relaxed(base + p->reg_ena_val) & BIT(mbox->tx_id))) {
++		dev_warn(mdev->dev, "Mbox: %d, inst: %x, chan: %x disabled\n",
++			mdev->id, mbox->tx_inst, mbox->tx_id);
++		return false;
++	}
++
++	if (readl_relaxed(base + p->reg_val) & BIT(mbox->tx_id)) {
++		dev_warn(mdev->dev, "Mbox: %d, inst: %x, chan: %x not ready\n",
++			mdev->id, mbox->tx_inst, mbox->tx_id);
++		return false;
++	}
++
++	return true;
++}
++
++static bool sti_mbox_tx_is_done(struct mbox_chan *chan)
++{
++	return sti_mbox_tx_is_ready(chan);
++}
++
++static int sti_mbox_send_data(struct mbox_chan *chan, void *data)
++{
++	struct sti_mbox_dev_data *mbox = chan->con_priv;
++	struct sti_mbox_data *md = &mbox->mdata;
++	struct sti_mbox_device *mdev = mbox->parent;
++	struct sti_mbox_attribute *p = mdev->cfg;
++	void __iomem *base;
++
++	dev_info(mdev->dev, "Using Mbox (%x) %s: channel (%d)\n",
++		 mdev->id, mdev->name, mbox->chan_id);
++
++	base = mdev->mbox_reg_base + (p->num_inst * mbox->tx_inst);
++
++	if ((!data) || (!sti_mbox_chan_is_tx(mbox)))
++		return -EINVAL;
++
++	if (sti_mbox_tx_is_ready(chan)) {
++		if (md->tx_addr != NULL)
++			sti_mbox_write(mbox, data);
++
++		/* send event */
++		writel_relaxed(BIT(mbox->tx_id), base + p->reg_set);
++		return 0;
++	}
++
++	return -EBUSY;
++}
++
++static struct mbox_chan_ops sti_mbox_ops = {
++	.startup	= sti_mbox_startup,
++	.send_data	= sti_mbox_send_data,
++	.shutdown	= sti_mbox_shutdown,
++	.last_tx_done	= sti_mbox_tx_is_done,
 +};
 +
-+mailbox3: mailbox at 3 {
-+	compatible = "st,stih407-mailbox";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	#mbox-cells = <1>;
-+	reg = <0x8f03000 0x100>;
-+	reg-names = "mbox-reg";
-+	st,name = "st231_video";
-+	st,mbox-rx-id = <0>;
-+	st,mbox-chans = <2 1 2 1>;
++/*
++ * Interrupt management
++ *
++ * mask/unmask must be managed by SW
++ */
++static void mbox_irq_enable(struct irq_data *d)
++{
++	struct sti_mbox_instance *mbinst =
++		(struct sti_mbox_instance *)d->domain->host_data;
++
++	sti_mbox_enable_irq(mbinst, BIT(d->hwirq));
++}
++
++static void mbox_irq_disable(struct irq_data *d)
++{
++	struct sti_mbox_instance *mbinst =
++		(struct sti_mbox_instance *)d->domain->host_data;
++
++	sti_mbox_disable_irq(mbinst, BIT(d->hwirq));
++}
++
++static struct irq_chip sti_mbox_irq_chip = {
++	.name		= "sti_mbox",
++	.irq_enable	= mbox_irq_enable,
++	.irq_disable	= mbox_irq_disable,
++	.irq_mask	= mbox_irq_disable,
++	.irq_unmask	= mbox_irq_enable,
 +};
 +
-+In this configuration, if you use channel 0 you will have the following
-+configuration:
-+- "chan0_video" will use mailbox0 as Rx mailbox.
-+- "chan0_video" will use instance 1, bit 2 in mailbox0 for rx.
-+- "chan0_video" will use instance 1, bit 2 in mailbox3 for tx.
++static int sti_mbox_irq_map(struct irq_domain *d, unsigned int irq,
++			    irq_hw_number_t hwirq)
++{
++	irq_set_chip_and_handler(irq, &sti_mbox_irq_chip,
++				 handle_simple_irq);
++	set_irq_flags(irq, IRQF_VALID);
 +
-+If you declare a channel only for Rx, you have to set magic number 0xff
-+for tx_id and tx_instance.
-+If you declare a channel only for Tx, you have to set magic number 0xff
-+for rx_id and rx_instance.
++	return 0;
++}
++
++static const struct irq_domain_ops sti_mbox_irq_ops = {
++	.map    = sti_mbox_irq_map,
++	.xlate  = irq_domain_xlate_onecell,
++};
++
++static const struct sti_mbox_attribute mbox_config_407 = {
++	.num_inst	= 4,
++	.num_mbox	= 32,
++	.reg_set	= REG_MBOX_INT_STA_SET,
++	.reg_clr	= REG_MBOX_INT_STA_CLR,
++	.reg_val	= REG_MBOX_INT_STA_VAL,
++	.reg_ena_set	= REG_MBOX_ENA_SET,
++	.reg_ena_val	= REG_MBOX_ENA_VAL,
++	.reg_ena_clr	= REG_MBOX_ENA_CLR,
++};
++
++static const struct of_device_id sti_mailbox_match[] = {
++	{
++		.compatible = "st,stih407-mailbox",
++		.data = (void *)&mbox_config_407
++	},
++	{ }
++};
++
++static int sti_mbox_map_tx_to_rx(struct platform_device *pdev,
++				 struct sti_mbox_device *mdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	u32 id;
++	int ret;
++
++	mdev->mdev_rx = devm_kzalloc(&pdev->dev, sizeof(struct sti_mbox_device),
++				     GFP_KERNEL);
++	if (!mdev->mdev_rx)
++		return -ENOMEM;
++
++	ret = of_property_read_u32(np, "st,mbox-rx-id", &id);
++	if (!ret) {
++		mdev->rx_id = id;
++		mdev->mdev_rx =  &mdev_rxs[mdev->rx_id];
++	} else
++		mdev->rx_id = MBOX_NO_RX;
++
++	return 0;
++}
++
++static int sti_mbox_create_chan_ctrl(struct platform_device *pdev,
++				     struct sti_mbox_device *mdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct sti_mbox_attribute *p = mdev->cfg;
++	struct sti_mbox_dev_data *mbox;
++	struct mbox_chan *chans;
++	struct sti_mbox_instance *mbinst;
++	const char *name;
++	const __be32 *tmp;
++	const __be32 *mbox_chans;
++	int i, ret, data_len, mb_count = 0;
++
++	of_property_read_string(np, "st,name", &name);
++	strcpy(mdev->name, name);
++
++	/* In case of TX mailbox affect an RX mailbox if needed  */
++	ret = sti_mbox_map_tx_to_rx(pdev, mdev);
++	if (ret)
++		return ret;
++
++	/* Check mailbox configuration from DT */
++	mb_count = of_property_count_strings(np, "st,mbox-names");
++	if (!mb_count || mb_count > p->num_mbox) {
++		dev_err(&pdev->dev,
++			"Wrong number [%d/%d] of mbox devices found\n",
++			mb_count, p->num_mbox);
++		return -ENODEV;
++	}
++
++	chans = devm_kzalloc(&pdev->dev,
++			     (mb_count + 1) * sizeof(struct mbox_chan),
++			     GFP_KERNEL);
++	if (!chans)
++		return -ENOMEM;
++
++	mbox = devm_kzalloc(&pdev->dev,
++			    mb_count * sizeof(struct sti_mbox_dev_data),
++			    GFP_KERNEL);
++	if (!mbox)
++		return -ENOMEM;
++
++	mbox_chans = of_get_property(np, "st,mbox-chans", &data_len);
++	if (!mbox_chans) {
++		dev_err(&pdev->dev, "no mbox device data found\n");
++		return -ENODEV;
++	}
++
++	for (i = 0; i < mb_count; i++) {
++		tmp = mbox_chans + i;
++		mbox->rx_id = (u32)of_read_number(tmp, 1);
++		mbox->rx_inst = (u32)of_read_number(tmp+1, 1);
++		mbox->tx_id = (u32)of_read_number(tmp+2, 1);
++		mbox->tx_inst = (u32)of_read_number(tmp+3, 1);
++
++		/* Affect Rx configuration to the channel if needed */
++		if (sti_mbox_chan_is_rx(mbox)) {
++			if (mdev->rx_id == MBOX_NO_RX) {
++				dev_err(&pdev->dev, "Mbox Rx id not defined for Mailbox: %s\n"
++					, mdev->name);
++				return -EINVAL;
++			}
++
++			mbinst = mdev->mdev_rx->mbinst[mbox->rx_inst];
++
++			if (!mbinst)
++				return -EINVAL;
++
++			if (!mbinst->irq_domain)
++				return -EINVAL;
++
++			mbox->irq = irq_create_mapping(mbinst->irq_domain,
++						       mbox->rx_id);
++			sti_mbox_disable_irq(mbinst, BIT(mbox->rx_id));
++			sti_mbox_clr_irq(mbinst, BIT(mbox->rx_id));
++		}
++		/*
++		 * read here rx_id and fill mbox->instance accordly to what
++		 * we have registered.
++		 */
++		mbox->parent = mdev;
++		mbox->chan_id = i;
++		chans[i].con_priv = (struct sti_mbox_dev_data *)mbox;
++	}
++	mdev->dev = &pdev->dev;
++
++	/* sti mailbox does not have a Tx-Done or Tx-Ready IRQ */
++	mdev->controller.txdone_irq = false;
++	mdev->controller.txdone_poll = true;
++	mdev->controller.txpoll_period = 1000;
++	mdev->controller.ops = &sti_mbox_ops;
++	mdev->controller.chans = chans;
++	mdev->controller.num_chans = mb_count;
++	mdev->controller.dev = mdev->dev;
++
++	ret = mbox_controller_register(&mdev->controller);
++	if (ret)
++		return ret;
++
++	dev_info(&pdev->dev, "Mbox (%x) %s: %x channel registered\n", mdev->id,
++		 mdev->name, mb_count);
++
++	return 0;
++}
++
++static int sti_mbox_create_mbinst(struct platform_device *pdev,
++				  struct sti_mbox_device *mdev,
++				  struct sti_mbox_instance *mbinst)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct sti_mbox_attribute *p = mdev->cfg;
++
++	mbinst->parent = mdev;
++
++	mbinst->irq_domain = irq_domain_add_linear(np, p->num_mbox,
++						   &sti_mbox_irq_ops, mbinst);
++
++	if (!mbinst->irq_domain) {
++		dev_err(&pdev->dev, "Failed to create irqdomain\n");
++		return -ENOSYS;
++	}
++
++	return 0;
++}
++
++static int sti_mbox_create_rx_interrupt(struct platform_device *pdev,
++					struct sti_mbox_device *mdev)
++{
++	struct sti_mbox_instance *mbinst = NULL;
++	struct sti_mbox_attribute *p = mdev->cfg;
++	int ret, i;
++
++	mdev->irq = platform_get_irq(pdev, 0);
++	ret = devm_request_irq(&pdev->dev, mdev->irq, sti_mbox_irq_handler,
++			       IRQF_NO_SUSPEND | IRQF_ONESHOT,	"sti_mbox",
++			       mdev);
++	if (ret)
++		return -EINVAL;
++
++	/*
++	 *  create 4 irq domain per RX Hw Mailbox. Corespond to 4 HW
++	 *  instances
++	 */
++	for (i = 0; i < p->num_inst; i++) {
++		mbinst = devm_kzalloc(&pdev->dev, p->num_inst * sizeof(*mbinst),
++				      GFP_KERNEL);
++		if (!mbinst)
++			return -ENOMEM;
++
++		ret = sti_mbox_create_mbinst(pdev, mdev, mbinst);
++		if (ret)
++			return ret;
++
++		mbinst->id = i;
++
++		mdev->mbinst[i] = mbinst;
++	}
++
++	/* Fill potential Rx mailboxes */
++	mdev_rxs[mdev->id] = *mdev;
++
++	return 0;
++}
++
++static int sti_mbox_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct resource *mem;
++	struct sti_mbox_device *mdev;
++	struct sti_mbox_attribute *cfg;
++	int ret;
++
++	mdev = devm_kzalloc(&pdev->dev, sizeof(struct sti_mbox_device),
++			    GFP_KERNEL);
++	if (!mdev)
++		return -ENOMEM;
++
++	cfg = (struct sti_mbox_attribute *)of_match_device(sti_mailbox_match,
++							   &pdev->dev)->data;
++	if (!cfg) {
++		/* No mailbox configuration */
++		dev_err(&pdev->dev, "No configuration found\n");
++		return -ENODEV;
++	}
++	mdev->cfg = cfg;
++	mdev->id = of_alias_get_id(np, "mailbox");
++	if (mdev->id < 0) {
++		dev_err(&pdev->dev, "No alias found\n");
++		return mdev->id;
++	}
++
++	mem = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mbox-reg");
++	if (!mem)
++		return -ENOENT;
++	if (!devm_request_mem_region(&pdev->dev, mem->start, resource_size(mem),
++				     pdev->name))
++		return -EBUSY;
++	mdev->mbox_reg_base = devm_ioremap(&pdev->dev, mem->start,
++					   resource_size(mem));
++	if (!mdev->mbox_reg_base)
++		return -ENOMEM;
++
++	/* Register interrupt if mailbox is Rx capable */
++	if (of_property_read_bool(np, "st,mbox-rx")) {
++		ret = sti_mbox_create_rx_interrupt(pdev, mdev);
++		if (ret)
++			return ret;
++	}
++
++	/*  Create channels */
++	ret = sti_mbox_create_chan_ctrl(pdev, mdev);
++	if (ret)
++		return ret;
++
++	platform_set_drvdata(pdev, mdev);
++
++	return 0;
++}
++
++static int sti_mbox_remove(struct platform_device *pdev)
++{
++	struct sti_mbox_device *mdev = platform_get_drvdata(pdev);
++
++	mbox_controller_unregister(&mdev->controller);
++
++	return 0;
++}
++
++static struct platform_driver sti_mbox_driver = {
++	.probe = sti_mbox_probe,
++	.remove = sti_mbox_remove,
++	.driver = {
++		.name = "sti-mailbox",
++		.of_match_table = sti_mailbox_match,
++	},
++};
++
++static int __init sti_mbox_init(void)
++{
++	return platform_driver_register(&sti_mbox_driver);
++}
++
++static void __exit sti_mbox_exit(void)
++{
++	platform_driver_unregister(&sti_mbox_driver);
++}
++
++postcore_initcall(sti_mbox_init);
++module_exit(sti_mbox_exit);
++
++MODULE_LICENSE("GPL");
++MODULE_DESCRIPTION("stmicroelectronics mailbox: st architecture specific functions");
++MODULE_AUTHOR("Alexandre Torgue <alexandre.torgue@st.com>");
++MODULE_AUTHOR("Olivier Lebreton <olivier.lebreton@st.com>");
++MODULE_AUTHOR("Loic Pallardy <loic.pallardy@st.com>");
++MODULE_ALIAS("platform:sti-mailbox");
+diff --git a/include/linux/mailbox_sti.h b/include/linux/mailbox_sti.h
+new file mode 100644
+index 0000000..ff19d07
+--- /dev/null
++++ b/include/linux/mailbox_sti.h
+@@ -0,0 +1,128 @@
++/*
++ * mailbox-sti.h
++ *
++ * Copyright (C) 2014 ST Microelectronics
++ *
++ * Author:  <olivier.lebreton@st.com> for ST Microelectronics
++ * Author:  <alexandre.torgue@st.com> for ST Microelectronics
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/ioport.h>
++#include <linux/mailbox_controller.h>
++
++/* Max instance per HW mailbox */
++#define MBOX_INST_MAX		4
++
++/*
++ * struct sti_mbox_msg - sti mailbox message description
++ * @dsize:		data payload size
++ * @pdata:		message data payload
++ */
++struct sti_mbox_msg {
++	u32		dsize;
++	u8		*pdata;
++};
++
++/*
++ * struct sti_mbox_attribute - sti mailbox device attribute info
++ * @num_inst:		maximum number of instance in one HW mailbox
++ * @num_mbox:		maximum number of channel per instance
++ * @reg_set:		register offset to generate mailbox interrupt
++ * @reg_clr:		register offset to clear pending interrupt
++ * @reg_val:		register offset to read interrupt status
++ * @reg_ena_set:	register offset to enable mailbox
++ * @reg_ena_val:	register offset to read enable status
++ * @reg_ena_clr:	register offset to disable mailbox
++ */
++struct sti_mbox_attribute {
++	int		num_inst;
++	int		num_mbox;
++	int		reg_set;
++	int		reg_clr;
++	int		reg_val;
++	int		reg_ena_val;
++	int		reg_ena_set;
++	int		reg_ena_clr;
++};
++
++/*
++ * struct sti_mbox_data - sti mailbox buffer attribute info
++ * @rx_offset:		rx mailbox addr in shared memory
++ * @tx_offset:		tx mailbox addr in shared memory
++ */
++struct sti_mbox_data {
++	void __iomem	*rx_addr;
++	void __iomem	*tx_addr;
++};
++
++/*
++ * struct sti_mbox_dev_data - sti channel info
++ * An IP mailbox is composed by 4 instances.
++ * Each instance is composed by 32 channels (also named mbox)
++ * This means that we have potentially 128 channels (128 sw interrupts).
++ * A channel an be used for TX way, RX way or both.
++ *
++ * @mdata:		mailbox buffer info
++ * @parent:		mailbox device to which it is attached
++ * @msg:		rx message
++ * @chan_id:		channel id in an instance
++ * @irq:		irq number (virtual) assigned to the channel
++ * @rx_inst:		instance for the channel used in RX way
++ * @rx_id:		id in an instance for the channel used in RX way
++ * @tx_inst:		instance for the channel used in TX way
++ * @tx_id:		id in an instance for the channel used in TX way
++ */
++struct sti_mbox_dev_data {
++	struct sti_mbox_data		mdata;
++	struct sti_mbox_device		*parent;
++	struct sti_mbox_msg		*msg;
++	u32				chan_id;
++	u32				irq;
++	u32				rx_inst;
++	u32				rx_id;
++	u32				tx_inst;
++	u32				tx_id;
++};
++
++struct sti_mbox_instance {
++	struct irq_domain	*irq_domain;
++	struct sti_mbox_device	*parent;
++	u32			irq_msk;
++	int			id;
++};
++
++/*
++ * struct sti_mbox_device - sti mailbox device data
++ * An IP mailbox is composed by 4 instances.
++ * Each instance is composed by 32 channels (also named mbox)
++ * This means that we have potentially 128 channels (128 sw interrupts).
++ * A channel an be used for TX way, RX way or both.
++ *
++ * @id:			Id of the mailbox
++ * @irq:		Interrupt number assigned to mailbox Rx
++ * @cfg:		mailbox attribute data
++ * @dev:		device to which it is attached
++ * @mbox_reg_base:	base address of the register mapping region
++ * @controller:		representation of a communication channel controller
++ * @type:		type of mailbox (tx, rx or rx_tx)
++ * @name:		name of the mailbox
++ * @mbox_inst		data for several instances in the mailbox
++ */
++struct sti_mbox_device {
++	int				id;
++	int				irq;
++	struct sti_mbox_attribute	*cfg;
++	struct device			*dev;
++	void __iomem			*mbox_reg_base;
++	struct mbox_controller		controller;
++	const char			*type;
++	struct sti_mbox_device		*mdev_rx;
++	u32				rx_id;
++	char				name[64];
++	struct sti_mbox_instance	*mbinst[MBOX_INST_MAX];
++};
 -- 
 1.9.1
