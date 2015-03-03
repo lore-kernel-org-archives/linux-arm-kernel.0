@@ -1,32 +1,40 @@
 From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 3 Mar 2015 11:10:30 +0100
-Subject: [PATCH 0/2] Enable DRM/KMS support for STiH407 and STiH410 boards
-In-Reply-To: <1421250432-25903-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1421250432-25903-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <54F58896.5010407@st.com>
+Date: Tue, 3 Mar 2015 11:16:33 +0100
+Subject: [PATCH 4/6] ARM: DT: STi: STiH407: Add dwc3 usb3 DT node.
+In-Reply-To: <20150227104353.GB9094@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1424871377-1795-1-git-send-email-peter.griffin@linaro.org>
+ <1424871377-1795-5-git-send-email-peter.griffin@linaro.org>
+ <20150225151229.GE5132@x1>
+ <20150225152201.GA14329@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20150225155005.GE6688@x1>
+ <20150227104353.GB9094@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <54F58A01.7090806@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Peter,
 
-On 01/14/2015 04:47 PM, Gabriel FERNANDEZ wrote:
-> This patch-set Enable DRM/KMS support for STiH407-b2120 and STiH410-b2120 boards.
+On 02/27/2015 11:43 AM, Peter Griffin wrote:
+> Hi Lee,
 >
-> This patch-set replace the previous one (PATCH 0/2] Enable DRM/KMS support for STiH407 Family boards)
+> On Wed, 25 Feb 2015, Lee Jones wrote:
 >
-> Gabriel Fernandez (2):
->    ARM: DT: STiH407: Add DRM dt nodes
->    ARM: DT: STiH410: Add DRM dt nodes
+>>>>> +			reset-names	= "powerdown",
+>>>>> +					  "softreset";
+>>>> Nit: What's the purpose of having these on separate lines?
+>>> The only reason was to stay aligned with the example in
+>>> Documentation/devicetree/bindings/usb/dwc3-st.txt.
+>> But didn't you author that too? :)
+> Yep
 >
->   arch/arm/boot/dts/stih407-b2120.dts  |   3 +-
->   arch/arm/boot/dts/stih407.dtsi       | 151 +++++++++++++++++++++++++++++++++++
->   arch/arm/boot/dts/stih410.dtsi       | 138 ++++++++++++++++++++++++++++++++
->   arch/arm/boot/dts/stihxxx-b2120.dtsi |   2 +-
->   4 files changed, 291 insertions(+), 3 deletions(-)
->   create mode 100644 arch/arm/boot/dts/stih407.dtsi
->
-Forgot to reply to this series:
+>> I would change them both.  No need to force a line wrap if it's not required.
+> Ok, I'll remove it from both in v2, whilst adding the acks.
+Thanks. Once fixed, you can add my:
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-Applied, and already in v4.0-rc1.
-
-Thanks,
+BR,
 Maxime
+>
+> regards,
+>
+> Peter.
