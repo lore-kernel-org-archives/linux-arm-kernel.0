@@ -1,99 +1,71 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 2 Mar 2015 21:10:59 -0600
-Subject: [PATCH v4 20/30] PCI/sparc: Use pci_scan_root_bridge() for
- simplicity
-In-Reply-To: <1424938344-4017-21-git-send-email-wangyijing@huawei.com>
-References: <1424938344-4017-1-git-send-email-wangyijing@huawei.com>
- <1424938344-4017-21-git-send-email-wangyijing@huawei.com>
-Message-ID: <20150303031059.GJ11978@google.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Tue, 03 Mar 2015 08:42:16 +0530
+Subject: [PATCH] ARM64: gic: Do not allow bypass FIQ signals to reach
+ to processor
+In-Reply-To: <54DDB236.4040503@redhat.com>
+References: <b449dac39614ed462c9a479e9de0aa5300d2c7cf.1423462126.git.panand@redhat.com>
+ <54DDB236.4040503@redhat.com>
+Message-ID: <54F52690.70702@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 26, 2015 at 04:12:14PM +0800, Yijing Wang wrote:
-> Now we could use pci_scan_root_bridge() to scan
-> pci buses, provide sparc specific pci_host_bridge_ops.
-> 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> CC: "David S. Miller" <davem@davemloft.net>
-> CC: sparclinux at vger.kernel.org
-> ---
->  arch/sparc/kernel/pci.c |   32 ++++++++++++++++++++++----------
->  1 files changed, 22 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/sparc/kernel/pci.c b/arch/sparc/kernel/pci.c
-> index 0af7c58..03e7376 100644
-> --- a/arch/sparc/kernel/pci.c
-> +++ b/arch/sparc/kernel/pci.c
-> @@ -650,12 +650,25 @@ static void pci_claim_bus_resources(struct pci_bus *bus)
->  		pci_claim_bus_resources(child_bus);
->  }
->  
-> +static void pci_host_bridge_of_scan_bus(
-> +		struct pci_host_bridge *host)
-> +{
-> +	struct pci_pbm_info *pbm = dev_get_drvdata(&host->dev);
-> +	struct device_node *node = pbm->op->dev.of_node;
-> +
-> +	pci_of_scan_bus(pbm, node, host->bus);
-> +}
-> +
-> +static struct pci_host_bridge_ops phb_ops = {
-> +	.phb_of_scan_bus = pci_host_bridge_of_scan_bus,
-> +};
-> +
->  struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
->  				 struct device *parent)
->  {
->  	LIST_HEAD(resources);
->  	struct device_node *node = pbm->op->dev.of_node;
-> -	struct pci_bus *bus;
-> +	struct pci_host_bridge *host;
->  
->  	printk("PCI: Scanning PBM %s\n", node->full_name);
->  
-> @@ -667,23 +680,22 @@ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
->  	pbm->busn.end	= pbm->pci_last_busno;
->  	pbm->busn.flags	= IORESOURCE_BUS;
->  	pci_add_resource(&resources, &pbm->busn);
-> -	bus = pci_create_root_bus(parent, 
-> +	host = pci_scan_root_bridge(parent, 
->  			PCI_DOMBUS(pbm->index, pbm->pci_first_busno), 
-> -			pbm->pci_ops, pbm, &resources);
-> -	if (!bus) {
-> -		printk(KERN_ERR "Failed to create bus for %s\n",
-> +			pbm->pci_ops, pbm, &resources, &phb_ops);
-> +	if (!host) {
-> +		printk(KERN_ERR "Failed to create host bridge for %s\n",
->  		       node->full_name);
->  		pci_free_resource_list(&resources);
->  		return NULL;
->  	}
->  
-> -	pci_of_scan_bus(pbm, node, bus);
-> -	pci_bus_add_devices(bus);
-> -	pci_bus_register_of_sysfs(bus);
-> +	pci_bus_add_devices(host->bus);
-> +	pci_bus_register_of_sysfs(host->bus);
->  
-> -	pci_claim_bus_resources(bus);
-> +	pci_claim_bus_resources(host->bus);
 
-Isn't this a case where pci_claim_bus_resources() should be done before
-pci_bus_add_devices()?  You didn't introduce this problem, but since you're
-fixing similar issues, seems like we should fix this one, too.  In a patch
-of its own, of course.
+On Friday 13 February 2015 01:43 PM, Pratyush Anand wrote:
+> Hi Jason,
+>
+> On Monday 09 February 2015 11:48 AM, Pratyush Anand wrote:
+>> In some case few signals of an IP(like PMU Overflow in APM88xx0x) can be
+>> mapped to nLEGACYFIQ, ie nFIQ of CPU. Until ARM64 supports FIQ handling,
+>> we will get nice "Bad mode in FIQ handler detected"
+>>
+>> Therefore force FIQBypDisGrp1 to '1', so that bypass FIQ signal is not
+>> signaled to the processor.
+>>
+>
+> Please review this patch.
 
->  
-> -	return bus;
-> +	return host->bus;
->  }
->  
->  void pcibios_fixup_bus(struct pci_bus *pbus)
-> -- 
-> 1.7.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+ping
+
+>
+> ~Pratyush
+>
+>> Signed-off-by: Pratyush Anand <panand@redhat.com>
+>> ---
+>>   drivers/irqchip/irq-gic.c       | 9 ++++++++-
+>>   include/linux/irqchip/arm-gic.h | 1 +
+>>   2 files changed, 9 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>> index d617ee5a3d8a..525dfc966e60 100644
+>> --- a/drivers/irqchip/irq-gic.c
+>> +++ b/drivers/irqchip/irq-gic.c
+>> @@ -362,7 +362,14 @@ static void gic_cpu_if_up(void)
+>>       */
+>>       bypass = readl(cpu_base + GIC_CPU_CTRL);
+>>       bypass &= GICC_DIS_BYPASS_MASK;
+>> -
+>> +#ifdef CONFIG_ARM64
+>> +    /* FIXME: when ARM64 starts supporting FIQ mode.
+>> +     *
+>> +     * Until ARM64 supports FIQ handling, force FIQBypDisGrp1 to
+>> +     * '1', so that bypass FIQ signal is not signaled to the processor.
+>> +     */
+>> +    bypass |= GICC_DIS_BYPASS_FIQ_TO_CPU;
+>> +#endif
+>>       writel_relaxed(bypass | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
+>>   }
+>>
+>> diff --git a/include/linux/irqchip/arm-gic.h
+>> b/include/linux/irqchip/arm-gic.h
+>> index 71d706d5f169..c9fdd1972625 100644
+>> --- a/include/linux/irqchip/arm-gic.h
+>> +++ b/include/linux/irqchip/arm-gic.h
+>> @@ -25,6 +25,7 @@
+>>   #define GICC_INT_PRI_THRESHOLD        0xf0
+>>   #define GICC_IAR_INT_ID_MASK        0x3ff
+>>   #define GICC_INT_SPURIOUS        1023
+>> +#define GICC_DIS_BYPASS_FIQ_TO_CPU    (1 << 5)
+>>   #define GICC_DIS_BYPASS_MASK        0x1e0
+>>
+>>   #define GIC_DIST_CTRL            0x000
+>>
