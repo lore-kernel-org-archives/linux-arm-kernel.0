@@ -1,76 +1,51 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 3 Mar 2015 17:54:25 -0500
-Subject: [PATCH - v7] of: Move of_dma_configure() to device.c to help
- re-use
-In-Reply-To: <CAErSpo5gPVqRrzZ3LbWvLRchr6SjxN0eve62dTJamfz+=O882Q@mail.gmail.com>
-References: <1425333548-8802-1-git-send-email-m-karicheri2@ti.com>
- <CAErSpo7MsxgVZyhpijRzVN7mVNcbN7M4A4W-UKaNs4AnmGrB6g@mail.gmail.com>
- <54F5F59C.5000603@ti.com>
- <CAErSpo5gPVqRrzZ3LbWvLRchr6SjxN0eve62dTJamfz+=O882Q@mail.gmail.com>
-Message-ID: <54F63BA1.8030708@ti.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Wed, 4 Mar 2015 01:09:13 +0200
+Subject: [PATCH 01/10] media: omap3isp: remove unused clkdev
+In-Reply-To: <20150302235435.GF29584@n2100.arm.linux.org.uk>
+References: <20150302170538.GQ8656@n2100.arm.linux.org.uk>
+ <E1YSTnC-0001JU-CX@rmk-PC.arm.linux.org.uk>
+ <118780170.u6ZO5zJrEk@avalon>
+ <20150302225336.GV6539@valkosipuli.retiisi.org.uk>
+ <20150302235435.GF29584@n2100.arm.linux.org.uk>
+Message-ID: <20150303230913.GZ6539@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2015 03:53 PM, Bjorn Helgaas wrote:
-> [+cc linux-pci]
->
-> On Tue, Mar 3, 2015 at 11:55 AM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
->> On 03/02/2015 10:43 PM, Bjorn Helgaas wrote:
->>>
->>> On Mon, Mar 2, 2015 at 3:59 PM, Murali Karicheri<m-karicheri2@ti.com>
->>> wrote:
->>>>
->>>> Move of_dma_configure() to device.c so it can be re-used for PCI devices
->>>> to
->>>> obtain DMA configuration from DT.  Also add a second argument so that for
->>>> PCI, the DT node of root bus host bridge can be used to obtain the DMA
->>>> configuration for the slave PCI device.
->>>>
->>>> Tested-by: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>   (AMD
->>>> Seattle)
->>>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
->>>> Signed-off-by: Bjorn Helgaas<bhelgaas@google.com>
->>>> Reviewed-by: Catalin Marinas<catalin.marinas@arm.com>
->>>> Acked-by: Will Deacon<will.deacon@arm.com>
->>>> CC: Joerg Roedel<joro@8bytes.org>
->>>> CC: Grant Likely<grant.likely@linaro.org>
->>>> CC: Rob Herring<robh+dt@kernel.org>
->>>> CC: Russell King<linux@arm.linux.org.uk>
->>>> CC: Arnd Bergmann<arnd@arndb.de>
->>>> ---
->>>>    - Based on the existing patch applied to arm-pci/pci/iommu for pci next
->>>> (Bjorn)
->>>>    - Fixed the build issue reported on ARCH=x86_64
->>>
->>>
->>> Hi Murali,
->>>
->>> Can you please repost the entire series with fixed patches?  It's
->>> easier for me to reapply the whole thing at once than it is to keep
->>> track of and fiddle with individual patches.
->>>
->>> Bjorn
->>
->> Bjorn,
->>
->> Ok. I have just posted v8 of the series including all patches.
->
-> Thanks, I put them on a pci/murali-v8 branch for now.  I'm assuming
-> you want them to go through my tree.  In the cover letter, you
-> mentioned the "arm-pci iommu branch", so if that means you want them
-> via an ARM tree instead of mine, just let me know.  I assume the build
-> will be clean and I'll rename it back to pci/iommu.
+Hi Russell,
 
-My bad. It should have beem pci/iommu. My remote was named arm-pci and 
-hence the confusion. Please apply it to the pci/iommu branch.
+On Mon, Mar 02, 2015 at 11:54:35PM +0000, Russell King - ARM Linux wrote:
+> (Combining replies...)
+> 
+> On Tue, Mar 03, 2015 at 12:53:37AM +0200, Sakari Ailus wrote:
+> > Hi Laurent and Russell,
+> > 
+> > On Tue, Mar 03, 2015 at 12:33:44AM +0200, Laurent Pinchart wrote:
+> > > Sakari, does it conflict with the omap3isp DT support ? If so, how would you 
+> > > prefer to resolve the conflict ? Russell, would it be fine to merge this 
+> > > through Mauro's tree ?
+> 
+> As other changes will depend on this, I'd prefer not to.  The whole
+> "make clk_get() return a unique struct clk" wasn't well tested, and
+> several places broke - and currently clk_add_alias() is broken as a
+> result of that.
+> 
+> I'm trying to get to the longer term solution, where clkdev internally
+> uses a struct clk_hw pointer rather than a struct clk pointer, and I
+> want to clean stuff up first.
+> 
+> If omap3isp needs to keep this code, then so be it - I'll come up with
+> a different patch improving its use of clkdev instead.
 
-Thanks
+I discussed this with Laurent and the two options we thought are
 
-Murali
->
-> Bjorn
+- You provide a stable branch on which I can rebase the patches, in order
+  to avoid a merge conflict or
 
+- We ignore the conflict and let Stephen Rothwell handle it. The conflict
+  itself is relatively simple to resolve.
 
 -- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+Kind regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
