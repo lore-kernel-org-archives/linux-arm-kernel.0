@@ -1,46 +1,52 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 3 Mar 2015 09:58:58 -0500
-Subject: [PATCH - v7] of: Move of_dma_configure() to device.c to help
- re-use
-In-Reply-To: <CAErSpo7MsxgVZyhpijRzVN7mVNcbN7M4A4W-UKaNs4AnmGrB6g@mail.gmail.com>
-References: <1425333548-8802-1-git-send-email-m-karicheri2@ti.com>
- <CAErSpo7MsxgVZyhpijRzVN7mVNcbN7M4A4W-UKaNs4AnmGrB6g@mail.gmail.com>
-Message-ID: <54F5CC32.6050603@ti.com>
+From: mporter@konsulko.com (Matt Porter)
+Date: Tue, 3 Mar 2015 10:08:09 -0500
+Subject: [PATCH] ARM: dts: imx: Add dr_mode host setting to all host-only
+ usb instances
+In-Reply-To: <20150303044334.GA16617@shlinux2>
+References: <1425045960-14191-1-git-send-email-mporter@konsulko.com>
+ <20150303034133.GJ20455@dragon> <20150303044334.GA16617@shlinux2>
+Message-ID: <20150303150809.GD30263@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2015 10:43 PM, Bjorn Helgaas wrote:
-> On Mon, Mar 2, 2015 at 3:59 PM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
->> Move of_dma_configure() to device.c so it can be re-used for PCI devices to
->> obtain DMA configuration from DT.  Also add a second argument so that for
->> PCI, the DT node of root bus host bridge can be used to obtain the DMA
->> configuration for the slave PCI device.
->>
->> Tested-by: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>  (AMD Seattle)
->> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
->> Signed-off-by: Bjorn Helgaas<bhelgaas@google.com>
->> Reviewed-by: Catalin Marinas<catalin.marinas@arm.com>
->> Acked-by: Will Deacon<will.deacon@arm.com>
->> CC: Joerg Roedel<joro@8bytes.org>
->> CC: Grant Likely<grant.likely@linaro.org>
->> CC: Rob Herring<robh+dt@kernel.org>
->> CC: Russell King<linux@arm.linux.org.uk>
->> CC: Arnd Bergmann<arnd@arndb.de>
->> ---
->>   - Based on the existing patch applied to arm-pci/pci/iommu for pci next (Bjorn)
->>   - Fixed the build issue reported on ARCH=x86_64
->
-> Hi Murali,
->
-> Can you please repost the entire series with fixed patches?  It's
-> easier for me to reapply the whole thing at once than it is to keep
-> track of and fiddle with individual patches.
->
-> Bjorn
-Ok Fine. Will post now.
+On Tue, Mar 03, 2015 at 12:43:36PM +0800, Peter Chen wrote:
+> On Tue, Mar 03, 2015 at 11:41:35AM +0800, Shawn Guo wrote:
+> > 
+> > On Fri, Feb 27, 2015 at 09:06:00AM -0500, Matt Porter wrote:
+> > > The chipidea driver adds an extra line of spam to the log when a
+> > > host-only chipidea instance is left set to the default of a dual role
+> > > controller.
+> > > 
+> > > [    2.010873] ci_hdrc ci_hdrc.1: doesn't support gadget
+> > > 
+> > > Set the dr_mode property to host on all the host-only nodes
+> > > to avoid this warning.
+> 
+> It is not an warning, it is dev_info.
 
-Murali
+True enough, it's info level but is essentially warning that, in the
+case of instances that are restricted to host only (at the SoC level),
+that the DT hardware description is incorrect. Yes, it's benign, but
+if the dtsi is corrected for those parts we don't have to see that
+message.
 
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+> In fact, imx28, imx6sl and imx6sx's second controller is dual-role
+> controller, we only set dr_mode at board's dts according to design
+> unless the controller's capability register is incorrect.
+
+The patch doesn't set dr_mode to host on the second controller for
+the imx6sl or imx6sx, only on the third host-only controller. If
+imx28's second controller is really dual-role capable then the
+reference manual is incorrect and I can drop that hunk in v2.
+I only have imx6q and imx6d parts in hand to verify so for the rest
+I went by the RM claim of which controllers were host-only.
+
+> So, sorry, I don't think this change is necessary.
+
+I can correct the set of instances that should have dr_mode set to host
+in v2 of this. We clearly have some that should have this set in their
+SoC .dtsi to have the hardware description correct.  Will that work for
+you or do you want the SoC-specific cases of this property to be only
+reflected in the board level dts?
+
+-Matt
