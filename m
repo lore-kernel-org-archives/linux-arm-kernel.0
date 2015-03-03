@@ -1,49 +1,103 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 3 Mar 2015 09:26:20 +0100
-Subject: [PATCH] udc: gadget: atmel_usba_udc: depend on COMMON_CLK_AT91
-In-Reply-To: <1425368567-5333-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1425368567-5333-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150303092620.63e1861d@bbrezillon>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 3 Mar 2015 09:30:02 +0100
+Subject: [PATCH v2] seccomp: switch to using asm-generic for seccomp.h
+In-Reply-To: <20150302231254.GA4857@www.outflux.net>
+References: <20150302231254.GA4857@www.outflux.net>
+Message-ID: <20150303083002.GA1207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
 
-On Tue,  3 Mar 2015 08:42:47 +0100
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+* Kees Cook <keescook@chromium.org> wrote:
 
-> Since the addition of the errata handling for at91sam9rl and at91sam9g45, the
-> atmel_usba_udc depends on the pmc driver being present. Explicitly set that
-> dependency.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  drivers/usb/gadget/udc/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/usb/gadget/udc/Kconfig b/drivers/usb/gadget/udc/Kconfig
-> index 9a3a6b00391a..b04206fdba11 100644
-> --- a/drivers/usb/gadget/udc/Kconfig
-> +++ b/drivers/usb/gadget/udc/Kconfig
-> @@ -55,7 +55,7 @@ config USB_LPC32XX
->  
->  config USB_ATMEL_USBA
->  	tristate "Atmel USBA"
-> -	depends on AVR32 || ARCH_AT91
-> +	depends on AVR32 || ARCH_AT91 && COMMON_CLK_AT91
+> Most architectures don't need to do anything special for the strict
+> seccomp syscall entries. Remove the redundant headers and reduce the
+> others.
 
-I guess you should add parenthesis to make it clearer ?
+>  19 files changed, 27 insertions(+), 137 deletions(-)
 
-	depends on AVR32 || (ARCH_AT91 && COMMON_CLK_AT91)
+Lovely cleanup factor.
 
-And I wonder why you need that. I though this option was selected by all
-at91 platforms ?
+Just to make sure, are you sure the 32-bit details are identical 
+across architectures?
 
-Regards,
+For example some architectures did this:
 
-Boris
+> --- a/arch/microblaze/include/asm/seccomp.h
+> +++ /dev/null
+> @@ -1,16 +0,0 @@
+> -#ifndef _ASM_MICROBLAZE_SECCOMP_H
+> -#define _ASM_MICROBLAZE_SECCOMP_H
+> -
+> -#include <linux/unistd.h>
+> -
+> -#define __NR_seccomp_read		__NR_read
+> -#define __NR_seccomp_write		__NR_write
+> -#define __NR_seccomp_exit		__NR_exit
+> -#define __NR_seccomp_sigreturn		__NR_sigreturn
+> -
+> -#define __NR_seccomp_read_32		__NR_read
+> -#define __NR_seccomp_write_32		__NR_write
+> -#define __NR_seccomp_exit_32		__NR_exit
+> -#define __NR_seccomp_sigreturn_32	__NR_sigreturn
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+others did this:
+
+> diff --git a/arch/x86/include/asm/seccomp_64.h b/arch/x86/include/asm/seccomp_64.h
+> deleted file mode 100644
+> index 84ec1bd161a5..000000000000
+> --- a/arch/x86/include/asm/seccomp_64.h
+> +++ /dev/null
+> @@ -1,17 +0,0 @@
+> -#ifndef _ASM_X86_SECCOMP_64_H
+> -#define _ASM_X86_SECCOMP_64_H
+> -
+> -#include <linux/unistd.h>
+> -#include <asm/ia32_unistd.h>
+> -
+> -#define __NR_seccomp_read __NR_read
+> -#define __NR_seccomp_write __NR_write
+> -#define __NR_seccomp_exit __NR_exit
+> -#define __NR_seccomp_sigreturn __NR_rt_sigreturn
+> -
+> -#define __NR_seccomp_read_32 __NR_ia32_read
+> -#define __NR_seccomp_write_32 __NR_ia32_write
+> -#define __NR_seccomp_exit_32 __NR_ia32_exit
+> -#define __NR_seccomp_sigreturn_32 __NR_ia32_sigreturn
+> -
+> -#endif /* _ASM_X86_SECCOMP_64_H */
+
+While in yet another case you kept the syscall mappings:
+
+> --- a/arch/x86/include/asm/seccomp.h
+> +++ b/arch/x86/include/asm/seccomp.h
+> @@ -1,5 +1,20 @@
+> +#ifndef _ASM_X86_SECCOMP_H
+> +#define _ASM_X86_SECCOMP_H
+> +
+> +#include <asm/unistd.h>
+> +
+> +#ifdef CONFIG_COMPAT
+> +#include <asm/ia32_unistd.h>
+> +#define __NR_seccomp_read_32		__NR_ia32_read
+> +#define __NR_seccomp_write_32		__NR_ia32_write
+> +#define __NR_seccomp_exit_32		__NR_ia32_exit
+> +#define __NR_seccomp_sigreturn_32	__NR_ia32_sigreturn
+> +#endif
+> +
+>  #ifdef CONFIG_X86_32
+> -# include <asm/seccomp_32.h>
+> -#else
+> -# include <asm/seccomp_64.h>
+> +#define __NR_seccomp_sigreturn		__NR_sigreturn
+>  #endif
+> +
+> +#include <asm-generic/seccomp.h>
+> +
+> +#endif /* _ASM_X86_SECCOMP_H */
+
+It might all be correct, but it's not obvious to me.
+
+Thanks,
+
+	Ingo
