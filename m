@@ -1,27 +1,33 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 04 Mar 2015 21:31:32 +0100
-Subject: [RFC PATCH 00/18] ARM: msm multiplatform support
-In-Reply-To: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
-References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
-Message-ID: <1425501092.2090.21.camel@tiscali.nl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Mar 2015 21:31:52 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC sh7372 SoC Removal Updates for
+ v4.1
+In-Reply-To: <cover.1424931560.git.horms+renesas@verge.net.au>
+References: <cover.1424931560.git.horms+renesas@verge.net.au>
+Message-ID: <3043216.AuL1ank19q@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann schreef op wo 04-03-2015 om 20:32 [+0100]:
->  arch/arm/mach-msm/board-sapphire.c                 |   17 +-
+On Thursday 26 February 2015 15:22:11 Simon Horman wrote:
+> Renesas ARM Based SoC sh7372 SoC Removal Updates for v4.1
+> 
+> * Remove the sh7372 SoC and its mackerel board
+> 
 
-Please be aware that board-sapphire.c isn't actually wired into the
-build system _at all_. It never has been (see
-https://lkml.org/lkml/2014/5/14/634 ). There's another thread were the
-submitter of this file basically refuses to remove this file, if memory
-serves me right.
+Pulled into next/cleanup.
 
-I try not to use colorful language on the net. Perhaps I wouldn't have
-to bother you now if I would have used such language last year.
+I found the text a little short to justify a removal, but since I know
+the story, I've extended the narrative a bit, I hope this text is
+ok with you:
 
-You touch board-sapphire.c in 12/18 and 17/18. That was a waste of your
-time, however small. Should I submit a separate patch to remove it or do
-you prefer to fold such a patch into this series?
+    [arnd: The sh7372 platform is rather dated and is believed to
+     have no active users. It stands in the way of converting all
+     of mach-shmobile to be multiplatform capable, as adding
+     pinctrl and clock support for it would be more work than it's
+     worth. As always, should any legitimate upstream users show up
+     in the future, we will revert this removal]
 
+It would be nice to have more text in the tag description for cases that
+are not obvious to the reader, like this one.
 
-Paul Bolle
+	Arnd
