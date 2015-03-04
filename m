@@ -1,243 +1,210 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed,  4 Mar 2015 10:12:54 +0000
-Subject: [PATCH 4.0-rc1 v17 6/6] ARM: Add support for on-demand backtrace of
- other CPUs
-In-Reply-To: <1425463974-23568-1-git-send-email-daniel.thompson@linaro.org>
-References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
- <1425463974-23568-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1425463974-23568-7-git-send-email-daniel.thompson@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 4 Mar 2015 15:45:40 +0530
+Subject: [PATCH v2 1/4] cpufreq-dt: add clock domain and intermediate
+ frequency support
+In-Reply-To: <1425458956-20665-2-git-send-email-pi-cheng.chen@linaro.org>
+References: <1425458956-20665-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1425458956-20665-2-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <CAKohpomw6iDRRMxgmOORzZVeW4h2-LzKOsUcdpUnANcxiAYm+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replicate the x86 code to trigger a backtrace using an NMI and hook
-it up to IPI on ARM.
+On 4 March 2015 at 14:19, pi-cheng.chen <pi-cheng.chen@linaro.org> wrote:
+> In this patch, CPU clock/power domain information is added into the
+> platform_data of cpufreq-dt so that cpufreq-dt driver could check with CPUs
+> share clock/power. Also, intermediate frequency support is added in this
 
-The code differs slightly from the code on x86 because, on ARM, we do
-now know at compile time whether a platform is capable of supporting FIQ.
-We must avoid using an IPI to request a backtrace from the CPU on which
-the backtrace was requested if interrupts are disabled and fall back to
-generating it directly.
+You should have separate patches for logically separate changes.
 
-In addition the implementation of arch_trigger_all_cpu_backtrace() the
-patch also includes a few small items of plumbing that must be hooked
-up for the new code to work.
+> version. Since the program flows of .target_index and .target_intermediate
+> are quite similar, consolidate the flow as a new function to keep readibility.
+>
+> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
+> ---
+>  drivers/cpufreq/cpufreq-dt.c | 68 +++++++++++++++++++++++++++++++++++++++-----
+>  include/linux/cpufreq-dt.h   |  7 +++++
+>  2 files changed, 68 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+> index bab67db..5948bdf 100644
+> --- a/drivers/cpufreq/cpufreq-dt.c
+> +++ b/drivers/cpufreq/cpufreq-dt.c
+> @@ -34,25 +34,37 @@ struct private_data {
+>         struct regulator *cpu_reg;
+>         struct thermal_cooling_device *cdev;
+>         unsigned int voltage_tolerance; /* in percentage */
+> +       unsigned long intermediate_freq;
+>  };
+>
+> -static int set_target(struct cpufreq_policy *policy, unsigned int index)
+> +static unsigned int get_intermediate(struct cpufreq_policy *policy,
+> +                                    unsigned int index)
+> +{
+> +       struct private_data *priv = policy->driver_data;
+> +       struct cpufreq_frequency_table *freq_table;
+> +       unsigned long freq = clk_get_rate(policy->clk);
 
-Credit:
-  Russell King provided the initial prototype implementing this feature
-  for ARM. Today the patch has been reworked and, mostly, rewriten to
-  keep it aligned with x86. However this patch does still include some
-  code from Russell's original prototype.
+This will return current freq, which can also be fetched with
+policy->cur.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Steven Rostedt <rostedt@goodmis.org>
----
- arch/arm/Kconfig               |  1 +
- arch/arm/include/asm/hardirq.h |  2 +-
- arch/arm/include/asm/irq.h     |  5 +++
- arch/arm/include/asm/smp.h     |  3 ++
- arch/arm/kernel/smp.c          | 80 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/traps.c        |  3 ++
- 6 files changed, 93 insertions(+), 1 deletion(-)
+> +
+> +       freq_table = cpufreq_frequency_get_table(policy->cpu);
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9f1f09a2bc9b..2bb2e3cc660d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -76,6 +76,7 @@ config ARM
- 	select OLD_SIGACTION
- 	select OLD_SIGSUSPEND3
- 	select PERF_USE_VMALLOC
-+	select PRINTK_NMI
- 	select RTC_LIB
- 	select SYS_SUPPORTS_APM_EMULATION
- 	# Above selects are sorted alphabetically; please add new ones
-diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
-index fe3ea776dc34..5df33e30ae1b 100644
---- a/arch/arm/include/asm/hardirq.h
-+++ b/arch/arm/include/asm/hardirq.h
-@@ -5,7 +5,7 @@
- #include <linux/threads.h>
- #include <asm/irq.h>
- 
--#define NR_IPI	8
-+#define NR_IPI	9
- 
- typedef struct {
- 	unsigned int __softirq_pending;
-diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-index 53c15dec7af6..be1d07d59ee9 100644
---- a/arch/arm/include/asm/irq.h
-+++ b/arch/arm/include/asm/irq.h
-@@ -35,6 +35,11 @@ extern void (*handle_arch_irq)(struct pt_regs *);
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
- #endif
- 
-+#ifdef CONFIG_SMP
-+extern void arch_trigger_all_cpu_backtrace(bool);
-+#define arch_trigger_all_cpu_backtrace(x) arch_trigger_all_cpu_backtrace(x)
-+#endif
-+
- #endif
- 
- #endif
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 18f5a554134f..b076584ac0fa 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -18,6 +18,8 @@
- # error "<asm/smp.h> included in non-SMP build"
- #endif
- 
-+#define SMP_IPI_FIQ_MASK 0x0100
-+
- #define raw_smp_processor_id() (current_thread_info()->cpu)
- 
- struct seq_file;
-@@ -79,6 +81,7 @@ extern void arch_send_call_function_single_ipi(int cpu);
- extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
- extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
- 
-+extern void ipi_cpu_backtrace(struct pt_regs *regs);
- extern int register_ipi_completion(struct completion *completion, int cpu);
- 
- struct smp_operations {
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 86ef244c5a24..828277c4c248 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -26,6 +26,7 @@
- #include <linux/completion.h>
- #include <linux/cpufreq.h>
- #include <linux/irq_work.h>
-+#include <linux/seq_buf.h>
- 
- #include <linux/atomic.h>
- #include <asm/smp.h>
-@@ -72,6 +73,7 @@ enum ipi_msg_type {
- 	IPI_CPU_STOP,
- 	IPI_IRQ_WORK,
- 	IPI_COMPLETION,
-+	IPI_CPU_BACKTRACE,
- };
- 
- static DECLARE_COMPLETION(cpu_running);
-@@ -456,6 +458,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
- 	S(IPI_CPU_STOP, "CPU stop interrupts"),
- 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
- 	S(IPI_COMPLETION, "completion interrupts"),
-+	S(IPI_CPU_BACKTRACE, "backtrace interrupts"),
- };
- 
- static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
-@@ -570,6 +573,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 	unsigned int cpu = smp_processor_id();
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 
-+	BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_CPU_BACKTRACE));
-+
- 	if ((unsigned)ipinr < NR_IPI) {
- 		trace_ipi_entry(ipi_types[ipinr]);
- 		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
-@@ -623,6 +628,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 		irq_exit();
- 		break;
- 
-+	case IPI_CPU_BACKTRACE:
-+		irq_enter();
-+		ipi_cpu_backtrace(regs);
-+		irq_exit();
-+		break;
-+
- 	default:
- 		pr_crit("CPU%u: Unknown IPI message 0x%x\n",
- 		        cpu, ipinr);
-@@ -717,3 +728,72 @@ static int __init register_cpufreq_notifier(void)
- core_initcall(register_cpufreq_notifier);
- 
- #endif
-+
-+/* For reliability, we're prepared to waste bits here. */
-+static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
-+
-+void arch_trigger_all_cpu_backtrace(bool include_self)
-+{
-+	int i;
-+	int this_cpu = get_cpu();
-+
-+	if (0 != printk_nmi_prepare()) {
-+		/*
-+		 * If there is already an nmi printk sequence in
-+		 * progress then just give up...
-+		 */
-+		put_cpu();
-+		return;
-+	}
-+
-+	cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
-+
-+	/*
-+	 * If irqs are disabled on the current processor then, if
-+	 * IPI_CPU_BACKTRACE is delivered using IRQ, we will won't be able to
-+	 * react to IPI_CPU_BACKTRACE until we leave this function. We avoid
-+	 * the potential timeout (not to mention the failure to print useful
-+	 * information) by calling the backtrace directly.
-+	 */
-+	if (irqs_disabled()) {
-+		ipi_cpu_backtrace(in_interrupt() ? get_irq_regs() : NULL);
-+		include_self = false;
-+	}
-+
-+	if (!include_self)
-+		cpumask_clear_cpu(this_cpu, to_cpumask(backtrace_mask));
-+
-+	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
-+		pr_info("Sending FIQ to %s CPUs:\n",
-+			(include_self ? "all" : "other"));
-+		smp_cross_call(to_cpumask(backtrace_mask), IPI_CPU_BACKTRACE);
-+	}
-+
-+	/* Wait for up to 10 seconds for all CPUs to do the backtrace */
-+	for (i = 0; i < 10 * 1000; i++) {
-+		if (cpumask_empty(to_cpumask(backtrace_mask)))
-+			break;
-+		mdelay(1);
-+		touch_softlockup_watchdog();
-+	}
-+
-+	printk_nmi_complete();
-+	put_cpu();
-+}
-+
-+void ipi_cpu_backtrace(struct pt_regs *regs)
-+{
-+	int cpu = smp_processor_id();
-+
-+	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
-+		printk_nmi_this_cpu_begin();
-+		pr_warn("FIQ backtrace for cpu %d\n", cpu);
-+		if (regs != NULL)
-+			show_regs(regs);
-+		else
-+			dump_stack();
-+		printk_nmi_this_cpu_end();
-+
-+		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
-+	}
-+}
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index b35e220ae1b1..1836415b8a5c 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -483,6 +483,9 @@ asmlinkage void __exception_irq_entry handle_fiq_as_nmi(struct pt_regs *regs)
- #ifdef CONFIG_ARM_GIC
- 	gic_handle_fiq_ipi();
- #endif
-+#ifdef CONFIG_SMP
-+	ipi_cpu_backtrace(regs);
-+#endif
- 
- 	nmi_exit();
- 
--- 
-2.1.0
+instead, freq_table = policy->freq_table.
+
+> +
+
+Always add a comment over such decision making expressions, on
+why you chose to return 0.
+
+> +       if (freq == priv->intermediate_freq ||
+
+Looks fine, current freq == intermediate freq..
+
+> +           freq_table[index].frequency * 1000 == freq)
+
+Absolutely wrong, current-freq == requested-freq.
+Instead it should be:
+
+freq_table[index].frequency * 1000 == priv->intermediate_freq.
+
+> +               return 0;
+> +
+> +       return priv->intermediate_freq;
+> +}
+> +
+> +static int set_frequency(struct cpufreq_policy *policy, long freq_Hz)
+>  {
+>         struct dev_pm_opp *opp;
+> -       struct cpufreq_frequency_table *freq_table = policy->freq_table;
+>         struct clk *cpu_clk = policy->clk;
+>         struct private_data *priv = policy->driver_data;
+>         struct device *cpu_dev = priv->cpu_dev;
+>         struct regulator *cpu_reg = priv->cpu_reg;
+>         unsigned long volt = 0, volt_old = 0, tol = 0;
+>         unsigned int old_freq, new_freq;
+> -       long freq_Hz, freq_exact;
+> +       long freq_exact;
+>         int ret;
+>
+> -       freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
+> -       if (freq_Hz <= 0)
+> -               freq_Hz = freq_table[index].frequency * 1000;
+> -
+>         freq_exact = freq_Hz;
+>         new_freq = freq_Hz / 1000;
+>         old_freq = clk_get_rate(cpu_clk) / 1000;
+> @@ -112,6 +124,29 @@ static int set_target(struct cpufreq_policy *policy, unsigned int index)
+>         return ret;
+>  }
+>
+> +static int target_intermediate(struct cpufreq_policy *policy,
+> +                              unsigned int index)
+> +{
+> +       struct private_data *priv = policy->driver_data;
+> +       long freq_Hz;
+> +
+> +       freq_Hz = priv->intermediate_freq;
+> +       return set_frequency(policy, freq_Hz);
+
+Instead, return set_frequency(policy, priv->intermediate_freq);
+
+> +}
+> +
+> +static int set_target(struct cpufreq_policy *policy, unsigned int index)
+> +{
+> +       struct cpufreq_frequency_table *freq_table = policy->freq_table;
+> +       struct clk *cpu_clk = policy->clk;
+> +       long freq_Hz;
+> +
+> +       freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
+
+Use policy->clk here directly instead of another local variable.
+
+> +       if (freq_Hz <= 0)
+> +               freq_Hz = freq_table[index].frequency * 1000;
+
+Why shouldn't we call clk_round_rate() for intermediate freq as well ?
+I think, it
+should be called for it as well.. And so you can save intermediate_freq_index
+instead of the freq..
+
+> +       return set_frequency(policy, freq_Hz);
+> +}
+> +
+>  static int allocate_resources(int cpu, struct device **cdev,
+>                               struct regulator **creg, struct clk **cclk)
+>  {
+> @@ -296,6 +331,23 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+>         pd = cpufreq_get_driver_data();
+>         if (!pd || !pd->independent_clocks)
+>                 cpumask_setall(policy->cpus);
+> +       else if (pd && !list_empty(&pd->domain_list)) {
+> +               struct list_head *domain_node;
+> +               struct cpufreq_cpu_domain *domain;
+> +
+> +               list_for_each(domain_node, &pd->domain_list) {
+> +                       domain = container_of(domain_node,
+> +                                             struct cpufreq_cpu_domain, node);
+> +                       if (!cpumask_test_cpu(policy->cpu, &domain->cpus))
+> +                               continue;
+> +
+> +                       if (domain->intermediate_freq)
+> +                               priv->intermediate_freq =
+> +                                               domain->intermediate_freq;
+> +                       cpumask_copy(policy->cpus, &domain->cpus);
+> +                       break;
+> +               }
+> +       }
+>
+
+Do this in a separate patch.
+
+>         of_node_put(np);
+>
+> @@ -363,6 +415,8 @@ static struct cpufreq_driver dt_cpufreq_driver = {
+>         .verify = cpufreq_generic_frequency_table_verify,
+>         .target_index = set_target,
+>         .get = cpufreq_generic_get,
+> +       .get_intermediate = get_intermediate,
+> +       .target_intermediate = target_intermediate,
+>         .init = cpufreq_init,
+>         .exit = cpufreq_exit,
+>         .ready = cpufreq_ready,
+> diff --git a/include/linux/cpufreq-dt.h b/include/linux/cpufreq-dt.h
+> index 0414009..d6e2097 100644
+> --- a/include/linux/cpufreq-dt.h
+> +++ b/include/linux/cpufreq-dt.h
+> @@ -10,6 +10,12 @@
+>  #ifndef __CPUFREQ_DT_H__
+>  #define __CPUFREQ_DT_H__
+>
+> +struct cpufreq_cpu_domain {
+> +       struct list_head node;
+> +       cpumask_t cpus;
+> +       unsigned long intermediate_freq;
+
+This should come from DT instead of platform data.
+
+> +};
+
+This struct will die along with the below one as soon as my patches
+on OPP bindings V2 get merged.
+
+>  struct cpufreq_dt_platform_data {
+>         /*
+>          * True when each CPU has its own clock to control its
+> @@ -17,6 +23,7 @@ struct cpufreq_dt_platform_data {
+>          * clock.
+>          */
+>         bool independent_clocks;
+> +       struct list_head domain_list;
+
+Also update the comment on how what these fields mean..
+
+>  };
+>
+>  #endif /* __CPUFREQ_DT_H__ */
+> --
+> 1.9.1
+>
