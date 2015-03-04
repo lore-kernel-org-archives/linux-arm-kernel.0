@@ -1,115 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 4 Mar 2015 14:58:58 -0800
-Subject: [PATCH 2/2] pinctrl: Introduce TI IOdelay configuration driver
-In-Reply-To: <1425509926.2090.56.camel@tiscali.nl>
-References: <1425427237-11511-1-git-send-email-nm@ti.com>
- <1425427237-11511-3-git-send-email-nm@ti.com>
- <1425509926.2090.56.camel@tiscali.nl>
-Message-ID: <20150304225857.GC13520@atomide.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 4 Mar 2015 15:05:29 -0800
+Subject: [PATCH 01/10] Input: s3c2410_ts: fix S3C_ADC dependency
+In-Reply-To: <1425299763-4066822-2-git-send-email-arnd@arndb.de>
+References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
+ <1425299763-4066822-2-git-send-email-arnd@arndb.de>
+Message-ID: <20150304230529.GC38298@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Bolle <pebolle@tiscali.nl> [150304 14:58]:
-> Nishanth Menon schreef op di 03-03-2015 om 18:00 [-0600]:
-> > diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-> > index ee9f44ad7f02..8e463d75fbb2 100644
-> > --- a/drivers/pinctrl/Kconfig
-> > +++ b/drivers/pinctrl/Kconfig
-> > @@ -160,6 +160,17 @@ config PINCTRL_TEGRA_XUSB
-> >  	select PINCONF
-> >  	select PINMUX
-> >  
-> > +config PINCTRL_TI_IODELAY
-> > +	bool "TI IODelay Module pinconf driver"
+On Mon, Mar 02, 2015 at 01:35:54PM +0100, Arnd Bergmann wrote:
+> S3C_ADC is only available on machines that don't do ARCH_MULTIPLATFORM,
+> so changing the 'select' into 'depends on' here helps us move to
+> ARCH_MULTIPLATFORM without introducing regressions.
 > 
-> This adds a boolean Kconfig symbol.
-> 
-> > +	depends on OF
-> > +	select PINCONF
-> > +	select GENERIC_PINCONF
-> > +	select REGMAP_MMIO
-> > +	help
-> > +	  Say Y here to support Texas Instruments' IODelay pinconf driver.
-> > +	  IODelay module is used for the DRA7 SoC family. This driver is in
-> > +	  addition to PINCTRL_SINGLE which controls the mux.
-> > +
-> >  config PINCTRL_TZ1090
-> >  	bool "Toumaz Xenif TZ1090 pin control driver"
-> >  	depends on SOC_TZ1090
-> > diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
-> > index 0475206dd600..e441cd71aedf 100644
-> > --- a/drivers/pinctrl/Makefile
-> > +++ b/drivers/pinctrl/Makefile
-> > @@ -28,6 +28,7 @@ obj-$(CONFIG_PINCTRL_TEGRA30)	+= pinctrl-tegra30.o
-> >  obj-$(CONFIG_PINCTRL_TEGRA114)	+= pinctrl-tegra114.o
-> >  obj-$(CONFIG_PINCTRL_TEGRA124)	+= pinctrl-tegra124.o
-> >  obj-$(CONFIG_PINCTRL_TEGRA_XUSB)	+= pinctrl-tegra-xusb.o
-> > +obj-$(CONFIG_PINCTRL_TI_IODELAY)	+= pinctrl-ti-iodelay.o
-> 
-> So this objectfile will either be built-in or not be built at all.
-> 
-> >  obj-$(CONFIG_PINCTRL_TZ1090)	+= pinctrl-tz1090.o
-> >  obj-$(CONFIG_PINCTRL_TZ1090_PDC)	+= pinctrl-tz1090-pdc.o
-> >  obj-$(CONFIG_PINCTRL_U300)	+= pinctrl-u300.o
-> > diff --git a/drivers/pinctrl/pinctrl-ti-iodelay.c b/drivers/pinctrl/pinctrl-ti-iodelay.c
-> > new file mode 100644
-> > index 000000000000..e4c6e25a781c
-> > --- /dev/null
-> > +++ b/drivers/pinctrl/pinctrl-ti-iodelay.c
-> > @@ -0,0 +1,963 @@
-> >[...]
-> > +#include <linux/err.h>
-> > +#include <linux/init.h>
-> > +#include <linux/io.h>
-> > +#include <linux/list.h>
-> > +#include <linux/module.h>
-> 
-> This is, I think, a bit of a red flag.
-> 
-> > +#include <linux/of_device.h>
-> > +#include <linux/of.h>
-> > +#include <linux/pinctrl/pinconf-generic.h>
-> > +#include <linux/pinctrl/pinconf.h>
-> > +#include <linux/pinctrl/pinctrl.h>
-> > +#include <linux/regmap.h>
-> > +#include <linux/slab.h>
-> 
-> [...]
-> 
-> > +static const struct of_device_id ti_iodelay_of_match[] = {
-> > +	{.compatible = "ti,dra7-iodelay", .data = &dra7_iodelay_data},
-> > +	{ /* Hopefully no more.. */ },
-> > +};
-> > +MODULE_DEVICE_TABLE(of, ti_iodelay_of_match);
-> > +
-> > +static struct platform_driver ti_iodelay_driver = {
-> > +	.probe = ti_iodelay_probe,
-> > +	.remove = ti_iodelay_remove,
-> > +	.driver = {
-> > +		   .owner = THIS_MODULE,
-> 
-> So THIS_MODULE will, basically, be NULL.
-> 
-> > +		   .name = DRIVER_NAME,
-> > +		   .of_match_table = ti_iodelay_of_match,
-> > +		   },
-> > +};
-> > +module_platform_driver(ti_iodelay_driver);
-> > +
-> > +MODULE_AUTHOR("Texas Instruments, Inc.");
-> > +MODULE_DESCRIPTION("Pinconf driver for TI's IO Delay module");
-> > +MODULE_LICENSE("GPL v2");
-> 
-> And these three macros will be preprocessed away.
-> 
-> (Perhaps there are non-modular alternatives to MODULE_DEVICE_TABLE and
-> module_platform_driver, but I'm not sure how those two macros actually
-> work.)
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-This should be just made to work as a regular loadable module.
-We already have pinctrl-single for the same platforms working
-as a loadable module.
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-Regards,
+> ---
+>  drivers/input/touchscreen/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+> index 58917525126e..3b4cd9ab1af0 100644
+> --- a/drivers/input/touchscreen/Kconfig
+> +++ b/drivers/input/touchscreen/Kconfig
+> @@ -326,7 +326,7 @@ config TOUCHSCREEN_ILI210X
+>  config TOUCHSCREEN_S3C2410
+>  	tristate "Samsung S3C2410/generic touchscreen input driver"
+>  	depends on ARCH_S3C24XX || SAMSUNG_DEV_TS
+> -	select S3C_ADC
+> +	depends on S3C_ADC
+>  	help
+>  	  Say Y here if you have the s3c2410 touchscreen.
+>  
+> -- 
+> 2.1.0.rc2
+> 
 
-Tony
+-- 
+Dmitry
