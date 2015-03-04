@@ -1,24 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Mar 2015 21:04:40 +0100
-Subject: [GIT PULL 2/2] Samsung fixes-2 for v4.0
-In-Reply-To: <54F4B33E.3070803@kernel.org>
-References: <54F4B33E.3070803@kernel.org>
-Message-ID: <2064108.qlOP0oDx90@wuerfel>
+From: rockford@yandex.ru (=?koi8-r?B?8MHOz9cg4c7E0sXK?=)
+Date: Wed, 04 Mar 2015 23:05:43 +0300
+Subject: [PATCH] ARM: i.MX6Q: Add fixup for RTL8211E Gigabit Ethernet PHY
+In-Reply-To: <2796821.5chD2g3yoZ@wuerfel>
+References: <1425404579-30591-1-git-send-email-rockford@yandex.ru>
+ <3988965.hS0GXm2TNL@wuerfel> <4686121425496122@web26g.yandex.ru>
+ <2796821.5chD2g3yoZ@wuerfel>
+Message-ID: <4971421425499543@web17m.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 March 2015 04:00:14 Kukjin Kim wrote:
-> Please pull Samsung tmu and hdmi regression fixes for v4.0 and I know
-> this is quite big for fixes but I couldn't handle this series for
-> previous merge window because of dependency with driver side...sorry for
-> that and please pull so that we could support them in v4.0 on exynos
-> platforms.
 
-What kind of dependency do you have there? It really should not be
-necessary to wait for driver changes, unless you do an incompatible
-DT binding change, which you should avoid.
 
-I've pulled it into fixes, but won't forward it until I hear a
-good explanation.
+04.03.2015, 22:44, "Arnd Bergmann" <arnd@arndb.de>:
+> On Wednesday 04 March 2015 22:08:42 ????? ?????? wrote:
+>>>> ??+ ??????????????phy_register_fixup_for_uid(PHY_ID_RTL8211E, 0xffffffff,
+>>>> ??+ ??????????????????????????????rtl8211e_phy_fixup);
+>>> ?How do you ensure that this fixup is only applied on the boards that need
+>>> ?it, rather than all machines that happen to have this phy?
+>> ?I've thought that if there no other fixups in code here checking a particular
+>> ?board where they run, this isn't necessary.
+>> ?This SoC has only one ethernet MAC and if it is connected to this PHY,
+>> ?it should be initalized this way independently of board, like other code here does, I think.
+>>
+>> ?This code just does forcibly restart autonegotiation.
+>> ?I can wrap it in if(!of_machine_is_compatible(...)){}, if it is need.
+>
+> Your explanation makes sense to me, though I wonder what the property of this
+> SoC is that requires the PHY fixup. Is this something we could or should be doing
+> in a more general way using the PHY API, by having the device driver call a
+> phy API function to restart autoneg independent of the PHY?
 
-	Arnd
+Actually, I don't know. I've discovered this when I wanted to boot a more recent kernel
+on this board, and network wasn't working. So I've had to disassembly a vendor's binary only module
+to discover how they handle this situation.
+
+--
+ ??????
