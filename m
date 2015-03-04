@@ -1,49 +1,51 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Wed,  4 Mar 2015 14:35:50 +0000
-Subject: [PATCH v2 3/6] hw/char: pl011 don't keep setting the IRQ if nothing
- changed
-In-Reply-To: <1425479753-18349-1-git-send-email-alex.bennee@linaro.org>
-References: <1425479753-18349-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1425479753-18349-4-git-send-email-alex.bennee@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Mar 2015 15:38:29 +0100
+Subject: [PATCH 3/8] ARM: make xscale iwmmxt code multiplatform aware
+In-Reply-To: <87pp8ozwb1.fsf@free.fr>
+References: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
+ <1425043775-3106827-4-git-send-email-arnd@arndb.de> <87pp8ozwb1.fsf@free.fr>
+Message-ID: <356997090.ZkRbrlLqgW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While observing KVM traces I can see additional IRQ calls on pretty much
-every MMIO access which is just plain inefficient. Only update the QEMU
-IRQ level if something has actually changed from last time. Otherwise we
-may be papering over other failure modes.
+On Wednesday 04 March 2015 15:12:02 Robert Jarzmik wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> 
+> I'm not sure I understand this patch fully, so take with caution my comment.
+> If I'm not mistaken, the former behavior was for pxa3xx:
+>  - cpu_is_xscale() -> false
+>  - cpu_is_xsc3() -> true
+>  => this implied PMD_BIT4 was set
+> 
+> With your patch :
+>  - cpu_is_xscale() -> true
+>  - cpu_is_xsc3() -> true
+>  => this implied PMD_BIT4 is not set
+> 
+> I like the new meaning for cpu_is_*(), but is the change of PMD_BIT4 the goal of
+> this patch (the piece in [1]) ?
 
-diff --git a/hw/char/pl011.c b/hw/char/pl011.c
-index 0a45115..bb554bc 100644
---- a/hw/char/pl011.c
-+++ b/hw/char/pl011.c
-@@ -36,6 +36,9 @@ typedef struct PL011State {
-     CharDriverState *chr;
-     qemu_irq irq;
-     const unsigned char *id;
-+
-+    /* not serialised, prevents pl011_update doing extra set_irqs */
-+    uint32_t current_irq;
- } PL011State;
- 
- #define PL011_INT_TX 0x20
-@@ -53,10 +56,11 @@ static const unsigned char pl011_id_luminary[8] =
- 
- static void pl011_update(PL011State *s)
- {
--    uint32_t flags;
--
--    flags = s->int_level & s->int_enabled;
--    qemu_set_irq(s->irq, flags != 0);
-+    uint32_t flags = s->int_level & s->int_enabled;
-+    if (flags != s->current_irq) {
-+        s->current_irq = flags;
-+        qemu_set_irq(s->irq, s->current_irq != 0);
-+    }
- }
- 
- static uint64_t pl011_read(void *opaque, hwaddr offset,
--- 
-2.3.1
+> > -     if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
+> > +     if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ &&
+> > +         !cpu_is_xscale() && !cpu_is_xsc3())
+> >               prot |= PMD_BIT4;
+> >  
+> >       pgd += pgd_index(addr);
+
+I tried to not change the behavior here, and I think you missed this part:
+
+-#if !defined(CONFIG_CPU_XSCALE) && !defined(CONFIG_CPU_XSC3)
++#if !defined(CONFIG_CPU_XSCALE)
+ #define        cpu_is_xscale() 0
+ #else
+-#define        cpu_is_xscale() 1
+ ...
+
+This means that previously, cpu_is_xscale() returned true for pxa3xx,
+while now it returns false, and I added the "&& !cpu_is_xsc3()" to
+keep the logic the same as before.
+
+Does that make sense?
+
+	Arnd
