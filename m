@@ -1,73 +1,34 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 04 Mar 2015 23:56:27 +0100
-Subject: [PATCH v9 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <12535711.Yi1RhU69kM@vostro.rjw.lan>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 04 Mar 2015 14:33:31 -0800
+Subject: [PATCH v2 2/3] arm64: qcom: Add support for Qualcomm MSM8916 SoC
+In-Reply-To: <1425503602-24916-2-git-send-email-galak@codeaurora.org>
+References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
+ <1425503602-24916-2-git-send-email-galak@codeaurora.org>
+Message-ID: <54F7883B.90704@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 25, 2015 04:39:40 PM Hanjun Guo wrote:
-> Changes since v8:
->   - remove MPIDR packing things by introducing phys_cpuid_t;
-> 
->   - update patch acpi: fix acpi_os_ioremap for arm64 to follow
->     Rafael's suggestion;
-> 
->   - Squash patch (disable ACPI if ACPI less than 5.1) to patch
->     (Get RSDP and ACPI boot-time table);
-> 
->   - Move sleep_arm.c to arch/arm64/ and rename it as acpi_sleep.c 
-> 
->   - Rework the uefi generated empty dtb to enable acpi when no dtb
->     is available, thanks Ard for the updated patch.
-> 
->   - rework the function of register cpu for kexec case
-> 
->   - use pr_debug() instead of pr_info() when scanning MADT.
-> 
->   - rebase on top of 4.0-rc1
-> 
-> Thanks
-> Hanjun
-> 
-> Al Stone (4):
->   ARM64 / ACPI: Get RSDP and ACPI boot-time tables
->   ARM64 / ACPI: Introduce early_param "acpi=" to enable/disable ACPI
->   ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on
->     ARM64
->   ARM64 / ACPI: additions of ACPI documentation for arm64
-> 
-> Graeme Gregory (6):
->   ACPI: add arm64 to the platforms that use ioremap
->   ACPI / sleep: Introduce arm64 specific acpi_sleep.c
->   ARM64 / ACPI: If we chose to boot from acpi then disable FDT
->   ARM64 / ACPI: Get PSCI flags in FADT for PSCI init
->   ARM64 / ACPI: Enable ARM64 in Kconfig
->   Documentation: ACPI for ARM64
-> 
-> Hanjun Guo (8):
->   ACPI / table: Use pr_debug() instead of pr_info() for MADT table
->     scanning
->   ACPI / processor: Introduce phys_cpuid_t for CPU hardware ID
->   ARM64 / ACPI: Introduce PCI stub functions for ACPI
->   ACPI / table: Print GIC information when MADT is parsed
->   ARM64 / ACPI: Parse MADT for SMP initialization
->   ACPI / processor: Make it possible to get CPU hardware ID via GICC
->   ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and register device's gsi
->   clocksource / arch_timer: Parse GTDT to initialize arch timer
-> 
-> Mark Salter (2):
->   ARM64: allow late use of early_ioremap
->   ACPI: fix acpi_os_ioremap for arm64
-> 
-> Tomasz Nowicki (1):
->   irqchip: Add GICv2 specific ACPI boot support
+On 03/04/15 13:13, Kumar Gala wrote:
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 1b8e973..4c8b119 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -177,6 +177,15 @@ config ARCH_MEDIATEK
+>  	help
+>  	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
+>  
+> +config ARCH_QCOM
+> +	bool "Qualcomm Platforms"
+> +	select ARCH_REQUIRE_GPIOLIB
+> +	select COMMON_CLK_QCOM
+> +	select PINCTRL
+> +	select SOC_BUS
 
-I've ACKed or commented the ones relevant for me.  As for the ARM64-specific
-code, I don't think I can give any meaningful input.
-
+I imagine all we need is select PINCTRL here. SOC_BUS is not used, also
+we shouldn't force COMMON_CLK_QCOM to be Y instead of M so please drop
+that select. Also we dropped ARCH_REQUIRE_GPIOLIB in arm32 so it would
+match if we just relied on ARCH_WANT_GPIOLIB that arm64 has by default
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
