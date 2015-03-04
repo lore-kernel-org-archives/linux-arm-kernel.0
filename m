@@ -1,33 +1,23 @@
-From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Thu,  5 Mar 2015 00:17:21 +0300
-Subject: [PATCH 2/2] dt-bindings: Add vendor-prefix for Wexler
-In-Reply-To: <1425456947-4152-1-git-send-email-mamlinav@gmail.com>
-References: <1425456947-4152-1-git-send-email-mamlinav@gmail.com>
-Message-ID: <1425503841-28605-1-git-send-email-mamlinav@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Mar 2015 22:19:22 +0100
+Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
+ msm-id and qcom, board-id
+In-Reply-To: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
+References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
+Message-ID: <2483237.3YTlNsnOp7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds vendor-prefix for Wexler.
+On Wednesday 04 March 2015 15:13:20 Kumar Gala wrote:
+> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
+> on Qualcomm MSM platforms to determine which device tree should be
+> utilized and passed to the kernel.
+> 
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
 
-WEXLER trademark owned by AVIRSA Electronics, a member of the
-diversified holding AVIRSA.
+This seems to duplicate the root-node compatible strings for no particular
+reason, with a less flexible format. I think it would be better to fix
+the boot loader.
 
-Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
----
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 389ca13..eb67da4 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -189,6 +189,7 @@ variscite	Variscite Ltd.
- via	VIA Technologies, Inc.
- virtio	Virtual I/O Device Specification, developed by the OASIS consortium
- voipac	Voipac Technologies s.r.o.
-+wexler	AVIRSA Electronics
- winbond Winbond Electronics corp.
- wlf	Wolfson Microelectronics
- wm	Wondermedia Technologies, Inc.
--- 
-2.0.5
+	Arnd
