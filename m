@@ -1,58 +1,43 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 04 Mar 2015 22:30:38 +0100
-Subject: [PATCH] genirq / PM: Add flag for shared NO_SUSPEND interrupt
- lines
-In-Reply-To: <20150304194246.GF22156@leverpostej>
-References: <1424771762-16343-1-git-send-email-boris.brezillon@free-electrons.com>
- <6864616.1aRDSmSsvx@vostro.rjw.lan> <20150304194246.GF22156@leverpostej>
-Message-ID: <3299261.2jupvhrEvj@vostro.rjw.lan>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 04 Mar 2015 22:09:55 +0100
+Subject: [RFC PATCH 00/18] ARM: msm multiplatform support
+In-Reply-To: <3942232.3OrEzc0z0v@wuerfel>
+References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
+ <1425501092.2090.21.camel@tiscali.nl> <3942232.3OrEzc0z0v@wuerfel>
+Message-ID: <1425503395.2090.31.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 04, 2015 07:42:46 PM Mark Rutland wrote:
-> Hi Rafael,
-> 
-> I'm a little late to the party here, but I have just a couple of minor
-> comments...
-> 
-> [...]
-> 
-> > Link: http://marc.info/?l=linux-kernel&m=142252777602084&w=2
-> > Link: http://marc.info/?t=142252775300011&r=1&w=2
-> > Linx: https://lkml.org/lkml/2014/12/15/552
-> 
-> s/x/k/ ?
+[Added Michal and kbuild.]
 
-Yes, thanks!
-
-> > Reported-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> > ---
-> >  include/linux/interrupt.h |    5 +++++
-> >  include/linux/irqdesc.h   |    1 +
-> >  kernel/irq/manage.c       |    7 ++++++-
-> >  kernel/irq/pm.c           |    7 ++++++-
-> >  4 files changed, 18 insertions(+), 2 deletions(-)
+Arnd Bergmann schreef op wo 04-03-2015 om 21:35 [+0100]:
+> On Wednesday 04 March 2015 21:31:32 Paul Bolle wrote:
+> > Arnd Bergmann schreef op wo 04-03-2015 om 20:32 [+0100]:
+> > >  arch/arm/mach-msm/board-sapphire.c                 |   17 +-
 > > 
-> > Index: linux-pm/include/linux/interrupt.h
-> > ===================================================================
-> > --- linux-pm.orig/include/linux/interrupt.h
-> > +++ linux-pm/include/linux/interrupt.h
-> > @@ -57,6 +57,10 @@
-> >   * IRQF_NO_THREAD - Interrupt cannot be threaded
-> >   * IRQF_EARLY_RESUME - Resume IRQ early during syscore instead of at device
-> >   *                resume time.
-> > + * IRQF_COND_SUSPEND - If the IRQ is shared with a NO_SUSPEND user, execute this
-> > + *                interrupt handler after suspending interrupts. For system
-> > + *                wakeup devices users need to implement wakeup detection in
-> > + *                their interrupt handlers.
+> > Please be aware that board-sapphire.c isn't actually wired into the
+> > build system _at all_. It never has been (see
+> > https://lkml.org/lkml/2014/5/14/634 ). There's another thread were the
+> > submitter of this file basically refuses to remove this file, if memory
+> > serves me right.
+> > 
+> > I try not to use colorful language on the net. Perhaps I wouldn't have
+> > to bother you now if I would have used such language last year.
 > 
-> It's probably worth documenting this in suspend-and-interrupts.txt, as
-> this invalidates some of the "IRQF_NO_SUSPEND and enable_irq_wake()"
-> section. I'll send a patch momentarily to that effect.
->
-> Otherwise, this patch looks good, thanks for handling this!
+> I noticed this, but since it was not standing in the way of what I tried
+> to do, I did not do anything about it here.
+>  
+> > You touch board-sapphire.c in 12/18 and 17/18. That was a waste of your
+> > time, however small. Should I submit a separate patch to remove it or do
+> > you prefer to fold such a patch into this series?
 > 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> The patch would be appreciated, but I'd keep it separate from this series.
+> I saw a lot of things in need of cleanup in the files I touched here,
+> but refused the temptation, in order to get something done and not
+> start something controversial.
 
-Thanks!
+I'll resubmit my trivial patch once this series hits linux-next. Feel
+free to prod me if I forget.
+
+
+Paul Bolle
