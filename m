@@ -1,93 +1,88 @@
 From: dhdang@apm.com (Duc Dang)
-Date: Wed,  4 Mar 2015 11:39:58 -0800
-Subject: [PATCH v2 2/4] arm64: dts: Add the device tree entry for the APM
- X-Gene PCIe MSI node.
+Date: Wed,  4 Mar 2015 11:39:59 -0800
+Subject: [PATCH v2 3/4] documentation: dts: Add the device tree binding for
+ APM X-Gene v1 PCIe MSI device tree node.
 In-Reply-To: <cover.1425497218.git.dhdang@apm.com>
 References: <cover.1425497218.git.dhdang@apm.com>
-Message-ID: <18fd1d4b65bb5997062d5ceef52dfa0c5d4c49b9.1425497218.git.dhdang@apm.com>
+Message-ID: <d44b9e71443b7b151de385f05211afd75f426035.1425497218.git.dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is single MSI block in X-Gene v1 SOC which serves all 5 PCIe ports.
+The driver for this binding is under 'drivers/pci/host/pci-xgene-msi.c'
 
 Signed-off-by: Duc Dang <dhdang@apm.com>
 Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
 ---
- arch/arm64/boot/dts/apm/apm-storm.dtsi | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ .../devicetree/bindings/pci/xgene-pci-msi.txt      | 61 ++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index f1ad9c2..0fe05dc 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -354,6 +354,28 @@
- 			};
- 		};
- 
-+		msi: msi at 79000000 {
-+			compatible = "apm,xgene1-msi";
-+			msi-controller;
-+			reg = <0x00 0x79000000 0x0 0x900000>;
-+			interrupts = <  0x0 0x10 0x4
-+					0x0 0x11 0x4
-+					0x0 0x12 0x4
-+					0x0 0x13 0x4
-+					0x0 0x14 0x4
-+					0x0 0x15 0x4
-+					0x0 0x16 0x4
-+					0x0 0x17 0x4
-+					0x0 0x18 0x4
-+					0x0 0x19 0x4
-+					0x0 0x1a 0x4
-+					0x0 0x1b 0x4
-+					0x0 0x1c 0x4
-+					0x0 0x1d 0x4
-+					0x0 0x1e 0x4
-+					0x0 0x1f 0x4>;
-+		};
+diff --git a/Documentation/devicetree/bindings/pci/xgene-pci-msi.txt b/Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
+new file mode 100644
+index 0000000..fdd55d6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
+@@ -0,0 +1,61 @@
++* AppliedMicro X-Gene PCIe MSI interface
 +
- 		pcie0: pcie at 1f2b0000 {
- 			status = "disabled";
- 			device_type = "pci";
-@@ -375,6 +397,7 @@
- 					 0x0 0x0 0x0 0x4 &gic 0x0 0xc5 0x1>;
- 			dma-coherent;
- 			clocks = <&pcie0clk 0>;
-+			msi-parent= <&msi>;
- 		};
- 
- 		pcie1: pcie at 1f2c0000 {
-@@ -398,6 +421,7 @@
- 					 0x0 0x0 0x0 0x4 &gic 0x0 0xcb 0x1>;
- 			dma-coherent;
- 			clocks = <&pcie1clk 0>;
-+			msi-parent= <&msi>;
- 		};
- 
- 		pcie2: pcie at 1f2d0000 {
-@@ -421,6 +445,7 @@
- 					 0x0 0x0 0x0 0x4 &gic 0x0 0xd1 0x1>;
- 			dma-coherent;
- 			clocks = <&pcie2clk 0>;
-+			msi-parent= <&msi>;
- 		};
- 
- 		pcie3: pcie at 1f500000 {
-@@ -444,6 +469,7 @@
- 					 0x0 0x0 0x0 0x4 &gic 0x0 0xd7 0x1>;
- 			dma-coherent;
- 			clocks = <&pcie3clk 0>;
-+			msi-parent= <&msi>;
- 		};
- 
- 		pcie4: pcie at 1f510000 {
-@@ -467,6 +493,7 @@
- 					 0x0 0x0 0x0 0x4 &gic 0x0 0xdd 0x1>;
- 			dma-coherent;
- 			clocks = <&pcie4clk 0>;
-+			msi-parent= <&msi>;
- 		};
- 
- 		serial0: serial at 1c020000 {
++Required properties:
++
++- compatible: should contain "apm,xgene1-msi" to identify the core.
++- msi-controller: indicates that this is X-Gene1 PCIe MSI controller node
++- reg: A list of physical base address and length for each set of controller
++       registers.
++- interrupts: A list of interrupt outputs of the controller.
++
++Each PCIe node needs to have property msi-parent that points to msi controller node
++
++Examples:
++
++SoC DTSI:
++
++	msi at 79000000 {
++		compatible = "apm,xgene1-msi";
++		msi-controller;
++		reg = <0x00 0x79000000 0x0 0x900000>;
++		interrupts = <  0x0 0x10 0x4
++				0x0 0x11 0x4
++				0x0 0x12 0x4
++				0x0 0x13 0x4
++				0x0 0x14 0x4
++				0x0 0x15 0x4
++				0x0 0x16 0x4
++				0x0 0x17 0x4
++				0x0 0x18 0x4
++				0x0 0x19 0x4
++				0x0 0x1a 0x4
++				0x0 0x1b 0x4
++				0x0 0x1c 0x4
++				0x0 0x1d 0x4
++				0x0 0x1e 0x4
++				0x0 0x1f 0x4>;
++	};
++
++	pcie0: pcie at 1f2b0000 {
++		status = "disabled";
++		device_type = "pci";
++		compatible = "apm,xgene-storm-pcie", "apm,xgene-pcie";
++		#interrupt-cells = <1>;
++		#size-cells = <2>;
++		#address-cells = <3>;
++		reg = < 0x00 0x1f2b0000 0x0 0x00010000   /* Controller registers */
++			0xe0 0xd0000000 0x0 0x00040000>; /* PCI config space */
++		reg-names = "csr", "cfg";
++		ranges = <0x01000000 0x00 0x00000000 0xe0 0x10000000 0x00 0x00010000   /* io */
++			  0x02000000 0x00 0x80000000 0xe1 0x80000000 0x00 0x80000000>; /* mem */
++		dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
++			      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
++		interrupt-map-mask = <0x0 0x0 0x0 0x7>;
++		interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xc2 0x1
++				 0x0 0x0 0x0 0x2 &gic 0x0 0xc3 0x1
++				 0x0 0x0 0x0 0x3 &gic 0x0 0xc4 0x1
++				 0x0 0x0 0x0 0x4 &gic 0x0 0xc5 0x1>;
++		dma-coherent;
++		clocks = <&pcie0clk 0>;
++		msi-parent= <&msi>;
++	};
 -- 
 1.9.1
