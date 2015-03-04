@@ -1,69 +1,142 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 4 Mar 2015 16:20:49 +0000
-Subject: [PATCH] ARM: advertise availability of v8 Crypto instructions
-In-Reply-To: <CAKv+Gu_dSgtsUp8aeMwz9a6stEC3DCg8GMU5QWWTPy_oOyHCSw@mail.gmail.com>
-References: <1425054991-29951-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_dSgtsUp8aeMwz9a6stEC3DCg8GMU5QWWTPy_oOyHCSw@mail.gmail.com>
-Message-ID: <20150304162049.GX28951@e104818-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 4 Mar 2015 16:20:56 +0000
+Subject: [PATCH v2 1/3] arm64: pmu: add support for interrupt-affinity
+ property
+In-Reply-To: <1425065549-24661-1-git-send-email-will.deacon@arm.com>
+References: <1425065549-24661-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20150304162056.GA22156@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 02:43:01PM +0100, Ard Biesheuvel wrote:
-> On 27 February 2015 at 17:36, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > When running the 32-bit ARM kernel on ARMv8 capable bare metal (e.g.,
-> > 32-bit Android userland and kernel on a Cortex-A53), or as a KVM guest
-> > on a 64-bit host, we should advertise the availability of the Crypto
-> > instructions, so that userland libraries such as OpenSSL may use them.
-> > (Support for the v8 Crypto instructions in the 32-bit build was added
-> > to OpenSSL more than six months ago)
-> >
-> > This adds the ID feature bit detection, and sets elf_hwcap2 accordingly.
-> >
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >  arch/arm/kernel/setup.c | 16 ++++++++++++++++
-> >  1 file changed, 16 insertions(+)
-> >
-> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> > index e55408e96559..8d4cb1c1c9ac 100644
-> > --- a/arch/arm/kernel/setup.c
-> > +++ b/arch/arm/kernel/setup.c
-> > @@ -393,6 +393,22 @@ static void __init cpuid_init_hwcaps(void)
-> >         vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
-> >         if (vmsa >= 5)
-> >                 elf_hwcap |= HWCAP_LPAE;
-> > +
-> > +       /* check for supported v8 Crypto instructions on non v7-M CPUs */
+Hi Will,
+
+On Fri, Feb 27, 2015 at 07:32:27PM +0000, Will Deacon wrote:
+> Historically, the PMU devicetree bindings have expected SPIs to be
+> listed in order of *logical* CPU number. This is problematic for
+> bootloaders, especially when the boot CPU (logical ID 0) isn't listed
+> first in the devicetree.
 > 
-> Perhaps this should be 'on v7+ (non v7-M) CPUs'
+> This patch adds a new optional property, interrupt-affinity, to the
+> PMU node which allows the interrupt affinity to be described using
+> a list of phandled to CPU nodes, with each entry in the list
+> corresponding to the SPI at the same index in the interrupts property.
 > 
-> > +       if (cpu_architecture() == CPU_ARCH_ARMv7) {
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/pmu.txt |  6 +++
+>  arch/arm64/include/asm/pmu.h                  |  1 +
+>  arch/arm64/kernel/perf_event.c                | 57 +++++++++++++++++++++++++--
+>  3 files changed, 60 insertions(+), 4 deletions(-)
+
+Please split the DT portion out from the arm64 code; it's equally
+applicable to the arm and arm64 patches.
+
 > 
-> @Russell: any thoughts on this?
-> 
-> Currently, v8 CPUs are identified as CPU_ARCH_ARMv7, and there is no
-> point in performing this test on other architectures (including v7-M)
+> diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+> index 75ef91d08f3b..a9281fc48743 100644
+> --- a/Documentation/devicetree/bindings/arm/pmu.txt
+> +++ b/Documentation/devicetree/bindings/arm/pmu.txt
+> @@ -24,6 +24,12 @@ Required properties:
+>  
+>  Optional properties:
+>  
+> +- interrupt-affinity : Valid only when using SPIs, specifies a list of phandles
+> +                       to CPU nodes corresponding directly to the affinity of
+> +		       the SPIs listed in the interrupts property. If absent,
+> +		       the interrupts are assumed to be listed in logical CPU
+> +		       order.
 
-With the new CPUID scheme introduced around v6/v7, the OS is no longer
-meant to read much into the architecture version. Even the current
-__get_cpu_architecture() function that we have returns the VMSA version
-and not the actual CPU architecture version (for example, ARM11MPCore is
-reported as ARMv7 by Linux when it's clearly an ARMv6). With ARMv8, the
-ID_MMFR0 would still report VMSAv7 with LPAE (0b0101) like on a
-Cortex-A15. You may be able to guess it's an ARMv8 from other fields
-like ID_ISAR2[3:0] (acquire/release semantics for load/store) but that's
-not how CPUID registers are meant to be used.
+I would prefer if this were: 
 
-If we are bothered by the ARMv7 name, we could redefine some of these
-macros to make it clear that the arch version is no longer relevant,
-something like below (covering the profile names as well):
+----
+- interrupt-affinity : Valid only when using SPIs, specifies a list of phandles
+		       to CPU nodes corresponding directly to the affinity of
+		       the SPIs listed in the interrupts property.
 
-	CPU_ARCH_CPUID_A
-	CPU_ARCH_CPUID_R
-	CPU_ARCH_CPUID_M
+		       This property should be present when there is more than
+		       a single SPI.
+----
 
-Once you find such cpu arch number, you know you have access to the
-architected CPUID registers.
+That makes it clear that new DTs should be using the property. It also
+gets rid of the mention of the logical CPU order, which DT authors
+simply cannot know anything about.
 
--- 
-Catalin
+There are cases I can think of that this doesn't cover:
+
+* A single muxed SPI
+* Muxed SPIs per-cluster
+* Differing PPIs per-cluster
+
+I can see how we can cover the first quite easily with a simple binding
+extension, but I'm having difficulty with the last two. If they're
+unlikely to appear in practice, then we are fine, but it's not clear to
+me if that's the case.
+
+If you think those are unlikely to appear in practice, then I think this
+binding is sufficient. So, for the binding split out into a seaprate
+patch, with those changes:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+[...]
+
+Now, for the code...
+
+[...]
+
+>  static int armpmu_device_probe(struct platform_device *pdev)
+>  {
+> +	int i, *irqs;
+> +
+>  	if (!cpu_pmu)
+>  		return -ENODEV;
+>  
+
+We should pull the affinity parsing into a function that we only bother
+to call if there's an interrupt-affinity property present. That will
+make it possible to error out if there is a property but it is
+malformed.
+
+> +	irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
+> +	if (!irqs)
+> +		return -ENOMEM;
+> +
+> +	for (i = 0; i < pdev->num_resources; ++i) {
+> +		struct device_node *dn;
+> +		int cpu = -1;
+> +
+> +		dn = of_parse_phandle(pdev->dev.of_node, "interrupt-affinity",
+> +				      i);
+> +		if (!dn) {
+> +			pr_warn("Failed to parse interrupt-affinity for idx %d\n",
+> +				i);
+
+This would be nicer with the node name:
+
+			pr_warn("Failed to parse %s/interrupt-affinity[%d]",
+				of_node_full_name(dn), i);
+
+> +			break;
+> +		}
+> +
+> +		for_each_possible_cpu(cpu)
+> +			if (arch_find_n_match_cpu_physical_id(dn, cpu, NULL))
+> +				break;
+> +
+> +		if (cpu == -1) {
+> +			pr_warn("Failed to find logical CPU for %s\n",
+> +				dn->name);
+> +			break;
+> +		}
+
+Refcount leak on dn here. You can move the put immediately after the
+for_each_possible_cpu.
+
+> +
+> +		irqs[i] = cpu;
+> +		of_node_put(dn);
+> +	}
+
+Thanks,
+Mark.
