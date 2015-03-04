@@ -1,38 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Mar 2015 10:48:44 +0100
-Subject: [PATCH 02/10] mailbox: Enable BCM2835 mailbox support
-In-Reply-To: <54F675F1.60205@wwwdotorg.org>
-References: <1425329684-23968-1-git-send-email-eric@anholt.net>
- <1425329684-23968-3-git-send-email-eric@anholt.net>
- <54F675F1.60205@wwwdotorg.org>
-Message-ID: <2241453.IVZx9NW1xt@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Mar 2015 09:51:55 +0000
+Subject: [PATCH 1/8] clk: add helper function clk_is_match()
+In-Reply-To: <20150225172757.421.43718@quantum>
+References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+ <1424876018-17852-2-git-send-email-shawn.guo@linaro.org>
+ <20150225172757.421.43718@quantum>
+Message-ID: <20150304095155.GB8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 March 2015 20:03:13 Stephen Warren wrote:
-> > +
-> > +/*
-> > + * Mailbox registers. We basically only support mailbox 0 & 1. We
-> > + * deliver to the VC in mailbox 1, it delivers to us in mailbox 0. See
-> > + * BCM2835-ARM-Peripherals.pdf section 1.3 for an explanation about
-> > + * the placement of memory barriers.
-> > + */
-> > +#define MAIL0_RD     (ARM_0_MAIL0 + 0x00)
-> > +#define MAIL0_POL    (ARM_0_MAIL0 + 0x10)
-> > +#define MAIL0_STA    (ARM_0_MAIL0 + 0x18)
-> > +#define MAIL0_CNF    (ARM_0_MAIL0 + 0x1C)
-> > +#define MAIL1_WRT    (ARM_0_MAIL1 + 0x00)
-> 
-> That implies there are more mailboxes. I wonder if we should
-> parameterize which to use via some DT properties? I guess we can defer
-> that though; we can default to the current values and add properties
-> later if we want to use something else.
+On Wed, Feb 25, 2015 at 09:27:57AM -0800, Mike Turquette wrote:
+> +static inline bool clk_is_match(struct clk *p, struct clk *q)
+> +{
+> +	return p == q ? true : false;
 
-How about changing #mbox-cells to <2> and using the first cell to
-identify the mailbox and the second to identify the channel?
+When they created the C standard, they already taught the compiler that
+p == q returns a true / false boolean value; there's no need for ?: here.
 
-The binding isn't very clear on the meaning of the one argument
-cell for the mailbox reference, but I assume it's used for the
-mailbox channel rather than the mailbox id.
-
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
