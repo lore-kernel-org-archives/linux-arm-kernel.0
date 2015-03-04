@@ -1,31 +1,84 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Tue,  3 Mar 2015 18:10:15 -0800
-Subject: [PATCH v3 0/10] split ET_DYN ASLR from mmap ASLR
-Message-ID: <1425435025-30284-1-git-send-email-keescook@chromium.org>
+Date: Tue,  3 Mar 2015 18:10:20 -0800
+Subject: [PATCH v3 05/10] powerpc: standardize mmap_rnd() usage
+In-Reply-To: <1425435025-30284-1-git-send-email-keescook@chromium.org>
+References: <1425435025-30284-1-git-send-email-keescook@chromium.org>
+Message-ID: <1425435025-30284-6-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To address the "offset2lib" ASLR weakness[1], this separates ET_DYN
-ASLR from mmap ASLR, as already done on s390. The architectures
-that are already randomizing mmap (arm, arm64, mips, powerpc, s390,
-and x86), have their various forms of arch_mmap_rnd() made available
-via the new CONFIG_ARCH_HAS_ELF_RANDOMIZE. For these architectures,
-arch_randomize_brk() is collapsed as well.
+In preparation for splitting out ET_DYN ASLR, this refactors the use of
+mmap_rnd() to be used similarly to arm and x86.
 
-This is an alternative to the solutions in:
-https://lkml.org/lkml/2015/2/23/442
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+Can mmap ASLR be safely enabled in the legacy mmap case here? Other archs
+use "mm->mmap_base = TASK_UNMAPPED_BASE + random_factor".
+---
+ arch/powerpc/mm/mmap.c | 26 +++++++++++++++-----------
+ 1 file changed, 15 insertions(+), 11 deletions(-)
 
-I've been able to test x86 and arm, and the buildbot (so far) seems
-happy with building the rest.
-
-Thanks!
-
--Kees
-
-[1] http://cybersecurity.upv.es/attacks/offset2lib/offset2lib.html
-
-v3:
-- split change on a per-arch basis for easier review
-- moved PF_RANDOMIZE check out of per-arch code (ingo)
-v2:
-- verbosified the commit logs, especially 4/5 (akpm)
+diff --git a/arch/powerpc/mm/mmap.c b/arch/powerpc/mm/mmap.c
+index cb8bdbe4972f..3d7088bfe93c 100644
+--- a/arch/powerpc/mm/mmap.c
++++ b/arch/powerpc/mm/mmap.c
+@@ -55,19 +55,18 @@ static inline int mmap_is_legacy(void)
+ 
+ static unsigned long mmap_rnd(void)
+ {
+-	unsigned long rnd = 0;
++	unsigned long rnd;
++
++	/* 8MB for 32bit, 1GB for 64bit */
++	if (is_32bit_task())
++		rnd = (unsigned long)get_random_int() % (1<<(23-PAGE_SHIFT));
++	else
++		rnd = (unsigned long)get_random_int() % (1<<(30-PAGE_SHIFT));
+ 
+-	if (current->flags & PF_RANDOMIZE) {
+-		/* 8MB for 32bit, 1GB for 64bit */
+-		if (is_32bit_task())
+-			rnd = (long)(get_random_int() % (1<<(23-PAGE_SHIFT)));
+-		else
+-			rnd = (long)(get_random_int() % (1<<(30-PAGE_SHIFT)));
+-	}
+ 	return rnd << PAGE_SHIFT;
+ }
+ 
+-static inline unsigned long mmap_base(void)
++static inline unsigned long mmap_base(unsigned long base)
+ {
+ 	unsigned long gap = rlimit(RLIMIT_STACK);
+ 
+@@ -76,7 +75,7 @@ static inline unsigned long mmap_base(void)
+ 	else if (gap > MAX_GAP)
+ 		gap = MAX_GAP;
+ 
+-	return PAGE_ALIGN(TASK_SIZE - gap - mmap_rnd());
++	return PAGE_ALIGN(TASK_SIZE - gap - base);
+ }
+ 
+ /*
+@@ -85,6 +84,11 @@ static inline unsigned long mmap_base(void)
+  */
+ void arch_pick_mmap_layout(struct mm_struct *mm)
+ {
++	unsigned long random_factor = 0UL;
++
++	if (current->flags & PF_RANDOMIZE)
++		random_factor = mmap_rnd();
++
+ 	/*
+ 	 * Fall back to the standard layout if the personality
+ 	 * bit is set, or if the expected stack growth is unlimited:
+@@ -93,7 +97,7 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
+ 		mm->mmap_base = TASK_UNMAPPED_BASE;
+ 		mm->get_unmapped_area = arch_get_unmapped_area;
+ 	} else {
+-		mm->mmap_base = mmap_base();
++		mm->mmap_base = mmap_base(random_factor);
+ 		mm->get_unmapped_area = arch_get_unmapped_area_topdown;
+ 	}
+ }
+-- 
+1.9.1
