@@ -1,55 +1,98 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Wed, 04 Mar 2015 15:16:41 +1100
-Subject: [PATCH 4/5] mm: split ET_DYN ASLR from mmap ASLR
-In-Reply-To: <1425341988-1599-5-git-send-email-keescook@chromium.org>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 4 Mar 2015 05:20:45 +0100
+Subject: [PATCH v2 0/5] split ET_DYN ASLR from mmap ASLR
+In-Reply-To: <CAGXu5j+qJLeRx2xx=890OxHp8kjd=ws8zg3_JYPNJd_6p2xoYQ@mail.gmail.com>
 References: <1425341988-1599-1-git-send-email-keescook@chromium.org>
- <1425341988-1599-5-git-send-email-keescook@chromium.org>
-Message-ID: <1425442601.9084.9.camel@ellerman.id.au>
+ <20150303073132.GA30602@gmail.com>
+ <CAGXu5j+qJLeRx2xx=890OxHp8kjd=ws8zg3_JYPNJd_6p2xoYQ@mail.gmail.com>
+Message-ID: <20150304042044.GA25354@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-03-02 at 16:19 -0800, Kees Cook wrote:
-> This fixes the "offset2lib" weakness in ASLR for arm, arm64, mips,
-> powerpc, and x86. The problem is that if there is a leak of ASLR from
-> the executable (ET_DYN), it means a leak of shared library offset as
-> well (mmap), and vice versa. Further details and a PoC of this attack
-> are available here:
-> http://cybersecurity.upv.es/attacks/offset2lib/offset2lib.html
+
+* Kees Cook <keescook@chromium.org> wrote:
+
+> On Mon, Mar 2, 2015 at 11:31 PM, Ingo Molnar <mingo@kernel.org> wrote:
+> >
+> > * Kees Cook <keescook@chromium.org> wrote:
+> >
+> >> To address the "offset2lib" ASLR weakness[1], this separates ET_DYN
+> >> ASLR from mmap ASLR, as already done on s390. The architectures
+> >> that are already randomizing mmap (arm, arm64, mips, powerpc, s390,
+> >> and x86), have their various forms of arch_mmap_rnd() made available
+> >> via the new CONFIG_ARCH_HAS_ELF_RANDOMIZE. For these architectures,
+> >> arch_randomize_brk() is collapsed as well.
+> >>
+> >> This is an alternative to the solutions in:
+> >> https://lkml.org/lkml/2015/2/23/442
+> >
+> > Looks good so far:
+> >
+> > Reviewed-by: Ingo Molnar <mingo@kernel.org>
+> >
+> > While reviewing this series I also noticed that the following code
+> > could be factored out from architecture mmap code as well:
+> >
+> >   - arch_pick_mmap_layout() uses very similar patterns across the
+> >     platforms, with only few variations. Many architectures use
+> >     the same duplicated mmap_is_legacy() helper as well. There's
+> >     usually just trivial differences between mmap_legacy_base()
+> >     approaches as well.
 > 
-> With this patch, a PIE linked executable (ET_DYN) has its own ASLR region:
+> I was nervous to start refactoring this code, but it's true: most of 
+> it is the same.
+
+Well, it still needs to be done if we want to add new randomization 
+features: code fractured over multiple architectures is a receipe for 
+bugs, as this series demonstrates. So it first has to be made more 
+maintainable.
+
+> >   - arch_mmap_rnd(): the PF_RANDOMIZE checks are needlessly
+> >     exposed to the arch routine - the arch routine should only
+> >     concentrate on arch details, not generic flags like
+> >     PF_RANDOMIZE.
 > 
-> $ ./show_mmaps_pie
-> 54859ccd6000-54859ccd7000 r-xp  ...  /tmp/show_mmaps_pie
-> 54859ced6000-54859ced7000 r--p  ...  /tmp/show_mmaps_pie
-> 54859ced7000-54859ced8000 rw-p  ...  /tmp/show_mmaps_pie
+> Yeah, excellent point. I will send a follow-up patch to move this 
+> into binfmt_elf instead. I'd like to avoid removing it in any of the 
+> other patches since each was attempting a single step in the 
+> refactoring.
 
-Just to be clear, it's the fact that the above vmas are in a different
-address range to those below that shows the patch is working, right?
+Finegrained patches are ideal!
 
-> 7f75be764000-7f75be91f000 r-xp  ...  /lib/x86_64-linux-gnu/libc.so.6
-> 7f75be91f000-7f75beb1f000 ---p  ...  /lib/x86_64-linux-gnu/libc.so.6
+> > In theory the mmap layout could be fully parametrized as well: 
+> > i.e. no callback functions to architectures by default at all: 
+> > just declarations of bits of randomization desired (or, available 
+> > address space bits), and perhaps an arch helper to allow 32-bit 
+> > vs. 64-bit address space distinctions.
+> 
+> Yeah, I was considering that too, since each architecture has a 
+> nearly identical arch_mmap_rnd() at this point. Only the size of the 
+> entropy was changing.
+>
+> > 'Weird' architectures could provide special routines, but only by 
+> > overriding the default behavior, which should be generic, safe and 
+> > robust.
+> 
+> Yeah, quite true. Should entropy size be a #define like 
+> ELF_ET_DYN_BASE? Something like ASLR_MMAP_ENTROPY and 
+> ASLR_MMAP_ENTROPY_32? [...]
 
+That would work I suspect.
 
-On powerpc I'm seeing:
+> [...] Is there a common function for determining a compat task? That 
+> seemed to be per-arch too. Maybe arch_mmap_entropy()?
 
-# /bin/dash
-# cat /proc/$$/maps
-524e0000-52510000 r-xp 00000000 08:03 129814                             /bin/dash
-52510000-52520000 rw-p 00020000 08:03 129814                             /bin/dash
-10034f20000-10034f50000 rw-p 00000000 00:00 0                            [heap]
-3fffaeaf0000-3fffaeca0000 r-xp 00000000 08:03 13529                      /lib/powerpc64le-linux-gnu/libc-2.19.so
-3fffaeca0000-3fffaecb0000 rw-p 001a0000 08:03 13529                      /lib/powerpc64le-linux-gnu/libc-2.19.so
-3fffaecc0000-3fffaecd0000 rw-p 00000000 00:00 0 
-3fffaecd0000-3fffaecf0000 r-xp 00000000 00:00 0                          [vdso]
-3fffaecf0000-3fffaed20000 r-xp 00000000 08:03 13539                      /lib/powerpc64le-linux-gnu/ld-2.19.so
-3fffaed20000-3fffaed30000 rw-p 00020000 08:03 13539                      /lib/powerpc64le-linux-gnu/ld-2.19.so
-3fffc7070000-3fffc70a0000 rw-p 00000000 00:00 0                          [stack]
+Compat flags are a bit of a mess, and since they often tie into arch 
+low level assembly code, they are hard to untangle. So maybe as an 
+intermediate step add an is_compat() generic method, and make that 
+obvious and self-defined function a per arch thing?
 
+But I'm just handwaving here - I suspect it has to be tried to see all 
+the complications and to determine whether that's the best structure 
+and whether it's a win ... Only one thing is certain: the current code 
+is not compact and reviewable enough, and VM bits hiding in 
+arch/*/mm/mmap.c tends to reduce net attention paid to these details.
 
-Whereas previously the /bin/dash vmas were up at 3fff..
+Thanks,
 
-So looks good to me for powerpc.
-
-Acked-by: Michael Ellerman <mpe@ellerman.id.au>
-
-cheers
+	Ingo
