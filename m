@@ -1,31 +1,42 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 4 Mar 2015 07:47:21 +0100
-Subject: Bug in i2c-core?
-In-Reply-To: <3574616.qzNqihiGp7@avalon>
-References: <54F0507F.6030804@armadeus.com> <20150227165944.GA6679@dtor-ws>
- <3574616.qzNqihiGp7@avalon>
-Message-ID: <20150304064721.GA883@katana>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 04 Mar 2015 15:59:55 +0900
+Subject: [PATCH v4 2/8] arm64: dts: exynos: Add dts files for 64-bit
+ Exynos5433 SoC
+In-Reply-To: <13467157.nyRCsNWIp6@wuerfel>
+References: <1424755011-15999-1-git-send-email-cw00.choi@samsung.com>
+ <2707354.mhmQEHxoKV@wuerfel>
+ <CAGTfZH0VVT0hMn4ooRNZxnqjUQ_hF8nHg-4NtNriayick50qgw@mail.gmail.com>
+ <13467157.nyRCsNWIp6@wuerfel>
+Message-ID: <54F6AD6B.70007@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> > Yes, this commit breaks all drivers using devm* for IRQ management on
-> > OF-based systemsi because devm* cleanup happens in device code, after
-> > bus's remove() method returns. I'd recommend reverting and finding a
-> > better way (making cleanup a custom devm action as well?).
+On 03/02/2015 06:22 AM, Arnd Bergmann wrote:
+> On Saturday 28 February 2015 09:47:01 Chanwoo Choi wrote:
+>> "earlycon=exynos4210,0x14C20000" is correct bootparam. You can check
+>> it on Documentation/kernel-parameters.txt as following.
+>>
+>>      exynos4210,<addr>
+>>                 Use early console provided by serial driver available
+>>                 on Samsung SoCs, requires selecting proper type and
+>>                 a correct base address of the selected UART port. The
+>>                 serial port must already be setup and configured.
+>>                 Options are not yet supported.
+>>
+>>
 > 
-> Ouch, my bad.
+> But it's crazy to do this when you have a DT. Please fix the existing
+> devicetree files that use this to just list 'earlycon'.
 > 
-> Wolfram, any opinion ? The original patch fixes a real bug, so we shouldn't 
-> just revert it.
+> The syntax above only makes sense for classic board files that we
+> do not support for exynos any more.
 
-I guess the usual rules apply. Let's try to fix it for v4.0, otherwise I
-have to revert it.
+Following earlycon patch for exynos soc was merged in Linux 4.0-rc1.
+- commit-id: b94ba0328d3b36ff95f5074c0e9b44f90dc56bb5 (serial: samsung: Add support for early console)
+Almost Exynos SoC use the same UART IP of Exynos4210.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150304/3ee92e4f/attachment.sig>
+If you mean that "earlycon=exynos4210" naming will be changed to "earlycon=exynos",
+we have to modify the drivers/tty/serial/samsung.c.
+
+Thanks,
+Chanwoo Choi
