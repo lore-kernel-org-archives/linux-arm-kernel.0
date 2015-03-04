@@ -1,28 +1,46 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 4 Mar 2015 17:32:50 +0530
-Subject: [PATCH] dma: xilinx-dma: move header file to common location
-In-Reply-To: <2793259.VbbYy9Imif@wuerfel>
-References: <4c3e2425e14646cb86c20d6aebdcfe22@BY2FFO11FD004.protection.gbl>
- <2793259.VbbYy9Imif@wuerfel>
-Message-ID: <20150304120250.GO2613@intel.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Wed, 4 Mar 2015 13:08:02 +0100
+Subject: [PATCH v2 04/18] clocksource: Add ARM System timer driver
+In-Reply-To: <1425411786.2606.24.camel@tiscali.nl>
+References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1424455277-29983-5-git-send-email-mcoquelin.stm32@gmail.com>
+ <20150220195437.GT19388@pengutronix.de>
+ <1424468908.24292.10.camel@x220>
+ <CALszF6Bm_Y4ZLednjpmP-hMix3gA23FwLm5hViEjr1QojUY+Mg@mail.gmail.com>
+ <1425411786.2606.24.camel@tiscali.nl>
+Message-ID: <CALszF6AEThPrRe7c7nJ6q7yb2fhLMFuHJUV10sf=w0TMcqVVaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 08:28:01PM +0100, Arnd Bergmann wrote:
-> On Monday 02 March 2015 23:24:24 Kedareswara rao Appana wrote:
-> > This patch moves the xilinx_dma.h header file
-> > to the include/linux/dma.
-> > 
-> > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> 
-> Please move this header file to drivers/dma/xilinx/ directly to
-> make it inaccessible by other driver. No driver should pass extra
-> data structures to a dmaengine driver.
-Actually that is not true. Few of the drivers need some additional
-parameters to be set which are not covered by the common set, hence an
-additional API is exposed by this driver to do so...
+2015-03-03 20:43 GMT+01:00 Paul Bolle <pebolle@tiscali.nl>:
+> Maxime Coquelin schreef op ma 02-03-2015 om 17:53 [+0100]:
+>> Do you agree if I define it like this:
+>>
+>> config ARMV7M_SYSTICK
+>>     bool "Clocksource driver for ARMv7-M System timer"
+>>     depends on OF && (CPU_V7M || COMPILE_TEST)
+>>     select CLKSRC_OF
+>>     select CLKSRC_MMIO
+>>     help
+>>       This options enables clocksource support for the ARMv7-M system
+>>       timer unit.
+>
+> I don't really have strong feelings on whatever way you choose to fix
+> the, well, minor problem I pointed out.
+>
+> Having said that, if a Kconfig entry without a prompt (and therefor,
+> without help) actually does what you want it to do, why bother adding a
+> prompt and a one line help text?
 
-If ever we could get rid of these...
+This is because I added also support for COMPILE_TEST coverage as per
+Uwe advice,
+and thought it was necessary to have an entry for this.
+Maybe I'm just wrong?
 
--- 
-~Vinod
+Thanks,
+Maxime
+
+>
+>
+> Paul Bolle
+>
