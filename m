@@ -1,87 +1,54 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 4 Mar 2015 17:39:48 +0100
-Subject: [PATCH] ARM: at91/dt: add uart0 to sama5d3 DT
-In-Reply-To: <1425486402-17580-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1425486402-17580-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <54F73554.3080804@atmel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 4 Mar 2015 17:39:35 +0100
+Subject: [PATCH v2 2/4] i2c: sunxi: Add Reduced Serial Bus (RSB) DT
+ bindings documentation
+In-Reply-To: <1425284686-5116-3-git-send-email-wens@csie.org>
+References: <1425284686-5116-1-git-send-email-wens@csie.org>
+ <1425284686-5116-3-git-send-email-wens@csie.org>
+Message-ID: <20150304163935.GO4911@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 04/03/2015 17:26, Nicolas Ferre a ?crit :
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Please, forget this patch. It is handled by
-arch/arm/boot/dts/sama5d3_uart.dtsi file.
-
-Sorry for the noise ;-)
-
-Bye,
-
-
-> ---
->  arch/arm/boot/dts/sama5d3.dtsi | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
+On Mon, Mar 02, 2015 at 04:24:44PM +0800, Chen-Yu Tsai wrote:
+> Reduced Serial Bus (RSB) is an SMBus like bus used to communicate
+> with some PMICs (like the AXP223) or other peripherals.
 > 
-> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-> index e30fee2edd55..def05e20e9d6 100644
-> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> @@ -26,6 +26,7 @@
->  		serial2 = &usart1;
->  		serial3 = &usart2;
->  		serial4 = &usart3;
-> +		serial5 = &uart0;
->  		gpio0 = &pioA;
->  		gpio1 = &pioB;
->  		gpio2 = &pioC;
-> @@ -206,6 +207,17 @@
->  				status = "disabled";
->  			};
->  
-> +			uart0: serial at f0024000 {
-> +				compatible = "atmel,at91sam9260-usart";
-> +				reg = <0xf0024000 0x100>;
-> +				interrupts = <16 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_uart0>;
-> +				clocks = <&uart0_clk>;
-> +				clock-names = "usart";
-> +				status = "disabled";
-> +			};
-> +
->  			pwm0: pwm at f002c000 {
->  				compatible = "atmel,sama5d3-pwm";
->  				reg = <0xf002c000 0x300>;
-> @@ -764,6 +776,14 @@
->  					};
->  				};
->  
-> +				uart0 {
-> +					pinctrl_uart0: uart0-0 {
-> +						atmel,pins =
-> +							<AT91_PIOC 29 AT91_PERIPH_A AT91_PINCTRL_NONE		/* conflicts with PWMFI2, ISI_D8 */
-> +							 AT91_PIOC 30 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;	/* conflicts with ISI_PCK */
-> +					};
-> +				};
-> +
->  				usart0 {
->  					pinctrl_usart0: usart0-0 {
->  						atmel,pins =
-> @@ -1098,6 +1118,12 @@
->  						atmel,clk-output-range = <0 66000000>;
->  					};
->  
-> +					uart0_clk: uart0_clk {
-> +						#clock-cells = <0>;
-> +						reg = <16>;
-> +						atmel,clk-output-range = <0 66000000>;
-> +					};
-> +
->  					twi0_clk: twi0_clk {
->  						reg = <18>;
->  						#clock-cells = <0>;
+> The RSB DT bindings are pretty much the same as the one defined for
+> the marvell's mv64xxx controller, with the additional RSB specific
+> "allwinner,rsb-hw-addr" property for slave device nodes.
 > 
+> There are 2 types of addresses for RSB devices, a hardware address
+> and a runtime (software) configurable address. The former is only
+> used when configuring the latter. All read/write accesses use the
+> runtime address.
+> 
+> It would seem straightforward to use the hardware address in the
+> DT bindings as the slave's address. However this will not work as
+> the hardware address is 12 bits wide, and at least 1 device, the
+> AC100 audio codec, has the highest bit set. This address would be
+> incompatible with I2C (7 or 10 bit addresses) and likely rejected.
+> 
+> Hence this binding uses statically allocated (by the author of the
+> DT) runtime addresses for the slave's "reg" property. The hardware
+> address is put in a separete named property. When writing a new DT,
+                      ^ separate
+> the author must take care to not have multiple slave devices use
+> the same address. It is recommended to follow whatever conventions
+> the hardware vendor uses.
 
+While very complete, the three last paragraphs should rather be, or at
+least duplicated, in the file itself.
+
+Maxime
 
 -- 
-Nicolas Ferre
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150304/0c8967a8/attachment.sig>
