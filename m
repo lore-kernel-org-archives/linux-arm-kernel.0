@@ -1,26 +1,24 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 04 Mar 2015 23:38 +0100
-Subject: [PATCH v9 07/21] ACPI / sleep: Introduce arm64 specific
- acpi_sleep.c
-In-Reply-To: <1424853601-6675-8-git-send-email-hanjun.guo@linaro.org>
+Date: Wed, 04 Mar 2015 23:40 +0100
+Subject: [PATCH v9 12/21] ACPI / table: Print GIC information when MADT is
+ parsed
+In-Reply-To: <1424853601-6675-13-git-send-email-hanjun.guo@linaro.org>
 References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <1424853601-6675-8-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <2076446.VFvTauDDiK@vostro.rjw.lan>
+ <1424853601-6675-13-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1559116.NBxTWyWPs4@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 25, 2015 04:39:47 PM Hanjun Guo wrote:
-> From: Graeme Gregory <graeme.gregory@linaro.org>
+On Wednesday, February 25, 2015 04:39:52 PM Hanjun Guo wrote:
+> When MADT is parsed, print GIC information as debug message:
 > 
-> ACPI 5.1 does not currently support S states for ARM64 hardware but
-> ACPI code will call acpi_target_system_state() for device power
-> management, so introduce acpi_sleep.c to allow other drivers to function
-> until S states are defined.
+> ACPI: GICC (acpi_id[0x0000] address[00000000e112f000] MPIDR[0x0] enabled)
+> ACPI: GICC (acpi_id[0x0001] address[00000000e112f000] MPIDR[0x1] enabled)
+> ...
+> ACPI: GICC (acpi_id[0x0201] address[00000000e112f000] MPIDR[0x201] enabled)
 > 
-> Since it is arm64 specific stub holder, so let acpi_sleep.c to ARM64
-> specific.
-> 
-> TODO: merge this with drivers/acpi/sleep.c once we fix the specification.
+> Those debug information will be very helpful to bring up early systems to
+> see if acpi_id and MPIDR are matched or not as spec defined.
 > 
 > CC: Rafael J. Wysocki <rjw@rjwysocki.net>
 > Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
@@ -30,80 +28,49 @@ On Wednesday, February 25, 2015 04:39:47 PM Hanjun Guo wrote:
 > Tested-by: Timur Tabi <timur@codeaurora.org>
 > Tested-by: Robert Richter <rrichter@cavium.com>
 > Acked-by: Robert Richter <rrichter@cavium.com>
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+
 > ---
->  arch/arm64/kernel/Makefile     |  2 +-
->  arch/arm64/kernel/acpi_sleep.c | 28 ++++++++++++++++++++++++++++
->  drivers/acpi/Makefile          |  2 ++
->  3 files changed, 31 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm64/kernel/acpi_sleep.c
+>  drivers/acpi/tables.c | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
 > 
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 218eb7e..4435943 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -34,7 +34,7 @@ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
->  arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
->  arm64-obj-$(CONFIG_PCI)			+= pci.o
->  arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
-> -arm64-obj-$(CONFIG_ACPI)		+= acpi.o
-> +arm64-obj-$(CONFIG_ACPI)		+= acpi.o acpi_sleep.o
+> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+> index f4e5b88..2e19189 100644
+> --- a/drivers/acpi/tables.c
+> +++ b/drivers/acpi/tables.c
+> @@ -185,6 +185,28 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>  		}
+>  		break;
 >  
->  obj-y					+= $(arm64-obj-y) vdso/
->  obj-m					+= $(arm64-obj-m)
-> diff --git a/arch/arm64/kernel/acpi_sleep.c b/arch/arm64/kernel/acpi_sleep.c
-> new file mode 100644
-> index 0000000..54578ef
-> --- /dev/null
-> +++ b/arch/arm64/kernel/acpi_sleep.c
-> @@ -0,0 +1,28 @@
-> +/*
-> + *  ARM64 Specific Sleep Functionality
-> + *
-> + *  Copyright (C) 2013-2014, Linaro Ltd.
-> + *      Author: Graeme Gregory <graeme.gregory@linaro.org>
-> + *
-> + *  This program is free software; you can redistribute it and/or modify
-> + *  it under the terms of the GNU General Public License version 2 as
-> + *  published by the Free Software Foundation.
-> + */
+> +	case ACPI_MADT_TYPE_GENERIC_INTERRUPT:
+> +		{
+> +			struct acpi_madt_generic_interrupt *p =
+> +				(struct acpi_madt_generic_interrupt *)header;
+> +			pr_debug("GICC (acpi_id[0x%04x] address[%llx] MPIDR[0x%llx] %s)\n",
+> +				 p->uid, p->base_address,
+> +				 p->arm_mpidr,
+> +				 (p->flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
 > +
-> +#include <linux/acpi.h>
+> +		}
+> +		break;
 > +
-> +/*
-> + * Currently the ACPI 5.1 standard does not define S states in a
-> + * manner which is usable for ARM64. These two stubs are sufficient
-> + * that system initialises and device PM works.
-> + */
-> +u32 acpi_target_system_state(void)
-> +{
-> +	return ACPI_STATE_S0;
-> +}
-> +EXPORT_SYMBOL_GPL(acpi_target_system_state);
+> +	case ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR:
+> +		{
+> +			struct acpi_madt_generic_distributor *p =
+> +				(struct acpi_madt_generic_distributor *)header;
+> +			pr_debug("GIC Distributor (gic_id[0x%04x] address[%llx] gsi_base[%d])\n",
+> +				 p->gic_id, p->base_address,
+> +				 p->global_irq_base);
+> +		}
+> +		break;
 > +
-> +int __init acpi_sleep_init(void)
-> +{
-> +	return -ENOSYS;
-> +}
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index 623b117..c32edf5 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -23,7 +23,9 @@ acpi-y				+= nvs.o
->  
->  # Power management related files
->  acpi-y				+= wakeup.o
-> +ifneq (,$(findstring $(ARCH),x86 ia64))
-
-This is super-ugly.  Isn't there a better way to do that?
-
->  acpi-y				+= sleep.o
-> +endif
->  acpi-y				+= device_pm.o
->  acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
->  
+>  	default:
+>  		pr_warn("Found unsupported MADT entry (type = 0x%x)\n",
+>  			header->type);
 > 
 
 -- 
