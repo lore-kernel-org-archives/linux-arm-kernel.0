@@ -1,213 +1,208 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 03 Mar 2015 20:03:13 -0700
-Subject: [PATCH 02/10] mailbox: Enable BCM2835 mailbox support
-In-Reply-To: <1425329684-23968-3-git-send-email-eric@anholt.net>
-References: <1425329684-23968-1-git-send-email-eric@anholt.net>
- <1425329684-23968-3-git-send-email-eric@anholt.net>
-Message-ID: <54F675F1.60205@wwwdotorg.org>
+From: wuyun.wu@huawei.com (Yun Wu (Abel))
+Date: Wed, 4 Mar 2015 11:10:55 +0800
+Subject: [PATCH v2 5/6] irqchip: gicv3-its: add support for power down
+In-Reply-To: <54E333CE.5010800@huawei.com>
+References: <1423992723-5028-1-git-send-email-wuyun.wu@huawei.com>
+ <1423992723-5028-6-git-send-email-wuyun.wu@huawei.com>
+ <20150217092935.1fefcb24@arm.com> <54E314B3.40803@huawei.com>
+ <20150217111104.5718d6f1@arm.com> <54E333CE.5010800@huawei.com>
+Message-ID: <54F677BF.9060208@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2015 01:54 PM, Eric Anholt wrote:
-> From: Lubomir Rintel <lkundrak@v3.sk>
+On 2015/2/17 20:27, Yun Wu (Abel) wrote:
+
+> On 2015/2/17 19:11, Marc Zyngier wrote:
 > 
-> Implement BCM2835 mailbox support as a device registered with the
-> general purpose mailbox framework. Implementation based on commits by
-> Lubomir Rintel [1], Suman Anna and Jassi Brar [2] on which to base the
-> implementation.
+>> On Tue, 17 Feb 2015 10:15:15 +0000
+>> "Yun Wu (Abel)" <wuyun.wu@huawei.com> wrote:
+>>
+>>> On 2015/2/17 17:29, Marc Zyngier wrote:
+>>>
+>>>> On Sun, 15 Feb 2015 09:32:02 +0000
+>>>> Yun Wu <wuyun.wu@huawei.com> wrote:
+>>>>
+>>>>> It's unsafe to change the configurations of an activated ITS
+>>>>> directly since this will lead to unpredictable results. This patch
+>>>>> guarantees a safe quiescent status before initializing an ITS.
+>>>>
+>>>> Please change the title of this patch to reflect what it actually
+>>>> does. Nothing here is about powering down anything.
+>>>
+>>> My miss, I will fix this in next version.
+>>>
+>>>>
+>>>>> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
+>>>>> ---
+>>>>>  drivers/irqchip/irq-gic-v3-its.c | 32
+>>>>> ++++++++++++++++++++++++++++++++ 1 file changed, 32 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/irqchip/irq-gic-v3-its.c
+>>>>> b/drivers/irqchip/irq-gic-v3-its.c index 42c03b2..29eb665 100644
+>>>>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>>>>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>>>>> @@ -1321,6 +1321,31 @@ static const struct irq_domain_ops
+>>>>> its_domain_ops = { .deactivate		=
+>>>>> its_irq_domain_deactivate, };
+>>>>>
+>>>>> +static int its_check_quiesced(void __iomem *base)
+>>>>> +{
+>>>>> +	u32 count = 1000000;	/* 1s */
+>>>>> +	u32 val;
+>>>>> +
+>>>>> +	val = readl_relaxed(base + GITS_CTLR);
+>>>>> +	if (val & GITS_CTLR_QUIESCENT)
+>>>>> +		return 0;
+>>>>> +
+>>>>> +	/* Disable the generation of all interrupts to this ITS */
+>>>>> +	val &= ~GITS_CTLR_ENABLE;
+>>>>> +	writel_relaxed(val, base + GITS_CTLR);
+>>>>> +
+>>>>> +	/* Poll GITS_CTLR and wait until ITS becomes quiescent */
+>>>>> +	while (count--) {
+>>>>> +		val = readl_relaxed(base + GITS_CTLR);
+>>>>> +		if (val & GITS_CTLR_QUIESCENT)
+>>>>> +			return 0;
+>>>>> +		cpu_relax();
+>>>>> +		udelay(1);
+>>>>> +	}
+>>>>
+>>>> You're now introducing a third variant of a 1s timeout loop. Notice
+>>>> a pattern?
+>>>>
+>>>
+>>> I am not sure I know exactly what you suggest. Do you mean I should
+>>> code like below to keep the coding style same as the other 2 loops?
+>>>
+>>> 	while (1) {
+>>> 		val = readl_relaxed(base + GITS_CTLR);
+>>> 		if (val & GITS_CTLR_QUIESCENT)
+>>> 			return 0;
+>>>
+>>> 		count--;
+>>> 		if (!count)
+>>> 			return -EBUSY;
+>>>
+>>> 		cpu_relax();
+>>> 		udelay(1);
+>>> 	}
+>>
+>> That'd be a good start. But given that this is starting to be a common
+>> construct, it could probably be rewritten as:
+>>
+>> static int its_poll_timeout(struct its_node *its, void *data,
+>>                             int (*fn)(struct its_node *its,
+>>                                       void *data))
+>> {
+>> 	while (1) {
+>> 		if (!fn(its, data))
+>> 			return 0;
+>>
+>> 		...
+>> 	}
+>> }
+>>
+>> and have the call sites to provide the right utility function. We also
+>> have two similar timeout loops in the main GICv3 driver, so there
+>> should be room for improvement.
+>>
+>> Thoughts?
+>>
 
-> diff --git a/drivers/mailbox/bcm2835-mailbox.c b/drivers/mailbox/bcm2835-mailbox.c
 
-> +/* Mailboxes */
-> +#define ARM_0_MAIL0	0x00
-> +#define ARM_0_MAIL1	0x20
-> +
-> +/*
-> + * Mailbox registers. We basically only support mailbox 0 & 1. We
-> + * deliver to the VC in mailbox 1, it delivers to us in mailbox 0. See
-> + * BCM2835-ARM-Peripherals.pdf section 1.3 for an explanation about
-> + * the placement of memory barriers.
-> + */
-> +#define MAIL0_RD	(ARM_0_MAIL0 + 0x00)
-> +#define MAIL0_POL	(ARM_0_MAIL0 + 0x10)
-> +#define MAIL0_STA	(ARM_0_MAIL0 + 0x18)
-> +#define MAIL0_CNF	(ARM_0_MAIL0 + 0x1C)
-> +#define MAIL1_WRT	(ARM_0_MAIL1 + 0x00)
+Hi Marc,
 
-That implies there are more mailboxes. I wonder if we should
-parameterize which to use via some DT properties? I guess we can defer
-that though; we can default to the current values and add properties
-later if we want to use something else.
+Currently I didn't make any improvement on providing a unified utility
+function to do the timeout loops, because I haven't found a proper way
+yet. And to achieve this, at least three aspects I can imagine are
+needed to be considered.
 
-> +static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
-> +{
-> +	struct bcm2835_mbox *mbox = (struct bcm2835_mbox *) dev_id;
-> +	struct device *dev = mbox->dev;
-> +
-> +	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
-> +		u32 msg = readl(mbox->regs + MAIL0_RD);
-> +		unsigned int chan = MBOX_CHAN(msg);
-> +
-> +		if (!mbox->channel[chan].started) {
-> +			dev_err(dev, "Reply on stopped channel %d\n", chan);
-> +			continue;
-> +		}
-> +		dev_dbg(dev, "Reply 0x%08X\n", msg);
-> +		mbox_chan_received_data(mbox->channel[chan].link,
-> +			(void *) MBOX_DATA28(msg));
-> +	}
-> +	rmb(); /* Finished last mailbox read. */
+Refactoring the existing loop functions comes first. A prototype is
+showed below.
 
-I know the PDF mentioned in the comment earlier in the patch says to put
-in barriers between accesses to different peripherals, which this seems
-compliant with, but I don't see quite what this barrier achieves. I
-think the PDF is talking generalities, not imposing a rule that must be
-blindly followed. Besides, if there's a context-switch you can't
-actually implement the rules the PDF suggests. What read operation is
-this barrier attempting to ensure happens after reading all mailbox
-messages and any associated DRAM buffer?
+	static T1 func_prototype(T2 node, char *msg, void **args)
+	{
+		u32 count = 1000000;
 
-If any barrier is needed, shouldn't it be between the mailbox read and
-the processing of that message (which could at least in some cases read
-an SDRAM buffer). So, the producer would do roughly:
+		do_something_here(node, args);
 
-p1) Fill in DRAM buffer
-p2) Write memory barrier so the MBOX write happens after the above
-p3) Send mbox message to tell the consumer to process the buffer
+		while (1) {
+			if (condition_satisfied(node, args))
+				return (T1)SUCCESS;
 
-... and the consumer:
+			count--;
+			if (!count) {
+				print_err_msg(msg);
+				return (T1)FAIL;
+			}
 
-c1) Read MBOX register to know which DRAM buffer to handle
-c2) rmb() to make sure we read from the DRAM buffer after the MBOX read
-c3) Read the DRAM buffer
+			cpu_relax();
+			udelay(1);
+		}
+	}
 
-Even then, since (c3) is data-dependent on (c1), I don't think the rmb()
-in (c2) there actually does anything useful.
+Obviously it will make things complicated to move do_something_here() and
+print_err_msg() outside of func_prototype(), because func_prototype() could
+be called sereval places. But the two functions are different from each
+loop function, so...
 
-> +static int bcm2835_send_data(struct mbox_chan *link, void *data)
-> +{
-> +	struct bcm2835_channel *chan = to_channel(link);
-> +	struct bcm2835_mbox *mbox = chan->mbox;
-> +	int ret = 0;
-> +
-> +	if (!chan->started)
-> +		return -ENODEV;
-> +	spin_lock(&mbox->lock);
+	static T1 func_prototype(T2 node, char *msg, void **args)
+	{
+		u32 count = 1000000;
 
-Is it safe to read chan->started without the channel lock held?
+		do_something_here(node, args);
 
-> +	if (readl(mbox->regs + MAIL0_STA) & ARM_MS_FULL) {
-> +		rmb(); /* Finished last mailbox read. */
+		while (count--) {
+			if (condition_satisfied(node, args))
+				return (T1)SUCCESS;
 
-This also doesn't seem useful?
+			cpu_relax();
+			udelay(1);
+		}
 
-> +		ret = -EBUSY;
-> +		goto end;
-> +	}
-> +	wmb(); /* About to write to the mail box. */
-> +	writel(MBOX_MSG(chan->chan_num, (u32) data), mbox->regs + MAIL1_WRT);
+		print_err_msg(msg);
+		return (T1)FAIL;
+	}
 
-This one I agree with, at least if MBOX messages contain pointers to
-DRAM buffers.
+Now we can unify the loop part,
 
-> +static int bcm2835_startup(struct mbox_chan *link)
-> +{
-> +	struct bcm2835_channel *chan = to_channel(link);
-> +
-> +	chan->started = true;
-> +	return 0;
-> +}
-> +
-> +static void bcm2835_shutdown(struct mbox_chan *link)
-> +{
-> +	struct bcm2835_channel *chan = to_channel(link);
-> +
-> +	chan->started = false;
-> +}
+	static bool condition_satisfied(T2 node, void **args);
 
-Don't we need to hold chan->lock when adjusting chan->started? Or is
-start/stop intended to be asynchronous to any operations currently in
-progress on the channel?
+	static u32 poll_timeout(T2 node, void **args,
+				bool (*fn)(T2, void **))
+	{
+		u32 count = 1000000;
 
-> +static bool bcm2835_last_tx_done(struct mbox_chan *link)
-> +{
-> +	struct bcm2835_channel *chan = to_channel(link);
-> +	struct bcm2835_mbox *mbox = chan->mbox;
-> +	bool ret;
-> +
-> +	if (!chan->started)
-> +		return false;
-> +	spin_lock(&mbox->lock);
-> +	ret = !(readl(mbox->regs + MAIL0_STA) & ARM_MS_FULL);
-> +	rmb(); /* Finished last mailbox read. */
+		while (count--) {
+			if (fn(node, args))
+				break;
 
-That barrier doesn't seem useful?
+			cpu_relax();
+			udelay(1);
+		}
 
-What are the semantics of "tx done"? This seems to be testing that the
-TX mailbox isn't completely full, which is more about whether the
-consumer side is backed up rather than whether our producer-side TX
-operations are done.
+		return count;
+	}
 
-If the idea is to wait for the consumer to have consumed everything in
-our TX direction, shouldn't this check for empty not !full?
+	static T1 func_prototype(T2 node, char *msg, void **args)
+	{
+		do_something_here(node, args);
 
-> +static int request_mailbox_irq(struct bcm2835_mbox *mbox)
+		if (poll_timeout(node, args, condition_satisfied)) {
+			return (T1)SUCCESS;
+		} else {
+			print_err_msg(msg);
+			return (T1)FAIL;
+		}
+	}
 
-> +	if (irq <= 0) {
-> +		dev_err(dev, "Can't get IRQ number for mailbox\n");
-> +		return -ENODEV;
-> +	}
+Look at what I have done, turn the original N loop functions to 2*N+1 functions.
+It can hardly be called improvement.. :(
 
-I expect devm_request_irq() checkes that condition.
+The 2nd and 3rd aspects are return value and list of parameters respectively.
+Using (void *) may help a lot, I think.
 
-> +	ret = devm_request_irq(dev, irq, bcm2835_mbox_irq, 0, dev_name(dev),
-> +		mbox);
-> +	if (ret) {
-> +		dev_err(dev, "Failed to register a mailbox IRQ handler\n");
+Thoughts?
 
-Printing ret might be useful to know why.
-
-Are you sure devm_request_irq() is appropriate? The IRQ handler will be
-unregistered *after* bcm2835_mbox_remove() is called, and I think
-without any guarantee re: the order that other devm_ allocations are
-cleaned up. If bcm2835_mbox_remove() can't guarantee that no IRQ will
-fire after it exits, then bcm2835_mbox_irq() might just get called after
-some allocations are torn down, thus causing the IRQ handler to touch
-free'd memory.
-
-Both request_mailbox_iomem and request_mailbox_irq are small enough
-they're typically written inline into the main probe() function.
-
-> +static int bcm2835_mbox_probe(struct platform_device *pdev)
-
-> +	mbox = devm_kzalloc(dev, sizeof(*mbox), GFP_KERNEL);
-> +	if (mbox == NULL) {
-> +		dev_err(dev, "Failed to allocate mailbox memory\n");
-
-devm_kzalloc() already prints an error, so no need to add another here,
-even if it does nicely document the fact that you remembered error
-messages:-)
-
-> +	mbox->controller.txdone_poll = true;
-> +	mbox->controller.txpoll_period = 5;
-> +	mbox->controller.ops = &bcm2835_mbox_chan_ops;
-> +	mbox->controller.dev = dev;
-> +	mbox->controller.num_chans = MBOX_CHAN_COUNT;
-> +	mbox->controller.chans = devm_kzalloc(dev,
-> +		sizeof(struct mbox_chan) * MBOX_CHAN_COUNT,
-> +		GFP_KERNEL);
-
-It'd be common to say "sizeof(*mbox->controller.chans) so the type can't
-mismatch what's being assigned to.
-
-> +	if (!mbox->controller.chans) {
-> +		dev_err(dev, "Failed to alloc mbox_chans\n");
-
-Same comment about error messages here.
-
-> +	/* Enable the interrupt on data reception */
-> +	writel(ARM_MC_IHAVEDATAIRQEN, mbox->regs + MAIL0_CNF);
-> +	dev_info(dev, "mailbox enabled\n");
-
-There's no interrupt for "TX space available"? Oh well. I guess that's
-why mbox->controller.txdone_poll = true.
+Thanks,
+	Abel
