@@ -1,36 +1,40 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 4 Mar 2015 10:35:47 +0800
-Subject: [PATCH 1/2] cpufreq-dt: support cluster level clock
-In-Reply-To: <CAKohponQ1keZ3x9mK=9qchfwPF=cYKAA9aYgmu52X5NDGJLECg@mail.gmail.com>
-References: <1425387817-11382-1-git-send-email-leo.yan@linaro.org>
- <1425387817-11382-2-git-send-email-leo.yan@linaro.org>
- <CAKohpoksXwMRWYzSBmbV1nN5_LvUiB1Y2wfgOcCJPx+oipaXZw@mail.gmail.com>
- <20150303140331.GA11325@leoy-linaro>
- <CAKohponQ1keZ3x9mK=9qchfwPF=cYKAA9aYgmu52X5NDGJLECg@mail.gmail.com>
-Message-ID: <20150304023547.GB21106@leoy-linaro>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed, 4 Mar 2015 10:51:47 +0800
+Subject: [PATCH v4 1/2] ARM: at91: sama5d4/dts: add #{address,
+ size}_cells properties for macb0
+Message-ID: <1425437508-30976-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 08:49:25PM +0530, Viresh Kumar wrote:
-> On 3 March 2015 at 19:33, Leo Yan <leo.yan@linaro.org> wrote:
-> > I'm just thinking to finish things in one time. From my previous
-> > experience, clocks per cluster are common cases for ARM's
-> > multi-clusters, so i think it's reasonable to add related support.
-> 
-> Yes they are common, but that will be fixed with new OPP bindings
-> I am working on [1].
+macb0 DT node can have phy child nodes, so add the #{address,
+size}_cells for macb0 node.
 
-Good to know this and looking forward the patches...
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
 
-> > Regarding of testing this patch, i created two virtual clocks for
-> > every cluster and passed the test. Do u think this is acceptable?
-> 
-> Just to confirm again, we aren't going to accept or apply these
-> patches. It will work without any changes for you, for now.
+Changes in v4:
+- fix typo in commit message: cell -> cells
 
-OK, i will go back to just support for the case of one clock source.
+Changes in v3:
+- new added
 
-> --
-> viresh
-> 
-> [1] https://www.marc.info/?l=linaro-kernel&m=142364262800650&w=3
+Changes in v2: None
+
+ arch/arm/boot/dts/sama5d4.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+index d986b41..07953f2 100644
+--- a/arch/arm/boot/dts/sama5d4.dtsi
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -852,6 +852,8 @@
+ 				interrupts = <54 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_macb0_rmii>;
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				clocks = <&macb0_clk>, <&macb0_clk>;
+ 				clock-names = "hclk", "pclk";
+ 				status = "disabled";
+-- 
+1.9.1
