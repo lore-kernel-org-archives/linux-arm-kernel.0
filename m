@@ -1,34 +1,24 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 04 Mar 2015 21:03:29 +0100
-Subject: [RFC PATCH 01/18] serial: remove obsolete msm_serial_hs driver
-In-Reply-To: <1425497592-1831064-2-git-send-email-arnd@arndb.de>
-References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
- <1425497592-1831064-2-git-send-email-arnd@arndb.de>
-Message-ID: <1425499409.2090.7.camel@tiscali.nl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Mar 2015 21:04:40 +0100
+Subject: [GIT PULL 2/2] Samsung fixes-2 for v4.0
+In-Reply-To: <54F4B33E.3070803@kernel.org>
+References: <54F4B33E.3070803@kernel.org>
+Message-ID: <2064108.qlOP0oDx90@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann schreef op wo 04-03-2015 om 20:32 [+0100]:
-> Linux currently has two drivers for the same hardware: msm_serial
-> and msm_serial_hs. Only the former is being actively maintained,
-> and the latter is not used by any in-tree board files, so we
-> can safely remove it.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arnd.de>
-> ---
->  drivers/tty/serial/Kconfig                  |   12 -
->  drivers/tty/serial/msm_serial_hs.c          | 1874 ---------------------------
+On Tuesday 03 March 2015 04:00:14 Kukjin Kim wrote:
+> Please pull Samsung tmu and hdmi regression fixes for v4.0 and I know
+> this is quite big for fixes but I couldn't handle this series for
+> previous merge window because of dependency with driver side...sorry for
+> that and please pull so that we could support them in v4.0 on exynos
+> platforms.
 
-I haven't even bothered to check, but in a diff stat like this one
-expects a line like
-    drivers/tty/serial/Makefile               |     1 -
+What kind of dependency do you have there? It really should not be
+necessary to wait for driver changes, unless you do an incompatible
+DT binding change, which you should avoid.
 
-here. Is that expectation correct?
+I've pulled it into fixes, but won't forward it until I hear a
+good explanation.
 
->  include/linux/platform_data/msm_serial_hs.h |   49 -
->  3 files changed, 1935 deletions(-)
->  delete mode 100644 drivers/tty/serial/msm_serial_hs.c
->  delete mode 100644 include/linux/platform_data/msm_serial_hs.h
-
-
-Paul Bolle
+	Arnd
