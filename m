@@ -1,75 +1,70 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 4 Mar 2015 12:35:23 +0100
-Subject: [PATCH] ARM: at91: remove ksz8081 phy fixup registration for
- sama5d4ek board
-In-Reply-To: <1425468012-17274-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1425468012-17274-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150304113523.GF3989@piout.net>
+From: lsanfil@marvell.com (sanfilippo)
+Date: Wed, 4 Mar 2015 12:40:34 +0100
+Subject: [RFC PATCH 0/1] Wrong structure alignment due to compiler
+ attribute "section"
+In-Reply-To: <20150303144130.GB5177@e103592.cambridge.arm.com>
+References: <1425290502-2322-1-git-send-email-lsanfil@marvell.com>
+ <20150303144130.GB5177@e103592.cambridge.arm.com>
+Message-ID: <54F6EF32.7080306@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2015 at 12:20:12 +0100, Boris Brezillon wrote :
-> Commit 2b0ba96cea60 ("net: phy: micrel: disable NAND-tree for KSZ8021,
-> KSZ8031, KSZ8051, KSZ8081") automated the NAND-tree mode deactivation
-> process, thus making this phy fixup useless.
-> Remove it along with the associated headers inclusion.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On 03.03.2015 15:41, Dave Martin wrote:
 
-> ---
->  arch/arm/mach-at91/sama5.c | 20 --------------------
->  1 file changed, 20 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
-> index 03dcb44..23d067a 100644
-> --- a/arch/arm/mach-at91/sama5.c
-> +++ b/arch/arm/mach-at91/sama5.c
-> @@ -11,13 +11,10 @@
->  #include <linux/init.h>
->  #include <linux/module.h>
->  #include <linux/gpio.h>
-> -#include <linux/micrel_phy.h>
->  #include <linux/of.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
-> -#include <linux/phy.h>
->  #include <linux/clk-provider.h>
-> -#include <linux/phy.h>
->  
->  #include <mach/hardware.h>
->  
-> @@ -29,25 +26,8 @@
->  
->  #include "generic.h"
->  
-> -static int ksz8081_phy_fixup(struct phy_device *phy)
-> -{
-> -	int value;
-> -
-> -	value = phy_read(phy, 0x16);
-> -	value &= ~0x20;
-> -	phy_write(phy, 0x16, value);
-> -
-> -	return 0;
-> -}
-> -
->  static void __init sama5_dt_device_init(void)
->  {
-> -	if (of_machine_is_compatible("atmel,sama5d4ek") &&
-> -	   IS_ENABLED(CONFIG_PHYLIB)) {
-> -		phy_register_fixup_for_id("fc028000.etherne:00",
-> -						ksz8081_phy_fixup);
-> -	}
-> -
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->  	at91sam9x5_pm_init();
->  }
-> -- 
-> 1.9.1
-> 
+Dave,
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+thanks for your response.
+
+> For the element _size_ issue, I'm confused.  On 32-bit, that
+> structure is clearly 196 bytes in size, with the alignment requirement
+> of void * (4 bytes)... so there's no clear reason why the linker
+> shouldn't be inserting extra padding.
+>
+> I can't reproduce this with my current tools (upstream binutils-2.24,
+> gcc-4.9.2).
+>
+>
+> Can you try to track down where this discrepancy is coming from?
+>
+> i.e.,
+>
+>   * If you're juggling with multiple kernel trees, make sure there
+>     are not differences between them that could be causing this, such
+>     as changes to linker scripts or header files that are involved
+>     in building these arrays.
+
+I can reproduce this with a vanilla kernel (3.19) from kernel.org. What 
+I do is:
+
+- configure the kernel with mvebu_v5_defconfig
+- compile it
+
+However this issue occurs (so far) only with this special toolchain:
+http://www.plugcomputer.org/405/us/gplugd/tool-chain/arm-marvell-linux-gnueabi.tar.bz2
+
+If you like you can try this yourself. I am sure that you will get the 
+same results.
+
+I tried the same with three other toolchains but with those the problem 
+did not occur. I also tried other kernel configurations with that 
+"problematic" toolchain, but also the problem did not occur any more.
+
+So I think its either a bug in that compiler/linker or the current 
+solution in vmlinux.lds.h does not work correct under some special 
+circumstances.
+
+>
+>   * See what the input to the assembler looks like, with regard to
+>     .align directives.
+>
+>   * See what the alignment of the affected sections is in each individual
+>     .o file.
+
+Not sure what exactly I should check here. Could you be a bit more precise?
+
+>   * See what __alignof__(struct of_device_id) evaluates to.
+
+It evaluates to "4" even for the bad case.
+
+Regards,
+Lino
