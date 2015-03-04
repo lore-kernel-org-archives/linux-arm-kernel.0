@@ -1,38 +1,39 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 4 Mar 2015 18:15:05 +0100
-Subject: [PATCH 5/6] ARM: at91: remove SoC headers
-In-Reply-To: <8819576.zV70Ce3SCo@wuerfel>
-References: <1425480446-31711-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1425480446-31711-6-git-send-email-alexandre.belloni@free-electrons.com>
- <8819576.zV70Ce3SCo@wuerfel>
-Message-ID: <20150304171505.GH3989@piout.net>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 4 Mar 2015 18:17:58 +0100
+Subject: [PATCH v3 4/9] power: reset: Add AT91RM9200 reset driver
+In-Reply-To: <1425478897-27322-5-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1425478897-27322-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1425478897-27322-5-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20150304171758.GA8717@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2015 at 18:03:45 +0100, Arnd Bergmann wrote :
-> On Wednesday 04 March 2015 15:47:25 Alexandre Belloni wrote:
-> > @@ -21,6 +21,14 @@
-> >  #include "generic.h"
-> >  #include "soc.h"
-> >  
-> > +#define SAMA5D4_BASE_USART3    0xfc00c000 /* (USART3 non-secure) Base Address */
-> > +#define SAMA5D4_BASE_PMC       0xf0018000 /* (PMC) Base Address */
-> > +#define SAMA5D4_BASE_MPDDRC    0xf0010000 /* (MPDDRC) Base Address */
-> > +#define SAMA5D4_BASE_PIOD      0xfc068000 /* (PIOD) Base Address */
-> > +
-> > +/* Some other peripherals */
-> > +#define SAMA5D4_BASE_SYS2      SAMA5D4_BASE_PIOD
-> > 
-> 
-> Why are these still needed? I would expect that the code using them
-> can be removed as well.
-> 
+Hi,
 
-Yeah, that is still something I need to investigate. Nicolas told me it
-doesn't work without it. My guess is that it has something to do with
-secure booting.
+On Wed, Mar 04, 2015 at 03:21:32PM +0100, Alexandre Belloni wrote:
+> AT91RM9200 uses the watchdog from the system timer to reset.
+> [...]
+> +	regmap_write(regmap_st, AT91_ST_WDMR,
+> +		     AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
+> +	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
+> +
+> +	mdelay(2000);
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+At pity that you have to write into two registers, otherwise you
+could have used the syscon-reboot driver.
+
+> [...]
+> +module_platform_driver(at91rm9200_reset_driver);
+
+Apart from missing module metadata (MODULE_AUTHOR(),
+MODULE_LICENSE(), ...) the driver looks fine to me.
+
+-- Sebastian
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150304/a22bafa2/attachment.sig>
