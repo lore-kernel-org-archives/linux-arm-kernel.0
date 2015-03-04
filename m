@@ -1,58 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 Mar 2015 19:42:46 +0000
-Subject: [PATCH] genirq / PM: Add flag for shared NO_SUSPEND interrupt
- lines
-In-Reply-To: <6864616.1aRDSmSsvx@vostro.rjw.lan>
-References: <1424771762-16343-1-git-send-email-boris.brezillon@free-electrons.com>
- <8151717.nkhnGBri9h@vostro.rjw.lan>
- <20150226191724.0ae4ca4e@bbrezillon>
- <6864616.1aRDSmSsvx@vostro.rjw.lan>
-Message-ID: <20150304194246.GF22156@leverpostej>
+From: k.kozlowski.k@gmail.com (=?UTF-8?Q?Krzysztof_Koz=C5=82owski?=)
+Date: Wed, 4 Mar 2015 20:44:07 +0100
+Subject: [PATCH 8/9] ARM: EXYNOS: suspend requires regulator access
+In-Reply-To: <2062492.pEav958W9c@wuerfel>
+References: <1423769746-582629-1-git-send-email-arnd@arndb.de>
+ <2062492.pEav958W9c@wuerfel>
+Message-ID: <CAJKOXPf6eY4oZZe3tG51QnRhsvFuOVRmYsEpc4g0bwyAfip0EQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+W dniu poniedzia?ek, 2 marca 2015 Arnd Bergmann <arnd@arndb.de> napisa?(a):
+>
+> Building an exynos kernel without regulators but with suspend enabled results
+> in a link error:
+>
+> arch/arm/mach-exynos/built-in.o: In function `exynos_suspend_finish':
+> arch/arm/mach-exynos/suspend.c:532: undefined reference to `regulator_suspend_finish'
+> arch/arm/mach-exynos/built-in.o: In function `exynos_suspend_prepare':
+> arch/arm/mach-exynos/suspend.c:515: undefined reference to `regulator_suspend_prepare'
+>
+> This adds an appropriate 'select' statement in Kconfig to ensure the symbols
+> are available.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I'm a little late to the party here, but I have just a couple of minor
-comments...
 
-[...]
+Isn't this fixed already by:?https://lkml.org/lkml/2015/2/4/119
+(applied by Mark Brown)?
 
-> Link: http://marc.info/?l=linux-kernel&m=142252777602084&w=2
-> Link: http://marc.info/?t=142252775300011&r=1&w=2
-> Linx: https://lkml.org/lkml/2014/12/15/552
+I can't test it now (I am out of office) but issue looks quite similar.
 
-s/x/k/ ?
+Best regards,
+Krzysztof
 
-> Reported-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+>
 > ---
->  include/linux/interrupt.h |    5 +++++
->  include/linux/irqdesc.h   |    1 +
->  kernel/irq/manage.c       |    7 ++++++-
->  kernel/irq/pm.c           |    7 ++++++-
->  4 files changed, 18 insertions(+), 2 deletions(-)
-> 
-> Index: linux-pm/include/linux/interrupt.h
-> ===================================================================
-> --- linux-pm.orig/include/linux/interrupt.h
-> +++ linux-pm/include/linux/interrupt.h
-> @@ -57,6 +57,10 @@
->   * IRQF_NO_THREAD - Interrupt cannot be threaded
->   * IRQF_EARLY_RESUME - Resume IRQ early during syscore instead of at device
->   *                resume time.
-> + * IRQF_COND_SUSPEND - If the IRQ is shared with a NO_SUSPEND user, execute this
-> + *                interrupt handler after suspending interrupts. For system
-> + *                wakeup devices users need to implement wakeup detection in
-> + *                their interrupt handlers.
-
-It's probably worth documenting this in suspend-and-interrupts.txt, as
-this invalidates some of the "IRQF_NO_SUSPEND and enable_irq_wake()"
-section. I'll send a patch momentarily to that effect.
-
-Otherwise, this patch looks good, thanks for handling this!
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
+> ?arch/arm/mach-exynos/Kconfig | 1 +
+> ?1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index 603820e5aba7..f4bd06370ad8 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -22,6 +22,7 @@ menuconfig ARCH_EXYNOS
+> ? ? ? ? select PINCTRL
+> ? ? ? ? select PINCTRL_EXYNOS
+> ? ? ? ? select PM_GENERIC_DOMAINS if PM
+> +? ? ? ?select REGULATOR if PM_SLEEP
+> ? ? ? ? select S5P_DEV_MFC
+> ? ? ? ? select SRAM
+> ? ? ? ? select MFD_SYSCON
+> --
+> 2.1.0.rc2
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
