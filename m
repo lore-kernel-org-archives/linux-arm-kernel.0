@@ -1,36 +1,55 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 4 Mar 2015 16:08:15 +0100
-Subject: [PATCH v3 3/9] watchdog: at91rm9200: use the system timer syscon
-In-Reply-To: <54F71C07.6070204@roeck-us.net>
-References: <1425478897-27322-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1425478897-27322-4-git-send-email-alexandre.belloni@free-electrons.com>
- <54F71C07.6070204@roeck-us.net>
-Message-ID: <20150304150815.GG3989@piout.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 4 Mar 2015 16:19:18 +0100
+Subject: [PATCH] ARM: at91: dts: sama5d3/sama5d4: reduce NFC command
+ registers memory region
+In-Reply-To: <20150115110501.53b4584c@bbrezillon>
+References: <1421305683-8739-1-git-send-email-josh.wu@atmel.com>	<20150115094527.3fde882a@bbrezillon>	<54B78F73.9000504@atmel.com>
+ <20150115110501.53b4584c@bbrezillon>
+Message-ID: <54F72276.8060605@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2015 at 06:51:51 -0800, Guenter Roeck wrote :
-> >@@ -267,7 +276,7 @@ static struct platform_driver at91wdt_driver = {
-> >  	.suspend	= at91wdt_suspend,
-> >  	.resume		= at91wdt_resume,
-> >  	.driver		= {
-> >-		.name	= "at91_wdt",
-> >+		.name	= "atmel_st_watchdog",
+Le 15/01/2015 11:05, Boris Brezillon a ?crit :
+> Hi Josh,
 > 
-> If you change the driver name you also need to change the MODULE_ALIAS
-> a few lines down.
+> On Thu, 15 Jan 2015 17:59:15 +0800
+> Josh Wu <josh.wu@atmel.com> wrote:
 > 
-> But why change it in the first place ? Maybe that was discussed somewhere,
-> but not here where it belongs, and not in patch 0/9 either.
+>> Hi? Boris
+>>
+>> Thanks for the review.
+>>
+>> On 1/15/2015 4:45 PM, Boris Brezillon wrote:
+>>> Hi Josh,
+>>>
+>>> On Thu, 15 Jan 2015 15:08:03 +0800
+>>> Josh Wu <josh.wu@atmel.com> wrote:
+>>>
+>>>> To get NFC status, we need to read the NFC command registers, which is a
+>>>> 256M memory mapping address. To check the status, you just read such
+>>>> address from NFC command registers.
+>>>> For example, to check NFCBUSY (bit 27), you need to read 0x08000000
+>>>> (bit 27 is set to 1) of the NFC command register.
+>>>> If you want to check NFCBUSY (bit 27) and NFCWR (bit 26) in same time,
+>>>> you need to read 0x0c000000 (bit 27 and bit 26 are set to 1).
+>>> Are NFCBUSY and NFCWR found in NFCDATA_STATUS and those found in HSMC_SR
+>>> representing the same thing.
+>> yes. it is. I just check with IP team. The NFCBUSY of NFCDATA_STATUS is 
+>> also refer to NFC_BUSY of HSMC_SR.
+>>
+>>> If they are, I think you can just use HSMC_SR instead of NFCDATA_STATUS
+>>> to check the status [1] and drop the last bit in the NFC Command
+>>> Resgiters range.
+>> Thank you. your code works (just need some typo change).
+>> I want to send [1] code with your signed-off and my acked to mtd list.
+>> Is it okay for you?
 > 
+> Sure, no problem.
 
-That's because it conflicts with drivers/watchdog/at91sam9_wdt.c
+Hi Josh,
 
-I'm not sure that is relevant anymore as they will only be probed using
-DT now.
+What is the status of this patch set?
 
-
+Bye,
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Nicolas Ferre
