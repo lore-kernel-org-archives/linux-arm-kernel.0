@@ -1,88 +1,53 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  4 Mar 2015 15:21:37 +0100
-Subject: [PATCH v3 9/9] ARM: at91: remove useless include
-In-Reply-To: <1425478897-27322-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1425478897-27322-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1425478897-27322-10-git-send-email-alexandre.belloni@free-electrons.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 04 Mar 2015 15:53:11 +0100
+Subject: [PATCH] cpuidle: mvebu: Fix the CPU PM notifier usage
+In-Reply-To: <54F5D13A.1020002@linaro.org>
+References: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
+ <54F5CC0D.6060509@libero.it> <54F5D13A.1020002@linaro.org>
+Message-ID: <3654949.JbH3Ca4PON@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both drivers using the system timer are now converted to an MFD. mach/at91_st.h
-is now useless.
+On Tuesday, March 03, 2015 04:20:26 PM Daniel Lezcano wrote:
+> On 03/03/2015 03:58 PM, Fulvio wrote:
+> >
+> >> I didn't know you experimented random kernel panics and that you thought
+> >> it was related to the CPU Idle driver.
+> >>
+> >>> All i can say is that the system use the "armadaxp_idle" driver and
+> >>> works fine when running "stress --cpu 8" in background.
+> >>> I asked Netgear to provide a firmware without the idle driver to
+> >>> confirm if it's the cause of the problem, but they did not answered.
+> >>
+> >> I think that if you disable all the state using by doing an
+> >>
+> >> echo 1 > /sys/devices/system/cpu/cpu0/cpuidle/stateNUM/disable
+> >>
+> >> where NUM is the nuymbert of the state. Then it should disable the
+> >> cpuidle on the fly.
+> > Thanks, i'll try that as soon as possible (i gave back the unit to my
+> > client) and report back.
+> >
+> > However, the description of the cpu_pm_enter function state:
+> > "Must be called on the affected CPU with interrupts disabled.  Platform
+> > is responsible for ensuring that cpu_pm_enter is not called twice on the
+> > same CPU before cpu_pm_exit is called. Notified drivers can include VFP
+> > co-processor, interrupt controller and its PM extensions, local CPU
+> > timers context save/restore which shouldn't be interrupted. Hence it
+> > must be called with interrupts disabled."
+> >
+> > and the point is: it that an invariant? Do current code and future code
+> > safely assume that cpu_pm_enter is not called twice?
+> 
+> The fix is correct. The cpu_pm_enter/exit symmetry must be kept because 
+> we don't know what the notifier clients are doing.
+> 
+> The point is : can we send it to stable@ as a bug fix or not ?
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- arch/arm/mach-at91/include/mach/at91_st.h | 61 -------------------------------
- 1 file changed, 61 deletions(-)
- delete mode 100644 arch/arm/mach-at91/include/mach/at91_st.h
+Yes, we can, unless there's a risk of breaking things that cannot be
+ignored.
 
-diff --git a/arch/arm/mach-at91/include/mach/at91_st.h b/arch/arm/mach-at91/include/mach/at91_st.h
-deleted file mode 100644
-index 67fdbd13c3ed..000000000000
---- a/arch/arm/mach-at91/include/mach/at91_st.h
-+++ /dev/null
-@@ -1,61 +0,0 @@
--/*
-- * arch/arm/mach-at91/include/mach/at91_st.h
-- *
-- * Copyright (C) 2005 Ivan Kokshaysky
-- * Copyright (C) SAN People
-- *
-- * System Timer (ST) - System peripherals registers.
-- * Based on AT91RM9200 datasheet revision E.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--#ifndef AT91_ST_H
--#define AT91_ST_H
--
--#ifndef __ASSEMBLY__
--extern void __iomem *at91_st_base;
--
--#define at91_st_read(field) \
--	__raw_readl(at91_st_base + field)
--
--#define at91_st_write(field, value) \
--	__raw_writel(value, at91_st_base + field)
--#else
--.extern at91_st_base
--#endif
--
--#define	AT91_ST_CR		0x00			/* Control Register */
--#define 	AT91_ST_WDRST		(1 << 0)		/* Watchdog Timer Restart */
--
--#define	AT91_ST_PIMR		0x04			/* Period Interval Mode Register */
--#define		AT91_ST_PIV		(0xffff <<  0)		/* Period Interval Value */
--
--#define	AT91_ST_WDMR		0x08			/* Watchdog Mode Register */
--#define		AT91_ST_WDV		(0xffff <<  0)		/* Watchdog Counter Value */
--#define		AT91_ST_RSTEN		(1	<< 16)		/* Reset Enable */
--#define		AT91_ST_EXTEN		(1	<< 17)		/* External Signal Assertion Enable */
--
--#define	AT91_ST_RTMR		0x0c			/* Real-time Mode Register */
--#define		AT91_ST_RTPRES		(0xffff <<  0)		/* Real-time Prescalar Value */
--
--#define	AT91_ST_SR		0x10			/* Status Register */
--#define		AT91_ST_PITS		(1 << 0)		/* Period Interval Timer Status */
--#define		AT91_ST_WDOVF		(1 << 1) 		/* Watchdog Overflow */
--#define		AT91_ST_RTTINC		(1 << 2) 		/* Real-time Timer Increment */
--#define		AT91_ST_ALMS		(1 << 3) 		/* Alarm Status */
--
--#define	AT91_ST_IER		0x14			/* Interrupt Enable Register */
--#define	AT91_ST_IDR		0x18			/* Interrupt Disable Register */
--#define	AT91_ST_IMR		0x1c			/* Interrupt Mask Register */
--
--#define	AT91_ST_RTAR		0x20			/* Real-time Alarm Register */
--#define		AT91_ST_ALMV		(0xfffff << 0)		/* Alarm Value */
--
--#define	AT91_ST_CRTR		0x24			/* Current Real-time Register */
--#define		AT91_ST_CRTV		(0xfffff << 0)		/* Current Real-Time Value */
--
--#endif
+
 -- 
-2.1.0
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
