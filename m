@@ -1,42 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 4 Mar 2015 21:34:00 +0100
-Subject: [PATCH] ARM: sun7i: dt: Add new MK808C device
-In-Reply-To: <CAEKpxB=-vtjMckh3ZHoy0mezE9U1EtKzmttdXRD5ZNztZvB_ag@mail.gmail.com>
-References: <1425131004-8551-1-git-send-email-codekipper@gmail.com>
- <20150303071342.GB4713@lukather>
- <CAEKpxB=-vtjMckh3ZHoy0mezE9U1EtKzmttdXRD5ZNztZvB_ag@mail.gmail.com>
-Message-ID: <20150304203400.GR4911@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Mar 2015 21:35:53 +0100
+Subject: [RFC PATCH 00/18] ARM: msm multiplatform support
+In-Reply-To: <1425501092.2090.21.camel@tiscali.nl>
+References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
+ <1425501092.2090.21.camel@tiscali.nl>
+Message-ID: <3942232.3OrEzc0z0v@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 09:22:32PM +0100, Code Kipper wrote:
-> >> +
-> >> +/ {
-> >> +     model = "mk808c";
-> >> +     compatible = "mk808c", "allwinner,sun7i-a20";
-> >
-> > the compatible must be of the format "vendor,device". Please add the
-> > vendor name.
+On Wednesday 04 March 2015 21:31:32 Paul Bolle wrote:
+> Arnd Bergmann schreef op wo 04-03-2015 om 20:32 [+0100]:
+> >  arch/arm/mach-msm/board-sapphire.c                 |   17 +-
 > 
-> Ahhh....I've searched high and low for a vendors name. I listed it as
-> unknown on the wiki page,
-> would 'odm' be considered valid?
+> Please be aware that board-sapphire.c isn't actually wired into the
+> build system _at all_. It never has been (see
+> https://lkml.org/lkml/2014/5/14/634 ). There's another thread were the
+> submitter of this file basically refuses to remove this file, if memory
+> serves me right.
+> 
+> I try not to use colorful language on the net. Perhaps I wouldn't have
+> to bother you now if I would have used such language last year.
 
-Not really. Another mk808c device might very well be made by some
-other odm.
+I noticed this, but since it was not standing in the way of what I tried
+to do, I did not do anything about it here.
+ 
+> You touch board-sapphire.c in 12/18 and 17/18. That was a waste of your
+> time, however small. Should I submit a separate patch to remove it or do
+> you prefer to fold such a patch into this series?
 
-Don't your device has any brand on the case or the PCB?
+The patch would be appreciated, but I'd keep it separate from this series.
+I saw a lot of things in need of cleanup in the files I touched here,
+but refused the temptation, in order to get something done and not
+start something controversial.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150304/7bf9b2c4/attachment.sig>
+	Arnd
