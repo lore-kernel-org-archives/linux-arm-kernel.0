@@ -1,137 +1,80 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 4 Mar 2015 15:57:36 +0000
-Subject: [PATCH 4/5] arm64: juno: Add APB registers and LEDs using syscon
-In-Reply-To: <1425375148-4369-5-git-send-email-linus.walleij@linaro.org>
-References: <1425375148-4369-1-git-send-email-linus.walleij@linaro.org>
- <1425375148-4369-5-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20150304155736.GC16268@e106497-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 4 Mar 2015 17:13:03 +0100
+Subject: [PATCH] ARM: at91/dt: sama5d4: add ISI dt support
+Message-ID: <1425485583-16364-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 09:32:27AM +0000, Linus Walleij wrote:
-> This defines the Juno "APB system registers" as a syscon device,
-> and all the LEDs controlled by the APB system registers right
-> below it using the syscon LEDs driver on top of syscon. Define
-> LED0 for heartbeat, LED1 for MMC0 activity and the following
-> four LEDs indicating CPU activity using the Linux-specific
-> DT bindings for triggers.
-> 
-> This is the pattern and same drivers as used on the legacy
-> platform device trees for the ARM Integrators and the RealView
-> PB1176.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+From: Josh Wu <josh.wu@atmel.com>
 
-Tested-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Add ISI dt node and pinctrl settings in sama5d4.dtsi.
 
-KITT test shell script working beautifully. :)
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+[nicolas.ferre at atmel.com: sort nodes in order. remove useless comments]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/sama5d4.dtsi | 42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-Best regards,
-Liviu
-
-> ---
-> ChangeLog v1->v2:
-> - Use "simple-mfd" so that the syscon LEDs get spawned from the
->   syscon as sub-platform devices.
-> ---
->  arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 68 +++++++++++++++++++++++++++
->  1 file changed, 68 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-> index c138b95a8356..5ce111dcf16d 100644
-> --- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-> +++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-> @@ -66,6 +66,74 @@
->  				#size-cells = <1>;
->  				ranges = <0 3 0 0x200000>;
->  
-> +				apbregs at 010000 {
-> +					compatible = "syscon", "simple-mfd";
-> +					reg = <0x010000 0x1000>;
-> +
-> +					led at 08.0 {
-> +						compatible = "register-bit-led";
-> +						offset = <0x08>;
-> +						mask = <0x01>;
-> +						label = "vexpress:0";
-> +						linux,default-trigger = "heartbeat";
-> +						default-state = "on";
-> +					};
-> +					led at 08.1 {
-> +						compatible = "register-bit-led";
-> +						offset = <0x08>;
-> +						mask = <0x02>;
-> +						label = "vexpress:1";
-> +						linux,default-trigger = "mmc0";
-> +						default-state = "off";
-> +					};
-> +					led at 08.2 {
-> +						compatible = "register-bit-led";
-> +						offset = <0x08>;
-> +						mask = <0x04>;
-> +						label = "vexpress:2";
-> +						linux,default-trigger = "cpu0";
-> +						default-state = "off";
-> +					};
-> +					led at 08.3 {
-> +						compatible = "register-bit-led";
-> +						offset = <0x08>;
-> +						mask = <0x08>;
-> +						label = "vexpress:3";
-> +						linux,default-trigger = "cpu1";
-> +						default-state = "off";
-> +					};
-> +					led at 08.4 {
-> +						compatible = "register-bit-led";
-> +						offset = <0x08>;
-> +						mask = <0x10>;
-> +						label = "vexpress:4";
-> +						linux,default-trigger = "cpu2";
-> +						default-state = "off";
-> +					};
-> +					led at 08.5 {
-> +						compatible = "register-bit-led";
-> +						offset = <0x08>;
-> +						mask = <0x20>;
-> +						label = "vexpress:5";
-> +						linux,default-trigger = "cpu3";
-> +						default-state = "off";
-> +					};
-> +					led at 08.6 {
-> +						compatible = "register-bit-led";
-> +						offset = <0x08>;
-> +						mask = <0x40>;
-> +						label = "vexpress:6";
-> +						default-state = "off";
-> +					};
-> +					led at 08.7 {
-> +						compatible = "register-bit-led";
-> +						offset = <0x08>;
-> +						mask = <0x80>;
-> +						label = "vexpress:7";
-> +						default-state = "off";
-> +					};
-> +				};
-> +
->  				mmci at 050000 {
->  					compatible = "arm,pl180", "arm,primecell";
->  					reg = <0x050000 0x1000>;
-> -- 
-> 1.9.3
-> 
-> 
-
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+index 3041baaa19a1..63eb7a2c08f7 100644
+--- a/arch/arm/boot/dts/sama5d4.dtsi
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -323,6 +323,21 @@
+ 				clock-names = "dma_clk";
+ 			};
+ 
++			isi: isi at f0008000 {
++				compatible = "atmel,at91sam9g45-isi";
++				reg = <0xf0008000 0x4000>;
++				interrupts = <52 IRQ_TYPE_LEVEL_HIGH 5>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_isi_data_0_7>;
++				clocks = <&isi_clk>;
++				clock-names = "isi_clk";
++				status = "disabled";
++				port {
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
++			};
++
+ 			ramc0: ramc at f0010000 {
+ 				compatible = "atmel,sama5d3-ddramc";
+ 				reg = <0xf0010000 0x200>;
+@@ -1316,6 +1331,33 @@
+ 					};
+ 				};
+ 
++				isi {
++					pinctrl_isi_data_0_7: isi-0-data-0-7 {
++						atmel,pins =
++							<AT91_PIOC 19 AT91_PERIPH_A AT91_PINCTRL_NONE	/* ISI_D0 */
++							 AT91_PIOC 20 AT91_PERIPH_A AT91_PINCTRL_NONE	/* ISI_D1 */
++							 AT91_PIOC 21 AT91_PERIPH_A AT91_PINCTRL_NONE	/* ISI_D2 */
++							 AT91_PIOC 22 AT91_PERIPH_A AT91_PINCTRL_NONE	/* ISI_D3 */
++							 AT91_PIOC 23 AT91_PERIPH_A AT91_PINCTRL_NONE	/* ISI_D4 */
++							 AT91_PIOC 24 AT91_PERIPH_A AT91_PINCTRL_NONE	/* ISI_D5 */
++							 AT91_PIOC 25 AT91_PERIPH_A AT91_PINCTRL_NONE	/* ISI_D6 */
++							 AT91_PIOC 26 AT91_PERIPH_A AT91_PINCTRL_NONE	/* ISI_D7 */
++							 AT91_PIOB  1 AT91_PERIPH_C AT91_PINCTRL_NONE	/* ISI_PCK, conflict with G0_RXCK */
++							 AT91_PIOB  3 AT91_PERIPH_C AT91_PINCTRL_NONE	/* ISI_VSYNC */
++							 AT91_PIOB  4 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* ISI_HSYNC */
++					};
++					pinctrl_isi_data_8_9: isi-0-data-8-9 {
++						atmel,pins =
++							<AT91_PIOC 0 AT91_PERIPH_C AT91_PINCTRL_NONE	/* ISI_D8, conflicts with SPI0_MISO, PWMH2 */
++							 AT91_PIOC 1 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* ISI_D9, conflicts with SPI0_MOSI, PWML2 */
++					};
++					pinctrl_isi_data_10_11: isi-0-data-10-11 {
++						atmel,pins =
++							<AT91_PIOC 2 AT91_PERIPH_C AT91_PINCTRL_NONE	/* ISI_D10, conflicts with SPI0_SPCK, PWMH3 */
++							 AT91_PIOC 3 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* ISI_D11, conflicts with SPI0_NPCS0, PWML3 */
++					};
++				};
++
+ 				macb0 {
+ 					pinctrl_macb0_rmii: macb0_rmii-0 {
+ 						atmel,pins =
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+2.1.3
