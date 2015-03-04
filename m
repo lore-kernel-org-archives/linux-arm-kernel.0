@@ -1,53 +1,44 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  4 Mar 2015 20:11:28 +0100
-Subject: [PATCH v3 4/4] arm64: remove __lookup_processor_type_data,
- object from head.S
-In-Reply-To: <1425496288-14483-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1425496288-14483-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1425496288-14483-5-git-send-email-ard.biesheuvel@linaro.org>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 04 Mar 2015 20:24:32 +0100
+Subject: [PATCH v5 8/9] rtc: st: add new driver for ST's LPC RTC
+In-Reply-To: <1425492398-27340-9-git-send-email-lee.jones@linaro.org>
+References: <1425492398-27340-1-git-send-email-lee.jones@linaro.org>
+ <1425492398-27340-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1425497072.2090.4.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes __lookup_processor_type_data, replacing the original
-user with a simple PC-relative address load.
+Lee Jones schreef op wo 04-03-2015 om 18:06 [+0000]:
+> --- /dev/null
+> +++ b/drivers/rtc/rtc-st-lpc.c
+> @@ -0,0 +1,354 @@
+> +/*
+> + * rtc-st-lpc.c - ST's LPC RTC, powered by the Low Power Timer
+> + *
+> + * Copyright (C) 2014 STMicroelectronics Limited
+> + *
+> + * Author: David Paris <david.paris@st.com> for STMicroelectronics
+> + *         Lee Jones <lee.jones@linaro.org> for STMicroelectronics
+> + *
+> + * Based on the original driver written by Stuart Menefy.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public Licence
+> + * as published by the Free Software Foundation; either version
+> + * 2 of the Licence, or (at your option) any later version.
+> + */
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/head.S | 15 +--------------
- 1 file changed, 1 insertion(+), 14 deletions(-)
+This states the license is GPL v2 or later.
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 2b60b587a70f..cd3b94cb597f 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -709,15 +709,9 @@ ENDPROC(__error)
-  * This function gets the processor ID in w0 and searches the cpu_table[] for
-  * a match. It returns a pointer to the struct cpu_info it found. The
-  * cpu_table[] must end with an empty (all zeros) structure.
-- *
-- * This routine can be called via C code and it needs to work with the MMU
-- * both disabled and enabled (the offset is calculated automatically).
-  */
- ENTRY(lookup_processor_type)
--	adr	x1, __lookup_processor_type_data
--	ldp	x2, x3, [x1]
--	sub	x1, x1, x2			// get offset between VA and PA
--	add	x3, x3, x1			// convert VA to PA
-+	adr_l	x3, cpu_table
- 1:
- 	ldp	w5, w6, [x3]			// load cpu_id_val and cpu_id_mask
- 	cbz	w5, 2f				// end of list?
-@@ -732,10 +726,3 @@ ENTRY(lookup_processor_type)
- 	mov	x0, x3
- 	ret
- ENDPROC(lookup_processor_type)
--
--	.align	3
--	.type	__lookup_processor_type_data, %object
--__lookup_processor_type_data:
--	.quad	.
--	.quad	cpu_table
--	.size	__lookup_processor_type_data, . - __lookup_processor_type_data
--- 
-1.8.3.2
+> +MODULE_LICENSE("GPLv2");
+
+This will taint the kernel at module load, won't it? You probably meant
+"GPL v2", but only
+    MODULE_LICENSE("GPL");
+
+correctly matches the license in the comment at the top of this file. 
+
+(I assume I missed all this when looking at the v4 series.)
+
+
+Paul Bolle
