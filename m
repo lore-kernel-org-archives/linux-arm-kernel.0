@@ -1,58 +1,48 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Wed, 4 Mar 2015 02:36:06 -0700
-Subject: Tegra baseline test results for v4.0-rc2
-Message-ID: <54F6D206.2070500@nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Mar 2015 10:38:06 +0100
+Subject: [PATCH v4 2/8] arm64: dts: exynos: Add dts files for 64-bit
+ Exynos5433 SoC
+In-Reply-To: <54F6AD6B.70007@samsung.com>
+References: <1424755011-15999-1-git-send-email-cw00.choi@samsung.com>
+ <13467157.nyRCsNWIp6@wuerfel> <54F6AD6B.70007@samsung.com>
+Message-ID: <2449954.zWisnqDpUA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.0-rc2.
-Logs and other details at:
+On Wednesday 04 March 2015 15:59:55 Chanwoo Choi wrote:
+> On 03/02/2015 06:22 AM, Arnd Bergmann wrote:
+> > On Saturday 28 February 2015 09:47:01 Chanwoo Choi wrote:
+> >> "earlycon=exynos4210,0x14C20000" is correct bootparam. You can check
+> >> it on Documentation/kernel-parameters.txt as following.
+> >>
+> >>      exynos4210,<addr>
+> >>                 Use early console provided by serial driver available
+> >>                 on Samsung SoCs, requires selecting proper type and
+> >>                 a correct base address of the selected UART port. The
+> >>                 serial port must already be setup and configured.
+> >>                 Options are not yet supported.
+> >>
+> >>
+> > 
+> > But it's crazy to do this when you have a DT. Please fix the existing
+> > devicetree files that use this to just list 'earlycon'.
+> > 
+> > The syntax above only makes sense for classic board files that we
+> > do not support for exynos any more.
+> 
+> Following earlycon patch for exynos soc was merged in Linux 4.0-rc1.
+> - commit-id: b94ba0328d3b36ff95f5074c0e9b44f90dc56bb5 (serial: samsung: Add support for early console)
+> Almost Exynos SoC use the same UART IP of Exynos4210.
+> 
+> If you mean that "earlycon=exynos4210" naming will be changed to "earlycon=exynos",
+> we have to modify the drivers/tty/serial/samsung.c.
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v4.0-rc2/20150304011913/
+No, what I mean is that you should use just "earlycon" instead of "earlycon=..."
+when you have a DTB. You have the OF_EARLYCON_DECLARE() in the driver as
+well, so that should just work.
 
+EARLYCON_DECLARE() is really just a hack that allows users to override the
+early console from the command line without modifying the stdout-path
+property. Don't put that into a dts file.
 
-Test summary
-------------
-
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-     Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-     Pass: ( 1/ 1): qemu-vexpress64
-
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.0-rc1 (c517d838eb7d07bbe9507871fab3931deccff539)):
-    text     data      bss    total  kernel
-+495197  +100104    +7232  +602533  multi_v7_defconfig
-    +168        0        0     +168  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.0-rc1 (c517d838eb7d07bbe9507871fab3931deccff539))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-         .        .        .        .      qemu-vexpress64            defconfig           __internal
-     -592k     592k        .      24k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-     -592k     592k        .      24k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-         .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-     -592k     592k        .      24k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
-
-
-
-An unusually large size increase from an -rc1 to an -rc2 release for multi_v7_defconfig.
-
-Starting with this test report, an ARM64 defconfig kernel will be built and booted
-on QEMU Versatile Express 64.
+	Arnd
