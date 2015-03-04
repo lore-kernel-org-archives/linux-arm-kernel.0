@@ -1,70 +1,66 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 4 Mar 2015 08:51:53 +0800
-Subject: [PATCH] ARM: dts: imx: Add dr_mode host setting to all host-only
- usb instances
-In-Reply-To: <20150303150809.GD30263@beef>
-References: <1425045960-14191-1-git-send-email-mporter@konsulko.com>
- <20150303034133.GJ20455@dragon> <20150303044334.GA16617@shlinux2>
- <20150303150809.GD30263@beef>
-Message-ID: <20150304005152.GA23399@shlinux2>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue,  3 Mar 2015 18:10:23 -0800
+Subject: [PATCH v3 08/10] s390: redefine randomize_et_dyn for ELF_ET_DYN_BASE
+In-Reply-To: <1425435025-30284-1-git-send-email-keescook@chromium.org>
+References: <1425435025-30284-1-git-send-email-keescook@chromium.org>
+Message-ID: <1425435025-30284-9-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 10:08:09AM -0500, Matt Porter wrote:
-> On Tue, Mar 03, 2015 at 12:43:36PM +0800, Peter Chen wrote:
-> > On Tue, Mar 03, 2015 at 11:41:35AM +0800, Shawn Guo wrote:
-> > > 
-> > > On Fri, Feb 27, 2015 at 09:06:00AM -0500, Matt Porter wrote:
-> > > > The chipidea driver adds an extra line of spam to the log when a
-> > > > host-only chipidea instance is left set to the default of a dual role
-> > > > controller.
-> > > > 
-> > > > [    2.010873] ci_hdrc ci_hdrc.1: doesn't support gadget
-> > > > 
-> > > > Set the dr_mode property to host on all the host-only nodes
-> > > > to avoid this warning.
-> > 
-> > It is not an warning, it is dev_info.
-> 
-> True enough, it's info level but is essentially warning that, in the
-> case of instances that are restricted to host only (at the SoC level),
-> that the DT hardware description is incorrect. Yes, it's benign, but
-> if the dtsi is corrected for those parts we don't have to see that
-> message.
+In preparation for moving ET_DYN randomization into the ELF loader (which
+requires a static ELF_ET_DYN_BASE), this redefines s390's existing ET_DYN
+randomization in a call to arch_mmap_rnd(). This refactoring results in
+the same ET_DYN randomization on s390.
 
-You are right.
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/s390/include/asm/elf.h |  8 +++++---
+ arch/s390/mm/mmap.c         | 11 ++---------
+ 2 files changed, 7 insertions(+), 12 deletions(-)
 
-> 
-> > In fact, imx28, imx6sl and imx6sx's second controller is dual-role
-> > controller, we only set dr_mode at board's dts according to design
-> > unless the controller's capability register is incorrect.
-> 
-> The patch doesn't set dr_mode to host on the second controller for
-> the imx6sl or imx6sx, only on the third host-only controller. If
-> imx28's second controller is really dual-role capable then the
-> reference manual is incorrect and I can drop that hunk in v2.
-> I only have imx6q and imx6d parts in hand to verify so for the rest
-> I went by the RM claim of which controllers were host-only.
-
-Maybe IC guys don't want to export that imx28's that capabilities,
-so don't need to change.
-
-> 
-> > So, sorry, I don't think this change is necessary.
-> 
-> I can correct the set of instances that should have dr_mode set to host
-> in v2 of this. We clearly have some that should have this set in their
-> SoC .dtsi to have the hardware description correct.  Will that work for
-> you or do you want the SoC-specific cases of this property to be only
-> reflected in the board level dts?
-> 
-
-After thinking more, it is a benefit fix, and doesn't need to do any
-changes, thanks.
-
-Acked-by: Peter Chen <peter.chen@freescale.com>
-
+diff --git a/arch/s390/include/asm/elf.h b/arch/s390/include/asm/elf.h
+index c9df40b5c0ac..2e63de8aac7c 100644
+--- a/arch/s390/include/asm/elf.h
++++ b/arch/s390/include/asm/elf.h
+@@ -161,10 +161,12 @@ extern unsigned int vdso_enabled;
+ /* This is the location that an ET_DYN program is loaded if exec'ed.  Typical
+    use of this is to invoke "./ld.so someprog" to test out a new version of
+    the loader.  We need to make sure that it is out of the way of the program
+-   that it will "exec", and that there is sufficient room for the brk.  */
+-
++   that it will "exec", and that there is sufficient room for the brk. 64-bit
++   tasks are aligned to 4GB. */
+ extern unsigned long randomize_et_dyn(void);
+-#define ELF_ET_DYN_BASE		randomize_et_dyn()
++#define ELF_ET_DYN_BASE (randomize_et_dyn() + (is_32bit_task() ? \
++				(STACK_TOP / 3 * 2) : \
++				(STACK_TOP / 3 * 2) & ~((1UL << 32) - 1)))
+ 
+ /* This yields a mask that user programs can use to figure out what
+    instruction set this CPU supports. */
+diff --git a/arch/s390/mm/mmap.c b/arch/s390/mm/mmap.c
+index a94504d99c47..8c11536f972d 100644
+--- a/arch/s390/mm/mmap.c
++++ b/arch/s390/mm/mmap.c
+@@ -179,17 +179,10 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
+ 
+ unsigned long randomize_et_dyn(void)
+ {
+-	unsigned long base;
+-
+-	base = STACK_TOP / 3 * 2;
+-	if (!is_32bit_task())
+-		/* Align to 4GB */
+-		base &= ~((1UL << 32) - 1);
+-
+ 	if (current->flags & PF_RANDOMIZE)
+-		base += arch_mmap_rnd();
++		return arch_mmap_rnd();
+ 
+-	return base;
++	return 0UL;
+ }
+ 
+ #ifndef CONFIG_64BIT
 -- 
-
-Best Regards,
-Peter Chen
+1.9.1
