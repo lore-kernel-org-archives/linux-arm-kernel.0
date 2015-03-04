@@ -1,41 +1,30 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 4 Mar 2015 17:42:51 +0100
-Subject: [PATCH] ARM: at91/dt: fix lcdck declaration
-In-Reply-To: <1425486360-21799-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1425486360-21799-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <54F7360B.1070308@atmel.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 04 Mar 2015 16:44:00 +0000
+Subject: [PATCH REPOST 0/2] Remove pl011 startup glitches and avoid dummy
+ TX during startup
+In-Reply-To: <1425472054-7543-1-git-send-email-Dave.Martin@arm.com>
+References: <1425472054-7543-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <54F73650.2070304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 04/03/2015 17:26, Boris Brezillon a ?crit :
-> lcdck clk is assigned id 3 and not 4.
+Hi Dave,
+
+On 04/03/15 12:27, Dave P Martin wrote:
+> There have been no comments on this series since my previous post, and
+> I have made no further changes.
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-and squashed into previous one.
-
-Thanks!
-
-> ---
->  arch/arm/boot/dts/sama5d4.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Since then, I have confirmed that this also works robustly with TX DMA
+> enabled on Juno.
 > 
-> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-> index aa4b829..1273af4 100644
-> --- a/arch/arm/boot/dts/sama5d4.dtsi
-> +++ b/arch/arm/boot/dts/sama5d4.dtsi
-> @@ -461,7 +461,7 @@
->  
->  					lcdck: lcdck {
->  						#clock-cells = <0>;
-> -						reg = <4>;
-> +						reg = <3>;
->  						clocks = <&mck>;
->  					};
->  
-> 
+> Review/comments/testing still welcome.
 
+this has been tested briefly on a Calxeda Midway without any
+regressions. Also I use them as the base for my SBSA series now (which
+are tested on the model and the Midway) and I see that all problems
+observed before are gone now.
 
--- 
-Nicolas Ferre
+Tested-by: Andre Przywara <andre.przywara@arm.com>
+
+Cheers,
+Andre.
