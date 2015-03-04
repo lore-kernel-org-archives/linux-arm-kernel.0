@@ -1,84 +1,209 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Mar 2015 15:44:03 +0000
-Subject: [PATCH v3 2/9] mfd: syscon: Add atmel system timer registers
- definition
-In-Reply-To: <1425478897-27322-3-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1425478897-27322-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1425478897-27322-3-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150304154403.GM32624@x1>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Wed, 04 Mar 2015 10:45:02 -0500
+Subject: [PATCH v3 2/3] of: add optional options parameter to
+ of_find_node_by_path()
+In-Reply-To: <1417110967-16284-3-git-send-email-leif.lindholm@linaro.org>
+References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
+ <1417110967-16284-3-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <54F7287E.6060302@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 04 Mar 2015, Alexandre Belloni wrote:
+Hi Leif,
 
-> AT91RM920 has a memory range reserved for timer and watchdog configuration.
-> Expose those registers so that drivers can make use of the system timer syscon
-> declared in at91 DTs.
+On 11/27/2014 12:56 PM, Leif Lindholm wrote:
+> Update of_find_node_by_path():
+> 1) Rename function to of_find_node_opts_by_path(), adding an optional
+>    pointer argument. Provide a static inline wrapper version of
+>    of_find_node_by_path() which calls the new function with NULL as
+>    the optional argument.
+> 2) Ignore any part of the path beyond and including the ':' separator.
+> 3) Set the new provided pointer argument to the beginning of the string
+>    following the ':' separator.
+> 4: Add tests.
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
 > ---
->  include/linux/mfd/syscon/atmel-st.h | 47 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 47 insertions(+)
->  create mode 100644 include/linux/mfd/syscon/atmel-st.h
+>  drivers/of/base.c     |   21 +++++++++++++++++----
+>  drivers/of/selftest.c |   12 ++++++++++++
+>  include/linux/of.h    |   14 +++++++++++++-
+>  3 files changed, 42 insertions(+), 5 deletions(-)
 > 
-> diff --git a/include/linux/mfd/syscon/atmel-st.h b/include/linux/mfd/syscon/atmel-st.h
-> new file mode 100644
-> index 000000000000..8e29a1028807
-> --- /dev/null
-> +++ b/include/linux/mfd/syscon/atmel-st.h
-> @@ -0,0 +1,47 @@
-> +/*
-> + * Copyright (C) 2005 Ivan Kokshaysky
-> + * Copyright (C) SAN People
-> + *
-> + * System Timer (ST) - System peripherals registers.
-> + * Based on AT91RM9200 datasheet revision E.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 3823edf..7f0e5f7 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -699,10 +699,15 @@ static struct device_node *__of_find_node_by_path(struct device_node *parent,
+>  {
+>  	struct device_node *child;
+>  	int len = strchrnul(path, '/') - path;
+> +	int term;
+>  
+>  	if (!len)
+>  		return NULL;
+>  
+> +	term = strchrnul(path, ':') - path;
+> +	if (term < len)
+> +		len = term;
 > +
-> +#ifndef _LINUX_MFD_SYSCON_ATMEL_ST_H
-> +#define _LINUX_MFD_SYSCON_ATMEL_ST_H
+>  	__for_each_child_of_node(parent, child) {
+>  		const char *name = strrchr(child->full_name, '/');
+>  		if (WARN(!name, "malformed device_node %s\n", child->full_name))
+> @@ -715,11 +720,14 @@ static struct device_node *__of_find_node_by_path(struct device_node *parent,
+>  }
+>  
+>  /**
+> - *	of_find_node_by_path - Find a node matching a full OF path
+> + *	of_find_node_opts_by_path - Find a node matching a full OF path
+>   *	@path: Either the full path to match, or if the path does not
+>   *	       start with '/', the name of a property of the /aliases
+>   *	       node (an alias).  In the case of an alias, the node
+>   *	       matching the alias' value will be returned.
+> + *	@opts: Address of a pointer into which to store the start of
+> + *	       an options string appended to the end of the path with
+> + *	       a ':' separator.
+>   *
+>   *	Valid paths:
+>   *		/foo/bar	Full path
+> @@ -729,19 +737,24 @@ static struct device_node *__of_find_node_by_path(struct device_node *parent,
+>   *	Returns a node pointer with refcount incremented, use
+>   *	of_node_put() on it when done.
+>   */
+> -struct device_node *of_find_node_by_path(const char *path)
+> +struct device_node *of_find_node_opts_by_path(const char *path, const char **opts)
+>  {
+>  	struct device_node *np = NULL;
+>  	struct property *pp;
+>  	unsigned long flags;
+> +	char *separator;
+>  
+>  	if (strcmp(path, "/") == 0)
+>  		return of_node_get(of_allnodes);
+>  
+> +	separator = strchr(path, ':');
+> +	if (separator && opts)
+> +		*opts = separator + 1;
 > +
-> +#define	AT91_ST_CR	0x00	/* Control Register */
-> +#define		AT91_ST_WDRST	(1 << 0)	/* Watchdog Timer Restart */
+>  	/* The path could begin with an alias */
+>  	if (*path != '/') {
+>  		char *p = strchrnul(path, '/');
+> -		int len = p - path;
+> +		int len = separator ? separator - path : p - path;
+>  
+>  		/* of_aliases must not be NULL */
+>  		if (!of_aliases)
+> @@ -770,7 +783,7 @@ struct device_node *of_find_node_by_path(const char *path)
+>  	raw_spin_unlock_irqrestore(&devtree_lock, flags);
+>  	return np;
+>  }
+> -EXPORT_SYMBOL(of_find_node_by_path);
+> +EXPORT_SYMBOL(of_find_node_opts_by_path);
+>  
+>  /**
+>   *	of_find_node_by_name - Find a node by its "name" property
+> diff --git a/drivers/of/selftest.c b/drivers/of/selftest.c
+> index e2d79af..c298065 100644
+> --- a/drivers/of/selftest.c
+> +++ b/drivers/of/selftest.c
+> @@ -43,6 +43,7 @@ static bool selftest_live_tree;
+>  static void __init of_selftest_find_node_by_name(void)
+>  {
+>  	struct device_node *np;
+> +	const char *options;
+>  
+>  	np = of_find_node_by_path("/testcase-data");
+>  	selftest(np && !strcmp("/testcase-data", np->full_name),
+> @@ -83,6 +84,17 @@ static void __init of_selftest_find_node_by_name(void)
+>  	np = of_find_node_by_path("testcase-alias/missing-path");
+>  	selftest(!np, "non-existent alias with relative path returned node %s\n", np->full_name);
+>  	of_node_put(np);
+> +
+> +	np = of_find_node_opts_by_path("/testcase-data:testoption", &options);
+> +	selftest(np && !strcmp("testoption", options),
+> +		 "option path test failed\n");
+> +	of_node_put(np);
+> +
+> +	np = of_find_node_opts_by_path("testcase-alias:testaliasoption",
+> +				       &options);
+> +	selftest(np && !strcmp("testaliasoption", options),
+> +		 "option alias path test failed\n");
+> +	of_node_put(np);
+>  }
 
-Please use BIT() for "1 <<".
+The path parsing gets lost if the string after ':' contains '/'.
 
-> +#define	AT91_ST_PIMR	0x04	/* Period Interval Mode Register */
-> +#define		AT91_ST_PIV	(0xffff <<  0)	/* Period Interval Value */
-> +
-> +#define	AT91_ST_WDMR	0x08	/* Watchdog Mode Register */
-> +#define		AT91_ST_WDV	(0xffff <<  0)	/* Watchdog Counter Value */
-> +#define		AT91_ST_RSTEN	(1 << 16)	/* Reset Enable */
-> +#define		AT91_ST_EXTEN	(1 << 17)	/* External Signal Assertion Enable */
-> +
-> +#define	AT91_ST_RTMR	0x0c	/* Real-time Mode Register */
-> +#define		AT91_ST_RTPRES	(0xffff <<  0)	/* Real-time Prescalar Value */
-> +
-> +#define	AT91_ST_SR	0x10	/* Status Register */
-> +#define		AT91_ST_PITS	(1 << 0)	/* Period Interval Timer Status */
-> +#define		AT91_ST_WDOVF	(1 << 1)	/* Watchdog Overflow */
-> +#define		AT91_ST_RTTINC	(1 << 2)	/* Real-time Timer Increment */
-> +#define		AT91_ST_ALMS	(1 << 3)	/* Alarm Status */
-> +
-> +#define	AT91_ST_IER	0x14	/* Interrupt Enable Register */
-> +#define	AT91_ST_IDR	0x18	/* Interrupt Disable Register */
-> +#define	AT91_ST_IMR	0x1c	/* Interrupt Mask Register */
-> +
-> +#define	AT91_ST_RTAR	0x20	/* Real-time Alarm Register */
-> +#define		AT91_ST_ALMV	(0xfffff << 0)	/* Alarm Value */
-> +
-> +#define	AT91_ST_CRTR	0x24	/* Current Real-time Register */
-> +#define		AT91_ST_CRTV	(0xfffff << 0)	/* Current Real-Time Value */
-> +
-> +#endif /* _LINUX_MFD_SYSCON_ATMEL_ST_H */
+The selftests below fail with:
+[    1.365528] ### dt-test ### FAIL of_selftest_find_node_by_name():99 option path test failed
+[    1.365610] ### dt-test ### FAIL of_selftest_find_node_by_name():115 option alias path test failed
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Peter Hurley
+
+
+--- >% ---
+diff --git a/drivers/of/unittest.c b/drivers/of/unittest.c
+index 41a4a13..07ba5aa 100644
+--- a/drivers/of/unittest.c
++++ b/drivers/of/unittest.c
+@@ -94,6 +94,11 @@ static void __init of_selftest_find_node_by_name(void)
+ 		 "option path test failed\n");
+ 	of_node_put(np);
+ 
++	np = of_find_node_opts_by_path("/testcase-data:test/option", &options);
++	selftest(np && !strcmp("test/option", options),
++		 "option path test failed\n");
++	of_node_put(np);
++
+ 	np = of_find_node_opts_by_path("/testcase-data:testoption", NULL);
+ 	selftest(np, "NULL option path test failed\n");
+ 	of_node_put(np);
+@@ -104,6 +109,12 @@ static void __init of_selftest_find_node_by_name(void)
+ 		 "option alias path test failed\n");
+ 	of_node_put(np);
+ 
++	np = of_find_node_opts_by_path("testcase-alias:test/alias/option",
++				       &options);
++	selftest(np && !strcmp("test/alias/option", options),
++		 "option alias path test failed\n");
++	of_node_put(np);
++
+ 	np = of_find_node_opts_by_path("testcase-alias:testaliasoption", NULL);
+ 	selftest(np, "NULL option alias path test failed\n");
+ 	of_node_put(np);
+
+
+
+>  static void __init of_selftest_dynamic(void)
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index 29f0adc..a36be70 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -228,7 +228,13 @@ extern struct device_node *of_find_matching_node_and_match(
+>  	const struct of_device_id *matches,
+>  	const struct of_device_id **match);
+>  
+> -extern struct device_node *of_find_node_by_path(const char *path);
+> +extern struct device_node *of_find_node_opts_by_path(const char *path,
+> +	const char **opts);
+> +static inline struct device_node *of_find_node_by_path(const char *path)
+> +{
+> +	return of_find_node_opts_by_path(path, NULL);
+> +}
+> +
+>  extern struct device_node *of_find_node_by_phandle(phandle handle);
+>  extern struct device_node *of_get_parent(const struct device_node *node);
+>  extern struct device_node *of_get_next_parent(struct device_node *node);
+> @@ -385,6 +391,12 @@ static inline struct device_node *of_find_node_by_path(const char *path)
+>  	return NULL;
+>  }
+>  
+> +static inline struct device_node *of_find_node_opts_by_path(const char *path,
+> +	const char **opts)
+> +{
+> +	return NULL;
+> +}
+> +
+>  static inline struct device_node *of_get_parent(const struct device_node *node)
+>  {
+>  	return NULL;
+> 
