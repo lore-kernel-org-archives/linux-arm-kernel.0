@@ -1,53 +1,66 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 04 Mar 2015 15:53:11 +0100
-Subject: [PATCH] cpuidle: mvebu: Fix the CPU PM notifier usage
-In-Reply-To: <54F5D13A.1020002@linaro.org>
-References: <1424971248-29076-1-git-send-email-gregory.clement@free-electrons.com>
- <54F5CC0D.6060509@libero.it> <54F5D13A.1020002@linaro.org>
-Message-ID: <3654949.JbH3Ca4PON@vostro.rjw.lan>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 4 Mar 2015 14:29:44 +0000
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <20150304141212.GA5352@hawk.usersys.redhat.com>
+References: <20150220153626.GB10942@hawk.usersys.redhat.com>
+ <20150224145529.GA5498@hawk.usersys.redhat.com>
+ <CAKv+Gu-Uk2wg1OkoWgQe4da_EiFoEz_u8VuD8Ees6qU1UYMDvQ@mail.gmail.com>
+ <20150302163146.GB9686@lvm> <54F51A63.4060302@samsung.com>
+ <20150304113505.GS28951@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8OUtcpaQh5+gb6vNrdi+Q7eu_zKOujmyoRPrzrs+GJVQ@mail.gmail.com>
+ <20150304122956.GT28951@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
+ <20150304141212.GA5352@hawk.usersys.redhat.com>
+Message-ID: <20150304142943.GU28951@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 03, 2015 04:20:26 PM Daniel Lezcano wrote:
-> On 03/03/2015 03:58 PM, Fulvio wrote:
-> >
-> >> I didn't know you experimented random kernel panics and that you thought
-> >> it was related to the CPU Idle driver.
-> >>
-> >>> All i can say is that the system use the "armadaxp_idle" driver and
-> >>> works fine when running "stress --cpu 8" in background.
-> >>> I asked Netgear to provide a firmware without the idle driver to
-> >>> confirm if it's the cause of the problem, but they did not answered.
-> >>
-> >> I think that if you disable all the state using by doing an
-> >>
-> >> echo 1 > /sys/devices/system/cpu/cpu0/cpuidle/stateNUM/disable
-> >>
-> >> where NUM is the nuymbert of the state. Then it should disable the
-> >> cpuidle on the fly.
-> > Thanks, i'll try that as soon as possible (i gave back the unit to my
-> > client) and report back.
-> >
-> > However, the description of the cpu_pm_enter function state:
-> > "Must be called on the affected CPU with interrupts disabled.  Platform
-> > is responsible for ensuring that cpu_pm_enter is not called twice on the
-> > same CPU before cpu_pm_exit is called. Notified drivers can include VFP
-> > co-processor, interrupt controller and its PM extensions, local CPU
-> > timers context save/restore which shouldn't be interrupted. Hence it
-> > must be called with interrupts disabled."
-> >
-> > and the point is: it that an invariant? Do current code and future code
-> > safely assume that cpu_pm_enter is not called twice?
+On Wed, Mar 04, 2015 at 03:12:12PM +0100, Andrew Jones wrote:
+> On Wed, Mar 04, 2015 at 01:43:02PM +0100, Ard Biesheuvel wrote:
+> > On 4 March 2015 at 13:29, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > > On Wed, Mar 04, 2015 at 12:50:57PM +0100, Ard Biesheuvel wrote:
+> > >> I think we have established that the performance hit is not the
+> > >> problem but the correctness is.
+> > >
+> > > I haven't looked at the performance figures but has anyone assessed the
+> > > hit caused by doing cache maintenance in Qemu vs cacheable guest
+> > > accesses (and no maintenance)?
 > 
-> The fix is correct. The cpu_pm_enter/exit symmetry must be kept because 
-> we don't know what the notifier clients are doing.
-> 
-> The point is : can we send it to stable@ as a bug fix or not ?
+> I'm working on a PoC of a QEMU/KVM cache maintenance approach now.
+> Hopefully I'll send it out this evening. Tomorrow at the latest.
+> Getting numbers of that approach vs. a guest's use of cached memory
+> for devices would take a decent amount of additional work, so won't
+> be part of that post.
 
-Yes, we can, unless there's a risk of breaking things that cannot be
-ignored.
+OK.
 
+> I'm actually not sure we should care about
+> the numbers for a guest using normal mem attributes for device
+> memory - other than out of curiosity. For correctness this issue
+> really needs to be solved 100% host-side. We can't rely on a
+> guest to do different/weird things, just because it's a guest.
+> Ideally guests don't even know that they're guests. (Even if we
+> describe the memory as cache-able to the guest, I don't think we
+> can rely on the guest believing us.)
+
+I disagree it is 100% a host-side issue. It is a host-side issue _if_
+the host tells the guest that the (virtual) device is non-coherent (or,
+more precisely, it does not explicitly tell the guest that the device is
+coherent). If the guest thinks the (virtual) device is non-coherent
+because of information passed by the host, I fully agree that the host
+needs to manage the cache coherency.
+
+However, the host could also pass a "dma-coherent" property in the DT
+given to the guest and avoid any form of cache maintenance. If the guest
+does not honour such coherency property, it's a guest problem and it
+needs fixing in the guest. This isn't any different from a real physical
+device behaviour.
+
+(there are counter arguments for the latter as well like emulating old
+platforms that never had coherency but from a performance/production
+perspective, I strongly recommend that guests are passed the
+"dma-coherent" property for such virtual devices)
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Catalin
