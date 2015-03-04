@@ -1,38 +1,47 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 04 Mar 2015 06:51:51 -0800
-Subject: [PATCH v3 3/9] watchdog: at91rm9200: use the system timer syscon
-In-Reply-To: <1425478897-27322-4-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1425478897-27322-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1425478897-27322-4-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54F71C07.6070204@roeck-us.net>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Wed,  4 Mar 2015 15:52:19 +0100
+Subject: [PATCH 4/4] leds: leds-ns2: depends on MACH_ARMADA_370
+In-Reply-To: <1425480739-2373-1-git-send-email-simon.guinot@sequanux.org>
+References: <1425480739-2373-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <1425480739-2373-5-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2015 06:21 AM, Alexandre Belloni wrote:
-> Use a syscon regmap to access the systemr timer registers.
->
-s/systemr/system/
+The leds-ns2 driver is also used by the n090401 board (Seagate NAS
+4-Bay), which is based on the Marvell Armada-370 SoC.
 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
-...
->
->   static const struct of_device_id at91_wdt_dt_ids[] = {
-> +	{ .compatible = "atmel,at91rm9200-st" },
->   	{ .compatible = "atmel,at91rm9200-wdt" },
->   	{ /* sentinel */ }
->   };
-> @@ -267,7 +276,7 @@ static struct platform_driver at91wdt_driver = {
->   	.suspend	= at91wdt_suspend,
->   	.resume		= at91wdt_resume,
->   	.driver		= {
-> -		.name	= "at91_wdt",
-> +		.name	= "atmel_st_watchdog",
+Then this patch allows to select the leds-ns2 driver if MACH_ARMADA_370
+is enabled. Additionally, this also updates the Kconfig help message.
 
-If you change the driver name you also need to change the MODULE_ALIAS
-a few lines down.
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+---
+ drivers/leds/Kconfig | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-But why change it in the first place ? Maybe that was discussed somewhere,
-but not here where it belongs, and not in patch 0/9 either.
-
-Guenter
+diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+index 25b320d64e26..5bdeb6e41b2e 100644
+--- a/drivers/leds/Kconfig
++++ b/drivers/leds/Kconfig
+@@ -431,12 +431,16 @@ config LEDS_MC13783
+ config LEDS_NS2
+ 	tristate "LED support for Network Space v2 GPIO LEDs"
+ 	depends on LEDS_CLASS
+-	depends on MACH_KIRKWOOD
++	depends on MACH_KIRKWOOD || MACH_ARMADA_370
+ 	default y
+ 	help
+-	  This option enable support for the dual-GPIO LED found on the
+-	  Network Space v2 board (and parents). This include Internet Space v2,
+-	  Network Space (Max) v2 and d2 Network v2 boards.
++	  This option enables support for the dual-GPIO LEDs found on the
++	  following LaCie/Seagate boards:
++
++		Network Space v2 (and parents: Max, Mini)
++		Internet Space v2
++		d2 Network v2
++		n090401 (Seagate NAS 4-Bay)
+ 
+ config LEDS_NETXBIG
+ 	tristate "LED support for Big Network series LEDs"
+-- 
+2.1.1
