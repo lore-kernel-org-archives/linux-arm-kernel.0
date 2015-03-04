@@ -1,66 +1,74 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 4 Mar 2015 14:29:44 +0000
-Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
- uncached guest mappings
-In-Reply-To: <20150304141212.GA5352@hawk.usersys.redhat.com>
-References: <20150220153626.GB10942@hawk.usersys.redhat.com>
- <20150224145529.GA5498@hawk.usersys.redhat.com>
- <CAKv+Gu-Uk2wg1OkoWgQe4da_EiFoEz_u8VuD8Ees6qU1UYMDvQ@mail.gmail.com>
- <20150302163146.GB9686@lvm> <54F51A63.4060302@samsung.com>
- <20150304113505.GS28951@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8OUtcpaQh5+gb6vNrdi+Q7eu_zKOujmyoRPrzrs+GJVQ@mail.gmail.com>
- <20150304122956.GT28951@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
- <20150304141212.GA5352@hawk.usersys.redhat.com>
-Message-ID: <20150304142943.GU28951@e104818-lin.cambridge.arm.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 4 Mar 2015 15:29:59 +0100
+Subject: [PATCH 4/6] ARM: DT: STi: STiH407: Add dwc3 usb3 DT node.
+In-Reply-To: <1424871377-1795-5-git-send-email-peter.griffin@linaro.org>
+References: <1424871377-1795-1-git-send-email-peter.griffin@linaro.org>
+ <1424871377-1795-5-git-send-email-peter.griffin@linaro.org>
+Message-ID: <54F716E7.9090406@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 03:12:12PM +0100, Andrew Jones wrote:
-> On Wed, Mar 04, 2015 at 01:43:02PM +0100, Ard Biesheuvel wrote:
-> > On 4 March 2015 at 13:29, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > On Wed, Mar 04, 2015 at 12:50:57PM +0100, Ard Biesheuvel wrote:
-> > >> I think we have established that the performance hit is not the
-> > >> problem but the correctness is.
-> > >
-> > > I haven't looked at the performance figures but has anyone assessed the
-> > > hit caused by doing cache maintenance in Qemu vs cacheable guest
-> > > accesses (and no maintenance)?
-> 
-> I'm working on a PoC of a QEMU/KVM cache maintenance approach now.
-> Hopefully I'll send it out this evening. Tomorrow at the latest.
-> Getting numbers of that approach vs. a guest's use of cached memory
-> for devices would take a decent amount of additional work, so won't
-> be part of that post.
+Hi Peter,
 
-OK.
+On 02/25/2015 02:36 PM, Peter Griffin wrote:
+> Now that both usb2 and usb3 phy drivers, and also the ST dwc3 glue code
+> are all present upstream, we can add the dwc3 DT node and have a working
+> usb3 controller on stih407-b2120 and stih410-b2020.
+>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>   arch/arm/boot/dts/stih407-family.dtsi | 26 ++++++++++++++++++++++++++
+>   1 file changed, 26 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> index 186412d..18ff5a5 100644
+> --- a/arch/arm/boot/dts/stih407-family.dtsi
+> +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> @@ -7,6 +7,7 @@
+>    * publishhed by the Free Software Foundation.
+>    */
+>   #include "stih407-pinctrl.dtsi"
+> +#include <dt-bindings/phy/phy.h>
+>   #include <dt-bindings/reset-controller/stih407-resets.h>
+>   / {
+>   	#address-cells = <1>;
+> @@ -336,5 +337,30 @@
+>   				resets = <&softreset STIH407_MIPHY2_SOFTRESET>;
+>   			};
+>   		};
+> +
+> +		st_dwc3: dwc3 at 8f94000 {
+> +			compatible	= "st,stih407-dwc3";
+> +			reg		= <0x08f94000 0x1000>, <0x110 0x4>;
+> +			reg-names	= "reg-glue", "syscfg-reg";
+> +			st,syscfg	= <&syscfg_core>;
+> +			resets		= <&powerdown STIH407_USB3_POWERDOWN>,
+> +					  <&softreset STIH407_MIPHY2_SOFTRESET>;
+> +			reset-names	= "powerdown",
+> +					  "softreset";
+> +			#address-cells	= <1>;
+> +			#size-cells	= <1>;
+> +			pinctrl-names	= "default";
+> +			pinctrl-0	= <&pinctrl_usb3>;
+> +			ranges;
+> +
+> +			dwc3: dwc3 at 9900000 {
+> +				compatible	= "snps,dwc3";
+> +				reg		= <0x09900000 0x100000>;
+> +				interrupts	= <GIC_SPI 155 IRQ_TYPE_NONE>;
+> +				dr_mode		= "host";
+> +				phy-names	= "usb2-phy", "usb3-phy";
+> +				phys		= <&usb2_picophy0>, <&phy_port2 PHY_TYPE_USB3>;
+> +			};
+> +		};
+>   	};
+>   };
 
-> I'm actually not sure we should care about
-> the numbers for a guest using normal mem attributes for device
-> memory - other than out of curiosity. For correctness this issue
-> really needs to be solved 100% host-side. We can't rely on a
-> guest to do different/weird things, just because it's a guest.
-> Ideally guests don't even know that they're guests. (Even if we
-> describe the memory as cache-able to the guest, I don't think we
-> can rely on the guest believing us.)
+The USB3 port should only be enabled in the board files, not the soc one.
+We can have a board without USB3 port, so it should be disbaled by default.
 
-I disagree it is 100% a host-side issue. It is a host-side issue _if_
-the host tells the guest that the (virtual) device is non-coherent (or,
-more precisely, it does not explicitly tell the guest that the device is
-coherent). If the guest thinks the (virtual) device is non-coherent
-because of information passed by the host, I fully agree that the host
-needs to manage the cache coherency.
+Other than that, you can enable it also on stih418-b2199, just tested 
+and it is working.
 
-However, the host could also pass a "dma-coherent" property in the DT
-given to the guest and avoid any form of cache maintenance. If the guest
-does not honour such coherency property, it's a guest problem and it
-needs fixing in the guest. This isn't any different from a real physical
-device behaviour.
-
-(there are counter arguments for the latter as well like emulating old
-platforms that never had coherency but from a performance/production
-perspective, I strongly recommend that guests are passed the
-"dma-coherent" property for such virtual devices)
-
--- 
-Catalin
+Thanks,
+Maxime
