@@ -1,17 +1,14 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 4 Mar 2015 08:59:07 +0100
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 4 Mar 2015 08:01:52 +0000
 Subject: [PATCH] mfd: mt6397: Use set_irq_flags only on ARM
 In-Reply-To: <1425453869-18482-1-git-send-email-s.hauer@pengutronix.de>
 References: <1425453869-18482-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150304075907.GN7865@pengutronix.de>
+Message-ID: <20150304080152.GK32624@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, 04 Mar 2015, Sascha Hauer wrote:
 
-[Cc += tglx, rmk]
-
-On Wed, Mar 04, 2015 at 08:24:29AM +0100, Sascha Hauer wrote:
 > Continue the common pattern in MFD drivers and use set_irq_flags on ARM
 > and irq_set_noprobe on other architectures. This fixes compilation on
 > non ARM architecures.
@@ -22,7 +19,11 @@ On Wed, Mar 04, 2015 at 08:24:29AM +0100, Sascha Hauer wrote:
 > Lee, feel free to squash this into the patch adding mt6397 core support.
 > Alternatively I could also add some Kconfig dependency to compile this
 > on ARM only if you are more comfortable with that.
-> 
+
+This solution is fine.  I'm going to squash this patch.
+
+Thanks for fixing.
+
 >  drivers/mfd/mt6397-core.c | 4 ++++
 >  1 file changed, 4 insertions(+)
 > 
@@ -39,12 +40,12 @@ On Wed, Mar 04, 2015 at 08:24:29AM +0100, Sascha Hauer wrote:
 > +#else
 > +	irq_set_noprobe(irq);
 > +#endif
-While this is what everyone does, I wonder why ARM is special here.
-Has this only historic reasons and needs refurbishment?
-
-Best regards
-Uwe
+>  
+>  	return 0;
+>  }
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
