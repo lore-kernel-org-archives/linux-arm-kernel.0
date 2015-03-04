@@ -1,46 +1,78 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 Mar 2015 18:38:09 +0000
-Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
- IRQF_NO_SUSPEND
-In-Reply-To: <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
-References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
- <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150304183809.GD22156@leverpostej>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Wed, 4 Mar 2015 12:37:26 -0600
+Subject: [BUG] ARM: socfpga: L2 cache init
+In-Reply-To: <20150304102342.GA14613@pengutronix.de>
+References: <54D8E3BB.3060505@opensource.altera.com>
+ <20150209185820.GB7994@pengutronix.de> <20150209213017.GC7994@pengutronix.de>
+ <54DD2BB3.3090507@opensource.altera.com>
+ <20150213080106.GD7994@pengutronix.de>
+ <CADhT+wfbZb+u7a-aCi71rh9xFMuphOvqiyEgEYpmmTQtujLcVg@mail.gmail.com>
+ <20150217222817.GS8656@n2100.arm.linux.org.uk>
+ <CADhT+wcpWcfca6JWLAfpQm_yPHOpTRRbCpiikUEs0ha1NHq3TQ@mail.gmail.com>
+ <20150225092657.GU8656@n2100.arm.linux.org.uk>
+ <CADhT+wcyim0Yeq6Wcy6UFAmv+GPjWtVO3hQQ_7uX1bMskADSJQ@mail.gmail.com>
+ <20150304102342.GA14613@pengutronix.de>
+Message-ID: <54F750E6.5030703@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
-
-On Mon, Mar 02, 2015 at 09:18:17AM +0000, Boris Brezillon wrote:
-> The watchdog interrupt (only used when activating software watchdog)
-> shouldn't be suspended when entering suspend mode, because it is shared
-> with a timer device (which request the line with IRQF_NO_SUSPEND) and once
-> the watchdog "Mode Register" has been written, it cannot be changed (which
-> means we cannot disable the watchdog interrupt when entering suspend).
+On 03/04/2015 04:23 AM, Steffen Trumtrar wrote:
+> On Wed, Feb 25, 2015 at 10:30:32AM -0600, Dinh Nguyen wrote:
+>> On Wed, Feb 25, 2015 at 3:26 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>> On Tue, Feb 24, 2015 at 05:55:05PM -0600, Dinh Nguyen wrote:
+>>>> Do you have a recommendation on what should be done?
+>>>
+>>> Please try this:
+>>>
+>>>  arch/arm/mach-socfpga/socfpga.c | 5 +++++
+>>>  1 file changed, 5 insertions(+)
+>>>
+>>> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+>>> index 383d61e138af..f5e597c207b9 100644
+>>> --- a/arch/arm/mach-socfpga/socfpga.c
+>>> +++ b/arch/arm/mach-socfpga/socfpga.c
+>>> @@ -23,6 +23,7 @@
+>>>  #include <asm/hardware/cache-l2x0.h>
+>>>  #include <asm/mach/arch.h>
+>>>  #include <asm/mach/map.h>
+>>> +#include <asm/cacheflush.h>
+>>>
+>>>  #include "core.h"
+>>>
+>>> @@ -73,6 +74,10 @@ void __init socfpga_sysmgr_init(void)
+>>>                         (u32 *) &socfpga_cpu1start_addr))
+>>>                 pr_err("SMP: Need cpu1-start-addr in device tree.\n");
+>>>
+>>> +       /* Ensure that socfpga_cpu1start_addr is visible to other CPUs */
+>>> +       smp_wmb();
+>>> +       sync_cache_w(&socfpga_cpu1start_addr);
+>>> +
+>>>         sys_manager_base_addr = of_iomap(np, 0);
+>>>
+>>>         np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
+>>>
+>>> --
+>>
+>>
+>> Thanks Russell! I have been able to run the test for > 30 minutes now
+>> with both cores coming up just fine.
+>>
+>> Do you mind taking this patch for 4.0-rc? If so,
+>>
+>> Tested-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+>>
+>> Steffen, if you don't mind, do you want to test on your setup as well?
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  drivers/watchdog/at91sam9_wdt.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> Looks good for me, too:
 > 
-> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-> index 6df9405..1443b3c 100644
-> --- a/drivers/watchdog/at91sam9_wdt.c
-> +++ b/drivers/watchdog/at91sam9_wdt.c
-> @@ -208,7 +208,8 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
->  
->  	if ((tmp & AT91_WDT_WDFIEN) && wdt->irq) {
->  		err = request_irq(wdt->irq, wdt_interrupt,
-> -				  IRQF_SHARED | IRQF_IRQPOLL,
-> +				  IRQF_SHARED | IRQF_IRQPOLL |
-> +				  IRQF_NO_SUSPEND,
+> Tested-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> 
 
-I'm a little confused by this. What happens if the watchdog fires when
-we're actually in the suspended state (when IRQF_NO_SUSPEND interrupts
-aren't guaranteed to be delivered).
+Steffen, thanks for testing.
 
-Does this rely on the watchdog IRQ being taken while in the actual
-suspended state (but not waking up the system while handling it)?
+Russell, if you don't mind, I'll take this patch through my tree as I
+have a couple of other fixes for 4.0-rc as well.
 
 Thanks,
-Mark.
+Dinh
