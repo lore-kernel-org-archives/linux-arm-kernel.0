@@ -1,123 +1,79 @@
-From: lsanfil@marvell.com (Lino Sanfilippo)
-Date: Wed, 4 Mar 2015 17:29:14 +0100
-Subject: [RFC PATCH 0/1] Wrong structure alignment due to compiler
- attribute "section"
-In-Reply-To: <20150304143527.GA5653@e103592.cambridge.arm.com>
-References: <1425290502-2322-1-git-send-email-lsanfil@marvell.com>
- <20150303144130.GB5177@e103592.cambridge.arm.com>
- <54F6EF32.7080306@marvell.com>
- <20150304143527.GA5653@e103592.cambridge.arm.com>
-Message-ID: <54F732DA.2050004@marvell.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 4 Mar 2015 17:31:00 +0100
+Subject: [PATCH] ARM: advertise availability of v8 Crypto instructions
+In-Reply-To: <20150304162049.GX28951@e104818-lin.cambridge.arm.com>
+References: <1425054991-29951-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu_dSgtsUp8aeMwz9a6stEC3DCg8GMU5QWWTPy_oOyHCSw@mail.gmail.com>
+ <20150304162049.GX28951@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu-pSOMFhSs=AeAERU1=XKU3xsBJCBOedVnZYBg6frWN9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.03.2015 15:35, Dave Martin wrote:
-
+On 4 March 2015 at 17:20, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Mar 03, 2015 at 02:43:01PM +0100, Ard Biesheuvel wrote:
+>> On 27 February 2015 at 17:36, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> > When running the 32-bit ARM kernel on ARMv8 capable bare metal (e.g.,
+>> > 32-bit Android userland and kernel on a Cortex-A53), or as a KVM guest
+>> > on a 64-bit host, we should advertise the availability of the Crypto
+>> > instructions, so that userland libraries such as OpenSSL may use them.
+>> > (Support for the v8 Crypto instructions in the 32-bit build was added
+>> > to OpenSSL more than six months ago)
+>> >
+>> > This adds the ID feature bit detection, and sets elf_hwcap2 accordingly.
+>> >
+>> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> > ---
+>> >  arch/arm/kernel/setup.c | 16 ++++++++++++++++
+>> >  1 file changed, 16 insertions(+)
+>> >
+>> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>> > index e55408e96559..8d4cb1c1c9ac 100644
+>> > --- a/arch/arm/kernel/setup.c
+>> > +++ b/arch/arm/kernel/setup.c
+>> > @@ -393,6 +393,22 @@ static void __init cpuid_init_hwcaps(void)
+>> >         vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
+>> >         if (vmsa >= 5)
+>> >                 elf_hwcap |= HWCAP_LPAE;
+>> > +
+>> > +       /* check for supported v8 Crypto instructions on non v7-M CPUs */
+>>
+>> Perhaps this should be 'on v7+ (non v7-M) CPUs'
+>>
+>> > +       if (cpu_architecture() == CPU_ARCH_ARMv7) {
+>>
+>> @Russell: any thoughts on this?
+>>
+>> Currently, v8 CPUs are identified as CPU_ARCH_ARMv7, and there is no
+>> point in performing this test on other architectures (including v7-M)
 >
-> Try
+> With the new CPUID scheme introduced around v6/v7, the OS is no longer
+> meant to read much into the architecture version. Even the current
+> __get_cpu_architecture() function that we have returns the VMSA version
+> and not the actual CPU architecture version (for example, ARM11MPCore is
+> reported as ARMv7 by Linux when it's clearly an ARMv6). With ARMv8, the
+> ID_MMFR0 would still report VMSAv7 with LPAE (0b0101) like on a
+> Cortex-A15. You may be able to guess it's an ARMv8 from other fields
+> like ID_ISAR2[3:0] (acquire/release semantics for load/store) but that's
+> not how CPUID registers are meant to be used.
 >
-> rm drivers/clk/mvebu/kirkwood.o
-> make ARCH=arm KBUILD_CFLAGS_KERNEL=-save-temps drivers/clk/mvebu/kirkwood.o
+
+It doesn't really matter which architecture it is. I just want to be
+reasonably sure that reading ID_ISAR5 isn't going to explode. If there
+are other/better ways to guarantee that, I am happy to use those as
+well. (I noticed that there is a v7-M specific definition of ID_ISAR5
+in the source which I couldn't find any reference to in any of the
+Cortex-M TRMs on the infocenter web site.)
+
+> If we are bothered by the ARMv7 name, we could redefine some of these
+> macros to make it clear that the arch version is no longer relevant,
+> something like below (covering the profile names as well):
 >
-> (abuse of KBUILD_CFLAGS_KERNEL here, but it's empty by default, and
-> I'm too lazy to copy-paste command lines...)
+>         CPU_ARCH_CPUID_A
+>         CPU_ARCH_CPUID_R
+>         CPU_ARCH_CPUID_M
 >
+> Once you find such cpu arch number, you know you have access to the
+> architected CPUID registers.
 >
-> The compiler will split out the compiled assembly code in kirkwood.s:
->
-> Look for ".align" directives between the start of the affected section
-> and the start of the next section (next .section directive).
->
-> Here, we just have .align 2, which is the expected correct value
-> (i.e., align __of_table_mv88f6180_clk on a 2^2 = 4 byte boundary).
->
-> A different value here may indicate a bug in the compiler, because
-> you observed that gcc _thinks_ that __alignof__ is 4 for the struct
-> in this section even in the failing case.
 
-Ok, this is the result for the assembly:
-
-         .section        __clk_of_table,"a",%progbits
-         .align  3
-         .type   __of_table_mv88f6180_clk, %object
-         .size   __of_table_mv88f6180_clk, 196
-__of_table_mv88f6180_clk:
-         .space  64
-         .ascii  "marvell,mv88f6180-core-clock\000"
-         .space  99
-         .word   kirkwood_clk_init
-         .space  4
-         .type   __of_table_kirkwood_clk, %object
-         .size   __of_table_kirkwood_clk, 196
-__of_table_kirkwood_clk:
-         .space  64
-         .ascii  "marvell,kirkwood-core-clock\000"
-         .space  100
-         .word   kirkwood_clk_init
-
-And this is the objdump:
-
-Sections:
-Idx Name          Size      VMA       LMA       File off  Algn
-   0 .text         00000094  00000000  00000000  00000034  2**2
-                   CONTENTS, ALLOC, LOAD, RELOC, READONLY, CODE
-   1 .data         00000008  00000000  00000000  000000c8  2**3
-                   CONTENTS, ALLOC, LOAD, RELOC, DATA
-   2 .bss          00000000  00000000  00000000  000000d0  2**0
-                   ALLOC
-   3 .debug_abbrev 0000047a  00000000  00000000  000000d0  2**0
-                   CONTENTS, READONLY, DEBUGGING
-   4 .debug_info   00002c7d  00000000  00000000  0000054a  2**0
-                   CONTENTS, RELOC, READONLY, DEBUGGING
-   5 .debug_line   000003c7  00000000  00000000  000031c7  2**0
-                   CONTENTS, RELOC, READONLY, DEBUGGING
-   6 .init.text    00000348  00000000  00000000  00003590  2**2
-                   CONTENTS, ALLOC, LOAD, RELOC, READONLY, CODE
-   7 .ARM.extab.init.text 00000000  00000000  00000000  000038d8  2**0
-                   CONTENTS, ALLOC, LOAD, READONLY, DATA
-   8 .ARM.exidx.init.text 00000030  00000000  00000000  000038d8  2**2
-                   CONTENTS, ALLOC, LOAD, RELOC, READONLY, DATA
-   9 .ARM.extab    00000010  00000000  00000000  00003908  2**2
-                   CONTENTS, ALLOC, LOAD, READONLY, DATA
-  10 .ARM.exidx    00000008  00000000  00000000  00003918  2**2
-                   CONTENTS, ALLOC, LOAD, RELOC, READONLY, DATA
-  11 .rodata       00000040  00000000  00000000  00003920  2**3
-                   CONTENTS, ALLOC, LOAD, RELOC, READONLY, DATA
-  12 __clk_of_table 00000190  00000000  00000000  00003960  2**3
-                   CONTENTS, ALLOC, LOAD, RELOC, READONLY, DATA
-  13 .rodata.str1.8 00000100  00000000  00000000  00003af0  2**3
-                   CONTENTS, ALLOC, LOAD, READONLY, DATA
-  14 .init.rodata  00000288  00000000  00000000  00003bf0  2**3
-                   CONTENTS, ALLOC, LOAD, RELOC, READONLY, DATA
-  15 .debug_frame  000000b4  00000000  00000000  00003e78  2**2
-                   CONTENTS, RELOC, READONLY, DEBUGGING
-  16 .debug_loc    000002ef  00000000  00000000  00003f2c  2**0
-                   CONTENTS, RELOC, READONLY, DEBUGGING
-  17 .debug_pubnames 0000002c  00000000  00000000  0000421b  2**0
-                   CONTENTS, RELOC, READONLY, DEBUGGING
-  18 .debug_aranges 00000050  00000000  00000000  00004247  2**0
-                   CONTENTS, RELOC, READONLY, DEBUGGING
-  19 .debug_ranges 00000108  00000000  00000000  00004297  2**0
-                   CONTENTS, RELOC, READONLY, DEBUGGING
-  20 .debug_str    0000163d  00000000  00000000  0000439f  2**0
-                   CONTENTS, READONLY, DEBUGGING
-  21 .comment      00000055  00000000  00000000  000059dc  2**0
-                   CONTENTS, READONLY
-  22 .note.GNU-stack 00000000  00000000  00000000  00005a31  2**0
-                   CONTENTS, READONLY
-  23 .ARM.attributes 0000002b  00000000  00000000  00005a31  2**0
-                   CONTENTS, READONLY
-
-
-Very interesting. It shows an .align 3 which explains alignment on
-8 byte boundaries:
-
-
-c07630f8 T __clk_of_table
-c07630f8 t __of_table_fixed_factor_clk
-c07630f8 T __stop_kprobe_blacklist
-c07631c0 t __of_table_fixed_clk
-c0763288 t __of_table_gpio_gate_clk
-c0763350 t __of_table_mv88f6180_clk
-
-So this is indeed a compiler bug, right?
+Let's just rename 7 to 7up  and be done with it :-)
