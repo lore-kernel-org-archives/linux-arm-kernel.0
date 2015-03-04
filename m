@@ -1,64 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Mar 2015 21:13:32 +0100
-Subject: [GIT PULL 1/2] Samsung fixes-1 for v4.0
-In-Reply-To: <5506858.hZnoOahndE@amdc1032>
-References: <54F4B250.5080200@kernel.org> <1651242.NSDETIvUSP@amdc1032>
- <5506858.hZnoOahndE@amdc1032>
-Message-ID: <3844945.fqZoGxPksl@wuerfel>
+From: rockford@yandex.ru (=?koi8-r?B?8MHOz9cg4c7E0sXK?=)
+Date: Wed, 04 Mar 2015 23:32:38 +0300
+Subject: [PATCH] ARM: i.MX6Q: Add fixup for RTL8211E Gigabit Ethernet PHY
+In-Reply-To: <CAOMZO5C+uyfi=Br8kj5zE1ik=qxk2h4vaQn1Loo9=Uv_WGaoQg@mail.gmail.com>
+References: <1425404579-30591-1-git-send-email-rockford@yandex.ru>
+ <3988965.hS0GXm2TNL@wuerfel> <4686121425496122@web26g.yandex.ru>
+ <2796821.5chD2g3yoZ@wuerfel> <4971421425499543@web17m.yandex.ru>
+ <CAOMZO5C+uyfi=Br8kj5zE1ik=qxk2h4vaQn1Loo9=Uv_WGaoQg@mail.gmail.com>
+Message-ID: <5019881425501158@web17m.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 March 2015 17:23:52 Bartlomiej Zolnierkiewicz wrote:
-> On Tuesday, March 03, 2015 04:48:39 PM Bartlomiej Zolnierkiewicz wrote:
-> > On Tuesday, March 03, 2015 03:56:16 AM Kukjin Kim wrote:
-> > > The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-> > > 
-> > >   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-> > > 
-> > > are available in the git repository at:
-> > > 
-> > >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > > tags/samsung-fixes-1
-> > > 
-> > > for you to fetch changes up to 8a68de64e984cfc49ecc22ac18155a7fe6dbbfaf:
-> > > 
-> > >   ARM: EXYNOS: fix exynos randconfig build error (2015-03-03 03:37:57 +0900)
-> > > 
-> > > ----------------------------------------------------------------
-> > > Samsung fixes for v4.0
-> > > 
-> > > - fix exynos randconfig build error with SMP=n
-> > > - fix wrong hwirq of RTC interrupt for exynos3250
-> > > - fix usage of LDREX and STREX after disabling cache coherency
-> > > 
-> > > ----------------------------------------------------------------
-> > > Chanwoo Choi (1):
-> > >       ARM: EXYNOS: Fix wrong hwirq of RTC interrupt for Exynos3250 SoC
 
-Question: why doesn't the number come from DT?
 
-> > > Krzysztof Kozlowski (1):
-> > >       ARM: EXYNOS: Don't use LDREX and STREX after disabling cache coherency
+04.03.2015, 23:18, "Fabio Estevam" <festevam@gmail.com>:
+> On Wed, Mar 4, 2015 at 5:05 PM, ????? ?????? <rockford@yandex.ru> wrote:
+>> ?Actually, I don't know. I've discovered this when I wanted to boot a more recent kernel
+>> ?on this board, and network wasn't working. So I've had to disassembly a vendor's binary only module
+>> ?to discover how they handle this situation.
+>
+> Do you use the generic PHY driver or do you have CONFIG_REALTEK_PHY enabled?
 
-I suppose the right long-term fix would be to kill off those soc_is_exynos*
-macros as well, and derive the right set of SMP operations from the machine
-descriptor that would then use the top-level compatible string to match
-the machine.
+CONFIG_REALTEK_PHY=y
+CONFIG_FIXED_PHY=y
 
-> > > Russell King (1):
-> > >       ARM: EXYNOS: fix exynos randconfig build error
-> > 
-> > Has anyone actually tested this patch with SMP=n && PM_SLEEP=y
-> > or SMP=n && CONFIG_ARM_EXYNOS_CPUIDLE=y?
-> > 
-> > The patch is just insufficient as it prevents build of
-> 
-> By insufficient here I mean compeltely bogus.  I don't mean to be rude
-> howeover since the wrong patch was picked please let me explain it in
-> more technical details.
+> In case you use the realtek PHY driver and still see the issue, can't
+> you fix this in drivers/net/phy/realtek.c instead?
 
-Thanks for the detailed analysis. I noticed the same thing earlier
-when it showed up in linux-next. I've done a partial merge now
-and took only the other two patches, which seem necessary.
+I think there it will require a more work with board detection than here and will
+populate a driver with unnecessary for most users code.
 
-	Arnd
+
+--
+ ??????
