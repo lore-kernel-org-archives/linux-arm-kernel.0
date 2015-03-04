@@ -1,92 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Mar 2015 23:39:18 +0100
-Subject: [PATCH] ARM: fix typos in smc91x platform data
-In-Reply-To: <55454365.1GsbtFBXGk@wuerfel>
-References: <2226303.iMQTNXSl1n@wuerfel>
- <20150228.125721.1605776377351425463.davem@davemloft.net>
- <55454365.1GsbtFBXGk@wuerfel>
-Message-ID: <3483843.L07cLWCFPN@wuerfel>
+From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
+Date: Wed, 4 Mar 2015 14:40:13 -0800
+Subject: [PATCHv1] rtc: bcm-iproc: Add support for Broadcom iproc rtc
+In-Reply-To: <3699327.0G6ZNxn8QA@wuerfel>
+References: <1418757750-3628-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1603624.EMYvBCWhuM@wuerfel> <54DD2685.6020207@broadcom.com>
+ <3699327.0G6ZNxn8QA@wuerfel>
+Message-ID: <54F789CD.5030504@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I recently did a rework of the smc91x driver and did some build-testing
-by compiling hundreds of randconfig kernels. Unfortunately, my script
-was wrong and did not actually test the configurations that mattered,
-so I introduced stupid typos in almost every file I touched.
 
-I fixed my script now, built all configurations that actually matter
-and fixed all the typos, this is the result.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b70661c70830d ("net: smc91x: use run-time configuration on all ARM machines")
----
-Hi Dave,
+On 15-03-04 02:21 PM, Arnd Bergmann wrote:
+> On Thursday 12 February 2015 14:17:41 Arun Ramamurthy wrote:
+>> Hi Arnd
+>>
+>> My apologies for the late reply, I was moved to other work items. I
+>> wanted to get more clarification on the syscon issue so that I can
+>> submit the next patch set. If I understand correctly, you would like
+>> me to move the CRMU logic to a new driver under mfd/ and use the syscon
+>> api calls in my rtc driver? Thanks
+>
+> It depends a lot on what's in there, I can best advise you if you
+> have some form of register list.
+>
+> A common approach would be to not have a driver for the crmu at all,
+> but just mark it as syscon, and have the other drivers either reference
+> the syscon node through a phandle, or create them as childrem of
+> the syscon node. The latter case makes most sense if all uses of
+> the crmu have no other MMIO registers.
+>
 
-I could either take this through our arm-soc tree, or through netdev,
-whichever suits you.
-
-diff --git a/arch/arm/mach-pxa/idp.c b/arch/arm/mach-pxa/idp.c
-index ddad190c8abc..c5d9b02d5cbf 100644
---- a/arch/arm/mach-pxa/idp.c
-+++ b/arch/arm/mach-pxa/idp.c
-@@ -36,6 +36,7 @@
- #include <linux/platform_data/video-pxafb.h>
- #include <mach/bitfield.h>
- #include <linux/platform_data/mmc-pxamci.h>
-+#include <linux/smc91x.h>
- 
- #include "generic.h"
- #include "devices.h"
-diff --git a/arch/arm/mach-pxa/lpd270.c b/arch/arm/mach-pxa/lpd270.c
-index 5f9f64e4726e..6c896c9375cb 100644
---- a/arch/arm/mach-pxa/lpd270.c
-+++ b/arch/arm/mach-pxa/lpd270.c
-@@ -195,7 +195,7 @@ static struct resource smc91x_resources[] = {
- };
- 
- struct smc91x_platdata smc91x_platdata = {
--	.flags = SMC91X_USE_16BIT | SMC91X_NOWAIT;
-+	.flags = SMC91X_USE_16BIT | SMC91X_NOWAIT,
- };
- 
- static struct platform_device smc91x_device = {
-diff --git a/arch/arm/mach-sa1100/neponset.c b/arch/arm/mach-sa1100/neponset.c
-index 7b0cd3172354..af868d258e66 100644
---- a/arch/arm/mach-sa1100/neponset.c
-+++ b/arch/arm/mach-sa1100/neponset.c
-@@ -268,8 +268,8 @@ static int neponset_probe(struct platform_device *dev)
- 		.id = 0,
- 		.res = smc91x_resources,
- 		.num_res = ARRAY_SIZE(smc91x_resources),
--		.data = &smc91c_platdata,
--		.size_data = sizeof(smc91c_platdata),
-+		.data = &smc91x_platdata,
-+		.size_data = sizeof(smc91x_platdata),
- 	};
- 	int ret, irq;
- 
-diff --git a/arch/arm/mach-sa1100/pleb.c b/arch/arm/mach-sa1100/pleb.c
-index 696fd0fe4806..1525d7b5f1b7 100644
---- a/arch/arm/mach-sa1100/pleb.c
-+++ b/arch/arm/mach-sa1100/pleb.c
-@@ -54,7 +54,7 @@ static struct platform_device smc91x_device = {
- 	.num_resources	= ARRAY_SIZE(smc91x_resources),
- 	.resource	= smc91x_resources,
- 	.dev = {
--		.platform_data  = &smc91c_platdata,
-+		.platform_data  = &smc91x_platdata,
- 	},
- };
- 
-diff --git a/drivers/net/ethernet/smsc/smc91x.c b/drivers/net/ethernet/smsc/smc91x.c
-index 209ee1b27f8d..5d093dc0f5f5 100644
---- a/drivers/net/ethernet/smsc/smc91x.c
-+++ b/drivers/net/ethernet/smsc/smc91x.c
-@@ -92,6 +92,7 @@ static const char version[] =
- #include "smc91x.h"
- 
- #if defined(CONFIG_ASSABET_NEPONSET)
-+#include <mach/assabet.h>
- #include <mach/neponset.h>
- #endif
- 
+Thank you Arnd, I am going to follow the approach of adding a child node 
+to the syscon node. Several other driver use other registers in the CRMU 
+so I think the child node approach makes the most sense.
+>
+>> On 14-12-17 06:31 AM, Arnd Bergmann wrote:
+>>> On Tuesday 16 December 2014 13:54:04 Arun Ramamurthy wrote:
+>>>> On 14-12-16 12:27 PM, Ray Jui wrote:
+>>>>> On 12/16/2014 12:19 PM, Arnd Bergmann wrote:
+>>>>>>
+>>>>>> It sounds like CRMU is some other unit aside from the RTC. Could this
+>>>>>> be something like a generic system controller? I think it should
+>>>>>> either have its own driver or use the syscon logic if that is what
+>>>>>> this is.
+>>>>>>
+>>>>> Giving that CRMU has scattered, miscellaneous control logic for multiple
+>>>>> different peripherals, it probably makes more sense to use the syscon
+>>>>> logic here.
+>>>>>
+>>>> Arnd, thanks for the feedback. If I was to write a separate driver for
+>>>> the CRMU, I would have to export certain functions and create an api
+>>>> that only this RTC driver would use. I am not sure that is efficient or
+>>>> required. What is your opinion?
+>>>> Would it be better if I use the syson api in my current driver and move
+>>>> the CRMU registers to separate syscon device tree entry?
+>>>>
+>>>
+>>> This is something that's normally up to the platform maintainers, depending
+>>> on what works best for a given SoC. If you have a control block that
+>>> wants to export the same high-level API for multiple drivers, that's
+>>> fine, but if literally every register does something different, a syscon
+>>> driver works best.
+>>>
+>>> It's also possible that some of the functions of the CRMU already have
+>>> abstractions, like system-reset, device-reset, regulator or clock support.
+>>> In that case, you can still use syscon but have the more other drivers
+>>> use that for accessing the registers.
+>>>
+>>> 	Arnd
+>>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
