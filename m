@@ -1,94 +1,107 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 05 Mar 2015 00:11:24 +0100
-Subject: [PATCH v3 7/9] ACPI: enable arch-specific compilation for _OSI
- and the blacklist
-In-Reply-To: <1424824585-6405-8-git-send-email-al.stone@linaro.org>
-References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
- <1424824585-6405-8-git-send-email-al.stone@linaro.org>
-Message-ID: <15870247.dI8jiUeRfk@vostro.rjw.lan>
+From: graeme.gregory@linaro.org (G Gregory)
+Date: Wed, 4 Mar 2015 22:49:25 +0000
+Subject: [PATCH v9 07/21] ACPI / sleep: Introduce arm64 specific
+ acpi_sleep.c
+In-Reply-To: <2076446.VFvTauDDiK@vostro.rjw.lan>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <1424853601-6675-8-git-send-email-hanjun.guo@linaro.org>
+ <2076446.VFvTauDDiK@vostro.rjw.lan>
+Message-ID: <CAGCh1+=RWVfcFoG549_03AZx3Y548GrJUMAXMgmdFFMmiE40KQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, February 24, 2015 05:36:23 PM al.stone at linaro.org wrote:
-> From: Al Stone <al.stone@linaro.org>
-> 
-> Whether arch-specific functions are used or not now depends on the config
-> option CONFIG_ARCH_SPECIFIC_ACPI_OSI.  By default, this is set false which
-> causes the x86/ia64 versions to be used, just as is done today.  Setting
-> this option true causes architecture-specific implementations to be built
-> instead; this patch also provides arm64 implementations.
-> 
-> For x86/ia64, there is no functional change.  Other architectures will have
-> to add files to provide their specific functionality.
-> 
-> Signed-off-by: Al Stone <al.stone@linaro.org>
+On 4 March 2015 at 22:38, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Wednesday, February 25, 2015 04:39:47 PM Hanjun Guo wrote:
+>> From: Graeme Gregory <graeme.gregory@linaro.org>
+>>
+>> ACPI 5.1 does not currently support S states for ARM64 hardware but
+>> ACPI code will call acpi_target_system_state() for device power
+>> management, so introduce acpi_sleep.c to allow other drivers to function
+>> until S states are defined.
+>>
+>> Since it is arm64 specific stub holder, so let acpi_sleep.c to ARM64
+>> specific.
+>>
+>> TODO: merge this with drivers/acpi/sleep.c once we fix the specification.
+>>
+>> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> Tested-by: Yijing Wang <wangyijing@huawei.com>
+>> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+>> Tested-by: Jon Masters <jcm@redhat.com>
+>> Tested-by: Timur Tabi <timur@codeaurora.org>
+>> Tested-by: Robert Richter <rrichter@cavium.com>
+>> Acked-by: Robert Richter <rrichter@cavium.com>
+>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>  arch/arm64/kernel/Makefile     |  2 +-
+>>  arch/arm64/kernel/acpi_sleep.c | 28 ++++++++++++++++++++++++++++
+>>  drivers/acpi/Makefile          |  2 ++
+>>  3 files changed, 31 insertions(+), 1 deletion(-)
+>>  create mode 100644 arch/arm64/kernel/acpi_sleep.c
+>>
+>> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+>> index 218eb7e..4435943 100644
+>> --- a/arch/arm64/kernel/Makefile
+>> +++ b/arch/arm64/kernel/Makefile
+>> @@ -34,7 +34,7 @@ arm64-obj-$(CONFIG_KGDB)            += kgdb.o
+>>  arm64-obj-$(CONFIG_EFI)                      += efi.o efi-stub.o efi-entry.o
+>>  arm64-obj-$(CONFIG_PCI)                      += pci.o
+>>  arm64-obj-$(CONFIG_ARMV8_DEPRECATED) += armv8_deprecated.o
+>> -arm64-obj-$(CONFIG_ACPI)             += acpi.o
+>> +arm64-obj-$(CONFIG_ACPI)             += acpi.o acpi_sleep.o
+>>
+>>  obj-y                                        += $(arm64-obj-y) vdso/
+>>  obj-m                                        += $(arm64-obj-m)
+>> diff --git a/arch/arm64/kernel/acpi_sleep.c b/arch/arm64/kernel/acpi_sleep.c
+>> new file mode 100644
+>> index 0000000..54578ef
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/acpi_sleep.c
+>> @@ -0,0 +1,28 @@
+>> +/*
+>> + *  ARM64 Specific Sleep Functionality
+>> + *
+>> + *  Copyright (C) 2013-2014, Linaro Ltd.
+>> + *      Author: Graeme Gregory <graeme.gregory@linaro.org>
+>> + *
+>> + *  This program is free software; you can redistribute it and/or modify
+>> + *  it under the terms of the GNU General Public License version 2 as
+>> + *  published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/acpi.h>
+>> +
+>> +/*
+>> + * Currently the ACPI 5.1 standard does not define S states in a
+>> + * manner which is usable for ARM64. These two stubs are sufficient
+>> + * that system initialises and device PM works.
+>> + */
+>> +u32 acpi_target_system_state(void)
+>> +{
+>> +     return ACPI_STATE_S0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(acpi_target_system_state);
+>> +
+>> +int __init acpi_sleep_init(void)
+>> +{
+>> +     return -ENOSYS;
+>> +}
+>> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+>> index 623b117..c32edf5 100644
+>> --- a/drivers/acpi/Makefile
+>> +++ b/drivers/acpi/Makefile
+>> @@ -23,7 +23,9 @@ acpi-y                              += nvs.o
+>>
+>>  # Power management related files
+>>  acpi-y                               += wakeup.o
+>> +ifneq (,$(findstring $(ARCH),x86 ia64))
+>
+> This is super-ugly.  Isn't there a better way to do that?
+>
+Its the standard example in the GNU Make manual, I would certainly
+love if someone had a batter suggestion.
 
-This one is fine by me.
-
-> ---
->  drivers/acpi/Kconfig  | 3 +++
->  drivers/acpi/Makefile | 7 ++++++-
->  include/linux/acpi.h  | 8 ++++++++
->  3 files changed, 17 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index b340509..4d91f22 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -53,6 +53,9 @@ config ACPI_SLEEP
->  	depends on SUSPEND || HIBERNATION
->  	default y
->  
-> +config ARCH_SPECIFIC_ACPI_OSI
-> +	def_bool n
-> +
->  config ACPI_PROCFS_POWER
->  	bool "Deprecated power /proc/acpi directories"
->  	depends on PROC_FS
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index 97191eb..1428464 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -18,9 +18,14 @@ obj-y				+= acpi.o \
->  					acpica/
->  
->  # All the builtin files are in the "acpi." module_param namespace.
-> -acpi-y				+= osl.o utils.o reboot.o osi.o
-> +acpi-y				+= osl.o utils.o reboot.o
->  acpi-y				+= nvs.o
->  
-> +# _OSI related files
-> +ifneq ($(CONFIG_ARCH_SPECIFIC_ACPI_OSI), y)
-> +acpi-y				+= osi.o
-> +endif
-> +
->  # Power management related files
->  acpi-y				+= wakeup.o
->  acpi-y				+= sleep.o
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index 71cdeb6..97185a1 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -279,9 +279,17 @@ static inline int acpi_video_display_switch_support(void)
->  #endif /* defined(CONFIG_ACPI_VIDEO) || defined(CONFIG_ACPI_VIDEO_MODULE) */
->  
->  extern int acpi_blacklisted(void);
-> +
-> +#ifdef CONFIG_ARCH_SPECIFIC_ACPI_OSI
-> +static inline void __init acpi_dmi_osi_linux(int enable,
-> +					     const struct dmi_system_id *d) { }
-> +static inline void __init acpi_osi_setup(char *str) { }
-> +#else
->  extern void __init acpi_dmi_osi_linux(int enable,
->  				      const struct dmi_system_id *d);
->  extern void __init acpi_osi_setup(char *str);
-> +#endif
-> +
->  extern u32 acpi_osi_handler(acpi_string interface, u32 supported);
->  
->  #ifdef CONFIG_ACPI_NUMA
-> 
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Graeme
