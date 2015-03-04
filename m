@@ -1,117 +1,79 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Wed,  4 Mar 2015 14:35:52 +0000
-Subject: [PATCH v2 5/6] target-arm: kvm64 fix save/restore of SPSR regs
+Date: Wed,  4 Mar 2015 14:35:48 +0000
+Subject: [PATCH v2 1/6] target-arm: kvm: save/restore mp state
 In-Reply-To: <1425479753-18349-1-git-send-email-alex.bennee@linaro.org>
 References: <1425479753-18349-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1425479753-18349-6-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1425479753-18349-2-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+This adds the saving and restore of the current Multi-Processing state
+of the machine. While the KVM_GET/SET_MP_STATE API exposes a number of
+potential states for x86 we only use two for ARM. Either the process is
+running or not. We then save this state into the cpu_powered TCG state
+to avoid changing the serialisation format.
 
-The current code was negatively indexing the cpu state array and not
-synchronizing banked spsr register state with the current mode's spsr
-state, causing occasional failures with migration.
-
-Some munging is done to take care of the aarch64 mapping and also to
-ensure the most current value of the spsr is updated to the banked
-registers (relevant for KVM<->TCG migration).
-
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
 ---
-v2 (ajb)
-  - minor tweaks and clarifications
-v3
-  - Use the correct bank index function for setting/getting env->spsr
-  - only deal with spsrs in elevated exception levels
+v2
+  - make mpstate field runtime dependant (kvm_enabled())
+  - drop initial KVM_CAP_MP_STATE requirement
+  - re-use cpu_powered instead of new field
 
-diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
-index c60e989..45e5c3f 100644
---- a/target-arm/kvm64.c
-+++ b/target-arm/kvm64.c
-@@ -140,6 +140,7 @@ int kvm_arch_put_registers(CPUState *cs, int level)
-     uint64_t val;
-     int i;
-     int ret;
-+    unsigned int el;
+diff --git a/target-arm/machine.c b/target-arm/machine.c
+index 9446e5a..185f9a2 100644
+--- a/target-arm/machine.c
++++ b/target-arm/machine.c
+@@ -161,6 +161,7 @@ static const VMStateInfo vmstate_cpsr = {
+     .put = put_cpsr,
+ };
  
-     ARMCPU *cpu = ARM_CPU(cs);
-     CPUARMState *env = &cpu->env;
-@@ -206,9 +207,27 @@ int kvm_arch_put_registers(CPUState *cs, int level)
-         return ret;
-     }
- 
-+    /* Saved Program State Registers
-+     *
-+     * Before we restore from the banked_spsr[] array we need to
-+     * ensure that any modifications to env->spsr are correctly
-+     * reflected and map aarch64 exception levels if required.
-+     */
-+    el = arm_current_el(env);
-+    if (el > 0) {
-+        if (is_a64(env)) {
-+            g_assert(el == 1);
-+            /* KVM only maps KVM_SPSR_SVC to KVM_SPSR_EL1 for aarch64 ATM */
-+            env->banked_spsr[1] = env->banked_spsr[0];
-+        } else {
-+            i = bank_number(env->uncached_cpsr & CPSR_M);
-+            env->banked_spsr[i] = env->spsr;
-+        }
-+    }
 +
-     for (i = 0; i < KVM_NR_SPSR; i++) {
-         reg.id = AARCH64_CORE_REG(spsr[i]);
--        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
-+        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
-         ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
-         if (ret) {
-             return ret;
-@@ -253,6 +272,7 @@ int kvm_arch_get_registers(CPUState *cs)
-     struct kvm_one_reg reg;
-     uint64_t val;
-     uint32_t fpr;
-+    unsigned int el;
-     int i;
-     int ret;
- 
-@@ -325,15 +345,35 @@ int kvm_arch_get_registers(CPUState *cs)
-         return ret;
-     }
- 
-+    /* Fetch the SPSR registers
-+     *
-+     * KVM has an array of state indexed for all the possible aarch32
-+     * privilage levels. Although not all are valid at all points
-+     * there are some transitions possible which can access old state
-+     * so it is worth keeping them all.
-+     */
-     for (i = 0; i < KVM_NR_SPSR; i++) {
-         reg.id = AARCH64_CORE_REG(spsr[i]);
--        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
-+        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
-         ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
-         if (ret) {
-             return ret;
+ static void cpu_pre_save(void *opaque)
+ {
+     ARMCPU *cpu = opaque;
+@@ -170,6 +171,20 @@ static void cpu_pre_save(void *opaque)
+             /* This should never fail */
+             abort();
          }
-     }
- 
-+    el = arm_current_el(env);
-+    if (el > 0) {
-+        if (is_a64(env)) {
-+            g_assert(el == 1);
-+            /* KVM maps KVM_SPSR_SVC to KVM_SPSR_EL1 for aarch64 */
-+            env->banked_spsr[0] = env->banked_spsr[1];
-+            i = aarch64_banked_spsr_index(el);
-+        } else {
-+            i = bank_number(env->uncached_cpsr & CPSR_M);
++#if defined CONFIG_KVM
++        if (kvm_check_extension(CPU(cpu)->kvm_state, KVM_CAP_MP_STATE)) {
++            struct kvm_mp_state mp_state;
++            int ret = kvm_vcpu_ioctl(CPU(cpu), KVM_GET_MP_STATE, &mp_state);
++            if (ret) {
++                fprintf(stderr, "%s: failed to get MP_STATE %d/%s\n",
++                        __func__, ret, strerror(ret));
++                abort();
++            }
++            cpu->powered_off =
++                (mp_state.mp_state == KVM_MP_STATE_RUNNABLE)
++                ? false : true;
 +        }
-+        env->spsr = env->banked_spsr[i];
-+    }
-+
-     /* Advanced SIMD and FP registers */
-     for (i = 0; i < 32; i++) {
-         reg.id = AARCH64_SIMD_CORE_REG(fp_regs.vregs[i]);
++#endif
+     } else {
+         if (!write_cpustate_to_list(cpu)) {
+             /* This should never fail. */
+@@ -222,6 +237,20 @@ static int cpu_post_load(void *opaque, int version_id)
+          * we're using it.
+          */
+         write_list_to_cpustate(cpu);
++#if defined CONFIG_KVM
++        if (kvm_check_extension(CPU(cpu)->kvm_state, KVM_CAP_MP_STATE)) {
++            struct kvm_mp_state mp_state = {
++                .mp_state =
++                cpu->powered_off ? KVM_MP_STATE_HALTED : KVM_MP_STATE_RUNNABLE
++            };
++            int ret = kvm_vcpu_ioctl(CPU(cpu), KVM_SET_MP_STATE, &mp_state);
++            if (ret) {
++                fprintf(stderr, "%s: failed to set MP_STATE %d/%s\n",
++                        __func__, ret, strerror(ret));
++                return -1;
++            }
++        }
++#endif
+     } else {
+         if (!write_list_to_cpustate(cpu)) {
+             return -1;
 -- 
 2.3.1
