@@ -1,42 +1,62 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 04 Mar 2015 15:59:55 +0900
-Subject: [PATCH v4 2/8] arm64: dts: exynos: Add dts files for 64-bit
- Exynos5433 SoC
-In-Reply-To: <13467157.nyRCsNWIp6@wuerfel>
-References: <1424755011-15999-1-git-send-email-cw00.choi@samsung.com>
- <2707354.mhmQEHxoKV@wuerfel>
- <CAGTfZH0VVT0hMn4ooRNZxnqjUQ_hF8nHg-4NtNriayick50qgw@mail.gmail.com>
- <13467157.nyRCsNWIp6@wuerfel>
-Message-ID: <54F6AD6B.70007@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 4 Mar 2015 16:02:59 +0900
+Subject: [PATCH/RFC] ARM: shmobile: r8a7790: Fix HSUSB clock to hp_clk
+ from mp_clk
+In-Reply-To: <CAMuHMdUHMA+cJTGWS-0Prt6-BT5=UkGQ4OWZ+bz-g2G7DSwLzw@mail.gmail.com>
+References: <1424011746-3787-2-git-send-email-ykaneko0929@gmail.com>
+ <CAMuHMdX=cdHaiHCnYsJvZFc2RNv=Pk8cLXuvkezg4Ht4U4mXsg@mail.gmail.com>
+ <20150216135754.GA5479@verge.net.au>
+ <CAMuHMdUHMA+cJTGWS-0Prt6-BT5=UkGQ4OWZ+bz-g2G7DSwLzw@mail.gmail.com>
+Message-ID: <20150304070258.GA16597@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2015 06:22 AM, Arnd Bergmann wrote:
-> On Saturday 28 February 2015 09:47:01 Chanwoo Choi wrote:
->> "earlycon=exynos4210,0x14C20000" is correct bootparam. You can check
->> it on Documentation/kernel-parameters.txt as following.
->>
->>      exynos4210,<addr>
->>                 Use early console provided by serial driver available
->>                 on Samsung SoCs, requires selecting proper type and
->>                 a correct base address of the selected UART port. The
->>                 serial port must already be setup and configured.
->>                 Options are not yet supported.
->>
->>
+Hi Geert,
+
+On Mon, Feb 16, 2015 at 03:04:16PM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> But it's crazy to do this when you have a DT. Please fix the existing
-> devicetree files that use this to just list 'earlycon'.
+> On Mon, Feb 16, 2015 at 2:57 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Mon, Feb 16, 2015 at 10:20:10AM +0100, Geert Uytterhoeven wrote:
+> >> Hi Kaneko-san, Mizuguchi-san,
+> >>
+> >> On Sun, Feb 15, 2015 at 3:49 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+> >> > From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+> >> >
+> >> > HSUSB uses hp_clk for H/W register access.
+> >>
+> >> That indeed seems to be true, and that's what this patch is changing.
+> >>
+> >> > HSUSB uses mp_clk for USB-DMAC access.
+> >>
+> >> However, page 64-2 doesn't mention the MP clock for USB-DMAC:
+> >>    "AXI bus clock (ZS?: 260 MHz), HPB bus clock (HP?: 130 MHz).
+> >>     USB local bus clock (48 MHz)"
+> >> So your statement doesn't seem to be true?
+> >
+> > Thanks, I see that too.
+> >
+> >> Note that mstp3_clks in dtsi has hp_clk as the parent for both usbdmac0 and
+> >> usbdmac1, so if your statement would be true, that has to changed, too?
+> >>
+> >> The same is true for other members of the R-Car Gen2 family, e.g. your patch
+> >> for r8a7791.
+> >
+> > It seems to me that we could:
+> >
+> > 1. Apply this patch with the changelog updated and;
+> > 2. Follow up on the DMAC clocks
+> >
+> > Does that sound reasonable to you?
 > 
-> The syntax above only makes sense for classic board files that we
-> do not support for exynos any more.
+> Yes, that sounds fine to me.
 
-Following earlycon patch for exynos soc was merged in Linux 4.0-rc1.
-- commit-id: b94ba0328d3b36ff95f5074c0e9b44f90dc56bb5 (serial: samsung: Add support for early console)
-Almost Exynos SoC use the same UART IP of Exynos4210.
+The purpose of this email is to offer a quick status update which
+I hope will bring this matter to a close.
 
-If you mean that "earlycon=exynos4210" naming will be changed to "earlycon=exynos",
-we have to modify the drivers/tty/serial/samsung.c.
+I have submitted and queued up a patch as per 1. above.
 
-Thanks,
-Chanwoo Choi
+With regards to item 2. above: I have also followed up on the "HSUSB uses
+mp_clk for USB-DMAC access" comment in the original changelog (above).
+Mizuguchi-san has confirmed that statement is not correct and its presence
+in the changelog was an error.
