@@ -1,32 +1,115 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 05 Mar 2015 00:04:01 +0100
-Subject: [GIT PULL 2/2] Samsung fixes-2 for v4.0
-In-Reply-To: <2064108.qlOP0oDx90@wuerfel>
-References: <54F4B33E.3070803@kernel.org> <2064108.qlOP0oDx90@wuerfel>
-Message-ID: <20154650.hb5Lekq8n0@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 4 Mar 2015 14:58:58 -0800
+Subject: [PATCH 2/2] pinctrl: Introduce TI IOdelay configuration driver
+In-Reply-To: <1425509926.2090.56.camel@tiscali.nl>
+References: <1425427237-11511-1-git-send-email-nm@ti.com>
+ <1425427237-11511-3-git-send-email-nm@ti.com>
+ <1425509926.2090.56.camel@tiscali.nl>
+Message-ID: <20150304225857.GC13520@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 March 2015 21:04:40 Arnd Bergmann wrote:
-> On Tuesday 03 March 2015 04:00:14 Kukjin Kim wrote:
-> > Please pull Samsung tmu and hdmi regression fixes for v4.0 and I know
-> > this is quite big for fixes but I couldn't handle this series for
-> > previous merge window because of dependency with driver side...sorry for
-> > that and please pull so that we could support them in v4.0 on exynos
-> > platforms.
+* Paul Bolle <pebolle@tiscali.nl> [150304 14:58]:
+> Nishanth Menon schreef op di 03-03-2015 om 18:00 [-0600]:
+> > diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+> > index ee9f44ad7f02..8e463d75fbb2 100644
+> > --- a/drivers/pinctrl/Kconfig
+> > +++ b/drivers/pinctrl/Kconfig
+> > @@ -160,6 +160,17 @@ config PINCTRL_TEGRA_XUSB
+> >  	select PINCONF
+> >  	select PINMUX
+> >  
+> > +config PINCTRL_TI_IODELAY
+> > +	bool "TI IODelay Module pinconf driver"
 > 
-> What kind of dependency do you have there? It really should not be
-> necessary to wait for driver changes, unless you do an incompatible
-> DT binding change, which you should avoid.
+> This adds a boolean Kconfig symbol.
 > 
-> I've pulled it into fixes, but won't forward it until I hear a
-> good explanation.
+> > +	depends on OF
+> > +	select PINCONF
+> > +	select GENERIC_PINCONF
+> > +	select REGMAP_MMIO
+> > +	help
+> > +	  Say Y here to support Texas Instruments' IODelay pinconf driver.
+> > +	  IODelay module is used for the DRA7 SoC family. This driver is in
+> > +	  addition to PINCTRL_SINGLE which controls the mux.
+> > +
+> >  config PINCTRL_TZ1090
+> >  	bool "Toumaz Xenif TZ1090 pin control driver"
+> >  	depends on SOC_TZ1090
+> > diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+> > index 0475206dd600..e441cd71aedf 100644
+> > --- a/drivers/pinctrl/Makefile
+> > +++ b/drivers/pinctrl/Makefile
+> > @@ -28,6 +28,7 @@ obj-$(CONFIG_PINCTRL_TEGRA30)	+= pinctrl-tegra30.o
+> >  obj-$(CONFIG_PINCTRL_TEGRA114)	+= pinctrl-tegra114.o
+> >  obj-$(CONFIG_PINCTRL_TEGRA124)	+= pinctrl-tegra124.o
+> >  obj-$(CONFIG_PINCTRL_TEGRA_XUSB)	+= pinctrl-tegra-xusb.o
+> > +obj-$(CONFIG_PINCTRL_TI_IODELAY)	+= pinctrl-ti-iodelay.o
+> 
+> So this objectfile will either be built-in or not be built at all.
+> 
+> >  obj-$(CONFIG_PINCTRL_TZ1090)	+= pinctrl-tz1090.o
+> >  obj-$(CONFIG_PINCTRL_TZ1090_PDC)	+= pinctrl-tz1090-pdc.o
+> >  obj-$(CONFIG_PINCTRL_U300)	+= pinctrl-u300.o
+> > diff --git a/drivers/pinctrl/pinctrl-ti-iodelay.c b/drivers/pinctrl/pinctrl-ti-iodelay.c
+> > new file mode 100644
+> > index 000000000000..e4c6e25a781c
+> > --- /dev/null
+> > +++ b/drivers/pinctrl/pinctrl-ti-iodelay.c
+> > @@ -0,0 +1,963 @@
+> >[...]
+> > +#include <linux/err.h>
+> > +#include <linux/init.h>
+> > +#include <linux/io.h>
+> > +#include <linux/list.h>
+> > +#include <linux/module.h>
+> 
+> This is, I think, a bit of a red flag.
+> 
+> > +#include <linux/of_device.h>
+> > +#include <linux/of.h>
+> > +#include <linux/pinctrl/pinconf-generic.h>
+> > +#include <linux/pinctrl/pinconf.h>
+> > +#include <linux/pinctrl/pinctrl.h>
+> > +#include <linux/regmap.h>
+> > +#include <linux/slab.h>
+> 
+> [...]
+> 
+> > +static const struct of_device_id ti_iodelay_of_match[] = {
+> > +	{.compatible = "ti,dra7-iodelay", .data = &dra7_iodelay_data},
+> > +	{ /* Hopefully no more.. */ },
+> > +};
+> > +MODULE_DEVICE_TABLE(of, ti_iodelay_of_match);
+> > +
+> > +static struct platform_driver ti_iodelay_driver = {
+> > +	.probe = ti_iodelay_probe,
+> > +	.remove = ti_iodelay_remove,
+> > +	.driver = {
+> > +		   .owner = THIS_MODULE,
+> 
+> So THIS_MODULE will, basically, be NULL.
+> 
+> > +		   .name = DRIVER_NAME,
+> > +		   .of_match_table = ti_iodelay_of_match,
+> > +		   },
+> > +};
+> > +module_platform_driver(ti_iodelay_driver);
+> > +
+> > +MODULE_AUTHOR("Texas Instruments, Inc.");
+> > +MODULE_DESCRIPTION("Pinconf driver for TI's IO Delay module");
+> > +MODULE_LICENSE("GPL v2");
+> 
+> And these three macros will be preprocessed away.
+> 
+> (Perhaps there are non-modular alternatives to MODULE_DEVICE_TABLE and
+> module_platform_driver, but I'm not sure how those two macros actually
+> work.)
 
-Even with both fixes-1 and fixes-2 applied, we still get boot failures
-on Exynos:
+This should be just made to work as a regular loadable module.
+We already have pinctrl-single for the same platforms working
+as a loadable module.
 
-http://arm-soc.lixom.net/bootlogs/arm-soc/v4.0-rc2-104-g2ee4716/
+Regards,
 
-Any idea what is going on?
-
-	Arnd
+Tony
