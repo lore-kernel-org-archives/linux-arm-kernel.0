@@ -1,85 +1,34 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 4 Mar 2015 22:30:03 +0100
-Subject: [PATCH] pinctrl: at91: move lock/unlock_as_irq calls into
- request/release resources methods
-In-Reply-To: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150304213003.GD14457@ns203013.ovh.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Mar 2015 22:31:34 +0100
+Subject: [PATCH] ARM: i.MX6Q: Add fixup for RTL8211E Gigabit Ethernet PHY
+In-Reply-To: <5019881425501158@web17m.yandex.ru>
+References: <1425404579-30591-1-git-send-email-rockford@yandex.ru>
+ <CAOMZO5C+uyfi=Br8kj5zE1ik=qxk2h4vaQn1Loo9=Uv_WGaoQg@mail.gmail.com>
+ <5019881425501158@web17m.yandex.ru>
+Message-ID: <2318103.drIWJFctaK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19:23 Sun 08 Feb     , Boris Brezillon wrote:
-> The gpiochip_lock_as_irq call can fail and return an error, while the
-> irq_startup is not expected to fail (returns an unsigned int which is not
-> checked by irq core code).
+On Wednesday 04 March 2015 23:32:38 ????? ?????? wrote:
+> 04.03.2015, 23:18, "Fabio Estevam" <festevam@gmail.com>:
+> > On Wed, Mar 4, 2015 at 5:05 PM, ????? ?????? <rockford@yandex.ru> wrote:
+> >>  Actually, I don't know. I've discovered this when I wanted to boot a more recent kernel
+> >>  on this board, and network wasn't working. So I've had to disassembly a vendor's binary only module
+> >>  to discover how they handle this situation.
+> >
+> > Do you use the generic PHY driver or do you have CONFIG_REALTEK_PHY enabled?
 > 
-> irq_request/release_resources functions have been created to address this
-> problem.
+> CONFIG_REALTEK_PHY=y
+> CONFIG_FIXED_PHY=y
 > 
-> Move gpiochip_lock/unlock_as_irq calls into
-> irq_request/release_resources functions to prevent using a gpio as an irq
-> if the gpiochip_lock_as_irq call failed.
+> > In case you use the realtek PHY driver and still see the issue, can't
+> > you fix this in drivers/net/phy/realtek.c instead?
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Linus
+> I think there it will require a more work with board detection than here and will
+> populate a driver with unnecessary for most users code.
 
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+But you said earlier that it's board independent and a property of the SoC
+instead. Can't the ethernet driver call phy_start_aneg() for the same effect,
+like a lot of other ethernet drivers do?
 
-Best Regards,
-J.
-> ---
->  drivers/pinctrl/pinctrl-at91.c | 17 +++++++----------
->  1 file changed, 7 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index f4cd0b9..a481406 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -1477,28 +1477,25 @@ static void gpio_irq_ack(struct irq_data *d)
->  	/* the interrupt is already cleared before by reading ISR */
->  }
->  
-> -static unsigned int gpio_irq_startup(struct irq_data *d)
-> +static int gpio_irq_request_res(struct irq_data *d)
->  {
->  	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
->  	unsigned	pin = d->hwirq;
->  	int ret;
->  
->  	ret = gpiochip_lock_as_irq(&at91_gpio->chip, pin);
-> -	if (ret) {
-> +	if (ret)
->  		dev_err(at91_gpio->chip.dev, "unable to lock pind %lu IRQ\n",
->  			d->hwirq);
-> -		return ret;
-> -	}
-> -	gpio_irq_unmask(d);
-> -	return 0;
-> +
-> +	return ret;
->  }
->  
-> -static void gpio_irq_shutdown(struct irq_data *d)
-> +static void gpio_irq_release_res(struct irq_data *d)
->  {
->  	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
->  	unsigned	pin = d->hwirq;
->  
-> -	gpio_irq_mask(d);
->  	gpiochip_unlock_as_irq(&at91_gpio->chip, pin);
->  }
->  
-> @@ -1577,8 +1574,8 @@ void at91_pinctrl_gpio_resume(void)
->  static struct irq_chip gpio_irqchip = {
->  	.name		= "GPIO",
->  	.irq_ack	= gpio_irq_ack,
-> -	.irq_startup	= gpio_irq_startup,
-> -	.irq_shutdown	= gpio_irq_shutdown,
-> +	.irq_request_resources = gpio_irq_request_res,
-> +	.irq_release_resources = gpio_irq_release_res,
->  	.irq_disable	= gpio_irq_mask,
->  	.irq_mask	= gpio_irq_mask,
->  	.irq_unmask	= gpio_irq_unmask,
-> -- 
-> 1.9.1
-> 
+	Arnd
