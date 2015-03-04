@@ -1,37 +1,84 @@
-From: dwalker@fifo99.com (dwalker at fifo99.com)
-Date: Wed, 4 Mar 2015 22:11:41 +0000
-Subject: [RFC PATCH 00/18] ARM: msm multiplatform support
-In-Reply-To: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
-References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
-Message-ID: <20150304221141.GA10550@fifo99.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 04 Mar 2015 23:36:11 +0100
+Subject: [PATCH v9 06/21] ACPI: fix acpi_os_ioremap for arm64
+In-Reply-To: <1424853601-6675-7-git-send-email-hanjun.guo@linaro.org>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <1424853601-6675-7-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <8319080.yo6LBolOJB@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 08:32:54PM +0100, Arnd Bergmann wrote:
-> This is my final piece of the puzzle for ARMv6/v7 multiplatform
-> support. In combination with the other patches that are now
-> at git://kernel.org/pub/scm/linux/kernel/git/arnd/playground.git
-> multiplatform-4.0-rc2 and the at91 and shmobile parts from other
-> developers, you can now build one kernel that includes all 
-> ARMv6 and ARMv7 targets we support in Linux.
+On Wednesday, February 25, 2015 04:39:46 PM Hanjun Guo wrote:
+> From: Mark Salter <msalter@redhat.com>
 > 
-> Since mach-msm has seen very few updates over the last years,
-> it was more work to get to this point than the others, and
-> some patches are more of a band-aid than a proper solution.
-> Still, I think that each patch in the series is an improvement
-> over the status-quo and I really want to see the last one
-> merged into 4.1 and it depends on all the other ones.
+> The acpi_os_ioremap() function may be used to map normal RAM or IO
+> regions. The current implementation simply uses ioremap_cache(). This
+> will work for some architectures, but arm64 ioremap_cache() cannot be
+> used to map IO regions which don't support caching. So for arm64, use
+> ioremap() for non-RAM regions.
 > 
-> Stephen Boyd mentioned on IRC that he has been workin on
-> a similar series, and I'm more than happy to replace some
-> of this work with patches that he has done, as long as we
-> can still have the full multiplatform support for 4.1.
-> 
-> Since a lot of the patches are nontrivial and I have not
-> been able to test any of this, I'm posting it as an RFC,
-> but I'm also very interested in people testing it.
+> CC: Rafael J Wysocki <rjw@rjwysocki.net>
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> Tested-by: Robert Richter <rrichter@cavium.com>
+> Acked-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Didn't look at it in great detail (I will eventually), but it looks like your just
-cleaning things up .. Is that accurate ?
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
-Daniel
+> ---
+>  arch/arm64/include/asm/acpi.h | 13 +++++++++++++
+>  include/acpi/acpi_io.h        |  4 ++++
+>  2 files changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 8b837ab..40e0924 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -12,8 +12,21 @@
+>  #ifndef _ASM_ACPI_H
+>  #define _ASM_ACPI_H
+>  
+> +#include <linux/mm.h>
+> +
+>  /* Basic configuration for ACPI */
+>  #ifdef	CONFIG_ACPI
+> +/* ACPI table mapping after acpi_gbl_permanent_mmap is set */
+> +static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+> +					    acpi_size size)
+> +{
+> +	if (!page_is_ram(phys >> PAGE_SHIFT))
+> +		return ioremap(phys, size);
+> +
+> +	return ioremap_cache(phys, size);
+> +}
+> +#define acpi_os_ioremap acpi_os_ioremap
+> +
+>  #define acpi_strict 1	/* No out-of-spec workarounds on ARM64 */
+>  extern int acpi_disabled;
+>  extern int acpi_noirq;
+> diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
+> index 444671e..dd86c5f 100644
+> --- a/include/acpi/acpi_io.h
+> +++ b/include/acpi/acpi_io.h
+> @@ -3,11 +3,15 @@
+>  
+>  #include <linux/io.h>
+>  
+> +#include <asm/acpi.h>
+> +
+> +#ifndef acpi_os_ioremap
+>  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+>  					    acpi_size size)
+>  {
+>         return ioremap_cache(phys, size);
+>  }
+> +#endif
+>  
+>  void __iomem *__init_refok
+>  acpi_os_map_iomem(acpi_physical_address phys, acpi_size size);
+> 
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
