@@ -1,37 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Mar 2015 17:23:53 +0000
-Subject: [PATCH] ARM: advertise availability of v8 Crypto instructions
-In-Reply-To: <20150304170404.GZ28951@e104818-lin.cambridge.arm.com>
-References: <1425054991-29951-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_dSgtsUp8aeMwz9a6stEC3DCg8GMU5QWWTPy_oOyHCSw@mail.gmail.com>
- <20150304162049.GX28951@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-pSOMFhSs=AeAERU1=XKU3xsBJCBOedVnZYBg6frWN9A@mail.gmail.com>
- <20150304170404.GZ28951@e104818-lin.cambridge.arm.com>
-Message-ID: <20150304172353.GC8656@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 4 Mar 2015 18:26:39 +0100
+Subject: [PATCH] ARM: at91/dt: at91-sama5d3_xplained: add gpio-key pinctrl
+ property
+Message-ID: <1425489999-24664-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 05:04:05PM +0000, Catalin Marinas wrote:
-> On Wed, Mar 04, 2015 at 05:31:00PM +0100, Ard Biesheuvel wrote:
-> > It doesn't really matter which architecture it is. I just want to be
-> > reasonably sure that reading ID_ISAR5 isn't going to explode. If there
-> > are other/better ways to guarantee that, I am happy to use those as
-> > well. (I noticed that there is a v7-M specific definition of ID_ISAR5
-> > in the source which I couldn't find any reference to in any of the
-> > Cortex-M TRMs on the infocenter web site.)
-> 
-> The ARMv7-M reference manual only defines to ID_ISAR4. Maybe it will get
-> a fifth register at some point but for now I don't think we should read
-> it (I guess it was just copy/paste from the A profile).
+From: Wenyou Yang <wenyou.yang@atmel.com>
 
-I think you need to read carefully the requirements that are placed
-upon non-implemented CPUID registers.
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-In DDI0406C, non-implemented CPUID registers are reserved, but must
-behave as RAZ.  I would be very surprised if this were not true for
-ARMv7-M.
-
-
+diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+index fec1fca2ad66..225c63d003d1 100644
+--- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+@@ -188,6 +188,11 @@
+ 							<AT91_PIOA 19 AT91_PERIPH_B AT91_PINCTRL_PULL_UP>;
+ 					};
+ 
++					pinctrl_key_gpio: key_gpio_0 {
++						atmel,pins =
++							<AT91_PIOE 29 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
++					};
++
+ 					pinctrl_mmc0_cd: mmc0_cd {
+ 						atmel,pins =
+ 							<AT91_PIOE 0 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
+@@ -276,6 +281,9 @@
+ 	gpio_keys {
+ 		compatible = "gpio-keys";
+ 
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_key_gpio>;
++
+ 		bp3 {
+ 			label = "PB_USER";
+ 			gpios = <&pioE 29 GPIO_ACTIVE_LOW>;
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.3
