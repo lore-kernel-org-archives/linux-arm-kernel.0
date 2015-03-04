@@ -1,40 +1,58 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Wed,  4 Mar 2015 11:40:00 -0800
-Subject: [PATCH v2 4/4] PCI: X-Gene: Add the MAINTAINERS entry for APM X-Gene
- v1 PCIe MSI driver
-In-Reply-To: <cover.1425497218.git.dhdang@apm.com>
-References: <cover.1425497218.git.dhdang@apm.com>
-Message-ID: <474d683f92125442811a3778e7f29acedb9b1e77.1425497218.git.dhdang@apm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 4 Mar 2015 19:42:46 +0000
+Subject: [PATCH] genirq / PM: Add flag for shared NO_SUSPEND interrupt
+ lines
+In-Reply-To: <6864616.1aRDSmSsvx@vostro.rjw.lan>
+References: <1424771762-16343-1-git-send-email-boris.brezillon@free-electrons.com>
+ <8151717.nkhnGBri9h@vostro.rjw.lan>
+ <20150226191724.0ae4ca4e@bbrezillon>
+ <6864616.1aRDSmSsvx@vostro.rjw.lan>
+Message-ID: <20150304194246.GF22156@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds information of maintainers for APM X-Gene v1 PCIe
-MSI/MSIX termination driver
+Hi Rafael,
 
-Signed-off-by: Duc Dang <dhdang@apm.com>
-Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
----
- MAINTAINERS | 8 ++++++++
- 1 file changed, 8 insertions(+)
+I'm a little late to the party here, but I have just a couple of minor
+comments...
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ddc5a8c..a1b119b 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7490,6 +7490,14 @@ L:	linux-pci at vger.kernel.org
- S:	Maintained
- F:	drivers/pci/host/*spear*
- 
-+PCI MSI DRIVER FOR APPLIEDMICRO XGENE
-+M:	Duc Dang <dhdang@apm.com>
-+L:	linux-pci at vger.kernel.org
-+L:	linux-arm-kernel at lists.infradead.org
-+S:	Maintained
-+F:	Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
-+F:	drivers/pci/host/pci-xgene-msi.c
-+
- PCMCIA SUBSYSTEM
- P:	Linux PCMCIA Team
- L:	linux-pcmcia at lists.infradead.org
--- 
-1.9.1
+[...]
+
+> Link: http://marc.info/?l=linux-kernel&m=142252777602084&w=2
+> Link: http://marc.info/?t=142252775300011&r=1&w=2
+> Linx: https://lkml.org/lkml/2014/12/15/552
+
+s/x/k/ ?
+
+> Reported-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> ---
+>  include/linux/interrupt.h |    5 +++++
+>  include/linux/irqdesc.h   |    1 +
+>  kernel/irq/manage.c       |    7 ++++++-
+>  kernel/irq/pm.c           |    7 ++++++-
+>  4 files changed, 18 insertions(+), 2 deletions(-)
+> 
+> Index: linux-pm/include/linux/interrupt.h
+> ===================================================================
+> --- linux-pm.orig/include/linux/interrupt.h
+> +++ linux-pm/include/linux/interrupt.h
+> @@ -57,6 +57,10 @@
+>   * IRQF_NO_THREAD - Interrupt cannot be threaded
+>   * IRQF_EARLY_RESUME - Resume IRQ early during syscore instead of at device
+>   *                resume time.
+> + * IRQF_COND_SUSPEND - If the IRQ is shared with a NO_SUSPEND user, execute this
+> + *                interrupt handler after suspending interrupts. For system
+> + *                wakeup devices users need to implement wakeup detection in
+> + *                their interrupt handlers.
+
+It's probably worth documenting this in suspend-and-interrupts.txt, as
+this invalidates some of the "IRQF_NO_SUSPEND and enable_irq_wake()"
+section. I'll send a patch momentarily to that effect.
+
+Otherwise, this patch looks good, thanks for handling this!
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
