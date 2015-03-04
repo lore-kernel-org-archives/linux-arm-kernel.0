@@ -1,46 +1,97 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 4 Mar 2015 18:53:39 +0100
-Subject: [PATCH] ARM: advertise availability of v8 Crypto instructions
-In-Reply-To: <20150304173415.GB28951@e104818-lin.cambridge.arm.com>
-References: <1425054991-29951-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_dSgtsUp8aeMwz9a6stEC3DCg8GMU5QWWTPy_oOyHCSw@mail.gmail.com>
- <20150304162049.GX28951@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-pSOMFhSs=AeAERU1=XKU3xsBJCBOedVnZYBg6frWN9A@mail.gmail.com>
- <20150304170404.GZ28951@e104818-lin.cambridge.arm.com>
- <20150304172353.GC8656@n2100.arm.linux.org.uk>
- <20150304173415.GB28951@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu9zJQf3g5cF2Q0RqDMQK2y7ocESfGVy+StScymqXd-cpg@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed,  4 Mar 2015 17:59:48 +0000
+Subject: [PATCH v2 04/10] drivers: PL011: refactor pl011_set_termios()
+In-Reply-To: <1425491994-23913-1-git-send-email-andre.przywara@arm.com>
+References: <1425491994-23913-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1425491994-23913-5-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 March 2015 at 18:34, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Wed, Mar 04, 2015 at 05:23:53PM +0000, Russell King - ARM Linux wrote:
->> On Wed, Mar 04, 2015 at 05:04:05PM +0000, Catalin Marinas wrote:
->> > On Wed, Mar 04, 2015 at 05:31:00PM +0100, Ard Biesheuvel wrote:
->> > > It doesn't really matter which architecture it is. I just want to be
->> > > reasonably sure that reading ID_ISAR5 isn't going to explode. If there
->> > > are other/better ways to guarantee that, I am happy to use those as
->> > > well. (I noticed that there is a v7-M specific definition of ID_ISAR5
->> > > in the source which I couldn't find any reference to in any of the
->> > > Cortex-M TRMs on the infocenter web site.)
->> >
->> > The ARMv7-M reference manual only defines to ID_ISAR4. Maybe it will get
->> > a fifth register at some point but for now I don't think we should read
->> > it (I guess it was just copy/paste from the A profile).
->>
->> I think you need to read carefully the requirements that are placed
->> upon non-implemented CPUID registers.
->>
->> In DDI0406C, non-implemented CPUID registers are reserved, but must
->> behave as RAZ.  I would be very surprised if this were not true for
->> ARMv7-M.
->
-> At a second search, I found ID_ISAR5 as reserved in the registers
-> summary table. So, I agree, it should be RAZ, so safe to read (I thought
-> ID_ISAR5 would not be present at all).
->
+Split the pl011_set_termios() function into smaller chunks to allow
+easier reuse later when adding SBSA support.
 
-OK, in that case I will drop the redundant architecture check.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ drivers/tty/serial/amba-pl011.c |   60 +++++++++++++++++++++------------------
+ 1 file changed, 33 insertions(+), 27 deletions(-)
 
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 4e0036c..37b55ee 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1807,6 +1807,38 @@ static void pl011_shutdown(struct uart_port *port)
+ }
+ 
+ static void
++pl011_setup_status_masks(struct uart_port *port, struct ktermios *termios)
++{
++	port->read_status_mask = UART011_DR_OE | 255;
++	if (termios->c_iflag & INPCK)
++		port->read_status_mask |= UART011_DR_FE | UART011_DR_PE;
++	if (termios->c_iflag & (IGNBRK | BRKINT | PARMRK))
++		port->read_status_mask |= UART011_DR_BE;
++
++	/*
++	 * Characters to ignore
++	 */
++	port->ignore_status_mask = 0;
++	if (termios->c_iflag & IGNPAR)
++		port->ignore_status_mask |= UART011_DR_FE | UART011_DR_PE;
++	if (termios->c_iflag & IGNBRK) {
++		port->ignore_status_mask |= UART011_DR_BE;
++		/*
++		 * If we're ignoring parity and break indicators,
++		 * ignore overruns too (for real raw support).
++		 */
++		if (termios->c_iflag & IGNPAR)
++			port->ignore_status_mask |= UART011_DR_OE;
++	}
++
++	/*
++	 * Ignore all characters if CREAD is not set.
++	 */
++	if ((termios->c_cflag & CREAD) == 0)
++		port->ignore_status_mask |= UART_DUMMY_DR_RX;
++}
++
++static void
+ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
+ 		     struct ktermios *old)
+ {
+@@ -1870,33 +1902,7 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	 */
+ 	uart_update_timeout(port, termios->c_cflag, baud);
+ 
+-	port->read_status_mask = UART011_DR_OE | 255;
+-	if (termios->c_iflag & INPCK)
+-		port->read_status_mask |= UART011_DR_FE | UART011_DR_PE;
+-	if (termios->c_iflag & (IGNBRK | BRKINT | PARMRK))
+-		port->read_status_mask |= UART011_DR_BE;
+-
+-	/*
+-	 * Characters to ignore
+-	 */
+-	port->ignore_status_mask = 0;
+-	if (termios->c_iflag & IGNPAR)
+-		port->ignore_status_mask |= UART011_DR_FE | UART011_DR_PE;
+-	if (termios->c_iflag & IGNBRK) {
+-		port->ignore_status_mask |= UART011_DR_BE;
+-		/*
+-		 * If we're ignoring parity and break indicators,
+-		 * ignore overruns too (for real raw support).
+-		 */
+-		if (termios->c_iflag & IGNPAR)
+-			port->ignore_status_mask |= UART011_DR_OE;
+-	}
+-
+-	/*
+-	 * Ignore all characters if CREAD is not set.
+-	 */
+-	if ((termios->c_cflag & CREAD) == 0)
+-		port->ignore_status_mask |= UART_DUMMY_DR_RX;
++	pl011_setup_status_masks(port, termios);
+ 
+ 	if (UART_ENABLE_MS(port, termios->c_cflag))
+ 		pl011_enable_ms(port);
 -- 
-Ard.
+1.7.9.5
