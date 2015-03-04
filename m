@@ -1,49 +1,117 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Wed,  4 Mar 2015 14:35:47 +0000
-Subject: [PATCH v2 0/6] QEMU ARM64 Migration Fixes
-Message-ID: <1425479753-18349-1-git-send-email-alex.bennee@linaro.org>
+Date: Wed,  4 Mar 2015 14:35:52 +0000
+Subject: [PATCH v2 5/6] target-arm: kvm64 fix save/restore of SPSR regs
+In-Reply-To: <1425479753-18349-1-git-send-email-alex.bennee@linaro.org>
+References: <1425479753-18349-1-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1425479753-18349-6-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is an update to the series I posted last week addressing some of
-the comments so far.
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-The main changes to this series are:
+The current code was negatively indexing the cpu state array and not
+synchronizing banked spsr register state with the current mode's spsr
+state, causing occasional failures with migration.
 
-v2
+Some munging is done to take care of the aarch64 mapping and also to
+ensure the most current value of the spsr is updated to the banked
+registers (relevant for KVM<->TCG migration).
 
-  - Save/Restore MP STATE
-    - no longer needs CAP_MP_STATE at start
-    - re-uses cpu->powered_off for storing state (no stream ABI change)
-    - kvm_enabled() runtime check (although ioctl still in #if defined)
-  - Save/Restore SPSR
-    - use the correct bank_number for aarch32
-    - only tweak SPSR for elevated exception levels
-  - arm_giv_kvm
-    - add Christoffer's Acked-by:
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
-The only question up in the air at the moment is defining a new
-constant for the MP_STATE to represent powered off which I'm going to
-look at when I re-spin the kernel series.
+---
+v2 (ajb)
+  - minor tweaks and clarifications
+v3
+  - Use the correct bank index function for setting/getting env->spsr
+  - only deal with spsrs in elevated exception levels
 
-Branch: https://github.com/stsquad/qemu/tree/migration/fixes-v3
-
-Alex Benn?e (5):
-  target-arm: kvm: save/restore mp state
-  hw/intc: arm_gic_kvm.c restore config first
-  hw/char: pl011 don't keep setting the IRQ if nothing changed
-  target-arm: kvm64 sync FP register state
-  target-arm: cpu.h document why env->spsr exists
-
-Christoffer Dall (1):
-  target-arm: kvm64 fix save/restore of SPSR regs
-
- hw/char/pl011.c       |  12 ++++--
- hw/intc/arm_gic_kvm.c |   7 +++-
- target-arm/cpu.h      |   5 +++
- target-arm/kvm64.c    | 109 +++++++++++++++++++++++++++++++++++++++++++++++---
- target-arm/machine.c  |  29 ++++++++++++++
- 5 files changed, 151 insertions(+), 11 deletions(-)
-
+diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
+index c60e989..45e5c3f 100644
+--- a/target-arm/kvm64.c
++++ b/target-arm/kvm64.c
+@@ -140,6 +140,7 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+     uint64_t val;
+     int i;
+     int ret;
++    unsigned int el;
+ 
+     ARMCPU *cpu = ARM_CPU(cs);
+     CPUARMState *env = &cpu->env;
+@@ -206,9 +207,27 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+         return ret;
+     }
+ 
++    /* Saved Program State Registers
++     *
++     * Before we restore from the banked_spsr[] array we need to
++     * ensure that any modifications to env->spsr are correctly
++     * reflected and map aarch64 exception levels if required.
++     */
++    el = arm_current_el(env);
++    if (el > 0) {
++        if (is_a64(env)) {
++            g_assert(el == 1);
++            /* KVM only maps KVM_SPSR_SVC to KVM_SPSR_EL1 for aarch64 ATM */
++            env->banked_spsr[1] = env->banked_spsr[0];
++        } else {
++            i = bank_number(env->uncached_cpsr & CPSR_M);
++            env->banked_spsr[i] = env->spsr;
++        }
++    }
++
+     for (i = 0; i < KVM_NR_SPSR; i++) {
+         reg.id = AARCH64_CORE_REG(spsr[i]);
+-        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
++        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
+         ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
+         if (ret) {
+             return ret;
+@@ -253,6 +272,7 @@ int kvm_arch_get_registers(CPUState *cs)
+     struct kvm_one_reg reg;
+     uint64_t val;
+     uint32_t fpr;
++    unsigned int el;
+     int i;
+     int ret;
+ 
+@@ -325,15 +345,35 @@ int kvm_arch_get_registers(CPUState *cs)
+         return ret;
+     }
+ 
++    /* Fetch the SPSR registers
++     *
++     * KVM has an array of state indexed for all the possible aarch32
++     * privilage levels. Although not all are valid at all points
++     * there are some transitions possible which can access old state
++     * so it is worth keeping them all.
++     */
+     for (i = 0; i < KVM_NR_SPSR; i++) {
+         reg.id = AARCH64_CORE_REG(spsr[i]);
+-        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
++        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
+         ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
+         if (ret) {
+             return ret;
+         }
+     }
+ 
++    el = arm_current_el(env);
++    if (el > 0) {
++        if (is_a64(env)) {
++            g_assert(el == 1);
++            /* KVM maps KVM_SPSR_SVC to KVM_SPSR_EL1 for aarch64 */
++            env->banked_spsr[0] = env->banked_spsr[1];
++            i = aarch64_banked_spsr_index(el);
++        } else {
++            i = bank_number(env->uncached_cpsr & CPSR_M);
++        }
++        env->spsr = env->banked_spsr[i];
++    }
++
+     /* Advanced SIMD and FP registers */
+     for (i = 0; i < 32; i++) {
+         reg.id = AARCH64_SIMD_CORE_REG(fp_regs.vregs[i]);
 -- 
 2.3.1
