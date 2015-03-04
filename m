@@ -1,87 +1,50 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 04 Mar 2015 12:18:59 +0000
-Subject: [PATCH 4/5] arm-cci: Split the code for PMU vs driver support
-In-Reply-To: <54F5D914.7030705@arm.com>
-References: <1425295754-13376-1-git-send-email-suzuki.poulose@arm.com>
- <1425295754-13376-5-git-send-email-suzuki.poulose@arm.com>
- <54F5D914.7030705@arm.com>
-Message-ID: <54F6F833.1030906@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed,  4 Mar 2015 12:27:34 +0000
+Subject: [PATCH REPOST 2/2] serial/amba-pl011: Leave the TX IRQ alone when the
+ UART is not open
+In-Reply-To: <1425472054-7543-1-git-send-email-Dave.Martin@arm.com>
+References: <1425472054-7543-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1425472054-7543-3-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/15 15:53, Sudeep Holla wrote:
->
->
-> On 02/03/15 11:29, Suzuki K. Poulose wrote:
->> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
->>
->> This patch separates the PMU driver code from the low level
->> CCI driver code.
->>
->> Introduces config options for both.
->>
->>    ARM_CCI400_PORT_CTRL	- controls the low level driver code for
->> 			  CCI400 ports.
->>    ARM_CCI400_PMU 	- controls the PMU driver code
->>    ARM_CCI400_COMMON 	- Common defintions for CCI400
->>
->> Also the ARM_CCI400_PORT_CTRL cannot be enabled by user. This
->> should be selected by platforms which need it.
->>
->> This patch also changes:
->>    ARM_CCI - common code for probing the CCI devices. This can be
->>      used for adding support for newer CCI versions(e.g, CCI-500).
->>
->> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
->> ---
->>    arch/arm/mach-exynos/Kconfig   |    2 +-
->>    arch/arm/mach-vexpress/Kconfig |    4 ++--
->>    drivers/bus/Kconfig            |   27 +++++++++++++++++++++++----
->>    drivers/bus/arm-cci.c          |   24 ++++++++++++++++++++----
->>    include/linux/arm-cci.h        |    7 ++++++-
->>    5 files changed, 52 insertions(+), 12 deletions(-)
->>
->
-> [...]
->
->> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
->> index b99729e..bdc189f 100644
->> --- a/drivers/bus/Kconfig
->> +++ b/drivers/bus/Kconfig
->> @@ -43,12 +43,31 @@ config OMAP_INTERCONNECT
->>    	help
->>    	  Driver to enable OMAP interconnect error handling driver.
->>
->> -config ARM_CCI
->> -	bool "ARM CCI driver support"
->> +config ARM_CCI400_PORT_CTRL
->> +	bool
->>    	depends on ARM && OF && CPU_V7
->> +	select ARM_CCI400_COMMON
->> +	help
->> +	  Low level power management driver for CCI400 cache coherent
->> +	  interconnect for ARM platforms.
->> +
->> +config ARM_CCI400_PMU
->> +	bool "ARM CCI400 PMU support"
->> +	depends on ARM || ARM64
->> +	depends on HW_PERF_EVENTS
->> +	select ARM_CCI400_COMMON
->>    	help
->> -	  Driver supporting the CCI cache coherent interconnect for ARM
->> -	  platforms.
->> +	  Support for PMU events monitoring on the ARM CCI cache coherent
->> +	  interconnect.
->> +
->> +	  If unsure, say N
->
-> Just a query rather than comment. Before this change all platforms
-> having ARM_CCI and HW_PERF_EVENTS had CCI PMU enabled by default.
-> With this change, one has to select this option explicitly. I assume
-> that's fine, else this needs to be default 'y'
+Getting the TX IRQ re-asserted from scratch can be inefficient in
+some setups.
 
-Yes, that makes sense. Now that we decide if we can access the CCI 
-safely at runtime, it is safe to make this default.
+This patch avoids clearing the TX IRQ across pl011_shutdown()...
+pl011_startup(), so that if the port is closed and reopened, the
+IRQ will still work afterwards without having to bootstrap it again.
 
-Regards
-Suzuki
+The TX IRQ continues to be masked in IMSC when the UART is not in
+use.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ drivers/tty/serial/amba-pl011.c |    5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 69910f7..92783fc 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1676,9 +1676,6 @@ static int pl011_startup(struct uart_port *port)
+ 
+ 	writew(uap->vendor->ifls, uap->port.membase + UART011_IFLS);
+ 
+-	/* Assume that TX IRQ doesn't work until we see one: */
+-	uap->tx_irq_seen = 0;
+-
+ 	spin_lock_irq(&uap->port.lock);
+ 
+ 	/* restore RTS and DTR */
+@@ -1742,7 +1739,7 @@ static void pl011_shutdown(struct uart_port *port)
+ 	spin_lock_irq(&uap->port.lock);
+ 	uap->im = 0;
+ 	writew(uap->im, uap->port.membase + UART011_IMSC);
+-	writew(0xffff, uap->port.membase + UART011_ICR);
++	writew(0xffff & ~UART011_TXIS, uap->port.membase + UART011_ICR);
+ 	spin_unlock_irq(&uap->port.lock);
+ 
+ 	pl011_dma_shutdown(uap);
+-- 
+1.7.10.4
