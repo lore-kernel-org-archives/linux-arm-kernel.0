@@ -1,44 +1,23 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 4 Mar 2015 18:26:39 +0100
-Subject: [PATCH] ARM: at91/dt: at91-sama5d3_xplained: add gpio-key pinctrl
- property
-Message-ID: <1425489999-24664-1-git-send-email-nicolas.ferre@atmel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Mar 2015 17:26:15 +0000
+Subject: [PATCH 0/5] ASoC: davinci: Use edma-pcm and remove davinci-pcm
+In-Reply-To: <1425393921-14219-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1425393921-14219-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20150304172615.GR21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wenyou Yang <wenyou.yang@atmel.com>
+On Tue, Mar 03, 2015 at 04:45:16PM +0200, Peter Ujfalusi wrote:
+> Hi,
+> 
+> This series will deprecate and removes the davinci-pcm platform driver and
+> converts the daVinci DAI drivers to use the edma-pcm.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91-sama5d3_xplained.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-index fec1fca2ad66..225c63d003d1 100644
---- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-@@ -188,6 +188,11 @@
- 							<AT91_PIOA 19 AT91_PERIPH_B AT91_PINCTRL_PULL_UP>;
- 					};
- 
-+					pinctrl_key_gpio: key_gpio_0 {
-+						atmel,pins =
-+							<AT91_PIOE 29 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
-+					};
-+
- 					pinctrl_mmc0_cd: mmc0_cd {
- 						atmel,pins =
- 							<AT91_PIOE 0 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
-@@ -276,6 +281,9 @@
- 	gpio_keys {
- 		compatible = "gpio-keys";
- 
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_key_gpio>;
-+
- 		bp3 {
- 			label = "PB_USER";
- 			gpios = <&pioE 29 GPIO_ACTIVE_LOW>;
--- 
-2.1.3
+Looks good, applied all thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150304/b4fec2de/attachment.sig>
