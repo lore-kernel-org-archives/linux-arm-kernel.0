@@ -1,38 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Mar 2015 22:56:46 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC sh7372 SoC Removal Updates for
- v4.1
-In-Reply-To: <3043216.AuL1ank19q@wuerfel>
-References: <cover.1424931560.git.horms+renesas@verge.net.au>
- <3043216.AuL1ank19q@wuerfel>
-Message-ID: <2173215.cbpof3lVb6@wuerfel>
+From: dwalker@fifo99.com (dwalker at fifo99.com)
+Date: Wed, 4 Mar 2015 22:11:41 +0000
+Subject: [RFC PATCH 00/18] ARM: msm multiplatform support
+In-Reply-To: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
+References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
+Message-ID: <20150304221141.GA10550@fifo99.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 March 2015 21:31:52 Arnd Bergmann wrote:
-> On Thursday 26 February 2015 15:22:11 Simon Horman wrote:
-> > Renesas ARM Based SoC sh7372 SoC Removal Updates for v4.1
-> > 
-> > * Remove the sh7372 SoC and its mackerel board
-> > 
+On Wed, Mar 04, 2015 at 08:32:54PM +0100, Arnd Bergmann wrote:
+> This is my final piece of the puzzle for ARMv6/v7 multiplatform
+> support. In combination with the other patches that are now
+> at git://kernel.org/pub/scm/linux/kernel/git/arnd/playground.git
+> multiplatform-4.0-rc2 and the at91 and shmobile parts from other
+> developers, you can now build one kernel that includes all 
+> ARMv6 and ARMv7 targets we support in Linux.
 > 
-> Pulled into next/cleanup.
+> Since mach-msm has seen very few updates over the last years,
+> it was more work to get to this point than the others, and
+> some patches are more of a band-aid than a proper solution.
+> Still, I think that each patch in the series is an improvement
+> over the status-quo and I really want to see the last one
+> merged into 4.1 and it depends on all the other ones.
 > 
-> I found the text a little short to justify a removal, but since I know
-> the story, I've extended the narrative a bit, I hope this text is
-> ok with you:
+> Stephen Boyd mentioned on IRC that he has been workin on
+> a similar series, and I'm more than happy to replace some
+> of this work with patches that he has done, as long as we
+> can still have the full multiplatform support for 4.1.
 > 
->     [arnd: The sh7372 platform is rather dated and is believed to
->      have no active users. It stands in the way of converting all
->      of mach-shmobile to be multiplatform capable, as adding
->      pinctrl and clock support for it would be more work than it's
->      worth. As always, should any legitimate upstream users show up
->      in the future, we will revert this removal]
-> 
-> It would be nice to have more text in the tag description for cases that
-> are not obvious to the reader, like this one.
+> Since a lot of the patches are nontrivial and I have not
+> been able to test any of this, I'm posting it as an RFC,
+> but I'm also very interested in people testing it.
 
-Upon further consideration, I've put this into next/multiplatform
-instead of next/cleanup.
+Didn't look at it in great detail (I will eventually), but it looks like your just
+cleaning things up .. Is that accurate ?
 
-	Arnd
+Daniel
