@@ -1,106 +1,116 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Wed, 4 Mar 2015 10:24:55 +0800
-Subject: [PATCH 3/3] early kprobes: x86: don't try to recover ftraced
- instruction before ftrace get ready.
-In-Reply-To: <20150303170633.GG3703@dhcp128.suse.cz>
-References: <1425306312-3437-1-git-send-email-wangnan0@huawei.com>
- <1425359345-38714-1-git-send-email-wangnan0@huawei.com>
- <1425359345-38714-4-git-send-email-wangnan0@huawei.com>
- <20150303170633.GG3703@dhcp128.suse.cz>
-Message-ID: <54F66CF7.9010606@huawei.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue,  3 Mar 2015 18:10:21 -0800
+Subject: [PATCH v3 06/10] s390: standardize mmap_rnd() usage
+In-Reply-To: <1425435025-30284-1-git-send-email-keescook@chromium.org>
+References: <1425435025-30284-1-git-send-email-keescook@chromium.org>
+Message-ID: <1425435025-30284-7-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/4 1:06, Petr Mladek wrote:
-> On Tue 2015-03-03 13:09:05, Wang Nan wrote:
->> Before ftrace convertin instruction to nop, if an early kprobe is
->> registered then unregistered, without this patch its first bytes will
->> be replaced by head of NOP, which may confuse ftrace.
->>
->> Actually, since we have a patch which convert ftrace entry to nop
->> when probing, this problem should never be triggered. Provide it for
->> safety.
->>
->> Signed-off-by: Wang Nan <wangnan0@huawei.com>
->> ---
->>  arch/x86/kernel/kprobes/core.c | 3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/arch/x86/kernel/kprobes/core.c b/arch/x86/kernel/kprobes/core.c
->> index 87beb64..c7d304d 100644
->> --- a/arch/x86/kernel/kprobes/core.c
->> +++ b/arch/x86/kernel/kprobes/core.c
->> @@ -225,6 +225,9 @@ __recover_probed_insn(kprobe_opcode_t *buf, unsigned long addr)
->>  	struct kprobe *kp;
->>  	unsigned long faddr;
->>  
->> +	if (!kprobes_on_ftrace_initialized)
->> +		return addr;
-> 
-> This is not correct. The function has to return a buffer with the original
-> code also when it is modified by normal kprobes. If it is a normal
-> Kprobe, it reads the current code and replaces the first byte (INT3
-> instruction) with the saved kp->opcode.
-> 
->> +
->>  	kp = get_kprobe((void *)addr);
->>  	faddr = ftrace_location(addr);
-> 
-> IMHO, the proper fix might be to replace the above line with
-> 
-> 	if (kprobes_on_ftrace_initialized)
-> 		faddr = ftrace_location(addr);
-> 	else
-> 		faddr = 0UL;
-> 
-> By other words, it might pretend that it is not a ftrace location
-> when the ftrace is not ready yet.
-> 
+In preparation for splitting out ET_DYN ASLR, this refactors the use of
+mmap_rnd() to be used similarly to arm and x86, and extracts the checking
+of PF_RANDOMIZE.
 
-Thanks for your reply. I'll follow your suggection in my next version. I change
-it as follow to enable the checking.
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/s390/mm/mmap.c | 34 +++++++++++++++++++++++-----------
+ 1 file changed, 23 insertions(+), 11 deletions(-)
 
-diff --git a/arch/x86/kernel/kprobes/core.c b/arch/x86/kernel/kprobes/core.c
-index 4e3d5a9..3241677 100644
---- a/arch/x86/kernel/kprobes/core.c
-+++ b/arch/x86/kernel/kprobes/core.c
-@@ -234,6 +234,20 @@ __recover_probed_insn(kprobe_opcode_t *buf, unsigned long addr)
-	 */
-	if (WARN_ON(faddr && faddr != addr))
-		return 0UL;
+diff --git a/arch/s390/mm/mmap.c b/arch/s390/mm/mmap.c
+index 179a2c20b01f..db57078075c5 100644
+--- a/arch/s390/mm/mmap.c
++++ b/arch/s390/mm/mmap.c
+@@ -62,20 +62,18 @@ static inline int mmap_is_legacy(void)
+ 
+ static unsigned long mmap_rnd(void)
+ {
+-	if (!(current->flags & PF_RANDOMIZE))
+-		return 0;
+ 	if (is_32bit_task())
+ 		return (get_random_int() & 0x7ff) << PAGE_SHIFT;
+ 	else
+ 		return (get_random_int() & mmap_rnd_mask) << PAGE_SHIFT;
+ }
+ 
+-static unsigned long mmap_base_legacy(void)
++static unsigned long mmap_base_legacy(unsigned long rnd)
+ {
+-	return TASK_UNMAPPED_BASE + mmap_rnd();
++	return TASK_UNMAPPED_BASE + rnd;
+ }
+ 
+-static inline unsigned long mmap_base(void)
++static inline unsigned long mmap_base(unsigned long rnd)
+ {
+ 	unsigned long gap = rlimit(RLIMIT_STACK);
+ 
+@@ -84,7 +82,7 @@ static inline unsigned long mmap_base(void)
+ 	else if (gap > MAX_GAP)
+ 		gap = MAX_GAP;
+ 	gap &= PAGE_MASK;
+-	return STACK_TOP - stack_maxrandom_size() - mmap_rnd() - gap;
++	return STACK_TOP - stack_maxrandom_size() - rnd - gap;
+ }
+ 
+ unsigned long
+@@ -187,7 +185,11 @@ unsigned long randomize_et_dyn(void)
+ 	if (!is_32bit_task())
+ 		/* Align to 4GB */
+ 		base &= ~((1UL << 32) - 1);
+-	return base + mmap_rnd();
 +
-+	/*
-+	 * If ftrace is not ready yet, pretend this is not an ftrace
-+	 * location, because currently the target instruction has not
-+	 * been replaced by a NOP yet. When ftrace trying to convert
-+	 * it to NOP, kprobe should be notified and the kprobe data
-+	 * should be fixed at that time.
-+	 *
-+	 * Since it is possible that an early kprobe already on that
-+	 * place, don't return addr directly.
-+	 */
-+	if (likely(kprobes_on_ftrace_initialized))
-+		faddr = 0UL;
++	if (current->flags & PF_RANDOMIZE)
++		base += mmap_rnd();
 +
-	/*
-	 * Use the current code if it is not modified by Kprobe
-	 * and it cannot be modified by ftrace
-
-
-
-
-> Or is the code modified another special way when it is a ftrace location but
-> ftrace has not been initialized yet?
-> 
-> Best Regards,
-> Petr
-> 
->>  	/*
->> -- 
->> 1.8.4
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
++	return base;
+ }
+ 
+ #ifndef CONFIG_64BIT
+@@ -198,15 +200,20 @@ unsigned long randomize_et_dyn(void)
+  */
+ void arch_pick_mmap_layout(struct mm_struct *mm)
+ {
++	unsigned long random_factor = 0UL;
++
++	if (current->flags & PF_RANDOMIZE)
++		random_factor = mmap_rnd();
++
+ 	/*
+ 	 * Fall back to the standard layout if the personality
+ 	 * bit is set, or if the expected stack growth is unlimited:
+ 	 */
+ 	if (mmap_is_legacy()) {
+-		mm->mmap_base = mmap_base_legacy();
++		mm->mmap_base = mmap_base_legacy(random_factor);
+ 		mm->get_unmapped_area = arch_get_unmapped_area;
+ 	} else {
+-		mm->mmap_base = mmap_base();
++		mm->mmap_base = mmap_base(random_factor);
+ 		mm->get_unmapped_area = arch_get_unmapped_area_topdown;
+ 	}
+ }
+@@ -273,15 +280,20 @@ s390_get_unmapped_area_topdown(struct file *filp, const unsigned long addr,
+  */
+ void arch_pick_mmap_layout(struct mm_struct *mm)
+ {
++	unsigned long random_factor = 0UL;
++
++	if (current->flags & PF_RANDOMIZE)
++		random_factor = mmap_rnd();
++
+ 	/*
+ 	 * Fall back to the standard layout if the personality
+ 	 * bit is set, or if the expected stack growth is unlimited:
+ 	 */
+ 	if (mmap_is_legacy()) {
+-		mm->mmap_base = mmap_base_legacy();
++		mm->mmap_base = mmap_base_legacy(random_factor);
+ 		mm->get_unmapped_area = s390_get_unmapped_area;
+ 	} else {
+-		mm->mmap_base = mmap_base();
++		mm->mmap_base = mmap_base(random_factor);
+ 		mm->get_unmapped_area = s390_get_unmapped_area_topdown;
+ 	}
+ }
+-- 
+1.9.1
