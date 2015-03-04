@@ -1,296 +1,60 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed,  4 Mar 2015 13:10:51 -0800
-Subject: [PATCH v4 07/10] mm: expose arch_mmap_rnd when available
-In-Reply-To: <1425503454-7531-1-git-send-email-keescook@chromium.org>
-References: <1425503454-7531-1-git-send-email-keescook@chromium.org>
-Message-ID: <1425503454-7531-8-git-send-email-keescook@chromium.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 04 Mar 2015 22:41:24 +0100
+Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
+ IRQF_NO_SUSPEND
+In-Reply-To: <20150304183809.GD22156@leverpostej>
+References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20150304183809.GD22156@leverpostej>
+Message-ID: <14143668.0aRkeVrc3Q@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an architecture fully supports randomizing the ELF load location,
-a per-arch mmap_rnd() function is used to find a randomized mmap base.
-In preparation for randomizing the location of ET_DYN binaries
-separately from mmap, this renames and exports these functions as
-arch_mmap_rnd(). Additionally introduces CONFIG_ARCH_HAS_ELF_RANDOMIZE
-for describing this feature on architectures that support it
-(which is a superset of ARCH_BINFMT_ELF_RANDOMIZE_PIE, since s390
-already supports a separated ET_DYN ASLR from mmap ASLR without the
-ARCH_BINFMT_ELF_RANDOMIZE_PIE logic).
+On Wednesday, March 04, 2015 06:38:09 PM Mark Rutland wrote:
+> Hi Boris,
+> 
+> On Mon, Mar 02, 2015 at 09:18:17AM +0000, Boris Brezillon wrote:
+> > The watchdog interrupt (only used when activating software watchdog)
+> > shouldn't be suspended when entering suspend mode, because it is shared
+> > with a timer device (which request the line with IRQF_NO_SUSPEND) and once
+> > the watchdog "Mode Register" has been written, it cannot be changed (which
+> > means we cannot disable the watchdog interrupt when entering suspend).
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  drivers/watchdog/at91sam9_wdt.c | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+> > index 6df9405..1443b3c 100644
+> > --- a/drivers/watchdog/at91sam9_wdt.c
+> > +++ b/drivers/watchdog/at91sam9_wdt.c
+> > @@ -208,7 +208,8 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
+> >  
+> >  	if ((tmp & AT91_WDT_WDFIEN) && wdt->irq) {
+> >  		err = request_irq(wdt->irq, wdt_interrupt,
+> > -				  IRQF_SHARED | IRQF_IRQPOLL,
+> > +				  IRQF_SHARED | IRQF_IRQPOLL |
+> > +				  IRQF_NO_SUSPEND,
+> 
+> I'm a little confused by this. What happens if the watchdog fires when
+> we're actually in the suspended state (when IRQF_NO_SUSPEND interrupts
+> aren't guaranteed to be delivered).
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- arch/Kconfig                  |  7 +++++++
- arch/arm/Kconfig              |  1 +
- arch/arm/mm/mmap.c            |  4 ++--
- arch/arm64/Kconfig            |  1 +
- arch/arm64/mm/mmap.c          |  4 ++--
- arch/mips/Kconfig             |  1 +
- arch/mips/mm/mmap.c           |  4 ++--
- arch/powerpc/Kconfig          |  1 +
- arch/powerpc/mm/mmap.c        |  4 ++--
- arch/s390/Kconfig             |  1 +
- arch/s390/mm/mmap.c           |  8 ++++----
- arch/x86/Kconfig              |  1 +
- arch/x86/mm/mmap.c            |  4 ++--
- include/linux/elf-randomize.h | 10 ++++++++++
- 14 files changed, 37 insertions(+), 14 deletions(-)
- create mode 100644 include/linux/elf-randomize.h
+Why wouldn't they be delivered?
 
-diff --git a/arch/Kconfig b/arch/Kconfig
-index 05d7a8a458d5..9ff5aa8fa2c1 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -484,6 +484,13 @@ config HAVE_IRQ_EXIT_ON_IRQ_STACK
- 	  This spares a stack switch and improves cache usage on softirq
- 	  processing.
- 
-+config ARCH_HAS_ELF_RANDOMIZE
-+	bool
-+	help
-+	  An architecture supports choosing randomized locations for
-+	  stack, mmap, brk, and ET_DYN. Defined functions:
-+	  - arch_mmap_rnd()
-+
- #
- # ABI hall of shame
- #
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9f1f09a2bc9b..248d99cabaa8 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -3,6 +3,7 @@ config ARM
- 	default y
- 	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-+	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_HAVE_CUSTOM_GPIO_H
- 	select ARCH_HAS_GCOV_PROFILE_ALL
-diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
-index 15a8160096b3..407dc786583a 100644
---- a/arch/arm/mm/mmap.c
-+++ b/arch/arm/mm/mmap.c
-@@ -169,7 +169,7 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
- 	return addr;
- }
- 
--static unsigned long mmap_rnd(void)
-+unsigned long arch_mmap_rnd(void)
- {
- 	unsigned long rnd;
- 
-@@ -184,7 +184,7 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
- 	unsigned long random_factor = 0UL;
- 
- 	if (current->flags & PF_RANDOMIZE)
--		random_factor = mmap_rnd();
-+		random_factor = arch_mmap_rnd();
- 
- 	if (mmap_is_legacy()) {
- 		mm->mmap_base = TASK_UNMAPPED_BASE + random_factor;
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 1b8e97331ffb..5f469095e0e2 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -2,6 +2,7 @@ config ARM64
- 	def_bool y
- 	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-+	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_HAS_SG_CHAIN
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
-diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
-index ba776c01b552..ed177475dd8c 100644
---- a/arch/arm64/mm/mmap.c
-+++ b/arch/arm64/mm/mmap.c
-@@ -47,7 +47,7 @@ static int mmap_is_legacy(void)
- 	return sysctl_legacy_va_layout;
- }
- 
--static unsigned long mmap_rnd(void)
-+unsigned long arch_mmap_rnd(void)
- {
- 	unsigned long rnd;
- 
-@@ -77,7 +77,7 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
- 	unsigned long random_factor = 0UL;
- 
- 	if (current->flags & PF_RANDOMIZE)
--		random_factor = mmap_rnd();
-+		random_factor = arch_mmap_rnd();
- 
- 	/*
- 	 * Fall back to the standard layout if the personality bit is set, or
-diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
-index c7a16904cd03..72ce5cece768 100644
---- a/arch/mips/Kconfig
-+++ b/arch/mips/Kconfig
-@@ -24,6 +24,7 @@ config MIPS
- 	select HAVE_DEBUG_KMEMLEAK
- 	select HAVE_SYSCALL_TRACEPOINTS
- 	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
-+	select ARCH_HAS_ELF_RANDOMIZE
- 	select HAVE_ARCH_TRANSPARENT_HUGEPAGE if CPU_SUPPORTS_HUGEPAGES && 64BIT
- 	select RTC_LIB if !MACH_LOONGSON
- 	select GENERIC_ATOMIC64 if !64BIT
-diff --git a/arch/mips/mm/mmap.c b/arch/mips/mm/mmap.c
-index 9a4f1f5c1f0e..5c81fdd032c3 100644
---- a/arch/mips/mm/mmap.c
-+++ b/arch/mips/mm/mmap.c
-@@ -142,7 +142,7 @@ unsigned long arch_get_unmapped_area_topdown(struct file *filp,
- 			addr0, len, pgoff, flags, DOWN);
- }
- 
--static unsigned long mmap_rnd(void)
-+unsigned long arch_mmap_rnd(void)
- {
- 	unsigned long rnd;
- 
-@@ -161,7 +161,7 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
- 	unsigned long random_factor = 0UL;
- 
- 	if (current->flags & PF_RANDOMIZE)
--		random_factor = mmap_rnd();
-+		random_factor = arch_mmap_rnd();
- 
- 	if (mmap_is_legacy()) {
- 		mm->mmap_base = TASK_UNMAPPED_BASE + random_factor;
-diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-index 22b0940494bb..14fe1c411489 100644
---- a/arch/powerpc/Kconfig
-+++ b/arch/powerpc/Kconfig
-@@ -89,6 +89,7 @@ config PPC
- 	select ARCH_MIGHT_HAVE_PC_SERIO
- 	select BINFMT_ELF
- 	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
-+	select ARCH_HAS_ELF_RANDOMIZE
- 	select OF
- 	select OF_EARLY_FLATTREE
- 	select OF_RESERVED_MEM
-diff --git a/arch/powerpc/mm/mmap.c b/arch/powerpc/mm/mmap.c
-index 1ad2299d795d..0f0502e12f6c 100644
---- a/arch/powerpc/mm/mmap.c
-+++ b/arch/powerpc/mm/mmap.c
-@@ -53,7 +53,7 @@ static inline int mmap_is_legacy(void)
- 	return sysctl_legacy_va_layout;
- }
- 
--static unsigned long mmap_rnd(void)
-+unsigned long arch_mmap_rnd(void)
- {
- 	unsigned long rnd;
- 
-@@ -87,7 +87,7 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
- 	unsigned long random_factor = 0UL;
- 
- 	if (current->flags & PF_RANDOMIZE)
--		random_factor = mmap_rnd();
-+		random_factor = arch_mmap_rnd();
- 
- 	/*
- 	 * Fall back to the standard layout if the personality
-diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-index 373cd5badf1c..4d707bb3e8dd 100644
---- a/arch/s390/Kconfig
-+++ b/arch/s390/Kconfig
-@@ -65,6 +65,7 @@ config S390
- 	def_bool y
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
-+	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_HAS_SG_CHAIN
- 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
-diff --git a/arch/s390/mm/mmap.c b/arch/s390/mm/mmap.c
-index db57078075c5..a94504d99c47 100644
---- a/arch/s390/mm/mmap.c
-+++ b/arch/s390/mm/mmap.c
-@@ -60,7 +60,7 @@ static inline int mmap_is_legacy(void)
- 	return sysctl_legacy_va_layout;
- }
- 
--static unsigned long mmap_rnd(void)
-+unsigned long arch_mmap_rnd(void)
- {
- 	if (is_32bit_task())
- 		return (get_random_int() & 0x7ff) << PAGE_SHIFT;
-@@ -187,7 +187,7 @@ unsigned long randomize_et_dyn(void)
- 		base &= ~((1UL << 32) - 1);
- 
- 	if (current->flags & PF_RANDOMIZE)
--		base += mmap_rnd();
-+		base += arch_mmap_rnd();
- 
- 	return base;
- }
-@@ -203,7 +203,7 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
- 	unsigned long random_factor = 0UL;
- 
- 	if (current->flags & PF_RANDOMIZE)
--		random_factor = mmap_rnd();
-+		random_factor = arch_mmap_rnd();
- 
- 	/*
- 	 * Fall back to the standard layout if the personality
-@@ -283,7 +283,7 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
- 	unsigned long random_factor = 0UL;
- 
- 	if (current->flags & PF_RANDOMIZE)
--		random_factor = mmap_rnd();
-+		random_factor = arch_mmap_rnd();
- 
- 	/*
- 	 * Fall back to the standard layout if the personality
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index c2fb8a87dccb..9aa91727fbf8 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -88,6 +88,7 @@ config X86
- 	select HAVE_ARCH_KASAN if X86_64 && SPARSEMEM_VMEMMAP
- 	select HAVE_USER_RETURN_NOTIFIER
- 	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
-+	select ARCH_HAS_ELF_RANDOMIZE
- 	select HAVE_ARCH_JUMP_LABEL
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select SPARSE_IRQ
-diff --git a/arch/x86/mm/mmap.c b/arch/x86/mm/mmap.c
-index ebfa52030d5c..9d518d693b4b 100644
---- a/arch/x86/mm/mmap.c
-+++ b/arch/x86/mm/mmap.c
-@@ -65,7 +65,7 @@ static int mmap_is_legacy(void)
- 	return sysctl_legacy_va_layout;
- }
- 
--static unsigned long mmap_rnd(void)
-+unsigned long arch_mmap_rnd(void)
- {
- 	unsigned long rnd;
- 
-@@ -114,7 +114,7 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
- 	unsigned long random_factor = 0UL;
- 
- 	if (current->flags & PF_RANDOMIZE)
--		random_factor = mmap_rnd();
-+		random_factor = arch_mmap_rnd();
- 
- 	mm->mmap_legacy_base = mmap_legacy_base(random_factor);
- 
-diff --git a/include/linux/elf-randomize.h b/include/linux/elf-randomize.h
-new file mode 100644
-index 000000000000..7a4eda02d2b1
---- /dev/null
-+++ b/include/linux/elf-randomize.h
-@@ -0,0 +1,10 @@
-+#ifndef _ELF_RANDOMIZE_H
-+#define _ELF_RANDOMIZE_H
-+
-+#ifndef CONFIG_ARCH_HAS_ELF_RANDOMIZE
-+static inline unsigned long arch_mmap_rnd(void) { return 0; }
-+#else
-+extern unsigned long arch_mmap_rnd(void);
-+#endif
-+
-+#endif
+If that's suspend-to-idle, we'll handle them normally.  If that's full suspend,
+they may not be handled at the last stage (when we run on one CPU with interrupts
+off), but that was the case before the wakeup interrupts rework already and I'd
+expect it to be taken into account somehow in the existing code (or if it isn't
+taken into account, we have a bug, but it is not related to this series).
+
+> Does this rely on the watchdog IRQ being taken while in the actual
+> suspended state (but not waking up the system while handling it)?
+
+It is going to work this way at least AFAICT.
+
+
 -- 
-1.9.1
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
