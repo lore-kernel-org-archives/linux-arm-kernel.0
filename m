@@ -1,39 +1,50 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 4 Mar 2015 18:17:58 +0100
-Subject: [PATCH v3 4/9] power: reset: Add AT91RM9200 reset driver
-In-Reply-To: <1425478897-27322-5-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1425478897-27322-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1425478897-27322-5-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150304171758.GA8717@earth>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 04 Mar 2015 09:21:15 -0800
+Subject: [PATCH 4.0-rc1 v17 4/6] printk: Simple implementation for NMI
+ backtracing
+In-Reply-To: <1425486786.2769.25.camel@linaro.org>
+References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
+ <1425463974-23568-1-git-send-email-daniel.thompson@linaro.org>
+ <1425463974-23568-5-git-send-email-daniel.thompson@linaro.org>
+ <1425485601.2712.9.camel@perches.com>
+ <20150304112010.338501ab@gandalf.local.home>
+ <1425486786.2769.25.camel@linaro.org>
+Message-ID: <1425489675.2712.16.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 2015-03-04 at 16:33 +0000, Daniel Thompson wrote:
+> On Wed, 2015-03-04 at 11:20 -0500, Steven Rostedt wrote:
+> > On Wed, 04 Mar 2015 08:13:21 -0800
+> > Joe Perches <joe@perches.com> wrote:
+> > 
+> > > On Wed, 2015-03-04 at 10:12 +0000, Daniel Thompson wrote:
+> > > > Currently there is a quite a pile of code sitting in
+> > > > arch/x86/kernel/apic/hw_nmi.c to support safe all-cpu backtracing from NMI.
+> > > > The code is inaccessible to backtrace implementations for other
+> > > > architectures, which is a shame because they would probably like to be
+> > > > safe too.
+> > > > 
+> > > > Copy this code into printk. We'll port the x86 NMI backtrace to it in a
+> > > > later patch.
+> > > 
+> > > I think this would be better as a separate file
+> > > rather than increasing the bulk of printk.c
+> > > 
+> > I agree, as printk already has its own directory. Perhaps a
+> > "nmi_backtrace.c"?
+> 
+> I agree on moving the code. However, after Thomas' review I made sure
+> all the external symbols were prefixed printk_nmi and, as a result of
+> the same review I started using CONFIG_PRINTK_NMI to enable/disable the
+> feature). For that reason I'm much more inclined to name it
+> "printk_nmi.c". Any objections?
 
-On Wed, Mar 04, 2015 at 03:21:32PM +0100, Alexandre Belloni wrote:
-> AT91RM9200 uses the watchdog from the system timer to reset.
-> [...]
-> +	regmap_write(regmap_st, AT91_ST_WDMR,
-> +		     AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
-> +	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
-> +
-> +	mdelay(2000);
+Steven's suggestion seems more sensible.
 
-At pity that you have to write into two registers, otherwise you
-could have used the syscon-reboot driver.
+sed 's/CONFIG_PRINTK_NMI/CONFIG_PRINTK_NMI_BACKTRACE/g'
+sed 's/printk_nmi/printk_nmib/g'
+or
+sed 's/printk_nmi/nmi_backtrace/g'
 
-> [...]
-> +module_platform_driver(at91rm9200_reset_driver);
-
-Apart from missing module metadata (MODULE_AUTHOR(),
-MODULE_LICENSE(), ...) the driver looks fine to me.
-
--- Sebastian
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150304/a22bafa2/attachment.sig>
+might work well.
