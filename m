@@ -1,82 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 Mar 2015 18:23:56 +0000
-Subject: [PATCH v2 2/6] rtc: at91sam9: rework wakeup and interrupt handling
-In-Reply-To: <1425287898-15093-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
- <1425287898-15093-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150304182356.GC22156@leverpostej>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 04 Mar 2015 10:28:00 -0800
+Subject: [PATCH 02/10] mailbox: Enable BCM2835 mailbox support
+In-Reply-To: <54F675F1.60205@wwwdotorg.org>
+References: <1425329684-23968-1-git-send-email-eric@anholt.net>
+ <1425329684-23968-3-git-send-email-eric@anholt.net>
+ <54F675F1.60205@wwwdotorg.org>
+Message-ID: <871tl48vnz.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-On Mon, Mar 02, 2015 at 09:18:14AM +0000, Boris Brezillon wrote:
-> The IRQ line used by the RTC device is usually shared with the system timer
-> (PIT) on at91 platforms.
-> Since timers are registering their handlers with IRQF_NO_SUSPEND, we should
-> expect being called in suspended state, and properly wake the system up
-> when this is the case.
-> 
-> Set IRQF_COND_SUSPEND flag when registering the IRQ handler to inform
-> irq core that it can safely be called while the system is suspended.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  drivers/rtc/rtc-at91sam9.c | 73 ++++++++++++++++++++++++++++++++++++++--------
->  1 file changed, 61 insertions(+), 12 deletions(-)
+> On 03/02/2015 01:54 PM, Eric Anholt wrote:
+>> From: Lubomir Rintel <lkundrak@v3.sk>
+>> 
+>> Implement BCM2835 mailbox support as a device registered with the
+>> general purpose mailbox framework. Implementation based on commits by
+>> Lubomir Rintel [1], Suman Anna and Jassi Brar [2] on which to base the
+>> implementation.
+>
+>> diff --git a/drivers/mailbox/bcm2835-mailbox.c b/drivers/mailbox/bcm2835-mailbox.c
+>
+>> +/* Mailboxes */
+>> +#define ARM_0_MAIL0	0x00
+>> +#define ARM_0_MAIL1	0x20
+>> +
+>> +/*
+>> + * Mailbox registers. We basically only support mailbox 0 & 1. We
+>> + * deliver to the VC in mailbox 1, it delivers to us in mailbox 0. See
+>> + * BCM2835-ARM-Peripherals.pdf section 1.3 for an explanation about
+>> + * the placement of memory barriers.
+>> + */
+>> +#define MAIL0_RD	(ARM_0_MAIL0 + 0x00)
+>> +#define MAIL0_POL	(ARM_0_MAIL0 + 0x10)
+>> +#define MAIL0_STA	(ARM_0_MAIL0 + 0x18)
+>> +#define MAIL0_CNF	(ARM_0_MAIL0 + 0x1C)
+>> +#define MAIL1_WRT	(ARM_0_MAIL1 + 0x00)
+>
+> That implies there are more mailboxes. I wonder if we should
+> parameterize which to use via some DT properties? I guess we can defer
+> that though; we can default to the current values and add properties
+> later if we want to use something else.
 
-[...]
+BCM2835-ARM-Peripherals.pdf:
 
-> +/*
-> + * IRQ handler for the RTC
-> + */
-> +static irqreturn_t at91_rtc_interrupt(int irq, void *_rtc)
-> +{
-> +	struct sam9_rtc *rtc = _rtc;
-> +	int ret;
-> +
-> +	spin_lock(&rtc->lock);
-> +
-> +	ret = at91_rtc_cache_events(rtc);
-> +
-> +	/* We're called in suspended state */
-> +	if (rtc->suspended) {
-> +		/* Mask irqs coming from this peripheral */
-> +		rtt_writel(rtc, MR,
-> +			   rtt_readl(rtc, MR) &
-> +			   ~(AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN));
-> +		/* Trigger a system wakeup */
-> +		pm_system_wakeup();
-> +	} else {
-> +		at91_rtc_flush_events(rtc);
-> +	}
-> +
-> +	spin_unlock(&rtc->lock);
-> +
-> +	return ret;
+"Default the interrupts from doorbell 0,1 and mailbox 0 go to the ARM
+this means that these resources should be written by the GPU and read by
+the ARM. The opposite holds for doorbells 2, 3 and mailbox 1."
 
-[...]
-
-> @@ -421,7 +456,8 @@ static int at91_rtc_probe(struct platform_device *pdev)
->  
->  	/* register irq handler after we know what name we'll use */
->  	ret = devm_request_irq(&pdev->dev, rtc->irq, at91_rtc_interrupt,
-> -				IRQF_SHARED, dev_name(&rtc->rtcdev->dev), rtc);
-> +			       IRQF_SHARED | IRQF_COND_SUSPEND,
-> +			       dev_name(&rtc->rtcdev->dev), rtc);
-
-To try to avoid thie getting cargo-culted, it's probably worth expanding
-the comment to cover the IRQF_COND_SUSPEND usage. Something like:
-
-	/* 
-	 * Register irq handler after we know what name we'll use.
-	 *
-	 * The interrupt line may be shared with a timer (the PIT), so
-	 * we must use IRQF_COND_SUSPEND and call pm_system_wakeup()
-	 * when a genuine wakeup event occurs.
-	 */
-
-Otherwise this looks good to me.
-
-Thanks,
-Mark.
+I don't see any references to more mailboxes than 0 and 1.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150304/0aa1d5b5/attachment.sig>
