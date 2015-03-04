@@ -1,45 +1,54 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 4 Mar 2015 16:46:37 +0100
-Subject: [PATCH] ARM: at91/dt: sama5d4: add pwm device node
-Message-ID: <1425483997-14113-1-git-send-email-nicolas.ferre@atmel.com>
+From: b.reynal@virtualopensystems.com (Baptiste Reynal)
+Date: Wed,  4 Mar 2015 16:51:06 +0100
+Subject: [PATCH v2 1/1] iommu/arm-smmu: fix ARM_SMMU_FEAT_TRANS_OPS condition
+Message-ID: <1425484266-5449-1-git-send-email-b.reynal@virtualopensystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bo Shen <voice.shen@atmel.com>
+This patch is a fix to "iommu/arm-smmu: add support for iova_to_phys
+through ATS1PR".
+According to ARM documentation, translation registers are optional even
+in SMMUv1, so ID0_S1TS needs to be checked to verify their presence.
+Also, we check that the domain is a stage-1 domain.
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Baptiste Reynal <b.reynal@virtualopensystems.com>
+
 ---
- arch/arm/boot/dts/sama5d4.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+v1 -> v2:
+Add domain stage test (Thanks to Will Deacon)
 
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index 93dc4e374b64..3041baaa19a1 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -64,6 +64,7 @@
- 		gpio2 = &pioC;
- 		gpio3 = &pioD;
- 		gpio4 = &pioE;
-+		pwm0 = &pwm0;
- 		ssc0 = &ssc0;
- 		ssc1 = &ssc1;
- 		tcb0 = &tcb0;
-@@ -821,6 +822,15 @@
- 				status = "disabled";
- 			};
+---
+ drivers/iommu/arm-smmu.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index fc13dd5..a3adde6 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1288,10 +1288,13 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
+ 		return 0;
  
-+			pwm0: pwm at f800c000 {
-+				compatible = "atmel,sama5d3-pwm";
-+				reg = <0xf800c000 0x300>;
-+				interrupts = <43 IRQ_TYPE_LEVEL_HIGH 4>;
-+				#pwm-cells = <3>;
-+				clocks = <&pwm_clk>;
-+				status = "disabled";
-+			};
+ 	spin_lock_irqsave(&smmu_domain->pgtbl_lock, flags);
+-	if (smmu_domain->smmu->features & ARM_SMMU_FEAT_TRANS_OPS)
++	if (smmu_domain->smmu->features & ARM_SMMU_FEAT_TRANS_OPS &&
++			smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
+ 		ret = arm_smmu_iova_to_phys_hard(domain, iova);
+-	else
++	} else {
+ 		ret = ops->iova_to_phys(ops, iova);
++	}
 +
- 			spi0: spi at f8010000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
+ 	spin_unlock_irqrestore(&smmu_domain->pgtbl_lock, flags);
+ 
+ 	return ret;
+@@ -1556,7 +1559,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 		return -ENODEV;
+ 	}
+ 
+-	if (smmu->version == 1 || (!(id & ID0_ATOSNS) && (id & ID0_S1TS))) {
++	if ((id & ID0_S1TS) && ((smmu->version == 1) || (id & ID0_ATOSNS))) {
+ 		smmu->features |= ARM_SMMU_FEAT_TRANS_OPS;
+ 		dev_notice(smmu->dev, "\taddress translation ops\n");
+ 	}
 -- 
-2.1.3
+2.3.1
