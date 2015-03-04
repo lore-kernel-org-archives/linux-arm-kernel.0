@@ -1,36 +1,20 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 05 Mar 2015 00:04:54 +0100
-Subject: [PATCH v3 1/9] ACPI: fix all errors reported by cleanpatch.pl in
- osl.c
-In-Reply-To: <1424824585-6405-2-git-send-email-al.stone@linaro.org>
-References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
- <1424824585-6405-2-git-send-email-al.stone@linaro.org>
-Message-ID: <1528624.HcuCny6IaW@vostro.rjw.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Mar 2015 23:43:39 +0100
+Subject: [PATCH 0/2] ARM: multi_v7_defconfig,
+ sunxi_defconfig: increase maximum number of CPUs
+In-Reply-To: <1423626748-1277-1-git-send-email-tyler.baker@linaro.org>
+References: <1423626748-1277-1-git-send-email-tyler.baker@linaro.org>
+Message-ID: <2308137.QLJGd5NpZl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, February 24, 2015 05:36:17 PM al.stone at linaro.org wrote:
-> From: Al Stone <al.stone@linaro.org>
+On Tuesday 10 February 2015 19:52:26 Tyler Baker wrote:
+> I have recently been reviewing the kernel warnings generated from the kernelci.org boot farm, and have discovered that the HiP04 and a80-optimus boards have more CPUs then the maximum allowed in a few of the ARM defconfigs. This series fixes those warnings by increasing the maximum number of CPUs. I went ahead and boot tested these patches on various boards [1] to insure there are no regressions introduced when increasing the number of CPUs. 
 > 
-> In preparation for later splitting out some of the arch-dependent code from
-> osl.c, clean up the errors reported by checkpatch.pl.  They fell into these
-> classes:
-> 
->    -- remove the FSF address from the GPL notice
->    -- "foo * bar" should be "foo *bar" (and the ** variation of same)
->    -- a return is not a function, so parentheses are not required.
-> 
-> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Any comments would be appreciated. Perhaps we may want to increase these limits further?
 
-checkpatch.pl is irrelevant here.  You're trying to make the coding style be
-more consistent with the coding style of the rest of the kernel.
+I've applied your version. Increasing the limit more would mainly cause memory
+to be wasted, so I don't think that's a good idea until we need to support
+other hardware.
 
-The warnings from checkpatch.pl are meaningless for the existing code, so
-it should not be used to justify changes in that code.
-
-Of course, the same applies to patches [2-4/9].
-
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+	Arnd
