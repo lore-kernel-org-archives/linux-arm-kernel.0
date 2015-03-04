@@ -1,44 +1,37 @@
 From: wuyun.wu@huawei.com (Yun Wu)
-Date: Wed, 4 Mar 2015 11:18:13 +0800
-Subject: [PATCH v3 0/5] enhance configuring an ITS
-Message-ID: <1425439098-10708-1-git-send-email-wuyun.wu@huawei.com>
+Date: Wed, 4 Mar 2015 11:18:15 +0800
+Subject: [PATCH v3 2/5] irqchip: gicv3-its: use 64KB page as default granule
+In-Reply-To: <1425439098-10708-1-git-send-email-wuyun.wu@huawei.com>
+References: <1425439098-10708-1-git-send-email-wuyun.wu@huawei.com>
+Message-ID: <1425439098-10708-3-git-send-email-wuyun.wu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series makes some enhancement to ITS configuration in the
-following aspects:
+The field of page size in register GITS_BASERn might be read-only
+if an implementation only supports a single, fixed page size. But
+currently the ITS driver will throw out an error when PAGE_SIZE
+is less than the minimum size supported by an ITS. So addressing
+this problem by using 64KB pages as default granule for all the
+ITS base tables.
 
-o make allocation of the ITS tables more sensible
-o replace magic numbers with sensible macros
-o guarantees a safe quiescent status before initializing an ITS
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This patch series is based on Marc's branch[1], and tested on Hisilion
-ARM64 board with GICv3 ITS hardware.
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 69eeea3..f5bfa42 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -800,7 +800,7 @@ static int its_alloc_tables(struct its_node *its)
+ {
+ 	int err;
+ 	int i;
+-	int psz = PAGE_SIZE;
++	int psz = SZ_64K;
+ 	u64 shr = GITS_BASER_InnerShareable;
 
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gic-fixes
-
-v2 -> v3:
-o drop the patch of tracing LPI enabling status since Vladimir Murzin
-  had already posted a similar patch
-o fix several improper description issues
-
-v1 -> v2:
-o rebase to Marc's GIC fix branch
-o drop size calculation for Device Table since Marc had already posted one
-o guarantees a safe quiescent status before initializing an ITS as
-  Marc suggested, rather than register a reboot notifier
-o fix an issue about the enabling status of LPI feature
-
-Yun Wu (5):
-  irqchip: gicv3-its: zero itt before handling to hardware
-  irqchip: gicv3-its: use 64KB page as default granule
-  irqchip: gicv3-its: add limitation to page order
-  irqchip: gicv3-its: define macros for GITS_CTLR fields
-  irqchip: gicv3-its: support safe initialization
-
- drivers/irqchip/irq-gic-v3-its.c   | 46 +++++++++++++++++++++++++++++++++++---
- include/linux/irqchip/arm-gic-v3.h |  3 +++
- 2 files changed, 46 insertions(+), 3 deletions(-)
-
+ 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
 --
 1.8.0
