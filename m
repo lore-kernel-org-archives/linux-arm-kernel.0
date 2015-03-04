@@ -1,38 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Mar 2015 20:44:23 +0100
-Subject: [PATCH] ARM: i.MX6Q: Add fixup for RTL8211E Gigabit Ethernet PHY
-In-Reply-To: <4686121425496122@web26g.yandex.ru>
-References: <1425404579-30591-1-git-send-email-rockford@yandex.ru>
- <3988965.hS0GXm2TNL@wuerfel> <4686121425496122@web26g.yandex.ru>
-Message-ID: <2796821.5chD2g3yoZ@wuerfel>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed,  4 Mar 2015 13:57:25 -0600
+Subject: [PATCH] arm: qcom: dts: gic: add compatible string for Qualcomm MSM
+ GICs
+Message-ID: <1425499045-31450-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 March 2015 22:08:42 ????? ?????? wrote:
-> 
-> >>  +               phy_register_fixup_for_uid(PHY_ID_RTL8211E, 0xffffffff,
-> >>  +                               rtl8211e_phy_fixup);
-> >
-> > How do you ensure that this fixup is only applied on the boards that need
-> > it, rather than all machines that happen to have this phy?
-> 
-> I've thought that if there no other fixups in code here checking a particular 
-> board where they run, this isn't necessary.
-> This SoC has only one ethernet MAC and if it is connected to this PHY, 
-> it should be initalized this way independently of board, like other code here does, I think.
-> 
-> This code just does forcibly restart autonegotiation.
-> I can wrap it in if(!of_machine_is_compatible(...)){}, if it is need.
+Document the Qualcomm MSM GICs implementation as compatible with the
+ARM GIC standard.
 
-Your explanation makes sense to me, though I wonder what the property of this
-SoC is that requires the PHY fixup. Is this something we could or should be doing
-in a more general way using the PHY API, by having the device driver call a
-phy API function to restart autoneg independent of the PHY?
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+---
+ Documentation/devicetree/bindings/arm/gic.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> And I see, mask is wrong - I should use 0x001fffff.
-> 
-> I'll resend a patch, thanks.
-
-Ok.
-
-	Arnd
+diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+index c97484b..6204630 100644
+--- a/Documentation/devicetree/bindings/arm/gic.txt
++++ b/Documentation/devicetree/bindings/arm/gic.txt
+@@ -18,6 +18,8 @@ Main node required properties:
+ 	"arm,arm11mp-gic"
+ 	"brcm,brahma-b15-gic"
+ 	"arm,arm1176jzf-devchip-gic"
++	"qcom,msm-8660-qgic"
++	"qcom,msm-qgic2"
+ - interrupt-controller : Identifies the node as an interrupt controller
+ - #interrupt-cells : Specifies the number of cells needed to encode an
+   interrupt source.  The type shall be a <u32> and the value shall be 3.
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
