@@ -1,44 +1,21 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 04 Mar 2015 20:24:32 +0100
-Subject: [PATCH v5 8/9] rtc: st: add new driver for ST's LPC RTC
-In-Reply-To: <1425492398-27340-9-git-send-email-lee.jones@linaro.org>
-References: <1425492398-27340-1-git-send-email-lee.jones@linaro.org>
- <1425492398-27340-9-git-send-email-lee.jones@linaro.org>
-Message-ID: <1425497072.2090.4.camel@tiscali.nl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Mar 2015 20:24:31 +0100
+Subject: [PATCH 5/6] ARM: at91: remove SoC headers
+In-Reply-To: <20150304171505.GH3989@piout.net>
+References: <1425480446-31711-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <8819576.zV70Ce3SCo@wuerfel> <20150304171505.GH3989@piout.net>
+Message-ID: <4037393.1yvBxSRZeM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lee Jones schreef op wo 04-03-2015 om 18:06 [+0000]:
-> --- /dev/null
-> +++ b/drivers/rtc/rtc-st-lpc.c
-> @@ -0,0 +1,354 @@
-> +/*
-> + * rtc-st-lpc.c - ST's LPC RTC, powered by the Low Power Timer
-> + *
-> + * Copyright (C) 2014 STMicroelectronics Limited
-> + *
-> + * Author: David Paris <david.paris@st.com> for STMicroelectronics
-> + *         Lee Jones <lee.jones@linaro.org> for STMicroelectronics
-> + *
-> + * Based on the original driver written by Stuart Menefy.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public Licence
-> + * as published by the Free Software Foundation; either version
-> + * 2 of the Licence, or (at your option) any later version.
-> + */
+On Wednesday 04 March 2015 18:15:05 Alexandre Belloni wrote:
+> 
+> Yeah, that is still something I need to investigate. Nicolas told me it
+> doesn't work without it. My guess is that it has something to do with
+> secure booting.
+> 
 
-This states the license is GPL v2 or later.
+I see. It's unlikely that all four regions are needed, so I guess you
+have to try out which one is actually used.
 
-> +MODULE_LICENSE("GPLv2");
-
-This will taint the kernel at module load, won't it? You probably meant
-"GPL v2", but only
-    MODULE_LICENSE("GPL");
-
-correctly matches the license in the comment at the top of this file. 
-
-(I assume I missed all this when looking at the v4 series.)
-
-
-Paul Bolle
+	Arnd
