@@ -1,311 +1,440 @@
 From: vincent.cw.yang@gmail.com (Vincent Yang)
-Date: Wed,  4 Mar 2015 19:01:24 +0800
-Subject: [PATCH v7 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
+Date: Wed,  4 Mar 2015 19:02:28 +0800
+Subject: [PATCH v7 3/7] ARM: MB86S7X: Add MCPM support
 In-Reply-To: <1425466367-30556-1-git-send-email-vincent.yang@socionext.com>
 References: <1425466367-30556-1-git-send-email-vincent.yang@socionext.com>
-Message-ID: <1425466884-30648-1-git-send-email-vincent.yang@socionext.com>
+Message-ID: <1425466948-30691-1-git-send-email-vincent.yang@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jassi Brar <jaswinder.singh@linaro.org>
 
-Add driver for the ARM Primecell Message-Handling-Unit(MHU) controller.
+The remote firmware(SCB) owns the SMP control. This MCPM driver gets
+CPU/CLUSTER power up/down done by SCB over mailbox.
 
-Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
 Signed-off-by: Andy Green <andy.green@linaro.org>
 Signed-off-by: Vincent Yang <vincent.yang@socionext.com>
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
 Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@socionext.com>
 ---
- .../devicetree/bindings/mailbox/arm-mhu.txt        |  43 +++++
- drivers/mailbox/Kconfig                            |   9 +
- drivers/mailbox/Makefile                           |   2 +
- drivers/mailbox/arm_mhu.c                          | 195 +++++++++++++++++++++
- 4 files changed, 249 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/arm-mhu.txt
- create mode 100644 drivers/mailbox/arm_mhu.c
+ arch/arm/mach-mb86s7x/Makefile |   4 +-
+ arch/arm/mach-mb86s7x/mcpm.c   | 318 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mb86s7x/smc.S    |  27 ++++
+ drivers/soc/mb86s7x/scb_mhu.c  |  14 ++
+ include/soc/mb86s7x/scb_mhu.h  |   8 ++
+ 5 files changed, 370 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
+ create mode 100644 arch/arm/mach-mb86s7x/smc.S
 
-diff --git a/Documentation/devicetree/bindings/mailbox/arm-mhu.txt b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+diff --git a/arch/arm/mach-mb86s7x/Makefile b/arch/arm/mach-mb86s7x/Makefile
+index 97640b6..00e843c 100644
+--- a/arch/arm/mach-mb86s7x/Makefile
++++ b/arch/arm/mach-mb86s7x/Makefile
+@@ -1 +1,3 @@
+-obj-$(CONFIG_ARCH_MB86S7X)	+= board.o
++obj-$(CONFIG_ARCH_MB86S7X)	+= board.o mcpm.o smc.o
++CFLAGS_smc.o			+= -march=armv7-a
++CFLAGS_mcpm.o			+= -march=armv7-a
+diff --git a/arch/arm/mach-mb86s7x/mcpm.c b/arch/arm/mach-mb86s7x/mcpm.c
 new file mode 100644
-index 0000000..4971f03
+index 0000000..17803a6
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
-@@ -0,0 +1,43 @@
-+ARM MHU Mailbox Driver
-+======================
-+
-+The ARM's Message-Handling-Unit (MHU) is a mailbox controller that has
-+3 independent channels/links to communicate with remote processor(s).
-+ MHU links are hardwired on a platform. A link raises interrupt for any
-+received data. However, there is no specified way of knowing if the sent
-+data has been read by the remote. This driver assumes the sender polls
-+STAT register and the remote clears it after having read the data.
-+The last channel is specified to be a 'Secure' resource, hence can't be
-+used by Linux running NS.
-+
-+Mailbox Device Node:
-+====================
-+
-+Required properties:
-+--------------------
-+- compatible:		Shall be "arm,mhu" & "arm,primecell"
-+- reg:			Contains the mailbox register address range (base
-+			address and length)
-+- #mbox-cells		Shall be 1 - the index of the channel needed.
-+- interrupts:		Contains the interrupt information corresponding to
-+			each of the 3 links of MHU.
-+
-+Example:
-+--------
-+
-+	mhu: mailbox at 2b1f0000 {
-+		#mbox-cells = <1>;
-+		compatible = "arm,mhu", "arm,primecell";
-+		reg = <0 0x2b1f0000 0x1000>;
-+		interrupts = <0 36 4>, /* LP-NonSecure */
-+			     <0 35 4>, /* HP-NonSecure */
-+			     <0 37 4>; /* Secure */
-+		clocks = <&clock 0 2 1>;
-+		clock-names = "apb_pclk";
-+	};
-+
-+	mhu_client: scb at 2e000000 {
-+		compatible = "fujitsu,mb86s70-scb-1.0";
-+		reg = <0 0x2e000000 0x4000>;
-+		mboxes = <&mhu 1>; /* HP-NonSecure */
-+	};
-diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-index 84325f2..84b0a2d 100644
---- a/drivers/mailbox/Kconfig
-+++ b/drivers/mailbox/Kconfig
-@@ -6,6 +6,15 @@ menuconfig MAILBOX
- 	  signals. Say Y if your platform supports hardware mailboxes.
- 
- if MAILBOX
-+
-+config ARM_MHU
-+	tristate "ARM MHU Mailbox"
-+	depends on ARM_AMBA
-+	help
-+	  Say Y here if you want to build the ARM MHU controller driver.
-+	  The controller has 3 mailbox channels, the last of which can be
-+	  used in Secure mode only.
-+
- config PL320_MBOX
- 	bool "ARM PL320 Mailbox"
- 	depends on ARM_AMBA
-diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
-index 2e79231..b18201e 100644
---- a/drivers/mailbox/Makefile
-+++ b/drivers/mailbox/Makefile
-@@ -2,6 +2,8 @@
- 
- obj-$(CONFIG_MAILBOX)		+= mailbox.o
- 
-+obj-$(CONFIG_ARM_MHU)	+= arm_mhu.o
-+
- obj-$(CONFIG_PL320_MBOX)	+= pl320-ipc.o
- 
- obj-$(CONFIG_OMAP2PLUS_MBOX)	+= omap-mailbox.o
-diff --git a/drivers/mailbox/arm_mhu.c b/drivers/mailbox/arm_mhu.c
-new file mode 100644
-index 0000000..ac693c6
---- /dev/null
-+++ b/drivers/mailbox/arm_mhu.c
-@@ -0,0 +1,195 @@
++++ b/arch/arm/mach-mb86s7x/mcpm.c
+@@ -0,0 +1,318 @@
 +/*
-+ * Copyright (C) 2013-2015 Fujitsu Semiconductor Ltd.
-+ * Copyright (C) 2015 Linaro Ltd.
-+ * Author: Jassi Brar <jaswinder.singh@linaro.org>
++ * arch/arm/mach-mb86s7x/mcpm.c
++ * Copyright:	(C) 2013-2015 Fujitsu Semiconductor Limited
++ * Copyright:	(C) 2015 Linaro Ltd.
 + *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation, version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
 +
-+#include <linux/interrupt.h>
-+#include <linux/spinlock.h>
-+#include <linux/mutex.h>
-+#include <linux/delay.h>
-+#include <linux/slab.h>
-+#include <linux/err.h>
 +#include <linux/io.h>
++#include <linux/pm.h>
++#include <linux/delay.h>
++#include <linux/cpu_pm.h>
++#include <linux/kernel.h>
 +#include <linux/module.h>
-+#include <linux/amba/bus.h>
-+#include <linux/mailbox_controller.h>
++#include <linux/arm-cci.h>
++#include <linux/spinlock.h>
++#include <linux/suspend.h>
++#include <linux/of_device.h>
++#include <linux/irqchip/arm-gic.h>
++#include <linux/platform_device.h>
 +
-+#define INTR_STAT_OFS	0x0
-+#define INTR_SET_OFS	0x8
-+#define INTR_CLR_OFS	0x10
++#include <soc/mb86s7x/scb_mhu.h>
 +
-+#define MHU_LP_OFFSET	0x0
-+#define MHU_HP_OFFSET	0x20
-+#define MHU_SEC_OFFSET	0x200
-+#define TX_REG_OFFSET	0x100
++#include <asm/mcpm.h>
++#include <asm/cp15.h>
++#include <asm/cputype.h>
++#include <asm/suspend.h>
++#include <asm/idmap.h>
 +
-+#define MHU_CHANS	3
++#define S7X_MAX_CLUSTER	2
++#define S7X_MAX_CPU	2
 +
-+struct mhu_link {
-+	unsigned irq;
-+	void __iomem *tx_reg;
-+	void __iomem *rx_reg;
++#define MHU_SHM_OFFSET		0x3800
++#define TRAMPOLINE_OFFSET	0x3c00
++#define RESET_OFFSET		(TRAMPOLINE_OFFSET + 0x3fc)
++
++static arch_spinlock_t mb86s7x_pm_lock = __ARCH_SPIN_LOCK_UNLOCKED;
++static int mb86s7x_pm_use_count[S7X_MAX_CLUSTER][S7X_MAX_CPU];
++
++struct mb86s7x_cpu_gate {
++	u32 payload_size;
++	u32 cluster_class;
++	u32 cluster_id;
++	u32 cpu_id;
++#define SCB_CPU_STATE_OFF	0x0
++#define SCB_CPU_STATE_ON	0x1
++#define SCB_CPU_STATE_SUSP	0x2
++	u32 cpu_state;
 +};
 +
-+struct arm_mhu {
-+	void __iomem *base;
-+	struct mhu_link mlink[MHU_CHANS];
-+	struct mbox_chan chan[MHU_CHANS];
-+	struct mbox_controller mbox;
-+};
-+
-+static irqreturn_t mhu_rx_interrupt(int irq, void *p)
++static int mb86s7x_pm_power_up(unsigned int cpu, unsigned int cluster)
 +{
-+	struct mbox_chan *chan = p;
-+	struct mhu_link *mlink = chan->con_priv;
-+	u32 val;
++	int ret = 0;
 +
-+	val = readl_relaxed(mlink->rx_reg + INTR_STAT_OFS);
-+	if (!val)
-+		return IRQ_NONE;
++	if (cluster >= S7X_MAX_CLUSTER || cpu >= S7X_MAX_CPU)
++		return -EINVAL;
 +
-+	mbox_chan_received_data(chan, (void *)&val);
++	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
 +
-+	writel_relaxed(val, mlink->rx_reg + INTR_CLR_OFS);
++	local_irq_disable();
++	arch_spin_lock(&mb86s7x_pm_lock);
 +
-+	return IRQ_HANDLED;
-+}
++	mb86s7x_pm_use_count[cluster][cpu]++;
 +
-+static bool mhu_last_tx_done(struct mbox_chan *chan)
-+{
-+	struct mhu_link *mlink = chan->con_priv;
-+	u32 val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
++	if (mb86s7x_pm_use_count[cluster][cpu] == 1) {
++		struct mb86s7x_cpu_gate cmd;
 +
-+	return (val == 0);
-+}
++		mb86s7x_set_wficolor(cluster, cpu, AT_WFI_DO_NOTHING);
++		arch_spin_unlock(&mb86s7x_pm_lock);
++		local_irq_enable();
 +
-+static int mhu_send_data(struct mbox_chan *chan, void *data)
-+{
-+	struct mhu_link *mlink = chan->con_priv;
-+	u32 *arg = data;
++		cmd.payload_size = sizeof(cmd);
++		cmd.cluster_class = 0;
++		cmd.cluster_id = cluster;
++		cmd.cpu_id = cpu;
++		cmd.cpu_state = SCB_CPU_STATE_ON;
 +
-+	writel_relaxed(*arg, mlink->tx_reg + INTR_SET_OFS);
++		pr_debug("%s:%d CMD Cl_Class-%u CL_ID-%u CPU_ID-%u STATE-%u}\n",
++			 __func__, __LINE__, cmd.cluster_class,
++			 cmd.cluster_id, cmd.cpu_id, cmd.cpu_state);
 +
-+	return 0;
-+}
++		ret = mb86s7x_send_packet(CMD_CPU_CLOCK_GATE_SET_REQ,
++					  &cmd, sizeof(cmd));
++		if (ret < 0) {
++			pr_err("%s:%d failed!\n", __func__, __LINE__);
++			return ret;
++		}
 +
-+static int mhu_startup(struct mbox_chan *chan)
-+{
-+	struct mhu_link *mlink = chan->con_priv;
-+	u32 val;
-+	int ret;
++		pr_debug("%s:%d REP Cl_Class-%u CL_ID-%u CPU_ID-%u STATE-%u}\n",
++			 __func__, __LINE__, cmd.cluster_class,
++			 cmd.cluster_id, cmd.cpu_id, cmd.cpu_state);
 +
-+	val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
-+	writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
-+
-+	ret = request_irq(mlink->irq, mhu_rx_interrupt,
-+			  IRQF_SHARED, "mhu_link", chan);
-+	if (ret) {
-+		dev_err(chan->mbox->dev,
-+			"Unable to aquire IRQ %d\n", mlink->irq);
-+		return ret;
++		if (cmd.cpu_state != SCB_CPU_STATE_ON)
++			return -ENODEV;
++	} else if (mb86s7x_pm_use_count[cluster][cpu] == 2) {
++		arch_spin_unlock(&mb86s7x_pm_lock);
++		local_irq_enable();
++	} else {
++		/*
++		 * The only possible values are:
++		 * 0 = CPU down
++		 * 1 = CPU (still) up
++		 * 2 = CPU requested to be up before it had a chance
++		 *     to actually make itself down.
++		 * Any other value is a bug.
++		 */
++		BUG();
 +	}
 +
 +	return 0;
 +}
 +
-+static void mhu_shutdown(struct mbox_chan *chan)
++static void mb86s7x_pm_suspend(u64 ignored)
 +{
-+	struct mhu_link *mlink = chan->con_priv;
++	unsigned int mpidr, cpu, cluster;
++	bool last_man = false, skip_wfi = false;
 +
-+	free_irq(mlink->irq, chan);
-+}
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
 +
-+static struct mbox_chan_ops mhu_ops = {
-+	.send_data = mhu_send_data,
-+	.startup = mhu_startup,
-+	.shutdown = mhu_shutdown,
-+	.last_tx_done = mhu_last_tx_done,
-+};
++	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
++	__mcpm_cpu_going_down(cpu, cluster);
 +
-+static int mhu_probe(struct amba_device *adev, const struct amba_id *id)
-+{
-+	int i, err;
-+	struct arm_mhu *mhu;
-+	struct device *dev = &adev->dev;
-+	int mhu_reg[MHU_CHANS] = {MHU_LP_OFFSET, MHU_HP_OFFSET, MHU_SEC_OFFSET};
++	arch_spin_lock(&mb86s7x_pm_lock);
++	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
 +
-+	/* Allocate memory for device */
-+	mhu = devm_kzalloc(dev, sizeof(*mhu), GFP_KERNEL);
-+	if (!mhu)
-+		return -ENOMEM;
++	mb86s7x_pm_use_count[cluster][cpu]--;
 +
-+	mhu->base = devm_ioremap_resource(dev, &adev->res);
-+	if (IS_ERR(mhu->base)) {
-+		dev_err(dev, "ioremap failed\n");
-+		return PTR_ERR(mhu->base);
++	if (mb86s7x_pm_use_count[cluster][cpu] == 0) {
++		if (!mb86s7x_pm_use_count[cluster][0] &&
++		    !mb86s7x_pm_use_count[cluster][1])
++			last_man = true;
++		mb86s7x_set_wficolor(cluster, cpu, AT_WFI_DO_POWEROFF);
++	} else if (mb86s7x_pm_use_count[cluster][cpu] == 1) {
++		skip_wfi = true; /* Overtaken by a power up */
++	} else {
++		BUG();
 +	}
 +
-+	for (i = 0; i < MHU_CHANS; i++) {
-+		mhu->chan[i].con_priv = &mhu->mlink[i];
-+		mhu->mlink[i].irq = adev->irq[i];
-+		mhu->mlink[i].rx_reg = mhu->base + mhu_reg[i];
-+		mhu->mlink[i].tx_reg = mhu->mlink[i].rx_reg + TX_REG_OFFSET;
++	if (!skip_wfi)
++		gic_cpu_if_down();
++
++	if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
++		arch_spin_unlock(&mb86s7x_pm_lock);
++
++		if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A15) {
++			/*
++			 * On the Cortex-A15 we need to disable
++			 * L2 prefetching before flushing the cache.
++			 */
++			asm volatile(
++			"mcr p15, 1, %0, c15, c0, 3\n\t"
++			"isb\n\t"
++			"dsb"
++			: : "r" (0x400));
++		}
++
++		v7_exit_coherency_flush(all);
++
++		cci_disable_port_by_cpu(mpidr);
++
++		__mcpm_outbound_leave_critical(cluster, CLUSTER_DOWN);
++	} else {
++		arch_spin_unlock(&mb86s7x_pm_lock);
++		v7_exit_coherency_flush(louis);
 +	}
 +
-+	mhu->mbox.dev = dev;
-+	mhu->mbox.chans = &mhu->chan[0];
-+	mhu->mbox.num_chans = MHU_CHANS;
-+	mhu->mbox.ops = &mhu_ops;
-+	mhu->mbox.txdone_irq = false;
-+	mhu->mbox.txdone_poll = true;
-+	mhu->mbox.txpoll_period = 10;
++	__mcpm_cpu_down(cpu, cluster);
 +
-+	amba_set_drvdata(adev, mhu);
-+
-+	err = mbox_controller_register(&mhu->mbox);
-+	if (err) {
-+		dev_err(dev, "Failed to register mailboxes %d\n", err);
-+		return err;
-+	}
-+
-+	dev_info(dev, "ARM MHU Mailbox registered\n");
-+	return 0;
++	/* Now we are prepared for power-down, do it: */
++	if (!skip_wfi)
++		wfi();
 +}
 +
-+static int mhu_remove(struct amba_device *adev)
++static void mb86s7x_pm_power_down(void)
 +{
-+	struct arm_mhu *mhu = amba_get_drvdata(adev);
-+
-+	mbox_controller_unregister(&mhu->mbox);
-+
-+	return 0;
++	mb86s7x_pm_suspend(0);
 +}
 +
-+static struct amba_id mhu_ids[] = {
-+	{
-+		.id	= 0x1bb098,
-+		.mask	= 0xffffff,
-+	},
-+	{ 0, 0 },
-+};
-+MODULE_DEVICE_TABLE(amba, mhu_ids);
++static int mb86s7x_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
++{
++	struct mb86s7x_cpu_gate cmd;
++	int i, ret;
 +
-+static struct amba_driver arm_mhu_driver = {
-+	.drv = {
-+		.name	= "mhu",
-+	},
-+	.id_table	= mhu_ids,
-+	.probe		= mhu_probe,
-+	.remove		= mhu_remove,
-+};
-+module_amba_driver(arm_mhu_driver);
++	BUG_ON(cluster >= S7X_MAX_CLUSTER || cpu >= S7X_MAX_CPU);
 +
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("ARM MHU Driver");
-+MODULE_AUTHOR("Jassi Brar <jassisinghbrar@gmail.com>");
++	cmd.payload_size = sizeof(cmd);
++	cmd.cluster_class = 0;
++	cmd.cluster_id = cluster;
++	cmd.cpu_id = cpu;
++	cmd.cpu_state = SCB_CPU_STATE_ON;
++
++	for (i = 0; i < 50; i++) {
++		ret = mb86s7x_send_packet(CMD_CPU_CLOCK_GATE_GET_REQ,
++					  &cmd, sizeof(cmd));
++		if (ret < 0) {
++			pr_err("%s:%d failed to get CPU status\n",
++			       __func__, __LINE__);
++			return ret;
++		}
++
++		pr_debug("%s:%d Cl_Class-%u CL_ID-%u CPU_ID-%u STATE-%u\n",
++			 __func__, __LINE__,
++			 cmd.cluster_class, cmd.cluster_id,
++			 cmd.cpu_id, cmd.cpu_state);
++
++		if (cmd.cpu_state == SCB_CPU_STATE_OFF)
++			return 0;
++
++		msleep(20);
++	}
++
++	return -ETIMEDOUT;
++}
++
++static void mb86s7x_pm_powered_up(void)
++{
++	unsigned int mpidr, cpu, cluster;
++
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++
++	arch_spin_lock(&mb86s7x_pm_lock);
++	if (!mb86s7x_pm_use_count[cluster][cpu])
++		mb86s7x_pm_use_count[cluster][cpu] = 1;
++	arch_spin_unlock(&mb86s7x_pm_lock);
++}
++
++static const struct mcpm_platform_ops mb86s7x_pm_power_ops = {
++	.power_up		= mb86s7x_pm_power_up,
++	.power_down		= mb86s7x_pm_power_down,
++	.wait_for_powerdown	= mb86s7x_wait_for_powerdown,
++	.suspend		= mb86s7x_pm_suspend,
++	.powered_up		= mb86s7x_pm_powered_up,
++};
++
++/*
++ * Enable cluster-level coherency, in preparation for turning on the MMU.
++ */
++static void __naked mb86s7x_pm_power_up_setup(unsigned int affinity_level)
++{
++	asm volatile ("\n"
++"	cmp	r0, #1\n"
++"	bxne	lr\n"
++"	b	cci_enable_port_for_self");
++}
++
++static void __init mb86s7x_cache_off(void)
++{
++	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A15) {
++		/* disable L2 prefetching on the Cortex-A15 */
++		asm volatile(
++		"mcr	p15, 1, %0, c15, c0, 3\n\t"
++		"isb\n\t"
++		"dsb"
++		: : "r" (0x400));
++	}
++	v7_exit_coherency_flush(all);
++}
++
++struct mb86s7x_scb_version {
++	u32 payload_size;
++	u32 version;
++	u32 config_version;
++};
++
++static int __init mb86s7x_mcpm_init(void)
++{
++	unsigned int mpidr, cpu, cluster;
++	struct mb86s7x_scb_version cmd;
++	struct device_node *np;
++	int ret = -ENODEV;
++
++	np = of_find_compatible_node(NULL, NULL, "fujitsu,mb86s70-scb-1.0");
++	if (!np || !of_device_is_available(np) || !cci_probed())
++		goto exit;
++
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++
++	pr_info("Booting on cpu_%u cluster_%u\n", cpu, cluster);
++	mb86s7x_pm_use_count[cluster][cpu] = 1;
++
++	/* reset the wfi 'color' for primary cpu */
++	mb86s7x_set_wficolor(cluster, cpu, AT_WFI_DO_NOTHING);
++
++	/* Do SMC to set entry address for CPUs coming online */
++	mb86s7x_cpu_entry(virt_to_phys(mcpm_entry_point));
++
++	cmd.payload_size = sizeof(cmd);
++	cmd.version = 0;
++	cmd.config_version = 0;
++	ret = mb86s7x_send_packet(CMD_SCB_CAPABILITY_GET_REQ,
++				  &cmd, sizeof(cmd));
++	if (ret < 0) /* non fatal */
++		pr_err("%s:%d failed to get SCB version\n",
++		       __func__, __LINE__);
++	else
++		pr_err("MB86S7x SCB version 0x%x:0x%x\n",
++		       cmd.version, cmd.config_version);
++
++	ret = mcpm_platform_register(&mb86s7x_pm_power_ops);
++	if (!ret)
++		ret = mcpm_sync_init(mb86s7x_pm_power_up_setup);
++	if (!ret)
++		ret = mcpm_loopback(mb86s7x_cache_off); /* turn on the CCI */
++	if (!ret)
++		mcpm_smp_set_ops();
++exit:
++	of_node_put(np);
++	return ret;
++}
++early_initcall(mb86s7x_mcpm_init);
+diff --git a/arch/arm/mach-mb86s7x/smc.S b/arch/arm/mach-mb86s7x/smc.S
+new file mode 100644
+index 0000000..3ffe4f7
+--- /dev/null
++++ b/arch/arm/mach-mb86s7x/smc.S
+@@ -0,0 +1,27 @@
++/*
++ * SMC command interface to set secondary entry point
++ * Copyright: (C) 2013-2015 Fujitsu Semiconductor Limited
++ * Copyright: (C) 2015 Linaro Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/linkage.h>
++
++.arch_extension sec
++
++/* void mb86s7x_cpu_entry(unsigned long secondary_entry); */
++ENTRY(mb86s7x_cpu_entry)
++	stmfd   sp!, {r1-r11, lr}
++	mov r1, r0
++	ldr r0, =1
++	mrc p15, 0, r3, c1, c0, 0
++	mov r4, r3
++	and r3, #0xbfffffff
++	mcr p15, 0, r3, c1, c0, 0
++	smc #0
++	mcr p15, 0, r4, c1, c0, 0
++	ldmfd   sp!, {r1-r11, pc}
++ENDPROC(mb86s7x_cpu_entry)
+diff --git a/drivers/soc/mb86s7x/scb_mhu.c b/drivers/soc/mb86s7x/scb_mhu.c
+index c1d66f4..7141287 100644
+--- a/drivers/soc/mb86s7x/scb_mhu.c
++++ b/drivers/soc/mb86s7x/scb_mhu.c
+@@ -89,6 +89,20 @@ static struct mhu_xfer {
+ 	struct list_head node;
+ } *ax; /* stages of xfer */
+ 
++#define WFI_COLOR_OFFSET	0x3f00
++
++void mb86s7x_set_wficolor(unsigned clstr, unsigned cpu, unsigned clr)
++{
++	u8 val;
++
++	val = readb_relaxed(mb86s7x_shm_base
++			    + WFI_COLOR_OFFSET + clstr * 2 + cpu);
++	val &= ~AT_WFI_COLOR_MASK;
++	val |= clr;
++	writeb_relaxed(val, mb86s7x_shm_base
++		       + WFI_COLOR_OFFSET + clstr * 2 + cpu);
++}
++
+ static int mhu_alloc_xfers(int n, struct list_head *list)
+ {
+ 	struct mhu_xfer *x = kcalloc(n, sizeof(struct mhu_xfer), GFP_ATOMIC);
+diff --git a/include/soc/mb86s7x/scb_mhu.h b/include/soc/mb86s7x/scb_mhu.h
+index 42a1baa..8ee75f2 100644
+--- a/include/soc/mb86s7x/scb_mhu.h
++++ b/include/soc/mb86s7x/scb_mhu.h
+@@ -87,6 +87,14 @@ enum {
+ #define CMD_POWERDOMAIN_SET_REP		ENC_REP(CMD_POWERDOMAIN_SET_REQ)
+ #define CMD_STG_BLOCK_ERASE_REP		ENC_REP(CMD_STG_BLOCK_ERASE_REQ)
+ 
++#define AT_WFI_DO_NOTHING	0x0
++#define AT_WFI_DO_SUSPEND	0x1
++#define AT_WFI_DO_POWEROFF	0x2
++#define AT_WFI_COLOR_MASK	0x3
++
++void mb86s7x_set_wficolor(unsigned clstr, unsigned cpu, unsigned clr);
++void mb86s7x_cpu_entry(unsigned long secondary_entry);
++
+ /* Helper functions to talk to remote */
+ int mb86s7x_send_packet(u32 code, void *buf, int len);
+ 
 -- 
 1.9.0
