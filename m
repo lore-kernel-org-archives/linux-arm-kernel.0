@@ -1,89 +1,104 @@
-From: pi-cheng.chen@linaro.org (pi-cheng.chen)
-Date: Wed,  4 Mar 2015 16:49:16 +0800
-Subject: [PATCH v2 4/4] ARM64: dts: mediatek: add cpufreq dts for MT8173 SoC
-In-Reply-To: <1425458956-20665-1-git-send-email-pi-cheng.chen@linaro.org>
-References: <1425458956-20665-1-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <1425458956-20665-5-git-send-email-pi-cheng.chen@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 4 Mar 2015 09:55:37 +0100
+Subject: [PATCH 1/8] clk: add helper function clk_is_match()
+In-Reply-To: <20150225172757.421.43718@quantum>
+References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+ <1424876018-17852-2-git-send-email-shawn.guo@linaro.org>
+ <20150225172757.421.43718@quantum>
+Message-ID: <CAMuHMdX_co60Aez4_8iA4+41CMSD=Ky7af8mVJruQL-2v9m=0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch illustrates how to enable mtk-cpufreq driver for a Mediatek SoC in
-device tree using MT8173 as an example. This patch was tested on MT8173 EVB
-with several patches which are not yet posted on public mailing list.
+On Wed, Feb 25, 2015 at 6:27 PM, Mike Turquette <mturquette@linaro.org> wrote:
+> From: Michael Turquette <mturquette@linaro.org>
+> Date: Wed, 25 Feb 2015 09:11:01 -0800
+> Subject: [PATCH] clk: introduce clk_is_match
+>
+> Some drivers compare struct clk pointers as a means of knowing
+> if the two pointers reference the same clock hardware. This behavior is
+> dubious (drivers must not dereference struct clk), but did not cause any
+> regressions until the per-user struct clk patch was merged. Now the test
+> for matching clk's will always fail with per-user struct clk's.
+>
+> clk_is_match is introduced to fix the regression and prevent drivers
+> from comparing the pointers manually.
+>
+> Fixes: 035a61c314eb ("clk: Make clk API return per-user struct clk instances")
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Signed-off-by: Michael Turquette <mturquette@linaro.org>
+> ---
+>  drivers/clk/clk.c   | 26 ++++++++++++++++++++++++++
+>  include/linux/clk.h | 18 ++++++++++++++++++
+>  2 files changed, 44 insertions(+)
+>
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index eb01529..09670de 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -2171,6 +2171,32 @@ int clk_get_phase(struct clk *clk)
+>  }
+>
+>  /**
+> + * clk_is_match - check if two clk's point to the same hardware clock
+> + * @p: clk compared against q
+> + * @q: clk compared against p
+> + *
+> + * Returns true if the two struct clk pointers both point to the same hardware
+> + * clock node. Put differently, returns true if struct clk *p and struct clk *q
+> + * share the same struct clk_core object.
+> + *
+> + * Returns false otherwise. Note that two NULL clks are treated as matching.
+> + */
+> +bool clk_is_match(struct clk *p, struct clk *q)
 
-Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
----
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 10 ++++++++++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 25 +++++++++++++++++++++++++
- 2 files changed, 35 insertions(+)
+const struct clk *p, const struct clk *q
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-index b57f095..cc3b954 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-@@ -417,3 +417,13 @@
- 	status = "okay";
- 	clock-frequency = <100000>;
- };
-+
-+&cpu0 {
-+	cpu-supply = <&mt6397_vpca15_reg>;
-+	voltage-tolerance = <1>;
-+};
-+
-+&cpu2 {
-+	proc-supply = <&da9211_vcpu_reg>;
-+	sram-supply = <&mt6397_vsramca7_reg>;
-+};
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index dd0a445..4ad75a6 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -51,6 +51,16 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a53";
- 			reg = <0x000>;
-+			clocks = <&infracfg INFRA_CA53SEL>;
-+			operating-points = <
-+				1508000 1109000
-+				1404000	1083000
-+				1183000	1028000
-+				1105000	1009000
-+				1001000	 983000
-+				 702000	 908000
-+				 507000	 859000
-+			>;
- 		};
- 
- 		cpu1: cpu at 1 {
-@@ -65,6 +75,16 @@
- 			compatible = "arm,cortex-a57";
- 			reg = <0x100>;
- 			enable-method = "psci";
-+			clocks = <&infracfg INFRA_CA57SEL>;
-+			operating-points = <
-+				1807000	1089000
-+				1612000	1049000
-+				1404000	1007000
-+				1209000	 968000
-+				1001000	 927000
-+				 702000	 867000
-+				 507000	 828000
-+			>;
- 		};
- 
- 		cpu3: cpu at 101 {
-@@ -75,6 +95,11 @@
- 		};
- 	};
- 
-+	cpufreq {
-+		compatible = "mediatek,mtk-cpufreq";
-+		clocks = <&apmixedsys APMIXED_MAINPLL>;
-+	};
-+
- 	psci {
- 		compatible = "arm,psci";
- 		method = "smc";
--- 
-1.9.1
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -376,6 +376,19 @@ struct clk *clk_get_parent(struct clk *clk);
+>   */
+>  struct clk *clk_get_sys(const char *dev_id, const char *con_id);
+>
+> +/**
+> + * clk_is_match - check if two clk's point to the same hardware clock
+> + * @p: clk compared against q
+> + * @q: clk compared against p
+> + *
+> + * Returns true if the two struct clk pointers both point to the same hardware
+> + * clock node. Put differently, returns true if struct clk *p and struct clk *q
+> + * share the same struct clk_core object.
+> + *
+> + * Returns false otherwise. Note that two NULL clks are treated as matching.
+> + */
+> +bool clk_is_match(struct clk *p, struct clk *q);
+
+const struct clk *p, const struct clk *q
+
+> +
+>  #else /* !CONFIG_HAVE_CLK */
+>
+>  static inline struct clk *clk_get(struct device *dev, const char *id)
+> @@ -429,6 +442,11 @@ static inline struct clk *clk_get_parent(struct clk *clk)
+>         return NULL;
+>  }
+>
+> +static inline bool clk_is_match(struct clk *p, struct clk *q)
+
+const struct clk *p, const struct clk *q
+
+> +{
+> +       return p == q ? true : false;
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
