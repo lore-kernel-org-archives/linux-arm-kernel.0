@@ -1,62 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Mar 2015 18:32:58 +0000
-Subject: [PATCH v2 1/1] iommu/arm-smmu: fix ARM_SMMU_FEAT_TRANS_OPS
- condition
-In-Reply-To: <1425484266-5449-1-git-send-email-b.reynal@virtualopensystems.com>
-References: <1425484266-5449-1-git-send-email-b.reynal@virtualopensystems.com>
-Message-ID: <20150304183258.GN17250@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 4 Mar 2015 18:38:09 +0000
+Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
+ IRQF_NO_SUSPEND
+In-Reply-To: <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
+References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150304183809.GD22156@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 03:51:06PM +0000, Baptiste Reynal wrote:
-> This patch is a fix to "iommu/arm-smmu: add support for iova_to_phys
-> through ATS1PR".
-> According to ARM documentation, translation registers are optional even
-> in SMMUv1, so ID0_S1TS needs to be checked to verify their presence.
-> Also, we check that the domain is a stage-1 domain.
+Hi Boris,
+
+On Mon, Mar 02, 2015 at 09:18:17AM +0000, Boris Brezillon wrote:
+> The watchdog interrupt (only used when activating software watchdog)
+> shouldn't be suspended when entering suspend mode, because it is shared
+> with a timer device (which request the line with IRQF_NO_SUSPEND) and once
+> the watchdog "Mode Register" has been written, it cannot be changed (which
+> means we cannot disable the watchdog interrupt when entering suspend).
 > 
-> Signed-off-by: Baptiste Reynal <b.reynal@virtualopensystems.com>
-> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > ---
-> v1 -> v2:
-> Add domain stage test (Thanks to Will Deacon)
+>  drivers/watchdog/at91sam9_wdt.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> ---
->  drivers/iommu/arm-smmu.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index fc13dd5..a3adde6 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1288,10 +1288,13 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
->  		return 0;
+> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+> index 6df9405..1443b3c 100644
+> --- a/drivers/watchdog/at91sam9_wdt.c
+> +++ b/drivers/watchdog/at91sam9_wdt.c
+> @@ -208,7 +208,8 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
 >  
->  	spin_lock_irqsave(&smmu_domain->pgtbl_lock, flags);
-> -	if (smmu_domain->smmu->features & ARM_SMMU_FEAT_TRANS_OPS)
-> +	if (smmu_domain->smmu->features & ARM_SMMU_FEAT_TRANS_OPS &&
-> +			smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
->  		ret = arm_smmu_iova_to_phys_hard(domain, iova);
-> -	else
-> +	} else {
->  		ret = ops->iova_to_phys(ops, iova);
-> +	}
-> +
->  	spin_unlock_irqrestore(&smmu_domain->pgtbl_lock, flags);
->  
->  	return ret;
-> @@ -1556,7 +1559,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
->  		return -ENODEV;
->  	}
->  
-> -	if (smmu->version == 1 || (!(id & ID0_ATOSNS) && (id & ID0_S1TS))) {
-> +	if ((id & ID0_S1TS) && ((smmu->version == 1) || (id & ID0_ATOSNS))) {
->  		smmu->features |= ARM_SMMU_FEAT_TRANS_OPS;
->  		dev_notice(smmu->dev, "\taddress translation ops\n");
+>  	if ((tmp & AT91_WDT_WDFIEN) && wdt->irq) {
+>  		err = request_irq(wdt->irq, wdt_interrupt,
+> -				  IRQF_SHARED | IRQF_IRQPOLL,
+> +				  IRQF_SHARED | IRQF_IRQPOLL |
+> +				  IRQF_NO_SUSPEND,
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+I'm a little confused by this. What happens if the watchdog fires when
+we're actually in the suspended state (when IRQF_NO_SUSPEND interrupts
+aren't guaranteed to be delivered).
 
-Sorry Joerg, but this is the latest in the drip of ARM SMMU fixes for
-4.0! Please pick it up with the rest.
+Does this rely on the watchdog IRQ being taken while in the actual
+suspended state (but not waking up the system while handling it)?
 
-Will
+Thanks,
+Mark.
