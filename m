@@ -1,47 +1,85 @@
-From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Wed, 4 Mar 2015 14:53:40 -0800
-Subject: [PATCHv1] rtc: bcm-iproc: Add support for Broadcom iproc rtc
-In-Reply-To: <2569223.1gDQjv8f8j@wuerfel>
-References: <1418757750-3628-1-git-send-email-arun.ramamurthy@broadcom.com>
- <3699327.0G6ZNxn8QA@wuerfel> <54F789CD.5030504@broadcom.com>
- <2569223.1gDQjv8f8j@wuerfel>
-Message-ID: <54F78CF4.9040108@broadcom.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 05 Mar 2015 00:17:33 +0100
+Subject: [PATCH v3 9/9] ACPI: arm64: use "Linux" as ACPI_OS_NAME for _OS
+ on arm64
+In-Reply-To: <1424824585-6405-10-git-send-email-al.stone@linaro.org>
+References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
+ <1424824585-6405-10-git-send-email-al.stone@linaro.org>
+Message-ID: <1826593.dqIcOSxkcP@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday, February 24, 2015 05:36:25 PM al.stone at linaro.org wrote:
+> From: Al Stone <al.stone@linaro.org>
+> 
+> ACPI_OS_NAME is globally defined as "Microsoft Windows NT" for now.
+> That doesn't make much sense in the ARM context, so set it to "Linux"
+> when CONFIG_ARM64.
+> 
+> If it is necessary to change the return value from \_OS_ (that is, return
+> some value other than the default in ACPI_OS_NAME), use the kernel parameter
+> "acpi_os_name=<string>".
+> 
+> Many thanks to Rafael Wysocki for this greatly simplified form of the patch.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Al Stone <al.stone@linaro.org>
 
+Yup, fine by me.
 
-On 15-03-04 02:50 PM, Arnd Bergmann wrote:
-> On Wednesday 04 March 2015 14:40:13 Arun Ramamurthy wrote:
->> On 15-03-04 02:21 PM, Arnd Bergmann wrote:
->>> On Thursday 12 February 2015 14:17:41 Arun Ramamurthy wrote:
->>>> Hi Arnd
->>>>
->>>> My apologies for the late reply, I was moved to other work items. I
->>>> wanted to get more clarification on the syscon issue so that I can
->>>> submit the next patch set. If I understand correctly, you would like
->>>> me to move the CRMU logic to a new driver under mfd/ and use the syscon
->>>> api calls in my rtc driver? Thanks
->>>
->>> It depends a lot on what's in there, I can best advise you if you
->>> have some form of register list.
->>>
->>> A common approach would be to not have a driver for the crmu at all,
->>> but just mark it as syscon, and have the other drivers either reference
->>> the syscon node through a phandle, or create them as childrem of
->>> the syscon node. The latter case makes most sense if all uses of
->>> the crmu have no other MMIO registers.
->>>
->>
->> Thank you Arnd, I am going to follow the approach of adding a child node
->> to the syscon node. Several other driver use other registers in the CRMU
->> so I think the child node approach makes the most sense.
->
-> Just to be sure we have the same understanding: of those other drivers,
-> do you think that they would use only CRMU registers, or could there
-> be drivers that have both CRMU as well as other MMIO registers?
->
-The other drivers have both CRMU and other MMIO registers. So I thought 
-they could also switch to using the syscon child nodes.
-> 	Arnd
->
+> ---
+>  arch/arm64/Kconfig              | 5 +++++
+>  include/acpi/acconfig.h         | 2 ++
+>  include/acpi/platform/aclinux.h | 4 ++++
+>  3 files changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index e441d28..d812113 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -87,6 +87,11 @@ config ARM64
+>  config 64BIT
+>  	def_bool y
+>  
+> +config ACPI_OS_NAME
+> +	string
+> +	default "Linux"
+> +	depends on ACPI
+> +
+>  config ARCH_PHYS_ADDR_T_64BIT
+>  	def_bool y
+>  
+> diff --git a/include/acpi/acconfig.h b/include/acpi/acconfig.h
+> index 5a0a3e5..1980bf4 100644
+> --- a/include/acpi/acconfig.h
+> +++ b/include/acpi/acconfig.h
+> @@ -69,7 +69,9 @@
+>   * code that will not execute the _OSI method unless _OS matches the string
+>   * below.  Therefore, change this string at your own risk.
+>   */
+> +#ifndef ACPI_OS_NAME
+>  #define ACPI_OS_NAME                    "Microsoft Windows NT"
+> +#endif
+>  
+>  /* Maximum objects in the various object caches */
+>  
+> diff --git a/include/acpi/platform/aclinux.h b/include/acpi/platform/aclinux.h
+> index 1ba7c19..a871cdd 100644
+> --- a/include/acpi/platform/aclinux.h
+> +++ b/include/acpi/platform/aclinux.h
+> @@ -69,6 +69,10 @@
+>  #define ACPI_REDUCED_HARDWARE 1
+>  #endif
+>  
+> +#ifdef CONFIG_ACPI_OS_NAME
+> +#define ACPI_OS_NAME CONFIG_ACPI_OS_NAME
+> +#endif
+> +
+>  #include <linux/string.h>
+>  #include <linux/kernel.h>
+>  #include <linux/ctype.h>
+> 
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
