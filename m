@@ -1,55 +1,53 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 4 Mar 2015 16:19:18 +0100
-Subject: [PATCH] ARM: at91: dts: sama5d3/sama5d4: reduce NFC command
- registers memory region
-In-Reply-To: <20150115110501.53b4584c@bbrezillon>
-References: <1421305683-8739-1-git-send-email-josh.wu@atmel.com>	<20150115094527.3fde882a@bbrezillon>	<54B78F73.9000504@atmel.com>
- <20150115110501.53b4584c@bbrezillon>
-Message-ID: <54F72276.8060605@atmel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 4 Mar 2015 16:20:08 +0100
+Subject: [PATCH v3 00/20] ARM: mvebu: Armada 39x basic support, and
+ preparatory cleanups
+In-Reply-To: <54F71F45.3060503@free-electrons.com>
+References: <1425393675-17820-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <54F71F45.3060503@free-electrons.com>
+Message-ID: <20150304162008.1d337e6e@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 15/01/2015 11:05, Boris Brezillon a ?crit :
-> Hi Josh,
-> 
-> On Thu, 15 Jan 2015 17:59:15 +0800
-> Josh Wu <josh.wu@atmel.com> wrote:
-> 
->> Hi? Boris
->>
->> Thanks for the review.
->>
->> On 1/15/2015 4:45 PM, Boris Brezillon wrote:
->>> Hi Josh,
->>>
->>> On Thu, 15 Jan 2015 15:08:03 +0800
->>> Josh Wu <josh.wu@atmel.com> wrote:
->>>
->>>> To get NFC status, we need to read the NFC command registers, which is a
->>>> 256M memory mapping address. To check the status, you just read such
->>>> address from NFC command registers.
->>>> For example, to check NFCBUSY (bit 27), you need to read 0x08000000
->>>> (bit 27 is set to 1) of the NFC command register.
->>>> If you want to check NFCBUSY (bit 27) and NFCWR (bit 26) in same time,
->>>> you need to read 0x0c000000 (bit 27 and bit 26 are set to 1).
->>> Are NFCBUSY and NFCWR found in NFCDATA_STATUS and those found in HSMC_SR
->>> representing the same thing.
->> yes. it is. I just check with IP team. The NFCBUSY of NFCDATA_STATUS is 
->> also refer to NFC_BUSY of HSMC_SR.
->>
->>> If they are, I think you can just use HSMC_SR instead of NFCDATA_STATUS
->>> to check the status [1] and drop the last bit in the NFC Command
->>> Resgiters range.
->> Thank you. your code works (just need some typo change).
->> I want to send [1] code with your signed-off and my acked to mtd list.
->> Is it okay for you?
-> 
-> Sure, no problem.
+Gregory,
 
-Hi Josh,
+On Wed, 04 Mar 2015 16:05:41 +0100, Gregory CLEMENT wrote:
 
-What is the status of this patch set?
+> Patches 1 applied to mvebu/cleanup
+> Patches 2 to 8 and patch 17 applied to mvebu/dt
+> Patches 9,12,16 and 18 applied to mvebu/soc
+> Patch 19 applied to mvebu/defconfig
+> 
+> and
+> 
+> Patches 10,13 and 14 applied to mvebu/clk as requested by Mike.
+> 
+> I had to amend the patch "ARM: mvebu: fix unit address of MPIC nodes"
+> by removing the armada-38x related part which was already applied by the
+> patch "ARM: mvebu: Fix MPIC unit address".
+> 
+> Patch 20 should be directly taken by the arm-soc maintainer.
 
-Bye,
+Thanks!
+
+So this leaves only:
+
+  [PATCH v3 11/20] devicetree: bindings: add Device Tree bindings for Armada 39x pin-muxing controller
+  [PATCH v3 15/20] pinctrl: mvebu: add pinctrl driver for Marvell Armada 39x
+
+to be applied, right? Patch 15/20 has been applied by Linus Walleij
+already, but from the v1 of the series. I also asked him to merge PATCH
+v3 11/20.
+
+With this done, and PATCH v2 20/20 merged by the arm-soc maintainers, I
+guess we should be all set with this patch series.
+
+Thanks again!
+
+Best regards,
+
+Thomas
 -- 
-Nicolas Ferre
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
