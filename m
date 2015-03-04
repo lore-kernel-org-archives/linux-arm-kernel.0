@@ -1,39 +1,45 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 04 Mar 2015 18:30:34 +0100
-Subject: [PATCH 3/8] ARM: make xscale iwmmxt code multiplatform aware
-In-Reply-To: <356997090.ZkRbrlLqgW@wuerfel> (Arnd Bergmann's message of "Wed,
- 04 Mar 2015 15:38:29 +0100")
-References: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
- <1425043775-3106827-4-git-send-email-arnd@arndb.de>
- <87pp8ozwb1.fsf@free.fr> <356997090.ZkRbrlLqgW@wuerfel>
-Message-ID: <87fv9kzn45.fsf@free.fr>
+From: rjui@broadcom.com (Ray Jui)
+Date: Wed, 4 Mar 2015 09:31:15 -0800
+Subject: [PATCH v4 1/4] pinctrl: bcm: consolidate Broadcom pinctrl drivers
+In-Reply-To: <CACRpkdaiM+mqGg43BT1Kr-CNi8+_U4KgZM4iZocv9+ovHL5hLQ@mail.gmail.com>
+References: <rjui@broadcom.com>	<1423015801-26967-1-git-send-email-rjui@broadcom.com>	<1423015801-26967-2-git-send-email-rjui@broadcom.com>
+ <CACRpkdaiM+mqGg43BT1Kr-CNi8+_U4KgZM4iZocv9+ovHL5hLQ@mail.gmail.com>
+Message-ID: <54F74163.8060801@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Hi Linus,
 
-> On Wednesday 04 March 2015 15:12:02 Robert Jarzmik wrote:
->
-> I tried to not change the behavior here, and I think you missed this part:
->
-> -#if !defined(CONFIG_CPU_XSCALE) && !defined(CONFIG_CPU_XSC3)
-> +#if !defined(CONFIG_CPU_XSCALE)
->  #define        cpu_is_xscale() 0
->  #else
-> -#define        cpu_is_xscale() 1
->  ...
->
-> This means that previously, cpu_is_xscale() returned true for pxa3xx,
-> while now it returns false, and I added the "&& !cpu_is_xsc3()" to
-> keep the logic the same as before.
->
-> Does that make sense?
-Ah now yes, I missed the former cpu_is_xscale() behavior, my brain is working in
-first gear lately ...
+On 3/4/2015 1:07 AM, Linus Walleij wrote:
+> On Wed, Feb 4, 2015 at 3:09 AM, Ray Jui <rjui@broadcom.com> wrote:
+> 
+>> Consolidate Broadcom pinctrl drivers into drivers/pinctrl/bcm/*
+>>
+>> Signed-off-by: Ray Jui <rjui@broadcom.com>
+> 
+> This patch doesn't apply so it needs to be rebased on v4.0-rc1 and resent.
+> 
+> And also when just moving files, always do this:
+> 
+> git format-patch -M ...
+> 
+> So that file movement is detected, and the patch will apply nicely even
+> if the contents of the file(s) have changed.
+> 
+> Can you also combine this series with the v9 GPIO etc series and
+> send out ONE big patch set that I can look at because right now I'm
+> getting really confused ...
+> 
+> I'll look over the rest and see if there is some remaining technical
+> comments (hopefully mainly patch mechanics remains).
+> 
+> Yours,
+> Linus Walleij
+> 
 
-Then the patch looks fine.
+Okay. I'll rebase to v4.0-rc1 and consolidate both pinmux and gpio
+pinctrl patch series into one, which will be PATCH v5.
 
-Cheers.
+Thanks,
 
--- 
-Robert
+Ray
