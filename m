@@ -1,37 +1,73 @@
 From: wuyun.wu@huawei.com (Yun Wu)
-Date: Wed, 4 Mar 2015 11:18:15 +0800
-Subject: [PATCH v3 2/5] irqchip: gicv3-its: use 64KB page as default granule
+Date: Wed, 4 Mar 2015 11:18:18 +0800
+Subject: [PATCH v3 5/5] irqchip: gicv3-its: support safe initialization
 In-Reply-To: <1425439098-10708-1-git-send-email-wuyun.wu@huawei.com>
 References: <1425439098-10708-1-git-send-email-wuyun.wu@huawei.com>
-Message-ID: <1425439098-10708-3-git-send-email-wuyun.wu@huawei.com>
+Message-ID: <1425439098-10708-6-git-send-email-wuyun.wu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The field of page size in register GITS_BASERn might be read-only
-if an implementation only supports a single, fixed page size. But
-currently the ITS driver will throw out an error when PAGE_SIZE
-is less than the minimum size supported by an ITS. So addressing
-this problem by using 64KB pages as default granule for all the
-ITS base tables.
+It's unsafe to change the configurations of an activated ITS directly
+since this will lead to unpredictable results. This patch guarantees
+the ITSes being initialized are quiescent.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/irqchip/irq-gic-v3-its.c | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 69eeea3..f5bfa42 100644
+index d13c24e..9e09aa0 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -800,7 +800,7 @@ static int its_alloc_tables(struct its_node *its)
- {
- 	int err;
- 	int i;
--	int psz = PAGE_SIZE;
-+	int psz = SZ_64K;
- 	u64 shr = GITS_BASER_InnerShareable;
+@@ -1320,6 +1320,34 @@ static const struct irq_domain_ops its_domain_ops = {
+ 	.deactivate		= its_irq_domain_deactivate,
+ };
 
- 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
++static int its_check_quiesced(void __iomem *base)
++{
++	u32 count = 1000000;	/* 1s */
++	u32 val;
++
++	val = readl_relaxed(base + GITS_CTLR);
++	if (val & GITS_CTLR_QUIESCENT)
++		return 0;
++
++	/* Disable the generation of all interrupts to this ITS */
++	val &= ~GITS_CTLR_ENABLE;
++	writel_relaxed(val, base + GITS_CTLR);
++
++	/* Poll GITS_CTLR and wait until ITS becomes quiescent */
++	while (1) {
++		val = readl_relaxed(base + GITS_CTLR);
++		if (val & GITS_CTLR_QUIESCENT)
++			return 0;
++
++		count--;
++		if (!count)
++			return -EBUSY;
++
++		cpu_relax();
++		udelay(1);
++	}
++}
++
+ static int its_probe(struct device_node *node, struct irq_domain *parent)
+ {
+ 	struct resource res;
+@@ -1348,6 +1376,13 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+ 		goto out_unmap;
+ 	}
+
++	err = its_check_quiesced(its_base);
++	if (err) {
++		pr_warn("%s: failed to quiesce, giving up\n",
++			node->full_name);
++		goto out_unmap;
++	}
++
+ 	pr_info("ITS: %s\n", node->full_name);
+
+ 	its = kzalloc(sizeof(*its), GFP_KERNEL);
 --
 1.8.0
