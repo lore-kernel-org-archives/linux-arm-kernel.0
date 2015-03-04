@@ -1,378 +1,286 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  4 Mar 2015 20:33:03 +0100
-Subject: [RFC PATCH 09/18] ARM: msm: fix vic irqchip for multiplatform
+Date: Wed,  4 Mar 2015 20:33:02 +0100
+Subject: [RFC PATCH 08/18] ARM: msm: fix gpiomux config for multiplatform
 In-Reply-To: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
 References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
-Message-ID: <1425497592-1831064-10-git-send-email-arnd@arndb.de>
+Message-ID: <1425497592-1831064-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vic code is common between msm7x30 and qsd8x50, but has
-minor differences in the number of registers and the mapping
-between interrupt numbers and smsm numbers.
-
-This moves the differences out to the soc-specific files so the
-vic implementation can be shared.
+The msm gpiomux code uses a global symbol for configuration
+that has multiple definitions, and a size that depends on
+the SoC that is configured. Both of these are broken
+when dealing with a kernel that enables more than one soc,
+so we have to pass the data at boot time.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-msm/board-msm7x30.c |  55 +++++++++++++++++-
- arch/arm/mach-msm/board-qsd8x50.c |  59 ++++++++++++++++++-
- arch/arm/mach-msm/common.h        |   1 +
- arch/arm/mach-msm/irq-vic.c       | 117 +++++---------------------------------
- 4 files changed, 125 insertions(+), 107 deletions(-)
+ arch/arm/mach-msm/board-msm7x30.c |  4 +++-
+ arch/arm/mach-msm/board-qsd8x50.c |  3 +++
+ arch/arm/mach-msm/gpiomux-8x50.c  |  2 +-
+ arch/arm/mach-msm/gpiomux-v1.h    |  9 ++-------
+ arch/arm/mach-msm/gpiomux.c       | 18 +++++++++---------
+ arch/arm/mach-msm/gpiomux.h       |  8 +++++++-
+ drivers/gpio/gpio-msm-v1.c        | 16 +++++++++++-----
+ 7 files changed, 36 insertions(+), 24 deletions(-)
 
 diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
-index a964e3e3724d..4718a661306e 100644
+index e19109f69096..a964e3e3724d 100644
 --- a/arch/arm/mach-msm/board-msm7x30.c
 +++ b/arch/arm/mach-msm/board-msm7x30.c
-@@ -31,6 +31,7 @@
- #include <asm/setup.h>
- 
- #include <mach/clk.h>
-+#include <mach/irqs-7x30.h>
- #include <mach/msm_iomap-7x30.h>
- 
- #include <mach/vreg.h>
-@@ -132,9 +133,61 @@ static struct platform_device *devices[] __initdata = {
- 	&msm_device_hsusb_host,
+@@ -99,7 +99,7 @@ static struct msm_otg_platform_data msm_otg_pdata = {
+ 	.phy_clk_reset		= hsusb_phy_clk_reset,
  };
  
-+#define SMSM_FAKE_IRQ (0xff)
-+static uint8_t msm_irq_to_smsm[NR_IRQS] = {
-+	[INT_MDDI_EXT] = 1,
-+	[INT_MDDI_PRI] = 2,
-+	[INT_MDDI_CLIENT] = 3,
-+	[INT_USB_OTG] = 4,
-+
-+	[INT_PWB_I2C] = 5,
-+	[INT_SDC1_0] = 6,
-+	[INT_SDC1_1] = 7,
-+	[INT_SDC2_0] = 8,
-+
-+	[INT_SDC2_1] = 9,
-+	[INT_ADSP_A9_A11] = 10,
-+	[INT_UART1] = 11,
-+	[INT_UART2] = 12,
-+
-+	[INT_UART3] = 13,
-+	[INT_UART1_RX] = 14,
-+	[INT_UART2_RX] = 15,
-+	[INT_UART3_RX] = 16,
-+
-+	[INT_UART1DM_IRQ] = 17,
-+	[INT_UART1DM_RX] = 18,
-+	[INT_KEYSENSE] = 19,
-+
-+	[INT_NAND_WR_ER_DONE] = 21,
-+	[INT_NAND_OP_DONE] = 22,
-+	[INT_TCHSCRN1] = 23,
-+	[INT_TCHSCRN2] = 24,
-+
-+	[INT_TCHSCRN_SSBI] = 25,
-+	[INT_USB_HS] = 26,
-+	[INT_UART2DM_RX] = 27,
-+	[INT_UART2DM_IRQ] = 28,
-+
-+	[INT_SDC4_1] = 29,
-+	[INT_SDC4_0] = 30,
-+	[INT_SDC3_1] = 31,
-+	[INT_SDC3_0] = 32,
-+
-+	/* fake wakeup interrupts */
-+	[INT_GPIO_GROUP1] = SMSM_FAKE_IRQ,
-+	[INT_GPIO_GROUP2] = SMSM_FAKE_IRQ,
-+	[INT_A9_M2A_0] = SMSM_FAKE_IRQ,
-+	[INT_A9_M2A_1] = SMSM_FAKE_IRQ,
-+	[INT_A9_M2A_5] = SMSM_FAKE_IRQ,
-+	[INT_GP_TIMER_EXP] = SMSM_FAKE_IRQ,
-+	[INT_DEBUG_TIMER_EXP] = SMSM_FAKE_IRQ,
-+	[INT_ADSP_A11] = SMSM_FAKE_IRQ,
-+};
-+
- static void __init msm7x30_init_irq(void)
- {
--	msm_init_irq();
-+	msm_init_vic(msm_irq_to_smsm, 4);
- }
+-struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {
++static struct msm_gpiomux_config msm7x30_gpiomux_configs[MSM7X30_GPIOMUX_NGPIOS] = {
+ #ifdef CONFIG_SERIAL_MSM_CONSOLE
+ 	[49] = { /* UART2 RFR */
+ 		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
+@@ -139,6 +139,8 @@ static void __init msm7x30_init_irq(void)
  
  static void __init msm7x30_init(void)
+ {
++	gpiomux_init(msm7x30_gpiomux_configs,
++		     ARRAY_SIZE(msm7x30_gpiomux_configs));
+ 	msm_device_otg.dev.platform_data = &msm_otg_pdata;
+ 	msm_device_hsusb.dev.parent = &msm_device_otg.dev;
+ 	msm_device_hsusb_host.dev.parent = &msm_device_otg.dev;
 diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
-index 259ea05c41b9..ff458806785b 100644
+index 24f4ae061f79..259ea05c41b9 100644
 --- a/arch/arm/mach-msm/board-qsd8x50.c
 +++ b/arch/arm/mach-msm/board-qsd8x50.c
-@@ -221,9 +221,64 @@ static void __init qsd8x50_init_mmc(void)
- 	msm_add_sdcc(1, &qsd8x50_sdc1_data, 0, 0);
- }
+@@ -36,6 +36,7 @@
  
-+#define SMSM_FAKE_IRQ (0xff)
-+static uint8_t msm_irq_to_smsm[NR_IRQS] = {
-+	[INT_MDDI_EXT] = 1,
-+	[INT_MDDI_PRI] = 2,
-+	[INT_MDDI_CLIENT] = 3,
-+	[INT_USB_OTG] = 4,
-+
-+	[INT_PWB_I2C] = 5,
-+	[INT_SDC1_0] = 6,
-+	[INT_SDC1_1] = 7,
-+	[INT_SDC2_0] = 8,
-+
-+	[INT_SDC2_1] = 9,
-+	[INT_ADSP_A9_A11] = 10,
-+	[INT_UART1] = 11,
-+	[INT_UART2] = 12,
-+
-+	[INT_UART3] = 13,
-+	[INT_UART1_RX] = 14,
-+	[INT_UART2_RX] = 15,
-+	[INT_UART3_RX] = 16,
-+
-+	[INT_UART1DM_IRQ] = 17,
-+	[INT_UART1DM_RX] = 18,
-+	[INT_KEYSENSE] = 19,
-+	[INT_AD_HSSD] = 20,
-+
-+	[INT_NAND_WR_ER_DONE] = 21,
-+	[INT_NAND_OP_DONE] = 22,
-+	[INT_TCHSCRN1] = 23,
-+	[INT_TCHSCRN2] = 24,
-+
-+	[INT_TCHSCRN_SSBI] = 25,
-+	[INT_USB_HS] = 26,
-+	[INT_UART2DM_RX] = 27,
-+	[INT_UART2DM_IRQ] = 28,
-+
-+	[INT_SDC4_1] = 29,
-+	[INT_SDC4_0] = 30,
-+	[INT_SDC3_1] = 31,
-+	[INT_SDC3_0] = 32,
-+
-+	/* fake wakeup interrupts */
-+	[INT_GPIO_GROUP1] = SMSM_FAKE_IRQ,
-+	[INT_GPIO_GROUP2] = SMSM_FAKE_IRQ,
-+	[INT_A9_M2A_0] = SMSM_FAKE_IRQ,
-+	[INT_A9_M2A_1] = SMSM_FAKE_IRQ,
-+	[INT_A9_M2A_5] = SMSM_FAKE_IRQ,
-+	[INT_GP_TIMER_EXP] = SMSM_FAKE_IRQ,
-+	[INT_DEBUG_TIMER_EXP] = SMSM_FAKE_IRQ,
-+	[INT_ADSP_A11] = SMSM_FAKE_IRQ,
-+	[INT_SIRC_0] = SMSM_FAKE_IRQ,
-+	[INT_SIRC_1] = SMSM_FAKE_IRQ,
-+};
-+
- static void __init qsd8x50_init_irq(void)
+ #include "devices.h"
+ #include "common.h"
++#include "gpiomux.h"
+ 
+ static const resource_size_t qsd8x50_surf_smc91x_base __initconst = 0x70000300;
+ static const unsigned        qsd8x50_surf_smc91x_gpio __initconst = 156;
+@@ -228,6 +229,8 @@ static void __init qsd8x50_init_irq(void)
+ 
+ static void __init qsd8x50_init(void)
  {
--	msm_init_irq();
-+	msm_init_vic(msm_irq_to_smsm, 2);
- 	msm_init_sirc(FIRST_SIRC_IRQ, NR_SIRC_IRQS_REV_OTHER, INT_SIRC_0);
- }
++	gpiomux_init(qsd8x50_gpiomux_configs,
++		     ARRAY_SIZE(qsd8x50_gpiomux_configs));
+ 	msm_device_otg.dev.platform_data = &msm_otg_pdata;
+ 	msm_device_hsusb.dev.parent = &msm_device_otg.dev;
+ 	msm_device_hsusb_host.dev.parent = &msm_device_otg.dev;
+diff --git a/arch/arm/mach-msm/gpiomux-8x50.c b/arch/arm/mach-msm/gpiomux-8x50.c
+index f7a4ea593c95..6851342ec049 100644
+--- a/arch/arm/mach-msm/gpiomux-8x50.c
++++ b/arch/arm/mach-msm/gpiomux-8x50.c
+@@ -29,7 +29,7 @@
+ #define SDC1_SUSPEND_CONFIG (GPIOMUX_VALID | GPIOMUX_PULL_DOWN\
+ 				| GPIOMUX_FUNC_GPIO | GPIOMUX_DRV_2MA)
  
-@@ -255,7 +310,7 @@ MACHINE_END
- #ifdef CONFIG_MSM_SOC_REV_A
- static void __init qsd8x50_init_irq_rev_a(void)
- {
--	msm_init_irq();
-+	msm_init_vic(msm_irq_to_smsm, 2);
- 	msm_init_sirc(FIRST_SIRC_IRQ, NR_SIRC_IRQS_REV_A, INT_SIRC_0);
- }
- 
-diff --git a/arch/arm/mach-msm/common.h b/arch/arm/mach-msm/common.h
-index 8267f6402325..7e4ddfdf4fe8 100644
---- a/arch/arm/mach-msm/common.h
-+++ b/arch/arm/mach-msm/common.h
-@@ -28,6 +28,7 @@ struct msm_mmc_platform_data;
- 
- extern void msm_add_devices(void);
- extern void msm_init_irq(void);
-+extern void msm_init_vic(uint8_t *irq_to_smsm, int nr);
- extern void msm_init_gpio(void);
- extern int msm_add_sdcc(unsigned int controller,
- 			struct msm_mmc_platform_data *plat,
-diff --git a/arch/arm/mach-msm/irq-vic.c b/arch/arm/mach-msm/irq-vic.c
-index 1b54f807c2d0..33a52f570dae 100644
---- a/arch/arm/mach-msm/irq-vic.c
-+++ b/arch/arm/mach-msm/irq-vic.c
-@@ -71,15 +71,9 @@ module_param_named(debug_mask, msm_irq_debug_mask, int,
- #define VIC_INT_POLARITY3   VIC_REG(0x005C)  /* 1: NEG, 0: POS */
- #define VIC_NO_PEND_VAL     VIC_REG(0x0060)
- 
--#if defined(CONFIG_ARCH_MSM_SCORPION)
- #define VIC_NO_PEND_VAL_FIQ VIC_REG(0x0064)
- #define VIC_INT_MASTEREN    VIC_REG(0x0068)  /* 1: IRQ, 2: FIQ     */
- #define VIC_CONFIG          VIC_REG(0x006C)  /* 1: USE SC VIC */
--#else
--#define VIC_INT_MASTEREN    VIC_REG(0x0064)  /* 1: IRQ, 2: FIQ     */
--#define VIC_PROTECTION      VIC_REG(0x006C)  /* 1: ENABLE          */
--#define VIC_CONFIG          VIC_REG(0x0068)  /* 1: USE ARM1136 VIC */
--#endif
- 
- #define VIC_IRQ_STATUS0     VIC_REG(0x0080)
- #define VIC_IRQ_STATUS1     VIC_REG(0x0084)
-@@ -105,7 +99,6 @@ module_param_named(debug_mask, msm_irq_debug_mask, int,
- #define VIC_IRQ_VEC_PEND_RD VIC_REG(0x00D4)  /* pending vector addr */
- #define VIC_IRQ_VEC_WR      VIC_REG(0x00D8)
- 
--#if defined(CONFIG_ARCH_MSM_SCORPION)
- #define VIC_FIQ_VEC_RD      VIC_REG(0x00DC)
- #define VIC_FIQ_VEC_PEND_RD VIC_REG(0x00E0)
- #define VIC_FIQ_VEC_WR      VIC_REG(0x00E4)
-@@ -115,40 +108,11 @@ module_param_named(debug_mask, msm_irq_debug_mask, int,
- #define VIC_FIQ_IN_STACK    VIC_REG(0x00F4)
- #define VIC_TEST_BUS_SEL    VIC_REG(0x00F8)
- #define VIC_IRQ_CTRL_CONFIG VIC_REG(0x00FC)
--#else
--#define VIC_IRQ_IN_SERVICE  VIC_REG(0x00E0)
--#define VIC_IRQ_IN_STACK    VIC_REG(0x00E4)
--#define VIC_TEST_BUS_SEL    VIC_REG(0x00E8)
--#endif
- 
- #define VIC_VECTPRIORITY(n) VIC_REG(0x0200+((n) * 4))
- #define VIC_VECTADDR(n)     VIC_REG(0x0400+((n) * 4))
+-struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {
++struct msm_gpiomux_config qsd8x50_gpiomux_configs[QSD8X50_GPIOMUX_NGPIOS] = {
+ 	[86] = { /* UART3 RX */
+ 		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
+ 			     GPIOMUX_FUNC_1 | GPIOMUX_VALID,
+diff --git a/arch/arm/mach-msm/gpiomux-v1.h b/arch/arm/mach-msm/gpiomux-v1.h
+index 71d86feba450..733c11aa7707 100644
+--- a/arch/arm/mach-msm/gpiomux-v1.h
++++ b/arch/arm/mach-msm/gpiomux-v1.h
+@@ -17,13 +17,8 @@
+ #ifndef __ARCH_ARM_MACH_MSM_GPIOMUX_V1_H
+ #define __ARCH_ARM_MACH_MSM_GPIOMUX_V1_H
  
 -#if defined(CONFIG_ARCH_MSM7X30)
--#define VIC_NUM_REGS	    4
+-#define GPIOMUX_NGPIOS 182
+-#elif defined(CONFIG_ARCH_QSD8X50)
+-#define GPIOMUX_NGPIOS 165
 -#else
--#define VIC_NUM_REGS	    2
+-#define GPIOMUX_NGPIOS 133
 -#endif
--
--#if VIC_NUM_REGS == 2
--#define DPRINT_REGS(base_reg, format, ...)	      			\
--	printk(KERN_INFO format " %x %x\n", ##__VA_ARGS__,		\
--			readl(base_reg ## 0), readl(base_reg ## 1))
--#define DPRINT_ARRAY(array, format, ...)				\
--	printk(KERN_INFO format " %x %x\n", ##__VA_ARGS__,		\
--			array[0], array[1])
--#elif VIC_NUM_REGS == 4
--#define DPRINT_REGS(base_reg, format, ...) \
--	printk(KERN_INFO format " %x %x %x %x\n", ##__VA_ARGS__,	\
--			readl(base_reg ## 0), readl(base_reg ## 1),	\
--			readl(base_reg ## 2), readl(base_reg ## 3))
--#define DPRINT_ARRAY(array, format, ...)				\
--	printk(KERN_INFO format " %x %x %x %x\n", ##__VA_ARGS__,	\
--			array[0], array[1],				\
--			array[2], array[3])
--#else
--#error "VIC_NUM_REGS set to illegal value"
--#endif
-+#define VIC_MAX_REGS	    4
++#define MSM7X30_GPIOMUX_NGPIOS 182
++#define QSD8X50_GPIOMUX_NGPIOS 165
  
- static uint32_t msm_irq_smsm_wake_enable[2];
- static struct {
-@@ -156,73 +120,17 @@ static struct {
- 	uint32_t int_type;
- 	uint32_t int_polarity;
- 	uint32_t int_select;
--} msm_irq_shadow_reg[VIC_NUM_REGS];
--static uint32_t msm_irq_idle_disable[VIC_NUM_REGS];
-+} msm_irq_shadow_reg[VIC_MAX_REGS];
-+static uint32_t msm_irq_idle_disable[VIC_MAX_REGS];
+ typedef u32 gpiomux_config_t;
  
- #define SMSM_FAKE_IRQ (0xff)
--static uint8_t msm_irq_to_smsm[NR_IRQS] = {
--	[INT_MDDI_EXT] = 1,
--	[INT_MDDI_PRI] = 2,
--	[INT_MDDI_CLIENT] = 3,
--	[INT_USB_OTG] = 4,
--
--	[INT_PWB_I2C] = 5,
--	[INT_SDC1_0] = 6,
--	[INT_SDC1_1] = 7,
--	[INT_SDC2_0] = 8,
--
--	[INT_SDC2_1] = 9,
--	[INT_ADSP_A9_A11] = 10,
--	[INT_UART1] = 11,
--	[INT_UART2] = 12,
--
--	[INT_UART3] = 13,
--	[INT_UART1_RX] = 14,
--	[INT_UART2_RX] = 15,
--	[INT_UART3_RX] = 16,
--
--	[INT_UART1DM_IRQ] = 17,
--	[INT_UART1DM_RX] = 18,
--	[INT_KEYSENSE] = 19,
--#if !defined(CONFIG_ARCH_MSM7X30)
--	[INT_AD_HSSD] = 20,
--#endif
--
--	[INT_NAND_WR_ER_DONE] = 21,
--	[INT_NAND_OP_DONE] = 22,
--	[INT_TCHSCRN1] = 23,
--	[INT_TCHSCRN2] = 24,
--
--	[INT_TCHSCRN_SSBI] = 25,
--	[INT_USB_HS] = 26,
--	[INT_UART2DM_RX] = 27,
--	[INT_UART2DM_IRQ] = 28,
--
--	[INT_SDC4_1] = 29,
--	[INT_SDC4_0] = 30,
--	[INT_SDC3_1] = 31,
--	[INT_SDC3_0] = 32,
--
--	/* fake wakeup interrupts */
--	[INT_GPIO_GROUP1] = SMSM_FAKE_IRQ,
--	[INT_GPIO_GROUP2] = SMSM_FAKE_IRQ,
--	[INT_A9_M2A_0] = SMSM_FAKE_IRQ,
--	[INT_A9_M2A_1] = SMSM_FAKE_IRQ,
--	[INT_A9_M2A_5] = SMSM_FAKE_IRQ,
--	[INT_GP_TIMER_EXP] = SMSM_FAKE_IRQ,
--	[INT_DEBUG_TIMER_EXP] = SMSM_FAKE_IRQ,
--	[INT_ADSP_A11] = SMSM_FAKE_IRQ,
--#ifdef CONFIG_ARCH_QSD8X50
--	[INT_SIRC_0] = SMSM_FAKE_IRQ,
--	[INT_SIRC_1] = SMSM_FAKE_IRQ,
--#endif
--};
-+static uint8_t *msm_irq_to_smsm;
+diff --git a/arch/arm/mach-msm/gpiomux.c b/arch/arm/mach-msm/gpiomux.c
+index 2b8e2d217082..768de1a05a56 100644
+--- a/arch/arm/mach-msm/gpiomux.c
++++ b/arch/arm/mach-msm/gpiomux.c
+@@ -20,6 +20,8 @@
+ #include "proc_comm.h"
  
--static inline void msm_irq_write_all_regs(void __iomem *base, unsigned int val)
-+static inline void msm_irq_write_all_regs(void __iomem *base, unsigned int val, int num)
+ static DEFINE_SPINLOCK(gpiomux_lock);
++static int gpiomux_ngpios;
++static struct msm_gpiomux_config *msm_gpiomux_configs;
+ 
+ static void __msm_gpiomux_write(unsigned gpio, gpiomux_config_t val)
  {
- 	int i;
+@@ -43,7 +45,7 @@ int msm_gpiomux_write(unsigned gpio,
+ 	unsigned long irq_flags;
+ 	gpiomux_config_t setting;
  
--	for (i = 0; i < VIC_NUM_REGS; i++)
-+	for (i = 0; i < num; i++)
- 		writel(val, base + (i * 4));
+-	if (gpio >= GPIOMUX_NGPIOS)
++	if (gpio >= gpiomux_ngpios)
+ 		return -EINVAL;
+ 
+ 	spin_lock_irqsave(&gpiomux_lock, irq_flags);
+@@ -61,14 +63,13 @@ int msm_gpiomux_write(unsigned gpio,
+ 	spin_unlock_irqrestore(&gpiomux_lock, irq_flags);
+ 	return 0;
  }
+-EXPORT_SYMBOL(msm_gpiomux_write);
  
-@@ -334,21 +242,22 @@ static struct irq_chip msm_irq_chip = {
- 	.irq_set_type  = msm_irq_set_type,
- };
+ int msm_gpiomux_get(unsigned gpio)
+ {
+ 	struct msm_gpiomux_config *cfg = msm_gpiomux_configs + gpio;
+ 	unsigned long irq_flags;
  
--void __init msm_init_irq(void)
-+void __init msm_init_vic(uint8_t *irq_to_smsm, int nr)
+-	if (gpio >= GPIOMUX_NGPIOS)
++	if (gpio >= gpiomux_ngpios)
+ 		return -EINVAL;
+ 
+ 	spin_lock_irqsave(&gpiomux_lock, irq_flags);
+@@ -77,14 +78,13 @@ int msm_gpiomux_get(unsigned gpio)
+ 	spin_unlock_irqrestore(&gpiomux_lock, irq_flags);
+ 	return 0;
+ }
+-EXPORT_SYMBOL(msm_gpiomux_get);
+ 
+ int msm_gpiomux_put(unsigned gpio)
+ {
+ 	struct msm_gpiomux_config *cfg = msm_gpiomux_configs + gpio;
+ 	unsigned long irq_flags;
+ 
+-	if (gpio >= GPIOMUX_NGPIOS)
++	if (gpio >= gpiomux_ngpios)
+ 		return -EINVAL;
+ 
+ 	spin_lock_irqsave(&gpiomux_lock, irq_flags);
+@@ -94,13 +94,14 @@ int msm_gpiomux_put(unsigned gpio)
+ 	spin_unlock_irqrestore(&gpiomux_lock, irq_flags);
+ 	return 0;
+ }
+-EXPORT_SYMBOL(msm_gpiomux_put);
+ 
+-static int __init gpiomux_init(void)
++int __init gpiomux_init(struct msm_gpiomux_config *config, unsigned int ngpios)
  {
  	unsigned n;
-+	msm_irq_to_smsm = irq_to_smsm;
++	msm_gpiomux_configs = config;
++	gpiomux_ngpios = ngpios;
  
- 	/* select level interrupts */
--	msm_irq_write_all_regs(VIC_INT_TYPE0, 0);
-+	msm_irq_write_all_regs(VIC_INT_TYPE0, 0, nr / 32);
- 
- 	/* select highlevel interrupts */
--	msm_irq_write_all_regs(VIC_INT_POLARITY0, 0);
-+	msm_irq_write_all_regs(VIC_INT_POLARITY0, 0, nr / 32);
- 
- 	/* select IRQ for all INTs */
--	msm_irq_write_all_regs(VIC_INT_SELECT0, 0);
-+	msm_irq_write_all_regs(VIC_INT_SELECT0, 0, nr / 32);
- 
- 	/* disable all INTs */
--	msm_irq_write_all_regs(VIC_INT_EN0, 0);
-+	msm_irq_write_all_regs(VIC_INT_EN0, 0, nr / 32);
- 
- 	/* don't use vic */
- 	writel(0, VIC_CONFIG);
-@@ -356,7 +265,7 @@ void __init msm_init_irq(void)
- 	/* enable interrupt controller */
- 	writel(3, VIC_INT_MASTEREN);
- 
--	for (n = 0; n < NR_MSM_IRQS; n++) {
-+	for (n = 0; n < nr; n++) {
- 		irq_set_chip_and_handler(n, &msm_irq_chip, handle_level_irq);
- 		set_irq_flags(n, IRQF_VALID);
+-	for (n = 0; n < GPIOMUX_NGPIOS; ++n) {
++	for (n = 0; n < gpiomux_ngpios; ++n) {
+ 		msm_gpiomux_configs[n].ref = 0;
+ 		if (!(msm_gpiomux_configs[n].suspended & GPIOMUX_VALID))
+ 			continue;
+@@ -108,4 +109,3 @@ static int __init gpiomux_init(void)
  	}
+ 	return 0;
+ }
+-postcore_initcall(gpiomux_init);
+diff --git a/arch/arm/mach-msm/gpiomux.h b/arch/arm/mach-msm/gpiomux.h
+index 4410d7766f93..cdc1578d1e73 100644
+--- a/arch/arm/mach-msm/gpiomux.h
++++ b/arch/arm/mach-msm/gpiomux.h
+@@ -65,7 +65,7 @@ enum {
+  * of that flag will prevent the configuration from being applied
+  * during state transitions.
+  */
+-extern struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS];
++extern struct msm_gpiomux_config qsd8x50_gpiomux_configs[QSD8X50_GPIOMUX_NGPIOS];
+ 
+ /* Install a new configuration to the gpio line.  To avoid overwriting
+  * a configuration, leave the VALID bit out.
+@@ -73,6 +73,8 @@ extern struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS];
+ int msm_gpiomux_write(unsigned gpio,
+ 		      gpiomux_config_t active,
+ 		      gpiomux_config_t suspended);
++
++int gpiomux_init(struct msm_gpiomux_config *config, unsigned int ngpios);
+ #else
+ static inline int msm_gpiomux_write(unsigned gpio,
+ 				    gpiomux_config_t active,
+@@ -80,5 +82,9 @@ static inline int msm_gpiomux_write(unsigned gpio,
+ {
+ 	return -ENOSYS;
+ }
++int gpiomux_init(struct msm_gpiomux_config *config, unsigned int ngpios)
++{
++	return 0;
++}
+ #endif
+ #endif
+diff --git a/drivers/gpio/gpio-msm-v1.c b/drivers/gpio/gpio-msm-v1.c
+index edf285e26667..589115c1faa2 100644
+--- a/drivers/gpio/gpio-msm-v1.c
++++ b/drivers/gpio/gpio-msm-v1.c
+@@ -328,8 +328,11 @@ struct msm_gpio_chip {
+ struct msm_gpio_initdata {
+ 	struct msm_gpio_chip *chips;
+ 	int count;
++	bool mux;
+ };
+ 
++static bool msm_gpio_mux;
++
+ static void msm_gpio_writel(struct msm_gpio_chip *chip, u32 val,
+ 			    enum msm_gpio_reg reg)
+ {
+@@ -446,20 +449,19 @@ static int msm_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+ 	return MSM_GPIO_TO_INT(chip->base + offset);
+ }
+ 
+-#ifdef CONFIG_MSM_GPIOMUX
+ static int msm_gpio_request(struct gpio_chip *chip, unsigned offset)
+ {
++	if (!IS_ENABLED(CONFIG_MSM_GPIOMUX) || !msm_gpio_mux)
++		return 0;
+ 	return msm_gpiomux_get(chip->base + offset);
+ }
+ 
+ static void msm_gpio_free(struct gpio_chip *chip, unsigned offset)
+ {
++	if (!IS_ENABLED(CONFIG_MSM_GPIOMUX) || !msm_gpio_mux)
++		return;
+ 	msm_gpiomux_put(chip->base + offset);
+ }
+-#else
+-#define msm_gpio_request NULL
+-#define msm_gpio_free NULL
+-#endif
+ 
+ static struct msm_gpio_chip *msm_gpio_chips;
+ static int msm_gpio_count;
+@@ -476,6 +478,7 @@ static struct msm_gpio_chip msm_gpio_chips_msm7x01[] = {
+ static struct msm_gpio_initdata msm_gpio_7x01_init = {
+ 	.chips = msm_gpio_chips_msm7x01,
+ 	.count = ARRAY_SIZE(msm_gpio_chips_msm7x01),
++	.mux = false,
+ };
+ 
+ static struct msm_gpio_chip msm_gpio_chips_msm7x30[] = {
+@@ -492,6 +495,7 @@ static struct msm_gpio_chip msm_gpio_chips_msm7x30[] = {
+ static struct msm_gpio_initdata msm_gpio_7x30_init = {
+ 	.chips = msm_gpio_chips_msm7x30,
+ 	.count = ARRAY_SIZE(msm_gpio_chips_msm7x30),
++	.mux = true,
+ };
+ 
+ static struct msm_gpio_chip msm_gpio_chips_qsd8x50[] = {
+@@ -508,6 +512,7 @@ static struct msm_gpio_chip msm_gpio_chips_qsd8x50[] = {
+ static struct msm_gpio_initdata msm_gpio_8x50_init = {
+ 	.chips = msm_gpio_chips_qsd8x50,
+ 	.count = ARRAY_SIZE(msm_gpio_chips_qsd8x50),
++	.mux = true,
+ };
+ 
+ static void msm_gpio_irq_ack(struct irq_data *d)
+@@ -643,6 +648,7 @@ static int gpio_msm_v1_probe(struct platform_device *pdev)
+ 	data = (struct msm_gpio_initdata *)dev_id->driver_data;
+ 	msm_gpio_chips = data->chips;
+ 	msm_gpio_count = data->count;
++	msm_gpio_mux = data->mux;
+ 
+ 	irq1 = platform_get_irq(pdev, 0);
+ 	if (irq1 < 0)
 -- 
 2.1.0.rc2
