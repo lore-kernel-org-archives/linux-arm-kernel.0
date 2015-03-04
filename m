@@ -1,112 +1,74 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Thu,  5 Mar 2015 00:10:23 +0100
-Subject: [PATCH 4/5] ARM: dts: vf610: add NAND flash controller peripherial
-In-Reply-To: <1425510624-22250-1-git-send-email-stefan@agner.ch>
-References: <1425510624-22250-1-git-send-email-stefan@agner.ch>
-Message-ID: <1425510624-22250-5-git-send-email-stefan@agner.ch>
+Date: Thu,  5 Mar 2015 00:10:19 +0100
+Subject: [PATCH 0/5] mtd: nand: vf610_nfc: Freescale NFC for VF610
+Message-ID: <1425510624-22250-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the NAND flash controller (NFC) peripherial. The driver
-supports the SLC NAND chips found on Freescale's Vybrid Tower System
-Module. The Micron NAND chip on the module needs 4-bit ECC per 512
-byte page. Use 24-bit ECC per 2k page, which is supported by the
-driver.
+This adds support for Freescale NAND flash controller (NFC) found on
+various devices such as Vybrid (VF610), MPC5125, MCF54418 (ColdFire)
+and Kinetis K70.
 
-Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/vf500.dtsi    |  4 ++++
- arch/arm/boot/dts/vf610-twr.dts | 43 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/vfxxx.dtsi    |  7 +++++++
- 3 files changed, 54 insertions(+)
+The patchset is based on the patchset by Bill Pringlemeir, see:
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/295419
 
-diff --git a/arch/arm/boot/dts/vf500.dtsi b/arch/arm/boot/dts/vf500.dtsi
-index 1dbf8d2..1aa1e47 100644
---- a/arch/arm/boot/dts/vf500.dtsi
-+++ b/arch/arm/boot/dts/vf500.dtsi
-@@ -118,6 +118,10 @@
- 	interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
- };
- 
-+&nfc {
-+	interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
-+};
-+
- &pit {
- 	interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
- };
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index f64fddc..704564e 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -287,6 +287,49 @@
- 	status = "okay";
- };
- 
-+&iomuxc {
-+	vf610-twr {
-+		pinctrl_nfc_1: nfcgrp_1 {
-+			fsl,pins = <
-+			VF610_PAD_PTD31__NF_IO15	0x28df
-+			VF610_PAD_PTD30__NF_IO14	0x28df
-+			VF610_PAD_PTD29__NF_IO13	0x28df
-+			VF610_PAD_PTD28__NF_IO12	0x28df
-+			VF610_PAD_PTD27__NF_IO11	0x28df
-+			VF610_PAD_PTD26__NF_IO10	0x28df
-+			VF610_PAD_PTD25__NF_IO9		0x28df
-+			VF610_PAD_PTD24__NF_IO8		0x28df
-+			VF610_PAD_PTD23__NF_IO7		0x28df
-+			VF610_PAD_PTD22__NF_IO6		0x28df
-+			VF610_PAD_PTD21__NF_IO5		0x28df
-+			VF610_PAD_PTD20__NF_IO4		0x28df
-+			VF610_PAD_PTD19__NF_IO3		0x28df
-+			VF610_PAD_PTD18__NF_IO2		0x28df
-+			VF610_PAD_PTD17__NF_IO1		0x28df
-+			VF610_PAD_PTD16__NF_IO0		0x28df
-+			VF610_PAD_PTB24__NF_WE_B	0x28c2
-+			VF610_PAD_PTB25__NF_CE0_B	0x28c2
-+			VF610_PAD_PTB27__NF_RE_B	0x28c2
-+			VF610_PAD_PTC26__NF_RB_B	0x283d
-+			VF610_PAD_PTC27__NF_ALE		0x28c2
-+			VF610_PAD_PTC28__NF_CLE		0x28c2
-+			>;
-+		};
-+	};
-+};
-+
-+&nfc {
-+	clock-frequency = <33000000>;
-+	nand-bus-width = <16>;
-+	nand-ecc-mode = "hw";
-+	nand-on-flash-bbt;
-+	nand-ecc-strength = <24>;
-+	nand-ecc-step-size = <2048>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_nfc_1>;
-+	status = "okay";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-index a29c7ce..03b4b55 100644
---- a/arch/arm/boot/dts/vfxxx.dtsi
-+++ b/arch/arm/boot/dts/vfxxx.dtsi
-@@ -458,6 +458,13 @@
- 				status = "disabled";
- 			};
- 
-+			nfc: nand at 400e0000 {
-+				compatible = "fsl,vf610-nfc";
-+				reg = <0x400e0000 0x4000>;
-+				clocks = <&clks VF610_CLK_NFC>;
-+				clock-names = "nfc";
-+				status = "disabled";
-+			};
- 		};
- 	};
- };
+A variant of this driver is in upstream U-Boot now. During this
+process, various points have been discussed and changed. Those
+changes are also incorporated in this patchset, including the
+change to the name "vf610_nfc" (discussion in first patchset).
+http://thread.gmane.org/gmane.comp.boot-loaders.u-boot/192465
+http://thread.gmane.org/gmane.comp.boot-loaders.u-boot/193142
+http://thread.gmane.org/gmane.comp.boot-loaders.u-boot/193351
+http://thread.gmane.org/gmane.comp.boot-loaders.u-boot/195441
+http://thread.gmane.org/gmane.comp.boot-loaders.u-boot/195513
+
+MTD tests worked, except mtd_nandecctest.ko: The test stopped
+already after changing the first bit. I guess this is due to not
+properly working raw page read/write implementation. However,
+implementing those functions is not feasible since ECC is always
+done on-the-fly.
+
+Performance keypoints (slightly less for page write/reads):
+[ 1782.284398] mtd_speedtest: testing eraseblock write speed
+[ 1963.472907] mtd_speedtest: eraseblock write speed is 2877 KiB/s
+[ 1963.478913] mtd_speedtest: testing eraseblock read speed
+[ 2004.906267] mtd_speedtest: eraseblock read speed is 12586 KiB/s
+
+The driver has only been tested on Freescale Vybrid. Tests on other
+platforms welcome, especially on big endian architectures...
+
+Changes since RFC (Bill Pringlemeir):
+- Renamed driver from fsl_nfc to vf610_nfc
+- Use readl/writel for all register in accessor functions
+- Optimized field accessor functions
+- Implemented PM (suspend/resume) functions
+- Implemented basic support for ECC strength/ECC step size from dt
+- Improved performance of count_written_bits by using hweight32
+- Support ECC with 60-bytes to correct up to 32 bit errors
+- Changed to in-band BBT (NAND_BBT_NO_OOB) which also allows ECC modes
+  which uses up to 60 bytes on 64 byte OOB
+- Removed custom (downstream) BBT pattern since BBT table won't be
+  compatible anyway (due to the change above)
+
+Stefan Agner (5):
+  mtd: nand: vf610_nfc: Freescale NFC for VF610, MPC5125 and others
+  mtd: nand: vf610_nfc: add hardware BCH-ECC support
+  mtd: nand: vf610_nfc: add device tree bindings
+  ARM: dts: vf610: add NAND flash controller peripherial
+  ARM: dts: vf-colibri: enable NAND flash controller
+
+ .../devicetree/bindings/mtd/vf610-nfc.txt          |  38 +
+ arch/arm/boot/dts/vf-colibri.dtsi                  |  31 +
+ arch/arm/boot/dts/vf500.dtsi                       |   4 +
+ arch/arm/boot/dts/vf610-twr.dts                    |  43 +
+ arch/arm/boot/dts/vfxxx.dtsi                       |   7 +
+ arch/arm/mach-imx/Kconfig                          |   1 +
+ drivers/mtd/nand/Kconfig                           |  14 +
+ drivers/mtd/nand/Makefile                          |   1 +
+ drivers/mtd/nand/vf610_nfc.c                       | 873 +++++++++++++++++++++
+ 9 files changed, 1012 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+ create mode 100644 drivers/mtd/nand/vf610_nfc.c
+
 -- 
 2.3.0
