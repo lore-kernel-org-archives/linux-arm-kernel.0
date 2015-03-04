@@ -1,114 +1,218 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 04 Mar 2015 10:10:50 +0100
-Subject: [PATCH v2 1/4] i2c: mux-pinctrl: Rework to honor disabled child
- nodes
-In-Reply-To: <54F4C185.9080808@wwwdotorg.org>
-References: <1424199129-22099-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1425039885-5137-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1425039885-5137-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <54F4C185.9080808@wwwdotorg.org>
-Message-ID: <54F6CC1A.3030102@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 04 Mar 2015 10:20:36 +0100
+Subject: [PATCH/RFC 0/4] Probe deferral for IOMMU DT integration
+In-Reply-To: <1519819.qZaXvuQI61@avalon>
+References: <1423182722-16646-1-git-send-email-lauraa@codeaurora.org>
+ <1519819.qZaXvuQI61@avalon>
+Message-ID: <54F6CE64.8040503@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.03.2015 21:01, Stephen Warren wrote:
-> On 02/27/2015 05:24 AM, Sebastian Hesselbarth wrote:
->> I2C mux pinctrl driver currently determines the number of sub-busses by
->> counting available pinctrl-names. Unfortunately, this requires each
->> incarnation of the devicetree node with different available sub-busses
->> to be rewritten.
+Hello,
+
+On 2015-02-16 17:14, Laurent Pinchart wrote:
+> Hi Laura and all,
+>
+> On Thursday 05 February 2015 16:31:58 Laura Abbott wrote:
+>> Hi,
 >>
->> This patch reworks i2c-mux-pinctrl driver to count the number of
->> available sub-nodes instead. The rework should be compatible to the old
->> way of probing for sub-busses and additionally allows to disable unused
->> sub-busses with standard DT property status = "disabled".
+>> On the heels of Exynos integrating SMMU in to the DT for probing,
+>> this series attempts to add support to make SMMU drivers work with
+>> deferred probing. This has been referenced before[1] but this is
+>> some actual code to use as a starting point for discussion.
 >>
->> This also amends the corresponding devicetree binding documentation to
->> reflect the new functionality to disable unused sub-nodes. While at it,
->> also fix two references to binding documentation files that miss an
->> "i2c-"
->> prefix.
->
->> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mux-pinctrl.txt
->> b/Documentation/devicetree/bindings/i2c/i2c-mux-pinctrl.txt
->
->> -For each named state defined in the pinctrl-names property, an I2C
->> child bus
->> -will be created. I2C child bus numbers are assigned based on the
->> index into
->> -the pinctrl-names property.
->> +For each enabled child node an I2C child bus will be created. I2C
->> child bus
->> +numbers are assigned based on the order of child nodes.
->
-> I think that I2C bus numbers are an internal concept for the OS. As
-> such, we should probably remove any mention re: the bus numbers from the
-> binding.
-
-Stephen,
-
-yeah as you can see I am struggling to find a good documentation. I
-agree that we should get rid of the bus number thing above.
-
->> -The only exception is that no bus will be created for a state named
->> "idle". If
->> -such a state is defined, it must be the last entry in pinctrl-names. For
->> -example:
->> +There must be a corresponding pinctrl-names entry for each enabled child
->> +node at the position of the child node's "reg" property. Also, there
->> can be
->> +an idle pinctrl state defined at the end of possible pinctrl states.
->> If such
->> +a state is defined, it must be the last entry in pinctrl-names. For
->> example:
->
-> What about gaps in the numbering sequence? IIRC, in a situation with 5
-> nodes with reg 0, 1, 2, 3, 4 but where only the nodes with reg of 1, 3
-> enabled, we only want 2 entries in pinctrl-names? If so, "at the
-> position of the child node's "reg" property" isn't correct, since "at
-> the position" implies there must be gaps in pinctrl-names. "In the same
-> order as the reg property values for enabled subnodes" might be a better
-> description.
-
-Good point. The idea was to _have_ gaps in pinctrl-names to allow to
-configure the current mux layout by status properties only. The existing
-implementation (and docu) suggested you have to amend pinctrl-names to
-achieve a specific setup.
-
-> Perhaps I'm misremembering and you explicitly didn't want to remove
-> entries from pinctrl-names if child nodes were disabled? If so, then
-> surely then in the text above, "for each enabled child" should be
-> replaced with "for each child"?
-
-True.
-
->> @@ -68,6 +68,7 @@ Example:
->>           pinctrl-1 = <&state_i2cmux_pta>;
->>           pinctrl-2 = <&state_i2cmux_idle>;
+>> The requirement for this is based on a previous patch to add clock
+>> support to the ARM SMMU driver[2]. Once we have clock support, it's
+>> possible that the driver itself may need to be defered which breaks
+>> a bunch of assumptions about how SMMU probing is supposed to work.
+>> The concept here is to have the driver call of_dma_configure which
+>> may return -EPROBE_DEFER. of_dma_configure could possibly be moved
+>> up to probe level. The existing method of initialization still needs
+>> to be done as well which might mean we have the worst of both worlds.
 >>
->> +        /* Enabled child bus 0 */
->>           i2c at 0 {
->>               reg = <0>;
->>               #address-cells = <1>;
->> @@ -79,10 +80,12 @@ Example:
->>               };
->>           };
->>
->> +        /* Disabled child bus 1 */
->>           i2c at 1 {
->>               reg = <1>;
->>               #address-cells = <1>;
->>               #size-cells = <0>;
->> +            status = "disabled";
+>> Open questions:
+>> - This still doesn't really address Arnd's concerns[3] about disabling
+>> IOMMUs
+> Arnd, Will and I have discussed IOMMU probe deferral last week. Here's a
+> summary of the discussion, before the details blur away.
 >
-> To make the example cover more cases, perhaps make child node i2c at 0
-> disabled and i2c at 1 enabled. Then, the example would show what happens to
-> pinctrl-names when there are gaps in the reg property numbering space of
-> enabled children?
+> The discussion covered both higher level concepts and lower level details, in
+> various directions. I'll try to make the summary clear by filling the gaps
+> between pieces where needed, so some of the information below might not be a
+> direct result of the discussions. Arnd and Will, please feel free to correct
+> me.
+>
+> The first question we've discussed was whether probe deferral for IOMMUs is
+> really needed. Various dependencies between IOMMU devices and other devices
+> exist, in particular on clocks (as you have mentioned above) and on power
+> domains (as mentioned by Marek in http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/323238.html). While there are mechanism to handle
+> some of them with probe deferral (for instance by using the OF_DECLARE macros
+> to register clock drivers), generalizing those mechanisms would essentially
+> recreate a probe ordering mechanism similar to link order probe ordering and
+> couldn't really scale.
+>
+> Additionally, IOMMUs could also be present hot-pluggable devices and depend on
+> resources that are thus hot-plugged. OF_DECLARE wouldn't help in that case.
+> For all those reasons we have concluded that probe deferral for IOMMUs is
+> desired if it can be implemented cleanly.
+>
+> The second question we've discussed was how to implement probe deferral
+> cleanly :-)
+>
+> The current implementation configures DMA at device creation time and sets the
+> following properties:
+>
+> - dma_map_ops (IOMMU, SWIOTLB, linear mapping)
+> - initial DMA mask
+> - DMA offset
+> - DMA coherency
+>
+> Additionally the IOMMU group (when an IOMMU is present) will also be
+> configured at the same time (patches are under review).
+>
+> The base idea is to defer probing of bus master devices when their IOMMU isn't
+> present. Three cases need to be handled.
+>
+> 1. No IOMMU is declared by the firmware (through DT, ACPI, ...) for the bus
+> master device. The bus master device probe doesn't need to be deferred due to
+> the IOMMU. dma_map_ops must be set to SWIOTLB or linear mapping (the later
+> should likely be implemented through SWIOTLB).
+>
+> 2. An IOMMU is declared for the bus master device and the IOMMU has been
+> successfully probed and registered. The bus master device probe doesn't need
+> to be deferred due to the IOMMU. dma_map_ops must be set to IOMMU ops.
+>
+> 3. An IOMMU is declared for the bus master device but the IOMMU isn't
+> registered. This can be caused by different reasons:
+>
+> - a. No driver is loaded for this IOMMU (for instance because DT describes the
+> IOMMU connection, but the IOMMU driver hasn't been developed yet, or an older
+> kernel is used). If the IOMMU is optional the bus master device probe should
+> succeed, and dma_map_ops should be set to linear. If the IOMMU is mandatory
+> the bus master device probe should fail.
+>
+> Note that, as we require IOMMU drivers to be compiled in, we don't need to
+> handle the case of loadable IOMMU drivers that haven't been loaded yet.
+>
+> - b. A driver is loaded for this IOMMU but the IOMMU hasn't been probed yet,
+> or its probe has been deferred. The bus master device probe should be
+> deferred.
+>
+> - c. A driver is loaded for this IOMMU but the IOMMU probe has failed
+> permanently. It's not clear at the moment whether we should try to recover
+> from this automatically using the same mechanism as case 3.a, or if we can
+> considered this as an abnormal failure and disable the bus master device.
+>
+> Assuming that we should try to recover from such an error, we can't predict
+> this case when the device is instantiated (even if IOMMUs are registered
+> before bus master devices are added, for instance using the OF_DECLARE
+> mechanism that Will has implemented). We thus need to setup the dma_map_ops
+> and IOMMU group at bus master device probe time.
+>
+> Furthermore, we can't distinguish cases 3.a and 3.b at bus master probe time
+> without early registration of IOMMU drivers. Case 3.a would instead be
+> considered as 3.b, leading to infinite probe deferral of bus master devices.
+>
+> For those reasons we have concluded that IOMMU probe deferral needs to be
+> implemented with a combination of several mechanisms. The following steps
+> should happen at bus master device probe time.
+>
+> 1. The IOMMU device referenced by the firmware with the bus master device is
+> looked up. On DT-based systems, this will be the IOMMU DT node referenced by
+> the iommus property. If no IOMMU device is associated, dma_map_ops will be set
+> to linear mapping or SWIOTLB and device probe will continue.
+>
+> 2. An IOMMU device is referenced for the bus master device.
+>
+> The corresponding IOMMU instance is looked up. This requires a new IOMMU
+> registration system. IOMMU drivers will create IOMMU instances at probe time
+> and register them with the IOMMU core.
+>
+> If an IOMMU instance is found for the referenced IOMMU device, the IOMMU
+> instance's of_xlate function will be called to setup the IOMMU.
+>
+> If the of_xlate call succeeds dma_map_ops will be set to IOMMU ops and device
+> probe will continue. If the call fails we can either fail the bus master
+> device probe, or fall back to non-IOMMU dma_map_ops (to be discussed).
+>
+> 3. The IOMMU device referenced for the bus master device isn't present, due to
+> the IOMMU device probe not having been performed yet, having been deferred, or
+> having failed.
+>
+> The IOMMU driver associated with the IOMMU device is looked up. This was
+> initially thought to require an early registration mechanism for IOMMU drivers
+> (using an OF_DECLARE mechanism for DT-based systems for instance), but on
+> second thought it might be possible to implement this based on normal driver
+> registration (to be researched).
+>
+> If an IOMMU driver is found for the referenced IOMMU device, a callback
+> function of the IOMMU driver is called to check whether an IOMMU instance is
+> expected to be registered later (most IOMMU drivers will just return true, so
+> we could skip this callback function until an IOMMU driver requires it). If an
+> IOMMU instance is expected to be registered later the bus master device probe
+> is deferred. Otherwise dma_map_ops will be set to linear mapping/SWIOTLB and
+> device probe will continue.
+>
+>
+> The initial DMA mask and the DMA offset can still be configured at device
+> instantiation time if desired.
 
-The idea was to make nothing happen to pinctrl-names if you enable/
-disable any of the children. But I can move the disabled status to
-i2c at 0 to make it more clear that there should still be a pinctrl-names
-cell for it.
+I'm sorry for not participating in the discussions, I was terribly busy 
+with our
+internal stuff. The approach you have described looks fine although I 
+would like
+also to know a bit more about the roadmap of development. The IOMMU 
+integration
+is being discussed for over 2 years and right now we are STILL discussing.
 
-Sebastian
+Do you plan to post any patches implementing this approach? I would 
+really like
+to merge something simple, maybe not fully optimized and then resolve 
+all the
+corner cases and possible integration details.
+
+>
+>> - Currently tested where we knew the driver was going to be deferring.
+>> Probably need some logic for calling of_dma_configure again.
+>>
+>> This is based on Robin Murphy's work for dma mapping[4] and a few
+>> patches from Murali Kaicheri[5] for of_dma_configure.
+>>
+>>
+>> [1]
+>> http://lists.linuxfoundation.org/pipermail/iommu/2015-January/011764.html
+>> [2]
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/279036.ht
+>> ml [3]
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/311579.
+>> html [4]
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315459.h
+>> tml [5]
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/319390.h
+>> tml
+>>
+>> Laura Abbott (3):
+>>    dma-mapping: Make arch_setup_dma_ops return an error code
+>>    of: Return error codes from of_dma_configure
+>>    iommu/arm-smmu: Support deferred probing
+>>
+>> Mitchel Humpherys (1):
+>>    iommu/arm-smmu: add support for specifying clocks
+>>
+>>   arch/arm/include/asm/dma-mapping.h   |   2 +-
+>>   arch/arm/mm/dma-mapping.c            |   4 +-
+>>   arch/arm64/include/asm/dma-mapping.h |   2 +-
+>>   arch/arm64/mm/dma-mapping.c          |  16 +--
+>>   drivers/iommu/arm-smmu.c             | 186 ++++++++++++++++++++++++++++++--
+>>   drivers/iommu/iommu.c                |  49 ++++++++-
+>>   drivers/iommu/of_iommu.c             |  14 ++-
+>>   drivers/of/device.c                  |   9 +-
+>>   include/linux/dma-mapping.h          |   7 +-
+>>   include/linux/iommu.h                |   2 +
+>>   include/linux/of_device.h            |   4 +-
+>>   11 files changed, 268 insertions(+), 27 deletions(-)
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
