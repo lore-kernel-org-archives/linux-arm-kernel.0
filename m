@@ -1,40 +1,58 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 05 Mar 2015 00:23:09 +0100
-Subject: [PATCH] pinctrl: imx: do not implicitly set pin regs to -1
-In-Reply-To: <20150302155315.GD7865@pengutronix.de>
-References: <1423240256-27210-1-git-send-email-stefan@agner.ch>
- <20150302114516.GC3040@dragon> <20150302125935.GC7865@pengutronix.de>
- <43491e2cb2c520d8f15d90ae99a82f28@agner.ch>
- <20150302155315.GD7865@pengutronix.de>
-Message-ID: <89abf03242a4e5a39fab1373c62dce13@agner.ch>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 5 Mar 2015 00:35:58 +0100
+Subject: [PATCH 1/6] ARM: at91: switch to multiplatform
+In-Reply-To: <1425511307.2090.60.camel@tiscali.nl>
+References: <1425480446-31711-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1425480446-31711-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <1425511307.2090.60.camel@tiscali.nl>
+Message-ID: <20150304233558.GK3989@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-03-02 16:53, Uwe Kleine-K?nig wrote:
-> Hello,
+On 05/03/2015 at 00:21:47 +0100, Paul Bolle wrote :
+> > +config ARCH_AT91
+> > +	select ARCH_REQUIRE_GPIOLIB
+> >  	select COMMON_CLK_AT91
+> > -	select CPU_V7
+> > +	select CLKDEV_LOOKUP
+> >  	select GENERIC_CLOCKEVENTS
+> > -	select MEMORY
+> > -	select ATMEL_SDRAMC
+> > -	select PHYLIB if NETDEVICES
+> > -
+> > -menu "Atmel AT91 System-on-Chip"
+> > -
+> > -choice
+> > -
+> > -	prompt "Core type"
+> > -
+> > -config SOC_SAM_V4_V5
+> > -	bool "ARM9 AT91SAM9/AT91RM9200"
+> > -	help
+> > -	  Select this if you are using one of Atmel's AT91SAM9 or
+> > -	  AT91RM9200 SoC.
+> > +	select IRQ_DOMAIN
+> > +	select NEED_MACH_IO_H if PCCARD
+> > +	select PINCTRL
+> > +	select PINCTRL_AT91
+> > +	select SOC_BUS
+> > +	select USE_OF
+> > +	bool
 > 
-> On Mon, Mar 02, 2015 at 02:42:01PM +0100, Stefan Agner wrote:
->> On 2015-03-02 13:59, Uwe Kleine-K?nig wrote:
->> > On Mon, Mar 02, 2015 at 07:45:17PM +0800, Shawn Guo wrote:
->> >> On Fri, Feb 06, 2015 at 05:30:56PM +0100, Stefan Agner wrote:
->> >> > Commit 3dac1918a491 ("pinctrl: imx: detect uninitialized pins") needs
->> >> > the values in struct imx_pin_reg to be -1. This has been done in a
->> >> > rather unorthodox way by setting the memory to 0xff using memset...
->> >> > Use a proper for loop to initialize the whole array with -1.
->> >> >
->> >> > Signed-off-by: Stefan Agner <stefan@agner.ch>
->> >>
->> >> Acked-by: Shawn Guo <shawn.guo@linaro.org>
->> > too late. This patch is part of 4.0-rc1 (4ff0f034e95d).
->>
->> This is not the same patch. The patch you are mentioning is actually
->> fixing a bug introduce in the change where we set -1 for uninitialized
->> pins. This patch is solving the weird assignment of the initial value...
-> ah right.
+> Utterly trivial, but anyhow. Could you please make this
+>     bool
+> 
+> line to be the line directly following the line reading
+>     config ARCH_AT91
+> 
+> above?
+> 
 
-Do you generally agree to that change?
+I can definitely do that, is your parser relying on it? :)
 
-@Linus Walleij, anything holding this patch back from getting merged?
 
---
-Stefan
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
