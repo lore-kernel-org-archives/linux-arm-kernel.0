@@ -1,101 +1,38 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 4 Mar 2015 17:58:12 +0100
-Subject: [PATCH] ARM: at91/dt/trivial: correct file headers for SAMA5D3 SoC
- peripherals
-Message-ID: <1425488292-21303-1-git-send-email-nicolas.ferre@atmel.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Wed, 04 Mar 2015 18:03:11 +0100
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <20150304142943.GU28951@e104818-lin.cambridge.arm.com>
+References: <20150220153626.GB10942@hawk.usersys.redhat.com>
+ <20150224145529.GA5498@hawk.usersys.redhat.com>
+ <CAKv+Gu-Uk2wg1OkoWgQe4da_EiFoEz_u8VuD8Ees6qU1UYMDvQ@mail.gmail.com>
+ <20150302163146.GB9686@lvm> <54F51A63.4060302@samsung.com>
+ <20150304113505.GS28951@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8OUtcpaQh5+gb6vNrdi+Q7eu_zKOujmyoRPrzrs+GJVQ@mail.gmail.com>
+ <20150304122956.GT28951@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
+ <20150304141212.GA5352@hawk.usersys.redhat.com>
+ <20150304142943.GU28951@e104818-lin.cambridge.arm.com>
+Message-ID: <54F73ACF.1090605@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-File name had at91 prefix, which is not the case anymore for SAMA5D3.
-AT91SAM9x5 was mentioned instead of SAMA5D3 SoC.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/sama5d3_can.dtsi  | 2 +-
- arch/arm/boot/dts/sama5d3_emac.dtsi | 2 +-
- arch/arm/boot/dts/sama5d3_gmac.dtsi | 2 +-
- arch/arm/boot/dts/sama5d3_lcd.dtsi  | 2 +-
- arch/arm/boot/dts/sama5d3_mci2.dtsi | 2 +-
- arch/arm/boot/dts/sama5d3_tcb1.dtsi | 2 +-
- arch/arm/boot/dts/sama5d3_uart.dtsi | 2 +-
- 7 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sama5d3_can.dtsi b/arch/arm/boot/dts/sama5d3_can.dtsi
-index eaf41451ad0c..c5a3772741bf 100644
---- a/arch/arm/boot/dts/sama5d3_can.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_can.dtsi
-@@ -1,5 +1,5 @@
- /*
-- * at91sama5d3_can.dtsi - Device Tree Include file for AT91SAM9x5 SoC with
-+ * sama5d3_can.dtsi - Device Tree Include file for SAMA5D3 SoC with
-  * CAN support
-  *
-  * Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
-diff --git a/arch/arm/boot/dts/sama5d3_emac.dtsi b/arch/arm/boot/dts/sama5d3_emac.dtsi
-index fe2af9276312..ca4094d8d0fc 100644
---- a/arch/arm/boot/dts/sama5d3_emac.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_emac.dtsi
-@@ -1,5 +1,5 @@
- /*
-- * at91sama5d3_emac.dtsi - Device Tree Include file for AT91SAM9x5 SoC with
-+ * sama5d3_emac.dtsi - Device Tree Include file for SAMA5D3 SoC with
-  * Ethernet.
-  *
-  * Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
-diff --git a/arch/arm/boot/dts/sama5d3_gmac.dtsi b/arch/arm/boot/dts/sama5d3_gmac.dtsi
-index de5ed59fb446..23f225fbb756 100644
---- a/arch/arm/boot/dts/sama5d3_gmac.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_gmac.dtsi
-@@ -1,5 +1,5 @@
- /*
-- * at91sama5d3_gmac.dtsi - Device Tree Include file for AT91SAM9x5 SoC with
-+ * sama5d3_gmac.dtsi - Device Tree Include file for SAMA5D3 SoC with
-  * Gigabit Ethernet.
-  *
-  * Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
-diff --git a/arch/arm/boot/dts/sama5d3_lcd.dtsi b/arch/arm/boot/dts/sama5d3_lcd.dtsi
-index 85d302701565..8aeff6c122aa 100644
---- a/arch/arm/boot/dts/sama5d3_lcd.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_lcd.dtsi
-@@ -1,5 +1,5 @@
- /*
-- * at91sama5d3_lcd.dtsi - Device Tree Include file for AT91SAM9x5 SoC with
-+ * sama5d3_lcd.dtsi - Device Tree Include file for SAMA5D3 SoC with
-  * LCD support
-  *
-  * Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
-diff --git a/arch/arm/boot/dts/sama5d3_mci2.dtsi b/arch/arm/boot/dts/sama5d3_mci2.dtsi
-index 1b02208ea6ff..026b252f09b3 100644
---- a/arch/arm/boot/dts/sama5d3_mci2.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_mci2.dtsi
-@@ -1,5 +1,5 @@
- /*
-- * at91sama5d3_mci2.dtsi - Device Tree Include file for AT91SAM9x5 SoC with
-+ * sama5d3_mci2.dtsi - Device Tree Include file for SAMA5D3 SoC with
-  * 3 MMC ports
-  *
-  * Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
-diff --git a/arch/arm/boot/dts/sama5d3_tcb1.dtsi b/arch/arm/boot/dts/sama5d3_tcb1.dtsi
-index 02848453ca0c..f7fa58fe09f1 100644
---- a/arch/arm/boot/dts/sama5d3_tcb1.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_tcb1.dtsi
-@@ -1,5 +1,5 @@
- /*
-- * at91sama5d3_tcb1.dtsi - Device Tree Include file for AT91SAM9x5 SoC with
-+ * sama5d3_tcb1.dtsi - Device Tree Include file for SAMA5D3 SoC with
-  * 2 TC blocks.
-  *
-  * Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
-diff --git a/arch/arm/boot/dts/sama5d3_uart.dtsi b/arch/arm/boot/dts/sama5d3_uart.dtsi
-index 7a8d4c6115f7..2511d748867b 100644
---- a/arch/arm/boot/dts/sama5d3_uart.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_uart.dtsi
-@@ -1,5 +1,5 @@
- /*
-- * at91sama5d3_uart.dtsi - Device Tree Include file for AT91SAM9x5 SoC with
-+ * sama5d3_uart.dtsi - Device Tree Include file for SAMA5D3 SoC with
-  * UART support
-  *
-  * Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
--- 
-2.1.3
+On 04/03/2015 15:29, Catalin Marinas wrote:
+> I disagree it is 100% a host-side issue. It is a host-side issue _if_
+> the host tells the guest that the (virtual) device is non-coherent (or,
+> more precisely, it does not explicitly tell the guest that the device is
+> coherent). If the guest thinks the (virtual) device is non-coherent
+> because of information passed by the host, I fully agree that the host
+> needs to manage the cache coherency.
+> 
+> However, the host could also pass a "dma-coherent" property in the DT
+> given to the guest and avoid any form of cache maintenance. If the guest
+> does not honour such coherency property, it's a guest problem and it
+> needs fixing in the guest. This isn't any different from a real physical
+> device behaviour.
+
+Can you add that property to the device tree for PCI devices too?
+
+Paolo
