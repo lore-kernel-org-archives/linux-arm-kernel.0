@@ -1,52 +1,70 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 4 Mar 2015 09:44:45 +0800
-Subject: [PATCH] ARM: at91: pm: change at91_pm_set_standby() to static
-Message-ID: <1425433485-902-1-git-send-email-wenyou.yang@atmel.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 4 Mar 2015 08:51:53 +0800
+Subject: [PATCH] ARM: dts: imx: Add dr_mode host setting to all host-only
+ usb instances
+In-Reply-To: <20150303150809.GD30263@beef>
+References: <1425045960-14191-1-git-send-email-mporter@konsulko.com>
+ <20150303034133.GJ20455@dragon> <20150303044334.GA16617@shlinux2>
+ <20150303150809.GD30263@beef>
+Message-ID: <20150304005152.GA23399@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since at91_pm_set_standby() will not be used out of the pm.c file,
-change its attribute from extern to static, remove its declaration as well.
+On Tue, Mar 03, 2015 at 10:08:09AM -0500, Matt Porter wrote:
+> On Tue, Mar 03, 2015 at 12:43:36PM +0800, Peter Chen wrote:
+> > On Tue, Mar 03, 2015 at 11:41:35AM +0800, Shawn Guo wrote:
+> > > 
+> > > On Fri, Feb 27, 2015 at 09:06:00AM -0500, Matt Porter wrote:
+> > > > The chipidea driver adds an extra line of spam to the log when a
+> > > > host-only chipidea instance is left set to the default of a dual role
+> > > > controller.
+> > > > 
+> > > > [    2.010873] ci_hdrc ci_hdrc.1: doesn't support gadget
+> > > > 
+> > > > Set the dr_mode property to host on all the host-only nodes
+> > > > to avoid this warning.
+> > 
+> > It is not an warning, it is dev_info.
+> 
+> True enough, it's info level but is essentially warning that, in the
+> case of instances that are restricted to host only (at the SoC level),
+> that the DT hardware description is incorrect. Yes, it's benign, but
+> if the dtsi is corrected for those parts we don't have to see that
+> message.
 
-void at91_pm_set_standby(void (*at91_standby)(void))
--->
-static void at91_pm_set_standby(void (*at91_standby)(void))
+You are right.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- arch/arm/mach-at91/pm.c |    2 +-
- arch/arm/mach-at91/pm.h |    6 ------
- 2 files changed, 1 insertion(+), 7 deletions(-)
+> 
+> > In fact, imx28, imx6sl and imx6sx's second controller is dual-role
+> > controller, we only set dr_mode at board's dts according to design
+> > unless the controller's capability register is incorrect.
+> 
+> The patch doesn't set dr_mode to host on the second controller for
+> the imx6sl or imx6sx, only on the third host-only controller. If
+> imx28's second controller is really dual-role capable then the
+> reference manual is incorrect and I can drop that hunk in v2.
+> I only have imx6q and imx6d parts in hand to verify so for the rest
+> I went by the RM claim of which controllers were host-only.
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index aa4116e..a4473dc 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -218,7 +218,7 @@ static struct platform_device at91_cpuidle_device = {
- 	.name = "cpuidle-at91",
- };
- 
--void at91_pm_set_standby(void (*at91_standby)(void))
-+static void at91_pm_set_standby(void (*at91_standby)(void))
- {
- 	if (at91_standby) {
- 		at91_cpuidle_device.dev.platform_data = at91_standby;
-diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index 86c0aa8..86a9d0b 100644
---- a/arch/arm/mach-at91/pm.h
-+++ b/arch/arm/mach-at91/pm.h
-@@ -15,12 +15,6 @@
- 
- #include <mach/at91_ramc.h>
- 
--#ifdef CONFIG_PM
--extern void at91_pm_set_standby(void (*at91_standby)(void));
--#else
--static inline void at91_pm_set_standby(void (*at91_standby)(void)) { }
--#endif
--
- /*
-  * The AT91RM9200 goes into self-refresh mode with this command, and will
-  * terminate self-refresh automatically on the next SDRAM access.
+Maybe IC guys don't want to export that imx28's that capabilities,
+so don't need to change.
+
+> 
+> > So, sorry, I don't think this change is necessary.
+> 
+> I can correct the set of instances that should have dr_mode set to host
+> in v2 of this. We clearly have some that should have this set in their
+> SoC .dtsi to have the hardware description correct.  Will that work for
+> you or do you want the SoC-specific cases of this property to be only
+> reflected in the board level dts?
+> 
+
+After thinking more, it is a benefit fix, and doesn't need to do any
+changes, thanks.
+
+Acked-by: Peter Chen <peter.chen@freescale.com>
+
 -- 
-1.7.9.5
+
+Best Regards,
+Peter Chen
