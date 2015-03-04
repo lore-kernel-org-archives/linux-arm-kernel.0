@@ -1,77 +1,53 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  4 Mar 2015 20:11:27 +0100
-Subject: [PATCH v3 3/4] arm64: remove __switch_data object from head.S
+Date: Wed,  4 Mar 2015 20:11:28 +0100
+Subject: [PATCH v3 4/4] arm64: remove __lookup_processor_type_data,
+ object from head.S
 In-Reply-To: <1425496288-14483-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1425496288-14483-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1425496288-14483-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1425496288-14483-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes the confusing __switch_data object from head.S,
-and replaces it with standard PC-relative references to the
-various symbols it encapsulates.
+This removes __lookup_processor_type_data, replacing the original
+user with a simple PC-relative address load.
 
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/head.S | 29 ++++++++---------------------
- 1 file changed, 8 insertions(+), 21 deletions(-)
+ arch/arm64/kernel/head.S | 15 +--------------
+ 1 file changed, 1 insertion(+), 14 deletions(-)
 
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 003db2eadd7a..2b60b587a70f 100644
+index 2b60b587a70f..cd3b94cb597f 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -263,7 +263,7 @@ ENTRY(stext)
- 	 * On return, the CPU will be ready for the MMU to be turned on and
- 	 * the TCR will have been set.
- 	 */
--	ldr	x27, __switch_data		// address to jump to after
-+	ldr	x27, =__mmap_switched		// address to jump to after
- 						// MMU has been enabled
- 	adrp	lr, __enable_mmu		// return (PIC) address
- 	add	lr, lr, #:lo12:__enable_mmu
-@@ -432,35 +432,22 @@ __create_page_tables:
- ENDPROC(__create_page_tables)
- 	.ltorg
- 
--	.align	3
--	.type	__switch_data, %object
--__switch_data:
--	.quad	__mmap_switched
--	.quad	__bss_start			// x6
--	.quad	__bss_stop			// x7
--	.quad	__fdt_pointer			// x5
--	.quad	memstart_addr			// x6
--	.quad	init_thread_union + THREAD_START_SP // sp
--
- /*
-- * The following fragment of code is executed with the MMU on in MMU mode, and
-- * uses absolute addresses; this is not position independent.
-+ * The following fragment of code is executed with the MMU enabled.
+@@ -709,15 +709,9 @@ ENDPROC(__error)
+  * This function gets the processor ID in w0 and searches the cpu_table[] for
+  * a match. It returns a pointer to the struct cpu_info it found. The
+  * cpu_table[] must end with an empty (all zeros) structure.
+- *
+- * This routine can be called via C code and it needs to work with the MMU
+- * both disabled and enabled (the offset is calculated automatically).
   */
-+	.set	initial_sp, init_thread_union + THREAD_START_SP
- __mmap_switched:
--	adr	x3, __switch_data + 8
-+	adr_l	x6, __bss_start
-+	adr_l	x7, __bss_stop
- 
--	ldp	x6, x7, [x3], #16
- 1:	cmp	x6, x7
- 	b.hs	2f
- 	str	xzr, [x6], #8			// Clear BSS
- 	b	1b
- 2:
--	ldr	x5, [x3], #8
--	ldr	x6, [x3], #8
--	ldr	x16, [x3]
--	mov	sp, x16
--	str	x21, [x5]			// Save FDT pointer
--	str	x24, [x6]			// Save PHYS_OFFSET
-+	adr_l	sp, initial_sp, x4
-+	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
-+	str_l	x24, memstart_addr, x6		// Save PHYS_OFFSET
- 	mov	x29, #0
- 	b	start_kernel
- ENDPROC(__mmap_switched)
+ ENTRY(lookup_processor_type)
+-	adr	x1, __lookup_processor_type_data
+-	ldp	x2, x3, [x1]
+-	sub	x1, x1, x2			// get offset between VA and PA
+-	add	x3, x3, x1			// convert VA to PA
++	adr_l	x3, cpu_table
+ 1:
+ 	ldp	w5, w6, [x3]			// load cpu_id_val and cpu_id_mask
+ 	cbz	w5, 2f				// end of list?
+@@ -732,10 +726,3 @@ ENTRY(lookup_processor_type)
+ 	mov	x0, x3
+ 	ret
+ ENDPROC(lookup_processor_type)
+-
+-	.align	3
+-	.type	__lookup_processor_type_data, %object
+-__lookup_processor_type_data:
+-	.quad	.
+-	.quad	cpu_table
+-	.size	__lookup_processor_type_data, . - __lookup_processor_type_data
 -- 
 1.8.3.2
