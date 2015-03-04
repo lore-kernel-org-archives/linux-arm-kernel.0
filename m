@@ -1,41 +1,86 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 4 Mar 2015 13:29:50 +0100
-Subject: [PATCH 2/4] ARM: mvebu: add audio I2S controller to Armada 38x
- Device Tree
-In-Reply-To: <CAPv3WKfEBXMbRzFeQioV5ZBVWpKMebcTkAQmyMhYwkObyyBKWw@mail.gmail.com>
-References: <1424901482-3809-1-git-send-email-mw@semihalf.com>
- <1424901482-3809-3-git-send-email-mw@semihalf.com>
- <54EE4AD6.6090101@gmail.com>
- <CAPv3WKf8b+fuB-4qVwKC57iKaNHTLZAf9VFpfDbow1Sb3YAsNw@mail.gmail.com>
- <54EE6942.9080800@gmail.com>
- <CAPv3WKezrx4jkZNo3PYSOGZtiSJH09+94BaknYNN4xPkB1AxKw@mail.gmail.com>
- <20150227150303.2c4ea0e7@free-electrons.com>
- <CAPv3WKeLfFsxcC5gvZeP9DZqysZ0XtashByppeuDzRfvjxjujg@mail.gmail.com>
- <20150228105844.3749a825@free-electrons.com>
- <CAPv3WKfEBXMbRzFeQioV5ZBVWpKMebcTkAQmyMhYwkObyyBKWw@mail.gmail.com>
-Message-ID: <20150304132950.070008e4@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 4 Mar 2015 12:29:57 +0000
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <CAKv+Gu8OUtcpaQh5+gb6vNrdi+Q7eu_zKOujmyoRPrzrs+GJVQ@mail.gmail.com>
+References: <54E62404.9040702@redhat.com>
+ <20150220142905.GA10942@hawk.usersys.redhat.com>
+ <CAKv+Gu-YUzmnACZQi98OPRgKKL+gAGqwWYq2-_dwCdNqcktNUg@mail.gmail.com>
+ <20150220153626.GB10942@hawk.usersys.redhat.com>
+ <20150224145529.GA5498@hawk.usersys.redhat.com>
+ <CAKv+Gu-Uk2wg1OkoWgQe4da_EiFoEz_u8VuD8Ees6qU1UYMDvQ@mail.gmail.com>
+ <20150302163146.GB9686@lvm> <54F51A63.4060302@samsung.com>
+ <20150304113505.GS28951@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8OUtcpaQh5+gb6vNrdi+Q7eu_zKOujmyoRPrzrs+GJVQ@mail.gmail.com>
+Message-ID: <20150304122956.GT28951@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Marcin Wojtas,
-
-On Wed, 4 Mar 2015 13:12:10 +0100, Marcin Wojtas wrote:
-
-> I've got an update from Marvell - TDM and Audio are available in A39x
-> and it has the same set of PLL registers like A38x. Shouldn't we place
-> PLL configuration code in a separate file like clk-pll.c, or whatever
-> name you suggest?
-
-Yes, seems OK to me.
-
-> > Have you sorted out how to handle the pin-muxing part of the problem?
+On Wed, Mar 04, 2015 at 12:50:57PM +0100, Ard Biesheuvel wrote:
+> On 4 March 2015 at 12:35, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Mon, Mar 02, 2015 at 06:20:19PM -0800, Mario Smarduch wrote:
+> >> On 03/02/2015 08:31 AM, Christoffer Dall wrote:
+> >> > However, my concern with these patches are on two points:
+> >> >
+> >> > 1. It's not a fix-all.  We still have the case where the guest expects
+> >> > the behavior of device memory (for strong ordering for example) on a RAM
+> >> > region, which we now break.  Similiarly this doesn't support the
+> >> > non-coherent DMA to RAM region case.
+> >> >
+> >> > 2. While the code is probably as nice as this kind of stuff gets, it
+> >> > is non-trivial and extremely difficult to debug.  The counter-point here
+> >> > is that we may end up handling other stuff at EL2 for performanc reasons
+> >> > in the future.
+> >> >
+> >> > Mainly because of point 1 above, I am leaning to thinking userspace
+> >> > should do the invalidation when it knows it needs to, either through KVM
+> >> > via a memslot flag or through some other syscall mechanism.
+> >
+> > I expressed my concerns as well, I'm definitely against merging this
+> > series.
 > 
-> I'll come back with this issue after implementing poc.
+> Don't worry, that was never the intention, at least not as-is :-)
 
-Ok, thanks!
+I wasn't worried, just wanted to make my position clearer ;).
 
-Thomas
+> I think we have established that the performance hit is not the
+> problem but the correctness is.
+
+I haven't looked at the performance figures but has anyone assessed the
+hit caused by doing cache maintenance in Qemu vs cacheable guest
+accesses (and no maintenance)?
+
+> I do have a remaining question, though: my original [non-working]
+> approach was to replace uncached mappings with write-through
+> read-allocate write-allocate,
+
+Does it make sense to have write-through and write-allocate at the same
+time? The write-allocate hint would probably be ignored as write-through
+writes do not generate linefills.
+
+> which I expected would keep the caches
+> in sync with main memory, but apparently I am misunderstanding
+> something here. (This is the reason for s/0xbb/0xff/ in patch #2 to
+> get it to work: it replaces WT/RA/WA with WB/RA/WA)
+> 
+> Is there no way to use write-through caching here?
+
+Write-through is considered non-cacheable from a write perspective when
+it does not hit in the cache. AFAIK, it should still be able to hit
+existing cache lines and evict. The ARM ARM states that cache cleaning
+to _PoU_ is not required for coherency when the writes are to
+write-through memory but I have to dig further into the PoC because
+that's what we care about here.
+
+What platform did you test it on? I can't tell what the behaviour of
+system caches is. I know they intercept explicit cache maintenance by VA
+but not sure what happens to write-through writes when they hit in the
+system cache (are they evicted to RAM or not?). If such write-through
+writes are only evicted to the point-of-unification, they won't work
+since non-cacheable accesses go all the way to PoC.
+
+I need to do more reading through the ARM ARM, it should be hidden
+somewhere ;).
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Catalin
