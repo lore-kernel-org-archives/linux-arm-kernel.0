@@ -1,33 +1,40 @@
 From: sbranden@broadcom.com (Scott Branden)
-Date: Wed, 4 Mar 2015 12:42:12 -0800
-Subject: [PATCH v3 0/2] Add support for Broadcom RNG200
-In-Reply-To: <Scott Branden <sbranden@broadcom.com>
+Date: Wed, 4 Mar 2015 12:42:13 -0800
+Subject: [PATCH v3 1/2] hwrng: iproc-rng200 - Add device tree bindings
+In-Reply-To: <1425501734-14025-1-git-send-email-sbranden@broadcom.com>
 References: <Scott Branden <sbranden@broadcom.com>
-Message-ID: <1425501734-14025-1-git-send-email-sbranden@broadcom.com>
+ <1425501734-14025-1-git-send-email-sbranden@broadcom.com>
+Message-ID: <1425501734-14025-2-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of patchsets contains the Broadcom Random Number Generator
-driver and device tree binding documentation.
+Documents the IPROC random number generator device tree bindings
+used in some Broadcom chipsets.
 
-Changes from v2:
- added usleep_range instead of cpu_relax
- add init and cleanup functions following new hwrng model
- 
-Changes from v1:
- added \n to 2 dev_err messages
-
-Scott Branden (2):
-  hwrng: iproc-rng200 - Add device tree bindings
-  hwrng: iproc-rng200 - Add Broadcom IPROC RNG driver
-
- .../bindings/hwrng/brcm,iproc-rng200.txt           |  12 +
- drivers/char/hw_random/Kconfig                     |  13 ++
- drivers/char/hw_random/Makefile                    |   1 +
- drivers/char/hw_random/iproc-rng200.c              | 254 +++++++++++++++++++++
- 4 files changed, 280 insertions(+)
+Reviewed-by: Ray Jui <rjui@broadcom.com>
+Signed-off-by: Scott Branden <sbranden@broadcom.com>
+---
+ .../devicetree/bindings/hwrng/brcm,iproc-rng200.txt          | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/hwrng/brcm,iproc-rng200.txt
- create mode 100644 drivers/char/hw_random/iproc-rng200.c
 
+diff --git a/Documentation/devicetree/bindings/hwrng/brcm,iproc-rng200.txt b/Documentation/devicetree/bindings/hwrng/brcm,iproc-rng200.txt
+new file mode 100644
+index 0000000..e25a456
+--- /dev/null
++++ b/Documentation/devicetree/bindings/hwrng/brcm,iproc-rng200.txt
+@@ -0,0 +1,12 @@
++HWRNG support for the iproc-rng200 driver
++
++Required properties:
++- compatible : "brcm,iproc-rng200"
++- reg : base address and size of control register block
++
++Example:
++
++rng {
++        compatible = "brcm,iproc-rng200";
++        reg = <0x18032000 0x28>;
++};
 -- 
 2.3.0
