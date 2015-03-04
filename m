@@ -1,70 +1,34 @@
-From: maxime.ripard@free-electrons.com (maxime.ripard at free-electrons.com)
-Date: Wed, 4 Mar 2015 17:18:55 +0100
-Subject: [PATCH] mtd: nand: pxa3xx: Switch FIFO draining to jiffies-based
- timeout
-In-Reply-To: <20150303101846.GO15668@tarshish>
-References: <1425376529-1860-1-git-send-email-maxime.ripard@free-electrons.com>
- <20150303101846.GO15668@tarshish>
-Message-ID: <20150304161855.GN4911@lukather>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 4 Mar 2015 11:20:10 -0500
+Subject: [PATCH 4.0-rc1 v17 4/6] printk: Simple implementation for NMI
+ backtracing
+In-Reply-To: <1425485601.2712.9.camel@perches.com>
+References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
+ <1425463974-23568-1-git-send-email-daniel.thompson@linaro.org>
+ <1425463974-23568-5-git-send-email-daniel.thompson@linaro.org>
+ <1425485601.2712.9.camel@perches.com>
+Message-ID: <20150304112010.338501ab@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+On Wed, 04 Mar 2015 08:13:21 -0800
+Joe Perches <joe@perches.com> wrote:
 
-On Tue, Mar 03, 2015 at 12:18:46PM +0200, Baruch Siach wrote:
-> Hi Maxime,
-> 
-> On Tue, Mar 03, 2015 at 10:55:29AM +0100, Maxime Ripard wrote:
-> > Now that the driver handles the FIFO draining in a threaded interrupt, we can
-> > base our timeout on jiffies and sleeping, instead of using mdelay.
+> On Wed, 2015-03-04 at 10:12 +0000, Daniel Thompson wrote:
+> > Currently there is a quite a pile of code sitting in
+> > arch/x86/kernel/apic/hw_nmi.c to support safe all-cpu backtracing from NMI.
+> > The code is inaccessible to backtrace implementations for other
+> > architectures, which is a shame because they would probably like to be
+> > safe too.
 > > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/mtd/nand/pxa3xx_nand.c | 9 ++++-----
-> >  1 file changed, 4 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> > index 3f09f2e9aeb4..1eb957c347cd 100644
-> > --- a/drivers/mtd/nand/pxa3xx_nand.c
-> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> > @@ -496,16 +496,15 @@ static void drain_fifo(struct pxa3xx_nand_info *info, void *data, int len)
-> >  		while (len > 8) {
-> >  			__raw_readsl(info->mmio_base + NDDB, data, 8);
-> >  
-> > -			for (timeout = 0;
-> > -			     !(nand_readl(info, NDSR) & NDSR_RDDREQ);
-> > -			     timeout++) {
-> > -				if (timeout >= 5) {
-> > +			timeout = jiffies + msecs_to_jiffies(5);
-> > +			while (!(nand_readl(info, NDSR) & NDSR_RDDREQ)) {
-> > +				if (!time_before(jiffies, timeout)) {
-> >  					dev_err(&info->pdev->dev,
-> >  						"Timeout on RDDREQ while draining the FIFO\n");
-> >  					return;
-> >  				}
-> >  
-> > -				mdelay(1);
-> > +				msleep(1);
-> >  			}
+> > Copy this code into printk. We'll port the x86 NMI backtrace to it in a
+> > later patch.
 > 
-> You may want to consider using readl_relaxed_poll_timeout() from 
-> linux/iopoll.h, which was introduced in v4.0-rc1.
+> I think this would be better as a separate file
+> rather than increasing the bulk of printk.c
+> 
 
-Thanks for pointing this out.
+I agree, as printk already has its own directory. Perhaps a
+"nmi_backtrace.c"?
 
-I'll send a new version using this.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150304/06bd1069/attachment-0001.sig>
+-- Steve
