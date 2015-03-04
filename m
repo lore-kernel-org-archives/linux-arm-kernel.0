@@ -1,54 +1,137 @@
-From: b.reynal@virtualopensystems.com (Baptiste Reynal)
-Date: Wed,  4 Mar 2015 16:51:06 +0100
-Subject: [PATCH v2 1/1] iommu/arm-smmu: fix ARM_SMMU_FEAT_TRANS_OPS condition
-Message-ID: <1425484266-5449-1-git-send-email-b.reynal@virtualopensystems.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 4 Mar 2015 15:57:36 +0000
+Subject: [PATCH 4/5] arm64: juno: Add APB registers and LEDs using syscon
+In-Reply-To: <1425375148-4369-5-git-send-email-linus.walleij@linaro.org>
+References: <1425375148-4369-1-git-send-email-linus.walleij@linaro.org>
+ <1425375148-4369-5-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20150304155736.GC16268@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is a fix to "iommu/arm-smmu: add support for iova_to_phys
-through ATS1PR".
-According to ARM documentation, translation registers are optional even
-in SMMUv1, so ID0_S1TS needs to be checked to verify their presence.
-Also, we check that the domain is a stage-1 domain.
+On Tue, Mar 03, 2015 at 09:32:27AM +0000, Linus Walleij wrote:
+> This defines the Juno "APB system registers" as a syscon device,
+> and all the LEDs controlled by the APB system registers right
+> below it using the syscon LEDs driver on top of syscon. Define
+> LED0 for heartbeat, LED1 for MMC0 activity and the following
+> four LEDs indicating CPU activity using the Linux-specific
+> DT bindings for triggers.
+> 
+> This is the pattern and same drivers as used on the legacy
+> platform device trees for the ARM Integrators and the RealView
+> PB1176.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Signed-off-by: Baptiste Reynal <b.reynal@virtualopensystems.com>
+Tested-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
----
-v1 -> v2:
-Add domain stage test (Thanks to Will Deacon)
+KITT test shell script working beautifully. :)
 
----
- drivers/iommu/arm-smmu.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+Best regards,
+Liviu
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index fc13dd5..a3adde6 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1288,10 +1288,13 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
- 		return 0;
- 
- 	spin_lock_irqsave(&smmu_domain->pgtbl_lock, flags);
--	if (smmu_domain->smmu->features & ARM_SMMU_FEAT_TRANS_OPS)
-+	if (smmu_domain->smmu->features & ARM_SMMU_FEAT_TRANS_OPS &&
-+			smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
- 		ret = arm_smmu_iova_to_phys_hard(domain, iova);
--	else
-+	} else {
- 		ret = ops->iova_to_phys(ops, iova);
-+	}
-+
- 	spin_unlock_irqrestore(&smmu_domain->pgtbl_lock, flags);
- 
- 	return ret;
-@@ -1556,7 +1559,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 		return -ENODEV;
- 	}
- 
--	if (smmu->version == 1 || (!(id & ID0_ATOSNS) && (id & ID0_S1TS))) {
-+	if ((id & ID0_S1TS) && ((smmu->version == 1) || (id & ID0_ATOSNS))) {
- 		smmu->features |= ARM_SMMU_FEAT_TRANS_OPS;
- 		dev_notice(smmu->dev, "\taddress translation ops\n");
- 	}
+> ---
+> ChangeLog v1->v2:
+> - Use "simple-mfd" so that the syscon LEDs get spawned from the
+>   syscon as sub-platform devices.
+> ---
+>  arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 68 +++++++++++++++++++++++++++
+>  1 file changed, 68 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> index c138b95a8356..5ce111dcf16d 100644
+> --- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> @@ -66,6 +66,74 @@
+>  				#size-cells = <1>;
+>  				ranges = <0 3 0 0x200000>;
+>  
+> +				apbregs at 010000 {
+> +					compatible = "syscon", "simple-mfd";
+> +					reg = <0x010000 0x1000>;
+> +
+> +					led at 08.0 {
+> +						compatible = "register-bit-led";
+> +						offset = <0x08>;
+> +						mask = <0x01>;
+> +						label = "vexpress:0";
+> +						linux,default-trigger = "heartbeat";
+> +						default-state = "on";
+> +					};
+> +					led at 08.1 {
+> +						compatible = "register-bit-led";
+> +						offset = <0x08>;
+> +						mask = <0x02>;
+> +						label = "vexpress:1";
+> +						linux,default-trigger = "mmc0";
+> +						default-state = "off";
+> +					};
+> +					led at 08.2 {
+> +						compatible = "register-bit-led";
+> +						offset = <0x08>;
+> +						mask = <0x04>;
+> +						label = "vexpress:2";
+> +						linux,default-trigger = "cpu0";
+> +						default-state = "off";
+> +					};
+> +					led at 08.3 {
+> +						compatible = "register-bit-led";
+> +						offset = <0x08>;
+> +						mask = <0x08>;
+> +						label = "vexpress:3";
+> +						linux,default-trigger = "cpu1";
+> +						default-state = "off";
+> +					};
+> +					led at 08.4 {
+> +						compatible = "register-bit-led";
+> +						offset = <0x08>;
+> +						mask = <0x10>;
+> +						label = "vexpress:4";
+> +						linux,default-trigger = "cpu2";
+> +						default-state = "off";
+> +					};
+> +					led at 08.5 {
+> +						compatible = "register-bit-led";
+> +						offset = <0x08>;
+> +						mask = <0x20>;
+> +						label = "vexpress:5";
+> +						linux,default-trigger = "cpu3";
+> +						default-state = "off";
+> +					};
+> +					led at 08.6 {
+> +						compatible = "register-bit-led";
+> +						offset = <0x08>;
+> +						mask = <0x40>;
+> +						label = "vexpress:6";
+> +						default-state = "off";
+> +					};
+> +					led at 08.7 {
+> +						compatible = "register-bit-led";
+> +						offset = <0x08>;
+> +						mask = <0x80>;
+> +						label = "vexpress:7";
+> +						default-state = "off";
+> +					};
+> +				};
+> +
+>  				mmci at 050000 {
+>  					compatible = "arm,pl180", "arm,primecell";
+>  					reg = <0x050000 0x1000>;
+> -- 
+> 1.9.3
+> 
+> 
+
 -- 
-2.3.1
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
