@@ -1,294 +1,213 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 4 Mar 2015 10:51:48 +0800
-Subject: [PATCH v4 2/2] ARM: at91: dts: sama5d4: add dts for sama5d4 xplained
- board
-In-Reply-To: <1425437508-30976-1-git-send-email-josh.wu@atmel.com>
-References: <1425437508-30976-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1425437508-30976-2-git-send-email-josh.wu@atmel.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 03 Mar 2015 20:03:13 -0700
+Subject: [PATCH 02/10] mailbox: Enable BCM2835 mailbox support
+In-Reply-To: <1425329684-23968-3-git-send-email-eric@anholt.net>
+References: <1425329684-23968-1-git-send-email-eric@anholt.net>
+ <1425329684-23968-3-git-send-email-eric@anholt.net>
+Message-ID: <54F675F1.60205@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add at91 sama5d4 xplained board support.
+On 03/02/2015 01:54 PM, Eric Anholt wrote:
+> From: Lubomir Rintel <lkundrak@v3.sk>
+> 
+> Implement BCM2835 mailbox support as a device registered with the
+> general purpose mailbox framework. Implementation based on commits by
+> Lubomir Rintel [1], Suman Anna and Jassi Brar [2] on which to base the
+> implementation.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
+> diff --git a/drivers/mailbox/bcm2835-mailbox.c b/drivers/mailbox/bcm2835-mailbox.c
 
-Changes in v4:
-- Thanks to Bo Shen to find following leds issues:
-    1. the leds' label is changed in new xplained board.
-    2. as piod bank is disabled in sama5d4, that will whole led driver
-not work. So just disable the led which used piod.
+> +/* Mailboxes */
+> +#define ARM_0_MAIL0	0x00
+> +#define ARM_0_MAIL1	0x20
+> +
+> +/*
+> + * Mailbox registers. We basically only support mailbox 0 & 1. We
+> + * deliver to the VC in mailbox 1, it delivers to us in mailbox 0. See
+> + * BCM2835-ARM-Peripherals.pdf section 1.3 for an explanation about
+> + * the placement of memory barriers.
+> + */
+> +#define MAIL0_RD	(ARM_0_MAIL0 + 0x00)
+> +#define MAIL0_POL	(ARM_0_MAIL0 + 0x10)
+> +#define MAIL0_STA	(ARM_0_MAIL0 + 0x18)
+> +#define MAIL0_CNF	(ARM_0_MAIL0 + 0x1C)
+> +#define MAIL1_WRT	(ARM_0_MAIL1 + 0x00)
 
-Changes in v3:
-- add phy0 child node under macb0
-- rebase on top of linux next, re-formated the arch/arm/boot/dts/Makefile
+That implies there are more mailboxes. I wonder if we should
+parameterize which to use via some DT properties? I guess we can defer
+that though; we can default to the current values and add properties
+later if we want to use something else.
 
-Changes in v2:
-- to be sorted by memory address, put the adc dt node after usart4.
+> +static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
+> +{
+> +	struct bcm2835_mbox *mbox = (struct bcm2835_mbox *) dev_id;
+> +	struct device *dev = mbox->dev;
+> +
+> +	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
+> +		u32 msg = readl(mbox->regs + MAIL0_RD);
+> +		unsigned int chan = MBOX_CHAN(msg);
+> +
+> +		if (!mbox->channel[chan].started) {
+> +			dev_err(dev, "Reply on stopped channel %d\n", chan);
+> +			continue;
+> +		}
+> +		dev_dbg(dev, "Reply 0x%08X\n", msg);
+> +		mbox_chan_received_data(mbox->channel[chan].link,
+> +			(void *) MBOX_DATA28(msg));
+> +	}
+> +	rmb(); /* Finished last mailbox read. */
 
- arch/arm/boot/dts/Makefile                  |   3 +-
- arch/arm/boot/dts/at91-sama5d4_xplained.dts | 239 ++++++++++++++++++++++++++++
- 2 files changed, 241 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/at91-sama5d4_xplained.dts
+I know the PDF mentioned in the comment earlier in the patch says to put
+in barriers between accesses to different peripherals, which this seems
+compliant with, but I don't see quite what this barrier achieves. I
+think the PDF is talking generalities, not imposing a rule that must be
+blindly followed. Besides, if there's a context-switch you can't
+actually implement the rules the PDF suggests. What read operation is
+this barrier attempting to ensure happens after reading all mailbox
+messages and any associated DRAM buffer?
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a1c776b..5c189a5 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -42,7 +42,8 @@ dtb-$(CONFIG_SOC_SAM_V7) += \
- 	sama5d34ek.dtb \
- 	sama5d35ek.dtb \
- 	sama5d36ek.dtb \
--	at91-sama5d4ek.dtb
-+	at91-sama5d4ek.dtb \
-+	at91-sama5d4_xplained.dtb
- dtb-$(CONFIG_ARCH_ATLAS6) += \
- 	atlas6-evb.dtb
- dtb-$(CONFIG_ARCH_ATLAS7) += \
-diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-new file mode 100644
-index 0000000..af8f4f5
---- /dev/null
-+++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-@@ -0,0 +1,239 @@
-+/*
-+ * at91-sama5d4_xplained.dts - Device Tree file for SAMA5D4 Xplained board
-+ *
-+ *  Copyright (C) 2015 Atmel,
-+ *                2015 Josh Wu <josh.wu@atmel.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+/dts-v1/;
-+#include "sama5d4.dtsi"
-+
-+/ {
-+	model = "Atmel SAMA5D4 Xplained";
-+	compatible = "atmel,sama5d4-xplained", "atmel,sama5d4", "atmel,sama5";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 ignore_loglevel earlyprintk";
-+	};
-+
-+	memory {
-+		reg = <0x20000000 0x20000000>;
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		main_clock: clock at 0 {
-+			compatible = "atmel,osc", "fixed-clock";
-+			clock-frequency = <12000000>;
-+		};
-+
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <12000000>;
-+		};
-+	};
-+
-+	ahb {
-+		apb {
-+			spi0: spi at f8010000 {
-+				cs-gpios = <&pioC 3 0>, <0>, <0>, <0>;
-+				status = "okay";
-+				m25p80 at 0 {
-+					compatible = "atmel,at25df321a";
-+					spi-max-frequency = <50000000>;
-+					reg = <0>;
-+				};
-+			};
-+
-+			macb0: ethernet at f8020000 {
-+				phy-mode = "rmii";
-+				status = "okay";
-+
-+				phy0: ethernet-phy at 1 {
-+					interrupt-parent = <&pioE>;
-+					interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
-+					reg = <1>;
-+				};
-+			};
-+
-+			mmc1: mmc at fc000000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_mmc1_clk_cmd_dat0 &pinctrl_mmc1_dat1_3 &pinctrl_mmc1_cd>;
-+				status = "okay";
-+				slot at 0 {
-+					reg = <0>;
-+					bus-width = <4>;
-+					cd-gpios = <&pioE 3 0>;
-+				};
-+			};
-+
-+			usart3: serial at fc00c000 {
-+				status = "okay";
-+			};
-+
-+			usart4: serial at fc010000 {
-+				status = "okay";
-+			};
-+
-+			adc0: adc at fc034000 {
-+				atmel,adc-vref = <3300>;
-+				status = "okay";
-+			};
-+
-+			watchdog at fc068640 {
-+				status = "okay";
-+			};
-+
-+			pinctrl at fc06a000 {
-+				board {
-+					pinctrl_mmc1_cd: mmc1_cd {
-+						atmel,pins =
-+							<AT91_PIOE 3 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
-+					};
-+					pinctrl_usba_vbus: usba_vbus {
-+						atmel,pins =
-+							<AT91_PIOE 31 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;
-+					};
-+					pinctrl_key_gpio: key_gpio_0 {
-+						atmel,pins =
-+							<AT91_PIOE 8 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>; /* PE13 gpio */
-+					};
-+				};
-+			};
-+		};
-+
-+		usb0: gadget at 00400000 {
-+			atmel,vbus-gpio = <&pioE 31 GPIO_ACTIVE_HIGH>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usba_vbus>;
-+			status = "okay";
-+		};
-+
-+		usb1: ohci at 00500000 {
-+			num-ports = <3>;
-+			atmel,vbus-gpio = <0
-+					   &pioE 11 GPIO_ACTIVE_HIGH
-+					   &pioE 14 GPIO_ACTIVE_HIGH
-+					  >;
-+			status = "okay";
-+		};
-+
-+		usb2: ehci at 00600000 {
-+			status = "okay";
-+		};
-+
-+		nand0: nand at 80000000 {
-+			nand-bus-width = <8>;
-+			nand-ecc-mode = "hw";
-+			nand-on-flash-bbt;
-+			atmel,has-pmecc;
-+			status = "okay";
-+
-+			at91bootstrap at 0 {
-+				label = "at91bootstrap";
-+				reg = <0x0 0x40000>;
-+			};
-+
-+			bootloader at 40000 {
-+				label = "bootloader";
-+				reg = <0x40000 0x80000>;
-+			};
-+
-+			bootloaderenv at c0000 {
-+				label = "bootloader env";
-+				reg = <0xc0000 0xc0000>;
-+			};
-+
-+			dtb at 180000 {
-+				label = "device tree";
-+				reg = <0x180000 0x80000>;
-+			};
-+
-+			kernel at 200000 {
-+				label = "kernel";
-+				reg = <0x200000 0x600000>;
-+			};
-+
-+			rootfs at 800000 {
-+				label = "rootfs";
-+				reg = <0x800000 0x0f800000>;
-+			};
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_key_gpio>;
-+
-+		pb_user1 {
-+			label = "pb_user1";
-+			gpios = <&pioE 8 GPIO_ACTIVE_HIGH>;
-+			linux,code = <0x100>;
-+			gpio-key,wakeup;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		status = "okay";
-+
-+		d8 {
-+			label = "d8";
-+			gpios = <&pioD 30 GPIO_ACTIVE_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		d10 {
-+			label = "d10";
-+			gpios = <&pioE 15 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
--- 
-1.9.1
+If any barrier is needed, shouldn't it be between the mailbox read and
+the processing of that message (which could at least in some cases read
+an SDRAM buffer). So, the producer would do roughly:
+
+p1) Fill in DRAM buffer
+p2) Write memory barrier so the MBOX write happens after the above
+p3) Send mbox message to tell the consumer to process the buffer
+
+... and the consumer:
+
+c1) Read MBOX register to know which DRAM buffer to handle
+c2) rmb() to make sure we read from the DRAM buffer after the MBOX read
+c3) Read the DRAM buffer
+
+Even then, since (c3) is data-dependent on (c1), I don't think the rmb()
+in (c2) there actually does anything useful.
+
+> +static int bcm2835_send_data(struct mbox_chan *link, void *data)
+> +{
+> +	struct bcm2835_channel *chan = to_channel(link);
+> +	struct bcm2835_mbox *mbox = chan->mbox;
+> +	int ret = 0;
+> +
+> +	if (!chan->started)
+> +		return -ENODEV;
+> +	spin_lock(&mbox->lock);
+
+Is it safe to read chan->started without the channel lock held?
+
+> +	if (readl(mbox->regs + MAIL0_STA) & ARM_MS_FULL) {
+> +		rmb(); /* Finished last mailbox read. */
+
+This also doesn't seem useful?
+
+> +		ret = -EBUSY;
+> +		goto end;
+> +	}
+> +	wmb(); /* About to write to the mail box. */
+> +	writel(MBOX_MSG(chan->chan_num, (u32) data), mbox->regs + MAIL1_WRT);
+
+This one I agree with, at least if MBOX messages contain pointers to
+DRAM buffers.
+
+> +static int bcm2835_startup(struct mbox_chan *link)
+> +{
+> +	struct bcm2835_channel *chan = to_channel(link);
+> +
+> +	chan->started = true;
+> +	return 0;
+> +}
+> +
+> +static void bcm2835_shutdown(struct mbox_chan *link)
+> +{
+> +	struct bcm2835_channel *chan = to_channel(link);
+> +
+> +	chan->started = false;
+> +}
+
+Don't we need to hold chan->lock when adjusting chan->started? Or is
+start/stop intended to be asynchronous to any operations currently in
+progress on the channel?
+
+> +static bool bcm2835_last_tx_done(struct mbox_chan *link)
+> +{
+> +	struct bcm2835_channel *chan = to_channel(link);
+> +	struct bcm2835_mbox *mbox = chan->mbox;
+> +	bool ret;
+> +
+> +	if (!chan->started)
+> +		return false;
+> +	spin_lock(&mbox->lock);
+> +	ret = !(readl(mbox->regs + MAIL0_STA) & ARM_MS_FULL);
+> +	rmb(); /* Finished last mailbox read. */
+
+That barrier doesn't seem useful?
+
+What are the semantics of "tx done"? This seems to be testing that the
+TX mailbox isn't completely full, which is more about whether the
+consumer side is backed up rather than whether our producer-side TX
+operations are done.
+
+If the idea is to wait for the consumer to have consumed everything in
+our TX direction, shouldn't this check for empty not !full?
+
+> +static int request_mailbox_irq(struct bcm2835_mbox *mbox)
+
+> +	if (irq <= 0) {
+> +		dev_err(dev, "Can't get IRQ number for mailbox\n");
+> +		return -ENODEV;
+> +	}
+
+I expect devm_request_irq() checkes that condition.
+
+> +	ret = devm_request_irq(dev, irq, bcm2835_mbox_irq, 0, dev_name(dev),
+> +		mbox);
+> +	if (ret) {
+> +		dev_err(dev, "Failed to register a mailbox IRQ handler\n");
+
+Printing ret might be useful to know why.
+
+Are you sure devm_request_irq() is appropriate? The IRQ handler will be
+unregistered *after* bcm2835_mbox_remove() is called, and I think
+without any guarantee re: the order that other devm_ allocations are
+cleaned up. If bcm2835_mbox_remove() can't guarantee that no IRQ will
+fire after it exits, then bcm2835_mbox_irq() might just get called after
+some allocations are torn down, thus causing the IRQ handler to touch
+free'd memory.
+
+Both request_mailbox_iomem and request_mailbox_irq are small enough
+they're typically written inline into the main probe() function.
+
+> +static int bcm2835_mbox_probe(struct platform_device *pdev)
+
+> +	mbox = devm_kzalloc(dev, sizeof(*mbox), GFP_KERNEL);
+> +	if (mbox == NULL) {
+> +		dev_err(dev, "Failed to allocate mailbox memory\n");
+
+devm_kzalloc() already prints an error, so no need to add another here,
+even if it does nicely document the fact that you remembered error
+messages:-)
+
+> +	mbox->controller.txdone_poll = true;
+> +	mbox->controller.txpoll_period = 5;
+> +	mbox->controller.ops = &bcm2835_mbox_chan_ops;
+> +	mbox->controller.dev = dev;
+> +	mbox->controller.num_chans = MBOX_CHAN_COUNT;
+> +	mbox->controller.chans = devm_kzalloc(dev,
+> +		sizeof(struct mbox_chan) * MBOX_CHAN_COUNT,
+> +		GFP_KERNEL);
+
+It'd be common to say "sizeof(*mbox->controller.chans) so the type can't
+mismatch what's being assigned to.
+
+> +	if (!mbox->controller.chans) {
+> +		dev_err(dev, "Failed to alloc mbox_chans\n");
+
+Same comment about error messages here.
+
+> +	/* Enable the interrupt on data reception */
+> +	writel(ARM_MC_IHAVEDATAIRQEN, mbox->regs + MAIL0_CNF);
+> +	dev_info(dev, "mailbox enabled\n");
+
+There's no interrupt for "TX space available"? Oh well. I guess that's
+why mbox->controller.txdone_poll = true.
