@@ -1,39 +1,145 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 4 Mar 2015 23:34:54 +0900
-Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
- uncached guest mappings
-In-Reply-To: <20150304142943.GU28951@e104818-lin.cambridge.arm.com>
-References: <20150220153626.GB10942@hawk.usersys.redhat.com>
- <20150224145529.GA5498@hawk.usersys.redhat.com>
- <CAKv+Gu-Uk2wg1OkoWgQe4da_EiFoEz_u8VuD8Ees6qU1UYMDvQ@mail.gmail.com>
- <20150302163146.GB9686@lvm> <54F51A63.4060302@samsung.com>
- <20150304113505.GS28951@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8OUtcpaQh5+gb6vNrdi+Q7eu_zKOujmyoRPrzrs+GJVQ@mail.gmail.com>
- <20150304122956.GT28951@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
- <20150304141212.GA5352@hawk.usersys.redhat.com>
- <20150304142943.GU28951@e104818-lin.cambridge.arm.com>
-Message-ID: <CAFEAcA-kDDhkoC0hU1PD7YbW_JFx+ucVFu7iTa7soTtMPZumiQ@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 4 Mar 2015 14:35:40 +0000
+Subject: [RFC PATCH 0/1] Wrong structure alignment due to compiler
+ attribute "section"
+In-Reply-To: <54F6EF32.7080306@marvell.com>
+References: <1425290502-2322-1-git-send-email-lsanfil@marvell.com>
+ <20150303144130.GB5177@e103592.cambridge.arm.com>
+ <54F6EF32.7080306@marvell.com>
+Message-ID: <20150304143527.GA5653@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 March 2015 at 23:29, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> I disagree it is 100% a host-side issue. It is a host-side issue _if_
-> the host tells the guest that the (virtual) device is non-coherent (or,
-> more precisely, it does not explicitly tell the guest that the device is
-> coherent). If the guest thinks the (virtual) device is non-coherent
-> because of information passed by the host, I fully agree that the host
-> needs to manage the cache coherency.
->
-> However, the host could also pass a "dma-coherent" property in the DT
-> given to the guest and avoid any form of cache maintenance. If the guest
-> does not honour such coherency property, it's a guest problem and it
-> needs fixing in the guest. This isn't any different from a real physical
-> device behaviour.
+On Wed, Mar 04, 2015 at 12:40:34PM +0100, sanfilippo wrote:
+> On 03.03.2015 15:41, Dave Martin wrote:
+> 
+> Dave,
+> 
+> thanks for your response.
+> 
+> >For the element _size_ issue, I'm confused.  On 32-bit, that
+> >structure is clearly 196 bytes in size, with the alignment requirement
+> >of void * (4 bytes)... so there's no clear reason why the linker
+> >shouldn't be inserting extra padding.
+> >
+> >I can't reproduce this with my current tools (upstream binutils-2.24,
+> >gcc-4.9.2).
+> >
+> >
+> >Can you try to track down where this discrepancy is coming from?
+> >
+> >i.e.,
+> >
+> >  * If you're juggling with multiple kernel trees, make sure there
+> >    are not differences between them that could be causing this, such
+> >    as changes to linker scripts or header files that are involved
+> >    in building these arrays.
+> 
+> I can reproduce this with a vanilla kernel (3.19) from kernel.org.
+> What I do is:
+> 
+> - configure the kernel with mvebu_v5_defconfig
+> - compile it
+> 
+> However this issue occurs (so far) only with this special toolchain:
+> http://www.plugcomputer.org/405/us/gplugd/tool-chain/arm-marvell-linux-gnueabi.tar.bz2
+> 
+> If you like you can try this yourself. I am sure that you will get
+> the same results.
 
-Right, and we should do that for things like virtio, because we want
-the performance. But we also have devices (like vga framebuffers)
-which shouldn't be handled as cacheable, so we need to be able to
-deal with both situations.
+Not really ;)  Please see what you can find out first (see below).
 
--- PMM
+> 
+> I tried the same with three other toolchains but with those the
+> problem did not occur. I also tried other kernel configurations with
+> that "problematic" toolchain, but also the problem did not occur any
+> more.
+> 
+> So I think its either a bug in that compiler/linker or the current
+> solution in vmlinux.lds.h does not work correct under some special
+> circumstances.
+> 
+> >
+> >  * See what the input to the assembler looks like, with regard to
+> >    .align directives.
+> >
+> >  * See what the alignment of the affected sections is in each individual
+> >    .o file.
+> 
+> Not sure what exactly I should check here. Could you be a bit more precise?
+> 
+> >  * See what __alignof__(struct of_device_id) evaluates to.
+> 
+> It evaluates to "4" even for the bad case.
+
+Try
+
+rm drivers/clk/mvebu/kirkwood.o
+make ARCH=arm KBUILD_CFLAGS_KERNEL=-save-temps drivers/clk/mvebu/kirkwood.o
+
+(abuse of KBUILD_CFLAGS_KERNEL here, but it's empty by default, and
+I'm too lazy to copy-paste command lines...)
+
+
+The compiler will split out the compiled assembly code in kirkwood.s:
+
+Look for ".align" directives between the start of the affected section
+and the start of the next section (next .section directive).
+
+Here, we just have .align 2, which is the expected correct value
+(i.e., align __of_table_mv88f6180_clk on a 2^2 = 4 byte boundary).
+
+A different value here may indicate a bug in the compiler, because
+you observed that gcc _thinks_ that __alignof__ is 4 for the struct
+in this section even in the failing case.
+
+
+	.section	__clk_of_table,"a",%progbits
+	.align	2
+	.type	__of_table_mv88f6180_clk, %object
+	.size	__of_table_mv88f6180_clk, 196
+__of_table_mv88f6180_clk:
+	.space	64
+	.ascii	"marvell,mv88f6180-core-clock\000"
+	.space	99
+	.word	kirkwood_clk_init
+	.type	__of_table_kirkwood_clk, %object
+	.size	__of_table_kirkwood_clk, 196
+__of_table_kirkwood_clk:
+	.space	64
+	.ascii	"marvell,kirkwood-core-clock\000"
+	.space	100
+	.word	kirkwood_clk_init
+	.section	.rodata.str1.8,"aMS",%progbits,1
+
+
+Also try:
+
+	arm-linux-gnueabi-objdump --headers drivers/clk/mvebu/kirkwood.o
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+
+	[...]
+
+  9 __clk_of_table 00000188  00000000  00000000  00000434  2**2
+                  CONTENTS, ALLOC, LOAD, RELOC, READONLY, DATA
+
+The "Algn" column should be 2**2.  If it's not, but the assembly
+code generated by the compiler looks correct, then there may be
+a bug in the assembler.
+
+
+If the .o file looks correct, it's possible that there is another
+.o file containing data for this section that specifies a different
+alignment.o -- try git grep CLK_OF_DECLARE to find the affected
+files.
+
+It's also worth looking at __clk_of_table_end in drivers/clk/clk.o.
+That gets merged in at the end of the same section, so if its
+alignment is higher for some reason, that might be causing the
+problem.
+
+
+Cheers
+---Dave
