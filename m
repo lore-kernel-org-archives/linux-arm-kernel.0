@@ -1,54 +1,38 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 04 Mar 2015 23:33:48 +0100
-Subject: [PATCH v9 03/21] ACPI: add arm64 to the platforms that use ioremap
-In-Reply-To: <1424853601-6675-4-git-send-email-hanjun.guo@linaro.org>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <1424853601-6675-4-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <2415033.fhZTq8sY1z@vostro.rjw.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Mar 2015 22:56:46 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC sh7372 SoC Removal Updates for
+ v4.1
+In-Reply-To: <3043216.AuL1ank19q@wuerfel>
+References: <cover.1424931560.git.horms+renesas@verge.net.au>
+ <3043216.AuL1ank19q@wuerfel>
+Message-ID: <2173215.cbpof3lVb6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 25, 2015 04:39:43 PM Hanjun Guo wrote:
-> From: Graeme Gregory <graeme.gregory@linaro.org>
+On Wednesday 04 March 2015 21:31:52 Arnd Bergmann wrote:
+> On Thursday 26 February 2015 15:22:11 Simon Horman wrote:
+> > Renesas ARM Based SoC sh7372 SoC Removal Updates for v4.1
+> > 
+> > * Remove the sh7372 SoC and its mackerel board
+> > 
 > 
-> Now with the base changes to the arm memory mapping it is safe
-> to convert to using ioremap to map in the tables after
-> acpi_gbl_permanent_mmap is set.
+> Pulled into next/cleanup.
 > 
-> CC: Rafael J Wysocki <rjw@rjwysocki.net>
-> Tested-by: Robert Richter <rrichter@cavium.com>
-> Acked-by: Robert Richter <rrichter@cavium.com>
-> Signed-off-by: Al Stone <al.stone@linaro.org>
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> I found the text a little short to justify a removal, but since I know
+> the story, I've extended the narrative a bit, I hope this text is
+> ok with you:
+> 
+>     [arnd: The sh7372 platform is rather dated and is believed to
+>      have no active users. It stands in the way of converting all
+>      of mach-shmobile to be multiplatform capable, as adding
+>      pinctrl and clock support for it would be more work than it's
+>      worth. As always, should any legitimate upstream users show up
+>      in the future, we will revert this removal]
+> 
+> It would be nice to have more text in the tag description for cases that
+> are not obvious to the reader, like this one.
 
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Upon further consideration, I've put this into next/multiplatform
+instead of next/cleanup.
 
-> ---
->  drivers/acpi/osl.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
-> index f9eeae8..39748bb 100644
-> --- a/drivers/acpi/osl.c
-> +++ b/drivers/acpi/osl.c
-> @@ -336,11 +336,11 @@ acpi_map_lookup_virt(void __iomem *virt, acpi_size size)
->  	return NULL;
->  }
->  
-> -#ifndef CONFIG_IA64
-> -#define should_use_kmap(pfn)   page_is_ram(pfn)
-> -#else
-> +#if defined(CONFIG_IA64) || defined(CONFIG_ARM64)
->  /* ioremap will take care of cache attributes */
->  #define should_use_kmap(pfn)   0
-> +#else
-> +#define should_use_kmap(pfn)   page_is_ram(pfn)
->  #endif
->  
->  static void __iomem *acpi_map(acpi_physical_address pg_off, unsigned long pg_sz)
-> 
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+	Arnd
