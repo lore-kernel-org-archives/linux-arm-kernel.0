@@ -1,69 +1,35 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 4 Mar 2015 15:12:12 +0100
-Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
- uncached guest mappings
-In-Reply-To: <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
-References: <CAKv+Gu-YUzmnACZQi98OPRgKKL+gAGqwWYq2-_dwCdNqcktNUg@mail.gmail.com>
- <20150220153626.GB10942@hawk.usersys.redhat.com>
- <20150224145529.GA5498@hawk.usersys.redhat.com>
- <CAKv+Gu-Uk2wg1OkoWgQe4da_EiFoEz_u8VuD8Ees6qU1UYMDvQ@mail.gmail.com>
- <20150302163146.GB9686@lvm> <54F51A63.4060302@samsung.com>
- <20150304113505.GS28951@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8OUtcpaQh5+gb6vNrdi+Q7eu_zKOujmyoRPrzrs+GJVQ@mail.gmail.com>
- <20150304122956.GT28951@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
-Message-ID: <20150304141212.GA5352@hawk.usersys.redhat.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 4 Mar 2015 15:15:08 +0100
+Subject: [PATCH 0/4] ARM: at91: sama5d4ek: enable audio support
+In-Reply-To: <1422859907-14881-1-git-send-email-voice.shen@atmel.com>
+References: <1422859907-14881-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <54F7136C.5040307@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 01:43:02PM +0100, Ard Biesheuvel wrote:
-> On 4 March 2015 at 13:29, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Wed, Mar 04, 2015 at 12:50:57PM +0100, Ard Biesheuvel wrote:
-> >> On 4 March 2015 at 12:35, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> > On Mon, Mar 02, 2015 at 06:20:19PM -0800, Mario Smarduch wrote:
-> >> >> On 03/02/2015 08:31 AM, Christoffer Dall wrote:
-> >> >> > However, my concern with these patches are on two points:
-> >> >> >
-> >> >> > 1. It's not a fix-all.  We still have the case where the guest expects
-> >> >> > the behavior of device memory (for strong ordering for example) on a RAM
-> >> >> > region, which we now break.  Similiarly this doesn't support the
-> >> >> > non-coherent DMA to RAM region case.
-> >> >> >
-> >> >> > 2. While the code is probably as nice as this kind of stuff gets, it
-> >> >> > is non-trivial and extremely difficult to debug.  The counter-point here
-> >> >> > is that we may end up handling other stuff at EL2 for performanc reasons
-> >> >> > in the future.
-> >> >> >
-> >> >> > Mainly because of point 1 above, I am leaning to thinking userspace
-> >> >> > should do the invalidation when it knows it needs to, either through KVM
-> >> >> > via a memslot flag or through some other syscall mechanism.
-> >> >
-> >> > I expressed my concerns as well, I'm definitely against merging this
-> >> > series.
-> >>
-> >> Don't worry, that was never the intention, at least not as-is :-)
-> >
-> > I wasn't worried, just wanted to make my position clearer ;).
-> >
-> >> I think we have established that the performance hit is not the
-> >> problem but the correctness is.
-> >
-> > I haven't looked at the performance figures but has anyone assessed the
-> > hit caused by doing cache maintenance in Qemu vs cacheable guest
-> > accesses (and no maintenance)?
-> >
+Le 02/02/2015 07:51, Bo Shen a ?crit :
+> This patch set enable audio support on sama5d4ek.
+> It depends the patch [1] (ASoC: atmel-pcm-dma: won't check direction
+> when configure dma)
+> [1] https://patchwork.kernel.org/patch/5759441/
+> 
+> 
+> Bo Shen (4):
+>   ARM: at91: dt: sama5d4: add ssc nodes
+>   ARM: at91: dt: sama5d4ek: enable ssc0
+>   ARM: at91: dt: sama5d4ek: add and enable wm8904
+>   ARM: at91: dt: sama5d4ek: enable audio
 
-I'm working on a PoC of a QEMU/KVM cache maintenance approach now.
-Hopefully I'll send it out this evening. Tomorrow at the latest.
-Getting numbers of that approach vs. a guest's use of cached memory
-for devices would take a decent amount of additional work, so won't
-be part of that post. I'm actually not sure we should care about
-the numbers for a guest using normal mem attributes for device
-memory - other than out of curiosity. For correctness this issue
-really needs to be solved 100% host-side. We can't rely on a
-guest to do different/weird things, just because it's a guest.
-Ideally guests don't even know that they're guests. (Even if we
-describe the memory as cache-able to the guest, I don't think we
-can rely on the guest believing us.)
+Whole series stacked on top of at91-4.1-dt.
 
-drew
+Thanks, bye.
+
+
+>  arch/arm/boot/dts/at91-sama5d4ek.dts | 31 ++++++++++++++++
+>  arch/arm/boot/dts/sama5d4.dtsi       | 70 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 101 insertions(+)
+> 
+
+
+-- 
+Nicolas Ferre
