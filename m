@@ -1,309 +1,301 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 4 Mar 2015 12:07:53 +0100
-Subject: [PATCH v4 2/2] ARM: at91: dts: sama5d4: add dts for sama5d4
- xplained board
-In-Reply-To: <1425437508-30976-2-git-send-email-josh.wu@atmel.com>
-References: <1425437508-30976-1-git-send-email-josh.wu@atmel.com>
- <1425437508-30976-2-git-send-email-josh.wu@atmel.com>
-Message-ID: <54F6E789.5080508@atmel.com>
+From: vincent.cw.yang@gmail.com (Vincent Yang)
+Date: Wed,  4 Mar 2015 19:08:36 +0800
+Subject: [PATCH v7 7/7] ARM: MB86S7x: Add configs
+In-Reply-To: <1425466367-30556-1-git-send-email-vincent.yang@socionext.com>
+References: <1425466367-30556-1-git-send-email-vincent.yang@socionext.com>
+Message-ID: <1425467316-30863-1-git-send-email-vincent.yang@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 04/03/2015 03:51, Josh Wu a ?crit :
-> Add at91 sama5d4 xplained board support.
-> 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
-> 
-> Changes in v4:
-> - Thanks to Bo Shen to find following leds issues:
->     1. the leds' label is changed in new xplained board.
->     2. as piod bank is disabled in sama5d4, that will whole led driver
-> not work. So just disable the led which used piod.
-> 
-> Changes in v3:
-> - add phy0 child node under macb0
-> - rebase on top of linux next, re-formated the arch/arm/boot/dts/Makefile
-> 
-> Changes in v2:
-> - to be sorted by memory address, put the adc dt node after usart4.
-> 
->  arch/arm/boot/dts/Makefile                  |   3 +-
->  arch/arm/boot/dts/at91-sama5d4_xplained.dts | 239 ++++++++++++++++++++++++++++
->  2 files changed, 241 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/at91-sama5d4_xplained.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index a1c776b..5c189a5 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -42,7 +42,8 @@ dtb-$(CONFIG_SOC_SAM_V7) += \
->  	sama5d34ek.dtb \
->  	sama5d35ek.dtb \
->  	sama5d36ek.dtb \
-> -	at91-sama5d4ek.dtb
-> +	at91-sama5d4ek.dtb \
-> +	at91-sama5d4_xplained.dtb
->  dtb-$(CONFIG_ARCH_ATLAS6) += \
->  	atlas6-evb.dtb
->  dtb-$(CONFIG_ARCH_ATLAS7) += \
-> diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-> new file mode 100644
-> index 0000000..af8f4f5
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-> @@ -0,0 +1,239 @@
-> +/*
-> + * at91-sama5d4_xplained.dts - Device Tree file for SAMA5D4 Xplained board
-> + *
-> + *  Copyright (C) 2015 Atmel,
-> + *                2015 Josh Wu <josh.wu@atmel.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +/dts-v1/;
-> +#include "sama5d4.dtsi"
-> +
-> +/ {
-> +	model = "Atmel SAMA5D4 Xplained";
-> +	compatible = "atmel,sama5d4-xplained", "atmel,sama5d4", "atmel,sama5";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200 ignore_loglevel earlyprintk";
-> +	};
-> +
-> +	memory {
-> +		reg = <0x20000000 0x20000000>;
-> +	};
-> +
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		main_clock: clock at 0 {
-> +			compatible = "atmel,osc", "fixed-clock";
-> +			clock-frequency = <12000000>;
-> +		};
-> +
-> +		slow_xtal {
-> +			clock-frequency = <32768>;
-> +		};
-> +
-> +		main_xtal {
-> +			clock-frequency = <12000000>;
-> +		};
-> +	};
-> +
-> +	ahb {
-> +		apb {
-> +			spi0: spi at f8010000 {
-> +				cs-gpios = <&pioC 3 0>, <0>, <0>, <0>;
-> +				status = "okay";
-> +				m25p80 at 0 {
-> +					compatible = "atmel,at25df321a";
-> +					spi-max-frequency = <50000000>;
-> +					reg = <0>;
-> +				};
-> +			};
-> +
-> +			macb0: ethernet at f8020000 {
-> +				phy-mode = "rmii";
-> +				status = "okay";
-> +
-> +				phy0: ethernet-phy at 1 {
-> +					interrupt-parent = <&pioE>;
-> +					interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
-> +					reg = <1>;
-> +				};
-> +			};
-> +
-> +			mmc1: mmc at fc000000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_mmc1_clk_cmd_dat0 &pinctrl_mmc1_dat1_3 &pinctrl_mmc1_cd>;
-> +				status = "okay";
-> +				slot at 0 {
-> +					reg = <0>;
-> +					bus-width = <4>;
-> +					cd-gpios = <&pioE 3 0>;
-> +				};
-> +			};
-> +
-> +			usart3: serial at fc00c000 {
-> +				status = "okay";
-> +			};
-> +
-> +			usart4: serial at fc010000 {
-> +				status = "okay";
-> +			};
-> +
-> +			adc0: adc at fc034000 {
-> +				atmel,adc-vref = <3300>;
-> +				status = "okay";
-> +			};
-> +
-> +			watchdog at fc068640 {
-> +				status = "okay";
-> +			};
-> +
-> +			pinctrl at fc06a000 {
-> +				board {
-> +					pinctrl_mmc1_cd: mmc1_cd {
-> +						atmel,pins =
-> +							<AT91_PIOE 3 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
-> +					};
-> +					pinctrl_usba_vbus: usba_vbus {
-> +						atmel,pins =
-> +							<AT91_PIOE 31 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;
-> +					};
-> +					pinctrl_key_gpio: key_gpio_0 {
-> +						atmel,pins =
-> +							<AT91_PIOE 8 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>; /* PE13 gpio */
+From: Jassi Brar <jaswinder.singh@linaro.org>
 
-Nit: useless comment which is wrong. I remove it.
+Fujitsu's ARCH_MB86S7X is multi_v7 compatible, so add options to
+multi_v7_defconfig. Also add a new defconfig for MB86S7X for those
+who want the kernel built specifically for ARCH_MB86S7X.
 
+Signed-off-by: Andy Green <andy.green@linaro.org>
+Signed-off-by: Vincent Yang <vincent.yang@socionext.com>
+Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@socionext.com>
+---
+ arch/arm/configs/fujitsu_defconfig  | 232 ++++++++++++++++++++++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig |   5 +
+ 2 files changed, 237 insertions(+)
+ create mode 100644 arch/arm/configs/fujitsu_defconfig
 
-
-> +					};
-> +				};
-> +			};
-> +		};
-> +
-> +		usb0: gadget at 00400000 {
-> +			atmel,vbus-gpio = <&pioE 31 GPIO_ACTIVE_HIGH>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_usba_vbus>;
-> +			status = "okay";
-> +		};
-> +
-> +		usb1: ohci at 00500000 {
-> +			num-ports = <3>;
-> +			atmel,vbus-gpio = <0
-> +					   &pioE 11 GPIO_ACTIVE_HIGH
-> +					   &pioE 14 GPIO_ACTIVE_HIGH
-> +					  >;
-> +			status = "okay";
-> +		};
-> +
-> +		usb2: ehci at 00600000 {
-> +			status = "okay";
-> +		};
-> +
-> +		nand0: nand at 80000000 {
-> +			nand-bus-width = <8>;
-> +			nand-ecc-mode = "hw";
-> +			nand-on-flash-bbt;
-> +			atmel,has-pmecc;
-> +			status = "okay";
-> +
-> +			at91bootstrap at 0 {
-> +				label = "at91bootstrap";
-> +				reg = <0x0 0x40000>;
-> +			};
-> +
-> +			bootloader at 40000 {
-> +				label = "bootloader";
-> +				reg = <0x40000 0x80000>;
-> +			};
-> +
-> +			bootloaderenv at c0000 {
-> +				label = "bootloader env";
-> +				reg = <0xc0000 0xc0000>;
-> +			};
-> +
-> +			dtb at 180000 {
-> +				label = "device tree";
-> +				reg = <0x180000 0x80000>;
-> +			};
-> +
-> +			kernel at 200000 {
-> +				label = "kernel";
-> +				reg = <0x200000 0x600000>;
-> +			};
-> +
-> +			rootfs at 800000 {
-> +				label = "rootfs";
-> +				reg = <0x800000 0x0f800000>;
-> +			};
-> +		};
-> +	};
-> +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_key_gpio>;
-> +
-> +		pb_user1 {
-> +			label = "pb_user1";
-> +			gpios = <&pioE 8 GPIO_ACTIVE_HIGH>;
-> +			linux,code = <0x100>;
-> +			gpio-key,wakeup;
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		status = "okay";
-> +
-> +		d8 {
-> +			label = "d8";
-> +			gpios = <&pioD 30 GPIO_ACTIVE_HIGH>;
-> +			status = "disabled";
-> +		};
-> +
-> +		d10 {
-> +			label = "d10";
-> +			gpios = <&pioE 15 GPIO_ACTIVE_LOW>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +	};
-> +};
-> 
-
-Otherwise, it's okay:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-I take it for at91-4.1-dt (no need to respin it).
-
-Bye,
+diff --git a/arch/arm/configs/fujitsu_defconfig b/arch/arm/configs/fujitsu_defconfig
+new file mode 100644
+index 0000000..2d922e4
+--- /dev/null
++++ b/arch/arm/configs/fujitsu_defconfig
+@@ -0,0 +1,232 @@
++# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_DEFAULT_HOSTNAME="MB86S7x"
++CONFIG_SYSVIPC=y
++CONFIG_POSIX_MQUEUE=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_NAMESPACES=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_RD_BZIP2=y
++CONFIG_RD_LZMA=y
++CONFIG_RD_XZ=y
++CONFIG_RD_LZO=y
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_EXPERT=y
++# CONFIG_COMPAT_BRK is not set
++CONFIG_SLAB=y
++CONFIG_PROFILING=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_ARCH_MB86S7X=y
++CONFIG_ARM_LPAE=y
++CONFIG_ARM_ERRATA_754322=y
++CONFIG_ARM_ERRATA_754327=y
++CONFIG_ARM_ERRATA_764369=y
++CONFIG_ARM_ERRATA_775420=y
++CONFIG_ARM_ERRATA_798181=y
++CONFIG_PCI=y
++CONFIG_SMP=y
++CONFIG_SCHED_MC=y
++CONFIG_SCHED_SMT=y
++CONFIG_VMSPLIT_2G=y
++CONFIG_PREEMPT=y
++CONFIG_THUMB2_KERNEL=y
++CONFIG_HIGHMEM=y
++CONFIG_CMA=y
++CONFIG_CMA_AREAS=8
++# CONFIG_ATAGS is not set
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_CMDLINE="mem=2048M console=ttyS0,115200 root=/dev/mmcblk1p1 rootfstype=ext4 rootwait rw"
++CONFIG_KEXEC=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_CPUFREQ_DT=m
++CONFIG_CPU_IDLE=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++CONFIG_PM_WAKELOCKS=y
++CONFIG_PM_RUNTIME=y
++CONFIG_PM_DEBUG=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_DMA_CMA=y
++CONFIG_CMA_SIZE_MBYTES=192
++CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_CFI_ADV_OPTIONS=y
++CONFIG_MTD_CFI_AMDSTD=y
++CONFIG_MTD_ROM=y
++CONFIG_MTD_COMPLEX_MAPPINGS=y
++CONFIG_MTD_PHYSMAP=y
++CONFIG_MTD_PHYSMAP_OF=y
++CONFIG_MTD_PLATRAM=y
++CONFIG_MTD_M25P80=y
++CONFIG_MTD_SPI_NOR=y
++CONFIG_BLK_DEV_LOOP=m
++CONFIG_BLK_DEV_CRYPTOLOOP=m
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_COUNT=2
++CONFIG_BLK_DEV_RAM_SIZE=1024
++CONFIG_BLK_DEV_SD=m
++CONFIG_ATA=m
++# CONFIG_ATA_VERBOSE_ERROR is not set
++# CONFIG_SATA_PMP is not set
++CONFIG_SATA_AHCI_PLATFORM=m
++# CONFIG_ATA_SFF is not set
++CONFIG_NETDEVICES=y
++CONFIG_TUN=m
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_MICROCHIP is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++CONFIG_PHYLIB=y
++# CONFIG_WLAN is not set
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_INPUT_MOUSEDEV_SCREEN_X=800
++CONFIG_INPUT_MOUSEDEV_SCREEN_Y=480
++CONFIG_INPUT_EVDEV=m
++# CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_GPIO_POLLED=y
++# CONFIG_MOUSE_PS2 is not set
++CONFIG_MOUSE_GPIO=m
++CONFIG_INPUT_TOUCHSCREEN=y
++CONFIG_TOUCHSCREEN_EGALAX=m
++CONFIG_TOUCHSCREEN_ILI210X=m
++# CONFIG_SERIO_SERPORT is not set
++CONFIG_LEGACY_PTY_COUNT=16
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_8250=y
++# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_EXTENDED=y
++CONFIG_SERIAL_8250_DW=y
++CONFIG_SERIAL_OF_PLATFORM=y
++# CONFIG_HW_RANDOM is not set
++# CONFIG_I2C_COMPAT is not set
++CONFIG_I2C_CHARDEV=m
++# CONFIG_I2C_HELPER_AUTO is not set
++CONFIG_SPI=y
++CONFIG_GPIO_SYSFS=y
++CONFIG_GPIO_MB86S7X=y
++CONFIG_GPIO_MCP23S08=m
++# CONFIG_HWMON is not set
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_GPIO=y
++# CONFIG_VGA_ARB is not set
++CONFIG_DRM=y
++CONFIG_FB=y
++CONFIG_FIRMWARE_EDID=y
++CONFIG_FB_MODE_HELPERS=y
++CONFIG_FB_TILEBLITTING=y
++CONFIG_BACKLIGHT_LCD_SUPPORT=y
++CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
++CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
++CONFIG_LOGO=y
++# CONFIG_LOGO_LINUX_MONO is not set
++# CONFIG_LOGO_LINUX_VGA16 is not set
++CONFIG_SOUND=m
++CONFIG_SND=m
++CONFIG_SND_DYNAMIC_MINORS=y
++# CONFIG_SND_SUPPORT_OLD_API is not set
++# CONFIG_SND_VERBOSE_PROCFS is not set
++# CONFIG_SND_ARM is not set
++# CONFIG_SND_SPI is not set
++CONFIG_SND_SOC=m
++CONFIG_HID=m
++CONFIG_HID_PID=y
++CONFIG_USB_HIDDEV=y
++CONFIG_USB=m
++CONFIG_USB_OTG=y
++CONFIG_USB_XHCI_HCD=m
++CONFIG_USB_EHCI_HCD=m
++CONFIG_USB_EHCI_HCD_PLATFORM=m
++CONFIG_USB_OHCI_HCD=m
++# CONFIG_USB_OHCI_HCD_PCI is not set
++CONFIG_USB_OHCI_HCD_PLATFORM=m
++CONFIG_USB_ACM=m
++CONFIG_USB_STORAGE=m
++CONFIG_USB_DWC3=m
++CONFIG_USB_DWC3_HOST=y
++CONFIG_USB_DWC3_DEBUG=y
++CONFIG_USB_GADGET=m
++CONFIG_USB_MASS_STORAGE=m
++CONFIG_USB_G_MULTI=m
++CONFIG_MMC=y
++CONFIG_MMC_CLKGATE=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_SDHCI_F_SDH30=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_TIMER=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_LEDS_TRIGGER_BACKLIGHT=m
++CONFIG_LEDS_TRIGGER_CPU=y
++CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
++CONFIG_LEDS_TRIGGER_TRANSIENT=m
++CONFIG_DMADEVICES=y
++CONFIG_STAGING=y
++CONFIG_ANDROID=y
++CONFIG_ANDROID_BINDER_IPC=y
++CONFIG_ASHMEM=y
++CONFIG_ANDROID_LOGGER=m
++CONFIG_ANDROID_LOW_MEMORY_KILLER=y
++CONFIG_ION=y
++CONFIG_ARM_MHU=y
++CONFIG_ARM_SMMU=y
++CONFIG_EXT4_FS=y
++CONFIG_EXT4_FS_POSIX_ACL=y
++CONFIG_EXT4_FS_SECURITY=y
++CONFIG_VFAT_FS=m
++CONFIG_TMPFS=y
++CONFIG_JFFS2_FS=m
++CONFIG_CRAMFS=y
++CONFIG_ROMFS_FS=y
++CONFIG_ROMFS_BACKED_BY_BOTH=y
++# CONFIG_NETWORK_FILESYSTEMS is not set
++CONFIG_NLS_CODEPAGE_437=m
++CONFIG_NLS_ISO8859_1=m
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_INFO=y
++CONFIG_DEBUG_FS=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_MEMORY_INIT=y
++# CONFIG_DEBUG_PREEMPT is not set
++# CONFIG_RCU_CPU_STALL_VERBOSE is not set
++# CONFIG_FTRACE is not set
++CONFIG_DEBUG_USER=y
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++# CONFIG_CRYPTO_HW is not set
++CONFIG_FONTS=y
++CONFIG_FONT_SUN8x16=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index b7e6b6fb..78e9149 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -50,6 +50,7 @@ CONFIG_SOC_AM43XX=y
+ CONFIG_SOC_DRA7XX=y
+ CONFIG_ARCH_QCOM=y
+ CONFIG_ARCH_MEDIATEK=y
++CONFIG_ARCH_MB86S7X=y
+ CONFIG_ARCH_MSM8X60=y
+ CONFIG_ARCH_MSM8960=y
+ CONFIG_ARCH_MSM8974=y
+@@ -304,6 +305,7 @@ CONFIG_GPIO_PALMAS=y
+ CONFIG_GPIO_SYSCON=y
+ CONFIG_GPIO_TPS6586X=y
+ CONFIG_GPIO_TPS65910=y
++CONFIG_GPIO_MB86S7X=y
+ CONFIG_BATTERY_SBS=y
+ CONFIG_CHARGER_TPS65090=y
+ CONFIG_POWER_RESET_AS3722=y
+@@ -452,6 +454,7 @@ CONFIG_MMC_SDHCI_SPEAR=y
+ CONFIG_MMC_SDHCI_S3C=y
+ CONFIG_MMC_SDHCI_S3C_DMA=y
+ CONFIG_MMC_SDHCI_BCM_KONA=y
++CONFIG_MMC_SDHCI_F_SDH30=y
+ CONFIG_MMC_SDHCI_ST=y
+ CONFIG_MMC_OMAP=y
+ CONFIG_MMC_OMAP_HS=y
+@@ -550,6 +553,8 @@ CONFIG_PHY_MIPHY365X=y
+ CONFIG_PHY_STIH41X_USB=y
+ CONFIG_PHY_STIH407_USB=y
+ CONFIG_PHY_SUN4I_USB=y
++CONFIG_MAILBOX=y
++CONFIG_ARM_MHU=y
+ CONFIG_EXT4_FS=y
+ CONFIG_AUTOFS4_FS=y
+ CONFIG_MSDOS_FS=y
 -- 
-Nicolas Ferre
+1.9.0
