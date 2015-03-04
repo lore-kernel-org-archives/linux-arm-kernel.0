@@ -1,34 +1,42 @@
-From: rockford@yandex.ru (=?koi8-r?B?8MHOz9cg4c7E0sXK?=)
-Date: Wed, 04 Mar 2015 23:32:38 +0300
-Subject: [PATCH] ARM: i.MX6Q: Add fixup for RTL8211E Gigabit Ethernet PHY
-In-Reply-To: <CAOMZO5C+uyfi=Br8kj5zE1ik=qxk2h4vaQn1Loo9=Uv_WGaoQg@mail.gmail.com>
-References: <1425404579-30591-1-git-send-email-rockford@yandex.ru>
- <3988965.hS0GXm2TNL@wuerfel> <4686121425496122@web26g.yandex.ru>
- <2796821.5chD2g3yoZ@wuerfel> <4971421425499543@web17m.yandex.ru>
- <CAOMZO5C+uyfi=Br8kj5zE1ik=qxk2h4vaQn1Loo9=Uv_WGaoQg@mail.gmail.com>
-Message-ID: <5019881425501158@web17m.yandex.ru>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 4 Mar 2015 21:34:00 +0100
+Subject: [PATCH] ARM: sun7i: dt: Add new MK808C device
+In-Reply-To: <CAEKpxB=-vtjMckh3ZHoy0mezE9U1EtKzmttdXRD5ZNztZvB_ag@mail.gmail.com>
+References: <1425131004-8551-1-git-send-email-codekipper@gmail.com>
+ <20150303071342.GB4713@lukather>
+ <CAEKpxB=-vtjMckh3ZHoy0mezE9U1EtKzmttdXRD5ZNztZvB_ag@mail.gmail.com>
+Message-ID: <20150304203400.GR4911@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Mar 03, 2015 at 09:22:32PM +0100, Code Kipper wrote:
+> >> +
+> >> +/ {
+> >> +     model = "mk808c";
+> >> +     compatible = "mk808c", "allwinner,sun7i-a20";
+> >
+> > the compatible must be of the format "vendor,device". Please add the
+> > vendor name.
+> 
+> Ahhh....I've searched high and low for a vendors name. I listed it as
+> unknown on the wiki page,
+> would 'odm' be considered valid?
 
+Not really. Another mk808c device might very well be made by some
+other odm.
 
-04.03.2015, 23:18, "Fabio Estevam" <festevam@gmail.com>:
-> On Wed, Mar 4, 2015 at 5:05 PM, ????? ?????? <rockford@yandex.ru> wrote:
->> ?Actually, I don't know. I've discovered this when I wanted to boot a more recent kernel
->> ?on this board, and network wasn't working. So I've had to disassembly a vendor's binary only module
->> ?to discover how they handle this situation.
->
-> Do you use the generic PHY driver or do you have CONFIG_REALTEK_PHY enabled?
+Don't your device has any brand on the case or the PCB?
 
-CONFIG_REALTEK_PHY=y
-CONFIG_FIXED_PHY=y
+Maxime
 
-> In case you use the realtek PHY driver and still see the issue, can't
-> you fix this in drivers/net/phy/realtek.c instead?
-
-I think there it will require a more work with board detection than here and will
-populate a driver with unnecessary for most users code.
-
-
---
- ??????
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150304/7bf9b2c4/attachment.sig>
