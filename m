@@ -1,48 +1,87 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 04 Mar 2015 16:33:06 +0000
-Subject: [PATCH 4.0-rc1 v17 4/6] printk: Simple implementation for NMI
- backtracing
-In-Reply-To: <20150304112010.338501ab@gandalf.local.home>
-References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
- <1425463974-23568-1-git-send-email-daniel.thompson@linaro.org>
- <1425463974-23568-5-git-send-email-daniel.thompson@linaro.org>
- <1425485601.2712.9.camel@perches.com>
- <20150304112010.338501ab@gandalf.local.home>
-Message-ID: <1425486786.2769.25.camel@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 4 Mar 2015 17:39:48 +0100
+Subject: [PATCH] ARM: at91/dt: add uart0 to sama5d3 DT
+In-Reply-To: <1425486402-17580-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1425486402-17580-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <54F73554.3080804@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-03-04 at 11:20 -0500, Steven Rostedt wrote:
-> On Wed, 04 Mar 2015 08:13:21 -0800
-> Joe Perches <joe@perches.com> wrote:
+Le 04/03/2015 17:26, Nicolas Ferre a ?crit :
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Please, forget this patch. It is handled by
+arch/arm/boot/dts/sama5d3_uart.dtsi file.
+
+Sorry for the noise ;-)
+
+Bye,
+
+
+> ---
+>  arch/arm/boot/dts/sama5d3.dtsi | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
 > 
-> > On Wed, 2015-03-04 at 10:12 +0000, Daniel Thompson wrote:
-> > > Currently there is a quite a pile of code sitting in
-> > > arch/x86/kernel/apic/hw_nmi.c to support safe all-cpu backtracing from NMI.
-> > > The code is inaccessible to backtrace implementations for other
-> > > architectures, which is a shame because they would probably like to be
-> > > safe too.
-> > > 
-> > > Copy this code into printk. We'll port the x86 NMI backtrace to it in a
-> > > later patch.
-> > 
-> > I think this would be better as a separate file
-> > rather than increasing the bulk of printk.c
-> > 
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index e30fee2edd55..def05e20e9d6 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -26,6 +26,7 @@
+>  		serial2 = &usart1;
+>  		serial3 = &usart2;
+>  		serial4 = &usart3;
+> +		serial5 = &uart0;
+>  		gpio0 = &pioA;
+>  		gpio1 = &pioB;
+>  		gpio2 = &pioC;
+> @@ -206,6 +207,17 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			uart0: serial at f0024000 {
+> +				compatible = "atmel,at91sam9260-usart";
+> +				reg = <0xf0024000 0x100>;
+> +				interrupts = <16 IRQ_TYPE_LEVEL_HIGH 5>;
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_uart0>;
+> +				clocks = <&uart0_clk>;
+> +				clock-names = "usart";
+> +				status = "disabled";
+> +			};
+> +
+>  			pwm0: pwm at f002c000 {
+>  				compatible = "atmel,sama5d3-pwm";
+>  				reg = <0xf002c000 0x300>;
+> @@ -764,6 +776,14 @@
+>  					};
+>  				};
+>  
+> +				uart0 {
+> +					pinctrl_uart0: uart0-0 {
+> +						atmel,pins =
+> +							<AT91_PIOC 29 AT91_PERIPH_A AT91_PINCTRL_NONE		/* conflicts with PWMFI2, ISI_D8 */
+> +							 AT91_PIOC 30 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;	/* conflicts with ISI_PCK */
+> +					};
+> +				};
+> +
+>  				usart0 {
+>  					pinctrl_usart0: usart0-0 {
+>  						atmel,pins =
+> @@ -1098,6 +1118,12 @@
+>  						atmel,clk-output-range = <0 66000000>;
+>  					};
+>  
+> +					uart0_clk: uart0_clk {
+> +						#clock-cells = <0>;
+> +						reg = <16>;
+> +						atmel,clk-output-range = <0 66000000>;
+> +					};
+> +
+>  					twi0_clk: twi0_clk {
+>  						reg = <18>;
+>  						#clock-cells = <0>;
 > 
-> I agree, as printk already has its own directory. Perhaps a
-> "nmi_backtrace.c"?
-
-I agree on moving the code. However, after Thomas' review I made sure
-all the external symbols were prefixed printk_nmi and, as a result of
-the same review I started using CONFIG_PRINTK_NMI to enable/disable the
-feature). For that reason I'm much more inclined to name it
-"printk_nmi.c". Any objections?
-
-I know it is a somewhat generic name but I'll move the comment text that
-commences "This is not a generic printk() implementation and must be
-used with great care. In particular..." to the top of the file to make
-clear the limitations of this code.
 
 
-Daniel.
+-- 
+Nicolas Ferre
