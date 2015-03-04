@@ -1,30 +1,33 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 04 Mar 2015 15:54:38 -0500 (EST)
-Subject: [PATCH v2 0/3] drivers: net: xgene: Fix backward compatibility
- of newer firmware with older kernel
-In-Reply-To: <1425411581-25463-1-git-send-email-isubramanian@apm.com>
-References: <1425411581-25463-1-git-send-email-isubramanian@apm.com>
-Message-ID: <20150304.155438.1283662648499374073.davem@davemloft.net>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Wed, 4 Mar 2015 12:42:12 -0800
+Subject: [PATCH v3 0/2] Add support for Broadcom RNG200
+In-Reply-To: <Scott Branden <sbranden@broadcom.com>
+References: <Scott Branden <sbranden@broadcom.com>
+Message-ID: <1425501734-14025-1-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Iyappan Subramanian <isubramanian@apm.com>
-Date: Tue,  3 Mar 2015 11:39:38 -0800
+This series of patchsets contains the Broadcom Random Number Generator
+driver and device tree binding documentation.
 
-> Kernel 3.17 driver supports only RGMII ethernet interface.
-> Since the Tianocore DT contains same compatibility string for RGMII,
-> SGMII based 1G and XFI based 10G interfaces, crash happens when probe called
-> on SGMII based 1G and XFI based 10G interface.
-> 
-> This patch fixes the backward compatibility of the older driver with the
-> newer firmware by making the binding unique so that the older driver won't
-> recognize the non-supported interfaces.
-> 
-> v2: Address comments from v1
-> * updated cover letter subject line with net: xgene
-> * Documentation: formatted compatible string values as list
-> 
-> v1:
-> * Initial version
+Changes from v2:
+ added usleep_range instead of cpu_relax
+ add init and cleanup functions following new hwrng model
+ 
+Changes from v1:
+ added \n to 2 dev_err messages
 
-Series applied, thanks.
+Scott Branden (2):
+  hwrng: iproc-rng200 - Add device tree bindings
+  hwrng: iproc-rng200 - Add Broadcom IPROC RNG driver
+
+ .../bindings/hwrng/brcm,iproc-rng200.txt           |  12 +
+ drivers/char/hw_random/Kconfig                     |  13 ++
+ drivers/char/hw_random/Makefile                    |   1 +
+ drivers/char/hw_random/iproc-rng200.c              | 254 +++++++++++++++++++++
+ 4 files changed, 280 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwrng/brcm,iproc-rng200.txt
+ create mode 100644 drivers/char/hw_random/iproc-rng200.c
+
+-- 
+2.3.0
