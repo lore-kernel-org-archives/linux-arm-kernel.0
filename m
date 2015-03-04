@@ -1,27 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 4 Mar 2015 13:54:42 +0100
-Subject: [PATCH 07/10] pinctrl: mvebu: add pinctrl driver for Marvell
- Armada 39x
-In-Reply-To: <1423238276-9206-8-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1423238276-9206-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1423238276-9206-8-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CACRpkdZH9vUPR65Yw65LKHns8_b3vM+1ARoks2j73WV2WmAExQ@mail.gmail.com>
+Date: Wed, 4 Mar 2015 13:55:48 +0100
+Subject: [PATCH 1/2] i2c: nomadik: match return type of
+ wait_for_completion_timeout
+In-Reply-To: <1423398873-24653-1-git-send-email-hofrat@osadl.org>
+References: <1423398873-24653-1-git-send-email-hofrat@osadl.org>
+Message-ID: <CACRpkdYod8K75CnC7R6i9ghjEp6vuXfi64QUMGt=2sNexviRdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 6, 2015 at 4:57 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
+On Sun, Feb 8, 2015 at 1:34 PM, Nicholas Mc Guire <hofrat@osadl.org> wrote:
 
-> This commit adds a new pinctrl driver for the Marvell Armada 39x
-> family of processors, which hooks into the existing infrastructure to
-> support pin-muxing on Marvell EBU processors. Two variants of the
-> Armada 39x are supported: 88F6920 (Armada 390) and 88F6928 (Armada
-> 398), which have a few differences in the available functions for
-> certain pins.
+> return type of wait_for_completion_timeout is unsigned long not int. as
+> timeout is used for wait_for_completion_timeout exclusively here its
+> type is simply changed to unsigned long.
 >
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
 
-Patch applied.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
