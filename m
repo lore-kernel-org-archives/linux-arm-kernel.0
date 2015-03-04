@@ -1,38 +1,41 @@
-From: rockford@yandex.ru (=?koi8-r?B?8MHOz9cg4c7E0sXK?=)
-Date: Wed, 04 Mar 2015 23:05:43 +0300
-Subject: [PATCH] ARM: i.MX6Q: Add fixup for RTL8211E Gigabit Ethernet PHY
-In-Reply-To: <2796821.5chD2g3yoZ@wuerfel>
-References: <1425404579-30591-1-git-send-email-rockford@yandex.ru>
- <3988965.hS0GXm2TNL@wuerfel> <4686121425496122@web26g.yandex.ru>
- <2796821.5chD2g3yoZ@wuerfel>
-Message-ID: <4971421425499543@web17m.yandex.ru>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 04 Mar 2015 21:07:21 +0100
+Subject: [RFC PATCH 01/18] serial: remove obsolete msm_serial_hs driver
+In-Reply-To: <1425499409.2090.7.camel@tiscali.nl>
+References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
+ <1425497592-1831064-2-git-send-email-arnd@arndb.de>
+ <1425499409.2090.7.camel@tiscali.nl>
+Message-ID: <1425499641.2090.10.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Paul Bolle schreef op wo 04-03-2015 om 21:03 [+0100]:
+> Arnd Bergmann schreef op wo 04-03-2015 om 20:32 [+0100]:
+> > Linux currently has two drivers for the same hardware: msm_serial
+> > and msm_serial_hs. Only the former is being actively maintained,
+> > and the latter is not used by any in-tree board files, so we
+> > can safely remove it.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arnd.de>
+> > ---
+> >  drivers/tty/serial/Kconfig                  |   12 -
+> >  drivers/tty/serial/msm_serial_hs.c          | 1874 ---------------------------
+> 
+> I haven't even bothered to check, but in a diff stat like this one
+> expects a line like
+>     drivers/tty/serial/Makefile               |     1 -
+> 
+> here. Is that expectation correct?
+> 
+> >  include/linux/platform_data/msm_serial_hs.h |   49 -
+> >  3 files changed, 1935 deletions(-)
+> >  delete mode 100644 drivers/tty/serial/msm_serial_hs.c
+> >  delete mode 100644 include/linux/platform_data/msm_serial_hs.h
+
+Please note that your own email address is
+    arnd at arndb.de
+
+(I fixed up the Cc list for this message. And I don't do smilies.)
 
 
-04.03.2015, 22:44, "Arnd Bergmann" <arnd@arndb.de>:
-> On Wednesday 04 March 2015 22:08:42 ????? ?????? wrote:
->>>> ??+ ??????????????phy_register_fixup_for_uid(PHY_ID_RTL8211E, 0xffffffff,
->>>> ??+ ??????????????????????????????rtl8211e_phy_fixup);
->>> ?How do you ensure that this fixup is only applied on the boards that need
->>> ?it, rather than all machines that happen to have this phy?
->> ?I've thought that if there no other fixups in code here checking a particular
->> ?board where they run, this isn't necessary.
->> ?This SoC has only one ethernet MAC and if it is connected to this PHY,
->> ?it should be initalized this way independently of board, like other code here does, I think.
->>
->> ?This code just does forcibly restart autonegotiation.
->> ?I can wrap it in if(!of_machine_is_compatible(...)){}, if it is need.
->
-> Your explanation makes sense to me, though I wonder what the property of this
-> SoC is that requires the PHY fixup. Is this something we could or should be doing
-> in a more general way using the PHY API, by having the device driver call a
-> phy API function to restart autoneg independent of the PHY?
-
-Actually, I don't know. I've discovered this when I wanted to boot a more recent kernel
-on this board, and network wasn't working. So I've had to disassembly a vendor's binary only module
-to discover how they handle this situation.
-
---
- ??????
+Paul Bolle
