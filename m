@@ -1,78 +1,33 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 04 Mar 2015 23:40 +0100
-Subject: [PATCH v9 12/21] ACPI / table: Print GIC information when MADT is
- parsed
-In-Reply-To: <1424853601-6675-13-git-send-email-hanjun.guo@linaro.org>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <1424853601-6675-13-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1559116.NBxTWyWPs4@vostro.rjw.lan>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 4 Mar 2015 23:17:29 +0100
+Subject: [PATCH] genirq: describe IRQF_COND_SUSPEND
+In-Reply-To: <20150304200040.GA12126@leverpostej>
+References: <1424771762-16343-1-git-send-email-boris.brezillon@free-electrons.com>
+ <8151717.nkhnGBri9h@vostro.rjw.lan>
+ <20150226191724.0ae4ca4e@bbrezillon>
+ <6864616.1aRDSmSsvx@vostro.rjw.lan>
+ <20150304194246.GF22156@leverpostej>
+ <20150304200040.GA12126@leverpostej>
+Message-ID: <20150304221729.GI3989@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 25, 2015 04:39:52 PM Hanjun Guo wrote:
-> When MADT is parsed, print GIC information as debug message:
-> 
-> ACPI: GICC (acpi_id[0x0000] address[00000000e112f000] MPIDR[0x0] enabled)
-> ACPI: GICC (acpi_id[0x0001] address[00000000e112f000] MPIDR[0x1] enabled)
-> ...
-> ACPI: GICC (acpi_id[0x0201] address[00000000e112f000] MPIDR[0x201] enabled)
-> 
-> Those debug information will be very helpful to bring up early systems to
-> see if acpi_id and MPIDR are matched or not as spec defined.
-> 
-> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Tested-by: Yijing Wang <wangyijing@huawei.com>
-> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-> Tested-by: Jon Masters <jcm@redhat.com>
-> Tested-by: Timur Tabi <timur@codeaurora.org>
-> Tested-by: Robert Richter <rrichter@cavium.com>
-> Acked-by: Robert Richter <rrichter@cavium.com>
-> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+tiny tiny nitpick:
 
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+On 04/03/2015 at 20:00:40 +0000, Mark Rutland wrote :
+> With certain restrictions it is possible for a wakeup device to share
+> and IRQ with an IRQF_NO_SUSPEND user, and the warnings introduced by
+  ^ an
 
-> ---
->  drivers/acpi/tables.c | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
-> 
-> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
-> index f4e5b88..2e19189 100644
-> --- a/drivers/acpi/tables.c
-> +++ b/drivers/acpi/tables.c
-> @@ -185,6 +185,28 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
->  		}
->  		break;
->  
-> +	case ACPI_MADT_TYPE_GENERIC_INTERRUPT:
-> +		{
-> +			struct acpi_madt_generic_interrupt *p =
-> +				(struct acpi_madt_generic_interrupt *)header;
-> +			pr_debug("GICC (acpi_id[0x%04x] address[%llx] MPIDR[0x%llx] %s)\n",
-> +				 p->uid, p->base_address,
-> +				 p->arm_mpidr,
-> +				 (p->flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
-> +
-> +		}
-> +		break;
-> +
-> +	case ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR:
-> +		{
-> +			struct acpi_madt_generic_distributor *p =
-> +				(struct acpi_madt_generic_distributor *)header;
-> +			pr_debug("GIC Distributor (gic_id[0x%04x] address[%llx] gsi_base[%d])\n",
-> +				 p->gic_id, p->base_address,
-> +				 p->global_irq_base);
-> +		}
-> +		break;
-> +
->  	default:
->  		pr_warn("Found unsupported MADT entry (type = 0x%x)\n",
->  			header->type);
-> 
+
+> +In rare cases an IRQ can be shared between a wakeup device driver and an
+> +IRQF_NO_SUSPEND user. In order for this to be safe, the wakeup device driver
+> +must be able to discern spurious IRQs from genuine wakeup events (signalling
+
+And genuine question, should we use British English or American English
+or we don't care ?
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
