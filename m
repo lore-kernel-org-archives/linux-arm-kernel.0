@@ -1,23 +1,25 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 4 Mar 2015 15:47:46 +0530
-Subject: [PATCH v2 1/4] cpufreq-dt: add clock domain and intermediate
- frequency support
-In-Reply-To: <CAKohpomw6iDRRMxgmOORzZVeW4h2-LzKOsUcdpUnANcxiAYm+A@mail.gmail.com>
-References: <1425458956-20665-1-git-send-email-pi-cheng.chen@linaro.org>
- <1425458956-20665-2-git-send-email-pi-cheng.chen@linaro.org>
- <CAKohpomw6iDRRMxgmOORzZVeW4h2-LzKOsUcdpUnANcxiAYm+A@mail.gmail.com>
-Message-ID: <CAKohpom+Ls6AiP_wntwCri2gharN7tGu2Dzk4p4Yd0n75BuXdA@mail.gmail.com>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Wed, 4 Mar 2015 11:18:28 +0100
+Subject: [PATCH] ARM: at91/dt: keep watchdog running in idle mode
+In-Reply-To: <549954F7.9070009@objectxp.com>
+References: <549954F7.9070009@objectxp.com>
+Message-ID: <20150304101828.GA7983@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 March 2015 at 15:45, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->> +struct cpufreq_cpu_domain {
->> +       struct list_head node;
->> +       cpumask_t cpus;
->> +       unsigned long intermediate_freq;
->
-> This should come from DT instead of platform data.
+Hello Nicolas, Michel,
 
-Well, we are getting fixed this in OPP bindings now, so for now
-do it from platform data as you have done it. Once OPP-v2 is
-around, we will get rid of it ..
+On Tue, Dec 23, 2014 at 12:41:43PM +0100, Michel Marti wrote:
+> Since turning on idle-halt in commit fe46aa679, SoCs compatible with
+> the sam9 watchdog no longer reboot if the wdt times out. Removing the
+> 'idle-halt' flag fixes this.
+
+I missed that and I did exactly the same recently in my "[PATCHv2 0/2] 
+dts: AT91 Watchdog, remove property idle halt by default", first come, 
+first serve:
+
+Acked-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+
+But my patch summary is IMHO better (even with my broken english ;-).
+
+Sylvain
