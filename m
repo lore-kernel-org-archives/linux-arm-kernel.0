@@ -1,53 +1,19 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  4 Mar 2015 18:06:36 +0000
-Subject: [PATCH v5 7/9] rtc: bindings: Provide ST bindings for ST's LPC RTC
- device
-In-Reply-To: <1425492398-27340-1-git-send-email-lee.jones@linaro.org>
-References: <1425492398-27340-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1425492398-27340-8-git-send-email-lee.jones@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 4 Mar 2015 18:08:41 +0000
+Subject: [PATCH v2 1/3] arm64: remove processor_id
+In-Reply-To: <1425468197-22377-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1425468197-22377-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1425468197-22377-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150304180841.GC28951@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On current ST platforms the LPC controls a number of functions including
-Watchdog and Real Time Clock.  This patch provides the bindings used to
-configure LPC in RTC mode.
+On Wed, Mar 04, 2015 at 12:23:15PM +0100, Ard Biesheuvel wrote:
+> The global processor_id is assigned the MIDR_EL1 value of the boot
+> CPU in the early init code, but is never referenced afterwards.
+> 
+> So remove it.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- .../devicetree/bindings/rtc/rtc-st-lpc.txt         | 25 ++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
-
-diff --git a/Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt b/Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
-new file mode 100644
-index 0000000..aaf9855
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
-@@ -0,0 +1,25 @@
-+STMicroelectronics Low Power Controller (LPC) - RTC
-+===================================================
-+
-+LPC currently supports Watchdog OR Real Time Clock functionality.
-+
-+[See: ../watchdog/st_lpc_wdt.txt for Watchdog options]
-+
-+Required properties
-+
-+- compatible 	: Must be one of: "st,stih407-lpc" "st,stih416-lpc"
-+				  "st,stih415-lpc" "st,stid127-lpc"
-+- reg		: LPC registers base address + size
-+- interrupts    : LPC interrupt line number and associated flags
-+- clocks	: Clock used by LPC device (See: ../clock/clock-bindings.txt)
-+- st,lpc-mode	: The LPC can run either one of two modes ST_LPC_MODE_RTC [0] or
-+		  ST_LPC_MODE_WDT [1].  One (and only one) mode must be
-+		  selected.
-+
-+Example:
-+	lpc at fde05000 {
-+		compatible	= "st,stih416-lpc-watchdog";
-+		reg		= <0xfde05000 0x1000>;
-+		clocks 		= <&clk_s_d3_flexgen CLK_LPC_0>;
-+		st,lpc-mode	= <ST_LPC_MODE_RTC>;
-+	};
--- 
-1.9.1
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
