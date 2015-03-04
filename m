@@ -1,78 +1,84 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Wed, 4 Mar 2015 12:37:26 -0600
-Subject: [BUG] ARM: socfpga: L2 cache init
-In-Reply-To: <20150304102342.GA14613@pengutronix.de>
-References: <54D8E3BB.3060505@opensource.altera.com>
- <20150209185820.GB7994@pengutronix.de> <20150209213017.GC7994@pengutronix.de>
- <54DD2BB3.3090507@opensource.altera.com>
- <20150213080106.GD7994@pengutronix.de>
- <CADhT+wfbZb+u7a-aCi71rh9xFMuphOvqiyEgEYpmmTQtujLcVg@mail.gmail.com>
- <20150217222817.GS8656@n2100.arm.linux.org.uk>
- <CADhT+wcpWcfca6JWLAfpQm_yPHOpTRRbCpiikUEs0ha1NHq3TQ@mail.gmail.com>
- <20150225092657.GU8656@n2100.arm.linux.org.uk>
- <CADhT+wcyim0Yeq6Wcy6UFAmv+GPjWtVO3hQQ_7uX1bMskADSJQ@mail.gmail.com>
- <20150304102342.GA14613@pengutronix.de>
-Message-ID: <54F750E6.5030703@opensource.altera.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 4 Mar 2015 18:43:18 +0000
+Subject: [PATCH v2 0/6] ARM: at91: fix irq_pm_install_action WARNING
+In-Reply-To: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150304184318.GE22156@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2015 04:23 AM, Steffen Trumtrar wrote:
-> On Wed, Feb 25, 2015 at 10:30:32AM -0600, Dinh Nguyen wrote:
->> On Wed, Feb 25, 2015 at 3:26 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Tue, Feb 24, 2015 at 05:55:05PM -0600, Dinh Nguyen wrote:
->>>> Do you have a recommendation on what should be done?
->>>
->>> Please try this:
->>>
->>>  arch/arm/mach-socfpga/socfpga.c | 5 +++++
->>>  1 file changed, 5 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
->>> index 383d61e138af..f5e597c207b9 100644
->>> --- a/arch/arm/mach-socfpga/socfpga.c
->>> +++ b/arch/arm/mach-socfpga/socfpga.c
->>> @@ -23,6 +23,7 @@
->>>  #include <asm/hardware/cache-l2x0.h>
->>>  #include <asm/mach/arch.h>
->>>  #include <asm/mach/map.h>
->>> +#include <asm/cacheflush.h>
->>>
->>>  #include "core.h"
->>>
->>> @@ -73,6 +74,10 @@ void __init socfpga_sysmgr_init(void)
->>>                         (u32 *) &socfpga_cpu1start_addr))
->>>                 pr_err("SMP: Need cpu1-start-addr in device tree.\n");
->>>
->>> +       /* Ensure that socfpga_cpu1start_addr is visible to other CPUs */
->>> +       smp_wmb();
->>> +       sync_cache_w(&socfpga_cpu1start_addr);
->>> +
->>>         sys_manager_base_addr = of_iomap(np, 0);
->>>
->>>         np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
->>>
->>> --
->>
->>
->> Thanks Russell! I have been able to run the test for > 30 minutes now
->> with both cores coming up just fine.
->>
->> Do you mind taking this patch for 4.0-rc? If so,
->>
->> Tested-by: Dinh Nguyen <dinguyen@opensource.altera.com>
->>
->> Steffen, if you don't mind, do you want to test on your setup as well?
-> 
-> Looks good for me, too:
-> 
-> Tested-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> 
+Hi Boris,
 
-Steffen, thanks for testing.
+Other than the watchdog patch, which I'm a little confused by, this all
+looks fine to me. So for the other patches:
 
-Russell, if you don't mind, I'll take this patch through my tree as I
-have a couple of other fixes for 4.0-rc as well.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Sorry I haven't replied to anything for the last few days, and thanks
+for digging into this.
 
 Thanks,
-Dinh
+Mark.
+
+On Mon, Mar 02, 2015 at 09:18:12AM +0000, Boris Brezillon wrote:
+> My apologies to those of you who already received this series, but I
+> didn't increment the patch version and forgot some subsystem maintainers
+> and MLs.
+> 
+> Commit cab303be91dc47942bc25de33dc1140123540800 [1] introduced a WARN_ON
+> test which triggers a WARNING backtrace on at91 platforms.
+> While this WARN_ON is absolutely necessary to warn users that they should
+> not mix request with and without IRQF_NO_SUSPEND flags on shared IRQs,
+> there is no easy way to solve this issue on at91 platforms.
+> 
+> The main reason is that the init timer is often using a shared irq line
+> and thus request this irq with IRQF_NO_SUSPEND flag set, while other
+> peripherals request the same irq line without this flag.
+> 
+> This problem has recently been addressed by this patch [2] which adds
+> a new IRQF_COND_SUSPEND flag, that authorize mixing IRQF_NO_SUSPEND and
+> !IRQF_NO_SUSPEND as long as irq handlers setting IRQF_COND_SUSPEND
+> can safely be called in suspended state.
+> 
+> Doing this also implies taking care of system wakeup in devices handlers
+> if they tag the IRQ line as a wakeup source.
+> The first patch of this series exports the pm_system_wakeup symbol so
+> that drivers can call pm_system_wakeup from their interrupt handler.
+> 
+> This series then patches all at91 drivers that can have devices sharing
+> their IRQ line with a timer.
+> 
+> This series depends on [2].
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> [1]https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/kernel/irq/pm.c?id=cab303be91dc47942bc25de33dc1140123540800
+> [2]https://lkml.org/lkml/2015/2/26/675
+> 
+> Changes since v1:
+>  - replaced the IRQF_SUSPEND_NOACTION flag by IRQF_COND_SUSPEND
+>  - properly addressed wakeup handling in drivers
+> 
+> Boris Brezillon (6):
+>   PM / wakeup: export pm_system_wakeup symbol
+>   rtc: at91sam9: rework wakeup and interrupt handling
+>   rtc: at91rm9200: rework wakeup and interrupt handling
+>   clk: at91: implement suspend/resume for the PMC irqchip
+>   watchdog: at91sam9: request the irq with IRQF_NO_SUSPEND
+>   tty: serial: atmel: rework interrupt and wakeup handling
+> 
+>  drivers/base/power/wakeup.c       |  1 +
+>  drivers/clk/at91/pmc.c            | 20 ++++++++++-
+>  drivers/clk/at91/pmc.h            |  1 +
+>  drivers/rtc/rtc-at91rm9200.c      | 62 +++++++++++++++++++++++++--------
+>  drivers/rtc/rtc-at91sam9.c        | 73 ++++++++++++++++++++++++++++++++-------
+>  drivers/tty/serial/atmel_serial.c | 49 +++++++++++++++++++++++---
+>  drivers/watchdog/at91sam9_wdt.c   |  3 +-
+>  7 files changed, 177 insertions(+), 32 deletions(-)
+> 
+> -- 
+> 1.9.1
+> 
+> 
