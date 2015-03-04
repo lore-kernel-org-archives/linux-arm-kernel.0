@@ -1,70 +1,59 @@
-From: lsanfil@marvell.com (sanfilippo)
-Date: Wed, 4 Mar 2015 12:40:34 +0100
-Subject: [RFC PATCH 0/1] Wrong structure alignment due to compiler
- attribute "section"
-In-Reply-To: <20150303144130.GB5177@e103592.cambridge.arm.com>
-References: <1425290502-2322-1-git-send-email-lsanfil@marvell.com>
- <20150303144130.GB5177@e103592.cambridge.arm.com>
-Message-ID: <54F6EF32.7080306@marvell.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 04 Mar 2015 12:43:57 +0100
+Subject: [PATCH v2 5/5] clocksource: sun5i: Add clock notifiers
+In-Reply-To: <20150304093215.GI4911@lukather>
+References: <1422265856-27631-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1422265856-27631-6-git-send-email-maxime.ripard@free-electrons.com>
+ <54C62368.7050600@linaro.org> <20150126143541.GG31568@lukather>
+ <20150303085204.GA4911@lukather> <54F59829.2070205@linaro.org>
+ <20150304093215.GI4911@lukather>
+Message-ID: <54F6EFFD.5070802@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.03.2015 15:41, Dave Martin wrote:
-
-Dave,
-
-thanks for your response.
-
-> For the element _size_ issue, I'm confused.  On 32-bit, that
-> structure is clearly 196 bytes in size, with the alignment requirement
-> of void * (4 bytes)... so there's no clear reason why the linker
-> shouldn't be inserting extra padding.
+On 03/04/2015 10:32 AM, Maxime Ripard wrote:
+> On Tue, Mar 03, 2015 at 12:16:57PM +0100, Daniel Lezcano wrote:
+>> On 03/03/2015 09:52 AM, Maxime Ripard wrote:
+>>> On Mon, Jan 26, 2015 at 03:35:41PM +0100, Maxime Ripard wrote:
+>>>>>> +static int sun5i_rate_cb_clksrc(struct notifier_block *nb,
+>>>>>> +				unsigned long event, void *data)
+>>>>>> +{
+>>>>>> +	struct clk_notifier_data *ndata = data;
+>>>>>> +	struct sun5i_timer *timer = to_sun5i_timer(nb);
+>>>>>> +	struct sun5i_timer_clksrc *cs = container_of(timer,
+>>>>>> +						     struct sun5i_timer_clksrc, timer);
+>>>>>> +
+>>>>>> +	switch (event) {
+>>>>>> +	case PRE_RATE_CHANGE:
+>>>>>> +		clocksource_unregister(&cs->clksrc);
+>>>>>> +		break;
+>>>>>> +
+>>>>>> +	case POST_RATE_CHANGE:
+>>>>>> +		clocksource_register_hz(&cs->clksrc, ndata->new_rate);
+>>>>>> +		break;
+>>>>>
+>>>>> Why clocksource_unregister couldn't be in the POST_RATE_CHANGE ?
+>>>>
+>>>> Wouldn't that leave a (small, I agree) window where the timer would
+>>>> run at a rate different to the one it has been registered with?
+>>>
+>>> Ping?
+>>
+>> Hi Maxime,
+>>
+>> except I missed something, there were a couple of comments and I was waiting
+>> a V3.
 >
-> I can't reproduce this with my current tools (upstream binutils-2.24,
-> gcc-4.9.2).
->
->
-> Can you try to track down where this discrepancy is coming from?
->
-> i.e.,
->
->   * If you're juggling with multiple kernel trees, make sure there
->     are not differences between them that could be causing this, such
->     as changes to linker scripts or header files that are involved
->     in building these arrays.
+> Indeed, but one of these comments (the one above) was still under
+> discussion.
 
-I can reproduce this with a vanilla kernel (3.19) from kernel.org. What 
-I do is:
+Ah, yeah. Fair enough :)
 
-- configure the kernel with mvebu_v5_defconfig
-- compile it
 
-However this issue occurs (so far) only with this special toolchain:
-http://www.plugcomputer.org/405/us/gplugd/tool-chain/arm-marvell-linux-gnueabi.tar.bz2
 
-If you like you can try this yourself. I am sure that you will get the 
-same results.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-I tried the same with three other toolchains but with those the problem 
-did not occur. I also tried other kernel configurations with that 
-"problematic" toolchain, but also the problem did not occur any more.
-
-So I think its either a bug in that compiler/linker or the current 
-solution in vmlinux.lds.h does not work correct under some special 
-circumstances.
-
->
->   * See what the input to the assembler looks like, with regard to
->     .align directives.
->
->   * See what the alignment of the affected sections is in each individual
->     .o file.
-
-Not sure what exactly I should check here. Could you be a bit more precise?
-
->   * See what __alignof__(struct of_device_id) evaluates to.
-
-It evaluates to "4" even for the bad case.
-
-Regards,
-Lino
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
