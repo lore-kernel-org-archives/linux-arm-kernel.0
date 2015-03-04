@@ -1,108 +1,53 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 4 Mar 2015 11:04:37 +0100
-Subject: [PATCH] ARM: at91/dt: keep watchdog running in idle mode
-In-Reply-To: <549954F7.9070009@objectxp.com>
-References: <549954F7.9070009@objectxp.com>
-Message-ID: <20150304110437.71c46526@bbrezillon>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 04 Mar 2015 19:11:17 +0900
+Subject: [PATCH v4 2/8] arm64: dts: exynos: Add dts files for 64-bit
+ Exynos5433 SoC
+In-Reply-To: <2449954.zWisnqDpUA@wuerfel>
+References: <1424755011-15999-1-git-send-email-cw00.choi@samsung.com>
+ <13467157.nyRCsNWIp6@wuerfel> <54F6AD6B.70007@samsung.com>
+ <2449954.zWisnqDpUA@wuerfel>
+Message-ID: <54F6DA45.2080508@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Dec 2014 12:41:43 +0100
-Michel Marti <mma@objectxp.com> wrote:
-
-> Since turning on idle-halt in commit fe46aa679, SoCs compatible with
-> the sam9 watchdog no longer reboot if the wdt times out. Removing the
-> 'idle-halt' flag fixes this.
+On 03/04/2015 06:38 PM, Arnd Bergmann wrote:
+> On Wednesday 04 March 2015 15:59:55 Chanwoo Choi wrote:
+>> On 03/02/2015 06:22 AM, Arnd Bergmann wrote:
+>>> On Saturday 28 February 2015 09:47:01 Chanwoo Choi wrote:
+>>>> "earlycon=exynos4210,0x14C20000" is correct bootparam. You can check
+>>>> it on Documentation/kernel-parameters.txt as following.
+>>>>
+>>>>      exynos4210,<addr>
+>>>>                 Use early console provided by serial driver available
+>>>>                 on Samsung SoCs, requires selecting proper type and
+>>>>                 a correct base address of the selected UART port. The
+>>>>                 serial port must already be setup and configured.
+>>>>                 Options are not yet supported.
+>>>>
+>>>>
+>>>
+>>> But it's crazy to do this when you have a DT. Please fix the existing
+>>> devicetree files that use this to just list 'earlycon'.
+>>>
+>>> The syntax above only makes sense for classic board files that we
+>>> do not support for exynos any more.
+>>
+>> Following earlycon patch for exynos soc was merged in Linux 4.0-rc1.
+>> - commit-id: b94ba0328d3b36ff95f5074c0e9b44f90dc56bb5 (serial: samsung: Add support for early console)
+>> Almost Exynos SoC use the same UART IP of Exynos4210.
+>>
+>> If you mean that "earlycon=exynos4210" naming will be changed to "earlycon=exynos",
+>> we have to modify the drivers/tty/serial/samsung.c.
 > 
-> Signed-off-by: Michel Marti <mma@objectxp.com>
-
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-> ---
->  arch/arm/boot/dts/at91sam9260.dtsi | 1 -
->  arch/arm/boot/dts/at91sam9263.dtsi | 1 -
->  arch/arm/boot/dts/at91sam9g45.dtsi | 1 -
->  arch/arm/boot/dts/at91sam9n12.dtsi | 1 -
->  arch/arm/boot/dts/at91sam9x5.dtsi  | 1 -
->  arch/arm/boot/dts/sama5d3.dtsi     | 1 -
->  6 files changed, 6 deletions(-)
+> No, what I mean is that you should use just "earlycon" instead of "earlycon=..."
+> when you have a DTB. You have the OF_EARLYCON_DECLARE() in the driver as
+> well, so that should just work.
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-> index dd1313c..184e1d1 100644
-> --- a/arch/arm/boot/dts/at91sam9260.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-> @@ -971,7 +971,6 @@
->                  atmel,watchdog-type = "hardware";
->                  atmel,reset-type = "all";
->                  atmel,dbg-halt;
-> -                atmel,idle-halt;
->                  status = "disabled";
->              };
->  
-> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> index 1467750..c39556b 100644
-> --- a/arch/arm/boot/dts/at91sam9263.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> @@ -874,7 +874,6 @@
->                  atmel,watchdog-type = "hardware";
->                  atmel,reset-type = "all";
->                  atmel,dbg-halt;
-> -                atmel,idle-halt;
->                  status = "disabled";
->              };
->  
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> index 2a8da8a..b8d741d 100644
-> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -1111,7 +1111,6 @@
->                  atmel,watchdog-type = "hardware";
->                  atmel,reset-type = "all";
->                  atmel,dbg-halt;
-> -                atmel,idle-halt;
->                  status = "disabled";
->              };
->  
-> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-> index 68eb9ad..e0b5c24 100644
-> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-> @@ -889,7 +889,6 @@
->                  atmel,watchdog-type = "hardware";
->                  atmel,reset-type = "all";
->                  atmel,dbg-halt;
-> -                atmel,idle-halt;
->                  status = "disabled";
->              };
->  
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index bbb3ba6..ce61f91 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -1125,7 +1125,6 @@
->                  atmel,watchdog-type = "hardware";
->                  atmel,reset-type = "all";
->                  atmel,dbg-halt;
-> -                atmel,idle-halt;
->                  status = "disabled";
->              };
->  
-> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-> index 5f4144d..63d12ed 100644
-> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> @@ -1224,7 +1224,6 @@
->                  atmel,watchdog-type = "hardware";
->                  atmel,reset-type = "all";
->                  atmel,dbg-halt;
-> -                atmel,idle-halt;
->                  status = "disabled";
->              };
->  
+> EARLYCON_DECLARE() is really just a hack that allows users to override the
+> early console from the command line without modifying the stdout-path
+> property. Don't put that into a dts file.
 
+OK, I understand. Thanks for your comment.
 
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards,
+Chanwoo Choi
