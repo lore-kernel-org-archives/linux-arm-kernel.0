@@ -1,140 +1,935 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  4 Mar 2015 20:32:59 +0100
-Subject: [RFC PATCH 05/18] ARM: msm: fix qsd8x50 rev.a support
+Date: Wed,  4 Mar 2015 20:32:56 +0100
+Subject: [RFC PATCH 02/18] mmc: msm: move data mover into mmc driver
 In-Reply-To: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
 References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
-Message-ID: <1425497592-1831064-6-git-send-email-arnd@arndb.de>
+Message-ID: <1425497592-1831064-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MSM_SMI_BASE variable was accidentally declared inside
-of an #ifdef, which makes it depend on a Kconfig symbol,
-and incompatible between multiple machines that may
-coexist in the kernel.
+The msm_sdcc driver is the only user of the proprietary msm
+data mover interface. In order to simplify the multiplatform
+conversion, this patch moves the entire data mover code into
+the mmc driver.
 
-This fixes the problem by duplicating the qsd8x50_io_desc
-for the two revisions.
+If against our expectations any other drivers should be added
+in the future that use the same data mover, the best approach
+would be to convert this code into a dmaengine driver and use
+the generic interfaces for that.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-msm/board-qsd8x50.c               |  9 ++-------
- arch/arm/mach-msm/common.h                      |  1 +
- arch/arm/mach-msm/include/mach/msm_iomap-8x50.h | 11 ++++-------
- arch/arm/mach-msm/io.c                          | 23 ++++++++++++++++++++++-
- 4 files changed, 29 insertions(+), 15 deletions(-)
+ arch/arm/mach-msm/Makefile           |   6 +-
+ arch/arm/mach-msm/board-msm7x30.c    |   1 -
+ arch/arm/mach-msm/devices-msm7x30.c  |   1 -
+ arch/arm/mach-msm/devices-qsd8x50.c  |   1 -
+ arch/arm/mach-msm/dma.c              | 298 -----------------------------
+ arch/arm/mach-msm/include/mach/dma.h | 151 ---------------
+ drivers/mmc/host/msm_sdcc.c          | 360 ++++++++++++++++++++++++++++++++++-
+ 7 files changed, 362 insertions(+), 456 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/dma.c
+ delete mode 100644 arch/arm/mach-msm/include/mach/dma.h
 
-diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
-index 9676a73683d2..58c7ab45c1d4 100644
---- a/arch/arm/mach-msm/board-qsd8x50.c
-+++ b/arch/arm/mach-msm/board-qsd8x50.c
-@@ -220,11 +220,6 @@ static void __init qsd8x50_init_mmc(void)
- 	msm_add_sdcc(1, &qsd8x50_sdc1_data, 0, 0);
- }
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index 27c078a568df..2fb46dc0ead8 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -7,9 +7,9 @@ obj-$(CONFIG_ARCH_QSD8X50) += sirc.o
  
--static void __init qsd8x50_map_io(void)
+ obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o vreg.o
+ 
+-obj-$(CONFIG_ARCH_MSM7X00A) += dma.o io.o
+-obj-$(CONFIG_ARCH_MSM7X30) += dma.o io.o
+-obj-$(CONFIG_ARCH_QSD8X50) += dma.o io.o
++obj-$(CONFIG_ARCH_MSM7X00A) += io.o
++obj-$(CONFIG_ARCH_MSM7X30) += io.o
++obj-$(CONFIG_ARCH_QSD8X50) += io.o
+ 
+ obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
+ obj-$(CONFIG_MSM_SMD) += last_radio_log.o
+diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
+index 8f5ecdc4f3ce..44a5bdbf0ee7 100644
+--- a/arch/arm/mach-msm/board-msm7x30.c
++++ b/arch/arm/mach-msm/board-msm7x30.c
+@@ -32,7 +32,6 @@
+ 
+ #include <mach/clk.h>
+ #include <mach/msm_iomap.h>
+-#include <mach/dma.h>
+ 
+ #include <mach/vreg.h>
+ #include "devices.h"
+diff --git a/arch/arm/mach-msm/devices-msm7x30.c b/arch/arm/mach-msm/devices-msm7x30.c
+index c15ea8ab20a7..5a0705b55321 100644
+--- a/arch/arm/mach-msm/devices-msm7x30.c
++++ b/arch/arm/mach-msm/devices-msm7x30.c
+@@ -20,7 +20,6 @@
+ #include <linux/clkdev.h>
+ #include <mach/irqs.h>
+ #include <mach/msm_iomap.h>
+-#include <mach/dma.h>
+ 
+ #include "devices.h"
+ #include "smd_private.h"
+diff --git a/arch/arm/mach-msm/devices-qsd8x50.c b/arch/arm/mach-msm/devices-qsd8x50.c
+index 9e1e9ce07b1a..dfc884521fc1 100644
+--- a/arch/arm/mach-msm/devices-qsd8x50.c
++++ b/arch/arm/mach-msm/devices-qsd8x50.c
+@@ -20,7 +20,6 @@
+ 
+ #include <mach/irqs.h>
+ #include <mach/msm_iomap.h>
+-#include <mach/dma.h>
+ 
+ #include "devices.h"
+ #include "common.h"
+diff --git a/arch/arm/mach-msm/dma.c b/arch/arm/mach-msm/dma.c
+deleted file mode 100644
+index fb9762464718..000000000000
+--- a/arch/arm/mach-msm/dma.c
++++ /dev/null
+@@ -1,298 +0,0 @@
+-/* linux/arch/arm/mach-msm/dma.c
+- *
+- * Copyright (C) 2007 Google, Inc.
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-#include <linux/clk.h>
+-#include <linux/err.h>
+-#include <linux/io.h>
+-#include <linux/interrupt.h>
+-#include <linux/completion.h>
+-#include <linux/module.h>
+-#include <mach/dma.h>
+-#include <mach/msm_iomap.h>
+-
+-#define MSM_DMOV_CHANNEL_COUNT 16
+-
+-#define DMOV_SD0(off, ch) (MSM_DMOV_BASE + 0x0000 + (off) + ((ch) << 2))
+-#define DMOV_SD1(off, ch) (MSM_DMOV_BASE + 0x0400 + (off) + ((ch) << 2))
+-#define DMOV_SD2(off, ch) (MSM_DMOV_BASE + 0x0800 + (off) + ((ch) << 2))
+-#define DMOV_SD3(off, ch) (MSM_DMOV_BASE + 0x0C00 + (off) + ((ch) << 2))
+-
+-#if defined(CONFIG_ARCH_MSM7X30)
+-#define DMOV_SD_AARM DMOV_SD2
+-#else
+-#define DMOV_SD_AARM DMOV_SD3
+-#endif
+-
+-#define DMOV_CMD_PTR(ch)      DMOV_SD_AARM(0x000, ch)
+-#define DMOV_RSLT(ch)         DMOV_SD_AARM(0x040, ch)
+-#define DMOV_FLUSH0(ch)       DMOV_SD_AARM(0x080, ch)
+-#define DMOV_FLUSH1(ch)       DMOV_SD_AARM(0x0C0, ch)
+-#define DMOV_FLUSH2(ch)       DMOV_SD_AARM(0x100, ch)
+-#define DMOV_FLUSH3(ch)       DMOV_SD_AARM(0x140, ch)
+-#define DMOV_FLUSH4(ch)       DMOV_SD_AARM(0x180, ch)
+-#define DMOV_FLUSH5(ch)       DMOV_SD_AARM(0x1C0, ch)
+-
+-#define DMOV_STATUS(ch)       DMOV_SD_AARM(0x200, ch)
+-#define DMOV_ISR              DMOV_SD_AARM(0x380, 0)
+-
+-#define DMOV_CONFIG(ch)       DMOV_SD_AARM(0x300, ch)
+-
+-enum {
+-	MSM_DMOV_PRINT_ERRORS = 1,
+-	MSM_DMOV_PRINT_IO = 2,
+-	MSM_DMOV_PRINT_FLOW = 4
+-};
+-
+-static DEFINE_SPINLOCK(msm_dmov_lock);
+-static struct clk *msm_dmov_clk;
+-static unsigned int channel_active;
+-static struct list_head ready_commands[MSM_DMOV_CHANNEL_COUNT];
+-static struct list_head active_commands[MSM_DMOV_CHANNEL_COUNT];
+-unsigned int msm_dmov_print_mask = MSM_DMOV_PRINT_ERRORS;
+-
+-#define MSM_DMOV_DPRINTF(mask, format, args...) \
+-	do { \
+-		if ((mask) & msm_dmov_print_mask) \
+-			printk(KERN_ERR format, args); \
+-	} while (0)
+-#define PRINT_ERROR(format, args...) \
+-	MSM_DMOV_DPRINTF(MSM_DMOV_PRINT_ERRORS, format, args);
+-#define PRINT_IO(format, args...) \
+-	MSM_DMOV_DPRINTF(MSM_DMOV_PRINT_IO, format, args);
+-#define PRINT_FLOW(format, args...) \
+-	MSM_DMOV_DPRINTF(MSM_DMOV_PRINT_FLOW, format, args);
+-
+-void msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful)
 -{
--	msm_map_qsd8x50_io();
+-	writel((graceful << 31), DMOV_FLUSH0(id));
+-}
+-EXPORT_SYMBOL_GPL(msm_dmov_stop_cmd);
+-
+-void msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd)
+-{
+-	unsigned long irq_flags;
+-	unsigned int status;
+-
+-	spin_lock_irqsave(&msm_dmov_lock, irq_flags);
+-	if (!channel_active)
+-		clk_enable(msm_dmov_clk);
+-	dsb();
+-	status = readl(DMOV_STATUS(id));
+-	if (list_empty(&ready_commands[id]) &&
+-		(status & DMOV_STATUS_CMD_PTR_RDY)) {
+-#if 0
+-		if (list_empty(&active_commands[id])) {
+-			PRINT_FLOW("msm_dmov_enqueue_cmd(%d), enable interrupt\n", id);
+-			writel(DMOV_CONFIG_IRQ_EN, DMOV_CONFIG(id));
+-		}
+-#endif
+-		if (cmd->execute_func)
+-			cmd->execute_func(cmd);
+-		PRINT_IO("msm_dmov_enqueue_cmd(%d), start command, status %x\n", id, status);
+-		list_add_tail(&cmd->list, &active_commands[id]);
+-		if (!channel_active)
+-			enable_irq(INT_ADM_AARM);
+-		channel_active |= 1U << id;
+-		writel(cmd->cmdptr, DMOV_CMD_PTR(id));
+-	} else {
+-		if (!channel_active)
+-			clk_disable(msm_dmov_clk);
+-		if (list_empty(&active_commands[id]))
+-			PRINT_ERROR("msm_dmov_enqueue_cmd(%d), error datamover stalled, status %x\n", id, status);
+-
+-		PRINT_IO("msm_dmov_enqueue_cmd(%d), enqueue command, status %x\n", id, status);
+-		list_add_tail(&cmd->list, &ready_commands[id]);
+-	}
+-	spin_unlock_irqrestore(&msm_dmov_lock, irq_flags);
+-}
+-EXPORT_SYMBOL_GPL(msm_dmov_enqueue_cmd);
+-
+-struct msm_dmov_exec_cmdptr_cmd {
+-	struct msm_dmov_cmd dmov_cmd;
+-	struct completion complete;
+-	unsigned id;
+-	unsigned int result;
+-	struct msm_dmov_errdata err;
+-};
+-
+-static void
+-dmov_exec_cmdptr_complete_func(struct msm_dmov_cmd *_cmd,
+-			       unsigned int result,
+-			       struct msm_dmov_errdata *err)
+-{
+-	struct msm_dmov_exec_cmdptr_cmd *cmd = container_of(_cmd, struct msm_dmov_exec_cmdptr_cmd, dmov_cmd);
+-	cmd->result = result;
+-	if (result != 0x80000002 && err)
+-		memcpy(&cmd->err, err, sizeof(struct msm_dmov_errdata));
+-
+-	complete(&cmd->complete);
 -}
 -
- static void __init qsd8x50_init_irq(void)
- {
- 	msm_init_irq();
-@@ -247,7 +242,7 @@ static void __init qsd8x50_init_late(void)
- 
- MACHINE_START(QSD8X50_SURF, "QCT QSD8X50 SURF")
- 	.atag_offset = 0x100,
--	.map_io = qsd8x50_map_io,
-+	.map_io = msm_map_qsd8x50_io,
- 	.init_irq = qsd8x50_init_irq,
- 	.init_machine = qsd8x50_init,
- 	.init_late = qsd8x50_init_late,
-@@ -256,7 +251,7 @@ MACHINE_END
- 
- MACHINE_START(QSD8X50A_ST1_5, "QCT QSD8X50A ST1.5")
- 	.atag_offset = 0x100,
--	.map_io = qsd8x50_map_io,
-+	.map_io = msm_map_qsd8x50_io_rev_a,
- 	.init_irq = qsd8x50_init_irq,
- 	.init_machine = qsd8x50_init,
- 	.init_late = qsd8x50_init_late,
-diff --git a/arch/arm/mach-msm/common.h b/arch/arm/mach-msm/common.h
-index 572479a3c7be..8267f6402325 100644
---- a/arch/arm/mach-msm/common.h
-+++ b/arch/arm/mach-msm/common.h
-@@ -18,6 +18,7 @@ extern void qsd8x50_timer_init(void);
- 
- extern void msm_map_common_io(void);
- extern void msm_map_msm7x30_io(void);
-+extern void msm_map_qsd8x50_io_rev_a(void);
- extern void msm_map_qsd8x50_io(void);
- 
- extern void __iomem *__msm_ioremap_caller(phys_addr_t phys_addr, size_t size,
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h b/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h
-index 0faa894729b7..f9f4a9ccb747 100644
---- a/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h
-@@ -64,14 +64,11 @@
- #define MSM_SCPLL_PHYS        0xA8800000
- #define MSM_SCPLL_SIZE        SZ_4K
- 
--#ifdef CONFIG_MSM_SOC_REV_A
--#define MSM_SMI_BASE 0xE0000000
+-int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr)
+-{
+-	struct msm_dmov_exec_cmdptr_cmd cmd;
+-
+-	PRINT_FLOW("dmov_exec_cmdptr(%d, %x)\n", id, cmdptr);
+-
+-	cmd.dmov_cmd.cmdptr = cmdptr;
+-	cmd.dmov_cmd.complete_func = dmov_exec_cmdptr_complete_func;
+-	cmd.dmov_cmd.execute_func = NULL;
+-	cmd.id = id;
+-	init_completion(&cmd.complete);
+-
+-	msm_dmov_enqueue_cmd(id, &cmd.dmov_cmd);
+-	wait_for_completion(&cmd.complete);
+-
+-	if (cmd.result != 0x80000002) {
+-		PRINT_ERROR("dmov_exec_cmdptr(%d): ERROR, result: %x\n", id, cmd.result);
+-		PRINT_ERROR("dmov_exec_cmdptr(%d):  flush: %x %x %x %x\n",
+-			id, cmd.err.flush[0], cmd.err.flush[1], cmd.err.flush[2], cmd.err.flush[3]);
+-		return -EIO;
+-	}
+-	PRINT_FLOW("dmov_exec_cmdptr(%d, %x) done\n", id, cmdptr);
+-	return 0;
+-}
+-
+-
+-static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
+-{
+-	unsigned int int_status, mask, id;
+-	unsigned long irq_flags;
+-	unsigned int ch_status;
+-	unsigned int ch_result;
+-	struct msm_dmov_cmd *cmd;
+-
+-	spin_lock_irqsave(&msm_dmov_lock, irq_flags);
+-
+-	int_status = readl(DMOV_ISR); /* read and clear interrupt */
+-	PRINT_FLOW("msm_datamover_irq_handler: DMOV_ISR %x\n", int_status);
+-
+-	while (int_status) {
+-		mask = int_status & -int_status;
+-		id = fls(mask) - 1;
+-		PRINT_FLOW("msm_datamover_irq_handler %08x %08x id %d\n", int_status, mask, id);
+-		int_status &= ~mask;
+-		ch_status = readl(DMOV_STATUS(id));
+-		if (!(ch_status & DMOV_STATUS_RSLT_VALID)) {
+-			PRINT_FLOW("msm_datamover_irq_handler id %d, result not valid %x\n", id, ch_status);
+-			continue;
+-		}
+-		do {
+-			ch_result = readl(DMOV_RSLT(id));
+-			if (list_empty(&active_commands[id])) {
+-				PRINT_ERROR("msm_datamover_irq_handler id %d, got result "
+-					"with no active command, status %x, result %x\n",
+-					id, ch_status, ch_result);
+-				cmd = NULL;
+-			} else
+-				cmd = list_entry(active_commands[id].next, typeof(*cmd), list);
+-			PRINT_FLOW("msm_datamover_irq_handler id %d, status %x, result %x\n", id, ch_status, ch_result);
+-			if (ch_result & DMOV_RSLT_DONE) {
+-				PRINT_FLOW("msm_datamover_irq_handler id %d, status %x\n",
+-					id, ch_status);
+-				PRINT_IO("msm_datamover_irq_handler id %d, got result "
+-					"for %p, result %x\n", id, cmd, ch_result);
+-				if (cmd) {
+-					list_del(&cmd->list);
+-					dsb();
+-					cmd->complete_func(cmd, ch_result, NULL);
+-				}
+-			}
+-			if (ch_result & DMOV_RSLT_FLUSH) {
+-				struct msm_dmov_errdata errdata;
+-
+-				errdata.flush[0] = readl(DMOV_FLUSH0(id));
+-				errdata.flush[1] = readl(DMOV_FLUSH1(id));
+-				errdata.flush[2] = readl(DMOV_FLUSH2(id));
+-				errdata.flush[3] = readl(DMOV_FLUSH3(id));
+-				errdata.flush[4] = readl(DMOV_FLUSH4(id));
+-				errdata.flush[5] = readl(DMOV_FLUSH5(id));
+-				PRINT_FLOW("msm_datamover_irq_handler id %d, status %x\n", id, ch_status);
+-				PRINT_FLOW("msm_datamover_irq_handler id %d, flush, result %x, flush0 %x\n", id, ch_result, errdata.flush[0]);
+-				if (cmd) {
+-					list_del(&cmd->list);
+-					dsb();
+-					cmd->complete_func(cmd, ch_result, &errdata);
+-				}
+-			}
+-			if (ch_result & DMOV_RSLT_ERROR) {
+-				struct msm_dmov_errdata errdata;
+-
+-				errdata.flush[0] = readl(DMOV_FLUSH0(id));
+-				errdata.flush[1] = readl(DMOV_FLUSH1(id));
+-				errdata.flush[2] = readl(DMOV_FLUSH2(id));
+-				errdata.flush[3] = readl(DMOV_FLUSH3(id));
+-				errdata.flush[4] = readl(DMOV_FLUSH4(id));
+-				errdata.flush[5] = readl(DMOV_FLUSH5(id));
+-
+-				PRINT_ERROR("msm_datamover_irq_handler id %d, status %x\n", id, ch_status);
+-				PRINT_ERROR("msm_datamover_irq_handler id %d, error, result %x, flush0 %x\n", id, ch_result, errdata.flush[0]);
+-				if (cmd) {
+-					list_del(&cmd->list);
+-					dsb();
+-					cmd->complete_func(cmd, ch_result, &errdata);
+-				}
+-				/* this does not seem to work, once we get an error */
+-				/* the datamover will no longer accept commands */
+-				writel(0, DMOV_FLUSH0(id));
+-			}
+-			ch_status = readl(DMOV_STATUS(id));
+-			PRINT_FLOW("msm_datamover_irq_handler id %d, status %x\n", id, ch_status);
+-			if ((ch_status & DMOV_STATUS_CMD_PTR_RDY) && !list_empty(&ready_commands[id])) {
+-				cmd = list_entry(ready_commands[id].next, typeof(*cmd), list);
+-				list_move_tail(&cmd->list, &active_commands[id]);
+-				if (cmd->execute_func)
+-					cmd->execute_func(cmd);
+-				PRINT_FLOW("msm_datamover_irq_handler id %d, start command\n", id);
+-				writel(cmd->cmdptr, DMOV_CMD_PTR(id));
+-			}
+-		} while (ch_status & DMOV_STATUS_RSLT_VALID);
+-		if (list_empty(&active_commands[id]) && list_empty(&ready_commands[id]))
+-			channel_active &= ~(1U << id);
+-		PRINT_FLOW("msm_datamover_irq_handler id %d, status %x\n", id, ch_status);
+-	}
+-
+-	if (!channel_active) {
+-		disable_irq_nosync(INT_ADM_AARM);
+-		clk_disable(msm_dmov_clk);
+-	}
+-
+-	spin_unlock_irqrestore(&msm_dmov_lock, irq_flags);
+-	return IRQ_HANDLED;
+-}
+-
+-static int __init msm_init_datamover(void)
+-{
+-	int i;
+-	int ret;
+-	struct clk *clk;
+-
+-	for (i = 0; i < MSM_DMOV_CHANNEL_COUNT; i++) {
+-		INIT_LIST_HEAD(&ready_commands[i]);
+-		INIT_LIST_HEAD(&active_commands[i]);
+-		writel(DMOV_CONFIG_IRQ_EN | DMOV_CONFIG_FORCE_TOP_PTR_RSLT | DMOV_CONFIG_FORCE_FLUSH_RSLT, DMOV_CONFIG(i));
+-	}
+-	clk = clk_get(NULL, "adm_clk");
+-	if (IS_ERR(clk))
+-		return PTR_ERR(clk);
+-	clk_prepare(clk);
+-	msm_dmov_clk = clk;
+-	ret = request_irq(INT_ADM_AARM, msm_datamover_irq_handler, 0, "msmdatamover", NULL);
+-	if (ret)
+-		return ret;
+-	disable_irq(INT_ADM_AARM);
+-	return 0;
+-}
+-module_init(msm_init_datamover);
+diff --git a/arch/arm/mach-msm/include/mach/dma.h b/arch/arm/mach-msm/include/mach/dma.h
+deleted file mode 100644
+index a72d48d42342..000000000000
+--- a/arch/arm/mach-msm/include/mach/dma.h
++++ /dev/null
+@@ -1,151 +0,0 @@
+-/* linux/include/asm-arm/arch-msm/dma.h
+- *
+- * Copyright (C) 2007 Google, Inc.
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-#ifndef __ASM_ARCH_MSM_DMA_H
+-
+-#include <linux/list.h>
+-
+-struct msm_dmov_errdata {
+-	uint32_t flush[6];
+-};
+-
+-struct msm_dmov_cmd {
+-	struct list_head list;
+-	unsigned int cmdptr;
+-	void (*complete_func)(struct msm_dmov_cmd *cmd,
+-			      unsigned int result,
+-			      struct msm_dmov_errdata *err);
+-	void (*execute_func)(struct msm_dmov_cmd *cmd);
+-	void *data;
+-};
+-
+-#ifndef CONFIG_ARCH_MSM8X60
+-void msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd);
+-void msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful);
+-int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
 -#else
--#define MSM_SMI_BASE 0x00000000
+-static inline
+-void msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd) { }
+-static inline
+-void msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful) { }
+-static inline
+-int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr) { return -EIO; }
 -#endif
-+#define MSM_SMI_BASE_REV_A 0xE0000000
-+#define MSM_SMI_BASE_REV_OTHER 0x00000000
+-
+-#define DMOV_CMD_LIST         (0 << 29) /* does not work */
+-#define DMOV_CMD_PTR_LIST     (1 << 29) /* works */
+-#define DMOV_CMD_INPUT_CFG    (2 << 29) /* untested */
+-#define DMOV_CMD_OUTPUT_CFG   (3 << 29) /* untested */
+-#define DMOV_CMD_ADDR(addr)   ((addr) >> 3)
+-
+-#define DMOV_RSLT_VALID       (1 << 31) /* 0 == host has empties result fifo */
+-#define DMOV_RSLT_ERROR       (1 << 3)
+-#define DMOV_RSLT_FLUSH       (1 << 2)
+-#define DMOV_RSLT_DONE        (1 << 1)  /* top pointer done */
+-#define DMOV_RSLT_USER        (1 << 0)  /* command with FR force result */
+-
+-#define DMOV_STATUS_RSLT_COUNT(n)    (((n) >> 29))
+-#define DMOV_STATUS_CMD_COUNT(n)     (((n) >> 27) & 3)
+-#define DMOV_STATUS_RSLT_VALID       (1 << 1)
+-#define DMOV_STATUS_CMD_PTR_RDY      (1 << 0)
+-
+-#define DMOV_CONFIG_FORCE_TOP_PTR_RSLT (1 << 2)
+-#define DMOV_CONFIG_FORCE_FLUSH_RSLT   (1 << 1)
+-#define DMOV_CONFIG_IRQ_EN             (1 << 0)
+-
+-/* channel assignments */
+-
+-#define DMOV_NAND_CHAN        7
+-#define DMOV_NAND_CRCI_CMD    5
+-#define DMOV_NAND_CRCI_DATA   4
+-
+-#define DMOV_SDC1_CHAN        8
+-#define DMOV_SDC1_CRCI        6
+-
+-#define DMOV_SDC2_CHAN        8
+-#define DMOV_SDC2_CRCI        7
+-
+-#define DMOV_TSIF_CHAN        10
+-#define DMOV_TSIF_CRCI        10
+-
+-#define DMOV_USB_CHAN         11
+-
+-/* no client rate control ifc (eg, ram) */
+-#define DMOV_NONE_CRCI        0
+-
+-
+-/* If the CMD_PTR register has CMD_PTR_LIST selected, the data mover
+- * is going to walk a list of 32bit pointers as described below.  Each
+- * pointer points to a *array* of dmov_s, etc structs.  The last pointer
+- * in the list is marked with CMD_PTR_LP.  The last struct in each array
+- * is marked with CMD_LC (see below).
+- */
+-#define CMD_PTR_ADDR(addr)  ((addr) >> 3)
+-#define CMD_PTR_LP          (1 << 31) /* last pointer */
+-#define CMD_PTR_PT          (3 << 29) /* ? */
+-
+-/* Single Item Mode */
+-typedef struct {
+-	unsigned cmd;
+-	unsigned src;
+-	unsigned dst;
+-	unsigned len;
+-} dmov_s;
+-
+-/* Scatter/Gather Mode */
+-typedef struct {
+-	unsigned cmd;
+-	unsigned src_dscr;
+-	unsigned dst_dscr;
+-	unsigned _reserved;
+-} dmov_sg;
+-
+-/* Box mode */
+-typedef struct {
+-	uint32_t cmd;
+-	uint32_t src_row_addr;
+-	uint32_t dst_row_addr;
+-	uint32_t src_dst_len;
+-	uint32_t num_rows;
+-	uint32_t row_offset;
+-} dmov_box;
+-
+-/* bits for the cmd field of the above structures */
+-
+-#define CMD_LC      (1 << 31)  /* last command */
+-#define CMD_FR      (1 << 22)  /* force result -- does not work? */
+-#define CMD_OCU     (1 << 21)  /* other channel unblock */
+-#define CMD_OCB     (1 << 20)  /* other channel block */
+-#define CMD_TCB     (1 << 19)  /* ? */
+-#define CMD_DAH     (1 << 18)  /* destination address hold -- does not work?*/
+-#define CMD_SAH     (1 << 17)  /* source address hold -- does not work? */
+-
+-#define CMD_MODE_SINGLE     (0 << 0) /* dmov_s structure used */
+-#define CMD_MODE_SG         (1 << 0) /* untested */
+-#define CMD_MODE_IND_SG     (2 << 0) /* untested */
+-#define CMD_MODE_BOX        (3 << 0) /* untested */
+-
+-#define CMD_DST_SWAP_BYTES  (1 << 14) /* exchange each byte n with byte n+1 */
+-#define CMD_DST_SWAP_SHORTS (1 << 15) /* exchange each short n with short n+1 */
+-#define CMD_DST_SWAP_WORDS  (1 << 16) /* exchange each word n with word n+1 */
+-
+-#define CMD_SRC_SWAP_BYTES  (1 << 11) /* exchange each byte n with byte n+1 */
+-#define CMD_SRC_SWAP_SHORTS (1 << 12) /* exchange each short n with short n+1 */
+-#define CMD_SRC_SWAP_WORDS  (1 << 13) /* exchange each word n with word n+1 */
+-
+-#define CMD_DST_CRCI(n)     (((n) & 15) << 7)
+-#define CMD_SRC_CRCI(n)     (((n) & 15) << 3)
+-
+-#endif
+diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
+index 90c60fd4ff6e..83dc4e5d9963 100644
+--- a/drivers/mmc/host/msm_sdcc.c
++++ b/drivers/mmc/host/msm_sdcc.c
+@@ -15,6 +15,7 @@
+  *
+  */
  
--#define MSM_SHARED_RAM_BASE   IOMEM(0xE0100000)
--#define MSM_SHARED_RAM_PHYS (MSM_SMI_BASE + 0x00100000)
-+#define MSM_SHARED_RAM_PHYS_REV_A (MSM_SMI_BASE_REV_A + 0x00100000)
-+#define MSM_SHARED_RAM_PHYS_REV_OTHER (MSM_SMI_BASE_REV_OTHER + 0x00100000)
- #define MSM_SHARED_RAM_SIZE   SZ_1M
++#include <linux/completion.h>
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
+ #include <linux/init.h>
+@@ -24,6 +25,7 @@
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/highmem.h>
++#include <linux/list.h>
+ #include <linux/log2.h>
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/card.h>
+@@ -43,9 +45,365 @@
+ #include <asm/sizes.h>
  
- #define MSM_UART1_PHYS        0xA9A00000
-diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
-index b042dca1f633..ea7dc16fbb13 100644
---- a/arch/arm/mach-msm/io.c
-+++ b/arch/arm/mach-msm/io.c
-@@ -98,9 +98,12 @@ static struct map_desc qsd8x50_io_desc[] __initdata = {
- 	MSM_DEVICE(SCPLL),
- 	MSM_DEVICE(AD5),
- 	MSM_DEVICE(MDC),
+ #include <linux/platform_data/mmc-msm_sdcc.h>
+-#include <mach/dma.h>
++#include <mach/msm_iomap.h>
+ #include <mach/clk.h>
+ 
++/* data mover definitions */
++
++struct msm_dmov_errdata {
++	uint32_t flush[6];
 +};
 +
-+static struct map_desc qsd8x50_io_desc_rev_other[] __initdata = {
- 	{
- 		.virtual =  (unsigned long) MSM_SHARED_RAM_BASE,
--		.pfn = __phys_to_pfn(MSM_SHARED_RAM_PHYS),
-+		.pfn = __phys_to_pfn(MSM_SHARED_RAM_PHYS_REV_OTHER),
- 		.length =   MSM_SHARED_RAM_SIZE,
- 		.type =     MT_DEVICE,
- 	},
-@@ -110,7 +113,25 @@ void __init msm_map_qsd8x50_io(void)
- {
- 	debug_ll_io_init();
- 	iotable_init(qsd8x50_io_desc, ARRAY_SIZE(qsd8x50_io_desc));
-+	iotable_init(qsd8x50_io_desc_rev_other, ARRAY_SIZE(qsd8x50_io_desc_rev_other));
-+}
-+#ifdef CONFIG_MSM_SOC_REV_A
-+static struct map_desc qsd8x50_io_desc_rev_a[] __initdata = {
-+	{
-+		.virtual =  (unsigned long) MSM_SHARED_RAM_BASE,
-+		.pfn = __phys_to_pfn(MSM_SHARED_RAM_PHYS_REV_A),
-+		.length =   MSM_SHARED_RAM_SIZE,
-+		.type =     MT_DEVICE,
-+	},
++struct msm_dmov_cmd {
++	struct list_head list;
++	unsigned int cmdptr;
++	void (*complete_func)(struct msm_dmov_cmd *cmd,
++			      unsigned int result,
++			      struct msm_dmov_errdata *err);
++	void (*execute_func)(struct msm_dmov_cmd *cmd);
++	void *data;
 +};
 +
-+void __init msm_map_qsd8x50_io_rev_a(void)
++#define DMOV_CMD_LIST         (0 << 29) /* does not work */
++#define DMOV_CMD_PTR_LIST     (1 << 29) /* works */
++#define DMOV_CMD_INPUT_CFG    (2 << 29) /* untested */
++#define DMOV_CMD_OUTPUT_CFG   (3 << 29) /* untested */
++#define DMOV_CMD_ADDR(addr)   ((addr) >> 3)
++
++#define DMOV_RSLT_VALID       (1 << 31) /* 0 == host has empties result fifo */
++#define DMOV_RSLT_ERROR       (1 << 3)
++#define DMOV_RSLT_FLUSH       (1 << 2)
++#define DMOV_RSLT_DONE        (1 << 1)  /* top pointer done */
++#define DMOV_RSLT_USER        (1 << 0)  /* command with FR force result */
++
++#define DMOV_STATUS_RSLT_COUNT(n)    (((n) >> 29))
++#define DMOV_STATUS_CMD_COUNT(n)     (((n) >> 27) & 3)
++#define DMOV_STATUS_RSLT_VALID       (1 << 1)
++#define DMOV_STATUS_CMD_PTR_RDY      (1 << 0)
++
++#define DMOV_CONFIG_FORCE_TOP_PTR_RSLT (1 << 2)
++#define DMOV_CONFIG_FORCE_FLUSH_RSLT   (1 << 1)
++#define DMOV_CONFIG_IRQ_EN             (1 << 0)
++
++/* channel assignments */
++
++#define DMOV_NAND_CHAN        7
++#define DMOV_NAND_CRCI_CMD    5
++#define DMOV_NAND_CRCI_DATA   4
++
++#define DMOV_SDC1_CHAN        8
++#define DMOV_SDC1_CRCI        6
++
++#define DMOV_SDC2_CHAN        8
++#define DMOV_SDC2_CRCI        7
++
++#define DMOV_TSIF_CHAN        10
++#define DMOV_TSIF_CRCI        10
++
++#define DMOV_USB_CHAN         11
++
++/* no client rate control ifc (eg, ram) */
++#define DMOV_NONE_CRCI        0
++
++
++/* If the CMD_PTR register has CMD_PTR_LIST selected, the data mover
++ * is going to walk a list of 32bit pointers as described below.  Each
++ * pointer points to a *array* of dmov_s, etc structs.  The last pointer
++ * in the list is marked with CMD_PTR_LP.  The last struct in each array
++ * is marked with CMD_LC (see below).
++ */
++#define CMD_PTR_ADDR(addr)  ((addr) >> 3)
++#define CMD_PTR_LP          (1 << 31) /* last pointer */
++#define CMD_PTR_PT          (3 << 29) /* ? */
++
++/* Single Item Mode */
++typedef struct {
++	unsigned cmd;
++	unsigned src;
++	unsigned dst;
++	unsigned len;
++} dmov_s;
++
++/* Scatter/Gather Mode */
++typedef struct {
++	unsigned cmd;
++	unsigned src_dscr;
++	unsigned dst_dscr;
++	unsigned _reserved;
++} dmov_sg;
++
++/* Box mode */
++typedef struct {
++	uint32_t cmd;
++	uint32_t src_row_addr;
++	uint32_t dst_row_addr;
++	uint32_t src_dst_len;
++	uint32_t num_rows;
++	uint32_t row_offset;
++} dmov_box;
++
++/* bits for the cmd field of the above structures */
++
++#define CMD_LC      (1 << 31)  /* last command */
++#define CMD_FR      (1 << 22)  /* force result -- does not work? */
++#define CMD_OCU     (1 << 21)  /* other channel unblock */
++#define CMD_OCB     (1 << 20)  /* other channel block */
++#define CMD_TCB     (1 << 19)  /* ? */
++#define CMD_DAH     (1 << 18)  /* destination address hold -- does not work?*/
++#define CMD_SAH     (1 << 17)  /* source address hold -- does not work? */
++
++#define CMD_MODE_SINGLE     (0 << 0) /* dmov_s structure used */
++#define CMD_MODE_SG         (1 << 0) /* untested */
++#define CMD_MODE_IND_SG     (2 << 0) /* untested */
++#define CMD_MODE_BOX        (3 << 0) /* untested */
++
++#define CMD_DST_SWAP_BYTES  (1 << 14) /* exchange each byte n with byte n+1 */
++#define CMD_DST_SWAP_SHORTS (1 << 15) /* exchange each short n with short n+1 */
++#define CMD_DST_SWAP_WORDS  (1 << 16) /* exchange each word n with word n+1 */
++
++#define CMD_SRC_SWAP_BYTES  (1 << 11) /* exchange each byte n with byte n+1 */
++#define CMD_SRC_SWAP_SHORTS (1 << 12) /* exchange each short n with short n+1 */
++#define CMD_SRC_SWAP_WORDS  (1 << 13) /* exchange each word n with word n+1 */
++
++#define CMD_DST_CRCI(n)     (((n) & 15) << 7)
++#define CMD_SRC_CRCI(n)     (((n) & 15) << 3)
++
++#define MSM_DMOV_CHANNEL_COUNT 16
++
++#define DMOV_SD0(off, ch) (MSM_DMOV_BASE + 0x0000 + (off) + ((ch) << 2))
++#define DMOV_SD1(off, ch) (MSM_DMOV_BASE + 0x0400 + (off) + ((ch) << 2))
++#define DMOV_SD2(off, ch) (MSM_DMOV_BASE + 0x0800 + (off) + ((ch) << 2))
++#define DMOV_SD3(off, ch) (MSM_DMOV_BASE + 0x0C00 + (off) + ((ch) << 2))
++
++#if defined(CONFIG_ARCH_MSM7X30)
++#define DMOV_SD_AARM DMOV_SD2
++#else
++#define DMOV_SD_AARM DMOV_SD3
++#endif
++
++#define DMOV_CMD_PTR(ch)      DMOV_SD_AARM(0x000, ch)
++#define DMOV_RSLT(ch)         DMOV_SD_AARM(0x040, ch)
++#define DMOV_FLUSH0(ch)       DMOV_SD_AARM(0x080, ch)
++#define DMOV_FLUSH1(ch)       DMOV_SD_AARM(0x0C0, ch)
++#define DMOV_FLUSH2(ch)       DMOV_SD_AARM(0x100, ch)
++#define DMOV_FLUSH3(ch)       DMOV_SD_AARM(0x140, ch)
++#define DMOV_FLUSH4(ch)       DMOV_SD_AARM(0x180, ch)
++#define DMOV_FLUSH5(ch)       DMOV_SD_AARM(0x1C0, ch)
++
++#define DMOV_STATUS(ch)       DMOV_SD_AARM(0x200, ch)
++#define DMOV_ISR              DMOV_SD_AARM(0x380, 0)
++
++#define DMOV_CONFIG(ch)       DMOV_SD_AARM(0x300, ch)
++
++enum {
++	MSM_DMOV_PRINT_ERRORS = 1,
++	MSM_DMOV_PRINT_IO = 2,
++	MSM_DMOV_PRINT_FLOW = 4
++};
++
++static DEFINE_SPINLOCK(msm_dmov_lock);
++static struct clk *msm_dmov_clk;
++static unsigned int channel_active;
++static struct list_head ready_commands[MSM_DMOV_CHANNEL_COUNT];
++static struct list_head active_commands[MSM_DMOV_CHANNEL_COUNT];
++static const unsigned int msm_dmov_print_mask = MSM_DMOV_PRINT_ERRORS;
++
++#define MSM_DMOV_DPRINTF(mask, format, args...) \
++	do { \
++		if ((mask) & msm_dmov_print_mask) \
++			printk(KERN_ERR format, args); \
++	} while (0)
++#define PRINT_ERROR(format, args...) \
++	MSM_DMOV_DPRINTF(MSM_DMOV_PRINT_ERRORS, format, args);
++#define PRINT_IO(format, args...) \
++	MSM_DMOV_DPRINTF(MSM_DMOV_PRINT_IO, format, args);
++#define PRINT_FLOW(format, args...) \
++	MSM_DMOV_DPRINTF(MSM_DMOV_PRINT_FLOW, format, args);
++
++static void msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful)
 +{
-+	debug_ll_io_init();
-+	iotable_init(qsd8x50_io_desc, ARRAY_SIZE(qsd8x50_io_desc));
-+	iotable_init(qsd8x50_io_desc_rev_a, ARRAY_SIZE(qsd8x50_io_desc_rev_a));
- }
-+#endif /* CONFIG_MSM_SOC_REV_A */
- #endif /* CONFIG_ARCH_QSD8X50 */
++	writel((graceful << 31), DMOV_FLUSH0(id));
++}
++
++static void msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd)
++{
++	unsigned long irq_flags;
++	unsigned int status;
++
++	spin_lock_irqsave(&msm_dmov_lock, irq_flags);
++	if (!channel_active)
++		clk_enable(msm_dmov_clk);
++	dsb();
++	status = readl(DMOV_STATUS(id));
++	if (list_empty(&ready_commands[id]) &&
++		(status & DMOV_STATUS_CMD_PTR_RDY)) {
++#if 0
++		if (list_empty(&active_commands[id])) {
++			PRINT_FLOW("msm_dmov_enqueue_cmd(%d), enable interrupt\n", id);
++			writel(DMOV_CONFIG_IRQ_EN, DMOV_CONFIG(id));
++		}
++#endif
++		if (cmd->execute_func)
++			cmd->execute_func(cmd);
++		PRINT_IO("msm_dmov_enqueue_cmd(%d), start command, status %x\n", id, status);
++		list_add_tail(&cmd->list, &active_commands[id]);
++		if (!channel_active)
++			enable_irq(INT_ADM_AARM);
++		channel_active |= 1U << id;
++		writel(cmd->cmdptr, DMOV_CMD_PTR(id));
++	} else {
++		if (!channel_active)
++			clk_disable(msm_dmov_clk);
++		if (list_empty(&active_commands[id]))
++			PRINT_ERROR("msm_dmov_enqueue_cmd(%d), error datamover stalled, status %x\n", id, status);
++
++		PRINT_IO("msm_dmov_enqueue_cmd(%d), enqueue command, status %x\n", id, status);
++		list_add_tail(&cmd->list, &ready_commands[id]);
++	}
++	spin_unlock_irqrestore(&msm_dmov_lock, irq_flags);
++}
++
++struct msm_dmov_exec_cmdptr_cmd {
++	struct msm_dmov_cmd dmov_cmd;
++	struct completion complete;
++	unsigned id;
++	unsigned int result;
++	struct msm_dmov_errdata err;
++};
++
++static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
++{
++	unsigned int int_status, mask, id;
++	unsigned long irq_flags;
++	unsigned int ch_status;
++	unsigned int ch_result;
++	struct msm_dmov_cmd *cmd;
++
++	spin_lock_irqsave(&msm_dmov_lock, irq_flags);
++
++	int_status = readl(DMOV_ISR); /* read and clear interrupt */
++	PRINT_FLOW("msm_datamover_irq_handler: DMOV_ISR %x\n", int_status);
++
++	while (int_status) {
++		mask = int_status & -int_status;
++		id = fls(mask) - 1;
++		PRINT_FLOW("msm_datamover_irq_handler %08x %08x id %d\n", int_status, mask, id);
++		int_status &= ~mask;
++		ch_status = readl(DMOV_STATUS(id));
++		if (!(ch_status & DMOV_STATUS_RSLT_VALID)) {
++			PRINT_FLOW("msm_datamover_irq_handler id %d, result not valid %x\n", id, ch_status);
++			continue;
++		}
++		do {
++			ch_result = readl(DMOV_RSLT(id));
++			if (list_empty(&active_commands[id])) {
++				PRINT_ERROR("msm_datamover_irq_handler id %d, got result "
++					"with no active command, status %x, result %x\n",
++					id, ch_status, ch_result);
++				cmd = NULL;
++			} else
++				cmd = list_entry(active_commands[id].next, typeof(*cmd), list);
++			PRINT_FLOW("msm_datamover_irq_handler id %d, status %x, result %x\n", id, ch_status, ch_result);
++			if (ch_result & DMOV_RSLT_DONE) {
++				PRINT_FLOW("msm_datamover_irq_handler id %d, status %x\n",
++					id, ch_status);
++				PRINT_IO("msm_datamover_irq_handler id %d, got result "
++					"for %p, result %x\n", id, cmd, ch_result);
++				if (cmd) {
++					list_del(&cmd->list);
++					dsb();
++					cmd->complete_func(cmd, ch_result, NULL);
++				}
++			}
++			if (ch_result & DMOV_RSLT_FLUSH) {
++				struct msm_dmov_errdata errdata;
++
++				errdata.flush[0] = readl(DMOV_FLUSH0(id));
++				errdata.flush[1] = readl(DMOV_FLUSH1(id));
++				errdata.flush[2] = readl(DMOV_FLUSH2(id));
++				errdata.flush[3] = readl(DMOV_FLUSH3(id));
++				errdata.flush[4] = readl(DMOV_FLUSH4(id));
++				errdata.flush[5] = readl(DMOV_FLUSH5(id));
++				PRINT_FLOW("msm_datamover_irq_handler id %d, status %x\n", id, ch_status);
++				PRINT_FLOW("msm_datamover_irq_handler id %d, flush, result %x, flush0 %x\n", id, ch_result, errdata.flush[0]);
++				if (cmd) {
++					list_del(&cmd->list);
++					dsb();
++					cmd->complete_func(cmd, ch_result, &errdata);
++				}
++			}
++			if (ch_result & DMOV_RSLT_ERROR) {
++				struct msm_dmov_errdata errdata;
++
++				errdata.flush[0] = readl(DMOV_FLUSH0(id));
++				errdata.flush[1] = readl(DMOV_FLUSH1(id));
++				errdata.flush[2] = readl(DMOV_FLUSH2(id));
++				errdata.flush[3] = readl(DMOV_FLUSH3(id));
++				errdata.flush[4] = readl(DMOV_FLUSH4(id));
++				errdata.flush[5] = readl(DMOV_FLUSH5(id));
++
++				PRINT_ERROR("msm_datamover_irq_handler id %d, status %x\n", id, ch_status);
++				PRINT_ERROR("msm_datamover_irq_handler id %d, error, result %x, flush0 %x\n", id, ch_result, errdata.flush[0]);
++				if (cmd) {
++					list_del(&cmd->list);
++					dsb();
++					cmd->complete_func(cmd, ch_result, &errdata);
++				}
++				/* this does not seem to work, once we get an error */
++				/* the datamover will no longer accept commands */
++				writel(0, DMOV_FLUSH0(id));
++			}
++			ch_status = readl(DMOV_STATUS(id));
++			PRINT_FLOW("msm_datamover_irq_handler id %d, status %x\n", id, ch_status);
++			if ((ch_status & DMOV_STATUS_CMD_PTR_RDY) && !list_empty(&ready_commands[id])) {
++				cmd = list_entry(ready_commands[id].next, typeof(*cmd), list);
++				list_move_tail(&cmd->list, &active_commands[id]);
++				if (cmd->execute_func)
++					cmd->execute_func(cmd);
++				PRINT_FLOW("msm_datamover_irq_handler id %d, start command\n", id);
++				writel(cmd->cmdptr, DMOV_CMD_PTR(id));
++			}
++		} while (ch_status & DMOV_STATUS_RSLT_VALID);
++		if (list_empty(&active_commands[id]) && list_empty(&ready_commands[id]))
++			channel_active &= ~(1U << id);
++		PRINT_FLOW("msm_datamover_irq_handler id %d, status %x\n", id, ch_status);
++	}
++
++	if (!channel_active) {
++		disable_irq_nosync(INT_ADM_AARM);
++		clk_disable(msm_dmov_clk);
++	}
++
++	spin_unlock_irqrestore(&msm_dmov_lock, irq_flags);
++	return IRQ_HANDLED;
++}
++
++static int __init msm_init_datamover(void)
++{
++	int i;
++	int ret;
++	struct clk *clk;
++
++	for (i = 0; i < MSM_DMOV_CHANNEL_COUNT; i++) {
++		INIT_LIST_HEAD(&ready_commands[i]);
++		INIT_LIST_HEAD(&active_commands[i]);
++		writel(DMOV_CONFIG_IRQ_EN | DMOV_CONFIG_FORCE_TOP_PTR_RSLT | DMOV_CONFIG_FORCE_FLUSH_RSLT, DMOV_CONFIG(i));
++	}
++	clk = clk_get(NULL, "adm_clk");
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++	clk_prepare(clk);
++	msm_dmov_clk = clk;
++	ret = request_irq(INT_ADM_AARM, msm_datamover_irq_handler, 0, "msmdatamover", NULL);
++	if (ret)
++		return ret;
++	disable_irq(INT_ADM_AARM);
++	return 0;
++}
++module_init(msm_init_datamover);
++
++/* now the actual SD card driver */
++
+ #include "msm_sdcc.h"
  
- #ifdef CONFIG_ARCH_MSM7X30
+ #define DRIVER_NAME "msm-sdcc"
 -- 
 2.1.0.rc2
