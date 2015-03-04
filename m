@@ -1,53 +1,53 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  4 Mar 2015 12:23:17 +0100
-Subject: [PATCH v2 3/3] arm64: remove __lookup_processor_type_data object from
- head.S
-In-Reply-To: <1425468197-22377-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1425468197-22377-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1425468197-22377-4-git-send-email-ard.biesheuvel@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed,  4 Mar 2015 12:29:23 +0100
+Subject: [PATCH] ARM: at91: sama5d4: Properly configure L2CC
+Message-ID: <1425468563-14300-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes __lookup_processor_type_data, replacing the original
-use with a simple PC-relative address load.
+As the bootloader may not properly configure the L2CC, enforce its configuration
+in the kernel.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm64/kernel/head.S | 16 ++--------------
- 1 file changed, 2 insertions(+), 14 deletions(-)
+ arch/arm/boot/dts/sama5d4.dtsi | 4 ++++
+ arch/arm/mach-at91/sama5.c     | 3 +++
+ 2 files changed, 7 insertions(+)
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index e6216b56257a..89444070f96b 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -714,15 +714,10 @@ ENDPROC(__error)
-  * This function gets the processor ID in w0 and searches the cpu_table[] for
-  * a match. It returns a pointer to the struct cpu_info it found. The
-  * cpu_table[] must end with an empty (all zeros) structure.
-- *
-- * This routine can be called via C code and it needs to work with the MMU
-- * both disabled and enabled (the offset is calculated automatically).
-  */
- ENTRY(lookup_processor_type)
--	adr	x1, __lookup_processor_type_data
--	ldp	x2, x3, [x1]
--	sub	x1, x1, x2			// get offset between VA and PA
--	add	x3, x3, x1			// convert VA to PA
-+	adrp	x3, cpu_table
-+	add	x3, x3, :lo12:cpu_table
- 1:
- 	ldp	w5, w6, [x3]			// load cpu_id_val and cpu_id_mask
- 	cbz	w5, 2f				// end of list?
-@@ -737,10 +732,3 @@ ENTRY(lookup_processor_type)
- 	mov	x0, x3
- 	ret
- ENDPROC(lookup_processor_type)
--
--	.align	3
--	.type	__lookup_processor_type_data, %object
--__lookup_processor_type_data:
--	.quad	.
--	.quad	cpu_table
--	.size	__lookup_processor_type_data, . - __lookup_processor_type_data
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+index 07953f279a56..8998f14dda04 100644
+--- a/arch/arm/boot/dts/sama5d4.dtsi
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -270,6 +270,10 @@
+ 			interrupts = <67 IRQ_TYPE_LEVEL_HIGH 4>;
+ 			cache-unified;
+ 			cache-level = <2>;
++			arm,double-linefill = <1>;
++			arm,double-linefill-incr = <1>;
++			arm,prefetch-drop = <1>;
++			arm,prefetch-offset = <1>;
+ 		};
+ 
+ 		nand0: nand at 80000000 {
+diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
+index 03dcb441f3d2..a3df9328daa9 100644
+--- a/arch/arm/mach-at91/sama5.c
++++ b/arch/arm/mach-at91/sama5.c
+@@ -22,6 +22,7 @@
+ #include <mach/hardware.h>
+ 
+ #include <asm/setup.h>
++#include <asm/hardware/cache-l2x0.h>
+ #include <asm/irq.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -107,5 +108,7 @@ DT_MACHINE_START(sama5_alt_dt, "Atmel SAMA5")
+ 	.map_io		= sama5_alt_map_io,
+ 	.init_machine	= sama5_dt_device_init,
+ 	.dt_compat	= sama5_alt_dt_board_compat,
++	.l2c_aux_val	= L310_AUX_CTRL_DATA_PREFETCH |
++		L310_AUX_CTRL_INSTR_PREFETCH,
+ 	.l2c_aux_mask	= ~0UL,
+ MACHINE_END
 -- 
-1.8.3.2
+2.1.0
