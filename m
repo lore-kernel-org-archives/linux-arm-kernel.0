@@ -1,50 +1,131 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 3 Mar 2015 18:00:35 -0600
-Subject: [PATCH 0/2] pinctrl: Introduce support for iodelay module in TI SoCs
-Message-ID: <1425427237-11511-1-git-send-email-nm@ti.com>
+Date: Tue, 3 Mar 2015 18:00:36 -0600
+Subject: [PATCH 1/2] pinctrl: bindings: pinctrl: Add support for TI's IODelay
+ configuration
+In-Reply-To: <1425427237-11511-1-git-send-email-nm@ti.com>
+References: <1425427237-11511-1-git-send-email-nm@ti.com>
+Message-ID: <1425427237-11511-2-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi,
 
 SoCs such as DRA7 family from Texas Instruments also include a highly
 configurable hardware block called the IOdelay block. This block
 allows very specific custom fine tuning for electrical characteristics
-of IO pins that are necessary for functionality and device lifetime
-requirements.
-
-IODelay module exists on it's own register space with registers
-allocated for various pins. A set of values (derived from either
-automated tools OR from device datasheet) is then computed on a
-per-chip basis(to account for die specific variations) to generate a
-set of delay parameters that are programmed to one or more registers
-for the delay path of the io line. This is used in specific instances
-such as MMC to achieve high-throughput modes, and most pins dont
-usually need tweaking functionality provided by this driver.
-
-Even though this kind of operates similar to a pinctrl model,
-functionally, it is a characteristics tuning which does not completely
-fit the standard pinconf model either.
+of IO pins.
 
 In addition to the regular pin muxing modes supported by the
 pinctrl-single, additional configuration for this block for specific
 pins may also be mandatory in certain cases.
 
-Series based on v4.0-rc1
+It is advocated strongly in TI's official documentation considering
+the existing design of the DRA7 family of processors, which during mux
+or IODelay reconfiguration, has a potential for a significant glitch
+which may cause functional impairment to certain hardware. It is hence
+recommended to do as little of muxing as absolutely necessary without
+IO isolation (which can only be done in initial stages of bootloader).
 
-Nishanth Menon (2):
-  pinctrl: bindings: pinctrl: Add support for TI's IODelay
-    configuration
-  pinctrl: Introduce TI IOdelay configuration driver
+Even with the above limitation, certain functionality such as MMC may
+mandate the need of IODelay reconfiguration depending on speed of
+transfer. Hence, introduce a new binding to facilitate programming the
+same.
 
- .../bindings/pinctrl/ti,iodelay-pinctrl.txt        |   86 ++
- drivers/pinctrl/Kconfig                            |   11 +
- drivers/pinctrl/Makefile                           |    1 +
- drivers/pinctrl/pinctrl-ti-iodelay.c               |  963 ++++++++++++++++++++
- include/dt-bindings/pinctrl/dra.h                  |    6 +
- 5 files changed, 1067 insertions(+)
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ .../bindings/pinctrl/ti,iodelay-pinctrl.txt        |   86 ++++++++++++++++++++
+ 1 file changed, 86 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/pinctrl/ti,iodelay-pinctrl.txt
- create mode 100644 drivers/pinctrl/pinctrl-ti-iodelay.c
 
+diff --git a/Documentation/devicetree/bindings/pinctrl/ti,iodelay-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/ti,iodelay-pinctrl.txt
+new file mode 100644
+index 000000000000..e12f4e5a3f25
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pinctrl/ti,iodelay-pinctrl.txt
+@@ -0,0 +1,86 @@
++Texas Instruments I/O Delay module configuration pinctrl definition
++
++Used in conjunction with Documentation/devicetree/bindings/pinctrl/ti,omap-pinctrl.txt
++
++Required Properties:
++- compatible: Should be:
++  "ti,dra7-iodelay" - I/O delay configuration for DRA7
++- reg	- must be the register address range of IODelay module
++- #address-cells = <1>;
++- #size-cells = <0>;
++
++Important note: Use of "ti,dra7-iodelay" compatible definition need to be
++carefully evaluated due to the expectation of glitch during configuration.
++
++Example:
++
++dra7_iodelay_core: padconf at 4844a000 {
++	compatible = "ti,dra7-iodelay";
++	reg = <0x4844a000 0x0d1c>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++};
++
++Configuration definition follows similar model as the pinctrl-single:
++The groups of pin configuration are defined under "pinctrl-single,pins"
++
++&dra7_iodelay_core {
++	mmc2_iodelay_3v3_conf: mmc2_iodelay_3v3_conf {
++		pinctrl-single,pins = <
++			0x18c (A_DELAY(0) | G_DELAY(120))	/* CFG_GPMC_A19_IN */
++			0x1a4 (A_DELAY(265) | G_DELAY(360))	/* CFG_GPMC_A20_IN */
++			0x1b0 (A_DELAY(0) | G_DELAY(120))	/* CFG_GPMC_A21_IN */
++			0x1bc (A_DELAY(0) | G_DELAY(120))	/* CFG_GPMC_A22_IN */
++			0x1c8 (A_DELAY(287) | G_DELAY(420))	/* CFG_GPMC_A23_IN */
++			0x1d4 (A_DELAY(144) | G_DELAY(240))	/* CFG_GPMC_A24_IN */
++			0x1e0 (A_DELAY(0) | G_DELAY(0))		/* CFG_GPMC_A25_IN */
++			0x1ec (A_DELAY(120) | G_DELAY(0))	/* CFG_GPMC_A26_IN */
++			0x1f8 (A_DELAY(120) | G_DELAY(180))	/* CFG_GPMC_A27_IN */
++			0x360 (A_DELAY(0) | G_DELAY(0))		/* CFG_GPMC_CS1_IN */
++		>;
++	};
++};
++
++Usage in conjunction with pinctrl single:
++
++For a complete description of the pins both the regular muxing as well as the
++iodelay configuration is necessary. For example:
++
++&dra7_pmx_core {
++	mmc2_pins_default: mmc2_pins_default {
++		pinctrl-single,pins = <
++			0x9c (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /* gpmc_a23.mmc2_clk */
++			0xb0 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /* gpmc_cs1.mmc2_cmd */
++			0xa0 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /* gpmc_a24.mmc2_dat0 */
++			0xa4 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /* gpmc_a25.mmc2_dat1 */
++			0xa8 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /* gpmc_a26.mmc2_dat2 */
++			0xac (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /* gpmc_a27.mmc2_dat3 */
++			0x8c (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /* gpmc_a19.mmc2_dat4 */
++			0x90 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /* gpmc_a20.mmc2_dat5 */
++			0x94 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /* gpmc_a21.mmc2_dat6 */
++			0x98 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /* gpmc_a22.mmc2_dat7 */
++		>;
++	};
++};
++
++&dra7_iodelay_core {
++	mmc2_iodelay_3v3_conf: mmc2_iodelay_3v3_conf {
++		pinctrl-single,pins = <
++			0x18c (A_DELAY(0) | G_DELAY(120))	/* CFG_GPMC_A19_IN */
++			0x1a4 (A_DELAY(265) | G_DELAY(360))	/* CFG_GPMC_A20_IN */
++			0x1b0 (A_DELAY(0) | G_DELAY(120))	/* CFG_GPMC_A21_IN */
++			0x1bc (A_DELAY(0) | G_DELAY(120))	/* CFG_GPMC_A22_IN */
++			0x1c8 (A_DELAY(287) | G_DELAY(420))	/* CFG_GPMC_A23_IN */
++			0x1d4 (A_DELAY(144) | G_DELAY(240))	/* CFG_GPMC_A24_IN */
++			0x1e0 (A_DELAY(0) | G_DELAY(0))		/* CFG_GPMC_A25_IN */
++			0x1ec (A_DELAY(120) | G_DELAY(0))	/* CFG_GPMC_A26_IN */
++			0x1f8 (A_DELAY(120) | G_DELAY(180))	/* CFG_GPMC_A27_IN */
++			0x360 (A_DELAY(0) | G_DELAY(0))		/* CFG_GPMC_CS1_IN */
++		>;
++	};
++};
++
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins_default &mmc2_iodelay_3v3_conf>;
++};
 -- 
 1.7.9.5
