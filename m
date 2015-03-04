@@ -1,54 +1,51 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 4 Mar 2015 14:32:45 +0100
-Subject: [PATCH] pinctrl: at91: simplify probe error handling
-In-Reply-To: <2adab2d9a86d0e44051541052ace08527bdcc045.1425317325.git.baruch@tkos.co.il>
-References: <2adab2d9a86d0e44051541052ace08527bdcc045.1425317325.git.baruch@tkos.co.il>
-Message-ID: <20150304133245.GF9132@odux.rfo.atmel.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 4 Mar 2015 14:43:05 +0100
+Subject: [PATCH 0/4] ARM: at91: at91sam9x5: enable ISI and ov2640 support
+In-Reply-To: <20150212100837.2ab78742@bbrezillon>
+References: <1423728386-24544-1-git-send-email-josh.wu@atmel.com>
+ <20150212100837.2ab78742@bbrezillon>
+Message-ID: <54F70BE9.2030009@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 07:28:45PM +0200, Baruch Siach wrote:
-> There is no code ender the 'err' label. Just return the error code directly.
->
-
-Probably a remainder of pre managed resources time.
-
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-
-> ---
->  drivers/pinctrl/pinctrl-at91.c | 6 +-----
->  1 file changed, 1 insertion(+), 5 deletions(-)
+Le 12/02/2015 10:08, Boris Brezillon a ?crit :
+> On Thu, 12 Feb 2015 16:06:22 +0800
+> Josh Wu <josh.wu@atmel.com> wrote:
 > 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index f4cd0b9b2438..6cfe534ab27e 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -1240,8 +1240,7 @@ static int at91_pinctrl_probe(struct platform_device *pdev)
->  
->  	if (!info->pctl) {
->  		dev_err(&pdev->dev, "could not register AT91 pinctrl driver\n");
-> -		ret = -EINVAL;
-> -		goto err;
-> +		return -EINVAL;
->  	}
->  
->  	/* We will handle a range of GPIO pins */
-> @@ -1252,9 +1251,6 @@ static int at91_pinctrl_probe(struct platform_device *pdev)
->  	dev_info(&pdev->dev, "initialized AT91 pinctrl driver\n");
->  
->  	return 0;
-> -
-> -err:
-> -	return ret;
->  }
->  
->  static int at91_pinctrl_remove(struct platform_device *pdev)
-> -- 
-> 2.1.4
+>> This patch series will enable ISI and ov2640 sensor support for
+>> at91sam9g25ek board.
+> 
+> This series looks good to me.
+> 
+> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+
+3 first patches stacked on top of at91-4.1-dt. Last one on
+at91-4.1-defconfig.
+
+Thank, bye.
+
+
+>> Josh Wu (4):
+>>   ARM: at91: at91sam9x5/dts: add ISI dt support, include isi node,
+>>     pinctrls
+>>   ARM: at91: at91sam9x5ek/dts: add ov2640 support
+>>   ARM: at91: at91sam9g25ek/dts: enable ISI and ov2640
+>>   ARM: at91: at91_dt_defconfig: enable ISI and ov2640 support
+>>
+>>  arch/arm/boot/dts/at91sam9g25.dtsi    |  1 +
+>>  arch/arm/boot/dts/at91sam9g25ek.dts   | 18 +++++++++++++
+>>  arch/arm/boot/dts/at91sam9x5_isi.dtsi | 46 +++++++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/at91sam9x5ek.dtsi   | 48 +++++++++++++++++++++++++++++++++++
+>>  arch/arm/configs/at91_dt_defconfig    |  6 +++++
+>>  5 files changed, 119 insertions(+)
+>>
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
+-- 
+Nicolas Ferre
