@@ -1,53 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 4 Mar 2015 14:33:09 +0100
-Subject: [PATCH 1/2] arm64: fixmap: make FIX_TEXT_POKE0 permanent
-In-Reply-To: <1425475655-22118-1-git-send-email-mark.rutland@arm.com>
-References: <1425475655-22118-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAKv+Gu9L84goFyaPH41g6aXyBbCAF-oezj3LnEDd4Lo=pbbTdg@mail.gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 4 Mar 2015 14:32:45 +0100
+Subject: [PATCH] pinctrl: at91: simplify probe error handling
+In-Reply-To: <2adab2d9a86d0e44051541052ace08527bdcc045.1425317325.git.baruch@tkos.co.il>
+References: <2adab2d9a86d0e44051541052ace08527bdcc045.1425317325.git.baruch@tkos.co.il>
+Message-ID: <20150304133245.GF9132@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 March 2015 at 14:27, Mark Rutland <mark.rutland@arm.com> wrote:
-> The FIX_TEST_POKE0 is currently at the end of the temporary fixmap
-> slots, despite the fact that it can be used at any point during runtime
-> (e.g. for poking the text of loaded modules), and thus should be a
-> permanent fixmap slot (as is the case on arm and x86).
+On Mon, Mar 02, 2015 at 07:28:45PM +0200, Baruch Siach wrote:
+> There is no code ender the 'err' label. Just return the error code directly.
 >
-> This patch moves FIX_TEXT_POKE0 into the set of permanent fixmap slots.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Laura Abbott <lauraa@codeaurora.org>
-> Cc: Will Deacon <will.deacon@arm.com>
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Probably a remainder of pre managed resources time.
+
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
 > ---
->  arch/arm64/include/asm/fixmap.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-> index defa0ff9..9264956 100644
-> --- a/arch/arm64/include/asm/fixmap.h
-> +++ b/arch/arm64/include/asm/fixmap.h
-> @@ -33,6 +33,7 @@
->  enum fixed_addresses {
->         FIX_HOLE,
->         FIX_EARLYCON_MEM_BASE,
-> +       FIX_TEXT_POKE0,
->         __end_of_permanent_fixed_addresses,
->
->         /*
-> @@ -49,7 +50,6 @@ enum fixed_addresses {
->
->         FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
->         FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
-> -       FIX_TEXT_POKE0,
->         __end_of_fixed_addresses
->  };
->
-> --
-> 1.9.1
->
+>  drivers/pinctrl/pinctrl-at91.c | 6 +-----
+>  1 file changed, 1 insertion(+), 5 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index f4cd0b9b2438..6cfe534ab27e 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -1240,8 +1240,7 @@ static int at91_pinctrl_probe(struct platform_device *pdev)
+>  
+>  	if (!info->pctl) {
+>  		dev_err(&pdev->dev, "could not register AT91 pinctrl driver\n");
+> -		ret = -EINVAL;
+> -		goto err;
+> +		return -EINVAL;
+>  	}
+>  
+>  	/* We will handle a range of GPIO pins */
+> @@ -1252,9 +1251,6 @@ static int at91_pinctrl_probe(struct platform_device *pdev)
+>  	dev_info(&pdev->dev, "initialized AT91 pinctrl driver\n");
+>  
+>  	return 0;
+> -
+> -err:
+> -	return ret;
+>  }
+>  
+>  static int at91_pinctrl_remove(struct platform_device *pdev)
+> -- 
+> 2.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
