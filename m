@@ -1,48 +1,27 @@
-From: rockford@yandex.ru (=?koi8-r?B?8MHOz9cg4c7E0sXK?=)
-Date: Wed, 04 Mar 2015 22:08:42 +0300
-Subject: [PATCH] ARM: i.MX6Q: Add fixup for RTL8211E Gigabit Ethernet PHY
-In-Reply-To: <3988965.hS0GXm2TNL@wuerfel>
-References: <1425404579-30591-1-git-send-email-rockford@yandex.ru>
- <3988965.hS0GXm2TNL@wuerfel>
-Message-ID: <4686121425496122@web26g.yandex.ru>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  4 Mar 2015 20:11:24 +0100
+Subject: [PATCH v3 0/4] arm64: head.S cleanup
+Message-ID: <1425496288-14483-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+This some janitorial work on head.S, just stuff I noticed when making
+changes to it for other reasons.
 
-04.03.2015, 02:29, "Arnd Bergmann" <arnd@arndb.de>:
-> On Tuesday 03 March 2015 20:42:59 Andrey Panov wrote:
->> ?+static int rtl8211e_phy_fixup(struct phy_device *dev)
->> ?+{
->> ?+ ??????phy_write(dev, 0x00, 0x3140);
->> ?+ ??????mdelay(10);
->> ?+ ??????phy_write(dev, 0x00, 0x3340);
->> ?+ ??????mdelay(10);
->> ?+
->> ?+ ??????return 0;
->> ?+}
->
-> mdelay(10) is rather evil, can you use msleep(10) here instead?
+Changes since v2:
+- added separate patch to add macros for adrp/add, adrp/ldr and adrp/str
+- added R-b's
 
-Yes
+Ard Biesheuvel (4):
+  arm64: add macros for common adrp usages
+  arm64: remove processor_id
+  arm64: remove __switch_data object from head.S
+  arm64: remove __lookup_processor_type_data, object from head.S
 
->> ?+ ??????????????phy_register_fixup_for_uid(PHY_ID_RTL8211E, 0xffffffff,
->> ?+ ??????????????????????????????rtl8211e_phy_fixup);
->
-> How do you ensure that this fixup is only applied on the boards that need
-> it, rather than all machines that happen to have this phy?
+ arch/arm64/include/asm/assembler.h | 20 +++++++++++++++
+ arch/arm64/kernel/head.S           | 52 ++++++++------------------------------
+ arch/arm64/kernel/setup.c          |  3 ---
+ 3 files changed, 31 insertions(+), 44 deletions(-)
 
-I've thought that if there no other fixups in code here checking a particular 
-board where they run, this isn't necessary.
-This SoC has only one ethernet MAC and if it is connected to this PHY, 
-it should be initalized this way independently of board, like other code here does, I think.
-
-This code just does forcibly restart autonegotiation.
-I can wrap it in if(!of_machine_is_compatible(...)){}, if it is need.
-
-And I see, mask is wrong - I should use 0x001fffff.
-
-I'll resend a patch, thanks.
-
---
- ??????
+-- 
+1.8.3.2
