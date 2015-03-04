@@ -1,33 +1,26 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed,  4 Mar 2015 13:57:25 -0600
-Subject: [PATCH] arm: qcom: dts: gic: add compatible string for Qualcomm MSM
- GICs
-Message-ID: <1425499045-31450-1-git-send-email-galak@codeaurora.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 04 Mar 2015 20:57:40 +0100
+Subject: [PATCH v2 0/2] add dts for PopMetal board
+In-Reply-To: <1425201914-4695-1-git-send-email-andy.yan@rock-chips.com>
+References: <1425201914-4695-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <2239622.yIer0hBRK8@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the Qualcomm MSM GICs implementation as compatible with the
-ARM GIC standard.
+Hi Andy,
 
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
----
- Documentation/devicetree/bindings/arm/gic.txt | 2 ++
- 1 file changed, 2 insertions(+)
+Am Sonntag, 1. M?rz 2015, 17:25:14 schrieb Andy Yan:
+> PopMetal is a rockchip rk3288 based board made by ChipSpark,
+> which has many interface such as VGA,HDMI,usb,ir,sdcad and lots of
+> sensors such as gyroscope(L3G4200D),accelerometer(mma8452),compass(AK8963C).
+> 
+> http://wiki.chipspark.com/en/index.php?title=PopMetal
+> 
+> This patch add basic support for it, which can boot the board
+> into a shell with linux boot logo on hdmi, sdcard and many
+> sensors enabled. More feather will be enabled later.
 
-diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-index c97484b..6204630 100644
---- a/Documentation/devicetree/bindings/arm/gic.txt
-+++ b/Documentation/devicetree/bindings/arm/gic.txt
-@@ -18,6 +18,8 @@ Main node required properties:
- 	"arm,arm11mp-gic"
- 	"brcm,brahma-b15-gic"
- 	"arm,arm1176jzf-devchip-gic"
-+	"qcom,msm-8660-qgic"
-+	"qcom,msm-qgic2"
- - interrupt-controller : Identifies the node as an interrupt controller
- - #interrupt-cells : Specifies the number of cells needed to encode an
-   interrupt source.  The type shall be a <u32> and the value shall be 3.
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I've added both patches to my dts branch
+
+
+Heiko
