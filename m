@@ -1,41 +1,39 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 04 Mar 2015 21:07:21 +0100
-Subject: [RFC PATCH 01/18] serial: remove obsolete msm_serial_hs driver
-In-Reply-To: <1425499409.2090.7.camel@tiscali.nl>
-References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
- <1425497592-1831064-2-git-send-email-arnd@arndb.de>
- <1425499409.2090.7.camel@tiscali.nl>
-Message-ID: <1425499641.2090.10.camel@tiscali.nl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Mar 2015 21:15:25 +0100
+Subject: [GIT PULL] at91: fixes for 4.0 #1
+In-Reply-To: <1425466305-25150-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1425466305-25150-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <5791968.WNZjnOPoKI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Bolle schreef op wo 04-03-2015 om 21:03 [+0100]:
-> Arnd Bergmann schreef op wo 04-03-2015 om 20:32 [+0100]:
-> > Linux currently has two drivers for the same hardware: msm_serial
-> > and msm_serial_hs. Only the former is being actively maintained,
-> > and the latter is not used by any in-tree board files, so we
-> > can safely remove it.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arnd.de>
-> > ---
-> >  drivers/tty/serial/Kconfig                  |   12 -
-> >  drivers/tty/serial/msm_serial_hs.c          | 1874 ---------------------------
+On Wednesday 04 March 2015 11:51:45 Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
-> I haven't even bothered to check, but in a diff stat like this one
-> expects a line like
->     drivers/tty/serial/Makefile               |     1 -
+> Here is the first batch of fixes for 4.0. Several topics covered like PM, DT or
+> defconfig. The watchdog option removal is the most important one.
 > 
-> here. Is that expectation correct?
+> Thanks, best regards,
 > 
-> >  include/linux/platform_data/msm_serial_hs.h |   49 -
-> >  3 files changed, 1935 deletions(-)
-> >  delete mode 100644 drivers/tty/serial/msm_serial_hs.c
-> >  delete mode 100644 include/linux/platform_data/msm_serial_hs.h
+> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+> 
+>   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes
+> 
+> for you to fetch changes up to 2141102e045e622cac176891cb66c5bf08e439f5:
+> 
+>   ARM: at91/dt: keep watchdog running in idle mode (2015-03-04 11:20:52 +0100)
+> 
+> ----------------------------------------------------------------
+> First fixes batch for AT91 on 4.0:
+> - PM slowclock fixes for DDR and timeouts
+> - fix some DT entries
+> - little defconfig updates
+> - the removal of a harmful watchdog option + its detailed documentation
 
-Please note that your own email address is
-    arnd at arndb.de
+Pulled into fixes, thanks!
 
-(I fixed up the Cc list for this message. And I don't do smilies.)
-
-
-Paul Bolle
+	Arnd
