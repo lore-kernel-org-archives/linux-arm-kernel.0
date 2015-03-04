@@ -1,51 +1,52 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 4 Mar 2015 14:43:05 +0100
-Subject: [PATCH 0/4] ARM: at91: at91sam9x5: enable ISI and ov2640 support
-In-Reply-To: <20150212100837.2ab78742@bbrezillon>
-References: <1423728386-24544-1-git-send-email-josh.wu@atmel.com>
- <20150212100837.2ab78742@bbrezillon>
-Message-ID: <54F70BE9.2030009@atmel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 4 Mar 2015 14:33:44 +0100
+Subject: [PATCH 2/2] arm64: fixmap: check idx is definitely valid
+In-Reply-To: <1425475655-22118-2-git-send-email-mark.rutland@arm.com>
+References: <1425475655-22118-1-git-send-email-mark.rutland@arm.com>
+ <1425475655-22118-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAKv+Gu-Nb_XKkpKjuih2C0d__PrdjOeg-_-az71+M+xYidFBZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/02/2015 10:08, Boris Brezillon a ?crit :
-> On Thu, 12 Feb 2015 16:06:22 +0800
-> Josh Wu <josh.wu@atmel.com> wrote:
-> 
->> This patch series will enable ISI and ov2640 sensor support for
->> at91sam9g25ek board.
-> 
-> This series looks good to me.
-> 
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+On 4 March 2015 at 14:27, Mark Rutland <mark.rutland@arm.com> wrote:
+> Fixmap indices are in the interval (FIX_HOLE, __end_of_fixed_addresses),
+> but in __set_fixmap we only check idx <= __end_of_fixed_addresses, and
+> therefore indices <= FIX_HOLE are erroneously accepted. If called with
+> such an idx, __set_fixmap may corrupt page tables outside of the fixmap
+> region.
+>
+> This patch ensures that we validate the idx against both endpoints of
+> the interval.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Laura Abbott <lauraa@codeaurora.org>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-
-3 first patches stacked on top of at91-4.1-dt. Last one on
-at91-4.1-defconfig.
-
-Thank, bye.
-
-
->> Josh Wu (4):
->>   ARM: at91: at91sam9x5/dts: add ISI dt support, include isi node,
->>     pinctrls
->>   ARM: at91: at91sam9x5ek/dts: add ov2640 support
->>   ARM: at91: at91sam9g25ek/dts: enable ISI and ov2640
->>   ARM: at91: at91_dt_defconfig: enable ISI and ov2640 support
->>
->>  arch/arm/boot/dts/at91sam9g25.dtsi    |  1 +
->>  arch/arm/boot/dts/at91sam9g25ek.dts   | 18 +++++++++++++
->>  arch/arm/boot/dts/at91sam9x5_isi.dtsi | 46 +++++++++++++++++++++++++++++++++
->>  arch/arm/boot/dts/at91sam9x5ek.dtsi   | 48 +++++++++++++++++++++++++++++++++++
->>  arch/arm/configs/at91_dt_defconfig    |  6 +++++
->>  5 files changed, 119 insertions(+)
->>
-> 
-> 
-> 
-
-
--- 
-Nicolas Ferre
+> ---
+>  arch/arm64/mm/mmu.c | 5 +----
+>  1 file changed, 1 insertion(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index c6daaf6..c9267ac 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -627,10 +627,7 @@ void __set_fixmap(enum fixed_addresses idx,
+>         unsigned long addr = __fix_to_virt(idx);
+>         pte_t *pte;
+>
+> -       if (idx >= __end_of_fixed_addresses) {
+> -               BUG();
+> -               return;
+> -       }
+> +       BUG_ON(idx <= FIX_HOLE || idx >= __end_of_fixed_addresses);
+>
+>         pte = fixmap_pte(addr);
+>
+> --
+> 1.9.1
+>
