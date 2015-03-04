@@ -1,74 +1,140 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  4 Mar 2015 20:33:04 +0100
-Subject: [RFC PATCH 10/18] gpio: move msm-v1 driver to mach-msm
+Date: Wed,  4 Mar 2015 20:32:59 +0100
+Subject: [RFC PATCH 05/18] ARM: msm: fix qsd8x50 rev.a support
 In-Reply-To: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
 References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
-Message-ID: <1425497592-1831064-11-git-send-email-arnd@arndb.de>
+Message-ID: <1425497592-1831064-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The msm gpio driver uses the gpiomux infrastructure that
-relies on platform specific internals. We should really
-use a proper pinmux driver here, but for now, the easiest
-solution is to move it into mach-msm to get rid of the
-header file dependency.
+The MSM_SMI_BASE variable was accidentally declared inside
+of an #ifdef, which makes it depend on a Kconfig symbol,
+and incompatible between multiple machines that may
+coexist in the kernel.
+
+This fixes the problem by duplicating the qsd8x50_io_desc
+for the two revisions.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-msm/Makefile                        | 2 ++
- {drivers/gpio => arch/arm/mach-msm}/gpio-msm-v1.c | 0
- drivers/gpio/Kconfig                              | 8 --------
- drivers/gpio/Makefile                             | 1 -
- 4 files changed, 2 insertions(+), 9 deletions(-)
- rename {drivers/gpio => arch/arm/mach-msm}/gpio-msm-v1.c (100%)
+ arch/arm/mach-msm/board-qsd8x50.c               |  9 ++-------
+ arch/arm/mach-msm/common.h                      |  1 +
+ arch/arm/mach-msm/include/mach/msm_iomap-8x50.h | 11 ++++-------
+ arch/arm/mach-msm/io.c                          | 23 ++++++++++++++++++++++-
+ 4 files changed, 29 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index bab22a179c47..eb0fa4bf7f36 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -7,6 +7,8 @@ obj-$(CONFIG_ARCH_QSD8X50) += sirc.o
+diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
+index 9676a73683d2..58c7ab45c1d4 100644
+--- a/arch/arm/mach-msm/board-qsd8x50.c
++++ b/arch/arm/mach-msm/board-qsd8x50.c
+@@ -220,11 +220,6 @@ static void __init qsd8x50_init_mmc(void)
+ 	msm_add_sdcc(1, &qsd8x50_sdc1_data, 0, 0);
+ }
  
- obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o vreg.o
- 
-+obj-$(CONFIG_ARCH_MSM) += gpio-msm-v1.o
-+
- obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
- obj-$(CONFIG_MSM_SMD) += last_radio_log.o
- 
-diff --git a/drivers/gpio/gpio-msm-v1.c b/arch/arm/mach-msm/gpio-msm-v1.c
-similarity index 100%
-rename from drivers/gpio/gpio-msm-v1.c
-rename to arch/arm/mach-msm/gpio-msm-v1.c
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 2ebc124e1217..00c489f31d9d 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -223,14 +223,6 @@ config GPIO_MPC8XXX
- 	  Say Y here if you're going to use hardware that connects to the
- 	  MPC512x/831x/834x/837x/8572/8610 GPIOs.
- 
--config GPIO_MSM_V1
--	tristate "Qualcomm MSM GPIO v1"
--	depends on GPIOLIB && ARCH_MSM && (ARCH_MSM7X00A || ARCH_MSM7X30 || ARCH_QSD8X50)
--	help
--	  Say yes here to support the GPIO interface on ARM v6 based
--	  Qualcomm MSM chips.  Most of the pins on the MSM can be
--	  selected for GPIO, and are controlled by this driver.
+-static void __init qsd8x50_map_io(void)
+-{
+-	msm_map_qsd8x50_io();
+-}
 -
- config GPIO_MSM_V2
- 	tristate "Qualcomm MSM GPIO v2"
- 	depends on GPIOLIB && OF && ARCH_QCOM
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index 0e48e5d89d63..b2fb21036655 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -58,7 +58,6 @@ obj-$(CONFIG_GPIO_MOXART)	+= gpio-moxart.o
- obj-$(CONFIG_GPIO_MPC5200)	+= gpio-mpc5200.o
- obj-$(CONFIG_GPIO_MPC8XXX)	+= gpio-mpc8xxx.o
- obj-$(CONFIG_GPIO_MSIC)		+= gpio-msic.o
--obj-$(CONFIG_GPIO_MSM_V1)	+= gpio-msm-v1.o
- obj-$(CONFIG_GPIO_MSM_V2)	+= gpio-msm-v2.o
- obj-$(CONFIG_GPIO_MVEBU)        += gpio-mvebu.o
- obj-$(CONFIG_GPIO_MXC)		+= gpio-mxc.o
+ static void __init qsd8x50_init_irq(void)
+ {
+ 	msm_init_irq();
+@@ -247,7 +242,7 @@ static void __init qsd8x50_init_late(void)
+ 
+ MACHINE_START(QSD8X50_SURF, "QCT QSD8X50 SURF")
+ 	.atag_offset = 0x100,
+-	.map_io = qsd8x50_map_io,
++	.map_io = msm_map_qsd8x50_io,
+ 	.init_irq = qsd8x50_init_irq,
+ 	.init_machine = qsd8x50_init,
+ 	.init_late = qsd8x50_init_late,
+@@ -256,7 +251,7 @@ MACHINE_END
+ 
+ MACHINE_START(QSD8X50A_ST1_5, "QCT QSD8X50A ST1.5")
+ 	.atag_offset = 0x100,
+-	.map_io = qsd8x50_map_io,
++	.map_io = msm_map_qsd8x50_io_rev_a,
+ 	.init_irq = qsd8x50_init_irq,
+ 	.init_machine = qsd8x50_init,
+ 	.init_late = qsd8x50_init_late,
+diff --git a/arch/arm/mach-msm/common.h b/arch/arm/mach-msm/common.h
+index 572479a3c7be..8267f6402325 100644
+--- a/arch/arm/mach-msm/common.h
++++ b/arch/arm/mach-msm/common.h
+@@ -18,6 +18,7 @@ extern void qsd8x50_timer_init(void);
+ 
+ extern void msm_map_common_io(void);
+ extern void msm_map_msm7x30_io(void);
++extern void msm_map_qsd8x50_io_rev_a(void);
+ extern void msm_map_qsd8x50_io(void);
+ 
+ extern void __iomem *__msm_ioremap_caller(phys_addr_t phys_addr, size_t size,
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h b/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h
+index 0faa894729b7..f9f4a9ccb747 100644
+--- a/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h
++++ b/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h
+@@ -64,14 +64,11 @@
+ #define MSM_SCPLL_PHYS        0xA8800000
+ #define MSM_SCPLL_SIZE        SZ_4K
+ 
+-#ifdef CONFIG_MSM_SOC_REV_A
+-#define MSM_SMI_BASE 0xE0000000
+-#else
+-#define MSM_SMI_BASE 0x00000000
+-#endif
++#define MSM_SMI_BASE_REV_A 0xE0000000
++#define MSM_SMI_BASE_REV_OTHER 0x00000000
+ 
+-#define MSM_SHARED_RAM_BASE   IOMEM(0xE0100000)
+-#define MSM_SHARED_RAM_PHYS (MSM_SMI_BASE + 0x00100000)
++#define MSM_SHARED_RAM_PHYS_REV_A (MSM_SMI_BASE_REV_A + 0x00100000)
++#define MSM_SHARED_RAM_PHYS_REV_OTHER (MSM_SMI_BASE_REV_OTHER + 0x00100000)
+ #define MSM_SHARED_RAM_SIZE   SZ_1M
+ 
+ #define MSM_UART1_PHYS        0xA9A00000
+diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
+index b042dca1f633..ea7dc16fbb13 100644
+--- a/arch/arm/mach-msm/io.c
++++ b/arch/arm/mach-msm/io.c
+@@ -98,9 +98,12 @@ static struct map_desc qsd8x50_io_desc[] __initdata = {
+ 	MSM_DEVICE(SCPLL),
+ 	MSM_DEVICE(AD5),
+ 	MSM_DEVICE(MDC),
++};
++
++static struct map_desc qsd8x50_io_desc_rev_other[] __initdata = {
+ 	{
+ 		.virtual =  (unsigned long) MSM_SHARED_RAM_BASE,
+-		.pfn = __phys_to_pfn(MSM_SHARED_RAM_PHYS),
++		.pfn = __phys_to_pfn(MSM_SHARED_RAM_PHYS_REV_OTHER),
+ 		.length =   MSM_SHARED_RAM_SIZE,
+ 		.type =     MT_DEVICE,
+ 	},
+@@ -110,7 +113,25 @@ void __init msm_map_qsd8x50_io(void)
+ {
+ 	debug_ll_io_init();
+ 	iotable_init(qsd8x50_io_desc, ARRAY_SIZE(qsd8x50_io_desc));
++	iotable_init(qsd8x50_io_desc_rev_other, ARRAY_SIZE(qsd8x50_io_desc_rev_other));
++}
++#ifdef CONFIG_MSM_SOC_REV_A
++static struct map_desc qsd8x50_io_desc_rev_a[] __initdata = {
++	{
++		.virtual =  (unsigned long) MSM_SHARED_RAM_BASE,
++		.pfn = __phys_to_pfn(MSM_SHARED_RAM_PHYS_REV_A),
++		.length =   MSM_SHARED_RAM_SIZE,
++		.type =     MT_DEVICE,
++	},
++};
++
++void __init msm_map_qsd8x50_io_rev_a(void)
++{
++	debug_ll_io_init();
++	iotable_init(qsd8x50_io_desc, ARRAY_SIZE(qsd8x50_io_desc));
++	iotable_init(qsd8x50_io_desc_rev_a, ARRAY_SIZE(qsd8x50_io_desc_rev_a));
+ }
++#endif /* CONFIG_MSM_SOC_REV_A */
+ #endif /* CONFIG_ARCH_QSD8X50 */
+ 
+ #ifdef CONFIG_ARCH_MSM7X30
 -- 
 2.1.0.rc2
