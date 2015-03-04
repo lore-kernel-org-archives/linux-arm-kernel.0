@@ -1,448 +1,495 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed,  4 Mar 2015 13:25:45 +0000
-Subject: [PATCH v6] arm: perf: Directly handle SMP platforms with one SPI
-In-Reply-To: <1416581603-30557-1-git-send-email-daniel.thompson@linaro.org>
-References: <1416581603-30557-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1425475545-4323-1-git-send-email-daniel.thompson@linaro.org>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Wed, 4 Mar 2015 18:57:55 +0530
+Subject: [PATCH 3/3] mailbox: Add support for ST's Mailbox IP
+In-Reply-To: <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
+References: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
+ <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAJe_Zhc1uLf_grsbzOs3ahJHJXXZ+BF__702mEPPL=SWPU5nzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some ARM platforms mux the PMU interrupt of every core into a single
-SPI. On such platforms if the PMU of any core except 0 raises an interrupt
-then it cannot be serviced and eventually, if you are lucky, the spurious
-irq detection might forcefully disable the interrupt.
+On 3 March 2015 at 16:11, Lee Jones <lee.jones@linaro.org> wrote:
 
-On these SoCs it is not possible to determine which core raised the
-interrupt so workaround this issue by queuing irqwork on the other
-cores whenever the primary interrupt handler is unable to service the
-interrupt.
+> ---
+>  drivers/mailbox/Kconfig       |   7 +
+>  drivers/mailbox/Makefile      |   2 +
+>  drivers/mailbox/mailbox-sti.c | 664 ++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mailbox_sti.h   | 128 ++++++++
+>
+How about the header in include/linux/soc/sti/  away from the limelight?
 
-The u8500 platform has an alternative workaround that dynamically alters
-the affinity of the PMU interrupt. This workaround logic is no longer
-required so the original code is removed as is the hook it relied upon.
+> + */
+> +#define MBOX_HW_MAX            5
+> +#define MBOX_NO_RX             0xff
+> +
+> +static struct sti_mbox_device mdev_rxs[MBOX_HW_MAX];
+> +
+> +static DEFINE_SPINLOCK(sti_mbox_irqs_lock);
+> +
+> +/* Mailbox H/W preparations */
+> +static struct irq_chip sti_mbox_irq_chip;
+> +
+> +static inline bool sti_mbox_chan_is_rx(struct sti_mbox_dev_data *mbox)
+> +{
+> +       return ((mbox->rx_id != MBOX_NO_RX) && (mbox->rx_inst != MBOX_NO_RX));
+> +}
+> +
+> +static inline bool sti_mbox_chan_is_tx(struct sti_mbox_dev_data *mbox)
+> +{
+> +       return ((mbox->tx_id != MBOX_NO_RX) && (mbox->tx_inst != MBOX_NO_RX));
+>
+  nit:  something neutral like MBOX_ABSENT or anything without RX?
 
-Tested on imx6q (which has fours cores/PMUs all muxed to a single SPI)
-using a simple soak, combined perf and CPU hotplug soak and using
-perf fuzzer's fast_repro.sh.
+> +/* Message management */
+> +static void sti_mbox_read(struct sti_mbox_dev_data *mbox,
+> +                         struct sti_mbox_msg *msg)
+> +{
+> +       struct sti_mbox_data *md = &mbox->mdata;
+> +       void __iomem *hdr = md->rx_addr;
+> +
+> +       /* Read data payload */
+> +       msg->dsize = readb(hdr);
+> +       msg->pdata = (u8*)++hdr;
+> +}
+> +
+> +static void sti_mbox_write(struct sti_mbox_dev_data *mbox, void *data)
+> +{
+> +       struct sti_mbox_data *md = &mbox->mdata;
+> +       struct sti_mbox_msg *msg = (struct sti_mbox_msg *)data;
+> +       u32 len = msg->dsize;
+> +       void __iomem *hdr;
+> +       u8 *wrb;
+> +       unsigned int j;
+> +
+> +       hdr = md->tx_addr;
+> +
+> +       /* Payload size */
+> +       writeb((u8)len, hdr);
+>
+So the first 1byte bitfield is the 'size' of the packset. could you
+please get rid of sti_mbox_msg.dsize?
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
+> +
+> +       wrb = msg->pdata;
+> +       if (!wrb)
+> +               return;
+> +
+> +       /* Payload data */
+> +       for (j = 0, hdr++; j < len; j++, wrb++, hdr++)
+> +               writeb(*wrb, hdr);
+> +}
+> +
+> +/* Mailbox IRQ handle functions */
+> +static void sti_mbox_enable_irq(struct sti_mbox_instance *mbinst, u32 msk)
+> +{
+> +       struct sti_mbox_device *mdev = mbinst->parent;
+> +       struct sti_mbox_attribute *p = mdev->cfg;
+> +       void __iomem *base;
+> +       unsigned long flags;
+> +
+> +       base = mdev->mdev_rx->mbox_reg_base + (mbinst->id * p->num_inst);
+> +       spin_lock_irqsave(&sti_mbox_irqs_lock, flags);
+> +       mbinst->irq_msk |= msk;
+> +
+> +       writel_relaxed(msk, base + p->reg_ena_set);
+> +
+> +       spin_unlock_irqrestore(&sti_mbox_irqs_lock, flags);
+> +}
+> +
+> +static void sti_mbox_disable_irq(struct sti_mbox_instance *mbinst, u32 msk)
+> +{
+> +       struct sti_mbox_device *mdev = mbinst->parent;
+> +       struct sti_mbox_attribute *p = mdev->cfg;
+> +       void __iomem *base;
+> +       unsigned long flags;
+> +
+> +       base = mdev->mdev_rx->mbox_reg_base + (mbinst->id * p->num_inst);
+> +       spin_lock_irqsave(&sti_mbox_irqs_lock, flags);
+> +       mbinst->irq_msk &= ~msk;
+> +       writel_relaxed(msk, base + p->reg_ena_clr);
+> +       spin_unlock_irqrestore(&sti_mbox_irqs_lock, flags);
+> +}
+> +
+> +static void sti_mbox_clr_irq(struct sti_mbox_instance *mbinst, u32 msk)
+> +{
+> +       struct sti_mbox_device *mdev = mbinst->parent;
+> +       struct sti_mbox_attribute *p = mdev->cfg;
+> +       void __iomem *base;
+> +
+> +       base = mdev->mdev_rx->mbox_reg_base + (mbinst->id * p->num_inst);
+> +       writel_relaxed(msk, base + p->reg_clr);
+> +}
+> +
+> +static irqreturn_t sti_mbox_thread_interrupt(int irq, void *data)
+> +{
+> +       struct mbox_chan *chan = data;
+> +       struct sti_mbox_dev_data *mbox = chan->con_priv;
+> +       struct sti_mbox_device *mdev_rx = mbox->parent->mdev_rx;
+> +
+> +       mbox_chan_received_data(chan, (void *)mbox->msg);
+> +       sti_mbox_enable_irq(mdev_rx->mbinst[mbox->rx_inst], BIT(mbox->rx_id));
+> +
+> +       return IRQ_HANDLED;
+> +}
+> +
+> +static irqreturn_t sti_mbox_interrupt(int irq, void *data)
+> +{
+> +       struct mbox_chan *chan = data;
+> +       struct sti_mbox_dev_data *mbox = chan->con_priv;
+> +       struct sti_mbox_data *md = &mbox->mdata;
+> +       struct sti_mbox_device *mdev_rx = mbox->parent->mdev_rx;
+> +
+> +       sti_mbox_disable_irq(mdev_rx->mbinst[mbox->rx_inst], BIT(mbox->rx_id));
+> +
+> +       if (md->rx_addr != NULL)
+> +               sti_mbox_read(mbox, mbox->msg);
+> +
+> +       return IRQ_WAKE_THREAD;
+> +}
+> +
+> +
+> +static irqreturn_t sti_mbox_irq_handler(int irq, void *data)
+> +{
+> +       struct sti_mbox_device *mdev_rx = data;
+> +       struct sti_mbox_attribute *p = mdev_rx->cfg;
+> +       struct irq_domain *mbox_irq_domain;
+> +       void __iomem *base;
+> +       u32 irq_chan;
+> +       unsigned long bits = 0;
+> +       u8 n;
+> +       int i;
+> +
+> +       base = mdev_rx->mbox_reg_base + mdev_rx->cfg->reg_val;
+> +
+> +       for (i = 0; i < p->num_inst; i++) {
+> +               bits = readl_relaxed(base + (i * p->num_inst));
+> +               if (bits)
+> +                       break;
+> +       }
+> +
+> +       if (unlikely(!bits))
+> +               return IRQ_NONE;
+> +
+> +       mbox_irq_domain = mdev_rx->mbinst[i]->irq_domain;
+> +
+> +       for (n = 0; bits; n++) {
+> +               if (test_and_clear_bit(n, &bits)) {
+> +
+> +                       irq_chan = irq_find_mapping(mbox_irq_domain, n);
+> +                       if (mdev_rx->mbinst[i]->irq_msk & BIT(n)) {
+> +                               generic_handle_irq(irq_chan);
+> +                               sti_mbox_clr_irq(mdev_rx->mbinst[i], BIT(n));
+> +
+> +                       } else
+> +                               dev_warn(mdev_rx->dev,
+> +                                        "Unexpected mailbox interrupt\n"
+> +                                        "mask: %x\n",
+> +                                        mdev_rx->mbinst[i]->irq_msk);
+> +               }
+> +       }
+> +       return IRQ_HANDLED;
+> +}
+> +
+> +/* Channel management */
+> +static int sti_mbox_startup(struct mbox_chan *chan)
+> +{
+> +       struct sti_mbox_dev_data *mbox = chan->con_priv;
+> +       struct sti_mbox_device *mdev = mbox->parent;
+> +       char name[32];
+> +       int ret = 0;
+> +
+> +       /* Allocate Rx msg per channel */
+> +       mbox->msg = devm_kzalloc(mdev->dev, sizeof(struct sti_mbox_device),
+> +                                 GFP_KERNEL);
+> +       if (!mbox->msg)
+> +               return -ENOMEM;
+> +
+> +       if (sti_mbox_chan_is_rx(mbox)) {
+> +               snprintf(name, sizeof(name), "%s-%d", mdev->name,
+> +                        mbox->chan_id);
+> +               /* IRQ automatically enabled */
+> +               ret = request_threaded_irq(mbox->irq, sti_mbox_interrupt,
+> +                                          sti_mbox_thread_interrupt,
+> +                                          IRQF_SHARED, name, chan);
+> +               if (ret)
+> +                       dev_err(mdev->dev,
+> +                               "failed to register mailbox interrupt:%d\n",
+> +                               ret);
+> +       }
+> +
+> +       return ret;
+> +}
+> +
+> +static void sti_mbox_shutdown(struct mbox_chan *chan)
+> +{
+> +       struct sti_mbox_dev_data *mbox = chan->con_priv;
+> +       struct sti_mbox_device *mdev = mbox->parent;
+> +
+> +       /* IRQ automatically disabled */
+> +       free_irq(mbox->irq, chan);
+> +
+> +       /* Free Rx msg */
+> +       devm_kfree(mdev->dev, mbox->msg);
+> +}
+> +
+> +static bool sti_mbox_tx_is_ready(struct mbox_chan *chan)
+> +{
+> +       struct sti_mbox_dev_data *mbox = chan->con_priv;
+> +       struct sti_mbox_device *mdev = mbox->parent;
+> +       struct sti_mbox_attribute *p = mdev->cfg;
+> +       void __iomem *base;
+> +
+> +       /*
+> +        *  Check if tx mbox has got a pending interrupt, and if it is enabled
+> +        *  before sending a new message
+> +        */
+> +       base = mdev->mbox_reg_base + (p->num_inst * mbox->tx_inst);
+> +
+> +       if (!(readl_relaxed(base + p->reg_ena_val) & BIT(mbox->tx_id))) {
+> +               dev_warn(mdev->dev, "Mbox: %d, inst: %x, chan: %x disabled\n",
+> +                       mdev->id, mbox->tx_inst, mbox->tx_id);
+> +               return false;
+> +       }
+> +
+> +       if (readl_relaxed(base + p->reg_val) & BIT(mbox->tx_id)) {
+> +               dev_warn(mdev->dev, "Mbox: %d, inst: %x, chan: %x not ready\n",
+> +                       mdev->id, mbox->tx_inst, mbox->tx_id);
+> +               return false;
+> +       }
+> +
+> +       return true;
+> +}
+> +
+> +static bool sti_mbox_tx_is_done(struct mbox_chan *chan)
+> +{
+> +       return sti_mbox_tx_is_ready(chan);
+> +}
+Why not simply move sti_mbox_tx_is_ready -> sti_mbox_tx_is_done ?
 
-Notes:
-    v2 was tested on u8500 (thanks to Linus Walleij). The latest patch
-    doesn't change the nature of the workaround itself but there has been
-    substantial churn in the logic to decide when it can safely be deployed.
-    Thus the changes were sufficient for me not to
-    preserve the Tested-By:.
-    
-    v6:
-     * Redesigned the code that decides if it is safe to deploy the
-       workaround (acting on the review by Mark Rutland). Code should no
-       longer race during hot unplug; previous patches sought to make the
-       hot unplug race benign and the old approach had flaws and even if
-       it could be made correct was tortuously hard to review.
-    
-    v5:
-     * Removed the work queue nonsense; being completely race-free requires
-       us to take a mutex or avoid dispatch from interrupt (Will Deacon).
-       Replacement code can potentially race with a CPU hot unplug however
-       it is careful to minimise exposure, to mitigate harmful effects and
-       has fairly prominent comments.
-    
-    v4:
-     * Ripped out the logic that tried to preserve the operation of the
-       spurious interrupt detector. It was complex and not really needed
-       (Will Deacon).
-     * Removed a redundant memory barrier and added a comment explaining
-       why it is not needed (Will Deacon).
-     * Made fully safe w.r.t. hotplug by falling back to a work queue
-       if there is a hotplug operation in flight when the PMU interrupt
-       comes in (Will Deacon). The work queue code paths have been tested
-       synthetically (by changing the if condition).
-     * Posted the correct, as in compilable and tested, version of the code
-       (Will Deacon).
-    
-    v3:
-     * Removed function pointer indirection when deploying workaround code
-       and reorganise the code accordingly (Mark Rutland).
-     * Move the workaround state tracking into the existing percpu data
-       structure (Mark Rutland).
-     * Renamed cret to percpu_ret and rewrote the comment describing the
-       purpose of this variable (Mark Rutland).
-     * Copy the cpu_online_mask and use that to act on a consistent set of
-       cpus throughout the workaround (Mark Rutland).
-     * Changed "single_irq" to "muxed_spi" to more explicitly describe
-       the problem.
-    
-    v2:
-     * Fixed build problems on systems without SMP.
-    
-    v1:
-     * Thanks to Lucas Stach, Russell King and Thomas Gleixner for
-       critiquing an older, completely different way to tackle the
-       same problem.
-    
+> +
+> +static int sti_mbox_send_data(struct mbox_chan *chan, void *data)
+> +{
+> +       struct sti_mbox_dev_data *mbox = chan->con_priv;
+> +       struct sti_mbox_data *md = &mbox->mdata;
+> +       struct sti_mbox_device *mdev = mbox->parent;
+> +       struct sti_mbox_attribute *p = mdev->cfg;
+> +       void __iomem *base;
+> +
+> +       dev_info(mdev->dev, "Using Mbox (%x) %s: channel (%d)\n",
+> +                mdev->id, mdev->name, mbox->chan_id);
+> +
+> +       base = mdev->mbox_reg_base + (p->num_inst * mbox->tx_inst);
+> +
+> +       if ((!data) || (!sti_mbox_chan_is_tx(mbox)))
+>
+nit: too much protection.
 
- arch/arm/include/asm/pmu.h       |  12 +++
- arch/arm/kernel/perf_event.c     |   9 +-
- arch/arm/kernel/perf_event_cpu.c | 179 +++++++++++++++++++++++++++++++++++----
- arch/arm/kernel/perf_event_v7.c  |   2 +-
- arch/arm/mach-ux500/cpu-db8500.c |  29 -------
- 5 files changed, 178 insertions(+), 53 deletions(-)
+> +               return -EINVAL;
+> +
+> +       if (sti_mbox_tx_is_ready(chan)) {
+.send_data() isn't called, unless last_tx_done(). So you may drop the check
 
-diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-index b1596bd59129..dfef7904b790 100644
---- a/arch/arm/include/asm/pmu.h
-+++ b/arch/arm/include/asm/pmu.h
-@@ -87,6 +87,14 @@ struct pmu_hw_events {
- 	 * already have to allocate this struct per cpu.
- 	 */
- 	struct arm_pmu		*percpu_pmu;
-+
-+#ifdef CONFIG_SMP
-+	/*
-+	 * This is used to schedule workaround logic on platforms where all
-+	 * the PMUs are attached to a single SPI.
-+	 */
-+	struct irq_work work;
-+#endif
- };
 
- struct arm_pmu {
-@@ -117,6 +125,10 @@ struct arm_pmu {
- 	struct platform_device	*plat_device;
- 	struct pmu_hw_events	__percpu *hw_events;
- 	struct notifier_block	hotplug_nb;
-+#ifdef CONFIG_SMP
-+	int			muxed_spi_workaround_irq;
-+	atomic_t		remaining_irq_work;
-+#endif
- };
+> +
+> +       mbox_chans = of_get_property(np, "st,mbox-chans", &data_len);
+> +       if (!mbox_chans) {
+> +               dev_err(&pdev->dev, "no mbox device data found\n");
+> +               return -ENODEV;
+> +       }
+> +
+> +       for (i = 0; i < mb_count; i++) {
+> +               tmp = mbox_chans + i;
+> +               mbox->rx_id = (u32)of_read_number(tmp, 1);
+> +               mbox->rx_inst = (u32)of_read_number(tmp+1, 1);
+> +               mbox->tx_id = (u32)of_read_number(tmp+2, 1);
+> +               mbox->tx_inst = (u32)of_read_number(tmp+3, 1);
+nit:   some spaces and
+  of_property_read_u32_index(np, "st,mbox-chans", 0, &mbox->rx_id)
+  of_property_read_u32_index(np, "st,mbox-chans", 1, &mbox->rx_inst)
+  of_property_read_u32_index(np, "st,mbox-chans", 2, &mbox->tx_id)
+  of_property_read_u32_index(np, "st,mbox-chans", 3, &mbox->tx_inst)  ?
 
- #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 557e128e4df0..e3fc1a0ce969 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -305,8 +305,6 @@ validate_group(struct perf_event *event)
- static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
- {
- 	struct arm_pmu *armpmu;
--	struct platform_device *plat_device;
--	struct arm_pmu_platdata *plat;
- 	int ret;
- 	u64 start_clock, finish_clock;
 
-@@ -317,14 +315,9 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
- 	 * dereference.
- 	 */
- 	armpmu = *(void **)dev;
--	plat_device = armpmu->plat_device;
--	plat = dev_get_platdata(&plat_device->dev);
+> +
+> +               /* Affect Rx configuration to the channel if needed */
+> +               if (sti_mbox_chan_is_rx(mbox)) {
+> +                       if (mdev->rx_id == MBOX_NO_RX) {
+> +                               dev_err(&pdev->dev, "Mbox Rx id not defined for Mailbox: %s\n"
+> +                                       , mdev->name);
+> +                               return -EINVAL;
+> +                       }
+> +
+> +                       mbinst = mdev->mdev_rx->mbinst[mbox->rx_inst];
+> +
+> +                       if (!mbinst)
+> +                               return -EINVAL;
+> +
+> +                       if (!mbinst->irq_domain)
+> +                               return -EINVAL;
+> +
+> +                       mbox->irq = irq_create_mapping(mbinst->irq_domain,
+> +                                                      mbox->rx_id);
+>
+simply assigning same IRQ to all controller DT nodes and using
+IRQF_SHARED for the common handler, wouldn't work?
 
- 	start_clock = sched_clock();
--	if (plat && plat->handle_irq)
--		ret = plat->handle_irq(irq, armpmu, armpmu->handle_irq);
--	else
--		ret = armpmu->handle_irq(irq, armpmu);
-+	ret = armpmu->handle_irq(irq, armpmu);
- 	finish_clock = sched_clock();
 
- 	perf_sample_event_took(finish_clock - start_clock);
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index 61b53c46edfa..d5bbd79abd4c 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -59,6 +59,116 @@ int perf_num_counters(void)
- }
- EXPORT_SYMBOL_GPL(perf_num_counters);
+> +                       sti_mbox_disable_irq(mbinst, BIT(mbox->rx_id));
+> +                       sti_mbox_clr_irq(mbinst, BIT(mbox->rx_id));
+> +               }
+> +               /*
+> +                * read here rx_id and fill mbox->instance accordly to what
+> +                * we have registered.
+> +                */
+> +               mbox->parent = mdev;
+> +               mbox->chan_id = i;
+> +               chans[i].con_priv = (struct sti_mbox_dev_data *)mbox;
+>
+isn't mbox already a struct sti_mbox_dev_data *
 
-+#ifdef CONFIG_SMP
-+
-+static cpumask_t down_prepare_cpu_mask;
-+static DEFINE_SPINLOCK(down_prepare_cpu_lock);
-+
-+/*
-+ * Workaround logic that is distributed to all cores if the PMU has only
-+ * a single IRQ and the CPU receiving that IRQ cannot handle it. Its
-+ * job is to try to service the interrupt on the current CPU. It will
-+ * also enable the IRQ again if all the other CPUs have already tried to
-+ * service it.
-+ */
-+static void cpu_pmu_do_percpu_work(struct irq_work *w)
-+{
-+	struct pmu_hw_events *hw_events =
-+	    container_of(w, struct pmu_hw_events, work);
-+	struct arm_pmu *cpu_pmu = hw_events->percpu_pmu;
-+
-+	/* Ignore the return code, we can do nothing useful with it */
-+	(void) cpu_pmu->handle_irq(0, cpu_pmu);
-+
-+	if (atomic_dec_and_test(&cpu_pmu->remaining_irq_work))
-+		enable_irq(cpu_pmu->muxed_spi_workaround_irq);
-+}
-+
-+/*
-+ * Workaround for systems where all PMU interrupts are targeting a
-+ * single SPI.
-+ *
-+ * The workaround will disable the interrupt and distribute irqwork to all
-+ * the other processors in the system. Hopefully one of them will clear the
-+ * interrupt...
-+ *
-+ * The workaround is only deployed when all PMU interrupts are aimed
-+ * at a single core. As a result the workaround is never re-entered
-+ * making it safe for us to use static data to maintain state.
-+ */
-+static void cpu_pmu_deploy_muxed_spi_workaround(struct arm_pmu *cpu_pmu)
-+{
-+	static cpumask_t irqwork_mask;
-+	int cpu;
-+
-+	disable_irq_nosync(cpu_pmu->muxed_spi_workaround_irq);
-+	spin_lock(&down_prepare_cpu_lock);
-+
-+	/*
-+	 * Combining cpu_online_mask and down_prepare_cpu_mask gives
-+	 * us the CPUs that are currently online and cannot die until
-+	 * we release down_prepare_cpu_lock.
-+	 */
-+	cpumask_andnot(&irqwork_mask, cpu_online_mask, &down_prepare_cpu_mask);
-+	cpumask_clear_cpu(smp_processor_id(), &irqwork_mask);
-+	atomic_add(cpumask_weight(&irqwork_mask), &cpu_pmu->remaining_irq_work);
-+
-+	for_each_cpu(cpu, &irqwork_mask) {
-+		struct pmu_hw_events *hw_events =
-+		    per_cpu_ptr(cpu_pmu->hw_events, cpu);
-+
-+		if (!irq_work_queue_on(&hw_events->work, cpu))
-+			if (atomic_dec_and_test(&cpu_pmu->remaining_irq_work))
-+				enable_irq(cpu_pmu->muxed_spi_workaround_irq);
-+	}
-+
-+	spin_unlock(&down_prepare_cpu_lock);
-+}
-+
-+/*
-+ * Called when the main interrupt handler cannot determine the source
-+ * of interrupt. It will deploy a workaround if we are running on an SMP
-+ * platform with only a single muxed SPI.
-+ */
-+static irqreturn_t cpu_pmu_handle_irq_none(int irq_num, struct arm_pmu *cpu_pmu)
-+{
-+	if (irq_num != cpu_pmu->muxed_spi_workaround_irq)
-+		return IRQ_NONE;
-+
-+	cpu_pmu_deploy_muxed_spi_workaround(cpu_pmu);
-+	return IRQ_HANDLED;
-+}
-+
-+static int cpu_pmu_muxed_spi_workaround_init(struct arm_pmu *cpu_pmu)
-+{
-+	struct platform_device *pmu_device = cpu_pmu->plat_device;
-+
-+	atomic_set(&cpu_pmu->remaining_irq_work, 0);
-+	cpu_pmu->muxed_spi_workaround_irq = platform_get_irq(pmu_device, 0);
-+
-+	return 0;
-+}
-+
-+static void cpu_pmu_muxed_spi_workaround_term(struct arm_pmu *cpu_pmu)
-+{
-+	cpu_pmu->muxed_spi_workaround_irq = 0;
-+}
-+#else /* CONFIG_SMP */
-+static int cpu_pmu_muxed_spi_workaround_init(struct arm_pmu *cpu_pmu)
-+{
-+	return 0;
-+}
-+
-+static void cpu_pmu_muxed_spi_workaround_term(struct arm_pmu *cpu_pmu)
-+{
-+}
-+
-+static irqreturn_t cpu_pmu_handle_irq_none(int irq_num, struct arm_pmu *cpu_pmu)
-+{
-+	return IRQ_NONE;
-+}
-+#endif /* CONFIG_SMP */
-+
- /* Include the PMU-specific implementations. */
- #include "perf_event_xscale.c"
- #include "perf_event_v6.c"
-@@ -98,6 +208,8 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
- 			if (irq >= 0)
- 				free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, i));
- 		}
-+
-+		cpu_pmu_muxed_spi_workaround_term(cpu_pmu);
- 	}
- }
 
-@@ -155,31 +267,65 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+> +       }
+> +       mdev->dev = &pdev->dev;
+> +
+> +       /* sti mailbox does not have a Tx-Done or Tx-Ready IRQ */
+> +       mdev->controller.txdone_irq = false;
+> +       mdev->controller.txdone_poll = true;
+> +       mdev->controller.txpoll_period = 1000;
+>
+does your remote really take ~1sec to respond?
 
- 			cpumask_set_cpu(i, &cpu_pmu->active_irqs);
- 		}
-+
-+		/*
-+		 * If we are running SMP and have only one interrupt source
-+		 * then get ready to share that single irq among the cores.
-+		 */
-+		if (nr_cpu_ids > 1 && irqs == 1) {
-+			err = cpu_pmu_muxed_spi_workaround_init(cpu_pmu);
-+			if (err)
-+				return err;
-+		}
- 	}
 
- 	return 0;
- }
-
--/*
-- * PMU hardware loses all context when a CPU goes offline.
-- * When a CPU is hotplugged back in, since some hardware registers are
-- * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
-- * junk values out of them.
-- */
- static int cpu_pmu_notify(struct notifier_block *b, unsigned long action,
- 			  void *hcpu)
- {
- 	struct arm_pmu *pmu = container_of(b, struct arm_pmu, hotplug_nb);
-+	long cpu = (long)hcpu;
-+	unsigned long flags;
-+
-+	switch (action & ~CPU_TASKS_FROZEN) {
-+	/*
-+	 * PMU hardware loses all context when a CPU goes offline.
-+	 * When a CPU is hotplugged back in, since some hardware registers are
-+	 * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
-+	 * junk values out of them.
-+	 */
-+	case CPU_STARTING:
-+		if (pmu->reset)
-+			pmu->reset(pmu);
-+		else
-+			return NOTIFY_DONE;
-+
-+		return NOTIFY_OK;
-+
-+#ifdef CONFIG_SMP
-+	/*
-+	 * The workaround logic in cpu_pmu_handle_irq_none requires us
-+	 * to keep track of CPUs that may be about to die so we can
-+	 * avoid sending them irqwork.
-+	 */
-+	case CPU_DOWN_PREPARE:
-+		spin_lock_irqsave(&down_prepare_cpu_lock, flags);
-+		cpumask_set_cpu(cpu, &down_prepare_cpu_mask);
-+		spin_unlock_irqrestore(&down_prepare_cpu_lock, flags);
-+		return NOTIFY_OK;
-+
-+	case CPU_DOWN_FAILED:
-+	case CPU_DEAD:
-+		spin_lock_irqsave(&down_prepare_cpu_lock, flags);
-+		cpumask_clear_cpu(cpu, &down_prepare_cpu_mask);
-+		spin_unlock_irqrestore(&down_prepare_cpu_lock, flags);
-+		return NOTIFY_OK;
-+#endif
-+	}
-
--	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
--		return NOTIFY_DONE;
--
--	if (pmu->reset)
--		pmu->reset(pmu);
--	else
--		return NOTIFY_DONE;
--
--	return NOTIFY_OK;
-+	return NOTIFY_DONE;
- }
-
- static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
-@@ -201,6 +347,9 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
- 		raw_spin_lock_init(&events->pmu_lock);
- 		events->percpu_pmu = cpu_pmu;
-+#ifdef CONFIG_SMP
-+		init_irq_work(&events->work, cpu_pmu_do_percpu_work);
-+#endif
- 	}
-
- 	cpu_pmu->hw_events	= cpu_hw_events;
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 8993770c47de..0dd914c10803 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -792,7 +792,7 @@ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
- 	 * Did an overflow occur?
- 	 */
- 	if (!armv7_pmnc_has_overflowed(pmnc))
--		return IRQ_NONE;
-+		return cpu_pmu_handle_irq_none(irq_num, cpu_pmu);
-
- 	/*
- 	 * Handle the counter(s) overflow(s)
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 6f63954c8bde..917774999c5c 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -12,8 +12,6 @@
- #include <linux/init.h>
- #include <linux/device.h>
- #include <linux/amba/bus.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/mfd/abx500/ab8500.h>
-@@ -23,7 +21,6 @@
- #include <linux/regulator/machine.h>
- #include <linux/random.h>
-
--#include <asm/pmu.h>
- #include <asm/mach/map.h>
-
- #include "setup.h"
-@@ -99,30 +96,6 @@ static void __init u8500_map_io(void)
- 		iotable_init(u8500_io_desc, ARRAY_SIZE(u8500_io_desc));
- }
-
--/*
-- * The PMU IRQ lines of two cores are wired together into a single interrupt.
-- * Bounce the interrupt to the other core if it's not ours.
-- */
--static irqreturn_t db8500_pmu_handler(int irq, void *dev, irq_handler_t handler)
--{
--	irqreturn_t ret = handler(irq, dev);
--	int other = !smp_processor_id();
--
--	if (ret == IRQ_NONE && cpu_online(other))
--		irq_set_affinity(irq, cpumask_of(other));
--
--	/*
--	 * We should be able to get away with the amount of IRQ_NONEs we give,
--	 * while still having the spurious IRQ detection code kick in if the
--	 * interrupt really starts hitting spuriously.
--	 */
--	return ret;
--}
--
--static struct arm_pmu_platdata db8500_pmu_platdata = {
--	.handle_irq		= db8500_pmu_handler,
--};
--
- static const char *db8500_read_soc_id(void)
- {
- 	void __iomem *uid = __io_address(U8500_BB_UID_BASE);
-@@ -143,8 +116,6 @@ static struct device * __init db8500_soc_device_init(void)
- }
-
- static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
--	/* Requires call-back bindings. */
--	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
- 	/* Requires DMA bindings. */
- 	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80123000,
- 		       "ux500-msp-i2s.0", &msp0_platform_data),
---
-2.1.0
+> +++ b/include/linux/mailbox_sti.h
+> @@ -0,0 +1,128 @@
+> +/*
+> + * mailbox-sti.h
+> + *
+> + * Copyright (C) 2014 ST Microelectronics
+> + *
+> + * Author:  <olivier.lebreton@st.com> for ST Microelectronics
+> + * Author:  <alexandre.torgue@st.com> for ST Microelectronics
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/ioport.h>
+> +#include <linux/mailbox_controller.h>
+> +
+> +/* Max instance per HW mailbox */
+> +#define MBOX_INST_MAX          4
+> +
+> +/*
+> + * struct sti_mbox_msg - sti mailbox message description
+> + * @dsize:             data payload size
+> + * @pdata:             message data payload
+> + */
+> +struct sti_mbox_msg {
+> +       u32             dsize;
+> +       u8              *pdata;
+> +};
+> +
+> +/*
+> + * struct sti_mbox_attribute - sti mailbox device attribute info
+> + * @num_inst:          maximum number of instance in one HW mailbox
+> + * @num_mbox:          maximum number of channel per instance
+> + * @reg_set:           register offset to generate mailbox interrupt
+> + * @reg_clr:           register offset to clear pending interrupt
+> + * @reg_val:           register offset to read interrupt status
+> + * @reg_ena_set:       register offset to enable mailbox
+> + * @reg_ena_val:       register offset to read enable status
+> + * @reg_ena_clr:       register offset to disable mailbox
+> + */
+> +struct sti_mbox_attribute {
+> +       int             num_inst;
+> +       int             num_mbox;
+> +       int             reg_set;
+> +       int             reg_clr;
+> +       int             reg_val;
+> +       int             reg_ena_val;
+> +       int             reg_ena_set;
+> +       int             reg_ena_clr;
+> +};
+> +
+> +/*
+> + * struct sti_mbox_data - sti mailbox buffer attribute info
+> + * @rx_offset:         rx mailbox addr in shared memory
+> + * @tx_offset:         tx mailbox addr in shared memory
+> + */
+> +struct sti_mbox_data {
+> +       void __iomem    *rx_addr;
+> +       void __iomem    *tx_addr;
+> +};
+> +
+> +/*
+> + * struct sti_mbox_dev_data - sti channel info
+> + * An IP mailbox is composed by 4 instances.
+> + * Each instance is composed by 32 channels (also named mbox)
+> + * This means that we have potentially 128 channels (128 sw interrupts).
+> + * A channel an be used for TX way, RX way or both.
+> + *
+> + * @mdata:             mailbox buffer info
+> + * @parent:            mailbox device to which it is attached
+> + * @msg:               rx message
+> + * @chan_id:           channel id in an instance
+> + * @irq:               irq number (virtual) assigned to the channel
+> + * @rx_inst:           instance for the channel used in RX way
+> + * @rx_id:             id in an instance for the channel used in RX way
+> + * @tx_inst:           instance for the channel used in TX way
+> + * @tx_id:             id in an instance for the channel used in TX way
+> + */
+> +struct sti_mbox_dev_data {
+> +       struct sti_mbox_data            mdata;
+> +       struct sti_mbox_device          *parent;
+> +       struct sti_mbox_msg             *msg;
+> +       u32                             chan_id;
+> +       u32                             irq;
+> +       u32                             rx_inst;
+> +       u32                             rx_id;
+> +       u32                             tx_inst;
+> +       u32                             tx_id;
+> +};
+> +
+> +struct sti_mbox_instance {
+> +       struct irq_domain       *irq_domain;
+> +       struct sti_mbox_device  *parent;
+> +       u32                     irq_msk;
+> +       int                     id;
+> +};
+> +
+> +/*
+> + * struct sti_mbox_device - sti mailbox device data
+> + * An IP mailbox is composed by 4 instances.
+> + * Each instance is composed by 32 channels (also named mbox)
+> + * This means that we have potentially 128 channels (128 sw interrupts).
+> + * A channel an be used for TX way, RX way or both.
+> + *
+> + * @id:                        Id of the mailbox
+> + * @irq:               Interrupt number assigned to mailbox Rx
+> + * @cfg:               mailbox attribute data
+> + * @dev:               device to which it is attached
+> + * @mbox_reg_base:     base address of the register mapping region
+> + * @controller:                representation of a communication channel controller
+> + * @type:              type of mailbox (tx, rx or rx_tx)
+> + * @name:              name of the mailbox
+> + * @mbox_inst          data for several instances in the mailbox
+> + */
+> +struct sti_mbox_device {
+> +       int                             id;
+> +       int                             irq;
+> +       struct sti_mbox_attribute       *cfg;
+> +       struct device                   *dev;
+> +       void __iomem                    *mbox_reg_base;
+> +       struct mbox_controller          controller;
+> +       const char                      *type;
+> +       struct sti_mbox_device          *mdev_rx;
+> +       u32                             rx_id;
+> +       char                            name[64];
+> +       struct sti_mbox_instance        *mbinst[MBOX_INST_MAX];
+> +};
+>
+There isn't any client driver in this patchset to tell exactly, but it
+seems the header could be split into one shared between mailbox
+clients and provider and another internal to client/provider ?
