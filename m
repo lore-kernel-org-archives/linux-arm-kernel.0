@@ -1,72 +1,328 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Wed, 04 Mar 2015 12:31:00 +0200
-Subject: [PATCH 0/3] Add initial DT support for Qualcomm SPMI PMIC devices
-In-Reply-To: <20150303081958.GA6293@codeaurora.org>
-References: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
- <54E6848C.1090405@codeaurora.org> <1424967957.2340.30.camel@mm-sol.com>
- <20150303081958.GA6293@codeaurora.org>
-Message-ID: <1425465060.5705.4.camel@mm-sol.com>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Wed, 04 Mar 2015 11:38:31 +0100
+Subject: [PATCH 1/3] thermal: exynos: Add the support for Exynos5433 TMU
+In-Reply-To: <1424950521-6236-2-git-send-email-cw00.choi@samsung.com>
+References: <1424950521-6236-1-git-send-email-cw00.choi@samsung.com>
+ <1424950521-6236-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <20150304113831.6da39aa8@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Chanwoo,
 
-On Tue, 2015-03-03 at 00:19 -0800, Stephen Boyd wrote:
-> On 02/26, Ivan T. Ivanov wrote:
-> > Hi Stephen,
-> > 
-> > Sorry for delayed answer.
-> > 
-> > On Thu, 2015-02-19 at 16:49 -0800, Stephen Boyd wrote:
-> > > On 02/03/15 04:17, Ivan T. Ivanov wrote:
-> > > > Following set of patches add initial DT support for PMIC devices
-> > > > found on recent Quqalcomm chipsets. Details for SPMI bus and PMIC arbiter
-> > > > could be found here [1].
-> > > 
-> > > Can you please put the specific compatible strings for the pmic model
-> > > into the nodes in addition to the generic "qcom,spmi-pmic"? We may want
-> > > to have regmap config tables in the future that describe the
-> > > cache/read/write abilities of the regsiters. If all we have is the
-> > > generic binding then we don't have a way to populate these tables.
-> > > Unless the plan there is to use the revid registers?
-> > > 
-> > 
-> > I would really like that we can use "revid" registers, but I don't know...
-> > 
-> > From what I can see usually in one physical PMIC chip they
-> > are 2 USID devices.
-> > 
-> > I can successfully discover following USID's on APQ8074 boards:
-> > 
-> > pmic-spmi 0-00: qcom,pm8941-v1.0 detected
-> > pmic-spmi 0-01: qcom,pm8941-v1.0 detected
-> > pmic-spmi 0-04: qcom,pm8841-v0.0 detected
-> > pmic-spmi 0-05: qcom,pm8841-v0.0 detected
-> > 
-> > Unfortunately on PM8916 only one device is detected, with USID 0.
-> > But they should be two, judging by downstream DTS files, right?
-> > 
-> > pmic-spmi 0-00: qcom,pm8916-v0.0 detected
-> > pmic-spmi 0-01: unknown device
-> > 
-> > For communication with PM8916 I am using recent patches from Gilad [1].
-> > Maybe there are still some issues with these patches, which can cause
-> > this behavior or PM8916 just didn't have these registers for USID 1?
-> > 
-> > Regards,
-> > Ivan
+> This patch adds the support for Exynos5433's TMU (Thermal Management
+> Unit). Exynos5433 has a little different register bit fields as
+> following description:
+> - Support the eight trip points for rising/falling interrupt by using
+> two registers
+> - Read the calibration type (1-point or 2-point) and sensor id from
+> TRIMINFO register
+> - Use a little different register address
 > 
-> Hmm... do you have 4 total rev-id nodes on apq8074? I only see
-> one rev-id node per pmic (2 total), so I'm a little lost how the
-> correct pmic version is detected on the 0-01 and 0-05 devices in
-> your example above. 
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Eduardo Valentin <edubezval@gmail.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  drivers/thermal/samsung/exynos_tmu.c | 161
+> +++++++++++++++++++++++++++++++++--
+> drivers/thermal/samsung/exynos_tmu.h |   1 + 2 files changed, 157
+> insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/thermal/samsung/exynos_tmu.c
+> b/drivers/thermal/samsung/exynos_tmu.c index 1d30b09..1bb2fb7 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.c
+> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> @@ -97,6 +97,32 @@
+>  #define EXYNOS4412_MUX_ADDR_VALUE          6
+>  #define EXYNOS4412_MUX_ADDR_SHIFT          20
+>  
+> +/* Exynos5433 specific registers */
+> +#define EXYNOS5433_TMU_REG_CONTROL1		0x024
+> +#define EXYNOS5433_TMU_SAMPLING_INTERVAL	0x02c
+> +#define EXYNOS5433_TMU_COUNTER_VALUE0		0x030
+> +#define EXYNOS5433_TMU_COUNTER_VALUE1		0x034
+> +#define EXYNOS5433_TMU_REG_CURRENT_TEMP1	0x044
+> +#define EXYNOS5433_THD_TEMP_RISE3_0		0x050
+> +#define EXYNOS5433_THD_TEMP_RISE7_4		0x054
+> +#define EXYNOS5433_THD_TEMP_FALL3_0		0x060
+> +#define EXYNOS5433_THD_TEMP_FALL7_4		0x064
+> +#define EXYNOS5433_TMU_REG_INTEN		0x0c0
+> +#define EXYNOS5433_TMU_REG_INTPEND		0x0c8
+> +#define EXYNOS5433_TMU_EMUL_CON			0x110
+> +#define EXYNOS5433_TMU_PD_DET_EN		0x130
+> +
+> +#define EXYNOS5433_TRIMINFO_SENSOR_ID_SHIFT	16
+> +#define EXYNOS5433_TRIMINFO_CALIB_SEL_SHIFT	23
+> +#define EXYNOS5433_TRIMINFO_SENSOR_ID_MASK	\
+> +			(0xf << EXYNOS5433_TRIMINFO_SENSOR_ID_SHIFT)
+> +#define EXYNOS5433_TRIMINFO_CALIB_SEL_MASK	BIT(23)
+> +
+> +#define EXYNOS5433_TRIMINFO_ONE_POINT_TRIMMING	0
+> +#define EXYNOS5433_TRIMINFO_TWO_POINT_TRIMMING	1
+> +
+> +#define EXYNOS5433_PD_DET_EN			1
+> +
+>  /*exynos5440 specific registers*/
+>  #define EXYNOS5440_TMU_S0_7_TRIM		0x000
+>  #define EXYNOS5440_TMU_S0_7_CTRL		0x020
+> @@ -484,6 +510,101 @@ out:
+>  	return ret;
+>  }
+>  
+> +static int exynos5433_tmu_initialize(struct platform_device *pdev)
+> +{
+> +	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
+> +	struct exynos_tmu_platform_data *pdata = data->pdata;
+> +	struct thermal_zone_device *tz = data->tzd;
+> +	unsigned int status, trim_info;
+> +	unsigned int rising_threshold = 0, falling_threshold = 0;
+> +	unsigned long temp, temp_hist;
+> +	int ret = 0, threshold_code, i, sensor_id, cal_type;
+> +
+> +	status = readb(data->base + EXYNOS_TMU_REG_STATUS);
+> +	if (!status) {
+> +		ret = -EBUSY;
+> +		goto out;
+> +	}
+> +
+> +	trim_info = readl(data->base + EXYNOS_TMU_REG_TRIMINFO);
+> +	sanitize_temp_error(data, trim_info);
+> +
+> +	/* Read the temperature sensor id */
+> +	sensor_id = (trim_info & EXYNOS5433_TRIMINFO_SENSOR_ID_MASK)
+> +				>>
+> EXYNOS5433_TRIMINFO_SENSOR_ID_SHIFT;
+> +	dev_info(&pdev->dev, "Temperature sensor ID: 0x%x\n",
+> sensor_id); +
 
-Same confusion here. I am using this[1] patch to read revision info.
+	Isn't dev_info a bit too noisy? IMHO, dev_dbg would be enough
+	here.
 
-Address at offset 0x105 for USID 0,1 on PM8914 and USID 4,5 on PM8841
-contains 0x51, which denotes them as PMIC's, so patch assumes that rest
-of the registers have to contain valid version values.
+	Please consider this globally.
 
-Regards,
-Ivan
+> +	/* Read the calibration mode */
+> +	writel(trim_info, data->base + EXYNOS_TMU_REG_TRIMINFO);
+> +	cal_type = (trim_info & EXYNOS5433_TRIMINFO_CALIB_SEL_MASK)
+> +				>>
+> EXYNOS5433_TRIMINFO_CALIB_SEL_SHIFT; +
+> +	switch (cal_type) {
+> +	case EXYNOS5433_TRIMINFO_ONE_POINT_TRIMMING:
+> +		pdata->cal_type = TYPE_ONE_POINT_TRIMMING;
+> +		break;
+> +	case EXYNOS5433_TRIMINFO_TWO_POINT_TRIMMING:
+> +		pdata->cal_type = TYPE_TWO_POINT_TRIMMING;
+> +		break;
+> +	default:
+> +		pdata->cal_type = TYPE_ONE_POINT_TRIMMING;
+> +		break;
+> +	};
+> +
+> +	dev_info(&pdev->dev, "Calibration type is %d-point
+> calibration\n",
+> +			cal_type ?  2 : 1);
+> +
+> +	/* Write temperature code for rising and falling threshold */
+> +	for (i = 0; i < of_thermal_get_ntrips(tz); i++) {
+> +		int rising_reg_offset, falling_reg_offset;
+> +		int j = 0;
+> +
+> +		switch (i) {
+> +		case 0:
+> +		case 1:
+> +		case 2:
+> +		case 3:
+> +			rising_reg_offset =
+> EXYNOS5433_THD_TEMP_RISE3_0;
+> +			falling_reg_offset =
+> EXYNOS5433_THD_TEMP_FALL3_0;
+> +			j = i;
+> +			break;
+> +		case 4:
+> +		case 5:
+> +		case 6:
+> +		case 7:
+> +			rising_reg_offset =
+> EXYNOS5433_THD_TEMP_RISE7_4;
+> +			falling_reg_offset =
+> EXYNOS5433_THD_TEMP_FALL7_4;
+> +			j = i - 4;
+> +			break;
+> +		default:
+> +			continue;
+> +		}
+> +
+> +		/* Write temperature code for rising threshold */
+> +		tz->ops->get_trip_temp(tz, i, &temp);
+> +		temp /= MCELSIUS;
+> +		threshold_code = temp_to_code(data, temp);
+> +
+> +		rising_threshold = readl(data->base +
+> rising_reg_offset);
+> +		rising_threshold |= (threshold_code << j * 8);
+> +		writel(rising_threshold, data->base +
+> rising_reg_offset); +
+> +		/* Write temperature code for falling threshold */
+> +		tz->ops->get_trip_hyst(tz, i, &temp_hist);
+> +		temp_hist = temp - (temp_hist / MCELSIUS);
+> +		threshold_code = temp_to_code(data, temp_hist);
+> +
+> +		falling_threshold = readl(data->base +
+> falling_reg_offset);
+> +		falling_threshold &= ~(0xff << j * 8);
+> +		falling_threshold |= (threshold_code << j * 8);
+> +		writel(falling_threshold, data->base +
+> falling_reg_offset);
+> +	}
+> +
+> +	data->tmu_clear_irqs(data);
+> +out:
+> +	return ret;
+> +}
+> +
+>  static int exynos5440_tmu_initialize(struct platform_device *pdev)
+>  {
+>  	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
+> @@ -682,7 +803,8 @@ static void exynos7_tmu_control(struct
+> platform_device *pdev, bool on) 
+>  	if (on) {
+>  		con |= (1 << EXYNOS_TMU_CORE_EN_SHIFT);
+> -		con |= (1 << EXYNOS7_PD_DET_EN_SHIFT);
+> +		if (data->soc == SOC_ARCH_EXYNOS7)
+> +			con |= (1 << EXYNOS7_PD_DET_EN_SHIFT);
 
-[1] http://permalink.gmane.org/gmane.linux.kernel/1900135
+	Isn't exynos7 implying that we already have SOC_ARCH_EXYNOS7?
+	Why do we need this extra check?
+
+>  		interrupt_en =
+>  			(of_thermal_is_trip_valid(tz, 7)
+>  			<< EXYNOS7_TMU_INTEN_RISE7_SHIFT) |
+> @@ -705,11 +827,20 @@ static void exynos7_tmu_control(struct
+> platform_device *pdev, bool on) interrupt_en <<
+> EXYNOS_TMU_INTEN_FALL0_SHIFT; } else {
+>  		con &= ~(1 << EXYNOS_TMU_CORE_EN_SHIFT);
+> -		con &= ~(1 << EXYNOS7_PD_DET_EN_SHIFT);
+> +		if (data->soc == SOC_ARCH_EXYNOS7)
+> +			con &= ~(1 << EXYNOS7_PD_DET_EN_SHIFT);
+>  		interrupt_en = 0; /* Disable all interrupts */
+>  	}
+>  
+> -	writel(interrupt_en, data->base + EXYNOS7_TMU_REG_INTEN);
+> +	if (data->soc == SOC_ARCH_EXYNOS5433) {
+> +		int pd_det_en = on ? EXYNOS5433_PD_DET_EN : 0;
+> +
+> +		writel(pd_det_en, data->base +
+> EXYNOS5433_TMU_PD_DET_EN);
+> +		writel(interrupt_en, data->base +
+> EXYNOS5433_TMU_REG_INTEN);
+> +	} else {
+> +		writel(interrupt_en, data->base +
+> EXYNOS7_TMU_REG_INTEN);
+> +	}
+> +
+>  	writel(con, data->base + EXYNOS_TMU_REG_CONTROL);
+>  }
+>  
+> @@ -770,6 +901,8 @@ static void exynos4412_tmu_set_emulation(struct
+> exynos_tmu_data *data, 
+>  	if (data->soc == SOC_ARCH_EXYNOS5260)
+>  		emul_con = EXYNOS5260_EMUL_CON;
+> +	if (data->soc == SOC_ARCH_EXYNOS5433)
+> +		emul_con = EXYNOS5433_TMU_EMUL_CON;
+>  	else if (data->soc == SOC_ARCH_EXYNOS7)
+>  		emul_con = EXYNOS7_TMU_REG_EMUL_CON;
+>  	else
+> @@ -882,6 +1015,9 @@ static void exynos4210_tmu_clear_irqs(struct
+> exynos_tmu_data *data) } else if (data->soc == SOC_ARCH_EXYNOS7) {
+>  		tmu_intstat = EXYNOS7_TMU_REG_INTPEND;
+>  		tmu_intclear = EXYNOS7_TMU_REG_INTPEND;
+> +	} else if (data->soc == SOC_ARCH_EXYNOS5433) {
+> +		tmu_intstat = EXYNOS5433_TMU_REG_INTPEND;
+> +		tmu_intclear = EXYNOS5433_TMU_REG_INTPEND;
+>  	} else {
+>  		tmu_intstat = EXYNOS_TMU_REG_INTSTAT;
+>  		tmu_intclear = EXYNOS_TMU_REG_INTCLEAR;
+> @@ -926,6 +1062,7 @@ static const struct of_device_id
+> exynos_tmu_match[] = { { .compatible = "samsung,exynos5260-tmu", },
+>  	{ .compatible = "samsung,exynos5420-tmu", },
+>  	{ .compatible = "samsung,exynos5420-tmu-ext-triminfo", },
+> +	{ .compatible = "samsung,exynos5433-tmu", },
+>  	{ .compatible = "samsung,exynos5440-tmu", },
+>  	{ .compatible = "samsung,exynos7-tmu", },
+>  	{ /* sentinel */ },
+> @@ -949,6 +1086,8 @@ static int exynos_of_get_soc_type(struct
+> device_node *np) else if (of_device_is_compatible(np,
+>  					 "samsung,exynos5420-tmu-ext-triminfo"))
+>  		return SOC_ARCH_EXYNOS5420_TRIMINFO;
+> +	else if (of_device_is_compatible(np,
+> "samsung,exynos5433-tmu"))
+> +		return SOC_ARCH_EXYNOS5433;
+>  	else if (of_device_is_compatible(np,
+> "samsung,exynos5440-tmu")) return SOC_ARCH_EXYNOS5440;
+>  	else if (of_device_is_compatible(np, "samsung,exynos7-tmu"))
+> @@ -1069,6 +1208,13 @@ static int exynos_map_dt_data(struct
+> platform_device *pdev) data->tmu_set_emulation =
+> exynos4412_tmu_set_emulation; data->tmu_clear_irqs =
+> exynos4210_tmu_clear_irqs; break;
+> +	case SOC_ARCH_EXYNOS5433:
+> +		data->tmu_initialize = exynos5433_tmu_initialize;
+> +		data->tmu_control = exynos7_tmu_control;
+
+I must frankly admit that I'm a bit confused.
+
+I'm curious why we didn't either define totally separate set of
+exynos5433_tmu_* functions or reusing existing exynos7_tmu_* ?
+
+Are exynos7 and exynos5433 so much different?
+
+> +		data->tmu_read = exynos4412_tmu_read;
+> +		data->tmu_set_emulation =
+> exynos4412_tmu_set_emulation;
+> +		data->tmu_clear_irqs = exynos4210_tmu_clear_irqs;
+> +		break;
+>  	case SOC_ARCH_EXYNOS5440:
+>  		data->tmu_initialize = exynos5440_tmu_initialize;
+>  		data->tmu_control = exynos5440_tmu_control;
+> @@ -1172,7 +1318,9 @@ static int exynos_tmu_probe(struct
+> platform_device *pdev) goto err_clk_sec;
+>  	}
+>  
+> -	if (data->soc == SOC_ARCH_EXYNOS7) {
+> +	switch (data->soc) {
+> +	case SOC_ARCH_EXYNOS5433:
+> +	case SOC_ARCH_EXYNOS7:
+>  		data->sclk = devm_clk_get(&pdev->dev, "tmu_sclk");
+>  		if (IS_ERR(data->sclk)) {
+>  			dev_err(&pdev->dev, "Failed to get sclk\n");
+> @@ -1184,7 +1332,10 @@ static int exynos_tmu_probe(struct
+> platform_device *pdev) goto err_clk;
+>  			}
+>  		}
+> -	}
+> +		break;
+> +	default:
+> +		break;
+> +	};
+>  
+>  	ret = exynos_tmu_initialize(pdev);
+>  	if (ret) {
+> diff --git a/drivers/thermal/samsung/exynos_tmu.h
+> b/drivers/thermal/samsung/exynos_tmu.h index 4d71ec6..440c714 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.h
+> +++ b/drivers/thermal/samsung/exynos_tmu.h
+> @@ -33,6 +33,7 @@ enum soc_type {
+>  	SOC_ARCH_EXYNOS5260,
+>  	SOC_ARCH_EXYNOS5420,
+>  	SOC_ARCH_EXYNOS5420_TRIMINFO,
+> +	SOC_ARCH_EXYNOS5433,
+>  	SOC_ARCH_EXYNOS5440,
+>  	SOC_ARCH_EXYNOS7,
+>  };
+
+
+
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
