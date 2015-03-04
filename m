@@ -1,45 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Mar 2015 21:38:39 +0100
-Subject: [RFC PATCH 01/18] serial: remove obsolete msm_serial_hs driver
-In-Reply-To: <1425499641.2090.10.camel@tiscali.nl>
-References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
- <1425499409.2090.7.camel@tiscali.nl> <1425499641.2090.10.camel@tiscali.nl>
-Message-ID: <2275091.6uV6ugRsN6@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 4 Mar 2015 21:39:36 +0100
+Subject: [PATCH] ARM: dts: sun7i: Add dts file for Wexler TAB7200
+In-Reply-To: <20150304232615.3a91de393b12c0e38ee93b67@gmail.com>
+References: <1425456947-4152-1-git-send-email-mamlinav@gmail.com>
+ <20150304201819.GQ4911@lukather>
+ <20150304232615.3a91de393b12c0e38ee93b67@gmail.com>
+Message-ID: <20150304203936.GS4911@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 March 2015 21:07:21 Paul Bolle wrote:
-> Paul Bolle schreef op wo 04-03-2015 om 21:03 [+0100]:
-> > Arnd Bergmann schreef op wo 04-03-2015 om 20:32 [+0100]:
-> > > Linux currently has two drivers for the same hardware: msm_serial
-> > > and msm_serial_hs. Only the former is being actively maintained,
-> > > and the latter is not used by any in-tree board files, so we
-> > > can safely remove it.
+On Wed, Mar 04, 2015 at 11:26:15PM +0300, Aleksei Mamlin wrote:
+> On Wed, 4 Mar 2015 21:18:19 +0100
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > On Wed, Mar 04, 2015 at 11:15:47AM +0300, Aleksei Mamlin wrote:
+> > > This patch add support for Wexler TAB7200 tablet.
 > > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arnd.de>
+> > > The Wexler TAB7200 is a A20 based tablet with 7 inch display(800x480),
+> > > capacitive touchscreen(5 fingers), 1G RAM, 4G NAND, micro SD card slot,
+> > > mini HDMI port, 3.5mm audio plug, 1 USB OTG port and 1 USB 2.0 port.
+> > > 
+> > > Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
 > > > ---
-> > >  drivers/tty/serial/Kconfig                  |   12 -
-> > >  drivers/tty/serial/msm_serial_hs.c          | 1874 ---------------------------
+> > >  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+> > >  arch/arm/boot/dts/Makefile                         |   3 +-
+> > >  arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts     | 185 +++++++++++++++++++++
+> > >  3 files changed, 188 insertions(+), 1 deletion(-)
+> > >  create mode 100644 arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > > index 389ca13..eb67da4 100644
+> > > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > > @@ -189,6 +189,7 @@ variscite	Variscite Ltd.
+> > >  via	VIA Technologies, Inc.
+> > >  virtio	Virtual I/O Device Specification, developed by the OASIS consortium
+> > >  voipac	Voipac Technologies s.r.o.
+> > > +wexler	AVIRSA Electronics
 > > 
-> > I haven't even bothered to check, but in a diff stat like this one
-> > expects a line like
-> >     drivers/tty/serial/Makefile               |     1 -
-> > 
-> > here. Is that expectation correct?
-> > 
-> > >  include/linux/platform_data/msm_serial_hs.h |   49 -
-> > >  3 files changed, 1935 deletions(-)
-> > >  delete mode 100644 drivers/tty/serial/msm_serial_hs.c
-> > >  delete mode 100644 include/linux/platform_data/msm_serial_hs.h
+> > Why a different name?
 > 
-> Please note that your own email address is
->     arnd at arndb.de
-> 
-> (I fixed up the Cc list for this message. And I don't do smilies.)
-> 
+> WEXLER trademark owned by AVIRSA Electronics, a member of the diversified holding AVIRSA.
 
-You are obviously right on both issues, I'll fix them up.
+It's not really an issue. There's a lot of different vendor owned by
+the same companies in that file. And the fact that you named it wexler
+in the first place proves that wexler is more known than avirsa.
 
-Thanks a lot!
+Maxime
 
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150304/3fcd0a86/attachment.sig>
