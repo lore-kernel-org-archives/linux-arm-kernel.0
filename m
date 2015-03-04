@@ -1,27 +1,53 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  4 Mar 2015 20:11:24 +0100
-Subject: [PATCH v3 0/4] arm64: head.S cleanup
-Message-ID: <1425496288-14483-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Wed,  4 Mar 2015 20:11:25 +0100
+Subject: [PATCH v3 1/4] arm64: add macros for common adrp usages
+In-Reply-To: <1425496288-14483-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1425496288-14483-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1425496288-14483-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This some janitorial work on head.S, just stuff I noticed when making
-changes to it for other reasons.
+The adrp instruction is mostly used in combination with either
+an add, a ldr or a str instruction with the low bits of the
+referenced symbol in the 12-bit immediate of the followup
+instruction.
 
-Changes since v2:
-- added separate patch to add macros for adrp/add, adrp/ldr and adrp/str
-- added R-b's
+Introduce the macros adr_l, ldr_l and str_l that encapsulate
+these common patterns.
 
-Ard Biesheuvel (4):
-  arm64: add macros for common adrp usages
-  arm64: remove processor_id
-  arm64: remove __switch_data object from head.S
-  arm64: remove __lookup_processor_type_data, object from head.S
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/assembler.h | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
- arch/arm64/include/asm/assembler.h | 20 +++++++++++++++
- arch/arm64/kernel/head.S           | 52 ++++++++------------------------------
- arch/arm64/kernel/setup.c          |  3 ---
- 3 files changed, 31 insertions(+), 44 deletions(-)
-
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 750bac4e637e..14c30c58d101 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -159,4 +159,24 @@ lr	.req	x30		// link register
+ 	orr	\rd, \lbits, \hbits, lsl #32
+ 	.endm
+ 
++	.macro	adr_l, dst, sym, tmp=
++	.ifb	\tmp
++	adrp	\dst, \sym
++	add	\dst, \dst, :lo12:\sym
++	.else
++	adrp	\tmp, \sym
++	add	\dst, \tmp, :lo12:\sym
++	.endif
++	.endm
++
++	.macro	ldr_l, dst, sym, tmp
++	adrp	\tmp, \sym
++	ldr	\dst, [\sym, :lo12:\sym]
++	.endm
++
++	.macro	str_l, src, sym, tmp
++	adrp	\tmp, \sym
++	str	\src, [\tmp, :lo12:\sym]
++	.endm
++
+ #endif	/* __ASM_ASSEMBLER_H */
 -- 
 1.8.3.2
