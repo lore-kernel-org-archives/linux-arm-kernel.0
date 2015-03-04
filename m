@@ -1,52 +1,262 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed,  4 Mar 2015 17:24:24 -0500
-Subject: [PATCH] PCI: xgene: fix breakage from generic config usage
-Message-ID: <1425507864-22055-1-git-send-email-msalter@redhat.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 04 Mar 2015 23:50:36 +0100
+Subject: [PATCH v9 16/21] irqchip: Add GICv2 specific ACPI boot support
+In-Reply-To: <1424853601-6675-17-git-send-email-hanjun.guo@linaro.org>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <1424853601-6675-17-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <5921774.hkUTDjxi3A@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 350f8be5bb402 ("PCI: xgene: Convert to use generic config
-accessors") breaks PCI on the X-Gene platform. It creates two
-problems with the xgene_pcie_map_bus() function. First, it returns
-an int but should return a void __iomem *, but that's just a
-compile-time warning. The breakage is caused by the offset not
-being added to the base of the config map. So all config reads
-and writes operate on the first four bytes of config space. This
-patch fixes both issues.
+On Wednesday, February 25, 2015 04:39:56 PM Hanjun Guo wrote:
+> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> 
+> ACPI kernel uses MADT table for proper GIC initialization. It needs to
+> parse GIC related subtables, collect CPU interface and distributor
+> addresses and call driver initialization function (which is hardware
+> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
+> 
+> NOTE: This commit allow to initialize GICv1/2 basic functionality.
+> While now simple GICv2 init call is used, any further GIC features
+> require generic infrastructure for proper ACPI irqchip initialization.
+> That mechanism and stacked irqdomains to support GICv2 MSI/virtualization
+> extension, GICv3/4 and its ITS are considered as next steps.
+> 
+> CC: Jason Cooper <jason@lakedaemon.net>
+> CC: Marc Zyngier <marc.zyngier@arm.com>
+> CC: Thomas Gleixner <tglx@linutronix.de>
+> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Tested-by: Yijing Wang <wangyijing@huawei.com>
+> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+> Tested-by: Jon Masters <jcm@redhat.com>
+> Tested-by: Timur Tabi <timur@codeaurora.org>
+> Tested-by: Robert Richter <rrichter@cavium.com>
+> Acked-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/include/asm/acpi.h        |   2 +
+>  arch/arm64/kernel/acpi.c             |  25 +++++++++
+>  drivers/irqchip/irq-gic.c            | 102 +++++++++++++++++++++++++++++++++++
+>  drivers/irqchip/irqchip.c            |   3 ++
+>  include/linux/acpi.h                 |  14 +++++
+>  include/linux/irqchip/arm-gic-acpi.h |  29 ++++++++++
+>  6 files changed, 175 insertions(+)
+>  create mode 100644 include/linux/irqchip/arm-gic-acpi.h
+> 
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 9a23369..a720a61 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -13,6 +13,8 @@
+>  #define _ASM_ACPI_H
+>  
+>  #include <linux/mm.h>
+> +#include <linux/irqchip/arm-gic-acpi.h>
+> +
+>  #include <asm/cputype.h>
+>  #include <asm/smp_plat.h>
+>  
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 31f080e..af308c3 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -359,3 +359,28 @@ void __init acpi_boot_table_init(void)
+>  		pr_err("Can't find FADT\n");
+>  	}
+>  }
+> +
+> +void __init acpi_gic_init(void)
+> +{
+> +	struct acpi_table_header *table;
+> +	acpi_status status;
+> +	acpi_size tbl_size;
+> +	int err;
+> +
+> +	if (acpi_disabled)
+> +		return;
+> +
+> +	status = acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table, &tbl_size);
+> +	if (ACPI_FAILURE(status)) {
+> +		const char *msg = acpi_format_exception(status);
+> +
+> +		pr_err("Failed to get MADT table, %s\n", msg);
+> +		return;
+> +	}
+> +
+> +	err = gic_v2_acpi_init(table);
+> +	if (err)
+> +		pr_err("Failed to initialize GIC IRQ controller");
+> +
+> +	early_acpi_os_unmap_memory((char *)table, tbl_size);
+> +}
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 4634cf7..929d668 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -33,12 +33,14 @@
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_irq.h>
+> +#include <linux/acpi.h>
+>  #include <linux/irqdomain.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/percpu.h>
+>  #include <linux/slab.h>
+>  #include <linux/irqchip/chained_irq.h>
+>  #include <linux/irqchip/arm-gic.h>
+> +#include <linux/irqchip/arm-gic-acpi.h>
+>  
+>  #include <asm/cputype.h>
+>  #include <asm/irq.h>
+> @@ -1086,3 +1088,103 @@ IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
+>  IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
+>  
+>  #endif
+> +
+> +#ifdef CONFIG_ACPI
+> +static phys_addr_t dist_phy_base, cpu_phy_base __initdata;
+> +
+> +static int __init
+> +gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+> +			const unsigned long end)
+> +{
+> +	struct acpi_madt_generic_interrupt *processor;
+> +	phys_addr_t gic_cpu_base;
+> +	static int cpu_base_assigned;
+> +
+> +	processor = (struct acpi_madt_generic_interrupt *)header;
+> +
+> +	if (BAD_MADT_ENTRY(processor, end))
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * There is no support for non-banked GICv1/2 register in ACPI spec.
+> +	 * All CPU interface addresses have to be the same.
+> +	 */
+> +	gic_cpu_base = processor->base_address;
+> +	if (cpu_base_assigned && gic_cpu_base != cpu_phy_base)
+> +		return -EINVAL;
+> +
+> +	cpu_phy_base = gic_cpu_base;
+> +	cpu_base_assigned = 1;
+> +	return 0;
+> +}
+> +
+> +static int __init
+> +gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
+> +				const unsigned long end)
+> +{
+> +	struct acpi_madt_generic_distributor *dist;
+> +
+> +	dist = (struct acpi_madt_generic_distributor *)header;
+> +
+> +	if (BAD_MADT_ENTRY(dist, end))
+> +		return -EINVAL;
+> +
+> +	dist_phy_base = dist->base_address;
+> +	return 0;
+> +}
+> +
+> +int __init
+> +gic_v2_acpi_init(struct acpi_table_header *table)
+> +{
+> +	void __iomem *cpu_base, *dist_base;
+> +	int count;
+> +
+> +	/* Collect CPU base addresses */
+> +	count = acpi_parse_entries(ACPI_SIG_MADT,
+> +				   sizeof(struct acpi_table_madt),
+> +				   gic_acpi_parse_madt_cpu, table,
+> +				   ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
+> +	if (count <= 0) {
+> +		pr_err("No valid GICC entries exist\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/*
+> +	 * Find distributor base address. We expect one distributor entry since
+> +	 * ACPI 5.1 spec neither support multi-GIC instances nor GIC cascade.
+> +	 */
+> +	count = acpi_parse_entries(ACPI_SIG_MADT,
+> +				   sizeof(struct acpi_table_madt),
+> +				   gic_acpi_parse_madt_distributor, table,
+> +				   ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
+> +	if (count <= 0) {
+> +		pr_err("No valid GICD entries exist\n");
+> +		return -EINVAL;
+> +	} else if (count > 1) {
+> +		pr_err("More than one GICD entry detected\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	cpu_base = ioremap(cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
+> +	if (!cpu_base) {
+> +		pr_err("Unable to map GICC registers\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	dist_base = ioremap(dist_phy_base, ACPI_GICV2_DIST_MEM_SIZE);
+> +	if (!dist_base) {
+> +		pr_err("Unable to map GICD registers\n");
+> +		iounmap(cpu_base);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	/*
+> +	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
+> +	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
+> +	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
+> +	 */
+> +	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
+> +	irq_set_default_host(gic_data[0].domain);
+> +	return 0;
+> +}
+> +#endif
+> diff --git a/drivers/irqchip/irqchip.c b/drivers/irqchip/irqchip.c
+> index 0fe2f71..5855240 100644
+> --- a/drivers/irqchip/irqchip.c
+> +++ b/drivers/irqchip/irqchip.c
+> @@ -8,6 +8,7 @@
+>   * warranty of any kind, whether express or implied.
+>   */
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/init.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/irqchip.h>
+> @@ -26,4 +27,6 @@ extern struct of_device_id __irqchip_of_table[];
+>  void __init irqchip_init(void)
+>  {
+>  	of_irq_init(__irqchip_of_table);
+> +
+> +	acpi_irq_init();
+>  }
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index c03d8d1..e27117a 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -557,6 +557,20 @@ static inline int acpi_device_modalias(struct device *dev,
+>  
+>  #endif	/* !CONFIG_ACPI */
+>  
+> +#if defined(CONFIG_ACPI) && defined(CONFIG_ARM64)
+> +static inline void acpi_irq_init(void)
+> +{
+> +	/*
+> +	 * Hardcode ACPI IRQ chip initialization to GICv2 for now.
+> +	 * Proper irqchip infrastructure will be implemented along with
+> +	 * incoming  GICv2m|GICv3|ITS bits.
+> +	 */
+> +	acpi_gic_init();
+> +}
+> +#else
+> +static inline void acpi_irq_init(void) { }
+> +#endif
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
----
- drivers/pci/host/pci-xgene.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+I don't want this in a common header.
 
-diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-index 52bb25c..b87f80b 100644
---- a/drivers/pci/host/pci-xgene.c
-+++ b/drivers/pci/host/pci-xgene.c
-@@ -129,17 +129,21 @@ static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
- 	return false;
- }
- 
--static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
--			      int offset)
-+static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
-+					int offset)
- {
- 	struct xgene_pcie_port *port = bus->sysdata;
-+	void __iomem *base;
- 
- 	if ((pci_is_root_bus(bus) && devfn != 0) || !port->link_up ||
- 	    xgene_pcie_hide_rc_bars(bus, offset))
- 		return NULL;
- 
- 	xgene_pcie_set_rtdid_reg(bus, devfn);
--	return xgene_pcie_get_cfg_base(bus);
-+	base = xgene_pcie_get_cfg_base(bus);
-+	if (base)
-+		base += offset;
-+	return base;
- }
- 
- static struct pci_ops xgene_pcie_ops = {
+
 -- 
-1.8.3.1
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
