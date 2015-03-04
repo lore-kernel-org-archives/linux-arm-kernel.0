@@ -1,51 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Mar 2015 15:38:29 +0100
-Subject: [PATCH 3/8] ARM: make xscale iwmmxt code multiplatform aware
-In-Reply-To: <87pp8ozwb1.fsf@free.fr>
-References: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
- <1425043775-3106827-4-git-send-email-arnd@arndb.de> <87pp8ozwb1.fsf@free.fr>
-Message-ID: <356997090.ZkRbrlLqgW@wuerfel>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed,  4 Mar 2015 15:41:27 +0100
+Subject: [PATCH] ARM: at91: debug: fix non MMU debug
+Message-ID: <1425480087-31097-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 March 2015 15:12:02 Robert Jarzmik wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
+Linux may be used without MMU on atmel SoCs, fix debug in this configuration.
 
-> 
-> I'm not sure I understand this patch fully, so take with caution my comment.
-> If I'm not mistaken, the former behavior was for pxa3xx:
->  - cpu_is_xscale() -> false
->  - cpu_is_xsc3() -> true
->  => this implied PMD_BIT4 was set
-> 
-> With your patch :
->  - cpu_is_xscale() -> true
->  - cpu_is_xsc3() -> true
->  => this implied PMD_BIT4 is not set
-> 
-> I like the new meaning for cpu_is_*(), but is the change of PMD_BIT4 the goal of
-> this patch (the piece in [1]) ?
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/include/debug/at91.S | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-> > -     if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
-> > +     if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ &&
-> > +         !cpu_is_xscale() && !cpu_is_xsc3())
-> >               prot |= PMD_BIT4;
-> >  
-> >       pgd += pgd_index(addr);
-
-I tried to not change the behavior here, and I think you missed this part:
-
--#if !defined(CONFIG_CPU_XSCALE) && !defined(CONFIG_CPU_XSC3)
-+#if !defined(CONFIG_CPU_XSCALE)
- #define        cpu_is_xscale() 0
- #else
--#define        cpu_is_xscale() 1
- ...
-
-This means that previously, cpu_is_xscale() returned true for pxa3xx,
-while now it returns false, and I added the "&& !cpu_is_xsc3()" to
-keep the logic the same as before.
-
-Does that make sense?
-
-	Arnd
+diff --git a/arch/arm/include/debug/at91.S b/arch/arm/include/debug/at91.S
+index 80a6501b4d50..c3c45e628e33 100644
+--- a/arch/arm/include/debug/at91.S
++++ b/arch/arm/include/debug/at91.S
+@@ -18,8 +18,11 @@
+ #define AT91_DBGU 0xfc00c000 /* SAMA5D4_BASE_USART3 */
+ #endif
+ 
+-/* Keep in sync with mach-at91/include/mach/hardware.h */
++#ifdef CONFIG_MMU
+ #define AT91_IO_P2V(x) ((x) - 0x01000000)
++#else
++#define AT91_IO_P2V(x) (x)
++#endif
+ 
+ #define AT91_DBGU_SR		(0x14)	/* Status Register */
+ #define AT91_DBGU_THR		(0x1c)	/* Transmitter Holding Register */
+-- 
+2.1.0
