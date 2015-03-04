@@ -1,78 +1,53 @@
 From: vincent.cw.yang@gmail.com (Vincent Yang)
-Date: Wed,  4 Mar 2015 19:04:03 +0800
-Subject: [PATCH v7 4/7] clk: Add clock driver for mb86s7x
+Date: Wed,  4 Mar 2015 19:05:46 +0800
+Subject: [PATCH v7 5/7] dt: mb86s7x: add dt files for MB86S7x evbs
 In-Reply-To: <1425466367-30556-1-git-send-email-vincent.yang@socionext.com>
 References: <1425466367-30556-1-git-send-email-vincent.yang@socionext.com>
-Message-ID: <1425467043-30733-1-git-send-email-vincent.yang@socionext.com>
+Message-ID: <1425467146-30777-1-git-send-email-vincent.yang@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jassi Brar <jaswinder.singh@linaro.org>
 
- The CRG11 clock controller is managed by remote f/w.
-This driver simply maps Linux CLK ops onto mailbox api.
+Add dt files for MB86S7x evb.
 
 Signed-off-by: Andy Green <andy.green@linaro.org>
 Signed-off-by: Vincent Yang <vincent.yang@socionext.com>
 Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@socionext.com>
 ---
- .../bindings/clock/fujitsu,mb86s70-crg11.txt       |  26 ++
- drivers/clk/Makefile                               |   1 +
- drivers/clk/clk-mb86s7x.c                          | 386 +++++++++++++++++++++
- 3 files changed, 413 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
- create mode 100644 drivers/clk/clk-mb86s7x.c
+ arch/arm/boot/dts/Makefile      |   3 +
+ arch/arm/boot/dts/mb86s70.dtsi  |  91 +++++++++++++++++++++++++
+ arch/arm/boot/dts/mb86s70eb.dts |  57 ++++++++++++++++
+ arch/arm/boot/dts/mb86s73.dtsi  |  63 ++++++++++++++++++
+ arch/arm/boot/dts/mb86s73eb.dts |  44 +++++++++++++
+ arch/arm/boot/dts/mb86s7x.dtsi  | 142 ++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 400 insertions(+)
+ create mode 100644 arch/arm/boot/dts/mb86s70.dtsi
+ create mode 100644 arch/arm/boot/dts/mb86s70eb.dts
+ create mode 100644 arch/arm/boot/dts/mb86s73.dtsi
+ create mode 100644 arch/arm/boot/dts/mb86s73eb.dts
+ create mode 100644 arch/arm/boot/dts/mb86s7x.dtsi
 
-diff --git a/Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt b/Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a1c776b..aa0e6d4 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -197,6 +197,9 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
+ 	kirkwood-ts419-6282.dtb
+ dtb-$(CONFIG_ARCH_LPC32XX) += \
+ 	ea3250.dtb phy3250.dtb
++dtb-$(CONFIG_ARCH_MB86S7X) += \
++	mb86s70eb.dtb \
++	mb86s73eb.dtb
+ dtb-$(CONFIG_MACH_MESON6) += \
+ 	meson6-atv1200.dtb
+ dtb-$(CONFIG_ARCH_MMP) += \
+diff --git a/arch/arm/boot/dts/mb86s70.dtsi b/arch/arm/boot/dts/mb86s70.dtsi
 new file mode 100644
-index 0000000..3323962
+index 0000000..057e135
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
-@@ -0,0 +1,26 @@
-+Fujitsu CRG11 clock driver bindings
-+-----------------------------------
-+
-+Required properties :
-+- compatible : Shall contain "fujitsu,mb86s70-crg11"
-+- #clock-cells : Shall be 3 {cntrlr domain port}
-+
-+The consumer specifies the desired clock pointing to its phandle.
-+
-+Example:
-+
-+	clock: crg11 {
-+		compatible = "fujitsu,mb86s70-crg11";
-+		#clock-cells = <3>;
-+	};
-+
-+	mhu: mhu0 at 2b1f0000 {
-+		#mbox-cells = <1>;
-+		compatible = "arm,mhu";
-+		reg = <0 0x2B1F0000 0x1000>;
-+		interrupts = <0 36 4>, /* LP Non-Sec */
-+			     <0 35 4>, /* HP Non-Sec */
-+			     <0 37 4>; /* Secure */
-+		clocks = <&clock 0 2 1>; /* Cntrlr:0 Domain:2 Port:1 */
-+		clock-names = "clk";
-+	};
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index d478ceb..1d35f3b 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -28,6 +28,7 @@ obj-$(CONFIG_MACH_LOONGSON1)		+= clk-ls1x.o
- obj-$(CONFIG_COMMON_CLK_MAX_GEN)	+= clk-max-gen.o
- obj-$(CONFIG_COMMON_CLK_MAX77686)	+= clk-max77686.o
- obj-$(CONFIG_COMMON_CLK_MAX77802)	+= clk-max77802.o
-+obj-$(CONFIG_ARCH_MB86S7X)		+= clk-mb86s7x.o
- obj-$(CONFIG_ARCH_MOXART)		+= clk-moxart.o
- obj-$(CONFIG_ARCH_NOMADIK)		+= clk-nomadik.o
- obj-$(CONFIG_ARCH_NSPIRE)		+= clk-nspire.o
-diff --git a/drivers/clk/clk-mb86s7x.c b/drivers/clk/clk-mb86s7x.c
-new file mode 100644
-index 0000000..f39c25a
---- /dev/null
-+++ b/drivers/clk/clk-mb86s7x.c
-@@ -0,0 +1,386 @@
++++ b/arch/arm/boot/dts/mb86s70.dtsi
+@@ -0,0 +1,91 @@
 +/*
 + * Copyright (C) 2013-2015 FUJITSU SEMICONDUCTOR LIMITED
 + * Copyright (C) 2015 Linaro Ltd.
@@ -80,384 +55,419 @@ index 0000000..f39c25a
 + * This program is free software: you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation, version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
 + */
 +
-+#include <linux/clkdev.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/cpu.h>
-+#include <linux/clk-provider.h>
-+#include <linux/spinlock.h>
-+#include <linux/module.h>
-+#include <linux/topology.h>
-+#include <linux/mailbox_client.h>
-+#include <linux/platform_device.h>
++#include "mb86s7x.dtsi"
 +
-+#include <soc/mb86s7x/scb_mhu.h>
++/ {
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+#define to_crg_clk(p) container_of(p, struct crg_clk, hw)
-+#define to_clc_clk(p) container_of(p, struct cl_clk, hw)
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x0>;
++			cci-control-port = <&cci_control4>;
++			clock-frequency = <1200000000>;
++			clock-latency = <100000>;
++		};
 +
-+struct mb86s7x_peri_clk {
-+	u32 payload_size;
-+	u32 cntrlr;
-+	u32 domain;
-+	u32 port;
-+	u32 en;
-+	u64 frequency;
-+} __packed __aligned(4);
++		cpu1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x1>;
++			cci-control-port = <&cci_control4>;
++			clock-frequency = <1200000000>;
++			clock-latency = <100000>;
++		};
 +
-+struct hack_rate {
-+	unsigned clk_id;
-+	unsigned long rate;
-+	int gated;
++		cpu2: cpu at 100 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x100>;
++			cci-control-port = <&cci_control3>;
++			clock-frequency = <800000000>;
++			clock-latency = <100000>;
++		};
++
++		cpu3: cpu at 101 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x101>;
++			cci-control-port = <&cci_control3>;
++			clock-frequency = <800000000>;
++			clock-latency = <100000>;
++		};
++	};
++
++	cci at 2c090000 {
++		compatible = "arm,cci-400";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0 0x2c090000 0x1000>;
++		ranges = <0x0 0x0 0x2c090000 0x10000>;
++
++		cci_control3: slave-if at 4000 {
++			compatible = "arm,cci-400-ctrl-if";
++			interface-type = "ace";
++			reg = <0x4000 0x1000>;
++		};
++
++		cci_control4: slave-if at 5000 {
++			compatible = "arm,cci-400-ctrl-if";
++			interface-type = "ace";
++			reg = <0x5000 0x1000>;
++		};
++
++		pmu at 9000 {
++			compatible = "arm,cci-400-pmu";
++			reg = <0x9000 0x5000>;
++			interrupts = <0 77 4>,
++					<0 77 4>,
++					<0 77 4>,
++					<0 77 4>,
++					<0 77 4>;
++		};
++	};
 +};
 +
-+struct crg_clk {
-+	struct clk_hw hw;
-+	u8 cntrlr, domain, port;
++&archtimer {
++	status = "disabled";
 +};
 +
-+static int crg_gate_control(struct clk_hw *hw, int en)
-+{
-+	struct crg_clk *crgclk = to_crg_clk(hw);
-+	struct mb86s7x_peri_clk cmd;
-+	int ret;
++&pmua7 {
++	status = "disabled";
++};
+diff --git a/arch/arm/boot/dts/mb86s70eb.dts b/arch/arm/boot/dts/mb86s70eb.dts
+new file mode 100644
+index 0000000..1e51ce0
+--- /dev/null
++++ b/arch/arm/boot/dts/mb86s70eb.dts
+@@ -0,0 +1,57 @@
++/*
++ * Copyright (C) 2013-2015 FUJITSU SEMICONDUCTOR LIMITED
++ * Copyright (C) 2015 Linaro Ltd.
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, version 2 of the License.
++ */
 +
-+	cmd.payload_size = sizeof(cmd);
-+	cmd.cntrlr = crgclk->cntrlr;
-+	cmd.domain = crgclk->domain;
-+	cmd.port = crgclk->port;
-+	cmd.en = en;
++/dts-v1/;
 +
-+	/* Port is UngatedCLK */
-+	if (cmd.port == 8)
-+		return en ? 0 : -EINVAL;
++#include "mb86s70.dtsi"
 +
-+	pr_debug("%s:%d CMD Cntrlr-%u Dom-%u Port-%u En-%u}\n",
-+		 __func__, __LINE__, cmd.cntrlr,
-+		 cmd.domain, cmd.port, cmd.en);
++/ {
++	model = "Fujitsu MB86S70 EVB";
++	compatible = "fujitsu,mb86s70-evb";
 +
-+	ret = mb86s7x_send_packet(CMD_PERI_CLOCK_GATE_SET_REQ,
-+				  &cmd, sizeof(cmd));
-+	if (ret < 0) {
-+		pr_err("%s:%d failed!\n", __func__, __LINE__);
-+		return ret;
-+	}
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++	};
 +
-+	pr_debug("%s:%d REP Cntrlr-%u Dom-%u Port-%u En-%u}\n",
-+		 __func__, __LINE__, cmd.cntrlr,
-+		 cmd.domain, cmd.port, cmd.en);
++	memory {
++		device_type = "memory";
++		reg = <0 0x80000000 0x80000000>, <0x08 0x80000000 0x80000000>;
 +
-+	/* If the request was rejected */
-+	if (cmd.en != en)
-+		ret = -EINVAL;
-+	else
-+		ret = 0;
++	};
 +
-+	return ret;
-+}
++	chosen {
++		bootargs = "console=ttyS0,115200 root=/dev/mmcblk1p1 rootfstype=ext4 rootwait rw";
++		linux,initrd-start = <0xc0000000>;
++		linux,initrd-end =   <0xc0800000>;
++	};
 +
-+static int crg_port_prepare(struct clk_hw *hw)
-+{
-+	return crg_gate_control(hw, 1);
-+}
-+
-+static void crg_port_unprepare(struct clk_hw *hw)
-+{
-+	crg_gate_control(hw, 0);
-+}
-+
-+static int
-+crg_rate_control(struct clk_hw *hw, int set, unsigned long *rate)
-+{
-+	struct crg_clk *crgclk = to_crg_clk(hw);
-+	struct mb86s7x_peri_clk cmd;
-+	int code, ret;
-+
-+	cmd.payload_size = sizeof(cmd);
-+	cmd.cntrlr = crgclk->cntrlr;
-+	cmd.domain = crgclk->domain;
-+	cmd.port = crgclk->port;
-+	cmd.frequency = *rate;
-+
-+	if (set) {
-+		code = CMD_PERI_CLOCK_RATE_SET_REQ;
-+		pr_debug("%s:%d CMD Cntrlr-%u Dom-%u Port-%u Rate-SET %lluHz}\n",
-+			 __func__, __LINE__, cmd.cntrlr,
-+			 cmd.domain, cmd.port, cmd.frequency);
-+	} else {
-+		code = CMD_PERI_CLOCK_RATE_GET_REQ;
-+		pr_debug("%s:%d CMD Cntrlr-%u Dom-%u Port-%u Rate-GET}\n",
-+			 __func__, __LINE__, cmd.cntrlr,
-+			 cmd.domain, cmd.port);
-+	}
-+
-+	ret = mb86s7x_send_packet(code, &cmd, sizeof(cmd));
-+	if (ret < 0) {
-+		pr_err("%s:%d failed!\n", __func__, __LINE__);
-+		return ret;
-+	}
-+
-+	if (set)
-+		pr_debug("%s:%d REP Cntrlr-%u Dom-%u Port-%u Rate-SET %lluHz}\n",
-+			 __func__, __LINE__, cmd.cntrlr,
-+			 cmd.domain, cmd.port, cmd.frequency);
-+	else
-+		pr_debug("%s:%d REP Cntrlr-%u Dom-%u Port-%u Rate-GOT %lluHz}\n",
-+			 __func__, __LINE__, cmd.cntrlr,
-+			 cmd.domain, cmd.port, cmd.frequency);
-+
-+	*rate = cmd.frequency;
-+	return 0;
-+}
-+
-+static unsigned long
-+crg_port_recalc_rate(struct clk_hw *hw,	unsigned long parent_rate)
-+{
-+	unsigned long rate;
-+
-+	crg_rate_control(hw, 0, &rate);
-+
-+	return rate;
-+}
-+
-+static long
-+crg_port_round_rate(struct clk_hw *hw,
-+		    unsigned long rate, unsigned long *pr)
-+{
-+	return rate;
-+}
-+
-+static int
-+crg_port_set_rate(struct clk_hw *hw,
-+		  unsigned long rate, unsigned long parent_rate)
-+{
-+	return crg_rate_control(hw, 1, &rate);
-+}
-+
-+const struct clk_ops crg_port_ops = {
-+	.prepare = crg_port_prepare,
-+	.unprepare = crg_port_unprepare,
-+	.recalc_rate = crg_port_recalc_rate,
-+	.round_rate = crg_port_round_rate,
-+	.set_rate = crg_port_set_rate,
++	vccq_sdhci1: regulator at 0 {
++		compatible = "regulator-gpio";
++		regulator-name = "SDHCI1 VccQ";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++		gpios = <&gpio0 7 0>;
++		gpios-states = <1>;
++		states = <3300000 1
++			  1800000 0>;
++	};
 +};
 +
-+struct mb86s70_crg11 {
-+	struct mutex lock; /* protects CLK populating and searching */
++&sdhci0 {
++	status = "ok";
++	bus-width = <8>;
 +};
 +
-+static struct clk *crg11_get(struct of_phandle_args *clkspec, void *data)
-+{
-+	struct mb86s70_crg11 *crg11 = data;
-+	struct clk_init_data init;
-+	u32 cntrlr, domain, port;
-+	struct crg_clk *crgclk;
-+	struct clk *clk;
-+	char clkp[20];
++&sdhci1 {
++	status = "ok";
++	bus-width = <4>;
++	vqmmc-supply = <&vccq_sdhci1>;
++};
+diff --git a/arch/arm/boot/dts/mb86s73.dtsi b/arch/arm/boot/dts/mb86s73.dtsi
+new file mode 100644
+index 0000000..3c9d8d0
+--- /dev/null
++++ b/arch/arm/boot/dts/mb86s73.dtsi
+@@ -0,0 +1,63 @@
++/*
++ * Copyright (C) 2013-2015 FUJITSU SEMICONDUCTOR LIMITED
++ * Copyright (C) 2015 Linaro Ltd.
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, version 2 of the License.
++ */
 +
-+	if (clkspec->args_count != 3)
-+		return ERR_PTR(-EINVAL);
++#include "mb86s7x.dtsi"
 +
-+	cntrlr = clkspec->args[0];
-+	domain = clkspec->args[1];
-+	port = clkspec->args[2];
++/ {
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+	if (port > 7)
-+		snprintf(clkp, 20, "UngatedCLK%d_%X", cntrlr, domain);
-+	else
-+		snprintf(clkp, 20, "CLK%d_%X_%d", cntrlr, domain, port);
++		cpu0: cpu at 100 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x100>;
++			cci-control-port = <&cci_control3>;
++			clock-frequency = <800000000>;
++			clock-latency = <100000>;
++		};
 +
-+	mutex_lock(&crg11->lock);
++		cpu1: cpu at 101 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x101>;
++			cci-control-port = <&cci_control3>;
++			clock-frequency = <800000000>;
++			clock-latency = <100000>;
++		};
++	};
 +
-+	clk = __clk_lookup(clkp);
-+	if (clk) {
-+		mutex_unlock(&crg11->lock);
-+		return clk;
-+	}
++	cci at 2c090000 {
++		compatible = "arm,cci-400";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0 0x2c090000 0x1000>;
++		ranges = <0x0 0x0 0x2c090000 0x10000>;
 +
-+	crgclk = kzalloc(sizeof(*crgclk), GFP_KERNEL);
-+	if (!crgclk) {
-+		mutex_unlock(&crg11->lock);
-+		return ERR_PTR(-ENOMEM);
-+	}
++		cci_control3: slave-if at 4000 {
++			compatible = "arm,cci-400-ctrl-if";
++			interface-type = "ace";
++			reg = <0x4000 0x1000>;
++		};
++	};
 +
-+	init.name = clkp;
-+	init.num_parents = 0;
-+	init.ops = &crg_port_ops;
-+	init.flags = CLK_IS_ROOT;
-+	crgclk->hw.init = &init;
-+	crgclk->cntrlr = cntrlr;
-+	crgclk->domain = domain;
-+	crgclk->port = port;
-+	clk = clk_register(NULL, &crgclk->hw);
-+	if (IS_ERR(clk))
-+		pr_err("%s:%d Error!\n", __func__, __LINE__);
-+	else
-+		pr_debug("Registered %s\n", clkp);
++	hcd21_ehci: f_usb20ho_echi at 34240000 {
++		compatible = "fujitsu,f_usb20ho", "generic-ehci";
++		reg = <0 0x34240000 0x1000>;
++		interrupts = <0 419 0x4>;
++		clocks = <&clock 2 2 4>, <&clock 2 4 5>, <&clock 4 0 0>;
++	};
 +
-+	clk_register_clkdev(clk, clkp, NULL);
-+	mutex_unlock(&crg11->lock);
-+	return clk;
-+}
++	hcd21_ohci: f_usb20ho_ochi at 34240000 {
++		compatible = "fujitsu,f_usb20ho", "generic-ohci";
++		reg = <0 0x34241000 0x1000>;
++		interrupts = <0 419 0x4>;
++		clocks = <&clock 2 2 4>, <&clock 2 4 5>, <&clock 4 0 0>;
++	};
++};
+diff --git a/arch/arm/boot/dts/mb86s73eb.dts b/arch/arm/boot/dts/mb86s73eb.dts
+new file mode 100644
+index 0000000..43f2fc6
+--- /dev/null
++++ b/arch/arm/boot/dts/mb86s73eb.dts
+@@ -0,0 +1,44 @@
++/*
++ * Copyright (C) 2013-2015 FUJITSU SEMICONDUCTOR LIMITED
++ * Copyright (C) 2015 Linaro Ltd.
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, version 2 of the License.
++ */
 +
-+static void __init crg_port_init(struct device_node *node)
-+{
-+	struct mb86s70_crg11 *crg11;
++/dts-v1/;
 +
-+	crg11 = kzalloc(sizeof(*crg11), GFP_KERNEL);
-+	if (!crg11)
-+		return;
++#include "mb86s73.dtsi"
 +
-+	mutex_init(&crg11->lock);
++/ {
++	model = "Fujitsu MB86S73 EVB";
++	compatible = "fujitsu,mb86s73-evb";
 +
-+	of_clk_add_provider(node, crg11_get, crg11);
-+}
-+CLK_OF_DECLARE(crg11_gate, "fujitsu,mb86s70-crg11", crg_port_init);
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++	};
 +
-+struct cl_clk {
-+	struct clk_hw hw;
-+	int cluster;
++	memory {
++		device_type = "memory";
++		reg = <0 0x80000000 0x80000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,115200 root=/dev/mmcblk1p1 rootfstype=ext4 rootwait rw";
++		linux,initrd-start = <0xc0000000>;
++		linux,initrd-end =   <0xc0800000>;
++	};
 +};
 +
-+struct mb86s7x_cpu_freq {
-+	u32 payload_size;
-+	u32 cluster_class;
-+	u32 cluster_id;
-+	u32 cpu_id;
-+	u64 frequency;
++&sdhci0 {
++	status = "ok";
++	bus-width = <8>;
 +};
 +
-+static void mhu_cluster_rate(struct clk_hw *hw, unsigned long *rate, int get)
-+{
-+	struct cl_clk *clc = to_clc_clk(hw);
-+	struct mb86s7x_cpu_freq cmd;
-+	int code, ret;
-+
-+	cmd.payload_size = sizeof(cmd);
-+	cmd.cluster_class = 0;
-+	cmd.cluster_id = clc->cluster;
-+	cmd.cpu_id = 0;
-+	cmd.frequency = *rate;
-+
-+	if (get)
-+		code = CMD_CPU_CLOCK_RATE_GET_REQ;
-+	else
-+		code = CMD_CPU_CLOCK_RATE_SET_REQ;
-+
-+	pr_debug("%s:%d CMD Cl_Class-%u CL_ID-%u CPU_ID-%u Freq-%llu}\n",
-+		 __func__, __LINE__, cmd.cluster_class,
-+		 cmd.cluster_id, cmd.cpu_id, cmd.frequency);
-+
-+	ret = mb86s7x_send_packet(code, &cmd, sizeof(cmd));
-+	if (ret < 0) {
-+		pr_err("%s:%d failed!\n", __func__, __LINE__);
-+		return;
-+	}
-+
-+	pr_debug("%s:%d REP Cl_Class-%u CL_ID-%u CPU_ID-%u Freq-%llu}\n",
-+		 __func__, __LINE__, cmd.cluster_class,
-+		 cmd.cluster_id, cmd.cpu_id, cmd.frequency);
-+
-+	*rate = cmd.frequency;
-+}
-+
-+static unsigned long
-+clc_recalc_rate(struct clk_hw *hw, unsigned long unused)
-+{
-+	unsigned long rate;
-+
-+	mhu_cluster_rate(hw, &rate, 1);
-+	return rate;
-+}
-+
-+static long
-+clc_round_rate(struct clk_hw *hw, unsigned long rate,
-+	       unsigned long *unused)
-+{
-+	return rate;
-+}
-+
-+static int
-+clc_set_rate(struct clk_hw *hw, unsigned long rate,
-+	     unsigned long unused)
-+{
-+	unsigned long res = rate;
-+
-+	mhu_cluster_rate(hw, &res, 0);
-+
-+	return (res == rate) ? 0 : -EINVAL;
-+}
-+
-+static struct clk_ops clk_clc_ops = {
-+	.recalc_rate = clc_recalc_rate,
-+	.round_rate = clc_round_rate,
-+	.set_rate = clc_set_rate,
++&sdhci1 {
++	status = "ok";
++	bus-width = <4>;
 +};
+diff --git a/arch/arm/boot/dts/mb86s7x.dtsi b/arch/arm/boot/dts/mb86s7x.dtsi
+new file mode 100644
+index 0000000..4731af1
+--- /dev/null
++++ b/arch/arm/boot/dts/mb86s7x.dtsi
+@@ -0,0 +1,142 @@
++/*
++ * Copyright (C) 2013-2015 FUJITSU SEMICONDUCTOR LIMITED
++ * Copyright (C) 2015 Linaro Ltd.
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, version 2 of the License.
++ */
 +
-+struct clk *mb86s7x_clclk_register(struct device *cpu_dev)
-+{
-+	struct clk_init_data init;
-+	struct cl_clk *clc;
++#include "skeleton.dtsi"
 +
-+	clc = kzalloc(sizeof(*clc), GFP_KERNEL);
-+	if (!clc)
-+		return ERR_PTR(-ENOMEM);
++/ {
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <1>;
 +
-+	clc->hw.init = &init;
-+	clc->cluster = topology_physical_package_id(cpu_dev->id);
++	pmua7: pmu_a7 {
++		compatible = "arm,cortex-a7-pmu";
++		interrupts = <0 18 4>,
++			     <0 22 4>;
++	};
 +
-+	init.name = dev_name(cpu_dev);
-+	init.ops = &clk_clc_ops;
-+	init.flags = CLK_IS_ROOT | CLK_GET_RATE_NOCACHE;
-+	init.num_parents = 0;
++	clock: crg11 {
++		compatible = "fujitsu,mb86s70-crg11";
++		#clock-cells = <3>;
++	};
 +
-+	return devm_clk_register(cpu_dev, &clc->hw);
-+}
++	timer0: timer at 31080000 {
++		compatible = "arm,sp804", "arm,primecell";
++		reg = <0 0x31080000 0x1000>;
++		interrupts = <0 324 4>,
++			     <0 325 4>;
++		clocks = <&clock 0 6 8>;
++		clock-names = "apb_pclk";
++	};
 +
-+static int mb86s7x_clclk_of_init(void)
-+{
-+	int cpu, ret = -ENODEV;
-+	struct device_node *np;
-+	struct clk *clk;
++	archtimer: archtimer {
++		compatible = "arm,armv7-timer";
++		clock-frequency = <125000000>;
++		interrupts = <1 13 0xf08>,
++			     <1 14 0xf08>,
++			     <1 11 0xf08>,
++			     <1 10 0xf08>;
++	};
 +
-+	np = of_find_compatible_node(NULL, NULL, "fujitsu,mb86s70-scb-1.0");
-+	if (!np || !of_device_is_available(np))
-+		goto exit;
++	gic: interrupt-controller at 2c001000 {
++		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		interrupt-controller;
++		reg = <0 0x2c001000 0x1000>,
++		      <0 0x2c002000 0x1000>,
++		      <0 0x2c004000 0x2000>,
++		      <0 0x2c006000 0x2000>;
++		interrupts = <1 9 0xf04>;
++	};
 +
-+	for_each_possible_cpu(cpu) {
-+		struct device *cpu_dev = get_cpu_device(cpu);
++	mhu: mailbox at 2b1f0000 {
++		#mbox-cells = <1>;
++		compatible = "arm,mhu", "arm,primecell";
++		reg = <0 0x2b1f0000 0x1000>;
++		interrupts = <0 36 4>, /* LP Non-Sec */
++			     <0 35 4>, /* HP Non-Sec */
++			     <0 37 4>; /* Secure */
++		clocks = <&clock 0 6 8>;
++		clock-names = "apb_pclk";
++	};
 +
-+		if (!cpu_dev) {
-+			pr_err("failed to get cpu%d device\n", cpu);
-+			continue;
-+		}
++	mhu_client: scb at 2e000000 {
++		compatible = "fujitsu,mb86s70-scb-1.0";
++		reg = <0 0x2e000000 0x4000>; /* SHM for IPC */
++		mboxes = <&mhu 1>;
++	};
 +
-+		clk = mb86s7x_clclk_register(cpu_dev);
-+		if (IS_ERR(clk)) {
-+			pr_err("failed to register cpu%d clock\n", cpu);
-+			continue;
-+		}
-+		if (clk_register_clkdev(clk, NULL, dev_name(cpu_dev))) {
-+			pr_err("failed to register cpu%d clock lookup\n", cpu);
-+			continue;
-+		}
-+		pr_debug("registered clk for %s\n", dev_name(cpu_dev));
-+	}
-+	ret = 0;
++	uart0: serial at 31040000 {
++		compatible = "snps,dw-apb-uart";
++		reg = <0 0x31040000 0x100>;
++		interrupts = <0 320 0x4>;
++		clock-frequency = <62500000>;
++		reg-io-width = <4>;
++		reg-shift = <2>;
++		clocks = <&clock 0 2 1>;
++		clock-names = "sclk";
++	};
 +
-+	platform_device_register_simple("arm-bL-cpufreq-dt", -1, NULL, 0);
-+exit:
-+	of_node_put(np);
-+	return ret;
-+}
-+module_init(mb86s7x_clclk_of_init);
++	uart1: serial at 31050000 {
++		compatible = "snps,dw-apb-uart";
++		reg = <0 0x31050000 0x100>;
++		interrupts = <0 321 0x4>;
++		clock-frequency = <62500000>;
++		reg-io-width = <4>;
++		reg-shift = <2>;
++		clocks = <&clock 0 2 1>;
++		clock-names = "sclk";
++	};
++
++	uart2: serial at 31060000 {
++		compatible = "snps,dw-apb-uart";
++		reg = <0 0x31060000 0x100>;
++		interrupts = <0 322 0x4>;
++		clock-frequency = <62500000>;
++		reg-io-width = <4>;
++		reg-shift = <2>;
++		clocks = <&clock 0 2 1>;
++		clock-names = "sclk";
++	};
++
++	gpio0: gpio at 31000000 {
++		compatible = "fujitsu,mb86s70-gpio";
++		reg = <0 0x31000000 0x10000>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		clocks = <&clock 0 2 1>;
++	};
++
++	gpio1: gpio at 31010000 {
++		compatible = "fujitsu,mb86s70-gpio";
++		reg = <0 0x31010000 0x10000>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		clocks = <&clock 0 2 1>;
++	};
++
++	sdhci0: mmc at 300c0000 {
++		status = "disabled";
++		compatible = "fujitsu,mb86s70-sdhci-3.0";
++		reg = <0 0x300c0000 0x1000>;
++		interrupts = <0 164 0x4>,
++			     <0 165 0x4>;
++		clocks = <&clock 0 0xc 0>, <&clock 0 0xb 0>;
++		clock-names = "iface", "core";
++	};
++
++	sdhci1: mmc at 36600000 {
++		status = "disabled";
++		compatible = "fujitsu,mb86s70-sdhci-3.0";
++		reg = <0 0x36600000 0x1000>;
++		interrupts = <0 172 0x4>,
++			     <0 173 0x4>;
++		clocks = <&clock 2 0xc 0>, <&clock 2 0xd 0>;
++		clock-names = "iface", "core";
++	};
++};
 -- 
 1.9.0
