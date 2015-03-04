@@ -1,44 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Mar 2015 23:30:59 +0100
-Subject: [RFC PATCH 00/18] ARM: msm multiplatform support
-In-Reply-To: <20150304221141.GA10550@fifo99.com>
-References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
- <20150304221141.GA10550@fifo99.com>
-Message-ID: <2137185.YgRmu1hF3r@wuerfel>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 04 Mar 2015 23:56:27 +0100
+Subject: [PATCH v9 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <12535711.Yi1RhU69kM@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 March 2015 22:11:41 dwalker at fifo99.com wrote:
-> On Wed, Mar 04, 2015 at 08:32:54PM +0100, Arnd Bergmann wrote:
-> > This is my final piece of the puzzle for ARMv6/v7 multiplatform
-> > support. In combination with the other patches that are now
-> > at git://kernel.org/pub/scm/linux/kernel/git/arnd/playground.git
-> > multiplatform-4.0-rc2 and the at91 and shmobile parts from other
-> > developers, you can now build one kernel that includes all 
-> > ARMv6 and ARMv7 targets we support in Linux.
-> > 
-> > Since mach-msm has seen very few updates over the last years,
-> > it was more work to get to this point than the others, and
-> > some patches are more of a band-aid than a proper solution.
-> > Still, I think that each patch in the series is an improvement
-> > over the status-quo and I really want to see the last one
-> > merged into 4.1 and it depends on all the other ones.
-> > 
-> > Stephen Boyd mentioned on IRC that he has been workin on
-> > a similar series, and I'm more than happy to replace some
-> > of this work with patches that he has done, as long as we
-> > can still have the full multiplatform support for 4.1.
-> > 
-> > Since a lot of the patches are nontrivial and I have not
-> > been able to test any of this, I'm posting it as an RFC,
-> > but I'm also very interested in people testing it.
+On Wednesday, February 25, 2015 04:39:40 PM Hanjun Guo wrote:
+> Changes since v8:
+>   - remove MPIDR packing things by introducing phys_cpuid_t;
 > 
-> Didn't look at it in great detail (I will eventually), but it looks like your just
-> cleaning things up .. Is that accurate ?
+>   - update patch acpi: fix acpi_os_ioremap for arm64 to follow
+>     Rafael's suggestion;
+> 
+>   - Squash patch (disable ACPI if ACPI less than 5.1) to patch
+>     (Get RSDP and ACPI boot-time table);
+> 
+>   - Move sleep_arm.c to arch/arm64/ and rename it as acpi_sleep.c 
+> 
+>   - Rework the uefi generated empty dtb to enable acpi when no dtb
+>     is available, thanks Ard for the updated patch.
+> 
+>   - rework the function of register cpu for kexec case
+> 
+>   - use pr_debug() instead of pr_info() when scanning MADT.
+> 
+>   - rebase on top of 4.0-rc1
+> 
+> Thanks
+> Hanjun
+> 
+> Al Stone (4):
+>   ARM64 / ACPI: Get RSDP and ACPI boot-time tables
+>   ARM64 / ACPI: Introduce early_param "acpi=" to enable/disable ACPI
+>   ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on
+>     ARM64
+>   ARM64 / ACPI: additions of ACPI documentation for arm64
+> 
+> Graeme Gregory (6):
+>   ACPI: add arm64 to the platforms that use ioremap
+>   ACPI / sleep: Introduce arm64 specific acpi_sleep.c
+>   ARM64 / ACPI: If we chose to boot from acpi then disable FDT
+>   ARM64 / ACPI: Get PSCI flags in FADT for PSCI init
+>   ARM64 / ACPI: Enable ARM64 in Kconfig
+>   Documentation: ACPI for ARM64
+> 
+> Hanjun Guo (8):
+>   ACPI / table: Use pr_debug() instead of pr_info() for MADT table
+>     scanning
+>   ACPI / processor: Introduce phys_cpuid_t for CPU hardware ID
+>   ARM64 / ACPI: Introduce PCI stub functions for ACPI
+>   ACPI / table: Print GIC information when MADT is parsed
+>   ARM64 / ACPI: Parse MADT for SMP initialization
+>   ACPI / processor: Make it possible to get CPU hardware ID via GICC
+>   ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and register device's gsi
+>   clocksource / arch_timer: Parse GTDT to initialize arch timer
+> 
+> Mark Salter (2):
+>   ARM64: allow late use of early_ioremap
+>   ACPI: fix acpi_os_ioremap for arm64
+> 
+> Tomasz Nowicki (1):
+>   irqchip: Add GICv2 specific ACPI boot support
 
-Yes: if I did everything right, there should be no functional
-changes. Most of the work was converting compile-time conditionals
-into runtime conditionals, to ensure that things work when we
-enable all options at once.
+I've ACKed or commented the ones relevant for me.  As for the ARM64-specific
+code, I don't think I can give any meaningful input.
 
-	Arnd
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
