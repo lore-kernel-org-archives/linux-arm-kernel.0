@@ -1,43 +1,101 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 04 Mar 2015 22:09:55 +0100
-Subject: [RFC PATCH 00/18] ARM: msm multiplatform support
-In-Reply-To: <3942232.3OrEzc0z0v@wuerfel>
-References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
- <1425501092.2090.21.camel@tiscali.nl> <3942232.3OrEzc0z0v@wuerfel>
-Message-ID: <1425503395.2090.31.camel@tiscali.nl>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed,  4 Mar 2015 13:10:46 -0800
+Subject: [PATCH v4 02/10] x86: standardize mmap_rnd() usage
+In-Reply-To: <1425503454-7531-1-git-send-email-keescook@chromium.org>
+References: <1425503454-7531-1-git-send-email-keescook@chromium.org>
+Message-ID: <1425503454-7531-3-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Added Michal and kbuild.]
+In preparation for splitting out ET_DYN ASLR, this refactors the use of
+mmap_rnd() to be used similarly to arm, and extracts the checking of
+PF_RANDOMIZE.
 
-Arnd Bergmann schreef op wo 04-03-2015 om 21:35 [+0100]:
-> On Wednesday 04 March 2015 21:31:32 Paul Bolle wrote:
-> > Arnd Bergmann schreef op wo 04-03-2015 om 20:32 [+0100]:
-> > >  arch/arm/mach-msm/board-sapphire.c                 |   17 +-
-> > 
-> > Please be aware that board-sapphire.c isn't actually wired into the
-> > build system _at all_. It never has been (see
-> > https://lkml.org/lkml/2014/5/14/634 ). There's another thread were the
-> > submitter of this file basically refuses to remove this file, if memory
-> > serves me right.
-> > 
-> > I try not to use colorful language on the net. Perhaps I wouldn't have
-> > to bother you now if I would have used such language last year.
-> 
-> I noticed this, but since it was not standing in the way of what I tried
-> to do, I did not do anything about it here.
->  
-> > You touch board-sapphire.c in 12/18 and 17/18. That was a waste of your
-> > time, however small. Should I submit a separate patch to remove it or do
-> > you prefer to fold such a patch into this series?
-> 
-> The patch would be appreciated, but I'd keep it separate from this series.
-> I saw a lot of things in need of cleanup in the files I touched here,
-> but refused the temptation, in order to get something done and not
-> start something controversial.
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/x86/mm/mmap.c | 36 ++++++++++++++++++++----------------
+ 1 file changed, 20 insertions(+), 16 deletions(-)
 
-I'll resubmit my trivial patch once this series hits linux-next. Feel
-free to prod me if I forget.
-
-
-Paul Bolle
+diff --git a/arch/x86/mm/mmap.c b/arch/x86/mm/mmap.c
+index df4552bd239e..ebfa52030d5c 100644
+--- a/arch/x86/mm/mmap.c
++++ b/arch/x86/mm/mmap.c
+@@ -67,22 +67,21 @@ static int mmap_is_legacy(void)
+ 
+ static unsigned long mmap_rnd(void)
+ {
+-	unsigned long rnd = 0;
++	unsigned long rnd;
+ 
+ 	/*
+-	*  8 bits of randomness in 32bit mmaps, 20 address space bits
+-	* 28 bits of randomness in 64bit mmaps, 40 address space bits
+-	*/
+-	if (current->flags & PF_RANDOMIZE) {
+-		if (mmap_is_ia32())
+-			rnd = get_random_int() % (1<<8);
+-		else
+-			rnd = get_random_int() % (1<<28);
+-	}
++	 *  8 bits of randomness in 32bit mmaps, 20 address space bits
++	 * 28 bits of randomness in 64bit mmaps, 40 address space bits
++	 */
++	if (mmap_is_ia32())
++		rnd = (unsigned long)get_random_int() % (1<<8);
++	else
++		rnd = (unsigned long)get_random_int() % (1<<28);
++
+ 	return rnd << PAGE_SHIFT;
+ }
+ 
+-static unsigned long mmap_base(void)
++static unsigned long mmap_base(unsigned long rnd)
+ {
+ 	unsigned long gap = rlimit(RLIMIT_STACK);
+ 
+@@ -91,19 +90,19 @@ static unsigned long mmap_base(void)
+ 	else if (gap > MAX_GAP)
+ 		gap = MAX_GAP;
+ 
+-	return PAGE_ALIGN(TASK_SIZE - gap - mmap_rnd());
++	return PAGE_ALIGN(TASK_SIZE - gap - rnd);
+ }
+ 
+ /*
+  * Bottom-up (legacy) layout on X86_32 did not support randomization, X86_64
+  * does, but not when emulating X86_32
+  */
+-static unsigned long mmap_legacy_base(void)
++static unsigned long mmap_legacy_base(unsigned long rnd)
+ {
+ 	if (mmap_is_ia32())
+ 		return TASK_UNMAPPED_BASE;
+ 	else
+-		return TASK_UNMAPPED_BASE + mmap_rnd();
++		return TASK_UNMAPPED_BASE + rnd;
+ }
+ 
+ /*
+@@ -112,13 +111,18 @@ static unsigned long mmap_legacy_base(void)
+  */
+ void arch_pick_mmap_layout(struct mm_struct *mm)
+ {
+-	mm->mmap_legacy_base = mmap_legacy_base();
+-	mm->mmap_base = mmap_base();
++	unsigned long random_factor = 0UL;
++
++	if (current->flags & PF_RANDOMIZE)
++		random_factor = mmap_rnd();
++
++	mm->mmap_legacy_base = mmap_legacy_base(random_factor);
+ 
+ 	if (mmap_is_legacy()) {
+ 		mm->mmap_base = mm->mmap_legacy_base;
+ 		mm->get_unmapped_area = arch_get_unmapped_area;
+ 	} else {
++		mm->mmap_base = mmap_base(random_factor);
+ 		mm->get_unmapped_area = arch_get_unmapped_area_topdown;
+ 	}
+ }
+-- 
+1.9.1
