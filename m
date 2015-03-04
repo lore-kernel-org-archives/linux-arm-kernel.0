@@ -1,36 +1,69 @@
-From: tuomas.tynkkynen@iki.fi (Tuomas Tynkkynen)
-Date: Wed, 04 Mar 2015 09:11:59 +0200
-Subject: [PATCH v8 15/18] cpufreq: Add cpufreq driver for Tegra124
-In-Reply-To: <54F59C16.2010401@kapsi.fi>
-References: <1425213881-5262-1-git-send-email-mikko.perttunen@kapsi.fi>	
- <1425213881-5262-16-git-send-email-mikko.perttunen@kapsi.fi>
- <1425286186.24292.76.camel@x220> <54F59C16.2010401@kapsi.fi>
-Message-ID: <54F6B03F.8080703@iki.fi>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed, 4 Mar 2015 15:22:54 +0800
+Subject: [PATCH v2] mtd: atmel_nand: check NFC busy flag by HSMC_SR instead
+ of NFC cmd regs
+In-Reply-To: <1421922090-8803-1-git-send-email-josh.wu@atmel.com>
+References: <1421922090-8803-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <54F6B2CE.9020604@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2015 01:33 PM, Mikko Perttunen wrote:
-> On 03/02/2015 10:49 AM, Paul Bolle wrote:
->> On Sun, 2015-03-01 at 14:44 +0200, Mikko Perttunen wrote:
->>
->> [...]
->>
->>> +static struct platform_driver tegra124_cpufreq_platdrv = {
->>> +    .driver = {
->>> +        .name    = "cpufreq-tegra124",
->>> +        .owner    = THIS_MODULE,
->>
->> .owner will always be, in short, NULL.
->>
+Hi, Brain
 
-Which reminds me: recently there have been cleanups that remove the 
-.owner field assignments (e.g. 30f51f248c1d "cpufreq: drop owner 
-assignment from platform_drivers"), so it can be removed from here as well.
+Would you have any chance to take this patch as it's been a long time?
 
+Best Regards,
+Josh Wu
 
+On 1/22/2015 6:21 PM, Josh Wu wrote:
+> From: Boris Brezillon <boris.brezillon@free-electrons.com>
 >
-> Well noticed! I changed the config symbol to be tristate.
+> Currently the driver read NFC command registers to get NFC busy flag.
+> Actually this flag also can be get by reading HSMC_SR register.
 >
-> Thanks,
-> Mikko Perttunen
+> Use the read NFC command registers need mapping a huge memory region.
+> To save the mapped memory region, we change to check NFC busy flag by
+> reading HSMC_SR register.
 >
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+>
+> Changes in v2:
+> - Change me to signed-off-by.
+> - modify the error log.
+>
+>   drivers/mtd/nand/atmel_nand.c     | 5 ++---
+>   drivers/mtd/nand/atmel_nand_nfc.h | 1 +
+>   2 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index d93c849..336cc2d 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -1752,11 +1752,10 @@ static int nfc_send_command(struct atmel_nand_host *host,
+>   		cmd, addr, cycle0);
+>   
+>   	timeout = jiffies + msecs_to_jiffies(NFC_TIME_OUT_MS);
+> -	while (nfc_cmd_readl(NFCADDR_CMD_NFCBUSY, host->nfc->base_cmd_regs)
+> -			& NFCADDR_CMD_NFCBUSY) {
+> +	while (nfc_readl(host->nfc->hsmc_regs, SR) & NFC_SR_BUSY) {
+>   		if (time_after(jiffies, timeout)) {
+>   			dev_err(host->dev,
+> -				"Time out to wait CMD_NFCBUSY ready!\n");
+> +				"Time out to wait for NFC ready!\n");
+>   			return -ETIMEDOUT;
+>   		}
+>   	}
+> diff --git a/drivers/mtd/nand/atmel_nand_nfc.h b/drivers/mtd/nand/atmel_nand_nfc.h
+> index 85b8ca6..4d5d262 100644
+> --- a/drivers/mtd/nand/atmel_nand_nfc.h
+> +++ b/drivers/mtd/nand/atmel_nand_nfc.h
+> @@ -35,6 +35,7 @@
+>   #define		NFC_CTRL_DISABLE	(1 << 1)
+>   
+>   #define ATMEL_HSMC_NFC_SR	0x08		/* NFC Status Register */
+> +#define		NFC_SR_BUSY		(1 << 8)
+>   #define		NFC_SR_XFR_DONE		(1 << 16)
+>   #define		NFC_SR_CMD_DONE		(1 << 17)
+>   #define		NFC_SR_DTOE		(1 << 20)
