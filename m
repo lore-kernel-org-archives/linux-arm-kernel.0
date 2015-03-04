@@ -1,301 +1,281 @@
-From: vincent.cw.yang@gmail.com (Vincent Yang)
-Date: Wed,  4 Mar 2015 19:08:36 +0800
-Subject: [PATCH v7 7/7] ARM: MB86S7x: Add configs
-In-Reply-To: <1425466367-30556-1-git-send-email-vincent.yang@socionext.com>
-References: <1425466367-30556-1-git-send-email-vincent.yang@socionext.com>
-Message-ID: <1425467316-30863-1-git-send-email-vincent.yang@socionext.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 4 Mar 2015 16:39:21 +0530
+Subject: [PATCH v2 3/4] cpufreq: mediatek: add Mediatek cpufreq driver
+In-Reply-To: <1425458956-20665-4-git-send-email-pi-cheng.chen@linaro.org>
+References: <1425458956-20665-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1425458956-20665-4-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <CAKohpo=c2t4_2hdPP-vQM7xewK5SXaHBGNA9PhvTwDv3++pSTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jassi Brar <jaswinder.singh@linaro.org>
+Haven't reviewed it completely yet, but this is all I have done.
 
-Fujitsu's ARCH_MB86S7X is multi_v7 compatible, so add options to
-multi_v7_defconfig. Also add a new defconfig for MB86S7X for those
-who want the kernel built specifically for ARCH_MB86S7X.
+On 4 March 2015 at 14:19, pi-cheng.chen <pi-cheng.chen@linaro.org> wrote:
 
-Signed-off-by: Andy Green <andy.green@linaro.org>
-Signed-off-by: Vincent Yang <vincent.yang@socionext.com>
-Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@socionext.com>
----
- arch/arm/configs/fujitsu_defconfig  | 232 ++++++++++++++++++++++++++++++++++++
- arch/arm/configs/multi_v7_defconfig |   5 +
- 2 files changed, 237 insertions(+)
- create mode 100644 arch/arm/configs/fujitsu_defconfig
+> +static int mtk_cpufreq_notify(struct notifier_block *nb,
+> +                             unsigned long action, void *data)
+> +{
+> +       struct cpufreq_freqs *freqs = data;
+> +       struct cpu_opp_table *opp_tbl = dvfs_info->opp_tbl;
 
-diff --git a/arch/arm/configs/fujitsu_defconfig b/arch/arm/configs/fujitsu_defconfig
-new file mode 100644
-index 0000000..2d922e4
---- /dev/null
-+++ b/arch/arm/configs/fujitsu_defconfig
-@@ -0,0 +1,232 @@
-+# CONFIG_LOCALVERSION_AUTO is not set
-+CONFIG_DEFAULT_HOSTNAME="MB86S7x"
-+CONFIG_SYSVIPC=y
-+CONFIG_POSIX_MQUEUE=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_NAMESPACES=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_RD_BZIP2=y
-+CONFIG_RD_LZMA=y
-+CONFIG_RD_XZ=y
-+CONFIG_RD_LZO=y
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_EXPERT=y
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_SLAB=y
-+CONFIG_PROFILING=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_ARCH_MB86S7X=y
-+CONFIG_ARM_LPAE=y
-+CONFIG_ARM_ERRATA_754322=y
-+CONFIG_ARM_ERRATA_754327=y
-+CONFIG_ARM_ERRATA_764369=y
-+CONFIG_ARM_ERRATA_775420=y
-+CONFIG_ARM_ERRATA_798181=y
-+CONFIG_PCI=y
-+CONFIG_SMP=y
-+CONFIG_SCHED_MC=y
-+CONFIG_SCHED_SMT=y
-+CONFIG_VMSPLIT_2G=y
-+CONFIG_PREEMPT=y
-+CONFIG_THUMB2_KERNEL=y
-+CONFIG_HIGHMEM=y
-+CONFIG_CMA=y
-+CONFIG_CMA_AREAS=8
-+# CONFIG_ATAGS is not set
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_CMDLINE="mem=2048M console=ttyS0,115200 root=/dev/mmcblk1p1 rootfstype=ext4 rootwait rw"
-+CONFIG_KEXEC=y
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-+CONFIG_CPUFREQ_DT=m
-+CONFIG_CPU_IDLE=y
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+CONFIG_PM_WAKELOCKS=y
-+CONFIG_PM_RUNTIME=y
-+CONFIG_PM_DEBUG=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_MULTICAST=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_IPV6 is not set
-+# CONFIG_WIRELESS is not set
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_DMA_CMA=y
-+CONFIG_CMA_SIZE_MBYTES=192
-+CONFIG_MTD=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_CFI_ADV_OPTIONS=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_ROM=y
-+CONFIG_MTD_COMPLEX_MAPPINGS=y
-+CONFIG_MTD_PHYSMAP=y
-+CONFIG_MTD_PHYSMAP_OF=y
-+CONFIG_MTD_PLATRAM=y
-+CONFIG_MTD_M25P80=y
-+CONFIG_MTD_SPI_NOR=y
-+CONFIG_BLK_DEV_LOOP=m
-+CONFIG_BLK_DEV_CRYPTOLOOP=m
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=2
-+CONFIG_BLK_DEV_RAM_SIZE=1024
-+CONFIG_BLK_DEV_SD=m
-+CONFIG_ATA=m
-+# CONFIG_ATA_VERBOSE_ERROR is not set
-+# CONFIG_SATA_PMP is not set
-+CONFIG_SATA_AHCI_PLATFORM=m
-+# CONFIG_ATA_SFF is not set
-+CONFIG_NETDEVICES=y
-+CONFIG_TUN=m
-+# CONFIG_NET_CADENCE is not set
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_MICROCHIP is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+# CONFIG_NET_VENDOR_SMSC is not set
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+# CONFIG_NET_VENDOR_WIZNET is not set
-+CONFIG_PHYLIB=y
-+# CONFIG_WLAN is not set
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_INPUT_MOUSEDEV_SCREEN_X=800
-+CONFIG_INPUT_MOUSEDEV_SCREEN_Y=480
-+CONFIG_INPUT_EVDEV=m
-+# CONFIG_KEYBOARD_ATKBD is not set
-+CONFIG_KEYBOARD_GPIO_POLLED=y
-+# CONFIG_MOUSE_PS2 is not set
-+CONFIG_MOUSE_GPIO=m
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_EGALAX=m
-+CONFIG_TOUCHSCREEN_ILI210X=m
-+# CONFIG_SERIO_SERPORT is not set
-+CONFIG_LEGACY_PTY_COUNT=16
-+# CONFIG_DEVKMEM is not set
-+CONFIG_SERIAL_8250=y
-+# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_EXTENDED=y
-+CONFIG_SERIAL_8250_DW=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_I2C_COMPAT is not set
-+CONFIG_I2C_CHARDEV=m
-+# CONFIG_I2C_HELPER_AUTO is not set
-+CONFIG_SPI=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_GPIO_MB86S7X=y
-+CONFIG_GPIO_MCP23S08=m
-+# CONFIG_HWMON is not set
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_GPIO=y
-+# CONFIG_VGA_ARB is not set
-+CONFIG_DRM=y
-+CONFIG_FB=y
-+CONFIG_FIRMWARE_EDID=y
-+CONFIG_FB_MODE_HELPERS=y
-+CONFIG_FB_TILEBLITTING=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
-+CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
-+CONFIG_LOGO=y
-+# CONFIG_LOGO_LINUX_MONO is not set
-+# CONFIG_LOGO_LINUX_VGA16 is not set
-+CONFIG_SOUND=m
-+CONFIG_SND=m
-+CONFIG_SND_DYNAMIC_MINORS=y
-+# CONFIG_SND_SUPPORT_OLD_API is not set
-+# CONFIG_SND_VERBOSE_PROCFS is not set
-+# CONFIG_SND_ARM is not set
-+# CONFIG_SND_SPI is not set
-+CONFIG_SND_SOC=m
-+CONFIG_HID=m
-+CONFIG_HID_PID=y
-+CONFIG_USB_HIDDEV=y
-+CONFIG_USB=m
-+CONFIG_USB_OTG=y
-+CONFIG_USB_XHCI_HCD=m
-+CONFIG_USB_EHCI_HCD=m
-+CONFIG_USB_EHCI_HCD_PLATFORM=m
-+CONFIG_USB_OHCI_HCD=m
-+# CONFIG_USB_OHCI_HCD_PCI is not set
-+CONFIG_USB_OHCI_HCD_PLATFORM=m
-+CONFIG_USB_ACM=m
-+CONFIG_USB_STORAGE=m
-+CONFIG_USB_DWC3=m
-+CONFIG_USB_DWC3_HOST=y
-+CONFIG_USB_DWC3_DEBUG=y
-+CONFIG_USB_GADGET=m
-+CONFIG_USB_MASS_STORAGE=m
-+CONFIG_USB_G_MULTI=m
-+CONFIG_MMC=y
-+CONFIG_MMC_CLKGATE=y
-+CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_PLTFM=y
-+CONFIG_MMC_SDHCI_F_SDH30=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_TIMER=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_BACKLIGHT=m
-+CONFIG_LEDS_TRIGGER_CPU=y
-+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
-+CONFIG_LEDS_TRIGGER_TRANSIENT=m
-+CONFIG_DMADEVICES=y
-+CONFIG_STAGING=y
-+CONFIG_ANDROID=y
-+CONFIG_ANDROID_BINDER_IPC=y
-+CONFIG_ASHMEM=y
-+CONFIG_ANDROID_LOGGER=m
-+CONFIG_ANDROID_LOW_MEMORY_KILLER=y
-+CONFIG_ION=y
-+CONFIG_ARM_MHU=y
-+CONFIG_ARM_SMMU=y
-+CONFIG_EXT4_FS=y
-+CONFIG_EXT4_FS_POSIX_ACL=y
-+CONFIG_EXT4_FS_SECURITY=y
-+CONFIG_VFAT_FS=m
-+CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=m
-+CONFIG_CRAMFS=y
-+CONFIG_ROMFS_FS=y
-+CONFIG_ROMFS_BACKED_BY_BOTH=y
-+# CONFIG_NETWORK_FILESYSTEMS is not set
-+CONFIG_NLS_CODEPAGE_437=m
-+CONFIG_NLS_ISO8859_1=m
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_INFO=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_MEMORY_INIT=y
-+# CONFIG_DEBUG_PREEMPT is not set
-+# CONFIG_RCU_CPU_STALL_VERBOSE is not set
-+# CONFIG_FTRACE is not set
-+CONFIG_DEBUG_USER=y
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-+# CONFIG_CRYPTO_HW is not set
-+CONFIG_FONTS=y
-+CONFIG_FONT_SUN8x16=y
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index b7e6b6fb..78e9149 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -50,6 +50,7 @@ CONFIG_SOC_AM43XX=y
- CONFIG_SOC_DRA7XX=y
- CONFIG_ARCH_QCOM=y
- CONFIG_ARCH_MEDIATEK=y
-+CONFIG_ARCH_MB86S7X=y
- CONFIG_ARCH_MSM8X60=y
- CONFIG_ARCH_MSM8960=y
- CONFIG_ARCH_MSM8974=y
-@@ -304,6 +305,7 @@ CONFIG_GPIO_PALMAS=y
- CONFIG_GPIO_SYSCON=y
- CONFIG_GPIO_TPS6586X=y
- CONFIG_GPIO_TPS65910=y
-+CONFIG_GPIO_MB86S7X=y
- CONFIG_BATTERY_SBS=y
- CONFIG_CHARGER_TPS65090=y
- CONFIG_POWER_RESET_AS3722=y
-@@ -452,6 +454,7 @@ CONFIG_MMC_SDHCI_SPEAR=y
- CONFIG_MMC_SDHCI_S3C=y
- CONFIG_MMC_SDHCI_S3C_DMA=y
- CONFIG_MMC_SDHCI_BCM_KONA=y
-+CONFIG_MMC_SDHCI_F_SDH30=y
- CONFIG_MMC_SDHCI_ST=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
-@@ -550,6 +553,8 @@ CONFIG_PHY_MIPHY365X=y
- CONFIG_PHY_STIH41X_USB=y
- CONFIG_PHY_STIH407_USB=y
- CONFIG_PHY_SUN4I_USB=y
-+CONFIG_MAILBOX=y
-+CONFIG_ARM_MHU=y
- CONFIG_EXT4_FS=y
- CONFIG_AUTOFS4_FS=y
- CONFIG_MSDOS_FS=y
--- 
-1.9.0
+There is only one dvfs info ? but there are two clusters, sorry got confused
+a bit..
+
+> +       int old_vproc, new_vproc, old_index, new_index;
+> +
+> +       if (!cpumask_test_cpu(freqs->cpu, &dvfs_info->cpus))
+> +               return NOTIFY_DONE;
+> +
+> +       old_vproc = regulator_get_voltage(dvfs_info->proc_reg);
+> +       old_index = cpu_opp_table_get_volt_index(old_vproc);
+> +       new_index = cpu_opp_table_get_freq_index(freqs->new * 1000);
+> +       new_vproc = opp_tbl[new_index].vproc;
+> +
+> +       if (old_vproc == new_vproc)
+> +               return 0;
+> +
+> +       if ((action == CPUFREQ_PRECHANGE && old_vproc < new_vproc) ||
+> +           (action == CPUFREQ_POSTCHANGE && old_vproc > new_vproc))
+> +               mtk_cpufreq_voltage_trace(old_index, new_index);
+> +
+> +       return NOTIFY_OK;
+> +}
+> +
+> +static struct notifier_block mtk_cpufreq_nb = {
+> +       .notifier_call = mtk_cpufreq_notify,
+> +};
+> +
+> +static int cpu_opp_table_init(struct device *dev)
+> +{
+> +       struct device *cpu_dev = dvfs_info->cpu_dev;
+> +       struct cpu_opp_table *opp_tbl;
+> +       struct dev_pm_opp *opp;
+> +       int ret, cnt, i;
+> +       unsigned long rate, vproc, vsram;
+> +
+> +       ret = of_init_opp_table(cpu_dev);
+> +       if (ret) {
+> +               dev_err(dev, "Failed to init mtk_opp_table: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       rcu_read_lock();
+> +
+> +       cnt = dev_pm_opp_get_opp_count(cpu_dev);
+> +       if (cnt < 0) {
+> +               dev_err(cpu_dev, "No OPP table is found: %d", cnt);
+> +               ret = cnt;
+> +               goto out_free_opp_tbl;
+> +       }
+> +
+> +       opp_tbl = devm_kcalloc(dev, (cnt + 1), sizeof(struct cpu_opp_table),
+> +                              GFP_ATOMIC);
+> +       if (!opp_tbl) {
+> +               ret = -ENOMEM;
+> +               goto out_free_opp_tbl;
+> +       }
+> +
+> +       for (i = 0, rate = 0; i < cnt; i++, rate++) {
+> +               opp = dev_pm_opp_find_freq_ceil(cpu_dev, &rate);
+> +               if (IS_ERR(opp)) {
+> +                       ret = PTR_ERR(opp);
+> +                       goto out_free_opp_tbl;
+> +               }
+> +
+> +               vproc = dev_pm_opp_get_voltage(opp);
+> +               vproc = get_regulator_voltage_ceil(dvfs_info->proc_reg, vproc);
+> +               vsram = vproc + VOLT_SHIFT_LOWER_LIMIT;
+> +               vsram = get_regulator_voltage_ceil(dvfs_info->sram_reg, vsram);
+> +
+> +               if (vproc < 0 || vsram < 0) {
+> +                       ret = -EINVAL;
+> +                       goto out_free_opp_tbl;
+> +               }
+> +
+> +               opp_tbl[i].freq = rate;
+> +               opp_tbl[i].vproc = vproc;
+> +               opp_tbl[i].vsram = vsram;
+> +       }
+> +
+> +       opp_tbl[i].freq = 0;
+> +       opp_tbl[i].vproc = -1;
+> +       opp_tbl[i].vsram = -1;
+> +       dvfs_info->opp_tbl = opp_tbl;
+> +
+> +out_free_opp_tbl:
+> +       rcu_read_unlock();
+> +       of_free_opp_table(cpu_dev);
+> +
+> +       return ret;
+> +}
+> +
+> +static struct cpufreq_cpu_domain *get_cpu_domain(struct list_head *domain_list,
+> +                                                int cpu)
+> +{
+> +       struct list_head *node;
+> +
+> +       list_for_each(node, domain_list) {
+> +               struct cpufreq_cpu_domain *domain;
+> +
+> +               domain = container_of(node, struct cpufreq_cpu_domain, node);
+> +               if (cpumask_test_cpu(cpu, &domain->cpus))
+> +                       return domain;
+> +       }
+> +
+> +       return NULL;
+> +}
+> +
+> +static int mtk_cpufreq_probe(struct platform_device *pdev)
+
+On a dual cluster big LITTLE (your system), how many times is probe
+getting called ? Once or twice, i.e. for each cluster ??
+
+> +{
+> +       struct clk *inter_clk;
+> +       struct cpufreq_dt_platform_data *pd;
+> +       struct platform_device *dev;
+> +       unsigned long inter_freq;
+> +       int cpu, ret;
+> +
+> +       inter_clk = clk_get(&pdev->dev, NULL);
+
+How is this supposed to work ? How will pdev->dev give intermediate
+clock ?
+
+> +       if (IS_ERR(inter_clk)) {
+> +               if (PTR_ERR(inter_clk) == -EPROBE_DEFER) {
+> +                       dev_warn(&pdev->dev, "clock not ready. defer probeing.\n");
+> +                       return -EPROBE_DEFER;
+> +               }
+> +
+> +               dev_err(&pdev->dev, "Failed to get intermediate clock\n");
+> +               return -ENODEV;
+> +       }
+> +       inter_freq = clk_get_rate(inter_clk);
+> +
+> +       pd = devm_kzalloc(&pdev->dev, sizeof(*pd), GFP_KERNEL);
+> +       if (!pd)
+> +               return -ENOMEM;
+> +
+> +       dvfs_info = devm_kzalloc(&pdev->dev, sizeof(*dvfs_info), GFP_KERNEL);
+> +       if (!dvfs_info)
+> +               return -ENOMEM;
+
+Instead of two allocations, you could have made pd part of dvfs_info
+and allocated only
+once.
+
+> +
+> +       pd->independent_clocks = 1,
+
+s/,/; ??
+
+> +       INIT_LIST_HEAD(&pd->domain_list);
+> +
+> +       for_each_possible_cpu(cpu) {
+> +               struct device *cpu_dev;
+> +               struct cpufreq_cpu_domain *new_domain;
+> +               struct regulator *proc_reg, *sram_reg;
+> +
+> +               cpu_dev = get_cpu_device(cpu);
+
+This should be done in the below if block only.
+
+> +               if (!dvfs_info->cpu_dev) {
+> +                       proc_reg = regulator_get_exclusive(cpu_dev, "proc");
+> +                       sram_reg = regulator_get_exclusive(cpu_dev, "sram");
+> +
+> +                       if (PTR_ERR(proc_reg) == -EPROBE_DEFER ||
+> +                           PTR_ERR(sram_reg) == -EPROBE_DEFER)
+> +                               return -EPROBE_DEFER;
+> +
+> +                       if (!IS_ERR_OR_NULL(proc_reg) &&
+> +                           !IS_ERR_OR_NULL(sram_reg)) {
+> +                               dvfs_info->cpu_dev = cpu_dev;
+> +                               dvfs_info->proc_reg = proc_reg;
+> +                               dvfs_info->sram_reg = sram_reg;
+> +                               cpumask_copy(&dvfs_info->cpus,
+> +                                            &cpu_topology[cpu].core_sibling);
+> +                       }
+> +               }
+> +
+> +               if (get_cpu_domain(&pd->domain_list, cpu))
+> +                       continue;
+
+This isn't required if you do below..
+
+> +
+> +               new_domain = devm_kzalloc(&pdev->dev, sizeof(*new_domain),
+> +                                         GFP_KERNEL);
+> +               if (!new_domain)
+> +                       return -ENOMEM;
+> +
+> +               cpumask_copy(&new_domain->cpus,
+> +                            &cpu_topology[cpu].core_sibling);
+> +               new_domain->intermediate_freq = inter_freq;
+> +               list_add(&new_domain->node, &pd->domain_list);
+
+Just issue a 'break' from here as you don't want to let this loop run again.
+
+> +       }
+> +
+> +       if (IS_ERR_OR_NULL(dvfs_info->proc_reg) ||
+> +           IS_ERR_OR_NULL(dvfs_info->sram_reg)) {
+> +               dev_err(&pdev->dev, "Failed to get regulators\n");
+> +               return -ENODEV;
+> +       }
+
+If you really need these, then don't allocate new_domain unless you find a CPU
+with these regulators..
+
+> +       ret = cpu_opp_table_init(&pdev->dev);
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "Failed to setup cpu_opp_table: %d\n",
+> +                       ret);
+> +               return ret;
+> +       }
+> +
+> +       ret = cpufreq_register_notifier(&mtk_cpufreq_nb,
+> +                                       CPUFREQ_TRANSITION_NOTIFIER);
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "Failed to register cpufreq notifier\n");
+> +               return ret;
+> +       }
+
+Don't want to free OPP table here on error ?
+
+> +       dev = platform_device_register_data(NULL, "cpufreq-dt", -1, pd,
+> +                                           sizeof(*pd));
+
+So this routine is going to be called only once. Then how are you
+initializing stuff
+for both the clusters in the upper for loop ? It looked very very confusing.
+
+> +       if (IS_ERR(dev)) {
+> +               dev_err(&pdev->dev,
+> +                       "Failed to register cpufreq-dt platform device\n");
+> +               return PTR_ERR(dev);
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct of_device_id mtk_cpufreq_match[] = {
+> +       {
+> +               .compatible = "mediatek,mtk-cpufreq",
+
+Can't you use "mediatek,mt8173" here ?
+
+> +       },
+> +       {}
+> +};
+> +MODULE_DEVICE_TABLE(of, mtk_cpufreq_match);
+> +
+> +static struct platform_driver mtk_cpufreq_platdrv = {
+> +       .driver = {
+> +               .name   = "mtk-cpufreq",
+> +               .of_match_table = mtk_cpufreq_match,
+> +       },
+> +       .probe  = mtk_cpufreq_probe,
+> +};
+> +module_platform_driver(mtk_cpufreq_platdrv);
