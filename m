@@ -1,23 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Mar 2015 22:54:09 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Cleanup for v4.1
-In-Reply-To: <cover.1424931049.git.horms+renesas@verge.net.au>
-References: <cover.1424931049.git.horms+renesas@verge.net.au>
-Message-ID: <9266543.XzoOMM56Nv@wuerfel>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 4 Mar 2015 22:54:37 +0100
+Subject: [PATCH v4 0/10] split ET_DYN ASLR from mmap ASLR
+In-Reply-To: <1425503454-7531-1-git-send-email-keescook@chromium.org>
+References: <1425503454-7531-1-git-send-email-keescook@chromium.org>
+Message-ID: <20150304215437.GA22254@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 26 February 2015 15:22:32 Simon Horman wrote:
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC Cleanup for v4.1
-> 
-> * Remove redundant cpu_disable implementation from r8a7779 SoC
-> * Remove mach/{uncompress,clkdev,system}.h
-> 
 
-We have a lot of work for multiplatform this time, with your changes,
-at91 and the patches I send over the last week. I've decided to
-create a next/multiplatform branch for this, and merge your patches
-into that one.
+* Kees Cook <keescook@chromium.org> wrote:
 
-	Arnd
+> To address the "offset2lib" ASLR weakness[1], this separates ET_DYN
+> ASLR from mmap ASLR, as already done on s390. The architectures
+> that are already randomizing mmap (arm, arm64, mips, powerpc, s390,
+> and x86), have their various forms of arch_mmap_rnd() made available
+> via the new CONFIG_ARCH_HAS_ELF_RANDOMIZE. For these architectures,
+> arch_randomize_brk() is collapsed as well.
+> 
+> This is an alternative to the solutions in:
+> https://lkml.org/lkml/2015/2/23/442
+> 
+> I've been able to test x86 and arm, and the buildbot (so far) seems
+> happy with building the rest.
+
+Ok, this looks really good - for all patches:
+
+   Reviewed-by: Ingo Molnar <mingo@kernel.org>
+
+Thanks,
+
+	Ingo
