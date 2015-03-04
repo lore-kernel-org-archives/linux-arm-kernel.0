@@ -1,337 +1,241 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed,  4 Mar 2015 10:12:51 +0000
-Subject: [PATCH 4.0-rc1 v17 3/6] irqchip: gic: Introduce plumbing for IPI FIQ
+Date: Wed,  4 Mar 2015 10:12:52 +0000
+Subject: [PATCH 4.0-rc1 v17 4/6] printk: Simple implementation for NMI
+ backtracing
 In-Reply-To: <1425463974-23568-1-git-send-email-daniel.thompson@linaro.org>
 References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
  <1425463974-23568-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1425463974-23568-4-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1425463974-23568-5-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently it is not possible to exploit FIQ for systems with a GIC, even if
-the systems are otherwise capable of it. This patch makes it possible
-for IPIs to be delivered using FIQ.
+Currently there is a quite a pile of code sitting in
+arch/x86/kernel/apic/hw_nmi.c to support safe all-cpu backtracing from NMI.
+The code is inaccessible to backtrace implementations for other
+architectures, which is a shame because they would probably like to be
+safe too.
 
-To do so it modifies the register state so that normal interrupts are
-placed in group 1 and specific IPIs are placed into group 0. It also
-configures the controller to raise group 0 interrupts using the FIQ
-signal. It provides a means for architecture code to define which IPIs
-shall use FIQ and to acknowledge any IPIs that are raised.
+Copy this code into printk. We'll port the x86 NMI backtrace to it in a
+later patch.
 
-All GIC hardware except GICv1-without-TrustZone support provides a means
-to group exceptions into group 0 and group 1 but the hardware
-functionality is unavailable to the kernel when a secure monitor is
-present because access to the grouping registers are prohibited outside
-"secure world". However when grouping is not available (or in the case
-of early GICv1 implementations is very hard to configure) the code to
-change groups does not deploy and all IPIs will be raised via IRQ.
-
-It has been tested and shown working on two systems capable of
-supporting grouping (Freescale i.MX6 and STiH416). It has also been
-tested for boot regressions on two systems that do not support grouping
-(vexpress-a9 and Qualcomm Snapdragon 600).
+Incidentally, technically I think it might be safe to call
+printk_nmi_prepare() from NMI, providing care were taken to honour the
+return code. printk_nmi_complete() cannot be called from NMI but could
+be scheduled using irq_work_queue(). However honouring the return code
+means sometimes it is impossible to get the message out so in most cases
+I'd say using this code in such a way should probably attract sympathy
+and/or derision rather than admiration.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Tested-by: Jon Medhurst <tixy@linaro.org>
+Cc: Steven Rostedt <rostedt@goodmis.org>
 ---
- arch/arm/kernel/traps.c         |   5 +-
- drivers/irqchip/irq-gic.c       | 151 +++++++++++++++++++++++++++++++++++++---
- include/linux/irqchip/arm-gic.h |   8 +++
- 3 files changed, 153 insertions(+), 11 deletions(-)
+ include/linux/printk.h |  18 ++++++
+ init/Kconfig           |   3 +
+ kernel/printk/printk.c | 149 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 170 insertions(+)
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 788e23fe64d8..b35e220ae1b1 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -26,6 +26,7 @@
- #include <linux/init.h>
- #include <linux/sched.h>
- #include <linux/irq.h>
-+#include <linux/irqchip/arm-gic.h>
- 
- #include <linux/atomic.h>
- #include <asm/cacheflush.h>
-@@ -479,7 +480,9 @@ asmlinkage void __exception_irq_entry handle_fiq_as_nmi(struct pt_regs *regs)
- 
- 	nmi_enter();
- 
--	/* nop. FIQ handlers for special arch/arm features can be added here. */
-+#ifdef CONFIG_ARM_GIC
-+	gic_handle_fiq_ipi();
-+#endif
- 
- 	nmi_exit();
- 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 48d6296a365a..cd2e4f93675b 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -39,6 +39,7 @@
- #include <linux/slab.h>
- #include <linux/irqchip/chained_irq.h>
- #include <linux/irqchip/arm-gic.h>
-+#include <linux/ratelimit.h>
- 
- #include <asm/cputype.h>
- #include <asm/irq.h>
-@@ -48,6 +49,10 @@
- #include "irq-gic-common.h"
- #include "irqchip.h"
- 
-+#ifndef SMP_IPI_FIQ_MASK
-+#define SMP_IPI_FIQ_MASK 0
-+#endif
-+
- union gic_base {
- 	void __iomem *common_base;
- 	void __percpu * __iomem *percpu_base;
-@@ -65,6 +70,7 @@ struct gic_chip_data {
+diff --git a/include/linux/printk.h b/include/linux/printk.h
+index baa3f97d8ce8..7fd94e644976 100644
+--- a/include/linux/printk.h
++++ b/include/linux/printk.h
+@@ -228,6 +228,24 @@ static inline void show_regs_print_info(const char *log_lvl)
+ }
  #endif
- 	struct irq_domain *domain;
- 	unsigned int gic_irqs;
-+	u32 igroup0_shadow;
- #ifdef CONFIG_GIC_NON_BANKED
- 	void __iomem *(*get_base)(union gic_base *);
- #endif
-@@ -351,6 +357,83 @@ static struct irq_chip gic_chip = {
- 	.irq_set_wake		= gic_set_wake,
- };
  
++#ifdef CONFIG_PRINTK_NMI
 +/*
-+ * Shift an interrupt between Group 0 and Group 1.
-+ *
-+ * In addition to changing the group we also modify the priority to
-+ * match what "ARM strongly recommends" for a system where no Group 1
-+ * interrupt must ever preempt a Group 0 interrupt.
-+ *
-+ * If is safe to call this function on systems which do not support
-+ * grouping (it will have no effect).
++ * printk_nmi_prepare/complete are called to prepare the system for
++ * some or all cores to issue trace from NMI. printk_nmi_complete will
++ * print buffered output and cannot (safely) be called from NMI.
 + */
-+static void gic_set_group_irq(struct gic_chip_data *gic, unsigned int hwirq,
-+			      int group)
-+{
-+	void __iomem *base = gic_data_dist_base(gic);
-+	unsigned int grp_reg = hwirq / 32 * 4;
-+	u32 grp_mask = BIT(hwirq % 32);
-+	u32 grp_val;
-+
-+	unsigned int pri_reg = (hwirq / 4) * 4;
-+	u32 pri_mask = BIT(7 + ((hwirq % 4) * 8));
-+	u32 pri_val;
-+
-+	/*
-+	 * Systems which do not support grouping will have not have
-+	 * the EnableGrp1 bit set.
-+	 */
-+	if (!(GICD_ENABLE_GRP1 & readl_relaxed(base + GIC_DIST_CTRL)))
-+		return;
-+
-+	raw_spin_lock(&irq_controller_lock);
-+
-+	grp_val = readl_relaxed(base + GIC_DIST_IGROUP + grp_reg);
-+	pri_val = readl_relaxed(base + GIC_DIST_PRI + pri_reg);
-+
-+	if (group) {
-+		grp_val |= grp_mask;
-+		pri_val |= pri_mask;
-+	} else {
-+		grp_val &= ~grp_mask;
-+		pri_val &= ~pri_mask;
-+	}
-+
-+	writel_relaxed(grp_val, base + GIC_DIST_IGROUP + grp_reg);
-+	if (grp_reg == 0)
-+		gic->igroup0_shadow = grp_val;
-+
-+	writel_relaxed(pri_val, base + GIC_DIST_PRI + pri_reg);
-+
-+	raw_spin_unlock(&irq_controller_lock);
-+}
-+
++extern int printk_nmi_prepare(void);
++extern void printk_nmi_complete(void);
 +
 +/*
-+ * Fully acknowledge (both ack and eoi) any outstanding FIQ-based IPI,
-+ * otherwise do nothing.
++ * printk_nmi_this_cpu_begin/end are used divert/restore printk on this
++ * cpu. The result is the output of printk() (by this CPU) will be
++ * stored in temporary buffers for later printing by printk_nmi_complete.
 + */
-+void gic_handle_fiq_ipi(void)
++extern void printk_nmi_this_cpu_begin(void);
++extern void printk_nmi_this_cpu_end(void);
++#endif
++
+ extern asmlinkage void dump_stack(void) __cold;
+ 
+ #ifndef pr_fmt
+diff --git a/init/Kconfig b/init/Kconfig
+index f5dbc6d4261b..4f00d11ef0a4 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -1421,6 +1421,9 @@ config PRINTK
+ 	  very difficult to diagnose system problems, saying N here is
+ 	  strongly discouraged.
+ 
++config PRINTK_NMI
++	bool
++
+ config BUG
+ 	bool "BUG() support" if EXPERT
+ 	default y
+diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
+index 01cfd69c54c6..291271300cd5 100644
+--- a/kernel/printk/printk.c
++++ b/kernel/printk/printk.c
+@@ -1829,6 +1829,155 @@ EXPORT_SYMBOL_GPL(vprintk_default);
+  */
+ DEFINE_PER_CPU(printk_func_t, printk_func) = vprintk_default;
+ 
++#ifdef CONFIG_PRINTK_NMI
++
++#define NMI_BUF_SIZE		4096
++
++struct nmi_seq_buf {
++	unsigned char		buffer[NMI_BUF_SIZE];
++	struct seq_buf		seq;
++};
++
++/* Safe printing in NMI context */
++static DEFINE_PER_CPU(struct nmi_seq_buf, nmi_print_seq);
++
++static DEFINE_PER_CPU(printk_func_t, nmi_print_saved_print_func);
++
++/* "in progress" flag of NMI printing */
++static unsigned long nmi_print_flag;
++
++static int __init printk_nmi_init(void)
 +{
-+	struct gic_chip_data *gic = &gic_data[0];
-+	void __iomem *cpu_base = gic_data_cpu_base(gic);
-+	unsigned long irqstat, irqnr;
++	struct nmi_seq_buf *s;
++	int cpu;
 +
-+	if (WARN_ON(!in_nmi()))
-+		return;
-+
-+	while ((1u << readl_relaxed(cpu_base + GIC_CPU_HIGHPRI)) &
-+	       SMP_IPI_FIQ_MASK) {
-+		irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
-+		writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
-+
-+		irqnr = irqstat & GICC_IAR_INT_ID_MASK;
-+		WARN_RATELIMIT(irqnr > 16,
-+			       "Unexpected irqnr %lu (bad prioritization?)\n",
-+			       irqnr);
++	for_each_possible_cpu(cpu) {
++		s = &per_cpu(nmi_print_seq, cpu);
++		seq_buf_init(&s->seq, s->buffer, NMI_BUF_SIZE);
 +	}
++
++	return 0;
++}
++pure_initcall(printk_nmi_init);
++
++/*
++ * It is not safe to call printk() directly from NMI handlers.
++ * It may be fine if the NMI detected a lock up and we have no choice
++ * but to do so, but doing a NMI on all other CPUs to get a back trace
++ * can be done with a sysrq-l. We don't want that to lock up, which
++ * can happen if the NMI interrupts a printk in progress.
++ *
++ * Instead, we redirect the vprintk() to this nmi_vprintk() that writes
++ * the content into a per cpu seq_buf buffer. Then when the NMIs are
++ * all done, we can safely dump the contents of the seq_buf to a printk()
++ * from a non NMI context.
++ *
++ * This is not a generic printk() implementation and must be used with
++ * great care. In particular there is a static limit on the quantity of
++ * data that may be emitted during NMI, only one client can be active at
++ * one time (arbitrated by the return value of printk_nmi_begin() and
++ * it is required that something at task or interrupt context be scheduled
++ * to issue the output.
++ */
++static int nmi_vprintk(const char *fmt, va_list args)
++{
++	struct nmi_seq_buf *s = this_cpu_ptr(&nmi_print_seq);
++	unsigned int len = seq_buf_used(&s->seq);
++
++	seq_buf_vprintf(&s->seq, fmt, args);
++	return seq_buf_used(&s->seq) - len;
 +}
 +
- void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
- {
- 	if (gic_nr >= MAX_GIC_NR)
-@@ -382,15 +465,24 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
- static void gic_cpu_if_up(void)
- {
- 	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
--	u32 bypass = 0;
-+	void __iomem *dist_base = gic_data_dist_base(&gic_data[0]);
-+	u32 ctrl = 0;
- 
- 	/*
--	* Preserve bypass disable bits to be written back later
--	*/
--	bypass = readl(cpu_base + GIC_CPU_CTRL);
--	bypass &= GICC_DIS_BYPASS_MASK;
-+	 * Preserve bypass disable bits to be written back later
-+	 */
-+	ctrl = readl(cpu_base + GIC_CPU_CTRL);
-+	ctrl &= GICC_DIS_BYPASS_MASK;
- 
--	writel_relaxed(bypass | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
-+	/*
-+	 * If EnableGrp1 is set in the distributor then enable group 1
-+	 * support for this CPU (and route group 0 interrupts to FIQ).
-+	 */
-+	if (GICD_ENABLE_GRP1 & readl_relaxed(dist_base + GIC_DIST_CTRL))
-+		ctrl |= GICC_COMMON_BPR | GICC_FIQ_EN | GICC_ACK_CTL |
-+			GICC_ENABLE_GRP1;
-+
-+	writel_relaxed(ctrl | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
- }
- 
- 
-@@ -414,7 +506,23 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
- 
- 	gic_dist_config(base, gic_irqs, NULL);
- 
--	writel_relaxed(GICD_ENABLE, base + GIC_DIST_CTRL);
-+	/*
-+	 * Set EnableGrp1/EnableGrp0 (bit 1 and 0) or EnableGrp (bit 0 only,
-+	 * bit 1 ignored) depending on current mode.
-+	 */
-+	writel_relaxed(GICD_ENABLE_GRP1 | GICD_ENABLE, base + GIC_DIST_CTRL);
-+
-+	/*
-+	 * Set all global interrupts to be group 1 if (and only if) it
-+	 * is possible to enable group 1 interrupts. This register is RAZ/WI
-+	 * if not accessible or not implemented, however some GICv1 devices
-+	 * do not implement the EnableGrp1 bit making it unsafe to set
-+	 * this register unconditionally.
-+	 */
-+	if (GICD_ENABLE_GRP1 & readl_relaxed(base + GIC_DIST_CTRL))
-+		for (i = 32; i < gic_irqs; i += 32)
-+			writel_relaxed(0xffffffff,
-+				       base + GIC_DIST_IGROUP + i * 4 / 32);
- }
- 
- static void gic_cpu_init(struct gic_chip_data *gic)
-@@ -423,6 +531,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
- 	void __iomem *base = gic_data_cpu_base(gic);
- 	unsigned int cpu_mask, cpu = smp_processor_id();
- 	int i;
-+	unsigned long secure_irqs, secure_irq;
- 
- 	/*
- 	 * Get what the GIC says our CPU mask is.
-@@ -441,6 +550,20 @@ static void gic_cpu_init(struct gic_chip_data *gic)
- 
- 	gic_cpu_config(dist_base, NULL);
- 
-+	/*
-+	 * If the distributor is configured to support interrupt grouping
-+	 * then set any PPI and SGI interrupts not set in SMP_IPI_FIQ_MASK
-+	 * to be group1 and ensure any remaining group 0 interrupts have
-+	 * the right priority.
-+	 */
-+	if (GICD_ENABLE_GRP1 & readl_relaxed(dist_base + GIC_DIST_CTRL)) {
-+		secure_irqs = SMP_IPI_FIQ_MASK;
-+		writel_relaxed(~secure_irqs, dist_base + GIC_DIST_IGROUP + 0);
-+		gic->igroup0_shadow = ~secure_irqs;
-+		for_each_set_bit(secure_irq, &secure_irqs, 16)
-+			gic_set_group_irq(gic, secure_irq, 0);
++/*
++ * Reserve the NMI printk mechanism. Return an error if some other component
++ * is already using it.
++ */
++int printk_nmi_prepare(void)
++{
++	if (test_and_set_bit(0, &nmi_print_flag)) {
++		/*
++		 * If something is already using the NMI print facility we
++		 * can't allow a second one...
++		 */
++		return -EBUSY;
 +	}
 +
- 	writel_relaxed(GICC_INT_PRI_THRESHOLD, base + GIC_CPU_PRIMASK);
- 	gic_cpu_if_up();
- }
-@@ -530,7 +653,8 @@ static void gic_dist_restore(unsigned int gic_nr)
- 		writel_relaxed(gic_data[gic_nr].saved_spi_enable[i],
- 			dist_base + GIC_DIST_ENABLE_SET + i * 4);
- 
--	writel_relaxed(GICD_ENABLE, dist_base + GIC_DIST_CTRL);
-+	writel_relaxed(GICD_ENABLE_GRP1 | GICD_ENABLE,
-+		       dist_base + GIC_DIST_CTRL);
- }
- 
- static void gic_cpu_save(unsigned int gic_nr)
-@@ -658,6 +782,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- {
- 	int cpu;
- 	unsigned long map = 0;
-+	unsigned long softint;
- 
- 	gic_migration_lock();
- 
-@@ -671,8 +796,14 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 	 */
- 	dmb(ishst);
- 
--	/* this always happens on GIC0 */
--	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
-+	/* We avoid a readl here by using the shadow copy of IGROUP[0] */
-+	softint = map << 16 | irq;
-+	if (gic_data[0].igroup0_shadow & BIT(irq))
-+		softint |= 0x8000;
++	return 0;
++}
 +
-+	/* This always happens on GIC0 */
-+	writel_relaxed(softint,
-+		       gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
- 
- 	gic_migration_unlock();
- }
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 71d706d5f169..7690f70049a3 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -22,6 +22,10 @@
- #define GIC_CPU_IDENT			0xfc
- 
- #define GICC_ENABLE			0x1
-+#define GICC_ENABLE_GRP1		0x2
-+#define GICC_ACK_CTL			0x4
-+#define GICC_FIQ_EN			0x8
-+#define GICC_COMMON_BPR			0x10
- #define GICC_INT_PRI_THRESHOLD		0xf0
- #define GICC_IAR_INT_ID_MASK		0x3ff
- #define GICC_INT_SPURIOUS		1023
-@@ -44,6 +48,7 @@
- #define GIC_DIST_SGI_PENDING_SET	0xf20
- 
- #define GICD_ENABLE			0x1
-+#define GICD_ENABLE_GRP1		0x2
- #define GICD_DISABLE			0x0
- #define GICD_INT_ACTLOW_LVLTRIG		0x0
- #define GICD_INT_EN_CLR_X32		0xffffffff
-@@ -121,5 +126,8 @@ static inline void __init register_routable_domain_ops
- {
- 	gic_routable_irq_domain_ops = ops;
- }
++static void print_seq_line(struct nmi_seq_buf *s, int start, int end)
++{
++	const char *buf = s->buffer + start;
 +
-+void gic_handle_fiq_ipi(void);
++	printk("%.*s", (end - start) + 1, buf);
++}
 +
- #endif /* __ASSEMBLY */
- #endif
++void printk_nmi_complete(void)
++{
++	struct nmi_seq_buf *s;
++	int len, cpu, i, last_i;
++
++	/*
++	 * Now that all the NMIs have triggered, we can dump out their
++	 * back traces safely to the console.
++	 */
++	for_each_possible_cpu(cpu) {
++		s = &per_cpu(nmi_print_seq, cpu);
++		last_i = 0;
++
++		len = seq_buf_used(&s->seq);
++		if (!len)
++			continue;
++
++		/* Print line by line. */
++		for (i = 0; i < len; i++) {
++			if (s->buffer[i] == '\n') {
++				print_seq_line(s, last_i, i);
++				last_i = i + 1;
++			}
++		}
++		/* Check if there was a partial line. */
++		if (last_i < len) {
++			print_seq_line(s, last_i, len - 1);
++			pr_cont("\n");
++		}
++
++		/* Wipe out the buffer ready for the next time around. */
++		seq_buf_clear(&s->seq);
++	}
++
++	clear_bit(0, &nmi_print_flag);
++	smp_mb__after_atomic();
++}
++
++void printk_nmi_this_cpu_begin(void)
++{
++	/*
++	 * Detect double-begins and report them. This code is unsafe (because
++	 * it will print from NMI) but things are pretty badly damaged if the
++	 * NMI re-enters and is somehow granted permission to use NMI printk,
++	 * so how much worse can it get? Also since this code interferes with
++	 * the operation of printk it is unlikely that any consequential
++	 * failures will be able to log anything making this our last
++	 * opportunity to tell anyone that something is wrong.
++	 */
++	if (this_cpu_read(nmi_print_saved_print_func)) {
++		this_cpu_write(printk_func, vprintk_default);
++		BUG();
++	}
++
++	this_cpu_write(nmi_print_saved_print_func, this_cpu_read(printk_func));
++	this_cpu_write(printk_func, nmi_vprintk);
++}
++
++void printk_nmi_this_cpu_end(void)
++{
++	this_cpu_write(printk_func, this_cpu_read(nmi_print_saved_print_func));
++	this_cpu_write(nmi_print_saved_print_func, NULL);
++}
++
++#endif /* CONFIG_PRINTK_NMI */
++
+ /**
+  * printk - print a kernel message
+  * @fmt: format string
 -- 
 2.1.0
