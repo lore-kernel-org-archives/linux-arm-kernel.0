@@ -1,50 +1,37 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 04 Mar 2015 09:21:15 -0800
-Subject: [PATCH 4.0-rc1 v17 4/6] printk: Simple implementation for NMI
- backtracing
-In-Reply-To: <1425486786.2769.25.camel@linaro.org>
-References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
- <1425463974-23568-1-git-send-email-daniel.thompson@linaro.org>
- <1425463974-23568-5-git-send-email-daniel.thompson@linaro.org>
- <1425485601.2712.9.camel@perches.com>
- <20150304112010.338501ab@gandalf.local.home>
- <1425486786.2769.25.camel@linaro.org>
-Message-ID: <1425489675.2712.16.camel@perches.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Mar 2015 17:23:53 +0000
+Subject: [PATCH] ARM: advertise availability of v8 Crypto instructions
+In-Reply-To: <20150304170404.GZ28951@e104818-lin.cambridge.arm.com>
+References: <1425054991-29951-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu_dSgtsUp8aeMwz9a6stEC3DCg8GMU5QWWTPy_oOyHCSw@mail.gmail.com>
+ <20150304162049.GX28951@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-pSOMFhSs=AeAERU1=XKU3xsBJCBOedVnZYBg6frWN9A@mail.gmail.com>
+ <20150304170404.GZ28951@e104818-lin.cambridge.arm.com>
+Message-ID: <20150304172353.GC8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-03-04 at 16:33 +0000, Daniel Thompson wrote:
-> On Wed, 2015-03-04 at 11:20 -0500, Steven Rostedt wrote:
-> > On Wed, 04 Mar 2015 08:13:21 -0800
-> > Joe Perches <joe@perches.com> wrote:
-> > 
-> > > On Wed, 2015-03-04 at 10:12 +0000, Daniel Thompson wrote:
-> > > > Currently there is a quite a pile of code sitting in
-> > > > arch/x86/kernel/apic/hw_nmi.c to support safe all-cpu backtracing from NMI.
-> > > > The code is inaccessible to backtrace implementations for other
-> > > > architectures, which is a shame because they would probably like to be
-> > > > safe too.
-> > > > 
-> > > > Copy this code into printk. We'll port the x86 NMI backtrace to it in a
-> > > > later patch.
-> > > 
-> > > I think this would be better as a separate file
-> > > rather than increasing the bulk of printk.c
-> > > 
-> > I agree, as printk already has its own directory. Perhaps a
-> > "nmi_backtrace.c"?
+On Wed, Mar 04, 2015 at 05:04:05PM +0000, Catalin Marinas wrote:
+> On Wed, Mar 04, 2015 at 05:31:00PM +0100, Ard Biesheuvel wrote:
+> > It doesn't really matter which architecture it is. I just want to be
+> > reasonably sure that reading ID_ISAR5 isn't going to explode. If there
+> > are other/better ways to guarantee that, I am happy to use those as
+> > well. (I noticed that there is a v7-M specific definition of ID_ISAR5
+> > in the source which I couldn't find any reference to in any of the
+> > Cortex-M TRMs on the infocenter web site.)
 > 
-> I agree on moving the code. However, after Thomas' review I made sure
-> all the external symbols were prefixed printk_nmi and, as a result of
-> the same review I started using CONFIG_PRINTK_NMI to enable/disable the
-> feature). For that reason I'm much more inclined to name it
-> "printk_nmi.c". Any objections?
+> The ARMv7-M reference manual only defines to ID_ISAR4. Maybe it will get
+> a fifth register at some point but for now I don't think we should read
+> it (I guess it was just copy/paste from the A profile).
 
-Steven's suggestion seems more sensible.
+I think you need to read carefully the requirements that are placed
+upon non-implemented CPUID registers.
 
-sed 's/CONFIG_PRINTK_NMI/CONFIG_PRINTK_NMI_BACKTRACE/g'
-sed 's/printk_nmi/printk_nmib/g'
-or
-sed 's/printk_nmi/nmi_backtrace/g'
+In DDI0406C, non-implemented CPUID registers are reserved, but must
+behave as RAZ.  I would be very surprised if this were not true for
+ARMv7-M.
 
-might work well.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
