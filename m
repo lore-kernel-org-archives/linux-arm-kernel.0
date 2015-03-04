@@ -1,69 +1,69 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 04 Mar 2015 15:12:02 +0100
-Subject: [PATCH 3/8] ARM: make xscale iwmmxt code multiplatform aware
-In-Reply-To: <1425043775-3106827-4-git-send-email-arnd@arndb.de> (Arnd
- Bergmann's message of "Fri, 27 Feb 2015 14:29:30 +0100")
-References: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
- <1425043775-3106827-4-git-send-email-arnd@arndb.de>
-Message-ID: <87pp8ozwb1.fsf@free.fr>
+From: drjones@redhat.com (Andrew Jones)
+Date: Wed, 4 Mar 2015 15:12:12 +0100
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
+References: <CAKv+Gu-YUzmnACZQi98OPRgKKL+gAGqwWYq2-_dwCdNqcktNUg@mail.gmail.com>
+ <20150220153626.GB10942@hawk.usersys.redhat.com>
+ <20150224145529.GA5498@hawk.usersys.redhat.com>
+ <CAKv+Gu-Uk2wg1OkoWgQe4da_EiFoEz_u8VuD8Ees6qU1UYMDvQ@mail.gmail.com>
+ <20150302163146.GB9686@lvm> <54F51A63.4060302@samsung.com>
+ <20150304113505.GS28951@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8OUtcpaQh5+gb6vNrdi+Q7eu_zKOujmyoRPrzrs+GJVQ@mail.gmail.com>
+ <20150304122956.GT28951@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
+Message-ID: <20150304141212.GA5352@hawk.usersys.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Wed, Mar 04, 2015 at 01:43:02PM +0100, Ard Biesheuvel wrote:
+> On 4 March 2015 at 13:29, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Wed, Mar 04, 2015 at 12:50:57PM +0100, Ard Biesheuvel wrote:
+> >> On 4 March 2015 at 12:35, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> > On Mon, Mar 02, 2015 at 06:20:19PM -0800, Mario Smarduch wrote:
+> >> >> On 03/02/2015 08:31 AM, Christoffer Dall wrote:
+> >> >> > However, my concern with these patches are on two points:
+> >> >> >
+> >> >> > 1. It's not a fix-all.  We still have the case where the guest expects
+> >> >> > the behavior of device memory (for strong ordering for example) on a RAM
+> >> >> > region, which we now break.  Similiarly this doesn't support the
+> >> >> > non-coherent DMA to RAM region case.
+> >> >> >
+> >> >> > 2. While the code is probably as nice as this kind of stuff gets, it
+> >> >> > is non-trivial and extremely difficult to debug.  The counter-point here
+> >> >> > is that we may end up handling other stuff at EL2 for performanc reasons
+> >> >> > in the future.
+> >> >> >
+> >> >> > Mainly because of point 1 above, I am leaning to thinking userspace
+> >> >> > should do the invalidation when it knows it needs to, either through KVM
+> >> >> > via a memslot flag or through some other syscall mechanism.
+> >> >
+> >> > I expressed my concerns as well, I'm definitely against merging this
+> >> > series.
+> >>
+> >> Don't worry, that was never the intention, at least not as-is :-)
+> >
+> > I wasn't worried, just wanted to make my position clearer ;).
+> >
+> >> I think we have established that the performance hit is not the
+> >> problem but the correctness is.
+> >
+> > I haven't looked at the performance figures but has anyone assessed the
+> > hit caused by doing cache maintenance in Qemu vs cacheable guest
+> > accesses (and no maintenance)?
+> >
 
-> In a multiplatform configuration, we may end up building a kernel
-> for both Marvell PJ1 and an ARMv4 CPU implementation. In that
-> case, the xscale-cp0 code is built with gcc -march=armv4{,t},
-> which results in a build error from the coprocessor instructions.
->
-> Since we know this code will only have to run on an actual xscale
-> processor, we can simply build the entire file for ARMv5TE.
->
-> Related to this, we need to handle the iWMMXT initialization sequence
-> differently during boot, to ensure we don't try to touch xscale
-> specific registers on other CPUs from the xscale_cp0_init initcall.
-> cpu_is_xscale() used to be hardcoded to '1' in any configuration
-> that enables any XScale-compatible core, but this breaks once
-> we can have a combined kernel with MMP1 and something else.
->
-> In this patch, I introduce two new macros, cpu_is_xscale()
-> and cpu_is_mohawk, so we can test for all three of them in
-> the iwmmxt initialization. The two existing users of
-> cpu_is_xscale() are modified accordingly, but slightly
-> change behavior for kernels that enable CPU_MOHAWK in combination
-> with CPU_XSCALE or CPU_XSC3. Previously, these would leave
-> clear PMD_BIT4 in the page tables, now they leave it untouched,
-> just like we always do for kernels that enable only CPU_MOHAWK.
-> Since the previous behavior was inconsistent, I assume it was
-> unintentional.
-Hi Arnd,
+I'm working on a PoC of a QEMU/KVM cache maintenance approach now.
+Hopefully I'll send it out this evening. Tomorrow at the latest.
+Getting numbers of that approach vs. a guest's use of cached memory
+for devices would take a decent amount of additional work, so won't
+be part of that post. I'm actually not sure we should care about
+the numbers for a guest using normal mem attributes for device
+memory - other than out of curiosity. For correctness this issue
+really needs to be solved 100% host-side. We can't rely on a
+guest to do different/weird things, just because it's a guest.
+Ideally guests don't even know that they're guests. (Even if we
+describe the memory as cache-able to the guest, I don't think we
+can rely on the guest believing us.)
 
-I'm not sure I understand this patch fully, so take with caution my comment.
-If I'm not mistaken, the former behavior was for pxa3xx:
- - cpu_is_xscale() -> false
- - cpu_is_xsc3() -> true
- => this implied PMD_BIT4 was set
-
-With your patch :
- - cpu_is_xscale() -> true
- - cpu_is_xsc3() -> true
- => this implied PMD_BIT4 is not set
-
-I like the new meaning for cpu_is_*(), but is the change of PMD_BIT4 the goal of
-this patch (the piece in [1]) ?
-
-Cheers.
-
---
-Robert
-
-[1]
-> -	if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
-> +	if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ &&
-> +	    !cpu_is_xscale() && !cpu_is_xsc3())
->  		prot |= PMD_BIT4;
->  
->  	pgd += pgd_index(addr);
-
--- 
-Robert
+drew
