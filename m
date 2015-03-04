@@ -1,46 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  4 Mar 2015 13:27:35 +0000
-Subject: [PATCH 2/2] arm64: fixmap: check idx is definitely valid
-In-Reply-To: <1425475655-22118-1-git-send-email-mark.rutland@arm.com>
-References: <1425475655-22118-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1425475655-22118-2-git-send-email-mark.rutland@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 04 Mar 2015 14:28:52 +0100
+Subject: [PATCH v5] ARM: mvebu: a385-db-ap: Enable the NAND
+In-Reply-To: <1425377805-20573-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1425377805-20573-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54F70894.4040706@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixmap indices are in the interval (FIX_HOLE, __end_of_fixed_addresses),
-but in __set_fixmap we only check idx <= __end_of_fixed_addresses, and
-therefore indices <= FIX_HOLE are erroneously accepted. If called with
-such an idx, __set_fixmap may corrupt page tables outside of the fixmap
-region.
+Hi Maxime,
 
-This patch ensures that we validate the idx against both endpoints of
-the interval.
+On 03/03/2015 11:16, Maxime Ripard wrote:
+> The Armada 385 Access Point Development Board has a 1GB NAND SLC chip from
+> Micron as its main storage. Enable it.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Laura Abbott <lauraa@codeaurora.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/mmu.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+applied on mvebu/dt
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index c6daaf6..c9267ac 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -627,10 +627,7 @@ void __set_fixmap(enum fixed_addresses idx,
- 	unsigned long addr = __fix_to_virt(idx);
- 	pte_t *pte;
- 
--	if (idx >= __end_of_fixed_addresses) {
--		BUG();
--		return;
--	}
-+	BUG_ON(idx <= FIX_HOLE || idx >= __end_of_fixed_addresses);
- 
- 	pte = fixmap_pte(addr);
- 
+Thanks,
+
+Gregory
+
+
+>  Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+> Changes from v4:
+>   - Rebased on top of 4.0-rc1
+> 
+> 
+>  arch/arm/boot/dts/armada-385-db-ap.dts | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
+> index 57b9119fb3e0..9e33f7d7276b 100644
+> --- a/arch/arm/boot/dts/armada-385-db-ap.dts
+> +++ b/arch/arm/boot/dts/armada-385-db-ap.dts
+> @@ -150,6 +150,19 @@
+>  				phy = <&phy0>;
+>  				phy-mode = "rgmii-id";
+>  			};
+> +
+> +			nfc: flash at d0000 {
+> +				status = "okay";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +
+> +				num-cs = <1>;
+> +				nand-ecc-strength = <4>;
+> +				nand-ecc-step-size = <512>;
+> +				marvell,nand-keep-config;
+> +				marvell,nand-enable-arbiter;
+> +				nand-on-flash-bbt;
+> +			};
+>  		};
+>  
+>  		pcie-controller {
+> 
+
+
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
