@@ -1,44 +1,43 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 05 Mar 2015 12:29:57 +0000
-Subject: [PATCH 4.0-rc1 v17 5/6] x86/nmi: Use common printk functions
-In-Reply-To: <20150305005424.GA21715@gmail.com>
-References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
- <1425463974-23568-1-git-send-email-daniel.thompson@linaro.org>
- <1425463974-23568-6-git-send-email-daniel.thompson@linaro.org>
- <20150305005424.GA21715@gmail.com>
-Message-ID: <1425558597.2769.53.camel@linaro.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 5 Mar 2015 12:33:07 +0000
+Subject: [PATCH REPOST 0/2] Remove pl011 startup glitches and avoid dummy
+ TX during startup
+In-Reply-To: <54F84713.6040305@arm.com>
+References: <1425472054-7543-1-git-send-email-Dave.Martin@arm.com>
+ <54F73650.2070304@arm.com>
+ <20150305120320.GB3612@e103592.cambridge.arm.com>
+ <54F84713.6040305@arm.com>
+Message-ID: <20150305123307.GD3612@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-03-05 at 01:54 +0100, Ingo Molnar wrote:
-> * Daniel Thompson <daniel.thompson@linaro.org> wrote:
-> 
-> > Much of the code sitting in arch/x86/kernel/apic/hw_nmi.c to support 
-> > safe all-cpu backtracing from NMI has been copied to printk.c to 
-> > make it accessible to other architectures.
+On Thu, Mar 05, 2015 at 12:07:47PM +0000, Andre Przywara wrote:
+> On 05/03/15 12:03, Dave P Martin wrote:
+> > On Wed, Mar 04, 2015 at 04:44:00PM +0000, Andre Przywara wrote:
+> >> Hi Dave,
+> >>
+> >> On 04/03/15 12:27, Dave P Martin wrote:
+> >>> There have been no comments on this series since my previous post, and
+> >>> I have made no further changes.
+> >>>
+> >>> Since then, I have confirmed that this also works robustly with TX DMA
+> >>> enabled on Juno.
+> >>>
+> >>> Review/comments/testing still welcome.
+> >>
+> >> this has been tested briefly on a Calxeda Midway without any
+> >> regressions. Also I use them as the base for my SBSA series now (which
+> >> are tested on the model and the Midway) and I see that all problems
+> >> observed before are gone now.
+> >>
+> >> Tested-by: Andre Przywara <andre.przywara@arm.com>
 > > 
-> > Port the x86 NMI backtrace to the generic code.
+> > Thanks -- should I take that for both patches?
 > 
-> Is there any difference between the generic and the x86 code as they 
-> stand today?
+> Yes, please. Also I tested this on the Raspberry Pi 2 today (though with
+> their kernel, not upstream).
 
-Shouldn't be any user observable change but there are some changes,
-mostly due to review comments.
+Thanks for that.  The more the better!
 
-1. The seq_buf structures are initialized at boot and *after* they
-   are consumed (originally they were initialized just before use).
-
-2. The generic code doesn't maintain an equivalent of backtrace_mask
-   (which was essentially a copy of cpus_online made when backtracing
-   was requested) and instead iterates using for_each_possible_cpu()
-   to initialize and dump the seq_buf:s.
-
-
-Daniel.
-
-
-PS
-The main piece that git code motion tracking should follow if I squashed
-the generic and x86 patches together would be nmi_vprintk(). I suspect
-most of the rest would be missed as the code copies is in pretty small
-fragments.
+Cheers
+---Dave
