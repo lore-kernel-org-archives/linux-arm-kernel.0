@@ -1,35 +1,40 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 5 Mar 2015 19:40:44 +0100
-Subject: [PATCH v2 1/4] i2c: sunxi: Add Reduced Serial Bus (RSB) support
-In-Reply-To: <20150305182817.GB4911@lukather>
-References: <1425284686-5116-1-git-send-email-wens@csie.org>
- <1425284686-5116-2-git-send-email-wens@csie.org>
- <20150304172710.GA884@katana> <20150305182817.GB4911@lukather>
-Message-ID: <20150305184044.GA881@katana>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 5 Mar 2015 20:41:31 +0200
+Subject: [PATCH v3 3/5] i2c: recovery: change input parameter to
+ i2c_adapter for prepare/unprepare_recovery
+In-Reply-To: <20141204182910.GH7944@katana>
+References: <1417448047-15236-1-git-send-email-grygorii.strashko@ti.com>
+ <1417448047-15236-4-git-send-email-grygorii.strashko@ti.com>
+ <20141204182910.GH7944@katana>
+Message-ID: <54F8A35B.5040706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Wolfram,
 
-> > I don't have the bandwidth for a full review right now. However, I
-> > already wanted to tell you guys that my gut feeling is that this
-> > protocol is quite far away from I2C. P2WI was already at the edge.
-> > Maybe there is a better place for such custom stuff? I dunno yet.
-> 
-> That's unfortunate, especially since it looks closer to SPI than what
-> P2WI even was.
+On 12/04/2014 08:29 PM, Wolfram Sang wrote:
+> On Mon, Dec 01, 2014 at 05:34:05PM +0200, Grygorii Strashko wrote:
+>> This patch changes type of input parameter for .prepare/unprepare_recovery()
+>> callbacks from struct i2c_bus_recovery_info * to struct i2c_adapter *.
+>> This allows to simplify implementation of these callbacks and avoid
+>> type conversations from i2c_bus_recovery_info to i2c_adapter.
+>> The i2c_bus_recovery_info can be simply retrieved from struct i2c_adapter
+>> which contains pointer on it.
+>>
+>> CC: Sekhar Nori <nsekhar@ti.com>
+>> CC: Kevin Hilman <khilman@deeprootsystems.com>
+>> CC: Santosh Shilimkar <ssantosh@kernel.org>
+>> CC: Murali Karicheri <m-karicheri2@ti.com>
+>> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>
+> Ah, bus recovery, I need to have a closer look on this one. Scheduled
+> for 3.20.
+>
 
-SPI? I assume you mean I2C. Can you elaborate your reasoning?
+Unfortunately, it looks like you've missed these patches :(
 
-> What would be your suggestion?
+I'm going to resend them if you agree.
 
-Let me quote:
-
-"I don't have the bandwidth for a full review right now... I dunno
-yet."
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150305/977c183b/attachment.sig>
+regards,
+-grygorii
