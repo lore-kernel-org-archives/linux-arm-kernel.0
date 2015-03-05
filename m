@@ -1,46 +1,114 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 05 Mar 2015 11:57:52 -0800
-Subject: [PATCH RESEND 0/4] Add support for IPROC SDHCI controller
-In-Reply-To: <CAPDyKFpH=dYzku9KNVFPtqc73+TptLFGZHNkFZ3Q4=suLOwFfQ@mail.gmail.com>
-References: <sbranden@broadcom.com>	<1425571148-5876-1-git-send-email-sbranden@broadcom.com>
- <CAPDyKFpH=dYzku9KNVFPtqc73+TptLFGZHNkFZ3Q4=suLOwFfQ@mail.gmail.com>
-Message-ID: <54F8B540.6000301@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 5 Mar 2015 14:11:26 -0600
+Subject: [PATCH v1 3/6] eeprom: Add bindings for simple eeprom framework
+In-Reply-To: <1425548765-13019-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1425548685-12887-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1425548765-13019-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <CAL_Jsq+wrZYn82otDfLsTVpgmhLFWtzRHQ4v+qn-Ks--ZpXR8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/15 08:16, Ulf Hansson wrote:
-> On 5 March 2015 at 16:59, Scott Branden <sbranden@broadcom.com> wrote:
->> This series of patchsets contains the IPROC SDHCI driver used
->> in a series of Broadcom SoCs
->> Quirks are also added to support this controller.
->>
->> Corneliu Doban (1):
->>   mmc: sdhci: do not set AUTO_CMD12 for multi-block CMD53
->>
->> Scott Branden (3):
->>   mmc: sdhci: add quirk for ACMD23 broken
->>   mmc: sdhci-iproc: add IPROC SDHCI driver
->>   mmc: sdhci-iproc: add device tree bindings
->>
->>  .../devicetree/bindings/mmc/brcm,sdhci-iproc.txt   |  23 ++
->>  drivers/mmc/host/Kconfig                           |  14 ++
->>  drivers/mmc/host/Makefile                          |   1 +
->>  drivers/mmc/host/sdhci-iproc.c                     | 241 +++++++++++++++++++++
->>  drivers/mmc/host/sdhci.c                           |   7 +-
->>  include/linux/mmc/sdhci.h                          |   2 +
->>  6 files changed, 286 insertions(+), 2 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt
->>  create mode 100644 drivers/mmc/host/sdhci-iproc.c
->>
->> --
->> 2.2.2
->>
-> 
-> Applied, thanks!
-> 
-> Actually, I needed to re-solve some conflicts and I switched to order
-> of patch3 and patch4, to avoid checkpatch warnings. Just so you know.
+On Thu, Mar 5, 2015 at 3:46 AM, Srinivas Kandagatla
+<srinivas.kandagatla@linaro.org> wrote:
+> This patch adds bindings for simple eeprom framework which allows eeprom
+> consumers to talk to eeprom providers to get access to eeprom cell data.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> [Maxime Ripard: intial version of eeprom framework]
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  .../devicetree/bindings/eeprom/eeprom.txt          | 70 ++++++++++++++++++++++
+>  1 file changed, 70 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/eeprom/eeprom.txt
+>
+> diff --git a/Documentation/devicetree/bindings/eeprom/eeprom.txt b/Documentation/devicetree/bindings/eeprom/eeprom.txt
+> new file mode 100644
+> index 0000000..dbfb95c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/eeprom/eeprom.txt
+> @@ -0,0 +1,70 @@
+> += EEPROM Data Device Tree Bindings =
+> +
+> +This binding is intended to represent the location of hardware
+> +configuration data stored in EEPROMs.
+> +
+> +On a significant proportion of boards, the manufacturer has stored
+> +some data on an EEPROM-like device, for the OS to be able to retrieve
+> +these information and act upon it. Obviously, the OS has to know
+> +about where to retrieve these data from, and where they are stored on
+> +the storage device.
+> +
+> +This document is here to document this.
+> +
+> += Data providers =
+> +Contains bindings specific to provider drivers and data cells as children
+> +to this node.
+> +
+> += Data cells =
+> +These are the child nodes of the provider which contain data cell
+> +information like offset and size in eeprom provider.
+> +
+> +Required properties:
+> +reg:   specifies the offset in byte within that storage device, and the length
+> +       in bytes of the data we care about.
+> +       There could be more then one offset-length pairs in this property.
+> +
+> +Optional properties:
+> +As required by specific data parsers/interpreters.
+> +
+> +For example:
+> +
+> +       /* Provider */
+> +       qfprom: qfprom at 00700000 {
+> +               compatible      = "qcom,qfprom";
+> +               reg             = <0x00700000 0x1000>;
+> +               ...
+> +
+> +               /* Data cells */
+> +               tsens_calibration: calib at 404 {
+> +                       reg = <0x404 0x10>;
+> +               };
+> +
+> +               serial_number: sn {
+> +                       reg = <0x104 0x4>, <0x204 0x4>, <0x30c 0x4>;
+> +
+> +               };
+> +               ...
+> +       };
+> +
+> += Data consumers =
+> +Are drivers which consume eeprom data cells.
 
-Thanks, patch 4 dropped from devicetree/next.
--- 
-Florian
+s/drivers/device nodes/
+
+> +
+> +Required properties:
+> +
+> +eeproms: List of phandle and data cell the device might be interested in.
+> +
+> +Optional properties:
+> +
+> +eeprom-names: List of data cell name strings sorted in the same order
+> +             as the resets property. Consumers drivers will use
+
+resets?
+
+> +             eeprom-names to differentiate between multiple cells,
+> +             and hence being able to know what these cells are for.
+
+Is this still needed? The sub-node name defines the name. Or you can
+use reg-names with-in the sub-node.
+
+Rob
+
+> +
+> +For example:
+> +
+> +       tsens {
+> +               ...
+> +               eeproms = <&tsens_calibration>;
+> +               eeprom-names = "calibration";
+> +       };
+> --
+> 1.9.1
+>
