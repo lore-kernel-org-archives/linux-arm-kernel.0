@@ -1,52 +1,63 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 5 Mar 2015 08:03:01 -0800
-Subject: [PATCH v2 2/3] arm64: qcom: Add support for Qualcomm MSM8916 SoC
-In-Reply-To: <63B0478A-6282-4826-8991-46B0E4BA7BA5@codeaurora.org>
-References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
- <1425503602-24916-2-git-send-email-galak@codeaurora.org>
- <54F7883B.90704@codeaurora.org>
- <63B0478A-6282-4826-8991-46B0E4BA7BA5@codeaurora.org>
-Message-ID: <20150305160301.GA29444@codeaurora.org>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Fri, 6 Mar 2015 01:12:43 +0900
+Subject: [PATCH v5 1/9] arm64: dts: exynos: Add dts files for 64-bit
+ Exynos5433 SoC
+In-Reply-To: <20150305122459.GC14093@leverpostej>
+References: <1425533911-14800-1-git-send-email-cw00.choi@samsung.com>
+ <1425533911-14800-2-git-send-email-cw00.choi@samsung.com>
+ <20150305122459.GC14093@leverpostej>
+Message-ID: <CAGTfZH3Bf1ueFO25NXFbN+Mvb9TcGbErbSp=a+vQ0=A+E07mQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05, Kumar Gala wrote:
-> 
-> On Mar 4, 2015, at 4:33 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> 
-> > On 03/04/15 13:13, Kumar Gala wrote:
-> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> >> index 1b8e973..4c8b119 100644
-> >> --- a/arch/arm64/Kconfig
-> >> +++ b/arch/arm64/Kconfig
-> >> @@ -177,6 +177,15 @@ config ARCH_MEDIATEK
-> >> 	help
-> >> 	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
-> >> 
-> >> +config ARCH_QCOM
-> >> +	bool "Qualcomm Platforms"
-> >> +	select ARCH_REQUIRE_GPIOLIB
-> >> +	select COMMON_CLK_QCOM
-> >> +	select PINCTRL
-> >> +	select SOC_BUS
-> > 
-> > I imagine all we need is select PINCTRL here. SOC_BUS is not used, also
-> > we shouldn't force COMMON_CLK_QCOM to be Y instead of M so please drop
-> > that select. Also we dropped ARCH_REQUIRE_GPIOLIB in arm32 so it would
-> > match if we just relied on ARCH_WANT_GPIOLIB that arm64 has by default
-> 
-> Will drop SOC_BUS.  We seem to have other arm64 platforms that set ARCH_REQUIRE_GPIOLIB.  Why should we not select COMMON_CLK_QCOM?  Can we do much useful without COMMON_CLK_QCOM set?
-> 
+Hi Mark,
 
-For gpiolib I was trying to say that it would match what we did
-for ARCH_QCOM on arm32. The same is true for COMMON_CLK_QCOM.
+On Thu, Mar 5, 2015 at 9:24 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Mar 05, 2015 at 05:38:23AM +0000, Chanwoo Choi wrote:
+>> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC based on
+>> Octal core CPUs (quad Cortex-A57 and quad Cortex-A53). And Exynos5433 supports
+>> PSCI (Power State Coordination Interface) v0.1.
+>>
+>> This patch includes following dt node to support Exynos5433 SoC:
+>> 1. Octa core for big.LITTLE architecture
+>> - Cortex-A53 LITTLE Quad-core
+>> - Cortex-A57 big Quad-core
+>> - Support PSCI v0.1
+>
+> [...]
+>
+>> +       psci {
+>> +               compatible = "arm,psci";
+>> +               method = "smc";
+>> +               cpu_off = <0x84000002>;
+>> +               cpu_on = <0xC4000003>;
+>> +       };
+>
+> Back at v2 you mentioned that CPU_OFF wasn't working [1].
+>
+> Do both CPU_ON and CPU_OFF work for all CPUs, including the boot CPU?
 
-We don't select these configs because they aren't required to
-boot into a ramdisk that contains the clock driver and gpiolib
-framework plus whatever disk driver and filesystem we may need to
-access the (presumably) much larger disk that contains the rest
-of the modules.
+The CPU1 ~ CPU7 are well woking about CPU_ON/OFF.
+CPU0 (boot CPU) is only well working for CPU_OFF.
+But when I try to turn on the CPU0 after CPU_OFF, I failed it.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>
+> I take it CPUs boot at EL2?
+>
+> [...]
+>
+>> +               timer {
+>> +                       compatible = "arm,armv8-timer";
+>> +                       interrupts = <1 13 0xff04>,
+>> +                                    <1 14 0xff04>,
+>> +                                    <1 11 0xff04>,
+>> +                                    <1 10 0xff04>;
+>> +               };
+>
+> The timer node should be moved under the root node. It doesn't live on
+> the bus; it's a component of the CPU.
+
+OK. I'll move it according to your comment.
+
+Thanks,
+Chanwoo Choi
