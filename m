@@ -1,69 +1,55 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 Mar 2015 14:57:55 -0600
-Subject: [PATCH] pci: host: xgene: fix incorrectly returned address by
- map_bus
-In-Reply-To: <20150305163822.GA3048@google.com>
-References: <1424214840-26498-1-git-send-email-fkan@apm.com>
- <20150227002151.GG25765@google.com> <20150305163822.GA3048@google.com>
-Message-ID: <CAL_JsqJZ2JN8ZyUeLBbJqRV9bjHBCEs8JZRx=47sFrJL-QEgbQ@mail.gmail.com>
+Date: Thu, 5 Mar 2015 15:00:02 -0600
+Subject: [PATCH v5] drivers/tty: amba: defer probing DMA availability
+ until hw_init
+In-Reply-To: <54F77A3F.5000300@linaro.org>
+References: <1424969811-11197-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <1424969811-11197-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <CAL_Jsq+1ayOsYH+dyexnyiLTuW4=ervVFdU6HL7GLtKQGCt9Ew@mail.gmail.com>
+ <54F77A3F.5000300@linaro.org>
+Message-ID: <CAL_Jsq+LPOMfO4ZymduEHegwb6vSZtfgnT5gHWyj47X5sOuYbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 5, 2015 at 10:38 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> [+cc Mark]
->
-> On Thu, Feb 26, 2015 at 06:21:51PM -0600, Bjorn Helgaas wrote:
->> On Tue, Feb 17, 2015 at 03:14:00PM -0800, Feng Kan wrote:
->> > The generic accessor functions for pci-xgene uses map_bus
->> > call that returns the base address but did not add the additional
->> > offset.
->> >
->> > Signed-off-by: Feng Kan <fkan@apm.com>
->> > ---
->> >  drivers/pci/host/pci-xgene.c | 4 ++--
->> >  1 file changed, 2 insertions(+), 2 deletions(-)
->> >
->> > diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
->> > index aab5547..ee082c0 100644
->> > --- a/drivers/pci/host/pci-xgene.c
->> > +++ b/drivers/pci/host/pci-xgene.c
->> > @@ -127,7 +127,7 @@ static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
->> >     return false;
->> >  }
->> >
->> > -static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
->> > +static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
->> >                           int offset)
->> >  {
->> >     struct xgene_pcie_port *port = bus->sysdata;
->> > @@ -137,7 +137,7 @@ static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
->> >             return NULL;
->> >
->> >     xgene_pcie_set_rtdid_reg(bus, devfn);
->> > -   return xgene_pcie_get_cfg_base(bus);
->> > +   return xgene_pcie_get_cfg_base(bus) + offset;
->>
->> Where's the locking here?  ECAM doesn't need locking because the
->> bus/dev/fn/offset is all encoded in the MMIO address.  But it looks
->> like X-Gene doesn't work that way and bus/dev/fn is in the RTDID register.
->>
->> So it seems like X-Gene needs locking that not everybody needs.  Are you
->> relying on higher-level locking somewhere?
->
-> Ping, what's going on here?  I've gotten at least three patches for this
-> offset issue, so we need to get it resolved.
->
-> If there's no locking problem, I can just apply this and we'll be finished.
-> Actually, I think Mark's patch is better, because it correctly returns NULL
-> (failure) if xgene_pcie_get_cfg_base() fails.  So please review and ack
-> that one or explain why this one is better.
->
-> But if there *is* a locking problem, we should fix that, too.  That should
-> be a separate patch, so I guess I can apply the one to fix the offset
-> problem first, and we'll at least be no worse off with respect to locking
-> than we are today.
+On Wed, Mar 4, 2015 at 3:33 PM, Jorge Ramirez-Ortiz
+<jorge.ramirez-ortiz@linaro.org> wrote:
+> On 03/03/2015 11:13 AM, Rob Herring wrote:
+>> On Thu, Feb 26, 2015 at 10:56 AM, Jorge Ramirez-Ortiz
+>> <jorge.ramirez-ortiz@linaro.org> wrote:
+>>> Fix a race condition that happens when device_initcall(pl011_dma_initicall)
+>>> is executed before all the devices have been probed - this issue was observed on
+>>> an hisi_6220 SoC (HiKey board from Linaro).
 
-There's no locking problem. The config accesses are all within the
-pci_lock spinlock and nothing else touches that register.
+[...]
+
+>>> @@ -261,10 +262,11 @@ static void pl011_sgbuf_free(struct dma_chan *chan, struct pl011_sgbuf *sg,
+>>>         }
+>>>  }
+>>>
+>>> -static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *uap)
+>>> +static void pl011_dma_probe(struct uart_amba_port *uap)
+>>>  {
+>>>         /* DMA is the sole user of the platform data right now */
+>>> -       struct amba_pl011_data *plat = dev_get_platdata(uap->port.dev);
+>>> +       struct device *const uap_dev = uap->port.dev;
+>> Call this "dev" so you don't have all the needless renaming.
+>>
+>> With that change:
+>>
+>> Reviewed-by: Rob Herring <robh@kernel.org>
+>
+>
+> OK.
+>
+> while I am at it, you initially suggested to do the probe in pl011_dma_startup.
+>
+> Instead I probed from pl011_hwinit since it matched the original behaviour of
+> also probing the DMA when CONFIG_CONSOLE_POLL was enabled.
+> However, since the CONFIG_CONSOLE_POLL implementation for the amba-pl011 doesn't
+> use the DMA it actually doesn't help to keep it in pl011_hwinit.
+>
+> is it ok with you if I move this to pl011_dma_startup as you initially suggested?
+
+That sounds fine.
 
 Rob
