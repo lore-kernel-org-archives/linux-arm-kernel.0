@@ -1,75 +1,64 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 5 Mar 2015 17:06:34 +0800
-Subject: [PATCH v9 16/21] irqchip: Add GICv2 specific ACPI boot support
-In-Reply-To: <5921774.hkUTDjxi3A@vostro.rjw.lan>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <1424853601-6675-17-git-send-email-hanjun.guo@linaro.org>
- <5921774.hkUTDjxi3A@vostro.rjw.lan>
-Message-ID: <54F81C9A.6040502@huawei.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 5 Mar 2015 10:13:13 +0100
+Subject: [PATCH] ARM: at91: dts: sama5d3/sama5d4: reduce NFC command
+ registers memory region
+In-Reply-To: <54F7B6CE.8060403@atmel.com>
+References: <1421305683-8739-1-git-send-email-josh.wu@atmel.com>	<20150115094527.3fde882a@bbrezillon>	<54B78F73.9000504@atmel.com>
+ <20150115110501.53b4584c@bbrezillon> <54F72276.8060605@atmel.com>
+ <54F7B6CE.8060403@atmel.com>
+Message-ID: <54F81E29.7010605@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/5 6:50, Rafael J. Wysocki wrote:
-> On Wednesday, February 25, 2015 04:39:56 PM Hanjun Guo wrote:
->> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+Le 05/03/2015 02:52, Josh Wu a ?crit :
+> Hi, Nicolas
+> 
+> On 3/4/2015 11:19 PM, Nicolas Ferre wrote:
+>> Le 15/01/2015 11:05, Boris Brezillon a ?crit :
+>>> Hi Josh,
+>>>
+>>> On Thu, 15 Jan 2015 17:59:15 +0800
+>>> Josh Wu <josh.wu@atmel.com> wrote:
+>>>
+>>>> Hi? Boris
+>>>>
+>>>> Thanks for the review.
+>>>>
+>>>> On 1/15/2015 4:45 PM, Boris Brezillon wrote:
+>>>>> Hi Josh,
+>>>>>
+>>>>> On Thu, 15 Jan 2015 15:08:03 +0800
+>>>>> Josh Wu <josh.wu@atmel.com> wrote:
+>>>>>
+>>>>>> To get NFC status, we need to read the NFC command registers, which is a
+>>>>>> 256M memory mapping address. To check the status, you just read such
+>>>>>> address from NFC command registers.
+>>>>>> For example, to check NFCBUSY (bit 27), you need to read 0x08000000
+>>>>>> (bit 27 is set to 1) of the NFC command register.
+>>>>>> If you want to check NFCBUSY (bit 27) and NFCWR (bit 26) in same time,
+>>>>>> you need to read 0x0c000000 (bit 27 and bit 26 are set to 1).
+>>>>> Are NFCBUSY and NFCWR found in NFCDATA_STATUS and those found in HSMC_SR
+>>>>> representing the same thing.
+>>>> yes. it is. I just check with IP team. The NFCBUSY of NFCDATA_STATUS is
+>>>> also refer to NFC_BUSY of HSMC_SR.
+>>>>
+>>>>> If they are, I think you can just use HSMC_SR instead of NFCDATA_STATUS
+>>>>> to check the status [1] and drop the last bit in the NFC Command
+>>>>> Resgiters range.
+>>>> Thank you. your code works (just need some typo change).
+>>>> I want to send [1] code with your signed-off and my acked to mtd list.
+>>>> Is it okay for you?
+>>> Sure, no problem.
+>> Hi Josh,
 >>
->> ACPI kernel uses MADT table for proper GIC initialization. It needs to
->> parse GIC related subtables, collect CPU interface and distributor
->> addresses and call driver initialization function (which is hardware
->> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
->>
->> NOTE: This commit allow to initialize GICv1/2 basic functionality.
->> While now simple GICv2 init call is used, any further GIC features
->> require generic infrastructure for proper ACPI irqchip initialization.
->> That mechanism and stacked irqdomains to support GICv2 MSI/virtualization
->> extension, GICv3/4 and its ITS are considered as next steps.
-[...]
->> diff --git a/drivers/irqchip/irqchip.c b/drivers/irqchip/irqchip.c
->> index 0fe2f71..5855240 100644
->> --- a/drivers/irqchip/irqchip.c
->> +++ b/drivers/irqchip/irqchip.c
->> @@ -8,6 +8,7 @@
->>   * warranty of any kind, whether express or implied.
->>   */
->>  
->> +#include <linux/acpi.h>
->>  #include <linux/init.h>
->>  #include <linux/of_irq.h>
->>  #include <linux/irqchip.h>
->> @@ -26,4 +27,6 @@ extern struct of_device_id __irqchip_of_table[];
->>  void __init irqchip_init(void)
->>  {
->>  	of_irq_init(__irqchip_of_table);
->> +
->> +	acpi_irq_init();
->>  }
->> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
->> index c03d8d1..e27117a 100644
->> --- a/include/linux/acpi.h
->> +++ b/include/linux/acpi.h
->> @@ -557,6 +557,20 @@ static inline int acpi_device_modalias(struct device *dev,
->>  
->>  #endif	/* !CONFIG_ACPI */
->>  
->> +#if defined(CONFIG_ACPI) && defined(CONFIG_ARM64)
->> +static inline void acpi_irq_init(void)
->> +{
->> +	/*
->> +	 * Hardcode ACPI IRQ chip initialization to GICv2 for now.
->> +	 * Proper irqchip infrastructure will be implemented along with
->> +	 * incoming  GICv2m|GICv3|ITS bits.
->> +	 */
->> +	acpi_gic_init();
->> +}
->> +#else
->> +static inline void acpi_irq_init(void) { }
->> +#endif
-> I don't want this in a common header.
+>> What is the status of this patch set?
+> 
+> The v2 of this patch is sent. But it's not taken by Brain.
+> I just ping Brain yesterday. Check the v2 patch here:
+> http://patchwork.ozlabs.org/patch/431752/
 
-This is because of irqchip_init(void) in drivers/irqchip/irqchip.c
-will be called by PowerPC too, so we need to put it in a common
-head file, I will discuss with Tomasz to see if we have any further
-solution.
+Ok, thanks for the information Josh.
 
-Thanks
-Hanjun
+Bye,
+-- 
+Nicolas Ferre
