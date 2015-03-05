@@ -1,38 +1,57 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 5 Mar 2015 13:55:00 +0100
-Subject: [PATCH v3 4/9] mtd: pxa3xx_nand: rework timings setup
-In-Reply-To: <20150305135023.45727776@free-electrons.com>
-References: <1425555085-29531-1-git-send-email-antoine.tenart@free-electrons.com>
- <1425555085-29531-5-git-send-email-antoine.tenart@free-electrons.com>
- <20150305135023.45727776@free-electrons.com>
-Message-ID: <20150305125500.GB5265@kwain>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Thu, 5 Mar 2015 13:55:53 +0100
+Subject: [PATCH] ARM: STi: Add STiH410 SoC support
+In-Reply-To: <1425559623-12379-1-git-send-email-fabrice.gasnier@st.com>
+References: <1425559623-12379-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <54F85259.8080807@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+Hi Fabrice,
 
-On Thu, Mar 05, 2015 at 01:50:23PM +0100, Thomas Petazzoni wrote:
-> On Thu,  5 Mar 2015 12:31:20 +0100, Antoine Tenart wrote:
-> > Use the nand framework helpers: onfi_get_async_timing_mode() and
-> > onfi_async_timing_mode_to_sdr_timings() to retrieve the timing
-> > configuration. Then update the pxa3xx timing setup function to use the
-> > timing configuration retrieved.
-> > 
-> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> > ---
-> >  drivers/mtd/nand/pxa3xx_nand.c                | 101 ++++++++++++++++++--------
-> >  include/linux/platform_data/mtd-nand-pxa3xx.h |   2 -
-> >  2 files changed, 69 insertions(+), 34 deletions(-)
-> 
-> After this commit, the pxa3xx_nand_timing structure type is no longer
-> used as far as I understand. So maybe it can be removed from
-> include/linux/platform_data/mtd-nand-pxa3xx.h ?
+On 03/05/2015 01:47 PM, Fabrice GASNIER wrote:
+> This patch adds support to STiH410 SoC.
 
-Right, I'll remove it.
+Actually, the STiH410 support is already here in v4.0-rc1.
+The problem is that it is missing the entry in the match table,
+and so the L2 cache and other cpus than 0 don't get initialized.
 
-Antoine
+Once fixed, you can add my:
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks,
+Maxime
+>
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+>   Documentation/devicetree/bindings/arm/sti.txt | 4 ++++
+>   arch/arm/mach-sti/board-dt.c                  | 1 +
+>   2 files changed, 5 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/sti.txt b/Documentation/devicetree/bindings/arm/sti.txt
+> index d70ec35..8d27f6b 100644
+> --- a/Documentation/devicetree/bindings/arm/sti.txt
+> +++ b/Documentation/devicetree/bindings/arm/sti.txt
+> @@ -13,6 +13,10 @@ Boards with the ST STiH407 SoC shall have the following properties:
+>   Required root node property:
+>   compatible = "st,stih407";
+>   
+> +Boards with the ST STiH410 SoC shall have the following properties:
+> +Required root node property:
+> +compatible = "st,stih410";
+> +
+>   Boards with the ST STiH418 SoC shall have the following properties:
+>   Required root node property:
+>   compatible = "st,stih418";
+> diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
+> index b067390..b373aca 100644
+> --- a/arch/arm/mach-sti/board-dt.c
+> +++ b/arch/arm/mach-sti/board-dt.c
+> @@ -18,6 +18,7 @@ static const char *stih41x_dt_match[] __initdata = {
+>   	"st,stih415",
+>   	"st,stih416",
+>   	"st,stih407",
+> +	"st,stih410",
+>   	"st,stih418",
+>   	NULL
+>   };
