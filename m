@@ -1,314 +1,129 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 5 Mar 2015 10:14:54 +0800
-Subject: [PATCH v4 2/2] ARM: at91: dts: sama5d4: add dts for sama5d4
- xplained board
-In-Reply-To: <54F6E789.5080508@atmel.com>
-References: <1425437508-30976-1-git-send-email-josh.wu@atmel.com>
- <1425437508-30976-2-git-send-email-josh.wu@atmel.com>
- <54F6E789.5080508@atmel.com>
-Message-ID: <54F7BC1E.3020808@atmel.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 4 Mar 2015 20:22:04 -0600
+Subject: [PATCH 2/2] pinctrl: Introduce TI IOdelay configuration driver
+In-Reply-To: <20150304225857.GC13520@atomide.com>
+References: <1425427237-11511-1-git-send-email-nm@ti.com>
+ <1425427237-11511-3-git-send-email-nm@ti.com>
+ <1425509926.2090.56.camel@tiscali.nl> <20150304225857.GC13520@atomide.com>
+Message-ID: <54F7BDCC.8030602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/4/2015 7:07 PM, Nicolas Ferre wrote:
-> Le 04/03/2015 03:51, Josh Wu a ?crit :
->> Add at91 sama5d4 xplained board support.
+On 03/04/2015 04:58 PM, Tony Lindgren wrote:
+> * Paul Bolle <pebolle@tiscali.nl> [150304 14:58]:
+>> Nishanth Menon schreef op di 03-03-2015 om 18:00 [-0600]:
+>>> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+>>> index ee9f44ad7f02..8e463d75fbb2 100644
+>>> --- a/drivers/pinctrl/Kconfig
+>>> +++ b/drivers/pinctrl/Kconfig
+>>> @@ -160,6 +160,17 @@ config PINCTRL_TEGRA_XUSB
+>>>  	select PINCONF
+>>>  	select PINMUX
+>>>  
+>>> +config PINCTRL_TI_IODELAY
+>>> +	bool "TI IODelay Module pinconf driver"
 >>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> ---
->>
->> Changes in v4:
->> - Thanks to Bo Shen to find following leds issues:
->>      1. the leds' label is changed in new xplained board.
->>      2. as piod bank is disabled in sama5d4, that will whole led driver
->> not work. So just disable the led which used piod.
->>
->> Changes in v3:
->> - add phy0 child node under macb0
->> - rebase on top of linux next, re-formated the arch/arm/boot/dts/Makefile
->>
->> Changes in v2:
->> - to be sorted by memory address, put the adc dt node after usart4.
->>
->>   arch/arm/boot/dts/Makefile                  |   3 +-
->>   arch/arm/boot/dts/at91-sama5d4_xplained.dts | 239 ++++++++++++++++++++++++++++
->>   2 files changed, 241 insertions(+), 1 deletion(-)
->>   create mode 100644 arch/arm/boot/dts/at91-sama5d4_xplained.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index a1c776b..5c189a5 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -42,7 +42,8 @@ dtb-$(CONFIG_SOC_SAM_V7) += \
->>   	sama5d34ek.dtb \
->>   	sama5d35ek.dtb \
->>   	sama5d36ek.dtb \
->> -	at91-sama5d4ek.dtb
->> +	at91-sama5d4ek.dtb \
->> +	at91-sama5d4_xplained.dtb
->>   dtb-$(CONFIG_ARCH_ATLAS6) += \
->>   	atlas6-evb.dtb
->>   dtb-$(CONFIG_ARCH_ATLAS7) += \
->> diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
->> new file mode 100644
->> index 0000000..af8f4f5
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
->> @@ -0,0 +1,239 @@
->> +/*
->> + * at91-sama5d4_xplained.dts - Device Tree file for SAMA5D4 Xplained board
->> + *
->> + *  Copyright (C) 2015 Atmel,
->> + *                2015 Josh Wu <josh.wu@atmel.com>
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This file is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +/dts-v1/;
->> +#include "sama5d4.dtsi"
->> +
->> +/ {
->> +	model = "Atmel SAMA5D4 Xplained";
->> +	compatible = "atmel,sama5d4-xplained", "atmel,sama5d4", "atmel,sama5";
->> +
->> +	chosen {
->> +		bootargs = "console=ttyS0,115200 ignore_loglevel earlyprintk";
->> +	};
->> +
->> +	memory {
->> +		reg = <0x20000000 0x20000000>;
->> +	};
->> +
->> +	clocks {
->> +		#address-cells = <1>;
->> +		#size-cells = <1>;
->> +		ranges;
->> +
->> +		main_clock: clock at 0 {
->> +			compatible = "atmel,osc", "fixed-clock";
->> +			clock-frequency = <12000000>;
->> +		};
->> +
->> +		slow_xtal {
->> +			clock-frequency = <32768>;
->> +		};
->> +
->> +		main_xtal {
->> +			clock-frequency = <12000000>;
->> +		};
->> +	};
->> +
->> +	ahb {
->> +		apb {
->> +			spi0: spi at f8010000 {
->> +				cs-gpios = <&pioC 3 0>, <0>, <0>, <0>;
->> +				status = "okay";
->> +				m25p80 at 0 {
->> +					compatible = "atmel,at25df321a";
->> +					spi-max-frequency = <50000000>;
->> +					reg = <0>;
->> +				};
->> +			};
->> +
->> +			macb0: ethernet at f8020000 {
->> +				phy-mode = "rmii";
->> +				status = "okay";
->> +
->> +				phy0: ethernet-phy at 1 {
->> +					interrupt-parent = <&pioE>;
->> +					interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
->> +					reg = <1>;
->> +				};
->> +			};
->> +
->> +			mmc1: mmc at fc000000 {
->> +				pinctrl-names = "default";
->> +				pinctrl-0 = <&pinctrl_mmc1_clk_cmd_dat0 &pinctrl_mmc1_dat1_3 &pinctrl_mmc1_cd>;
->> +				status = "okay";
->> +				slot at 0 {
->> +					reg = <0>;
->> +					bus-width = <4>;
->> +					cd-gpios = <&pioE 3 0>;
->> +				};
->> +			};
->> +
->> +			usart3: serial at fc00c000 {
->> +				status = "okay";
->> +			};
->> +
->> +			usart4: serial at fc010000 {
->> +				status = "okay";
->> +			};
->> +
->> +			adc0: adc at fc034000 {
->> +				atmel,adc-vref = <3300>;
->> +				status = "okay";
->> +			};
->> +
->> +			watchdog at fc068640 {
->> +				status = "okay";
->> +			};
->> +
->> +			pinctrl at fc06a000 {
->> +				board {
->> +					pinctrl_mmc1_cd: mmc1_cd {
->> +						atmel,pins =
->> +							<AT91_PIOE 3 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
->> +					};
->> +					pinctrl_usba_vbus: usba_vbus {
->> +						atmel,pins =
->> +							<AT91_PIOE 31 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;
->> +					};
->> +					pinctrl_key_gpio: key_gpio_0 {
->> +						atmel,pins =
->> +							<AT91_PIOE 8 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>; /* PE13 gpio */
-> Nit: useless comment which is wrong. I remove it.
+>> This adds a boolean Kconfig symbol.
 
-oh, my bad.
->
->
->
->> +					};
->> +				};
->> +			};
->> +		};
->> +
->> +		usb0: gadget at 00400000 {
->> +			atmel,vbus-gpio = <&pioE 31 GPIO_ACTIVE_HIGH>;
->> +			pinctrl-names = "default";
->> +			pinctrl-0 = <&pinctrl_usba_vbus>;
->> +			status = "okay";
->> +		};
->> +
->> +		usb1: ohci at 00500000 {
->> +			num-ports = <3>;
->> +			atmel,vbus-gpio = <0
->> +					   &pioE 11 GPIO_ACTIVE_HIGH
->> +					   &pioE 14 GPIO_ACTIVE_HIGH
->> +					  >;
->> +			status = "okay";
->> +		};
->> +
->> +		usb2: ehci at 00600000 {
->> +			status = "okay";
->> +		};
->> +
->> +		nand0: nand at 80000000 {
->> +			nand-bus-width = <8>;
->> +			nand-ecc-mode = "hw";
->> +			nand-on-flash-bbt;
->> +			atmel,has-pmecc;
->> +			status = "okay";
->> +
->> +			at91bootstrap at 0 {
->> +				label = "at91bootstrap";
->> +				reg = <0x0 0x40000>;
->> +			};
->> +
->> +			bootloader at 40000 {
->> +				label = "bootloader";
->> +				reg = <0x40000 0x80000>;
->> +			};
->> +
->> +			bootloaderenv at c0000 {
->> +				label = "bootloader env";
->> +				reg = <0xc0000 0xc0000>;
->> +			};
->> +
->> +			dtb at 180000 {
->> +				label = "device tree";
->> +				reg = <0x180000 0x80000>;
->> +			};
->> +
->> +			kernel at 200000 {
->> +				label = "kernel";
->> +				reg = <0x200000 0x600000>;
->> +			};
->> +
->> +			rootfs at 800000 {
->> +				label = "rootfs";
->> +				reg = <0x800000 0x0f800000>;
->> +			};
->> +		};
->> +	};
->> +
->> +	gpio_keys {
->> +		compatible = "gpio-keys";
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pinctrl_key_gpio>;
->> +
->> +		pb_user1 {
->> +			label = "pb_user1";
->> +			gpios = <&pioE 8 GPIO_ACTIVE_HIGH>;
->> +			linux,code = <0x100>;
->> +			gpio-key,wakeup;
->> +		};
->> +	};
->> +
->> +	leds {
->> +		compatible = "gpio-leds";
->> +		status = "okay";
->> +
->> +		d8 {
->> +			label = "d8";
->> +			gpios = <&pioD 30 GPIO_ACTIVE_HIGH>;
->> +			status = "disabled";
->> +		};
->> +
->> +		d10 {
->> +			label = "d10";
->> +			gpios = <&pioE 15 GPIO_ACTIVE_LOW>;
->> +			linux,default-trigger = "heartbeat";
->> +		};
->> +	};
->> +};
+Uggh.. thanks for the review and catching this..
+
 >>
-> Otherwise, it's okay:
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->
-> I take it for at91-4.1-dt (no need to respin it).
+>>> +	depends on OF
+>>> +	select PINCONF
+>>> +	select GENERIC_PINCONF
+>>> +	select REGMAP_MMIO
+>>> +	help
+>>> +	  Say Y here to support Texas Instruments' IODelay pinconf driver.
+>>> +	  IODelay module is used for the DRA7 SoC family. This driver is in
+>>> +	  addition to PINCTRL_SINGLE which controls the mux.
+>>> +
+>>>  config PINCTRL_TZ1090
+>>>  	bool "Toumaz Xenif TZ1090 pin control driver"
+>>>  	depends on SOC_TZ1090
+>>> diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+>>> index 0475206dd600..e441cd71aedf 100644
+>>> --- a/drivers/pinctrl/Makefile
+>>> +++ b/drivers/pinctrl/Makefile
+>>> @@ -28,6 +28,7 @@ obj-$(CONFIG_PINCTRL_TEGRA30)	+= pinctrl-tegra30.o
+>>>  obj-$(CONFIG_PINCTRL_TEGRA114)	+= pinctrl-tegra114.o
+>>>  obj-$(CONFIG_PINCTRL_TEGRA124)	+= pinctrl-tegra124.o
+>>>  obj-$(CONFIG_PINCTRL_TEGRA_XUSB)	+= pinctrl-tegra-xusb.o
+>>> +obj-$(CONFIG_PINCTRL_TI_IODELAY)	+= pinctrl-ti-iodelay.o
+>>
+>> So this objectfile will either be built-in or not be built at all.
+>>
+>>>  obj-$(CONFIG_PINCTRL_TZ1090)	+= pinctrl-tz1090.o
+>>>  obj-$(CONFIG_PINCTRL_TZ1090_PDC)	+= pinctrl-tz1090-pdc.o
+>>>  obj-$(CONFIG_PINCTRL_U300)	+= pinctrl-u300.o
+>>> diff --git a/drivers/pinctrl/pinctrl-ti-iodelay.c b/drivers/pinctrl/pinctrl-ti-iodelay.c
+>>> new file mode 100644
+>>> index 000000000000..e4c6e25a781c
+>>> --- /dev/null
+>>> +++ b/drivers/pinctrl/pinctrl-ti-iodelay.c
+>>> @@ -0,0 +1,963 @@
+>>> [...]
+>>> +#include <linux/err.h>
+>>> +#include <linux/init.h>
+>>> +#include <linux/io.h>
+>>> +#include <linux/list.h>
+>>> +#include <linux/module.h>
+>>
+>> This is, I think, a bit of a red flag.
+>>
+>>> +#include <linux/of_device.h>
+>>> +#include <linux/of.h>
+>>> +#include <linux/pinctrl/pinconf-generic.h>
+>>> +#include <linux/pinctrl/pinconf.h>
+>>> +#include <linux/pinctrl/pinctrl.h>
+>>> +#include <linux/regmap.h>
+>>> +#include <linux/slab.h>
+>>
+>> [...]
+>>
+>>> +static const struct of_device_id ti_iodelay_of_match[] = {
+>>> +	{.compatible = "ti,dra7-iodelay", .data = &dra7_iodelay_data},
+>>> +	{ /* Hopefully no more.. */ },
+>>> +};
+>>> +MODULE_DEVICE_TABLE(of, ti_iodelay_of_match);
+>>> +
+>>> +static struct platform_driver ti_iodelay_driver = {
+>>> +	.probe = ti_iodelay_probe,
+>>> +	.remove = ti_iodelay_remove,
+>>> +	.driver = {
+>>> +		   .owner = THIS_MODULE,
+>>
+>> So THIS_MODULE will, basically, be NULL.
+>>
+>>> +		   .name = DRIVER_NAME,
+>>> +		   .of_match_table = ti_iodelay_of_match,
+>>> +		   },
+>>> +};
+>>> +module_platform_driver(ti_iodelay_driver);
+>>> +
+>>> +MODULE_AUTHOR("Texas Instruments, Inc.");
+>>> +MODULE_DESCRIPTION("Pinconf driver for TI's IO Delay module");
+>>> +MODULE_LICENSE("GPL v2");
+>>
+>> And these three macros will be preprocessed away.
+>>
+>> (Perhaps there are non-modular alternatives to MODULE_DEVICE_TABLE and
+>> module_platform_driver, but I'm not sure how those two macros actually
+>> work.)
+> 
+> This should be just made to work as a regular loadable module.
+> We already have pinctrl-single for the same platforms working
+> as a loadable module.
+> 
+Yes, indeed. this can easily be fixed. my bad. will convert this to a
+module in the next rev.
 
-Thank you.
+I will wait a week before reposting next rev to see if there are
+improvements necessary in other areas - specifically in the way
+pinconf is being used and if there are any binding related comments.
 
-Best Regards,
-Josh Wu
->
-> Bye,
+Will be great to hear any feedback on the same as well.
+
+
+-- 
+Regards,
+Nishanth Menon
