@@ -1,345 +1,247 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu,  5 Mar 2015 15:32:52 +0100
-Subject: [PATCH] clocksource: sun5i: Refactor the current code
-In-Reply-To: <54F86883.7080208@linaro.org>
-References: <54F86883.7080208@linaro.org>
-Message-ID: <1425565972-30316-1-git-send-email-daniel.lezcano@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 05 Mar 2015 14:34:21 +0000
+Subject: [PATCH v9 5/5] KVM: arm/arm64: add irqfd support
+In-Reply-To: <54F8677F.8050906@linaro.org>
+References: <1425464076-20558-1-git-send-email-eric.auger@linaro.org>
+ <1425464076-20558-6-git-send-email-eric.auger@linaro.org>
+ <54F8359A.4020405@arm.com> <54F86259.20704@linaro.org>
+ <54F86623.5070605@arm.com> <54F8677F.8050906@linaro.org>
+Message-ID: <54F8696D.9010600@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
+On 05/03/15 14:26, Eric Auger wrote:
+> On 03/05/2015 03:20 PM, Marc Zyngier wrote:
+>> On 05/03/15 14:04, Eric Auger wrote:
+>>> Hi Marc,
+>>> On 03/05/2015 11:53 AM, Marc Zyngier wrote:
+>>>> On 04/03/15 10:14, Eric Auger wrote:
+>>>>> This patch enables irqfd on arm/arm64.
+>>>>>
+>>>>> Both irqfd and resamplefd are supported. Injection is implemented
+>>>>> in vgic.c without routing.
+>>>>>
+>>>>> This patch enables CONFIG_HAVE_KVM_EVENTFD and CONFIG_HAVE_KVM_IRQFD.
+>>>>>
+>>>>> KVM_CAP_IRQFD is now advertised. KVM_CAP_IRQFD_RESAMPLE capability
+>>>>> automatically is advertised as soon as CONFIG_HAVE_KVM_IRQFD is set.
+>>>>>
+>>>>> Irqfd injection is restricted to SPI. The rationale behind not
+>>>>> supporting PPI irqfd injection is that any device using a PPI would
+>>>>> be a private-to-the-CPU device (timer for instance), so its state
+>>>>> would have to be context-switched along with the VCPU and would
+>>>>> require in-kernel wiring anyhow. It is not a relevant use case for
+>>>>> irqfds.
+>>>>>
+>>>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>>>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>>>>
+>>>>> ---
+>>>>> v8 -> v9:
+>>>>> - replace kvm_debug by trace_kvm_set_irq and add
+>>>>>   BUG_ON(!vgic_initialized(kvm));
+>>>>>
+>>>>> v7 -> v8:
+>>>>> - remove kvm_irq_has_notifier call
+>>>>> - part of dist locking changes now are part of previous patch file
+>>>>> - remove gic_initialized() check in kvm_set_irq
+>>>>> - remove Christoffer's Reviewed-by after this change
+>>>>>
+>>>>> v5 -> v6:
+>>>>> - KVM_CAP_IRQFD support depends on vgic_present
+>>>>> - add Christoffer's Reviewed-by
+>>>>>
+>>>>> v4 -> v5:
+>>>>> - squash [PATCH v4 3/3] KVM: arm64: add irqfd support into this patch
+>>>>> - some rewording in Documentation/virtual/kvm/api.txt and in vgic
+>>>>>   vgic_process_maintenance unlock comment.
+>>>>> - move explanation of why not supporting PPI into commit message
+>>>>> - in case of injection before gic readiness, -ENODEV is returned. It is
+>>>>>   up to the user space to avoid this situation.
+>>>>>
+>>>>> v3 -> v4:
+>>>>> - reword commit message
+>>>>> - explain why we unlock the distributor before calling kvm_notify_acked_irq
+>>>>> - rename is_assigned_irq into has_notifier
+>>>>> - change EOI and injection kvm_debug format string
+>>>>> - remove error local variable in kvm_set_irq
+>>>>> - Move HAVE_KVM_IRQCHIP unset in a separate patch
+>>>>> - handle case were the irqfd injection is attempted before the vgic is ready.
+>>>>>   in such a case the notifier, if any, is called immediatly
+>>>>> - use nr_irqs to test spi is within correct range
+>>>>>
+>>>>> v2 -> v3:
+>>>>> - removal of irq.h from eventfd.c put in a separate patch to increase
+>>>>>   visibility
+>>>>> - properly expose KVM_CAP_IRQFD capability in arm.c
+>>>>> - remove CONFIG_HAVE_KVM_IRQCHIP meaningfull only if irq_comm.c is used
+>>>>>
+>>>>> v1 -> v2:
+>>>>> - rebase on 3.17rc1
+>>>>> - move of the dist unlock in process_maintenance
+>>>>> - remove of dist lock in __kvm_vgic_sync_hwstate
+>>>>> - rewording of the commit message (add resamplefd reference)
+>>>>> - remove irq.h
+>>>>>
+>>>>> Conflicts:
+>>>>>      arch/arm64/kvm/Kconfig
+>>>>> ---
+>>>>>  Documentation/virtual/kvm/api.txt |  6 ++++-
+>>>>>  arch/arm/include/uapi/asm/kvm.h   |  3 +++
+>>>>>  arch/arm/kvm/Kconfig              |  2 ++
+>>>>>  arch/arm/kvm/Makefile             |  2 +-
+>>>>>  arch/arm/kvm/arm.c                |  5 ++++
+>>>>>  arch/arm64/include/uapi/asm/kvm.h |  3 +++
+>>>>>  arch/arm64/kvm/Kconfig            |  2 ++
+>>>>>  arch/arm64/kvm/Makefile           |  2 +-
+>>>>>  virt/kvm/arm/vgic.c               | 48 +++++++++++++++++++++++++++++++++++++++
+>>>>>  9 files changed, 70 insertions(+), 3 deletions(-)
+>>>>>
+>>>>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>>>>> index b112efc..b265d8e 100644
+>>>>> --- a/Documentation/virtual/kvm/api.txt
+>>>>> +++ b/Documentation/virtual/kvm/api.txt
+>>>>> @@ -2234,7 +2234,7 @@ into the hash PTE second double word).
+>>>>>  4.75 KVM_IRQFD
+>>>>>
+>>>>>  Capability: KVM_CAP_IRQFD
+>>>>> -Architectures: x86 s390
+>>>>> +Architectures: x86 s390 arm arm64
+>>>>>  Type: vm ioctl
+>>>>>  Parameters: struct kvm_irqfd (in)
+>>>>>  Returns: 0 on success, -1 on error
+>>>>> @@ -2260,6 +2260,10 @@ Note that closing the resamplefd is not sufficient to disable the
+>>>>>  irqfd.  The KVM_IRQFD_FLAG_RESAMPLE is only necessary on assignment
+>>>>>  and need not be specified with KVM_IRQFD_FLAG_DEASSIGN.
+>>>>>
+>>>>> +On ARM/ARM64, the gsi field in the kvm_irqfd struct specifies the Shared
+>>>>> +Peripheral Interrupt (SPI) index, such that the GIC interrupt ID is
+>>>>> +given by gsi + 32.
+>>>>> +
+>>>>>  4.76 KVM_PPC_ALLOCATE_HTAB
+>>>>>
+>>>>>  Capability: KVM_CAP_PPC_ALLOC_HTAB
+>>>>> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+>>>>> index 0db25bc..2499867 100644
+>>>>> --- a/arch/arm/include/uapi/asm/kvm.h
+>>>>> +++ b/arch/arm/include/uapi/asm/kvm.h
+>>>>> @@ -198,6 +198,9 @@ struct kvm_arch_memory_slot {
+>>>>>  /* Highest supported SPI, from VGIC_NR_IRQS */
+>>>>>  #define KVM_ARM_IRQ_GIC_MAX         127
+>>>>>
+>>>>> +/* One single KVM irqchip, ie. the VGIC */
+>>>>> +#define KVM_NR_IRQCHIPS          1
+>>>>> +
+>>>>>  /* PSCI interface */
+>>>>>  #define KVM_PSCI_FN_BASE            0x95c1ba5e
+>>>>>  #define KVM_PSCI_FN(n)                      (KVM_PSCI_FN_BASE + (n))
+>>>>> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+>>>>> index aae5242..d735a3e 100644
+>>>>> --- a/arch/arm/kvm/Kconfig
+>>>>> +++ b/arch/arm/kvm/Kconfig
+>>>>> @@ -27,6 +27,7 @@ config KVM
+>>>>>      select KVM_GENERIC_DIRTYLOG_READ_PROTECT
+>>>>>      select SRCU
+>>>>>      depends on ARM_VIRT_EXT && ARM_LPAE
+>>>>> +    select HAVE_KVM_EVENTFD
+>>>>>      ---help---
+>>>>>        Support hosting virtualized guest machines. You will also
+>>>>>        need to select one or more of the processor modules below.
+>>>>> @@ -58,6 +59,7 @@ config KVM_ARM_MAX_VCPUS
+>>>>>  config KVM_ARM_VGIC
+>>>>>      bool "KVM support for Virtual GIC"
+>>>>>      depends on KVM_ARM_HOST && OF
+>>>>> +    select HAVE_KVM_IRQFD
+>>>>>      default y
+>>>>>      ---help---
+>>>>>        Adds support for a hardware assisted, in-kernel GIC emulation.
+>>>>> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+>>>>> index 443b8be..539c1a5 100644
+>>>>> --- a/arch/arm/kvm/Makefile
+>>>>> +++ b/arch/arm/kvm/Makefile
+>>>>> @@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
+>>>>>  AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
+>>>>>
+>>>>>  KVM := ../../../virt/kvm
+>>>>> -kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o
+>>>>> +kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
+>>>>>
+>>>>>  obj-y += kvm-arm.o init.o interrupts.o
+>>>>>  obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+>>>>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>>>>> index 5300d5a..4313776 100644
+>>>>> --- a/arch/arm/kvm/arm.c
+>>>>> +++ b/arch/arm/kvm/arm.c
+>>>>> @@ -175,6 +175,11 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>>>>>      case KVM_CAP_IRQCHIP:
+>>>>>              r = vgic_present;
+>>>>>              break;
+>>>>> +#ifdef CONFIG_HAVE_KVM_IRQFD
+>>>>> +    case KVM_CAP_IRQFD:
+>>>>> +            r = vgic_present;
+>>>>> +            break;
+>>>>> +#endif
+>>>>
+>>>> Nitpick: we have "select HAVE_KVM_IRQFD", so we can lose the #ifdef-ery.
+>>> right. Also I think the vgic_present can be removed since
+>>> CONFIG_HAVE_KVM_IRQFD always is set when CONFIG_KVM_ARM_VGIC is set.
+>>> So overall this indeed can simply be replaced by Paolo's patch.
+>>>>
+>>>>>      case KVM_CAP_DEVICE_CTRL:
+>>>>>      case KVM_CAP_USER_MEMORY:
+>>>>>      case KVM_CAP_SYNC_MMU:
+>>>>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+>>>>> index 3ef77a4..c154c0b 100644
+>>>>> --- a/arch/arm64/include/uapi/asm/kvm.h
+>>>>> +++ b/arch/arm64/include/uapi/asm/kvm.h
+>>>>> @@ -191,6 +191,9 @@ struct kvm_arch_memory_slot {
+>>>>>  /* Highest supported SPI, from VGIC_NR_IRQS */
+>>>>>  #define KVM_ARM_IRQ_GIC_MAX         127
+>>>>>
+>>>>> +/* One single KVM irqchip, ie. the VGIC */
+>>>>> +#define KVM_NR_IRQCHIPS          1
+>>>>> +
+>>>>>  /* PSCI interface */
+>>>>>  #define KVM_PSCI_FN_BASE            0x95c1ba5e
+>>>>>  #define KVM_PSCI_FN(n)                      (KVM_PSCI_FN_BASE + (n))
+>>>>> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+>>>>> index 039d8cf..143c9fd 100644
+>>>>> --- a/arch/arm64/kvm/Kconfig
+>>>>> +++ b/arch/arm64/kvm/Kconfig
+>>>>> @@ -29,6 +29,7 @@ config KVM
+>>>>>      select KVM_ARM_TIMER
+>>>>>      select KVM_GENERIC_DIRTYLOG_READ_PROTECT
+>>>>>      select SRCU
+>>>>> +    select HAVE_KVM_EVENTFD
+>>>>>      ---help---
+>>>>>        Support hosting virtualized guest machines.
+>>>>>
+>>>>> @@ -53,6 +54,7 @@ config KVM_ARM_MAX_VCPUS
+>>>>>  config KVM_ARM_VGIC
+>>>>>      bool
+>>>>>      depends on KVM_ARM_HOST && OF
+>>>>> +    select HAVE_KVM_IRQFD
+>>>>
+>>>> Hmmm. There is way too many selects here. Can't we just select it with
+>>>> CONFIG_KVM_ARM_VGIC, and be done with it?
+>>>
+>>> I did that way since CONFIG_KVM_ARM_VGIC is not selected in the config
+>>> KVM section on 32b. Currently the IRQFD select location is same for arm
+>>> and arm64.
+>>>
+>>> do you prefer I select HAVE_KVM_IRQFD in the config KVM section, ie. at
+>>> the same place we select CONFIG_KVM_ARM_VGIC?
+>>
+>> We cannot have irqfd without vgic, can we? Or am I misunderstanding the
+>> dependency chain entirely?
+> 
+> No we can't have irqfd without vgic.
 
-Refactor the code in order to remove the global variables and split the clock
-source and clock events registration in order to ease the addition of the clock
-notifiers needed to handle the parent clock rate changes.
+Blah. Ignore me. The additional select is for eventfd, not irqfd. Your
+patch is just fine...
 
-[dlezcano] : Fixed conflict with commit 1096be084ac59927158ce80ff1d31c33eed0e565
+Sorry about the noise.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/clocksource/timer-sun5i.c | 231 +++++++++++++++++++++++++++-----------
- 1 file changed, 166 insertions(+), 65 deletions(-)
-
-diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
-index 623ff9e..824ce2d 100644
---- a/drivers/clocksource/timer-sun5i.c
-+++ b/drivers/clocksource/timer-sun5i.c
-@@ -18,6 +18,7 @@
- #include <linux/irqreturn.h>
- #include <linux/reset.h>
- #include <linux/sched_clock.h>
-+#include <linux/slab.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-@@ -37,8 +38,27 @@
- 
- #define TIMER_SYNC_TICKS	3
- 
--static void __iomem *timer_base;
--static u32 ticks_per_jiffy;
-+struct sun5i_timer {
-+	void __iomem		*base;
-+	struct clk		*clk;
-+	u32			ticks_per_jiffy;
-+};
-+
-+struct sun5i_timer_clksrc {
-+	struct sun5i_timer	timer;
-+	struct clocksource	clksrc;
-+};
-+
-+#define to_sun5i_timer_clksrc(x) \
-+	container_of(x, struct sun5i_timer_clksrc, clksrc)
-+
-+struct sun5i_timer_clkevt {
-+	struct sun5i_timer		timer;
-+	struct clock_event_device	clkevt;
-+};
-+
-+#define to_sun5i_timer_clkevt(x) \
-+	container_of(x, struct sun5i_timer_clkevt, clkevt)
- 
- /*
-  * When we disable a timer, we need to wait at least for 2 cycles of
-@@ -46,30 +66,30 @@ static u32 ticks_per_jiffy;
-  * that is already setup and runs at the same frequency than the other
-  * timers, and we never will be disabled.
-  */
--static void sun5i_clkevt_sync(void)
-+static void sun5i_clkevt_sync(struct sun5i_timer_clkevt *ce)
- {
--	u32 old = readl(timer_base + TIMER_CNTVAL_LO_REG(1));
-+	u32 old = readl(ce->timer.base + TIMER_CNTVAL_LO_REG(1));
- 
--	while ((old - readl(timer_base + TIMER_CNTVAL_LO_REG(1))) < TIMER_SYNC_TICKS)
-+	while ((old - readl(ce->timer.base + TIMER_CNTVAL_LO_REG(1))) < TIMER_SYNC_TICKS)
- 		cpu_relax();
- }
- 
--static void sun5i_clkevt_time_stop(u8 timer)
-+static void sun5i_clkevt_time_stop(struct sun5i_timer_clkevt *ce, u8 timer)
- {
--	u32 val = readl(timer_base + TIMER_CTL_REG(timer));
--	writel(val & ~TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(timer));
-+	u32 val = readl(ce->timer.base + TIMER_CTL_REG(timer));
-+	writel(val & ~TIMER_CTL_ENABLE, ce->timer.base + TIMER_CTL_REG(timer));
- 
--	sun5i_clkevt_sync();
-+	sun5i_clkevt_sync(ce);
- }
- 
--static void sun5i_clkevt_time_setup(u8 timer, u32 delay)
-+static void sun5i_clkevt_time_setup(struct sun5i_timer_clkevt *ce, u8 timer, u32 delay)
- {
--	writel(delay, timer_base + TIMER_INTVAL_LO_REG(timer));
-+	writel(delay, ce->timer.base + TIMER_INTVAL_LO_REG(timer));
- }
- 
--static void sun5i_clkevt_time_start(u8 timer, bool periodic)
-+static void sun5i_clkevt_time_start(struct sun5i_timer_clkevt *ce, u8 timer, bool periodic)
- {
--	u32 val = readl(timer_base + TIMER_CTL_REG(timer));
-+	u32 val = readl(ce->timer.base + TIMER_CTL_REG(timer));
- 
- 	if (periodic)
- 		val &= ~TIMER_CTL_ONESHOT;
-@@ -77,66 +97,170 @@ static void sun5i_clkevt_time_start(u8 timer, bool periodic)
- 		val |= TIMER_CTL_ONESHOT;
- 
- 	writel(val | TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
--	       timer_base + TIMER_CTL_REG(timer));
-+	       ce->timer.base + TIMER_CTL_REG(timer));
- }
- 
- static void sun5i_clkevt_mode(enum clock_event_mode mode,
--			      struct clock_event_device *clk)
-+			      struct clock_event_device *clkevt)
- {
-+	struct sun5i_timer_clkevt *ce = to_sun5i_timer_clkevt(clkevt);
-+
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
--		sun5i_clkevt_time_stop(0);
--		sun5i_clkevt_time_setup(0, ticks_per_jiffy);
--		sun5i_clkevt_time_start(0, true);
-+		sun5i_clkevt_time_stop(ce, 0);
-+		sun5i_clkevt_time_setup(ce, 0, ce->timer.ticks_per_jiffy);
-+		sun5i_clkevt_time_start(ce, 0, true);
- 		break;
- 	case CLOCK_EVT_MODE_ONESHOT:
--		sun5i_clkevt_time_stop(0);
--		sun5i_clkevt_time_start(0, false);
-+		sun5i_clkevt_time_stop(ce, 0);
-+		sun5i_clkevt_time_start(ce, 0, false);
- 		break;
- 	case CLOCK_EVT_MODE_UNUSED:
- 	case CLOCK_EVT_MODE_SHUTDOWN:
- 	default:
--		sun5i_clkevt_time_stop(0);
-+		sun5i_clkevt_time_stop(ce, 0);
- 		break;
- 	}
- }
- 
- static int sun5i_clkevt_next_event(unsigned long evt,
--				   struct clock_event_device *unused)
-+				   struct clock_event_device *clkevt)
- {
--	sun5i_clkevt_time_stop(0);
--	sun5i_clkevt_time_setup(0, evt - TIMER_SYNC_TICKS);
--	sun5i_clkevt_time_start(0, false);
-+	struct sun5i_timer_clkevt *ce = to_sun5i_timer_clkevt(clkevt);
-+
-+	sun5i_clkevt_time_stop(ce, 0);
-+	sun5i_clkevt_time_setup(ce, 0, evt - TIMER_SYNC_TICKS);
-+	sun5i_clkevt_time_start(ce, 0, false);
- 
- 	return 0;
- }
- 
--static struct clock_event_device sun5i_clockevent = {
--	.name = "sun5i_tick",
--	.rating = 340,
--	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
--	.set_mode = sun5i_clkevt_mode,
--	.set_next_event = sun5i_clkevt_next_event,
--};
--
--
- static irqreturn_t sun5i_timer_interrupt(int irq, void *dev_id)
- {
--	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
-+	struct sun5i_timer_clkevt *ce = (struct sun5i_timer_clkevt *)dev_id;
- 
--	writel(0x1, timer_base + TIMER_IRQ_ST_REG);
--	evt->event_handler(evt);
-+	writel(0x1, ce->timer.base + TIMER_IRQ_ST_REG);
-+	ce->clkevt.event_handler(&ce->clkevt);
- 
- 	return IRQ_HANDLED;
- }
- 
-+static cycle_t sun5i_clksrc_read(struct clocksource *clksrc)
-+{
-+	struct sun5i_timer_clksrc *cs = to_sun5i_timer_clksrc(clksrc);
-+
-+	return ~readl(cs->timer.base + TIMER_CNTVAL_LO_REG(1));
-+}
-+
-+static int __init sun5i_setup_clocksource(struct device_node *node,
-+					  void __iomem *base,
-+					  struct clk *clk, int irq)
-+{
-+	struct sun5i_timer_clksrc *cs;
-+	unsigned long rate;
-+	int ret;
-+
-+	cs = kzalloc(sizeof(*cs), GFP_KERNEL);
-+	if (!cs)
-+		return -ENOMEM;
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret) {
-+		pr_err("Couldn't enable parent clock\n");
-+		goto err_free;
-+	}
-+
-+	rate = clk_get_rate(clk);
-+
-+	cs->timer.base = base;
-+	cs->timer.clk = clk;
-+
-+	writel(~0, base + TIMER_INTVAL_LO_REG(1));
-+	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
-+	       base + TIMER_CTL_REG(1));
-+
-+	cs->clksrc.name = node->name;
-+	cs->clksrc.rating = 340;
-+	cs->clksrc.read = sun5i_clksrc_read;
-+	cs->clksrc.mask = CLOCKSOURCE_MASK(32);
-+	cs->clksrc.flags = CLOCK_SOURCE_IS_CONTINUOUS;
-+
-+	ret = clocksource_register_hz(&cs->clksrc, rate);
-+	if (ret) {
-+		pr_err("Couldn't register clock source.\n");
-+		goto err_disable_clk;
-+	}
-+
-+	return 0;
-+
-+err_disable_clk:
-+	clk_disable_unprepare(clk);
-+err_free:
-+	kfree(cs);
-+	return ret;
-+}
-+
-+static int __init sun5i_setup_clockevent(struct device_node *node, void __iomem *base,
-+					 struct clk *clk, int irq)
-+{
-+	struct sun5i_timer_clkevt *ce;
-+	unsigned long rate;
-+	int ret;
-+	u32 val;
-+
-+	ce = kzalloc(sizeof(*ce), GFP_KERNEL);
-+	if (!ce)
-+		return -ENOMEM;
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret) {
-+		pr_err("Couldn't enable parent clock\n");
-+		goto err_free;
-+	}
-+
-+	rate = clk_get_rate(clk);
-+
-+	ce->timer.base = base;
-+	ce->timer.ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
-+	ce->timer.clk = clk;
-+
-+	ce->clkevt.name = node->name;
-+	ce->clkevt.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
-+	ce->clkevt.set_next_event = sun5i_clkevt_next_event;
-+	ce->clkevt.set_mode = sun5i_clkevt_mode;
-+	ce->clkevt.rating = 340;
-+	ce->clkevt.irq = irq;
-+	ce->clkevt.cpumask = cpu_possible_mask;
-+
-+	/* Enable timer0 interrupt */
-+	val = readl(base + TIMER_IRQ_EN_REG);
-+	writel(val | TIMER_IRQ_EN(0), base + TIMER_IRQ_EN_REG);
-+
-+	clockevents_config_and_register(&ce->clkevt, rate,
-+					TIMER_SYNC_TICKS, 0xffffffff);
-+
-+	ret = request_irq(irq, sun5i_timer_interrupt, IRQF_TIMER | IRQF_IRQPOLL,
-+			  "sun5i_timer0", ce);
-+	if (ret) {
-+		pr_err("Unable to register interrupt\n");
-+		goto err_disable_clk;
-+	}
-+
-+	return 0;
-+
-+err_disable_clk:
-+	clk_disable_unprepare(clk);
-+err_free:
-+	kfree(ce);
-+	return ret;
-+}
-+
- static void __init sun5i_timer_init(struct device_node *node)
- {
- 	struct reset_control *rstc;
--	unsigned long rate;
-+	void __iomem *timer_base;
- 	struct clk *clk;
--	int ret, irq;
--	u32 val;
-+	int irq;
- 
- 	timer_base = of_io_request_and_map(node, 0,
- 					   of_node_full_name(node));
-@@ -150,36 +274,13 @@ static void __init sun5i_timer_init(struct device_node *node)
- 	clk = of_clk_get(node, 0);
- 	if (IS_ERR(clk))
- 		panic("Can't get timer clock");
--	clk_prepare_enable(clk);
--	rate = clk_get_rate(clk);
- 
- 	rstc = of_reset_control_get(node, NULL);
- 	if (!IS_ERR(rstc))
- 		reset_control_deassert(rstc);
- 
--	writel(~0, timer_base + TIMER_INTVAL_LO_REG(1));
--	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
--	       timer_base + TIMER_CTL_REG(1));
--
--	clocksource_mmio_init(timer_base + TIMER_CNTVAL_LO_REG(1), node->name,
--			      rate, 340, 32, clocksource_mmio_readl_down);
--
--	ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
--
--	/* Enable timer0 interrupt */
--	val = readl(timer_base + TIMER_IRQ_EN_REG);
--	writel(val | TIMER_IRQ_EN(0), timer_base + TIMER_IRQ_EN_REG);
--
--	sun5i_clockevent.cpumask = cpu_possible_mask;
--	sun5i_clockevent.irq = irq;
--
--	clockevents_config_and_register(&sun5i_clockevent, rate,
--					TIMER_SYNC_TICKS, 0xffffffff);
--
--	ret = request_irq(irq, sun5i_timer_interrupt, IRQF_TIMER | IRQF_IRQPOLL,
--			  "sun5i_timer0", &sun5i_clockevent);
--	if (ret)
--		pr_warn("failed to setup irq %d\n", irq);
-+	sun5i_setup_clocksource(node, timer_base, clk, irq);
-+	sun5i_setup_clockevent(node, timer_base, clk, irq);
- }
- CLOCKSOURCE_OF_DECLARE(sun5i_a13, "allwinner,sun5i-a13-hstimer",
- 		       sun5i_timer_init);
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
