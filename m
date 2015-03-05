@@ -1,43 +1,85 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 5 Mar 2015 18:02:54 +0800
-Subject: [PATCH ulf.hansson-mmc] mmc: dw_mmc: exynos:
- dw_mci_exynos_prepare_hs400_tuning() can be static
-In-Reply-To: <201503051843.EsoMldBU%fengguang.wu@intel.com>
-References: <201503051843.EsoMldBU%fengguang.wu@intel.com>
-Message-ID: <20150305100254.GA66299@lkp-sb04.lkp.intel.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 05 Mar 2015 10:10:48 +0000
+Subject: [PATCH v1 5/6] eeprom: qfprom: Add Qualcomm QFPROM support.
+In-Reply-To: <1425549757.24292.204.camel@x220>
+References: <1425548685-12887-1-git-send-email-srinivas.kandagatla@linaro.org>	
+ <1425548783-13110-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1425549757.24292.204.camel@x220>
+Message-ID: <54F82BA8.80803@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Thankyou for the comments,
 
-Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
----
- dw_mmc-exynos.c |    2 +-
- dw_mmc.c        |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+On 05/03/15 10:02, Paul Bolle wrote:
+> On Thu, 2015-03-05 at 09:46 +0000, Srinivas Kandagatla wrote:
+>> diff --git a/drivers/eeprom/Kconfig b/drivers/eeprom/Kconfig
+>> index bff8ecb..65325c7 100644
+>> --- a/drivers/eeprom/Kconfig
+>> +++ b/drivers/eeprom/Kconfig
+>> @@ -28,4 +28,11 @@ config EEPROM_SUNXI_SID
+>>   	  This driver can also be built as a module. If so, the module
+>>   	  will be called sunxi_sid.
+>>
+>> +config QCOM_QFPROM
+>> +	tristate "QCOM QFPROM Support"
+>> +        depends on EEPROM
+>
+> Make this one tab, please.
+>
+>> +	select REGMAP_MMIO
+>> +	help
+>> +          Say y here to enable QFPROM support. The QFPROM provides access
+>> +          functions for QFPROM data to rest of the drivers via eeprom interface.
+>
+> And this one tab and two spaces, please.
+>
+> All utterly trivial, of course, but I found a less trivial problem with
+> this patch, so I included these two comments anyway.
+>
+Will fix it in next version.
+>>   endif
+>> diff --git a/drivers/eeprom/Makefile b/drivers/eeprom/Makefile
+>> index 661422c..f99c824 100644
+>> --- a/drivers/eeprom/Makefile
+>> +++ b/drivers/eeprom/Makefile
+>> @@ -8,3 +8,4 @@ obj-$(CONFIG_EEPROM)		+= core.o
+>>
+>>   # Devices
+>>   obj-$(CONFIG_EEPROM_SUNXI_SID)	+= eeprom-sunxi-sid.o
+>> +obj-$(CONFIG_QCOM_QFPROM)	+= qfprom.o
+>> diff --git a/drivers/eeprom/qfprom.c b/drivers/eeprom/qfprom.c
+>> new file mode 100644
+>> index 0000000..371a8c0
+>> --- /dev/null
+>> +++ b/drivers/eeprom/qfprom.c
+>> @@ -0,0 +1,74 @@
+>> +#include <linux/device.h>
+>> +#include <linux/module.h>
+>> +#include <linux/err.h>
+>> +#include <linux/of.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/eeprom-provider.h>
+>
+> [...]
+>
+>> +MODULE_LICENSE("GPL2");
+>
+> This will taint the kernel on module load. I guess you meant
+>      MODULE_LICENSE("GPL v2");
+>
+> but there's no comment with some lines about the license at the top of
+> this file, so I can't be sure.
+>
+Yes, I meant GPL v2, and will fix the license header too in next version.
 
-diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-index 0a56d766..e761eb1 100644
---- a/drivers/mmc/host/dw_mmc-exynos.c
-+++ b/drivers/mmc/host/dw_mmc-exynos.c
-@@ -477,7 +477,7 @@ static int dw_mci_exynos_execute_tuning(struct dw_mci_slot *slot)
- 	return ret;
- }
- 
--int dw_mci_exynos_prepare_hs400_tuning(struct dw_mci *host,
-+static int dw_mci_exynos_prepare_hs400_tuning(struct dw_mci *host,
- 					struct mmc_ios *ios)
- {
- 	struct dw_mci_exynos_priv_data *priv = host->priv;
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index f30ef69..a99fa1b 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -1324,7 +1324,7 @@ static int dw_mci_execute_tuning(struct mmc_host *mmc, u32 opcode)
- 	return err;
- }
- 
--int dw_mci_prepare_hs400_tuning(struct mmc_host *mmc, struct mmc_ios *ios)
-+static int dw_mci_prepare_hs400_tuning(struct mmc_host *mmc, struct mmc_ios *ios)
- {
- 	struct dw_mci_slot *slot = mmc_priv(mmc);
- 	struct dw_mci *host = slot->host;
+--srini
+
+>
+> Paul Bolle
+>
+> (Chances are that by the end of this week everybody is so tired of
+> messages like this that people actually check this stuff before
+> submitting, and there's no need to review this anymore for the rest of
+> this year. That would be mission accomplished, I guess.)
+>
