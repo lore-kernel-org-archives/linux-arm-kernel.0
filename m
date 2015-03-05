@@ -1,175 +1,105 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu,  5 Mar 2015 13:11:21 +0100
-Subject: [PATCH v2 4/9] ARM: at91/dt: introduce atmel,<chip>-dbgu
+Date: Thu,  5 Mar 2015 13:11:23 +0100
+Subject: [PATCH v2 6/9] ARM: at91: at91rm9200 use SoC detection infrastructure
 In-Reply-To: <1425557486-3534-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1425557486-3534-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1425557486-3534-5-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1425557486-3534-7-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DBGU is not a simple UART and we need to be able to distinguish it from the
-other UARTs, in particular to get its address and check the chip id.
+Use the soc detection infrastructure for at91rm9200 initialization.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- Documentation/devicetree/bindings/serial/atmel-usart.txt | 3 ++-
- arch/arm/boot/dts/at91rm9200.dtsi                        | 2 +-
- arch/arm/boot/dts/at91sam9260.dtsi                       | 2 +-
- arch/arm/boot/dts/at91sam9261.dtsi                       | 2 +-
- arch/arm/boot/dts/at91sam9263.dtsi                       | 2 +-
- arch/arm/boot/dts/at91sam9g45.dtsi                       | 2 +-
- arch/arm/boot/dts/at91sam9n12.dtsi                       | 2 +-
- arch/arm/boot/dts/at91sam9rl.dtsi                        | 2 +-
- arch/arm/boot/dts/at91sam9x5.dtsi                        | 2 +-
- arch/arm/boot/dts/sama5d3.dtsi                           | 2 +-
- arch/arm/boot/dts/sama5d4.dtsi                           | 2 +-
- 11 files changed, 12 insertions(+), 11 deletions(-)
+ arch/arm/mach-at91/at91rm9200.c | 34 ++++++++++++++++++++--------------
+ arch/arm/mach-at91/soc.h        |  3 +++
+ 2 files changed, 23 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-index a6391e70a8fd..90787aa2e648 100644
---- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
-+++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-@@ -1,9 +1,10 @@
- * Atmel Universal Synchronous Asynchronous Receiver/Transmitter (USART)
+diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+index 8fcfb70f7124..9f3f91daf9fe 100644
+--- a/arch/arm/mach-at91/at91rm9200.c
++++ b/arch/arm/mach-at91/at91rm9200.c
+@@ -8,25 +8,27 @@
+  * Licensed under GPLv2 or later.
+  */
  
- Required properties:
--- compatible: Should be "atmel,<chip>-usart"
-+- compatible: Should be "atmel,<chip>-usart" or "atmel,<chip>-dbgu"
-   The compatible <chip> indicated will be the first SoC to support an
-   additional mode or an USART new feature.
-+  For the dbgu UART, use "atmel,<chip>-dbgu", "atmel,<chip>-usart"
- - reg: Should contain registers location and length
- - interrupts: Should contain interrupt
- - clock-names: tuple listing input clock names.
-diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-index 21c2b504f977..c515e4b160be 100644
---- a/arch/arm/boot/dts/at91rm9200.dtsi
-+++ b/arch/arm/boot/dts/at91rm9200.dtsi
-@@ -830,7 +830,7 @@
- 			};
+-#include <linux/types.h>
+-#include <linux/init.h>
+-#include <linux/module.h>
+-#include <linux/gpio.h>
++#include <linux/clk-provider.h>
+ #include <linux/of.h>
+-#include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+-#include <linux/clk-provider.h>
  
- 			dbgu: serial at fffff200 {
--				compatible = "atmel,at91rm9200-usart";
-+				compatible = "atmel,at91rm9200-dbgu", "atmel,at91rm9200-usart";
- 				reg = <0xfffff200 0x200>;
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index fff0ee69aab4..9ea347eff3a7 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -753,7 +753,7 @@
- 			};
+-#include <asm/setup.h>
+-#include <asm/irq.h>
+ #include <asm/mach/arch.h>
+-#include <asm/mach/map.h>
+-#include <asm/mach/irq.h>
+ #include <asm/system_misc.h>
  
- 			dbgu: serial at fffff200 {
--				compatible = "atmel,at91sam9260-usart";
-+				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
- 				reg = <0xfffff200 0x200>;
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
-index e247b0b5fdab..45973554f229 100644
---- a/arch/arm/boot/dts/at91sam9261.dtsi
-+++ b/arch/arm/boot/dts/at91sam9261.dtsi
-@@ -275,7 +275,7 @@
- 			};
+ #include <mach/at91_st.h>
  
- 			dbgu: serial at fffff200 {
--				compatible = "atmel,at91sam9260-usart";
-+				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
- 				reg = <0xfffff200 0x200>;
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 1f67bb4c144e..111a4e029cca 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -762,7 +762,7 @@
- 			};
+ #include "generic.h"
++#include "soc.h"
++
++static const struct at91_soc rm9200_socs[] = {
++	AT91_SOC(AT91RM9200_CIDR_MATCH, 0, "at91rm9200", "at91rm9200 BGA"),
++	{ /* sentinel */ },
++};
++
++static const struct at91_soc_family rm9200_families[] = {
++	AT91_SOC_FAMILY(ARCH_ID_AT91RM9200, "AT91RM9200", rm9200_socs),
++	{ /* sentinel */ },
++};
  
- 			dbgu: serial at ffffee00 {
--				compatible = "atmel,at91sam9260-usart";
-+				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
- 				reg = <0xffffee00 0x200>;
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index ee80aa9c0759..d5ec0fb935fb 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -893,7 +893,7 @@
- 			};
+ static void at91rm9200_restart(enum reboot_mode reboot_mode, const char *cmd)
+ {
+@@ -45,15 +47,20 @@ static void __init at91rm9200_dt_timer_init(void)
  
- 			dbgu: serial at ffffee00 {
--				compatible = "atmel,at91sam9260-usart";
-+				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
- 				reg = <0xffffee00 0x200>;
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index c2666a7cb5b1..00934c005ff9 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -757,7 +757,7 @@
- 			};
+ static void __init at91rm9200_dt_device_init(void)
+ {
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	struct soc_device *soc;
++	struct device *soc_dev = NULL;
++
++	soc = at91_soc_init(rm9200_families);
++	if (soc != NULL)
++		soc_dev = soc_device_to_device(soc);
++
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, soc_dev);
  
- 			dbgu: serial at fffff200 {
--				compatible = "atmel,at91sam9260-usart";
-+				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
- 				reg = <0xfffff200 0x200>;
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/at91sam9rl.dtsi b/arch/arm/boot/dts/at91sam9rl.dtsi
-index 40f645b8fe25..ebfd5ce9cb38 100644
---- a/arch/arm/boot/dts/at91sam9rl.dtsi
-+++ b/arch/arm/boot/dts/at91sam9rl.dtsi
-@@ -377,7 +377,7 @@
- 			};
+ 	arm_pm_idle = at91rm9200_idle;
+ 	arm_pm_restart = at91rm9200_restart;
+ 	at91rm9200_pm_init();
+ }
  
- 			dbgu: serial at fffff200 {
--				compatible = "atmel,at91sam9260-usart";
-+				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
- 				reg = <0xfffff200 0x200>;
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 818dabdd8c0e..ce1494622205 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -860,7 +860,7 @@
- 			};
+-
+-
+ static const char *at91rm9200_dt_board_compat[] __initconst = {
+ 	"atmel,at91rm9200",
+ 	NULL
+@@ -61,7 +68,6 @@ static const char *at91rm9200_dt_board_compat[] __initconst = {
  
- 			dbgu: serial at fffff200 {
--				compatible = "atmel,at91sam9260-usart";
-+				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
- 				reg = <0xfffff200 0x200>;
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index 261311bdf65b..8e850d1bc588 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -439,7 +439,7 @@
- 			};
+ DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200")
+ 	.init_time      = at91rm9200_dt_timer_init,
+-	.map_io		= at91_map_io,
+ 	.init_machine	= at91rm9200_dt_device_init,
+ 	.dt_compat	= at91rm9200_dt_board_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
+index 66dcd146601a..b330fcfe18a3 100644
+--- a/arch/arm/mach-at91/soc.h
++++ b/arch/arm/mach-at91/soc.h
+@@ -45,4 +45,7 @@ struct at91_soc_family {
+ struct soc_device * __init
+ at91_soc_init(const struct at91_soc_family *families);
  
- 			dbgu: serial at ffffee00 {
--				compatible = "atmel,at91sam9260-usart";
-+				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
- 				reg = <0xffffee00 0x200>;
- 				interrupts = <2 IRQ_TYPE_LEVEL_HIGH 7>;
- 				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(13)>,
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index d986b41b9654..d3627c4a58e0 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -1063,7 +1063,7 @@
- 			};
- 
- 			dbgu: serial at fc069000 {
--				compatible = "atmel,at91sam9260-usart";
-+				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
- 				reg = <0xfc069000 0x200>;
- 				interrupts = <2 IRQ_TYPE_LEVEL_HIGH 7>;
- 				pinctrl-names = "default";
++#define ARCH_ID_AT91RM9200		0x92
++#define AT91RM9200_CIDR_MATCH		0x09290780
++
+ #endif /* __AT91_SOC_H */
 -- 
 2.1.0
