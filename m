@@ -1,26 +1,32 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 5 Mar 2015 01:54:24 +0100
-Subject: [PATCH 4.0-rc1 v17 5/6] x86/nmi: Use common printk functions
-In-Reply-To: <1425463974-23568-6-git-send-email-daniel.thompson@linaro.org>
-References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
- <1425463974-23568-1-git-send-email-daniel.thompson@linaro.org>
- <1425463974-23568-6-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20150305005424.GA21715@gmail.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Thu, 05 Mar 2015 08:56:04 +0800
+Subject: [PATCH v2 0/2] add dts for PopMetal board
+In-Reply-To: <2239622.yIer0hBRK8@phil>
+References: <1425201914-4695-1-git-send-email-andy.yan@rock-chips.com>
+ <2239622.yIer0hBRK8@phil>
+Message-ID: <54F7A9A4.2030209@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-* Daniel Thompson <daniel.thompson@linaro.org> wrote:
-
-> Much of the code sitting in arch/x86/kernel/apic/hw_nmi.c to support 
-> safe all-cpu backtracing from NMI has been copied to printk.c to 
-> make it accessible to other architectures.
-> 
-> Port the x86 NMI backtrace to the generic code.
-
-Is there any difference between the generic and the x86 code as they 
-stand today?
-
-Thanks,
-
-	Ingo
+Hi Heiko:
+  Thanks very much.
+On 2015?03?05? 03:57, Heiko Stuebner wrote:
+> Hi Andy,
+>
+> Am Sonntag, 1. M?rz 2015, 17:25:14 schrieb Andy Yan:
+>> PopMetal is a rockchip rk3288 based board made by ChipSpark,
+>> which has many interface such as VGA,HDMI,usb,ir,sdcad and lots of
+>> sensors such as gyroscope(L3G4200D),accelerometer(mma8452),compass(AK8963C).
+>>
+>> http://wiki.chipspark.com/en/index.php?title=PopMetal
+>>
+>> This patch add basic support for it, which can boot the board
+>> into a shell with linux boot logo on hdmi, sdcard and many
+>> sensors enabled. More feather will be enabled later.
+> I've added both patches to my dts branch
+>
+>
+> Heiko
+>
+>
+>
