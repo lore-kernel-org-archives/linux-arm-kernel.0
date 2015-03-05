@@ -1,73 +1,77 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 5 Mar 2015 12:26:06 +0000
-Subject: [RFC PATCH 0/1] Wrong structure alignment due to compiler
- attribute "section"
-In-Reply-To: <54F732DA.2050004@marvell.com>
-References: <1425290502-2322-1-git-send-email-lsanfil@marvell.com>
- <20150303144130.GB5177@e103592.cambridge.arm.com>
- <54F6EF32.7080306@marvell.com>
- <20150304143527.GA5653@e103592.cambridge.arm.com>
- <54F732DA.2050004@marvell.com>
-Message-ID: <20150305122606.GC3612@e103592.cambridge.arm.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 05 Mar 2015 13:26:39 +0100
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <20150305120348.GD7712@e104818-lin.cambridge.arm.com>
+References: <CAKv+Gu8OUtcpaQh5+gb6vNrdi+Q7eu_zKOujmyoRPrzrs+GJVQ@mail.gmail.com>
+ <20150304122956.GT28951@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
+ <20150304141212.GA5352@hawk.usersys.redhat.com>
+ <20150304142943.GU28951@e104818-lin.cambridge.arm.com>
+ <54F73ACF.1090605@redhat.com>
+ <20150304172855.GA28951@e104818-lin.cambridge.arm.com>
+ <54F82C06.2000701@redhat.com>
+ <20150305110415.GA7712@e104818-lin.cambridge.arm.com>
+ <CAFEAcA98j_EsP4Hy20tQCKdnP3=NuvS3Ona37peBjan8aWLSEA@mail.gmail.com>
+ <20150305120348.GD7712@e104818-lin.cambridge.arm.com>
+Message-ID: <54F84B7F.5010007@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 05:29:14PM +0100, Lino Sanfilippo wrote:
-> On 04.03.2015 15:35, Dave Martin wrote:
-> 
-> >
-> >Try
-> >
-> >rm drivers/clk/mvebu/kirkwood.o
-> >make ARCH=arm KBUILD_CFLAGS_KERNEL=-save-temps drivers/clk/mvebu/kirkwood.o
-> >
-> >(abuse of KBUILD_CFLAGS_KERNEL here, but it's empty by default, and
-> >I'm too lazy to copy-paste command lines...)
-> >
-> >
-> >The compiler will split out the compiled assembly code in kirkwood.s:
-> >
-> >Look for ".align" directives between the start of the affected section
-> >and the start of the next section (next .section directive).
-> >
-> >Here, we just have .align 2, which is the expected correct value
-> >(i.e., align __of_table_mv88f6180_clk on a 2^2 = 4 byte boundary).
-> >
-> >A different value here may indicate a bug in the compiler, because
-> >you observed that gcc _thinks_ that __alignof__ is 4 for the struct
-> >in this section even in the failing case.
-> 
-> Ok, this is the result for the assembly:
-> 
->         .section        __clk_of_table,"a",%progbits
->         .align  3
->         .type   __of_table_mv88f6180_clk, %object
->         .size   __of_table_mv88f6180_clk, 196
-> __of_table_mv88f6180_clk:
->         .space  64
 
-[...]
 
-> Very interesting. It shows an .align 3 which explains alignment on
-> 8 byte boundaries:
+On 05/03/2015 13:03, Catalin Marinas wrote:
+>> > 
+>> > I'd hate to have to do that. PCI should be entirely probeable
+>> > given that we tell the guest where the host bridge is, that's
+>> > one of its advantages.
+> I didn't say a DT node per device, the DT doesn't know what PCI devices
+> are available (otherwise it defeats the idea of probing). But we need to
+> tell the OS where the host bridge is via DT.
 > 
-> 
-> c07630f8 T __clk_of_table
-> c07630f8 t __of_table_fixed_factor_clk
-> c07630f8 T __stop_kprobe_blacklist
-> c07631c0 t __of_table_fixed_clk
-> c0763288 t __of_table_gpio_gate_clk
-> c0763350 t __of_table_mv88f6180_clk
-> 
-> So this is indeed a compiler bug, right?
+> So the guest would be told about two host bridges: one for real devices
+> and another for virtual devices. These can have different coherency
+> properties.
 
-It certainly looks like the compiler is causing the issue somehow.
+Yeah, and it would suck that the user needs to know the difference
+between the coherency proprties of the host bridges.
 
-Whether this is a bug, a bug-like feature, a configuration issue,
-or a combination of these is not clear.
+It would especially suck if the user has a cluster with different
+machines, some of them coherent and others non-coherent, and then has to
+debug why the same configuration works on some machines and not on others.
 
-If you know where to find the toolchain source, it might be worth
-taking a look.
 
-Cheers
----Dave
+To avoid replying in two different places, which of the solutions look
+to me like something that half-works?  Pretty much all of them, because
+in the end it is just a processor misfeature.  For example, Intel
+virtualization extensions let the hypervisor override stage1 translation
+_if necessary_.  AMD doesn't, but has some other quirky things that let
+you achieve the same effect..
+
+In particular, I am not even sure that this is about bus coherency,
+because this problem does not happen when the device is doing bus master
+DMA.  Working around coherency for bus master DMA would be easy.
+
+The problem arises with MMIO areas that the guest can reasonably expect
+to be uncacheable, but that are optimized by the host so that they end
+up backed by cacheable RAM.  It's perfectly reasonable that the same
+device needs cacheable mapping with one userspace, and works with
+uncacheable mapping with another userspace that doesn't optimize the
+MMIO area to RAM.
+
+Currently the VGA framebuffer is the main case where this happen, and I
+don't expect many more.  Because this is not bus master DMA, it's hard
+to find a QEMU API that can be hooked to invalidate the cache.  QEMU is
+just reading from an array of chars.
+
+In practice, the VGA framebuffer has an optimization that uses dirty
+page tracking, so we could piggyback on the ioctls that return which
+pages are dirty.  It turns out that piggybacking on those ioctls also
+should fix the case of migrating a guest while the MMU is disabled.
+
+But it's a hack, and it may not work for other devices.
+
+We could use _DSD to export the device tree property separately for each
+device, but that wouldn't work for hotplugged devices.
+
+Paolo
