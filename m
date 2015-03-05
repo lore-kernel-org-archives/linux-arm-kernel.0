@@ -1,95 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 05 Mar 2015 12:05:33 +0000
-Subject: [PATCH v3 5/5] irqchip: gicv3-its: support safe initialization
-In-Reply-To: <1425439098-10708-6-git-send-email-wuyun.wu@huawei.com>
-References: <1425439098-10708-1-git-send-email-wuyun.wu@huawei.com>
- <1425439098-10708-6-git-send-email-wuyun.wu@huawei.com>
-Message-ID: <54F8468D.7090902@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 5 Mar 2015 12:07:02 +0000
+Subject: [PATCH] genirq: describe IRQF_COND_SUSPEND
+In-Reply-To: <20150305113306.GP3989@piout.net>
+References: <1424771762-16343-1-git-send-email-boris.brezillon@free-electrons.com>
+ <8151717.nkhnGBri9h@vostro.rjw.lan>
+ <20150226191724.0ae4ca4e@bbrezillon>
+ <6864616.1aRDSmSsvx@vostro.rjw.lan>
+ <20150304194246.GF22156@leverpostej>
+ <20150304200040.GA12126@leverpostej>
+ <20150304221729.GI3989@piout.net>
+ <20150305110411.GC13617@leverpostej>
+ <20150305113306.GP3989@piout.net>
+Message-ID: <20150305120702.GB14093@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/15 03:18, Yun Wu wrote:
-> It's unsafe to change the configurations of an activated ITS directly
-> since this will lead to unpredictable results. This patch guarantees
-> the ITSes being initialized are quiescent.
+On Thu, Mar 05, 2015 at 11:33:06AM +0000, Alexandre Belloni wrote:
+> On 05/03/2015 at 11:04:11 +0000, Mark Rutland wrote :
+> > > > +In rare cases an IRQ can be shared between a wakeup device driver and an
+> > > > +IRQF_NO_SUSPEND user. In order for this to be safe, the wakeup device driver
+> > > > +must be able to discern spurious IRQs from genuine wakeup events (signalling
+> > > 
+> > > And genuine question, should we use British English or American English
+> > > or we don't care ?
+> > 
+> > Have I written something that isn't valid American English there? I read
+> > over this a few times and failed to spot anything obvious.
+> > 
+> > I'm happy to change for consistency, I generally assume that's the most
+> > important thing.
 > 
-> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 35 +++++++++++++++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index d13c24e..9e09aa0 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1320,6 +1320,34 @@ static const struct irq_domain_ops its_domain_ops = {
->  	.deactivate		= its_irq_domain_deactivate,
->  };
-> 
-> +static int its_check_quiesced(void __iomem *base)
+> I'd say signalling vs signaling. I actually had to look up which one was
+> correct. I'm personally using Incorrect/Broken English so I'm definitely
+> not here to give lessons.
 
-Another nitpick: Rather than "its_check_quiesced", how about
-"its_force_quiescent" instead? Because this does a lot more than just
-checking.
+Easy option to keep everyone happy: s/signalling/indicating/
 
-> +{
-> +	u32 count = 1000000;	/* 1s */
-> +	u32 val;
-> +
-> +	val = readl_relaxed(base + GITS_CTLR);
-> +	if (val & GITS_CTLR_QUIESCENT)
-> +		return 0;
-> +
-> +	/* Disable the generation of all interrupts to this ITS */
-> +	val &= ~GITS_CTLR_ENABLE;
-> +	writel_relaxed(val, base + GITS_CTLR);
-> +
-> +	/* Poll GITS_CTLR and wait until ITS becomes quiescent */
-> +	while (1) {
-> +		val = readl_relaxed(base + GITS_CTLR);
-> +		if (val & GITS_CTLR_QUIESCENT)
-> +			return 0;
-> +
-> +		count--;
-> +		if (!count)
-> +			return -EBUSY;
-> +
-> +		cpu_relax();
-> +		udelay(1);
-> +	}
-> +}
-> +
+That should be valid for the English variants I'm aware of, and it has
+the same number of characters so we don't need to reflow the text.
 
-I still dislike this repeated pattern, but I don't have a good solution
-so far.
-
->  static int its_probe(struct device_node *node, struct irq_domain *parent)
->  {
->  	struct resource res;
-> @@ -1348,6 +1376,13 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
->  		goto out_unmap;
->  	}
-> 
-> +	err = its_check_quiesced(its_base);
-> +	if (err) {
-> +		pr_warn("%s: failed to quiesce, giving up\n",
-> +			node->full_name);
-> +		goto out_unmap;
-> +	}
-> +
->  	pr_info("ITS: %s\n", node->full_name);
-> 
->  	its = kzalloc(sizeof(*its), GFP_KERNEL);
-> --
-> 1.8.0
-> 
-> 
-> 
-
-Assuming you fix the above nitpick:
-
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Mark.
