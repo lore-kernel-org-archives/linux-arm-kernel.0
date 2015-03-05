@@ -1,65 +1,58 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 5 Mar 2015 11:15:56 +0000
-Subject: [PATCH 10/10] drivers: PL011: add support for the ARM SBSA
- generic UART
-In-Reply-To: <54F7453C.5060407@arm.com>
-References: <1421428986-11300-1-git-send-email-andre.przywara@arm.com>
- <1421428986-11300-11-git-send-email-andre.przywara@arm.com>
- <54E36477.3050406@codeaurora.org>
- <20150217161613.GC3783@e103592.cambridge.arm.com>
- <54F7453C.5060407@arm.com>
-Message-ID: <20150305111550.GA3612@e103592.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 05 Mar 2015 11:16:28 +0000
+Subject: [RFC PATCH v2 2/3] arm64: add IOMMU dma_ops
+In-Reply-To: <54F7A121.3050103@codeaurora.org>
+References: <cover.1423226542.git.robin.murphy@arm.com>			
+ <058e038009ac708a40197c80e07410914c2a162e.1423226542.git.robin.murphy@arm.com>		
+ <1423543151.18280.2.camel@mtksdaap41> <54D9F486.10501@arm.com>	
+ <1423901011.27922.7.camel@mhfsdcap03> <54E24D50.408@arm.com>
+ <1425353927.4555.10.camel@mhfsdcap03> <54F5A5FE.3040506@arm.com>
+ <54F7A121.3050103@codeaurora.org>
+Message-ID: <54F83B0C.9020606@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 05:47:40PM +0000, Andre Przywara wrote:
-> Philip,
-> 
-> sorry for the late reply, that was stuck in my Drafts folder :-(
-> 
-> On 02/17/2015 04:16 PM, Dave P Martin wrote:
-> > On Tue, Feb 17, 2015 at 10:55:35AM -0500, Philip Elcan wrote:
+Hi Laura,
 
+On 05/03/15 00:19, Laura Abbott wrote:
 [...]
+>> Consider that the IOMMU's page table walker is a DMA master in its own
+> right, and that is the device you're mapping the page tables for.
+> Therefore your IOMMU driver needs to have access to the struct device
+> of the IOMMU itself to use for the page-table-related mappings. Also,
+> be sure to set the IOMMU's DMA mask correctly to prevent SWIOTLB bounce
+> buffers being created in the process (which as I've found generally ends
+> in disaster).
+>>
+>>>           And normally, we always need do cache maintenance only for some
+>>> bytes in the pagetable but not whole a page. Then is there a easy way to
+>>> do the cache maintenance?
+>>
+>> For a noncoherent device, dma_map_single() will end up calling
+> __dma_map_area() with the page offset and size of the original request, so
+> the updated part gets flushed by VA, and the rest of the page isn't touched
+> if it doesn't need to be. On the other hand if the page tables were
+> allocated with dma_alloc_coherent() in the first place, then just calling
+> dma_sync_single_for_device() for the updated region should suffice.
+>>
+>
+> Where exactly would you call the dma_unmap? It seems a bit strange to
+> be repeatedly calling dma_map and never calling dma_unmap. I don't see it
+> explicitly forbidden in the docs anywhere to do this but it seems like
+> it would be violating the implicit handoff of dma_map/dma_unmap.
 
-> >> I'm a little late to address this patchset, but the SBSA defines all
-> >> the Generic UART registers 32-bit wide. However, the amba-pl011 driver
-> >> uses 16-bit accessors. How will you be handling that? Can the ARM PL011
-> >> hardware handle 32-bit access?
-> > 
-> > Interesting question.  The PL011 TRM [1] specifies only a 16-bit-wide
-> > APB bus interface, but does not say that 32-bit accesses won't work.
-> > 
-> > I suspect that 32-bit accesses will work on all or most PL011s -- if
-> > that looks too risky or we can't find enough test platforms to be sure
-> > of this, then we could maybe abstract the register access size as a
-> > quirk.
-> > 
-> > Andre may already have an answer on this.
-> 
-> I am not sure if the 32-bit register _width_ mentioned in the spec
-> really mandates 32-bit accesses, also the width may be just a spec bug.
-> Since the SBSA states that an ARM PL011r1p5 is a valid SBSA-UART
-> implementation, I wonder how this goes together. Also the highest
-> non-reserved bit in the registers is bit 15 in PL011 and bit 11 in the
-> SBSA subset.
-> 
-> I fear the actual bus connection is an implementation detail. Given the
-> fact that all existing PL011 hardware so far works with the 16bit
-> accesses, I don't dare to change this.
-> 
-> So I'd suggest to keep it as readw/writew for now and the revisit this
-> topic if some SBSA UART users complain. That makes it easier to justify
-> the rather invasive change to all MMIO accessors (which I already tried
-> on one machine for now without problems, btw).
+I think ideally you'd call dma_map_page when you first create the page 
+table, dma_sync_single_for_device on any update, and dma_unmap_page when 
+you tear it down, and you'd also use the appropriate DMA addresses 
+everywhere instead of physical addresses.
 
-+1
+I wouldn't compare that with what we do in the ARM SMMU driver, because 
+that's a lot more hacky; there we're actually _relying_ on the mapping 
+aspect of dma_map_page being a no-op so we just get the implicit sync 
+part of it, thus we know an unmap would do absolutely nothing (since the 
+SMMU doesn't write to the page tables we've no need to sync them back to 
+the CPU), so we can get away with skipping it. Of course, as both Mitch 
+and I have apparently discovered recently, things end up going wrong 
+when that no-op assumption isn't true and bounce buffers happen...
 
-As I understand it, the PL011 bus interface does not take access size
-into account at all, so providing "large-enough" accesses are used to
-cover all the bits meaningful to the UART, things are likely to work
-fine -- and this seems to be the case for all platforms currently
-supported by the amba-pl011 driver.
-
-Cheers
----Dave
+Robin.
