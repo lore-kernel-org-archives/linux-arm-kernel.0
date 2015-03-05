@@ -1,44 +1,48 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Wed, 4 Mar 2015 21:01:45 -0800
-Subject: [PATCH v9 2/4] pinctrl: cygnus: add gpio/pinconf driver
-In-Reply-To: <54F742CA.7080500@broadcom.com>
-References: <1423606584-21795-1-git-send-email-rjui@broadcom.com>	<1423606584-21795-3-git-send-email-rjui@broadcom.com>
- <CACRpkda-C1upKfa4FKLcVF9sxL4T=B+eG9ndun4fS6DZ9TfCSw@mail.gmail.com>
- <54F742CA.7080500@broadcom.com>
-Message-ID: <54F7E339.50902@broadcom.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Wed, 4 Mar 2015 23:25:36 -0600
+Subject: [GIT PULL] SoCFPGA fixes for v4.0
+Message-ID: <1425533136-31995-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Arnd, Kevin and Olof,
 
->>> +#include <linux/kernel.h>
->>> +#include <linux/slab.h>
->>> +#include <linux/module.h>
->>> +#include <linux/interrupt.h>
->>> +#include <linux/io.h>
->>> +#include <linux/gpio.h>
->>
->> This should be:
->> #include <linux/gpio/driver.h>
-
-In fact, just by trying it out I found I need linux/gpio.h for APIs like
-gpiochip_add_pin_range, and etc.
-
->>
->>
-> 
-> Great! I will address all comments and re-send a BIG patch series with
-> the other pinctrl patch series consolidated.
-> 
-> Thanks!
-> 
-> Ray
-> 
-
-I've consolidated this patch series with the IOMUX and sent out a
-combined patch series earlier. I believe all other comments have been
-addressed except the above include header one.
+Please consider pulling in these patches for v4.0. The patch from Russell is
+probably the most important as it's fixed a sporadic SMP issue where CPU1
+start address variable was being cached away, and never made it to physical
+memory.
 
 Thanks,
 
-Ray
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+
+  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+
+are available in the git repository at:
+
+  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_fixes_for_v4.0
+
+for you to fetch changes up to cee9b8d6b8b7d82bfb34e4700d839aec76519f02:
+
+  ARM: socfpga: make sure socfpga_cpu1start_addr is properly flushed (2015-03-04 13:03:17 -0600)
+
+----------------------------------------------------------------
+Fixes for v4.0 on the SoCFPGA platform:
+- Fix the SCU virtual mapping
+- Add misssing DMA channels for UART nodes
+- Fix a sporadic SMP error where CPU1 was not seeing its start address
+
+----------------------------------------------------------------
+Russell King (1):
+      ARM: socfpga: make sure socfpga_cpu1start_addr is properly flushed
+
+Steffen Trumtrar (1):
+      ARM: socfpga: fix uart DMA binding error
+
+Vince Bridgers (1):
+      ARM: socfpga: Correct SCU virtual mapping in socfpga
+
+ arch/arm/boot/dts/socfpga.dtsi  | 6 ++++++
+ arch/arm/mach-socfpga/core.h    | 2 +-
+ arch/arm/mach-socfpga/socfpga.c | 5 +++++
+ 3 files changed, 12 insertions(+), 1 deletion(-)
