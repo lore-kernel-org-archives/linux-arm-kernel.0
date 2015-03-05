@@ -1,50 +1,36 @@
-From: lersek@redhat.com (Laszlo Ersek)
-Date: Thu, 05 Mar 2015 16:42:58 +0100
-Subject: [PATCH] KVM: vgic: add virt-capable compatible strings
-In-Reply-To: <1425566864-5509-1-git-send-email-mark.rutland@arm.com>
-References: <1425566864-5509-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <54F87982.5090203@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 5 Mar 2015 16:44:20 +0100
+Subject: [PATCH] clocksource: sun5i: Refactor the current code
+In-Reply-To: <1425565972-30316-1-git-send-email-daniel.lezcano@linaro.org>
+References: <54F86883.7080208@linaro.org>
+ <1425565972-30316-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20150305154420.GX4911@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/15 15:47, Mark Rutland wrote:
-> Several dts only list "arm,cortex-a7-gic" or "arm,gic-400" in their GIC
-> compatible list, and while this is correct (and supported by the GIC
-> driver), KVM will fail to detect that it can support these cases.
+On Thu, Mar 05, 2015 at 03:32:52PM +0100, Daniel Lezcano wrote:
+> From: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
-> This patch adds the missing strings to the VGIC code. The of_device_id
-> entries are padded to keep the probe fucntion data aligned.
-
-Side note: there's a typo in "function".
-
-Laszlo
-
-
+> Refactor the code in order to remove the global variables and split the clock
+> source and clock events registration in order to ease the addition of the clock
+> notifiers needed to handle the parent clock rate changes.
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Andre Przywara <andre.przywara@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Michal Simek <monstr@monstr.eu>
-> ---
->  virt/kvm/arm/vgic.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+> [dlezcano] : Fixed conflict with commit 1096be084ac59927158ce80ff1d31c33eed0e565
 > 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 0cc6ab6..86cec79 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1865,8 +1865,10 @@ static struct notifier_block vgic_cpu_nb = {
->  };
->  
->  static const struct of_device_id vgic_ids[] = {
-> -	{ .compatible = "arm,cortex-a15-gic", .data = vgic_v2_probe, },
-> -	{ .compatible = "arm,gic-v3", .data = vgic_v3_probe, },
-> +	{ .compatible = "arm,cortex-a15-gic",	.data = vgic_v2_probe, },
-> +	{ .compatible = "arm,cortex-a7-gic",	.data = vgic_v2_probe, },
-> +	{ .compatible = "arm,gic-400",		.data = vgic_v2_probe, },
-> +	{ .compatible = "arm,gic-v3",		.data = vgic_v3_probe, },
->  	{},
->  };
->  
-> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+It looks good, thanks for taking care of this!
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150305/41c6d9f9/attachment.sig>
