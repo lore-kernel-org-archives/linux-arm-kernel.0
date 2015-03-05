@@ -1,56 +1,48 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 5 Mar 2015 20:44:18 +0100
-Subject: [PATCH 3/3] net: macb: remove #if defined(CONFIG_ARCH_AT91)
- sections
-In-Reply-To: <1425572842-6084-4-git-send-email-boris.brezillon@free-electrons.com>
-References: <1425572842-6084-1-git-send-email-boris.brezillon@free-electrons.com>
- <1425572842-6084-4-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150305194418.GY3989@piout.net>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 5 Mar 2015 20:46:53 +0100
+Subject: [PATCH 4.0-rc1 v17 5/6] x86/nmi: Use common printk functions
+In-Reply-To: <1425558597.2769.53.camel@linaro.org>
+References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
+ <1425463974-23568-1-git-send-email-daniel.thompson@linaro.org>
+ <1425463974-23568-6-git-send-email-daniel.thompson@linaro.org>
+ <20150305005424.GA21715@gmail.com>
+ <1425558597.2769.53.camel@linaro.org>
+Message-ID: <20150305194653.GA17436@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2015 at 17:27:22 +0100, Boris Brezillon wrote :
-> @@ -2388,21 +2392,20 @@ static int macb_probe(struct platform_device *pdev)
->  		bp->phy_interface = err;
->  	}
->  
-> +	config = 0;
->  	if (bp->phy_interface == PHY_INTERFACE_MODE_RGMII)
-> -		macb_or_gem_writel(bp, USRIO, GEM_BIT(RGMII));
-> -	else if (bp->phy_interface == PHY_INTERFACE_MODE_RMII)
-> -#if defined(CONFIG_ARCH_AT91)
-> -		macb_or_gem_writel(bp, USRIO, (MACB_BIT(RMII) |
-> -					       MACB_BIT(CLKEN)));
-> -#else
-> -		macb_or_gem_writel(bp, USRIO, 0);
-> -#endif
-> -	else
-> -#if defined(CONFIG_ARCH_AT91)
-> -		macb_or_gem_writel(bp, USRIO, MACB_BIT(CLKEN));
-> -#else
-> -		macb_or_gem_writel(bp, USRIO, MACB_BIT(MII));
-> -#endif
-> +		config = GEM_BIT(RGMII);
-> +	else if (bp->phy_interface == PHY_INTERFACE_MODE_RMII &&
-> +		 (bp->caps & MACB_CAPS_USRIO_DEFAULT_IS_MII))
-> +		config = MACB_BIT(RMII);
-> +	else if (bp->phy_interface == PHY_INTERFACE_MODE_MII &&
 
-I'm not sure you should check for PHY_INTERFACE_MODE_MII here as this
-may change the previous behaviour.
+* Daniel Thompson <daniel.thompson@linaro.org> wrote:
 
-> +		 !(bp->caps & MACB_CAPS_USRIO_DEFAULT_IS_MII))
-> +		config = MACB_BIT(MII);
-> +
-> +	if (bp->caps & MACB_CAPS_USRIO_HAS_CLKEN)
-> +		config |= MACB_BIT(CLKEN);
-> +
-> +	macb_or_gem_writel(bp, USRIO, config);
->  
->  	err = register_netdev(dev);
->  	if (err) {
+> On Thu, 2015-03-05 at 01:54 +0100, Ingo Molnar wrote:
+> > * Daniel Thompson <daniel.thompson@linaro.org> wrote:
+> > 
+> > > Much of the code sitting in arch/x86/kernel/apic/hw_nmi.c to support 
+> > > safe all-cpu backtracing from NMI has been copied to printk.c to 
+> > > make it accessible to other architectures.
+> > > 
+> > > Port the x86 NMI backtrace to the generic code.
+> > 
+> > Is there any difference between the generic and the x86 code as they 
+> > stand today?
+> 
+> Shouldn't be any user observable change but there are some changes,
+> mostly due to review comments.
+> 
+> 1. The seq_buf structures are initialized at boot and *after* they
+>    are consumed (originally they were initialized just before use).
+> 
+> 2. The generic code doesn't maintain an equivalent of backtrace_mask
+>    (which was essentially a copy of cpus_online made when backtracing
+>    was requested) and instead iterates using for_each_possible_cpu()
+>    to initialize and dump the seq_buf:s.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Ok, I have no fundamental objections:
+
+Acked-by: Ingo Molnar <mingo@kernel.org>
+
+I suspect you want to carry the x86 bits yourself?
+
+Thanks,
+
+	Ingo
