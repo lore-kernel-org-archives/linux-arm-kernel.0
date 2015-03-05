@@ -1,29 +1,50 @@
-From: lsanfil@marvell.com (Lino Sanfilippo)
-Date: Thu, 5 Mar 2015 16:32:28 +0100
-Subject: [RFC PATCH 0/1] Wrong structure alignment due to compiler
- attribute "section"
-In-Reply-To: <20150305134733.GE3612@e103592.cambridge.arm.com>
-References: <1425290502-2322-1-git-send-email-lsanfil@marvell.com>
- <20150303144130.GB5177@e103592.cambridge.arm.com>
- <54F6EF32.7080306@marvell.com>
- <20150304143527.GA5653@e103592.cambridge.arm.com>
- <54F732DA.2050004@marvell.com>
- <20150305122606.GC3612@e103592.cambridge.arm.com>
- <54F8582B.80703@marvell.com>
- <20150305134733.GE3612@e103592.cambridge.arm.com>
-Message-ID: <54F8770C.8080709@marvell.com>
+From: lersek@redhat.com (Laszlo Ersek)
+Date: Thu, 05 Mar 2015 16:42:58 +0100
+Subject: [PATCH] KVM: vgic: add virt-capable compatible strings
+In-Reply-To: <1425566864-5509-1-git-send-email-mark.rutland@arm.com>
+References: <1425566864-5509-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <54F87982.5090203@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.03.2015 14:47, Dave Martin wrote:
+On 03/05/15 15:47, Mark Rutland wrote:
+> Several dts only list "arm,cortex-a7-gic" or "arm,gic-400" in their GIC
+> compatible list, and while this is correct (and supported by the GIC
+> driver), KVM will fail to detect that it can support these cases.
+> 
+> This patch adds the missing strings to the VGIC code. The of_device_id
+> entries are padded to keep the probe fucntion data aligned.
 
->
-> Source code?  That just looks like binaries to me.
->
+Side note: there's a typo in "function".
 
-Oops, youre right, there is no source in that package, sorry. I tried to 
-contact the persons that are maintaining this toolchain and asked for 
-access to the source. Hope I will get a response, soon...
+Laszlo
 
-Regards,
-Lino
+
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Andre Przywara <andre.przywara@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Michal Simek <monstr@monstr.eu>
+> ---
+>  virt/kvm/arm/vgic.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 0cc6ab6..86cec79 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1865,8 +1865,10 @@ static struct notifier_block vgic_cpu_nb = {
+>  };
+>  
+>  static const struct of_device_id vgic_ids[] = {
+> -	{ .compatible = "arm,cortex-a15-gic", .data = vgic_v2_probe, },
+> -	{ .compatible = "arm,gic-v3", .data = vgic_v3_probe, },
+> +	{ .compatible = "arm,cortex-a15-gic",	.data = vgic_v2_probe, },
+> +	{ .compatible = "arm,cortex-a7-gic",	.data = vgic_v2_probe, },
+> +	{ .compatible = "arm,gic-400",		.data = vgic_v2_probe, },
+> +	{ .compatible = "arm,gic-v3",		.data = vgic_v3_probe, },
+>  	{},
+>  };
+>  
+> 
