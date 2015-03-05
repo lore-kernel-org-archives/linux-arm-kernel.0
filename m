@@ -1,40 +1,31 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu,  5 Mar 2015 14:10:30 +0100
-Subject: [RESENT PATCH] spi: xilinx: Use standard num-cs binding
-Message-ID: <1777fd49a103237c7ac0ebca434b33509e1b843f.1425561027.git.michal.simek@xilinx.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 5 Mar 2015 07:13:29 -0600
+Subject: [PATCH 2/4] ARM: OMAP2+: AM43xx hwmod: Add RTC hwmod for AM43xx
+In-Reply-To: <1425561211-31003-1-git-send-email-d-gerlach@ti.com>
+References: <1425561211-31003-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <1425561211-31003-3-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use standard num-cs binding property and setup
-"xlnx,num-ss-bits" as deprecated.
+RTC hwmod is needed for proper operation of PM features like
+rtcwake and rtc-only mode so reuse the am33xx rtc hwmod.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 1 +
+ 1 file changed, 1 insertion(+)
 
- drivers/spi/spi-xilinx.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-index 133f53a9c1d4..69313407b690 100644
---- a/drivers/spi/spi-xilinx.c
-+++ b/drivers/spi/spi-xilinx.c
-@@ -374,8 +374,15 @@ static int xilinx_spi_probe(struct platform_device *pdev)
- 		num_cs = pdata->num_chipselect;
- 		bits_per_word = pdata->bits_per_word;
- 	} else {
--		of_property_read_u32(pdev->dev.of_node, "xlnx,num-ss-bits",
--					  &num_cs);
-+		if (of_property_read_u32(pdev->dev.of_node, "num-cs",
-+					 &num_cs)) {
-+			if (!of_property_read_u32(pdev->dev.of_node,
-+						  "xlnx,num-ss-bits",
-+						  &num_cs)) {
-+				dev_err(&pdev->dev,
-+					"property name 'xlnx,num-ss-bits' is deprecated.\n");
-+			}
-+		}
- 	}
+diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+index 8eb8592..9070535 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+@@ -889,6 +889,7 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am43xx_l4_ls__dss,
+ 	&am43xx_l4_ls__dss_dispc,
+ 	&am43xx_l4_ls__dss_rfbi,
++	&am33xx_l4_wkup__rtc,
+ 	NULL,
+ };
  
- 	if (!num_cs) {
 -- 
-1.8.2.3
+2.3.0
