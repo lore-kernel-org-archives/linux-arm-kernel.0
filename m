@@ -1,59 +1,44 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 05 Mar 2015 15:08:26 +0100
-Subject: [PATCH v2] ARM64: Add new Xilinx ZynqMP SoC
-In-Reply-To: <20150305150322.19e378d9@free-electrons.com>
-References: <cd616fa25dafee38f98e3b207e74450c5403f440.1425563597.git.michal.simek@xilinx.com>
- <20150305150322.19e378d9@free-electrons.com>
-Message-ID: <54F8635A.9020808@monstr.eu>
+From: mporter@konsulko.com (Matt Porter)
+Date: Thu, 5 Mar 2015 09:10:37 -0500
+Subject: [PATCH] MAINTAINERS: Remove self as ARM mach-bcm co-maintainer
+In-Reply-To: <1424193477-5141-1-git-send-email-mporter@linaro.org>
+References: <1424193477-5141-1-git-send-email-mporter@linaro.org>
+Message-ID: <20150305141037.GD19577@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Florian,
 
-On 03/05/2015 03:03 PM, Thomas Petazzoni wrote:
-> Dear Michal Simek,
-> 
-> On Thu,  5 Mar 2015 14:53:34 +0100, Michal Simek wrote:
-> 
->> +	pmu {
->> +		compatible = "arm,armv8-pmuv3";
->> +		interrupts = <0 143 4>,
->> +			     <0 144 4>,
->> +			     <0 145 4>,
->> +			     <0 146 4>;
-> 
-> Any reason not to use
-> 
-> #include <dt-bindings/interrupt-controller/arm-gic.h>
-> #include <dt-bindings/interrupt-controller/irq.h>
-> 
-> in order to write the more descriptive:
-> 
-> 		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>,
-> 			     <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>,
-> 			     <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
-> 			     <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
-> 
-> And ditto for all other interrupts properties?
-
-I tend to not to use them because it is just hassle when I want
-to move DTSes to different project.
+That email address is dead now so can you pick this up for 4.0 fixes?
 
 Thanks,
-Michal
+Matt
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150305/6483e80f/attachment.sig>
+On Tue, Feb 17, 2015 at 12:17:57PM -0500, Matt Porter wrote:
+> Removing myself as a co-maintainer.
+> 
+> Signed-off-by: Matt Porter <mporter@linaro.org>
+> ---
+>  MAINTAINERS | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 2ebb056..e21438b 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2077,7 +2077,6 @@ F:	drivers/net/ethernet/broadcom/bnx2x/
+>  
+>  BROADCOM BCM281XX/BCM11XXX/BCM216XX ARM ARCHITECTURE
+>  M:	Christian Daudt <bcm@fixthebug.org>
+> -M:	Matt Porter <mporter@linaro.org>
+>  M:	Florian Fainelli <f.fainelli@gmail.com>
+>  L:	bcm-kernel-feedback-list at broadcom.com
+>  T:	git git://github.com/broadcom/mach-bcm
+> -- 
+> 1.8.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
