@@ -1,65 +1,158 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Wed, 4 Mar 2015 16:35:55 -0800
-Subject: [PATCH v5 7/8] ARM: dts: enable GPIO for Broadcom Cygnus
+Date: Wed, 4 Mar 2015 16:35:50 -0800
+Subject: [PATCH v5 2/8] pinctrl: Broadcom Cygnus pinctrl device tree binding
 In-Reply-To: <1425515756-321-1-git-send-email-rjui@broadcom.com>
 References: <1425515756-321-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1425515756-321-8-git-send-email-rjui@broadcom.com>
+Message-ID: <1425515756-321-3-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables all 3 GPIO controllers including the ASIU GPIO, the
-chipcommonG GPIO, and the ALWAYS-ON GPIO, for Broadcom Cygnus SoC
+Device tree binding documentation for Broadcom Cygnus IOMUX driver
 
 Signed-off-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
-Tested-by: Dmitry Torokhov <dtor@chromium.org>
 ---
- arch/arm/boot/dts/bcm-cygnus.dtsi |   33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ .../bindings/pinctrl/brcm,cygnus-pinmux.txt        |  132 ++++++++++++++++++++
+ 1 file changed, 132 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinmux.txt
 
-diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index 1cbae6a..8d247d2 100644
---- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -60,6 +60,39 @@
- 		      <0x0301d24c 0x2c>;
- 	};
- 
-+	gpio_crmu: gpio at 03024800 {
-+		compatible = "brcm,cygnus-gpio";
-+		reg = <0x03024800 0x50>,
-+		      <0x03024008 0x18>;
-+		ngpios = <6>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
+diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinmux.txt b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinmux.txt
+new file mode 100644
+index 0000000..3600d5c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinmux.txt
+@@ -0,0 +1,132 @@
++Broadcom Cygnus IOMUX Controller
++
++The Cygnus IOMUX controller supports group based mux configuration. In
++addition, certain pins can be muxed to GPIO function individually.
++
++Required properties:
++
++- compatible:
++    Must be "brcm,cygnus-pinmux"
++
++- reg:
++    Define the base and range of the I/O address space that contains the Cygnus
++IOMUX registers
++
++Properties in subnodes:
++
++- function:
++    The mux function to select
++
++- groups:
++    The list of groups to select with a given function
++
++For more details, refer to
++Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
++
++For example:
++
++	pinmux: pinmux at 0x0301d0c8 {
++		compatible = "brcm,cygnus-pinmux";
++		reg = <0x0301d0c8 0x1b0>;
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2s0_default>;
++
++		i2s0_default: i2s0_default {
++			mux {
++				function = "i2s0";
++				groups = "i2s0_0_grp", "i2s0_1_grp";
++			};
++		};
 +	};
 +
-+	gpio_ccm: gpio at 1800a000 {
-+		compatible = "brcm,cygnus-gpio";
-+		reg = <0x1800a000 0x50>,
-+		      <0x0301d164 0x20>;
-+		ngpios = <24>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-controller;
-+	};
++List of supported functions and groups in Cygnus:
 +
-+	gpio_asiu: gpio at 180a5000 {
-+		compatible = "brcm,cygnus-gpio";
-+		reg = <0x180a5000 0x668>;
-+		ngpios = <146>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
++"i2s0": "i2s0_0_grp", "i2s0_1_grp"
 +
-+		pinmux = <&pinctrl>;
++"i2s1": "i2s1_0_grp", "i2s1_1_grp"
 +
-+		interrupt-controller;
-+		interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-+	};
++"i2s2": "i2s2_0_grp", "i2s2_1_grp", "i2s2_2_grp", "i2s2_3_grp", "i2s2_4_grp"
 +
- 	amba {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
++"spdif": "spdif_grp"
++
++"pwm0": "pwm0_grp"
++
++"pwm1": "pwm1_grp"
++
++"pwm2": "pwm2_grp"
++
++"pwm3": "pwm3_grp"
++
++"pwm4": "pwm4_grp"
++
++"pwm5": "pwm5_grp"
++
++"key": "key0_grp", "key1_grp", "key2_grp", "key3_grp", "key4_grp", "key5_grp",
++"key6_grp", "key7_grp", "key8_grp", "key9_grp", "key10_grp", "key11_grp",
++"key12_grp", "key13_grp", "key14_grp", "key15_grp"
++
++"audio_dte": "audio_dte0_grp", "audio_dte1_grp", "audio_dte2_grp", "audio_dte3_grp"
++
++"smart_card0": "smart_card0_grp", "smart_card0_fcb_grp"
++
++"smart_card1": "smart_card1_grp", "smart_card1_fcb_grp"
++
++"spi0": "spi0_grp"
++
++"spi1": "spi1_grp"
++
++"spi2": "spi2_grp"
++
++"spi3": "spi3_grp"
++
++"spi4": "spi4_0_grp", "spi4_1_grp"
++
++"spi5": "spi5_grp"
++
++"sw_led0": "sw_led0_0_grp", "sw_led0_1_grp"
++
++"sw_led1": "sw_led1_grp"
++
++"sw_led2": "sw_led2_0_grp", "sw_led2_1_grp"
++
++"d1w": "d1w_grp"
++
++"lcd": "lcd_grp"
++
++"sram": "sram_0_grp", "sram_1_grp"
++
++"uart0": "uart0_grp"
++
++"uart1": "uart1_grp", "uart1_dte_grp"
++
++"uart2": "uart2_grp"
++
++"uart3": "uart3_grp"
++
++"uart4": "uart4_grp"
++
++"qspi": "qspi_0_grp", "qspi_1_grp"
++
++"nand": "nand_grp"
++
++"sdio0": "sdio0_grp", "sdio0_cd_grp", "sdio0_mmc_grp"
++
++"sdio1": "sdio1_data_0_grp", "sdio1_data_1_grp", "sdio1_cd_grp",
++"sdio1_led_grp", "sdio1_mmc_grp"
++
++"can0": "can0_grp"
++
++"can1": "can1_grp"
++
++"cam": "cam_led_grp", "cam_0_grp", "cam_1_grp"
++
++"bsc1": "bsc1_grp"
++
++"pcie_clkreq": "pcie_clkreq_grp"
++
++"usb0_oc": "usb0_oc_grp"
++
++"usb1_oc": "usb1_oc_grp"
++
++"usb2_oc": "usb2_oc_grp"
 -- 
 1.7.9.5
