@@ -1,33 +1,45 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu,  5 Mar 2015 12:31:22 +0100
-Subject: [PATCH v3 6/9] Documentation: bindings: add the Berlin nand
- controller compatible
+Date: Thu,  5 Mar 2015 12:31:24 +0100
+Subject: [PATCH v3 8/9] ARM: berlin: add BG2Q node for the nand
 In-Reply-To: <1425555085-29531-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1425555085-29531-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1425555085-29531-7-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1425555085-29531-9-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Berlin nand controller support was introduced using the existing
-pxa3xx nand driver. Add the Berlin specific compatible into the
-documentation.
+Add a node describing the nand controller of the Marvell Berlin BG2Q
+SoC. It uses the pxa3xx nand driver, with a dedicated compatible.
+
+Also add the corresponding pinmuxing configuration.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/berlin2q.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-index ecd1fc071f81..f33ee0aa0a2e 100644
---- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-@@ -5,6 +5,7 @@ Required properties:
-  - compatible:		Should be set to one of the following:
- 			marvell,pxa3xx-nand
- 			marvell,armada370-nand
-+			marvell,berlin2-nand
-  - reg: 		The register base for the controller
-  - interrupts:		The interrupt to map
-  - #address-cells:	Set to <1> if the node includes partitions
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index be5397288d24..aeb3a0ea0540 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -437,6 +437,19 @@
+ 			status = "disabled";
+ 		};
+ 
++		nand0: nand at f00000 {
++			compatible = "marvell,berlin2-nand";
++			reg = <0xf00000 0x10000>;
++			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&chip CLKID_NFC>,
++				 <&chip CLKID_NFC_ECC>;
++			clock-names = "nfc", "ecc";
++
++			#address-cells = <1>;
++
++			status = "disabled";
++		};
++
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
 -- 
 2.3.1
