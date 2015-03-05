@@ -1,82 +1,46 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 05 Mar 2015 20:49:14 +0100
-Subject: [PATCH v4 4/9] power: reset: Add AT91RM9200 reset driver
-In-Reply-To: <1425570594-13124-5-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1425570594-13124-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1425570594-13124-5-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1425584954.24292.243.camel@x220>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 05 Mar 2015 11:57:52 -0800
+Subject: [PATCH RESEND 0/4] Add support for IPROC SDHCI controller
+In-Reply-To: <CAPDyKFpH=dYzku9KNVFPtqc73+TptLFGZHNkFZ3Q4=suLOwFfQ@mail.gmail.com>
+References: <sbranden@broadcom.com>	<1425571148-5876-1-git-send-email-sbranden@broadcom.com>
+ <CAPDyKFpH=dYzku9KNVFPtqc73+TptLFGZHNkFZ3Q4=suLOwFfQ@mail.gmail.com>
+Message-ID: <54F8B540.6000301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-03-05 at 16:49 +0100, Alexandre Belloni wrote:
-> --- a/drivers/power/reset/Kconfig
-> +++ b/drivers/power/reset/Kconfig
-> @@ -30,6 +30,13 @@ config POWER_RESET_AT91_RESET
->  	  This driver supports restart for Atmel AT91SAM9 and SAMA5
->  	  SoCs
->  
-> +config POWER_RESET_AT91RM9200_RESET
-> +	bool "Atmel AT91RM9200 reset driver"
+On 05/03/15 08:16, Ulf Hansson wrote:
+> On 5 March 2015 at 16:59, Scott Branden <sbranden@broadcom.com> wrote:
+>> This series of patchsets contains the IPROC SDHCI driver used
+>> in a series of Broadcom SoCs
+>> Quirks are also added to support this controller.
+>>
+>> Corneliu Doban (1):
+>>   mmc: sdhci: do not set AUTO_CMD12 for multi-block CMD53
+>>
+>> Scott Branden (3):
+>>   mmc: sdhci: add quirk for ACMD23 broken
+>>   mmc: sdhci-iproc: add IPROC SDHCI driver
+>>   mmc: sdhci-iproc: add device tree bindings
+>>
+>>  .../devicetree/bindings/mmc/brcm,sdhci-iproc.txt   |  23 ++
+>>  drivers/mmc/host/Kconfig                           |  14 ++
+>>  drivers/mmc/host/Makefile                          |   1 +
+>>  drivers/mmc/host/sdhci-iproc.c                     | 241 +++++++++++++++++++++
+>>  drivers/mmc/host/sdhci.c                           |   7 +-
+>>  include/linux/mmc/sdhci.h                          |   2 +
+>>  6 files changed, 286 insertions(+), 2 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt
+>>  create mode 100644 drivers/mmc/host/sdhci-iproc.c
+>>
+>> --
+>> 2.2.2
+>>
+> 
+> Applied, thanks!
+> 
+> Actually, I needed to re-solve some conflicts and I switched to order
+> of patch3 and patch4, to avoid checkpatch warnings. Just so you know.
 
-This adds a bool symbol.
-
-> +	depends on ARCH_AT91 && MFD_SYSCON
-> +	default SOC_AT91RM9200
-> +	help
-> +	  This driver supports restart for Atmel AT91RM9200.
-> +
->  config POWER_RESET_AXXIA
->  	bool "LSI Axxia reset driver"
->  	depends on ARCH_AXXIA
-> diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-> index 11de15bae52e..96e972bbb922 100644
-> --- a/drivers/power/reset/Makefile
-> +++ b/drivers/power/reset/Makefile
-> @@ -1,6 +1,7 @@
->  obj-$(CONFIG_POWER_RESET_AS3722) += as3722-poweroff.o
->  obj-$(CONFIG_POWER_RESET_AT91_POWEROFF) += at91-poweroff.o
->  obj-$(CONFIG_POWER_RESET_AT91_RESET) += at91-reset.o
-> +obj-$(CONFIG_POWER_RESET_AT91RM9200_RESET) += at91rm9200-reset.o
-
-This objectfile will never be modular.
-
->  obj-$(CONFIG_POWER_RESET_AXXIA) += axxia-reset.o
->  obj-$(CONFIG_POWER_RESET_BRCMSTB) += brcmstb-reboot.o
->  obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
-> diff --git a/drivers/power/reset/at91rm9200-reset.c b/drivers/power/reset/at91rm9200-reset.c
-> new file mode 100644
-> index 000000000000..b739ac82b9c9
-> --- /dev/null
-> +++ b/drivers/power/reset/at91rm9200-reset.c
-> @@ -0,0 +1,72 @@
-
-> +#include <linux/module.h>
-
-Is this needed?
-
-> +static struct platform_driver at91rm9200_reset_driver = {
-> +	.probe = at91rm9200_reset_probe,
-> +	.driver = {
-> +		.name = "at91rm9200-reset",
-> +		.of_match_table = at91rm9200_reset_of_match,
-> +	},
-> +};
-> +module_platform_driver(at91rm9200_reset_driver);
-
-This should, perhaps, be replaced by a wrapper that calls
-    platform_driver_register(at91rm9200_reset_driver)
-
-while that wrapper is, well, called through
-    device_initcall()
-
-or something similar. I didn't test this suggestion.
-
-> +MODULE_ALIAS("platform:at91rm9200-reset");
-> +MODULE_AUTHOR("Alexandre Belloni <alexandre.belloni@free-electrons.com>");
-> +MODULE_DESCRIPTION("Atmel at91rm9200 System Timer Reset driver");
-> +MODULE_LICENSE("GPL v2");
-
-All these macros will be, basically, preprocessed away.
-
-
-Paul Bolle
+Thanks, patch 4 dropped from devicetree/next.
+-- 
+Florian
