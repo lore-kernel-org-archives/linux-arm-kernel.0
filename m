@@ -1,57 +1,49 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Thu, 5 Mar 2015 09:13:28 -0800
-Subject: [PATCH v5 6/8] pinctrl: cygnus: add gpio/pinconf driver
-In-Reply-To: <1425544581.24292.194.camel@x220>
-References: <1425515756-321-1-git-send-email-rjui@broadcom.com>	
- <1425515756-321-7-git-send-email-rjui@broadcom.com>	
- <1425543104.24292.185.camel@x220> <1425544581.24292.194.camel@x220>
-Message-ID: <54F88EB8.3020208@broadcom.com>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Thu, 05 Mar 2015 09:28:02 -0800
+Subject: [PATCH] iommu/arm-smmu: fix leak in arm_smmu_flush_pgtable
+In-Reply-To: <54F83235.70700@arm.com> (Robin Murphy's message of "Thu, 05 Mar
+ 2015 10:38:45 +0000")
+References: <1425514685-23831-1-git-send-email-mitchelh@codeaurora.org>
+ <54F83235.70700@arm.com>
+Message-ID: <vnkwsidjtkv1.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-On 3/5/2015 12:36 AM, Paul Bolle wrote:
-> On Thu, 2015-03-05 at 09:11 +0100, Paul Bolle wrote:
->> On Wed, 2015-03-04 at 16:35 -0800, Ray Jui wrote:
->>> +MODULE_AUTHOR("Ray Jui <rjui@broadcom.com>");
->>> +MODULE_DESCRIPTION("Broadcom Cygnus GPIO Driver");
->>> +MODULE_LICENSE("GPL v2");
+On Thu, Mar 05 2015 at 02:38:45 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+> Hi Mitch,
+>
+> On 05/03/15 00:18, Mitchel Humpherys wrote:
+>> We're currently mapping a page in arm_smmu_flush_pgtable without ever
+>> unmapping it.  Fix this by calling dma_unmap_page on the returned dma
+>> address.  Since the only reason we're calling dma_map_page is to make
+>> sure it actually gets flushed out to RAM, we can just call
+>> dma_unmap_page immediately following the map.
 >>
->> These three macros will be preprocessed away. (There's also
->> MODULE_DEVICE_TABLE. I don't yet know how that is handled in a
->> non-modular build, sorry.)
-> 
-> It turns out MODULE_DEVICE_TABLE is _really_ preprocessed away. See
-> include/linux/module.h:
->     #ifdef MODULE
->     /* Creates an alias so file2alias.c can find device table. */
->     #define MODULE_DEVICE_TABLE(type, name)                                 \
->     extern const typeof(name) __mod_##type##__##name##_device_table         \
->       __attribute__ ((unused, alias(__stringify(name))))
->     #else  /* !MODULE */
->     #define MODULE_DEVICE_TABLE(type, name)
->     #endif
-> 
-> 
-> Did I get that right?
-> 
-> (I knew the other three MODULE_* macros are handled in slightly more
-> complicated way, but the effect is basically that they are preprocessed
-> away.)
-> 
-> 
-> Paul Bolle
-> 
+>> Without this, eventually swiotlb runs out of memory and starts printing
+>> things like:
+>>
+>>      [   35.545076] arm-smmu d00000.arm,smmu: swiotlb buffer is full (sz: 128 bytes)
+>>
+>
+> So, you have non-coherent SMMUs too ;) The real problem is that the SMMU's
+> DMA mask is wrong (as it happens I've just given Will a patch to fix that)
+> - this is really just doing a whole bunch of unnecessary work (two memory
+> copies and two cache flushes, one of which isn't even flushing the right
+> area) to hide the problem. With an appropriate DMA mask set,
+> swiotlb_map_page becomes a no-op and we fall through to the cache flush
+> without ever allocating anything.
 
-Even these module macros will be pre-processed away when the driver is
-statically linked (and yes, I'm not planning to ever make these driver
-built as module), I'm not too sure about the convention here. I thought
-that they are still good to be in the driver for information purpose.
-I'm seeing other pinctrl drivers doing this as well.
+Yeah I noticed that as well...  But isn't this still incorrect usage of
+the API (DMA-API-HOWTO.txt seems to indicate that calls to map should
+always be balanced with calls to unmap)?  What we really want to do here
+is just call __dma_map_area directly, but the comment on that guy
+expressly forbids it...  Not sure what's worse, abusing the DMA API or
+disobeying that comment?
 
-Maybe Linus can help to clarify this?
 
-Thanks,
+-Mitch
 
-Ray
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
