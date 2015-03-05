@@ -1,41 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Mar 2015 10:57:29 +0000
-Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
- IRQF_NO_SUSPEND
-In-Reply-To: <14143668.0aRkeVrc3Q@vostro.rjw.lan>
-References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
- <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
- <20150304183809.GD22156@leverpostej>
- <14143668.0aRkeVrc3Q@vostro.rjw.lan>
-Message-ID: <20150305105729.GB13617@leverpostej>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 5 Mar 2015 11:59:15 +0100
+Subject: [GIT PULL] at91: fixes for 4.0 #2
+Message-ID: <1425553155-30407-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Arnd, Olof, Kevin,
 
-> > >  		err = request_irq(wdt->irq, wdt_interrupt,
-> > > -				  IRQF_SHARED | IRQF_IRQPOLL,
-> > > +				  IRQF_SHARED | IRQF_IRQPOLL |
-> > > +				  IRQF_NO_SUSPEND,
-> > 
-> > I'm a little confused by this. What happens if the watchdog fires when
-> > we're actually in the suspended state (when IRQF_NO_SUSPEND interrupts
-> > aren't guaranteed to be delivered).
-> 
-> Why wouldn't they be delivered?
-> 
-> If that's suspend-to-idle, we'll handle them normally.  If that's full suspend,
-> they may not be handled at the last stage (when we run on one CPU with interrupts
-> off), but that was the case before the wakeup interrupts rework already and I'd
-> expect it to be taken into account somehow in the existing code (or if it isn't
-> taken into account, we have a bug, but it is not related to this series).
+Another batch of fixes that I have now, so it doesn't make sense to hold them
+more.
 
-There's no enable_irq_wake(wdt->irq), and I was under the impression this
-is for full suspend.
+Thanks, best regards,
 
-I agree that if problematic, it's an existing bug. Given Boris's
-comments in the other thread this may just a minor semantic issue w.r.t.
-IRQF_NO_SUSPEND vs IRQF_COND_SUSPEND.
+The following changes since commit 2141102e045e622cac176891cb66c5bf08e439f5:
 
-Thanks,
-Mark.
+  ARM: at91/dt: keep watchdog running in idle mode (2015-03-04 11:20:52 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes2
+
+for you to fetch changes up to 5957457a2d96e4c9b2fecd40f29cdb3bb841d75e:
+
+  ARM: at91/pm: MOR register KEY was missing (2015-03-05 11:43:02 +0100)
+
+----------------------------------------------------------------
+Second fixes batch for AT91 on 4.0:
+- little fix for !MMU debug: may also help for randconfig
+- fix of 2 errors in LCD clock definitions
+- in PM code, not writing the key leads to not execute the action
+
+----------------------------------------------------------------
+Alexandre Belloni (1):
+      ARM: at91: debug: fix non MMU debug
+
+Boris BREZILLON (2):
+      ARM: at91/dt: sama5d4: rename lcd_clk into lcdc_clk
+      ARM: at91/dt: sama5d4: fix lcdck clock definition
+
+Patrice Vilchez (1):
+      ARM: at91/pm: MOR register KEY was missing
+
+ arch/arm/boot/dts/sama5d4.dtsi    | 6 +++---
+ arch/arm/include/debug/at91.S     | 5 ++++-
+ arch/arm/mach-at91/pm_slowclock.S | 2 ++
+ 3 files changed, 9 insertions(+), 4 deletions(-)
+
+-- 
+Nicolas Ferre
