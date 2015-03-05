@@ -1,77 +1,373 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 5 Mar 2015 08:12:52 +0100
-Subject: [PATCH v7 1/8] ARM: dt: Binding documentation for imx25 ADC/TSC
-In-Reply-To: <2620642.Qp1W4O8uh6@wuerfel>
-References: <1425369498-25541-1-git-send-email-mpa@pengutronix.de>
- <1425369498-25541-2-git-send-email-mpa@pengutronix.de>
- <2620642.Qp1W4O8uh6@wuerfel>
-Message-ID: <20150305071252.GA8062@pengutronix.de>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Thu, 5 Mar 2015 15:27:23 +0800
+Subject: [PATCH v2 3/4] cpufreq: mediatek: add Mediatek cpufreq driver
+In-Reply-To: <CAKohpo=c2t4_2hdPP-vQM7xewK5SXaHBGNA9PhvTwDv3++pSTg@mail.gmail.com>
+References: <1425458956-20665-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1425458956-20665-4-git-send-email-pi-cheng.chen@linaro.org>
+ <CAKohpo=c2t4_2hdPP-vQM7xewK5SXaHBGNA9PhvTwDv3++pSTg@mail.gmail.com>
+Message-ID: <CALx668VypyWbVuph0ir0SRt4kqASvYzwBuyc_r5tFeoHi+HieA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Viresh,
 
-On Tue, Mar 03, 2015 at 10:02:12AM +0100, Arnd Bergmann wrote:
-> On Tuesday 03 March 2015 08:58:11 Markus Pargmann wrote:
-> > +Example:
-> > +       tscadc: tscadc at 50030000 {
-> > +               compatible = "fsl,imx25-tsadc";
-> > +               reg = <0x50030000 0xc>;
-> > +               interrupts = <46>;
-> > +               clocks = <&clks 119>;
-> > +               clock-names = "ipg";
-> > +               interrupt-controller;
-> > +               #interrupt-cells = <1>;
-> > +               #address-cells = <1>;
-> > +               #size-cells = <1>;
-> > +               ranges;
-> > +
-> > +               tsc: tcq at 50030400 {
-> > +                       compatible = "fsl,imx25-tcq";
-> > +                       reg = <0x50030400 0x60>;
-> > +                       ...
-> > +               };
-> > +
-> > +               adc: gcq at 50030800 {
-> > +                       compatible = "fsl,imx25-gcq";
-> > +                       reg = <0x50030800 0x60>;
-> > +                       ...
-> > +               };
-> > +       };
-> > 
-> 
-> I wonder if we should just treat this MFD as a single IIO device
-> that also registers to the input layer.
-> 
-> Are there any other registers in the 0x50030000-0x50031000
-> range, or could the fsl,imx25-tcq and fsl,imx25-gcq devices
-> be reused outside of a fsl,imx25-tsadc device?
+Thanks for reviewing.
+Please see my reply below:
 
-There are no other registers in this range. The tcq and gcq devices can
-not be used outside of the tsadc. gcq and tcq are identical units so it
-may work to use both of them as gcq for example but nothing else.
+On 4 March 2015 at 19:09, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> Haven't reviewed it completely yet, but this is all I have done.
+>
+> On 4 March 2015 at 14:19, pi-cheng.chen <pi-cheng.chen@linaro.org> wrote:
+>
+>> +static int mtk_cpufreq_notify(struct notifier_block *nb,
+>> +                             unsigned long action, void *data)
+>> +{
+>> +       struct cpufreq_freqs *freqs = data;
+>> +       struct cpu_opp_table *opp_tbl = dvfs_info->opp_tbl;
+>
+> There is only one dvfs info ? but there are two clusters, sorry got confused
+> a bit..
 
-It may work to have this as single IIO device. However this would be a
-major rework of this series. There are a lot less users of imx25 than
-imx6 for example. And of these users barely anyone uses this unit at
-all. I really would like to get these drivers mainline so others can use
-it. But after 1 year and 7 versions of this series I don't want to put
-a lot of work into these drivers. I think there are other components in
-the kernel where the time is better used.
+There are 2 clusters, but only the big cluster need to do voltage scaling in the
+notifier, since the voltage controlling is done by cpufreq-dt driver
+in this version.
+Therefore only one dvfs_info struct here.
+
+>
+>> +       int old_vproc, new_vproc, old_index, new_index;
+>> +
+>> +       if (!cpumask_test_cpu(freqs->cpu, &dvfs_info->cpus))
+>> +               return NOTIFY_DONE;
+>> +
+>> +       old_vproc = regulator_get_voltage(dvfs_info->proc_reg);
+>> +       old_index = cpu_opp_table_get_volt_index(old_vproc);
+>> +       new_index = cpu_opp_table_get_freq_index(freqs->new * 1000);
+>> +       new_vproc = opp_tbl[new_index].vproc;
+>> +
+>> +       if (old_vproc == new_vproc)
+>> +               return 0;
+>> +
+>> +       if ((action == CPUFREQ_PRECHANGE && old_vproc < new_vproc) ||
+>> +           (action == CPUFREQ_POSTCHANGE && old_vproc > new_vproc))
+>> +               mtk_cpufreq_voltage_trace(old_index, new_index);
+>> +
+>> +       return NOTIFY_OK;
+>> +}
+>> +
+>> +static struct notifier_block mtk_cpufreq_nb = {
+>> +       .notifier_call = mtk_cpufreq_notify,
+>> +};
+>> +
+>> +static int cpu_opp_table_init(struct device *dev)
+>> +{
+>> +       struct device *cpu_dev = dvfs_info->cpu_dev;
+>> +       struct cpu_opp_table *opp_tbl;
+>> +       struct dev_pm_opp *opp;
+>> +       int ret, cnt, i;
+>> +       unsigned long rate, vproc, vsram;
+>> +
+>> +       ret = of_init_opp_table(cpu_dev);
+>> +       if (ret) {
+>> +               dev_err(dev, "Failed to init mtk_opp_table: %d\n", ret);
+>> +               return ret;
+>> +       }
+>> +
+>> +       rcu_read_lock();
+>> +
+>> +       cnt = dev_pm_opp_get_opp_count(cpu_dev);
+>> +       if (cnt < 0) {
+>> +               dev_err(cpu_dev, "No OPP table is found: %d", cnt);
+>> +               ret = cnt;
+>> +               goto out_free_opp_tbl;
+>> +       }
+>> +
+>> +       opp_tbl = devm_kcalloc(dev, (cnt + 1), sizeof(struct cpu_opp_table),
+>> +                              GFP_ATOMIC);
+>> +       if (!opp_tbl) {
+>> +               ret = -ENOMEM;
+>> +               goto out_free_opp_tbl;
+>> +       }
+>> +
+>> +       for (i = 0, rate = 0; i < cnt; i++, rate++) {
+>> +               opp = dev_pm_opp_find_freq_ceil(cpu_dev, &rate);
+>> +               if (IS_ERR(opp)) {
+>> +                       ret = PTR_ERR(opp);
+>> +                       goto out_free_opp_tbl;
+>> +               }
+>> +
+>> +               vproc = dev_pm_opp_get_voltage(opp);
+>> +               vproc = get_regulator_voltage_ceil(dvfs_info->proc_reg, vproc);
+>> +               vsram = vproc + VOLT_SHIFT_LOWER_LIMIT;
+>> +               vsram = get_regulator_voltage_ceil(dvfs_info->sram_reg, vsram);
+>> +
+>> +               if (vproc < 0 || vsram < 0) {
+>> +                       ret = -EINVAL;
+>> +                       goto out_free_opp_tbl;
+>> +               }
+>> +
+>> +               opp_tbl[i].freq = rate;
+>> +               opp_tbl[i].vproc = vproc;
+>> +               opp_tbl[i].vsram = vsram;
+>> +       }
+>> +
+>> +       opp_tbl[i].freq = 0;
+>> +       opp_tbl[i].vproc = -1;
+>> +       opp_tbl[i].vsram = -1;
+>> +       dvfs_info->opp_tbl = opp_tbl;
+>> +
+>> +out_free_opp_tbl:
+>> +       rcu_read_unlock();
+>> +       of_free_opp_table(cpu_dev);
+>> +
+>> +       return ret;
+>> +}
+>> +
+>> +static struct cpufreq_cpu_domain *get_cpu_domain(struct list_head *domain_list,
+>> +                                                int cpu)
+>> +{
+>> +       struct list_head *node;
+>> +
+>> +       list_for_each(node, domain_list) {
+>> +               struct cpufreq_cpu_domain *domain;
+>> +
+>> +               domain = container_of(node, struct cpufreq_cpu_domain, node);
+>> +               if (cpumask_test_cpu(cpu, &domain->cpus))
+>> +                       return domain;
+>> +       }
+>> +
+>> +       return NULL;
+>> +}
+>> +
+>> +static int mtk_cpufreq_probe(struct platform_device *pdev)
+>
+> On a dual cluster big LITTLE (your system), how many times is probe
+> getting called ? Once or twice, i.e. for each cluster ??
+
+The probe function will be called only once since it's triggered by the device
+tree node in the 2nd patch of this series. Though it's not acceptable obviously.
+
+>
+>> +{
+>> +       struct clk *inter_clk;
+>> +       struct cpufreq_dt_platform_data *pd;
+>> +       struct platform_device *dev;
+>> +       unsigned long inter_freq;
+>> +       int cpu, ret;
+>> +
+>> +       inter_clk = clk_get(&pdev->dev, NULL);
+>
+> How is this supposed to work ? How will pdev->dev give intermediate
+> clock ?
+
+It works with the the device tree binding in the 2nd patch of this series, too.
+Since the cpufreq node is not allowed, would you have some suggestions on
+how to get the intermediate clock source in this case?
+
+>
+>> +       if (IS_ERR(inter_clk)) {
+>> +               if (PTR_ERR(inter_clk) == -EPROBE_DEFER) {
+>> +                       dev_warn(&pdev->dev, "clock not ready. defer probeing.\n");
+>> +                       return -EPROBE_DEFER;
+>> +               }
+>> +
+>> +               dev_err(&pdev->dev, "Failed to get intermediate clock\n");
+>> +               return -ENODEV;
+>> +       }
+>> +       inter_freq = clk_get_rate(inter_clk);
+>> +
+>> +       pd = devm_kzalloc(&pdev->dev, sizeof(*pd), GFP_KERNEL);
+>> +       if (!pd)
+>> +               return -ENOMEM;
+>> +
+>> +       dvfs_info = devm_kzalloc(&pdev->dev, sizeof(*dvfs_info), GFP_KERNEL);
+>> +       if (!dvfs_info)
+>> +               return -ENOMEM;
+>
+> Instead of two allocations, you could have made pd part of dvfs_info
+> and allocated only
+> once.
+
+Will do it.
+
+>
+>> +
+>> +       pd->independent_clocks = 1,
+>
+> s/,/; ??
+
+It's strange that I didn't get a compiling error here.
+Will fix it.
+
+>
+>> +       INIT_LIST_HEAD(&pd->domain_list);
+>> +
+>> +       for_each_possible_cpu(cpu) {
+>> +               struct device *cpu_dev;
+>> +               struct cpufreq_cpu_domain *new_domain;
+>> +               struct regulator *proc_reg, *sram_reg;
+>> +
+>> +               cpu_dev = get_cpu_device(cpu);
+>
+> This should be done in the below if block only.
+
+Will do it.
+
+>
+>> +               if (!dvfs_info->cpu_dev) {
+>> +                       proc_reg = regulator_get_exclusive(cpu_dev, "proc");
+>> +                       sram_reg = regulator_get_exclusive(cpu_dev, "sram");
+>> +
+>> +                       if (PTR_ERR(proc_reg) == -EPROBE_DEFER ||
+>> +                           PTR_ERR(sram_reg) == -EPROBE_DEFER)
+>> +                               return -EPROBE_DEFER;
+>> +
+>> +                       if (!IS_ERR_OR_NULL(proc_reg) &&
+>> +                           !IS_ERR_OR_NULL(sram_reg)) {
+>> +                               dvfs_info->cpu_dev = cpu_dev;
+>> +                               dvfs_info->proc_reg = proc_reg;
+>> +                               dvfs_info->sram_reg = sram_reg;
+>> +                               cpumask_copy(&dvfs_info->cpus,
+>> +                                            &cpu_topology[cpu].core_sibling);
+>> +                       }
+>> +               }
+>> +
+>> +               if (get_cpu_domain(&pd->domain_list, cpu))
+>> +                       continue;
+>
+> This isn't required if you do below..
+
+Please see below.
+
+>
+>> +
+>> +               new_domain = devm_kzalloc(&pdev->dev, sizeof(*new_domain),
+>> +                                         GFP_KERNEL);
+>> +               if (!new_domain)
+>> +                       return -ENOMEM;
+>> +
+>> +               cpumask_copy(&new_domain->cpus,
+>> +                            &cpu_topology[cpu].core_sibling);
+>> +               new_domain->intermediate_freq = inter_freq;
+>> +               list_add(&new_domain->node, &pd->domain_list);
+>
+> Just issue a 'break' from here as you don't want to let this loop run again.
+
+Please see below.
+
+>
+>> +       }
+>> +
+>> +       if (IS_ERR_OR_NULL(dvfs_info->proc_reg) ||
+>> +           IS_ERR_OR_NULL(dvfs_info->sram_reg)) {
+>> +               dev_err(&pdev->dev, "Failed to get regulators\n");
+>> +               return -ENODEV;
+>> +       }
+>
+> If you really need these, then don't allocate new_domain unless you find a CPU
+> with these regulators..
+
+Please see below.
+
+>
+>> +       ret = cpu_opp_table_init(&pdev->dev);
+>> +       if (ret) {
+>> +               dev_err(&pdev->dev, "Failed to setup cpu_opp_table: %d\n",
+>> +                       ret);
+>> +               return ret;
+>> +       }
+>> +
+>> +       ret = cpufreq_register_notifier(&mtk_cpufreq_nb,
+>> +                                       CPUFREQ_TRANSITION_NOTIFIER);
+>> +       if (ret) {
+>> +               dev_err(&pdev->dev, "Failed to register cpufreq notifier\n");
+>> +               return ret;
+>> +       }
+>
+> Don't want to free OPP table here on error ?
+
+Please correct me if I was wrong. Since the OPP table in the dvfs_info is
+allocated by devm_kzalloc(), it is supposed to be freed if the probe function
+failed, isn't it?
+
+And the OPP table initialized by of_init_opp_table() in cpu_opp_table_init()
+was freed right before the function return since it will be initialized again in
+the cpufreq-dt driver.
+
+>
+>> +       dev = platform_device_register_data(NULL, "cpufreq-dt", -1, pd,
+>> +                                           sizeof(*pd));
+>
+> So this routine is going to be called only once. Then how are you
+> initializing stuff
+> for both the clusters in the upper for loop ? It looked very very confusing.
+
+Please let me clarify this here.
+We have two clusters, one for big and another for little cores. For
+the little cores'
+cluster, only one voltage source needs to be controlled when doing CPU DVFS.
+Therefore the voltage scaling of little cores' cluster is done in the
+cpufreq-dt.
+But for the big cores' cluster, there are two voltage sources here to
+be controlled
+and these two voltage source need to be scaled up and down in a SoC specific
+manner which is implemented in the mtk_cpufreq_voltage_trace() function.
+Hence, we put the voltage scaling of big cores' cluster in the cpufreq
+notifier and
+that's also why we need a mtk-cpufreq driver in addition to cpufreq-dt.
+
+In the confusing loop above, I am trying to solve two problems:
+1. to find out which CPUs shares the same clock / power domains among all CPUs
+2. to initialize the dvfs_info which is only needed by big cores' cluster
+
+I think that's why the loop looks so confusing. Maybe doing it in two
+separate loops
+will make the code more readable? I'll try it in next version.
+
+>
+>> +       if (IS_ERR(dev)) {
+>> +               dev_err(&pdev->dev,
+>> +                       "Failed to register cpufreq-dt platform device\n");
+>> +               return PTR_ERR(dev);
+>> +       }
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static const struct of_device_id mtk_cpufreq_match[] = {
+>> +       {
+>> +               .compatible = "mediatek,mtk-cpufreq",
+>
+> Can't you use "mediatek,mt8173" here ?
+
+Again, the device tree binding in the 2nd patch of this series. I am
+trying to get
+the intermediate clock source from the device tree. The reason why I am doing
+this is the intermediate clock source might be different among
+different Mediatek
+SoCs. Either different clock ID or different intermediate frequency. I
+want to keep
+the flexibility of the driver so I am trying to specify the
+intermediate clock source
+in the device tree. I think I need to find out some other way to do it
+since it's not
+allowed to do it by creating a "cpufreq node" in device tree.
+
+Thanks again for reviewing.
 
 Best Regards,
+Pi-Cheng
 
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150305/95f068cb/attachment.sig>
+>
+>> +       },
+>> +       {}
+>> +};
+>> +MODULE_DEVICE_TABLE(of, mtk_cpufreq_match);
+>> +
+>> +static struct platform_driver mtk_cpufreq_platdrv = {
+>> +       .driver = {
+>> +               .name   = "mtk-cpufreq",
+>> +               .of_match_table = mtk_cpufreq_match,
+>> +       },
+>> +       .probe  = mtk_cpufreq_probe,
+>> +};
+>> +module_platform_driver(mtk_cpufreq_platdrv);
