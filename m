@@ -1,52 +1,95 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Mar 2015 12:03:49 +0000
-Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
- uncached guest mappings
-In-Reply-To: <CAFEAcA98j_EsP4Hy20tQCKdnP3=NuvS3Ona37peBjan8aWLSEA@mail.gmail.com>
-References: <CAKv+Gu8OUtcpaQh5+gb6vNrdi+Q7eu_zKOujmyoRPrzrs+GJVQ@mail.gmail.com>
- <20150304122956.GT28951@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
- <20150304141212.GA5352@hawk.usersys.redhat.com>
- <20150304142943.GU28951@e104818-lin.cambridge.arm.com>
- <54F73ACF.1090605@redhat.com>
- <20150304172855.GA28951@e104818-lin.cambridge.arm.com>
- <54F82C06.2000701@redhat.com>
- <20150305110415.GA7712@e104818-lin.cambridge.arm.com>
- <CAFEAcA98j_EsP4Hy20tQCKdnP3=NuvS3Ona37peBjan8aWLSEA@mail.gmail.com>
-Message-ID: <20150305120348.GD7712@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 05 Mar 2015 12:05:33 +0000
+Subject: [PATCH v3 5/5] irqchip: gicv3-its: support safe initialization
+In-Reply-To: <1425439098-10708-6-git-send-email-wuyun.wu@huawei.com>
+References: <1425439098-10708-1-git-send-email-wuyun.wu@huawei.com>
+ <1425439098-10708-6-git-send-email-wuyun.wu@huawei.com>
+Message-ID: <54F8468D.7090902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 05, 2015 at 08:52:49PM +0900, Peter Maydell wrote:
-> On 5 March 2015 at 20:04, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Thu, Mar 05, 2015 at 11:12:22AM +0100, Paolo Bonzini wrote:
-> >> On 04/03/2015 18:28, Catalin Marinas wrote:
-> >> >> > Can you add that property to the device tree for PCI devices too?
-> >> >
-> >> > Yes but not with mainline yet:
-> >> >
-> >> > http://thread.gmane.org/gmane.linux.kernel.iommu/8935
-> >> >
-> >> > We can add the property at the PCI host bridge level (with the drawback
-> >> > that it covers all the PCI devices), like here:
-> >>
-> >> Even covering all PCI devices is not enough if we want to support device
-> >> assignment of PCI host devices.
-> >
-> > Can we not have another PCI bridge node in the DT for the host device
-> > assignments?
+On 04/03/15 03:18, Yun Wu wrote:
+> It's unsafe to change the configurations of an activated ITS directly
+> since this will lead to unpredictable results. This patch guarantees
+> the ITSes being initialized are quiescent.
 > 
-> I'd hate to have to do that. PCI should be entirely probeable
-> given that we tell the guest where the host bridge is, that's
-> one of its advantages.
+> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 35 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 35 insertions(+)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index d13c24e..9e09aa0 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1320,6 +1320,34 @@ static const struct irq_domain_ops its_domain_ops = {
+>  	.deactivate		= its_irq_domain_deactivate,
+>  };
+> 
+> +static int its_check_quiesced(void __iomem *base)
 
-I didn't say a DT node per device, the DT doesn't know what PCI devices
-are available (otherwise it defeats the idea of probing). But we need to
-tell the OS where the host bridge is via DT.
+Another nitpick: Rather than "its_check_quiesced", how about
+"its_force_quiescent" instead? Because this does a lot more than just
+checking.
 
-So the guest would be told about two host bridges: one for real devices
-and another for virtual devices. These can have different coherency
-properties.
+> +{
+> +	u32 count = 1000000;	/* 1s */
+> +	u32 val;
+> +
+> +	val = readl_relaxed(base + GITS_CTLR);
+> +	if (val & GITS_CTLR_QUIESCENT)
+> +		return 0;
+> +
+> +	/* Disable the generation of all interrupts to this ITS */
+> +	val &= ~GITS_CTLR_ENABLE;
+> +	writel_relaxed(val, base + GITS_CTLR);
+> +
+> +	/* Poll GITS_CTLR and wait until ITS becomes quiescent */
+> +	while (1) {
+> +		val = readl_relaxed(base + GITS_CTLR);
+> +		if (val & GITS_CTLR_QUIESCENT)
+> +			return 0;
+> +
+> +		count--;
+> +		if (!count)
+> +			return -EBUSY;
+> +
+> +		cpu_relax();
+> +		udelay(1);
+> +	}
+> +}
+> +
 
+I still dislike this repeated pattern, but I don't have a good solution
+so far.
+
+>  static int its_probe(struct device_node *node, struct irq_domain *parent)
+>  {
+>  	struct resource res;
+> @@ -1348,6 +1376,13 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+>  		goto out_unmap;
+>  	}
+> 
+> +	err = its_check_quiesced(its_base);
+> +	if (err) {
+> +		pr_warn("%s: failed to quiesce, giving up\n",
+> +			node->full_name);
+> +		goto out_unmap;
+> +	}
+> +
+>  	pr_info("ITS: %s\n", node->full_name);
+> 
+>  	its = kzalloc(sizeof(*its), GFP_KERNEL);
+> --
+> 1.8.0
+> 
+> 
+> 
+
+Assuming you fix the above nitpick:
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
