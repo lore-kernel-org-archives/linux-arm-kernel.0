@@ -1,54 +1,73 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Mar 2015 12:24:59 +0000
-Subject: [PATCH v5 1/9] arm64: dts: exynos: Add dts files for 64-bit
- Exynos5433 SoC
-In-Reply-To: <1425533911-14800-2-git-send-email-cw00.choi@samsung.com>
-References: <1425533911-14800-1-git-send-email-cw00.choi@samsung.com>
- <1425533911-14800-2-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20150305122459.GC14093@leverpostej>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 5 Mar 2015 12:26:06 +0000
+Subject: [RFC PATCH 0/1] Wrong structure alignment due to compiler
+ attribute "section"
+In-Reply-To: <54F732DA.2050004@marvell.com>
+References: <1425290502-2322-1-git-send-email-lsanfil@marvell.com>
+ <20150303144130.GB5177@e103592.cambridge.arm.com>
+ <54F6EF32.7080306@marvell.com>
+ <20150304143527.GA5653@e103592.cambridge.arm.com>
+ <54F732DA.2050004@marvell.com>
+Message-ID: <20150305122606.GC3612@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 05, 2015 at 05:38:23AM +0000, Chanwoo Choi wrote:
-> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC based on
-> Octal core CPUs (quad Cortex-A57 and quad Cortex-A53). And Exynos5433 supports
-> PSCI (Power State Coordination Interface) v0.1.
+On Wed, Mar 04, 2015 at 05:29:14PM +0100, Lino Sanfilippo wrote:
+> On 04.03.2015 15:35, Dave Martin wrote:
 > 
-> This patch includes following dt node to support Exynos5433 SoC:
-> 1. Octa core for big.LITTLE architecture
-> - Cortex-A53 LITTLE Quad-core
-> - Cortex-A57 big Quad-core
-> - Support PSCI v0.1
+> >
+> >Try
+> >
+> >rm drivers/clk/mvebu/kirkwood.o
+> >make ARCH=arm KBUILD_CFLAGS_KERNEL=-save-temps drivers/clk/mvebu/kirkwood.o
+> >
+> >(abuse of KBUILD_CFLAGS_KERNEL here, but it's empty by default, and
+> >I'm too lazy to copy-paste command lines...)
+> >
+> >
+> >The compiler will split out the compiled assembly code in kirkwood.s:
+> >
+> >Look for ".align" directives between the start of the affected section
+> >and the start of the next section (next .section directive).
+> >
+> >Here, we just have .align 2, which is the expected correct value
+> >(i.e., align __of_table_mv88f6180_clk on a 2^2 = 4 byte boundary).
+> >
+> >A different value here may indicate a bug in the compiler, because
+> >you observed that gcc _thinks_ that __alignof__ is 4 for the struct
+> >in this section even in the failing case.
+> 
+> Ok, this is the result for the assembly:
+> 
+>         .section        __clk_of_table,"a",%progbits
+>         .align  3
+>         .type   __of_table_mv88f6180_clk, %object
+>         .size   __of_table_mv88f6180_clk, 196
+> __of_table_mv88f6180_clk:
+>         .space  64
 
 [...]
 
-> +       psci {
-> +               compatible = "arm,psci";
-> +               method = "smc";
-> +               cpu_off = <0x84000002>;
-> +               cpu_on = <0xC4000003>;
-> +       };
+> Very interesting. It shows an .align 3 which explains alignment on
+> 8 byte boundaries:
+> 
+> 
+> c07630f8 T __clk_of_table
+> c07630f8 t __of_table_fixed_factor_clk
+> c07630f8 T __stop_kprobe_blacklist
+> c07631c0 t __of_table_fixed_clk
+> c0763288 t __of_table_gpio_gate_clk
+> c0763350 t __of_table_mv88f6180_clk
+> 
+> So this is indeed a compiler bug, right?
 
-Back at v2 you mentioned that CPU_OFF wasn't working [1].
+It certainly looks like the compiler is causing the issue somehow.
 
-Do both CPU_ON and CPU_OFF work for all CPUs, including the boot CPU?
+Whether this is a bug, a bug-like feature, a configuration issue,
+or a combination of these is not clear.
 
-I take it CPUs boot at EL2?
+If you know where to find the toolchain source, it might be worth
+taking a look.
 
-[...]
-
-> +               timer {
-> +                       compatible = "arm,armv8-timer";
-> +                       interrupts = <1 13 0xff04>,
-> +                                    <1 14 0xff04>,
-> +                                    <1 11 0xff04>,
-> +                                    <1 10 0xff04>;
-> +               };
-
-The timer node should be moved under the root node. It doesn't live on
-the bus; it's a component of the CPU.
-
-Thanks,
-Mark.
-
-[1] https://lkml.org/lkml/2014/12/2/413
+Cheers
+---Dave
