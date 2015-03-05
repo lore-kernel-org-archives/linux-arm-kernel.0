@@ -1,80 +1,78 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 05 Mar 2015 16:42:31 +0000
-Subject: [RFC PATCH 0/5] arm64: IOMMU-backed DMA mapping
-In-Reply-To: <54F868A8.7070103@samsung.com>
-References: <cover.1421086706.git.robin.murphy@arm.com>
- <54F868A8.7070103@samsung.com>
-Message-ID: <54F88777.3090404@arm.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 5 Mar 2015 10:46:01 -0600
+Subject: [PATCH v2 2/2] ARM: dts: am33xx: Move wkup_m3 node to soc node
+ and add ranges
+In-Reply-To: <20150305154039.GD13520@atomide.com>
+References: <1425528742-3087-1-git-send-email-d-gerlach@ti.com>
+ <1425528742-3087-3-git-send-email-d-gerlach@ti.com>
+ <20150305154039.GD13520@atomide.com>
+Message-ID: <54F88849.1090708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On 03/05/2015 09:40 AM, Tony Lindgren wrote:
+> * Dave Gerlach <d-gerlach@ti.com> [150304 20:14]:
+Dave,
 
-On 05/03/15 14:31, Marek Szyprowski wrote:
-> Hello,
->
-> On 2015-01-12 21:48, Robin Murphy wrote:
->> Hi all,
+Looks like the commit message disappeared during your patch preparation.
+
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> ---
+>>  arch/arm/boot/dts/am33xx.dtsi | 21 +++++++++++++--------
+>>  1 file changed, 13 insertions(+), 8 deletions(-)
 >>
->> Whilst it's a long way off perfect, this has reached the point of being
->> functional and stable enough to be useful, so here it is. The core
->> consists of the meat of the arch/arm implementation modified to remove
->> the assumption of PAGE_SIZE pages and ported over to the Intel IOVA
->> allocator instead of the bitmap-based one. For that, this series depends
->> on my "Genericise the IOVA allocator" series posted earlier[1].
->
-> I've tested your patches on Exynos 5433 based system and I have a few
-> comments. To get them working I had to do some fixes. Most of them
-> are already reported in this thread, the remaining I will send in a few
-> minutes.
+>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+>> index acd3705..086415c 100644
+>> --- a/arch/arm/boot/dts/am33xx.dtsi
+>> +++ b/arch/arm/boot/dts/am33xx.dtsi
+>> @@ -77,10 +77,23 @@
+>>  	 */
+>>  	soc {
+>>  		compatible = "ti,omap-infra";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		ranges = <0x0     0x44d00000 0x4000>,
+>> +			 <0x80000 0x44d80000 0x2000>;
+>> +
+> 
+> I think putting the ranges here will cause issues for adding
+> ranges for anything else.
+> 
+> How about do something like this instead (untested):
+> 
+> ocp {
+> 	l4_wkup: l4_wkup at 44c00000 {
+> 		compatible = "am335-l4-wkup", "simple-bus";
+> 		ranges = <0 0x44c00000 0x3fffff>;
+> 
+> 		wkup_m3: wkup_m3 at 44d00000 {
+> 			compatible = "ti,am3353-wkup-m3";
+> 			reg = <0x1000000     0x4000>,	/* M3 UMEM */
+> 			      <0x180000	     0x2000>;	/* M3 DMEM */
+> 			ti,hwmods = "wkup_m3";
+> 			ti,pm-firmware = "am335x-pm-firmware.elf";
+> 		};
+> 
+> 		...
+> 	};
+> };
+> 
+> That way we can start moving also the other l4_wkup components there
+> eventuallly without having to redo the ranges again for wkup_m3.
+> 
+> You can also look at how the scm_conf was done for dm816x.dtsi for an
+> example, and the recent large set of patches posted by Tero.
+> 
+Tony,
 
-Thanks!
+Thanks, I will take a look at this. I initially tried adding to ocp node
+directly, but obviously it had issues.
 
-> Do you plan to send an updated patchset?
+But in general, you are ok with the ranges approach right, rather than
+having to define another property with virtual addresses. These devices
+are not on a separate bus like PCI, so I placed them in the soc node,
+and expect only special devices like processors to kinda go under that node.
 
-I already sent a v2 which addressed some of the major issues here:
-
-http://thread.gmane.org/gmane.linux.kernel.iommu/8773
-
-Following some of the feedback there I've currently got a v3 in 
-development, which reworks a lot of it more in favour of scatterlists, 
-and fills in some of the gaps needed to move arch/arm over (I still need 
-to look at how to handle the drivers currently making use of 
-dma_iommu_mapping directly).
-
-Robin.
-
->
->> There are plenty of obvious things still to do, including:
->>
->>    * Domain and group handling is all wrong, but that's a bigger problem.
->>      For the moment it does more or less the same thing as the arch/arm
->>      code, which at least works for the one-IOMMU-per-device situation.
->>    * IOMMU domains and IOVA domains probably want to be better integrated
->>      with devices and each other, rather than having a proliferation of
->>      arch-specific structs.
->>    * The temporary map_sg implementation - I have a 'proper' iommu_map_sg
->>      based one in progress, but since the simple one works it's not been
->>      as high a priority.
->
-> Well, for ARM arch this was the main feature of IOMMU and DMA-mapping
-> integration. It is heavily used by some multimedia devices and dma-buf
-> realted stuff to get a scattered buffer mapped into contiguous IO address
-> space.
->
->>    * Port arch/arm over to it. I'd guess it might be preferable to merge
->>      this through arm64 first, though, rather than overcomplicate matters.
->
-> I think that the code in arch/arm is already quite well tested and can be
-> almost directly reused for common dma-mapping helpers.
->
->>    * There may well be scope for streamlining and tidying up the copied
->>      parts - In general I've simply avoided touching anything I don't
->>      fully understand.
->>    * In the same vein, I'm sure lots of it is fairly ARM-specific, so will
->>      need longer-term work to become truly generic.
->>
->> [1]:http://thread.gmane.org/gmane.linux.kernel.iommu/8208
->
-> Best regards
->
+regards
+Suman
