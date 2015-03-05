@@ -1,77 +1,62 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 5 Mar 2015 10:19:04 -0800
-Subject: [PATCH v9 11/21] ARM64 / ACPI: Get PSCI flags in FADT for PSCI
- init
-In-Reply-To: <1424853601-6675-12-git-send-email-hanjun.guo@linaro.org>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <1424853601-6675-12-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150305181904.GE4932@quad.lixom.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 5 Mar 2015 19:28:17 +0100
+Subject: [PATCH v2 1/4] i2c: sunxi: Add Reduced Serial Bus (RSB) support
+In-Reply-To: <20150304172710.GA884@katana>
+References: <1425284686-5116-1-git-send-email-wens@csie.org>
+ <1425284686-5116-2-git-send-email-wens@csie.org>
+ <20150304172710.GA884@katana>
+Message-ID: <20150305182817.GB4911@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Wolfram,
 
-On Wed, Feb 25, 2015 at 04:39:51PM +0800, Hanjun Guo wrote:
-> From: Graeme Gregory <graeme.gregory@linaro.org>
+On Wed, Mar 04, 2015 at 06:27:11PM +0100, Wolfram Sang wrote:
+> On Mon, Mar 02, 2015 at 04:24:43PM +0800, Chen-Yu Tsai wrote:
+> > The RSB controller looks like an SMBus controller which only supports byte
+> > and word data transfers. It can also do double-word data transfers, but the
+> > I2C subsystem does not support this, nor have we seen devices using this.
+> > 
+> > The RSB differs from standard SMBus protocol on several aspects:
+> > - it uses addresses set at runtime to address slaves. Runtime addresses
+> >   are sent to slaves using their 12bit hardware addresses. Up to 15
+> >   runtime addresses are available.
+> > - it adds a parity bit every 8bits of data and address for read and
+> >   write accesses; this replaces the ack bit
+> > - only one read access is required to read a byte (instead of a write
+> >   followed by a read access in standard SMBus protocol)
+> > - there's no Ack bit after each read access
+> > 
+> > This means this bus cannot be used to interface with standard SMBus
+> > devices (known devices supporting this interface are the AXP223, AXP806,
+> > AXP809 PMICs and the AC100 codec/RTC). However the RSB protocol is an
+> > extension of P2WI, which was close enough to SMBus to be integrated into
+> > the I2C subsystem in commit 3e833490fae5 ("i2c: sunxi: add P2WI (Push/Pull
+> > 2 Wire Interface) controller support").
+> > 
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > 
-> There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
-> the former signals to the OS that the firmware is PSCI compliant.
-> The latter selects the appropriate conduit for PSCI calls by
-> toggling between Hypervisor Calls (HVC) and Secure Monitor Calls
-> (SMC).
-> 
-> FADT table contains such information in ACPI 5.1, FADT table was
-> parsed in ACPI table init and copy to struct acpi_gbl_FADT, so
-> use the flags in struct acpi_gbl_FADT for PSCI init.
-> 
-> Since ACPI 5.1 doesn't support self defined PSCI function IDs,
-> which means that only PSCI 0.2+ is supported in ACPI.
-> 
-> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> CC: Will Deacon <will.deacon@arm.com>
-> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Tested-by: Yijing Wang <wangyijing@huawei.com>
-> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-> Tested-by: Jon Masters <jcm@redhat.com>
-> Tested-by: Timur Tabi <timur@codeaurora.org>
-> Tested-by: Robert Richter <rrichter@cavium.com>
-> Acked-by: Robert Richter <rrichter@cavium.com>
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> I don't have the bandwidth for a full review right now. However, I
+> already wanted to tell you guys that my gut feeling is that this
+> protocol is quite far away from I2C. P2WI was already at the edge.
+> Maybe there is a better place for such custom stuff? I dunno yet.
 
-Acked-by: Olof Johansson <olof@lixom.net>
+That's unfortunate, especially since it looks closer to SPI than what
+P2WI even was.
 
+What would be your suggestion?
 
-However, a comment on the color of the bike shed below. I'm fine with this
-being addressed with an incremental patch instead of respun:
+Thanks,
+Maxime
 
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index e8c7000..97fa7f3 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -390,10 +390,12 @@ void __init setup_arch(char **cmdline_p)
->  
->  	early_ioremap_reset();
->  
-> -	if (acpi_disabled)
-> +	if (acpi_disabled) {
->  		unflatten_device_tree();
-> -
-> -	psci_init();
-> +		psci_dt_init();
-> +	} else {
-> +		psci_acpi_init();
-> +	}
-
-I would prefer having a common psci_init() in psci.c, which in turn calls
-either the dt or the acpi version, and after that calls the set_functions
-if the init function passed -- it'll keep more code common as new versions
-of PSCI is added.
-
-It also keeps setup_arch() somewhat cleaner, and avoids bubbling up the
-dt-vs-acpi differences to the top level.
-
-
--Olof
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150305/ca4afefe/attachment.sig>
