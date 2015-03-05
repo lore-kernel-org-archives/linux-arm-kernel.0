@@ -1,29 +1,36 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 5 Mar 2015 09:28:38 +0530
-Subject: [PATCH v2 1/4] cpufreq-dt: add clock domain and intermediate
- frequency support
-In-Reply-To: <CALx668XCh46yMLajThuVzba9RRSxf+tEkNuMP9J7w-=vsZN8-Q@mail.gmail.com>
-References: <1425458956-20665-1-git-send-email-pi-cheng.chen@linaro.org>
- <1425458956-20665-2-git-send-email-pi-cheng.chen@linaro.org>
- <CAKohpomw6iDRRMxgmOORzZVeW4h2-LzKOsUcdpUnANcxiAYm+A@mail.gmail.com>
- <CALx668XCh46yMLajThuVzba9RRSxf+tEkNuMP9J7w-=vsZN8-Q@mail.gmail.com>
-Message-ID: <CAKohpo=zPsezGs8rqVzx3ChQkavs5z7eFMMETe12pc2mjm-8OA@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 4 Mar 2015 22:12:20 -0600
+Subject: [PATCH v2 0/2] ARM: OMAP2+: wkup_m3_rproc support patches
+Message-ID: <1425528742-3087-1-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 March 2015 at 09:02, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
-> In the case of Mediatek SoC, the intermediate frequency might not be one entry
-> of OPP table. To elaborate, the source clock node of the CPUs/Cluster on
-> Mediatek SoC is a mux. The mux has several PLLs as parents. When we are
-> doing CPU frequency scaling, the mux should re-parent to another stable PLL,
-> wait until the original parent PLL become stable, and then switch back to the
-> original parent. In this case, we could but we might not want the intermediate
-> frequency as part of OPP table. Therefore I save intermediate_freq instead of
-> intermediate frequency index in the cpufreq_dt_platform_datat struct.
+Hi,
+This series adds the mach-omap2 code for the wkup_m3_rproc driver
+submitted here [1]. pdata-quirks patch requires the pdata added with
+patch 3 of the aforementioned series. The dt patch was previously
+included as part of the rproc series here [2]. Changes are:
 
-Hmm, I remember that discussion. Okay leave it as is.
+v1->v2: 
+-Because the firmware loading has changed, the wkup_m3 node
+ has moved into the soc node and ranges have been added so the
+ device address to virtual address translation can work.
+-Removed the ti,no-reset-on-init flag as asserting the hard-reset
+ line on init is what the wkup_m3 has by default already.
 
-> BTW, is this case that intermediate frequency is not necessarily be one entry
-> of OPP table supported in the OPPv2 bindings?
+Regards,
+Dave
 
-Not yet, but will add a property for that.
+[1] https://www.mail-archive.com/linux-omap at vger.kernel.org/msg114621.html
+[2] http://www.spinics.net/lists/arm-kernel/msg387984.html
+
+Dave Gerlach (2):
+  ARM: OMAP2+: Use pdata-quirks for wkup_m3 deassert_hardreset
+  ARM: dts: am33xx: Move wkup_m3 node to soc node and add ranges
+
+ arch/arm/boot/dts/am33xx.dtsi      | 21 +++++++++++++--------
+ arch/arm/mach-omap2/pdata-quirks.c | 13 +++++++++++++
+ 2 files changed, 26 insertions(+), 8 deletions(-)
+
+-- 
+2.3.0
