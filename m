@@ -1,66 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Mar 2015 09:06:04 +0000
-Subject: [PATCH] net: smc91x: use run-time configuration on all ARM
- machines
-In-Reply-To: <55454365.1GsbtFBXGk@wuerfel>
-References: <2226303.iMQTNXSl1n@wuerfel>
- <20150228.125721.1605776377351425463.davem@davemloft.net>
- <55454365.1GsbtFBXGk@wuerfel>
-Message-ID: <20150305090604.GE8656@n2100.arm.linux.org.uk>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 5 Mar 2015 17:06:34 +0800
+Subject: [PATCH v9 16/21] irqchip: Add GICv2 specific ACPI boot support
+In-Reply-To: <5921774.hkUTDjxi3A@vostro.rjw.lan>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <1424853601-6675-17-git-send-email-hanjun.guo@linaro.org>
+ <5921774.hkUTDjxi3A@vostro.rjw.lan>
+Message-ID: <54F81C9A.6040502@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 11:36:16PM +0100, Arnd Bergmann wrote:
-> On Saturday 28 February 2015 12:57:21 David Miller wrote:
-> > From: Arnd Bergmann <arnd@arndb.de>
-> > Date: Wed, 25 Feb 2015 16:31:57 +0100
-> > 
-> > > The smc91x driver traditionally gets configured at compile-time
-> > > for whichever hardware it runs on. This no longer works on
-> > > ARM as we continue to move to building all-in-one kernels.
-> > > 
-> > > Most ARM configurations with this driver already use run-time
-> > > configuration through DT or through platform_data, but a
-> > > few have not been converted yet.
-> > > 
-> > > I've checked all ARM boards that use this driver in their
-> > > legacy board files, and converted the ones that were using
-> > > compile-time configuration in smc91x.h to behave like the
-> > > other ones and provide the interrupt polarity along with
-> > > the MMIO configuration (width, stride) at platform device
-> > > creation time.
-> > > 
-> > > In particular, these combinations were previously selectable
-> > > in Kconfig but in fact broken:
-> > > 
-> > > - sa1100 assabet plus pleb
-> > > - msm combined with any other armv6/v7 platform
-> > > - pxa-idp combined with any non-DMA pxa variant
-> > > - LogicPD PXA270 combined with any other pxa
-> > > - nomadik combined with any other armv4/v5 platform,
-> > >   e.g. versatile.
-> > > 
-> > > None of these seem critical enough to warrant a backport
-> > > to stable, but it would be nice to clean this up for good.
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> > Applied, thanks Arnd.
-> > 
-> 
-> It seems my build testing went wrong and although I was building
-> lots of kernels, it did not catch the obvious typos I introduced.
-> 
-> I'm deeply sorry about that, following up with a fix now (which
-> was actually tested).
+On 2015/3/5 6:50, Rafael J. Wysocki wrote:
+> On Wednesday, February 25, 2015 04:39:56 PM Hanjun Guo wrote:
+>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>>
+>> ACPI kernel uses MADT table for proper GIC initialization. It needs to
+>> parse GIC related subtables, collect CPU interface and distributor
+>> addresses and call driver initialization function (which is hardware
+>> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
+>>
+>> NOTE: This commit allow to initialize GICv1/2 basic functionality.
+>> While now simple GICv2 init call is used, any further GIC features
+>> require generic infrastructure for proper ACPI irqchip initialization.
+>> That mechanism and stacked irqdomains to support GICv2 MSI/virtualization
+>> extension, GICv3/4 and its ITS are considered as next steps.
+[...]
+>> diff --git a/drivers/irqchip/irqchip.c b/drivers/irqchip/irqchip.c
+>> index 0fe2f71..5855240 100644
+>> --- a/drivers/irqchip/irqchip.c
+>> +++ b/drivers/irqchip/irqchip.c
+>> @@ -8,6 +8,7 @@
+>>   * warranty of any kind, whether express or implied.
+>>   */
+>>  
+>> +#include <linux/acpi.h>
+>>  #include <linux/init.h>
+>>  #include <linux/of_irq.h>
+>>  #include <linux/irqchip.h>
+>> @@ -26,4 +27,6 @@ extern struct of_device_id __irqchip_of_table[];
+>>  void __init irqchip_init(void)
+>>  {
+>>  	of_irq_init(__irqchip_of_table);
+>> +
+>> +	acpi_irq_init();
+>>  }
+>> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+>> index c03d8d1..e27117a 100644
+>> --- a/include/linux/acpi.h
+>> +++ b/include/linux/acpi.h
+>> @@ -557,6 +557,20 @@ static inline int acpi_device_modalias(struct device *dev,
+>>  
+>>  #endif	/* !CONFIG_ACPI */
+>>  
+>> +#if defined(CONFIG_ACPI) && defined(CONFIG_ARM64)
+>> +static inline void acpi_irq_init(void)
+>> +{
+>> +	/*
+>> +	 * Hardcode ACPI IRQ chip initialization to GICv2 for now.
+>> +	 * Proper irqchip infrastructure will be implemented along with
+>> +	 * incoming  GICv2m|GICv3|ITS bits.
+>> +	 */
+>> +	acpi_gic_init();
+>> +}
+>> +#else
+>> +static inline void acpi_irq_init(void) { }
+>> +#endif
+> I don't want this in a common header.
 
-Maybe it would be better to wait for someone to actually build and
-run the change on real hardware?  You know I have a neponset, which
-is one of the platforms you've changed.
+This is because of irqchip_init(void) in drivers/irqchip/irqchip.c
+will be called by PowerPC too, so we need to put it in a common
+head file, I will discuss with Tomasz to see if we have any further
+solution.
 
-(I may not be able to do that for a while yet however... still
-recovering post-op.)
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks
+Hanjun
