@@ -1,79 +1,37 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Thu,  5 Mar 2015 12:26:06 +0100
-Subject: [PATCH] KVM: arm/arm64: prefer IS_ENABLED to a static variable
-Message-ID: <1425554766-4119-1-git-send-email-pbonzini@redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Mar 2015 11:27:08 +0000
+Subject: [PATCH v9 14/21] ACPI / processor: Make it possible to get CPU
+ hardware ID via GICC
+In-Reply-To: <54F80DC9.3090808@huawei.com>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <1424853601-6675-15-git-send-email-hanjun.guo@linaro.org>
+ <2411054.s4TkmAUKjT@vostro.rjw.lan> <54F80DC9.3090808@huawei.com>
+Message-ID: <20150305112707.GB7712@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IS_ENABLED gives compile-time checking and keeps the code clearer.
+On Thu, Mar 05, 2015 at 04:03:21PM +0800, Hanjun Guo wrote:
+> On 2015/3/5 6:46, Rafael J. Wysocki wrote:
+> > IMO, you really need to define phys_cpuid_t in a common place or people will
+> > forget that it may be 64-bit, because they'll only be looking at their arch.
+> 
+> Since x86 and ARM64 are using different types for phys_cpuid_t, we need to
+> introduce something like following if define it in common place:
+> 
+> in linux/acpi.h,
+> 
+> #if defined(CONFIG_X86) || defined(CONFIG_IA64)
+> typedef u32 phys_cpuid_t;
+> #define PHYS_CPUID_INVALID (phys_cpuid_t)(-1)
+> #else if defined(CONFIG_ARM64)
+> typedef u64 phys_cpuid_t;
+> #define PHYS_CPUID_INVALID INVALID_HWID
+> #endif
+> 
+> I think it's awful, did I miss something?
 
-The one exception is inside kvm_vm_ioctl_check_extension, where
-the established idiom is to wrap the case labels with an #ifdef.
+I also think that's awful. I'm rather in favour of a per-arch
+phys_cpuid_t.
 
-Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
---
-	Untested...
----
- arch/arm/kvm/arm.c | 17 +++++------------
- 1 file changed, 5 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 07e7eb1d7ab6..706769fb0f2e 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -61,8 +61,6 @@ static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
- static u8 kvm_next_vmid;
- static DEFINE_SPINLOCK(kvm_vmid_lock);
- 
--static bool vgic_present;
--
- static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
- {
- 	BUG_ON(preemptible());
-@@ -172,9 +170,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- {
- 	int r;
- 	switch (ext) {
-+#ifdef CONFIG_KVM_ARM_VGIC
- 	case KVM_CAP_IRQCHIP:
--		r = vgic_present;
--		break;
-+#endif
- 	case KVM_CAP_DEVICE_CTRL:
- 	case KVM_CAP_USER_MEMORY:
- 	case KVM_CAP_SYNC_MMU:
-@@ -831,7 +829,7 @@ static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
- 
- 	switch (dev_id) {
- 	case KVM_ARM_DEVICE_VGIC_V2:
--		if (!vgic_present)
-+		if (!IS_ENABLED(CONFIG_KVM_ARM_VGIC))
- 			return -ENXIO;
- 		return kvm_vgic_addr(kvm, type, &dev_addr->addr, true);
- 	default:
-@@ -847,10 +845,9 @@ long kvm_arch_vm_ioctl(struct file *filp,
- 
- 	switch (ioctl) {
- 	case KVM_CREATE_IRQCHIP: {
--		if (vgic_present)
--			return kvm_vgic_create(kvm, KVM_DEV_TYPE_ARM_VGIC_V2);
--		else
-+		if (!IS_ENABLED(CONFIG_KVM_ARM_VGIC))
- 			return -ENXIO;
-+		return kvm_vgic_create(kvm, KVM_DEV_TYPE_ARM_VGIC_V2);
- 	}
- 	case KVM_ARM_SET_DEVICE_ADDR: {
- 		struct kvm_arm_device_addr dev_addr;
-@@ -1035,10 +1032,6 @@ static int init_hyp_mode(void)
- 	if (err)
- 		goto out_free_context;
- 
--#ifdef CONFIG_KVM_ARM_VGIC
--		vgic_present = true;
--#endif
--
- 	/*
- 	 * Init HYP architected timer support
- 	 */
 -- 
-2.3.0
+Catalin
