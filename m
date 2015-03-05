@@ -1,430 +1,1021 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  5 Mar 2015 10:58:04 +0900
-Subject: [PATCH 12/13] ARM: shmobile: r8a73a4 dtsi: Add PM domain support
+Date: Thu,  5 Mar 2015 10:58:05 +0900
+Subject: [PATCH 13/13] ARM: shmobile: r8a73a4: Remove legacy code
 In-Reply-To: <cover.1425517246.git.horms+renesas@verge.net.au>
 References: <cover.1425517246.git.horms+renesas@verge.net.au>
-Message-ID: <7b9ad9a0ab82be3cb0607d5242584a4a4948e89c.1425517246.git.horms+renesas@verge.net.au>
+Message-ID: <914d7d148411997c2f76f689338d27c362300b7a.1425517246.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Add a device node for the System Controller, with subnodes that
-represent the hardware power area hierarchy.
-Hook up all devices to their respective PM domains.
+All r8a73a4 boards are now used with multiplatform kernels only. We can
+remove all the unused r8a73a4 legacy device and clock registration code.
 
-Add a minimal device node for the Coresight-ETM hardware block, and
-hook it up to the D4 PM domain, so the R-Mobile System Controller
-driver can keep the domain powered, until the new Coresight code
-handles runtime PM.
-
-The System Controller is also used by the R-Mobile Reset driver, which
-can now restart the system.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a73a4.dtsi | 177 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 177 insertions(+)
+ arch/arm/mach-shmobile/Makefile        |   1 -
+ arch/arm/mach-shmobile/clock-r8a73a4.c | 659 ---------------------------------
+ arch/arm/mach-shmobile/r8a73a4.h       |  17 -
+ arch/arm/mach-shmobile/setup-r8a73a4.c | 273 +-------------
+ 4 files changed, 2 insertions(+), 948 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/clock-r8a73a4.c
+ delete mode 100644 arch/arm/mach-shmobile/r8a73a4.h
 
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index d41201d..0fd889f 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -28,9 +28,15 @@
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
- 			clock-frequency = <1500000000>;
-+			power-domains = <&pd_a2sl>;
- 		};
- 	};
- 
-+	ptm {
-+		compatible = "arm,coresight-etm3x";
-+		power-domains = <&pd_d4>;
-+	};
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 963d985..cf8b348 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -23,7 +23,6 @@ ifndef CONFIG_COMMON_CLK
+ obj-y				+= clock.o
+ obj-$(CONFIG_ARCH_SH7372)	+= clock-sh7372.o
+ obj-$(CONFIG_ARCH_SH73A0)	+= clock-sh73a0.o
+-obj-$(CONFIG_ARCH_R8A73A4)	+= clock-r8a73a4.o
+ obj-$(CONFIG_ARCH_R8A7740)	+= clock-r8a7740.o
+ obj-$(CONFIG_ARCH_R8A7778)	+= clock-r8a7778.o
+ obj-$(CONFIG_ARCH_R8A7779)	+= clock-r8a7779.o
+diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
+deleted file mode 100644
+index 1cf44dc..0000000
+--- a/arch/arm/mach-shmobile/clock-r8a73a4.c
++++ /dev/null
+@@ -1,659 +0,0 @@
+-/*
+- * r8a73a4 clock framework support
+- *
+- * Copyright (C) 2013  Renesas Solutions Corp.
+- * Copyright (C) 2013  Magnus Damm
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; version 2 of the License.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-#include <linux/init.h>
+-#include <linux/io.h>
+-#include <linux/kernel.h>
+-#include <linux/sh_clk.h>
+-#include <linux/clkdev.h>
+-#include "common.h"
+-#include "clock.h"
+-
+-#define CPG_BASE 0xe6150000
+-#define CPG_LEN 0x270
+-
+-#define SMSTPCR2 0xe6150138
+-#define SMSTPCR3 0xe615013c
+-#define SMSTPCR4 0xe6150140
+-#define SMSTPCR5 0xe6150144
+-
+-#define FRQCRA		0xE6150000
+-#define FRQCRB		0xE6150004
+-#define FRQCRC		0xE61500E0
+-#define VCLKCR1		0xE6150008
+-#define VCLKCR2		0xE615000C
+-#define VCLKCR3		0xE615001C
+-#define VCLKCR4		0xE6150014
+-#define VCLKCR5		0xE6150034
+-#define ZBCKCR		0xE6150010
+-#define SD0CKCR		0xE6150074
+-#define SD1CKCR		0xE6150078
+-#define SD2CKCR		0xE615007C
+-#define MMC0CKCR	0xE6150240
+-#define MMC1CKCR	0xE6150244
+-#define FSIACKCR	0xE6150018
+-#define FSIBCKCR	0xE6150090
+-#define MPCKCR		0xe6150080
+-#define SPUVCKCR	0xE6150094
+-#define HSICKCR		0xE615026C
+-#define M4CKCR		0xE6150098
+-#define PLLECR		0xE61500D0
+-#define PLL0CR		0xE61500D8
+-#define PLL1CR		0xE6150028
+-#define PLL2CR		0xE615002C
+-#define PLL2SCR		0xE61501F4
+-#define PLL2HCR		0xE61501E4
+-#define CKSCR		0xE61500C0
+-
+-#define CPG_MAP(o) ((o - CPG_BASE) + cpg_mapping.base)
+-
+-static struct clk_mapping cpg_mapping = {
+-	.phys   = CPG_BASE,
+-	.len    = CPG_LEN,
+-};
+-
+-static struct clk extalr_clk = {
+-	.rate	= 32768,
+-	.mapping	= &cpg_mapping,
+-};
+-
+-static struct clk extal1_clk = {
+-	.rate	= 26000000,
+-	.mapping	= &cpg_mapping,
+-};
+-
+-static struct clk extal2_clk = {
+-	.rate	= 48000000,
+-	.mapping	= &cpg_mapping,
+-};
+-
+-static struct sh_clk_ops followparent_clk_ops = {
+-	.recalc	= followparent_recalc,
+-};
+-
+-static struct clk main_clk = {
+-	/* .parent will be set r8a73a4_clock_init */
+-	.ops	= &followparent_clk_ops,
+-};
+-
+-SH_CLK_RATIO(div2,	1, 2);
+-SH_CLK_RATIO(div4,	1, 4);
+-
+-SH_FIXED_RATIO_CLK(main_div2_clk,	main_clk,		div2);
+-SH_FIXED_RATIO_CLK(extal1_div2_clk,	extal1_clk,		div2);
+-SH_FIXED_RATIO_CLK(extal2_div2_clk,	extal2_clk,		div2);
+-SH_FIXED_RATIO_CLK(extal2_div4_clk,	extal2_clk,		div4);
+-
+-/* External FSIACK/FSIBCK clock */
+-static struct clk fsiack_clk = {
+-};
+-
+-static struct clk fsibck_clk = {
+-};
+-
+-/*
+- *		PLL clocks
+- */
+-static struct clk *pll_parent_main[] = {
+-	[0] = &main_clk,
+-	[1] = &main_div2_clk
+-};
+-
+-static struct clk *pll_parent_main_extal[8] = {
+-	[0] = &main_div2_clk,
+-	[1] = &extal2_div2_clk,
+-	[3] = &extal2_div4_clk,
+-	[4] = &main_clk,
+-	[5] = &extal2_clk,
+-};
+-
+-static unsigned long pll_recalc(struct clk *clk)
+-{
+-	unsigned long mult = 1;
+-
+-	if (ioread32(CPG_MAP(PLLECR)) & (1 << clk->enable_bit))
+-		mult = (((ioread32(clk->mapped_reg) >> 24) & 0x7f) + 1);
+-
+-	return clk->parent->rate * mult;
+-}
+-
+-static int pll_set_parent(struct clk *clk, struct clk *parent)
+-{
+-	u32 val;
+-	int i, ret;
+-
+-	if (!clk->parent_table || !clk->parent_num)
+-		return -EINVAL;
+-
+-	/* Search the parent */
+-	for (i = 0; i < clk->parent_num; i++)
+-		if (clk->parent_table[i] == parent)
+-			break;
+-
+-	if (i == clk->parent_num)
+-		return -ENODEV;
+-
+-	ret = clk_reparent(clk, parent);
+-	if (ret < 0)
+-		return ret;
+-
+-	val = ioread32(clk->mapped_reg) &
+-		~(((1 << clk->src_width) - 1) << clk->src_shift);
+-
+-	iowrite32(val | i << clk->src_shift, clk->mapped_reg);
+-
+-	return 0;
+-}
+-
+-static struct sh_clk_ops pll_clk_ops = {
+-	.recalc		= pll_recalc,
+-	.set_parent	= pll_set_parent,
+-};
+-
+-#define PLL_CLOCK(name, p, pt, w, s, reg, e)		\
+-	static struct clk name = {			\
+-		.ops		= &pll_clk_ops,		\
+-		.flags		= CLK_ENABLE_ON_INIT,	\
+-		.parent		= p,			\
+-		.parent_table	= pt,			\
+-		.parent_num	= ARRAY_SIZE(pt),	\
+-		.src_width	= w,			\
+-		.src_shift	= s,			\
+-		.enable_reg	= (void __iomem *)reg,	\
+-		.enable_bit	= e,			\
+-		.mapping	= &cpg_mapping,		\
+-	}
+-
+-PLL_CLOCK(pll0_clk,  &main_clk,      pll_parent_main,      1, 20, PLL0CR,  0);
+-PLL_CLOCK(pll1_clk,  &main_clk,      pll_parent_main,       1, 7, PLL1CR,  1);
+-PLL_CLOCK(pll2_clk,  &main_div2_clk, pll_parent_main_extal, 3, 5, PLL2CR,  2);
+-PLL_CLOCK(pll2s_clk, &main_div2_clk, pll_parent_main_extal, 3, 5, PLL2SCR, 4);
+-PLL_CLOCK(pll2h_clk, &main_div2_clk, pll_parent_main_extal, 3, 5, PLL2HCR, 5);
+-
+-SH_FIXED_RATIO_CLK(pll1_div2_clk,	pll1_clk,	div2);
+-
+-static atomic_t frqcr_lock;
+-
+-/* Several clocks need to access FRQCRB, have to lock */
+-static bool frqcr_kick_check(struct clk *clk)
+-{
+-	return !(ioread32(CPG_MAP(FRQCRB)) & BIT(31));
+-}
+-
+-static int frqcr_kick_do(struct clk *clk)
+-{
+-	int i;
+-
+-	/* set KICK bit in FRQCRB to update hardware setting, check success */
+-	iowrite32(ioread32(CPG_MAP(FRQCRB)) | BIT(31), CPG_MAP(FRQCRB));
+-	for (i = 1000; i; i--)
+-		if (ioread32(CPG_MAP(FRQCRB)) & BIT(31))
+-			cpu_relax();
+-		else
+-			return 0;
+-
+-	return -ETIMEDOUT;
+-}
+-
+-static int zclk_set_rate(struct clk *clk, unsigned long rate)
+-{
+-	void __iomem *frqcrc;
+-	int ret;
+-	unsigned long step, p_rate;
+-	u32 val;
+-
+-	if (!clk->parent || !__clk_get(clk->parent))
+-		return -ENODEV;
+-
+-	if (!atomic_inc_and_test(&frqcr_lock) || !frqcr_kick_check(clk)) {
+-		ret = -EBUSY;
+-		goto done;
+-	}
+-
+-	/*
+-	 * Users are supposed to first call clk_set_rate() only with
+-	 * clk_round_rate() results. So, we don't fix wrong rates here, but
+-	 * guard against them anyway
+-	 */
+-
+-	p_rate = clk_get_rate(clk->parent);
+-	if (rate == p_rate) {
+-		val = 0;
+-	} else {
+-		step = DIV_ROUND_CLOSEST(p_rate, 32);
+-
+-		if (rate > p_rate || rate < step) {
+-			ret = -EINVAL;
+-			goto done;
+-		}
+-
+-		val = 32 - rate / step;
+-	}
+-
+-	frqcrc = clk->mapped_reg + (FRQCRC - (u32)clk->enable_reg);
+-
+-	iowrite32((ioread32(frqcrc) & ~(clk->div_mask << clk->enable_bit)) |
+-		  (val << clk->enable_bit), frqcrc);
+-
+-	ret = frqcr_kick_do(clk);
+-
+-done:
+-	atomic_dec(&frqcr_lock);
+-	__clk_put(clk->parent);
+-	return ret;
+-}
+-
+-static long zclk_round_rate(struct clk *clk, unsigned long rate)
+-{
+-	/*
+-	 * theoretical rate = parent rate * multiplier / 32,
+-	 * where 1 <= multiplier <= 32. Therefore we should do
+-	 * multiplier = rate * 32 / parent rate
+-	 * rounded rate = parent rate * multiplier / 32.
+-	 * However, multiplication before division won't fit in 32 bits, so
+-	 * we sacrifice some precision by first dividing and then multiplying.
+-	 * To find the nearest divisor we calculate both and pick up the best
+-	 * one. This avoids 64-bit arithmetics.
+-	 */
+-	unsigned long step, mul_min, mul_max, rate_min, rate_max;
+-
+-	rate_max = clk_get_rate(clk->parent);
+-
+-	/* output freq <= parent */
+-	if (rate >= rate_max)
+-		return rate_max;
+-
+-	step = DIV_ROUND_CLOSEST(rate_max, 32);
+-	/* output freq >= parent / 32 */
+-	if (step >= rate)
+-		return step;
+-
+-	mul_min = rate / step;
+-	mul_max = DIV_ROUND_UP(rate, step);
+-	rate_min = step * mul_min;
+-	if (mul_max == mul_min)
+-		return rate_min;
+-
+-	rate_max = step * mul_max;
+-
+-	if (rate_max - rate <  rate - rate_min)
+-		return rate_max;
+-
+-	return rate_min;
+-}
+-
+-static unsigned long zclk_recalc(struct clk *clk)
+-{
+-	void __iomem *frqcrc = FRQCRC - (u32)clk->enable_reg + clk->mapped_reg;
+-	unsigned int max = clk->div_mask + 1;
+-	unsigned long val = ((ioread32(frqcrc) >> clk->enable_bit) &
+-			     clk->div_mask);
+-
+-	return DIV_ROUND_CLOSEST(clk_get_rate(clk->parent), max) *
+-		(max - val);
+-}
+-
+-static struct sh_clk_ops zclk_ops = {
+-	.recalc = zclk_recalc,
+-	.set_rate = zclk_set_rate,
+-	.round_rate = zclk_round_rate,
+-};
+-
+-static struct clk z_clk = {
+-	.parent = &pll0_clk,
+-	.div_mask = 0x1f,
+-	.enable_bit = 8,
+-	/* We'll need to access FRQCRB and FRQCRC */
+-	.enable_reg = (void __iomem *)FRQCRB,
+-	.ops = &zclk_ops,
+-};
+-
+-/*
+- * It seems only 1/2 divider is usable in manual mode. 1/2 / 2/3
+- * switching is only available in auto-DVFS mode
+- */
+-SH_FIXED_RATIO_CLK(pll0_div2_clk,	pll0_clk,		div2);
+-
+-static struct clk z2_clk = {
+-	.parent = &pll0_div2_clk,
+-	.div_mask = 0x1f,
+-	.enable_bit = 0,
+-	/* We'll need to access FRQCRB and FRQCRC */
+-	.enable_reg = (void __iomem *)FRQCRB,
+-	.ops = &zclk_ops,
+-};
+-
+-static struct clk *main_clks[] = {
+-	&extalr_clk,
+-	&extal1_clk,
+-	&extal1_div2_clk,
+-	&extal2_clk,
+-	&extal2_div2_clk,
+-	&extal2_div4_clk,
+-	&main_clk,
+-	&main_div2_clk,
+-	&fsiack_clk,
+-	&fsibck_clk,
+-	&pll0_clk,
+-	&pll1_clk,
+-	&pll1_div2_clk,
+-	&pll2_clk,
+-	&pll2s_clk,
+-	&pll2h_clk,
+-	&z_clk,
+-	&pll0_div2_clk,
+-	&z2_clk,
+-};
+-
+-/* DIV4 */
+-static void div4_kick(struct clk *clk)
+-{
+-	if (!WARN(!atomic_inc_and_test(&frqcr_lock), "FRQCR* lock broken!\n"))
+-		frqcr_kick_do(clk);
+-	atomic_dec(&frqcr_lock);
+-}
+-
+-static int divisors[] = { 2, 3, 4, 6, 8, 12, 16, 18, 24, 0, 36, 48, 10};
+-
+-static struct clk_div_mult_table div4_div_mult_table = {
+-	.divisors	= divisors,
+-	.nr_divisors	= ARRAY_SIZE(divisors),
+-};
+-
+-static struct clk_div4_table div4_table = {
+-	.div_mult_table	= &div4_div_mult_table,
+-	.kick		= div4_kick,
+-};
+-
+-enum {
+-	DIV4_I, DIV4_M3, DIV4_B, DIV4_M1, DIV4_M2,
+-	DIV4_ZX, DIV4_ZS, DIV4_HP,
+-	DIV4_NR };
+-
+-static struct clk div4_clks[DIV4_NR] = {
+-	[DIV4_I]	= SH_CLK_DIV4(&pll1_clk, FRQCRA, 20, 0x0dff, CLK_ENABLE_ON_INIT),
+-	[DIV4_M3]	= SH_CLK_DIV4(&pll1_clk, FRQCRA, 12, 0x1dff, CLK_ENABLE_ON_INIT),
+-	[DIV4_B]	= SH_CLK_DIV4(&pll1_clk, FRQCRA,  8, 0x0dff, CLK_ENABLE_ON_INIT),
+-	[DIV4_M1]	= SH_CLK_DIV4(&pll1_clk, FRQCRA,  4, 0x1dff, 0),
+-	[DIV4_M2]	= SH_CLK_DIV4(&pll1_clk, FRQCRA,  0, 0x1dff, 0),
+-	[DIV4_ZX]	= SH_CLK_DIV4(&pll1_clk, FRQCRB, 12, 0x0dff, 0),
+-	[DIV4_ZS]	= SH_CLK_DIV4(&pll1_clk, FRQCRB,  8, 0x0dff, 0),
+-	[DIV4_HP]	= SH_CLK_DIV4(&pll1_clk, FRQCRB,  4, 0x0dff, 0),
+-};
+-
+-enum {
+-	DIV6_ZB,
+-	DIV6_SDHI0, DIV6_SDHI1, DIV6_SDHI2,
+-	DIV6_MMC0, DIV6_MMC1,
+-	DIV6_VCK1, DIV6_VCK2, DIV6_VCK3, DIV6_VCK4, DIV6_VCK5,
+-	DIV6_FSIA, DIV6_FSIB,
+-	DIV6_MP, DIV6_M4, DIV6_HSI, DIV6_SPUV,
+-	DIV6_NR };
+-
+-static struct clk *div6_parents[8] = {
+-	[0] = &pll1_div2_clk,
+-	[1] = &pll2s_clk,
+-	[3] = &extal2_clk,
+-	[4] = &main_div2_clk,
+-	[6] = &extalr_clk,
+-};
+-
+-static struct clk *fsia_parents[4] = {
+-	[0] = &pll1_div2_clk,
+-	[1] = &pll2s_clk,
+-	[2] = &fsiack_clk,
+-};
+-
+-static struct clk *fsib_parents[4] = {
+-	[0] = &pll1_div2_clk,
+-	[1] = &pll2s_clk,
+-	[2] = &fsibck_clk,
+-};
+-
+-static struct clk *mp_parents[4] = {
+-	[0] = &pll1_div2_clk,
+-	[1] = &pll2s_clk,
+-	[2] = &extal2_clk,
+-	[3] = &extal2_clk,
+-};
+-
+-static struct clk *m4_parents[2] = {
+-	[0] = &pll2s_clk,
+-};
+-
+-static struct clk *hsi_parents[4] = {
+-	[0] = &pll2h_clk,
+-	[1] = &pll1_div2_clk,
+-	[3] = &pll2s_clk,
+-};
+-
+-/*** FIXME ***
+- * SH_CLK_DIV6_EXT() macro doesn't care .mapping
+- * but, it is necessary on R-Car (= ioremap() base CPG)
+- * The difference between
+- * SH_CLK_DIV6_EXT() <--> SH_CLK_MAP_DIV6_EXT()
+- * is only .mapping
+- */
+-#define SH_CLK_MAP_DIV6_EXT(_reg, _flags, _parents,			\
+-			    _num_parents, _src_shift, _src_width)	\
+-{									\
+-	.enable_reg	= (void __iomem *)_reg,				\
+-	.enable_bit	= 0, /* unused */				\
+-	.flags		= _flags | CLK_MASK_DIV_ON_DISABLE,		\
+-	.div_mask	= SH_CLK_DIV6_MSK,				\
+-	.parent_table	= _parents,					\
+-	.parent_num	= _num_parents,					\
+-	.src_shift	= _src_shift,					\
+-	.src_width	= _src_width,					\
+-	.mapping	= &cpg_mapping,					\
+-}
+-
+-static struct clk div6_clks[DIV6_NR] = {
+-	[DIV6_ZB] = SH_CLK_MAP_DIV6_EXT(ZBCKCR, CLK_ENABLE_ON_INIT,
+-				div6_parents, 2, 7, 1),
+-	[DIV6_SDHI0] = SH_CLK_MAP_DIV6_EXT(SD0CKCR, 0,
+-				div6_parents, 2, 6, 2),
+-	[DIV6_SDHI1] = SH_CLK_MAP_DIV6_EXT(SD1CKCR, 0,
+-				div6_parents, 2, 6, 2),
+-	[DIV6_SDHI2] = SH_CLK_MAP_DIV6_EXT(SD2CKCR, 0,
+-				div6_parents, 2, 6, 2),
+-	[DIV6_MMC0] = SH_CLK_MAP_DIV6_EXT(MMC0CKCR, 0,
+-				div6_parents, 2, 6, 2),
+-	[DIV6_MMC1] = SH_CLK_MAP_DIV6_EXT(MMC1CKCR, 0,
+-				div6_parents, 2, 6, 2),
+-	[DIV6_VCK1] = SH_CLK_MAP_DIV6_EXT(VCLKCR1, 0, /* didn't care bit[6-7] */
+-				div6_parents, ARRAY_SIZE(div6_parents), 12, 3),
+-	[DIV6_VCK2] = SH_CLK_MAP_DIV6_EXT(VCLKCR2, 0, /* didn't care bit[6-7] */
+-				div6_parents, ARRAY_SIZE(div6_parents), 12, 3),
+-	[DIV6_VCK3] = SH_CLK_MAP_DIV6_EXT(VCLKCR3, 0, /* didn't care bit[6-7] */
+-				div6_parents, ARRAY_SIZE(div6_parents), 12, 3),
+-	[DIV6_VCK4] = SH_CLK_MAP_DIV6_EXT(VCLKCR4, 0, /* didn't care bit[6-7] */
+-				div6_parents, ARRAY_SIZE(div6_parents), 12, 3),
+-	[DIV6_VCK5] = SH_CLK_MAP_DIV6_EXT(VCLKCR5, 0, /* didn't care bit[6-7] */
+-				div6_parents, ARRAY_SIZE(div6_parents), 12, 3),
+-	[DIV6_FSIA] = SH_CLK_MAP_DIV6_EXT(FSIACKCR, 0,
+-				fsia_parents, ARRAY_SIZE(fsia_parents), 6, 2),
+-	[DIV6_FSIB] = SH_CLK_MAP_DIV6_EXT(FSIBCKCR, 0,
+-				fsib_parents, ARRAY_SIZE(fsib_parents), 6, 2),
+-	[DIV6_MP] = SH_CLK_MAP_DIV6_EXT(MPCKCR, 0, /* it needs bit[9-11] control */
+-				mp_parents, ARRAY_SIZE(mp_parents), 6, 2),
+-	/* pll2s will be selected always for M4 */
+-	[DIV6_M4] = SH_CLK_MAP_DIV6_EXT(M4CKCR, 0, /* it needs bit[9] control */
+-				m4_parents, ARRAY_SIZE(m4_parents), 6, 1),
+-	[DIV6_HSI] = SH_CLK_MAP_DIV6_EXT(HSICKCR, 0, /* it needs bit[9] control */
+-				hsi_parents, ARRAY_SIZE(hsi_parents), 6, 2),
+-	[DIV6_SPUV] = SH_CLK_MAP_DIV6_EXT(SPUVCKCR, 0,
+-				mp_parents, ARRAY_SIZE(mp_parents), 6, 2),
+-};
+-
+-/* MSTP */
+-enum {
+-	MSTP218, MSTP217, MSTP216, MSTP207, MSTP206, MSTP204, MSTP203,
+-	MSTP329, MSTP323, MSTP318, MSTP317, MSTP316,
+-	MSTP315, MSTP314, MSTP313, MSTP312, MSTP305, MSTP300,
+-	MSTP411, MSTP410, MSTP409,
+-	MSTP522, MSTP515,
+-	MSTP_NR
+-};
+-
+-static struct clk mstp_clks[MSTP_NR] = {
+-	[MSTP204] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 4, 0), /* SCIFA0 */
+-	[MSTP203] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 3, 0), /* SCIFA1 */
+-	[MSTP206] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 6, 0), /* SCIFB0 */
+-	[MSTP207] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 7, 0), /* SCIFB1 */
+-	[MSTP216] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 16, 0), /* SCIFB2 */
+-	[MSTP217] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 17, 0), /* SCIFB3 */
+-	[MSTP218] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR2, 18, 0), /* DMAC */
+-	[MSTP300] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 0, 0), /* IIC2 */
+-	[MSTP305] = SH_CLK_MSTP32(&div6_clks[DIV6_MMC1],SMSTPCR3, 5, 0), /* MMCIF1 */
+-	[MSTP312] = SH_CLK_MSTP32(&div6_clks[DIV6_SDHI2],SMSTPCR3, 12, 0), /* SDHI2 */
+-	[MSTP313] = SH_CLK_MSTP32(&div6_clks[DIV6_SDHI1],SMSTPCR3, 13, 0), /* SDHI1 */
+-	[MSTP314] = SH_CLK_MSTP32(&div6_clks[DIV6_SDHI0],SMSTPCR3, 14, 0), /* SDHI0 */
+-	[MSTP315] = SH_CLK_MSTP32(&div6_clks[DIV6_MMC0],SMSTPCR3, 15, 0), /* MMCIF0 */
+-	[MSTP316] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 16, 0), /* IIC6 */
+-	[MSTP317] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 17, 0), /* IIC7 */
+-	[MSTP318] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 18, 0), /* IIC0 */
+-	[MSTP323] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 23, 0), /* IIC1 */
+-	[MSTP329] = SH_CLK_MSTP32(&extalr_clk, SMSTPCR3, 29, 0), /* CMT10 */
+-	[MSTP409] = SH_CLK_MSTP32(&main_div2_clk,	SMSTPCR4, 9, 0), /* IIC5 */
+-	[MSTP410] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR4, 10, 0), /* IIC4 */
+-	[MSTP411] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR4, 11, 0), /* IIC3 */
+-	[MSTP522] = SH_CLK_MSTP32(&extal2_clk, SMSTPCR5, 22, 0), /* Thermal */
+-	[MSTP515] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR5, 15, 0), /* IIC8 */
+-};
+-
+-static struct clk_lookup lookups[] = {
+-	/* main clock */
+-	CLKDEV_CON_ID("extal1",			&extal1_clk),
+-	CLKDEV_CON_ID("extal1_div2",		&extal1_div2_clk),
+-	CLKDEV_CON_ID("extal2",			&extal2_clk),
+-	CLKDEV_CON_ID("extal2_div2",		&extal2_div2_clk),
+-	CLKDEV_CON_ID("extal2_div4",		&extal2_div4_clk),
+-	CLKDEV_CON_ID("fsiack",			&fsiack_clk),
+-	CLKDEV_CON_ID("fsibck",			&fsibck_clk),
+-
+-	/* pll clock */
+-	CLKDEV_CON_ID("pll1",			&pll1_clk),
+-	CLKDEV_CON_ID("pll1_div2",		&pll1_div2_clk),
+-	CLKDEV_CON_ID("pll2",			&pll2_clk),
+-	CLKDEV_CON_ID("pll2s",			&pll2s_clk),
+-	CLKDEV_CON_ID("pll2h",			&pll2h_clk),
+-
+-	/* CPU clock */
+-	CLKDEV_DEV_ID("cpu0",			&z_clk),
+-
+-	/* DIV6 */
+-	CLKDEV_CON_ID("zb",			&div6_clks[DIV6_ZB]),
+-	CLKDEV_CON_ID("vck1",			&div6_clks[DIV6_VCK1]),
+-	CLKDEV_CON_ID("vck2",			&div6_clks[DIV6_VCK2]),
+-	CLKDEV_CON_ID("vck3",			&div6_clks[DIV6_VCK3]),
+-	CLKDEV_CON_ID("vck4",			&div6_clks[DIV6_VCK4]),
+-	CLKDEV_CON_ID("vck5",			&div6_clks[DIV6_VCK5]),
+-	CLKDEV_CON_ID("fsia",			&div6_clks[DIV6_FSIA]),
+-	CLKDEV_CON_ID("fsib",			&div6_clks[DIV6_FSIB]),
+-	CLKDEV_CON_ID("mp",			&div6_clks[DIV6_MP]),
+-	CLKDEV_CON_ID("m4",			&div6_clks[DIV6_M4]),
+-	CLKDEV_CON_ID("hsi",			&div6_clks[DIV6_HSI]),
+-	CLKDEV_CON_ID("spuv",			&div6_clks[DIV6_SPUV]),
+-
+-	/* MSTP */
+-	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
+-	CLKDEV_DEV_ID("e6c40000.serial", &mstp_clks[MSTP204]),
+-	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
+-	CLKDEV_DEV_ID("e6c50000.serial", &mstp_clks[MSTP203]),
+-	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]),
+-	CLKDEV_DEV_ID("e6c20000.serial", &mstp_clks[MSTP206]),
+-	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP207]),
+-	CLKDEV_DEV_ID("e6c30000.serial", &mstp_clks[MSTP207]),
+-	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP216]),
+-	CLKDEV_DEV_ID("e6ce0000.serial", &mstp_clks[MSTP216]),
+-	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP217]),
+-	CLKDEV_DEV_ID("e6cf0000.serial", &mstp_clks[MSTP217]),
+-	CLKDEV_DEV_ID("sh-dma-engine.0", &mstp_clks[MSTP218]),
+-	CLKDEV_DEV_ID("e6700020.dma-controller", &mstp_clks[MSTP218]),
+-	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
+-	CLKDEV_DEV_ID("e6520000.i2c", &mstp_clks[MSTP300]),
+-	CLKDEV_DEV_ID("sh_mmcif.1", &mstp_clks[MSTP305]),
+-	CLKDEV_DEV_ID("ee220000.mmc", &mstp_clks[MSTP305]),
+-	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP312]),
+-	CLKDEV_DEV_ID("ee140000.sd", &mstp_clks[MSTP312]),
+-	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP313]),
+-	CLKDEV_DEV_ID("ee120000.sd", &mstp_clks[MSTP313]),
+-	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]),
+-	CLKDEV_DEV_ID("ee100000.sd", &mstp_clks[MSTP314]),
+-	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP315]),
+-	CLKDEV_DEV_ID("ee200000.mmc", &mstp_clks[MSTP315]),
+-	CLKDEV_DEV_ID("e6550000.i2c", &mstp_clks[MSTP316]),
+-	CLKDEV_DEV_ID("e6560000.i2c", &mstp_clks[MSTP317]),
+-	CLKDEV_DEV_ID("e6500000.i2c", &mstp_clks[MSTP318]),
+-	CLKDEV_DEV_ID("e6510000.i2c", &mstp_clks[MSTP323]),
+-	CLKDEV_ICK_ID("fck", "sh-cmt-48-gen2.1", &mstp_clks[MSTP329]),
+-	CLKDEV_ICK_ID("fck", "e6130000.timer", &mstp_clks[MSTP329]),
+-	CLKDEV_DEV_ID("e60b0000.i2c", &mstp_clks[MSTP409]),
+-	CLKDEV_DEV_ID("e6540000.i2c", &mstp_clks[MSTP410]),
+-	CLKDEV_DEV_ID("e6530000.i2c", &mstp_clks[MSTP411]),
+-	CLKDEV_DEV_ID("e6570000.i2c", &mstp_clks[MSTP515]),
+-
+-	/* for DT */
+-	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
+-};
+-
+-void __init r8a73a4_clock_init(void)
+-{
+-	void __iomem *reg;
+-	int k, ret = 0;
+-	u32 ckscr;
+-
+-	atomic_set(&frqcr_lock, -1);
+-
+-	reg = ioremap_nocache(CKSCR, PAGE_SIZE);
+-	BUG_ON(!reg);
+-	ckscr = ioread32(reg);
+-	iounmap(reg);
+-
+-	switch ((ckscr >> 28) & 0x3) {
+-	case 0:
+-		main_clk.parent = &extal1_clk;
+-		break;
+-	case 1:
+-		main_clk.parent = &extal1_div2_clk;
+-		break;
+-	case 2:
+-		main_clk.parent = &extal2_clk;
+-		break;
+-	case 3:
+-		main_clk.parent = &extal2_div2_clk;
+-		break;
+-	}
+-
+-	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
+-		ret = clk_register(main_clks[k]);
+-
+-	if (!ret)
+-		ret = sh_clk_div4_register(div4_clks, DIV4_NR, &div4_table);
+-
+-	if (!ret)
+-		ret = sh_clk_div6_reparent_register(div6_clks, DIV6_NR);
+-
+-	if (!ret)
+-		ret = sh_clk_mstp_register(mstp_clks, MSTP_NR);
+-
+-	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+-
+-	if (!ret)
+-		shmobile_clk_init();
+-	else
+-		panic("failed to setup r8a73a4 clocks\n");
+-}
+diff --git a/arch/arm/mach-shmobile/r8a73a4.h b/arch/arm/mach-shmobile/r8a73a4.h
+deleted file mode 100644
+index 70dcd84..0000000
+--- a/arch/arm/mach-shmobile/r8a73a4.h
++++ /dev/null
+@@ -1,17 +0,0 @@
+-#ifndef __ASM_R8A73A4_H__
+-#define __ASM_R8A73A4_H__
+-
+-/* DMA slave IDs */
+-enum {
+-	SHDMA_SLAVE_INVALID,
+-	SHDMA_SLAVE_MMCIF0_TX,
+-	SHDMA_SLAVE_MMCIF0_RX,
+-	SHDMA_SLAVE_MMCIF1_TX,
+-	SHDMA_SLAVE_MMCIF1_RX,
+-};
+-
+-void r8a73a4_add_standard_devices(void);
+-void r8a73a4_clock_init(void);
+-void r8a73a4_pinmux_init(void);
+-
+-#endif /* __ASM_R8A73A4_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
+index c276822..446cee6 100644
+--- a/arch/arm/mach-shmobile/setup-r8a73a4.c
++++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
+@@ -13,280 +13,12 @@
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  */
+-#include <linux/irq.h>
+-#include <linux/kernel.h>
+-#include <linux/of_platform.h>
+-#include <linux/platform_data/irq-renesas-irqc.h>
+-#include <linux/serial_sci.h>
+-#include <linux/sh_dma.h>
+-#include <linux/sh_timer.h>
 +
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts = <1 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-@@ -42,11 +48,13 @@
- 	dbsc1: memory-controller at e6790000 {
- 		compatible = "renesas,dbsc-r8a73a4";
- 		reg = <0 0xe6790000 0 0x10000>;
-+		power-domains = <&pd_a3bc>;
- 	};
++#include <linux/init.h>
  
- 	dbsc2: memory-controller at e67a0000 {
- 		compatible = "renesas,dbsc-r8a73a4";
- 		reg = <0 0xe67a0000 0 0x10000>;
-+		power-domains = <&pd_a3bc>;
- 	};
+ #include <asm/mach/arch.h>
  
- 	dmac: dma-multiplexer {
-@@ -89,6 +97,7 @@
- 					"ch12", "ch13", "ch14", "ch15",
- 					"ch16", "ch17", "ch18", "ch19";
- 			clocks = <&mstp2_clks R8A73A4_CLK_DMAC>;
-+			power-domains = <&pd_a3sp>;
- 		};
- 	};
+ #include "common.h"
+-#include "dma-register.h"
+-#include "irqs.h"
+-#include "r8a73a4.h"
+-
+-static const struct resource pfc_resources[] = {
+-	DEFINE_RES_MEM(0xe6050000, 0x9000),
+-};
+-
+-void __init r8a73a4_pinmux_init(void)
+-{
+-	platform_device_register_simple("pfc-r8a73a4", -1, pfc_resources,
+-					ARRAY_SIZE(pfc_resources));
+-}
+-
+-#define R8A73A4_SCIF(scif_type, _scscr, index, baseaddr, irq)	\
+-static struct plat_sci_port scif##index##_platform_data = {	\
+-	.type		= scif_type,				\
+-	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,	\
+-	.scscr		= _scscr,				\
+-};								\
+-								\
+-static struct resource scif##index##_resources[] = {		\
+-	DEFINE_RES_MEM(baseaddr, 0x100),			\
+-	DEFINE_RES_IRQ(irq),					\
+-}
+-
+-#define R8A73A4_SCIFA(index, baseaddr, irq)	\
+-	R8A73A4_SCIF(PORT_SCIFA, SCSCR_RE | SCSCR_TE | SCSCR_CKE0, \
+-		     index, baseaddr, irq)
+-
+-#define R8A73A4_SCIFB(index, baseaddr, irq)	\
+-	R8A73A4_SCIF(PORT_SCIFB, SCSCR_RE | SCSCR_TE, \
+-		     index, baseaddr, irq)
+-
+-R8A73A4_SCIFA(0, 0xe6c40000, gic_spi(144)); /* SCIFA0 */
+-R8A73A4_SCIFA(1, 0xe6c50000, gic_spi(145)); /* SCIFA1 */
+-R8A73A4_SCIFB(2, 0xe6c20000, gic_spi(148)); /* SCIFB0 */
+-R8A73A4_SCIFB(3, 0xe6c30000, gic_spi(149)); /* SCIFB1 */
+-R8A73A4_SCIFB(4, 0xe6ce0000, gic_spi(150)); /* SCIFB2 */
+-R8A73A4_SCIFB(5, 0xe6cf0000, gic_spi(151)); /* SCIFB3 */
+-
+-#define r8a73a4_register_scif(index)					       \
+-	platform_device_register_resndata(NULL, "sh-sci", index,	       \
+-					  scif##index##_resources,	       \
+-					  ARRAY_SIZE(scif##index##_resources), \
+-					  &scif##index##_platform_data,	       \
+-					  sizeof(scif##index##_platform_data))
+-
+-static const struct renesas_irqc_config irqc0_data = {
+-	.irq_base = irq_pin(0), /* IRQ0 -> IRQ31 */
+-};
+-
+-static const struct resource irqc0_resources[] = {
+-	DEFINE_RES_MEM(0xe61c0000, 0x200), /* IRQC Event Detector Block_0 */
+-	DEFINE_RES_IRQ(gic_spi(0)), /* IRQ0 */
+-	DEFINE_RES_IRQ(gic_spi(1)), /* IRQ1 */
+-	DEFINE_RES_IRQ(gic_spi(2)), /* IRQ2 */
+-	DEFINE_RES_IRQ(gic_spi(3)), /* IRQ3 */
+-	DEFINE_RES_IRQ(gic_spi(4)), /* IRQ4 */
+-	DEFINE_RES_IRQ(gic_spi(5)), /* IRQ5 */
+-	DEFINE_RES_IRQ(gic_spi(6)), /* IRQ6 */
+-	DEFINE_RES_IRQ(gic_spi(7)), /* IRQ7 */
+-	DEFINE_RES_IRQ(gic_spi(8)), /* IRQ8 */
+-	DEFINE_RES_IRQ(gic_spi(9)), /* IRQ9 */
+-	DEFINE_RES_IRQ(gic_spi(10)), /* IRQ10 */
+-	DEFINE_RES_IRQ(gic_spi(11)), /* IRQ11 */
+-	DEFINE_RES_IRQ(gic_spi(12)), /* IRQ12 */
+-	DEFINE_RES_IRQ(gic_spi(13)), /* IRQ13 */
+-	DEFINE_RES_IRQ(gic_spi(14)), /* IRQ14 */
+-	DEFINE_RES_IRQ(gic_spi(15)), /* IRQ15 */
+-	DEFINE_RES_IRQ(gic_spi(16)), /* IRQ16 */
+-	DEFINE_RES_IRQ(gic_spi(17)), /* IRQ17 */
+-	DEFINE_RES_IRQ(gic_spi(18)), /* IRQ18 */
+-	DEFINE_RES_IRQ(gic_spi(19)), /* IRQ19 */
+-	DEFINE_RES_IRQ(gic_spi(20)), /* IRQ20 */
+-	DEFINE_RES_IRQ(gic_spi(21)), /* IRQ21 */
+-	DEFINE_RES_IRQ(gic_spi(22)), /* IRQ22 */
+-	DEFINE_RES_IRQ(gic_spi(23)), /* IRQ23 */
+-	DEFINE_RES_IRQ(gic_spi(24)), /* IRQ24 */
+-	DEFINE_RES_IRQ(gic_spi(25)), /* IRQ25 */
+-	DEFINE_RES_IRQ(gic_spi(26)), /* IRQ26 */
+-	DEFINE_RES_IRQ(gic_spi(27)), /* IRQ27 */
+-	DEFINE_RES_IRQ(gic_spi(28)), /* IRQ28 */
+-	DEFINE_RES_IRQ(gic_spi(29)), /* IRQ29 */
+-	DEFINE_RES_IRQ(gic_spi(30)), /* IRQ30 */
+-	DEFINE_RES_IRQ(gic_spi(31)), /* IRQ31 */
+-};
+-
+-static const struct renesas_irqc_config irqc1_data = {
+-	.irq_base = irq_pin(32), /* IRQ32 -> IRQ57 */
+-};
+-
+-static const struct resource irqc1_resources[] = {
+-	DEFINE_RES_MEM(0xe61c0200, 0x200), /* IRQC Event Detector Block_1 */
+-	DEFINE_RES_IRQ(gic_spi(32)), /* IRQ32 */
+-	DEFINE_RES_IRQ(gic_spi(33)), /* IRQ33 */
+-	DEFINE_RES_IRQ(gic_spi(34)), /* IRQ34 */
+-	DEFINE_RES_IRQ(gic_spi(35)), /* IRQ35 */
+-	DEFINE_RES_IRQ(gic_spi(36)), /* IRQ36 */
+-	DEFINE_RES_IRQ(gic_spi(37)), /* IRQ37 */
+-	DEFINE_RES_IRQ(gic_spi(38)), /* IRQ38 */
+-	DEFINE_RES_IRQ(gic_spi(39)), /* IRQ39 */
+-	DEFINE_RES_IRQ(gic_spi(40)), /* IRQ40 */
+-	DEFINE_RES_IRQ(gic_spi(41)), /* IRQ41 */
+-	DEFINE_RES_IRQ(gic_spi(42)), /* IRQ42 */
+-	DEFINE_RES_IRQ(gic_spi(43)), /* IRQ43 */
+-	DEFINE_RES_IRQ(gic_spi(44)), /* IRQ44 */
+-	DEFINE_RES_IRQ(gic_spi(45)), /* IRQ45 */
+-	DEFINE_RES_IRQ(gic_spi(46)), /* IRQ46 */
+-	DEFINE_RES_IRQ(gic_spi(47)), /* IRQ47 */
+-	DEFINE_RES_IRQ(gic_spi(48)), /* IRQ48 */
+-	DEFINE_RES_IRQ(gic_spi(49)), /* IRQ49 */
+-	DEFINE_RES_IRQ(gic_spi(50)), /* IRQ50 */
+-	DEFINE_RES_IRQ(gic_spi(51)), /* IRQ51 */
+-	DEFINE_RES_IRQ(gic_spi(52)), /* IRQ52 */
+-	DEFINE_RES_IRQ(gic_spi(53)), /* IRQ53 */
+-	DEFINE_RES_IRQ(gic_spi(54)), /* IRQ54 */
+-	DEFINE_RES_IRQ(gic_spi(55)), /* IRQ55 */
+-	DEFINE_RES_IRQ(gic_spi(56)), /* IRQ56 */
+-	DEFINE_RES_IRQ(gic_spi(57)), /* IRQ57 */
+-};
+-
+-#define r8a73a4_register_irqc(idx)					\
+-	platform_device_register_resndata(NULL, "renesas_irqc", 	\
+-					  idx, irqc##idx##_resources,	\
+-					  ARRAY_SIZE(irqc##idx##_resources), \
+-					  &irqc##idx##_data,		\
+-					  sizeof(struct renesas_irqc_config))
+-
+-/* Thermal0 -> Thermal2 */
+-static const struct resource thermal0_resources[] = {
+-	DEFINE_RES_MEM(0xe61f0000, 0x14),
+-	DEFINE_RES_MEM(0xe61f0100, 0x38),
+-	DEFINE_RES_MEM(0xe61f0200, 0x38),
+-	DEFINE_RES_MEM(0xe61f0300, 0x38),
+-	DEFINE_RES_IRQ(gic_spi(69)),
+-};
+-
+-#define r8a73a4_register_thermal()					\
+-	platform_device_register_simple("rcar_thermal", -1,		\
+-					thermal0_resources,		\
+-					ARRAY_SIZE(thermal0_resources))
+-
+-static struct sh_timer_config cmt1_platform_data = {
+-	.channels_mask = 0xff,
+-};
+-
+-static struct resource cmt1_resources[] = {
+-	DEFINE_RES_MEM(0xe6130000, 0x1004),
+-	DEFINE_RES_IRQ(gic_spi(120)),
+-};
+-
+-#define r8a73a4_register_cmt(idx)					\
+-	platform_device_register_resndata(NULL, "sh-cmt-48-gen2",	\
+-					  idx, cmt##idx##_resources,	\
+-					  ARRAY_SIZE(cmt##idx##_resources), \
+-					  &cmt##idx##_platform_data,	\
+-					  sizeof(struct sh_timer_config))
+-
+-/* DMA */
+-static const struct sh_dmae_slave_config dma_slaves[] = {
+-	{
+-		.slave_id	= SHDMA_SLAVE_MMCIF0_TX,
+-		.addr		= 0xee200034,
+-		.chcr		= CHCR_TX(XMIT_SZ_32BIT),
+-		.mid_rid	= 0xd1,
+-	}, {
+-		.slave_id	= SHDMA_SLAVE_MMCIF0_RX,
+-		.addr		= 0xee200034,
+-		.chcr		= CHCR_RX(XMIT_SZ_32BIT),
+-		.mid_rid	= 0xd2,
+-	}, {
+-		.slave_id	= SHDMA_SLAVE_MMCIF1_TX,
+-		.addr		= 0xee220034,
+-		.chcr		= CHCR_TX(XMIT_SZ_32BIT),
+-		.mid_rid	= 0xe1,
+-	}, {
+-		.slave_id	= SHDMA_SLAVE_MMCIF1_RX,
+-		.addr		= 0xee220034,
+-		.chcr		= CHCR_RX(XMIT_SZ_32BIT),
+-		.mid_rid	= 0xe2,
+-	},
+-};
+-
+-#define DMAE_CHANNEL(a, b)				\
+-	{						\
+-		.offset         = (a) - 0x20,		\
+-		.dmars          = (a) - 0x20 + 0x40,	\
+-		.chclr_bit	= (b),			\
+-		.chclr_offset	= 0x80 - 0x20,		\
+-	}
+-
+-static const struct sh_dmae_channel dma_channels[] = {
+-	DMAE_CHANNEL(0x8000, 0),
+-	DMAE_CHANNEL(0x8080, 1),
+-	DMAE_CHANNEL(0x8100, 2),
+-	DMAE_CHANNEL(0x8180, 3),
+-	DMAE_CHANNEL(0x8200, 4),
+-	DMAE_CHANNEL(0x8280, 5),
+-	DMAE_CHANNEL(0x8300, 6),
+-	DMAE_CHANNEL(0x8380, 7),
+-	DMAE_CHANNEL(0x8400, 8),
+-	DMAE_CHANNEL(0x8480, 9),
+-	DMAE_CHANNEL(0x8500, 10),
+-	DMAE_CHANNEL(0x8580, 11),
+-	DMAE_CHANNEL(0x8600, 12),
+-	DMAE_CHANNEL(0x8680, 13),
+-	DMAE_CHANNEL(0x8700, 14),
+-	DMAE_CHANNEL(0x8780, 15),
+-	DMAE_CHANNEL(0x8800, 16),
+-	DMAE_CHANNEL(0x8880, 17),
+-	DMAE_CHANNEL(0x8900, 18),
+-	DMAE_CHANNEL(0x8980, 19),
+-};
+-
+-static const struct sh_dmae_pdata dma_pdata = {
+-	.slave		= dma_slaves,
+-	.slave_num	= ARRAY_SIZE(dma_slaves),
+-	.channel	= dma_channels,
+-	.channel_num	= ARRAY_SIZE(dma_channels),
+-	.ts_low_shift	= TS_LOW_SHIFT,
+-	.ts_low_mask	= TS_LOW_BIT << TS_LOW_SHIFT,
+-	.ts_high_shift	= TS_HI_SHIFT,
+-	.ts_high_mask	= TS_HI_BIT << TS_HI_SHIFT,
+-	.ts_shift	= dma_ts_shift,
+-	.ts_shift_num	= ARRAY_SIZE(dma_ts_shift),
+-	.dmaor_init     = DMAOR_DME,
+-	.chclr_present	= 1,
+-	.chclr_bitwise	= 1,
+-};
+-
+-static struct resource dma_resources[] = {
+-	DEFINE_RES_MEM(0xe6700020, 0x89e0),
+-	DEFINE_RES_IRQ(gic_spi(220)),
+-	{
+-		/* IRQ for channels 0-19 */
+-		.start  = gic_spi(200),
+-		.end    = gic_spi(219),
+-		.flags  = IORESOURCE_IRQ,
+-	},
+-};
+-
+-#define r8a73a4_register_dmac()							\
+-	platform_device_register_resndata(NULL, "sh-dma-engine", 0,		\
+-				dma_resources, ARRAY_SIZE(dma_resources),	\
+-				&dma_pdata, sizeof(dma_pdata))
+-
+-void __init r8a73a4_add_standard_devices(void)
+-{
+-	r8a73a4_register_cmt(1);
+-	r8a73a4_register_scif(0);
+-	r8a73a4_register_scif(1);
+-	r8a73a4_register_scif(2);
+-	r8a73a4_register_scif(3);
+-	r8a73a4_register_scif(4);
+-	r8a73a4_register_scif(5);
+-	r8a73a4_register_irqc(0);
+-	r8a73a4_register_irqc(1);
+-	r8a73a4_register_thermal();
+-	r8a73a4_register_dmac();
+-}
+-
+-#ifdef CONFIG_USE_OF
  
-@@ -99,6 +108,7 @@
- 		reg = <0 0xe60b0000 0 0x428>;
- 		interrupts = <0 179 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp4_clks R8A73A4_CLK_IIC5>;
-+		power-domains = <&pd_a3sp>;
- 
- 		status = "disabled";
- 	};
-@@ -109,6 +119,7 @@
- 		interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A73A4_CLK_CMT1>;
- 		clock-names = "fck";
-+		power-domains = <&pd_c5>;
- 
- 		renesas,channels-mask = <0xff>;
- 
-@@ -152,6 +163,7 @@
- 			     <0 29 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 30 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 31 IRQ_TYPE_LEVEL_HIGH>;
-+		power-domains = <&pd_c4>;
- 	};
- 
- 	irqc1: interrupt-controller at e61c0200 {
-@@ -185,6 +197,7 @@
- 			     <0 55 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 56 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 57 IRQ_TYPE_LEVEL_HIGH>;
-+		power-domains = <&pd_c4>;
- 	};
- 
- 	pfc: pfc at e6050000 {
-@@ -208,6 +221,7 @@
- 			<&irqc1 16 0>, <&irqc1 17 0>, <&irqc1 18 0>, <&irqc1 19 0>,
- 			<&irqc1 20 0>, <&irqc1 21 0>, <&irqc1 22 0>, <&irqc1 23 0>,
- 			<&irqc1 24 0>, <&irqc1 25 0>;
-+		power-domains = <&pd_c5>;
- 	};
- 
- 	thermal at e61f0000 {
-@@ -216,6 +230,7 @@
- 			 <0 0xe61f0200 0 0x38>, <0 0xe61f0300 0 0x38>;
- 		interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp5_clks R8A73A4_CLK_THERMAL>;
-+		power-domains = <&pd_c5>;
- 	};
- 
- 	i2c0: i2c at e6500000 {
-@@ -225,6 +240,7 @@
- 		reg = <0 0xe6500000 0 0x428>;
- 		interrupts = <0 174 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A73A4_CLK_IIC0>;
-+		power-domains = <&pd_a3sp>;
- 		status = "disabled";
- 	};
- 
-@@ -235,6 +251,7 @@
- 		reg = <0 0xe6510000 0 0x428>;
- 		interrupts = <0 175 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A73A4_CLK_IIC1>;
-+		power-domains = <&pd_a3sp>;
- 		status = "disabled";
- 	};
- 
-@@ -245,6 +262,7 @@
- 		reg = <0 0xe6520000 0 0x428>;
- 		interrupts = <0 176 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A73A4_CLK_IIC2>;
-+		power-domains = <&pd_a3sp>;
- 		status = "disabled";
- 	};
- 
-@@ -255,6 +273,7 @@
- 		reg = <0 0xe6530000 0 0x428>;
- 		interrupts = <0 177 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp4_clks R8A73A4_CLK_IIC3>;
-+		power-domains = <&pd_a3sp>;
- 		status = "disabled";
- 	};
- 
-@@ -265,6 +284,7 @@
- 		reg = <0 0xe6540000 0 0x428>;
- 		interrupts = <0 178 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp4_clks R8A73A4_CLK_IIC4>;
-+		power-domains = <&pd_a3sp>;
- 		status = "disabled";
- 	};
- 
-@@ -275,6 +295,7 @@
- 		reg = <0 0xe6550000 0 0x428>;
- 		interrupts = <0 184 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A73A4_CLK_IIC6>;
-+		power-domains = <&pd_a3sp>;
- 		status = "disabled";
- 	};
- 
-@@ -285,6 +306,7 @@
- 		reg = <0 0xe6560000 0 0x428>;
- 		interrupts = <0 185 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A73A4_CLK_IIC7>;
-+		power-domains = <&pd_a3sp>;
- 		status = "disabled";
- 	};
- 
-@@ -295,6 +317,7 @@
- 		reg = <0 0xe6570000 0 0x428>;
- 		interrupts = <0 173 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp5_clks R8A73A4_CLK_IIC8>;
-+		power-domains = <&pd_a3sp>;
- 		status = "disabled";
- 	};
- 
-@@ -304,6 +327,7 @@
- 		interrupts = <0 148 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A73A4_CLK_SCIFB0>;
- 		clock-names = "sci_ick";
-+		power-domains = <&pd_a3sp>;
- 		status = "disabled";
- 	};
- 
-@@ -313,6 +337,7 @@
- 		interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A73A4_CLK_SCIFB1>;
- 		clock-names = "sci_ick";
-+		power-domains = <&pd_a3sp>;
- 		status = "disabled";
- 	};
- 
-@@ -322,6 +347,7 @@
- 		interrupts = <0 144 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A73A4_CLK_SCIFA0>;
- 		clock-names = "sci_ick";
-+		power-domains = <&pd_a3sp>;
- 		status = "disabled";
- 	};
- 
-@@ -331,6 +357,7 @@
- 		interrupts = <0 145 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A73A4_CLK_SCIFA1>;
- 		clock-names = "sci_ick";
-+		power-domains = <&pd_a3sp>;
- 		status = "disabled";
- 	};
- 
-@@ -340,6 +367,7 @@
- 		interrupts = <0 150 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A73A4_CLK_SCIFB2>;
- 		clock-names = "sci_ick";
-+		power-domains = <&pd_a3sp>;
- 		status = "disabled";
- 	};
- 
-@@ -349,6 +377,7 @@
- 		interrupts = <0 151 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A73A4_CLK_SCIFB3>;
- 		clock-names = "sci_ick";
-+		power-domains = <&pd_c4>;
- 		status = "disabled";
- 	};
- 
-@@ -357,6 +386,7 @@
- 		reg = <0 0xee100000 0 0x100>;
- 		interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A73A4_CLK_SDHI0>;
-+		power-domains = <&pd_a3sp>;
- 		cap-sd-highspeed;
- 		status = "disabled";
- 	};
-@@ -366,6 +396,7 @@
- 		reg = <0 0xee120000 0 0x100>;
- 		interrupts = <0 166 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A73A4_CLK_SDHI1>;
-+		power-domains = <&pd_a3sp>;
- 		cap-sd-highspeed;
- 		status = "disabled";
- 	};
-@@ -375,6 +406,7 @@
- 		reg = <0 0xee140000 0 0x100>;
- 		interrupts = <0 167 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A73A4_CLK_SDHI2>;
-+		power-domains = <&pd_a3sp>;
- 		cap-sd-highspeed;
- 		status = "disabled";
- 	};
-@@ -384,6 +416,7 @@
- 		reg = <0 0xee200000 0 0x80>;
- 		interrupts = <0 169 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A73A4_CLK_MMCIF0>;
-+		power-domains = <&pd_a3sp>;
- 		reg-io-width = <4>;
- 		status = "disabled";
- 	};
-@@ -393,6 +426,7 @@
- 		reg = <0 0xee220000 0 0x80>;
- 		interrupts = <0 170 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A73A4_CLK_MMCIF1>;
-+		power-domains = <&pd_a3sp>;
- 		reg-io-width = <4>;
- 		status = "disabled";
- 	};
-@@ -417,6 +451,7 @@
- 		ranges = <0 0 0 0x20000000>;
- 		reg = <0 0xfec10000 0 0x400>;
- 		clocks = <&zb_clk>;
-+		power-domains = <&pd_c4>;
- 	};
- 
- 	clocks {
-@@ -711,4 +746,146 @@
- 				"thermal", "iic8";
- 		};
- 	};
-+
-+	sysc: system-controller at e6180000 {
-+		compatible = "renesas,sysc-r8a73a4", "renesas,sysc-rmobile";
-+		reg = <0 0xe6180000 0 0x8000>, <0 0xe6188000 0 0x8000>;
-+
-+		pm-domains {
-+			pd_c5: c5 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				#power-domain-cells = <0>;
-+
-+				pd_c4: c4 at 0 {
-+					reg = <0>;
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					#power-domain-cells = <0>;
-+
-+					pd_a3sg: a3sg at 16 {
-+						reg = <16>;
-+						#power-domain-cells = <0>;
-+					};
-+
-+					pd_a3ex: a3ex at 17 {
-+						reg = <17>;
-+						#power-domain-cells = <0>;
-+					};
-+
-+					pd_a3sp: a3sp at 18 {
-+						reg = <18>;
-+						#address-cells = <1>;
-+						#size-cells = <0>;
-+						#power-domain-cells = <0>;
-+
-+						pd_a2us: a2us at 19 {
-+							reg = <19>;
-+							#power-domain-cells = <0>;
-+						};
-+					};
-+
-+					pd_a3sm: a3sm at 20 {
-+						reg = <20>;
-+						#address-cells = <1>;
-+						#size-cells = <0>;
-+						#power-domain-cells = <0>;
-+
-+						pd_a2sl: a2sl at 21 {
-+							reg = <21>;
-+							#power-domain-cells = <0>;
-+						};
-+					};
-+
-+					pd_a3km: a3km at 22 {
-+						reg = <22>;
-+						#address-cells = <1>;
-+						#size-cells = <0>;
-+						#power-domain-cells = <0>;
-+
-+						pd_a2kl: a2kl at 23 {
-+							reg = <23>;
-+							#power-domain-cells = <0>;
-+						};
-+					};
-+				};
-+
-+				pd_c4ma: c4ma at 1 {
-+					reg = <1>;
-+					#power-domain-cells = <0>;
-+				};
-+
-+				pd_c4cl: c4cl at 2 {
-+					reg = <2>;
-+					#power-domain-cells = <0>;
-+				};
-+
-+				pd_d4: d4 at 3 {
-+					reg = <3>;
-+					#power-domain-cells = <0>;
-+				};
-+
-+				pd_a4bc: a4bc at 4 {
-+					reg = <4>;
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					#power-domain-cells = <0>;
-+
-+					pd_a3bc: a3bc at 5 {
-+						reg = <5>;
-+						#power-domain-cells = <0>;
-+					};
-+				};
-+
-+				pd_a4l: a4l at 6 {
-+					reg = <6>;
-+					#power-domain-cells = <0>;
-+				};
-+
-+				pd_a4lc: a4lc at 7 {
-+					reg = <7>;
-+					#power-domain-cells = <0>;
-+				};
-+
-+				pd_a4mp: a4mp at 8 {
-+					reg = <8>;
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					#power-domain-cells = <0>;
-+
-+					pd_a3mp: a3mp at 9 {
-+						reg = <9>;
-+						#power-domain-cells = <0>;
-+					};
-+
-+					pd_a3vc: a3vc at 10 {
-+						reg = <10>;
-+						#power-domain-cells = <0>;
-+					};
-+				};
-+
-+				pd_a4sf: a4sf at 11 {
-+					reg = <11>;
-+					#power-domain-cells = <0>;
-+				};
-+
-+				pd_a3r: a3r at 12 {
-+					reg = <12>;
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					#power-domain-cells = <0>;
-+
-+					pd_a2rv: a2rv at 13 {
-+						reg = <13>;
-+						#power-domain-cells = <0>;
-+					};
-+
-+					pd_a2is: a2is at 14 {
-+						reg = <14>;
-+						#power-domain-cells = <0>;
-+					};
-+				};
-+			};
-+		};
-+	};
- };
+ static const char *r8a73a4_boards_compat_dt[] __initdata = {
+ 	"renesas,r8a73a4",
+@@ -298,4 +30,3 @@ DT_MACHINE_START(R8A73A4_DT, "Generic R8A73A4 (Flattened Device Tree)")
+ 	.init_late	= shmobile_init_late,
+ 	.dt_compat	= r8a73a4_boards_compat_dt,
+ MACHINE_END
+-#endif /* CONFIG_USE_OF */
 -- 
 2.1.4
