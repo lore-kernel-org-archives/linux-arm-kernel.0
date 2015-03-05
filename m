@@ -1,45 +1,75 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 5 Mar 2015 10:58:27 +0100
-Subject: [PATCH] ARM: at91: debug: fix non MMU debug
-In-Reply-To: <1425480087-31097-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1425480087-31097-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54F828C3.6090901@atmel.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 05 Mar 2015 11:02:37 +0100
+Subject: [PATCH v1 5/6] eeprom: qfprom: Add Qualcomm QFPROM support.
+In-Reply-To: <1425548783-13110-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1425548685-12887-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1425548783-13110-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1425549757.24292.204.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 04/03/2015 15:41, Alexandre Belloni a ?crit :
-> Linux may be used without MMU on atmel SoCs, fix debug in this configuration.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-and stacked on top of at91-4.0-fixes.
-
-Thanks!
-
-> ---
->  arch/arm/include/debug/at91.S | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/debug/at91.S b/arch/arm/include/debug/at91.S
-> index 80a6501b4d50..c3c45e628e33 100644
-> --- a/arch/arm/include/debug/at91.S
-> +++ b/arch/arm/include/debug/at91.S
-> @@ -18,8 +18,11 @@
->  #define AT91_DBGU 0xfc00c000 /* SAMA5D4_BASE_USART3 */
->  #endif
+On Thu, 2015-03-05 at 09:46 +0000, Srinivas Kandagatla wrote:
+> diff --git a/drivers/eeprom/Kconfig b/drivers/eeprom/Kconfig
+> index bff8ecb..65325c7 100644
+> --- a/drivers/eeprom/Kconfig
+> +++ b/drivers/eeprom/Kconfig
+> @@ -28,4 +28,11 @@ config EEPROM_SUNXI_SID
+>  	  This driver can also be built as a module. If so, the module
+>  	  will be called sunxi_sid.
 >  
-> -/* Keep in sync with mach-at91/include/mach/hardware.h */
-> +#ifdef CONFIG_MMU
->  #define AT91_IO_P2V(x) ((x) - 0x01000000)
-> +#else
-> +#define AT91_IO_P2V(x) (x)
-> +#endif
+> +config QCOM_QFPROM
+> +	tristate "QCOM QFPROM Support"
+> +        depends on EEPROM
+
+Make this one tab, please.
+
+> +	select REGMAP_MMIO
+> +	help
+> +          Say y here to enable QFPROM support. The QFPROM provides access
+> +          functions for QFPROM data to rest of the drivers via eeprom interface.
+
+And this one tab and two spaces, please.
+
+All utterly trivial, of course, but I found a less trivial problem with
+this patch, so I included these two comments anyway.
+
+>  endif
+> diff --git a/drivers/eeprom/Makefile b/drivers/eeprom/Makefile
+> index 661422c..f99c824 100644
+> --- a/drivers/eeprom/Makefile
+> +++ b/drivers/eeprom/Makefile
+> @@ -8,3 +8,4 @@ obj-$(CONFIG_EEPROM)		+= core.o
 >  
->  #define AT91_DBGU_SR		(0x14)	/* Status Register */
->  #define AT91_DBGU_THR		(0x1c)	/* Transmitter Holding Register */
-> 
+>  # Devices
+>  obj-$(CONFIG_EEPROM_SUNXI_SID)	+= eeprom-sunxi-sid.o
+> +obj-$(CONFIG_QCOM_QFPROM)	+= qfprom.o
+> diff --git a/drivers/eeprom/qfprom.c b/drivers/eeprom/qfprom.c
+> new file mode 100644
+> index 0000000..371a8c0
+> --- /dev/null
+> +++ b/drivers/eeprom/qfprom.c
+> @@ -0,0 +1,74 @@
+> +#include <linux/device.h>
+> +#include <linux/module.h>
+> +#include <linux/err.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/eeprom-provider.h>
+
+[...]
+
+> +MODULE_LICENSE("GPL2");
+
+This will taint the kernel on module load. I guess you meant
+    MODULE_LICENSE("GPL v2");
+
+but there's no comment with some lines about the license at the top of
+this file, so I can't be sure.
 
 
--- 
-Nicolas Ferre
+Paul Bolle
+
+(Chances are that by the end of this week everybody is so tired of
+messages like this that people actually check this stuff before
+submitting, and there's no need to review this anymore for the rest of
+this year. That would be mission accomplished, I guess.)
