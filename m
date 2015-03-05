@@ -1,42 +1,33 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed,  4 Mar 2015 17:27:03 -0800
-Subject: [PATCH v3 3/8] microblaze: use asm-generic for seccomp.h
+Date: Wed,  4 Mar 2015 17:27:01 -0800
+Subject: [PATCH v3 1/8] seccomp: allow COMPAT sigreturn overrides
 In-Reply-To: <1425518828-16017-1-git-send-email-keescook@chromium.org>
 References: <1425518828-16017-1-git-send-email-keescook@chromium.org>
-Message-ID: <1425518828-16017-4-git-send-email-keescook@chromium.org>
+Message-ID: <1425518828-16017-2-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to using the newly created asm-generic/seccomp.h for the seccomp
-strict mode syscall definitions. Since microblaze is 32-bit, the COMPAT
-seccomp defines are unused and can be dropped. The obsolete sigreturn
-for seccomp strict mode is retained as an override. Remaining definitions
-are identical.
+Some architectures may need to override the compat sigreturn definition,
+as is already possible in the non-compat case.
 
 Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- arch/microblaze/include/asm/seccomp.h | 8 +-------
- 1 file changed, 1 insertion(+), 7 deletions(-)
+ include/asm-generic/seccomp.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/microblaze/include/asm/seccomp.h b/arch/microblaze/include/asm/seccomp.h
-index 0d912758a0d7..204618a2ce84 100644
---- a/arch/microblaze/include/asm/seccomp.h
-+++ b/arch/microblaze/include/asm/seccomp.h
-@@ -3,14 +3,8 @@
+diff --git a/include/asm-generic/seccomp.h b/include/asm-generic/seccomp.h
+index 9fa1f653ed3b..c9ccafa0d99a 100644
+--- a/include/asm-generic/seccomp.h
++++ b/include/asm-generic/seccomp.h
+@@ -17,7 +17,9 @@
+ #define __NR_seccomp_read_32		__NR_read
+ #define __NR_seccomp_write_32		__NR_write
+ #define __NR_seccomp_exit_32		__NR_exit
++#ifndef __NR_seccomp_sigreturn_32
+ #define __NR_seccomp_sigreturn_32	__NR_rt_sigreturn
++#endif
+ #endif /* CONFIG_COMPAT && ! already defined */
  
- #include <linux/unistd.h>
- 
--#define __NR_seccomp_read		__NR_read
--#define __NR_seccomp_write		__NR_write
--#define __NR_seccomp_exit		__NR_exit
- #define __NR_seccomp_sigreturn		__NR_sigreturn
- 
--#define __NR_seccomp_read_32		__NR_read
--#define __NR_seccomp_write_32		__NR_write
--#define __NR_seccomp_exit_32		__NR_exit
--#define __NR_seccomp_sigreturn_32	__NR_sigreturn
-+#include <asm-generic/seccomp.h>
- 
- #endif	/* _ASM_MICROBLAZE_SECCOMP_H */
+ #define __NR_seccomp_read		__NR_read
 -- 
 1.9.1
