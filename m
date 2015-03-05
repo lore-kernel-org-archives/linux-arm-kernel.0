@@ -1,86 +1,83 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Mar 2015 14:22:44 +0000
-Subject: [PATCH] arm64/efi: use UEFI ResetSystem() Runtime Service for
- system reset
-In-Reply-To: <1425559871-3433-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1425559871-3433-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150305142244.GD14093@leverpostej>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 05 Mar 2015 15:27:47 +0100
+Subject: [PATCH v2] ARM64: Add new Xilinx ZynqMP SoC
+In-Reply-To: <54F862BE.7000901@arm.com>
+References: <cd616fa25dafee38f98e3b207e74450c5403f440.1425563597.git.michal.simek@xilinx.com>
+ <54F862BE.7000901@arm.com>
+Message-ID: <54F867E3.6070706@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Hi Marc,
 
-On Thu, Mar 05, 2015 at 12:51:11PM +0000, Ard Biesheuvel wrote:
-> If UEFI Runtime Services are available, the ResetSystem() service should
-> be preferred over direct PSCI calls or other methods to reset the system.
-> The reason is that the UpdateCapsule() UEFI Runtime Service, which is used
-> to perform firmware updates, relies on this.
+On 03/05/2015 03:05 PM, Marc Zyngier wrote:
+> Hi Michal,
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> I sent roughly the same patch ~6 months ago, but at the time, we were still
-> waiting for the restart notifier call chain patches to land. Since that code
-> got rejected, I am proposing this again. Note that efi_enabled(x) always
-> evaluates to 'false' on !CONFIG_EFI.
-
-Also, efi_reboot is a static inline for !CONFIG_EFI, so I can't see any
-possibility of a build failure.
-
-> This fixes reboot on my Seattle [although it doesn't make it any faster :-)]
+> On 05/03/15 13:53, Michal Simek wrote:
+>> Initial version of device tree for Xilinx ZynqMP SoC.
+>>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+>> ---
+>>
+>> Changes in v2:
+>> -  move timer out of amba_apu bus because it is not on bus
+>>    Reported by Mark
+>> - FIC GICC and GICV addresses - Reported by Rob
+>> - Fix copyright
+>> - Enable cadence IP in defconfig
+>> - Add support for macb multiqueue
+>>
+>>  arch/arm64/Kconfig                          |   5 +
+>>  arch/arm64/boot/dts/Makefile                |   1 +
+>>  arch/arm64/boot/dts/xilinx/Makefile         |   5 +
+>>  arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts |  47 +++++
+>>  arch/arm64/boot/dts/xilinx/zynqmp.dtsi      | 303 ++++++++++++++++++++++++++++
+>>  arch/arm64/configs/defconfig                |   3 +
+>>  6 files changed, 364 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/xilinx/Makefile
+>>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+>>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp.dtsi
 > 
->  arch/arm64/kernel/process.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
+> [...]
 > 
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index fde9923af859..a52bc0c316a8 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -21,6 +21,7 @@
->  #include <stdarg.h>
->  
->  #include <linux/compat.h>
-> +#include <linux/efi.h>
->  #include <linux/export.h>
->  #include <linux/sched.h>
->  #include <linux/kernel.h>
-> @@ -150,6 +151,14 @@ void machine_restart(char *cmd)
->  	local_irq_disable();
->  	smp_send_stop();
->  
-> +	/*
-> +	 * Prefer reboot via EFI if available, so that capsule updates [which
-> +	 * rely on UEFI's ResetSystem() being called with the return value of
-> +	 * UpdateCapsule()] have a chance of working as expected.
-> +	 */
-> +	if (efi_enabled(EFI_RUNTIME_SERVICES))
-> +		efi_reboot(reboot_mode, NULL);
+>> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+>> new file mode 100644
+>> index 000000000000..0a3f40ecd06d
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+> 
+> [...]
+> 
+>> +		gic: interrupt-controller at f9010000 {
+>> +			compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+>> +			#interrupt-cells = <3>;
+>> +			reg = <0x0 0xf9010000 0x10000>,
+>> +			      <0x0 0xf902f000 0x2000>,
+>> +			      <0x0 0xf9040000 0x20000>,
+>> +			      <0x0 0xf906f000 0x2000>;
+>> +			interrupt-controller;
+> 
+> Please add the missing GIC maintenance interrupt.
 
-I expect that the particulars of the UpdateCapsule() will be handled
-within efi_reboot and won't require any additions here. So the comment
-could just be trimmed to say that UpdateCapsule() depends on the system
-being reset with ResetSystem().
-
-Also, we need to make sure we call efi_poweroff to make UpdateCapsule()
-work when shutting the machine down (behind the scenes efi_poweroff
-calls ResetSystem(EfiResetShutdown, ...)).
-
-For that I think adding the following to arch/arm64/kernel/efi.c is
-sufficient:
-
-/*
- * UpdateCapsule() depends on the system being shutdown via
- * ResetSystem().
- */
-bool efi_poweroff_required(void)
-{
-	return efi_enabled(EFI_RUNTIME_SERVICES);
-}
-
-I've given the patch a spin (with and without that addition) on Juno and
-Seattle. So with that folded in:
-
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Ok. Will add interrupts = <1 9 0xf04>;
 
 Thanks,
-Mark.
+Michal
+
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150305/f478d746/attachment-0001.sig>
