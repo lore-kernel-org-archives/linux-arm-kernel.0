@@ -1,64 +1,76 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 5 Mar 2015 10:13:13 +0100
-Subject: [PATCH] ARM: at91: dts: sama5d3/sama5d4: reduce NFC command
- registers memory region
-In-Reply-To: <54F7B6CE.8060403@atmel.com>
-References: <1421305683-8739-1-git-send-email-josh.wu@atmel.com>	<20150115094527.3fde882a@bbrezillon>	<54B78F73.9000504@atmel.com>
- <20150115110501.53b4584c@bbrezillon> <54F72276.8060605@atmel.com>
- <54F7B6CE.8060403@atmel.com>
-Message-ID: <54F81E29.7010605@atmel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 5 Mar 2015 10:19:48 +0100
+Subject: [PATCH] clk: mediatek: Export CPU mux clocks for CPU frequency
+ control
+In-Reply-To: <CAKohponSqLPcULA9-T8y9b_b44Torti0p6W3sJfRZ1oKUWqtTw@mail.gmail.com>
+References: <1425466152-7867-1-git-send-email-pi-cheng.chen@linaro.org>
+ <20150304112109.GB11010@pengutronix.de>
+ <CALx668WKKmifhuODsV+Uaoq4ggcmB1=wbpLzXBnjEtxbuB4qig@mail.gmail.com>
+ <20150305074207.GC11010@pengutronix.de>
+ <CAKohponSqLPcULA9-T8y9b_b44Torti0p6W3sJfRZ1oKUWqtTw@mail.gmail.com>
+Message-ID: <20150305091948.GH11010@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/03/2015 02:52, Josh Wu a ?crit :
-> Hi, Nicolas
+On Thu, Mar 05, 2015 at 02:29:50PM +0530, Viresh Kumar wrote:
+> On 5 March 2015 at 13:12, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > We have clk_set_parent for changing the parent and clk_set_rate to
+> > change the rate. Use the former for changing the parent and the latter
+> > for changing the rate. What you are interested in is changing the
+> > parent, so use clk_set_parent for this and not abuse a side effect
+> > of clk_set_rate.
 > 
-> On 3/4/2015 11:19 PM, Nicolas Ferre wrote:
->> Le 15/01/2015 11:05, Boris Brezillon a ?crit :
->>> Hi Josh,
->>>
->>> On Thu, 15 Jan 2015 17:59:15 +0800
->>> Josh Wu <josh.wu@atmel.com> wrote:
->>>
->>>> Hi? Boris
->>>>
->>>> Thanks for the review.
->>>>
->>>> On 1/15/2015 4:45 PM, Boris Brezillon wrote:
->>>>> Hi Josh,
->>>>>
->>>>> On Thu, 15 Jan 2015 15:08:03 +0800
->>>>> Josh Wu <josh.wu@atmel.com> wrote:
->>>>>
->>>>>> To get NFC status, we need to read the NFC command registers, which is a
->>>>>> 256M memory mapping address. To check the status, you just read such
->>>>>> address from NFC command registers.
->>>>>> For example, to check NFCBUSY (bit 27), you need to read 0x08000000
->>>>>> (bit 27 is set to 1) of the NFC command register.
->>>>>> If you want to check NFCBUSY (bit 27) and NFCWR (bit 26) in same time,
->>>>>> you need to read 0x0c000000 (bit 27 and bit 26 are set to 1).
->>>>> Are NFCBUSY and NFCWR found in NFCDATA_STATUS and those found in HSMC_SR
->>>>> representing the same thing.
->>>> yes. it is. I just check with IP team. The NFCBUSY of NFCDATA_STATUS is
->>>> also refer to NFC_BUSY of HSMC_SR.
->>>>
->>>>> If they are, I think you can just use HSMC_SR instead of NFCDATA_STATUS
->>>>> to check the status [1] and drop the last bit in the NFC Command
->>>>> Resgiters range.
->>>> Thank you. your code works (just need some typo change).
->>>> I want to send [1] code with your signed-off and my acked to mtd list.
->>>> Is it okay for you?
->>> Sure, no problem.
->> Hi Josh,
->>
->> What is the status of this patch set?
+> clk_set_rate() for CPUs clock is responsible to change clock rate
+> of the CPU. Whether it plays with PLLs or muxes, its not that relevant.
+
+The sequence to change the CPU frequency on the Mediatek SoCs is like this:
+
+- Change CPU from CPU PLL to another clock source (intermediate source)
+- Change CPU PLL frequency
+- wait until PLL has settled
+- switch back to CPU PLL
+
+The frequency of the intermediate source is irrelevant, the important
+thing is that the CPU is switched to this source while the CPU PLL is
+reconfigured.
+
+In Pi-Chengs patches the switch to th eintermediate clock is done like:
+
+	rate = clk_get_rate(intermediate_clk);
+	clk_set_rate(cpu_clk, rate);
+
+Now the clk framework does the switch not because it's told to switch
+to another parent, but only because the other parent happens to be the
+only provider for that rate. That's rubbish, when the parent must be
+changed, then it should be done explicitly.
+What if the CPU PLL and the intermediate clk happen to have the same
+rate? Then the clk_set_rate above simply does nothing, no parent is
+changed and the following rate change of the CPU PLL just crashes the
+system.
+
 > 
-> The v2 of this patch is sent. But it's not taken by Brain.
-> I just ping Brain yesterday. Check the v2 patch here:
-> http://patchwork.ozlabs.org/patch/431752/
+> > My suggestion is to take another approach. Implement clk_set_rate for
+> > these muxes and in the set_rate hook:
+> >
+> > - switch mux to intermediate PLL parent
+> > - call clk_set_rate() for the real parent PLL
+> > - switch mux back to real parent PLL
+> >
+> > This way the things happening behind the scenes are completely transparent
+> > to the cpufreq driver and you can use cpufreq-dt as is without changes.
+> 
+> CPUFreq wants to change to intermediate frequency by itself against
+> some magic change behind the scene. The major requirement for that
+> comes from the fact that we want to send PRE/POST freq notifiers on
+> which loops-per-jiffie depends.
 
-Ok, thanks for the information Josh.
+Maybe, I don't know the internals of CPUFreq. But here the important
+thing is the rate change, not the parent change.
 
-Bye,
+Sascha
+
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
