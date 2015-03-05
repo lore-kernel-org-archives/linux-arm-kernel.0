@@ -1,153 +1,101 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  5 Mar 2015 10:58:01 +0900
-Subject: [PATCH 01/16] ARM: shmobile: r8a7778: synchronize dts with reference
- platform
+Date: Thu,  5 Mar 2015 10:58:02 +0900
+Subject: [PATCH 02/16] ARM: shmobile: r8a7778: add CPG register bits header
 In-Reply-To: <cover.1425518337.git.horms+renesas@verge.net.au>
 References: <cover.1425518337.git.horms+renesas@verge.net.au>
-Message-ID: <8c4892a633f08edbc54b6b59a673f76bd1cd7e94.1425518337.git.horms+renesas@verge.net.au>
+Message-ID: <83054671d28db9f1dbac1d3d1bf3b50b128e06ba.1425518337.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-This moves everything to the legacy dts that is missing there to make it
-suitable for use with multiplatform.
+Enumerates CPG driver custom clocks and MSTP clock enable bits.
 
 Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7778-bockw.dts | 106 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 106 insertions(+)
+ include/dt-bindings/clock/r8a7778-clock.h | 71 +++++++++++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
+ create mode 100644 include/dt-bindings/clock/r8a7778-clock.h
 
-diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
-index 46a884d..7347223 100644
---- a/arch/arm/boot/dts/r8a7778-bockw.dts
-+++ b/arch/arm/boot/dts/r8a7778-bockw.dts
-@@ -16,17 +16,123 @@
- 
- /dts-v1/;
- #include "r8a7778.dtsi"
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "bockw";
- 	compatible = "renesas,bockw", "renesas,r8a7778";
- 
-+	aliases {
-+		serial0 = &scif0;
-+	};
+diff --git a/include/dt-bindings/clock/r8a7778-clock.h b/include/dt-bindings/clock/r8a7778-clock.h
+new file mode 100644
+index 0000000..f6b07c5
+--- /dev/null
++++ b/include/dt-bindings/clock/r8a7778-clock.h
+@@ -0,0 +1,71 @@
++/*
++ * Copyright (C) 2014 Ulrich Hecht
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
 +
- 	chosen {
- 		bootargs = "console=ttySC0,115200 ignore_loglevel ip=dhcp root=/dev/nfs rw";
-+		stdout-path = &scif0;
- 	};
- 
- 	memory {
- 		device_type = "memory";
- 		reg = <0x60000000 0x10000000>;
- 	};
++#ifndef __DT_BINDINGS_CLOCK_R8A7778_H__
++#define __DT_BINDINGS_CLOCK_R8A7778_H__
 +
-+	fixedregulator3v3: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fixed-3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
++/* CPG */
++#define R8A7778_CLK_PLLA	0
++#define R8A7778_CLK_PLLB	1
++#define R8A7778_CLK_B		2
++#define R8A7778_CLK_OUT		3
++#define R8A7778_CLK_P		4
++#define R8A7778_CLK_S		5
++#define R8A7778_CLK_S1		6
 +
-+	ethernet at 18300000 {
-+		compatible = "smsc,lan9220", "smsc,lan9115";
-+		reg = <0x18300000 0x1000>;
++/* MSTP0 */
++#define R8A7778_CLK_I2C0	30
++#define R8A7778_CLK_I2C1	29
++#define R8A7778_CLK_I2C2	28
++#define R8A7778_CLK_I2C3	27
++#define R8A7778_CLK_SCIF0	26
++#define R8A7778_CLK_SCIF1	25
++#define R8A7778_CLK_SCIF2	24
++#define R8A7778_CLK_SCIF3	23
++#define R8A7778_CLK_SCIF4	22
++#define R8A7778_CLK_SCIF5	21
++#define R8A7778_CLK_TMU0	16
++#define R8A7778_CLK_TMU1	15
++#define R8A7778_CLK_TMU2	14
++#define R8A7778_CLK_SSI0	12
++#define R8A7778_CLK_SSI1	11
++#define R8A7778_CLK_SSI2	10
++#define R8A7778_CLK_SSI3	9
++#define R8A7778_CLK_SRU		8
++#define R8A7778_CLK_HSPI	7
 +
-+		phy-mode = "mii";
-+		interrupt-parent = <&irqpin>;
-+		interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
-+		reg-io-width = <4>;
-+		vddvario-supply = <&fixedregulator3v3>;
-+		vdd33a-supply = <&fixedregulator3v3>;
-+	};
-+};
++/* MSTP1 */
++#define R8A7778_CLK_ETHER	14
++#define R8A7778_CLK_VIN0	10
++#define R8A7778_CLK_VIN1	9
++#define R8A7778_CLK_USB		0
 +
-+&mmcif {
-+	pinctrl-0 = <&mmc_pins>;
-+	pinctrl-names = "default";
++/* MSTP3 */
++#define R8A7778_CLK_MMC		31
++#define R8A7778_CLK_SDHI0	23
++#define R8A7778_CLK_SDHI1	22
++#define R8A7778_CLK_SDHI2	21
++#define R8A7778_CLK_SSI4	11
++#define R8A7778_CLK_SSI5	10
++#define R8A7778_CLK_SSI6	9
++#define R8A7778_CLK_SSI7	8
++#define R8A7778_CLK_SSI8	7
 +
-+	vmmc-supply = <&fixedregulator3v3>;
-+	bus-width = <8>;
-+	broken-cd;
-+	status = "okay";
-+};
++/* MSTP5 */
++#define R8A7778_CLK_SRU_SRC0	31
++#define R8A7778_CLK_SRU_SRC1	30
++#define R8A7778_CLK_SRU_SRC2	29
++#define R8A7778_CLK_SRU_SRC3	28
++#define R8A7778_CLK_SRU_SRC4	27
++#define R8A7778_CLK_SRU_SRC5	26
++#define R8A7778_CLK_SRU_SRC6	25
++#define R8A7778_CLK_SRU_SRC7	24
++#define R8A7778_CLK_SRU_SRC8	23
 +
-+&irqpin {
-+	status = "okay";
-+};
-+
-+&tmu0 {
-+	status = "okay";
-+};
-+
-+&pfc {
-+	scif0_pins: serial0 {
-+		renesas,groups = "scif0_data_a", "scif0_ctrl";
-+		renesas,function = "scif0";
-+	};
-+
-+	mmc_pins: mmc {
-+		renesas,groups = "mmc_data8", "mmc_ctrl";
-+		renesas,function = "mmc";
-+	};
-+
-+	sdhi0_pins: sd0 {
-+		renesas,groups = "sdhi0_data4", "sdhi0_ctrl",
-+				  "sdhi0_cd";
-+		renesas,function = "sdhi0";
-+	};
-+
-+	hspi0_pins: hspi0 {
-+		renesas,groups = "hspi0_a";
-+		renesas,function = "hspi0";
-+	};
-+};
-+
-+&sdhi0 {
-+	pinctrl-0 = <&sdhi0_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&fixedregulator3v3>;
-+	bus-width = <4>;
-+	status = "okay";
-+	wp-gpios = <&gpio3 18 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&hspi0 {
-+	pinctrl-0 = <&hspi0_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+
-+	flash: flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "spansion,s25fl008k";
-+		reg = <0>;
-+		spi-max-frequency = <104000000>;
-+		m25p,fast-read;
-+
-+		partition at 0 {
-+			label = "data(spi)";
-+			reg = <0x00000000 0x00100000>;
-+		};
-+	};
-+};
-+
-+&scif0 {
-+	pinctrl-0 = <&scif0_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
- };
++#endif /* __DT_BINDINGS_CLOCK_R8A7778_H__ */
 -- 
 2.1.4
