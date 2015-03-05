@@ -1,62 +1,61 @@
-From: fkan@apm.com (Feng Kan)
-Date: Thu, 5 Mar 2015 08:54:16 -0800
-Subject: [PATCH] PCI: xgene: fix breakage from generic config usage
-In-Reply-To: <1425507864-22055-1-git-send-email-msalter@redhat.com>
-References: <1425507864-22055-1-git-send-email-msalter@redhat.com>
-Message-ID: <CAL85gmBUzc-q5u+4VPiFOexWo=-XuHHrP34qnBUpPMWMotiBtg@mail.gmail.com>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Thu, 05 Mar 2015 18:55:40 +0200
+Subject: [PATCH 0/6] Add support for QCOM GDSCs
+In-Reply-To: <1425279749-16625-1-git-send-email-rnayak@codeaurora.org>
+References: <1425279749-16625-1-git-send-email-rnayak@codeaurora.org>
+Message-ID: <54F88A8C.4080100@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Feng Kan <fkan@apm.com>
+On 03/02/2015 09:02 AM, Rajendra Nayak wrote:
+> GDSCs (Global Distributed Switch Controllers) control switches
+> that supply power to an on-chip power domain and hence can be
+> programmed in SW to safely power collapse and restore power to the
+> respective PDs. They are part of a considerable number of recent QCOM
+> SoCs (This series adds support for msm8974, msm8916 and apq8084 devices)
+> and are part of the Clock control block.
+> 
+> The series implements support for GDSC using the genpd framework
+> modelling these as SW controllable power domains.
+> 
+> 8916 support has a dependency on the Global Clock controller support [1]
+> posted by Georgi Djakov.
+> 
+> [1] 
+> https://lkml.org/lkml/2015/2/25/416
+> 
+> Rajendra Nayak (3):
+>   clk: qcom: gdsc: Prepare common clk probe to register gdscs
+>   clk: qcom: gdsc: Add GDSCs in msm8916 GCC
+>   clk: qcom: gdsc: Add GDSCs in apq8084 GCC
+> 
+> Stephen Boyd (3):
+>   clk: qcom: Add support for GDSCs
+>   clk: qcom: gdsc: Add GDSCs in msm8974 GCC
+>   clk: qcom: gdsc: Add GDSCs in msm8974 MMCC
+> 
+>  drivers/clk/qcom/Kconfig                      |   8 ++
+>  drivers/clk/qcom/Makefile                     |   1 +
+>  drivers/clk/qcom/common.c                     |  27 +++++-
+>  drivers/clk/qcom/common.h                     |   2 +
+>  drivers/clk/qcom/gcc-apq8084.c                |  38 ++++++++
+>  drivers/clk/qcom/gcc-msm8916.c                |  46 +++++++++
+>  drivers/clk/qcom/gcc-msm8974.c                |  14 +++
+>  drivers/clk/qcom/gdsc.c                       | 130 ++++++++++++++++++++++++++
+>  drivers/clk/qcom/gdsc.h                       |  43 +++++++++
+>  drivers/clk/qcom/mmcc-msm8974.c               |  54 +++++++++++
+>  include/dt-bindings/clock/qcom,gcc-apq8084.h  |   6 ++
+>  include/dt-bindings/clock/qcom,gcc-msm8916.h  |   8 ++
+>  include/dt-bindings/clock/qcom,gcc-msm8974.h  |   3 +
+>  include/dt-bindings/clock/qcom,mmcc-msm8974.h |   8 ++
+>  14 files changed, 387 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/clk/qcom/gdsc.c
+>  create mode 100644 drivers/clk/qcom/gdsc.h
+> 
 
-On Wed, Mar 4, 2015 at 2:24 PM, Mark Salter <msalter@redhat.com> wrote:
-> Commit 350f8be5bb402 ("PCI: xgene: Convert to use generic config
-> accessors") breaks PCI on the X-Gene platform. It creates two
-> problems with the xgene_pcie_map_bus() function. First, it returns
-> an int but should return a void __iomem *, but that's just a
-> compile-time warning. The breakage is caused by the offset not
-> being added to the base of the config map. So all config reads
-> and writes operate on the first four bytes of config space. This
-> patch fixes both issues.
->
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> ---
->  drivers/pci/host/pci-xgene.c | 10 +++++++---
->  1 file changed, 7 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-> index 52bb25c..b87f80b 100644
-> --- a/drivers/pci/host/pci-xgene.c
-> +++ b/drivers/pci/host/pci-xgene.c
-> @@ -129,17 +129,21 @@ static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
->         return false;
->  }
->
-> -static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
-> -                             int offset)
-> +static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
-> +                                       int offset)
->  {
->         struct xgene_pcie_port *port = bus->sysdata;
-> +       void __iomem *base;
->
->         if ((pci_is_root_bus(bus) && devfn != 0) || !port->link_up ||
->             xgene_pcie_hide_rc_bars(bus, offset))
->                 return NULL;
->
->         xgene_pcie_set_rtdid_reg(bus, devfn);
-> -       return xgene_pcie_get_cfg_base(bus);
-> +       base = xgene_pcie_get_cfg_base(bus);
-> +       if (base)
-> +               base += offset;
-> +       return base;
->  }
->
->  static struct pci_ops xgene_pcie_ops = {
-> --
-> 1.8.3.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+You missed a patch who adds appropriate changes in qcom,gcc.txt
+(qcom,mmcc.txt), at least #power-domain-cells property should be described.
+
+-- 
+regards,
+Stan
