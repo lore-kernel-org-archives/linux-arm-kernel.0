@@ -1,43 +1,302 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 5 Mar 2015 20:52:49 +0900
-Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
- uncached guest mappings
-In-Reply-To: <20150305110415.GA7712@e104818-lin.cambridge.arm.com>
-References: <54F51A63.4060302@samsung.com>
- <20150304113505.GS28951@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8OUtcpaQh5+gb6vNrdi+Q7eu_zKOujmyoRPrzrs+GJVQ@mail.gmail.com>
- <20150304122956.GT28951@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
- <20150304141212.GA5352@hawk.usersys.redhat.com>
- <20150304142943.GU28951@e104818-lin.cambridge.arm.com>
- <54F73ACF.1090605@redhat.com>
- <20150304172855.GA28951@e104818-lin.cambridge.arm.com>
- <54F82C06.2000701@redhat.com>
- <20150305110415.GA7712@e104818-lin.cambridge.arm.com>
-Message-ID: <CAFEAcA98j_EsP4Hy20tQCKdnP3=NuvS3Ona37peBjan8aWLSEA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Mar 2015 11:53:22 +0000
+Subject: [PATCH v9 16/21] irqchip: Add GICv2 specific ACPI boot support
+In-Reply-To: <5921774.hkUTDjxi3A@vostro.rjw.lan>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <1424853601-6675-17-git-send-email-hanjun.guo@linaro.org>
+ <5921774.hkUTDjxi3A@vostro.rjw.lan>
+Message-ID: <20150305115322.GC7712@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 March 2015 at 20:04, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Mar 05, 2015 at 11:12:22AM +0100, Paolo Bonzini wrote:
->> On 04/03/2015 18:28, Catalin Marinas wrote:
->> >> > Can you add that property to the device tree for PCI devices too?
->> >
->> > Yes but not with mainline yet:
->> >
->> > http://thread.gmane.org/gmane.linux.kernel.iommu/8935
->> >
->> > We can add the property at the PCI host bridge level (with the drawback
->> > that it covers all the PCI devices), like here:
->>
->> Even covering all PCI devices is not enough if we want to support device
->> assignment of PCI host devices.
->
-> Can we not have another PCI bridge node in the DT for the host device
-> assignments?
+On Wed, Mar 04, 2015 at 11:50:36PM +0100, Rafael J. Wysocki wrote:
+> On Wednesday, February 25, 2015 04:39:56 PM Hanjun Guo wrote:
+> > From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> > 
+> > ACPI kernel uses MADT table for proper GIC initialization. It needs to
+> > parse GIC related subtables, collect CPU interface and distributor
+> > addresses and call driver initialization function (which is hardware
+> > abstraction agnostic). In a similar way, FDT initialize GICv1/2.
+> > 
+> > NOTE: This commit allow to initialize GICv1/2 basic functionality.
+> > While now simple GICv2 init call is used, any further GIC features
+> > require generic infrastructure for proper ACPI irqchip initialization.
+> > That mechanism and stacked irqdomains to support GICv2 MSI/virtualization
+> > extension, GICv3/4 and its ITS are considered as next steps.
+> > 
+> > CC: Jason Cooper <jason@lakedaemon.net>
+> > CC: Marc Zyngier <marc.zyngier@arm.com>
+> > CC: Thomas Gleixner <tglx@linutronix.de>
+> > Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> > Tested-by: Yijing Wang <wangyijing@huawei.com>
+> > Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+> > Tested-by: Jon Masters <jcm@redhat.com>
+> > Tested-by: Timur Tabi <timur@codeaurora.org>
+> > Tested-by: Robert Richter <rrichter@cavium.com>
+> > Acked-by: Robert Richter <rrichter@cavium.com>
+> > Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > ---
+> >  arch/arm64/include/asm/acpi.h        |   2 +
+> >  arch/arm64/kernel/acpi.c             |  25 +++++++++
+> >  drivers/irqchip/irq-gic.c            | 102 +++++++++++++++++++++++++++++++++++
+> >  drivers/irqchip/irqchip.c            |   3 ++
+> >  include/linux/acpi.h                 |  14 +++++
+> >  include/linux/irqchip/arm-gic-acpi.h |  29 ++++++++++
+> >  6 files changed, 175 insertions(+)
+> >  create mode 100644 include/linux/irqchip/arm-gic-acpi.h
+> > 
+> > diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> > index 9a23369..a720a61 100644
+> > --- a/arch/arm64/include/asm/acpi.h
+> > +++ b/arch/arm64/include/asm/acpi.h
+> > @@ -13,6 +13,8 @@
+> >  #define _ASM_ACPI_H
+> >  
+> >  #include <linux/mm.h>
+> > +#include <linux/irqchip/arm-gic-acpi.h>
+> > +
+> >  #include <asm/cputype.h>
+> >  #include <asm/smp_plat.h>
+> >  
+> > diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> > index 31f080e..af308c3 100644
+> > --- a/arch/arm64/kernel/acpi.c
+> > +++ b/arch/arm64/kernel/acpi.c
+> > @@ -359,3 +359,28 @@ void __init acpi_boot_table_init(void)
+> >  		pr_err("Can't find FADT\n");
+> >  	}
+> >  }
+> > +
+> > +void __init acpi_gic_init(void)
+> > +{
+> > +	struct acpi_table_header *table;
+> > +	acpi_status status;
+> > +	acpi_size tbl_size;
+> > +	int err;
+> > +
+> > +	if (acpi_disabled)
+> > +		return;
+> > +
+> > +	status = acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table, &tbl_size);
+> > +	if (ACPI_FAILURE(status)) {
+> > +		const char *msg = acpi_format_exception(status);
+> > +
+> > +		pr_err("Failed to get MADT table, %s\n", msg);
+> > +		return;
+> > +	}
+> > +
+> > +	err = gic_v2_acpi_init(table);
+> > +	if (err)
+> > +		pr_err("Failed to initialize GIC IRQ controller");
+> > +
+> > +	early_acpi_os_unmap_memory((char *)table, tbl_size);
+> > +}
+> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> > index 4634cf7..929d668 100644
+> > --- a/drivers/irqchip/irq-gic.c
+> > +++ b/drivers/irqchip/irq-gic.c
+> > @@ -33,12 +33,14 @@
+> >  #include <linux/of.h>
+> >  #include <linux/of_address.h>
+> >  #include <linux/of_irq.h>
+> > +#include <linux/acpi.h>
+> >  #include <linux/irqdomain.h>
+> >  #include <linux/interrupt.h>
+> >  #include <linux/percpu.h>
+> >  #include <linux/slab.h>
+> >  #include <linux/irqchip/chained_irq.h>
+> >  #include <linux/irqchip/arm-gic.h>
+> > +#include <linux/irqchip/arm-gic-acpi.h>
+> >  
+> >  #include <asm/cputype.h>
+> >  #include <asm/irq.h>
+> > @@ -1086,3 +1088,103 @@ IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
+> >  IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
+> >  
+> >  #endif
+> > +
+> > +#ifdef CONFIG_ACPI
+> > +static phys_addr_t dist_phy_base, cpu_phy_base __initdata;
+> > +
+> > +static int __init
+> > +gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+> > +			const unsigned long end)
+> > +{
+> > +	struct acpi_madt_generic_interrupt *processor;
+> > +	phys_addr_t gic_cpu_base;
+> > +	static int cpu_base_assigned;
+> > +
+> > +	processor = (struct acpi_madt_generic_interrupt *)header;
+> > +
+> > +	if (BAD_MADT_ENTRY(processor, end))
+> > +		return -EINVAL;
+> > +
+> > +	/*
+> > +	 * There is no support for non-banked GICv1/2 register in ACPI spec.
+> > +	 * All CPU interface addresses have to be the same.
+> > +	 */
+> > +	gic_cpu_base = processor->base_address;
+> > +	if (cpu_base_assigned && gic_cpu_base != cpu_phy_base)
+> > +		return -EINVAL;
+> > +
+> > +	cpu_phy_base = gic_cpu_base;
+> > +	cpu_base_assigned = 1;
+> > +	return 0;
+> > +}
+> > +
+> > +static int __init
+> > +gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
+> > +				const unsigned long end)
+> > +{
+> > +	struct acpi_madt_generic_distributor *dist;
+> > +
+> > +	dist = (struct acpi_madt_generic_distributor *)header;
+> > +
+> > +	if (BAD_MADT_ENTRY(dist, end))
+> > +		return -EINVAL;
+> > +
+> > +	dist_phy_base = dist->base_address;
+> > +	return 0;
+> > +}
+> > +
+> > +int __init
+> > +gic_v2_acpi_init(struct acpi_table_header *table)
+> > +{
+> > +	void __iomem *cpu_base, *dist_base;
+> > +	int count;
+> > +
+> > +	/* Collect CPU base addresses */
+> > +	count = acpi_parse_entries(ACPI_SIG_MADT,
+> > +				   sizeof(struct acpi_table_madt),
+> > +				   gic_acpi_parse_madt_cpu, table,
+> > +				   ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
+> > +	if (count <= 0) {
+> > +		pr_err("No valid GICC entries exist\n");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	/*
+> > +	 * Find distributor base address. We expect one distributor entry since
+> > +	 * ACPI 5.1 spec neither support multi-GIC instances nor GIC cascade.
+> > +	 */
+> > +	count = acpi_parse_entries(ACPI_SIG_MADT,
+> > +				   sizeof(struct acpi_table_madt),
+> > +				   gic_acpi_parse_madt_distributor, table,
+> > +				   ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
+> > +	if (count <= 0) {
+> > +		pr_err("No valid GICD entries exist\n");
+> > +		return -EINVAL;
+> > +	} else if (count > 1) {
+> > +		pr_err("More than one GICD entry detected\n");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	cpu_base = ioremap(cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
+> > +	if (!cpu_base) {
+> > +		pr_err("Unable to map GICC registers\n");
+> > +		return -ENOMEM;
+> > +	}
+> > +
+> > +	dist_base = ioremap(dist_phy_base, ACPI_GICV2_DIST_MEM_SIZE);
+> > +	if (!dist_base) {
+> > +		pr_err("Unable to map GICD registers\n");
+> > +		iounmap(cpu_base);
+> > +		return -ENOMEM;
+> > +	}
+> > +
+> > +	/*
+> > +	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
+> > +	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
+> > +	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
+> > +	 */
+> > +	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
+> > +	irq_set_default_host(gic_data[0].domain);
+> > +	return 0;
+> > +}
+> > +#endif
+> > diff --git a/drivers/irqchip/irqchip.c b/drivers/irqchip/irqchip.c
+> > index 0fe2f71..5855240 100644
+> > --- a/drivers/irqchip/irqchip.c
+> > +++ b/drivers/irqchip/irqchip.c
+> > @@ -8,6 +8,7 @@
+> >   * warranty of any kind, whether express or implied.
+> >   */
+> >  
+> > +#include <linux/acpi.h>
+> >  #include <linux/init.h>
+> >  #include <linux/of_irq.h>
+> >  #include <linux/irqchip.h>
+> > @@ -26,4 +27,6 @@ extern struct of_device_id __irqchip_of_table[];
+> >  void __init irqchip_init(void)
+> >  {
+> >  	of_irq_init(__irqchip_of_table);
+> > +
+> > +	acpi_irq_init();
+> >  }
+> > diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> > index c03d8d1..e27117a 100644
+> > --- a/include/linux/acpi.h
+> > +++ b/include/linux/acpi.h
+> > @@ -557,6 +557,20 @@ static inline int acpi_device_modalias(struct device *dev,
+> >  
+> >  #endif	/* !CONFIG_ACPI */
+> >  
+> > +#if defined(CONFIG_ACPI) && defined(CONFIG_ARM64)
+> > +static inline void acpi_irq_init(void)
+> > +{
+> > +	/*
+> > +	 * Hardcode ACPI IRQ chip initialization to GICv2 for now.
+> > +	 * Proper irqchip infrastructure will be implemented along with
+> > +	 * incoming  GICv2m|GICv3|ITS bits.
+> > +	 */
+> > +	acpi_gic_init();
+> > +}
+> > +#else
+> > +static inline void acpi_irq_init(void) { }
+> > +#endif
+> 
+> I don't want this in a common header.
 
-I'd hate to have to do that. PCI should be entirely probeable
-given that we tell the guest where the host bridge is, that's
-one of its advantages.
+I don't like it either. What about adding it to a new header,
+linux/acpi_irq.h just for the dummy acpi_irq_init()? This would be
+similar to the DT equivalent, of_irq_init() in linux/of_irq.h and at
+some point it will gain more macros for declaring interrupt controllers
+in the ACPI context.
 
--- PMM
+What we objected to previously was calling acpi_gic_init() directly from
+the core irqchip_init() and asked for something similar to the more
+generic of_irq_init(). The arm64-specific patch above is clearly a
+temporary hack until full support for multiple interrupt controllers is
+added (we asked for this several times in the past, but the ARM ACPI
+guys thought it's too much hassle ;). I don't fully get it since one of
+the platforms they target needs GICv2m support anyway).
+
+Anyway, if we are to keep the temporary hack, I think we could define
+something like below (possibly in a new linux/acpi_irq.h which includes
+asm/irq.h):
+
+#ifndef acpi_irq_init
+static inline void acpi_irq_init(void)
+{
+}
+#endif
+
+And in the arm64 asm/irq.h:
+
+static inline void acpi_irq_init(void)
+{
+	/*
+	 * Hardcode ACPI IRQ chip initialization to GICv2 for now.
+	 * Proper irqchip infrastructure will be implemented along with
+	 * incoming  GICv2m|GICv3|ITS bits.
+	 */
+	acpi_gic_init();
+}
+#define acpi_irq_init acpi_irq_init
+
+When the new infrastructure is in place, we can get rid of the #ifndef
+and arm64-specific acpi_irq_init().
+
+-- 
+Catalin
