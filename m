@@ -1,88 +1,118 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 5 Mar 2015 16:11:08 +0530
-Subject: [PATCH 2/2] dmaengine: fsl-edma: add PM suspend/resume support
-In-Reply-To: <1419928907-18053-3-git-send-email-jingchang.lu@freescale.com>
-References: <1419928907-18053-1-git-send-email-jingchang.lu@freescale.com>
- <1419928907-18053-3-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <20150305104108.GF2613@intel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 5 Mar 2015 11:51:04 +0100
+Subject: [PATCH] clk: mediatek: Export CPU mux clocks for CPU frequency
+ control
+In-Reply-To: <CALx668X2m0hMVQumGQmhhrKnv4h1hiYp20Q4FcKuECK3mhoJiA@mail.gmail.com>
+References: <1425466152-7867-1-git-send-email-pi-cheng.chen@linaro.org>
+ <20150304112109.GB11010@pengutronix.de>
+ <CALx668WKKmifhuODsV+Uaoq4ggcmB1=wbpLzXBnjEtxbuB4qig@mail.gmail.com>
+ <20150305074207.GC11010@pengutronix.de>
+ <CAKohponSqLPcULA9-T8y9b_b44Torti0p6W3sJfRZ1oKUWqtTw@mail.gmail.com>
+ <20150305091948.GH11010@pengutronix.de>
+ <CALx668X2m0hMVQumGQmhhrKnv4h1hiYp20Q4FcKuECK3mhoJiA@mail.gmail.com>
+Message-ID: <20150305105104.GJ11010@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 30, 2014 at 04:41:47PM +0800, Jingchang Lu wrote:
-> This adds power management suspend/resume support for
-> the fsl-edma driver.
+On Thu, Mar 05, 2015 at 05:39:12PM +0800, Pi-Cheng Chen wrote:
+> On 5 March 2015 at 17:19, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Thu, Mar 05, 2015 at 02:29:50PM +0530, Viresh Kumar wrote:
+> >> On 5 March 2015 at 13:12, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> >> > We have clk_set_parent for changing the parent and clk_set_rate to
+> >> > change the rate. Use the former for changing the parent and the latter
+> >> > for changing the rate. What you are interested in is changing the
+> >> > parent, so use clk_set_parent for this and not abuse a side effect
+> >> > of clk_set_rate.
+> >>
+> >> clk_set_rate() for CPUs clock is responsible to change clock rate
+> >> of the CPU. Whether it plays with PLLs or muxes, its not that relevant.
+> >
+> > The sequence to change the CPU frequency on the Mediatek SoCs is like this:
+> >
+> > - Change CPU from CPU PLL to another clock source (intermediate source)
+> > - Change CPU PLL frequency
+> > - wait until PLL has settled
+> > - switch back to CPU PLL
+> >
+> > The frequency of the intermediate source is irrelevant, the important
+> > thing is that the CPU is switched to this source while the CPU PLL is
+> > reconfigured.
+> >
+> > In Pi-Chengs patches the switch to th eintermediate clock is done like:
+> >
+> >         rate = clk_get_rate(intermediate_clk);
+> >         clk_set_rate(cpu_clk, rate);
+> >
+> > Now the clk framework does the switch not because it's told to switch
+> > to another parent, but only because the other parent happens to be the
+> > only provider for that rate. That's rubbish, when the parent must be
+> > changed, then it should be done explicitly.
 > 
-> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-> ---
->  drivers/dma/fsl-edma.c | 38 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
+> Hi,
 > 
-> diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
-> index e0bd517..6a81699 100644
-> --- a/drivers/dma/fsl-edma.c
-> +++ b/drivers/dma/fsl-edma.c
-> @@ -1017,6 +1017,43 @@ static int fsl_edma_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM_SLEEP
-> +static int fsl_edma_pm_suspend(struct device *dev)
-> +{
-> +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
-> +	struct fsl_edma_chan *fsl_chan;
-> +	int i;
-> +
-> +	for (i = 0; i < fsl_edma->n_chans; i++) {
-> +		fsl_chan = &fsl_edma->chans[i];
-> +		fsl_edma_chan_mux(fsl_chan, 0, false);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int fsl_edma_pm_resume(struct device *dev)
-> +{
-> +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
-> +	struct fsl_edma_chan *fsl_chan;
-> +	int i;
-> +
-> +	for (i = 0; i < fsl_edma->n_chans; i++) {
-> +		fsl_chan = &fsl_edma->chans[i];
-> +		edma_writew(fsl_edma, 0x0, fsl_edma->membase + EDMA_TCD_CSR(i));
-> +		/* restore the channel slave id configuration */
-> +		fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id, true);
-Wouldnt this be reconfigured? Should you do this for all channels or active
-ones.
-Also I dont see you pausing or suspending active channels or checking for
-them?
+> Please correct me if I was wrong. But I think that's the reason why we have
+> a determine_rate hook here, isn't it?
+> 
+> > What if the CPU PLL and the intermediate clk happen to have the same
+> > rate? Then the clk_set_rate above simply does nothing, no parent is
+> > changed and the following rate change of the CPU PLL just crashes the
+> > system.
+> 
+> I think what I am trying to do in the determine_rate hook of cpumux is:
+> 
+> * if the target rate of clk_set_rate is equal to the rate of MAINPLL,
+> then switch
+>   the mux to MAINPLL
+> * otherwise, set the rate directly on ARMPLL and switch the mux back to
+>   ARMPLL if the current parent of mux is not ARMPLL
+> 
+> And if the CPU PLL and the intermediate clk happen to have the same rate,
+> I think the cpufreq-dt driver will change nothing on the clk framework. Or do
+> I misunderstand your point?
+
+Imagine the board starts with both the CPU PLL and Intermediate PLL
+running with the same frequency with the CPU driven from the CPU PLL.
+Now the cpufreq driver does it's very first frequency transition. Now
+when clk_set_rate is used with the intention to switch to the
+intermediate PLL nothing will happen because the CPU PLL already runs
+at the desired frequency. Reconfiguring the CPU PLL then crashes your
+system.
+
+Another reason why abusing clk_set_rate to change the parent is this:
+You have this in your SoC:
+
+            ---
+CPU_PLL ---|   |
+           |   |
+           |   |----- CPU
+           |   |
+IM_PLL ----|   |
+            ---
+
+Now you do a clk_set_rate(CPU, clk_get_rate(IM_PLL)) which (often) works
+in your case. Many SoCs have an additional divider though, like this:
+
+            ---
+CPU_PLL ---|   |
+           |   |   ----
+           |   |--| :x | --- CPU
+           |   |   ----
+IM_PLL ----|   |
+            ---
+
+Now clk_set_rate(CPU, clk_get_rate(IM_PLL)) doesn't give anything
+sensible anymore.
+
+Given the variance of different SoCs I don't think it makes sense
+to try to handle all these cases. Instead the cpufreq-dt driver
+should just call clk_set_rate() on the CPU clock with the desired
+target frequency. Everything else should be handled in the clock
+driver which has intimate knowledge about the SoC anyway.
+
+Sascha
 
 -- 
-~Vinod
-
-> +	}
-> +
-> +	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA,
-> +		    fsl_edma->membase + EDMA_CR);
-> +
-> +	return 0;
-> +}
-> +#endif
-> +static
-> +SIMPLE_DEV_PM_OPS(fsl_edma_pm_ops, fsl_edma_pm_suspend, fsl_edma_pm_resume);
-> +
->  static const struct of_device_id fsl_edma_dt_ids[] = {
->  	{ .compatible = "fsl,vf610-edma", },
->  	{ /* sentinel */ }
-> @@ -1027,6 +1064,7 @@ static struct platform_driver fsl_edma_driver = {
->  	.driver		= {
->  		.name	= "fsl-edma",
->  		.of_match_table = fsl_edma_dt_ids,
-> +		.pm	= &fsl_edma_pm_ops,
->  	},
->  	.probe          = fsl_edma_probe,
->  	.remove		= fsl_edma_remove,
-> -- 
-> 1.8.0
-> 
-
--- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
