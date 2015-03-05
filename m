@@ -1,50 +1,104 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 5 Mar 2015 15:53:35 +0530
-Subject: [PATCH] clk: mediatek: Export CPU mux clocks for CPU frequency
- control
-In-Reply-To: <20150305091948.GH11010@pengutronix.de>
-References: <1425466152-7867-1-git-send-email-pi-cheng.chen@linaro.org>
- <20150304112109.GB11010@pengutronix.de>
- <CALx668WKKmifhuODsV+Uaoq4ggcmB1=wbpLzXBnjEtxbuB4qig@mail.gmail.com>
- <20150305074207.GC11010@pengutronix.de>
- <CAKohponSqLPcULA9-T8y9b_b44Torti0p6W3sJfRZ1oKUWqtTw@mail.gmail.com>
- <20150305091948.GH11010@pengutronix.de>
-Message-ID: <CAKohpokVxxxTY9DpQVxNPnq92pyK=2J2dDeLmis_+WD16aatOg@mail.gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 05 Mar 2015 11:23:44 +0100
+Subject: [PATCH v1 1/6] eeprom: Add a simple EEPROM framework for eeprom
+ providers
+In-Reply-To: <1425548741-12930-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1425548685-12887-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1425548741-12930-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1425551024.24292.218.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 March 2015 at 14:49, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> The sequence to change the CPU frequency on the Mediatek SoCs is like this:
->
-> - Change CPU from CPU PLL to another clock source (intermediate source)
-> - Change CPU PLL frequency
-> - wait until PLL has settled
-> - switch back to CPU PLL
+On Thu, 2015-03-05 at 09:45 +0000, Srinivas Kandagatla wrote:
+> --- /dev/null
+> +++ b/drivers/eeprom/Kconfig
+> @@ -0,0 +1,20 @@
+> +menuconfig EEPROM
+> +	bool "EEPROM Support"
 
-This should be the case for most of the intermediate-freq users..
+EEPROM is a bool symbol.
 
-> The frequency of the intermediate source is irrelevant, the important
-> thing is that the CPU is switched to this source while the CPU PLL is
-> reconfigured.
+> +	depends on OF
+> +	select REGMAP
+> +	help
+> +	  Support for EEPROM alike devices.
+> +
+> +	  This framework is designed to provide a generic interface to EEPROM
+> +	  from both the Linux Kernel and the userspace.
+> +
+> +	  If unsure, say no.
+> +
+> +if EEPROM
+> +
+> +config EEPROM_DEBUG
+> +	bool "EEPROM debug support"
+> +	help
+> +	  Say yes here to enable debugging support.
+> +
+> +endif
+> diff --git a/drivers/eeprom/Makefile b/drivers/eeprom/Makefile
+> new file mode 100644
+> index 0000000..e130079
+> --- /dev/null
+> +++ b/drivers/eeprom/Makefile
+> @@ -0,0 +1,9 @@
+> +#
+> +# Makefile for eeprom drivers.
+> +#
+> +
+> +ccflags-$(CONFIG_EEPROM_DEBUG) += -DDEBUG
+> +
+> +obj-$(CONFIG_EEPROM)		+= core.o
 
-Right.
+So core.o will be built-in (or not built at all, of course).
 
-> In Pi-Chengs patches the switch to th eintermediate clock is done like:
->
->         rate = clk_get_rate(intermediate_clk);
->         clk_set_rate(cpu_clk, rate);
->
-> Now the clk framework does the switch not because it's told to switch
-> to another parent, but only because the other parent happens to be the
-> only provider for that rate. That's rubbish, when the parent must be
-> changed, then it should be done explicitly.
-> What if the CPU PLL and the intermediate clk happen to have the same
-> rate? Then the clk_set_rate above simply does nothing, no parent is
-> changed and the following rate change of the CPU PLL just crashes the
-> system.
+> +# Devices
+> diff --git a/drivers/eeprom/core.c b/drivers/eeprom/core.c
+> new file mode 100644
+> index 0000000..243e466
+> --- /dev/null
+> +++ b/drivers/eeprom/core.c
+> @@ -0,0 +1,208 @@
+> +/*
+> + * EEPROM framework core.
+> + *
+> + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> + * Copyright (C) 2013 Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/device.h>
+> +#include <linux/eeprom-provider.h>
+> +#include <linux/export.h>
+> +#include <linux/fs.h>
+> +#include <linux/idr.h>
+> +#include <linux/init.h>
+> +#include <linux/module.h>
 
-The problem is that the code is common across platforms that need to
-reparent or just change rate for intermediate clocks. And the best we
-can do is clk_set_rate() and so probably the clk driver need to take care
-of this somehow and make sure we don't result in a crash like you just
-demonstrated.
+So I guess this header is not needed.
+
+> +#include <linux/of.h>
+> +#include <linux/slab.h>
+> +#include <linux/uaccess.h>
+
+> +module_exit(eeprom_exit);
+
+And this will never be called.
+
+> +MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@linaro.org");
+> +MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com");
+> +MODULE_DESCRIPTION("EEPROM Driver Core");
+> +MODULE_LICENSE("GPL");
+
+And those four macros will basically be preprocessed away. But if you
+actually want this code to be built modular too, and change EEPROM to
+tristate, you probably want to use
+    MODULE_LICENSE("GPL v2");
+
+here.
+
+
+Paul Bolle
