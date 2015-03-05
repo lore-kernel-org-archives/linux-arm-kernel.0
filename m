@@ -1,52 +1,40 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 5 Mar 2015 14:13:58 +0100
-Subject: [PATCH v9 14/21] ACPI / processor: Make it possible to get CPU
- hardware ID via GICC
-In-Reply-To: <20150305112707.GB7712@e104818-lin.cambridge.arm.com>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <1424853601-6675-15-git-send-email-hanjun.guo@linaro.org>
- <2411054.s4TkmAUKjT@vostro.rjw.lan> <54F80DC9.3090808@huawei.com>
- <20150305112707.GB7712@e104818-lin.cambridge.arm.com>
-Message-ID: <CAJZ5v0iHstGiXLT0DPHu2=xH3bD-kD=WCqfuB1XaTgNSnthcLQ@mail.gmail.com>
+From: lsanfil@marvell.com (Lino Sanfilippo)
+Date: Thu, 5 Mar 2015 14:20:43 +0100
+Subject: [RFC PATCH 0/1] Wrong structure alignment due to compiler
+ attribute "section"
+In-Reply-To: <20150305122606.GC3612@e103592.cambridge.arm.com>
+References: <1425290502-2322-1-git-send-email-lsanfil@marvell.com>
+ <20150303144130.GB5177@e103592.cambridge.arm.com>
+ <54F6EF32.7080306@marvell.com>
+ <20150304143527.GA5653@e103592.cambridge.arm.com>
+ <54F732DA.2050004@marvell.com>
+ <20150305122606.GC3612@e103592.cambridge.arm.com>
+Message-ID: <54F8582B.80703@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 5, 2015 at 12:27 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, Mar 05, 2015 at 04:03:21PM +0800, Hanjun Guo wrote:
->> On 2015/3/5 6:46, Rafael J. Wysocki wrote:
->> > IMO, you really need to define phys_cpuid_t in a common place or people will
->> > forget that it may be 64-bit, because they'll only be looking at their arch.
+On 05.03.2015 13:26, Dave Martin wrote:
+
 >>
->> Since x86 and ARM64 are using different types for phys_cpuid_t, we need to
->> introduce something like following if define it in common place:
->>
->> in linux/acpi.h,
->>
->> #if defined(CONFIG_X86) || defined(CONFIG_IA64)
->> typedef u32 phys_cpuid_t;
->> #define PHYS_CPUID_INVALID (phys_cpuid_t)(-1)
->> #else if defined(CONFIG_ARM64)
->> typedef u64 phys_cpuid_t;
->> #define PHYS_CPUID_INVALID INVALID_HWID
->> #endif
->>
->> I think it's awful, did I miss something?
+>> So this is indeed a compiler bug, right?
+>
+> It certainly looks like the compiler is causing the issue somehow.
+>
+> Whether this is a bug, a bug-like feature, a configuration issue,
+> or a combination of these is not clear.
+>
+> If you know where to find the toolchain source, it might be worth
+> taking a look.
 
-Well, you can define the type and PHYS_CPUID_INVALID in the arch
-code and then do this in a common header:
+The toolchain can be found here:
+http://www.plugcomputer.org/405/us/gplugd/tool-chain/arm-marvell-linux-gnueabi.tar.bz2
 
-#ifndef PHYS_CPUID_INVALID
-typedef u32 phys_cpuid_t;
-#define PHYS_CPUID_INVALID (phys_cpuid_t)(-1)
-#endif
+But since it turns out to be a compiler issue I dont know if its worth 
+to be investigated further. I think the best solution to avoid that 
+structure alignment problem is to simply use another toolchain.
 
-That would allow you to avoid the need to duplicate the
-definitions where it is not necessary.
+Dave, I thank you very much for your help and efforts to clarify that 
+this is actually not a bug in the kernel.
 
-> I also think that's awful. I'm rather in favour of a per-arch
-> phys_cpuid_t.
-
-OK, so what about the above?
-
-Rafael
+Thx,
+Lino
