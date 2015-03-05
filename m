@@ -1,36 +1,38 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  5 Mar 2015 17:27:19 +0100
-Subject: [PATCH 0/3] net: macb: rework at91 specific handling
-Message-ID: <1425572842-6084-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Thu,  5 Mar 2015 17:27:20 +0100
+Subject: [PATCH 1/3] net/macb: Update DT bindings documentation
+In-Reply-To: <1425572842-6084-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1425572842-6084-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1425572842-6084-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add missing "cdns,at91sam9260-macb", "atmel,sama5d3-gem" and
+"atmel,sama5d4-gem" compatible strings.
 
-This removes the #if defined(ARCH_AT91) sections to prevent any problem
-when enabling ARM multi-platform support.
-The at91 specific logic is now activated when the "at91sam9260-macb"
-compatible string is found. 
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ Documentation/devicetree/bindings/net/macb.txt | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-Best Regards,
-
-Boris
-
-Boris Brezillon (3):
-  net/macb: Update DT bindings documentation
-  ARM: at91/dt: fix macb compatible strings
-  net: macb: remove #if defined(CONFIG_ARCH_AT91) sections
-
- Documentation/devicetree/bindings/net/macb.txt |  5 +++-
- arch/arm/boot/dts/at91sam9260.dtsi             |  2 +-
- arch/arm/boot/dts/at91sam9263.dtsi             |  2 +-
- arch/arm/boot/dts/at91sam9g45.dtsi             |  2 +-
- arch/arm/boot/dts/at91sam9x5_macb0.dtsi        |  2 +-
- arch/arm/boot/dts/at91sam9x5_macb1.dtsi        |  2 +-
- arch/arm/boot/dts/sama5d3_emac.dtsi            |  2 +-
- drivers/net/ethernet/cadence/macb.c            | 33 ++++++++++++++------------
- drivers/net/ethernet/cadence/macb.h            |  2 ++
- 9 files changed, 30 insertions(+), 22 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
+index aaa6964..ba19d67 100644
+--- a/Documentation/devicetree/bindings/net/macb.txt
++++ b/Documentation/devicetree/bindings/net/macb.txt
+@@ -2,10 +2,13 @@
+ 
+ Required properties:
+ - compatible: Should be "cdns,[<chip>-]{macb|gem}"
+-  Use "cdns,at91sam9260-macb" Atmel at91sam9260 and at91sam9263 SoCs.
++  Use "cdns,at91sam9260-macb" for Atmel at91sam9 SoCs or the 10/100Mbit IP
++  available on sama5d3 SoCs.
+   Use "cdns,at32ap7000-macb" for other 10/100 usage or use the generic form: "cdns,macb".
+   Use "cdns,pc302-gem" for Picochip picoXcell pc302 and later devices based on
+   the Cadence GEM, or the generic form: "cdns,gem".
++  Use "cdns,sama5d3-gem" for the Gigabit IP available on Atmel sama5d3 SoCs.
++  Use "cdns,sama5d4-gem" for the Gigabit IP available on Atmel sama5d4 SoCs.
+ - reg: Address and length of the register set for the device
+ - interrupts: Should contain macb interrupt
+ - phy-mode: See ethernet.txt file in the same directory.
 -- 
 1.9.1
