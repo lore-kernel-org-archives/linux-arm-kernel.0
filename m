@@ -1,40 +1,42 @@
-From: lsanfil@marvell.com (Lino Sanfilippo)
-Date: Thu, 5 Mar 2015 14:20:43 +0100
-Subject: [RFC PATCH 0/1] Wrong structure alignment due to compiler
- attribute "section"
-In-Reply-To: <20150305122606.GC3612@e103592.cambridge.arm.com>
-References: <1425290502-2322-1-git-send-email-lsanfil@marvell.com>
- <20150303144130.GB5177@e103592.cambridge.arm.com>
- <54F6EF32.7080306@marvell.com>
- <20150304143527.GA5653@e103592.cambridge.arm.com>
- <54F732DA.2050004@marvell.com>
- <20150305122606.GC3612@e103592.cambridge.arm.com>
-Message-ID: <54F8582B.80703@marvell.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 5 Mar 2015 14:23:56 +0100
+Subject: [PATCH v9 02/21] ACPI / processor: Introduce phys_cpuid_t for CPU
+ hardware ID
+In-Reply-To: <54F8095C.4030308@huawei.com>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <1424853601-6675-3-git-send-email-hanjun.guo@linaro.org>
+ <1484357.vjmmcyQq4z@vostro.rjw.lan> <54F8095C.4030308@huawei.com>
+Message-ID: <CAJZ5v0hu=TB4S00krNk1RpsXeHJVud2ehhcM0dZDhHAk6DamKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.03.2015 13:26, Dave Martin wrote:
+On Thu, Mar 5, 2015 at 8:44 AM, Hanjun Guo <guohanjun@huawei.com> wrote:
+> On 2015/3/5 6:29, Rafael J. Wysocki wrote:
+>> On Wednesday, February 25, 2015 04:39:42 PM Hanjun Guo wrote:
 
->>
->> So this is indeed a compiler bug, right?
+[cut]
+
+>>> @@ -190,7 +190,7 @@ int acpi_map_cpuid(int phys_id, u32 acpi_id)
+>>>              if (nr_cpu_ids <= 1 && acpi_id == 0)
+>>>                      return acpi_id;
+>>>              else
+>>> -                    return phys_id;
+>>> +                    return -1;
+>> Can we use a proper error code here?
 >
-> It certainly looks like the compiler is causing the issue somehow.
->
-> Whether this is a bug, a bug-like feature, a configuration issue,
-> or a combination of these is not clear.
->
-> If you know where to find the toolchain source, it might be worth
-> taking a look.
+> I'm afraid not. In ACPI processor drivers, -1 will be deemed to
+> invalid cpu logical number, if we return error code here, we need
+> to modify multi places of "if (cpu_logical_num == -1)" to
 
-The toolchain can be found here:
-http://www.plugcomputer.org/405/us/gplugd/tool-chain/arm-marvell-linux-gnueabi.tar.bz2
+Oh, silly stuff.
 
-But since it turns out to be a compiler issue I dont know if its worth 
-to be investigated further. I think the best solution to avoid that 
-structure alignment problem is to simply use another toolchain.
+> "if (! (cpu_logical_num < 0))" too, so for me, I prefer to keep it as
+> -1, but I'm open for suggestions.
 
-Dave, I thank you very much for your help and efforts to clarify that 
-this is actually not a bug in the kernel.
+OK
 
-Thx,
-Lino
+I think we need something like invalid_logical_cpuid() and use it
+in all of those checks instead of the direct comparisons, but we
+can make those changes later.
+
+Rafael
