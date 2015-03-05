@@ -1,102 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 5 Mar 2015 10:17:05 +0000
-Subject: [PATCH v3 8/9] ACPI: arm64: use an arch-specific ACPI _OSI
- method and ACPI blacklist
-In-Reply-To: <2149383.4T7uuqhSe1@vostro.rjw.lan>
-References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
- <20150302172939.GC7919@arm.com> <54F4B345.6020001@linaro.org>
- <2149383.4T7uuqhSe1@vostro.rjw.lan>
-Message-ID: <20150305101705.GB5287@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 5 Mar 2015 15:53:35 +0530
+Subject: [PATCH] clk: mediatek: Export CPU mux clocks for CPU frequency
+ control
+In-Reply-To: <20150305091948.GH11010@pengutronix.de>
+References: <1425466152-7867-1-git-send-email-pi-cheng.chen@linaro.org>
+ <20150304112109.GB11010@pengutronix.de>
+ <CALx668WKKmifhuODsV+Uaoq4ggcmB1=wbpLzXBnjEtxbuB4qig@mail.gmail.com>
+ <20150305074207.GC11010@pengutronix.de>
+ <CAKohponSqLPcULA9-T8y9b_b44Torti0p6W3sJfRZ1oKUWqtTw@mail.gmail.com>
+ <20150305091948.GH11010@pengutronix.de>
+Message-ID: <CAKohpokVxxxTY9DpQVxNPnq92pyK=2J2dDeLmis_+WD16aatOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 11:14:50PM +0000, Rafael J. Wysocki wrote:
-> On Monday, March 02, 2015 12:00:21 PM Al Stone wrote:
-> > On 03/02/2015 10:29 AM, Will Deacon wrote:
-> > > On Wed, Feb 25, 2015 at 12:36:24AM +0000, al.stone at linaro.org wrote:
-> > >> diff --git a/arch/arm64/kernel/acpi-blacklist.c b/arch/arm64/kernel/acpi-blacklist.c
-> > >> new file mode 100644
-> > >> index 0000000..1be6a56
-> > >> --- /dev/null
-> > >> +++ b/arch/arm64/kernel/acpi-blacklist.c
-> > >> @@ -0,0 +1,20 @@
-> > >> +/*
-> > >> + *  ARM64 Specific ACPI Blacklist Support
-> > >> + *
-> > >> + *  Copyright (C) 2015, Linaro Ltd.
-> > >> + *	Author: Al Stone <al.stone@linaro.org>
-> > >> + *
-> > >> + *  This program is free software; you can redistribute it and/or modify
-> > >> + *  it under the terms of the GNU General Public License version 2 as
-> > >> + *  published by the Free Software Foundation.
-> > >> + */
-> > >> +
-> > >> +#define pr_fmt(fmt) "ACPI: " fmt
-> > >> +
-> > >> +#include <linux/acpi.h>
-> > >> +
-> > >> +/* The arm64 ACPI blacklist is currently empty.  */
-> > >> +int __init acpi_blacklisted(void)
-> > >> +{
-> > >> +	return 0;
-> > >> +}
-> > >> diff --git a/arch/arm64/kernel/acpi-osi.c b/arch/arm64/kernel/acpi-osi.c
-> > >> new file mode 100644
-> > >> index 0000000..bb351f4
-> > >> --- /dev/null
-> > >> +++ b/arch/arm64/kernel/acpi-osi.c
-> > >> @@ -0,0 +1,25 @@
-> > >> +/*
-> > >> + *  ARM64 Specific ACPI _OSI Support
-> > >> + *
-> > >> + *  Copyright (C) 2015, Linaro Ltd.
-> > >> + *	Author: Al Stone <al.stone@linaro.org>
-> > >> + *
-> > >> + *  This program is free software; you can redistribute it and/or modify
-> > >> + *  it under the terms of the GNU General Public License version 2 as
-> > >> + *  published by the Free Software Foundation.
-> > >> + */
-> > >> +
-> > >> +#define pr_fmt(fmt) "ACPI: " fmt
-> > >> +
-> > >> +#include <linux/acpi.h>
-> > >> +
-> > >> +/*
-> > >> + * Consensus is to deprecate _OSI for all new ACPI-supported architectures.
-> > >> + * So, for arm64, reduce _OSI to a warning message, and tell the firmware
-> > >> + * nothing of value.
-> > >> + */
-> > >> +u32 acpi_osi_handler(acpi_string interface, u32 supported)
-> > >> +{
-> > >> +	pr_warn("_OSI was called, but is deprecated for this architecture.\n");
-> > >> +	return false;
-> > >> +}
-> > > 
-> > > This kinda feels backwards to me. If _OSI is going away, then the default
-> > > should be "the architecture doesn't need to do anything", rather than have
-> > > new architectures defining a bunch of empty, useless stub code.
-> > > 
-> > > Anyway we could make this the default in core code and have architectures
-> > > that *do* want _OSI override that behaviour, instead of the other way around?
-> > > 
-> > We could do that; I personally don't have a strong preference either way,
-> > so I'm inclined to make it whatever structure Rafael thinks is proper since
-> > it affects ACPI code most.  That being said, the current patch structure
-> > made sense to me since it wasn't distorting existing code much -- and given
-> > the pure number of x86/ia64 machines vs ARM machines using ACPI, that seemed
-> > the more cautious approach.
-> > 
-> > @Rafael: do you have an opinion/preference?
-> 
-> My preference is to avoid changes in the existing code at least for the time
-> being.  Especially if the changes in question are going to affect ia64, unless
-> you have an Itanium machine where you can readily test those, that is. :-)
+On 5 March 2015 at 14:49, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> The sequence to change the CPU frequency on the Mediatek SoCs is like this:
+>
+> - Change CPU from CPU PLL to another clock source (intermediate source)
+> - Change CPU PLL frequency
+> - wait until PLL has settled
+> - switch back to CPU PLL
 
-Well, this code doesn't even need to compiled for ia64 if we have those
-architectures that want to use _OSI select a Kconfig symbol for it, so I
-don't think the testing argument is really that valid. I appreciate that you
-want to avoid changing the existing code, but I also don't want to add this
-sort of stuff to the architecture code, when it really has nothing to do
-with the architecture.
+This should be the case for most of the intermediate-freq users..
 
-Will
+> The frequency of the intermediate source is irrelevant, the important
+> thing is that the CPU is switched to this source while the CPU PLL is
+> reconfigured.
+
+Right.
+
+> In Pi-Chengs patches the switch to th eintermediate clock is done like:
+>
+>         rate = clk_get_rate(intermediate_clk);
+>         clk_set_rate(cpu_clk, rate);
+>
+> Now the clk framework does the switch not because it's told to switch
+> to another parent, but only because the other parent happens to be the
+> only provider for that rate. That's rubbish, when the parent must be
+> changed, then it should be done explicitly.
+> What if the CPU PLL and the intermediate clk happen to have the same
+> rate? Then the clk_set_rate above simply does nothing, no parent is
+> changed and the following rate change of the CPU PLL just crashes the
+> system.
+
+The problem is that the code is common across platforms that need to
+reparent or just change rate for intermediate clocks. And the best we
+can do is clk_set_rate() and so probably the clk driver need to take care
+of this somehow and make sure we don't result in a crash like you just
+demonstrated.
