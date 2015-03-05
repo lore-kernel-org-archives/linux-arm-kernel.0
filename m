@@ -1,41 +1,33 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 05 Mar 2015 09:36:21 +0100
-Subject: [PATCH v5 6/8] pinctrl: cygnus: add gpio/pinconf driver
-In-Reply-To: <1425543104.24292.185.camel@x220>
-References: <1425515756-321-1-git-send-email-rjui@broadcom.com>
- <1425515756-321-7-git-send-email-rjui@broadcom.com>
- <1425543104.24292.185.camel@x220>
-Message-ID: <1425544581.24292.194.camel@x220>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 5 Mar 2015 09:44:55 +0100
+Subject: preferable method for pinctrl driver
+In-Reply-To: <54D88EC9.70409@rempel-privat.de>
+References: <54379C10.3050004@rempel-privat.de>
+ <CACRpkdYG6sNEfKNJBdbYCn4AbGiX2OfQAVJorR64cbB_gsWDbw@mail.gmail.com>
+ <545C846C.6090502@rempel-privat.de>
+ <545C9C41.1090300@rempel-privat.de>
+ <CACRpkdZMX=HSpusLtPREufJpXuHOwH2MCtHrViASDR7Vbu_eMw@mail.gmail.com>
+ <54D88EC9.70409@rempel-privat.de>
+Message-ID: <CACRpkdarpb05emmf4xUpgyWua8U8ueoLWwEkJG2EtVK3w0RG6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-03-05 at 09:11 +0100, Paul Bolle wrote:
-> On Wed, 2015-03-04 at 16:35 -0800, Ray Jui wrote:
-> > +MODULE_AUTHOR("Ray Jui <rjui@broadcom.com>");
-> > +MODULE_DESCRIPTION("Broadcom Cygnus GPIO Driver");
-> > +MODULE_LICENSE("GPL v2");
-> 
-> These three macros will be preprocessed away. (There's also
-> MODULE_DEVICE_TABLE. I don't yet know how that is handled in a
-> non-modular build, sorry.)
+On Mon, Feb 9, 2015 at 11:41 AM, Oleksij Rempel <linux@rempel-privat.de> wrote:
 
-It turns out MODULE_DEVICE_TABLE is _really_ preprocessed away. See
-include/linux/module.h:
-    #ifdef MODULE
-    /* Creates an alias so file2alias.c can find device table. */
-    #define MODULE_DEVICE_TABLE(type, name)                                 \
-    extern const typeof(name) __mod_##type##__##name##_device_table         \
-      __attribute__ ((unused, alias(__stringify(name))))
-    #else  /* !MODULE */
-    #define MODULE_DEVICE_TABLE(type, name)
-    #endif
+> What is preferred method of handling gpio_request_enable in pinctrl
+> driver? My hw provide GPIO as one of mux variants for each controlled
+> pin.  if i see it correctly, pin subsystem will not prevent using one
+> pin as gpio and request for some other functionality? Should it be
+> prevented by driver?
 
+That is up to the driver writer. We have contemplated adding an
+option to pinctrl_desc enforcing "exclusive GPIO" meaning that
+GPIO and another mux setting cannot be used at the same time,
+but noone got around to implementing that.
 
-Did I get that right?
+Some pin controllers can do GPIO and another function at the
+same time, see illustrations and text in
+Documentation/pinctrl.txt
 
-(I knew the other three MODULE_* macros are handled in slightly more
-complicated way, but the effect is basically that they are preprocessed
-away.)
-
-
-Paul Bolle
+Yours,
+Linus Walleij
