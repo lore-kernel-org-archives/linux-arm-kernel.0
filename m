@@ -1,131 +1,38 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu,  5 Mar 2015 09:46:23 +0000
-Subject: [PATCH v1 5/6] eeprom: qfprom: Add Qualcomm QFPROM support.
+Date: Thu,  5 Mar 2015 09:46:31 +0000
+Subject: [PATCH v1 6/6] eeprom: Add to MAINTAINERS for eeprom framework
 In-Reply-To: <1425548685-12887-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1425548685-12887-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1425548783-13110-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1425548791-13152-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds QFPROM support driver which is used by other drivers
-like thermal sensor and cpufreq.
-
-On MSM parts there are some efuses (called qfprom) these fuses store things like
-calibration data, speed bins.. etc. Drivers like cpufreq, thermal sensors would
-read out this data for configuring the driver.
+This patch adds MAINTAINERS to eeprom framework.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/eeprom/Kconfig  |  7 +++++
- drivers/eeprom/Makefile |  1 +
- drivers/eeprom/qfprom.c | 74 +++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 82 insertions(+)
- create mode 100644 drivers/eeprom/qfprom.c
+ MAINTAINERS | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/eeprom/Kconfig b/drivers/eeprom/Kconfig
-index bff8ecb..65325c7 100644
---- a/drivers/eeprom/Kconfig
-+++ b/drivers/eeprom/Kconfig
-@@ -28,4 +28,11 @@ config EEPROM_SUNXI_SID
- 	  This driver can also be built as a module. If so, the module
- 	  will be called sunxi_sid.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index d66a97d..ee7ba92 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -3657,6 +3657,15 @@ T:	git git://git.alsa-project.org/alsa-kernel.git
+ S:	Maintained
+ F:	sound/usb/misc/ua101.c
  
-+config QCOM_QFPROM
-+	tristate "QCOM QFPROM Support"
-+        depends on EEPROM
-+	select REGMAP_MMIO
-+	help
-+          Say y here to enable QFPROM support. The QFPROM provides access
-+          functions for QFPROM data to rest of the drivers via eeprom interface.
- endif
-diff --git a/drivers/eeprom/Makefile b/drivers/eeprom/Makefile
-index 661422c..f99c824 100644
---- a/drivers/eeprom/Makefile
-+++ b/drivers/eeprom/Makefile
-@@ -8,3 +8,4 @@ obj-$(CONFIG_EEPROM)		+= core.o
- 
- # Devices
- obj-$(CONFIG_EEPROM_SUNXI_SID)	+= eeprom-sunxi-sid.o
-+obj-$(CONFIG_QCOM_QFPROM)	+= qfprom.o
-diff --git a/drivers/eeprom/qfprom.c b/drivers/eeprom/qfprom.c
-new file mode 100644
-index 0000000..371a8c0
---- /dev/null
-+++ b/drivers/eeprom/qfprom.c
-@@ -0,0 +1,74 @@
-+#include <linux/device.h>
-+#include <linux/module.h>
-+#include <linux/err.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/eeprom-provider.h>
++EEPROM FRAMEWORK
++M:	Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
++M:	Maxime Ripard <maxime.ripard@free-electrons.com>
++S:	Maintained
++F:	drivers/eeprom/
++F:	Documentation/devicetree/bindings/eeprom/
++F:	include/linux/eeprom-provider.h
++F:	include/linux/eeprom-consumer.h
 +
-+static struct regmap_config qfprom_regmap_config = {
-+	.reg_bits = 32,
-+	.val_bits = 8,
-+	.reg_stride = 1,
-+};
-+
-+static struct eeprom_config econfig = {
-+	.stride = 1,
-+	.name = "qfprom",
-+};
-+
-+static int qfprom_remove(struct platform_device *pdev)
-+{
-+	struct eeprom_device *eeprom = platform_get_drvdata(pdev);
-+
-+	return eeprom_unregister(eeprom);
-+}
-+
-+static int qfprom_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	void __iomem *base;
-+	struct device *dev = &pdev->dev;
-+	struct eeprom_device *eeprom;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	qfprom_regmap_config.max_register = resource_size(res) - 1;
-+
-+	econfig.regmap = devm_regmap_init_mmio(dev, base,
-+					       &qfprom_regmap_config);
-+	if (IS_ERR(econfig.regmap)) {
-+		dev_err(dev, "regmap init failed\n");
-+		return PTR_ERR(econfig.regmap);
-+	}
-+	econfig.owner = THIS_MODULE;
-+	econfig.dev = dev;
-+	econfig.size = resource_size(res) - 1;
-+	eeprom = eeprom_register(&econfig);
-+	if (IS_ERR(eeprom))
-+		return PTR_ERR(eeprom);
-+
-+	platform_set_drvdata(pdev, eeprom);
-+	return 0;
-+}
-+
-+static const struct of_device_id qfprom_of_match[] = {
-+	{ .compatible = "qcom,qfprom"},
-+	{/* sentinel */},
-+};
-+MODULE_DEVICE_TABLE(of, qfprom_of_match);
-+
-+static struct platform_driver qfprom_driver = {
-+	.probe = qfprom_probe,
-+	.remove = qfprom_remove,
-+	.driver = {
-+		.name = "qcom,qfprom",
-+		.of_match_table = qfprom_of_match,
-+	},
-+};
-+module_platform_driver(qfprom_driver);
-+MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@linaro.org>");
-+MODULE_DESCRIPTION("Qualcomm QFPROM driver");
-+MODULE_LICENSE("GPL2");
+ EXTENSIBLE FIRMWARE INTERFACE (EFI)
+ M:	Matt Fleming <matt.fleming@intel.com>
+ L:	linux-efi at vger.kernel.org
 -- 
 1.9.1
