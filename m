@@ -1,131 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Mar 2015 14:58:32 +0000
-Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
- uncached guest mappings
-In-Reply-To: <54F84B7F.5010007@redhat.com>
-References: <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
- <20150304141212.GA5352@hawk.usersys.redhat.com>
- <20150304142943.GU28951@e104818-lin.cambridge.arm.com>
- <54F73ACF.1090605@redhat.com>
- <20150304172855.GA28951@e104818-lin.cambridge.arm.com>
- <54F82C06.2000701@redhat.com>
- <20150305110415.GA7712@e104818-lin.cambridge.arm.com>
- <CAFEAcA98j_EsP4Hy20tQCKdnP3=NuvS3Ona37peBjan8aWLSEA@mail.gmail.com>
- <20150305120348.GD7712@e104818-lin.cambridge.arm.com>
- <54F84B7F.5010007@redhat.com>
-Message-ID: <20150305145831.GA11447@e104818-lin.cambridge.arm.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 5 Mar 2015 09:06:22 -0600
+Subject: [PATCH v2 2/3] arm64: qcom: Add support for Qualcomm MSM8916 SoC
+In-Reply-To: <54F7883B.90704@codeaurora.org>
+References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
+ <1425503602-24916-2-git-send-email-galak@codeaurora.org>
+ <54F7883B.90704@codeaurora.org>
+Message-ID: <63B0478A-6282-4826-8991-46B0E4BA7BA5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 05, 2015 at 01:26:39PM +0100, Paolo Bonzini wrote:
-> On 05/03/2015 13:03, Catalin Marinas wrote:
-> >> > I'd hate to have to do that. PCI should be entirely probeable
-> >> > given that we tell the guest where the host bridge is, that's
-> >> > one of its advantages.
-> > I didn't say a DT node per device, the DT doesn't know what PCI devices
-> > are available (otherwise it defeats the idea of probing). But we need to
-> > tell the OS where the host bridge is via DT.
-> > 
-> > So the guest would be told about two host bridges: one for real devices
-> > and another for virtual devices. These can have different coherency
-> > properties.
+
+On Mar 4, 2015, at 4:33 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+
+> On 03/04/15 13:13, Kumar Gala wrote:
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 1b8e973..4c8b119 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -177,6 +177,15 @@ config ARCH_MEDIATEK
+>> 	help
+>> 	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
+>> 
+>> +config ARCH_QCOM
+>> +	bool "Qualcomm Platforms"
+>> +	select ARCH_REQUIRE_GPIOLIB
+>> +	select COMMON_CLK_QCOM
+>> +	select PINCTRL
+>> +	select SOC_BUS
 > 
-> Yeah, and it would suck that the user needs to know the difference
-> between the coherency proprties of the host bridges.
+> I imagine all we need is select PINCTRL here. SOC_BUS is not used, also
+> we shouldn't force COMMON_CLK_QCOM to be Y instead of M so please drop
+> that select. Also we dropped ARCH_REQUIRE_GPIOLIB in arm32 so it would
+> match if we just relied on ARCH_WANT_GPIOLIB that arm64 has by default
 
-The host needs to know about this, unless we assume full coherency on
-all the platforms. Arguably, Qemu needs to know as well if it is the one
-generating the DT for guest (or at least passing some snippets from the
-host DT).
+Will drop SOC_BUS.  We seem to have other arm64 platforms that set ARCH_REQUIRE_GPIOLIB.  Why should we not select COMMON_CLK_QCOM?  Can we do much useful without COMMON_CLK_QCOM set?
 
-> It would especially suck if the user has a cluster with different
-> machines, some of them coherent and others non-coherent, and then has to
-> debug why the same configuration works on some machines and not on others.
-
-That's a problem indeed, especially with guest migration. But I don't
-think we have any sane solution here for the bus master DMA.
-
-> To avoid replying in two different places, which of the solutions look
-> to me like something that half-works?  Pretty much all of them, because
-> in the end it is just a processor misfeature.  For example, Intel
-> virtualization extensions let the hypervisor override stage1 translation
-> _if necessary_.  AMD doesn't, but has some other quirky things that let
-> you achieve the same effect..
-
-ARM can override them as well but only making them stricter. Otherwise,
-on a weakly ordered architecture, it's not always safe (let's say the
-guest thinks it accesses Strongly Ordered memory and avoids barriers for
-flag updates but the host "upgrades" it to Cacheable which breaks the
-memory order).
-
-If we want the host to enforce guest memory mapping attributes via stage
-2, we could do it the other way around: get the guests to always assume
-full cache coherency, generating Normal Cacheable mappings, but use the
-stage 2 attributes restriction in the host to make such mappings
-non-cacheable when needed (it works this way on ARM but not in the other
-direction to relax the attributes).
-
-> In particular, I am not even sure that this is about bus coherency,
-> because this problem does not happen when the device is doing bus master
-> DMA.  Working around coherency for bus master DMA would be easy.
-
-My previous emails on the "dma-coherent" property were only about bus
-master DMA (which would cause the correct selection of the DMA API ops
-in the guest).
-
-But even for bus master DMA, guest OS still needs to be aware of the
-(virtual) device DMA capabilities (cache coherent or not). You may be
-able to work around it in the host (stage 2, explicit cache flushing or
-SMMU attributes) if the guests assumes non-coherency but it's not really
-efficient (nor nice to implement).
-
-> The problem arises with MMIO areas that the guest can reasonably expect
-> to be uncacheable, but that are optimized by the host so that they end
-> up backed by cacheable RAM.  It's perfectly reasonable that the same
-> device needs cacheable mapping with one userspace, and works with
-> uncacheable mapping with another userspace that doesn't optimize the
-> MMIO area to RAM.
-
-Unless the guest allocates the framebuffer itself (e.g.
-dma_alloc_coherent), we can't control the cacheability via
-"dma-coherent" properties as it refers to bus master DMA.
-
-So for MMIO with the buffer allocated by the host (Qemu), the only
-solution I see on ARM is for the host to ensure coherency, either via
-explicit cache maintenance (new KVM API) or by changing the memory
-attributes used by Qemu to access such virtual MMIO.
-
-Basically Qemu is acting as a bus master when reading the framebuffer it
-allocated but the guest considers it a slave access and we don't have a
-way to tell the guest that such accesses should be cacheable, nor can we
-upgrade them via architecture features.
-
-> Currently the VGA framebuffer is the main case where this happen, and I
-> don't expect many more.  Because this is not bus master DMA, it's hard
-> to find a QEMU API that can be hooked to invalidate the cache.  QEMU is
-> just reading from an array of chars.
-
-I now understand the problem better. I was under the impression that the
-guest allocates the framebuffer itself and tells Qemu where it is (like
-in amba-clcd.c for example).
-
-> In practice, the VGA framebuffer has an optimization that uses dirty
-> page tracking, so we could piggyback on the ioctls that return which
-> pages are dirty.  It turns out that piggybacking on those ioctls also
-> should fix the case of migrating a guest while the MMU is disabled.
-
-Yes, Qemu would need to invalidate the cache before reading a dirty
-framebuffer page.
-
-As I said above, an API that allows non-cacheable mappings for the VGA
-framebuffer in Qemu would also solve the problem. I'm not sure what KVM
-provides here (or whether we can add such API).
-
-> We could use _DSD to export the device tree property separately for each
-> device, but that wouldn't work for hotplugged devices.
-
-This would only work for bus master DMA, so it doesn't solve the VGA
-framebuffer issue.
+- k
 
 -- 
-Catalin
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
