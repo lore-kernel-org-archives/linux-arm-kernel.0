@@ -1,42 +1,54 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 5 Mar 2015 14:23:56 +0100
-Subject: [PATCH v9 02/21] ACPI / processor: Introduce phys_cpuid_t for CPU
- hardware ID
-In-Reply-To: <54F8095C.4030308@huawei.com>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <1424853601-6675-3-git-send-email-hanjun.guo@linaro.org>
- <1484357.vjmmcyQq4z@vostro.rjw.lan> <54F8095C.4030308@huawei.com>
-Message-ID: <CAJZ5v0hu=TB4S00krNk1RpsXeHJVud2ehhcM0dZDhHAk6DamKg@mail.gmail.com>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Thu, 05 Mar 2015 15:27:05 +0200
+Subject: [RFC V2 00/12] i2c: describe adapter quirks in a generic way
+In-Reply-To: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
+References: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <1425562025.5705.24.camel@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 5, 2015 at 8:44 AM, Hanjun Guo <guohanjun@huawei.com> wrote:
-> On 2015/3/5 6:29, Rafael J. Wysocki wrote:
->> On Wednesday, February 25, 2015 04:39:42 PM Hanjun Guo wrote:
 
-[cut]
+On Wed, 2015-02-25 at 17:01 +0100, Wolfram Sang wrote:
+> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> 
+> Here is the second version of the patch series to describe i2c adapter quirks
+> in a generic way. For the motivation, please read description of patch 1. This
+> is still RFC because I would like to do some more tests on my own, but I need
+> to write a tool for that. However, I'd really like to have the driver authors
+> to have a look already. Actual testing is very much appreciated. Thanks to the
+> Mediatek guys for rebasing their new driver to this framework. That helps, too!
+> 
+> The branch is also here:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/quirks
+> 
+> Thanks,
+> 
+>    Wolfram
+> 
+> Major changes since V1:
+> 
+> * more fine-grained options to describe modes with combined messages.
+>   This should also cover the Mediatek HW now as well as all other
+>   permutations I can think of.
+> 
+> * the core code and at91 driver had to be refactored to reflect the
+>   above change
+> 
+> * added the bcm-iproc driver which came to mainline recently
+> 
+> Wolfram Sang (12):
+>   i2c: add quirk structure to describe adapter flaws
+>   i2c: add quirk checks to core
+>   i2c: at91: make use of the new infrastructure for quirks
+>   i2c: opal: make use of the new infrastructure for quirks
+>   i2c: qup: make use of the new infrastructure for quirks
+> 
 
->>> @@ -190,7 +190,7 @@ int acpi_map_cpuid(int phys_id, u32 acpi_id)
->>>              if (nr_cpu_ids <= 1 && acpi_id == 0)
->>>                      return acpi_id;
->>>              else
->>> -                    return phys_id;
->>> +                    return -1;
->> Can we use a proper error code here?
->
-> I'm afraid not. In ACPI processor drivers, -1 will be deemed to
-> invalid cpu logical number, if we return error code here, we need
-> to modify multi places of "if (cpu_logical_num == -1)" to
+For QUP driver. 
 
-Oh, silly stuff.
+Reviewed-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+Tested-by: Ivan T. Ivanov <iivanov@mm-sol.com>
 
-> "if (! (cpu_logical_num < 0))" too, so for me, I prefer to keep it as
-> -1, but I'm open for suggestions.
-
-OK
-
-I think we need something like invalid_logical_cpuid() and use it
-in all of those checks instead of the direct comparisons, but we
-can make those changes later.
-
-Rafael
+Thanks,
+Ivan
