@@ -1,93 +1,61 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed,  4 Mar 2015 17:27:08 -0800
-Subject: [PATCH v3 8/8] x86: switch to using asm-generic for seccomp.h
-In-Reply-To: <1425518828-16017-1-git-send-email-keescook@chromium.org>
-References: <1425518828-16017-1-git-send-email-keescook@chromium.org>
-Message-ID: <1425518828-16017-9-git-send-email-keescook@chromium.org>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 5 Mar 2015 09:52:14 +0800
+Subject: [PATCH] ARM: at91: dts: sama5d3/sama5d4: reduce NFC command
+ registers memory region
+In-Reply-To: <54F72276.8060605@atmel.com>
+References: <1421305683-8739-1-git-send-email-josh.wu@atmel.com>	<20150115094527.3fde882a@bbrezillon>	<54B78F73.9000504@atmel.com>
+ <20150115110501.53b4584c@bbrezillon> <54F72276.8060605@atmel.com>
+Message-ID: <54F7B6CE.8060403@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to using the newly created asm-generic/seccomp.h for the seccomp
-strict mode syscall definitions. The obsolete sigreturn syscall override
-is retained in 32-bit mode, and the ia32 syscall overrides are used in
-the compat case. Remaining definitions were identical.
+Hi, Nicolas
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- arch/x86/include/asm/seccomp.h    | 21 ++++++++++++++++++---
- arch/x86/include/asm/seccomp_32.h | 11 -----------
- arch/x86/include/asm/seccomp_64.h | 17 -----------------
- 3 files changed, 18 insertions(+), 31 deletions(-)
- delete mode 100644 arch/x86/include/asm/seccomp_32.h
- delete mode 100644 arch/x86/include/asm/seccomp_64.h
+On 3/4/2015 11:19 PM, Nicolas Ferre wrote:
+> Le 15/01/2015 11:05, Boris Brezillon a ?crit :
+>> Hi Josh,
+>>
+>> On Thu, 15 Jan 2015 17:59:15 +0800
+>> Josh Wu <josh.wu@atmel.com> wrote:
+>>
+>>> Hi? Boris
+>>>
+>>> Thanks for the review.
+>>>
+>>> On 1/15/2015 4:45 PM, Boris Brezillon wrote:
+>>>> Hi Josh,
+>>>>
+>>>> On Thu, 15 Jan 2015 15:08:03 +0800
+>>>> Josh Wu <josh.wu@atmel.com> wrote:
+>>>>
+>>>>> To get NFC status, we need to read the NFC command registers, which is a
+>>>>> 256M memory mapping address. To check the status, you just read such
+>>>>> address from NFC command registers.
+>>>>> For example, to check NFCBUSY (bit 27), you need to read 0x08000000
+>>>>> (bit 27 is set to 1) of the NFC command register.
+>>>>> If you want to check NFCBUSY (bit 27) and NFCWR (bit 26) in same time,
+>>>>> you need to read 0x0c000000 (bit 27 and bit 26 are set to 1).
+>>>> Are NFCBUSY and NFCWR found in NFCDATA_STATUS and those found in HSMC_SR
+>>>> representing the same thing.
+>>> yes. it is. I just check with IP team. The NFCBUSY of NFCDATA_STATUS is
+>>> also refer to NFC_BUSY of HSMC_SR.
+>>>
+>>>> If they are, I think you can just use HSMC_SR instead of NFCDATA_STATUS
+>>>> to check the status [1] and drop the last bit in the NFC Command
+>>>> Resgiters range.
+>>> Thank you. your code works (just need some typo change).
+>>> I want to send [1] code with your signed-off and my acked to mtd list.
+>>> Is it okay for you?
+>> Sure, no problem.
+> Hi Josh,
+>
+> What is the status of this patch set?
 
-diff --git a/arch/x86/include/asm/seccomp.h b/arch/x86/include/asm/seccomp.h
-index 0f3d7f099224..0c8c7c8861b4 100644
---- a/arch/x86/include/asm/seccomp.h
-+++ b/arch/x86/include/asm/seccomp.h
-@@ -1,5 +1,20 @@
-+#ifndef _ASM_X86_SECCOMP_H
-+#define _ASM_X86_SECCOMP_H
-+
-+#include <asm/unistd.h>
-+
- #ifdef CONFIG_X86_32
--# include <asm/seccomp_32.h>
--#else
--# include <asm/seccomp_64.h>
-+#define __NR_seccomp_sigreturn		__NR_sigreturn
- #endif
-+
-+#ifdef CONFIG_COMPAT
-+#include <asm/ia32_unistd.h>
-+#define __NR_seccomp_read_32		__NR_ia32_read
-+#define __NR_seccomp_write_32		__NR_ia32_write
-+#define __NR_seccomp_exit_32		__NR_ia32_exit
-+#define __NR_seccomp_sigreturn_32	__NR_ia32_sigreturn
-+#endif
-+
-+#include <asm-generic/seccomp.h>
-+
-+#endif /* _ASM_X86_SECCOMP_H */
-diff --git a/arch/x86/include/asm/seccomp_32.h b/arch/x86/include/asm/seccomp_32.h
-deleted file mode 100644
-index b811d6f5780c..000000000000
---- a/arch/x86/include/asm/seccomp_32.h
-+++ /dev/null
-@@ -1,11 +0,0 @@
--#ifndef _ASM_X86_SECCOMP_32_H
--#define _ASM_X86_SECCOMP_32_H
--
--#include <linux/unistd.h>
--
--#define __NR_seccomp_read __NR_read
--#define __NR_seccomp_write __NR_write
--#define __NR_seccomp_exit __NR_exit
--#define __NR_seccomp_sigreturn __NR_sigreturn
--
--#endif /* _ASM_X86_SECCOMP_32_H */
-diff --git a/arch/x86/include/asm/seccomp_64.h b/arch/x86/include/asm/seccomp_64.h
-deleted file mode 100644
-index 84ec1bd161a5..000000000000
---- a/arch/x86/include/asm/seccomp_64.h
-+++ /dev/null
-@@ -1,17 +0,0 @@
--#ifndef _ASM_X86_SECCOMP_64_H
--#define _ASM_X86_SECCOMP_64_H
--
--#include <linux/unistd.h>
--#include <asm/ia32_unistd.h>
--
--#define __NR_seccomp_read __NR_read
--#define __NR_seccomp_write __NR_write
--#define __NR_seccomp_exit __NR_exit
--#define __NR_seccomp_sigreturn __NR_rt_sigreturn
--
--#define __NR_seccomp_read_32 __NR_ia32_read
--#define __NR_seccomp_write_32 __NR_ia32_write
--#define __NR_seccomp_exit_32 __NR_ia32_exit
--#define __NR_seccomp_sigreturn_32 __NR_ia32_sigreturn
--
--#endif /* _ASM_X86_SECCOMP_64_H */
--- 
-1.9.1
+The v2 of this patch is sent. But it's not taken by Brain.
+I just ping Brain yesterday. Check the v2 patch here:
+http://patchwork.ozlabs.org/patch/431752/
+
+Best Regards,
+Josh Wu
+>
+> Bye,
