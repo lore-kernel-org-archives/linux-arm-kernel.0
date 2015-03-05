@@ -1,75 +1,31 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 05 Mar 2015 11:02:37 +0100
-Subject: [PATCH v1 5/6] eeprom: qfprom: Add Qualcomm QFPROM support.
-In-Reply-To: <1425548783-13110-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1425548685-12887-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1425548783-13110-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1425549757.24292.204.camel@x220>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 5 Mar 2015 18:02:54 +0800
+Subject: [ulf.hansson-mmc:next 1/17] drivers/mmc/host/dw_mmc-exynos.c:480:5:
+ sparse: symbol 'dw_mci_exynos_prepare_hs400_tuning' was not declared. Should
+ it be static?
+Message-ID: <201503051843.EsoMldBU%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-03-05 at 09:46 +0000, Srinivas Kandagatla wrote:
-> diff --git a/drivers/eeprom/Kconfig b/drivers/eeprom/Kconfig
-> index bff8ecb..65325c7 100644
-> --- a/drivers/eeprom/Kconfig
-> +++ b/drivers/eeprom/Kconfig
-> @@ -28,4 +28,11 @@ config EEPROM_SUNXI_SID
->  	  This driver can also be built as a module. If so, the module
->  	  will be called sunxi_sid.
->  
-> +config QCOM_QFPROM
-> +	tristate "QCOM QFPROM Support"
-> +        depends on EEPROM
-
-Make this one tab, please.
-
-> +	select REGMAP_MMIO
-> +	help
-> +          Say y here to enable QFPROM support. The QFPROM provides access
-> +          functions for QFPROM data to rest of the drivers via eeprom interface.
-
-And this one tab and two spaces, please.
-
-All utterly trivial, of course, but I found a less trivial problem with
-this patch, so I included these two comments anyway.
-
->  endif
-> diff --git a/drivers/eeprom/Makefile b/drivers/eeprom/Makefile
-> index 661422c..f99c824 100644
-> --- a/drivers/eeprom/Makefile
-> +++ b/drivers/eeprom/Makefile
-> @@ -8,3 +8,4 @@ obj-$(CONFIG_EEPROM)		+= core.o
->  
->  # Devices
->  obj-$(CONFIG_EEPROM_SUNXI_SID)	+= eeprom-sunxi-sid.o
-> +obj-$(CONFIG_QCOM_QFPROM)	+= qfprom.o
-> diff --git a/drivers/eeprom/qfprom.c b/drivers/eeprom/qfprom.c
-> new file mode 100644
-> index 0000000..371a8c0
-> --- /dev/null
-> +++ b/drivers/eeprom/qfprom.c
-> @@ -0,0 +1,74 @@
-> +#include <linux/device.h>
-> +#include <linux/module.h>
-> +#include <linux/err.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/eeprom-provider.h>
-
-[...]
-
-> +MODULE_LICENSE("GPL2");
-
-This will taint the kernel on module load. I guess you meant
-    MODULE_LICENSE("GPL v2");
-
-but there's no comment with some lines about the license at the top of
-this file, so I can't be sure.
+tree:   https://git.linaro.org/people/ulf.hansson/mmc next
+head:   cc92508d8a444000ec259debaf7603faf77540de
+commit: 880e5e640a1f39802da76d9570bed2d8456f302a [1/17] mmc: dw_mmc: exynos: Support eMMC's HS400 mode
+reproduce:
+  # apt-get install sparse
+  git checkout 880e5e640a1f39802da76d9570bed2d8456f302a
+  make ARCH=x86_64 allmodconfig
+  make C=1 CF=-D__CHECK_ENDIAN__
 
 
-Paul Bolle
+sparse warnings: (new ones prefixed by >>)
 
-(Chances are that by the end of this week everybody is so tired of
-messages like this that people actually check this stuff before
-submitting, and there's no need to review this anymore for the rest of
-this year. That would be mission accomplished, I guess.)
+>> drivers/mmc/host/dw_mmc-exynos.c:480:5: sparse: symbol 'dw_mci_exynos_prepare_hs400_tuning' was not declared. Should it be static?
+--
+>> drivers/mmc/host/dw_mmc.c:1327:5: sparse: symbol 'dw_mci_prepare_hs400_tuning' was not declared. Should it be static?
+   drivers/mmc/host/dw_mmc.c:2913:1: sparse: symbol '__UNIQUE_ID_author__COUNTER__' has multiple initializers (originally initialized at drivers/mmc/host/dw_mmc.c:2912)
+
+Please review and possibly fold the followup patch.
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+http://lists.01.org/mailman/listinfo/kbuild                 Intel Corporation
