@@ -1,61 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 05 Mar 2015 11:59:48 +0000
-Subject: [PATCH v3 4/5] irqchip: gicv3-its: define macros for GITS_CTLR
- fields
-In-Reply-To: <1425439098-10708-5-git-send-email-wuyun.wu@huawei.com>
-References: <1425439098-10708-1-git-send-email-wuyun.wu@huawei.com>
- <1425439098-10708-5-git-send-email-wuyun.wu@huawei.com>
-Message-ID: <54F84534.3000900@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 5 Mar 2015 12:03:20 +0000
+Subject: [PATCH REPOST 0/2] Remove pl011 startup glitches and avoid dummy
+ TX during startup
+In-Reply-To: <54F73650.2070304@arm.com>
+References: <1425472054-7543-1-git-send-email-Dave.Martin@arm.com>
+ <54F73650.2070304@arm.com>
+Message-ID: <20150305120320.GB3612@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/15 03:18, Yun Wu wrote:
-> Define macros for GITS_CTLR fields to avoid using magic numbers.
+On Wed, Mar 04, 2015 at 04:44:00PM +0000, Andre Przywara wrote:
+> Hi Dave,
 > 
-> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
+> On 04/03/15 12:27, Dave P Martin wrote:
+> > There have been no comments on this series since my previous post, and
+> > I have made no further changes.
+> > 
+> > Since then, I have confirmed that this also works robustly with TX DMA
+> > enabled on Juno.
+> > 
+> > Review/comments/testing still welcome.
+> 
+> this has been tested briefly on a Calxeda Midway without any
+> regressions. Also I use them as the base for my SBSA series now (which
+> are tested on the model and the Midway) and I see that all problems
+> observed before are gone now.
+> 
+> Tested-by: Andre Przywara <andre.przywara@arm.com>
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Thanks -- should I take that for both patches?
 
-	M.
-
-> ---
->  drivers/irqchip/irq-gic-v3-its.c   | 2 +-
->  include/linux/irqchip/arm-gic-v3.h | 3 +++
->  2 files changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index e8bda0b..d13c24e 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1388,7 +1388,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
->  	writeq_relaxed(baser, its->base + GITS_CBASER);
->  	tmp = readq_relaxed(its->base + GITS_CBASER);
->  	writeq_relaxed(0, its->base + GITS_CWRITER);
-> -	writel_relaxed(1, its->base + GITS_CTLR);
-> +	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
-> 
->  	if ((tmp ^ baser) & GITS_BASER_SHAREABILITY_MASK) {
->  		pr_info("ITS: using cache flushing for cmd queue\n");
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index 3459b43..c9d3002 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -134,6 +134,9 @@
-> 
->  #define GITS_TRANSLATER			0x10040
-> 
-> +#define GITS_CTLR_ENABLE		(1U << 0)
-> +#define GITS_CTLR_QUIESCENT		(1U << 31)
-> +
->  #define GITS_TYPER_DEVBITS_SHIFT	13
->  #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
->  #define GITS_TYPER_PTA			(1UL << 19)
-> --
-> 1.8.0
-> 
-> 
-> 
-
-
--- 
-Jazz is not dead. It just smells funny...
+Cheers
+---Dave
