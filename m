@@ -1,49 +1,65 @@
-From: fabrice.gasnier@st.com (Fabrice GASNIER)
-Date: Thu,  5 Mar 2015 14:05:06 +0100
-Subject: [PATCH v2] ARM: STi: Add STiH410 SoC support
-Message-ID: <1425560706-22907-1-git-send-email-fabrice.gasnier@st.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 5 Mar 2015 14:08:43 +0100
+Subject: [PATCH v3 5/9] mtd: pxa3xx_nand: add support for the Marvell
+ Berlin nand controller
+In-Reply-To: <20150305140000.39081aa8@free-electrons.com>
+References: <1425555085-29531-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1425555085-29531-6-git-send-email-antoine.tenart@free-electrons.com>
+ <20150305140000.39081aa8@free-electrons.com>
+Message-ID: <20150305130843.GC5265@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to STiH410 SoC.
+Thomas,
 
-Please note "st,stih410" is already present in device tree.
-The problem is that it is missing the entry in the match table,
-and so the L2 cache and other cpus than 0 don't get initialized.
+On Thu, Mar 05, 2015 at 02:00:00PM +0100, Thomas Petazzoni wrote:
+> On Thu,  5 Mar 2015 12:31:21 +0100, Antoine Tenart wrote:
+> 
+> >  struct pxa3xx_nand_host {
+> > @@ -253,6 +258,12 @@ static struct pxa3xx_nand_flash builtin_flash_types[] = {
+> >  { "512MiB 8-bit",  0xdc2c,  64, 2048,  8,  8, 4096 },
+> >  { "512MiB 16-bit", 0xcc2c,  64, 2048, 16, 16, 4096 },
+> >  { "256MiB 16-bit", 0xba20,  64, 2048, 16, 16, 2048 },
+> > +{ }
+> > +};
+> > +
+> > +static struct pxa3xx_nand_flash berlin_builtin_flash_types[] = {
+> > +{ "4GiB 8-bit",    0xd7ec, 128, 8192,  8,  8, 4096 },
+> > +{ },
+> 
+> This looks fishy. You know have two different definitions for the exact
+> same chip_id. In the builtin_flash_types[] array:
+> 
+> { "4GiB 8-bit",    0xd7ec, 128, 4096,  8,  8, 8192 },
+> 
+> and in your new berlin_builtin_flash_types[] array:
+> 
+> { "4GiB 8-bit",    0xd7ec, 128, 8192,  8,  8, 4096 },
+> 
+> So you have twice a big pages, and twice as less blocks. Are you sure
+> about your definition of the 0xd7ec NAND chip_id ?
+> 
+> Why cannot you use the same data for both the Berlin platform and the
+> platforms already supported by the driver? Are you sure your NAND isn't
+> using 4k pages ? Or maybe the 0xd7ec entry in builtin_flash_types[] is
+> incorrect?
+> 
+> Or maybe like
+> http://lists.infradead.org/pipermail/linux-mtd/2010-June/031159.html,
+> the NAND chip_id is the same, but the NAND ext id is different.
+> 
+> Is there no common NAND mechanism to handle this, rather than having
+> this specifically in the driver?
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
----
- Documentation/devicetree/bindings/arm/sti.txt | 4 ++++
- arch/arm/mach-sti/board-dt.c                  | 1 +
- 2 files changed, 5 insertions(+)
+I totally agree, this is one more thing wrong with this driver. Using a
+ext id would solve the issue here.
 
-diff --git a/Documentation/devicetree/bindings/arm/sti.txt b/Documentation/devicetree/bindings/arm/sti.txt
-index d70ec35..8d27f6b 100644
---- a/Documentation/devicetree/bindings/arm/sti.txt
-+++ b/Documentation/devicetree/bindings/arm/sti.txt
-@@ -13,6 +13,10 @@ Boards with the ST STiH407 SoC shall have the following properties:
- Required root node property:
- compatible = "st,stih407";
- 
-+Boards with the ST STiH410 SoC shall have the following properties:
-+Required root node property:
-+compatible = "st,stih410";
-+
- Boards with the ST STiH418 SoC shall have the following properties:
- Required root node property:
- compatible = "st,stih418";
-diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
-index b067390..b373aca 100644
---- a/arch/arm/mach-sti/board-dt.c
-+++ b/arch/arm/mach-sti/board-dt.c
-@@ -18,6 +18,7 @@ static const char *stih41x_dt_match[] __initdata = {
- 	"st,stih415",
- 	"st,stih416",
- 	"st,stih407",
-+	"st,stih410",
- 	"st,stih418",
- 	NULL
- };
+If a NULL table is given to the nand_get_flash_type() function, then the
+nand_flash_ids is used. This should be handled this way.
+
+Antoine
+
 -- 
-1.9.1
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
