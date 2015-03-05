@@ -1,75 +1,77 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 5 Mar 2015 15:03:32 +0800
-Subject: [PATCH v9 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <12535711.Yi1RhU69kM@vostro.rjw.lan>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <12535711.Yi1RhU69kM@vostro.rjw.lan>
-Message-ID: <54F7FFC4.9070107@huawei.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 5 Mar 2015 08:12:52 +0100
+Subject: [PATCH v7 1/8] ARM: dt: Binding documentation for imx25 ADC/TSC
+In-Reply-To: <2620642.Qp1W4O8uh6@wuerfel>
+References: <1425369498-25541-1-git-send-email-mpa@pengutronix.de>
+ <1425369498-25541-2-git-send-email-mpa@pengutronix.de>
+ <2620642.Qp1W4O8uh6@wuerfel>
+Message-ID: <20150305071252.GA8062@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/5 6:56, Rafael J. Wysocki wrote:
-> On Wednesday, February 25, 2015 04:39:40 PM Hanjun Guo wrote:
->> Changes since v8:
->>   - remove MPIDR packing things by introducing phys_cpuid_t;
->>
->>   - update patch acpi: fix acpi_os_ioremap for arm64 to follow
->>     Rafael's suggestion;
->>
->>   - Squash patch (disable ACPI if ACPI less than 5.1) to patch
->>     (Get RSDP and ACPI boot-time table);
->>
->>   - Move sleep_arm.c to arch/arm64/ and rename it as acpi_sleep.c 
->>
->>   - Rework the uefi generated empty dtb to enable acpi when no dtb
->>     is available, thanks Ard for the updated patch.
->>
->>   - rework the function of register cpu for kexec case
->>
->>   - use pr_debug() instead of pr_info() when scanning MADT.
->>
->>   - rebase on top of 4.0-rc1
->>
->> Thanks
->> Hanjun
->>
->> Al Stone (4):
->>   ARM64 / ACPI: Get RSDP and ACPI boot-time tables
->>   ARM64 / ACPI: Introduce early_param "acpi=" to enable/disable ACPI
->>   ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on
->>     ARM64
->>   ARM64 / ACPI: additions of ACPI documentation for arm64
->>
->> Graeme Gregory (6):
->>   ACPI: add arm64 to the platforms that use ioremap
->>   ACPI / sleep: Introduce arm64 specific acpi_sleep.c
->>   ARM64 / ACPI: If we chose to boot from acpi then disable FDT
->>   ARM64 / ACPI: Get PSCI flags in FADT for PSCI init
->>   ARM64 / ACPI: Enable ARM64 in Kconfig
->>   Documentation: ACPI for ARM64
->>
->> Hanjun Guo (8):
->>   ACPI / table: Use pr_debug() instead of pr_info() for MADT table
->>     scanning
->>   ACPI / processor: Introduce phys_cpuid_t for CPU hardware ID
->>   ARM64 / ACPI: Introduce PCI stub functions for ACPI
->>   ACPI / table: Print GIC information when MADT is parsed
->>   ARM64 / ACPI: Parse MADT for SMP initialization
->>   ACPI / processor: Make it possible to get CPU hardware ID via GICC
->>   ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and register device's gsi
->>   clocksource / arch_timer: Parse GTDT to initialize arch timer
->>
->> Mark Salter (2):
->>   ARM64: allow late use of early_ioremap
->>   ACPI: fix acpi_os_ioremap for arm64
->>
->> Tomasz Nowicki (1):
->>   irqchip: Add GICv2 specific ACPI boot support
-> I've ACKed or commented the ones relevant for me.  As for the ARM64-specific
-> code, I don't think I can give any meaningful input.
+Hi,
 
-Hi Rafael, thank you very much for the ACKs and review comments, I will
-wait for other maintainers comments and then update this patch set.
+On Tue, Mar 03, 2015 at 10:02:12AM +0100, Arnd Bergmann wrote:
+> On Tuesday 03 March 2015 08:58:11 Markus Pargmann wrote:
+> > +Example:
+> > +       tscadc: tscadc at 50030000 {
+> > +               compatible = "fsl,imx25-tsadc";
+> > +               reg = <0x50030000 0xc>;
+> > +               interrupts = <46>;
+> > +               clocks = <&clks 119>;
+> > +               clock-names = "ipg";
+> > +               interrupt-controller;
+> > +               #interrupt-cells = <1>;
+> > +               #address-cells = <1>;
+> > +               #size-cells = <1>;
+> > +               ranges;
+> > +
+> > +               tsc: tcq at 50030400 {
+> > +                       compatible = "fsl,imx25-tcq";
+> > +                       reg = <0x50030400 0x60>;
+> > +                       ...
+> > +               };
+> > +
+> > +               adc: gcq at 50030800 {
+> > +                       compatible = "fsl,imx25-gcq";
+> > +                       reg = <0x50030800 0x60>;
+> > +                       ...
+> > +               };
+> > +       };
+> > 
+> 
+> I wonder if we should just treat this MFD as a single IIO device
+> that also registers to the input layer.
+> 
+> Are there any other registers in the 0x50030000-0x50031000
+> range, or could the fsl,imx25-tcq and fsl,imx25-gcq devices
+> be reused outside of a fsl,imx25-tsadc device?
 
-Regards
-Hanjun
+There are no other registers in this range. The tcq and gcq devices can
+not be used outside of the tsadc. gcq and tcq are identical units so it
+may work to use both of them as gcq for example but nothing else.
+
+It may work to have this as single IIO device. However this would be a
+major rework of this series. There are a lot less users of imx25 than
+imx6 for example. And of these users barely anyone uses this unit at
+all. I really would like to get these drivers mainline so others can use
+it. But after 1 year and 7 versions of this series I don't want to put
+a lot of work into these drivers. I think there are other components in
+the kernel where the time is better used.
+
+Best Regards,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150305/95f068cb/attachment.sig>
