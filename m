@@ -1,60 +1,144 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 5 Mar 2015 09:27:20 +0900
-Subject: [PATCH 1/2] ARM: shmobile: Enable bockw board in multiplatform
- defconfig
-In-Reply-To: <1425471261-25110-2-git-send-email-geert+renesas@glider.be>
-References: <1425471261-25110-1-git-send-email-geert+renesas@glider.be>
- <1425471261-25110-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150305002717.GA4558@verge.net.au>
+From: rjui@broadcom.com (Ray Jui)
+Date: Wed, 4 Mar 2015 16:35:49 -0800
+Subject: [PATCH v5 1/8] pinctrl: bcm: consolidate Broadcom pinctrl drivers
+In-Reply-To: <1425515756-321-1-git-send-email-rjui@broadcom.com>
+References: <1425515756-321-1-git-send-email-rjui@broadcom.com>
+Message-ID: <1425515756-321-2-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 01:14:20PM +0100, Geert Uytterhoeven wrote:
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->   - Derived from r8a7778-bockw.dtb using
->     https://github.com/geertu/linux-scripts/blob/master/linux-config-from-dt
->   - Not tested on bockw due to lack of hardware
-> ---
->  arch/arm/configs/shmobile_defconfig | 3 +++
->  1 file changed, 3 insertions(+)
+Consolidate Broadcom pinctrl drivers into drivers/pinctrl/bcm/*
 
-Thanks, I have queued this up.
+Signed-off-by: Ray Jui <rjui@broadcom.com>
+---
+ drivers/pinctrl/Kconfig                      |   19 +------------------
+ drivers/pinctrl/Makefile                     |    3 +--
+ drivers/pinctrl/bcm/Kconfig                  |   21 +++++++++++++++++++++
+ drivers/pinctrl/bcm/Makefile                 |    4 ++++
+ drivers/pinctrl/{ => bcm}/pinctrl-bcm281xx.c |    4 ++--
+ drivers/pinctrl/{ => bcm}/pinctrl-bcm2835.c  |    0
+ 6 files changed, 29 insertions(+), 22 deletions(-)
+ create mode 100644 drivers/pinctrl/bcm/Kconfig
+ create mode 100644 drivers/pinctrl/bcm/Makefile
+ rename drivers/pinctrl/{ => bcm}/pinctrl-bcm281xx.c (99%)
+ rename drivers/pinctrl/{ => bcm}/pinctrl-bcm2835.c (100%)
 
-> 
-> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-> index 11554158fa96ca9c..b58618e2d13c51c8 100644
-> --- a/arch/arm/configs/shmobile_defconfig
-> +++ b/arch/arm/configs/shmobile_defconfig
-> @@ -14,6 +14,7 @@ CONFIG_ARCH_EMEV2=y
->  CONFIG_ARCH_R7S72100=y
->  CONFIG_ARCH_R8A73A4=y
->  CONFIG_ARCH_R8A7740=y
-> +CONFIG_ARCH_R8A7778=y
->  CONFIG_ARCH_R8A7779=y
->  CONFIG_ARCH_R8A7790=y
->  CONFIG_ARCH_R8A7791=y
-> @@ -137,6 +138,7 @@ CONFIG_V4L_MEM2MEM_DRIVERS=y
->  CONFIG_VIDEO_RENESAS_VSP1=y
->  # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
->  CONFIG_VIDEO_ADV7180=y
-> +CONFIG_VIDEO_ML86V7667=y
->  CONFIG_DRM=y
->  CONFIG_DRM_RCAR_DU=y
->  CONFIG_FB_SH_MOBILE_LCDC=y
-> @@ -171,6 +173,7 @@ CONFIG_LEDS_GPIO=y
->  CONFIG_RTC_CLASS=y
->  CONFIG_RTC_DRV_RS5C372=y
->  CONFIG_RTC_DRV_S35390A=y
-> +CONFIG_RTC_DRV_RX8581=y
->  CONFIG_DMADEVICES=y
->  CONFIG_SH_DMAE=y
->  CONFIG_RCAR_DMAC=y
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index ee9f44a..1a9143d 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -67,24 +67,6 @@ config PINCTRL_AT91
+ 	help
+ 	  Say Y here to enable the at91 pinctrl driver
+ 
+-config PINCTRL_BCM2835
+-	bool
+-	select PINMUX
+-	select PINCONF
+-
+-config PINCTRL_BCM281XX
+-	bool "Broadcom BCM281xx pinctrl driver"
+-	depends on OF && (ARCH_BCM_MOBILE || COMPILE_TEST)
+-	select PINMUX
+-	select PINCONF
+-	select GENERIC_PINCONF
+-	select REGMAP_MMIO
+-	help
+-	  Say Y here to support Broadcom BCM281xx pinctrl driver, which is used
+-	  for the BCM281xx SoC family, including BCM11130, BCM11140, BCM11351,
+-	  BCM28145, and BCM28155 SoCs.  This driver requires the pinctrl
+-	  framework.  GPIO is provided by a separate GPIO driver.
+-
+ config PINCTRL_LANTIQ
+ 	bool
+ 	depends on LANTIQ
+@@ -207,6 +189,7 @@ config PINCTRL_ZYNQ
+ 	help
+ 	  This selectes the pinctrl driver for Xilinx Zynq.
+ 
++source "drivers/pinctrl/bcm/Kconfig"
+ source "drivers/pinctrl/berlin/Kconfig"
+ source "drivers/pinctrl/freescale/Kconfig"
+ source "drivers/pinctrl/intel/Kconfig"
+diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+index 0475206..c14ce05 100644
+--- a/drivers/pinctrl/Makefile
++++ b/drivers/pinctrl/Makefile
+@@ -14,8 +14,6 @@ obj-$(CONFIG_PINCTRL_AS3722)	+= pinctrl-as3722.o
+ obj-$(CONFIG_PINCTRL_BF54x)	+= pinctrl-adi2-bf54x.o
+ obj-$(CONFIG_PINCTRL_BF60x)	+= pinctrl-adi2-bf60x.o
+ obj-$(CONFIG_PINCTRL_AT91)	+= pinctrl-at91.o
+-obj-$(CONFIG_PINCTRL_BCM2835)	+= pinctrl-bcm2835.o
+-obj-$(CONFIG_PINCTRL_BCM281XX)	+= pinctrl-bcm281xx.o
+ obj-$(CONFIG_PINCTRL_FALCON)	+= pinctrl-falcon.o
+ obj-$(CONFIG_PINCTRL_MESON)	+= meson/
+ obj-$(CONFIG_PINCTRL_PALMAS)	+= pinctrl-palmas.o
+@@ -38,6 +36,7 @@ obj-$(CONFIG_PINCTRL_TB10X)	+= pinctrl-tb10x.o
+ obj-$(CONFIG_PINCTRL_ST) 	+= pinctrl-st.o
+ obj-$(CONFIG_PINCTRL_ZYNQ)	+= pinctrl-zynq.o
+ 
++obj-$(CONFIG_ARCH_BCM)		+= bcm/
+ obj-$(CONFIG_ARCH_BERLIN)	+= berlin/
+ obj-y				+= freescale/
+ obj-$(CONFIG_X86)		+= intel/
+diff --git a/drivers/pinctrl/bcm/Kconfig b/drivers/pinctrl/bcm/Kconfig
+new file mode 100644
+index 0000000..bc6d048
+--- /dev/null
++++ b/drivers/pinctrl/bcm/Kconfig
+@@ -0,0 +1,21 @@
++#
++# Broadcom pinctrl drivers
++#
++
++config PINCTRL_BCM281XX
++	bool "Broadcom BCM281xx pinctrl driver"
++	depends on OF && (ARCH_BCM_MOBILE || COMPILE_TEST)
++	select PINMUX
++	select PINCONF
++	select GENERIC_PINCONF
++	select REGMAP_MMIO
++	help
++	  Say Y here to support Broadcom BCM281xx pinctrl driver, which is used
++	  for the BCM281xx SoC family, including BCM11130, BCM11140, BCM11351,
++	  BCM28145, and BCM28155 SoCs.  This driver requires the pinctrl
++	  framework.  GPIO is provided by a separate GPIO driver.
++
++config PINCTRL_BCM2835
++	bool
++	select PINMUX
++	select PINCONF
+diff --git a/drivers/pinctrl/bcm/Makefile b/drivers/pinctrl/bcm/Makefile
+new file mode 100644
+index 0000000..7ba80a3
+--- /dev/null
++++ b/drivers/pinctrl/bcm/Makefile
+@@ -0,0 +1,4 @@
++# Broadcom pinctrl support
++
++obj-$(CONFIG_PINCTRL_BCM281XX)	+= pinctrl-bcm281xx.o
++obj-$(CONFIG_PINCTRL_BCM2835)	+= pinctrl-bcm2835.o
+diff --git a/drivers/pinctrl/pinctrl-bcm281xx.c b/drivers/pinctrl/bcm/pinctrl-bcm281xx.c
+similarity index 99%
+rename from drivers/pinctrl/pinctrl-bcm281xx.c
+rename to drivers/pinctrl/bcm/pinctrl-bcm281xx.c
+index b88cfe5..9641f1c 100644
+--- a/drivers/pinctrl/pinctrl-bcm281xx.c
++++ b/drivers/pinctrl/bcm/pinctrl-bcm281xx.c
+@@ -21,8 +21,8 @@
+ #include <linux/pinctrl/pinconf-generic.h>
+ #include <linux/regmap.h>
+ #include <linux/slab.h>
+-#include "core.h"
+-#include "pinctrl-utils.h"
++#include "../core.h"
++#include "../pinctrl-utils.h"
+ 
+ /* BCM281XX Pin Control Registers Definitions */
+ 
+diff --git a/drivers/pinctrl/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+similarity index 100%
+rename from drivers/pinctrl/pinctrl-bcm2835.c
+rename to drivers/pinctrl/bcm/pinctrl-bcm2835.c
+-- 
+1.7.9.5
