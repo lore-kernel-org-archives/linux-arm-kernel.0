@@ -1,76 +1,78 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Mar 2015 16:32:27 +0000
-Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
- IRQF_NO_SUSPEND
-In-Reply-To: <CAJZ5v0h8vn26BeWPVhC4e_KNhBu15-mshnbq0K=OQ1M36vPQEQ@mail.gmail.com>
-References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
- <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
- <20150304183809.GD22156@leverpostej>
- <14143668.0aRkeVrc3Q@vostro.rjw.lan>
- <20150305105729.GB13617@leverpostej>
- <CAJZ5v0h8vn26BeWPVhC4e_KNhBu15-mshnbq0K=OQ1M36vPQEQ@mail.gmail.com>
-Message-ID: <20150305163227.GF14093@leverpostej>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 5 Mar 2015 10:38:22 -0600
+Subject: [PATCH] pci: host: xgene: fix incorrectly returned address by
+ map_bus
+In-Reply-To: <20150227002151.GG25765@google.com>
+References: <1424214840-26498-1-git-send-email-fkan@apm.com>
+ <20150227002151.GG25765@google.com>
+Message-ID: <20150305163822.GA3048@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+[+cc Mark]
 
-> enable_irq_wake() has no effect on IRQF_NO_SUSPEND interrupts, so if the
-> driver uses IRQF_NO_SUSPEND, it does not need to use enable_irq_wake()
-> in addition to that.
-
-That's not generally true -- certainly not for irq_chips without the
-IRQCHIP_SKIP_SET_WAKE flag.
-
-Consider systems where the suspended state results in power to the CPU
-being cut, and we rely on an external piece of logic attached to the
-irq_chip to detect wakeup IRQs and restore power.
-
-In those cases irq_chip::irq_set_wake() must be called to ensure that
-the wakeup logic is configured. If the wakeup logic is not configured to
-look out for an IRQ, then when the IRQ is asserted by a device the
-wakeup logic may not trigger. Thus the CPU power never gets restored, so
-the CPU cannot handle the interrupt.
-
-This is handled in enable_irq_wake() -- either the chip has the
-IRQCHIP_SKIP_SET_WAKE flag set or chip->irq_set_wake() must succeed. If
-neither is true enable_irq_wake() will return an error code to indicate
-we can't use the IRQ for wakeup.
-
-The request_irq path never results in a call to chip->irq_set_wake(),
-even with the IRQF_NO_SUSPEND flag. So requesting an irq with
-IRQF_NO_SUSPEND does not guarantee wakeup; it only guarantees that the
-CPU can take the interrupt _around_ the suspended state, not necessarily
-while _in_ the suspended state.
-
-> Drivers using IRQF_COND_SUSPEND generally should use enable_irq_wake() too
-> in case they end up in a situation without sharing a NO_SUSPEND interrupt, in
-> which case their interrupt handlers won't be called after suspend_device_irqs(),
-> so they need to rely on the core to do the wakeup.
+On Thu, Feb 26, 2015 at 06:21:51PM -0600, Bjorn Helgaas wrote:
+> On Tue, Feb 17, 2015 at 03:14:00PM -0800, Feng Kan wrote:
+> > The generic accessor functions for pci-xgene uses map_bus
+> > call that returns the base address but did not add the additional
+> > offset.
+> > 
+> > Signed-off-by: Feng Kan <fkan@apm.com>
+> > ---
+> >  drivers/pci/host/pci-xgene.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> > index aab5547..ee082c0 100644
+> > --- a/drivers/pci/host/pci-xgene.c
+> > +++ b/drivers/pci/host/pci-xgene.c
+> > @@ -127,7 +127,7 @@ static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
+> >  	return false;
+> >  }
+> >  
+> > -static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+> > +static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+> >  			      int offset)
+> >  {
+> >  	struct xgene_pcie_port *port = bus->sysdata;
+> > @@ -137,7 +137,7 @@ static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+> >  		return NULL;
+> >  
+> >  	xgene_pcie_set_rtdid_reg(bus, devfn);
+> > -	return xgene_pcie_get_cfg_base(bus);
+> > +	return xgene_pcie_get_cfg_base(bus) + offset;
 > 
-> > I agree that if problematic, it's an existing bug. Given Boris's
-> > comments in the other thread this may just a minor semantic issue w.r.t.
-> > IRQF_NO_SUSPEND vs IRQF_COND_SUSPEND.
+> Where's the locking here?  ECAM doesn't need locking because the
+> bus/dev/fn/offset is all encoded in the MMIO address.  But it looks
+> like X-Gene doesn't work that way and bus/dev/fn is in the RTDID register.
 > 
-> It depends on whether or not the watchdog's interrupt handler has to be
-> called immediately after receiving an interrupt (IRQF_NO_SUSPEND is
-> better then) or it can be deferred till the resume_device_irqs() time.
+> So it seems like X-Gene needs locking that not everybody needs.  Are you
+> relying on higher-level locking somewhere?
 
-We seem to be conflating some related properties:
+Ping, what's going on here?  I've gotten at least three patches for this
+offset issue, so we need to get it resolved.
 
-[a] The IRQ will be left unmasked.
-[b] The IRQ will be handled immediately when taken.
-[c] The IRQ will wake the system from suspend.
+If there's no locking problem, I can just apply this and we'll be finished.
+Actually, I think Mark's patch is better, because it correctly returns NULL
+(failure) if xgene_pcie_get_cfg_base() fails.  So please review and ack
+that one or explain why this one is better.
 
-Requesting an IRQ with IRQF_NO_SUSPEND guarantees [a,b], but does not
-guarantee [c].
+But if there *is* a locking problem, we should fix that, too.  That should
+be a separate patch, so I guess I can apply the one to fix the offset
+problem first, and we'll at least be no worse off with respect to locking
+than we are today.
 
-A successful enable_irq_wake() on an IRQ guarantees [a,c], but usually
-does not give [b] unless the IRQ was requested with IRQF_COND_SUSPEND
-and happens to be shared with an IRQF_NO_SUSPEND user.
+Please help me out.
 
-It sounds like for this kind of watchdog device we want [a,b,c], even if
-the IRQ is not shared with an IRQF_NO_SUSPEND user.
+Bjorn
 
-Thanks,
-Mark.
+> >  }
+> >  
+> >  static struct pci_ops xgene_pcie_ops = {
+> > -- 
+> > 1.9.1
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
