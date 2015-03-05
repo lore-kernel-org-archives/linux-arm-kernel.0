@@ -1,77 +1,44 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Thu, 05 Mar 2015 13:26:39 +0100
-Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
- uncached guest mappings
-In-Reply-To: <20150305120348.GD7712@e104818-lin.cambridge.arm.com>
-References: <CAKv+Gu8OUtcpaQh5+gb6vNrdi+Q7eu_zKOujmyoRPrzrs+GJVQ@mail.gmail.com>
- <20150304122956.GT28951@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
- <20150304141212.GA5352@hawk.usersys.redhat.com>
- <20150304142943.GU28951@e104818-lin.cambridge.arm.com>
- <54F73ACF.1090605@redhat.com>
- <20150304172855.GA28951@e104818-lin.cambridge.arm.com>
- <54F82C06.2000701@redhat.com>
- <20150305110415.GA7712@e104818-lin.cambridge.arm.com>
- <CAFEAcA98j_EsP4Hy20tQCKdnP3=NuvS3Ona37peBjan8aWLSEA@mail.gmail.com>
- <20150305120348.GD7712@e104818-lin.cambridge.arm.com>
-Message-ID: <54F84B7F.5010007@redhat.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 05 Mar 2015 12:29:57 +0000
+Subject: [PATCH 4.0-rc1 v17 5/6] x86/nmi: Use common printk functions
+In-Reply-To: <20150305005424.GA21715@gmail.com>
+References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
+ <1425463974-23568-1-git-send-email-daniel.thompson@linaro.org>
+ <1425463974-23568-6-git-send-email-daniel.thompson@linaro.org>
+ <20150305005424.GA21715@gmail.com>
+Message-ID: <1425558597.2769.53.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 05/03/2015 13:03, Catalin Marinas wrote:
->> > 
->> > I'd hate to have to do that. PCI should be entirely probeable
->> > given that we tell the guest where the host bridge is, that's
->> > one of its advantages.
-> I didn't say a DT node per device, the DT doesn't know what PCI devices
-> are available (otherwise it defeats the idea of probing). But we need to
-> tell the OS where the host bridge is via DT.
+On Thu, 2015-03-05 at 01:54 +0100, Ingo Molnar wrote:
+> * Daniel Thompson <daniel.thompson@linaro.org> wrote:
 > 
-> So the guest would be told about two host bridges: one for real devices
-> and another for virtual devices. These can have different coherency
-> properties.
+> > Much of the code sitting in arch/x86/kernel/apic/hw_nmi.c to support 
+> > safe all-cpu backtracing from NMI has been copied to printk.c to 
+> > make it accessible to other architectures.
+> > 
+> > Port the x86 NMI backtrace to the generic code.
+> 
+> Is there any difference between the generic and the x86 code as they 
+> stand today?
 
-Yeah, and it would suck that the user needs to know the difference
-between the coherency proprties of the host bridges.
+Shouldn't be any user observable change but there are some changes,
+mostly due to review comments.
 
-It would especially suck if the user has a cluster with different
-machines, some of them coherent and others non-coherent, and then has to
-debug why the same configuration works on some machines and not on others.
+1. The seq_buf structures are initialized at boot and *after* they
+   are consumed (originally they were initialized just before use).
+
+2. The generic code doesn't maintain an equivalent of backtrace_mask
+   (which was essentially a copy of cpus_online made when backtracing
+   was requested) and instead iterates using for_each_possible_cpu()
+   to initialize and dump the seq_buf:s.
 
 
-To avoid replying in two different places, which of the solutions look
-to me like something that half-works?  Pretty much all of them, because
-in the end it is just a processor misfeature.  For example, Intel
-virtualization extensions let the hypervisor override stage1 translation
-_if necessary_.  AMD doesn't, but has some other quirky things that let
-you achieve the same effect..
+Daniel.
 
-In particular, I am not even sure that this is about bus coherency,
-because this problem does not happen when the device is doing bus master
-DMA.  Working around coherency for bus master DMA would be easy.
 
-The problem arises with MMIO areas that the guest can reasonably expect
-to be uncacheable, but that are optimized by the host so that they end
-up backed by cacheable RAM.  It's perfectly reasonable that the same
-device needs cacheable mapping with one userspace, and works with
-uncacheable mapping with another userspace that doesn't optimize the
-MMIO area to RAM.
-
-Currently the VGA framebuffer is the main case where this happen, and I
-don't expect many more.  Because this is not bus master DMA, it's hard
-to find a QEMU API that can be hooked to invalidate the cache.  QEMU is
-just reading from an array of chars.
-
-In practice, the VGA framebuffer has an optimization that uses dirty
-page tracking, so we could piggyback on the ioctls that return which
-pages are dirty.  It turns out that piggybacking on those ioctls also
-should fix the case of migrating a guest while the MMU is disabled.
-
-But it's a hack, and it may not work for other devices.
-
-We could use _DSD to export the device tree property separately for each
-device, but that wouldn't work for hotplugged devices.
-
-Paolo
+PS
+The main piece that git code motion tracking should follow if I squashed
+the generic and x86 patches together would be nmi_vprintk(). I suspect
+most of the rest would be missed as the code copies is in pretty small
+fragments.
