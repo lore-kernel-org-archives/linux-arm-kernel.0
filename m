@@ -1,46 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  5 Mar 2015 11:20:54 +0100
-Subject: [PATCH v3 3/5] clocksource: sun5i: Remove sched_clock
-In-Reply-To: <1425550856-12928-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1425550856-12928-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1425550856-12928-4-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu,  5 Mar 2015 11:20:51 +0100
+Subject: [PATCH v3 0/5] clocksource: sun5i: Support parent clock rate changes
+Message-ID: <1425550856-12928-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's not possible to remove a sched_clock once it has been added, nor is it
-possible to change its rate.
+Hi,
 
-Since we will need to support a rate change, and that we have other
-sched_clocks in the system anyway, remove it.
+The Allwinner HS timers have the AHB clock as their parent
+clock. Since this clock is shared with other devices, we could very
+well have another driver requesting a rate change of that clock,
+making our timer change frequency at the same time.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/clocksource/timer-sun5i.c | 6 ------
- 1 file changed, 6 deletions(-)
+This is especially true on the A31, where the DMA controller needs to
+do such a rate change, making the HS timer unreliable at the time on
+the A31.
 
-diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
-index 2f70ed528174..295bb5e1010c 100644
---- a/drivers/clocksource/timer-sun5i.c
-+++ b/drivers/clocksource/timer-sun5i.c
-@@ -130,11 +130,6 @@ static irqreturn_t sun5i_timer_interrupt(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
--static u64 sun5i_timer_sched_read(void)
--{
--	return ~readl(timer_base + TIMER_CNTVAL_LO_REG(1));
--}
--
- static void __init sun5i_timer_init(struct device_node *node)
- {
- 	struct reset_control *rstc;
-@@ -166,7 +161,6 @@ static void __init sun5i_timer_init(struct device_node *node)
- 	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
- 	       timer_base + TIMER_CTL_REG(1));
- 
--	sched_clock_register(sun5i_timer_sched_read, 32, rate);
- 	clocksource_mmio_init(timer_base + TIMER_CNTVAL_LO_REG(1), node->name,
- 			      rate, 340, 32, clocksource_mmio_readl_down);
- 
+This serie makes some cleanups and implements clock notifiers to be
+able to reflect such rate changes and make sure that the timer is
+always working.
+
+Maxime
+
+Changes from v2:
+  - Rebased on top of v4.0-rc1
+  - Removed the local_irq_save/restore around clockevents_update_freq
+
+Changes from v1:
+  - Changed the interrupt name to its previous value
+
+Maxime Ripard (5):
+  clocksource: sun5i: Switch to request_irq
+  clocksource: sun5i: Use of_io_request_and_map
+  clocksource: sun5i: Remove sched_clock
+  clocksource: sun5i: Refactor the current code
+  clocksource: sun5i: Add clock notifiers
+
+ drivers/clocksource/timer-sun5i.c | 302 ++++++++++++++++++++++++++++----------
+ 1 file changed, 228 insertions(+), 74 deletions(-)
+
 -- 
 2.3.0
