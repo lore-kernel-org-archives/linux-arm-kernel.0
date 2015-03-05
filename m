@@ -1,34 +1,52 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 5 Mar 2015 12:03:20 +0000
-Subject: [PATCH REPOST 0/2] Remove pl011 startup glitches and avoid dummy
- TX during startup
-In-Reply-To: <54F73650.2070304@arm.com>
-References: <1425472054-7543-1-git-send-email-Dave.Martin@arm.com>
- <54F73650.2070304@arm.com>
-Message-ID: <20150305120320.GB3612@e103592.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Mar 2015 12:03:49 +0000
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <CAFEAcA98j_EsP4Hy20tQCKdnP3=NuvS3Ona37peBjan8aWLSEA@mail.gmail.com>
+References: <CAKv+Gu8OUtcpaQh5+gb6vNrdi+Q7eu_zKOujmyoRPrzrs+GJVQ@mail.gmail.com>
+ <20150304122956.GT28951@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
+ <20150304141212.GA5352@hawk.usersys.redhat.com>
+ <20150304142943.GU28951@e104818-lin.cambridge.arm.com>
+ <54F73ACF.1090605@redhat.com>
+ <20150304172855.GA28951@e104818-lin.cambridge.arm.com>
+ <54F82C06.2000701@redhat.com>
+ <20150305110415.GA7712@e104818-lin.cambridge.arm.com>
+ <CAFEAcA98j_EsP4Hy20tQCKdnP3=NuvS3Ona37peBjan8aWLSEA@mail.gmail.com>
+Message-ID: <20150305120348.GD7712@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 04:44:00PM +0000, Andre Przywara wrote:
-> Hi Dave,
+On Thu, Mar 05, 2015 at 08:52:49PM +0900, Peter Maydell wrote:
+> On 5 March 2015 at 20:04, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Thu, Mar 05, 2015 at 11:12:22AM +0100, Paolo Bonzini wrote:
+> >> On 04/03/2015 18:28, Catalin Marinas wrote:
+> >> >> > Can you add that property to the device tree for PCI devices too?
+> >> >
+> >> > Yes but not with mainline yet:
+> >> >
+> >> > http://thread.gmane.org/gmane.linux.kernel.iommu/8935
+> >> >
+> >> > We can add the property at the PCI host bridge level (with the drawback
+> >> > that it covers all the PCI devices), like here:
+> >>
+> >> Even covering all PCI devices is not enough if we want to support device
+> >> assignment of PCI host devices.
+> >
+> > Can we not have another PCI bridge node in the DT for the host device
+> > assignments?
 > 
-> On 04/03/15 12:27, Dave P Martin wrote:
-> > There have been no comments on this series since my previous post, and
-> > I have made no further changes.
-> > 
-> > Since then, I have confirmed that this also works robustly with TX DMA
-> > enabled on Juno.
-> > 
-> > Review/comments/testing still welcome.
-> 
-> this has been tested briefly on a Calxeda Midway without any
-> regressions. Also I use them as the base for my SBSA series now (which
-> are tested on the model and the Midway) and I see that all problems
-> observed before are gone now.
-> 
-> Tested-by: Andre Przywara <andre.przywara@arm.com>
+> I'd hate to have to do that. PCI should be entirely probeable
+> given that we tell the guest where the host bridge is, that's
+> one of its advantages.
 
-Thanks -- should I take that for both patches?
+I didn't say a DT node per device, the DT doesn't know what PCI devices
+are available (otherwise it defeats the idea of probing). But we need to
+tell the OS where the host bridge is via DT.
 
-Cheers
----Dave
+So the guest would be told about two host bridges: one for real devices
+and another for virtual devices. These can have different coherency
+properties.
+
+-- 
+Catalin
