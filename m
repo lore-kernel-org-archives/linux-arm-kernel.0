@@ -1,29 +1,26 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 5 Mar 2015 01:48:01 +0100
-Subject: [PATCH v3 3/6] Documentation: DT: Document twl4030-madc-battery
- bindings
-In-Reply-To: <1423088075-10025-4-git-send-email-marek@goldelico.com>
-References: <1423088075-10025-1-git-send-email-marek@goldelico.com>
- <1423088075-10025-4-git-send-email-marek@goldelico.com>
-Message-ID: <20150305004801.GC1033@earth>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 5 Mar 2015 01:54:24 +0100
+Subject: [PATCH 4.0-rc1 v17 5/6] x86/nmi: Use common printk functions
+In-Reply-To: <1425463974-23568-6-git-send-email-daniel.thompson@linaro.org>
+References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
+ <1425463974-23568-1-git-send-email-daniel.thompson@linaro.org>
+ <1425463974-23568-6-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <20150305005424.GA21715@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Wed, Feb 04, 2015 at 11:14:32PM +0100, Marek Belisko wrote:
-> + - volt-to-capacity-charging-map : list of voltage(mV):level(%) values
-> +	for charging calibration (see example)
-> + - volt-to-capacity-discharging-map : list of voltage(mV):level(%) values
-> +	for discharging calibration (see example)
+* Daniel Thompson <daniel.thompson@linaro.org> wrote:
 
-Please prefix these properties with "ti,"
+> Much of the code sitting in arch/x86/kernel/apic/hw_nmi.c to support 
+> safe all-cpu backtracing from NMI has been copied to printk.c to 
+> make it accessible to other architectures.
+> 
+> Port the x86 NMI backtrace to the generic code.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150305/a03a99da/attachment.sig>
+Is there any difference between the generic and the x86 code as they 
+stand today?
+
+Thanks,
+
+	Ingo
