@@ -1,31 +1,37 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 5 Mar 2015 07:13:29 -0600
-Subject: [PATCH 2/4] ARM: OMAP2+: AM43xx hwmod: Add RTC hwmod for AM43xx
-In-Reply-To: <1425561211-31003-1-git-send-email-d-gerlach@ti.com>
-References: <1425561211-31003-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1425561211-31003-3-git-send-email-d-gerlach@ti.com>
+Date: Thu, 5 Mar 2015 07:13:27 -0600
+Subject: [PATCH 0/4] Add AM437x RTC
+Message-ID: <1425561211-31003-1-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RTC hwmod is needed for proper operation of PM features like
-rtcwake and rtc-only mode so reuse the am33xx rtc hwmod.
+Hi,
+This series adds support for the rtc on am437x, as previously the hwmod
+and dt entries were missing. The am43x-epos-evm requires special treatment
+because the RTC gets disabled in hardware with no way to tell through
+software so we add a ti,no-init dt flag for the hwmod layer so we can
+avoid writing to the SYSCONFIG register and triggering an external abort.
+If we use this flag for the am43x-epos-evm we can add the rtc as normal
+to am437x-gp-evm. am437x-sk-evm already has the required dt entry in place. 
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 1 +
- 1 file changed, 1 insertion(+)
+Regards,
+Dave
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-index 8eb8592..9070535 100644
---- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-@@ -889,6 +889,7 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
- 	&am43xx_l4_ls__dss,
- 	&am43xx_l4_ls__dss_dispc,
- 	&am43xx_l4_ls__dss_rfbi,
-+	&am33xx_l4_wkup__rtc,
- 	NULL,
- };
- 
+Dave Gerlach (3):
+  ARM: OMAP2+: omap_hwmod: Introduce ti,no-init dt property
+  ARM: OMAP2+: AM43xx hwmod: Add RTC hwmod for AM43xx
+  ARM: dts: am43x-epos-evm: Add rtc node with ti,no-init property
+
+Keerthy (1):
+  ARM: dts: am437x-gp-evm: Enable RTC
+
+ Documentation/devicetree/bindings/arm/omap/omap.txt | 2 ++
+ arch/arm/boot/dts/am437x-gp-evm.dts                 | 4 ++++
+ arch/arm/boot/dts/am43x-epos-evm.dts                | 4 ++++
+ arch/arm/mach-omap2/omap_hwmod.c                    | 7 ++++++-
+ arch/arm/mach-omap2/omap_hwmod.h                    | 4 ++++
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c          | 1 +
+ 6 files changed, 21 insertions(+), 1 deletion(-)
+
 -- 
 2.3.0
