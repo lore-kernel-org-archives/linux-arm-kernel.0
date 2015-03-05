@@ -1,129 +1,107 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 4 Mar 2015 20:22:04 -0600
-Subject: [PATCH 2/2] pinctrl: Introduce TI IOdelay configuration driver
-In-Reply-To: <20150304225857.GC13520@atomide.com>
-References: <1425427237-11511-1-git-send-email-nm@ti.com>
- <1425427237-11511-3-git-send-email-nm@ti.com>
- <1425509926.2090.56.camel@tiscali.nl> <20150304225857.GC13520@atomide.com>
-Message-ID: <54F7BDCC.8030602@ti.com>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Thu, 5 Mar 2015 10:43:21 +0800
+Subject: [PATCH] clk: mediatek: Export CPU mux clocks for CPU frequency
+ control
+In-Reply-To: <20150304112109.GB11010@pengutronix.de>
+References: <1425466152-7867-1-git-send-email-pi-cheng.chen@linaro.org>
+ <20150304112109.GB11010@pengutronix.de>
+Message-ID: <CALx668WKKmifhuODsV+Uaoq4ggcmB1=wbpLzXBnjEtxbuB4qig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2015 04:58 PM, Tony Lindgren wrote:
-> * Paul Bolle <pebolle@tiscali.nl> [150304 14:58]:
->> Nishanth Menon schreef op di 03-03-2015 om 18:00 [-0600]:
->>> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
->>> index ee9f44ad7f02..8e463d75fbb2 100644
->>> --- a/drivers/pinctrl/Kconfig
->>> +++ b/drivers/pinctrl/Kconfig
->>> @@ -160,6 +160,17 @@ config PINCTRL_TEGRA_XUSB
->>>  	select PINCONF
->>>  	select PINMUX
->>>  
->>> +config PINCTRL_TI_IODELAY
->>> +	bool "TI IODelay Module pinconf driver"
->>
->> This adds a boolean Kconfig symbol.
+Hi Sascha,
 
-Uggh.. thanks for the review and catching this..
+On 4 March 2015 at 19:21, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Wed, Mar 04, 2015 at 06:49:11PM +0800, pi-cheng.chen wrote:
+>> This patch adds CPU mux clocks which are used by Mediatek cpufreq driver
+>> for intermediate clock source switching. This patch is based on Mediatek
+>> clock driver patches[1].
+>>
+>> [1] http://thread.gmane.org/gmane.linux.kernel/1892436
+>>
+>> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
+>> ---
+>> +static long clk_cpumux_determine_rate(struct clk_hw *hw, unsigned long rate,
+>> +                                   unsigned long min_rate,
+>> +                                   unsigned long max_rate,
+>> +                                   unsigned long *best_parent_rate,
+>> +                                   struct clk_hw **best_parent_p)
+>> +{
+>> +     struct clk *clk = hw->clk, *parent;
+>> +     unsigned long parent_rate;
+>> +     int i;
+>> +
+>> +     for (i = MAINPLL_INDEX; i >= ARMPLL_INDEX; i--) {
+>> +             parent = clk_get_parent_by_index(clk, i);
+>> +             if (!parent)
+>> +                     return 0;
+>> +
+>> +             if (i == MAINPLL_INDEX) {
+>> +                     parent_rate = __clk_get_rate(parent);
+>> +                     if (parent_rate == rate)
+>> +                             break;
+>> +             }
+>> +
+>> +             parent_rate = __clk_round_rate(parent, rate);
+>> +     }
+>> +
+>> +     *best_parent_rate = parent_rate;
+>> +     *best_parent_p = __clk_get_hw(parent);
+>> +     return parent_rate;
+>> +}
+>
+> Why this determine_rate hook? If you want to switch the clock to some
+> intermediate parent I would assume you do this explicitly by setting the
+> parent and not implicitly by setting a rate.
+>
 
->>
->>> +	depends on OF
->>> +	select PINCONF
->>> +	select GENERIC_PINCONF
->>> +	select REGMAP_MMIO
->>> +	help
->>> +	  Say Y here to support Texas Instruments' IODelay pinconf driver.
->>> +	  IODelay module is used for the DRA7 SoC family. This driver is in
->>> +	  addition to PINCTRL_SINGLE which controls the mux.
->>> +
->>>  config PINCTRL_TZ1090
->>>  	bool "Toumaz Xenif TZ1090 pin control driver"
->>>  	depends on SOC_TZ1090
->>> diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
->>> index 0475206dd600..e441cd71aedf 100644
->>> --- a/drivers/pinctrl/Makefile
->>> +++ b/drivers/pinctrl/Makefile
->>> @@ -28,6 +28,7 @@ obj-$(CONFIG_PINCTRL_TEGRA30)	+= pinctrl-tegra30.o
->>>  obj-$(CONFIG_PINCTRL_TEGRA114)	+= pinctrl-tegra114.o
->>>  obj-$(CONFIG_PINCTRL_TEGRA124)	+= pinctrl-tegra124.o
->>>  obj-$(CONFIG_PINCTRL_TEGRA_XUSB)	+= pinctrl-tegra-xusb.o
->>> +obj-$(CONFIG_PINCTRL_TI_IODELAY)	+= pinctrl-ti-iodelay.o
->>
->> So this objectfile will either be built-in or not be built at all.
->>
->>>  obj-$(CONFIG_PINCTRL_TZ1090)	+= pinctrl-tz1090.o
->>>  obj-$(CONFIG_PINCTRL_TZ1090_PDC)	+= pinctrl-tz1090-pdc.o
->>>  obj-$(CONFIG_PINCTRL_U300)	+= pinctrl-u300.o
->>> diff --git a/drivers/pinctrl/pinctrl-ti-iodelay.c b/drivers/pinctrl/pinctrl-ti-iodelay.c
->>> new file mode 100644
->>> index 000000000000..e4c6e25a781c
->>> --- /dev/null
->>> +++ b/drivers/pinctrl/pinctrl-ti-iodelay.c
->>> @@ -0,0 +1,963 @@
->>> [...]
->>> +#include <linux/err.h>
->>> +#include <linux/init.h>
->>> +#include <linux/io.h>
->>> +#include <linux/list.h>
->>> +#include <linux/module.h>
->>
->> This is, I think, a bit of a red flag.
->>
->>> +#include <linux/of_device.h>
->>> +#include <linux/of.h>
->>> +#include <linux/pinctrl/pinconf-generic.h>
->>> +#include <linux/pinctrl/pinconf.h>
->>> +#include <linux/pinctrl/pinctrl.h>
->>> +#include <linux/regmap.h>
->>> +#include <linux/slab.h>
->>
->> [...]
->>
->>> +static const struct of_device_id ti_iodelay_of_match[] = {
->>> +	{.compatible = "ti,dra7-iodelay", .data = &dra7_iodelay_data},
->>> +	{ /* Hopefully no more.. */ },
->>> +};
->>> +MODULE_DEVICE_TABLE(of, ti_iodelay_of_match);
->>> +
->>> +static struct platform_driver ti_iodelay_driver = {
->>> +	.probe = ti_iodelay_probe,
->>> +	.remove = ti_iodelay_remove,
->>> +	.driver = {
->>> +		   .owner = THIS_MODULE,
->>
->> So THIS_MODULE will, basically, be NULL.
->>
->>> +		   .name = DRIVER_NAME,
->>> +		   .of_match_table = ti_iodelay_of_match,
->>> +		   },
->>> +};
->>> +module_platform_driver(ti_iodelay_driver);
->>> +
->>> +MODULE_AUTHOR("Texas Instruments, Inc.");
->>> +MODULE_DESCRIPTION("Pinconf driver for TI's IO Delay module");
->>> +MODULE_LICENSE("GPL v2");
->>
->> And these three macros will be preprocessed away.
->>
->> (Perhaps there are non-modular alternatives to MODULE_DEVICE_TABLE and
->> module_platform_driver, but I'm not sure how those two macros actually
->> work.)
-> 
-> This should be just made to work as a regular loadable module.
-> We already have pinctrl-single for the same platforms working
-> as a loadable module.
-> 
-Yes, indeed. this can easily be fixed. my bad. will convert this to a
-module in the next rev.
+I use determine_rate hook here because I am using generic cpufreq-dt
+driver and I want to make clock switching transparent to cpufreq-dt.
+I.e. when I am trying to switch the clock from ARMPLL to MAINPLL, I
+call clk_set_rate() with the rate of MAINPLL, and determine_rate will
+select MAINPLL as the new parent.
 
-I will wait a week before reposting next rev to see if there are
-improvements necessary in other areas - specifically in the way
-pinconf is being used and if there are any binding related comments.
+>> +int mtk_clk_register_cpumuxes(struct device_node *node,
+>> +                           struct mtk_composite *clks, int num,
+>> +                           struct clk_onecell_data *clk_data)
+>> +{
+>> +     int i;
+>> +     struct clk *clk;
+>> +     struct regmap *regmap;
+>> +
+>> +     if (!clk_data)
+>> +             return -ENOMEM;
+>> +
+>> +     regmap = syscon_node_to_regmap(node);
+>> +     if (IS_ERR(regmap)) {
+>> +             pr_err("Cannot find regmap for %s: %ld\n", node->full_name,
+>> +                    PTR_ERR(regmap));
+>> +             return PTR_ERR(regmap);
+>> +     }
+>> +
+>> +     for (i = 0; i < num; i++) {
+>> +             struct mtk_composite *mux = &clks[i];
+>> +
+>> +             clk = mtk_clk_register_cpumux(mux->name, mux->parent_names,
+>> +                                           mux->num_parents, regmap,
+>> +                                           mux->mux_reg, mux->mux_shift,
+>> +                                           mux->mux_width);
+>
+> Pass 'mux' directly instead of dispatching this struct into the
+> individual fields.
+> Also, probably better to move this function to
+> drivers/clk/mediatek/clk-cpumux.c
 
-Will be great to hear any feedback on the same as well.
+Will do it. Thanks for reviewing.
 
+Best Regards,
+Pi-Cheng
 
--- 
-Regards,
-Nishanth Menon
+>
+> Sascha
+>
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
