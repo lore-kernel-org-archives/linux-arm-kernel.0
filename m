@@ -1,61 +1,157 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 4 Mar 2015 22:12:21 -0600
-Subject: [PATCH v2 1/2] ARM: OMAP2+: Use pdata-quirks for wkup_m3
- deassert_hardreset
-In-Reply-To: <1425528742-3087-1-git-send-email-d-gerlach@ti.com>
-References: <1425528742-3087-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1425528742-3087-2-git-send-email-d-gerlach@ti.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Wed, 4 Mar 2015 20:30:37 -0800
+Subject: [GIT PULL 00/21] perf/core improvements and fixes
+In-Reply-To: <1423688955-8094-1-git-send-email-acme@kernel.org>
+References: <1423688955-8094-1-git-send-email-acme@kernel.org>
+Message-ID: <CAA3XUr0LNX0E9kWbrzsTcMMs7ukq-Mt4XDWyQyWDyLfXqtSRTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use pdata-quirks to provide platform data required for reset
-of the wkup_m3 during boot.
+Hi Arnaldo, Ingo,
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
-This patch requires the pdata introduced in this patch:
-https://www.mail-archive.com/linux-omap at vger.kernel.org/msg114622.html
+What happened with this pull request? I already
+see in v4.0-rc2 changes additions to one requested
+by this pull request, but I don't see this series itself.
 
- arch/arm/mach-omap2/pdata-quirks.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+For example e370a3d57664cd5e39c0b95d157ebc841b568409
+"perf symbols: Define EM_AARCH64 for older OSes" by David
+is already in v4.0-rc2 and it is supposed to be addition to
+"perf symbols: Ignore mapping symbols on aarch64" that is part
+of this pull request but it did not make into v4.0-rcX yet. Looks
+quite strange.
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 190fa43..7a09513 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -18,6 +18,7 @@
- 
- #include <linux/platform_data/pinctrl-single.h>
- #include <linux/platform_data/iommu-omap.h>
-+#include <linux/platform_data/wkup_m3.h>
- 
- #include "common.h"
- #include "common-board-devices.h"
-@@ -287,6 +288,14 @@ static void __init omap3_tao3530_legacy_init(void)
- }
- #endif /* CONFIG_ARCH_OMAP3 */
- 
-+#ifdef CONFIG_SOC_AM33XX
-+static struct wkup_m3_platform_data wkup_m3_data = {
-+	.reset_name = "wkup_m3",
-+	.assert_reset = omap_device_assert_hardreset,
-+	.deassert_reset = omap_device_deassert_hardreset,
-+};
-+#endif
-+
- #ifdef CONFIG_ARCH_OMAP4
- static void __init omap4_sdp_legacy_init(void)
- {
-@@ -382,6 +391,10 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,am3517-emac", 0x5c000000, "davinci_emac.0",
- 		       &am35xx_emac_pdata),
- #endif
-+#ifdef CONFIG_SOC_AM33XX
-+	OF_DEV_AUXDATA("ti,am3353-wkup-m3", 0x44d00000, "44d00000.wkup_m3",
-+		       &wkup_m3_data),
-+#endif
- #ifdef CONFIG_ARCH_OMAP4
- 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a100040, "4a100040.pinmux", &pcs_pdata),
- 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a31e040, "4a31e040.pinmux", &pcs_pdata),
--- 
-2.3.0
+Thanks,
+Victor
+
+On 11 February 2015 at 13:08, Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+> Hi Ingo,
+>
+>         Please consider pulling,
+>
+> - Arnaldo
+>
+> The following changes since commit 2fde4f94e0a9531251e706fa57131b51b0df042e:
+>
+>   perf: Decouple unthrottling and rotating (2015-02-04 08:07:16 +0100)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-core-for-mingo
+>
+> for you to fetch changes up to 39f5704399042fff5f0d5f6af32bbbc3e787a897:
+>
+>   perf tools: Define _GNU_SOURCE on pthread_attr_setaffinity_np feature check (2015-02-11 17:38:55 -0300)
+>
+> ----------------------------------------------------------------
+> perf/core improvement and fixes:
+>
+> User visible:
+>
+> - No need to explicitely enable evsels for workload started from perf, let it
+>   be enabled via perf_event_attr.enable_on_exec, removing some events that take
+>   place in the 'perf trace' before a workload is really started by it.
+>   (Arnaldo Carvalho de Melo)
+>
+> - Fix to handle optimized not-inlined functions in 'perf probe' (Masami Hiramatsu)
+>
+> - Update 'perf probe' man page (Masami Hiramatsu)
+>
+> Infrastructure:
+>
+> Arnaldo Carvalho de Melo (4):
+> - Introduce {trace_seq_do,event_format_}_fprintf functions to allow
+>   a default tracepoint field list printer to be used in tools that allows
+>   redirecting output to a file. (Arnaldo Carvalho de Melo)
+>
+> - The man page for pthread_attr_set_affinity_np states that _GNU_SOURCE
+>   must be defined before pthread.h, do it to fix the build in some
+>   systems (Josh Boyer)
+>
+> - Cleanups in 'perf buildid-cache' (Masami Hiramatsu)
+>
+> - Fix dso cache test case (Namhyung Kim)
+>
+> - Do Not rely on dso__data_read_offset() to open DSO (Namhyung Kim)
+>
+> - Make perf aware of tracefs (Steven Rostedt).
+>
+> - Fix build by defining STT_GNU_IFUNC for glibc 2.9 and older (Vinson Lee)
+>
+> - AArch64 symbol resolution fixes (Victor Kamensky)
+>
+> Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+>
+> ----------------------------------------------------------------
+> Arnaldo Carvalho de Melo (4):
+>       tools lib traceevent: Introduce trace_seq_do_fprintf function
+>       perf tools: Introduce event_format__fprintf method
+>       perf trace: No need to enable evsels for workload started from perf
+>       perf evlist: Fix typo in comment
+>
+> Josh Boyer (1):
+>       perf tools: Define _GNU_SOURCE on pthread_attr_setaffinity_np feature check
+>
+> Masami Hiramatsu (4):
+>       perf probe: Fix to handle optimized not-inlined functions
+>       perf probe: Update man page
+>       perf buildid-cache: Remove unneeded debugdir parameters
+>       perf buildid-cache: Consolidate .build-id cache path generators
+>
+> Namhyung Kim (3):
+>       perf test: Fix dso cache testcase
+>       perf tests: Do not rely on dso__data_read_offset() to open dso
+>       perf tools: Fix a dso open fail message
+>
+> Steven Rostedt (Red Hat) (6):
+>       perf tools: Do not check debugfs MAGIC for tracing files
+>       tools lib fs: Add helper to find mounted file systems
+>       tools lib api fs: Add tracefs mount helper functions
+>       tools lib api debugfs: Add DEBUGFS_DEFAULT_PATH macro
+>       tools lib api fs: Add {tracefs,debugfs}_configured() functions
+>       perf tools: Make perf aware of tracefs
+>
+> Victor Kamensky (2):
+>       perf symbols: Ignore mapping symbols on aarch64
+>       perf symbols: debuglink should take symfs option into account
+>
+> Vinson Lee (1):
+>       perf symbols: Define STT_GNU_IFUNC for glibc 2.9 and older.
+>
+>  tools/lib/api/Makefile                    |  4 ++
+>  tools/lib/api/fs/debugfs.c                | 69 +++++++---------------
+>  tools/lib/api/fs/debugfs.h                | 13 +----
+>  tools/lib/api/fs/findfs.c                 | 63 ++++++++++++++++++++
+>  tools/lib/api/fs/findfs.h                 | 23 ++++++++
+>  tools/lib/api/fs/tracefs.c                | 78 +++++++++++++++++++++++++
+>  tools/lib/api/fs/tracefs.h                | 21 +++++++
+>  tools/lib/traceevent/event-parse.h        |  2 +
+>  tools/lib/traceevent/trace-seq.c          | 13 +++--
+>  tools/perf/Documentation/perf-probe.txt   | 16 +++++-
+>  tools/perf/builtin-buildid-cache.c        | 37 ++++++------
+>  tools/perf/builtin-trace.c                |  4 +-
+>  tools/perf/config/feature-checks/Makefile |  2 +-
+>  tools/perf/tests/dso-data.c               | 22 ++++---
+>  tools/perf/tests/open-syscall-all-cpus.c  |  7 ++-
+>  tools/perf/tests/open-syscall.c           |  7 ++-
+>  tools/perf/tests/parse-events.c           | 13 ++++-
+>  tools/perf/util/build-id.c                | 96 +++++++++++++++++++------------
+>  tools/perf/util/build-id.h                |  4 +-
+>  tools/perf/util/cache.h                   |  1 +
+>  tools/perf/util/dso.c                     |  8 +--
+>  tools/perf/util/dwarf-aux.c               | 15 +++++
+>  tools/perf/util/dwarf-aux.h               |  3 +
+>  tools/perf/util/evlist.c                  |  3 +-
+>  tools/perf/util/parse-events.c            | 19 ------
+>  tools/perf/util/parse-events.h            |  2 +-
+>  tools/perf/util/probe-event.c             | 24 +++++---
+>  tools/perf/util/probe-finder.c            | 12 ++--
+>  tools/perf/util/symbol-elf.c              | 11 ++--
+>  tools/perf/util/trace-event-parse.c       | 12 +++-
+>  tools/perf/util/trace-event.h             |  3 +
+>  tools/perf/util/util.c                    | 60 +++++++++++++++----
+>  tools/perf/util/util.h                    |  1 +
+>  33 files changed, 468 insertions(+), 200 deletions(-)
+>  create mode 100644 tools/lib/api/fs/findfs.c
+>  create mode 100644 tools/lib/api/fs/findfs.h
+>  create mode 100644 tools/lib/api/fs/tracefs.c
+>  create mode 100644 tools/lib/api/fs/tracefs.h
