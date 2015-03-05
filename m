@@ -1,53 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Mar 2015 12:17:14 -0800
-Subject: [PATCH 1/4] ARM: OMAP2+: omap_hwmod: Introduce ti,no-init dt
- property
-In-Reply-To: <54F8B2C7.7060202@ti.com>
-References: <1425561211-31003-1-git-send-email-d-gerlach@ti.com>
- <1425561211-31003-2-git-send-email-d-gerlach@ti.com>
- <alpine.DEB.2.02.1503051815590.5613@utopia.booyaka.com>
- <20150305184952.GF13520@atomide.com> <54F8B2C7.7060202@ti.com>
-Message-ID: <20150305201713.GH13520@atomide.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 5 Mar 2015 14:23:04 -0600
+Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
+ msm-id and qcom, board-id
+In-Reply-To: <7h8ufbjkod.fsf@deeprootsystems.com>
+References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
+ <7h8ufbjkod.fsf@deeprootsystems.com>
+Message-ID: <07D4E4D1-BF8C-4583-9505-9F321DB10406@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [150305 11:53]:
-> On 03/05/2015 12:49 PM, Tony Lindgren wrote:
-> > * Paul Walmsley <paul@pwsan.com> [150305 10:16]:
-> >> On Thu, 5 Mar 2015, Dave Gerlach wrote:
-> >>
-> >>> Introduce a dt property, ti,no-init, that prevents hwmod initialization.
-> >>> Even if a dt node is marked as disabled, hwmod still at least enables
-> >>> the hwmod and programs the sysconfig before attempting to idle it at
-> >>> boot. If an IP has been disabled by the hardware configuration on a
-> >>> platform, this will cause a hang due to writing to inactive registers.
-> >>> This property prevents that from happening by marking the hwmod as
-> >>> _HWMOD_STATE_DISABLED during init.
-> >>
-> >> I'm kind of wondering if hwmod should even touch a device if it's marked 
-> >> as disabled in the DT.  Tony, what do you think?
-> > 
-> > Well nothing happens if a device is status = "disabled". No dev entry
-> > gets created for it at all and hwmod won't have any data for the device
-> > populated. The only way hwmod code could see that device if the device
-> > gets it's data from the legacy omap_hwmod_*_data.c instead of DT.
-> > 
+
+On Mar 5, 2015, at 1:42 PM, Kevin Hilman <khilman@kernel.org> wrote:
+
+> Kumar Gala <galak@codeaurora.org> writes:
 > 
-> We still need this for the sysconfig programming, correct? hwmod programs that
-> regardless of dt status and then idles the IP,
+>> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
+>> on Qualcomm MSM platforms to determine which device tree should be
+>> utilized and passed to the kernel.
+>> 
+>> Cc: <devicetree@vger.kernel.org>
+>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> 
+> Is this the special magic that allows qcom bootloaders to take a kernel
+> plus multiple DTBs and figure out which DTB to pass?
+> 
+> Kevin
 
-Well hwmod does not even know about the IP IO addresses if it's marked
-with status = "disabled".. Which IP are you having problems with?
+yes
 
-> which is why I needed the ti,no-init for the epos evm. It isn't just a
-> matter of we shouldnt write to it because we don't want to use it; we
-> can't write to it because the module is held off so it causes an
-> external abort if we do.
+- k
 
-Well hard to say not knowing which module this is.. Pretty much all
-the modules have drivers and the driver just does pm_runtime_get()
-on it?
-
-Regards,
-
-Tony
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
