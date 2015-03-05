@@ -1,38 +1,57 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 05 Mar 2015 12:07:47 +0000
-Subject: [PATCH REPOST 0/2] Remove pl011 startup glitches and avoid dummy
- TX during startup
-In-Reply-To: <20150305120320.GB3612@e103592.cambridge.arm.com>
-References: <1425472054-7543-1-git-send-email-Dave.Martin@arm.com>
- <54F73650.2070304@arm.com> <20150305120320.GB3612@e103592.cambridge.arm.com>
-Message-ID: <54F84713.6040305@arm.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 05 Mar 2015 12:11:25 +0000
+Subject: [PATCH 4.0-rc1 v17 4/6] printk: Simple implementation for NMI
+ backtracing
+In-Reply-To: <1425489675.2712.16.camel@perches.com>
+References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
+ <1425463974-23568-1-git-send-email-daniel.thompson@linaro.org>
+ <1425463974-23568-5-git-send-email-daniel.thompson@linaro.org>
+ <1425485601.2712.9.camel@perches.com>
+ <20150304112010.338501ab@gandalf.local.home>
+ <1425486786.2769.25.camel@linaro.org>
+ <1425489675.2712.16.camel@perches.com>
+Message-ID: <1425557485.2769.41.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/15 12:03, Dave P Martin wrote:
-> On Wed, Mar 04, 2015 at 04:44:00PM +0000, Andre Przywara wrote:
->> Hi Dave,
->>
->> On 04/03/15 12:27, Dave P Martin wrote:
->>> There have been no comments on this series since my previous post, and
->>> I have made no further changes.
->>>
->>> Since then, I have confirmed that this also works robustly with TX DMA
->>> enabled on Juno.
->>>
->>> Review/comments/testing still welcome.
->>
->> this has been tested briefly on a Calxeda Midway without any
->> regressions. Also I use them as the base for my SBSA series now (which
->> are tested on the model and the Midway) and I see that all problems
->> observed before are gone now.
->>
->> Tested-by: Andre Przywara <andre.przywara@arm.com>
+On Wed, 2015-03-04 at 09:21 -0800, Joe Perches wrote:
+> On Wed, 2015-03-04 at 16:33 +0000, Daniel Thompson wrote:
+> > On Wed, 2015-03-04 at 11:20 -0500, Steven Rostedt wrote:
+> > > On Wed, 04 Mar 2015 08:13:21 -0800
+> > > Joe Perches <joe@perches.com> wrote:
+> > > 
+> > > > On Wed, 2015-03-04 at 10:12 +0000, Daniel Thompson wrote:
+> > > > > Currently there is a quite a pile of code sitting in
+> > > > > arch/x86/kernel/apic/hw_nmi.c to support safe all-cpu backtracing from NMI.
+> > > > > The code is inaccessible to backtrace implementations for other
+> > > > > architectures, which is a shame because they would probably like to be
+> > > > > safe too.
+> > > > > 
+> > > > > Copy this code into printk. We'll port the x86 NMI backtrace to it in a
+> > > > > later patch.
+> > > > 
+> > > > I think this would be better as a separate file
+> > > > rather than increasing the bulk of printk.c
+> > > > 
+> > > I agree, as printk already has its own directory. Perhaps a
+> > > "nmi_backtrace.c"?
+> > 
+> > I agree on moving the code. However, after Thomas' review I made sure
+> > all the external symbols were prefixed printk_nmi and, as a result of
+> > the same review I started using CONFIG_PRINTK_NMI to enable/disable the
+> > feature). For that reason I'm much more inclined to name it
+> > "printk_nmi.c". Any objections?
 > 
-> Thanks -- should I take that for both patches?
+> Steven's suggestion seems more sensible.
+> 
+> sed 's/CONFIG_PRINTK_NMI/CONFIG_PRINTK_NMI_BACKTRACE/g'
+> sed 's/printk_nmi/printk_nmib/g'
+> or
+> sed 's/printk_nmi/nmi_backtrace/g'
+> 
+> might work well.
 
-Yes, please. Also I tested this on the Raspberry Pi 2 today (though with
-their kernel, not upstream).
+Ok. The later rename is consistent and makes is much less likely the
+facility will be (accidentally) misused in future.
 
-Cheers,
-Andre.
+I'll change like this.
