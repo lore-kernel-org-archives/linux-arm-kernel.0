@@ -1,39 +1,95 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Thu, 5 Mar 2015 15:28:47 +0800
-Subject: [PATCH v2 1/4] cpufreq-dt: add clock domain and intermediate
- frequency support
-In-Reply-To: <CAKohpo=zPsezGs8rqVzx3ChQkavs5z7eFMMETe12pc2mjm-8OA@mail.gmail.com>
-References: <1425458956-20665-1-git-send-email-pi-cheng.chen@linaro.org>
- <1425458956-20665-2-git-send-email-pi-cheng.chen@linaro.org>
- <CAKohpomw6iDRRMxgmOORzZVeW4h2-LzKOsUcdpUnANcxiAYm+A@mail.gmail.com>
- <CALx668XCh46yMLajThuVzba9RRSxf+tEkNuMP9J7w-=vsZN8-Q@mail.gmail.com>
- <CAKohpo=zPsezGs8rqVzx3ChQkavs5z7eFMMETe12pc2mjm-8OA@mail.gmail.com>
-Message-ID: <CALx668VZ4QMjFWssbjpZfcUKWJAYET81r3=jKHyAosUKDsbbBw@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 5 Mar 2015 08:42:07 +0100
+Subject: [PATCH] clk: mediatek: Export CPU mux clocks for CPU frequency
+ control
+In-Reply-To: <CALx668WKKmifhuODsV+Uaoq4ggcmB1=wbpLzXBnjEtxbuB4qig@mail.gmail.com>
+References: <1425466152-7867-1-git-send-email-pi-cheng.chen@linaro.org>
+ <20150304112109.GB11010@pengutronix.de>
+ <CALx668WKKmifhuODsV+Uaoq4ggcmB1=wbpLzXBnjEtxbuB4qig@mail.gmail.com>
+Message-ID: <20150305074207.GC11010@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 March 2015 at 11:58, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 5 March 2015 at 09:02, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
->> In the case of Mediatek SoC, the intermediate frequency might not be one entry
->> of OPP table. To elaborate, the source clock node of the CPUs/Cluster on
->> Mediatek SoC is a mux. The mux has several PLLs as parents. When we are
->> doing CPU frequency scaling, the mux should re-parent to another stable PLL,
->> wait until the original parent PLL become stable, and then switch back to the
->> original parent. In this case, we could but we might not want the intermediate
->> frequency as part of OPP table. Therefore I save intermediate_freq instead of
->> intermediate frequency index in the cpufreq_dt_platform_datat struct.
->
-> Hmm, I remember that discussion. Okay leave it as is.
 
-Okay.
++Cc Viresh Kumar
 
->
->> BTW, is this case that intermediate frequency is not necessarily be one entry
->> of OPP table supported in the OPPv2 bindings?
->
-> Not yet, but will add a property for that.
+Viresh, this is the patch for the underlying clocks for the Mediatek
+cpufreq driver.
 
-Thanks for taking this case into consideration.
+On Thu, Mar 05, 2015 at 10:43:21AM +0800, Pi-Cheng Chen wrote:
+> Hi Sascha,
+> 
+> On 4 March 2015 at 19:21, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Wed, Mar 04, 2015 at 06:49:11PM +0800, pi-cheng.chen wrote:
+> >> This patch adds CPU mux clocks which are used by Mediatek cpufreq driver
+> >> for intermediate clock source switching. This patch is based on Mediatek
+> >> clock driver patches[1].
+> >>
+> >> [1] http://thread.gmane.org/gmane.linux.kernel/1892436
+> >>
+> >> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
+> >> ---
+> >> +static long clk_cpumux_determine_rate(struct clk_hw *hw, unsigned long rate,
+> >> +                                   unsigned long min_rate,
+> >> +                                   unsigned long max_rate,
+> >> +                                   unsigned long *best_parent_rate,
+> >> +                                   struct clk_hw **best_parent_p)
+> >> +{
+> >> +     struct clk *clk = hw->clk, *parent;
+> >> +     unsigned long parent_rate;
+> >> +     int i;
+> >> +
+> >> +     for (i = MAINPLL_INDEX; i >= ARMPLL_INDEX; i--) {
+> >> +             parent = clk_get_parent_by_index(clk, i);
+> >> +             if (!parent)
+> >> +                     return 0;
+> >> +
+> >> +             if (i == MAINPLL_INDEX) {
+> >> +                     parent_rate = __clk_get_rate(parent);
+> >> +                     if (parent_rate == rate)
+> >> +                             break;
+> >> +             }
+> >> +
+> >> +             parent_rate = __clk_round_rate(parent, rate);
+> >> +     }
+> >> +
+> >> +     *best_parent_rate = parent_rate;
+> >> +     *best_parent_p = __clk_get_hw(parent);
+> >> +     return parent_rate;
+> >> +}
+> >
+> > Why this determine_rate hook? If you want to switch the clock to some
+> > intermediate parent I would assume you do this explicitly by setting the
+> > parent and not implicitly by setting a rate.
+> >
+> 
+> I use determine_rate hook here because I am using generic cpufreq-dt
+> driver and I want to make clock switching transparent to cpufreq-dt.
+> I.e. when I am trying to switch the clock from ARMPLL to MAINPLL, I
+> call clk_set_rate() with the rate of MAINPLL, and determine_rate will
+> select MAINPLL as the new parent.
 
-Best Regards,
-Pi-Cheng
+We have clk_set_parent for changing the parent and clk_set_rate to
+change the rate. Use the former for changing the parent and the latter
+for changing the rate. What you are interested in is changing the
+parent, so use clk_set_parent for this and not abuse a side effect
+of clk_set_rate.
+
+My suggestion is to take another approach. Implement clk_set_rate for
+these muxes and in the set_rate hook:
+
+- switch mux to intermediate PLL parent
+- call clk_set_rate() for the real parent PLL
+- switch mux back to real parent PLL
+
+This way the things happening behind the scenes are completely transparent
+to the cpufreq driver and you can use cpufreq-dt as is without changes.
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
