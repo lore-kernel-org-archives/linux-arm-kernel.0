@@ -1,29 +1,26 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu,  5 Mar 2015 06:58:53 +0100
-Subject: [PATCH] MAINTAINERS: Add Mediatek SoC mailing list
-Message-ID: <1425535133-27390-1-git-send-email-matthias.bgg@gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 5 Mar 2015 07:31:43 +0100
+Subject: [PATCH v3 8/8] x86: switch to using asm-generic for seccomp.h
+In-Reply-To: <1425518828-16017-9-git-send-email-keescook@chromium.org>
+References: <1425518828-16017-1-git-send-email-keescook@chromium.org>
+ <1425518828-16017-9-git-send-email-keescook@chromium.org>
+Message-ID: <20150305063143.GA23023@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the new list that Mediatek specific patches should also be
-directed to.
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+* Kees Cook <keescook@chromium.org> wrote:
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ddc5a8c..3e30c83 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1205,6 +1205,7 @@ F:	arch/arm/mach-orion5x/ts78xx-*
- ARM/Mediatek SoC support
- M:	Matthias Brugger <matthias.bgg@gmail.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+L:	linux-mediatek at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/boot/dts/mt6*
- F:	arch/arm/boot/dts/mt8*
--- 
-1.9.1
+> Switch to using the newly created asm-generic/seccomp.h for the 
+> seccomp strict mode syscall definitions. The obsolete sigreturn 
+> syscall override is retained in 32-bit mode, and the ia32 syscall 
+> overrides are used in the compat case. Remaining definitions were 
+> identical.
+> 
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+
+Acked-by: Ingo Molnar <mingo@kernel.org>
+
+Thanks,
+
+	Ingo
