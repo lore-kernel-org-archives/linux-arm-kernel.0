@@ -1,41 +1,49 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 05 Mar 2015 16:04:39 +0300
-Subject: [PATCH 01/16] ARM: shmobile: r8a7778: synchronize dts with
- reference platform
-In-Reply-To: <8c4892a633f08edbc54b6b59a673f76bd1cd7e94.1425518337.git.horms+renesas@verge.net.au>
-References: <cover.1425518337.git.horms+renesas@verge.net.au>
- <8c4892a633f08edbc54b6b59a673f76bd1cd7e94.1425518337.git.horms+renesas@verge.net.au>
-Message-ID: <54F85467.2010700@cogentembedded.com>
+From: fabrice.gasnier@st.com (Fabrice GASNIER)
+Date: Thu,  5 Mar 2015 14:05:06 +0100
+Subject: [PATCH v2] ARM: STi: Add STiH410 SoC support
+Message-ID: <1425560706-22907-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+This patch adds support to STiH410 SoC.
 
-On 3/5/2015 4:58 AM, Simon Horman wrote:
+Please note "st,stih410" is already present in device tree.
+The problem is that it is missing the entry in the match table,
+and so the L2 cache and other cpus than 0 don't get initialized.
 
-> From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+---
+ Documentation/devicetree/bindings/arm/sti.txt | 4 ++++
+ arch/arm/mach-sti/board-dt.c                  | 1 +
+ 2 files changed, 5 insertions(+)
 
-> This moves everything to the legacy dts that is missing there to make it
-> suitable for use with multiplatform.
-
-> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->   arch/arm/boot/dts/r8a7778-bockw.dts | 106 ++++++++++++++++++++++++++++++++++++
->   1 file changed, 106 insertions(+)
-
-> diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
-> index 46a884d..7347223 100644
-> --- a/arch/arm/boot/dts/r8a7778-bockw.dts
-> +++ b/arch/arm/boot/dts/r8a7778-bockw.dts
-> @@ -16,17 +16,123 @@
-[...]
-> +
-> +	fixedregulator3v3: fixedregulator at 0 {
-
-    Ugh, this node should be named just "regulator at 0". The label also doesn't 
-appeal to me -- I'd rather prefer a name derived from the schematics. :-/
-
-WBR, Sergei
+diff --git a/Documentation/devicetree/bindings/arm/sti.txt b/Documentation/devicetree/bindings/arm/sti.txt
+index d70ec35..8d27f6b 100644
+--- a/Documentation/devicetree/bindings/arm/sti.txt
++++ b/Documentation/devicetree/bindings/arm/sti.txt
+@@ -13,6 +13,10 @@ Boards with the ST STiH407 SoC shall have the following properties:
+ Required root node property:
+ compatible = "st,stih407";
+ 
++Boards with the ST STiH410 SoC shall have the following properties:
++Required root node property:
++compatible = "st,stih410";
++
+ Boards with the ST STiH418 SoC shall have the following properties:
+ Required root node property:
+ compatible = "st,stih418";
+diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
+index b067390..b373aca 100644
+--- a/arch/arm/mach-sti/board-dt.c
++++ b/arch/arm/mach-sti/board-dt.c
+@@ -18,6 +18,7 @@ static const char *stih41x_dt_match[] __initdata = {
+ 	"st,stih415",
+ 	"st,stih416",
+ 	"st,stih407",
++	"st,stih410",
+ 	"st,stih418",
+ 	NULL
+ };
+-- 
+1.9.1
