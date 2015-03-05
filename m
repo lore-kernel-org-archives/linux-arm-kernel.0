@@ -1,61 +1,75 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Wed, 4 Mar 2015 22:49:13 -0800
-Subject: [GIT PULL 00/21] perf/core improvements and fixes
-In-Reply-To: <20150305063712.GA23109@gmail.com>
-References: <1423688955-8094-1-git-send-email-acme@kernel.org>
- <CAA3XUr0LNX0E9kWbrzsTcMMs7ukq-Mt4XDWyQyWDyLfXqtSRTA@mail.gmail.com>
- <20150305063712.GA23109@gmail.com>
-Message-ID: <CAA3XUr3xXTGPDUTYEQ7JRu9034H7j9JjA=J7Cxmx361H9HcdYw@mail.gmail.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 5 Mar 2015 15:03:32 +0800
+Subject: [PATCH v9 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <12535711.Yi1RhU69kM@vostro.rjw.lan>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <12535711.Yi1RhU69kM@vostro.rjw.lan>
+Message-ID: <54F7FFC4.9070107@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 March 2015 at 22:37, Ingo Molnar <mingo@kernel.org> wrote:
->
-> * Victor Kamensky <victor.kamensky@linaro.org> wrote:
->
->> Hi Arnaldo, Ingo,
+On 2015/3/5 6:56, Rafael J. Wysocki wrote:
+> On Wednesday, February 25, 2015 04:39:40 PM Hanjun Guo wrote:
+>> Changes since v8:
+>>   - remove MPIDR packing things by introducing phys_cpuid_t;
 >>
->> What happened with this pull request? [...]
->
-> This pull request was for v4.1, and I merged it in:
-
-Ok, I got it. Sorry I missed that before.
-
-> commit 8a26ce4e544659256349551283414df504889a59
-> Merge: acba3c7e4652 726f3234dd12
-> Author: Ingo Molnar <mingo@kernel.org>
-> Date:   Wed Feb 18 19:14:54 2015 +0100
->
->     Merge tag 'perf-core-for-mingo' of git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux into perf/core
->
->     Pull perf/core improvements and fixes from Arnaldo Carvalho de Melo:
->
->     User visible changes:
->
->> [...] I already see in v4.0-rc2 changes additions to one requested
->> by this pull request, but I don't see this series itself.
+>>   - update patch acpi: fix acpi_os_ioremap for arm64 to follow
+>>     Rafael's suggestion;
 >>
->> For example e370a3d57664cd5e39c0b95d157ebc841b568409
->> "perf symbols: Define EM_AARCH64 for older OSes" by David
->> is already in v4.0-rc2 and it is supposed to be addition to
->> "perf symbols: Ignore mapping symbols on aarch64" that is part
->> of this pull request but it did not make into v4.0-rcX yet. Looks
->> quite strange.
->
-> If some commits of the v4.1 queue are needed in v4.0 as well then they
-> should be cherry-picked back into the urgent queue.
->
-> But maybe e370a3d57 was merged prematurely - in that case it appears
-> to be harmless and v4.1 will sort it out.
+>>   - Squash patch (disable ACPI if ACPI less than 5.1) to patch
+>>     (Get RSDP and ACPI boot-time table);
+>>
+>>   - Move sleep_arm.c to arch/arm64/ and rename it as acpi_sleep.c 
+>>
+>>   - Rework the uefi generated empty dtb to enable acpi when no dtb
+>>     is available, thanks Ard for the updated patch.
+>>
+>>   - rework the function of register cpu for kexec case
+>>
+>>   - use pr_debug() instead of pr_info() when scanning MADT.
+>>
+>>   - rebase on top of 4.0-rc1
+>>
+>> Thanks
+>> Hanjun
+>>
+>> Al Stone (4):
+>>   ARM64 / ACPI: Get RSDP and ACPI boot-time tables
+>>   ARM64 / ACPI: Introduce early_param "acpi=" to enable/disable ACPI
+>>   ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on
+>>     ARM64
+>>   ARM64 / ACPI: additions of ACPI documentation for arm64
+>>
+>> Graeme Gregory (6):
+>>   ACPI: add arm64 to the platforms that use ioremap
+>>   ACPI / sleep: Introduce arm64 specific acpi_sleep.c
+>>   ARM64 / ACPI: If we chose to boot from acpi then disable FDT
+>>   ARM64 / ACPI: Get PSCI flags in FADT for PSCI init
+>>   ARM64 / ACPI: Enable ARM64 in Kconfig
+>>   Documentation: ACPI for ARM64
+>>
+>> Hanjun Guo (8):
+>>   ACPI / table: Use pr_debug() instead of pr_info() for MADT table
+>>     scanning
+>>   ACPI / processor: Introduce phys_cpuid_t for CPU hardware ID
+>>   ARM64 / ACPI: Introduce PCI stub functions for ACPI
+>>   ACPI / table: Print GIC information when MADT is parsed
+>>   ARM64 / ACPI: Parse MADT for SMP initialization
+>>   ACPI / processor: Make it possible to get CPU hardware ID via GICC
+>>   ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and register device's gsi
+>>   clocksource / arch_timer: Parse GTDT to initialize arch timer
+>>
+>> Mark Salter (2):
+>>   ARM64: allow late use of early_ioremap
+>>   ACPI: fix acpi_os_ioremap for arm64
+>>
+>> Tomasz Nowicki (1):
+>>   irqchip: Add GICv2 specific ACPI boot support
+> I've ACKed or commented the ones relevant for me.  As for the ARM64-specific
+> code, I don't think I can give any meaningful input.
 
-Yes, this merge is harmless. Indeed it should be OK with v4.1.
+Hi Rafael, thank you very much for the ACKs and review comments, I will
+wait for other maintainers comments and then update this patch set.
 
-Thanks for explanation.
-
-- Victor
-
-> Arnaldo?
->
-> Thanks,
->
->         Ingo
+Regards
+Hanjun
