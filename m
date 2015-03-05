@@ -1,81 +1,42 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 5 Mar 2015 12:17:23 +0100
-Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
- IRQF_NO_SUSPEND
-In-Reply-To: <20150305105308.GA13617@leverpostej>
-References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
- <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
- <20150304183809.GD22156@leverpostej>
- <20150305095306.3db98ac8@bbrezillon>
- <20150305105308.GA13617@leverpostej>
-Message-ID: <20150305121723.1da0d016@bbrezillon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 05 Mar 2015 11:22:52 +0000
+Subject: [PATCH v3 3/5] irqchip: gicv3-its: add limitation to page order
+In-Reply-To: <1425439098-10708-4-git-send-email-wuyun.wu@huawei.com>
+References: <1425439098-10708-1-git-send-email-wuyun.wu@huawei.com>
+ <1425439098-10708-4-git-send-email-wuyun.wu@huawei.com>
+Message-ID: <54F83C8C.3060305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
-
-On Thu, 5 Mar 2015 10:53:08 +0000
-Mark Rutland <mark.rutland@arm.com> wrote:
-
-> Hi Boris,
+On 04/03/15 03:18, Yun Wu wrote:
+> When required size of Device Table is out of the page allocator's
+> capability, the whole ITS will fail in probing. This actually is
+> not the hardware's problem and is mainly a limitation of the kernel
+> page allocator. This patch will keep ITS going on to the next
+> initializaion stage with an explicit warning.
 > 
-> I'd missed the fact that this was for SW watchdog as opposed to HW
-> watchdog, which may explain my confusion.
+> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> [...]
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index f5bfa42..e8bda0b 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -828,6 +828,11 @@ static int its_alloc_tables(struct its_node *its)
+>  			u32 ids = GITS_TYPER_DEVBITS(typer);
 > 
-> > > >  		err = request_irq(wdt->irq, wdt_interrupt,
-> > > > -				  IRQF_SHARED | IRQF_IRQPOLL,
-> > > > +				  IRQF_SHARED | IRQF_IRQPOLL |
-> > > > +				  IRQF_NO_SUSPEND,
-> > > 
-> > > I'm a little confused by this. What happens if the watchdog fires when
-> > > we're actually in the suspended state (when IRQF_NO_SUSPEND interrupts
-> > > aren't guaranteed to be delivered).
-> > 
-> > It reboot the system.
-> 
-> Is the timer we use to ping the watchdog guaranted to result in a wakeup
-> before an interrupt will be triggered? If so, then I think we're ok.
+>  			order = get_order((1UL << ids) * entry_size);
+> +			if (order >= MAX_ORDER) {
+> +				order = MAX_ORDER - 1;
+> +				pr_warn("%s: DT size too large, reduce page order to %u\n",
 
-It should be (I don't recall exactly what the logic is, but it's at
-least half the watchdog time limit).
+Please spell out device table instead of DT. Most people will interpret
+DT as Device Tree, and won't immediately get what is happening.
 
-> 
-> If not, then don't we need to clear a potentially pending watchdog irq
-> at resume time so at to not immediately reboot the machine? I couldn't
-> see any logic to that effect in the driver.
+Thanks,
 
-That depends on what we want.
-If we want the watchdog to be inactive when entering suspend, then we
-shouldn't reboot the machine when receiving a watchdog irq while the
-system is suspended.
-ITOH, with the hardware mode (reset handled by the watchdog IP) you
-can't disable the watchdog when entering suspend, so I would expect the
-same behavior for the SW mode.
-
-> 
-> Regardless, if the only reason we care about taking the interrupt during
-> the suspend/resume phases is due to the timer sharing the IRQ, then
-> shouldn't we be using IRQF_COND_SUSPEND?
-
-I'm not sure, but IMO this interrupt should be flagged as NO_SUSPEND,
-because it's here to reset the system (even if it is suspended).
-If you flag the irq line as COND_SUSPEND, and atmel decide to give this
-peripheral its own IRQ line (on new SoCs), then your watchdog will not
-reboot the system when it is suspended.
-Another solution would be to support wakeup for this peripheral and
-delay the system reboot until it has resumed.
-
-Anyway, if we decide to go for the wakeup approach, I'd prefer to post
-another patch on top of this one.
-
-Best Regards,
-
-Boris
-
-
+	M.
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
