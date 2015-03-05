@@ -1,45 +1,46 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 5 Mar 2015 16:32:06 +0530
-Subject: [PATCH] clk: mediatek: Export CPU mux clocks for CPU frequency
- control
-In-Reply-To: <20150305105104.GJ11010@pengutronix.de>
-References: <1425466152-7867-1-git-send-email-pi-cheng.chen@linaro.org>
- <20150304112109.GB11010@pengutronix.de>
- <CALx668WKKmifhuODsV+Uaoq4ggcmB1=wbpLzXBnjEtxbuB4qig@mail.gmail.com>
- <20150305074207.GC11010@pengutronix.de>
- <CAKohponSqLPcULA9-T8y9b_b44Torti0p6W3sJfRZ1oKUWqtTw@mail.gmail.com>
- <20150305091948.GH11010@pengutronix.de>
- <CALx668X2m0hMVQumGQmhhrKnv4h1hiYp20Q4FcKuECK3mhoJiA@mail.gmail.com>
- <20150305105104.GJ11010@pengutronix.de>
-Message-ID: <CAKohpo=90YH3TLfnMro0AQOM6_uMB_SPS9Q3j6Myz4RqqBdVHg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Mar 2015 11:04:16 +0000
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <54F82C06.2000701@redhat.com>
+References: <54F51A63.4060302@samsung.com>
+ <20150304113505.GS28951@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8OUtcpaQh5+gb6vNrdi+Q7eu_zKOujmyoRPrzrs+GJVQ@mail.gmail.com>
+ <20150304122956.GT28951@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
+ <20150304141212.GA5352@hawk.usersys.redhat.com>
+ <20150304142943.GU28951@e104818-lin.cambridge.arm.com>
+ <54F73ACF.1090605@redhat.com>
+ <20150304172855.GA28951@e104818-lin.cambridge.arm.com>
+ <54F82C06.2000701@redhat.com>
+Message-ID: <20150305110415.GA7712@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 March 2015 at 16:21, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> Given the variance of different SoCs I don't think it makes sense
-> to try to handle all these cases. Instead the cpufreq-dt driver
-> should just call clk_set_rate() on the CPU clock with the desired
-> target frequency. Everything else should be handled in the clock
-> driver which has intimate knowledge about the SoC anyway.
+On Thu, Mar 05, 2015 at 11:12:22AM +0100, Paolo Bonzini wrote:
+> On 04/03/2015 18:28, Catalin Marinas wrote:
+> >> > Can you add that property to the device tree for PCI devices too?
+> >
+> > Yes but not with mainline yet:
+> > 
+> > http://thread.gmane.org/gmane.linux.kernel.iommu/8935
+> > 
+> > We can add the property at the PCI host bridge level (with the drawback
+> > that it covers all the PCI devices), like here:
+> 
+> Even covering all PCI devices is not enough if we want to support device
+> assignment of PCI host devices. 
 
-I agree..
+Can we not have another PCI bridge node in the DT for the host device
+assignments?
 
-@Russell: I wanted to ask you this since sometime..
+> I'd rather not spend effort on a solution that we know will only
+> half-work a few months down the road.
 
-On CPU-freq changes we fire PRE/POST notifiers and they are
-used for updating loops_per_jiffies which then controls delays.
+Which of the solutions are you referring to? On the Applied Micro
+boards, for example, the PCIe is coherent. If you do device assignment,
+the guest must be aware of the coherency property of the physical device
+and behave accordingly, there isn't much the host can do about it.
 
-Now, it is fine to do that for normal frequencies, but what should be
-the approach for intermediate frequencies ?
-
-Intermediate freqs: On some platforms changing PLL's straight away
-isn't considered safe and so we switch parent to another stable clock,
-change PLL rate and switch back.
-
-The *wild* thought I earlier had was to fire these notifiers for even these
-intermediate frequencies, otherwise some of the delays will end before
-they should have and that *might* cause other problems.
-
-I wanted to know what do you (and other champs) think about this..
-
-Thanks in advance for your advice.
+-- 
+Catalin
