@@ -1,58 +1,81 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 05 Mar 2015 11:16:28 +0000
-Subject: [RFC PATCH v2 2/3] arm64: add IOMMU dma_ops
-In-Reply-To: <54F7A121.3050103@codeaurora.org>
-References: <cover.1423226542.git.robin.murphy@arm.com>			
- <058e038009ac708a40197c80e07410914c2a162e.1423226542.git.robin.murphy@arm.com>		
- <1423543151.18280.2.camel@mtksdaap41> <54D9F486.10501@arm.com>	
- <1423901011.27922.7.camel@mhfsdcap03> <54E24D50.408@arm.com>
- <1425353927.4555.10.camel@mhfsdcap03> <54F5A5FE.3040506@arm.com>
- <54F7A121.3050103@codeaurora.org>
-Message-ID: <54F83B0C.9020606@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 5 Mar 2015 12:17:23 +0100
+Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
+ IRQF_NO_SUSPEND
+In-Reply-To: <20150305105308.GA13617@leverpostej>
+References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20150304183809.GD22156@leverpostej>
+ <20150305095306.3db98ac8@bbrezillon>
+ <20150305105308.GA13617@leverpostej>
+Message-ID: <20150305121723.1da0d016@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+Hi Boris,
 
-On 05/03/15 00:19, Laura Abbott wrote:
-[...]
->> Consider that the IOMMU's page table walker is a DMA master in its own
-> right, and that is the device you're mapping the page tables for.
-> Therefore your IOMMU driver needs to have access to the struct device
-> of the IOMMU itself to use for the page-table-related mappings. Also,
-> be sure to set the IOMMU's DMA mask correctly to prevent SWIOTLB bounce
-> buffers being created in the process (which as I've found generally ends
-> in disaster).
->>
->>>           And normally, we always need do cache maintenance only for some
->>> bytes in the pagetable but not whole a page. Then is there a easy way to
->>> do the cache maintenance?
->>
->> For a noncoherent device, dma_map_single() will end up calling
-> __dma_map_area() with the page offset and size of the original request, so
-> the updated part gets flushed by VA, and the rest of the page isn't touched
-> if it doesn't need to be. On the other hand if the page tables were
-> allocated with dma_alloc_coherent() in the first place, then just calling
-> dma_sync_single_for_device() for the updated region should suffice.
->>
->
-> Where exactly would you call the dma_unmap? It seems a bit strange to
-> be repeatedly calling dma_map and never calling dma_unmap. I don't see it
-> explicitly forbidden in the docs anywhere to do this but it seems like
-> it would be violating the implicit handoff of dma_map/dma_unmap.
+On Thu, 5 Mar 2015 10:53:08 +0000
+Mark Rutland <mark.rutland@arm.com> wrote:
 
-I think ideally you'd call dma_map_page when you first create the page 
-table, dma_sync_single_for_device on any update, and dma_unmap_page when 
-you tear it down, and you'd also use the appropriate DMA addresses 
-everywhere instead of physical addresses.
+> Hi Boris,
+> 
+> I'd missed the fact that this was for SW watchdog as opposed to HW
+> watchdog, which may explain my confusion.
+> 
+> [...]
+> 
+> > > >  		err = request_irq(wdt->irq, wdt_interrupt,
+> > > > -				  IRQF_SHARED | IRQF_IRQPOLL,
+> > > > +				  IRQF_SHARED | IRQF_IRQPOLL |
+> > > > +				  IRQF_NO_SUSPEND,
+> > > 
+> > > I'm a little confused by this. What happens if the watchdog fires when
+> > > we're actually in the suspended state (when IRQF_NO_SUSPEND interrupts
+> > > aren't guaranteed to be delivered).
+> > 
+> > It reboot the system.
+> 
+> Is the timer we use to ping the watchdog guaranted to result in a wakeup
+> before an interrupt will be triggered? If so, then I think we're ok.
 
-I wouldn't compare that with what we do in the ARM SMMU driver, because 
-that's a lot more hacky; there we're actually _relying_ on the mapping 
-aspect of dma_map_page being a no-op so we just get the implicit sync 
-part of it, thus we know an unmap would do absolutely nothing (since the 
-SMMU doesn't write to the page tables we've no need to sync them back to 
-the CPU), so we can get away with skipping it. Of course, as both Mitch 
-and I have apparently discovered recently, things end up going wrong 
-when that no-op assumption isn't true and bounce buffers happen...
+It should be (I don't recall exactly what the logic is, but it's at
+least half the watchdog time limit).
 
-Robin.
+> 
+> If not, then don't we need to clear a potentially pending watchdog irq
+> at resume time so at to not immediately reboot the machine? I couldn't
+> see any logic to that effect in the driver.
+
+That depends on what we want.
+If we want the watchdog to be inactive when entering suspend, then we
+shouldn't reboot the machine when receiving a watchdog irq while the
+system is suspended.
+ITOH, with the hardware mode (reset handled by the watchdog IP) you
+can't disable the watchdog when entering suspend, so I would expect the
+same behavior for the SW mode.
+
+> 
+> Regardless, if the only reason we care about taking the interrupt during
+> the suspend/resume phases is due to the timer sharing the IRQ, then
+> shouldn't we be using IRQF_COND_SUSPEND?
+
+I'm not sure, but IMO this interrupt should be flagged as NO_SUSPEND,
+because it's here to reset the system (even if it is suspended).
+If you flag the irq line as COND_SUSPEND, and atmel decide to give this
+peripheral its own IRQ line (on new SoCs), then your watchdog will not
+reboot the system when it is suspended.
+Another solution would be to support wakeup for this peripheral and
+delay the system reboot until it has resumed.
+
+Anyway, if we decide to go for the wakeup approach, I'd prefer to post
+another patch on top of this one.
+
+Best Regards,
+
+Boris
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
