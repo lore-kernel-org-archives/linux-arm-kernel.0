@@ -1,120 +1,58 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 5 Mar 2015 13:56:24 +0100
-Subject: [PATCH v3 8/9] ACPI: arm64: use an arch-specific ACPI _OSI method
- and ACPI blacklist
-In-Reply-To: <20150305101705.GB5287@arm.com>
-References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
- <20150302172939.GC7919@arm.com> <54F4B345.6020001@linaro.org>
- <2149383.4T7uuqhSe1@vostro.rjw.lan> <20150305101705.GB5287@arm.com>
-Message-ID: <CAJZ5v0g_1T_5dMzDrPNObQ3MPboMz9jVaT0fioRq5mDusc2dFQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 5 Mar 2015 14:00:00 +0100
+Subject: [PATCH v3 5/9] mtd: pxa3xx_nand: add support for the Marvell
+ Berlin nand controller
+In-Reply-To: <1425555085-29531-6-git-send-email-antoine.tenart@free-electrons.com>
+References: <1425555085-29531-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1425555085-29531-6-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20150305140000.39081aa8@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 5, 2015 at 11:17 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Mar 04, 2015 at 11:14:50PM +0000, Rafael J. Wysocki wrote:
->> On Monday, March 02, 2015 12:00:21 PM Al Stone wrote:
->> > On 03/02/2015 10:29 AM, Will Deacon wrote:
->> > > On Wed, Feb 25, 2015 at 12:36:24AM +0000, al.stone at linaro.org wrote:
->> > >> diff --git a/arch/arm64/kernel/acpi-blacklist.c b/arch/arm64/kernel/acpi-blacklist.c
->> > >> new file mode 100644
->> > >> index 0000000..1be6a56
->> > >> --- /dev/null
->> > >> +++ b/arch/arm64/kernel/acpi-blacklist.c
->> > >> @@ -0,0 +1,20 @@
->> > >> +/*
->> > >> + *  ARM64 Specific ACPI Blacklist Support
->> > >> + *
->> > >> + *  Copyright (C) 2015, Linaro Ltd.
->> > >> + *      Author: Al Stone <al.stone@linaro.org>
->> > >> + *
->> > >> + *  This program is free software; you can redistribute it and/or modify
->> > >> + *  it under the terms of the GNU General Public License version 2 as
->> > >> + *  published by the Free Software Foundation.
->> > >> + */
->> > >> +
->> > >> +#define pr_fmt(fmt) "ACPI: " fmt
->> > >> +
->> > >> +#include <linux/acpi.h>
->> > >> +
->> > >> +/* The arm64 ACPI blacklist is currently empty.  */
->> > >> +int __init acpi_blacklisted(void)
->> > >> +{
->> > >> +        return 0;
->> > >> +}
->> > >> diff --git a/arch/arm64/kernel/acpi-osi.c b/arch/arm64/kernel/acpi-osi.c
->> > >> new file mode 100644
->> > >> index 0000000..bb351f4
->> > >> --- /dev/null
->> > >> +++ b/arch/arm64/kernel/acpi-osi.c
->> > >> @@ -0,0 +1,25 @@
->> > >> +/*
->> > >> + *  ARM64 Specific ACPI _OSI Support
->> > >> + *
->> > >> + *  Copyright (C) 2015, Linaro Ltd.
->> > >> + *      Author: Al Stone <al.stone@linaro.org>
->> > >> + *
->> > >> + *  This program is free software; you can redistribute it and/or modify
->> > >> + *  it under the terms of the GNU General Public License version 2 as
->> > >> + *  published by the Free Software Foundation.
->> > >> + */
->> > >> +
->> > >> +#define pr_fmt(fmt) "ACPI: " fmt
->> > >> +
->> > >> +#include <linux/acpi.h>
->> > >> +
->> > >> +/*
->> > >> + * Consensus is to deprecate _OSI for all new ACPI-supported architectures.
->> > >> + * So, for arm64, reduce _OSI to a warning message, and tell the firmware
->> > >> + * nothing of value.
->> > >> + */
->> > >> +u32 acpi_osi_handler(acpi_string interface, u32 supported)
->> > >> +{
->> > >> +        pr_warn("_OSI was called, but is deprecated for this architecture.\n");
->> > >> +        return false;
->> > >> +}
->> > >
->> > > This kinda feels backwards to me. If _OSI is going away, then the default
->> > > should be "the architecture doesn't need to do anything", rather than have
->> > > new architectures defining a bunch of empty, useless stub code.
->> > >
->> > > Anyway we could make this the default in core code and have architectures
->> > > that *do* want _OSI override that behaviour, instead of the other way around?
->> > >
->> > We could do that; I personally don't have a strong preference either way,
->> > so I'm inclined to make it whatever structure Rafael thinks is proper since
->> > it affects ACPI code most.  That being said, the current patch structure
->> > made sense to me since it wasn't distorting existing code much -- and given
->> > the pure number of x86/ia64 machines vs ARM machines using ACPI, that seemed
->> > the more cautious approach.
->> >
->> > @Rafael: do you have an opinion/preference?
->>
->> My preference is to avoid changes in the existing code at least for the time
->> being.  Especially if the changes in question are going to affect ia64, unless
->> you have an Itanium machine where you can readily test those, that is. :-)
->
-> Well, this code doesn't even need to compiled for ia64 if we have those
-> architectures that want to use _OSI select a Kconfig symbol for it, so I
-> don't think the testing argument is really that valid. I appreciate that you
-> want to avoid changing the existing code, but I also don't want to add this
-> sort of stuff to the architecture code, when it really has nothing to do
-> with the architecture.
+Dear Antoine Tenart,
 
-OK, so consider this.
+On Thu,  5 Mar 2015 12:31:21 +0100, Antoine Tenart wrote:
 
-_OSI may be deprecated in the spec for *new* implementations.
+>  struct pxa3xx_nand_host {
+> @@ -253,6 +258,12 @@ static struct pxa3xx_nand_flash builtin_flash_types[] = {
+>  { "512MiB 8-bit",  0xdc2c,  64, 2048,  8,  8, 4096 },
+>  { "512MiB 16-bit", 0xcc2c,  64, 2048, 16, 16, 4096 },
+>  { "256MiB 16-bit", 0xba20,  64, 2048, 16, 16, 2048 },
+> +{ }
+> +};
+> +
+> +static struct pxa3xx_nand_flash berlin_builtin_flash_types[] = {
+> +{ "4GiB 8-bit",    0xd7ec, 128, 8192,  8,  8, 4096 },
+> +{ },
 
-However, there still are many systems out there that use _OSI and
-we'll need to support
-them going forward.  So while the spec people may think that they have
-deprecated
-_OSI, the reality is that in the kernel it is not going to be
-deprecated as long as there
-are systems using it that we need to support.
+This looks fishy. You know have two different definitions for the exact
+same chip_id. In the builtin_flash_types[] array:
 
-So the whole "_OSI is going away" argument is simply bogus and useless.
+{ "4GiB 8-bit",    0xd7ec, 128, 4096,  8,  8, 8192 },
 
-That aside, yes, we can use a Kconfig symbol to select from x86 and ia64
-and compile the generic code conditional on that.  That would be fine by me.
+and in your new berlin_builtin_flash_types[] array:
 
-Rafael
+{ "4GiB 8-bit",    0xd7ec, 128, 8192,  8,  8, 4096 },
+
+So you have twice a big pages, and twice as less blocks. Are you sure
+about your definition of the 0xd7ec NAND chip_id ?
+
+Why cannot you use the same data for both the Berlin platform and the
+platforms already supported by the driver? Are you sure your NAND isn't
+using 4k pages ? Or maybe the 0xd7ec entry in builtin_flash_types[] is
+incorrect?
+
+Or maybe like
+http://lists.infradead.org/pipermail/linux-mtd/2010-June/031159.html,
+the NAND chip_id is the same, but the NAND ext id is different.
+
+Is there no common NAND mechanism to handle this, rather than having
+this specifically in the driver?
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
