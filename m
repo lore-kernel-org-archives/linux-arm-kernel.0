@@ -1,29 +1,33 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 5 Mar 2015 13:41:57 +0000
-Subject: [PATCH] ARM: STi: Add STiH410 SoC support
-In-Reply-To: <1425559623-12379-1-git-send-email-fabrice.gasnier@st.com>
-References: <1425559623-12379-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20150305134157.GD31098@x1>
+Date: Thu, 5 Mar 2015 13:43:38 +0000
+Subject: [PATCH v2] ARM: STi: Add STiH410 SoC support
+In-Reply-To: <1425560706-22907-1-git-send-email-fabrice.gasnier@st.com>
+References: <1425560706-22907-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20150305134338.GE31098@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime,
-
-Can you send this directly to Arnd for inclusion into the -rcs please?
-
-Also, please also CC -stable and add the necessary tag in the commit
-message.
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
+On Thu, 05 Mar 2015, Fabrice GASNIER wrote:
 
 > This patch adds support to STiH410 SoC.
 > 
+> Please note "st,stih410" is already present in device tree.
+> The problem is that it is missing the entry in the match table,
+> and so the L2 cache and other cpus than 0 don't get initialized.
+> 
 > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 > ---
 >  Documentation/devicetree/bindings/arm/sti.txt | 4 ++++
 >  arch/arm/mach-sti/board-dt.c                  | 1 +
 >  2 files changed, 5 insertions(+)
-> 
+
+Sorry, this is the one I was looking at oneline.
+
+Same comments apply though.
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
 > diff --git a/Documentation/devicetree/bindings/arm/sti.txt b/Documentation/devicetree/bindings/arm/sti.txt
 > index d70ec35..8d27f6b 100644
 > --- a/Documentation/devicetree/bindings/arm/sti.txt
