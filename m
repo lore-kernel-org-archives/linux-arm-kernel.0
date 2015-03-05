@@ -1,60 +1,86 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 05 Mar 2015 10:38:45 +0000
-Subject: [PATCH] iommu/arm-smmu: fix leak in arm_smmu_flush_pgtable
-In-Reply-To: <1425514685-23831-1-git-send-email-mitchelh@codeaurora.org>
-References: <1425514685-23831-1-git-send-email-mitchelh@codeaurora.org>
-Message-ID: <54F83235.70700@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 05 Mar 2015 12:39:42 +0200
+Subject: [PATCH 1/3] media: atmel-isi: move the peripheral clock to
+ start/stop_stream() function
+In-Reply-To: <1425531661-20040-2-git-send-email-josh.wu@atmel.com>
+References: <1425531661-20040-1-git-send-email-josh.wu@atmel.com>
+ <1425531661-20040-2-git-send-email-josh.wu@atmel.com>
+Message-ID: <16387779.aQaQKCyNOp@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mitch,
+Hi Josh,
 
-On 05/03/15 00:18, Mitchel Humpherys wrote:
-> We're currently mapping a page in arm_smmu_flush_pgtable without ever
-> unmapping it.  Fix this by calling dma_unmap_page on the returned dma
-> address.  Since the only reason we're calling dma_map_page is to make
-> sure it actually gets flushed out to RAM, we can just call
-> dma_unmap_page immediately following the map.
->
-> Without this, eventually swiotlb runs out of memory and starts printing
-> things like:
->
->      [   35.545076] arm-smmu d00000.arm,smmu: swiotlb buffer is full (sz: 128 bytes)
->
+Thank you for the patch.
 
-So, you have non-coherent SMMUs too ;) The real problem is that the 
-SMMU's DMA mask is wrong (as it happens I've just given Will a patch to 
-fix that) - this is really just doing a whole bunch of unnecessary work 
-(two memory copies and two cache flushes, one of which isn't even 
-flushing the right area) to hide the problem. With an appropriate DMA 
-mask set, swiotlb_map_page becomes a no-op and we fall through to the 
-cache flush without ever allocating anything.
+On Thursday 05 March 2015 13:00:59 Josh Wu wrote:
+> As the clock_start/stop() use to control the mclk for the sensor not the
+> ISI peripheral clock.
+> So we move them to start/stop_stream() function.
 
-Robin.
+Then the driver will access registers with the peripheral clock disabled, for 
+instance in isi_camera_set_fmt() (calling configure_geometry), 
+isi_camera_set_bus_param() or atmel_isi_probe(). Isn't that a problem ? Or are 
+all registers guaranteed to be accessible (and retained) when the clock is 
+disabled ?
 
-> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 > ---
->   drivers/iommu/arm-smmu.c | 9 +++++++--
->   1 file changed, 7 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index fc13dd56953e..2ff8f35cf533 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -627,8 +627,13 @@ static void arm_smmu_flush_pgtable(void *addr, size_t size, void *cookie)
->   		 * recursion here as the SMMU table walker will not be wired
->   		 * through another SMMU.
->   		 */
-> -		dma_map_page(smmu->dev, virt_to_page(addr), offset, size,
-> -			     DMA_TO_DEVICE);
-> +		dma_addr_t handle = dma_map_page(smmu->dev, virt_to_page(addr),
-> +						offset, size, DMA_TO_DEVICE);
-> +		if (handle == DMA_ERROR_CODE)
-> +			dev_err(smmu->dev,
-> +				"Couldn't flush page tables at %p!\n", addr);
-> +		else
-> +			dma_unmap_page(smmu->dev, handle, size, DMA_TO_DEVICE);
->   	}
->   }
->
->
+> 
+>  drivers/media/platform/soc_camera/atmel-isi.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
+> b/drivers/media/platform/soc_camera/atmel-isi.c index 1208818..eb179e7
+> 100644
+> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+> @@ -386,6 +386,10 @@ static int start_streaming(struct vb2_queue *vq,
+> unsigned int count) struct atmel_isi *isi = ici->priv;
+>  	int ret;
+> 
+> +	ret = clk_prepare_enable(isi->pclk);
+> +	if (ret)
+> +		return ret;
+> +
+>  	/* Reset ISI */
+>  	ret = atmel_isi_wait_status(isi, WAIT_ISI_RESET);
+>  	if (ret < 0) {
+> @@ -445,6 +449,8 @@ static void stop_streaming(struct vb2_queue *vq)
+>  	ret = atmel_isi_wait_status(isi, WAIT_ISI_DISABLE);
+>  	if (ret < 0)
+>  		dev_err(icd->parent, "Disable ISI timed out\n");
+> +
+> +	clk_disable_unprepare(isi->pclk);
+>  }
+> 
+>  static struct vb2_ops isi_video_qops = {
+> @@ -723,14 +729,9 @@ static int isi_camera_clock_start(struct
+> soc_camera_host *ici) struct atmel_isi *isi = ici->priv;
+>  	int ret;
+> 
+> -	ret = clk_prepare_enable(isi->pclk);
+> -	if (ret)
+> -		return ret;
+> -
+>  	if (!IS_ERR(isi->mck)) {
+>  		ret = clk_prepare_enable(isi->mck);
+>  		if (ret) {
+> -			clk_disable_unprepare(isi->pclk);
+>  			return ret;
+>  		}
+>  	}
+> @@ -745,7 +746,6 @@ static void isi_camera_clock_stop(struct soc_camera_host
+> *ici)
+> 
+>  	if (!IS_ERR(isi->mck))
+>  		clk_disable_unprepare(isi->mck);
+> -	clk_disable_unprepare(isi->pclk);
+>  }
+> 
+>  static unsigned int isi_camera_poll(struct file *file, poll_table *pt)
+
+-- 
+Regards,
+
+Laurent Pinchart
