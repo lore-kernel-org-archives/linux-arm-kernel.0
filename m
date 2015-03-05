@@ -1,51 +1,45 @@
 From: sbranden@broadcom.com (Scott Branden)
-Date: Thu, 5 Mar 2015 07:59:08 -0800
-Subject: [PATCH 4/4] mmc: sdhci-iproc: add device tree bindings
+Date: Thu, 5 Mar 2015 07:59:06 -0800
+Subject: [PATCH 2/4] mmc: sdhci: do not set AUTO_CMD12 for multi-block CMD53
 In-Reply-To: <1425571148-5876-1-git-send-email-sbranden@broadcom.com>
 References: <Scott Branden <sbranden@broadcom.com>
  <1425571148-5876-1-git-send-email-sbranden@broadcom.com>
-Message-ID: <1425571148-5876-5-git-send-email-sbranden@broadcom.com>
+Message-ID: <1425571148-5876-3-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree binding documentation for IPROC SDHCI driver.
+From: Corneliu Doban <cdoban@broadcom.com>
 
-Acked-by: Ray Jui <rjui@broadcom.com>
+For CMD53 in block mode, the host does not need to stop the transfer,
+as it stops when the block count (present in CMD53) is reached.
+
 Signed-off-by: Corneliu Doban <cdoban@broadcom.com>
 Signed-off-by: Scott Branden <sbranden@broadcom.com>
 ---
- .../devicetree/bindings/mmc/brcm,sdhci-iproc.txt   | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt
+ drivers/mmc/host/sdhci.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt b/Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt
-new file mode 100644
-index 0000000..72cc9cc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt
-@@ -0,0 +1,23 @@
-+Broadcom IPROC SDHCI controller
-+
-+This file documents differences between the core properties described
-+by mmc.txt and the properties that represent the IPROC SDHCI controller.
-+
-+Required properties:
-+- compatible : Should be "brcm,sdhci-iproc-cygnus".
-+- clocks : The clock feeding the SDHCI controller.
-+
-+Optional properties:
-+  - sdhci,auto-cmd12: specifies that controller should use auto CMD12.
-+
-+Example:
-+
-+sdhci0: sdhci at 0x18041000 {
-+	compatible = "brcm,sdhci-iproc-cygnus";
-+	reg = <0x18041000 0x100>;
-+	interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
-+	clocks = <&lcpll0_clks BCM_CYGNUS_LCPLL0_SDIO_CLK>;
-+	bus-width = <4>;
-+	sdhci,auto-cmd12;
-+	no-1-8-v;
-+};
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index fcf78ab..f35d413 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -28,6 +28,7 @@
+ #include <linux/mmc/mmc.h>
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/card.h>
++#include <linux/mmc/sdio.h>
+ #include <linux/mmc/slot-gpio.h>
+ 
+ #include "sdhci.h"
+@@ -934,7 +935,8 @@ static void sdhci_set_transfer_mode(struct sdhci_host *host,
+ 		 * If we are sending CMD23, CMD12 never gets sent
+ 		 * on successful completion (so no Auto-CMD12).
+ 		 */
+-		if (!host->mrq->sbc && (host->flags & SDHCI_AUTO_CMD12))
++		if (!host->mrq->sbc && (host->flags & SDHCI_AUTO_CMD12) &&
++		    (cmd->opcode != SD_IO_RW_EXTENDED))
+ 			mode |= SDHCI_TRNS_AUTO_CMD12;
+ 		else if (host->mrq->sbc && (host->flags & SDHCI_AUTO_CMD23)) {
+ 			mode |= SDHCI_TRNS_AUTO_CMD23;
 -- 
 2.2.2
