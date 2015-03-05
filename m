@@ -1,36 +1,93 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 5 Mar 2015 14:23:04 -0600
-Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
- msm-id and qcom, board-id
-In-Reply-To: <7h8ufbjkod.fsf@deeprootsystems.com>
-References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
- <7h8ufbjkod.fsf@deeprootsystems.com>
-Message-ID: <07D4E4D1-BF8C-4583-9505-9F321DB10406@codeaurora.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 5 Mar 2015 21:34:32 +0100
+Subject: [PATCH v4 4/9] power: reset: Add AT91RM9200 reset driver
+In-Reply-To: <1425584954.24292.243.camel@x220>
+References: <1425570594-13124-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1425570594-13124-5-git-send-email-alexandre.belloni@free-electrons.com>
+ <1425584954.24292.243.camel@x220>
+Message-ID: <20150305203432.GB3989@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Mar 5, 2015, at 1:42 PM, Kevin Hilman <khilman@kernel.org> wrote:
-
-> Kumar Gala <galak@codeaurora.org> writes:
+On 05/03/2015 at 20:49:14 +0100, Paul Bolle wrote :
+> On Thu, 2015-03-05 at 16:49 +0100, Alexandre Belloni wrote:
+> > --- a/drivers/power/reset/Kconfig
+> > +++ b/drivers/power/reset/Kconfig
+> > @@ -30,6 +30,13 @@ config POWER_RESET_AT91_RESET
+> >  	  This driver supports restart for Atmel AT91SAM9 and SAMA5
+> >  	  SoCs
+> >  
+> > +config POWER_RESET_AT91RM9200_RESET
+> > +	bool "Atmel AT91RM9200 reset driver"
 > 
->> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
->> on Qualcomm MSM platforms to determine which device tree should be
->> utilized and passed to the kernel.
->> 
->> Cc: <devicetree@vger.kernel.org>
->> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> This adds a bool symbol.
 > 
-> Is this the special magic that allows qcom bootloaders to take a kernel
-> plus multiple DTBs and figure out which DTB to pass?
+> > +	depends on ARCH_AT91 && MFD_SYSCON
+> > +	default SOC_AT91RM9200
+> > +	help
+> > +	  This driver supports restart for Atmel AT91RM9200.
+> > +
+> >  config POWER_RESET_AXXIA
+> >  	bool "LSI Axxia reset driver"
+> >  	depends on ARCH_AXXIA
+> > diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+> > index 11de15bae52e..96e972bbb922 100644
+> > --- a/drivers/power/reset/Makefile
+> > +++ b/drivers/power/reset/Makefile
+> > @@ -1,6 +1,7 @@
+> >  obj-$(CONFIG_POWER_RESET_AS3722) += as3722-poweroff.o
+> >  obj-$(CONFIG_POWER_RESET_AT91_POWEROFF) += at91-poweroff.o
+> >  obj-$(CONFIG_POWER_RESET_AT91_RESET) += at91-reset.o
+> > +obj-$(CONFIG_POWER_RESET_AT91RM9200_RESET) += at91rm9200-reset.o
 > 
-> Kevin
+> This objectfile will never be modular.
+> 
+> >  obj-$(CONFIG_POWER_RESET_AXXIA) += axxia-reset.o
+> >  obj-$(CONFIG_POWER_RESET_BRCMSTB) += brcmstb-reboot.o
+> >  obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
+> > diff --git a/drivers/power/reset/at91rm9200-reset.c b/drivers/power/reset/at91rm9200-reset.c
+> > new file mode 100644
+> > index 000000000000..b739ac82b9c9
+> > --- /dev/null
+> > +++ b/drivers/power/reset/at91rm9200-reset.c
+> > @@ -0,0 +1,72 @@
+> 
+> > +#include <linux/module.h>
+> 
+> Is this needed?
+> 
+> > +static struct platform_driver at91rm9200_reset_driver = {
+> > +	.probe = at91rm9200_reset_probe,
+> > +	.driver = {
+> > +		.name = "at91rm9200-reset",
+> > +		.of_match_table = at91rm9200_reset_of_match,
+> > +	},
+> > +};
+> > +module_platform_driver(at91rm9200_reset_driver);
+> 
+> This should, perhaps, be replaced by a wrapper that calls
+>     platform_driver_register(at91rm9200_reset_driver)
+> 
+> while that wrapper is, well, called through
+>     device_initcall()
+> 
+> or something similar. I didn't test this suggestion.
+> 
+> > +MODULE_ALIAS("platform:at91rm9200-reset");
+> > +MODULE_AUTHOR("Alexandre Belloni <alexandre.belloni@free-electrons.com>");
+> > +MODULE_DESCRIPTION("Atmel at91rm9200 System Timer Reset driver");
+> > +MODULE_LICENSE("GPL v2");
+> 
+> All these macros will be, basically, preprocessed away.
+> 
+> 
 
-yes
+Indeed, a lot got cargo culted/copy-pasted. I'll fix it and the
+at91-reset driver too.
 
-- k
+Thanks!
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
