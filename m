@@ -1,86 +1,60 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 04 Mar 2015 16:19:45 -0800
-Subject: [RFC PATCH v2 2/3] arm64: add IOMMU dma_ops
-In-Reply-To: <54F5A5FE.3040506@arm.com>
-References: <cover.1423226542.git.robin.murphy@arm.com>			
- <058e038009ac708a40197c80e07410914c2a162e.1423226542.git.robin.murphy@arm.com>		
- <1423543151.18280.2.camel@mtksdaap41> <54D9F486.10501@arm.com>	
- <1423901011.27922.7.camel@mhfsdcap03> <54E24D50.408@arm.com>
- <1425353927.4555.10.camel@mhfsdcap03> <54F5A5FE.3040506@arm.com>
-Message-ID: <54F7A121.3050103@codeaurora.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 5 Mar 2015 09:27:20 +0900
+Subject: [PATCH 1/2] ARM: shmobile: Enable bockw board in multiplatform
+ defconfig
+In-Reply-To: <1425471261-25110-2-git-send-email-geert+renesas@glider.be>
+References: <1425471261-25110-1-git-send-email-geert+renesas@glider.be>
+ <1425471261-25110-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <20150305002717.GA4558@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/3/2015 4:15 AM, Robin Murphy wrote:
-> On 03/03/15 03:38, Yong Wu wrote:
->> On Mon, 2015-02-16 at 20:04 +0000, Robin Murphy wrote:
->>
->>>>        2)int (*domain_init)(struct iommu_domain *domain);
->>>>          About this function, it will alloc pagetable for the iommu
->>>> domain. And We expect the pagetable memory is uncacheable, so try to
->>>> call "dma_alloc_coherent", unfortunately the "struct device *" can't be
->>>> passed into this function. so is it possible if adding a parameter in
->>>> this function.
->>>
->>> ...one of the ideas of the new of_iommu_configure framework is that
->>> iommu_ops structures can represent individual IOMMU devices if
->>> necessary. The ops->priv pointer was included for that purpose, but
->>> isn't very clean so Will has plans to remove it again - it's easy enough
->>> to achieve the same effect by having the driver embed the ops in its
->>> private instance data instead. I've done that with the ARM SMMU driver
->>> which has a similar issue of needing hardware details at domain_init()
->>> time (no patches ready yet but I have an iommu/dev branch on top of the
->>> iommu/dma branch with some current work-in-progress bits)
->>>
->>> Thanks,
->>> Robin.
->>>
->> Dear Robin,
->>          Thanks very much for your suggestion.
->>
->>          I have a more question: how to do cache maintenance in arm64.
->>
->>          a) "__dma_flush_range" can not be expected to used directly.
->>          b) Following Documentation\DMA-API.txt, section: Streaming DMA
->> mappings. dma_map_single should be used, But I am not sure how to pass
->> the first "struct device *".
->>           We have a device which call arch_setup_dma_ops to create the
->> iommu domain, if we use this device, it will enter __iommu_map_page;
->>          If we input NULL for dmap_map_single, it will assert at
->> dma_capable in swiotlb_map_page...
->
-> Consider that the IOMMU's page table walker is a DMA master in its own
-right, and that is the device you're mapping the page tables for.
-Therefore your IOMMU driver needs to have access to the struct device
-of the IOMMU itself to use for the page-table-related mappings. Also,
-be sure to set the IOMMU's DMA mask correctly to prevent SWIOTLB bounce
-buffers being created in the process (which as I've found generally ends
-in disaster).
->
->>          And normally, we always need do cache maintenance only for some
->> bytes in the pagetable but not whole a page. Then is there a easy way to
->> do the cache maintenance?
->
-> For a noncoherent device, dma_map_single() will end up calling
-__dma_map_area() with the page offset and size of the original request, so
-the updated part gets flushed by VA, and the rest of the page isn't touched
-if it doesn't need to be. On the other hand if the page tables were
-allocated with dma_alloc_coherent() in the first place, then just calling
-dma_sync_single_for_device() for the updated region should suffice.
->
+On Wed, Mar 04, 2015 at 01:14:20PM +0100, Geert Uytterhoeven wrote:
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>   - Derived from r8a7778-bockw.dtb using
+>     https://github.com/geertu/linux-scripts/blob/master/linux-config-from-dt
+>   - Not tested on bockw due to lack of hardware
+> ---
+>  arch/arm/configs/shmobile_defconfig | 3 +++
+>  1 file changed, 3 insertions(+)
 
-Where exactly would you call the dma_unmap? It seems a bit strange to
-be repeatedly calling dma_map and never calling dma_unmap. I don't see it
-explicitly forbidden in the docs anywhere to do this but it seems like
-it would be violating the implicit handoff of dma_map/dma_unmap.
+Thanks, I have queued this up.
 
-> Robin.
->
-
-Thanks,
-Laura
-
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> 
+> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+> index 11554158fa96ca9c..b58618e2d13c51c8 100644
+> --- a/arch/arm/configs/shmobile_defconfig
+> +++ b/arch/arm/configs/shmobile_defconfig
+> @@ -14,6 +14,7 @@ CONFIG_ARCH_EMEV2=y
+>  CONFIG_ARCH_R7S72100=y
+>  CONFIG_ARCH_R8A73A4=y
+>  CONFIG_ARCH_R8A7740=y
+> +CONFIG_ARCH_R8A7778=y
+>  CONFIG_ARCH_R8A7779=y
+>  CONFIG_ARCH_R8A7790=y
+>  CONFIG_ARCH_R8A7791=y
+> @@ -137,6 +138,7 @@ CONFIG_V4L_MEM2MEM_DRIVERS=y
+>  CONFIG_VIDEO_RENESAS_VSP1=y
+>  # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
+>  CONFIG_VIDEO_ADV7180=y
+> +CONFIG_VIDEO_ML86V7667=y
+>  CONFIG_DRM=y
+>  CONFIG_DRM_RCAR_DU=y
+>  CONFIG_FB_SH_MOBILE_LCDC=y
+> @@ -171,6 +173,7 @@ CONFIG_LEDS_GPIO=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DRV_RS5C372=y
+>  CONFIG_RTC_DRV_S35390A=y
+> +CONFIG_RTC_DRV_RX8581=y
+>  CONFIG_DMADEVICES=y
+>  CONFIG_SH_DMAE=y
+>  CONFIG_RCAR_DMAC=y
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
