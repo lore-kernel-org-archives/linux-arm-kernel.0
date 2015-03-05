@@ -1,107 +1,268 @@
 From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Thu, 5 Mar 2015 10:43:21 +0800
-Subject: [PATCH] clk: mediatek: Export CPU mux clocks for CPU frequency
- control
-In-Reply-To: <20150304112109.GB11010@pengutronix.de>
-References: <1425466152-7867-1-git-send-email-pi-cheng.chen@linaro.org>
- <20150304112109.GB11010@pengutronix.de>
-Message-ID: <CALx668WKKmifhuODsV+Uaoq4ggcmB1=wbpLzXBnjEtxbuB4qig@mail.gmail.com>
+Date: Thu, 5 Mar 2015 11:32:33 +0800
+Subject: [PATCH v2 1/4] cpufreq-dt: add clock domain and intermediate
+ frequency support
+In-Reply-To: <CAKohpomw6iDRRMxgmOORzZVeW4h2-LzKOsUcdpUnANcxiAYm+A@mail.gmail.com>
+References: <1425458956-20665-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1425458956-20665-2-git-send-email-pi-cheng.chen@linaro.org>
+ <CAKohpomw6iDRRMxgmOORzZVeW4h2-LzKOsUcdpUnANcxiAYm+A@mail.gmail.com>
+Message-ID: <CALx668XCh46yMLajThuVzba9RRSxf+tEkNuMP9J7w-=vsZN8-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Hi Viresh,
 
-On 4 March 2015 at 19:21, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Wed, Mar 04, 2015 at 06:49:11PM +0800, pi-cheng.chen wrote:
->> This patch adds CPU mux clocks which are used by Mediatek cpufreq driver
->> for intermediate clock source switching. This patch is based on Mediatek
->> clock driver patches[1].
->>
->> [1] http://thread.gmane.org/gmane.linux.kernel/1892436
+Thanks for reviewing. Please see my reply below:
+
+On 4 March 2015 at 18:15, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 4 March 2015 at 14:19, pi-cheng.chen <pi-cheng.chen@linaro.org> wrote:
+>> In this patch, CPU clock/power domain information is added into the
+>> platform_data of cpufreq-dt so that cpufreq-dt driver could check with CPUs
+>> share clock/power. Also, intermediate frequency support is added in this
+>
+> You should have separate patches for logically separate changes.
+
+Sure. Will do it.
+
+>
+>> version. Since the program flows of .target_index and .target_intermediate
+>> are quite similar, consolidate the flow as a new function to keep readibility.
 >>
 >> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
 >> ---
->> +static long clk_cpumux_determine_rate(struct clk_hw *hw, unsigned long rate,
->> +                                   unsigned long min_rate,
->> +                                   unsigned long max_rate,
->> +                                   unsigned long *best_parent_rate,
->> +                                   struct clk_hw **best_parent_p)
+>>  drivers/cpufreq/cpufreq-dt.c | 68 +++++++++++++++++++++++++++++++++++++++-----
+>>  include/linux/cpufreq-dt.h   |  7 +++++
+>>  2 files changed, 68 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+>> index bab67db..5948bdf 100644
+>> --- a/drivers/cpufreq/cpufreq-dt.c
+>> +++ b/drivers/cpufreq/cpufreq-dt.c
+>> @@ -34,25 +34,37 @@ struct private_data {
+>>         struct regulator *cpu_reg;
+>>         struct thermal_cooling_device *cdev;
+>>         unsigned int voltage_tolerance; /* in percentage */
+>> +       unsigned long intermediate_freq;
+>>  };
+>>
+>> -static int set_target(struct cpufreq_policy *policy, unsigned int index)
+>> +static unsigned int get_intermediate(struct cpufreq_policy *policy,
+>> +                                    unsigned int index)
 >> +{
->> +     struct clk *clk = hw->clk, *parent;
->> +     unsigned long parent_rate;
->> +     int i;
+>> +       struct private_data *priv = policy->driver_data;
+>> +       struct cpufreq_frequency_table *freq_table;
+>> +       unsigned long freq = clk_get_rate(policy->clk);
+>
+> This will return current freq, which can also be fetched with
+> policy->cur.
+
+Will fix it.
+
+>
 >> +
->> +     for (i = MAINPLL_INDEX; i >= ARMPLL_INDEX; i--) {
->> +             parent = clk_get_parent_by_index(clk, i);
->> +             if (!parent)
->> +                     return 0;
+>> +       freq_table = cpufreq_frequency_get_table(policy->cpu);
+>
+> instead, freq_table = policy->freq_table.
+
+Will fix it.
+
+>
 >> +
->> +             if (i == MAINPLL_INDEX) {
->> +                     parent_rate = __clk_get_rate(parent);
->> +                     if (parent_rate == rate)
->> +                             break;
->> +             }
+>
+> Always add a comment over such decision making expressions, on
+> why you chose to return 0.
+
+Will fix it.
+
+>
+>> +       if (freq == priv->intermediate_freq ||
+>
+> Looks fine, current freq == intermediate freq..
+>
+>> +           freq_table[index].frequency * 1000 == freq)
+>
+> Absolutely wrong, current-freq == requested-freq.
+> Instead it should be:
+>
+> freq_table[index].frequency * 1000 == priv->intermediate_freq.
+>
+
+Thanks for correcting. Will fix it.
+
+>> +               return 0;
 >> +
->> +             parent_rate = __clk_round_rate(parent, rate);
->> +     }
->> +
->> +     *best_parent_rate = parent_rate;
->> +     *best_parent_p = __clk_get_hw(parent);
->> +     return parent_rate;
+>> +       return priv->intermediate_freq;
 >> +}
->
-> Why this determine_rate hook? If you want to switch the clock to some
-> intermediate parent I would assume you do this explicitly by setting the
-> parent and not implicitly by setting a rate.
->
-
-I use determine_rate hook here because I am using generic cpufreq-dt
-driver and I want to make clock switching transparent to cpufreq-dt.
-I.e. when I am trying to switch the clock from ARMPLL to MAINPLL, I
-call clk_set_rate() with the rate of MAINPLL, and determine_rate will
-select MAINPLL as the new parent.
-
->> +int mtk_clk_register_cpumuxes(struct device_node *node,
->> +                           struct mtk_composite *clks, int num,
->> +                           struct clk_onecell_data *clk_data)
+>> +
+>> +static int set_frequency(struct cpufreq_policy *policy, long freq_Hz)
+>>  {
+>>         struct dev_pm_opp *opp;
+>> -       struct cpufreq_frequency_table *freq_table = policy->freq_table;
+>>         struct clk *cpu_clk = policy->clk;
+>>         struct private_data *priv = policy->driver_data;
+>>         struct device *cpu_dev = priv->cpu_dev;
+>>         struct regulator *cpu_reg = priv->cpu_reg;
+>>         unsigned long volt = 0, volt_old = 0, tol = 0;
+>>         unsigned int old_freq, new_freq;
+>> -       long freq_Hz, freq_exact;
+>> +       long freq_exact;
+>>         int ret;
+>>
+>> -       freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
+>> -       if (freq_Hz <= 0)
+>> -               freq_Hz = freq_table[index].frequency * 1000;
+>> -
+>>         freq_exact = freq_Hz;
+>>         new_freq = freq_Hz / 1000;
+>>         old_freq = clk_get_rate(cpu_clk) / 1000;
+>> @@ -112,6 +124,29 @@ static int set_target(struct cpufreq_policy *policy, unsigned int index)
+>>         return ret;
+>>  }
+>>
+>> +static int target_intermediate(struct cpufreq_policy *policy,
+>> +                              unsigned int index)
 >> +{
->> +     int i;
->> +     struct clk *clk;
->> +     struct regmap *regmap;
+>> +       struct private_data *priv = policy->driver_data;
+>> +       long freq_Hz;
 >> +
->> +     if (!clk_data)
->> +             return -ENOMEM;
->> +
->> +     regmap = syscon_node_to_regmap(node);
->> +     if (IS_ERR(regmap)) {
->> +             pr_err("Cannot find regmap for %s: %ld\n", node->full_name,
->> +                    PTR_ERR(regmap));
->> +             return PTR_ERR(regmap);
->> +     }
->> +
->> +     for (i = 0; i < num; i++) {
->> +             struct mtk_composite *mux = &clks[i];
->> +
->> +             clk = mtk_clk_register_cpumux(mux->name, mux->parent_names,
->> +                                           mux->num_parents, regmap,
->> +                                           mux->mux_reg, mux->mux_shift,
->> +                                           mux->mux_width);
+>> +       freq_Hz = priv->intermediate_freq;
+>> +       return set_frequency(policy, freq_Hz);
 >
-> Pass 'mux' directly instead of dispatching this struct into the
-> individual fields.
-> Also, probably better to move this function to
-> drivers/clk/mediatek/clk-cpumux.c
+> Instead, return set_frequency(policy, priv->intermediate_freq);
 
-Will do it. Thanks for reviewing.
+Will fix it.
+
+>
+>> +}
+>> +
+>> +static int set_target(struct cpufreq_policy *policy, unsigned int index)
+>> +{
+>> +       struct cpufreq_frequency_table *freq_table = policy->freq_table;
+>> +       struct clk *cpu_clk = policy->clk;
+>> +       long freq_Hz;
+>> +
+>> +       freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
+>
+> Use policy->clk here directly instead of another local variable.
+
+Will fix it.
+
+>
+>> +       if (freq_Hz <= 0)
+>> +               freq_Hz = freq_table[index].frequency * 1000;
+>
+> Why shouldn't we call clk_round_rate() for intermediate freq as well ?
+
+Yes. Will do it.
+
+> I think, it
+> should be called for it as well.. And so you can save intermediate_freq_index
+> instead of the freq..
+>
+
+Here is the case I wanted to talk to you at HKG15:
+In the case of Mediatek SoC, the intermediate frequency might not be one entry
+of OPP table. To elaborate, the source clock node of the CPUs/Cluster on
+Mediatek SoC is a mux. The mux has several PLLs as parents. When we are
+doing CPU frequency scaling, the mux should re-parent to another stable PLL,
+wait until the original parent PLL become stable, and then switch back to the
+original parent. In this case, we could but we might not want the intermediate
+frequency as part of OPP table. Therefore I save intermediate_freq instead of
+intermediate frequency index in the cpufreq_dt_platform_datat struct.
+
+BTW, is this case that intermediate frequency is not necessarily be one entry
+of OPP table supported in the OPPv2 bindings?
+
+>> +       return set_frequency(policy, freq_Hz);
+>> +}
+>> +
+>>  static int allocate_resources(int cpu, struct device **cdev,
+>>                               struct regulator **creg, struct clk **cclk)
+>>  {
+>> @@ -296,6 +331,23 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+>>         pd = cpufreq_get_driver_data();
+>>         if (!pd || !pd->independent_clocks)
+>>                 cpumask_setall(policy->cpus);
+>> +       else if (pd && !list_empty(&pd->domain_list)) {
+>> +               struct list_head *domain_node;
+>> +               struct cpufreq_cpu_domain *domain;
+>> +
+>> +               list_for_each(domain_node, &pd->domain_list) {
+>> +                       domain = container_of(domain_node,
+>> +                                             struct cpufreq_cpu_domain, node);
+>> +                       if (!cpumask_test_cpu(policy->cpu, &domain->cpus))
+>> +                               continue;
+>> +
+>> +                       if (domain->intermediate_freq)
+>> +                               priv->intermediate_freq =
+>> +                                               domain->intermediate_freq;
+>> +                       cpumask_copy(policy->cpus, &domain->cpus);
+>> +                       break;
+>> +               }
+>> +       }
+>>
+>
+> Do this in a separate patch.
+
+Will do it.
+
+>
+>>         of_node_put(np);
+>>
+>> @@ -363,6 +415,8 @@ static struct cpufreq_driver dt_cpufreq_driver = {
+>>         .verify = cpufreq_generic_frequency_table_verify,
+>>         .target_index = set_target,
+>>         .get = cpufreq_generic_get,
+>> +       .get_intermediate = get_intermediate,
+>> +       .target_intermediate = target_intermediate,
+>>         .init = cpufreq_init,
+>>         .exit = cpufreq_exit,
+>>         .ready = cpufreq_ready,
+>> diff --git a/include/linux/cpufreq-dt.h b/include/linux/cpufreq-dt.h
+>> index 0414009..d6e2097 100644
+>> --- a/include/linux/cpufreq-dt.h
+>> +++ b/include/linux/cpufreq-dt.h
+>> @@ -10,6 +10,12 @@
+>>  #ifndef __CPUFREQ_DT_H__
+>>  #define __CPUFREQ_DT_H__
+>>
+>> +struct cpufreq_cpu_domain {
+>> +       struct list_head node;
+>> +       cpumask_t cpus;
+>> +       unsigned long intermediate_freq;
+>
+> This should come from DT instead of platform data.
+>
+>> +};
+>
+> This struct will die along with the below one as soon as my patches
+> on OPP bindings V2 get merged.
+
+Sure. Will adapt the new way once it's merged.
+
+>
+>>  struct cpufreq_dt_platform_data {
+>>         /*
+>>          * True when each CPU has its own clock to control its
+>> @@ -17,6 +23,7 @@ struct cpufreq_dt_platform_data {
+>>          * clock.
+>>          */
+>>         bool independent_clocks;
+>> +       struct list_head domain_list;
+>
+> Also update the comment on how what these fields mean..
+
+Will do it.
+
+Thanks.
 
 Best Regards,
 Pi-Cheng
 
 >
-> Sascha
->
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>>  };
+>>
+>>  #endif /* __CPUFREQ_DT_H__ */
+>> --
+>> 1.9.1
+>>
