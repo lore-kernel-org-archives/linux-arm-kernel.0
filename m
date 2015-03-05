@@ -1,31 +1,143 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 5 Mar 2015 10:41:42 +0100
-Subject: [PATCH 08/11] Documentation: bindings: move the Berlin pinctrl
- documentation
-In-Reply-To: <1423671332-24580-9-git-send-email-antoine.tenart@free-electrons.com>
-References: <1423671332-24580-1-git-send-email-antoine.tenart@free-electrons.com>
- <1423671332-24580-9-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <CACRpkdY5g4Xjtf0gRP2b2BjEmXRgorwDB8zFaUcGZbpwPGQE1g@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu,  5 Mar 2015 09:44:45 +0000
+Subject: [PATCH v1 0/6] Add simple EEPROM Framework via regmap.
+In-Reply-To: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1424365639-26634-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1425548685-12887-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 11, 2015 at 5:15 PM, Antoine Tenart
-<antoine.tenart@free-electrons.com> wrote:
+Thankyou all for providing inputs and comments on RFC patchset.
+Here is the v1 of the patchset addressing all the issues raised as
+part of RFC review.
 
-> The Berlin pinctrl documentation was part of the Marvell Berlin SoC
-> documentation because the Berlin pinctrl configuration was inside the
-> chip and the system controllers. With the recent rework of the chip and
-> system controller handling (now an MFD driver registers all sub-devices
-> of the two soc and system controller nodes and each device has its own
-> sub-node), the documentation of the Berlin pinctrl driver can be moved
-> to the generic pinctrl documentation directory.
->
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+This patchset adds a new simple EEPROM framework to kernel.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Up until now, EEPROM drivers were stored in drivers/misc, where they all had to
+duplicate pretty much the same code to register a sysfs file, allow in-kernel
+users to access the content of the devices they were driving, etc.
+    
+This was also a problem as far as other in-kernel users were involved, since
+the solutions used were pretty much different from on driver to another, there
+was a rather big abstraction leak.
+    
+This introduction of this framework aims at solving this. It also introduces DT
+representation for consumer devices to go get the data they require (MAC
+Addresses, SoC/Revision ID, part numbers, and so on) from the EEPROMs.
+    
+Having regmap interface to this framework would give much better
+abstraction for eeproms on different buses.
 
-I tried applying the patch but it doesn't work. Rebase on v4.0-rc1 and
-resend if you want me to apply it to the pinctrl tree.
+patch 1-4 Introduces the EEPROM framework.
+Patch 5 migrates an existing driver to eeprom framework.
+Patch 6 Adds Qualcomm specific qfprom driver.
 
-Yours,
-Linus Walleij
+Its also possible to migrate other eeprom drivers to this framework.
+Patch 6 can also be made a generic mmio-eeprom driver.
+
+Providers APIs:
+	eeprom_register/unregister();
+
+Consumers APIs:
+	eeprom_cell_get()/of_eeprom_cell_get()/of_eeprom_cell_get_byname();
+	eeprom_cell_read()/eeprom_cell_write();
+
+Device Tree:
+
+	/* Provider */
+	qfprom: qfprom at 00700000 {
+		compatible 	= "qcom,qfprom";
+		reg		= <0x00700000 0x1000>;
+		...
+
+		/* Data cells */
+		tsens_calibration: calib at 404 {
+			reg = <0x404 0x10>;
+		};
+
+		serial_number: sn {
+			reg = <0x104 0x4>, <0x204 0x4>, <0x30c 0x4>;
+
+		};
+		...
+	};
+	
+	/* Consumer node */
+	tsens: tsens {
+		...
+		eeproms = <&tsens_calibration>;
+		eeprom-names = "calib";
+		...
+	};
+
+userspace interface:
+
+hexdump /sys/class/eeprom/qfprom0/eeprom
+                                                                                                                                                                                                                  
+0000000 0000 0000 0000 0000 0000 0000 0000 0000
+*
+00000a0 db10 2240 0000 e000 0c00 0c00 0000 0c00
+0000000 0000 0000 0000 0000 0000 0000 0000 0000
+...
+*
+0001000
+
+
+Changes since RFC(https://lkml.org/lkml/2015/2/19/307)
+ * Fix documentation and error checks in read/write spotted by Andrew Lunn
+ * Kconfig fix suggested by Stephen Boyd.
+ * Add module owner suggested by Stephen Boyd and others.
+ * Fix unsafe handling of eeprom in unregister spotted by Russell and Mark Brown.
+ * seperate bindings patch as suggested by Rob.
+ * Add MAINTAINERS as suggested by Rob.
+ * Added support to allow reading eeprom for things like serial number which
+ * canbe scatters across.
+ * Added eeprom data using reg property suggested by Sascha and Stephen.
+ * Added non-DT support.
+ * Move kerneldoc to the src files spotted by Mark Brown.
+ * Remove local list and do eeprom lookup by using class_find_device()
+
+
+Thanks,
+srini
+
+
+Maxime Ripard (1):
+  eeprom: sunxi: Move the SID driver to the eeprom framework
+
+Srinivas Kandagatla (5):
+  eeprom: Add a simple EEPROM framework for eeprom providers
+  eeprom: Add a simple EEPROM framework for eeprom consumers
+  eeprom: Add bindings for simple eeprom framework
+  eeprom: qfprom: Add Qualcomm QFPROM support.
+  eeprom: Add to MAINTAINERS for eeprom framework
+
+ Documentation/ABI/testing/sysfs-driver-sunxi-sid   |  22 -
+ .../devicetree/bindings/eeprom/eeprom.txt          |  70 +++
+ MAINTAINERS                                        |   9 +
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   1 +
+ drivers/eeprom/Kconfig                             |  38 ++
+ drivers/eeprom/Makefile                            |  11 +
+ drivers/eeprom/core.c                              | 506 +++++++++++++++++++++
+ drivers/eeprom/eeprom-sunxi-sid.c                  | 129 ++++++
+ drivers/eeprom/qfprom.c                            |  74 +++
+ drivers/misc/eeprom/Kconfig                        |  13 -
+ drivers/misc/eeprom/Makefile                       |   1 -
+ drivers/misc/eeprom/sunxi_sid.c                    | 156 -------
+ include/linux/eeprom-consumer.h                    |  67 +++
+ include/linux/eeprom-provider.h                    |  47 ++
+ 15 files changed, 954 insertions(+), 192 deletions(-)
+ delete mode 100644 Documentation/ABI/testing/sysfs-driver-sunxi-sid
+ create mode 100644 Documentation/devicetree/bindings/eeprom/eeprom.txt
+ create mode 100644 drivers/eeprom/Kconfig
+ create mode 100644 drivers/eeprom/Makefile
+ create mode 100644 drivers/eeprom/core.c
+ create mode 100644 drivers/eeprom/eeprom-sunxi-sid.c
+ create mode 100644 drivers/eeprom/qfprom.c
+ delete mode 100644 drivers/misc/eeprom/sunxi_sid.c
+ create mode 100644 include/linux/eeprom-consumer.h
+ create mode 100644 include/linux/eeprom-provider.h
+
+-- 
+1.9.1
