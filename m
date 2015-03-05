@@ -1,268 +1,65 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Thu, 5 Mar 2015 11:32:33 +0800
-Subject: [PATCH v2 1/4] cpufreq-dt: add clock domain and intermediate
- frequency support
-In-Reply-To: <CAKohpomw6iDRRMxgmOORzZVeW4h2-LzKOsUcdpUnANcxiAYm+A@mail.gmail.com>
-References: <1425458956-20665-1-git-send-email-pi-cheng.chen@linaro.org>
- <1425458956-20665-2-git-send-email-pi-cheng.chen@linaro.org>
- <CAKohpomw6iDRRMxgmOORzZVeW4h2-LzKOsUcdpUnANcxiAYm+A@mail.gmail.com>
-Message-ID: <CALx668XCh46yMLajThuVzba9RRSxf+tEkNuMP9J7w-=vsZN8-Q@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 4 Mar 2015 21:53:57 -0600
+Subject: [PATCH v2 0/3] remoteproc: Introduce wkup_m3_rproc driver
+Message-ID: <1425527640-2690-1-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Hi,
+This patch series is version two of the series to add a
+wkup_m3_rproc driver for TI AM335x SoCs. This family of SoCs
+contains an ARM Cortex M3 coprocessor that is responsible for
+low-level power tasks that cannot be handled by the main ARM
+Cortex A8 so firmware running from the CM3 can be used instead.
+This driver handles loading of the firmware and reset of the CM3
+once it is booted.
 
-Thanks for reviewing. Please see my reply below:
+The previous version of this series can be found here [1].
+I have pushed a branch based on v4.0-rc1 containing the entire 
+am335x suspend series here for a higher level view of the entire
+series of patch sets here [2].
 
-On 4 March 2015 at 18:15, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 4 March 2015 at 14:19, pi-cheng.chen <pi-cheng.chen@linaro.org> wrote:
->> In this patch, CPU clock/power domain information is added into the
->> platform_data of cpufreq-dt so that cpufreq-dt driver could check with CPUs
->> share clock/power. Also, intermediate frequency support is added in this
->
-> You should have separate patches for logically separate changes.
+This patch set contains a new patch from Suman Anna that replaces
+the RSC_INTMEM patch that this series used to depend on based on
+comments on that series. More info is included in the patch.
+Additional changes are:
 
-Sure. Will do it.
+v1 -> v2:
+-firmware loaded has changed, new code added by Suman Anna
+-wkup_m3_rproc can now be built and loaded as a module
+-added binding info and docs for am437x support
+-dts and pdata-quirks patch split to separate mach-omap2 series
+-remove ti,no-reset-on-init from required dt binding as it asserts
+ hardreset which is default state of wkup_m3 anyway
 
->
->> version. Since the program flows of .target_index and .target_intermediate
->> are quite similar, consolidate the flow as a new function to keep readibility.
->>
->> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
->> ---
->>  drivers/cpufreq/cpufreq-dt.c | 68 +++++++++++++++++++++++++++++++++++++++-----
->>  include/linux/cpufreq-dt.h   |  7 +++++
->>  2 files changed, 68 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
->> index bab67db..5948bdf 100644
->> --- a/drivers/cpufreq/cpufreq-dt.c
->> +++ b/drivers/cpufreq/cpufreq-dt.c
->> @@ -34,25 +34,37 @@ struct private_data {
->>         struct regulator *cpu_reg;
->>         struct thermal_cooling_device *cdev;
->>         unsigned int voltage_tolerance; /* in percentage */
->> +       unsigned long intermediate_freq;
->>  };
->>
->> -static int set_target(struct cpufreq_policy *policy, unsigned int index)
->> +static unsigned int get_intermediate(struct cpufreq_policy *policy,
->> +                                    unsigned int index)
->> +{
->> +       struct private_data *priv = policy->driver_data;
->> +       struct cpufreq_frequency_table *freq_table;
->> +       unsigned long freq = clk_get_rate(policy->clk);
->
-> This will return current freq, which can also be fetched with
-> policy->cur.
+The driver expects to load firmware am335x-pm-firmware.elf from
+/lib/firmware which is found here [3].
 
-Will fix it.
+Regards,
+Dave
 
->
->> +
->> +       freq_table = cpufreq_frequency_get_table(policy->cpu);
->
-> instead, freq_table = policy->freq_table.
+[1] http://www.spinics.net/lists/arm-kernel/msg387984.html
+[2] https://github.com/dgerlach/linux-pm/tree/pm-v4.0-rc1-am335x-suspend
+[3] https://git.ti.com/ti-cm3-pm-firmware/amx3-cm3/commits/next-upstream
 
-Will fix it.
+Dave Gerlach (2):
+  Documentation: dt: add ti,am3353-wkup-m3 bindings
+  remoteproc: wkup_m3: Add wkup_m3 remoteproc driver
 
->
->> +
->
-> Always add a comment over such decision making expressions, on
-> why you chose to return 0.
+Suman Anna (1):
+  remoteproc: add a rproc ops for performing address translation
 
-Will fix it.
+ .../bindings/remoteproc/wkup_m3_rproc.txt          |  46 +++++
+ drivers/remoteproc/Kconfig                         |  13 ++
+ drivers/remoteproc/Makefile                        |   1 +
+ drivers/remoteproc/remoteproc_core.c               |  31 ++-
+ drivers/remoteproc/wkup_m3_rproc.c                 | 229 +++++++++++++++++++++
+ include/linux/platform_data/wkup_m3.h              |  25 +++
+ include/linux/remoteproc.h                         |   2 +
+ 7 files changed, 341 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
+ create mode 100644 drivers/remoteproc/wkup_m3_rproc.c
+ create mode 100644 include/linux/platform_data/wkup_m3.h
 
->
->> +       if (freq == priv->intermediate_freq ||
->
-> Looks fine, current freq == intermediate freq..
->
->> +           freq_table[index].frequency * 1000 == freq)
->
-> Absolutely wrong, current-freq == requested-freq.
-> Instead it should be:
->
-> freq_table[index].frequency * 1000 == priv->intermediate_freq.
->
-
-Thanks for correcting. Will fix it.
-
->> +               return 0;
->> +
->> +       return priv->intermediate_freq;
->> +}
->> +
->> +static int set_frequency(struct cpufreq_policy *policy, long freq_Hz)
->>  {
->>         struct dev_pm_opp *opp;
->> -       struct cpufreq_frequency_table *freq_table = policy->freq_table;
->>         struct clk *cpu_clk = policy->clk;
->>         struct private_data *priv = policy->driver_data;
->>         struct device *cpu_dev = priv->cpu_dev;
->>         struct regulator *cpu_reg = priv->cpu_reg;
->>         unsigned long volt = 0, volt_old = 0, tol = 0;
->>         unsigned int old_freq, new_freq;
->> -       long freq_Hz, freq_exact;
->> +       long freq_exact;
->>         int ret;
->>
->> -       freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
->> -       if (freq_Hz <= 0)
->> -               freq_Hz = freq_table[index].frequency * 1000;
->> -
->>         freq_exact = freq_Hz;
->>         new_freq = freq_Hz / 1000;
->>         old_freq = clk_get_rate(cpu_clk) / 1000;
->> @@ -112,6 +124,29 @@ static int set_target(struct cpufreq_policy *policy, unsigned int index)
->>         return ret;
->>  }
->>
->> +static int target_intermediate(struct cpufreq_policy *policy,
->> +                              unsigned int index)
->> +{
->> +       struct private_data *priv = policy->driver_data;
->> +       long freq_Hz;
->> +
->> +       freq_Hz = priv->intermediate_freq;
->> +       return set_frequency(policy, freq_Hz);
->
-> Instead, return set_frequency(policy, priv->intermediate_freq);
-
-Will fix it.
-
->
->> +}
->> +
->> +static int set_target(struct cpufreq_policy *policy, unsigned int index)
->> +{
->> +       struct cpufreq_frequency_table *freq_table = policy->freq_table;
->> +       struct clk *cpu_clk = policy->clk;
->> +       long freq_Hz;
->> +
->> +       freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
->
-> Use policy->clk here directly instead of another local variable.
-
-Will fix it.
-
->
->> +       if (freq_Hz <= 0)
->> +               freq_Hz = freq_table[index].frequency * 1000;
->
-> Why shouldn't we call clk_round_rate() for intermediate freq as well ?
-
-Yes. Will do it.
-
-> I think, it
-> should be called for it as well.. And so you can save intermediate_freq_index
-> instead of the freq..
->
-
-Here is the case I wanted to talk to you at HKG15:
-In the case of Mediatek SoC, the intermediate frequency might not be one entry
-of OPP table. To elaborate, the source clock node of the CPUs/Cluster on
-Mediatek SoC is a mux. The mux has several PLLs as parents. When we are
-doing CPU frequency scaling, the mux should re-parent to another stable PLL,
-wait until the original parent PLL become stable, and then switch back to the
-original parent. In this case, we could but we might not want the intermediate
-frequency as part of OPP table. Therefore I save intermediate_freq instead of
-intermediate frequency index in the cpufreq_dt_platform_datat struct.
-
-BTW, is this case that intermediate frequency is not necessarily be one entry
-of OPP table supported in the OPPv2 bindings?
-
->> +       return set_frequency(policy, freq_Hz);
->> +}
->> +
->>  static int allocate_resources(int cpu, struct device **cdev,
->>                               struct regulator **creg, struct clk **cclk)
->>  {
->> @@ -296,6 +331,23 @@ static int cpufreq_init(struct cpufreq_policy *policy)
->>         pd = cpufreq_get_driver_data();
->>         if (!pd || !pd->independent_clocks)
->>                 cpumask_setall(policy->cpus);
->> +       else if (pd && !list_empty(&pd->domain_list)) {
->> +               struct list_head *domain_node;
->> +               struct cpufreq_cpu_domain *domain;
->> +
->> +               list_for_each(domain_node, &pd->domain_list) {
->> +                       domain = container_of(domain_node,
->> +                                             struct cpufreq_cpu_domain, node);
->> +                       if (!cpumask_test_cpu(policy->cpu, &domain->cpus))
->> +                               continue;
->> +
->> +                       if (domain->intermediate_freq)
->> +                               priv->intermediate_freq =
->> +                                               domain->intermediate_freq;
->> +                       cpumask_copy(policy->cpus, &domain->cpus);
->> +                       break;
->> +               }
->> +       }
->>
->
-> Do this in a separate patch.
-
-Will do it.
-
->
->>         of_node_put(np);
->>
->> @@ -363,6 +415,8 @@ static struct cpufreq_driver dt_cpufreq_driver = {
->>         .verify = cpufreq_generic_frequency_table_verify,
->>         .target_index = set_target,
->>         .get = cpufreq_generic_get,
->> +       .get_intermediate = get_intermediate,
->> +       .target_intermediate = target_intermediate,
->>         .init = cpufreq_init,
->>         .exit = cpufreq_exit,
->>         .ready = cpufreq_ready,
->> diff --git a/include/linux/cpufreq-dt.h b/include/linux/cpufreq-dt.h
->> index 0414009..d6e2097 100644
->> --- a/include/linux/cpufreq-dt.h
->> +++ b/include/linux/cpufreq-dt.h
->> @@ -10,6 +10,12 @@
->>  #ifndef __CPUFREQ_DT_H__
->>  #define __CPUFREQ_DT_H__
->>
->> +struct cpufreq_cpu_domain {
->> +       struct list_head node;
->> +       cpumask_t cpus;
->> +       unsigned long intermediate_freq;
->
-> This should come from DT instead of platform data.
->
->> +};
->
-> This struct will die along with the below one as soon as my patches
-> on OPP bindings V2 get merged.
-
-Sure. Will adapt the new way once it's merged.
-
->
->>  struct cpufreq_dt_platform_data {
->>         /*
->>          * True when each CPU has its own clock to control its
->> @@ -17,6 +23,7 @@ struct cpufreq_dt_platform_data {
->>          * clock.
->>          */
->>         bool independent_clocks;
->> +       struct list_head domain_list;
->
-> Also update the comment on how what these fields mean..
-
-Will do it.
-
-Thanks.
-
-Best Regards,
-Pi-Cheng
-
->
->>  };
->>
->>  #endif /* __CPUFREQ_DT_H__ */
->> --
->> 1.9.1
->>
+-- 
+2.3.0
