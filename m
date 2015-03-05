@@ -1,114 +1,78 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 5 Mar 2015 14:11:26 -0600
-Subject: [PATCH v1 3/6] eeprom: Add bindings for simple eeprom framework
-In-Reply-To: <1425548765-13019-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1425548685-12887-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1425548765-13019-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <CAL_Jsq+wrZYn82otDfLsTVpgmhLFWtzRHQ4v+qn-Ks--ZpXR8Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Mar 2015 20:17:53 +0000
+Subject: ARM: OMPA4+: is it expected dma_coerce_mask_and_coherent(dev,
+ DMA_BIT_MASK(64)); to fail?
+In-Reply-To: <54F8A68B.3080709@linaro.org>
+References: <54F8A68B.3080709@linaro.org>
+Message-ID: <20150305201753.GG29584@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 5, 2015 at 3:46 AM, Srinivas Kandagatla
-<srinivas.kandagatla@linaro.org> wrote:
-> This patch adds bindings for simple eeprom framework which allows eeprom
-> consumers to talk to eeprom providers to get access to eeprom cell data.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> [Maxime Ripard: intial version of eeprom framework]
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  .../devicetree/bindings/eeprom/eeprom.txt          | 70 ++++++++++++++++++++++
->  1 file changed, 70 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/eeprom/eeprom.txt
->
-> diff --git a/Documentation/devicetree/bindings/eeprom/eeprom.txt b/Documentation/devicetree/bindings/eeprom/eeprom.txt
-> new file mode 100644
-> index 0000000..dbfb95c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/eeprom/eeprom.txt
-> @@ -0,0 +1,70 @@
-> += EEPROM Data Device Tree Bindings =
-> +
-> +This binding is intended to represent the location of hardware
-> +configuration data stored in EEPROMs.
-> +
-> +On a significant proportion of boards, the manufacturer has stored
-> +some data on an EEPROM-like device, for the OS to be able to retrieve
-> +these information and act upon it. Obviously, the OS has to know
-> +about where to retrieve these data from, and where they are stored on
-> +the storage device.
-> +
-> +This document is here to document this.
-> +
-> += Data providers =
-> +Contains bindings specific to provider drivers and data cells as children
-> +to this node.
-> +
-> += Data cells =
-> +These are the child nodes of the provider which contain data cell
-> +information like offset and size in eeprom provider.
-> +
-> +Required properties:
-> +reg:   specifies the offset in byte within that storage device, and the length
-> +       in bytes of the data we care about.
-> +       There could be more then one offset-length pairs in this property.
-> +
-> +Optional properties:
-> +As required by specific data parsers/interpreters.
-> +
-> +For example:
-> +
-> +       /* Provider */
-> +       qfprom: qfprom at 00700000 {
-> +               compatible      = "qcom,qfprom";
-> +               reg             = <0x00700000 0x1000>;
-> +               ...
-> +
-> +               /* Data cells */
-> +               tsens_calibration: calib at 404 {
-> +                       reg = <0x404 0x10>;
-> +               };
-> +
-> +               serial_number: sn {
-> +                       reg = <0x104 0x4>, <0x204 0x4>, <0x30c 0x4>;
-> +
-> +               };
-> +               ...
-> +       };
-> +
-> += Data consumers =
-> +Are drivers which consume eeprom data cells.
+On Thu, Mar 05, 2015 at 08:55:07PM +0200, Grygorii.Strashko at linaro.org wrote:
+> Now I can see very interesting behavior related to dma_coerce_mask_and_coherent()
+> and friends which I'd like to explain and clarify.
+> 
+> Below is set of questions I have (why - I explained below):
+> - Is expected dma_coerce_mask_and_coherent(DMA_BIT_MASK(64)) and friends to fail on 32 bits HW?
 
-s/drivers/device nodes/
+Not really.
 
-> +
-> +Required properties:
-> +
-> +eeproms: List of phandle and data cell the device might be interested in.
-> +
-> +Optional properties:
-> +
-> +eeprom-names: List of data cell name strings sorted in the same order
-> +             as the resets property. Consumers drivers will use
+> - What is expected value for max_pfn: max_phys_pfn or max_phys_pfn + 1?
 
-resets?
+mm/page_owner.c:
+        /* Find an allocated page */
+        for (; pfn < max_pfn; pfn++) {
 
-> +             eeprom-names to differentiate between multiple cells,
-> +             and hence being able to know what these cells are for.
+drivers/base/platform.c:    u32 low_totalram = ((max_pfn - 1) << PAGE_SHIFT);
+drivers/base/platform.c:    u32 high_totalram = ((max_pfn - 1) >> (32 - PAGE_SHIFT));
 
-Is this still needed? The sub-node name defines the name. Or you can
-use reg-names with-in the sub-node.
+So, there's ample evidence that max_pfn is one more than the greatest pfn
+which may be used in the system.
 
-Rob
+> - What is expected value for struct memblock_region->size: mem_range_size or mem_range_size - 1?
 
-> +
-> +For example:
-> +
-> +       tsens {
-> +               ...
-> +               eeproms = <&tsens_calibration>;
-> +               eeprom-names = "calibration";
-> +       };
-> --
-> 1.9.1
->
+A size is a size - it's a number of bytes contained within the region.
+If it is value 1, then there is exactly one byte in the region.  If
+there are 0x7fffffff, then there are 2G-1 bytes in the region, not 2G.
+
+> - What is expected value to be returned by memblock_end_of_DRAM():
+>   @base + @size(max_phys_addr + 1) or @base + @size - 1(max_phys_addr)?
+
+The last address plus one in the system.  However, there's a problem here.
+On a 32-bit system, phys_addr_t may be 32-bit.  If it is 32-bit, then
+"last address plus one" could be zero, which makes no sense.  Hence, it
+is artificially reduced to 0xfffff000, thereby omitting the final page.
+
+> Example 3 CONFIG_ARM_LPAE=y (but system really works with 32 bit address space):
+> 	memory {
+> 		device_type = "memory";
+> 		reg = <0x80000000 0x80000000>;
+> 	};
+> 
+>   memblock will be configured as:
+> 	memory.cnt  = 0x1
+> 	memory[0x0]     [0x00000080000000-0x000000ffffffff], 0x80000000 bytes flags: 0x0
+> 							     ^^^^^^^^^^
+>   max_pfn = 0x00100000
+> 
+> The dma_coerce_mask_and_coherent() will fail in case 'Example 3' and succeed in cases 1,2.
+> dma-mapping.c --> __dma_supported()
+> 	if (sizeof(mask) != sizeof(dma_addr_t) && <== true for all OMAP4+
+> 	    mask > (dma_addr_t)~0 &&		<== true for DMA_BIT_MASK(64)
+> 	    dma_to_pfn(dev, ~0) < max_pfn) {  <== true only for Example 3
+
+Hmm, I think this may make more sense to be "< max_pfn - 1" here, as
+that would be better suited to our intention.
+
+The result of dma_to_pfn(dev, ~0) is the maximum PFN which we could
+address via DMA, but we're comparing it with the maximum PFN in the
+system plus 1 - so we need to subtract one from it.
+
+Please think about this and test this out; I'm not back to normal yet
+(post-op) so I could very well not be thinking straight yet.
+
+Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: currently@10.5Mbps down 400kbps up
+according to speedtest.net.
