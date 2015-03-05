@@ -1,46 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 5 Mar 2015 17:31:54 +0000
-Subject: [PATCH] iommu/arm-smmu: fix leak in arm_smmu_flush_pgtable
-In-Reply-To: <vnkwsidjtkv1.fsf@mitchelh-linux.qualcomm.com>
-References: <1425514685-23831-1-git-send-email-mitchelh@codeaurora.org>
- <54F83235.70700@arm.com>
- <vnkwsidjtkv1.fsf@mitchelh-linux.qualcomm.com>
-Message-ID: <20150305173154.GB8163@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 5 Mar 2015 17:33:28 +0000
+Subject: [RFC PATCH 0/1] Wrong structure alignment due to compiler
+ attribute "section"
+In-Reply-To: <54F8770C.8080709@marvell.com>
+References: <1425290502-2322-1-git-send-email-lsanfil@marvell.com>
+ <20150303144130.GB5177@e103592.cambridge.arm.com>
+ <54F6EF32.7080306@marvell.com>
+ <20150304143527.GA5653@e103592.cambridge.arm.com>
+ <54F732DA.2050004@marvell.com>
+ <20150305122606.GC3612@e103592.cambridge.arm.com>
+ <54F8582B.80703@marvell.com>
+ <20150305134733.GE3612@e103592.cambridge.arm.com>
+ <54F8770C.8080709@marvell.com>
+Message-ID: <20150305173327.GF3612@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 05, 2015 at 05:28:02PM +0000, Mitchel Humpherys wrote:
-> On Thu, Mar 05 2015 at 02:38:45 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> > On 05/03/15 00:18, Mitchel Humpherys wrote:
-> >> We're currently mapping a page in arm_smmu_flush_pgtable without ever
-> >> unmapping it.  Fix this by calling dma_unmap_page on the returned dma
-> >> address.  Since the only reason we're calling dma_map_page is to make
-> >> sure it actually gets flushed out to RAM, we can just call
-> >> dma_unmap_page immediately following the map.
-> >>
-> >> Without this, eventually swiotlb runs out of memory and starts printing
-> >> things like:
-> >>
-> >>      [   35.545076] arm-smmu d00000.arm,smmu: swiotlb buffer is full (sz: 128 bytes)
-> >>
-> >
-> > So, you have non-coherent SMMUs too ;) The real problem is that the SMMU's
-> > DMA mask is wrong (as it happens I've just given Will a patch to fix that)
-> > - this is really just doing a whole bunch of unnecessary work (two memory
-> > copies and two cache flushes, one of which isn't even flushing the right
-> > area) to hide the problem. With an appropriate DMA mask set,
-> > swiotlb_map_page becomes a no-op and we fall through to the cache flush
-> > without ever allocating anything.
+On Thu, Mar 05, 2015 at 04:32:28PM +0100, Lino Sanfilippo wrote:
+> On 05.03.2015 14:47, Dave Martin wrote:
 > 
-> Yeah I noticed that as well...  But isn't this still incorrect usage of
-> the API (DMA-API-HOWTO.txt seems to indicate that calls to map should
-> always be balanced with calls to unmap)?  What we really want to do here
-> is just call __dma_map_area directly, but the comment on that guy
-> expressly forbids it...  Not sure what's worse, abusing the DMA API or
-> disobeying that comment?
+> >
+> >Source code?  That just looks like binaries to me.
+> >
+> 
+> Oops, youre right, there is no source in that package, sorry. I
+> tried to contact the persons that are maintaining this toolchain and
+> asked for access to the source. Hope I will get a response, soon...
 
-I'm not against adding the unmap, but the reasoning would have to change
-slightly (it's not related to swiotlb) and it could wait until 4.1 since
-Robin's fix actually addresses the root cause.
+OK
 
-Will
+Cheers
+---Dave
