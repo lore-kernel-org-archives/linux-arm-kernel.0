@@ -1,42 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Mar 2015 12:07:02 +0000
-Subject: [PATCH] genirq: describe IRQF_COND_SUSPEND
-In-Reply-To: <20150305113306.GP3989@piout.net>
-References: <1424771762-16343-1-git-send-email-boris.brezillon@free-electrons.com>
- <8151717.nkhnGBri9h@vostro.rjw.lan>
- <20150226191724.0ae4ca4e@bbrezillon>
- <6864616.1aRDSmSsvx@vostro.rjw.lan>
- <20150304194246.GF22156@leverpostej>
- <20150304200040.GA12126@leverpostej>
- <20150304221729.GI3989@piout.net>
- <20150305110411.GC13617@leverpostej>
- <20150305113306.GP3989@piout.net>
-Message-ID: <20150305120702.GB14093@leverpostej>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 05 Mar 2015 12:07:47 +0000
+Subject: [PATCH REPOST 0/2] Remove pl011 startup glitches and avoid dummy
+ TX during startup
+In-Reply-To: <20150305120320.GB3612@e103592.cambridge.arm.com>
+References: <1425472054-7543-1-git-send-email-Dave.Martin@arm.com>
+ <54F73650.2070304@arm.com> <20150305120320.GB3612@e103592.cambridge.arm.com>
+Message-ID: <54F84713.6040305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 05, 2015 at 11:33:06AM +0000, Alexandre Belloni wrote:
-> On 05/03/2015 at 11:04:11 +0000, Mark Rutland wrote :
-> > > > +In rare cases an IRQ can be shared between a wakeup device driver and an
-> > > > +IRQF_NO_SUSPEND user. In order for this to be safe, the wakeup device driver
-> > > > +must be able to discern spurious IRQs from genuine wakeup events (signalling
-> > > 
-> > > And genuine question, should we use British English or American English
-> > > or we don't care ?
-> > 
-> > Have I written something that isn't valid American English there? I read
-> > over this a few times and failed to spot anything obvious.
-> > 
-> > I'm happy to change for consistency, I generally assume that's the most
-> > important thing.
+On 05/03/15 12:03, Dave P Martin wrote:
+> On Wed, Mar 04, 2015 at 04:44:00PM +0000, Andre Przywara wrote:
+>> Hi Dave,
+>>
+>> On 04/03/15 12:27, Dave P Martin wrote:
+>>> There have been no comments on this series since my previous post, and
+>>> I have made no further changes.
+>>>
+>>> Since then, I have confirmed that this also works robustly with TX DMA
+>>> enabled on Juno.
+>>>
+>>> Review/comments/testing still welcome.
+>>
+>> this has been tested briefly on a Calxeda Midway without any
+>> regressions. Also I use them as the base for my SBSA series now (which
+>> are tested on the model and the Midway) and I see that all problems
+>> observed before are gone now.
+>>
+>> Tested-by: Andre Przywara <andre.przywara@arm.com>
 > 
-> I'd say signalling vs signaling. I actually had to look up which one was
-> correct. I'm personally using Incorrect/Broken English so I'm definitely
-> not here to give lessons.
+> Thanks -- should I take that for both patches?
 
-Easy option to keep everyone happy: s/signalling/indicating/
+Yes, please. Also I tested this on the Raspberry Pi 2 today (though with
+their kernel, not upstream).
 
-That should be valid for the English variants I'm aware of, and it has
-the same number of characters so we don't need to reflow the text.
-
-Mark.
+Cheers,
+Andre.
