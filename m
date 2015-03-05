@@ -1,62 +1,43 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  5 Mar 2015 12:51:42 +0100
-Subject: [PATCH v2] ARM: advertise availability of v8 Crypto instructions
-Message-ID: <1425556302-3370-1-git-send-email-ard.biesheuvel@linaro.org>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 5 Mar 2015 20:52:49 +0900
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <20150305110415.GA7712@e104818-lin.cambridge.arm.com>
+References: <54F51A63.4060302@samsung.com>
+ <20150304113505.GS28951@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8OUtcpaQh5+gb6vNrdi+Q7eu_zKOujmyoRPrzrs+GJVQ@mail.gmail.com>
+ <20150304122956.GT28951@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
+ <20150304141212.GA5352@hawk.usersys.redhat.com>
+ <20150304142943.GU28951@e104818-lin.cambridge.arm.com>
+ <54F73ACF.1090605@redhat.com>
+ <20150304172855.GA28951@e104818-lin.cambridge.arm.com>
+ <54F82C06.2000701@redhat.com>
+ <20150305110415.GA7712@e104818-lin.cambridge.arm.com>
+Message-ID: <CAFEAcA98j_EsP4Hy20tQCKdnP3=NuvS3Ona37peBjan8aWLSEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When running the 32-bit ARM kernel on ARMv8 capable bare metal (e.g.,
-32-bit Android userland and kernel on a Cortex-A53), or as a KVM guest
-on a 64-bit host, we should advertise the availability of the Crypto
-instructions, so that userland libraries such as OpenSSL may use them.
-(Support for the v8 Crypto instructions in the 32-bit build was added
-to OpenSSL more than six months ago)
+On 5 March 2015 at 20:04, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Thu, Mar 05, 2015 at 11:12:22AM +0100, Paolo Bonzini wrote:
+>> On 04/03/2015 18:28, Catalin Marinas wrote:
+>> >> > Can you add that property to the device tree for PCI devices too?
+>> >
+>> > Yes but not with mainline yet:
+>> >
+>> > http://thread.gmane.org/gmane.linux.kernel.iommu/8935
+>> >
+>> > We can add the property at the PCI host bridge level (with the drawback
+>> > that it covers all the PCI devices), like here:
+>>
+>> Even covering all PCI devices is not enough if we want to support device
+>> assignment of PCI host devices.
+>
+> Can we not have another PCI bridge node in the DT for the host device
+> assignments?
 
-This adds the ID feature bit detection, and sets elf_hwcap2 accordingly.
+I'd hate to have to do that. PCI should be entirely probeable
+given that we tell the guest where the host bridge is, that's
+one of its advantages.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v2:
-- drop redundant architecture check -> accessing ID_ISAR5 should be safe
-  even on v7-M, and even if we don't expect to find crypto features there
-- add comment regarding pmull->aes
-
- arch/arm/kernel/setup.c | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index e55408e96559..482bdfa24daa 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -375,7 +375,7 @@ void __init early_print(const char *str, ...)
- 
- static void __init cpuid_init_hwcaps(void)
- {
--	unsigned int divide_instrs, vmsa;
-+	unsigned int divide_instrs, vmsa, isar5;
- 
- 	if (cpu_architecture() < CPU_ARCH_ARMv7)
- 		return;
-@@ -393,6 +393,20 @@ static void __init cpuid_init_hwcaps(void)
- 	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
- 	if (vmsa >= 5)
- 		elf_hwcap |= HWCAP_LPAE;
-+
-+	/* check for supported v8 Crypto instructions */
-+	isar5 = read_cpuid_ext(CPUID_EXT_ISAR5);
-+
-+	switch ((isar5 >> 4) & 0xf) {
-+	case 2:	elf_hwcap2 |= HWCAP2_PMULL;	/* pmull implies aes */
-+	case 1:	elf_hwcap2 |= HWCAP2_AES;
-+	}
-+	if (((isar5 >> 8) & 0xf) == 1)
-+		elf_hwcap2 |= HWCAP2_SHA1;
-+	if (((isar5 >> 12) & 0xf) == 1)
-+		elf_hwcap2 |= HWCAP2_SHA2;
-+	if (((isar5 >> 16) & 0xf) == 1)
-+		elf_hwcap2 |= HWCAP2_CRC32;
- }
- 
- static void __init elf_hwcap_fixup(void)
--- 
-1.8.3.2
+-- PMM
