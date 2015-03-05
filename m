@@ -1,43 +1,42 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 5 Mar 2015 09:06:22 -0600
-Subject: [PATCH v2 2/3] arm64: qcom: Add support for Qualcomm MSM8916 SoC
-In-Reply-To: <54F7883B.90704@codeaurora.org>
-References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
- <1425503602-24916-2-git-send-email-galak@codeaurora.org>
- <54F7883B.90704@codeaurora.org>
-Message-ID: <63B0478A-6282-4826-8991-46B0E4BA7BA5@codeaurora.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 5 Mar 2015 16:09:56 +0100
+Subject: [PATCH v3 4/9] power: reset: Add AT91RM9200 reset driver
+In-Reply-To: <20150304171758.GA8717@earth>
+References: <1425478897-27322-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1425478897-27322-5-git-send-email-alexandre.belloni@free-electrons.com>
+ <20150304171758.GA8717@earth>
+Message-ID: <20150305150956.GT3989@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Mar 4, 2015, at 4:33 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-
-> On 03/04/15 13:13, Kumar Gala wrote:
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 1b8e973..4c8b119 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -177,6 +177,15 @@ config ARCH_MEDIATEK
->> 	help
->> 	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
->> 
->> +config ARCH_QCOM
->> +	bool "Qualcomm Platforms"
->> +	select ARCH_REQUIRE_GPIOLIB
->> +	select COMMON_CLK_QCOM
->> +	select PINCTRL
->> +	select SOC_BUS
+On 04/03/2015 at 18:17:58 +0100, Sebastian Reichel wrote :
+> Hi,
 > 
-> I imagine all we need is select PINCTRL here. SOC_BUS is not used, also
-> we shouldn't force COMMON_CLK_QCOM to be Y instead of M so please drop
-> that select. Also we dropped ARCH_REQUIRE_GPIOLIB in arm32 so it would
-> match if we just relied on ARCH_WANT_GPIOLIB that arm64 has by default
+> On Wed, Mar 04, 2015 at 03:21:32PM +0100, Alexandre Belloni wrote:
+> > AT91RM9200 uses the watchdog from the system timer to reset.
+> > [...]
+> > +	regmap_write(regmap_st, AT91_ST_WDMR,
+> > +		     AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
+> > +	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
+> > +
+> > +	mdelay(2000);
+> 
+> At pity that you have to write into two registers, otherwise you
+> could have used the syscon-reboot driver.
+> 
 
-Will drop SOC_BUS.  We seem to have other arm64 platforms that set ARCH_REQUIRE_GPIOLIB.  Why should we not select COMMON_CLK_QCOM?  Can we do much useful without COMMON_CLK_QCOM set?
+Exactly what I was thinking :)
 
-- k
+> > [...]
+> > +module_platform_driver(at91rm9200_reset_driver);
+> 
+> Apart from missing module metadata (MODULE_AUTHOR(),
+> MODULE_LICENSE(), ...) the driver looks fine to me.
+> 
+
+I'll add those.
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
