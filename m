@@ -1,182 +1,59 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Wed, 4 Mar 2015 20:01:14 -0600
-Subject: [PATCH v8 2/4] hwspinlock/core: add device tree support
+Date: Wed, 4 Mar 2015 20:01:15 -0600
+Subject: [PATCH v8 3/4] Documentation: dt: add the omap hwspinlock bindings
+ document
 In-Reply-To: <1425520876-37826-1-git-send-email-s-anna@ti.com>
 References: <1425520876-37826-1-git-send-email-s-anna@ti.com>
-Message-ID: <1425520876-37826-3-git-send-email-s-anna@ti.com>
+Message-ID: <1425520876-37826-4-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a new OF-friendly API of_hwspin_lock_get_id()
-for hwspinlock clients to use/request locks from a hwspinlock
-device instantiated through a device-tree blob. This new API
-can be used by hwspinlock clients to get the id for a specific
-lock using the phandle + args specifier, so that it can be
-requested using the available hwspin_lock_request_specific()
-API.
+HwSpinlock IP is present only on OMAP4 and other newer SoCs,
+which are all device-tree boot only. This patch adds the
+DT bindings information for OMAP hwspinlock module.
 
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
-v8: Removed the previous OF helpers of_hwspin_lock_get_num_locks()
-    & of_hwspin_lock_get_base_id() due to the revised generic
-    bindings. Added back the support for deferred probing and
-    pargs specifier validation like in v6, but without using an
-    added list for storing registered hwspinlock devices.
+v8: Removed the previous information about hwlock-base-id, and added
+    a reference to the base binding document.
 
- Documentation/hwspinlock.txt         | 10 +++++
- drivers/hwspinlock/hwspinlock_core.c | 79 ++++++++++++++++++++++++++++++++++++
- include/linux/hwspinlock.h           |  7 ++++
- 3 files changed, 96 insertions(+)
+ .../devicetree/bindings/hwlock/omap-hwspinlock.txt | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwlock/omap-hwspinlock.txt
 
-diff --git a/Documentation/hwspinlock.txt b/Documentation/hwspinlock.txt
-index 62f7d4ea6e26..61c1ee98e59f 100644
---- a/Documentation/hwspinlock.txt
-+++ b/Documentation/hwspinlock.txt
-@@ -48,6 +48,16 @@ independent, drivers.
-      ids for predefined purposes.
-      Should be called from a process context (might sleep).
- 
-+  int of_hwspin_lock_get_id(struct device_node *np, int index);
-+   - retrieve the global lock id for an OF phandle-based specific lock.
-+     This function provides a means for DT users of a hwspinlock module
-+     to get the global lock id of a specific hwspinlock, so that it can
-+     be requested using the normal hwspin_lock_request_specific() API.
-+     The function returns a lock id number on success, -EPROBE_DEFER if
-+     the hwspinlock device is not yet registered with the core, or other
-+     error values.
-+     Should be called from a process context (might sleep).
+diff --git a/Documentation/devicetree/bindings/hwlock/omap-hwspinlock.txt b/Documentation/devicetree/bindings/hwlock/omap-hwspinlock.txt
+new file mode 100644
+index 000000000000..2c9804f4f4ac
+--- /dev/null
++++ b/Documentation/devicetree/bindings/hwlock/omap-hwspinlock.txt
+@@ -0,0 +1,26 @@
++OMAP4+ HwSpinlock Driver
++========================
 +
-   int hwspin_lock_free(struct hwspinlock *hwlock);
-    - free a previously-assigned hwspinlock; returns 0 on success, or an
-      appropriate error code on failure (e.g. -EINVAL if the hwspinlock
-diff --git a/drivers/hwspinlock/hwspinlock_core.c b/drivers/hwspinlock/hwspinlock_core.c
-index 461a0d739d75..f8539f624e3d 100644
---- a/drivers/hwspinlock/hwspinlock_core.c
-+++ b/drivers/hwspinlock/hwspinlock_core.c
-@@ -27,6 +27,7 @@
- #include <linux/hwspinlock.h>
- #include <linux/pm_runtime.h>
- #include <linux/mutex.h>
-+#include <linux/of.h>
- 
- #include "hwspinlock_internal.h"
- 
-@@ -257,6 +258,84 @@ void __hwspin_unlock(struct hwspinlock *hwlock, int mode, unsigned long *flags)
- }
- EXPORT_SYMBOL_GPL(__hwspin_unlock);
- 
-+/**
-+ * of_hwspin_lock_simple_xlate - translate hwlock_spec to return a lock id
-+ * @bank: the hwspinlock device bank
-+ * @hwlock_spec: hwlock specifier as found in the device tree
-+ *
-+ * This is a simple translation function, suitable for hwspinlock platform
-+ * drivers that only has a lock specifier length of 1.
-+ *
-+ * Returns a relative index of the lock within a specified bank on success,
-+ * or -EINVAL on invalid specifier cell count.
-+ */
-+static inline int
-+of_hwspin_lock_simple_xlate(const struct of_phandle_args *hwlock_spec)
-+{
-+	if (WARN_ON(hwlock_spec->args_count != 1))
-+		return -EINVAL;
++Required properties:
++- compatible:		Should be "ti,omap4-hwspinlock" for
++			    OMAP44xx, OMAP54xx, AM33xx, AM43xx, DRA7xx SoCs
++- reg:			Contains the hwspinlock module register address space
++			(base address and length)
++- ti,hwmods:		Name of the hwmod associated with the hwspinlock device
++- #hwlock-cells:	Should be 1. The OMAP hwspinlock users will use a
++			0-indexed relative hwlock number as the argument
++			specifier value for requesting a specific hwspinlock
++			within a hwspinlock bank.
 +
-+	return hwlock_spec->args[0];
-+}
++Please look at the generic hwlock binding for usage information for consumers,
++"Documentation/devicetree/bindings/hwlock/hwlock.txt"
 +
-+/**
-+ * of_hwspin_lock_get_id() - get lock id for an OF phandle-based specific lock
-+ * @np: device node from which to request the specific hwlock
-+ * @index: index of the hwlock in the list of values
-+ *
-+ * This function provides a means for DT users of the hwspinlock module to
-+ * get the global lock id of a specific hwspinlock using the phandle of the
-+ * hwspinlock device, so that it can be requested using the normal
-+ * hwspin_lock_request_specific() API.
-+ *
-+ * Returns the global lock id number on success, -EPROBE_DEFER if the hwspinlock
-+ * device is not yet registered, -EINVAL on invalid args specifier value or an
-+ * appropriate error as returned from the OF parsing of the DT client node.
-+ */
-+int of_hwspin_lock_get_id(struct device_node *np, int index)
-+{
-+	struct of_phandle_args args;
-+	struct hwspinlock *hwlock;
-+	struct radix_tree_iter iter;
-+	void **slot;
-+	int id;
-+	int ret;
++Example:
 +
-+	ret = of_parse_phandle_with_args(np, "hwlocks", "#hwlock-cells", index,
-+					 &args);
-+	if (ret)
-+		return ret;
-+
-+	/* perform a sanity check of the hwspinlock device */
-+	ret = -EPROBE_DEFER;
-+	rcu_read_lock();
-+	radix_tree_for_each_slot(slot, &hwspinlock_tree, &iter, 0) {
-+		hwlock = radix_tree_deref_slot(slot);
-+		if (unlikely(!hwlock))
-+			continue;
-+
-+		if (hwlock->bank->dev->of_node == args.np) {
-+			ret = 0;
-+			break;
-+		}
-+	}
-+	rcu_read_unlock();
-+	if (ret < 0)
-+		goto out;
-+
-+	id = of_hwspin_lock_simple_xlate(&args);
-+	if (id < 0 || id >= hwlock->bank->num_locks) {
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+	id += hwlock->bank->base_id;
-+
-+out:
-+	of_node_put(args.np);
-+	return ret ? ret : id;
-+}
-+EXPORT_SYMBOL_GPL(of_hwspin_lock_get_id);
-+
- static int hwspin_lock_register_single(struct hwspinlock *hwlock, int id)
- {
- 	struct hwspinlock *tmp;
-diff --git a/include/linux/hwspinlock.h b/include/linux/hwspinlock.h
-index 3343298e40e8..859d673d98c8 100644
---- a/include/linux/hwspinlock.h
-+++ b/include/linux/hwspinlock.h
-@@ -26,6 +26,7 @@
- #define HWLOCK_IRQ	0x02	/* Disable interrupts, don't save state */
- 
- struct device;
-+struct device_node;
- struct hwspinlock;
- struct hwspinlock_device;
- struct hwspinlock_ops;
-@@ -66,6 +67,7 @@ int hwspin_lock_unregister(struct hwspinlock_device *bank);
- struct hwspinlock *hwspin_lock_request(void);
- struct hwspinlock *hwspin_lock_request_specific(unsigned int id);
- int hwspin_lock_free(struct hwspinlock *hwlock);
-+int of_hwspin_lock_get_id(struct device_node *np, int index);
- int hwspin_lock_get_id(struct hwspinlock *hwlock);
- int __hwspin_lock_timeout(struct hwspinlock *, unsigned int, int,
- 							unsigned long *);
-@@ -120,6 +122,11 @@ void __hwspin_unlock(struct hwspinlock *hwlock, int mode, unsigned long *flags)
- {
- }
- 
-+static inline int of_hwspin_lock_get_id(struct device_node *np, int index)
-+{
-+	return 0;
-+}
-+
- static inline int hwspin_lock_get_id(struct hwspinlock *hwlock)
- {
- 	return 0;
++/* OMAP4 */
++hwspinlock: spinlock at 4a0f6000 {
++	compatible = "ti,omap4-hwspinlock";
++	reg = <0x4a0f6000 0x1000>;
++	ti,hwmods = "spinlock";
++	#hwlock-cells = <1>;
++};
 -- 
 2.3.0
