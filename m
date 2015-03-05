@@ -1,123 +1,60 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 05 Mar 2015 12:36:58 +0200
-Subject: [PATCH 2/3] media: atmel-isi: add runtime pm support
-In-Reply-To: <1425531661-20040-3-git-send-email-josh.wu@atmel.com>
-References: <1425531661-20040-1-git-send-email-josh.wu@atmel.com>
- <1425531661-20040-3-git-send-email-josh.wu@atmel.com>
-Message-ID: <4374983.hs3Q8DJocG@avalon>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 05 Mar 2015 10:38:45 +0000
+Subject: [PATCH] iommu/arm-smmu: fix leak in arm_smmu_flush_pgtable
+In-Reply-To: <1425514685-23831-1-git-send-email-mitchelh@codeaurora.org>
+References: <1425514685-23831-1-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <54F83235.70700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+Hi Mitch,
 
-Thank you for the patch.
+On 05/03/15 00:18, Mitchel Humpherys wrote:
+> We're currently mapping a page in arm_smmu_flush_pgtable without ever
+> unmapping it.  Fix this by calling dma_unmap_page on the returned dma
+> address.  Since the only reason we're calling dma_map_page is to make
+> sure it actually gets flushed out to RAM, we can just call
+> dma_unmap_page immediately following the map.
+>
+> Without this, eventually swiotlb runs out of memory and starts printing
+> things like:
+>
+>      [   35.545076] arm-smmu d00000.arm,smmu: swiotlb buffer is full (sz: 128 bytes)
+>
 
-On Thursday 05 March 2015 13:01:00 Josh Wu wrote:
-> The runtime pm resume/suspend will enable/disable pclk (ISI peripheral
-> clock).
-> And we need to call rumtime_pm_get/put_sync function to make pm
-> resume/suspend.
-> 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+So, you have non-coherent SMMUs too ;) The real problem is that the 
+SMMU's DMA mask is wrong (as it happens I've just given Will a patch to 
+fix that) - this is really just doing a whole bunch of unnecessary work 
+(two memory copies and two cache flushes, one of which isn't even 
+flushing the right area) to hide the problem. With an appropriate DMA 
+mask set, swiotlb_map_page becomes a no-op and we fall through to the 
+cache flush without ever allocating anything.
+
+Robin.
+
+> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
 > ---
-> 
->  drivers/media/platform/soc_camera/atmel-isi.c | 36 +++++++++++++++++++++---
->  1 file changed, 32 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
-> b/drivers/media/platform/soc_camera/atmel-isi.c index eb179e7..4a384f1
-> 100644
-> --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> @@ -20,6 +20,7 @@
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/slab.h>
-> 
->  #include <media/atmel-isi.h>
-> @@ -386,9 +387,7 @@ static int start_streaming(struct vb2_queue *vq,
-> unsigned int count) struct atmel_isi *isi = ici->priv;
->  	int ret;
-> 
-> -	ret = clk_prepare_enable(isi->pclk);
-> -	if (ret)
-> -		return ret;
-> +	pm_runtime_get_sync(ici->v4l2_dev.dev);
-> 
->  	/* Reset ISI */
->  	ret = atmel_isi_wait_status(isi, WAIT_ISI_RESET);
-> @@ -450,7 +449,7 @@ static void stop_streaming(struct vb2_queue *vq)
->  	if (ret < 0)
->  		dev_err(icd->parent, "Disable ISI timed out\n");
-> 
-> -	clk_disable_unprepare(isi->pclk);
-> +	pm_runtime_put_sync(ici->v4l2_dev.dev);
-
-Is there a reason to use pm_runtime_put_sync() and not just pm_runtime_put() ?
-
->  }
-> 
->  static struct vb2_ops isi_video_qops = {
-> @@ -1042,6 +1041,9 @@ static int atmel_isi_probe(struct platform_device
-> *pdev) soc_host->v4l2_dev.dev	= &pdev->dev;
->  	soc_host->nr		= pdev->id;
-> 
-> +	pm_suspend_ignore_children(&pdev->dev, true);
-> +	pm_runtime_enable(&pdev->dev);
-> +
->  	if (isi->pdata.asd_sizes) {
->  		soc_host->asd = isi->pdata.asd;
->  		soc_host->asd_sizes = isi->pdata.asd_sizes;
-> @@ -1055,6 +1057,7 @@ static int atmel_isi_probe(struct platform_device
-> *pdev) return 0;
-> 
->  err_register_soc_camera_host:
-> +	pm_runtime_disable(&pdev->dev);
->  err_req_irq:
->  err_ioremap:
->  	vb2_dma_contig_cleanup_ctx(isi->alloc_ctx);
-> @@ -1067,6 +1070,30 @@ err_alloc_ctx:
->  	return ret;
->  }
-> 
-> +static int atmel_isi_runtime_suspend(struct device *dev)
-> +{
-> +	struct soc_camera_host *soc_host = to_soc_camera_host(dev);
-> +	struct atmel_isi *isi = container_of(soc_host,
-> +					struct atmel_isi, soc_host);
-> +
-> +	clk_disable_unprepare(isi->pclk);
-> +
-> +	return 0;
-> +}
-> +static int atmel_isi_runtime_resume(struct device *dev)
-> +{
-> +	struct soc_camera_host *soc_host = to_soc_camera_host(dev);
-> +	struct atmel_isi *isi = container_of(soc_host,
-> +					struct atmel_isi, soc_host);
-> +
-> +	return clk_prepare_enable(isi->pclk);
-> +}
-> +
-> +static const struct dev_pm_ops atmel_isi_dev_pm_ops = {
-> +	SET_RUNTIME_PM_OPS(atmel_isi_runtime_suspend,
-> +				atmel_isi_runtime_resume, NULL)
-> +};
-> +
->  static const struct of_device_id atmel_isi_of_match[] = {
->  	{ .compatible = "atmel,at91sam9g45-isi" },
->  	{ }
-> @@ -1079,6 +1106,7 @@ static struct platform_driver atmel_isi_driver = {
->  		.name = "atmel_isi",
->  		.owner = THIS_MODULE,
->  		.of_match_table = of_match_ptr(atmel_isi_of_match),
-> +		.pm	= &atmel_isi_dev_pm_ops,
->  	},
->  };
-
--- 
-Regards,
-
-Laurent Pinchart
+>   drivers/iommu/arm-smmu.c | 9 +++++++--
+>   1 file changed, 7 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index fc13dd56953e..2ff8f35cf533 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -627,8 +627,13 @@ static void arm_smmu_flush_pgtable(void *addr, size_t size, void *cookie)
+>   		 * recursion here as the SMMU table walker will not be wired
+>   		 * through another SMMU.
+>   		 */
+> -		dma_map_page(smmu->dev, virt_to_page(addr), offset, size,
+> -			     DMA_TO_DEVICE);
+> +		dma_addr_t handle = dma_map_page(smmu->dev, virt_to_page(addr),
+> +						offset, size, DMA_TO_DEVICE);
+> +		if (handle == DMA_ERROR_CODE)
+> +			dev_err(smmu->dev,
+> +				"Couldn't flush page tables at %p!\n", addr);
+> +		else
+> +			dma_unmap_page(smmu->dev, handle, size, DMA_TO_DEVICE);
+>   	}
+>   }
+>
+>
