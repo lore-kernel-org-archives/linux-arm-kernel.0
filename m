@@ -1,56 +1,455 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 5 Mar 2015 14:51:02 +0100
-Subject: [PATCH] mmc: sunxi: avoid invalid pointer calculation
-In-Reply-To: <27509084.spYfayGTeo@wuerfel>
-References: <27509084.spYfayGTeo@wuerfel>
-Message-ID: <CAPDyKFq-V4egasTCgu3O7am_ur2Z8taq4VJHgqaMjAYOR7upLQ@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu,  5 Mar 2015 14:53:34 +0100
+Subject: [PATCH v2] ARM64: Add new Xilinx ZynqMP SoC
+Message-ID: <cd616fa25dafee38f98e3b207e74450c5403f440.1425563597.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 February 2015 at 10:47, Arnd Bergmann <arnd@arndb.de> wrote:
-> The sunxi mmc driver tries to calculate a dma address by using pointer
-> arithmetic, which causes a warning when dma_addr_t is wider than a pointer:
->
-> drivers/mmc/host/sunxi-mmc.c: In function 'sunxi_mmc_init_idma_des':
-> drivers/mmc/host/sunxi-mmc.c:296:35: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
->   struct sunxi_idma_des *pdes_pa = (struct sunxi_idma_des *)host->sg_dma;
->                                    ^
->
-> To avoid this warning and to simplify the logic, this changes
-> the code to avoid the cast and calculate the correct address
-> manually. The behavior should be unchanged.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Initial version of device tree for Xilinx ZynqMP SoC.
 
-Applied, thanks!
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+---
 
-Kind regards
-Uffe
+Changes in v2:
+-  move timer out of amba_apu bus because it is not on bus
+   Reported by Mark
+- FIC GICC and GICV addresses - Reported by Rob
+- Fix copyright
+- Enable cadence IP in defconfig
+- Add support for macb multiqueue
 
+ arch/arm64/Kconfig                          |   5 +
+ arch/arm64/boot/dts/Makefile                |   1 +
+ arch/arm64/boot/dts/xilinx/Makefile         |   5 +
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts |  47 +++++
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi      | 303 ++++++++++++++++++++++++++++
+ arch/arm64/configs/defconfig                |   3 +
+ 6 files changed, 364 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/xilinx/Makefile
+ create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+ create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp.dtsi
 
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index e8a4218b5726..c326ac965806 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -293,7 +293,7 @@ static void sunxi_mmc_init_idma_des(struct sunxi_mmc_host *host,
->                                     struct mmc_data *data)
->  {
->         struct sunxi_idma_des *pdes = (struct sunxi_idma_des *)host->sg_cpu;
-> -       struct sunxi_idma_des *pdes_pa = (struct sunxi_idma_des *)host->sg_dma;
-> +       dma_addr_t next_desc = host->sg_dma;
->         int i, max_len = (1 << host->idma_des_size_bits);
->
->         for (i = 0; i < data->sg_len; i++) {
-> @@ -305,8 +305,9 @@ static void sunxi_mmc_init_idma_des(struct sunxi_mmc_host *host,
->                 else
->                         pdes[i].buf_size = data->sg[i].length;
->
-> +               next_desc += sizeof(struct sunxi_idma_des);
->                 pdes[i].buf_addr_ptr1 = sg_dma_address(&data->sg[i]);
-> -               pdes[i].buf_addr_ptr2 = (u32)&pdes_pa[i + 1];
-> +               pdes[i].buf_addr_ptr2 = (u32)next_desc;
->         }
->
->         pdes[0].config |= SDXC_IDMAC_DES0_FD;
->
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1b8e97331ffb..9f805cf2e0b0 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -228,6 +228,11 @@ config ARCH_XGENE
+ 	help
+ 	  This enables support for AppliedMicro X-Gene SOC Family
+ 
++config ARCH_ZYNQMP
++	bool "Xilinx ZynqMP Family"
++	help
++	  This enables support for Xilinx ZynqMP Family
++
+ endmenu
+ 
+ menu "Bus support"
+diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+index e0350caf049e..ff088ec6ca5f 100644
+--- a/arch/arm64/boot/dts/Makefile
++++ b/arch/arm64/boot/dts/Makefile
+@@ -5,5 +5,6 @@ dts-dirs += cavium
+ dts-dirs += exynos
+ dts-dirs += freescale
+ dts-dirs += mediatek
++dts-dirs += xilinx
+ 
+ subdir-y	:= $(dts-dirs)
+diff --git a/arch/arm64/boot/dts/xilinx/Makefile b/arch/arm64/boot/dts/xilinx/Makefile
+new file mode 100644
+index 000000000000..ae16427f6a4a
+--- /dev/null
++++ b/arch/arm64/boot/dts/xilinx/Makefile
+@@ -0,0 +1,5 @@
++dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-ep108.dtb
++
++always		:= $(dtb-y)
++subdir-y	:= $(dts-dirs)
++clean-files	:= *.dtb
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+new file mode 100644
+index 000000000000..0a3f40ecd06d
+--- /dev/null
++++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+@@ -0,0 +1,47 @@
++/*
++ * dts file for Xilinx ZynqMP ep108 development board
++ *
++ * (C) Copyright 2014 - 2015, Xilinx, Inc.
++ *
++ * Michal Simek <michal.simek@xilinx.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ */
++
++/dts-v1/;
++
++/include/ "zynqmp.dtsi"
++
++/ {
++	model = "ZynqMP EP108";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x0 0x0 0x40000000>;
++	};
++};
++
++&gem0 {
++	status = "okay";
++	phy-handle = <&phy0>;
++	phy-mode = "rgmii-id";
++	phy0: phy at 0{
++		reg = <0>;
++		max-speed = <100>;
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+new file mode 100644
+index 000000000000..c5f140a34856
+--- /dev/null
++++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+@@ -0,0 +1,303 @@
++/*
++ * dts file for Xilinx ZynqMP
++ *
++ * (C) Copyright 2014 - 2015, Xilinx, Inc.
++ *
++ * Michal Simek <michal.simek@xilinx.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ */
++
++/ {
++	compatible = "xlnx,zynqmp";
++	#address-cells = <2>;
++	#size-cells = <1>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			enable-method = "psci";
++			reg = <0x0>;
++		};
++
++		cpu at 1 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			enable-method = "psci";
++			reg = <0x1>;
++		};
++
++		cpu at 2 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			enable-method = "psci";
++			reg = <0x2>;
++		};
++
++		cpu at 3 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			enable-method = "psci";
++			reg = <0x3>;
++		};
++	};
++
++	pmu {
++		compatible = "arm,armv8-pmuv3";
++		interrupts = <0 143 4>,
++			     <0 144 4>,
++			     <0 145 4>,
++			     <0 146 4>;
++	};
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupt-parent = <&gic>;
++		interrupts = <1 13 0xff01>,
++			     <1 14 0xff01>,
++			     <1 11 0xff01>,
++			     <1 10 0xff01>;
++	};
++
++	amba_apu {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <1>;
++		ranges;
++
++		gic: interrupt-controller at f9010000 {
++			compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
++			#interrupt-cells = <3>;
++			reg = <0x0 0xf9010000 0x10000>,
++			      <0x0 0xf902f000 0x2000>,
++			      <0x0 0xf9040000 0x20000>,
++			      <0x0 0xf906f000 0x2000>;
++			interrupt-controller;
++		};
++	};
++
++	amba {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <1>;
++		ranges;
++
++		misc_clk: misc_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <25000000>;
++		};
++
++		ttc0: timer at ff110000 {
++			compatible = "cdns,ttc";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 36 4>, <0 37 4>, <0 38 4>;
++			reg = <0x0 0xff110000 0x1000>;
++			clocks = <&misc_clk>;
++			timer-width = <32>;
++		};
++
++		ttc1: timer at ff120000 {
++			compatible = "cdns,ttc";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 39 4>, <0 40 4>, <0 41 4>;
++			reg = <0x0 0xff120000 0x1000>;
++			clocks = <&misc_clk>;
++			timer-width = <32>;
++		};
++
++		ttc2: timer at ff130000 {
++			compatible = "cdns,ttc";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 42 4>, <0 43 4>, <0 44 4>;
++			reg = <0x0 0xff130000 0x1000>;
++			clocks = <&misc_clk>;
++			timer-width = <32>;
++		};
++
++		ttc3: timer at ff140000 {
++			compatible = "cdns,ttc";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 45 4>, <0 46 4>, <0 47 4>;
++			reg = <0x0 0xff140000 0x1000>;
++			clocks = <&misc_clk>;
++			timer-width = <32>;
++		};
++
++		uart0: serial at ff000000 {
++			compatible = "cdns,uart-r1p8";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 21 4>;
++			reg = <0x0 0xff000000 0x1000>;
++			clock-names = "uart_clk", "pclk";
++			clocks = <&misc_clk &misc_clk>;
++		};
++
++		uart1: serial at ff010000 {
++			compatible = "cdns,uart-r1p8";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 22 4>;
++			reg = <0x0 0xff010000 0x1000>;
++			clock-names = "uart_clk", "pclk";
++			clocks = <&misc_clk &misc_clk>;
++		};
++
++		gpio: gpio at ff0a0000 {
++			compatible = "xlnx,zynq-gpio-1.0";
++			status = "disabled";
++			#gpio-cells = <0x2>;
++			clocks = <&misc_clk>;
++			interrupt-parent = <&gic>;
++			interrupts = <0 16 4>;
++			reg = <0x0 0xff0a0000 0x1000>;
++		};
++
++		gem0: ethernet at ff0b0000 {
++			compatible = "cdns,gem";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 57 4>, <0 57 4>;
++			reg = <0x0 0xff0b0000 0x1000>;
++			clock-names = "pclk", "hclk", "tx_clk";
++			clocks = <&misc_clk>, <&misc_clk>, <&misc_clk>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		gem1: ethernet at ff0c0000 {
++			compatible = "cdns,gem";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 59 4>, <0 59 4>;
++			reg = <0x0 0xff0c0000 0x1000>;
++			clock-names = "pclk", "hclk", "tx_clk";
++			clocks = <&misc_clk>, <&misc_clk>, <&misc_clk>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		gem2: ethernet at ff0d0000 {
++			compatible = "cdns,gem";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 61 4>, <0 61 4>;
++			reg = <0x0 0xff0d0000 0x1000>;
++			clock-names = "pclk", "hclk", "tx_clk";
++			clocks = <&misc_clk>, <&misc_clk>, <&misc_clk>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		gem3: ethernet at ff0e0000 {
++			compatible = "cdns,gem";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 63 4>, <0 63 4>;
++			reg = <0x0 0xff0e0000 0x1000>;
++			clock-names = "pclk", "hclk", "tx_clk";
++			clocks = <&misc_clk>, <&misc_clk>, <&misc_clk>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		spi0: spi at ff040000 {
++			compatible = "cdns,spi-r1p6";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 19 4>;
++			reg = <0x0 0xff040000 0x1000>;
++			clock-names = "ref_clk", "pclk";
++			clocks = <&misc_clk &misc_clk>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		spi1: spi at ff050000 {
++			compatible = "cdns,spi-r1p6";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 20 4>;
++			reg = <0x0 0xff050000 0x1000>;
++			clock-names = "ref_clk", "pclk";
++			clocks = <&misc_clk &misc_clk>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		i2c_clk: i2c_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0x0>;
++			clock-frequency = <111111111>;
++		};
++
++		i2c0: i2c at ff020000 {
++			compatible = "cdns,i2c-r1p10";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 17 4>;
++			reg = <0x0 0xff020000 0x1000>;
++			clocks = <&i2c_clk>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		i2c1: i2c at ff030000 {
++			compatible = "cdns,i2c-r1p10";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 18 4>;
++			reg = <0x0 0xff030000 0x1000>;
++			clocks = <&i2c_clk>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		sdhci0: sdhci at ff160000 {
++			compatible = "arasan,sdhci-8.9a";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 48 4>;
++			reg = <0x0 0xff160000 0x1000>;
++			clock-names = "clk_xin", "clk_ahb";
++			clocks = <&misc_clk>, <&misc_clk>;
++		};
++
++		sdhci1: sdhci at ff170000 {
++			compatible = "arasan,sdhci-8.9a";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 49 4>;
++			reg = <0x0 0xff170000 0x1000>;
++			clock-names = "clk_xin", "clk_ahb";
++			clocks = <&misc_clk>, <&misc_clk>;
++		};
++
++		watchdog0: watchdog at fd4d0000 {
++			compatible = "cdns,wdt-r1p2";
++			status = "disabled";
++			clocks= <&misc_clk>;
++			interrupt-parent = <&gic>;
++			interrupts = <0 52 1>;
++			reg = <0x0 0xfd4d0000 0x1000>;
++			timeout-sec = <10>;
++		};
++	};
++};
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index be1f12a5a5f0..c34bfa002303 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -36,6 +36,7 @@ CONFIG_ARCH_MEDIATEK=y
+ CONFIG_ARCH_THUNDER=y
+ CONFIG_ARCH_VEXPRESS=y
+ CONFIG_ARCH_XGENE=y
++CONFIG_ARCH_ZYNQMP=y
+ CONFIG_PCI=y
+ CONFIG_PCI_MSI=y
+ CONFIG_PCI_XGENE=y
+@@ -94,6 +95,8 @@ CONFIG_SERIAL_8250_MT6577=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_SERIAL_XILINX_PS_UART=y
++CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
+ CONFIG_VIRTIO_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_SPI=y
+-- 
+1.8.2.3
