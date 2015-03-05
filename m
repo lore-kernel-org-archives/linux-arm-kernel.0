@@ -1,38 +1,45 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu,  5 Mar 2015 18:56:36 +0000
-Subject: [PATCH] iommu: arm-smmu: set a more appropriate DMA mask
-Message-ID: <2ad6f0a7d198d607e252c420fef52d95dbe048c6.1425581413.git.robin.murphy@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 5 Mar 2015 10:57:01 -0800
+Subject: [PATCH v9 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150305185701.GH4932@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we use dma_map_page() as an architecture-independent means of
-making page table updates visible to non-coherent SMMUs, we need to
-have a suitable DMA mask set to discourage the DMA mapping layer from
-creating bounce buffers and flushing those instead, if said page tables
-happen to lie outside the default 32-bit mask.
+Hi,
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/arm-smmu.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+On Wed, Feb 25, 2015 at 04:39:40PM +0800, Hanjun Guo wrote:
+> Changes since v8:
+>   - remove MPIDR packing things by introducing phys_cpuid_t;
+> 
+>   - update patch acpi: fix acpi_os_ioremap for arm64 to follow
+>     Rafael's suggestion;
+> 
+>   - Squash patch (disable ACPI if ACPI less than 5.1) to patch
+>     (Get RSDP and ACPI boot-time table);
+> 
+>   - Move sleep_arm.c to arch/arm64/ and rename it as acpi_sleep.c 
+> 
+>   - Rework the uefi generated empty dtb to enable acpi when no dtb
+>     is available, thanks Ard for the updated patch.
+> 
+>   - rework the function of register cpu for kexec case
+> 
+>   - use pr_debug() instead of pr_info() when scanning MADT.
+> 
+>   - rebase on top of 4.0-rc1
+> 
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index fc13dd5..dc0ae62 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1630,6 +1630,13 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 	size = arm_smmu_id_size_to_bits((id >> ID2_OAS_SHIFT) & ID2_OAS_MASK);
- 	smmu->pa_size = size;
- 
-+	/*
-+	 * What the page table walker can address actually depends on which
-+	 * descriptor format is in use, but since a) we don't know that yet,
-+	 * and b) it can vary per context bank, this will have to do...
-+	 */
-+	dma_set_mask_and_coherent(smmu->dev, DMA_BIT_MASK(size));
-+
- 	if (smmu->version == ARM_SMMU_V1) {
- 		smmu->va_size = smmu->ipa_size;
- 		size = SZ_4K | SZ_2M | SZ_1G;
--- 
-1.9.1
+I've looked at most of the arch code besides GIC and some of the timer stuff,
+which I might revisit later, but the pieces I've seen seem reasonable. I've
+acked individual patches.
+
+There are some cleanups to be made, but that can be done incrementally on top,
+it's all internal implementation details.
+
+I also haven't looked closely at the documentation patches yet, so I might have
+some comments on those showing up.
+
+
+-Olof
