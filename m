@@ -1,59 +1,53 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 5 Mar 2015 08:58:21 +0100
-Subject: [PATCH v3 1/4] arm64: add macros for common adrp usages
-In-Reply-To: <1425496288-14483-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1425496288-14483-1-git-send-email-ard.biesheuvel@linaro.org>
- <1425496288-14483-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu8wnyGbvRQ9osub9P+uLMD5wqCZ3nMGbDLgD0_A2CZRSA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 5 Mar 2015 08:02:45 +0000
+Subject: [PATCH v5 8/9] rtc: st: add new driver for ST's LPC RTC
+In-Reply-To: <1425497072.2090.4.camel@tiscali.nl>
+References: <1425492398-27340-1-git-send-email-lee.jones@linaro.org>
+ <1425492398-27340-9-git-send-email-lee.jones@linaro.org>
+ <1425497072.2090.4.camel@tiscali.nl>
+Message-ID: <20150305080245.GA31098@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 March 2015 at 20:11, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> The adrp instruction is mostly used in combination with either
-> an add, a ldr or a str instruction with the low bits of the
-> referenced symbol in the 12-bit immediate of the followup
-> instruction.
->
-> Introduce the macros adr_l, ldr_l and str_l that encapsulate
-> these common patterns.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/assembler.h | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index 750bac4e637e..14c30c58d101 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -159,4 +159,24 @@ lr .req    x30             // link register
->         orr     \rd, \lbits, \hbits, lsl #32
->         .endm
->
-> +       .macro  adr_l, dst, sym, tmp=
-> +       .ifb    \tmp
-> +       adrp    \dst, \sym
-> +       add     \dst, \dst, :lo12:\sym
-> +       .else
-> +       adrp    \tmp, \sym
-> +       add     \dst, \tmp, :lo12:\sym
-> +       .endif
-> +       .endm
-> +
-> +       .macro  ldr_l, dst, sym, tmp
-> +       adrp    \tmp, \sym
-> +       ldr     \dst, [\sym, :lo12:\sym]
+On Wed, 04 Mar 2015, Paul Bolle wrote:
 
-Whoops ^^^
+> Lee Jones schreef op wo 04-03-2015 om 18:06 [+0000]:
+> > --- /dev/null
+> > +++ b/drivers/rtc/rtc-st-lpc.c
+> > @@ -0,0 +1,354 @@
+> > +/*
+> > + * rtc-st-lpc.c - ST's LPC RTC, powered by the Low Power Timer
+> > + *
+> > + * Copyright (C) 2014 STMicroelectronics Limited
+> > + *
+> > + * Author: David Paris <david.paris@st.com> for STMicroelectronics
+> > + *         Lee Jones <lee.jones@linaro.org> for STMicroelectronics
+> > + *
+> > + * Based on the original driver written by Stuart Menefy.
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public Licence
+> > + * as published by the Free Software Foundation; either version
+> > + * 2 of the Licence, or (at your option) any later version.
+> > + */
+> 
+> This states the license is GPL v2 or later.
+> 
+> > +MODULE_LICENSE("GPLv2");
+> 
+> This will taint the kernel at module load, won't it? You probably meant
+> "GPL v2", but only
+>     MODULE_LICENSE("GPL");
+> 
+> correctly matches the license in the comment at the top of this file. 
+> 
+> (I assume I missed all this when looking at the v4 series.)
 
-> +       .endm
-> +
-> +       .macro  str_l, src, sym, tmp
-> +       adrp    \tmp, \sym
-> +       str     \src, [\tmp, :lo12:\sym]
-> +       .endm
-> +
->  #endif /* __ASM_ASSEMBLER_H */
-> --
-> 1.8.3.2
->
+Actually, I've already fixed this along with another typo I found
+after resubmitting.  Always the way sadly.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
