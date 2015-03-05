@@ -1,38 +1,28 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu,  5 Mar 2015 09:46:31 +0000
-Subject: [PATCH v1 6/6] eeprom: Add to MAINTAINERS for eeprom framework
-In-Reply-To: <1425548685-12887-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1425548685-12887-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1425548791-13152-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 5 Mar 2015 10:53:46 +0100
+Subject: [PATCH v3] pinctrl: exynos: Add support for Exynos5433
+In-Reply-To: <1421822591-10536-1-git-send-email-cw00.choi@samsung.com>
+References: <1421822591-10536-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <CACRpkdZaRbkLtaS2ABWt8jsv2j7MRsg63E0gDte6mvh1TzbH2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds MAINTAINERS to eeprom framework.
+On Wed, Jan 21, 2015 at 7:43 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
+> This patch adds driver data for Exynos5433 SoC. Exynos5433 includes 228 multi-
+> functional input/output port pins and 135 memory port pins. There are 41 general
+> port groups and 2 memory port groups.
+>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Inki Dae <inki.dae@samsung.com>
+> ---
+> Changes from v2:
+> - Rebase it on v3.19-rc5
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index d66a97d..ee7ba92 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -3657,6 +3657,15 @@ T:	git git://git.alsa-project.org/alsa-kernel.git
- S:	Maintained
- F:	sound/usb/misc/ua101.c
- 
-+EEPROM FRAMEWORK
-+M:	Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-+M:	Maxime Ripard <maxime.ripard@free-electrons.com>
-+S:	Maintained
-+F:	drivers/eeprom/
-+F:	Documentation/devicetree/bindings/eeprom/
-+F:	include/linux/eeprom-provider.h
-+F:	include/linux/eeprom-consumer.h
-+
- EXTENSIBLE FIRMWARE INTERFACE (EFI)
- M:	Matt Fleming <matt.fleming@intel.com>
- L:	linux-efi at vger.kernel.org
--- 
-1.9.1
+Patch applied with Tomasz ACK.
+
+Yours,
+Linus Walleij
