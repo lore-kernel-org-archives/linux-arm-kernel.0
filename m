@@ -1,44 +1,33 @@
-From: fabrice.gasnier@st.com (Fabrice GASNIER)
-Date: Thu,  5 Mar 2015 13:47:03 +0100
-Subject: [PATCH] ARM: STi: Add STiH410 SoC support
-Message-ID: <1425559623-12379-1-git-send-email-fabrice.gasnier@st.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 5 Mar 2015 13:50:23 +0100
+Subject: [PATCH v3 4/9] mtd: pxa3xx_nand: rework timings setup
+In-Reply-To: <1425555085-29531-5-git-send-email-antoine.tenart@free-electrons.com>
+References: <1425555085-29531-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1425555085-29531-5-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20150305135023.45727776@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to STiH410 SoC.
+Dear Antoine Tenart,
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- Documentation/devicetree/bindings/arm/sti.txt | 4 ++++
- arch/arm/mach-sti/board-dt.c                  | 1 +
- 2 files changed, 5 insertions(+)
+On Thu,  5 Mar 2015 12:31:20 +0100, Antoine Tenart wrote:
+> Use the nand framework helpers: onfi_get_async_timing_mode() and
+> onfi_async_timing_mode_to_sdr_timings() to retrieve the timing
+> configuration. Then update the pxa3xx timing setup function to use the
+> timing configuration retrieved.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  drivers/mtd/nand/pxa3xx_nand.c                | 101 ++++++++++++++++++--------
+>  include/linux/platform_data/mtd-nand-pxa3xx.h |   2 -
+>  2 files changed, 69 insertions(+), 34 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/sti.txt b/Documentation/devicetree/bindings/arm/sti.txt
-index d70ec35..8d27f6b 100644
---- a/Documentation/devicetree/bindings/arm/sti.txt
-+++ b/Documentation/devicetree/bindings/arm/sti.txt
-@@ -13,6 +13,10 @@ Boards with the ST STiH407 SoC shall have the following properties:
- Required root node property:
- compatible = "st,stih407";
- 
-+Boards with the ST STiH410 SoC shall have the following properties:
-+Required root node property:
-+compatible = "st,stih410";
-+
- Boards with the ST STiH418 SoC shall have the following properties:
- Required root node property:
- compatible = "st,stih418";
-diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
-index b067390..b373aca 100644
---- a/arch/arm/mach-sti/board-dt.c
-+++ b/arch/arm/mach-sti/board-dt.c
-@@ -18,6 +18,7 @@ static const char *stih41x_dt_match[] __initdata = {
- 	"st,stih415",
- 	"st,stih416",
- 	"st,stih407",
-+	"st,stih410",
- 	"st,stih418",
- 	NULL
- };
+After this commit, the pxa3xx_nand_timing structure type is no longer
+used as far as I understand. So maybe it can be removed from
+include/linux/platform_data/mtd-nand-pxa3xx.h ?
+
+Thomas
 -- 
-1.9.1
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
