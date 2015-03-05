@@ -1,118 +1,38 @@
-From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
-Date: Thu, 05 Mar 2015 20:55:07 +0200
-Subject: ARM: OMPA4+: is it expected dma_coerce_mask_and_coherent(dev,
- DMA_BIT_MASK(64)); to fail?
-Message-ID: <54F8A68B.3080709@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu,  5 Mar 2015 18:56:36 +0000
+Subject: [PATCH] iommu: arm-smmu: set a more appropriate DMA mask
+Message-ID: <2ad6f0a7d198d607e252c420fef52d95dbe048c6.1425581413.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Since we use dma_map_page() as an architecture-independent means of
+making page table updates visible to non-coherent SMMUs, we need to
+have a suitable DMA mask set to discourage the DMA mapping layer from
+creating bounce buffers and flushing those instead, if said page tables
+happen to lie outside the default 32-bit mask.
 
-Now I can see very interesting behavior related to dma_coerce_mask_and_coherent()
-and friends which I'd like to explain and clarify.
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/arm-smmu.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Below is set of questions I have (why - I explained below):
-- Is expected dma_coerce_mask_and_coherent(DMA_BIT_MASK(64)) and friends to fail on 32 bits HW?
-
-- What is expected value for max_pfn: max_phys_pfn or max_phys_pfn + 1?
-
-- What is expected value for struct memblock_region->size: mem_range_size or mem_range_size - 1?
-
-- What is expected value to be returned by memblock_end_of_DRAM():
-  @base + @size(max_phys_addr + 1) or @base + @size - 1(max_phys_addr)?
-
-
-I'm working with BeaglBoard-X15 (AM572x/DRA7xx) board and have following code in OMAP ASOC driver
-which is failed SOMETIMES during the boot with error -EIO.
-=== to omap-pcm.c:
-omap_pcm_new() {
-...
-	ret = dma_coerce_mask_and_coherent(card->dev, DMA_BIT_MASK(64));
-^^ failed sometimes
-	if (ret)
-		return ret;
-}
-
-What I can see is that dma_coerce_mask_and_coherent() and etc may fail or succeed 
-depending on - max_pfn value. 
--> max_pfn value depends on memblock configuration
-max_pfn = max_high = PFN_DOWN(memblock_end_of_DRAM());
-           |- PFN_DOWN(memblock.memory.regions[last_idx].base + memblock.memory.regions[last_idx].size)
-
--> memblock configuration depends on
-a) CONFIG_ARM_LPAE=y|n (my system really works with 32 bit address space)
-b) RAM configuration
-
-Example 1 CONFIG_ARM_LPAE=n:
-	memory {
-		device_type = "memory";
-		reg = <0x80000000 0x60000000>; /* 1536 MB */
-	};
-
-  memblock will be configured as:
-	memory.cnt  = 0x1
-	memory[0x0]     [0x00000080000000-0x000000dfffffff], 0x60000000 bytes flags: 0x0
-							     ^^^^^^^^^^
-  max_pfn = 0x000E0000
-
-Example 2 CONFIG_ARM_LPAE=n:
-	memory {
-		device_type = "memory";
-		reg = <0x80000000 0x80000000>;
-	};
-
-  memblock will be configured as:
-	memory.cnt  = 0x1
-	memory[0x0]     [0x00000080000000-0x000000fffffffe], 0x7fffffff bytes flags: 0x0
-							     ^^^^^^^^^^
-  max_pfn = 0x000FFFFF
-
-Example 3 CONFIG_ARM_LPAE=y (but system really works with 32 bit address space):
-	memory {
-		device_type = "memory";
-		reg = <0x80000000 0x80000000>;
-	};
-
-  memblock will be configured as:
-	memory.cnt  = 0x1
-	memory[0x0]     [0x00000080000000-0x000000ffffffff], 0x80000000 bytes flags: 0x0
-							     ^^^^^^^^^^
-  max_pfn = 0x00100000
-
-The dma_coerce_mask_and_coherent() will fail in case 'Example 3' and succeed in cases 1,2.
-dma-mapping.c --> __dma_supported()
-	if (sizeof(mask) != sizeof(dma_addr_t) && <== true for all OMAP4+
-	    mask > (dma_addr_t)~0 &&		<== true for DMA_BIT_MASK(64)
-	    dma_to_pfn(dev, ~0) < max_pfn) {  <== true only for Example 3
-
-I've tracked down patch which changes memblock behavior to:
-commit eb18f1b5bfb99b1d7d2f5d792e6ee5c9b7d89330
-Author: Tejun Heo <tj@kernel.org>
-Date:   Thu Dec 8 10:22:07 2011 -0800
-
-    memblock: Make memblock functions handle overflowing range @size
-
-This commit is pretty old :( and it doesn't takes into account LPAE mode
-where phys_addr_t is 64 bit, but physically accessible addresses <= 40 bit
-(memblock_cap_size()).
-
-The issue with omap-pcm was simply fixed by using DMA_BIT_MASK(32), but It seems problem is
-wider and above behavior of dma_set_maskX() and memblock confused me a bit.
-
-I'd be very appreciated for any comments/clarification on questions I've listed at the
-beginning of my e-mail - there are no patches from my side as I'd like to understand 
-expected behavior of the kernel first (especially taking into account that any
-memblock changes might affect on@least half of arches). 
-
-Thanks.
-
-
-Additional info:
-memblock: Make memblock functions handle overflowing range @size
-https://lkml.org/lkml/2011/7/26/235
-[alsa-devel] [PATCH] ASoC: omap-pcm: Lower the dma coherent mask to 32bits
-http://mailman.alsa-project.org/pipermail/alsa-devel/2013-December/069817.html
-
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index fc13dd5..dc0ae62 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1630,6 +1630,13 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 	size = arm_smmu_id_size_to_bits((id >> ID2_OAS_SHIFT) & ID2_OAS_MASK);
+ 	smmu->pa_size = size;
+ 
++	/*
++	 * What the page table walker can address actually depends on which
++	 * descriptor format is in use, but since a) we don't know that yet,
++	 * and b) it can vary per context bank, this will have to do...
++	 */
++	dma_set_mask_and_coherent(smmu->dev, DMA_BIT_MASK(size));
++
+ 	if (smmu->version == ARM_SMMU_V1) {
+ 		smmu->va_size = smmu->ipa_size;
+ 		size = SZ_4K | SZ_2M | SZ_1G;
 -- 
-regards,
--grygorii
+1.9.1
