@@ -1,24 +1,50 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 05 Mar 2015 11:42:10 -0800
-Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
- msm-id and qcom, board-id
-In-Reply-To: <1425503602-24916-1-git-send-email-galak@codeaurora.org> (Kumar
- Gala's message of "Wed, 4 Mar 2015 15:13:20 -0600")
-References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
-Message-ID: <7h8ufbjkod.fsf@deeprootsystems.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 5 Mar 2015 20:42:58 +0100
+Subject: [PATCH 0/3] net: macb: rework at91 specific handling
+In-Reply-To: <1425572842-6084-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1425572842-6084-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150305194258.GX3989@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kumar Gala <galak@codeaurora.org> writes:
+On 05/03/2015 at 17:27:19 +0100, Boris Brezillon wrote :
+> Hello,
+> 
+> This removes the #if defined(ARCH_AT91) sections to prevent any problem
+> when enabling ARM multi-platform support.
+> The at91 specific logic is now activated when the "at91sam9260-macb"
+> compatible string is found. 
+> 
 
-> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
-> on Qualcomm MSM platforms to determine which device tree should be
-> utilized and passed to the kernel.
->
-> Cc: <devicetree@vger.kernel.org>
-> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+A small nit in patch 3 but I'm fine with the series
 
-Is this the special magic that allows qcom bootloaders to take a kernel
-plus multiple DTBs and figure out which DTB to pass?
+Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Kevin
+> Best Regards,
+> 
+> Boris
+> 
+> Boris Brezillon (3):
+>   net/macb: Update DT bindings documentation
+>   ARM: at91/dt: fix macb compatible strings
+>   net: macb: remove #if defined(CONFIG_ARCH_AT91) sections
+> 
+>  Documentation/devicetree/bindings/net/macb.txt |  5 +++-
+>  arch/arm/boot/dts/at91sam9260.dtsi             |  2 +-
+>  arch/arm/boot/dts/at91sam9263.dtsi             |  2 +-
+>  arch/arm/boot/dts/at91sam9g45.dtsi             |  2 +-
+>  arch/arm/boot/dts/at91sam9x5_macb0.dtsi        |  2 +-
+>  arch/arm/boot/dts/at91sam9x5_macb1.dtsi        |  2 +-
+>  arch/arm/boot/dts/sama5d3_emac.dtsi            |  2 +-
+>  drivers/net/ethernet/cadence/macb.c            | 33 ++++++++++++++------------
+>  drivers/net/ethernet/cadence/macb.h            |  2 ++
+>  9 files changed, 30 insertions(+), 22 deletions(-)
+> 
+> -- 
+> 1.9.1
+> 
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
