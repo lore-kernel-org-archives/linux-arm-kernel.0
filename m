@@ -1,74 +1,47 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Wed, 04 Mar 2015 17:06:14 -0700
-Subject: [PATCH v3 1/9] ACPI: fix all errors reported by cleanpatch.pl
- in osl.c
-In-Reply-To: <3363575.FHEZ9Qjrf1@vostro.rjw.lan>
-References: <1424824585-6405-1-git-send-email-al.stone@linaro.org>
- <1528624.HcuCny6IaW@vostro.rjw.lan> <54F79B9C.1030901@redhat.com>
- <3363575.FHEZ9Qjrf1@vostro.rjw.lan>
-Message-ID: <54F79DF6.60204@redhat.com>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Wed,  4 Mar 2015 16:18:05 -0800
+Subject: [PATCH] iommu/arm-smmu: fix leak in arm_smmu_flush_pgtable
+Message-ID: <1425514685-23831-1-git-send-email-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2015 05:25 PM, Rafael J. Wysocki wrote:
-> On Wednesday, March 04, 2015 04:56:12 PM Al Stone wrote:
->> On 03/04/2015 04:04 PM, Rafael J. Wysocki wrote:
->>> On Tuesday, February 24, 2015 05:36:17 PM al.stone at linaro.org wrote:
->>>> From: Al Stone <al.stone@linaro.org>
->>>>
->>>> In preparation for later splitting out some of the arch-dependent code from
->>>> osl.c, clean up the errors reported by checkpatch.pl.  They fell into these
->>>> classes:
->>>>
->>>>    -- remove the FSF address from the GPL notice
->>>>    -- "foo * bar" should be "foo *bar" (and the ** variation of same)
->>>>    -- a return is not a function, so parentheses are not required.
->>>>
->>>> Signed-off-by: Al Stone <al.stone@linaro.org>
->>>
->>> checkpatch.pl is irrelevant here.  You're trying to make the coding style be
->>> more consistent with the coding style of the rest of the kernel.
->>>
->>> The warnings from checkpatch.pl are meaningless for the existing code, so
->>> it should not be used to justify changes in that code.
->>>
->>> Of course, the same applies to patches [2-4/9].
->>>
->>>
->>
->> Okay, I'm puzzled.  In the last version of these patches, I asked if I
->> should clean up osl.c as long as I was creating the new osi.c file.  I
->> understood the reply to mean it would also be good to correct osl.c [0]
->> from checkpatch's point of view.  I took that to mean errors (patch [1/9])
->> and warnings (patches [2-4/9]) -- so that's what I did.  What did I
->> misunderstand from that reply?
->>
->> If these changes are objectionable, then I'll drop these from the next
->> version of the patch set; I'm not hung up on insisting on either of the
->> kernel's or ACPI's coding style -- I try to adapt as needed.  I only did
->> the patches because I thought it was helping out with some long-term
->> maintenance type work.
-> 
-> The changes are basically OK, but the justification is bogus to me.
-> "I'm making the chagne, because checkpatch.pl told me so" is a pretty bad
-> explanation in my view.  It is much better to say "This file does not
-> adhere to the general kernel coding style and since I'm going to split it
-> into pieces and I want those pieces to follow the coding style more closely,
-> make changes as follows."
-> 
-> So this is more about the changelogs (and subjects) than the code changes
-> themselves.
+We're currently mapping a page in arm_smmu_flush_pgtable without ever
+unmapping it.  Fix this by calling dma_unmap_page on the returned dma
+address.  Since the only reason we're calling dma_map_page is to make
+sure it actually gets flushed out to RAM, we can just call
+dma_unmap_page immediately following the map.
 
-Aha.  That makes much more sense to me.  Sorry if I was being a bit dense;
-I'll rev these for the next version so it's far clearer.  Thanks for being
-patient :).
+Without this, eventually swiotlb runs out of memory and starts printing
+things like:
 
+    [   35.545076] arm-smmu d00000.arm,smmu: swiotlb buffer is full (sz: 128 bytes)
+
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+---
+ drivers/iommu/arm-smmu.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index fc13dd56953e..2ff8f35cf533 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -627,8 +627,13 @@ static void arm_smmu_flush_pgtable(void *addr, size_t size, void *cookie)
+ 		 * recursion here as the SMMU table walker will not be wired
+ 		 * through another SMMU.
+ 		 */
+-		dma_map_page(smmu->dev, virt_to_page(addr), offset, size,
+-			     DMA_TO_DEVICE);
++		dma_addr_t handle = dma_map_page(smmu->dev, virt_to_page(addr),
++						offset, size, DMA_TO_DEVICE);
++		if (handle == DMA_ERROR_CODE)
++			dev_err(smmu->dev,
++				"Couldn't flush page tables at %p!\n", addr);
++		else
++			dma_unmap_page(smmu->dev, handle, size, DMA_TO_DEVICE);
+ 	}
+ }
+ 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
