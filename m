@@ -1,43 +1,174 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 5 Mar 2015 12:33:07 +0000
-Subject: [PATCH REPOST 0/2] Remove pl011 startup glitches and avoid dummy
- TX during startup
-In-Reply-To: <54F84713.6040305@arm.com>
-References: <1425472054-7543-1-git-send-email-Dave.Martin@arm.com>
- <54F73650.2070304@arm.com>
- <20150305120320.GB3612@e103592.cambridge.arm.com>
- <54F84713.6040305@arm.com>
-Message-ID: <20150305123307.GD3612@e103592.cambridge.arm.com>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Thu, 05 Mar 2015 14:47:14 +0200
+Subject: [PATCH 1/6] clk: qcom: Add support for GDSCs
+In-Reply-To: <1425279749-16625-2-git-send-email-rnayak@codeaurora.org>
+References: <1425279749-16625-1-git-send-email-rnayak@codeaurora.org>
+ <1425279749-16625-2-git-send-email-rnayak@codeaurora.org>
+Message-ID: <54F85052.8090600@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 05, 2015 at 12:07:47PM +0000, Andre Przywara wrote:
-> On 05/03/15 12:03, Dave P Martin wrote:
-> > On Wed, Mar 04, 2015 at 04:44:00PM +0000, Andre Przywara wrote:
-> >> Hi Dave,
-> >>
-> >> On 04/03/15 12:27, Dave P Martin wrote:
-> >>> There have been no comments on this series since my previous post, and
-> >>> I have made no further changes.
-> >>>
-> >>> Since then, I have confirmed that this also works robustly with TX DMA
-> >>> enabled on Juno.
-> >>>
-> >>> Review/comments/testing still welcome.
-> >>
-> >> this has been tested briefly on a Calxeda Midway without any
-> >> regressions. Also I use them as the base for my SBSA series now (which
-> >> are tested on the model and the Midway) and I see that all problems
-> >> observed before are gone now.
-> >>
-> >> Tested-by: Andre Przywara <andre.przywara@arm.com>
-> > 
-> > Thanks -- should I take that for both patches?
+On 03/02/2015 09:02 AM, Rajendra Nayak wrote:
+> From: Stephen Boyd <sboyd@codeaurora.org>
 > 
-> Yes, please. Also I tested this on the Raspberry Pi 2 today (though with
-> their kernel, not upstream).
+> GDSCs (Global Distributed Switch Controllers) are responsible for
+> safely collapsing and restoring power to peripherals in the SoC.
+> These are best modelled as power domains using genpd and given
+> the registers are scattered throughout the clock controller register
+> space, its best to have the support added through the clock driver.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> ---
+>  drivers/clk/qcom/Kconfig  |   5 ++
+>  drivers/clk/qcom/Makefile |   1 +
+>  drivers/clk/qcom/gdsc.c   | 130 ++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/qcom/gdsc.h   |  43 +++++++++++++++
+>  4 files changed, 179 insertions(+)
+>  create mode 100644 drivers/clk/qcom/gdsc.c
+>  create mode 100644 drivers/clk/qcom/gdsc.h
+> 
 
-Thanks for that.  The more the better!
+<snip>
 
-Cheers
----Dave
+> --- /dev/null
+> +++ b/drivers/clk/qcom/gdsc.c
+> @@ -0,0 +1,130 @@
+> +/*
+
+<snip>
+
+> +
+> +#include "gdsc.h"
+> +
+> +#define PWR_ON_MASK		BIT(31)
+> +#define EN_REST_WAIT_MASK	(0xF << 20)
+
+you can use GENMASK(23, 20) here and below
+
+> +#define EN_FEW_WAIT_MASK	(0xF << 16)
+> +#define CLK_DIS_WAIT_MASK	(0xF << 12)
+> +#define SW_OVERRIDE_MASK	BIT(2)
+> +#define HW_CONTROL_MASK		BIT(1)
+> +#define SW_COLLAPSE_MASK	BIT(0)
+> +
+> +/* Wait 2^n CXO cycles between all states. Here, n=2 (4 cycles). */
+> +#define EN_REST_WAIT_VAL	(0x2 << 20)
+> +#define EN_FEW_WAIT_VAL		(0x8 << 16)
+> +#define CLK_DIS_WAIT_VAL	(0x2 << 12)
+> +
+> +#define TIMEOUT_US		100
+> +
+> +static int gdsc_is_enabled(struct gdsc *sc)
+> +{
+> +	u32 val;
+> +
+> +	regmap_read(sc->regmap, sc->gdscr, &val);
+
+please, check the regmap_read for error, here and on few places below.
+
+> +	return !!(val & PWR_ON_MASK);
+> +}
+> +
+> +static int gdsc_toggle_logic(struct gdsc *sc, bool en)
+> +{
+> +	int ret;
+> +	u32 val = en ? 0 : SW_COLLAPSE_MASK;
+> +	u32 check = en ? PWR_ON_MASK : 0;
+> +	unsigned long timeout;
+> +
+> +	ret = regmap_update_bits(sc->regmap, sc->gdscr, SW_COLLAPSE_MASK, val);
+> +	if (ret)
+> +		return ret;
+> +
+> +	timeout = jiffies + usecs_to_jiffies(TIMEOUT_US);
+> +	do {
+> +		regmap_read(sc->regmap, sc->gdscr, &val);
+> +		if ((val & PWR_ON_MASK) == check)
+> +			return 0;
+> +	} while (time_before(jiffies, timeout));
+
+blank line here will be better.
+
+> +	regmap_read(sc->regmap, sc->gdscr, &val);
+> +	if ((val & PWR_ON_MASK) == check)
+> +		return 0;
+> +
+> +	pr_err("%s %s timed out\n", en ? "enabling" : "disabling", sc->pd.name);
+
+use dev_err() or giving the error to the upper layers should be enough.
+
+> +	return -ETIMEDOUT;
+> +}
+> +
+> +static int gdsc_enable(struct generic_pm_domain *domain)
+> +{
+> +	struct gdsc *sc = domain_to_gdsc(domain);
+> +	int ret;
+> +
+> +	ret = gdsc_toggle_logic(sc, true);
+> +	if (ret)
+> +		return ret;
+> +	/*
+> +	 * If clocks to this power domain were already on, they will take an
+> +	 * additional 4 clock cycles to re-enable after the power domain is
+> +	 * enabled. Delay to account for this. A delay is also needed to ensure
+> +	 * clocks are not enabled within 400ns of enabling power to the
+> +	 * memories.
+> +	 */
+> +	udelay(1);
+> +
+> +	return 0;
+> +}
+> +
+> +static int gdsc_disable(struct generic_pm_domain *domain)
+> +{
+> +	struct gdsc *sc = domain_to_gdsc(domain);
+> +	int ret = 0;
+> +
+> +	ret = gdsc_toggle_logic(sc, false);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return ret;
+
+return gdsc_toggle_logic(sc, false);
+
+> +}
+> +
+> +int gdsc_init(struct generic_pm_domain *domain, struct regmap *regmap)
+> +{
+> +	struct gdsc *sc = domain_to_gdsc(domain);
+> +	u32 mask;
+> +	u32 val;
+> +	int on;
+> +
+> +	sc->regmap = regmap;
+> +
+> +	/*
+> +	 * Disable HW trigger: collapse/restore occur based on registers writes.
+> +	 * Disable SW override: Use hardware state-machine for sequencing.
+> +	 * Configure wait time between states.
+> +	 */
+> +	mask = HW_CONTROL_MASK | SW_OVERRIDE_MASK |
+> +	       EN_REST_WAIT_MASK | EN_FEW_WAIT_MASK | CLK_DIS_WAIT_MASK;
+> +	val = EN_REST_WAIT_VAL | EN_FEW_WAIT_VAL | CLK_DIS_WAIT_VAL;
+> +	regmap_update_bits(sc->regmap, sc->gdscr, mask, val);
+> +
+> +	on = gdsc_is_enabled(sc);
+> +
+> +	pm_genpd_init(&sc->pd, NULL, !on);
+> +	sc->pd.power_off = gdsc_disable;
+> +	sc->pd.power_on = gdsc_enable;
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(gdsc_init);
+
+gdsc_init is used in common.c, no need to export it.
+
+<snip>
+
+-- 
+regards,
+Stan
