@@ -1,33 +1,33 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu,  5 Mar 2015 12:31:23 +0100
-Subject: [PATCH v3 7/9] mtd: nand: let Marvell Berlin SoCs select the pxa3xx
- driver
+Date: Thu,  5 Mar 2015 12:31:22 +0100
+Subject: [PATCH v3 6/9] Documentation: bindings: add the Berlin nand
+ controller compatible
 In-Reply-To: <1425555085-29531-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1425555085-29531-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1425555085-29531-8-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1425555085-29531-7-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell Berlin nand controller support has been added in the pxa3xx nand
-driver. Let these SoCs select the driver.
+The Berlin nand controller support was introduced using the existing
+pxa3xx nand driver. Add the Berlin specific compatible into the
+documentation.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/mtd/nand/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 5b76a173cd95..cfe7f223f48f 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -332,7 +332,7 @@ config MTD_NAND_ATMEL
- 
- config MTD_NAND_PXA3xx
- 	tristate "NAND support on PXA3xx and Armada 370/XP"
--	depends on PXA3xx || ARCH_MMP || PLAT_ORION
-+	depends on PXA3xx || ARCH_MMP || PLAT_ORION || ARCH_BERLIN
- 	help
- 	  This enables the driver for the NAND flash device found on
- 	  PXA3xx processors (NFCv1) and also on Armada 370/XP (NFCv2).
+diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+index ecd1fc071f81..f33ee0aa0a2e 100644
+--- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+@@ -5,6 +5,7 @@ Required properties:
+  - compatible:		Should be set to one of the following:
+ 			marvell,pxa3xx-nand
+ 			marvell,armada370-nand
++			marvell,berlin2-nand
+  - reg: 		The register base for the controller
+  - interrupts:		The interrupt to map
+  - #address-cells:	Set to <1> if the node includes partitions
 -- 
 2.3.1
