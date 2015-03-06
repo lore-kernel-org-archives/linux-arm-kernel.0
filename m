@@ -1,178 +1,79 @@
-From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez-Ortiz)
-Date: Fri,  6 Mar 2015 13:05:40 -0500
-Subject: [PATCH v6] drivers/tty: amba: defer DMA probe until the DMA channel
- is required.
-Message-ID: <1425665140-1827-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 6 Mar 2015 18:06:36 +0000
+Subject: [PATCH v9 12/21] ACPI / table: Print GIC information when MADT
+ is parsed
+In-Reply-To: <1424853601-6675-13-git-send-email-hanjun.guo@linaro.org>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <1424853601-6675-13-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150306180636.GB26888@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix a race condition that happens when device_initcall(pl011_dma_initicall)
-is executed before all the devices have been probed - this issue was observed on
-a hisi_6220 SoC (HiKey board from Linaro).
+On Wed, Feb 25, 2015 at 08:39:52AM +0000, Hanjun Guo wrote:
+> When MADT is parsed, print GIC information as debug message:
+> 
+> ACPI: GICC (acpi_id[0x0000] address[00000000e112f000] MPIDR[0x0] enabled)
+> ACPI: GICC (acpi_id[0x0001] address[00000000e112f000] MPIDR[0x1] enabled)
+> ...
+> ACPI: GICC (acpi_id[0x0201] address[00000000e112f000] MPIDR[0x201] enabled)
+> 
+> Those debug information will be very helpful to bring up early systems to
+> see if acpi_id and MPIDR are matched or not as spec defined.
 
-The deferred driver probing framework relies on late_initcall to trigger
-deferred probes so it is just possible that, even with a valid DMA driver ready
-to be loaded, we fail to synchronize with it.
+Nit: "This debug information"
 
-The proposed implementation delays probing the DMA until dma_startup.
+> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Tested-by: Yijing Wang <wangyijing@huawei.com>
+> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+> Tested-by: Jon Masters <jcm@redhat.com>
+> Tested-by: Timur Tabi <timur@codeaurora.org>
+> Tested-by: Robert Richter <rrichter@cavium.com>
+> Acked-by: Robert Richter <rrichter@cavium.com>
+> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 
-As this is invoked on port startup and port resume - but DMA probing is only
-required once - we avoid calling multiple times using a new field in
-uart_amba_port to track this scenario.
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-This commit allows for subsequent attempts to associate an external DMA if the
-DMA driver itself is not available (but present in the deferred probe pending
-list).
-
-Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
- drivers/tty/serial/amba-pl011.c | 71 ++++++++++-------------------------------
- 1 file changed, 17 insertions(+), 54 deletions(-)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 8d94c19..f34f85c 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -164,6 +164,7 @@ struct uart_amba_port {
- 	bool			using_rx_dma;
- 	struct pl011_dmarx_data dmarx;
- 	struct pl011_dmatx_data	dmatx;
-+	bool			dma_probed;
- #endif
- };
- 
-@@ -261,10 +262,11 @@ static void pl011_sgbuf_free(struct dma_chan *chan, struct pl011_sgbuf *sg,
- 	}
- }
- 
--static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *uap)
-+static void pl011_dma_probe(struct uart_amba_port *uap)
- {
- 	/* DMA is the sole user of the platform data right now */
- 	struct amba_pl011_data *plat = dev_get_platdata(uap->port.dev);
-+	struct device *dev = uap->port.dev;
- 	struct dma_slave_config tx_conf = {
- 		.dst_addr = uap->port.mapbase + UART01x_DR,
- 		.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE,
-@@ -275,9 +277,15 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
- 	struct dma_chan *chan;
- 	dma_cap_mask_t mask;
- 
--	chan = dma_request_slave_channel(dev, "tx");
-+	uap->dma_probed = true;
-+	chan = dma_request_slave_channel_reason(dev, "tx");
-+	if (IS_ERR(chan)) {
-+		if (PTR_ERR(chan) == -EPROBE_DEFER) {
-+			dev_info(uap->port.dev, "DMA driver not ready\n");
-+			uap->dma_probed = false;
-+			return;
-+		}
- 
--	if (!chan) {
- 		/* We need platform data */
- 		if (!plat || !plat->dma_filter) {
- 			dev_info(uap->port.dev, "no DMA platform data\n");
-@@ -385,55 +393,8 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
- 	}
- }
- 
--#ifndef MODULE
--/*
-- * Stack up the UARTs and let the above initcall be done at device
-- * initcall time, because the serial driver is called as an arch
-- * initcall, and at this time the DMA subsystem is not yet registered.
-- * At this point the driver will switch over to using DMA where desired.
-- */
--struct dma_uap {
--	struct list_head node;
--	struct uart_amba_port *uap;
--	struct device *dev;
--};
--
--static LIST_HEAD(pl011_dma_uarts);
--
--static int __init pl011_dma_initcall(void)
--{
--	struct list_head *node, *tmp;
--
--	list_for_each_safe(node, tmp, &pl011_dma_uarts) {
--		struct dma_uap *dmau = list_entry(node, struct dma_uap, node);
--		pl011_dma_probe_initcall(dmau->dev, dmau->uap);
--		list_del(node);
--		kfree(dmau);
--	}
--	return 0;
--}
--
--device_initcall(pl011_dma_initcall);
--
--static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
--{
--	struct dma_uap *dmau = kzalloc(sizeof(struct dma_uap), GFP_KERNEL);
--	if (dmau) {
--		dmau->uap = uap;
--		dmau->dev = dev;
--		list_add_tail(&dmau->node, &pl011_dma_uarts);
--	}
--}
--#else
--static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
--{
--	pl011_dma_probe_initcall(dev, uap);
--}
--#endif
--
- static void pl011_dma_remove(struct uart_amba_port *uap)
- {
--	/* TODO: remove the initcall if it has not yet executed */
- 	if (uap->dmatx.chan)
- 		dma_release_channel(uap->dmatx.chan);
- 	if (uap->dmarx.chan)
-@@ -1021,6 +982,9 @@ static void pl011_dma_startup(struct uart_amba_port *uap)
- {
- 	int ret;
- 
-+	if (!uap->dma_probed)
-+		pl011_dma_probe(uap);
-+
- 	if (!uap->dmatx.chan)
- 		return;
- 
-@@ -1142,7 +1106,7 @@ static inline bool pl011_dma_rx_running(struct uart_amba_port *uap)
- 
- #else
- /* Blank functions if the DMA engine is not available */
--static inline void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
-+static inline void pl011_dma_probe(struct uart_amba_port *uap)
- {
- }
- 
-@@ -2218,7 +2182,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 	uap->port.ops = &amba_pl011_pops;
- 	uap->port.flags = UPF_BOOT_AUTOCONF;
- 	uap->port.line = i;
--	pl011_dma_probe(&dev->dev, uap);
- 
- 	/* Ensure interrupts from this UART are masked and cleared */
- 	writew(0, uap->port.membase + UART011_IMSC);
-@@ -2233,7 +2196,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 	if (!amba_reg.state) {
- 		ret = uart_register_driver(&amba_reg);
- 		if (ret < 0) {
--			pr_err("Failed to register AMBA-PL011 driver\n");
-+			dev_err(&dev->dev,
-+				"Failed to register AMBA-PL011 driver\n");
- 			return ret;
- 		}
- 	}
-@@ -2242,7 +2206,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 	if (ret) {
- 		amba_ports[i] = NULL;
- 		uart_unregister_driver(&amba_reg);
--		pl011_dma_remove(uap);
- 	}
- 
- 	return ret;
--- 
-1.9.1
+> ---
+>  drivers/acpi/tables.c | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+> 
+> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+> index f4e5b88..2e19189 100644
+> --- a/drivers/acpi/tables.c
+> +++ b/drivers/acpi/tables.c
+> @@ -185,6 +185,28 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>  		}
+>  		break;
+>  
+> +	case ACPI_MADT_TYPE_GENERIC_INTERRUPT:
+> +		{
+> +			struct acpi_madt_generic_interrupt *p =
+> +				(struct acpi_madt_generic_interrupt *)header;
+> +			pr_debug("GICC (acpi_id[0x%04x] address[%llx] MPIDR[0x%llx] %s)\n",
+> +				 p->uid, p->base_address,
+> +				 p->arm_mpidr,
+> +				 (p->flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+> +
+> +		}
+> +		break;
+> +
+> +	case ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR:
+> +		{
+> +			struct acpi_madt_generic_distributor *p =
+> +				(struct acpi_madt_generic_distributor *)header;
+> +			pr_debug("GIC Distributor (gic_id[0x%04x] address[%llx] gsi_base[%d])\n",
+> +				 p->gic_id, p->base_address,
+> +				 p->global_irq_base);
+> +		}
+> +		break;
+> +
+>  	default:
+>  		pr_warn("Found unsupported MADT entry (type = 0x%x)\n",
+>  			header->type);
+> -- 
+> 1.9.1
+> 
+> 
