@@ -1,72 +1,59 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Fri, 06 Mar 2015 13:59:59 -0500
-Subject: [PATCH v3 2/3] of: add optional options parameter to
- of_find_node_by_path()
-In-Reply-To: <54F9EDE8.1090902@hurleysoftware.com>
-References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
- <1417110967-16284-3-git-send-email-leif.lindholm@linaro.org>
- <54F7287E.6060302@hurleysoftware.com>
- <20150306165253.GJ4278@bivouac.eciton.net>
- <54F9EDE8.1090902@hurleysoftware.com>
-Message-ID: <54F9F92F.7080900@hurleysoftware.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 06 Mar 2015 19:02:10 +0000
+Subject: [PATCH 4.0-rc1 v17 5/6] x86/nmi: Use common printk functions
+In-Reply-To: <20150305194653.GA17436@gmail.com>
+References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
+ <1425463974-23568-1-git-send-email-daniel.thompson@linaro.org>
+ <1425463974-23568-6-git-send-email-daniel.thompson@linaro.org>
+ <20150305005424.GA21715@gmail.com> <1425558597.2769.53.camel@linaro.org>
+ <20150305194653.GA17436@gmail.com>
+Message-ID: <1425668530.2769.82.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2015 01:11 PM, Peter Hurley wrote:
-> On 03/06/2015 11:52 AM, Leif Lindholm wrote:
-
-[...]
-
->> Could you give the below a spin, and if it works for you, send me the
->> above tests as a full patch so that I can post both as a series?
+On Thu, 2015-03-05 at 20:46 +0100, Ingo Molnar wrote:
+> * Daniel Thompson <daniel.thompson@linaro.org> wrote:
 > 
-> Will do as soon as I finish testing.
+> > On Thu, 2015-03-05 at 01:54 +0100, Ingo Molnar wrote:
+> > > * Daniel Thompson <daniel.thompson@linaro.org> wrote:
+> > > 
+> > > > Much of the code sitting in arch/x86/kernel/apic/hw_nmi.c to support 
+> > > > safe all-cpu backtracing from NMI has been copied to printk.c to 
+> > > > make it accessible to other architectures.
+> > > > 
+> > > > Port the x86 NMI backtrace to the generic code.
+> > > 
+> > > Is there any difference between the generic and the x86 code as they 
+> > > stand today?
+> > 
+> > Shouldn't be any user observable change but there are some changes,
+> > mostly due to review comments.
+> > 
+> > 1. The seq_buf structures are initialized at boot and *after* they
+> >    are consumed (originally they were initialized just before use).
+> > 
+> > 2. The generic code doesn't maintain an equivalent of backtrace_mask
+> >    (which was essentially a copy of cpus_online made when backtracing
+> >    was requested) and instead iterates using for_each_possible_cpu()
+> >    to initialize and dump the seq_buf:s.
+> 
+> Ok, I have no fundamental objections:
+> 
+> Acked-by: Ingo Molnar <mingo@kernel.org>
+> 
+> I suspect you want to carry the x86 bits yourself?
 
-All passed with your patch; patch for testcases below.
+I've done plenty of bisectability testing on this set so patches 4 and 5
+could be separated from the set and go via the x86 tree. However with
+your ack I hope that taking the patchset via the irqchip route should be
+possible.
 
-Regards,
-Peter Hurley
+Jason: After I've attended to Joe Perches/Steven Rostedt's comments will
+you be comfortable enough to take patches 1-5 through one of your
+trees? 
 
---- >% ---
-From: Peter Hurley <peter@hurleysoftware.com>
-Subject: [PATCH] of: unittest: Add options string testcase variants
+It would be great to deliver patch 6 too but rmk is having a short break
+so getting an ack for that may not work out
 
-Add testcase variants with '/' in the options string to test for
-scan beyond end path name terminated by ':'.
 
-Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
----
- drivers/of/unittest.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/drivers/of/unittest.c b/drivers/of/unittest.c
-index 0cf9a23..b2d7547 100644
---- a/drivers/of/unittest.c
-+++ b/drivers/of/unittest.c
-@@ -92,6 +92,11 @@ static void __init of_selftest_find_node_by_name(void)
- 		 "option path test failed\n");
- 	of_node_put(np);
- 
-+	np = of_find_node_opts_by_path("/testcase-data:test/option", &options);
-+	selftest(np && !strcmp("test/option", options),
-+		 "option path test, subcase #1 failed\n");
-+	of_node_put(np);
-+
- 	np = of_find_node_opts_by_path("/testcase-data:testoption", NULL);
- 	selftest(np, "NULL option path test failed\n");
- 	of_node_put(np);
-@@ -102,6 +107,12 @@ static void __init of_selftest_find_node_by_name(void)
- 		 "option alias path test failed\n");
- 	of_node_put(np);
- 
-+	np = of_find_node_opts_by_path("testcase-alias:test/alias/option",
-+				       &options);
-+	selftest(np && !strcmp("test/alias/option", options),
-+		 "option alias path test, subcase #1 failed\n");
-+	of_node_put(np);
-+
- 	np = of_find_node_opts_by_path("testcase-alias:testaliasoption", NULL);
- 	selftest(np, "NULL option alias path test failed\n");
- 	of_node_put(np);
--- 
-2.3.1
+Daniel.
