@@ -1,111 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 6 Mar 2015 11:21:37 +0000
-Subject: [PATCH 4/5] dt-bindings: iommu: Add binding for mediatek IOMMU
-In-Reply-To: <1425638900-24989-5-git-send-email-yong.wu@mediatek.com>
-References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
- <1425638900-24989-5-git-send-email-yong.wu@mediatek.com>
-Message-ID: <20150306112137.GE8700@leverpostej>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 6 Mar 2015 12:25:49 +0100
+Subject: [PATCH 3/3] net: macb: remove #if defined(CONFIG_ARCH_AT91)
+ sections
+In-Reply-To: <20150305194418.GY3989@piout.net>
+References: <1425572842-6084-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1425572842-6084-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20150305194418.GY3989@piout.net>
+Message-ID: <20150306122549.314c6439@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 06, 2015 at 10:48:19AM +0000, yong.wu at mediatek.com wrote:
-> From: Yong Wu <yong.wu@mediatek.com>
+On Thu, 5 Mar 2015 20:44:18 +0100
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+
+> On 05/03/2015 at 17:27:22 +0100, Boris Brezillon wrote :
+> > @@ -2388,21 +2392,20 @@ static int macb_probe(struct platform_device *pdev)
+> >  		bp->phy_interface = err;
+> >  	}
+> >  
+> > +	config = 0;
+> >  	if (bp->phy_interface == PHY_INTERFACE_MODE_RGMII)
+> > -		macb_or_gem_writel(bp, USRIO, GEM_BIT(RGMII));
+> > -	else if (bp->phy_interface == PHY_INTERFACE_MODE_RMII)
+> > -#if defined(CONFIG_ARCH_AT91)
+> > -		macb_or_gem_writel(bp, USRIO, (MACB_BIT(RMII) |
+> > -					       MACB_BIT(CLKEN)));
+> > -#else
+> > -		macb_or_gem_writel(bp, USRIO, 0);
+> > -#endif
+> > -	else
+> > -#if defined(CONFIG_ARCH_AT91)
+> > -		macb_or_gem_writel(bp, USRIO, MACB_BIT(CLKEN));
+> > -#else
+> > -		macb_or_gem_writel(bp, USRIO, MACB_BIT(MII));
+> > -#endif
+> > +		config = GEM_BIT(RGMII);
+> > +	else if (bp->phy_interface == PHY_INTERFACE_MODE_RMII &&
+> > +		 (bp->caps & MACB_CAPS_USRIO_DEFAULT_IS_MII))
+> > +		config = MACB_BIT(RMII);
+> > +	else if (bp->phy_interface == PHY_INTERFACE_MODE_MII &&
 > 
-> This patch add mediatek iommu dts binding document.
-> 
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> ---
->  .../devicetree/bindings/iommu/mediatek,iommu.txt   | 41 ++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt b/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
-> new file mode 100644
-> index 0000000..db01c92
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
-> @@ -0,0 +1,41 @@
-> +/******************************************************/
-> +/*    Mediatek IOMMU Hardware block diagram           */
-> +/******************************************************/
-> +              EMI (External Memory Interface)
-> +               |
-> +              m4u (Multimedia Memory Management Unit)
-> +               |
-> +              smi (Smart Multimedia Interface)
-> +               |
-> +        +---------------+-------
-> +        |               |
-> +        |               |
-> +    vdec larb       disp larb      ... SoCs have different local arbiter(larb).
-> +        |               |
-> +        |               |
-> +   +----+----+    +-----+-----+
-> +   |    |    |    |     |     |    ...
-> +   |    |    |    |     |     |    ...
-> +   |    |    |    |     |     |    ...
-> +  MC   PP   VLD  OVL0 RDMA0 WDMA0  ... There are different ports in each larb.
-> +
-> +Required properties:
-> +- compatible : must be "mediatek,mt8173-iommu"
+> I'm not sure you should check for PHY_INTERFACE_MODE_MII here as this
+> may change the previous behaviour.
 
-s/iommu/m4u/ -- the name should match what the hardware is called.
-
-> +- reg : m4u register base
-
-... and size
-
-> +- interrupts : must contain the interrupts from each internal translation unit
-
-How many "internal translation units" are there?
-
-How should the interrupts be ordered?
-
-How do these relate to the larbs?
-
-> +- clocks : must contain one entry for each clock-name
-> +- clock-name: m4u clock
-
-This does not match the example.
-
-s/clock-name/clock-names/
-
-Please format this like a list, with names quoted, e.g.
-
-- clock-names: must contain:
-  * "m4u" - The functional clock for the m4u
-
-> +- larb : must contain the larbes of current platform
-
-s/larbes/local arbiters/
-
-How should these be ordered? Surely there's a relationship with
-registers/interrupts/etc in this unit?
-
-> +- iommu-cells : must be 1. Specifies the client PortID as defined in
-> +dt-binding/iommu/mt**-iommu-port.h
-
-Give the absolute filename.
-
-The include file should be added in this patch (it's part of the
-binding). The whole patch should be moved earlier in the series.
+Absolutely (I fixed it in v2).
 
 Thanks,
-Mark.
 
-> +
-> +Example:
-> +		iommu: mmsys_iommu at 10205000 {
-> +			compatible = "mediatek,mt8173-iommu";
-> +			reg = <0 0x10205000 0 0x1000>;
-> +			interrupts = <GIC_SPI 139 IRQ_TYPE_LEVEL_LOW>;
-> +			clocks = <&infrasys INFRA_M4U>;
-> +			clock-names = "infra_m4u";
-> +			larb = <&larb0 &larb1 &larb2 &larb3 &larb4 &larb5>;
-> +			#iommu-cells = <1>;
-> +		};
-> \ No newline at end of file
-> -- 
-> 1.8.1.1.dirty
-> 
-> 
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
