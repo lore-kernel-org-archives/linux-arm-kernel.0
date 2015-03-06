@@ -1,88 +1,129 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 6 Mar 2015 14:28:50 +0200
-Subject: =?UTF-8?q?=5BPATCH=2015/24=5D=20ARM=3A=20OMAP3=3A=20clock=3A=20remove=20clock3xxx=2Ec=20file?=
+Date: Fri, 6 Mar 2015 14:28:51 +0200
+Subject: [PATCH 16/24] ARM: OMAP2+: clock: remove clkdm_control static boolean
+ from code
 In-Reply-To: <1425644939-3232-1-git-send-email-t-kristo@ti.com>
 References: <1425644939-3232-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1425644939-3232-16-git-send-email-t-kristo@ti.com>
+Message-ID: <1425644939-3232-17-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This now only has a couple of variables within it, which are used outside
-the file itself. Move these variables to where they are actually used,
-and remove the file completely as it is now empty.
+clkdm_control is used to determine, whether clocks should trigger a
+clockdomain transition when they are enabled/disabled. Keep this
+functionality intact, but replace this with a clk_features flag
+which can be initialized during boot if needed.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/Makefile           |    2 +-
- arch/arm/mach-omap2/clkt34xx_dpll3m2.c |    2 ++
- arch/arm/mach-omap2/clock3xxx.c        |   33 --------------------------------
- 3 files changed, 3 insertions(+), 34 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/clock3xxx.c
+ arch/arm/mach-omap2/clock.c |   34 ++++++++++------------------------
+ arch/arm/mach-omap2/clock.h |    2 --
+ include/linux/clk/ti.h      |    1 +
+ 3 files changed, 11 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 2c8b36d..ebfc3f6 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -186,7 +186,7 @@ obj-$(CONFIG_ARCH_OMAP2)		+= clkt2xxx_dpllcore.o
- obj-$(CONFIG_ARCH_OMAP2)		+= clkt2xxx_virt_prcm_set.o
- obj-$(CONFIG_ARCH_OMAP2)		+= clkt2xxx_dpll.o
- obj-$(CONFIG_SOC_OMAP2430)		+= clock2430.o
--obj-$(CONFIG_ARCH_OMAP3)		+= $(clock-common) clock3xxx.o
-+obj-$(CONFIG_ARCH_OMAP3)		+= $(clock-common)
- obj-$(CONFIG_ARCH_OMAP3)		+= clock34xx.o clkt34xx_dpll3m2.o
- obj-$(CONFIG_ARCH_OMAP3)		+= clock3517.o
- obj-$(CONFIG_ARCH_OMAP4)		+= $(clock-common)
-diff --git a/arch/arm/mach-omap2/clkt34xx_dpll3m2.c b/arch/arm/mach-omap2/clkt34xx_dpll3m2.c
-index 825e3da..6cd2961 100644
---- a/arch/arm/mach-omap2/clkt34xx_dpll3m2.c
-+++ b/arch/arm/mach-omap2/clkt34xx_dpll3m2.c
-@@ -29,6 +29,8 @@
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index 9f86e50..d9150f8 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -58,14 +58,6 @@ u16 cpu_mask;
+ #define OMAP3PLUS_DPLL_FINT_MIN		32000
+ #define OMAP3PLUS_DPLL_FINT_MAX		52000000
  
- #define CYCLES_PER_MHZ			1000000
- 
-+struct clk *sdrc_ick_p, *arm_fck_p;
-+
- /*
-  * CORE DPLL (DPLL3) M2 divider rate programming functions
-  *
-diff --git a/arch/arm/mach-omap2/clock3xxx.c b/arch/arm/mach-omap2/clock3xxx.c
-deleted file mode 100644
-index 0b0e3a87..0000000
---- a/arch/arm/mach-omap2/clock3xxx.c
-+++ /dev/null
-@@ -1,33 +0,0 @@
 -/*
-- * OMAP3-specific clock framework functions
-- *
-- * Copyright (C) 2007-2008 Texas Instruments, Inc.
-- * Copyright (C) 2007-2010 Nokia Corporation
-- *
-- * Paul Walmsley
-- * Jouni H?gander
-- *
-- * Parts of this code are based on code written by
-- * Richard Woodruff, Tony Lindgren, Tuukka Tikkanen, Karthik Dasu
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
+- * clkdm_control: if true, then when a clock is enabled in the
+- * hardware, its clockdomain will first be enabled; and when a clock
+- * is disabled in the hardware, its clockdomain will be disabled
+- * afterwards.
 - */
--#undef DEBUG
+-static bool clkdm_control = true;
 -
--#include <linux/kernel.h>
--#include <linux/errno.h>
--#include <linux/clk.h>
--#include <linux/io.h>
+ void __iomem *clk_memmaps[CLK_MAX_MEMMAPS];
+ 
+ void omap2_clk_writel(u32 val, struct clk_hw_omap *clk, void __iomem *reg)
+@@ -202,19 +194,6 @@ void omap2_init_clk_clkdm(struct clk_hw *hw)
+ }
+ 
+ /**
+- * omap2_clk_disable_clkdm_control - disable clkdm control on clk enable/disable
+- *
+- * Prevent the OMAP clock code from calling into the clockdomain code
+- * when a hardware clock in that clockdomain is enabled or disabled.
+- * Intended to be called at init time from omap*_clk_init().  No
+- * return value.
+- */
+-void __init omap2_clk_disable_clkdm_control(void)
+-{
+-	clkdm_control = false;
+-}
 -
--#include "soc.h"
--#include "clock.h"
--#include "clock3xxx.h"
--#include "prm2xxx_3xxx.h"
--#include "prm-regbits-34xx.h"
--#include "cm2xxx_3xxx.h"
--#include "cm-regbits-34xx.h"
+-/**
+  * omap2_clk_dflt_find_companion - find companion clock to @clk
+  * @clk: struct clk * to find the companion clock of
+  * @other_reg: void __iomem ** to return the companion clock CM_*CLKEN va in
+@@ -298,6 +277,12 @@ int omap2_dflt_clk_enable(struct clk_hw *hw)
+ 	struct clk_hw_omap *clk;
+ 	u32 v;
+ 	int ret = 0;
++	bool clkdm_control;
++
++	if (ti_clk_get_features()->flags & TI_CLK_DISABLE_CLKDM_CONTROL)
++		clkdm_control = false;
++	else
++		clkdm_control = true;
+ 
+ 	clk = to_clk_hw_omap(hw);
+ 
+@@ -371,7 +356,8 @@ void omap2_dflt_clk_disable(struct clk_hw *hw)
+ 	omap2_clk_writel(v, clk, clk->enable_reg);
+ 	/* No OCP barrier needed here since it is a disable operation */
+ 
+-	if (clkdm_control && clk->clkdm)
++	if (!(ti_clk_get_features()->flags & TI_CLK_DISABLE_CLKDM_CONTROL) &&
++	    clk->clkdm)
+ 		clkdm_clk_disable(clk->clkdm, hw->clk);
+ }
+ 
+@@ -404,7 +390,7 @@ int omap2_clkops_enable_clkdm(struct clk_hw *hw)
+ 		pr_err("%s: %s: should use dflt_clk_enable ?!\n", __func__,
+ 		       __clk_get_name(hw->clk));
+ 
+-	if (!clkdm_control) {
++	if (ti_clk_get_features()->flags & TI_CLK_DISABLE_CLKDM_CONTROL) {
+ 		pr_err("%s: %s: clkfw-based clockdomain control disabled ?!\n",
+ 		       __func__, __clk_get_name(hw->clk));
+ 		return 0;
+@@ -442,7 +428,7 @@ void omap2_clkops_disable_clkdm(struct clk_hw *hw)
+ 		pr_err("%s: %s: should use dflt_clk_disable ?!\n", __func__,
+ 		       __clk_get_name(hw->clk));
+ 
+-	if (!clkdm_control) {
++	if (ti_clk_get_features()->flags & TI_CLK_DISABLE_CLKDM_CONTROL) {
+ 		pr_err("%s: %s: clkfw-based clockdomain control disabled ?!\n",
+ 		       __func__, __clk_get_name(hw->clk));
+ 		return;
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index c224719..f8282e8 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -180,8 +180,6 @@ struct clksel {
+ #define OMAP4XXX_EN_DPLL_FRBYPASS		0x6
+ #define OMAP4XXX_EN_DPLL_LOCKED			0x7
+ 
+-void __init omap2_clk_disable_clkdm_control(void);
 -
--/* needed by omap3_core_dpll_m2_set_rate() */
--struct clk *sdrc_ick_p, *arm_fck_p;
+ void omap2_clk_print_new_rates(const char *hfclkin_ck_name,
+ 			       const char *core_ck_name,
+ 			       const char *mpu_ck_name);
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+index 653791e..78b776a 100644
+--- a/include/linux/clk/ti.h
++++ b/include/linux/clk/ti.h
+@@ -330,6 +330,7 @@ struct ti_clk_features {
+ 
+ #define TI_CLK_DPLL_HAS_FREQSEL			BIT(0)
+ #define TI_CLK_DPLL4_DENY_REPROGRAM		BIT(1)
++#define TI_CLK_DISABLE_CLKDM_CONTROL		BIT(2)
+ 
+ void ti_clk_setup_features(struct ti_clk_features *features);
+ struct ti_clk_features *ti_clk_get_features(void);
 -- 
 1.7.9.5
