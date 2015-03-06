@@ -1,60 +1,162 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 6 Mar 2015 14:37:52 -0600
-Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
- msm-id and qcom, board-id
-In-Reply-To: <CAOesGMjpOx4SxY7j8jnoEwLG+mhPKB2st8qCb-hduHLOVw=RcQ@mail.gmail.com>
-References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
- <7h8ufbjkod.fsf@deeprootsystems.com>
- <07D4E4D1-BF8C-4583-9505-9F321DB10406@codeaurora.org>
- <CAOesGMgy3VY=4-t+N0BYqCuSLQkh-rYe8nd9iJh1mMeBFz_sWQ@mail.gmail.com>
- <B8019148-3B26-453E-A3F0-9D67874083E0@codeaurora.org>
- <CAOesGMjpOx4SxY7j8jnoEwLG+mhPKB2st8qCb-hduHLOVw=RcQ@mail.gmail.com>
-Message-ID: <F9B276F7-61EF-4406-AB46-97D7F1ECEEFE@codeaurora.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 06 Mar 2015 20:37:50 +0000
+Subject: [PATCH v9 09/21] ARM64 / ACPI: Introduce early_param "acpi=" to
+ enable/disable ACPI
+In-Reply-To: <1424853601-6675-10-git-send-email-hanjun.guo@linaro.org>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <1424853601-6675-10-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150306203750.98A60C40AA9@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Mar 6, 2015, at 1:15 PM, Olof Johansson <olof@lixom.net> wrote:
-
-> On Fri, Mar 6, 2015 at 8:08 AM, Kumar Gala <galak@codeaurora.org> wrote:
->> 
->> On Mar 5, 2015, at 7:59 PM, Olof Johansson <olof@lixom.net> wrote:
->> 
->>> On Thu, Mar 5, 2015 at 12:23 PM, Kumar Gala <galak@codeaurora.org> wrote:
->>>> 
->>>> On Mar 5, 2015, at 1:42 PM, Kevin Hilman <khilman@kernel.org> wrote:
->>>> 
->>>>> Kumar Gala <galak@codeaurora.org> writes:
->>>>> 
->>>>>> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
->>>>>> on Qualcomm MSM platforms to determine which device tree should be
->>>>>> utilized and passed to the kernel.
->>>>>> 
->>>>>> Cc: <devicetree@vger.kernel.org>
->>>>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
->>>>> 
->>>>> Is this the special magic that allows qcom bootloaders to take a kernel
->>>>> plus multiple DTBs and figure out which DTB to pass?
->>>>> 
->>>>> Kevin
->>>> 
->>>> yes
->>> 
->>> That's a bummer.
->>> 
->>> Luckily, the solution for upstream is still quite simple: Provide only
->>> one devicetree, and it'll be used, right?
->> 
->> We can provide only one, we still need the IDs in the DT.
+On Wed, 25 Feb 2015 16:39:49 +0800
+, Hanjun Guo <hanjun.guo@linaro.org>
+ wrote:
+> From: Al Stone <al.stone@linaro.org>
 > 
-> How are the DTS provided? Concatenated with the kernel, or in a
-> wrapped data format? Or in a separate partition from the kernel?
+> This implements the following policy to decide whether ACPI should
+> be used to boot the system:
+> - acpi=off: ACPI will not be used to boot the system, even if there is
+>   no alternative available (e.g., device tree is empty)
+> - acpi=force: only ACPI will be used to boot the system; if that fails,
+>   there will be no fallback to alternative methods (such as device tree)
+> - otherwise, ACPI will be used as a fallback if the device tree turns out
+>   to lack a platform description; the heuristic to decide this is whether
+>   /chosen is the only node present at depth 1
+> 
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Its a wrapped data format that is than concatenated with the kernel if I remember correctly.
+Acked-by: Grant Likely <grant.likely@linaro.org>
 
-- k
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> ---
+>  Documentation/kernel-parameters.txt |  3 ++-
+>  arch/arm64/include/asm/acpi.h       |  7 +++++
+>  arch/arm64/kernel/acpi.c            | 52 +++++++++++++++++++++++++++++++++----
+>  3 files changed, 56 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+> index bfcb1a6..d6c35a7 100644
+> --- a/Documentation/kernel-parameters.txt
+> +++ b/Documentation/kernel-parameters.txt
+> @@ -165,7 +165,7 @@ multipliers 'Kilo', 'Mega', and 'Giga', equalling 2^10, 2^20, and 2^30
+>  bytes respectively. Such letter suffixes can also be entirely omitted.
+>  
+>  
+> -	acpi=		[HW,ACPI,X86]
+> +	acpi=		[HW,ACPI,X86,ARM64]
+>  			Advanced Configuration and Power Interface
+>  			Format: { force | off | strict | noirq | rsdt }
+>  			force -- enable ACPI if default was off
+> @@ -175,6 +175,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>  				strictly ACPI specification compliant.
+>  			rsdt -- prefer RSDT over (default) XSDT
+>  			copy_dsdt -- copy DSDT to memory
+> +			For ARM64, ONLY "acpi=off" or "acpi=force" are available
+>  
+>  			See also Documentation/power/runtime_pm.txt, pci=noacpi
+>  
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 40e0924..c5a9b97 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -39,6 +39,13 @@ static inline void disable_acpi(void)
+>  	acpi_noirq = 1;
+>  }
+>  
+> +static inline void enable_acpi(void)
+> +{
+> +	acpi_disabled = 0;
+> +	acpi_pci_disabled = 0;
+> +	acpi_noirq = 0;
+> +}
+> +
+>  /*
+>   * It's used from ACPI core in kdump to boot UP system with SMP kernel,
+>   * with this check the ACPI core will not override the CPU index
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index f052e7a..bdcc9fc 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -22,15 +22,49 @@
+>  #include <linux/irq.h>
+>  #include <linux/irqdomain.h>
+>  #include <linux/memblock.h>
+> +#include <linux/of_fdt.h>
+>  #include <linux/smp.h>
+>  
+> -int acpi_noirq;			/* skip ACPI IRQ initialization */
+> -int acpi_disabled;
+> +int acpi_noirq = 1;		/* skip ACPI IRQ initialization */
+> +int acpi_disabled = 1;
+>  EXPORT_SYMBOL(acpi_disabled);
+>  
+> -int acpi_pci_disabled;		/* skip ACPI PCI scan and IRQ initialization */
+> +int acpi_pci_disabled = 1;	/* skip ACPI PCI scan and IRQ initialization */
+>  EXPORT_SYMBOL(acpi_pci_disabled);
+>  
+> +static bool __initdata param_acpi_off;
+> +static bool __initdata param_acpi_force;
+> +
+> +static int __init parse_acpi(char *arg)
+> +{
+> +	if (!arg)
+> +		return -EINVAL;
+> +
+> +	/* "acpi=off" disables both ACPI table parsing and interpreter */
+> +	if (strcmp(arg, "off") == 0)
+> +		param_acpi_off = true;
+> +	else if (strcmp(arg, "force") == 0) /* force ACPI to be enabled */
+> +		param_acpi_force = true;
+> +	else
+> +		return -EINVAL;	/* Core will print when we return error */
+> +
+> +	return 0;
+> +}
+> +early_param("acpi", parse_acpi);
+> +
+> +static int __init dt_scan_depth1_nodes(unsigned long node,
+> +				       const char *uname, int depth,
+> +				       void *data)
+> +{
+> +	/*
+> +	 * Return 1 as soon as we encounter a node at depth 1 that is
+> +	 * not the /chosen node.
+> +	 */
+> +	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+> +		return 1;
+> +	return 0;
+> +}
+> +
+>  /*
+>   * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>   * or early_memremap() should be called here to for ACPI table mapping.
+> @@ -83,10 +117,18 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
+>   */
+>  void __init acpi_boot_table_init(void)
+>  {
+> -	/* If acpi_disabled, bail out */
+> -	if (acpi_disabled)
+> +	/*
+> +	 * Enable ACPI instead of device tree unless
+> +	 * - ACPI has been disabled explicitly (acpi=off), or
+> +	 * - the device tree is not empty (it has more than just a /chosen node)
+> +	 *   and ACPI has not been force enabled (acpi=force)
+> +	 */
+> +	if (param_acpi_off ||
+> +	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+>  		return;
+>  
+> +	enable_acpi();
+> +
+>  	/* Initialize the ACPI boot-time table parser. */
+>  	if (acpi_table_init()) {
+>  		disable_acpi();
+> -- 
+> 1.9.1
+> 
