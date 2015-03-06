@@ -1,84 +1,65 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Fri, 6 Mar 2015 13:39:14 +0100
-Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
- IRQF_NO_SUSPEND
-In-Reply-To: <20150306110618.GC8700@leverpostej>
-References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
- <CAJZ5v0h8vn26BeWPVhC4e_KNhBu15-mshnbq0K=OQ1M36vPQEQ@mail.gmail.com>
- <20150305163227.GF14093@leverpostej>
- <1696230.CygTkv53VA@vostro.rjw.lan>
- <20150306110618.GC8700@leverpostej>
-Message-ID: <CAJZ5v0jA-hRUnP_+mOdFw7vN7CGZ4o0FjUVu81rq7foi92f63g@mail.gmail.com>
+From: fabrice.gasnier@st.com (Fabrice GASNIER)
+Date: Fri,  6 Mar 2015 13:38:29 +0100
+Subject: [RFC PATCH] ARM: l2c: Fix prefect settings of parsing
+Message-ID: <1425645509-30479-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 6, 2015 at 12:06 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> [...]
->
->> > The request_irq path never results in a call to chip->irq_set_wake(),
->> > even with the IRQF_NO_SUSPEND flag. So requesting an irq with
->> > IRQF_NO_SUSPEND does not guarantee wakeup; it only guarantees that the
->> > CPU can take the interrupt _around_ the suspended state, not necessarily
->> > while _in_ the suspended state.
->>
->> Right.  "Suspended state" meaning full suspend here I suppose?
->
-> Yes; any state deeper than suspend-to-idle.
->
-> [...]
->
->> > We seem to be conflating some related properties:
->> >
->> > [a] The IRQ will be left unmasked.
->> > [b] The IRQ will be handled immediately when taken.
->> > [c] The IRQ will wake the system from suspend.
->> >
->> > Requesting an IRQ with IRQF_NO_SUSPEND guarantees [a,b], but does not
->> > guarantee [c].
->>
->> That's correct.  IRQF_NO_SUSPEND does not guarantee that interrupts from
->> that IRQ will have any effect after arch_suspend_disable_irqs() in
->> suspend_enter().
->
-> [...]
->
->> > It sounds like for this kind of watchdog device we want [a,b,c], even if
->> > the IRQ is not shared with an IRQF_NO_SUSPEND user.
->>
->> We can't guarantee that, though.  arch_suspend_disable_irqs() disables
->> interrupts on the last working CPU and it won't get any.  It may be
->> brought out of a low-power state by a pending interrupt, but it won't act
->> upon that interrupt immediately anyway, only after the arch_suspend_enable_irqs()
->> in suspend_enter().
->
-> Ok, so [b] needs the caveat that it's only handled "immediately" outside
-> of the arch_suspend_disable_irqs() ... arch_suspend_enable_irqs()
-> section.
->
->> But then it might as well be deferred until after
->> resume_device_irqs().
->
-> That was my original line of thinking, in which case the watchdog driver
-> should use IRQF_COND_SUSPEND rather than IRQF_NO_SUSPEND, with
-> enable_irq_wake() if we care about the watchdog during suspend. I'm
-> happy with this.
->
-> Considering that the use-case of a watchdog is to alert us to something
-> going hideously wrong in the kernel, we want to handle the IRQ after
-> executing the smallest amount of kernel code possible. For that, they
-> need to have their handlers to be called "immediately" outside of the
-> arch_suspend_disable_irqs() ... arch_suspend_enable_irqs() window, and
-> need to be enabled during suspend to attempt to catch bad wakeup device
-> configuration.
->
-> I think it's possible (assuming the caveats on [b] above) to provide
-> [a,b,c] for this case.
+Allow prefect settings overriding by of tree, in case
+l2x0_cache_size_of_parse() returns value, prefect tuning
+properties are silently ignored. E.g. arm,double-linefill* and
+arm,prefetch*.
+This happens for example, when "cache-size" or "cache-sets"
+properties haven't been filled in l2c dt node.
 
-OK
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ arch/arm/mm/cache-l2x0.c | 33 ++++++++++++++++-----------------
+ 1 file changed, 16 insertions(+), 17 deletions(-)
 
-But in this case the request_irq() passing IRQF_NO_SUSPEND *and* requiring
-enable_irq_wake() in addition to that needs a big fat comment explaining the
-whole thing or we'll forget about the gory details at one point and no one will
-know what's going on in there.
-
-Rafael
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index c6c7696..8f15f70 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1131,23 +1131,22 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 	}
+ 
+ 	ret = l2x0_cache_size_of_parse(np, aux_val, aux_mask, &assoc, SZ_512K);
+-	if (ret)
+-		return;
+-
+-	switch (assoc) {
+-	case 16:
+-		*aux_val &= ~L2X0_AUX_CTRL_ASSOC_MASK;
+-		*aux_val |= L310_AUX_CTRL_ASSOCIATIVITY_16;
+-		*aux_mask &= ~L2X0_AUX_CTRL_ASSOC_MASK;
+-		break;
+-	case 8:
+-		*aux_val &= ~L2X0_AUX_CTRL_ASSOC_MASK;
+-		*aux_mask &= ~L2X0_AUX_CTRL_ASSOC_MASK;
+-		break;
+-	default:
+-		pr_err("L2C-310 OF cache associativity %d invalid, only 8 or 16 permitted\n",
+-		       assoc);
+-		break;
++	if (!ret) {
++		switch (assoc) {
++		case 16:
++			*aux_val &= ~L2X0_AUX_CTRL_ASSOC_MASK;
++			*aux_val |= L310_AUX_CTRL_ASSOCIATIVITY_16;
++			*aux_mask &= ~L2X0_AUX_CTRL_ASSOC_MASK;
++			break;
++		case 8:
++			*aux_val &= ~L2X0_AUX_CTRL_ASSOC_MASK;
++			*aux_mask &= ~L2X0_AUX_CTRL_ASSOC_MASK;
++			break;
++		default:
++			pr_err("L2C-310 OF cache associativity %d invalid, only 8 or 16 permitted\n",
++			       assoc);
++			break;
++		}
+ 	}
+ 
+ 	prefetch = l2x0_saved_regs.prefetch_ctrl;
+-- 
+1.9.1
