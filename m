@@ -1,43 +1,54 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 6 Mar 2015 20:31:28 +0900
-Subject: [PATCH 01/16] ARM: shmobile: r8a7778: synchronize dts with
- reference platform
-In-Reply-To: <54F85467.2010700@cogentembedded.com>
-References: <cover.1425518337.git.horms+renesas@verge.net.au>
- <8c4892a633f08edbc54b6b59a673f76bd1cd7e94.1425518337.git.horms+renesas@verge.net.au>
- <54F85467.2010700@cogentembedded.com>
-Message-ID: <20150306113128.GC27105@verge.net.au>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  6 Mar 2015 11:34:46 +0000
+Subject: [PATCH 0/2] Kill off pgsize_bitmap field from struct iommu_ops
+Message-ID: <1425641688-26438-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 05, 2015 at 04:04:39PM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 3/5/2015 4:58 AM, Simon Horman wrote:
-> 
-> >From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-> 
-> >This moves everything to the legacy dts that is missing there to make it
-> >suitable for use with multiplatform.
-> 
-> >Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-> >Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >---
-> >  arch/arm/boot/dts/r8a7778-bockw.dts | 106 ++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 106 insertions(+)
-> 
-> >diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
-> >index 46a884d..7347223 100644
-> >--- a/arch/arm/boot/dts/r8a7778-bockw.dts
-> >+++ b/arch/arm/boot/dts/r8a7778-bockw.dts
-> >@@ -16,17 +16,123 @@
-> [...]
-> >+
-> >+	fixedregulator3v3: fixedregulator at 0 {
-> 
->    Ugh, this node should be named just "regulator at 0". The label also doesn't
-> appeal to me -- I'd rather prefer a name derived from the schematics. :-/
+Hi all,
 
-Please feel free to supply an incremental cleanup patch.
+These patches move the pgsize_bitmap field out of iommu_ops and into
+the iommu_domain structure, as there are systems containing multiple
+instances of a given IOMMU (e.g. the ARM SMMU) with different page size
+support on the individual devices.
+
+Once that's done, we can get back to treating the iommu_ops as constant,
+since they just contain function pointers.
+
+Comments welcome,
+
+Will
+
+--->8
+
+Robin Murphy (1):
+  iommu: of: enforce const-ness of struct iommu_ops
+
+Will Deacon (1):
+  iommu: move pgsize_bitmap from struct iommu_ops to struct iommu_domain
+
+ arch/arm/include/asm/dma-mapping.h   |  2 +-
+ arch/arm/mm/dma-mapping.c            |  6 +++---
+ arch/arm64/include/asm/dma-mapping.h |  3 ++-
+ drivers/iommu/amd_iommu.c            |  2 +-
+ drivers/iommu/arm-smmu.c             | 12 +++++-------
+ drivers/iommu/exynos-iommu.c         |  3 ++-
+ drivers/iommu/intel-iommu.c          |  2 +-
+ drivers/iommu/iommu.c                | 16 ++++++++--------
+ drivers/iommu/ipmmu-vmsa.c           |  2 +-
+ drivers/iommu/msm_iommu.c            |  3 ++-
+ drivers/iommu/of_iommu.c             | 12 ++++++------
+ drivers/iommu/omap-iommu.c           |  3 ++-
+ drivers/iommu/rockchip-iommu.c       |  2 +-
+ drivers/iommu/shmobile-iommu.c       |  2 +-
+ drivers/iommu/tegra-gart.c           |  2 +-
+ drivers/iommu/tegra-smmu.c           |  3 +--
+ drivers/of/platform.c                |  2 +-
+ drivers/vfio/vfio_iommu_type1.c      |  2 +-
+ include/linux/dma-mapping.h          |  2 +-
+ include/linux/iommu.h                |  6 +-----
+ include/linux/of_iommu.h             |  8 ++++----
+ 21 files changed, 46 insertions(+), 49 deletions(-)
+
+-- 
+2.1.4
