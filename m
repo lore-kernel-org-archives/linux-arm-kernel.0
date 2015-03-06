@@ -1,45 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 6 Mar 2015 10:24:25 +0100
-Subject: [PATCH v2 11/18] pinctrl: Add pinctrl driver for STM32 MCUs
-In-Reply-To: <1424455277-29983-12-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1424455277-29983-12-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <CACRpkdbuJ5B_GwvRXax2Y4V37ihh5e6H7=2no0fYTMZPXwDdCw@mail.gmail.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 6 Mar 2015 17:33:35 +0800
+Subject: [PATCH v5 18/29] sparc/PCI: Claim bus resources before
+ pci_bus_add_devices()
+In-Reply-To: <1425634426-437-1-git-send-email-wangyijing@huawei.com>
+References: <1425634426-437-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1425634426-437-19-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 7:01 PM, Maxime Coquelin
-<mcoquelin.stm32@gmail.com> wrote:
+Pci_claim_bus_resources() should be called before
+pci_bus_add_devices(), or driver may failed to
+load, because the resources had not claimed.
 
-> This driver adds pinctrl and GPIO support to STMicrolectronic's
-> STM32 family of MCUs.
->
-> Pin muxing and GPIO handling have been tested on STM32F429
-> based Discovery board.
->
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+---
+ arch/sparc/kernel/pci.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-(...)
-> +config PINCTRL_STM32
-> +       bool "STMicroelectronics STM32 pinctrl driver"
-> +       depends on OF
-> +       depends on ARCH_STM32 || COMPILE_TEST
-> +       select PINMUX
-> +       select PINCONF
-> +       select GPIOLIB_IRQCHIP
-> +       help
-> +         This selects the device tree based generic pinctrl driver for STM32.
-
-Good start! Especially that you use GPIOLIB_IRQCHIP.
-
-But this (as discussed earlier) should select GENERIC_PINCONF
-
-Stopping review here so you can reengineer it a bit using GENERIC_PINCONF
-for next submission.
-
-Also think about pinmux in single registers, whether you want to do this
-with a single value for a register or using strings to identify groups
-and functions.
-
-Yours,
-Linus Walleij
+diff --git a/arch/sparc/kernel/pci.c b/arch/sparc/kernel/pci.c
+index 838fe1e..21f804a 100644
+--- a/arch/sparc/kernel/pci.c
++++ b/arch/sparc/kernel/pci.c
+@@ -678,11 +678,10 @@ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
+ 	}
+ 
+ 	pci_of_scan_bus(pbm, node, bus);
+-	pci_bus_add_devices(bus);
+ 	pci_bus_register_of_sysfs(bus);
+ 
+ 	pci_claim_bus_resources(bus);
+-
++	pci_bus_add_devices(bus);
+ 	return bus;
+ }
+ 
+-- 
+1.7.1
