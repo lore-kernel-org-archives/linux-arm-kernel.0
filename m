@@ -1,55 +1,40 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 6 Mar 2015 12:25:49 +0100
-Subject: [PATCH 3/3] net: macb: remove #if defined(CONFIG_ARCH_AT91)
- sections
-In-Reply-To: <20150305194418.GY3989@piout.net>
-References: <1425572842-6084-1-git-send-email-boris.brezillon@free-electrons.com>
- <1425572842-6084-4-git-send-email-boris.brezillon@free-electrons.com>
- <20150305194418.GY3989@piout.net>
-Message-ID: <20150306122549.314c6439@bbrezillon>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 06 Mar 2015 12:30:45 +0100
+Subject: [PATCH 1/5] soc: mediatek: Add SMI driver
+In-Reply-To: <1425638900-24989-2-git-send-email-yong.wu@mediatek.com>
+References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
+ <1425638900-24989-2-git-send-email-yong.wu@mediatek.com>
+Message-ID: <1425641445.24292.280.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Mar 2015 20:44:18 +0100
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+On Fri, 2015-03-06 at 18:48 +0800, yong.wu at mediatek.com wrote:
+> --- a/drivers/soc/mediatek/Kconfig
+> +++ b/drivers/soc/mediatek/Kconfig
+> @@ -20,3 +20,10 @@ config MT8173_PMIC_WRAP
+>  	  PMIC wrapper is a proprietary hardware in MT8173 to make
+>  	  communication protocols to access PMIC device.
+>  	  This driver implement access protocols for MT8173.
+> +
+> +config MTK_SMI
+> +        bool
 
-> On 05/03/2015 at 17:27:22 +0100, Boris Brezillon wrote :
-> > @@ -2388,21 +2392,20 @@ static int macb_probe(struct platform_device *pdev)
-> >  		bp->phy_interface = err;
-> >  	}
-> >  
-> > +	config = 0;
-> >  	if (bp->phy_interface == PHY_INTERFACE_MODE_RGMII)
-> > -		macb_or_gem_writel(bp, USRIO, GEM_BIT(RGMII));
-> > -	else if (bp->phy_interface == PHY_INTERFACE_MODE_RMII)
-> > -#if defined(CONFIG_ARCH_AT91)
-> > -		macb_or_gem_writel(bp, USRIO, (MACB_BIT(RMII) |
-> > -					       MACB_BIT(CLKEN)));
-> > -#else
-> > -		macb_or_gem_writel(bp, USRIO, 0);
-> > -#endif
-> > -	else
-> > -#if defined(CONFIG_ARCH_AT91)
-> > -		macb_or_gem_writel(bp, USRIO, MACB_BIT(CLKEN));
-> > -#else
-> > -		macb_or_gem_writel(bp, USRIO, MACB_BIT(MII));
-> > -#endif
-> > +		config = GEM_BIT(RGMII);
-> > +	else if (bp->phy_interface == PHY_INTERFACE_MODE_RMII &&
-> > +		 (bp->caps & MACB_CAPS_USRIO_DEFAULT_IS_MII))
-> > +		config = MACB_BIT(RMII);
-> > +	else if (bp->phy_interface == PHY_INTERFACE_MODE_MII &&
-> 
-> I'm not sure you should check for PHY_INTERFACE_MODE_MII here as this
-> may change the previous behaviour.
+Nit: make this one tab instead of 8 spaces, please.
 
-Absolutely (I fixed it in v2).
+> +	help
+> +	  Smi help enable/disable iommu in mt8173 and control the
+> +	  clock of each local arbiter.
+> +	  It should be true while MTK_IOMMU enable.
+
+I don't think anyone using the *config tools will ever see this text, as
+there's no prompt. So you might as well make this a comment or drop it
+altogether.
+
+Is this selected by more than just MTK_IOMMU (see 2/5)? If not, I think
+MTK_SMI will be set and unset in lockstep with MTK_IOMMU. In other
+words, you could as well use one Kconfig symbol.
 
 Thanks,
 
-Boris
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Paul Bolle
