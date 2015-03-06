@@ -1,49 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 Mar 2015 16:37:47 +0000
-Subject: [PATCH 08/11] irqchip: gicv3-its: use 64KB page as default granule
-In-Reply-To: <1425659870-11832-1-git-send-email-marc.zyngier@arm.com>
-References: <1425659870-11832-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1425659870-11832-9-git-send-email-marc.zyngier@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 6 Mar 2015 08:37:16 -0800
+Subject: [PATCH 0/2] ARM: DRA7x/OMAP5: Clock: DPLL Clock fixes
+In-Reply-To: <54ED79B0.4020101@ti.com>
+References: <1422724005-9415-1-git-send-email-rk@ti.com>
+ <54E5FC6D.7040701@ti.com> <20150224162719.GA28244@atomide.com>
+ <54ED79B0.4020101@ti.com>
+Message-ID: <20150306163715.GO13520@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yun Wu <wuyun.wu@huawei.com>
+* Tero Kristo <t-kristo@ti.com> [150225 00:05]:
+> On 02/24/2015 06:27 PM, Tony Lindgren wrote:
+> >* Ravikumar Kattekola <rk@ti.com> [150219 08:13]:
+> >>On 1/31/2015 10:36 PM, Ravikumar Kattekola wrote:
+> >>>Fix bypass clock source for a few DPLLs.
+> >>>
+> >>>On DRA7x/OMAP5, for a few DPLLs, both CLKINP and CLKINPULOW are connected
+> >>>to a mux and the output from mux is routed to the bypass clkout.
+> >>>Add a mux-clock as bypass clock with CLKINP and CLKINPULOW as parents.
+> >>>
+> >>>Tested against:
+> >>>	tree: https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git
+> >>>	branch: master
+> >>>On:
+> >>>CPU  : OMAP5432 ES2.0
+> >>>Board: OMAP5432 uEVM
+> >>>and
+> >>>CPU  : DRA752 ES1.0
+> >>>Board: DRA7xx
+> >>>
+> >>>
+> >>>Ravikumar Kattekola (2):
+> >>>   ARM: DRA7x: dts: Fix the bypass clock source for dpll_iva and others
+> >>>   ARM: OMAP5: dts: Fix the bypass clock source for dpll_iva and others
+> >>>
+> >>>  arch/arm/boot/dts/dra7xx-clocks.dtsi   |   90 ++++++++++++++++++++++++++++----
+> >>>  arch/arm/boot/dts/omap54xx-clocks.dtsi |   41 +++++++++++++--
+> >>>  2 files changed, 118 insertions(+), 13 deletions(-)
+> >>>
+> >>Hi Benoit,
+> >>     Can these fixes be looked into for 3.20-rc?
+> >
+> >Seem like valid fixes to me. Tero, care to take a look at these and ack
+> >if OK?
+> 
+> Yes, both are good to go.
+> 
+> Acked-by: Tero Kristo <t-kristo@ti.com>
 
-The field of page size in register GITS_BASERn might be read-only
-if an implementation only supports a single, fixed page size. But
-currently the ITS driver will throw out an error when PAGE_SIZE
-is less than the minimum size supported by an ITS. So addressing
-this problem by using 64KB pages as default granule for all the
-ITS base tables.
+Applying both into omap-for-v4.0/fixes thanks.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-[maz: fixed bug breaking non Device Table allocations]
-Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 69eeea3..0fe25a9 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -800,14 +800,14 @@ static int its_alloc_tables(struct its_node *its)
- {
- 	int err;
- 	int i;
--	int psz = PAGE_SIZE;
-+	int psz = SZ_64K;
- 	u64 shr = GITS_BASER_InnerShareable;
- 
- 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
- 		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
- 		u64 type = GITS_BASER_TYPE(val);
- 		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
--		int order = 0;
-+		int order = get_order(psz);
- 		int alloc_size;
- 		u64 tmp;
- 		void *base;
--- 
-2.1.4
+Tony 
