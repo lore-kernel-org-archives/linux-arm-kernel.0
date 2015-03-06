@@ -1,135 +1,39 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri, 6 Mar 2015 16:52:53 +0000
-Subject: [PATCH v3 2/3] of: add optional options parameter to
- of_find_node_by_path()
-In-Reply-To: <54F7287E.6060302@hurleysoftware.com>
-References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
- <1417110967-16284-3-git-send-email-leif.lindholm@linaro.org>
- <54F7287E.6060302@hurleysoftware.com>
-Message-ID: <20150306165253.GJ4278@bivouac.eciton.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 6 Mar 2015 08:53:03 -0800
+Subject: [PATCH 0/2] fix ehrpwm tbclk data on am33xx and am43xx
+In-Reply-To: <54ED7B4A.2030201@ti.com>
+References: <1423546542-29664-1-git-send-email-vigneshr@ti.com>
+ <20150224171546.GB28244@atomide.com> <54ED7B4A.2030201@ti.com>
+Message-ID: <20150306165302.GP13520@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-On Wed, Mar 04, 2015 at 10:45:02AM -0500, Peter Hurley wrote:
-> The path parsing gets lost if the string after ':' contains '/'.
-
-Doh!
-Thanks for reporting (and sorry for slow response).
-
-> The selftests below fail with:
-> [    1.365528] ### dt-test ### FAIL of_selftest_find_node_by_name():99 option path test failed
-> [    1.365610] ### dt-test ### FAIL of_selftest_find_node_by_name():115 option alias path test failed
+* Tero Kristo <t-kristo@ti.com> [150224 23:39]:
+> On 02/24/2015 07:15 PM, Tony Lindgren wrote:
+> >* Vignesh R <vigneshr@ti.com> [150209 22:43]:
+> >>In am33xx and am43xx, ehrpwm tbclk is derived from functional clock of
+> >>PWMSS. The schematics and TRMs show that there is only one input clock to
+> >>the PWMSS. But currently, tbclk is wrongly shown to be deriving from
+> >>dpll_per_m2_ck instead of functional clock l4ls_gclk in the DT.
+> >>
+> >>Fixing ehrpwm tbclk data to reflect the right clk source.
+> >>Tested on beaglebone and am437x-gp-evm.
+> >>
+> >>Vignesh R (2):
+> >>   ARM: dts: am33xx-clocks: Fix ehrpwm tbclk data on am33xx
+> >>   ARM: dts: am43xx-clocks: Fix ehrpwm tbclk data on am43xx
+> >>
+> >>  arch/arm/boot/dts/am33xx-clocks.dtsi |  6 +++---
+> >>  arch/arm/boot/dts/am43xx-clocks.dtsi | 12 ++++++------
+> >>  2 files changed, 9 insertions(+), 9 deletions(-)
+> >
+> >Tero, care to check this one too and ack if OK?
 > 
-> Regards,
-> Peter Hurley
+> These look fine also, just verified from TRM. These two were actually buried
+> in my mailbox, sorry about that.
 > 
-> 
-> --- >% ---
-> diff --git a/drivers/of/unittest.c b/drivers/of/unittest.c
-> index 41a4a13..07ba5aa 100644
-> --- a/drivers/of/unittest.c
-> +++ b/drivers/of/unittest.c
-> @@ -94,6 +94,11 @@ static void __init of_selftest_find_node_by_name(void)
->  		 "option path test failed\n");
->  	of_node_put(np);
->  
-> +	np = of_find_node_opts_by_path("/testcase-data:test/option", &options);
-> +	selftest(np && !strcmp("test/option", options),
-> +		 "option path test failed\n");
-> +	of_node_put(np);
-> +
->  	np = of_find_node_opts_by_path("/testcase-data:testoption", NULL);
->  	selftest(np, "NULL option path test failed\n");
->  	of_node_put(np);
-> @@ -104,6 +109,12 @@ static void __init of_selftest_find_node_by_name(void)
->  		 "option alias path test failed\n");
->  	of_node_put(np);
->  
-> +	np = of_find_node_opts_by_path("testcase-alias:test/alias/option",
-> +				       &options);
-> +	selftest(np && !strcmp("test/alias/option", options),
-> +		 "option alias path test failed\n");
-> +	of_node_put(np);
-> +
->  	np = of_find_node_opts_by_path("testcase-alias:testaliasoption", NULL);
->  	selftest(np, "NULL option alias path test failed\n");
->  	of_node_put(np);
+> Acked-by: Tero Kristo <t-kristo@ti.com>
 
-Could you give the below a spin, and if it works for you, send me the
-above tests as a full patch so that I can post both as a series?
+Thanks applying both into omap-for-v4.0/fixes.
 
-Regards,
-
-Leif
-
->From bf4ab0b2e33902ba88809a3c4a2cdf07efd02dde Mon Sep 17 00:00:00 2001
-From: Leif Lindholm <leif.lindholm@linaro.org>
-Date: Fri, 6 Mar 2015 16:38:54 +0000
-Subject: [PATCH] of: fix handling of '/' in options for of_find_node_by_path()
-
-Ensure proper handling of paths with appended options (after ':'),
-where those options may contain a '/'.
-
-Fixes: 7914a7c5651a ("of: support passing console options with stdout-path")
-Reported-by: Peter Hurley <peter@hurleysoftware.com>
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
----
- drivers/of/base.c | 23 +++++++++++++++--------
- 1 file changed, 15 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 0a8aeb8..8b904e5 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -714,16 +714,17 @@ static struct device_node *__of_find_node_by_path(struct device_node *parent,
- 						const char *path)
- {
- 	struct device_node *child;
--	int len = strchrnul(path, '/') - path;
--	int term;
-+	int len;
-+	const char *end;
- 
-+	end = strchr(path, ':');
-+	if (!end)
-+		end = strchrnul(path, '/');
-+
-+	len = end - path;
- 	if (!len)
- 		return NULL;
- 
--	term = strchrnul(path, ':') - path;
--	if (term < len)
--		len = term;
--
- 	__for_each_child_of_node(parent, child) {
- 		const char *name = strrchr(child->full_name, '/');
- 		if (WARN(!name, "malformed device_node %s\n", child->full_name))
-@@ -768,8 +769,12 @@ struct device_node *of_find_node_opts_by_path(const char *path, const char **opt
- 
- 	/* The path could begin with an alias */
- 	if (*path != '/') {
--		char *p = strchrnul(path, '/');
--		int len = separator ? separator - path : p - path;
-+		int len;
-+		const char *p = separator;
-+
-+		if (!p)
-+			p = strchrnul(path, '/');
-+		len = p - path;
- 
- 		/* of_aliases must not be NULL */
- 		if (!of_aliases)
-@@ -794,6 +799,8 @@ struct device_node *of_find_node_opts_by_path(const char *path, const char **opt
- 		path++; /* Increment past '/' delimiter */
- 		np = __of_find_node_by_path(np, path);
- 		path = strchrnul(path, '/');
-+		if (separator && separator < path)
-+			break;
- 	}
- 	raw_spin_unlock_irqrestore(&devtree_lock, flags);
- 	return np;
--- 
-2.1.4
+Tony 
