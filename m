@@ -1,94 +1,98 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 5 Mar 2015 22:53:48 -0600
-Subject: [PATCH] pci: host: xgene: fix incorrectly returned address by
- map_bus
-In-Reply-To: <CAL_JsqJZ2JN8ZyUeLBbJqRV9bjHBCEs8JZRx=47sFrJL-QEgbQ@mail.gmail.com>
-References: <1424214840-26498-1-git-send-email-fkan@apm.com>
- <20150227002151.GG25765@google.com>
- <20150305163822.GA3048@google.com>
- <CAL_JsqJZ2JN8ZyUeLBbJqRV9bjHBCEs8JZRx=47sFrJL-QEgbQ@mail.gmail.com>
-Message-ID: <20150306045348.GB20077@google.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 05 Mar 2015 21:54:21 -0700
+Subject: [PATCH 02/10] mailbox: Enable BCM2835 mailbox support
+In-Reply-To: <87a8zs8vzo.fsf@eliezer.anholt.net>
+References: <1425329684-23968-1-git-send-email-eric@anholt.net>
+ <1425329684-23968-3-git-send-email-eric@anholt.net>
+ <54F675F1.60205@wwwdotorg.org> <87a8zs8vzo.fsf@eliezer.anholt.net>
+Message-ID: <54F932FD.5040207@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 05, 2015 at 02:57:55PM -0600, Rob Herring wrote:
-> On Thu, Mar 5, 2015 at 10:38 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> > [+cc Mark]
-> >
-> > On Thu, Feb 26, 2015 at 06:21:51PM -0600, Bjorn Helgaas wrote:
-> >> On Tue, Feb 17, 2015 at 03:14:00PM -0800, Feng Kan wrote:
-> >> > The generic accessor functions for pci-xgene uses map_bus
-> >> > call that returns the base address but did not add the additional
-> >> > offset.
-> >> >
-> >> > Signed-off-by: Feng Kan <fkan@apm.com>
-> >> > ...
-
-> >> > @@ -137,7 +137,7 @@ static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
-> >> >             return NULL;
-> >> >
-> >> >     xgene_pcie_set_rtdid_reg(bus, devfn);
-> >> > -   return xgene_pcie_get_cfg_base(bus);
-> >> > +   return xgene_pcie_get_cfg_base(bus) + offset;
-> >>
-> >> Where's the locking here?  ECAM doesn't need locking because the
-> >> bus/dev/fn/offset is all encoded in the MMIO address.  But it looks
-> >> like X-Gene doesn't work that way and bus/dev/fn is in the RTDID register.
-> >>
-> >> So it seems like X-Gene needs locking that not everybody needs.  Are you
-> >> relying on higher-level locking somewhere?
-> >> ...
+On 03/04/2015 11:20 AM, Eric Anholt wrote:
+> Stephen Warren <swarren@wwwdotorg.org> writes:
 > 
-> There's no locking problem. The config accesses are all within the
-> pci_lock spinlock and nothing else touches that register.
+>> On 03/02/2015 01:54 PM, Eric Anholt wrote:
+>>> From: Lubomir Rintel <lkundrak@v3.sk>
+>>> 
+>>> Implement BCM2835 mailbox support as a device registered with
+>>> the general purpose mailbox framework. Implementation based on
+>>> commits by Lubomir Rintel [1], Suman Anna and Jassi Brar [2] on
+>>> which to base the implementation.
+>> 
+>>> diff --git a/drivers/mailbox/bcm2835-mailbox.c
+>>> b/drivers/mailbox/bcm2835-mailbox.c
 
-Mmmmm.  Yes, you're right.  pci_bus_{read,write}_config_{byte,word,dword}()
-all acquire pci_lock.  For anybody following along at home, here's the
-path I was concerned about:
+>>> +static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id) +{ 
+>>> +	struct bcm2835_mbox *mbox = (struct bcm2835_mbox *) dev_id; +
+>>> struct device *dev = mbox->dev; + +	while (!(readl(mbox->regs +
+>>> MAIL0_STA) & ARM_MS_EMPTY)) { +		u32 msg = readl(mbox->regs +
+>>> MAIL0_RD); +		unsigned int chan = MBOX_CHAN(msg); + +		if
+>>> (!mbox->channel[chan].started) { +			dev_err(dev, "Reply on
+>>> stopped channel %d\n", chan); +			continue; +		} +
+>>> dev_dbg(dev, "Reply 0x%08X\n", msg); +
+>>> mbox_chan_received_data(mbox->channel[chan].link, +			(void *)
+>>> MBOX_DATA28(msg)); +	} +	rmb(); /* Finished last mailbox read.
+>>> */
+>> 
+>> I know the PDF mentioned in the comment earlier in the patch says
+>> to put in barriers between accesses to different peripherals,
+>> which this seems compliant with, but I don't see quite what this
+>> barrier achieves. I think the PDF is talking generalities, not
+>> imposing a rule that must be blindly followed. Besides, if
+>> there's a context-switch you can't actually implement the rules
+>> the PDF suggests. What read operation is this barrier attempting
+>> to ensure happens after reading all mailbox messages and any
+>> associated DRAM buffer?
+> 
+> Looking at this bit of code in particular:
+> 
+> "As interrupts can appear anywhere in the code so you should
+> safeguard those. If an interrupt routine reads from a peripheral
+> the routine should start with a memory read barrier. If an
+> interrupt routine writes to a peripheral the routine should end
+> with a memory write barrier."
 
-    pci_read_config_byte
-      pci_bus_read_config_byte
-        lock(&pci_lock)                         # acquire pci_lock
-        bus->ops->read/write                    # struct pci_ops
-          pci_generic_config_read               # gen_pci_ops
-            bus->ops->map_bus
-              xgene_pcie_map_bus                # xgene_pcie_ops
-                xgene_pcie_set_rtdid_reg
-                  writel                        # requires mutex
-            readb                               # config read
+I can see that doing that would be safe, but I don't think following
+those rules is actually necessary in the general case. Following those
+rules would cause lots of unnecessary barriers in code.
 
-I'm not exactly sure *why* we do locking there, other than we're just
-too scared to change it.  As far as I know, methods like ECAM shouldn't
-require that lock, so it's sort of a shame to do it at the top level
-like that.
+Barriers shouldn't be used arbitrarily at the start/end of ISRs, but
+rather at specific chosen locations in the code that actually need to
+enforce some kind of memory ordering.
 
-Some of the low-level routines, like pci_{conf1,conf2,bios}, also use a
-lock (pci_config_lock in these cases).  We do need it there because a
-few paths do call the low-level routines directly.
+For example, if the CPU writes a buffer to RAM, then programs a DMA
+peripheral to read from that RAM buffer, you'd need to make sure the
+RAM writes were visible to the DMA controller before kicking it off.
+That's often achieved by wmb() between the last write to the memory
+buffer (and perhaps some cache management) and the write to the DMA
+controller to kick off the DMA read.
 
-Here's a typical path on x86:
+Not all ISRs will have any kind of interaction between DMA peripherals
+and peripheral registers. For example, an I2C driver that only gets
+data into/out-of the I2C controller HW via CPU PIO register
+reads/writes rather than via DMA to/from RAM likely wouldn't ever need
+any barriers.
 
-    pci_read_config_byte
-      pci_bus_read_config_byte
-        lock(&pci_lock)                         # acquire pci_lock
-        bus->ops->read/write                    # struct pci_ops
-          pci_read                              # x86 pci_root_ops
-            raw_pci_read
-              raw_pci_ops->read
-                pci_conf1_read                  # x86 raw_pci_ops
-                  lock(&pci_config_lock)        # acquire pci_config_lock
+> So it seems like the IRQ handler at least wants:
+> 
+> diff --git a/drivers/mailbox/bcm2835-mailbox.c
+> b/drivers/mailbox/bcm2835-mailbox.c index 604beb7..7e528f6 100644 
+> --- a/drivers/mailbox/bcm2835-mailbox.c +++
+> b/drivers/mailbox/bcm2835-mailbox.c @@ -88,6 +88,13 @@ static
+> irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id) struct
+> bcm2835_mbox *mbox = (struct bcm2835_mbox *) dev_id; struct device
+> *dev = mbox->dev;
+> 
+> +	/* +	 * BCM2835-ARM-Peripherals.pdf says "If an interrupt
+> routine +	 * reads from a peripheral the routine should start with
+> a +	 * memory read barrier." +	 */ +	rmb(); + while
+> (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) { u32 msg =
+> readl(mbox->regs + MAIL0_RD); unsigned int chan = MBOX_CHAN(msg); 
+> @@ -100,7 +107,6 @@ static irqreturn_t bcm2835_mbox_irq(int irq,
+> void *dev_id) mbox_chan_received_data(mbox->channel[chan].link, 
+> (void *) MBOX_DATA28(msg)); } -	rmb(); /* Finished last mailbox
+> read. */ return IRQ_HANDLED; }
 
-And here's a path on x86 that uses the low-level routines directly and
-requires the locking there:
-
-    acpi_os_read_pci_configuration
-      raw_pci_read
-        raw_pci_ops->read
-          pci_conf1_read
-            lock(&pci_config_lock)
-
-So ideally I think the locking would be done in the low-level routines
-that need it, and we could do without pci_lock.  But I don't know
-whether that's practical at this point or not.
-
-Bjorn
+In this case, I don't think neither the original barrier is needed,
+nor the extra one you added.
