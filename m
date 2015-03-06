@@ -1,401 +1,130 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 6 Mar 2015 14:28:44 +0200
-Subject: [PATCH 09/24] clk: ti: autoidle: move generic autoidle handling code
- to clock driver
+Date: Fri, 6 Mar 2015 14:28:43 +0200
+Subject: [PATCH 08/24] ARM: OMAP36xx: remove clock36xx.c/.h files
 In-Reply-To: <1425644939-3232-1-git-send-email-t-kristo@ti.com>
 References: <1425644939-3232-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1425644939-3232-10-git-send-email-t-kristo@ti.com>
+Message-ID: <1425644939-3232-9-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is no longer needed in platform directory, as the legacy clock data
-is gone, so move it under TI clock driver. Some static functions are
-renamed also.
+These files contain legacy clock implementations which are no longer used
+for anything, thus remove them completely.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/clock.c   |  103 -----------------------------------
- arch/arm/mach-omap2/clock.h   |    3 --
- drivers/clk/ti/autoidle.c     |  119 ++++++++++++++++++++++++++++++++++++++---
- drivers/clk/ti/clock.h        |    3 ++
- drivers/clk/ti/fixed-factor.c |    2 +
- include/linux/clk/ti.h        |   13 ++---
- 6 files changed, 119 insertions(+), 124 deletions(-)
+ arch/arm/mach-omap2/Makefile    |    2 +-
+ arch/arm/mach-omap2/clock36xx.c |   69 ---------------------------------------
+ arch/arm/mach-omap2/clock36xx.h |   13 --------
+ 3 files changed, 1 insertion(+), 83 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/clock36xx.c
+ delete mode 100644 arch/arm/mach-omap2/clock36xx.h
 
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index 1d87860..99f1dc5 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -66,7 +66,6 @@ u16 cpu_mask;
-  */
- static bool clkdm_control = true;
- 
--static LIST_HEAD(clk_hw_omap_clocks);
- void __iomem *clk_memmaps[CLK_MAX_MEMMAPS];
- 
- void omap2_clk_writel(u32 val, struct clk_hw_omap *clk, void __iomem *reg)
-@@ -496,108 +495,6 @@ static int __init omap_clk_setup(char *str)
- __setup("mpurate=", omap_clk_setup);
- 
- /**
-- * omap2_init_clk_hw_omap_clocks - initialize an OMAP clock
-- * @clk: struct clk * to initialize
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index c172cf1..db627b2 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -188,7 +188,7 @@ obj-$(CONFIG_ARCH_OMAP2)		+= clkt2xxx_dpll.o
+ obj-$(CONFIG_SOC_OMAP2430)		+= clock2430.o
+ obj-$(CONFIG_ARCH_OMAP3)		+= $(clock-common) clock3xxx.o
+ obj-$(CONFIG_ARCH_OMAP3)		+= clock34xx.o clkt34xx_dpll3m2.o
+-obj-$(CONFIG_ARCH_OMAP3)		+= clock3517.o clock36xx.o
++obj-$(CONFIG_ARCH_OMAP3)		+= clock3517.o
+ obj-$(CONFIG_ARCH_OMAP3)		+= dpll3xxx.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= $(clock-common)
+ obj-$(CONFIG_ARCH_OMAP4)		+= dpll3xxx.o
+diff --git a/arch/arm/mach-omap2/clock36xx.c b/arch/arm/mach-omap2/clock36xx.c
+deleted file mode 100644
+index 91ccb96..0000000
+--- a/arch/arm/mach-omap2/clock36xx.c
++++ /dev/null
+@@ -1,69 +0,0 @@
+-/*
+- * OMAP36xx-specific clkops
 - *
-- * Add an OMAP clock @clk to the internal list of OMAP clocks.  Used
-- * temporarily for autoidle handling, until this support can be
-- * integrated into the common clock framework code in some way.  No
-- * return value.
+- * Copyright (C) 2010 Texas Instruments, Inc.
+- * Copyright (C) 2010 Nokia Corporation
+- *
+- * Mike Turquette
+- * Vijaykumar GN
+- * Paul Walmsley
+- *
+- * Parts of this code are based on code written by
+- * Richard Woodruff, Tony Lindgren, Tuukka Tikkanen, Karthik Dasu,
+- * Russell King
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
 - */
--void omap2_init_clk_hw_omap_clocks(struct clk *clk)
--{
--	struct clk_hw_omap *c;
+-#undef DEBUG
 -
--	if (__clk_get_flags(clk) & CLK_IS_BASIC)
--		return;
+-#include <linux/kernel.h>
+-#include <linux/clk.h>
+-#include <linux/clk-provider.h>
+-#include <linux/io.h>
 -
--	c = to_clk_hw_omap(__clk_get_hw(clk));
--	list_add(&c->node, &clk_hw_omap_clocks);
--}
+-#include "clock.h"
+-#include "clock36xx.h"
+-#define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
 -
 -/**
-- * omap2_clk_enable_autoidle_all - enable autoidle on all OMAP clocks that
-- * support it
+- * omap36xx_pwrdn_clk_enable_with_hsdiv_restore - enable clocks suffering
+- *         from HSDivider PWRDN problem Implements Errata ID: i556.
+- * @clk: DPLL output struct clk
 - *
-- * Enable clock autoidle on all OMAP clocks that have allow_idle
-- * function pointers associated with them.  This function is intended
-- * to be temporary until support for this is added to the common clock
-- * code.  Returns 0.
+- * 3630 only: dpll3_m3_ck, dpll4_m2_ck, dpll4_m3_ck, dpll4_m4_ck,
+- * dpll4_m5_ck & dpll4_m6_ck dividers gets loaded with reset
+- * valueafter their respective PWRDN bits are set.  Any dummy write
+- * (Any other value different from the Read value) to the
+- * corresponding CM_CLKSEL register will refresh the dividers.
 - */
--int omap2_clk_enable_autoidle_all(void)
+-int omap36xx_pwrdn_clk_enable_with_hsdiv_restore(struct clk_hw *clk)
 -{
--	struct clk_hw_omap *c;
+-	struct clk_divider *parent;
+-	struct clk_hw *parent_hw;
+-	u32 dummy_v, orig_v;
+-	struct clk_hw_omap *omap_clk = to_clk_hw_omap(clk);
+-	int ret;
 -
--	list_for_each_entry(c, &clk_hw_omap_clocks, node)
--		if (c->ops && c->ops->allow_idle)
--			c->ops->allow_idle(c);
+-	/* Clear PWRDN bit of HSDIVIDER */
+-	ret = omap2_dflt_clk_enable(clk);
 -
--	of_ti_clk_allow_autoidle_all();
+-	parent_hw = __clk_get_hw(__clk_get_parent(clk->clk));
+-	parent = to_clk_divider(parent_hw);
 -
--	return 0;
+-	/* Restore the dividers */
+-	if (!ret) {
+-		orig_v = omap2_clk_readl(omap_clk, parent->reg);
+-		dummy_v = orig_v;
+-
+-		/* Write any other value different from the Read value */
+-		dummy_v ^= (1 << parent->shift);
+-		omap2_clk_writel(dummy_v, omap_clk, parent->reg);
+-
+-		/* Write the original divider */
+-		omap2_clk_writel(orig_v, omap_clk, parent->reg);
+-	}
+-
+-	return ret;
 -}
--
--/**
-- * omap2_clk_disable_autoidle_all - disable autoidle on all OMAP clocks that
-- * support it
+diff --git a/arch/arm/mach-omap2/clock36xx.h b/arch/arm/mach-omap2/clock36xx.h
+deleted file mode 100644
+index 945bb7f..0000000
+--- a/arch/arm/mach-omap2/clock36xx.h
++++ /dev/null
+@@ -1,13 +0,0 @@
+-/*
+- * OMAP36xx clock function prototypes and macros
 - *
-- * Disable clock autoidle on all OMAP clocks that have allow_idle
-- * function pointers associated with them.  This function is intended
-- * to be temporary until support for this is added to the common clock
-- * code.  Returns 0.
+- * Copyright (C) 2010 Texas Instruments, Inc.
+- * Copyright (C) 2010 Nokia Corporation
 - */
--int omap2_clk_disable_autoidle_all(void)
--{
--	struct clk_hw_omap *c;
 -
--	list_for_each_entry(c, &clk_hw_omap_clocks, node)
--		if (c->ops && c->ops->deny_idle)
--			c->ops->deny_idle(c);
+-#ifndef __ARCH_ARM_MACH_OMAP2_CLOCK36XX_H
+-#define __ARCH_ARM_MACH_OMAP2_CLOCK36XX_H
 -
--	of_ti_clk_deny_autoidle_all();
+-extern int omap36xx_pwrdn_clk_enable_with_hsdiv_restore(struct clk_hw *hw);
 -
--	return 0;
--}
--
--/**
-- * omap2_clk_deny_idle - disable autoidle on an OMAP clock
-- * @clk: struct clk * to disable autoidle for
-- *
-- * Disable autoidle on an OMAP clock.
-- */
--int omap2_clk_deny_idle(struct clk *clk)
--{
--	struct clk_hw_omap *c;
--
--	if (__clk_get_flags(clk) & CLK_IS_BASIC)
--		return -EINVAL;
--
--	c = to_clk_hw_omap(__clk_get_hw(clk));
--	if (c->ops && c->ops->deny_idle)
--		c->ops->deny_idle(c);
--	return 0;
--}
--
--/**
-- * omap2_clk_allow_idle - enable autoidle on an OMAP clock
-- * @clk: struct clk * to enable autoidle for
-- *
-- * Enable autoidle on an OMAP clock.
-- */
--int omap2_clk_allow_idle(struct clk *clk)
--{
--	struct clk_hw_omap *c;
--
--	if (__clk_get_flags(clk) & CLK_IS_BASIC)
--		return -EINVAL;
--
--	c = to_clk_hw_omap(__clk_get_hw(clk));
--	if (c->ops && c->ops->allow_idle)
--		c->ops->allow_idle(c);
--	return 0;
--}
--
--/**
-  * omap2_clk_enable_init_clocks - prepare & enable a list of clocks
-  * @clk_names: ptr to an array of strings of clock names to enable
-  * @num_clocks: number of clock names in @clk_names
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index d7c6644..1ce54b3 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -186,9 +186,6 @@ void omap3_dpll_deny_idle(struct clk_hw_omap *clk);
- 
- void __init omap2_clk_disable_clkdm_control(void);
- 
--int omap2_clk_enable_autoidle_all(void);
--int omap2_clk_allow_idle(struct clk *clk);
--int omap2_clk_deny_idle(struct clk *clk);
- int omap2_clk_switch_mpurate_at_boot(const char *mpurate_ck_name);
- void omap2_clk_print_new_rates(const char *hfclkin_ck_name,
- 			       const char *core_ck_name,
-diff --git a/drivers/clk/ti/autoidle.c b/drivers/clk/ti/autoidle.c
-index 8912ff8..7f4010d 100644
---- a/drivers/clk/ti/autoidle.c
-+++ b/drivers/clk/ti/autoidle.c
-@@ -33,8 +33,47 @@ struct clk_ti_autoidle {
- #define AUTOIDLE_LOW		0x1
- 
- static LIST_HEAD(autoidle_clks);
-+static LIST_HEAD(clk_hw_omap_clocks);
- 
--static void ti_allow_autoidle(struct clk_ti_autoidle *clk)
-+/**
-+ * omap2_clk_deny_idle - disable autoidle on an OMAP clock
-+ * @clk: struct clk * to disable autoidle for
-+ *
-+ * Disable autoidle on an OMAP clock.
-+ */
-+int omap2_clk_deny_idle(struct clk *clk)
-+{
-+	struct clk_hw_omap *c;
-+
-+	if (__clk_get_flags(clk) & CLK_IS_BASIC)
-+		return -EINVAL;
-+
-+	c = to_clk_hw_omap(__clk_get_hw(clk));
-+	if (c->ops && c->ops->deny_idle)
-+		c->ops->deny_idle(c);
-+	return 0;
-+}
-+
-+/**
-+ * omap2_clk_allow_idle - enable autoidle on an OMAP clock
-+ * @clk: struct clk * to enable autoidle for
-+ *
-+ * Enable autoidle on an OMAP clock.
-+ */
-+int omap2_clk_allow_idle(struct clk *clk)
-+{
-+	struct clk_hw_omap *c;
-+
-+	if (__clk_get_flags(clk) & CLK_IS_BASIC)
-+		return -EINVAL;
-+
-+	c = to_clk_hw_omap(__clk_get_hw(clk));
-+	if (c->ops && c->ops->allow_idle)
-+		c->ops->allow_idle(c);
-+	return 0;
-+}
-+
-+static void _allow_autoidle(struct clk_ti_autoidle *clk)
- {
- 	u32 val;
- 
-@@ -48,7 +87,7 @@ static void ti_allow_autoidle(struct clk_ti_autoidle *clk)
- 	ti_clk_ll_ops->clk_writel(val, clk->reg);
- }
- 
--static void ti_deny_autoidle(struct clk_ti_autoidle *clk)
-+static void _deny_autoidle(struct clk_ti_autoidle *clk)
- {
- 	u32 val;
- 
-@@ -63,31 +102,31 @@ static void ti_deny_autoidle(struct clk_ti_autoidle *clk)
- }
- 
- /**
-- * of_ti_clk_allow_autoidle_all - enable autoidle for all clocks
-+ * _clk_generic_allow_autoidle_all - enable autoidle for all clocks
-  *
-  * Enables hardware autoidle for all registered DT clocks, which have
-  * the feature.
-  */
--void of_ti_clk_allow_autoidle_all(void)
-+static void _clk_generic_allow_autoidle_all(void)
- {
- 	struct clk_ti_autoidle *c;
- 
- 	list_for_each_entry(c, &autoidle_clks, node)
--		ti_allow_autoidle(c);
-+		_allow_autoidle(c);
- }
- 
- /**
-- * of_ti_clk_deny_autoidle_all - disable autoidle for all clocks
-+ * _clk_generic_deny_autoidle_all - disable autoidle for all clocks
-  *
-  * Disables hardware autoidle for all registered DT clocks, which have
-  * the feature.
-  */
--void of_ti_clk_deny_autoidle_all(void)
-+static void _clk_generic_deny_autoidle_all(void)
- {
- 	struct clk_ti_autoidle *c;
- 
- 	list_for_each_entry(c, &autoidle_clks, node)
--		ti_deny_autoidle(c);
-+		_deny_autoidle(c);
- }
- 
- /**
-@@ -131,3 +170,67 @@ int __init of_ti_clk_autoidle_setup(struct device_node *node)
- 
- 	return 0;
- }
-+
-+/**
-+ * omap2_init_clk_hw_omap_clocks - initialize an OMAP clock
-+ * @clk: struct clk * to initialize
-+ *
-+ * Add an OMAP clock @clk to the internal list of OMAP clocks.  Used
-+ * temporarily for autoidle handling, until this support can be
-+ * integrated into the common clock framework code in some way.  No
-+ * return value.
-+ */
-+void omap2_init_clk_hw_omap_clocks(struct clk *clk)
-+{
-+	struct clk_hw_omap *c;
-+
-+	if (__clk_get_flags(clk) & CLK_IS_BASIC)
-+		return;
-+
-+	c = to_clk_hw_omap(__clk_get_hw(clk));
-+	list_add(&c->node, &clk_hw_omap_clocks);
-+}
-+
-+/**
-+ * omap2_clk_enable_autoidle_all - enable autoidle on all OMAP clocks that
-+ * support it
-+ *
-+ * Enable clock autoidle on all OMAP clocks that have allow_idle
-+ * function pointers associated with them.  This function is intended
-+ * to be temporary until support for this is added to the common clock
-+ * code.  Returns 0.
-+ */
-+int omap2_clk_enable_autoidle_all(void)
-+{
-+	struct clk_hw_omap *c;
-+
-+	list_for_each_entry(c, &clk_hw_omap_clocks, node)
-+		if (c->ops && c->ops->allow_idle)
-+			c->ops->allow_idle(c);
-+
-+	_clk_generic_allow_autoidle_all();
-+
-+	return 0;
-+}
-+
-+/**
-+ * omap2_clk_disable_autoidle_all - disable autoidle on all OMAP clocks that
-+ * support it
-+ *
-+ * Disable clock autoidle on all OMAP clocks that have allow_idle
-+ * function pointers associated with them.  This function is intended
-+ * to be temporary until support for this is added to the common clock
-+ * code.  Returns 0.
-+ */
-+int omap2_clk_disable_autoidle_all(void)
-+{
-+	struct clk_hw_omap *c;
-+
-+	list_for_each_entry(c, &clk_hw_omap_clocks, node)
-+		if (c->ops && c->ops->deny_idle)
-+			c->ops->deny_idle(c);
-+
-+	_clk_generic_deny_autoidle_all();
-+
-+	return 0;
-+}
-diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
-index a7256a9..9b51021 100644
---- a/drivers/clk/ti/clock.h
-+++ b/drivers/clk/ti/clock.h
-@@ -169,6 +169,9 @@ void ti_clk_patch_legacy_clks(struct ti_clk **patch);
- struct clk *ti_clk_register_clk(struct ti_clk *setup);
- int ti_clk_register_legacy_clks(struct ti_clk_alias *clks);
- 
-+void omap2_init_clk_hw_omap_clocks(struct clk *clk);
-+int of_ti_clk_autoidle_setup(struct device_node *node);
-+
- extern const struct clk_hw_omap_ops clkhwops_omap4_dpllmx;
- extern const struct clk_hw_omap_ops clkhwops_iclk;
- extern const struct clk_hw_omap_ops clkhwops_iclk_wait;
-diff --git a/drivers/clk/ti/fixed-factor.c b/drivers/clk/ti/fixed-factor.c
-index c2c8a28..3cd4067 100644
---- a/drivers/clk/ti/fixed-factor.c
-+++ b/drivers/clk/ti/fixed-factor.c
-@@ -22,6 +22,8 @@
- #include <linux/of_address.h>
- #include <linux/clk/ti.h>
- 
-+#include "clock.h"
-+
- #undef pr_fmt
- #define pr_fmt(fmt) "%s: " fmt, __func__
- 
-diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-index f3ce6ec..50be1fd 100644
---- a/include/linux/clk/ti.h
-+++ b/include/linux/clk/ti.h
-@@ -259,7 +259,6 @@ extern const struct clk_ops ti_clk_mux_ops;
- 
- #define to_clk_hw_omap(_hw) container_of(_hw, struct clk_hw_omap, hw)
- 
--void omap2_init_clk_hw_omap_clocks(struct clk *clk);
- int omap3_noncore_dpll_enable(struct clk_hw *hw);
- void omap3_noncore_dpll_disable(struct clk_hw *hw);
- int omap3_noncore_dpll_set_parent(struct clk_hw *hw, u8 index);
-@@ -288,6 +287,9 @@ long omap3_clkoutx2_round_rate(struct clk_hw *hw, unsigned long rate,
- int omap2_clkops_enable_clkdm(struct clk_hw *hw);
- void omap2_clkops_disable_clkdm(struct clk_hw *hw);
- int omap2_clk_disable_autoidle_all(void);
-+int omap2_clk_enable_autoidle_all(void);
-+int omap2_clk_allow_idle(struct clk *clk);
-+int omap2_clk_deny_idle(struct clk *clk);
- void omap2_clk_enable_init_clocks(const char **clk_names, u8 num_clocks);
- int omap3_dpll4_set_rate(struct clk_hw *clk, unsigned long rate,
- 			 unsigned long parent_rate);
-@@ -320,7 +322,6 @@ void ti_dt_clk_init_retry_clks(void);
- void ti_dt_clockdomains_setup(void);
- int ti_clk_retry_init(struct device_node *node, struct clk_hw *hw,
- 		      ti_of_clk_init_cb_t func);
--int of_ti_clk_autoidle_setup(struct device_node *node);
- int ti_clk_add_component(struct device_node *node, struct clk_hw *hw, int type);
- 
- int omap3430_dt_clk_init(void);
-@@ -351,14 +352,6 @@ struct ti_clk_features {
- void ti_clk_setup_features(struct ti_clk_features *features);
- struct ti_clk_features *ti_clk_get_features(void);
- 
--#ifdef CONFIG_OF
--void of_ti_clk_allow_autoidle_all(void);
--void of_ti_clk_deny_autoidle_all(void);
--#else
--static inline void of_ti_clk_allow_autoidle_all(void) { }
--static inline void of_ti_clk_deny_autoidle_all(void) { }
 -#endif
--
- extern const struct clk_hw_omap_ops clkhwops_omap2xxx_dpll;
- extern const struct clk_hw_omap_ops clkhwops_omap2430_i2chs_wait;
- extern const struct clk_hw_omap_ops clkhwops_omap3_dpll;
 -- 
 1.7.9.5
