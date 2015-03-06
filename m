@@ -1,33 +1,141 @@
-From: tyler.baker@linaro.org (tyler.baker at linaro.org)
-Date: Fri,  6 Mar 2015 15:35:05 -0800
-Subject: [PATCH 2/2] ARM: dts: add vendor prefix for cubietech
-In-Reply-To: <1425684905-23652-1-git-send-email-tyler.baker@linaro.org>
-References: <1425684905-23652-1-git-send-email-tyler.baker@linaro.org>
-Message-ID: <1425684905-23652-3-git-send-email-tyler.baker@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri,  6 Mar 2015 15:41:53 -0800
+Subject: [PATCH v2] clk: qcom: Properly change rates for ahbix clock
+Message-ID: <1425685313-6005-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tyler Baker <tyler.baker@linaro.org>
+The ahbix clock can never be turned off in practice. To change the
+rates we need to switch the mux off the M/N counter to an always on
+source (XO), reprogram the M/N counter to get the rate we want and
+finally switch back to the M/N counter. Add a new ops structure
+for this type of clock so that we can set the rate properly.
 
-Add a cubietech vendor prefix, as it is missing. The cubietruck, cubieboard2,
-and cubieboard all already reference this prefix.
-
-Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+Fixes: c99e515a92e9 "clk: qcom: Add IPQ806X LPASS clock controller (LCC) driver"
+Cc: Kenneth Westfield <kwestfie@codeaurora.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index aeb5bb5..58364cf 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -45,6 +45,7 @@ cnxt	Conexant Systems, Inc.
- cortina	Cortina Systems, Inc.
- cosmic	Cosmic Circuits
- crystalfontz	Crystalfontz America, Inc.
-+cubietech	Cubietech, Ltd.
- dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
- davicom	DAVICOM Semiconductor, Inc.
- denx	Denx Software Engineering
+Changes from v1:
+ * Handle the case where clock feeding M/N counter is off
+
+ drivers/clk/qcom/clk-rcg.c     | 62 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/qcom/clk-rcg.h     |  1 +
+ drivers/clk/qcom/lcc-ipq806x.c |  5 ++--
+ 3 files changed, 65 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/clk/qcom/clk-rcg.c b/drivers/clk/qcom/clk-rcg.c
+index 0039bd7d3965..466f30ca65c2 100644
+--- a/drivers/clk/qcom/clk-rcg.c
++++ b/drivers/clk/qcom/clk-rcg.c
+@@ -495,6 +495,57 @@ static int clk_rcg_bypass_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	return __clk_rcg_set_rate(rcg, rcg->freq_tbl);
+ }
+ 
++/*
++ * This type of clock has a glitch-free mux that switches between the output of
++ * the M/N counter and an always on clock source (XO). When clk_set_rate() is
++ * called we need to make sure that we don't switch to the M/N counter if it
++ * isn't clocking because the mux will get stuck and the clock will stop
++ * outputting a clock. This can happen if the framework isn't aware that this
++ * clock is on and so clk_set_rate() doesn't turn on the new parent. To fix
++ * this we switch the mux in the enable/disable ops and reprogram the M/N
++ * counter in the set_rate op. We also make sure to switch away from the M/N
++ * counter in set_rate if software thinks the clock is off.
++ */
++static int clk_rcg_lcc_set_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long parent_rate)
++{
++	struct clk_rcg *rcg = to_clk_rcg(hw);
++	const struct freq_tbl *f;
++	int ret;
++	u32 gfm = BIT(10);
++
++	f = qcom_find_freq(rcg->freq_tbl, rate);
++	if (!f)
++		return -EINVAL;
++
++	/* Switch to XO to avoid glitches */
++	regmap_update_bits(rcg->clkr.regmap, rcg->ns_reg, gfm, 0);
++	ret = __clk_rcg_set_rate(rcg, f);
++	/* Switch back to M/N if it's clocking */
++	if (__clk_is_enabled(hw->clk))
++		regmap_update_bits(rcg->clkr.regmap, rcg->ns_reg, gfm, gfm);
++
++	return ret;
++}
++
++static int clk_rcg_lcc_enable(struct clk_hw *hw)
++{
++	struct clk_rcg *rcg = to_clk_rcg(hw);
++	u32 gfm = BIT(10);
++
++	/* Use M/N */
++	return regmap_update_bits(rcg->clkr.regmap, rcg->ns_reg, gfm, gfm);
++}
++
++static void clk_rcg_lcc_disable(struct clk_hw *hw)
++{
++	struct clk_rcg *rcg = to_clk_rcg(hw);
++	u32 gfm = BIT(10);
++
++	/* Use XO */
++	regmap_update_bits(rcg->clkr.regmap, rcg->ns_reg, gfm, 0);
++}
++
+ static int __clk_dyn_rcg_set_rate(struct clk_hw *hw, unsigned long rate)
+ {
+ 	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
+@@ -543,6 +594,17 @@ const struct clk_ops clk_rcg_bypass_ops = {
+ };
+ EXPORT_SYMBOL_GPL(clk_rcg_bypass_ops);
+ 
++const struct clk_ops clk_rcg_lcc_ops = {
++	.enable = clk_rcg_lcc_enable,
++	.disable = clk_rcg_lcc_disable,
++	.get_parent = clk_rcg_get_parent,
++	.set_parent = clk_rcg_set_parent,
++	.recalc_rate = clk_rcg_recalc_rate,
++	.determine_rate = clk_rcg_determine_rate,
++	.set_rate = clk_rcg_lcc_set_rate,
++};
++EXPORT_SYMBOL_GPL(clk_rcg_lcc_ops);
++
+ const struct clk_ops clk_dyn_rcg_ops = {
+ 	.enable = clk_enable_regmap,
+ 	.is_enabled = clk_is_enabled_regmap,
+diff --git a/drivers/clk/qcom/clk-rcg.h b/drivers/clk/qcom/clk-rcg.h
+index 687e41f91d7c..d09d06ba278e 100644
+--- a/drivers/clk/qcom/clk-rcg.h
++++ b/drivers/clk/qcom/clk-rcg.h
+@@ -96,6 +96,7 @@ struct clk_rcg {
+ 
+ extern const struct clk_ops clk_rcg_ops;
+ extern const struct clk_ops clk_rcg_bypass_ops;
++extern const struct clk_ops clk_rcg_lcc_ops;
+ 
+ #define to_clk_rcg(_hw) container_of(to_clk_regmap(_hw), struct clk_rcg, clkr)
+ 
+diff --git a/drivers/clk/qcom/lcc-ipq806x.c b/drivers/clk/qcom/lcc-ipq806x.c
+index 9e27d82c0201..a6d3a6745c4d 100644
+--- a/drivers/clk/qcom/lcc-ipq806x.c
++++ b/drivers/clk/qcom/lcc-ipq806x.c
+@@ -386,13 +386,12 @@ static struct clk_rcg ahbix_clk = {
+ 	.freq_tbl = clk_tbl_ahbix,
+ 	.clkr = {
+ 		.enable_reg = 0x38,
+-		.enable_mask = BIT(10), /* toggle the gfmux to select mn/pxo */
++		.enable_mask = BIT(11),
+ 		.hw.init = &(struct clk_init_data){
+ 			.name = "ahbix",
+ 			.parent_names = lcc_pxo_pll4,
+ 			.num_parents = 2,
+-			.ops = &clk_rcg_ops,
+-			.flags = CLK_SET_RATE_GATE,
++			.ops = &clk_rcg_lcc_ops,
+ 		},
+ 	},
+ };
 -- 
-2.1.0
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
