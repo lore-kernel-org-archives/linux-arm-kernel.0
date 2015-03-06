@@ -1,9 +1,9 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri,  6 Mar 2015 19:04:02 +0100
-Subject: [PATCH 4/8] ARM: dts: rockchip: relicense rk3288.dtsi under GPLv2/X11
+Date: Fri,  6 Mar 2015 19:04:00 +0100
+Subject: [PATCH 2/8] ARM: dts: rockchip: relicense rk3066a.dtsi under GPLv2/X11
 In-Reply-To: <1425665046-22927-1-git-send-email-heiko@sntech.de>
 References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
-Message-ID: <1425665046-22927-5-git-send-email-heiko@sntech.de>
+Message-ID: <1425665046-22927-3-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,40 +11,29 @@ GPLv2-only devicetrees make reuse difficult for software components licensed
 under a different license.
 
 The consensus is that a GPL/X11 dual-license should allow all necessary uses,
-so relicense the rk3288.dtsi to this combination.
+so relicense the rk3066a.dtsi to this combination.
 
 CCs were aquired by git shortlog -sne so it should've hopefully catched
 every contributor.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Cc: Kever Yang <kever.yang@rock-chips.com>
-Cc: Doug Anderson <dianders@chromium.org>
-Cc: Addy Ke <addy.ke@rock-chips.com>
-Cc: Daniel Kurtz <djkurtz@chromium.org>
-Cc: Andy Yan <andy.yan@rock-chips.com>
-Cc: Caesar Wang <caesar.wang@rock-chips.com>
-Cc: Chris Zhong <zyw@rock-chips.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Jianqun Xu<jay.xu@rock-chips.com>
-Cc: Roger Chen <roger.chen@rock-chips.com>
-Cc: Sonny Rao <sonnyrao@chromium.org>
-Cc: Yunzhi Li <lyz@rock-chips.com>
-Cc: huang lin <hl@rock-chips.com>
-
-Not sure if an Ack for a simple revert is necessary, but included anyway
-Cc: Olof Johansson <olof@lixom.net>
+Cc: Beniamino Galvani <b.galvani@gmail.com>
+Cc: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
+Cc: Romain Perier <romain.perier@gmail.com>
 ---
 I'm hoping to get Acked-by tags from the people in the Cc-list.
 
- arch/arm/boot/dts/rk3288.dtsi | 44 +++++++++++++++++++++++++++++++++++--------
+ arch/arm/boot/dts/rk3066a.dtsi | 44 ++++++++++++++++++++++++++++++++++--------
  1 file changed, 36 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 2c29a3e..35a06a5 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -1,13 +1,41 @@
- /*
+diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+index 41ffd49..d32229b 100644
+--- a/arch/arm/boot/dts/rk3066a.dtsi
++++ b/arch/arm/boot/dts/rk3066a.dtsi
+@@ -2,15 +2,43 @@
+  * Copyright (c) 2013 MundoReader S.L.
+  * Author: Heiko Stuebner <heiko@sntech.de>
+  *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
 - * the Free Software Foundation; either version 2 of the License, or
