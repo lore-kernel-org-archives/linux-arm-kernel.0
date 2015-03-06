@@ -1,132 +1,135 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 7 Mar 2015 00:49:55 +0800
-Subject: [PATCH] pinctrl: dt: at91: new binding
-In-Reply-To: <54F9C2FE.8060804@atmel.com>
-References: <1424943294-8805-1-git-send-email-plagnioj@jcrosoft.com>
- <54F9C2FE.8060804@atmel.com>
-Message-ID: <AB034DC5-9E4C-4883-BBF0-B93B438C7A54@jcrosoft.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Fri, 6 Mar 2015 16:52:53 +0000
+Subject: [PATCH v3 2/3] of: add optional options parameter to
+ of_find_node_by_path()
+In-Reply-To: <54F7287E.6060302@hurleysoftware.com>
+References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
+ <1417110967-16284-3-git-send-email-leif.lindholm@linaro.org>
+ <54F7287E.6060302@hurleysoftware.com>
+Message-ID: <20150306165253.GJ4278@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Peter,
 
-> On Mar 6, 2015, at 11:08 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> 
-> Le 26/02/2015 10:34, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
->> Today if we want to disable a pio bank we may will siliently break pinctrl
->> configuration in the DT. This will be detected only at runtime.
->> 
->> So move the pinctrl configuration to the bank instead of the bus.
->> This allow to detect pinctrl issue at DT compiling time when disable a bank.
->> 
->> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: devicetree at vger.kernel.org
->> ---
->> .../bindings/pinctrl/atmel,at91-pinctrl.txt        | 66 ++++++++++++++++++++++
->> 1 file changed, 66 insertions(+)
->> 
->> diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
->> index b7a93e8..78355ee 100644
->> --- a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
->> +++ b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
->> @@ -148,3 +148,69 @@ dbgu: serial at fffff200 {
->> 	pinctrl-0 = <&pinctrl_dbgu>;
->> 	status = "disabled";
->> };
->> +
->> +II) New Bindings per PIO Block
-> 
-> Sorry but NACK.
-> 
-> I don't want to manage another flavor of the pinmux biding with no real
-> benefit. I would have been good if we had it from day-1. Now it's too late.
+On Wed, Mar 04, 2015 at 10:45:02AM -0500, Peter Hurley wrote:
+> The path parsing gets lost if the string after ':' contains '/'.
 
-yes we do, we catch but a compiling time instead of RUNTIME which is critical
+Doh!
+Thanks for reporting (and sorry for slow response).
 
-so I?ll pass on the NACK
+> The selftests below fail with:
+> [    1.365528] ### dt-test ### FAIL of_selftest_find_node_by_name():99 option path test failed
+> [    1.365610] ### dt-test ### FAIL of_selftest_find_node_by_name():115 option alias path test failed
+> 
+> Regards,
+> Peter Hurley
+> 
+> 
+> --- >% ---
+> diff --git a/drivers/of/unittest.c b/drivers/of/unittest.c
+> index 41a4a13..07ba5aa 100644
+> --- a/drivers/of/unittest.c
+> +++ b/drivers/of/unittest.c
+> @@ -94,6 +94,11 @@ static void __init of_selftest_find_node_by_name(void)
+>  		 "option path test failed\n");
+>  	of_node_put(np);
+>  
+> +	np = of_find_node_opts_by_path("/testcase-data:test/option", &options);
+> +	selftest(np && !strcmp("test/option", options),
+> +		 "option path test failed\n");
+> +	of_node_put(np);
+> +
+>  	np = of_find_node_opts_by_path("/testcase-data:testoption", NULL);
+>  	selftest(np, "NULL option path test failed\n");
+>  	of_node_put(np);
+> @@ -104,6 +109,12 @@ static void __init of_selftest_find_node_by_name(void)
+>  		 "option alias path test failed\n");
+>  	of_node_put(np);
+>  
+> +	np = of_find_node_opts_by_path("testcase-alias:test/alias/option",
+> +				       &options);
+> +	selftest(np && !strcmp("test/alias/option", options),
+> +		 "option alias path test failed\n");
+> +	of_node_put(np);
+> +
+>  	np = of_find_node_opts_by_path("testcase-alias:testaliasoption", NULL);
+>  	selftest(np, "NULL option alias path test failed\n");
+>  	of_node_put(np);
 
-> 
-> Moreover, splitting a binding definition if you have a function given by
-> multiple banks can be weird and not well understood in regard to our
-> current group+function definition scheme (Cf. your last example).
-> 
+Could you give the below a spin, and if it works for you, send me the
+above tests as a full patch so that I can post both as a series?
 
-Others already do so and this is not complex at all
+Regards,
 
-Best Regards,
-J.
+Leif
 
-> 
->> +This allow to detect pinctrl issue at DT compiling time when disable a bank
->> +
->> +Required properties for iomux controller:
->> +- compatible: "atmel,at91rm9200-pio-pinctrl" or "atmel,at91sam9x5-pio-pinctrl"
->> +		or "atmel,sama5d3-pio-pinctrl"
->> +- atmel,mux-mask: array of mask (periph per bank) to describe if a pin can be
->> +  configured in this periph mode. All the periph and bank need to be describe.
->> +
->> +How to create such array:
->> +
->> +Each column will represent the possible peripheral of the pinctrl for the bank
->> +
->> +Take an example on the 9260
->> +Peripheral: 2 ( A and B)
->> +=>
->> +
->> +  /*    A         B     */
->> +  0xffffffff 0xffc00c3b  /* pioA */
->> +
->> +For each peripheral/bank we will descibe in a u32 if a pin can be
->> +configured in it by putting 1 to the pin bit (1 << pin)
->> +
->> +Required properties for pin configuration node:
->> +- atmel,pins: 3 integers array, represents a group of pins mux and config
->> +  setting. The format is atmel,pins = <PIN_NUM PERIPH CONFIG>.
->> +  The PERIPH 0 means gpio, PERIPH 1 is periph A, PERIPH 2 is periph B...
->> +
->> +Bits used for CONFIG:
->> +cf atmel,at91-pinctrl
->> +
->> +pioB: gpio at fffff600 {
->> +	compatible = "atmel,at91rm9200-gpio", "atmel,at91rm9200-pio-pinctrl";
->> +	reg = <0xfffff600 0x200>;
->> +	interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
->> +	#gpio-cells = <2>;
->> +	gpio-controller;
->> +	interrupt-controller;
->> +	#interrupt-cells = <2>;
->> +	clocks = <&pioB_clk>;
->> +
->> +			 /*    A         B     */
->> +	atmel,mux-mask = <0xffffffff 0x7fff3ccf>;
->> +
->> +	dbgu {
->> +		pinctrl_dbgu: dbgu-0 {
->> +			atmel,pins =
->> +				<14 0x1 0x0	/* PB14 periph A */
->> +				 15 0x1 0x1>;	/* PB15 periph A with pullup */
->> +		};
->> +	};
->> +};
->> +
->> +dbgu: serial at fffff200 {
->> +	compatible = "atmel,at91sam9260-usart";
->> +	reg = <0xfffff200 0x200>;
->> +	interrupts = <1 4 7>;
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_dbgu>;
->> +	status = "disabled";
->> +};
->> +
->> +if you have to use multiple bank
->> +	pinctrl-0 = <&pinctrl_ip_piaa>, <&pinctrl_ip_piab>;
->> 
-> 
-> Best regards,
-> -- 
-> Nicolas Ferre
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>From bf4ab0b2e33902ba88809a3c4a2cdf07efd02dde Mon Sep 17 00:00:00 2001
+From: Leif Lindholm <leif.lindholm@linaro.org>
+Date: Fri, 6 Mar 2015 16:38:54 +0000
+Subject: [PATCH] of: fix handling of '/' in options for of_find_node_by_path()
+
+Ensure proper handling of paths with appended options (after ':'),
+where those options may contain a '/'.
+
+Fixes: 7914a7c5651a ("of: support passing console options with stdout-path")
+Reported-by: Peter Hurley <peter@hurleysoftware.com>
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+---
+ drivers/of/base.c | 23 +++++++++++++++--------
+ 1 file changed, 15 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 0a8aeb8..8b904e5 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -714,16 +714,17 @@ static struct device_node *__of_find_node_by_path(struct device_node *parent,
+ 						const char *path)
+ {
+ 	struct device_node *child;
+-	int len = strchrnul(path, '/') - path;
+-	int term;
++	int len;
++	const char *end;
+ 
++	end = strchr(path, ':');
++	if (!end)
++		end = strchrnul(path, '/');
++
++	len = end - path;
+ 	if (!len)
+ 		return NULL;
+ 
+-	term = strchrnul(path, ':') - path;
+-	if (term < len)
+-		len = term;
+-
+ 	__for_each_child_of_node(parent, child) {
+ 		const char *name = strrchr(child->full_name, '/');
+ 		if (WARN(!name, "malformed device_node %s\n", child->full_name))
+@@ -768,8 +769,12 @@ struct device_node *of_find_node_opts_by_path(const char *path, const char **opt
+ 
+ 	/* The path could begin with an alias */
+ 	if (*path != '/') {
+-		char *p = strchrnul(path, '/');
+-		int len = separator ? separator - path : p - path;
++		int len;
++		const char *p = separator;
++
++		if (!p)
++			p = strchrnul(path, '/');
++		len = p - path;
+ 
+ 		/* of_aliases must not be NULL */
+ 		if (!of_aliases)
+@@ -794,6 +799,8 @@ struct device_node *of_find_node_opts_by_path(const char *path, const char **opt
+ 		path++; /* Increment past '/' delimiter */
+ 		np = __of_find_node_by_path(np, path);
+ 		path = strchrnul(path, '/');
++		if (separator && separator < path)
++			break;
+ 	}
+ 	raw_spin_unlock_irqrestore(&devtree_lock, flags);
+ 	return np;
+-- 
+2.1.4
