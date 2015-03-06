@@ -1,41 +1,118 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 6 Mar 2015 16:04:21 +0800
-Subject: [PATCH 2/2] ARM: imx6sl-evk: set swbst_reg as vbus's parent reg
-In-Reply-To: <1425629061-8995-1-git-send-email-peter.chen@freescale.com>
-References: <1425629061-8995-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1425629061-8995-2-git-send-email-peter.chen@freescale.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri,  6 Mar 2015 09:11:26 +0100
+Subject: [PATCH v2 1/2] net/macb: unify clock management
+In-Reply-To: <1425622439-2372-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1425622439-2372-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1425629486-6180-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-USB vbus 5V is from PMIC SWBST, so set swbst_reg as vbus's
-parent reg, it fixed a bug that the voltage of vbus is incorrect
-due to swbst_reg is disabled after boots up.
+From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
-Cc: stable <stable@vger.kernel.org>
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
+Most of the functions from the Common Clk Framework handle NULL pointer as
+input argument.
+
+Since the TX clock is optional, we now set tx_clk to NULL value
+instead of ERR_PTR(-ENOENT) when this clock is not available. This simplifies
+the clock management and avoid the need to test tx_clk value.
+
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/imx6sl-evk.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/net/ethernet/cadence/macb.c | 31 ++++++++++++++-----------------
+ 1 file changed, 14 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
-index fda4932..945887d 100644
---- a/arch/arm/boot/dts/imx6sl-evk.dts
-+++ b/arch/arm/boot/dts/imx6sl-evk.dts
-@@ -52,6 +52,7 @@
- 			regulator-max-microvolt = <5000000>;
- 			gpio = <&gpio4 0 0>;
- 			enable-active-high;
-+			vin-supply = <&swbst_reg>;
- 		};
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index a7dbf04..a429cf8 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -213,6 +213,9 @@ static void macb_set_tx_clk(struct clk *clk, int speed, struct net_device *dev)
+ {
+ 	long ferr, rate, rate_rounded;
  
- 		reg_usb_otg2_vbus: regulator at 1 {
-@@ -62,6 +63,7 @@
- 			regulator-max-microvolt = <5000000>;
- 			gpio = <&gpio4 2 0>;
- 			enable-active-high;
-+			vin-supply = <&swbst_reg>;
- 		};
++	if (!clk)
++		return;
++
+ 	switch (speed) {
+ 	case SPEED_10:
+ 		rate = 2500000;
+@@ -292,8 +295,7 @@ static void macb_handle_link_change(struct net_device *dev)
  
- 		reg_aud3v: regulator at 2 {
+ 	spin_unlock_irqrestore(&bp->lock, flags);
+ 
+-	if (!IS_ERR(bp->tx_clk))
+-		macb_set_tx_clk(bp->tx_clk, phydev->speed, dev);
++	macb_set_tx_clk(bp->tx_clk, phydev->speed, dev);
+ 
+ 	if (status_change) {
+ 		if (phydev->link) {
+@@ -2244,6 +2246,8 @@ static int macb_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	tx_clk = devm_clk_get(&pdev->dev, "tx_clk");
++	if (IS_ERR(tx_clk))
++		tx_clk = NULL;
+ 
+ 	err = clk_prepare_enable(pclk);
+ 	if (err) {
+@@ -2257,13 +2261,10 @@ static int macb_probe(struct platform_device *pdev)
+ 		goto err_out_disable_pclk;
+ 	}
+ 
+-	if (!IS_ERR(tx_clk)) {
+-		err = clk_prepare_enable(tx_clk);
+-		if (err) {
+-			dev_err(&pdev->dev, "failed to enable tx_clk (%u)\n",
+-				err);
+-			goto err_out_disable_hclk;
+-		}
++	err = clk_prepare_enable(tx_clk);
++	if (err) {
++		dev_err(&pdev->dev, "failed to enable tx_clk (%u)\n", err);
++		goto err_out_disable_hclk;
+ 	}
+ 
+ 	err = -ENOMEM;
+@@ -2436,8 +2437,7 @@ err_out_unregister_netdev:
+ err_out_free_netdev:
+ 	free_netdev(dev);
+ err_out_disable_clocks:
+-	if (!IS_ERR(tx_clk))
+-		clk_disable_unprepare(tx_clk);
++	clk_disable_unprepare(tx_clk);
+ err_out_disable_hclk:
+ 	clk_disable_unprepare(hclk);
+ err_out_disable_pclk:
+@@ -2461,8 +2461,7 @@ static int macb_remove(struct platform_device *pdev)
+ 		kfree(bp->mii_bus->irq);
+ 		mdiobus_free(bp->mii_bus);
+ 		unregister_netdev(dev);
+-		if (!IS_ERR(bp->tx_clk))
+-			clk_disable_unprepare(bp->tx_clk);
++		clk_disable_unprepare(bp->tx_clk);
+ 		clk_disable_unprepare(bp->hclk);
+ 		clk_disable_unprepare(bp->pclk);
+ 		free_netdev(dev);
+@@ -2480,8 +2479,7 @@ static int __maybe_unused macb_suspend(struct device *dev)
+ 	netif_carrier_off(netdev);
+ 	netif_device_detach(netdev);
+ 
+-	if (!IS_ERR(bp->tx_clk))
+-		clk_disable_unprepare(bp->tx_clk);
++	clk_disable_unprepare(bp->tx_clk);
+ 	clk_disable_unprepare(bp->hclk);
+ 	clk_disable_unprepare(bp->pclk);
+ 
+@@ -2496,8 +2494,7 @@ static int __maybe_unused macb_resume(struct device *dev)
+ 
+ 	clk_prepare_enable(bp->pclk);
+ 	clk_prepare_enable(bp->hclk);
+-	if (!IS_ERR(bp->tx_clk))
+-		clk_prepare_enable(bp->tx_clk);
++	clk_prepare_enable(bp->tx_clk);
+ 
+ 	netif_device_attach(netdev);
+ 
 -- 
 1.9.1
