@@ -1,48 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 6 Mar 2015 13:10:26 +0000
-Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
- IRQF_NO_SUSPEND
-In-Reply-To: <CAJZ5v0jA-hRUnP_+mOdFw7vN7CGZ4o0FjUVu81rq7foi92f63g@mail.gmail.com>
-References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
- <CAJZ5v0h8vn26BeWPVhC4e_KNhBu15-mshnbq0K=OQ1M36vPQEQ@mail.gmail.com>
- <20150305163227.GF14093@leverpostej>
- <1696230.CygTkv53VA@vostro.rjw.lan>
- <20150306110618.GC8700@leverpostej>
- <CAJZ5v0jA-hRUnP_+mOdFw7vN7CGZ4o0FjUVu81rq7foi92f63g@mail.gmail.com>
-Message-ID: <20150306131025.GH8700@leverpostej>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 6 Mar 2015 14:18:43 +0100
+Subject: [PATCH 1/2] arm64: mediatek: Select PINCTRL for Mediatek platform
+In-Reply-To: <1425623091-30478-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1425623091-30478-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <CABuKBeKBDQ0uqH2ssuRFHV=77_cVYddZMzJR-SsN44U245imvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> > We seem to be conflating some related properties:
-> >> >
-> >> > [a] The IRQ will be left unmasked.
-> >> > [b] The IRQ will be handled immediately when taken.
-> >> > [c] The IRQ will wake the system from suspend.
+2015-03-06 7:24 GMT+01:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
+> These 2 patches are fixup for MT8173 pinctrl driver:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/320066.html
+>
+> Arm64 maintainers doesn't want to add MACH_* in Kconfig, this patch
+> is used to replace the first one in that series.
+>
+> Matthias,
+> Can you take this one?
+>
+> ----------------------------------
+> MediaTek SoC expect to work with a pinctrl driver.
+> Select PINCTRL if ARCH_MEDIATEK is selected.
+>
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 
-[...]
+applied to v4.0-next/arm64
 
-> > Considering that the use-case of a watchdog is to alert us to something
-> > going hideously wrong in the kernel, we want to handle the IRQ after
-> > executing the smallest amount of kernel code possible. For that, they
-> > need to have their handlers to be called "immediately" outside of the
-> > arch_suspend_disable_irqs() ... arch_suspend_enable_irqs() window, and
-> > need to be enabled during suspend to attempt to catch bad wakeup device
-> > configuration.
-> >
-> > I think it's possible (assuming the caveats on [b] above) to provide
-> > [a,b,c] for this case.
-> 
-> OK
-> 
-> But in this case the request_irq() passing IRQF_NO_SUSPEND *and* requiring
-> enable_irq_wake() in addition to that needs a big fat comment explaining the
-> whole thing or we'll forget about the gory details at one point and no one will
-> know what's going on in there.
+> ---
+>  arch/arm64/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index e627ead..a2ddd3f 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -151,6 +151,7 @@ menu "Platform selection"
+>  config ARCH_MEDIATEK
+>         bool "Mediatek MT65xx & MT81xx ARMv8 SoC"
+>         select ARM_GIC
+> +       select PINCTRL
+>         help
+>           Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
+>
+> --
+> 1.8.1.1.dirty
+>
 
-Agreed.
 
-I'd expect an IRQF_SW_WATCHDOG or something to that effect should also
-be required for that case.
 
-Thanks,
-Mark.
+-- 
+motzblog.wordpress.com
