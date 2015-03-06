@@ -1,131 +1,56 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 6 Mar 2015 17:33:37 +0800
-Subject: [PATCH v5 20/29] PCI: Introduce pci_bus_child_max_busnr()
-In-Reply-To: <1425634426-437-1-git-send-email-wangyijing@huawei.com>
-References: <1425634426-437-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1425634426-437-21-git-send-email-wangyijing@huawei.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Fri, 06 Mar 2015 18:43:03 +0900
+Subject: [GIT PULL 2/2] Samsung fixes-2 for v4.0
+In-Reply-To: <CABxcv=nTi_+qkNhw=4NypNnR795cX4QUsWLOR4S+2w3suXvz5g@mail.gmail.com>
+References: <54F4B33E.3070803@kernel.org> <2064108.qlOP0oDx90@wuerfel>
+ <20154650.hb5Lekq8n0@wuerfel>
+ <CABxcv=nTi_+qkNhw=4NypNnR795cX4QUsWLOR4S+2w3suXvz5g@mail.gmail.com>
+Message-ID: <027501d057f1$f13a5090$d3aef1b0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes, we need to know the highest reserved
-busnr for children bus. Because parent's
-bus->busn_res could have padding in it.
-This function return the max child busnr as
-pci_scan_child_bus().
+Javier Martinez Canillas wrote:
+> 
+> Hello Arnd,
+> 
+Hi,
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
----
- drivers/pci/hotplug/acpiphp_glue.c |   29 +----------------------------
- drivers/pci/pci.c                  |   27 +++++++++++++++++++++++++--
- include/linux/pci.h                |    2 +-
- 3 files changed, 27 insertions(+), 31 deletions(-)
+> On Thu, Mar 5, 2015 at 12:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 04 March 2015 21:04:40 Arnd Bergmann wrote:
+> >> On Tuesday 03 March 2015 04:00:14 Kukjin Kim wrote:
+> >> > Please pull Samsung tmu and hdmi regression fixes for v4.0 and I know
+> >> > this is quite big for fixes but I couldn't handle this series for
+> >> > previous merge window because of dependency with driver side...sorry for
+> >> > that and please pull so that we could support them in v4.0 on exynos
+> >> > platforms.
+> >>
+> >> What kind of dependency do you have there? It really should not be
+> >> necessary to wait for driver changes, unless you do an incompatible
+> >> DT binding change, which you should avoid.
+> >>
+> >> I've pulled it into fixes, but won't forward it until I hear a
+> >> good explanation.
+> >
+> > Even with both fixes-1 and fixes-2 applied, we still get boot failures
+> > on Exynos:
+> >
+> > http://arm-soc.lixom.net/bootlogs/arm-soc/v4.0-rc2-104-g2ee4716/
+> >
+> > Any idea what is going on?
+> >
+> 
+> Yes, the problem is the Exynos DRM driver which has a lot of issues.
+> It's broken if CONFIG_DRM_EXYNOS_IOMMU is enabled which defaults to
+> yes after commit 8dcc14f82f06 ("drm/exynos: IOMMU support should not
+> be selectable by user").
+> 
+> I posted a patch to disable IOMMU support on Exynos to avoid these
+> boot failures and also mentioned to Kukjin that it should be a fix for
+> 4.0 [0]. But even with IOMMU disabled, the Exynos DRM is broken in
+> some boards [1] so we may have to disable that driver until everything
+> gets sorted out and is stable again.
+> 
+Yes, the fix is in my tree and it will be sent to upstream via arm-soc soon.
 
-diff --git a/drivers/pci/hotplug/acpiphp_glue.c b/drivers/pci/hotplug/acpiphp_glue.c
-index bcb90e4..84f2584 100644
---- a/drivers/pci/hotplug/acpiphp_glue.c
-+++ b/drivers/pci/hotplug/acpiphp_glue.c
-@@ -397,33 +397,6 @@ static void cleanup_bridge(struct acpiphp_bridge *bridge)
- 	acpi_unlock_hp_context();
- }
- 
--/**
-- * acpiphp_max_busnr - return the highest reserved bus number under the given bus.
-- * @bus: bus to start search with
-- */
--static unsigned char acpiphp_max_busnr(struct pci_bus *bus)
--{
--	struct pci_bus *tmp;
--	unsigned char max, n;
--
--	/*
--	 * pci_bus_max_busnr will return the highest
--	 * reserved busnr for all these children.
--	 * that is equivalent to the bus->subordinate
--	 * value.  We don't want to use the parent's
--	 * bus->subordinate value because it could have
--	 * padding in it.
--	 */
--	max = bus->busn_res.start;
--
--	list_for_each_entry(tmp, &bus->children, node) {
--		n = pci_bus_max_busnr(tmp);
--		if (n > max)
--			max = n;
--	}
--	return max;
--}
--
- static void acpiphp_set_acpi_region(struct acpiphp_slot *slot)
- {
- 	struct acpiphp_func *func;
-@@ -489,7 +462,7 @@ static void enable_slot(struct acpiphp_slot *slot)
- 	LIST_HEAD(add_list);
- 
- 	acpiphp_rescan_slot(slot);
--	max = acpiphp_max_busnr(bus);
-+	max = pci_bus_child_max_busnr(bus);
- 	for (pass = 0; pass < 2; pass++) {
- 		list_for_each_entry(dev, &bus->devices, bus_list) {
- 			if (PCI_SLOT(dev->devfn) != slot->device)
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index c49eec1..0001896 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -108,7 +108,7 @@ static bool pcie_ari_disabled;
-  * Given a PCI bus, returns the highest PCI bus number present in the set
-  * including the given PCI bus and its list of child PCI buses.
-  */
--unsigned char pci_bus_max_busnr(struct pci_bus *bus)
-+static unsigned char pci_bus_max_busnr(struct pci_bus *bus)
- {
- 	struct pci_bus *tmp;
- 	unsigned char max, n;
-@@ -121,7 +121,30 @@ unsigned char pci_bus_max_busnr(struct pci_bus *bus)
- 	}
- 	return max;
- }
--EXPORT_SYMBOL_GPL(pci_bus_max_busnr);
-+
-+unsigned char pci_bus_child_max_busnr(struct pci_bus *bus)
-+{
-+	struct pci_bus *tmp;
-+	unsigned char max, n;
-+
-+	/*
-+	 * pci_bus_max_busnr will return the highest
-+	 * reserved busnr for all these children.
-+	 * that is equivalent to the bus->subordinate
-+	 * value.  We don't want to use the parent's
-+	 * bus->subordinate value because it could have
-+	 * padding in it.
-+	 */
-+	max = bus->busn_res.start;
-+
-+	list_for_each_entry(tmp, &bus->children, node) {
-+		n = pci_bus_max_busnr(tmp);
-+		if (n > max)
-+			max = n;
-+	}
-+	return max;
-+}
-+EXPORT_SYMBOL_GPL(pci_bus_child_max_busnr);
- 
- #ifdef CONFIG_HAS_IOMEM
- void __iomem *pci_ioremap_bar(struct pci_dev *pdev, int bar)
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index cfaf217..261b8de 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1181,7 +1181,7 @@ int pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
- void pci_walk_bus(struct pci_bus *top, int (*cb)(struct pci_dev *, void *),
- 		  void *userdata);
- int pci_cfg_space_size(struct pci_dev *dev);
--unsigned char pci_bus_max_busnr(struct pci_bus *bus);
-+unsigned char pci_bus_child_max_busnr(struct pci_bus *bus);
- void pci_setup_bridge(struct pci_bus *bus);
- resource_size_t pcibios_window_alignment(struct pci_bus *bus,
- 					 unsigned long type);
--- 
-1.7.1
+Thanks,
+Kukjin
