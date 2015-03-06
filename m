@@ -1,9 +1,10 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri,  6 Mar 2015 19:03:59 +0100
-Subject: [PATCH 1/8] ARM: dts: rockchip: relicense rk3xxx.dtsi under GPLv2/X11
+Date: Fri,  6 Mar 2015 19:04:04 +0100
+Subject: [PATCH 6/8] ARM: dts: rockchip: relicense rk3066a-bqcurie2.dts under
+ GPLv2/X11
 In-Reply-To: <1425665046-22927-1-git-send-email-heiko@sntech.de>
 References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
-Message-ID: <1425665046-22927-2-git-send-email-heiko@sntech.de>
+Message-ID: <1425665046-22927-7-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,25 +12,24 @@ GPLv2-only devicetrees make reuse difficult for software components licensed
 under a different license.
 
 The consensus is that a GPL/X11 dual-license should allow all necessary uses,
-so relicense the rk3xxx.dtsi to this combination.
+so relicense the rk3066a-bqcurie2.dts to this combination.
 
 CCs were aquired by git shortlog -sne so it should've hopefully catched
 every contributor.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Cc: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
 Cc: Beniamino Galvani <b.galvani@gmail.com>
-Cc: Romain Perier <romain.perier@gmail.com>
+Cc: Jaehoon Chung <jh80.chung@samsung.com>
 ---
 I'm hoping to get Acked-by tags from the people in the Cc-list.
 
- arch/arm/boot/dts/rk3xxx.dtsi | 44 +++++++++++++++++++++++++++++++++++--------
+ arch/arm/boot/dts/rk3066a-bqcurie2.dts | 44 +++++++++++++++++++++++++++-------
  1 file changed, 36 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-index c54a971..a2ae9f3 100644
---- a/arch/arm/boot/dts/rk3xxx.dtsi
-+++ b/arch/arm/boot/dts/rk3xxx.dtsi
+diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+index baf21ac..b299b26 100644
+--- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
++++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
 @@ -2,15 +2,43 @@
   * Copyright (c) 2013 MundoReader S.L.
   * Author: Heiko Stuebner <heiko@sntech.de>
@@ -81,6 +81,6 @@ index c54a971..a2ae9f3 100644
 + *     OTHER DEALINGS IN THE SOFTWARE.
   */
  
- #include <dt-bindings/interrupt-controller/irq.h>
+ /dts-v1/;
 -- 
 2.1.4
