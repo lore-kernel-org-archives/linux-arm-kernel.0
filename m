@@ -1,79 +1,43 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 6 Mar 2015 18:06:36 +0000
-Subject: [PATCH v9 12/21] ACPI / table: Print GIC information when MADT
- is parsed
-In-Reply-To: <1424853601-6675-13-git-send-email-hanjun.guo@linaro.org>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <1424853601-6675-13-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150306180636.GB26888@e102568-lin.cambridge.arm.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 6 Mar 2015 10:10:00 -0800
+Subject: [PATCH 8/8] ARM: dts: rockchip: relicense rk3288-evb* under
+ GPLv2/X11
+In-Reply-To: <1425665046-22927-9-git-send-email-heiko@sntech.de>
+References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
+ <1425665046-22927-9-git-send-email-heiko@sntech.de>
+Message-ID: <CAD=FV=WD69252+KGce_sri2D3M3sWGh+EPXePZv+RgVJun9VyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 08:39:52AM +0000, Hanjun Guo wrote:
-> When MADT is parsed, print GIC information as debug message:
-> 
-> ACPI: GICC (acpi_id[0x0000] address[00000000e112f000] MPIDR[0x0] enabled)
-> ACPI: GICC (acpi_id[0x0001] address[00000000e112f000] MPIDR[0x1] enabled)
-> ...
-> ACPI: GICC (acpi_id[0x0201] address[00000000e112f000] MPIDR[0x201] enabled)
-> 
-> Those debug information will be very helpful to bring up early systems to
-> see if acpi_id and MPIDR are matched or not as spec defined.
+Heiko,
 
-Nit: "This debug information"
-
-> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Tested-by: Yijing Wang <wangyijing@huawei.com>
-> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-> Tested-by: Jon Masters <jcm@redhat.com>
-> Tested-by: Timur Tabi <timur@codeaurora.org>
-> Tested-by: Robert Richter <rrichter@cavium.com>
-> Acked-by: Robert Richter <rrichter@cavium.com>
-> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
+On Fri, Mar 6, 2015 at 10:04 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> GPLv2-only devicetrees make reuse difficult for software components licensed
+> under a different license.
+>
+> The consensus is that a GPL/X11 dual-license should allow all necessary uses,
+> so relicense the rk3288-evb files to this combination.
+>
+> CCs were aquired by git shortlog -sne so it should've hopefully catched
+> every contributor.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Chris Zhong <zyw@rock-chips.com>
+> Cc: Roger Chen <roger.chen@rock-chips.com>
+> Cc: Romain Perier <romain.perier@gmail.com>
+> Cc: Caesar Wang <caesar.wang@rock-chips.com>
+> Cc: Kever Yang <kever.yang@rock-chips.com>
+> Cc: Yunzhi Li <lyz@rock-chips.com>
 > ---
->  drivers/acpi/tables.c | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
-> 
-> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
-> index f4e5b88..2e19189 100644
-> --- a/drivers/acpi/tables.c
-> +++ b/drivers/acpi/tables.c
-> @@ -185,6 +185,28 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
->  		}
->  		break;
->  
-> +	case ACPI_MADT_TYPE_GENERIC_INTERRUPT:
-> +		{
-> +			struct acpi_madt_generic_interrupt *p =
-> +				(struct acpi_madt_generic_interrupt *)header;
-> +			pr_debug("GICC (acpi_id[0x%04x] address[%llx] MPIDR[0x%llx] %s)\n",
-> +				 p->uid, p->base_address,
-> +				 p->arm_mpidr,
-> +				 (p->flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
-> +
-> +		}
-> +		break;
-> +
-> +	case ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR:
-> +		{
-> +			struct acpi_madt_generic_distributor *p =
-> +				(struct acpi_madt_generic_distributor *)header;
-> +			pr_debug("GIC Distributor (gic_id[0x%04x] address[%llx] gsi_base[%d])\n",
-> +				 p->gic_id, p->base_address,
-> +				 p->global_irq_base);
-> +		}
-> +		break;
-> +
->  	default:
->  		pr_warn("Found unsupported MADT entry (type = 0x%x)\n",
->  			header->type);
-> -- 
-> 1.9.1
-> 
-> 
+> I'm hoping to get Acked-by tags from the people in the Cc-list.
+>
+>  arch/arm/boot/dts/rk3288-evb-act8846.dts | 44 ++++++++++++++++++++++++++------
+>  arch/arm/boot/dts/rk3288-evb-rk808.dts   | 44 ++++++++++++++++++++++++++------
+>  arch/arm/boot/dts/rk3288-evb.dtsi        | 44 ++++++++++++++++++++++++++------
+>  3 files changed, 108 insertions(+), 24 deletions(-)
+
+I didn't read every word of the text, but dual licensing should be
+fine from my point of view.
+
+Acked-by: Doug Anderson <dianders@chromium.org>
