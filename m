@@ -1,90 +1,84 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 06 Mar 2015 01:29:03 +0100
-Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
- IRQF_NO_SUSPEND
-In-Reply-To: <20150305163227.GF14093@leverpostej>
-References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
- <CAJZ5v0h8vn26BeWPVhC4e_KNhBu15-mshnbq0K=OQ1M36vPQEQ@mail.gmail.com>
- <20150305163227.GF14093@leverpostej>
-Message-ID: <1696230.CygTkv53VA@vostro.rjw.lan>
+Date: Fri, 06 Mar 2015 01:42:33 +0100
+Subject: [PATCH v9 16/21] irqchip: Add GICv2 specific ACPI boot support
+In-Reply-To: <20150305115322.GC7712@e104818-lin.cambridge.arm.com>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <5921774.hkUTDjxi3A@vostro.rjw.lan>
+ <20150305115322.GC7712@e104818-lin.cambridge.arm.com>
+Message-ID: <2059307.pqvrarRxyo@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 05, 2015 04:32:27 PM Mark Rutland wrote:
-> Hi Rafael,
-> 
-> > enable_irq_wake() has no effect on IRQF_NO_SUSPEND interrupts, so if the
-> > driver uses IRQF_NO_SUSPEND, it does not need to use enable_irq_wake()
-> > in addition to that.
-> 
-> That's not generally true -- certainly not for irq_chips without the
-> IRQCHIP_SKIP_SET_WAKE flag.
-> 
-> Consider systems where the suspended state results in power to the CPU
-> being cut, and we rely on an external piece of logic attached to the
-> irq_chip to detect wakeup IRQs and restore power.
-> 
-> In those cases irq_chip::irq_set_wake() must be called to ensure that
-> the wakeup logic is configured. If the wakeup logic is not configured to
-> look out for an IRQ, then when the IRQ is asserted by a device the
-> wakeup logic may not trigger. Thus the CPU power never gets restored, so
-> the CPU cannot handle the interrupt.
-> 
-> This is handled in enable_irq_wake() -- either the chip has the
-> IRQCHIP_SKIP_SET_WAKE flag set or chip->irq_set_wake() must succeed. If
-> neither is true enable_irq_wake() will return an error code to indicate
-> we can't use the IRQ for wakeup.
+On Thursday, March 05, 2015 11:53:22 AM Catalin Marinas wrote:
+> On Wed, Mar 04, 2015 at 11:50:36PM +0100, Rafael J. Wysocki wrote:
+> > On Wednesday, February 25, 2015 04:39:56 PM Hanjun Guo wrote:
 
-Right.  I forgot about that part.
+[cut]
 
-> The request_irq path never results in a call to chip->irq_set_wake(),
-> even with the IRQF_NO_SUSPEND flag. So requesting an irq with
-> IRQF_NO_SUSPEND does not guarantee wakeup; it only guarantees that the
-> CPU can take the interrupt _around_ the suspended state, not necessarily
-> while _in_ the suspended state.
-
-Right.  "Suspended state" meaning full suspend here I suppose?
-
-> > Drivers using IRQF_COND_SUSPEND generally should use enable_irq_wake() too
-> > in case they end up in a situation without sharing a NO_SUSPEND interrupt, in
-> > which case their interrupt handlers won't be called after suspend_device_irqs(),
-> > so they need to rely on the core to do the wakeup.
+> > > diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> > > index c03d8d1..e27117a 100644
+> > > --- a/include/linux/acpi.h
+> > > +++ b/include/linux/acpi.h
+> > > @@ -557,6 +557,20 @@ static inline int acpi_device_modalias(struct device *dev,
+> > >  
+> > >  #endif	/* !CONFIG_ACPI */
+> > >  
+> > > +#if defined(CONFIG_ACPI) && defined(CONFIG_ARM64)
+> > > +static inline void acpi_irq_init(void)
+> > > +{
+> > > +	/*
+> > > +	 * Hardcode ACPI IRQ chip initialization to GICv2 for now.
+> > > +	 * Proper irqchip infrastructure will be implemented along with
+> > > +	 * incoming  GICv2m|GICv3|ITS bits.
+> > > +	 */
+> > > +	acpi_gic_init();
+> > > +}
+> > > +#else
+> > > +static inline void acpi_irq_init(void) { }
+> > > +#endif
 > > 
-> > > I agree that if problematic, it's an existing bug. Given Boris's
-> > > comments in the other thread this may just a minor semantic issue w.r.t.
-> > > IRQF_NO_SUSPEND vs IRQF_COND_SUSPEND.
-> > 
-> > It depends on whether or not the watchdog's interrupt handler has to be
-> > called immediately after receiving an interrupt (IRQF_NO_SUSPEND is
-> > better then) or it can be deferred till the resume_device_irqs() time.
+> > I don't want this in a common header.
 > 
-> We seem to be conflating some related properties:
+> I don't like it either. What about adding it to a new header,
+> linux/acpi_irq.h just for the dummy acpi_irq_init()? This would be
+> similar to the DT equivalent, of_irq_init() in linux/of_irq.h and at
+> some point it will gain more macros for declaring interrupt controllers
+> in the ACPI context.
 > 
-> [a] The IRQ will be left unmasked.
-> [b] The IRQ will be handled immediately when taken.
-> [c] The IRQ will wake the system from suspend.
+> What we objected to previously was calling acpi_gic_init() directly from
+> the core irqchip_init() and asked for something similar to the more
+> generic of_irq_init(). The arm64-specific patch above is clearly a
+> temporary hack until full support for multiple interrupt controllers is
+> added (we asked for this several times in the past, but the ARM ACPI
+> guys thought it's too much hassle ;). I don't fully get it since one of
+> the platforms they target needs GICv2m support anyway).
 > 
-> Requesting an IRQ with IRQF_NO_SUSPEND guarantees [a,b], but does not
-> guarantee [c].
+> Anyway, if we are to keep the temporary hack, I think we could define
+> something like below (possibly in a new linux/acpi_irq.h which includes
+> asm/irq.h):
+> 
+> #ifndef acpi_irq_init
+> static inline void acpi_irq_init(void)
+> {
+> }
+> #endif
+> 
+> And in the arm64 asm/irq.h:
+> 
+> static inline void acpi_irq_init(void)
+> {
+> 	/*
+> 	 * Hardcode ACPI IRQ chip initialization to GICv2 for now.
+> 	 * Proper irqchip infrastructure will be implemented along with
+> 	 * incoming  GICv2m|GICv3|ITS bits.
+> 	 */
+> 	acpi_gic_init();
+> }
+> #define acpi_irq_init acpi_irq_init
+> 
+> When the new infrastructure is in place, we can get rid of the #ifndef
+> and arm64-specific acpi_irq_init().
 
-That's correct.  IRQF_NO_SUSPEND does not guarantee that interrupts from
-that IRQ will have any effect after arch_suspend_disable_irqs() in
-suspend_enter().
-
-> A successful enable_irq_wake() on an IRQ guarantees [a,c], but usually
-> does not give [b] unless the IRQ was requested with IRQF_COND_SUSPEND
-> and happens to be shared with an IRQF_NO_SUSPEND user.
-
-That's correct too.
-
-> It sounds like for this kind of watchdog device we want [a,b,c], even if
-> the IRQ is not shared with an IRQF_NO_SUSPEND user.
-
-We can't guarantee that, though.  arch_suspend_disable_irqs() disables
-interrupts on the last working CPU and it won't get any.  It may be
-brought out of a low-power state by a pending interrupt, but it won't act
-upon that interrupt immediately anyway, only after the arch_suspend_enable_irqs()
-in suspend_enter().  But then it might as well be deferred until after
-resume_device_irqs().
+Well, that sounds much better than the original patch.
 
 Rafael
