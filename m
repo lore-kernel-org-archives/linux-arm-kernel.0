@@ -1,83 +1,40 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 Mar 2015 16:37:45 +0000
-Subject: [PATCH 06/11] irqchip: gic-v3: fix out of bounds access to
- cpu_logical_map
+Date: Fri,  6 Mar 2015 16:37:46 +0000
+Subject: [PATCH 07/11] irqchip: gicv3-its: zero itt before handling to hardware
 In-Reply-To: <1425659870-11832-1-git-send-email-marc.zyngier@arm.com>
 References: <1425659870-11832-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1425659870-11832-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1425659870-11832-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Murzin <vladimir.murzin@arm.com>
+From: Yun Wu <wuyun.wu@huawei.com>
 
-While playing with KASan support for arm64/arm the following appeared on boot:
+Some kind of brain-dead implementations chooses to insert ITEes in
+rapid sequence of disabled ITEes, and an un-zeroed ITT will confuse
+ITS on judging whether an ITE is really enabled or not. Considering
+the implementations are still supported by the GICv3 architecture,
+in which ITT is not required to be zeroed before being handled to
+hardware, we do the favor in ITS driver.
 
-==================================================================
-BUG: AddressSanitizer: out of bounds access in __asan_load8+0x14/0x1c at addr ffffffc000ad0dc0
-Read of size 8 by task swapper/0/1
-page:ffffffbdc202b400 count:1 mapcount:0 mapping:          (null) index:0x0
-flags: 0x400(reserved)
-page dumped because: kasan: bad access detected
-Address belongs to variable __cpu_logical_map+0x200/0x220
-CPU: 2 PID: 1 Comm: swapper/0 Not tainted 3.19.0-rc6-next-20150129+ #481
-Hardware name: FVP Base (DT)
-Call trace:
-[<ffffffc00008a794>] dump_backtrace+0x0/0x184
-[<ffffffc00008a928>] show_stack+0x10/0x1c
-[<ffffffc00075e46c>] dump_stack+0xa0/0xf8
-[<ffffffc0001df490>] kasan_report_error+0x23c/0x264
-[<ffffffc0001e0188>] check_memory_region+0xc0/0xe4
-[<ffffffc0001dedf0>] __asan_load8+0x10/0x1c
-[<ffffffc000431294>] gic_raise_softirq+0xc4/0x1b4
-[<ffffffc000091fc0>] smp_send_reschedule+0x30/0x3c
-[<ffffffc0000f0d1c>] try_to_wake_up+0x394/0x434
-[<ffffffc0000f0de8>] wake_up_process+0x2c/0x6c
-[<ffffffc0000d9570>] wake_up_worker+0x38/0x48
-[<ffffffc0000dbb50>] insert_work+0xac/0xec
-[<ffffffc0000dbd38>] __queue_work+0x1a8/0x374
-[<ffffffc0000dbf60>] queue_work_on+0x5c/0x7c
-[<ffffffc0000d8a78>] call_usermodehelper_exec+0x170/0x188
-[<ffffffc0004037b8>] kobject_uevent_env+0x650/0x6bc
-[<ffffffc000403830>] kobject_uevent+0xc/0x18
-[<ffffffc00040292c>] kset_register+0xa8/0xc8
-[<ffffffc0004d6c88>] bus_register+0x134/0x2e8
-[<ffffffc0004d73b4>] subsys_virtual_register+0x2c/0x5c
-[<ffffffc000a76a4c>] wq_sysfs_init+0x14/0x20
-[<ffffffc000082a28>] do_one_initcall+0xa8/0x1fc
-[<ffffffc000a70db4>] kernel_init_freeable+0x1ec/0x294
-[<ffffffc00075aa5c>] kernel_init+0xc/0xec
-Memory state around the buggy address:
- ffffff80003e0820: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
- ffffff80003e0830: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->ffffff80003e0840: fa fa fa fa 00 00 00 00 00 00 00 00 00 00 00 00
-                   ^
- ffffff80003e0850: 00 00 fa fa fa fa fa fa 00 00 00 00 00 00 00 00
-==================================================================
-
-The reason for that cpumask_next() returns >= nr_cpu_ids if no further cpus
-set, but "==" condition is checked only, so we end up with out-of-bounds
-access to cpu_logical_map.
-
-Fix is by using the condition check for cpumask_next.
-
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3.c | 2 +-
+ drivers/irqchip/irq-gic-v3-its.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 1c6dea2..fd8850d 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -466,7 +466,7 @@ static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
- 		tlist |= 1 << (mpidr & 0xf);
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 6850141..69eeea3 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1076,7 +1076,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
+ 	sz = nr_ites * its->ite_size;
+ 	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
+-	itt = kmalloc(sz, GFP_KERNEL);
++	itt = kzalloc(sz, GFP_KERNEL);
+ 	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
  
- 		cpu = cpumask_next(cpu, mask);
--		if (cpu == nr_cpu_ids)
-+		if (cpu >= nr_cpu_ids)
- 			goto out;
- 
- 		mpidr = cpu_logical_map(cpu);
+ 	if (!dev || !itt || !lpi_map) {
 -- 
 2.1.4
