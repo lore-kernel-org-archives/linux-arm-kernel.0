@@ -1,90 +1,120 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  6 Mar 2015 14:25:56 -0300
-Subject: [PATCH v2 1/3] ARM: imx25: Remove eukrea mx25 board files
-Message-ID: <1425662758-4675-1-git-send-email-festevam@gmail.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Fri, 6 Mar 2015 09:26:05 -0800
+Subject: [PATCH v3 2/3] pci: iproc: Add Broadcom iProc PCIe support
+In-Reply-To: <1425639640.24292.271.camel@x220>
+References: <1425603699-13416-1-git-send-email-rjui@broadcom.com>	
+ <1425603699-13416-3-git-send-email-rjui@broadcom.com>
+ <1425639640.24292.271.camel@x220>
+Message-ID: <54F9E32D.4090005@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Paul,
 
-eukrea mx25 is well supported in device tree, so let's get rid of its board
-files.
+On 3/6/2015 3:00 AM, Paul Bolle wrote:
+> On Thu, 2015-03-05 at 17:01 -0800, Ray Jui wrote:
+>> --- a/drivers/pci/host/Kconfig
+>> +++ b/drivers/pci/host/Kconfig
+>> @@ -106,4 +106,21 @@ config PCI_VERSATILE
+>>  	bool "ARM Versatile PB PCI controller"
+>>  	depends on ARCH_VERSATILE
+>>  
+>> +config PCIE_IPROC
+>> +	bool "Broadcom iProc PCIe controller"
+> 
+> bool symbol.
+> 
+>> +	help
+>> +	  This enables the iProc PCIe core controller support for Broadcom's
+>> +	  iProc family of SoCs. An appropriate bus interface driver also needs
+>> +	  to be enabled
+>> +
+>> +config PCIE_IPROC_PLTFM
+>> +	bool "Broadcom iProc PCIe platform bus driver"
+> 
+> Another bool symbol.
+> 
+>> +	depends on ARCH_BCM_IPROC || COMPILE_TEST
+>> +	depends on OF
+>> +	select PCIE_IPROC
+>> +	default ARCH_BCM_IPROC
+>> +	help
+>> +	  Say Y here if you want to use the Broadcom iProc PCIe controller
+>> +	  through the generic platform bus interface
+>> +
+>>  endmenu
+> 
+>> --- a/drivers/pci/host/Makefile
+>> +++ b/drivers/pci/host/Makefile
+> 
+>> +obj-$(CONFIG_PCIE_IPROC) += pcie-iproc.o
+>> +obj-$(CONFIG_PCIE_IPROC_PLTFM) += pcie-iproc-pltfm.o
+> 
+> Both objectfiles will never be part of a module.
+> 
+>> --- /dev/null
+>> +++ b/drivers/pci/host/pcie-iproc-pltfm.c
+> 
+>> +#include <linux/module.h>
+> 
+> Is this needed?
+> 
+>> +MODULE_DEVICE_TABLE(of, iproc_pcie_of_match_table);
+> 
+> This macro will be preprocessed away, won't it?
+> 
+>> +static struct platform_driver iproc_pcie_pltfm_driver = {
+>> +	.driver = {
+>> +		.name = "iproc-pcie",
+>> +		.of_match_table = of_match_ptr(iproc_pcie_of_match_table),
+>> +		.suppress_bind_attrs = true,
+>> +	},
+>> +	.probe = iproc_pcie_pltfm_probe,
+>> +};
+>> +module_platform_driver(iproc_pcie_pltfm_driver);
+> 
+> Perhaps it's clearer to have make this a call to
+> platform_driver_register(), put that in a wrapper function, and invoke
+> that wrapper function through device_initcall() or similar. I haven't
+> actually tested that, so the details could be off.
+> 
+>> +MODULE_AUTHOR("Ray Jui <rjui@broadcom.com>");
+>> +MODULE_DESCRIPTION("Broadcom iPROC PCIe platform driver");
+>> +MODULE_LICENSE("GPL v2");
+> 
+> And these three macros will, effectively, be preprocessed away.
+> 
+>> --- /dev/null
+>> +++ b/drivers/pci/host/pcie-iproc.c
+> 
+>> +#include <linux/module.h>
+> 
+> See above.
+> 
+>> +MODULE_AUTHOR("Ray Jui <rjui@broadcom.com>");
+>> +MODULE_DESCRIPTION("Broadcom iPROC PCIe common driver");
+>> +MODULE_LICENSE("GPL v2");
+> 
+> Ditto.
+> 
+> 
+> Paul Bolle
+> 
 
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- None
+So every single PCIe host driver under drivers/pci/host/* has their
+config flag of "bool" type, and all of them except pci-keystone-dw.c
+have these MODULE based macros in their driver. While I agree with you
+that these macros will preprocessed away while compiled as statically
+linked in, I thought it's a convention to have these macros in the
+driver. At least it provides information on the author, driver
+description, and license (although one can also argue you can find all
+of those info from the maintainer list, Kconfig, and license header).
 
- arch/arm/mach-imx/Kconfig                      |  32 ---
- arch/arm/mach-imx/Makefile                     |   2 -
- arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c | 310 -------------------------
- arch/arm/mach-imx/mach-eukrea_cpuimx25.c       | 172 --------------
- 4 files changed, 516 deletions(-)
- delete mode 100644 arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
- delete mode 100644 arch/arm/mach-imx/mach-eukrea_cpuimx25.c
+Would you be able to sort this out with a developer or subsystem
+maintainer who is familiar with this matter and let us know what is the
+convention for MODULE macros usage in a driver when its config flag is
+set to "bool" instead of "tristate"?
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 247a465..4861ad5 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -151,38 +151,6 @@ config MACH_MX21ADS
- 
- comment "MX25 platforms:"
- 
--config MACH_EUKREA_CPUIMX25SD
--	bool "Support Eukrea CPUIMX25 Platform"
--	select IMX_HAVE_PLATFORM_FLEXCAN
--	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
--	select IMX_HAVE_PLATFORM_IMX2_WDT
--	select IMX_HAVE_PLATFORM_IMXDI_RTC
--	select IMX_HAVE_PLATFORM_IMX_FB
--	select IMX_HAVE_PLATFORM_IMX_I2C
--	select IMX_HAVE_PLATFORM_IMX_UART
--	select IMX_HAVE_PLATFORM_MXC_EHCI
--	select IMX_HAVE_PLATFORM_MXC_NAND
--	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
--	select USB_ULPI_VIEWPORT if USB_ULPI
--	select SOC_IMX25
--
--choice
--	prompt "Baseboard"
--	depends on MACH_EUKREA_CPUIMX25SD
--	default MACH_EUKREA_MBIMXSD25_BASEBOARD
--
--config MACH_EUKREA_MBIMXSD25_BASEBOARD
--	bool "Eukrea MBIMXSD development board"
--	select IMX_HAVE_PLATFORM_GPIO_KEYS
--	select IMX_HAVE_PLATFORM_IMX_SSI
--	select IMX_HAVE_PLATFORM_SPI_IMX
--	select LEDS_GPIO_REGISTER
--	help
--	  This adds board specific devices that can be found on Eukrea's
--	  MBIMXSD evaluation board.
--
--endchoice
--
- config MACH_IMX25_DT
- 	bool "Support i.MX25 platforms from device tree"
- 	select SOC_IMX25
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index e92ede9..724b7fb 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -49,8 +49,6 @@ obj-$(CONFIG_MACH_IMX1_DT) += imx1-dt.o
- obj-$(CONFIG_MACH_MX21ADS) += mach-mx21ads.o
- 
- # i.MX25 based machines
--obj-$(CONFIG_MACH_EUKREA_CPUIMX25SD) += mach-eukrea_cpuimx25.o
--obj-$(CONFIG_MACH_EUKREA_MBIMXSD25_BASEBOARD) += eukrea_mbimxsd25-baseboard.o
- obj-$(CONFIG_MACH_IMX25_DT) += imx25-dt.o
- 
- # i.MX27 based machines
-diff --git a/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
-deleted file mode 100644
-index e77cc3af..0000000
-diff --git a/arch/arm/mach-imx/mach-eukrea_cpuimx25.c b/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
-deleted file mode 100644
-index b2ee6e0..0000000
--- 
-1.9.1
+Thanks,
+
+Ray
