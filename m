@@ -1,57 +1,39 @@
-From: macro@linux-mips.org (Maciej W. Rozycki)
-Date: Fri, 6 Mar 2015 11:58:31 +0000 (GMT)
-Subject: [PATCH 04/15] MIPS: Add sched_clock support
-In-Reply-To: <1425517137-26463-5-git-send-email-dengcheng.zhu@imgtec.com>
-References: <1425517137-26463-1-git-send-email-dengcheng.zhu@imgtec.com>
- <1425517137-26463-5-git-send-email-dengcheng.zhu@imgtec.com>
-Message-ID: <alpine.LFD.2.11.1503061146430.15786@eddie.linux-mips.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 6 Mar 2015 11:59:10 +0000
+Subject: [PATCH 1/2] iommu: move pgsize_bitmap from struct iommu_ops to
+ struct iommu_domain
+In-Reply-To: <3242222.7VyhtFfsx7@avalon>
+References: <1425641688-26438-1-git-send-email-will.deacon@arm.com>
+ <1425641688-26438-2-git-send-email-will.deacon@arm.com>
+ <3242222.7VyhtFfsx7@avalon>
+Message-ID: <20150306115909.GJ22377@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Mar 2015, Deng-Cheng Zhu wrote:
+On Fri, Mar 06, 2015 at 11:56:08AM +0000, Laurent Pinchart wrote:
+> Hi Will,
 
-> This will provide sched_clock interface to implement individual
-> read_sched_clock(). Not for CAVIUM_OCTEON_SOC as it defines its own
-> sched_clock() directly (not using the sched_clock_register interface).
+Hi Laurent,
+
+Cheers for taking a look.
+
+> On Friday 06 March 2015 11:34:47 Will Deacon wrote:
+> > diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
+> > index 10186cac7716..cd867b255b99 100644
+> > --- a/drivers/iommu/ipmmu-vmsa.c
+> > +++ b/drivers/iommu/ipmmu-vmsa.c
+> > @@ -469,6 +469,7 @@ static int ipmmu_domain_init(struct iommu_domain
+> > *io_domain)
+> > 
+> >  	io_domain->priv = domain;
+> >  	domain->io_domain = io_domain;
+> > +	domain->pgsize_bitmap = SZ_2M | SZ_64K | SZ_4K;
 > 
-> Signed-off-by: Deng-Cheng Zhu <dengcheng.zhu@imgtec.com>
-> ---
->  arch/mips/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
-> index 068592a..09405dc 100644
-> --- a/arch/mips/Kconfig
-> +++ b/arch/mips/Kconfig
-> @@ -43,6 +43,7 @@ config MIPS
->  	select GENERIC_SMP_IDLE_THREAD
->  	select BUILDTIME_EXTABLE_SORT
->  	select GENERIC_CLOCKEVENTS
-> +	select GENERIC_SCHED_CLOCK if !CAVIUM_OCTEON_SOC
->  	select GENERIC_CMOS_UPDATE
->  	select HAVE_MOD_ARCH_SPECIFIC
->  	select VIRT_TO_BUS
+> You're changing the bitmap, was it intended ?
 
- Why does this change add this question:
+Yikes, no, sorry about that. It looks like this is due to a bad rebase (I
+build tested everything, but don't have an ipmmu-vmsa to run on). You
+changed the bitmap in f20ed39f531 when you moved to the generic allocator
+and I didn't pick up the change here. Will fix.
 
-ARM Versatile (Express) reference platforms clock source (CLKSRC_VERSATILE) [N/y/?] (NEW) ?
-
-This option enables clock source based on free running
-counter available in the "System Registers" block of
-ARM Versatile, RealView and Versatile Express reference
-platforms.
-
-Symbol: CLKSRC_VERSATILE [=n]
-Type  : boolean
-Prompt: ARM Versatile (Express) reference platforms clock source
-  Location:
-    -> Device Drivers
-      -> Clock Source drivers
-  Defined at drivers/clocksource/Kconfig:216
-  Depends on: GENERIC_SCHED_CLOCK [=y] && !ARCH_USES_GETTIMEOFFSET [=n]
-  Selects: CLKSRC_OF [=n]
-
-to a MIPS configuration?  I find it silly, this appears a platform 
-device to me (use reverse dependencies?).
-
-  Maciej
+Will
