@@ -1,66 +1,32 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  6 Mar 2015 15:49:24 +0100
-Subject: [PATCH v2] efi/arm64: use UEFI for system reset and poweroff
-Message-ID: <1425653364-12591-1-git-send-email-ard.biesheuvel@linaro.org>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Fri,  6 Mar 2015 16:05:20 +0100
+Subject: [PATCH v2 02/10] ARM: berlin: select MFD_SYSCON by default
+In-Reply-To: <1425654328-26298-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1425654328-26298-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1425654328-26298-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If UEFI Runtime Services are available, they are preferred over direct
-PSCI calls or other methods to reset the system.
+The chip and system controller nodes handle sub-devices, such as the
+clock, pinctrl or reset controllers. The drivers handling them need a
+regmap provided by syscon. Select it by default when using a Berlin SoC.
 
-For the reset case, we need to hook into machine_restart(), as the
-arm_pm_restart function pointer may be overwritten by modules.
-
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm64/kernel/efi.c     | 9 +++++++++
- arch/arm64/kernel/process.c | 8 ++++++++
- 2 files changed, 17 insertions(+)
+ arch/arm/mach-berlin/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index b42c7b480e1e..2b8d70164428 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -354,3 +354,12 @@ void efi_virtmap_unload(void)
- 	efi_set_pgd(current->active_mm);
- 	preempt_enable();
- }
-+
-+/*
-+ * UpdateCapsule() depends on the system being shutdown via
-+ * ResetSystem().
-+ */
-+bool efi_poweroff_required(void)
-+{
-+	return efi_enabled(EFI_RUNTIME_SERVICES);
-+}
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index fde9923af859..c6b1f3b96f45 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -21,6 +21,7 @@
- #include <stdarg.h>
+diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
+index 3e40a947f3ea..742d53a5f7f9 100644
+--- a/arch/arm/mach-berlin/Kconfig
++++ b/arch/arm/mach-berlin/Kconfig
+@@ -6,6 +6,7 @@ menuconfig ARCH_BERLIN
+ 	select DW_APB_ICTL
+ 	select DW_APB_TIMER_OF
+ 	select GENERIC_IRQ_CHIP
++	select MFD_SYSCON
+ 	select PINCTRL
  
- #include <linux/compat.h>
-+#include <linux/efi.h>
- #include <linux/export.h>
- #include <linux/sched.h>
- #include <linux/kernel.h>
-@@ -150,6 +151,13 @@ void machine_restart(char *cmd)
- 	local_irq_disable();
- 	smp_send_stop();
- 
-+	/*
-+	 * UpdateCapsule() depends on the system being reset via
-+	 * ResetSystem().
-+	 */
-+	if (efi_enabled(EFI_RUNTIME_SERVICES))
-+		efi_reboot(reboot_mode, NULL);
-+
- 	/* Now call the architecture specific reboot code. */
- 	if (arm_pm_restart)
- 		arm_pm_restart(reboot_mode, cmd);
+ if ARCH_BERLIN
 -- 
-1.8.3.2
+2.3.1
