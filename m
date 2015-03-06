@@ -1,39 +1,33 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 6 Mar 2015 18:07:08 +0100
-Subject: [PATCH] pinctrl: dt: at91: new binding
-In-Reply-To: <AB034DC5-9E4C-4883-BBF0-B93B438C7A54@jcrosoft.com>
-References: <1424943294-8805-1-git-send-email-plagnioj@jcrosoft.com>
- <54F9C2FE.8060804@atmel.com>
- <AB034DC5-9E4C-4883-BBF0-B93B438C7A54@jcrosoft.com>
-Message-ID: <20150306170708.GR3989@piout.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 6 Mar 2015 09:07:50 -0800
+Subject: [PATCH] ARM: dts: OMAP5: fix polling intervals for thermal zones
+In-Reply-To: <20150227213535.GA5633@developer.amazonguestwifi.org>
+References: <1425045543-19540-1-git-send-email-t-kristo@ti.com>
+ <20150227213535.GA5633@developer.amazonguestwifi.org>
+Message-ID: <20150306170749.GT13520@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2015 at 00:49:55 +0800, Jean-Christophe PLAGNIOL-VILLARD wrote :
+* Eduardo Valentin <edubezval@gmail.com> [150227 13:39]:
+> On Fri, Feb 27, 2015 at 03:59:03PM +0200, Tero Kristo wrote:
+> > OMAP4 has a finer counter granularity, which allows for a delay of 1000ms
+> > in the thermal zone polling intervals. OMAP5 has a different counter
+> > mechanism, which allows at maximum a 500ms timer. Adjust the cpu thermal
+> > zone polling interval accordingly.
 > > 
-> > Sorry but NACK.
+> > Without this patch, the polling interval information is simply ignored,
+> > and the following thermal warnings are printed during boot (assuming
+> > thermal is enabled);
 > > 
-> > I don't want to manage another flavor of the pinmux biding with no real
-> > benefit. I would have been good if we had it from day-1. Now it's too late.
+> > [    1.545343] ti-soc-thermal 4a0021e0.bandgap: Delay 1000 ms is not supported
+> > [    1.552691] ti-soc-thermal 4a0021e0.bandgap: Delay 1000 ms is not supported
+> > [    1.560029] ti-soc-thermal 4a0021e0.bandgap: Delay 1000 ms is not supported
+> > 
+> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
 > 
-> yes we do, we catch but a compiling time instead of RUNTIME which is critical
-> 
-> so I?ll pass on the NACK
-> 
+> Acked-by: Eduardo Valentin <edubezval@gmail.com>
 
-If you are changing the binding, how about doing it right this time and
-completely drop the current mess?
+Applying into omap-for-v4.0/fixes thanks.
 
-> > 
-> > Moreover, splitting a binding definition if you have a function given by
-> > multiple banks can be weird and not well understood in regard to our
-> > current group+function definition scheme (Cf. your last example).
-> > 
-> 
-> Others already do so and this is not complex at all
-> 
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Tony
