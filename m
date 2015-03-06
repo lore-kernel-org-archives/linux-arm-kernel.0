@@ -1,125 +1,101 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 06 Mar 2015 14:40:46 -0700
-Subject: [PATCH 02/10] mailbox: Enable BCM2835 mailbox support
-In-Reply-To: <54FA0E2B.30300@wwwdotorg.org>
-References: <1425329684-23968-1-git-send-email-eric@anholt.net>
- <1425329684-23968-3-git-send-email-eric@anholt.net>
- <54F675F1.60205@wwwdotorg.org> <87a8zs8vzo.fsf@eliezer.anholt.net>
- <54F932FD.5040207@wwwdotorg.org> <87bnk5lwvt.fsf@eliezer.anholt.net>
- <54FA0E2B.30300@wwwdotorg.org>
-Message-ID: <54FA1EDE.1060900@wwwdotorg.org>
+From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
+Date: Fri, 06 Mar 2015 23:47:48 +0200
+Subject: ARM: OMPA4+: is it expected dma_coerce_mask_and_coherent(dev,
+ DMA_BIT_MASK(64)); to fail?
+In-Reply-To: <20150305201753.GG29584@n2100.arm.linux.org.uk>
+References: <54F8A68B.3080709@linaro.org>
+ <20150305201753.GG29584@n2100.arm.linux.org.uk>
+Message-ID: <54FA2084.8050803@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2015 01:29 PM, Stephen Warren wrote:
-> On 03/06/2015 01:00 PM, Eric Anholt wrote:
->> Stephen Warren <swarren@wwwdotorg.org> writes:
+Hi Russell,
+
+On 03/05/2015 10:17 PM, Russell King - ARM Linux wrote:
+> On Thu, Mar 05, 2015 at 08:55:07PM +0200, Grygorii.Strashko at linaro.org wrote:
+>> Now I can see very interesting behavior related to dma_coerce_mask_and_coherent()
+>> and friends which I'd like to explain and clarify.
 >>
->>> On 03/04/2015 11:20 AM, Eric Anholt wrote:
->>>> Stephen Warren <swarren@wwwdotorg.org> writes:
->>>>
->>>>> On 03/02/2015 01:54 PM, Eric Anholt wrote:
->>>>>> From: Lubomir Rintel <lkundrak@v3.sk>
->>>>>>
->>>>>> Implement BCM2835 mailbox support as a device registered with
->>>>>> the general purpose mailbox framework. Implementation based on
->>>>>> commits by Lubomir Rintel [1], Suman Anna and Jassi Brar [2] on
->>>>>> which to base the implementation.
->>>>>
->>>>>> diff --git a/drivers/mailbox/bcm2835-mailbox.c
->>>>>> b/drivers/mailbox/bcm2835-mailbox.c
->>>
->>>>>> +static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id) +{
->>>>>> +    struct bcm2835_mbox *mbox = (struct bcm2835_mbox *) dev_id; +
->>>>>> struct device *dev = mbox->dev; + +    while (!(readl(mbox->regs +
->>>>>> MAIL0_STA) & ARM_MS_EMPTY)) { +        u32 msg = readl(mbox->regs +
->>>>>> MAIL0_RD); +        unsigned int chan = MBOX_CHAN(msg); + +        if
->>>>>> (!mbox->channel[chan].started) { +            dev_err(dev, "Reply on
->>>>>> stopped channel %d\n", chan); +            continue; +        } +
->>>>>> dev_dbg(dev, "Reply 0x%08X\n", msg); +
->>>>>> mbox_chan_received_data(mbox->channel[chan].link, +
->>>>>> (void *)
->>>>>> MBOX_DATA28(msg)); +    } +    rmb(); /* Finished last mailbox read.
->>>>>> */
->>>>>
->>>>> I know the PDF mentioned in the comment earlier in the patch says
->>>>> to put in barriers between accesses to different peripherals,
->>>>> which this seems compliant with, but I don't see quite what this
->>>>> barrier achieves. I think the PDF is talking generalities, not
->>>>> imposing a rule that must be blindly followed. Besides, if
->>>>> there's a context-switch you can't actually implement the rules
->>>>> the PDF suggests. What read operation is this barrier attempting
->>>>> to ensure happens after reading all mailbox messages and any
->>>>> associated DRAM buffer?
->>>>
->>>> Looking at this bit of code in particular:
->>>>
->>>> "As interrupts can appear anywhere in the code so you should
->>>> safeguard those. If an interrupt routine reads from a peripheral
->>>> the routine should start with a memory read barrier. If an
->>>> interrupt routine writes to a peripheral the routine should end
->>>> with a memory write barrier."
->>>
->>> I can see that doing that would be safe, but I don't think following
->>> those rules is actually necessary in the general case. Following those
->>> rules would cause lots of unnecessary barriers in code.
->>>
->>> Barriers shouldn't be used arbitrarily at the start/end of ISRs, but
->>> rather at specific chosen locations in the code that actually need to
->>> enforce some kind of memory ordering.
+>> Below is set of questions I have (why - I explained below):
+>> - Is expected dma_coerce_mask_and_coherent(DMA_BIT_MASK(64)) and friends to fail on 32 bits HW?
+> 
+> Not really.
+> 
+>> - What is expected value for max_pfn: max_phys_pfn or max_phys_pfn + 1?
+> 
+> mm/page_owner.c:
+>          /* Find an allocated page */
+>          for (; pfn < max_pfn; pfn++) {
+> 
+> drivers/base/platform.c:    u32 low_totalram = ((max_pfn - 1) << PAGE_SHIFT);
+> drivers/base/platform.c:    u32 high_totalram = ((max_pfn - 1) >> (32 - PAGE_SHIFT));
+> 
+> So, there's ample evidence that max_pfn is one more than the greatest pfn
+> which may be used in the system.
+> 
+>> - What is expected value for struct memblock_region->size: mem_range_size or mem_range_size - 1?
+> 
+> A size is a size - it's a number of bytes contained within the region.
+> If it is value 1, then there is exactly one byte in the region.  If
+> there are 0x7fffffff, then there are 2G-1 bytes in the region, not 2G.
+
+Thanks - it seems clear now.
+
+>> - What is expected value to be returned by memblock_end_of_DRAM():
+>>    @base + @size(max_phys_addr + 1) or @base + @size - 1(max_phys_addr)?
+> 
+> The last address plus one in the system.  However, there's a problem here.
+> On a 32-bit system, phys_addr_t may be 32-bit.  If it is 32-bit, then
+> "last address plus one" could be zero, which makes no sense.  Hence, it
+> is artificially reduced to 0xfffff000, thereby omitting the final page.
+
+^ this part seems not fully true now, because for ARM32 + DT the 
+fdt.c->early_init_dt_add_memory_arch() is called instead of arm_add_memory()
+ and it works in a different way a bit.
+
+For example, I don't see below message when reg = <0x80000000 0x80000000>:
+"Truncating memory at 0x80000000 to fit in 32-bit physical address space"
+
+instead memblock silently configured as
+memory.cnt  = 0x1
+memory[0x0].base = 0x80000000
+memory[0x0].size = 0x7fffffff
+
+
+> 
+>> Example 3 CONFIG_ARM_LPAE=y (but system really works with 32 bit address space):
+>> 	memory {
+>> 		device_type = "memory";
+>> 		reg = <0x80000000 0x80000000>;
+>> 	};
 >>
->> According to the architecture docs, if you don't RMB at the start of
->> your ISR, then the following timeline could get the wrong values:
->
-> Which architecture doc and section/... specifically?
-
-Ah, this is BCM2835-ARM-Peripherals.pdf still. I found the footnote you 
-mentioned.
-
->> some other device driver               our isr
->> ------------------------               -------
->> rmb()
->> read from device
->>                                         read from device
->>                                         examine value read
->>                                         exit isr
->> examine value raed.
+>>    memblock will be configured as:
+>> 	memory.cnt  = 0x1
+>> 	memory[0x0]     [0x00000080000000-0x000000ffffffff], 0x80000000 bytes flags: 0x0
+>> 							     ^^^^^^^^^^
+>>    max_pfn = 0x00100000
 >>
->> The ISR could get the device driver's value.  This is made explicit in
->> footnote 2 on page 7.
->
-> Are you saying that the "read from device" in the right -hand "our isr"
-> column could end up returning the value actually read during "read from
-> device" in the left-hand "some other device driver" column, or vice-versa?
->
-> That doesn't make any sense.
->
-> Barriers are about ensuring that accesses happen (are visible or
-> complete) in the desired order, not about ensuring that the results of
-> two unrelated reads don't get swapped.
+>> The dma_coerce_mask_and_coherent() will fail in case 'Example 3' and succeed in cases 1,2.
+>> dma-mapping.c --> __dma_supported()
+>> 	if (sizeof(mask) != sizeof(dma_addr_t) && <== true for all OMAP4+
+>> 	    mask > (dma_addr_t)~0 &&		<== true for DMA_BIT_MASK(64)
+>> 	    dma_to_pfn(dev, ~0) < max_pfn) {  <== true only for Example 3
+> 
+> Hmm, I think this may make more sense to be "< max_pfn - 1" here, as
+> that would be better suited to our intention.
+> 
+> The result of dma_to_pfn(dev, ~0) is the maximum PFN which we could
+> address via DMA, but we're comparing it with the maximum PFN in the
+> system plus 1 - so we need to subtract one from it.
 
-Ah. I've been thinking about the typical uses of barriers to ensure 
-ordering of transactions on a standards-compliant ARM CPU.
+Ok. I'll try it.
 
-It was pointed out on IRC that perhaps the barriers are to work around a 
-CPU/SoC bug. In which case, if the CPU/bus really can swap results, then 
-I can see how barriers might be required and how they might solve the 
-problem. If this is the real reason, it sounds truly massively scary.
+> 
+> Please think about this and test this out; I'm not back to normal yet
+> (post-op) so I could very well not be thinking straight yet.
 
-I think this deserves a complete description in each driver file and in 
-the commit description for any commit that introduces these barriers. 
-Otherwise someone else will just want to rip them out.
+Thanks for your comments. I hope you feel better.
 
-I'm also concerned that we need to add barriers in many more places than 
-just that start/end of ISRs. For example, what if the ISR for the 
-mailbox ends up calling back into some other driver that goes and 
-touches a different HW module. Now we need to put barriers either at the 
-start/end of that callback function, or immediately before/after we call 
-that callback function. This has potential to need barriers in a whole 
-bunch of places one wouldn't expect.
-
-I sure hope this was fixed on bcm2836, or that the ordering issue 
-appears separately within each CPU core and there's no interaction 
-between multiple CPU cores. Otherwise, two separate pieces of code 
-running on two separate CPU cores are going to have trouble when they 
-start touching different peripherals.
+-- 
+regards,
+-grygorii
