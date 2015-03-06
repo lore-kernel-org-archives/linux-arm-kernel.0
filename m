@@ -1,101 +1,29 @@
-From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
-Date: Fri, 06 Mar 2015 23:47:48 +0200
-Subject: ARM: OMPA4+: is it expected dma_coerce_mask_and_coherent(dev,
- DMA_BIT_MASK(64)); to fail?
-In-Reply-To: <20150305201753.GG29584@n2100.arm.linux.org.uk>
-References: <54F8A68B.3080709@linaro.org>
- <20150305201753.GG29584@n2100.arm.linux.org.uk>
-Message-ID: <54FA2084.8050803@linaro.org>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Fri, 6 Mar 2015 22:57:58 +0100
+Subject: twl4030_charger: need changes to get probed?
+In-Reply-To: <20150306212417.GA24169@amd>
+References: <20150224043341.4243.23291.stgit@notabene.brown>
+ <20150305173350.50502b95@notabene.brown> <20150306212417.GA24169@amd>
+Message-ID: <201503062257.58180@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Friday 06 March 2015 22:24:17 Pavel Machek wrote:
+> Hi!
+> 
+> According to n900 dts, twl4030-bci (aka charger) should be
+> included.
+> 
 
-On 03/05/2015 10:17 PM, Russell King - ARM Linux wrote:
-> On Thu, Mar 05, 2015 at 08:55:07PM +0200, Grygorii.Strashko at linaro.org wrote:
->> Now I can see very interesting behavior related to dma_coerce_mask_and_coherent()
->> and friends which I'd like to explain and clarify.
->>
->> Below is set of questions I have (why - I explained below):
->> - Is expected dma_coerce_mask_and_coherent(DMA_BIT_MASK(64)) and friends to fail on 32 bits HW?
-> 
-> Not really.
-> 
->> - What is expected value for max_pfn: max_phys_pfn or max_phys_pfn + 1?
-> 
-> mm/page_owner.c:
->          /* Find an allocated page */
->          for (; pfn < max_pfn; pfn++) {
-> 
-> drivers/base/platform.c:    u32 low_totalram = ((max_pfn - 1) << PAGE_SHIFT);
-> drivers/base/platform.c:    u32 high_totalram = ((max_pfn - 1) >> (32 - PAGE_SHIFT));
-> 
-> So, there's ample evidence that max_pfn is one more than the greatest pfn
-> which may be used in the system.
-> 
->> - What is expected value for struct memblock_region->size: mem_range_size or mem_range_size - 1?
-> 
-> A size is a size - it's a number of bytes contained within the region.
-> If it is value 1, then there is exactly one byte in the region.  If
-> there are 0x7fffffff, then there are 2G-1 bytes in the region, not 2G.
-
-Thanks - it seems clear now.
-
->> - What is expected value to be returned by memblock_end_of_DRAM():
->>    @base + @size(max_phys_addr + 1) or @base + @size - 1(max_phys_addr)?
-> 
-> The last address plus one in the system.  However, there's a problem here.
-> On a 32-bit system, phys_addr_t may be 32-bit.  If it is 32-bit, then
-> "last address plus one" could be zero, which makes no sense.  Hence, it
-> is artificially reduced to 0xfffff000, thereby omitting the final page.
-
-^ this part seems not fully true now, because for ARM32 + DT the 
-fdt.c->early_init_dt_add_memory_arch() is called instead of arm_add_memory()
- and it works in a different way a bit.
-
-For example, I don't see below message when reg = <0x80000000 0x80000000>:
-"Truncating memory at 0x80000000 to fit in 32-bit physical address space"
-
-instead memblock silently configured as
-memory.cnt  = 0x1
-memory[0x0].base = 0x80000000
-memory[0x0].size = 0x7fffffff
-
-
-> 
->> Example 3 CONFIG_ARM_LPAE=y (but system really works with 32 bit address space):
->> 	memory {
->> 		device_type = "memory";
->> 		reg = <0x80000000 0x80000000>;
->> 	};
->>
->>    memblock will be configured as:
->> 	memory.cnt  = 0x1
->> 	memory[0x0]     [0x00000080000000-0x000000ffffffff], 0x80000000 bytes flags: 0x0
->> 							     ^^^^^^^^^^
->>    max_pfn = 0x00100000
->>
->> The dma_coerce_mask_and_coherent() will fail in case 'Example 3' and succeed in cases 1,2.
->> dma-mapping.c --> __dma_supported()
->> 	if (sizeof(mask) != sizeof(dma_addr_t) && <== true for all OMAP4+
->> 	    mask > (dma_addr_t)~0 &&		<== true for DMA_BIT_MASK(64)
->> 	    dma_to_pfn(dev, ~0) < max_pfn) {  <== true only for Example 3
-> 
-> Hmm, I think this may make more sense to be "< max_pfn - 1" here, as
-> that would be better suited to our intention.
-> 
-> The result of dma_to_pfn(dev, ~0) is the maximum PFN which we could
-> address via DMA, but we're comparing it with the maximum PFN in the
-> system plus 1 - so we need to subtract one from it.
-
-Ok. I'll try it.
-
-> 
-> Please think about this and test this out; I'm not back to normal yet
-> (post-op) so I could very well not be thinking straight yet.
-
-Thanks for your comments. I hope you feel better.
+AFAIK it is not present on n900...
 
 -- 
-regards,
--grygorii
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150306/cbf1153d/attachment.sig>
