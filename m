@@ -1,93 +1,112 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri,  6 Mar 2015 16:05:27 +0100
-Subject: [PATCH v2 09/10] ARM: berlin: rework chip and system controller nodes
- for BG2CD
-In-Reply-To: <1425654328-26298-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1425654328-26298-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1425654328-26298-10-git-send-email-antoine.tenart@free-electrons.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 6 Mar 2015 16:08:46 +0100
+Subject: [PATCH] pinctrl: dt: at91: new binding
+In-Reply-To: <1424943294-8805-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1424943294-8805-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <54F9C2FE.8060804@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chip and system controller nodes are now handled by the Berlin
-controller mfd driver. Its sub-devices are then registered by the mfd
-driver and let the drivers be probed properly, using their own
-sub-nodes.
+Le 26/02/2015 10:34, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
+> Today if we want to disable a pio bank we may will siliently break pinctrl
+> configuration in the DT. This will be detected only at runtime.
+> 
+> So move the pinctrl configuration to the bank instead of the bus.
+> This allow to detect pinctrl issue at DT compiling time when disable a bank.
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: devicetree at vger.kernel.org
+> ---
+>  .../bindings/pinctrl/atmel,at91-pinctrl.txt        | 66 ++++++++++++++++++++++
+>  1 file changed, 66 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+> index b7a93e8..78355ee 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+> @@ -148,3 +148,69 @@ dbgu: serial at fffff200 {
+>  	pinctrl-0 = <&pinctrl_dbgu>;
+>  	status = "disabled";
+>  };
+> +
+> +II) New Bindings per PIO Block
 
-Rework the device tree to take this changes into account.
+Sorry but NACK.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2cd.dtsi | 32 ++++++++++++++++++++++----------
- 1 file changed, 22 insertions(+), 10 deletions(-)
+I don't want to manage another flavor of the pinmux biding with no real
+benefit. I would have been good if we had it from day-1. Now it's too late.
 
-diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index 81b670ac494a..4bca01ee94d6 100644
---- a/arch/arm/boot/dts/berlin2cd.dtsi
-+++ b/arch/arm/boot/dts/berlin2cd.dtsi
-@@ -84,7 +84,7 @@
- 			compatible = "marvell,berlin2cd-usb-phy";
- 			reg = <0xb74000 0x128>;
- 			#phy-cells = <0>;
--			resets = <&chip 0x178 23>;
-+			resets = <&chip_rst 0x178 23>;
- 			status = "disabled";
- 		};
- 
-@@ -92,7 +92,7 @@
- 			compatible = "marvell,berlin2cd-usb-phy";
- 			reg = <0xb78000 0x128>;
- 			#phy-cells = <0>;
--			resets = <&chip 0x178 24>;
-+			resets = <&chip_rst 0x178 24>;
- 			status = "disabled";
- 		};
- 
-@@ -294,17 +294,25 @@
- 			};
- 		};
- 
--		chip: chip-control at ea0000 {
--			compatible = "marvell,berlin2cd-chip-ctrl";
--			#clock-cells = <1>;
--			#reset-cells = <2>;
-+		chip: chip-controller at ea0000 {
-+			compatible = "marvell,berlin2cd-chip-ctrl", "simple-mfd", "syscon";
- 			reg = <0xea0000 0x400>;
-+			#clock-cells = <1>;
- 			clocks = <&refclk>;
- 			clock-names = "refclk";
- 
--			uart0_pmux: uart0-pmux {
--				groups = "G6";
--				function = "uart0";
-+			soc_pinctrl: pin-controller {
-+				compatible = "marvell,berlin2cd-soc-pinctrl";
-+
-+				uart0_pmux: uart0-pmux {
-+					groups = "G6";
-+					function = "uart0";
-+				};
-+			};
-+
-+			chip_rst: reset {
-+				compatible = "marvell,berlin2-reset";
-+				#reset-cells = <2>;
- 			};
- 		};
- 
-@@ -389,8 +397,12 @@
- 			};
- 
- 			sysctrl: system-controller at d000 {
--				compatible = "marvell,berlin2cd-system-ctrl";
-+				compatible = "marvell,berlin2cd-system-ctrl", "simple-mfd", "syscon";
- 				reg = <0xd000 0x100>;
-+
-+				sys_pinctrl: pin-controller {
-+					compatible = "marvell,berlin2cd-system-pinctrl";
-+				};
- 			};
- 
- 			sic: interrupt-controller at e000 {
+Moreover, splitting a binding definition if you have a function given by
+multiple banks can be weird and not well understood in regard to our
+current group+function definition scheme (Cf. your last example).
+
+
+> +This allow to detect pinctrl issue at DT compiling time when disable a bank
+> +
+> +Required properties for iomux controller:
+> +- compatible: "atmel,at91rm9200-pio-pinctrl" or "atmel,at91sam9x5-pio-pinctrl"
+> +		or "atmel,sama5d3-pio-pinctrl"
+> +- atmel,mux-mask: array of mask (periph per bank) to describe if a pin can be
+> +  configured in this periph mode. All the periph and bank need to be describe.
+> +
+> +How to create such array:
+> +
+> +Each column will represent the possible peripheral of the pinctrl for the bank
+> +
+> +Take an example on the 9260
+> +Peripheral: 2 ( A and B)
+> +=>
+> +
+> +  /*    A         B     */
+> +  0xffffffff 0xffc00c3b  /* pioA */
+> +
+> +For each peripheral/bank we will descibe in a u32 if a pin can be
+> +configured in it by putting 1 to the pin bit (1 << pin)
+> +
+> +Required properties for pin configuration node:
+> +- atmel,pins: 3 integers array, represents a group of pins mux and config
+> +  setting. The format is atmel,pins = <PIN_NUM PERIPH CONFIG>.
+> +  The PERIPH 0 means gpio, PERIPH 1 is periph A, PERIPH 2 is periph B...
+> +
+> +Bits used for CONFIG:
+> +cf atmel,at91-pinctrl
+> +
+> +pioB: gpio at fffff600 {
+> +	compatible = "atmel,at91rm9200-gpio", "atmel,at91rm9200-pio-pinctrl";
+> +	reg = <0xfffff600 0x200>;
+> +	interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
+> +	#gpio-cells = <2>;
+> +	gpio-controller;
+> +	interrupt-controller;
+> +	#interrupt-cells = <2>;
+> +	clocks = <&pioB_clk>;
+> +
+> +			 /*    A         B     */
+> +	atmel,mux-mask = <0xffffffff 0x7fff3ccf>;
+> +
+> +	dbgu {
+> +		pinctrl_dbgu: dbgu-0 {
+> +			atmel,pins =
+> +				<14 0x1 0x0	/* PB14 periph A */
+> +				 15 0x1 0x1>;	/* PB15 periph A with pullup */
+> +		};
+> +	};
+> +};
+> +
+> +dbgu: serial at fffff200 {
+> +	compatible = "atmel,at91sam9260-usart";
+> +	reg = <0xfffff200 0x200>;
+> +	interrupts = <1 4 7>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_dbgu>;
+> +	status = "disabled";
+> +};
+> +
+> +if you have to use multiple bank
+> +	pinctrl-0 = <&pinctrl_ip_piaa>, <&pinctrl_ip_piab>;
+> 
+
+Best regards,
 -- 
-2.3.1
+Nicolas Ferre
