@@ -1,52 +1,118 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri,  6 Mar 2015 11:48:39 +0100
-Subject: [PATCH v3 0/2] net/macb: merge at91_ether driver into macb driver
-Message-ID: <1425638921-9768-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Fri,  6 Mar 2015 11:48:40 +0100
+Subject: [PATCH v3 1/2] net/macb: unify clock management
+In-Reply-To: <1425638921-9768-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1425638921-9768-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1425638921-9768-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
-The rm9200 boards use the dedicated at91_ether driver instead of the
-regular macb driver.
+Most of the functions from the Common Clk Framework handle NULL pointer as
+input argument.
 
-Both the macb and at91_ether drivers can be compiled as separated
-modules.
-Since the at91_ether driver uses code from the macb driver, at91_ether.ko
-depends on macb.ko.
+Since the TX clock is optional, we now set tx_clk to NULL value
+instead of ERR_PTR(-ENOENT) when this clock is not available. This simplifies
+the clock management and avoid the need to test tx_clk value.
 
-However the macb.ko module always fails to load on rm9200 boards: the
-macb_probe() function expects a hclk clock which doesn't exist on rm9200.
-Then the at91_ether.ko can't be loaded in turn due to unresolved
-dependencies.
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/net/ethernet/cadence/macb.c | 31 ++++++++++++++-----------------
+ 1 file changed, 14 insertions(+), 17 deletions(-)
 
-This series of patches fix this issue by merging at91_ether into macb.
-
-This series depends on this one [1].
-
-Best Regards,
-
-Boris
-
-Changes since v2:
-- rebase after changed brought by [1]
-
-Changes since v1:
-- rework probe functions to share common probing logic
-
-[1]https://lkml.org/lkml/2015/3/6/234
-
-Cyrille Pitchen (2):
-  net/macb: unify clock management
-  net/macb: merge at91_ether driver into macb driver
-
- drivers/net/ethernet/cadence/Kconfig      |   8 -
- drivers/net/ethernet/cadence/Makefile     |   1 -
- drivers/net/ethernet/cadence/at91_ether.c | 481 ----------------------
- drivers/net/ethernet/cadence/macb.c       | 660 ++++++++++++++++++++++--------
- drivers/net/ethernet/cadence/macb.h       |  10 +-
- 5 files changed, 493 insertions(+), 667 deletions(-)
- delete mode 100644 drivers/net/ethernet/cadence/at91_ether.c
-
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index 86e915f..d8748c5 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -213,6 +213,9 @@ static void macb_set_tx_clk(struct clk *clk, int speed, struct net_device *dev)
+ {
+ 	long ferr, rate, rate_rounded;
+ 
++	if (!clk)
++		return;
++
+ 	switch (speed) {
+ 	case SPEED_10:
+ 		rate = 2500000;
+@@ -292,8 +295,7 @@ static void macb_handle_link_change(struct net_device *dev)
+ 
+ 	spin_unlock_irqrestore(&bp->lock, flags);
+ 
+-	if (!IS_ERR(bp->tx_clk))
+-		macb_set_tx_clk(bp->tx_clk, phydev->speed, dev);
++	macb_set_tx_clk(bp->tx_clk, phydev->speed, dev);
+ 
+ 	if (status_change) {
+ 		if (phydev->link) {
+@@ -2244,6 +2246,8 @@ static int macb_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	tx_clk = devm_clk_get(&pdev->dev, "tx_clk");
++	if (IS_ERR(tx_clk))
++		tx_clk = NULL;
+ 
+ 	err = clk_prepare_enable(pclk);
+ 	if (err) {
+@@ -2257,13 +2261,10 @@ static int macb_probe(struct platform_device *pdev)
+ 		goto err_out_disable_pclk;
+ 	}
+ 
+-	if (!IS_ERR(tx_clk)) {
+-		err = clk_prepare_enable(tx_clk);
+-		if (err) {
+-			dev_err(&pdev->dev, "failed to enable tx_clk (%u)\n",
+-				err);
+-			goto err_out_disable_hclk;
+-		}
++	err = clk_prepare_enable(tx_clk);
++	if (err) {
++		dev_err(&pdev->dev, "failed to enable tx_clk (%u)\n", err);
++		goto err_out_disable_hclk;
+ 	}
+ 
+ 	err = -ENOMEM;
+@@ -2435,8 +2436,7 @@ err_out_unregister_netdev:
+ err_out_free_netdev:
+ 	free_netdev(dev);
+ err_out_disable_clocks:
+-	if (!IS_ERR(tx_clk))
+-		clk_disable_unprepare(tx_clk);
++	clk_disable_unprepare(tx_clk);
+ err_out_disable_hclk:
+ 	clk_disable_unprepare(hclk);
+ err_out_disable_pclk:
+@@ -2460,8 +2460,7 @@ static int macb_remove(struct platform_device *pdev)
+ 		kfree(bp->mii_bus->irq);
+ 		mdiobus_free(bp->mii_bus);
+ 		unregister_netdev(dev);
+-		if (!IS_ERR(bp->tx_clk))
+-			clk_disable_unprepare(bp->tx_clk);
++		clk_disable_unprepare(bp->tx_clk);
+ 		clk_disable_unprepare(bp->hclk);
+ 		clk_disable_unprepare(bp->pclk);
+ 		free_netdev(dev);
+@@ -2479,8 +2478,7 @@ static int __maybe_unused macb_suspend(struct device *dev)
+ 	netif_carrier_off(netdev);
+ 	netif_device_detach(netdev);
+ 
+-	if (!IS_ERR(bp->tx_clk))
+-		clk_disable_unprepare(bp->tx_clk);
++	clk_disable_unprepare(bp->tx_clk);
+ 	clk_disable_unprepare(bp->hclk);
+ 	clk_disable_unprepare(bp->pclk);
+ 
+@@ -2495,8 +2493,7 @@ static int __maybe_unused macb_resume(struct device *dev)
+ 
+ 	clk_prepare_enable(bp->pclk);
+ 	clk_prepare_enable(bp->hclk);
+-	if (!IS_ERR(bp->tx_clk))
+-		clk_prepare_enable(bp->tx_clk);
++	clk_prepare_enable(bp->tx_clk);
+ 
+ 	netif_device_attach(netdev);
+ 
 -- 
 1.9.1
