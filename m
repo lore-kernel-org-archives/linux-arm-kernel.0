@@ -1,83 +1,103 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 6 Mar 2015 19:23:45 +0100
-Subject: [PATCH] pinctrl: dt: at91: new binding
-In-Reply-To: <AB034DC5-9E4C-4883-BBF0-B93B438C7A54@jcrosoft.com>
-References: <1424943294-8805-1-git-send-email-plagnioj@jcrosoft.com>
- <54F9C2FE.8060804@atmel.com>
- <AB034DC5-9E4C-4883-BBF0-B93B438C7A54@jcrosoft.com>
-Message-ID: <20150306192345.1262cc94@bbrezillon>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Fri, 6 Mar 2015 10:29:26 -0800
+Subject: [PATCH 4/8] ARM: dts: rockchip: relicense rk3288.dtsi under
+ GPLv2/X11
+In-Reply-To: <1425665046-22927-5-git-send-email-heiko@sntech.de>
+References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
+ <1425665046-22927-5-git-send-email-heiko@sntech.de>
+Message-ID: <CAPz6YkWggHnV9Pns1uGqf-71mYMiMTsn_Y0Xy9rsA_2b2NW94A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
+On Fri, Mar 6, 2015 at 10:04 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> GPLv2-only devicetrees make reuse difficult for software components licensed
+> under a different license.
+>
+> The consensus is that a GPL/X11 dual-license should allow all necessary uses,
+> so relicense the rk3288.dtsi to this combination.
+>
+> CCs were aquired by git shortlog -sne so it should've hopefully catched
+> every contributor.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Cc: Kever Yang <kever.yang@rock-chips.com>
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Addy Ke <addy.ke@rock-chips.com>
+> Cc: Daniel Kurtz <djkurtz@chromium.org>
+> Cc: Andy Yan <andy.yan@rock-chips.com>
+> Cc: Caesar Wang <caesar.wang@rock-chips.com>
+> Cc: Chris Zhong <zyw@rock-chips.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Jianqun Xu<jay.xu@rock-chips.com>
+> Cc: Roger Chen <roger.chen@rock-chips.com>
+> Cc: Sonny Rao <sonnyrao@chromium.org>
+> Cc: Yunzhi Li <lyz@rock-chips.com>
+> Cc: huang lin <hl@rock-chips.com>
+>
+> Not sure if an Ack for a simple revert is necessary, but included anyway
+> Cc: Olof Johansson <olof@lixom.net>
+> ---
+> I'm hoping to get Acked-by tags from the people in the Cc-list.
+>
+>  arch/arm/boot/dts/rk3288.dtsi | 44 +++++++++++++++++++++++++++++++++++--------
+>  1 file changed, 36 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index 2c29a3e..35a06a5 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -1,13 +1,41 @@
+>  /*
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+>   *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>   */
+>
+>  #include <dt-bindings/gpio/gpio.h>
+> --
+> 2.1.4
+>
 
-On Sat, 7 Mar 2015 00:49:55 +0800
-Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-
-> 
-> > On Mar 6, 2015, at 11:08 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> > 
-> > Le 26/02/2015 10:34, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
-> >> Today if we want to disable a pio bank we may will siliently break pinctrl
-> >> configuration in the DT. This will be detected only at runtime.
-> >> 
-> >> So move the pinctrl configuration to the bank instead of the bus.
-> >> This allow to detect pinctrl issue at DT compiling time when disable a bank.
-> >> 
-> >> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >> Cc: Linus Walleij <linus.walleij@linaro.org>
-> >> Cc: devicetree at vger.kernel.org
-> >> ---
-> >> .../bindings/pinctrl/atmel,at91-pinctrl.txt        | 66 ++++++++++++++++++++++
-> >> 1 file changed, 66 insertions(+)
-> >> 
-> >> diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
-> >> index b7a93e8..78355ee 100644
-> >> --- a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
-> >> +++ b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
-> >> @@ -148,3 +148,69 @@ dbgu: serial at fffff200 {
-> >> 	pinctrl-0 = <&pinctrl_dbgu>;
-> >> 	status = "disabled";
-> >> };
-> >> +
-> >> +II) New Bindings per PIO Block
-> > 
-> > Sorry but NACK.
-> > 
-> > I don't want to manage another flavor of the pinmux biding with no real
-> > benefit. I would have been good if we had it from day-1. Now it's too late.
-> 
-> yes we do, we catch but a compiling time instead of RUNTIME which is critical
-> 
-> so I?ll pass on the NACK
-
-Tell me, how can you pass on a NACK coming from the at91 maintainer
-(which is also your co-maintainer) when you modify bindings of an at91
-driver ?
-Please let's try to be constructive here, so that we can find an
-acceptable solution.
-
-> 
-> > 
-> > Moreover, splitting a binding definition if you have a function given by
-> > multiple banks can be weird and not well understood in regard to our
-> > current group+function definition scheme (Cf. your last example).
-> > 
-
-I don't think it's a good idea either: you'll have to split pinconf
-definitions and that definitely doesn't improve readability.
-
-> 
-> Others already do so and this is not complex at all
-
-Could you point out these bindings (and real examples please).
-
-Best Regards,
-
-Boris
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Acked-by: Sonny Rao <sonnyrao@chromium.org>
