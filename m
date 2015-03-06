@@ -1,61 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Mar 2015 16:41:57 -0800
-Subject: [PATCH 1/4] ARM: OMAP2+: omap_hwmod: Introduce ti,no-init dt
- property
-In-Reply-To: <20150305201713.GH13520@atomide.com>
-References: <1425561211-31003-1-git-send-email-d-gerlach@ti.com>
- <1425561211-31003-2-git-send-email-d-gerlach@ti.com>
- <alpine.DEB.2.02.1503051815590.5613@utopia.booyaka.com>
- <20150305184952.GF13520@atomide.com> <54F8B2C7.7060202@ti.com>
- <20150305201713.GH13520@atomide.com>
-Message-ID: <20150306004157.GI13520@atomide.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Thu, 5 Mar 2015 17:01:35 -0800
+Subject: [PATCH v3 0/3] pci: iproc: Add Broadcom iProc PCIe support
+Message-ID: <1425603699-13416-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150305 12:24]:
-> * Dave Gerlach <d-gerlach@ti.com> [150305 11:53]:
-> > On 03/05/2015 12:49 PM, Tony Lindgren wrote:
-> > > * Paul Walmsley <paul@pwsan.com> [150305 10:16]:
-> > >> On Thu, 5 Mar 2015, Dave Gerlach wrote:
-> > >>
-> > >>> Introduce a dt property, ti,no-init, that prevents hwmod initialization.
-> > >>> Even if a dt node is marked as disabled, hwmod still at least enables
-> > >>> the hwmod and programs the sysconfig before attempting to idle it at
-> > >>> boot. If an IP has been disabled by the hardware configuration on a
-> > >>> platform, this will cause a hang due to writing to inactive registers.
-> > >>> This property prevents that from happening by marking the hwmod as
-> > >>> _HWMOD_STATE_DISABLED during init.
-> > >>
-> > >> I'm kind of wondering if hwmod should even touch a device if it's marked 
-> > >> as disabled in the DT.  Tony, what do you think?
-> > > 
-> > > Well nothing happens if a device is status = "disabled". No dev entry
-> > > gets created for it at all and hwmod won't have any data for the device
-> > > populated. The only way hwmod code could see that device if the device
-> > > gets it's data from the legacy omap_hwmod_*_data.c instead of DT.
-> > > 
-> > 
-> > We still need this for the sysconfig programming, correct? hwmod programs that
-> > regardless of dt status and then idles the IP,
-> 
-> Well hwmod does not even know about the IP IO addresses if it's marked
-> with status = "disabled".. Which IP are you having problems with?
-> 
-> > which is why I needed the ti,no-init for the epos evm. It isn't just a
-> > matter of we shouldnt write to it because we don't want to use it; we
-> > can't write to it because the module is held off so it causes an
-> > external abort if we do.
-> 
-> Well hard to say not knowing which module this is.. Pretty much all
-> the modules have drivers and the driver just does pm_runtime_get()
-> on it?
+This patch series adds the support for Broadcom iProc PCIe controller
 
-Heh OK this thread is about the RTC driver, so I assume that's the
-problem :) So if you set the rtc to status = "disabled" how can the
-hwmod code do anything as AFAIK it won't even get the rtc IO address?
+pcie-iproc.c servers as the common core driver, and front-end bus
+interface needs to be added to support different bus interfaces
 
-Or am I missing something here?
+pcie-iproc-pltfm.c contains the support for the platform bus interface
 
-Regards,
+Changes from v2:
+ - Major rework of the PCIe driver to factor out common generic code from
+   front-end bus interface. Support for generic platform bus interface is
+   also added
+ - Adapt to several new PCI APIs that have been introduced lately
 
-Tony
+Changes from v1:
+ - Add standard PCI interrupt DT properties "#interrupt-cells",
+   "interrupt-map-mask" and "interrupt-map" so legacy INTx interrupts can be
+   supported by using standard PCI OF IRQ parsing function
+ - Get rid of custom IRQ mapping function in the driver. Use
+   of_irq_parse_and_map_pci instead
+
+Ray Jui (3):
+  pci: iProc: define iProc PCIe platform bus binding
+  pci: iproc: Add Broadcom iProc PCIe support
+  ARM: dts: enable PCIe support for Cygnus
+
+ .../devicetree/bindings/pci/brcm,iproc-pcie.txt    |   63 ++++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |   42 +++
+ arch/arm/boot/dts/bcm958300k.dts                   |    8 +
+ drivers/pci/host/Kconfig                           |   17 +
+ drivers/pci/host/Makefile                          |    2 +
+ drivers/pci/host/pcie-iproc-pltfm.c                |  101 ++++++
+ drivers/pci/host/pcie-iproc.c                      |  337 ++++++++++++++++++++
+ drivers/pci/host/pcie-iproc.h                      |   39 +++
+ 8 files changed, 609 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+ create mode 100644 drivers/pci/host/pcie-iproc-pltfm.c
+ create mode 100644 drivers/pci/host/pcie-iproc.c
+ create mode 100644 drivers/pci/host/pcie-iproc.h
+
+-- 
+1.7.9.5
