@@ -1,117 +1,44 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Fri, 06 Mar 2015 13:08:29 -0800
-Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
- uncached guest mappings
-In-Reply-To: <54F895C8.2070306@redhat.com>
-References: <CAKv+Gu-JnvXFzr-fpjZZ-zTt8hOSfGqefw69s+4JX2iu_6_BMw@mail.gmail.com>
- <20150304141212.GA5352@hawk.usersys.redhat.com>
- <20150304142943.GU28951@e104818-lin.cambridge.arm.com>
- <54F73ACF.1090605@redhat.com>
- <20150304172855.GA28951@e104818-lin.cambridge.arm.com>
- <54F82C06.2000701@redhat.com>
- <20150305110415.GA7712@e104818-lin.cambridge.arm.com>
- <CAFEAcA98j_EsP4Hy20tQCKdnP3=NuvS3Ona37peBjan8aWLSEA@mail.gmail.com>
- <20150305120348.GD7712@e104818-lin.cambridge.arm.com>
- <54F84B7F.5010007@redhat.com>
- <20150305145831.GA11447@e104818-lin.cambridge.arm.com>
- <54F895C8.2070306@redhat.com>
-Message-ID: <54FA174D.4030807@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 6 Mar 2015 22:09:09 +0100
+Subject: [PATCH 0/3] clk: divider: three exactness fixes (and a rant)
+In-Reply-To: <54FA0385.2060808@codeaurora.org>
+References: <20150221085620.GV19388@pengutronix.de>
+ <1424515225-6929-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20150306185730.11109.45998@quantum>
+ <54FA0385.2060808@codeaurora.org>
+Message-ID: <20150306210909.GI10717@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2015 09:43 AM, Paolo Bonzini wrote:
+On Fri, Mar 06, 2015 at 11:44:05AM -0800, Stephen Boyd wrote:
+> On 03/06/15 10:57, Mike Turquette wrote:
+> >
+> > Uwe,
+> >
+> > Thanks for the fixes. I'm thinking of taking all three for 4.0. I also
+> > agree on clk_round_rate_nearest (along with a _ceil and _floor version
+> > as well). That's something we can do for 4.1 probably.
+> >
+> > There are currently 3 users of CLK_DIVIDER_ROUND_CLOSEST:
+> >
+> > Loongson
+> > QCOM
+> > ST
+> >
+> > So now is probably the right time to remove the flag if we're going to
+> > do it.
+> >
+> > What do you think?
+> >
 > 
-> 
-> On 05/03/2015 15:58, Catalin Marinas wrote:
->>> It would especially suck if the user has a cluster with different
->>> machines, some of them coherent and others non-coherent, and then has to
->>> debug why the same configuration works on some machines and not on others.
->>
->> That's a problem indeed, especially with guest migration. But I don't
->> think we have any sane solution here for the bus master DMA.
-> 
-> I do not oppose doing cache management in QEMU for bus master DMA
-> (though if the solution you outlined below works it would be great).
-> 
->> ARM can override them as well but only making them stricter. Otherwise,
->> on a weakly ordered architecture, it's not always safe (let's say the
->> guest thinks it accesses Strongly Ordered memory and avoids barriers for
->> flag updates but the host "upgrades" it to Cacheable which breaks the
->> memory order).
-> 
-> The same can happen on x86 though, even if it's rarer.  You still need a
-> barrier between stores and loads.
-> 
->> If we want the host to enforce guest memory mapping attributes via stage
->> 2, we could do it the other way around: get the guests to always assume
->> full cache coherency, generating Normal Cacheable mappings, but use the
->> stage 2 attributes restriction in the host to make such mappings
->> non-cacheable when needed (it works this way on ARM but not in the other
->> direction to relax the attributes).
-> 
-> That sounds like a plan for device assignment.  But it still would not
-> solve the problem of the MMIO framebuffer, right?
-> 
->>> The problem arises with MMIO areas that the guest can reasonably expect
->>> to be uncacheable, but that are optimized by the host so that they end
->>> up backed by cacheable RAM.  It's perfectly reasonable that the same
->>> device needs cacheable mapping with one userspace, and works with
->>> uncacheable mapping with another userspace that doesn't optimize the
->>> MMIO area to RAM.
->>
->> Unless the guest allocates the framebuffer itself (e.g.
->> dma_alloc_coherent), we can't control the cacheability via
->> "dma-coherent" properties as it refers to bus master DMA.
-> 
-> Okay, it's good to rule that out.  One less thing to think about. :)
-> Same for _DSD.
-> 
->> So for MMIO with the buffer allocated by the host (Qemu), the only
->> solution I see on ARM is for the host to ensure coherency, either via
->> explicit cache maintenance (new KVM API) or by changing the memory
->> attributes used by Qemu to access such virtual MMIO.
->>
->> Basically Qemu is acting as a bus master when reading the framebuffer it
->> allocated but the guest considers it a slave access and we don't have a
->> way to tell the guest that such accesses should be cacheable, nor can we
->> upgrade them via architecture features.
-> 
-> Yes, that's a way to put it.
-> 
->>> In practice, the VGA framebuffer has an optimization that uses dirty
->>> page tracking, so we could piggyback on the ioctls that return which
->>> pages are dirty.  It turns out that piggybacking on those ioctls also
->>> should fix the case of migrating a guest while the MMU is disabled.
->>
->> Yes, Qemu would need to invalidate the cache before reading a dirty
->> framebuffer page.
->>
->> As I said above, an API that allows non-cacheable mappings for the VGA
->> framebuffer in Qemu would also solve the problem. I'm not sure what KVM
->> provides here (or whether we can add such API).
-> 
-> Nothing for now; other architectures simply do not have the issue.
-> 
-> As long as it's just VGA, we can quirk it.  There's just a couple
-> vendor/device IDs to catch, and the guest can then use a cacheable mapping.
-> 
-> For a more generic solution, the API would be madvise(MADV_DONTCACHE).
-> It would be easy for QEMU to use it, but I am not too optimistic about
-> convincing the mm folks about it.  We can try.
+> I may have had to do divider round closest on qcom platforms because of
+> the problem these patches are for. I'll have to go back and look.
+When you do that, also check if it works for you. I think the
+implementation is broken for most of the cases.
 
-Interested to see the outcome.
+Best regards
+Uwe
 
-I was thinking of a very basic memory driver that can provide
-an uncached memslot to QEMU - in mmap() file operation
-apply pgprot_uncached to allocated pages, lock them, flush TLB
-call remap_pfn_range().
-
-Mario
-
-> 
-> Paolo
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-> 
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
