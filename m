@@ -1,36 +1,80 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 6 Mar 2015 10:34:29 +0000
-Subject: Intermittent efi libstub build errors on arm64
-Message-ID: <20150306103428.GA8045@linaro.org>
+From: yong.wu@mediatek.com (yong.wu at mediatek.com)
+Date: Fri, 6 Mar 2015 18:37:45 +0800
+Subject: [RFC PATCH 0/5] MT8173 IOMMU support
+Message-ID: <1425638270-24903-1-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-I've run into some strange build errors with 3.19.
+  This is based on Robin Murphy's arm64: IOMMU-backed DMA mapping[1]. 
+This patch adds support for m4u(Multimedia Memory Management Unit),
+Currently it only support the m4u with 2 levels of page table on mt8173.
 
-If I set a high number of parallel jobs, I sometimes get build errors
-such as:
+  Please check the hardware block diagram of Mediatek IOMMU.
 
-mv: cannot stat ?drivers/firmware/efi/libstub/.fdt.o.tmp?: No such file or directory
-  AR      drivers/firmware/efi/libstub/lib.a
-scripts/Makefile.build:257: recipe for target 'drivers/firmware/efi/libstub/fdt.o' failed
-make[1]: *** [drivers/firmware/efi/libstub/fdt.o] Error 1
-Makefile:939: recipe for target 'drivers/firmware/efi/libstub' failed
-make: *** [drivers/firmware/efi/libstub] Error 2
+              EMI (External Memory Interface)
+               |
+              m4u (Multimedia Memory Management Unit)
+               |
+              smi (Smart Multimedia Interface)
+               |
+        +---------------+-------
+        |               |
+        |               |
+    vdec larb       disp larb      ... SoCs have different local arbiter(larb).
+        |               |
+        |               |
+   +----+----+    +-----+-----+
+   |    |    |    |     |     |    ...
+   |    |    |    |     |     |    ...
+   |    |    |    |     |     |    ...
+  MC   PP   VLD  OVL0 RDMA0 WDMA0  ... 
+  
+  Normally we specify a local arbiter(larb) for each multimedia hardware like
+display, video decode, video encode and camera. And there are different ports in
+each larb. Take a example, there are some ports like MC, PP, UFO, VLD, AVC_MV,
+PRED_RD, PRED_WR in video larb, all the ports are according to the video hardware.
 
-and,
+	From the diagram, all the multimedia module connect with m4u via smi.
+SMI is responsible to enable/disable iommu and control the clocks of each local
+arbiter. If we should enable the iommu of video decode, it should config the 
+video's ports. And if the video hardware work wether enable/disable iommu, 
+it should enable the clock of its larb's clock. So we add a special driver for smi.
 
-fixdep: error opening depfile: drivers/firmware/efi/libstub/.efi-stub-helper.o.d: No such file or directory
-scripts/Makefile.build:257: recipe for target 'drivers/firmware/efi/libstub/efi-stub-helper.o' failed
-make[1]: *** [drivers/firmware/efi/libstub/efi-stub-helper.o] Error 2
-Makefile:939: recipe for target 'drivers/firmware/efi/libstub' failed
-make: *** [drivers/firmware/efi/libstub] Error 2
-make: *** Waiting for unfinished jobs....
+[1] http://lists.linuxfoundation.org/pipermail/iommu/2015-February/012236.html
 
+Yong Wu (5):
+  soc: mediatek: Add SMI driver
+  iommu/mediatek: Add mt8173 IOMMU driver
+  dt-bindings: mediatek: Add smi dts binding
+  dt-bindings: iommu: Add binding for mediatek IOMMU
+  dts: mt8173: Add iommu/smi nodes for mt8173
 
-I think some dependency information/header includes may need tweaking
-somewhere. Has anyone else come across this, or know more?
+ .../devicetree/bindings/iommu/mediatek,iommu.txt   |  41 ++
+ .../bindings/soc/mediatek/mediatek,smi.txt         |  17 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  60 ++
+ drivers/iommu/Kconfig                              |  11 +
+ drivers/iommu/Makefile                             |   1 +
+ drivers/iommu/mtk_iommu.c                          | 754 +++++++++++++++++++++
+ drivers/iommu/mtk_iommu.h                          |  73 ++
+ drivers/iommu/mtk_iommu_pagetable.c                | 439 ++++++++++++
+ drivers/iommu/mtk_iommu_pagetable.h                |  49 ++
+ drivers/soc/mediatek/Kconfig                       |   7 +
+ drivers/soc/mediatek/Makefile                      |   1 +
+ drivers/soc/mediatek/mt8173-smi.c                  | 143 ++++
+ include/dt-bindings/iommu/mt8173-iommu-port.h      | 127 ++++
+ include/linux/mtk-smi.h                            |  40 ++
+ 14 files changed, 1763 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
+ create mode 100644 drivers/iommu/mtk_iommu.c
+ create mode 100644 drivers/iommu/mtk_iommu.h
+ create mode 100644 drivers/iommu/mtk_iommu_pagetable.c
+ create mode 100644 drivers/iommu/mtk_iommu_pagetable.h
+ create mode 100644 drivers/soc/mediatek/mt8173-smi.c
+ create mode 100644 include/dt-bindings/iommu/mt8173-iommu-port.h
+ create mode 100644 include/linux/mtk-smi.h
 
-Cheers,
 -- 
-Steve
+1.8.1.1.dirty
+
+G:IT: [PATCH 5/5] dts: mt8173: Add iommu/smi nodes for mt8173
