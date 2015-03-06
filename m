@@ -1,45 +1,100 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 Mar 2015 16:37:39 +0000
-Subject: [PATCH 00/11] Collection of GIC/GICv3 fixes for 4.0
-Message-ID: <1425659870-11832-1-git-send-email-marc.zyngier@arm.com>
+Date: Fri,  6 Mar 2015 16:37:41 +0000
+Subject: [PATCH 02/11] irqchip: gicv3-its: Allocate enough memory for the full
+ range of DeviceID
+In-Reply-To: <1425659870-11832-1-git-send-email-marc.zyngier@arm.com>
+References: <1425659870-11832-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1425659870-11832-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series fixes a number of GIC(v3) issues, ranging from
-initialization fixes to out of bound accesses and locking issues.
+The ITS table allocator is only allocating a single page per table.
+This works fine for most things, but leads to silent lack of
+interrupt delivery if we end-up with a device that has an ID that is
+out of the range defined by a single page of memory. Even worse, depending
+on the page size, behaviour changes, which is not a very good experience.
 
-A number of these patches have already been posted before, but as
-we're starting to get patch dependencies, and in an effort to reduce
-the load on the maintainers, I've decided to collate them in a single
-series.
+A solution is actually to allocate memory for the full range of ID that
+the ITS supports. A massive waste memory wise, but at least a safe bet.
 
-This is based on v4.0-rc1, and available at from the following branch:
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gic-fixes
+Tested on a Phytium SoC.
 
-Marc Zyngier (4):
-  irqchip: gicv3-its: Allocate enough memory for the full range of
-    DeviceID
-  irqchip: gicv3-its: Iterate over PCI aliases to generate ITS
-    configuration
-  irqchip: gicv3-its: Fix unsafe locking reported by lockdep
-  irqchip: gic: Fix unsafe locking reported by lockdep
+Tested-by: Chen Baozi <chenbaozi@kylinos.com.cn>
+Acked-by: Chen Baozi <chenbaozi@kylinos.com.cn>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c   | 25 +++++++++++++++++++++----
+ include/linux/irqchip/arm-gic-v3.h |  2 ++
+ 2 files changed, 23 insertions(+), 4 deletions(-)
 
-Vladimir Murzin (2):
-  irqchip: gicv3-its: Fix ITS CPU init
-  irqchip: gic-v3: fix out of bounds access to cpu_logical_map
-
-Yun Wu (5):
-  irqchip: gicv3-its: zero itt before handling to hardware
-  irqchip: gicv3-its: use 64KB page as default granule
-  irqchip: gicv3-its: add limitation to page order
-  irqchip: gicv3-its: define macros for GITS_CTLR fields
-  irqchip: gicv3-its: support safe initialization
-
- drivers/irqchip/irq-gic-v3-its.c   | 157 ++++++++++++++++++++++++++++++-------
- drivers/irqchip/irq-gic-v3.c       |   2 +-
- drivers/irqchip/irq-gic.c          |  20 +++--
- include/linux/irqchip/arm-gic-v3.h |   5 ++
- 4 files changed, 146 insertions(+), 38 deletions(-)
-
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index c217ebc..733b32f 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -806,14 +806,31 @@ static int its_alloc_tables(struct its_node *its)
+ 		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
+ 		u64 type = GITS_BASER_TYPE(val);
+ 		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
++		int order = 0;
++		int alloc_size;
+ 		u64 tmp;
+ 		void *base;
+ 
+ 		if (type == GITS_BASER_TYPE_NONE)
+ 			continue;
+ 
+-		/* We're lazy and only allocate a single page for now */
+-		base = (void *)get_zeroed_page(GFP_KERNEL);
++		/*
++		 * Allocate as many entries as required to fit the
++		 * range of device IDs that the ITS can grok... The ID
++		 * space being incredibly sparse, this results in a
++		 * massive waste of memory.
++		 *
++		 * For other tables, only allocate a single page.
++		 */
++		if (type == GITS_BASER_TYPE_DEVICE) {
++			u64 typer = readq_relaxed(its->base + GITS_TYPER);
++			u32 ids = GITS_TYPER_DEVBITS(typer);
++
++			order = get_order((1UL << ids) * entry_size);
++		}
++
++		alloc_size = (1 << order) * PAGE_SIZE;
++		base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+ 		if (!base) {
+ 			err = -ENOMEM;
+ 			goto out_free;
+@@ -841,7 +858,7 @@ retry_baser:
+ 			break;
+ 		}
+ 
+-		val |= (PAGE_SIZE / psz) - 1;
++		val |= (alloc_size / psz) - 1;
+ 
+ 		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
+ 		tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
+@@ -882,7 +899,7 @@ retry_baser:
+ 		}
+ 
+ 		pr_info("ITS: allocated %d %s @%lx (psz %dK, shr %d)\n",
+-			(int)(PAGE_SIZE / entry_size),
++			(int)(alloc_size / entry_size),
+ 			its_base_type_string[type],
+ 			(unsigned long)virt_to_phys(base),
+ 			psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 800544b..cbdd440 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -166,6 +166,8 @@
+ 
+ #define GITS_TRANSLATER			0x10040
+ 
++#define GITS_TYPER_DEVBITS_SHIFT	13
++#define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
+ #define GITS_TYPER_PTA			(1UL << 19)
+ 
+ #define GITS_CBASER_VALID		(1UL << 63)
 -- 
 2.1.4
