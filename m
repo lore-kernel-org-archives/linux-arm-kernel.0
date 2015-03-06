@@ -1,29 +1,28 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Fri, 6 Mar 2015 22:57:58 +0100
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Sat, 7 Mar 2015 00:12:07 +0200
 Subject: twl4030_charger: need changes to get probed?
-In-Reply-To: <20150306212417.GA24169@amd>
+In-Reply-To: <201503062257.58180@pali>
 References: <20150224043341.4243.23291.stgit@notabene.brown>
- <20150305173350.50502b95@notabene.brown> <20150306212417.GA24169@amd>
-Message-ID: <201503062257.58180@pali>
+ <20150305173350.50502b95@notabene.brown>
+ <20150306212417.GA24169@amd> <201503062257.58180@pali>
+Message-ID: <CANOLnONUtfF1UwgW3O5fkAX30UMznZXwbtPkqPFDLR4jFdNqow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 06 March 2015 22:24:17 Pavel Machek wrote:
-> Hi!
-> 
-> According to n900 dts, twl4030-bci (aka charger) should be
-> included.
-> 
+On Fri, Mar 6, 2015 at 11:57 PM, Pali Roh?r <pali.rohar@gmail.com> wrote:
+> On Friday 06 March 2015 22:24:17 Pavel Machek wrote:
+>> Hi!
+>>
+>> According to n900 dts, twl4030-bci (aka charger) should be
+>> included.
+>>
+>
+> AFAIK it is not present on n900...
 
-AFAIK it is not present on n900...
+Right, it uses twl5030 variant without the charger, charging on n900
+is provided by separate chip and for a good reason as twl's charger is
+not that good. Forcing the driver to load just ends up with it
+accessing non-existent registers over i2c.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150306/cbf1153d/attachment.sig>
+
+Gra?vydas
