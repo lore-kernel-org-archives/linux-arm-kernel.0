@@ -1,28 +1,120 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 06 Mar 2015 15:16:53 -0500 (EST)
-Subject: [PATCH v2 0/2] net/macb: merge at91_ether driver into macb driver
-In-Reply-To: <1425622439-2372-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1425622439-2372-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150306.151653.2133726487330517804.davem@davemloft.net>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 06 Mar 2015 20:17:18 +0000
+Subject: [PATCH v9 01/21] ACPI / table: Use pr_debug() instead of
+ pr_info() for MADT table scanning
+In-Reply-To: <1424853601-6675-2-git-send-email-hanjun.guo@linaro.org>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <1424853601-6675-2-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150306201718.9363CC40AA9@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
-Date: Fri,  6 Mar 2015 07:13:57 +0100
+On Wed, 25 Feb 2015 16:39:41 +0800
+, Hanjun Guo <hanjun.guo@linaro.org>
+ wrote:
+> For a normal 8 cpu sockets system, it will up to 240 cpu threads (Xeon E7
+> v2 family for now), and we need 240 entries for local apic or local x2apic
+> in MADT table, so it will be much verbose information printed with a slow
+> uart console when system booted, this will be even worse with large system
+> with 16/32 cpu sockets.
+> 
+> This patch just use pr_debug() instead of pr_info() for ioapic/iosapic,
+> local apic/x2apic/sapic structures when scanning the MADT table to remove
+> those verbose information, but leave other structures unchanged.
+> 
+> CC: Rafael J Wysocki <rjw@rjwysocki.net>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-> The rm9200 boards use the dedicated at91_ether driver instead of the
-> regular macb driver.
-> 
-> Both the macb and at91_ether drivers can be compiled as separated
-> modules.
-> Since the at91_ether driver uses code from the macb driver, at91_ether.ko
-> depends on macb.ko.
-> 
-> However the macb.ko module always fails to load on rm9200 boards: the
-> macb_probe() function expects a hclk clock which doesn't exist on rm9200.
-> Then the at91_ether.ko can't be loaded in turn due to unresolved
-> dependencies.
-> 
-> This series of patches fix this issue by merging at91_ether into macb.
+One nitpick below, but don't respin over this, and don't do a fixup.
 
-Series applied to net-next, thanks.
+Acked-by: Grant Likely <grant.likely@linaro.org>
+
+> ---
+>  drivers/acpi/tables.c | 30 ++++++++++++++++--------------
+>  1 file changed, 16 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+> index 93b8152..f4e5b88 100644
+> --- a/drivers/acpi/tables.c
+> +++ b/drivers/acpi/tables.c
+> @@ -23,6 +23,8 @@
+>   *
+>   */
+>  
+> +/* Uncomment next line to get verbose printout */
+> +/* #define DEBUG */
+>  #define pr_fmt(fmt) "ACPI: " fmt
+>  
+>  #include <linux/init.h>
+> @@ -61,9 +63,9 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>  		{
+>  			struct acpi_madt_local_apic *p =
+>  			    (struct acpi_madt_local_apic *)header;
+> -			pr_info("LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
+> -				p->processor_id, p->id,
+> -				(p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+> +			pr_debug("LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
+> +				 p->processor_id, p->id,
+> +				 (p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+
+The whitespace changes makes each 1 line change into 3 line changes. In
+these situations, I would chose to leave the whitespace alone to keep
+the diffstat as small as possible. It makes it less likely to conflict
+with other patches and easier to find context.
+
+>  		}
+>  		break;
+>  
+> @@ -71,9 +73,9 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>  		{
+>  			struct acpi_madt_local_x2apic *p =
+>  			    (struct acpi_madt_local_x2apic *)header;
+> -			pr_info("X2APIC (apic_id[0x%02x] uid[0x%02x] %s)\n",
+> -				p->local_apic_id, p->uid,
+> -				(p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+> +			pr_debug("X2APIC (apic_id[0x%02x] uid[0x%02x] %s)\n",
+> +				 p->local_apic_id, p->uid,
+> +				 (p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+>  		}
+>  		break;
+>  
+> @@ -81,8 +83,8 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>  		{
+>  			struct acpi_madt_io_apic *p =
+>  			    (struct acpi_madt_io_apic *)header;
+> -			pr_info("IOAPIC (id[0x%02x] address[0x%08x] gsi_base[%d])\n",
+> -				p->id, p->address, p->global_irq_base);
+> +			pr_debug("IOAPIC (id[0x%02x] address[0x%08x] gsi_base[%d])\n",
+> +				 p->id, p->address, p->global_irq_base);
+>  		}
+>  		break;
+>  
+> @@ -155,9 +157,9 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>  		{
+>  			struct acpi_madt_io_sapic *p =
+>  			    (struct acpi_madt_io_sapic *)header;
+> -			pr_info("IOSAPIC (id[0x%x] address[%p] gsi_base[%d])\n",
+> -				p->id, (void *)(unsigned long)p->address,
+> -				p->global_irq_base);
+> +			pr_debug("IOSAPIC (id[0x%x] address[%p] gsi_base[%d])\n",
+> +				 p->id, (void *)(unsigned long)p->address,
+> +				 p->global_irq_base);
+>  		}
+>  		break;
+>  
+> @@ -165,9 +167,9 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>  		{
+>  			struct acpi_madt_local_sapic *p =
+>  			    (struct acpi_madt_local_sapic *)header;
+> -			pr_info("LSAPIC (acpi_id[0x%02x] lsapic_id[0x%02x] lsapic_eid[0x%02x] %s)\n",
+> -				p->processor_id, p->id, p->eid,
+> -				(p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+> +			pr_debug("LSAPIC (acpi_id[0x%02x] lsapic_id[0x%02x] lsapic_eid[0x%02x] %s)\n",
+> +				 p->processor_id, p->id, p->eid,
+> +				 (p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+>  		}
+>  		break;
+>  
+> -- 
+> 1.9.1
+> 
