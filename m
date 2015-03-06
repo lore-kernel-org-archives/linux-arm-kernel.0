@@ -1,86 +1,178 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri,  6 Mar 2015 19:04:00 +0100
-Subject: [PATCH 2/8] ARM: dts: rockchip: relicense rk3066a.dtsi under GPLv2/X11
-In-Reply-To: <1425665046-22927-1-git-send-email-heiko@sntech.de>
-References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
-Message-ID: <1425665046-22927-3-git-send-email-heiko@sntech.de>
+From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez-Ortiz)
+Date: Fri,  6 Mar 2015 13:05:40 -0500
+Subject: [PATCH v6] drivers/tty: amba: defer DMA probe until the DMA channel
+ is required.
+Message-ID: <1425665140-1827-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPLv2-only devicetrees make reuse difficult for software components licensed
-under a different license.
+Fix a race condition that happens when device_initcall(pl011_dma_initicall)
+is executed before all the devices have been probed - this issue was observed on
+a hisi_6220 SoC (HiKey board from Linaro).
 
-The consensus is that a GPL/X11 dual-license should allow all necessary uses,
-so relicense the rk3066a.dtsi to this combination.
+The deferred driver probing framework relies on late_initcall to trigger
+deferred probes so it is just possible that, even with a valid DMA driver ready
+to be loaded, we fail to synchronize with it.
 
-CCs were aquired by git shortlog -sne so it should've hopefully catched
-every contributor.
+The proposed implementation delays probing the DMA until dma_startup.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Cc: Beniamino Galvani <b.galvani@gmail.com>
-Cc: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
-Cc: Romain Perier <romain.perier@gmail.com>
+As this is invoked on port startup and port resume - but DMA probing is only
+required once - we avoid calling multiple times using a new field in
+uart_amba_port to track this scenario.
+
+This commit allows for subsequent attempts to associate an external DMA if the
+DMA driver itself is not available (but present in the deferred probe pending
+list).
+
+Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
-I'm hoping to get Acked-by tags from the people in the Cc-list.
+ drivers/tty/serial/amba-pl011.c | 71 ++++++++++-------------------------------
+ 1 file changed, 17 insertions(+), 54 deletions(-)
 
- arch/arm/boot/dts/rk3066a.dtsi | 44 ++++++++++++++++++++++++++++++++++--------
- 1 file changed, 36 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index 41ffd49..d32229b 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -2,15 +2,43 @@
-  * Copyright (c) 2013 MundoReader S.L.
-  * Author: Heiko Stuebner <heiko@sntech.de>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-  *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-  */
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 8d94c19..f34f85c 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -164,6 +164,7 @@ struct uart_amba_port {
+ 	bool			using_rx_dma;
+ 	struct pl011_dmarx_data dmarx;
+ 	struct pl011_dmatx_data	dmatx;
++	bool			dma_probed;
+ #endif
+ };
  
- #include <dt-bindings/gpio/gpio.h>
+@@ -261,10 +262,11 @@ static void pl011_sgbuf_free(struct dma_chan *chan, struct pl011_sgbuf *sg,
+ 	}
+ }
+ 
+-static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *uap)
++static void pl011_dma_probe(struct uart_amba_port *uap)
+ {
+ 	/* DMA is the sole user of the platform data right now */
+ 	struct amba_pl011_data *plat = dev_get_platdata(uap->port.dev);
++	struct device *dev = uap->port.dev;
+ 	struct dma_slave_config tx_conf = {
+ 		.dst_addr = uap->port.mapbase + UART01x_DR,
+ 		.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE,
+@@ -275,9 +277,15 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
+ 	struct dma_chan *chan;
+ 	dma_cap_mask_t mask;
+ 
+-	chan = dma_request_slave_channel(dev, "tx");
++	uap->dma_probed = true;
++	chan = dma_request_slave_channel_reason(dev, "tx");
++	if (IS_ERR(chan)) {
++		if (PTR_ERR(chan) == -EPROBE_DEFER) {
++			dev_info(uap->port.dev, "DMA driver not ready\n");
++			uap->dma_probed = false;
++			return;
++		}
+ 
+-	if (!chan) {
+ 		/* We need platform data */
+ 		if (!plat || !plat->dma_filter) {
+ 			dev_info(uap->port.dev, "no DMA platform data\n");
+@@ -385,55 +393,8 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
+ 	}
+ }
+ 
+-#ifndef MODULE
+-/*
+- * Stack up the UARTs and let the above initcall be done at device
+- * initcall time, because the serial driver is called as an arch
+- * initcall, and at this time the DMA subsystem is not yet registered.
+- * At this point the driver will switch over to using DMA where desired.
+- */
+-struct dma_uap {
+-	struct list_head node;
+-	struct uart_amba_port *uap;
+-	struct device *dev;
+-};
+-
+-static LIST_HEAD(pl011_dma_uarts);
+-
+-static int __init pl011_dma_initcall(void)
+-{
+-	struct list_head *node, *tmp;
+-
+-	list_for_each_safe(node, tmp, &pl011_dma_uarts) {
+-		struct dma_uap *dmau = list_entry(node, struct dma_uap, node);
+-		pl011_dma_probe_initcall(dmau->dev, dmau->uap);
+-		list_del(node);
+-		kfree(dmau);
+-	}
+-	return 0;
+-}
+-
+-device_initcall(pl011_dma_initcall);
+-
+-static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
+-{
+-	struct dma_uap *dmau = kzalloc(sizeof(struct dma_uap), GFP_KERNEL);
+-	if (dmau) {
+-		dmau->uap = uap;
+-		dmau->dev = dev;
+-		list_add_tail(&dmau->node, &pl011_dma_uarts);
+-	}
+-}
+-#else
+-static void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
+-{
+-	pl011_dma_probe_initcall(dev, uap);
+-}
+-#endif
+-
+ static void pl011_dma_remove(struct uart_amba_port *uap)
+ {
+-	/* TODO: remove the initcall if it has not yet executed */
+ 	if (uap->dmatx.chan)
+ 		dma_release_channel(uap->dmatx.chan);
+ 	if (uap->dmarx.chan)
+@@ -1021,6 +982,9 @@ static void pl011_dma_startup(struct uart_amba_port *uap)
+ {
+ 	int ret;
+ 
++	if (!uap->dma_probed)
++		pl011_dma_probe(uap);
++
+ 	if (!uap->dmatx.chan)
+ 		return;
+ 
+@@ -1142,7 +1106,7 @@ static inline bool pl011_dma_rx_running(struct uart_amba_port *uap)
+ 
+ #else
+ /* Blank functions if the DMA engine is not available */
+-static inline void pl011_dma_probe(struct device *dev, struct uart_amba_port *uap)
++static inline void pl011_dma_probe(struct uart_amba_port *uap)
+ {
+ }
+ 
+@@ -2218,7 +2182,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 	uap->port.ops = &amba_pl011_pops;
+ 	uap->port.flags = UPF_BOOT_AUTOCONF;
+ 	uap->port.line = i;
+-	pl011_dma_probe(&dev->dev, uap);
+ 
+ 	/* Ensure interrupts from this UART are masked and cleared */
+ 	writew(0, uap->port.membase + UART011_IMSC);
+@@ -2233,7 +2196,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 	if (!amba_reg.state) {
+ 		ret = uart_register_driver(&amba_reg);
+ 		if (ret < 0) {
+-			pr_err("Failed to register AMBA-PL011 driver\n");
++			dev_err(&dev->dev,
++				"Failed to register AMBA-PL011 driver\n");
+ 			return ret;
+ 		}
+ 	}
+@@ -2242,7 +2206,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 	if (ret) {
+ 		amba_ports[i] = NULL;
+ 		uart_unregister_driver(&amba_reg);
+-		pl011_dma_remove(uap);
+ 	}
+ 
+ 	return ret;
 -- 
-2.1.4
+1.9.1
