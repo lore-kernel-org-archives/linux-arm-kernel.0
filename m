@@ -1,97 +1,41 @@
 From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 06 Mar 2015 12:00:40 +0100
-Subject: [PATCH v3 2/3] pci: iproc: Add Broadcom iProc PCIe support
-In-Reply-To: <1425603699-13416-3-git-send-email-rjui@broadcom.com>
-References: <1425603699-13416-1-git-send-email-rjui@broadcom.com>
- <1425603699-13416-3-git-send-email-rjui@broadcom.com>
-Message-ID: <1425639640.24292.271.camel@x220>
+Date: Fri, 06 Mar 2015 12:05:54 +0100
+Subject: [PATCH 2/2] pinctrl: mediatek: Adjust mt8173 pinctrl kconfig
+In-Reply-To: <1425623091-30478-2-git-send-email-yingjoe.chen@mediatek.com>
+References: <1425623091-30478-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1425623091-30478-2-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1425639954.24292.274.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-03-05 at 17:01 -0800, Ray Jui wrote:
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -106,4 +106,21 @@ config PCI_VERSATILE
->  	bool "ARM Versatile PB PCI controller"
->  	depends on ARCH_VERSATILE
+On Fri, 2015-03-06 at 14:24 +0800, Yingjoe Chen wrote:
+> --- a/drivers/pinctrl/mediatek/Kconfig
+> +++ b/drivers/pinctrl/mediatek/Kconfig
+
+> @@ -8,11 +8,13 @@ config PINCTRL_MTK_COMMON
+>  	select OF_GPIO
 >  
-> +config PCIE_IPROC
-> +	bool "Broadcom iProc PCIe controller"
+>  config PINCTRL_MT8135
+> -	def_bool MACH_MT8135
+> +	def_bool MACH_MT8135 || COMPILE_TEST
+>  	select PINCTRL_MTK_COMMON
+>  
+>  config PINCTRL_MT8173
+> -	def_bool MACH_MT8173
+> +	bool "Mediatek MT8173 pin control"
+> +	def_bool y
 
-bool symbol.
+The kconfig tools will do what you mean here, but I think it's cleaner
+to make this just:
+	bool "Mediatek MT8173 pin control"
+	default y
 
-> +	help
-> +	  This enables the iProc PCIe core controller support for Broadcom's
-> +	  iProc family of SoCs. An appropriate bus interface driver also needs
-> +	  to be enabled
-> +
-> +config PCIE_IPROC_PLTFM
-> +	bool "Broadcom iProc PCIe platform bus driver"
+> +	depends on ARM64 || COMPILE_TEST
+>  	select PINCTRL_MTK_COMMON
+>  
+>  endif
 
-Another bool symbol.
-
-> +	depends on ARCH_BCM_IPROC || COMPILE_TEST
-> +	depends on OF
-> +	select PCIE_IPROC
-> +	default ARCH_BCM_IPROC
-> +	help
-> +	  Say Y here if you want to use the Broadcom iProc PCIe controller
-> +	  through the generic platform bus interface
-> +
->  endmenu
-
-> --- a/drivers/pci/host/Makefile
-> +++ b/drivers/pci/host/Makefile
-
-> +obj-$(CONFIG_PCIE_IPROC) += pcie-iproc.o
-> +obj-$(CONFIG_PCIE_IPROC_PLTFM) += pcie-iproc-pltfm.o
-
-Both objectfiles will never be part of a module.
-
-> --- /dev/null
-> +++ b/drivers/pci/host/pcie-iproc-pltfm.c
-
-> +#include <linux/module.h>
-
-Is this needed?
-
-> +MODULE_DEVICE_TABLE(of, iproc_pcie_of_match_table);
-
-This macro will be preprocessed away, won't it?
-
-> +static struct platform_driver iproc_pcie_pltfm_driver = {
-> +	.driver = {
-> +		.name = "iproc-pcie",
-> +		.of_match_table = of_match_ptr(iproc_pcie_of_match_table),
-> +		.suppress_bind_attrs = true,
-> +	},
-> +	.probe = iproc_pcie_pltfm_probe,
-> +};
-> +module_platform_driver(iproc_pcie_pltfm_driver);
-
-Perhaps it's clearer to have make this a call to
-platform_driver_register(), put that in a wrapper function, and invoke
-that wrapper function through device_initcall() or similar. I haven't
-actually tested that, so the details could be off.
-
-> +MODULE_AUTHOR("Ray Jui <rjui@broadcom.com>");
-> +MODULE_DESCRIPTION("Broadcom iPROC PCIe platform driver");
-> +MODULE_LICENSE("GPL v2");
-
-And these three macros will, effectively, be preprocessed away.
-
-> --- /dev/null
-> +++ b/drivers/pci/host/pcie-iproc.c
-
-> +#include <linux/module.h>
-
-See above.
-
-> +MODULE_AUTHOR("Ray Jui <rjui@broadcom.com>");
-> +MODULE_DESCRIPTION("Broadcom iPROC PCIe common driver");
-> +MODULE_LICENSE("GPL v2");
-
-Ditto.
+Thanks,
 
 
 Paul Bolle
