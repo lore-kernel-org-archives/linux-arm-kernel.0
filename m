@@ -1,37 +1,57 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 6 Mar 2015 04:26:09 +0000 (UTC)
-Subject: [PATCH 2/4] ARM: OMAP2+: AM43xx hwmod: Add RTC hwmod for
- AM43xx
-In-Reply-To: <1425561211-31003-3-git-send-email-d-gerlach@ti.com>
-References: <1425561211-31003-1-git-send-email-d-gerlach@ti.com>
- <1425561211-31003-3-git-send-email-d-gerlach@ti.com>
-Message-ID: <alpine.DEB.2.02.1503060425590.5613@utopia.booyaka.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Fri, 6 Mar 2015 12:26:20 +0800
+Subject: [PATCH v9 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <20150305185701.GH4932@quad.lixom.net>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <20150305185701.GH4932@quad.lixom.net>
+Message-ID: <54F92C6C.4040203@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Mar 2015, Dave Gerlach wrote:
+On 2015/3/6 2:57, Olof Johansson wrote:
+> Hi,
 
-> RTC hwmod is needed for proper operation of PM features like
-> rtcwake and rtc-only mode so reuse the am33xx rtc hwmod.
-> 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> index 8eb8592..9070535 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> @@ -889,6 +889,7 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
->  	&am43xx_l4_ls__dss,
->  	&am43xx_l4_ls__dss_dispc,
->  	&am43xx_l4_ls__dss_rfbi,
-> +	&am33xx_l4_wkup__rtc,
->  	NULL,
->  };
+Hi Olof,
 
-Thanks, queued for v4.1.
+>
+> On Wed, Feb 25, 2015 at 04:39:40PM +0800, Hanjun Guo wrote:
+>> Changes since v8:
+>>   - remove MPIDR packing things by introducing phys_cpuid_t;
+>>
+>>   - update patch acpi: fix acpi_os_ioremap for arm64 to follow
+>>     Rafael's suggestion;
+>>
+>>   - Squash patch (disable ACPI if ACPI less than 5.1) to patch
+>>     (Get RSDP and ACPI boot-time table);
+>>
+>>   - Move sleep_arm.c to arch/arm64/ and rename it as acpi_sleep.c 
+>>
+>>   - Rework the uefi generated empty dtb to enable acpi when no dtb
+>>     is available, thanks Ard for the updated patch.
+>>
+>>   - rework the function of register cpu for kexec case
+>>
+>>   - use pr_debug() instead of pr_info() when scanning MADT.
+>>
+>>   - rebase on top of 4.0-rc1
+>>
+> I've looked at most of the arch code besides GIC and some of the timer stuff,
+> which I might revisit later, but the pieces I've seen seem reasonable. I've
+> acked individual patches.
 
+Thank you very much for the ACKs and review comments!
 
-- Paul
+>
+> There are some cleanups to be made, but that can be done incrementally on top,
+> it's all internal implementation details.
+
+Definitely in my TODO list :)
+
+>
+> I also haven't looked closely at the documentation patches yet, so I might have
+> some comments on those showing up.
+
+OK, thanks.
+
+Regards
+Hanjun
