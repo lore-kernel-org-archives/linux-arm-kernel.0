@@ -1,62 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 06 Mar 2015 16:04:56 +0000
-Subject: [PATCH v4 2/5] irqchip: gicv3-its: use 64KB page as default
- granule
-In-Reply-To: <1425615203-3300-3-git-send-email-wuyun.wu@huawei.com>
-References: <1425615203-3300-1-git-send-email-wuyun.wu@huawei.com>
- <1425615203-3300-3-git-send-email-wuyun.wu@huawei.com>
-Message-ID: <54F9D028.4010002@arm.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 6 Mar 2015 10:08:09 -0600
+Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
+ msm-id and qcom, board-id
+In-Reply-To: <CAOesGMgy3VY=4-t+N0BYqCuSLQkh-rYe8nd9iJh1mMeBFz_sWQ@mail.gmail.com>
+References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
+ <7h8ufbjkod.fsf@deeprootsystems.com>
+ <07D4E4D1-BF8C-4583-9505-9F321DB10406@codeaurora.org>
+ <CAOesGMgy3VY=4-t+N0BYqCuSLQkh-rYe8nd9iJh1mMeBFz_sWQ@mail.gmail.com>
+Message-ID: <B8019148-3B26-453E-A3F0-9D67874083E0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/15 04:13, Yun Wu wrote:
-> The field of page size in register GITS_BASERn might be read-only
-> if an implementation only supports a single, fixed page size. But
-> currently the ITS driver will throw out an error when PAGE_SIZE
-> is less than the minimum size supported by an ITS. So addressing
-> this problem by using 64KB pages as default granule for all the
-> ITS base tables.
+
+On Mar 5, 2015, at 7:59 PM, Olof Johansson <olof@lixom.net> wrote:
+
+> On Thu, Mar 5, 2015 at 12:23 PM, Kumar Gala <galak@codeaurora.org> wrote:
+>> 
+>> On Mar 5, 2015, at 1:42 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>> 
+>>> Kumar Gala <galak@codeaurora.org> writes:
+>>> 
+>>>> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
+>>>> on Qualcomm MSM platforms to determine which device tree should be
+>>>> utilized and passed to the kernel.
+>>>> 
+>>>> Cc: <devicetree@vger.kernel.org>
+>>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+>>> 
+>>> Is this the special magic that allows qcom bootloaders to take a kernel
+>>> plus multiple DTBs and figure out which DTB to pass?
+>>> 
+>>> Kevin
+>> 
+>> yes
 > 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> That's a bummer.
 > 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 69eeea3..f5bfa42 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -800,7 +800,7 @@ static int its_alloc_tables(struct its_node *its)
->  {
->  	int err;
->  	int i;
-> -	int psz = PAGE_SIZE;
-> +	int psz = SZ_64K;
->  	u64 shr = GITS_BASER_InnerShareable;
-> 
->  	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+> Luckily, the solution for upstream is still quite simple: Provide only
+> one devicetree, and it'll be used, right?
 
-Just went through a test run with this, and this breaks any non Device
-Table allocation when PAGE_SIZE != 64K.
+We can provide only one, we still need the IDs in the DT.
 
-The following hunk fixes it:
-
-@@ -806,7 +806,7 @@ static int its_alloc_tables(struct its_node *its)
- 		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
- 		u64 type = GITS_BASER_TYPE(val);
- 		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
--		int order = 0;
-+		int order = get_order(psz);
- 		int alloc_size;
- 		u64 tmp;
- 		void *base;
-
-I'll fold it in to the original patch, but I'd be grateful if you could
-do a slightly more thorough testing before sending patches.
-
-Thanks,
-
-	M.
+- k
 -- 
-Jazz is not dead. It just smells funny...
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
