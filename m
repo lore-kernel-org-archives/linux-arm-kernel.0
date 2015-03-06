@@ -1,57 +1,39 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Fri, 06 Mar 2015 19:16:53 +0900
-Subject: [GIT PULL 2/2] Samsung fixes-2 for v4.0
-In-Reply-To: <2064108.qlOP0oDx90@wuerfel>
-References: <54F4B33E.3070803@kernel.org> <2064108.qlOP0oDx90@wuerfel>
-Message-ID: <02cd01d057f6$ab1a8e40$014faac0$@kernel.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri,  6 Mar 2015 11:23:59 +0100
+Subject: [PATCH v2 0/3] net: macb: rework at91 specific handling
+Message-ID: <1425637442-8724-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> 
-+ Eduardo
+Hello,
 
-Hi Arnd,
+This removes the #if defined(ARCH_AT91) sections to prevent any problem
+when enabling ARM multi-platform support.
+The at91 specific logic is now activated when the "at91sam9260-macb"
+compatible string is found. 
 
-> On Tuesday 03 March 2015 04:00:14 Kukjin Kim wrote:
-> > Please pull Samsung tmu and hdmi regression fixes for v4.0 and I know
-> > this is quite big for fixes but I couldn't handle this series for
-> > previous merge window because of dependency with driver side...sorry for
-> > that and please pull so that we could support them in v4.0 on exynos
-> > platforms.
-> 
-> What kind of dependency do you have there? It really should not be
-> necessary to wait for driver changes, unless you do an incompatible
-> DT binding change, which you should avoid.
-> 
-For TMU patches, I've asked Eduardo to provide topic branch for
-'include/dt-bindings/thermal/thermal_exynos.h' has been added via thermal tree
-because if I can't apply the patch in Samsung tree for arm-soc, kernel build
-breakage will be happened. But I couldn't get Eduardo's topic branch.
+Best Regards,
 
-http://www.spinics.net/lists/linux-samsung-soc/msg41877.html
+Boris
 
+Changes since v1:
+- avoid changing existing behavior as Alexandre suggested
 
-For HDMI patches, I thought the DT changes have a dependency with "drm/exynos:
-add support for 'hdmi' clock" so waited for its applying then in drm tree. But
-I couldn't send it to arm-soc after that...
+Boris Brezillon (3):
+  net/macb: Update DT bindings documentation
+  ARM: at91/dt: fix macb compatible strings
+  net: macb: remove #if defined(CONFIG_ARCH_AT91) sections
 
-http://www.spinics.net/lists/linux-samsung-soc/msg42173.html
+ Documentation/devicetree/bindings/net/macb.txt |  5 +++-
+ arch/arm/boot/dts/at91sam9260.dtsi             |  2 +-
+ arch/arm/boot/dts/at91sam9263.dtsi             |  2 +-
+ arch/arm/boot/dts/at91sam9g45.dtsi             |  2 +-
+ arch/arm/boot/dts/at91sam9x5_macb0.dtsi        |  2 +-
+ arch/arm/boot/dts/at91sam9x5_macb1.dtsi        |  2 +-
+ arch/arm/boot/dts/sama5d3_emac.dtsi            |  2 +-
+ drivers/net/ethernet/cadence/macb.c            | 32 ++++++++++++++------------
+ drivers/net/ethernet/cadence/macb.h            |  2 ++
+ 9 files changed, 29 insertions(+), 22 deletions(-)
 
-
-I asked about the situation (late DT changes?) when I sent a pull-request, then
-I couldn't get a access my kernel.org because of biz. trip to China :(
-
-http://www.spinics.net/lists/linux-samsung-soc/msg42235.html
-
-
-> I've pulled it into fixes, but won't forward it until I hear a
-> good explanation.
-> 
-As you know, basically I tried to make a clear branch for pull-request but in
-that case, I couldn't find a solution. Sorry for the inconvenience.
-
-I hope v4.0 can support them properly.
-
-Thanks,
-Kukjin
+-- 
+1.9.1
