@@ -1,27 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 Mar 2015 08:56:41 -0800
-Subject: [PATCH v2] ARM: dts: am335x-bone-common: enable aes and sham
-In-Reply-To: <CAOCHtYisxjpQM4zvotNxhj3KaYrqb3cgCbTXPXphB1ZV2jCZ8w@mail.gmail.com>
-References: <1424890361-31848-1-git-send-email-mporter@konsulko.com>
- <CAOCHtYisxjpQM4zvotNxhj3KaYrqb3cgCbTXPXphB1ZV2jCZ8w@mail.gmail.com>
-Message-ID: <20150306165641.GQ13520@atomide.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 6 Mar 2015 11:04:08 -0600
+Subject: [PATCH] PCI: xgene: fix breakage from generic config usage
+In-Reply-To: <1425507864-22055-1-git-send-email-msalter@redhat.com>
+References: <1425507864-22055-1-git-send-email-msalter@redhat.com>
+Message-ID: <20150306170408.GD20077@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Robert Nelson <robertcnelson@gmail.com> [150225 11:13]:
-> On Wed, Feb 25, 2015 at 12:52 PM, Matt Porter <mporter@konsulko.com> wrote:
-> > Beaglebone Black doesn't have AES and SHAM enabled like the
-> > original Beaglebone White dts. This breaks applications that
-> > leverage the crypto blocks so fix this by enabling these nodes
-> > in the am335x-bone-common.dtsi. With this change, enabling the
-> > nodes in am335x-bone.dts is no longer required so remove them.
-> >
-> > Signed-off-by: Matt Porter <mporter@konsulko.com>
+On Wed, Mar 04, 2015 at 05:24:24PM -0500, Mark Salter wrote:
+> Commit 350f8be5bb402 ("PCI: xgene: Convert to use generic config
+> accessors") breaks PCI on the X-Gene platform. It creates two
+> problems with the xgene_pcie_map_bus() function. First, it returns
+> an int but should return a void __iomem *, but that's just a
+> compile-time warning. The breakage is caused by the offset not
+> being added to the base of the config map. So all config reads
+> and writes operate on the first four bytes of config space. This
+> patch fixes both issues.
 > 
-> Looks good! Wonder why didn't we do this sooner! ;)
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+
+I forgot to copy you, Mark, but I applied Feng's earlier patch [1], which I
+think is equivalent to yours.
+
+[1] https://patchwork.ozlabs.org/patch/440759/
+
+> ---
+>  drivers/pci/host/pci-xgene.c | 10 +++++++---
+>  1 file changed, 7 insertions(+), 3 deletions(-)
 > 
-> Acked-by: Robert Nelson <robertcnelson@gmail.com>
-
-Applying both into omap-for-v4.0/fixes thanks.
-
-Tony
+> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> index 52bb25c..b87f80b 100644
+> --- a/drivers/pci/host/pci-xgene.c
+> +++ b/drivers/pci/host/pci-xgene.c
+> @@ -129,17 +129,21 @@ static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
+>  	return false;
+>  }
+>  
+> -static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+> -			      int offset)
+> +static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+> +					int offset)
+>  {
+>  	struct xgene_pcie_port *port = bus->sysdata;
+> +	void __iomem *base;
+>  
+>  	if ((pci_is_root_bus(bus) && devfn != 0) || !port->link_up ||
+>  	    xgene_pcie_hide_rc_bars(bus, offset))
+>  		return NULL;
+>  
+>  	xgene_pcie_set_rtdid_reg(bus, devfn);
+> -	return xgene_pcie_get_cfg_base(bus);
+> +	base = xgene_pcie_get_cfg_base(bus);
+> +	if (base)
+> +		base += offset;
+> +	return base;
+>  }
+>  
+>  static struct pci_ops xgene_pcie_ops = {
+> -- 
+> 1.8.3.1
+> 
