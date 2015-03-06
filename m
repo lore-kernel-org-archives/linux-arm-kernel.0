@@ -1,26 +1,39 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 6 Mar 2015 15:18:24 +0800
-Subject: parent/child hierarchy for regulator
-In-Reply-To: <20150305122234.GL21293@sirena.org.uk>
-References: <20150305103534.GA19600@shlinux2>
- <20150305122234.GL21293@sirena.org.uk>
-Message-ID: <20150306071823.GC12879@shlinux2>
+Date: Fri, 6 Mar 2015 16:04:20 +0800
+Subject: [PATCH 1/2] ARM: imx6qdl-sabresd: set swbst_reg as vbus's parent reg
+Message-ID: <1425629061-8995-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 05, 2015 at 12:22:34PM +0000, Mark Brown wrote:
-> On Thu, Mar 05, 2015 at 06:35:36PM +0800, Peter Chen wrote:
-> 
-> > Any good ways at code/dts to show parent/child hierarchy for regulator?
-> 
-> There's plenty of examples in mainline...
-> 
+USB vbus 5V is from PMIC SWBST, so set swbst_reg as vbus's
+parent reg, it fixed a bug that the voltage of vbus is incorrect
+due to swbst_reg is disabled after boots up.
 
-Thanks, I get answer for adding parent regulator for fixed regulator,
-it is very easy, we only need to add 'vin-supply = <&parent_reg>;'
-at fixed's property.
+Cc: stable <stable@vger.kernel.org>
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index f1cd214..a626e6d 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -35,6 +35,7 @@
+ 			regulator-max-microvolt = <5000000>;
+ 			gpio = <&gpio3 22 0>;
+ 			enable-active-high;
++			vin-supply = <&swbst_reg>;
+ 		};
+ 
+ 		reg_usb_h1_vbus: regulator at 1 {
+@@ -45,6 +46,7 @@
+ 			regulator-max-microvolt = <5000000>;
+ 			gpio = <&gpio1 29 0>;
+ 			enable-active-high;
++			vin-supply = <&swbst_reg>;
+ 		};
+ 
+ 		reg_audio: regulator at 2 {
 -- 
-
-Best Regards,
-Peter Chen
+1.9.1
