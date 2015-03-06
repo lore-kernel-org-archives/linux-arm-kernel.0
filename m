@@ -1,130 +1,62 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 6 Mar 2015 14:28:43 +0200
-Subject: [PATCH 08/24] ARM: OMAP36xx: remove clock36xx.c/.h files
+Date: Fri, 6 Mar 2015 14:28:48 +0200
+Subject: [PATCH 13/24] ARM: OMAP2+: clock: add support for specific CM ops to
+ ti_clk_ll_ops
 In-Reply-To: <1425644939-3232-1-git-send-email-t-kristo@ti.com>
 References: <1425644939-3232-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1425644939-3232-9-git-send-email-t-kristo@ti.com>
+Message-ID: <1425644939-3232-14-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These files contain legacy clock implementations which are no longer used
-for anything, thus remove them completely.
+Clock driver requires access to some CM API functions once the code
+is being moved under the clock driver from the platform directory.
+Gate type clock requires access to cm_wait_module_ready and
+cm_split_idlest_reg functions, which are both used for waiting until
+the module being clocked has been successfully activated. These CM
+APIs are now exported through the ti_clk_ll_ops struct.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/Makefile    |    2 +-
- arch/arm/mach-omap2/clock36xx.c |   69 ---------------------------------------
- arch/arm/mach-omap2/clock36xx.h |   13 --------
- 3 files changed, 1 insertion(+), 83 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/clock36xx.c
- delete mode 100644 arch/arm/mach-omap2/clock36xx.h
+ arch/arm/mach-omap2/prm_common.c |    2 ++
+ include/linux/clk/ti.h           |    6 ++++++
+ 2 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index c172cf1..db627b2 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -188,7 +188,7 @@ obj-$(CONFIG_ARCH_OMAP2)		+= clkt2xxx_dpll.o
- obj-$(CONFIG_SOC_OMAP2430)		+= clock2430.o
- obj-$(CONFIG_ARCH_OMAP3)		+= $(clock-common) clock3xxx.o
- obj-$(CONFIG_ARCH_OMAP3)		+= clock34xx.o clkt34xx_dpll3m2.o
--obj-$(CONFIG_ARCH_OMAP3)		+= clock3517.o clock36xx.o
-+obj-$(CONFIG_ARCH_OMAP3)		+= clock3517.o
- obj-$(CONFIG_ARCH_OMAP3)		+= dpll3xxx.o
- obj-$(CONFIG_ARCH_OMAP4)		+= $(clock-common)
- obj-$(CONFIG_ARCH_OMAP4)		+= dpll3xxx.o
-diff --git a/arch/arm/mach-omap2/clock36xx.c b/arch/arm/mach-omap2/clock36xx.c
-deleted file mode 100644
-index 91ccb96..0000000
---- a/arch/arm/mach-omap2/clock36xx.c
-+++ /dev/null
-@@ -1,69 +0,0 @@
--/*
-- * OMAP36xx-specific clkops
-- *
-- * Copyright (C) 2010 Texas Instruments, Inc.
-- * Copyright (C) 2010 Nokia Corporation
-- *
-- * Mike Turquette
-- * Vijaykumar GN
-- * Paul Walmsley
-- *
-- * Parts of this code are based on code written by
-- * Richard Woodruff, Tony Lindgren, Tuukka Tikkanen, Karthik Dasu,
-- * Russell King
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#undef DEBUG
--
--#include <linux/kernel.h>
--#include <linux/clk.h>
--#include <linux/clk-provider.h>
--#include <linux/io.h>
--
--#include "clock.h"
--#include "clock36xx.h"
--#define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
--
--/**
-- * omap36xx_pwrdn_clk_enable_with_hsdiv_restore - enable clocks suffering
-- *         from HSDivider PWRDN problem Implements Errata ID: i556.
-- * @clk: DPLL output struct clk
-- *
-- * 3630 only: dpll3_m3_ck, dpll4_m2_ck, dpll4_m3_ck, dpll4_m4_ck,
-- * dpll4_m5_ck & dpll4_m6_ck dividers gets loaded with reset
-- * valueafter their respective PWRDN bits are set.  Any dummy write
-- * (Any other value different from the Read value) to the
-- * corresponding CM_CLKSEL register will refresh the dividers.
-- */
--int omap36xx_pwrdn_clk_enable_with_hsdiv_restore(struct clk_hw *clk)
--{
--	struct clk_divider *parent;
--	struct clk_hw *parent_hw;
--	u32 dummy_v, orig_v;
--	struct clk_hw_omap *omap_clk = to_clk_hw_omap(clk);
--	int ret;
--
--	/* Clear PWRDN bit of HSDIVIDER */
--	ret = omap2_dflt_clk_enable(clk);
--
--	parent_hw = __clk_get_hw(__clk_get_parent(clk->clk));
--	parent = to_clk_divider(parent_hw);
--
--	/* Restore the dividers */
--	if (!ret) {
--		orig_v = omap2_clk_readl(omap_clk, parent->reg);
--		dummy_v = orig_v;
--
--		/* Write any other value different from the Read value */
--		dummy_v ^= (1 << parent->shift);
--		omap2_clk_writel(dummy_v, omap_clk, parent->reg);
--
--		/* Write the original divider */
--		omap2_clk_writel(orig_v, omap_clk, parent->reg);
--	}
--
--	return ret;
--}
-diff --git a/arch/arm/mach-omap2/clock36xx.h b/arch/arm/mach-omap2/clock36xx.h
-deleted file mode 100644
-index 945bb7f..0000000
---- a/arch/arm/mach-omap2/clock36xx.h
-+++ /dev/null
-@@ -1,13 +0,0 @@
--/*
-- * OMAP36xx clock function prototypes and macros
-- *
-- * Copyright (C) 2010 Texas Instruments, Inc.
-- * Copyright (C) 2010 Nokia Corporation
-- */
--
--#ifndef __ARCH_ARM_MACH_OMAP2_CLOCK36XX_H
--#define __ARCH_ARM_MACH_OMAP2_CLOCK36XX_H
--
--extern int omap36xx_pwrdn_clk_enable_with_hsdiv_restore(struct clk_hw *hw);
--
--#endif
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index 6fcb932..b9ad113 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -626,6 +626,8 @@ static struct ti_clk_ll_ops omap_clk_ll_ops = {
+ 	.clk_writel = prm_clk_writel,
+ 	.clkdm_clk_enable = clkdm_clk_enable,
+ 	.clkdm_clk_disable = clkdm_clk_disable,
++	.cm_wait_module_ready = omap_cm_wait_module_ready,
++	.cm_split_idlest_reg = cm_split_idlest_reg,
+ };
+ 
+ int __init of_prcm_init(void)
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+index 4778783..339cc38 100644
+--- a/include/linux/clk/ti.h
++++ b/include/linux/clk/ti.h
+@@ -243,6 +243,8 @@ struct clk_omap_reg {
+  * @clk_writel: pointer to register write function
+  * @clkdm_clk_enable: pointer to clockdomain enable function
+  * @clkdm_clk_disable: pointer to clockdomain disable function
++ * @cm_wait_module_ready: pointer to CM module wait ready function
++ * @cm_split_idlest_reg: pointer to CM module function to split idlest reg
+  *
+  * Low-level ops are generally used by the basic clock types (clk-gate,
+  * clk-mux, clk-divider etc.) to provide support for various low-level
+@@ -256,6 +258,10 @@ struct ti_clk_ll_ops {
+ 	int	(*clkdm_clk_enable)(struct clockdomain *clkdm, struct clk *clk);
+ 	int	(*clkdm_clk_disable)(struct clockdomain *clkdm,
+ 				     struct clk *clk);
++	int	(*cm_wait_module_ready)(u8 part, s16 prcm_mod, u16 idlest_reg,
++					u8 idlest_shift);
++	int	(*cm_split_idlest_reg)(void __iomem *idlest_reg, s16 *prcm_inst,
++				       u8 *idlest_reg_id);
+ };
+ 
+ extern struct ti_clk_ll_ops *ti_clk_ll_ops;
 -- 
 1.7.9.5
