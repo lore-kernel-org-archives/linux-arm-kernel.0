@@ -1,84 +1,40 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 06 Mar 2015 20:30:39 +0000
-Subject: [PATCH v9 06/21] ACPI: fix acpi_os_ioremap for arm64
-In-Reply-To: <1424853601-6675-7-git-send-email-hanjun.guo@linaro.org>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 06 Mar 2015 12:31:16 -0800
+Subject: [PATCH v9 01/21] ACPI / table: Use pr_debug() instead of
+ pr_info() for MADT table scanning
+In-Reply-To: <20150306201718.9363CC40AA9@trevor.secretlab.ca>
 References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <1424853601-6675-7-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150306203039.833AFC40AA9@trevor.secretlab.ca>
+ <1424853601-6675-2-git-send-email-hanjun.guo@linaro.org>
+ <20150306201718.9363CC40AA9@trevor.secretlab.ca>
+Message-ID: <1425673876.12017.50.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Feb 2015 16:39:46 +0800
-, Hanjun Guo <hanjun.guo@linaro.org>
- wrote:
-> From: Mark Salter <msalter@redhat.com>
+On Fri, 2015-03-06 at 20:17 +0000, Grant Likely wrote:
+> On Wed, 25 Feb 2015 16:39:41 +0800 Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> > This patch just use pr_debug() instead of pr_info() for ioapic/iosapic,
+> > local apic/x2apic/sapic structures when scanning the MADT table to remove
+> > those verbose information, but leave other structures unchanged.
+[]
+> One nitpick below, but don't respin over this, and don't do a fixup.
+[]
+> > diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+[]
+> > @@ -61,9 +63,9 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+> >  		{
+> >  			struct acpi_madt_local_apic *p =
+> >  			    (struct acpi_madt_local_apic *)header;
+> > -			pr_info("LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
+> > -				p->processor_id, p->id,
+> > -				(p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+> > +			pr_debug("LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
+> > +				 p->processor_id, p->id,
+> > +				 (p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
 > 
-> The acpi_os_ioremap() function may be used to map normal RAM or IO
-> regions. The current implementation simply uses ioremap_cache(). This
-> will work for some architectures, but arm64 ioremap_cache() cannot be
-> used to map IO regions which don't support caching. So for arm64, use
-> ioremap() for non-RAM regions.
-> 
-> CC: Rafael J Wysocki <rjw@rjwysocki.net>
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> Tested-by: Robert Richter <rrichter@cavium.com>
-> Acked-by: Robert Richter <rrichter@cavium.com>
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> The whitespace changes makes each 1 line change into 3 line changes. In
+> these situations, I would chose to leave the whitespace alone to keep
+> the diffstat as small as possible. It makes it less likely to conflict
+> with other patches and easier to find context.
 
-Reviewed-by: Grant Likely <grant.likely@linaro.org>
-
-> ---
->  arch/arm64/include/asm/acpi.h | 13 +++++++++++++
->  include/acpi/acpi_io.h        |  4 ++++
->  2 files changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index 8b837ab..40e0924 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -12,8 +12,21 @@
->  #ifndef _ASM_ACPI_H
->  #define _ASM_ACPI_H
->  
-> +#include <linux/mm.h>
-> +
->  /* Basic configuration for ACPI */
->  #ifdef	CONFIG_ACPI
-> +/* ACPI table mapping after acpi_gbl_permanent_mmap is set */
-> +static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
-> +					    acpi_size size)
-> +{
-> +	if (!page_is_ram(phys >> PAGE_SHIFT))
-> +		return ioremap(phys, size);
-> +
-> +	return ioremap_cache(phys, size);
-> +}
-> +#define acpi_os_ioremap acpi_os_ioremap
-> +
->  #define acpi_strict 1	/* No out-of-spec workarounds on ARM64 */
->  extern int acpi_disabled;
->  extern int acpi_noirq;
-> diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
-> index 444671e..dd86c5f 100644
-> --- a/include/acpi/acpi_io.h
-> +++ b/include/acpi/acpi_io.h
-> @@ -3,11 +3,15 @@
->  
->  #include <linux/io.h>
->  
-> +#include <asm/acpi.h>
-> +
-> +#ifndef acpi_os_ioremap
->  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
->  					    acpi_size size)
->  {
->         return ioremap_cache(phys, size);
->  }
-> +#endif
->  
->  void __iomem *__init_refok
->  acpi_os_map_iomem(acpi_physical_address phys, acpi_size size);
-> -- 
-> 1.9.1
-> 
+I think it's mostly better to use a consistent indentation style
+regardless of the number in whitespace changes surrounding the change.
