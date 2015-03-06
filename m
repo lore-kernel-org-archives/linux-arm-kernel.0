@@ -1,66 +1,45 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 Mar 2015 16:37:40 +0000
-Subject: [PATCH 01/11] irqchip: gicv3-its: Fix ITS CPU init
-In-Reply-To: <1425659870-11832-1-git-send-email-marc.zyngier@arm.com>
-References: <1425659870-11832-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1425659870-11832-2-git-send-email-marc.zyngier@arm.com>
+Date: Fri,  6 Mar 2015 16:37:39 +0000
+Subject: [PATCH 00/11] Collection of GIC/GICv3 fixes for 4.0
+Message-ID: <1425659870-11832-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Murzin <Vladimir.Murzin@arm.com>
+This series fixes a number of GIC(v3) issues, ranging from
+initialization fixes to out of bound accesses and locking issues.
 
-We skip initialisation of ITS in case the device-tree has no
-corresponding description, but we are still accessing to ITS bits while
-setting CPU interface what leads to the kernel panic:
+A number of these patches have already been posted before, but as
+we're starting to get patch dependencies, and in an effort to reduce
+the load on the maintainers, I've decided to collate them in a single
+series.
 
-ITS: No ITS available, not enabling LPIs
-CPU0: found redistributor 0 region 0:0x000000002f100000
-Unable to handle kernel NULL pointer dereference at virtual address 00000000
-pgd = ffffffc0007fb000
-[00000000] *pgd=00000000fc407003, *pud=00000000fc407003, *pmd=00000000fc408003, *pte=006000002f000707
-Internal error: Oops: 96000005 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.19.0-rc2+ #318
-Hardware name: FVP Base (DT)
-task: ffffffc00077edb0 ti: ffffffc00076c000 task.ti: ffffffc00076c000
-PC is at its_cpu_init+0x2c/0x320
-LR is at gic_cpu_init+0x168/0x1bc
+This is based on v4.0-rc1, and available at from the following branch:
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gic-fixes
 
-It happens in gic_rdists_supports_plpis() because gic_rdists is NULL.
-The gic_rdists is set to non-NULL only when ITS node is presented in
-the device-tree.
+Marc Zyngier (4):
+  irqchip: gicv3-its: Allocate enough memory for the full range of
+    DeviceID
+  irqchip: gicv3-its: Iterate over PCI aliases to generate ITS
+    configuration
+  irqchip: gicv3-its: Fix unsafe locking reported by lockdep
+  irqchip: gic: Fix unsafe locking reported by lockdep
 
-Fix this by moving the call to gic_rdists_supports_plpis() inside the
-!list_empty(&its_nodes) block, because it is that list that guards the
-validity of the rest of the information in this driver.
+Vladimir Murzin (2):
+  irqchip: gicv3-its: Fix ITS CPU init
+  irqchip: gic-v3: fix out of bounds access to cpu_logical_map
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+Yun Wu (5):
+  irqchip: gicv3-its: zero itt before handling to hardware
+  irqchip: gicv3-its: use 64KB page as default granule
+  irqchip: gicv3-its: add limitation to page order
+  irqchip: gicv3-its: define macros for GITS_CTLR fields
+  irqchip: gicv3-its: support safe initialization
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index d8996bd..c217ebc 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1382,12 +1382,11 @@ static bool gic_rdists_supports_plpis(void)
- 
- int its_cpu_init(void)
- {
--	if (!gic_rdists_supports_plpis()) {
--		pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
--		return -ENXIO;
--	}
--
- 	if (!list_empty(&its_nodes)) {
-+		if (!gic_rdists_supports_plpis()) {
-+			pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
-+			return -ENXIO;
-+		}
- 		its_cpu_init_lpis();
- 		its_cpu_init_collection();
- 	}
+ drivers/irqchip/irq-gic-v3-its.c   | 157 ++++++++++++++++++++++++++++++-------
+ drivers/irqchip/irq-gic-v3.c       |   2 +-
+ drivers/irqchip/irq-gic.c          |  20 +++--
+ include/linux/irqchip/arm-gic-v3.h |   5 ++
+ 4 files changed, 146 insertions(+), 38 deletions(-)
+
 -- 
 2.1.4
