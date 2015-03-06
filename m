@@ -1,48 +1,29 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 6 Mar 2015 10:08:09 -0600
-Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
- msm-id and qcom, board-id
-In-Reply-To: <CAOesGMgy3VY=4-t+N0BYqCuSLQkh-rYe8nd9iJh1mMeBFz_sWQ@mail.gmail.com>
-References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
- <7h8ufbjkod.fsf@deeprootsystems.com>
- <07D4E4D1-BF8C-4583-9505-9F321DB10406@codeaurora.org>
- <CAOesGMgy3VY=4-t+N0BYqCuSLQkh-rYe8nd9iJh1mMeBFz_sWQ@mail.gmail.com>
-Message-ID: <B8019148-3B26-453E-A3F0-9D67874083E0@codeaurora.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 6 Mar 2015 18:10:08 +0200
+Subject: [PATCH 11/24] ARM: OMAP2+: clock: remove support for legacy
+ mpurate command line param
+In-Reply-To: <20150306153254.GK13520@atomide.com>
+References: <1425644939-3232-1-git-send-email-t-kristo@ti.com>
+ <1425644939-3232-12-git-send-email-t-kristo@ti.com>
+ <20150306153254.GK13520@atomide.com>
+Message-ID: <54F9D160.7010708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/06/2015 05:32 PM, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [150306 04:29]:
+>> The legacy support is wrong and dangerous, as it doesn't take any
+>> OPPs into account and does not scale voltages. Switching mpurate should
+>> be handled through cpufreq.
+>
+> Hmm I wonder if some systems actually rely on the mpurate cmdline
+> parameter. If this cannot be fixed properly, you should at least
+> print an error here.
 
-On Mar 5, 2015, at 7:59 PM, Olof Johansson <olof@lixom.net> wrote:
+Yea, I was kind of worried about this comment. We have also an option of 
+doing this through clock driver, but I was hesitant of doing this 
+either. Isn't having a global kernel option like this frowned upon 
+anyway? I believe this piece of init code gets executed on every board 
+on multiarch kernel.
 
-> On Thu, Mar 5, 2015 at 12:23 PM, Kumar Gala <galak@codeaurora.org> wrote:
->> 
->> On Mar 5, 2015, at 1:42 PM, Kevin Hilman <khilman@kernel.org> wrote:
->> 
->>> Kumar Gala <galak@codeaurora.org> writes:
->>> 
->>>> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
->>>> on Qualcomm MSM platforms to determine which device tree should be
->>>> utilized and passed to the kernel.
->>>> 
->>>> Cc: <devicetree@vger.kernel.org>
->>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
->>> 
->>> Is this the special magic that allows qcom bootloaders to take a kernel
->>> plus multiple DTBs and figure out which DTB to pass?
->>> 
->>> Kevin
->> 
->> yes
-> 
-> That's a bummer.
-> 
-> Luckily, the solution for upstream is still quite simple: Provide only
-> one devicetree, and it'll be used, right?
-
-We can provide only one, we still need the IDs in the DT.
-
-- k
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+-Tero
