@@ -1,45 +1,108 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 6 Mar 2015 17:45:00 +0100
-Subject: [PATCH v2 1/3] net/macb: Update DT bindings documentation
-In-Reply-To: <1425637442-8724-2-git-send-email-boris.brezillon@free-electrons.com>
+Date: Fri, 6 Mar 2015 17:45:15 +0100
+Subject: [PATCH v2 2/3] ARM: at91/dt: fix macb compatible strings
+In-Reply-To: <1425637442-8724-3-git-send-email-boris.brezillon@free-electrons.com>
 References: <1425637442-8724-1-git-send-email-boris.brezillon@free-electrons.com>
- <1425637442-8724-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <54F9D98C.2020807@atmel.com>
+ <1425637442-8724-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <54F9D99B.3090006@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Le 06/03/2015 11:24, Boris Brezillon a ?crit :
-> Add missing "cdns,at91sam9260-macb", "atmel,sama5d3-gem" and
-> "atmel,sama5d4-gem" compatible strings.
+> Some at91 SoCs embed a 10/100 Mbit Ethernet IP, that is based on the
+> at91sam9260 SoC.
+> Fix at91 DTs accordingly.
 > 
 > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
 > ---
->  Documentation/devicetree/bindings/net/macb.txt | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
+>  arch/arm/boot/dts/at91sam9260.dtsi      | 2 +-
+>  arch/arm/boot/dts/at91sam9263.dtsi      | 2 +-
+>  arch/arm/boot/dts/at91sam9g45.dtsi      | 2 +-
+>  arch/arm/boot/dts/at91sam9x5_macb0.dtsi | 2 +-
+>  arch/arm/boot/dts/at91sam9x5_macb1.dtsi | 2 +-
+>  arch/arm/boot/dts/sama5d3_emac.dtsi     | 2 +-
+>  6 files changed, 6 insertions(+), 6 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
-> index aaa6964..ba19d67 100644
-> --- a/Documentation/devicetree/bindings/net/macb.txt
-> +++ b/Documentation/devicetree/bindings/net/macb.txt
-> @@ -2,10 +2,13 @@
+> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+> index fff0ee6..9f7c737 100644
+> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+> @@ -842,7 +842,7 @@
+>  			};
 >  
->  Required properties:
->  - compatible: Should be "cdns,[<chip>-]{macb|gem}"
-> -  Use "cdns,at91sam9260-macb" Atmel at91sam9260 and at91sam9263 SoCs.
-> +  Use "cdns,at91sam9260-macb" for Atmel at91sam9 SoCs or the 10/100Mbit IP
-> +  available on sama5d3 SoCs.
->    Use "cdns,at32ap7000-macb" for other 10/100 usage or use the generic form: "cdns,macb".
->    Use "cdns,pc302-gem" for Picochip picoXcell pc302 and later devices based on
->    the Cadence GEM, or the generic form: "cdns,gem".
-> +  Use "cdns,sama5d3-gem" for the Gigabit IP available on Atmel sama5d3 SoCs.
-> +  Use "cdns,sama5d4-gem" for the Gigabit IP available on Atmel sama5d4 SoCs.
->  - reg: Address and length of the register set for the device
->  - interrupts: Should contain macb interrupt
->  - phy-mode: See ethernet.txt file in the same directory.
+>  			macb0: ethernet at fffc4000 {
+> -				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+> +				compatible = "cdns,at91sam9260-macb", "cdns,macb";
+>  				reg = <0xfffc4000 0x100>;
+>  				interrupts = <21 IRQ_TYPE_LEVEL_HIGH 3>;
+>  				pinctrl-names = "default";
+> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+> index 1f67bb4..340179e 100644
+> --- a/arch/arm/boot/dts/at91sam9263.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
+> @@ -845,7 +845,7 @@
+>  			};
+>  
+>  			macb0: ethernet at fffbc000 {
+> -				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+> +				compatible = "cdns,at91sam9260-macb", "cdns,macb";
+>  				reg = <0xfffbc000 0x100>;
+>  				interrupts = <21 IRQ_TYPE_LEVEL_HIGH 3>;
+>  				pinctrl-names = "default";
+> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+> index ee80aa9..586eab7 100644
+> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+> @@ -956,7 +956,7 @@
+>  			};
+>  
+>  			macb0: ethernet at fffbc000 {
+> -				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+> +				compatible = "cdns,at91sam9260-macb", "cdns,macb";
+>  				reg = <0xfffbc000 0x100>;
+>  				interrupts = <25 IRQ_TYPE_LEVEL_HIGH 3>;
+>  				pinctrl-names = "default";
+> diff --git a/arch/arm/boot/dts/at91sam9x5_macb0.dtsi b/arch/arm/boot/dts/at91sam9x5_macb0.dtsi
+> index 57e89d1..73d7e30 100644
+> --- a/arch/arm/boot/dts/at91sam9x5_macb0.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5_macb0.dtsi
+> @@ -53,7 +53,7 @@
+>  			};
+>  
+>  			macb0: ethernet at f802c000 {
+> -				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+> +				compatible = "cdns,at91sam9260-macb", "cdns,macb";
+>  				reg = <0xf802c000 0x100>;
+>  				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 3>;
+>  				pinctrl-names = "default";
+> diff --git a/arch/arm/boot/dts/at91sam9x5_macb1.dtsi b/arch/arm/boot/dts/at91sam9x5_macb1.dtsi
+> index 663676c..d81980c 100644
+> --- a/arch/arm/boot/dts/at91sam9x5_macb1.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5_macb1.dtsi
+> @@ -41,7 +41,7 @@
+>  			};
+>  
+>  			macb1: ethernet at f8030000 {
+> -				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+> +				compatible = "cdns,at91sam9260-macb", "cdns,macb";
+>  				reg = <0xf8030000 0x100>;
+>  				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 3>;
+>  				pinctrl-names = "default";
+> diff --git a/arch/arm/boot/dts/sama5d3_emac.dtsi b/arch/arm/boot/dts/sama5d3_emac.dtsi
+> index fe2af92..b4544cf 100644
+> --- a/arch/arm/boot/dts/sama5d3_emac.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3_emac.dtsi
+> @@ -41,7 +41,7 @@
+>  			};
+>  
+>  			macb1: ethernet at f802c000 {
+> -				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+> +				compatible = "cdns,at91sam9260-macb", "cdns,macb";
+>  				reg = <0xf802c000 0x100>;
+>  				interrupts = <35 IRQ_TYPE_LEVEL_HIGH 3>;
+>  				pinctrl-names = "default";
 > 
 
 
