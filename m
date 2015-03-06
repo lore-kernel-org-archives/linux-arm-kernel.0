@@ -1,10 +1,9 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri,  6 Mar 2015 19:04:05 +0100
-Subject: [PATCH 7/8] ARM: dts: rockchip: relicense rk3188-radxarock.dts under
- GPLv2/X11
+Date: Fri,  6 Mar 2015 19:04:01 +0100
+Subject: [PATCH 3/8] ARM: dts: rockchip: relicense rk3188.dtsi under GPLv2/X11
 In-Reply-To: <1425665046-22927-1-git-send-email-heiko@sntech.de>
 References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
-Message-ID: <1425665046-22927-8-git-send-email-heiko@sntech.de>
+Message-ID: <1425665046-22927-4-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,29 +11,29 @@ GPLv2-only devicetrees make reuse difficult for software components licensed
 under a different license.
 
 The consensus is that a GPL/X11 dual-license should allow all necessary uses,
-so relicense the rk3188-radxarock.dts to this combination.
+so relicense the rk3188.dtsi to this combination.
 
 CCs were aquired by git shortlog -sne so it should've hopefully catched
 every contributor.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Cc: Beniamino Galvani <b.galvani@gmail.com>
-Cc: Romain Perier <romain.perier@gmail.com>
-Cc: Jaehoon Chung <jh80.chung@samsung.com>
 Cc: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
+Cc: Beniamino Galvani <b.galvani@gmail.com>
+Cc: Max Schwarz <max.schwarz@online.de>
+Cc: Romain Perier <romain.perier@gmail.com>
 ---
 I'm hoping to get Acked-by tags from the people in the Cc-list.
 
- arch/arm/boot/dts/rk3188-radxarock.dts | 44 +++++++++++++++++++++++++++-------
+ arch/arm/boot/dts/rk3188.dtsi | 44 +++++++++++++++++++++++++++++++++++--------
  1 file changed, 36 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
-index 9a09579..1eca953 100644
---- a/arch/arm/boot/dts/rk3188-radxarock.dts
-+++ b/arch/arm/boot/dts/rk3188-radxarock.dts
-@@ -1,15 +1,43 @@
- /*
-  * Copyright (c) 2013 Heiko Stuebner <heiko@sntech.de>
+diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+index 1d4d79c..0f23aed 100644
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@ -2,15 +2,43 @@
+  * Copyright (c) 2013 MundoReader S.L.
+  * Author: Heiko Stuebner <heiko@sntech.de>
   *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -83,6 +82,6 @@ index 9a09579..1eca953 100644
 + *     OTHER DEALINGS IN THE SOFTWARE.
   */
  
- /dts-v1/;
+ #include <dt-bindings/gpio/gpio.h>
 -- 
 2.1.4
