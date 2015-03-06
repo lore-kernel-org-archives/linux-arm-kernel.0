@@ -1,95 +1,72 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 6 Mar 2015 10:58:11 +0000
-Subject: [PATCH v4 2/9] mfd: syscon: Add atmel system timer registers
- definition
-In-Reply-To: <1425570594-13124-3-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1425570594-13124-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1425570594-13124-3-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150306105811.GC3318@x1>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 6 Mar 2015 10:58:21 +0000
+Subject: [PATCH 2/5] iommu/mediatek: Add mt8173 IOMMU driver
+In-Reply-To: <1425638900-24989-3-git-send-email-yong.wu@mediatek.com>
+References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
+ <1425638900-24989-3-git-send-email-yong.wu@mediatek.com>
+Message-ID: <20150306105821.GE22377@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 05 Mar 2015, Alexandre Belloni wrote:
+On Fri, Mar 06, 2015 at 10:48:17AM +0000, yong.wu at mediatek.com wrote:
+> From: Yong Wu <yong.wu@mediatek.com>
+> 
+> This patch adds support for mediatek m4u (MultiMedia Memory Management Unit).
+> Currently this only supports m4u gen 2 with 2 levels of page table on mt8173.
 
-> AT91RM920 has a memory range reserved for timer and watchdog configuration.
-> Expose those registers so that drivers can make use of the system timer syscon
-> declared in at91 DTs.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  include/linux/mfd/syscon/atmel-st.h | 49 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 49 insertions(+)
->  create mode 100644 include/linux/mfd/syscon/atmel-st.h
-> 
-> diff --git a/include/linux/mfd/syscon/atmel-st.h b/include/linux/mfd/syscon/atmel-st.h
+[...]
+
+> diff --git a/drivers/iommu/mtk_iommu_pagetable.c b/drivers/iommu/mtk_iommu_pagetable.c
 > new file mode 100644
-> index 000000000000..93c7affc2809
+> index 0000000..5fe9640
 > --- /dev/null
-> +++ b/include/linux/mfd/syscon/atmel-st.h
-> @@ -0,0 +1,49 @@
+> +++ b/drivers/iommu/mtk_iommu_pagetable.c
+> @@ -0,0 +1,439 @@
 > +/*
-> + * Copyright (C) 2005 Ivan Kokshaysky
-> + * Copyright (C) SAN People
-> + *
-> + * System Timer (ST) - System peripherals registers.
-> + * Based on AT91RM9200 datasheet revision E.
+> + * Copyright (c) 2014-2015 MediaTek Inc.
+> + * Author: Yong Wu <yong.wu@mediatek.com>
 > + *
 > + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
 > + */
+> +#include <linux/err.h>
+> +#include <linux/mm.h>
+> +#include <linux/iommu.h>
+> +#include <linux/errno.h>
+> +#include "asm/cacheflush.h"
 > +
-> +#ifndef _LINUX_MFD_SYSCON_ATMEL_ST_H
-> +#define _LINUX_MFD_SYSCON_ATMEL_ST_H
+> +#include "mtk_iommu.h"
+> +#include "mtk_iommu_pagetable.h"
 > +
-> +#include <linux/bitops.h>
-> +
-> +#define	AT91_ST_CR	0x00	/* Control Register */
-> +#define		AT91_ST_WDRST	BIT(0)	/* Watchdog Timer Restart */
+> +/* 2 level pagetable: pgd -> pte */
+> +#define F_PTE_TYPE_GET(regval)  (regval & 0x3)
+> +#define F_PTE_TYPE_LARGE         BIT(0)
+> +#define F_PTE_TYPE_SMALL         BIT(1)
+> +#define F_PTE_B_BIT              BIT(2)
+> +#define F_PTE_C_BIT              BIT(3)
+> +#define F_PTE_BIT32_BIT          BIT(9)
+> +#define F_PTE_S_BIT              BIT(10)
+> +#define F_PTE_NG_BIT             BIT(11)
+> +#define F_PTE_PA_LARGE_MSK            (~0UL << 16)
+> +#define F_PTE_PA_LARGE_GET(regval)    ((regval >> 16) & 0xffff)
+> +#define F_PTE_PA_SMALL_MSK            (~0UL << 12)
+> +#define F_PTE_PA_SMALL_GET(regval)    ((regval >> 12) & (~0))
+> +#define F_PTE_TYPE_IS_LARGE_PAGE(pte) ((imu_pte_val(pte) & 0x3) == \
+> +                                       F_PTE_TYPE_LARGE)
+> +#define F_PTE_TYPE_IS_SMALL_PAGE(pte) ((imu_pte_val(pte) & 0x3) == \
+> +                                       F_PTE_TYPE_SMALL)
 
-Sorry for the incremental reviews, I'm exceptionally busy of late.
+This looks like the ARM short-descriptor format to me. Could you please
+add a new page table format to the io-pgtable code, so that other IOMMU
+drivers can make use of this? I know there was some interest in using
+short descriptor for the ARM SMMU, for example.
 
-The next white space character after #define should be a humble space.
+Cheers,
 
-... at least for the register defines.  The bit assignments can be
-tabbed out to denote what they are.
-
-Once fixed, please resend with my:
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
-> +#define	AT91_ST_PIMR	0x04	/* Period Interval Mode Register */
-> +#define		AT91_ST_PIV	0xffff	/* Period Interval Value */
-> +
-> +#define	AT91_ST_WDMR	0x08	/* Watchdog Mode Register */
-> +#define		AT91_ST_WDV	0xffff	/* Watchdog Counter Value */
-> +#define		AT91_ST_RSTEN	BIT(16)	/* Reset Enable */
-> +#define		AT91_ST_EXTEN	BIT(17)	/* External Signal Assertion Enable */
-> +
-> +#define	AT91_ST_RTMR	0x0c	/* Real-time Mode Register */
-> +#define		AT91_ST_RTPRES	0xffff	/* Real-time Prescalar Value */
-> +
-> +#define	AT91_ST_SR	0x10	/* Status Register */
-> +#define		AT91_ST_PITS	BIT(0)	/* Period Interval Timer Status */
-> +#define		AT91_ST_WDOVF	BIT(1)	/* Watchdog Overflow */
-> +#define		AT91_ST_RTTINC	BIT(2)	/* Real-time Timer Increment */
-> +#define		AT91_ST_ALMS	BIT(3)	/* Alarm Status */
-> +
-> +#define	AT91_ST_IER	0x14	/* Interrupt Enable Register */
-> +#define	AT91_ST_IDR	0x18	/* Interrupt Disable Register */
-> +#define	AT91_ST_IMR	0x1c	/* Interrupt Mask Register */
-> +
-> +#define	AT91_ST_RTAR	0x20	/* Real-time Alarm Register */
-> +#define		AT91_ST_ALMV	0xfffff	/* Alarm Value */
-> +
-> +#define	AT91_ST_CRTR	0x24	/* Current Real-time Register */
-> +#define		AT91_ST_CRTV	0xfffff	/* Current Real-Time Value */
-> +
-> +#endif /* _LINUX_MFD_SYSCON_ATMEL_ST_H */
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Will
