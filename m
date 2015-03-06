@@ -1,53 +1,26 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 6 Mar 2015 14:51:52 +0800
-Subject: [PATCH v9 14/21] ACPI / processor: Make it possible to get CPU
- hardware ID via GICC
-In-Reply-To: <20150305151915.GB11447@e104818-lin.cambridge.arm.com>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <1424853601-6675-15-git-send-email-hanjun.guo@linaro.org>
- <2411054.s4TkmAUKjT@vostro.rjw.lan> <54F80DC9.3090808@huawei.com>
- <20150305112707.GB7712@e104818-lin.cambridge.arm.com>
- <CAJZ5v0iHstGiXLT0DPHu2=xH3bD-kD=WCqfuB1XaTgNSnthcLQ@mail.gmail.com>
- <20150305151915.GB11447@e104818-lin.cambridge.arm.com>
-Message-ID: <54F94E88.9040706@huawei.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 6 Mar 2015 15:18:24 +0800
+Subject: parent/child hierarchy for regulator
+In-Reply-To: <20150305122234.GL21293@sirena.org.uk>
+References: <20150305103534.GA19600@shlinux2>
+ <20150305122234.GL21293@sirena.org.uk>
+Message-ID: <20150306071823.GC12879@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/5 23:19, Catalin Marinas wrote:
-> On Thu, Mar 05, 2015 at 02:13:58PM +0100, Rafael J. Wysocki wrote:
->> On Thu, Mar 5, 2015 at 12:27 PM, Catalin Marinas
->> <catalin.marinas@arm.com> wrote:
->>> On Thu, Mar 05, 2015 at 04:03:21PM +0800, Hanjun Guo wrote:
->>>> On 2015/3/5 6:46, Rafael J. Wysocki wrote:
->>>>> IMO, you really need to define phys_cpuid_t in a common place or people will
->>>>> forget that it may be 64-bit, because they'll only be looking at their arch.
->>>> Since x86 and ARM64 are using different types for phys_cpuid_t, we need to
->>>> introduce something like following if define it in common place:
->>>>
->>>> in linux/acpi.h,
->>>>
->>>> #if defined(CONFIG_X86) || defined(CONFIG_IA64)
->>>> typedef u32 phys_cpuid_t;
->>>> #define PHYS_CPUID_INVALID (phys_cpuid_t)(-1)
->>>> #else if defined(CONFIG_ARM64)
->>>> typedef u64 phys_cpuid_t;
->>>> #define PHYS_CPUID_INVALID INVALID_HWID
->>>> #endif
->>>>
->>>> I think it's awful, did I miss something?
->> Well, you can define the type and PHYS_CPUID_INVALID in the arch
->> code and then do this in a common header:
->>
->> #ifndef PHYS_CPUID_INVALID
->> typedef u32 phys_cpuid_t;
->> #define PHYS_CPUID_INVALID (phys_cpuid_t)(-1)
->> #endif
->>
->> That would allow you to avoid the need to duplicate the
->> definitions where it is not necessary.
-> It's fine by me.
+On Thu, Mar 05, 2015 at 12:22:34PM +0000, Mark Brown wrote:
+> On Thu, Mar 05, 2015 at 06:35:36PM +0800, Peter Chen wrote:
+> 
+> > Any good ways at code/dts to show parent/child hierarchy for regulator?
+> 
+> There's plenty of examples in mainline...
+> 
 
-I will update the patch.
+Thanks, I get answer for adding parent regulator for fixed regulator,
+it is very easy, we only need to add 'vin-supply = <&parent_reg>;'
+at fixed's property.
 
-Thanks
-Hanjun
+-- 
+
+Best Regards,
+Peter Chen
