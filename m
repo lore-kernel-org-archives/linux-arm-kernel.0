@@ -1,121 +1,577 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 06 Mar 2015 14:31:51 +0100
-Subject: [PATCH 1/5] mtd: nand: =?UTF-8?Q?vf=36=31=30=5Fnfc=3A=20Frees?=
- =?UTF-8?Q?cale=20NFC=20for=20VF=36=31=30=2C=20MPC=35=31=32=35=20and=20oth?=
- =?UTF-8?Q?ers?=
-In-Reply-To: <20150306061502.GB10997@pengutronix.de>
-References: <1425510624-22250-1-git-send-email-stefan@agner.ch>
- <1425510624-22250-2-git-send-email-stefan@agner.ch>
- <20150306061502.GB10997@pengutronix.de>
-Message-ID: <fdfc84d92bbcb8abc98f2c29e1aa368b@agner.ch>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri,  6 Mar 2015 10:52:26 -0300
+Subject: [PATCH 1/3] ARM: imx25: Remove eukrea mx25 board files
+Message-ID: <1425649948-451-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-03-06 07:15, Sascha Hauer wrote:
-> Hi Stefan,
-> 
-> On Thu, Mar 05, 2015 at 12:10:20AM +0100, Stefan Agner wrote:
->> +
->> +static int vf610_nfc_probe_dt(struct device *dev, struct vf610_nfc_config *cfg)
->> +{
->> +	struct device_node *np = dev->of_node;
->> +	int buswidth;
->> +	u32 clkrate;
->> +
->> +	if (!np)
->> +		return 1;
->> +
->> +	cfg->flash_bbt = of_get_nand_on_flash_bbt(np);
->> +
->> +	if (!of_property_read_u32(np, "clock-frequency", &clkrate))
->> +		cfg->clkrate = clkrate;
-> 
-> Normally the clock-frequency property tells the driver at which
-> frequency the device actually is running, not to tell the driver at
-> which frequency the device *should* run. It's strange to use the value
-> of the clock-frequency property as input to clk_set_rate(). Maybe the
-> assigned clock binding is more appropriate here, see
-> Documentation/devicetree/bindings/clock/clock-bindings.txt.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-What we try to do here is to specify the hardware limitations. There
-seem to be some hardware restrictions when it comes to clock
-frequencies. There has been a rather long discussion over at Freescales
-community about it:
-https://community.freescale.com/thread/317074
+eukrea mx25 is well supported in device tree, so let's get rid of its board
+files.
 
-Not sure if this is the right way to specify the supported frequencies,
-or should we create a custom property for this, something like
-fsl,max-nfc-frequency = <33000000>?
+Cc: Eric B??nard <eric@eukrea.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/Kconfig                      |  34 ---
+ arch/arm/mach-imx/Makefile                     |   2 -
+ arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c | 310 -------------------------
+ arch/arm/mach-imx/mach-eukrea_cpuimx25.c       | 172 --------------
+ 4 files changed, 518 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
+ delete mode 100644 arch/arm/mach-imx/mach-eukrea_cpuimx25.c
 
-
-> 
-> BTW the above can easier be written as:
-> 
-> 	of_property_read_u32(np, "clock-frequency", &cfg->clkrate);
-> 
-> No return value checking necessary.
-> 
->> +static int vf610_nfc_probe(struct platform_device *pdev)
->> +{
->> +	struct vf610_nfc *nfc;
->> +	struct resource *res;
->> +	struct mtd_info *mtd;
->> +	struct nand_chip *chip;
->> +	struct vf610_nfc_config *cfg;
->> +	int err = 0;
->> +	int page_sz;
->> +	int irq;
->> +
->> +	nfc = devm_kzalloc(&pdev->dev, sizeof(*nfc), GFP_KERNEL);
->> +	if (!nfc)
->> +		return -ENOMEM;
->> +
->> +	nfc->cfg = devm_kzalloc(&pdev->dev, sizeof(*nfc), GFP_KERNEL);
->> +	if (!nfc->cfg)
->> +		return -ENOMEM;
->> +	cfg = nfc->cfg;
-> 
-> Why is nfc->cfg allocated separately instead of embedding it into struct
-> vf610_nfc? Is this some platform_data leftover you can remove now?
-> 
-
-Yeah, looks like a platform_data leftover, will change that.
-
->> +
->> +	nfc->dev = &pdev->dev;
->> +	nfc->page = -1;
->> +	mtd = &nfc->mtd;
->> +	chip = &nfc->chip;
->> +
->> +	mtd->priv = chip;
->> +	mtd->owner = THIS_MODULE;
->> +	mtd->dev.parent = nfc->dev;
->> +	mtd->name = DRV_NAME;
->> +
->> +	err = vf610_nfc_probe_dt(nfc->dev, cfg);
->> +	if (err)
->> +		return -ENODEV;
-> 
-> Does this driver work without device tree or not? Currently the driver
-> bails out when device tree support is enabled but no device node is
-> given. When device tree support is disabled in the kernel though the
-> driver happily continues here.
-> 
-
-Hm, I never tried using this Driver without DT. I guess in practice, we
-won't get here in a DT enabled kernel anyway: If there is no device tree
-node with one of the drivers compatibility ids, the probe function won't
-be called.
-
-Theoretically, the IP supported by this driver is part of two other
-SoC's which are supported by Linux: PowerPC MPC5125 (DT) and a ColdFire
-MCF54418 (non-DT). So this driver might be used on a ColdFire SoC using
-the platform support. Currently, one would just not have the ability to
-set the hardware ECC options... I'm a bit reluctant to implement full
-platform support without being able to properly test it. If anybody is
-interested in it, one could easily extend the driver...
-
-Put Geert in CC...
-
---
-Stefan
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 247a465..6eec625 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -149,40 +149,6 @@ config MACH_MX21ADS
+ 	  Include support for MX21ADS platform. This includes specific
+ 	  configurations for the board and its peripherals.
+ 
+-comment "MX25 platforms:"
+-
+-config MACH_EUKREA_CPUIMX25SD
+-	bool "Support Eukrea CPUIMX25 Platform"
+-	select IMX_HAVE_PLATFORM_FLEXCAN
+-	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
+-	select IMX_HAVE_PLATFORM_IMX2_WDT
+-	select IMX_HAVE_PLATFORM_IMXDI_RTC
+-	select IMX_HAVE_PLATFORM_IMX_FB
+-	select IMX_HAVE_PLATFORM_IMX_I2C
+-	select IMX_HAVE_PLATFORM_IMX_UART
+-	select IMX_HAVE_PLATFORM_MXC_EHCI
+-	select IMX_HAVE_PLATFORM_MXC_NAND
+-	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+-	select USB_ULPI_VIEWPORT if USB_ULPI
+-	select SOC_IMX25
+-
+-choice
+-	prompt "Baseboard"
+-	depends on MACH_EUKREA_CPUIMX25SD
+-	default MACH_EUKREA_MBIMXSD25_BASEBOARD
+-
+-config MACH_EUKREA_MBIMXSD25_BASEBOARD
+-	bool "Eukrea MBIMXSD development board"
+-	select IMX_HAVE_PLATFORM_GPIO_KEYS
+-	select IMX_HAVE_PLATFORM_IMX_SSI
+-	select IMX_HAVE_PLATFORM_SPI_IMX
+-	select LEDS_GPIO_REGISTER
+-	help
+-	  This adds board specific devices that can be found on Eukrea's
+-	  MBIMXSD evaluation board.
+-
+-endchoice
+-
+ config MACH_IMX25_DT
+ 	bool "Support i.MX25 platforms from device tree"
+ 	select SOC_IMX25
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index e92ede9..724b7fb 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -49,8 +49,6 @@ obj-$(CONFIG_MACH_IMX1_DT) += imx1-dt.o
+ obj-$(CONFIG_MACH_MX21ADS) += mach-mx21ads.o
+ 
+ # i.MX25 based machines
+-obj-$(CONFIG_MACH_EUKREA_CPUIMX25SD) += mach-eukrea_cpuimx25.o
+-obj-$(CONFIG_MACH_EUKREA_MBIMXSD25_BASEBOARD) += eukrea_mbimxsd25-baseboard.o
+ obj-$(CONFIG_MACH_IMX25_DT) += imx25-dt.o
+ 
+ # i.MX27 based machines
+diff --git a/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
+deleted file mode 100644
+index 10e5381..0000000
+--- a/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
++++ /dev/null
+@@ -1,310 +0,0 @@
+-/*
+- * Copyright (C) 2010 Eric Benard - eric at eukrea.com
+- *
+- * Based on pcm970-baseboard.c which is :
+- * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+- * MA 02110-1301, USA.
+- */
+-
+-#include <linux/gpio.h>
+-#include <linux/leds.h>
+-#include <linux/platform_device.h>
+-#include <linux/input.h>
+-#include <linux/spi/spi.h>
+-#include <video/platform_lcd.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-
+-#include "common.h"
+-#include "devices-imx25.h"
+-#include "hardware.h"
+-#include "iomux-mx25.h"
+-#include "mx25.h"
+-
+-static const iomux_v3_cfg_t eukrea_mbimxsd_pads[] __initconst = {
+-	/* LCD */
+-	MX25_PAD_LD0__LD0,
+-	MX25_PAD_LD1__LD1,
+-	MX25_PAD_LD2__LD2,
+-	MX25_PAD_LD3__LD3,
+-	MX25_PAD_LD4__LD4,
+-	MX25_PAD_LD5__LD5,
+-	MX25_PAD_LD6__LD6,
+-	MX25_PAD_LD7__LD7,
+-	MX25_PAD_LD8__LD8,
+-	MX25_PAD_LD9__LD9,
+-	MX25_PAD_LD10__LD10,
+-	MX25_PAD_LD11__LD11,
+-	MX25_PAD_LD12__LD12,
+-	MX25_PAD_LD13__LD13,
+-	MX25_PAD_LD14__LD14,
+-	MX25_PAD_LD15__LD15,
+-	MX25_PAD_GPIO_E__LD16,
+-	MX25_PAD_GPIO_F__LD17,
+-	MX25_PAD_HSYNC__HSYNC,
+-	MX25_PAD_VSYNC__VSYNC,
+-	MX25_PAD_LSCLK__LSCLK,
+-	MX25_PAD_OE_ACD__OE_ACD,
+-	MX25_PAD_CONTRAST__CONTRAST,
+-	/* LCD_PWR */
+-	MX25_PAD_PWM__GPIO_1_26,
+-	/* LED */
+-	MX25_PAD_POWER_FAIL__GPIO_3_19,
+-	/* SWITCH */
+-	MX25_PAD_VSTBY_ACK__GPIO_3_18,
+-	/* UART2 */
+-	MX25_PAD_UART2_RTS__UART2_RTS,
+-	MX25_PAD_UART2_CTS__UART2_CTS,
+-	MX25_PAD_UART2_TXD__UART2_TXD,
+-	MX25_PAD_UART2_RXD__UART2_RXD,
+-	/* SD1 */
+-	MX25_PAD_SD1_CMD__SD1_CMD,
+-	MX25_PAD_SD1_CLK__SD1_CLK,
+-	MX25_PAD_SD1_DATA0__SD1_DATA0,
+-	MX25_PAD_SD1_DATA1__SD1_DATA1,
+-	MX25_PAD_SD1_DATA2__SD1_DATA2,
+-	MX25_PAD_SD1_DATA3__SD1_DATA3,
+-	/* SD1 CD */
+-	MX25_PAD_DE_B__GPIO_2_20,
+-	/* I2S */
+-	MX25_PAD_KPP_COL3__AUD5_TXFS,
+-	MX25_PAD_KPP_COL2__AUD5_TXC,
+-	MX25_PAD_KPP_COL1__AUD5_RXD,
+-	MX25_PAD_KPP_COL0__AUD5_TXD,
+-	/* CAN */
+-	MX25_PAD_GPIO_D__CAN2_RX,
+-	MX25_PAD_GPIO_C__CAN2_TX,
+-	/* SPI1 */
+-	MX25_PAD_CSPI1_MOSI__CSPI1_MOSI,
+-	MX25_PAD_CSPI1_MISO__CSPI1_MISO,
+-	MX25_PAD_CSPI1_SS0__GPIO_1_16,
+-	MX25_PAD_CSPI1_SS1__GPIO_1_17,
+-	MX25_PAD_CSPI1_SCLK__CSPI1_SCLK,
+-	MX25_PAD_CSPI1_RDY__GPIO_2_22,
+-};
+-
+-#define GPIO_LED1		IMX_GPIO_NR(3, 19)
+-#define GPIO_SWITCH1	IMX_GPIO_NR(3, 18)
+-#define GPIO_SD1CD		IMX_GPIO_NR(2, 20)
+-#define GPIO_LCDPWR		IMX_GPIO_NR(1, 26)
+-#define	GPIO_SPI1_SS0	IMX_GPIO_NR(1, 16)
+-#define	GPIO_SPI1_SS1	IMX_GPIO_NR(1, 17)
+-#define	GPIO_SPI1_IRQ	IMX_GPIO_NR(2, 22)
+-
+-static struct imx_fb_videomode eukrea_mximxsd_modes[] = {
+-	{
+-		.mode	= {
+-			.name		= "CMO-QVGA",
+-			.refresh	= 60,
+-			.xres		= 320,
+-			.yres		= 240,
+-			.pixclock	= KHZ2PICOS(6500),
+-			.left_margin	= 30,
+-			.right_margin	= 38,
+-			.upper_margin	= 20,
+-			.lower_margin	= 3,
+-			.hsync_len	= 15,
+-			.vsync_len	= 4,
+-		},
+-		.bpp	= 16,
+-		.pcr	= 0xCAD08B80,
+-	}, {
+-		.mode = {
+-			.name		= "DVI-VGA",
+-			.refresh	= 60,
+-			.xres		= 640,
+-			.yres		= 480,
+-			.pixclock	= 32000,
+-			.hsync_len	= 7,
+-			.left_margin	= 100,
+-			.right_margin	= 100,
+-			.vsync_len	= 7,
+-			.upper_margin	= 7,
+-			.lower_margin	= 100,
+-		},
+-		.pcr		= 0xFA208B80,
+-		.bpp		= 16,
+-	}, {
+-		.mode = {
+-			.name		= "DVI-SVGA",
+-			.refresh	= 60,
+-			.xres		= 800,
+-			.yres		= 600,
+-			.pixclock	= 25000,
+-			.hsync_len	= 7,
+-			.left_margin	= 75,
+-			.right_margin	= 75,
+-			.vsync_len	= 7,
+-			.upper_margin	= 7,
+-			.lower_margin	= 75,
+-		},
+-		.pcr		= 0xFA208B80,
+-		.bpp		= 16,
+-	},
+-};
+-
+-static const struct imx_fb_platform_data eukrea_mximxsd_fb_pdata __initconst = {
+-	.mode		= eukrea_mximxsd_modes,
+-	.num_modes	= ARRAY_SIZE(eukrea_mximxsd_modes),
+-	.pwmr		= 0x00A903FF,
+-	.lscr1		= 0x00120300,
+-	.dmacr		= 0x00040060,
+-};
+-
+-static void eukrea_mbimxsd_lcd_power_set(struct plat_lcd_data *pd,
+-				   unsigned int power)
+-{
+-	if (power)
+-		gpio_direction_output(GPIO_LCDPWR, 1);
+-	else
+-		gpio_direction_output(GPIO_LCDPWR, 0);
+-}
+-
+-static struct plat_lcd_data eukrea_mbimxsd_lcd_power_data = {
+-	.set_power		= eukrea_mbimxsd_lcd_power_set,
+-};
+-
+-static struct platform_device eukrea_mbimxsd_lcd_powerdev = {
+-	.name			= "platform-lcd",
+-	.dev.platform_data	= &eukrea_mbimxsd_lcd_power_data,
+-};
+-
+-static const struct gpio_led eukrea_mbimxsd_leds[] __initconst = {
+-	{
+-		.name			= "led1",
+-		.default_trigger	= "heartbeat",
+-		.active_low		= 1,
+-		.gpio			= GPIO_LED1,
+-	},
+-};
+-
+-static const struct gpio_led_platform_data
+-		eukrea_mbimxsd_led_info __initconst = {
+-	.leds		= eukrea_mbimxsd_leds,
+-	.num_leds	= ARRAY_SIZE(eukrea_mbimxsd_leds),
+-};
+-
+-static struct gpio_keys_button eukrea_mbimxsd_gpio_buttons[] = {
+-	{
+-		.gpio		= GPIO_SWITCH1,
+-		.code		= BTN_0,
+-		.desc		= "BP1",
+-		.active_low	= 1,
+-		.wakeup		= 1,
+-	},
+-};
+-
+-static const struct gpio_keys_platform_data
+-		eukrea_mbimxsd_button_data __initconst = {
+-	.buttons	= eukrea_mbimxsd_gpio_buttons,
+-	.nbuttons	= ARRAY_SIZE(eukrea_mbimxsd_gpio_buttons),
+-};
+-
+-static struct platform_device *platform_devices[] __initdata = {
+-	&eukrea_mbimxsd_lcd_powerdev,
+-};
+-
+-static const struct imxuart_platform_data uart_pdata __initconst = {
+-	.flags = IMXUART_HAVE_RTSCTS,
+-};
+-
+-static struct i2c_board_info eukrea_mbimxsd_i2c_devices[] = {
+-	{
+-		I2C_BOARD_INFO("tlv320aic23", 0x1a),
+-	},
+-};
+-
+-static const
+-struct imx_ssi_platform_data eukrea_mbimxsd_ssi_pdata __initconst = {
+-	.flags = IMX_SSI_SYN | IMX_SSI_NET | IMX_SSI_USE_I2S_SLAVE,
+-};
+-
+-static struct esdhc_platform_data sd1_pdata = {
+-	.cd_gpio = GPIO_SD1CD,
+-	.cd_type = ESDHC_CD_GPIO,
+-	.wp_type = ESDHC_WP_NONE,
+-};
+-
+-static struct spi_board_info eukrea_mbimxsd25_spi_board_info[] __initdata = {
+-	{
+-		.modalias = "spidev",
+-		.max_speed_hz = 20000000,
+-		.bus_num = 0,
+-		.chip_select = 0,
+-		.mode = SPI_MODE_0,
+-	},
+-	{
+-		.modalias = "spidev",
+-		.max_speed_hz = 20000000,
+-		.bus_num = 0,
+-		.chip_select = 1,
+-		.mode = SPI_MODE_0,
+-	},
+-};
+-
+-static int eukrea_mbimxsd25_spi_cs[] = {GPIO_SPI1_SS0, GPIO_SPI1_SS1};
+-
+-static const struct spi_imx_master eukrea_mbimxsd25_spi0_data __initconst = {
+-	.chipselect     = eukrea_mbimxsd25_spi_cs,
+-	.num_chipselect = ARRAY_SIZE(eukrea_mbimxsd25_spi_cs),
+-};
+-
+-/*
+- * system init for baseboard usage. Will be called by cpuimx25 init.
+- *
+- * Add platform devices present on this baseboard and init
+- * them from CPU side as far as required to use them later on
+- */
+-void __init eukrea_mbimxsd25_baseboard_init(void)
+-{
+-	if (mxc_iomux_v3_setup_multiple_pads(eukrea_mbimxsd_pads,
+-			ARRAY_SIZE(eukrea_mbimxsd_pads)))
+-		printk(KERN_ERR "error setting mbimxsd pads !\n");
+-
+-	imx25_add_imx_uart1(&uart_pdata);
+-	imx25_add_imx_fb(&eukrea_mximxsd_fb_pdata);
+-	imx25_add_imx_ssi(0, &eukrea_mbimxsd_ssi_pdata);
+-
+-	imx25_add_flexcan1();
+-	imx25_add_sdhci_esdhc_imx(0, &sd1_pdata);
+-
+-	gpio_request(GPIO_LED1, "LED1");
+-	gpio_direction_output(GPIO_LED1, 1);
+-	gpio_free(GPIO_LED1);
+-
+-	gpio_request(GPIO_SWITCH1, "SWITCH1");
+-	gpio_direction_input(GPIO_SWITCH1);
+-	gpio_free(GPIO_SWITCH1);
+-
+-	gpio_request(GPIO_LCDPWR, "LCDPWR");
+-	gpio_direction_output(GPIO_LCDPWR, 1);
+-
+-	i2c_register_board_info(0, eukrea_mbimxsd_i2c_devices,
+-				ARRAY_SIZE(eukrea_mbimxsd_i2c_devices));
+-
+-	gpio_request(GPIO_SPI1_IRQ, "SPI1_IRQ");
+-	gpio_direction_input(GPIO_SPI1_IRQ);
+-	gpio_free(GPIO_SPI1_IRQ);
+-	imx25_add_spi_imx0(&eukrea_mbimxsd25_spi0_data);
+-	spi_register_board_info(eukrea_mbimxsd25_spi_board_info,
+-		ARRAY_SIZE(eukrea_mbimxsd25_spi_board_info));
+-
+-	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+-	gpio_led_register_device(-1, &eukrea_mbimxsd_led_info);
+-	imx_add_gpio_keys(&eukrea_mbimxsd_button_data);
+-	imx_add_platform_device("eukrea_tlv320", 0, NULL, 0, NULL, 0);
+-}
+diff --git a/arch/arm/mach-imx/mach-eukrea_cpuimx25.c b/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
+deleted file mode 100644
+index 0263219..0000000
+--- a/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
++++ /dev/null
+@@ -1,172 +0,0 @@
+-/*
+- * Copyright 2009 Sascha Hauer, <kernel@pengutronix.de>
+- * Copyright 2010 Eric B??nard - Eukr??a Electromatique, <eric@eukrea.com>
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor,
+- * Boston, MA  02110-1301, USA.
+- */
+-
+-#include <linux/types.h>
+-#include <linux/init.h>
+-#include <linux/delay.h>
+-#include <linux/clk.h>
+-#include <linux/irq.h>
+-#include <linux/gpio.h>
+-#include <linux/platform_device.h>
+-#include <linux/usb/otg.h>
+-#include <linux/usb/ulpi.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-#include <asm/memory.h>
+-#include <asm/mach/map.h>
+-
+-#include "common.h"
+-#include "devices-imx25.h"
+-#include "ehci.h"
+-#include "eukrea-baseboards.h"
+-#include "hardware.h"
+-#include "iomux-mx25.h"
+-#include "mx25.h"
+-
+-static const struct imxuart_platform_data uart_pdata __initconst = {
+-	.flags = IMXUART_HAVE_RTSCTS,
+-};
+-
+-static const iomux_v3_cfg_t eukrea_cpuimx25_pads[] __initconst = {
+-	/* FEC - RMII */
+-	MX25_PAD_FEC_MDC__FEC_MDC,
+-	MX25_PAD_FEC_MDIO__FEC_MDIO,
+-	MX25_PAD_FEC_TDATA0__FEC_TDATA0,
+-	MX25_PAD_FEC_TDATA1__FEC_TDATA1,
+-	MX25_PAD_FEC_TX_EN__FEC_TX_EN,
+-	MX25_PAD_FEC_RDATA0__FEC_RDATA0,
+-	MX25_PAD_FEC_RDATA1__FEC_RDATA1,
+-	MX25_PAD_FEC_RX_DV__FEC_RX_DV,
+-	MX25_PAD_FEC_TX_CLK__FEC_TX_CLK,
+-	/* I2C1 */
+-	MX25_PAD_I2C1_CLK__I2C1_CLK,
+-	MX25_PAD_I2C1_DAT__I2C1_DAT,
+-};
+-
+-static const struct fec_platform_data mx25_fec_pdata __initconst = {
+-	.phy	= PHY_INTERFACE_MODE_RMII,
+-};
+-
+-static const struct mxc_nand_platform_data
+-eukrea_cpuimx25_nand_board_info __initconst = {
+-	.width		= 1,
+-	.hw_ecc		= 1,
+-	.flash_bbt	= 1,
+-};
+-
+-static const struct imxi2c_platform_data
+-eukrea_cpuimx25_i2c0_data __initconst = {
+-	.bitrate = 100000,
+-};
+-
+-static struct i2c_board_info eukrea_cpuimx25_i2c_devices[] = {
+-	{
+-		I2C_BOARD_INFO("pcf8563", 0x51),
+-	},
+-};
+-
+-static int eukrea_cpuimx25_otg_init(struct platform_device *pdev)
+-{
+-	return mx25_initialize_usb_hw(pdev->id, MXC_EHCI_INTERFACE_DIFF_UNI);
+-}
+-
+-static const struct mxc_usbh_platform_data otg_pdata __initconst = {
+-	.init	= eukrea_cpuimx25_otg_init,
+-	.portsc	= MXC_EHCI_MODE_UTMI,
+-};
+-
+-static int eukrea_cpuimx25_usbh2_init(struct platform_device *pdev)
+-{
+-	return mx25_initialize_usb_hw(pdev->id, MXC_EHCI_INTERFACE_SINGLE_UNI |
+-			MXC_EHCI_INTERNAL_PHY | MXC_EHCI_IPPUE_DOWN);
+-}
+-
+-static const struct mxc_usbh_platform_data usbh2_pdata __initconst = {
+-	.init	= eukrea_cpuimx25_usbh2_init,
+-	.portsc	= MXC_EHCI_MODE_SERIAL,
+-};
+-
+-static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
+-	.operating_mode = FSL_USB2_DR_DEVICE,
+-	.phy_mode       = FSL_USB2_PHY_UTMI,
+-	.workaround     = FLS_USB2_WORKAROUND_ENGCM09152,
+-};
+-
+-static bool otg_mode_host __initdata;
+-
+-static int __init eukrea_cpuimx25_otg_mode(char *options)
+-{
+-	if (!strcmp(options, "host"))
+-		otg_mode_host = true;
+-	else if (!strcmp(options, "device"))
+-		otg_mode_host = false;
+-	else
+-		pr_info("otg_mode neither \"host\" nor \"device\". "
+-			"Defaulting to device\n");
+-	return 1;
+-}
+-__setup("otg_mode=", eukrea_cpuimx25_otg_mode);
+-
+-static void __init eukrea_cpuimx25_init(void)
+-{
+-	imx25_soc_init();
+-
+-	if (mxc_iomux_v3_setup_multiple_pads(eukrea_cpuimx25_pads,
+-			ARRAY_SIZE(eukrea_cpuimx25_pads)))
+-		printk(KERN_ERR "error setting cpuimx25 pads !\n");
+-
+-	imx25_add_imx_uart0(&uart_pdata);
+-	imx25_add_mxc_nand(&eukrea_cpuimx25_nand_board_info);
+-	imx25_add_imxdi_rtc();
+-	imx25_add_fec(&mx25_fec_pdata);
+-	imx25_add_imx2_wdt();
+-
+-	i2c_register_board_info(0, eukrea_cpuimx25_i2c_devices,
+-				ARRAY_SIZE(eukrea_cpuimx25_i2c_devices));
+-	imx25_add_imx_i2c0(&eukrea_cpuimx25_i2c0_data);
+-
+-	if (otg_mode_host)
+-		imx25_add_mxc_ehci_otg(&otg_pdata);
+-	else
+-		imx25_add_fsl_usb2_udc(&otg_device_pdata);
+-
+-	imx25_add_mxc_ehci_hs(&usbh2_pdata);
+-
+-#ifdef CONFIG_MACH_EUKREA_MBIMXSD25_BASEBOARD
+-	eukrea_mbimxsd25_baseboard_init();
+-#endif
+-}
+-
+-static void __init eukrea_cpuimx25_timer_init(void)
+-{
+-	mx25_clocks_init();
+-}
+-
+-MACHINE_START(EUKREA_CPUIMX25SD, "Eukrea CPUIMX25")
+-	/* Maintainer: Eukrea Electromatique */
+-	.atag_offset = 0x100,
+-	.map_io = mx25_map_io,
+-	.init_early = imx25_init_early,
+-	.init_irq = mx25_init_irq,
+-	.init_time = eukrea_cpuimx25_timer_init,
+-	.init_machine = eukrea_cpuimx25_init,
+-	.restart	= mxc_restart,
+-MACHINE_END
+-- 
+1.9.1
