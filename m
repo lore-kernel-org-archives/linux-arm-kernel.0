@@ -1,828 +1,630 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 6 Mar 2015 14:28:37 +0200
-Subject: [PATCH 02/24] clk: ti: move generic OMAP DPLL implementation under
+Date: Fri, 6 Mar 2015 14:28:38 +0200
+Subject: [PATCH 03/24] clk: ti: move OMAP4+ DPLL implementation under
  drivers/clk
 In-Reply-To: <1425644939-3232-1-git-send-email-t-kristo@ti.com>
 References: <1425644939-3232-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1425644939-3232-3-git-send-email-t-kristo@ti.com>
+Message-ID: <1425644939-3232-4-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the legacy clock data now gone, we can start moving OMAP clock
-type implementations under clock driver. Start this with moving the
-generic OMAP DPLL clock type under TI clock driver.
+With the legacy clock support gone, the OMAP4 specific DPLL implementations
+can be moved under the clock driver. Change some of the function prototypes
+to be static at the same time, and remove some exports from the global TI
+clock driver header.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/Makefile    |    2 +-
- arch/arm/mach-omap2/clkt_dpll.c |  370 ---------------------------------------
- drivers/clk/ti/Makefile         |    3 +-
- drivers/clk/ti/clkt_dpll.c      |  369 ++++++++++++++++++++++++++++++++++++++
- drivers/clk/ti/clock.h          |    2 +
- include/linux/clk/ti.h          |    1 -
- 6 files changed, 374 insertions(+), 373 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/clkt_dpll.c
- create mode 100644 drivers/clk/ti/clkt_dpll.c
+ arch/arm/mach-omap2/Makefile   |    6 +-
+ arch/arm/mach-omap2/clock.h    |    4 -
+ arch/arm/mach-omap2/dpll44xx.c |  232 ---------------------------------------
+ drivers/clk/ti/Makefile        |    6 +-
+ drivers/clk/ti/clock.h         |   14 +++
+ drivers/clk/ti/dpll44xx.c      |  233 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk/ti.h         |   13 +--
+ 7 files changed, 254 insertions(+), 254 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/dpll44xx.c
+ create mode 100644 drivers/clk/ti/dpll44xx.c
 
 diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index b83f18f..af89278 100644
+index af89278..a7739a0 100644
 --- a/arch/arm/mach-omap2/Makefile
 +++ b/arch/arm/mach-omap2/Makefile
-@@ -13,7 +13,7 @@ obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o timer.o pm.o \
- hwmod-common				= omap_hwmod.o omap_hwmod_reset.o \
- 					  omap_hwmod_common_data.o
- clock-common				= clock.o clock_common_data.o \
--					  clkt_dpll.o clkt_clksel.o
-+					  clkt_clksel.o
- secure-common				= omap-smc.o omap-secure.o
+@@ -193,12 +193,12 @@ obj-$(CONFIG_ARCH_OMAP3)		+= clock3517.o clock36xx.o
+ obj-$(CONFIG_ARCH_OMAP3)		+= dpll3xxx.o
+ obj-$(CONFIG_ARCH_OMAP3)		+= clkt_iclk.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= $(clock-common)
+-obj-$(CONFIG_ARCH_OMAP4)		+= dpll3xxx.o dpll44xx.o
++obj-$(CONFIG_ARCH_OMAP4)		+= dpll3xxx.o
+ obj-$(CONFIG_SOC_AM33XX)		+= $(clock-common) dpll3xxx.o
+ obj-$(CONFIG_SOC_OMAP5)			+= $(clock-common)
+-obj-$(CONFIG_SOC_OMAP5)			+= dpll3xxx.o dpll44xx.o
++obj-$(CONFIG_SOC_OMAP5)			+= dpll3xxx.o
+ obj-$(CONFIG_SOC_DRA7XX)		+= $(clock-common)
+-obj-$(CONFIG_SOC_DRA7XX)		+= dpll3xxx.o dpll44xx.o
++obj-$(CONFIG_SOC_DRA7XX)		+= dpll3xxx.o
+ obj-$(CONFIG_SOC_AM43XX)		+= $(clock-common) dpll3xxx.o
  
- obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(hwmod-common)
-diff --git a/arch/arm/mach-omap2/clkt_dpll.c b/arch/arm/mach-omap2/clkt_dpll.c
+ # OMAP2 clock rate set data (old "OPP" data)
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index 3649e5e..2686530 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -183,8 +183,6 @@ struct clksel {
+ u32 omap3_dpll_autoidle_read(struct clk_hw_omap *clk);
+ void omap3_dpll_allow_idle(struct clk_hw_omap *clk);
+ void omap3_dpll_deny_idle(struct clk_hw_omap *clk);
+-void omap4_dpllmx_allow_gatectrl(struct clk_hw_omap *clk);
+-void omap4_dpllmx_deny_gatectrl(struct clk_hw_omap *clk);
+ 
+ void __init omap2_clk_disable_clkdm_control(void);
+ 
+@@ -204,8 +202,6 @@ int omap2_clksel_set_parent(struct clk_hw *hw, u8 field_val);
+ extern void omap2_clkt_iclk_allow_idle(struct clk_hw_omap *clk);
+ extern void omap2_clkt_iclk_deny_idle(struct clk_hw_omap *clk);
+ 
+-unsigned long omap2_get_dpll_rate(struct clk_hw_omap *clk);
+-
+ void omap2_clk_dflt_find_companion(struct clk_hw_omap *clk,
+ 				   void __iomem **other_reg,
+ 				   u8 *other_bit);
+diff --git a/arch/arm/mach-omap2/dpll44xx.c b/arch/arm/mach-omap2/dpll44xx.c
 deleted file mode 100644
-index 82f0600..0000000
---- a/arch/arm/mach-omap2/clkt_dpll.c
+index f231be0..0000000
+--- a/arch/arm/mach-omap2/dpll44xx.c
 +++ /dev/null
-@@ -1,370 +0,0 @@
+@@ -1,232 +0,0 @@
 -/*
-- * OMAP2/3/4 DPLL clock functions
+- * OMAP4-specific DPLL control functions
 - *
-- * Copyright (C) 2005-2008 Texas Instruments, Inc.
-- * Copyright (C) 2004-2010 Nokia Corporation
-- *
-- * Contacts:
-- * Richard Woodruff <r-woodruff2@ti.com>
-- * Paul Walmsley
+- * Copyright (C) 2011 Texas Instruments, Inc.
+- * Rajendra Nayak
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
 - */
--#undef DEBUG
 -
 -#include <linux/kernel.h>
 -#include <linux/errno.h>
--#include <linux/clk-provider.h>
+-#include <linux/clk.h>
 -#include <linux/io.h>
--
--#include <asm/div64.h>
+-#include <linux/bitops.h>
 -
 -#include "clock.h"
 -
--/* DPLL rate rounding: minimum DPLL multiplier, divider values */
--#define DPLL_MIN_MULTIPLIER		2
--#define DPLL_MIN_DIVIDER		1
--
--/* Possible error results from _dpll_test_mult */
--#define DPLL_MULT_UNDERFLOW		-1
+-/*
+- * Maximum DPLL input frequency (FINT) and output frequency (FOUT) that
+- * can supported when using the DPLL low-power mode. Frequencies are
+- * defined in OMAP4430/60 Public TRM section 3.6.3.3.2 "Enable Control,
+- * Status, and Low-Power Operation Mode".
+- */
+-#define OMAP4_DPLL_LP_FINT_MAX	1000000
+-#define OMAP4_DPLL_LP_FOUT_MAX	100000000
 -
 -/*
-- * Scale factor to mitigate roundoff errors in DPLL rate rounding.
-- * The higher the scale factor, the greater the risk of arithmetic overflow,
-- * but the closer the rounded rate to the target rate.  DPLL_SCALE_FACTOR
-- * must be a power of DPLL_SCALE_BASE.
+- * Bitfield declarations
 - */
--#define DPLL_SCALE_FACTOR		64
--#define DPLL_SCALE_BASE			2
--#define DPLL_ROUNDING_VAL		((DPLL_SCALE_BASE / 2) * \
--					 (DPLL_SCALE_FACTOR / DPLL_SCALE_BASE))
+-#define OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK		(1 << 8)
+-#define OMAP4430_DPLL_CLKOUTX2_GATE_CTRL_MASK		(1 << 10)
+-#define OMAP4430_DPLL_REGM4XEN_MASK			(1 << 11)
 -
--/*
-- * DPLL valid Fint frequency range for OMAP36xx and OMAP4xxx.
-- * From device data manual section 4.3 "DPLL and DLL Specifications".
-- */
--#define OMAP3PLUS_DPLL_FINT_JTYPE_MIN	500000
--#define OMAP3PLUS_DPLL_FINT_JTYPE_MAX	2500000
+-/* Static rate multiplier for OMAP4 REGM4XEN clocks */
+-#define OMAP4430_REGM4XEN_MULT				4
 -
--/* _dpll_test_fint() return codes */
--#define DPLL_FINT_UNDERFLOW		-1
--#define DPLL_FINT_INVALID		-2
--
--/* Private functions */
--
--/*
-- * _dpll_test_fint - test whether an Fint value is valid for the DPLL
-- * @clk: DPLL struct clk to test
-- * @n: divider value (N) to test
-- *
-- * Tests whether a particular divider @n will result in a valid DPLL
-- * internal clock frequency Fint. See the 34xx TRM 4.7.6.2 "DPLL Jitter
-- * Correction".  Returns 0 if OK, -1 if the enclosing loop can terminate
-- * (assuming that it is counting N upwards), or -2 if the enclosing loop
-- * should skip to the next iteration (again assuming N is increasing).
-- */
--static int _dpll_test_fint(struct clk_hw_omap *clk, unsigned int n)
+-void omap4_dpllmx_allow_gatectrl(struct clk_hw_omap *clk)
 -{
--	struct dpll_data *dd;
--	long fint, fint_min, fint_max;
--	int ret = 0;
+-	u32 v;
+-	u32 mask;
 -
--	dd = clk->dpll_data;
+-	if (!clk || !clk->clksel_reg)
+-		return;
 -
--	/* DPLL divider must result in a valid jitter correction val */
--	fint = __clk_get_rate(__clk_get_parent(clk->hw.clk)) / n;
+-	mask = clk->flags & CLOCK_CLKOUTX2 ?
+-			OMAP4430_DPLL_CLKOUTX2_GATE_CTRL_MASK :
+-			OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK;
 -
--	if (dd->flags & DPLL_J_TYPE) {
--		fint_min = OMAP3PLUS_DPLL_FINT_JTYPE_MIN;
--		fint_max = OMAP3PLUS_DPLL_FINT_JTYPE_MAX;
--	} else {
--		fint_min = ti_clk_get_features()->fint_min;
--		fint_max = ti_clk_get_features()->fint_max;
--	}
--
--	if (!fint_min || !fint_max) {
--		WARN(1, "No fint limits available!\n");
--		return DPLL_FINT_INVALID;
--	}
--
--	if (fint < ti_clk_get_features()->fint_min) {
--		pr_debug("rejecting n=%d due to Fint failure, lowering max_divider\n",
--			 n);
--		dd->max_divider = n;
--		ret = DPLL_FINT_UNDERFLOW;
--	} else if (fint > ti_clk_get_features()->fint_max) {
--		pr_debug("rejecting n=%d due to Fint failure, boosting min_divider\n",
--			 n);
--		dd->min_divider = n;
--		ret = DPLL_FINT_INVALID;
--	} else if (fint > ti_clk_get_features()->fint_band1_max &&
--		   fint < ti_clk_get_features()->fint_band2_min) {
--		pr_debug("rejecting n=%d due to Fint failure\n", n);
--		ret = DPLL_FINT_INVALID;
--	}
--
--	return ret;
+-	v = omap2_clk_readl(clk, clk->clksel_reg);
+-	/* Clear the bit to allow gatectrl */
+-	v &= ~mask;
+-	omap2_clk_writel(v, clk, clk->clksel_reg);
 -}
 -
--static unsigned long _dpll_compute_new_rate(unsigned long parent_rate,
--					    unsigned int m, unsigned int n)
+-void omap4_dpllmx_deny_gatectrl(struct clk_hw_omap *clk)
 -{
--	unsigned long long num;
+-	u32 v;
+-	u32 mask;
 -
--	num = (unsigned long long)parent_rate * m;
--	do_div(num, n);
--	return num;
+-	if (!clk || !clk->clksel_reg)
+-		return;
+-
+-	mask = clk->flags & CLOCK_CLKOUTX2 ?
+-			OMAP4430_DPLL_CLKOUTX2_GATE_CTRL_MASK :
+-			OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK;
+-
+-	v = omap2_clk_readl(clk, clk->clksel_reg);
+-	/* Set the bit to deny gatectrl */
+-	v |= mask;
+-	omap2_clk_writel(v, clk, clk->clksel_reg);
 -}
 -
--/*
-- * _dpll_test_mult - test a DPLL multiplier value
-- * @m: pointer to the DPLL m (multiplier) value under test
-- * @n: current DPLL n (divider) value under test
-- * @new_rate: pointer to storage for the resulting rounded rate
-- * @target_rate: the desired DPLL rate
-- * @parent_rate: the DPLL's parent clock rate
+-const struct clk_hw_omap_ops clkhwops_omap4_dpllmx = {
+-	.allow_idle	= omap4_dpllmx_allow_gatectrl,
+-	.deny_idle      = omap4_dpllmx_deny_gatectrl,
+-};
+-
+-/**
+- * omap4_dpll_lpmode_recalc - compute DPLL low-power setting
+- * @dd: pointer to the dpll data structure
 - *
-- * This code tests a DPLL multiplier value, ensuring that the
-- * resulting rate will not be higher than the target_rate, and that
-- * the multiplier value itself is valid for the DPLL.  Initially, the
-- * integer pointed to by the m argument should be prescaled by
-- * multiplying by DPLL_SCALE_FACTOR.  The code will replace this with
-- * a non-scaled m upon return.  This non-scaled m will result in a
-- * new_rate as close as possible to target_rate (but not greater than
-- * target_rate) given the current (parent_rate, n, prescaled m)
-- * triple. Returns DPLL_MULT_UNDERFLOW in the event that the
-- * non-scaled m attempted to underflow, which can allow the calling
-- * function to bail out early; or 0 upon success.
+- * Calculates if low-power mode can be enabled based upon the last
+- * multiplier and divider values calculated. If low-power mode can be
+- * enabled, then the bit to enable low-power mode is stored in the
+- * last_rounded_lpmode variable. This implementation is based upon the
+- * criteria for enabling low-power mode as described in the OMAP4430/60
+- * Public TRM section 3.6.3.3.2 "Enable Control, Status, and Low-Power
+- * Operation Mode".
 - */
--static int _dpll_test_mult(int *m, int n, unsigned long *new_rate,
--			   unsigned long target_rate,
--			   unsigned long parent_rate)
+-static void omap4_dpll_lpmode_recalc(struct dpll_data *dd)
 -{
--	int r = 0, carry = 0;
+-	long fint, fout;
 -
--	/* Unscale m and round if necessary */
--	if (*m % DPLL_SCALE_FACTOR >= DPLL_ROUNDING_VAL)
--		carry = 1;
--	*m = (*m / DPLL_SCALE_FACTOR) + carry;
+-	fint = __clk_get_rate(dd->clk_ref) / (dd->last_rounded_n + 1);
+-	fout = fint * dd->last_rounded_m;
 -
--	/*
--	 * The new rate must be <= the target rate to avoid programming
--	 * a rate that is impossible for the hardware to handle
--	 */
--	*new_rate = _dpll_compute_new_rate(parent_rate, *m, n);
--	if (*new_rate > target_rate) {
--		(*m)--;
--		*new_rate = 0;
--	}
--
--	/* Guard against m underflow */
--	if (*m < DPLL_MIN_MULTIPLIER) {
--		*m = DPLL_MIN_MULTIPLIER;
--		*new_rate = 0;
--		r = DPLL_MULT_UNDERFLOW;
--	}
--
--	if (*new_rate == 0)
--		*new_rate = _dpll_compute_new_rate(parent_rate, *m, n);
--
--	return r;
+-	if ((fint < OMAP4_DPLL_LP_FINT_MAX) && (fout < OMAP4_DPLL_LP_FOUT_MAX))
+-		dd->last_rounded_lpmode = 1;
+-	else
+-		dd->last_rounded_lpmode = 0;
 -}
 -
 -/**
-- * _omap2_dpll_is_in_bypass - check if DPLL is in bypass mode or not
-- * @v: bitfield value of the DPLL enable
+- * omap4_dpll_regm4xen_recalc - compute DPLL rate, considering REGM4XEN bit
+- * @clk: struct clk * of the DPLL to compute the rate for
 - *
-- * Checks given DPLL enable bitfield to see whether the DPLL is in bypass
-- * mode or not. Returns 1 if the DPLL is in bypass, 0 otherwise.
+- * Compute the output rate for the OMAP4 DPLL represented by @clk.
+- * Takes the REGM4XEN bit into consideration, which is needed for the
+- * OMAP4 ABE DPLL.  Returns the DPLL's output rate (before M-dividers)
+- * upon success, or 0 upon error.
 - */
--static int _omap2_dpll_is_in_bypass(u32 v)
--{
--	u8 mask, val;
--
--	mask = ti_clk_get_features()->dpll_bypass_vals;
--
--	/*
--	 * Each set bit in the mask corresponds to a bypass value equal
--	 * to the bitshift. Go through each set-bit in the mask and
--	 * compare against the given register value.
--	 */
--	while (mask) {
--		val = __ffs(mask);
--		mask ^= (1 << val);
--		if (v == val)
--			return 1;
--	}
--
--	return 0;
--}
--
--/* Public functions */
--u8 omap2_init_dpll_parent(struct clk_hw *hw)
+-unsigned long omap4_dpll_regm4xen_recalc(struct clk_hw *hw,
+-			unsigned long parent_rate)
 -{
 -	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
 -	u32 v;
+-	unsigned long rate;
 -	struct dpll_data *dd;
+-
+-	if (!clk || !clk->dpll_data)
+-		return 0;
+-
+-	dd = clk->dpll_data;
+-
+-	rate = omap2_get_dpll_rate(clk);
+-
+-	/* regm4xen adds a multiplier of 4 to DPLL calculations */
+-	v = omap2_clk_readl(clk, dd->control_reg);
+-	if (v & OMAP4430_DPLL_REGM4XEN_MASK)
+-		rate *= OMAP4430_REGM4XEN_MULT;
+-
+-	return rate;
+-}
+-
+-/**
+- * omap4_dpll_regm4xen_round_rate - round DPLL rate, considering REGM4XEN bit
+- * @clk: struct clk * of the DPLL to round a rate for
+- * @target_rate: the desired rate of the DPLL
+- *
+- * Compute the rate that would be programmed into the DPLL hardware
+- * for @clk if set_rate() were to be provided with the rate
+- * @target_rate.  Takes the REGM4XEN bit into consideration, which is
+- * needed for the OMAP4 ABE DPLL.  Returns the rounded rate (before
+- * M-dividers) upon success, -EINVAL if @clk is null or not a DPLL, or
+- * ~0 if an error occurred in omap2_dpll_round_rate().
+- */
+-long omap4_dpll_regm4xen_round_rate(struct clk_hw *hw,
+-				    unsigned long target_rate,
+-				    unsigned long *parent_rate)
+-{
+-	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+-	struct dpll_data *dd;
+-	long r;
+-
+-	if (!clk || !clk->dpll_data)
+-		return -EINVAL;
+-
+-	dd = clk->dpll_data;
+-
+-	dd->last_rounded_m4xen = 0;
+-
+-	/*
+-	 * First try to compute the DPLL configuration for
+-	 * target rate without using the 4X multiplier.
+-	 */
+-	r = omap2_dpll_round_rate(hw, target_rate, NULL);
+-	if (r != ~0)
+-		goto out;
+-
+-	/*
+-	 * If we did not find a valid DPLL configuration, try again, but
+-	 * this time see if using the 4X multiplier can help. Enabling the
+-	 * 4X multiplier is equivalent to dividing the target rate by 4.
+-	 */
+-	r = omap2_dpll_round_rate(hw, target_rate / OMAP4430_REGM4XEN_MULT,
+-				  NULL);
+-	if (r == ~0)
+-		return r;
+-
+-	dd->last_rounded_rate *= OMAP4430_REGM4XEN_MULT;
+-	dd->last_rounded_m4xen = 1;
+-
+-out:
+-	omap4_dpll_lpmode_recalc(dd);
+-
+-	return dd->last_rounded_rate;
+-}
+-
+-/**
+- * omap4_dpll_regm4xen_determine_rate - determine rate for a DPLL
+- * @hw: pointer to the clock to determine rate for
+- * @rate: target rate for the DPLL
+- * @best_parent_rate: pointer for returning best parent rate
+- * @best_parent_clk: pointer for returning best parent clock
+- *
+- * Determines which DPLL mode to use for reaching a desired rate.
+- * Checks whether the DPLL shall be in bypass or locked mode, and if
+- * locked, calculates the M,N values for the DPLL via round-rate.
+- * Returns a positive clock rate with success, negative error value
+- * in failure.
+- */
+-long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw, unsigned long rate,
+-					unsigned long min_rate,
+-					unsigned long max_rate,
+-					unsigned long *best_parent_rate,
+-					struct clk_hw **best_parent_clk)
+-{
+-	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+-	struct dpll_data *dd;
+-
+-	if (!hw || !rate)
+-		return -EINVAL;
 -
 -	dd = clk->dpll_data;
 -	if (!dd)
 -		return -EINVAL;
 -
--	v = omap2_clk_readl(clk, dd->control_reg);
--	v &= dd->enable_mask;
--	v >>= __ffs(dd->enable_mask);
--
--	/* Reparent the struct clk in case the dpll is in bypass */
--	if (_omap2_dpll_is_in_bypass(v))
--		return 1;
--
--	return 0;
--}
--
--/**
-- * omap2_get_dpll_rate - returns the current DPLL CLKOUT rate
-- * @clk: struct clk * of a DPLL
-- *
-- * DPLLs can be locked or bypassed - basically, enabled or disabled.
-- * When locked, the DPLL output depends on the M and N values.  When
-- * bypassed, on OMAP2xxx, the output rate is either the 32KiHz clock
-- * or sys_clk.  Bypass rates on OMAP3 depend on the DPLL: DPLLs 1 and
-- * 2 are bypassed with dpll1_fclk and dpll2_fclk respectively
-- * (generated by DPLL3), while DPLL 3, 4, and 5 bypass rates are sys_clk.
-- * Returns the current DPLL CLKOUT rate (*not* CLKOUTX2) if the DPLL is
-- * locked, or the appropriate bypass rate if the DPLL is bypassed, or 0
-- * if the clock @clk is not a DPLL.
-- */
--unsigned long omap2_get_dpll_rate(struct clk_hw_omap *clk)
--{
--	long long dpll_clk;
--	u32 dpll_mult, dpll_div, v;
--	struct dpll_data *dd;
--
--	dd = clk->dpll_data;
--	if (!dd)
--		return 0;
--
--	/* Return bypass rate if DPLL is bypassed */
--	v = omap2_clk_readl(clk, dd->control_reg);
--	v &= dd->enable_mask;
--	v >>= __ffs(dd->enable_mask);
--
--	if (_omap2_dpll_is_in_bypass(v))
--		return __clk_get_rate(dd->clk_bypass);
--
--	v = omap2_clk_readl(clk, dd->mult_div1_reg);
--	dpll_mult = v & dd->mult_mask;
--	dpll_mult >>= __ffs(dd->mult_mask);
--	dpll_div = v & dd->div1_mask;
--	dpll_div >>= __ffs(dd->div1_mask);
--
--	dpll_clk = (long long) __clk_get_rate(dd->clk_ref) * dpll_mult;
--	do_div(dpll_clk, dpll_div + 1);
--
--	return dpll_clk;
--}
--
--/* DPLL rate rounding code */
--
--/**
-- * omap2_dpll_round_rate - round a target rate for an OMAP DPLL
-- * @clk: struct clk * for a DPLL
-- * @target_rate: desired DPLL clock rate
-- *
-- * Given a DPLL and a desired target rate, round the target rate to a
-- * possible, programmable rate for this DPLL.  Attempts to select the
-- * minimum possible n.  Stores the computed (m, n) in the DPLL's
-- * dpll_data structure so set_rate() will not need to call this
-- * (expensive) function again.  Returns ~0 if the target rate cannot
-- * be rounded, or the rounded rate upon success.
-- */
--long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
--		unsigned long *parent_rate)
--{
--	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
--	int m, n, r, scaled_max_m;
--	int min_delta_m = INT_MAX, min_delta_n = INT_MAX;
--	unsigned long scaled_rt_rp;
--	unsigned long new_rate = 0;
--	struct dpll_data *dd;
--	unsigned long ref_rate;
--	long delta;
--	long prev_min_delta = LONG_MAX;
--	const char *clk_name;
--
--	if (!clk || !clk->dpll_data)
--		return ~0;
--
--	dd = clk->dpll_data;
--
--	ref_rate = __clk_get_rate(dd->clk_ref);
--	clk_name = __clk_get_name(hw->clk);
--	pr_debug("clock: %s: starting DPLL round_rate, target rate %lu\n",
--		 clk_name, target_rate);
--
--	scaled_rt_rp = target_rate / (ref_rate / DPLL_SCALE_FACTOR);
--	scaled_max_m = dd->max_multiplier * DPLL_SCALE_FACTOR;
--
--	dd->last_rounded_rate = 0;
--
--	for (n = dd->min_divider; n <= dd->max_divider; n++) {
--
--		/* Is the (input clk, divider) pair valid for the DPLL? */
--		r = _dpll_test_fint(clk, n);
--		if (r == DPLL_FINT_UNDERFLOW)
--			break;
--		else if (r == DPLL_FINT_INVALID)
--			continue;
--
--		/* Compute the scaled DPLL multiplier, based on the divider */
--		m = scaled_rt_rp * n;
--
--		/*
--		 * Since we're counting n up, a m overflow means we
--		 * can bail out completely (since as n increases in
--		 * the next iteration, there's no way that m can
--		 * increase beyond the current m)
--		 */
--		if (m > scaled_max_m)
--			break;
--
--		r = _dpll_test_mult(&m, n, &new_rate, target_rate,
--				    ref_rate);
--
--		/* m can't be set low enough for this n - try with a larger n */
--		if (r == DPLL_MULT_UNDERFLOW)
--			continue;
--
--		/* skip rates above our target rate */
--		delta = target_rate - new_rate;
--		if (delta < 0)
--			continue;
--
--		if (delta < prev_min_delta) {
--			prev_min_delta = delta;
--			min_delta_m = m;
--			min_delta_n = n;
--		}
--
--		pr_debug("clock: %s: m = %d: n = %d: new_rate = %lu\n",
--			 clk_name, m, n, new_rate);
--
--		if (delta == 0)
--			break;
+-	if (__clk_get_rate(dd->clk_bypass) == rate &&
+-	    (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
+-		*best_parent_clk = __clk_get_hw(dd->clk_bypass);
+-	} else {
+-		rate = omap4_dpll_regm4xen_round_rate(hw, rate,
+-						      best_parent_rate);
+-		*best_parent_clk = __clk_get_hw(dd->clk_ref);
 -	}
 -
--	if (prev_min_delta == LONG_MAX) {
--		pr_debug("clock: %s: cannot round to rate %lu\n",
--			 clk_name, target_rate);
--		return ~0;
--	}
+-	*best_parent_rate = rate;
 -
--	dd->last_rounded_m = min_delta_m;
--	dd->last_rounded_n = min_delta_n;
--	dd->last_rounded_rate = target_rate - prev_min_delta;
--
--	return dd->last_rounded_rate;
+-	return rate;
 -}
--
 diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
-index 105ffd0..62dae2a 100644
+index 62dae2a..c3ec301 100644
 --- a/drivers/clk/ti/Makefile
 +++ b/drivers/clk/ti/Makefile
-@@ -1,6 +1,7 @@
- obj-y					+= clk.o autoidle.o clockdomain.o
- clk-common				= dpll.o composite.o divider.o gate.o \
--					  fixed-factor.o mux.o apll.o
-+					  fixed-factor.o mux.o apll.o \
-+					  clkt_dpll.o
- obj-$(CONFIG_SOC_AM33XX)		+= $(clk-common) clk-33xx.o
- obj-$(CONFIG_SOC_TI81XX)		+= $(clk-common) fapll.o clk-816x.o
+@@ -7,10 +7,10 @@ obj-$(CONFIG_SOC_TI81XX)		+= $(clk-common) fapll.o clk-816x.o
  obj-$(CONFIG_ARCH_OMAP2)		+= $(clk-common) interface.o clk-2xxx.o
-diff --git a/drivers/clk/ti/clkt_dpll.c b/drivers/clk/ti/clkt_dpll.c
+ obj-$(CONFIG_ARCH_OMAP3)		+= $(clk-common) interface.o \
+ 					   clk-3xxx.o
+-obj-$(CONFIG_ARCH_OMAP4)		+= $(clk-common) clk-44xx.o
+-obj-$(CONFIG_SOC_OMAP5)			+= $(clk-common) clk-54xx.o
++obj-$(CONFIG_ARCH_OMAP4)		+= $(clk-common) clk-44xx.o dpll44xx.o
++obj-$(CONFIG_SOC_OMAP5)			+= $(clk-common) clk-54xx.o dpll44xx.o
+ obj-$(CONFIG_SOC_DRA7XX)		+= $(clk-common) clk-7xx.o \
+-					   clk-dra7-atl.o
++					   clk-dra7-atl.o dpll44xx.o
+ obj-$(CONFIG_SOC_AM43XX)		+= $(clk-common) clk-43xx.o
+ 
+ ifdef CONFIG_ATAGS
+diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
+index 05ed10a..c75d4b4 100644
+--- a/drivers/clk/ti/clock.h
++++ b/drivers/clk/ti/clock.h
+@@ -169,6 +169,20 @@ void ti_clk_patch_legacy_clks(struct ti_clk **patch);
+ struct clk *ti_clk_register_clk(struct ti_clk *setup);
+ int ti_clk_register_legacy_clks(struct ti_clk_alias *clks);
+ 
++extern const struct clk_hw_omap_ops clkhwops_omap4_dpllmx;
++
+ u8 omap2_init_dpll_parent(struct clk_hw *hw);
+ 
++unsigned long omap4_dpll_regm4xen_recalc(struct clk_hw *hw,
++					 unsigned long parent_rate);
++long omap4_dpll_regm4xen_round_rate(struct clk_hw *hw,
++				    unsigned long target_rate,
++				    unsigned long *parent_rate);
++long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw,
++					unsigned long rate,
++					unsigned long min_rate,
++					unsigned long max_rate,
++					unsigned long *best_parent_rate,
++					struct clk_hw **best_parent_clk);
++
+ #endif
+diff --git a/drivers/clk/ti/dpll44xx.c b/drivers/clk/ti/dpll44xx.c
 new file mode 100644
-index 0000000..a01fc7f
+index 0000000..ef1a5b4
 --- /dev/null
-+++ b/drivers/clk/ti/clkt_dpll.c
-@@ -0,0 +1,369 @@
++++ b/drivers/clk/ti/dpll44xx.c
+@@ -0,0 +1,233 @@
 +/*
-+ * OMAP2/3/4 DPLL clock functions
++ * OMAP4-specific DPLL control functions
 + *
-+ * Copyright (C) 2005-2008 Texas Instruments, Inc.
-+ * Copyright (C) 2004-2010 Nokia Corporation
-+ *
-+ * Contacts:
-+ * Richard Woodruff <r-woodruff2@ti.com>
-+ * Paul Walmsley
++ * Copyright (C) 2011 Texas Instruments, Inc.
++ * Rajendra Nayak
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
-+#undef DEBUG
 +
 +#include <linux/kernel.h>
 +#include <linux/errno.h>
-+#include <linux/clk-provider.h>
++#include <linux/clk.h>
 +#include <linux/io.h>
++#include <linux/bitops.h>
 +#include <linux/clk/ti.h>
-+
-+#include <asm/div64.h>
 +
 +#include "clock.h"
 +
-+/* DPLL rate rounding: minimum DPLL multiplier, divider values */
-+#define DPLL_MIN_MULTIPLIER		2
-+#define DPLL_MIN_DIVIDER		1
-+
-+/* Possible error results from _dpll_test_mult */
-+#define DPLL_MULT_UNDERFLOW		-1
++/*
++ * Maximum DPLL input frequency (FINT) and output frequency (FOUT) that
++ * can supported when using the DPLL low-power mode. Frequencies are
++ * defined in OMAP4430/60 Public TRM section 3.6.3.3.2 "Enable Control,
++ * Status, and Low-Power Operation Mode".
++ */
++#define OMAP4_DPLL_LP_FINT_MAX	1000000
++#define OMAP4_DPLL_LP_FOUT_MAX	100000000
 +
 +/*
-+ * Scale factor to mitigate roundoff errors in DPLL rate rounding.
-+ * The higher the scale factor, the greater the risk of arithmetic overflow,
-+ * but the closer the rounded rate to the target rate.  DPLL_SCALE_FACTOR
-+ * must be a power of DPLL_SCALE_BASE.
++ * Bitfield declarations
 + */
-+#define DPLL_SCALE_FACTOR		64
-+#define DPLL_SCALE_BASE			2
-+#define DPLL_ROUNDING_VAL		((DPLL_SCALE_BASE / 2) * \
-+					 (DPLL_SCALE_FACTOR / DPLL_SCALE_BASE))
++#define OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK		BIT(8)
++#define OMAP4430_DPLL_CLKOUTX2_GATE_CTRL_MASK		BIT(10)
++#define OMAP4430_DPLL_REGM4XEN_MASK			BIT(11)
 +
-+/*
-+ * DPLL valid Fint frequency range for OMAP36xx and OMAP4xxx.
-+ * From device data manual section 4.3 "DPLL and DLL Specifications".
-+ */
-+#define OMAP3PLUS_DPLL_FINT_JTYPE_MIN	500000
-+#define OMAP3PLUS_DPLL_FINT_JTYPE_MAX	2500000
++/* Static rate multiplier for OMAP4 REGM4XEN clocks */
++#define OMAP4430_REGM4XEN_MULT				4
 +
-+/* _dpll_test_fint() return codes */
-+#define DPLL_FINT_UNDERFLOW		-1
-+#define DPLL_FINT_INVALID		-2
-+
-+/* Private functions */
-+
-+/*
-+ * _dpll_test_fint - test whether an Fint value is valid for the DPLL
-+ * @clk: DPLL struct clk to test
-+ * @n: divider value (N) to test
-+ *
-+ * Tests whether a particular divider @n will result in a valid DPLL
-+ * internal clock frequency Fint. See the 34xx TRM 4.7.6.2 "DPLL Jitter
-+ * Correction".  Returns 0 if OK, -1 if the enclosing loop can terminate
-+ * (assuming that it is counting N upwards), or -2 if the enclosing loop
-+ * should skip to the next iteration (again assuming N is increasing).
-+ */
-+static int _dpll_test_fint(struct clk_hw_omap *clk, unsigned int n)
++static void omap4_dpllmx_allow_gatectrl(struct clk_hw_omap *clk)
 +{
-+	struct dpll_data *dd;
-+	long fint, fint_min, fint_max;
-+	int ret = 0;
++	u32 v;
++	u32 mask;
 +
-+	dd = clk->dpll_data;
++	if (!clk || !clk->clksel_reg)
++		return;
 +
-+	/* DPLL divider must result in a valid jitter correction val */
-+	fint = __clk_get_rate(__clk_get_parent(clk->hw.clk)) / n;
++	mask = clk->flags & CLOCK_CLKOUTX2 ?
++			OMAP4430_DPLL_CLKOUTX2_GATE_CTRL_MASK :
++			OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK;
 +
-+	if (dd->flags & DPLL_J_TYPE) {
-+		fint_min = OMAP3PLUS_DPLL_FINT_JTYPE_MIN;
-+		fint_max = OMAP3PLUS_DPLL_FINT_JTYPE_MAX;
-+	} else {
-+		fint_min = ti_clk_get_features()->fint_min;
-+		fint_max = ti_clk_get_features()->fint_max;
-+	}
-+
-+	if (!fint_min || !fint_max) {
-+		WARN(1, "No fint limits available!\n");
-+		return DPLL_FINT_INVALID;
-+	}
-+
-+	if (fint < ti_clk_get_features()->fint_min) {
-+		pr_debug("rejecting n=%d due to Fint failure, lowering max_divider\n",
-+			 n);
-+		dd->max_divider = n;
-+		ret = DPLL_FINT_UNDERFLOW;
-+	} else if (fint > ti_clk_get_features()->fint_max) {
-+		pr_debug("rejecting n=%d due to Fint failure, boosting min_divider\n",
-+			 n);
-+		dd->min_divider = n;
-+		ret = DPLL_FINT_INVALID;
-+	} else if (fint > ti_clk_get_features()->fint_band1_max &&
-+		   fint < ti_clk_get_features()->fint_band2_min) {
-+		pr_debug("rejecting n=%d due to Fint failure\n", n);
-+		ret = DPLL_FINT_INVALID;
-+	}
-+
-+	return ret;
++	v = ti_clk_ll_ops->clk_readl(clk->clksel_reg);
++	/* Clear the bit to allow gatectrl */
++	v &= ~mask;
++	ti_clk_ll_ops->clk_writel(v, clk->clksel_reg);
 +}
 +
-+static unsigned long _dpll_compute_new_rate(unsigned long parent_rate,
-+					    unsigned int m, unsigned int n)
++static void omap4_dpllmx_deny_gatectrl(struct clk_hw_omap *clk)
 +{
-+	unsigned long long num;
++	u32 v;
++	u32 mask;
 +
-+	num = (unsigned long long)parent_rate * m;
-+	do_div(num, n);
-+	return num;
++	if (!clk || !clk->clksel_reg)
++		return;
++
++	mask = clk->flags & CLOCK_CLKOUTX2 ?
++			OMAP4430_DPLL_CLKOUTX2_GATE_CTRL_MASK :
++			OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK;
++
++	v = ti_clk_ll_ops->clk_readl(clk->clksel_reg);
++	/* Set the bit to deny gatectrl */
++	v |= mask;
++	ti_clk_ll_ops->clk_writel(v, clk->clksel_reg);
 +}
 +
-+/*
-+ * _dpll_test_mult - test a DPLL multiplier value
-+ * @m: pointer to the DPLL m (multiplier) value under test
-+ * @n: current DPLL n (divider) value under test
-+ * @new_rate: pointer to storage for the resulting rounded rate
-+ * @target_rate: the desired DPLL rate
-+ * @parent_rate: the DPLL's parent clock rate
++const struct clk_hw_omap_ops clkhwops_omap4_dpllmx = {
++	.allow_idle	= omap4_dpllmx_allow_gatectrl,
++	.deny_idle      = omap4_dpllmx_deny_gatectrl,
++};
++
++/**
++ * omap4_dpll_lpmode_recalc - compute DPLL low-power setting
++ * @dd: pointer to the dpll data structure
 + *
-+ * This code tests a DPLL multiplier value, ensuring that the
-+ * resulting rate will not be higher than the target_rate, and that
-+ * the multiplier value itself is valid for the DPLL.  Initially, the
-+ * integer pointed to by the m argument should be prescaled by
-+ * multiplying by DPLL_SCALE_FACTOR.  The code will replace this with
-+ * a non-scaled m upon return.  This non-scaled m will result in a
-+ * new_rate as close as possible to target_rate (but not greater than
-+ * target_rate) given the current (parent_rate, n, prescaled m)
-+ * triple. Returns DPLL_MULT_UNDERFLOW in the event that the
-+ * non-scaled m attempted to underflow, which can allow the calling
-+ * function to bail out early; or 0 upon success.
++ * Calculates if low-power mode can be enabled based upon the last
++ * multiplier and divider values calculated. If low-power mode can be
++ * enabled, then the bit to enable low-power mode is stored in the
++ * last_rounded_lpmode variable. This implementation is based upon the
++ * criteria for enabling low-power mode as described in the OMAP4430/60
++ * Public TRM section 3.6.3.3.2 "Enable Control, Status, and Low-Power
++ * Operation Mode".
 + */
-+static int _dpll_test_mult(int *m, int n, unsigned long *new_rate,
-+			   unsigned long target_rate,
-+			   unsigned long parent_rate)
++static void omap4_dpll_lpmode_recalc(struct dpll_data *dd)
 +{
-+	int r = 0, carry = 0;
++	long fint, fout;
 +
-+	/* Unscale m and round if necessary */
-+	if (*m % DPLL_SCALE_FACTOR >= DPLL_ROUNDING_VAL)
-+		carry = 1;
-+	*m = (*m / DPLL_SCALE_FACTOR) + carry;
++	fint = __clk_get_rate(dd->clk_ref) / (dd->last_rounded_n + 1);
++	fout = fint * dd->last_rounded_m;
 +
-+	/*
-+	 * The new rate must be <= the target rate to avoid programming
-+	 * a rate that is impossible for the hardware to handle
-+	 */
-+	*new_rate = _dpll_compute_new_rate(parent_rate, *m, n);
-+	if (*new_rate > target_rate) {
-+		(*m)--;
-+		*new_rate = 0;
-+	}
-+
-+	/* Guard against m underflow */
-+	if (*m < DPLL_MIN_MULTIPLIER) {
-+		*m = DPLL_MIN_MULTIPLIER;
-+		*new_rate = 0;
-+		r = DPLL_MULT_UNDERFLOW;
-+	}
-+
-+	if (*new_rate == 0)
-+		*new_rate = _dpll_compute_new_rate(parent_rate, *m, n);
-+
-+	return r;
++	if ((fint < OMAP4_DPLL_LP_FINT_MAX) && (fout < OMAP4_DPLL_LP_FOUT_MAX))
++		dd->last_rounded_lpmode = 1;
++	else
++		dd->last_rounded_lpmode = 0;
 +}
 +
 +/**
-+ * _omap2_dpll_is_in_bypass - check if DPLL is in bypass mode or not
-+ * @v: bitfield value of the DPLL enable
++ * omap4_dpll_regm4xen_recalc - compute DPLL rate, considering REGM4XEN bit
++ * @clk: struct clk * of the DPLL to compute the rate for
 + *
-+ * Checks given DPLL enable bitfield to see whether the DPLL is in bypass
-+ * mode or not. Returns 1 if the DPLL is in bypass, 0 otherwise.
++ * Compute the output rate for the OMAP4 DPLL represented by @clk.
++ * Takes the REGM4XEN bit into consideration, which is needed for the
++ * OMAP4 ABE DPLL.  Returns the DPLL's output rate (before M-dividers)
++ * upon success, or 0 upon error.
 + */
-+static int _omap2_dpll_is_in_bypass(u32 v)
-+{
-+	u8 mask, val;
-+
-+	mask = ti_clk_get_features()->dpll_bypass_vals;
-+
-+	/*
-+	 * Each set bit in the mask corresponds to a bypass value equal
-+	 * to the bitshift. Go through each set-bit in the mask and
-+	 * compare against the given register value.
-+	 */
-+	while (mask) {
-+		val = __ffs(mask);
-+		mask ^= (1 << val);
-+		if (v == val)
-+			return 1;
-+	}
-+
-+	return 0;
-+}
-+
-+/* Public functions */
-+u8 omap2_init_dpll_parent(struct clk_hw *hw)
++unsigned long omap4_dpll_regm4xen_recalc(struct clk_hw *hw,
++					 unsigned long parent_rate)
 +{
 +	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
 +	u32 v;
++	unsigned long rate;
 +	struct dpll_data *dd;
++
++	if (!clk || !clk->dpll_data)
++		return 0;
++
++	dd = clk->dpll_data;
++
++	rate = omap2_get_dpll_rate(clk);
++
++	/* regm4xen adds a multiplier of 4 to DPLL calculations */
++	v = ti_clk_ll_ops->clk_readl(dd->control_reg);
++	if (v & OMAP4430_DPLL_REGM4XEN_MASK)
++		rate *= OMAP4430_REGM4XEN_MULT;
++
++	return rate;
++}
++
++/**
++ * omap4_dpll_regm4xen_round_rate - round DPLL rate, considering REGM4XEN bit
++ * @clk: struct clk * of the DPLL to round a rate for
++ * @target_rate: the desired rate of the DPLL
++ *
++ * Compute the rate that would be programmed into the DPLL hardware
++ * for @clk if set_rate() were to be provided with the rate
++ * @target_rate.  Takes the REGM4XEN bit into consideration, which is
++ * needed for the OMAP4 ABE DPLL.  Returns the rounded rate (before
++ * M-dividers) upon success, -EINVAL if @clk is null or not a DPLL, or
++ * ~0 if an error occurred in omap2_dpll_round_rate().
++ */
++long omap4_dpll_regm4xen_round_rate(struct clk_hw *hw,
++				    unsigned long target_rate,
++				    unsigned long *parent_rate)
++{
++	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
++	struct dpll_data *dd;
++	long r;
++
++	if (!clk || !clk->dpll_data)
++		return -EINVAL;
++
++	dd = clk->dpll_data;
++
++	dd->last_rounded_m4xen = 0;
++
++	/*
++	 * First try to compute the DPLL configuration for
++	 * target rate without using the 4X multiplier.
++	 */
++	r = omap2_dpll_round_rate(hw, target_rate, NULL);
++	if (r != ~0)
++		goto out;
++
++	/*
++	 * If we did not find a valid DPLL configuration, try again, but
++	 * this time see if using the 4X multiplier can help. Enabling the
++	 * 4X multiplier is equivalent to dividing the target rate by 4.
++	 */
++	r = omap2_dpll_round_rate(hw, target_rate / OMAP4430_REGM4XEN_MULT,
++				  NULL);
++	if (r == ~0)
++		return r;
++
++	dd->last_rounded_rate *= OMAP4430_REGM4XEN_MULT;
++	dd->last_rounded_m4xen = 1;
++
++out:
++	omap4_dpll_lpmode_recalc(dd);
++
++	return dd->last_rounded_rate;
++}
++
++/**
++ * omap4_dpll_regm4xen_determine_rate - determine rate for a DPLL
++ * @hw: pointer to the clock to determine rate for
++ * @rate: target rate for the DPLL
++ * @best_parent_rate: pointer for returning best parent rate
++ * @best_parent_clk: pointer for returning best parent clock
++ *
++ * Determines which DPLL mode to use for reaching a desired rate.
++ * Checks whether the DPLL shall be in bypass or locked mode, and if
++ * locked, calculates the M,N values for the DPLL via round-rate.
++ * Returns a positive clock rate with success, negative error value
++ * in failure.
++ */
++long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw, unsigned long rate,
++					unsigned long min_rate,
++					unsigned long max_rate,
++					unsigned long *best_parent_rate,
++					struct clk_hw **best_parent_clk)
++{
++	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
++	struct dpll_data *dd;
++
++	if (!hw || !rate)
++		return -EINVAL;
 +
 +	dd = clk->dpll_data;
 +	if (!dd)
 +		return -EINVAL;
 +
-+	v = ti_clk_ll_ops->clk_readl(dd->control_reg);
-+	v &= dd->enable_mask;
-+	v >>= __ffs(dd->enable_mask);
-+
-+	/* Reparent the struct clk in case the dpll is in bypass */
-+	if (_omap2_dpll_is_in_bypass(v))
-+		return 1;
-+
-+	return 0;
-+}
-+
-+/**
-+ * omap2_get_dpll_rate - returns the current DPLL CLKOUT rate
-+ * @clk: struct clk * of a DPLL
-+ *
-+ * DPLLs can be locked or bypassed - basically, enabled or disabled.
-+ * When locked, the DPLL output depends on the M and N values.  When
-+ * bypassed, on OMAP2xxx, the output rate is either the 32KiHz clock
-+ * or sys_clk.  Bypass rates on OMAP3 depend on the DPLL: DPLLs 1 and
-+ * 2 are bypassed with dpll1_fclk and dpll2_fclk respectively
-+ * (generated by DPLL3), while DPLL 3, 4, and 5 bypass rates are sys_clk.
-+ * Returns the current DPLL CLKOUT rate (*not* CLKOUTX2) if the DPLL is
-+ * locked, or the appropriate bypass rate if the DPLL is bypassed, or 0
-+ * if the clock @clk is not a DPLL.
-+ */
-+unsigned long omap2_get_dpll_rate(struct clk_hw_omap *clk)
-+{
-+	long long dpll_clk;
-+	u32 dpll_mult, dpll_div, v;
-+	struct dpll_data *dd;
-+
-+	dd = clk->dpll_data;
-+	if (!dd)
-+		return 0;
-+
-+	/* Return bypass rate if DPLL is bypassed */
-+	v = ti_clk_ll_ops->clk_readl(dd->control_reg);
-+	v &= dd->enable_mask;
-+	v >>= __ffs(dd->enable_mask);
-+
-+	if (_omap2_dpll_is_in_bypass(v))
-+		return __clk_get_rate(dd->clk_bypass);
-+
-+	v = ti_clk_ll_ops->clk_readl(dd->mult_div1_reg);
-+	dpll_mult = v & dd->mult_mask;
-+	dpll_mult >>= __ffs(dd->mult_mask);
-+	dpll_div = v & dd->div1_mask;
-+	dpll_div >>= __ffs(dd->div1_mask);
-+
-+	dpll_clk = (long long)__clk_get_rate(dd->clk_ref) * dpll_mult;
-+	do_div(dpll_clk, dpll_div + 1);
-+
-+	return dpll_clk;
-+}
-+
-+/* DPLL rate rounding code */
-+
-+/**
-+ * omap2_dpll_round_rate - round a target rate for an OMAP DPLL
-+ * @clk: struct clk * for a DPLL
-+ * @target_rate: desired DPLL clock rate
-+ *
-+ * Given a DPLL and a desired target rate, round the target rate to a
-+ * possible, programmable rate for this DPLL.  Attempts to select the
-+ * minimum possible n.  Stores the computed (m, n) in the DPLL's
-+ * dpll_data structure so set_rate() will not need to call this
-+ * (expensive) function again.  Returns ~0 if the target rate cannot
-+ * be rounded, or the rounded rate upon success.
-+ */
-+long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
-+			   unsigned long *parent_rate)
-+{
-+	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
-+	int m, n, r, scaled_max_m;
-+	int min_delta_m = INT_MAX, min_delta_n = INT_MAX;
-+	unsigned long scaled_rt_rp;
-+	unsigned long new_rate = 0;
-+	struct dpll_data *dd;
-+	unsigned long ref_rate;
-+	long delta;
-+	long prev_min_delta = LONG_MAX;
-+	const char *clk_name;
-+
-+	if (!clk || !clk->dpll_data)
-+		return ~0;
-+
-+	dd = clk->dpll_data;
-+
-+	ref_rate = __clk_get_rate(dd->clk_ref);
-+	clk_name = __clk_get_name(hw->clk);
-+	pr_debug("clock: %s: starting DPLL round_rate, target rate %lu\n",
-+		 clk_name, target_rate);
-+
-+	scaled_rt_rp = target_rate / (ref_rate / DPLL_SCALE_FACTOR);
-+	scaled_max_m = dd->max_multiplier * DPLL_SCALE_FACTOR;
-+
-+	dd->last_rounded_rate = 0;
-+
-+	for (n = dd->min_divider; n <= dd->max_divider; n++) {
-+		/* Is the (input clk, divider) pair valid for the DPLL? */
-+		r = _dpll_test_fint(clk, n);
-+		if (r == DPLL_FINT_UNDERFLOW)
-+			break;
-+		else if (r == DPLL_FINT_INVALID)
-+			continue;
-+
-+		/* Compute the scaled DPLL multiplier, based on the divider */
-+		m = scaled_rt_rp * n;
-+
-+		/*
-+		 * Since we're counting n up, a m overflow means we
-+		 * can bail out completely (since as n increases in
-+		 * the next iteration, there's no way that m can
-+		 * increase beyond the current m)
-+		 */
-+		if (m > scaled_max_m)
-+			break;
-+
-+		r = _dpll_test_mult(&m, n, &new_rate, target_rate,
-+				    ref_rate);
-+
-+		/* m can't be set low enough for this n - try with a larger n */
-+		if (r == DPLL_MULT_UNDERFLOW)
-+			continue;
-+
-+		/* skip rates above our target rate */
-+		delta = target_rate - new_rate;
-+		if (delta < 0)
-+			continue;
-+
-+		if (delta < prev_min_delta) {
-+			prev_min_delta = delta;
-+			min_delta_m = m;
-+			min_delta_n = n;
-+		}
-+
-+		pr_debug("clock: %s: m = %d: n = %d: new_rate = %lu\n",
-+			 clk_name, m, n, new_rate);
-+
-+		if (delta == 0)
-+			break;
++	if (__clk_get_rate(dd->clk_bypass) == rate &&
++	    (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
++		*best_parent_clk = __clk_get_hw(dd->clk_bypass);
++	} else {
++		rate = omap4_dpll_regm4xen_round_rate(hw, rate,
++						      best_parent_rate);
++		*best_parent_clk = __clk_get_hw(dd->clk_ref);
 +	}
 +
-+	if (prev_min_delta == LONG_MAX) {
-+		pr_debug("clock: %s: cannot round to rate %lu\n",
-+			 clk_name, target_rate);
-+		return ~0;
-+	}
++	*best_parent_rate = rate;
 +
-+	dd->last_rounded_m = min_delta_m;
-+	dd->last_rounded_n = min_delta_n;
-+	dd->last_rounded_rate = target_rate - prev_min_delta;
-+
-+	return dd->last_rounded_rate;
++	return rate;
 +}
-diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
-index 404158d..05ed10a 100644
---- a/drivers/clk/ti/clock.h
-+++ b/drivers/clk/ti/clock.h
-@@ -169,4 +169,6 @@ void ti_clk_patch_legacy_clks(struct ti_clk **patch);
- struct clk *ti_clk_register_clk(struct ti_clk *setup);
- int ti_clk_register_legacy_clks(struct ti_clk_alias *clks);
- 
-+u8 omap2_init_dpll_parent(struct clk_hw *hw);
-+
- #endif
 diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-index 6a32716..2fe1498 100644
+index 2fe1498..4fad023 100644
 --- a/include/linux/clk/ti.h
 +++ b/include/linux/clk/ti.h
-@@ -286,7 +286,6 @@ long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw,
- 					unsigned long max_rate,
- 					unsigned long *best_parent_rate,
- 					struct clk_hw **best_parent_clk);
--u8 omap2_init_dpll_parent(struct clk_hw *hw);
+@@ -275,17 +275,6 @@ long omap3_noncore_dpll_determine_rate(struct clk_hw *hw,
+ 				       unsigned long max_rate,
+ 				       unsigned long *best_parent_rate,
+ 				       struct clk_hw **best_parent_clk);
+-unsigned long omap4_dpll_regm4xen_recalc(struct clk_hw *hw,
+-					 unsigned long parent_rate);
+-long omap4_dpll_regm4xen_round_rate(struct clk_hw *hw,
+-				    unsigned long target_rate,
+-				    unsigned long *parent_rate);
+-long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw,
+-					unsigned long rate,
+-					unsigned long min_rate,
+-					unsigned long max_rate,
+-					unsigned long *best_parent_rate,
+-					struct clk_hw **best_parent_clk);
  unsigned long omap3_dpll_recalc(struct clk_hw *hw, unsigned long parent_rate);
  long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
  			   unsigned long *parent_rate);
+@@ -314,6 +303,7 @@ int omap2_reprogram_dpllcore(struct clk_hw *clk, unsigned long rate,
+ 			     unsigned long parent_rate);
+ void omap2xxx_clkt_dpllcore_init(struct clk_hw *hw);
+ void omap2xxx_clkt_vps_init(void);
++unsigned long omap2_get_dpll_rate(struct clk_hw_omap *clk);
+ 
+ void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index);
+ void ti_dt_clocks_register(struct ti_dt_clk *oclks);
+@@ -364,7 +354,6 @@ static inline void of_ti_clk_deny_autoidle_all(void) { }
+ extern const struct clk_hw_omap_ops clkhwops_omap2xxx_dpll;
+ extern const struct clk_hw_omap_ops clkhwops_omap2430_i2chs_wait;
+ extern const struct clk_hw_omap_ops clkhwops_omap3_dpll;
+-extern const struct clk_hw_omap_ops clkhwops_omap4_dpllmx;
+ extern const struct clk_hw_omap_ops clkhwops_wait;
+ extern const struct clk_hw_omap_ops clkhwops_omap3430es2_dss_usbhost_wait;
+ extern const struct clk_hw_omap_ops clkhwops_am35xx_ipss_module_wait;
 -- 
 1.7.9.5
