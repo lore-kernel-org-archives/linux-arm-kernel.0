@@ -1,62 +1,37 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 6 Mar 2015 11:04:08 -0600
-Subject: [PATCH] PCI: xgene: fix breakage from generic config usage
-In-Reply-To: <1425507864-22055-1-git-send-email-msalter@redhat.com>
-References: <1425507864-22055-1-git-send-email-msalter@redhat.com>
-Message-ID: <20150306170408.GD20077@google.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 6 Mar 2015 09:03:01 -0800
+Subject: [PATCH] ARM: dts: am335x-lxm: Use rmii-clock-ext
+In-Reply-To: <1424969294-5993-1-git-send-email-george.mccollister@gmail.com>
+References: <1424969294-5993-1-git-send-email-george.mccollister@gmail.com>
+Message-ID: <20150306170300.GS13520@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 05:24:24PM -0500, Mark Salter wrote:
-> Commit 350f8be5bb402 ("PCI: xgene: Convert to use generic config
-> accessors") breaks PCI on the X-Gene platform. It creates two
-> problems with the xgene_pcie_map_bus() function. First, it returns
-> an int but should return a void __iomem *, but that's just a
-> compile-time warning. The breakage is caused by the offset not
-> being added to the base of the config map. So all config reads
-> and writes operate on the first four bytes of config space. This
-> patch fixes both issues.
+* George McCollister <george.mccollister@gmail.com> [150226 08:53]:
+> Use external clock for RMII since the internal clock doesn't meet the
+> jitter requirements.
 > 
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-
-I forgot to copy you, Mark, but I applied Feng's earlier patch [1], which I
-think is equivalent to yours.
-
-[1] https://patchwork.ozlabs.org/patch/440759/
-
+> Signed-off-by: George McCollister <george.mccollister@gmail.com>
 > ---
->  drivers/pci/host/pci-xgene.c | 10 +++++++---
->  1 file changed, 7 insertions(+), 3 deletions(-)
+>  arch/arm/boot/dts/am335x-lxm.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-> index 52bb25c..b87f80b 100644
-> --- a/drivers/pci/host/pci-xgene.c
-> +++ b/drivers/pci/host/pci-xgene.c
-> @@ -129,17 +129,21 @@ static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
->  	return false;
->  }
+> diff --git a/arch/arm/boot/dts/am335x-lxm.dts b/arch/arm/boot/dts/am335x-lxm.dts
+> index 7266a00..5c5667a 100644
+> --- a/arch/arm/boot/dts/am335x-lxm.dts
+> +++ b/arch/arm/boot/dts/am335x-lxm.dts
+> @@ -328,6 +328,10 @@
+>  	dual_emac_res_vlan = <3>;
+>  };
 >  
-> -static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
-> -			      int offset)
-> +static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
-> +					int offset)
->  {
->  	struct xgene_pcie_port *port = bus->sysdata;
-> +	void __iomem *base;
->  
->  	if ((pci_is_root_bus(bus) && devfn != 0) || !port->link_up ||
->  	    xgene_pcie_hide_rc_bars(bus, offset))
->  		return NULL;
->  
->  	xgene_pcie_set_rtdid_reg(bus, devfn);
-> -	return xgene_pcie_get_cfg_base(bus);
-> +	base = xgene_pcie_get_cfg_base(bus);
-> +	if (base)
-> +		base += offset;
-> +	return base;
->  }
->  
->  static struct pci_ops xgene_pcie_ops = {
-> -- 
-> 1.8.3.1
-> 
+> +&phy_sel {
+> +	rmii-clock-ext;
+> +};
+> +
+>  &mac {
+>  	pinctrl-names = "default", "sleep";
+>  	pinctrl-0 = <&cpsw_default>;
+
+Applying into omap-for-v4.0/fixes thanks.
+
+Tony
