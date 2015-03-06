@@ -1,118 +1,83 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 Mar 2015 16:37:43 +0000
-Subject: [PATCH 04/11] irqchip: gicv3-its: Fix unsafe locking reported by
- lockdep
+Date: Fri,  6 Mar 2015 16:37:45 +0000
+Subject: [PATCH 06/11] irqchip: gic-v3: fix out of bounds access to
+ cpu_logical_map
 In-Reply-To: <1425659870-11832-1-git-send-email-marc.zyngier@arm.com>
 References: <1425659870-11832-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1425659870-11832-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1425659870-11832-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When compiled with CONFIG_LOCKDEP, the kernel shouts badly, saying
-that my locking is unsafe. I'm afraid the kernel is right:
+From: Vladimir Murzin <vladimir.murzin@arm.com>
 
-       CPU0                    CPU1
-       ----                    ----
-  lock(&its->lock);
-                               local_irq_disable();
-                               lock(&irq_desc_lock_class);
-                               lock(&its->lock);
-  <Interrupt>
-    lock(&irq_desc_lock_class);
+While playing with KASan support for arm64/arm the following appeared on boot:
 
- *** DEADLOCK ***
+==================================================================
+BUG: AddressSanitizer: out of bounds access in __asan_load8+0x14/0x1c at addr ffffffc000ad0dc0
+Read of size 8 by task swapper/0/1
+page:ffffffbdc202b400 count:1 mapcount:0 mapping:          (null) index:0x0
+flags: 0x400(reserved)
+page dumped because: kasan: bad access detected
+Address belongs to variable __cpu_logical_map+0x200/0x220
+CPU: 2 PID: 1 Comm: swapper/0 Not tainted 3.19.0-rc6-next-20150129+ #481
+Hardware name: FVP Base (DT)
+Call trace:
+[<ffffffc00008a794>] dump_backtrace+0x0/0x184
+[<ffffffc00008a928>] show_stack+0x10/0x1c
+[<ffffffc00075e46c>] dump_stack+0xa0/0xf8
+[<ffffffc0001df490>] kasan_report_error+0x23c/0x264
+[<ffffffc0001e0188>] check_memory_region+0xc0/0xe4
+[<ffffffc0001dedf0>] __asan_load8+0x10/0x1c
+[<ffffffc000431294>] gic_raise_softirq+0xc4/0x1b4
+[<ffffffc000091fc0>] smp_send_reschedule+0x30/0x3c
+[<ffffffc0000f0d1c>] try_to_wake_up+0x394/0x434
+[<ffffffc0000f0de8>] wake_up_process+0x2c/0x6c
+[<ffffffc0000d9570>] wake_up_worker+0x38/0x48
+[<ffffffc0000dbb50>] insert_work+0xac/0xec
+[<ffffffc0000dbd38>] __queue_work+0x1a8/0x374
+[<ffffffc0000dbf60>] queue_work_on+0x5c/0x7c
+[<ffffffc0000d8a78>] call_usermodehelper_exec+0x170/0x188
+[<ffffffc0004037b8>] kobject_uevent_env+0x650/0x6bc
+[<ffffffc000403830>] kobject_uevent+0xc/0x18
+[<ffffffc00040292c>] kset_register+0xa8/0xc8
+[<ffffffc0004d6c88>] bus_register+0x134/0x2e8
+[<ffffffc0004d73b4>] subsys_virtual_register+0x2c/0x5c
+[<ffffffc000a76a4c>] wq_sysfs_init+0x14/0x20
+[<ffffffc000082a28>] do_one_initcall+0xa8/0x1fc
+[<ffffffc000a70db4>] kernel_init_freeable+0x1ec/0x294
+[<ffffffc00075aa5c>] kernel_init+0xc/0xec
+Memory state around the buggy address:
+ ffffff80003e0820: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+ ffffff80003e0830: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>ffffff80003e0840: fa fa fa fa 00 00 00 00 00 00 00 00 00 00 00 00
+                   ^
+ ffffff80003e0850: 00 00 fa fa fa fa fa fa 00 00 00 00 00 00 00 00
+==================================================================
 
-The fix is to always take its->lock with interrupts disabled.
+The reason for that cpumask_next() returns >= nr_cpu_ids if no further cpus
+set, but "==" condition is checked only, so we end up with out-of-bounds
+access to cpu_logical_map.
 
-Reported-by: Will Deacon <will.deacon@arm.com>
+Fix is by using the condition check for cpumask_next.
+
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 23 ++++++++++++++---------
- 1 file changed, 14 insertions(+), 9 deletions(-)
+ drivers/irqchip/irq-gic-v3.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 46b9441..6850141 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -416,13 +416,14 @@ static void its_send_single_command(struct its_node *its,
- {
- 	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;
- 	struct its_collection *sync_col;
-+	unsigned long flags;
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 1c6dea2..fd8850d 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -466,7 +466,7 @@ static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
+ 		tlist |= 1 << (mpidr & 0xf);
  
--	raw_spin_lock(&its->lock);
-+	raw_spin_lock_irqsave(&its->lock, flags);
+ 		cpu = cpumask_next(cpu, mask);
+-		if (cpu == nr_cpu_ids)
++		if (cpu >= nr_cpu_ids)
+ 			goto out;
  
- 	cmd = its_allocate_entry(its);
- 	if (!cmd) {		/* We're soooooo screewed... */
- 		pr_err_ratelimited("ITS can't allocate, dropping command\n");
--		raw_spin_unlock(&its->lock);
-+		raw_spin_unlock_irqrestore(&its->lock, flags);
- 		return;
- 	}
- 	sync_col = builder(cmd, desc);
-@@ -442,7 +443,7 @@ static void its_send_single_command(struct its_node *its,
- 
- post:
- 	next_cmd = its_post_commands(its);
--	raw_spin_unlock(&its->lock);
-+	raw_spin_unlock_irqrestore(&its->lock, flags);
- 
- 	its_wait_for_range_completion(its, cmd, next_cmd);
- }
-@@ -1037,8 +1038,9 @@ static void its_cpu_init_collection(void)
- static struct its_device *its_find_device(struct its_node *its, u32 dev_id)
- {
- 	struct its_device *its_dev = NULL, *tmp;
-+	unsigned long flags;
- 
--	raw_spin_lock(&its->lock);
-+	raw_spin_lock_irqsave(&its->lock, flags);
- 
- 	list_for_each_entry(tmp, &its->its_device_list, entry) {
- 		if (tmp->device_id == dev_id) {
-@@ -1047,7 +1049,7 @@ static struct its_device *its_find_device(struct its_node *its, u32 dev_id)
- 		}
- 	}
- 
--	raw_spin_unlock(&its->lock);
-+	raw_spin_unlock_irqrestore(&its->lock, flags);
- 
- 	return its_dev;
- }
-@@ -1057,6 +1059,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
- {
- 	struct its_device *dev;
- 	unsigned long *lpi_map;
-+	unsigned long flags;
- 	void *itt;
- 	int lpi_base;
- 	int nr_lpis;
-@@ -1092,9 +1095,9 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
- 	dev->device_id = dev_id;
- 	INIT_LIST_HEAD(&dev->entry);
- 
--	raw_spin_lock(&its->lock);
-+	raw_spin_lock_irqsave(&its->lock, flags);
- 	list_add(&dev->entry, &its->its_device_list);
--	raw_spin_unlock(&its->lock);
-+	raw_spin_unlock_irqrestore(&its->lock, flags);
- 
- 	/* Bind the device to the first possible CPU */
- 	cpu = cpumask_first(cpu_online_mask);
-@@ -1108,9 +1111,11 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
- 
- static void its_free_device(struct its_device *its_dev)
- {
--	raw_spin_lock(&its_dev->its->lock);
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&its_dev->its->lock, flags);
- 	list_del(&its_dev->entry);
--	raw_spin_unlock(&its_dev->its->lock);
-+	raw_spin_unlock_irqrestore(&its_dev->its->lock, flags);
- 	kfree(its_dev->itt);
- 	kfree(its_dev);
- }
+ 		mpidr = cpu_logical_map(cpu);
 -- 
 2.1.4
