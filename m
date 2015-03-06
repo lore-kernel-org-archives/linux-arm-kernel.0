@@ -1,61 +1,66 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 06 Mar 2015 17:48:53 +0300
-Subject: [PATCH 3/5] dt-bindings: mediatek: Add smi dts binding
-In-Reply-To: <1425638900-24989-4-git-send-email-yong.wu@mediatek.com>
-References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
- <1425638900-24989-4-git-send-email-yong.wu@mediatek.com>
-Message-ID: <54F9BE55.90601@cogentembedded.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri,  6 Mar 2015 15:49:24 +0100
+Subject: [PATCH v2] efi/arm64: use UEFI for system reset and poweroff
+Message-ID: <1425653364-12591-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+If UEFI Runtime Services are available, they are preferred over direct
+PSCI calls or other methods to reset the system.
 
-On 3/6/2015 1:48 PM, yong.wu at mediatek.com wrote:
+For the reset case, we need to hook into machine_restart(), as the
+arm_pm_restart function pointer may be overwritten by modules.
 
-> From: Yong Wu <yong.wu@mediatek.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/efi.c     | 9 +++++++++
+ arch/arm64/kernel/process.c | 8 ++++++++
+ 2 files changed, 17 insertions(+)
 
-> This patch add smi binding document.
-
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> ---
->   .../devicetree/bindings/soc/mediatek/mediatek,smi.txt   | 17 +++++++++++++++++
->   1 file changed, 17 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
-
-> diff --git a/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
-> new file mode 100644
-> index 0000000..0fc9d1a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
-> @@ -0,0 +1,17 @@
-> +SMI hardware block diagram please help check <bindings/iommu/mediatek,iommu.txt>
-> +
-> +Required properties:
-> +- compatible : must be "mediatek,mediatek,mt8173-smi-larb"
-
-    One "mediatek," is enough. :-)
-
-> +- reg : the register of each local arbiter
-> +- clocks : the clocks of each local arbiter
-> +- clock-name: larb_sub*(3 clockes at most)
-
-    clock-names.
-
-> +
-> +Example:
-> +	larb1:larb at 16010000 {
-> +	        compatible = "mediatek,mt8173-smi-larb";
-> +		reg = <0 0x16010000 0 0x1000>;
-> +		clocks = <&mmsys MM_SMI_COMMON>,
-> +		        <&vdecsys VDEC_CKEN>,
-
-    Please align with the < above.
-
-> +                        <&vdecsys VDEC_LARB_CKEN>;
-
-    Use tabs instead of spaces, please.
-
-> +		clock-names = "larb_sub0", "larb_sub1", "larb_sub2";
-> +	};
-
-WBR, Sergei
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index b42c7b480e1e..2b8d70164428 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -354,3 +354,12 @@ void efi_virtmap_unload(void)
+ 	efi_set_pgd(current->active_mm);
+ 	preempt_enable();
+ }
++
++/*
++ * UpdateCapsule() depends on the system being shutdown via
++ * ResetSystem().
++ */
++bool efi_poweroff_required(void)
++{
++	return efi_enabled(EFI_RUNTIME_SERVICES);
++}
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index fde9923af859..c6b1f3b96f45 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -21,6 +21,7 @@
+ #include <stdarg.h>
+ 
+ #include <linux/compat.h>
++#include <linux/efi.h>
+ #include <linux/export.h>
+ #include <linux/sched.h>
+ #include <linux/kernel.h>
+@@ -150,6 +151,13 @@ void machine_restart(char *cmd)
+ 	local_irq_disable();
+ 	smp_send_stop();
+ 
++	/*
++	 * UpdateCapsule() depends on the system being reset via
++	 * ResetSystem().
++	 */
++	if (efi_enabled(EFI_RUNTIME_SERVICES))
++		efi_reboot(reboot_mode, NULL);
++
+ 	/* Now call the architecture specific reboot code. */
+ 	if (arm_pm_restart)
+ 		arm_pm_restart(reboot_mode, cmd);
+-- 
+1.8.3.2
