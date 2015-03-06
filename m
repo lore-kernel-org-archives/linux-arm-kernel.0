@@ -1,40 +1,43 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 06 Mar 2015 12:30:45 +0100
-Subject: [PATCH 1/5] soc: mediatek: Add SMI driver
-In-Reply-To: <1425638900-24989-2-git-send-email-yong.wu@mediatek.com>
-References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
- <1425638900-24989-2-git-send-email-yong.wu@mediatek.com>
-Message-ID: <1425641445.24292.280.camel@x220>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 6 Mar 2015 20:31:28 +0900
+Subject: [PATCH 01/16] ARM: shmobile: r8a7778: synchronize dts with
+ reference platform
+In-Reply-To: <54F85467.2010700@cogentembedded.com>
+References: <cover.1425518337.git.horms+renesas@verge.net.au>
+ <8c4892a633f08edbc54b6b59a673f76bd1cd7e94.1425518337.git.horms+renesas@verge.net.au>
+ <54F85467.2010700@cogentembedded.com>
+Message-ID: <20150306113128.GC27105@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-03-06 at 18:48 +0800, yong.wu at mediatek.com wrote:
-> --- a/drivers/soc/mediatek/Kconfig
-> +++ b/drivers/soc/mediatek/Kconfig
-> @@ -20,3 +20,10 @@ config MT8173_PMIC_WRAP
->  	  PMIC wrapper is a proprietary hardware in MT8173 to make
->  	  communication protocols to access PMIC device.
->  	  This driver implement access protocols for MT8173.
-> +
-> +config MTK_SMI
-> +        bool
+On Thu, Mar 05, 2015 at 04:04:39PM +0300, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 3/5/2015 4:58 AM, Simon Horman wrote:
+> 
+> >From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+> 
+> >This moves everything to the legacy dts that is missing there to make it
+> >suitable for use with multiplatform.
+> 
+> >Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+> >Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >---
+> >  arch/arm/boot/dts/r8a7778-bockw.dts | 106 ++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 106 insertions(+)
+> 
+> >diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
+> >index 46a884d..7347223 100644
+> >--- a/arch/arm/boot/dts/r8a7778-bockw.dts
+> >+++ b/arch/arm/boot/dts/r8a7778-bockw.dts
+> >@@ -16,17 +16,123 @@
+> [...]
+> >+
+> >+	fixedregulator3v3: fixedregulator at 0 {
+> 
+>    Ugh, this node should be named just "regulator at 0". The label also doesn't
+> appeal to me -- I'd rather prefer a name derived from the schematics. :-/
 
-Nit: make this one tab instead of 8 spaces, please.
-
-> +	help
-> +	  Smi help enable/disable iommu in mt8173 and control the
-> +	  clock of each local arbiter.
-> +	  It should be true while MTK_IOMMU enable.
-
-I don't think anyone using the *config tools will ever see this text, as
-there's no prompt. So you might as well make this a comment or drop it
-altogether.
-
-Is this selected by more than just MTK_IOMMU (see 2/5)? If not, I think
-MTK_SMI will be set and unset in lockstep with MTK_IOMMU. In other
-words, you could as well use one Kconfig symbol.
-
-Thanks,
-
-
-Paul Bolle
+Please feel free to supply an incremental cleanup patch.
