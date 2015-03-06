@@ -1,46 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 Mar 2015 09:54:50 -0800
-Subject: [GIT PULL v2] ARM: OMAP2+: first set of hwmod and PRCM fixes for
- v4.0-rc
-In-Reply-To: <alpine.DEB.2.02.1503020413320.9987@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1503020402460.9987@utopia.booyaka.com>
- <alpine.DEB.2.02.1503020413320.9987@utopia.booyaka.com>
-Message-ID: <20150306175450.GY13520@atomide.com>
+From: LinoSanfilippo@gmx.de (Lino Sanfilippo)
+Date: Fri, 06 Mar 2015 19:20:18 +0100
+Subject: [RFC PATCH 0/1] Wrong structure alignment due to compiler
+ attribute "section"
+In-Reply-To: <54F9B36F.8040307@marvell.com>
+References: <1425290502-2322-1-git-send-email-lsanfil@marvell.com>
+ <20150303144130.GB5177@e103592.cambridge.arm.com>
+ <54F6EF32.7080306@marvell.com>
+ <20150304143527.GA5653@e103592.cambridge.arm.com>
+ <54F732DA.2050004@marvell.com>
+ <20150305122606.GC3612@e103592.cambridge.arm.com>
+ <54F8582B.80703@marvell.com>
+ <20150305134733.GE3612@e103592.cambridge.arm.com>
+ <54F8770C.8080709@marvell.com>
+ <20150305173327.GF3612@e103592.cambridge.arm.com>
+ <54F9B36F.8040307@marvell.com>
+Message-ID: <54F9EFE2.2020205@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [150301 20:17]:
-> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-> 
->   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.0-rc/omap-fixes-a
-> 
-> for you to fetch changes up to 50f59d07e9822274a2e6034777eb4e90cfb30cfc:
-> 
->   ARM: OMAP4+: PRM: fix omap4 version of prm_save_and_clear_irqen (2015-03-01 16:58:25 -0700)
-> 
-> ----------------------------------------------------------------
-> ARM: OMAP2+: first set of hwmod and PRCM fixes for v4.0-rc
-> 
-> This series fixes the following bugs:
-> 
-> - a lockdep problem with the OMAP hwmod code;
-> - incorrect PCIe hwmod data for the DRA7xx chips;
-> - the clockdomain handling in the hardreset deassertion code,
->   preventing idle;
-> - the use of an IRQ status register rather than an IRQ enable register
->   in the OMAP4 PRM code.
-> 
-> Basic build, boot, and PM test results are available here:
-> 
-> http://www.pwsan.com/omap/testlogs/omap-hwmod-a-for-v4.0-rc/20150301165949/
 
-Thanks pulling this into omap-for-v4.0/fixes, sorry for the delay
-with this one.
+>>
+> 
+> Ok, I got a link to the source now. It can be found here:
+> 
+> http://tp-lab200/release/gcc/temp/internal/2010q4-113-4.4.5/marvell-gcc.src-2010q4-113.tar.bz2
+> 
 
-Regards,
 
-Tony
+Sigh. Just realized that the url is not accessible. Will check that on
+monday.
+
+Lino
