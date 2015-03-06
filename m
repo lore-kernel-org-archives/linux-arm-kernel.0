@@ -1,239 +1,213 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 6 Mar 2015 14:28:54 +0200
-Subject: [PATCH 19/24] clk: ti: clkdm: move clkdm gate clock support code to
- clock driver
+Date: Fri, 6 Mar 2015 14:28:59 +0200
+Subject: [PATCH 24/24] ARM: OMAP2+: clock: remove dead definitions from the
+ clock header file
 In-Reply-To: <1425644939-3232-1-git-send-email-t-kristo@ti.com>
 References: <1425644939-3232-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1425644939-3232-20-git-send-email-t-kristo@ti.com>
+Message-ID: <1425644939-3232-25-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the legacy clock data gone, this is no longer needed under platform,
-so move it under the clock driver itself. Remove the exported clock driver
-APIs as well, as these are not needed outside clock driver anymore.
+Cleanup the mess in clock.h by removing all definitions that are no longer
+used for anything.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/clock.c  |   76 ------------------------------------------
- arch/arm/mach-omap2/clock.h  |    3 --
- drivers/clk/ti/clock.h       |    3 ++
- drivers/clk/ti/clockdomain.c |   76 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk/ti.h       |    2 --
- 5 files changed, 79 insertions(+), 81 deletions(-)
+ arch/arm/mach-omap2/clkt34xx_dpll3m2.c |    1 -
+ arch/arm/mach-omap2/clock.h            |  129 --------------------------------
+ arch/arm/mach-omap2/clock34xx.h        |   18 -----
+ 3 files changed, 148 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/clock34xx.h
 
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index efa09bc..944ad5f 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -116,82 +116,6 @@ void omap2_init_clk_clkdm(struct clk_hw *hw)
- 	}
- }
+diff --git a/arch/arm/mach-omap2/clkt34xx_dpll3m2.c b/arch/arm/mach-omap2/clkt34xx_dpll3m2.c
+index 6cd2961..07e1956 100644
+--- a/arch/arm/mach-omap2/clkt34xx_dpll3m2.c
++++ b/arch/arm/mach-omap2/clkt34xx_dpll3m2.c
+@@ -23,7 +23,6 @@
  
--/**
-- * omap2_clkops_enable_clkdm - increment usecount on clkdm of @hw
-- * @hw: struct clk_hw * of the clock being enabled
-- *
-- * Increment the usecount of the clockdomain of the clock pointed to
-- * by @hw; if the usecount is 1, the clockdomain will be "enabled."
-- * Only needed for clocks that don't use omap2_dflt_clk_enable() as
-- * their enable function pointer.  Passes along the return value of
-- * clkdm_clk_enable(), -EINVAL if @hw is not associated with a
-- * clockdomain, or 0 if clock framework-based clockdomain control is
-- * not implemented.
-- */
--int omap2_clkops_enable_clkdm(struct clk_hw *hw)
--{
--	struct clk_hw_omap *clk;
--	int ret = 0;
--
--	clk = to_clk_hw_omap(hw);
--
--	if (unlikely(!clk->clkdm)) {
--		pr_err("%s: %s: no clkdm set ?!\n", __func__,
--		       __clk_get_name(hw->clk));
--		return -EINVAL;
--	}
--
--	if (unlikely(clk->enable_reg))
--		pr_err("%s: %s: should use dflt_clk_enable ?!\n", __func__,
--		       __clk_get_name(hw->clk));
--
--	if (ti_clk_get_features()->flags & TI_CLK_DISABLE_CLKDM_CONTROL) {
--		pr_err("%s: %s: clkfw-based clockdomain control disabled ?!\n",
--		       __func__, __clk_get_name(hw->clk));
--		return 0;
--	}
--
--	ret = clkdm_clk_enable(clk->clkdm, hw->clk);
--	WARN(ret, "%s: could not enable %s's clockdomain %s: %d\n",
--	     __func__, __clk_get_name(hw->clk), clk->clkdm->name, ret);
--
--	return ret;
--}
--
--/**
-- * omap2_clkops_disable_clkdm - decrement usecount on clkdm of @hw
-- * @hw: struct clk_hw * of the clock being disabled
-- *
-- * Decrement the usecount of the clockdomain of the clock pointed to
-- * by @hw; if the usecount is 0, the clockdomain will be "disabled."
-- * Only needed for clocks that don't use omap2_dflt_clk_disable() as their
-- * disable function pointer.  No return value.
-- */
--void omap2_clkops_disable_clkdm(struct clk_hw *hw)
--{
--	struct clk_hw_omap *clk;
--
--	clk = to_clk_hw_omap(hw);
--
--	if (unlikely(!clk->clkdm)) {
--		pr_err("%s: %s: no clkdm set ?!\n", __func__,
--		       __clk_get_name(hw->clk));
--		return;
--	}
--
--	if (unlikely(clk->enable_reg))
--		pr_err("%s: %s: should use dflt_clk_disable ?!\n", __func__,
--		       __clk_get_name(hw->clk));
--
--	if (ti_clk_get_features()->flags & TI_CLK_DISABLE_CLKDM_CONTROL) {
--		pr_err("%s: %s: clkfw-based clockdomain control disabled ?!\n",
--		       __func__, __clk_get_name(hw->clk));
--		return;
--	}
--
--	clkdm_clk_disable(clk->clkdm, hw->clk);
--}
--
- static int __initdata mpurate;
+ #include "clock.h"
+ #include "clock3xxx.h"
+-#include "clock34xx.h"
+ #include "sdrc.h"
+ #include "sram.h"
  
- /*
 diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index f8282e8..3227acd 100644
+index 3227acd..6250a07 100644
 --- a/arch/arm/mach-omap2/clock.h
 +++ b/arch/arm/mach-omap2/clock.h
-@@ -204,8 +204,5 @@ extern const struct clk_hw_omap_ops clkhwops_apll96;
+@@ -23,90 +23,6 @@
+ #include <linux/clk-provider.h>
+ #include <linux/clk/ti.h>
  
+-struct omap_clk {
+-	u16				cpu;
+-	struct clk_lookup		lk;
+-};
+-
+-#define CLK(dev, con, ck)		\
+-	{				\
+-		.lk = {			\
+-			.dev_id = dev,	\
+-			.con_id = con,	\
+-			.clk = ck,	\
+-		},			\
+-	}
+-
+-struct clockdomain;
+-
+-#define DEFINE_STRUCT_CLK(_name, _parent_array_name, _clkops_name)	\
+-	static struct clk_core _name##_core = {			\
+-		.name = #_name,					\
+-		.hw = &_name##_hw.hw,				\
+-		.parent_names = _parent_array_name,		\
+-		.num_parents = ARRAY_SIZE(_parent_array_name),	\
+-		.ops = &_clkops_name,				\
+-	};							\
+-	static struct clk _name = {				\
+-		.core = &_name##_core,				\
+-	};
+-
+-#define DEFINE_STRUCT_CLK_FLAGS(_name, _parent_array_name,	\
+-				_clkops_name, _flags)		\
+-	static struct clk_core _name##_core = {			\
+-		.name = #_name,					\
+-		.hw = &_name##_hw.hw,				\
+-		.parent_names = _parent_array_name,		\
+-		.num_parents = ARRAY_SIZE(_parent_array_name),	\
+-		.ops = &_clkops_name,				\
+-		.flags = _flags,				\
+-	};							\
+-	static struct clk _name = {				\
+-		.core = &_name##_core,				\
+-	};
+-
+-#define DEFINE_STRUCT_CLK_HW_OMAP(_name, _clkdm_name)		\
+-	static struct clk_hw_omap _name##_hw = {		\
+-		.hw = {						\
+-			.clk = &_name,				\
+-		},						\
+-		.clkdm_name = _clkdm_name,			\
+-	};
+-
+-#define DEFINE_CLK_OMAP_MUX(_name, _clkdm_name, _clksel,	\
+-			    _clksel_reg, _clksel_mask,		\
+-			    _parent_names, _ops)		\
+-	static struct clk _name;				\
+-	static struct clk_hw_omap _name##_hw = {		\
+-		.hw = {						\
+-			.clk = &_name,				\
+-		},						\
+-		.clksel		= _clksel,			\
+-		.clksel_reg	= _clksel_reg,			\
+-		.clksel_mask	= _clksel_mask,			\
+-		.clkdm_name	= _clkdm_name,			\
+-	};							\
+-	DEFINE_STRUCT_CLK(_name, _parent_names, _ops);
+-
+-#define DEFINE_CLK_OMAP_MUX_GATE(_name, _clkdm_name, _clksel,	\
+-				 _clksel_reg, _clksel_mask,	\
+-				 _enable_reg, _enable_bit,	\
+-				 _hwops, _parent_names, _ops)	\
+-	static struct clk _name;				\
+-	static struct clk_hw_omap _name##_hw = {		\
+-		.hw = {						\
+-			.clk = &_name,				\
+-		},						\
+-		.ops		= _hwops,			\
+-		.enable_reg	= _enable_reg,			\
+-		.enable_bit	= _enable_bit,			\
+-		.clksel		= _clksel,			\
+-		.clksel_reg	= _clksel_reg,			\
+-		.clksel_mask	= _clksel_mask,			\
+-		.clkdm_name	= _clkdm_name,			\
+-	};							\
+-	DEFINE_STRUCT_CLK(_name, _parent_names, _ops);
+-
+ /* struct clksel_rate.flags possibilities */
+ #define RATE_IN_242X		(1 << 0)
+ #define RATE_IN_243X		(1 << 1)
+@@ -127,38 +43,6 @@ struct clockdomain;
+ /* RATE_IN_3430ES2PLUS_36XX includes 34xx/35xx with ES >=2, and all 36xx/37xx */
+ #define RATE_IN_3430ES2PLUS_36XX	(RATE_IN_3430ES2PLUS | RATE_IN_36XX)
+ 
+-
+-/**
+- * struct clksel_rate - register bitfield values corresponding to clk divisors
+- * @val: register bitfield value (shifted to bit 0)
+- * @div: clock divisor corresponding to @val
+- * @flags: (see "struct clksel_rate.flags possibilities" above)
+- *
+- * @val should match the value of a read from struct clk.clksel_reg
+- * AND'ed with struct clk.clksel_mask, shifted right to bit 0.
+- *
+- * @div is the divisor that should be applied to the parent clock's rate
+- * to produce the current clock's rate.
+- */
+-struct clksel_rate {
+-	u32			val;
+-	u8			div;
+-	u16			flags;
+-};
+-
+-/**
+- * struct clksel - available parent clocks, and a pointer to their divisors
+- * @parent: struct clk * to a possible parent clock
+- * @rates: available divisors for this parent clock
+- *
+- * A struct clksel is always associated with one or more struct clks
+- * and one or more struct clksel_rates.
+- */
+-struct clksel {
+-	struct clk		 *parent;
+-	const struct clksel_rate *rates;
+-};
+-
+ /* CM_CLKSEL2_PLL.CORE_CLK_SRC bits (2XXX) */
+ #define CORE_CLK_SRC_32K		0x0
+ #define CORE_CLK_SRC_DPLL		0x1
+@@ -189,19 +73,6 @@ void omap2_clk_writel(u32 val, struct clk_hw_omap *clk, void __iomem *reg);
+ 
+ extern u16 cpu_mask;
+ 
+-extern const struct clkops clkops_omap2_dflt_wait;
+-extern const struct clkops clkops_omap2_dflt;
+-
+-extern struct clk_functions omap2_clk_functions;
+-
+-extern const struct clk_hw_omap_ops clkhwops_wait;
+-extern const struct clk_hw_omap_ops clkhwops_omap3430es2_ssi_wait;
+-extern const struct clk_hw_omap_ops clkhwops_omap3430es2_dss_usbhost_wait;
+-extern const struct clk_hw_omap_ops clkhwops_omap3430es2_hsotgusb_wait;
+-extern const struct clk_hw_omap_ops clkhwops_am35xx_ipss_module_wait;
+-extern const struct clk_hw_omap_ops clkhwops_apll54;
+-extern const struct clk_hw_omap_ops clkhwops_apll96;
+-
  extern void __iomem *clk_memmaps[];
  
--extern int omap2_clkops_enable_clkdm(struct clk_hw *hw);
--extern void omap2_clkops_disable_clkdm(struct clk_hw *hw);
--
  void __init ti_clk_init_features(void);
- #endif
-diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
-index 3652c26..83476d1 100644
---- a/drivers/clk/ti/clock.h
-+++ b/drivers/clk/ti/clock.h
-@@ -180,6 +180,9 @@ extern const struct clk_hw_omap_ops clkhwops_iclk;
- extern const struct clk_hw_omap_ops clkhwops_iclk_wait;
- extern const struct clk_hw_omap_ops clkhwops_omap2430_i2chs_wait;
- 
-+int omap2_clkops_enable_clkdm(struct clk_hw *hw);
-+void omap2_clkops_disable_clkdm(struct clk_hw *hw);
-+
- int omap2_dflt_clk_enable(struct clk_hw *hw);
- void omap2_dflt_clk_disable(struct clk_hw *hw);
- int omap2_dflt_clk_is_enabled(struct clk_hw *hw);
-diff --git a/drivers/clk/ti/clockdomain.c b/drivers/clk/ti/clockdomain.c
-index b4c5fac..6206c3a 100644
---- a/drivers/clk/ti/clockdomain.c
-+++ b/drivers/clk/ti/clockdomain.c
-@@ -24,6 +24,82 @@
- #undef pr_fmt
- #define pr_fmt(fmt) "%s: " fmt, __func__
- 
-+/**
-+ * omap2_clkops_enable_clkdm - increment usecount on clkdm of @hw
-+ * @hw: struct clk_hw * of the clock being enabled
-+ *
-+ * Increment the usecount of the clockdomain of the clock pointed to
-+ * by @hw; if the usecount is 1, the clockdomain will be "enabled."
-+ * Only needed for clocks that don't use omap2_dflt_clk_enable() as
-+ * their enable function pointer.  Passes along the return value of
-+ * clkdm_clk_enable(), -EINVAL if @hw is not associated with a
-+ * clockdomain, or 0 if clock framework-based clockdomain control is
-+ * not implemented.
-+ */
-+int omap2_clkops_enable_clkdm(struct clk_hw *hw)
-+{
-+	struct clk_hw_omap *clk;
-+	int ret = 0;
-+
-+	clk = to_clk_hw_omap(hw);
-+
-+	if (unlikely(!clk->clkdm)) {
-+		pr_err("%s: %s: no clkdm set ?!\n", __func__,
-+		       __clk_get_name(hw->clk));
-+		return -EINVAL;
-+	}
-+
-+	if (unlikely(clk->enable_reg))
-+		pr_err("%s: %s: should use dflt_clk_enable ?!\n", __func__,
-+		       __clk_get_name(hw->clk));
-+
-+	if (ti_clk_get_features()->flags & TI_CLK_DISABLE_CLKDM_CONTROL) {
-+		pr_err("%s: %s: clkfw-based clockdomain control disabled ?!\n",
-+		       __func__, __clk_get_name(hw->clk));
-+		return 0;
-+	}
-+
-+	ret = ti_clk_ll_ops->clkdm_clk_enable(clk->clkdm, hw->clk);
-+	WARN(ret, "%s: could not enable %s's clockdomain %s: %d\n",
-+	     __func__, __clk_get_name(hw->clk), clk->clkdm_name, ret);
-+
-+	return ret;
-+}
-+
-+/**
-+ * omap2_clkops_disable_clkdm - decrement usecount on clkdm of @hw
-+ * @hw: struct clk_hw * of the clock being disabled
-+ *
-+ * Decrement the usecount of the clockdomain of the clock pointed to
-+ * by @hw; if the usecount is 0, the clockdomain will be "disabled."
-+ * Only needed for clocks that don't use omap2_dflt_clk_disable() as their
-+ * disable function pointer.  No return value.
-+ */
-+void omap2_clkops_disable_clkdm(struct clk_hw *hw)
-+{
-+	struct clk_hw_omap *clk;
-+
-+	clk = to_clk_hw_omap(hw);
-+
-+	if (unlikely(!clk->clkdm)) {
-+		pr_err("%s: %s: no clkdm set ?!\n", __func__,
-+		       __clk_get_name(hw->clk));
-+		return;
-+	}
-+
-+	if (unlikely(clk->enable_reg))
-+		pr_err("%s: %s: should use dflt_clk_disable ?!\n", __func__,
-+		       __clk_get_name(hw->clk));
-+
-+	if (ti_clk_get_features()->flags & TI_CLK_DISABLE_CLKDM_CONTROL) {
-+		pr_err("%s: %s: clkfw-based clockdomain control disabled ?!\n",
-+		       __func__, __clk_get_name(hw->clk));
-+		return;
-+	}
-+
-+	ti_clk_ll_ops->clkdm_clk_disable(clk->clkdm, hw->clk);
-+}
-+
- static void __init of_ti_clockdomain_setup(struct device_node *node)
- {
- 	struct clk *clk;
-diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-index a419fde..4e70b7f 100644
---- a/include/linux/clk/ti.h
-+++ b/include/linux/clk/ti.h
-@@ -272,8 +272,6 @@ extern const struct clk_ops ti_clk_mux_ops;
- #define to_clk_hw_omap(_hw) container_of(_hw, struct clk_hw_omap, hw)
- 
- void omap2_init_clk_clkdm(struct clk_hw *clk);
--int omap2_clkops_enable_clkdm(struct clk_hw *hw);
--void omap2_clkops_disable_clkdm(struct clk_hw *hw);
- int omap2_clk_disable_autoidle_all(void);
- int omap2_clk_enable_autoidle_all(void);
- int omap2_clk_allow_idle(struct clk *clk);
+diff --git a/arch/arm/mach-omap2/clock34xx.h b/arch/arm/mach-omap2/clock34xx.h
+deleted file mode 100644
+index 084ba71..0000000
+--- a/arch/arm/mach-omap2/clock34xx.h
++++ /dev/null
+@@ -1,18 +0,0 @@
+-/*
+- * OMAP34xx clock function prototypes and macros
+- *
+- * Copyright (C) 2007-2010 Texas Instruments, Inc.
+- * Copyright (C) 2007-2011 Nokia Corporation
+- */
+-
+-#ifndef __ARCH_ARM_MACH_OMAP2_CLOCK34XX_H
+-#define __ARCH_ARM_MACH_OMAP2_CLOCK34XX_H
+-
+-extern const struct clkops clkops_omap3430es2_ssi_wait;
+-extern const struct clkops clkops_omap3430es2_iclk_ssi_wait;
+-extern const struct clkops clkops_omap3430es2_hsotgusb_wait;
+-extern const struct clkops clkops_omap3430es2_iclk_hsotgusb_wait;
+-extern const struct clkops clkops_omap3430es2_dss_usbhost_wait;
+-extern const struct clkops clkops_omap3430es2_iclk_dss_usbhost_wait;
+-
+-#endif
 -- 
 1.7.9.5
