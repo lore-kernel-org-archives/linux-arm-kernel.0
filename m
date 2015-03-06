@@ -1,93 +1,84 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 06 Mar 2015 13:29:31 -0700
-Subject: [PATCH 02/10] mailbox: Enable BCM2835 mailbox support
-In-Reply-To: <87bnk5lwvt.fsf@eliezer.anholt.net>
-References: <1425329684-23968-1-git-send-email-eric@anholt.net>
- <1425329684-23968-3-git-send-email-eric@anholt.net>
- <54F675F1.60205@wwwdotorg.org> <87a8zs8vzo.fsf@eliezer.anholt.net>
- <54F932FD.5040207@wwwdotorg.org> <87bnk5lwvt.fsf@eliezer.anholt.net>
-Message-ID: <54FA0E2B.30300@wwwdotorg.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 06 Mar 2015 20:30:39 +0000
+Subject: [PATCH v9 06/21] ACPI: fix acpi_os_ioremap for arm64
+In-Reply-To: <1424853601-6675-7-git-send-email-hanjun.guo@linaro.org>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <1424853601-6675-7-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150306203039.833AFC40AA9@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2015 01:00 PM, Eric Anholt wrote:
-> Stephen Warren <swarren@wwwdotorg.org> writes:
->
->> On 03/04/2015 11:20 AM, Eric Anholt wrote:
->>> Stephen Warren <swarren@wwwdotorg.org> writes:
->>>
->>>> On 03/02/2015 01:54 PM, Eric Anholt wrote:
->>>>> From: Lubomir Rintel <lkundrak@v3.sk>
->>>>>
->>>>> Implement BCM2835 mailbox support as a device registered with
->>>>> the general purpose mailbox framework. Implementation based on
->>>>> commits by Lubomir Rintel [1], Suman Anna and Jassi Brar [2] on
->>>>> which to base the implementation.
->>>>
->>>>> diff --git a/drivers/mailbox/bcm2835-mailbox.c
->>>>> b/drivers/mailbox/bcm2835-mailbox.c
->>
->>>>> +static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id) +{
->>>>> +	struct bcm2835_mbox *mbox = (struct bcm2835_mbox *) dev_id; +
->>>>> struct device *dev = mbox->dev; + +	while (!(readl(mbox->regs +
->>>>> MAIL0_STA) & ARM_MS_EMPTY)) { +		u32 msg = readl(mbox->regs +
->>>>> MAIL0_RD); +		unsigned int chan = MBOX_CHAN(msg); + +		if
->>>>> (!mbox->channel[chan].started) { +			dev_err(dev, "Reply on
->>>>> stopped channel %d\n", chan); +			continue; +		} +
->>>>> dev_dbg(dev, "Reply 0x%08X\n", msg); +
->>>>> mbox_chan_received_data(mbox->channel[chan].link, +			(void *)
->>>>> MBOX_DATA28(msg)); +	} +	rmb(); /* Finished last mailbox read.
->>>>> */
->>>>
->>>> I know the PDF mentioned in the comment earlier in the patch says
->>>> to put in barriers between accesses to different peripherals,
->>>> which this seems compliant with, but I don't see quite what this
->>>> barrier achieves. I think the PDF is talking generalities, not
->>>> imposing a rule that must be blindly followed. Besides, if
->>>> there's a context-switch you can't actually implement the rules
->>>> the PDF suggests. What read operation is this barrier attempting
->>>> to ensure happens after reading all mailbox messages and any
->>>> associated DRAM buffer?
->>>
->>> Looking at this bit of code in particular:
->>>
->>> "As interrupts can appear anywhere in the code so you should
->>> safeguard those. If an interrupt routine reads from a peripheral
->>> the routine should start with a memory read barrier. If an
->>> interrupt routine writes to a peripheral the routine should end
->>> with a memory write barrier."
->>
->> I can see that doing that would be safe, but I don't think following
->> those rules is actually necessary in the general case. Following those
->> rules would cause lots of unnecessary barriers in code.
->>
->> Barriers shouldn't be used arbitrarily at the start/end of ISRs, but
->> rather at specific chosen locations in the code that actually need to
->> enforce some kind of memory ordering.
->
-> According to the architecture docs, if you don't RMB at the start of
-> your ISR, then the following timeline could get the wrong values:
+On Wed, 25 Feb 2015 16:39:46 +0800
+, Hanjun Guo <hanjun.guo@linaro.org>
+ wrote:
+> From: Mark Salter <msalter@redhat.com>
+> 
+> The acpi_os_ioremap() function may be used to map normal RAM or IO
+> regions. The current implementation simply uses ioremap_cache(). This
+> will work for some architectures, but arm64 ioremap_cache() cannot be
+> used to map IO regions which don't support caching. So for arm64, use
+> ioremap() for non-RAM regions.
+> 
+> CC: Rafael J Wysocki <rjw@rjwysocki.net>
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> Tested-by: Robert Richter <rrichter@cavium.com>
+> Acked-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Which architecture doc and section/... specifically?
+Reviewed-by: Grant Likely <grant.likely@linaro.org>
 
-> some other device driver               our isr
-> ------------------------               -------
-> rmb()
-> read from device
->                                         read from device
->                                         examine value read
->                                         exit isr
-> examine value raed.
->
-> The ISR could get the device driver's value.  This is made explicit in
-> footnote 2 on page 7.
-
-Are you saying that the "read from device" in the right -hand "our isr" 
-column could end up returning the value actually read during "read from 
-device" in the left-hand "some other device driver" column, or vice-versa?
-
-That doesn't make any sense.
-
-Barriers are about ensuring that accesses happen (are visible or 
-complete) in the desired order, not about ensuring that the results of 
-two unrelated reads don't get swapped.
+> ---
+>  arch/arm64/include/asm/acpi.h | 13 +++++++++++++
+>  include/acpi/acpi_io.h        |  4 ++++
+>  2 files changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 8b837ab..40e0924 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -12,8 +12,21 @@
+>  #ifndef _ASM_ACPI_H
+>  #define _ASM_ACPI_H
+>  
+> +#include <linux/mm.h>
+> +
+>  /* Basic configuration for ACPI */
+>  #ifdef	CONFIG_ACPI
+> +/* ACPI table mapping after acpi_gbl_permanent_mmap is set */
+> +static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+> +					    acpi_size size)
+> +{
+> +	if (!page_is_ram(phys >> PAGE_SHIFT))
+> +		return ioremap(phys, size);
+> +
+> +	return ioremap_cache(phys, size);
+> +}
+> +#define acpi_os_ioremap acpi_os_ioremap
+> +
+>  #define acpi_strict 1	/* No out-of-spec workarounds on ARM64 */
+>  extern int acpi_disabled;
+>  extern int acpi_noirq;
+> diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
+> index 444671e..dd86c5f 100644
+> --- a/include/acpi/acpi_io.h
+> +++ b/include/acpi/acpi_io.h
+> @@ -3,11 +3,15 @@
+>  
+>  #include <linux/io.h>
+>  
+> +#include <asm/acpi.h>
+> +
+> +#ifndef acpi_os_ioremap
+>  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+>  					    acpi_size size)
+>  {
+>         return ioremap_cache(phys, size);
+>  }
+> +#endif
+>  
+>  void __iomem *__init_refok
+>  acpi_os_map_iomem(acpi_physical_address phys, acpi_size size);
+> -- 
+> 1.9.1
+> 
