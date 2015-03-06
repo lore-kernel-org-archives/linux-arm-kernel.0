@@ -1,10 +1,10 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri,  6 Mar 2015 19:04:04 +0100
-Subject: [PATCH 6/8] ARM: dts: rockchip: relicense rk3066a-bqcurie2.dts under
+Date: Fri,  6 Mar 2015 19:04:03 +0100
+Subject: [PATCH 5/8] ARM: dts: rockchip: relicense rk3288-thermal.dtsi under
  GPLv2/X11
 In-Reply-To: <1425665046-22927-1-git-send-email-heiko@sntech.de>
 References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
-Message-ID: <1425665046-22927-7-git-send-email-heiko@sntech.de>
+Message-ID: <1425665046-22927-6-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,41 +12,35 @@ GPLv2-only devicetrees make reuse difficult for software components licensed
 under a different license.
 
 The consensus is that a GPL/X11 dual-license should allow all necessary uses,
-so relicense the rk3066a-bqcurie2.dts to this combination.
+so relicense the rk3288-thermal.dtsi to this combination.
 
 CCs were aquired by git shortlog -sne so it should've hopefully catched
 every contributor.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Cc: Beniamino Galvani <b.galvani@gmail.com>
-Cc: Jaehoon Chung <jh80.chung@samsung.com>
+Cc: Caesar Wang <caesar.wang@rock-chips.com>
 ---
 I'm hoping to get Acked-by tags from the people in the Cc-list.
 
- arch/arm/boot/dts/rk3066a-bqcurie2.dts | 44 +++++++++++++++++++++++++++-------
- 1 file changed, 36 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/rk3288-thermal.dtsi | 40 ++++++++++++++++++++++++++++++++---
+ 1 file changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-index baf21ac..b299b26 100644
---- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-+++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-@@ -2,15 +2,43 @@
-  * Copyright (c) 2013 MundoReader S.L.
-  * Author: Heiko Stuebner <heiko@sntech.de>
+diff --git a/arch/arm/boot/dts/rk3288-thermal.dtsi b/arch/arm/boot/dts/rk3288-thermal.dtsi
+index 2695200..3404066 100644
+--- a/arch/arm/boot/dts/rk3288-thermal.dtsi
++++ b/arch/arm/boot/dts/rk3288-thermal.dtsi
+@@ -3,9 +3,43 @@
   *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
+  * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
+  *
+- * This file is licensed under the terms of the GNU General Public License
+- * version 2.  This program is licensed "as is" without any warranty of any
+- * kind, whether express or implied.
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
 + * licensing only applies to this file, and not this project as a
 + * whole.
-  *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
++ *
 + *  a) This file is free software; you can redistribute it and/or
 + *     modify it under the terms of the GNU General Public License as
 + *     published by the Free Software Foundation; either version 2 of the
@@ -81,6 +75,6 @@ index baf21ac..b299b26 100644
 + *     OTHER DEALINGS IN THE SOFTWARE.
   */
  
- /dts-v1/;
+ #include <dt-bindings/thermal/thermal.h>
 -- 
 2.1.4
