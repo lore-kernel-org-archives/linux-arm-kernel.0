@@ -1,38 +1,52 @@
-From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
-Date: Fri, 6 Mar 2015 17:43:16 +0000
-Subject: [PATCH 05/10] ARM: s3c64xx: enable sparse IRQ support
-In-Reply-To: <1425299763-4066822-6-git-send-email-arnd@arndb.de>
-References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
- <1425299763-4066822-6-git-send-email-arnd@arndb.de>
-Message-ID: <20150306174316.GA26692@opensource.wolfsonmicro.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 6 Mar 2015 17:44:03 +0000 (UTC)
+Subject: [PATCH 2/4] ARM: OMAP2+: AM43xx hwmod: Add RTC hwmod for
+ AM43xx
+In-Reply-To: <54F9E41B.5010805@ti.com>
+References: <1425561211-31003-1-git-send-email-d-gerlach@ti.com>
+ <1425561211-31003-3-git-send-email-d-gerlach@ti.com>
+ <alpine.DEB.2.02.1503060425590.5613@utopia.booyaka.com>
+ <54F9E41B.5010805@ti.com>
+Message-ID: <alpine.DEB.2.02.1503061743170.20994@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 01:35:58PM +0100, Arnd Bergmann wrote:
-> This is another prerequisite for enabling multiplatform
-> support, and it is the part I am least certain about.
+Hi Dave,
+
+On Fri, 6 Mar 2015, Dave Gerlach wrote:
+
+> Paul,
+> On 03/05/2015 10:26 PM, Paul Walmsley wrote:
+> > On Thu, 5 Mar 2015, Dave Gerlach wrote:
+> > 
+> >> RTC hwmod is needed for proper operation of PM features like
+> >> rtcwake and rtc-only mode so reuse the am33xx rtc hwmod.
+> >>
+> >> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> >> ---
+> >>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 1 +
+> >>  1 file changed, 1 insertion(+)
+> >>
+> >> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> >> index 8eb8592..9070535 100644
+> >> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> >> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> >> @@ -889,6 +889,7 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+> >>  	&am43xx_l4_ls__dss,
+> >>  	&am43xx_l4_ls__dss_dispc,
+> >>  	&am43xx_l4_ls__dss_rfbi,
+> >> +	&am33xx_l4_wkup__rtc,
+> >>  	NULL,
+> >>  };
+> > 
+> > Thanks, queued for v4.1.
 > 
-> I assume it will cause the extra boot message "Cannot
-> allocate irq_descs @ IRQ%d, assuming pre-allocated" to
-> be printed, but otherwise work ok. This definitely needs
-> to be tested on real hardware to see if it works.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
+> Thanks, but please note as I just commented in Patch 1 of this series, without
+> the ti,no-init flag in place that is introduced there this patch will cause the
+> am43x-epos-evm to fail to boot.
 
-This one appears to cause some problems with the IRQs on
-Cragganmore, I need to look into it a bit more but it looks like
-one of the PMICs can't allocate its IRQs:
+If that's so, shouldn't it appear in the series after patch 3, then?  
+If only patches 1 and 2 are applied, then won't the boot be broken on 
+am43x-epos-evm ?
 
-[    0.961455] wm831x 1-0034: WM8311 revision C
-[    0.965066] wm831x 1-0034: Failed to allocate IRQs: -17
-
-And the CODEC can't request its IRQ:
-
-[    4.252735] arizona spi0.1: WM5102 revision C
-[    4.269763] arizona spi0.1: Failed to request primary IRQ 263: -22
-
-Hopefully I can look into this a little more next week.
-
-Thanks,
-Charles
+- Paul
