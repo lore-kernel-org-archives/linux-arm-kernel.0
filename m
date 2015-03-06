@@ -1,339 +1,823 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  6 Mar 2015 01:57:31 -0300
-Subject: [PATCH v3] ARM: mx25: Remove mach-mx25_3ds board file
-Message-ID: <1425617851-7645-1-git-send-email-festevam@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 6 Mar 2015 12:57:50 +0800
+Subject: [PATCH 1/5] mtd: nand: vf610_nfc: Freescale NFC for VF610,
+ MPC5125 and others
+In-Reply-To: <1425510624-22250-2-git-send-email-stefan@agner.ch>
+References: <1425510624-22250-1-git-send-email-stefan@agner.ch>
+ <1425510624-22250-2-git-send-email-stefan@agner.ch>
+Message-ID: <20150306045748.GS20455@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Thu, Mar 05, 2015 at 12:10:20AM +0100, Stefan Agner wrote:
+> This driver supports Freescale NFC (NAND flash controller) found on
+> Vybrid (VF610), MPC5125, MCF54418 and Kinetis K70.
+> 
+> Limitations:
+> - DMA and pipelining not used
+> - Pages larger than 2k are not supported
+> - No hardware ECC
+> 
+> The driver has only been tested on Vybrid (VF610).
+> 
+> Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  arch/arm/mach-imx/Kconfig    |   1 +
 
-imx25-pdk.dts provides a more complete support than the board file version, so
-let's get rid of the board file.
+This change shouldn't be part of driver patch.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v2:
-- Do not use -D option when generating the patch
+Shawn
 
- arch/arm/mach-imx/Kconfig         |  15 ---
- arch/arm/mach-imx/Makefile        |   1 -
- arch/arm/mach-imx/mach-mx25_3ds.c | 270 --------------------------------------
- 3 files changed, 286 deletions(-)
- delete mode 100644 arch/arm/mach-imx/mach-mx25_3ds.c
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index f9d17f3..247a465 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -151,21 +151,6 @@ config MACH_MX21ADS
- 
- comment "MX25 platforms:"
- 
--config MACH_MX25_3DS
--	bool "Support MX25PDK (3DS) Platform"
--	select IMX_HAVE_PLATFORM_FLEXCAN
--	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
--	select IMX_HAVE_PLATFORM_IMX2_WDT
--	select IMX_HAVE_PLATFORM_IMXDI_RTC
--	select IMX_HAVE_PLATFORM_IMX_FB
--	select IMX_HAVE_PLATFORM_IMX_I2C
--	select IMX_HAVE_PLATFORM_IMX_KEYPAD
--	select IMX_HAVE_PLATFORM_IMX_UART
--	select IMX_HAVE_PLATFORM_MXC_EHCI
--	select IMX_HAVE_PLATFORM_MXC_NAND
--	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
--	select SOC_IMX25
--
- config MACH_EUKREA_CPUIMX25SD
- 	bool "Support Eukrea CPUIMX25 Platform"
- 	select IMX_HAVE_PLATFORM_FLEXCAN
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 8d1b101..e92ede9 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -49,7 +49,6 @@ obj-$(CONFIG_MACH_IMX1_DT) += imx1-dt.o
- obj-$(CONFIG_MACH_MX21ADS) += mach-mx21ads.o
- 
- # i.MX25 based machines
--obj-$(CONFIG_MACH_MX25_3DS) += mach-mx25_3ds.o
- obj-$(CONFIG_MACH_EUKREA_CPUIMX25SD) += mach-eukrea_cpuimx25.o
- obj-$(CONFIG_MACH_EUKREA_MBIMXSD25_BASEBOARD) += eukrea_mbimxsd25-baseboard.o
- obj-$(CONFIG_MACH_IMX25_DT) += imx25-dt.o
-diff --git a/arch/arm/mach-imx/mach-mx25_3ds.c b/arch/arm/mach-imx/mach-mx25_3ds.c
-deleted file mode 100644
-index 584248a..0000000
---- a/arch/arm/mach-imx/mach-mx25_3ds.c
-+++ /dev/null
-@@ -1,270 +0,0 @@
--/*
-- * Copyright 2009 Sascha Hauer, <kernel@pengutronix.de>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version 2
-- * of the License, or (at your option) any later version.
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor,
-- * Boston, MA  02110-1301, USA.
-- */
--
--/*
-- * This machine is known as:
-- *  - i.MX25 3-Stack Development System
-- *  - i.MX25 Platform Development Kit (i.MX25 PDK)
-- */
--
--#include <linux/types.h>
--#include <linux/init.h>
--#include <linux/delay.h>
--#include <linux/clk.h>
--#include <linux/irq.h>
--#include <linux/gpio.h>
--#include <linux/platform_device.h>
--#include <linux/usb/otg.h>
--
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
--#include <asm/memory.h>
--#include <asm/mach/map.h>
--
--#include "common.h"
--#include "devices-imx25.h"
--#include "ehci.h"
--#include "hardware.h"
--#include "iomux-mx25.h"
--#include "mx25.h"
--
--#define MX25PDK_CAN_PWDN	IMX_GPIO_NR(4, 6)
--
--static const struct imxuart_platform_data uart_pdata __initconst = {
--	.flags = IMXUART_HAVE_RTSCTS,
--};
--
--static const iomux_v3_cfg_t mx25pdk_pads[] __initconst = {
--	MX25_PAD_FEC_MDC__FEC_MDC,
--	MX25_PAD_FEC_MDIO__FEC_MDIO,
--	MX25_PAD_FEC_TDATA0__FEC_TDATA0,
--	MX25_PAD_FEC_TDATA1__FEC_TDATA1,
--	MX25_PAD_FEC_TX_EN__FEC_TX_EN,
--	MX25_PAD_FEC_RDATA0__FEC_RDATA0,
--	MX25_PAD_FEC_RDATA1__FEC_RDATA1,
--	MX25_PAD_FEC_RX_DV__FEC_RX_DV,
--	MX25_PAD_FEC_TX_CLK__FEC_TX_CLK,
--	MX25_PAD_A17__GPIO_2_3, /* FEC_EN, GPIO 35 */
--	MX25_PAD_D12__GPIO_4_8, /* FEC_RESET_B, GPIO 104 */
--
--	/* LCD */
--	MX25_PAD_LD0__LD0,
--	MX25_PAD_LD1__LD1,
--	MX25_PAD_LD2__LD2,
--	MX25_PAD_LD3__LD3,
--	MX25_PAD_LD4__LD4,
--	MX25_PAD_LD5__LD5,
--	MX25_PAD_LD6__LD6,
--	MX25_PAD_LD7__LD7,
--	MX25_PAD_LD8__LD8,
--	MX25_PAD_LD9__LD9,
--	MX25_PAD_LD10__LD10,
--	MX25_PAD_LD11__LD11,
--	MX25_PAD_LD12__LD12,
--	MX25_PAD_LD13__LD13,
--	MX25_PAD_LD14__LD14,
--	MX25_PAD_LD15__LD15,
--	MX25_PAD_GPIO_E__LD16,
--	MX25_PAD_GPIO_F__LD17,
--	MX25_PAD_HSYNC__HSYNC,
--	MX25_PAD_VSYNC__VSYNC,
--	MX25_PAD_LSCLK__LSCLK,
--	MX25_PAD_OE_ACD__OE_ACD,
--	MX25_PAD_CONTRAST__CONTRAST,
--
--	/* Keypad */
--	MX25_PAD_KPP_ROW0__KPP_ROW0,
--	MX25_PAD_KPP_ROW1__KPP_ROW1,
--	MX25_PAD_KPP_ROW2__KPP_ROW2,
--	MX25_PAD_KPP_ROW3__KPP_ROW3,
--	MX25_PAD_KPP_COL0__KPP_COL0,
--	MX25_PAD_KPP_COL1__KPP_COL1,
--	MX25_PAD_KPP_COL2__KPP_COL2,
--	MX25_PAD_KPP_COL3__KPP_COL3,
--
--	/* SD1 */
--	MX25_PAD_SD1_CMD__SD1_CMD,
--	MX25_PAD_SD1_CLK__SD1_CLK,
--	MX25_PAD_SD1_DATA0__SD1_DATA0,
--	MX25_PAD_SD1_DATA1__SD1_DATA1,
--	MX25_PAD_SD1_DATA2__SD1_DATA2,
--	MX25_PAD_SD1_DATA3__SD1_DATA3,
--	MX25_PAD_A14__GPIO_2_0, /* WriteProtect */
--	MX25_PAD_A15__GPIO_2_1, /* CardDetect */
--
--	/* I2C1 */
--	MX25_PAD_I2C1_CLK__I2C1_CLK,
--	MX25_PAD_I2C1_DAT__I2C1_DAT,
--
--	/* CAN1 */
--	MX25_PAD_GPIO_A__CAN1_TX,
--	MX25_PAD_GPIO_B__CAN1_RX,
--	MX25_PAD_D14__GPIO_4_6,	/* CAN_PWDN */
--};
--
--static const struct fec_platform_data mx25_fec_pdata __initconst = {
--	.phy    = PHY_INTERFACE_MODE_RMII,
--};
--
--#define FEC_ENABLE_GPIO		IMX_GPIO_NR(2, 3)
--#define FEC_RESET_B_GPIO	IMX_GPIO_NR(4, 8)
--
--static void __init mx25pdk_fec_reset(void)
--{
--	gpio_request(FEC_ENABLE_GPIO, "FEC PHY enable");
--	gpio_request(FEC_RESET_B_GPIO, "FEC PHY reset");
--
--	gpio_direction_output(FEC_ENABLE_GPIO, 0);  /* drop PHY power */
--	gpio_direction_output(FEC_RESET_B_GPIO, 0); /* assert reset */
--	udelay(2);
--
--	/* turn on PHY power and lift reset */
--	gpio_set_value(FEC_ENABLE_GPIO, 1);
--	gpio_set_value(FEC_RESET_B_GPIO, 1);
--}
--
--static const struct mxc_nand_platform_data
--mx25pdk_nand_board_info __initconst = {
--	.width		= 1,
--	.hw_ecc		= 1,
--	.flash_bbt	= 1,
--};
--
--static struct imx_fb_videomode mx25pdk_modes[] = {
--	{
--		.mode	= {
--			.name		= "CRT-VGA",
--			.refresh	= 60,
--			.xres		= 640,
--			.yres		= 480,
--			.pixclock	= 39683,
--			.left_margin	= 45,
--			.right_margin	= 114,
--			.upper_margin	= 33,
--			.lower_margin	= 11,
--			.hsync_len	= 1,
--			.vsync_len	= 1,
--		},
--		.bpp	= 16,
--		.pcr	= 0xFA208B80,
--	},
--};
--
--static const struct imx_fb_platform_data mx25pdk_fb_pdata __initconst = {
--	.mode		= mx25pdk_modes,
--	.num_modes	= ARRAY_SIZE(mx25pdk_modes),
--	.pwmr		= 0x00A903FF,
--	.lscr1		= 0x00120300,
--	.dmacr		= 0x00020010,
--};
--
--static const uint32_t mx25pdk_keymap[] = {
--	KEY(0, 0, KEY_UP),
--	KEY(0, 1, KEY_DOWN),
--	KEY(0, 2, KEY_VOLUMEDOWN),
--	KEY(0, 3, KEY_HOME),
--	KEY(1, 0, KEY_RIGHT),
--	KEY(1, 1, KEY_LEFT),
--	KEY(1, 2, KEY_ENTER),
--	KEY(1, 3, KEY_VOLUMEUP),
--	KEY(2, 0, KEY_F6),
--	KEY(2, 1, KEY_F8),
--	KEY(2, 2, KEY_F9),
--	KEY(2, 3, KEY_F10),
--	KEY(3, 0, KEY_F1),
--	KEY(3, 1, KEY_F2),
--	KEY(3, 2, KEY_F3),
--	KEY(3, 3, KEY_POWER),
--};
--
--static const struct matrix_keymap_data mx25pdk_keymap_data __initconst = {
--	.keymap		= mx25pdk_keymap,
--	.keymap_size	= ARRAY_SIZE(mx25pdk_keymap),
--};
--
--static int mx25pdk_usbh2_init(struct platform_device *pdev)
--{
--	return mx25_initialize_usb_hw(pdev->id, MXC_EHCI_INTERNAL_PHY);
--}
--
--static const struct mxc_usbh_platform_data usbh2_pdata __initconst = {
--	.init	= mx25pdk_usbh2_init,
--	.portsc	= MXC_EHCI_MODE_SERIAL,
--};
--
--static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
--	.operating_mode = FSL_USB2_DR_DEVICE,
--	.phy_mode       = FSL_USB2_PHY_UTMI,
--};
--
--static const struct imxi2c_platform_data mx25_3ds_i2c0_data __initconst = {
--	.bitrate = 100000,
--};
--
--#define SD1_GPIO_WP	IMX_GPIO_NR(2, 0)
--#define SD1_GPIO_CD	IMX_GPIO_NR(2, 1)
--
--static const struct esdhc_platform_data mx25pdk_esdhc_pdata __initconst = {
--	.wp_gpio = SD1_GPIO_WP,
--	.cd_gpio = SD1_GPIO_CD,
--	.wp_type = ESDHC_WP_GPIO,
--	.cd_type = ESDHC_CD_GPIO,
--};
--
--static void __init mx25pdk_init(void)
--{
--	imx25_soc_init();
--
--	mxc_iomux_v3_setup_multiple_pads(mx25pdk_pads,
--			ARRAY_SIZE(mx25pdk_pads));
--
--	imx25_add_imx_uart0(&uart_pdata);
--	imx25_add_fsl_usb2_udc(&otg_device_pdata);
--	imx25_add_mxc_ehci_hs(&usbh2_pdata);
--	imx25_add_mxc_nand(&mx25pdk_nand_board_info);
--	imx25_add_imxdi_rtc();
--	imx25_add_imx_fb(&mx25pdk_fb_pdata);
--	imx25_add_imx2_wdt();
--
--	mx25pdk_fec_reset();
--	imx25_add_fec(&mx25_fec_pdata);
--	imx25_add_imx_keypad(&mx25pdk_keymap_data);
--
--	imx25_add_sdhci_esdhc_imx(0, &mx25pdk_esdhc_pdata);
--	imx25_add_imx_i2c0(&mx25_3ds_i2c0_data);
--
--	gpio_request_one(MX25PDK_CAN_PWDN, GPIOF_OUT_INIT_LOW, "can-pwdn");
--	imx25_add_flexcan0();
--}
--
--static void __init mx25pdk_timer_init(void)
--{
--	mx25_clocks_init();
--}
--
--MACHINE_START(MX25_3DS, "Freescale MX25PDK (3DS)")
--	/* Maintainer: Freescale Semiconductor, Inc. */
--	.atag_offset = 0x100,
--	.map_io = mx25_map_io,
--	.init_early = imx25_init_early,
--	.init_irq = mx25_init_irq,
--	.init_time	= mx25pdk_timer_init,
--	.init_machine = mx25pdk_init,
--	.restart	= mxc_restart,
--MACHINE_END
--- 
-1.9.1
+>  drivers/mtd/nand/Kconfig     |  12 +
+>  drivers/mtd/nand/Makefile    |   1 +
+>  drivers/mtd/nand/vf610_nfc.c | 730 +++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 744 insertions(+)
+>  create mode 100644 drivers/mtd/nand/vf610_nfc.c
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index e8627e0..de4a51a 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -634,6 +634,7 @@ config SOC_VF610
+>  	select ARM_GIC
+>  	select PINCTRL_VF610
+>  	select PL310_ERRATA_769419 if CACHE_L2X0
+> +	select HAVE_NAND_VF610_NFC
+>  
+>  	help
+>  	  This enable support for Freescale Vybrid VF610 processor.
+> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+> index 5b76a17..1be30a6 100644
+> --- a/drivers/mtd/nand/Kconfig
+> +++ b/drivers/mtd/nand/Kconfig
+> @@ -455,6 +455,18 @@ config MTD_NAND_MPC5121_NFC
+>  	  This enables the driver for the NAND flash controller on the
+>  	  MPC5121 SoC.
+>  
+> +config HAVE_NAND_VF610_NFC
+> +	bool
+> +
+> +config MTD_NAND_VF610_NFC
+> +	tristate "Support for Freescale NFC for VF610/MPC5125"
+> +	depends on HAVE_NAND_VF610_NFC
+> +	help
+> +	  Enables support for NAND Flash Controller on some Freescale
+> +	  processors like the VF610, MPC5125, MCF54418 or Kinetis K70.
+> +	  The driver supports a maximum 2k page size. The driver
+> +	  currently does not support hardware ECC.
+> +
+>  config MTD_NAND_MXC
+>  	tristate "MXC NAND support"
+>  	depends on ARCH_MXC
+> diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
+> index 582bbd05..e97ca7b 100644
+> --- a/drivers/mtd/nand/Makefile
+> +++ b/drivers/mtd/nand/Makefile
+> @@ -45,6 +45,7 @@ obj-$(CONFIG_MTD_NAND_SOCRATES)		+= socrates_nand.o
+>  obj-$(CONFIG_MTD_NAND_TXX9NDFMC)	+= txx9ndfmc.o
+>  obj-$(CONFIG_MTD_NAND_NUC900)		+= nuc900_nand.o
+>  obj-$(CONFIG_MTD_NAND_MPC5121_NFC)	+= mpc5121_nfc.o
+> +obj-$(CONFIG_MTD_NAND_VF610_NFC)	+= vf610_nfc.o
+>  obj-$(CONFIG_MTD_NAND_RICOH)		+= r852.o
+>  obj-$(CONFIG_MTD_NAND_JZ4740)		+= jz4740_nand.o
+>  obj-$(CONFIG_MTD_NAND_GPMI_NAND)	+= gpmi-nand/
+> diff --git a/drivers/mtd/nand/vf610_nfc.c b/drivers/mtd/nand/vf610_nfc.c
+> new file mode 100644
+> index 0000000..101fd20
+> --- /dev/null
+> +++ b/drivers/mtd/nand/vf610_nfc.c
+> @@ -0,0 +1,730 @@
+> +/*
+> + * Copyright 2009-2015 Freescale Semiconductor, Inc. and others
+> + *
+> + * Description: MPC5125, VF610, MCF54418 and Kinetis K70 Nand driver.
+> + * Jason ported to M54418TWR and MVFA5 (VF610).
+> + * Authors: Stefan Agner <stefan.agner@toradex.com>
+> + *          Bill Pringlemeir <bpringlemeir@nbsps.com>
+> + *          Shaohui Xie <b21989@freescale.com>
+> + *          Jason Jin <Jason.jin@freescale.com>
+> + *
+> + * Based on original driver mpc5121_nfc.c.
+> + *
+> + * This is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * Limitations:
+> + * - Untested on MPC5125 and M54418.
+> + * - DMA not used.
+> + * - 2K pages or less.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/init.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/mtd/mtd.h>
+> +#include <linux/mtd/nand.h>
+> +#include <linux/mtd/partitions.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/of_mtd.h>
+> +
+> +#define	DRV_NAME		"vf610_nfc"
+> +
+> +/* Register Offsets */
+> +#define NFC_FLASH_CMD1			0x3F00
+> +#define NFC_FLASH_CMD2			0x3F04
+> +#define NFC_COL_ADDR			0x3F08
+> +#define NFC_ROW_ADDR			0x3F0c
+> +#define NFC_ROW_ADDR_INC		0x3F14
+> +#define NFC_FLASH_STATUS1		0x3F18
+> +#define NFC_FLASH_STATUS2		0x3F1c
+> +#define NFC_CACHE_SWAP			0x3F28
+> +#define NFC_SECTOR_SIZE			0x3F2c
+> +#define NFC_FLASH_CONFIG		0x3F30
+> +#define NFC_IRQ_STATUS			0x3F38
+> +
+> +/* Addresses for NFC MAIN RAM BUFFER areas */
+> +#define NFC_MAIN_AREA(n)		((n) *  0x1000)
+> +
+> +#define PAGE_2K				0x0800
+> +#define OOB_64				0x0040
+> +
+> +/*
+> + * NFC_CMD2[CODE] values. See section:
+> + *  - 31.4.7 Flash Command Code Description, Vybrid manual
+> + *  - 23.8.6 Flash Command Sequencer, MPC5125 manual
+> + *
+> + * Briefly these are bitmasks of controller cycles.
+> + */
+> +#define READ_PAGE_CMD_CODE		0x7EE0
+> +#define PROGRAM_PAGE_CMD_CODE		0x7FC0
+> +#define ERASE_CMD_CODE			0x4EC0
+> +#define READ_ID_CMD_CODE		0x4804
+> +#define RESET_CMD_CODE			0x4040
+> +#define STATUS_READ_CMD_CODE		0x4068
+> +
+> +/* NFC ECC mode define */
+> +#define ECC_BYPASS			0
+> +
+> +/*** Register Mask and bit definitions */
+> +
+> +/* NFC_FLASH_CMD1 Field */
+> +#define CMD_BYTE2_MASK				0xFF000000
+> +#define CMD_BYTE2_SHIFT				24
+> +
+> +/* NFC_FLASH_CM2 Field */
+> +#define CMD_BYTE1_MASK				0xFF000000
+> +#define CMD_BYTE1_SHIFT				24
+> +#define CMD_CODE_MASK				0x00FFFF00
+> +#define CMD_CODE_SHIFT				8
+> +#define BUFNO_MASK				0x00000006
+> +#define BUFNO_SHIFT				1
+> +#define START_BIT				(1<<0)
+> +
+> +/* NFC_COL_ADDR Field */
+> +#define COL_ADDR_MASK				0x0000FFFF
+> +#define COL_ADDR_SHIFT				0
+> +
+> +/* NFC_ROW_ADDR Field */
+> +#define ROW_ADDR_MASK				0x00FFFFFF
+> +#define ROW_ADDR_SHIFT				0
+> +#define ROW_ADDR_CHIP_SEL_RB_MASK		0xF0000000
+> +#define ROW_ADDR_CHIP_SEL_RB_SHIFT		28
+> +#define ROW_ADDR_CHIP_SEL_MASK			0x0F000000
+> +#define ROW_ADDR_CHIP_SEL_SHIFT			24
+> +
+> +/* NFC_FLASH_STATUS2 Field */
+> +#define STATUS_BYTE1_MASK			0x000000FF
+> +
+> +/* NFC_FLASH_CONFIG Field */
+> +#define CONFIG_ECC_SRAM_REQ_BIT			(1<<21)
+> +#define CONFIG_DMA_REQ_BIT			(1<<20)
+> +#define CONFIG_ECC_MODE_MASK			0x000E0000
+> +#define CONFIG_ECC_MODE_SHIFT			17
+> +#define CONFIG_FAST_FLASH_BIT			(1<<16)
+> +#define CONFIG_16BIT				(1<<7)
+> +#define CONFIG_BOOT_MODE_BIT			(1<<6)
+> +#define CONFIG_ADDR_AUTO_INCR_BIT		(1<<5)
+> +#define CONFIG_BUFNO_AUTO_INCR_BIT		(1<<4)
+> +#define CONFIG_PAGE_CNT_MASK			0xF
+> +#define CONFIG_PAGE_CNT_SHIFT			0
+> +
+> +/* NFC_IRQ_STATUS Field */
+> +#define IDLE_IRQ_BIT				(1<<29)
+> +#define IDLE_EN_BIT				(1<<20)
+> +#define CMD_DONE_CLEAR_BIT			(1<<18)
+> +#define IDLE_CLEAR_BIT				(1<<17)
+> +
+> +#define NFC_TIMEOUT		(HZ)
+> +
+> +struct vf610_nfc_config {
+> +	int width;
+> +	int flash_bbt;
+> +	u32 clkrate;
+> +};
+> +
+> +struct fsl_nfc {
+> +	struct mtd_info	   mtd;
+> +	struct nand_chip   chip;
+> +	struct device	  *dev;
+> +	void __iomem	  *regs;
+> +	wait_queue_head_t  irq_waitq;
+> +	uint               column;
+> +	int                spareonly;
+> +	int                page;
+> +	/* Status and ID are in alternate locations. */
+> +	int                alt_buf;
+> +#define ALT_BUF_ID   1
+> +#define ALT_BUF_STAT 2
+> +	struct clk        *clk;
+> +
+> +	struct vf610_nfc_config *cfg;
+> +};
+> +
+> +#define mtd_to_nfc(_mtd) container_of(_mtd, struct vf610_nfc, mtd)
+> +
+> +static u8 bbt_pattern[] = {'B', 'b', 't', '0' };
+> +static u8 mirror_pattern[] = {'1', 't', 'b', 'B' };
+> +
+> +static struct nand_bbt_descr bbt_main_descr = {
+> +	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE |
+> +		   NAND_BBT_2BIT | NAND_BBT_VERSION,
+> +	.offs =	11,
+> +	.len = 4,
+> +	.veroffs = 15,
+> +	.maxblocks = 4,
+> +	.pattern = bbt_pattern,
+> +};
+> +
+> +static struct nand_bbt_descr bbt_mirror_descr = {
+> +	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE |
+> +		   NAND_BBT_2BIT | NAND_BBT_VERSION,
+> +	.offs =	11,
+> +	.len = 4,
+> +	.veroffs = 15,
+> +	.maxblocks = 4,
+> +	.pattern = mirror_pattern,
+> +};
+> +
+> +static inline u32 vf610_nfc_read(struct vf610_nfc *nfc, uint reg)
+> +{
+> +	return readl(nfc->regs + reg);
+> +}
+> +
+> +static inline void vf610_nfc_write(struct vf610_nfc *nfc, uint reg, u32 val)
+> +{
+> +	writel(val, nfc->regs + reg);
+> +}
+> +
+> +static inline void vf610_nfc_set(struct vf610_nfc *nfc, uint reg, u32 bits)
+> +{
+> +	vf610_nfc_write(nfc, reg, vf610_nfc_read(nfc, reg) | bits);
+> +}
+> +
+> +static inline void vf610_nfc_clear(struct vf610_nfc *nfc, uint reg, u32 bits)
+> +{
+> +	vf610_nfc_write(nfc, reg, vf610_nfc_read(nfc, reg) & ~bits);
+> +}
+> +
+> +static inline void vf610_nfc_set_field(struct vf610_nfc *nfc, u32 reg,
+> +				       u32 mask, u32 shift, u32 val)
+> +{
+> +	vf610_nfc_write(nfc, reg,
+> +			(vf610_nfc_read(nfc, reg) & (~mask)) | val << shift);
+> +}
+> +
+> +static inline void vf610_nfc_memcpy(void *dst, const void *src, size_t n)
+> +{
+> +	/*
+> +	 * Use this accessor for the interal SRAM buffers. On ARM we can
+> +	 * treat the SRAM buffer as if its memory, hence use memcpy
+> +	 */
+> +	memcpy(dst, src, n);
+> +}
+> +
+> +/* Clear flags for upcoming command */
+> +static inline void vf610_nfc_clear_status(struct vf610_nfc *nfc)
+> +{
+> +	void __iomem *reg = nfc->regs + NFC_IRQ_STATUS;
+> +	u32 tmp = __raw_readl(reg);
+> +
+> +	tmp |= CMD_DONE_CLEAR_BIT | IDLE_CLEAR_BIT;
+> +	__raw_writel(tmp, reg);
+> +}
+> +
+> +static inline void vf610_nfc_done(struct vf610_nfc *nfc)
+> +{
+> +	int rv;
+> +
+> +	/*
+> +	 * Barrier is needed after this write. This write need
+> +	 * to be done before reading the next register the first
+> +	 * time.
+> +	 * vf610_nfc_set implicates such a barrier by using writel
+> +	 * to write to the register.
+> +	 */
+> +	vf610_nfc_set(nfc, NFC_IRQ_STATUS, IDLE_EN_BIT);
+> +	vf610_nfc_set(nfc, NFC_FLASH_CMD2, START_BIT);
+> +
+> +	if (!(vf610_nfc_read(nfc, NFC_IRQ_STATUS) & IDLE_IRQ_BIT)) {
+> +		rv = wait_event_timeout(nfc->irq_waitq,
+> +			(vf610_nfc_read(nfc, NFC_IRQ_STATUS) & IDLE_IRQ_BIT),
+> +					NFC_TIMEOUT);
+> +		if (!rv)
+> +			dev_warn(nfc->dev, "Timeout while waiting for BUSY.\n");
+> +	}
+> +	vf610_nfc_clear_status(nfc);
+> +}
+> +
+> +static u8 vf610_nfc_get_id(struct vf610_nfc *nfc, int col)
+> +{
+> +	u32 flash_id;
+> +
+> +	if (col < 4) {
+> +		flash_id = vf610_nfc_read(nfc, NFC_FLASH_STATUS1);
+> +		return (flash_id >> (3-col)*8) & 0xff;
+> +	} else {
+> +		flash_id = vf610_nfc_read(nfc, NFC_FLASH_STATUS2);
+> +		return flash_id >> 24;
+> +	}
+> +}
+> +
+> +static u8 vf610_nfc_get_status(struct vf610_nfc *nfc)
+> +{
+> +	return vf610_nfc_read(nfc, NFC_FLASH_STATUS2) & STATUS_BYTE1_MASK;
+> +}
+> +
+> +static void vf610_nfc_send_command(struct vf610_nfc *nfc, u32 cmd_byte1,
+> +				   u32 cmd_code)
+> +{
+> +	void __iomem *reg = nfc->regs + NFC_FLASH_CMD2;
+> +	u32 tmp;
+> +
+> +	vf610_nfc_clear_status(nfc);
+> +
+> +	tmp = __raw_readl(reg);
+> +	tmp &= ~(CMD_BYTE1_MASK | CMD_CODE_MASK | BUFNO_MASK);
+> +	tmp |= cmd_byte1 << CMD_BYTE1_SHIFT;
+> +	tmp |= cmd_code << CMD_CODE_SHIFT;
+> +	__raw_writel(tmp, reg);
+> +}
+> +
+> +static void vf610_nfc_send_commands(struct vf610_nfc *nfc, u32 cmd_byte1,
+> +				    u32 cmd_byte2, u32 cmd_code)
+> +{
+> +	void __iomem *reg = nfc->regs + NFC_FLASH_CMD1;
+> +	u32 tmp;
+> +
+> +	vf610_nfc_send_command(nfc, cmd_byte1, cmd_code);
+> +
+> +	tmp = __raw_readl(reg);
+> +	tmp &= ~CMD_BYTE2_MASK;
+> +	tmp |= cmd_byte2 << CMD_BYTE2_SHIFT;
+> +	__raw_writel(tmp, reg);
+> +}
+> +
+> +static irqreturn_t vf610_nfc_irq(int irq, void *data)
+> +{
+> +	struct mtd_info *mtd = data;
+> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
+> +
+> +	vf610_nfc_clear(nfc, NFC_IRQ_STATUS, IDLE_EN_BIT);
+> +	wake_up(&nfc->irq_waitq);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static void vf610_nfc_addr_cycle(struct vf610_nfc *nfc, int column, int page)
+> +{
+> +	if (column != -1) {
+> +		if (nfc->chip.options | NAND_BUSWIDTH_16)
+> +			column = column/2;
+> +		vf610_nfc_set_field(nfc, NFC_COL_ADDR, COL_ADDR_MASK,
+> +				    COL_ADDR_SHIFT, column);
+> +	}
+> +	if (page != -1)
+> +		vf610_nfc_set_field(nfc, NFC_ROW_ADDR, ROW_ADDR_MASK,
+> +				    ROW_ADDR_SHIFT, page);
+> +}
+> +
+> +static void vf610_nfc_command(struct mtd_info *mtd, unsigned command,
+> +			      int column, int page)
+> +{
+> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
+> +
+> +	nfc->column     = max(column, 0);
+> +	nfc->spareonly	= 0;
+> +	nfc->alt_buf	= 0;
+> +
+> +	switch (command) {
+> +	case NAND_CMD_PAGEPROG:
+> +		nfc->page = -1;
+> +		vf610_nfc_send_commands(nfc, NAND_CMD_SEQIN,
+> +					command, PROGRAM_PAGE_CMD_CODE);
+> +		vf610_nfc_addr_cycle(nfc, column, page);
+> +		break;
+> +
+> +	case NAND_CMD_RESET:
+> +		vf610_nfc_send_command(nfc, command, RESET_CMD_CODE);
+> +		break;
+> +	/*
+> +	 * NFC does not support sub-page reads and writes,
+> +	 * so emulate them using full page transfers.
+> +	 */
+> +	case NAND_CMD_READOOB:
+> +		nfc->spareonly = 1;
+> +	case NAND_CMD_SEQIN: /* Pre-read for partial writes. */
+> +	case NAND_CMD_READ0:
+> +		column = 0;
+> +		/* Already read? */
+> +		if (nfc->page == page)
+> +			return;
+> +		nfc->page = page;
+> +		vf610_nfc_send_commands(nfc, NAND_CMD_READ0,
+> +					NAND_CMD_READSTART, READ_PAGE_CMD_CODE);
+> +		vf610_nfc_addr_cycle(nfc, column, page);
+> +		break;
+> +
+> +	case NAND_CMD_ERASE1:
+> +		if (nfc->page == page)
+> +			nfc->page = -1;
+> +		vf610_nfc_send_commands(nfc, command,
+> +				  NAND_CMD_ERASE2, ERASE_CMD_CODE);
+> +		vf610_nfc_addr_cycle(nfc, column, page);
+> +		break;
+> +
+> +	case NAND_CMD_READID:
+> +		nfc->alt_buf = ALT_BUF_ID;
+> +		vf610_nfc_send_command(nfc, command, READ_ID_CMD_CODE);
+> +		break;
+> +
+> +	case NAND_CMD_STATUS:
+> +		nfc->alt_buf = ALT_BUF_STAT;
+> +		vf610_nfc_send_command(nfc, command, STATUS_READ_CMD_CODE);
+> +		break;
+> +	default:
+> +		return;
+> +	}
+> +
+> +	vf610_nfc_done(nfc);
+> +}
+> +
+> +static inline void vf610_nfc_read_spare(struct mtd_info *mtd, void *buf,
+> +					int len)
+> +{
+> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
+> +
+> +	len = min_t(uint, mtd->oobsize, len);
+> +	if (len > 0)
+> +		vf610_nfc_memcpy(buf, nfc->regs + mtd->writesize, len);
+> +}
+> +
+> +static void vf610_nfc_read_buf(struct mtd_info *mtd, u_char *buf, int len)
+> +{
+> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
+> +	uint c = nfc->column;
+> +	uint l;
+> +
+> +	/* Handle main area */
+> +	if (!nfc->spareonly) {
+> +		l = min_t(uint, len, mtd->writesize - c);
+> +		nfc->column += l;
+> +
+> +		if (!nfc->alt_buf)
+> +			vf610_nfc_memcpy(buf, nfc->regs + NFC_MAIN_AREA(0) + c, l);
+> +		else
+> +			if (nfc->alt_buf & ALT_BUF_ID)
+> +				*buf = vf610_nfc_get_id(nfc, c);
+> +			else
+> +				*buf = vf610_nfc_get_status(nfc);
+> +
+> +		buf += l;
+> +		len -= l;
+> +	}
+> +
+> +	/* Handle spare area access */
+> +	if (len) {
+> +		nfc->column += len;
+> +		vf610_nfc_read_spare(mtd, buf, len);
+> +	}
+> +}
+> +
+> +static void vf610_nfc_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
+> +{
+> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
+> +	uint c = nfc->column;
+> +	uint l;
+> +
+> +	l = min_t(uint, len, mtd->writesize + mtd->oobsize - c);
+> +	nfc->column += l;
+> +	vf610_nfc_memcpy(nfc->regs + NFC_MAIN_AREA(0) + c, buf, l);
+> +}
+> +
+> +static uint8_t vf610_nfc_read_byte(struct mtd_info *mtd)
+> +{
+> +	u8 tmp;
+> +
+> +	vf610_nfc_read_buf(mtd, &tmp, sizeof(tmp));
+> +	return tmp;
+> +}
+> +
+> +static u16 vf610_nfc_read_word(struct mtd_info *mtd)
+> +{
+> +	u16 tmp;
+> +
+> +	vf610_nfc_read_buf(mtd, (u_char *)&tmp, sizeof(tmp));
+> +	return tmp;
+> +}
+> +
+> +/* If not provided, upper layers apply a fixed delay. */
+> +static int vf610_nfc_dev_ready(struct mtd_info *mtd)
+> +{
+> +	/* NFC handles R/B internally; always ready.  */
+> +	return 1;
+> +}
+> +
+> +/*
+> + * This function supports Vybrid only (MPC5125 would have full RB and four CS)
+> + */
+> +static void vf610_nfc_select_chip(struct mtd_info *mtd, int chip)
+> +{
+> +#ifdef CONFIG_SOC_VF610
+> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
+> +	u32 tmp = vf610_nfc_read(nfc, NFC_ROW_ADDR);
+> +
+> +	tmp &= ~(ROW_ADDR_CHIP_SEL_RB_MASK | ROW_ADDR_CHIP_SEL_MASK);
+> +	tmp |= 1 << ROW_ADDR_CHIP_SEL_RB_SHIFT;
+> +
+> +	if (chip == 0)
+> +		tmp |= 1 << ROW_ADDR_CHIP_SEL_SHIFT;
+> +	else if (chip == 1)
+> +		tmp |= 2 << ROW_ADDR_CHIP_SEL_SHIFT;
+> +
+> +	vf610_nfc_write(nfc, NFC_ROW_ADDR, tmp);
+> +#endif
+> +}
+> +
+> +#ifdef CONFIG_OF_MTD
+> +static const struct of_device_id vf610_nfc_dt_ids[] = {
+> +	{ .compatible = "fsl,vf610-nfc" },
+> +	{ .compatible = "fsl,mpc5125-nfc" },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, vf610_nfc_dt_ids);
+> +
+> +static int vf610_nfc_probe_dt(struct device *dev, struct vf610_nfc_config *cfg)
+> +{
+> +	struct device_node *np = dev->of_node;
+> +	int buswidth;
+> +	u32 clkrate;
+> +
+> +	if (!np)
+> +		return 1;
+> +
+> +	cfg->flash_bbt = of_get_nand_on_flash_bbt(np);
+> +
+> +	if (!of_property_read_u32(np, "clock-frequency", &clkrate))
+> +		cfg->clkrate = clkrate;
+> +
+> +	buswidth = of_get_nand_bus_width(np);
+> +	if (buswidth < 0)
+> +		return buswidth;
+> +
+> +	cfg->width = buswidth;
+> +
+> +	return 0;
+> +}
+> +#else
+> +static int vf610_nfc_probe_dt(struct device *dev, struct vf610_nfc_config *cfg)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +
+> +static int vf610_nfc_init_controller(struct vf610_nfc *nfc, int page_sz)
+> +{
+> +	struct vf610_nfc_config *cfg = nfc->cfg;
+> +
+> +	if (cfg->width == 16)
+> +		vf610_nfc_set(nfc, NFC_FLASH_CONFIG, CONFIG_16BIT);
+> +	else
+> +		vf610_nfc_clear(nfc, NFC_FLASH_CONFIG, CONFIG_16BIT);
+> +
+> +	/* Set configuration register. */
+> +	vf610_nfc_clear(nfc, NFC_FLASH_CONFIG, CONFIG_ADDR_AUTO_INCR_BIT);
+> +	vf610_nfc_clear(nfc, NFC_FLASH_CONFIG, CONFIG_BUFNO_AUTO_INCR_BIT);
+> +	vf610_nfc_clear(nfc, NFC_FLASH_CONFIG, CONFIG_BOOT_MODE_BIT);
+> +	vf610_nfc_clear(nfc, NFC_FLASH_CONFIG, CONFIG_DMA_REQ_BIT);
+> +	vf610_nfc_set(nfc, NFC_FLASH_CONFIG, CONFIG_FAST_FLASH_BIT);
+> +
+> +	/* PAGE_CNT = 1 */
+> +	vf610_nfc_set_field(nfc, NFC_FLASH_CONFIG, CONFIG_PAGE_CNT_MASK,
+> +			    CONFIG_PAGE_CNT_SHIFT, 1);
+> +
+> +	/* Set ECC_STATUS offset */
+> +	vf610_nfc_set_field(nfc, NFC_FLASH_CONFIG,
+> +			    CONFIG_ECC_SRAM_ADDR_MASK,
+> +			    CONFIG_ECC_SRAM_ADDR_SHIFT, ECC_SRAM_ADDR);
+> +
+> +	vf610_nfc_write(nfc, NFC_SECTOR_SIZE, page_sz);
+> +
+> +	return 0;
+> +}
+> +
+> +static int vf610_nfc_probe(struct platform_device *pdev)
+> +{
+> +	struct vf610_nfc *nfc;
+> +	struct resource *res;
+> +	struct mtd_info *mtd;
+> +	struct nand_chip *chip;
+> +	struct vf610_nfc_config *cfg;
+> +	int err = 0;
+> +	int page_sz;
+> +	int irq;
+> +
+> +	nfc = devm_kzalloc(&pdev->dev, sizeof(*nfc), GFP_KERNEL);
+> +	if (!nfc)
+> +		return -ENOMEM;
+> +
+> +	nfc->cfg = devm_kzalloc(&pdev->dev, sizeof(*nfc), GFP_KERNEL);
+> +	if (!nfc->cfg)
+> +		return -ENOMEM;
+> +	cfg = nfc->cfg;
+> +
+> +	nfc->dev = &pdev->dev;
+> +	nfc->page = -1;
+> +	mtd = &nfc->mtd;
+> +	chip = &nfc->chip;
+> +
+> +	mtd->priv = chip;
+> +	mtd->owner = THIS_MODULE;
+> +	mtd->dev.parent = nfc->dev;
+> +	mtd->name = DRV_NAME;
+> +
+> +	err = vf610_nfc_probe_dt(nfc->dev, cfg);
+> +	if (err)
+> +		return -ENODEV;
+> +
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq <= 0)
+> +		return -EINVAL;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	nfc->regs = devm_ioremap_resource(nfc->dev, res);
+> +	if (IS_ERR(nfc->regs))
+> +		return PTR_ERR(nfc->regs);
+> +
+> +	nfc->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(nfc->clk))
+> +		return PTR_ERR(nfc->clk);
+> +
+> +	if (cfg->clkrate && clk_set_rate(nfc->clk, cfg->clkrate)) {
+> +		dev_err(nfc->dev, "Clock rate not set.");
+> +		return -EINVAL;
+> +	}
+> +
+> +	err = clk_prepare_enable(nfc->clk);
+> +	if (err) {
+> +		dev_err(nfc->dev, "Unable to enable clock!\n");
+> +		return err;
+> +	}
+> +
+> +	if (cfg->width == 16)
+> +		chip->options |= NAND_BUSWIDTH_16;
+> +	else
+> +		chip->options &= ~NAND_BUSWIDTH_16;
+> +
+> +	chip->dev_ready = vf610_nfc_dev_ready;
+> +	chip->cmdfunc = vf610_nfc_command;
+> +	chip->read_byte = vf610_nfc_read_byte;
+> +	chip->read_word = vf610_nfc_read_word;
+> +	chip->read_buf = vf610_nfc_read_buf;
+> +	chip->write_buf = vf610_nfc_write_buf;
+> +	chip->select_chip = vf610_nfc_select_chip;
+> +
+> +	/* Bad block options. */
+> +	if (cfg->flash_bbt)
+> +		chip->bbt_options = NAND_BBT_USE_FLASH | NAND_BBT_CREATE;
+> +
+> +	chip->bbt_td = &bbt_main_descr;
+> +	chip->bbt_md = &bbt_mirror_descr;
+> +
+> +	init_waitqueue_head(&nfc->irq_waitq);
+> +
+> +	err = devm_request_irq(nfc->dev, irq, vf610_nfc_irq, 0, DRV_NAME, mtd);
+> +	if (err) {
+> +		dev_err(nfc->dev, "Error requesting IRQ!\n");
+> +		goto error;
+> +	}
+> +
+> +	page_sz = PAGE_2K + OOB_64;
+> +	page_sz += cfg->width == 16 ? 1 : 0;
+> +
+> +	vf610_nfc_init_controller(nfc, page_sz);
+> +
+> +	/* first scan to find the device and get the page size */
+> +	if (nand_scan_ident(mtd, 1, NULL)) {
+> +		err = -ENXIO;
+> +		goto error;
+> +	}
+> +
+> +	chip->ecc.mode = NAND_ECC_SOFT; /* default */
+> +
+> +	page_sz = mtd->writesize + mtd->oobsize;
+> +
+> +	/* Single buffer only, max 256 OOB minus ECC status */
+> +	if (page_sz > PAGE_2K + 256 - 8) {
+> +		dev_err(nfc->dev, "Unsupported flash size\n");
+> +		err = -ENXIO;
+> +		goto error;
+> +	}
+> +	page_sz += cfg->width == 16 ? 1 : 0;
+> +	vf610_nfc_write(nfc, NFC_SECTOR_SIZE, page_sz);
+> +
+> +	/* second phase scan */
+> +	if (nand_scan_tail(mtd)) {
+> +		err = -ENXIO;
+> +		goto error;
+> +	}
+> +
+> +	/* Register device in MTD */
+> +	mtd_device_parse_register(mtd, NULL,
+> +		&(struct mtd_part_parser_data){
+> +			.of_node = pdev->dev.of_node,
+> +		},
+> +		NULL, 0);
+> +
+> +	platform_set_drvdata(pdev, mtd);
+> +
+> +	return 0;
+> +
+> +error:
+> +	clk_disable_unprepare(nfc->clk);
+> +	return err;
+> +}
+> +
+> +static int vf610_nfc_remove(struct platform_device *pdev)
+> +{
+> +	struct mtd_info *mtd = platform_get_drvdata(pdev);
+> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
+> +
+> +	nand_release(mtd);
+> +	clk_disable_unprepare(nfc->clk);
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +static int vf610_nfc_suspend(struct device *dev)
+> +{
+> +	struct mtd_info *mtd = dev_get_drvdata(dev);
+> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
+> +
+> +	clk_disable_unprepare(nfc->clk);
+> +	return 0;
+> +}
+> +
+> +static int vf610_nfc_resume(struct device *dev)
+> +{
+> +	struct mtd_info *mtd = dev_get_drvdata(dev);
+> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
+> +	int page_sz;
+> +
+> +	pinctrl_pm_select_default_state(dev);
+> +	if (nfc->cfg->clkrate && clk_set_rate(nfc->clk, nfc->cfg->clkrate)) {
+> +		dev_err(nfc->dev, "Clock rate not set.");
+> +		return -EINVAL;
+> +	}
+> +
+> +	clk_prepare_enable(nfc->clk);
+> +
+> +	page_sz = mtd->writesize + mtd->oobsize;
+> +	page_sz += nfc->cfg->width == 16 ? 1 : 0;
+> +
+> +	vf610_nfc_init_controller(nfc, page_sz);
+> +	return 0;
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(vf610_nfc_pm_ops, vf610_nfc_suspend, vf610_nfc_resume);
+> +
+> +static struct platform_driver vf610_nfc_driver = {
+> +	.driver		= {
+> +		.name	= DRV_NAME,
+> +		.of_match_table = vf610_nfc_dt_ids,
+> +		.pm	= &vf610_nfc_pm_ops,
+> +	},
+> +	.probe		= vf610_nfc_probe,
+> +	.remove		= vf610_nfc_remove,
+> +};
+> +
+> +module_platform_driver(vf610_nfc_driver);
+> +
+> +MODULE_AUTHOR("Freescale Semiconductor, Inc.");
+> +MODULE_DESCRIPTION("Freescale VF610/MPC5125 NFC MTD NAND driver");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 2.3.0
+> 
