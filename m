@@ -1,166 +1,71 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 6 Mar 2015 17:33:28 +0800
-Subject: [PATCH v5 11/29] PCI: Introduce pci_host_bridge_ops to support host
- specific operations
+Date: Fri, 6 Mar 2015 17:33:20 +0800
+Subject: [PATCH v5 03/29] xen/PCI: Don't use deprecated function
+ pci_scan_bus_parented()
 In-Reply-To: <1425634426-437-1-git-send-email-wangyijing@huawei.com>
 References: <1425634426-437-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1425634426-437-12-git-send-email-wangyijing@huawei.com>
+Message-ID: <1425634426-437-4-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we have weak functions like pcibios_root_bridge_prepare()
-to setup pci host bridge, We could introduce pci_host_bridge_ops
-which contain host bridge specific ops to setup pci_host_bridge.
-Then host bridge driver could add pci_host_bridge_ops hooks
-intead of weak function to setup pci_host_bridge.
-This patch add following pci_host_bridge_ops hooks:
+From: Arnd Bergmann <arnd@arndb.de>
 
-pci_host_bridge_ops {
-	/* set root bus speed, some platform need this like powerpc */
-	void (*set_root_bus_speed)(struct pci_host_bridge *host);
-	/* setup pci_host_bridge before pci_host_bridge be added to driver core */
-	int (*prepare)(struct pci_host_bridge *host);
-	/* platform specific of scan hook to scan pci device */
-	void (*scan_bus)(struct pci_host_bridge *);
-}
-We could easily extend it to support different host bridge
-specific operations.
+Use pci_scan_root_bus() instead of deprecated function
+pci_scan_bus_parented().
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+CC: xen-devel at lists.xenproject.org
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/pci/host-bridge.c |   12 ++++++++++--
- drivers/pci/pci.h         |    4 ++--
- drivers/pci/probe.c       |   17 +++++++++++------
- include/linux/pci.h       |    8 ++++++++
- 4 files changed, 31 insertions(+), 10 deletions(-)
+ drivers/pci/xen-pcifront.c |   11 ++++++++---
+ 1 files changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-index 3c34c49..bc1de59 100644
---- a/drivers/pci/host-bridge.c
-+++ b/drivers/pci/host-bridge.c
-@@ -23,8 +23,8 @@ static void pci_release_host_bridge_dev(struct device *dev)
- }
- 
- struct pci_host_bridge *pci_create_host_bridge(
--		struct device *parent, u32 db,
--		struct list_head *resources, void *sysdata)
-+		struct device *parent, u32 db, struct list_head *resources,
-+		void *sysdata, struct pci_host_bridge_ops *ops)
+diff --git a/drivers/pci/xen-pcifront.c b/drivers/pci/xen-pcifront.c
+index b1ffebe..7057930 100644
+--- a/drivers/pci/xen-pcifront.c
++++ b/drivers/pci/xen-pcifront.c
+@@ -446,6 +446,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+ 				 unsigned int domain, unsigned int bus)
  {
- 	int error;
- 	int bus = PCI_BUSNUM(db);
-@@ -56,6 +56,7 @@ struct pci_host_bridge *pci_create_host_bridge(
- 		}
- 	mutex_unlock(&phb_mutex);
- 
-+	host->ops = ops;
- 	host->dev.parent = parent;
- 	INIT_LIST_HEAD(&host->windows);
- 	host->dev.release = pci_release_host_bridge_dev;
-@@ -63,6 +64,13 @@ struct pci_host_bridge *pci_create_host_bridge(
- 	dev_set_name(&host->dev, "pci%04x:%02x", host->domain,
- 			host->busnum);
- 
-+	if (host->ops && host->ops->prepare) {
-+		error = host->ops->prepare(host);
-+		if (error) {
-+			kfree(host);
-+			return NULL;
-+		}
-+	}
- 	error = device_register(&host->dev);
- 	if (error) {
- 		put_device(&host->dev);
-diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
-index 8783a1d..8bf5be7 100644
---- a/drivers/pci/pci.h
-+++ b/drivers/pci/pci.h
-@@ -322,8 +322,8 @@ static inline int pci_dev_specific_reset(struct pci_dev *dev, int probe)
- #endif
- 
- struct pci_host_bridge *pci_create_host_bridge(
--		struct device *parent, u32 dombus,
--		struct list_head *resources, void *sysdata);
-+		struct device *parent, u32 dombus, struct list_head *resources,
-+		void *sysdata, struct pci_host_bridge_ops *ops);
- 
- void pci_free_host_bridge(struct pci_host_bridge *host);
- #endif /* DRIVERS_PCI_H */
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 2985281..b76fca6 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1888,6 +1888,8 @@ static struct pci_bus *__pci_create_root_bus(
- 
- 	bridge->bus = b;
- 	b->bridge = get_device(&bridge->dev);
-+	if (bridge->ops && bridge->ops->set_root_bus_speed)
-+		bridge->ops->set_root_bus_speed(bridge);
- 	error = pcibios_root_bridge_prepare(bridge);
- 	if (error)
+ 	struct pci_bus *b;
++	LIST_HEAD(resources);
+ 	struct pcifront_sd *sd = NULL;
+ 	struct pci_bus_entry *bus_entry = NULL;
+ 	int err = 0;
+@@ -470,17 +471,21 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+ 		err = -ENOMEM;
  		goto err_out;
-@@ -1953,7 +1955,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, u32 db,
- {
- 	struct pci_host_bridge *host;
+ 	}
++	pci_add_resource(&resources, &ioport_resource);
++	pci_add_resource(&resources, &iomem_resource);
++	pci_add_resource(&resources, &busn_resource);
+ 	pcifront_init_sd(sd, domain, bus, pdev);
  
--	host = pci_create_host_bridge(parent, db, resources, sysdata);
-+	host = pci_create_host_bridge(parent, db, resources, sysdata, NULL);
- 	if (!host)
- 		return NULL;
+ 	pci_lock_rescan_remove();
  
-@@ -2050,10 +2052,13 @@ static struct pci_bus *__pci_scan_root_bus(
- 		pci_bus_insert_busn_res(b, b->number, 255);
+-	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
+-				  &pcifront_bus_ops, sd);
++	b = pci_scan_root_bus(&pdev->xdev->dev, bus,
++				  &pcifront_bus_ops, sd, &resources);
+ 	if (!b) {
+ 		dev_err(&pdev->xdev->dev,
+ 			"Error creating PCI Frontend Bus!\n");
+ 		err = -ENOMEM;
+ 		pci_unlock_rescan_remove();
++		pci_free_resource_list(&resources);
+ 		goto err_out;
  	}
  
--	max = pci_scan_child_bus(b);
--
--	if (!found)
--		pci_bus_update_busn_res_end(b, max);
-+	if (host->ops && host->ops->scan_bus) {
-+		host->ops->scan_bus(host);
-+	} else {
-+		max = pci_scan_child_bus(b);
-+		if (!found)
-+			pci_bus_update_busn_res_end(b, max);
-+	}
+@@ -488,7 +493,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
  
- 	return b;
- }
-@@ -2063,7 +2068,7 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
- {
- 	struct pci_host_bridge *host;
+ 	list_add(&bus_entry->list, &pdev->root_buses);
  
--	host = pci_create_host_bridge(parent, db, resources, sysdata);
-+	host = pci_create_host_bridge(parent, db, resources, sysdata, NULL);
- 	if (!host)
- 		return NULL;
+-	/* pci_scan_bus_parented skips devices which do not have a have
++	/* pci_scan_root_bus skips devices which do not have a
+ 	* devfn==0. The pcifront_scan_bus enumerates all devfn. */
+ 	err = pcifront_scan_bus(pdev, domain, bus, b);
  
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index b621f5b..e9922b1 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -400,6 +400,13 @@ static inline int pci_channel_offline(struct pci_dev *pdev)
- 	return (pdev->error_state != pci_channel_io_normal);
- }
- 
-+struct pci_host_bridge;
-+struct pci_host_bridge_ops {
-+	void (*set_root_bus_speed)(struct pci_host_bridge *host);
-+	int (*prepare)(struct pci_host_bridge *host);
-+	void (*scan_bus)(struct pci_host_bridge *);
-+};
-+
- struct pci_host_bridge {
- 	u16	domain;
- 	u16 busnum;
-@@ -407,6 +414,7 @@ struct pci_host_bridge {
- 	struct pci_bus *bus;		/* root bus */
- 	struct list_head windows;	/* resource_entry */
- 	struct list_head list;
-+	struct pci_host_bridge_ops *ops;
- 	void (*release_fn)(struct pci_host_bridge *);
- 	void *release_data;
- };
 -- 
 1.7.1
