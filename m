@@ -1,56 +1,125 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Fri, 06 Mar 2015 18:43:03 +0900
-Subject: [GIT PULL 2/2] Samsung fixes-2 for v4.0
-In-Reply-To: <CABxcv=nTi_+qkNhw=4NypNnR795cX4QUsWLOR4S+2w3suXvz5g@mail.gmail.com>
-References: <54F4B33E.3070803@kernel.org> <2064108.qlOP0oDx90@wuerfel>
- <20154650.hb5Lekq8n0@wuerfel>
- <CABxcv=nTi_+qkNhw=4NypNnR795cX4QUsWLOR4S+2w3suXvz5g@mail.gmail.com>
-Message-ID: <027501d057f1$f13a5090$d3aef1b0$@kernel.org>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 6 Mar 2015 17:33:26 +0800
+Subject: [PATCH v5 09/29] PCI: Introduce pci_host_bridge_list to manage host
+ bridges
+In-Reply-To: <1425634426-437-1-git-send-email-wangyijing@huawei.com>
+References: <1425634426-437-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1425634426-437-10-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier Martinez Canillas wrote:
-> 
-> Hello Arnd,
-> 
-Hi,
+Introduce pci_host_bridge_list to manage pci host
+bridges in system, so we could detect whether
+the host in domain:bus is alreay registered.
+Then we could remove bus alreay exist test in
+__pci_create_root_bus().
 
-> On Thu, Mar 5, 2015 at 12:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 04 March 2015 21:04:40 Arnd Bergmann wrote:
-> >> On Tuesday 03 March 2015 04:00:14 Kukjin Kim wrote:
-> >> > Please pull Samsung tmu and hdmi regression fixes for v4.0 and I know
-> >> > this is quite big for fixes but I couldn't handle this series for
-> >> > previous merge window because of dependency with driver side...sorry for
-> >> > that and please pull so that we could support them in v4.0 on exynos
-> >> > platforms.
-> >>
-> >> What kind of dependency do you have there? It really should not be
-> >> necessary to wait for driver changes, unless you do an incompatible
-> >> DT binding change, which you should avoid.
-> >>
-> >> I've pulled it into fixes, but won't forward it until I hear a
-> >> good explanation.
-> >
-> > Even with both fixes-1 and fixes-2 applied, we still get boot failures
-> > on Exynos:
-> >
-> > http://arm-soc.lixom.net/bootlogs/arm-soc/v4.0-rc2-104-g2ee4716/
-> >
-> > Any idea what is going on?
-> >
-> 
-> Yes, the problem is the Exynos DRM driver which has a lot of issues.
-> It's broken if CONFIG_DRM_EXYNOS_IOMMU is enabled which defaults to
-> yes after commit 8dcc14f82f06 ("drm/exynos: IOMMU support should not
-> be selectable by user").
-> 
-> I posted a patch to disable IOMMU support on Exynos to avoid these
-> boot failures and also mentioned to Kukjin that it should be a fix for
-> 4.0 [0]. But even with IOMMU disabled, the Exynos DRM is broken in
-> some boards [1] so we may have to disable that driver until everything
-> gets sorted out and is stable again.
-> 
-Yes, the fix is in my tree and it will be sent to upstream via arm-soc soon.
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+---
+ drivers/pci/host-bridge.c |   24 +++++++++++++++++++++++-
+ drivers/pci/probe.c       |    8 +-------
+ include/linux/pci.h       |    1 +
+ 3 files changed, 25 insertions(+), 8 deletions(-)
 
-Thanks,
-Kukjin
+diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+index 3bd45e7..0bb08ef 100644
+--- a/drivers/pci/host-bridge.c
++++ b/drivers/pci/host-bridge.c
+@@ -8,6 +8,9 @@
+ 
+ #include "pci.h"
+ 
++static LIST_HEAD(pci_host_bridge_list);
++static DEFINE_MUTEX(phb_mutex);
++
+ static void pci_release_host_bridge_dev(struct device *dev)
+ {
+ 	struct pci_host_bridge *bridge = to_pci_host_bridge(dev);
+@@ -25,7 +28,7 @@ struct pci_host_bridge *pci_create_host_bridge(
+ 	int error;
+ 	int bus = PCI_BUSNUM(db);
+ 	int domain = PCI_DOMAIN(db);
+-	struct pci_host_bridge *host;
++	struct pci_host_bridge *host, *temp;
+ 	struct resource_entry *window, *n;
+ 
+ 	host = kzalloc(sizeof(*host), GFP_KERNEL);
+@@ -40,6 +43,18 @@ struct pci_host_bridge *pci_create_host_bridge(
+ 	 */
+ 	pci_host_assign_domain_nr(host);
+ 
++	mutex_lock(&phb_mutex);
++	list_for_each_entry(temp, &pci_host_bridge_list, list)
++		if (temp->domain == host->domain
++				&& temp->busnum == host->busnum) {
++			dev_dbg(&host->dev, "pci host bridge pci%04x:%02x exist\n",
++					host->domain, host->busnum);
++			mutex_unlock(&phb_mutex);
++			kfree(host);
++			return NULL;
++		}
++	mutex_unlock(&phb_mutex);
++
+ 	host->dev.parent = parent;
+ 	INIT_LIST_HEAD(&host->windows);
+ 	host->dev.release = pci_release_host_bridge_dev;
+@@ -55,11 +70,18 @@ struct pci_host_bridge *pci_create_host_bridge(
+ 	resource_list_for_each_entry_safe(window, n, resources)
+ 		list_move_tail(&window->node, &host->windows);
+ 
++	mutex_lock(&phb_mutex);
++	list_add_tail(&host->list, &pci_host_bridge_list);
++	mutex_unlock(&phb_mutex);
+ 	return host;
+ }
+ 
+ void pci_free_host_bridge(struct pci_host_bridge *host)
+ {
++	mutex_lock(&phb_mutex);
++	list_del(&host->list);
++	mutex_unlock(&phb_mutex);
++
+ 	device_unregister(&host->dev);
+ }
+ 
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 751fec3..fdb808c 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1869,7 +1869,7 @@ static struct pci_bus *__pci_create_root_bus(
+ 		void *sysdata)
+ {
+ 	int error;
+-	struct pci_bus *b, *b2;
++	struct pci_bus *b;
+ 	struct resource_entry *window;
+ 	struct device *parent;
+ 	struct resource *res;
+@@ -1886,12 +1886,6 @@ static struct pci_bus *__pci_create_root_bus(
+ 	b->ops = ops;
+ 	b->number = b->busn_res.start = bridge->busnum;
+ 	pci_bus_assign_domain_nr(b, parent);
+-	b2 = pci_find_bus(pci_domain_nr(b), b->number);
+-	if (b2) {
+-		/* If we already got to this bus through a different bridge, ignore it */
+-		dev_dbg(&b2->dev, "bus already known\n");
+-		goto err_out;
+-	}
+ 
+ 	bridge->bus = b;
+ 	b->bridge = get_device(&bridge->dev);
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 463eaa3..b621f5b 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -406,6 +406,7 @@ struct pci_host_bridge {
+ 	struct device dev;
+ 	struct pci_bus *bus;		/* root bus */
+ 	struct list_head windows;	/* resource_entry */
++	struct list_head list;
+ 	void (*release_fn)(struct pci_host_bridge *);
+ 	void *release_data;
+ };
+-- 
+1.7.1
