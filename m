@@ -1,81 +1,38 @@
-From: dengcheng.zhu@imgtec.com (Deng-Cheng Zhu)
-Date: Fri, 6 Mar 2015 15:23:20 -0800
-Subject: [PATCH 04/15] MIPS: Add sched_clock support
-In-Reply-To: <alpine.LFD.2.11.1503061146430.15786@eddie.linux-mips.org>
-References: <1425517137-26463-1-git-send-email-dengcheng.zhu@imgtec.com>
- <1425517137-26463-5-git-send-email-dengcheng.zhu@imgtec.com>
- <alpine.LFD.2.11.1503061146430.15786@eddie.linux-mips.org>
-Message-ID: <54FA36E8.7010501@imgtec.com>
+From: tyler.baker@linaro.org (tyler.baker at linaro.org)
+Date: Fri,  6 Mar 2015 15:35:03 -0800
+Subject: [PATCH 0/2] ARM: dts: add dts files for Cubieboard4
+Message-ID: <1425684905-23652-1-git-send-email-tyler.baker@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2015 03:58 AM, Maciej W. Rozycki wrote:
-> On Wed, 4 Mar 2015, Deng-Cheng Zhu wrote:
->
->> This will provide sched_clock interface to implement individual
->> read_sched_clock(). Not for CAVIUM_OCTEON_SOC as it defines its own
->> sched_clock() directly (not using the sched_clock_register interface).
->>
->> Signed-off-by: Deng-Cheng Zhu <dengcheng.zhu@imgtec.com>
->> ---
->>   arch/mips/Kconfig | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
->> index 068592a..09405dc 100644
->> --- a/arch/mips/Kconfig
->> +++ b/arch/mips/Kconfig
->> @@ -43,6 +43,7 @@ config MIPS
->>   	select GENERIC_SMP_IDLE_THREAD
->>   	select BUILDTIME_EXTABLE_SORT
->>   	select GENERIC_CLOCKEVENTS
->> +	select GENERIC_SCHED_CLOCK if !CAVIUM_OCTEON_SOC
->>   	select GENERIC_CMOS_UPDATE
->>   	select HAVE_MOD_ARCH_SPECIFIC
->>   	select VIRT_TO_BUS
->   Why does this change add this question:
->
-> ARM Versatile (Express) reference platforms clock source (CLKSRC_VERSATILE) [N/y/?] (NEW) ?
+From: Tyler Baker <tyler.baker@linaro.org>
 
-Good catch.
+This series adds basic support for the Cubietech Cubieboard4.
 
->
-> This option enables clock source based on free running
-> counter available in the "System Registers" block of
-> ARM Versatile, RealView and Versatile Express reference
-> platforms.
->
-> Symbol: CLKSRC_VERSATILE [=n]
-> Type  : boolean
-> Prompt: ARM Versatile (Express) reference platforms clock source
->    Location:
->      -> Device Drivers
->        -> Clock Source drivers
->    Defined at drivers/clocksource/Kconfig:216
->    Depends on: GENERIC_SCHED_CLOCK [=y] && !ARCH_USES_GETTIMEOFFSET [=n]
->    Selects: CLKSRC_OF [=n]
->
-> to a MIPS configuration?  I find it silly, this appears a platform
-> device to me (use reverse dependencies?).
+The Cubietech Cubieboard4 is a A80 based development board with 2GB DDR3, 8GB
+eMMC, Micro SD, HDMI, VGA, 3.5mm audio jack. One USB OTG port and four USB 2.0
+ports.
 
-GENERIC_SCHED_CLOCK is generic, by default it uses jiffy_sched_clock_read() 
-for read_sched_clock(). Instead of using reverse dependencies, I suggest 
-the following:
+The sun9i-a80-optimus device tree[1] has been used to boot this board for some
+time now, as the two platforms are very similar. But there are differences, so 
+it deserves it's own device tree. I've tested this series on a 
+Cubieboard4[2][3] and can confirm UART, eMMC, and MMC are working properly.
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 1c2506f..22e0ee1 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -225,7 +225,7 @@ config CLKSRC_QCOM
+This patch series is based on arm-soc v4.0-rc2.
 
-  config CLKSRC_VERSATILE
-         bool "ARM Versatile (Express) reference platforms clock source"
--       depends on GENERIC_SCHED_CLOCK && !ARCH_USES_GETTIMEOFFSET
-+       depends on PLAT_VERSATILE && GENERIC_SCHED_CLOCK && 
-!ARCH_USES_GETTIMEOFFSET
-         select CLKSRC_OF
-         default y if MFD_VEXPRESS_SYSREG
-         help
+[1] http://kernelci.org/boot/sun9i-a80-cubieboard4/ 
+[2] http://lava.kernelci.org/scheduler/job/47969/log_file#L_13_308
+[3] http://lava.kernelci.org/scheduler/job/47969/log_file#L_17_11
 
+Tyler Baker (2):
+  ARM: dts: add cubietech cubieboard4
+  ARM: dts: add vendor prefix for cubietech
 
-Deng-Cheng
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts        | 100 +++++++++++++++++++++
+ 3 files changed, 103 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+
+-- 
+2.1.0
