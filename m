@@ -1,33 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 Mar 2015 09:07:50 -0800
-Subject: [PATCH] ARM: dts: OMAP5: fix polling intervals for thermal zones
-In-Reply-To: <20150227213535.GA5633@developer.amazonguestwifi.org>
-References: <1425045543-19540-1-git-send-email-t-kristo@ti.com>
- <20150227213535.GA5633@developer.amazonguestwifi.org>
-Message-ID: <20150306170749.GT13520@atomide.com>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Fri, 06 Mar 2015 09:15:17 -0800
+Subject: [PATCH 2/5] iommu/mediatek: Add mt8173 IOMMU driver
+In-Reply-To: <1425638900-24989-3-git-send-email-yong.wu@mediatek.com> (yong
+ wu's message of "Fri, 6 Mar 2015 18:48:17 +0800")
+References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
+ <1425638900-24989-3-git-send-email-yong.wu@mediatek.com>
+Message-ID: <vnkwwq2unj2y.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Eduardo Valentin <edubezval@gmail.com> [150227 13:39]:
-> On Fri, Feb 27, 2015 at 03:59:03PM +0200, Tero Kristo wrote:
-> > OMAP4 has a finer counter granularity, which allows for a delay of 1000ms
-> > in the thermal zone polling intervals. OMAP5 has a different counter
-> > mechanism, which allows at maximum a 500ms timer. Adjust the cpu thermal
-> > zone polling interval accordingly.
-> > 
-> > Without this patch, the polling interval information is simply ignored,
-> > and the following thermal warnings are printed during boot (assuming
-> > thermal is enabled);
-> > 
-> > [    1.545343] ti-soc-thermal 4a0021e0.bandgap: Delay 1000 ms is not supported
-> > [    1.552691] ti-soc-thermal 4a0021e0.bandgap: Delay 1000 ms is not supported
-> > [    1.560029] ti-soc-thermal 4a0021e0.bandgap: Delay 1000 ms is not supported
-> > 
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> 
-> Acked-by: Eduardo Valentin <edubezval@gmail.com>
+On Fri, Mar 06 2015 at 02:48:17 AM, <yong.wu@mediatek.com> wrote:
+> From: Yong Wu <yong.wu@mediatek.com>
+>
+> This patch adds support for mediatek m4u (MultiMedia Memory Management Unit).
+> Currently this only supports m4u gen 2 with 2 levels of page table on mt8173.
 
-Applying into omap-for-v4.0/fixes thanks.
+[...]
 
-Tony
+> +static int mtk_iommu_invalidate_tlb(const struct mtk_iommu_info *piommu,
+> +				    int isinvall, unsigned int iova_start,
+> +				    unsigned int iova_end)
+> +{
+> +	void __iomem *m4u_base = piommu->m4u_base;
+> +	u32 val;
+> +	u64 start, end;
+> +
+> +	start = sched_clock();
+> +
+> +	if (!isinvall) {
+> +		iova_start = round_down(iova_start, SZ_4K);
+> +		iova_end = round_up(iova_end, SZ_4K);
+> +	}
+> +
+> +	val = F_MMU_INV_EN_L2 | F_MMU_INV_EN_L1;
+> +
+> +	writel(val, m4u_base + REG_INVLID_SEL);
+> +
+> +	if (isinvall) {
+> +		writel(F_MMU_INV_ALL, m4u_base + REG_MMU_INVLD);
+> +	} else {
+> +		writel(iova_start, m4u_base + REG_MMU_INVLD_SA);
+> +		writel(iova_end, m4u_base + REG_MMU_INVLD_EA);
+> +		writel(F_MMU_INV_RANGE, m4u_base + REG_MMU_INVLD);
+> +
+> +		while (!readl(m4u_base + REG_MMU_CPE_DONE)) {
+> +			end = sched_clock();
+> +			if (end - start >= 100000000ULL) {
+> +				dev_warn(piommu->dev, "invalid don't done\n");
+> +				writel(F_MMU_INV_ALL, m4u_base + REG_MMU_INVLD);
+> +			}
+> +		};
+
+Superfluous `;'.  Also, maybe you should be using readl_poll_timeout?
+
+> +		writel(0, m4u_base + REG_MMU_CPE_DONE);
+> +	}
+> +
+> +	return 0;
+> +}
+
+
+
+-Mitch
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
