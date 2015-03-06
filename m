@@ -1,78 +1,52 @@
-From: yong.wu@mediatek.com (yong.wu at mediatek.com)
-Date: Fri, 6 Mar 2015 18:48:15 +0800
-Subject: [RFC PATCH 0/5] MT8173 IOMMU support
-Message-ID: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri,  6 Mar 2015 11:48:39 +0100
+Subject: [PATCH v3 0/2] net/macb: merge at91_ether driver into macb driver
+Message-ID: <1425638921-9768-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  This is based on Robin Murphy's arm64: IOMMU-backed DMA mapping[1]. 
-This patch adds support for m4u(Multimedia Memory Management Unit),
-Currently it only support the m4u with 2 levels of page table on mt8173.
+Hello,
 
-  Please check the hardware block diagram of Mediatek IOMMU.
+The rm9200 boards use the dedicated at91_ether driver instead of the
+regular macb driver.
 
-              EMI (External Memory Interface)
-               |
-              m4u (Multimedia Memory Management Unit)
-               |
-              smi (Smart Multimedia Interface)
-               |
-        +---------------+-------
-        |               |
-        |               |
-    vdec larb       disp larb      ... SoCs have different local arbiter(larb).
-        |               |
-        |               |
-   +----+----+    +-----+-----+
-   |    |    |    |     |     |    ...
-   |    |    |    |     |     |    ...
-   |    |    |    |     |     |    ...
-  MC   PP   VLD  OVL0 RDMA0 WDMA0  ... 
-  
-  Normally we specify a local arbiter(larb) for each multimedia hardware like
-display, video decode, video encode and camera. And there are different ports in
-each larb. Take a example, there are some ports like MC, PP, UFO, VLD, AVC_MV,
-PRED_RD, PRED_WR in video larb, all the ports are according to the video hardware.
+Both the macb and at91_ether drivers can be compiled as separated
+modules.
+Since the at91_ether driver uses code from the macb driver, at91_ether.ko
+depends on macb.ko.
 
-	From the diagram, all the multimedia module connect with m4u via smi.
-SMI is responsible to enable/disable iommu and control the clocks of each local
-arbiter. If we should enable the iommu of video decode, it should config the 
-video's ports. And if the video hardware work wether enable/disable iommu, 
-it should enable the clock of its larb's clock. So we add a special driver for smi.
+However the macb.ko module always fails to load on rm9200 boards: the
+macb_probe() function expects a hclk clock which doesn't exist on rm9200.
+Then the at91_ether.ko can't be loaded in turn due to unresolved
+dependencies.
 
-[1] http://lists.linuxfoundation.org/pipermail/iommu/2015-February/012236.html
+This series of patches fix this issue by merging at91_ether into macb.
 
-Yong Wu (5):
-  soc: mediatek: Add SMI driver
-  iommu/mediatek: Add mt8173 IOMMU driver
-  dt-bindings: mediatek: Add smi dts binding
-  dt-bindings: iommu: Add binding for mediatek IOMMU
-  dts: mt8173: Add iommu/smi nodes for mt8173
+This series depends on this one [1].
 
- .../devicetree/bindings/iommu/mediatek,iommu.txt   |  41 ++
- .../bindings/soc/mediatek/mediatek,smi.txt         |  17 +
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  60 ++
- drivers/iommu/Kconfig                              |  11 +
- drivers/iommu/Makefile                             |   1 +
- drivers/iommu/mtk_iommu.c                          | 754 +++++++++++++++++++++
- drivers/iommu/mtk_iommu.h                          |  73 ++
- drivers/iommu/mtk_iommu_pagetable.c                | 439 ++++++++++++
- drivers/iommu/mtk_iommu_pagetable.h                |  49 ++
- drivers/soc/mediatek/Kconfig                       |   7 +
- drivers/soc/mediatek/Makefile                      |   1 +
- drivers/soc/mediatek/mt8173-smi.c                  | 143 ++++
- include/dt-bindings/iommu/mt8173-iommu-port.h      | 127 ++++
- include/linux/mtk-smi.h                            |  40 ++
- 14 files changed, 1763 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
- create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
- create mode 100644 drivers/iommu/mtk_iommu.c
- create mode 100644 drivers/iommu/mtk_iommu.h
- create mode 100644 drivers/iommu/mtk_iommu_pagetable.c
- create mode 100644 drivers/iommu/mtk_iommu_pagetable.h
- create mode 100644 drivers/soc/mediatek/mt8173-smi.c
- create mode 100644 include/dt-bindings/iommu/mt8173-iommu-port.h
- create mode 100644 include/linux/mtk-smi.h
+Best Regards,
+
+Boris
+
+Changes since v2:
+- rebase after changed brought by [1]
+
+Changes since v1:
+- rework probe functions to share common probing logic
+
+[1]https://lkml.org/lkml/2015/3/6/234
+
+Cyrille Pitchen (2):
+  net/macb: unify clock management
+  net/macb: merge at91_ether driver into macb driver
+
+ drivers/net/ethernet/cadence/Kconfig      |   8 -
+ drivers/net/ethernet/cadence/Makefile     |   1 -
+ drivers/net/ethernet/cadence/at91_ether.c | 481 ----------------------
+ drivers/net/ethernet/cadence/macb.c       | 660 ++++++++++++++++++++++--------
+ drivers/net/ethernet/cadence/macb.h       |  10 +-
+ 5 files changed, 493 insertions(+), 667 deletions(-)
+ delete mode 100644 drivers/net/ethernet/cadence/at91_ether.c
 
 -- 
-1.8.1.1.dirty
+1.9.1
