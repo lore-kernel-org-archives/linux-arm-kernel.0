@@ -1,39 +1,72 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 5 Mar 2015 21:02:03 -0600
-Subject: [PATCH v2 1/7] ARM: at91: switch to multiplatform
-In-Reply-To: <20150305233532.GD3989@piout.net>
-References: <1425583068-5826-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1425583068-5826-2-git-send-email-alexandre.belloni@free-electrons.com>
- <CAL_Jsq+r3KrAcR+n6uwo-k_OVNfzDrK+MNZ7ech_RsQirutaaQ@mail.gmail.com>
- <20150305233532.GD3989@piout.net>
-Message-ID: <CAL_JsqKm9iaqQqs_RsdYa=ePW8akcLFMVis8oHLWU0zOEfVkwA@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 5 Mar 2015 22:12:43 -0600
+Subject: [PATCH] pci: host: xgene: fix incorrectly returned address by
+ map_bus
+In-Reply-To: <CAL85gmABrzMGfnxP=xgOi=cwxXoEo0=WFYE_XOzpyjtntURO-A@mail.gmail.com>
+References: <1424214840-26498-1-git-send-email-fkan@apm.com>
+ <20150227002151.GG25765@google.com>
+ <20150305163822.GA3048@google.com>
+ <CAL85gmABrzMGfnxP=xgOi=cwxXoEo0=WFYE_XOzpyjtntURO-A@mail.gmail.com>
+Message-ID: <20150306041243.GA20077@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 5, 2015 at 5:35 PM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> On 05/03/2015 at 16:50:57 -0600, Rob Herring wrote :
->> > -config SOC_SAMA5
->> > +config ARCH_AT91
->> >         bool
->> > -       select ATMEL_AIC5_IRQ
->> > +       select ARCH_REQUIRE_GPIOLIB
->> >         select COMMON_CLK_AT91
->> > -       select CPU_V7
->> > +       select CLKDEV_LOOKUP
->>
->> This is already selected by COMMON_CLK I think.
->>
->> >         select GENERIC_CLOCKEVENTS
->>
->> This is already selected.
->>
->
-> I'm just moving options around I didn't add or remove any. That applies
-> to most of your comments.
+On Thu, Mar 05, 2015 at 08:53:38AM -0800, Feng Kan wrote:
+> Please take Mark's patch if you think it is better.
+> 
+> 
+> 
+> On Thu, Mar 5, 2015 at 8:38 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> > [+cc Mark]
+> >
+> > On Thu, Feb 26, 2015 at 06:21:51PM -0600, Bjorn Helgaas wrote:
+> >> On Tue, Feb 17, 2015 at 03:14:00PM -0800, Feng Kan wrote:
+> >> > The generic accessor functions for pci-xgene uses map_bus
+> >> > call that returns the base address but did not add the additional
+> >> > offset.
+> >> >
+> >> > Signed-off-by: Feng Kan <fkan@apm.com>
+> >> > ---
+> >> >  drivers/pci/host/pci-xgene.c | 4 ++--
+> >> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> >> >
+> >> > diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> >> > index aab5547..ee082c0 100644
+> >> > --- a/drivers/pci/host/pci-xgene.c
+> >> > +++ b/drivers/pci/host/pci-xgene.c
+> >> > @@ -127,7 +127,7 @@ static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
+> >> >     return false;
+> >> >  }
+> >> >
+> >> > -static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+> >> > +static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+> >> >                           int offset)
+> >> >  {
+> >> >     struct xgene_pcie_port *port = bus->sysdata;
+> >> > @@ -137,7 +137,7 @@ static int xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+> >> >             return NULL;
+> >> >
+> >> >     xgene_pcie_set_rtdid_reg(bus, devfn);
+> >> > -   return xgene_pcie_get_cfg_base(bus);
+> >> > +   return xgene_pcie_get_cfg_base(bus) + offset;
+> >>
+> >> Where's the locking here?  ECAM doesn't need locking because the
+> >> bus/dev/fn/offset is all encoded in the MMIO address.  But it looks
+> >> like X-Gene doesn't work that way and bus/dev/fn is in the RTDID register.
+> >>
+> >> So it seems like X-Gene needs locking that not everybody needs.  Are you
+> >> relying on higher-level locking somewhere?
+> >
+> > Ping, what's going on here?  I've gotten at least three patches for this
+> > offset issue, so we need to get it resolved.
+> >
+> > If there's no locking problem, I can just apply this and we'll be finished.
+> > Actually, I think Mark's patch is better, because it correctly returns NULL
+> > (failure) if xgene_pcie_get_cfg_base() fails.  So please review and ack
+> > that one or explain why this one is better.
 
-You are enabling multiplatform which means you can drop selecting the
-ones multiplatform selects. I've cleaned-up up the tree once for this
-and I don't care to do it again.
+Huh, I could swear I saw a failure path in xgene_pcie_get_cfg_base().  But
+I don't see a way it can fail, so I don't think it matters which way we fix
+this.
 
-Rob
+Bjorn
