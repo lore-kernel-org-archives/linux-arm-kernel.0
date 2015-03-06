@@ -1,67 +1,99 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 6 Mar 2015 13:11:44 +0100
-Subject: Intermittent efi libstub build errors on arm64
-In-Reply-To: <20150306110941.GA8770@linaro.org>
-References: <20150306103428.GA8045@linaro.org>
- <20150306110941.GA8770@linaro.org>
-Message-ID: <CAKv+Gu8TWRRgqqCKuyXmTcEQvzJtNVw9ZYVfm327NvEDs0fFJQ@mail.gmail.com>
+Date: Fri, 6 Mar 2015 13:14:13 +0100
+Subject: [PATCH] arm64/efi: use UEFI ResetSystem() Runtime Service for
+ system reset
+In-Reply-To: <20150305142244.GD14093@leverpostej>
+References: <1425559871-3433-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150305142244.GD14093@leverpostej>
+Message-ID: <CAKv+Gu9WW2O3fG+cvmgDtZwbaVo0JyRaha3O10mbbWPHzv-C7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 March 2015 at 12:09, Steve Capper <steve.capper@linaro.org> wrote:
-> On Fri, Mar 06, 2015 at 10:34:29AM +0000, Steve Capper wrote:
->> Hi,
->> I've run into some strange build errors with 3.19.
->>
->> If I set a high number of parallel jobs, I sometimes get build errors
->> such as:
->>
->> mv: cannot stat ?drivers/firmware/efi/libstub/.fdt.o.tmp?: No such file or directory
->>   AR      drivers/firmware/efi/libstub/lib.a
->> scripts/Makefile.build:257: recipe for target 'drivers/firmware/efi/libstub/fdt.o' failed
->> make[1]: *** [drivers/firmware/efi/libstub/fdt.o] Error 1
->> Makefile:939: recipe for target 'drivers/firmware/efi/libstub' failed
->> make: *** [drivers/firmware/efi/libstub] Error 2
->>
->> and,
->>
->> fixdep: error opening depfile: drivers/firmware/efi/libstub/.efi-stub-helper.o.d: No such file or directory
->> scripts/Makefile.build:257: recipe for target 'drivers/firmware/efi/libstub/efi-stub-helper.o' failed
->> make[1]: *** [drivers/firmware/efi/libstub/efi-stub-helper.o] Error 2
->> Makefile:939: recipe for target 'drivers/firmware/efi/libstub' failed
->> make: *** [drivers/firmware/efi/libstub] Error 2
->> make: *** Waiting for unfinished jobs....
->>
->>
->> I think some dependency information/header includes may need tweaking
->> somewhere. Has anyone else come across this, or know more?
->>
+On 5 March 2015 at 15:22, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Ard,
 >
-> Having done some more digging, I believe it may be the libstub
-> directory being entered twice by the build system.
+> On Thu, Mar 05, 2015 at 12:51:11PM +0000, Ard Biesheuvel wrote:
+>> If UEFI Runtime Services are available, the ResetSystem() service should
+>> be preferred over direct PSCI calls or other methods to reset the system.
+>> The reason is that the UpdateCapsule() UEFI Runtime Service, which is used
+>> to perform firmware updates, relies on this.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>> I sent roughly the same patch ~6 months ago, but at the time, we were still
+>> waiting for the restart notifier call chain patches to land. Since that code
+>> got rejected, I am proposing this again. Note that efi_enabled(x) always
+>> evaluates to 'false' on !CONFIG_EFI.
 >
-> I am testing the following patch out:
-> --- a/drivers/firmware/efi/Makefile
-> +++ b/drivers/firmware/efi/Makefile
-> @@ -7,4 +7,3 @@ obj-$(CONFIG_EFI_VARS_PSTORE)           += efi-pstore.o
->  obj-$(CONFIG_UEFI_CPER)                        += cper.o
->  obj-$(CONFIG_EFI_RUNTIME_MAP)          += runtime-map.o
->  obj-$(CONFIG_EFI_RUNTIME_WRAPPERS)     += runtime-wrappers.o
-> -obj-$(CONFIG_EFI_STUB)                 += libstub/
+> Also, efi_reboot is a static inline for !CONFIG_EFI, so I can't see any
+> possibility of a build failure.
 >
-> To see if the problem persists.
+>> This fixes reboot on my Seattle [although it doesn't make it any faster :-)]
+>>
+>>  arch/arm64/kernel/process.c | 9 +++++++++
+>>  1 file changed, 9 insertions(+)
+>>
+>> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+>> index fde9923af859..a52bc0c316a8 100644
+>> --- a/arch/arm64/kernel/process.c
+>> +++ b/arch/arm64/kernel/process.c
+>> @@ -21,6 +21,7 @@
+>>  #include <stdarg.h>
+>>
+>>  #include <linux/compat.h>
+>> +#include <linux/efi.h>
+>>  #include <linux/export.h>
+>>  #include <linux/sched.h>
+>>  #include <linux/kernel.h>
+>> @@ -150,6 +151,14 @@ void machine_restart(char *cmd)
+>>       local_irq_disable();
+>>       smp_send_stop();
+>>
+>> +     /*
+>> +      * Prefer reboot via EFI if available, so that capsule updates [which
+>> +      * rely on UEFI's ResetSystem() being called with the return value of
+>> +      * UpdateCapsule()] have a chance of working as expected.
+>> +      */
+>> +     if (efi_enabled(EFI_RUNTIME_SERVICES))
+>> +             efi_reboot(reboot_mode, NULL);
+>
+> I expect that the particulars of the UpdateCapsule() will be handled
+> within efi_reboot and won't require any additions here. So the comment
+> could just be trimmed to say that UpdateCapsule() depends on the system
+> being reset with ResetSystem().
 >
 
-I have noticed something odd once or twice, but I thought it was just
-my stale build tree.
+OK.
 
-In any case, removing this line will break x86, as it includes
-libstub/lib.a explicitly into its decompressor, so it needs the build
-system to traverse libstub/
-So we could either drop this and link arm64's vmlinux to libstub/lib.a
-explicitly as well, or conditionalize it on CONFIG_ARM64
+> Also, we need to make sure we call efi_poweroff to make UpdateCapsule()
+> work when shutting the machine down (behind the scenes efi_poweroff
+> calls ResetSystem(EfiResetShutdown, ...)).
+>
+> For that I think adding the following to arch/arm64/kernel/efi.c is
+> sufficient:
+>
+> /*
+>  * UpdateCapsule() depends on the system being shutdown via
+>  * ResetSystem().
+>  */
+> bool efi_poweroff_required(void)
+> {
+>         return efi_enabled(EFI_RUNTIME_SERVICES);
+> }
+>
 
-(This all assuming this is the culprit)
+Yes. I used to have this as a separate patch as well ~6 months ago,
+but I did not realise at the time that UpdateCapsule() depends on
+ResetSystem() for poweroff as well.
 
-Thanks,
+> I've given the patch a spin (with and without that addition) on Juno and
+> Seattle. So with that folded in:
+>
+> Tested-by: Mark Rutland <mark.rutland@arm.com>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+>
+
+Thanks. I will fold it in and resend.
+
+-- 
 Ard.
