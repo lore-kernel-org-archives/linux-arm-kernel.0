@@ -1,48 +1,47 @@
 From: wuyun.wu@huawei.com (Yun Wu)
-Date: Fri, 6 Mar 2015 12:13:18 +0800
-Subject: [PATCH v4 0/5] enhance configuring an ITS
-Message-ID: <1425615203-3300-1-git-send-email-wuyun.wu@huawei.com>
+Date: Fri, 6 Mar 2015 12:13:22 +0800
+Subject: [PATCH v4 4/5] irqchip: gicv3-its: define macros for GITS_CTLR fields
+In-Reply-To: <1425615203-3300-1-git-send-email-wuyun.wu@huawei.com>
+References: <1425615203-3300-1-git-send-email-wuyun.wu@huawei.com>
+Message-ID: <1425615203-3300-5-git-send-email-wuyun.wu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series makes some enhancement to ITS configuration in the
-following aspects:
+Define macros for GITS_CTLR fields to avoid using magic numbers.
 
-o make allocation of the ITS tables more sensible
-o replace magic numbers with sensible macros
-o guarantees a safe quiescent status before initializing an ITS
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c   | 2 +-
+ include/linux/irqchip/arm-gic-v3.h | 3 +++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
-This patch series is based on Marc's branch[1], and tested on Hisilion
-ARM64 board with GICv3 ITS hardware.
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index e8bda0b..d13c24e 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1388,7 +1388,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+ 	writeq_relaxed(baser, its->base + GITS_CBASER);
+ 	tmp = readq_relaxed(its->base + GITS_CBASER);
+ 	writeq_relaxed(0, its->base + GITS_CWRITER);
+-	writel_relaxed(1, its->base + GITS_CTLR);
++	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
 
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gic-fixes
+ 	if ((tmp ^ baser) & GITS_BASER_SHAREABILITY_MASK) {
+ 		pr_info("ITS: using cache flushing for cmd queue\n");
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 3459b43..c9d3002 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -134,6 +134,9 @@
 
-v3 -> v4:
-o Spell out device table instead of DT to avoid misunderstanding
-o Change its_check_quiesced() to a more sensible name its_force_quiescent()
+ #define GITS_TRANSLATER			0x10040
 
-v2 -> v3:
-o drop the patch of tracing LPI enabling status since Vladimir Murzin
-  had already posted a similar patch
-o fix several improper description issues
-
-v1 -> v2:
-o rebase to Marc's GIC fix branch
-o drop size calculation for Device Table since Marc had already posted one
-o guarantees a safe quiescent status before initializing an ITS as
-  Marc suggested, rather than register a reboot notifier
-o fix an issue about the enabling status of LPI feature
-
-Yun Wu (5):
-  irqchip: gicv3-its: zero itt before handling to hardware
-  irqchip: gicv3-its: use 64KB page as default granule
-  irqchip: gicv3-its: add limitation to page order
-  irqchip: gicv3-its: define macros for GITS_CTLR fields
-  irqchip: gicv3-its: support safe initialization
-
- drivers/irqchip/irq-gic-v3-its.c   | 46 +++++++++++++++++++++++++++++++++++---
- include/linux/irqchip/arm-gic-v3.h |  3 +++
- 2 files changed, 46 insertions(+), 3 deletions(-)
-
++#define GITS_CTLR_ENABLE		(1U << 0)
++#define GITS_CTLR_QUIESCENT		(1U << 31)
++
+ #define GITS_TYPER_DEVBITS_SHIFT	13
+ #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
+ #define GITS_TYPER_PTA			(1UL << 19)
 --
 1.8.0
