@@ -1,103 +1,55 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Fri, 6 Mar 2015 10:29:26 -0800
-Subject: [PATCH 4/8] ARM: dts: rockchip: relicense rk3288.dtsi under
- GPLv2/X11
-In-Reply-To: <1425665046-22927-5-git-send-email-heiko@sntech.de>
-References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
- <1425665046-22927-5-git-send-email-heiko@sntech.de>
-Message-ID: <CAPz6YkWggHnV9Pns1uGqf-71mYMiMTsn_Y0Xy9rsA_2b2NW94A@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 6 Mar 2015 18:31:57 +0000
+Subject: [PATCH v9 08/21] ARM64 / ACPI: Introduce PCI stub functions for
+ ACPI
+In-Reply-To: <1424853601-6675-9-git-send-email-hanjun.guo@linaro.org>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <1424853601-6675-9-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150306183157.GC26888@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 6, 2015 at 10:04 AM, Heiko Stuebner <heiko@sntech.de> wrote:
-> GPLv2-only devicetrees make reuse difficult for software components licensed
-> under a different license.
->
-> The consensus is that a GPL/X11 dual-license should allow all necessary uses,
-> so relicense the rk3288.dtsi to this combination.
->
-> CCs were aquired by git shortlog -sne so it should've hopefully catched
-> every contributor.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Cc: Kever Yang <kever.yang@rock-chips.com>
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Addy Ke <addy.ke@rock-chips.com>
-> Cc: Daniel Kurtz <djkurtz@chromium.org>
-> Cc: Andy Yan <andy.yan@rock-chips.com>
-> Cc: Caesar Wang <caesar.wang@rock-chips.com>
-> Cc: Chris Zhong <zyw@rock-chips.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Jianqun Xu<jay.xu@rock-chips.com>
-> Cc: Roger Chen <roger.chen@rock-chips.com>
-> Cc: Sonny Rao <sonnyrao@chromium.org>
-> Cc: Yunzhi Li <lyz@rock-chips.com>
-> Cc: huang lin <hl@rock-chips.com>
->
-> Not sure if an Ack for a simple revert is necessary, but included anyway
-> Cc: Olof Johansson <olof@lixom.net>
-> ---
-> I'm hoping to get Acked-by tags from the people in the Cc-list.
->
->  arch/arm/boot/dts/rk3288.dtsi | 44 +++++++++++++++++++++++++++++++++++--------
->  1 file changed, 36 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 2c29a3e..35a06a5 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -1,13 +1,41 @@
->  /*
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
->   *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - * GNU General Public License for more details.
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->
->  #include <dt-bindings/gpio/gpio.h>
-> --
-> 2.1.4
->
+On Wed, Feb 25, 2015 at 08:39:48AM +0000, Hanjun Guo wrote:
 
-Acked-by: Sonny Rao <sonnyrao@chromium.org>
+[...]
+
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index 6f93c24..4095379 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -10,6 +10,7 @@
+>   *
+>   */
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/init.h>
+>  #include <linux/io.h>
+>  #include <linux/kernel.h>
+> @@ -46,3 +47,27 @@ int pcibios_add_device(struct pci_dev *dev)
+>  
+>  	return 0;
+>  }
+> +
+> +/*
+> + * raw_pci_read/write - Platform-specific PCI config space access.
+> + */
+> +int raw_pci_read(unsigned int domain, unsigned int bus,
+> +		  unsigned int devfn, int reg, int len, u32 *val)
+> +{
+> +	return -ENXIO;
+> +}
+> +
+> +int raw_pci_write(unsigned int domain, unsigned int bus,
+> +		unsigned int devfn, int reg, int len, u32 val)
+> +{
+> +	return -ENXIO;
+> +}
+> +
+
+It would be nice to see:
+
+https://lkml.org/lkml/2015/2/27/264
+
+merged at the same time, so that the two functions above disappear :)
+
+Lorenzo
