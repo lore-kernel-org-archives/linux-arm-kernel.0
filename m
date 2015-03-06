@@ -1,57 +1,70 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 6 Mar 2015 12:26:20 +0800
-Subject: [PATCH v9 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <20150305185701.GH4932@quad.lixom.net>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <20150305185701.GH4932@quad.lixom.net>
-Message-ID: <54F92C6C.4040203@huawei.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Fri, 6 Mar 2015 04:31:40 -0000
+Subject: [PATCH 0/6] Add support for QCOM GDSCs
+In-Reply-To: <54F88A8C.4080100@mm-sol.com>
+References: <1425279749-16625-1-git-send-email-rnayak@codeaurora.org>
+ <54F88A8C.4080100@mm-sol.com>
+Message-ID: <4e73dedd220f1079148b4b3b7a5aabdc.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/6 2:57, Olof Johansson wrote:
-> Hi,
 
-Hi Olof,
-
+> On 03/02/2015 09:02 AM, Rajendra Nayak wrote:
+>> GDSCs (Global Distributed Switch Controllers) control switches
+>> that supply power to an on-chip power domain and hence can be
+>> programmed in SW to safely power collapse and restore power to the
+>> respective PDs. They are part of a considerable number of recent QCOM
+>> SoCs (This series adds support for msm8974, msm8916 and apq8084 devices)
+>> and are part of the Clock control block.
+>>
+>> The series implements support for GDSC using the genpd framework
+>> modelling these as SW controllable power domains.
+>>
+>> 8916 support has a dependency on the Global Clock controller support [1]
+>> posted by Georgi Djakov.
+>>
+>> [1]
+>> https://lkml.org/lkml/2015/2/25/416
+>>
+>> Rajendra Nayak (3):
+>>   clk: qcom: gdsc: Prepare common clk probe to register gdscs
+>>   clk: qcom: gdsc: Add GDSCs in msm8916 GCC
+>>   clk: qcom: gdsc: Add GDSCs in apq8084 GCC
+>>
+>> Stephen Boyd (3):
+>>   clk: qcom: Add support for GDSCs
+>>   clk: qcom: gdsc: Add GDSCs in msm8974 GCC
+>>   clk: qcom: gdsc: Add GDSCs in msm8974 MMCC
+>>
+>>  drivers/clk/qcom/Kconfig                      |   8 ++
+>>  drivers/clk/qcom/Makefile                     |   1 +
+>>  drivers/clk/qcom/common.c                     |  27 +++++-
+>>  drivers/clk/qcom/common.h                     |   2 +
+>>  drivers/clk/qcom/gcc-apq8084.c                |  38 ++++++++
+>>  drivers/clk/qcom/gcc-msm8916.c                |  46 +++++++++
+>>  drivers/clk/qcom/gcc-msm8974.c                |  14 +++
+>>  drivers/clk/qcom/gdsc.c                       | 130
+>> ++++++++++++++++++++++++++
+>>  drivers/clk/qcom/gdsc.h                       |  43 +++++++++
+>>  drivers/clk/qcom/mmcc-msm8974.c               |  54 +++++++++++
+>>  include/dt-bindings/clock/qcom,gcc-apq8084.h  |   6 ++
+>>  include/dt-bindings/clock/qcom,gcc-msm8916.h  |   8 ++
+>>  include/dt-bindings/clock/qcom,gcc-msm8974.h  |   3 +
+>>  include/dt-bindings/clock/qcom,mmcc-msm8974.h |   8 ++
+>>  14 files changed, 387 insertions(+), 1 deletion(-)
+>>  create mode 100644 drivers/clk/qcom/gdsc.c
+>>  create mode 100644 drivers/clk/qcom/gdsc.h
+>>
 >
-> On Wed, Feb 25, 2015 at 04:39:40PM +0800, Hanjun Guo wrote:
->> Changes since v8:
->>   - remove MPIDR packing things by introducing phys_cpuid_t;
->>
->>   - update patch acpi: fix acpi_os_ioremap for arm64 to follow
->>     Rafael's suggestion;
->>
->>   - Squash patch (disable ACPI if ACPI less than 5.1) to patch
->>     (Get RSDP and ACPI boot-time table);
->>
->>   - Move sleep_arm.c to arch/arm64/ and rename it as acpi_sleep.c 
->>
->>   - Rework the uefi generated empty dtb to enable acpi when no dtb
->>     is available, thanks Ard for the updated patch.
->>
->>   - rework the function of register cpu for kexec case
->>
->>   - use pr_debug() instead of pr_info() when scanning MADT.
->>
->>   - rebase on top of 4.0-rc1
->>
-> I've looked at most of the arch code besides GIC and some of the timer stuff,
-> which I might revisit later, but the pieces I've seen seem reasonable. I've
-> acked individual patches.
+> You missed a patch who adds appropriate changes in qcom,gcc.txt
+> (qcom,mmcc.txt), at least #power-domain-cells property should be
+> described.
 
-Thank you very much for the ACKs and review comments!
+Right, I also missed adding those in the dts files (for 8974 and 8084)
+which caused failures which I caught after I posted these out.
+Thanks for taking time to review, I will fix #power-domain-cells and also
+address other concerns you had on PATCH 1/6 and 2/6 and post a v2 soon.
 
->
-> There are some cleanups to be made, but that can be done incrementally on top,
-> it's all internal implementation details.
-
-Definitely in my TODO list :)
-
->
-> I also haven't looked closely at the documentation patches yet, so I might have
-> some comments on those showing up.
-
-OK, thanks.
-
-Regards
-Hanjun
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
