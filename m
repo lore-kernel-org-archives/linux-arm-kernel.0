@@ -1,47 +1,74 @@
 From: wuyun.wu@huawei.com (Yun Wu)
-Date: Fri, 6 Mar 2015 12:13:22 +0800
-Subject: [PATCH v4 4/5] irqchip: gicv3-its: define macros for GITS_CTLR fields
+Date: Fri, 6 Mar 2015 12:13:23 +0800
+Subject: [PATCH v4 5/5] irqchip: gicv3-its: support safe initialization
 In-Reply-To: <1425615203-3300-1-git-send-email-wuyun.wu@huawei.com>
 References: <1425615203-3300-1-git-send-email-wuyun.wu@huawei.com>
-Message-ID: <1425615203-3300-5-git-send-email-wuyun.wu@huawei.com>
+Message-ID: <1425615203-3300-6-git-send-email-wuyun.wu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define macros for GITS_CTLR fields to avoid using magic numbers.
+It's unsafe to change the configurations of an activated ITS directly
+since this will lead to unpredictable results. This patch guarantees
+the ITSes being initialized are quiescent.
 
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c   | 2 +-
- include/linux/irqchip/arm-gic-v3.h | 3 +++
- 2 files changed, 4 insertions(+), 1 deletion(-)
+ drivers/irqchip/irq-gic-v3-its.c | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index e8bda0b..d13c24e 100644
+index d13c24e..9e09aa0 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1388,7 +1388,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
- 	writeq_relaxed(baser, its->base + GITS_CBASER);
- 	tmp = readq_relaxed(its->base + GITS_CBASER);
- 	writeq_relaxed(0, its->base + GITS_CWRITER);
--	writel_relaxed(1, its->base + GITS_CTLR);
-+	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
+@@ -1320,6 +1320,34 @@ static const struct irq_domain_ops its_domain_ops = {
+ 	.deactivate		= its_irq_domain_deactivate,
+ };
 
- 	if ((tmp ^ baser) & GITS_BASER_SHAREABILITY_MASK) {
- 		pr_info("ITS: using cache flushing for cmd queue\n");
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 3459b43..c9d3002 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -134,6 +134,9 @@
-
- #define GITS_TRANSLATER			0x10040
-
-+#define GITS_CTLR_ENABLE		(1U << 0)
-+#define GITS_CTLR_QUIESCENT		(1U << 31)
++static int its_force_quiescent(void __iomem *base)
++{
++	u32 count = 1000000;	/* 1s */
++	u32 val;
 +
- #define GITS_TYPER_DEVBITS_SHIFT	13
- #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
- #define GITS_TYPER_PTA			(1UL << 19)
++	val = readl_relaxed(base + GITS_CTLR);
++	if (val & GITS_CTLR_QUIESCENT)
++		return 0;
++
++	/* Disable the generation of all interrupts to this ITS */
++	val &= ~GITS_CTLR_ENABLE;
++	writel_relaxed(val, base + GITS_CTLR);
++
++	/* Poll GITS_CTLR and wait until ITS becomes quiescent */
++	while (1) {
++		val = readl_relaxed(base + GITS_CTLR);
++		if (val & GITS_CTLR_QUIESCENT)
++			return 0;
++
++		count--;
++		if (!count)
++			return -EBUSY;
++
++		cpu_relax();
++		udelay(1);
++	}
++}
++
+ static int its_probe(struct device_node *node, struct irq_domain *parent)
+ {
+ 	struct resource res;
+@@ -1348,6 +1376,13 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+ 		goto out_unmap;
+ 	}
+
++	err = its_force_quiescent(its_base);
++	if (err) {
++		pr_warn("%s: failed to quiesce, giving up\n",
++			node->full_name);
++		goto out_unmap;
++	}
++
+ 	pr_info("ITS: %s\n", node->full_name);
+
+ 	its = kzalloc(sizeof(*its), GFP_KERNEL);
 --
 1.8.0
