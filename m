@@ -1,138 +1,84 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 6 Mar 2015 12:36:12 +0000
-Subject: [PATCH v9 07/21] ACPI / sleep: Introduce arm64 specific
- acpi_sleep.c
-In-Reply-To: <2304442.4NvTH1BPme@vostro.rjw.lan>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <CAGCh1+=RWVfcFoG549_03AZx3Y548GrJUMAXMgmdFFMmiE40KQ@mail.gmail.com>
- <2489018.mr9Fb0WeOy@vostro.rjw.lan>
- <2304442.4NvTH1BPme@vostro.rjw.lan>
-Message-ID: <20150306123611.GA24254@e102568-lin.cambridge.arm.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Fri, 6 Mar 2015 13:39:14 +0100
+Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
+ IRQF_NO_SUSPEND
+In-Reply-To: <20150306110618.GC8700@leverpostej>
+References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
+ <CAJZ5v0h8vn26BeWPVhC4e_KNhBu15-mshnbq0K=OQ1M36vPQEQ@mail.gmail.com>
+ <20150305163227.GF14093@leverpostej>
+ <1696230.CygTkv53VA@vostro.rjw.lan>
+ <20150306110618.GC8700@leverpostej>
+Message-ID: <CAJZ5v0jA-hRUnP_+mOdFw7vN7CGZ4o0FjUVu81rq7foi92f63g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 05, 2015 at 12:16:29AM +0000, Rafael J. Wysocki wrote:
-> On Thursday, March 05, 2015 12:25:54 AM Rafael J. Wysocki wrote:
-> > On Wednesday, March 04, 2015 10:49:25 PM G Gregory wrote:
-> > > On 4 March 2015 at 22:38, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > > > On Wednesday, February 25, 2015 04:39:47 PM Hanjun Guo wrote:
-> > > >> From: Graeme Gregory <graeme.gregory@linaro.org>
-> > > >>
-> > > >> ACPI 5.1 does not currently support S states for ARM64 hardware but
-> > > >> ACPI code will call acpi_target_system_state() for device power
-> > > >> management, so introduce acpi_sleep.c to allow other drivers to function
-> > > >> until S states are defined.
-> > > >>
-> > > >> Since it is arm64 specific stub holder, so let acpi_sleep.c to ARM64
-> > > >> specific.
-> > > >>
-> > > >> TODO: merge this with drivers/acpi/sleep.c once we fix the specification.
-> > > >>
-> > > >> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-> > > >> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> > > >> Tested-by: Yijing Wang <wangyijing@huawei.com>
-> > > >> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-> > > >> Tested-by: Jon Masters <jcm@redhat.com>
-> > > >> Tested-by: Timur Tabi <timur@codeaurora.org>
-> > > >> Tested-by: Robert Richter <rrichter@cavium.com>
-> > > >> Acked-by: Robert Richter <rrichter@cavium.com>
-> > > >> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> > > >> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> > > >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > > >> ---
-> > > >>  arch/arm64/kernel/Makefile     |  2 +-
-> > > >>  arch/arm64/kernel/acpi_sleep.c | 28 ++++++++++++++++++++++++++++
-> > > >>  drivers/acpi/Makefile          |  2 ++
-> > > >>  3 files changed, 31 insertions(+), 1 deletion(-)
-> > > >>  create mode 100644 arch/arm64/kernel/acpi_sleep.c
-> > > >>
-> > > >> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> > > >> index 218eb7e..4435943 100644
-> > > >> --- a/arch/arm64/kernel/Makefile
-> > > >> +++ b/arch/arm64/kernel/Makefile
-> > > >> @@ -34,7 +34,7 @@ arm64-obj-$(CONFIG_KGDB)            += kgdb.o
-> > > >>  arm64-obj-$(CONFIG_EFI)                      += efi.o efi-stub.o efi-entry.o
-> > > >>  arm64-obj-$(CONFIG_PCI)                      += pci.o
-> > > >>  arm64-obj-$(CONFIG_ARMV8_DEPRECATED) += armv8_deprecated.o
-> > > >> -arm64-obj-$(CONFIG_ACPI)             += acpi.o
-> > > >> +arm64-obj-$(CONFIG_ACPI)             += acpi.o acpi_sleep.o
-> > > >>
-> > > >>  obj-y                                        += $(arm64-obj-y) vdso/
-> > > >>  obj-m                                        += $(arm64-obj-m)
-> > > >> diff --git a/arch/arm64/kernel/acpi_sleep.c b/arch/arm64/kernel/acpi_sleep.c
-> > > >> new file mode 100644
-> > > >> index 0000000..54578ef
-> > > >> --- /dev/null
-> > > >> +++ b/arch/arm64/kernel/acpi_sleep.c
-> > > >> @@ -0,0 +1,28 @@
-> > > >> +/*
-> > > >> + *  ARM64 Specific Sleep Functionality
-> > > >> + *
-> > > >> + *  Copyright (C) 2013-2014, Linaro Ltd.
-> > > >> + *      Author: Graeme Gregory <graeme.gregory@linaro.org>
-> > > >> + *
-> > > >> + *  This program is free software; you can redistribute it and/or modify
-> > > >> + *  it under the terms of the GNU General Public License version 2 as
-> > > >> + *  published by the Free Software Foundation.
-> > > >> + */
-> > > >> +
-> > > >> +#include <linux/acpi.h>
-> > > >> +
-> > > >> +/*
-> > > >> + * Currently the ACPI 5.1 standard does not define S states in a
-> > > >> + * manner which is usable for ARM64. These two stubs are sufficient
-> > > >> + * that system initialises and device PM works.
-> > > >> + */
-> > > >> +u32 acpi_target_system_state(void)
-> > > >> +{
-> > > >> +     return ACPI_STATE_S0;
-> > > >> +}
-> > > >> +EXPORT_SYMBOL_GPL(acpi_target_system_state);
-> > > >> +
-> > > >> +int __init acpi_sleep_init(void)
-> > > >> +{
-> > > >> +     return -ENOSYS;
-> > > >> +}
-> > > >> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> > > >> index 623b117..c32edf5 100644
-> > > >> --- a/drivers/acpi/Makefile
-> > > >> +++ b/drivers/acpi/Makefile
-> > > >> @@ -23,7 +23,9 @@ acpi-y                              += nvs.o
-> > > >>
-> > > >>  # Power management related files
-> > > >>  acpi-y                               += wakeup.o
-> > > >> +ifneq (,$(findstring $(ARCH),x86 ia64))
-> > > >
-> > > > This is super-ugly.  Isn't there a better way to do that?
-> > > >
-> > > Its the standard example in the GNU Make manual,
-> > 
-> > It is never used in the kernel this way, though, and I'm not going to let
-> > that slip through.
-> > 
-> > > I would certainly love if someone had a batter suggestion.
-> > 
-> > Define ACPI_GENERIC_SLEEP in drivers/acpi/Kconfig as
-> > 
-> > 	config ACPI_GENERIC_SLEEP
-> > 		bool
-> > 		depends on IA64 || X86
-> > 
-> > and build the file conditional on that.
-> 
-> Or define
-> 
-> 	config ACPI_GENERIC_SLEEP
-> 		bool
-> 
-> and then make both x86 and ia64 do
-> 
-> 	select ACPI_GENERIC_SLEEP if ACPI
-> 
-> which kind of will make it clear where the choice takes place.
+On Fri, Mar 6, 2015 at 12:06 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> [...]
+>
+>> > The request_irq path never results in a call to chip->irq_set_wake(),
+>> > even with the IRQF_NO_SUSPEND flag. So requesting an irq with
+>> > IRQF_NO_SUSPEND does not guarantee wakeup; it only guarantees that the
+>> > CPU can take the interrupt _around_ the suspended state, not necessarily
+>> > while _in_ the suspended state.
+>>
+>> Right.  "Suspended state" meaning full suspend here I suppose?
+>
+> Yes; any state deeper than suspend-to-idle.
+>
+> [...]
+>
+>> > We seem to be conflating some related properties:
+>> >
+>> > [a] The IRQ will be left unmasked.
+>> > [b] The IRQ will be handled immediately when taken.
+>> > [c] The IRQ will wake the system from suspend.
+>> >
+>> > Requesting an IRQ with IRQF_NO_SUSPEND guarantees [a,b], but does not
+>> > guarantee [c].
+>>
+>> That's correct.  IRQF_NO_SUSPEND does not guarantee that interrupts from
+>> that IRQ will have any effect after arch_suspend_disable_irqs() in
+>> suspend_enter().
+>
+> [...]
+>
+>> > It sounds like for this kind of watchdog device we want [a,b,c], even if
+>> > the IRQ is not shared with an IRQF_NO_SUSPEND user.
+>>
+>> We can't guarantee that, though.  arch_suspend_disable_irqs() disables
+>> interrupts on the last working CPU and it won't get any.  It may be
+>> brought out of a low-power state by a pending interrupt, but it won't act
+>> upon that interrupt immediately anyway, only after the arch_suspend_enable_irqs()
+>> in suspend_enter().
+>
+> Ok, so [b] needs the caveat that it's only handled "immediately" outside
+> of the arch_suspend_disable_irqs() ... arch_suspend_enable_irqs()
+> section.
+>
+>> But then it might as well be deferred until after
+>> resume_device_irqs().
+>
+> That was my original line of thinking, in which case the watchdog driver
+> should use IRQF_COND_SUSPEND rather than IRQF_NO_SUSPEND, with
+> enable_irq_wake() if we care about the watchdog during suspend. I'm
+> happy with this.
+>
+> Considering that the use-case of a watchdog is to alert us to something
+> going hideously wrong in the kernel, we want to handle the IRQ after
+> executing the smallest amount of kernel code possible. For that, they
+> need to have their handlers to be called "immediately" outside of the
+> arch_suspend_disable_irqs() ... arch_suspend_enable_irqs() window, and
+> need to be enabled during suspend to attempt to catch bad wakeup device
+> configuration.
+>
+> I think it's possible (assuming the caveats on [b] above) to provide
+> [a,b,c] for this case.
 
-While at it, use the newly defined config entry to add the required static
-inline in the respective headers and get rid of acpi_sleep.c from arm64.
+OK
 
-Thanks,
-Lorenzo
+But in this case the request_irq() passing IRQF_NO_SUSPEND *and* requiring
+enable_irq_wake() in addition to that needs a big fat comment explaining the
+whole thing or we'll forget about the gory details at one point and no one will
+know what's going on in there.
+
+Rafael
