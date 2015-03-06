@@ -1,156 +1,137 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri,  6 Mar 2015 16:05:23 +0100
-Subject: [PATCH v2 05/10] pinctrl: berlin: use the regmap provided by syscon
+Date: Fri,  6 Mar 2015 16:05:28 +0100
+Subject: [PATCH v2 10/10] ARM: berlin: rework chip and system controller nodes
+ for BG2Q
 In-Reply-To: <1425654328-26298-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1425654328-26298-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1425654328-26298-6-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1425654328-26298-11-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Berlin pin controller nodes are now sub-nodes of the soc-controller
-and the system-controller nodes. The register bank is managed by syscon,
-which provides a regmap.
+The chip and system controller nodes are now handled by the Berlin
+controller mfd driver. Its sub-devices are then registered by the mfd
+driver and let the drivers be probed properly, using their own
+sub-nodes.
 
-Remove the regmap setup from the Berlin pinctrl driver and use the one
-provided by syscon.
+Rework the device tree to take this changes into account.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/pinctrl/berlin/berlin-bg2.c   | 22 ----------------------
- drivers/pinctrl/berlin/berlin-bg2cd.c | 22 ----------------------
- drivers/pinctrl/berlin/berlin-bg2q.c  | 22 ----------------------
- drivers/pinctrl/berlin/berlin.c       |  9 ++++++---
- 4 files changed, 6 insertions(+), 69 deletions(-)
+ arch/arm/boot/dts/berlin2q.dtsi | 70 ++++++++++++++++++++++++-----------------
+ 1 file changed, 41 insertions(+), 29 deletions(-)
 
-diff --git a/drivers/pinctrl/berlin/berlin-bg2.c b/drivers/pinctrl/berlin/berlin-bg2.c
-index b71a6fffef1b..368ec0b9b8ba 100644
---- a/drivers/pinctrl/berlin/berlin-bg2.c
-+++ b/drivers/pinctrl/berlin/berlin-bg2.c
-@@ -233,28 +233,6 @@ static int berlin2_pinctrl_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *match =
- 		of_match_device(berlin2_pinctrl_match, &pdev->dev);
--	struct regmap_config *rmconfig;
--	struct regmap *regmap;
--	struct resource *res;
--	void __iomem *base;
--
--	rmconfig = devm_kzalloc(&pdev->dev, sizeof(*rmconfig), GFP_KERNEL);
--	if (!rmconfig)
--		return -ENOMEM;
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(base))
--		return PTR_ERR(base);
--
--	rmconfig->reg_bits = 32,
--	rmconfig->val_bits = 32,
--	rmconfig->reg_stride = 4,
--	rmconfig->max_register = resource_size(res);
--
--	regmap = devm_regmap_init_mmio(&pdev->dev, base, rmconfig);
--	if (IS_ERR(regmap))
--		return PTR_ERR(regmap);
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index be5397288d24..006d382d44ff 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -127,7 +127,7 @@
+ 			compatible = "marvell,berlin2-usb-phy";
+ 			reg = <0xa2f400 0x128>;
+ 			#phy-cells = <0>;
+-			resets = <&chip 0x104 14>;
++			resets = <&chip_rst 0x104 14>;
+ 			status = "disabled";
+ 		};
  
- 	return berlin_pinctrl_probe(pdev, match->data);
- }
-diff --git a/drivers/pinctrl/berlin/berlin-bg2cd.c b/drivers/pinctrl/berlin/berlin-bg2cd.c
-index 19ac5a22c947..6b9cae029ef7 100644
---- a/drivers/pinctrl/berlin/berlin-bg2cd.c
-+++ b/drivers/pinctrl/berlin/berlin-bg2cd.c
-@@ -176,28 +176,6 @@ static int berlin2cd_pinctrl_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *match =
- 		of_match_device(berlin2cd_pinctrl_match, &pdev->dev);
--	struct regmap_config *rmconfig;
--	struct regmap *regmap;
--	struct resource *res;
--	void __iomem *base;
--
--	rmconfig = devm_kzalloc(&pdev->dev, sizeof(*rmconfig), GFP_KERNEL);
--	if (!rmconfig)
--		return -ENOMEM;
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(base))
--		return PTR_ERR(base);
--
--	rmconfig->reg_bits = 32,
--	rmconfig->val_bits = 32,
--	rmconfig->reg_stride = 4,
--	rmconfig->max_register = resource_size(res);
--
--	regmap = devm_regmap_init_mmio(&pdev->dev, base, rmconfig);
--	if (IS_ERR(regmap))
--		return PTR_ERR(regmap);
+@@ -145,7 +145,7 @@
+ 			compatible = "marvell,berlin2-usb-phy";
+ 			reg = <0xb74000 0x128>;
+ 			#phy-cells = <0>;
+-			resets = <&chip 0x104 12>;
++			resets = <&chip_rst 0x104 12>;
+ 			status = "disabled";
+ 		};
  
- 	return berlin_pinctrl_probe(pdev, match->data);
- }
-diff --git a/drivers/pinctrl/berlin/berlin-bg2q.c b/drivers/pinctrl/berlin/berlin-bg2q.c
-index bd9662e57ad3..11aa10cc0e3e 100644
---- a/drivers/pinctrl/berlin/berlin-bg2q.c
-+++ b/drivers/pinctrl/berlin/berlin-bg2q.c
-@@ -395,28 +395,6 @@ static int berlin2q_pinctrl_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *match =
- 		of_match_device(berlin2q_pinctrl_match, &pdev->dev);
--	struct regmap_config *rmconfig;
--	struct regmap *regmap;
--	struct resource *res;
--	void __iomem *base;
--
--	rmconfig = devm_kzalloc(&pdev->dev, sizeof(*rmconfig), GFP_KERNEL);
--	if (!rmconfig)
--		return -ENOMEM;
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(base))
--		return PTR_ERR(base);
--
--	rmconfig->reg_bits = 32,
--	rmconfig->val_bits = 32,
--	rmconfig->reg_stride = 4,
--	rmconfig->max_register = resource_size(res);
--
--	regmap = devm_regmap_init_mmio(&pdev->dev, base, rmconfig);
--	if (IS_ERR(regmap))
--		return PTR_ERR(regmap);
+@@ -359,22 +359,30 @@
+ 			};
+ 		};
  
- 	return berlin_pinctrl_probe(pdev, match->data);
- }
-diff --git a/drivers/pinctrl/berlin/berlin.c b/drivers/pinctrl/berlin/berlin.c
-index 7f0b0f93242b..2e3a8b8858ec 100644
---- a/drivers/pinctrl/berlin/berlin.c
-+++ b/drivers/pinctrl/berlin/berlin.c
-@@ -12,6 +12,7 @@
+-		chip: chip-control at ea0000 {
+-			compatible = "marvell,berlin2q-chip-ctrl";
+-			#clock-cells = <1>;
+-			#reset-cells = <2>;
++		chip: chip-controller at ea0000 {
++			compatible = "marvell,berlin2q-chip-ctrl", "simple-mfd", "syscon";
+ 			reg = <0xea0000 0x400>, <0xdd0170 0x10>;
++			#clock-cells = <1>;
+ 			clocks = <&refclk>;
+ 			clock-names = "refclk";
  
- #include <linux/io.h>
- #include <linux/module.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_device.h>
-@@ -295,13 +296,15 @@ int berlin_pinctrl_probe(struct platform_device *pdev,
- 			 const struct berlin_pinctrl_desc *desc)
- {
- 	struct device *dev = &pdev->dev;
-+	struct device_node *parent_np = of_get_parent(dev->of_node);
- 	struct berlin_pinctrl *pctrl;
- 	struct regmap *regmap;
- 	int ret;
+-			twsi0_pmux: twsi0-pmux {
+-				groups = "G6";
+-				function = "twsi0";
++			soc_pinctrl: pin-controller {
++				compatible = "marvell,berlin2q-soc-pinctrl";
++
++				twsi0_pmux: twsi0-pmux {
++					groups = "G6";
++					function = "twsi0";
++				};
++
++				twsi1_pmux: twsi1-pmux {
++					groups = "G7";
++					function = "twsi1";
++				};
+ 			};
  
--	regmap = dev_get_regmap(&pdev->dev, NULL);
--	if (!regmap)
--		return -ENODEV;
-+	regmap = syscon_node_to_regmap(parent_np);
-+	of_node_put(parent_np);
-+	if (IS_ERR(regmap))
-+		return PTR_ERR(regmap);
+-			twsi1_pmux: twsi1-pmux {
+-				groups = "G7";
+-				function = "twsi1";
++			chip_rst: reset {
++				compatible = "marvell,berlin2-reset";
++				#reset-cells = <2>;
+ 			};
+ 		};
  
- 	pctrl = devm_kzalloc(dev, sizeof(*pctrl), GFP_KERNEL);
- 	if (!pctrl)
+@@ -525,28 +533,32 @@
+ 				};
+ 			};
+ 
+-			sysctrl: pin-controller at d000 {
+-				compatible = "marvell,berlin2q-system-ctrl";
++			sysctrl: system-controller at d000 {
++				compatible = "marvell,berlin2q-system-ctrl", "simple-mfd", "syscon";
+ 				reg = <0xd000 0x100>;
+ 
+-				uart0_pmux: uart0-pmux {
+-					groups = "GSM12";
+-					function = "uart0";
+-				};
++				sys_pinctrl: pin-controller {
++					compatible = "marvell,berlin2q-system-pinctrl";
+ 
+-				uart1_pmux: uart1-pmux {
+-					groups = "GSM14";
+-					function = "uart1";
+-				};
++					uart0_pmux: uart0-pmux {
++						groups = "GSM12";
++						function = "uart0";
++					};
+ 
+-				twsi2_pmux: twsi2-pmux {
+-					groups = "GSM13";
+-					function = "twsi2";
+-				};
++					uart1_pmux: uart1-pmux {
++						groups = "GSM14";
++						function = "uart1";
++					};
++
++					twsi2_pmux: twsi2-pmux {
++						groups = "GSM13";
++						function = "twsi2";
++					};
+ 
+-				twsi3_pmux: twsi3-pmux {
+-					groups = "GSM14";
+-					function = "twsi3";
++					twsi3_pmux: twsi3-pmux {
++						groups = "GSM14";
++						function = "twsi3";
++					};
+ 				};
+ 			};
+ 
 -- 
 2.3.1
