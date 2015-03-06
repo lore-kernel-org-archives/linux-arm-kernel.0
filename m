@@ -1,39 +1,37 @@
-From: wuyun.wu@huawei.com (Yun Wu)
-Date: Fri, 6 Mar 2015 12:13:21 +0800
-Subject: [PATCH v4 3/5] irqchip: gicv3-its: add limitation to page order
-In-Reply-To: <1425615203-3300-1-git-send-email-wuyun.wu@huawei.com>
-References: <1425615203-3300-1-git-send-email-wuyun.wu@huawei.com>
-Message-ID: <1425615203-3300-4-git-send-email-wuyun.wu@huawei.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 6 Mar 2015 04:26:09 +0000 (UTC)
+Subject: [PATCH 2/4] ARM: OMAP2+: AM43xx hwmod: Add RTC hwmod for
+ AM43xx
+In-Reply-To: <1425561211-31003-3-git-send-email-d-gerlach@ti.com>
+References: <1425561211-31003-1-git-send-email-d-gerlach@ti.com>
+ <1425561211-31003-3-git-send-email-d-gerlach@ti.com>
+Message-ID: <alpine.DEB.2.02.1503060425590.5613@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When required size of Device Table is out of the page allocator's
-capability, the whole ITS will fail in probing. This actually is
-not the hardware's problem and is mainly a limitation of the kernel
-page allocator. This patch will keep ITS going on to the next
-initializaion stage with an explicit warning.
+On Thu, 5 Mar 2015, Dave Gerlach wrote:
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 5 +++++
- 1 file changed, 5 insertions(+)
+> RTC hwmod is needed for proper operation of PM features like
+> rtcwake and rtc-only mode so reuse the am33xx rtc hwmod.
+> 
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> index 8eb8592..9070535 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> @@ -889,6 +889,7 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+>  	&am43xx_l4_ls__dss,
+>  	&am43xx_l4_ls__dss_dispc,
+>  	&am43xx_l4_ls__dss_rfbi,
+> +	&am33xx_l4_wkup__rtc,
+>  	NULL,
+>  };
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index f5bfa42..e8bda0b 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -828,6 +828,11 @@ static int its_alloc_tables(struct its_node *its)
- 			u32 ids = GITS_TYPER_DEVBITS(typer);
+Thanks, queued for v4.1.
 
- 			order = get_order((1UL << ids) * entry_size);
-+			if (order >= MAX_ORDER) {
-+				order = MAX_ORDER - 1;
-+				pr_warn("%s: Device Table too large, reduce its page order to %u\n",
-+					its->msi_chip.of_node->full_name, order);
-+			}
- 		}
 
- 		alloc_size = (1 << order) * PAGE_SIZE;
---
-1.8.0
+- Paul
