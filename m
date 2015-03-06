@@ -1,56 +1,75 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 06 Mar 2015 20:24:00 +0000
-Subject: [PATCH v9 04/21] ARM64: allow late use of early_ioremap
-In-Reply-To: <1424853601-6675-5-git-send-email-hanjun.guo@linaro.org>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <1424853601-6675-5-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150306202400.7EF9BC40AA9@trevor.secretlab.ca>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 6 Mar 2015 21:25:36 +0100 (CET)
+Subject: [PATCH 3/3] media: atmel-isi: remove mck back compatiable code
+ as we don't need it
+In-Reply-To: <54F97DDF.7010403@atmel.com>
+References: <1425531661-20040-1-git-send-email-josh.wu@atmel.com>
+ <1425531661-20040-4-git-send-email-josh.wu@atmel.com>
+ <3743731.I7IKcDRdB6@avalon> <54F97DDF.7010403@atmel.com>
+Message-ID: <Pine.LNX.4.64.1503062124450.20271@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Feb 2015 16:39:44 +0800
-, Hanjun Guo <hanjun.guo@linaro.org>
- wrote:
-> From: Mark Salter <msalter@redhat.com>
-> 
-> Commit 0e63ea48b4d8 (arm64/efi: add missing call to early_ioremap_reset())
-> added a missing call to early_ioremap_reset(). This triggers a BUG if code
-> tries using early_ioremap() after the early_ioremap_reset(). This is a
-> problem for some ACPI code which needs short-lived temporary mappings
-> after paging_init() but before acpi_early_init() in start_kernel(). This
-> patch adds definitions for the __late_set_fixmap() and __late_clear_fixmap()
-> which avoids the BUG by allowing later use of early_ioremap().
-> 
-> CC: Leif Lindholm <leif.lindholm@linaro.org>
-> CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-> Tested-by: Jon Masters <jcm@redhat.com>
-> Tested-by: Robert Richter <rrichter@cavium.com>
-> Acked-by: Robert Richter <rrichter@cavium.com>
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Hi Josh, Laurent,
 
-Reviewed-by: Grant Likely <grant.likely@linaro.org>
+On Fri, 6 Mar 2015, Josh Wu wrote:
 
-> ---
->  arch/arm64/include/asm/fixmap.h | 3 +++
->  1 file changed, 3 insertions(+)
+> On 3/5/2015 6:41 PM, Laurent Pinchart wrote:
+> > Hi Josh,
+> > 
+> > Thank you for the patch.
+> > 
+> > On Thursday 05 March 2015 13:01:01 Josh Wu wrote:
+> > > The master clock should handled by sensor itself.
+> > I like that :-)
+> > 
+> > > Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> > > ---
+> > > 
+> > >   drivers/media/platform/soc_camera/atmel-isi.c | 32
+> > > ------------------------
+> > >   1 file changed, 32 deletions(-)
+> > > 
+> > > diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
+> > > b/drivers/media/platform/soc_camera/atmel-isi.c index 4a384f1..50375ce
+> > > 100644
+> > > --- a/drivers/media/platform/soc_camera/atmel-isi.c
+> > > +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+> > > @@ -83,8 +83,6 @@ struct atmel_isi {
+> > >   	struct completion		complete;
+> > >   	/* ISI peripherial clock */
+> > >   	struct clk			*pclk;
+> > > -	/* ISI_MCK, feed to camera sensor to generate pixel clock */
+> > > -	struct clk			*mck;
+> > >   	unsigned int			irq;
+> > > 
+> > >   	struct isi_platform_data	pdata;
+> > > @@ -725,26 +723,12 @@ static void isi_camera_remove_device(struct
+> > > soc_camera_device *icd) /* Called with .host_lock held */
+> > >   static int isi_camera_clock_start(struct soc_camera_host *ici)
+> > >   {
+> > > -	struct atmel_isi *isi = ici->priv;
+> > > -	int ret;
+> > > -
+> > > -	if (!IS_ERR(isi->mck)) {
+> > > -		ret = clk_prepare_enable(isi->mck);
+> > > -		if (ret) {
+> > > -			return ret;
+> > > -		}
+> > > -	}
+> > > -
+> > >   	return 0;
+> > Would it make sense to make the clock_start and clock_stop operations
+> > optional
+> > in the soc-camera core ?
+> I agree. For those camera host which don't provide master clock for sensor,
+> clock_start and clock_stop should be optional.
 > 
-> diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-> index defa0ff9..f196e40 100644
-> --- a/arch/arm64/include/asm/fixmap.h
-> +++ b/arch/arm64/include/asm/fixmap.h
-> @@ -62,6 +62,9 @@ void __init early_fixmap_init(void);
->  
->  #define __early_set_fixmap __set_fixmap
->  
-> +#define __late_set_fixmap __set_fixmap
-> +#define __late_clear_fixmap(idx) __set_fixmap((idx), 0, FIXMAP_PAGE_CLEAR)
-> +
->  extern void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
->  
->  #include <asm-generic/fixmap.h>
-> -- 
-> 1.9.1
+> Hi, Guennadi
 > 
+> Do you agree with this?
+
+Yes, sure, we can do this. Would anyone like to prepare a patch?
+
+Thanks
+Guennadi
