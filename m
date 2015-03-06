@@ -1,72 +1,48 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Fri, 6 Mar 2015 12:58:33 +0000
-Subject: [PATCHv6 1/3] arm: make __get_user() work for 8 byte values
-In-Reply-To: <1425646715-20834-1-git-send-email-david.vrabel@citrix.com>
-References: <1425646715-20834-1-git-send-email-david.vrabel@citrix.com>
-Message-ID: <1425646715-20834-2-git-send-email-david.vrabel@citrix.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 6 Mar 2015 13:10:26 +0000
+Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
+ IRQF_NO_SUSPEND
+In-Reply-To: <CAJZ5v0jA-hRUnP_+mOdFw7vN7CGZ4o0FjUVu81rq7foi92f63g@mail.gmail.com>
+References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
+ <CAJZ5v0h8vn26BeWPVhC4e_KNhBu15-mshnbq0K=OQ1M36vPQEQ@mail.gmail.com>
+ <20150305163227.GF14093@leverpostej>
+ <1696230.CygTkv53VA@vostro.rjw.lan>
+ <20150306110618.GC8700@leverpostej>
+ <CAJZ5v0jA-hRUnP_+mOdFw7vN7CGZ4o0FjUVu81rq7foi92f63g@mail.gmail.com>
+Message-ID: <20150306131025.GH8700@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-get_user(), __put_user(), and put_user() all worked with 8-byte values
-but __get_user() did not.
+> >> > We seem to be conflating some related properties:
+> >> >
+> >> > [a] The IRQ will be left unmasked.
+> >> > [b] The IRQ will be handled immediately when taken.
+> >> > [c] The IRQ will wake the system from suspend.
 
-Signed-off-by: David Vrabel <david.vrabel@citrix.com>
----
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/include/asm/uaccess.h |   32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+[...]
 
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index ce0786e..d8f535b 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -306,6 +306,7 @@ do {									\
- 	case 1:	__get_user_asm_byte(__gu_val, __gu_addr, err);	break;	\
- 	case 2:	__get_user_asm_half(__gu_val, __gu_addr, err);	break;	\
- 	case 4:	__get_user_asm_word(__gu_val, __gu_addr, err);	break;	\
-+	case 8:	__get_user_asm_dword(__gu_val, __gu_addr, err);	break;	\
- 	default: (__gu_val) = __get_user_bad();				\
- 	}								\
- 	(x) = (__typeof__(*(ptr)))__gu_val;				\
-@@ -365,6 +366,37 @@ do {									\
- 	: "r" (addr), "i" (-EFAULT)				\
- 	: "cc")
- 
-+#ifndef __ARMEB__
-+#define	__reg_get0	"%R1"
-+#define	__reg_get1	"%Q1"
-+#else
-+#define	__reg_get0	"%Q1"
-+#define	__reg_get1	"%R1"
-+#endif
-+
-+#define __get_user_asm_dword(x, addr, err)			\
-+	__asm__ __volatile__(					\
-+ ARM(	"1:	" TUSER(ldr) "	" __reg_get1 ", [%2], #4\n"	) \
-+ ARM(	"2:	" TUSER(ldr) "	" __reg_get0 ", [%2]\n"	) \
-+ THUMB(	"1:	" TUSER(ldr) "	" __reg_get1 ", [%2]\n"	) \
-+ THUMB(	"2:	" TUSER(ldr) "	" __reg_get0 ", [%2, #4]\n"	) \
-+	"3:\n"							\
-+	"	.pushsection .fixup,\"ax\"\n"			\
-+	"	.align	2\n"					\
-+	"4:	mov	%0, %3\n"				\
-+	"	mov	" __reg_get1 ", #0\n"			\
-+	"	mov	" __reg_get0 ", #0\n"			\
-+	"	b	3b\n"					\
-+	"	.popsection\n"					\
-+	"	.pushsection __ex_table,\"a\"\n"		\
-+	"	.align	3\n"					\
-+	"	.long	1b, 4b\n"				\
-+	"	.long	2b, 4b\n"				\
-+	"	.popsection"					\
-+	: "+r" (err), "=&r" (x)					\
-+	: "r" (addr), "i" (-EFAULT)				\
-+	: "cc")
-+
- #define __put_user(x, ptr)						\
- ({									\
- 	long __pu_err = 0;						\
--- 
-1.7.10.4
+> > Considering that the use-case of a watchdog is to alert us to something
+> > going hideously wrong in the kernel, we want to handle the IRQ after
+> > executing the smallest amount of kernel code possible. For that, they
+> > need to have their handlers to be called "immediately" outside of the
+> > arch_suspend_disable_irqs() ... arch_suspend_enable_irqs() window, and
+> > need to be enabled during suspend to attempt to catch bad wakeup device
+> > configuration.
+> >
+> > I think it's possible (assuming the caveats on [b] above) to provide
+> > [a,b,c] for this case.
+> 
+> OK
+> 
+> But in this case the request_irq() passing IRQF_NO_SUSPEND *and* requiring
+> enable_irq_wake() in addition to that needs a big fat comment explaining the
+> whole thing or we'll forget about the gory details at one point and no one will
+> know what's going on in there.
+
+Agreed.
+
+I'd expect an IRQF_SW_WATCHDOG or something to that effect should also
+be required for that case.
+
+Thanks,
+Mark.
