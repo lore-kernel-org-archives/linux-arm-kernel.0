@@ -1,112 +1,56 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 6 Mar 2015 16:08:46 +0100
-Subject: [PATCH] pinctrl: dt: at91: new binding
-In-Reply-To: <1424943294-8805-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1424943294-8805-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <54F9C2FE.8060804@atmel.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 06 Mar 2015 10:09:36 -0500
+Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,msm-id
+ and qcom,board-id
+In-Reply-To: <CAF6AEGssMoo6c3nf_7fcATwocuETGZ8nbpGQpUO=KcKWC+rvHw@mail.gmail.com>
+References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>	<7h8ufbjkod.fsf@deeprootsystems.com>	<07D4E4D1-BF8C-4583-9505-9F321DB10406@codeaurora.org>	<CAOesGMgy3VY=4-t+N0BYqCuSLQkh-rYe8nd9iJh1mMeBFz_sWQ@mail.gmail.com>
+ <CAF6AEGssMoo6c3nf_7fcATwocuETGZ8nbpGQpUO=KcKWC+rvHw@mail.gmail.com>
+Message-ID: <54F9C330.5090208@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 26/02/2015 10:34, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
-> Today if we want to disable a pio bank we may will siliently break pinctrl
-> configuration in the DT. This will be detected only at runtime.
+On 03/05/2015 09:28 PM, Rob Clark wrote:
+> On Thu, Mar 5, 2015 at 8:59 PM, Olof Johansson <olof@lixom.net> wrote:
+>> On Thu, Mar 5, 2015 at 12:23 PM, Kumar Gala <galak@codeaurora.org> wrote:
+>>>
+>>> On Mar 5, 2015, at 1:42 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>>>
+>>>> Kumar Gala <galak@codeaurora.org> writes:
+>>>>
+>>>>> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
+>>>>> on Qualcomm MSM platforms to determine which device tree should be
+>>>>> utilized and passed to the kernel.
+>>>>>
+>>>>> Cc: <devicetree@vger.kernel.org>
+>>>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+>>>>
+>>>> Is this the special magic that allows qcom bootloaders to take a kernel
+>>>> plus multiple DTBs and figure out which DTB to pass?
+>>>>
+>>>> Kevin
+>>>
+>>> yes
+>>
+>> That's a bummer.
+>>
+>> Luckily, the solution for upstream is still quite simple: Provide only
+>> one devicetree, and it'll be used, right?
+>>
 > 
-> So move the pinctrl configuration to the bank instead of the bus.
-> This allow to detect pinctrl issue at DT compiling time when disable a bank.
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: devicetree at vger.kernel.org
-> ---
->  .../bindings/pinctrl/atmel,at91-pinctrl.txt        | 66 ++++++++++++++++++++++
->  1 file changed, 66 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
-> index b7a93e8..78355ee 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
-> @@ -148,3 +148,69 @@ dbgu: serial at fffff200 {
->  	pinctrl-0 = <&pinctrl_dbgu>;
->  	status = "disabled";
->  };
-> +
-> +II) New Bindings per PIO Block
+> I never managed to figure out how to get that to work (at least on my
+> apq8074 dragonboard.. fortunately ifc6540 seems to work w/ appended
+> dtb).. kind of a pita because it is a bit of a non-standard boot.img
+> format too..
 
-Sorry but NACK.
+I think you're talking about the boot flow from plain poweron which I wish I
+knew more about, but in case it's any help, here are some fastboot boot steps
+what worked for me a while back.
 
-I don't want to manage another flavor of the pinmux biding with no real
-benefit. I would have been good if we had it from day-1. Now it's too late.
+http://elinux.org/Dragonboard/APQ8074
 
-Moreover, splitting a binding definition if you have a function given by
-multiple banks can be weird and not well understood in regard to our
-current group+function definition scheme (Cf. your last example).
+Chris
 
-
-> +This allow to detect pinctrl issue at DT compiling time when disable a bank
-> +
-> +Required properties for iomux controller:
-> +- compatible: "atmel,at91rm9200-pio-pinctrl" or "atmel,at91sam9x5-pio-pinctrl"
-> +		or "atmel,sama5d3-pio-pinctrl"
-> +- atmel,mux-mask: array of mask (periph per bank) to describe if a pin can be
-> +  configured in this periph mode. All the periph and bank need to be describe.
-> +
-> +How to create such array:
-> +
-> +Each column will represent the possible peripheral of the pinctrl for the bank
-> +
-> +Take an example on the 9260
-> +Peripheral: 2 ( A and B)
-> +=>
-> +
-> +  /*    A         B     */
-> +  0xffffffff 0xffc00c3b  /* pioA */
-> +
-> +For each peripheral/bank we will descibe in a u32 if a pin can be
-> +configured in it by putting 1 to the pin bit (1 << pin)
-> +
-> +Required properties for pin configuration node:
-> +- atmel,pins: 3 integers array, represents a group of pins mux and config
-> +  setting. The format is atmel,pins = <PIN_NUM PERIPH CONFIG>.
-> +  The PERIPH 0 means gpio, PERIPH 1 is periph A, PERIPH 2 is periph B...
-> +
-> +Bits used for CONFIG:
-> +cf atmel,at91-pinctrl
-> +
-> +pioB: gpio at fffff600 {
-> +	compatible = "atmel,at91rm9200-gpio", "atmel,at91rm9200-pio-pinctrl";
-> +	reg = <0xfffff600 0x200>;
-> +	interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
-> +	#gpio-cells = <2>;
-> +	gpio-controller;
-> +	interrupt-controller;
-> +	#interrupt-cells = <2>;
-> +	clocks = <&pioB_clk>;
-> +
-> +			 /*    A         B     */
-> +	atmel,mux-mask = <0xffffffff 0x7fff3ccf>;
-> +
-> +	dbgu {
-> +		pinctrl_dbgu: dbgu-0 {
-> +			atmel,pins =
-> +				<14 0x1 0x0	/* PB14 periph A */
-> +				 15 0x1 0x1>;	/* PB15 periph A with pullup */
-> +		};
-> +	};
-> +};
-> +
-> +dbgu: serial at fffff200 {
-> +	compatible = "atmel,at91sam9260-usart";
-> +	reg = <0xfffff200 0x200>;
-> +	interrupts = <1 4 7>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_dbgu>;
-> +	status = "disabled";
-> +};
-> +
-> +if you have to use multiple bank
-> +	pinctrl-0 = <&pinctrl_ip_piaa>, <&pinctrl_ip_piab>;
-> 
-
-Best regards,
 -- 
-Nicolas Ferre
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
