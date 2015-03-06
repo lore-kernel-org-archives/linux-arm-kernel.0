@@ -1,78 +1,37 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 5 Mar 2015 08:34:00 -0400
-Subject: [GIT PULL 2/2] Samsung fixes-2 for v4.0
-In-Reply-To: <02cd01d057f6$ab1a8e40$014faac0$@kernel.org>
-References: <54F4B33E.3070803@kernel.org> <2064108.qlOP0oDx90@wuerfel>
- <02cd01d057f6$ab1a8e40$014faac0$@kernel.org>
-Message-ID: <20150305123358.GC25728@developer.hsd1.ca.comcast.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 06 Mar 2015 11:44:05 -0800
+Subject: [PATCH 0/3] clk: divider: three exactness fixes (and a rant)
+In-Reply-To: <20150306185730.11109.45998@quantum>
+References: <20150221085620.GV19388@pengutronix.de>
+ <1424515225-6929-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20150306185730.11109.45998@quantum>
+Message-ID: <54FA0385.2060808@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 06, 2015 at 07:16:53PM +0900, Kukjin Kim wrote:
-> Arnd Bergmann wrote:
-> > 
-> + Eduardo
-> 
-> Hi Arnd,
-> 
-> > On Tuesday 03 March 2015 04:00:14 Kukjin Kim wrote:
-> > > Please pull Samsung tmu and hdmi regression fixes for v4.0 and I know
-> > > this is quite big for fixes but I couldn't handle this series for
-> > > previous merge window because of dependency with driver side...sorry for
-> > > that and please pull so that we could support them in v4.0 on exynos
-> > > platforms.
-> > 
-> > What kind of dependency do you have there? It really should not be
-> > necessary to wait for driver changes, unless you do an incompatible
-> > DT binding change, which you should avoid.
-> > 
-> For TMU patches, I've asked Eduardo to provide topic branch for
-> 'include/dt-bindings/thermal/thermal_exynos.h' has been added via thermal tree
-> because if I can't apply the patch in Samsung tree for arm-soc, kernel build
-> breakage will be happened. But I couldn't get Eduardo's topic branch.
+On 03/06/15 10:57, Mike Turquette wrote:
+>
+> Uwe,
+>
+> Thanks for the fixes. I'm thinking of taking all three for 4.0. I also
+> agree on clk_round_rate_nearest (along with a _ceil and _floor version
+> as well). That's something we can do for 4.1 probably.
+>
+> There are currently 3 users of CLK_DIVIDER_ROUND_CLOSEST:
+>
+> Loongson
+> QCOM
+> ST
+>
+> So now is probably the right time to remove the flag if we're going to
+> do it.
+>
+> What do you think?
+>
 
+I may have had to do divider round closest on qcom platforms because of
+the problem these patches are for. I'll have to go back and look.
 
-Specifically, the developer, while migrating the driver to support DT
-and OF thermal, decided to create a header with constants. The header is
-used by DT files and the driver code. The header was the dependency.
-
-
-BR,
-
-Eduardo Valentin
-
-> 
-> http://www.spinics.net/lists/linux-samsung-soc/msg41877.html
-> 
-> 
-> For HDMI patches, I thought the DT changes have a dependency with "drm/exynos:
-> add support for 'hdmi' clock" so waited for its applying then in drm tree. But
-> I couldn't send it to arm-soc after that...
-> 
-> http://www.spinics.net/lists/linux-samsung-soc/msg42173.html
-> 
-> 
-> I asked about the situation (late DT changes?) when I sent a pull-request, then
-> I couldn't get a access my kernel.org because of biz. trip to China :(
-> 
-> http://www.spinics.net/lists/linux-samsung-soc/msg42235.html
-> 
-> 
-> > I've pulled it into fixes, but won't forward it until I hear a
-> > good explanation.
-> > 
-> As you know, basically I tried to make a clear branch for pull-request but in
-> that case, I couldn't find a solution. Sorry for the inconvenience.
-> 
-> I hope v4.0 can support them properly.
-> 
-> Thanks,
-> Kukjin
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150305/b70427fe/attachment.sig>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
