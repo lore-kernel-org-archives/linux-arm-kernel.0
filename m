@@ -1,53 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 Mar 2015 08:37:16 -0800
-Subject: [PATCH 0/2] ARM: DRA7x/OMAP5: Clock: DPLL Clock fixes
-In-Reply-To: <54ED79B0.4020101@ti.com>
-References: <1422724005-9415-1-git-send-email-rk@ti.com>
- <54E5FC6D.7040701@ti.com> <20150224162719.GA28244@atomide.com>
- <54ED79B0.4020101@ti.com>
-Message-ID: <20150306163715.GO13520@atomide.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 6 Mar 2015 17:44:44 +0100
+Subject: [PATCH v2 0/3] net: macb: rework at91 specific handling
+In-Reply-To: <1425637442-8724-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1425637442-8724-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <54F9D97C.3050100@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [150225 00:05]:
-> On 02/24/2015 06:27 PM, Tony Lindgren wrote:
-> >* Ravikumar Kattekola <rk@ti.com> [150219 08:13]:
-> >>On 1/31/2015 10:36 PM, Ravikumar Kattekola wrote:
-> >>>Fix bypass clock source for a few DPLLs.
-> >>>
-> >>>On DRA7x/OMAP5, for a few DPLLs, both CLKINP and CLKINPULOW are connected
-> >>>to a mux and the output from mux is routed to the bypass clkout.
-> >>>Add a mux-clock as bypass clock with CLKINP and CLKINPULOW as parents.
-> >>>
-> >>>Tested against:
-> >>>	tree: https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git
-> >>>	branch: master
-> >>>On:
-> >>>CPU  : OMAP5432 ES2.0
-> >>>Board: OMAP5432 uEVM
-> >>>and
-> >>>CPU  : DRA752 ES1.0
-> >>>Board: DRA7xx
-> >>>
-> >>>
-> >>>Ravikumar Kattekola (2):
-> >>>   ARM: DRA7x: dts: Fix the bypass clock source for dpll_iva and others
-> >>>   ARM: OMAP5: dts: Fix the bypass clock source for dpll_iva and others
-> >>>
-> >>>  arch/arm/boot/dts/dra7xx-clocks.dtsi   |   90 ++++++++++++++++++++++++++++----
-> >>>  arch/arm/boot/dts/omap54xx-clocks.dtsi |   41 +++++++++++++--
-> >>>  2 files changed, 118 insertions(+), 13 deletions(-)
-> >>>
-> >>Hi Benoit,
-> >>     Can these fixes be looked into for 3.20-rc?
-> >
-> >Seem like valid fixes to me. Tero, care to take a look at these and ack
-> >if OK?
+Le 06/03/2015 11:23, Boris Brezillon a ?crit :
+> Hello,
 > 
-> Yes, both are good to go.
+> This removes the #if defined(ARCH_AT91) sections to prevent any problem
+> when enabling ARM multi-platform support.
+> The at91 specific logic is now activated when the "at91sam9260-macb"
+> compatible string is found. 
 > 
-> Acked-by: Tero Kristo <t-kristo@ti.com>
+> Best Regards,
+> 
+> Boris
 
-Applying both into omap-for-v4.0/fixes thanks.
+I'm okay with the whole series:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Tony 
+> 
+> Changes since v1:
+> - avoid changing existing behavior as Alexandre suggested
+> 
+> Boris Brezillon (3):
+>   net/macb: Update DT bindings documentation
+>   ARM: at91/dt: fix macb compatible strings
+>   net: macb: remove #if defined(CONFIG_ARCH_AT91) sections
+> 
+>  Documentation/devicetree/bindings/net/macb.txt |  5 +++-
+>  arch/arm/boot/dts/at91sam9260.dtsi             |  2 +-
+>  arch/arm/boot/dts/at91sam9263.dtsi             |  2 +-
+>  arch/arm/boot/dts/at91sam9g45.dtsi             |  2 +-
+>  arch/arm/boot/dts/at91sam9x5_macb0.dtsi        |  2 +-
+>  arch/arm/boot/dts/at91sam9x5_macb1.dtsi        |  2 +-
+>  arch/arm/boot/dts/sama5d3_emac.dtsi            |  2 +-
+>  drivers/net/ethernet/cadence/macb.c            | 32 ++++++++++++++------------
+>  drivers/net/ethernet/cadence/macb.h            |  2 ++
+>  9 files changed, 29 insertions(+), 22 deletions(-)
+> 
+
+
+-- 
+Nicolas Ferre
