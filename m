@@ -1,61 +1,61 @@
-From: dave.long@linaro.org (David Long)
-Date: Fri, 06 Mar 2015 09:42:59 -0500
-Subject: [PATCH v5 4/6] arm64: kprobes instruction simulation support
-In-Reply-To: <CAPvkgC1Af0ox8cujTyd0bCYWvJVqyXh-vsRZJ7FG4Zdw1SzEmg@mail.gmail.com>
-References: <1424214701-4899-1-git-send-email-dave.long@linaro.org>	<1424214701-4899-5-git-send-email-dave.long@linaro.org>
- <CAPvkgC1Af0ox8cujTyd0bCYWvJVqyXh-vsRZJ7FG4Zdw1SzEmg@mail.gmail.com>
-Message-ID: <54F9BCF3.1060609@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 06 Mar 2015 17:48:53 +0300
+Subject: [PATCH 3/5] dt-bindings: mediatek: Add smi dts binding
+In-Reply-To: <1425638900-24989-4-git-send-email-yong.wu@mediatek.com>
+References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
+ <1425638900-24989-4-git-send-email-yong.wu@mediatek.com>
+Message-ID: <54F9BE55.90601@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/15 06:39, Steve Capper wrote:
-> On 17 February 2015 at 23:11, David Long <dave.long@linaro.org> wrote:
->> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
->>
->> Kprobes needs simulation of instructions that cannot be stepped
->> from different memory location, e.g.: those instructions
->> that uses PC-relative addressing. In simulation, the behaviour
->> of the instruction is implemented using a copy of pt_regs.
->>
->> Following instruction catagories are simulated:
->>   - All branching instructions(conditional, register, and immediate)
->>   - Literal access instructions(load-literal, adr/adrp)
->>
->> Conditional execution is limited to branching instructions in
->> ARM v8. If conditions at PSTATE do not match the condition fields
->> of opcode, the instruction is effectively NOP. Kprobes considers
->> this case as 'miss'.
->>
->> Thanks to Will Cohen for assorted suggested changes.
->>
->> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
->> Signed-off-by: William Cohen <wcohen@redhat.com>
->> Signed-off-by: David A. Long <dave.long@linaro.org>
->> ---
->
-> Hi,
-> Apologies for looking at these late (I was on holiday).
->
-> I've applied this series on top of 3.19, but I get the following compile error:
-> arch/arm64/kernel/kprobes-arm64.c:23:34: fatal error:
-> probes-simulate-insn.h: No such file or directory
->   #include "probes-simulate-insn.h"
->                                    ^
-> compilation terminated.
-> scripts/Makefile.build:257: recipe for target
-> 'arch/arm64/kernel/kprobes-arm64.o' failed
->
-> Is something missing from this patch?
->
-> Cheers,
-> --
-> Steve
->
+Hello.
 
-Yes Steve, the patch is missing three new files.  It passed my testing 
-because I had not cleaned out non-checked-in files from my cloned repo. 
-  I've put a preliminary version of a v6 patch that addresses other 
-feedback in my own public repo, and will send out a new patch in the 
-near future after more testing and additional tweaks.
+On 3/6/2015 1:48 PM, yong.wu at mediatek.com wrote:
 
--dl
+> From: Yong Wu <yong.wu@mediatek.com>
+
+> This patch add smi binding document.
+
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> ---
+>   .../devicetree/bindings/soc/mediatek/mediatek,smi.txt   | 17 +++++++++++++++++
+>   1 file changed, 17 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
+
+> diff --git a/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
+> new file mode 100644
+> index 0000000..0fc9d1a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
+> @@ -0,0 +1,17 @@
+> +SMI hardware block diagram please help check <bindings/iommu/mediatek,iommu.txt>
+> +
+> +Required properties:
+> +- compatible : must be "mediatek,mediatek,mt8173-smi-larb"
+
+    One "mediatek," is enough. :-)
+
+> +- reg : the register of each local arbiter
+> +- clocks : the clocks of each local arbiter
+> +- clock-name: larb_sub*(3 clockes at most)
+
+    clock-names.
+
+> +
+> +Example:
+> +	larb1:larb at 16010000 {
+> +	        compatible = "mediatek,mt8173-smi-larb";
+> +		reg = <0 0x16010000 0 0x1000>;
+> +		clocks = <&mmsys MM_SMI_COMMON>,
+> +		        <&vdecsys VDEC_CKEN>,
+
+    Please align with the < above.
+
+> +                        <&vdecsys VDEC_LARB_CKEN>;
+
+    Use tabs instead of spaces, please.
+
+> +		clock-names = "larb_sub0", "larb_sub1", "larb_sub2";
+> +	};
+
+WBR, Sergei
