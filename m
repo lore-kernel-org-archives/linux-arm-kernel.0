@@ -1,86 +1,90 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 6 Mar 2015 00:37:36 +0100
-Subject: [PATCH] ARM: at91: remove ksz8081 phy fixup registration for
- sama5d4ek board
-In-Reply-To: <20150304113523.GF3989@piout.net>
-References: <1425468012-17274-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150304113523.GF3989@piout.net>
-Message-ID: <20150305233736.GE3989@piout.net>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 06 Mar 2015 01:29:03 +0100
+Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
+ IRQF_NO_SUSPEND
+In-Reply-To: <20150305163227.GF14093@leverpostej>
+References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
+ <CAJZ5v0h8vn26BeWPVhC4e_KNhBu15-mshnbq0K=OQ1M36vPQEQ@mail.gmail.com>
+ <20150305163227.GF14093@leverpostej>
+Message-ID: <1696230.CygTkv53VA@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2015 at 12:35:23 +0100, Alexandre Belloni wrote :
-> On 04/03/2015 at 12:20:12 +0100, Boris Brezillon wrote :
-> > Commit 2b0ba96cea60 ("net: phy: micrel: disable NAND-tree for KSZ8021,
-> > KSZ8031, KSZ8051, KSZ8081") automated the NAND-tree mode deactivation
-> > process, thus making this phy fixup useless.
-> > Remove it along with the associated headers inclusion.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Thursday, March 05, 2015 04:32:27 PM Mark Rutland wrote:
+> Hi Rafael,
 > 
-
-Actually, as Rob pointed out in my patch series, please remove the
-selection of PHYLIB in the Kconfig.
-
-> > ---
-> >  arch/arm/mach-at91/sama5.c | 20 --------------------
-> >  1 file changed, 20 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
-> > index 03dcb44..23d067a 100644
-> > --- a/arch/arm/mach-at91/sama5.c
-> > +++ b/arch/arm/mach-at91/sama5.c
-> > @@ -11,13 +11,10 @@
-> >  #include <linux/init.h>
-> >  #include <linux/module.h>
-> >  #include <linux/gpio.h>
-> > -#include <linux/micrel_phy.h>
-> >  #include <linux/of.h>
-> >  #include <linux/of_irq.h>
-> >  #include <linux/of_platform.h>
-> > -#include <linux/phy.h>
-> >  #include <linux/clk-provider.h>
-> > -#include <linux/phy.h>
-> >  
-> >  #include <mach/hardware.h>
-> >  
-> > @@ -29,25 +26,8 @@
-> >  
-> >  #include "generic.h"
-> >  
-> > -static int ksz8081_phy_fixup(struct phy_device *phy)
-> > -{
-> > -	int value;
-> > -
-> > -	value = phy_read(phy, 0x16);
-> > -	value &= ~0x20;
-> > -	phy_write(phy, 0x16, value);
-> > -
-> > -	return 0;
-> > -}
-> > -
-> >  static void __init sama5_dt_device_init(void)
-> >  {
-> > -	if (of_machine_is_compatible("atmel,sama5d4ek") &&
-> > -	   IS_ENABLED(CONFIG_PHYLIB)) {
-> > -		phy_register_fixup_for_id("fc028000.etherne:00",
-> > -						ksz8081_phy_fixup);
-> > -	}
-> > -
-> >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> >  	at91sam9x5_pm_init();
-> >  }
-> > -- 
-> > 1.9.1
-> > 
+> > enable_irq_wake() has no effect on IRQF_NO_SUSPEND interrupts, so if the
+> > driver uses IRQF_NO_SUSPEND, it does not need to use enable_irq_wake()
+> > in addition to that.
 > 
-> -- 
-> Alexandre Belloni, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+> That's not generally true -- certainly not for irq_chips without the
+> IRQCHIP_SKIP_SET_WAKE flag.
+> 
+> Consider systems where the suspended state results in power to the CPU
+> being cut, and we rely on an external piece of logic attached to the
+> irq_chip to detect wakeup IRQs and restore power.
+> 
+> In those cases irq_chip::irq_set_wake() must be called to ensure that
+> the wakeup logic is configured. If the wakeup logic is not configured to
+> look out for an IRQ, then when the IRQ is asserted by a device the
+> wakeup logic may not trigger. Thus the CPU power never gets restored, so
+> the CPU cannot handle the interrupt.
+> 
+> This is handled in enable_irq_wake() -- either the chip has the
+> IRQCHIP_SKIP_SET_WAKE flag set or chip->irq_set_wake() must succeed. If
+> neither is true enable_irq_wake() will return an error code to indicate
+> we can't use the IRQ for wakeup.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Right.  I forgot about that part.
+
+> The request_irq path never results in a call to chip->irq_set_wake(),
+> even with the IRQF_NO_SUSPEND flag. So requesting an irq with
+> IRQF_NO_SUSPEND does not guarantee wakeup; it only guarantees that the
+> CPU can take the interrupt _around_ the suspended state, not necessarily
+> while _in_ the suspended state.
+
+Right.  "Suspended state" meaning full suspend here I suppose?
+
+> > Drivers using IRQF_COND_SUSPEND generally should use enable_irq_wake() too
+> > in case they end up in a situation without sharing a NO_SUSPEND interrupt, in
+> > which case their interrupt handlers won't be called after suspend_device_irqs(),
+> > so they need to rely on the core to do the wakeup.
+> > 
+> > > I agree that if problematic, it's an existing bug. Given Boris's
+> > > comments in the other thread this may just a minor semantic issue w.r.t.
+> > > IRQF_NO_SUSPEND vs IRQF_COND_SUSPEND.
+> > 
+> > It depends on whether or not the watchdog's interrupt handler has to be
+> > called immediately after receiving an interrupt (IRQF_NO_SUSPEND is
+> > better then) or it can be deferred till the resume_device_irqs() time.
+> 
+> We seem to be conflating some related properties:
+> 
+> [a] The IRQ will be left unmasked.
+> [b] The IRQ will be handled immediately when taken.
+> [c] The IRQ will wake the system from suspend.
+> 
+> Requesting an IRQ with IRQF_NO_SUSPEND guarantees [a,b], but does not
+> guarantee [c].
+
+That's correct.  IRQF_NO_SUSPEND does not guarantee that interrupts from
+that IRQ will have any effect after arch_suspend_disable_irqs() in
+suspend_enter().
+
+> A successful enable_irq_wake() on an IRQ guarantees [a,c], but usually
+> does not give [b] unless the IRQ was requested with IRQF_COND_SUSPEND
+> and happens to be shared with an IRQF_NO_SUSPEND user.
+
+That's correct too.
+
+> It sounds like for this kind of watchdog device we want [a,b,c], even if
+> the IRQ is not shared with an IRQF_NO_SUSPEND user.
+
+We can't guarantee that, though.  arch_suspend_disable_irqs() disables
+interrupts on the last working CPU and it won't get any.  It may be
+brought out of a low-power state by a pending interrupt, but it won't act
+upon that interrupt immediately anyway, only after the arch_suspend_enable_irqs()
+in suspend_enter().  But then it might as well be deferred until after
+resume_device_irqs().
+
+Rafael
