@@ -1,104 +1,52 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri,  6 Mar 2015 11:24:01 +0100
-Subject: [PATCH v2 2/3] ARM: at91/dt: fix macb compatible strings
-In-Reply-To: <1425637442-8724-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1425637442-8724-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1425637442-8724-3-git-send-email-boris.brezillon@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Mar 2015 10:27:49 +0000
+Subject: Fwd: rmk's taking it easy for a while
+Message-ID: <20150306102749.GI29584@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some at91 SoCs embed a 10/100 Mbit Ethernet IP, that is based on the
-at91sam9260 SoC.
-Fix at91 DTs accordingly.
+As evidence why I'm not doing very much... I sent this to the wrong
+list address, and I've only just realised.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/at91sam9260.dtsi      | 2 +-
- arch/arm/boot/dts/at91sam9263.dtsi      | 2 +-
- arch/arm/boot/dts/at91sam9g45.dtsi      | 2 +-
- arch/arm/boot/dts/at91sam9x5_macb0.dtsi | 2 +-
- arch/arm/boot/dts/at91sam9x5_macb1.dtsi | 2 +-
- arch/arm/boot/dts/sama5d3_emac.dtsi     | 2 +-
- 6 files changed, 6 insertions(+), 6 deletions(-)
+----- Forwarded message from Russell King - ARM Linux <linux@arm.linux.org.uk> -----
+Date: Tue, 3 Mar 2015 23:41:12 +0000
+From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+To: linux-arm-kernel at lists.arm.linux.org.uk, linux-omap at vger.kernel.org
+Subject: rmk's taking it easy for a while
+Delivery-date: Tue, 03 Mar 2015 23:51:10 +0000
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index fff0ee6..9f7c737 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -842,7 +842,7 @@
- 			};
- 
- 			macb0: ethernet at fffc4000 {
--				compatible = "cdns,at32ap7000-macb", "cdns,macb";
-+				compatible = "cdns,at91sam9260-macb", "cdns,macb";
- 				reg = <0xfffc4000 0x100>;
- 				interrupts = <21 IRQ_TYPE_LEVEL_HIGH 3>;
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 1f67bb4..340179e 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -845,7 +845,7 @@
- 			};
- 
- 			macb0: ethernet at fffbc000 {
--				compatible = "cdns,at32ap7000-macb", "cdns,macb";
-+				compatible = "cdns,at91sam9260-macb", "cdns,macb";
- 				reg = <0xfffbc000 0x100>;
- 				interrupts = <21 IRQ_TYPE_LEVEL_HIGH 3>;
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index ee80aa9..586eab7 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -956,7 +956,7 @@
- 			};
- 
- 			macb0: ethernet at fffbc000 {
--				compatible = "cdns,at32ap7000-macb", "cdns,macb";
-+				compatible = "cdns,at91sam9260-macb", "cdns,macb";
- 				reg = <0xfffbc000 0x100>;
- 				interrupts = <25 IRQ_TYPE_LEVEL_HIGH 3>;
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/at91sam9x5_macb0.dtsi b/arch/arm/boot/dts/at91sam9x5_macb0.dtsi
-index 57e89d1..73d7e30 100644
---- a/arch/arm/boot/dts/at91sam9x5_macb0.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5_macb0.dtsi
-@@ -53,7 +53,7 @@
- 			};
- 
- 			macb0: ethernet at f802c000 {
--				compatible = "cdns,at32ap7000-macb", "cdns,macb";
-+				compatible = "cdns,at91sam9260-macb", "cdns,macb";
- 				reg = <0xf802c000 0x100>;
- 				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 3>;
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/at91sam9x5_macb1.dtsi b/arch/arm/boot/dts/at91sam9x5_macb1.dtsi
-index 663676c..d81980c 100644
---- a/arch/arm/boot/dts/at91sam9x5_macb1.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5_macb1.dtsi
-@@ -41,7 +41,7 @@
- 			};
- 
- 			macb1: ethernet at f8030000 {
--				compatible = "cdns,at32ap7000-macb", "cdns,macb";
-+				compatible = "cdns,at91sam9260-macb", "cdns,macb";
- 				reg = <0xf8030000 0x100>;
- 				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 3>;
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/sama5d3_emac.dtsi b/arch/arm/boot/dts/sama5d3_emac.dtsi
-index fe2af92..b4544cf 100644
---- a/arch/arm/boot/dts/sama5d3_emac.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_emac.dtsi
-@@ -41,7 +41,7 @@
- 			};
- 
- 			macb1: ethernet at f802c000 {
--				compatible = "cdns,at32ap7000-macb", "cdns,macb";
-+				compatible = "cdns,at91sam9260-macb", "cdns,macb";
- 				reg = <0xf802c000 0x100>;
- 				interrupts = <35 IRQ_TYPE_LEVEL_HIGH 3>;
- 				pinctrl-names = "default";
+For those who haven't read my post on google+, here's the news.
+
+Today, I had my impacted wisdom teeth out under a general anaesthetic.
+This means that I'm not going to be feeling right for a while, and I'm
+going to be taking things easy probably for the rest of this week.
+
+I'm on quite a high dosage of painkillers and anti-inflamatories, so
+whether I'm going to be doing anything kernel related is going to depend
+very much on how I feel day to day.
+
+Not only that, but eating a decent diet is going to be a problem for a
+while.
+
+What does this mean?  Don't expect me to be responsive or coherent for
+a while as I struggle to get back to something resembling normality.
+I might tinker with a few patches, I might post some series, and if I
+do, do /not/ take that as a sign I'm back to normal - that'll probably
+be an attempt to relieve some of the boredom.
+
+Thanks.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
+
+-------------------------------------------------------------------
+List admin: http://lists.arm.linux.org.uk/mailman/listinfo/linux-arm-kernel
+FAQ:        http://www.arm.linux.org.uk/mailinglists/faq.php
+Etiquette:  http://www.arm.linux.org.uk/mailinglists/etiquette.php
+
+----- End forwarded message -----
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
