@@ -1,34 +1,39 @@
-From: wuyun.wu@huawei.com (Yun Wu (Abel))
-Date: Fri, 6 Mar 2015 09:36:30 +0800
-Subject: [PATCH v3 0/5] enhance configuring an ITS
-In-Reply-To: <54F8481A.2090509@arm.com>
-References: <1425439098-10708-1-git-send-email-wuyun.wu@huawei.com>
- <54F8481A.2090509@arm.com>
-Message-ID: <54F9049E.6070209@huawei.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 5 Mar 2015 17:59:35 -0800
+Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
+ msm-id and qcom, board-id
+In-Reply-To: <07D4E4D1-BF8C-4583-9505-9F321DB10406@codeaurora.org>
+References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
+ <7h8ufbjkod.fsf@deeprootsystems.com>
+ <07D4E4D1-BF8C-4583-9505-9F321DB10406@codeaurora.org>
+Message-ID: <CAOesGMgy3VY=4-t+N0BYqCuSLQkh-rYe8nd9iJh1mMeBFz_sWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/5 20:12, Marc Zyngier wrote:
-
-> On 04/03/15 03:18, Yun Wu wrote:
->> This patch series makes some enhancement to ITS configuration in the
->> following aspects:
+On Thu, Mar 5, 2015 at 12:23 PM, Kumar Gala <galak@codeaurora.org> wrote:
+>
+> On Mar 5, 2015, at 1:42 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>
+>> Kumar Gala <galak@codeaurora.org> writes:
 >>
->> o make allocation of the ITS tables more sensible
->> o replace magic numbers with sensible macros
->> o guarantees a safe quiescent status before initializing an ITS
+>>> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
+>>> on Qualcomm MSM platforms to determine which device tree should be
+>>> utilized and passed to the kernel.
+>>>
+>>> Cc: <devicetree@vger.kernel.org>
+>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
 >>
->> This patch series is based on Marc's branch[1], and tested on Hisilion
->> ARM64 board with GICv3 ITS hardware.
-> 
-> So this now looks pretty good (assuming you fix the couple of nits I
-> mentioned).
-> 
-> As this relies on my branch, shall I take it and ask Jason to look at
-> the branch as a whole?
-> 
+>> Is this the special magic that allows qcom bootloaders to take a kernel
+>> plus multiple DTBs and figure out which DTB to pass?
+>>
+>> Kevin
+>
+> yes
 
-Yes, please.
+That's a bummer.
 
-Thanks,
-	Abel
+Luckily, the solution for upstream is still quite simple: Provide only
+one devicetree, and it'll be used, right?
+
+
+-Olof
