@@ -1,35 +1,91 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 6 Mar 2015 09:26:26 +0100
-Subject: [PATCH] RFC: let gpiod_get_optional et all return NULL when
- GPIOLIB is not enabled
-In-Reply-To: <1423731809-4800-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1423731809-4800-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CACRpkdb6KcZx3WfTqUKemhQ0_OsqxBGQb_P5cXXZvgc3riakdA@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 06 Mar 2015 09:36:01 +0100
+Subject: [PATCH v4 6/9] ARM: at91: time: move the system timer driver
+ to drivers/clocksource
+In-Reply-To: <1425570594-13124-7-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1425570594-13124-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1425570594-13124-7-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <54F966F1.4090900@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 12, 2015 at 10:03 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
+On 03/05/2015 04:49 PM, Alexandre Belloni wrote:
+> Import at91rm9200_time.c from mach-at91 as timer-atmel-st.c. Further cleanup is
+> required to get rid of the mach-at91 headers.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>   arch/arm/mach-at91/Makefile                                           | 2 +-
+>   drivers/clocksource/Kconfig                                           | 4 ++++
+>   drivers/clocksource/Makefile                                          | 1 +
+>   .../at91rm9200_time.c => drivers/clocksource/timer-atmel-st.c         | 0
+>   4 files changed, 6 insertions(+), 1 deletion(-)
+>   rename arch/arm/mach-at91/at91rm9200_time.c => drivers/clocksource/timer-atmel-st.c (100%)
+>
+> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+> index 827fdbcce1c7..963c29169242 100644
+> --- a/arch/arm/mach-at91/Makefile
+> +++ b/arch/arm/mach-at91/Makefile
+> @@ -7,7 +7,7 @@ obj-y		:= setup.o
+>   obj-$(CONFIG_SOC_AT91SAM9)	+= sam9_smc.o
+>
+>   # CPU-specific support
+> -obj-$(CONFIG_SOC_AT91RM9200)	+= at91rm9200.o at91rm9200_time.o
+> +obj-$(CONFIG_SOC_AT91RM9200)	+= at91rm9200.o
+>   obj-$(CONFIG_SOC_AT91SAM9)	+= at91sam9.o
+>   obj-$(CONFIG_SOC_SAMA5)		+= sama5.o
+>
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index 1c2506f68122..d1d15985a4ec 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -138,6 +138,10 @@ config ATMEL_PIT
+>   	select CLKSRC_OF if OF
+>   	def_bool SOC_AT91SAM9 || SOC_SAMA5
+>
+> +config ATMEL_ST
+> +	select CLKSRC_OF if OF
+> +	def_bool SOC_AT91RM9200
+> +
 
-> I wonder if gpiod_get_optional et all should be changed to return NULL
-> instead.
+H Alexandre,
 
-This is actually the norm in most subsystems returning cookie
-pointers, clk, regulator, pinctrl... a NULL pointer is a functional
-noop. But normally then NULL is returned from all stubs, not
-just optional.
+the global policy is to enable the timer from the platform Kconfig.
 
-Alexandre, what do you say?
+So it should be:
 
-> The obvious downside is that if the device tree specifies a
-> reset-gpio and the kernel just fails to use it because there is some
-> code missing, this should better be an error. (The adau1977 code has
-> this problem already know, but when changing devm_gpiod_get_optional all
-> callers are affected.)
+config ATMEL_ST
+	bool
+	select CLKSRC_OF if OF
 
-Device Tree-specific problems is not something we design
-subsystems for, we try to just accomodate them. I'm not
-sure I fully understand what you mean here.
+and change the mach's Kconfig to select this driver for the 
+corresponding platform.
 
-Yours,
-Linus Walleij
+>   config CLKSRC_METAG_GENERIC
+>   	def_bool y if METAG
+>   	help
+> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> index 752d5c70b0ef..5b85f6adb258 100644
+> --- a/drivers/clocksource/Makefile
+> +++ b/drivers/clocksource/Makefile
+> @@ -1,5 +1,6 @@
+>   obj-$(CONFIG_CLKSRC_OF)	+= clksrc-of.o
+>   obj-$(CONFIG_ATMEL_PIT)		+= timer-atmel-pit.o
+> +obj-$(CONFIG_ATMEL_ST)		+= timer-atmel-st.o
+>   obj-$(CONFIG_ATMEL_TCB_CLKSRC)	+= tcb_clksrc.o
+>   obj-$(CONFIG_X86_PM_TIMER)	+= acpi_pm.o
+>   obj-$(CONFIG_SCx200HR_TIMER)	+= scx200_hrt.o
+> diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/drivers/clocksource/timer-atmel-st.c
+> similarity index 100%
+> rename from arch/arm/mach-at91/at91rm9200_time.c
+> rename to drivers/clocksource/timer-atmel-st.c
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
