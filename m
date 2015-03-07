@@ -1,60 +1,99 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Sat, 7 Mar 2015 17:56:01 +0200
-Subject: twl4030_charger: need changes to get probed?
-In-Reply-To: <201503062356.06110@pali>
-References: <20150224043341.4243.23291.stgit@notabene.brown>
- <CANOLnONUtfF1UwgW3O5fkAX30UMznZXwbtPkqPFDLR4jFdNqow@mail.gmail.com>
- <20150306224034.GA20559@amd> <201503062356.06110@pali>
-Message-ID: <CANOLnONc3+F=e3VfYZyGCtnzMOHV3GrX6cUSV1G4WJDPrgGFSg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Sat, 7 Mar 2015 17:12:01 +0100
+Subject: [GIT PULL] at91: dt for 4.1 #1
+Message-ID: <1425744721-27138-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 7, 2015 at 12:56 AM, Pali Roh?r <pali.rohar@gmail.com> wrote:
-> On Friday 06 March 2015 23:40:34 Pavel Machek wrote:
->> On Sat 2015-03-07 00:12:07, Grazvydas Ignotas wrote:
->> > On Fri, Mar 6, 2015 at 11:57 PM, Pali Roh?r
->> > <pali.rohar@gmail.com> wrote:
->> > > On Friday 06 March 2015 22:24:17 Pavel Machek wrote:
->> > >> Hi!
->> > >>
->> > >> According to n900 dts, twl4030-bci (aka charger) should
->> > >> be included.
->> > >
->> > > AFAIK it is not present on n900...
->> >
->> > Right, it uses twl5030 variant without the charger, charging
->> > on n900 is provided by separate chip and for a good reason
->> > as twl's charger is not that good. Forcing the driver to
->> > load just ends up with it accessing non-existent registers
->> > over i2c.
->>
->> Ok, but:
->>
->> 1) Why is the twl4030-bci enabled in n900's dts, then
->>
->
-> maybe it is bug in n900 dts...
->
-> Grazvydas, is there some runtime check if twl4030/twl5030 chip
-> has charger or not? or do we need to explicitly disable device
-> twl4030-bci in DT?
+Arnd, Olof, Kevin,
 
-Actually from looking at the schematics, it looks like the charger
-pins are still there but all connected to ground. So it probably has
-the charger after all, it's just not connected or used.
+This is a first batch of DT updates for 4.1. You'll find many little nodes
+added to several chips and boards. The bulk of it is related to sama5d4 though.
+Sama5d4 Xplained board is also added during this cycle.
 
-I'm not aware or any registers for direct detection, and indirect
-detection is difficult because BCI mostly disables itself when no
-charger is connected and most registers read as 0 or have old values
-from last charging session (which will never happen on n900).
+Please note that this tag is stacked on top of my first at91-fixes pull-request
+that you already took. This is due to a conflict that shows up in the aliases
+section of sama5d4.dtsi.
+I did this to avoid having to deal with this conflict for the whole cycle. If
+you want me to do someting else, please tell me.
 
-There is IDCODE register on twl4030 itself, but it's documented as not
-meaningful when accessed over i2c (when is it meaningful then??).
+Thanks, best regards,
 
-drivers/mfd/twl-core.c has a i2c_device_id table of various twl4030
-variants, some of which have no charger. N900 has GAIA/twl5030, which
-differs from twl4030 only by vaux2 regulator according to that file.
-N900's old board files specify 5030, but .dts does not.
+The following changes since commit e61b8370d7e4ef40194bc62d6e22f3c95f4a01ec:
+
+  Merge tag 'at91-fixes' into at91-4.1-dt (2015-03-04 15:17:23 +0100)
+
+are available in the git repository at:
 
 
-Gra?vydas
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-dt
+
+for you to fetch changes up to 35762a624f82dbea7c62177bf3ef0cde0d0f84bc:
+
+  ARM: at91/dt: sama5d4: add ISI dt support (2015-03-04 18:36:17 +0100)
+
+----------------------------------------------------------------
+First batch of DT changes for 4.1:
+- at91sam9x5 & EK board: ISI and camera sensors
+- at91sam9n12 & EK board: USB gadget nodes
+- sama5d3: typos, gpio-keys on Xplained board
+- sama5d4: i2c, leds, audio, ISI, crypto, pwm missing nodes
+- new sama5d4 xplained board
+
+----------------------------------------------------------------
+Bo Shen (7):
+      ARM: at91/dt: at91sam9n12: add udp device node
+      ARM: at91/dt: at91sam9n12ek: enable udp
+      ARM: at91: dt: sama5d4: add ssc nodes
+      ARM: at91: dt: sama5d4ek: enable ssc0
+      ARM: at91: dt: sama5d4ek: add and enable wm8904
+      ARM: at91: dt: sama5d4ek: enable audio
+      ARM: at91/dt: sama5d4: add pwm0 device node
+
+Josh Wu (7):
+      ARM: at91: at91sam9x5/dts: add ISI dt support, include isi node, pinctrls
+      ARM: at91: at91sam9x5ek/dts: add ov2640 support
+      ARM: at91: at91sam9g25ek/dts: enable ISI and ov2640
+      ARM: at91/dt: sama5d4ek: add leds in DT node
+      ARM: at91/dt: sama5d4: add #{address, size}_cells properties for macb0
+      ARM: at91/dt: sama5d4: add dts for sama5d4 xplained board
+      ARM: at91/dt: sama5d4: add ISI dt support
+
+Leilei Zhao (1):
+      ARM: at91/dt: sama5d4: add aes, sha and tdes nodes
+
+Nicolas Ferre (3):
+      ARM: at91/dt/trivial: correct file headers for SAMA5D3 SoC peripherals
+      ARM: at91/dt: gpio-keys: address-cells and size-cells properties are not needed
+      ARM: at91/dt: sama5d4 xplained: add i2c0
+
+Philip Attfield (1):
+      ARM: at91/dt: add i2c1 declaration to sama5d4
+
+Wenyou Yang (1):
+      ARM: at91/dt: at91-sama5d3_xplained: add gpio-key pinctrl property
+
+ arch/arm/boot/dts/Makefile                  |   1 +
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts |   8 +
+ arch/arm/boot/dts/at91-sama5d4_xplained.dts | 241 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91-sama5d4ek.dts        |  55 ++++++-
+ arch/arm/boot/dts/at91sam9g25.dtsi          |   1 +
+ arch/arm/boot/dts/at91sam9g25ek.dts         |  18 +++
+ arch/arm/boot/dts/at91sam9n12.dtsi          |   9 ++
+ arch/arm/boot/dts/at91sam9n12ek.dts         |  14 ++
+ arch/arm/boot/dts/at91sam9x5_isi.dtsi       |  46 ++++++
+ arch/arm/boot/dts/at91sam9x5ek.dtsi         |  48 ++++++
+ arch/arm/boot/dts/sama5d35ek.dts            |   2 -
+ arch/arm/boot/dts/sama5d3_can.dtsi          |   2 +-
+ arch/arm/boot/dts/sama5d3_emac.dtsi         |   2 +-
+ arch/arm/boot/dts/sama5d3_gmac.dtsi         |   2 +-
+ arch/arm/boot/dts/sama5d3_lcd.dtsi          |   2 +-
+ arch/arm/boot/dts/sama5d3_mci2.dtsi         |   2 +-
+ arch/arm/boot/dts/sama5d3_tcb1.dtsi         |   2 +-
+ arch/arm/boot/dts/sama5d3_uart.dtsi         |   2 +-
+ arch/arm/boot/dts/sama5d4.dtsi              | 192 ++++++++++++++++++++++
+ 19 files changed, 638 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91-sama5d4_xplained.dts
+
+-- 
+Nicolas Ferre
