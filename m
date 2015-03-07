@@ -1,41 +1,61 @@
-From: dengcheng.zhu@imgtec.com (Deng-Cheng Zhu)
-Date: Sat, 7 Mar 2015 10:30:22 -0800
-Subject: [PATCH v2 04/17] clocksource: versatile: Add PLAT_VERSATILE dependency
-In-Reply-To: <1425753035-17087-1-git-send-email-dengcheng.zhu@imgtec.com>
-References: <1425753035-17087-1-git-send-email-dengcheng.zhu@imgtec.com>
-Message-ID: <1425753035-17087-5-git-send-email-dengcheng.zhu@imgtec.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat,  7 Mar 2015 20:01:18 +0100
+Subject: [PATCH 1/7] ARM: dts: sun4i: Enable tablet keys on Chuwi V7 CW0825
+Message-ID: <1425754884-7875-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GENERIC_SCHED_CLOCK can be selected by architectures other than ARM. The
-current dependencies of CLKSRC_VERSATILE make it possible that other
-architectures will have CLKSRC_VERSATILE available in configuration once
-they select GENERIC_SCHED_CLOCK, whereas this clock source should be solely
-available to ARM in reality.
+Enable the lradc controlled tablet keys on the Chuwi V7 CW0825 tablet.
 
-This patch adds one more dependency to CLKSRC_VERSATILE to fix the issue.
-
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: LKML <linux-kernel@vger.kernel.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Reported-by: Maciej W. Rozycki <macro@linux-mips.org>
-Signed-off-by: Deng-Cheng Zhu <dengcheng.zhu@imgtec.com>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/clocksource/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts | 27 +++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 1c2506f..22e0ee1 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -225,7 +225,7 @@ config CLKSRC_QCOM
+diff --git a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+index 58214f2..97fca89 100644
+--- a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
++++ b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+@@ -49,6 +49,7 @@
+ #include "sun4i-a10.dtsi"
+ #include "sunxi-common-regulators.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
  
- config CLKSRC_VERSATILE
- 	bool "ARM Versatile (Express) reference platforms clock source"
--	depends on GENERIC_SCHED_CLOCK && !ARCH_USES_GETTIMEOFFSET
-+	depends on PLAT_VERSATILE && GENERIC_SCHED_CLOCK && !ARCH_USES_GETTIMEOFFSET
- 	select CLKSRC_OF
- 	default y if MFD_VEXPRESS_SYSREG
- 	help
+ / {
+ 	model = "Chuwi V7 CW0825";
+@@ -74,6 +75,32 @@
+ 	};
+ };
+ 
++&lradc {
++	vref-supply = <&reg_vcc3v0>;
++	status = "okay";
++
++	button at 800 {
++		label = "Volume Up";
++		linux,code = <KEY_VOLUMEUP>;
++		channel = <0>;
++		voltage = <800000>;
++	};
++
++	button at 1000 {
++		label = "Volume Down";
++		linux,code = <KEY_VOLUMEDOWN>;
++		channel = <0>;
++		voltage = <1000000>;
++	};
++
++	button at 1200 {
++		label = "Back";
++		linux,code = <KEY_BACK>;
++		channel = <0>;
++		voltage = <1200000>;
++	};
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
 -- 
-2.3.2
+2.3.1
