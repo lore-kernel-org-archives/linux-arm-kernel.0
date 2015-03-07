@@ -1,118 +1,97 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat,  7 Mar 2015 07:23:31 +0100
-Subject: [PATCH v4 3/4] net/macb: unify clock management
+Date: Sat,  7 Mar 2015 07:23:30 +0100
+Subject: [PATCH v4 2/4] net: macb: remove #if defined(CONFIG_ARCH_AT91)
+ sections
 In-Reply-To: <1425709412-4935-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1425709412-4935-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1425709412-4935-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1425709412-4935-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+With multi platform support those sections could lead to unexpected
+behavior if both ARCH_AT91 and another ARM SoC using the MACB IP are
+selected.
+Add two new capabilities to encode the default MII mode and the presence
+of a CLKEN bit in USRIO register.
+Then define the appropriate config for IPs embedded in at91 SoCs.
 
-Most of the functions from the Common Clk Framework handle NULL pointer as
-input argument.
-
-Since the TX clock is optional, we now set tx_clk to NULL value
-instead of ERR_PTR(-ENOENT) when this clock is not available. This simplifies
-the clock management and avoid the need to test tx_clk value.
-
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/net/ethernet/cadence/macb.c | 31 ++++++++++++++-----------------
- 1 file changed, 14 insertions(+), 17 deletions(-)
+ drivers/net/ethernet/cadence/macb.c | 32 +++++++++++++++++---------------
+ drivers/net/ethernet/cadence/macb.h |  2 ++
+ 2 files changed, 19 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 86e915f..d8748c5 100644
+index ad76b8e..86e915f 100644
 --- a/drivers/net/ethernet/cadence/macb.c
 +++ b/drivers/net/ethernet/cadence/macb.c
-@@ -213,6 +213,9 @@ static void macb_set_tx_clk(struct clk *clk, int speed, struct net_device *dev)
- {
- 	long ferr, rate, rate_rounded;
+@@ -2113,6 +2113,10 @@ static const struct net_device_ops macb_netdev_ops = {
+ };
  
-+	if (!clk)
-+		return;
+ #if defined(CONFIG_OF)
++static struct macb_config at91sam9260_config = {
++	.caps = MACB_CAPS_USRIO_HAS_CLKEN | MACB_CAPS_USRIO_DEFAULT_IS_MII,
++};
 +
- 	switch (speed) {
- 	case SPEED_10:
- 		rate = 2500000;
-@@ -292,8 +295,7 @@ static void macb_handle_link_change(struct net_device *dev)
+ static struct macb_config pc302gem_config = {
+ 	.caps = MACB_CAPS_SG_DISABLED | MACB_CAPS_GIGABIT_MODE_AVAILABLE,
+ 	.dma_burst_length = 16,
+@@ -2130,7 +2134,7 @@ static struct macb_config sama5d4_config = {
  
- 	spin_unlock_irqrestore(&bp->lock, flags);
- 
--	if (!IS_ERR(bp->tx_clk))
--		macb_set_tx_clk(bp->tx_clk, phydev->speed, dev);
-+	macb_set_tx_clk(bp->tx_clk, phydev->speed, dev);
- 
- 	if (status_change) {
- 		if (phydev->link) {
-@@ -2244,6 +2246,8 @@ static int macb_probe(struct platform_device *pdev)
+ static const struct of_device_id macb_dt_ids[] = {
+ 	{ .compatible = "cdns,at32ap7000-macb" },
+-	{ .compatible = "cdns,at91sam9260-macb" },
++	{ .compatible = "cdns,at91sam9260-macb", .data = &at91sam9260_config },
+ 	{ .compatible = "cdns,macb" },
+ 	{ .compatible = "cdns,pc302-gem", .data = &pc302gem_config },
+ 	{ .compatible = "cdns,gem", .data = &pc302gem_config },
+@@ -2388,21 +2392,19 @@ static int macb_probe(struct platform_device *pdev)
+ 		bp->phy_interface = err;
  	}
  
- 	tx_clk = devm_clk_get(&pdev->dev, "tx_clk");
-+	if (IS_ERR(tx_clk))
-+		tx_clk = NULL;
++	config = 0;
+ 	if (bp->phy_interface == PHY_INTERFACE_MODE_RGMII)
+-		macb_or_gem_writel(bp, USRIO, GEM_BIT(RGMII));
+-	else if (bp->phy_interface == PHY_INTERFACE_MODE_RMII)
+-#if defined(CONFIG_ARCH_AT91)
+-		macb_or_gem_writel(bp, USRIO, (MACB_BIT(RMII) |
+-					       MACB_BIT(CLKEN)));
+-#else
+-		macb_or_gem_writel(bp, USRIO, 0);
+-#endif
+-	else
+-#if defined(CONFIG_ARCH_AT91)
+-		macb_or_gem_writel(bp, USRIO, MACB_BIT(CLKEN));
+-#else
+-		macb_or_gem_writel(bp, USRIO, MACB_BIT(MII));
+-#endif
++		config = GEM_BIT(RGMII);
++	else if (bp->phy_interface == PHY_INTERFACE_MODE_RMII &&
++		 (bp->caps & MACB_CAPS_USRIO_DEFAULT_IS_MII))
++		config = MACB_BIT(RMII);
++	else if (!(bp->caps & MACB_CAPS_USRIO_DEFAULT_IS_MII))
++		config = MACB_BIT(MII);
++
++	if (bp->caps & MACB_CAPS_USRIO_HAS_CLKEN)
++		config |= MACB_BIT(CLKEN);
++
++	macb_or_gem_writel(bp, USRIO, config);
  
- 	err = clk_prepare_enable(pclk);
+ 	err = register_netdev(dev);
  	if (err) {
-@@ -2257,13 +2261,10 @@ static int macb_probe(struct platform_device *pdev)
- 		goto err_out_disable_pclk;
- 	}
+diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+index 31dc080..efe0247 100644
+--- a/drivers/net/ethernet/cadence/macb.h
++++ b/drivers/net/ethernet/cadence/macb.h
+@@ -389,6 +389,8 @@
  
--	if (!IS_ERR(tx_clk)) {
--		err = clk_prepare_enable(tx_clk);
--		if (err) {
--			dev_err(&pdev->dev, "failed to enable tx_clk (%u)\n",
--				err);
--			goto err_out_disable_hclk;
--		}
-+	err = clk_prepare_enable(tx_clk);
-+	if (err) {
-+		dev_err(&pdev->dev, "failed to enable tx_clk (%u)\n", err);
-+		goto err_out_disable_hclk;
- 	}
- 
- 	err = -ENOMEM;
-@@ -2435,8 +2436,7 @@ err_out_unregister_netdev:
- err_out_free_netdev:
- 	free_netdev(dev);
- err_out_disable_clocks:
--	if (!IS_ERR(tx_clk))
--		clk_disable_unprepare(tx_clk);
-+	clk_disable_unprepare(tx_clk);
- err_out_disable_hclk:
- 	clk_disable_unprepare(hclk);
- err_out_disable_pclk:
-@@ -2460,8 +2460,7 @@ static int macb_remove(struct platform_device *pdev)
- 		kfree(bp->mii_bus->irq);
- 		mdiobus_free(bp->mii_bus);
- 		unregister_netdev(dev);
--		if (!IS_ERR(bp->tx_clk))
--			clk_disable_unprepare(bp->tx_clk);
-+		clk_disable_unprepare(bp->tx_clk);
- 		clk_disable_unprepare(bp->hclk);
- 		clk_disable_unprepare(bp->pclk);
- 		free_netdev(dev);
-@@ -2479,8 +2478,7 @@ static int __maybe_unused macb_suspend(struct device *dev)
- 	netif_carrier_off(netdev);
- 	netif_device_detach(netdev);
- 
--	if (!IS_ERR(bp->tx_clk))
--		clk_disable_unprepare(bp->tx_clk);
-+	clk_disable_unprepare(bp->tx_clk);
- 	clk_disable_unprepare(bp->hclk);
- 	clk_disable_unprepare(bp->pclk);
- 
-@@ -2495,8 +2493,7 @@ static int __maybe_unused macb_resume(struct device *dev)
- 
- 	clk_prepare_enable(bp->pclk);
- 	clk_prepare_enable(bp->hclk);
--	if (!IS_ERR(bp->tx_clk))
--		clk_prepare_enable(bp->tx_clk);
-+	clk_prepare_enable(bp->tx_clk);
- 
- 	netif_device_attach(netdev);
- 
+ /* Capability mask bits */
+ #define MACB_CAPS_ISR_CLEAR_ON_WRITE		0x00000001
++#define MACB_CAPS_USRIO_HAS_CLKEN		0x00000002
++#define MACB_CAPS_USRIO_DEFAULT_IS_MII		0x00000004
+ #define MACB_CAPS_FIFO_MODE			0x10000000
+ #define MACB_CAPS_GIGABIT_MODE_AVAILABLE	0x20000000
+ #define MACB_CAPS_SG_DISABLED			0x40000000
 -- 
 1.9.1
