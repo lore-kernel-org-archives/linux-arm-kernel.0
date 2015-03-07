@@ -1,49 +1,22 @@
-From: codekipper@gmail.com (Code Kipper)
-Date: Sat, 7 Mar 2015 09:41:54 +0100
-Subject: [PATCH] ARM: sun7i: dt: Add new MK808C device
-In-Reply-To: <20150304203400.GR4911@lukather>
-References: <1425131004-8551-1-git-send-email-codekipper@gmail.com>
- <20150303071342.GB4713@lukather>
- <CAEKpxB=-vtjMckh3ZHoy0mezE9U1EtKzmttdXRD5ZNztZvB_ag@mail.gmail.com>
- <20150304203400.GR4911@lukather>
-Message-ID: <CAEKpxBnRyhD8Xiu7uTomM=z4Xm4CH8WVTYjZH73yDgYzwMqn5w@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Sat, 7 Mar 2015 10:06:21 +0100
+Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
+ IRQF_NO_SUSPEND
+In-Reply-To: <CAJZ5v0h8vn26BeWPVhC4e_KNhBu15-mshnbq0K=OQ1M36vPQEQ@mail.gmail.com>
+References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20150304183809.GD22156@leverpostej>
+ <14143668.0aRkeVrc3Q@vostro.rjw.lan>
+ <20150305105729.GB13617@leverpostej>
+ <CAJZ5v0h8vn26BeWPVhC4e_KNhBu15-mshnbq0K=OQ1M36vPQEQ@mail.gmail.com>
+Message-ID: <20150307090621.GL23367@worktop.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 March 2015 at 21:34, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Mar 03, 2015 at 09:22:32PM +0100, Code Kipper wrote:
->> >> +
->> >> +/ {
->> >> +     model = "mk808c";
->> >> +     compatible = "mk808c", "allwinner,sun7i-a20";
->> >
->> > the compatible must be of the format "vendor,device". Please add the
->> > vendor name.
->>
->> Ahhh....I've searched high and low for a vendors name. I listed it as
->> unknown on the wiki page,
->> would 'odm' be considered valid?
->
-> Not really. Another mk808c device might very well be made by some
-> other odm.
->
-Hi Maxime,
+On Thu, Mar 05, 2015 at 04:10:16PM +0100, Rafael J. Wysocki wrote:
+> enable_irq_wake() has no effect on IRQF_NO_SUSPEND interrupts, so if the
+> driver uses IRQF_NO_SUSPEND, it does not need to use enable_irq_wake()
+> in addition to that.
 
-I documented the device here at http://linux-sunxi.org/MK808C.
-
-> Don't your device has any brand on the case or the PCB?
-
-There is nothing on the PCB to reference a manufacturer, the actual packaging
-and case are from the earlier MK808B and mention A9. There was only a
-small sticker on the side to show that the contents was a MK808C.
-I guess 'unknown' isn't a valid vendor name,
->
-> Maxime
-BR,
-CK
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+I still feel we should BUG when someone is calling enable_irq_wake() on
+an irq with only one desc which has NO_SUSPEND set.
