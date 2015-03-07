@@ -1,42 +1,67 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 07 Mar 2015 00:18:20 -0300
-Subject: [PATCH v3 5/9] mtd: pxa3xx_nand: add support for the Marvell
- Berlin nand controller
-In-Reply-To: <1425555085-29531-6-git-send-email-antoine.tenart@free-electrons.com>
-References: <1425555085-29531-1-git-send-email-antoine.tenart@free-electrons.com>
- <1425555085-29531-6-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <54FA6DFC.1070904@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sat,  7 Mar 2015 07:23:28 +0100
+Subject: [PATCH v4 0/4] net/macb: merge at91_ether driver into macb driver
+Message-ID: <1425709412-4935-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-Hi Antoine,
+The rm9200 boards use the dedicated at91_ether driver instead of the
+regular macb driver.
 
-On 03/05/2015 08:31 AM, Antoine Tenart wrote:
-[..]
-> +
-> +static struct pxa3xx_nand_flash berlin_builtin_flash_types[] = {
-> +{ "4GiB 8-bit",    0xd7ec, 128, 8192,  8,  8, 4096 },
-> +{ },
+Both the macb and at91_ether drivers can be compiled as separated
+modules.
+Since the at91_ether driver uses code from the macb driver, at91_ether.ko
+depends on macb.ko.
 
-IMHO, supporting a specific flash shouldn't be part of this patch.
+However the macb.ko module always fails to load on rm9200 boards: the
+macb_probe() function expects a hclk clock which doesn't exist on rm9200.
+Then the at91_ether.ko can't be loaded in turn due to unresolved
+dependencies.
 
-In any case, why do you need this? If you can share the details about
-this device, it would be interesting for me to take a look.
+This series of patches fix this issue by merging at91_ether into macb.
 
-This driver's open-coded, legacy-style flash detection is nasty, and the
-only reason I've kept it is to avoid breaking some wacky user with some
-old board. In fact, maybe we can just kill it so nobody thinks it's sane.
+Patch 1 is fixing a problem that might happen when enabling ARM
+multi-platform suppot.
 
-Flash detection is the NAND core's job, and duplicating it in the driver
-is not nice. Let's try to avoid it.
+Best Regards,
 
-BTW, nand_ids.c seems to list a similar device:
+Boris
 
-  EXTENDED_ID_NAND("NAND 4GiB 3,3V 8-bit",  0xD7, 4096, LP_OPTIONS),
+Changes since v3:
+- move "net: macb: remove #if defined(CONFIG_ARCH_AT91) sections" patch
+  into this series to avoid dependency on other patch series.
 
-Have you tried this?
+Changes since v2:
+- rebase after changed brought by commit "net: macb: remove #if
+  defined(CONFIG_ARCH_AT91) sections"
+
+Changes since v1:
+- rework probe functions to share common probing logic
+
+
+Boris Brezillon (2):
+  ARM: at91/dt: fix macb compatible strings
+  net: macb: remove #if defined(CONFIG_ARCH_AT91) sections
+
+Cyrille Pitchen (2):
+  net/macb: unify clock management
+  net/macb: merge at91_ether driver into macb driver
+
+ arch/arm/boot/dts/at91sam9260.dtsi        |   2 +-
+ arch/arm/boot/dts/at91sam9263.dtsi        |   2 +-
+ arch/arm/boot/dts/at91sam9g45.dtsi        |   2 +-
+ arch/arm/boot/dts/at91sam9x5_macb0.dtsi   |   2 +-
+ arch/arm/boot/dts/at91sam9x5_macb1.dtsi   |   2 +-
+ arch/arm/boot/dts/sama5d3_emac.dtsi       |   2 +-
+ drivers/net/ethernet/cadence/Kconfig      |   8 -
+ drivers/net/ethernet/cadence/Makefile     |   1 -
+ drivers/net/ethernet/cadence/at91_ether.c | 481 ----------------------
+ drivers/net/ethernet/cadence/macb.c       | 662 ++++++++++++++++++++++--------
+ drivers/net/ethernet/cadence/macb.h       |  12 +-
+ 11 files changed, 503 insertions(+), 673 deletions(-)
+ delete mode 100644 drivers/net/ethernet/cadence/at91_ether.c
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.9.1
