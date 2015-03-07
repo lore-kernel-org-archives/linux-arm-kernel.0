@@ -1,74 +1,64 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat,  7 Mar 2015 20:01:23 +0100
-Subject: [PATCH 6/7] ARM: dts: sun7i: Add OOB irq support to boards with
- broadcom sdio wifi
-In-Reply-To: <1425754884-7875-1-git-send-email-hdegoede@redhat.com>
-References: <1425754884-7875-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1425754884-7875-6-git-send-email-hdegoede@redhat.com>
+From: sre@debian.org (Sebastian Reichel)
+Date: Sat, 7 Mar 2015 22:01:02 +0100
+Subject: twl4030_charger: need changes to get probed?
+In-Reply-To: <20150306212417.GA24169@amd>
+References: <20150224043341.4243.23291.stgit@notabene.brown>
+ <20150224043352.4243.11227.stgit@notabene.brown>
+ <20150302210926.GP13270@amd>
+ <20150305173350.50502b95@notabene.brown>
+ <20150306212417.GA24169@amd>
+Message-ID: <20150307210102.GL5233@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 11 +++++++++++
- arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts  | 11 +++++++++++
- 2 files changed, 22 insertions(+)
+Hi,
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index 0c219a4..8111b0c 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -167,12 +167,23 @@
- };
- 
- &mmc3 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc3_pins_a>;
- 	vmmc-supply = <&reg_vmmc3>;
- 	bus-width = <4>;
- 	non-removable;
- 	status = "okay";
-+
-+	brcmf: bcrmf at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		interrupt-parent = <&pio>;
-+		interrupts = <10 8>; /* PH10 / EINT10 */
-+		interrupt-names = "host-wake";
-+	};
- };
- 
- &mmc3_pins_a {
-diff --git a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
-index baee563..4a8defd 100644
---- a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
-@@ -164,12 +164,23 @@
- };
- 
- &mmc3 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc3_pins_a>;
- 	vmmc-supply = <&reg_vmmc3>;
- 	bus-width = <4>;
- 	non-removable;
- 	status = "okay";
-+
-+	brcmf: bcrmf at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		interrupt-parent = <&pio>;
-+		interrupts = <10 8>; /* PH10 / EINT10 */
-+		interrupt-names = "host-wake";
-+	};
- };
- 
- &mmc3_pins_a {
--- 
-2.3.1
+On Fri, Mar 06, 2015 at 10:24:17PM +0100, Pavel Machek wrote:
+> According to n900 dts, twl4030-bci (aka charger) should be
+> included.
+
+its part of twl, but not used on N900 afaik.
+
+> (But it does not seem to do anything useful on n900. I was hoping for
+> measurement of input voltage, but .. no.)
+
+check for rx51-battery.
+
+> Any ideas why the patch below is needed?
+
+platform_driver_probe() does not support deferred probing.
+
+Neil, can you take this patch into your series for the next round?
+
+-- Sebastian
+
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> 
+> diff --git a/drivers/power/twl4030_charger.c b/drivers/power/twl4030_charger.c
+> index d35b83e..96bbbe9 100644
+> --- a/drivers/power/twl4030_charger.c
+> +++ b/drivers/power/twl4030_charger.c
+> @@ -714,6 +722,7 @@ static const struct of_device_id twl_bci_of_match[] = {
+>  MODULE_DEVICE_TABLE(of, twl_bci_of_match);
+>  
+>  static struct platform_driver twl4030_bci_driver = {
+> +	.probe = twl4030_bci_probe,
+>  	.driver	= {
+>  		.name	= "twl4030_bci",
+>  		.of_match_table = of_match_ptr(twl_bci_of_match),
+> @@ -721,7 +730,7 @@ static struct platform_driver twl4030_bci_driver = {
+>  	.remove	= __exit_p(twl4030_bci_remove),
+>  };
+>  
+> -module_platform_driver_probe(twl4030_bci_driver, twl4030_bci_probe);
+> +module_platform_driver(twl4030_bci_driver);
+>  
+>  MODULE_AUTHOR("Gra?vydas Ignotas");
+>  MODULE_DESCRIPTION("TWL4030 Battery Charger Interface driver");
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150307/fa10e97e/attachment.sig>
