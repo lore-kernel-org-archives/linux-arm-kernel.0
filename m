@@ -1,58 +1,83 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 07 Mar 2015 15:30:06 +0100
-Subject: [PATCH 2/2] ARM: dts: rockchip: add input supplies for the act8846 on
- Radxa Rock
-In-Reply-To: <1709506.shJhJsMxOa@phil>
-References: <1709506.shJhJsMxOa@phil>
-Message-ID: <1971287.rRrUEZJPze@phil>
+From: sasukewxt@163.com (Caesar Wang)
+Date: Sat, 07 Mar 2015 22:38:37 +0800
+Subject: [PATCH 5/8] ARM: dts: rockchip: relicense rk3288-thermal.dtsi
+ under GPLv2/X11
+In-Reply-To: <1425665046-22927-6-git-send-email-heiko@sntech.de>
+References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
+ <1425665046-22927-6-git-send-email-heiko@sntech.de>
+Message-ID: <54FB0D6D.6070406@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the Radxa Rock board most supplies come from the static 5v vsys supply, but
-the inl1-supply comes from the REG4 of the act8846 itself. Model this dependency
-using the added supply-handling to make sure the supplying regulator gets handled
-correctly and not accidentially turned off.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-I'll apply this one to my dts branch myself, if patch 1/2 is accepted
+? 2015?03?07? 02:04, Heiko Stuebner ??:
+> GPLv2-only devicetrees make reuse difficult for software components licensed
+> under a different license.
+>
+> The consensus is that a GPL/X11 dual-license should allow all necessary uses,
+> so relicense the rk3288-thermal.dtsi to this combination.
+>
+> CCs were aquired by git shortlog -sne so it should've hopefully catched
+> every contributor.
 
- arch/arm/boot/dts/rk3188-radxarock.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Acked-by: caesar.wang at rock-chips.com
 
-diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
-index 9a09579..bdf8570 100644
---- a/arch/arm/boot/dts/rk3188-radxarock.dts
-+++ b/arch/arm/boot/dts/rk3188-radxarock.dts
-@@ -103,6 +103,14 @@
- 		regulator-always-on;
- 		regulator-boot-on;
- 	};
-+
-+	vsys: vsys-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vsys";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-boot-on;
-+	};
- };
- 
- &emac {
-@@ -148,6 +156,14 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&act8846_dvs0_ctl>;
- 
-+		vp1-supply = <&vsys>;
-+		vp2-supply = <&vsys>;
-+		vp3-supply = <&vsys>;
-+		vp4-supply = <&vsys>;
-+		inl1-supply = <&vcc_io>;
-+		inl2-supply = <&vsys>;
-+		inl3-supply = <&vsys>;
-+
- 		regulators {
- 			vcc_ddr: REG1 {
- 				regulator-name = "VCC_DDR";
--- 
-2.1.4
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Cc: Caesar Wang <caesar.wang@rock-chips.com>
+> ---
+> I'm hoping to get Acked-by tags from the people in the Cc-list.
+>
+>   arch/arm/boot/dts/rk3288-thermal.dtsi | 40 ++++++++++++++++++++++++++++++++---
+>   1 file changed, 37 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/rk3288-thermal.dtsi b/arch/arm/boot/dts/rk3288-thermal.dtsi
+> index 2695200..3404066 100644
+> --- a/arch/arm/boot/dts/rk3288-thermal.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-thermal.dtsi
+> @@ -3,9 +3,43 @@
+>    *
+>    * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
+>    *
+> - * This file is licensed under the terms of the GNU General Public License
+> - * version 2.  This program is licensed "as is" without any warranty of any
+> - * kind, whether express or implied.
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>    */
+>   
+>   #include <dt-bindings/thermal/thermal.h>
