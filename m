@@ -1,36 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 7 Mar 2015 15:00:35 +0000
-Subject: [PATCH v1 1/6] eeprom: Add a simple EEPROM framework for eeprom
- providers
-In-Reply-To: <1425548741-12930-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1425548685-12887-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1425548741-12930-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20150307150035.GN28806@sirena.org.uk>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Sat,  7 Mar 2015 16:14:22 +0100
+Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable ChromeOS EC chardev driver
+Message-ID: <1425741262-8278-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 05, 2015 at 09:45:41AM +0000, Srinivas Kandagatla wrote:
+Exynos Chromebooks have an Embedded Controller known as the ChromeOS EC
+Enable the driver that provides an interface to access from user-space.
 
-> +
-> +	return eeprom;
-> +}
-> +EXPORT_SYMBOL(eeprom_register);
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ arch/arm/configs/exynos_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-This framework uses regmap but regmap is EXPORT_SYMBOL_GPL() and this is
-using EXPORT_SYMBOL().
-
-> +int eeprom_unregister(struct eeprom_device *eeprom)
-> +{
-> +	mutex_lock(&eeprom_mutex);
-> +	if (atomic_read(&eeprom->users)) {
-> +		mutex_unlock(&eeprom_mutex);
-
-Atomic reads and a mutex - isn't the mutex enough?  Atomics are
-generally a recipie for bugs due to the complexity in using them.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150307/8a4486a4/attachment.sig>
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 3d22aae39a83..14fa9f05f768 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -173,6 +173,8 @@ CONFIG_RTC_DRV_S5M=y
+ CONFIG_RTC_DRV_S3C=y
+ CONFIG_DMADEVICES=y
+ CONFIG_PL330_DMA=y
++CONFIG_CHROME_PLATFORMS=y
++CONFIG_CROS_EC_CHARDEV=y
+ CONFIG_COMMON_CLK_MAX77686=y
+ CONFIG_COMMON_CLK_MAX77802=y
+ CONFIG_COMMON_CLK_S2MPS11=y
+-- 
+2.1.4
