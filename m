@@ -1,80 +1,113 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sat, 7 Mar 2015 04:01:07 +0100
-Subject: [PATCH v2 00/10] drivers: PL011: add ARM SBSA Generic UART support
-In-Reply-To: <1425491994-23913-1-git-send-email-andre.przywara@arm.com>
-References: <1425491994-23913-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <20150307030107.GA29232@kroah.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 07 Mar 2015 15:28:54 +0100
+Subject: [PATCH 1/2] regulator: act8865: add input supply handling
+Message-ID: <1709506.shJhJsMxOa@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 05:59:44PM +0000, Andre Przywara wrote:
-> This is the second revision of the SBSA UART support series.
-> It is now based on 4.0-rc2 and Dave's PL011 fixes[2], which fixes
-> all problems seen on the fast models and on some hardware.
-> I also added support for reporting back the actual baudrate to
-> userland, which needs to be passed in via the device tree by the
-> firmware now. An attempt to change that value will be ignored by the
-> driver, sane userland software (like stty) also rightfully complains
-> about not being able to change it:
-> 
-> # stty < /dev/ttyAMA1 | head -n 1
-> speed 115200 baud; line = 0;
-> # stty 38400 < /dev/ttyAMA1
-> stty: standard input: cannot perform all requested operations
-> # stty < /dev/ttyAMA1 | head -n 1
-> speed 115200 baud; line = 0;
-> 
-> 
-> ----
-> 
-> 
-> The ARM Server Base System Architecture[1] document describes a
-> generic UART which is a subset of the PL011 UART.
-> It lacks DMA support, baud rate control and modem status line
-> control, among other things.
-> The idea is to move the UART initialization and setup into the
-> firmware (which does this job today already) and let the kernel just
-> use the UART for sending and receiving characters.
-> 
-> This patchset integrates support for this UART subset into the
-> existing PL011 driver - basically by refactoring some
-> functions and providing a new uart_ops structure for it. It also has
-> a separate probe function to be not dependent on AMBA/PrimeCell.
-> It provides a device tree binding, but can easily be adapted to other
-> device configuration systems.
-> Beside the obvious effect of code sharing reusing most of the PL011
-> code has the advantage of not introducing another serial device
-> prefix, so it can go with ttyAMA, which seems to be pretty common.
-> 
-> This series relies on Dave's recent PL011 fix[2], which gets rid of
-> the loopback trick to get the UART going. There is a repo at [3]
-> (branch sbsa-uart/v2), which has this patch already integrated.
-> 
-> Patch 1/10 contains a bug fix which applies to the PL011 part also,
-> it should be considered regardless of the rest of the series.
-> Patch 2-7 refactor some PL011 functions by splitting them up into
-> smaller pieces, so that most of the code can be reused later by the
-> SBSA part.
-> Patch 8 and 9 introduce two new properties for the vendor structure,
-> this is for SBSA functionality which cannot be controlled by
-> separate uart_ops members only.
-> Patch 10 then finally drops in the SBSA specific code, by providing
-> a new uart_ops, vendor struct and probe function for it. Also the new
-> device tree binding is documented.
-> 
-> For testing you should be able to take any hardware which has a PL011
-> and change the DT to use a "arm,sbsa-uart" compatible string and the
-> baud rate with the "current-speed" property.
-> Of course testing with a real SBSA Generic UART is welcomed - as well
-> as regression testing with any PL011 implementation.
-> 
-> Changelog v1..v2:
-> - rebased on top of 4.0-rc1 and Dave's newest PL011 fix [2]
-> - added mandatory current-speed property and report that to userland
+The act8846/act8865 regulators have a number of input supplies supplying the
+individual regulators. This may even be recursively like on most Rockchip boards
+using the act8846 where REG4 is most of the time connected to the inl1-supply.
 
-Even with Dave's latest fix, this series doesn't apply to my tty-testing
-branch of tty.git, can you please refresh it and resend?
+Therefore add the ability to specify the input supplies for the individual inputs.
+The input-names are taken from the datasheets of both act8846 and act8865.
 
-thanks,
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ .../bindings/regulator/act8865-regulator.txt       | 16 +++++++++
+ drivers/regulator/act8865-regulator.c              | 41 +++++++++++-----------
+ 2 files changed, 37 insertions(+), 20 deletions(-)
 
-greg k-h
+diff --git a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
+index dad6358..45028bb 100644
+--- a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
++++ b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
+@@ -9,6 +9,22 @@ Optional properties:
+ - system-power-controller: Telling whether or not this pmic is controlling
+   the system power. See Documentation/devicetree/bindings/power/power-controller.txt .
+ 
++Optional input supply properties:
++- for act8846:
++  - vp1-supply:  The input supply for REG1
++  - vp2-supply:  The input supply for REG2
++  - vp3-supply:  The input supply for REG3
++  - vp4-supply:  The input supply for REG4
++  - inl1-supply:  The input supply for REG5, REG6 and REG7
++  - inl2-supply:  The input supply for REG8 and LDO_REG9
++  - inl3-supply:  The input supply for REG10, REG11 and REG12
++- for act8865:
++  - vp1-supply:  The input supply for DCDC_REG1
++  - vp2-supply:  The input supply for DCDC_REG2
++  - vp3-supply:  The input supply for DCDC_REG3
++  - inl45-supply:  The input supply for LDO_REG1 and LDO_REG2
++  - inl67-supply:  The input supply for LDO_REG3 and LDO_REG4
++
+ Any standard regulator properties can be used to configure the single regulator.
+ 
+ The valid names for regulators are:
+diff --git a/drivers/regulator/act8865-regulator.c b/drivers/regulator/act8865-regulator.c
+index 9eec453..a4a85cd 100644
+--- a/drivers/regulator/act8865-regulator.c
++++ b/drivers/regulator/act8865-regulator.c
+@@ -126,9 +126,10 @@ static struct regulator_ops act8865_ops = {
+ 	.is_enabled		= regulator_is_enabled_regmap,
+ };
+ 
+-#define ACT88xx_REG(_name, _family, _id, _vsel_reg)			\
++#define ACT88xx_REG(_name, _family, _id, _vsel_reg, _supply)		\
+ 	[_family##_ID_##_id] = {					\
+ 		.name			= _name,			\
++		.supply_name		= _supply,			\
+ 		.id			= _family##_ID_##_id,		\
+ 		.type			= REGULATOR_VOLTAGE,		\
+ 		.ops			= &act8865_ops,			\
+@@ -143,28 +144,28 @@ static struct regulator_ops act8865_ops = {
+ 	}
+ 
+ static const struct regulator_desc act8846_regulators[] = {
+-	ACT88xx_REG("REG1", ACT8846, REG1, VSET),
+-	ACT88xx_REG("REG2", ACT8846, REG2, VSET0),
+-	ACT88xx_REG("REG3", ACT8846, REG3, VSET0),
+-	ACT88xx_REG("REG4", ACT8846, REG4, VSET0),
+-	ACT88xx_REG("REG5", ACT8846, REG5, VSET),
+-	ACT88xx_REG("REG6", ACT8846, REG6, VSET),
+-	ACT88xx_REG("REG7", ACT8846, REG7, VSET),
+-	ACT88xx_REG("REG8", ACT8846, REG8, VSET),
+-	ACT88xx_REG("REG9", ACT8846, REG9, VSET),
+-	ACT88xx_REG("REG10", ACT8846, REG10, VSET),
+-	ACT88xx_REG("REG11", ACT8846, REG11, VSET),
+-	ACT88xx_REG("REG12", ACT8846, REG12, VSET),
++	ACT88xx_REG("REG1", ACT8846, REG1, VSET, "vp1"),
++	ACT88xx_REG("REG2", ACT8846, REG2, VSET0, "vp2"),
++	ACT88xx_REG("REG3", ACT8846, REG3, VSET0, "vp3"),
++	ACT88xx_REG("REG4", ACT8846, REG4, VSET0, "vp4"),
++	ACT88xx_REG("REG5", ACT8846, REG5, VSET, "inl1"),
++	ACT88xx_REG("REG6", ACT8846, REG6, VSET, "inl1"),
++	ACT88xx_REG("REG7", ACT8846, REG7, VSET, "inl1"),
++	ACT88xx_REG("REG8", ACT8846, REG8, VSET, "inl2"),
++	ACT88xx_REG("REG9", ACT8846, REG9, VSET, "inl2"),
++	ACT88xx_REG("REG10", ACT8846, REG10, VSET, "inl3"),
++	ACT88xx_REG("REG11", ACT8846, REG11, VSET, "inl3"),
++	ACT88xx_REG("REG12", ACT8846, REG12, VSET, "inl3"),
+ };
+ 
+ static const struct regulator_desc act8865_regulators[] = {
+-	ACT88xx_REG("DCDC_REG1", ACT8865, DCDC1, VSET1),
+-	ACT88xx_REG("DCDC_REG2", ACT8865, DCDC2, VSET1),
+-	ACT88xx_REG("DCDC_REG3", ACT8865, DCDC3, VSET1),
+-	ACT88xx_REG("LDO_REG1", ACT8865, LDO1, VSET),
+-	ACT88xx_REG("LDO_REG2", ACT8865, LDO2, VSET),
+-	ACT88xx_REG("LDO_REG3", ACT8865, LDO3, VSET),
+-	ACT88xx_REG("LDO_REG4", ACT8865, LDO4, VSET),
++	ACT88xx_REG("DCDC_REG1", ACT8865, DCDC1, VSET1, "vp1"),
++	ACT88xx_REG("DCDC_REG2", ACT8865, DCDC2, VSET1, "vp2"),
++	ACT88xx_REG("DCDC_REG3", ACT8865, DCDC3, VSET1, "vp3"),
++	ACT88xx_REG("LDO_REG1", ACT8865, LDO1, VSET, "inl45"),
++	ACT88xx_REG("LDO_REG2", ACT8865, LDO2, VSET, "inl45"),
++	ACT88xx_REG("LDO_REG3", ACT8865, LDO3, VSET, "inl67"),
++	ACT88xx_REG("LDO_REG4", ACT8865, LDO4, VSET, "inl67"),
+ };
+ 
+ #ifdef CONFIG_OF
+-- 
+2.1.4
