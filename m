@@ -1,46 +1,36 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 7 Mar 2015 00:37:57 +0000 (UTC)
-Subject: [PATCH 2/4] ARM: OMAP2+: AM43xx hwmod: Add RTC hwmod for
- AM43xx
-In-Reply-To: <54F9E8DF.4000009@ti.com>
-References: <1425561211-31003-1-git-send-email-d-gerlach@ti.com>
- <1425561211-31003-3-git-send-email-d-gerlach@ti.com>
- <alpine.DEB.2.02.1503060425590.5613@utopia.booyaka.com>
- <54F9E41B.5010805@ti.com>
- <alpine.DEB.2.02.1503061743170.20994@utopia.booyaka.com>
- <54F9E8DF.4000009@ti.com>
-Message-ID: <alpine.DEB.2.02.1503070037240.20994@utopia.booyaka.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri,  6 Mar 2015 16:54:48 -0800
+Subject: [PATCH 0/5] ARM: Broadcom Brahma-B15 readahead cache support
+Message-ID: <1425689693-31034-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 6 Mar 2015, Dave Gerlach wrote:
+Hi all,
 
-> On 03/06/2015 11:44 AM, Paul Walmsley wrote:
-> > On Fri, 6 Mar 2015, Dave Gerlach wrote:
-> >> On 03/05/2015 10:26 PM, Paul Walmsley wrote:
-> >>> On Thu, 5 Mar 2015, Dave Gerlach wrote:
-> >>>
-> >>>> RTC hwmod is needed for proper operation of PM features like
-> >>>> rtcwake and rtc-only mode so reuse the am33xx rtc hwmod.
-> >>>>
-> >>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> >>>
-> >>> Thanks, queued for v4.1.
-> >>
-> >> Thanks, but please note as I just commented in Patch 1 of this series, without
-> >> the ti,no-init flag in place that is introduced there this patch will cause the
-> >> am43x-epos-evm to fail to boot.
-> > 
-> > If that's so, shouldn't it appear in the series after patch 3, then?  
-> > If only patches 1 and 2 are applied, then won't the boot be broken on 
-> > am43x-epos-evm ?
-> 
-> Hmm yes you are correct that would be the case, seems I should have swapped the
-> order. I've gotten into the habit of putting dt patches last to enable what gets
-> introduced previously, guess it's not always the best thing to do. Thanks for
-> pointing this out.
+This patch series adds support for the Broadcom Brahma-B15 CPU read-ahead cache
+which is to be found in several Broadcom SoCs, and mainline brcmstb.
 
-OK dropped until this thing is sorted out.
+Let me know your thoughts on this, we have tried to minimize both the
+compile-time and runtime impact for non-Broadcom CPU parts.
 
+Florian Fainelli (5):
+  ARM: v7: allow setting different cache functions
+  ARM: Add Broadcom Brahma-B15 readahead cache support
+  ARM: Hook B15 readahead cache functions based on processor
+  ARM: B15: Add CPU hotplug awareness
+  ARM: B15: Add suspend/resume hooks
 
-- Paul
+ arch/arm/include/asm/cacheflush.h             |   2 +-
+ arch/arm/include/asm/glue-cache.h             |   4 +
+ arch/arm/include/asm/hardware/cache-b15-rac.h |  12 +
+ arch/arm/mm/Kconfig                           |   8 +
+ arch/arm/mm/Makefile                          |   1 +
+ arch/arm/mm/cache-b15-rac.c                   | 329 ++++++++++++++++++++++++++
+ arch/arm/mm/cache-v7.S                        |  21 ++
+ arch/arm/mm/proc-v7.S                         |   6 +-
+ 8 files changed, 379 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/include/asm/hardware/cache-b15-rac.h
+ create mode 100644 arch/arm/mm/cache-b15-rac.c
+
+-- 
+2.1.0
