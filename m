@@ -1,141 +1,111 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  6 Mar 2015 15:41:53 -0800
-Subject: [PATCH v2] clk: qcom: Properly change rates for ahbix clock
-Message-ID: <1425685313-6005-1-git-send-email-sboyd@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 6 Mar 2015 16:27:05 -0800
+Subject: [GIT PULL] omap fixes against v4.0-rc2
+Message-ID: <20150307002704.GA5264@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ahbix clock can never be turned off in practice. To change the
-rates we need to switch the mux off the M/N counter to an always on
-source (XO), reprogram the M/N counter to get the rate we want and
-finally switch back to the M/N counter. Add a new ops structure
-for this type of clock so that we can set the rate properly.
+The following changes since commit 13a7a6ac0a11197edcd0f756a035f472b42cdf8b:
 
-Fixes: c99e515a92e9 "clk: qcom: Add IPQ806X LPASS clock controller (LCC) driver"
-Cc: Kenneth Westfield <kwestfie@codeaurora.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+  Linux 4.0-rc2 (2015-03-03 09:04:59 -0800)
 
-Changes from v1:
- * Handle the case where clock feeding M/N counter is off
+are available in the git repository at:
 
- drivers/clk/qcom/clk-rcg.c     | 62 ++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/qcom/clk-rcg.h     |  1 +
- drivers/clk/qcom/lcc-ipq806x.c |  5 ++--
- 3 files changed, 65 insertions(+), 3 deletions(-)
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/fixes-v4.0-rc2
 
-diff --git a/drivers/clk/qcom/clk-rcg.c b/drivers/clk/qcom/clk-rcg.c
-index 0039bd7d3965..466f30ca65c2 100644
---- a/drivers/clk/qcom/clk-rcg.c
-+++ b/drivers/clk/qcom/clk-rcg.c
-@@ -495,6 +495,57 @@ static int clk_rcg_bypass_set_rate(struct clk_hw *hw, unsigned long rate,
- 	return __clk_rcg_set_rate(rcg, rcg->freq_tbl);
- }
- 
-+/*
-+ * This type of clock has a glitch-free mux that switches between the output of
-+ * the M/N counter and an always on clock source (XO). When clk_set_rate() is
-+ * called we need to make sure that we don't switch to the M/N counter if it
-+ * isn't clocking because the mux will get stuck and the clock will stop
-+ * outputting a clock. This can happen if the framework isn't aware that this
-+ * clock is on and so clk_set_rate() doesn't turn on the new parent. To fix
-+ * this we switch the mux in the enable/disable ops and reprogram the M/N
-+ * counter in the set_rate op. We also make sure to switch away from the M/N
-+ * counter in set_rate if software thinks the clock is off.
-+ */
-+static int clk_rcg_lcc_set_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long parent_rate)
-+{
-+	struct clk_rcg *rcg = to_clk_rcg(hw);
-+	const struct freq_tbl *f;
-+	int ret;
-+	u32 gfm = BIT(10);
-+
-+	f = qcom_find_freq(rcg->freq_tbl, rate);
-+	if (!f)
-+		return -EINVAL;
-+
-+	/* Switch to XO to avoid glitches */
-+	regmap_update_bits(rcg->clkr.regmap, rcg->ns_reg, gfm, 0);
-+	ret = __clk_rcg_set_rate(rcg, f);
-+	/* Switch back to M/N if it's clocking */
-+	if (__clk_is_enabled(hw->clk))
-+		regmap_update_bits(rcg->clkr.regmap, rcg->ns_reg, gfm, gfm);
-+
-+	return ret;
-+}
-+
-+static int clk_rcg_lcc_enable(struct clk_hw *hw)
-+{
-+	struct clk_rcg *rcg = to_clk_rcg(hw);
-+	u32 gfm = BIT(10);
-+
-+	/* Use M/N */
-+	return regmap_update_bits(rcg->clkr.regmap, rcg->ns_reg, gfm, gfm);
-+}
-+
-+static void clk_rcg_lcc_disable(struct clk_hw *hw)
-+{
-+	struct clk_rcg *rcg = to_clk_rcg(hw);
-+	u32 gfm = BIT(10);
-+
-+	/* Use XO */
-+	regmap_update_bits(rcg->clkr.regmap, rcg->ns_reg, gfm, 0);
-+}
-+
- static int __clk_dyn_rcg_set_rate(struct clk_hw *hw, unsigned long rate)
- {
- 	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
-@@ -543,6 +594,17 @@ const struct clk_ops clk_rcg_bypass_ops = {
- };
- EXPORT_SYMBOL_GPL(clk_rcg_bypass_ops);
- 
-+const struct clk_ops clk_rcg_lcc_ops = {
-+	.enable = clk_rcg_lcc_enable,
-+	.disable = clk_rcg_lcc_disable,
-+	.get_parent = clk_rcg_get_parent,
-+	.set_parent = clk_rcg_set_parent,
-+	.recalc_rate = clk_rcg_recalc_rate,
-+	.determine_rate = clk_rcg_determine_rate,
-+	.set_rate = clk_rcg_lcc_set_rate,
-+};
-+EXPORT_SYMBOL_GPL(clk_rcg_lcc_ops);
-+
- const struct clk_ops clk_dyn_rcg_ops = {
- 	.enable = clk_enable_regmap,
- 	.is_enabled = clk_is_enabled_regmap,
-diff --git a/drivers/clk/qcom/clk-rcg.h b/drivers/clk/qcom/clk-rcg.h
-index 687e41f91d7c..d09d06ba278e 100644
---- a/drivers/clk/qcom/clk-rcg.h
-+++ b/drivers/clk/qcom/clk-rcg.h
-@@ -96,6 +96,7 @@ struct clk_rcg {
- 
- extern const struct clk_ops clk_rcg_ops;
- extern const struct clk_ops clk_rcg_bypass_ops;
-+extern const struct clk_ops clk_rcg_lcc_ops;
- 
- #define to_clk_rcg(_hw) container_of(to_clk_regmap(_hw), struct clk_rcg, clkr)
- 
-diff --git a/drivers/clk/qcom/lcc-ipq806x.c b/drivers/clk/qcom/lcc-ipq806x.c
-index 9e27d82c0201..a6d3a6745c4d 100644
---- a/drivers/clk/qcom/lcc-ipq806x.c
-+++ b/drivers/clk/qcom/lcc-ipq806x.c
-@@ -386,13 +386,12 @@ static struct clk_rcg ahbix_clk = {
- 	.freq_tbl = clk_tbl_ahbix,
- 	.clkr = {
- 		.enable_reg = 0x38,
--		.enable_mask = BIT(10), /* toggle the gfmux to select mn/pxo */
-+		.enable_mask = BIT(11),
- 		.hw.init = &(struct clk_init_data){
- 			.name = "ahbix",
- 			.parent_names = lcc_pxo_pll4,
- 			.num_parents = 2,
--			.ops = &clk_rcg_ops,
--			.flags = CLK_SET_RATE_GATE,
-+			.ops = &clk_rcg_lcc_ops,
- 		},
- 	},
- };
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+for you to fetch changes up to 5b7610f235627878617648a99dd1442997f1c889:
+
+  ARM: OMAP2+: Fix wl12xx on dm3730-evm with mainline u-boot (2015-03-06 10:37:34 -0800)
+
+----------------------------------------------------------------
+Fixes for various omap variants, mostly minor fixes for various SoCs
+with the bigger changes being for the dra7 clocks and hwmod data:
+
+- Fix wl12xx for dm3730-evm
+
+- Fix omap4 prm save and clea
+
+- Fix hwmod clkdm use count
+
+- Fix hwmod data for pcie on dra7
+
+- Fix lockdep for hwmod
+
+- Fix USB on most omap3 boars by enabling it in the defconfig
+
+- Fix the bypass clock source for omap5 and dra7
+
+- Fix the ehrpwm clock for am33xx and am43xx
+
+- Enable AES and SHAM for BeagleBone white
+
+- Use rmii clock for am335x-lxm
+
+- Fix polling intervals for omap5 thermal zones
+
+- Fix slewctrl for am33xx and am43xx
+
+- Fix dra7-evm dcan pinctrl
+
+----------------------------------------------------------------
+Aaro Koskinen (1):
+      ARM: OMAP: enable TWL4030_USB in omap2plus_defconfig
+
+Dave Gerlach (2):
+      ARM: dts: am33xx: fix SLEWCTRL_FAST pinctrl binding
+      ARM: dts: am43xx: fix SLEWCTRL_FAST pinctrl binding
+
+George McCollister (1):
+      ARM: dts: am335x-lxm: Use rmii-clock-ext
+
+Kishon Vijay Abraham I (1):
+      ARM: DRA7: hwmod_data: Fix hwmod data for pcie
+
+Matt Porter (1):
+      ARM: dts: am335x-bone-common: enable aes and sham
+
+Peter Ujfalusi (1):
+      ARM: omap2+: omap_hwmod: Set unique lock_class_key per hwmod
+
+Ravikumar Kattekola (2):
+      ARM: dts: DRA7x: Fix the bypass clock source for dpll_iva and others
+      ARM: dts: OMAP5: Fix the bypass clock source for dpll_iva and others
+
+Roger Quadros (2):
+      ARM: dts: dra7x-evm: Don't use dcan1_rx.gpio1_15 in DCAN pinctrl
+      ARM: dts: dra7x-evm: avoid possible contention while muxing on CAN lines
+
+Tero Kristo (3):
+      ARM: OMAP2+: hwmod: fix deassert hardreset clkdm usecounting
+      ARM: OMAP4+: PRM: fix omap4 version of prm_save_and_clear_irqen
+      ARM: dts: OMAP5: fix polling intervals for thermal zones
+
+Tony Lindgren (2):
+      Merge tag 'for-v4.0-rc/omap-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v4.0/fixes
+      ARM: OMAP2+: Fix wl12xx on dm3730-evm with mainline u-boot
+
+Vignesh R (2):
+      ARM: dts: am33xx-clocks: Fix ehrpwm tbclk data on am33xx
+      ARM: dts: am43xx-clocks: Fix ehrpwm tbclk data on am43xx
+
+ arch/arm/boot/dts/am335x-bone-common.dtsi |   8 +++
+ arch/arm/boot/dts/am335x-bone.dts         |   8 ---
+ arch/arm/boot/dts/am335x-lxm.dts          |   4 ++
+ arch/arm/boot/dts/am33xx-clocks.dtsi      |   6 +-
+ arch/arm/boot/dts/am43xx-clocks.dtsi      |  12 ++--
+ arch/arm/boot/dts/dra7-evm.dts            |  10 ++-
+ arch/arm/boot/dts/dra72-evm.dts           |  10 ++-
+ arch/arm/boot/dts/dra7xx-clocks.dtsi      |  90 +++++++++++++++++++++++---
+ arch/arm/boot/dts/omap5-core-thermal.dtsi |   2 +-
+ arch/arm/boot/dts/omap5-gpu-thermal.dtsi  |   2 +-
+ arch/arm/boot/dts/omap5.dtsi              |   4 ++
+ arch/arm/boot/dts/omap54xx-clocks.dtsi    |  41 ++++++++++--
+ arch/arm/configs/omap2plus_defconfig      |   1 +
+ arch/arm/mach-omap2/omap_hwmod.c          |  10 +--
+ arch/arm/mach-omap2/omap_hwmod.h          |   1 +
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 103 +++++++-----------------------
+ arch/arm/mach-omap2/pdata-quirks.c        |   1 +
+ arch/arm/mach-omap2/prm44xx.c             |   4 +-
+ include/dt-bindings/pinctrl/am33xx.h      |   3 +-
+ include/dt-bindings/pinctrl/am43xx.h      |   3 +-
+ 20 files changed, 191 insertions(+), 132 deletions(-)
