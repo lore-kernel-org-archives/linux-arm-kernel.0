@@ -1,64 +1,67 @@
-From: sre@debian.org (Sebastian Reichel)
-Date: Sat, 7 Mar 2015 22:01:02 +0100
-Subject: twl4030_charger: need changes to get probed?
-In-Reply-To: <20150306212417.GA24169@amd>
-References: <20150224043341.4243.23291.stgit@notabene.brown>
- <20150224043352.4243.11227.stgit@notabene.brown>
- <20150302210926.GP13270@amd>
- <20150305173350.50502b95@notabene.brown>
- <20150306212417.GA24169@amd>
-Message-ID: <20150307210102.GL5233@earth>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 7 Mar 2015 23:24:08 +0100
+Subject: [PATCH 1/2] arm64: juno: Add APB registers and LEDs using syscon
+In-Reply-To: <20150227140600.GZ905@e106497-lin.cambridge.arm.com>
+References: <1424866589-2988-1-git-send-email-linus.walleij@linaro.org>
+ <20150225135512.GE12377@arm.com>
+ <20150225144756.GA905@e106497-lin.cambridge.arm.com>
+ <20150225150023.GJ12377@arm.com>
+ <20150225151157.GC905@e106497-lin.cambridge.arm.com>
+ <CACRpkdYd7ZOMt1QxhCxzhavhcd8wcWrC2j1Ce5eGP9piX=xwkQ@mail.gmail.com>
+ <20150227140600.GZ905@e106497-lin.cambridge.arm.com>
+Message-ID: <CACRpkdZq9n1+3sBi3g-ZTa9TaC3_PsO3ecox2gu7Vq-0rouXxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Feb 27, 2015 at 3:06 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> On Fri, Feb 27, 2015 at 01:07:42PM +0000, Linus Walleij wrote:
 
-On Fri, Mar 06, 2015 at 10:24:17PM +0100, Pavel Machek wrote:
-> According to n900 dts, twl4030-bci (aka charger) should be
-> included.
+>> Notice that the SD card slot is *ALSO* inside the box, do you mean we
+>> should then also delete the uSD card support added in
+>> commit 71f867ec130e3cc8e692366fdf8941ded27c727e
+>> by yourself because the SD card slot is not reachable?
+>> Notice that to access that card slot you even have to remove the
+>> nice blue ARM boilerplate.
+>
+> That's not my view. I have a mobile phone with an uSD card slot, but I have to take
+> the cover off (and the battery) to access it. It doesn't mean I should not be able
+> to use it from kernel side because of that, only that the designer of the phone
+> (and of the Juno board + box by extension) did not expect people to use it with
+> covers off all the time.
+>
+> <virtual-tongue-in-cheek-on>
+> I fail to see why you need to remove the SD card all the time. Surely opening
+> the case once to put the uSD card in is enough? ;)
+> </virtual-tongue-in-cheek-on>
+>
+>>
+>> The board is obviously designed to be reachable and the top part
+>> of the case is obviously designed to be taken off by professional
+>> users.
+>
+> I'm mostly on your side, Linus, I was just looking for more use cases. Like I've said,
+> most of our customers seem to keep the case closed (or at least that is what they tell
+> us :) ) so I'm looking for explanations on how you use the LEDs (visual debugging for
+> big-LITTLE was how Lorenzo was using them on TC2 for example).
 
-its part of twl, but not used on N900 afaik.
+OK now I feel bad and maybe I was not in such a good mood that day.
 
-> (But it does not seem to do anything useful on n900. I was hoping for
-> measurement of input voltage, but .. no.)
+The LEDs I added are really useful on the other ARM reference designs,
+the heartbeat gives a sign that the system is alive even if your console is
+not working and that's what I appreaciate a lot about it (the
+heartbeat intensity
+also indicates system load).
 
-check for rx51-battery.
+The MMC read/write LED is as useful as the hard disk activity LED on
+some older PCs, kinda nice if you want to know something is going on.
 
-> Any ideas why the patch below is needed?
+The rest of the LEDs show which CPU cores are active. This was the
+original use of the LEDs on the RealView PB11MPcore and it was
+appreciated by the multicore developers who could see the different
+CPUs being busy with tasks.
 
-platform_driver_probe() does not support deferred probing.
+LEDs on development boards are real nice, simply, and I think also
+some deployed ARM64 server systems will have them.
 
-Neil, can you take this patch into your series for the next round?
-
--- Sebastian
-
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> 
-> diff --git a/drivers/power/twl4030_charger.c b/drivers/power/twl4030_charger.c
-> index d35b83e..96bbbe9 100644
-> --- a/drivers/power/twl4030_charger.c
-> +++ b/drivers/power/twl4030_charger.c
-> @@ -714,6 +722,7 @@ static const struct of_device_id twl_bci_of_match[] = {
->  MODULE_DEVICE_TABLE(of, twl_bci_of_match);
->  
->  static struct platform_driver twl4030_bci_driver = {
-> +	.probe = twl4030_bci_probe,
->  	.driver	= {
->  		.name	= "twl4030_bci",
->  		.of_match_table = of_match_ptr(twl_bci_of_match),
-> @@ -721,7 +730,7 @@ static struct platform_driver twl4030_bci_driver = {
->  	.remove	= __exit_p(twl4030_bci_remove),
->  };
->  
-> -module_platform_driver_probe(twl4030_bci_driver, twl4030_bci_probe);
-> +module_platform_driver(twl4030_bci_driver);
->  
->  MODULE_AUTHOR("Gra?vydas Ignotas");
->  MODULE_DESCRIPTION("TWL4030 Battery Charger Interface driver");
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150307/fa10e97e/attachment.sig>
+Yours,
+Linus Walleij
