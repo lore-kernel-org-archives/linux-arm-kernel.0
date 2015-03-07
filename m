@@ -1,74 +1,41 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 07 Mar 2015 18:24:09 +0000
-Subject: [PATCH v7 0/8] imx25 adc and touchscreen driver
-In-Reply-To: <1425369498-25541-1-git-send-email-mpa@pengutronix.de>
-References: <1425369498-25541-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <54FB4249.6070801@kernel.org>
+From: dengcheng.zhu@imgtec.com (Deng-Cheng Zhu)
+Date: Sat, 7 Mar 2015 10:30:22 -0800
+Subject: [PATCH v2 04/17] clocksource: versatile: Add PLAT_VERSATILE dependency
+In-Reply-To: <1425753035-17087-1-git-send-email-dengcheng.zhu@imgtec.com>
+References: <1425753035-17087-1-git-send-email-dengcheng.zhu@imgtec.com>
+Message-ID: <1425753035-17087-5-git-send-email-dengcheng.zhu@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/15 07:58, Markus Pargmann wrote:
-> Hi,
-> 
-> This series adds a driver for the Freescale i.MX25 SoC internal ADC unit which
-> is used for touchscreen and ADC. The driver consists of three parts, the MFD
-> driver which handles interrupts and some central configuration registers, the
-> ADC driver and the touchscreen driver.
-> 
-> v7 has some modifications in the probe functions to use devres irq requests.
-> irq checks were fixed to check for irqs <= 0. The header was cleaned up to have
-> a more uniform presentation of the bit fields. Detailed changelogs are attached
-> to the according mails.
-> 
-> Best Regards,
-> 
-> Markus
-Almost there as far as I am concerned.  Just that one unbalanced regulator_enable
-that needs dealing with.  The bindings are pretty simple so whilst a device-tree
-ack would of course be great I guess it could be taken without.
+GENERIC_SCHED_CLOCK can be selected by architectures other than ARM. The
+current dependencies of CLKSRC_VERSATILE make it possible that other
+architectures will have CLKSRC_VERSATILE available in configuration once
+they select GENERIC_SCHED_CLOCK, whereas this clock source should be solely
+available to ARM in reality.
 
-This wants to go via mfd or I suppose the freescale/arm-soc tree.  Either is fine
-with me.
+This patch adds one more dependency to CLKSRC_VERSATILE to fix the issue.
 
-Jonathan
-> 
-> 
-> Denis Carikli (2):
->   ARM: dts: imx25: Add TSC and ADC support
->   ARM: imx_v4_v5_defconfig: Add I.MX25 Touchscreen controller and ADC
->     support.
-> 
-> Markus Pargmann (6):
->   ARM: dt: Binding documentation for imx25 ADC/TSC
->   ARM: dt: Binding documentation for imx25 GCQ
->   ARM: dt: Binding documentation for imx25 touchscreen controller
->   mfd: fsl imx25 Touchscreen ADC driver
->   iio: adc: fsl,imx25-gcq driver
->   input: touchscreen: imx25 tcq driver
-> 
->  .../devicetree/bindings/iio/adc/fsl,imx25-gcq.txt  |  54 ++
->  .../bindings/input/touchscreen/fsl-mx25-tcq.txt    |  29 +
->  .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    |  46 ++
->  arch/arm/boot/dts/imx25.dtsi                       |  30 +-
->  arch/arm/configs/imx_v4_v5_defconfig               |   4 +
->  drivers/iio/adc/Kconfig                            |   7 +
->  drivers/iio/adc/Makefile                           |   1 +
->  drivers/iio/adc/fsl-imx25-gcq.c                    | 356 +++++++++++++
->  drivers/input/touchscreen/Kconfig                  |   6 +
->  drivers/input/touchscreen/Makefile                 |   1 +
->  drivers/input/touchscreen/fsl-imx25-tcq.c          | 593 +++++++++++++++++++++
->  drivers/mfd/Kconfig                                |  10 +
->  drivers/mfd/Makefile                               |   2 +
->  drivers/mfd/fsl-imx25-tsadc.c                      | 164 ++++++
->  include/dt-bindings/iio/adc/fsl-imx25-gcq.h        |  18 +
->  include/linux/mfd/imx25-tsadc.h                    | 141 +++++
->  16 files changed, 1459 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
->  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
->  create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
->  create mode 100644 drivers/iio/adc/fsl-imx25-gcq.c
->  create mode 100644 drivers/input/touchscreen/fsl-imx25-tcq.c
->  create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
->  create mode 100644 include/dt-bindings/iio/adc/fsl-imx25-gcq.h
->  create mode 100644 include/linux/mfd/imx25-tsadc.h
-> 
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: LKML <linux-kernel@vger.kernel.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Reported-by: Maciej W. Rozycki <macro@linux-mips.org>
+Signed-off-by: Deng-Cheng Zhu <dengcheng.zhu@imgtec.com>
+---
+ drivers/clocksource/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 1c2506f..22e0ee1 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -225,7 +225,7 @@ config CLKSRC_QCOM
+ 
+ config CLKSRC_VERSATILE
+ 	bool "ARM Versatile (Express) reference platforms clock source"
+-	depends on GENERIC_SCHED_CLOCK && !ARCH_USES_GETTIMEOFFSET
++	depends on PLAT_VERSATILE && GENERIC_SCHED_CLOCK && !ARCH_USES_GETTIMEOFFSET
+ 	select CLKSRC_OF
+ 	default y if MFD_VEXPRESS_SYSREG
+ 	help
+-- 
+2.3.2
