@@ -1,36 +1,43 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri,  6 Mar 2015 16:54:48 -0800
-Subject: [PATCH 0/5] ARM: Broadcom Brahma-B15 readahead cache support
-Message-ID: <1425689693-31034-1-git-send-email-f.fainelli@gmail.com>
+Date: Fri,  6 Mar 2015 16:54:49 -0800
+Subject: [PATCH 1/5] ARM: v7: allow setting different cache functions
+In-Reply-To: <1425689693-31034-1-git-send-email-f.fainelli@gmail.com>
+References: <1425689693-31034-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1425689693-31034-2-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+In preparation for adding support for the Broadcom Brahma-B15 read-ahead
+cache which requires a different set of cache functions, allow the
+__v7_proc macro to override the cache_fns settings, and default to
+v7_cache_fns unless specified otherwise.
 
-This patch series adds support for the Broadcom Brahma-B15 CPU read-ahead cache
-which is to be found in several Broadcom SoCs, and mainline brcmstb.
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/mm/proc-v7.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Let me know your thoughts on this, we have tried to minimize both the
-compile-time and runtime impact for non-Broadcom CPU parts.
-
-Florian Fainelli (5):
-  ARM: v7: allow setting different cache functions
-  ARM: Add Broadcom Brahma-B15 readahead cache support
-  ARM: Hook B15 readahead cache functions based on processor
-  ARM: B15: Add CPU hotplug awareness
-  ARM: B15: Add suspend/resume hooks
-
- arch/arm/include/asm/cacheflush.h             |   2 +-
- arch/arm/include/asm/glue-cache.h             |   4 +
- arch/arm/include/asm/hardware/cache-b15-rac.h |  12 +
- arch/arm/mm/Kconfig                           |   8 +
- arch/arm/mm/Makefile                          |   1 +
- arch/arm/mm/cache-b15-rac.c                   | 329 ++++++++++++++++++++++++++
- arch/arm/mm/cache-v7.S                        |  21 ++
- arch/arm/mm/proc-v7.S                         |   6 +-
- 8 files changed, 379 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/include/asm/hardware/cache-b15-rac.h
- create mode 100644 arch/arm/mm/cache-b15-rac.c
-
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 8b4ee5e81c14..e0dc266579bc 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -467,7 +467,7 @@ __v7_setup_stack:
+ 	/*
+ 	 * Standard v7 proc info content
+ 	 */
+-.macro __v7_proc initfunc, mm_mmuflags = 0, io_mmuflags = 0, hwcaps = 0, proc_fns = v7_processor_functions
++.macro __v7_proc initfunc, mm_mmuflags = 0, io_mmuflags = 0, hwcaps = 0, proc_fns = v7_processor_functions, cache_fns = v7_cache_fns
+ 	ALT_SMP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
+ 			PMD_SECT_AF | PMD_FLAGS_SMP | \mm_mmuflags)
+ 	ALT_UP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
+@@ -483,7 +483,7 @@ __v7_setup_stack:
+ 	.long	\proc_fns
+ 	.long	v7wbi_tlb_fns
+ 	.long	v6_user_fns
+-	.long	v7_cache_fns
++	.long	\cache_fns
+ .endm
+ 
+ #ifndef CONFIG_ARM_LPAE
 -- 
 2.1.0
