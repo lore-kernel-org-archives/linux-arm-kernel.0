@@ -1,33 +1,30 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Sat, 07 Mar 2015 14:27:35 +0200
-Subject: [PATCH 4/5] coresight-stm: adding driver for CoreSight STM
- component
-In-Reply-To: <1425078294-13059-5-git-send-email-mathieu.poirier@linaro.org>
-References: <1425078294-13059-1-git-send-email-mathieu.poirier@linaro.org>
- <1425078294-13059-5-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <87ioed6lhk.fsf@ashishki-desk.ger.corp.intel.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Sat, 7 Mar 2015 04:00:17 +0100
+Subject: [PATCH v2 07/10] drivers: PL011: move cts_event workaround into
+ separate function
+In-Reply-To: <1425491994-23913-8-git-send-email-andre.przywara@arm.com>
+References: <1425491994-23913-1-git-send-email-andre.przywara@arm.com>
+ <1425491994-23913-8-git-send-email-andre.przywara@arm.com>
+Message-ID: <20150307030017.GA29063@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+On Wed, Mar 04, 2015 at 05:59:51PM +0000, Andre Przywara wrote:
+> To avoid lines with more than 80 characters and to make the
+> pl011_int() function more readable, move the workaround out into a
+> separate function.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> 
+> Conflicts:
+> 
+> 	drivers/tty/serial/amba-pl011.c
 
-> From: Pratik Patel <pratikp@codeaurora.org>
->
-> This driver adds support for the STM CoreSight IP block,
-> allowing any system compoment (HW or SW) to log and
-> aggregate messages via a single entity.
->
-> The STM exposes an application defined number of channels
-> called stimulus port.  Configuration is done using entries
-> in sysfs and channels made available to userspace via devfs.
+Why is this here in the changelog?  It doesn't make sense when sending
+patches out :)
 
-I somehow missed it when it was posted, but anyway. It looks like we are
-solving a very similar problem (the STM device) and I'd like to propose
-a generic and architecture independent solution [1]. I also took the
-liberty to copy you and Pratik on those patches.
+Please fix up and resend the patches I didn't apply.
 
-[1] https://lkml.org/lkml/2015/3/7/99
+thanks,
 
-Regards,
---
-Alex
+greg k-h
