@@ -1,67 +1,104 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat,  7 Mar 2015 07:23:28 +0100
-Subject: [PATCH v4 0/4] net/macb: merge at91_ether driver into macb driver
-Message-ID: <1425709412-4935-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Sat,  7 Mar 2015 07:23:29 +0100
+Subject: [PATCH v4 1/4] ARM: at91/dt: fix macb compatible strings
+In-Reply-To: <1425709412-4935-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1425709412-4935-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1425709412-4935-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Some at91 SoCs embed a 10/100 Mbit Ethernet IP, that is based on the
+at91sam9260 SoC.
+Fix at91 DTs accordingly.
 
-The rm9200 boards use the dedicated at91_ether driver instead of the
-regular macb driver.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91sam9260.dtsi      | 2 +-
+ arch/arm/boot/dts/at91sam9263.dtsi      | 2 +-
+ arch/arm/boot/dts/at91sam9g45.dtsi      | 2 +-
+ arch/arm/boot/dts/at91sam9x5_macb0.dtsi | 2 +-
+ arch/arm/boot/dts/at91sam9x5_macb1.dtsi | 2 +-
+ arch/arm/boot/dts/sama5d3_emac.dtsi     | 2 +-
+ 6 files changed, 6 insertions(+), 6 deletions(-)
 
-Both the macb and at91_ether drivers can be compiled as separated
-modules.
-Since the at91_ether driver uses code from the macb driver, at91_ether.ko
-depends on macb.ko.
-
-However the macb.ko module always fails to load on rm9200 boards: the
-macb_probe() function expects a hclk clock which doesn't exist on rm9200.
-Then the at91_ether.ko can't be loaded in turn due to unresolved
-dependencies.
-
-This series of patches fix this issue by merging at91_ether into macb.
-
-Patch 1 is fixing a problem that might happen when enabling ARM
-multi-platform suppot.
-
-Best Regards,
-
-Boris
-
-Changes since v3:
-- move "net: macb: remove #if defined(CONFIG_ARCH_AT91) sections" patch
-  into this series to avoid dependency on other patch series.
-
-Changes since v2:
-- rebase after changed brought by commit "net: macb: remove #if
-  defined(CONFIG_ARCH_AT91) sections"
-
-Changes since v1:
-- rework probe functions to share common probing logic
-
-
-Boris Brezillon (2):
-  ARM: at91/dt: fix macb compatible strings
-  net: macb: remove #if defined(CONFIG_ARCH_AT91) sections
-
-Cyrille Pitchen (2):
-  net/macb: unify clock management
-  net/macb: merge at91_ether driver into macb driver
-
- arch/arm/boot/dts/at91sam9260.dtsi        |   2 +-
- arch/arm/boot/dts/at91sam9263.dtsi        |   2 +-
- arch/arm/boot/dts/at91sam9g45.dtsi        |   2 +-
- arch/arm/boot/dts/at91sam9x5_macb0.dtsi   |   2 +-
- arch/arm/boot/dts/at91sam9x5_macb1.dtsi   |   2 +-
- arch/arm/boot/dts/sama5d3_emac.dtsi       |   2 +-
- drivers/net/ethernet/cadence/Kconfig      |   8 -
- drivers/net/ethernet/cadence/Makefile     |   1 -
- drivers/net/ethernet/cadence/at91_ether.c | 481 ----------------------
- drivers/net/ethernet/cadence/macb.c       | 662 ++++++++++++++++++++++--------
- drivers/net/ethernet/cadence/macb.h       |  12 +-
- 11 files changed, 503 insertions(+), 673 deletions(-)
- delete mode 100644 drivers/net/ethernet/cadence/at91_ether.c
-
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index fff0ee6..9f7c737 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -842,7 +842,7 @@
+ 			};
+ 
+ 			macb0: ethernet at fffc4000 {
+-				compatible = "cdns,at32ap7000-macb", "cdns,macb";
++				compatible = "cdns,at91sam9260-macb", "cdns,macb";
+ 				reg = <0xfffc4000 0x100>;
+ 				interrupts = <21 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index 1f67bb4..340179e 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -845,7 +845,7 @@
+ 			};
+ 
+ 			macb0: ethernet at fffbc000 {
+-				compatible = "cdns,at32ap7000-macb", "cdns,macb";
++				compatible = "cdns,at91sam9260-macb", "cdns,macb";
+ 				reg = <0xfffbc000 0x100>;
+ 				interrupts = <21 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index ee80aa9..586eab7 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -956,7 +956,7 @@
+ 			};
+ 
+ 			macb0: ethernet at fffbc000 {
+-				compatible = "cdns,at32ap7000-macb", "cdns,macb";
++				compatible = "cdns,at91sam9260-macb", "cdns,macb";
+ 				reg = <0xfffbc000 0x100>;
+ 				interrupts = <25 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/at91sam9x5_macb0.dtsi b/arch/arm/boot/dts/at91sam9x5_macb0.dtsi
+index 57e89d1..73d7e30 100644
+--- a/arch/arm/boot/dts/at91sam9x5_macb0.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5_macb0.dtsi
+@@ -53,7 +53,7 @@
+ 			};
+ 
+ 			macb0: ethernet at f802c000 {
+-				compatible = "cdns,at32ap7000-macb", "cdns,macb";
++				compatible = "cdns,at91sam9260-macb", "cdns,macb";
+ 				reg = <0xf802c000 0x100>;
+ 				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/at91sam9x5_macb1.dtsi b/arch/arm/boot/dts/at91sam9x5_macb1.dtsi
+index 663676c..d81980c 100644
+--- a/arch/arm/boot/dts/at91sam9x5_macb1.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5_macb1.dtsi
+@@ -41,7 +41,7 @@
+ 			};
+ 
+ 			macb1: ethernet at f8030000 {
+-				compatible = "cdns,at32ap7000-macb", "cdns,macb";
++				compatible = "cdns,at91sam9260-macb", "cdns,macb";
+ 				reg = <0xf8030000 0x100>;
+ 				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/sama5d3_emac.dtsi b/arch/arm/boot/dts/sama5d3_emac.dtsi
+index fe2af92..b4544cf 100644
+--- a/arch/arm/boot/dts/sama5d3_emac.dtsi
++++ b/arch/arm/boot/dts/sama5d3_emac.dtsi
+@@ -41,7 +41,7 @@
+ 			};
+ 
+ 			macb1: ethernet at f802c000 {
+-				compatible = "cdns,at32ap7000-macb", "cdns,macb";
++				compatible = "cdns,at91sam9260-macb", "cdns,macb";
+ 				reg = <0xf802c000 0x100>;
+ 				interrupts = <35 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
 -- 
 1.9.1
