@@ -1,78 +1,108 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 07 Mar 2015 18:07:24 +0000
-Subject: [PATCH v7 1/8] ARM: dt: Binding documentation for imx25 ADC/TSC
-In-Reply-To: <20150305071252.GA8062@pengutronix.de>
-References: <1425369498-25541-1-git-send-email-mpa@pengutronix.de>
- <1425369498-25541-2-git-send-email-mpa@pengutronix.de>
- <2620642.Qp1W4O8uh6@wuerfel> <20150305071252.GA8062@pengutronix.de>
-Message-ID: <54FB3E5C.7080803@kernel.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Sat, 07 Mar 2015 19:21:19 +0100
+Subject: [PATCH 4/8] ARM: dts: rockchip: relicense rk3288.dtsi under
+ GPLv2/X11
+In-Reply-To: <1425665046-22927-5-git-send-email-heiko@sntech.de>
+References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
+ <1425665046-22927-5-git-send-email-heiko@sntech.de>
+Message-ID: <54FB419F.4050006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/15 07:12, Markus Pargmann wrote:
-> Hi,
-> 
-> On Tue, Mar 03, 2015 at 10:02:12AM +0100, Arnd Bergmann wrote:
->> On Tuesday 03 March 2015 08:58:11 Markus Pargmann wrote:
->>> +Example:
->>> +       tscadc: tscadc at 50030000 {
->>> +               compatible = "fsl,imx25-tsadc";
->>> +               reg = <0x50030000 0xc>;
->>> +               interrupts = <46>;
->>> +               clocks = <&clks 119>;
->>> +               clock-names = "ipg";
->>> +               interrupt-controller;
->>> +               #interrupt-cells = <1>;
->>> +               #address-cells = <1>;
->>> +               #size-cells = <1>;
->>> +               ranges;
->>> +
->>> +               tsc: tcq at 50030400 {
->>> +                       compatible = "fsl,imx25-tcq";
->>> +                       reg = <0x50030400 0x60>;
->>> +                       ...
->>> +               };
->>> +
->>> +               adc: gcq at 50030800 {
->>> +                       compatible = "fsl,imx25-gcq";
->>> +                       reg = <0x50030800 0x60>;
->>> +                       ...
->>> +               };
->>> +       };
->>>
->>
->> I wonder if we should just treat this MFD as a single IIO device
->> that also registers to the input layer.
->>
->> Are there any other registers in the 0x50030000-0x50031000
->> range, or could the fsl,imx25-tcq and fsl,imx25-gcq devices
->> be reused outside of a fsl,imx25-tsadc device?
-> 
-> There are no other registers in this range. The tcq and gcq devices can
-> not be used outside of the tsadc. gcq and tcq are identical units so it
-> may work to use both of them as gcq for example but nothing else.
-> 
-> It may work to have this as single IIO device. However this would be a
-> major rework of this series. There are a lot less users of imx25 than
-> imx6 for example. And of these users barely anyone uses this unit at
-> all. I really would like to get these drivers mainline so others can use
-> it. But after 1 year and 7 versions of this series I don't want to put
-> a lot of work into these drivers. I think there are other components in
-> the kernel where the time is better used.
-> 
-> Best Regards,
-> 
-> Markus
-> 
-I was pretty much against the IIO driver registering with input at least
-where it was vaguely separable.  Pushed a few drivers in this direction.
-Slightly more code, but often these devices are pretty separable (even
-if like here it's two identical hardware blocks) and we normally get
-a whole chunk of touch screen specific magic hardware that isn't of
-general use.
+On 03/06/2015 07:04 PM, Heiko Stuebner wrote:
+> GPLv2-only devicetrees make reuse difficult for software components licensed
+> under a different license.
+>
+> The consensus is that a GPL/X11 dual-license should allow all necessary uses,
+> so relicense the rk3288.dtsi to this combination.
+>
+> CCs were aquired by git shortlog -sne so it should've hopefully catched
+> every contributor.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Cc: Kever Yang <kever.yang@rock-chips.com>
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Addy Ke <addy.ke@rock-chips.com>
+> Cc: Daniel Kurtz <djkurtz@chromium.org>
+> Cc: Andy Yan <andy.yan@rock-chips.com>
+> Cc: Caesar Wang <caesar.wang@rock-chips.com>
+> Cc: Chris Zhong <zyw@rock-chips.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Jianqun Xu<jay.xu@rock-chips.com>
+> Cc: Roger Chen <roger.chen@rock-chips.com>
+> Cc: Sonny Rao <sonnyrao@chromium.org>
+> Cc: Yunzhi Li <lyz@rock-chips.com>
+> Cc: huang lin <hl@rock-chips.com>
+>
+> Not sure if an Ack for a simple revert is necessary, but included anyway
+> Cc: Olof Johansson <olof@lixom.net>
+> ---
+> I'm hoping to get Acked-by tags from the people in the Cc-list.
+>
+>   arch/arm/boot/dts/rk3288.dtsi | 44 +++++++++++++++++++++++++++++++++++--------
+>   1 file changed, 36 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index 2c29a3e..35a06a5 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -1,13 +1,41 @@
+>   /*
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+>    *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>    */
+>
+>   #include <dt-bindings/gpio/gpio.h>
 
-It would be lovely to try and generalize some of this stuff and have
-the touchscreen driver act as a client of IIO, but the
-hardware is too fiddly for it to be obvious how to do it so far.
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Jonathan
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
