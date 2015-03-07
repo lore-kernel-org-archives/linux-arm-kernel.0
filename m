@@ -1,38 +1,49 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat,  7 Mar 2015 07:37:06 +0100
-Subject: [PATCH] net/macb: Update DT bindings documentation
-Message-ID: <1425710226-5744-1-git-send-email-boris.brezillon@free-electrons.com>
+From: codekipper@gmail.com (Code Kipper)
+Date: Sat, 7 Mar 2015 09:41:54 +0100
+Subject: [PATCH] ARM: sun7i: dt: Add new MK808C device
+In-Reply-To: <20150304203400.GR4911@lukather>
+References: <1425131004-8551-1-git-send-email-codekipper@gmail.com>
+ <20150303071342.GB4713@lukather>
+ <CAEKpxB=-vtjMckh3ZHoy0mezE9U1EtKzmttdXRD5ZNztZvB_ag@mail.gmail.com>
+ <20150304203400.GR4911@lukather>
+Message-ID: <CAEKpxBnRyhD8Xiu7uTomM=z4Xm4CH8WVTYjZH73yDgYzwMqn5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing "cdns,at91sam9260-macb", "atmel,sama5d3-gem" and
-"atmel,sama5d4-gem" compatible strings.
+On 4 March 2015 at 21:34, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Mar 03, 2015 at 09:22:32PM +0100, Code Kipper wrote:
+>> >> +
+>> >> +/ {
+>> >> +     model = "mk808c";
+>> >> +     compatible = "mk808c", "allwinner,sun7i-a20";
+>> >
+>> > the compatible must be of the format "vendor,device". Please add the
+>> > vendor name.
+>>
+>> Ahhh....I've searched high and low for a vendors name. I listed it as
+>> unknown on the wiki page,
+>> would 'odm' be considered valid?
+>
+> Not really. Another mk808c device might very well be made by some
+> other odm.
+>
+Hi Maxime,
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- Documentation/devicetree/bindings/net/macb.txt | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+I documented the device here at http://linux-sunxi.org/MK808C.
 
-diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
-index aaa6964..ba19d67 100644
---- a/Documentation/devicetree/bindings/net/macb.txt
-+++ b/Documentation/devicetree/bindings/net/macb.txt
-@@ -2,10 +2,13 @@
- 
- Required properties:
- - compatible: Should be "cdns,[<chip>-]{macb|gem}"
--  Use "cdns,at91sam9260-macb" Atmel at91sam9260 and at91sam9263 SoCs.
-+  Use "cdns,at91sam9260-macb" for Atmel at91sam9 SoCs or the 10/100Mbit IP
-+  available on sama5d3 SoCs.
-   Use "cdns,at32ap7000-macb" for other 10/100 usage or use the generic form: "cdns,macb".
-   Use "cdns,pc302-gem" for Picochip picoXcell pc302 and later devices based on
-   the Cadence GEM, or the generic form: "cdns,gem".
-+  Use "cdns,sama5d3-gem" for the Gigabit IP available on Atmel sama5d3 SoCs.
-+  Use "cdns,sama5d4-gem" for the Gigabit IP available on Atmel sama5d4 SoCs.
- - reg: Address and length of the register set for the device
- - interrupts: Should contain macb interrupt
- - phy-mode: See ethernet.txt file in the same directory.
--- 
-1.9.1
+> Don't your device has any brand on the case or the PCB?
+
+There is nothing on the PCB to reference a manufacturer, the actual packaging
+and case are from the earlier MK808B and mention A9. There was only a
+small sticker on the side to show that the contents was a MK808C.
+I guess 'unknown' isn't a valid vendor name,
+>
+> Maxime
+BR,
+CK
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
