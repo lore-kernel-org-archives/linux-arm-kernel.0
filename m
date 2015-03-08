@@ -1,100 +1,75 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 8 Mar 2015 09:28:45 +0100
-Subject: [RFC V2 03/12] i2c: at91: make use of the new infrastructure for
- quirks
-In-Reply-To: <1424880126-15047-4-git-send-email-wsa@the-dreams.de>
-References: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
- <1424880126-15047-4-git-send-email-wsa@the-dreams.de>
-Message-ID: <20150308082845.GB1904@katana>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Sun, 8 Mar 2015 09:46:35 +0100
+Subject: [PATCH 1/2] pinctrl: Add support for Meson8b
+In-Reply-To: <1425657076-6709-2-git-send-email-carlo@caione.org>
+References: <1425657076-6709-1-git-send-email-carlo@caione.org>
+ <1425657076-6709-2-git-send-email-carlo@caione.org>
+Message-ID: <20150308084635.GA21781@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 05:01:54PM +0100, Wolfram Sang wrote:
-> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+On Fri, Mar 06, 2015 at 04:51:15PM +0100, Carlo Caione wrote:
+> From: Carlo Caione <carlo@endlessm.com>
 > 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> This patch adds pinctrl support for the AmLogic Meson8b SoC.
 
-Hi Ludovic,
+Hi Carlo,
 
-if you have a few minutes, could you please test this series? I'd like to
-include it in 4.1. and because at91 is using the quirk infrastructure in
-a more complex way, it is a really good test candidate.
-
-Thanks,
-
-   Wolfram
-
-> ---
->  drivers/i2c/busses/i2c-at91.c | 32 +++++++++++---------------------
->  1 file changed, 11 insertions(+), 21 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index 636fd2efad8850..b3a70e8fc653c5 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -487,30 +487,10 @@ static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
->  	if (ret < 0)
->  		goto out;
->  
-> -	/*
-> -	 * The hardware can handle at most two messages concatenated by a
-> -	 * repeated start via it's internal address feature.
-> -	 */
-> -	if (num > 2) {
-> -		dev_err(dev->dev,
-> -			"cannot handle more than two concatenated messages.\n");
-> -		ret = 0;
-> -		goto out;
-> -	} else if (num == 2) {
-> +	if (num == 2) {
->  		int internal_address = 0;
->  		int i;
->  
-> -		if (msg->flags & I2C_M_RD) {
-> -			dev_err(dev->dev, "first transfer must be write.\n");
-> -			ret = -EINVAL;
-> -			goto out;
-> -		}
-> -		if (msg->len > 3) {
-> -			dev_err(dev->dev, "first message size must be <= 3.\n");
-> -			ret = -EINVAL;
-> -			goto out;
-> -		}
-> -
->  		/* 1st msg is put into the internal address, start with 2nd */
->  		m_start = &msg[1];
->  		for (i = 0; i < msg->len; ++i) {
-> @@ -540,6 +520,15 @@ out:
->  	return ret;
->  }
->  
-> +/*
-> + * The hardware can handle at most two messages concatenated by a
-> + * repeated start via it's internal address feature.
-> + */
-> +static struct i2c_adapter_quirks at91_twi_quirks = {
-> +	.flags = I2C_AQ_COMB | I2C_AQ_COMB_WRITE_FIRST | I2C_AQ_COMB_SAME_ADDR,
-> +	.max_comb_1st_msg_len = 3,
-> +};
+> [...]
+> +static const unsigned int xtal_24m_pins[]	= { PIN_GPIOY_3 };
+> +static const unsigned int iso7816_2_clk_pins[]	= { PIN_GPIOY_13 };
+> +static const unsigned int iso7816_2_data_pins[] = { PIN_GPIOY_14 };
 > +
->  static u32 at91_twi_func(struct i2c_adapter *adapter)
->  {
->  	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL
-> @@ -777,6 +766,7 @@ static int at91_twi_probe(struct platform_device *pdev)
->  	dev->adapter.owner = THIS_MODULE;
->  	dev->adapter.class = I2C_CLASS_DEPRECATED;
->  	dev->adapter.algo = &at91_twi_algorithm;
-> +	dev->adapter.quirks = &at91_twi_quirks;
->  	dev->adapter.dev.parent = dev->dev;
->  	dev->adapter.nr = pdev->id;
->  	dev->adapter.timeout = AT91_I2C_TIMEOUT;
-> -- 
-> 2.1.4
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150308/eb77cf37/attachment.sig>
+> +
+
+Just a nitpick, there is a double empty line here.
+
+> [...]
+> +static const unsigned int remote_input_pins[]	= { PIN_GPIOAO_7 };
+> +static const unsigned int hdmi_cec_1_pins[]	= { PIN_GPIOAO_12 };
+> +static const unsigned int ir_blaster_pins[]	= { PIN_GPIOAO_13 };
+> +
+> +
+
+The same here.
+
+> [...]
+> +/* First GPIO chip */
+> +#define GPIOX_0		0
+> +#define GPIOX_1		1
+> +#define GPIOX_2		2
+> +#define GPIOX_3		3
+> +#define GPIOX_4		4
+> +#define GPIOX_5		5
+> +#define GPIOX_6		6
+> +#define GPIOX_7		7
+> +#define GPIOX_8		8
+> +#define GPIOX_9		9
+> +#define GPIOX_10	10
+> +#define GPIOX_11	11
+> +#define GPIOX_16	12
+
+This kind of pin numbering breaks the selection of the bit for a given
+pin in meson_calc_reg_and_bit(). Looking at the documentation it seems
+that pins GPIOX_12 through 15 are not available but their bit exist in
+the register and we must take that into account.
+
+For example GPIOX_10 and GPIOX_11 are associated to bits 10 and 11 of
+register 1 for changing the direction and GPIOX_16 to bit 16; but with
+the above assignment the function would select bit 12 for GPIOX_16.
+
+The strange thing is that the pins that are missing in the
+documentation (as GPIOX12-15, GPIOY_2 and others) not only are defined
+but also have some associated mux configuration in Amlogic kernel
+sources.
+
+I'm not very familiar with the inner mechanisms of the pinctrl
+subsystem, but I guess that holes in the numbering of pins wouldn't be
+a problem and thus we can skip the numbers associated to non-existent
+pins (i.e. GPIOX_11 -> 11, GPIOX_16 -> 16). Pinctrl experts please
+correct me if I'm wrong :)
+
+Or we could just pretend that the missing pins exist even if the
+documentation says otherwise.
+
+Beniamino
