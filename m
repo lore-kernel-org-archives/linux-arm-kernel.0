@@ -1,28 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 08 Mar 2015 22:10:14 +0100
-Subject: [PATCH] ASoC: davinci-mcasp: add missing semicolon
-Message-ID: <10196569.gafhWQrdaI@wuerfel>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Sun, 8 Mar 2015 14:11:17 -0700
+Subject: [PATCH 0/3] touchscreen: sun4i-ts: A10 (sun4i) has a different
+ temperature curve
+In-Reply-To: <1425848022-18001-1-git-send-email-hdegoede@redhat.com>
+References: <1425848022-18001-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150308211117.GA23193@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent patch introduced a build error because of a trivial typo, this
-gets it back to compile.
+Hi Hans,
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 6afda7f50754 ("ASoC: davinci-mcasp: Allow complete shutdown of McASP when not in use")
----
-I'm guessing this was reported already, but if not, please apply this patch.
+On Sun, Mar 08, 2015 at 09:53:39PM +0100, Hans de Goede wrote:
+> Hi Dmitry, Maxime, et al.
+> 
+> Here is a patch-set for the sun4i-ts driver temperature sensor support,
+> it consists of 2 fixes:
+> 
+> 1) Use a better temperature curve for A10 SoCs to avoid reporting a way to
+> high temperature.
+> 
+> 2) Start with reporting an "estimated" temperature of 40 degrees rather then
+> returning -EAGAIN until we get the first temperature ready interrupt to avoid
+> the kernel tempzone core logging errors because of our -EAGAIN return.
 
-diff --git a/sound/soc/davinci/davinci-mcasp.c b/sound/soc/davinci/davinci-mcasp.c
-index 33cea0728cd2..d40b392b3da2 100644
---- a/sound/soc/davinci/davinci-mcasp.c
-+++ b/sound/soc/davinci/davinci-mcasp.c
-@@ -1058,7 +1058,7 @@ static int davinci_mcasp_suspend(struct snd_soc_dai *dai)
- 	u32 reg;
- 	int i;
- 
--	context->pm_state = pm_runtime_enabled(mcasp->dev)
-+	context->pm_state = pm_runtime_enabled(mcasp->dev);
- 	if (!context->pm_state)
- 		pm_runtime_get_sync(mcasp->dev);
- 
+No, I think we better teach thermal core not to complain about
+-EAGAINs.
+
+> 
+> Dmitry can you please queue up the 2 sun4i-ts patches for 4.1, and Maxime,
+> can you please queue up the matching dts change ?
+> 
+> Thanks & Regards,
+> 
+> Hans
+
+-- 
+Dmitry
