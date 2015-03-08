@@ -1,81 +1,52 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 08 Mar 2015 02:28:55 +0200
-Subject: [PATCH 3/3] media: atmel-isi: remove mck back compatiable code as
- we don't need it
-In-Reply-To: <Pine.LNX.4.64.1503062124450.20271@axis700.grange>
-References: <1425531661-20040-1-git-send-email-josh.wu@atmel.com>
- <54F97DDF.7010403@atmel.com>
- <Pine.LNX.4.64.1503062124450.20271@axis700.grange>
-Message-ID: <2234113.JDoJN7Dx5y@avalon>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sun, 08 Mar 2015 02:11:45 +0100
+Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
+ IRQF_NO_SUSPEND
+In-Reply-To: <20150307110645.GW3989@piout.net>
+References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150307103939.GA17964@amd> <20150307110645.GW3989@piout.net>
+Message-ID: <2616799.fRG1k0Q6sR@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 06 March 2015 21:25:36 Guennadi Liakhovetski wrote:
-> On Fri, 6 Mar 2015, Josh Wu wrote:
-> > On 3/5/2015 6:41 PM, Laurent Pinchart wrote:
-> >> On Thursday 05 March 2015 13:01:01 Josh Wu wrote:
-> >>> The master clock should handled by sensor itself.
-> >> 
-> >> I like that :-)
-> >> 
-> >>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> >>> ---
-> >>> 
-> >>>   drivers/media/platform/soc_camera/atmel-isi.c | 32 -------------------
-> >>>   1 file changed, 32 deletions(-)
-> >>> 
-> >>> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
-> >>> b/drivers/media/platform/soc_camera/atmel-isi.c index 4a384f1..50375ce
-> >>> 100644
-> >>> --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> >>> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> >>> @@ -83,8 +83,6 @@ struct atmel_isi {
-> >>> 
-> >>>   	struct completion		complete;
-> >>>   	/* ISI peripherial clock */
-> >>>   	struct clk			*pclk;
-> >>> 
-> >>> -	/* ISI_MCK, feed to camera sensor to generate pixel clock */
-> >>> -	struct clk			*mck;
-> >>> 
-> >>>   	unsigned int			irq;
-> >>>   	
-> >>>   	struct isi_platform_data	pdata;
-> >>> 
-> >>> @@ -725,26 +723,12 @@ static void isi_camera_remove_device(struct
-> >>> soc_camera_device *icd) /* Called with .host_lock held */
-> >>> 
-> >>>   static int isi_camera_clock_start(struct soc_camera_host *ici)
-> >>>   {
-> >>> 
-> >>> -	struct atmel_isi *isi = ici->priv;
-> >>> -	int ret;
-> >>> -
-> >>> -	if (!IS_ERR(isi->mck)) {
-> >>> -		ret = clk_prepare_enable(isi->mck);
-> >>> -		if (ret) {
-> >>> -			return ret;
-> >>> -		}
-> >>> -	}
-> >>> -
-> >>> 
-> >>>   	return 0;
-> >> 
-> >> Would it make sense to make the clock_start and clock_stop operations
-> >> optional in the soc-camera core ?
+On Saturday, March 07, 2015 12:06:45 PM Alexandre Belloni wrote:
+> On 07/03/2015 at 11:39:39 +0100, Pavel Machek wrote :
+> > > The Atmel watchdog can't be stopped once it's started. This is actually 
+> > > very useful so we can reset if suspend or resume failed, the only 
+> > > drawback is that you have to wake up from time to time (e.g. by using 
+> > > the RTC/RTT) to clear the watchdog and then go back to sleep ASAP.
 > > 
-> > I agree. For those camera host which don't provide master clock for
-> > sensor, clock_start and clock_stop should be optional.
+> > Yeah. So you do "echo mem > /sys/power/state", and few seconds/minutes
+> > after watchdog kills the system. But you did not ask for dead system,
+> > you asked for suspend.
 > > 
-> > Hi, Guennadi
+> > And while that behaviour is useful for you, I don't think it is
+> > exactly useful behaviour, nor it is the behaviour user would expect.
 > > 
-> > Do you agree with this?
 > 
-> Yes, sure, we can do this. Would anyone like to prepare a patch?
+> I think you misunderstood, that is exactly the expected behaviour. This
+> is hardware defined. Once the watchdog is started, nobody can stop it.
+> Trying to change the mode register will result in a reset of the SoC.
+> 
+> It is documented in the datasheet and any user wanting another behaviour
+> is out of luck.
+> 
+> So basically, when using a watchdog, you have to wake up every 15-16s to
+> restart it.
 
-Josh, would you like to do that, or should I give it a go ?
+So question is if we need a separate interrupt handler for that, expecially
+since it is shared with the PIT timer anyway.
+
+Seems to me that the simplest way out of this conundrum would be to simply
+make the timer's interrupt handler kick the watchdog every once a while and
+get rid of the separate watchdog interrupt handler entirely.
+
+While at it, can anyone explain to me please how the suspend state (full
+suspend) looks like on that platform?  What's different from the working
+state in particular.
+
+
 
 -- 
-Regards,
-
-Laurent Pinchart
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
