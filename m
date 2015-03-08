@@ -1,51 +1,63 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 08 Mar 2015 22:18:30 +0100
-Subject: [PATCH] ARM: sun7i: dt: Add new MK808C device
-In-Reply-To: <20150308174721.GL5085@lukather>
-References: <1425131004-8551-1-git-send-email-codekipper@gmail.com>
- <CAEKpxBnRyhD8Xiu7uTomM=z4Xm4CH8WVTYjZH73yDgYzwMqn5w@mail.gmail.com>
- <20150308174721.GL5085@lukather>
-Message-ID: <9483321.y7yrfWRaG5@wuerfel>
+Date: Sun, 08 Mar 2015 22:42:59 +0100
+Subject: [PATCH 05/10] ARM: s3c64xx: enable sparse IRQ support
+In-Reply-To: <20150306174316.GA26692@opensource.wolfsonmicro.com>
+References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
+ <1425299763-4066822-6-git-send-email-arnd@arndb.de>
+ <20150306174316.GA26692@opensource.wolfsonmicro.com>
+Message-ID: <6643361.dhtMagqMYZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 08 March 2015 18:47:21 Maxime Ripard wrote:
-> 
-> Not enough information to check signature validity.	Show Details
-> Hi,
-> 
-> On Sat, Mar 07, 2015 at 09:41:54AM +0100, Code Kipper wrote:
-> > > Don't your device has any brand on the case or the PCB?
+On Friday 06 March 2015 17:43:16 Charles Keepax wrote:
+> On Mon, Mar 02, 2015 at 01:35:58PM +0100, Arnd Bergmann wrote:
+> > This is another prerequisite for enabling multiplatform
+> > support, and it is the part I am least certain about.
 > > 
-> > There is nothing on the PCB to reference a manufacturer, the actual packaging
-> > and case are from the earlier MK808B and mention A9. There was only a
-> > small sticker on the side to show that the contents was a MK808C.
-> > I guess 'unknown' isn't a valid vendor name,
+> > I assume it will cause the extra boot message "Cannot
+> > allocate irq_descs @ IRQ%d, assuming pre-allocated" to
+> > be printed, but otherwise work ok. This definitely needs
+> > to be tested on real hardware to see if it works.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
 > 
-> Not really.
+> This one appears to cause some problems with the IRQs on
+> Cragganmore, I need to look into it a bit more but it looks like
+> one of the PMICs can't allocate its IRQs:
 > 
-> I really don't know what's the policy to apply in such a case when we
-> have a device that has no identified vendor.
+> [    0.961455] wm831x 1-0034: WM8311 revision C
+> [    0.965066] wm831x 1-0034: Failed to allocate IRQs: -17
 > 
-> We need to give a vendor name, because the compatible is used to tell
-> two devices apart, in the case where we would have to apply quirks for
-> a particular devices.
+> And the CODEC can't request its IRQ:
 > 
-> And if we have two devices (say a Marvlell and an Allwinner one), with
-> the same name, and without any vendor, we're screwed.
+> [    4.252735] arizona spi0.1: WM5102 revision C
+> [    4.269763] arizona spi0.1: Failed to request primary IRQ 263: -22
 > 
-> Maybe falling back to the SoC vendor, in our case, would make sense?
-> 
-> Arnd? Rob? Mark? An opinion on this?
+> Hopefully I can look into this a little more next week.
 > 
 
-I don't really have a good idea. In this case the SoC vendor might
-not be the worst choice, because it's likely to be very close to
-some reference design they actually did.
+My interpretation is that I mistakenly set the .nr_irqs value for
+craggamore to include all irqs that the board has, while the
+wm831x tries to allocate the irq descriptors itself and fails if
+they are already allocated. If that is the only problem here, it
+would get fixed by this change:
 
-Another possibility would be to use a string that refers to the
-organization that does the upstream kernel support, but that's
-harder for individuals that do not work for a company that wants
-its name used that way.
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+index f395a5617142..cbe353a5450e 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+@@ -855,7 +855,7 @@ static void __init crag6410_machine_init(void)
+ MACHINE_START(WLF_CRAGG_6410, "Wolfson Cragganmore 6410")
+ 	/* Maintainer: Mark Brown <broonie@opensource.wolfsonmicro.com> */
+ 	.atag_offset	= 0x100,
+-	.nr_irqs	= S3C64XX_NR_IRQS + 160,
++	.nr_irqs	= S3C64XX_NR_IRQS,
+ 	.init_irq	= s3c6410_init_irq,
+ 	.map_io		= crag6410_map_io,
+ 	.init_machine	= crag6410_machine_init,
+
+The samsung-gpio driver does not allocate irq descriptors for itself
+though, otherwise we could make the S3C64XX_NR_IRQS number smaller.
 
 	Arnd
