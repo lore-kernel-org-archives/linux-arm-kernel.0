@@ -1,102 +1,62 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 08 Mar 2015 12:25:38 +0100
-Subject: [linux-sunxi] [PATCH 6/7] ARM: dts: sun7i: Add OOB irq support
- to boards with broadcom sdio wifi
-In-Reply-To: <CAGb2v642i_Yg9PAg=iMyVgzm0gNwe6v7wmziYJTZcjoDBAFmcw@mail.gmail.com>
+Date: Sun, 08 Mar 2015 12:27:53 +0100
+Subject: [linux-sunxi] [PATCH 7/7] ARM: dts: sun7i: Enable cap-sdio-irq
+ for bananapro sdio wifi
+In-Reply-To: <CAGb2v65tcCrg3njNN0owLrM-MUepRBwjxpU46dpXkLhy9mceEA@mail.gmail.com>
 References: <1425754884-7875-1-git-send-email-hdegoede@redhat.com>
- <1425754884-7875-6-git-send-email-hdegoede@redhat.com>
- <CAGb2v642i_Yg9PAg=iMyVgzm0gNwe6v7wmziYJTZcjoDBAFmcw@mail.gmail.com>
-Message-ID: <54FC31B2.3030706@redhat.com>
+ <1425754884-7875-7-git-send-email-hdegoede@redhat.com>
+ <CAGb2v65tcCrg3njNN0owLrM-MUepRBwjxpU46dpXkLhy9mceEA@mail.gmail.com>
+Message-ID: <54FC3239.5030200@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 08-03-15 04:12, Chen-Yu Tsai wrote:
+On 08-03-15 03:42, Chen-Yu Tsai wrote:
 > On Sun, Mar 8, 2015 at 3:01 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 11 +++++++++++
->>   arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts  | 11 +++++++++++
->>   2 files changed, 22 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->> index 0c219a4..8111b0c 100644
->> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->> @@ -167,12 +167,23 @@
->>   };
->>
->>   &mmc3 {
->> +       #address-cells = <1>;
->> +       #size-cells = <0>;
->> +
->>          pinctrl-names = "default";
->>          pinctrl-0 = <&mmc3_pins_a>;
->>          vmmc-supply = <&reg_vmmc3>;
->>          bus-width = <4>;
->>          non-removable;
->>          status = "okay";
->> +
->> +       brcmf: bcrmf at 1 {
->> +               reg = <1>;
->> +               compatible = "brcm,bcm4329-fmac";
->> +               interrupt-parent = <&pio>;
->> +               interrupts = <10 8>; /* PH10 / EINT10 */
->> +               interrupt-names = "host-wake";
->> +       };
+>> The sdio wifi on the Banana Pro does not appear to have an oob irq hooked
+>> up, so enable sdio-irq support to avoid unnecessary polling.
 >
-> I gave this a spin on my Cubietruck. (I was running cap-sdio-irq before.)
->
-> Ran a few ping tests with a simple
-> "sudo ping -i 0.1 -I wlan0 -s 65500 192.168.1.1"
-> After a few runs I got
->
-> sunxi-mmc 1c12000.mmc: smc 1 err, cmd 53, RD SBE !!
-> sunxi-mmc 1c12000.mmc: data error, sending stop command
-> brcmfmac: brcmf_sdio_readframes: RXHEADER FAILED: -110
-> brcmfmac: brcmf_sdio_rxfail: abort command, terminate frame, send NAK
-> brcmfmac: brcmf_sdiod_regrw_helper: failed to write data F1 at 0x0a040, err: -5
-> brcmfmac: brcmf_sdio_hdparse: seq 226: sequence number error, expect 227
-> sunxi-mmc 1c12000.mmc: smc 1 err, cmd 53, RD DTO !!
-> sunxi-mmc 1c12000.mmc: data error, sending stop command
-> sunxi-mmc 1c12000.mmc: smc 1 err, cmd 53, RD DTO !!
-> sunxi-mmc 1c12000.mmc: data error, sending stop command
-> sunxi-mmc 1c12000.mmc: smc 1 err, cmd 53, RD DTO !!
-> sunxi-mmc 1c12000.mmc: data error, sending stop command
-> brcmfmac: brcmf_sdiod_regrw_helper: failed to read data F1 at 0x0a020, err: -110
-> brcmfmac: brcmf_sdio_dpc: failed backplane access over SDIO, halting operation
-> sunxi-mmc 1c12000.mmc: smc 1 err, cmd 53, RD DTO !!
-> sunxi-mmc 1c12000.mmc: data error, sending stop command
-> sunxi-mmc 1c12000.mmc: smc 1 err, cmd 53, RD DTO !!
-> sunxi-mmc 1c12000.mmc: data error, sending stop command
-> sunxi-mmc 1c12000.mmc: smc 1 err, cmd 53, RD DTO !!
-> sunxi-mmc 1c12000.mmc: data error, sending stop command
->
-> The chip is pretty much dead afterwards.
->
-> With cap-sdio-irq it doesn't happen so soon, but it does.
-> Without either, the response time is bad with packet losses,
-> but at least it doesn't die.
+> I wonder if this is stable enough to put back into the mmc driver, i.e.
+> declare the capability in the driver itself? IIRC at one point it did.
 
-That is not true, without either cap-sdio-irq or oob irq it
-still dies, try doing a scp of a large file, that is a more
-reliable way to trigger it.
+That is a good question, I believe strongly that the sdio wifi issues we've
+been seeing which were the reason to disable cap-sdio-irq in the driver are
+actually unrelated to the irq delivery mechanism. So IMHO yes we can just enable
+this for all devices in the driver, and yes that would be a better solution.
 
-I've been down this road (blaming the irq) mechanism myself,
-but it is a dead end, the problem you're describing, the CMD 53
-SBE error happens with all 3 irq mechanisms.
+Maxime, if I send a patch to enable cal-sdio-irq at the driver level ( as it
+really is a hardware feature not a board feature), will you ack it ?
 
-> Is this the problem Arend (CC-ed) was looking into?
-
-Is looking into, yes. He has a Cubietruck now, and he can reproduce
-it, so hopefully we will see some progress on this soon.
-
-Note that as a workaround (for me at least) you can boot into
-the linux on the cubietruck nand, then insert an sdcard with
-upstream kernel, then reboot so that it boots from the sdcard
-without loosing power, and then the problem seems to be gone.
+If the answer is yet, then please do NOT apply this patch and I'll send
+a sunxi-mmc.c patch instead.
 
 Regards,
 
 Hans
+
+
+
+>
+> ChenYu
+>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   arch/arm/boot/dts/sun7i-a20-bananapro.dts | 1 +
+>>   1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapro.dts b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+>> index fb89fe7..d0cd78f 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+>> +++ b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+>> @@ -164,6 +164,7 @@
+>>          vmmc-supply = <&reg_vmmc3>;
+>>          bus-width = <4>;
+>>          non-removable;
+>> +       cap-sdio-irq;
+>>          status = "okay";
+>>   };
+>>
+>> --
+>> 2.3.1
+>
