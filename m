@@ -1,27 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 8 Mar 2015 19:00:12 +0000
-Subject: [PATCH] spi: xilinx: Use standard num-cs binding
-In-Reply-To: <67f3c196833c427a489ca2c530d08987a6b5ee2a.1421412912.git.michal.simek@xilinx.com>
-References: <67f3c196833c427a489ca2c530d08987a6b5ee2a.1421412912.git.michal.simek@xilinx.com>
-Message-ID: <20150308190012.GV28806@sirena.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 08 Mar 2015 20:15:30 +0100
+Subject: [PATCH 4/7] ARM: dts: sun5i: Add new Auxtek-t004 board
+In-Reply-To: <20150308172157.GE5085@lukather>
+References: <1425754884-7875-1-git-send-email-hdegoede@redhat.com>
+ <1425754884-7875-4-git-send-email-hdegoede@redhat.com>
+ <20150308172157.GE5085@lukather>
+Message-ID: <54FC9FD2.6010309@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 01:55:14PM +0100, Michal Simek wrote:
-> Use standard num-cs binding property and setup
-> "xlnx,num-ss-bits" as deprecated.
+Hi,
 
-Why?  These properties mean different things - num-cs is a bit confused
-and is the total number of available chip selects for the system (which
-could include GPIOs) while num-ss-bits is the size of the bitfield
-(which could include things not actually mapped out properly/successfully 
-or something if the hardware designers were feeling particularly inspired).
+On 08-03-15 18:21, Maxime Ripard wrote:
+> On Sat, Mar 07, 2015 at 08:01:21PM +0100, Hans de Goede wrote:
+>> The auxtek-t004:
+>> http://www.fasttech.com/products/1110/10004200/1318603-auxtek-t004-allwinner-a10s-single-core-android-ics
+>>
+>> Is an Allwinner A10s based hdmi tv stick with with 512M RAM, 4G nand flash,
+>> toc9002 (bcm43362) sdio wifi, 1 USB host ports using an USB-A receptacle and
+>> a 2 micro-usb receptacles, one for power and one for USB OTG.
+>>
+>> The sdio wifi appears to not have an oob irq hooked up, so we rely on sdio-irq
+>> support for it.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>
+>> foo
+>
+> I'm not sure what that foo was about :)
 
-I'm not convinced num-cs ever made any sense.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150308/f9e6ca0e/attachment.sig>
+Heh, that was the commit message of a fixup commit which I apparently
+added with a s (squash) rather then a f (fix) when doing a rebase -i leaving
+the foo in the combined commit msg. So now if you ever see a "foo" in a commit
+msg from me again you know where it comes from :)
+
+Regards,
+
+Hans
