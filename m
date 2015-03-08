@@ -1,25 +1,31 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 8 Mar 2015 22:21:43 +0000
-Subject: [PATCH] ASoC: davinci-mcasp: add missing semicolon
-In-Reply-To: <10196569.gafhWQrdaI@wuerfel>
-References: <10196569.gafhWQrdaI@wuerfel>
-Message-ID: <20150308222143.GD28806@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 08 Mar 2015 23:52:50 +0100
+Subject: [RFC PATCH 00/18] ARM: msm multiplatform support
+In-Reply-To: <CAPDyKFpuQ50qgUxh7fXrt-2AoqgnQQ5q0heCgzKchKvDQazNag@mail.gmail.com>
+References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
+ <CAPDyKFpuQ50qgUxh7fXrt-2AoqgnQQ5q0heCgzKchKvDQazNag@mail.gmail.com>
+Message-ID: <7616599.hAEbVQmATE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 08, 2015 at 10:10:14PM +0100, Arnd Bergmann wrote:
-> A recent patch introduced a build error because of a trivial typo, this
-> gets it back to compile.
+On Thursday 05 March 2015 17:40:18 Ulf Hansson wrote:
+> The goal from my side is to entirely remove this mmc driver and
+> instead convert to use the mmci host driver.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 6afda7f50754 ("ASoC: davinci-mcasp: Allow complete shutdown of McASP when not in use")
+> If I understand correctly, the current big blocker to reach that goal
+> is the DMA driver, since it's not converted to the DMA engine API? Do
+> you know if that's a correct statement?
 
-The same fix was sent several days ago, please submit against current
-code.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150308/e0fa66dd/attachment.sig>
+Yes, I think that is correct. As I wrote in the patch description,
+after we remove the serial-hs driver, msm_sdcc is the only user of the
+private MSM DMA API.
+
+I wasn't aware that this device is compatible with mmci, but that
+certainly simplifies things.
+
+> Anyway, I suppose this patchset can be considered as step in the right
+> direction, even if I don't like to take patches for the msm_sdcc.c.
+
+Ok.
+
+	Arnd
