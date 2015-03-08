@@ -1,49 +1,95 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sun, 08 Mar 2015 02:12:53 +0100
-Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
- IRQF_NO_SUSPEND
-In-Reply-To: <20150307112932.GA1372@amd>
-References: <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
- <20150307110645.GW3989@piout.net> <20150307112932.GA1372@amd>
-Message-ID: <1615214.0rkGfM1gZL@vostro.rjw.lan>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 08 Mar 2015 01:57:59 +0100
+Subject: [PATCH] ARM: dts: rockchip: complete rk3288-evb pmic supplies
+Message-ID: <52808563.Ey0qrIVQE3@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, March 07, 2015 12:29:33 PM Pavel Machek wrote:
-> On Sat 2015-03-07 12:06:45, Alexandre Belloni wrote:
-> > On 07/03/2015 at 11:39:39 +0100, Pavel Machek wrote :
-> > > > The Atmel watchdog can't be stopped once it's started. This is actually 
-> > > > very useful so we can reset if suspend or resume failed, the only 
-> > > > drawback is that you have to wake up from time to time (e.g. by using 
-> > > > the RTC/RTT) to clear the watchdog and then go back to sleep ASAP.
-> > > 
-> > > Yeah. So you do "echo mem > /sys/power/state", and few seconds/minutes
-> > > after watchdog kills the system. But you did not ask for dead system,
-> > > you asked for suspend.
-> > > 
-> > > And while that behaviour is useful for you, I don't think it is
-> > > exactly useful behaviour, nor it is the behaviour user would expect.
-> > > 
-> > 
-> > I think you misunderstood, that is exactly the expected behaviour. This
-> > is hardware defined. Once the watchdog is started, nobody can stop it.
-> > Trying to change the mode register will result in a reset of the
-> > SoC.
-> 
-> Well, it boils down to "what is stronger". Desire to suspend the
-> system, or desire to reboot the system.
-> 
-> It is "echo mem > state", not "echo reboot > state".
-> 
-> > It is documented in the datasheet and any user wanting another behaviour
-> > is out of luck.
-> 
-> Actaully, your platform should just refuse to enter suspend-to-RAM
-> when hw watchdog is enabled.
+This adds the static vcc_sys regulator to the rk3288-evb, the missing
+rk808 supplies from it and all the supplies of the act8846 evb-variant.
 
-Quite likely, depending on how exactly the suspend is implemented.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3288-evb-act8846.dts | 10 ++++++++++
+ arch/arm/boot/dts/rk3288-evb-rk808.dts   |  7 +++++++
+ arch/arm/boot/dts/rk3288-evb.dtsi        |  9 +++++++++
+ 3 files changed, 26 insertions(+)
 
-
+diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts b/arch/arm/boot/dts/rk3288-evb-act8846.dts
+index d7b8bbc..1687e83 100644
+--- a/arch/arm/boot/dts/rk3288-evb-act8846.dts
++++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
+@@ -33,6 +33,7 @@
+ 		regulator-max-microvolt = <1350000>;
+ 		regulator-always-on;
+ 		regulator-boot-on;
++		vin-supply = <&vcc_sys>;
+ 	};
+ 
+ 	vdd_gpu: syr828 at 41 {
+@@ -43,6 +44,7 @@
+ 		regulator-min-microvolt = <850000>;
+ 		regulator-max-microvolt = <1350000>;
+ 		regulator-always-on;
++		vin-supply = <&vcc_sys>;
+ 	};
+ 
+ 	hym8563 at 51 {
+@@ -64,6 +66,14 @@
+ 		reg = <0x5a>;
+ 		status = "okay";
+ 
++		vp1-supply = <&vcc_sys>;
++		vp2-supply = <&vcc_sys>;
++		vp3-supply = <&vcc_sys>;
++		vp4-supply = <&vcc_sys>;
++		inl1-supply = <&vcc_io>;
++		inl2-supply = <&vcc_sys>;
++		inl3-supply = <&vcc_20>;
++
+ 		regulators {
+ 			vcc_ddr: REG1 {
+ 				regulator-name = "VCC_DDR";
+diff --git a/arch/arm/boot/dts/rk3288-evb-rk808.dts b/arch/arm/boot/dts/rk3288-evb-rk808.dts
+index a1c294b..f62ea78 100644
+--- a/arch/arm/boot/dts/rk3288-evb-rk808.dts
++++ b/arch/arm/boot/dts/rk3288-evb-rk808.dts
+@@ -43,9 +43,16 @@
+ 		#clock-cells = <1>;
+ 		clock-output-names = "xin32k", "rk808-clkout2";
+ 
++		vcc1-supply = <&vcc_sys>;
++		vcc2-supply = <&vcc_sys>;
++		vcc3-supply = <&vcc_sys>;
++		vcc4-supply = <&vcc_sys>;
++		vcc6-supply = <&vcc_sys>;
++		vcc7-supply = <&vcc_sys>;
+ 		vcc8-supply = <&vcc_18>;
+ 		vcc9-supply = <&vcc_io>;
+ 		vcc10-supply = <&vcc_io>;
++		vcc11-supply = <&vcc_sys>;
+ 		vcc12-supply = <&vcc_io>;
+ 		vddio-supply = <&vccio_pmu>;
+ 
+diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+index 287a162..4a45751 100644
+--- a/arch/arm/boot/dts/rk3288-evb.dtsi
++++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+@@ -103,6 +103,15 @@
+ 		regulator-always-on;
+ 		regulator-boot-on;
+ 	};
++
++	vcc_sys: vsys-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc_sys";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
+ };
+ 
+ &emmc {
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+2.1.4
