@@ -1,88 +1,245 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Sun, 8 Mar 2015 17:13:58 +0100
-Subject: [PATCH 1/2] ARM: dts: imx6: factor out pinmux for edm1 module
-In-Reply-To: <20150220185351.GN15673@pengutronix.de>
-References: <1424457195-8796-1-git-send-email-m.grzeschik@pengutronix.de>
- <20150220185351.GN15673@pengutronix.de>
-Message-ID: <20150308161358.GB29524@pengutronix.de>
+From: m.grzeschik@pengutronix.de (Michael Grzeschik)
+Date: Sun,  8 Mar 2015 17:26:00 +0100
+Subject: [PATCH v2 2/2] ARM: dts: imx6: add support for technexion toucan board
+In-Reply-To: <1425831960-10259-1-git-send-email-m.grzeschik@pengutronix.de>
+References: <1425831960-10259-1-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <1425831960-10259-2-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 07:53:51PM +0100, Robert Schwebel wrote:
-> Adding Fabio to Cc, who brought Wandboard into the kernel. Could you
-> give Michael's patch a try? We don't have a Wandboard here for testing,
-> so this should get a Tested-By from you (or somebody else with hardware)
-> before applying.
-> 
-> rsc
-> 
-> On Fri, Feb 20, 2015 at 07:33:14PM +0100, Michael Grzeschik wrote:
-> > Thw Wandboard is using the EDM1-CF-IMX6 module which is
-> > defined under the edm standard.
-> > 
-> > http://www.edm-standard.org/
-> > 
-> > As this module is used on more boards this patch moves the default
-> > pinmux settings into the special file imx6qdl-edm1.dtsi.
-> > 
-> > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> > ---
-> >  arch/arm/boot/dts/imx6qdl-edm1.dtsi      | 231 +++++++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/imx6qdl-wandboard.dtsi |  99 +------------
-> >  2 files changed, 233 insertions(+), 97 deletions(-)
-> >  create mode 100644 arch/arm/boot/dts/imx6qdl-edm1.dtsi
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6qdl-edm1.dtsi b/arch/arm/boot/dts/imx6qdl-edm1.dtsi
-> > new file mode 100644
-> > index 0000000..b42605b
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/imx6qdl-edm1.dtsi
-> > @@ -0,0 +1,231 @@
-> > +&iomuxc {
-> > +	pinctrl-names = "default";
-> > +
-> > +	imx6qdl-edm1 {
-> > +
-> > +		pinctrl_audmux: audmuxgrp {
-> > +			fsl,pins = <
-> > +				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x130b0
-> > +				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x130b0
-> > +				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x110b0
-> > +				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x130b0
-> > +				MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x130b0
-> > +			>;
-> > +		};
-> > +
-> > +		pinctrl_enet: enetgrp {
-> > +			fsl,pins = <
-> > +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-> > +				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-> > +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
-> > +				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
-> > +				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
-> > +				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
-> > +				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
-> > +				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
-> > +				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
-> > +				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
-> > +				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
-> > +				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
-> > +				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
-> > +				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
-> > +				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
-> > +				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
-                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+This patch adds the second user of the edm1 module.
 
-                                This seems somehow board revision
-                                specific. It breaks the Toucan fec to
-                                work. I will send v2 with this moved to
-                                the hog pins of the wandboard revisions.
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+---
+- fixed alphabetical oder of the Makefile
+- fixed order and numbering of regulator nodes
+- fixed alphabetical oder of device nodes
 
-Thanks,
-Michael
+ arch/arm/boot/dts/Makefile          |   1 +
+ arch/arm/boot/dts/imx6dl-toucan.dts | 203 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 204 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-toucan.dts
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a1c776b..feeb350 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -263,6 +263,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6dl-sabreauto.dtb \
+ 	imx6dl-sabrelite.dtb \
+ 	imx6dl-sabresd.dtb \
++	imx6dl-toucan.dtb \
+ 	imx6dl-tx6dl-comtft.dtb \
+ 	imx6dl-tx6u-801x.dtb \
+ 	imx6dl-tx6u-811x.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-toucan.dts b/arch/arm/boot/dts/imx6dl-toucan.dts
+new file mode 100644
+index 0000000..c57332c
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-toucan.dts
+@@ -0,0 +1,203 @@
++/*
++ * Copyright 2015 Michael Grzeschik <mgr@pengutronix.de>, Pengutronix
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++/dts-v1/;
++
++#include "imx6dl.dtsi"
++#include "imx6qdl-edm1.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "Technexion Toucan";
++	compatible = "technexion,toucan", "fsl,imx6dl";
++
++	memory {
++		reg = <0x10000000 0x40000000>;
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_2p5v: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "2P5V";
++			regulator-min-microvolt = <2500000>;
++			regulator-max-microvolt = <2500000>;
++			regulator-always-on;
++		};
++
++		reg_3p3v: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++
++		reg_usbotg_vbus: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "usbotg_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			pinctrl-names = "default";
++			gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++		};
++	};
++
++	sound {
++		compatible = "fsl,imx6-toucan-sgtl5000",
++			     "fsl,imx-audio-sgtl5000";
++		model = "imx6-toucan-sgtl5000";
++		ssi-controller = <&ssi1>;
++		audio-codec = <&codec>;
++		audio-routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Headphone Jack", "HP_OUT";
++		mux-int-port = <1>;
++		mux-ext-port = <3>;
++	};
++};
++
++&audmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_audmux>;
++	status = "okay";
++};
++
++&can1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan1>;
++	status = "okay";
++};
++
++&can2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan2>;
++	status = "okay";
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet>;
++	phy-mode = "rgmii";
++	phy-reset-gpios = <&gpio3 29 GPIO_ACTIVE_LOW>;
++	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
++			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
++	status = "okay";
++};
++
++&hdmi {
++	ddc-i2c-bus = <&i2c1>;
++	status = "okay";
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	clock-frequency = <400000>;
++	status = "okay";
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++
++	codec: sgtl5000 at 0a {
++		compatible = "fsl,sgtl5000";
++		reg = <0x0a>;
++		clocks = <&clks 201>;
++		VDDA-supply = <&reg_2p5v>;
++		VDDIO-supply = <&reg_3p3v>;
++	};
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hog>;
++
++	imx6qdl-toucan {
++		pinctrl_hog: hoggrp {
++			fsl,pins = <
++				MX6QDL_PAD_CSI0_DAT19__GPIO6_IO05	0x0b0b0
++				MX6QDL_PAD_CSI0_DAT16__GPIO6_IO02	0x0b0b0
++				MX6QDL_PAD_CSI0_DAT18__GPIO6_IO04	0x0b0b0
++				MX6QDL_PAD_EIM_D27__GPIO3_IO27		0x0b0b0
++				MX6QDL_PAD_EIM_D26__GPIO3_IO26		0x0b0b0
++				MX6QDL_PAD_EIM_BCLK__GPIO6_IO31		0x0b0b0
++				MX6QDL_PAD_CSI0_DAT17__GPIO6_IO03	0x0b0b0
++				MX6QDL_PAD_ENET_RX_ER__GPIO1_IO24	0x0b0b0
++				MX6QDL_PAD_SD3_RST__GPIO7_IO08		0x0b0b0
++				MX6QDL_PAD_GPIO_19__GPIO4_IO05		0x0b0b0
++				MX6QDL_PAD_SD4_DAT0__GPIO2_IO08         0x17059
++			>;
++		};
++	};
++};
++
++&ssi1 {
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1 &pinctrl_uart1_rtscts>;
++	status = "okay";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2 &pinctrl_uart2_rtscts>;
++	status = "okay";
++};
++
++&usbh1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbh1>;
++	dr_mode = "host";
++	disable-over-current;
++	status = "okay";
++};
++
++&usbotg {
++	vbus-supply = <&reg_usbotg_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg>;
++	dr_mode = "peripheral";
++	disable-over-current;
++	status = "okay";
++};
++
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	bus-width = <4>;
++	no-1-8-v;
++	cd-gpios = <&gpio1 2 0>;
++	fsl,wp-controller;
++	status = "okay";
++};
++
++&usdhc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++	bus-width = <4>;
++	no-1-8-v;
++	fsl,wp-controller;
++	status = "okay";
++};
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.1.4
