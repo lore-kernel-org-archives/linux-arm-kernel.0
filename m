@@ -1,113 +1,96 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 8 Mar 2015 14:13:35 -0700
-Subject: [PATCH 1/3] touchscreen: sun4i-ts: A10 (sun4i) has a different
- temperature curve
-In-Reply-To: <1425848022-18001-2-git-send-email-hdegoede@redhat.com>
-References: <1425848022-18001-1-git-send-email-hdegoede@redhat.com>
- <1425848022-18001-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150308211335.GB23193@dtor-ws>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun,  8 Mar 2015 22:13:57 +0100
+Subject: [PATCH] pinctrl: sun4i: GPIOs configured as irq must be set to input
+ before reading
+Message-ID: <1425849237-30182-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 08, 2015 at 09:53:40PM +0100, Hans de Goede wrote:
-> Testing has revealed that the temperature in the rtp controller of the A10
-> (sun4i) SoC has a different curve then on the A13 (sun5i) and later models.
-> 
-> Add a new sun5i-a13-ts compatible to differentiate the newer models and
-> set the curve based on the compatible string.
-> 
-> The new curve is still not ideal on all A10-s, that seems to have to
-> do with there being a large spread between different A10-s out there,
-> the new curve us based on callibration results on 4 completely different
-> models:
->                         raw min raw max temp min temp max stepsize offset
-> Tong Zhang's hackberry    2402    2680    45.0     80.0    0.125   -255.3
-> Hansg's Cubieboard        2207    2300    36.0     45.0    0.096   -175.8
-> Olliver's lime 1 (*):     2258    2537    48.3     87.1    0.139   -265.7
-> Olliver's lime 2 (*):     2222    2486    46.7     91.7    0.170   -331.0
-> *) from: http://linux-sunxi.org/Temperature_Calibration
-> 
-> Average all 4:                                             0.133   -257.0
-> Average without outliers (middle 2):                       0.132   -261.0
-> 
-> Since it is better to slightly overreport the temperature this patch uses
-> the average of all 4 as curve.
-> 
-> This fixes the temperature reported on the A10 being much higher then
-> expected.
-> 
-> Cc: Tong Zhang <lovewilliam@gmail.com>
-> Cc: Olliver Schinagl <o.schinagl@ultimaker.com>
-> Reported-by: Tong Zhang <lovewilliam@gmail.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On sun4i-a10, when GPIOs are configured as external interrupt the value for
+them in the data register does not seem to get updated, so set their mux to
+input (and restore afterwards) when reading the pin.
 
+Missed edges seem to be buffered, so this does not introduce a race
+condition.
 
-Applied, thank you.
+I've also tested this on sun5i-a13 and sun7i-a20 and those do not seem to
+be affected, the input value representation in the data register does seem
+to correctly get updated to the actual pin value while in irq mode there.
 
-> ---
->  .../devicetree/bindings/input/touchscreen/sun4i.txt      |  3 ++-
->  drivers/input/touchscreen/sun4i-ts.c                     | 16 +++++++++++++---
->  2 files changed, 15 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> index 433332d..d59d252 100644
-> --- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> @@ -2,7 +2,8 @@ sun4i resistive touchscreen controller
->  --------------------------------------
->  
->  Required properties:
-> - - compatible: "allwinner,sun4i-a10-ts" or "allwinner,sun6i-a31-ts"
-> + - compatible: "allwinner,sun4i-a10-ts", "allwinner,sun5i-a13-ts" or
-> +   "allwinner,sun6i-a31-ts"
->   - reg: mmio address range of the chip
->   - interrupts: interrupt to which the chip is connected
->   - #thermal-sensor-cells: shall be 0
-> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
-> index b93a28b..66ccd5a 100644
-> --- a/drivers/input/touchscreen/sun4i-ts.c
-> +++ b/drivers/input/touchscreen/sun4i-ts.c
-> @@ -258,6 +258,15 @@ static int sun4i_ts_probe(struct platform_device *pdev)
->  		/* Allwinner SDK has temperature = -271 + (value / 6) (C) */
->  		ts->temp_offset = 1626;
->  		ts->temp_step = 167;
-> +	} else if (of_device_is_compatible(np, "allwinner,sun4i-a10-ts")) {
-> +		/*
-> +		 * The A10 temperature sensor has quite a wide spread, these
-> +		 * parameters are based on the averaging of the calibration
-> +		 * results of 4 completely different boards, with a spread of
-> +		 * temp_step from 96 - 170 and temp_offset from 1758 - 3310.
-> +		 */
-> +		ts->temp_offset = 2570;
-> +		ts->temp_step = 133;
->  	} else {
->  		/*
->  		 * The user manuals do not contain the formula for calculating
-> @@ -330,10 +339,10 @@ static int sun4i_ts_probe(struct platform_device *pdev)
->  	 * finally enable tp mode.
->  	 */
->  	reg = STYLUS_UP_DEBOUN(5) | STYLUS_UP_DEBOUN_EN(1);
-> -	if (of_device_is_compatible(np, "allwinner,sun4i-a10-ts"))
-> -		reg |= TP_MODE_EN(1);
-> -	else
-> +	if (of_device_is_compatible(np, "allwinner,sun6i-a31-ts"))
->  		reg |= SUN6I_TP_MODE_EN(1);
-> +	else
-> +		reg |= TP_MODE_EN(1);
->  	writel(reg, ts->base + TP_CTRL1);
->  
->  	/*
-> @@ -383,6 +392,7 @@ static int sun4i_ts_remove(struct platform_device *pdev)
->  
->  static const struct of_device_id sun4i_ts_of_match[] = {
->  	{ .compatible = "allwinner,sun4i-a10-ts", },
-> +	{ .compatible = "allwinner,sun5i-a13-ts", },
->  	{ .compatible = "allwinner,sun6i-a31-ts", },
->  	{ /* sentinel */ }
->  };
-> -- 
-> 2.3.1
-> 
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c |  1 +
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c     | 14 ++++++++++++--
+ drivers/pinctrl/sunxi/pinctrl-sunxi.h     |  4 ++++
+ 3 files changed, 17 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+index 24c5d88..3c68a8e 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+@@ -1011,6 +1011,7 @@ static const struct sunxi_pinctrl_desc sun4i_a10_pinctrl_data = {
+ 	.pins = sun4i_a10_pins,
+ 	.npins = ARRAY_SIZE(sun4i_a10_pins),
+ 	.irq_banks = 1,
++	.irq_read_needs_mux = true,
+ };
+ 
+ static int sun4i_a10_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index 3d074433..f8e171b 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -29,6 +29,7 @@
+ #include <linux/slab.h>
+ 
+ #include "../core.h"
++#include "../../gpio/gpiolib.h"
+ #include "pinctrl-sunxi.h"
+ 
+ static struct irq_chip sunxi_pinctrl_edge_irq_chip;
+@@ -464,10 +465,19 @@ static int sunxi_pinctrl_gpio_direction_input(struct gpio_chip *chip,
+ static int sunxi_pinctrl_gpio_get(struct gpio_chip *chip, unsigned offset)
+ {
+ 	struct sunxi_pinctrl *pctl = dev_get_drvdata(chip->dev);
+-
+ 	u32 reg = sunxi_data_reg(offset);
+ 	u8 index = sunxi_data_offset(offset);
+-	u32 val = (readl(pctl->membase + reg) >> index) & DATA_PINS_MASK;
++	u32 set_mux = pctl->desc->irq_read_needs_mux &&
++			test_bit(FLAG_USED_AS_IRQ, &chip->desc[offset].flags);
++	u32 val;
++
++	if (set_mux)
++		sunxi_pmx_set(pctl->pctl_dev, offset, SUN4I_FUNC_INPUT);
++
++	val = (readl(pctl->membase + reg) >> index) & DATA_PINS_MASK;
++
++	if (set_mux)
++		sunxi_pmx_set(pctl->pctl_dev, offset, SUN4I_FUNC_IRQ);
+ 
+ 	return val;
+ }
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+index 5a51523..e248e81 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+@@ -77,6 +77,9 @@
+ #define IRQ_LEVEL_LOW		0x03
+ #define IRQ_EDGE_BOTH		0x04
+ 
++#define SUN4I_FUNC_INPUT	0
++#define SUN4I_FUNC_IRQ		6
++
+ struct sunxi_desc_function {
+ 	const char	*name;
+ 	u8		muxval;
+@@ -94,6 +97,7 @@ struct sunxi_pinctrl_desc {
+ 	int				npins;
+ 	unsigned			pin_base;
+ 	unsigned			irq_banks;
++	bool				irq_read_needs_mux;
+ };
+ 
+ struct sunxi_pinctrl_function {
 -- 
-Dmitry
+2.3.1
