@@ -1,95 +1,83 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 08 Mar 2015 01:57:59 +0100
-Subject: [PATCH] ARM: dts: rockchip: complete rk3288-evb pmic supplies
-Message-ID: <52808563.Ey0qrIVQE3@phil>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 8 Mar 2015 10:40:46 +0800
+Subject: [linux-sunxi] [PATCH 6/7] ARM: dts: sun7i: Add OOB irq support to
+ boards with broadcom sdio wifi
+In-Reply-To: <1425754884-7875-6-git-send-email-hdegoede@redhat.com>
+References: <1425754884-7875-1-git-send-email-hdegoede@redhat.com>
+ <1425754884-7875-6-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v65sxMxfk3yy_ACZRXMz=wX1J0vZy8-n2UNT+T1BvMn1vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the static vcc_sys regulator to the rk3288-evb, the missing
-rk808 supplies from it and all the supplies of the act8846 evb-variant.
+Hi,
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3288-evb-act8846.dts | 10 ++++++++++
- arch/arm/boot/dts/rk3288-evb-rk808.dts   |  7 +++++++
- arch/arm/boot/dts/rk3288-evb.dtsi        |  9 +++++++++
- 3 files changed, 26 insertions(+)
+On Sun, Mar 8, 2015 at 3:01 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 11 +++++++++++
+>  arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts  | 11 +++++++++++
+>  2 files changed, 22 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> index 0c219a4..8111b0c 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> @@ -167,12 +167,23 @@
+>  };
+>
+>  &mmc3 {
+> +       #address-cells = <1>;
+> +       #size-cells = <0>;
+> +
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&mmc3_pins_a>;
+>         vmmc-supply = <&reg_vmmc3>;
+>         bus-width = <4>;
+>         non-removable;
+>         status = "okay";
+> +
+> +       brcmf: bcrmf at 1 {
+> +               reg = <1>;
+> +               compatible = "brcm,bcm4329-fmac";
+> +               interrupt-parent = <&pio>;
+> +               interrupts = <10 8>; /* PH10 / EINT10 */
+                                   ^ IRQ_TYPE_LEVEL_LOW?
 
-diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-index d7b8bbc..1687e83 100644
---- a/arch/arm/boot/dts/rk3288-evb-act8846.dts
-+++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-@@ -33,6 +33,7 @@
- 		regulator-max-microvolt = <1350000>;
- 		regulator-always-on;
- 		regulator-boot-on;
-+		vin-supply = <&vcc_sys>;
- 	};
- 
- 	vdd_gpu: syr828 at 41 {
-@@ -43,6 +44,7 @@
- 		regulator-min-microvolt = <850000>;
- 		regulator-max-microvolt = <1350000>;
- 		regulator-always-on;
-+		vin-supply = <&vcc_sys>;
- 	};
- 
- 	hym8563 at 51 {
-@@ -64,6 +66,14 @@
- 		reg = <0x5a>;
- 		status = "okay";
- 
-+		vp1-supply = <&vcc_sys>;
-+		vp2-supply = <&vcc_sys>;
-+		vp3-supply = <&vcc_sys>;
-+		vp4-supply = <&vcc_sys>;
-+		inl1-supply = <&vcc_io>;
-+		inl2-supply = <&vcc_sys>;
-+		inl3-supply = <&vcc_20>;
-+
- 		regulators {
- 			vcc_ddr: REG1 {
- 				regulator-name = "VCC_DDR";
-diff --git a/arch/arm/boot/dts/rk3288-evb-rk808.dts b/arch/arm/boot/dts/rk3288-evb-rk808.dts
-index a1c294b..f62ea78 100644
---- a/arch/arm/boot/dts/rk3288-evb-rk808.dts
-+++ b/arch/arm/boot/dts/rk3288-evb-rk808.dts
-@@ -43,9 +43,16 @@
- 		#clock-cells = <1>;
- 		clock-output-names = "xin32k", "rk808-clkout2";
- 
-+		vcc1-supply = <&vcc_sys>;
-+		vcc2-supply = <&vcc_sys>;
-+		vcc3-supply = <&vcc_sys>;
-+		vcc4-supply = <&vcc_sys>;
-+		vcc6-supply = <&vcc_sys>;
-+		vcc7-supply = <&vcc_sys>;
- 		vcc8-supply = <&vcc_18>;
- 		vcc9-supply = <&vcc_io>;
- 		vcc10-supply = <&vcc_io>;
-+		vcc11-supply = <&vcc_sys>;
- 		vcc12-supply = <&vcc_io>;
- 		vddio-supply = <&vccio_pmu>;
- 
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index 287a162..4a45751 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -103,6 +103,15 @@
- 		regulator-always-on;
- 		regulator-boot-on;
- 	};
-+
-+	vcc_sys: vsys-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_sys";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
- };
- 
- &emmc {
--- 
-2.1.4
+> +               interrupt-names = "host-wake";
+> +       };
+>  };
+>
+>  &mmc3_pins_a {
+> diff --git a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
+> index baee563..4a8defd 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
+> @@ -164,12 +164,23 @@
+>  };
+>
+>  &mmc3 {
+> +       #address-cells = <1>;
+> +       #size-cells = <0>;
+> +
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&mmc3_pins_a>;
+>         vmmc-supply = <&reg_vmmc3>;
+>         bus-width = <4>;
+>         non-removable;
+>         status = "okay";
+> +
+> +       brcmf: bcrmf at 1 {
+> +               reg = <1>;
+> +               compatible = "brcm,bcm4329-fmac";
+> +               interrupt-parent = <&pio>;
+> +               interrupts = <10 8>; /* PH10 / EINT10 */
+
+Same here.
+
+ChenYu
+
+> +               interrupt-names = "host-wake";
+> +       };
+>  };
+>
+>  &mmc3_pins_a {
