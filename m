@@ -1,42 +1,72 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 8 Mar 2015 09:16:39 +0100
-Subject: [PATCH v5 2/5] dt-bindings: Add pinctrl bindings for
- mt65xx/mt81xx.
-In-Reply-To: <CACRpkdYASTGTiiAF6EA=OCqYepdStf4UO9_qWGg6ACyd8=CaHw@mail.gmail.com>
-References: <1421818097-9281-1-git-send-email-hongzhou.yang@mediatek.com>
- <1421818097-9281-3-git-send-email-hongzhou.yang@mediatek.com>
- <CACRpkdYASTGTiiAF6EA=OCqYepdStf4UO9_qWGg6ACyd8=CaHw@mail.gmail.com>
-Message-ID: <CABuKBeL0y4OrLCtyV_n0eVsncpo7vT0ZentGC-ZW9YzBYDa1Qw@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sun, 8 Mar 2015 09:26:17 +0100
+Subject: Bug in i2c-core?
+In-Reply-To: <20150304082237.GA2955@katana>
+References: <54F0507F.6030804@armadeus.com> <20150227165944.GA6679@dtor-ws>
+ <3574616.qzNqihiGp7@avalon> <20150304082237.GA2955@katana>
+Message-ID: <20150308082617.GA1904@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, Mar 04, 2015 at 09:22:37AM +0100, Wolfram Sang wrote:
+> 
+> > > > I am writing an I2C touchscreen driver for an i.MX6 based board. I
+> > > > compiled it as a module and when I unload it, I get the following warning:
+> > > > 
+> > > > # modprobe sx8654
+> > > > [   46.261494] input: SX8654 I2C Touchscreen as
+> > > > /devices/soc0/soc/2100000.aips-bus/21a0000.i2c/i2c-0/0-0048/input/input1
+> > > > # rmmod sx8654
+> > > > [   76.435223] ------------[ cut here ]------------
+> > > > [   76.439909] WARNING: CPU: 0 PID: 134 at fs/proc/generic.c:552
+> > > > remove_proc_entry+0x148/0x164()
+> > > > [   76.448582] remove_proc_entry: removing non-empty directory
+> > > > 'irq/208', leaking at least 'sx8654'
+> > > 
+> > > ...
+> > > 
+> > > > When I revert commit e4df3a0 (i2c: core: Dispose OF IRQ mapping at
+> > > > client removal time) I don't get the warning.
+> > > > 
+> > > > Is this a bug in the i2c-core or am I doing something wrong in my driver?
+> > > 
+> > > Yes, this commit breaks all drivers using devm* for IRQ management on
+> > > OF-based systemsi because devm* cleanup happens in device code, after
+> > > bus's remove() method returns. I'd recommend reverting and finding a
+> > > better way (making cleanup a custom devm action as well?).
+> > 
+> > Ouch, my bad.
+> > 
+> > Wolfram, any opinion ? The original patch fixes a real bug, so we shouldn't 
+> > just revert it.
+> 
+> Looking at it some more: What bug does it fix? Anything you experienced?
+> 
+> I wonder if we really need e4df3a0 because I can't see where
+> platform_get_irq, the major user of of_irq_get, disposes the mapping.
+> irq_create_of_mapping() will return an already assigned mapping if
+> called twice. I don't know yet, though, if mappings are static or if a
+> mapping can be routed to another irq controller over some time because
+> theoretically they can be dynamically added/removed.
+> 
+> Adding Rob to CC as he wrote of_irq_get and put it into
+> platform_get_irq. Rob, we use of_irq_get() in the I2C core and the
+> question is now if we need to dispose the mapping and if so what would
+> be a good place for it so managed devices will not have their mappings
+> removed before the managed irq is removed.
 
-2015-02-10 9:01 GMT+01:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Wed, Jan 21, 2015 at 1:28 PM, Hongzhou Yang
-> <hongzhou.yang@mediatek.com> wrote:
->
->> From: Hongzhou Yang <hongzhou.yang@mediatek.com>
->>
->> Add devicetree bindings for Mediatek SoC pinctrl driver.
->>
->> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
->
-> OK applied this patch for v3.21 now, relying on Sascha's ACK.
-
-I can see the the pinctrl driver parts in your tree repository [0],
-but not in linux-next.
-Do think of merging them in the next merge window?
+Ping. Just so you know: Without further information, I will revert the
+patch in question around rc4/rc5. I'd still like to know if the
+non-disposing of the mapping in platform_get_irq() is intentional.
 
 Thanks,
-Matthias
 
-[0] https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/log/?h=mtk-staging
->
-> Yours,
-> Linus Walleij
+   Wolfram
 
-
-
--- 
-motzblog.wordpress.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150308/b1c806dc/attachment-0001.sig>
