@@ -1,53 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 8 Mar 2015 18:47:21 +0100
-Subject: [PATCH] ARM: sun7i: dt: Add new MK808C device
-In-Reply-To: <CAEKpxBnRyhD8Xiu7uTomM=z4Xm4CH8WVTYjZH73yDgYzwMqn5w@mail.gmail.com>
-References: <1425131004-8551-1-git-send-email-codekipper@gmail.com>
- <20150303071342.GB4713@lukather>
- <CAEKpxB=-vtjMckh3ZHoy0mezE9U1EtKzmttdXRD5ZNztZvB_ag@mail.gmail.com>
- <20150304203400.GR4911@lukather>
- <CAEKpxBnRyhD8Xiu7uTomM=z4Xm4CH8WVTYjZH73yDgYzwMqn5w@mail.gmail.com>
-Message-ID: <20150308174721.GL5085@lukather>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 8 Mar 2015 18:56:27 +0000
+Subject: [PATCH 05/10] ARM: s3c64xx: enable sparse IRQ support
+In-Reply-To: <20150306174316.GA26692@opensource.wolfsonmicro.com>
+References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
+ <1425299763-4066822-6-git-send-email-arnd@arndb.de>
+ <20150306174316.GA26692@opensource.wolfsonmicro.com>
+Message-ID: <20150308185627.GU28806@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Mar 06, 2015 at 05:43:16PM +0000, Charles Keepax wrote:
 
-On Sat, Mar 07, 2015 at 09:41:54AM +0100, Code Kipper wrote:
-> > Don't your device has any brand on the case or the PCB?
-> 
-> There is nothing on the PCB to reference a manufacturer, the actual packaging
-> and case are from the earlier MK808B and mention A9. There was only a
-> small sticker on the side to show that the contents was a MK808C.
-> I guess 'unknown' isn't a valid vendor name,
+> Cragganmore, I need to look into it a bit more but it looks like
+> one of the PMICs can't allocate its IRQs:
 
-Not really.
+> [    0.961455] wm831x 1-0034: WM8311 revision C
+> [    0.965066] wm831x 1-0034: Failed to allocate IRQs: -17
 
-I really don't know what's the policy to apply in such a case when we
-have a device that has no identified vendor.
+> And the CODEC can't request its IRQ:
 
-We need to give a vendor name, because the compatible is used to tell
-two devices apart, in the case where we would have to apply quirks for
-a particular devices.
+> [    4.252735] arizona spi0.1: WM5102 revision C
+> [    4.269763] arizona spi0.1: Failed to request primary IRQ 263: -22
 
-And if we have two devices (say a Marvlell and an Allwinner one), with
-the same name, and without any vendor, we're screwed.
+> Hopefully I can look into this a little more next week.
 
-Maybe falling back to the SoC vendor, in our case, would make sense?
-
-Arnd? Rob? Mark? An opinion on this?
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+The second is a knock on from the first - the CODEC interrupt line is
+connected to the PMIC so since the PMIC can't allocate its IRQ range the
+CODEC can't request it.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
+Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150308/218a94be/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150308/8268abcb/attachment.sig>
