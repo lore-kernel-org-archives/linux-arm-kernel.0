@@ -1,50 +1,26 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sun, 08 Mar 2015 17:22:04 -0300
-Subject: [PATCH v3 5/9] mtd: pxa3xx_nand: add support for the Marvell
- Berlin nand controller
-In-Reply-To: <87oao3xvh8.fsf@free.fr>
-References: <1425555085-29531-1-git-send-email-antoine.tenart@free-electrons.com>	<1425555085-29531-6-git-send-email-antoine.tenart@free-electrons.com>	<54FA6DFC.1070904@free-electrons.com>
- <87oao3xvh8.fsf@free.fr>
-Message-ID: <54FCAF6C.7010902@free-electrons.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun,  8 Mar 2015 21:53:39 +0100
+Subject: [PATCH 0/3] touchscreen: sun4i-ts: A10 (sun4i) has a different
+ temperature curve
+Message-ID: <1425848022-18001-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2015 02:14 PM, Robert Jarzmik wrote:
-> Ezequiel Garcia <ezequiel.garcia@free-electrons.com> writes:
-> 
->> Hi Antoine,
->>
->> On 03/05/2015 08:31 AM, Antoine Tenart wrote:
->> [..]
->>> +
->>> +static struct pxa3xx_nand_flash berlin_builtin_flash_types[] = {
->>> +{ "4GiB 8-bit",    0xd7ec, 128, 8192,  8,  8, 4096 },
->>> +{ },
->>
->> IMHO, supporting a specific flash shouldn't be part of this patch.
->>
->> In any case, why do you need this? If you can share the details about
->> this device, it would be interesting for me to take a look.
->>
->> This driver's open-coded, legacy-style flash detection is nasty, and the
->> only reason I've kept it is to avoid breaking some wacky user with some
->> old board. In fact, maybe we can just kill it so nobody thinks it's sane.
-> 
-> I think you'll kill the zylonite board, and I'll nack it if that's the case. At
-> least that's what happened when I tried to use onfi default values last time in
-> barebox development.
-> 
-> I can test your changes, but if the specific zylonite nand (ie. nand id 0xba20,
-> ie. pxa310 embedded flash) gets broken, I'm against the removal of the legacy
-> timings removal.
->
+Hi Dmitry, Maxime, et al.
 
-I'm not speaking of any timing params here, but about the flash
-identification.
+Here is a patch-set for the sun4i-ts driver temperature sensor support,
+it consists of 2 fixes:
 
-Which flash do you have there?
+1) Use a better temperature curve for A10 SoCs to avoid reporting a way to
+high temperature.
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+2) Start with reporting an "estimated" temperature of 40 degrees rather then
+returning -EAGAIN until we get the first temperature ready interrupt to avoid
+the kernel tempzone core logging errors because of our -EAGAIN return.
+
+Dmitry can you please queue up the 2 sun4i-ts patches for 4.1, and Maxime,
+can you please queue up the matching dts change ?
+
+Thanks & Regards,
+
+Hans
