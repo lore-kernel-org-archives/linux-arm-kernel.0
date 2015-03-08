@@ -1,50 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 8 Mar 2015 18:32:25 +0100
-Subject: [PATCH 0/3] ARM: sun9i: Add support for PRCM on Allwinner A80 SoC
-In-Reply-To: <1425349320-2754-1-git-send-email-wens@csie.org>
-References: <1425349320-2754-1-git-send-email-wens@csie.org>
-Message-ID: <20150308173225.GK5085@lukather>
+Date: Sun, 8 Mar 2015 18:47:21 +0100
+Subject: [PATCH] ARM: sun7i: dt: Add new MK808C device
+In-Reply-To: <CAEKpxBnRyhD8Xiu7uTomM=z4Xm4CH8WVTYjZH73yDgYzwMqn5w@mail.gmail.com>
+References: <1425131004-8551-1-git-send-email-codekipper@gmail.com>
+ <20150303071342.GB4713@lukather>
+ <CAEKpxB=-vtjMckh3ZHoy0mezE9U1EtKzmttdXRD5ZNztZvB_ag@mail.gmail.com>
+ <20150304203400.GR4911@lukather>
+ <CAEKpxBnRyhD8Xiu7uTomM=z4Xm4CH8WVTYjZH73yDgYzwMqn5w@mail.gmail.com>
+Message-ID: <20150308174721.GL5085@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+Hi,
 
-On Tue, Mar 03, 2015 at 10:21:57AM +0800, Chen-Yu Tsai wrote:
-> Hi everyone,
+On Sat, Mar 07, 2015 at 09:41:54AM +0100, Code Kipper wrote:
+> > Don't your device has any brand on the case or the PCB?
 > 
-> Some time ago I sent out an RFC series, which was not merged due
-> to lack of matching documentation for the SoC. A few weeks back I
-> sent out a request for the documents again. I have not received a
-> response. So I'm sending out the series now.
-> 
-> This series adds support for the Power Reset and Clock Management
-> module on Allwinner's A80 SoC. The PRCM manages clocks and resets
-> for the "special" block of peripherals, or the R/RTC block in
-> earlier SoCs. These peripherals include a standby processor core,
-> a timer block, a watchdog, pin controller, 1 wire interface, PS/2
-> interface, a UART, the RSB controller, a DMA controller, a consumer
-> IR receiver block, 2 I2C controllers, and 2 I2S controllers. We do
-> not have documents for all the peripherals. Support will be added
-> where possible.
-> 
-> 
-> Patch 1 adds support for the apbs (apb0 in earlier SoCs) gates.
-> 
-> Patch 2 adds sun9i-a80 support to the PRCM mfd driver
-> 
-> Patch 3 adds the clock and reset nodes for the PRCM to the A80 DTSI.
+> There is nothing on the PCB to reference a manufacturer, the actual packaging
+> and case are from the earlier MK808B and mention A9. There was only a
+> small sticker on the side to show that the contents was a MK808C.
+> I guess 'unknown' isn't a valid vendor name,
 
-These three patches look fine to me. Have you seen that the new
-bootloader code has some interesting infos about RSB and PRCM?
+Not really.
 
-If so, does it match what you did so far?
+I really don't know what's the policy to apply in such a case when we
+have a device that has no identified vendor.
 
-> To Allwinner people:
-> If you have any related documents or comments, please send them out.
+We need to give a vendor name, because the compatible is used to tell
+two devices apart, in the case where we would have to apply quirks for
+a particular devices.
 
-Kevin, Shuge, your input would be greatly appreciated.
+And if we have two devices (say a Marvlell and an Allwinner one), with
+the same name, and without any vendor, we're screwed.
 
-Thanks!
+Maybe falling back to the SoC vendor, in our case, would make sense?
+
+Arnd? Rob? Mark? An opinion on this?
+
+Thanks,
 Maxime
 
 -- 
@@ -57,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150308/15daee82/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150308/218a94be/attachment.sig>
