@@ -1,34 +1,31 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 8 Mar 2015 05:31:10 +0000
-Subject: [PATCH v6 0/3] irqchip: vf610-mscm: add MSCM interrupt router
- driver
-In-Reply-To: <1425249689-32354-1-git-send-email-stefan@agner.ch>
-References: <1425249689-32354-1-git-send-email-stefan@agner.ch>
-Message-ID: <20150308053110.GF21207@io.lakedaemon.net>
+Date: Sun, 8 Mar 2015 05:38:28 +0000
+Subject: [PATCH v2 0/7] ARM: mvebu: Enable perf support
+In-Reply-To: <1425379400-4346-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1425379400-4346-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150308053828.GG21207@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 01, 2015 at 11:41:26PM +0100, Stefan Agner wrote:
+On Tue, Mar 03, 2015 at 11:43:13AM +0100, Maxime Ripard wrote:
 ...
-> Stefan Agner (3):
->   irqchip: vf610-mscm-ir: add support for MSCM interrupt router
->   irqchip: vf610-mscm: dt-bindings: add MSCM bindings
->   ARM: dts: vf610: add Miscellaneous System Control Module (MSCM)
+> Ezequiel Garcia (5):
+>   irqchip: armada-370-xp: Initialize per cpu registers when CONFIG_SMP=N
+>   irqchip: armada-370-xp: Introduce a is_percpu_irq() helper for
+>     readability
+...
 > 
->  .../arm/freescale/fsl,vf610-mscm-cpucfg.txt        |  14 ++
->  .../bindings/arm/freescale/fsl,vf610-mscm-ir.txt   |  33 ++++
->  arch/arm/boot/dts/vf500.dtsi                       | 137 +------------
->  arch/arm/boot/dts/vfxxx.dtsi                       |  49 +++++
->  arch/arm/mach-imx/Kconfig                          |   1 +
->  drivers/irqchip/Makefile                           |   1 +
->  drivers/irqchip/irq-vf610-mscm-ir.c                | 212 +++++++++++++++++++++
->  7 files changed, 314 insertions(+), 133 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-cpucfg.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-ir.txt
->  create mode 100644 drivers/irqchip/irq-vf610-mscm-ir.c
+> Maxime Ripard (2):
+>   irqchip: armada-370-xp: Enable the PMU interrupts
+...
+>  arch/arm/configs/mvebu_v7_defconfig  |  1 +
+>  drivers/irqchip/irq-armada-370-xp.c  | 88 +++++++++++++++++++++++-------------
+>  5 files changed, 73 insertions(+), 31 deletions(-)
 
-Applied patches 1 and 2 to irqchip/vybrid.  Please let me know if you need to
-base other work off of this.
+Patches 1-3 applied to irqchip/mvebu with Gregory's Acks.  Please let me know
+if you need to use this as a base.
+
+Depends on the fix in irqchip/urgent.
 
 thx,
 
