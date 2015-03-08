@@ -1,102 +1,31 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Sun, 8 Mar 2015 11:43:26 +0100
+Date: Sun, 8 Mar 2015 12:07:02 +0100
 Subject: [PATCH 1/2] pinctrl: Add support for Meson8b
-In-Reply-To: <20150308084635.GA21781@gmail.com>
+In-Reply-To: <CAOQ7t2Yb2qP_R=exsUWet71uy9vGbfpR-Y+fyr5hE273ipSW0w@mail.gmail.com>
 References: <1425657076-6709-1-git-send-email-carlo@caione.org>
  <1425657076-6709-2-git-send-email-carlo@caione.org>
  <20150308084635.GA21781@gmail.com>
-Message-ID: <CAOQ7t2Yb2qP_R=exsUWet71uy9vGbfpR-Y+fyr5hE273ipSW0w@mail.gmail.com>
+ <CAOQ7t2Yb2qP_R=exsUWet71uy9vGbfpR-Y+fyr5hE273ipSW0w@mail.gmail.com>
+Message-ID: <CAOQ7t2aG2Gpt4qUaH-72PrHC3-fMGBKA46wQGqZp5dB3GGhjQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 8, 2015 at 9:46 AM, Beniamino Galvani <b.galvani@gmail.com> wrote:
-> On Fri, Mar 06, 2015 at 04:51:15PM +0100, Carlo Caione wrote:
->> From: Carlo Caione <carlo@endlessm.com>
->>
->> This patch adds pinctrl support for the AmLogic Meson8b SoC.
+On Sun, Mar 8, 2015 at 11:43 AM, Carlo Caione <carlo@caione.org> wrote:
+> On Sun, Mar 8, 2015 at 9:46 AM, Beniamino Galvani <b.galvani@gmail.com> wrote:
+>> I'm not very familiar with the inner mechanisms of the pinctrl
+>> subsystem, but I guess that holes in the numbering of pins wouldn't be
+>> a problem and thus we can skip the numbers associated to non-existent
+>> pins (i.e. GPIOX_11 -> 11, GPIOX_16 -> 16). Pinctrl experts please
+>> correct me if I'm wrong :)
 >
-> Hi Carlo,
+> Linus, any thought on that?
+> The only problem I see is that since the BANK macro works with 'first'
+> and 'last' without considering holes, we will be mapping GPIOs that do
+> not actually exist in our SoC.
 
-Hi Beniamino,
-
->> [...]
->> +static const unsigned int xtal_24m_pins[]    = { PIN_GPIOY_3 };
->> +static const unsigned int iso7816_2_clk_pins[]       = { PIN_GPIOY_13 };
->> +static const unsigned int iso7816_2_data_pins[] = { PIN_GPIOY_14 };
->> +
->> +
->
-> Just a nitpick, there is a double empty line here.
-
-Nitpicks are welcome.
-
->> [...]
->> +static const unsigned int remote_input_pins[]        = { PIN_GPIOAO_7 };
->> +static const unsigned int hdmi_cec_1_pins[]  = { PIN_GPIOAO_12 };
->> +static const unsigned int ir_blaster_pins[]  = { PIN_GPIOAO_13 };
->> +
->> +
->
-> The same here.
-
-Ok
-
->> [...]
->> +/* First GPIO chip */
->> +#define GPIOX_0              0
->> +#define GPIOX_1              1
->> +#define GPIOX_2              2
->> +#define GPIOX_3              3
->> +#define GPIOX_4              4
->> +#define GPIOX_5              5
->> +#define GPIOX_6              6
->> +#define GPIOX_7              7
->> +#define GPIOX_8              8
->> +#define GPIOX_9              9
->> +#define GPIOX_10     10
->> +#define GPIOX_11     11
->> +#define GPIOX_16     12
->
-> This kind of pin numbering breaks the selection of the bit for a given
-> pin in meson_calc_reg_and_bit(). Looking at the documentation it seems
-> that pins GPIOX_12 through 15 are not available but their bit exist in
-> the register and we must take that into account.
->
-> For example GPIOX_10 and GPIOX_11 are associated to bits 10 and 11 of
-> register 1 for changing the direction and GPIOX_16 to bit 16; but with
-> the above assignment the function would select bit 12 for GPIOX_16.
-
-Right. Fix coming in v2.
-Probably the most sensible thing to do is to reuse the same
-meson8-gpio.h integrated with the DIF bank pins missing from meson8
-and only present in Meson8b.
-
-> The strange thing is that the pins that are missing in the
-> documentation (as GPIOX12-15, GPIOY_2 and others) not only are defined
-> but also have some associated mux configuration in Amlogic kernel
-> sources.
-
-Looking at the pin-out diagram I have for the Meson8b it seems that
-those GPIOs are missing from the SoC pin-out, so I think that the
-documentation is more correct in this sense.
-
-> I'm not very familiar with the inner mechanisms of the pinctrl
-> subsystem, but I guess that holes in the numbering of pins wouldn't be
-> a problem and thus we can skip the numbers associated to non-existent
-> pins (i.e. GPIOX_11 -> 11, GPIOX_16 -> 16). Pinctrl experts please
-> correct me if I'm wrong :)
-
-Linus, any thought on that?
-The only problem I see is that since the BANK macro works with 'first'
-and 'last' without considering holes, we will be mapping GPIOs that do
-not actually exist in our SoC.
-
-> Or we could just pretend that the missing pins exist even if the
-> documentation says otherwise.
-
-I totally agree.
-
-Thanks,
+On a second thought this is not correct since 'first' and 'last' are
+only used for boundary checking and to compute the bit offset inside
+the mux register.
 
 -- 
 Carlo Caione
