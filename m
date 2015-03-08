@@ -1,54 +1,42 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 8 Mar 2015 05:56:17 +0000
-Subject: [PATCH 00/11] Collection of GIC/GICv3 fixes for 4.0
-In-Reply-To: <1425659870-11832-1-git-send-email-marc.zyngier@arm.com>
-References: <1425659870-11832-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150308055617.GH21207@io.lakedaemon.net>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Sun, 8 Mar 2015 09:16:39 +0100
+Subject: [PATCH v5 2/5] dt-bindings: Add pinctrl bindings for
+ mt65xx/mt81xx.
+In-Reply-To: <CACRpkdYASTGTiiAF6EA=OCqYepdStf4UO9_qWGg6ACyd8=CaHw@mail.gmail.com>
+References: <1421818097-9281-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1421818097-9281-3-git-send-email-hongzhou.yang@mediatek.com>
+ <CACRpkdYASTGTiiAF6EA=OCqYepdStf4UO9_qWGg6ACyd8=CaHw@mail.gmail.com>
+Message-ID: <CABuKBeL0y4OrLCtyV_n0eVsncpo7vT0ZentGC-ZW9YzBYDa1Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
+Hi Linus,
 
-On Fri, Mar 06, 2015 at 04:37:39PM +0000, Marc Zyngier wrote:
-> This series fixes a number of GIC(v3) issues, ranging from
-> initialization fixes to out of bound accesses and locking issues.
-> 
-> A number of these patches have already been posted before, but as
-> we're starting to get patch dependencies, and in an effort to reduce
-> the load on the maintainers, I've decided to collate them in a single
-> series.
-> 
-> This is based on v4.0-rc1, and available at from the following branch:
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gic-fixes
-> 
-> Marc Zyngier (4):
->   irqchip: gicv3-its: Allocate enough memory for the full range of
->     DeviceID
->   irqchip: gicv3-its: Iterate over PCI aliases to generate ITS
->     configuration
->   irqchip: gicv3-its: Fix unsafe locking reported by lockdep
->   irqchip: gic: Fix unsafe locking reported by lockdep
-> 
-> Vladimir Murzin (2):
->   irqchip: gicv3-its: Fix ITS CPU init
->   irqchip: gic-v3: fix out of bounds access to cpu_logical_map
-> 
-> Yun Wu (5):
->   irqchip: gicv3-its: zero itt before handling to hardware
->   irqchip: gicv3-its: use 64KB page as default granule
->   irqchip: gicv3-its: add limitation to page order
->   irqchip: gicv3-its: define macros for GITS_CTLR fields
->   irqchip: gicv3-its: support safe initialization
-> 
->  drivers/irqchip/irq-gic-v3-its.c   | 157 ++++++++++++++++++++++++++++++-------
->  drivers/irqchip/irq-gic-v3.c       |   2 +-
->  drivers/irqchip/irq-gic.c          |  20 +++--
->  include/linux/irqchip/arm-gic-v3.h |   5 ++
->  4 files changed, 146 insertions(+), 38 deletions(-)
+2015-02-10 9:01 GMT+01:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Wed, Jan 21, 2015 at 1:28 PM, Hongzhou Yang
+> <hongzhou.yang@mediatek.com> wrote:
+>
+>> From: Hongzhou Yang <hongzhou.yang@mediatek.com>
+>>
+>> Add devicetree bindings for Mediatek SoC pinctrl driver.
+>>
+>> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+>
+> OK applied this patch for v3.21 now, relying on Sascha's ACK.
 
-Thanks for pulling this into one series for me.  I've now applied the whole
-series to irqchip/urgent-gic.
+I can see the the pinctrl driver parts in your tree repository [0],
+but not in linux-next.
+Do think of merging them in the next merge window?
 
-thx,
+Thanks,
+Matthias
 
-Jason.
+[0] https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/log/?h=mtk-staging
+>
+> Yours,
+> Linus Walleij
+
+
+
+-- 
+motzblog.wordpress.com
