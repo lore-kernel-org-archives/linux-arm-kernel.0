@@ -1,31 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 08 Mar 2015 23:52:50 +0100
-Subject: [RFC PATCH 00/18] ARM: msm multiplatform support
-In-Reply-To: <CAPDyKFpuQ50qgUxh7fXrt-2AoqgnQQ5q0heCgzKchKvDQazNag@mail.gmail.com>
-References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
- <CAPDyKFpuQ50qgUxh7fXrt-2AoqgnQQ5q0heCgzKchKvDQazNag@mail.gmail.com>
-Message-ID: <7616599.hAEbVQmATE@wuerfel>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 09 Mar 2015 00:43:56 +0100
+Subject: [PATCH v6 0/3] irqchip: vf610-mscm: add MSCM interrupt router
+ driver
+In-Reply-To: <20150308053110.GF21207@io.lakedaemon.net>
+References: <1425249689-32354-1-git-send-email-stefan@agner.ch>
+ <20150308053110.GF21207@io.lakedaemon.net>
+Message-ID: <a64c8b81761a9886c83128dcf7749b6d@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 March 2015 17:40:18 Ulf Hansson wrote:
-> The goal from my side is to entirely remove this mmc driver and
-> instead convert to use the mmci host driver.
+On 2015-03-08 06:31, Jason Cooper wrote:
+> On Sun, Mar 01, 2015 at 11:41:26PM +0100, Stefan Agner wrote:
+> ...
+>> Stefan Agner (3):
+>>   irqchip: vf610-mscm-ir: add support for MSCM interrupt router
+>>   irqchip: vf610-mscm: dt-bindings: add MSCM bindings
+>>   ARM: dts: vf610: add Miscellaneous System Control Module (MSCM)
+>>
+>>  .../arm/freescale/fsl,vf610-mscm-cpucfg.txt        |  14 ++
+>>  .../bindings/arm/freescale/fsl,vf610-mscm-ir.txt   |  33 ++++
+>>  arch/arm/boot/dts/vf500.dtsi                       | 137 +------------
+>>  arch/arm/boot/dts/vfxxx.dtsi                       |  49 +++++
+>>  arch/arm/mach-imx/Kconfig                          |   1 +
+>>  drivers/irqchip/Makefile                           |   1 +
+>>  drivers/irqchip/irq-vf610-mscm-ir.c                | 212 +++++++++++++++++++++
+>>  7 files changed, 314 insertions(+), 133 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-cpucfg.txt
+>>  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-ir.txt
+>>  create mode 100644 drivers/irqchip/irq-vf610-mscm-ir.c
 > 
-> If I understand correctly, the current big blocker to reach that goal
-> is the DMA driver, since it's not converted to the DMA engine API? Do
-> you know if that's a correct statement?
+> Applied patches 1 and 2 to irqchip/vybrid.  Please let me know if you need to
+> base other work off of this.
 
-Yes, I think that is correct. As I wrote in the patch description,
-after we remove the serial-hs driver, msm_sdcc is the only user of the
-private MSM DMA API.
+Thx. Some patches in the patchset to run Linux on the Cortex-M4 of
+Vybrid is based on this driver. I will post a rebased version of that
+probably tomorrow.
 
-I wasn't aware that this device is compatible with mmci, but that
-certainly simplifies things.
-
-> Anyway, I suppose this patchset can be considered as step in the right
-> direction, even if I don't like to take patches for the msm_sdcc.c.
-
-Ok.
-
-	Arnd
+--
+Stefan
