@@ -1,38 +1,52 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 8 Mar 2015 18:26:38 +0100
-Subject: [linux-sunxi] [PATCH 7/7] ARM: dts: sun7i: Enable cap-sdio-irq
- for bananapro sdio wifi
-In-Reply-To: <54FC3239.5030200@redhat.com>
+Date: Sun, 8 Mar 2015 18:25:01 +0100
+Subject: [PATCH 6/7] ARM: dts: sun7i: Add OOB irq support to boards with
+ broadcom sdio wifi
+In-Reply-To: <1425754884-7875-6-git-send-email-hdegoede@redhat.com>
 References: <1425754884-7875-1-git-send-email-hdegoede@redhat.com>
- <1425754884-7875-7-git-send-email-hdegoede@redhat.com>
- <CAGb2v65tcCrg3njNN0owLrM-MUepRBwjxpU46dpXkLhy9mceEA@mail.gmail.com>
- <54FC3239.5030200@redhat.com>
-Message-ID: <20150308172638.GH5085@lukather>
+ <1425754884-7875-6-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150308172501.GG5085@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 08, 2015 at 12:27:53PM +0100, Hans de Goede wrote:
-> Hi,
+On Sat, Mar 07, 2015 at 08:01:23PM +0100, Hans de Goede wrote:
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 11 +++++++++++
+>  arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts  | 11 +++++++++++
+>  2 files changed, 22 insertions(+)
 > 
-> On 08-03-15 03:42, Chen-Yu Tsai wrote:
-> >On Sun, Mar 8, 2015 at 3:01 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> >>The sdio wifi on the Banana Pro does not appear to have an oob irq hooked
-> >>up, so enable sdio-irq support to avoid unnecessary polling.
-> >
-> >I wonder if this is stable enough to put back into the mmc driver, i.e.
-> >declare the capability in the driver itself? IIRC at one point it did.
-> 
-> That is a good question, I believe strongly that the sdio wifi issues we've
-> been seeing which were the reason to disable cap-sdio-irq in the driver are
-> actually unrelated to the irq delivery mechanism. So IMHO yes we can just enable
-> this for all devices in the driver, and yes that would be a better solution.
-> 
-> Maxime, if I send a patch to enable cal-sdio-irq at the driver level ( as it
-> really is a hardware feature not a board feature), will you ack it ?
+> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> index 0c219a4..8111b0c 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> @@ -167,12 +167,23 @@
+>  };
+>  
+>  &mmc3 {
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
 
-You know a lot more than I do on this, so I fully trust you. If you
-feel like it's the best solution, go ahead.
+Aside from Chen-Yu's comments, that should be in the DTSI.
 
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&mmc3_pins_a>;
+>  	vmmc-supply = <&reg_vmmc3>;
+>  	bus-width = <4>;
+>  	non-removable;
+>  	status = "okay";
+> +
+> +	brcmf: bcrmf at 1 {
+> +		reg = <1>;
+> +		compatible = "brcm,bcm4329-fmac";
+> +		interrupt-parent = <&pio>;
+> +		interrupts = <10 8>; /* PH10 / EINT10 */
+
+And you can use interrupts-extented here (not that I really care much,
+both solutions works for me).
+
+Thanks!
 Maxime
 
 -- 
@@ -45,4 +59,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150308/a70e052d/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150308/2fc0ca41/attachment-0001.sig>
