@@ -1,87 +1,124 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Mon, 9 Mar 2015 12:14:10 +0100
-Subject: twl4030_charger: need changes to get probed?
-In-Reply-To: <20150309110653.7532613c@notabene.brown>
-References: <20150224043341.4243.23291.stgit@notabene.brown>
- <20150224043352.4243.11227.stgit@notabene.brown>
- <20150302210926.GP13270@amd>
- <20150305173350.50502b95@notabene.brown>
- <20150306212417.GA24169@amd> <20150307210102.GL5233@earth>
- <20150309110653.7532613c@notabene.brown>
-Message-ID: <20150309111410.GB3914@earth>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Mon, 9 Mar 2015 19:30:55 +0800
+Subject: [PATCH 4/5] dt-bindings: iommu: Add binding for mediatek IOMMU
+In-Reply-To: <20150306112137.GE8700@leverpostej>
+References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
+ <1425638900-24989-5-git-send-email-yong.wu@mediatek.com>
+ <20150306112137.GE8700@leverpostej>
+Message-ID: <1425900655.13300.5.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Mark,
 
-On Mon, Mar 09, 2015 at 11:06:53AM +1100, NeilBrown wrote:
-> On Sat, 7 Mar 2015 22:01:02 +0100 Sebastian Reichel <sre@debian.org> wrote:
-> > platform_driver_probe() does not support deferred probing.
+     Thanks very much for your review.
+     I will fix them in the next verion.
+
+On Fri, 2015-03-06 at 11:21 +0000, Mark Rutland wrote:
+> On Fri, Mar 06, 2015 at 10:48:19AM +0000, yong.wu at mediatek.com wrote:
+> > From: Yong Wu <yong.wu@mediatek.com>
 > > 
-> > Neil, can you take this patch into your series for the next round?
+> > This patch add mediatek iommu dts binding document.
+> > 
+> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/iommu/mediatek,iommu.txt   | 41 ++++++++++++++++++++++
+> >  1 file changed, 41 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt b/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+> > new file mode 100644
+> > index 0000000..db01c92
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+> > @@ -0,0 +1,41 @@
+> > +/******************************************************/
+> > +/*    Mediatek IOMMU Hardware block diagram           */
+> > +/******************************************************/
+> > +              EMI (External Memory Interface)
+> > +               |
+> > +              m4u (Multimedia Memory Management Unit)
+> > +               |
+> > +              smi (Smart Multimedia Interface)
+> > +               |
+> > +        +---------------+-------
+> > +        |               |
+> > +        |               |
+> > +    vdec larb       disp larb      ... SoCs have different local arbiter(larb).
+> > +        |               |
+> > +        |               |
+> > +   +----+----+    +-----+-----+
+> > +   |    |    |    |     |     |    ...
+> > +   |    |    |    |     |     |    ...
+> > +   |    |    |    |     |     |    ...
+> > +  MC   PP   VLD  OVL0 RDMA0 WDMA0  ... There are different ports in each larb.
+> > +
+> > +Required properties:
+> > +- compatible : must be "mediatek,mt8173-iommu"
 > 
-> I could, but I do wonder if it is the right thing to do.
+> s/iommu/m4u/ -- the name should match what the hardware is called.
 > 
-> Shouldn't we fix platform_driver_probe() to support deferred probing.
-
-well most drivers use platform_driver_register anyways. Other
-subsystems, like e.g. i2c have converted all drivers already.
-In drivers/power/ there are only three drivers using
-platform_driver_probe:
-
-drivers/power/avs/smartreflex.c - ok here
-drivers/power/reset/brcmstb-reboot.c - looks ok, too
-drivers/power/twl4030_charger.c - should probably be converted
-
-> As I understand it, it refused to retry a probe if there is an error, and the
-> comments suggest that such retrying is avoided because it would be a waste
-> of time:
+> > +- reg : m4u register base
 > 
-> 	/*
-> 	 * Prevent driver from requesting probe deferral to avoid further
-> 	 * futile probe attempts.
-> 	 */
+> ... and size
 > 
-> In this case, it isn't futile.
-
-All drivers would benefit of being probed again if they returned
-EPROBEDEFER, but their probe function can't be called again if
-they use driver_platform_probe, since the probe function will be
-unloaded when it should be called again. Apart from that the
-.probe function pointer is not set. Thus trying to probe the
-driver again at a later point is "a waste of time" and "futile",
-since it will definitely fail.
-
-> Earlier there is a comment saying:
+> > +- interrupts : must contain the interrupts from each internal translation unit
 > 
->  * Use this instead of platform_driver_register() when you know the device
->  * is not hotpluggable and has already been registered, and you want to
->  * remove its run-once probe() infrastructure from memory after the driver
->  * has bound to the device.
+> How many "internal translation units" are there?
 > 
-> I presume all this applies.  I assume that the only problem is a probe-order
-> thing.  So maybe we should fix platform_driver_probe() to do the right thing
-> with -EPROBEDEFER??
+> How should the interrupts be ordered?
 > 
-> Trouble is, I really don't understand the  point or mechanism for
-> platform_driver_probe(), so I cannot suggest anything.
-> But I have been annoyed before that platform_driver_probe doesn't cope with
-> EPROBEDEFER, so I would like it fixed.
+> How do these relate to the larbs?
+   There is only one internal translation units in MT8173.(2 units in
+MT8135)
+   Because this patch is only for mt8173, so I will change it like this:
 
-platform_driver_probe is not about probe-order, but about not having
-the probe function in memory once the driver is loaded. So the probe
-function cannot be called again. If you don't want this use
-platform_driver_register, as most drivers actually do.
-
-I guess we should add some coccinelle scripts for detection of
-potentially broken drivers (e.g. everything requesting gpios/pinctrl
-together with platform_driver_register).
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150309/992889d1/attachment.sig>
+interrupts : the interrupt of the m4u.
+    is it ok?
+> 
+> > +- clocks : must contain one entry for each clock-name
+> > +- clock-name: m4u clock
+> 
+> This does not match the example.
+> 
+> s/clock-name/clock-names/
+> 
+> Please format this like a list, with names quoted, e.g.
+> 
+> - clock-names: must contain:
+>   * "m4u" - The functional clock for the m4u
+> 
+> > +- larb : must contain the larbes of current platform
+> 
+> s/larbes/local arbiters/
+> 
+> How should these be ordered? Surely there's a relationship with
+> registers/interrupts/etc in this unit?
+> 
+> > +- iommu-cells : must be 1. Specifies the client PortID as defined in
+> > +dt-binding/iommu/mt**-iommu-port.h
+> 
+> Give the absolute filename.
+> 
+> The include file should be added in this patch (it's part of the
+> binding). The whole patch should be moved earlier in the series.
+> 
+> Thanks,
+> Mark.
+> 
+> > +
+> > +Example:
+> > +		iommu: mmsys_iommu at 10205000 {
+> > +			compatible = "mediatek,mt8173-iommu";
+> > +			reg = <0 0x10205000 0 0x1000>;
+> > +			interrupts = <GIC_SPI 139 IRQ_TYPE_LEVEL_LOW>;
+> > +			clocks = <&infrasys INFRA_M4U>;
+> > +			clock-names = "infra_m4u";
+> > +			larb = <&larb0 &larb1 &larb2 &larb3 &larb4 &larb5>;
+> > +			#iommu-cells = <1>;
+> > +		};
+> > \ No newline at end of file
+> > -- 
+> > 1.8.1.1.dirty
+> > 
+> > 
