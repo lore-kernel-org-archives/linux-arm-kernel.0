@@ -1,34 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 09 Mar 2015 22:21:08 +0100
-Subject: [PATCH v2 3/3] ARM: mx25: Remove platform code support files
-In-Reply-To: <1425662758-4675-3-git-send-email-festevam@gmail.com>
-References: <1425662758-4675-1-git-send-email-festevam@gmail.com>
- <1425662758-4675-3-git-send-email-festevam@gmail.com>
-Message-ID: <21909740.nfZYRJLb3G@wuerfel>
+Date: Mon, 09 Mar 2015 22:27:02 +0100
+Subject: [PATCH] iommu: arm-smmu: set a more appropriate DMA mask
+In-Reply-To: <2ad6f0a7d198d607e252c420fef52d95dbe048c6.1425581413.git.robin.murphy@arm.com>
+References: <2ad6f0a7d198d607e252c420fef52d95dbe048c6.1425581413.git.robin.murphy@arm.com>
+Message-ID: <2824241.CYpYodyNAY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 06 March 2015 14:25:58 Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> As mx25 is a dt-only platform, we can get rid of platform code support files, 
-> which are unused now.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - None
-> 
->  arch/arm/mach-imx/Makefile        |   2 +-
->  arch/arm/mach-imx/devices-imx25.h |  85 -------
->  arch/arm/mach-imx/ehci-imx25.c    |  99 -------
->  arch/arm/mach-imx/iomux-mx25.h    | 524 --------------------------------------
+On Thursday 05 March 2015 18:56:36 Robin Murphy wrote:
+> @@ -1630,6 +1630,13 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+>         size = arm_smmu_id_size_to_bits((id >> ID2_OAS_SHIFT) & ID2_OAS_MASK);
+>         smmu->pa_size = size;
+>  
+> +       /*
+> +        * What the page table walker can address actually depends on which
+> +        * descriptor format is in use, but since a) we don't know that yet,
+> +        * and b) it can vary per context bank, this will have to do...
+> +        */
+> +       dma_set_mask_and_coherent(smmu->dev, DMA_BIT_MASK(size));
+> +
+>         if (smmu->version == ARM_SMMU_V1) {
+>                 smmu->va_size = smmu->ipa_size;
+>                 size = SZ_4K | SZ_2M | SZ_1G;
 > 
 
-Very nice, good to see some progress on the old machines!
+dma_set_mask_and_coherent() can fail if the parent bus cannot access all
+of RAM. While that would be serious misdesign for an IOMMU, you should not
+just ignore that failure and at least print a message once.
 
-If you find the time, could you summarize your plans for the remaining
-i.MX SoCs that have board files (imx21, imx27, imx31, imx35)? Do you plan
-to continue with those, one by one?
+Why not just attempt to set a 64-bit mask?
 
 	Arnd
