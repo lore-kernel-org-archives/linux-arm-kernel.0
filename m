@@ -1,18 +1,55 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 9 Mar 2015 08:27:58 -0700
-Subject: [v5, 1/9] mfd: dt-bindings: Provide human readable defines for
- LPC mode choosing
-In-Reply-To: <1425492398-27340-2-git-send-email-lee.jones@linaro.org>
-References: <1425492398-27340-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150309152758.GA7497@roeck-us.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Mar 2015 08:24:54 -0700
+Subject: [PATCH 11/24] ARM: OMAP2+: clock: remove support for legacy
+ mpurate command line param
+In-Reply-To: <54FD6306.4050109@ti.com>
+References: <1425644939-3232-1-git-send-email-t-kristo@ti.com>
+ <1425644939-3232-12-git-send-email-t-kristo@ti.com>
+ <20150306153254.GK13520@atomide.com> <54F9D160.7010708@ti.com>
+ <20150306162516.GN13520@atomide.com> <54FD6306.4050109@ti.com>
+Message-ID: <20150309152453.GF5264@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 06:06:30PM +0000, Lee Jones wrote:
-> ST's Low Power Controller can currently operate in two supported modes;
-> Watchdog and Real Time Clock.  These defines will aid engineers to easily
-> identify the selected mode.
+* Tero Kristo <t-kristo@ti.com> [150309 05:56]:
+> On 03/06/2015 06:25 PM, Tony Lindgren wrote:
+> >* Tero Kristo <t-kristo@ti.com> [150306 08:10]:
+> >>On 03/06/2015 05:32 PM, Tony Lindgren wrote:
+> >>>* Tero Kristo <t-kristo@ti.com> [150306 04:29]:
+> >>>>The legacy support is wrong and dangerous, as it doesn't take any
+> >>>>OPPs into account and does not scale voltages. Switching mpurate should
+> >>>>be handled through cpufreq.
+> >>>
+> >>>Hmm I wonder if some systems actually rely on the mpurate cmdline
+> >>>parameter. If this cannot be fixed properly, you should at least
+> >>>print an error here.
+> >>
+> >>Yea, I was kind of worried about this comment. We have also an option of
+> >>doing this through clock driver, but I was hesitant of doing this either.
+> >>Isn't having a global kernel option like this frowned upon anyway? I believe
+> >>this piece of init code gets executed on every board on multiarch kernel.
+> >
+> >Well the option has been there probably for 10 years already so we
+> >can't just drop it like that. Chances are it's unused though, so I
+> >suggest you just print out a warning for it.
+> >
+> >It's called from omap_arch_initcall which checks for soc_is_omap()
+> >so that's not an issue. But when moving the code, you naturally
+> >need to check the moved code initcall usage.
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> This patch is not really needed for the set itself btw, it can just be
+> dropped if you feel it actually is used by someone. Reverting it from the
+> set just causes a minor merge conflict and you can't remove two of the
+> otherwise empty clock files.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+How about set it up in a way where it can be easily reverted later
+on if there is need for that?
+ 
+> You could also just move the code over to clock.c maybe, merge these and do
+> a soc type check to reach the same behaviour.
+
+If it's needed yeah.
+
+Regards,
+
+Tony
