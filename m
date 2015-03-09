@@ -1,28 +1,34 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 09 Mar 2015 22:12:32 +0100
-Subject: [PATCH v2 04/18] clocksource: Add ARM System timer driver
-In-Reply-To: <CALszF6AEThPrRe7c7nJ6q7yb2fhLMFuHJUV10sf=w0TMcqVVaw@mail.gmail.com>
-References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1424455277-29983-5-git-send-email-mcoquelin.stm32@gmail.com>
- <20150220195437.GT19388@pengutronix.de> <1424468908.24292.10.camel@x220>
- <CALszF6Bm_Y4ZLednjpmP-hMix3gA23FwLm5hViEjr1QojUY+Mg@mail.gmail.com>
- <1425411786.2606.24.camel@tiscali.nl>
- <CALszF6AEThPrRe7c7nJ6q7yb2fhLMFuHJUV10sf=w0TMcqVVaw@mail.gmail.com>
-Message-ID: <1425935552.4244.6.camel@x220>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 Mar 2015 22:21:08 +0100
+Subject: [PATCH v2 3/3] ARM: mx25: Remove platform code support files
+In-Reply-To: <1425662758-4675-3-git-send-email-festevam@gmail.com>
+References: <1425662758-4675-1-git-send-email-festevam@gmail.com>
+ <1425662758-4675-3-git-send-email-festevam@gmail.com>
+Message-ID: <21909740.nfZYRJLb3G@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-03-04 at 13:08 +0100, Maxime Coquelin wrote:
-> This is because I added also support for COMPILE_TEST coverage as per
-> Uwe advice,
-> and thought it was necessary to have an entry for this.
-> Maybe I'm just wrong?
+On Friday 06 March 2015 14:25:58 Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> As mx25 is a dt-only platform, we can get rid of platform code support files, 
+> which are unused now.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Changes since v1:
+> - None
+> 
+>  arch/arm/mach-imx/Makefile        |   2 +-
+>  arch/arm/mach-imx/devices-imx25.h |  85 -------
+>  arch/arm/mach-imx/ehci-imx25.c    |  99 -------
+>  arch/arm/mach-imx/iomux-mx25.h    | 524 --------------------------------------
+> 
 
-I missed that you added COMPILE_TEST.
+Very nice, good to see some progress on the old machines!
 
-A quick scan of your idea doesn't show any obvious issues. (Note that I
-don't really know how people actually use COMPILE_TEST. I guess things
-like "make allyesconfig" are involved.)
+If you find the time, could you summarize your plans for the remaining
+i.MX SoCs that have board files (imx21, imx27, imx31, imx35)? Do you plan
+to continue with those, one by one?
 
-
-Paul Bolle
+	Arnd
