@@ -1,34 +1,25 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Mon, 09 Mar 2015 16:25:58 +0000
-Subject: [PATCH 5/6] target-arm/kvm64: fix save/restore of SPSR regs
-In-Reply-To: <CAFEAcA_DqHx-sDMuhSr0-uQL20-uJzXXpBvr6YLUWmzMN2mL4w@mail.gmail.com>
-References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
- <1424880159-29348-7-git-send-email-alex.bennee@linaro.org>
- <20150302172212.GB10137@lvm> <874mq27222.fsf@linaro.org>
- <20150309125650.GA20559@cbox>
- <CAFEAcA_DqHx-sDMuhSr0-uQL20-uJzXXpBvr6YLUWmzMN2mL4w@mail.gmail.com>
-Message-ID: <87r3syb0ix.fsf@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Mar 2015 17:26:26 +0100
+Subject: [PATCH v5 3/8] pinctrl: cygnus: add initial IOMUX driver support
+In-Reply-To: <1425515756-321-4-git-send-email-rjui@broadcom.com>
+References: <1425515756-321-1-git-send-email-rjui@broadcom.com>
+ <1425515756-321-4-git-send-email-rjui@broadcom.com>
+Message-ID: <CACRpkdacEjY3FuczY=tJ26Xpd67m3yYxCKbOVYrRDvjCynwoiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 5, 2015 at 1:35 AM, Ray Jui <rjui@broadcom.com> wrote:
 
-Peter Maydell <peter.maydell@linaro.org> writes:
-
-> On 9 March 2015 at 21:56, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->> this function, however, is not used only when migration, but should
->> generally cover the case where you want to synchronize QEMU's state into
->> KVM's state, right?  So while it may not be harmful in currently
->> supported use cases, is there ever a situation where (is_a64(env) && el
->> == 0) and env->spsr != banked_spsr[el], and where env->spsr is
->> out-of-date?
+> This adds the initial driver support for the Broadcom Cygnus IOMUX
+> controller. The Cygnus IOMUX controller supports group based mux
+> configuration but allows certain pins to be muxed to GPIO individually
 >
-> If EL == 0 then you can't access any SPSR, so env->spsr is by
-> definition out of date.
+> Signed-off-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> Tested-by: Dmitry Torokhov <dtor@chromium.org>
 
-Indeed and in v2 the whole thing is wrapped in if (el > 0)
+Nice and clean.
+Patch applied.
 
->
-> -- PMM
-
--- 
-Alex Benn?e
+Yours,
+Linus Walleij
