@@ -1,74 +1,74 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  9 Mar 2015 11:22:20 +0100
-Subject: [PATCH 2/4] crypto/arm: add support for SHA1 using ARMv8 Crypto
- Instructions
+Date: Mon,  9 Mar 2015 11:22:21 +0100
+Subject: [PATCH 3/4] crypto/arm: add support for SHA-224/256 using ARMv8
+ Crypto Extensions
 In-Reply-To: <1425896542-24946-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1425896542-24946-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1425896542-24946-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1425896542-24946-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This implements the SHA1 secure hash algorithm using the AArch32
-versions of the ARMv8 Crypto Extensions for SHA1.
+This implements the SHA-224/256 secure hash algorithm using the AArch32
+versions of the ARMv8 Crypto Extensions for SHA2.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/crypto/Kconfig        |  10 +++
+ arch/arm/crypto/Kconfig        |   9 ++
  arch/arm/crypto/Makefile       |   2 +
- arch/arm/crypto/sha1-ce-core.S | 134 ++++++++++++++++++++++++++++++++++++
- arch/arm/crypto/sha1-ce-glue.c | 150 +++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 296 insertions(+)
- create mode 100644 arch/arm/crypto/sha1-ce-core.S
- create mode 100644 arch/arm/crypto/sha1-ce-glue.c
+ arch/arm/crypto/sha2-ce-core.S | 134 +++++++++++++++++++++++++++
+ arch/arm/crypto/sha2-ce-glue.c | 203 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 348 insertions(+)
+ create mode 100644 arch/arm/crypto/sha2-ce-core.S
+ create mode 100644 arch/arm/crypto/sha2-ce-glue.c
 
 diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
-index 66fe82857e99..d7bc10beb8ac 100644
+index d7bc10beb8ac..9c1478e55a40 100644
 --- a/arch/arm/crypto/Kconfig
 +++ b/arch/arm/crypto/Kconfig
-@@ -27,6 +27,16 @@ config CRYPTO_SHA1_ARM_NEON
- 	  using optimized ARM NEON assembly, when NEON instructions are
- 	  available.
+@@ -37,6 +37,15 @@ config CRYPTO_SHA1_ARM_CE
+ 	  SHA-1 secure hash standard (FIPS 180-1/DFIPS 180-2) implemented
+ 	  using special ARMv8 Crypto Extensions.
  
-+config CRYPTO_SHA1_ARM_CE
-+	tristate "SHA1 digest algorithm (ARM v8 Crypto Extensions)"
++config CRYPTO_SHA2_ARM_CE
++	tristate "SHA-224/256 digest algorithm (ARM v8 Crypto Extensions)"
 +	depends on KERNEL_MODE_NEON
-+	select CRYPTO_SHA1_ARM
-+	select CRYPTO_SHA1
++	select CRYPTO_SHA256
 +	select CRYPTO_HASH
 +	help
-+	  SHA-1 secure hash standard (FIPS 180-1/DFIPS 180-2) implemented
++	  SHA-256 secure hash standard (DFIPS 180-2) implemented
 +	  using special ARMv8 Crypto Extensions.
 +
  config CRYPTO_SHA512_ARM_NEON
  	tristate "SHA384 and SHA512 digest algorithm (ARM NEON)"
  	depends on KERNEL_MODE_NEON
 diff --git a/arch/arm/crypto/Makefile b/arch/arm/crypto/Makefile
-index b48fa341648d..d92d05ba646e 100644
+index d92d05ba646e..4ea9f96c2782 100644
 --- a/arch/arm/crypto/Makefile
 +++ b/arch/arm/crypto/Makefile
-@@ -7,12 +7,14 @@ obj-$(CONFIG_CRYPTO_AES_ARM_BS) += aes-arm-bs.o
- obj-$(CONFIG_CRYPTO_SHA1_ARM) += sha1-arm.o
+@@ -8,6 +8,7 @@ obj-$(CONFIG_CRYPTO_SHA1_ARM) += sha1-arm.o
  obj-$(CONFIG_CRYPTO_SHA1_ARM_NEON) += sha1-arm-neon.o
  obj-$(CONFIG_CRYPTO_SHA512_ARM_NEON) += sha512-arm-neon.o
-+obj-$(CONFIG_CRYPTO_SHA1_ARM_CE) += sha1-arm-ce.o
+ obj-$(CONFIG_CRYPTO_SHA1_ARM_CE) += sha1-arm-ce.o
++obj-$(CONFIG_CRYPTO_SHA2_ARM_CE) += sha2-arm-ce.o
  
  aes-arm-y	:= aes-armv4.o aes_glue.o
  aes-arm-bs-y	:= aesbs-core.o aesbs-glue.o
- sha1-arm-y	:= sha1-armv4-large.o sha1_glue.o
+@@ -15,6 +16,7 @@ sha1-arm-y	:= sha1-armv4-large.o sha1_glue.o
  sha1-arm-neon-y	:= sha1-armv7-neon.o sha1_neon_glue.o
  sha512-arm-neon-y := sha512-armv7-neon.o sha512_neon_glue.o
-+sha1-arm-ce-y	:= sha1-ce-core.o sha1-ce-glue.o
+ sha1-arm-ce-y	:= sha1-ce-core.o sha1-ce-glue.o
++sha2-arm-ce-y	:= sha2-ce-core.o sha2-ce-glue.o
  
  quiet_cmd_perl = PERL    $@
        cmd_perl = $(PERL) $(<) > $(@)
-diff --git a/arch/arm/crypto/sha1-ce-core.S b/arch/arm/crypto/sha1-ce-core.S
+diff --git a/arch/arm/crypto/sha2-ce-core.S b/arch/arm/crypto/sha2-ce-core.S
 new file mode 100644
-index 000000000000..7542f10b2233
+index 000000000000..39e01ee7d485
 --- /dev/null
-+++ b/arch/arm/crypto/sha1-ce-core.S
++++ b/arch/arm/crypto/sha2-ce-core.S
 @@ -0,0 +1,134 @@
 +/*
-+ * sha1-ce-core.S - SHA-1 secure hash using ARMv8 Crypto Extensions
++ * sha2-ce-core.S - SHA-224/256 secure hash using ARMv8 Crypto Extensions
 + *
 + * Copyright (C) 2015 Linaro Ltd.
 + * Author: Ard Biesheuvel <ard.biesheuvel@linaro.org>
@@ -84,133 +84,133 @@ index 000000000000..7542f10b2233
 +	.text
 +	.fpu		crypto-neon-fp-armv8
 +
-+	k0		.req	q0
-+	k1		.req	q1
-+	k2		.req	q2
-+	k3		.req	q3
++	k0		.req	q7
++	k1		.req	q8
++	rk		.req	r3
 +
-+	ta0		.req	q4
-+	ta1		.req	q5
-+	tb0		.req	q5
-+	tb1		.req	q4
++	ta0		.req	q9
++	ta1		.req	q10
++	tb0		.req	q10
++	tb1		.req	q9
 +
-+	dga		.req	q6
-+	dgb		.req	q7
-+	dgbs		.req	s28
++	dga		.req	q11
++	dgb		.req	q12
 +
-+	dg0		.req	q12
-+	dg1a0		.req	q13
-+	dg1a1		.req	q14
-+	dg1b0		.req	q14
-+	dg1b1		.req	q13
++	dg0		.req	q13
++	dg1		.req	q14
++	dg2		.req	q15
 +
-+	.macro		add_only, op, ev, rc, s0, dg1
++	.macro		add_only, ev, s0
++	vmov		dg2, dg0
 +	.ifnb		\s0
-+	vadd.u32	tb\ev, q\s0, \rc
++	vld1.32		{k\ev}, [rk]!
 +	.endif
-+	sha1h.32	dg1b\ev, dg0
-+	.ifb		\dg1
-+	sha1\op\().32	dg0, dg1a\ev, ta\ev
-+	.else
-+	sha1\op\().32	dg0, \dg1, ta\ev
++	sha256h.32	dg0, dg1, tb\ev
++	sha256h2.32	dg1, dg2, tb\ev
++	.ifnb		\s0
++	vadd.u32	ta\ev, q\s0, k\ev
 +	.endif
 +	.endm
 +
-+	.macro		add_update, op, ev, rc, s0, s1, s2, s3, dg1
-+	sha1su0.32	q\s0, q\s1, q\s2
-+	add_only	\op, \ev, \rc, \s1, \dg1
-+	sha1su1.32	q\s0, q\s3
++	.macro		add_update, ev, s0, s1, s2, s3
++	sha256su0.32	q\s0, q\s1
++	add_only	\ev, \s1
++	sha256su1.32	q\s0, q\s2, q\s3
 +	.endm
 +
 +	.align		6
-+.Lsha1_rcon:
-+	.word		0x5a827999, 0x5a827999, 0x5a827999, 0x5a827999
-+	.word		0x6ed9eba1, 0x6ed9eba1, 0x6ed9eba1, 0x6ed9eba1
-+	.word		0x8f1bbcdc, 0x8f1bbcdc, 0x8f1bbcdc, 0x8f1bbcdc
-+	.word		0xca62c1d6, 0xca62c1d6, 0xca62c1d6, 0xca62c1d6
++.Lsha256_rcon:
++	.word		0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5
++	.word		0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5
++	.word		0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3
++	.word		0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174
++	.word		0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc
++	.word		0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da
++	.word		0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7
++	.word		0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967
++	.word		0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13
++	.word		0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85
++	.word		0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3
++	.word		0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070
++	.word		0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5
++	.word		0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3
++	.word		0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208
++	.word		0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
 +
 +	/*
-+	 * void sha1_ce_transform(int blocks, u8 const *src, u32 *state,
++	 * void sha2_ce_transform(int blocks, u8 const *src, u32 *state,
 +	 *			  u8 *head);
 +	 */
-+ENTRY(sha1_ce_transform)
-+	/* load round constants */
-+	adr		ip, .Lsha1_rcon
-+	vld1.32		{k0-k1}, [ip]!
-+	vld1.32		{k2-k3}, [ip]
-+
++ENTRY(sha2_ce_transform)
 +	/* load state */
-+	vldm		r2, {dga}
-+	vldr		dgbs, [r2, #16]
++	vld1.8		{dga-dgb}, [r2]
 +
 +	/* load partial input (if supplied) */
 +	teq		r3, #0
 +	beq		0f
-+	vld1.8		{q8-q9}, [r3]!
-+	vld1.8		{q10-q11}, [r3]
++	vld1.8		{q0-q1}, [r3]!
++	vld1.8		{q2-q3}, [r3]
 +	teq		r0, #0
 +	b		1f
 +
 +	/* load input */
-+0:	vld1.8		{q8-q9}, [r1]!
-+	vld1.8		{q10-q11}, [r1]!
++0:	vld1.8		{q0-q1}, [r1]!
++	vld1.8		{q2-q3}, [r1]!
 +	subs		r0, r0, #1
 +
 +1:
 +#ifndef CONFIG_CPU_BIG_ENDIAN
-+	vrev32.8	q8, q8
-+	vrev32.8	q9, q9
-+	vrev32.8	q10, q10
-+	vrev32.8	q11, q11
++	vrev32.8	q0, q0
++	vrev32.8	q1, q1
++	vrev32.8	q2, q2
++	vrev32.8	q3, q3
 +#endif
 +
-+	vadd.u32	ta0, q8, k0
++	/* load first round constant */
++	adr		rk, .Lsha256_rcon
++	vld1.32		{k0}, [rk]!
++
++	vadd.u32	ta0, q0, k0
 +	vmov		dg0, dga
++	vmov		dg1, dgb
 +
-+	add_update	c, 0, k0,  8,  9, 10, 11, dgb
-+	add_update	c, 1, k0,  9, 10, 11,  8
-+	add_update	c, 0, k0, 10, 11,  8,  9
-+	add_update	c, 1, k0, 11,  8,  9, 10
-+	add_update	c, 0, k1,  8,  9, 10, 11
++	add_update	1, 0, 1, 2, 3
++	add_update	0, 1, 2, 3, 0
++	add_update	1, 2, 3, 0, 1
++	add_update	0, 3, 0, 1, 2
++	add_update	1, 0, 1, 2, 3
++	add_update	0, 1, 2, 3, 0
++	add_update	1, 2, 3, 0, 1
++	add_update	0, 3, 0, 1, 2
++	add_update	1, 0, 1, 2, 3
++	add_update	0, 1, 2, 3, 0
++	add_update	1, 2, 3, 0, 1
++	add_update	0, 3, 0, 1, 2
 +
-+	add_update	p, 1, k1,  9, 10, 11,  8
-+	add_update	p, 0, k1, 10, 11,  8,  9
-+	add_update	p, 1, k1, 11,  8,  9, 10
-+	add_update	p, 0, k1,  8,  9, 10, 11
-+	add_update	p, 1, k2,  9, 10, 11,  8
-+
-+	add_update	m, 0, k2, 10, 11,  8,  9
-+	add_update	m, 1, k2, 11,  8,  9, 10
-+	add_update	m, 0, k2,  8,  9, 10, 11
-+	add_update	m, 1, k2,  9, 10, 11,  8
-+	add_update	m, 0, k3, 10, 11,  8,  9
-+
-+	add_update	p, 1, k3, 11,  8,  9, 10
-+	add_only	p, 0, k3,  9
-+	add_only	p, 1, k3, 10
-+	add_only	p, 0, k3, 11
-+	add_only	p, 1
++	add_only	1, 1
++	add_only	0, 2
++	add_only	1, 3
++	add_only	0
 +
 +	/* update state */
 +	vadd.u32	dga, dga, dg0
-+	vadd.u32	dgb, dgb, dg1a0
++	vadd.u32	dgb, dgb, dg1
 +	bne		0b
 +
 +	/* store new state */
-+	vstm		r2, {dga}
-+	vstr		dgbs, [r2, #16]
++	vst1.8		{dga-dgb}, [r2]
 +	bx		lr
-+ENDPROC(sha1_ce_transform)
-diff --git a/arch/arm/crypto/sha1-ce-glue.c b/arch/arm/crypto/sha1-ce-glue.c
++ENDPROC(sha2_ce_transform)
+diff --git a/arch/arm/crypto/sha2-ce-glue.c b/arch/arm/crypto/sha2-ce-glue.c
 new file mode 100644
-index 000000000000..5f7cdd050a80
+index 000000000000..9ffe8ad27402
 --- /dev/null
-+++ b/arch/arm/crypto/sha1-ce-glue.c
-@@ -0,0 +1,150 @@
++++ b/arch/arm/crypto/sha2-ce-glue.c
+@@ -0,0 +1,203 @@
 +/*
-+ * sha1-ce-glue.c - SHA-1 secure hash using ARMv8 Crypto Extensions
++ * sha2-ce-glue.c - SHA-224/SHA-256 using ARMv8 Crypto Extensions
 + *
-+ * Copyright (C) 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
++ * Copyright (C) 2015 Linaro Ltd <ard.biesheuvel@linaro.org>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -222,140 +222,193 @@ index 000000000000..5f7cdd050a80
 +#include <linux/crypto.h>
 +#include <linux/module.h>
 +
-+#include <asm/crypto/sha1.h>
 +#include <asm/hwcap.h>
-+#include <asm/neon.h>
 +#include <asm/simd.h>
++#include <asm/neon.h>
 +#include <asm/unaligned.h>
 +
-+MODULE_DESCRIPTION("SHA1 secure hash using ARMv8 Crypto Extensions");
++MODULE_DESCRIPTION("SHA-224/SHA-256 secure hash using ARMv8 Crypto Extensions");
 +MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
 +MODULE_LICENSE("GPL v2");
 +
-+asmlinkage void sha1_ce_transform(int blocks, u8 const *src, u32 *state, 
++asmlinkage void sha2_ce_transform(int blocks, u8 const *src, u32 *state,
 +				  u8 *head);
 +
-+static int sha1_init(struct shash_desc *desc)
++static int sha224_init(struct shash_desc *desc)
 +{
-+	struct sha1_state *sctx = shash_desc_ctx(desc);
++	struct sha256_state *sctx = shash_desc_ctx(desc);
 +
-+	*sctx = (struct sha1_state){
-+		.state = { SHA1_H0, SHA1_H1, SHA1_H2, SHA1_H3, SHA1_H4 },
++	*sctx = (struct sha256_state){
++		.state = {
++			SHA224_H0, SHA224_H1, SHA224_H2, SHA224_H3,
++			SHA224_H4, SHA224_H5, SHA224_H6, SHA224_H7,
++		}
 +	};
 +	return 0;
 +}
 +
-+static int sha1_update(struct shash_desc *desc, const u8 *data,
++static int sha256_init(struct shash_desc *desc)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++
++	*sctx = (struct sha256_state){
++		.state = {
++			SHA256_H0, SHA256_H1, SHA256_H2, SHA256_H3,
++			SHA256_H4, SHA256_H5, SHA256_H6, SHA256_H7,
++		}
++	};
++	return 0;
++}
++
++static int sha2_update(struct shash_desc *desc, const u8 *data,
 +		       unsigned int len)
 +{
-+	struct sha1_state *sctx = shash_desc_ctx(desc);
++	struct sha256_state *sctx = shash_desc_ctx(desc);
 +	unsigned int partial;
 +
 +	if (!may_use_simd())
-+		return sha1_update_arm(desc, data, len);
++		return crypto_sha256_update(desc, data, len);
 +
-+	partial = sctx->count % SHA1_BLOCK_SIZE;
++	partial = sctx->count % SHA256_BLOCK_SIZE;
 +	sctx->count += len;
 +
-+	if ((partial + len) >= SHA1_BLOCK_SIZE) {
++	if ((partial + len) >= SHA256_BLOCK_SIZE) {
 +		int blocks;
 +
 +		if (partial) {
-+			int p = SHA1_BLOCK_SIZE - partial;
++			int p = SHA256_BLOCK_SIZE - partial;
 +
-+			memcpy(sctx->buffer + partial, data, p);
++			memcpy(sctx->buf + partial, data, p);
 +			data += p;
 +			len -= p;
 +		}
 +
-+		blocks = len / SHA1_BLOCK_SIZE;
-+		len %= SHA1_BLOCK_SIZE;
++		blocks = len / SHA256_BLOCK_SIZE;
++		len %= SHA256_BLOCK_SIZE;
 +
 +		kernel_neon_begin();
-+		sha1_ce_transform(blocks, data, sctx->state,
-+				  partial ? sctx->buffer : NULL);
++		sha2_ce_transform(blocks, data, sctx->state,
++				  partial ? sctx->buf : NULL);
 +		kernel_neon_end();
 +
-+		data += blocks * SHA1_BLOCK_SIZE;
++		data += blocks * SHA256_BLOCK_SIZE;
 +		partial = 0;
 +	}
 +	if (len)
-+		memcpy(sctx->buffer + partial, data, len);
++		memcpy(sctx->buf + partial, data, len);
 +	return 0;
 +}
 +
-+static int sha1_final(struct shash_desc *desc, u8 *out)
++static void sha2_final(struct shash_desc *desc)
 +{
-+	static const u8 padding[SHA1_BLOCK_SIZE] = { 0x80, };
++	static const u8 padding[SHA256_BLOCK_SIZE] = { 0x80, };
 +
-+	struct sha1_state *sctx = shash_desc_ctx(desc);
++	struct sha256_state *sctx = shash_desc_ctx(desc);
 +	__be64 bits = cpu_to_be64(sctx->count << 3);
++	u32 padlen = SHA256_BLOCK_SIZE
++		     - ((sctx->count + sizeof(bits)) % SHA256_BLOCK_SIZE);
++
++	sha2_update(desc, padding, padlen);
++	sha2_update(desc, (const u8 *)&bits, sizeof(bits));
++}
++
++static int sha224_final(struct shash_desc *desc, u8 *out)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
 +	__be32 *dst = (__be32 *)out;
 +	int i;
 +
-+	u32 padlen = SHA1_BLOCK_SIZE
-+		     - ((sctx->count + sizeof(bits)) % SHA1_BLOCK_SIZE);
++	sha2_final(desc);
 +
-+	sha1_update(desc, padding, padlen);
-+	sha1_update(desc, (const u8 *)&bits, sizeof(bits));
-+
-+	for (i = 0; i < SHA1_DIGEST_SIZE / sizeof(__be32); i++)
++	for (i = 0; i < SHA224_DIGEST_SIZE / sizeof(__be32); i++)
 +		put_unaligned_be32(sctx->state[i], dst++);
 +
-+	*sctx = (struct sha1_state){};
++	*sctx = (struct sha256_state){};
 +	return 0;
 +}
 +
-+static int sha1_export(struct shash_desc *desc, void *out)
++static int sha256_final(struct shash_desc *desc, u8 *out)
 +{
-+	struct sha1_state *sctx = shash_desc_ctx(desc);
-+	struct sha1_state *dst = out;
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++	__be32 *dst = (__be32 *)out;
++	int i;
++
++	sha2_final(desc);
++
++	for (i = 0; i < SHA256_DIGEST_SIZE / sizeof(__be32); i++)
++		put_unaligned_be32(sctx->state[i], dst++);
++
++	*sctx = (struct sha256_state){};
++	return 0;
++}
++
++static int sha2_export(struct shash_desc *desc, void *out)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++	struct sha256_state *dst = out;
 +
 +	*dst = *sctx;
 +	return 0;
 +}
 +
-+static int sha1_import(struct shash_desc *desc, const void *in)
++static int sha2_import(struct shash_desc *desc, const void *in)
 +{
-+	struct sha1_state *sctx = shash_desc_ctx(desc);
-+	struct sha1_state const *src = in;
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++	struct sha256_state const *src = in;
 +
 +	*sctx = *src;
 +	return 0;
 +}
 +
-+static struct shash_alg alg = {
-+	.init			= sha1_init,
-+	.update			= sha1_update,
-+	.final			= sha1_final,
-+	.export			= sha1_export,
-+	.import			= sha1_import,
-+	.descsize		= sizeof(struct sha1_state),
-+	.digestsize		= SHA1_DIGEST_SIZE,
-+	.statesize		= sizeof(struct sha1_state),
++static struct shash_alg algs[] = { {
++	.init			= sha224_init,
++	.update			= sha2_update,
++	.final			= sha224_final,
++	.export			= sha2_export,
++	.import			= sha2_import,
++	.descsize		= sizeof(struct sha256_state),
++	.digestsize		= SHA224_DIGEST_SIZE,
++	.statesize		= sizeof(struct sha256_state),
 +	.base			= {
-+		.cra_name		= "sha1",
-+		.cra_driver_name	= "sha1-ce",
++		.cra_name		= "sha224",
++		.cra_driver_name	= "sha224-ce",
 +		.cra_priority		= 200,
 +		.cra_flags		= CRYPTO_ALG_TYPE_SHASH,
-+		.cra_blocksize		= SHA1_BLOCK_SIZE,
++		.cra_blocksize		= SHA256_BLOCK_SIZE,
 +		.cra_module		= THIS_MODULE,
 +	}
-+};
++}, {
++	.init			= sha256_init,
++	.update			= sha2_update,
++	.final			= sha256_final,
++	.export			= sha2_export,
++	.import			= sha2_import,
++	.descsize		= sizeof(struct sha256_state),
++	.digestsize		= SHA256_DIGEST_SIZE,
++	.statesize		= sizeof(struct sha256_state),
++	.base			= {
++		.cra_name		= "sha256",
++		.cra_driver_name	= "sha256-ce",
++		.cra_priority		= 200,
++		.cra_flags		= CRYPTO_ALG_TYPE_SHASH,
++		.cra_blocksize		= SHA256_BLOCK_SIZE,
++		.cra_module		= THIS_MODULE,
++	}
++} };
 +
-+static int __init sha1_ce_mod_init(void)
++static int __init sha2_ce_mod_init(void)
 +{
-+	if (!(elf_hwcap2 & HWCAP2_SHA1))
++	if (!(elf_hwcap2 & HWCAP2_SHA2))
 +		return -ENODEV;
-+	return crypto_register_shash(&alg);
++	return crypto_register_shashes(algs, ARRAY_SIZE(algs));
 +}
 +
-+static void __exit sha1_ce_mod_fini(void)
++static void __exit sha2_ce_mod_fini(void)
 +{
-+	crypto_unregister_shash(&alg);
++	crypto_unregister_shashes(algs, ARRAY_SIZE(algs));
 +}
 +
-+module_init(sha1_ce_mod_init);
-+module_exit(sha1_ce_mod_fini);
++module_init(sha2_ce_mod_init);
++module_exit(sha2_ce_mod_fini);
 -- 
 1.8.3.2
