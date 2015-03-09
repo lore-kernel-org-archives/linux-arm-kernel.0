@@ -1,32 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Mar 2015 17:14:39 +0100
-Subject: [PATCH] pinctrl: at91: move lock/unlock_as_irq calls into
- request/release resources methods
-In-Reply-To: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <CACRpkdazTt+_9m-iWEee2gJy4MQ+QNo3Rb2JY9hVSSXK2-dJRw@mail.gmail.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 09 Mar 2015 16:17:57 +0000
+Subject: [PATCH 1/2] arm64: juno: Add APB registers and LEDs using syscon
+In-Reply-To: <54FD767F.5010507@arm.com>
+References: <1424866589-2988-1-git-send-email-linus.walleij@linaro.org>
+ <20150225135512.GE12377@arm.com>
+ <20150225144756.GA905@e106497-lin.cambridge.arm.com>
+ <20150225150023.GJ12377@arm.com>
+ <20150225151157.GC905@e106497-lin.cambridge.arm.com>
+ <CACRpkdYd7ZOMt1QxhCxzhavhcd8wcWrC2j1Ce5eGP9piX=xwkQ@mail.gmail.com>
+ <20150227140600.GZ905@e106497-lin.cambridge.arm.com>
+ <54FD767F.5010507@arm.com>
+Message-ID: <1425917877.2657.12.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 8, 2015 at 7:23 PM, Boris Brezillon
-<boris.brezillon@free-electrons.com> wrote:
+On Mon, 2015-03-09 at 10:31 +0000, Sudeep Holla wrote:
+> 
+> On 27/02/15 14:06, Liviu Dudau wrote:
+> > On Fri, Feb 27, 2015 at 01:07:42PM +0000, Linus Walleij wrote:
+> >> On Wed, Feb 25, 2015 at 4:11 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> 
+> [...]
+> 
+> > I'm mostly on your side, Linus, I was just looking for more use cases. Like I've said,
+> > most of our customers seem to keep the case closed (or at least that is what they tell
+> > us :) ) so I'm looking for explanations on how you use the LEDs (visual debugging for
+> > big-LITTLE was how Lorenzo was using them on TC2 for example).
+> >
+> 
+> Just to clarify:
+> 
+> IIUC all VExpress platforms has these LEDs on the motherboard. The one
+> you are referring is on the TC2 core-tile which are completely
+> controlled by the firmware. The main advantage of that was to know if
+> the OSPM request is accepted by the firmware.
+> 
+> But the LEDs being referred here are under OS control and gives only the
+> OS view of the state which is good enough but not exactly what we had on
+> TC2.
 
-> The gpiochip_lock_as_irq call can fail and return an error, while the
-> irq_startup is not expected to fail (returns an unsigned int which is not
-> checked by irq core code).
->
-> irq_request/release_resources functions have been created to address this
-> problem.
->
-> Move gpiochip_lock/unlock_as_irq calls into
-> irq_request/release_resources functions to prevent using a gpio as an irq
-> if the gpiochip_lock_as_irq call failed.
->
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Well, when a TC2 CoreTile is plugged into the Versatile Express
+motherboard you get those LEDs as well and can see what the OS thinks is
+the state of the CPU's. I've found this useful in the past for debugging
+problems caused by a mismatch between the OS's and firmware's view of
+the world.
 
-Patch applied with all the ACKs.
-
-Happy new year J-C!
-
-Yours,
-Linus Walleij
+-- 
+Tixy
