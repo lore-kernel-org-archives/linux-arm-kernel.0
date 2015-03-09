@@ -1,61 +1,102 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 9 Mar 2015 10:34:25 +0800
-Subject: [PATCH v6 28/30] PCI: Export find_pci_host_bridge() and rename to
- pci_find_host_bridge()
+Date: Mon, 9 Mar 2015 10:34:24 +0800
+Subject: [PATCH v6 27/30] PCI: Rename __pci_create_root_bus() to
+ pci_create_root_bus()
 In-Reply-To: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
 References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1425868467-9667-29-git-send-email-wangyijing@huawei.com>
+Message-ID: <1425868467-9667-28-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+Now no one use pci_create_root_bus(), we could remove it
+and rename __pci_create_root_bus() to pci_create_root_bus().
+
+Signed-off-by: wangyijing at huawei.com
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/pci/host-bridge.c |    6 +++---
- drivers/pci/pci.h         |    2 ++
- 2 files changed, 5 insertions(+), 3 deletions(-)
+ drivers/pci/probe.c |   27 ++++++++-------------------
+ include/linux/pci.h |    3 ---
+ 2 files changed, 8 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-index bc1de59..51f0a82 100644
---- a/drivers/pci/host-bridge.c
-+++ b/drivers/pci/host-bridge.c
-@@ -103,7 +103,7 @@ static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
- 	return bus;
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 1080eff..196f08a 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1853,7 +1853,7 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
+ {
  }
  
--static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
-+struct pci_host_bridge *pci_find_host_bridge(struct pci_bus *bus)
+-static struct pci_bus *__pci_create_root_bus(
++static struct pci_bus *pci_create_root_bus(
+ 		struct pci_host_bridge *bridge, struct pci_ops *ops)
  {
- 	struct pci_bus *root_bus = find_pci_root_bus(bus);
+ 	int error;
+@@ -1937,18 +1937,6 @@ err_out:
+ 	return NULL;
+ }
  
-@@ -121,7 +121,7 @@ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
- void pcibios_resource_to_bus(struct pci_bus *bus, struct pci_bus_region *region,
- 			     struct resource *res)
+-struct pci_bus *pci_create_root_bus(struct device *parent, u32 db,
+-		struct pci_ops *ops, void *sysdata, struct list_head *resources)
+-{
+-	struct pci_host_bridge *host;
+-
+-	host = pci_create_host_bridge(parent, db, resources, sysdata, NULL);
+-	if (!host)
+-		return NULL;
+-
+-	return __pci_create_root_bus(host, ops);
+-}
+-
+ int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
  {
--	struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
-+	struct pci_host_bridge *bridge = pci_find_host_bridge(bus);
- 	struct resource_entry *window;
- 	resource_size_t offset = 0;
+ 	struct resource *res = &b->busn_res;
+@@ -2026,7 +2014,7 @@ static struct pci_bus *__pci_scan_root_bus(
+ 			break;
+ 		}
  
-@@ -146,7 +146,7 @@ static bool region_contains(struct pci_bus_region *region1,
- void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
- 			     struct pci_bus_region *region)
+-	b = __pci_create_root_bus(host, ops);
++	b = pci_create_root_bus(host, ops);
+ 	if (!b) {
+ 		pci_free_host_bridge(host);
+ 		return NULL;
+@@ -2089,18 +2077,19 @@ struct pci_bus *pci_scan_bus(u32 db, struct pci_ops *ops,
+ 					void *sysdata)
  {
--	struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
-+	struct pci_host_bridge *bridge = pci_find_host_bridge(bus);
- 	struct resource_entry *window;
- 	resource_size_t offset = 0;
+ 	LIST_HEAD(resources);
+-	struct pci_bus *b;
++	struct pci_host_bridge *host;
  
-diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
-index a1dc9f2..45252dd 100644
---- a/drivers/pci/pci.h
-+++ b/drivers/pci/pci.h
-@@ -328,4 +328,6 @@ struct pci_host_bridge *pci_create_host_bridge(
- 		void *sysdata, struct pci_host_bridge_ops *ops);
+ 	pci_add_resource(&resources, &ioport_resource);
+ 	pci_add_resource(&resources, &iomem_resource);
+ 	pci_add_resource(&resources, &busn_resource);
+-	b = pci_create_root_bus(NULL, db, ops, sysdata, &resources);
+-	if (b) {
+-		pci_scan_child_bus(b);
++	host = pci_create_host_bridge(NULL, db, sysdata, &resources, NULL);
++	if (host) {
++		__pci_scan_root_bus(host, ops);
++		return host->bus;
+ 	} else {
+ 		pci_free_resource_list(&resources);
+ 	}
+-	return b;
++	return NULL;
+ }
+ EXPORT_SYMBOL(pci_scan_bus);
  
- void pci_free_host_bridge(struct pci_host_bridge *host);
-+struct pci_host_bridge *pci_find_host_bridge(struct pci_bus *bus);
-+
- #endif /* DRIVERS_PCI_H */
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 261b8de..5717b14 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -779,9 +779,6 @@ void pcibios_scan_specific_bus(int busn);
+ struct pci_bus *pci_find_bus(int domain, int busnr);
+ void pci_bus_add_devices(const struct pci_bus *bus);
+ struct pci_bus *pci_scan_bus(u32 dombus, struct pci_ops *ops, void *sysdata);
+-struct pci_bus *pci_create_root_bus(struct device *parent, u32 dombus,
+-				    struct pci_ops *ops, void *sysdata,
+-				    struct list_head *resources);
+ int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int busmax);
+ int pci_bus_update_busn_res_end(struct pci_bus *b, int busmax);
+ void pci_bus_release_busn_res(struct pci_bus *b);
 -- 
 1.7.1
