@@ -1,47 +1,52 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 9 Mar 2015 11:08:22 +0200
-Subject: [PATCH 11/24] ARM: OMAP2+: clock: remove support for legacy
- mpurate command line param
-In-Reply-To: <20150306162516.GN13520@atomide.com>
-References: <1425644939-3232-1-git-send-email-t-kristo@ti.com>
- <1425644939-3232-12-git-send-email-t-kristo@ti.com>
- <20150306153254.GK13520@atomide.com> <54F9D160.7010708@ti.com>
- <20150306162516.GN13520@atomide.com>
-Message-ID: <54FD6306.4050109@ti.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 9 Mar 2015 03:11:29 -0600
+Subject: Tegra baseline test results for v4.0-rc3
+Message-ID: <54FD63C1.9050603@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2015 06:25 PM, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [150306 08:10]:
->> On 03/06/2015 05:32 PM, Tony Lindgren wrote:
->>> * Tero Kristo <t-kristo@ti.com> [150306 04:29]:
->>>> The legacy support is wrong and dangerous, as it doesn't take any
->>>> OPPs into account and does not scale voltages. Switching mpurate should
->>>> be handled through cpufreq.
->>>
->>> Hmm I wonder if some systems actually rely on the mpurate cmdline
->>> parameter. If this cannot be fixed properly, you should at least
->>> print an error here.
->>
->> Yea, I was kind of worried about this comment. We have also an option of
->> doing this through clock driver, but I was hesitant of doing this either.
->> Isn't having a global kernel option like this frowned upon anyway? I believe
->> this piece of init code gets executed on every board on multiarch kernel.
->
-> Well the option has been there probably for 10 years already so we
-> can't just drop it like that. Chances are it's unused though, so I
-> suggest you just print out a warning for it.
->
-> It's called from omap_arch_initcall which checks for soc_is_omap()
-> so that's not an issue. But when moving the code, you naturally
-> need to check the moved code initcall usage.
+Here are some basic Tegra test results for Linux v4.0-rc3.
+Logs and other details at:
 
-This patch is not really needed for the set itself btw, it can just be 
-dropped if you feel it actually is used by someone. Reverting it from 
-the set just causes a minor merge conflict and you can't remove two of 
-the otherwise empty clock files.
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v4.0-rc3/20150308163103/
 
-You could also just move the code over to clock.c maybe, merge these and 
-do a soc type check to reach the same behaviour.
 
--Tero
+Test summary
+------------
+
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+     Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+     Pass: ( 1/ 1): qemu-vexpress64
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.0-rc2 (13a7a6ac0a11197edcd0f756a035f472b42cdf8b)):
+    text     data      bss    total  kernel
+     -30      +16      +64      +50  defconfig
+   +3638      -80      +64    +3622  multi_v7_defconfig
+   +2590     -112      +64    +2542  tegra_defconfig
+
+
+  Boot-time memory difference
+(delta in bytes from test_v4.0-rc2 (13a7a6ac0a11197edcd0f756a035f472b42cdf8b))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+         .        .        .        .      qemu-vexpress64            defconfig           __internal
+         .        .        .      -4k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+         .        .        .      -4k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+         .        .        .      -4k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+         .        .        .      -4k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+         .        .        .      -4k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .      -4k       tegra30-beaver      tegra_defconfig       tegra30-beaver
