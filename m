@@ -1,32 +1,42 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon,  9 Mar 2015 10:27:10 +0000
-Subject: [PATCH 6/6] Documentation: update arch list in the 'memtest' entry
-In-Reply-To: <1425896830-19705-1-git-send-email-vladimir.murzin@arm.com>
-References: <1425896830-19705-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1425896830-19705-7-git-send-email-vladimir.murzin@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 09 Mar 2015 10:31:27 +0000
+Subject: [PATCH 1/2] arm64: juno: Add APB registers and LEDs using syscon
+In-Reply-To: <20150227140600.GZ905@e106497-lin.cambridge.arm.com>
+References: <1424866589-2988-1-git-send-email-linus.walleij@linaro.org>
+ <20150225135512.GE12377@arm.com>
+ <20150225144756.GA905@e106497-lin.cambridge.arm.com>
+ <20150225150023.GJ12377@arm.com>
+ <20150225151157.GC905@e106497-lin.cambridge.arm.com>
+ <CACRpkdYd7ZOMt1QxhCxzhavhcd8wcWrC2j1Ce5eGP9piX=xwkQ@mail.gmail.com>
+ <20150227140600.GZ905@e106497-lin.cambridge.arm.com>
+Message-ID: <54FD767F.5010507@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since arm64/arm support memtest command line option update the "memtest"
-entry.
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- Documentation/kernel-parameters.txt |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index bfcb1a6..ea11c98 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -1988,7 +1988,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 			seconds.  Use this parameter to check at some
- 			other rate.  0 disables periodic checking.
- 
--	memtest=	[KNL,X86] Enable memtest
-+	memtest=	[KNL,X86,ARM] Enable memtest
- 			Format: <integer>
- 			default : 0 <disable>
- 			Specifies the number of memtest passes to be
--- 
-1.7.9.5
+On 27/02/15 14:06, Liviu Dudau wrote:
+> On Fri, Feb 27, 2015 at 01:07:42PM +0000, Linus Walleij wrote:
+>> On Wed, Feb 25, 2015 at 4:11 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+
+[...]
+
+> I'm mostly on your side, Linus, I was just looking for more use cases. Like I've said,
+> most of our customers seem to keep the case closed (or at least that is what they tell
+> us :) ) so I'm looking for explanations on how you use the LEDs (visual debugging for
+> big-LITTLE was how Lorenzo was using them on TC2 for example).
+>
+
+Just to clarify:
+
+IIUC all VExpress platforms has these LEDs on the motherboard. The one
+you are referring is on the TC2 core-tile which are completely
+controlled by the firmware. The main advantage of that was to know if
+the OSPM request is accepted by the firmware.
+
+But the LEDs being referred here are under OS control and gives only the
+OS view of the state which is good enough but not exactly what we had on
+TC2.
+
+Regards,
+Sudeep
