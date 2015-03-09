@@ -1,88 +1,64 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 9 Mar 2015 10:34:11 +0800
-Subject: [PATCH v6 14/30] x86/PCI: Refine pci_acpi_scan_root() with generic
- pci_host_bridge
-In-Reply-To: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1425868467-9667-15-git-send-email-wangyijing@huawei.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 9 Mar 2015 11:10:50 +0800
+Subject: [PATCH 0/3] ARM: sun9i: Add support for PRCM on Allwinner A80 SoC
+In-Reply-To: <20150308173225.GK5085@lukather>
+References: <1425349320-2754-1-git-send-email-wens@csie.org>
+ <20150308173225.GK5085@lukather>
+Message-ID: <CAGb2v64xkoMEWt0HvHVPkrr3z6UQrnAmo1ZA6ht265AvAXqr+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Thomas Gleixner <tglx@linutronix.de>
-CC: x86 at kernel.org
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
----
- arch/x86/pci/acpi.c |   36 ++++++++++++++++++++----------------
- 1 files changed, 20 insertions(+), 16 deletions(-)
+Hi,
 
-diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
-index ad0e926..e730d31 100644
---- a/arch/x86/pci/acpi.c
-+++ b/arch/x86/pci/acpi.c
-@@ -349,6 +349,18 @@ static void probe_pci_root_info(struct pci_root_info *info,
- 			entry->res->name = info->name;
- }
- 
-+static int pci_host_bridge_prepare(struct pci_host_bridge *bridge)
-+{
-+	struct pci_sysdata *sd = dev_get_drvdata(&bridge->dev);
-+
-+	ACPI_COMPANION_SET(&bridge->dev, sd->companion);
-+	return 0;
-+}
-+
-+static struct pci_host_bridge_ops phb_ops = {
-+	.prepare = pci_host_bridge_prepare,
-+};
-+
- struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- {
- 	struct acpi_device *device = root->device;
-@@ -359,6 +371,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	LIST_HEAD(crs_res);
- 	LIST_HEAD(resources);
- 	struct pci_bus *bus;
-+	struct pci_host_bridge *host = NULL;
- 	struct pci_sysdata *sd;
- 	int node;
- 
-@@ -425,14 +438,13 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 
- 		if (!setup_mcfg_map(info, domain, (u8)root->secondary.start,
- 				(u8)root->secondary.end, root->mcfg_addr))
--			bus = pci_create_root_bus(NULL,
--				PCI_DOMBUS(domain, busnum), &pci_root_ops,
--				sd, &resources);
--
--		if (bus) {
--			pci_scan_child_bus(bus);
--			pci_set_host_bridge_release(
--				to_pci_host_bridge(bus->bridge),
-+			host = pci_scan_host_bridge(NULL,
-+				PCI_DOMBUS(domain, busnum),
-+				&pci_root_ops, sd, &resources, &phb_ops);
-+
-+		if (host) {
-+			bus = host->bus;
-+			pci_set_host_bridge_release(host,
- 				release_pci_root_info, info);
- 		} else {
- 			resource_list_free(&resources);
-@@ -456,14 +468,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	return bus;
- }
- 
--int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
--{
--	struct pci_sysdata *sd = bridge->bus->sysdata;
--
--	ACPI_COMPANION_SET(&bridge->dev, sd->companion);
--	return 0;
--}
--
- int __init pci_acpi_init(void)
- {
- 	struct pci_dev *dev = NULL;
--- 
-1.7.1
+On Mon, Mar 9, 2015 at 1:32 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Chen-Yu,
+>
+> On Tue, Mar 03, 2015 at 10:21:57AM +0800, Chen-Yu Tsai wrote:
+>> Hi everyone,
+>>
+>> Some time ago I sent out an RFC series, which was not merged due
+>> to lack of matching documentation for the SoC. A few weeks back I
+>> sent out a request for the documents again. I have not received a
+>> response. So I'm sending out the series now.
+>>
+>> This series adds support for the Power Reset and Clock Management
+>> module on Allwinner's A80 SoC. The PRCM manages clocks and resets
+>> for the "special" block of peripherals, or the R/RTC block in
+>> earlier SoCs. These peripherals include a standby processor core,
+>> a timer block, a watchdog, pin controller, 1 wire interface, PS/2
+>> interface, a UART, the RSB controller, a DMA controller, a consumer
+>> IR receiver block, 2 I2C controllers, and 2 I2S controllers. We do
+>> not have documents for all the peripherals. Support will be added
+>> where possible.
+>>
+>>
+>> Patch 1 adds support for the apbs (apb0 in earlier SoCs) gates.
+>>
+>> Patch 2 adds sun9i-a80 support to the PRCM mfd driver
+>>
+>> Patch 3 adds the clock and reset nodes for the PRCM to the A80 DTSI.
+>
+> These three patches look fine to me. Have you seen that the new
+> bootloader code has some interesting infos about RSB and PRCM?
+>
+> If so, does it match what you did so far?
+
+It does. Though that's the only stuff I found on PRCM in there.
+Previously I used u-boot and kernel sources from the SDK as a
+source of information.
+
+ChenYu
+
+>> To Allwinner people:
+>> If you have any related documents or comments, please send them out.
+>
+> Kevin, Shuge, your input would be greatly appreciated.
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
