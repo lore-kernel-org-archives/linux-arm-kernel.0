@@ -1,34 +1,60 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Mon, 9 Mar 2015 22:46:29 +0800
-Subject: [PATCH 2/5] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <CAAFQd5AhTe=d9tXN8kaRah_GiZYYxG0cD0up=cbHkSfbBnXmvQ@mail.gmail.com>
-References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
- <1425638900-24989-3-git-send-email-yong.wu@mediatek.com>
- <CAAFQd5AhTe=d9tXN8kaRah_GiZYYxG0cD0up=cbHkSfbBnXmvQ@mail.gmail.com>
-Message-ID: <1425912389.4871.19.camel@mtksdaap41>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Mar 2015 14:48:31 +0000
+Subject: [PATCH 1/5] arm: factor out mmap ASLR into mmap_rnd
+In-Reply-To: <1425341988-1599-2-git-send-email-keescook@chromium.org>
+References: <1425341988-1599-1-git-send-email-keescook@chromium.org>
+ <1425341988-1599-2-git-send-email-keescook@chromium.org>
+Message-ID: <20150309144831.GM8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-03-09 at 20:11 +0900, Tomasz Figa wrote:
-<...>
-> > +/*
-> > + * pimudev is a global var for dma_alloc_coherent.
-> > + * It is not accepatable, we will delete it if "domain_alloc" is enabled
-> > + */
-> > +static struct device *pimudev;
+On Mon, Mar 02, 2015 at 04:19:44PM -0800, Kees Cook wrote:
+> In preparation for exporting per-arch mmap randomization functions,
+> this moves the ASLR calculations for mmap on ARM into a separate routine.
 > 
-> This is indeed not acceptable. Could you replace dma_alloc_coherent()
-> with something that doesn't require device pointer, e.g.
-> alloc_pages()? (Although that would require you to handle cache
-> maintenance in the driver, due to cached memory allocated.) I need to
-> think about a better solution for this.
+> Signed-off-by: Kees Cook <keescook@chromium.org>
 
-Hi,
+Looks fine, thanks.
 
-For 2nd level page table, we use cached memory now. Currently we are
-using __dma_flush_range to flush the cache, which is also unacceptable.
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-For proper cache management, we'll need to use dma_map_single or
-dma_sync_*, which still need a deivce*.
+> ---
+>  arch/arm/mm/mmap.c | 13 ++++++++++---
+>  1 file changed, 10 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
+> index 5e85ed371364..0f8bc158f2c6 100644
+> --- a/arch/arm/mm/mmap.c
+> +++ b/arch/arm/mm/mmap.c
+> @@ -169,14 +169,21 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
+>  	return addr;
+>  }
+>  
+> -void arch_pick_mmap_layout(struct mm_struct *mm)
+> +static unsigned long mmap_rnd(void)
+>  {
+> -	unsigned long random_factor = 0UL;
+> +	unsigned long rnd = 0UL;
+>  
+>  	/* 8 bits of randomness in 20 address space bits */
+>  	if ((current->flags & PF_RANDOMIZE) &&
+>  	    !(current->personality & ADDR_NO_RANDOMIZE))
+> -		random_factor = (get_random_int() % (1 << 8)) << PAGE_SHIFT;
+> +		rnd = (get_random_int() % (1 << 8)) << PAGE_SHIFT;
+> +
+> +	return rnd;
+> +}
+> +
+> +void arch_pick_mmap_layout(struct mm_struct *mm)
+> +{
+> +	unsigned long random_factor = mmap_rnd();
+>  
+>  	if (mmap_is_legacy()) {
+>  		mm->mmap_base = TASK_UNMAPPED_BASE + random_factor;
+> -- 
+> 1.9.1
+> 
 
-Joe.C
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
