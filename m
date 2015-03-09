@@ -1,19 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Mar 2015 17:05:33 +0100
-Subject: [PATCH] pinctrl: at91: simplify probe error handling
-In-Reply-To: <2adab2d9a86d0e44051541052ace08527bdcc045.1425317325.git.baruch@tkos.co.il>
-References: <2adab2d9a86d0e44051541052ace08527bdcc045.1425317325.git.baruch@tkos.co.il>
-Message-ID: <CACRpkdZsoujmj7+raYc2QA2NZygMy1vmUjU9RVjgryC5h6aeAA@mail.gmail.com>
+Date: Mon, 9 Mar 2015 17:10:39 +0100
+Subject: [RFC PATCH 10/18] gpio: move msm-v1 driver to mach-msm
+In-Reply-To: <1425497592-1831064-11-git-send-email-arnd@arndb.de>
+References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
+ <1425497592-1831064-11-git-send-email-arnd@arndb.de>
+Message-ID: <CACRpkdb-WsBxUSFUcRQCGLRrckycbtA_=Z4yKqwnrrj6n3bhMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 2, 2015 at 6:28 PM, Baruch Siach <baruch@tkos.co.il> wrote:
+On Wed, Mar 4, 2015 at 8:33 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> There is no code ender the 'err' label. Just return the error code directly.
+> The msm gpio driver uses the gpiomux infrastructure that
+> relies on platform specific internals. We should really
+> use a proper pinmux driver here, but for now, the easiest
+> solution is to move it into mach-msm to get rid of the
+> header file dependency.
 >
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Patch applied with the ACKs.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
