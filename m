@@ -1,81 +1,72 @@
 From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 9 Mar 2015 20:11:43 +0800
+Date: Mon, 9 Mar 2015 20:16:26 +0800
 Subject: [PATCH 2/5] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <20150306105821.GE22377@arm.com>
+In-Reply-To: <vnkwwq2unj2y.fsf@mitchelh-linux.qualcomm.com>
 References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
  <1425638900-24989-3-git-send-email-yong.wu@mediatek.com>
- <20150306105821.GE22377@arm.com>
-Message-ID: <1425903103.13300.29.camel@mhfsdcap03>
+ <vnkwwq2unj2y.fsf@mitchelh-linux.qualcomm.com>
+Message-ID: <1425903386.13300.33.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Will,
+Dear Mitchel,
+     Thanks very much for your review.
 
-On Fri, 2015-03-06 at 10:58 +0000, Will Deacon wrote:
-> On Fri, Mar 06, 2015 at 10:48:17AM +0000, yong.wu at mediatek.com wrote:
+On Fri, 2015-03-06 at 09:15 -0800, Mitchel Humpherys wrote:
+> On Fri, Mar 06 2015 at 02:48:17 AM, <yong.wu@mediatek.com> wrote:
 > > From: Yong Wu <yong.wu@mediatek.com>
-> > 
+> >
 > > This patch adds support for mediatek m4u (MultiMedia Memory Management Unit).
 > > Currently this only supports m4u gen 2 with 2 levels of page table on mt8173.
 > 
 > [...]
 > 
-> > diff --git a/drivers/iommu/mtk_iommu_pagetable.c b/drivers/iommu/mtk_iommu_pagetable.c
-> > new file mode 100644
-> > index 0000000..5fe9640
-> > --- /dev/null
-> > +++ b/drivers/iommu/mtk_iommu_pagetable.c
-> > @@ -0,0 +1,439 @@
-> > +/*
-> > + * Copyright (c) 2014-2015 MediaTek Inc.
-> > + * Author: Yong Wu <yong.wu@mediatek.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +#include <linux/err.h>
-> > +#include <linux/mm.h>
-> > +#include <linux/iommu.h>
-> > +#include <linux/errno.h>
-> > +#include "asm/cacheflush.h"
+> > +static int mtk_iommu_invalidate_tlb(const struct mtk_iommu_info *piommu,
+> > +				    int isinvall, unsigned int iova_start,
+> > +				    unsigned int iova_end)
+> > +{
+> > +	void __iomem *m4u_base = piommu->m4u_base;
+> > +	u32 val;
+> > +	u64 start, end;
 > > +
-> > +#include "mtk_iommu.h"
-> > +#include "mtk_iommu_pagetable.h"
+> > +	start = sched_clock();
 > > +
-> > +/* 2 level pagetable: pgd -> pte */
-> > +#define F_PTE_TYPE_GET(regval)  (regval & 0x3)
-> > +#define F_PTE_TYPE_LARGE         BIT(0)
-> > +#define F_PTE_TYPE_SMALL         BIT(1)
-> > +#define F_PTE_B_BIT              BIT(2)
-> > +#define F_PTE_C_BIT              BIT(3)
-> > +#define F_PTE_BIT32_BIT          BIT(9)
-> > +#define F_PTE_S_BIT              BIT(10)
-> > +#define F_PTE_NG_BIT             BIT(11)
-> > +#define F_PTE_PA_LARGE_MSK            (~0UL << 16)
-> > +#define F_PTE_PA_LARGE_GET(regval)    ((regval >> 16) & 0xffff)
-> > +#define F_PTE_PA_SMALL_MSK            (~0UL << 12)
-> > +#define F_PTE_PA_SMALL_GET(regval)    ((regval >> 12) & (~0))
-> > +#define F_PTE_TYPE_IS_LARGE_PAGE(pte) ((imu_pte_val(pte) & 0x3) == \
-> > +                                       F_PTE_TYPE_LARGE)
-> > +#define F_PTE_TYPE_IS_SMALL_PAGE(pte) ((imu_pte_val(pte) & 0x3) == \
-> > +                                       F_PTE_TYPE_SMALL)
+> > +	if (!isinvall) {
+> > +		iova_start = round_down(iova_start, SZ_4K);
+> > +		iova_end = round_up(iova_end, SZ_4K);
+> > +	}
+> > +
+> > +	val = F_MMU_INV_EN_L2 | F_MMU_INV_EN_L1;
+> > +
+> > +	writel(val, m4u_base + REG_INVLID_SEL);
+> > +
+> > +	if (isinvall) {
+> > +		writel(F_MMU_INV_ALL, m4u_base + REG_MMU_INVLD);
+> > +	} else {
+> > +		writel(iova_start, m4u_base + REG_MMU_INVLD_SA);
+> > +		writel(iova_end, m4u_base + REG_MMU_INVLD_EA);
+> > +		writel(F_MMU_INV_RANGE, m4u_base + REG_MMU_INVLD);
+> > +
+> > +		while (!readl(m4u_base + REG_MMU_CPE_DONE)) {
+> > +			end = sched_clock();
+> > +			if (end - start >= 100000000ULL) {
+> > +				dev_warn(piommu->dev, "invalid don't done\n");
+> > +				writel(F_MMU_INV_ALL, m4u_base + REG_MMU_INVLD);
+> > +			}
+> > +		};
 > 
-> This looks like the ARM short-descriptor format to me. Could you please
-> add a new page table format to the io-pgtable code, so that other IOMMU
-> drivers can make use of this? I know there was some interest in using
-> short descriptor for the ARM SMMU, for example.
-    Currently I not familiar with the io-pgtable,I may need some time
-for it and the ARM short-descriptor. 
-    And there are some difference between mediatek's pagetable with the
-standard short-descriptor, like bit 9. we use it for the dram over 4GB.
-Then how should we do if there are some difference. 
+> Superfluous `;'.  Also, maybe you should be using readl_poll_timeout?
+   Thanks.
+   For the "readl_poll_timeout", My base is 3.19-rc7 and robin's patch.
+it don't have this interface.  I will try to add it in the next version.
 > 
-> Cheers,
+> > +		writel(0, m4u_base + REG_MMU_CPE_DONE);
+> > +	}
+> > +
+> > +	return 0;
+> > +}
 > 
-> Will
+> 
+> 
+> -Mitch
+> 
