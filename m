@@ -1,46 +1,35 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 9 Mar 2015 11:54:26 +0800
-Subject: [PATCH v2.0 2/2] pm: at91: flush data cache and clean,
- invalidate and disable the L2 cache
-In-Reply-To: <1425873187-8096-1-git-send-email-wenyou.yang@atmel.com>
-References: <1425873187-8096-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1425873266-8192-1-git-send-email-wenyou.yang@atmel.com>
+Date: Mon, 9 Mar 2015 11:56:18 +0800
+Subject: [PATCH v2.0 0/2] ARM: AT91: pm: add support to disable the DDR's clock
+Message-ID: <1425873378-8253-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Flush data cache, and clean, invalidate and disable the L2 cache before going to suspend.
-Restore the L2 cache configuration and re-enable the L2 cache after waking up.
+Hi,
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- arch/arm/mach-at91/pm.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+The patch series purpose is to disable the DDR controller's clock and DDR
+system clock during the suspending to achieve the lower power consumption.
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 9fb868d..ac947cd 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -30,6 +30,7 @@
- #include <asm/mach/time.h>
- #include <asm/mach/irq.h>
- #include <asm/fncpy.h>
-+#include <asm/cacheflush.h>
- 
- #include <mach/cpu.h>
- #include <mach/hardware.h>
-@@ -133,8 +134,13 @@ static void at91_pm_suspend(suspend_state_t state)
- 	pm_data |= (state == PM_SUSPEND_MEM) ?
- 				AT91_PM_MODE(AT91_PM_SLOW_CLOCK) : 0;
- 
-+	flush_cache_all();
-+	outer_disable();
-+
- 	at91_suspend_sram_fn(at91_pmc_base, at91_ramc_base[0],
- 				at91_ramc_base[1], pm_data);
-+
-+	outer_resume();
- }
- 
- static int at91_pm_enter(suspend_state_t state)
+It is based on the branch, at91-4.0-fixes
+git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
+	+ [PATCH] ARM: at91: Add pm support for sama5d3 and sama5d4
+
+Change log for v2.0
+ - rebase.
+
+Wenyou Yang (2):
+  pm: at91: add the PM initialization for the sama5d3 and sama5d4
+  pm: at91: add support to disable/enable the DDR clock
+
+ arch/arm/mach-at91/generic.h              |    4 ++
+ arch/arm/mach-at91/include/mach/sama5d3.h |    1 +
+ arch/arm/mach-at91/include/mach/sama5d4.h |    5 ++
+ arch/arm/mach-at91/pm.c                   |   25 +++++++++
+ arch/arm/mach-at91/pm.h                   |    9 ++++
+ arch/arm/mach-at91/pm_suspend.S           |   83 +++++++++++++++++++++++++++++
+ arch/arm/mach-at91/sama5.c                |    8 ++-
+ include/linux/clk/at91_pmc.h              |    1 +
+ 8 files changed, 135 insertions(+), 1 deletion(-)
+
 -- 
 1.7.9.5
