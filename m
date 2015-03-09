@@ -1,49 +1,29 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Mon, 09 Mar 2015 12:58:54 -0300
-Subject: [PATCH] MTD: cfi: reduce stack size
-In-Reply-To: <2161999.Fy9EjgoTPm@wuerfel>
-References: <2161999.Fy9EjgoTPm@wuerfel>
-Message-ID: <54FDC33E.2060004@vanguardiasur.com.ar>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Mar 2015 16:03:32 +0000
+Subject: [PATCH] ARM: l2c: enforce use of cache-level property
+In-Reply-To: <1425408941-9897-1-git-send-email-f.fainelli@gmail.com>
+References: <1425408941-9897-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20150309160332.GU8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2015 10:58 AM, Arnd Bergmann wrote:
-> The cfi_staa_write_buffers function uses a large amount of ernel stack
-
-Typo: "ernel"
-
-> whenever CONFIG_MTD_MAP_BANK_WIDTH_32 is set, and that results in a
-> warning on ARM allmodconfig builds:
+On Tue, Mar 03, 2015 at 10:55:41AM -0800, Florian Fainelli wrote:
+> Make sure that we can read the "cache-level" property from the L2 cache
+> controller node, and ensure its value is 2.
 > 
-> drivers/mtd/chips/cfi_cmdset_0020.c: In function 'cfi_staa_write_buffers':
-> drivers/mtd/chips/cfi_cmdset_0020.c:651:1: warning: the frame size of 1208 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+> Russell, Linus,
 > 
-> It turns out that this is largely a result of a suboptimal implementation
-> of map_word_andequal(). Replacing this function with a straightforward
-> one reduces the stack size in this function by exactly 200 bytes,
-> shrinks the .text segment for this file from 27648 bytes to 26608 bytes,
-> and makes the warning go away.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
-> index 5f487d776411..2d2457bee50c 100644
-> --- a/include/linux/mtd/map.h
-> +++ b/include/linux/mtd/map.h
-> @@ -314,7 +314,15 @@ static inline map_word map_word_or(struct map_info *map, map_word val1, map_word
->  	return r;
->  }
->  
-> -#define map_word_andequal(m, a, b, z) map_word_equal(m, z, map_word_and(m, a, b))
-> +static inline int map_word_andequal(struct map_info *map, map_word val1, map_word val2, map_word val3)
-> +{
-> +	int i;
-> +	for (i=0; i<map_words(map); i++) {
+> You may have seen that patch earlier, it was part of my attempt
+> to parse the 'cache-size' and 'cache-sets' properties, and ultimately
+> Linus' series went it, and this patch was lost ast see.
 
-Nit:
+Can you put it in the patch system please, and I'll get around to it
+once at some point during/after I've finished catching up?
 
-for (i = 0; i < map_words(map); i++)
+Thanks.
 
 -- 
-Ezequiel Garcia, VanguardiaSur
-www.vanguardiasur.com.ar
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
