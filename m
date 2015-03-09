@@ -1,29 +1,19 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 Mar 2015 16:03:32 +0000
-Subject: [PATCH] ARM: l2c: enforce use of cache-level property
-In-Reply-To: <1425408941-9897-1-git-send-email-f.fainelli@gmail.com>
-References: <1425408941-9897-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20150309160332.GU8656@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Mar 2015 17:05:33 +0100
+Subject: [PATCH] pinctrl: at91: simplify probe error handling
+In-Reply-To: <2adab2d9a86d0e44051541052ace08527bdcc045.1425317325.git.baruch@tkos.co.il>
+References: <2adab2d9a86d0e44051541052ace08527bdcc045.1425317325.git.baruch@tkos.co.il>
+Message-ID: <CACRpkdZsoujmj7+raYc2QA2NZygMy1vmUjU9RVjgryC5h6aeAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 10:55:41AM -0800, Florian Fainelli wrote:
-> Make sure that we can read the "cache-level" property from the L2 cache
-> controller node, and ensure its value is 2.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
-> Russell, Linus,
-> 
-> You may have seen that patch earlier, it was part of my attempt
-> to parse the 'cache-size' and 'cache-sets' properties, and ultimately
-> Linus' series went it, and this patch was lost ast see.
+On Mon, Mar 2, 2015 at 6:28 PM, Baruch Siach <baruch@tkos.co.il> wrote:
 
-Can you put it in the patch system please, and I'll get around to it
-once at some point during/after I've finished catching up?
+> There is no code ender the 'err' label. Just return the error code directly.
+>
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
-Thanks.
+Patch applied with the ACKs.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Yours,
+Linus Walleij
