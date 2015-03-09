@@ -1,56 +1,102 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 09 Mar 2015 23:29:53 +0300
-Subject: [PATCH v2] MTD: cfi: reduce stack size
-In-Reply-To: <2376719.UMjvd0rdnO@wuerfel>
-References: <2376719.UMjvd0rdnO@wuerfel>
-Message-ID: <54FE02C1.9090803@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 Mar 2015 21:36:18 +0100
+Subject: [PATCH 2/2] pinctrl: mediatek: Adjust mt8173 pinctrl kconfig
+In-Reply-To: <1425623091-30478-2-git-send-email-yingjoe.chen@mediatek.com>
+References: <1425623091-30478-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1425623091-30478-2-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <3011616.9oVy3HN0Pj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Friday 06 March 2015 14:24:51 Yingjoe Chen wrote:
+> Linus,
+> This one make PINCTRL_MT8173 option user selectable and is based on
+> mtk-staging in your tree. If you think this is OK, please applied or
+> squash this into previous change. Thanks.
 
-On 3/9/2015 10:34 PM, Arnd Bergmann wrote:
+The patch looks good in principle, just two small comments
 
-> The cfi_staa_write_buffers function uses a large amount of kernel stack
-> whenever CONFIG_MTD_MAP_BANK_WIDTH_32 is set, and that results in a
-> warning on ARM allmodconfig builds:
+> --------------------------------------------------
 
-> drivers/mtd/chips/cfi_cmdset_0020.c: In function 'cfi_staa_write_buffers':
-> drivers/mtd/chips/cfi_cmdset_0020.c:651:1: warning: the frame size of 1208 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+To simplify the job for Linus here, please start the line above
+with 
 
-> It turns out that this is largely a result of a suboptimal implementation
-> of map_word_andequal(). Replacing this function with a straightforward
-> one reduces the stack size in this function by exactly 200 bytes,
-> shrinks the .text segment for this file from 27648 bytes to 26608 bytes,
-> and makes the warning go away.
+8<------
 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+(a stylized pair if scissors)
 
-> diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
-> index 5f487d776411..7b5841663d4f 100644
-> --- a/include/linux/mtd/map.h
-> +++ b/include/linux/mtd/map.h
-> @@ -314,7 +314,15 @@ static inline map_word map_word_or(struct map_info *map, map_word val1, map_word
->   	return r;
->   }
->
-> -#define map_word_andequal(m, a, b, z) map_word_equal(m, z, map_word_and(m, a, b))
-> +static inline int map_word_andequal(struct map_info *map, map_word val1, map_word val2, map_word val3)
-> +{
-> +	int i;
+which is the magic that git-am looks for.
 
-    I think empty line is needed here.
 
-> +	for (i=0; i < map_words(map); i++) {
+> ARM64 maintainer doesn't want to add MACH_* for each SoC.
+> Adjust mt8173 pinctrl kconfig entry so user can manually select it.
+> 
+> Also make PINCTRL_MT8135 build when COMPILE_TEST is enabled.
+> 
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> ---
+>  drivers/pinctrl/mediatek/Kconfig | 8 +++++---
+>  1 file changed, 5 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/mediatek/Kconfig b/drivers/pinctrl/mediatek/Kconfig
+> index 49b8649..1472f0e 100644
+> --- a/drivers/pinctrl/mediatek/Kconfig
+> +++ b/drivers/pinctrl/mediatek/Kconfig
+> @@ -1,4 +1,4 @@
+> -if ARCH_MEDIATEK
+> +if ARCH_MEDIATEK || COMPILE_TEST
+>  
+>  config PINCTRL_MTK_COMMON
+>  	bool
+> @@ -8,11 +8,13 @@ config PINCTRL_MTK_COMMON
+>  	select OF_GPIO
+>  
+>  config PINCTRL_MT8135
+> -	def_bool MACH_MT8135
+> +	def_bool MACH_MT8135 || COMPILE_TEST
+>  	select PINCTRL_MTK_COMMON
+>  
+>  config PINCTRL_MT8173
+> -	def_bool MACH_MT8173
+> +	bool "Mediatek MT8173 pin control"
+> +	def_bool y
+> +	depends on ARM64 || COMPILE_TEST
+>  	select PINCTRL_MTK_COMMON
+>  
 
-    Could you please be consistent and surround all binary operators with 
-spaces, like on the line below?
+You have slightly different logic here: PINCTRL_MT8135 will
+always be enabled when COMPILE_TEST is on, while PINCTRL_MT8173
+is enabled by default in this case, but can be turned off.
 
-> +		if ((val1.x[i] & val2.x[i]) != val3.x[i])
-> +			return 0;
-> +	}
-> +	return 1;
-> +}
-[...]
+Neither of them is what you really want, which would be
 
-WBR, Sergei
+config PINCTRL_MT8135
+	bool "Mediatek MT8135 pin control"
+	depends on MACH_MT8135 || COMPILE_TEST
+	default MACH_MT8135
+	select PINCTRL_MTK_COMMON
+
+config PINCTRL_MT8135
+	bool "Mediatek MT8173 pin control"
+	depends on MACH_MT8173 || COMPILE_TEST
+	default MACH_MT8173
+	select PINCTRL_MTK_COMMON
+
+This way, the options are only enabled by default if MACH_MT8135
+or MACH_MT8173 are enabled, but you are free to enable or disable
+them when COMPILE_TEST is set. Alternatively, you can do
+
+config PINCTRL_MT8135
+	bool "Mediatek MT8135 pin control" if COMPILE_TEST && !MACH_MT8135
+	default MACH_MT8135
+	select PINCTRL_MTK_COMMON
+
+config PINCTRL_MT8135
+	bool "Mediatek MT8173 pin control" if COMPILE_TEST && !MACH_MT8173
+	default MACH_MT8173
+	select PINCTRL_MTK_COMMON
+
+which will let you turn on the options if COMPILE_TEST is set, but not
+let you turn them off when the drivers are required.
+
+	Arnd
