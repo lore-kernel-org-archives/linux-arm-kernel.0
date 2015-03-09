@@ -1,98 +1,61 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 9 Mar 2015 10:34:19 +0800
-Subject: [PATCH v6 22/30] parisc/PCI: Use pci_scan_root_bus() for simplicity
+Date: Mon, 9 Mar 2015 10:34:25 +0800
+Subject: [PATCH v6 28/30] PCI: Export find_pci_host_bridge() and rename to
+ pci_find_host_bridge()
 In-Reply-To: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
 References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1425868467-9667-23-git-send-email-wangyijing@huawei.com>
+Message-ID: <1425868467-9667-29-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yijing Wang <wangyijing0307@gmail.com>
-
-Now pci_bus_add_devices() has been ripped out
-from pci_scan_root_bus(), we could use pci_scan_root_bus()
-instead of pci_create_root_bus() + pci_scan_child_bus()
-for simplicity.
-
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: "James E.J. Bottomley" <jejb@parisc-linux.org>
-CC: linux-parisc at vger.kernel.org
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/parisc/dino.c    |    8 +++-----
- drivers/parisc/lba_pci.c |    7 ++-----
- 2 files changed, 5 insertions(+), 10 deletions(-)
+ drivers/pci/host-bridge.c |    6 +++---
+ drivers/pci/pci.h         |    2 ++
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/parisc/dino.c b/drivers/parisc/dino.c
-index a0580af..eb76a9d 100644
---- a/drivers/parisc/dino.c
-+++ b/drivers/parisc/dino.c
-@@ -981,11 +981,12 @@ static int __init dino_probe(struct parisc_device *dev)
- 	dino_dev->hba.bus_num.end = 255;
- 	dino_dev->hba.bus_num.flags = IORESOURCE_BUS;
- 	pci_add_resource(&resources, &dino_dev->hba.bus_num);
+diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+index bc1de59..51f0a82 100644
+--- a/drivers/pci/host-bridge.c
++++ b/drivers/pci/host-bridge.c
+@@ -103,7 +103,7 @@ static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
+ 	return bus;
+ }
+ 
+-static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
++struct pci_host_bridge *pci_find_host_bridge(struct pci_bus *bus)
+ {
+ 	struct pci_bus *root_bus = find_pci_root_bus(bus);
+ 
+@@ -121,7 +121,7 @@ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+ void pcibios_resource_to_bus(struct pci_bus *bus, struct pci_bus_region *region,
+ 			     struct resource *res)
+ {
+-	struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
++	struct pci_host_bridge *bridge = pci_find_host_bridge(bus);
+ 	struct resource_entry *window;
+ 	resource_size_t offset = 0;
+ 
+@@ -146,7 +146,7 @@ static bool region_contains(struct pci_bus_region *region1,
+ void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
+ 			     struct pci_bus_region *region)
+ {
+-	struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
++	struct pci_host_bridge *bridge = pci_find_host_bridge(bus);
+ 	struct resource_entry *window;
+ 	resource_size_t offset = 0;
+ 
+diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
+index a1dc9f2..45252dd 100644
+--- a/drivers/pci/pci.h
++++ b/drivers/pci/pci.h
+@@ -328,4 +328,6 @@ struct pci_host_bridge *pci_create_host_bridge(
+ 		void *sysdata, struct pci_host_bridge_ops *ops);
+ 
+ void pci_free_host_bridge(struct pci_host_bridge *host);
++struct pci_host_bridge *pci_find_host_bridge(struct pci_bus *bus);
 +
- 	/*
- 	** It's not used to avoid chicken/egg problems
- 	** with configuration accessor functions.
- 	*/
--	dino_dev->hba.hba_bus = bus = pci_create_root_bus(&dev->dev,
-+	dino_dev->hba.hba_bus = bus = pci_scan_root_bus(&dev->dev,
- 			 dino_current_bus, &dino_cfg_ops, NULL, &resources);
- 	if (!bus) {
- 		printk(KERN_ERR "ERROR: failed to scan PCI bus on %s (duplicate bus number %d?)\n",
-@@ -996,13 +997,10 @@ static int __init dino_probe(struct parisc_device *dev)
- 		return 0;
- 	}
- 
--	max = pci_scan_child_bus(bus);
--	pci_bus_update_busn_res_end(bus, max);
--
- 	/* This code *depends* on scanning being single threaded
- 	 * if it isn't, this global bus number count will fail
- 	 */
--	dino_current_bus = max + 1;
-+	dino_current_bus = bus->busn_res.end + 1;
- 	pci_bus_assign_resources(bus);
- 	pci_bus_add_devices(bus);
- 	return 0;
-diff --git a/drivers/parisc/lba_pci.c b/drivers/parisc/lba_pci.c
-index dceb9dd..ba6daec 100644
---- a/drivers/parisc/lba_pci.c
-+++ b/drivers/parisc/lba_pci.c
-@@ -1422,7 +1422,6 @@ lba_driver_probe(struct parisc_device *dev)
- 	void *tmp_obj;
- 	char *version;
- 	void __iomem *addr = ioremap_nocache(dev->hpa.start, 4096);
--	int max;
- 
- 	/* Read HW Rev First */
- 	func_class = READ_REG32(addr + LBA_FCLASS);
-@@ -1563,15 +1562,13 @@ lba_driver_probe(struct parisc_device *dev)
- 
- 	dev->dev.platform_data = lba_dev;
- 	lba_bus = lba_dev->hba.hba_bus =
--		pci_create_root_bus(&dev->dev, lba_dev->hba.bus_num.start,
-+		pci_scan_root_bus(&dev->dev, lba_dev->hba.bus_num.start,
- 				    cfg_ops, NULL, &resources);
- 	if (!lba_bus) {
- 		pci_free_resource_list(&resources);
- 		return 0;
- 	}
- 
--	max = pci_scan_child_bus(lba_bus);
--
- 	/* This is in lieu of calling pci_assign_unassigned_resources() */
- 	if (is_pdc_pat()) {
- 		/* assign resources to un-initialized devices */
-@@ -1599,7 +1596,7 @@ lba_driver_probe(struct parisc_device *dev)
- 		lba_dev->flags |= LBA_FLAG_SKIP_PROBE;
- 	}
- 
--	lba_next_bus = max + 1;
-+	lba_next_bus = pci_bus_child_max_busnr(lba_bus) + 1;
- 	pci_bus_add_devices(lba_bus);
- 
- 	/* Whew! Finally done! Tell services we got this one covered. */
+ #endif /* DRIVERS_PCI_H */
 -- 
 1.7.1
