@@ -1,65 +1,93 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 9 Mar 2015 15:49:30 -0700
-Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
-In-Reply-To: <CAB3XZEc_sjpA8kgfYCsO8FjGEc6O0xhE9aKO3VtgVbd+Meaakg@mail.gmail.com>
-References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
- <1425915402-10012-3-git-send-email-eliad@wizery.com>
- <9217056.Z3urqp19oZ@wuerfel>
- <CAB3XZEc_sjpA8kgfYCsO8FjGEc6O0xhE9aKO3VtgVbd+Meaakg@mail.gmail.com>
-Message-ID: <20150309224929.GL5264@atomide.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon,  9 Mar 2015 16:18:21 -0700
+Subject: [PATCH] mmc: dw_mmc: Add a timeout for sending CMD11
+Message-ID: <1425943101-11976-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Eliad Peller <eliad@wizery.com> [150309 14:03]:
-> On Mon, Mar 9, 2015 at 9:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 09 March 2015 17:36:42 Eliad Peller wrote:
-> >> --- a/arch/arm/boot/dts/omap3-igep0030-rev-g.dts
-> >> +++ b/arch/arm/boot/dts/omap3-igep0030-rev-g.dts
-> >> @@ -64,4 +64,13 @@
-> >>         vmmc-supply = <&lbep5clwmc_wlen>;
-> >>         bus-width = <4>;
-> >>         non-removable;
-> >> +
-> >> +       #address-cells = <1>;
-> >> +       #size-cells = <0>;
-> >> +       wlcore: wlcore at 2 {
-> >> +               compatible = "ti,wl1835";
-> >> +               reg = <2>;
-> >> +               interrupt-parent = <&gpio5>;
-> >> +               interrupts = <8 IRQ_TYPE_NONE>;
-> >> +       };
-> >>
-> >
-> > Why IRQ_TYPE_NONE?
-> >
-> i simply mirrored the current board file (which only sets the irq number).
-> 
-> > I was expecting you to remove all calls to legacy_init_wl12xx from this file,
-> > including the ones for wl12xx aside from the wl18xx ones you removed, but
-> > if that's enough to clean out the platform_data handling from the wlcore
-> > driver, it's good enough as a start.
-> not sure i'm following - can you elaborate?
-> 
-> i'll summarize the way i see it. please correct me if i'm wrong.
-> 
-> both wl18xx and wl12xx use the platform data to get the irq number.
-> wl12xx (only) also needs some additional clock definitions to be
-> passed. there's currently some issue with specifying some the of clock
-> sources, so i preferred starting only with (the simpler) wl18xx
-> bindings.
-> 
-> for platforms with wl18xx, we can remove the pdata-quirk, as all the
-> data (i.e. irq) can be passed by the new DT bindings.
-> however, for platforms with wl12xx, we still need to pass the clock
-> definitions (along with the irq), so we have to keep
-> legacy_init_wl12xx for the time being (and that's also why we have to
-> currently keep the platform_data handling in the wlcore driver)
-> 
-> do you have something else in mind?
+In the Designware databook's description of the "Voltage Switch Normal
+Scenario" it instructs us to set a timer and fail the voltage change
+if we don't see the voltage change interrupt within 2ms.  Let's
+implement that.  Without implementing this I have often been able to
+reproduce a hang while trying to send CMD11 on an rk3288-based board
+while constantly ejecting and inserting UHS cards.
 
-I think what Arnd is saying is we've now removed all the wl12xx using
-legacy platforms, so all of them can boot with just data from dts.
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ drivers/mmc/host/dw_mmc.c  | 26 ++++++++++++++++++++++++++
+ include/linux/mmc/dw_mmc.h |  2 ++
+ 2 files changed, 28 insertions(+)
 
-Regards,
-
-Tony
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 47dfd0e..d259662 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -1020,6 +1020,15 @@ static void __dw_mci_start_request(struct dw_mci *host,
+ 
+ 	dw_mci_start_command(host, cmd, cmdflags);
+ 
++	if (cmd->opcode == SD_SWITCH_VOLTAGE) {
++		/*
++		 * Databook says to fail after 2ms w/ no response; give an
++		 * extra jiffy just in case we're about to roll over.
++		 */
++		mod_timer(&host->cmd11_timer,
++			  jiffies + msecs_to_jiffies(2) + 1);
++	}
++
+ 	if (mrq->stop)
+ 		host->stop_cmdr = dw_mci_prepare_command(slot->mmc, mrq->stop);
+ 	else
+@@ -2158,6 +2167,8 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
+ 		/* Check volt switch first, since it can look like an error */
+ 		if ((host->state == STATE_SENDING_CMD11) &&
+ 		    (pending & SDMMC_INT_VOLT_SWITCH)) {
++			del_timer(&host->cmd11_timer);
++
+ 			mci_writel(host, RINTSTS, SDMMC_INT_VOLT_SWITCH);
+ 			pending &= ~SDMMC_INT_VOLT_SWITCH;
+ 			dw_mci_cmd_interrupt(host, pending);
+@@ -2571,6 +2582,18 @@ ciu_out:
+ 	return ret;
+ }
+ 
++static void dw_mci_cmd11_timer(unsigned long arg)
++{
++	struct dw_mci *host = (struct dw_mci *)arg;
++
++	if (host->state != STATE_SENDING_CMD11)
++		dev_info(host->dev, "Unexpected CMD11 timeout\n");
++
++	host->cmd_status = SDMMC_INT_RTO;
++	set_bit(EVENT_CMD_COMPLETE, &host->pending_events);
++	tasklet_schedule(&host->tasklet);
++}
++
+ #ifdef CONFIG_OF
+ static struct dw_mci_of_quirks {
+ 	char *quirk;
+@@ -2745,6 +2768,9 @@ int dw_mci_probe(struct dw_mci *host)
+ 		}
+ 	}
+ 
++	setup_timer(&host->cmd11_timer,
++		    dw_mci_cmd11_timer, (unsigned long)host);
++
+ 	host->quirks = host->pdata->quirks;
+ 
+ 	spin_lock_init(&host->lock);
+diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+index 471fb31..9efc567 100644
+--- a/include/linux/mmc/dw_mmc.h
++++ b/include/linux/mmc/dw_mmc.h
+@@ -202,6 +202,8 @@ struct dw_mci {
+ 	int			irq;
+ 
+ 	int			sdio_id0;
++
++	struct timer_list       cmd11_timer;
+ };
+ 
+ /* DMA ops for Internal/External DMAC interface */
+-- 
+2.2.0.rc0.207.ga3a616c
