@@ -1,33 +1,115 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 09 Mar 2015 22:27:02 +0100
-Subject: [PATCH] iommu: arm-smmu: set a more appropriate DMA mask
-In-Reply-To: <2ad6f0a7d198d607e252c420fef52d95dbe048c6.1425581413.git.robin.murphy@arm.com>
-References: <2ad6f0a7d198d607e252c420fef52d95dbe048c6.1425581413.git.robin.murphy@arm.com>
-Message-ID: <2824241.CYpYodyNAY@wuerfel>
+From: agross@codeaurora.org (Andy Gross)
+Date: Mon, 9 Mar 2015 16:29:26 -0500
+Subject: [RFC PATCH v15 01/11] ARM: cpuidle: Register per cpuidle device
+In-Reply-To: <1425914206-22295-2-git-send-email-lina.iyer@linaro.org>
+References: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
+ <1425914206-22295-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <20150309212926.GB17839@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 March 2015 18:56:36 Robin Murphy wrote:
-> @@ -1630,6 +1630,13 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
->         size = arm_smmu_id_size_to_bits((id >> ID2_OAS_SHIFT) & ID2_OAS_MASK);
->         smmu->pa_size = size;
->  
-> +       /*
-> +        * What the page table walker can address actually depends on which
-> +        * descriptor format is in use, but since a) we don't know that yet,
-> +        * and b) it can vary per context bank, this will have to do...
-> +        */
-> +       dma_set_mask_and_coherent(smmu->dev, DMA_BIT_MASK(size));
-> +
->         if (smmu->version == ARM_SMMU_V1) {
->                 smmu->va_size = smmu->ipa_size;
->                 size = SZ_4K | SZ_2M | SZ_1G;
+On Mon, Mar 09, 2015 at 09:16:36AM -0600, Lina Iyer wrote:
+> From: Daniel Lezcano <daniel.lezcano@linaro.org>
 > 
+> Some architectures have some cpus which does not support idle states.
+> 
+> Let the underlying low level code to return -ENOSYS when it is not
+> possible to set an idle state.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> [Minor clean ups and fixes of the per-cpu variable]
+> ---
+>  drivers/cpuidle/cpuidle-arm.c | 34 +++++++++++++++++++++++++++++++++-
+>  1 file changed, 33 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+> index 1c94b88..f7cdb73 100644
+> --- a/drivers/cpuidle/cpuidle-arm.c
+> +++ b/drivers/cpuidle/cpuidle-arm.c
+> @@ -17,11 +17,14 @@
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> +#include <linux/slab.h>
+>  
+>  #include <asm/cpuidle.h>
+>  
+>  #include "dt_idle_states.h"
+>  
+> +static DEFINE_PER_CPU(struct cpuidle_device, *cpuidle_arm_dev);
+> +
+>  /*
+>   * arm_enter_idle_state - Programs CPU to enter the specified state
+>   *
+> @@ -93,6 +96,7 @@ static const struct of_device_id arm_idle_state_match[] __initconst = {
+>  static int __init arm_idle_init(void)
+>  {
+>  	int cpu, ret;
+> +	struct cpuidle_device *dev;
+>  	struct cpuidle_driver *drv = &arm_idle_driver;
+>  
+>  	/*
+> @@ -105,18 +109,46 @@ static int __init arm_idle_init(void)
+>  	if (ret <= 0)
+>  		return ret ? : -ENODEV;
+>  
+> +
+> +	ret = cpuidle_register_driver(drv);
+> +	if (ret) {
+> +		pr_err("Failed to register cpuidle driver\n");
+> +		return ret;
+> +	}
+> +
+>  	/*
+>  	 * Call arch CPU operations in order to initialize
+>  	 * idle states suspend back-end specific data
+>  	 */
+>  	for_each_possible_cpu(cpu) {
+> +
+>  		ret = arm_cpuidle_init(cpu);
+> +		/*
+> +		 * This cpu does not support any idle states
+> +		 */
+> +		if (ret == -ENOSYS)
+> +			continue;
+> +
+>  		if (ret) {
+>  			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
+>  			return ret;
+>  		}
+> +
+> +		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 
-dma_set_mask_and_coherent() can fail if the parent bus cannot access all
-of RAM. While that would be serious misdesign for an IOMMU, you should not
-just ignore that failure and at least print a message once.
+devm_kzalloc?  Otherwise, failures could lead to lost memory.
 
-Why not just attempt to set a 64-bit mask?
+> +		if (!dev)
+> +			return -ENOMEM;
+> +
+> +		dev->cpu = cpu;
+> +		ret = cpuidle_register_device(dev);
+> +		if (ret) {
+> +			pr_err("Failed to register cpuidle device for CPU %d\n",
+> +			       cpu);
+> +			return ret;
+> +		}
+> +
+> +		per_cpu(cpuidle_arm_dev, cpu) = dev;
+>  	}
+>  
+> -	return cpuidle_register(drv, NULL);
+> +	return 0;
+>  }
+>  device_initcall(arm_idle_init);
+> -- 
+> 2.1.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-	Arnd
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
