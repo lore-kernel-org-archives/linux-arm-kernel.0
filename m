@@ -1,129 +1,20 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 9 Mar 2015 10:34:08 +0800
-Subject: [PATCH v6 11/30] PCI: Save sysdata in pci_host_bridge drvdata
-In-Reply-To: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1425868467-9667-12-git-send-email-wangyijing@huawei.com>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 08 Mar 2015 22:57:13 -0400 (EDT)
+Subject: [PATCH] net/macb: Update DT bindings documentation
+In-Reply-To: <1425710226-5744-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1425710226-5744-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150308.225713.270545268426212689.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save platform specific sysdata in pci_host_bridge
-drvdata, host bridge specific operation need to
-access it before the pci bus creation.
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
+Date: Sat,  7 Mar 2015 07:37:06 +0100
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
----
- drivers/pci/host-bridge.c |    4 +++-
- drivers/pci/pci.h         |    4 +++-
- drivers/pci/probe.c       |   18 ++++++++----------
- 3 files changed, 14 insertions(+), 12 deletions(-)
+> Add missing "cdns,at91sam9260-macb", "atmel,sama5d3-gem" and
+> "atmel,sama5d4-gem" compatible strings.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-index 0bb08ef..3c34c49 100644
---- a/drivers/pci/host-bridge.c
-+++ b/drivers/pci/host-bridge.c
-@@ -23,7 +23,8 @@ static void pci_release_host_bridge_dev(struct device *dev)
- }
- 
- struct pci_host_bridge *pci_create_host_bridge(
--		struct device *parent, u32 db, struct list_head *resources)
-+		struct device *parent, u32 db,
-+		struct list_head *resources, void *sysdata)
- {
- 	int error;
- 	int bus = PCI_BUSNUM(db);
-@@ -58,6 +59,7 @@ struct pci_host_bridge *pci_create_host_bridge(
- 	host->dev.parent = parent;
- 	INIT_LIST_HEAD(&host->windows);
- 	host->dev.release = pci_release_host_bridge_dev;
-+	dev_set_drvdata(&host->dev, sysdata);
- 	dev_set_name(&host->dev, "pci%04x:%02x", host->domain,
- 			host->busnum);
- 
-diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
-index 3de5e51..79a8894 100644
---- a/drivers/pci/pci.h
-+++ b/drivers/pci/pci.h
-@@ -324,6 +324,8 @@ static inline int pci_dev_specific_reset(struct pci_dev *dev, int probe)
- #endif
- 
- struct pci_host_bridge *pci_create_host_bridge(
--		struct device *parent, u32 dombus, struct list_head *resources);
-+		struct device *parent, u32 dombus,
-+		struct list_head *resources, void *sysdata);
-+
- void pci_free_host_bridge(struct pci_host_bridge *host);
- #endif /* DRIVERS_PCI_H */
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 7238fa3..c8e074d 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1866,8 +1866,7 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
- }
- 
- static struct pci_bus *__pci_create_root_bus(
--		struct pci_host_bridge *bridge, struct pci_ops *ops,
--		void *sysdata)
-+		struct pci_host_bridge *bridge, struct pci_ops *ops)
- {
- 	int error;
- 	struct pci_bus *b;
-@@ -1883,7 +1882,7 @@ static struct pci_bus *__pci_create_root_bus(
- 	if (!b)
- 		return NULL;
- 
--	b->sysdata = sysdata;
-+	b->sysdata = dev_get_drvdata(&bridge->dev);
- 	b->ops = ops;
- 	b->number = b->busn_res.start = bridge->busnum;
- 	pci_bus_assign_domain_nr(b, parent);
-@@ -1955,11 +1954,11 @@ struct pci_bus *pci_create_root_bus(struct device *parent, u32 db,
- {
- 	struct pci_host_bridge *host;
- 
--	host = pci_create_host_bridge(parent, db, resources);
-+	host = pci_create_host_bridge(parent, db, resources, sysdata);
- 	if (!host)
- 		return NULL;
- 
--	return __pci_create_root_bus(host, ops, sysdata);
-+	return __pci_create_root_bus(host, ops);
- }
- 
- int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
-@@ -2026,8 +2025,7 @@ void pci_bus_release_busn_res(struct pci_bus *b)
- }
- 
- static struct pci_bus *__pci_scan_root_bus(
--		struct pci_host_bridge *host, struct pci_ops *ops,
--		void *sysdata)
-+		struct pci_host_bridge *host, struct pci_ops *ops)
- {
- 	struct resource_entry *window;
- 	bool found = false;
-@@ -2040,7 +2038,7 @@ static struct pci_bus *__pci_scan_root_bus(
- 			break;
- 		}
- 
--	b = __pci_create_root_bus(host, ops, sysdata);
-+	b = __pci_create_root_bus(host, ops);
- 	if (!b) {
- 		pci_free_host_bridge(host);
- 		return NULL;
-@@ -2066,11 +2064,11 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
- {
- 	struct pci_host_bridge *host;
- 
--	host = pci_create_host_bridge(parent, db, resources);
-+	host = pci_create_host_bridge(parent, db, resources, sysdata);
- 	if (!host)
- 		return NULL;
- 
--	return __pci_scan_root_bus(host, ops, sysdata);
-+	return __pci_scan_root_bus(host, ops);
- }
- EXPORT_SYMBOL(pci_scan_root_bus);
- 
--- 
-1.7.1
+Applied to net-next, thanks.
