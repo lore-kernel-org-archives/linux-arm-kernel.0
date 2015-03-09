@@ -1,28 +1,28 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon,  9 Mar 2015 21:40:25 +0100
-Subject: [PATCH 12/15] ARM: dts: sun4i: Enable USB DRC on Chuwi V7 CW0825
+Date: Mon,  9 Mar 2015 21:40:28 +0100
+Subject: [PATCH 15/15] ARM: dts: sun7i: Enable USB DRC on A20-OLinuxIno-Lime
 In-Reply-To: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
 References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1425933628-9672-13-git-send-email-hdegoede@redhat.com>
+Message-ID: <1425933628-9672-16-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the otg/drc usb controller on the Chuwi V7 CW0825 tablet.
+Enable the otg/drc usb controller on the A20-OLinuxIno-Lime.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts | 31 +++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts | 29 ++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
-index 97fca89..034396c 100644
---- a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
-@@ -111,6 +111,26 @@
- 	status = "okay";
- };
- 
-+&pio {
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
+index 68efd2f..b3fda82 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
+@@ -146,6 +146,20 @@
+ 		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
++
 +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
 +		allwinner,pins = "PH4";
 +		allwinner,function = "gpio_in";
@@ -36,16 +36,21 @@ index 97fca89..034396c 100644
 +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 +		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
 +	};
-+};
-+
+ };
+ 
+ &reg_ahci_5v {
+@@ -154,6 +168,10 @@
+ 	status = "okay";
+ };
+ 
 +&reg_usb0_vbus {
 +	status = "okay";
 +};
 +
- &reg_usb2_vbus {
+ &reg_usb1_vbus {
  	status = "okay";
  };
-@@ -121,7 +141,18 @@
+@@ -168,7 +186,18 @@
  	status = "okay";
  };
  
@@ -61,8 +66,8 @@ index 97fca89..034396c 100644
 +
  &usbphy {
 +	usb0_vbus-supply = <&reg_usb0_vbus>;
+ 	usb1_vbus-supply = <&reg_usb1_vbus>;
  	usb2_vbus-supply = <&reg_usb2_vbus>;
  	status = "okay";
- };
 -- 
 2.3.1
