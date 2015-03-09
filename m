@@ -1,32 +1,52 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon,  9 Mar 2015 21:06:54 +0100
-Subject: [PATCH 1/4] ARM: shmobile: koelsch dts: Add da9210 regulator interrupt
-In-Reply-To: <1425931617-5479-1-git-send-email-geert+renesas@glider.be>
-References: <1425931617-5479-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1425931617-5479-2-git-send-email-geert+renesas@glider.be>
+Date: Mon,  9 Mar 2015 21:06:53 +0100
+Subject: [PATCH 0/4] ARM: shmobile: koelsch / lager regulator updates
+Message-ID: <1425931617-5479-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The da9210 regulator is connected to IRQ2. Reflect this in its device
-node, so the driver can use it when it gains interrupt support.
+	Hi Simon, Magnus,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a7791-koelsch.dts | 2 ++
- 1 file changed, 2 insertions(+)
+This patch series contains two DTS updates each for r8a7791/koelsch and
+r8a7790/lager:
+  - add the missing interrupt for the da9210 regulators,
+  - add device nodes for the da9063 pmics.
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 75fa9852e235455c..25ce4c71939febd0 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -587,6 +587,8 @@
- 	vdd_dvfs: regulator at 68 {
- 		compatible = "dlg,da9210";
- 		reg = <0x68>;
-+		interrupt-parent = <&irqc0>;
-+		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
- 
- 		regulator-min-microvolt = <1000000>;
- 		regulator-max-microvolt = <1000000>;
+The da9063 pmic allows the system to be restarted when the watchdog
+timer times out ("cat > dev/watchdog0", and wait 8 s), or when a system
+restart is requested ("reboot").
+
+This series depends on "[PATCH] ARM: shmobile: R-Car Gen2: Add
+da9063/da9210 regulator quirk".
+
+An earlier version of patch [2/4] has been posted before as "[PATCH 3/4]
+ARM: shmobile: koelsch: Add DA9063 PMIC device node for system
+restart", but it caused havoc without the quirk.
+
+This has been tested on r8a7791/koelsch.
+
+Thanks!
+
+Geert Uytterhoeven (4):
+  ARM: shmobile: koelsch dts: Add da9210 regulator interrupt
+  ARM: shmobile: koelsch: Add da9063 PMIC device node for system restart
+  ARM: shmobile: lager dts: Add da9210 regulator interrupt
+  ARM: shmobile: lager: Add da9063 PMIC device node for system restart
+
+ arch/arm/boot/dts/r8a7790-lager.dts   | 18 ++++++++++++++++++
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 18 ++++++++++++++++++
+ 2 files changed, 36 insertions(+)
+
 -- 
 1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
