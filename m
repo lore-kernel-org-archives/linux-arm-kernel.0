@@ -1,109 +1,101 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 9 Mar 2015 10:31:41 +0800
-Subject: [PATCH] soc/tegra: move soc_device_register call out of arch/arm
-Message-ID: <1425868301-22767-1-git-send-email-josephl@nvidia.com>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Mon, 09 Mar 2015 10:34:48 +0800
+Subject: [PATCH 4/8] ARM: dts: rockchip: relicense rk3288.dtsi under
+ GPLv2/X11
+In-Reply-To: <1425665046-22927-5-git-send-email-heiko@sntech.de>
+References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
+ <1425665046-22927-5-git-send-email-heiko@sntech.de>
+Message-ID: <54FD06C8.3020403@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Expending the usage for both Tegra & Tegra64 SoCs.
+Hi Heiko,
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- arch/arm/mach-tegra/tegra.c | 31 +------------------------------
- drivers/soc/tegra/common.c  | 33 +++++++++++++++++++++++++++++++++
- 2 files changed, 34 insertions(+), 30 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
-index 914341bcef25..95df6a97b956 100644
---- a/arch/arm/mach-tegra/tegra.c
-+++ b/arch/arm/mach-tegra/tegra.c
-@@ -87,36 +87,7 @@ static void __init tegra_dt_init_irq(void)
- 
- static void __init tegra_dt_init(void)
- {
--	struct soc_device_attribute *soc_dev_attr;
--	struct soc_device *soc_dev;
--	struct device *parent = NULL;
--
--	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
--	if (!soc_dev_attr)
--		goto out;
--
--	soc_dev_attr->family = kasprintf(GFP_KERNEL, "Tegra");
--	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%d",
--					   tegra_sku_info.revision);
--	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%u", tegra_get_chip_id());
--
--	soc_dev = soc_device_register(soc_dev_attr);
--	if (IS_ERR(soc_dev)) {
--		kfree(soc_dev_attr->family);
--		kfree(soc_dev_attr->revision);
--		kfree(soc_dev_attr->soc_id);
--		kfree(soc_dev_attr);
--		goto out;
--	}
--
--	parent = soc_device_to_device(soc_dev);
--
--	/*
--	 * Finished with the static registrations now; fill in the missing
--	 * devices
--	 */
--out:
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
- static void __init paz00_init(void)
-diff --git a/drivers/soc/tegra/common.c b/drivers/soc/tegra/common.c
-index a71cb74f3674..caf7d375eeae 100644
---- a/drivers/soc/tegra/common.c
-+++ b/drivers/soc/tegra/common.c
-@@ -7,8 +7,11 @@
-  */
- 
- #include <linux/of.h>
-+#include <linux/slab.h>
-+#include <linux/sys_soc.h>
- 
- #include <soc/tegra/common.h>
-+#include <soc/tegra/fuse.h>
- 
- static const struct of_device_id tegra_machine_match[] = {
- 	{ .compatible = "nvidia,tegra20", },
-@@ -28,3 +31,33 @@ bool soc_is_tegra(void)
- 
- 	return of_match_node(tegra_machine_match, root) != NULL;
- }
-+
-+static int __init tegra_soc_init(void)
-+{
-+	struct soc_device_attribute *soc_dev_attr;
-+	struct soc_device *soc_dev;
-+
-+	if (!soc_is_tegra())
-+		return 0;
-+
-+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	if (!soc_dev_attr)
-+		return -ENOMEM;
-+
-+	soc_dev_attr->family = kasprintf(GFP_KERNEL, "Tegra");
-+	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%d",
-+					   tegra_sku_info.revision);
-+	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%u", tegra_get_chip_id());
-+
-+	soc_dev = soc_device_register(soc_dev_attr);
-+	if (IS_ERR(soc_dev)) {
-+		kfree(soc_dev_attr->family);
-+		kfree(soc_dev_attr->revision);
-+		kfree(soc_dev_attr->soc_id);
-+		kfree(soc_dev_attr);
-+		return -ENODEV;
-+	}
-+
-+	return 0;
-+}
-+device_initcall(tegra_soc_init);
--- 
-2.3.1
+On 03/07/2015 02:04 AM, Heiko Stuebner wrote:
+> GPLv2-only devicetrees make reuse difficult for software components licensed
+> under a different license.
+>
+> The consensus is that a GPL/X11 dual-license should allow all necessary uses,
+> so relicense the rk3288.dtsi to this combination.
+>
+> CCs were aquired by git shortlog -sne so it should've hopefully catched
+> every contributor.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Cc: Kever Yang <kever.yang@rock-chips.com>
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Addy Ke <addy.ke@rock-chips.com>
+> Cc: Daniel Kurtz <djkurtz@chromium.org>
+> Cc: Andy Yan <andy.yan@rock-chips.com>
+> Cc: Caesar Wang <caesar.wang@rock-chips.com>
+> Cc: Chris Zhong <zyw@rock-chips.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Jianqun Xu<jay.xu@rock-chips.com>
+> Cc: Roger Chen <roger.chen@rock-chips.com>
+> Cc: Sonny Rao <sonnyrao@chromium.org>
+> Cc: Yunzhi Li <lyz@rock-chips.com>
+> Cc: huang lin <hl@rock-chips.com>
+>
+> Not sure if an Ack for a simple revert is necessary, but included anyway
+> Cc: Olof Johansson <olof@lixom.net>
+> ---
+> I'm hoping to get Acked-by tags from the people in the Cc-list.
+>
+>   arch/arm/boot/dts/rk3288.dtsi | 44 +++++++++++++++++++++++++++++++++++--------
+>   1 file changed, 36 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index 2c29a3e..35a06a5 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -1,13 +1,41 @@
+>   /*
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+>    *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>    */
+>   
+>   #include <dt-bindings/gpio/gpio.h>
+Acked-by: Kever Yang <kever.yang@rock-chips.com>
