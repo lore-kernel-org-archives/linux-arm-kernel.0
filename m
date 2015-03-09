@@ -1,49 +1,30 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 09 Mar 2015 13:46:25 -0700
-Subject: [PATCH 1/4] dt-bindings: soc: Add documentation for the MediaTek
- SCPSYS unit
-In-Reply-To: <1425888603-25800-2-git-send-email-s.hauer@pengutronix.de>
- (Sascha Hauer's message of "Mon, 9 Mar 2015 09:10:00 +0100")
-References: <1425888603-25800-1-git-send-email-s.hauer@pengutronix.de>
- <1425888603-25800-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <7hegox6gri.fsf@deeprootsystems.com>
+Date: Mon, 9 Mar 2015 14:00:27 -0700
+Subject: [PATCH v5 1/8] PM / Domains: Add DT bindings for power-on/off
+ latencies
+In-Reply-To: <1416231044-1903-2-git-send-email-geert+renesas@glider.be>
+References: <1416231044-1903-1-git-send-email-geert+renesas@glider.be>
+ <1416231044-1903-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMAWPa-PROLJVGU2w8FSJYt4YJehc2DAnaT047fukSTAM9Eddw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha Hauer <s.hauer@pengutronix.de> writes:
+Hi Geert,
 
-> This adds documentation for the MediaTek SCPSYS unit found in MT8173 SoCs.
+On Mon, Nov 17, 2014 at 5:30 AM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> PM domain power on/off-latencies are properties of the hardware.
+> In legacy code, they're specified from platform code.
+> On DT platforms, their values should come from DT.
 
-Curious if this IP unique to the 8173?  or maybe also used on 8135? ...
+Any plans to refresh/resend this patch now that the rest of the series
+has gone in?
 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  .../devicetree/bindings/soc/mediatek/scpsys.txt    | 32 ++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
->
-> diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> new file mode 100644
-> index 0000000..4764a03
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> @@ -0,0 +1,32 @@
-> +MediaTek SCPSYS
-> +===============
-> +
-> +The System Control Processor System (SCPSYS) has several power management
-> +related tasks in the system. The tasks include thermal measurement, dynamic
-> +voltage frequency scaling (DVFS), interrupt filter and lowlevel sleep control.
-> +The System Power Manager (SPM) inside the SCPSYS is for the MTCMOS power
-> +domain control.
-> +
-> +The driver implements the Generic PM domain bindings described in
-> +power/power_domain.txt. It provides the power domains defined in
-> +include/dt-bindings/power/mt8173-power.h.
-> +
-> +Required properties:
-> +- compatible: Must be "mediatek,mt8173-scpsys"
+I'm seeing some other PM domain series coming in for review[1] that
+could use this feature.
 
-... if so, maybe the compatible could/should be slightly more generic?
+Thanks,
 
 Kevin
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/328905.html
