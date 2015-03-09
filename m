@@ -1,36 +1,54 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 10 Mar 2015 00:21:21 +0100
-Subject: [PATCH 0/3] add power-supply support to dw_hdmi
-Message-ID: <1429128.MSqYm0qZ9p@phil>
+Date: Tue, 10 Mar 2015 00:22:06 +0100
+Subject: [PATCH 1/3] regulator: don't emit errors in {devm_}regulator_bulk_get
+ when defering
+In-Reply-To: <1429128.MSqYm0qZ9p@phil>
+References: <1429128.MSqYm0qZ9p@phil>
+Message-ID: <9261130.uPvufuEFrr@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At least the Rockchip variant of the dw_hdmi should control its supplying
-regulators. A cursory glance at the imx manual didn't any equivalent there,
-so I'm not sure if there are similar controllable regulators present.
+When {devm_}regulator_get returns -EPROBE_DEFER the driver in question will
+try probing again at a later time. So don't spam the log with failure messages
+as this is an expected result of probe ordering.
 
-Patch1 is only a small fix to keep {devm_}regulator_bulk_get quiet in
-the deferring case and could go directly to the regulator tree, if ok.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/regulator/core.c   | 5 +++--
+ drivers/regulator/devres.c | 5 +++--
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
-Patch3 is the addition of the supplies to the rk3288 boards and I would
-take it into my dts branch if patch2 gets deemed acceptable.
-
-
-Heiko Stuebner (3):
-  regulator: don't emit errors in {devm_}regulator_bulk_get when defering
-  drm/bridge: dw-hdmi: support optional supply regulators
-  ARM: dts: rockchip: add hdmi analog power supplies to rk3288 boards
-
- .../devicetree/bindings/drm/bridge/dw_hdmi.txt     |  5 ++++
- arch/arm/boot/dts/rk3288-evb.dtsi                  |  2 ++
- arch/arm/boot/dts/rk3288-firefly.dtsi              |  2 ++
- drivers/gpu/drm/bridge/dw_hdmi.c                   | 27 +++++++++++++++++++++-
- drivers/gpu/drm/imx/dw_hdmi-imx.c                  |  3 ++-
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 15 +++++++++++-
- drivers/regulator/core.c                           |  5 ++--
- drivers/regulator/devres.c                         |  5 ++--
- include/drm/bridge/dw_hdmi.h                       |  3 ++-
- 9 files changed, 59 insertions(+), 8 deletions(-)
-
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index 52af1d7..07ca6cb 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -3163,8 +3163,9 @@ int regulator_bulk_get(struct device *dev, int num_consumers,
+ 						      consumers[i].supply);
+ 		if (IS_ERR(consumers[i].consumer)) {
+ 			ret = PTR_ERR(consumers[i].consumer);
+-			dev_err(dev, "Failed to get supply '%s': %d\n",
+-				consumers[i].supply, ret);
++			if (ret != -EPROBE_DEFER)
++				dev_err(dev, "Failed to get supply '%s': %d\n",
++					consumers[i].supply, ret);
+ 			consumers[i].consumer = NULL;
+ 			goto err;
+ 		}
+diff --git a/drivers/regulator/devres.c b/drivers/regulator/devres.c
+index 6ec1d40..78e460d 100644
+--- a/drivers/regulator/devres.c
++++ b/drivers/regulator/devres.c
+@@ -168,8 +168,9 @@ int devm_regulator_bulk_get(struct device *dev, int num_consumers,
+ 							   consumers[i].supply);
+ 		if (IS_ERR(consumers[i].consumer)) {
+ 			ret = PTR_ERR(consumers[i].consumer);
+-			dev_err(dev, "Failed to get supply '%s': %d\n",
+-				consumers[i].supply, ret);
++			if (ret != -EPROBE_DEFER)
++				dev_err(dev, "Failed to get supply '%s': %d\n",
++					consumers[i].supply, ret);
+ 			consumers[i].consumer = NULL;
+ 			goto err;
+ 		}
 -- 
 2.1.4
