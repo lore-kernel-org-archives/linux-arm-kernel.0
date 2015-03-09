@@ -1,38 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 09 Mar 2015 12:39:36 +0100
-Subject: [PATCH] btrfs: fix size_t format string
-Message-ID: <2448187.keuqSF9F23@wuerfel>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 09 Mar 2015 08:37:51 -0300
+Subject: [PATCH v3 5/9] mtd: pxa3xx_nand: add support for the Marvell
+ Berlin nand controller
+In-Reply-To: <87ioebxhc7.fsf@free.fr>
+References: <1425555085-29531-1-git-send-email-antoine.tenart@free-electrons.com>	<1425555085-29531-6-git-send-email-antoine.tenart@free-electrons.com>	<54FA6DFC.1070904@free-electrons.com>
+ <87oao3xvh8.fsf@free.fr>	<54FCAF6C.7010902@free-electrons.com>
+ <87ioebxhc7.fsf@free.fr>
+Message-ID: <54FD860F.2000008@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This resolves a harmless gcc warning in btrfs_check_super_valid that
-results from a size_t value being printed as %lu:
+On 03/08/2015 07:19 PM, Robert Jarzmik wrote:
+> Ezequiel Garcia <ezequiel.garcia@free-electrons.com> writes:
+> 
+>>> I think you'll kill the zylonite board, and I'll nack it if that's the case. At
+>>> least that's what happened when I tried to use onfi default values last time in
+>>> barebox development.
+>>>
+>>> I can test your changes, but if the specific zylonite nand (ie. nand id 0xba20,
+>>> ie. pxa310 embedded flash) gets broken, I'm against the removal of the legacy
+>>> timings removal.
+>>>
+>>
+>> I'm not speaking of any timing params here, but about the flash
+>> identification.
+>>
+>> Which flash do you have there?
+> The one with 0xba20 id as I said, which is AFAIK a Numonyx NAND02GR4B2C.
+> 
 
-fs/btrfs/disk-io.c:3927:21: warning: format '%lu' expects argument of type 'long unsigned int', but argument 3 has type 'unsigned int' [-Wformat=]
+$ grep "0xBA" drivers/mtd/nand/nand_ids.c
+EXTENDED_ID_NAND("NAND 256MiB 1,8V 16-bit", 0xBA, 256, LP_OPTIONS16),
 
-On all Linux systems, size_t is the same length as unsigned long,
-but the compiler does not know this, and warns about potentially
-unportable code here. The correct printf string for size_t is %z.
+Seems already supported by the NAND core. The MTD way of probing
+a non-ONFI device is by using the IDs in nand_ids.c. Additional
+configuration (timings in this case) is applied between the nand_scan_ident()
+and nand_scan_tail() calls.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: ce7fca5f57ed0f "btrfs: add checks for sys_chunk_array sizes"
-Cc: David Sterba <dsterba@suse.cz>
-Cc: Chris Mason <clm@fb.com>
----
-This warning has been rather annoying because it shows up in every
-'allmodconfig' build. I assume others have reported it before, but
-please apply some fix for it, ideally before 4.0.
-
-diff --git a/fs/btrfs/disk-io.c b/fs/btrfs/disk-io.c
-index f79f38542a73..639f2663ed3f 100644
---- a/fs/btrfs/disk-io.c
-+++ b/fs/btrfs/disk-io.c
-@@ -3921,7 +3921,7 @@ static int btrfs_check_super_valid(struct btrfs_fs_info *fs_info,
- 	}
- 	if (btrfs_super_sys_array_size(sb) < sizeof(struct btrfs_disk_key)
- 			+ sizeof(struct btrfs_chunk)) {
--		printk(KERN_ERR "BTRFS: system chunk array too small %u < %lu\n",
-+		printk(KERN_ERR "BTRFS: system chunk array too small %u < %zu\n",
- 				btrfs_super_sys_array_size(sb),
- 				sizeof(struct btrfs_disk_key)
- 				+ sizeof(struct btrfs_chunk));
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
