@@ -1,24 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Mar 2015 17:10:39 +0100
-Subject: [RFC PATCH 10/18] gpio: move msm-v1 driver to mach-msm
-In-Reply-To: <1425497592-1831064-11-git-send-email-arnd@arndb.de>
-References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
- <1425497592-1831064-11-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdb-WsBxUSFUcRQCGLRrckycbtA_=Z4yKqwnrrj6n3bhMw@mail.gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 9 Mar 2015 17:11:57 +0100
+Subject: [RFC V2 03/12] i2c: at91: make use of the new infrastructure for
+ quirks
+In-Reply-To: <20150308082845.GB1904@katana>
+References: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
+ <1424880126-15047-4-git-send-email-wsa@the-dreams.de>
+ <20150308082845.GB1904@katana>
+Message-ID: <20150309161157.GW9132@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 4, 2015 at 8:33 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Hi Wolfram,
 
-> The msm gpio driver uses the gpiomux infrastructure that
-> relies on platform specific internals. We should really
-> use a proper pinmux driver here, but for now, the easiest
-> solution is to move it into mach-msm to get rid of the
-> header file dependency.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Sun, Mar 08, 2015 at 09:28:45AM +0100, Wolfram Sang wrote:
+> On Wed, Feb 25, 2015 at 05:01:54PM +0100, Wolfram Sang wrote:
+> > From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > 
+> > Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> 
+> Hi Ludovic,
+> 
+> if you have a few minutes, could you please test this series? I'd like to
+> include it in 4.1. and because at91 is using the quirk infrastructure in
+> a more complex way, it is a really good test candidate.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+It was in the pipe. I have reviewed it, this second version seems to be
+good. I am just waiting a bit more to give you my ack since I have some
+issues to read an i2c eeprom (it works with a temperature sensor).
+I am investigating if it doesn't come from a previous regression.
 
-Yours,
-Linus Walleij
+> 
+> Thanks,
+> 
+>    Wolfram
+> 
+
+Regards
+
+Ludovic
