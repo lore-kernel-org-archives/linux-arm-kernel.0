@@ -1,93 +1,30 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon,  9 Mar 2015 16:18:21 -0700
-Subject: [PATCH] mmc: dw_mmc: Add a timeout for sending CMD11
-Message-ID: <1425943101-11976-1-git-send-email-dianders@chromium.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 9 Mar 2015 16:19:44 -0700
+Subject: [PATCH] ARM: l2c: enforce use of cache-level property
+In-Reply-To: <20150309160332.GU8656@n2100.arm.linux.org.uk>
+References: <1425408941-9897-1-git-send-email-f.fainelli@gmail.com>
+ <20150309160332.GU8656@n2100.arm.linux.org.uk>
+Message-ID: <CAGVrzcao_hJWOE1QjX9-+t4CRzRia5TrqbZVRnFNrBJpQCX=Pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the Designware databook's description of the "Voltage Switch Normal
-Scenario" it instructs us to set a timer and fail the voltage change
-if we don't see the voltage change interrupt within 2ms.  Let's
-implement that.  Without implementing this I have often been able to
-reproduce a hang while trying to send CMD11 on an rk3288-based board
-while constantly ejecting and inserting UHS cards.
+2015-03-09 9:03 GMT-07:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Tue, Mar 03, 2015 at 10:55:41AM -0800, Florian Fainelli wrote:
+>> Make sure that we can read the "cache-level" property from the L2 cache
+>> controller node, and ensure its value is 2.
+>>
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>> ---
+>> Russell, Linus,
+>>
+>> You may have seen that patch earlier, it was part of my attempt
+>> to parse the 'cache-size' and 'cache-sets' properties, and ultimately
+>> Linus' series went it, and this patch was lost ast see.
+>
+> Can you put it in the patch system please, and I'll get around to it
+> once at some point during/after I've finished catching up?
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
- drivers/mmc/host/dw_mmc.c  | 26 ++++++++++++++++++++++++++
- include/linux/mmc/dw_mmc.h |  2 ++
- 2 files changed, 28 insertions(+)
-
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 47dfd0e..d259662 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -1020,6 +1020,15 @@ static void __dw_mci_start_request(struct dw_mci *host,
- 
- 	dw_mci_start_command(host, cmd, cmdflags);
- 
-+	if (cmd->opcode == SD_SWITCH_VOLTAGE) {
-+		/*
-+		 * Databook says to fail after 2ms w/ no response; give an
-+		 * extra jiffy just in case we're about to roll over.
-+		 */
-+		mod_timer(&host->cmd11_timer,
-+			  jiffies + msecs_to_jiffies(2) + 1);
-+	}
-+
- 	if (mrq->stop)
- 		host->stop_cmdr = dw_mci_prepare_command(slot->mmc, mrq->stop);
- 	else
-@@ -2158,6 +2167,8 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
- 		/* Check volt switch first, since it can look like an error */
- 		if ((host->state == STATE_SENDING_CMD11) &&
- 		    (pending & SDMMC_INT_VOLT_SWITCH)) {
-+			del_timer(&host->cmd11_timer);
-+
- 			mci_writel(host, RINTSTS, SDMMC_INT_VOLT_SWITCH);
- 			pending &= ~SDMMC_INT_VOLT_SWITCH;
- 			dw_mci_cmd_interrupt(host, pending);
-@@ -2571,6 +2582,18 @@ ciu_out:
- 	return ret;
- }
- 
-+static void dw_mci_cmd11_timer(unsigned long arg)
-+{
-+	struct dw_mci *host = (struct dw_mci *)arg;
-+
-+	if (host->state != STATE_SENDING_CMD11)
-+		dev_info(host->dev, "Unexpected CMD11 timeout\n");
-+
-+	host->cmd_status = SDMMC_INT_RTO;
-+	set_bit(EVENT_CMD_COMPLETE, &host->pending_events);
-+	tasklet_schedule(&host->tasklet);
-+}
-+
- #ifdef CONFIG_OF
- static struct dw_mci_of_quirks {
- 	char *quirk;
-@@ -2745,6 +2768,9 @@ int dw_mci_probe(struct dw_mci *host)
- 		}
- 	}
- 
-+	setup_timer(&host->cmd11_timer,
-+		    dw_mci_cmd11_timer, (unsigned long)host);
-+
- 	host->quirks = host->pdata->quirks;
- 
- 	spin_lock_init(&host->lock);
-diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-index 471fb31..9efc567 100644
---- a/include/linux/mmc/dw_mmc.h
-+++ b/include/linux/mmc/dw_mmc.h
-@@ -202,6 +202,8 @@ struct dw_mci {
- 	int			irq;
- 
- 	int			sdio_id0;
-+
-+	struct timer_list       cmd11_timer;
- };
- 
- /* DMA ops for Internal/External DMAC interface */
+Added as http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8309/1
+thanks!
 -- 
-2.2.0.rc0.207.ga3a616c
+Florian
