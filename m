@@ -1,62 +1,47 @@
-From: bpringlemeir@nbsps.com (Bill Pringlemeir)
-Date: Mon, 09 Mar 2015 16:11:59 -0400
-Subject: [PATCH v2 3/6] mtd: nand: vf610_nfc: add device tree bindings
-References: <1425919132-13827-1-git-send-email-stefan@agner.ch>
- <1425919132-13827-4-git-send-email-stefan@agner.ch>
-Message-ID: <87385eue0g.fsf@nbsps.com>
+From: tyler.baker@linaro.org (tyler.baker at linaro.org)
+Date: Mon,  9 Mar 2015 13:19:56 -0700
+Subject: [PATCH v2 0/2] ARM: dts: add dts files for Cubieboard4
+Message-ID: <1425932398-7194-1-git-send-email-tyler.baker@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On  9 Mar 2015, stefan at agner.ch wrote:
+From: Tyler Baker <tyler.baker@linaro.org>
 
-> Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> .../devicetree/bindings/mtd/vf610-nfc.txt | 39 ++++++++++++++++++++++
-> 1 file changed, 39 insertions(+) create mode 100644
-> Documentation/devicetree/bindings/mtd/vf610-nfc.txt
->
-> diff --git a/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
-> b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
-> new file mode 100644
-> index 0000000..312c872
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+This series adds basic support for the Cubietech Cubieboard4.
 
-[snip]
+The Cubietech Cubieboard4 is a A80 based development board with 2GB DDR3, 8GB
+eMMC, Micro SD, HDMI, VGA, 3.5mm audio jack. One USB OTG port and four USB 2.0
+ports.
 
-> +- reg: Address range of the mtd chip 
-> +- interrupts: Should contain the STMMAC interrupts 
+The sun9i-a80-optimus device tree[1] has been used to boot this board for some
+time now, as the two platforms are very similar. But there are differences, so 
+it deserves it's own device tree. I've tested this series on a 
+Cubieboard4[2][3] and can confirm UART, eMMC, and MMC are working properly.
 
-What is 'STMMAC'?  Is that something I cribbed from another file?  Ah, I
-see 'spear_smi.txt' which is an NAND driver with a 'clock-frequency'
-parameter (probably before 'assigned-clocks' support).
+This patch series is based on arm-soc v4.0-rc2.
 
- https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/mtd/spear_smi.txt
+Changes v1 -> v2:
+* Use more descriptive notation for stdout-path
 
-I don't think 'STMMAC' makes sense.
+Changes v0 -> v1:
+* Corrected typo. a80-cubietruck -> a80-cubieboard4.
+* Removed bootargs node.
+* Added stdout-path for uart0.
+* Removed unneeded newline.
 
-  +- interrupts: irq to be used
+[1] http://kernelci.org/boot/sun9i-a80-cubieboard4/ 
+[2] http://lava.kernelci.org/scheduler/job/47969/log_file#L_13_308
+[3] http://lava.kernelci.org/scheduler/job/47969/log_file#L_17_11
 
-Maybe?  Same as mxc-nand.txt.  It is not so helpful though.
+Tyler Baker (2):
+  ARM: dts: add cubietech cubieboard4
+  ARM: dts: add vendor prefix for cubietech
 
-> +- nand-bus-width: see nand.txt
-> +- nand-ecc-mode: see nand.txt
-> +- nand-on-flash-bbt: see nand.txt 
-> +- clock-frequency : Optional clock rate to NFC in Hz
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts        | 100 +++++++++++++++++++++
+ 3 files changed, 103 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
 
-I guess this changed?  We might want to put a note about what kind of
-impact this might have on the bus.  Ie,
-
- assigned-clocks: Input SOC clock to the NAND controller.
- assigned-clock-rates: The NAND bus timing is derived from this clock
-    rate and should not exceed maximum timing for any NAND memory chip
-    in a board stuffing.  Typical NAND memory timings derived from this
-    clock are found in the SOC hardware reference manual.
- 
-Originally, the reason I made this file was because the
-'clock-frequency' was non-standard.  I guess it is nice to have it
-anyways.
-
-Fwiw,
-Bill Pringlemeir.
+-- 
+2.1.0
