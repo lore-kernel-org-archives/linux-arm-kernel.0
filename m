@@ -1,68 +1,55 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 9 Mar 2015 20:32:26 +0800
-Subject: [PATCH 3/5] dt-bindings: mediatek: Add smi dts binding
-In-Reply-To: <54F9BE55.90601@cogentembedded.com>
-References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
- <1425638900-24989-4-git-send-email-yong.wu@mediatek.com>
- <54F9BE55.90601@cogentembedded.com>
-Message-ID: <1425904346.13300.37.camel@mhfsdcap03>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Mar 2015 12:34:47 +0000
+Subject: [PATCH] net: smc91x: improve neponset hack
+In-Reply-To: <20150309122012.GJ8656@n2100.arm.linux.org.uk>
+References: <5763365.j5Nvv4LgM3@wuerfel>
+ <20150219003549.GY8656@n2100.arm.linux.org.uk>
+ <5754481.gFE9BvLjh0@wuerfel>
+ <20150309122012.GJ8656@n2100.arm.linux.org.uk>
+Message-ID: <20150309123447.GL8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sergei,
-	Thanks very much for suggestion.
-        I will fix them in the next version.
+On Mon, Mar 09, 2015 at 12:20:12PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 20, 2015 at 04:47:06PM +0100, Arnd Bergmann wrote:
+> > On Thursday 19 February 2015 00:35:49 Russell King - ARM Linux wrote:
+> > > On Wed, Feb 18, 2015 at 08:47:30PM +0100, Arnd Bergmann wrote:
+> > > > The smc91x driver tries to support multiple platforms at compile
+> > > > time, but they are mutually exclusive at runtime, and not clearly
+> > > > defined.
+> > > 
+> > > I'd prefer to rework this to fix that properly.  From what I remember,
+> > > the whole SA11x0 stuff in this driver was a mess.
+> > 
+> > I guess that's reasonable. I've looked through the driver and it seems we
+> > did most of the multiplatform work but left a few things alone that should
+> > have been converted a long time ago.
+> > 
+> > Can you check if the approach below makes sense to you?
+> 
+> I don't know who's carrying what patches, but this is still broken.
+> 
+> arch/arm/mach-sa1100/neponset.c: In function 'neponset_probe':
+> arch/arm/mach-sa1100/neponset.c:271:12: error: 'smc91c_platdata' undeclared (first use in this function)
+> drivers/net/ethernet/smsc/smc91x.c: In function 'smc_drv_probe':
+> drivers/net/ethernet/smsc/smc91x.c:2363:2: error: implicit declaration of function 'machine_has_neponset' [-Werror=implicit-function-declaration]
+> 
+> This is from building Linus' tree as of Saturday plus arm-soc.
+> 
+> Let's revert all this crap and start again, this time testing it better?
 
-On Fri, 2015-03-06 at 17:48 +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 3/6/2015 1:48 PM, yong.wu at mediatek.com wrote:
-> 
-> > From: Yong Wu <yong.wu@mediatek.com>
-> 
-> > This patch add smi binding document.
-> 
-> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> > ---
-> >   .../devicetree/bindings/soc/mediatek/mediatek,smi.txt   | 17 +++++++++++++++++
-> >   1 file changed, 17 insertions(+)
-> >   create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
-> 
-> > diff --git a/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
-> > new file mode 100644
-> > index 0000000..0fc9d1a
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
-> > @@ -0,0 +1,17 @@
-> > +SMI hardware block diagram please help check <bindings/iommu/mediatek,iommu.txt>
-> > +
-> > +Required properties:
-> > +- compatible : must be "mediatek,mediatek,mt8173-smi-larb"
-> 
->     One "mediatek," is enough. :-)
-> 
-> > +- reg : the register of each local arbiter
-> > +- clocks : the clocks of each local arbiter
-> > +- clock-name: larb_sub*(3 clockes at most)
-> 
->     clock-names.
-> 
-> > +
-> > +Example:
-> > +	larb1:larb at 16010000 {
-> > +	        compatible = "mediatek,mt8173-smi-larb";
-> > +		reg = <0 0x16010000 0 0x1000>;
-> > +		clocks = <&mmsys MM_SMI_COMMON>,
-> > +		        <&vdecsys VDEC_CKEN>,
-> 
->     Please align with the < above.
-> 
-> > +                        <&vdecsys VDEC_LARB_CKEN>;
-> 
->     Use tabs instead of spaces, please.
-> 
-> > +		clock-names = "larb_sub0", "larb_sub1", "larb_sub2";
-> > +	};
-> 
-> WBR, Sergei
-> 
+I'm also getting:
+
+arch/arm/mach-pxa/idp.c:84:15: error: variable 'smc91x_platdata' has initializer but incomplete type
+arch/arm/mach-pxa/idp.c:85:2: error: unknown field 'flags' specified in initializer
+arch/arm/mach-pxa/idp.c:85:11: error: 'SMC91X_USE_32BIT' undeclared here (not in a function)
+arch/arm/mach-pxa/idp.c:85:30: error: 'SMC91X_USE_DMA' undeclared here (not in a function)
+arch/arm/mach-pxa/idp.c:85:47: error: 'SMC91X_NOWAIT' undeclared here (not in a function)
+arch/arm/mach-pxa/idp.c:85:2: warning: excess elements in struct initializer [enabled by default]
+arch/arm/mach-pxa/idp.c:85:2: warning: (near initialization for 'smc91x_platdata') [enabled by default]
+arch/arm/mach-pxa/lpd270.c:198:30: error: expected '}' before ';' token
+
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
