@@ -1,82 +1,121 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 9 Mar 2015 20:55:03 +0800
-Subject: [PATCH 3/5] dt-bindings: mediatek: Add smi dts binding
-In-Reply-To: <20150306111338.GD8700@leverpostej>
-References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
- <1425638900-24989-4-git-send-email-yong.wu@mediatek.com>
- <20150306111338.GD8700@leverpostej>
-Message-ID: <1425905703.13300.48.camel@mhfsdcap03>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 9 Mar 2015 13:56:50 +0100
+Subject: [PATCH 5/6] target-arm/kvm64: fix save/restore of SPSR regs
+In-Reply-To: <874mq27222.fsf@linaro.org>
+References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
+ <1424880159-29348-7-git-send-email-alex.bennee@linaro.org>
+ <20150302172212.GB10137@lvm> <874mq27222.fsf@linaro.org>
+Message-ID: <20150309125650.GA20559@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mark,
-      Thanks very much for you suggestion.
+On Tue, Mar 03, 2015 at 11:28:21AM +0000, Alex Benn?e wrote:
+> 
+> Christoffer Dall <christoffer.dall@linaro.org> writes:
+> 
+> > Hi Alex,
+> >
+> > Seems like you accidentally sent out two copies of this patch, hopefully
+> > I'm reviewing the right one...
+> 
+> Oops, perils of not wiping your output directory. I think it was just a
+> title tweak!
+> 
+> > On Wed, Feb 25, 2015 at 04:02:38PM +0000, Alex Benn?e wrote:
+> >> From: Christoffer Dall <christoffer.dall@linaro.org>
+> >> 
+> >> The current code was negatively indexing the cpu state array and not
+> >> synchronizing banked spsr register state with the current mode's spsr
+> >> state, causing occasional failures with migration.
+> >> 
+> >> Some munging is done to take care of the aarch64 mapping and also to
+> >> ensure the most current value of the spsr is updated to the banked
+> >> registers (relevant for KVM<->TCG migration).
+> >> 
+> >> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> >> 
+> >> ---
+> >> v2 (ajb)
+> >>   - minor tweaks and clarifications
+> >> 
+> >> diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
+> >> index c60e989..1e36b0a 100644
+> >> --- a/target-arm/kvm64.c
+> >> +++ b/target-arm/kvm64.c
+> >> @@ -140,6 +140,7 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+> >>      uint64_t val;
+> >>      int i;
+> >>      int ret;
+> >> +    unsigned int el;
+> >>  
+> >>      ARMCPU *cpu = ARM_CPU(cs);
+> >>      CPUARMState *env = &cpu->env;
+> >> @@ -206,9 +207,25 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+> >>          return ret;
+> >>      }
+> >>  
+> >> +    /* Saved Program State Registers
+> >> +     *
+> >> +     * Before we restore from the banked_spsr[] array we need to
+> >> +     * ensure that any modifications to env->spsr are correctly
+> >> +     * reflected and map aarch64 exception levels if required.
+> >> +     */
+> >> +    el = arm_current_el(env);
+> >> +    if (is_a64(env) && el > 0) {
+> >> +        g_assert(el == 1);
+> >> +        /* KVM maps KVM_SPSR_SVC to KVM_SPSR_EL1 for aarch64 */
+> >> +        env->banked_spsr[1] = env->banked_spsr[0];
+> >> +        env->banked_spsr[aarch64_banked_spsr_index(el)] = env->spsr;
+> >> +    } else {
+> >> +        env->banked_spsr[el] = env->spsr;
+> >
+> > is this valid if (is_a64(env) && el == 0)) ?  I thought that if you're
+> > in el == 0, then env->banked_spsr[x] is the most up-to-date one, not
+> > env->spsr ?
+> 
+> Actually they will both be the same (at least for KVM). In the end both:
+> 
+>         VMSTATE_UINT32(env.spsr, ARMCPU),
+>         VMSTATE_UINT64_ARRAY(env.banked_spsr, ARMCPU, 8),
+> 
+> get serialised in the stream and when we save the stream out we make
+> sure everything is in sync (i.e. env->spsr is correct). In reality this
+> makes more sense for TCG than KVM which is the only reason env->spsr
+> exists.
+> 
 
-On Fri, 2015-03-06 at 11:13 +0000, Mark Rutland wrote:
-> On Fri, Mar 06, 2015 at 10:48:18AM +0000, yong.wu at mediatek.com wrote:
-> > From: Yong Wu <yong.wu@mediatek.com>
-> > 
-> > This patch add smi binding document.
-> 
-> Please move binding documents to the start of the series. It makes
-> things far easier to review.
-> 
-> > 
-> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/soc/mediatek/mediatek,smi.txt   | 17 +++++++++++++++++
-> >  1 file changed, 17 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
-> > new file mode 100644
-> > index 0000000..0fc9d1a
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
-> > @@ -0,0 +1,17 @@
-> > +SMI hardware block diagram please help check <bindings/iommu/mediatek,iommu.txt>
-> > +
-> > +Required properties:
-> > +- compatible : must be "mediatek,mediatek,mt8173-smi-larb"
-> 
-> Double vendor prefix?
-Yes. I will change this.
-> 
-> What does "larb" mean? It would be nice for the intorductory paragraph
-> in this file to explain.
-That is local arbiter. I will add a link like this, is it ok?
+this function, however, is not used only when migration, but should
+generally cover the case where you want to synchronize QEMU's state into
+KVM's state, right?  So while it may not be harmful in currently
+supported use cases, is there ever a situation where (is_a64(env) && el
+== 0) and env->spsr != banked_spsr[el], and where env->spsr is
+out-of-date?
 
-compatible : must be "mediatek,mt8173-smi-larb", about the "larb",
-please check the <bindings/iommu/mediatek,iommu.txt>.
+If that's the case, I think it would be better to have an assert that
+says "don't call the code in this situation" than relying on limited use
+cases for callers of this function.
 
+> >
+> > for !is_a64(env) this looks wrong, because of the same as above if el ==
+> > 0, but also because I think you need
+> > bank_number(env->uncached_cpsr & CPSR_M) to index into the array.
+> >
 > 
-> > +- reg : the register of each local arbiter
-> > +- clocks : the clocks of each local arbiter
-> > +- clock-name: larb_sub*(3 clockes at most)
+> Good catch. For some reason I was treating the number from
+> arm_current_el() as equivalent. How about:
 > 
-> The names required _must_ be specified here, or clock-names is
-> pointless.
-> 
-> The clock names should be from the PoV of _this_ device (i.e. they
-> should be the names of the inputs) not from the PoV of the provider
-> (i.e. they should not be the names of the outputs from the provider).
-    I use larb_sub0, larb_sub1,larb_sub2 for more easily to control the
-clocks. if we use the PoV, We should list all the clocks name, it will
-has a little code. Anyway I will change this in the next version.
-> 
-> Mark.
-> 
-> > +
-> > +Example:
-> > +	larb1:larb at 16010000 {
-> > +	        compatible = "mediatek,mt8173-smi-larb";
-> > +		reg = <0 0x16010000 0 0x1000>;
-> > +		clocks = <&mmsys MM_SMI_COMMON>,
-> > +		        <&vdecsys VDEC_CKEN>,
-> > +                        <&vdecsys VDEC_LARB_CKEN>;
-> > +		clock-names = "larb_sub0", "larb_sub1", "larb_sub2";
-> > +	};
-> > -- 
-> > 1.8.1.1.dirty
-> > 
-> > 
+>     el = arm_current_el(env);
+>     if (is_a64(env) && el > 0) {
+>         g_assert(el == 1);
+>         /* KVM only maps KVM_SPSR_SVC to KVM_SPSR_EL1 for aarch64 ATM */
+>         env->banked_spsr[1] = env->banked_spsr[0];
+>     }
+>     i = is_a64(env) ?
+>         aarch64_banked_spsr_index(el) : bank_number(env->unached_cpsr & CPSR_M);
+
+I think that will fail due to the assert in aarch64_banked_spsr_index()
+for el == 0.
+
+
+-Christoffer
