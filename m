@@ -1,91 +1,59 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 09 Mar 2015 15:34:06 -0700
-Subject: [PATCH v2 4/6] clk: at91: implement suspend/resume for the PMC
- irqchip
-In-Reply-To: <1425287898-15093-5-git-send-email-boris.brezillon@free-electrons.com>
-References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
- <1425287898-15093-5-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150309223406.14952.5669@quantum>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 09 Mar 2015 15:40:29 -0700
+Subject: [PATCH 0/3] clk: divider: three exactness fixes (and a rant)
+In-Reply-To: <20150309215803.GD7525@pengutronix.de>
+References: <20150221085620.GV19388@pengutronix.de>
+ <1424515225-6929-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20150306185730.11109.45998@quantum> <20150306192813.GG10717@pengutronix.de>
+ <54FA02B7.8090703@codeaurora.org> <1425895136.3152.22.camel@pengutronix.de>
+ <54FDEEFE.1060803@codeaurora.org> <20150309210735.14952.91257@quantum>
+ <20150309215803.GD7525@pengutronix.de>
+Message-ID: <54FE215D.7090804@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Boris Brezillon (2015-03-02 01:18:16)
-> The irq line used by the PMC block is shared with several peripherals
-> including the init timer which is registering its handler with
-> IRQF_NO_SUSPEND.
-> Implement the appropriate suspend/resume callback for the PMC irqchip,
-> and inform irq core that PMC irq handler can be safely called while
-> the system is suspended by setting IRQF_COND_SUSPEND.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+On 03/09/15 14:58, Uwe Kleine-K?nig wrote:
+>
+> If you see
+>
+> 	round_rate(110) = 108
+>
+> it would be fortunate to know if you get 108 because the next available
+> greater rate is > 112 or because the implementation rounds down always
+> (which would mean that 111 is possible, too). For the "easy" consumers
+> this probably doesn't matter much, but if you do things that affects
+> a considerable part of the clock tree, you really want to know more
+> about the behaviour of round_rate to effectively work with its results.
+>
+> So yes, please let us pick ceiling for round_rate (i.e. a fixed policy
+> for all clks) and then it should even be possible to make
+> clk_set_rate_range a generic function that doesn't need the min and max
+> members in the clk struct and the respective parameters to
+> determine_rate.
+>
+> What should a clock that can only provide 100 Hz return on
+>
+> 	clk_round_rate(clk, 60);
+>
+> ? 0? -ESOMETHING (for SOMETHING = ...?)?
+>
 
-Looks OK to me. I'm not picking it due to the dependency you listed in
-the cover letter.
+Do you have any real world use cases, or is this just all theoretical?
+At least in Philipp's panel case we can discuss how to make an API that
+works properly. These other examples are either completely theoretical
+or taken out of context and so it's unclear how they matter in practice.
 
-Regards,
-Mike
+Ideally I'd like an API to exist that doesn't require going back and
+forth with the framework (i.e. it's "atomic" and doesn't require calling
+clk_round_rate() in a loop) and that allows consumers to properly
+express what they want. Right now we have a way to say min/max and a
+typical rate is in the works. If we need to declare some sort of clock
+provider rounding policy then we've failed to provide an API that
+properly expresses all the requirements that the consumer has. It
+probably means we're missing some key parameter that consumers know but
+we don't accept. Maybe some more concrete examples will help clarify
+what this is.
 
-> ---
->  drivers/clk/at91/pmc.c | 20 +++++++++++++++++++-
->  drivers/clk/at91/pmc.h |  1 +
->  2 files changed, 20 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-> index f07c815..3f27d21 100644
-> --- a/drivers/clk/at91/pmc.c
-> +++ b/drivers/clk/at91/pmc.c
-> @@ -89,12 +89,29 @@ static int pmc_irq_set_type(struct irq_data *d, unsigned type)
->         return 0;
->  }
->  
-> +static void pmc_irq_suspend(struct irq_data *d)
-> +{
-> +       struct at91_pmc *pmc = irq_data_get_irq_chip_data(d);
-> +
-> +       pmc->imr = pmc_read(pmc, AT91_PMC_IMR);
-> +       pmc_write(pmc, AT91_PMC_IDR, pmc->imr);
-> +}
-> +
-> +static void pmc_irq_resume(struct irq_data *d)
-> +{
-> +       struct at91_pmc *pmc = irq_data_get_irq_chip_data(d);
-> +
-> +       pmc_write(pmc, AT91_PMC_IER, pmc->imr);
-> +}
-> +
->  static struct irq_chip pmc_irq = {
->         .name = "PMC",
->         .irq_disable = pmc_irq_mask,
->         .irq_mask = pmc_irq_mask,
->         .irq_unmask = pmc_irq_unmask,
->         .irq_set_type = pmc_irq_set_type,
-> +       .irq_suspend = pmc_irq_suspend,
-> +       .irq_resume = pmc_irq_resume,
->  };
->  
->  static struct lock_class_key pmc_lock_class;
-> @@ -224,7 +241,8 @@ static struct at91_pmc *__init at91_pmc_init(struct device_node *np,
->                 goto out_free_pmc;
->  
->         pmc_write(pmc, AT91_PMC_IDR, 0xffffffff);
-> -       if (request_irq(pmc->virq, pmc_irq_handler, IRQF_SHARED, "pmc", pmc))
-> +       if (request_irq(pmc->virq, pmc_irq_handler,
-> +                       IRQF_SHARED | IRQF_COND_SUSPEND, "pmc", pmc))
->                 goto out_remove_irqdomain;
->  
->         return pmc;
-> diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-> index 52d2041..69abb08 100644
-> --- a/drivers/clk/at91/pmc.h
-> +++ b/drivers/clk/at91/pmc.h
-> @@ -33,6 +33,7 @@ struct at91_pmc {
->         spinlock_t lock;
->         const struct at91_pmc_caps *caps;
->         struct irq_domain *irqdomain;
-> +       u32 imr;
->  };
->  
->  static inline void pmc_lock(struct at91_pmc *pmc)
-> -- 
-> 1.9.1
-> 
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
