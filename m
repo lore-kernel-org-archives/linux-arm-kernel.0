@@ -1,41 +1,74 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Mon, 9 Mar 2015 16:26:24 +0800
-Subject: [PATCH 2/2] pinctrl: mediatek: Adjust mt8173 pinctrl kconfig
-In-Reply-To: <1425639954.24292.274.camel@x220>
-References: <1425623091-30478-1-git-send-email-yingjoe.chen@mediatek.com>
- <1425623091-30478-2-git-send-email-yingjoe.chen@mediatek.com>
- <1425639954.24292.274.camel@x220>
-Message-ID: <1425889584.4871.12.camel@mtksdaap41>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Mon, 09 Mar 2015 09:28:03 +0100
+Subject: [GIT PULL 2/2] Samsung fixes-2 for v4.0
+In-Reply-To: <076f01d05a41$be568660$3b039320$@kernel.org>
+References: <54F4B33E.3070803@kernel.org> <2064108.qlOP0oDx90@wuerfel>
+ <02cd01d057f6$ab1a8e40$014faac0$@kernel.org>
+ <20150305123358.GC25728@developer.hsd1.ca.comcast.net>
+ <20150309084418.227b3e16@amdc2363>
+ <076f01d05a41$be568660$3b039320$@kernel.org>
+Message-ID: <20150309092803.1943e5f2@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-03-06 at 12:05 +0100, Paul Bolle wrote:
-> On Fri, 2015-03-06 at 14:24 +0800, Yingjoe Chen wrote:
-> > --- a/drivers/pinctrl/mediatek/Kconfig
-> > +++ b/drivers/pinctrl/mediatek/Kconfig
+Hi Kukjin,
+
+> Lukasz Majewski wrote:
+> > 
+> > Hi Eduardo,
+> > 
+> > > On Fri, Mar 06, 2015 at 07:16:53PM +0900, Kukjin Kim wrote:
+> > > > Arnd Bergmann wrote:
+> > > > >
+> > > > + Eduardo
+> > > >
+> > > > Hi Arnd,
+> > > >
+> > > > > On Tuesday 03 March 2015 04:00:14 Kukjin Kim wrote:
+> > > > > > Please pull Samsung tmu and hdmi regression fixes for v4.0
+> > > > > > and I know this is quite big for fixes but I couldn't
+> > > > > > handle this series for previous merge window because of
+> > > > > > dependency with driver side...sorry for that and please
+> > > > > > pull so that we could support them in v4.0 on exynos
+> > > > > > platforms.
+> > > > >
+> > > > > What kind of dependency do you have there? It really should
+> > > > > not be necessary to wait for driver changes, unless you do an
+> > > > > incompatible DT binding change, which you should avoid.
+> > > > >
+> > > > For TMU patches, I've asked Eduardo to provide topic branch for
+> > > > 'include/dt-bindings/thermal/thermal_exynos.h' has been added
+> > > > via thermal tree because if I can't apply the patch in Samsung
+> > > > tree for arm-soc, kernel build breakage will be happened. But I
+> > > > couldn't get Eduardo's topic branch.
+> > >
+> > >
+> > > Specifically, the developer, while migrating the driver to
+> > > support DT and OF thermal, decided to create a header with
+> > > constants. The header is used by DT files and the driver code.
+> > > The header was the dependency.
+> > 
+> > Just my 2 cents :-).
+> > 
+> > The above situation is the justification for adding the whole patch
+> > set to one repository when all ACKs are collected for it.
+> > 
+> I don't think so, even your series can be upstreamed though, other
+> useless merge conflicts would be happened so we decided all of DT
+> should be handled in arch side not driver side. So please don't argue
+> about that.
+
+Ok, I will not :-)
+
 > 
-> > @@ -8,11 +8,13 @@ config PINCTRL_MTK_COMMON
-> >  	select OF_GPIO
-> >  
-> >  config PINCTRL_MT8135
-> > -	def_bool MACH_MT8135
-> > +	def_bool MACH_MT8135 || COMPILE_TEST
-> >  	select PINCTRL_MTK_COMMON
-> >  
-> >  config PINCTRL_MT8173
-> > -	def_bool MACH_MT8173
-> > +	bool "Mediatek MT8173 pin control"
-> > +	def_bool y
-> 
-> The kconfig tools will do what you mean here, but I think it's cleaner
-> to make this just:
-> 	bool "Mediatek MT8173 pin control"
-> 	default y
+> - Kukjin
 > 
 
-Hi Paul,
 
-Just sent a new version with this change.
-Thanks for your suggestion.
 
-Joe.C
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
