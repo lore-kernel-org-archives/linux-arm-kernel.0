@@ -1,26 +1,55 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 09 Mar 2015 19:47:12 +0100
-Subject: [PATCH v5 6/8] pinctrl: cygnus: add gpio/pinconf driver
-In-Reply-To: <CACRpkdbG3t3QEobibbf7wquTtCRm=B0qwivoAp9FTkYpYNL9JA@mail.gmail.com>
-References: <1425515756-321-1-git-send-email-rjui@broadcom.com>
- <1425515756-321-7-git-send-email-rjui@broadcom.com>
- <1425543104.24292.185.camel@x220> <1425544581.24292.194.camel@x220>
- <54F88EB8.3020208@broadcom.com>
- <CACRpkdbG3t3QEobibbf7wquTtCRm=B0qwivoAp9FTkYpYNL9JA@mail.gmail.com>
-Message-ID: <1425926832.2317.16.camel@tiscali.nl>
+From: rjui@broadcom.com (Ray Jui)
+Date: Mon, 9 Mar 2015 12:00:10 -0700
+Subject: [PATCH v5 3/8] pinctrl: cygnus: add initial IOMUX driver support
+In-Reply-To: <1425926456.2317.13.camel@tiscali.nl>
+References: <1425515756-321-1-git-send-email-rjui@broadcom.com>	
+ <1425515756-321-4-git-send-email-rjui@broadcom.com>	
+ <1425542612.24292.180.camel@x220>	
+ <CACRpkdYTDSSSd5oDNXmcav-2ycbki0=K+0Cm6dLSBHUv6UXF9g@mail.gmail.com>
+ <1425926456.2317.13.camel@tiscali.nl>
+Message-ID: <54FDEDBA.1070404@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij schreef op ma 09-03-2015 om 17:41 [+0100]:
-> As pointed out in another mail on similar subject, I think these macros
-> are a kind of obsolete documentation and if they should be dropped we
-> need to go over an entire subsystem at a time and remove all boolean users
-> in a big patch.
-
-And, as I stated in that other thread, we could start by first checking
-for things like this during review. (And if people were to do clean up
-patches I'd suggest to do them one driver at a time. Just to keep things
-manageable.)
 
 
-Paul Bolle
+On 3/9/2015 11:40 AM, Paul Bolle wrote:
+> Linus Walleij schreef op ma 09-03-2015 om 17:28 [+0100]:
+>> I think you're right. Or I fear you're right.
+>>
+>> But this problem is present in so many drivers that a generic
+>> fixup needs to be done with a script and across an entire subsystem
+>> at once,
+> 
+> Why don't we start with checking for similar cases during review, like
+> I'm now doing for only a week or two?
+> 
+>>  and besides I'm not sure of these macros disturb so much.
+> 
+> I think they're confusing at best. Ie, when reading the code and the
+> corresponding Kconfig file one has to wonder: should the Kconfig symbol
+> actually be tristate or should it stay bool but did someone forget to
+> delete the module-specific code?
+> 
+>> They are documentation in a sense, albeit a kind of documentation
+>> we used before we had git to record the actual authors of the
+>> code.
+> 
+> They're useful, mostly, for module utilities. Outside that scope they
+> add information that thousands of files (that can also only be built-in
+> but do not have these macros) do not have and, apparently, do not need.
+
+I think it depends on how you see it. Based on this logic, then one can
+also argue comments in the code will be pre-processed away and are not
+needed. They at least serve the same documentation purpose in a way. So
+far I haven't seen other people complaining that having these module
+based macros in the driver are confusing when the Kconfig has a bool.
+
+Ray
+
+> 
+> Thanks,
+> 
+> 
+> Paul Bolle
+> 
