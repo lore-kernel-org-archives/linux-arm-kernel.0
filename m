@@ -1,115 +1,56 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Mon, 9 Mar 2015 16:29:26 -0500
-Subject: [RFC PATCH v15 01/11] ARM: cpuidle: Register per cpuidle device
-In-Reply-To: <1425914206-22295-2-git-send-email-lina.iyer@linaro.org>
-References: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
- <1425914206-22295-2-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20150309212926.GB17839@qualcomm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 Mar 2015 22:33:45 +0100
+Subject: ARM: OMPA4+: is it expected dma_coerce_mask_and_coherent(dev,
+ DMA_BIT_MASK(64)); to fail?
+In-Reply-To: <54F8A68B.3080709@linaro.org>
+References: <54F8A68B.3080709@linaro.org>
+Message-ID: <2886917.pqK9QloHOD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 09, 2015 at 09:16:36AM -0600, Lina Iyer wrote:
-> From: Daniel Lezcano <daniel.lezcano@linaro.org>
+On Thursday 05 March 2015 20:55:07 Grygorii.Strashko at linaro.org wrote:
+> Hi All,
 > 
-> Some architectures have some cpus which does not support idle states.
+> Now I can see very interesting behavior related to dma_coerce_mask_and_coherent()
+> and friends which I'd like to explain and clarify.
 > 
-> Let the underlying low level code to return -ENOSYS when it is not
-> possible to set an idle state.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> [Minor clean ups and fixes of the per-cpu variable]
-> ---
->  drivers/cpuidle/cpuidle-arm.c | 34 +++++++++++++++++++++++++++++++++-
->  1 file changed, 33 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-> index 1c94b88..f7cdb73 100644
-> --- a/drivers/cpuidle/cpuidle-arm.c
-> +++ b/drivers/cpuidle/cpuidle-arm.c
-> @@ -17,11 +17,14 @@
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/slab.h>
->  
->  #include <asm/cpuidle.h>
->  
->  #include "dt_idle_states.h"
->  
-> +static DEFINE_PER_CPU(struct cpuidle_device, *cpuidle_arm_dev);
-> +
->  /*
->   * arm_enter_idle_state - Programs CPU to enter the specified state
->   *
-> @@ -93,6 +96,7 @@ static const struct of_device_id arm_idle_state_match[] __initconst = {
->  static int __init arm_idle_init(void)
->  {
->  	int cpu, ret;
-> +	struct cpuidle_device *dev;
->  	struct cpuidle_driver *drv = &arm_idle_driver;
->  
->  	/*
-> @@ -105,18 +109,46 @@ static int __init arm_idle_init(void)
->  	if (ret <= 0)
->  		return ret ? : -ENODEV;
->  
-> +
-> +	ret = cpuidle_register_driver(drv);
-> +	if (ret) {
-> +		pr_err("Failed to register cpuidle driver\n");
-> +		return ret;
-> +	}
-> +
->  	/*
->  	 * Call arch CPU operations in order to initialize
->  	 * idle states suspend back-end specific data
->  	 */
->  	for_each_possible_cpu(cpu) {
-> +
->  		ret = arm_cpuidle_init(cpu);
-> +		/*
-> +		 * This cpu does not support any idle states
-> +		 */
-> +		if (ret == -ENOSYS)
-> +			continue;
-> +
->  		if (ret) {
->  			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
->  			return ret;
->  		}
-> +
-> +		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+> Below is set of questions I have (why - I explained below):
+> - Is expected dma_coerce_mask_and_coherent(DMA_BIT_MASK(64)) and friends to fail on 32 bits HW?
 
-devm_kzalloc?  Otherwise, failures could lead to lost memory.
+No. dma_coerce_mask_and_coherent() is meant to ignore the actual mask. It's
+usually considered a bug to use this function for that reason.
 
-> +		if (!dev)
-> +			return -ENOMEM;
-> +
-> +		dev->cpu = cpu;
-> +		ret = cpuidle_register_device(dev);
-> +		if (ret) {
-> +			pr_err("Failed to register cpuidle device for CPU %d\n",
-> +			       cpu);
-> +			return ret;
-> +		}
-> +
-> +		per_cpu(cpuidle_arm_dev, cpu) = dev;
->  	}
->  
-> -	return cpuidle_register(drv, NULL);
-> +	return 0;
->  }
->  device_initcall(arm_idle_init);
-> -- 
-> 2.1.0
+> - What is expected value for max_pfn: max_phys_pfn or max_phys_pfn + 1?
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> - What is expected value for struct memblock_region->size: mem_range_size or mem_range_size - 1?
+> 
+> - What is expected value to be returned by memblock_end_of_DRAM():
+>   @base + @size(max_phys_addr + 1) or @base + @size - 1(max_phys_addr)?
+> 
+> 
+> I'm working with BeaglBoard-X15 (AM572x/DRA7xx) board and have following code in OMAP ASOC driver
+> which is failed SOMETIMES during the boot with error -EIO.
+> === to omap-pcm.c:
+> omap_pcm_new() {
+> ...
+> 	ret = dma_coerce_mask_and_coherent(card->dev, DMA_BIT_MASK(64));
+> ^^ failed sometimes
+> 	if (ret)
+> 		return ret;
+> }
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+The code should be fixed to use dma_set_mask_and_coherent(), which is expected to
+fail if the bus is incapable of addressing all RAM within the mask.
+
+> I'd be very appreciated for any comments/clarification on questions I've listed at the
+> beginning of my e-mail - there are no patches from my side as I'd like to understand 
+> expected behavior of the kernel first (especially taking into account that any
+> memblock changes might affect on at least half of arches). 
+
+Is the device you have actually 64-bit capable?
+
+Is the bus it is connected to 64-bit wide?
+
+Does the dma-ranges property of the parent bus reflect the correct address width?
+
+	Arnd
