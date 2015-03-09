@@ -1,22 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Mar 2015 17:18:05 +0100
+Date: Mon, 9 Mar 2015 17:18:51 +0100
 Subject: [PATCH] pinctrl: imx: do not implicitly set pin regs to -1
-In-Reply-To: <1423240256-27210-1-git-send-email-stefan@agner.ch>
+In-Reply-To: <89abf03242a4e5a39fab1373c62dce13@agner.ch>
 References: <1423240256-27210-1-git-send-email-stefan@agner.ch>
-Message-ID: <CACRpkdb1iTf4YjJ1r4Mq-jOun+J95ofRG8AkG+Oj6Of-m1=S0Q@mail.gmail.com>
+ <20150302114516.GC3040@dragon>
+ <20150302125935.GC7865@pengutronix.de>
+ <43491e2cb2c520d8f15d90ae99a82f28@agner.ch>
+ <20150302155315.GD7865@pengutronix.de>
+ <89abf03242a4e5a39fab1373c62dce13@agner.ch>
+Message-ID: <CACRpkdaSFag+tLqF383UK56V0XzdtCr6-xhyCEnmRphZdjo-7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 6, 2015 at 5:30 PM, Stefan Agner <stefan@agner.ch> wrote:
+On Thu, Mar 5, 2015 at 12:23 AM, Stefan Agner <stefan@agner.ch> wrote:
 
-> Commit 3dac1918a491 ("pinctrl: imx: detect uninitialized pins") needs
-> the values in struct imx_pin_reg to be -1. This has been done in a
-> rather unorthodox way by setting the memory to 0xff using memset...
-> Use a proper for loop to initialize the whole array with -1.
+> Do you generally agree to that change?
 >
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> @Linus Walleij, anything holding this patch back from getting merged?
 
-Patch applied with the ACKs.
+Nothing apart from me being overloaded.
+
+Merged now, thanks.
 
 Yours,
 Linus Walleij
