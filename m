@@ -1,71 +1,40 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 9 Mar 2015 10:34:10 +0800
-Subject: [PATCH v6 13/30] PCI: Introduce new scan function
- pci_scan_host_bridge()
+Date: Mon, 9 Mar 2015 10:34:23 +0800
+Subject: [PATCH v6 26/30] PCI/xgene: Use pci_scan_root_bus() instead of
+ pci_create_root_bus()
 In-Reply-To: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
 References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1425868467-9667-14-git-send-email-wangyijing@huawei.com>
+Message-ID: <1425868467-9667-27-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce new scan function pci_scan_host_bridge() to
-support host bridge drivers that need to provide platform
-own pci_host_bridge_ops.
+Use pci_scan_root_bus() instead of pci_create_root_bus() +
+pci_scan_child_bus() for simplicity.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Tanmay Inamdar <tinamdar@apm.com>
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/pci/probe.c |   22 ++++++++++++++++++++++
- include/linux/pci.h |    4 ++++
- 2 files changed, 26 insertions(+), 0 deletions(-)
+ drivers/pci/host/pci-xgene.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 59d9be3..99f17e3 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -2064,6 +2064,28 @@ static struct pci_bus *__pci_scan_root_bus(
- 	return b;
- }
+diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+index aab5547..0c0e632 100644
+--- a/drivers/pci/host/pci-xgene.c
++++ b/drivers/pci/host/pci-xgene.c
+@@ -499,12 +499,11 @@ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
  
-+struct pci_host_bridge *pci_scan_host_bridge(struct device *parent,
-+		u32 db, struct pci_ops *ops, void *sysdata,
-+		struct list_head *resources,
-+		struct pci_host_bridge_ops *phb_ops)
-+{
-+	struct pci_host_bridge *host;
-+	struct pci_bus *bus;
-+
-+	host = pci_create_host_bridge(parent, db, resources,
-+			sysdata, phb_ops);
-+	if (!host)
-+		return NULL;
-+
-+	bus = __pci_scan_root_bus(host, ops);
-+	if (!bus)
-+		pci_free_host_bridge(host);
-+
-+	return host;
-+}
-+EXPORT_SYMBOL(pci_scan_host_bridge);
-+
-+
- struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
- 		struct pci_ops *ops, void *sysdata, struct list_head *resources)
- {
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index e9922b1..28eafb5 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -790,6 +790,10 @@ void pci_bus_release_busn_res(struct pci_bus *b);
- struct pci_bus *pci_scan_root_bus(struct device *parent, u32 dombus,
- 					     struct pci_ops *ops, void *sysdata,
- 					     struct list_head *resources);
-+struct pci_host_bridge *pci_scan_host_bridge(struct device *parent,
-+		u32 dombus, struct pci_ops *ops, void *sysdata,
-+		struct list_head *resources,
-+		struct pci_host_bridge_ops *phb_ops);
- struct pci_bus *pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev,
- 				int busnr);
- void pcie_update_link_speed(struct pci_bus *bus, u16 link_status);
+-	bus = pci_create_root_bus(&pdev->dev, 0,
++	bus = pci_scan_root_bus(&pdev->dev, 0,
+ 					&xgene_pcie_ops, port, &res);
+ 	if (!bus)
+ 		return -ENOMEM;
+ 
+-	pci_scan_child_bus(bus);
+ 	pci_assign_unassigned_bus_resources(bus);
+ 	pci_bus_add_devices(bus);
+ 
 -- 
 1.7.1
