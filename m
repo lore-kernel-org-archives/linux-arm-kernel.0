@@ -1,73 +1,88 @@
-From: neilb@suse.de (NeilBrown)
-Date: Mon, 9 Mar 2015 11:06:53 +1100
-Subject: twl4030_charger: need changes to get probed?
-In-Reply-To: <20150307210102.GL5233@earth>
-References: <20150224043341.4243.23291.stgit@notabene.brown>
- <20150224043352.4243.11227.stgit@notabene.brown>
- <20150302210926.GP13270@amd>
- <20150305173350.50502b95@notabene.brown>
- <20150306212417.GA24169@amd> <20150307210102.GL5233@earth>
-Message-ID: <20150309110653.7532613c@notabene.brown>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 09 Mar 2015 01:29:28 +0100
+Subject: [PATCH v2 02/18] ARM: ARMv7M: Enlarge vector table to 256 entries
+In-Reply-To: <1424455277-29983-3-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1424455277-29983-3-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1364122b3b72c50138d81ee4eec2a4c7@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 7 Mar 2015 22:01:02 +0100 Sebastian Reichel <sre@debian.org> wrote:
-
-> Hi,
+On 2015-02-20 19:01, Maxime Coquelin wrote:
+> From Cortex-M reference manuals, the nvic supports up to 240 interrupts.
+> So the number of entries in vectors table is up to 256.
 > 
-> On Fri, Mar 06, 2015 at 10:24:17PM +0100, Pavel Machek wrote:
-> > According to n900 dts, twl4030-bci (aka charger) should be
-> > included.
+> This patch adds a new config flag to specify the number of external interrupts.
+> Some ifdeferies are added in order to respect the natural alignment without
+> wasting too much space on smaller systems.
 > 
-> its part of twl, but not used on N900 afaik.
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> ---
+>  arch/arm/kernel/entry-v7m.S | 13 +++++++++----
+>  arch/arm/mm/Kconfig         | 15 +++++++++++++++
+>  2 files changed, 24 insertions(+), 4 deletions(-)
 > 
-> > (But it does not seem to do anything useful on n900. I was hoping for
-> > measurement of input voltage, but .. no.)
-> 
-> check for rx51-battery.
-> 
-> > Any ideas why the patch below is needed?
-> 
-> platform_driver_probe() does not support deferred probing.
-> 
-> Neil, can you take this patch into your series for the next round?
+> diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
+> index 8944f49..68cde36 100644
+> --- a/arch/arm/kernel/entry-v7m.S
+> +++ b/arch/arm/kernel/entry-v7m.S
+> @@ -117,9 +117,14 @@ ENTRY(__switch_to)
+>  ENDPROC(__switch_to)
+>  
+>  	.data
+> -	.align	8
+> +#if CONFIG_CPUV7M_NUM_IRQ <= 112
+> +	.align	9
+> +#else
+> +	.align	10
+> +#endif
+> +
+>  /*
+> - * Vector table (64 words => 256 bytes natural alignment)
+> + * Vector table (Natural alignment need to be ensured)
+>   */
+>  ENTRY(vector_table)
+>  	.long	0			@ 0 - Reset stack pointer
+> @@ -138,6 +143,6 @@ ENTRY(vector_table)
+>  	.long	__invalid_entry		@ 13 - Reserved
+>  	.long	__pendsv_entry		@ 14 - PendSV
+>  	.long	__invalid_entry		@ 15 - SysTick
+> -	.rept	64 - 16
+> -	.long	__irq_entry		@ 16..64 - External Interrupts
+> +	.rept	CONFIG_CPUV7M_NUM_IRQ
+> +	.long	__irq_entry		@ External Interrupts
+>  	.endr
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index c43c714..27eb835 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -604,6 +604,21 @@ config CPU_USE_DOMAINS
+>  	  This option enables or disables the use of domain switching
+>  	  via the set_fs() function.
+>  
+> +config CPUV7M_NUM_IRQ
+> +	int "Number of external interrupts connected to the NVIC"
+> +	depends on CPU_V7M
+> +	default 90 if ARCH_STM32
+> +	default 38 if ARCH_EFM32
+> +	default 240
+> +	help
+> +	  This option indicates the number of interrupts connected to the NVIC.
+> +	  The value can be larger than the real number of interrupts supported
+> +	  by the system, but must not be lower.
+> +	  The default value is 240, corresponding to the maximum number of
+> +	  interrupts supported by the NVIC on Cortex-M family.
+> +
+> +	  If unsure, keep default value.
+> +
+>  #
+>  # CPU supports 36-bit I/O
+>  #
 
-I could, but I do wonder if it is the right thing to do.
+I sent a patch which extended that vector table some weeks ago:
+https://lkml.org/lkml/2014/12/29/296
 
-Shouldn't we fix platform_driver_probe() to support deferred probing.
+But your solution is definitely more flexible, and given that we deal
+with small devices here, it's worth saving memory.
 
-As I understand it, it refused to retry a probe if there is an error, and the
-comments suggest that such retrying is avoided because it would be a waste
-of time:
-
-	/*
-	 * Prevent driver from requesting probe deferral to avoid further
-	 * futile probe attempts.
-	 */
-
-In this case, it isn't futile.
-
-Earlier there is a comment saying:
-
- * Use this instead of platform_driver_register() when you know the device
- * is not hotpluggable and has already been registered, and you want to
- * remove its run-once probe() infrastructure from memory after the driver
- * has bound to the device.
-
-I presume all this applies.  I assume that the only problem is a probe-order
-thing.  So maybe we should fix platform_driver_probe() to do the right thing
-with -EPROBEDEFER??
-
-Trouble is, I really don't understand the  point or mechanism for
-platform_driver_probe(), so I cannot suggest anything.
-But I have been annoyed before that platform_driver_probe doesn't cope with
-EPROBEDEFER, so I would like it fixed.
-
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 811 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150309/74073678/attachment.sig>
+Acked-by: Stefan Agner <stefan@agner.ch>
