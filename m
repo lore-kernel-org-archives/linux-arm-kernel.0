@@ -1,43 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 09 Mar 2015 14:58:55 +0100
-Subject: [PATCH] MTD: cfi: reduce stack size
-Message-ID: <2161999.Fy9EjgoTPm@wuerfel>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 09 Mar 2015 15:30:01 +0100
+Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
+ IRQF_NO_SUSPEND
+In-Reply-To: <20150309075546.GY3989@piout.net>
+References: <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
+ <1615214.0rkGfM1gZL@vostro.rjw.lan> <20150309075546.GY3989@piout.net>
+Message-ID: <1592385.fqRVVyPSPE@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cfi_staa_write_buffers function uses a large amount of ernel stack
-whenever CONFIG_MTD_MAP_BANK_WIDTH_32 is set, and that results in a
-warning on ARM allmodconfig builds:
+On Monday, March 09, 2015 08:55:46 AM Alexandre Belloni wrote:
+> Hi,
+> 
+> On 08/03/2015 at 02:12:53 +0100, Rafael J. Wysocki wrote :
+> > > > I think you misunderstood, that is exactly the expected behaviour. This
+> > > > is hardware defined. Once the watchdog is started, nobody can stop it.
+> > > > Trying to change the mode register will result in a reset of the
+> > > > SoC.
+> > > 
+> > > Well, it boils down to "what is stronger". Desire to suspend the
+> > > system, or desire to reboot the system.
+> > > 
+> > > It is "echo mem > state", not "echo reboot > state".
+> > > 
+> > > > It is documented in the datasheet and any user wanting another behaviour
+> > > > is out of luck.
+> > > 
+> > > Actaully, your platform should just refuse to enter suspend-to-RAM
+> > > when hw watchdog is enabled.
+> > 
+> > Quite likely, depending on how exactly the suspend is implemented.
+> >
+> 
+> We've had absolutely zero complain on that. It is quite clear in the
+> datasheet that failing to refresh the watchdog once started will lead to
+> a reset and that it is impossible to stop.
+> It is actually quite convenient to also ensure that you can actually
+> wake up from suspend because that can obviously go wrong.
 
-drivers/mtd/chips/cfi_cmdset_0020.c: In function 'cfi_staa_write_buffers':
-drivers/mtd/chips/cfi_cmdset_0020.c:651:1: warning: the frame size of 1208 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+I gather then that the suspend implementation is such that touching the
+watchdog periodically while suspended is not a problem.
 
-It turns out that this is largely a result of a suboptimal implementation
-of map_word_andequal(). Replacing this function with a straightforward
-one reduces the stack size in this function by exactly 200 bytes,
-shrinks the .text segment for this file from 27648 bytes to 26608 bytes,
-and makes the warning go away.
+Again, can you please tell me how suspend is implemented on at91?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
-index 5f487d776411..2d2457bee50c 100644
---- a/include/linux/mtd/map.h
-+++ b/include/linux/mtd/map.h
-@@ -314,7 +314,15 @@ static inline map_word map_word_or(struct map_info *map, map_word val1, map_word
- 	return r;
- }
- 
--#define map_word_andequal(m, a, b, z) map_word_equal(m, z, map_word_and(m, a, b))
-+static inline int map_word_andequal(struct map_info *map, map_word val1, map_word val2, map_word val3)
-+{
-+	int i;
-+	for (i=0; i<map_words(map); i++) {
-+		if ((val1.x[i] & val2.x[i]) != val3.x[i])
-+			return 0;
-+	}
-+	return 1;
-+}
- 
- static inline int map_word_bitsset(struct map_info *map, map_word val1, map_word val2)
- {
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
