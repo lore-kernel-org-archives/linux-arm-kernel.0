@@ -1,69 +1,106 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 09 Mar 2015 13:43:49 +0100
-Subject: [PATCH 1/5] mtd: nand: =?UTF-8?Q?vf=36=31=30=5Fnfc=3A=20Frees?=
- =?UTF-8?Q?cale=20NFC=20for=20VF=36=31=30=2C=20MPC=35=31=32=35=20and=20oth?=
- =?UTF-8?Q?ers?=
-In-Reply-To: <20150309095843.GA31289@pengutronix.de>
-References: <1425510624-22250-1-git-send-email-stefan@agner.ch>
- <1425510624-22250-2-git-send-email-stefan@agner.ch>
- <20150306061502.GB10997@pengutronix.de>
- <fdfc84d92bbcb8abc98f2c29e1aa368b@agner.ch>
- <20150309095843.GA31289@pengutronix.de>
-Message-ID: <975eaa91737584f8b45b36942cece523@agner.ch>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Mon,  9 Mar 2015 12:46:30 +0000
+Subject: [PATCH 1/3] arm/pmu: Reject groups spanning multiple hardware PMUs
+In-Reply-To: <1425905192-10509-1-git-send-email-suzuki.poulose@arm.com>
+References: <1425905192-10509-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1425905192-10509-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-03-09 10:58, Sascha Hauer wrote:
-> On Fri, Mar 06, 2015 at 02:31:51PM +0100, Stefan Agner wrote:
->> On 2015-03-06 07:15, Sascha Hauer wrote:
->> > Hi Stefan,
->> >
->> > On Thu, Mar 05, 2015 at 12:10:20AM +0100, Stefan Agner wrote:
->> >> +
->> >> +static int vf610_nfc_probe_dt(struct device *dev, struct vf610_nfc_config *cfg)
->> >> +{
->> >> +	struct device_node *np = dev->of_node;
->> >> +	int buswidth;
->> >> +	u32 clkrate;
->> >> +
->> >> +	if (!np)
->> >> +		return 1;
->> >> +
->> >> +	cfg->flash_bbt = of_get_nand_on_flash_bbt(np);
->> >> +
->> >> +	if (!of_property_read_u32(np, "clock-frequency", &clkrate))
->> >> +		cfg->clkrate = clkrate;
->> >
->> > Normally the clock-frequency property tells the driver at which
->> > frequency the device actually is running, not to tell the driver at
->> > which frequency the device *should* run. It's strange to use the value
->> > of the clock-frequency property as input to clk_set_rate(). Maybe the
->> > assigned clock binding is more appropriate here, see
->> > Documentation/devicetree/bindings/clock/clock-bindings.txt.
->>
->> What we try to do here is to specify the hardware limitations. There
->> seem to be some hardware restrictions when it comes to clock
->> frequencies. There has been a rather long discussion over at Freescales
->> community about it:
->> https://community.freescale.com/thread/317074
->>
->> Not sure if this is the right way to specify the supported frequencies,
->> or should we create a custom property for this, something like
->> fsl,max-nfc-frequency = <33000000>?
-> 
-> What's wrong with the assigned clock binding? All you have to do is to
-> add it to the device node. The rest will be done from the generic clock
-> framework with no additional driver code.
+From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-Ah yes, assigned clock bindings seems like a match. So, the NFC node
-would look something like
+Don't allow grouping hardware events from different PMUs
+ (eg. CCI + CPU).
 
+Fixes a crash triggered by perf_fuzzer on Linux-4.0-rc2,
+with CCI PMU turned on. The validate_event(), after certain checks,
+assumes that the given hardware pmu event belongs to armpmu,
+which may not be true always, with other hardware PMUs
+around (CCI, CCN).
+
+ ---
+CPU: 0 PID: 1527 Comm: perf_fuzzer Not tainted 4.0.0-rc2 #57
+Hardware name: ARM-Versatile Express
+task: bd8484c0 ti: be676000 task.ti: be676000
+PC is at 0xbf1bbc90
+LR is at validate_event+0x34/0x5c
+pc : [<bf1bbc90>]    lr : [<80016060>]    psr: 00000013
 ...
-        assigned-clocks = <&clks VF610_CLK_NFC>;
-        assigned-clock-rates = <33000000>;
-...
+[<80016060>] (validate_event) from [<80016198>] (validate_group+0x28/0x90)
+[<80016198>] (validate_group) from [<80016398>] (armpmu_event_init+0x150/0x218)
+[<80016398>] (armpmu_event_init) from [<800882e4>] (perf_try_init_event+0x30/0x48)
+[<800882e4>] (perf_try_init_event) from [<8008f544>] (perf_init_event+0x5c/0xf4)
+[<8008f544>] (perf_init_event) from [<8008f8a8>] (perf_event_alloc+0x2cc/0x35c)
+[<8008f8a8>] (perf_event_alloc) from [<8009015c>] (SyS_perf_event_open+0x498/0xa70)
+[<8009015c>] (SyS_perf_event_open) from [<8000e420>] (ret_fast_syscall+0x0/0x34)
+Code: bf1be000 bf1bb380 802a2664 00000000 (00000002)
+---[ end trace 01aff0ff00926a0a ]---
 
-Will try to use that, thx.
+Also cleans up the code to use the arm_pmu only when we know that
+we are dealing with an arm pmu event.
 
---
-Stefan
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm/kernel/perf_event.c |   21 +++++++++++++++------
+ 1 file changed, 15 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 557e128..4a86a01 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -259,20 +259,29 @@ out:
+ }
+ 
+ static int
+-validate_event(struct pmu_hw_events *hw_events,
+-	       struct perf_event *event)
++validate_event(struct pmu *pmu, struct pmu_hw_events *hw_events,
++			       struct perf_event *event)
+ {
+-	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
++	struct arm_pmu *armpmu;
+ 
+ 	if (is_software_event(event))
+ 		return 1;
+ 
++	/*
++	 * Reject groups spanning multiple HW PMUs (e.g. CPU + CCI). The
++	 * core perf code won't check that the pmu->ctx == leader->ctx
++	 * until after pmu->event_init(event).
++	 */
++	if (event->pmu != pmu)
++		return 0;
++
+ 	if (event->state < PERF_EVENT_STATE_OFF)
+ 		return 1;
+ 
+ 	if (event->state == PERF_EVENT_STATE_OFF && !event->attr.enable_on_exec)
+ 		return 1;
+ 
++	armpmu = to_arm_pmu(event->pmu);
+ 	return armpmu->get_event_idx(hw_events, event) >= 0;
+ }
+ 
+@@ -288,15 +297,15 @@ validate_group(struct perf_event *event)
+ 	 */
+ 	memset(&fake_pmu.used_mask, 0, sizeof(fake_pmu.used_mask));
+ 
+-	if (!validate_event(&fake_pmu, leader))
++	if (!validate_event(event->pmu, &fake_pmu, leader))
+ 		return -EINVAL;
+ 
+ 	list_for_each_entry(sibling, &leader->sibling_list, group_entry) {
+-		if (!validate_event(&fake_pmu, sibling))
++		if (!validate_event(event->pmu, &fake_pmu, sibling))
+ 			return -EINVAL;
+ 	}
+ 
+-	if (!validate_event(&fake_pmu, event))
++	if (!validate_event(event->pmu, &fake_pmu, event))
+ 		return -EINVAL;
+ 
+ 	return 0;
+-- 
+1.7.9.5
