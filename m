@@ -1,88 +1,62 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon,  9 Mar 2015 09:16:41 -0600
-Subject: [PATCH v15 06/11] ARM: dts: qcom: Add power-controller device node
- for 8084 Krait CPUs
+Date: Mon,  9 Mar 2015 09:16:42 -0600
+Subject: [PATCH v15 07/11] ARM: dts: qcom: Update power-controller device node
+ for 8064 Krait CPUs
 In-Reply-To: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
 References: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1425914206-22295-7-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1425914206-22295-8-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each Krait CPU in the QCOM 8084 SoC has an SAW power controller to
-regulate the power to the cpu and aide the core in entering idle states.
-Reference the SAW instance and associate the instance with the CPU core.
+Update the SAW2 DT bindings to add qcom,apq8064-saw2-v1.1-cpu compatible
+binding string to configure SPM registers and allow the SPM to put the
+core in deeper idle states when the core is idle.
 
 Cc: Kumar Gala <galak@codeaurora.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-apq8084.dtsi | 26 +++++++++++++++++++++++++-
- 1 file changed, 25 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/qcom-apq8064.dtsi | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index 1f130bc..71182bf 100644
---- a/arch/arm/boot/dts/qcom-apq8084.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -21,6 +21,7 @@
- 			enable-method = "qcom,kpss-acc-v2";
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc0>;
-+			qcom,saw = <&saw0>;
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index b3154c0..9fd24bc 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -139,26 +139,26 @@
+ 			reg = <0x020b8000 0x1000>, <0x02008000 0x1000>;
  		};
  
- 		cpu at 1 {
-@@ -30,6 +31,7 @@
- 			enable-method = "qcom,kpss-acc-v2";
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc1>;
-+			qcom,saw = <&saw1>;
- 		};
- 
- 		cpu at 2 {
-@@ -39,6 +41,7 @@
- 			enable-method = "qcom,kpss-acc-v2";
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc2>;
-+			qcom,saw = <&saw2>;
- 		};
- 
- 		cpu at 3 {
-@@ -48,6 +51,7 @@
- 			enable-method = "qcom,kpss-acc-v2";
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc3>;
-+			qcom,saw = <&saw3>;
- 		};
- 
- 		L2: l2-cache {
-@@ -144,7 +148,27 @@
- 			};
- 		};
- 
--		saw_l2: regulator at f9012000 {
-+		saw0: power-controller at f9089000 {
-+			compatible = "qcom,apq8084-saw2-v2.1-cpu";
-+			reg = <0xf9089000 0x1000>, <0xf9009000 0x1000>;
-+		};
-+
-+		saw1: power-controller at f9099000 {
-+			compatible = "qcom,apq8084-saw2-v2.1-cpu";
-+			reg = <0xf9099000 0x1000>, <0xf9009000 0x1000>;
-+		};
-+
-+		saw2: power-controller at f90a9000 {
-+			compatible = "qcom,apq8084-saw2-v2.1-cpu";
-+			reg = <0xf90a9000 0x1000>, <0xf9009000 0x1000>;
-+		};
-+
-+		saw3: power-controller at f90b9000 {
-+			compatible = "qcom,apq8084-saw2-v2.1-cpu";
-+			reg = <0xf90b9000 0x1000>, <0xf9009000 0x1000>;
-+		};
-+
-+		saw_l2: power-controller at f9012000 {
- 			compatible = "qcom,saw2";
- 			reg = <0xf9012000 0x1000>;
+-		saw0: regulator at 2089000 {
+-			compatible = "qcom,saw2";
++		saw0: power-controller at 2089000 {
++			compatible = "qcom,apq8064-saw2-v1.1-cpu", "qcom,saw2";
+ 			reg = <0x02089000 0x1000>, <0x02009000 0x1000>;
  			regulator;
+ 		};
+ 
+-		saw1: regulator at 2099000 {
+-			compatible = "qcom,saw2";
++		saw1: power-controller at 2099000 {
++			compatible = "qcom,apq8064-saw2-v1.1-cpu", "qcom,saw2";
+ 			reg = <0x02099000 0x1000>, <0x02009000 0x1000>;
+ 			regulator;
+ 		};
+ 
+-		saw2: regulator at 20a9000 {
+-			compatible = "qcom,saw2";
++		saw2: power-controller at 20a9000 {
++			compatible = "qcom,apq8064-saw2-v1.1-cpu", "qcom,saw2";
+ 			reg = <0x020a9000 0x1000>, <0x02009000 0x1000>;
+ 			regulator;
+ 		};
+ 
+-		saw3: regulator at 20b9000 {
+-			compatible = "qcom,saw2";
++		saw3: power-controller at 20b9000 {
++			compatible = "qcom,apq8064-saw2-v1.1-cpu", "qcom,saw2";
+ 			reg = <0x020b9000 0x1000>, <0x02009000 0x1000>;
+ 			regulator;
+ 		};
 -- 
 2.1.0
