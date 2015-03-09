@@ -1,155 +1,43 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 9 Mar 2015 14:50:55 +0100
-Subject: [PATCH v2 1/5] arm: KVM: export vcpi->pause state via MP_STATE
- ioctls
-In-Reply-To: <1425302944-6276-2-git-send-email-alex.bennee@linaro.org>
-References: <1425302944-6276-1-git-send-email-alex.bennee@linaro.org>
- <1425302944-6276-2-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150309135055.GC20559@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 Mar 2015 14:58:55 +0100
+Subject: [PATCH] MTD: cfi: reduce stack size
+Message-ID: <2161999.Fy9EjgoTPm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+The cfi_staa_write_buffers function uses a large amount of ernel stack
+whenever CONFIG_MTD_MAP_BANK_WIDTH_32 is set, and that results in a
+warning on ARM allmodconfig builds:
 
-The subject of this change has a typo, and I also think it's not about
-exposing the pause state (that's just an internal name/concept), but
-about exposing the PSCI state, or simply the VCPU power state.
+drivers/mtd/chips/cfi_cmdset_0020.c: In function 'cfi_staa_write_buffers':
+drivers/mtd/chips/cfi_cmdset_0020.c:651:1: warning: the frame size of 1208 bytes is larger than 1024 bytes [-Wframe-larger-than=]
 
-On Mon, Mar 02, 2015 at 01:29:00PM +0000, Alex Benn?e wrote:
-> To cleanly restore an SMP VM we need to ensure that the current pause
-> state of each vcpu is correctly recorded. Things could get confused if
-> the CPU starts running after migration restore completes when it was
-> paused before it state was captured.
-> 
-> We use the existing KVM_GET/SET_MP_STATE ioctl to do this. The arm/arm64
-> interface is a lot simpler as the only valid states are
-> KVM_MP_STATE_RUNNABLE and KVM_MP_STATE_HALTED.
-> 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> 
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index b112efc..602156f 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -997,7 +997,7 @@ for vm-wide capabilities.
->  4.38 KVM_GET_MP_STATE
->  
->  Capability: KVM_CAP_MP_STATE
-> -Architectures: x86, s390
-> +Architectures: x86, s390, arm, arm64
->  Type: vcpu ioctl
->  Parameters: struct kvm_mp_state (out)
->  Returns: 0 on success; -1 on error
-> @@ -1027,15 +1027,21 @@ Possible values are:
->   - KVM_MP_STATE_LOAD:            the vcpu is in a special load/startup state
->                                   [s390]
->  
-> -On x86, this ioctl is only useful after KVM_CREATE_IRQCHIP. Without an
-> -in-kernel irqchip, the multiprocessing state must be maintained by userspace on
-> +For x86:
-> +
-> +This ioctl is only useful after KVM_CREATE_IRQCHIP.  Without an in-kernel
-> +irqchip, the multiprocessing state must be maintained by userspace on
+It turns out that this is largely a result of a suboptimal implementation
+of map_word_andequal(). Replacing this function with a straightforward
+one reduces the stack size in this function by exactly 200 bytes,
+shrinks the .text segment for this file from 27648 bytes to 26608 bytes,
+and makes the warning go away.
 
-Nit: I would not taint the git log with this change but instead just
-introduce a paragraph below starting with "On arm/arm64, " and you would
-get the same effect.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
->  these architectures.
->  
-> +For arm/arm64:
-> +
-> +The only states that are valid are KVM_MP_STATE_HALTED and
-> +KVM_MP_STATE_RUNNABLE which reflect if the vcpu is paused or not.
-
-As suggested on the QEMU series, HALTED is probably not the right thing
-to use.
-
->  
->  4.39 KVM_SET_MP_STATE
->  
->  Capability: KVM_CAP_MP_STATE
-> -Architectures: x86, s390
-> +Architectures: x86, s390, arm, arm64
->  Type: vcpu ioctl
->  Parameters: struct kvm_mp_state (in)
->  Returns: 0 on success; -1 on error
-> @@ -1043,10 +1049,16 @@ Returns: 0 on success; -1 on error
->  Sets the vcpu's current "multiprocessing state"; see KVM_GET_MP_STATE for
->  arguments.
->  
-> -On x86, this ioctl is only useful after KVM_CREATE_IRQCHIP. Without an
-> -in-kernel irqchip, the multiprocessing state must be maintained by userspace on
-> +For x86:
-> +
-> +This ioctl is only useful after KVM_CREATE_IRQCHIP.  Without an in-kernel
-> +irqchip, the multiprocessing state must be maintained by userspace on
->  these architectures.
->  
-> +For arm/arm64:
-> +
-> +The only states that are valid are KVM_MP_STATE_HALTED and
-> +KVM_MP_STATE_RUNNABLE which reflect if the vcpu should be paused or not.
-
-same as above
-
->  
->  4.40 KVM_SET_IDENTITY_MAP_ADDR
->  
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 5560f74..8531536 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -183,6 +183,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
->  	case KVM_CAP_ARM_PSCI:
->  	case KVM_CAP_ARM_PSCI_0_2:
->  	case KVM_CAP_READONLY_MEM:
-> +	case KVM_CAP_MP_STATE:
->  		r = 1;
->  		break;
->  	case KVM_CAP_COALESCED_MMIO:
-> @@ -313,13 +314,29 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
->  int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
->  				    struct kvm_mp_state *mp_state)
->  {
-> -	return -EINVAL;
-> +	if (vcpu->arch.pause)
-> +		mp_state->mp_state = KVM_MP_STATE_HALTED;
-> +	else
-> +		mp_state->mp_state = KVM_MP_STATE_RUNNABLE;
-> +
-> +	return 0;
->  }
->  
->  int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
->  				    struct kvm_mp_state *mp_state)
->  {
-> -	return -EINVAL;
-> +	switch (mp_state->mp_state) {
-> +	case KVM_MP_STATE_RUNNABLE:
-> +		vcpu->arch.pause = false;
-> +		break;
-> +	case KVM_MP_STATE_HALTED:
-> +		vcpu->arch.pause = true;
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
->  }
->  
->  /**
-
-Are we capturing the vcpu features in some way or do we expect userspace
-to migrate these on its own?  The reason I'm asking, is if you create
-multiple VCPUs, where all the non-primary VCPUs are started in power off
-mode, and then you boot your guest which powers on all VCPUs, and then
-you restart your guest (with PSCI RESET), the system will not power on
-all the non-primary VCPUs but hold them in power-off.
-
-We need to make sure this behavior is preserved for a reboot across a
-migration.  Is it?
-
-Thanks,
--Christoffer
+diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
+index 5f487d776411..2d2457bee50c 100644
+--- a/include/linux/mtd/map.h
++++ b/include/linux/mtd/map.h
+@@ -314,7 +314,15 @@ static inline map_word map_word_or(struct map_info *map, map_word val1, map_word
+ 	return r;
+ }
+ 
+-#define map_word_andequal(m, a, b, z) map_word_equal(m, z, map_word_and(m, a, b))
++static inline int map_word_andequal(struct map_info *map, map_word val1, map_word val2, map_word val3)
++{
++	int i;
++	for (i=0; i<map_words(map); i++) {
++		if ((val1.x[i] & val2.x[i]) != val3.x[i])
++			return 0;
++	}
++	return 1;
++}
+ 
+ static inline int map_word_bitsset(struct map_info *map, map_word val1, map_word val2)
+ {
