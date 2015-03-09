@@ -1,144 +1,158 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 9 Mar 2015 13:44:55 -0700
-Subject: [PATCH v6 1/8] pinctrl: bcm: consolidate Broadcom pinctrl drivers
+Date: Mon, 9 Mar 2015 13:44:56 -0700
+Subject: [PATCH v6 2/8] pinctrl: Broadcom Cygnus pinctrl device tree binding
 In-Reply-To: <1425933902-20652-1-git-send-email-rjui@broadcom.com>
 References: <1425933902-20652-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1425933902-20652-2-git-send-email-rjui@broadcom.com>
+Message-ID: <1425933902-20652-3-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Consolidate Broadcom pinctrl drivers into drivers/pinctrl/bcm/*
+Device tree binding documentation for Broadcom Cygnus IOMUX driver
 
 Signed-off-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- drivers/pinctrl/Kconfig                      |   19 +------------------
- drivers/pinctrl/Makefile                     |    3 +--
- drivers/pinctrl/bcm/Kconfig                  |   21 +++++++++++++++++++++
- drivers/pinctrl/bcm/Makefile                 |    4 ++++
- drivers/pinctrl/{ => bcm}/pinctrl-bcm281xx.c |    4 ++--
- drivers/pinctrl/{ => bcm}/pinctrl-bcm2835.c  |    0
- 6 files changed, 29 insertions(+), 22 deletions(-)
- create mode 100644 drivers/pinctrl/bcm/Kconfig
- create mode 100644 drivers/pinctrl/bcm/Makefile
- rename drivers/pinctrl/{ => bcm}/pinctrl-bcm281xx.c (99%)
- rename drivers/pinctrl/{ => bcm}/pinctrl-bcm2835.c (100%)
+ .../bindings/pinctrl/brcm,cygnus-pinmux.txt        |  132 ++++++++++++++++++++
+ 1 file changed, 132 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinmux.txt
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index ee9f44a..1a9143d 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -67,24 +67,6 @@ config PINCTRL_AT91
- 	help
- 	  Say Y here to enable the at91 pinctrl driver
- 
--config PINCTRL_BCM2835
--	bool
--	select PINMUX
--	select PINCONF
--
--config PINCTRL_BCM281XX
--	bool "Broadcom BCM281xx pinctrl driver"
--	depends on OF && (ARCH_BCM_MOBILE || COMPILE_TEST)
--	select PINMUX
--	select PINCONF
--	select GENERIC_PINCONF
--	select REGMAP_MMIO
--	help
--	  Say Y here to support Broadcom BCM281xx pinctrl driver, which is used
--	  for the BCM281xx SoC family, including BCM11130, BCM11140, BCM11351,
--	  BCM28145, and BCM28155 SoCs.  This driver requires the pinctrl
--	  framework.  GPIO is provided by a separate GPIO driver.
--
- config PINCTRL_LANTIQ
- 	bool
- 	depends on LANTIQ
-@@ -207,6 +189,7 @@ config PINCTRL_ZYNQ
- 	help
- 	  This selectes the pinctrl driver for Xilinx Zynq.
- 
-+source "drivers/pinctrl/bcm/Kconfig"
- source "drivers/pinctrl/berlin/Kconfig"
- source "drivers/pinctrl/freescale/Kconfig"
- source "drivers/pinctrl/intel/Kconfig"
-diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
-index 0475206..c14ce05 100644
---- a/drivers/pinctrl/Makefile
-+++ b/drivers/pinctrl/Makefile
-@@ -14,8 +14,6 @@ obj-$(CONFIG_PINCTRL_AS3722)	+= pinctrl-as3722.o
- obj-$(CONFIG_PINCTRL_BF54x)	+= pinctrl-adi2-bf54x.o
- obj-$(CONFIG_PINCTRL_BF60x)	+= pinctrl-adi2-bf60x.o
- obj-$(CONFIG_PINCTRL_AT91)	+= pinctrl-at91.o
--obj-$(CONFIG_PINCTRL_BCM2835)	+= pinctrl-bcm2835.o
--obj-$(CONFIG_PINCTRL_BCM281XX)	+= pinctrl-bcm281xx.o
- obj-$(CONFIG_PINCTRL_FALCON)	+= pinctrl-falcon.o
- obj-$(CONFIG_PINCTRL_MESON)	+= meson/
- obj-$(CONFIG_PINCTRL_PALMAS)	+= pinctrl-palmas.o
-@@ -38,6 +36,7 @@ obj-$(CONFIG_PINCTRL_TB10X)	+= pinctrl-tb10x.o
- obj-$(CONFIG_PINCTRL_ST) 	+= pinctrl-st.o
- obj-$(CONFIG_PINCTRL_ZYNQ)	+= pinctrl-zynq.o
- 
-+obj-$(CONFIG_ARCH_BCM)		+= bcm/
- obj-$(CONFIG_ARCH_BERLIN)	+= berlin/
- obj-y				+= freescale/
- obj-$(CONFIG_X86)		+= intel/
-diff --git a/drivers/pinctrl/bcm/Kconfig b/drivers/pinctrl/bcm/Kconfig
+diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinmux.txt b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinmux.txt
 new file mode 100644
-index 0000000..bc6d048
+index 0000000..3600d5c
 --- /dev/null
-+++ b/drivers/pinctrl/bcm/Kconfig
-@@ -0,0 +1,21 @@
-+#
-+# Broadcom pinctrl drivers
-+#
++++ b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinmux.txt
+@@ -0,0 +1,132 @@
++Broadcom Cygnus IOMUX Controller
 +
-+config PINCTRL_BCM281XX
-+	bool "Broadcom BCM281xx pinctrl driver"
-+	depends on OF && (ARCH_BCM_MOBILE || COMPILE_TEST)
-+	select PINMUX
-+	select PINCONF
-+	select GENERIC_PINCONF
-+	select REGMAP_MMIO
-+	help
-+	  Say Y here to support Broadcom BCM281xx pinctrl driver, which is used
-+	  for the BCM281xx SoC family, including BCM11130, BCM11140, BCM11351,
-+	  BCM28145, and BCM28155 SoCs.  This driver requires the pinctrl
-+	  framework.  GPIO is provided by a separate GPIO driver.
++The Cygnus IOMUX controller supports group based mux configuration. In
++addition, certain pins can be muxed to GPIO function individually.
 +
-+config PINCTRL_BCM2835
-+	bool
-+	select PINMUX
-+	select PINCONF
-diff --git a/drivers/pinctrl/bcm/Makefile b/drivers/pinctrl/bcm/Makefile
-new file mode 100644
-index 0000000..7ba80a3
---- /dev/null
-+++ b/drivers/pinctrl/bcm/Makefile
-@@ -0,0 +1,4 @@
-+# Broadcom pinctrl support
++Required properties:
 +
-+obj-$(CONFIG_PINCTRL_BCM281XX)	+= pinctrl-bcm281xx.o
-+obj-$(CONFIG_PINCTRL_BCM2835)	+= pinctrl-bcm2835.o
-diff --git a/drivers/pinctrl/pinctrl-bcm281xx.c b/drivers/pinctrl/bcm/pinctrl-bcm281xx.c
-similarity index 99%
-rename from drivers/pinctrl/pinctrl-bcm281xx.c
-rename to drivers/pinctrl/bcm/pinctrl-bcm281xx.c
-index b88cfe5..9641f1c 100644
---- a/drivers/pinctrl/pinctrl-bcm281xx.c
-+++ b/drivers/pinctrl/bcm/pinctrl-bcm281xx.c
-@@ -21,8 +21,8 @@
- #include <linux/pinctrl/pinconf-generic.h>
- #include <linux/regmap.h>
- #include <linux/slab.h>
--#include "core.h"
--#include "pinctrl-utils.h"
-+#include "../core.h"
-+#include "../pinctrl-utils.h"
- 
- /* BCM281XX Pin Control Registers Definitions */
- 
-diff --git a/drivers/pinctrl/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-similarity index 100%
-rename from drivers/pinctrl/pinctrl-bcm2835.c
-rename to drivers/pinctrl/bcm/pinctrl-bcm2835.c
++- compatible:
++    Must be "brcm,cygnus-pinmux"
++
++- reg:
++    Define the base and range of the I/O address space that contains the Cygnus
++IOMUX registers
++
++Properties in subnodes:
++
++- function:
++    The mux function to select
++
++- groups:
++    The list of groups to select with a given function
++
++For more details, refer to
++Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
++
++For example:
++
++	pinmux: pinmux at 0x0301d0c8 {
++		compatible = "brcm,cygnus-pinmux";
++		reg = <0x0301d0c8 0x1b0>;
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2s0_default>;
++
++		i2s0_default: i2s0_default {
++			mux {
++				function = "i2s0";
++				groups = "i2s0_0_grp", "i2s0_1_grp";
++			};
++		};
++	};
++
++List of supported functions and groups in Cygnus:
++
++"i2s0": "i2s0_0_grp", "i2s0_1_grp"
++
++"i2s1": "i2s1_0_grp", "i2s1_1_grp"
++
++"i2s2": "i2s2_0_grp", "i2s2_1_grp", "i2s2_2_grp", "i2s2_3_grp", "i2s2_4_grp"
++
++"spdif": "spdif_grp"
++
++"pwm0": "pwm0_grp"
++
++"pwm1": "pwm1_grp"
++
++"pwm2": "pwm2_grp"
++
++"pwm3": "pwm3_grp"
++
++"pwm4": "pwm4_grp"
++
++"pwm5": "pwm5_grp"
++
++"key": "key0_grp", "key1_grp", "key2_grp", "key3_grp", "key4_grp", "key5_grp",
++"key6_grp", "key7_grp", "key8_grp", "key9_grp", "key10_grp", "key11_grp",
++"key12_grp", "key13_grp", "key14_grp", "key15_grp"
++
++"audio_dte": "audio_dte0_grp", "audio_dte1_grp", "audio_dte2_grp", "audio_dte3_grp"
++
++"smart_card0": "smart_card0_grp", "smart_card0_fcb_grp"
++
++"smart_card1": "smart_card1_grp", "smart_card1_fcb_grp"
++
++"spi0": "spi0_grp"
++
++"spi1": "spi1_grp"
++
++"spi2": "spi2_grp"
++
++"spi3": "spi3_grp"
++
++"spi4": "spi4_0_grp", "spi4_1_grp"
++
++"spi5": "spi5_grp"
++
++"sw_led0": "sw_led0_0_grp", "sw_led0_1_grp"
++
++"sw_led1": "sw_led1_grp"
++
++"sw_led2": "sw_led2_0_grp", "sw_led2_1_grp"
++
++"d1w": "d1w_grp"
++
++"lcd": "lcd_grp"
++
++"sram": "sram_0_grp", "sram_1_grp"
++
++"uart0": "uart0_grp"
++
++"uart1": "uart1_grp", "uart1_dte_grp"
++
++"uart2": "uart2_grp"
++
++"uart3": "uart3_grp"
++
++"uart4": "uart4_grp"
++
++"qspi": "qspi_0_grp", "qspi_1_grp"
++
++"nand": "nand_grp"
++
++"sdio0": "sdio0_grp", "sdio0_cd_grp", "sdio0_mmc_grp"
++
++"sdio1": "sdio1_data_0_grp", "sdio1_data_1_grp", "sdio1_cd_grp",
++"sdio1_led_grp", "sdio1_mmc_grp"
++
++"can0": "can0_grp"
++
++"can1": "can1_grp"
++
++"cam": "cam_led_grp", "cam_0_grp", "cam_1_grp"
++
++"bsc1": "bsc1_grp"
++
++"pcie_clkreq": "pcie_clkreq_grp"
++
++"usb0_oc": "usb0_oc_grp"
++
++"usb1_oc": "usb1_oc_grp"
++
++"usb2_oc": "usb2_oc_grp"
 -- 
 1.7.9.5
