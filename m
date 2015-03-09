@@ -1,96 +1,41 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 9 Mar 2015 10:12:05 +0000
-Subject: [PATCH 1/2] arm64: juno: Add APB registers and LEDs using syscon
-In-Reply-To: <CACRpkdZq9n1+3sBi3g-ZTa9TaC3_PsO3ecox2gu7Vq-0rouXxw@mail.gmail.com>
-References: <1424866589-2988-1-git-send-email-linus.walleij@linaro.org>
- <20150225135512.GE12377@arm.com>
- <20150225144756.GA905@e106497-lin.cambridge.arm.com>
- <20150225150023.GJ12377@arm.com>
- <20150225151157.GC905@e106497-lin.cambridge.arm.com>
- <CACRpkdYd7ZOMt1QxhCxzhavhcd8wcWrC2j1Ce5eGP9piX=xwkQ@mail.gmail.com>
- <20150227140600.GZ905@e106497-lin.cambridge.arm.com>
- <CACRpkdZq9n1+3sBi3g-ZTa9TaC3_PsO3ecox2gu7Vq-0rouXxw@mail.gmail.com>
-Message-ID: <20150309101205.GY16268@e106497-lin.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 9 Mar 2015 11:13:54 +0100
+Subject: [PATCH v2 1/2] ARM: dts: sun7i: Add dts file for Wexler TAB7200
+In-Reply-To: <1425815853-5759-1-git-send-email-mamlinav@gmail.com>
+References: <1425456947-4152-1-git-send-email-mamlinav@gmail.com>
+ <1425815853-5759-1-git-send-email-mamlinav@gmail.com>
+Message-ID: <20150309101354.GP5085@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 07, 2015 at 10:24:08PM +0000, Linus Walleij wrote:
-> On Fri, Feb 27, 2015 at 3:06 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > On Fri, Feb 27, 2015 at 01:07:42PM +0000, Linus Walleij wrote:
+On Sun, Mar 08, 2015 at 02:57:33PM +0300, Aleksei Mamlin wrote:
+> This patch add support for Wexler TAB7200 tablet.
 > 
-> >> Notice that the SD card slot is *ALSO* inside the box, do you mean we
-> >> should then also delete the uSD card support added in
-> >> commit 71f867ec130e3cc8e692366fdf8941ded27c727e
-> >> by yourself because the SD card slot is not reachable?
-> >> Notice that to access that card slot you even have to remove the
-> >> nice blue ARM boilerplate.
-> >
-> > That's not my view. I have a mobile phone with an uSD card slot, but I have to take
-> > the cover off (and the battery) to access it. It doesn't mean I should not be able
-> > to use it from kernel side because of that, only that the designer of the phone
-> > (and of the Juno board + box by extension) did not expect people to use it with
-> > covers off all the time.
-> >
-> > <virtual-tongue-in-cheek-on>
-> > I fail to see why you need to remove the SD card all the time. Surely opening
-> > the case once to put the uSD card in is enough? ;)
-> > </virtual-tongue-in-cheek-on>
-> >
-> >>
-> >> The board is obviously designed to be reachable and the top part
-> >> of the case is obviously designed to be taken off by professional
-> >> users.
-> >
-> > I'm mostly on your side, Linus, I was just looking for more use cases. Like I've said,
-> > most of our customers seem to keep the case closed (or at least that is what they tell
-> > us :) ) so I'm looking for explanations on how you use the LEDs (visual debugging for
-> > big-LITTLE was how Lorenzo was using them on TC2 for example).
-Linus, 
-
+> The Wexler TAB7200 is a A20 based tablet with 7 inch display(800x480),
+> capacitive touchscreen(5 fingers), 1G RAM, 4G NAND, micro SD card slot,
+> mini HDMI port, 3.5mm audio plug, 1 USB OTG port and 1 USB 2.0 port.
 > 
-> OK now I feel bad and maybe I was not in such a good mood that day.
+> Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
+> ---
+> Changes since v1:
+> * Split to two patches:
+>   The first one adds dts file for Wexler TAB7200.
+>   The second one adds vendor-prefix for Wexler.
+> * Remove include dt-bindings/pinctrl/sun4i-a10.h because we don't use
+>   the pinctrl header.
 
-Don't worry, I actually found it amusing.
+Applied the two patches, thanks!
 
-> 
-> The LEDs I added are really useful on the other ARM reference designs,
-> the heartbeat gives a sign that the system is alive even if your console is
-> not working and that's what I appreaciate a lot about it (the
-> heartbeat intensity
-> also indicates system load).
-> 
-> The MMC read/write LED is as useful as the hard disk activity LED on
-> some older PCs, kinda nice if you want to know something is going on.
-> 
-> The rest of the LEDs show which CPU cores are active. This was the
-> original use of the LEDs on the RealView PB11MPcore and it was
-> appreciated by the multicore developers who could see the different
-> CPUs being busy with tasks.
-
-In that case you might want to use the remaining 2 leds for cpus 4 and 5,
-as Juno has a total of 6 cores. Your current patch leaves two LEDs unassigned.
-
-> 
-> LEDs on development boards are real nice, simply, and I think also
-> some deployed ARM64 server systems will have them.
-
-Agree on LEDs being nice. I'm guessing that on server side if you want blinking lights
-you need ACPI? ;)
-
-Best regards,
-Liviu
-
-> 
-> Yours,
-> Linus Walleij
-> 
+Maxime
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150309/e0f8093d/attachment.sig>
