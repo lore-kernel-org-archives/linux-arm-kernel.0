@@ -1,66 +1,91 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 9 Mar 2015 23:17:52 +0100
-Subject: [PATCH v2 04/18] clocksource: Add ARM System timer driver
-In-Reply-To: <1425935552.4244.6.camel@x220>
-References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1424455277-29983-5-git-send-email-mcoquelin.stm32@gmail.com>
- <20150220195437.GT19388@pengutronix.de>
- <1424468908.24292.10.camel@x220>
- <CALszF6Bm_Y4ZLednjpmP-hMix3gA23FwLm5hViEjr1QojUY+Mg@mail.gmail.com>
- <1425411786.2606.24.camel@tiscali.nl>
- <CALszF6AEThPrRe7c7nJ6q7yb2fhLMFuHJUV10sf=w0TMcqVVaw@mail.gmail.com>
- <1425935552.4244.6.camel@x220>
-Message-ID: <20150309221752.GE7525@pengutronix.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 09 Mar 2015 15:34:06 -0700
+Subject: [PATCH v2 4/6] clk: at91: implement suspend/resume for the PMC
+ irqchip
+In-Reply-To: <1425287898-15093-5-git-send-email-boris.brezillon@free-electrons.com>
+References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1425287898-15093-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150309223406.14952.5669@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Mon, Mar 09, 2015 at 10:12:32PM +0100, Paul Bolle wrote:
-> On Wed, 2015-03-04 at 13:08 +0100, Maxime Coquelin wrote:
-> > This is because I added also support for COMPILE_TEST coverage as per
-> > Uwe advice,
-> > and thought it was necessary to have an entry for this.
-> > Maybe I'm just wrong?
+Quoting Boris Brezillon (2015-03-02 01:18:16)
+> The irq line used by the PMC block is shared with several peripherals
+> including the init timer which is registering its handler with
+> IRQF_NO_SUSPEND.
+> Implement the appropriate suspend/resume callback for the PMC irqchip,
+> and inform irq core that PMC irq handler can be safely called while
+> the system is suspended by setting IRQF_COND_SUSPEND.
 > 
-> I missed that you added COMPILE_TEST.
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+Looks OK to me. I'm not picking it due to the dependency you listed in
+the cover letter.
+
+Regards,
+Mike
+
+> ---
+>  drivers/clk/at91/pmc.c | 20 +++++++++++++++++++-
+>  drivers/clk/at91/pmc.h |  1 +
+>  2 files changed, 20 insertions(+), 1 deletion(-)
 > 
-> A quick scan of your idea doesn't show any obvious issues. (Note that I
-> don't really know how people actually use COMPILE_TEST. I guess things
-> like "make allyesconfig" are involved.)
-Maybe this can clearify the purpose of COMPILE_TEST:
-
-diff --git a/init/Kconfig b/init/Kconfig
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -67,6 +67,26 @@ config COMPILE_TEST
- 	  here. If you are a user/distributor, say N here to exclude useless
- 	  drivers to be distributed.
- 
-+	# If you are a driver author consider to adjust your driver's
-+	# dependencies to make it buildable with minimal preconditions if
-+	# COMPILE_TEST is enabled. This helps contributers and maintainers
-+	# that might not have the necessary toolchain or kernel config handy and
-+	# also increases compile test coverage. It's your advantage if others can
-+	# build your driver more easily! So for a device that is only found on the
-+	# foo cpu use:
-+	#
-+	# 	depends on CPU_FOO || COMPILE_TEST
-+	#
-+	# . You might have to use
-+	#
-+	# 	depends on CPU_FOO || (COMPILE_TEST && COOKIE)
-+	#
-+	# or
-+	#
-+	#	depends on COOKIE && (CPU_FOO || COMPILE_TEST)
-+	#
-+	# if your driver uses features that are only available if COOKIE is on.
-+
- config LOCALVERSION
- 	string "Local version - append to kernel release"
- 	help
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+> index f07c815..3f27d21 100644
+> --- a/drivers/clk/at91/pmc.c
+> +++ b/drivers/clk/at91/pmc.c
+> @@ -89,12 +89,29 @@ static int pmc_irq_set_type(struct irq_data *d, unsigned type)
+>         return 0;
+>  }
+>  
+> +static void pmc_irq_suspend(struct irq_data *d)
+> +{
+> +       struct at91_pmc *pmc = irq_data_get_irq_chip_data(d);
+> +
+> +       pmc->imr = pmc_read(pmc, AT91_PMC_IMR);
+> +       pmc_write(pmc, AT91_PMC_IDR, pmc->imr);
+> +}
+> +
+> +static void pmc_irq_resume(struct irq_data *d)
+> +{
+> +       struct at91_pmc *pmc = irq_data_get_irq_chip_data(d);
+> +
+> +       pmc_write(pmc, AT91_PMC_IER, pmc->imr);
+> +}
+> +
+>  static struct irq_chip pmc_irq = {
+>         .name = "PMC",
+>         .irq_disable = pmc_irq_mask,
+>         .irq_mask = pmc_irq_mask,
+>         .irq_unmask = pmc_irq_unmask,
+>         .irq_set_type = pmc_irq_set_type,
+> +       .irq_suspend = pmc_irq_suspend,
+> +       .irq_resume = pmc_irq_resume,
+>  };
+>  
+>  static struct lock_class_key pmc_lock_class;
+> @@ -224,7 +241,8 @@ static struct at91_pmc *__init at91_pmc_init(struct device_node *np,
+>                 goto out_free_pmc;
+>  
+>         pmc_write(pmc, AT91_PMC_IDR, 0xffffffff);
+> -       if (request_irq(pmc->virq, pmc_irq_handler, IRQF_SHARED, "pmc", pmc))
+> +       if (request_irq(pmc->virq, pmc_irq_handler,
+> +                       IRQF_SHARED | IRQF_COND_SUSPEND, "pmc", pmc))
+>                 goto out_remove_irqdomain;
+>  
+>         return pmc;
+> diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
+> index 52d2041..69abb08 100644
+> --- a/drivers/clk/at91/pmc.h
+> +++ b/drivers/clk/at91/pmc.h
+> @@ -33,6 +33,7 @@ struct at91_pmc {
+>         spinlock_t lock;
+>         const struct at91_pmc_caps *caps;
+>         struct irq_domain *irqdomain;
+> +       u32 imr;
+>  };
+>  
+>  static inline void pmc_lock(struct at91_pmc *pmc)
+> -- 
+> 1.9.1
+> 
